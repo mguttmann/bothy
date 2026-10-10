@@ -1203,7 +1203,8 @@ paths:
       description: |-
         The DPoP proof must use the device key of the session. Reuse of an already rotated token revokes
         the token family and the session (`session_revoked`), except within `auth.refresh_reuse_grace`
-        with the same key.
+        with the same key. In maintenance mode (`server.maintenance_mode = read_only`, ADR 0065) the
+        server issues a new access token and returns the same refresh token, without rotation.
       x-authz-action: auth.token.refresh
       x-rate-limit-class: rl.public_auth
       x-idempotency-exempt: auth_flow
@@ -3471,7 +3472,7 @@ paths:
               default:
                 summary: Request
                 value:
-                  client_component: notification_ext
+                  client_component: share_ext
       responses:
         '201':
           description: Created.
@@ -3500,7 +3501,7 @@ paths:
                       user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                       device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
                       auth_method: oidc
-                      client_component: notification_ext
+                      client_component: share_ext
                       created_at: '2026-10-10T09:30:00.000Z'
                       expires_at: '2026-10-10T09:30:00.000Z'
                     device:
@@ -6653,6 +6654,69 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /channels/{channel_id}/tags/{tag_id}/move:
+    post:
+      operationId: moveForumTag
+      summary: Change the position of a forum tag
+      tags: [Channels]
+      description: Sets `sort_key` relative to sibling tags of the same forum; bumps the channel version and writes `channel.updated` like every tag change (03 `forum_tags`).
+      x-authz-action: forum_tag.manage
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      - $ref: '#/components/parameters/TagIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MovePosition'
+            examples:
+              default:
+                summary: Request
+                value: {}
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForumTag'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7f24-8f76-a5de0ed16c6f
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    name: bug
+                    color: rowan
+                    sort_key: a0
+                    restricted: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /channels/{channel_id}/templates:
     get:
       operationId: listTemplates
@@ -7293,7 +7357,7 @@ paths:
                     items:
                     - id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                      kind: main
+                      kind: thread
                       title: Invoice export fails
                       title_source: auto
                       state: open
@@ -7358,7 +7422,7 @@ paths:
                     thread:
                       id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                      kind: main
+                      kind: thread
                       title: Invoice export fails
                       title_source: auto
                       state: open
@@ -7391,7 +7455,7 @@ paths:
                     thread:
                       id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                      kind: main
+                      kind: thread
                       title: Invoice export fails
                       title_source: auto
                       state: open
@@ -7450,7 +7514,7 @@ paths:
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                    kind: main
+                    kind: thread
                     title: Invoice export fails
                     title_source: auto
                     state: open
@@ -7518,7 +7582,7 @@ paths:
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                    kind: main
+                    kind: thread
                     title: Invoice export fails
                     title_source: auto
                     state: open
@@ -7578,7 +7642,7 @@ paths:
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                    kind: main
+                    kind: thread
                     title: Invoice export fails
                     title_source: auto
                     state: open
@@ -7636,7 +7700,7 @@ paths:
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                    kind: main
+                    kind: thread
                     title: Invoice export fails
                     title_source: auto
                     state: open
@@ -7704,8 +7768,8 @@ paths:
                   summary: Response
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
-                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                    kind: main
+                    channel_id: 0192f4a0-7b1c-77d1-8cf4-a695a7985d2f
+                    kind: thread
                     title: Invoice export fails
                     title_source: auto
                     state: open
@@ -7715,7 +7779,8 @@ paths:
                     created_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                     created_at: '2026-10-10T09:30:00.000Z'
                     version: 3
-                    tag_ids: [0192f4a0-7b1c-712d-8017-1dad64203598]
+                    moved_at: '2026-10-10T09:30:00.000Z'
+                    tag_ids: []
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -7776,7 +7841,7 @@ paths:
                   value:
                     id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                    kind: main
+                    kind: thread
                     title: Invoice export fails
                     title_source: auto
                     state: open
@@ -9879,10 +9944,15 @@ paths:
       tags: [Files]
       description: |-
         Answers 200 with the bytes (supports `Range`); there are no presigned GET URLs (ADR 0048).
-        Media players without DPoP use a ticket (`createFileTicket`). 409 `file_not_ready` while
-        the scan is pending; infected files give 404.
+        Media players without DPoP use a ticket (`createFileTicket`) in the query parameter `ticket`
+        instead of `Authorization`. 409 `file_not_ready` while the scan is pending, 409 `file_blocked`
+        for blocked or failed files; without read access always 404 (12, 9.3).
       x-authz-action: file.read
       x-rate-limit-class: rl.read
+      security:
+      - dpopAuth: []
+      - bearerAuth: []
+      - fileTicket: []
       parameters:
       - $ref: '#/components/parameters/FileIdPath'
       responses:
@@ -9922,8 +9992,13 @@ paths:
       operationId: downloadThumbnail
       summary: Download a thumbnail
       tags: [Files]
+      description: Accepts a fetch ticket in the query parameter `ticket` like `downloadFile` (push preview `image_url`, ADR 0048). 409 `file_not_ready` or `file_blocked` as for `downloadFile`.
       x-authz-action: file.read
       x-rate-limit-class: rl.read
+      security:
+      - dpopAuth: []
+      - bearerAuth: []
+      - fileTicket: []
       parameters:
       - $ref: '#/components/parameters/FileIdPath'
       - $ref: '#/components/parameters/VariantPath'
@@ -9950,6 +10025,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -10018,6 +10095,7 @@ paths:
       operationId: getTranscript
       summary: Read the transcript of a voice message
       tags: [Files]
+      description: 409 `file_not_ready` or `file_blocked` as for `downloadFile`; without read access always 404 (12, 9.3).
       x-authz-action: file.read
       x-rate-limit-class: rl.read
       parameters:
@@ -10052,6 +10130,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -10451,6 +10531,9 @@ paths:
                     - id: 0192f4a0-7b1c-7f2d-8106-461e390824dc
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                       version: 3
+                    features:
+                    - key: dm.enabled
+                      enabled: false
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -10477,6 +10560,11 @@ paths:
           format: int64
           minimum: 0
         required: true
+      - name: epoch
+        in: query
+        description: Sync epoch stored with the cursor (04 section 7.5). A different epoch answers `410 resync_required` with `reason = epoch_changed`. Absent only before the first catch-up; then `cursor_ahead` is the second net (R-SY-04).
+        schema:
+          $ref: '#/components/schemas/Uuid'
       - name: limit
         in: query
         description: At most `sync.catchup_page_size`.
@@ -11126,14 +11214,19 @@ paths:
                 value:
                   platform: ios
                   app_version: 1.4.0
+                  density: touch
                   metrics:
-                  - name: client.thread_open_ms
+                  - name: client.thread_open.duration
                     kind: histogram
                     buckets:
-                    - le: 100
+                    - le: 0.1
                       count: 12
-                    - le: 250
+                    - le: 0.25
                       count: 3
+                  - name: client.reconnects
+                    kind: counter
+                    close_code: 4009
+                    value: 1
       responses:
         '202':
           description: Accepted.
@@ -16455,9 +16548,16 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
                     kind: message
+                    id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: message.created
                   payload:
                     message:
@@ -16547,9 +16647,16 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
                     kind: message
+                    id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: message.updated
                   payload:
                     message:
@@ -16639,9 +16746,16 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
                     kind: message
+                    id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                    version: 4
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: message.deleted
                   payload:
                     message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
@@ -16684,9 +16798,15 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
                     kind: message
+                    id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: reaction.added
                   payload:
                     message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
@@ -16730,9 +16850,15 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
                     kind: message
+                    id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: reaction.removed
                   payload:
                     message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
@@ -16776,9 +16902,15 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
                     kind: message
+                    id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: pin.added
                   payload:
                     pin:
@@ -16822,9 +16954,15 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
                     kind: message
+                    id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: pin.removed
                   payload:
                     pin:
@@ -16868,15 +17006,22 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
-                    kind: message
+                    kind: thread
+                    id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: thread.created
                   payload:
                     thread:
                       id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                      kind: main
+                      kind: thread
                       title: Invoice export fails
                       title_source: auto
                       state: open
@@ -16923,15 +17068,22 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
-                    kind: message
+                    kind: thread
+                    id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: thread.updated
                   payload:
                     thread:
                       id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                      kind: main
+                      kind: thread
                       title: Invoice export fails
                       title_source: auto
                       state: open
@@ -16978,15 +17130,22 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
-                    kind: message
+                    kind: thread
+                    id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: thread.closed
                   payload:
                     thread:
                       id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                      kind: main
+                      kind: thread
                       title: Invoice export fails
                       title_source: auto
                       state: open
@@ -17033,15 +17192,22 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
-                    kind: message
+                    kind: thread
+                    id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: thread.reopened
                   payload:
                     thread:
                       id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                      kind: main
+                      kind: thread
                       title: Invoice export fails
                       title_source: auto
                       state: open
@@ -17088,15 +17254,22 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
-                    kind: message
+                    kind: thread
+                    id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: thread.moved
                   payload:
                     thread:
                       id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
-                      kind: main
+                      kind: thread
                       title: Invoice export fails
                       title_source: auto
                       state: open
@@ -17106,7 +17279,8 @@ webhooks:
                       created_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                       created_at: '2026-10-10T09:30:00.000Z'
                       version: 3
-                      tag_ids: [0192f4a0-7b1c-712d-8017-1dad64203598]
+                      moved_at: '2026-10-10T09:30:00.000Z'
+                      tag_ids: []
                     from_channel_id: 0192f4a0-7b1c-745e-8621-aacfb6cd0aad
       responses:
         '204':
@@ -17144,9 +17318,14 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                   resource:
-                    kind: message
+                    kind: channel
+                    id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: thread.moved_out
                   payload:
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -17187,9 +17366,15 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
-                    kind: message
+                    kind: thread
+                    id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: agent_session.changed
                   payload:
                     thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
@@ -17241,9 +17426,16 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
-                    kind: message
+                    kind: run
+                    id: 0192f4a0-7b1c-767f-8292-c1b14d7d40df
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: run.state_changed
                   payload:
                     run:
@@ -17297,9 +17489,14 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                   resource:
-                    kind: message
+                    kind: space
+                    id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: space.created
                   payload:
                     space:
@@ -17344,9 +17541,14 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                   resource:
-                    kind: message
+                    kind: space
+                    id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: space.updated
                   payload:
                     space:
@@ -17391,9 +17593,14 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                   resource:
-                    kind: message
+                    kind: space
+                    id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: space.archived
                   payload:
                     space:
@@ -17438,9 +17645,15 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                   resource:
-                    kind: message
+                    kind: channel
+                    id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: channel.created
                   payload:
                     channel:
@@ -17491,9 +17704,15 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                   resource:
-                    kind: message
+                    kind: channel
+                    id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: channel.updated
                   payload:
                     channel:
@@ -17544,9 +17763,14 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                   resource:
-                    kind: message
+                    kind: channel
+                    id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: channel.settings_changed
                   payload:
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
@@ -17587,9 +17811,15 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                   resource:
-                    kind: message
+                    kind: channel
+                    id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: channel.archived
                   payload:
                     channel:
@@ -17640,9 +17870,13 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
+                  permission_version: 418
                   scope: {}
                   resource:
-                    kind: message
+                    kind: command
+                    id: 0192f4a0-7b1c-7beb-80fc-f336f4fe79aa
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: command.changed
                   payload:
                     command:
@@ -17696,9 +17930,12 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
+                  permission_version: 418
                   scope: {}
                   resource:
-                    kind: message
+                    kind: file
+                    id: 0192f4a0-7b1c-75c7-88f6-199cc394b56a
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: file.updated
                   payload:
                     file:
@@ -17753,9 +17990,12 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
+                  permission_version: 418
                   scope: {}
                   resource:
-                    kind: message
+                    kind: user
+                    id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: user.updated
                   payload:
                     user:
@@ -17801,9 +18041,13 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
+                  permission_version: 418
                   scope: {}
                   resource:
-                    kind: message
+                    kind: agent
+                    id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                    version: 3
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: agent.updated
                   payload:
                     agent:
@@ -17855,9 +18099,11 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
+                  permission_version: 418
                   scope: {}
                   resource:
-                    kind: message
+                    kind: instance
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: instance.updated
                   payload:
                     changed_keys: [branding.product_name]
@@ -17897,9 +18143,11 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
+                  permission_version: 418
                   scope: {}
                   resource:
-                    kind: message
+                    kind: instance
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: status.updated
                   payload:
                     overall_state: operational
@@ -17939,9 +18187,13 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
+                  permission_version: 418
+                  audience: self
                   scope: {}
                   resource:
-                    kind: message
+                    kind: principal
+                    id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: access.changed
                   payload:
                     permission_version: 418
@@ -18107,9 +18359,15 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
                   resource:
-                    kind: message
+                    kind: interaction
+                    id: 0192f4a0-7b1c-77f5-8fe4-151103a7b8b5
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: interaction.created
                   payload:
                     interaction:
@@ -18158,9 +18416,14 @@ webhooks:
                   seq: 5301
                   schema_version: 1
                   occurred_at: '2026-10-10T09:30:00.000Z'
-                  scope: {}
+                  permission_version: 418
+                  scope:
+                    space_id: 0192f4a0-7b1c-7881-8522-0a58634abc14
+                    channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                   resource:
-                    kind: message
+                    kind: command
+                    id: 0192f4a0-7b1c-7beb-80fc-f336f4fe79aa
+                  sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                   type: command.invoked
                   payload:
                     invocation_id: 0192f4a0-7b1c-712e-8ccb-17c85f8d11c9
@@ -18202,6 +18465,14 @@ components:
       description: |-
         API token of an agent, app or personal tool without key binding (`Authorization: Bearer
         <token>`).
+    fileTicket:
+      type: apiKey
+      in: query
+      name: ticket
+      description: |-
+        Short-lived fetch ticket from `createFileTicket` for media players that cannot send a DPoP
+        proof (12, 9.2; ADR 0048). Only `downloadFile` and `downloadThumbnail` accept it; every fetch
+        checks signature, expiry, session and `file.read`, and any failure gives 404.
   parameters:
     Cursor:
       name: cursor
@@ -19023,7 +19294,7 @@ components:
       - code: malformed_request
         status: 400
         title: 'Malformed request'
-        description: 'The body is not valid JSON or has the wrong media type.'
+        description: 'The body is not valid JSON, has a duplicate member name, invalid UTF-8 or nesting deeper than `http.max_json_depth` (SEC-IN-2).'
         client_action: 'Programming error; do not retry.'
       - code: cursor_invalid
         status: 400
@@ -19171,6 +19442,11 @@ components:
         title: 'File not ready'
         description: 'Upload incomplete or scan still running.'
         client_action: 'Wait for `file.updated`.'
+      - code: file_blocked
+        status: 409
+        title: 'File blocked'
+        description: 'The file is never delivered: malware found, scan error or failed upload (12, 9.3).'
+        client_action: 'Show the file as blocked; do not retry.'
       - code: title_manual
         status: 409
         title: 'Title set manually'
@@ -19264,7 +19540,7 @@ components:
         instance:
           type: string
           format: uri-reference
-          description: Request path of this occurrence.
+          description: Request path of this occurrence without query string. Path parameters that carry a secret (the `token` of `postIncomingWebhook`) appear as their template, e.g. `{token}`.
           examples: [/api/v1/threads/0192f4a0-7b1c-7000-8a00-000000000301]
         code:
           type: string
@@ -19909,7 +20185,7 @@ components:
       properties:
         client_component:
           type: string
-          enum: [notification_ext, share_ext]
+          enum: [share_ext]
     WebAuthnChallenge:
       type: object
       required: [challenge_id, public_key, expires_at]
@@ -20399,7 +20675,7 @@ components:
           enum: [oidc, trusted_header, passkey, password_totp, enrollment_code, device_pairing]
         client_component:
           type: string
-          enum: [app, notification_ext, share_ext, console]
+          enum: [app, share_ext, console]
         created_at:
           $ref: '#/components/schemas/Timestamp'
         expires_at:
@@ -20983,6 +21259,7 @@ components:
           examples: [tickets]
         topic:
           type: string
+          description: At most `channel.topic_max_chars` characters, no control or bidi characters.
         forum_default_sort:
           $ref: '#/components/schemas/ForumSort'
         after_channel_id:
@@ -20996,6 +21273,7 @@ components:
           examples: [tickets]
         topic:
           type: string
+          description: At most `channel.topic_max_chars` characters, no control or bidi characters.
         forum_default_sort:
           $ref: '#/components/schemas/ForumSort'
         default_notification_level:
@@ -21241,6 +21519,10 @@ components:
           examples: [bug]
         color:
           type: string
+          description: Key of a category color of the design system, never a hex value.
+        clear_color:
+          type: boolean
+          description: Removes the color; not together with `color`. There is no JSON null (R-API-03).
         restricted:
           type: boolean
     ForumTagList:
@@ -21291,9 +21573,10 @@ components:
           $ref: '#/components/schemas/Uuid'
         operator_agent_id:
           $ref: '#/components/schemas/Uuid'
+          description: Fixed operator of a thread of kind `thread` (R-DM-12). Absent for the main thread (`kind = main`, R-DM-21) and for threads without operator; clients then use `Channel.operator.effective_agent_id`.
         billing_mode:
           $ref: '#/components/schemas/BillingMode'
-          description: Current policy of the operator agent, for the header badge.
+          description: Current policy of `operator_agent_id`, for the header badge; absent exactly when `operator_agent_id` is absent. Changes arrive with `agent.updated`.
         last_message_seq:
           type: integer
           format: int64
@@ -21331,6 +21614,7 @@ components:
           $ref: '#/components/schemas/Uuid'
         tag_ids:
           type: array
+          description: Forum posts only; at most `thread.max_tags`. Restricted tags need `manage`, as with `setThreadTags`.
           items:
             $ref: '#/components/schemas/Uuid'
         first_message:
@@ -21366,6 +21650,7 @@ components:
       properties:
         tag_ids:
           type: array
+          description: Complete set, at most `thread.max_tags`, without duplicates.
           items:
             $ref: '#/components/schemas/Uuid'
     AgentSession:
@@ -21499,6 +21784,7 @@ components:
           examples: ['@support-agent the invoice export fails since this morning.']
         content_format:
           type: integer
+          description: Version of the Markdown dialect; `1` is CommonMark 0.31.2 without raw HTML, with mention tokens (03 `messages`).
           examples: [1]
         content_truncated:
           type: boolean
@@ -21522,6 +21808,7 @@ components:
             $ref: '#/components/schemas/Attachment'
         mention_ids:
           type: array
+          description: Principals resolved from the mention tokens of `content_md`, sorted. Clients render a token as a mention only for these.
           items:
             $ref: '#/components/schemas/Uuid'
         reactions:
@@ -21569,7 +21856,7 @@ components:
             $ref: '#/components/schemas/Uuid'
         mention_ids:
           type: array
-          description: Mentioned principals; must match the mentions in `content_md`.
+          description: Optional check. The server resolves mentions from `content_md` (03 `messages`, content format; 07 section 4.6); when present, the set must equal the resolved set, else `400 validation_failed` with code `mention_mismatch`.
           items:
             $ref: '#/components/schemas/Uuid'
         silent:
@@ -21586,6 +21873,7 @@ components:
             $ref: '#/components/schemas/ComponentCreate'
     MessageUpdate:
       type: object
+      description: The server resolves the mentions of the resulting content again; `mention_ids` is an optional check as in `MessageCreate`.
       properties:
         content_md:
           type: string
@@ -22321,6 +22609,7 @@ components:
       - agents
       - settings
       - drafts
+      - features
       - sync_epoch
       properties:
         head_seq:
@@ -22371,6 +22660,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/DraftRef'
+        features:
+          type: array
+          description: Feature flags evaluated for the principal, as in `InstanceInfo.features` (04 section 6.3, step 4).
+          items:
+            $ref: '#/components/schemas/EvaluatedFlag'
     Agent:
       type: object
       required:
@@ -23996,13 +24290,14 @@ components:
       properties:
         platform:
           type: string
-          enum: [ios, android, macos, windows, linux, web]
+          enum: [ios, android, macos, windows, web]
         app_version:
           type: string
           examples: [1.4.0]
         density:
           type: string
-          enum: [compact, comfortable]
+          enum: [comfortable, compact, touch]
+          description: Mobile apps always send `touch` (01, section 11).
         theme:
           type: string
           enum: [light, dark]
@@ -24017,10 +24312,18 @@ components:
       properties:
         name:
           type: string
-          examples: [client.thread_open_ms]
+          description: |-
+            One name of the closed list in docs/observability/signals.md section 4.6a: `client.cold_start.duration`, `client.thread_open.duration`, `client.send_local.duration`, `client.frames`, `client.frames.over_budget`, `client.catchup.duration`, `client.catchup.events`, `client.resync`, `client.reconnects`, `client.outbox.depth`, `client.push_display.duration`, `client.push.placeholder`. Not an enum on purpose: the server drops an entry with an unknown name, or with a `kind` that does not match the type of its name, one by one and still accepts the rest of the batch, so a newer app does not lose its batch against an older server.
+          pattern: '^client\.[a-z_.]+$'
+          maxLength: 64
+          examples: [client.thread_open.duration]
         kind:
           type: string
           enum: [histogram, counter, gauge]
+        close_code:
+          type: integer
+          description: Only for `client.reconnects`; a close code of 04 section 6.4.
+          examples: [4009]
         value:
           type: number
           format: double
@@ -24365,8 +24668,8 @@ components:
       type: object
       description: |
         Common envelope of every event. Each event schema adds `type` and its `payload`.
-        Durable events carry `seq` and `permission_version`; ephemeral events carry neither. Delivery-only members (`invocation_token`, `redelivered`)
-        are set per delivery and never stored in the event log.
+        Durable events carry `seq` and `permission_version`; ephemeral events carry neither. Delivery-only members (`invocation_token`, `redelivered`,
+        `sync_epoch`) are set per delivery and never stored in the event log.
       required: [id, schema_version, occurred_at, scope, resource]
       properties:
         id:
@@ -24412,6 +24715,9 @@ components:
         redelivered:
           type: boolean
           description: Set on redelivery to an agent consumer after `agent.ack_timeout`.
+        sync_epoch:
+          $ref: '#/components/schemas/Uuid'
+          description: Delivery-only member of outgoing webhooks; the time line of the event log (04, 7.5; ADR 0059). A receiver that sees a new epoch resets its `seq` state.
     MessagePayload:
       type: object
       required: [message]
@@ -25077,7 +25383,7 @@ components:
       properties:
         thread_ids:
           type: array
-          description: Complete set of focused threads; replaces the previous set.
+          description: Complete set of focused threads; replaces the previous set. More than `sync.max_focused_threads` ids answer `error` with `validation_failed` and keep the previous set.
           items:
             $ref: '#/components/schemas/Uuid'
         idle:

@@ -33,7 +33,7 @@ channels:
   gateway:
     address: /gateway
     title: Gateway
-    description: One connection per device or agent consumer. Close codes are listed in `x-close-codes`.
+    description: One connection per device (a newer one closes the older with `4017`) or agent consumer (`4015`). Close codes are listed in `x-close-codes`. A failing op answers `error` with a problem code and keeps the connection.
     messages:
       op.identify:
         $ref: '#/components/messages/op.identify'
@@ -216,7 +216,7 @@ channels:
       client_action: show the app update note, do not reconnect
     - code: 4008
       name: rate_limited
-      client_action: wait for the time given in the close reason
+      client_action: 'only `rl.gateway_connect` at `identify` and `resume`: wait for the time given in the close reason'
     - code: 4009
       name: heartbeat_timeout
       client_action: reconnect with backoff, try `resume`
@@ -231,13 +231,16 @@ channels:
       client_action: reconnect at once with a random delay, try `resume`
     - code: 4014
       name: slow_consumer
-      client_action: reconnect, catch up from the cursor
+      client_action: 'outbound queue full or write deadline `gateway.write_timeout` missed: reconnect, catch up from the cursor'
     - code: 4015
       name: consumer_replaced
       client_action: 'agents only: another process took over the same consumer; do not reconnect'
     - code: 4016
       name: device_pending
       client_action: 'device pending approval: do not reconnect until `GET /api/v1/devices/{id}` reports state `active`'
+    - code: 4017
+      name: device_replaced
+      client_action: 'a newer connection of the same device is active: do not reconnect on your own, only when the app returns to the foreground or on user action'
 
 operations:
   receive.identify:
@@ -304,7 +307,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/gateway'
-    summary: The person types in a thread.
+    summary: The person types in a thread. People only; agents show typing through their run (04 section 12).
     messages:
     - $ref: '#/channels/gateway/messages/op.typing.start'
     x-authz-action: typing.start
@@ -313,7 +316,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/gateway'
-    summary: The person stopped typing.
+    summary: The person stopped typing. No event is sent; the op only resets the throttle of the connection.
     messages:
     - $ref: '#/channels/gateway/messages/op.typing.stop'
     x-authz-action: typing.start
@@ -394,7 +397,7 @@ operations:
     action: send
     channel:
       $ref: '#/channels/gateway'
-    summary: Catch-up impossible; load `GET /sync/snapshot`.
+    summary: Catch-up impossible; load `GET /sync/snapshot`. The connection stays open and is live from `head_seq`.
     messages:
     - $ref: '#/channels/gateway/messages/op.resync_required'
     x-authz-action: gateway.connect
@@ -559,7 +562,7 @@ components:
     op.typing.start:
       name: typing.start
       title: typing.start
-      summary: The person types in a thread.
+      summary: The person types in a thread. People only.
       payload:
         type: object
         required: [op, d]
@@ -572,7 +575,7 @@ components:
     op.typing.stop:
       name: typing.stop
       title: typing.stop
-      summary: The person stopped typing.
+      summary: The person stopped typing. No event is sent; the op only resets the throttle of the connection.
       payload:
         type: object
         required: [op, d]
@@ -689,7 +692,7 @@ components:
     op.resync_required:
       name: resync_required
       title: resync_required
-      summary: Catch-up impossible; load `GET /sync/snapshot`.
+      summary: Catch-up impossible; load `GET /sync/snapshot`. The connection stays open and is live from `head_seq`.
       payload:
         type: object
         required: [op, d]

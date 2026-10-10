@@ -43,11 +43,12 @@ webhook-signature: v1a,<Ed25519-Signatur in Base64> v1,<HMAC-SHA256 in Base64>
 
 | Teil | Regel |
 |---|---|
-| Körper | Der Ereignis-Umschlag aus openapi.yaml (`MessageCreatedEvent` usw.), dieselbe Form wie im Gateway und in `GET /events`. Standard Webhooks empfiehlt `type`, `timestamp`, `data`; unser Umschlag hat `type` oben und `occurred_at` statt `timestamp`, weil eine Form für alle Kanäle wichtiger ist als die Empfehlung [belegt, W1]. |
+| Körper | Der Ereignis-Umschlag aus openapi.yaml (`MessageCreatedEvent` usw.), dieselbe Form wie im Gateway und in `GET /events`. Standard Webhooks empfiehlt `type`, `timestamp`, `data`; unser Umschlag hat `type` oben und `occurred_at` statt `timestamp`, weil eine Form für alle Kanäle wichtiger ist als die Empfehlung [belegt, W1] ([ADR 0052](../adr/0052-ein-ereignis-umschlag-fuer-gateway-rest-und-webhooks.md)). |
 | `webhook-id` | Ereignis-ID (`id` im Umschlag). Gleich bei jeder Wiederholung und bei einer vom Owner angestoßenen Neuzustellung. |
 | `webhook-timestamp` | Unix-Sekunden dieses Versuchs. |
 | `webhook-signature` | Leerzeichen-getrennte Liste: immer `v1a,<base64>` (Ed25519), zusätzlich `v1,<base64>` (HMAC-SHA256), wenn das Abo HMAC nutzt. Während eines Schlüsselwechsels stehen beide Schlüssel in der Liste. |
 | Signierter Inhalt | `{webhook-id}.{webhook-timestamp}.{Körper}`, der Körper Byte für Byte wie gesendet [belegt, W1]. |
+| Epoche | Jede Zustellung trägt das Zustellfeld `sync_epoch` (04, 2.2 und 7.5; [ADR 0059](../adr/0059-sync-epoche-nach-wiederherstellung.md)). |
 | Inhalt | Nur Felder, die die App mit der Empfangs-Aktion sehen darf (04, 2.2). Kanal-Prompts, Skills und Geheimnisse nie (R-AZ-09). Große Nutzlasten werden gekürzt und tragen `truncated: true`; die App lädt per REST nach. |
 
 ### 2.1 Signaturschlüssel
@@ -78,7 +79,9 @@ webhook-signature: v1a,<Ed25519-Signatur in Base64> v1,<HMAC-SHA256 in Base64>
 4. Doppel erkennen: `webhook-id` merken, mindestens für die Dauer der Wiederholungen
    (`webhook.retry_max_age`).
 5. Schnell mit `2xx` antworten, innerhalb `webhook.delivery_timeout` ([11-erweiterungen.md](../spec/11-erweiterungen.md)); die Arbeit danach erledigen.
-6. Reihenfolge über `seq` herstellen, Objektstand über `resource.version` (04, 9).
+6. Reihenfolge über `seq` herstellen, Objektstand über `resource.version` (04, 9). Ändert sich
+   `sync_epoch`, wurde die Instanz wiederhergestellt: den gemerkten Stand nach `seq` verwerfen und
+   mit der neuen Zeitlinie weitermachen, sonst gälten ihre kleineren Nummern als alt.
 
 ## 4. Wiederholungen und Abschalten
 

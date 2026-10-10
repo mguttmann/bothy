@@ -6,7 +6,8 @@
 #
 # The action lists mirror docs/spec/05-aktionen.md section 4 (closed catalogue), the rate-limit
 # classes section 3. The gate check `api-catalogue-sync` compares these lists with 05
-# (docs/spec/06-api.md); a new action enters 05 first, then this file.
+# (docs/spec/06-api.md); a new action enters 05 first, then this file. From ticket M1-02 the
+# lists are generated from docs/spec/actions.yaml (ADR 0049, machine-readable action catalogue).
 
 extends:
   - recommended
