@@ -95,8 +95,9 @@ Product requirements implemented here:
 12. Channel and tag order is a fractional index; moving changes exactly one row (03 "Grundsätze"
     point 5).
 13. Channel names are unique per space, case-insensitive, among non-archived channels; tag names
-    unique per channel among non-deleted tags (03 unique indexes). Display texts with control or
-    bidi control characters are rejected (SEC-IN-4, SEC-T07).
+    unique per channel among non-deleted tags (03 unique indexes). Channel names at most
+    `channel.name_max_chars`, tag names at most `forum_tag.name_max_chars` (03 9). Display texts
+    with control or bidi control characters are rejected (SEC-IN-4, SEC-T07).
 14. No read right gives `404`, identical to an unknown ID; lists filter in SQL and then run
     `authorize` per item (05 rule 1.2, 07 7.4).
 15. `channel.archive`: right `manage`, step-up, audit, and a rights change with `access.changed`
@@ -151,7 +152,8 @@ Create or change exactly these (paths relative to `services/server/` unless they
     file of subscriptions.
 12. Documentation: `internal/chat/README.md` (status, ports, tables, actions, events),
     `services/server/CHANGELOG.md` (Unreleased), `docs/DECISIONS.md` (rulings D1, D3, D6, D8
-    below), `docs/api/openapi.yaml` (description of `archiveChannel` with the rule of 07 "4.5").
+    below); the description of `archiveChannel` in `docs/api/openapi.yaml` already states the rule
+    of 07 "4.5".
     07 "4.1", "4.5" and 06 (problem code `channel_read_only` with `reason: channel_archived`)
     already state D2; if the M1-03 generator owns the 06 problem block, keep its source in step
     (D10).
@@ -299,9 +301,9 @@ D3. Forum tags.
 - `updateForumTag`: at least one field, else `400`; no change gives `200` without event.
 - `deleteForumTag`: sets `deleted_at`; deleting a deleted tag gives `204`; a tag ID that never
   belonged to this visible channel gives `404`.
-- Event ruling (spec gap, 05 section 6 has no tag event): every tag create, update or delete bumps
-  `channels.version` and emits `channel.updated`; clients reload `listForumTags` when the channel
-  version changes. Record in `docs/DECISIONS.md`. Audit details `{op, tag_id, name}`.
+- Events (03 `forum_tags`, 05 section 6 row `channel.updated`): every tag create, update or delete
+  bumps `channels.version` and emits `channel.updated`; clients reload `listForumTags` when the
+  channel version changes. Audit details `{op, tag_id, name}`.
 
 D4. Idempotency and concurrency. POST and PATCH operations listed above accept `Idempotency-Key`
 (M1-20 middleware, nothing to build). Lock order inside a transaction follows 03 6.3: the

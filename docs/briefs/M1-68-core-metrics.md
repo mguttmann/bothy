@@ -1,6 +1,6 @@
 # M1-68: Server core metrics per catalogue
 
-Status: ready | Depends on: M1-65 | Etappe: M1
+Status: ready | Depends on: M1-04, M1-65 | Etappe: M1
 
 ## Goal
 
@@ -198,7 +198,12 @@ Go registry and checks
    `without (...)`, `on (...)`, `ignoring (...)`, `group_left (...)`, `group_right (...)` are
    labels; skip keywords (`and`, `or`, `unless`, `bool`, `offset`, `inf`, `nan`), numbers and
    durations; the rest are metric names.
-6. Exit code 0 with a one-line summary, 1 with one line per finding (file, location, rule).
+6. PromQL syntax of the dashboards: every dashboard `expr` (after the replacements of rule 5)
+   becomes the `expr` of a recording rule in a temporary rules file under `tmp_path` or
+   `mktemp -d`, checked with the pinned `promtool check rules` from `tools/bin/tools.lock.json`
+   (M1-04); a parse error is a finding with the dashboard file and panel. Reason: rule 5 only
+   lexes names, and a broken query would show an empty panel without any gate noticing.
+7. Exit code 0 with a one-line summary, 1 with one line per finding (file, location, rule).
 
 Fixes to existing files: if the real dashboards, rules or Sloth files fail a rule, fix the file
 or, when the file is right, the catalogue, in this change, each with a line in the report.
@@ -244,7 +249,7 @@ Go (`internal/platform/otel/metrics` and the recording packages, SDK `ManualRead
 Python (`tools/signalcheck/tests/test_signalcheck.py`):
 
 - the real repository passes;
-- fixtures that must fail: unknown metric in a dashboard, unknown label on a catalogue metric,
+- fixtures that must fail: a dashboard query with a PromQL syntax error, unknown metric in a dashboard, unknown label on a catalogue metric,
   Sloth `le` that is not a bound, Prometheus column that breaks the translation rule, histogram
   without a 4.7 row, person attribute in the catalogue, undefined recording rule;
 - fixtures that must pass: recording rules, `{{.window}}`, Grafana variables, `by (...)` lists,

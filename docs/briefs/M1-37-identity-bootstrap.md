@@ -24,8 +24,8 @@ exactly once.
   `users`, `owners`, `identity_providers`, `user_identities`, `enrollment_codes`, `devices`,
   `device_keys`, `auth_sessions`, `refresh_token_families`, `idempotency_keys`, `audit_events`.
 - `docs/spec/05-aktionen.md`: rules 1.5 and 1.10, "Spalten Owner, Step-up, Audit, Rechte",
-  "Entscheidung"; actions `instance.discovery.read`, `instance.bootstrap`, `auth.login.complete`,
-  `user.create`, `user.update`.
+  "Entscheidung"; actions `instance.discovery.read`, `instance.bootstrap`, `owner.recover`,
+  `auth.login.complete`, `user.create`, `user.update`.
 - `docs/spec/02-architektur.md`: "Befehle des Binarys", "Modulliste", "Erlaubte Abhängigkeiten",
   "Querschnitts-Ports", "Schichten im Modul", "Transaktionen und Unit of Work", "Request-Pfad",
   "Fehlerarten", "Start".
@@ -85,47 +85,19 @@ exactly once.
 
 ## Scope
 
-Specification first, in this order and on this branch, before production code (plan principle 3):
-
-1. `docs/api/openapi.yaml` (resolves W5 for redemption without passkey):
-   - New operation `POST /auth/enroll/redeem`, `operationId: redeemEnrollmentCode`, tag `Auth`,
-     summary "Redeem an enrollment code with device keys and log in", `x-authz-action:
-     auth.login.complete`, `x-rate-limit-class: rl.public_auth`, `security: []`, parameter
-     `DpopProof`, no `Idempotency-Key` (login flows are protected by single-use codes, 06
-     "Idempotenz" point 3). Request schema `EnrollRedeemRequest` with required `enrollment_code`
-     (string) and `device` (`DeviceRegistration`), `additionalProperties: false`. Responses `201`
-     `TokenResponse` (example with `auth_method: enrollment_code`, `state: active`), `400`, `401`,
-     `409`, `429`, `default`.
-   - `EnrollmentCode`: add optional `purpose` (enum `first_login`, `recovery`, `identity_link`).
-   - `ServiceUnavailable`: add problem code `setup_required` to the description list.
-   - `createEnrollmentCode` and `createUser`: description says the code in the response is a
-     one-time secret that a replay with the same `Idempotency-Key` does not repeat (`409`).
-   - Leave `beginEnrollment` and `completeEnrollment` untouched; M1-40 builds them (enrollment
-     with passkey).
-2. Regenerate the generated blocks of `docs/spec/06-api.md` (endpoint table "Auth", problem table)
-   with the generator from M1-03 (`tools/api-checks`, regeneration command in its README). Add to
-   06 "Idempotenz" a row: operations whose success response carries a one-time secret store the
-   response without the secret; a replay answers `409 conflict` with `reason: one_time_secret`.
-   Add the problem code `setup_required` (503, "Instanz ist noch nicht eingerichtet", client
-   reaction "Owner richtet die Instanz am Host ein") to the source of the problem table.
-3. `docs/spec/08-identitaet.md`:
-   - "Einladungs-Code": format (Design notes), purposes and who may consume them, one valid code
-     per person (issuing expires older unused codes), definition of a failed attempt, redemption
-     via `POST /api/v1/auth/enroll/redeem`.
-   - "Erstinstallation": the command also creates the `local` identity provider if none exists and
-     a local identity for the owner; it uses the application database role; exit codes.
-   - "Lokale Konten" table, row "Einladungs-Code": redemption with device keys only, passkey
-     optional (M1-40).
-4. `docs/spec/16-betrieb.md`: in "Rollen" add `bothy setup` to the users of `bothy_app`; in
-   "Rand und Identität" add two sentences: host access is the root of trust of the instance; the
-   first owner and recovery codes come only from `bothy setup` (08 refers to this).
-5. `docs/operations/install-compose.md`, section "Start": replace `bothy owner create --login ...`
-   with `docker compose exec api bothy setup bootstrap-owner --handle <handle> --display-name
-   "<Name>"` and drop the sentence that calls the name a proposal (W3).
-6. `docs/PLAN.md`: row M1-37 names `redeemEnrollmentCode` instead of `beginEnrollment` and
-   `completeEnrollment`; row M1-40 "Einladung mit Passkey" names `beginEnrollment` and
-   `completeEnrollment`. Mark W3 and W5 (redemption part) as resolved by M1-37.
-7. `docs/DECISIONS.md`: one entry per ruling listed under Design notes "Rulings to record".
+The specification is in place (planning, spec first; W3 and W5 resolved there): operation
+`redeemEnrollmentCode` (`POST /auth/enroll/redeem`, `auth.login.complete`, `rl.public_auth`,
+`x-idempotency-exempt: auth_flow`, schema `EnrollRedeemRequest`), `EnrollmentCode.purpose`, the
+problem code `setup_required` in `x-problem-codes` (503) and the descriptions of
+`createEnrollmentCode` and `createUser` (one-time secret) in `openapi.yaml`; 06 "Idempotenz" row
+"Antwort mit einmaligem Geheimnis" and R-API-26; 08 "3.2" (format, purposes table, one valid code
+per person, definition of a failed attempt, redemption paths) and "4" (local provider and local
+identity created by `bootstrap-owner`, application role, recovery with the system action
+`owner.recover`); 05 `owner.recover`; 16 "4.3" (host access is the root of trust) and "7.1"
+(`bothy setup` uses `bothy_app`); `docs/operations/install-compose.md` (setup commands); PLAN rows
+M1-37 and M1-40. Change any of them only where the implementation proves them wrong (spec first,
+`make api-lint api-checks docs linkcheck` green). `docs/DECISIONS.md`: one entry per ruling listed
+under Design notes "Rulings to record".
 
 Production code under `services/server/`:
 
@@ -145,8 +117,8 @@ Production code under `services/server/`:
   extend the `CreateUser` handler for `local_account`.
 - `internal/platform/httpserver/setupgate.go`: middleware `SetupGate` with the consumer interface
   `SetupState`; `internal/wire` connects it to the setup state of `internal/instance` (M1-15).
-- One-time secret support in the idempotency layer (`internal/kernel/idempotency` and the
-  middleware from M1-20), unless M1-20 already provides an equivalent; see Design notes.
+- One-time secrets: the handlers of `createEnrollmentCode` and `createUser` (with
+  `local_account`) call `idempotency.MarkOneTimeSecret(ctx)` of M1-20; see Design notes.
 - `cmd/bothy`: subcommands `setup bootstrap-owner` and `setup issue-enrollment-code`.
 - `services/server/api/operations.yaml`: enable `redeemEnrollmentCode` and `createEnrollmentCode`
   (P-04); regenerate `api/rest` and `api/routes` (`make codegen-check` clean).
@@ -349,10 +321,9 @@ Setup gate:
 - Setup must be complete (else exit `4`). The person must be an active owner (else exit `2` with
   "not an active owner"). Issues a `recovery` code (`created_by = NULL`), prints it once like
   above.
-- Audit: actor NULL, action `user.update`, resource `user`, details `{command:
-  "setup.issue_enrollment_code", purpose: "recovery", enrollment_code_id}` (values are codes,
-  19 SEC-AUD-5). Reason: 05 has no system
-  action for host-issued recovery codes; 03 allows a NULL actor for host commands.
+- Audit: actor NULL, system action `owner.recover` (05, R-AZ-15), resource `user`, details
+  `{purpose: "recovery", enrollment_code_id}` (values are codes, 19 SEC-AUD-5). Reason: a host
+  command must not look like an action of a person, and every audit entry names a known action.
 - Recovery works for owners with or without a local identity; redemption then creates an active
   device without an identity.
 
@@ -367,24 +338,20 @@ conflict` with `reason: user_not_active`; purpose per the table above; `201` wit
 handle) and a `first_login` code in the same unit of work and returns it as `enrollment`.
 
 One-time secrets and idempotency: a response that carries a one-time secret is marked by the
-handler (add `idempotency.MarkOneTimeSecret(ctx)` to `internal/kernel/idempotency` if M1-20 has
-no equivalent). The idempotency layer then stores status and `{"one_time_secret": true}` as body
-instead of the response; a replay with the same key answers `409 conflict` with `reason:
-one_time_secret` and `hint` "issue a new code". Reason: `idempotency_keys.response_body` must not
-hold a secret in plain text (03 Grundsatz 9).
+handler with `idempotency.MarkOneTimeSecret(ctx)` (M1-20). The idempotency layer then stores status
+and `{"one_time_secret": true}` as body instead of the response; a replay with the same key answers
+`409 conflict` with `reason: one_time_secret` (06 "Idempotenz", R-API-26). Reason:
+`idempotency_keys.response_body` must not hold a secret in plain text (03 Grundsatz 9).
 
 Configuration used (all existing; add none): `auth.enrollment_code_ttl`,
 `auth.enrollment_code_max_attempts`, `auth.token_pepper_ref`, `auth.session_max_age`,
 `auth.refresh_token_ttl`, `auth.access_token_ttl`, `ratelimit.rl.public_auth.*`.
 
-Error codes: `setup_required` (503, new), `unauthenticated`, `invalid_dpop_proof`,
+Error codes: `setup_required` (503, in `x-problem-codes`), `unauthenticated`, `invalid_dpop_proof`,
 `use_dpop_nonce` (401), `validation_failed` (400), `conflict` (409), `rate_limited` (429).
 
-Rulings to record in `docs/DECISIONS.md`: W3 resolution and corrected install guide; W5 for
-redemption (new operation `redeemEnrollmentCode`, passkey enrollment stays in M1-40); definition
-of a failed attempt; one valid code per person; purposes table; audit of recovery codes as
-`user.update` with NULL actor; `bothy_app` role for `bothy setup`; non-replayable one-time
-secrets; setup gate placement and caching.
+Rulings to record in `docs/DECISIONS.md` (link the spec places named in Scope): W3 and W5
+resolution; setup gate placement and caching; code display format and normalisation.
 
 ## Tests (write them first)
 
@@ -449,7 +416,7 @@ Integration:
   one_time_secret`.
 - `TestCreateUserLocalAccountIssuesCode`.
 - `TestRecoveryCommand`: active owner gets a `recovery` code and can redeem it; non-owner exit
-  `2`; before setup exit `4`; audit entry `user.update` with actor NULL.
+  `2`; before setup exit `4`; audit entry with system action `owner.recover` and actor NULL.
 - The route-count test from M1-17/M1-25 (AZ-P1) passes with the two new operations.
 
 Commands that must pass:
@@ -462,8 +429,8 @@ make check
 
 ## Acceptance criteria
 
-- [ ] openapi.yaml, 06, 08, 16, install-compose.md and PLAN.md are changed as in Scope; `make
-      api-lint api-checks docs linkcheck` green.
+- [ ] The implementation matches openapi.yaml, 05, 06, 08, 16 and install-compose.md (changed only
+      where proven wrong); `make api-lint api-checks docs linkcheck` green.
 - [ ] ID-T06, ID-T07, ID-T11 and ID-T27 are green and named after their IDs.
 - [ ] Before setup only `instance.discovery.read` operations answer without `503
       setup_required`; bootstrap takes effect without restart.

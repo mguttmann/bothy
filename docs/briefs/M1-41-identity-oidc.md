@@ -32,7 +32,7 @@ provider tokens never reach a device and are never stored.
 - `docs/spec/19-sicherheit.md`: 8 "SSRF-Verbot und ausgehende Verbindungen" (SEC-NET-1 to
   SEC-NET-5), 9 "Logs ohne Geheimnisse und ohne Inhalte", 10 "Geheimnisse".
 - `docs/spec/02-architektur.md`: 4.1 "Regeln", 4.4 "Erlaubte Abhängigkeiten", 5 "Schichten im
-  Modul", 9 "Request-Pfad", 12.3 "Job-Katalog" (`identity.session_cleanup`), 13
+  Modul", 9 "Request-Pfad", 12.3 "Job-Katalog" (`identity.auth_cleanup`), 13
   "Konfigurationsladen".
 - `docs/spec/16-betrieb.md`: 4.3 "Rand und Identität".
 - ADRs 0011, 0013, 0015, 0019, 0020.
@@ -90,9 +90,9 @@ provider tokens never reach a device and are never stored.
 
 ## Scope
 
-Layering note (ruling, record it in `docs/DECISIONS.md`): the plan names
-`internal/identity/oidc`; a package outside the layers would fail the architecture gate (02 7.2,
-"Paket ohne Komponente"). The work therefore lands in the layers of the module:
+Layering (02 "6. Code-Layout", PLAN row M1-41): a package outside the layers would fail the
+architecture gate (02 7.2, "Paket ohne Komponente"), so the work lands in the layers of the
+module:
 
 - `services/server/internal/identity/domain/oidcflow/`: pure code without I/O and without
   third-party imports: flow state machine (`started` -> `code_issued` -> `completed`, any state ->
@@ -107,9 +107,10 @@ Layering note (ruling, record it in `docs/DECISIONS.md`): the plan names
   domain functions); repository methods for `auth_login_flows`.
 - `services/server/internal/identity/adapters/oidc/`: the provider client over
   `internal/platform/egress`: discovery, JWKS cache, token request with client authentication,
-  JWS verification with the JOSE library already pinned in `services/server/go.mod` by M1-33 or
-  M1-34 (do not add a second JOSE library and do not add an OIDC or OAuth client library: every
-  check must be visible here and run through the egress client).
+  JWS verification and the client assertion through `internal/kernel/jose` (ADR 0067; add
+  `RS256` and `PS256` verification and `PS256`, `RS256`, `ES256` signing there, with the RFC test
+  vectors the ADR names). Add no JOSE library and no OIDC or OAuth client library: every check
+  must be visible here and run through the egress client.
 - `services/server/internal/identity/adapters/oidc/oidctest/`: the fake identity provider (Design
   notes, "Fake IdP"); it is the test double named in `docs/PLAN.md` section 5.
 - `services/server/internal/identity/adapters/postgres/`: sqlc queries for `auth_login_flows`
@@ -121,23 +122,23 @@ Layering note (ruling, record it in `docs/DECISIONS.md`): the plan names
   revision named in the preconditions) with its indexes; `make migrations-lint` green.
 - Config validator for `identity_provider.oidc.v1` registered with the provider registry of M1-36
   (Design notes, "Provider configuration").
-- `identity.session_cleanup` (job of `identity`, 02 12.3): also deletes `auth_login_flows` rows
-  with `expires_at < now()`; if the job does not exist yet, create it through `platform/jobs` on
-  queue `maintenance`.
+- Job `identity.auth_cleanup` (created by M1-35, 02 12.3): also deletes `auth_login_flows` rows
+  with `expires_at < now()`.
 - The refresh use case of M1-34: the re-login rule of `auth.idp_recheck_interval` (Design notes).
-- `internal/platform/egress`: only if it has no per-call target allow-list, add a request option
-  `AllowHosts(hosts ...string)` with tests; no other change there.
+- `internal/platform/egress` is used as M1-22 built it: one client per provider with
+  `Options.Hosts` (the host policy of "Egress targets" below) and, in tests, `Deps.RootCAs`; no
+  change to the egress package (19 SEC-NET-2).
 - `internal/wire`: wiring of the use cases, the provider client and the new config key.
-- Configuration: new key `auth.oidc_client_assertion_ttl` (Design notes) in the configuration
-  schema of `platform/config` and in 08 section 18; regenerate `docs/operations/configuration.md`
-  with the generator of M1-08 (`make config-reference`, check with `make config-doc-check`).
-- Specification first, in the same change: `docs/spec/08-identitaet.md` (2.2 rewritten for the
-  ruling "account effects only at complete", provider configuration table, callback redirect
-  parameters and error codes, enrollment code at begin, link mode, diagram 14.1, section 18),
-  `docs/api/openapi.yaml` (`OidcBeginRequest.enrollment_code` optional; `handleOidcCallback`:
-  query parameter `iss`, description of the redirect parameters and the error codes),
-  `services/server/api/operations.yaml` (the five operations move from `later` to the built list),
-  regenerated server code (`make codegen-check` without diff).
+- Configuration: register `auth.oidc_client_assertion_ttl` (08 section 18) in the configuration
+  schema of `platform/config`; `auth.oidc_jwks_cache_ttl` covers discovery document and keys.
+  Regenerate the reference if the schema changes (`make config-reference`, `make config-doc-check`).
+- The specification is in place (planning, spec first): 08 2.2 (account effects only at complete,
+  enrollment code at begin, `iss`, callback redirect parameters and error codes, link mode), 2.6
+  (`identity_provider.oidc.v1`), 3.1, 14.1 and 18; 03 `auth_login_flows` with `external_identity`
+  and `enrollment_code_id` (R-DM-30); `openapi.yaml` (`OidcBeginRequest.enrollment_code`,
+  `handleOidcCallback` with `iss` and the redirect description). Change them only where the
+  implementation proves them wrong. `services/server/api/operations.yaml`: the five operations move
+  from `later` to the built list; regenerated server code (`make codegen-check` without diff).
 - Docs: `docs/operations/oidc-entra.md` (new, German like the other operations pages): app
   registration as web application, the single redirect URI `https://<host>/api/v1/auth/oidc/callback`,
   certificate credential for `private_key_jwt`, optional `groups` claim (pointer to M1-42),
@@ -184,12 +185,9 @@ Layering note (ruling, record it in `docs/DECISIONS.md`): the plan names
 
 **Preconditions (check before writing code; any failure: `Verdict: BLOCKED <which>`).**
 
-1. `docs/spec/03-datenmodell.md` table `auth_login_flows` contains a nullable column that carries
-   the verified external identity from callback to complete (proposed: `external_identity jsonb`,
-   schema `external_identity.v1`) and a nullable reference to the enrollment code presented at
-   begin (proposed: `enrollment_code_id uuid`, FK `enrollment_codes(id)` ON DELETE SET NULL). Use
-   the names the core revision (M0-03) adopted. Reason: see "Ruling: account effects only at
-   complete".
+1. `docs/spec/03-datenmodell.md` table `auth_login_flows` has `external_identity jsonb` (schema
+   `external_identity.v1`) and `enrollment_code_id` (FK `enrollment_codes(id)` ON DELETE SET NULL)
+   with their checks (R-DM-30). Reason: see "Ruling: account effects only at complete".
 2. M1-36 provides the provider registry with per-kind config validation and the `(issuer,
    subject)` lookup; M1-37 provides enrollment-code verification (attempt counting) and
    consumption; M1-33, M1-34 and M1-37 provide device registration from `DeviceRegistration`
@@ -204,11 +202,10 @@ account. If the callback linked an identity (enrollment code or link mode), a le
 a foreign provider account to the victim. Therefore the callback only verifies the ID token and
 stores the verified external identity in the flow; mapping, linking, provisioning, device, session
 and tokens happen at `complete`, which requires the `client_verifier` that only the app instance
-that began the flow holds. Update 08 2.2, 3.1 and the diagram 14.1 accordingly and record the
-ruling in `docs/DECISIONS.md`.
+that began the flow holds. 08 2.2, 3.1, the diagram 14.1 and R-DM-30 state this.
 
 **Provider configuration `identity_provider.oidc.v1`** (decoded strictly, unknown fields rejected
-with `400 validation_failed`; document as a table in 08 2.2):
+with `400 validation_failed`; normative table in 08 2.6):
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
@@ -222,6 +219,7 @@ with `400 validation_failed`; document as a table in 08 2.2):
 | `client_cert_x5t_s256` | base64url string | no | JWS header `x5t#S256` (Entra certificate credentials need it) |
 | `allowed_tenant_ids` | list of strings | yes if `issuer` contains `{tenantid}` | allowed values of the `tid` claim |
 | `app_redirect_uris` | list of strings | no | exact private-scheme or claimed `https` redirect URIs of the apps |
+| `groups_claim` | string | no | name of the groups claim; accepted and stored here, used by M1-42 (08 3.4) |
 
 Entra facts for the docs page, retrieved 2026-10-10: certificate assertions use `alg` `PS256`,
 `typ` `JWT`, header `x5t#S256`, claims `aud` (token endpoint), `iss` and `sub` (client ID),
@@ -352,14 +350,14 @@ A `401 step_up_required` does not consume the `login_code`.
 deny). `created_at` of an OIDC session is the time of the provider login.
 
 **Metadata cache.** Per provider: discovery document and JWKS cached for
-`auth.oidc_jwks_cache_ttl` (extend the meaning in 08 18 to "Anbieter-Metadaten und Schlüssel");
+`auth.oidc_jwks_cache_ttl` (08 18: provider metadata and keys);
 single-flight loading; responses limited by `egress.max_response_bytes` and `egress.timeout`.
 
 **Egress targets.** Per provider: the issuer host, then the hosts of `token_endpoint` and
 `jwks_uri` from the validated discovery document; all `https`; redirects only within these hosts
 (SEC-NET-4); IP checks at connect time stay with the egress client.
 
-**New configuration key** (08 section 18 and the schema): `auth.oidc_client_assertion_ttl`,
+**Configuration key** (08 section 18, register it in the schema): `auth.oidc_client_assertion_ttl`,
 default `2m`, lifetime of a `private_key_jwt` client assertion.
 
 **Fake IdP** (`oidctest`): `httptest.NewTLSServer` on `127.0.0.1:0`; endpoints
@@ -371,8 +369,8 @@ a `private_key_jwt` assertion against a registered public key, `aud`, `exp`, uni
 audience without `azp`, wrong `nonce`, expired, foreign `iss`, `tid`), key rotation, omitted `iss`
 parameter, provider `error`, Entra mode with issuer template `https://127.0.0.1:<port>/{tenantid}/v2.0`,
 request counters per endpoint. Tests configure the egress client with `egress.allowed_hosts` entry
-`127.0.0.1` and `allow_private: true` and with the test server's root CA (egress option; add
-`WithRootCAs` only if missing, same rule as `AllowHosts`).
+`127.0.0.1` and `allow_private: true` and with the test server's root CA (`Deps.RootCAs` of
+M1-22).
 
 **Audit and logs.** Callback: deny entries only (`auth.login.begin` column `abl`). Complete: allow
 and deny. Details carry IDs and codes only (`provider_id`, `login_attempt_id`, `device_id`,
@@ -463,8 +461,9 @@ make check
       `kid`.
 - [ ] Refresh of an OIDC session older than `auth.idp_recheck_interval` is refused.
 - [ ] No secret or token in logs, audit details or problem bodies.
-- [ ] 08, `openapi.yaml`, `operations.yaml`, the configuration reference, `oidc-entra.md` and the
-      DECISIONS entries are updated; `make codegen-check` shows no diff.
+- [ ] The implementation matches 03, 08 and `openapi.yaml` (changed only where proven wrong);
+      `operations.yaml`, the configuration reference, `oidc-entra.md` and the DECISIONS entries
+      are updated; `make codegen-check` shows no diff.
 - [ ] `make check` green.
 
 ## Definition of done

@@ -13,18 +13,13 @@ action with "Step-up = ja" in 05 (owners, grants, providers, keys, agent policy)
 
 ## Read first
 
-- Precondition (core contract): 03 must contain storage for step-up challenges and a revoke reason
-  for the failure limit. The M1 brief writer requested (see the M0-05 gap list): a table
-  `auth_challenges` owned by `identity` with `id` (API `challenge_id`), `purpose` (`step_up`),
-  `session_id` (FK `auth_sessions`, `ON DELETE CASCADE`), `challenge_hash` (HMAC-SHA-256, unique),
-  `status` (`issued`, `used`, `failed`), `created_at`, `expires_at`
-  (`created_at + auth.step_up_challenge_ttl`), `finished_at` (null exactly while `issued`), index
-  on `(session_id, finished_at) WHERE status = 'failed'` and on `(expires_at)`, retention
-  `transient`; and the value `step_up_failed` in `auth_sessions.revoke_reason` and in
-  `SessionRevokedPayload.reason`. Use the names 03 actually has. If 03 has no challenge storage or
-  no such reason, stop with `Verdict: BLOCKED core contract: step-up challenge storage` (P-11).
-  Reason: a single-use challenge and a failure limit need state that every process sees (the code
-  stays node-neutral from M1 on, plan section 20), and tables come only from 03.
+- `docs/spec/03-datenmodell.md` `auth_challenges` (R-DM-31): single-use challenges for step-up and
+  the WebAuthn ceremonies in one table (`purpose` `step_up`, `passkey_login`, `passkey_enroll`,
+  `passkey_register`), stored as HMAC, with `status`, `finished_at` and the failure index; and
+  `step_up_failed` in `auth_sessions.revoke_reason` and `SessionRevokedPayload.reason`. Reason for a
+  table: a single-use challenge and a failure limit need state that every process sees (the code
+  stays node-neutral from M1 on, plan section 20). This ticket creates the whole table (all
+  purposes in the CHECK) and uses `step_up`; M1-40 uses the passkey purposes.
 - `docs/spec/08-identitaet.md`: "6.1 Zwei Schlüssel je nativem Gerät", "6.2 Step-up-Ablauf",
   "7.4" (revocation helpers), "8. Sitzungsdauer", "13. Schutz der Anmeldung" (row Step-up),
   "14.3 Step-up" (sequence diagram), "15. Tests" (ID-T18, ID-T27), "18. Konfigurationswerte".
@@ -43,7 +38,7 @@ action with "Step-up = ja" in 05 (owners, grants, providers, keys, agent policy)
   (and `completeStepUpWithPasskey`, which M1-40 builds); schemas `StepUpChallenge`,
   `StepUpDeviceKeyRequest`, `StepUpResult`, `Problem`.
 - `docs/security/threat-model.md`: T-TK-01, T-ID-05 (step-up when approving devices).
-- Merged code of M1-33 (`domain/jose`, `identity.Devices.ActiveKey`, `identitytest`), M1-34
+- Merged code of M1-33 (`kernel/jose`, `identity.Devices.ActiveKey`, `identitytest`), M1-34
   (`identity.Auth.RevokeSession`, Authenticator, actor fields `StepUpAt`, `StepUpMethod`), M1-28
   (`authorize` step 8 and its matrix test world), M1-24 (audit recorder), M1-16 (event appender).
 - `services/server/internal/identity/README.md`, `docs/quality/gates.md`, `CONTRIBUTING.md`,
@@ -82,8 +77,8 @@ action with "Step-up = ja" in 05 (owners, grants, providers, keys, agent policy)
 
 ## Scope
 
-1. Migration `services/server/migrations/<next free number>_identity_step_up.sql`: the challenge
-   table exactly as 03 has it (see precondition).
+1. Migration `services/server/migrations/<next free number>_identity_step_up.sql`: the table
+   `auth_challenges` exactly as 03 has it (columns, checks, FKs, unique and indexes).
 2. sqlc queries `internal/identity/adapters/postgres/queries/stepup.sql` and repository.
 3. Port `internal/identity/stepup.go` (names fixed): `Challenge{ID, Value string, ExpiresAt}`,
    `StepUpResult{StepUpAt, ValidUntil time.Time}`, `type StepUp interface{ CreateChallenge(ctx,
@@ -99,20 +94,20 @@ action with "Step-up = ja" in 05 (owners, grants, providers, keys, agent policy)
 7. Config keys in the identity `Config`: `auth.step_up_challenge_ttl`, `auth.step_up_max_age`,
    `auth.step_up_fail_limit`, `auth.login_fail_window`, `auth.clock_leeway`,
    `auth.token_pepper_ref`; register missing ones in the schema, `make config-reference`.
-8. `docs/api/openapi.yaml`: the example of `StepUpDeviceKeyRequest.signature` signs `{"c": ...}`;
-   replace it with a compact JWS example whose payload is `{"challenge": ..., "sid": ...,
-   "iat": ...}` and describe the payload in the schema description (spec first; `make api-lint`
-   green).
-9. Docs: `docs/spec/08-identitaet.md` "6.2" gets the JWS profile, the failure counting and the
-   result codes of "Design notes"; rulings in `docs/DECISIONS.md`; identity README;
-   `services/server/CHANGELOG.md`.
+8. Job `identity.auth_cleanup` (02 "12.3", queue `maintenance`, every `auth.cleanup_interval`,
+   role `worker`): deletes rows of `auth_challenges` past `expires_at`; M1-38 adds pairings and
+   device expiry, M1-41 adds `auth_login_flows`. Register `auth.cleanup_interval` in the identity
+   `Config`. Request handling never depends on the job (expiry is checked per request).
+9. Docs: `docs/spec/08-identitaet.md` "6.2" and "13" already state the JWS profile, the failure
+   counting and the answers, and `StepUpDeviceKeyRequest` in `openapi.yaml` describes the signed
+   payload; change them only where the implementation proves them wrong (spec first). Rulings in
+   `docs/DECISIONS.md`; identity README; `services/server/CHANGELOG.md`.
 
 ## Out of scope
 
 - Step-up with a passkey (`completeStepUpWithPasskey`, `passkey_options` in the challenge) (M1-40).
-- Step-up with password and TOTP and with OIDC re-login (08 "6.2"): no operation exists in
-  `openapi.yaml`; console flows come with M6, local accounts with M1-39.
-- Cleanup of old challenge rows (retention class `transient`, M7 retention jobs).
+- Step-up with password and TOTP and with OIDC re-login (08 "6.2"): the operations come with the
+  console session (M6-01), spec first.
 - Any administrative action itself; this ticket proves AZ-M36 through `authorize`.
 - Device approval with step-up (M1-38), API tokens (M1-44; AZ-M35 with a real personal token is
   tested there).
@@ -161,7 +156,7 @@ Complete with the device key (`completeStepUpWithDeviceKey`):
 5. Challenge `status` not `issued` or `expires_at` <= now: `401 step_up_required`, not counted,
    audit deny.
 6. Signature check, counted as a failure when it fails:
-   - Parse with `domain/jose`, allowlist exactly the key's `alg`; reject `crit`, `jwk`, `jku`,
+   - Parse with `kernel/jose`, allowlist exactly the key's `alg`; reject `crit`, `jwk`, `jku`,
      `x5u`, `x5c` in the header (the key comes only from `device_keys`).
    - Verify with the active `step_up` key; a signature by the `dpop` key or any other key fails
      (ID-T18 "falscher Schlüssel").
@@ -246,8 +241,8 @@ make check
 - [ ] `auth.step_up_fail_limit` failures within `auth.login_fail_window` revoke the session with
       `session.revoked`.
 - [ ] Concurrent completions of one challenge succeed at most once.
-- [ ] `openapi.yaml` example fixed; 08 "6.2" documents profile, counting and codes; rulings in
-      DECISIONS.md.
+- [ ] The job `identity.auth_cleanup` deletes expired challenges (test with a controlled clock).
+- [ ] 08 "6.2" and "13" match the implementation; rulings in DECISIONS.md.
 - [ ] `make check` green.
 
 ## Definition of done

@@ -1,6 +1,6 @@
 # M1-34: identity: sessions, access tokens, refresh families and logout
 
-Status: ready | Depends on: M1-16, M1-24, M1-32, M1-33 | Etappe: M1
+Status: ready | Depends on: M1-32, M1-33 | Etappe: M1
 
 ## Goal
 
@@ -40,24 +40,25 @@ the token model of 08 "7. Token-Modell" that all login tickets (M1-37 to M1-43),
   "4.5 Querschnitts-Ports" (`kernel/actor`), "8. Transaktionen und Unit of Work",
   "9. Request-Pfad".
 - `docs/spec/19-sicherheit.md`: "9. Logs ohne Geheimnisse und ohne Inhalte", "10. Geheimnisse".
-- `docs/spec/15-client-architektur.md`: "8. Netzwerk und Anmeldung" (single-flight refresh).
+- `docs/spec/15-client-architektur.md`: "8. Netzwerk und Anmeldung" (single-flight refresh per
+  family; extensions refresh only their own child session).
 - ADR 0020, ADR 0021, ADR 0017.
 - `docs/api/openapi.yaml`: operations `refreshToken`, `logout`, `listMySessions`,
-  `listUserSessions`; schemas `TokenRefreshRequest`, `TokenResponse`, `Session`, `SessionPage`,
+  `listUserSessions`, `createExtensionSession`; schemas `TokenRefreshRequest`, `TokenResponse`,
+  `ExtensionSessionCreate`, `Session`, `SessionPage`,
   `Device`, `SessionRevokedPayload`, `SessionRevokedEvent`, `EventEnvelope`, `Problem`;
   parameter `DpopProof`; security schemes `dpopAuth`, `bearerAuth`.
 - `docs/security/threat-model.md`: T-TK-01, T-DV-01.
 - The merged code of M1-16 (`kernel/eventlog.Appender`), M1-24 (`kernel/auditing.Recorder`),
   M1-28 (`internal/authz`, `check_active`), M1-32 (`internal/instance` port `Keys`, purpose
-  `access_token`), M1-33 (`identity.Devices`, `identity.DPoP`, `domain/jose`, `identitytest`,
+  `access_token`), M1-33 (`identity.Devices`, `identity.DPoP`, `kernel/jose`, `identitytest`,
   `ExpectedHTU`), M1-18 (`platform/httpserver`, `kernel/actor`, problem mapping) and M1-15
   (instance record with `instance_id`).
 - `services/server/internal/identity/README.md`, `docs/quality/gates.md`, `CONTRIBUTING.md`,
   `docs/PLAN.md` "3. Arbeitsweise je Ticket".
 
-The plan index lists only M1-32 and M1-33 as dependencies; this ticket also writes
-`session.revoked` (M1-16) and audit entries (M1-24). At start, check that both are merged; if not,
-stop with `Verdict: BLOCKED dependency M1-16/M1-24 not merged`.
+This ticket also writes `session.revoked` (M1-16) and audit entries (M1-24); both are merged
+through the dependencies (M1-32 needs M1-20, which needs M1-16; M1-28 needs M1-24).
 
 ## Fixed requirements that apply
 
@@ -124,7 +125,8 @@ stop with `Verdict: BLOCKED dependency M1-16/M1-24 not merged`.
    - `type Auth interface`:
      `StartSession(ctx, StartSession) (TokenSet, error)` for the login tickets, joins the ambient
      unit of work;
-     `StartChildSession(ctx, parentSessionID ID, component ClientComponent) (TokenSet, error)`;
+     `StartChildSession(ctx, parentSessionID ID, component ClientComponent) (TokenSet, error)`
+     (used by the handler `createExtensionSession`);
      `Refresh(ctx, refreshToken string, proof VerifiedProof) (TokenSet, error)`;
      `Logout(ctx, actor.Actor) error`;
      `RevokeSession(ctx, sessionID ID, reason SessionRevokeReason, by *ID) error` (also used by
@@ -140,7 +142,7 @@ stop with `Verdict: BLOCKED dependency M1-16/M1-24 not merged`.
    `logout.go`, `authenticator.go` (implements `kernel/actor.Authenticator`), `accesstoken.go`
    (issue and verify through `instance.Keys`).
 6. Adapters `internal/identity/adapters/httpapi`: handlers `refreshToken`, `logout`,
-   `listMySessions`, `listUserSessions`; registration of the `Authenticator` in the HTTP chain
+   `listMySessions`, `listUserSessions`, `createExtensionSession`; registration of the `Authenticator` in the HTTP chain
    (step 7 of 02 "9.1") through `internal/wire`.
 7. `kernel/actor`: if the merged `Actor` lacks any of `SessionID`, `SessionActive`, `DeviceID`,
    `DeviceState`, `DeviceKeyActive`, `StepUpAt`, `StepUpMethod`, `AuthMethod`, `ClientComponent`,
@@ -156,15 +158,18 @@ stop with `Verdict: BLOCKED dependency M1-16/M1-24 not merged`.
    `auth.token_pepper_ref`, `identity.last_active_granularity`, `server.public_url`,
    `api.page_size_default`, `api.page_size_max`; register missing keys in the schema and run
    `make config-reference`.
-10. Enable `refreshToken`, `logout`, `listMySessions`, `listUserSessions` in
+10. Enable `refreshToken`, `logout`, `listMySessions`, `listUserSessions`,
+    `createExtensionSession` in
     `services/server/api/operations.yaml` and regenerate (command from `services/server/README.md`,
     M1-17).
 11. Lint: a depguard rule in `services/server/.golangci.yml` forbids `math/rand` and
     `math/rand/v2` in `internal/identity/...` (part of ID-T27), unless a repo-wide rule already
     does.
-12. Docs: `docs/spec/08-identitaet.md` "7.2" gets `aud`, header `typ`, `amr` form and the cap of
-    `exp` at the session end; "7.4" gets the refresh outcome table of "Design notes"; rulings in
-    `docs/DECISIONS.md`; identity README; `services/server/CHANGELOG.md`.
+12. Docs: `docs/spec/08-identitaet.md` "7.2" already states `aud`, header `typ`, `amr` and the
+    cap of `exp` at the session end, "7.4" the child sessions and "13" the refresh answers
+    ("Antworten, die das Kapitel festlegt"); change them only where the implementation proves
+    them wrong (spec first). Rulings in `docs/DECISIONS.md`; identity README;
+    `services/server/CHANGELOG.md`.
 13. **`authz.CredentialSource`, sessions part** (02 "Ports, Ereignisse und Quellen je Modul", 07
     "Ablauf" `check_active`, PLAN row M1-34): implement `SessionActive` and `SessionExpiresAt` of
     the request's session in the identity adapter of the source port that M1-28 declared, and
@@ -186,10 +191,8 @@ stop with `Verdict: BLOCKED dependency M1-16/M1-24 not merged`.
   (M1-64).
 - Console cookie sessions (M6-01).
 - Re-login after `auth.idp_recheck_interval` for OIDC sessions (M1-41 adds that refresh rule).
-- The job `identity.session_cleanup` and retention deletes: no M1 ticket owns them; expiry is
-  enforced at request time without a job.
-- An API operation to create child sessions: none exists in `openapi.yaml` or 05; build the app
-  function and test it, do not invent a route.
+- The job `identity.auth_cleanup` (M1-35 creates it, M1-38 adds device expiry; 02 "12.3") and
+  retention deletes; expiry is enforced at request time without a job.
 
 ## Boundaries
 
@@ -220,8 +223,8 @@ Access token (issue):
   `server.public_url` plus `/api/v1` (for example `https://chat.example.com/api/v1`); `sub` = user
   id; `sid` = session id; `did` = device id; `jti` = new UUIDv7; `iat` = `nbf` = now (seconds);
   `exp` = min(now + `auth.access_token_ttl`, `auth_sessions.expires_at`); `cnf` =
-  `{"jkt": <family dpop_jkt>}`; `amr` = `[<auth_sessions.auth_method>]`. No other claims. Record
-  `aud` and `typ` as rulings in DECISIONS.md and in 08 "7.2".
+  `{"jkt": <family dpop_jkt>}`; `amr` = `[<auth_sessions.auth_method>]`. No other claims (08
+  "7.2").
 - `TokenResponse.expires_in` = seconds from now to `exp`; `token_type` = `DPoP`.
 
 Authenticator (`Authenticate(r) (actor.Actor, error)`), in this order:
@@ -233,7 +236,7 @@ Authenticator (`Authenticate(r) (actor.Actor, error)`), in this order:
    `401 unauthenticated`). A token that parses as this server's access token (header `typ` =
    `at+jwt` and a known `kid`) gives `401 invalid_dpop_proof` (ID-T14 Bearer case). Anything else
    `401 unauthenticated`.
-4. `DPoP`: parse with `domain/jose`, allowlist = the algorithms of the access-token keys; header
+4. `DPoP`: parse with `kernel/jose`, allowlist = the algorithms of the access-token keys; header
    `typ` must be `at+jwt`; `kid` must belong to a key of purpose `access_token` in state `active`
    or `retiring`; signature, `iss`, `aud` must match; `nbf` <= now + leeway; `exp` > now - leeway.
    Malformed, unknown `kid`, bad signature, wrong `iss` or `aud`: `401 unauthenticated`; expired:
@@ -269,7 +272,15 @@ Child session (`StartChildSession`): parent active, `client_component = 'app'`, 
 child; component `notification_ext` or `share_ext`; same user, device, `auth_method`,
 `identity_id`; `parent_session_id` = parent; `expires_at` = parent `expires_at`; own family with
 the parent family's `dpop_jkt` (extensions share the device key through the keychain group, 15
-"9"). Any other input: `400 validation_failed` or `not_found`.
+"9"). An active child of the same parent and component is revoked (`logout`, with its family and
+`session.revoked`) in the same unit of work, so at most one exists (08 "7.4"). Any other input:
+`400 validation_failed` or `not_found`.
+
+`createExtensionSession` (`POST /api/v1/me/sessions/extensions`, action
+`session.extension.create`, right `self`, class `rl.write`, audit, `x-idempotency-exempt:
+auth_flow`): body `ExtensionSessionCreate` (`client_component`), caller's session is the parent,
+answer `201 TokenResponse` of the child. A repeated call replaces the child again; that is the
+reason for the exemption.
 
 Refresh (`refreshToken`, action `auth.token.refresh`, no `Idempotency-Key`), one unit of work:
 
@@ -401,10 +412,11 @@ make check
       ID-T15, ID-T16, ID-T17 green; a wrong key never revokes.
 - [ ] Logout and `RevokeSession` revoke children and families, append `session.revoked`, publish
       `SessionEnded`.
-- [ ] `listMySessions`, `listUserSessions`, `refreshToken`, `logout` enabled and conform to the
-      schema; no `null` members.
+- [ ] `listMySessions`, `listUserSessions`, `refreshToken`, `logout`, `createExtensionSession`
+      enabled and conform to the schema; no `null` members; a second child of the same component
+      revokes the first (ID-T16 setup).
 - [ ] Refresh tokens are 256 random bits from `crypto/rand`; `math/rand` banned in identity.
-- [ ] 08 "7.2" and "7.4" updated; rulings in DECISIONS.md.
+- [ ] 08 "7.2", "7.4" and "13" match the implementation; rulings in DECISIONS.md.
 - [ ] `make check` green.
 
 ## Definition of done

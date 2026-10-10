@@ -78,12 +78,13 @@ gaining rights the owner did not map to a group.
 - `services/server/internal/identity/app/` (OIDC use cases of M1-41) and
   `adapters/oidc/`: read the group claim at the callback, store it in the external identity, call
   `authz.Admin.SyncClaimGroups` inside the Unit of Work of `completeOidcLogin`.
-- `identity_provider.oidc.v1`: new optional field `groups_claim` and its validation (Design
-  notes); fake IdP of M1-41 gets knobs for a groups claim and an Entra overage claim.
-- Specification first: `docs/spec/08-identitaet.md` (3.4 precise rules, provider field
-  `groups_claim`, `external_identity.v1` fields `groups_state` and `groups`, at-most-one rule);
-  `docs/spec/07-rechte.md` 2.1 or 9 (claim groups are owned by the claim); `docs/spec/02-architektur.md`
-  4.3 (`authz` Admin port lists the claim sync).
+- `identity_provider.oidc.v1` field `groups_claim` (08 2.6; M1-41 already accepts it): read it
+  here; fake IdP of M1-41 gets knobs for a groups claim and an Entra overage claim.
+- The specification is in place (planning, spec first): 08 2.2 step 6 (`external_identity.v1`
+  fields `groups_state` and `groups`), 2.6, 3.4; 03 `groups.provider_id` with the unique index
+  `(provider_id, external_ref)` (R-DM-33) and the note at `group_memberships`; 05
+  `group.member.sync` and rule 1.6; 07 2.6 (claim groups are owned by the claim); 02 4.3 and 4.6.
+  Change them only where the implementation proves them wrong.
 - `services/server/internal/authz/README.md`, `services/server/internal/identity/README.md`,
   CHANGELOG entry under "Unreleased" of `services/server/CHANGELOG.md`, `docs/DECISIONS.md`
   entries for the rulings below, `docs/operations/oidc-entra.md` section on groups (claim
@@ -92,9 +93,8 @@ gaining rights the owner did not map to a group.
 
 ## Out of scope
 
-- Creating, renaming and deleting groups and manual membership changes over the API: M1-48. Note
-  for M1-48 in the report: manual member add and remove on `oidc_claim` groups conflict with the
-  sync.
+- Creating, renaming and deleting groups and manual membership changes over the API: M1-48 (it
+  rejects manual changes on claim groups with `409`, `reason: claim_managed_group`, 07 2.6).
 - Expiry sweep and reminders of memberships: M1-30 (the expiry itself is evaluated by `authorize`
   at every call).
 - Gateway delivery of `access.changed`: M1-65.
@@ -125,23 +125,21 @@ gaining rights the owner did not map to a group.
 
 **Preconditions (check before writing code; any failure: `Verdict: BLOCKED <which>`).**
 
-1. The action catalogue (`docs/spec/actions.yaml` and 05 4.4) contains a system action for the
-   claim sync (proposed ID `group.member.sync`: resource `group`, right `system`, owner no, step-up
-   no, audit yes, rights yes, rate-limit class none), it is listed in 05 rule 1.6 among the actions
-   with I1 check, and 02 4.6 assigns it to `authz`. Use the ID the core revision adopted. Reason: a
-   claim-driven change is neither an owner's `group.member.add` nor the expiry job, and every audit
-   entry must name a catalogued action (R-AZ-15).
+1. The action catalogue (`docs/spec/actions.yaml`, 05 4.4) has the system action
+   `group.member.sync` (resource `user`, right `system`, audit yes, rights yes, no rate-limit
+   class), 05 rule 1.6 lists it among the actions with I1 check, and 02 4.6 assigns it to `authz`.
+   Reason: a claim-driven change is neither an owner's `group.member.add` nor the expiry job, and
+   every audit entry must name a catalogued action (R-AZ-15).
 2. M1-41 is merged with the external identity carried in `auth_login_flows` and the mapping in
    `completeOidcLogin`.
 3. M1-29 provides the rights-change path (`permission_version` locked first, diff of visible
    targets, `access.changed`, `VerifyInvariants`, deny audit in its own transaction).
 
 **Provider field `groups_claim`** (`identity_provider.oidc.v1`, optional string, default absent =
-no sync for this provider). Ruling until groups are bound to a provider in the core contract: at
-most one enabled OIDC provider may have `groups_claim` set; creating or updating a provider that
-would break this gives `409 conflict` with `reason: groups_claim_provider_exists`. Reason:
-`groups.external_ref` is unique per instance, not per provider, so a second provider could assert
-the group values of the first.
+no sync for this provider). Claim groups are bound to their provider (`groups.provider_id`, unique
+`(provider_id, external_ref)`, R-DM-33): the sync of a login matches and changes only groups of
+that login's provider, so several providers with `groups_claim` are allowed and never touch each
+other's groups.
 
 **Reading the claim at the callback** (only when `groups_claim` is set), into
 `external_identity.v1`:
@@ -164,9 +162,10 @@ changes nothing.
 **`ReconcileClaimMemberships`** (pure, in `authz/domain`):
 
 ```go
-// Inputs: the person's memberships with removed_at IS NULL in groups with source 'oidc_claim'
-// and deleted_at IS NULL (expired ones included), the oidc_claim groups whose external_ref is
-// one of the claim values, the claim values, now and maxAge.
+// Inputs: the person's memberships with removed_at IS NULL in groups with source 'oidc_claim',
+// provider_id = the login's provider and deleted_at IS NULL (expired ones included), the
+// oidc_claim groups of that provider whose external_ref is one of the claim values, the claim
+// values, now and maxAge.
 func ReconcileClaimMemberships(current []ClaimMembership, matched []ClaimGroup,
     claim []string, now time.Time, maxAge time.Duration) ClaimDiff
 // ClaimDiff{Add []uuid.UUID; Extend []uuid.UUID; Remove []uuid.UUID} (group IDs, sorted by ID)
@@ -179,8 +178,8 @@ func ReconcileClaimMemberships(current []ClaimMembership, matched []ClaimGroup,
   index `(group_id, user_id) WHERE removed_at IS NULL` forbids a second row).
 - Remove: current membership whose group is not matched: `removed_at = now`, `removed_by` = the
   person.
-- Claim values without a matching group are ignored. Groups with `source = 'local'` are never
-  touched.
+- Claim values without a matching group are ignored. Groups with `source = 'local'` and claim
+  groups of other providers are never touched.
 - Ruling: `added_by` and `removed_by` are the person whose provider asserted the claim, because
   03 requires a principal and the change is caused by that login; the audit entry names the system
   action, so it cannot be mistaken for a manual change.
@@ -215,8 +214,8 @@ Unit tests:
   memberships, duplicate claim values, deleted groups ignored, output sorted.
 - `TestGroupsClaimParsing`: array of strings, empty array, absent, Entra overage via
   `_claim_names`, wrong type, non-string element.
-- `TestGroupsClaimProviderAtMostOne`: second provider with `groups_claim` gives `409
-  groups_claim_provider_exists`; disabling the first allows it.
+- `TestGroupClaimSync_OtherProviderUntouched`: two providers with `groups_claim` and groups with
+  the same `external_ref`; a login through provider A changes only A's groups.
 
 Integration tests (PostgreSQL 18, fake IdP of M1-41, fake `AgentPolicySource` and
 `StructureSource` for I1 as in AZ-P7, steerable clock):
@@ -262,8 +261,9 @@ make check
       entry exists.
 - [ ] Absent claim and overage change nothing; the server makes no call besides the provider
       endpoints of M1-41.
-- [ ] At most one enabled provider with `groups_claim`.
-- [ ] 08, 07, 02, READMEs, DECISIONS and `oidc-entra.md` updated; `make check` green.
+- [ ] Claim groups match only for their own provider.
+- [ ] The implementation matches 03, 05, 07 and 08 (changed only where proven wrong); READMEs,
+      DECISIONS and `oidc-entra.md` updated; `make check` green.
 
 ## Definition of done
 

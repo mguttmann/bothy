@@ -85,7 +85,9 @@ inventing their own account mapping, which closes the account takeover through e
    FKs, unique `lower(name)`, partial unique `(kind) WHERE kind IN ('trusted_header','local')`,
    partial unique `(provider_id, subject) WHERE unlinked_at IS NULL`, index `(user_id)`), plus
    `ALTER TABLE auth_sessions ADD CONSTRAINT ... FOREIGN KEY (identity_id) REFERENCES
-   user_identities(id) ON DELETE SET NULL` (deferred from M1-34 because the table did not exist).
+   user_identities(id) ON DELETE SET NULL` (deferred from M1-34 because the table did not exist)
+   and `ALTER TABLE groups ADD CONSTRAINT ... FOREIGN KEY (provider_id) REFERENCES
+   identity_providers(id) ON DELETE RESTRICT` (deferred from M1-27, 03 `groups`).
 2. sqlc queries `internal/identity/adapters/postgres/queries/providers.sql` and `identities.sql`,
    repository.
 3. Port `internal/identity/providers.go` (names fixed):
@@ -118,14 +120,13 @@ inventing their own account mapping, which closes the account takeover through e
      remaining sign-in methods for `Unlink`. This ticket registers the sources "identities" and
      "active devices"; M1-39 (local password, TOTP) and M1-40 (passkeys) register theirs.
 5. Config validation per kind in `internal/identity/domain/provider` (pure, strict decoding:
-   unknown members, duplicate keys and JSON `null` rejected), schemas named as in 03:
-   - `identity_provider.oidc.v1`: `issuer` (required; absolute `https` URL without query and
-     fragment), `client_id` (required, non-empty), `client_auth` (required: `private_key_jwt` or
-     `client_secret_basic`, 08 "2.2" step 5), `secret_ref` (required; a valid secret reference of
-     the secret provider holding the private key or the client secret; validated for syntax
-     only, never resolved here), `allowed_tenant_ids` (optional list of non-empty strings; required
-     and non-empty when the issuer path contains `/common/` or `/organizations/`, 08 "2.3"),
-     `groups_claim` (optional claim name; absent means no group sync, 08 "3.4").
+   unknown members, duplicate keys and JSON `null` rejected), exactly the schemas of 08 "2.6"
+   (normative; field names and rules there):
+   - `identity_provider.oidc.v1`: `issuer`, `client_id`, `client_auth`, `client_secret_ref`
+     (exactly with `client_secret_basic`), `client_key_ref` (exactly with `private_key_jwt`),
+     `client_key_alg`, `client_key_id`, `client_cert_x5t_s256`, `allowed_tenant_ids` (required
+     when `issuer` contains `{tenantid}`), `app_redirect_uris`, `groups_claim`. Secret references
+     are validated for syntax only, never resolved here.
    - `identity_provider.trusted_header.v1`: `login_header` (required, an HTTP field name token
      per RFC 9110), `name_header` (optional, same rule).
    - `identity_provider.local.v1`: empty object.
@@ -136,10 +137,9 @@ inventing their own account mapping, which closes the account takeover through e
    `internal/identity/adapters/httpapi/providers.go`, `credentials.go` for the eight operations;
    enable them in `services/server/api/operations.yaml` and regenerate (command from
    `services/server/README.md`).
-7. Docs: `docs/spec/08-identitaet.md` gets a new subsection "2.6 Konfiguration je Treiber" with
-   the three schemas above, and "3.3" gets the exact unlink rule and the rule that unlinking does
-   not end sessions; rulings in `docs/DECISIONS.md`; identity README;
-   `services/server/CHANGELOG.md`.
+7. Docs: 08 "2.6" and "3.3" already state the schemas and the unlink, disable and delete rules
+   (spec first; change them only where the implementation proves them wrong); rulings in
+   `docs/DECISIONS.md`; identity README; `services/server/CHANGELOG.md`.
 
 ## Out of scope
 
@@ -186,9 +186,10 @@ Provider management (actions from 05; `authorize` with resource `instance`):
   `local` provider gives `409 conflict`. Map the unique violations of PostgreSQL to these
   conflicts; never leak constraint names.
 - Validation errors are `400 validation_failed` with `errors[]` pointers into `/config/...`.
-- `enabled = false` stops new sign-ins through the provider (the drivers call `Enabled`); existing
-  sessions continue until they end or an owner revokes them. Record as ruling (the spec does not
-  say more).
+- `enabled = false` stops new sign-ins through the provider (the drivers call `Enabled`) and, in
+  the same unit of work, revokes every live session started with an identity of this provider
+  (`revoke_reason = 'admin'`, families revoked, one `session.revoked` each) through
+  `Auth.RevokeSession` of M1-34 (08 "3.3", R-ID-12).
 - Responses never contain secret values; `config` contains `secret_ref` names only, exactly as
   stored after normalization. Audit details name the provider id, kind and the names of changed
   members, never config values.
@@ -227,9 +228,10 @@ step-up, audit):
    `CredentialSource`: active identities at enabled providers other than this one; active devices
    of the person (device pairing, 08 "5.3"); later passkeys. Zero gives `409 conflict` with
    `reason` `no_login_method_left` and a `hint`; the person keeps the identity.
-4. Otherwise set `unlinked_at = now`; audit allow; `204`. Sessions started with this identity
-   continue (`auth_sessions.identity_id` stays); ending them is `session.revoke` (M1-45). Record
-   as ruling.
+4. Otherwise set `unlinked_at = now` and revoke every live session started with this identity
+   (`revoke_reason` `logout` when the person unlinks their own identity, `admin` otherwise; families
+   revoked; one `session.revoked` each) through `Auth.RevokeSession` of M1-34 (08 "3.3", R-ID-12);
+   audit allow; `204`.
 
 Concurrency: two unlinks of different identities of one person in parallel must not both pass the
 count. Lock the person's active `user_identities` rows `FOR UPDATE` in ascending `id` (03 "6.3")
@@ -273,6 +275,10 @@ real `authz` and audit:
   unlinks for another person: `204`; non-owner for another person: `404`.
 - `TestUnlink_ConcurrentLastTwo`: a person with exactly two identities and no device; two parallel
   unlinks: exactly one succeeds.
+- `TestUnlink_EndsItsSessions`: a session started with the identity is revoked (`logout` for self,
+  `admin` for an owner) with `session.revoked`; a session of another identity stays.
+- `TestDisableProvider_EndsSessions`: disabling revokes the sessions of all its identities
+  (`admin`) and new sign-ins fail; re-enabling restores no session.
 - `TestListForDiscovery`: only enabled providers, only id, kind, name.
 
 Commands that must pass:
@@ -288,8 +294,8 @@ make check
 
 ## Acceptance criteria
 
-- [ ] Migration creates `identity_providers` and `user_identities` exactly as 03 and adds the FK
-      on `auth_sessions.identity_id`.
+- [ ] Migration creates `identity_providers` and `user_identities` exactly as 03 and adds the FKs
+      on `auth_sessions.identity_id` and `groups.provider_id`.
 - [ ] `ExternalIdentity`, `Providers` and `Identities` exist with the names of "Scope".
 - [ ] Config schemas of the three kinds are enforced strictly and documented in 08 "2.6"; secrets
       only as `secret_ref`, never resolved or returned as values.
@@ -298,7 +304,8 @@ make check
 - [ ] ID-T04 green: mapping never uses e-mail or display name.
 - [ ] Unlink refuses to remove the last sign-in method, also under concurrency.
 - [ ] Credential overview conforms to `CredentialOverview` without `null` members.
-- [ ] Rulings in DECISIONS.md (provider disable keeps sessions, unlink keeps sessions, codes).
+- [ ] Unlinking and disabling end the sessions they concern (08 "3.3"); rulings in DECISIONS.md
+      link the spec.
 - [ ] `make check` green.
 
 ## Definition of done

@@ -74,36 +74,16 @@ passwords in answer and timing.
 
 ## Scope
 
-Precondition (check first): `docs/spec/03-datenmodell.md` table `local_credentials` must contain
-a column for the start of the failure window, expected `fail_window_started_at timestamptz NULL`
-(requested by the brief writer; without it `failed_count` cannot be tied to
-`auth.login_fail_window`). If the column is absent, stop with `Verdict: BLOCKED missing
-local_credentials.fail_window_started_at in 03` (P-11). If it exists under another name, use that
-name.
-
-Specification first, on this branch, before production code:
-
-1. `docs/api/openapi.yaml`:
-   - `LocalCredentialSet`: `password` becomes optional; add optional `totp_code` (string,
-     `pattern: ^[0-9]{6}$`); keep `totp_enroll`; `additionalProperties: false`; description lists
-     the rules from Design notes ("at least one field; the first call must set `password`").
-   - `LocalCredentialResult`: add required `totp_enabled` (boolean).
-   - `setMyLocalCredential`: responses add `403` (`feature_disabled`), `409` (`conflict`, no local
-     identity), `400`.
-   - `loginWithPassword`: description "New devices are `pending` until approved (M1-38)."
-2. Regenerate the generated blocks of `docs/spec/06-api.md` (M1-03 generator).
-3. `docs/spec/08-identitaet.md`, "Lokale Konten": login name is the `subject` of the local
-   identity; TOTP enrolment with confirmation (`totp_enroll`, then `totp_code`); AEAD scheme and
-   `auth.totp_key_ref`; otpauth issuer; the meaning of "Anmeldedaten bestehen" for step-up; the
-   failure window semantics; rehash on parameter change; source of the common-password list.
-   "Konfigurationswerte dieses Kapitels": add `auth.totp_key_ref` with default
-   `file:<secrets.dir>/totp_key`. In 07 "Ablauf" step 8 add the sentence: "`passkey.register` und
-   `local_credential.set` verlangen Step-up nur, wenn die Person schon einen aktiven Passkey bzw.
-   ein eingerichtetes lokales Passwort mit TOTP hat; Mensch mit Sitzung bleibt Pflicht." (M1-40
-   adds the identical sentence; keep the text exactly so the merge is clean.)
-4. `docs/operations/configuration.md` section "Geheimnisse": row `totp_key`, "erzeugt", service
-   `server`, use `auth.totp_key_ref`. Regenerate section 4 with the M1-08 generator.
-5. `docs/DECISIONS.md`: rulings listed in Design notes.
+The specification is in place (planning, spec first): 03 `local_credentials` with
+`fail_window_started_at` and its check; `docs/api/openapi.yaml` (`LocalCredentialSet` with
+optional `password`, `totp_enroll`, `totp_code`; `LocalCredentialResult.totp_enabled`; responses
+and descriptions of `setMyLocalCredential` and `loginWithPassword`); 08 "2.5" (login name, TOTP
+enrolment with confirmation, AES-256-GCM and `auth.totp_key_ref`, otpauth issuer, when the password
+path counts as established, rehash, common-password list with source in the adapter README), "13"
+(failure window) and "18" (`auth.totp_key_ref`); 07 "4.2" step 8 (`bedingt` with
+`hat_anmeldedaten`); `docs/operations/configuration.md` section "Geheimnisse" (row `totp_key`).
+Change them only where the implementation proves them wrong (spec first, `make api-lint
+api-checks` green). `docs/DECISIONS.md`: rulings listed in Design notes.
 
 Production code under `services/server/`:
 
@@ -158,9 +138,8 @@ type CommonPasswords interface { Contains(password string) bool }
 
 - Passkeys and the conditional step-up rule for `passkey.register` (M1-40), device approval of
   the pending devices this login creates (M1-38).
-- Step-up with password and TOTP (`step_up_method = 'password_totp'`): 08 foresees it for the
-  console, but no API operation exists; it belongs to the console session work (M6) after a
-  specification change.
+- Step-up with password and TOTP (`step_up_method = 'password_totp'`): its operation comes with the
+  console session (M6-01), spec first (08 6.2).
 - Discovery field `local_password_enabled` (M1-46).
 - Re-encrypting TOTP secrets after a key change (operations task, later).
 - Revoking other sessions on password change (not specified).
@@ -350,7 +329,7 @@ make check
 
 ## Acceptance criteria
 
-- [ ] Precondition checked; migration matches 03.
+- [ ] Migration matches 03 (including `fail_window_started_at` and its check).
 - [ ] ID-T20, ID-T21, ID-T24 green and named after their IDs; the TOTP part of ID-T27 green.
 - [ ] Password login answers `404` when switched off; unknown names and wrong passwords are
       indistinguishable in body and timing.

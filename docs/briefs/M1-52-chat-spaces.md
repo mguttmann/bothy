@@ -78,16 +78,12 @@ M1-53 to M1-55.
 
 ## Scope
 
-Specification changes (first):
-
-- `docs/spec/01-produkt.md` "14. Konfigurationswerte": new row `space.name_max_chars`, default
-  `100`, "Länge eines Bereichsnamens" (the specification has no limit for space names yet).
-- `docs/api/openapi.yaml`, descriptions only: `SpaceView.level` states that a space visible only
-  through one of its channels reports `read` and no capabilities; `SpaceCreate.name` and
-  `SpaceUpdate.name` name the limit `space.name_max_chars`; `archiveSpace` states the archive rule
-  of 07 "4.5 Archivierte Bereiche und Kanäle" in one sentence.
-- Run `make api-lint`, `make api-checks` and the M1-17 generation target; `make codegen-check`
-  shows no diff.
+The specification is in place (planning, spec first): 03 `spaces` (name limit
+`space.name_max_chars` in 03 9, icon from `space-icons`), 07 "4.5" and "7.2"/"7.4" (archive rule;
+`Scope` builds lists per request, so new spaces need no new rights version), and in
+`docs/api/openapi.yaml` the descriptions of `SpaceView.level`, `SpaceCreate`, `SpaceUpdate` and
+`archiveSpace`. Change them only where the implementation proves them wrong; run `make api-lint`,
+`make api-checks` and the M1-17 generation target; `make codegen-check` shows no diff.
 
 Code (paths under `services/server/`):
 
@@ -105,13 +101,9 @@ Code (paths under `services/server/`):
 - `internal/chat/adapters/postgres` (sqlc queries `spaces.sql`, `sidebar.sql`, repository),
   `internal/chat/adapters/httpapi` (handlers of the seven operations),
   `internal/chat/adapters/authzsource` (the space part of `authz.StructureSource`).
-- Shared helpers, only if not already reachable for `chat`:
-  - the generated palette and icon key list of M1-46: if it lives in a package `chat` may not
-    import (anything but `internal/kernel/**`, `identity`, `authz`), move it to
-    `internal/kernel/designkeys` (pure data, no imports), repoint its generator and gate check,
-    register the package as kernel-core in `architecture/modules.yaml`, add it to 02 "4.5";
-  - the display-text validator is `internal/kernel/textcheck` (M1-26, kernel-core in 02 "4.5");
-    use it as is.
+- Shared helpers (kernel-core, 02 "4.5"): the generated palette and `space-icons` list in
+  `internal/kernel/designkeys` (M1-46) and the display-text validator `internal/kernel/textcheck`
+  (M1-26); use them as they are.
 - `internal/authz`: only if the base lacks it (each with a test): in an archived space every
   effective level is capped at `read` (07 "4.5"; M1-53 builds the same cap for channels, share
   one implementation); `Scope` for spaces can express "all spaces" for owners and principals with
@@ -187,7 +179,8 @@ Validation:
   characters (SEC-IN-4); unique case-insensitive among non-archived spaces, else `409 conflict`.
 - `color`: a category colour key from the generated palette list; `icon`: an icon key from the
   generated list. Hex values, emoji and unknown keys give `400 validation_failed` (pointer
-  `/color` or `/icon`). `SpaceUpdate` cannot clear `icon` or `color` (no `null`, no clear field).
+  `/color` or `/icon`). `SpaceUpdate` cannot clear `icon` or `color` (no `null`, no clear field;
+  its description says so).
 - `updateSpace` requires `If-Match` (`428` missing, `412` stale with `current`), bumps `version`.
 
 Visibility and archive:
@@ -230,9 +223,8 @@ Events (all durable, no `null`, scope `{space_id}`): `space.created` (create), `
 (update and move), `space.archived` (archive), payload `SpacePayload`, resource version = space
 version.
 
-Rulings to record in `docs/DECISIONS.md`: fractional index scheme and lock for
-create and move; `SpaceView.level` for channel-only visibility; `space.name_max_chars`; location of
-shared helpers if moved to `internal/kernel`.
+Rulings to record in `docs/DECISIONS.md`: fractional index scheme and lock for create and move
+(the other decisions are in the specification).
 
 ## Tests (write them first)
 

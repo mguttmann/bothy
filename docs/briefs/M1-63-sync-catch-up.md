@@ -1,6 +1,6 @@
 # M1-63: Catch-up over REST and snapshot
 
-Status: ready | Depends on: M1-60, M1-61 | Etappe: M1
+Status: ready | Depends on: M1-61 | Etappe: M1
 
 ## Goal
 
@@ -116,7 +116,7 @@ Snapshot
    - `principal`: `PrincipalRef` of the actor from `identity.Directory` (new allowed edge `sync -> identity`).
    - `spaces`, `channels`: `SpaceView` and `ChannelView` of the visible, not archived spaces and channels with level and capabilities, through the chat port listing that serves `listSpaces` and `listSpaceChannels`; DM channels of participation are included.
    - `sidebar`: `Settings.ListSidebar` of M1-61.
-   - `unread_threads`: `Threads.Counters` for the visible channel ids, combined in Go with the actor's `read_states` of those channels: unread = `last_message_seq - GREATEST(last_read_seq, unread_floor_seq)` (never below 0); a thread is listed when unread is above 0 or `mention_count` is above 0; each listed thread is checked with `authorize(actor, thread.read, thread)` and dropped on deny (07 'Abfrage-Muster' rule 3). No SQL join across module tables (02 'Regeln' point 1); the join in 07 'Abfrage-Muster' illustrates the result, not the place of the query.
+   - `unread_threads`: `Threads.Counters` for the visible channel ids, combined in Go with the actor's `read_states` of those channels: unread = `last_message_seq - GREATEST(last_read_seq, unread_floor_seq)` (never below 0), and the unread mentions per thread from `messaging.Mentions.CountUnread` (M1-60) with the same read positions (computed, never stored, 03 R-DM-32); a thread is listed when unread is above 0 or its mention count is above 0; each listed thread is checked with `authorize(actor, thread.read, thread)` and dropped on deny (07 'Abfrage-Muster' rule 3). No SQL join across module tables (02 'Regeln' point 1); the join in 07 'Abfrage-Muster' illustrates the result, not the place of the query.
    - `active_runs`: from `RunSummarySource`. In M1 `internal/wire` binds `internal/sync/adapters/noruns`, which returns an empty list, because the table `runs` exists only from M2-05; its doc comment says so and names M2-05 as the ticket that binds the `runs` port.
    - `agents`: agents the actor may read (`agent.read`) from the agents port listing behind `listAgents`, each with `state: unknown` and without `reported_billing_mode`, because no heartbeat exists before M2-20 (`AgentRuntimeState` documents `unknown`).
    - `settings`: all stored rows of the person (M1-61).

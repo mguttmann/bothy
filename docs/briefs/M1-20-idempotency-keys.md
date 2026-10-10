@@ -39,7 +39,7 @@ After this ticket the `Idempotency-Key` header works inside the same unit of wor
 
 Paths are relative to `services/server/` unless they start with `docs/`.
 
-1. `internal/kernel/idempotency` (port; stdlib and kernel only): types, `Store` interface, `ErrInProgress`.
+1. `internal/kernel/idempotency` (port; stdlib and kernel only): types, `Store` interface, `ErrInProgress`, and `MarkOneTimeSecret(ctx)` / `OneTimeSecretMarked(ctx)` for responses that carry a one-time secret (Design notes "One-time secrets").
 2. `internal/sync`: the store implementation behind the kernel port (`app` for TTL and cleanup logic, `adapters/postgres` with `queries/idempotency_keys.sql` and the sqlc output), the job handler `sync.idempotency_cleanup`, `README.md` (table, job, port).
 3. Migration `migrations/<next free number>_sync_idempotency_keys.sql` (goose, sequential number per M1-01 lint) and the `sqlc.yaml` entry if needed.
 4. `internal/platform/httpserver`: the middleware for `StageIdempotency` (file `idempotency.go`), built on `kernel/idempotency` and `kernel/txn`.
@@ -94,6 +94,17 @@ SHA-256 over the upper-case method, a line feed, the escaped request path (`r.UR
    - every other status (`401`, `428`, `429`, `3xx`, `5xx`): roll back and store nothing.
    Then send the buffered response.
 4. Deadlock and lock-timeout retries of the unit of work (M1-13, `database.tx_retry_max`) re-run steps 2 and 3; reset the response buffer and restore the body for every attempt.
+
+### One-time secrets
+
+06 "Idempotenz" (row "POST mit einmaligem Geheimnis", R-API-26) and 03 Grundsatz 9: a response
+that carries a one-time secret (enrollment code, API token, later webhook secrets) is never stored.
+A handler that returns such a secret calls `idempotency.MarkOneTimeSecret(ctx)`. For a marked `2xx`
+the stage stores `response_status` and the body `{"one_time_secret": true}` instead of the response
+(and `resource_id` as usual). A replay of such a row answers `409 conflict` with `reason:
+one_time_secret`, `hint` "create a new one" and `Idempotent-Replay: true`, without the secret and
+without running the handler. Later tickets (M1-37 enrollment codes, M1-44 API tokens) only call the
+marker.
 
 ### Replay
 
@@ -163,6 +174,7 @@ Integration tests against PostgreSQL 18 (`pgtest`), through `httpservertest` wit
 - `TestNotStored_5xx`, `TestNotStored_429` (a fake rate-limit stage answers 429: no row), `TestNotStored_428`.
 - `TestStoredFinal_404ReplayedWithoutEffect`, `TestStoredFinal_409RollsBackEffect` (the handler writes an effect row and then returns a conflict: the effect row is gone, the 409 is stored and replayed with its original `correlation_id`).
 - `TestPerPrincipal_SameKeyIndependent`.
+- `TestOneTimeSecret_NotStoredReplay409`: a marked handler returns a secret; the row holds no part of it; the replay answers `409` with `reason: one_time_secret` and `Idempotent-Replay: true`.
 - `TestExpired_TreatedAsAbsent`.
 - `TestInvalidKey_400`, `TestIgnored_OperationWithoutKeyParameter`, `TestIgnored_AnonymousActor`.
 - `TestRetry_ReinvokesWithFreshBuffer`: through a fault hook of M1-13 if it exists, else a unit test of the stage with a fake unit of work that reports a retryable error once.
@@ -182,6 +194,7 @@ Commands that must pass: `cd services/server && go test -race ./internal/sync/..
 - [ ] A repeat while the first request runs gives `409 request_in_progress` after `database.lock_timeout`.
 - [ ] `401`, `429` and `5xx` are not stored; the repeat after step-up takes effect once.
 - [ ] Parallel requests with the same key have exactly one effect.
+- [ ] A response marked as one-time secret is never stored; its replay answers `409` with `reason: one_time_secret`.
 - [ ] The key is valid per principal; expired keys behave as absent and the cleanup job removes them in batches.
 - [ ] The migration equals the 03 table; `make migrations-lint` is green.
 - [ ] Generator checks hold for every keyed operation of `openapi.yaml`.

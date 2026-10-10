@@ -107,9 +107,12 @@ Paths are relative to `services/server/`.
 
 **Tables** (03 section 4.3, verbatim):
 - `groups`: `source` default `'local'` with `CHECK (source IN ('local','oidc_claim'))`,
-  `description` default `''`, FK `created_by -> principals(id)` ON DELETE RESTRICT, partial
-  unique index `lower(name) WHERE deleted_at IS NULL`, partial unique index `(external_ref)
-  WHERE source = 'oidc_claim'`.
+  `provider_id uuid NULL` (its FK to `identity_providers` follows with M1-36, which creates that
+  table), the checks `(source = 'oidc_claim') = (provider_id IS NOT NULL)` and `(source =
+  'oidc_claim') = (external_ref IS NOT NULL)`, `description` default `''`, FK `created_by ->
+  principals(id)` ON DELETE RESTRICT, partial unique index `lower(name) WHERE deleted_at IS NULL`,
+  partial unique index `(provider_id, external_ref) WHERE source = 'oidc_claim' AND deleted_at IS
+  NULL` (R-DM-33).
 - `group_memberships`: FKs `group_id -> groups(id)`, `user_id -> users(principal_id)`,
   `added_by`, `removed_by -> principals(id)`, all ON DELETE RESTRICT; `expiry_reminded_at`,
   `expiry_reported_at`; partial unique index `(group_id, user_id) WHERE removed_at IS NULL`; index
@@ -309,8 +312,9 @@ make check
 
 ## Acceptance criteria
 
-- [ ] The three tables match 03 section 4.3; the only deviation is the deferred target foreign
-      keys, documented in the migration and the README.
+- [ ] The three tables match 03 section 4.3; the only deviations are the deferred target foreign
+      keys and the deferred FK `groups.provider_id` (M1-36), documented in the migration and the
+      README.
 - [ ] The database rejects `trigger` and capabilities beyond `upload` for agent and app
       subjects.
 - [ ] Grants cannot be changed in place; revocation and the reminder can be set exactly once.

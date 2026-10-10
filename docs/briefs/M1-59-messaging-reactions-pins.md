@@ -1,6 +1,6 @@
 # M1-59: Reactions and pins
 
-Status: ready | Depends on: M1-56 | Etappe: M1
+Status: ready | Depends on: M1-58 | Etappe: M1
 
 ## Goal
 
@@ -117,25 +117,23 @@ All paths below `services/server/` unless stated.
    `sqlcgen/`.
 7. `internal/messaging/adapters/httpapi`: `AddReaction`, `RemoveReaction`, `ListReactions`,
    `PinMessage`, `UnpinMessage`, `ListPins`.
-8. Spec first, `docs/api/openapi.yaml`: add `'410': $ref: '#/components/responses/Gone'` to
-   `addReaction` and `pinMessage` (a deleted message cannot get either); regenerate `api/rest`.
-9. Spec first, configuration: unless a chapter table already defines a byte limit for a reaction
-   symbol, add `reaction.emoji_max_bytes` with standard `64` and meaning "größte Länge eines
-   Reaktions-Zeichens in Byte (UTF-8)" to `docs/spec/06-api.md` "Konfigurationswerte dieses
-   Kapitels" (messaging is a module of chapter 06, 02 4.2), add the key to the configuration schema
-   (M1-07) and regenerate `docs/operations/configuration.md` with the generator
-   `make config-doc-check` verifies.
+8. The specification is in place: `docs/api/openapi.yaml` has `410 Gone` on `addReaction` and
+   `pinMessage`; 03 9 defines `reaction.emoji_max_bytes`, `reaction.max_distinct_per_message` and
+   `pin.max_per_thread`; 03 `reactions` and `pins` state the limits (`400 validation_failed`, code
+   `limit_reached`); 04 9 item 3 and 15 5 state that reaction and pin events apply in `seq` order
+   without raising the message version. Change them only where the implementation proves them
+   wrong.
+9. Configuration: add the three keys to the configuration schema (M1-07) and keep
+   `docs/operations/configuration.md` current (`make config-doc-check`).
 10. `api/operations.yaml`: enable the six operations; regenerate.
 11. Docs: `internal/messaging/README.md` (German, existing structure), `services/server/CHANGELOG.md`,
-    `docs/DECISIONS.md` entries for notes 3, 6 and 9.
+    `docs/DECISIONS.md` entry for note 3 (notes 6 and 9 are in the specification).
 
 ## Out of scope
 
 - Editing, deleting, revisions and redaction (M1-58), except the coordination of note 9.
 - History paging (M1-57), mentions and templates (M1-60), push for reactions (none planned).
 - Delivery of the events over the gateway (M1-65); client rendering (M4); import of pins (M8).
-- A limit for distinct reactions per message or pins per thread: not specified; reported as a spec
-  gap, do not invent one.
 
 ## Boundaries
 
@@ -197,13 +195,15 @@ All paths below `services/server/` unless stated.
 5. `removeReaction`: deletes only the caller's row for this message and symbol. Only when a row was
    deleted: append `reaction.removed` with the count after the delete. `204` in both cases; an
    invisible message gives `404`.
-6. Message version (DECISIONS.md): reactions and pins do not raise `messages.version`, because 03
-   raises it only for edit, delete and status change, and raising it would make an author's next
-   edit fail with `412` after someone reacted. Their events carry the current message version in
-   `resource.version`; the payload carries absolute values (`count`, the pin), so applying it twice
-   is harmless. 04 "Zustellgarantie" item 3 and 15 section 5 let clients apply an event only when
-   `resource.version` is greater; that conflict is reported as a spec gap. If 04 or 15 resolve it
-   differently when you start, follow them and adjust the tests.
+6. Message version (03 `messages.version`, 04 9 item 3, 15 5): reactions and pins do not raise
+   `messages.version`, because raising it would make an author's next edit fail with `412` after
+   someone reacted. Their events carry the current message version in `resource.version`; the
+   payload carries absolute values (`count`, the pin), so applying it twice is harmless; clients
+   apply them in `seq` order.
+   Limits: adding a new symbol to a message that already has `reaction.max_distinct_per_message`
+   distinct symbols, and pinning in a thread with `pin.max_per_thread` pins, give `400
+   validation_failed` with code `limit_reached` (pointer `#path/emoji` resp. empty); checked under
+   the message row lock so the bound is exact.
 7. Representation (one function for REST and events): `reactions` is a list of `{emoji, count}`
    for the message, ordered by the earliest `created_at` of each symbol, then by symbol;
    `my_reactions` lists the caller's symbols in the same order and appears only in REST responses
@@ -212,19 +212,16 @@ All paths below `services/server/` unless stated.
    summaries, own reactions and pins with one query each for all message IDs of the page.
 8. `listReactions`: keyset order `created_at` ascending, then `principal_id`, then `emoji`;
    optional `emoji` filter (validated by note 3); `limit` with `api.page_size_default` and
-   `api.page_size_max`. Reuse the one cursor codec of earlier list operations, bound to the list
-   name, the message and the filter (a cursor of another list or filter gives `400
-   cursor_invalid`); if none exists on your base, add it once as a shared helper in
-   `internal/platform/httpserver` (opaque, versioned, carrying list name, filter binding and
-   keyset) and document it. Items `Reaction{emoji, principal: PrincipalRef, created_at}` with
+   `api.page_size_max`. Use the cursor codec of `internal/platform/httpserver` (M1-18), bound to
+   the list name, the message and the filter (a cursor of another list or filter gives `400
+   cursor_invalid`). Items `Reaction{emoji, principal: PrincipalRef, created_at}` with
    `PrincipalRef` from the `identity` `Directory` port in one batch call. A deleted message returns
    an empty page.
-9. Deletion of a message removes its `reactions` and `pins` rows in the same transaction (decided
-   for M1-58; the event payloads are redacted there). M1-58 runs in parallel. At start, if M1-58
-   (the delete use case) is merged on your base, add `DELETE FROM reactions` and `DELETE FROM pins`
-   for the message to that use case and the test `TestDeleteMessage_RemovesReactionsAndPin`. If it
-   is not, check again right before your local merge and add both then if M1-58 was merged
-   meanwhile. Either way, note 7 keeps tombstones free of reactions and pins.
+9. Deletion of a message removes its `reactions` and `pins` rows in the same transaction (03
+   `messages`, 20 4.2; the event payloads are redacted by M1-58). M1-58 is a dependency of this
+   ticket: add `DELETE FROM reactions` and `DELETE FROM pins` for the message at the marked step of
+   its delete use case and the test `TestDeleteMessage_RemovesReactionsAndPin`. Note 7 keeps
+   tombstones free of reactions and pins.
 10. `pinMessage`: `INSERT INTO pins (message_id, thread_id, pinned_by, pinned_at) ... ON CONFLICT
     DO NOTHING`; `thread_id` is the message's thread. Only when inserted: append `pin.added` with
     payload `PinPayload{pin}`. Already pinned: `204` without event. Any message kind may be pinned.
@@ -234,8 +231,9 @@ All paths below `services/server/` unless stated.
 12. `listPins`: `authorize(thread.read, thread)`; `SELECT` joins `messages` with
     `m.channel_id = ANY(@visible_channel_ids)` and `m.deleted_at IS NULL`; order `pinned_at DESC`,
     then `message_id DESC`; items `Pin{message_id, thread_id, pinned_by, pinned_at}`; unpaginated
-    (`PinList`). Each item passes `authorize(message.read)`; a denied item is dropped and logged as
-    `authz_filter_mismatch` with only action and resource kind.
+    (`PinList`, bounded by `pin.max_per_thread`). Each item passes `authorize(message.read)`; a
+    denied item is dropped, logged with only action and resource kind and counted in
+    `bothy.authz.errors` with `bothy.reason = filter_mismatch` (07 7.4 rule 3).
 13. Every `SELECT`, `UPDATE` or `DELETE` on `reactions` or `pins` joins `messages` with
     `channel_id = ANY(...)`; keep `TestQueriesCarryVisibleChannelPredicate` (M1-57) green when it is
     on your base.
@@ -267,8 +265,10 @@ Integration against PostgreSQL 18 (`pgtest`, world of 07 "Beispiele", HTTP throu
 - `TestAddReaction_Rights`: a principal with `read` only gets `403 forbidden`; Alex on a Marketing
   message gets `404`, equal to a random UUIDv7; a read-only channel gives `403 channel_read_only`;
   an operator agent reacts in its channel.
-- `TestAddReaction_DeletedMessage410` (tombstone created by a test helper if M1-58 is not on your
-  base).
+- `TestAddReaction_DeletedMessage410` (tombstone through the delete operation of M1-58).
+- `TestReactionAndPinLimits`: with small limits in the test configuration, one more distinct symbol
+  and one more pin give `400 limit_reached`; an existing symbol can still be added by another
+  person.
 - `TestAddReaction_InvalidSymbol400` with pointer `#path/emoji`.
 - `TestRemoveReaction_OwnOnlyAndIdempotent`: removing removes only the caller's row; a second call
   `204` without event; the event carries the count after removal.
@@ -308,8 +308,8 @@ Commands that must pass:
       receive actions of 05.
 - [ ] Every `Message` representation carries `reactions`, `pinned` and, in REST only,
       `my_reactions`.
-- [ ] `openapi.yaml` documents `410` for `addReaction` and `pinMessage`; the configuration key is in
-      chapter 06, the schema and the generated reference.
+- [ ] `410` for `addReaction` and `pinMessage` as in `openapi.yaml`; the three configuration keys
+      of 03 9 are in the schema and the generated reference; the limits hold.
 - [ ] The two new libraries are pinned, licensed as allowed, and used only in
       `adapters/unicode`; README, doc comments, CHANGELOG and DECISIONS.md entries are present.
 - [ ] `make check` is green.

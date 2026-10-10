@@ -69,7 +69,7 @@ Method on the `authz` application service: `VerifyInvariants(ctx context.Context
 
 ### 3. Pure domain functions (`internal/authz/domain`)
 
-- `TriggerSet(w World, agent AgentPolicy, t time.Time) []ids.ID`: active owners; plus active users with a valid `trigger` grant on the instance, on the space of a served channel or on a served channel; plus active members (membership valid at `t`, group not deleted) of groups that hold such a grant. Validity exactly as 07 section 2.5: at `expires_at = t` a row is already invalid. Agents and apps never appear (R-DM-08). The result is sorted and unique.
+- `TriggerSet(w World, agent AgentPolicy, t time.Time) []ids.ID`: active owners; plus active users with a valid `trigger` grant on the instance, on a served space (the space of a served channel, or a space whose default operator is the agent, 03 section 6.4 point 3) or on a served channel; plus active members (membership valid at `t`, group not deleted) of groups that hold such a grant. Validity exactly as 07 section 2.5: at `expires_at = t` a row is already invalid. Agents and apps never appear (R-DM-08). The result is sorted and unique.
 - `DiffVisible(before, after Snapshot) PrincipalDiff`: spaces compare by visibility only (`added`, `removed`, never `changed`, no `level`); channels compare `(level, capabilities)`: `added` carries `level` and `capabilities`, `removed` carries `kind` and `id` only, `changed` appears when level or capabilities differ and carries `level`, `previous_level` and `capabilities` (the new set). Lists are sorted by `(kind, id)`.
 - The served targets are not computed in `authz`; they come from `StructureSource`.
 
@@ -92,9 +92,9 @@ Port `Admin` in `internal/authz`, implementation in `internal/authz/app`, persis
 | `UpdateGroup(ctx, actor, groupID, UpdateGroupCmd{Name, Description})` (both optional) | `group.update` | no | same name rules; a group with `source = 'oidc_claim'` keeps its name in sync with the claim, so renaming it is `409 conflict` |
 | `DeleteGroup(ctx, actor, groupID, reason)` | `group.delete` | yes, all members with `removed_at IS NULL` | sets `deleted_at`; revokes every active grant of the group (`revoked_at`, `revoked_by` = actor, `revoke_reason` = reason) in ascending `id` |
 | `AddGroupMember(ctx, actor, groupID, AddMemberCmd{UserID, ExpiresAt})` (`ExpiresAt` optional) | `group.member.add` | yes, the user | subject must be a principal of kind `user` that is not `deleted`, else `404`; `expires_at` must lie after now, else `400 validation_failed`; an existing active membership is `409 conflict` |
-| `RemoveGroupMember(ctx, actor, groupID, userID)` | `group.member.remove` | yes, the user | no active membership is `404` |
+| `RemoveGroupMember(ctx, actor, groupID, userID)` | `group.member.remove` | yes, the user | never a member is `404`; a membership that existed but is already removed or expired succeeds without change (06 2 "Ohne Wirkung": no rights version, audit with `no_change: true`) |
 | `CreateGrant(ctx, actor, CreateGrantCmd{SubjectKind, SubjectID, TargetKind, TargetID, Level, Capabilities, ExpiresAt, Reason})` | `grant.create` | yes, the subject principal, or all members with `removed_at IS NULL` for a group | reason required; `expires_at` after now; target must exist (else `404`) and not be archived (else `409 conflict`); subject kind and delegation limits are evaluated by the guard of `authorize` (07 section 2.6, AZ-M31, AZ-M37, AZ-M38); the row is never updated later (R-DM-09) |
-| `RevokeGrant(ctx, actor, grantID, reason)` | `grant.revoke` | yes, as for `CreateGrant` | an already revoked grant is `409 conflict`; revoking is limited by 07 section 2.6 point 3 (AZ-M39) |
+| `RevokeGrant(ctx, actor, grantID, reason)` | `grant.revoke` | yes, as for `CreateGrant` | an already revoked grant succeeds without change (06 2 "Ohne Wirkung": no rights version, no event, audit with `no_change: true`); revoking is limited by 07 section 2.6 point 3 (AZ-M39) |
 
 If the merged `authorize` from M1-28 has no guard for `grant.create` and `grant.revoke` that applies 07 section 2.6 with the pure delegation functions from M1-27, add the guard in `internal/authz` in this ticket.
 

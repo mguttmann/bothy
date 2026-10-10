@@ -184,11 +184,19 @@ threshold where it does not fire. The directory lies outside the `rules/*.yaml` 
   `lint` gains `tools/opscheck`; `.PHONY`. No SKIP: the files exist.
 - `tools/pyproject.toml`: add `opscheck` to `testpaths`, `pythonpath`, coverage `source`, mypy
   `files`.
-- `renovate.json`: a package rule for `custom.regex` in `tools/bin/tools.lock.json` with
-  `matchDepNames` `otelcol-contrib`, `promtool`, `amtool`, `loki`, `tempo` and `enabled: false`,
-  description: these validators follow the image versions in `infra/compose/`; bump image and pin
-  together; check `tool-versions` holds them equal. Sloth and tofu stay with the "release
-  binaries" group. `make lint` validates the file against the Renovate schema.
+- `renovate.json` (ADR 0041, "Images der Hilfsdienste im Compose-Stack"): (1) a package rule for
+  `custom.regex` in `tools/bin/tools.lock.json` with `matchDepNames` `otelcol-contrib`,
+  `promtool`, `amtool`, `loki`, `tempo` and `enabled: false`, description: these validators follow
+  the image versions in `infra/compose/`; the maintainer refreshes them with `make tools-lock` in
+  the image pull request; (2) a regex custom manager over `infra/compose/.env.example` that reads a
+  comment `# renovate: datasource=docker depName=<image>` directly above each
+  `BOTHY_<X>_VERSION=` line of the section "Images der Hilfsdienste" (add these comments, image
+  names as in `compose.yaml`), and one over `infra/compose/compose.yaml` that reads the defaults
+  `<image>:${BOTHY_<X>_VERSION:-<version>}`, both in one group "Compose-Images" so a bump changes
+  both files in one pull request, with `prBodyNotes` naming `make tools-lock` for the five
+  validators. Sloth and tofu stay with the "release binaries" group. `make lint` validates the
+  file against the Renovate schema; a test in `tools/opscheck/tests` checks that every
+  `BOTHY_<X>_VERSION` of that section has exactly one such comment.
 - `docs/quality/gates.md`: row `ops-check` (German) and, under "Was die Gates nicht abdecken",
   that a future OpenTofu module with providers must make `tofu init` work offline (the check
   fails otherwise). `docs/spec/23-qualitaet.md` "Gates": new group row `| Betrieb | \`ops-check\` |
@@ -210,8 +218,8 @@ threshold where it does not fire. The directory lies outside the `rules/*.yaml` 
 ## Out of scope
 
 - Metric names used in dashboards, rules and SLOs against the signal catalogue, cardinality, bucket
-  boundaries: M1-68 (`signal-check`). PromQL validity of the Grafana dashboard queries: not covered
-  by any M1 ticket (reported as a gap).
+  boundaries: M1-68 (`signal-check`). PromQL validity of the Grafana dashboard queries: M1-68 with
+  the `promtool` pinned here.
 - Grafana provisioning and the running Compose stack: portability test (M1-73, M7).
 - Canary test of telemetry content: M1-69.
 - OpenTofu resources and providers: later module tickets.
@@ -310,9 +318,11 @@ in `bothy-alerts.yaml`. For each row whose column "Konfigurationswert" is exactl
 2. `fetch_tools.py` reads zip archives. Reason: Loki publishes only zip assets.
 3. Collector pairs are validated in both orders. Reason: overlays merge lists by replacement, so
    the result depends on the order of `BOTHY_OTEL_EXPORTER` and `BOTHY_OTEL_EXPORTER_2`.
-4. Validator pins of components that also run as images follow the image versions; Renovate is
-   off for them and `tool-versions` holds them equal. Reason: a validator newer or older than the
-   running component accepts or rejects other keys.
+4. Validator pins of components that also run as images follow the image versions; Renovate bumps
+   the images (group "Compose-Images", ADR 0041), is off for the validators, and `tool-versions`
+   holds them equal. Reason: a validator newer or older than the running component accepts or
+   rejects other keys; the images need an update path, and one pull request per bump keeps image
+   and validator together.
 5. Alertmanager routing is part of the gate. Reason: alerting.md documents the routes as checked
    by hand; a wrong route silences pages.
 6. The collector check sets a fixed datadog host name in its work copy. Reason: otherwise

@@ -70,8 +70,9 @@ search build on this read path.
 9. Limits and windows only through named configuration keys from
    `docs/operations/configuration.md`; prose and comments name the key, never the number.
 10. History of one thread over `thread_seq`: at most one of `before_seq`, `after_seq`,
-    `around_seq`; without any, the newest page; items ascending; tombstones included
-    (openapi `listThreadMessages`; 06 "Paginierung" item 5; 04 "Thread-Sequenz").
+    `around_seq`; without any, the newest page; items ascending; tombstones included; the window
+    rules of `around_seq` and the flags as in 06 "Paginierung" item 5 (openapi
+    `listThreadMessages`; 04 "Thread-Sequenz").
 11. Keyset pages over `thread_seq`: a new message never changes an existing page (06 "Paginierung"
     items 2 and 5; ADR 0015).
 12. A deleted message keeps its row and `thread_seq` and is returned as a tombstone without content
@@ -81,8 +82,11 @@ search build on this read path.
 14. Every SQL statement on messaging tables carries `channel_id = ANY($visible)` (directly or via a
     join to `messages`), and every returned element is checked again with `authorize` (07 7.4 rules
     1 and 3; preparation for AZ-P12).
-15. REST always returns the full content; `getMessage` is the reload path for content cut in events
-    (04 "Umschlag" rule 2; `Message.content_truncated`).
+15. Lists cut `content_md` above `message.list_content_max_bytes` at a UTF-8 character boundary and
+    set `content_truncated: true`; `getMessage` always returns the full content and is the reload
+    path for content cut in lists and events (06 "Paginierung" item 5, 04 "Umschlag" rule 2,
+    `Message.content_truncated`). Reason: one page stays below `api.page_size_max` times that
+    value.
 16. `limit` defaults to `api.page_size_default`; larger values are capped at `api.page_size_max`,
     not rejected (06 "Paginierung" item 3).
 17. `getMessage` returns `ETag: "<version>"` (06 "Nebenläufigkeit" item 1); no JSON `null` in any
@@ -173,9 +177,9 @@ established inside `internal/messaging`; the names below are the required public
       and invisible threads take the same code path and return the same error value (02 9.2).
    3. Get the visible channel IDs for `message.read` from `Authorizer.Scope`.
    4. Run the one statement for the mode (note 4); then call `authorize(message.read, message)`
-      per item (cached snapshot). A denied item is dropped and logged at error level as
-      `authz_filter_mismatch` with only the action and the resource kind (07 7.4 rule 3; no IDs,
-      no content).
+      per item (cached snapshot). A denied item is dropped, logged at error level with only the
+      action and the resource kind (no IDs, no content), and counted in `bothy.authz.errors` with
+      `bothy.reason = filter_mismatch` (07 7.4 rule 3, signals.md, alert `BothyAuthzError`).
    5. Build each item with the single representation function of M1-56.
 3. Window. `L = min(limit or api.page_size_default, api.page_size_max)`.
    - Newest: the `L` highest `thread_seq`.
@@ -197,17 +201,19 @@ established inside `internal/messaging`; the names below are the required public
    side), so all values stem from one snapshot under `READ COMMITTED`. The statements use the
    unique index `(thread_id, thread_seq)` and contain `m.thread_id = @thread_id AND m.channel_id =
    ANY(@visible_channel_ids::uuid[])`.
-5. Tombstone representation (one function, also used by M1-58): when `deleted_at` is set, the
+5. List representation: as `getMessage`, but `content_md` cut at `message.list_content_max_bytes`
+   (UTF-8 boundary) with `content_truncated: true` when cut, absent otherwise.
+6. Tombstone representation (one function, also used by M1-58): when `deleted_at` is set, the
    `Message` has `content_md = ""`, `attachments = []`, `mention_ids = []`, `reactions = []`,
    `my_reactions = []` (REST), `components = []`, `pinned = false`, `deleted_at` present,
    `content_truncated` absent; all other fields as stored. Tests create tombstones through a test
    helper that sets `content_md = ''`, `deleted_at`, `deleted_by` and `version = version + 1`
    directly, because the delete operation arrives with M1-58.
-6. `getMessage`: load with the visible predicate, then `authorize(message.read, message)`; missing
+7. `getMessage`: load with the visible predicate, then `authorize(message.read, message)`; missing
    and invisible return the same error value. `200` with the REST representation (full
    `content_md`, never `content_truncated`) and `ETag: "<version>"` from the M1-18 helper.
    Tombstones are `200` too.
-7. `TestQueriesCarryVisibleChannelPredicate` parses every `queries/*.sql` file of
+8. `TestQueriesCarryVisibleChannelPredicate` parses every `queries/*.sql` file of
    `internal/messaging/adapters/postgres` and fails when a `SELECT`, `UPDATE` or `DELETE` statement
    that names `messages`, `mentions`, `reactions`, `pins`, `message_revisions` or
    `message_templates` contains neither `channel_id = ANY(` nor an entry in an allowlist map in the
@@ -237,7 +243,10 @@ through the real chain on `127.0.0.1:0` with real authentication as in M1-48 and
 - `TestListThreadMessages_PagingCoversThreadExactlyOnce`: walking backwards from the newest page
   with `before_seq` yields every `thread_seq` from 1 to N exactly once, each page contiguous.
 - `TestListThreadMessages_TombstonesKeepThreadSeq`: a tombstone appears at its position with the
-  representation of note 5; the page stays contiguous.
+  representation of note 6; the page stays contiguous.
+- `TestListThreadMessages_ListContentCut`: with `message.list_content_max_bytes` set small in the
+  test configuration, a long message appears cut at a UTF-8 boundary with `content_truncated:
+  true`; `getMessage` returns it in full.
 - `TestListThreadMessages_LimitDefaultAndCap`: with the test configuration setting small values for
   `api.page_size_default` and `api.page_size_max`, no `limit` returns the default size and a larger
   `limit` is capped.
@@ -279,7 +288,7 @@ Commands that must pass:
 ## Definition of done
 
 Code, tests and docs are complete: module README updated, a doc comment on every public symbol,
-an ADR if an architecture decision was taken (none expected; record smaller rulings such as the
+an ADR if an architecture decision was taken (none expected; record smaller rulings beyond 06 such as the
 `around_seq` window in `docs/DECISIONS.md`), a CHANGELOG entry under `Unreleased`. `make check` is
 green. An independent review and the red team (`docs/quality/red-team-gate.md`) have run over the
 diff and their verdicts are recorded in the report. Merge locally into the base branch only if both

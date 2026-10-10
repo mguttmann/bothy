@@ -131,8 +131,8 @@ built instead of adding a second version.
    }
    type RedactFunc func(eventType string, schemaVersion int, payload json.RawMessage) (json.RawMessage, error)
    ```
-   Reason: `messaging` may not import `sync` (02 4.4, `sync` is the higher module); the PLAN's
-   "Port von sync" is therefore a kernel port, like `Appender`.
+   Reason: `messaging` may not import `sync` (02 4.4, `sync` is the higher module); the port is
+   therefore a kernel port, like `Appender` (02 4.5, PLAN row M1-58).
 8. `internal/sync`: postgres implementation of `Redactor` (rows locked with `FOR UPDATE`, index
    `(resource_kind, resource_id)`), registration in `internal/wire`; check that the envelope
    builder maps `redacted_at IS NOT NULL` to `"redacted": true` and add that mapping with a test if
@@ -143,18 +143,21 @@ built instead of adding a second version.
    no row or the count would go below zero).
 10. `api/operations.yaml`: enable `updateMessage`, `deleteMessage`, `listMessageRevisions`;
     regenerate.
-11. Spec first: `docs/spec/02-architektur.md` 4.3 (add the two `Threads` methods and the
-    `Redactor` implementation by `sync`) and 4.5 (row `kernel/eventlog`: `Redactor`, implemented by
-    `sync`); `architecture/modules.yaml` only if it lists kernel ports or their implementers.
+11. The specification is in place: `docs/spec/02-architektur.md` 4.3 (`chat.Threads` with the
+    message count, `sync` implements `eventlog.Redactor`) and 4.5 (row `kernel/eventlog` with
+    `Redactor`); 04 2.2 rules 4 and 5 (redacted shapes); 03 `messages` (deletion removes reactions
+    and the pin). Change them only where the implementation proves them wrong;
+    `architecture/modules.yaml` only if it lists kernel ports or their implementers.
 12. Docs: READMEs of `messaging`, `chat`, `sync` (keep their German text and structure; add the
     lock order of note 4), `services/server/CHANGELOG.md`, `docs/DECISIONS.md` entries for the
     no-op rule and error precedence of note 2 and for notes 4, 6 and 8.
 
 ## Out of scope
 
-- Reading history and the tombstone in history (M1-57); reactions and pins (M1-59) except the
-  coordination in note 8; mention list and counters (M1-60); read states and
-  `read_states.mention_count` (M1-61, M1-63); thread move (M1-62).
+- Reading history and the tombstone in history (M1-57); reactions and pins and their removal on
+  delete (M1-59, note 8); mention list and the computed counters (M1-60; no counter is stored,
+  so deleting needs no counter update, 03 R-DM-32); read states (M1-61, M1-63); thread move
+  (M1-62).
 - Deleting attachments (M3, through the `files` port) and components (M2, `runs` subscribes
   `MessageDeleted`); cancelling a run of a deleted trigger message (M2).
 - Deletion journal entry of 20 4.6 (M7-07); DSGVO jobs (M7).
@@ -256,16 +259,14 @@ built instead of adding a second version.
      set.
    - Any other type: return an internal error, so the transaction fails; a future event type on
      resource `message` must define its redaction before it can be deleted.
-   Every redacted payload stays valid against its schema in `openapi.yaml` (test). This shape is
-   requested for 04 "Umschlag (Envelope)" in the M0-05 feedback. If 04 defines a different redacted
-   shape when you start, follow 04 and adjust the tests.
+   Every redacted payload stays valid against its schema in `openapi.yaml` (test). 04 2.2 rule 5
+   states these shapes.
 7. Events and audit carry no content beyond the schema; logs carry no content, emoji or names.
-8. Reactions and pins of a deleted message are removed in the same transaction (DECISIONS.md: a
-   tombstone shows no reactions or pin, and their event payloads are redacted by note 6). The tables
-   come from M1-59, which runs in parallel. At start, if M1-59 is merged on your base, add
-   `DELETE FROM reactions` and `DELETE FROM pins` for the message and the test
-   `TestDeleteMessage_RemovesReactionsAndPin`. If it is not, check again right before your local
-   merge; if M1-59 was merged meanwhile, add both statements and the test then.
+8. Reactions and pins of a deleted message are removed in the same transaction (03 `messages`, 20
+   4.2: a tombstone shows no reactions or pin, and their event payloads are redacted by note 6).
+   Their tables come from M1-59, which depends on this ticket and adds the two `DELETE` statements
+   to this delete path with the test `TestDeleteMessage_RemovesReactionsAndPin`. Leave a marked
+   step for them in the use case.
 9. Concurrency: the message row lock serialises edits, deletions and (from M1-59) reactions and
    pins of one message; revision numbers come from `max(revision) + 1` under that lock.
 

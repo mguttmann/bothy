@@ -59,6 +59,7 @@ Paths are relative to `services/server/` unless they start with `docs/` or `infr
    - ADR 0053: add the property test of this ticket to its "Confirmation"; then `make adr-index`.
    - A `promtool test rules` case for `BothyAuthzError` if M1-04 set up rule tests.
    - `docs/operations/configuration.md` regenerated if the schema adds keys; `services/server/CHANGELOG.md` and `internal/platform/httpserver/README.md`; `docs/DECISIONS.md` only for decisions that the spec does not already state.
+10. Cursor codec for every list (06 "Paginierung" item 2, PLAN row M1-18) in `internal/platform/httpserver`: `EncodeCursor(list string, binding []byte, key any) (string, error)` and `DecodeCursor(list string, binding []byte, s string, key any) error`; opaque base64url without padding, versioned, carrying the list name, a SHA-256 fingerprint of the filter and sort binding (including the caller's principal ID) and the keyset values. A changed keyset value only moves the position inside the same bound and filtered list, so no signature is needed. A cursor of another list, another binding, another principal, a tampered or unknown version gives `400 cursor_invalid`. Every later list ticket uses it; no second codec.
 
 ## Out of scope
 
@@ -209,6 +210,7 @@ Commands that must pass: `cd services/server && go test -race ./internal/platfor
 - [ ] Duplicate keys, invalid UTF-8 and too deep nesting give `400 malformed_request` (SEC-IN-2); unknown request members give `400 validation_failed` (W7).
 - [ ] Request schemas in `openapi.yaml` are closed, the generator check holds it, `make api-lint` is green.
 - [ ] ADR 0053 names this ticket's property test; `openapi.yaml` request schemas are closed (W7) and the generator check holds them; the configuration reference is regenerated.
+- [ ] The cursor codec rejects a cursor of another list, binding or principal and any tampered byte with `400 cursor_invalid` (unit tests), and round-trips keyset values.
 - [ ] `make check` is green.
 
 ## Definition of done

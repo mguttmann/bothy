@@ -92,7 +92,7 @@ type Keys interface {
 }
 ```
 
-`PublicKey{KID, Purpose, Alg, State, Key ed25519.PublicKey, NotAfter}`, `RotateCommand{Purpose, Mode, Reason}`, `Rotation{Purpose, NewKID, PreviousKID, PreviousNotAfter}`. JOSE assembly (header, base64url, compact form) stays with the token issuers (M1-34 and later); this port signs raw signing input with the standard library only. Callers in M1-34, M1-37, M1-50 and M2 use this port; nobody else reads `server_signing_keys`.
+`PublicKey{KID, Purpose, Alg, State, Key ed25519.PublicKey, NotAfter}`, `RotateCommand{Purpose, Mode, Reason}`, `Rotation{Purpose, NewKID, PreviousKID, PreviousNotAfter}`. JOSE assembly (header, base64url, compact form) stays with the token issuers (M1-34 and later, through `internal/kernel/jose` of M1-33, ADR 0067); this port signs raw signing input with the standard library only and adds no JOSE library. Callers in M1-34, M1-37, M1-50 and M2 use this port; nobody else reads `server_signing_keys`.
 
 ### 4. Domain (`internal/instance/domain/signingkey.go`)
 
@@ -179,7 +179,7 @@ Migration `services/server/migrations/<next number>_server_signing_keys.sql` (go
 
 ## Tests (write them first)
 
-Controllable clock (`kernel/clock`), PostgreSQL 18 through `pgtest`, key store in a `mktemp -d` directory with mode 0700, test authenticator for HTTP (from M1-18, or the `actortest` package of M1-31 if merged, else add it as in M1-31).
+Controllable clock (`kernel/clock`), PostgreSQL 18 through `pgtest`, key store in a `mktemp -d` directory with mode 0700, test authenticator for HTTP from `internal/platform/httpserver/httpservertest` (M1-18, with the builders M1-31 added).
 
 1. `TestSigningKeyTransitions_*` (domain, table): every row of the transition and window tables, boundaries exactly at the due time, no transition when not due, at most one `next` per purpose.
 2. `TestThumbprint_RFC7638`: the thumbprint of the Ed25519 example key of RFC 8037 appendix A equals the value computed by hand in the test from the RFC 7638 rule.

@@ -75,32 +75,14 @@ accounts without passkeys a way to add devices.
 
 ## Scope
 
-Specification first, on this branch, before production code:
-
-1. `docs/api/openapi.yaml`:
-   - `approveDevice`: required request body `DeviceApprove` with required `verification_code`
-     (string, `pattern: ^[0-9]+$`), `additionalProperties: false`. Description: on a wrong code the
-     device is revoked and the response is `200` with `state: revoked`.
-   - `Device`: add optional `verification_code` (string, digits), description "Present only in
-     responses to the pending device itself (`TokenResponse`, `getDevice`, `listMyDevices` for its
-     own entry); never shown to other devices or owners."
-   - `approvePairing`: description adds "A code that matches no open pairing answers `404` and
-     ends the step-up of the calling session; the next attempt needs a new step-up."
-   - `completePairing`: description adds "A proof signed by another key rejects the pairing."
-2. Regenerate the generated blocks of `docs/spec/06-api.md` with the M1-03 generator.
-3. `docs/spec/08-identitaet.md`:
-   - "Bestätigung": derivation of the verification code, where it is shown, revoke reasons; test
-     ID-T12 reads "wartendes Gerät ruft eine Route auf: Tokens, aber kein Zugriff außer
-     Selbstauskunft (`403 device_pending`)".
-   - "Geräte-Kopplung": device created at approval, collection window, expiry, wrong code rule.
-   - "Schutz der Anmeldung": the table row for pairing and verification codes names the concrete
-     rules from Design notes.
-   - "Konfigurationswerte dieses Kapitels": add `auth.cleanup_interval` only if case B of the
-     cleanup job applies (Design notes).
-4. `docs/security/threat-model.md`: the STRIDE row "Wartendes Gerät verschafft sich Zugriff" says
-   "Tokens ohne Zugriff bis zur Bestätigung (403 device_pending), eingetippter Bestätigungs-Code".
-5. `docs/PLAN.md`: row M1-38 acceptance text for ID-T12 as in point 3.
-6. `docs/DECISIONS.md`: rulings listed in Design notes.
+The specification is in place (planning, spec first; W5 resolved there): `approveDevice` with the
+body `DeviceApprove`, `Device.verification_code` and the descriptions of `approveDevice`,
+`approvePairing` and `completePairing` in `openapi.yaml`; 08 "5.2" (derivation of the verification
+code, where it is shown), "5.3" (device created at approval, collection window, expiry, wrong code
+rule), "5.4" (revoke reasons), "13" and ID-T12; 03 `devices.revoke_reason` with its CHECK; 05
+`device.expire`; the STRIDE row of the threat model; PLAN row M1-38. Change them only where the
+implementation proves them wrong (spec first, `make api-lint api-checks docs` green).
+`docs/DECISIONS.md`: rulings listed in Design notes.
 
 Production code under `services/server/`:
 
@@ -117,14 +99,15 @@ Production code under `services/server/`:
   `revokeUnconfirmedDevice(ctx, deviceID, reason)`.
 - `internal/identity/app/pairing.go`: use cases `BeginPairing`, `ApprovePairing`,
   `CompletePairing`.
-- `internal/identity/app/expiry.go`: `ExpirePendingDevices`, `ExpirePairings` for the cleanup job.
+- `internal/identity/app/expiry.go`: `ExpirePendingDevices`, `ExpirePairings` for the job
+  `identity.auth_cleanup` (created by M1-35), audited as system action `device.expire`.
 - Authentication: the actor builder from M1-34 treats a pending device older than
   `auth.device_pending_ttl` as revoked (`401 session_revoked`, reason `device_inactive`).
 - Response mapping of `Device` and `TokenResponse.device`: add `verification_code` only for the
   pending device itself.
 - `internal/identity/adapters/httpapi`: handlers `ApproveDevice`, `BeginPairing`,
   `ApprovePairing`, `CompletePairing`.
-- Cleanup job (Design notes) registered through `internal/platform/jobs` in `internal/wire`.
+- Both expiry functions added to the job `identity.auth_cleanup` (Design notes).
 - `services/server/api/operations.yaml`: enable `approveDevice`, `beginPairing`, `approvePairing`,
   `completePairing`; regenerate `api/rest` and `api/routes`.
 - `internal/identity/README.md`, `services/server/CHANGELOG.md`.
@@ -152,8 +135,9 @@ func (s *Service) CompletePairing(ctx context.Context, pairingID ids.ID, proofJK
 - Revoking active devices with the full ordered sequence and push registrations (`device.revoke`,
   M1-45); the gateway close code `4016` for pending devices (M1-64, M1-65).
 - Notifying the person that a device waits (push, M3), key rotation of a device (08 "Verwaltung",
-  later), the console approval queue (M6), automatic revocation after
-  `auth.device_inactive_revoke_after` (not this ticket).
+  none: 08 "5.4" has no key change at an existing device), the console approval queue (M6),
+  automatic revocation of active devices after `auth.device_inactive_revoke_after` (M1-45, which
+  owns the full revocation sequence).
 
 ## Boundaries
 
@@ -175,8 +159,8 @@ func (s *Service) CompletePairing(ctx context.Context, pairingID ids.ID, proofJK
 Pending devices and the verification code:
 
 - The rule "tokens, but `403 device_pending`" is normative in 05 and 07 and already enforced by
-  `authorize` (M1-28). ID-T12 in 08, the threat model and the plan row say "no access token"; the
-  core contract wins. Fix those texts (Scope) and test the 05 behaviour.
+  `authorize` (M1-28); ID-T12, the threat model and the plan row say the same. Test the 05
+  behaviour.
 - The code is derived, not stored, so no column is needed: `HMAC-SHA-256(key = pepper, msg =
   "device-verification/v1" || 0x00 || device_id (16 bytes) || 0x00 || dpop_jkt (ASCII))`; take
   the first 8 bytes as big-endian `uint64`, reduce modulo `10^digits`, left-pad with zeros to
@@ -186,9 +170,10 @@ Pending devices and the verification code:
   that leaves the device pending, and `getDevice` or `listMyDevices` when the caller's session
   device is that device and it is still pending. Owners and other devices never see it.
 - `ApproveDevice` order: load the device (invisible: `404`), `authorize(actor, device.approve,
-  device)` (owner or self; a pending caller gets `403 device_pending`; step-up required), state not
-  `pending`: `409 invalid_state_transition`, pending older than `auth.device_pending_ttl`: revoke it
-  with reason `pending_expired` and answer `409 invalid_state_transition`.
+  device)` (owner or self; a pending caller gets `403 device_pending`; step-up required); state
+  `active`: `200` with the device and no change (06 2 "Ohne Wirkung"); state `revoked`: `409
+  invalid_state_transition`; pending older than `auth.device_pending_ttl`: revoke it with reason
+  `pending_expired` and answer `409 invalid_state_transition`.
 - Correct code: one unit of work with the rights-change option for the device's person: `state =
   'active'`, `approved_by` = actor, `approved_at`; audit `device.approve` allow with details
   `{device_id, result: "approved"}`; `200` with the device.
@@ -203,8 +188,9 @@ Pending devices and the verification code:
   `DeviceRevoked`. Use the session revocation primitive from M1-34. This subset is complete for
   unconfirmed devices because they never had push registrations or gateway connections; M1-45
   owns revocation of active devices.
-- Device revoke reasons introduced here (free text column `devices.revoke_reason`, document them
-  in 08): `verification_failed`, `pending_expired`, `pairing_expired`.
+- Device revoke reasons used here (CHECK of `devices.revoke_reason` in 03, 08 "5.4"):
+  `verification_failed`, `pending_expired`, `pairing_expired`. Expiry by the job is audited as the
+  system action `device.expire` with actor NULL.
 
 Pairing:
 
@@ -247,30 +233,20 @@ Pairing:
   `expired` and its device is revoked with `revokeUnconfirmedDevice(deviceID,
   "pairing_expired")` (it never got a session). Applied lazily on access and by the cleanup job.
 
-Cleanup job: the job catalogue in 02 names `identity.session_cleanup` (periodic, queue
-`maintenance`). Check with `grep -rn "identity.session_cleanup" services/server`.
+Cleanup job: `identity.auth_cleanup` (02 "12.3", interval `auth.cleanup_interval`) exists since
+M1-35; add `ExpirePendingDevices` and `ExpirePairings` to it.
 
-- Case A, the job exists: add `ExpirePendingDevices` and `ExpirePairings` to it and use its
-  interval key.
-- Case B, it does not exist: create it with exactly that name in `internal/identity` through
-  `internal/platform/jobs`, queue `maintenance`, interval from the new key `auth.cleanup_interval`
-  (default `1h`, type duration) added to the configuration schema (M1-07) and to 08
-  "Konfigurationswerte dieses Kapitels", then regenerate `docs/operations/configuration.md` with
-  the M1-08 generator.
-
-In both cases correctness never depends on the job: authentication treats an expired pending
+Correctness never depends on the job: authentication treats an expired pending
 device as revoked, and pairing endpoints check `expires_at` themselves (same principle as AZ-P10).
 Job arguments carry no data; each run is idempotent.
 
 Configuration used: `auth.device_pending_ttl`, `auth.device_verification_code_digits`,
 `auth.pairing_code_ttl`, `auth.pairing_code_chars`, `auth.token_pepper_ref`,
-`auth.step_up_max_age`, `ratelimit.rl.public_auth.*`, `ratelimit.rl.admin.*`; possibly
-`auth.cleanup_interval` (case B).
+`auth.step_up_max_age`, `auth.cleanup_interval`, `ratelimit.rl.public_auth.*`,
+`ratelimit.rl.admin.*`.
 
-Rulings to record in `docs/DECISIONS.md`: ID-T12 wording follows 05; derived verification code
-without storage; `200` with `state: revoked` on a wrong code; device created at pairing approval
-with a fresh collection window; wrong pairing code ends the caller's step-up; revoke reasons;
-cleanup job case taken.
+Rulings to record in `docs/DECISIONS.md` (link 08 "5.2" to "5.4"): `200` with `state: revoked` on
+a wrong code; pairing code collision handling.
 
 ## Tests (write them first)
 
@@ -301,7 +277,8 @@ Integration:
   session, response `200` with `state: revoked`; the pending device's next request `401`.
 - `TestApproveDeviceNeedsStepUp` (`401 step_up_required`), `TestApproveDeviceFromPendingDevice`
   (`403 device_pending`), `TestApproveForeignDeviceByNonOwner` (`404`),
-  `TestApproveActiveDevice` (`409 invalid_state_transition`).
+  `TestApproveActiveDevice` (`200`, no change), `TestApproveRevokedDevice` (`409
+  invalid_state_transition`).
 - `TestPendingDeviceExpires`: clock past `auth.device_pending_ttl`: requests `401`; approval
   `409`; after the cleanup run the row is `revoked` with `pending_expired`.
 - `TestPairingHappyPath`: begin `201`, complete `202`, approve `201`, complete `201` with
@@ -327,8 +304,9 @@ make check
 
 ## Acceptance criteria
 
-- [ ] openapi.yaml, 06, 08, threat model and PLAN row changed as in Scope; `make api-lint
-      api-checks docs` green.
+- [ ] The implementation matches openapi.yaml, 03, 05 and 08 (changed only where proven wrong);
+      `make api-lint api-checks docs` green; the expiry runs in `identity.auth_cleanup` and is
+      audited as `device.expire`.
 - [ ] ID-T12 and ID-T13 green and named after their IDs.
 - [ ] The verification code is shown only to the pending device and is never stored or logged.
 - [ ] A wrong verification code revokes the pending device with all its sessions and families.

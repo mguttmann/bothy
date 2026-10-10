@@ -33,7 +33,8 @@ non-exportable device key is worthless (08 "Ziele" item 3, threat T-TK-01).
   ES256; EdDSA stays allowed by the data model).
 - `docs/spec/04-sync-protokoll.md`: "6.3 Lebenszyklus" (the gateway reuses this verifier with
   `htm = GET` and the nonce from `hello`; not built here).
-- ADR 0020 (`docs/adr/0020-geraetebindung-dpop-step-up-fuer-admin-aktionen.md`), ADR 0008, ADR 0017.
+- ADR 0020 (`docs/adr/0020-geraetebindung-dpop-step-up-fuer-admin-aktionen.md`), ADR 0067
+  (`docs/adr/0067-jose-profil-mit-der-standardbibliothek.md`), ADR 0008, ADR 0017.
 - `docs/api/openapi.yaml`: operations `listMyDevices`, `listUserDevices`, `getDevice`; schemas
   `Device`, `DevicePage`, `DevicePlatform`, `DeviceRegistration`, `DeviceKeyRegistration`,
   `Problem`; responses `Unauthorized`, `Forbidden`, `NotFound`; headers `WWW-Authenticate`,
@@ -126,9 +127,14 @@ Work only in `services/server` and the docs named here.
    - `type DPoP interface{ CurrentNonce() string; Verify(ctx, ProofRequest) (VerifiedProof, error) }`.
    - `type DPoPError struct{ Code string; Nonce string }` with `Code` exactly `invalid_dpop_proof`
      or `use_dpop_nonce`; it maps to error kind `unauthenticated` of `kernel/errs`.
-4. Domain, standard library only:
-   - `internal/identity/domain/jose`: `ParseJWK(raw) (JWK, error)`, `JWK.Thumbprint() string`,
-     `ParseCompactJWS(s) (JWS, error)`, `JWS.Verify(JWK) error` for `ES256` and `EdDSA`.
+4. Kernel and domain, standard library only:
+   - `internal/kernel/jose` (kernel-core, ADR 0067, 02 "4.5" and "7.2"): `ParseJWK(raw) (JWK,
+     error)`, `JWK.Thumbprint() string` (RFC 7638), `ParseCompactJWS(s string, allowed []string,
+     typ string) (JWS, error)`, `JWS.Verify(JWK) error` for `ES256` and `EdDSA`, and
+     `SignCompact(signer Signer, header Header, payload []byte) (string, error)` with
+     `type Signer interface{ Alg() string; Sign(signingInput []byte) ([]byte, error) }` for the
+     token issuers (M1-34 access tokens, M1-50 audit checkpoints, M2 invocation tokens). M1-41 adds
+     `RS256` and `PS256`; nobody adds a JOSE library.
    - `internal/identity/domain/dpop`: `NormalizeHTU(string) (string, error)`, the claim checks
      of "Design notes", the nonce encode and check functions (pure, key and time passed in).
    - `internal/identity/domain/device`: registration validation and the state machine
@@ -144,7 +150,7 @@ Work only in `services/server` and the docs named here.
    operations) and `internal/identity/adapters/httpapi/dpop.go` with
    `ExpectedHTU(publicURL *url.URL, r *http.Request) string` (origin of `server.public_url` plus
    the escaped request path) for M1-34 and later login handlers.
-7. Test helpers `internal/identity/identitytest`: `NewDeviceKey(alg) (signer, PublicKey)`,
+7. Test helpers `internal/identity/adapters/identitytest` (02 "6. Code-Layout"): `NewDeviceKey(alg) (signer, PublicKey)`,
    `SignDPoPProof(signer, ProofClaims) string`, `SignJWS(signer, header, payload) string`. Later
    tickets (M1-34, M1-35, M1-64, M1-73) reuse them. Only `_test.go` files import this package; a
    test runs `go list -deps ./cmd/bothy` and fails if it appears.
@@ -162,13 +168,13 @@ Work only in `services/server` and the docs named here.
 10. If `kernel/errs` cannot carry response headers on an error, add an optional header list to
     its error type and render it in `platform/httpserver` (the only change outside `identity`
     besides wiring, config schema, secrets init and pagination below), with a unit test.
-11. If no keyset cursor helper exists in `internal/platform/httpserver` yet, add a generic one
-    there (opaque base64url, bound to a filter fingerprint, `400 cursor_invalid` on mismatch) with
-    unit tests; later list tickets reuse it.
-12. Docs: `docs/spec/08-identitaet.md` "7.3 DPoP" gets the nonce construction, the replay store
-    rule and the proof profile of "Design notes" (spec first, in the same change);
-    `docs/DECISIONS.md` gets the rulings listed in "Design notes"; module README and
-    `services/server/CHANGELOG.md` (Unreleased).
+11. Pagination uses the cursor codec of `internal/platform/httpserver` (M1-18, 06 "6.
+    Paginierung": opaque, bound to filter and sort, `400 cursor_invalid` on mismatch); no second
+    codec.
+12. Docs: `docs/spec/08-identitaet.md` "7.3 DPoP" already states the nonce construction, the
+    `htu` rule and the replay store; ADR 0067 states the JWS profile. Change them only where the
+    implementation proves them wrong (spec first). `docs/DECISIONS.md` gets the rulings listed in
+    "Design notes"; module README and `services/server/CHANGELOG.md` (Unreleased).
 13. **`authz.CredentialSource`, devices part** (02 "Ports, Ereignisse und Quellen je Modul", 07
     "Ablauf" `check_active`, PLAN row M1-33): implement `DeviceState` (`pending`, `active`,
     `revoked`) of the request's device in the identity adapter of the source port that M1-28
@@ -238,7 +244,8 @@ Device registration (`Register`):
 10. Attestation JSON is stored unchanged in `device_keys.attestation`; it is never required in M1
     (`auth.require_key_attestation` stays unused here, 08 "6.1").
 
-JWS profile (`domain/jose`, used by DPoP, access tokens in M1-34 and step-up in M1-35):
+JWS profile (`kernel/jose`, ADR 0067, used by DPoP, access tokens in M1-34, step-up in M1-35 and
+audit checkpoints in M1-50):
 
 1. Compact serialization only: exactly three segments, base64url without padding; any `=`, `+`,
    `/` or whitespace is an error.
@@ -250,9 +257,8 @@ JWS profile (`domain/jose`, used by DPoP, access tokens in M1-34 and step-up in 
 4. `ES256` signatures are exactly 64 bytes `R || S` (RFC 7518 section 3.4), verified with
    `crypto/ecdsa` over SHA-256 of the signing input; DER or other lengths are rejected. `EdDSA`
    uses `crypto/ed25519` with a 64-byte signature.
-5. No JOSE library: the profile is two algorithms and one serialization, and the domain layer may
-   not import third-party code (02 "5. Schichten im Modul"). Record this as a ruling in
-   `docs/DECISIONS.md`.
+5. No JOSE library (ADR 0067): the profile is a few algorithms and one serialization, and domain
+   layers may not import third-party code (02 "5. Schichten im Modul").
 
 DPoP proof checks (`Verify`), in this order; a failure stops and nothing is remembered:
 
@@ -289,8 +295,7 @@ hinweg schützt der Nonce"):
   HMAC-SHA256(key, uint64 big-endian(w))`.
 - Accepted: decoded length 24, MAC equal (`crypto/hmac.Equal`), `w` equals the current or the
   previous window. `NonceStale` is true for the previous window.
-- `CurrentNonce()` returns the nonce of the current window. Record the construction as a ruling in
-  `docs/DECISIONS.md` and in 08 "7.3".
+- `CurrentNonce()` returns the nonce of the current window. 08 "7.3" states this construction.
 
 Replay store: in-memory, sharded map plus expiry; no named size cap exists in the spec, so none
 is invented; memory is bounded by the time window and the rate limits. Expired entries are
@@ -402,8 +407,8 @@ choice>` and report duration and result; commit any crashing input as a seed aft
 - [ ] Fuzz targets with seed corpus run in every `go test`.
 - [ ] `listMyDevices`, `listUserDevices`, `getDevice` are enabled, authorize with `device.list`,
       give `404` for invisible devices and `403 device_pending` as specified.
-- [ ] 08 "7.3" documents nonce construction, replay store and proof profile; DECISIONS.md has the
-      rulings (stdlib JOSE profile, nonce construction).
+- [ ] `internal/kernel/jose` passes the tests ADR 0067 names (RFC test vectors, negative cases,
+      fuzz); 08 "7.3" and ADR 0067 match the implementation; DECISIONS.md has the rulings.
 - [ ] `make check` green.
 
 ## Definition of done

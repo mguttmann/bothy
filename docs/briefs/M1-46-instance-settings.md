@@ -1,6 +1,6 @@
 # M1-46: Instance settings, branding and discovery
 
-Status: ready | Depends on: M1-35, M1-36 | Etappe: M1
+Status: ready | Depends on: M1-36 | Etappe: M1
 
 ## Goal
 
@@ -99,22 +99,16 @@ serve space colours, space icons and forum tag colours in later tickets. Every c
 
 Paths are relative to `services/server/` unless they start with `docs/`, `design/` or `Makefile`.
 
-1. **Specification first** (same change, before the code):
-   - `docs/api/openapi.yaml`: `Discovery` gains `setup_required` (boolean, in `required`);
-     `ClientVersionRequirement` gains optional `recommended_version` (string) and its
-     `required` shrinks to `[platform]`; `InstanceSetting.updated_at` leaves `required`
-     (description: absent while the key still has its default and was never written);
-     `FieldError.pointer` description adds the form `#path/<name>` for path parameters;
-     `info.version` raised by one MINOR step. Keep every description English (L5).
-   - `docs/api/asyncapi.yaml`: `info` gains `x-protocol-versions: [1]` (04 6.1: the gateway
-     protocol version is 1); `info.version` raised by one PATCH step.
-   - `docs/spec/06-api.md` 5 item 3: `errors[].pointer` may be `#path/<name>`; regenerate any
-     generated blocks with the M1-03 target.
-   - `docs/spec/02-architektur.md`: 4.3 row `instance` declares the source port
-     `LoginOptionsSource` (implemented by `identity`); 4.5 lists `kernel/designkeys` (and
-     `kernel/displaytext` if you create it, see item 4); 6 lists the default product name as a
-     name-bound place.
-   - `docs/DECISIONS.md`: the rulings under Design notes, in the file's existing format.
+1. **Specification** (in place from planning, spec first; change it only where the
+   implementation proves it wrong): `docs/api/openapi.yaml` (`Discovery.setup_required` required,
+   `ClientVersionRequirement.recommended_version`, `InstanceSetting` with `updated_at` optional and
+   version `0` for defaults, `FieldError.pointer` with `#path/<name>`, `x-problem-codes` with
+   `setup_required`); `docs/api/asyncapi.yaml` `info.x-protocol-versions: [1]` (04 6.1); 06 5
+   item 3; 03 `instance_settings` note (version `0`) and `branding.product_name_max_chars`; 02 4.3
+   (`instance` declares `LoginOptionsSource`, implemented by `identity`), 4.5 and 7.2
+   (`kernel/designkeys` in kernel-core), 6 (the list of places with the product name, by kind);
+   ADR 0044 (accent list). To do here: `docs/DECISIONS.md` the rulings under Design notes, in the
+   file's existing format.
 2. **Generated design keys** `internal/kernel/designkeys`:
    - generator `tools/designkeysgen` (Go `main`, beside M1-05's `tools/archgen`; follow its
      location convention), reading `design/build/tokens.resolved.json` and writing
@@ -128,10 +122,9 @@ Paths are relative to `services/server/` unless they start with `docs/`, `design
      regenerate `.go-arch-lint.yml`.
 3. **Instance domain** `internal/instance/domain`: `settings.go` (registry), `branding.go`,
    `discovery.go`; pure functions only.
-4. **Display-text check.** `branding.product_name` uses the SEC-IN-4 check that M1-26 built for
-   display names. If that check lives inside `internal/identity`, move it to
-   `internal/kernel/displaytext` (kernel-core, function `Validate(s string) error`), switch
-   identity to it in the same commit, and register the package. Do not write a second copy.
+4. **Display-text check.** `branding.product_name` uses `internal/kernel/textcheck` (M1-26,
+   kernel-core, 02 4.5) and the length `branding.product_name_max_chars` (03 9). Do not write a
+   second copy.
 5. **Port** `internal/instance`: interface `Settings` (`Branding(ctx) (Branding, error)`,
    `LocaleDefault(ctx) (string, error)`), the DTOs `Branding`, `LoginOptions`, `ProviderInfo`,
    the exported func `SupportedLocales() []string`, and the declared source port
@@ -170,6 +163,13 @@ Paths are relative to `services/server/` unless they start with `docs/`, `design
     discovery sources, source port), `internal/kernel` README or package docs,
     `services/server/README.md` ("Namensgebundene Stellen": the default product name constant),
     `services/server/CHANGELOG.md` under `Unreleased`.
+14. **Places with the product name** (02 "6. Code-Layout", ADR 0044 Confirmation): a test
+    `tools/ci/tests/test_product_name_places.py` searches tracked code and configuration (not
+    `docs/`) for the working name, case-insensitively, and allows it only at the kinds 02 6 lists
+    (module path, binary and `cmd/bothy`, `BOTHY_` variables, image names and container paths,
+    database roles, telemetry, alert and SLO prefixes, the token prefix with its gitleaks rule,
+    `DefaultProductName`); every other hit fails with file and line. Add it to the existing
+    `tools/ci` test run.
 
 ## Out of scope
 
@@ -181,7 +181,8 @@ Paths are relative to `services/server/` unless they start with `docs/`, `design
 - The setup lock (`503 setup_required` for every other route): M1-37.
 - Space colours and icons (M1-52) and forum tag colours (M1-53) use the generated keys but are
   not built here.
-- Adding the problem code `setup_required` to the problem list: M1-37.
+- The setup lock itself and `bothy setup`: M1-37 (the problem code `setup_required` is in the
+  specification already).
 
 ## Boundaries
 
@@ -213,17 +214,18 @@ func AccentColors() []string // hand written in accent.go
 func IsAccentColor(key string) bool
 ```
 
-`accent.go` derives the accent list as the category colours minus the neutral surface palette
-`granite`, with a comment why: 01 12 and ADR 0044 allow seven accent keys; `granite` is the
-palette of all surfaces, so an accent in it has no contrast to the surfaces it sits on. A test
-asserts `AccentColors()` equals exactly the seven keys of ADR 0044. Keys are case sensitive;
+`accent.go` holds the accent list as an explicit constant of the seven keys of ADR 0044 and 01
+12 (`spruce`, `loch`, `heather`, `rowan`, `amber`, `gorse`, `moss`), not derived from the tokens:
+`granite` is the neutral palette of all surfaces, and a new category colour becomes an accent only
+after the contrast gate (ADR 0044). Tests assert that every accent is a generated category colour
+and that the constant equals the list in 01 12. Keys are case sensitive;
 `Spruce`, ` spruce` and `#5865f2` are not keys.
 
 **Settings registry** (`domain/settings.go`). One entry per key of configuration.md section 6:
 
 | Key | JSON type | Default | Route | Validation |
 |---|---|---|---|---|
-| `branding.product_name` | string | `DefaultProductName` | branding | trimmed length at least 1, display-text check (SEC-IN-4) |
+| `branding.product_name` | string | `DefaultProductName` | branding | trimmed length 1 to `branding.product_name_max_chars`, display-text check (SEC-IN-4) |
 | `branding.accent_color` | string | `spruce` | branding | `designkeys.IsAccentColor` |
 | `branding.logo_file_id` | string (UUID) | absent | branding, written only by M3-10 | UUIDv7 |
 | `locale.default` | string | `de` | settings | one of `SupportedLocales()` = `de`, `en` (01 9) |
@@ -303,12 +305,10 @@ type ProviderInfo struct { ID ids.ID; Kind string; Name string } // kind: oidc, 
 
 **`getProblemType`** (`instance.discovery.read`, public): look up `code` in the problem
 catalogue that `internal/platform/httpserver` uses for problem bodies (M1-18). Its source is the
-machine-readable problem list in `docs/api/openapi.yaml` that also generates the table in 06 5
-(M1-03). Map to `ProblemType{code, status, title, description, client_action}`; unknown code:
-`404 not_found`. If the generated catalogue lacks `description` or `client_action`, extend its
-generator; never add a second hand-written list. If no machine-readable problem list exists in
-`docs/api/openapi.yaml` at your start, stop with `Verdict: BLOCKED problem catalogue has no
-source`.
+machine-readable problem list `x-problem-codes` in `docs/api/openapi.yaml` that also generates
+the table in 06 5 (R-API-23, checked by M1-03). Map to `ProblemType{code, status, title,
+description, client_action}`; unknown code: `404 not_found`. If the catalogue in code lacks
+`description` or `client_action`, extend its generator; never add a second hand-written list.
 
 **Events.** `instance.updated`: `resource = {kind: instance, id: instance_id}` (no version),
 empty `scope`, payload `{changed_keys}` sorted.
@@ -318,9 +318,9 @@ empty `scope`, payload `{changed_keys}` sorted.
    one action per write path and one audit action per change.
 2. Branding version is the sum of the three branding row versions.
 3. A setting with its default has `version = 0` and no `updated_at`.
-4. Accent keys are the category colours without `granite`, held in `kernel/designkeys`.
-5. `kernel/designkeys` (and `kernel/displaytext`, if moved) are kernel-core packages. Reason:
-   `chat` (M1-52, M1-53) needs the same keys and may not import `instance` (02 4.4).
+4. Accent keys are the explicit list of ADR 0044, held in `kernel/designkeys`.
+5. `kernel/designkeys` is a kernel-core package (02 4.5). Reason: `chat` (M1-52, M1-53) needs the
+   same keys and may not import `instance` (02 4.4).
 6. `local_password_enabled` in discovery means configuration allows it and a `local` provider
    is enabled.
 

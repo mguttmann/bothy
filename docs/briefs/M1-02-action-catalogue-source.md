@@ -32,9 +32,9 @@ ADR 0049 records the decision.
 - ADRs: `docs/adr/0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`,
   `docs/adr/0013-spec-first-openapi-31-und-asyncapi-30-normativ.md`,
   `docs/adr/0001-adrs-im-madr-format-decisions-als-ruling-log.md`,
-  `docs/adr/0000-vorlage-madr-4.md`. ADR 0049 does not exist yet; this ticket writes it (P-12).
-  Its title comes from the list of the planning lead: "Maschinenlesbarer Aktionskatalog als
-  einzige Quelle für Doku, Lint und Code".
+  `docs/adr/0000-vorlage-madr-4.md`,
+  `docs/adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md` (accepted; it already
+  records the decision and the rulings of this ticket, see "Design notes").
 - `docs/quality/gates.md`, `docs/spec/23-qualitaet.md` "Gates", `tools/README.md`,
   `tools/pyproject.toml`, `Makefile` (targets `gates`, `lint`, `api-lint`), `CHANGELOG.md`,
   `docs/DECISIONS.md`.
@@ -74,7 +74,7 @@ No API operation and no table of chapter 03 changes.
     in the schema below without changing its text, stop with `Verdict: BLOCKED` and name the row
     (P-11).
 12. One source per fact: actions, classes, event types and ops exist in `actions.yaml` only; every
-    copy is generated and checked (ADR 0049, to be written here).
+    copy is generated and checked (ADR 0049).
 
 ## Scope
 
@@ -122,9 +122,8 @@ No API operation and no table of chapter 03 changes.
    `.PHONY`.
 7. `tools/pyproject.toml`: add `catalog` to `testpaths`, `pythonpath`, `[tool.coverage.run]
    source` and `[tool.mypy] files`.
-8. `docs/adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle-fuer-doku-lint-und-code.md`
-   (MADR 4, German text, English headings, front matter `status: accepted`, `date:` the day of the
-   merge, `decision-makers: Maintainer`); then `make adr-index`.
+8. ADR 0049 exists. Change it only where the implementation differs from it (then set `date:`
+   to the day of the merge and run `make adr-index`); no new ADR.
 9. Other documents: `docs/spec/02-architektur.md` "Abgleich mit dem Kern-Vertrag", row
    "Maschinenlesbarer Aktionskatalog": now `docs/spec/actions.yaml` (ADR 0049), checked by
    `make catalog-check`. `docs/api/README.md` "Ändern" items 2 and 3: a missing action or a new
@@ -333,17 +332,13 @@ test. The proof that no row changed is twofold: the fixture test below, and
 `git diff <base> -- docs/spec/05-aktionen.md` shows only added marker lines plus the edited
 sentences of rules 3 and 4 (put that diff summary into the report).
 
-### ADR 0049 content
+### ADR 0049
 
-Context: actions, classes, event types and ops are copied into 05 tables, redocly lists, 02
-tables, the asyncapi file and soon Go constants; copies drift silently. Options (at least): (1)
-YAML file in `docs/spec/` as source, everything else generated or checked; (2) Markdown tables of
-05 as source, parsed by tools; (3) Go constants as source, docs generated from code; (4) `x-`
-extensions in openapi.yaml as source. Decision: (1), because it is reviewable next to the chapter,
-typed, readable by Python tools and the Go generator, and independent of the API files that only
-reference it. Consequences: one more file to edit; the chapter text around the tables stays
-hand-written. Confirmation: `make catalog-check` in `gates` and the tests in
-`tools/catalog/tests/`; M1-03, M1-06 and M1-25 read the same file.
+ADR 0049 (`docs/adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md`) is accepted
+and names the file, the generated copies, the hand-written tables that are only cross-checked
+(2.6 and the configuration values of 05), the machine value next to prose cells of the receive
+action, and the confirmation (`make catalog-check` in `gates`, the tests in `tools/catalog/tests/`).
+M1-03, M1-06 and M1-25 read the same file.
 
 ### Rulings for `docs/DECISIONS.md`
 
@@ -405,7 +400,7 @@ make check
       (`test_render_reproduces_pre_migration_tables`), and the report shows the 05 diff contains
       only markers and the edited sentences of rules 3 and 4.
 - [ ] `make catalog-check` and `make api-lint` are green; `make catalog` gives no diff.
-- [ ] ADR 0049 exists, is in the ADR index, and names the confirmation.
+- [ ] ADR 0049 matches the implementation (changed only where the implementation differs).
 - [ ] Docs updated: 02 row, `docs/api/README.md`, `docs/quality/gates.md`, chapter 23,
       `tools/README.md`, `tools/catalog/README.md`, `CHANGELOG.md`, `docs/DECISIONS.md`.
 - [ ] `make check` green; no file of the diff contains U+2013 or U+2014.
@@ -413,7 +408,7 @@ make check
 ## Definition of done
 
 Code, tests and docs as above: docstrings on every public symbol of `action_catalog.py`; README of
-the tool; ADR 0049; CHANGELOG entry under `[Unreleased]`; `make check` green. Then `make review`
+the tool; ADR 0049 current; CHANGELOG entry under `[Unreleased]`; `make check` green. Then `make review`
 and an independent code review over the diff, then the red team gate
 (`docs/quality/red-team-gate.md`) over the diff with verdict recorded. Fix every finding with a
 test and re-check the delta. Merge locally into the base branch only if the review is clean, the

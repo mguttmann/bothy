@@ -9,9 +9,11 @@ After this ticket every copy between chapters 04, 05 and 06, `docs/spec/actions.
 gate against its source. Rule `api-catalogue-sync` (G2) compares actions, rate-limit classes, ops,
 events, receive actions, close codes, idempotency exemptions, deprecation dates and problem codes;
 rule `api-tables` (G3) regenerates every `BEGIN/END GENERATED` block of chapter 06 and
-`webhooks.md` and fails on any difference. To make that possible, the facts that today live only
-in prose get a machine-readable home in `openapi.yaml`: the problem codes with their status, the
-reasons for operations without `Idempotency-Key`, and the deprecation date.
+`webhooks.md` and fails on any difference. The machine-readable sources these rules read are
+already in the specification (planning, spec first): `x-problem-codes` on `Problem`, `x-status` on
+every response component, `x-idempotency-exempt` with a reason code, `x-deprecated-at`, and the
+English close-code texts in `asyncapi.yaml` (06 sections 5, 7, 13.4, R-API-23 to R-API-25). This
+ticket builds the tool that holds them.
 
 ## Read first
 
@@ -40,14 +42,15 @@ reasons for operations without `Idempotency-Key`, and the deprecation date.
 - ADRs: `docs/adr/0013-spec-first-openapi-31-und-asyncapi-30-normativ.md`,
   `docs/adr/0014-api-versionierung-und-deprecation-policy.md`,
   `docs/adr/0015-fehlerformat-rfc-9457-idempotenz-paginierung.md`,
-  `docs/adr/0016-webhooks-nach-standard-webhooks.md`, ADR 0049 (from M1-02).
+  `docs/adr/0016-webhooks-nach-standard-webhooks.md`,
+  `docs/adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md`.
 - `docs/quality/gates.md`, `docs/spec/23-qualitaet.md` "Gates", `tools/README.md`,
   `tools/pyproject.toml`, `Makefile`, `CHANGELOG.md`, `docs/DECISIONS.md`.
 
-Operations touched: every operation in `paths` and `webhooks` is read; `suspendApp` and
-`resumeApp` already carry the `Idempotency-Key` parameter (added in planning, 06 "Idempotenz"
-item 3); every POST or PATCH without that parameter gains
-`x-idempotency-exempt` (list in "Design notes"). No table of chapter 03 and no action id changes.
+Operations touched: every operation in `paths` and `webhooks` is read; none is changed unless the
+tool finds a real difference. `suspendApp` and `resumeApp` carry the `Idempotency-Key` parameter;
+every other POST or PATCH without it carries `x-idempotency-exempt` (06 "Idempotenz" item 3 and
+block `idempotency_exempt`). No table of chapter 03 and no action id changes.
 
 ## Fixed requirements that apply
 
@@ -76,14 +79,16 @@ item 3); every POST or PATCH without that parameter gains
     item 3, ADR 0038); the tool uses Python with PyYAML only.
 11. Every operation names exactly one known action and the class of that action; system actions
     never appear on a route or op (05 rules 3, 4, 10; test 7).
-12. Every POST and PATCH accepts `Idempotency-Key` except the cases of 06 "Idempotenz" item 3,
-    and the gate holds that list (06 G2; 04 5.2; R-API-09).
-13. A deprecated op or field carries `x-deprecated-since`, a deprecation date and `x-sunset`, with
-    `Sunset` at least `api.deprecation_min_notice` after `Deprecation` (06 13.4, RFC 9745,
-    RFC 8594).
+12. Every POST and PATCH accepts `Idempotency-Key` except the operations with
+    `x-idempotency-exempt` (06 "Idempotenz" item 3), and the gate holds that list (06 G2; 04 5.2;
+    R-API-09, R-API-24).
+13. A deprecated op or field carries `x-deprecated-since`, `x-deprecated-at` and `x-sunset`, with
+    `x-sunset` at least `api.deprecation_min_notice` after `x-deprecated-at` (06 13.4, R-API-25,
+    RFC 9745, RFC 8594).
 14. Descriptions in `openapi.yaml` and `asyncapi.yaml` are English (Ruling L5, R-API-15);
     chapters stay German.
-15. Additive API changes raise `info.version` MINOR, documentation-only changes PATCH (06 13.1).
+15. Additive API changes raise `info.version` MINOR, documentation-only changes PATCH (06 13.1);
+    this ticket changes neither API file unless the tool finds a difference.
 
 ## Scope
 
@@ -100,47 +105,19 @@ item 3); every POST or PATCH without that parameter gains
    `api-catalogue-sync: rest-action: <operationId>: ...`.
 2. `tools/api-checks/tests/test_api_checks.py` (mutation fixtures, see "Tests").
    `tools/api-checks/README.md` (German, short).
-3. `docs/api/openapi.yaml`:
-   - `components.schemas.Problem` gains `x-problem-codes`: a list of entries `{code, status,
-     title, description, client_action}` (English), one per row of today's 06 table "Bekannte
-     Codes", same order (sorted by status, stable), with optional `router: true` for codes the
-     router emits without any operation documenting them (`method_not_allowed`). Translate
-     today's German cells faithfully; `title` is the short RFC 9457 title (for example
-     `Validation failed`).
-   - Every entry of `components.responses` gains `x-status` (the HTTP status it stands for:
-     `BadRequest` 400, `Unauthorized` 401, `Forbidden` 403, `NotFound` 404, `Conflict` 409, `Gone`
-     410, `PreconditionFailed` 412, `PayloadTooLarge` 413, `UnsupportedMediaType` 415,
-     `RangeNotSatisfiable` 416, `UnprocessableEntity` 422, `PreconditionRequired` 428,
-     `TooManyRequests` 429, `Error` 500, `ServiceUnavailable` 503). Reason: `Error` is referenced
-     only as `default` and `ServiceUnavailable` nowhere, so the status of their codes cannot be
-     read from `paths`.
-   - Every POST and PATCH in `paths` without the `IdempotencyKey` parameter gets
-     `x-idempotency-exempt: <reason>` (list in "Design notes"); `suspendApp` and `resumeApp`
-     keep their `- $ref: '#/components/parameters/IdempotencyKey'`.
-   - `info.version` raised by one MINOR step (new `x-` extensions that tools read).
-4. `docs/api/asyncapi.yaml`: rewrite every `client_action` of `channels.gateway.x-close-codes` in
-   English, faithful to 04 "Schließ-Codes" (this also fixes the drift of code `4016`, whose text
-   differs from 04 today); `info.version` raised by one PATCH step.
-5. `docs/spec/06-api.md`:
-   - 5 "Fehler": the sentence before the block says the block is generated from `x-problem-codes`
-     in `openapi.yaml`; block `problems` gets the header `| Code | Status | Bedeutung (aus
-     openapi.yaml) | Client-Reaktion (aus openapi.yaml) |`.
-   - 7 "Idempotenz" item 3: replace the prose list by: "Ohne `Idempotency-Key` bleiben genau die
-     POST- und PATCH-Operationen mit `x-idempotency-exempt` in openapi.yaml; der Grund steht als
-     Code daran. Das Gate prüft die Liste (Abschnitt 15, G2):" followed by the new block
-     `idempotency_exempt`.
-   - 13 "Versionierung, Deprecation, Kompatibilität" item 4: add `x-deprecated-at` (date of the
-     deprecation, RFC 3339 full-date, source of the `Deprecation` header) next to
-     `x-deprecated-since` (spec version) and `x-sunset` (date).
-   - 15: rows G2 and G3 describe the real rules and the tool (`tools/api-checks`,
-     `make api-checks`); G2 no longer mentions the redocly list (that is `catalog-check` of
-     M1-02); G3 names sections 5, 7, 16 and 17 and `webhooks.md` (18.1 is no generated table).
-   - 19: new rulings `R-API-23` (problem codes have one source, `x-problem-codes`, and every
-     response component names its status in `x-status`), `R-API-24` (exemptions from
-     `Idempotency-Key` are machine-readable with a reason code; `suspendApp` and `resumeApp` take
-     the key), `R-API-25` (`x-deprecated-at` carries the deprecation date because
-     `x-deprecated-since` is a spec version, not a date).
-   - Blocks `endpoints`, `ws_ops`, `events` are regenerated (no content change expected).
+3. Specification already in place (verify, do not redo): `docs/api/openapi.yaml` has
+   `x-problem-codes` on `components.schemas.Problem` (entries `{code, status, title, description,
+   client_action}`, English, sorted by status, `router: true` for `method_not_allowed`), `x-status`
+   on every entry of `components.responses`, and `x-idempotency-exempt` on every POST and PATCH
+   without the `IdempotencyKey` parameter; `docs/api/asyncapi.yaml` has English `client_action`
+   texts in `channels.gateway.x-close-codes` following 04 "Schließ-Codes"; 06 has the blocks
+   `problems` and `idempotency_exempt`, the text of 5, 7.3, 13.4 and 15 (G2, G3) and the rulings
+   R-API-23 to R-API-25. If the tool finds a difference between a source and its copy, fix the copy
+   (or the source, if the copy is right by the chapter text) and list it in the report.
+4. `docs/spec/06-api.md`: blocks `problems`, `idempotency_exempt`, `endpoints`, `ws_ops`, `events`
+   regenerated by the tool; no content change expected.
+5. (no further spec text change; the chapter already describes the tool as `tools/api-checks` and
+   `make api-checks`).
 6. `docs/api/webhooks.md`: block `webhook_events` regenerated (no content change expected).
 7. `docs/api/README.md` "Ändern": item 2 names `x-idempotency-exempt` or the `IdempotencyKey`
    parameter and new problem codes in `x-problem-codes`; item 5 names `make api-tables` and
@@ -205,9 +182,12 @@ finding, never a default. Locate columns by header name, because M1-08 may add c
 
 ### Exemption reasons (`x-idempotency-exempt`)
 
+The German texts are those of the block `idempotency_exempt` in 06 (source of truth); the tool
+keeps them as a constant mapping.
+
 | Code | German text in block `idempotency_exempt` | Operations (state at planning) |
 |---|---|---|
-| `auth_flow` | Anmeldeablauf: einmalige Challenge oder Code, Refresh-Rotation | `beginOidcLogin`, `completeOidcLogin`, `loginWithTrustedHeader`, `beginPasskeyLogin`, `completePasskeyLogin`, `beginEnrollment`, `completeEnrollment`, `beginPairing`, `completePairing`, `loginWithPassword`, `refreshToken`, `logout`, `createStepUpChallenge`, `completeStepUpWithPasskey`, `completeStepUpWithDeviceKey`, `beginIdentityLink`, `completeIdentityLink`, `beginPasskeyRegistration`, `completePasskeyRegistration` |
+| `auth_flow` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung | `beginOidcLogin`, `completeOidcLogin`, `loginWithTrustedHeader`, `beginPasskeyLogin`, `completePasskeyLogin`, `beginEnrollment`, `completeEnrollment`, `redeemEnrollmentCode`, `beginPairing`, `completePairing`, `loginWithPassword`, `refreshToken`, `logout`, `createStepUpChallenge`, `completeStepUpWithPasskey`, `completeStepUpWithDeviceKey`, `beginIdentityLink`, `completeIdentityLink`, `beginPasskeyRegistration`, `completePasskeyRegistration`, `createExtensionSession` |
 | `read_only` | liest nur, ändert keinen dauerhaften Zustand | `previewGrant`, `autocompleteCommand`, `validateManifest`, `verifyAuditChain`, `createFileTicket` |
 | `agent_runtime` | Agenten-Laufzeit: monoton oder Compare-and-swap | `sendHeartbeat`, `ackAgentEvents`, `patchRun`, `startRun`, `resumeRun`, `awaitRunInput`, `finishRun`, `answerAutocomplete` |
 | `client_id` | Client-ID im Körper (Tabelle oben) | `createMessage`, `createInteraction`, `postIncomingWebhook` |
@@ -218,10 +198,10 @@ The `origin_key` text is written into 06 as a Markdown link relative to `docs/sp
 here because this brief lives in another folder).
 
 `suspendApp` and `resumeApp` change state with audit and fit no reason; they carry the
-`IdempotencyKey` parameter. If the base branch has other POST or PATCH operations without the
-header, give them the header unless one reason clearly applies, and list each decision in the
-report. The German texts live as a constant mapping in `api_checks.py` because they render a
-German chapter; comments and docstrings stay English.
+`IdempotencyKey` parameter. If the base branch has a POST or PATCH operation with neither, the
+check fails; fix the operation spec first (header, or a reason only if one clearly applies) and
+list the decision in the report. The German texts live as a constant mapping in `api_checks.py`
+because they render a German chapter; comments and docstrings stay English.
 
 ### Rule `api-tables` (G3), blocks
 
@@ -238,25 +218,20 @@ finding. Use `action_catalog.generated_blocks` and `replace_generated_block`. Ro
 | 06 | `events` | header `\| Ereignistyp \| Art \| Empfangs-Aktion \| Zielgruppe \| Schema \| Webhook \|`; messages in the order of the `dispatch` operation: `name`, `dauerhaft` or `kurzlebig`, `x-receive-action`, `x-audience` or empty, payload schema name, `ja` if the type is a key of `webhooks`, else empty |
 | `webhooks.md` | `webhook_events` | header `\| Ereignistyp \| Empfangs-Aktion \| Empfänger und Scope zusätzlich zu \`events:subscribe\` \| Schema \|`; entries of `webhooks` in file order: type, `x-receive-action`, scope cell, schema of the request body. Scope cell: event with `audience: self` and `receivers: agent` gives `nur Agenten-Abo (Agent ist Empfänger)`; other `self` events give `nur eigene (App oder Agent ist Empfänger)`; otherwise the `app_scope` of the receive action in backticks, or `keiner (Metadaten, 05 Abschnitt 2.6)` for `none` |
 
-Prototype runs on the planning state reproduced `endpoints`, `ws_ops`, `events` and
-`webhook_events` byte for byte with these rules; a difference after implementation is a bug in
-the renderer, not a reason to edit the block by hand.
+Prototype runs on the planning state reproduced `problems`, `idempotency_exempt`, `endpoints`,
+`ws_ops`, `events` and `webhook_events` byte for byte with these rules; a difference after
+implementation is a bug in the renderer, not a reason to edit the block by hand.
 
 ### Rulings for `docs/DECISIONS.md`
 
-1. Problem codes get one machine-readable source (`x-problem-codes` on `Problem`); the 06 table
-   is generated from it in English like the endpoint summaries. Reason: a German table cannot be
-   generated from an English contract (L5), and the server needs titles and descriptions for
-   `getProblemType` and problem bodies.
-2. Exemptions from `Idempotency-Key` carry a reason code; `suspendApp` and `resumeApp` take the
-   key. Reason: the prose list of 06 7.3 did not cover all operations, so the G2 check had no
-   source.
-3. `x-deprecated-at` added. Reason: `x-deprecated-since` is a spec version, and the sunset rule
-   and the `Deprecation` header need a date.
-4. Close codes are compared by code and name only; asyncapi texts are English. Reason: L5; the
+Rulings 1 to 3 and 5 are already recorded in 06 (R-API-23 to R-API-25); `docs/DECISIONS.md` points
+to them. New here:
+
+1. Close codes are compared by code and name only; asyncapi texts are English. Reason: L5; the
    meaning stays in 04.
-5. Every response component carries `x-status`. Reason: two components are not referenced under
-   a numeric status, and problem codes need a status from one place.
+2. Problem codes the router emits without any operation documenting them carry `router: true`.
+   Reason: the check "every code is named by a response" would otherwise fail on
+   `method_not_allowed`.
 
 ## Tests (write them first)
 
@@ -306,13 +281,11 @@ make check
 - [ ] `pytest tools/api-checks/tests`: for every sub-check of `api-catalogue-sync` and for every
       block of `api-tables` one mutated fixture is red; the repository is green.
 - [ ] `make api-checks` and `make api-lint` are green; `make api-tables` gives no diff.
-- [ ] `x-problem-codes`, `x-status`, `x-idempotency-exempt` and `x-deprecated-at` are defined in
-      06, used in `openapi.yaml` and checked; `suspendApp` and `resumeApp` take `Idempotency-Key`.
-- [ ] asyncapi close-code texts are English and match 04 in meaning; versions of both API files
-      raised as stated.
-- [ ] 06 sections 5, 7, 13, 15 and 19 updated; `docs/api/README.md`, `docs/quality/gates.md`,
-      chapter 23, `tools/README.md`, `tools/api-checks/README.md`, `CHANGELOG.md`,
-      `docs/DECISIONS.md` updated.
+- [ ] `x-problem-codes`, `x-status`, `x-idempotency-exempt` and `x-deprecated-at` are checked;
+      every difference the tool found is fixed and listed in the report.
+- [ ] asyncapi close codes equal 04 in code and name.
+- [ ] `docs/api/README.md`, `docs/quality/gates.md`, chapter 23, `tools/README.md`,
+      `tools/api-checks/README.md`, `CHANGELOG.md`, `docs/DECISIONS.md` updated.
 - [ ] `make check` green; no file of the diff contains U+2013 or U+2014.
 
 ## Definition of done

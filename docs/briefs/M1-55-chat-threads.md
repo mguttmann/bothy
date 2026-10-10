@@ -136,11 +136,9 @@ SetTags(ctx, SetTagsCmd) (Thread, error)          // optional expected version
 10. `internal/platform/config` schema: `thread.title_max_chars` (03) and
     `thread.placeholder_titles` (09) if missing; `api.page_size_default`, `api.page_size_max` (06)
     if missing.
-11. `docs/api/openapi.yaml`: add response `409` (`Conflict`) to `setThreadTitle` and
-    `closeThread`; add `title_manual` to the problem catalogue source (find it with
-    `grep -rn operator_mismatch tools docs/api services/server`) so the generated table in 06
-    "Fehler", the `Conflict` description and `getProblemType` include it; regenerate with
-    `make api-checks`.
+11. `docs/api/openapi.yaml` already has the `409` responses of `setThreadTitle` and `closeThread`
+    and `title_manual` in `x-problem-codes` (planning, spec first); the generated table in 06
+    "Fehler", the `Conflict` description and `getProblemType` include it.
 12. Documentation: `internal/chat/README.md`, `services/server/CHANGELOG.md`,
     `docs/DECISIONS.md` (rulings D1 tags at creation, D6 unknown tag filter, D7).
 
@@ -177,9 +175,11 @@ SetTags(ctx, SetTagsCmd) (Thread, error)          // optional expected version
 D0. Start check. `make check` green on the fresh worktree, else `Verdict: BLOCKED base branch red`.
 M1-53 merged (the `threads` table exists), else `Verdict: BLOCKED dependency M1-53 missing`.
 
-D1. `Threads.Create`:
-- Authorize `thread.create` on the channel (`write`); unknown or invisible channel `404`;
-  read-only or archived channel `403 channel_read_only` (authz).
+D1. `Threads.Create` (called by `messaging` only, 02 4.6: the action `thread.create` belongs to
+`messaging`, which authorizes it on the channel before the call; `chat` writes the row without a
+rights check of its own):
+- Unknown channel `404` (the caller has already turned an invisible channel into `404` through
+  `authorize`).
 - Forum channel: `Parent` must be nil (`400`, `/parent_message_id`, `not_allowed_in_forum`).
   Text channel: `Parent` is required (`400`, `/parent_message_id`, `required_in_text_channel`)
   and `Parent.ThreadID` must be the main thread of this channel (`400`, `/parent_message_id`,

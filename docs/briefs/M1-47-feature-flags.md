@@ -16,8 +16,8 @@ tokens (`tokens.personal_enabled`, M1-44) runs through this evaluation.
 ## Read first
 
 - `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 rows M1-27, M1-30, M1-44, M1-46,
-  M1-47; P-12 (the implementing ticket writes a missing ADR of the leadership list); exit
-  criterion 9 (ADR 0064 must exist).
+  M1-47; exit criterion 9 (ADR 0064, accepted:
+  `docs/adr/0064-feature-flag-registrierung-mit-aufraeum-gate.md`).
 - `docs/spec/16-betrieb.md`: "Umgebungen und Feature-Flags" (6), especially "Feature-Flags"
   (6.2), and decision R-OP-14.
 - `docs/operations/environments-and-flags.md`: section 2 "Feature-Flags" (2.1 to 2.5).
@@ -85,21 +85,15 @@ tokens (`tokens.personal_enabled`, M1-44) runs through this evaluation.
 
 Paths are relative to `services/server/` unless they start with `docs/` or `Makefile`.
 
-1. **Specification first:**
-   - `docs/api/openapi.yaml`: `FeatureFlag` gains `kind` (new schema `FeatureFlagKind`, enum
-     `release`, `option`; absent for orphaned rows), `default` (boolean; absent for orphaned),
-     `remove_by` (string, SemVer; only for `release`), `module` (string; absent for orphaned),
-     `orphaned` (boolean, required), `updated_by` (Uuid); `FeatureFlagPut` loses `description`
-     (the registry owns it) and gains `reason` (string, `minLength: 1`, required); update the
-     examples; `info.version` raised by one MINOR step (the build line is still `0.x`).
-   - `docs/adr/0064-feature-flag-registrierung-mit-aufraeum-gate.md` (MADR 4 like ADR 0000,
-     German text, English headings, `status: accepted`, `date` = day of writing); then
-     `make adr-index`. Content in Design notes.
-   - `docs/spec/02-architektur.md` 4.3: row `instance` declares `FlagGroupSource` and
-     `FlagUserSource`; row `authz` implements `instance.FlagGroupSource`; row `identity`
-     implements `instance.FlagUserSource`.
-   - `docs/quality/gates.md`: row `flag-check`.
-   - `docs/DECISIONS.md`: the rulings under Design notes, in the file's existing format.
+1. **Specification** (in place from planning, spec first; change it only where the
+   implementation proves it wrong): `docs/api/openapi.yaml` `FeatureFlag` with `kind`,
+   `description`, `default`, `remove_by`, `module`, `orphaned`, `version`, `updated_by`,
+   `updated_at` and `FeatureFlagPut` with required `enabled` and `reason` and without
+   `description`; ADR 0064; 03 `feature_flags` (no `description` column, version `0` for a
+   registered key without a row); 02 4.3 (`instance` declares `FlagGroupSource` and
+   `FlagUserSource`, implemented by `authz` and `identity`); 02 "6. Code-Layout"
+   (`tools/flagcheck`). To do here: `docs/quality/gates.md` row `flag-check`; `docs/DECISIONS.md`
+   the rulings under Design notes, in the file's existing format.
 2. **Port** `internal/instance/flags.go` (port package, imports only `kernel`):
    ```go
    type FlagKind string // FlagKindRelease = "release", FlagKindOption = "option"
@@ -128,9 +122,8 @@ Paths are relative to `services/server/` unless they start with `docs/` or `Make
        ExistingUserIDs(ctx context.Context, principalIDs []ids.ID) ([]ids.ID, error)
    }
    ```
-   The plan names `internal/instance/flags` as a package; 02 5 allows only the port package and
-   `domain`, `app`, `adapters` in a module, and go-arch-lint rejects a package without a
-   component. Build the parts in those layers instead.
+   02 5 allows only the port package and `domain`, `app`, `adapters` in a module (PLAN row M1-47),
+   so the parts live in those layers.
 3. **Domain** `internal/instance/domain/flags.go` (pure): `FlagSpec` (same fields as the port
    definition; `app` converts), `CheckRegistry(specs []FlagSpec, modules []string) []string`,
    `Evaluate(global bool, inRollout bool) bool`, `InRollout(r Rollout, kind string, principalID
@@ -147,10 +140,11 @@ Paths are relative to `services/server/` unless they start with `docs/` or `Make
    the M1-27 validity functions and the authz store; existing groups = not deleted),
    `internal/identity/adapters/flagsource` (principals of kind `user` with status other than
    `deleted`); wired in `internal/wire`.
-8. **Personal tokens.** Find how M1-44 decides `tokens.personal_enabled` today (search
-   `tokens.personal_enabled` and `feature_disabled` in `internal/identity`). Replace whatever
-   stands there with a call to `instance.Flags.Enabled(ctx, caller, instance.FlagTokensPersonalEnabled)`
-   through the identity app's dependencies, wired in `internal/wire`, and delete the stand-in.
+8. **Personal tokens.** M1-44 decides `tokens.personal_enabled` through its consumer port
+   `PersonalTokenSwitch`, bound to the default-off `app.PersonalTokensDefault{}`. Implement the
+   switch in `internal/identity/adapters/instanceflags` over
+   `instance.Flags.Enabled(ctx, caller, instance.FlagTokensPersonalEnabled)`, rebind it in
+   `internal/wire`, and delete the default binding.
 9. **Gate tool** `tools/flagcheck` (Go `main` in the server module, beside `tools/archgen`;
    follow its location convention): flags `-version-file`, `-config-doc`, `-modules`; checks in
    Design notes. `Makefile`: target `flag-check`, part of `gates`; it prints `SKIP flag-check no
@@ -259,14 +253,9 @@ Fails with one line per finding, prefixed `flag-check:`, exit code 1:
 Prints `flag-check: ok (<n> flags)` otherwise. The tool takes the registry as a function
 argument internally, so tests run it on fixture registries without touching the real one.
 
-**ADR 0064 "Feature-Flag-Registrierung mit Aufräum-Gate".** Context: flags without a registry
-rot and can hide security switches (16 6.2, R-OP-14). Drivers: one source for keys, server-side
-evaluation, no dead release flags, flags never as security limits, no extra service. Options at
-least: (1) registry in code plus values in `feature_flags` plus gate (chosen); (2) flags only as
-table rows created by owners at runtime; (3) an external flag service behind an SDK. Name
-external products only with a public URL, the retrieval date and a marker
-`[belegt]`/`[abgeleitet]`/`[vermutet]`, or leave them unnamed. Confirmation: `make flag-check`
-and the tests `TestCheckRegistry*`, `TestFlagCheck*`, `TestEvaluate*` by name.
+**ADR 0064** exists (accepted). Keep it current: if the implementation changes a rule or the
+confirmation (`make flag-check`, `TestCheckRegistry*`, `TestFlagCheck*`, `TestEvaluate*`), update
+the ADR in the same change and run `make adr-index`.
 
 **Rulings for `docs/DECISIONS.md`:**
 1. The registry owns key, kind, default, module and description; `FeatureFlagPut` has no
@@ -329,13 +318,13 @@ make check
 - [ ] `getInstance` returns the flags evaluated for the caller.
 - [ ] `tokens.personal_enabled` decides `createToken` for personal tokens through
       `instance.Flags`; no stand-in remains.
-- [ ] ADR 0064 exists, is indexed, and names its confirmation.
+- [ ] ADR 0064 matches the implementation and names its confirmation.
 - [ ] `make check` is green.
 
 ## Definition of done
 
 Code, tests and documentation are complete: module README updated, doc comments on every public
-symbol, ADR 0064 written, CHANGELOG entry under `Unreleased` in `services/server/CHANGELOG.md`.
+symbol, ADR 0064 current, CHANGELOG entry under `Unreleased` in `services/server/CHANGELOG.md`.
 `make check` is green. An independent review and the red team (`docs/quality/red-team-gate.md`)
 have run over the diff with their verdicts recorded in the report. Merge locally into the base
 branch only if both are green; then remove the worktree with `git worktree remove`.

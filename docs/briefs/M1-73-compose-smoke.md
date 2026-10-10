@@ -76,7 +76,7 @@ Existing files and outputs of the dependencies:
 - `services/server/Dockerfile`, `.dockerignore` and the `image` target (M1-23).
 - `services/server/internal/identity/README.md` and `bothy setup --help` (M1-37: output of
   `setup bootstrap-owner`, the database role it uses, whether a running server needs a restart
-  after setup; M1-35: step-up JWS format; M1-33: DPoP rules and the JOSE library in `go.mod`).
+  after setup; M1-35: step-up JWS format; M1-33: DPoP rules and `kernel/jose`, ADR 0067).
 - `services/server/internal/platform/otel/README.md` (M1-10: `service.name`, log exporter).
 - `services/server/internal/platform/pg/pgtest` (M1-12: the PostgreSQL 18 image reference).
 - `services/server/test/canary` (M1-69) and `architecture/modules.yaml` (M1-05: how test
@@ -308,8 +308,10 @@ M1-05.
        RFC 7638), `func NewProof(k Key, method, htu, nonce, accessToken string, now time.Time)
        (string, error)` (header `typ: dpop+jwt`, `alg: ES256`, public `jwk` only; claims `jti`
        random, `htm`, `htu` without query and fragment, `iat`, `nonce` when set, `ath` =
-       base64url SHA-256 of the token when set). Use the JOSE library M1-33 already pinned in
-       `go.mod`; add no new JOSE dependency.
+       base64url SHA-256 of the token when set). Build the compact JWS with the standard
+       library (`crypto/ecdsa`, signature as `R || S`, `encoding/base64` without padding); the
+       product has no JOSE library (ADR 0067) and this black-box harness imports no `internal/...`
+       package.
      - `htu.go`: `func GatewayHTU(publicURL string) (string, error)`: the HTTPS form of
        `<public URL>/api/v1/gateway` (04 6.3); `func RESTHTU(publicURL, path string) (string,
        error)`. The server checks `htu` against its public URL (08 7.3), not against the loopback
@@ -327,8 +329,8 @@ M1-05.
        `func CheckTelemetry(otelDir, serviceName, route string) error`.
      - `enroll.go`: `func ReadEnrollmentCode(stdout []byte) (string, error)`.
    - Register the package in `architecture/modules.yaml` as a test harness the way M1-69
-     registered `test/canary`, allowing exactly `api/rest`, `github.com/coder/websocket` and the
-     JOSE library; regenerate `.go-arch-lint.yml` with `tools/archgen`; no import of any
+     registered `test/canary`, allowing exactly `api/rest` and `github.com/coder/websocket`;
+     regenerate `.go-arch-lint.yml` with `tools/archgen`; no import of any
      `internal/...` package.
 6. `services/server/Dockerfile` (change): two stages before the production stage, which stays
    the last stage and unchanged: `smoke-build` (from the existing builder stage, builds

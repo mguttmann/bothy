@@ -1,6 +1,6 @@
 # M1-44: API tokens with prefix and checksum
 
-Status: ready | Depends on: M1-34 | Etappe: M1
+Status: ready | Depends on: M1-29, M1-35 | Etappe: M1
 
 ## Goal
 
@@ -97,20 +97,19 @@ step-up (SR5).
   export the function `AuthenticateAPIToken` for the gateway `identify` of M1-64.
 - `services/server/internal/authz/`: guard for `token.create` (a token for a person only for
   oneself, `forbidden` `not_self`) in the guard table of `authorize` (07 4.2 step 9), with tests.
-- `internal/kernel/idempotency` and its middleware: only if they offer no way to keep a one-time
-  secret out of the stored response, add a per-operation redaction hook with tests (Design notes).
+- One-time secret: the `createToken` handler calls `idempotency.MarkOneTimeSecret(ctx)` of M1-20
+  (Design notes).
 - `internal/wire`: bindings, including `PersonalTokenSwitch` (Design notes).
-- `.gitleaks.toml` rule `bothy-api-token`: checksum exactly 6 characters;
-  `tools/ci/tests/test_gitleaks_rules.py`: runtime token with a valid checksum, cross-check of the
-  Go vectors.
-- `docs/adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md` (P-12) and `make adr-index`.
-- Specification first, in the same change: `docs/spec/08-identitaet.md` 12 (exact format,
-  alphabet, lengths, checksum, `token_prefix` length, kind to principal mapping, scopes rule,
-  personal tokens only for oneself, authentication rules), `docs/spec/06-api.md` 7 (row for
-  responses with a one-time secret), `docs/api/openapi.yaml` (`ApiTokenCreate.expires_at`
-  required; descriptions of `scopes`, `dpop_jkt`, `409` reasons), `docs/spec/02-architektur.md` 4.3
-  if the port names differ from the table, `services/server/api/operations.yaml` (three operations
-  move to the built list), regenerated server code.
+- `.gitleaks.toml` rule `bothy-api-token` already requires exactly 6 checksum characters;
+  `tools/ci/tests/test_gitleaks_rules.py`: add a runtime token with a valid checksum and a
+  cross-check against the Go vectors.
+- The specification is in place (planning, spec first): ADR 0061 (format, Base62 alphabet,
+  lengths, CRC-32, `token_prefix` with 6 characters), 08 12 (kinds per principal, scopes rule,
+  personal tokens only for oneself, `app_not_installed`, one-time secret), 03 `api_tokens`
+  (`expires_at` NOT NULL), 06 7 (R-API-26), `openapi.yaml` (`ApiTokenCreate.expires_at` required,
+  description of `createToken`). Change them only where the implementation proves them wrong
+  (`docs/spec/02-architektur.md` 4.3 if the port names differ). `services/server/api/operations.yaml`:
+  the three operations move to the built list; regenerated server code.
 - `services/server/internal/identity/README.md`, CHANGELOG entry under "Unreleased" of
   `services/server/CHANGELOG.md`, `docs/DECISIONS.md` entries for the rulings below,
   `docs/security/threat-model.md` T-TK-02 test column with the test names.
@@ -156,14 +155,13 @@ step-up (SR5).
 
 **Preconditions (check before writing code; any failure: `Verdict: BLOCKED <which>`).**
 
-1. M1-24 (audit recorder) and M1-29 (rights-change path: `permission_version` first,
-   `access.changed`) are merged. `token.revoke` has "Rechte" = yes and both `token.create` and
-   `token.revoke` are audited; the plan lists only M1-34 as dependency.
+1. M1-29 (rights-change path: `permission_version` first, `access.changed`; with M1-24 audit)
+   and M1-35 (step-up for `token.create`) are merged: both are dependencies of this ticket.
 2. The DPoP verifier (M1-33) and the HMAC hasher with `auth.token_pepper_ref` (M1-34) exist.
 
-Step-up (M1-35) is not required: tests set `auth_sessions.step_up_at` through the test fixture.
+Tests obtain step-up through the M1-35 flow (or its test helper), not by writing columns.
 
-**Format** (write it into 08 12 and ADR 0061):
+**Format** (08 12 and ADR 0061):
 
 - `bothy_` + kind + `_` + random + `_` + checksum; kinds `agt` (agent), `app` (app), `pat`
   (personal), `whi` (incoming webhook). Total length 60 characters.
@@ -200,7 +198,7 @@ only for `user`; `whi` is never issued by `createToken` and never accepted by th
 5. Body: `name` 1 or more characters without control, format or bidi characters; `scopes` must be
    empty for `agt` (agents hold their scopes implicitly, 05 2.6) and for `pat` (ruling: personal
    tokens act with the person's grants; 07 knows scopes only for apps), else `400
-   validation_failed` with pointer `/scopes`; `expires_at` required (specification first), later than
+   validation_failed` with pointer `/scopes`; `expires_at` required (08 12), later than
    now and not later than now plus `auth.api_token_max_ttl` (`agt`, `app`) or
    `auth.personal_token_max_ttl` (`pat`), else `400` with pointer `/expires_at`; `dpop_jkt`
    optional, exactly 43 base64url characters (RFC 7638 SHA-256 thumbprint), required when the kind
@@ -211,13 +209,10 @@ only for `user`; `whi` is never issued by `createToken` and never accepted by th
    rights.
 7. `201 ApiTokenCreated` with `secret`; header `Cache-Control: no-store`.
 
-**Idempotency with a one-time secret.** 03 point 9 forbids storing the token, but
-`idempotency_keys.response_body` stores final responses. Ruling (06 7 gets a row, specification
-first): the stored body of `createToken` omits `secret`; a replay with the same key and body answers
-`409 conflict` with `reason: secret_shown_once`, `resource_id` = token ID and
-`Idempotent-Replay: true`, so the client can revoke the token and create a new one. Implement it
-through a per-operation redaction hook of the idempotency layer; the same hook will serve
-`createEnrollmentCode` and webhook secrets later (note in the report).
+**Idempotency with a one-time secret.** 03 point 9 forbids storing the token. The handler calls
+`idempotency.MarkOneTimeSecret(ctx)` (M1-20): the stored row holds no part of the secret, and a
+replay with the same key and body answers `409 conflict` with `reason: one_time_secret` and
+`Idempotent-Replay: true` (06 7, R-API-26); the owner revokes the unknown token in the list.
 
 **`listTokens`** (`GET /api/v1/principals/{principal_id}/tokens`, `token.list`, `rl.read`):
 `authorize` on the principal (owner, or the principal itself); tokens with `revoked_at IS NULL`
@@ -253,12 +248,10 @@ Work and returns the count; the caller owns the rights change and the audit (M1-
   NULL OR last_used_at < now - identity.last_active_granularity`; a failure is logged with the
   token ID and never fails the request.
 
-**`PersonalTokenSwitch` binding.** If `internal/instance` already exposes a working `Flags` port
-(M1-47 merged), implement the switch in `identity/adapters/instanceflags` over it with key
-`tokens.personal_enabled`. Otherwise bind `app.PersonalTokensDefault{}` in `internal/wire`, which
-returns the registered default `false` (16 6.2: unknown or unregistered flags are off), and list
-"M1-47 registers `tokens.personal_enabled` and rebinds `PersonalTokenSwitch`" as a follow-up in
-the report. Tests use a fake switch for both values.
+**`PersonalTokenSwitch` binding.** M1-47 (feature flags) depends on this ticket and comes later.
+Bind `app.PersonalTokensDefault{}` in `internal/wire`, which returns the registered default `false`
+(16 6.2: unknown or unregistered flags are off); M1-47 registers `tokens.personal_enabled` and
+rebinds `PersonalTokenSwitch` over its `Flags` port. Tests use a fake switch for both values.
 
 **ADR 0061** `docs/adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md`, MADR 4 like
 `0000-vorlage-madr-4.md` (headings English, text German, status `accepted`, date of the build).
@@ -286,7 +279,7 @@ Integration tests (PostgreSQL 18, real HTTP chain on `127.0.0.1:0`, steerable cl
 - `TestIDT23_OnlyHashStored`: after `createToken` the full secret appears in no row of
   `api_tokens`, `idempotency_keys` and `audit_events`; `token_hash` is the HMAC.
 - `TestIDT23_ShownOnce`: `listTokens` never returns the secret; a replay with the same
-  `Idempotency-Key` gives `409 secret_shown_once` with the token ID.
+  `Idempotency-Key` gives `409 conflict` with `reason: one_time_secret`.
 - `TestIDT23_WrongChecksumRejectedWithoutLookup` (repository fake counts calls),
   `TestIDT23_ExpiredRejected`, `TestIDT23_RevokedRejected`.
 - `TestIDT23_DPoPBoundAgentTokenWithoutProof`: `Bearer` gives `401 invalid_dpop_proof`; a proof
@@ -343,15 +336,15 @@ make check
       rights, no step-up (AZ-M35).
 - [ ] Revocation effective on the next request; `RevokeAllForPrincipal` available for M1-45 and
       M1-51.
-- [ ] ADR 0061 written and indexed; 08, 06, `openapi.yaml`, `operations.yaml`, DECISIONS updated;
-      `make check` green.
+- [ ] The implementation matches ADR 0061, 03, 06, 08 and `openapi.yaml` (changed only where proven
+      wrong); `operations.yaml` and DECISIONS updated; `make check` green.
 
 ## Definition of done
 
 - Code and tests as above; every public symbol has a doc comment (purpose, parameters, return
   value, errors, example where useful); comments explain why.
 - `internal/identity/README.md` current (token format, port `Tokens`, authentication path);
-  CHANGELOG entry under "Unreleased"; ADR 0061; `docs/DECISIONS.md` entries.
+  CHANGELOG entry under "Unreleased"; ADR 0061 current; `docs/DECISIONS.md` entries.
 - `make check` green.
 - Independent review (`make review` and a code review over the diff) and the red team gate over
   the diff, verdict recorded in the report; red team item 4 of the M1 section (personal token with
@@ -364,6 +357,5 @@ make check
 Write to `{{REPORT_PATH}}`: first line `Verdict: DONE` or `Verdict: BLOCKED <reason>`; then the
 commits, the files with line counts, the test results with counts (including the red runs), what
 is not proven, and follow-ups that could not be done in scope with the reason (at least: the
-`PersonalTokenSwitch` rebinding if M1-47 was not merged, the redaction hook for
-`createEnrollmentCode`, app tokens in M2-24). Then write `{{DONE_PATH}}` with `exit=0 sha=<sha>` or
+`PersonalTokenSwitch` rebinding by M1-47, app tokens in M2-24). Then write `{{DONE_PATH}}` with `exit=0 sha=<sha>` or
 `exit=1 <reason>`.

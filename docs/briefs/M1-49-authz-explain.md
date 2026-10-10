@@ -86,31 +86,16 @@ screens A2 to A4 (M6) and carry hint H1 ("Lesehorizont") wherever the specificat
 
 ## Scope
 
-Specification changes (do these first, in the same change):
-
-- `docs/api/openapi.yaml`, additive only:
-  - `GrantPreview`: add required `hints` (array of `PreviewHint`), required `text` (string, lines
-    separated by `\n`, no trailing newline), required `text_locale` (enum `de`, `en`), optional
-    `denial_reason` (string; a reason code from 07 "4.1").
-  - new schema `PreviewHint`: required `code` (enum `read_horizon`, `trigger_blocked_tool_class`,
-    `group_reach`, `expiry_missing`); optional `agent_id`, `principal_id`, `group_id`, `space_id`,
-    `channel_id` (all `Uuid`), `count` (integer, int64).
-  - `InvariantViolation`: add optional `credential_holder_id` (`Uuid`) and `organization_ready`
-    (boolean; true when `organization` is in the agent's reported `billing_modes_supported`).
-  - `AccessEntry`: `level` becomes `LevelOrNone` (`none` only for entries whose sole sources are
-    `via_agent`); add optional `inactive` (boolean, true when the principal status is not `active`;
-    such entries show the level their grants would give, as 07 "9.1" shows them struck through).
-  - `AccessSource.kind`: add `operator`, `via_agent`, `guard_blocked`; add optional `agent_id`
-    (`Uuid`), `rule` (enum `sr2`, `sr3`), `expires_at` (`Timestamp`, of the grant),
-    `membership_expires_at` (`Timestamp`), `reason` (string, the grant reason).
-  - `ViewAsSnapshot`: add required `expires_at` (`Timestamp`).
-  - Descriptions of the four operations state the rules of this brief in one or two sentences.
-- `docs/spec/07-rechte.md`: "9.1" names the new source kinds and fields; "9.3" names `hints`,
-  `text`, `text_locale`, `denial_reason`, the language rule (below) and the location of the message
-  catalog; the example block in "9.3" shows line 4 unwrapped exactly as the golden file below.
-  "9.2" states how the API realises view-as in M1 (snapshot operation plus `actor.ViewAs`).
-- Run the API gates (`make api-lint`, `make api-checks`) and regenerate the server code with the
-  code generation target added by M1-17 so that `make codegen-check` shows no diff.
+The specification is in place (planning, spec first): `docs/api/openapi.yaml` (`GrantPreview`
+with `hints`, `text`, `text_locale`, `denial_reason`; `PreviewHint`; `InvariantViolation` with
+`credential_holder_id` and `organization_ready`; `AccessEntry.level` as `LevelOrNone` and
+`inactive`; `AccessSource` kinds `operator`, `via_agent`, `guard_blocked` with `agent_id`, `rule`,
+`expires_at`, `membership_expires_at`, `reason`; `ViewAsSnapshot.expires_at`; descriptions of the
+four operations) and 07 "9.1" (API source kinds), "9.2" (view-as in M1 as a snapshot), "9.3"
+(language rule `users.locale` with fallback `de`, time zone, catalog in `authz`, the split between
+missing base right and `allowed = false`, the example with line 4 unwrapped). Change them only
+where the implementation proves them wrong; run `make api-lint` and `make api-checks` and
+regenerate the server code with the target of M1-17 so that `make codegen-check` shows no diff.
 
 Code (paths under `services/server/`):
 
@@ -159,8 +144,9 @@ Code (paths under `services/server/`):
   `GrantCreate` schema; preview of it waits for the ticket that adds it).
 - Previews of other actions with "Rechte" = `ja` (07 "9.3": they come with their routes).
 - The console screens, the "Rechte-Hinweise" list and console browsing of content as another
-  person (M6). The transport of a view-as context on ordinary requests is not specified yet (see
-  spec gap); in M1 only `authz` sets `actor.ViewAs`, inside `viewAsUser` and in tests.
+  person (M6-01 adds the view-as state of the console session with start and end operations to
+  the core contract first, 07 "9.2"); in M1 only `authz` sets `actor.ViewAs`, inside `viewAsUser`
+  and in tests.
 - SR3 data (dev environments, V2; project bindings, M2): `rule = sr3` is defined in the schema but
   emitted only once those exist.
 - Spaces, channels and agents tables and their APIs (M1-51 to M1-53).
@@ -408,8 +394,10 @@ make check
 
 ## Acceptance criteria
 
-- [ ] The openapi and chapter changes above are merged in the same change and `make api-lint`,
-      `make api-checks`, `make codegen-check` are green.
+- [ ] The implementation matches `openapi.yaml` and 07 "9" (changed only where proven wrong);
+      `make api-lint`, `make api-checks`, `make codegen-check` are green.
+- [ ] The report names what only fakes prove; the integration test with real spaces, channels and
+      agents follows in M1-54 (PLAN row M1-54).
 - [ ] The example from 07 "9.3" is reproducible byte for byte (German and English golden tests).
 - [ ] The preview runs in the real transaction and leaves no row, counter or notification behind.
 - [ ] AZ-M46 and AZ-M47 are green; view-as ends after `authz.view_as_max_duration`; every

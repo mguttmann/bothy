@@ -1,6 +1,6 @@
 # M1-54: Operators with invariant I1
 
-Status: ready | Depends on: M1-53 | Etappe: M1
+Status: ready | Depends on: M1-49, M1-53 | Etappe: M1
 
 ## Goal
 
@@ -137,7 +137,7 @@ Paths relative to `services/server/` unless they start with `docs/`:
 ## Design notes
 
 D0. Start check. `make check` green on the fresh worktree, else `Verdict: BLOCKED base branch red`.
-M1-53 merged, else `Verdict: BLOCKED dependency M1-53 missing`.
+M1-49 and M1-53 merged, else `Verdict: BLOCKED dependency missing`.
 
 D1. Request and validation (`OperatorSet {mode, agent_id?, reason}`):
 - `mode = agent` requires `agent_id`; `agent_id` with another mode gives `400 validation_failed`
@@ -186,13 +186,11 @@ query of `authz`; SQL pattern from 10 5.3):
 2. Channels with at least one thread `kind = 'thread'` and `operator_agent_id = A`, open or closed,
    whatever the channel's current operator (R-DM-12, BR-02).
 3. The spaces of these channels.
-4. Non-archived spaces whose `default_operator_agent_id = A`, even without channels. Ruling of this
-   ticket: baseline I1 counts "any target this agent serves", and a space's default operator
-   serves the space. Without this item a grant of `trigger` on an empty space would pass, and a
-   later `createChannel` in that space (not an I1 action) would make A serve a channel on which
-   that principal has `trigger`. With it, `createChannel` can never break I1, because a new channel
-   has no grants of its own. Record in `docs/DECISIONS.md`; reported as spec gap so that 03 6.4 and
-   10 5.2 list it. If `authz`'s I1 query only accepts served channels, extend it to served spaces.
+4. Non-archived spaces whose `default_operator_agent_id = A`, even without channels (03 6.4 point
+   3, 10 5.2 point 3 and its query in 10 5.3). Reason: baseline I1 counts "any target this agent
+   serves"; without this point a grant of `trigger` on an empty space would pass, and a later
+   `createChannel` there (not an I1 action) would make A serve a channel on which that principal
+   has `trigger`. If `authz`'s I1 query only accepts served channels, extend it to these spaces.
 5. The instance (always).
 Guest channels (`allow_mentioned_agents`) never count (10 5.2).
 
@@ -213,6 +211,13 @@ D8. Ruling recorded in `docs/DECISIONS.md`: `OperatorSet` does not accept `resol
 M2-21, although 05 rule 1.6 names it for both actions; the guided flow is an M2 feature.
 
 ## Tests (write them first)
+
+Integration with real sources for M1-49 (PLAN row M1-54): `explainSpaceAccess`,
+`explainChannelAccess`, `previewGrant` and `viewAsUser` against real spaces, channels, operators
+and agents (no fakes): an operator gives a source `operator`, a personal agent that reads another
+channel gives `via_agent` with level `none`, the preview of a `trigger` grant on a space whose
+default operator is a personal agent shows the I1 violation, and view-as lists exactly the
+channels the person reads.
 
 Unit (`internal/chat/domain`):
 - `TestOperatorSet_Validation`: table over modes, missing and superfluous `agent_id`, `inherit` on
@@ -284,6 +289,7 @@ make check
 - [ ] The I1 problem body carries `hint` and `conflicts`, and no foreign names.
 - [ ] `channel.updated` and `space.updated` carry the operator; inheriting channels get their own
       event with a higher version.
+- [ ] Explanation, preview and view-as are green with real sources.
 - [ ] Rulings recorded in `docs/DECISIONS.md`; `make check` is green.
 
 ## Definition of done

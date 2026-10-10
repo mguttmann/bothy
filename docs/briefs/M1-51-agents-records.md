@@ -1,6 +1,6 @@
 # M1-51: Agent records, backend policy and credential holder
 
-Status: ready | Depends on: M1-31, M1-35, M1-44 | Etappe: M1
+Status: ready | Depends on: M1-31, M1-44 | Etappe: M1
 
 ## Goal
 
@@ -78,48 +78,41 @@ This implements ADR 0024 for the data and administration side.
 
 ## Scope
 
-Specification changes (first):
-
-- `docs/api/openapi.yaml`: new schema `BillingModeSetAll` with required `billing_mode`, `reason`
-  (`minLength: 1`) and optional `credential_holder_id` (`Uuid`, required for `personal`) and
-  `agent_ids` (array of `Uuid`, required for `personal`, optional for `organization`); use it as
-  the request body of `setAllAgentsBillingMode` (10 "9.1" lists these fields; the current body
-  lacks `agent_ids`). Add `minLength: 1` to `reason` in `BillingModeSet` and
-  `CredentialHolderSet` ("Umschalten nur mit Grund").
-- `docs/spec/09-agenten.md` "2.2 Fähigkeiten": a table "Schema `agent_operator_config.v1`" with the
-  keys of the Design notes.
-- `docs/spec/10-backend-richtlinie.md` "5.1": one sentence that I1 is checked for active agents and
-  that `agent.enable` checks the enabled agent (see Design notes).
-- Run `make api-lint`, `make api-checks` and the M1-17 generation target; `make codegen-check`
-  shows no diff.
+The specification is in place (planning, spec first): `BillingModeSetAll` as the body of
+`setAllAgentsBillingMode` and `minLength: 1` on `reason` of `BillingModeSet` and
+`CredentialHolderSet` in `docs/api/openapi.yaml`; 09 "2.2" with the table of
+`agent_operator_config.v1`; 10 "5.1" (I1 over active agents, `agent.enable` checks this agent) and
+"5.2"; 05 row `agent.updated` (also at creation); 06 2 "Ohne Wirkung". Change them only where the
+implementation proves them wrong; run `make api-lint`, `make api-checks` and the M1-17 generation
+target; `make codegen-check` shows no diff.
 
 Code (paths under `services/server/`):
 
 - Migration (next free sequential goose version in `migrations/`): table `agents` exactly as 03
   (all columns, checks, FKs, indexes) plus the trigger that requires `principals.kind = 'agent'`.
 - `internal/agents` (port): interface `Agents` with `List`, `Get`, `Create`, `Update`, `Disable`,
-  `Enable`, `SetBillingMode`, `SetBillingModeAll`, `SetCredentialHolder`; DTOs; In-Tx event
+  `Enable`, `SetBillingMode`, `SetBillingModeAll`, `SetCredentialHolder`, `SetToolClass`; DTOs;
+  In-Tx event
   `AgentDisabled{AgentID ids.ID}` (no subscriber in M1; `runs` and `status` subscribe later).
 - `internal/agents/domain`: agent entity, backend policy value with transitions, tool class order
   `chat < scoped < host` and effective class, `OperatorConfigV1` validation, presence view.
 - `internal/agents/app`: one use case per operation (authorize, unit of work with the
   `RightsChange` option where "Rechte" = `ja`, domain, repository, events, audit).
 - `internal/agents/adapters/postgres` (sqlc queries and repository),
-  `internal/agents/adapters/httpapi` (handlers of the nine operations),
+  `internal/agents/adapters/httpapi` (handlers of the ten operations),
   `internal/agents/adapters/authzsource` (implements `authz.AgentPolicySource`).
 - `internal/identity` port additions, only where the base lacks them: create a principal of kind
   `agent` (handle and display-name rules of M1-26, case-insensitive handle uniqueness), set
   principal status with `disabled_at`, update display name, revoke all API tokens of a principal.
   Implement them in identity's adapters with tests.
 - `internal/wire`: register handlers and replace any placeholder `AgentPolicySource` with the
-  agents implementation; `services/server/api/operations.yaml`: enable the nine operations.
+  agents implementation; `services/server/api/operations.yaml`: enable the ten operations
+  (including `setAgentToolClass`).
 - Docs: `internal/agents/README.md` (ports, tables, actions, events, rules),
   `services/server/CHANGELOG.md` under Unreleased, rulings in `docs/DECISIONS.md`.
 
 ## Out of scope
 
-- `setAgentToolClass` (`agent.tool_class.set`): not assigned to this ticket in the plan; the column
-  `tool_class` is created with its default `chat` and read by the policy source (see spec gap).
 - Heartbeat, presence events, reported state and the mismatch alarm (M2-20); runs, invocation
   token, I2 and I3 (M2); costs (M2-22); consumers, commands, agent sessions (M2).
 - Operators of spaces and channels and the I1 integration test with all real sources (M1-54).
@@ -205,10 +198,16 @@ Disable and enable:
 
 - `Disable` (`ReasonBody`, Idempotency-Key): status `disabled` and `disabled_at` through identity,
   revoke every API token of the agent through identity, publish `AgentDisabled`, `agent.updated`,
-  `RightsChange` with the agent. Disabling a disabled agent gives `409 invalid_state_transition`.
+  `RightsChange` with the agent. Disabling a disabled agent succeeds without change: `200` with
+  the agent, no event, no rights version, audit with `no_change: true` (06 2 "Ohne Wirkung").
   Gateway connections close through the existing revocation path (M1-65).
 - `Enable` (`ReasonBody`): back to `active`; I1 is checked for this agent. Enabling an active agent
-  gives `409 invalid_state_transition`. Tokens are not restored; the owner creates new ones.
+  succeeds without change in the same way. Tokens are not restored; the owner creates new ones.
+- `SetToolClass` (`setAgentToolClass`, `PUT /agents/{agent_id}/tool-class`, `agent.tool_class.set`,
+  owner, step-up, `If-Match`, body `ToolClassSet` with `tool_class` and `reason`): sets
+  `agents.tool_class`, bumps `version`, `agent.updated`, `RightsChange` with the agent (SR2 reads
+  the effective class, 07 2.11), audit with old and new class and the reason. The same class
+  succeeds without change (06 2 "Ohne Wirkung").
 - I1 considers active agents only: `AgentPolicySource` reports personal agents whose principal
   status is `active`. Reason: a disabled agent cannot be triggered, and `agent.enable` exists in
   the I1 list (05 rule 1.6) precisely because enabling can create a violation that arose while the
@@ -221,9 +220,8 @@ available): status, `billing_mode`, `credential_holder_id`, effective tool class
 (always "none ready" until V2), and the list of active personal agents for I1. A shared contract
 test runs against the authz fake and this implementation.
 
-Rulings to record in `docs/DECISIONS.md`: I1 over active agents; create emits `agent.updated`;
-same-state disable or enable gives `409 invalid_state_transition`; unchanged policy PUT writes
-nothing; `operator_config` key defaults; `adapter_kind` pattern.
+Rulings to record in `docs/DECISIONS.md` (the others are in 05, 06, 09 and 10; link them):
+`adapter_kind` pattern; lock order of `SetBillingModeAll`.
 
 ## Tests (write them first)
 
@@ -289,11 +287,14 @@ make check
 - [ ] Switching needs owner, step-up and reason and is audited with old and new values.
 - [ ] `agent.read` works for the agent itself; visibility follows 07 "4.3".
 - [ ] `agent.updated` follows every mutation and carries the badge (`billing_mode`).
-- [ ] Disabling revokes the agent's tokens and publishes `AgentDisabled`.
+- [ ] Disabling revokes the agent's tokens and publishes `AgentDisabled`; disabling a disabled and
+      enabling an active agent succeed without change.
+- [ ] `setAgentToolClass` sets the class with owner, step-up, reason and audit; a test
+      `TestSetToolClass` covers change, same class and missing `If-Match`.
 - [ ] The agents module is the wired `AgentPolicySource`; AZ-P7 and AZ-P8 stay green.
 - [ ] No credential, key or subscription value is stored or logged (review of the diff).
-- [ ] Spec changes are in the same change; `make api-lint`, `make api-checks`,
-      `make codegen-check`, `make migrations-lint` are green; the nine operations are enabled.
+- [ ] The implementation matches the specification (changed only where proven wrong); `make api-lint`, `make api-checks`,
+      `make codegen-check`, `make migrations-lint` are green; the ten operations are enabled.
 - [ ] `make check` is green.
 
 ## Definition of done

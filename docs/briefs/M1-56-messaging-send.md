@@ -145,14 +145,13 @@ type MessagePosted struct {
     `sync.event_payload_max_bytes` (04) if missing.
 11. `internal/wire`: register `MessagePosted` (no subscriber in this ticket) and the handlers;
     update the golden file.
-12. `docs/api/openapi.yaml`: `createThread` gets a `200` response (`ThreadCreated`, header
-    `Idempotent-Replay`) for the replay through `first_message.client_msg_id`; the description of
-    `Message.content_md` says that for `kind = system` it holds a stable system code (D6).
-13. `docs/spec/02-architektur.md` 4.6 "Begründungen für Grenzfälle": one bullet for D8 (handler of
-    `createThread` in `messaging`, use case `thread.create` in `chat`); if
-    `architecture/modules.yaml` maps operations to modules, map `createThread` accordingly.
+12. `docs/api/openapi.yaml` already has the `200` replay response of `createThread` and
+    `Message.system_code` (D6); change them only where the implementation proves them wrong.
+13. `docs/spec/02-architektur.md` 4.6 already assigns `thread.create` to `messaging` (bullet in
+    "Begründungen für Grenzfälle"); `architecture/modules.yaml` lists `thread.create` under
+    `messaging` (M1-06 holds it).
 14. Documentation: `internal/messaging/README.md`, `services/server/CHANGELOG.md`,
-    `docs/DECISIONS.md` (rulings D2 rejected members, D5, D6, D8).
+    `docs/DECISIONS.md` (rulings D2 rejected members and D5; D6 and D8 link the spec).
 
 ## Out of scope
 
@@ -253,14 +252,13 @@ D5. Mentions (ruling, spec gap reported because 01 and 03 do not define the synt
   principals without read access to the channel (03 `mentions`: stored, no notification later).
 - `Message.mention_ids` lists the resolved IDs, sorted.
 
-D6. System line on reopen (ruling, spec gap reported because 01 6.1 shows the line but no contract
-defines it): a message with `kind = 'system'`, `origin = 'system'`, `author_principal_id` = the
-principal whose message reopened the thread, `content_md` = the stable system code
-`thread.reopened`, `client_msg_id` = a new server UUIDv7, `silent = true`, no mentions, no
-`trigger_state`, `thread_seq` directly before the reopening message. Clients render a localized
-sentence from the code and `author` ("Reopened by a message from Sam"). Document the code list
-(one entry now) in `internal/messaging/README.md` and in the openapi description of
-`Message.content_md`.
+D6. System line on reopen (03 `messages`, R-DM-34; `Message.system_code` in `openapi.yaml`): a
+message with `kind = 'system'`, `origin = 'system'`, `system_code = 'thread.reopened'`,
+`content_md` empty, `author_principal_id` = the principal whose message reopened the thread,
+`client_msg_id` = a new server UUIDv7, `silent = true`, no mentions, no `trigger_state`,
+`thread_seq` directly before the reopening message. Clients render a localized sentence from the
+code and `author` ("Reopened by a message from Sam"). Document the code list (one entry now) in
+`internal/messaging/README.md`.
 
 D7. Events (`kernel/eventlog.Appender`), one `message.created` per message, in this order inside
 the transaction: `thread.reopened` (appended by chat), `message.created` for the system line,
@@ -272,10 +270,11 @@ Truncation: if the serialized payload exceeds `sync.event_payload_max_bytes`, cu
 the longest valid UTF-8 prefix that makes it fit, set `message.content_truncated = true` and the
 envelope flag `truncated = true` (04 2.2 rule 2). REST answers are never cut. No JSON `null`.
 
-D8. `createThread` (ruling, recorded in `docs/DECISIONS.md` and 02 4.6): the HTTP handler lives in
-`messaging/adapters/httpapi` because the request carries a message and only `messaging` may compose
-`chat` with messages; the action `thread.create` stays a `chat` use case, authorized inside
-`chat.Threads.Create`, so the proof of the route action (02 9.3) holds.
+D8. `createThread` (02 4.6): handler and action `thread.create` belong to `messaging`, because the
+request carries a message and only `messaging` may compose `chat` with messages. The messaging use
+case authorizes `thread.create` on the channel (`write`; read-only or archived channel gives
+`403 channel_read_only`), so the proof of the route action (02 9.3) holds, and then calls
+`chat.Threads.Create` (M1-55), which validates and writes without a rights check of its own.
 - Validation that needs messages: `parent_message_id` must be an undeleted message whose thread is
   the main thread of the target channel; messaging loads it and passes `ParentMessage{MessageID,
   ThreadID}` to `Threads.Create`, which checks the main thread and the channel (M1-55 D1). A
@@ -379,7 +378,8 @@ make check
 - [ ] A message in a closed thread reopens it and writes the system line of D6.
 - [ ] `MessagePosted` carries the fields of the port type and can veto.
 - [ ] The test for sequence diagram 04 16.1 is green up to the log tail.
-- [ ] openapi.yaml, 02 4.6, the module README and `docs/DECISIONS.md` describe D5, D6 and D8.
+- [ ] The module README and `docs/DECISIONS.md` describe D5; D6 and D8 match 02 4.6, 03 and
+      `openapi.yaml` (changed only where proven wrong).
 - [ ] `make check` is green.
 
 ## Definition of done

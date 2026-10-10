@@ -147,8 +147,10 @@ Paths are relative to `services/server/` unless they start with `docs/`.
   `Authorize` is in scope).
 - `Authorizer.Observe` and the gateway's version handling: M1-65. If `kernel/authorize` already
   declares `Observe`, remove the declaration; M1-65 adds it with its implementation.
-- Following structure changes without a new rights version in the cache and in `Scope`
-  (`channel.created` and friends, 02 section 11.3): M1-53, M1-62.
+- Following structure changes without a new rights version in the gateway's per-process state
+  (`channel.created` and friends, 02 section 11.3): M1-53, M1-62, M1-65. REST needs nothing for
+  this: the snapshot holds grants per target and `Scope` builds its lists per request (07 7.2,
+  7.4).
 - Real implementations of the sources: `StructureSource` (M1-52, M1-53, M1-55), `AgentPolicySource`
   (M1-51; dev environments in V2), `CredentialSource` (M1-33 devices, M1-34 sessions, M1-44
   tokens). App installations as a source: M2.
@@ -220,9 +222,11 @@ type InvokeFacts struct {
 }
 
 type Scope struct {
-    ChannelIDs        []ids.ID // ascending, for "channel_id = ANY($1)"
-    SpaceIDs          []ids.ID // ascending
-    PermissionVersion int64
+    ChannelIDs           []ids.ID // ascending, for "channel_id = ANY($1)"; built per request
+    SpaceIDs             []ids.ID // ascending; spaces with at least one visible channel or a grant
+    FullyVisibleSpaceIDs []ids.ID // ascending; spaces with read on the space itself (07 7.2)
+    InstanceWide         bool     // owner or read on the instance (07 7.2)
+    PermissionVersion    int64
 }
 
 type Authorizer interface {
@@ -483,8 +487,10 @@ Effective rights on a path (instance, space S, channel C, optional thread T):
   `ValidUntil` the entry is rebuilt, so `expires_at = t` is already invalid without a job).
 - LRU bounded by `authz.snapshot_cache_max_entries`; `container/list` and a mutex from the
   standard library; no new dependency.
-- The visible lists for `Scope` are computed lazily from `StructureSource.Channels`,
-  `ChannelsOperatedBy` and `DMChannelsOf` and memoised in the entry.
+- The visible lists for `Scope` are never stored in the cache entry: they are built per request
+  from the snapshot and the current structure (`StructureSource.Channels`, `ChannelsOperatedBy`,
+  `DMChannelsOf`) and memoised only in the request scope (`WithRequestScope`), so a channel or
+  space created without a new rights version appears at once (07 7.2 and 7.4 rule 1).
 
 ### Rights version (`app/version.go`)
 
@@ -591,7 +597,7 @@ carries a doc comment naming the ticket that replaces it (M1-52, M1-53, M1-55; M
 M1-34, M1-44). Every request with credentials is therefore `unauthenticated` until M1-34, which
 is correct because no credential can exist before it.
 
-### Rulings (D1 to D3 and D6 are in the spec; D4 and D5 go to `docs/DECISIONS.md`)
+### Rulings (D1 to D3, D5 and D6 are in the spec; D4 goes to `docs/DECISIONS.md`)
 
 - D1: `authz.CredentialSource` is a fourth source port; identity implements it. Reason: 07
   section 4.2 checks session, device and token on every call and 04 section 8.5 caches that
@@ -603,7 +609,8 @@ is correct because no credential can exist before it.
 - D4: visibility per resource kind (table above) as the reading of 07 section 4.3 for resources
   outside the structure tree.
 - D5: the snapshot keeps direct grant maxima per target and applies propagation at evaluation
-  time; `level_by_channel` of 07 section 7.2 is the computed view used by `Scope`.
+  time; 07 section 7.2 states this (`instance_level`, `level_by_space`, `level_by_channel`,
+  `instance_wide`, `fully_visible_space_ids`), so it is in the spec now.
 - D6: app scopes come from `p.GrantedScopes` (07 section 3); token scopes are not evaluated until
   M2 defines how they combine with installation scopes; missing read scope on a visible channel
   is `403 scope_missing` (07 section 2.10), and 06 is aligned.
@@ -675,7 +682,9 @@ Pure tests run without a database; the test world and fakes live in
    - grant guards: `TestGrantCreateGuard` (AZ-M31 through `Authorize`, plus non-owner on
      instance target gives `owner_only`) and `TestGrantRevokeGuard`;
    - `TestScope_*`: owner excludes DMs and includes his DM participation; app without
-     `messages:read` gets empty lists; view as intersects; ascending order.
+     `messages:read` gets empty lists; view as intersects; ascending order; a channel added to
+     the fake structure of a space with a space grant appears in the next request's `Scope`
+     without a new rights version (cached snapshot unchanged).
 7. **Cache and version**: version change invalidates; `ValidUntil` boundary; LRU never exceeds
    `authz.snapshot_cache_max_entries` (run with a small value); one version read per request
    scope however many `Authorize` calls (count reads on a fake); pinned version wins.

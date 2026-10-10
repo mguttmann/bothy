@@ -6,17 +6,18 @@ Status: ready | Depends on: M1-37 | Etappe: M1
 
 After this ticket the server supports WebAuthn passkeys for login of local accounts, for the first
 enrollment with an enrollment code, for adding further passkeys and for step-up, for the web
-console and for instances with a public domain. Ceremonies are stateless on the server (no new
-table, works on several nodes), user verification is always required, attestation is not
-requested, relying party ID and origins come from configuration, and a falling signature counter is
-reported in the audit log. A virtual authenticator makes every path testable without a browser.
+console and for instances with a public domain. The state of every ceremony lives in the table
+`auth_challenges` (03, R-DM-31; created by M1-35), so it works on several nodes; user verification
+is always required, attestation is not requested, relying party ID and origins come from
+configuration, and a falling signature counter is reported in the audit log. A virtual authenticator makes every path testable without a browser.
 
 ## Read first
 
 - `docs/spec/08-identitaet.md`: "Lokale Konten" (WebAuthn paragraph), "Einladungs-Code",
   "Bestätigung", "Step-up-Ablauf", "DPoP", "Schutz der Anmeldung", "Web-Konsole: Sitzung nach dem
   Backend-for-Frontend-Muster" (context only), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/03-datenmodell.md`: tables `passkey_credentials`, `enrollment_codes`,
+- `docs/spec/03-datenmodell.md`: tables `passkey_credentials`, `auth_challenges` (R-DM-31),
+  `enrollment_codes`,
   `user_identities`, `identity_providers`, `auth_sessions` (`step_up_at`, `step_up_method`),
   `audit_events`; Grundsatz 1 (UUIDv7).
 - `docs/spec/05-aktionen.md`: actions `auth.login.begin`, `auth.login.complete`, `auth.step_up`,
@@ -29,7 +30,7 @@ reported in the audit log. A virtual authenticator makes every path testable wit
   domain).
 - `docs/PLAN.md`: P-03, P-11, row M1-40 (updated by M1-37), section 5 "Teststrategie" (virtual
   WebAuthn authenticator).
-- ADR 0019, ADR 0020; `docs/adr/0000-vorlage-madr-4.md` for the new ADR.
+- ADR 0019, ADR 0020.
 - `docs/api/openapi.yaml`: `beginPasskeyLogin`, `completePasskeyLogin`, `beginEnrollment`,
   `completeEnrollment`, `beginPasskeyRegistration`, `completePasskeyRegistration`, `revokePasskey`,
   `createStepUpChallenge`, `completeStepUpWithPasskey`, `getMyCredentials`, `getUserCredentials`;
@@ -69,46 +70,28 @@ reported in the audit log. A virtual authenticator makes every path testable wit
 10. Passkeys serve login of local accounts and step-up (03 `passkey_credentials`, 08 "Step-up-
     Ablauf"); the enrollment code confirms the first device (08 "Einladungs-Code").
 11. Code stays node neutral (PLAN section 20, "Mehrknoten-Betrieb"): no ceremony state in process
-    memory.
+    memory; it lives in `auth_challenges` (08 "2.5").
 
 ## Scope
 
-Specification first, on this branch, before production code:
-
-1. `docs/api/openapi.yaml`:
-   - `EnrollCompleteRequest`: add required `enrollment_code` (string); description: the code is
-     sent again because the server keeps no ceremony state.
-   - `beginEnrollment`, `completeEnrollment`: descriptions name the passkey enrollment; `401` for
-     every rejected code.
-   - `completePasskeyLogin`: description "A new device stays `pending` until approved (M1-38); a
-     known active device with the same key stays active."
-   - `beginPasskeyLogin`: description of the decoy for unknown login names.
-   - `StepUpChallenge.passkey_options` and `completeStepUpWithPasskey`: the WebAuthn challenge is
-     the step-up challenge value.
-2. Regenerate the generated blocks of `docs/spec/06-api.md` (M1-03 generator).
-3. `docs/spec/08-identitaet.md`, "Lokale Konten": configuration keys, stateless ceremonies,
-   single use rules, algorithms, login only for people with a local identity, decoy, sign counter
-   rule (the meaning of `bedingt` is in 05 2.4). "Konfigurationswerte dieses Kapitels": add
-   `auth.webauthn_rp_id` (default empty, meaning the host of `server.public_url`) and
-   `auth.webauthn_origins` (default empty list, meaning the origin of `server.public_url`). In 07
-   "Ablauf" step 8 add the sentence: "`passkey.register` und `local_credential.set` verlangen
-   Step-up nur, wenn die Person schon einen aktiven Passkey bzw. ein eingerichtetes lokales
-   Passwort mit TOTP hat; Mensch mit Sitzung bleibt Pflicht." (M1-39 adds the identical sentence.)
-4. New ADR `docs/adr/<next free number>-zustandslose-webauthn-zeremonien.md` (MADR 4, headings
-   English, text German, status `accepted`): options (1) stateless challenge derived from the
-   challenge ID with single use through existing rows, (2) a new ceremony table (core contract
-   change), (3) in-process cache (not node neutral); decision (1); Confirmation names the tests
-   below. Update `docs/adr/README.md` with the ADR index tool (`make docs` checks it).
-5. Regenerate `docs/operations/configuration.md` (M1-08 generator).
-6. `docs/DECISIONS.md`: rulings listed in Design notes.
+The specification is in place (planning, spec first): 08 "2.5" (configuration keys, ceremony
+state in `auth_challenges`, single use, algorithms, passkey login only with a local identity, decoy,
+sign counter), 08 "18" (`auth.webauthn_rp_id`, `auth.webauthn_origins`), 07 "4.2" step 8 with
+`hat_anmeldedaten` for the conditional step-up, and the descriptions of the passkey operations and
+of `WebAuthnChallenge` in `openapi.yaml`. Change them only where the implementation proves them
+wrong (spec first, `make api-lint api-checks` green), and regenerate `docs/operations/configuration.md`
+if a key changes. `docs/DECISIONS.md`: rulings listed in Design notes.
 
 Production code under `services/server/`:
 
 - `migrations/<next sequence>_identity_passkey_credentials.sql`: table `passkey_credentials`
   exactly as in 03.
 - `internal/identity/adapters/postgres/queries/passkey_credentials.sql`; regenerated sqlc code.
-- `internal/identity/domain/ceremony.go`: `DeriveCeremonyChallenge`, `CeremonyExpired`, sign
+- `internal/identity/domain/ceremony.go`: ceremony state (`webauthn_session.v1`: RP ID, required
+  user verification, allowed credential IDs, user handle), expiry and single-use decision, sign
   counter rule.
+- Repository of `auth_challenges` for the purposes `passkey_login`, `passkey_enroll`,
+  `passkey_register` (the table and the `step_up` part come from M1-35).
 - `internal/identity/app/passkeys.go`: use cases `BeginPasskeyLogin`, `CompletePasskeyLogin`,
   `BeginEnrollment`, `CompleteEnrollment`, `BeginPasskeyRegistration`,
   `CompletePasskeyRegistration`, `RevokePasskey`, `CompleteStepUpWithPasskey`; extend
@@ -176,30 +159,26 @@ ID equals the host of every HTTP(S) origin or is a registrable suffix of it; HTT
 (M1-46), and the display name is only a label. Public key algorithms offered and accepted: ES256
 (COSE -7), EdDSA (-8), RS256 (-257, needed by Windows Hello); nothing else.
 
-Stateless ceremonies (the ADR):
+Ceremony state (03 `auth_challenges`, 08 "2.5"):
 
-- `challenge_id` is a fresh UUIDv7 from `kernel/ids` at begin. Challenge bytes =
-  `HMAC-SHA-256(key = pepper from auth.token_pepper_ref, msg = "webauthn-challenge/v1" || 0x00 ||
-  purpose || 0x00 || challenge_id (16 bytes) || 0x00 || binding)`.
-- Expiry: the UUIDv7 timestamp plus the TTL; a timestamp more than `auth.clock_leeway` in the
-  future is rejected. Errors: `401 unauthenticated` for login and enrollment, `400
-  validation_failed` for registration.
-- go-webauthn's begin functions create random challenges and session data: call them, then
-  replace the challenge in the returned options with the derived bytes (or use a challenge option
-  if the pinned version has one) and discard the returned session data. At finish, rebuild
-  `webauthn.SessionData` from the derived challenge, the RP ID, `UserVerification: required` and
-  the expiry; nothing is persisted.
+- Begin creates a row: `id` = new UUIDv7 (API `challenge_id`), challenge value = 32 bytes from
+  `crypto/rand`, stored only as `challenge_hash` = HMAC-SHA-256(token pepper, value);
+  `webauthn_session` = `webauthn_session.v1` without the challenge; `expires_at` per the table
+  below. go-webauthn's begin functions create the options and session data: put the generated
+  challenge into the options (or use the library's challenge option if the pinned version has
+  one), store the session data fields named above, never the challenge itself.
+- Complete locks the row (`SELECT ... FOR UPDATE`), accepts only `status = issued` and not expired,
+  checks that the challenge in `clientDataJSON` has the stored HMAC (`hmac.Equal`), rebuilds
+  `webauthn.SessionData` from the row and verifies; then sets `used` (success) or `failed` (failed
+  verification) with `finished_at`. Unknown, used or expired rows: `401 unauthenticated` for login
+  and enrollment, `400 validation_failed` for registration.
 
-| Purpose | Binding | TTL key | Single use through |
-|---|---|---|---|
-| `login` | empty (the credential names the person) | `auth.login_flow_ttl` | the passkey row: the challenge time must be later than `last_used_at`; success sets `last_used_at` from the application clock, under `SELECT ... FOR UPDATE` |
-| `enroll` | `enrollment_codes.id` | `auth.login_flow_ttl` | `enrollment_codes.used_at` |
-| `register` | person ID and session ID | `auth.login_flow_ttl` | unique `credential_id` (a replay gives `409 conflict`) |
-| `step_up` | handled by M1-35 | `auth.step_up_challenge_ttl` | the M1-35 consumption of the step-up challenge |
-
-Residual risk to write into the ADR: clocks of several nodes must be synchronised (NTP); a clock
-behind by more than the gap between two logins of one passkey only causes a retry, never an
-acceptance.
+| Purpose (`auth_challenges.purpose`) | Bound to | Lifetime |
+|---|---|---|
+| `passkey_login` | nothing (the credential names the person) | `auth.login_flow_ttl` |
+| `passkey_enroll` | `enrollment_code_id` (checked at begin, redeemed at complete) | `auth.login_flow_ttl` |
+| `passkey_register` | `session_id` of the caller | `auth.login_flow_ttl` |
+| `step_up` (M1-35) | `session_id`; `passkey_options` use the same value | `auth.step_up_challenge_ttl` |
 
 Assertion checks for every purpose: origin in the list, RP ID hash, user present and user verified
 flags set (else reject), signature with the stored COSE key, credential not revoked, person
@@ -229,14 +208,16 @@ Enrollment with passkey (`beginEnrollment`, `completeEnrollment`):
   begin); invalid code `401 unauthenticated`. Creation options for the code's person: `user.id` =
   16 bytes of the principal ID, `user.name` = local identity subject or handle,
   `user.displayName` = display name, `excludeCredentials` = active passkeys of the person.
-- Complete: match the code again (row lock), verify the creation response; on failure roll back,
-  `RecordFailedAttempt` and answer `401`. On success insert the passkey (`name` =
+- Complete: load the challenge (row lock) and its `enrollment_code_id`, lock and check the code
+  again, verify the creation response; on failure roll back, `RecordFailedAttempt` (own
+  transaction, 08 "3.2") and answer `401`. On success insert the passkey (`name` =
   `passkey_name`), `CompleteLogin` with `TrustConfirmed`, `AuthMethod = "enrollment_code"`, then
-  `MarkUsed`; `201` `TokenResponse`.
+  `MarkUsed`; `201` `TokenResponse`. `EnrollCompleteRequest` carries no code: the challenge row
+  holds it.
 
 Registration (`beginPasskeyRegistration`, `completePasskeyRegistration`, action
 `passkey.register`, self): options like enrollment with the calling person and session; complete
-requires the same session as begin (binding); `201` `Passkey`. Duplicate `credential_id`: `409
+requires the session stored with the challenge; `201` `Passkey`. Duplicate `credential_id`: `409
 conflict`.
 
 Revoke (`revokePasskey`, `DELETE /users/{user_id}/passkeys/{passkey_id}`, self or owner,
@@ -244,8 +225,8 @@ step-up): sets `revoked_at`; already revoked `204`; not visible `404`.
 
 Step-up with passkey: `createStepUpChallenge` adds `passkey_options` (request options with the
 person's active passkeys, the step-up challenge value as challenge, UV required) when the person
-has at least one active passkey. `completeStepUpWithPasskey` consumes the challenge through the
-M1-35 mechanism, verifies the assertion against the session's person (another person's passkey
+has at least one active passkey. `completeStepUpWithPasskey` consumes the `step_up` row of M1-35
+(same lock and single use), verifies the assertion against the session's person (another person's passkey
 fails and counts toward `auth.step_up_fail_limit`), then sets `step_up_at` and `step_up_method =
 'passkey'` and updates `last_used_at` and `sign_count`. Works for local and OIDC people.
 
@@ -267,9 +248,8 @@ Virtual authenticator (`virtualauthn`): holds ES256 keys in memory; produces cre
 options to drop the UV flag, set the origin, set the RP ID, set or freeze the counter, sign with
 another key, mark backup flags and produce discoverable assertions with user handle.
 
-Rulings to record in `docs/DECISIONS.md`: stateless ceremonies (link the ADR); `enrollment_code`
-in `EnrollCompleteRequest`; TTL keys per ceremony; passkey login only with a local identity; decoy
-credential; RP display name; accepted algorithms; sign counter handling.
+Rulings to record in `docs/DECISIONS.md` (the spec decisions are in 03 R-DM-31 and 08 "2.5"; link
+them): RP display name; sign counter handling; decoy credential derivation (`passkey-decoy/v1`).
 
 ## Tests (write them first)
 
@@ -277,10 +257,8 @@ All WebAuthn tests use `virtualauthn`; integration tests use `pgtest` and the co
 
 Unit:
 
-- `TestDeriveCeremonyChallenge`: deterministic for equal inputs; differs per purpose, ID and
-  binding.
-- `TestCeremonyExpiry`: before TTL ok, after TTL rejected, future-dated beyond
-  `auth.clock_leeway` rejected.
+- `TestCeremonySingleUse`: `issued` and not expired accepted once; `used`, `failed` and expired
+  rejected; the stored row never contains the challenge value.
 - `TestSignCountRule`: table with zero counters, increase, equal, decrease.
 - `TestWebAuthnConfigValidation`: RP ID suffix rule, HTTP origin only for localhost, defaults from
   `server.public_url`.
@@ -328,8 +306,8 @@ make check
 
 ## Acceptance criteria
 
-- [ ] openapi.yaml, 06, 07, 08 and configuration reference changed as in Scope; ADR written and
-      indexed; `make api-lint api-checks docs` green.
+- [ ] Ceremony rows in `auth_challenges` with the purposes of 03; `make api-lint api-checks docs`
+      green; spec text changed only where proven wrong.
 - [ ] `userVerification = required`, `attestation = none`, RP ID and origins from configuration,
       only ES256, EdDSA and RS256.
 - [ ] No ceremony state in process memory; completion on another node works.
@@ -346,7 +324,7 @@ make check
 - Code and tests as above; doc comments on every exported symbol; comments explain why.
 - `internal/identity/README.md` (table, use cases, operations, ceremonies), README of
   `adapters/webauthn` and `virtualauthn`; `services/server/CHANGELOG.md` entry under
-  "Unreleased"; the new ADR.
+  "Unreleased".
 - Specification, API and configuration changes in the same branch; generated files regenerated;
   `docs/DECISIONS.md` updated.
 - `make check` green.
@@ -360,6 +338,6 @@ make check
 ## Report
 
 Write to `{{REPORT_PATH}}`: first line `Verdict: DONE` or `Verdict: BLOCKED <reason>`; then the
-commits, the files with line counts, test results with counts, the pinned go-webauthn version, the
-ADR number, what is not proven, and follow-ups that could not be done in scope with the reason.
+commits, the files with line counts, test results with counts, the pinned go-webauthn version, what
+is not proven, and follow-ups that could not be done in scope with the reason.
 Then write `{{DONE_PATH}}` with `exit=0 sha=<sha>` or `exit=1 <reason>`.

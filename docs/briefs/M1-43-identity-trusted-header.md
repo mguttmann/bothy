@@ -100,13 +100,14 @@ misconfiguration fails closed: the driver stays off and readiness reports it (W4
 - If `internal/platform/config` contains a start-time cross-check "header driver only with a
   loopback listener" (02 13 point 4), remove it in favour of the readiness check and adapt its
   test; no other change in `platform/config`.
-- Specification first, in the same change: `docs/spec/08-identitaet.md` (2.4 rule 1 and ID-T08
-  after W4; config table for `identity_provider.trusted_header.v1`; enrollment code at the header
-  login; binding details), `docs/spec/19-sicherheit.md` (SEC-T01 text after W4),
-  `docs/spec/02-architektur.md` (13 point 4 after W4), `docs/api/openapi.yaml`
-  (`TrustedHeaderLoginRequest.enrollment_code` optional; description of `404` and `409` on the
-  provider operations), `services/server/api/operations.yaml` (`loginWithTrustedHeader` moves to the
-  built list), regenerated server code.
+- The specification is in place (planning, spec first; W4 resolved there): 08 2.4 (rules 1 to 7
+  with W4, binding, RFC 2047), 2.6 (`identity_provider.trusted_header.v1`), 3.1 (enrollment code
+  at the header login), ID-T08 to ID-T10; 16 4.3; 19 SEC-T01; 02 13 point 4; 03
+  `auth_sessions.revoke_reason` with `trusted_header_mismatch`; `openapi.yaml`
+  (`TrustedHeaderLoginRequest.enrollment_code`). Change them only where the implementation proves
+  them wrong (if the descriptions of `404` and `409` on the provider operations lack the loopback
+  rule, add it, spec first). `services/server/api/operations.yaml`: `loginWithTrustedHeader` moves
+  to the built list; regenerated server code.
 - `docs/operations/tailscale.md` section 4 with a complete provider config example;
   `services/server/internal/identity/README.md`; CHANGELOG entry under "Unreleased" of
   `services/server/CHANGELOG.md`; `docs/DECISIONS.md` entry for W4 and for the rulings below;
@@ -147,15 +148,14 @@ misconfiguration fails closed: the driver stays off and readiness reports it (W4
 
 **Preconditions (check before writing code; any failure: `Verdict: BLOCKED <which>`).**
 
-1. `docs/spec/03-datenmodell.md` `auth_sessions.revoke_reason` contains a value for a binding
-   mismatch (proposed `trusted_header_mismatch`). None of the current values fits, and ID-T10
-   requires a revocation with a stated reason.
+1. `docs/spec/03-datenmodell.md` `auth_sessions.revoke_reason` contains `trusted_header_mismatch`
+   (also in `SessionRevokedPayload.reason`); ID-T10 requires a revocation with a stated reason.
 2. The authenticator and the session revocation of M1-34 exist (revocation also revokes the family
    and writes `session.revoked`), and M1-37 provides enrollment-code verification and consumption
    plus the shared login completion (device registration, session, token pair).
 
 **Provider configuration `identity_provider.trusted_header.v1`** (strict decoding, unknown fields
-`400 validation_failed`; table in 08 2.4):
+`400 validation_failed`; normative in 08 2.6):
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
@@ -224,11 +224,9 @@ deny with `deny_reason = 'session_revoked'` and the route's action, answer `401 
 The check runs for every request authenticated with such a session, including `refreshToken`,
 because the authenticator is shared. With the switch off, no header is read after the login.
 
-**Ruling on readiness versus start failure (W4).** 16 4.3 applies: the driver is a runtime
-setting of the owner, so a misconfiguration turns the driver off and fails readiness instead of
-preventing the start. Rewrite 08 2.4 rule 1, ID-T08 ("driver stays off, `/readyz` reports
-`trusted_header_requires_loopback`, enabling is refused") and SEC-T01 ("... with header driver and
-non-loopback listener: driver off") accordingly; record W4 in `docs/DECISIONS.md`.
+**Readiness versus start failure (W4).** 16 4.3 applies: the driver is a runtime setting of the
+owner, so a misconfiguration turns the driver off and fails readiness instead of preventing the
+start. 08 2.4 rule 1, ID-T08 and SEC-T01 say so; record W4 in `docs/DECISIONS.md` with a link.
 
 ## Tests (write them first)
 
@@ -286,8 +284,8 @@ make check
 - [ ] RFC 2047 values decoded; the login, not the name, is compared.
 - [ ] Binding revokes the session with a reason, an audit entry and `session.revoked`.
 - [ ] Header values never in logs, audit details or problem bodies.
-- [ ] 08, 19, 02, `openapi.yaml`, `operations.yaml`, `tailscale.md`, DECISIONS (W4) updated;
-      `make check` green.
+- [ ] The implementation matches 08, 16, 19 and `openapi.yaml` (changed only where proven wrong);
+      `operations.yaml`, `tailscale.md`, DECISIONS (W4) updated; `make check` green.
 
 ## Definition of done
 

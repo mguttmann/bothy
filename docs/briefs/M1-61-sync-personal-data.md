@@ -1,6 +1,6 @@
 # M1-61: Read state, drafts and personal settings
 
-Status: ready | Depends on: M1-56 | Etappe: M1
+Status: ready | Depends on: M1-60 | Etappe: M1
 
 ## Goal
 
@@ -21,7 +21,7 @@ The `sync` module owns the personal sync tables `read_states`, `drafts` and `use
 - `docs/api/openapi.yaml`: operations `listMyReadStates`, `putReadState`, `markThreadUnread`, `putThreadDraft`, `deleteThreadDraft`, `putChannelDraft`, `deleteChannelDraft`, `listMyDrafts`, `listMySettings`, `putMySetting`, `deleteMySetting`, `getMySidebar`; schemas `ReadState`, `ReadStatePut`, `ReadStateList`, `Draft`, `DraftPut`, `DraftPutResult`, `DraftList`, `UserSetting`, `UserSettingPut`, `UserSettingList`, `SidebarStateList`, `ReadStatePayload`, `DraftPayload`, `DraftDeletedPayload`, `SettingsPayload`, `MessageCreate` (`clear_draft`), `ThreadCreate`.
 - ADRs 0009, 0013, 0015, 0017, 0021 and, if present, 0052 and 0053.
 - `docs/PLAN.md`: 'Arbeitsweise je Ticket', the M1 rows M1-56, M1-60, M1-62 and M1-63; `docs/quality/gates.md`; `CONTRIBUTING.md`.
-- Code from earlier tickets under `services/server/`: `internal/sync` (appender, idempotency store), `internal/kernel/*`, `internal/chat` (threads, sidebar), `internal/messaging` (`MessagePosted`, mentions), `internal/authz`, `api/operations.yaml`, `architecture/modules.yaml`, `internal/wire`.
+- Code from earlier tickets under `services/server/`: `internal/sync` (appender, idempotency store), `internal/kernel/*`, `internal/chat` (threads, sidebar), `internal/messaging` (`MessagePosted`, `Mentions.CountUnread` of M1-60), `internal/authz`, `api/operations.yaml`, `architecture/modules.yaml`, `internal/wire`.
 
 ## Fixed requirements that apply
 
@@ -48,7 +48,7 @@ Product requirements implemented here:
 13. Settings: last write wins per key; only the keys and values of 01 'Einstellungen der Person' and 13 'Persönliche Schalter'; unknown keys and values outside the list are rejected (03 `user_settings`).
 14. Every change writes a durable personal event with `audience = self`: `read_state.updated`, `draft.updated`, `draft.deleted`, `settings.updated` (04, 05). Payloads carry `updated_by_device_id` of the writing device, so a device recognises its own echo (04 'Geräteübergreifende Synchronisation', last sentence).
 15. Sending with `clear_draft: true` deletes the draft in the same transaction as the message (04, 12 'Anhängen und Agenten-Aufruf' point 4).
-16. `read_states.mention_count` holds the unread mentions (03 `read_states`); `sync` maintains it through the subscription on `messaging.MessagePosted` (02 'Ports, Ereignisse und Quellen je Modul').
+16. Unread mentions are never stored (03 `read_states`, R-DM-32): `ReadState.mention_count` in responses and in `read_state.updated` is computed with `messaging.Mentions.CountUnread` (M1-60) at the time of the answer; a new mention writes no personal event (04 'Konflikte', row Gelesen-Stand). `sync` subscribes `messaging.MessagePosted` only to clear drafts (02 4.3).
 17. Every operation runs through `authorize` with its catalogue action; no read right gives `404`, never `403` (B7, 05 rules 1 and 2). Nobody but the owner can read a read state (20, DP-T10).
 18. No JSON `null` in responses or events (06 'Grundregeln', 04 'Umschlag (Envelope)').
 
@@ -70,7 +70,7 @@ Change:
 
 - `api/operations.yaml`: move the twelve operations from `later` into the enabled list and rerun the route generator.
 - `internal/wire`: register the handlers and the in-transaction subscription `messaging.MessagePosted -> sync.OnMessagePosted`; update the golden file of subscriptions (mechanism of M1-13) in the same commit.
-- `internal/messaging` port, additive only: `MessagePosted` must carry `MessageID`, `ThreadID`, `ChannelID`, `ThreadSeq`, `AuthorID`, `AuthorDeviceID` (absent when the author has no device), `Origin`, `MentionedUserIDs` (people only, author excluded, without duplicates), `ClearDraft` and `CreatedThread` (true when the message is the first message of a thread created in the same transaction). Add what M1-56 did not provide and set it in the create use cases. Add `Mentions.CountAfter(ctx, userID, threadID uuid, afterThreadSeq int64) (int, error)` (mentions of the person in the thread whose message has `thread_seq > afterThreadSeq`; deleted messages have no mention rows, 03 `messages`) unless M1-60 already offers an equivalent method.
+- `internal/messaging` port, additive only: `MessagePosted` must carry `MessageID`, `ThreadID`, `ChannelID`, `AuthorID`, `AuthorDeviceID` (absent when the author has no device), `ClearDraft` and `CreatedThread` (true when the message is the first message of a thread created in the same transaction). Add what M1-56 did not provide and set it in the create use cases. Unread mention counts come from `Mentions.CountUnread` of M1-60 (a dependency of this ticket); add no second counting method.
 - `internal/chat` port, additive only, unless M1-52 or M1-55 already offer them: `Threads.InfoForShare(ctx, threadID) (ThreadInfo, error)` returning `ChannelID`, `SpaceID`, `ChannelKind`, `LastMessageSeq` and `UnreadFloorSeq` under `FOR SHARE` on the thread row, and `Structure.ListSidebarStates(ctx, userID) ([]SidebarState, error)`.
 - `docs/spec/01-produkt.md`, section 'Einstellungen der Person': in the row `layout.column_widths` replace the value 'Objekt' with the shape from Design note 14.
 - READMEs `internal/sync/README.md`, `internal/messaging/README.md`, `internal/chat/README.md`; `services/server/CHANGELOG.md`; `docs/DECISIONS.md`.
@@ -101,11 +101,11 @@ Change:
 
 Read state
 
-1. `putReadState`: first `authorize(actor, read_state.update, thread)` (unknown or invisible thread gives `404`). Then `0 <= last_read_seq <= threads.last_message_seq`, otherwise `400 validation_failed` with `errors: [{pointer: /last_read_seq, code: out_of_range}]`. Store `GREATEST(old, new)`. If the stored value does not change, answer `200` with the current state, write no event and keep `version`. A missing row is the implicit state `last_read_seq = 0`, `mention_count = 0`, `version = 0`; advancing a missing row to `0` writes nothing.
-2. On a real change: `version = version + 1`, `updated_by_device_id` = device of the actor, `updated_at = now()`, `mention_count = Mentions.CountAfter(user, thread, new last_read_seq)`, `channel_id` from `Threads.InfoForShare`, one `read_state.updated`.
-3. `markThreadUnread`: `If-Match` is required (`428 precondition_required` when missing; use the M1-18 helpers). The ETag of a read state is its `version` in the format of 06 'Nebenläufigkeit' point 1; a missing row has version `0`. Mismatch gives `412 version_conflict` with the current `ReadState` in `current`. The body value must be at most the current `last_read_seq`, otherwise `400 validation_failed` (`out_of_range`; advancing is `putReadState`). An equal value answers `200` without event. Otherwise store exactly that value, raise `version`, recount `mention_count`, write the event and answer with the `ETag` header. The middleware of M1-20 handles `Idempotency-Key`.
+1. `putReadState`: first `authorize(actor, read_state.update, thread)` (unknown or invisible thread gives `404`). Then `0 <= last_read_seq <= threads.last_message_seq`, otherwise `400 validation_failed` with `errors: [{pointer: /last_read_seq, code: out_of_range}]`. Store `GREATEST(old, new)`. If the stored value does not change, answer `200` with the current state, write no event and keep `version`. A missing row is the implicit state `last_read_seq = 0`, `version = 0` (its `mention_count` is computed like any other); advancing a missing row to `0` writes nothing.
+2. On a real change: `version = version + 1`, `updated_by_device_id` = device of the actor, `updated_at = now()`, `channel_id` from `Threads.InfoForShare`, one `read_state.updated` whose payload and the response carry `mention_count` computed by `Mentions.CountUnread` for this thread with the new `last_read_seq` (never stored).
+3. `markThreadUnread`: `If-Match` is required (`428 precondition_required` when missing; use the M1-18 helpers). The ETag of a read state is its `version` in the format of 06 'Nebenläufigkeit' point 1; a missing row has version `0`. Mismatch gives `412 version_conflict` with the current `ReadState` in `current`. The body value must be at most the current `last_read_seq`, otherwise `400 validation_failed` (`out_of_range`; advancing is `putReadState`). An equal value answers `200` without event. Otherwise store exactly that value, raise `version`, compute `mention_count` as in note 2, write the event and answer with the `ETag` header. The middleware of M1-20 handles `Idempotency-Key`.
 4. Unread counts are never stored: unread is `threads.last_message_seq - GREATEST(last_read_seq, threads.unread_floor_seq)` (03 `read_states`), computed by readers (M1-63).
-5. `OnMessagePosted` runs in the message transaction. Skip mention counting when `Origin = import` (imported content never counts as unread, 04 'Schreiben eines Imports'). For each id in `MentionedUserIDs`, in ascending id order (03 'Sperrreihenfolge'), upsert `read_states (user, thread)` with `mention_count = mention_count + 1`, `version = version + 1`, `channel_id = ChannelID`, `updated_by_device_id` absent (a server-side change), and write `read_state.updated` for that person. The server does not move the author's own read position; clients advance it over REST (04: personal data changes over REST). Record as ruling.
+5. `OnMessagePosted` runs in the message transaction and only clears drafts (`ClearDraft`, note 15). It writes no read state and no event for mentions: clients count new mentions from `message.created` (`mention_ids`) between two read-state answers (04 'Konflikte'). The server does not move the author's own read position; clients advance it over REST (04: personal data changes over REST).
 6. `listMyReadStates` (`settings.read` on the own user): rows of the given channel only if the actor can read the channel (visible set from `Authorizer.Scope`), each row additionally checked with `authorize(actor, thread.read, thread)` and dropped on deny (07 'Abfrage-Muster' rule 3). An invisible and an unknown channel give the same `200` with `items: []`. Every query on the three tables has the predicate `user_id = <actor>`.
 
 Drafts
@@ -162,7 +162,7 @@ Unit, `internal/sync/domain`:
 
 Unit, `internal/sync/app`, with fakes for the chat and messaging ports, `kernel/authorize` and the repositories:
 
-- `TestOnMessagePostedImportDoesNotCount`, `TestOnMessagePostedSkipsAuthor`, `TestOnMessagePostedWritesInIDOrder`, `TestOnMessagePostedClearDraftThreadAndForumPost`.
+- `TestOnMessagePostedWritesNoReadState`, `TestOnMessagePostedClearDraftThreadAndForumPost`.
 
 Integration (PostgreSQL 18 via `internal/platform/pg/pgtest`, real modules through `internal/wire`, HTTP through the real chain, people with active devices and DPoP proofs from the identity test helpers of M1-33 and M1-34):
 
@@ -170,7 +170,7 @@ Integration (PostgreSQL 18 via `internal/platform/pg/pgtest`, real modules throu
 - `TestReadStateEventIsPersonal`: the `event_log` row has `type = read_state.updated`, `audience_principal_id` = the person, the scope ids of the thread, a payload valid against `ReadStatePayload`, `updated_by_device_id` = the calling device, no JSON `null`.
 - `TestMarkThreadUnreadPreconditions`: missing `If-Match` gives `428`; stale gives `412` with `current`; success returns `ETag` and writes the event.
 - `TestMarkThreadUnreadTwoDevices`: two devices send the same `If-Match` in parallel: exactly one `200` and one `412`.
-- `TestMentionCount`: Sam mentions Alex in two messages: Alex has `mention_count = 2` and two events; Alex advances past the first message: `1`; past both: `0`.
+- `TestMentionCount`: Sam mentions Alex in two messages: `listMyReadStates` shows `mention_count = 2` and no `read_state.updated` was written for the mentions; Alex advances past the first message: the answer and its event say `1`; past both: `0`; deleting a mentioning message lowers the count without any write to `read_states`.
 - `TestDraftsTwoDevicesServerOrder`: device A puts without base: version 1, `overwrote_newer = false`; device B puts with base 1: version 2, false; A puts with base 1: version 3, `overwrote_newer = true`.
 - `TestDraftsConcurrentFirstWrite`: two parallel first PUTs without base: both `200`, one row, versions 1 and 2, exactly one response with `overwrote_newer = true`.
 - `TestClearDraftSameTransaction`: a draft exists; `createMessage` with `clear_draft: true` removes it; `draft.deleted` and `message.created` carry the same `correlation_id`; a unit of work that runs `OnMessagePosted` and then rolls back keeps the draft.
@@ -198,7 +198,7 @@ Commands that must pass, from the repository root:
 - [ ] Draft writes from two devices end in server order with `overwrote_newer` exactly as in note 10, also for concurrent first writes.
 - [ ] `clear_draft: true` removes the draft in the message transaction; a rollback keeps it.
 - [ ] Unknown setting keys give `404`, invalid values `400`; the registry test against 01 and 13 passes.
-- [ ] Every real change writes exactly one personal event of the right type (plus one per mentioned person); a no-op writes none; payloads validate against their schemas and carry `updated_by_device_id` when a device wrote.
+- [ ] Every real change writes exactly one personal event of the right type; a mention writes none; a no-op writes none; payloads validate against their schemas and carry `updated_by_device_id` when a device wrote.
 - [ ] DP-T10 passes; invisible and unknown ids give identical responses.
 - [ ] Agent and app tokens are rejected with `403` on all twelve operations.
 - [ ] The golden file of in-transaction subscriptions contains `messaging.MessagePosted -> sync`.

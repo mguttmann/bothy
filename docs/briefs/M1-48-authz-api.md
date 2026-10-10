@@ -1,6 +1,6 @@
 # M1-48: Groups and grants over the API
 
-Status: ready | Depends on: M1-31, M1-35, M1-44 | Etappe: M1
+Status: ready | Depends on: M1-31, M1-44 | Etappe: M1
 
 ## Goal
 
@@ -97,10 +97,12 @@ group the caller is not in, unless the caller is an owner.
 
 Paths are relative to `services/server/` unless they start with `docs/`.
 
-1. **Specification first:** `docs/DECISIONS.md`: the rulings under Design notes, in the file's
-   existing format. `docs/spec/07-rechte.md` 9.5 (German): one sentence each for the visibility
-   of grants to `manage` holders and for manual memberships of `oidc_claim` groups (rulings 1
-   and 3).
+1. **Specification** (in place from planning): 07 2.6 item 6 (visibility of grants to `manage`
+   holders) and the paragraph on `oidc_claim` groups (`409 conflict`, `reason:
+   claim_managed_group`); 05 `group.member.add`, `group.member.remove`, `grant.read`; 03 `groups`
+   (`provider_id`, checks, unique `(provider_id, external_ref)`, length keys); 06 2 "Ohne Wirkung".
+   Change them only where the implementation proves them wrong. `docs/DECISIONS.md`: the rulings
+   under Design notes, in the file's existing format.
 2. **Application** `internal/authz/app`: use cases `ListGroups`, `GetGroup`, `ListGroupMembers`,
    `CreateGroup`, `UpdateGroup`, `DeleteGroup`, `AddGroupMember`, `RemoveGroupMember`,
    `ListGrants`, `GetGrant`, `CreateGrant`, `RevokeGrant`. Every write goes through the `Admin`
@@ -213,10 +215,13 @@ audit. An expired grant may be revoked; it changes no rights but closes the reco
 
 **Groups.**
 - `createGroup`: `name` trimmed, not blank, display-text check (SEC-IN-4, the shared check of
-  M1-26 or `kernel/displaytext` if M1-46 moved it); `description` same check, may be empty;
-  `source` default `local`; `oidc_claim` requires a non-blank `external_ref`, `local` forbids it.
-  Name taken by a live group (case-insensitive) or `external_ref` taken: `409 conflict` with
-  `errors` pointer `/name` or `/external_ref`. Not a rights change (05 "Rechte" `nein`).
+  M1-26, `kernel/textcheck`) and at most `group.name_max_chars`; `description` same check, may be
+  empty, at most `group.description_max_chars`;
+  `source` default `local`; `oidc_claim` requires a non-blank `external_ref` and the
+  `provider_id` of an existing OIDC provider (else `400`, pointer `/external_ref` or
+  `/provider_id`), `local` forbids both. Name taken by a live group (case-insensitive) or
+  `(provider_id, external_ref)` taken by a live group: `409 conflict` with `errors` pointer
+  `/name` or `/external_ref`. Not a rights change (05 "Rechte" `nein`).
   `group.changed {change: created}`; audit; `201`.
 - `updateGroup` (PATCH): at least one of `name`, `description`; same checks and conflicts;
   `group.changed {change: updated}`; audit; `200`.
@@ -226,16 +231,16 @@ audit. An expired grant may be revoked; it changes no rights but closes the reco
   `group.changed {change: deleted}`, one `grant.changed {change: revoked}` per grant; audit;
   `204`. An already deleted group: `204` without change (06 7, DELETE).
 - `addGroupMember` (body `GroupMemberAdd`, `Idempotency-Key`): group live, else `404`; group
-  with `source = oidc_claim`: `409 conflict`, detail "memberships of this group come from the
-  identity provider"; `user_id` must be a principal of kind `user` not `deleted` (else `400`,
+  with `source = oidc_claim`: `409 conflict` with `reason: claim_managed_group` (07 2.6); `user_id` must be a principal of kind `user` not `deleted` (else `400`,
   pointer `/user_id`, code `unknown_user`); already an in-effect member: `409 conflict`;
   `expires_at` absent or after `t`. RightsChange with affected `[user]` (I1: AZ-M25);
   `group.changed {change: member_added, user_id}`; audit; `201` with `GroupMember`.
 - `removeGroupMember`: live group; the in-effect membership gets `removed_at`, `removed_by`;
   RightsChange `[user]`; `group.changed {change: member_removed, user_id}`; audit; `204`. A
   membership that existed but is already removed or expired: `204` without change; never a
-  member: `404`. Removing from an `oidc_claim` group is allowed (an owner may cut access before
-  the identity provider is updated; the next login of that person re-adds it from the claim).
+  member: `404`. Removing from an `oidc_claim` group gives `409 conflict` with `reason:
+  claim_managed_group` (07 2.6): the next login would re-add it silently; an owner cuts access
+  with `user.disable` or by deleting the group.
 - `member_count` counts memberships in effect at `t`. `listGroupMembers` lists memberships in
   effect at `t`, ordered by membership `id`, keyset cursor.
 
@@ -247,11 +252,11 @@ and `channel_id` (from `StructureSource`; empty for instance grants), payload
 **Rulings for `docs/DECISIONS.md`:**
 1. Non-owners see grants only inside their `manage` scope; filters narrow, never widen it.
 2. A grant or group the caller may not read is `404` for every operation on it.
-3. Manual additions to `oidc_claim` groups are rejected; removals are allowed.
-4. Revoking an already revoked grant succeeds without change and is audited with `no_change`.
-5. Deleting a group revokes its grants with reason `group_deleted` and keeps memberships as
+3. Revoking an already revoked grant succeeds without change and is audited with `no_change`
+   (06 2 "Ohne Wirkung").
+4. Deleting a group revokes its grants with reason `group_deleted` and keeps memberships as
    history.
-6. `member_count` and member lists show memberships in effect at request time.
+5. `member_count` and member lists show memberships in effect at request time.
 
 ## Tests (write them first)
 
@@ -279,7 +284,8 @@ A controllable clock. Test names carry the spec IDs.
 2. HTTP integration, behaviour:
    - groups: create, duplicate name `409`, bidi name `400`, `oidc_claim` without
      `external_ref` `400`, update, delete revokes grants and writes `access.changed` for every
-     member, add and remove member with events, add to `oidc_claim` group `409`, remove twice
+     member, add and remove member with events, add to and remove from an `oidc_claim` group
+     `409 claim_managed_group`, remove twice
      `204`, never member `404`, `member_count` excludes an expired membership at the exact
      second.
    - group visibility: owner sees all; Sam sees only groups he is in; Robin gets `404` on a

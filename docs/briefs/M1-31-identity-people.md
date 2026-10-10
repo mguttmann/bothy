@@ -128,7 +128,7 @@ IDs and field names only, never values of names, e-mail addresses or locales (SE
 - Ruling: `revokeOwner` for a person without an active owner row is `404`, because the owner role is the resource.
 - Problem codes: `400 validation_failed` with `errors[]`, `400 cursor_invalid`, `401 unauthenticated`, `401 step_up_required`, `403 forbidden` (`owner_only`, `step_up_not_possible`, `subject_kind_not_allowed`), `404 not_found`, `409 conflict`, `409 invalid_state_transition`, `409 i1_violation`, `409 last_owner`, `422 idempotency_key_reuse` (M1-20).
 - Response validation: use the response validator of the merged tree if one exists; otherwise add a test-only helper in `services/server/test/apitest` that validates each response body against its component schema in `docs/api/openapi.yaml` with `github.com/santhosh-tekuri/jsonschema/v6` (Apache-2.0, JSON Schema 2020-12 as used by OpenAPI 3.1), pinned in `go.mod`, checked by `make licenses`.
-- Test authentication: use the test authenticator of M1-18 if it exists; otherwise add the test-only package `internal/kernel/actor/actortest` with builders for: owner in a session with fresh or old step-up, owner with a personal API token, human without owner role, human on a pending device, agent, anonymous.
+- Test authentication: use the fake authenticator of `internal/platform/httpserver/httpservertest` (M1-18); add the builders it lacks there (owner in a session with fresh or old step-up, owner with a personal API token, human without owner role, human on a pending device, agent, anonymous). Test helpers live in the tree of a component (02 "6. Code-Layout"); no package under `internal/kernel/actor`.
 
 ## Tests (write them first)
 

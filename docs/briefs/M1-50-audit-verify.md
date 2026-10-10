@@ -75,21 +75,13 @@ permanent warning instead of pretending to be protected.
 
 ## Scope
 
-Specification changes (first):
-
-- `docs/api/openapi.yaml`, additive: `AuditVerifyResult` gets optional `failure_reason` (enum
-  `hash_mismatch`, `link_mismatch`, `seq_gap`, `checkpoint_mismatch`, `checkpoint_invalid`),
-  required `checkpoints_compared` (integer, int64), optional `last_checkpoint_seq` (integer,
-  int64), required `warnings` (array of string; known value `checkpoint_sink_not_configured`).
-  Describe in `exportAuditEvents` that a stream cut short is detectable through the hash links.
-- `docs/spec/19-sicherheit.md` "12": a short table "Format der Prüfpunkte" with the payload, JWS
-  header, file layout and the definition of `previous_checkpoint_hash` from the Design notes, and
-  the accepted value format of `audit.checkpoint_sink` in the row of "16. Konfigurationswerte".
-- `docs/spec/02-architektur.md` "12.3 Job-Katalog", row `audit.chain_verify`: "periodisch je
-  `audit.checkpoint_interval`: Abschnitt seit dem letzten Prüfpunkt nachrechnen, dann Prüfpunkt
-  signieren, speichern und an `audit.checkpoint_sink` ablegen".
-- Run `make api-lint`, `make api-checks` and regenerate the server code (M1-17 generation target)
-  so that `make codegen-check` shows no diff.
+The specification is in place (planning, spec first): `AuditVerifyResult` with `failure_reason`,
+`checkpoints_compared`, `last_checkpoint_seq`, `warnings` and the description of
+`exportAuditEvents` in `docs/api/openapi.yaml`; 19 SEC-AUD-2, SEC-AUD-7 with the table "Format der
+Prüfpunkte" and the value format of `audit.checkpoint_sink` in 19 16; 03 `audit_checkpoints`; 02
+12.3 row `audit.chain_verify` (verify, then sign). Change them only where the implementation proves
+them wrong; run `make api-lint`, `make api-checks` and regenerate the server code (M1-17
+generation target) so that `make codegen-check` shows no diff.
 
 Code (paths under `services/server/`):
 
@@ -111,7 +103,8 @@ Code (paths under `services/server/`):
   periodic every `audit.checkpoint_interval`, role `worker` only).
 - `internal/instance` (port `Keys`): if the base lacks it, add
   `Verify(ctx, purpose, compactJWS []byte) (payload []byte, kid string, err error)` that accepts
-  keys of the purpose in every state including `retired`; JOSE code stays in instance adapters.
+  keys of the purpose in every state including `retired`; the compact JWS is built and parsed with
+  `internal/kernel/jose` (ADR 0067).
 - Metrics `bothy.audit.verify.failures` (counter) and `bothy.audit.verify.last_success.timestamp`
   (gauge) exactly as in `docs/observability/signals.md` "4.6", no attributes.
 - Configuration: register `audit.checkpoint_interval` (duration) and `audit.checkpoint_sink`
@@ -127,8 +120,8 @@ Code (paths under `services/server/`):
 - Signing keys, rotation and JWKS themselves (M1-32, merged).
 - Retention trim with anchor entry (`audit.retention_trim`, M7); verify starts at the smallest
   retained `seq` until anchors exist.
-- An object storage sink with retention lock (no ticket yet, see spec gap); the console warning
-  banner and CSV export (M6).
+- An object storage sink with retention lock (PLAN M7-22); the console warning banner and CSV
+  export (M6).
 - Canary test over all outputs (M1-69).
 
 ## Boundaries
@@ -221,10 +214,8 @@ SEC-AUD-1 holds already; the tests below re-check it as part of SEC-T16. To simu
 with write access to the database, tests connect as the superuser of the throwaway container,
 disable the protection trigger of `audit_events` for the change, and enable it again.
 
-Rulings to record in `docs/DECISIONS.md`: one job verifies and then signs (no separate checkpoint
-job, because signing an unverified chain would launder a change); sink format `file://` in M1;
-checkpoint payload, `typ` and `previous_checkpoint_hash` definition; signature column stores the
-compact JWS; a detected break ends the job without retry.
+Rulings to record in `docs/DECISIONS.md` (link 02 12.3 and 19 SEC-AUD-7): a detected break ends
+the job without retry; file mode and atomic write of the file sink.
 
 ## Tests (write them first)
 
@@ -281,8 +272,8 @@ make check
 - [ ] List, export and verify only for owners with step-up; every call is audited.
 - [ ] Job `audit.chain_verify` signs only verified segments, exports after commit and emits both
       metrics from the catalog.
-- [ ] The openapi and chapter changes are in the same change; `make api-lint`, `make api-checks`,
-      `make codegen-check` and `make config-doc-check` are green.
+- [ ] The implementation matches `openapi.yaml`, 02, 03 and 19 (changed only where proven wrong);
+      `make api-lint`, `make api-checks`, `make codegen-check` and `make config-doc-check` are green.
 - [ ] The three operations are enabled and registered with their actions.
 - [ ] `make check` is green.
 

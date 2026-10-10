@@ -1,6 +1,6 @@
 # M1-45: Disable a person, revoke a device, end a session
 
-Status: ready | Depends on: M1-29, M1-35, M1-44 | Etappe: M1
+Status: ready | Depends on: M1-44 | Etappe: M1
 
 ## Goal
 
@@ -165,8 +165,7 @@ Paths are relative to `services/server/` unless they start with `docs/`.
   M1-34. Device approval and pairing: M1-38.
 - "Revoke all grants of this person" as a console step: M4 and M6 (it is `grant.revoke` per
   grant, M1-48).
-- Automatic revocation of inactive devices (`auth.device_inactive_revoke_after`) and the job
-  `identity.session_cleanup`: not in this ticket (reported as a plan gap).
+- Expiry of pending devices and pairings in the job (M1-38).
 
 ## Boundaries
 
@@ -266,21 +265,27 @@ session_revoked` and must not be treated as reuse (no second audit entry of kind
 (M1-20); a replay returns the stored response with `Idempotent-Replay: true`. A repeat without
 the key is the no-change path above.
 
-**Rulings for `docs/DECISIONS.md`:**
-1. `devices.revoke_reason` holds a machine code (`revoked_by_self`, `revoked_by_owner`,
-   `user_disabled`); the free-text reason of the request goes only into the audit entry.
-   Reason: the column is shown in device lists, the text belongs to the audit trail.
-2. `session.revoke` stores `logout` when the session's own person ends it and `admin` otherwise.
+**Inactive devices.** Add `ExpireInactiveDevices` to the job `identity.auth_cleanup` (created by
+M1-35, 02 "12.3"): every active device whose `last_seen_at` (or `approved_at` when never seen) is
+older than `auth.device_inactive_revoke_after` is revoked with the same sequence as `revokeDevice`
+(steps of 08 "10"), `revoke_reason = 'inactive'`, actor NULL, audited as the system action
+`device.expire` (05). Request handling never waits for the job: authentication treats such a
+device as inactive already (08 "5.4").
+
+**Rulings.** The spec already states them; `docs/DECISIONS.md` links the places:
+1. `devices.revoke_reason` holds a machine code with a CHECK (03 `devices`, 08 "5.4"); the
+   free-text reason of the request goes only into the audit entry.
+2. `session.revoke` stores `logout` when the session's own person ends it and `admin` otherwise
+   (03 `auth_sessions.revoke_reason`).
 3. Revoking or disabling something that is already revoked or disabled succeeds without change
-   and is audited with `no_change`. Reason: clients retry after their idempotency window; a
-   conflict would look like a failure for a state that is already the wanted one.
+   and is audited with `no_change: true` (06 "2", row "Ohne Wirkung", R-API-27).
 
 ## Tests (write them first)
 
 Use the real modules `identity`, `authz`, `audit`, `sync`, `instance` against PostgreSQL 18
 (`pgtest`), real access tokens with DPoP proofs and real step-up (M1-34, M1-35). Use the
 test helpers the identity tickets introduced for creating people, devices, sessions and tokens;
-if none exist outside `_test.go` files, add `internal/identity/identitytest` and attach it to the
+if none exist outside `_test.go` files, add `internal/identity/adapters/identitytest` and attach it to the
 module register the way M1-05 attaches test-support packages. Fakes only for
 `authz.StructureSource` and `authz.AgentPolicySource` (no chat or agents data in this ticket).
 Test names carry the spec IDs.

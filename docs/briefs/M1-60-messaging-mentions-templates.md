@@ -22,7 +22,8 @@ stored but never show up in a list or a count.
   `sync` (subscribes `MessagePosted` for the mention counter), 4.4, "Schichten im Modul",
   "Transaktionen und Unit of Work", "Request-Pfad".
 - `docs/spec/03-datenmodell.md`: "Grundsätze" (items 7, 10, 12, 13), tables `mentions`,
-  `message_templates`, `messages`, `read_states` (`mention_count`, unread formula).
+  `message_templates`, `messages`, `read_states` (computed counters, R-DM-32), 9
+  (`template.name_max_chars`, `template.max_per_scope`).
 - `docs/spec/05-aktionen.md`: rules 1.1, 1.2, 1.8; "Spalte Recht" (`self`, `manage`); "Entscheidung";
   table 4.7 (`mention.list`, `template.read`, `template.manage`, `message.read`).
 - `docs/spec/06-api.md`: "Grundregeln", "Autorisierung in der API", "Fehler", "Paginierung",
@@ -102,22 +103,20 @@ All paths below `services/server/` unless stated.
    - `Templates` with `List(ctx, channelID ids.ID) ([]TemplateView, error)`,
      `CreatePersonal(ctx, c TemplateInput) (TemplateView, error)`,
      `CreateForChannel(ctx, channelID ids.ID, c TemplateInput) (TemplateView, error)`,
-     `Update(ctx, c TemplateChange) (TemplateView, error)`, `Delete(ctx, templateID ids.ID) error`.
+     `Update(ctx, c TemplateChange) (TemplateView, error)`, `Delete(ctx, templateID ids.ID) error`,
+     `ListMine(ctx) ([]TemplateView, error)`.
    `ids.ID` is the UUID type of `kernel/ids`; the actor comes from the context.
 3. `internal/messaging/domain`: template rules (name and content validation, no-op detection,
    scope) and the mention page keyset.
-4. `internal/messaging/app`: use cases for the six operations and `CountUnread`.
+4. `internal/messaging/app`: use cases for the seven operations and `CountUnread`.
 5. `internal/messaging/adapters/postgres/queries/mentions.sql`, `templates.sql`, regenerated
    `sqlcgen/`.
-6. `internal/messaging/adapters/httpapi`: `ListMyMentions`, `ListTemplates`,
+6. `internal/messaging/adapters/httpapi`: `ListMyMentions`, `ListMyTemplates`, `ListTemplates`,
    `CreatePersonalTemplate`, `CreateChannelTemplate`, `UpdateTemplate`, `DeleteTemplate`.
-7. Spec first, configuration: unless a chapter table already defines them, add to
-   `docs/spec/06-api.md` "Konfigurationswerte dieses Kapitels" (messaging is a module of chapter
-   06, 02 4.2): `template.name_max_chars` with standard `100` ("Länge eines Vorlagennamens in
-   Zeichen") and `template.max_per_scope` with standard `100` ("Vorlagen je Person bzw. je Kanal");
-   add both to the configuration schema (M1-07) and regenerate `docs/operations/configuration.md`
-   with the generator `make config-doc-check` verifies.
-8. `api/operations.yaml`: enable the six operations; regenerate.
+7. Configuration: `template.name_max_chars` and `template.max_per_scope` are defined in 03 9; add
+   both to the configuration schema (M1-07) and keep `docs/operations/configuration.md` current
+   (`make config-doc-check`).
+8. `api/operations.yaml`: enable the seven operations; regenerate.
 9. Docs: `internal/messaging/README.md` (German, existing structure, including who consumes
    `CountUnread`), `services/server/CHANGELOG.md`, `docs/DECISIONS.md` entries for notes 6, 8, 9
    and 12.
@@ -125,11 +124,10 @@ All paths below `services/server/` unless stated.
 ## Out of scope
 
 - Creating and resolving mentions when sending (M1-56) or editing (M1-58).
-- Maintaining `read_states.mention_count`, the read state, and the counters in the snapshot
-  (M1-61, M1-63). They use `CountUnread`; this ticket does not write `read_states`.
+- The read state and the counters in read-state responses, events and the snapshot (M1-61,
+  M1-63). No counter is stored (03 `read_states`, R-DM-32); they compute it with `CountUnread`.
 - Push and badge (M3); client views (M4); export of personal templates and their deletion with an
   account (M7, `personaldata.Participant`).
-- A `GET /me/templates` operation: not in the contract; reported as a spec gap, do not add it.
 
 ## Boundaries
 
@@ -159,6 +157,7 @@ All paths below `services/server/` unless stated.
    |---|---|---|---|---|---|
    | `listMyMentions` | `GET /api/v1/me/mentions` | `mention.list` | user = caller | `rl.read` | |
    | `listTemplates` | `GET /api/v1/channels/{channel_id}/templates` | `template.read` | channel | `rl.read` | |
+   | `listMyTemplates` | `GET /api/v1/me/templates` | `template.read` | user = caller | `rl.read` | |
    | `createPersonalTemplate` | `POST /api/v1/me/templates` | `template.manage` | user = caller | `rl.write` | `Idempotency-Key` |
    | `createChannelTemplate` | `POST /api/v1/channels/{channel_id}/templates` | `template.manage` | channel | `rl.write` | `Idempotency-Key` |
    | `updateTemplate` | `PATCH /api/v1/templates/{template_id}` | `template.manage` | user (personal) or channel | `rl.write` | `If-Match` required, `Idempotency-Key` |
@@ -172,20 +171,19 @@ All paths below `services/server/` unless stated.
    mn.message_id WHERE mn.principal_id = @caller AND m.channel_id = ANY(@visible) AND m.deleted_at
    IS NULL`, keyset `(mn.created_at DESC, mn.message_id DESC)`, `LIMIT L + 1` with `L` from
    `api.page_size_default` and `api.page_size_max` (index `(principal_id, created_at DESC)`). Each
-   item passes `authorize(message.read)`; a denied item is dropped and logged as
-   `authz_filter_mismatch` with only action and resource kind. Items `MentionItem{message,
+   item passes `authorize(message.read)`; a denied item is dropped, logged with only action and
+   resource kind and counted in `bothy.authz.errors` with `bothy.reason = filter_mismatch` (07 7.4
+   rule 3). Items `MentionItem{message,
    created_at}` with the REST representation of M1-56. `next_cursor` only when more exist.
-3. Cursor: reuse the one cursor codec of earlier list operations, bound to the list name and the
-   caller. A cursor of another list, of another principal, or a tampered one gives
-   `400 cursor_invalid`. If none exists on your base, add it once as a shared helper in
-   `internal/platform/httpserver` (opaque, versioned, carrying list name, filter binding and
-   keyset) and document it.
+3. Cursor: the codec of `internal/platform/httpserver` (M1-18, 06 "Paginierung"), bound to the
+   list name and the caller. A cursor of another list, of another principal, or a tampered one
+   gives `400 cursor_invalid`.
 4. `CountUnread`: for one principal, the number of mentions per thread with `m.thread_seq >
    LastReadSeq[thread]` (0 when the thread is not in the map), `m.deleted_at IS NULL`,
    `m.channel_id = ANY(VisibleChannelIDs)`; threads with count 0 are omitted. One statement; pass
    the map as two parallel arrays and `unnest` them. An empty `VisibleChannelIDs` returns nothing.
-   This port has no HTTP route; `sync` uses it in M1-61 and M1-63 to compute
-   `read_states.mention_count` and the snapshot counters.
+   This port has no HTTP route; `sync` uses it in M1-61 and M1-63 to compute the unread mention
+   counters of read states (`ReadState.mention_count` in responses and events) and the snapshot.
 5. Counters and lists never reveal invisible channels: the SQL predicate is mandatory and the
    result contains only visible threads (AZ-P5 part mentions).
 6. `threads.unread_floor_seq` is not needed for mentions: imports write no mentions (22 6.4), so a
@@ -197,6 +195,10 @@ All paths below `services/server/` unless stated.
    ANY(@visible))`. Personal items pass `authorize(template.read, user = caller)`, channel items are
    covered by the channel check. `Template{id, scope, channel_id (channel scope only), name,
    content_md, version}`.
+   `listMyTemplates`: `authorize(template.read, user = caller)`; the caller's personal templates
+   without `deleted_at`, ordered by `lower(name)`, then `id`; unpaginated, bounded by
+   `template.max_per_scope` (`TemplateList`). Reason: a person without any readable channel can
+   still list their own templates.
 8. Create: body `TemplateCreate{name, content_md}`. Validation (`400 validation_failed`, pointer and
    code per field): `name` not empty after trimming (`required`), at most `template.name_max_chars`
    code points (`too_long`), no control or Bidi control characters through the shared display-text
@@ -237,6 +239,8 @@ Unit:
 - `TestTemplateValidation`: empty and blank name, name at and above `template.name_max_chars`, name
   with U+202E, name with U+0007, empty content, content above `message.max_content_bytes`.
 - `TestTemplateNoop`: same values and empty body are no-ops.
+- `TestListMyTemplates`: only the caller's personal templates, also without any readable channel;
+  an agent gets `403`.
 
 Integration against PostgreSQL 18 (`pgtest`, world of 07 "Beispiele", HTTP through the real chain):
 - `TestListMyMentions_NewestFirstAndPaging`: 7 mentions of Alex, `limit=3`, three pages, newest
@@ -249,7 +253,8 @@ Integration against PostgreSQL 18 (`pgtest`, world of 07 "Beispiele", HTTP throu
   tampered one each give `400 cursor_invalid`.
 - `TestListMyMentions_AgentGets403`.
 - `TestListMyMentions_DropsItemDeniedByAuthorize`: app-level test with a fake `Authorizer` that
-  denies one item; the item is dropped and `authz_filter_mismatch` is logged without IDs.
+  denies one item; the item is dropped, logged without IDs and counted with `bothy.reason =
+  filter_mismatch`.
 - `TestCountUnread_FloorsAndDeleted`: counts respect `LastReadSeq`, default floor 0, ignore
   tombstones, omit zero counts.
 - `TestAZP5_CountUnreadRandomWorlds`: seeded random worlds (fixed seed list, `math/rand/v2`) with
