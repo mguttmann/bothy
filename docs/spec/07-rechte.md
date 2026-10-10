@@ -646,7 +646,7 @@ Herkunft als Kette. Herkunftsarten:
 | Owner | "Owner" |
 | Bediener | "Bediener dieses Kanals" (Agent) |
 | DM | "Teilnehmer" |
-| indirekt über Agent | "kann über Agent Helpdesk Inhalte dieses Kanals erfahren" (Hinweis H1) |
+| indirekt über Agent | "kann über Agent Lotse Inhalte dieses Kanals erfahren" (Hinweis H1) |
 | gesperrt durch Schutzregel | "trigger, aber Auslösen gesperrt: Dev-Umgebung nicht bereit (SR3)" |
 
 Gesperrte Prinzipale erscheinen durchgestrichen. Die Ansicht braucht `owner` oder `manage` (05).
@@ -709,7 +709,7 @@ Abschnitt 4).
 ## 10. Beispiele
 
 Ausgangslage für alle Beispiele (fiktiv): Bereiche Support, Marketing, Engineering, Research. Ein
-Owner. Agenten: Helpdesk (Bediener von Support, `organization`, `chat`), Texter (Bediener von
+Owner. Agenten: Lotse (Bediener von Support, `organization`, `chat`), Texter (Bediener von
 Marketing, `organization`, `scoped`), Runner (Bediener des Forums Engineering/Projekt-A mit
 Projektbindung, `organization`, `host`), Assistent (Bediener von Research, `personal`,
 `credential_holder` = Owner, `scoped`).
@@ -720,9 +720,9 @@ Projektbindung, `organization`, `host`), Assistent (Bediener von Research, `pers
 |---|---|---|---|---|---|---|
 | G-1 | Alex | Bereich Support | `trigger` | `upload`, `approve_actions` | keiner | Support-Leitung |
 
-Ergebnis: Alex sieht nur Support, kann Helpdesk auslösen und dessen Freigabe-Karten bestätigen.
+Ergebnis: Alex sieht nur Support, kann Lotse auslösen und dessen Freigabe-Karten bestätigen.
 Marketing, Engineering und Research sind für Alex `404`; Suche und Zähler zeigen dort nichts.
-Helpdesk ist `organization`: das ist Pflicht, sobald Alex `trigger` hat (I1).
+Lotse ist `organization`: das ist Pflicht, sobald Alex `trigger` hat (I1).
 
 ### 10.2 Marketing nur für Sam
 
@@ -757,7 +757,7 @@ Research geben, lehnt der Server mit `i1_violation` ab: "zuerst auf organization
 ### 11.1 Testmatrix
 
 Welt der Matrix: wie Abschnitt 10, dazu Gruppe Leser (Mitglied Sam, Mitgliedschaft mit Ablauf) mit
-Freigabe G-4 (`read` auf Support/Allgemein), Freigabe G-5 (Helpdesk, `write`, `upload`, Bereich
+Freigabe G-4 (`read` auf Support/Allgemein), Freigabe G-5 (Lotse, `write`, `upload`, Bereich
 Support), Freigabe G-6 (App Tracker, `write`, Kanal Support/Eskalation, Scope nur
 `messages:write`), Kanal Engineering/Werkzeuge (Text, Bediener Runner, ohne Projektbindung), ein
 DM zwischen Alex und Sam. Die Uhr ist in Tests steuerbar.
@@ -767,7 +767,7 @@ DM zwischen Alex und Sam. Die Uhr ist in Tests steuerbar.
 | AZ-M01 | Owner | Research/Notizen | `message.read` | | `allow` |
 | AZ-M02 | Owner | DM Alex-Sam | `message.read` | | `not_found` (SR6) |
 | AZ-M03 | Alex | Support/Allgemein | `message.create` | G-1 auf Bereich | `allow` (geerbt) |
-| AZ-M04 | Alex | Support/Allgemein | `agent.invoke` (Helpdesk) | | `allow` |
+| AZ-M04 | Alex | Support/Allgemein | `agent.invoke` (Lotse) | | `allow` |
 | AZ-M05 | Alex | Marketing/Kampagnen | `message.read` | | `not_found` |
 | AZ-M06 | Alex | Instanz | `search.query` "Kampagne" | 3 Treffer nur in Marketing | 0 Treffer, `total = 0` |
 | AZ-M07 | Sam | Support/Allgemein | `message.read` | Mitgliedschaft Leser gültig | `allow` (Gruppe) |
@@ -790,11 +790,11 @@ DM zwischen Alex und Sam. Die Uhr ist in Tests steuerbar.
 | AZ-M24 | Owner | Support/Allgemein | `channel.operator.set` Assistent | Alex hat `trigger` | `invariant_violation` `i1_violation` |
 | AZ-M25 | Owner | Gruppe mit `trigger` auf Research | `group.member.add` Sam | Assistent `personal` | `invariant_violation` `i1_violation` |
 | AZ-M26 | Owner | Owner selbst | `user.disable` | einziger Owner | `invariant_violation` `last_owner` |
-| AZ-M27 | Helpdesk | Support/Allgemein | `message.create` | G-5 | `allow` |
-| AZ-M28 | Helpdesk | Marketing/Kampagnen | `message.create` | Agent im fremden Bereich | `not_found` |
+| AZ-M27 | Lotse | Support/Allgemein | `message.create` | G-5 | `allow` |
+| AZ-M28 | Lotse | Marketing/Kampagnen | `message.create` | Agent im fremden Bereich | `not_found` |
 | AZ-M29 | Texter | Marketing/Kampagnen | `message.create` | keine Freigabe, Bediener | `allow` (Bediener-Regel) |
-| AZ-M30 | Helpdesk | Support/Allgemein | Nachricht erwähnt Texter | `origin = agent` | kein Lauf (SR4) |
-| AZ-M31 | Owner | Helpdesk | `grant.create` `trigger` | Subjekt Agent | `forbidden` `subject_kind_not_allowed` |
+| AZ-M30 | Lotse | Support/Allgemein | Nachricht erwähnt Texter | `origin = agent` | kein Lauf (SR4) |
+| AZ-M31 | Owner | Lotse | `grant.create` `trigger` | Subjekt Agent | `forbidden` `subject_kind_not_allowed` |
 | AZ-M32 | Tracker | Support/Eskalation | `message.create` | G-6, Scope `messages:write` | `allow` |
 | AZ-M33 | Tracker | Support/Eskalation | `message.read` | Scope `messages:read` fehlt | `forbidden` `scope_missing` |
 | AZ-M34 | Tracker | Support/Allgemein | `message.create` | keine Freigabe | `not_found` |
@@ -807,8 +807,8 @@ DM zwischen Alex und Sam. Die Uhr ist in Tests steuerbar.
 | AZ-M41 | Alex | beliebig | beliebig | Sitzung widerrufen, Token noch nicht abgelaufen | `unauthenticated` `session_revoked` |
 | AZ-M42 | Alex | Karte mit `restricted_to = run_starter`, Lauf vom Owner | `interaction.create` | | `forbidden` `component_restricted` |
 | AZ-M43 | Sam | Karte mit `approve_actions` in Marketing | `interaction.create` | Sam ohne `approve_actions` | `forbidden` `capability_missing` |
-| AZ-M44 | Helpdesk im Lauf von Alex | Engineering/Projekt-A | `message.read` | Helpdesk hat zusätzlich `read` auf Engineering | `not_found` `acting_for_insufficient` (SR9) |
-| AZ-M45 | Helpdesk ohne Laufbezug | Engineering/Projekt-A | `message.read` | wie M44 | `allow`, Hinweis H1 in der Konsole |
+| AZ-M44 | Lotse im Lauf von Alex | Engineering/Projekt-A | `message.read` | Lotse hat zusätzlich `read` auf Engineering | `not_found` `acting_for_insufficient` (SR9) |
+| AZ-M45 | Lotse ohne Laufbezug | Engineering/Projekt-A | `message.read` | wie M44 | `allow`, Hinweis H1 in der Konsole |
 | AZ-M46 | Owner als Alex | Marketing/Kampagnen | `message.read` | "Als Person ansehen" | `not_found` |
 | AZ-M47 | Owner als Alex | Support/Allgemein | `message.create` | "Als Person ansehen" | `forbidden` `view_as_read_only` |
 | AZ-M48 | Alex | Marketing-Nachricht mit Erwähnung von Alex | `push.deliver` | | kein Push, Erwähnung still gespeichert |
@@ -816,7 +816,7 @@ DM zwischen Alex und Sam. Die Uhr ist in Tests steuerbar.
 | AZ-M50 | Sam | Support/Allgemein | `message.read` | Gruppe Leser gelöscht | `not_found` |
 | AZ-M51 | Alex | Support/Allgemein | `agent.invoke` | Entzug zwischen Annahme und Zustellung | Lauf `failed` `access_revoked`, keine Zustellung (I2) |
 | AZ-M52 | Alex | Marketing/Kampagnen | `GET` Nachricht mit fremder ID | | gleich wie zufällige ID (Status, Körper, Kopfzeilen) |
-| AZ-M53 | Eingangs-Webhook von Tracker | Support/Eskalation | `webhook_in.post` mit Erwähnung von Helpdesk | Kanal mit `free_response` | Nachricht `origin = app`, kein Lauf (SR4) |
+| AZ-M53 | Eingangs-Webhook von Tracker | Support/Eskalation | `webhook_in.post` mit Erwähnung von Lotse | Kanal mit `free_response` | Nachricht `origin = app`, kein Lauf (SR4) |
 
 ### 11.2 Pflicht-Tests
 
