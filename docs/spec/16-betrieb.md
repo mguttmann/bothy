@@ -83,8 +83,10 @@ OpenTofu-Module je Ziel beschreibt [infra/tofu/README.md](../../infra/tofu/READM
 
 ### 4.1 Grundregeln
 
-1. Jeder veröffentlichte Port bindet an `127.0.0.1` des Hosts. TLS und öffentliche Erreichbarkeit
-   liefert ein Rand (Reverse-Proxy, Load Balancer, `tailscale serve`), nie der Server selbst.
+1. Jeder veröffentlichte Port bindet an `127.0.0.1` des Hosts. Im Compose-Stack liefert ein Rand
+   (Reverse-Proxy, Load Balancer, `tailscale serve`) TLS und öffentliche Erreichbarkeit. Ohne Rand
+   kann der Server TLS selbst beenden (`server.tls_cert_ref`, `server.tls_key_ref`;
+   [19-sicherheit.md](19-sicherheit.md), SEC-TLS-2).
 2. PostgreSQL hängt nur am internen Netz `internal` ohne Ausgang. Sein Port ist nie am Host
    veröffentlicht; so kollidiert er auch nie mit einem PostgreSQL des Hosts.
 3. Ausgang brauchen nur `api` (OIDC-Anbieter), `worker` (Push-Dienste, Webhooks), `backup`
@@ -99,15 +101,24 @@ OpenTofu-Module je Ziel beschreibt [infra/tofu/README.md](../../infra/tofu/READM
 | öffentlich | `server.listen_addr` | REST und Gateway |
 | intern | `server.internal_listen_addr` | `/healthz`, `/readyz`, Eingangs-Webhooks von Diensten im Stack (Alertmanager) |
 
-`/healthz` meldet nur, dass der Prozess lebt. `/readyz` meldet bereit, wenn die Datenbank
-antwortet, das Schema zur Binärversion passt (Abschnitt 10) und der Objektspeicher antwortet.
-Beide Antworten enthalten keine Details außer dem Namen der fehlgeschlagenen Prüfung.
+`/healthz` meldet nur, dass der Prozess lebt. `/readyz` meldet bereit, wenn der Start
+abgeschlossen ist, die Datenbank antwortet, die Binärversion zum Schema passt (Abschnitt 10), je
+Zweck ein aktiver Signierschlüssel besteht, kein Shutdown begonnen hat und (ab M3) der
+Objektspeicher antwortet; die Namen der Prüfungen stehen in
+[02-architektur.md](02-architektur.md), Abschnitt 15.2. Antworten: `GET` und `HEAD`,
+`Content-Type: application/json`, `Cache-Control: no-store`; Erfolg `200` mit
+`{"status":"ok"}`, sonst `503` mit `{"status":"unavailable","failed":[<Namen, sortiert>]}`.
+Die Namen der fehlgeschlagenen Prüfungen sind das einzige Detail. Jede Prüfung, die eine
+Abhängigkeit fragt, begrenzt sich selbst (die Datenbank über `database.acquire_timeout`).
+`bothy healthcheck --url` fragt nur Loopback-Adressen über `http` ab (Exitcode `0` bei `2xx`, sonst
+`1`) und nutzt den Loopback-Client von `platform/egress`
+([19-sicherheit.md](19-sicherheit.md), SEC-NET-1).
 
 ### 4.3 Rand und Identität
 
 | Rand | Anmeldung | Bedingung |
 |---|---|---|
-| Reverse-Proxy (Profil `direct`) | OIDC oder lokale Konten | `server.trusted_proxies` nennt den Proxy, damit die Client-IP für `rl.public_auth` stimmt |
+| Reverse-Proxy (Profil `direct`) | OIDC oder lokale Konten | `server.trusted_proxies` nennt die Gegenstelle, die der Server sieht: im Profil `direct` das Gateway des Compose-Netzes, nicht den Proxy selbst (Compose-Variable `BOTHY_TRUSTED_PROXIES`); sonst weist SEC-TLS-1 jede Anfrage ab, und die Client-IP für `rl.public_auth` stimmt nicht |
 | `tailscale serve` (Profil `tailscale`) | Identitätsanbieter `trusted_header` | Der öffentliche Listener lauscht nur auf `127.0.0.1` im Netz-Namespace des Sidecars |
 | privates Netz der Cloud | OIDC | Load Balancer oder Application Gateway terminiert TLS |
 
@@ -123,11 +134,18 @@ Kopfzeilen selbst setzen. Tailscale nennt das ausdrücklich
 ### 5.1 Konfiguration (ADR 0011)
 
 1. Prozess-Konfiguration kommt aus Umgebungsvariablen und einer optionalen YAML-Datei
-   (`BOTHY_CONFIG_FILE`). Vorrang: Umgebung vor Datei vor Standardwert.
+   (`BOTHY_CONFIG_FILE` oder `--config`). Vorrang: Kommandozeile (nur `--role`, `--config`) vor
+   Umgebung vor Datei vor Standardwert.
 2. Namensregel: Schlüssel `a.b_c.d` heißt in der Umgebung `BOTHY_A__B_C__D` (Punkt wird `__`).
    Die Regel ist umkehrbar, weil Schlüssel nie zwei Unterstriche hintereinander enthalten.
 3. Unbekannte Variablen mit Präfix `BOTHY_` und unbekannte Schlüssel in der Datei brechen den
    Start ab. Grund: Ein Tippfehler darf nie still eine Sicherheitsgrenze auf den Standard setzen.
+   Ausgenommen sind nur `BOTHY_CONFIG_FILE` und die Variablen, die ein wirksamer Verweis `env:`
+   nennt (5.2). Werkzeuge des Repositorys mit demselben Präfix (`BOTHY_DENYLIST_*`,
+   `BOTHY_CODERABBIT`) gehören nicht in die Umgebung eines Servers: Maintainer legen den Pfad der
+   Deny-Liste in `.denylist-path` ab oder setzen die Variable nur für den einen Befehl, und
+   Test-Werkzeuge starten den Server mit einer ausdrücklichen Umgebung. Grund: Eine Ausnahme für
+   Werkzeugnamen würde die Tippfehler-Prüfung für genau diese Namen abschalten.
 4. Ungültige Werte (Typ, Bereich) brechen den Start ab. `bothy config check` prüft ohne Start,
    `bothy config print --redacted` zeigt die wirksame Konfiguration ohne Geheimnisse.
 5. Prozess-Konfiguration wird nur beim Start gelesen. Ausnahme: Geheimnisse (5.2).
@@ -147,7 +165,7 @@ Jedes Geheimnis ist ein Verweis `secret_ref` (Spalten `secret_ref`, `private_key
 
 | Schema | Beispiel | Treiber | Schreiben | Status |
 |---|---|---|---|---|
-| `file` | `file:/run/bothy/secrets/db_app_password` | Datei lesen | nein | M1 |
+| `file` | `file:/run/bothy/secrets/db_app_password` | Datei lesen | nur unter `secrets.signing_key_dir` (ADR 0066) | M1 |
 | `env` | `env:BOTHY_SECRET_DB_APP_PASSWORD` | Umgebungsvariable lesen | nein | M1, nur wo die Plattform nichts anderes kann |
 | `azkv` | `azkv://vault-name/secret-name` | Azure Key Vault | ja | später |
 | `awssm` | `awssm://eu-central-1/bothy/db_app_password` | AWS Secrets Manager | ja | später |
@@ -159,7 +177,16 @@ Fehlermeldungen oder Ereignissen. `env:` ist erlaubt, aber nicht empfohlen: Umge
 erben Kindprozesse und Absturzberichte.
 
 Fehlt ein Verweis bei einem Schlüssel `*_ref`, gilt `file:<secrets.dir>/<name>` mit dem Namen aus
-dem Katalog in der Konfigurationsreferenz (Abschnitt "Geheimnisse").
+dem Katalog in der Konfigurationsreferenz (Abschnitt "Geheimnisse"). Die Kapiteltabellen schreiben
+diesen Standard aus. "leer" steht nur bei Geheimnissen ohne Katalogeintrag, die zu einer
+abschaltbaren Funktion gehören (z. B. `server.tls_cert_ref`, `server.tls_key_ref`: leer heißt, der
+Server beendet kein TLS); eine eingeschaltete Funktion ohne Verweis bricht den Start ab.
+
+Signierschlüssel des Servers sind die einzige Ausnahme vom Lesen: Der Server erzeugt sie selbst
+in `secrets.signing_key_dir` (Verzeichnis im Besitz des Dienstbenutzers, Modus `0700`, Dateien
+`0600`) über `Put` des Datei-Treibers; jeder andere Verweis bleibt nur lesbar (ADR 0066,
+[19-sicherheit.md](19-sicherheit.md) Abschnitt 10). Grund: Planmäßige und Notfall-Rotation
+brauchen neue Schlüssel ohne Handgriff auf dem Host.
 
 ### 5.3 Geheimnisse im Compose-Stack
 
@@ -167,17 +194,34 @@ dem Katalog in der Konfigurationsreferenz (Abschnitt "Geheimnisse").
    Off-site-Ziel, Telemetrie-Schlüssel, Webhook-URLs für Alarme) als Dateien in
    `infra/compose/secrets/` ab. Das Verzeichnis ist nie im Repository.
 2. `secrets-init` erzeugt fehlende Geheimnisse (Datenbank-Passwörter, Token-Pepper,
-   Pseudonym-Schlüssel der Telemetrie, Schlüssel der Sicherung, Signierschlüssel) und legt im
-   Volume `secrets` je Dienst ein Unterverzeichnis an. Jeder Dienst bindet nur sein
-   Unterverzeichnis ein (`subpath`), nur lesend. Bestehende Geheimnisse überschreibt es nie.
-3. `secrets-init` gibt am Ende die Fingerabdrücke aus, nie die Werte, und erinnert an die
-   Hinterlegung (5.4).
+   Pseudonym-Schlüssel der Telemetrie, Schlüssel der Sicherung) und legt im Volume `secrets` je
+   Dienst ein Unterverzeichnis an. Jeder Dienst bindet nur sein Unterverzeichnis ein (`subpath`),
+   nur lesend. Signierschlüssel erzeugt nicht `secrets-init`, sondern der Server (5.2).
+3. Die eine kanonische Kopie jedes Geheimnisses liegt in `_store/` des Volumes (Verzeichnis
+   `0700`, Dateien `0400`); die Dienstverzeichnisse sind Kopien daraus. Abgleich mit den vom Owner
+   gelieferten Dateien: Fehlt ein Eintrag, wird er erzeugt bzw. übernommen; ein gelieferter
+   Eintrag mit anderem Inhalt ersetzt den gespeicherten (die Quelle des Owners ist maßgeblich);
+   ein erzeugter Eintrag mit anderem Inhalt in der Quelle bricht ab, außer mit `--adopt-source`
+   (Wiederherstellung aus dem Bündel, [disaster-recovery.md](../operations/disaster-recovery.md)
+   Fall B). Eine Datei der Quelle ohne Katalogeintrag bricht ab. Ein zweiter Lauf ohne Änderung
+   schreibt nichts.
+4. Eigentum und Modus der Kopien: Dienste mit `--owner <dienst>=<uid>:<gid>` bekommen Verzeichnis
+   `0500` und Dateien `0400` mit diesem Besitzer; `server` und `migrate` brauchen ihn, weil der
+   Datei-Treiber nur eigene Dateien mit `0400` oder `0600` liest (SEC-SEC-1). Das Image
+   `bothy-server` läuft als uid und gid `65532` ([18-release.md](18-release.md), Abschnitt 7).
+   Fremddienste ohne `--owner` (Datenbank, Sicherung, Collector) bekommen Kopien im Besitz von
+   root mit Verzeichnis `0755` und Dateien `0444`, weil ihre Images eigene Benutzer haben; jeder
+   sieht trotzdem nur sein Unterverzeichnis.
+5. `secrets-init` gibt am Ende die Fingerabdrücke aus, nie die Werte, und erinnert an die
+   Hinterlegung (5.4). Katalogeinträge, deren Erzeuger eine spätere Etappe baut, meldet es als
+   `pending` (Konfigurationsreferenz, Abschnitt "Geheimnisse").
 
 ### 5.4 Hinterlegung (Escrow)
 
 Ohne einige Geheimnisse ist eine Sicherung wertlos. Der Owner exportiert sie nach jeder Änderung
 verschlüsselt (`bothy secrets export --age-recipient <öffentlicher Schlüssel>`) und bewahrt das
-Bündel getrennt vom Server und getrennt vom Off-site-Ziel auf.
+Bündel getrennt vom Server und getrennt vom Off-site-Ziel auf. Das Bündel enthält `_store/` und den
+Schlüsselspeicher `secrets.signing_key_dir`.
 
 | Geheimnis | Folge bei Verlust |
 |---|---|
@@ -226,14 +270,38 @@ Regeln:
 
 | Rolle | Rechte | Nutzer |
 |---|---|---|
-| `postgres` | Superuser | nur `migrate --bootstrap` und `bothy-backupd` |
-| `bothy_owner` | Eigentümer des Schemas, DDL | `migrate` |
+| `postgres` | Superuser (`migrate.bootstrap_user`) | nur `migrate --bootstrap` und `bothy-backupd` |
+| `bothy_owner` | Eigentümer der Datenbank, des Schemas `public` und von `jobs.schema`; DDL | `migrate` |
 | `bothy_app` | DML; auf `audit_events` nur `INSERT` und `SELECT` | `api`, `worker` |
 | `bothy_maint` | Kürzen des Audit-Logs am Fristende mit Anker-Eintrag | Aufbewahrungsjob ([03-datenmodell.md](03-datenmodell.md) 4.12) |
 | `bothy_monitor` | `pg_monitor` | `otel-collector` |
 
 `migrate --bootstrap` legt fehlende Rollen idempotent an und setzt ihre Passwörter aus den
-Geheimnissen. Mit einem verwalteten Dienst legt das OpenTofu-Modul die Rollen an.
+Geheimnissen (`migrate.*_password_ref`). Regeln:
+
+1. Je Rolle `CREATE ROLE` bzw. `ALTER ROLE` mit `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
+   NOREPLICATION NOBYPASSRLS`; das Passwort geht nur als SCRAM-SHA-256-Verifier an die Datenbank,
+   nie im Klartext.
+2. `bothy_owner` besitzt die Datenbank und das Schema `public`; `PUBLIC` verliert alle Rechte an
+   beiden; `bothy_app`, `bothy_maint` und `bothy_monitor` bekommen `CONNECT`, die ersten beiden
+   `USAGE` auf `public`; `bothy_monitor` bekommt `pg_monitor`.
+3. Keine Standardrechte im Schema `public`: Jede Migration, die eine Tabelle anlegt, erteilt
+   `bothy_app` genau die Rechte, die 03 und dieses Kapitel vorsehen (meist `SELECT, INSERT,
+   UPDATE, DELETE`, weniger etwa bei `audit_events`); ein Test prüft je Tabelle die Rechte gegen
+   eine Erwartungsliste. Grund: Ein vergessenes `GRANT` scheitert laut im Test, ein vergessenes
+   `REVOKE` wäre still. Ausnahme: Im Schema `jobs.schema` legt River Tabellen selbst an; dort
+   gelten Standardrechte für `bothy_app`.
+4. `migrate` läuft als `bothy_owner` (`database.user`) und prüft das vor der ersten Migration.
+
+Mit einem verwalteten Dienst legt das OpenTofu-Modul die Rollen mit denselben Namen an und führt
+dieselben Anweisungen aus; `--bootstrap` entfällt dort.
+
+DDL im Betrieb (heute nur Partitionen von `event_log`) läuft nie mit Rechten von `bothy_app`.
+Muster: eine Funktion `SECURITY DEFINER` im Besitz von `bothy_owner`, `search_path` fest auf das
+Domänenschema und `pg_temp`, `EXECUTE` von `PUBLIC` entzogen und nur `bothy_app` erteilt; Namen
+nur über `format('%I')`. Die Funktion nimmt nur Zahlen und Zeitpunkte als Parameter, nie Namen.
+Grund: Die Anwendungsrolle bleibt bei DML, und die einzige DDL-Stelle ist eng und prüfbar.
+Spätere DDL-Jobs nutzen dasselbe Muster.
 
 ### 7.2 Einstellungen
 
@@ -345,14 +413,18 @@ Ziele: `dr.rpo_target` (Datenverlust) und `dr.rto_target` (Dauer bis zum Betrieb
    `worker`. Gibt es offene Migrationen auf einem bestehenden Schema und keine erfolgreiche
    Sicherung jünger als `migrate.recent_backup_max_age`, bricht `migrate` ab, solange
    `migrate.require_recent_backup` gilt. Eine leere Datenbank (Erstinstallation) ist ausgenommen.
+   Diese Prüfung gilt ab M7-02, weil sie `backup_runs` liest; bis dahin prüft `migrate` keine
+   Sicherung, und die Konfigurationsreferenz führt beide Schlüssel als geplant.
 2. Migrationen folgen Expand/Contract: Version N darf nur entfernen, was Version N-1 nicht mehr
    nutzt. Damit läuft der Code von N-1 gegen das Schema von N, und der Rückweg ist ein
    Image-Wechsel ohne Datenbank-Rückbau.
 3. Down-Migrationen gibt es in Produktion nicht. Fehler korrigiert die nächste Version.
-4. Der Server prüft beim Start das Schema: Ist es älter als nötig, oder verlangt es eine neuere
-   Server-Version (`instance.min_server_version`, gesetzt von `migrate`; 03), meldet `/readyz`
-   einen Fehler und der Server nimmt keinen Betrieb auf. Ein
-   neueres, aber verträgliches Schema ist erlaubt; das ist der Rückweg aus Punkt 2.
+4. Der Server prüft beim Start das Schema: Ist es älter als nötig, bricht der Start mit Hinweis
+   auf `bothy migrate up` ab. Verlangt es eine neuere Server-Version
+   (`instance.min_server_version`, gesetzt von `migrate`; 03), läuft der Prozess weiter, wird aber
+   nie bereit (`/readyz` meldet `schema_requires_newer_server`). Grund für den Unterschied:
+   [02-architektur.md](02-architektur.md), Abschnitt 15.1. Ein neueres, aber verträgliches Schema
+   ist erlaubt; das ist der Rückweg aus Punkt 2.
 5. Ein Major-Upgrade von PostgreSQL ist ein eigener Schritt mit Wartungsfenster.
 
 Regeln im Detail und Ablauf: [upgrade.md](../operations/upgrade.md).
@@ -456,16 +528,26 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | `server.maintenance_mode` | `off` | `off` oder `read_only` (Umzug, Upgrade) |
 | `secrets.dir` | `/run/bothy/secrets` | Basis der Standardverweise `file:` |
 | `secrets.cache_ttl` | `5m` | so lange gilt ein gelesenes Geheimnis |
+| `secrets.signing_key_dir` | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, ADR 0066) |
+| `server.tls_cert_ref` | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) |
+| `server.tls_key_ref` | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` |
 | `database.host` | `localhost` | Host der Datenbank |
 | `database.port` | `5432` | Port der Datenbank im Netz des Servers |
 | `database.name` | `bothy` | Datenbankname |
 | `database.user` | `bothy_app` | Rolle des Servers |
 | `database.password_ref` | `file:<secrets.dir>/db_app_password` | Verweis auf das Passwort |
-| `database.sslmode` | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` |
+| `database.sslmode` | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` (SEC-TLS-5) |
+| `database.sslrootcert` | leer | CA-Bündel für `verify-full`; leer nutzt die Wurzeln des Systems |
 | `database.max_conns` | `20` | Größe des Verbindungspools je Prozess (Startwert bis zum Lasttest) |
 | `migrate.require_recent_backup` | `true` | `migrate` verlangt eine frische Sicherung |
 | `migrate.recent_backup_max_age` | `24h` | so alt darf diese Sicherung sein |
 | `migrate.lock_timeout` | `5s` | `lock_timeout` je Migrationsschritt |
+| `migrate.bootstrap_user` | `postgres` | Superuser-Anmeldung nur für `migrate up --bootstrap` |
+| `migrate.bootstrap_password_ref` | `file:<secrets.dir>/db_superuser_password` | dessen Passwort |
+| `migrate.owner_password_ref` | `file:<secrets.dir>/db_owner_password` | Passwort, das `--bootstrap` für `bothy_owner` setzt |
+| `migrate.app_password_ref` | `file:<secrets.dir>/db_app_password` | Passwort für `bothy_app` |
+| `migrate.maint_password_ref` | `file:<secrets.dir>/db_maint_password` | Passwort für `bothy_maint` |
+| `migrate.monitor_password_ref` | `file:<secrets.dir>/db_monitor_password` | Passwort für `bothy_monitor` |
 | `backup.pg.full_schedule` | `0 2 * * 0` | Plan der Vollsicherung (cron) |
 | `backup.pg.diff_schedule` | `0 2 * * 1-6` | Plan der Differenzsicherung (cron) |
 | `backup.pg.archive_timeout` | `60s` | spätestens dann wird ein WAL-Segment archiviert |
@@ -511,3 +593,5 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | R-OP-14 | Feature-Flags mit Art `release` und `remove_by`, Gate-Check; Flags nie für Sicherheitsgrenzen. | Verhindert tote Flags und versteckte Sicherheitsschalter. |
 | R-OP-15 | Statusseite im Server, automatische Zustände aus internen Prüfungen, nicht aus Prometheus. | Funktioniert ohne optionalen Observability-Stack. |
 | R-OP-16 | Produktionsdaten nie in `dev` oder `staging`. | Kein Anonymisierungswerkzeug; ein Abzug wäre ein Datenschutzvorfall. |
+| R-OP-17 | DDL im Betrieb nur über `SECURITY DEFINER`-Funktionen von `bothy_owner`; Tabellenrechte je Migration ausdrücklich, keine Standardrechte in `public`. | Die Anwendungsrolle bleibt bei DML; ein fehlendes Recht fällt im Test auf. |
+| R-OP-18 | Signierschlüssel erzeugt der Server in einem eigenen beschreibbaren Verzeichnis (ADR 0066). | Rotation ohne Handgriff auf dem Host; alle anderen Geheimnisse bleiben nur lesbar. |

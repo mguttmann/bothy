@@ -21,7 +21,7 @@ Begriffe: [00-glossar.md](00-glossar.md). Betrieb: [16-betrieb.md](16-betrieb.md
 | 1 | Instrumentierung nur mit OpenTelemetry (Go SDK im Server, OTel-SDKs in Python und TypeScript in den Adaptern). | B11 |
 | 2 | Export nur an einen OpenTelemetry Collector. Kein Prozess spricht direkt mit einem Hersteller-Backend. | B11, ADR 0034 |
 | 3 | Keine Nachrichteninhalte, Prompts, Dateinamen, Suchbegriffe, Tokens oder Geheimnisse in Telemetrie. Durchsetzung an der Quelle und im Collector (Allowlist). | B11, [privacy.md](../observability/privacy.md) |
-| 4 | Telemetrie ist asynchron mit begrenzter Warteschlange. Ist sie voll, verwirft der Prozess und zählt `bothy.telemetry.dropped`. Ein Export-Fehler ändert nie das Ergebnis einer Anfrage. | R-Telemetrie |
+| 4 | Telemetrie ist asynchron mit begrenzter Warteschlange. Ist sie voll, verwirft der Prozess und zählt `bothy.telemetry.dropped`. Ein Export-Fehler ändert nie das Ergebnis einer Anfrage. Verwirft ein Prozessor des SDK ohne Rückmeldung, nennt das README von `platform/otel` diese ungezählte Stelle. | R-Telemetrie |
 | 5 | `gen_ai.*`-Attribute stehen nur in einem Paket je Codebasis (Server, SDK). Ihr Status ist "Development"; ein Wechsel der Konvention ist eine Änderung an genau dieser Stelle. | R-Telemetrie, [signals.md](../observability/signals.md) 6 |
 | 6 | Das Audit-Log ist keine Telemetrie: eigene Tabelle, gleiche Transaktion, nie gesampelt, nie über den Collector. | B11, [audit-vs-telemetry.md](../observability/audit-vs-telemetry.md) |
 | 7 | Die In-App-Statistik liest eigene Tabellen, nie das Telemetrie-Backend. | [admin-statistics.md](../observability/admin-statistics.md) |
@@ -45,7 +45,10 @@ Einheiten und Attribute. Kurzfassung:
 | Sicherung | `bothy.backup.last_success.timestamp`, `bothy.backup.restore_test.*`, `bothy.storage.volume.*` |
 
 Traces folgen einer Anfrage über W3C Trace Context: App, REST, Ereignis-Log, Fan-out, Adapter,
-Laufzeit. `correlation_id` in Ereignissen und Audit ist die Trace-ID der auslösenden Anfrage.
+Laufzeit. Am öffentlichen Listener beginnt der Server einen eigenen Trace und verknüpft einen
+eingehenden `traceparent` als Span-Link; Eltern-Kontext wird er nur mit
+`telemetry.traces.trust_remote_parent`. `correlation_id` in Ereignissen und Audit ist die Trace-ID
+der auslösenden Anfrage; jede Anfrage hat eine, auch mit `telemetry.enabled = false`.
 Für die Weitergabe an Adapter trägt der Umschlag das Feld `trace_context` (W3C `traceparent`,
 gespeichert in `event_log.trace_context`; 03, 04 Abschnitt 2.2).
 
@@ -107,10 +110,12 @@ gibt es nicht. Einzelheiten: [admin-statistics.md](../observability/admin-statis
 
 1. Es gibt kein offizielles OpenTelemetry-SDK für Dart
    (https://opentelemetry.io/blog/2026/dart-flutter-opentelemetry/, abgerufen 2026-10-10)
-   [belegt]. Die Apps senden darum keine Spans. Sie setzen `traceparent` an jeder Anfrage, damit
-   Server-Traces und App-Fehlerberichte dieselbe Trace-ID tragen.
-2. Den Sampling-Entscheid trifft der Server (`telemetry.traces.trust_remote_sampling`). Grund: Ein
-   Client darf nicht erzwingen, dass alles aufgezeichnet wird.
+   [belegt]. Die Apps senden darum keine Spans. Sie setzen `traceparent` an jeder Anfrage; der
+   Server verknüpft ihn als Span-Link, sodass App-Fehlerberichte und Server-Traces auffindbar
+   verbunden sind.
+2. Trace-ID und Sampling-Entscheid trifft der Server (`telemetry.traces.trust_remote_parent`
+   ist standardmäßig aus). Grund: Ein Client darf weder erzwingen, dass alles aufgezeichnet wird,
+   noch die `correlation_id` wählen, die im Audit steht.
 3. Absturzberichte sendet eine App nur, wenn der Herausgeber der App ein Ziel konfiguriert hat
    (Sentry, [backends.md](../observability/backends.md)). Berichte enthalten keine Inhalte; die
    App entfernt Nachrichtentexte, Eingaben und URLs mit Parametern vor dem Versand (Kapitel 15).
@@ -134,7 +139,7 @@ gibt es nicht. Einzelheiten: [admin-statistics.md](../observability/admin-statis
 |---|---|---|
 | `telemetry.enabled` | `true` | Telemetrie an oder aus |
 | `telemetry.traces.sampler_ratio` | `1.0` | Anteil der Traces, die das SDK aufzeichnet; der Collector sampelt danach nach |
-| `telemetry.traces.trust_remote_sampling` | `false` | `true`: das Sampling-Flag eines eingehenden `traceparent` gilt |
+| `telemetry.traces.trust_remote_parent` | `false` | `true`: ein eingehender `traceparent` wird Eltern-Kontext (seine Trace-ID wird `correlation_id`, sein Sampling-Flag gilt); `false`: nur Span-Link, eigener Trace |
 | `telemetry.logs.exporter` | `both` | `otlp`, `stdout` oder `both` |
 | `telemetry.logs.level` | `info` | kleinste Stufe, die geschrieben wird |
 | `telemetry.pseudonym_key_ref` | `file:<secrets.dir>/telemetry_pseudonym_key` | Schlüssel für HMAC-Pseudonyme; mindestens 32 Byte |
@@ -150,7 +155,7 @@ gibt es nicht. Einzelheiten: [admin-statistics.md](../observability/admin-statis
 | R-OB-02 | Datenschutz doppelt: Verbot an der Quelle und Allowlist im Collector, geprüft mit Kanarien-Test. | Ein Fehler im Code allein darf keine Inhalte nach außen bringen. |
 | R-OB-03 | Personen nur als HMAC-Pseudonym in Spans und Logs, nie an Metriken. | Fehlersuche bleibt möglich, Leistungsüberwachung einzelner Menschen nicht. |
 | R-OB-04 | Tail-Sampling im Collector: alle Fehler, alle langsamen, Anteil vom Rest; SDK zeichnet vollständig auf. | Fehler gehen nie durch zufälliges Sampling verloren. |
-| R-OB-05 | Der Server entscheidet das Sampling, nicht der Client. | Ein Client kann keine Vollaufzeichnung erzwingen. |
+| R-OB-05 | Der Server entscheidet Trace-ID und Sampling, nicht der Client; ein eingehender `traceparent` ist standardmäßig nur ein Span-Link. | Ein Client kann keine Vollaufzeichnung erzwingen und die `correlation_id` im Audit nicht wählen. |
 | R-OB-06 | Histogramme mit festen Grenzen; jede SLO-Schwelle ist eine Grenze. | Ein SLI aus Buckets ist nur an Grenzen exakt. |
 | R-OB-07 | `correlation_id` ist die Trace-ID der auslösenden Anfrage. | Ereignisse, Audit und Traces lassen sich ohne zweite ID verbinden. |
 | R-OB-08 | Statusseite und Statistik hängen nicht vom Observability-Stack ab. | Der Stack ist optional; Betriebsfunktionen der App nicht. |

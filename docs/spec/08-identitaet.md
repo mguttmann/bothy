@@ -511,7 +511,10 @@ die Person kannte, Geheimnisse in ihrer Dev-Umgebung rotieren.
 - **Speicher.** Nur HMAC-SHA-256 mit Server-Pepper und die ersten Zeichen als `token_prefix` (03).
   Anzeige genau einmal bei `token.create`.
 - **Scopes.** Teilmenge der Manifest-Scopes bzw. Agenten-Scopes (03); Rechte zusätzlich aus
-  Freigaben (07).
+  Freigaben (07). In M1 prüft `authorize` für Apps nur `app_installations.granted_scopes` der
+  Installation des Tokens (07, Abschnitt 2.10); wie die Scopes des Tokens selbst dazukommen und wie
+  lange Verbindungen den Zustand der Installation neu prüfen, legt die Etappe M2 (Apps) fest,
+  bevor ein App-Token ausgegeben wird.
 - **Bindung.** Agenten-Tokens sind DPoP-gebunden, wenn `agent` in `auth.dpop_required_for` steht
   (Standard). Der Adapter erzeugt dafür bei der Einrichtung ein Schlüsselpaar.
 - **Ablauf.** Pflicht, höchstens `auth.api_token_max_ttl`, persönliche Tokens höchstens

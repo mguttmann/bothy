@@ -199,9 +199,14 @@ Zitat konsistent bleiben (03, Grundsatz 7).
   (03, `audit_events.details`). Mit der Pseudonymisierung des Prinzipals werden die IDs im Audit-Log
   pseudonym, ohne dass eine Zeile geändert wird. Die Hash-Kette bleibt dadurch gültig (ADR 0021).
 - IP-Adressen stehen im Audit-Log nur als HMAC mit einem Schlüssel je Zeitraum
-  (`privacy.audit_ip_key_period`). Schlüssel werden nach `privacy.audit_ip_key_retention` vernichtet.
-  Danach sind die Werte nicht mehr auf eine IP zurückzuführen, die Kette bleibt unverändert.
-  Innerhalb der Frist kann der Owner für eine Untersuchung prüfen, ob eine bekannte IP passt.
+  (`privacy.audit_ip_key_period`). Die Schlüssel liegen verschlüsselt in `audit_ip_keys` (03); der
+  Schlüssel dafür kommt aus dem Secret-Provider (`privacy.audit_ip_kek_ref`). Schlüssel werden nach
+  `privacy.audit_ip_key_retention` vernichtet (Spalte geleert, Zeile bleibt als Beleg). Danach sind
+  die Werte nicht mehr auf eine IP zurückzuführen, die Kette bleibt unverändert. Innerhalb der Frist
+  kann der Owner für eine Untersuchung prüfen, ob eine bekannte IP passt. Grund für Schlüssel in der
+  Datenbank: Sie müssen einzeln vernichtbar sein, und der Datei-Treiber des Secret-Providers legt
+  keine Schlüssel je Zeitraum an. Sicherungen enthalten einen vernichteten Schlüssel höchstens bis
+  zum Ende ihrer eigenen Frist (16, Abschnitt 8.1).
 - `auth_sessions.last_ip` ist Klartext für die Sicherheitsansicht und fällt mit der Sitzung nach
   `retention.security_after_end`.
 - Am Ende von `retention.audit` wird gekürzt; ein Anker-Eintrag hält die Prüfbarkeit (03).
@@ -301,7 +306,7 @@ Andere Daten berichtigt der Owner; ein Auftrag `rectification` dokumentiert das.
 | Regel | Umsetzung |
 |---|---|
 | Keine Inhalte | keine Nachrichtentexte, Dateinamen, Prompts, Transkripte, Suchbegriffe, Titel (Baseline B11; 19, SEC-LOG-6) |
-| Pseudonyme IDs | Prinzipal- und Geräte-IDs nur als HMAC mit Schlüssel je Zeitraum (`privacy.telemetry_pseudonym_rotation`); über Zeiträume nicht verknüpfbar |
+| Pseudonyme IDs | Menschen nur als HMAC mit einem Schlüssel je Zeitraum `privacy.telemetry_pseudonym_rotation`; der Zeitraum-Schlüssel wird per HMAC aus dem einen Geheimnis `telemetry.pseudonym_key_ref` abgeleitet ([privacy.md](../observability/privacy.md) Abschnitt 3); ohne dieses Geheimnis über Zeiträume nicht verknüpfbar. Geräte-IDs stehen in Telemetrie gar nicht |
 | Keine Netzdaten | keine IP-Adressen, keine Gerätenamen, keine Push-Tokens |
 | Erlaubnisliste | nur benannte Attribute je Signal ([17-observability.md](17-observability.md)) |
 | LLM-Attribute | `gen_ai.*` ohne Prompt- und Antworttexte |
@@ -404,6 +409,7 @@ Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026
 | `privacy.deletion_journal_retention` | `400d` | Aufbewahrung des Lösch-Journals; mindestens Sicherungsfrist |
 | `privacy.audit_ip_key_period` | `30d` | Zeitraum je Schlüssel für IP-Pseudonyme |
 | `privacy.audit_ip_key_retention` | `90d` | danach werden Schlüssel vernichtet |
+| `privacy.audit_ip_kek_ref` | `file:<secrets.dir>/audit_ip_kek` | Verweis auf den Schlüssel, mit dem die IP-Schlüssel in `audit_ip_keys` verschlüsselt sind |
 | `privacy.telemetry_pseudonym_rotation` | `30d` | Wechsel des Schlüssels für pseudonyme IDs in Telemetrie |
 | `privacy.per_person_stats_enabled` | `false` | Statistik je Person |
 | `privacy.stats_min_group_size` | `5` | kleinste Gruppe für Auswertungen nach Personen |

@@ -62,6 +62,8 @@ rules:
       required:
         - x-authz-action
     message: Every operation needs x-authz-action from docs/spec/05-aktionen.md.
+  # System actions (05 rule 10: grant.expire, group.member.expire, instance.bootstrap,
+  # signing_key.transition) are never on a route or op, so neither list contains them.
   rule/authz-action-known:
     subject:
       type: Operation
@@ -152,13 +154,11 @@ rules:
         - gdpr.request.decide
         - gdpr.request.read
         - grant.create
-        - grant.expire
         - grant.read
         - grant.revoke
         - group.create
         - group.delete
         - group.member.add
-        - group.member.expire
         - group.member.remove
         - group.read
         - group.update
@@ -170,7 +170,6 @@ rules:
         - import.apply
         - import.manage
         - import.read
-        - instance.bootstrap
         - instance.branding.update
         - instance.discovery.read
         - instance.read
@@ -393,13 +392,11 @@ rules:
         - gdpr.request.decide
         - gdpr.request.read
         - grant.create
-        - grant.expire
         - grant.read
         - grant.revoke
         - group.create
         - group.delete
         - group.member.add
-        - group.member.expire
         - group.member.remove
         - group.read
         - group.update
@@ -411,7 +408,6 @@ rules:
         - import.apply
         - import.manage
         - import.read
-        - instance.bootstrap
         - instance.branding.update
         - instance.discovery.read
         - instance.read

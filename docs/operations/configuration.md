@@ -18,8 +18,11 @@ Abschnitt 4 aus dem Schema, und der Check vergleicht es mit den Kapiteltabellen.
 | OpenTelemetry | Abschnitt 8, Variablen `OTEL_*` | Umgebung | beim Start |
 | Compose | Abschnitt 9, Datei `infra/compose/.env` | Datei | bei `docker compose up` |
 
-Vorrang der Prozess-Konfiguration: Umgebung vor Datei vor Standard. Ein Schlüssel steht in genau
-einer Quelle.
+Vorrang der Prozess-Konfiguration: Kommandozeile (nur `--role`, `--config`) vor Umgebung vor Datei
+vor Standard. Ein Schlüssel steht in genau einer Quelle. Abschnitt 4 führt auch Schlüssel, deren
+Nutzer erst in einer späteren Etappe entsteht; das Konfigurationsschema des Servers kennt einen
+Schlüssel ab dem Ticket, das seinen ersten Nutzer baut ([02-architektur.md](../spec/02-architektur.md)
+13, Punkt 5).
 
 ## 2. Namensregel und Formate
 
@@ -33,14 +36,17 @@ einer Quelle.
 | `secret_ref` | `<schema>:<pfad>`, Schemata in [16-betrieb.md](../spec/16-betrieb.md) 5.2 | `file:/run/bothy/secrets/db_app_password` |
 | `listen address` | `host:port`; `:port` heißt alle Schnittstellen | `127.0.0.1:8080` |
 | `semver` | SemVer ohne `v` | `1.4.0` |
+| Egress-Ziel (`egress.allowed_hosts`) | `host[:port][;allow_private]`; Host als DNS-Name (klein, ohne Punkt am Ende) oder IP-Literal (IPv6 in Klammern, wenn ein Port folgt); kein Platzhalter, kein Schema, kein Pfad; Port 1 bis 65535; einziger Schalter `allow_private` | `api.example.com:443`, `[2001:db8::10]:8443;allow_private` |
 
 Schlüssel enthalten nie zwei Unterstriche hintereinander; darum ist die Namensregel umkehrbar.
 
 ## 3. Prüfung
 
 1. Unbekannte `BOTHY_*`-Variablen und unbekannte Schlüssel in der Datei brechen den Start ab.
-2. Typ- und Bereichsfehler brechen den Start ab; die Meldung nennt Schlüssel und Quelle, nie den
-   Wert eines Geheimnisses.
+   Ausgenommen sind `BOTHY_CONFIG_FILE` und Variablen, die ein wirksamer Verweis `env:` nennt
+   ([16-betrieb.md](../spec/16-betrieb.md) 5.1).
+2. Typ- und Bereichsfehler brechen den Start ab; die Meldung nennt Schlüssel und Quelle, nie einen
+   Wert (ein Geheimnis kann im falschen Schlüssel stehen).
 3. `bothy config check` prüft ohne Start. `bothy config print --redacted` zeigt die wirksamen
    Werte und ihre Quelle, Geheimnisse nur als Verweis.
 
@@ -83,7 +89,9 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `http.transfer_timeout` | `BOTHY_HTTP__TRANSFER_TIMEOUT` | Server | `10m` | Frist für Upload und Download |
 | `http.idle_timeout` | `BOTHY_HTTP__IDLE_TIMEOUT` | Server | `120s` | Leerlauf von Keep-Alive-Verbindungen |
 | `http.max_header_bytes` | `BOTHY_HTTP__MAX_HEADER_BYTES` | Server | `65536` | größte Kopfzeilen |
-| `http.max_json_body_bytes` | `BOTHY_HTTP__MAX_JSON_BODY_BYTES` | Server | `1048576` | größter JSON-Körper; größer als `message.max_content_bytes` plus Umschlag |
+| `http.max_json_body_bytes` | `BOTHY_HTTP__MAX_JSON_BODY_BYTES` | Server | `1048576` | größter JSON-Körper; echt größer als `message.max_content_bytes` (13, Punkt 4) |
+| `http.max_json_depth` | `BOTHY_HTTP__MAX_JSON_DEPTH` | Server | `32` | größte Schachtelungstiefe eines JSON-Körpers (SEC-IN-2); ein Test hält, dass jedes Anfrage-Beispiel in `openapi.yaml` darunter bleibt |
+| `http.unavailable_retry_after` | `BOTHY_HTTP__UNAVAILABLE_RETRY_AFTER` | Server | `5s` | `Retry-After` jeder Antwort `503 unavailable` (in ganzen Sekunden) |
 | `database.acquire_timeout` | `BOTHY_DATABASE__ACQUIRE_TIMEOUT` | Server | `2s` | Warten auf eine Pool-Verbindung |
 | `database.statement_timeout` | `BOTHY_DATABASE__STATEMENT_TIMEOUT` | Server | `5s` | Frist je SQL-Anweisung |
 | `database.lock_timeout` | `BOTHY_DATABASE__LOCK_TIMEOUT` | Server | `2s` | Frist für Sperren |
@@ -93,9 +101,15 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `startup.dependency_wait` | `BOTHY_STARTUP__DEPENDENCY_WAIT` | Server | `60s` | Warten auf die Datenbank beim Start |
 | `sync.log_poll_interval` | `BOTHY_SYNC__LOG_POLL_INTERVAL` | Server | `1s` | Poll des Log-Tails ohne `NOTIFY` |
 | `sync.tail_batch_size` | `BOTHY_SYNC__TAIL_BATCH_SIZE` | Server | `1000` | Ereignisse je Lesevorgang des Log-Tails |
+| `sync.partition_maintenance_interval` | `BOTHY_SYNC__PARTITION_MAINTENANCE_INTERVAL` | Server | `10m` | Abstand des Jobs `sync.partition_maintenance` |
+| `sync.event_log_partitions_ahead` | `BOTHY_SYNC__EVENT_LOG_PARTITIONS_AHEAD` | Server | `3` | Partitionen von `event_log`, die vor dem Kopf bereitstehen; mit `sync.event_log_partition_size` reichen sie bei `perf.event_commit_min_per_s` länger als zwei Abstände `sync.partition_maintenance_interval` |
 | `gateway.write_timeout` | `BOTHY_GATEWAY__WRITE_TIMEOUT` | Server | `10s` | Frist für einen WebSocket-Schreibvorgang |
 | `consumer.batch_size` | `BOTHY_CONSUMER__BATCH_SIZE` | Server | `500` | Ereignisse je Runde eines Worker-Verbrauchers |
 | `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` |
+| `sync.idempotency_cleanup_interval` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_INTERVAL` | Server | `1h` | Abstand des Jobs `sync.idempotency_cleanup` |
+| `sync.idempotency_cleanup_batch_size` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE` | Server | `1000` | Zeilen je Löschstapel von `sync.idempotency_cleanup` |
+| `ratelimit.max_tracked_keys` | `BOTHY_RATELIMIT__MAX_TRACKED_KEYS` | Server | `100000` | höchstens so viele Rate-Limit-Eimer hält ein Prozess; darüber werden volle, dann älteste Eimer entfernt |
+| `ratelimit.sweep_interval` | `BOTHY_RATELIMIT__SWEEP_INTERVAL` | Server | `1m` | Abstand, in dem volle Eimer entfernt werden (ein voller Eimer entscheidet wie ein fehlender) |
 | `jobs.schema` | `BOTHY_JOBS__SCHEMA` | Server | `jobs` | PostgreSQL-Schema der River-Tabellen |
 | `jobs.queue.default.max_workers` | `BOTHY_JOBS__QUEUE__DEFAULT__MAX_WORKERS` | Server | `8` | Parallelität `default` |
 | `jobs.queue.files.max_workers` | `BOTHY_JOBS__QUEUE__FILES__MAX_WORKERS` | Server | `2` | Parallelität `files` |
@@ -106,22 +120,22 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `shutdown.http_grace` | `BOTHY_SHUTDOWN__HTTP_GRACE` | Server | `20s` | Frist für laufende HTTP-Anfragen |
 | `shutdown.jobs_soft_timeout` | `BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT` | Server | `20s` | weicher Stopp von River |
 | `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server | `5s` | Telemetrie leeren |
-| `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server | `45s` | gesamte Frist bis zum Ende |
-| `perf.reference_profile` | `BOTHY_PERF__REFERENCE_PROFILE` | Server | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 lokal, Rolle all` | Umgebung der Lasttests |
-| `perf.sustained_messages_per_s` | `BOTHY_PERF__SUSTAINED_MESSAGES_PER_S` | Server | `200` | Dauerlast für `perf.message_create_p99` |
-| `perf.message_create_p99` | `BOTHY_PERF__MESSAGE_CREATE_P99` | Server | `150ms` | Ziel |
-| `perf.event_commit_min_per_s` | `BOTHY_PERF__EVENT_COMMIT_MIN_PER_S` | Server | `1000` | Ziel (Mindestwert) |
-| `perf.fanout_local_p99` | `BOTHY_PERF__FANOUT_LOCAL_P99` | Server | `200ms` | Ziel |
-| `perf.fanout_cross_node_p99` | `BOTHY_PERF__FANOUT_CROSS_NODE_P99` | Server | `500ms` | Ziel |
-| `perf.invocation_delivery_p99` | `BOTHY_PERF__INVOCATION_DELIVERY_P99` | Server | `500ms` | Ziel |
-| `perf.run_patch_fanout_p99` | `BOTHY_PERF__RUN_PATCH_FANOUT_P99` | Server | `500ms` | Ziel |
-| `perf.catchup_page_p99` | `BOTHY_PERF__CATCHUP_PAGE_P99` | Server | `250ms` | Ziel |
-| `perf.authorize_cached_p99` | `BOTHY_PERF__AUTHORIZE_CACHED_P99` | Server | `100us` | Ziel |
-| `perf.ws_connections_per_node` | `BOTHY_PERF__WS_CONNECTIONS_PER_NODE` | Server | `5000` | Ziel (Mindestwert) |
-| `perf.ws_idle_conn_mem_max` | `BOTHY_PERF__WS_IDLE_CONN_MEM_MAX` | Server | `64KiB` | Ziel (Höchstwert) |
-| `perf.idle_rss_max` | `BOTHY_PERF__IDLE_RSS_MAX` | Server | `256MiB` | Ziel (Höchstwert) |
-| `perf.startup_ready_max` | `BOTHY_PERF__STARTUP_READY_MAX` | Server | `5s` | Ziel (Höchstwert) |
-| `perf.push_handoff_p95` | `BOTHY_PERF__PUSH_HANDOFF_P95` | Server | `2s` | Ziel |
+| `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server | `60s` | gesamte Frist bis zum Ende; mindestens die Summe der Schritt-Budgets (15.3) |
+| `perf.reference_profile` |  | Lasttest | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 lokal, Rolle all` | Umgebung der Lasttests |
+| `perf.sustained_messages_per_s` |  | Lasttest | `200` | Dauerlast für `perf.message_create_p99` |
+| `perf.message_create_p99` |  | Lasttest | `150ms` | Ziel |
+| `perf.event_commit_min_per_s` |  | Lasttest | `1000` | Ziel (Mindestwert) |
+| `perf.fanout_local_p99` |  | Lasttest | `200ms` | Ziel |
+| `perf.fanout_cross_node_p99` |  | Lasttest | `500ms` | Ziel |
+| `perf.invocation_delivery_p99` |  | Lasttest | `500ms` | Ziel |
+| `perf.run_patch_fanout_p99` |  | Lasttest | `500ms` | Ziel |
+| `perf.catchup_page_p99` |  | Lasttest | `250ms` | Ziel |
+| `perf.authorize_cached_p99` |  | Lasttest | `100us` | Ziel |
+| `perf.ws_connections_per_node` |  | Lasttest | `5000` | Ziel (Mindestwert) |
+| `perf.ws_idle_conn_mem_max` |  | Lasttest | `64KiB` | Ziel (Höchstwert) |
+| `perf.idle_rss_max` |  | Lasttest | `256MiB` | Ziel (Höchstwert) |
+| `perf.startup_ready_max` |  | Lasttest | `5s` | Ziel (Höchstwert) |
+| `perf.push_handoff_p95` |  | Lasttest | `2s` | Ziel |
 
 ### 03 Datenmodell (PostgreSQL)
 
@@ -130,6 +144,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | Schlüssel | Umgebung | Ort | Standard | Bedeutung |
 |---|---|---|---|---|
 | `principal.handle_max_chars` | `BOTHY_PRINCIPAL__HANDLE_MAX_CHARS` | Server | `32` | Länge eines Handles |
+| `principal.display_name_max_chars` | `BOTHY_PRINCIPAL__DISPLAY_NAME_MAX_CHARS` | Server | `64` | Länge eines Anzeigenamens in Unicode-Zeichen |
 | `identity.last_active_granularity` | `BOTHY_IDENTITY__LAST_ACTIVE_GRANULARITY` | Server | `5m` | höchstens so oft wird `last_active_at` bzw. `last_used_at` geschrieben |
 | `auth.session_max_age` | `BOTHY_AUTH__SESSION_MAX_AGE` | Server | `30d` | absolutes Ende einer Anmeldesitzung |
 | `auth.refresh_token_ttl` | `BOTHY_AUTH__REFRESH_TOKEN_TTL` | Server | `14d` | Lebensdauer eines Refresh-Tokens |
@@ -198,6 +213,7 @@ Quelle: [05-aktionen.md](../spec/05-aktionen.md), Abschnitt 10.
 | Schlüssel | Umgebung | Ort | Standard | Bedeutung |
 |---|---|---|---|---|
 | `audit.deny_aggregate_window` | `BOTHY_AUDIT__DENY_AGGREGATE_WINDOW` | Server | `60s` | Zusammenfassungsfenster für gleiche Ablehnungen |
+| `audit.deny_aggregate_max_keys` | `BOTHY_AUDIT__DENY_AGGREGATE_MAX_KEYS` | Server | `10000` | höchstens so viele offene Zusammenfassungen je Prozess; begrenzt den Speicher bei Fluten ohne Anmeldung |
 | `status.public_enabled` | `BOTHY_STATUS__PUBLIC_ENABLED` | Server | `false` | Statusseite ohne Anmeldung |
 | `ratelimit.rl.public_auth.per_minute` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__PER_MINUTE` | Server | `30` | je Client-IP |
 | `ratelimit.rl.public_auth.burst` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__BURST` | Server | `10` | je Client-IP |
@@ -252,6 +268,7 @@ Quelle: [07-rechte.md](../spec/07-rechte.md), Abschnitt 14.
 |---|---|---|---|---|
 | `authz.expiry_sweep_interval` | `BOTHY_AUTHZ__EXPIRY_SWEEP_INTERVAL` | Server | `1m` | Abstand des Jobs, der Abläufe meldet und Erinnerungen schreibt |
 | `authz.expiry_reminder_lead` | `BOTHY_AUTHZ__EXPIRY_REMINDER_LEAD` | Server | `48h` | so lange vor Ablauf kommt die Erinnerung (Studie C: zwei Tage) |
+| `authz.expiry_sweep_batch_max` | `BOTHY_AUTHZ__EXPIRY_SWEEP_BATCH_MAX` | Server | `500` | Zeilen je Transaktion der Jobs `authz.expiry_sweep` und `authz.expiry_reminder` |
 | `authz.view_as_max_duration` | `BOTHY_AUTHZ__VIEW_AS_MAX_DURATION` | Server | `15m` | Höchstdauer von "Als Person ansehen" |
 | `authz.snapshot_cache_max_entries` | `BOTHY_AUTHZ__SNAPSHOT_CACHE_MAX_ENTRIES` | Server | `10000` | Rechte-Stände im Speicher je Prozess (LRU) |
 | `authz.not_found_timing_tolerance` | `BOTHY_AUTHZ__NOT_FOUND_TIMING_TOLERANCE` | Server | `20ms` | erlaubte Abweichung des Medians in AZ-P4 |
@@ -320,7 +337,7 @@ Quelle: [09-agenten.md](../spec/09-agenten.md), Abschnitt 21.
 | `component.custom_id_max_chars` | `BOTHY_COMPONENT__CUSTOM_ID_MAX_CHARS` | Server | `100` | Länge von `custom_id` |
 | `component.form_max_fields` | `BOTHY_COMPONENT__FORM_MAX_FIELDS` | Server | `10` | Felder je Formular |
 | `thread.placeholder_titles` | `BOTHY_THREAD__PLACEHOLDER_TITLES` | Server | `["", "Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung |
-| `adapter.invocation_token_leeway` |  | Adapter | `10s` | Uhren-Toleranz bei `exp` und `iat` |
+| `adapter.invocation_token_leeway` |  | Adapter | `10s` | Uhren-Toleranz bei `exp` und `iat`; höchstens `auth.clock_leeway` des Servers (4.5) |
 | `adapter.jwks_refresh_min_interval` |  | Adapter | `60s` | höchstens so oft JWKS neu laden |
 | `hermes_adapter.platform_key` |  | Hermes-Adapter | `bothy` | Plattformname in Hermes; nach Inbetriebnahme nie ändern |
 | `hermes_adapter.consumer` |  | Hermes-Adapter | `default` | Verbrauchername am Gateway |
@@ -380,8 +397,8 @@ Quelle: [12-dateien.md](../spec/12-dateien.md), Abschnitt 18.
 | `file.s3.prefix` | `BOTHY_FILE__S3__PREFIX` | Server | leer | Präfix vor allen Schlüsseln |
 | `file.s3.use_path_style` | `BOTHY_FILE__S3__USE_PATH_STYLE` | Server | `true` | Pfad-Stil statt virtueller Hosts |
 | `file.s3.checksum_mode` | `BOTHY_FILE__S3__CHECKSUM_MODE` | Server | `when_required` | SDK-Prüfsummen für Anfrage und Antwort |
-| `file.s3.access_key_ref` | `BOTHY_FILE__S3__ACCESS_KEY_REF` | Server | leer | Verweise auf den Secret-Provider |
-| `file.s3.secret_key_ref` | `BOTHY_FILE__S3__SECRET_KEY_REF` | Server | leer | Verweise auf den Secret-Provider |
+| `file.s3.access_key_ref` | `BOTHY_FILE__S3__ACCESS_KEY_REF` | Server | `file:<secrets.dir>/s3_access_key` | Verweise auf den Secret-Provider; nur mit `file.storage.driver = s3` gelesen |
+| `file.s3.secret_key_ref` | `BOTHY_FILE__S3__SECRET_KEY_REF` | Server | `file:<secrets.dir>/s3_secret_key` | Verweise auf den Secret-Provider; nur mit `file.storage.driver = s3` gelesen |
 | `file.s3.presigned_upload` | `BOTHY_FILE__S3__PRESIGNED_UPLOAD` | Server | `false` | Modus `presigned` erlauben |
 | `file.s3.presign_ttl` | `BOTHY_FILE__S3__PRESIGN_TTL` | Server | `15m` | Gültigkeit einer presigned URL |
 | `file.upload_part_bytes` | `BOTHY_FILE__UPLOAD_PART_BYTES` | Server | `8388608` | Teilgröße |
@@ -412,7 +429,7 @@ Quelle: [12-dateien.md](../spec/12-dateien.md), Abschnitt 18.
 | `file.thumbnail.large_px` | `BOTHY_FILE__THUMBNAIL__LARGE_PX` | Server | `2048` | längste Kante `large` |
 | `file.thumbnail.jpeg_quality` | `BOTHY_FILE__THUMBNAIL__JPEG_QUALITY` | Server | `82` | Qualität der Vorschaubilder |
 | `file.ticket_ttl` | `BOTHY_FILE__TICKET_TTL` | Server | `5m` | Gültigkeit eines Abruf-Tickets |
-| `file.ticket_key_ref` | `BOTHY_FILE__TICKET_KEY_REF` | Server | leer | Verweis auf den Ticket-Schlüssel im Secret-Provider |
+| `file.ticket_key_ref` | `BOTHY_FILE__TICKET_KEY_REF` | Server | `file:<secrets.dir>/file_ticket_key` | Verweis auf den Ticket-Schlüssel im Secret-Provider |
 | `file.unattached_ttl` | `BOTHY_FILE__UNATTACHED_TTL` | Server | `24h` | Frist für nie angehängte Dateien |
 | `file.failed_row_ttl` | `BOTHY_FILE__FAILED_ROW_TTL` | Server | `7d` | Frist für Zeilen fehlgeschlagener oder blockierter Dateien |
 | `file.gc_interval` | `BOTHY_FILE__GC_INTERVAL` | Server | `10m` | Abstand des Aufräum-Jobs |
@@ -518,16 +535,26 @@ Quelle: [16-betrieb.md](../spec/16-betrieb.md), Abschnitt 14.
 | `server.maintenance_mode` | `BOTHY_SERVER__MAINTENANCE_MODE` | Server | `off` | `off` oder `read_only` (Umzug, Upgrade) |
 | `secrets.dir` | `BOTHY_SECRETS__DIR` | Server | `/run/bothy/secrets` | Basis der Standardverweise `file:` |
 | `secrets.cache_ttl` | `BOTHY_SECRETS__CACHE_TTL` | Server | `5m` | so lange gilt ein gelesenes Geheimnis |
+| `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, ADR 0066) |
+| `server.tls_cert_ref` | `BOTHY_SERVER__TLS_CERT_REF` | Server | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) |
+| `server.tls_key_ref` | `BOTHY_SERVER__TLS_KEY_REF` | Server | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` |
 | `database.host` | `BOTHY_DATABASE__HOST` | Server | `localhost` | Host der Datenbank |
 | `database.port` | `BOTHY_DATABASE__PORT` | Server | `5432` | Port der Datenbank im Netz des Servers |
 | `database.name` | `BOTHY_DATABASE__NAME` | Server | `bothy` | Datenbankname |
 | `database.user` | `BOTHY_DATABASE__USER` | Server | `bothy_app` | Rolle des Servers |
 | `database.password_ref` | `BOTHY_DATABASE__PASSWORD_REF` | Server | `file:<secrets.dir>/db_app_password` | Verweis auf das Passwort |
-| `database.sslmode` | `BOTHY_DATABASE__SSLMODE` | Server | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` |
+| `database.sslmode` | `BOTHY_DATABASE__SSLMODE` | Server | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` (SEC-TLS-5) |
+| `database.sslrootcert` | `BOTHY_DATABASE__SSLROOTCERT` | Server | leer | CA-Bündel für `verify-full`; leer nutzt die Wurzeln des Systems |
 | `database.max_conns` | `BOTHY_DATABASE__MAX_CONNS` | Server | `20` | Größe des Verbindungspools je Prozess (Startwert bis zum Lasttest) |
 | `migrate.require_recent_backup` | `BOTHY_MIGRATE__REQUIRE_RECENT_BACKUP` | Server | `true` | `migrate` verlangt eine frische Sicherung |
 | `migrate.recent_backup_max_age` | `BOTHY_MIGRATE__RECENT_BACKUP_MAX_AGE` | Server | `24h` | so alt darf diese Sicherung sein |
 | `migrate.lock_timeout` | `BOTHY_MIGRATE__LOCK_TIMEOUT` | Server | `5s` | `lock_timeout` je Migrationsschritt |
+| `migrate.bootstrap_user` | `BOTHY_MIGRATE__BOOTSTRAP_USER` | Server | `postgres` | Superuser-Anmeldung nur für `migrate up --bootstrap` |
+| `migrate.bootstrap_password_ref` | `BOTHY_MIGRATE__BOOTSTRAP_PASSWORD_REF` | Server | `file:<secrets.dir>/db_superuser_password` | dessen Passwort |
+| `migrate.owner_password_ref` | `BOTHY_MIGRATE__OWNER_PASSWORD_REF` | Server | `file:<secrets.dir>/db_owner_password` | Passwort, das `--bootstrap` für `bothy_owner` setzt |
+| `migrate.app_password_ref` | `BOTHY_MIGRATE__APP_PASSWORD_REF` | Server | `file:<secrets.dir>/db_app_password` | Passwort für `bothy_app` |
+| `migrate.maint_password_ref` | `BOTHY_MIGRATE__MAINT_PASSWORD_REF` | Server | `file:<secrets.dir>/db_maint_password` | Passwort für `bothy_maint` |
+| `migrate.monitor_password_ref` | `BOTHY_MIGRATE__MONITOR_PASSWORD_REF` | Server | `file:<secrets.dir>/db_monitor_password` | Passwort für `bothy_monitor` |
 | `backup.pg.full_schedule` | `BOTHY_BACKUP__PG__FULL_SCHEDULE` | Server | `0 2 * * 0` | Plan der Vollsicherung (cron) |
 | `backup.pg.diff_schedule` | `BOTHY_BACKUP__PG__DIFF_SCHEDULE` | Server | `0 2 * * 1-6` | Plan der Differenzsicherung (cron) |
 | `backup.pg.archive_timeout` | `BOTHY_BACKUP__PG__ARCHIVE_TIMEOUT` | Server | `60s` | spätestens dann wird ein WAL-Segment archiviert |
@@ -561,7 +588,7 @@ Quelle: [17-observability.md](../spec/17-observability.md), Abschnitt 11.
 |---|---|---|---|---|
 | `telemetry.enabled` | `BOTHY_TELEMETRY__ENABLED` | Server | `true` | Telemetrie an oder aus |
 | `telemetry.traces.sampler_ratio` | `BOTHY_TELEMETRY__TRACES__SAMPLER_RATIO` | Server | `1.0` | Anteil der Traces, die das SDK aufzeichnet; der Collector sampelt danach nach |
-| `telemetry.traces.trust_remote_sampling` | `BOTHY_TELEMETRY__TRACES__TRUST_REMOTE_SAMPLING` | Server | `false` | `true`: das Sampling-Flag eines eingehenden `traceparent` gilt |
+| `telemetry.traces.trust_remote_parent` | `BOTHY_TELEMETRY__TRACES__TRUST_REMOTE_PARENT` | Server | `false` | `true`: ein eingehender `traceparent` wird Eltern-Kontext (seine Trace-ID wird `correlation_id`, sein Sampling-Flag gilt); `false`: nur Span-Link, eigener Trace |
 | `telemetry.logs.exporter` | `BOTHY_TELEMETRY__LOGS__EXPORTER` | Server | `both` | `otlp`, `stdout` oder `both` |
 | `telemetry.logs.level` | `BOTHY_TELEMETRY__LOGS__LEVEL` | Server | `info` | kleinste Stufe, die geschrieben wird |
 | `telemetry.pseudonym_key_ref` | `BOTHY_TELEMETRY__PSEUDONYM_KEY_REF` | Server | `file:<secrets.dir>/telemetry_pseudonym_key` | Schlüssel für HMAC-Pseudonyme; mindestens 32 Byte |
@@ -591,11 +618,14 @@ Quelle: [19-sicherheit.md](../spec/19-sicherheit.md), Abschnitt 16.
 | Schlüssel | Umgebung | Ort | Standard | Bedeutung |
 |---|---|---|---|---|
 | `http.hsts_max_age` | `BOTHY_HTTP__HSTS_MAX_AGE` | Server | `31536000s` | `max-age` für HSTS |
-| `egress.allowed_hosts` | `BOTHY_EGRESS__ALLOWED_HOSTS` | Server | leer | zusätzliche erlaubte Ziele mit optional `allow_private` |
+| `egress.allowed_hosts` | `BOTHY_EGRESS__ALLOWED_HOSTS` | Server | leer | zusätzliche erlaubte Ziele, Form `host[:port][;allow_private]` ([configuration.md](../operations/configuration.md), Abschnitt 2); doppelte Einträge sind ein Ladefehler |
 | `egress.timeout` | `BOTHY_EGRESS__TIMEOUT` | Server | `15s` | Zeitgrenze einer ausgehenden Anfrage |
 | `egress.max_response_bytes` | `BOTHY_EGRESS__MAX_RESPONSE_BYTES` | Server | `1048576` | größte Antwort einer ausgehenden Anfrage |
 | `audit.checkpoint_interval` | `BOTHY_AUDIT__CHECKPOINT_INTERVAL` | Server | `1h` | Abstand der signierten Prüfpunkte des Audit-Logs |
 | `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server | leer | Ablageziel der Prüfpunkte außerhalb der Datenbank (z. B. Objektspeicher-Präfix mit Aufbewahrungssperre); leer erzeugt eine Warnung |
+| `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server | `30s` | längste Zeit, die ein Prozess einen zurückgezogenen Schlüssel noch annimmt oder einen neuen nicht kennt |
+| `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server | `1m` | Abstand des Jobs `instance.key_rotation` |
+| `signing_key.access_token_rotation_interval` | `BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL` | Server | `30d` | planmäßiger Wechsel des Schlüssels für Zugriffstokens |
 
 ### 20 Datenschutz
 
@@ -618,6 +648,7 @@ Quelle: [20-datenschutz.md](../spec/20-datenschutz.md), Abschnitt 13.
 | `privacy.deletion_journal_retention` | `BOTHY_PRIVACY__DELETION_JOURNAL_RETENTION` | Server | `400d` | Aufbewahrung des Lösch-Journals; mindestens Sicherungsfrist |
 | `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server | `30d` | Zeitraum je Schlüssel für IP-Pseudonyme |
 | `privacy.audit_ip_key_retention` | `BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION` | Server | `90d` | danach werden Schlüssel vernichtet |
+| `privacy.audit_ip_kek_ref` | `BOTHY_PRIVACY__AUDIT_IP_KEK_REF` | Server | `file:<secrets.dir>/audit_ip_kek` | Verweis auf den Schlüssel, mit dem die IP-Schlüssel in `audit_ip_keys` verschlüsselt sind |
 | `privacy.telemetry_pseudonym_rotation` | `BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION` | Server | `30d` | Wechsel des Schlüssels für pseudonyme IDs in Telemetrie |
 | `privacy.per_person_stats_enabled` | `BOTHY_PRIVACY__PER_PERSON_STATS_ENABLED` | Server | `false` | Statistik je Person |
 | `privacy.stats_min_group_size` | `BOTHY_PRIVACY__STATS_MIN_GROUP_SIZE` | Server | `5` | kleinste Gruppe für Auswertungen nach Personen |
@@ -674,7 +705,8 @@ kopiert.
 | `db_monitor_password` | erzeugt | collector, migrate | Rolle `bothy_monitor`, Empfänger `postgresql` |
 | `token_pepper` | erzeugt | server | `auth.token_pepper_ref` |
 | `telemetry_pseudonym_key` | erzeugt, mindestens 32 Byte | server, collector | `telemetry.pseudonym_key_ref`, `hmac_key` der Allowlist |
-| `signing/<zweck>-<kid>.pem` | erzeugt | server | `server_signing_keys.private_key_ref` (Zwecke `access_token`, `invocation`, `webhook_out`, `audit_checkpoint`) |
+| `audit_ip_kek` | erzeugt, 32 Byte | server | `privacy.audit_ip_kek_ref`: verschlüsselt die IP-Schlüssel in `audit_ip_keys` |
+| `file_ticket_key` | erzeugt, 32 Byte | server | `file.ticket_key_ref`: HMAC der Abruf-Tickets ([12-dateien.md](../spec/12-dateien.md) 9.2) |
 | `pgbackrest_cipher_pass` | erzeugt | backup | Verschlüsselung der pgBackRest-Repositorys |
 | `pgbackrest_tls/` | erzeugt (eigene CA) | postgres, backup | gegenseitiges TLS zwischen Datenbank und Repository-Host |
 | `restic_password` | erzeugt | backup | Verschlüsselung des restic-Repositorys |
@@ -692,6 +724,15 @@ kopiert.
 | `datadog_api_key` | geliefert | collector | Overlay `datadog` |
 | `azure_client_secret` | geliefert | collector | Overlay `azure-monitor` (Service Principal) |
 | `sentry_key` | geliefert | collector | Overlay `sentry` |
+
+Nicht im Volume `secrets`: Die privaten Signierschlüssel (`<zweck>-<kid>.pem`, Zwecke
+`access_token`, `invocation`, `webhook_out`, `audit_checkpoint`) erzeugt der Server selbst im
+Volume `signing-keys` (`secrets.signing_key_dir`, ADR 0066); `server_signing_keys.private_key_ref`
+zeigt dorthin. `bothy secrets export` sichert beide Orte.
+
+Erzeuger späterer Etappen: `pgbackrest_tls/` (M7-01) und die erzeugte Form von `s3_access_key` und
+`s3_secret_key` (Profil s3, M3). Bis dahin meldet `bothy secrets init` diese Einträge als `pending`;
+`s3_*` gelten so lange als geliefert.
 
 ## 6. Instanz-Einstellungen
 
@@ -748,6 +789,7 @@ Diese Variablen sind keine Server-Konfiguration; Compose setzt daraus Werte der 
 | `BOTHY_ENVIRONMENT` | `prod` | setzt `instance.environment` und `deployment.environment.name` |
 | `BOTHY_PUBLIC_URL` | `https://chat.example.com` | setzt `server.public_url` |
 | `BOTHY_HTTP_PUBLISH_PORT` | `8090` | Host-Port auf 127.0.0.1 für die API (Profil direct) |
+| `BOTHY_TRUSTED_PROXIES` | `127.0.0.1/32,::1/128` | setzt `server.trusted_proxies` im Profil direct; dort die Gateway-Adresse des Compose-Netzes eintragen ([install-compose.md](install-compose.md) 5.1) |
 | `BOTHY_OTLP_PUBLISH_PORT` | `4318` | Host-Port auf 127.0.0.1 für OTLP/HTTP von Adaptern auf demselben Host |
 | `BOTHY_PROMETHEUS_PUBLISH_PORT` | `9090` | Host-Port auf 127.0.0.1 für Prometheus |
 | `BOTHY_ALERTMANAGER_PUBLISH_PORT` | `9093` | Host-Port auf 127.0.0.1 für Alertmanager |

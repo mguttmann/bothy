@@ -65,7 +65,9 @@ gilt je Art:
 | Design-Tokens | `tools/design-tokens/Makefile` mit dem Ziel `check` |
 | Portabilität | ausführbares `infra/compose/smoke.sh` |
 
-Fehlt ein Teil, obwohl die Komponente Code hat, schlägt das Gate fehl.
+Fehlt ein Teil, obwohl die Komponente Code hat, schlägt das Gate fehl. Der Teil "Release" gilt
+ab der Release-Kette der Komponente, die das Ziel `release-build` und seinen Check mitbringt
+(Server: [PLAN.md](../PLAN.md), Ticket M7-10); vorher gibt es kein Artefakt, das er bauen müsste.
 
 ## 4. CI
 

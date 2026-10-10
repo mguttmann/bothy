@@ -754,7 +754,7 @@ Werte aus anderen Kapiteln (nur Verweis): `file.max_upload_bytes`, `message.max_
 | `file.s3.prefix` | leer | Präfix vor allen Schlüsseln |
 | `file.s3.use_path_style` | `true` | Pfad-Stil statt virtueller Hosts |
 | `file.s3.checksum_mode` | `when_required` | SDK-Prüfsummen für Anfrage und Antwort |
-| `file.s3.access_key_ref`, `file.s3.secret_key_ref` | leer | Verweise auf den Secret-Provider |
+| `file.s3.access_key_ref`, `file.s3.secret_key_ref` | `file:<secrets.dir>/s3_access_key` / `file:<secrets.dir>/s3_secret_key` | Verweise auf den Secret-Provider; nur mit `file.storage.driver = s3` gelesen |
 | `file.s3.presigned_upload` | `false` | Modus `presigned` erlauben |
 | `file.s3.presign_ttl` | `15m` | Gültigkeit einer presigned URL |
 | `file.upload_part_bytes` | `8388608` | Teilgröße |
@@ -785,7 +785,7 @@ Werte aus anderen Kapiteln (nur Verweis): `file.max_upload_bytes`, `message.max_
 | `file.thumbnail.large_px` | `2048` | längste Kante `large` |
 | `file.thumbnail.jpeg_quality` | `82` | Qualität der Vorschaubilder |
 | `file.ticket_ttl` | `5m` | Gültigkeit eines Abruf-Tickets |
-| `file.ticket_key_ref` | leer | Verweis auf den Ticket-Schlüssel im Secret-Provider |
+| `file.ticket_key_ref` | `file:<secrets.dir>/file_ticket_key` | Verweis auf den Ticket-Schlüssel im Secret-Provider |
 | `file.unattached_ttl` | `24h` | Frist für nie angehängte Dateien |
 | `file.failed_row_ttl` | `7d` | Frist für Zeilen fehlgeschlagener oder blockierter Dateien |
 | `file.gc_interval` | `10m` | Abstand des Aufräum-Jobs |

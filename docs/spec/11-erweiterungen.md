@@ -233,8 +233,10 @@ Empfänger als Idempotenz-Schlüssel und bleibt bei Wiederholungen gleich; nur `
 zwischen 15 und 30 Sekunden. Das Leitungsformat im Detail legt [../api/webhooks.md](../api/webhooks.md)
 fest.
 
-Grund für asymmetrische Signatur: Der Empfänger braucht nur den öffentlichen Schlüssel aus der
-JWKS des Servers; ein Leck beim Empfänger erlaubt keine gefälschten Webhooks.
+Grund für asymmetrische Signatur: Der Empfänger braucht nur den öffentlichen Schlüssel des Zwecks
+`webhook_out`, den der Server unter `GET /api/v1/instance/webhook-keys` (`getWebhookKeys`) ausgibt;
+die JWKS (`getJwks`) enthält nur Schlüssel für Zugriffstokens und Aufruf-Marken. Ein Leck beim
+Empfänger erlaubt keine gefälschten Webhooks.
 
 ## 8. Eingehende Webhooks
 

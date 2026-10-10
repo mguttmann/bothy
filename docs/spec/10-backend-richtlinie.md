@@ -163,14 +163,16 @@ WITH served_channels AS (           -- Port des Moduls chat
   SELECT c.id, c.space_id
     FROM channels c
     JOIN spaces s ON s.id = c.space_id
-   WHERE c.archived_at IS NULL
+   WHERE c.archived_at IS NULL AND s.archived_at IS NULL
      AND ((c.operator_inherit AND s.default_operator_agent_id = $a)
           OR (NOT c.operator_inherit AND c.operator_agent_id = $a))
   UNION
   SELECT c.id, c.space_id
     FROM threads t
     JOIN channels c ON c.id = t.channel_id
+    JOIN spaces s ON s.id = c.space_id
    WHERE t.kind = 'thread' AND t.operator_agent_id = $a
+     AND c.archived_at IS NULL AND s.archived_at IS NULL
 ),
 trigger_grants AS (
   SELECT g.subject_kind, g.subject_principal_id, g.subject_group_id

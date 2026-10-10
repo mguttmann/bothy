@@ -322,9 +322,12 @@ Schlüssel des Zwecks `invocation` in den Zuständen `next`, `active` und `retir
    und wird mindestens `agent.jwks_max_age` lang veröffentlicht, bevor er `active` wird. So kennt
    jeder Adapter ihn vor der ersten Marke.
 2. Der alte Schlüssel geht nach `retiring` und bleibt veröffentlicht, bis
-   `agent.invocation_token_ttl` plus `adapter.invocation_token_leeway` vergangen sind; dann
-   `retired`.
-3. Notfall (Schlüssel kompromittiert): sofort `retired` (`signing_key.rotate`, Owner, Step-up).
+   `agent.invocation_token_ttl` plus `auth.clock_leeway` vergangen sind; dann `retired`. Der
+   Server kennt die Toleranz des Adapters nicht; darum darf `adapter.invocation_token_leeway`
+   höchstens `auth.clock_leeway` des Servers sein.
+3. Notfall (Schlüssel kompromittiert): `signing_key.rotate` mit `mode = emergency` (Owner,
+   Step-up) setzt alle Schlüssel des Zwecks sofort auf `retired` und legt einen neuen `active` an;
+   ein vom Owner angestoßener planmäßiger Wechsel nutzt `mode = scheduled`.
    Marken mit diesem `kid` scheitern beim Adapter; weil der Server Marken je Zustellung neu
    ausstellt, kommt das Ereignis nach `agent.ack_timeout` mit einer Marke des neuen Schlüssels
    wieder. Ein Notfallwechsel kostet höchstens eine Zustellverzögerung, keinen Lauf.
@@ -1495,7 +1498,7 @@ Konfiguration des jeweiligen Programms außerhalb des Servers.
 | `component.custom_id_max_chars` | Server | `100` | Länge von `custom_id` |
 | `component.form_max_fields` | Server | `10` | Felder je Formular |
 | `thread.placeholder_titles` | Server | `["", "Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung |
-| `adapter.invocation_token_leeway` | Adapter | `10s` | Uhren-Toleranz bei `exp` und `iat` |
+| `adapter.invocation_token_leeway` | Adapter | `10s` | Uhren-Toleranz bei `exp` und `iat`; höchstens `auth.clock_leeway` des Servers (4.5) |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | höchstens so oft JWKS neu laden |
 | `hermes_adapter.platform_key` | Hermes-Adapter | `bothy` | Plattformname in Hermes; nach Inbetriebnahme nie ändern |
 | `hermes_adapter.consumer` | Hermes-Adapter | `default` | Verbrauchername am Gateway |

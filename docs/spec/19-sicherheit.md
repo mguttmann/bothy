@@ -24,11 +24,11 @@ Datenschutz: [20-datenschutz.md](20-datenschutz.md). Dev-Abschottung:
 
 | ID | Kontrolle |
 |---|---|
-| SEC-TLS-1 | Klartext-HTTP nimmt der Server nur auf Loopback oder von Gegenstellen in `server.trusted_proxies` ([16-betrieb.md](16-betrieb.md)) an (Reverse-Proxy im selben Host oder Container-Netz). Jede andere Klartext-Verbindung wird beim Verbindungsaufbau abgewiesen. |
-| SEC-TLS-2 | Wo der Server selbst TLS beendet: mindestens TLS 1.2, TLS 1.3 bevorzugt, Cipher-Suites aus der Go-Standardbibliothek ohne eigene Liste. Grund: Eine eigene Liste veraltet; die Standardauswahl wird mit Go gepflegt [abgeleitet]. |
-| SEC-TLS-3 | HSTS mit `http.hsts_max_age`, sobald die Instanz über HTTPS erreichbar ist (auch hinter einem TLS-Proxy). |
+| SEC-TLS-1 | Klartext-HTTP nimmt der öffentliche Listener (`server.listen_addr`) nur auf Loopback oder von Gegenstellen in `server.trusted_proxies` ([16-betrieb.md](16-betrieb.md)) an (Reverse-Proxy im selben Host oder Container-Netz). Jede andere Klartext-Verbindung wird beim Verbindungsaufbau geschlossen, ohne zu lesen oder zu schreiben. Der interne Listener ist ausgenommen (R-SE-09). |
+| SEC-TLS-2 | Wo der Server selbst TLS beendet (`server.tls_cert_ref` und `server.tls_key_ref`, beide gesetzt oder beide leer; mit TLS muss `server.public_url` `https` sein): mindestens TLS 1.2, TLS 1.3 bevorzugt, Cipher-Suites aus der Go-Standardbibliothek ohne eigene Liste. Grund: Eine eigene Liste veraltet; die Standardauswahl wird mit Go gepflegt [abgeleitet]. Kein Umleitungs-Listener für Klartext. |
+| SEC-TLS-3 | HSTS mit `http.hsts_max_age` auf jeder Antwort, sobald `server.public_url` `https` nutzt (auch hinter einem TLS-Proxy): `Strict-Transport-Security: max-age=<Sekunden>`, ohne `includeSubDomains` (andere Subdomains gehören dem Betreiber) und ohne `preload` (nicht rücknehmbar). Mit `http`-URL (Entwicklung auf Loopback) fehlt die Kopfzeile. |
 | SEC-TLS-4 | Ausgehende TLS-Verbindungen prüfen immer Zertifikat und Hostnamen. `InsecureSkipVerify` ist per Lint verboten. |
-| SEC-TLS-5 | PostgreSQL über Unix-Socket oder mit `sslmode=verify-full`. Virenscanner nur über Unix-Socket (clamd hat keine Anmeldung im Protokoll; ClamAV empfiehlt den lokalen Modus; https://raw.githubusercontent.com/Cisco-Talos/clamav/main/etc/clamd.conf.sample, abgerufen 2026-10-10 [belegt]). OTel Collector über Loopback oder TLS. |
+| SEC-TLS-5 | PostgreSQL über Unix-Socket, mit `sslmode=verify-full` oder im internen Compose-Netz `internal` ohne Ausgang und ohne Host-Port mit `sslmode=disable` ([16-betrieb.md](16-betrieb.md), Abschnitt 4.1, Regel 2). Virenscanner nur über Unix-Socket (clamd hat keine Anmeldung im Protokoll; ClamAV empfiehlt den lokalen Modus; https://raw.githubusercontent.com/Cisco-Talos/clamav/main/etc/clamd.conf.sample, abgerufen 2026-10-10 [belegt]). OTel Collector über Loopback oder TLS. |
 | SEC-TLS-6 | Hostnamen mit öffentlichen Zertifikaten erscheinen in Certificate-Transparency-Logs (https://tailscale.com/kb/1153/enabling-https, abgerufen 2026-10-10 [belegt]). Die Betriebsdoku empfiehlt neutrale Hostnamen. |
 
 ## 3. HTTP-Sicherheitskopfzeilen
@@ -147,11 +147,11 @@ Baseline Abschnitt 4: kein serverseitiges Laden fremder URLs.
 
 | ID | Kontrolle |
 |---|---|
-| SEC-NET-1 | Alle ausgehenden HTTP-Verbindungen laufen über einen Egress-Client im Server. Ein Lint verbietet `http.DefaultClient`, `http.Get`, `http.Post` und eigene Dialer außerhalb dieses Pakets. |
-| SEC-NET-2 | Erlaubte Ziele sind nur: konfigurierte Identitätsanbieter (Aussteller und daraus entdeckte Endpunkte desselben Anbieters), Push-Dienste, `webhook.allowed_hosts` (03), Objektspeicher, OTel Collector, Transkriptions-Dienst. Alles andere: Ablehnung vor dem Verbindungsaufbau. |
-| SEC-NET-3 | Prüfung der IP nach der DNS-Auflösung beim Verbindungsaufbau (nicht vorher), damit DNS-Rebinding nicht greift. Gesperrt: Loopback, private Netze (RFC 1918), Link-Local inklusive der Metadaten-Adresse der Cloud-Anbieter (RFC 3927), Shared Address Space (RFC 6598, auch von Overlay-Netzen benutzt), Unique Local Addresses (RFC 4193), Multicast, unspezifizierte Adressen. Ausnahme nur für Einträge in `egress.allowed_hosts` mit `allow_private: true`. |
+| SEC-NET-1 | Alle ausgehenden HTTP-Verbindungen laufen über einen Egress-Client im Server (`platform/egress`). Ein Lint verbietet `http.DefaultClient`, `http.Get`, `http.Post`, eigene Transporte und Dialer außerhalb dieses Pakets. Für `bothy healthcheck` gibt es dort einen Loopback-Client (nur Loopback, nur `http`, keine Weiterleitung). Ausgenommen ist nur der OTLP-Export an den Collector: Sein Ziel kommt aus der Betreiber-Konfiguration (`OTEL_EXPORTER_OTLP_*`), nie aus Daten, und die Exporter des SDK wählen ihren Dialer selbst. |
+| SEC-NET-2 | Erlaubte Ziele sind nur: konfigurierte Identitätsanbieter (Aussteller und daraus entdeckte Endpunkte desselben Anbieters), Push-Dienste, `webhook.allowed_hosts` (03), Objektspeicher, Transkriptions-Dienst und Einträge in `egress.allowed_hosts`. Alles andere: Ablehnung vor dem Verbindungsaufbau, ohne DNS-Abfrage. Umgebungs-Proxys (`HTTP_PROXY`, `HTTPS_PROXY`) gelten nicht, weil die Prüfung sonst nur den Proxy sähe. `http` nur für Einträge mit `allow_private`. |
+| SEC-NET-3 | Prüfung der IP nach der DNS-Auflösung beim Verbindungsaufbau (nicht vorher), damit DNS-Rebinding nicht greift; verbunden wird die geprüfte Adresse, nie der Name erneut. Immer gesperrt, auch mit `allow_private`: unspezifizierte Adressen (`0.0.0.0/8`, `::`), Link-Local inklusive der Metadaten-Adresse der Cloud-Anbieter (`169.254.0.0/16`, `fe80::/10`; RFC 3927), Multicast (`224.0.0.0/4`, `ff00::/8`), Broadcast und reservierte Adressen (`240.0.0.0/4`), IETF-Protokollzuweisungen (`192.0.0.0/24`), Benchmarking (`198.18.0.0/15`), veraltetes Site-Local (`fec0::/10`), Discard-Only (`100::/64`), IPv4-kompatible Adressen (`::/96`), NAT64 (`64:ff9b::/96`, `64:ff9b:1::/48`), 6to4 (`2002::/16`) und Teredo (`2001::/32`); IPv4-gemappte IPv6-Adressen werden vor der Prüfung entpackt. Gesperrt außer bei einem passenden Eintrag in `egress.allowed_hosts` mit `allow_private`: Loopback, private Netze (RFC 1918), Shared Address Space (RFC 6598, auch von Overlay-Netzen benutzt), Unique Local Addresses (RFC 4193). Dokumentationsbereiche (RFC 5737, RFC 3849) sind nicht gesperrt; sie werden im Internet nicht geroutet. |
 | SEC-NET-4 | Keine automatische Verfolgung von Weiterleitungen bei Webhooks; bei OIDC nur zu erlaubten Zielen. |
-| SEC-NET-5 | Zeit- und Größengrenzen je Antwort (`egress.timeout`, `egress.max_response_bytes`). |
+| SEC-NET-5 | Zeit- und Größengrenzen je Antwort (`egress.timeout`, `egress.max_response_bytes`); eine zu große Antwort ist ein Fehler, nie still gekürzt. Abgewiesene Versuche zählt `bothy.egress.blocked` ([signals.md](../observability/signals.md)) und loggt sie mit Zweck, Grund und Host, nie mit Pfad oder Inhalt. |
 | SEC-NET-6 | Clients laden keine Link-Vorschauen (SEC-OUT-2). Agenten-Werkzeuge mit Netzzugriff liegen in der Laufzeit, außerhalb des Servers; ihre Grenze ist die Werkzeugklasse (07, Abschnitt 2.11). |
 
 ## 9. Logs ohne Geheimnisse und ohne Inhalte
@@ -173,7 +173,7 @@ nur Hashes, verschlüsselte Werte mit externem Schlüssel oder Verweise (`secret
 
 | Geheimnis | Ort | Wechsel |
 |---|---|---|
-| Private Signierschlüssel (Zugriffstoken, Aufruf-Marke, ausgehende Webhooks, Audit-Prüfpunkte) | Secret-Provider; öffentlicher Teil in `server_signing_keys` | `signing_key.rotate`: Zustände `next`, `active`, `retiring`, `retired`; ein Schlüssel bleibt `retiring`, bis die längste damit signierte Gültigkeit abgelaufen ist |
+| Private Signierschlüssel (Zugriffstoken, Aufruf-Marke, ausgehende Webhooks, Audit-Prüfpunkte) | vom Server erzeugt im Schlüsselspeicher `secrets.signing_key_dir` (ADR 0066): Ed25519, `kid` = Fingerabdruck nach RFC 7638, Datei `<zweck>-<kid>.pem`; öffentlicher Teil in `server_signing_keys` | Zustände `next`, `active`, `retiring`, `retired`. Planmäßig nach `signing_key.invocation_rotation_interval` (Aufruf-Marke, 09) bzw. `signing_key.access_token_rotation_interval` (Zugriffstoken), Job `instance.key_rotation` alle `signing_key.rotation_check_interval`, Systemaktion `signing_key.transition`; `webhook_out` und `audit_checkpoint` nur auf Anforderung (`signing_key.rotate` mit `mode = scheduled`). Ein Schlüssel bleibt `retiring`, bis die längste damit signierte Gültigkeit plus `auth.clock_leeway` abgelaufen ist; dann `retired`, und die private Datei wird gelöscht. Notfall: `signing_key.rotate` mit `mode = emergency` setzt alle Schlüssel des Zwecks sofort auf `retired`, weil ein Leck des Speichers auch `next` und `retiring` offenlegt. Prozesse übernehmen Änderungen spätestens nach `signing_key.cache_ttl` |
 | Pepper für Token-Hashes | Secret-Provider | nur nach Kompromittierung; dann werden alle Tokens neu ausgegeben, weil Hashes unbekannter Tokens nicht umgerechnet werden können |
 | Schlüssel für TOTP-Geheimnisse | Secret-Provider, `totp_key_ref` je Zeile | neuer Schlüssel für neue Einträge, alte bleiben lesbar bis zum Umschlüsseln |
 | Datenbank-Zugang | Secret-Provider oder Umgebung | Betrieb |
@@ -237,6 +237,9 @@ Audit-Integrität (ADR 0021):
 | SEC-AUD-1 | Die Anwendungsrolle hat auf `audit_events` nur `INSERT` und `SELECT`; `UPDATE` und `DELETE` sind gesperrt (03). |
 | SEC-AUD-2 | Alle `audit.checkpoint_interval` entsteht ein signierter Prüfpunkt (Sequenz, Hash, Zeit, voriger Prüfpunkt), der an `audit.checkpoint_sink` außerhalb der Datenbank abgelegt wird. Ist kein Ziel gesetzt, zeigt die Konsole eine dauerhafte Warnung. |
 | SEC-AUD-3 | `audit.verify` vergleicht die nachgerechnete Kette mit den Prüfpunkten vom Ziel, nicht aus der Datenbank. |
+| SEC-AUD-4 | Kanonische Form einer Zeile (Eingang von `hash`, 03 `audit_events`): ein JSON-Objekt mit den Spaltennamen außer `hash`; `seq` als Ganzzahl; IDs und `correlation_id` als UUID in Kleinbuchstaben mit Bindestrichen; `occurred_at` als RFC 3339 in UTC mit genau drei Nachkommastellen und `Z` (der Recorder kürzt die Zeit vor dem Speichern auf Millisekunden); `prev_hash` als Hex in Kleinbuchstaben; `details` wie gespeichert; NULL-Spalten fehlen. Serialisiert nach RFC 8785 (JCS). Diese Form ist genau die API-Darstellung `AuditEvent` ohne `hash`; ein Export (`audit.read`) liefert sie unverändert, damit er ohne Server prüfbar ist. |
+| SEC-AUD-5 | Schema `audit_details.v1`: ein flaches Objekt. Reservierte Felder: `ip_hmac` (64 Hex-Zeichen), `ip_key_id` (UUID aus `audit_ip_keys`), `aggregate` (`count` ab 1, `first_at`, `last_at`), `violations` (bei `i1_violation`: Liste von `{code, agent_id, credential_holder_id, principal_ids}`), `reason` (der Grund, den eine Verwaltungsaktion mit Pflichtgrund verlangt, wie ihn die Anfrage nennt; ohne Steuer- und Bidi-Zeichen nach SEC-IN-4, Länge durch das Schema der Anfrage begrenzt). Alle anderen Felder: Schlüssel `^[a-z][a-z0-9_]*$`, Werte nur UUIDs, Codes `^[a-z0-9][a-z0-9_.:-]*$`, Ganzzahlen, Wahrheitswerte, Zeiten in der Form von SEC-AUD-4 oder Listen davon. Kein Freitext, kein `null`, keine Gleitkommazahlen, nie Inhalte, Namen, E-Mail-Adressen, Tokens oder Codes von Einladungen. Ein Wert außerhalb dieser Formen ist ein Programmfehler, den der Recorder ablehnt. Braucht eine Aktion weiteren Freitext, erweitert ihr Ticket das Schema hier und im Code. |
+| SEC-AUD-6 | Gleiche Ablehnungen fasst jeder Prozess je `audit.deny_aggregate_window` zusammen (05, Abschnitt 2.4); höchstens `audit.deny_aggregate_max_keys` offene Zusammenfassungen, darüber wird die älteste sofort geschrieben. Restrisiko: Ein harter Absturz verliert die offenen Zusammenfassungen eines Fensters ([threat-model.md](../security/threat-model.md)). |
 
 ## 13. Penetrationstest-Plan
 
@@ -291,17 +294,24 @@ Audit-Integrität (ADR 0021):
 | R-SE-05 | Clients laden keine fremden Ressourcen aus Inhalten. | Schließt Daten-Abfluss über Bild-URLs und Tracking der Lesenden. |
 | R-SE-06 | Bild-Metadaten werden immer entfernt, ohne Schalter. | Ortsdaten in Fotos sind ein häufiges, unbemerktes Leck; ein Schalter zum Abschalten wäre eine Falle ohne Nutzen für einen Team-Chat. |
 | R-SE-07 | Externer Penetrationstest vor der zweiten produktiven Person und vor der Veröffentlichung. | Studie C: Red Team vor erster echter zweiter Person; öffentliches Produkt braucht unabhängige Prüfung. |
+| R-SE-08 | TLS im Server nur mit beiden Verweisen (`server.tls_cert_ref`, `server.tls_key_ref`), ohne eigene Cipher-Liste und ohne Klartext-Umleitung. | Ein Rand bleibt der Normalfall; ohne Rand soll der Server sicher allein stehen. Eine Umleitung nähme Klartext von jedem an. |
+| R-SE-09 | Der interne Listener hat keinen Filter nach Gegenstelle. | Er liefert nur Health und stack-interne Webhooks, wertet keine Identitäts- oder Weiterleitungs-Kopfzeilen aus und ist nie am Host veröffentlicht. Ein Filter zwänge den Betreiber, das ganze Compose-Netz in `server.trusted_proxies` einzutragen; dann zählten Weiterleitungs-Kopfzeilen jedes Containers auch am öffentlichen Listener. |
+| R-SE-10 | Strengere Sperrliste für ausgehende Verbindungen; `allow_private` öffnet nie Link-Local, Multicast oder unspezifizierte Adressen. | Bekannte SSRF-Umgehungen (gemappte IPv6, NAT64, 6to4, Teredo) und Metadaten-Dienste der Clouds; ein Operator-Eintrag soll ein internes Ziel öffnen, nicht die Metadaten. |
+| R-SE-11 | Audit-Prüfung offline: kanonische Form gleich API-Darstellung, festes Schema der Details ohne Freitext. | Ein Export lässt sich ohne Server prüfen; Freitext wäre ein Ort für Inhalte und Geheimnisse. |
 
 ## 16. Konfigurationswerte dieses Kapitels
 
 | Name | Standard | Bedeutung |
 |---|---|---|
 | `http.hsts_max_age` | `31536000s` | `max-age` für HSTS |
-| `egress.allowed_hosts` | leer | zusätzliche erlaubte Ziele mit optional `allow_private` |
+| `egress.allowed_hosts` | leer | zusätzliche erlaubte Ziele, Form `host[:port][;allow_private]` ([configuration.md](../operations/configuration.md), Abschnitt 2); doppelte Einträge sind ein Ladefehler |
 | `egress.timeout` | `15s` | Zeitgrenze einer ausgehenden Anfrage |
 | `egress.max_response_bytes` | `1048576` | größte Antwort einer ausgehenden Anfrage |
 | `audit.checkpoint_interval` | `1h` | Abstand der signierten Prüfpunkte des Audit-Logs |
 | `audit.checkpoint_sink` | leer | Ablageziel der Prüfpunkte außerhalb der Datenbank (z. B. Objektspeicher-Präfix mit Aufbewahrungssperre); leer erzeugt eine Warnung |
+| `signing_key.cache_ttl` | `30s` | längste Zeit, die ein Prozess einen zurückgezogenen Schlüssel noch annimmt oder einen neuen nicht kennt |
+| `signing_key.rotation_check_interval` | `1m` | Abstand des Jobs `instance.key_rotation` |
+| `signing_key.access_token_rotation_interval` | `30d` | planmäßiger Wechsel des Schlüssels für Zugriffstokens |
 
 Werte anderer Kapitel, auf die dieses Kapitel verweist: `server.trusted_proxies`
 ([16-betrieb.md](16-betrieb.md)), `http.max_json_body_bytes`, `http.max_header_bytes`,

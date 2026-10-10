@@ -75,7 +75,7 @@ im Diagramm. api und worker lesen sie beim Start und bei Rotation (Abschnitt 13)
 | Ereignis-Verbraucher `push` und `webhooks` | nein | ja |
 | River: Jobs einfügen | ja | ja |
 | River: Jobs ausführen, periodische Jobs, Leader-Wahl | nein | ja |
-| Ops-Listener (Health, optional Metriken) | ja | ja |
+| interner Listener `server.internal_listen_addr` (Health, Eingangs-Webhooks aus dem Stack) | ja | ja |
 
 Rolle `all` vereint beide in einem Prozess und ist der Standard (`server.role`). Grund: eine
 Installation auf einem Rechner braucht genau einen Server-Container. Die Trennung kostet nur eine
@@ -89,7 +89,7 @@ nennen nur Befehle von hier.
 | Befehl | Zweck | Kapitel |
 |---|---|---|
 | `bothy serve --role=api\|worker\|all` | Server starten | dieses Kapitel |
-| `bothy migrate up\|status\|validate` | Migrationen des Domänenschemas (goose) und der River-Tabellen (rivermigrate); setzt `instance.min_server_version` | ADR 0007, [16-betrieb.md](16-betrieb.md) |
+| `bothy migrate up\|status\|validate` | Migrationen des Domänenschemas (goose) und der River-Tabellen (rivermigrate); legt beim ersten Lauf die Zeile `instance` an (über den Port des Moduls `instance`), setzt `instance.schema_version` und `instance.min_server_version`; legt die ersten Partitionen von `event_log` an (03) | ADR 0007, [16-betrieb.md](16-betrieb.md) |
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | Einrichtung: erster Owner per Server-Befehl (Systemaktion `instance.bootstrap`), Einladungs-Code zur Wiederherstellung | [08-identitaet.md](08-identitaet.md) |
 | `bothy config check\|print` | Konfiguration prüfen, redigiert ausgeben | Abschnitt 13 |
 | `bothy import discord ...` | Import und Lese-Spiegel über die Import-API (`import.apply`) | [22-import-migration.md](22-import-migration.md) |
@@ -99,6 +99,14 @@ nennen nur Befehle von hier.
 | `bothy files rescan` | Wartung: Dateien erneut prüfen lassen | [12-dateien.md](12-dateien.md) |
 | `bothy telemetry pseudonym` | Pseudonym eines Prinzipals für die Fehlersuche des Owners | [../observability/privacy.md](../observability/privacy.md) |
 | `bothy dev seed` | Testdaten, nur in `instance.environment = dev` | [../operations/environments-and-flags.md](../operations/environments-and-flags.md) |
+
+Exitcodes aller Befehle: `0` Erfolg bzw. geordnetes Ende; `1` Fehler (Start gescheitert, fataler
+Laufzeitfehler, Shutdown über `shutdown.total_timeout`, Prüfung negativ); `2` Aufruf- oder
+Konfigurationsfehler. Ab `3` sind Codes je Befehl und stehen in seiner Hilfe: `serve` `3` für ein
+erzwungenes Ende durch ein zweites Signal (Abschnitt 15.3); `setup bootstrap-owner` `3`, wenn die
+Einrichtung schon abgeschlossen ist; `setup issue-enrollment-code` `4`, wenn sie es noch nicht ist
+([08-identitaet.md](08-identitaet.md)). Grund: Orchestrator und Skripte unterscheiden "falsch
+aufgerufen" von "zur Laufzeit gescheitert" und erkennen erwartete Zustände ohne Textvergleich.
 
 Migrationen laufen nie implizit beim Start von `serve` (R-AR-16). Grund: Bei mehreren Knoten würden
 sie gleichzeitig starten, und ein fehlgeschlagener Schritt soll den Betrieb nicht in einer
@@ -137,7 +145,7 @@ Diagramm: [c4-3-komponenten-server.svg](../architecture/c4-3-komponenten-server.
 | Modul | Verantwortung | Besitzt Tabellen | Kapitel |
 |---|---|---|---|
 | `instance` | Instanz-Identität, Sync-Epoche, Mindest-Server-Version, Einstellungen und Branding, Feature-Flags, Server-Signierschlüssel mit JWKS und Rotation, Sequenz-Zähler | `instance`, `instance_settings`, `server_signing_keys`, `feature_flags`, `sequence_counters` | 06, 16, 19 |
-| `audit` | Audit-Log mit Hash-Kette, signierte Prüfpunkte, Abfrage, Prüfung, Kürzung mit Anker | `audit_events`, `audit_checkpoints` | 19, 20 |
+| `audit` | Audit-Log mit Hash-Kette, signierte Prüfpunkte, Schlüssel der IP-Pseudonyme, Abfrage, Prüfung, Kürzung mit Anker | `audit_events`, `audit_checkpoints`, `audit_ip_keys` | 19, 20 |
 | `authz` | `authorize`, Rechte-Cache, sichtbare Ziele, Gruppen, Freigaben, Rechte-Version, I1-Prüfung, "Wer hat Zugriff", "Als Person ansehen" | `groups`, `group_memberships`, `grants` | 07 |
 | `billing` | Preistabelle, Kostenbuchungen, Summen je Lauf, Thread, Bereich, Agent, Abgleich | `price_table`, `cost_entries` | 10 |
 | `identity` | Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten, Einladungs-Codes, Anmeldevorgänge, Geräte-Kopplung, Passkeys, Geräte und Geräteschlüssel, Sitzungen, Refresh-Familien, API-Tokens, Step-up, Zugriffstokens | `principals`, `users`, `owners`, `identity_providers`, `user_identities`, `local_credentials`, `enrollment_codes`, `auth_login_flows`, `device_pairings`, `passkey_credentials`, `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`, `refresh_tokens`, `api_tokens` | 08 |
@@ -170,11 +178,11 @@ tieferer Module, die das Modul implementiert.
 
 | Modul | Port (Auszug) | Gibt aus (In-Tx) | Abonniert (In-Tx) | Implementiert Quellen |
 |---|---|---|---|---|
-| `instance` | `Settings`, `Flags`, `Keys` (Signer je Zweck, JWKS, Rotation), `Counters` (nur für die Phasen-Hooks von `authz`, `sync`, `audit`) | | | |
+| `instance` | `Settings`, `Flags`, `Keys` (Signer je Zweck, JWKS, Rotation), `Counters` (nur für die Phasen-Hooks von `authz`, `sync`, `audit`), `Versions` (Zählerstände ohne Sperre lesen, z. B. `permission_version` für den Rechte-Cache, `event_seq` für Catch-up) | | | |
 | `audit` | `Log` (Abfrage, Prüfung) | | | kernel `auditing.Recorder` |
-| `authz` | `Admin` (Gruppen, Freigaben, Erklärung, Ansicht als Person); deklariert `PrincipalSource`, `StructureSource`, `AgentPolicySource` | kernel `authorize.AccessChanged` | | kernel `authorize.Authorizer` |
+| `authz` | `Admin` (Gruppen, Freigaben, Erklärung, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource` | kernel `authorize.AccessChanged` | | kernel `authorize.Authorizer` |
 | `billing` | `Costs` (Buchen, Korrektur, Summen), `Prices` | | | |
-| `identity` | `Auth` (Anmeldung, Refresh, Logout, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`; deklariert `AvatarFiles` | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, kernel `personaldata.Participant` |
+| `identity` | `Auth` (Anmeldung, Refresh, Logout, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`; deklariert `AvatarFiles` | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), kernel `personaldata.Participant` |
 | `chat` | `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen, `AppendToThread`, Schließen, Öffnen, Verschieben, Info), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
 | `agents` | `Agents` (Verwaltung, Richtlinie, Werkzeugklasse), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe) | `AgentDisabled` | | `authz.AgentPolicySource` (Richtlinie, Werkzeugklasse, Bereitschaft der Dev-Umgebung), kernel `personaldata.Participant` |
 | `files` | `Uploads` (Sitzungen, Teile), `Files` (Lesen, Öffnen, Vorschau, Abruf-Tickets, Löschen), `Attachments`, `Transcripts`, `TextExtracts`; deklariert `AttachmentLocator` | `FileFinalized` (Scan und gegebenenfalls Transkript endgültig) | | `identity.AvatarFiles`, kernel `personaldata.Participant` |
@@ -201,7 +209,7 @@ andere ist verboten und schlägt im Gate fehl (Abschnitt 7).
 | `billing` | nichts | Kostenzeilen tragen Kopien von Thread, Kanal, Bereich und Agent (03); keine Rückfrage nötig |
 | `audit` | `instance` | Zähler `audit_seq` |
 | `authz` | `instance` | Zähler `permission_version`; alle anderen Daten über Quellen-Ports |
-| `identity` | `instance`, `authz` | Signierschlüssel für Zugriffstokens; implementiert `PrincipalSource` |
+| `identity` | `instance`, `authz` | Signierschlüssel für Zugriffstokens; implementiert `PrincipalSource` und `CredentialSource` |
 | `chat` | `identity`, `authz` | Bediener ist aktiver Agent-Prinzipal, DM-Teilnehmer sind Menschen; implementiert `StructureSource` |
 | `agents` | `identity`, `authz`, `chat` | Agent-Prinzipal anlegen, Zugangsdaten-Inhaber ist Mensch; implementiert `AgentPolicySource`; Thread für Sitzungen, Geltung von Befehlen |
 | `files` | `identity`, `chat` | implementiert `AvatarFiles`; Upload-Kanal prüfen |
@@ -224,6 +232,11 @@ Ebenen (von unten): `instance`, `billing` · `audit`, `authz` · `identity` · `
 Zusätzlich gilt für alle Module: `kernel` ja, `platform` nur in `adapters`, `api` (generierter Code)
 nur in `adapters`, River nur in `platform/jobs`.
 
+Quellen-Ports, deren Implementierung ein späteres Ticket baut, verdrahtet `internal/wire` bis
+dahin mit einer leeren Quelle, die nichts kennt; `authorize` entscheidet dann fail closed (keine
+Struktur, kein aktives Gerät). Das Ticket der Implementierung ersetzt die leere Quelle (PLAN,
+Tickets der Module `identity`, `chat`, `agents`).
+
 ### 4.5 Querschnitts-Ports (`internal/kernel`)
 
 | Paket | Zweck | Implementiert von | Genutzt von |
@@ -231,6 +244,8 @@ nur in `adapters`, River nur in `platform/jobs`.
 | `kernel/ids` | UUIDv7 erzeugen und prüfen (03, R-DM-01) | kernel selbst | allen |
 | `kernel/clock` | Zeitquelle, in Tests ersetzbar | kernel selbst | allen |
 | `kernel/errs` | Fehlerarten mit stabilem Code (Abschnitt 14.1) | kernel selbst | allen |
+| `kernel/textcheck` | Prüfung von Anzeige-Texten nach SEC-IN-4 (ungültiges UTF-8, Steuerzeichen, Bidi-Steuerzeichen); keine Längenprüfung | kernel selbst | `domain`-Pakete aller Module mit Anzeige-Texten |
+| `kernel/reqmeta` | `correlation_id` (Trace-ID der Anfrage, als UUID geschrieben, keine UUIDv7) und Client-IP der Anfrage im Kontext; nur Standardbibliothek | `platform/httpserver` setzt die Werte | `audit`, `sync`, `platform/*` |
 | `kernel/actor` | Prinzipal einer Anfrage (ID, Art, Gerät, Sitzung, Step-up-Zeit, Scopes); `Authenticator` | `identity` | `platform/httpserver`, `gateway` |
 | `kernel/authorize` | Aktionen (generiert aus 05), Ressourcen-Deskriptor, `Decision`, `Authorizer` (`Authorize`, `Scope` für Listen, `Observe` für `access.changed`), In-Tx-Ereignis `AccessChanged` | `authz` | allen |
 | `kernel/txn` | Unit of Work, Phasen vor dem Commit, In-Tx-Ereignisbus (Abschnitt 8) | `platform/pg`; Phasen-Hooks von `authz`, `sync`, `audit` | allen `app`-Paketen |
@@ -238,6 +253,9 @@ nur in `adapters`, River nur in `platform/jobs`.
 | `kernel/auditing` | `Recorder`: in der Transaktion oder getrennt (für Ablehnungen nach Rollback) | `audit` | allen |
 | `kernel/idempotency` | `Store` für `Idempotency-Key` im Unit of Work | `sync` | `platform/httpserver` |
 | `kernel/personaldata` | `Participant`: Export und Löschung je Modul für einen Menschen | Module mit personenbezogenen Tabellen | `privacy` |
+
+`kernel/ids` prüft nur IDs nach R-DM-01. `correlation_id` ist keine UUIDv7 und wird nie mit
+`kernel/ids` geprüft; sie kommt nur aus `kernel/reqmeta` bzw. dem Span-Kontext.
 
 `kernel` hängt von nichts im Projekt ab. Gründe: Diese Ports braucht jedes Modul; als Modul-Kanten
 würden sie Zyklen erzeugen (jedes Modul ruft `authorize`, `authz` braucht Ereignisse und Audit).
@@ -249,7 +267,7 @@ Tabelle mit dem Katalog (Abschnitt 7.3).
 
 | Modul | Aktionen |
 |---|---|
-| `instance` | `instance.discovery.read`, `instance.read`, `instance.settings.read`, `instance.settings.update`, `instance.branding.update`, `instance.bootstrap`, `feature_flag.read`, `feature_flag.update`, `signing_key.rotate` |
+| `instance` | `instance.discovery.read`, `instance.read`, `instance.settings.read`, `instance.settings.update`, `instance.branding.update`, `instance.bootstrap`, `feature_flag.read`, `feature_flag.update`, `signing_key.rotate`, `signing_key.transition` |
 | `audit` | `audit.read`, `audit.verify` |
 | `authz` | `access.explain`, `access.preview`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `group.member.expire`, `grant.read`, `grant.create`, `grant.revoke`, `grant.expire` |
 | `identity` | `auth.login.begin`, `auth.login.complete`, `auth.token.refresh`, `auth.logout`, `auth.step_up`, `identity_provider.read`, `identity_provider.manage`, `owner.add`, `owner.remove`, `self.read`, `user.read`, `user.create`, `user.update`, `user.disable`, `user.enable`, `self.profile.update`, `identity.read`, `identity.link`, `identity.unlink`, `local_credential.set`, `passkey.register`, `passkey.revoke`, `device.list`, `device.approve`, `device.revoke`, `session.list`, `session.revoke`, `token.list`, `token.create`, `token.revoke` |
@@ -311,7 +329,7 @@ Ein Ereignistyp hat genau ein erzeugendes Modul. Die Empfangs-Aktion steht in 05
 | Schicht | Paket | Enthält | Darf importieren | Darf nicht |
 |---|---|---|---|---|
 | Port | `internal/<modul>` | Eingehende Schnittstellen, Befehls- und Ergebnis-Typen (DTOs), In-Tx-Ereignisse, deklarierte Quellen-Ports | `kernel` | `domain`, `app`, `adapters`, fremde Module, Fremdbibliotheken |
-| Domain | `internal/<modul>/domain` | Entitäten, Wertobjekte, Zustandsmaschinen (z. B. Lauf-Übergänge), Invarianten, reine Funktionen | `kernel/ids`, `kernel/clock`, `kernel/errs` | Ein- und Ausgabe, SQL, HTTP, Kontext mit Transaktion, Fremdbibliotheken |
+| Domain | `internal/<modul>/domain` | Entitäten, Wertobjekte, Zustandsmaschinen (z. B. Lauf-Übergänge), Invarianten, reine Funktionen | Pakete aus `kernel-core` (`kernel/ids`, `kernel/clock`, `kernel/errs`, `kernel/textcheck`, `kernel/reqmeta`) | Ein- und Ausgabe, SQL, HTTP, Kontext mit Transaktion, Fremdbibliotheken |
 | Anwendung | `internal/<modul>/app` | Anwendungsfälle: `authorize`, Unit of Work, Domain aufrufen, Ereignisse anhängen; ausgehende Ports (Repository, Uhr, Fremddienst) als Schnittstellen | eigener Port, eigene Domain, `kernel`, Ports erlaubter Module | `adapters`, `platform`, `api`, Fremdbibliotheken |
 | Adapter | `internal/<modul>/adapters/<art>` | `postgres` (sqlc-Code und Repository), `httpapi` (Teil des generierten Server-Interfaces), weitere wie `objectstore`, `clamav`, `apns` | alles des eigenen Moduls, `kernel`, `platform`, `api`, Ports erlaubter Module, zugelassene Fremdbibliotheken | `app` oder `domain` fremder Module |
 
@@ -333,7 +351,7 @@ Regeln mit Grund:
 
 ```text
 services/server/
-  go.mod                      Modulpfad siehe Abschnitt 21 (offen)
+  go.mod                      Modulpfad github.com/OWNER/bothy/services/server bis V1 (PLAN P-05)
   cmd/bothy/                  main: Unterbefehle serve, migrate, setup, config
   api/
     rest/                     generiert aus docs/api/openapi.yaml (oapi-codegen: std-http-server, strict-server)
@@ -345,7 +363,7 @@ services/server/
   internal/
     kernel/                   Querschnitts-Ports (Abschnitt 4.5), ohne Abhängigkeiten im Projekt
     platform/                 Technik ohne Fachlogik
-      config/ secrets/ pg/ httpserver/ ratelimit/ jobs/ otel/ health/ lifecycle/
+      config/ secrets/ pg/ httpserver/ ratelimit/ jobs/ otel/ health/ lifecycle/ egress/ buildinfo/
     wire/                     Verdrahtung je Rolle, Registrierung der In-Tx-Abonnenten
     <modul>/                  Port (Wurzelpaket)
       domain/
@@ -355,6 +373,7 @@ services/server/
         httpapi/              Handler für die Operationen des Moduls
         ...                   weitere Adapter des Moduls
       README.md               Zweck, Ports, Abhängigkeiten, Tabellen, Kapitel
+  tools/archgen/              Generator: architecture/modules.yaml -> .go-arch-lint.yml
   sqlc.yaml                   ein Eintrag je Modul, Schema aus migrations/
   .go-arch-lint.yml           generiert aus architecture/modules.yaml
 ```
@@ -367,69 +386,103 @@ Eine Liste dieser Stellen führt [18-release.md](18-release.md); weitere Stellen
 
 ### 7.1 Modulregister als Quelle
 
-`services/server/architecture/modules.yaml` ist die einzige Quelle für Modulgrenzen. Daraus entstehen
-die go-arch-lint-Konfiguration, die Prüfungen aus 7.3 und der Abgleich mit den Tabellen 4.2, 4.4 und
-4.6 dieses Kapitels. Format (Auszug):
+`services/server/architecture/modules.yaml` ist die einzige Quelle für Modulgrenzen (ADR 0050).
+Daraus entstehen die go-arch-lint-Konfiguration, die Prüfungen aus 7.3 und der Abgleich mit den
+Tabellen 4.2, 4.4, 4.6 und 4.7 dieses Kapitels. Format (normativ; spätere Tickets ergänzen
+Einträge, nie Felder):
 
 ```yaml
+# SPDX-License-Identifier: Apache-2.0
 version: 1
+exclude: [tools]                  # Verzeichnisse, die go-arch-lint nicht prüft (Werkzeuge)
+kernel:
+  core: [ids, clock, errs, textcheck, reqmeta]   # von jedem Paket nutzbar
+  ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata]
+platform:                         # je Plattform-Paket eine Komponente
+  jobs: {depends_on: [pg], vendors: [river]}
+  pg: {vendors: [pgx]}
+wire: {vendors: []}
+cmd: {vendors: []}
+api: {vendors: []}               # mit dem ersten generierten Code (M1-17)
 modules:
   chat:
     tables: [spaces, user_space_states, channels, channel_skill_bindings, project_bindings,
              dm_participants, forum_tags, threads, thread_tags]
     actions: [space.read, space.create, thread.move, agent.config.read]   # vollständig im Register
+    events: [thread.created, channel.created]                              # vollständig im Register
+    ephemeral_events: []
+    ws_ops: []
     depends_on: [identity, authz]
     adapter_vendors: [pgx, otel]
-  runs:
-    tables: [runs, run_steps, run_followups, message_components, interactions]
-    actions: [agent.invoke, run.start, run.update, run.finish]            # vollständig im Register
-    depends_on: [instance, chat, agents, messaging, billing]
-    adapter_vendors: [pgx, otel, jose]
-vendors:
+vendors:                          # <gruppe>: Importpfade
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]
-  websocket: [github.com/coder/websocket, github.com/coder/websocket/**]
+  river: [github.com/riverqueue/river, github.com/riverqueue/river/**]
 ```
+
+Regeln: Module stehen in der Reihenfolge der Ebenen aus 4.4; `tables`, `actions`, `events`,
+`ephemeral_events`, `ws_ops` und `depends_on` folgen den Tabellen 4.2, 4.6, 4.7 und 4.4. Der
+Generator lehnt unbekannte Felder, doppelte Einträge, unbekannte Module oder Vendor-Gruppen und
+Zyklen ab. Ein Ticket, das ein Plattform-Paket oder eine Fremdbibliothek einführt, trägt seinen
+Eintrag und seine Vendor-Gruppe in derselben Änderung ein; ein Paket ohne Eintrag scheitert in
+`make arch` ("not attached to any component").
 
 ### 7.2 go-arch-lint
 
-Werkzeug: go-arch-lint (MIT), aktuell v1.19.0 vom 2026-09-07 [Q8, belegt]. Ein kleiner Generator
-erzeugt aus `modules.yaml` je Modul vier Komponenten (`<m>`, `<m>-domain`, `<m>-app`,
-`<m>-adapters`) und die Regeln aus Abschnitt 5. Erzeugter Auszug für `chat`:
+Werkzeug: go-arch-lint (MIT), aktuell v1.19.0 vom 2026-09-07 [Q8, belegt]. Der Generator
+`tools/archgen` erzeugt aus `modules.yaml` je Modul vier Komponenten (`<m>`, `<m>-domain`,
+`<m>-app`, `<m>-adapters`), je Plattform-Paket eine Komponente `platform-<p>`, dazu `wire`, `cmd`
+und `api`, und die Regeln aus Abschnitt 5. Grund für eine Komponente je Plattform-Paket: Nur so
+lässt sich eine Fremdbibliothek auf genau ein Paket begrenzen (River nur in `platform/jobs`,
+Abschnitt 12.1). Erzeugter Auszug für `chat`:
 
 ```yaml
 version: 3
 workdir: .
 allow:
   depOnAnyVendor: false
+exclude: [tools]
 excludeFiles: ["^.*_test\\.go$"]
+vendors:
+  v-pgx:   { in: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**] }
+  v-river: { in: [github.com/riverqueue/river, github.com/riverqueue/river/**] }
 components:
-  kernel-core:  { in: [internal/kernel/ids, internal/kernel/errs, internal/kernel/clock] }
-  kernel-ports: { in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn,
-                       internal/kernel/eventlog, internal/kernel/auditing,
-                       internal/kernel/idempotency, internal/kernel/personaldata] }
-  platform:     { in: internal/platform/** }
-  api:          { in: api/** }
+  kernel-core:   { in: [internal/kernel/ids, internal/kernel/clock, internal/kernel/errs,
+                        internal/kernel/textcheck, internal/kernel/reqmeta] }
+  kernel-ports:  { in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn,
+                        internal/kernel/eventlog, internal/kernel/auditing,
+                        internal/kernel/idempotency, internal/kernel/personaldata] }
+  platform-pg:   { in: [internal/platform/pg, internal/platform/pg/**] }
+  platform-jobs: { in: [internal/platform/jobs, internal/platform/jobs/**] }
+  wire:          { in: [internal/wire, internal/wire/**] }
+  cmd:           { in: cmd/** }
+  api:           { in: api/** }
   chat:          { in: internal/chat }
   chat-domain:   { in: [internal/chat/domain, internal/chat/domain/**] }
   chat-app:      { in: [internal/chat/app, internal/chat/app/**] }
   chat-adapters: { in: internal/chat/adapters/** }
 commonComponents: [kernel-core]
 deps:
+  platform-pg:   { mayDependOn: [kernel-ports], canUse: [v-pgx] }
+  platform-jobs: { mayDependOn: [kernel-ports, platform-pg], canUse: [v-river] }
   chat:          { mayDependOn: [kernel-ports] }
   chat-app:      { mayDependOn: [chat, chat-domain, kernel-ports, identity, authz] }
-  chat-adapters: { mayDependOn: [chat, chat-app, chat-domain, kernel-ports, platform, api,
-                                 identity, authz],
+  chat-adapters: { mayDependOn: [chat, chat-app, chat-domain, kernel-ports, platform-pg,
+                                 platform-jobs, api, identity, authz],
                    canUse: [v-pgx, v-otel] }
 ```
 
-Eine Komponente `<m>-domain` hat keinen Eintrag unter `deps`; sie darf damit nur `kernel-core`.
-Ein leeres `mayDependOn` lehnt go-arch-lint ab; darum fehlt der Eintrag statt leer zu sein.
+`wire` darf alle Modul-, Plattform- und Kernel-Komponenten nutzen, `cmd` nur `wire`, Plattform und
+`kernel-ports`. Eine Komponente `<m>-domain` hat keinen Eintrag unter `deps`; sie darf damit nur
+`kernel-core`. Ein leeres `mayDependOn` lehnt go-arch-lint ab; darum fehlt der Eintrag statt leer
+zu sein.
 
 Geprüft am 2026-10-10 an einem Gerüst mit allen Modulen aus Abschnitt 4.2 (Go 1.27.2, go-arch-lint
 v1.19.0): sauberes Gerüst ergibt "No warnings found", Exitcode 0. Vier eingebaute Verstöße wurden
 alle gemeldet, Exitcode 1: `chat/domain` importiert pgx; `chat/app` importiert den Port von
 `messaging`; `messaging/app` importiert `runs/app`; ein neues Paket `chat/util` ohne Komponente
 ("not attached to any component"). Der letzte Punkt ist gewollt: Neue Pakete müssen ins Register.
+Die Form mit Plattform-Komponenten ist an diesem Gerüst noch nicht gelaufen; M1-05 belegt sie mit
+denselben vier Verstößen (ADR 0050, "Confirmation").
 
 ### 7.3 Weitere Prüfungen im Gate
 
@@ -438,8 +491,9 @@ alle gemeldet, Exitcode 1: `chat/domain` importiert pgx; `chat/app` importiert d
 | Tabellenbesitz | SQL eines Moduls nennt nur eigene Tabellen (Grundsatz 12 aus 03) | Durchlauf über `adapters/postgres/queries/*.sql`, Tabellennamen gegen `modules.yaml` |
 | Vollständigkeit | jede Tabelle aus 03 und jede Aktion aus 05 genau einmal im Register | Abgleich Register mit Kern-Vertrag |
 | Routen und Ops | jede Operation hat eine bekannte Aktion; ihr Handler liegt im Modul, dem die Aktion gehört | Start-Prüfung des Servers und Test über die generierte Routen-Tabelle |
-| In-Tx-Abonnements | jedes Abonnement ist eine erlaubte Richtung (höheres Modul abonniert tieferes) | Golden-Datei der Registrierungen in `internal/wire` |
-| Doku-Abgleich | Tabellen 4.2, 4.4, 4.6 dieses Kapitels stimmen mit dem Register überein | Vergleich im Doku-Gate |
+| In-Tx-Abonnements | jedes Abonnement ist eine erlaubte Richtung (höheres Modul abonniert tieferes) | Golden-Datei der Registrierungen in `internal/wire`; Veröffentlicher und Abonnent leitet die Registrierung aus den Go-Paketen ab, nicht aus Angaben |
+| Zähler-Zugriff | nur die Phasen-Hooks von `authz`, `sync`, `audit` nutzen `instance.Counters` | Phasen-Wächter in `Counters` (Laufzeit, 8.2) und statischer Test: nur `instance`, `wire` und die Pakete der registrierten Hooks referenzieren `Counters` |
+| Doku-Abgleich | Tabellen 4.2, 4.4, 4.6, 4.7 dieses Kapitels stimmen mit dem Register überein | Vergleich im Doku-Gate |
 | Erzeugte Dateien aktuell | `.go-arch-lint.yml`, sqlc-Code, API-Code entsprechen ihrer Quelle | Neu erzeugen und `git diff --exit-code` |
 
 ## 8. Transaktionen und Unit of Work
@@ -470,9 +524,15 @@ Phasen (Diagramm [fluss-ereignis-pfad.svg](../architecture/fluss-ereignis-pfad.s
    3. `audit` (Phasen-Hook): `audit_seq` sperren, Hash-Kette fortschreiben.
 4. **Commit.** Danach Antwort an den Aufrufer.
 
-`platform/pg` kennt keine Fachmodule. `kernel/txn` definiert die Phasen; `internal/wire` registriert
-die Hooks von `authz` (Phase 1 und 3.1), `sync` (3.2) und `audit` (3.3); `platform/pg` ruft sie in
-dieser Reihenfolge.
+`platform/pg` kennt keine Fachmodule. `kernel/txn` definiert die Phasen und das Register
+`txn.Registry` (`SetHook`, `Subscribe`, `Seal`); `internal/wire` registriert die Hooks von `authz`
+(Phase 1 und 3.1), `sync` (3.2) und `audit` (3.3) und alle Abonnenten an genau einer Stelle und
+versiegelt das Register vor dem ersten Unit of Work; `platform/pg` ruft die Hooks in dieser
+Reihenfolge. Hooks und Abonnenten sind Funktionen oder Methodenwerte des besitzenden Moduls, nie
+Closures in `internal/wire`; das Register leitet ihr Modul aus dem Go-Paket ab und lehnt sonst ab.
+Grund: Die Golden-Datei soll den echten Besitzer zeigen. `RightsChange` gilt nur am äußersten
+Unit of Work; In-Tx-Ereignisse und dauerhafte Ereignisse entstehen nur in den Phasen "Arbeit" und
+3.1.
 
 Ein Veto in Phase 2 oder 3.1 (Domänenfehler, I1-Verletzung) rollt alles zurück. Ablehnungen, die ins
 Audit müssen, schreibt `auditing.Recorder` danach in einer eigenen Transaktion (03, 6.4).
@@ -481,10 +541,15 @@ Audit müssen, schreibt `auditing.Recorder` danach in einer eigenen Transaktion 
 
 Die Reihenfolge aus 03 Abschnitt 6.3 setzt die Unit of Work durch, nicht der einzelne
 Anwendungsfall: Zähler sperren nur diese Phasen-Hooks über `instance.Counters`; sonst ruft kein
-Modul `Counters` auf (Prüfung über die Golden-Datei der Registrierungen, 7.3). Mehrere Zeilen derselben Tabelle sperrt ein Modul in
-aufsteigender `id`. Schlägt eine Transaktion mit Deadlock (`40P01`) oder Sperr-Zeitüberschreitung
-(`55P03`) fehl, wiederholt `platform/pg` den ganzen Unit of Work höchstens `database.tx_retry_max` Mal.
-Das ist sicher, weil der Unit of Work vollständig zurückgerollt ist und keine externen Aufrufe enthält.
+Modul `Counters` auf. `Counters` prüft dazu die Phase zur Laufzeit (`permission_version` nur in
+Phase 1, `event_seq` nur in 3.2, `audit_seq` nur in 3.3; sonst Fehlerart `internal`), und ein
+statischer Test begrenzt die Pakete, die `Counters` nennen (7.3). Mehrere Zeilen derselben Tabelle
+sperrt ein Modul in aufsteigender `id`. Schlägt eine Transaktion mit Deadlock (`40P01`) oder
+Sperr-Zeitüberschreitung (`55P03`) fehl, wiederholt `platform/pg` den ganzen Unit of Work höchstens
+`database.tx_retry_max` Mal. Das ist sicher, weil der Unit of Work vollständig zurückgerollt ist und
+keine externen Aufrufe enthält. Ausnahme: Das Warten am Idempotenz-Schlüssel (8.4) meldet der
+Speicher als `request_in_progress`, nicht als wiederholbaren `55P03`; sonst würde die Wiederholung
+die Wartezeit vervielfachen.
 
 ### 8.3 In-Tx-Ereignisse
 
@@ -493,7 +558,8 @@ Das ist sicher, weil der Unit of Work vollständig zurückgerollt ist und keine 
 - Zustellung synchron, in der Reihenfolge der Registrierung, in derselben Transaktion. Ein Abonnent
   darf schreiben, dauerhafte Ereignisse anhängen und mit einem Fehler den Commit verhindern.
 - Registrierung nur in `internal/wire`, als eine Liste. Eine Golden-Datei hält sie fest; jede Änderung
-  ist im Diff sichtbar. Jeder Abonnent bekommt einen eigenen OTel-Span.
+  ist im Diff sichtbar. Jeder Abonnent bekommt einen eigenen OTel-Span `txn.subscribe <Abonnent>`
+  mit `bothy.outcome` (`ok` oder `veto`) ([signals.md](../observability/signals.md), Abschnitt 5.2).
 - Grund für synchron statt asynchron: Die Folgen (Lauf anlegen, Entwurf leeren, Lauf abbrechen bei
   Entzug) müssen atomar mit der Ursache sein. Was nicht atomar sein muss, läuft über das
   `event_log` (Abschnitt 11).
@@ -502,12 +568,15 @@ Das ist sicher, weil der Unit of Work vollständig zurückgerollt ist und keine 
 
 - Nachrichten und Interaktionen: Paar aus Autor und `client_msg_id` bzw. `client_interaction_id`
   nach 04 Abschnitt 5.1.
-- Alle anderen schreibenden Operationen mit `Idempotency-Key`: Der `httpapi`-Adapter öffnet den Unit of
-  Work, legt die Zeile in `idempotency_keys` mit `in_progress` an, ruft den Anwendungsfall (der der
-  Transaktion beitritt), speichert Status und Antwortkörper und committet alles zusammen. Eine
+- Alle anderen schreibenden Operationen mit `Idempotency-Key`: Eine Stufe der HTTP-Kette
+  (`platform/httpserver`, Speicher `kernel/idempotency.Store` aus `sync`) öffnet den Unit of Work,
+  legt die Zeile in `idempotency_keys` mit `in_progress` an, ruft den Anwendungsfall (der der
+  Transaktion beitritt), speichert bei `2xx` Status und Antwortkörper und committet alles zusammen.
+  Endgültige Fehlerantworten (06, Abschnitt 7, Punkt 2) haben keine Wirkung: Der Unit of Work rollt
+  zurück, und die Antwort wird danach in einer eigenen kurzen Transaktion gespeichert. Eine
   gleichzeitige Wiederholung wartet am Primärschlüssel, bis die erste Transaktion endet, und liest
-  dann die gespeicherte Antwort. Endet die Wartezeit mit `database.lock_timeout`, antwortet der Server
-  `409 request_in_progress` (04, 5.2).
+  dann die gespeicherte Antwort. Endet die Wartezeit mit `database.lock_timeout`, antwortet der
+  Server `409 request_in_progress` (04, 5.2) und speichert nichts.
 - Grund: Schlüssel und Wirkung entstehen in einer Transaktion. Ein Absturz dazwischen hinterlässt
   keinen Schlüssel ohne Wirkung und keine Wirkung ohne Schlüssel.
 
@@ -525,19 +594,42 @@ Diagramm: [fluss-request-pfad.svg](../architecture/fluss-request-pfad.svg).
 
 ### 9.1 Kette im api-Knoten
 
+Äußerer Teil, für jede Anfrage auf dem öffentlichen Listener vor dem Routing:
+
 | Schritt | Ort | Aufgabe |
 |---|---|---|
-| 1 | `platform/httpserver` | Panic abfangen, Request-ID und `correlation_id` setzen |
-| 2 | `platform/otel` | Span über otelhttp, Zugriffslog ohne Inhalte und ohne Tokens |
-| 3 | `platform/httpserver` | Grenzen je Routenklasse: `http.max_json_body_bytes` bzw. `file.max_upload_bytes`, Kontext-Frist `http.request_timeout` bzw. `http.transfer_timeout` |
-| 4 | `kernel/actor` (von `identity`) | Zugriffstoken mit DPoP oder API-Token prüfen, Sitzung, Gerät, Prinzipal-Status; ohne Token: Prinzipal `anonymous` |
-| 5 | `api/routes` | Aktion und Rate-Limit-Klasse der Operation nachschlagen (nach dem Routing über `Request.Pattern` bzw. die `operationId` der Strict-Middleware [Q10, Q11, belegt]) |
-| 6 | `platform/ratelimit` | Token-Bucket der Klasse, `429` mit `Retry-After` |
-| 7 | `api/rest` (generiert) | Anfrage dekodieren und gegen das Schema prüfen |
-| 8 | `<modul>/adapters/httpapi` | DTO bauen, Anwendungsfall aufrufen, Antwort abbilden |
-| 9 | `<modul>/app` | `authorize`, Unit of Work, Domain, Repository |
-| 10 | `platform/httpserver` | Fehler als `application/problem+json` (Abschnitt 14.1) |
-| 11 | Strict-Middleware | Nachweis-Prüfung (9.3) |
+| 1 | `platform/httpserver` | Panic abfangen (`500 internal_error`, Stack nur im Log) |
+| 2 | `platform/otel` | Server-Span über otelhttp (eingehender `traceparent` nach 17, Abschnitt 3), `correlation_id` aus der Trace-ID, Zugriffslog ohne Inhalte, Query und Tokens |
+| 3 | `platform/httpserver` | Basis-Kopfzeilen (SEC-HDR-1, `Correlation-Id`), Client-IP aus vertrauten Proxys in `kernel/reqmeta` |
+| 4 | `net/http`-Router | Operation finden; kein Muster: `404 not_found`, falsche Methode: `405 method_not_allowed` mit `Allow` |
+
+Je Route, um den Handler jeder Operation gelegt (Muster und Operation sind bekannt):
+
+| Schritt | Ort | Aufgabe |
+|---|---|---|
+| 5 | `platform/httpserver` | Operation mit Aktion und Rate-Limit-Klasse aus `api/routes` in den Kontext; Grenzen je Routenklasse: `http.max_json_body_bytes` bzw. `file.max_upload_bytes`, Frist `http.request_timeout` bzw. `http.transfer_timeout`; Antwort-Schreiber mit Nachweis-Prüfung (9.3) |
+| 6 | `platform/httpserver` | CORS (SEC-CORS-1, SEC-CORS-2) |
+| 7 | `kernel/actor` (von `identity`) | Zugriffstoken mit DPoP oder API-Token prüfen, Sitzung, Gerät, Prinzipal-Status; ohne Anmeldedaten: Prinzipal `anonymous` |
+| 8 | `platform/ratelimit` | Token-Bucket der Klasse, `429` mit `Retry-After` |
+| 9 | `platform/httpserver` | Wartungsmodus (05, Regel 9) |
+| 10 | `platform/httpserver` | `Idempotency-Key` (8.4) |
+| 11 | `platform/httpserver` | Medientyp; JSON-Wächter: doppelte Schlüssel, ungültiges UTF-8, Schachtelung über `http.max_json_depth` (SEC-IN-2) |
+| 12 | `platform/httpserver` | Pflicht-`If-Match` (`428 precondition_required`) |
+| 13 | `api/rest` (generiert) | Anfrage gegen das Schema prüfen (SEC-IN-1) |
+| 14 | `platform/httpserver` | Prüfprotokoll für den Nachweis installieren (9.3) |
+| 15 | `<modul>/adapters/httpapi`, `<modul>/app` | DTO bauen, Anwendungsfall mit `authorize`, Unit of Work, Domain, Repository; Antwort abbilden |
+
+Jeder Schritt meldet Fehler als `application/problem+json` (Abschnitt 14.1). Grund für die
+Reihenfolge: Körpergrenze und Frist hängen von der Routenklasse ab, und die ist erst nach dem
+Routing bekannt; die Drosselung läuft vor dem teuren Teil (Dekodierung, Schema, Datenbank), aber
+nach der Authentisierung, weil die meisten Klassen je Prinzipal zählen (05, Abschnitt 3).
+
+Gegen Fluten mit ungültigen Anmeldedaten vor der Drosselung: Scheitert in Schritt 7 die Prüfung
+vorgelegter Anmeldedaten (`401` außer `token_expired` und `use_dpop_nonce`, die normale Abläufe
+sind), verbraucht die Anfrage ein Token aus `rl.public_auth` der Client-IP. Ist dieser Eimer leer,
+antwortet Schritt 7 für Anfragen mit Anmeldedaten von dieser Client-IP mit `429`, ohne die
+Anmeldedaten zu prüfen (05, Abschnitt 3). Grund: Jede Prüfung kostet eine Signaturprüfung, und ohne
+diese Regel wäre sie unbegrenzt.
 
 ### 9.2 404 statt 403
 
@@ -547,10 +639,16 @@ zum Fehler (05, Test 4).
 
 ### 9.3 Nachweis der Prüfung
 
-`kernel/authorize` protokolliert im Anfrage-Kontext jede Prüfung (Aktion, Entscheidung). Nach dem
-Handler prüft die Strict-Middleware: Bei Erfolg (`2xx`, `3xx`) muss mindestens eine Prüfung mit der
-Aktion der Route stattgefunden haben; Listen zählen über `Scope`. Fehlt sie, wird die Antwort durch
-`500` ersetzt, ein Alarm-Zähler steigt, Tests schlagen fehl. Grund: B7 verlangt, dass jede Route
+`kernel/authorize` protokolliert im Anfrage-Kontext jede Prüfung (Aktion, Art, Entscheidung); jede
+Implementierung von `Authorizer` schreibt einen Eintrag je `Authorize` und `Scope`. Der
+Antwort-Schreiber aus Schritt 5 prüft beim ersten `WriteHeader` bzw. `Write`: Bei Erfolg (Status
+unter `400`) muss mindestens eine Prüfung mit der Aktion der Route stattgefunden haben; Listen
+zählen über `Scope`. Fehlt sie, verwirft er Kopfzeilen und Körper des Handlers, sendet `500
+internal_error` (Ursache `authz_not_checked` nur in Log und Metrik, 14.1), erhöht
+`bothy.authz.errors` mit `bothy.reason = authz_not_checked`
+([signals.md](../observability/signals.md)), und Tests schlagen fehl.
+Antworten ab `400` gehen unverändert durch. Grund für den Ort: Die Strict-Middleware sieht ein
+typisiertes Antwortobjekt, nicht den Status. Grund: B7 verlangt, dass jede Route
 prüft. Die Lint-Regel in der Spec hält nur die Deklaration; dieser Nachweis hält die Ausführung.
 
 ## 10. Gateway
@@ -596,10 +694,10 @@ Benachrichtigung erst nach dem Commit zu [Q1, belegt].
 Der Cache liegt in `authz`, je Prozess, je Prinzipal, mit Schlüssel `permission_version`. Der
 Log-Tail meldet jedes `access.changed` über `Authorizer.Observe`, bevor der Hub spätere Ereignisse
 verteilt (R-SY-02). Einträge tragen eine Gültigkeit bis zum frühesten Ablauf einer beteiligten
-Freigabe oder Mitgliedschaft und werden danach neu berechnet. Strukturänderungen ohne neue
-Rechte-Version (`channel.created`, `channel.updated` mit Schreibschutz, `channel.archived`,
-`space.archived`, `thread.moved`) wendet der Cache ebenfalls in Log-Reihenfolge an (04, Abschnitt
-8.1). Das Nachholen filtert zusätzlich nach vollständig sichtbaren Bereichen, damit Ereignisse
+Freigabe oder Mitgliedschaft und werden danach neu berechnet. Strukturänderungen
+(`channel.created`, `channel.updated` mit Schreibschutz, `channel.archived`, `space.archived`,
+`thread.moved`) wendet der Cache ebenfalls in Log-Reihenfolge an; Archivieren bringt zusätzlich
+eine neue Rechte-Version (04, Abschnitt 8.1). Das Nachholen filtert zusätzlich nach vollständig sichtbaren Bereichen, damit Ereignisse
 neuer Kanäle nicht fehlen (04, Abschnitt 7.2).
 
 ### 11.4 Hub und Zustellung
@@ -702,8 +800,8 @@ und Webhooks nicht verzögern. Importe laufen nicht als Job im Server, sondern i
 | `authz.expiry_sweep` | `authz` | periodisch, `access.changed` nach Ablauf (Systemaktionen `grant.expire`, `group.member.expire`) | `maintenance` | 07 |
 | `identity.session_cleanup` | `identity` | periodisch | `maintenance` | 08 |
 | `instance.key_rotation` | `instance` | periodisch, Zustände `next` bis `retired` | `maintenance` | 19 |
-| `sync.partition_maintenance` | `sync` | periodisch, Partitionen anlegen und nach `sync.event_retention` abhängen | `maintenance` | 04 |
-| `sync.idempotency_cleanup` | `sync` | periodisch | `maintenance` | 04 |
+| `sync.partition_maintenance` | `sync` | periodisch alle `sync.partition_maintenance_interval` und beim Start des worker: `sync.event_log_partitions_ahead` Partitionen vor dem Kopf anlegen, nach `sync.event_retention` abhängen, nie die Partition mit dem Kopf (03 `event_log`); `bothy migrate up` ruft dieselbe Routine | `maintenance` | 03, 04 |
+| `sync.idempotency_cleanup` | `sync` | periodisch alle `sync.idempotency_cleanup_interval`, löscht abgelaufene Zeilen in Stapeln von `sync.idempotency_cleanup_batch_size` | `maintenance` | 04 |
 | `audit.chain_verify` | `audit` | periodisch | `maintenance` | 19 |
 | `audit.retention_trim` | `audit` | periodisch, eigene Wartungsrolle der Datenbank | `maintenance` | 20 |
 | `privacy.export`, `privacy.erase` | `privacy` | Freigabe eines Auftrags | `privacy` | 20 |
@@ -721,6 +819,13 @@ und Webhooks nicht verzögern. Importe laufen nicht als Job im Server, sondern i
    Fachkapitels).
 4. Wiederholung mit Backoff übernimmt River; Fachkapitel mit eigener Regel (Webhooks:
    `webhook.retry_backoff_base`, `webhook.retry_backoff_cap`) setzen eine eigene Wiederholungs-Regel.
+5. Sonst gelten die Standardwerte der gepinnten River-Version für Job-Frist, Abrufintervall,
+   Wiederholungs-Backoff und Höchstzahl der Versuche; das README von `platform/jobs` nennt sie mit
+   der Version. Ein Job mit anderem Bedarf setzt einen benannten Wert seines Fachkapitels. Grund:
+   Ein eigener Name ohne Bedarf wäre eine zweite Quelle für denselben Wert.
+6. SQL in Jobs läuft im selben Unit of Work wie im Anfragepfad, also mit `database.statement_timeout`
+   und `database.lock_timeout`. Lange Arbeit teilt ein Job in Stapel (Regel 1). Migrationen setzen
+   nur `migrate.lock_timeout` je Schritt ([upgrade.md](../operations/upgrade.md), Regel M6).
 
 ## 13. Konfigurationsladen
 
@@ -738,17 +843,25 @@ Server lädt.
    Konfigurationsreferenz erzeugt) < Datei (`--config` oder `BOTHY_CONFIG_FILE`, YAML, verschachtelt
    wie die Namen) < Umgebung (`BOTHY_` plus Name in Großbuchstaben, `.` wird `__`, Beispiel
    `sync.event_retention` wird `BOTHY_SYNC__EVENT_RETENTION`) < Kommandozeile (nur `--role` und
-   `--config`). Die genaue Abbildung legt ADR 0011 fest; diese ist der Vorschlag.
+   `--config`). Die Abbildung ist umkehrbar (ADR 0011, [16-betrieb.md](16-betrieb.md) 5.1).
 3. **Geheimnisse** nur als Verweis in Schlüsseln mit Endung `_ref` (z. B. `database.password_ref`). Der
    Secret-Provider löst sie beim Start auf. Werte erscheinen nie in Logs, Fehlertexten oder
    `bothy config print` (dort `<redacted>`).
-4. **Prüfung beim Start, fail fast:** unbekannte Schlüssel brechen ab (Tippfehler sind sonst
-   still); Typen und Bereiche; Querbedingungen. Beispiele: Identitäts-Header-Treiber nur mit
-   Loopback-`server.listen_addr`; `http.max_json_body_bytes` größer als `message.max_content_bytes`
-   plus Umschlag; `server.internal_listen_addr` ungleich `server.listen_addr`.
-5. **Typisiert je Modul.** Jedes Modul hat eine eigene `Config`-Struktur; `internal/wire` füllt sie
-   aus `platform/config`. Module lesen nie Umgebungsvariablen. Grund: Testbarkeit und eine Stelle
-   für Prüfungen.
+4. **Prüfung beim Start, fail fast:** unbekannte Schlüssel und unbekannte `BOTHY_`-Variablen
+   brechen ab (Tippfehler sind sonst still; Ausnahmen in [16-betrieb.md](16-betrieb.md) 5.1);
+   Typen und Bereiche; Querbedingungen. Querbedingungen heute: `http.max_json_body_bytes` echt
+   größer als `message.max_content_bytes` (der Umschlag einer Nachricht ist klein gegen den
+   Abstand der Standardwerte; ein eigener Wert für ihn wäre ohne Messung geraten);
+   `server.internal_listen_addr` ungleich `server.listen_addr` (Port `0` darf doppelt vorkommen,
+   weil Tests Port 0 binden). Die Regel "Identitäts-Header nur mit Loopback-Listener" ist keine
+   Konfigurationsprüfung, weil der Treiber eine Einstellung des Owners in der Datenbank ist; sie
+   gilt bei der Bereitschaft ([16-betrieb.md](16-betrieb.md) 4.3). Meldungen nennen Schlüssel und
+   Quelle, nie den Wert.
+5. **Typisiert je Modul.** Jedes Modul und jedes Plattform-Paket hat eine eigene `Config`-Struktur
+   im eigenen Paket; `internal/wire` füllt sie aus `platform/config` (Bindung über Struktur-Tags).
+   Module lesen nie Umgebungsvariablen. Ein Schlüssel kommt mit dem Ticket ins Schema, das seinen
+   ersten Nutzer baut; bis dahin führt ihn die Konfigurationsreferenz als "geplant" mit Etappe.
+   Grund: Testbarkeit, eine Stelle für Prüfungen und kein Schlüssel ohne Wirkung.
 6. **Kein Nachladen im Betrieb** außer Geheimnis-Rotation (Signierschlüssel, Webhook-Geheimnisse),
    die der Secret-Provider meldet. Grund: Vorhersagbares Verhalten; halb übernommene Grenzen sind
    schwerer zu diagnostizieren als ein Neustart.
@@ -759,25 +872,38 @@ Server lädt.
 
 ### 14.1 Fehlerarten
 
-`kernel/errs` kennt diese Arten. Jeder Fehler trägt einen stabilen `code` (snake_case). Die
-`type`-URIs und den Körper nach RFC 9457 legt [06-api.md](06-api.md) fest (ADR 0015). Das Gateway
-nutzt dieselben Codes in der Op `error`.
+`kernel/errs` kennt diese Arten. Jeder Fehler trägt einen stabilen öffentlichen `code` aus der
+geschlossenen Liste in [06-api.md](06-api.md), Abschnitt 5; die Art folgt aus dem Code, nie aus dem
+Aufrufer. `type`-URIs und Körper nach RFC 9457 legt 06 fest (ADR 0015). Das Gateway nutzt dieselben
+Codes in der Op `error`.
 
-| Art | HTTP | Beispiele für `code` |
+| Art | HTTP | Codes aus 06 (Beispiele) |
 |---|---|---|
-| `bad_request` | `400` | `malformed_json`, `invalid_cursor` |
-| `unauthenticated` | `401` | `token_expired`, `dpop_invalid` |
+| `bad_request` | `400` | `validation_failed`, `malformed_request`, `cursor_invalid` |
+| `unauthenticated` | `401` | `unauthenticated`, `token_expired`, `invalid_dpop_proof` |
 | `step_up_required` | `401` | `step_up_required` |
-| `forbidden` | `403` | `insufficient_level`, `capability_missing` |
+| `forbidden` | `403` | `forbidden`, `scope_missing`, `channel_read_only` |
 | `not_found` | `404` | `not_found` (auch ohne Leserecht) |
-| `conflict` | `409` | `version_conflict`, `already_started`, `request_in_progress` |
+| `method_not_allowed` | `405` | `method_not_allowed` |
+| `conflict` | `409` | `conflict`, `already_started`, `request_in_progress` |
 | `invariant_violation` | `409` | `i1_violation`, `last_owner` |
 | `gone` | `410` | `message_deleted`, `resync_required` |
+| `precondition_failed` | `412` | `version_conflict` |
 | `too_large` | `413` | `payload_too_large` |
-| `unprocessable` | `422` | `validation_failed`, `idempotency_key_reuse` |
+| `unsupported_media_type` | `415` | `unsupported_media_type` |
+| `range_not_satisfiable` | `416` | `range_not_satisfiable` |
+| `unprocessable` | `422` | `idempotency_key_reuse` |
+| `precondition_required` | `428` | `precondition_required` |
 | `rate_limited` | `429` | `rate_limited` mit `Retry-After` |
-| `unavailable` | `503` | `dependency_unavailable`, `db_pool_exhausted`, `shutting_down`, `deadline_exceeded` mit `Retry-After` |
-| `internal` | `500` | `internal`, `unknown_action`, `authz_not_checked` |
+| `internal` | `500` | `internal_error` |
+| `unavailable` | `503` | `unavailable`, `maintenance`, immer mit `Retry-After` (`http.unavailable_retry_after`) |
+
+Gründe einer Ablehnung (`level_insufficient`, `capability_missing` usw., 07 Abschnitt 4.1) sind
+keine Codes: Sie stehen im Audit und, wo 06 es vorsieht, in der Erweiterung `reason`; der Code ist
+`forbidden`. Interne Ursachen sind Bezeichner für Log und Metrik, nie Teil einer Antwort:
+`authz_not_checked`, `unknown_action` (beide `500 internal_error`), `db_pool_exhausted`,
+`shutting_down`, `deadline_exceeded`, `dependency_unavailable` (alle `503 unavailable`). Grund:
+06 hält die geschlossene Menge öffentlicher Codes, und interne Zustände gehören nicht in Antworten.
 
 Interne Details (SQL-Fehler, Stack) stehen nur im Log mit `correlation_id`, nie in der Antwort.
 
@@ -801,8 +927,10 @@ Idempotenz die Wiederholung des Clients.
 
 ### 14.3 Wiederholungen
 
-- Im Anfragepfad: nur der ganze Unit of Work bei `40P01` und `55P03` (Abschnitt 8.2). Keine
-  Wiederholung externer Aufrufe im Anfragepfad (es gibt dort keine).
+- Im Anfragepfad: nur der ganze Unit of Work bei `40P01` und `55P03` (Abschnitt 8.2). Nach
+  `database.tx_retry_max` Wiederholungen endet er mit Fehlerart `unavailable` (`503 unavailable`
+  mit `Retry-After`); der Datenbankfehler steht nur im Log. Keine Wiederholung externer Aufrufe im
+  Anfragepfad (es gibt dort keine).
 - In Jobs: River mit Backoff; Fachkapitel können eigene Regeln setzen.
 - Clients wiederholen nach 04 (Ausgangsfach, Full Jitter).
 
@@ -833,36 +961,57 @@ Clients nehmen nach 04 wieder auf.
 ### 15.1 Start
 
 1. Konfiguration laden und prüfen (Abschnitt 13), Telemetrie starten.
-2. Geheimnisse auflösen.
-3. Datenbank erreichen, höchstens `startup.dependency_wait` lang mit Backoff.
+2. Geheimnisse auflösen. Der interne Listener öffnet jetzt, damit der Orchestrator `/healthz`
+   sieht und `/readyz` mit `startup` scheitert, solange der Start läuft.
+3. Datenbank erreichen, höchstens `startup.dependency_wait` lang mit Backoff; danach Abbruch.
 4. Schema-Version prüfen: Das Binary kennt die kleinste nötige Version. Ist die Datenbank älter,
-   bricht der Start mit Hinweis auf `bothy migrate up` ab. Neuere Versionen sind erlaubt, weil
-   Migrationen nach Erweitern und Zusammenziehen gebaut sind (ADR 0007).
-5. Instanz laden; ohne `setup_completed_at` startet nur der Einrichtungsweg (08).
-6. Routen registrieren und Routen-Metadaten prüfen: Jede Operation hat eine bekannte Aktion, sonst
+   bricht der Start mit Hinweis auf `bothy migrate up` ab (Exitcode `1`). Neuere Versionen sind
+   erlaubt, weil Migrationen nach Erweitern und Zusammenziehen gebaut sind (ADR 0007).
+5. Instanz laden (fehlt die Zeile: Abbruch mit Hinweis auf `bothy migrate up`); ohne
+   `setup_completed_at` startet nur der Einrichtungsweg (08). Verlangt
+   `instance.min_server_version` eine neuere Version als die eigene, läuft der Prozess weiter,
+   wird aber nie bereit: `/readyz` scheitert mit `schema_requires_newer_server`.
+6. Signierschlüssel sicherstellen: Jeder Zweck ohne `active`-Schlüssel bekommt einen
+   ([19-sicherheit.md](19-sicherheit.md), Abschnitt 10; ADR 0066).
+7. Routen registrieren und Routen-Metadaten prüfen: Jede Operation hat eine bekannte Aktion, sonst
    Abbruch (05, Regel 3).
-7. Rolle `api`: Log-Tail starten, `local_head` auf den aktuellen Kopf, Listener öffnen.
-   Rolle `worker`: River und Verbraucher starten.
-8. Bereit melden.
+8. Rolle `api`: Log-Tail starten, `local_head` auf den aktuellen Kopf, öffentlichen Listener
+   öffnen. Rolle `worker`: River und Verbraucher starten.
+9. Bereit melden.
+
+Grund für Abbruch bei zu altem Schema, aber "nicht bereit" bei `min_server_version`: Ein Binary
+vor einem zu alten Schema findet seine Tabellen nicht; weiterlaufen hätte keinen Nutzen. Ein zu
+altes Binary vor einem neueren Schema (Rückweg über mehr als eine Version) könnte laufen, darf es
+aber nicht; als nicht bereiter Prozess zeigt es den Grund auf `/readyz` und hält den Orchestrator
+nicht in einer Neustart-Schleife (R-AR-16).
 
 ### 15.2 Health
 
 Auf dem internen Listener `server.internal_listen_addr`, nicht in der öffentlichen API
 (R-AR-13, Ruling L2); Pfade und Fehlercodes legt [16-betrieb.md](16-betrieb.md), Abschnitt 4.2 fest:
 
-- `/healthz` (lebt): Prozess antwortet, Log-Tail und Hub laufen (api) bzw. River-Client läuft
-  (worker).
-- `/readyz` (bereit): Start abgeschlossen, Datenbank erreichbar, Schema passend
-  (`instance.min_server_version`), kein Shutdown begonnen.
+- `/healthz` (lebt): Der Prozess antwortet. Fällt der Log-Tail, der Hub (api) oder der
+  River-Client (worker) unerwartet aus, beendet sich der Prozess mit Exitcode `1` (Abschnitt
+  14.5); darum braucht `/healthz` keine eigene Prüfung dafür.
+- `/readyz` (bereit): Start abgeschlossen (`startup`), Datenbank erreichbar (`database`), Version
+  zum Schema passend (`schema_requires_newer_server`), je Zweck ein aktiver Signierschlüssel
+  (`signing_keys`), kein Shutdown begonnen (`shutting_down`). Weitere Prüfungen bringen die
+  Fachkapitel mit (z. B. `trusted_header_requires_loopback`, 16 Abschnitt 4.3). Antwortformat:
+  16, Abschnitt 4.2.
 
 Grund für den eigenen Listener: Health braucht keine Anmeldung und keine Aktion, darf aber nicht
 öffentlich erreichbar sein. Darum hat Health keinen Eintrag im Aktionskatalog (05, R-AZ-22).
 
 ### 15.3 Shutdown
 
-Signale `SIGTERM` und `SIGINT` starten ihn, ein zweites Signal beendet sofort. Gesamtfrist
-`shutdown.total_timeout`; der Orchestrator muss länger warten (Compose `stop_grace_period`,
-[16-betrieb.md](16-betrieb.md)).
+Signale `SIGTERM` und `SIGINT` starten ihn, ein zweites Signal beendet sofort (Exitcode `3`).
+Gesamtfrist `shutdown.total_timeout`; jeder Schritt läuft höchstens mit seinem eigenen Budget und
+dem Rest der Gesamtfrist. Beim Verdrahten darf die Summe der Schritt-Budgets
+(`shutdown.drain_delay`, `shutdown.http_grace`, `shutdown.jobs_soft_timeout`,
+`shutdown.telemetry_flush_timeout`) `shutdown.total_timeout` nicht übersteigen, sonst bricht der
+Start ab (Exitcode `2`). Der Orchestrator muss länger warten: Compose setzt `stop_grace_period`
+größer als `shutdown.total_timeout` ([infra/compose/compose.yaml](../../infra/compose/compose.yaml),
+ein Test hält es).
 
 Rolle `api`:
 
@@ -985,7 +1134,7 @@ das Ziel "ungeprüft" (Tickets).
 | R-AR-10 | Kurzlebige Ereignisse über Knoten nur als ID-Signal (`NOTIFY ephemeral`), nur im Modus `multi`. | R-Stack: NOTIFY ohne Inhalt; jedes NOTIFY kostet eine instanzweite Sperre beim Commit. |
 | R-AR-11 | Gateway-Sitzungen nur im Prozess; fremder Knoten antwortet auf `resume` mit `4006`. | Kein geteilter Sitzungsspeicher; `identify` mit Cursor liefert dasselbe Nachholen. |
 | R-AR-12 | Rate-Limits im Prozess, bei mehreren Knoten je Knoten. | Kein weiterer Dienst; Grenzen sind Schutz, keine Abrechnung. |
-| R-AR-13 | Health und optionale Metriken auf eigenem Ops-Listener außerhalb der öffentlichen API. | Ohne Anmeldung nutzbar für Orchestrator, aber nicht öffentlich; keine Aktion im Katalog nötig. |
+| R-AR-13 | Health auf dem internen Listener außerhalb der öffentlichen API; Metriken nur über OTLP, kein Metrik-Endpunkt (ADR 0034). | Ohne Anmeldung nutzbar für Orchestrator, aber nicht öffentlich; keine Aktion im Katalog nötig. |
 | R-AR-14 | Nachweis je Anfrage, dass `authorize` mit der Aktion der Route lief. | Hält B7 zur Laufzeit, nicht nur in der Spec. |
 | R-AR-15 | Trennung Konfiguration (Betreiber, Neustart) und Einstellungen (Owner, Datenbank, sofort); unbekannte Schlüssel brechen den Start ab. | Klare Zuständigkeit; Tippfehler fallen sofort auf. |
 | R-AR-16 | Migrationen nur über `bothy migrate`, nie implizit beim Start; Server prüft die Schema-Version. | Kein gleichzeitiges Migrieren mehrerer Knoten, keine Neustart-Schleife. |
@@ -1017,8 +1166,6 @@ Kern-Vertrag (Integration vom 2026-10-10):
 
 ## 21. Offen
 
-- Go-Modulpfad: hängt am Ort des öffentlichen Repos (Abschnitt 6). Bis zur Entscheidung steht in
-  allen Plänen der Platzhalter `<go-module>`.
 - Werkzeug für Go-Typen aus AsyncAPI 3.0: entscheidet [06-api.md](06-api.md); bis dahin
   handgeschriebene Typen mit Vertragstest gegen die Schemas.
 - Ob `PollOnly` für River unter Last nötig ist (eigene NOTIFY-Last von River), zeigt
@@ -1026,58 +1173,68 @@ Kern-Vertrag (Integration vom 2026-10-10):
 
 ## 22. Konfigurationswerte dieses Kapitels
 
-Standardwerte. Leistungsziele (`perf.*`) sind Schwellen für Tests, keine Laufzeit-Konfiguration.
+Standardwerte. Leistungsziele (`perf.*`, Ort `Lasttest`) sind Schwellen für Tests, keine
+Laufzeit-Konfiguration: Sie haben keinen Umgebungsnamen, stehen nicht im Konfigurationsschema des
+Servers, und `make perf` liest sie aus dieser Tabelle (ADR 0063).
 Listener, Rolle, öffentliche URL, vertrauenswürdige Proxys und die Verbindungsdaten der Datenbank
 (`server.*`, `database.host` bis `database.max_conns`) führt [16-betrieb.md](16-betrieb.md); die
 Grenzen ausgehender Aufrufe (`egress.*`) führt [19-sicherheit.md](19-sicherheit.md).
 
-| Name | Standard | Bedeutung |
-|---|---|---|
-| `cluster.mode` | `single` | `single` oder `multi` (mehrere api-Knoten) |
-| `http.read_header_timeout` | `5s` | Frist für Kopfzeilen |
-| `http.request_timeout` | `15s` | Kontext-Frist normaler Anfragen |
-| `http.transfer_timeout` | `10m` | Frist für Upload und Download |
-| `http.idle_timeout` | `120s` | Leerlauf von Keep-Alive-Verbindungen |
-| `http.max_header_bytes` | `65536` | größte Kopfzeilen |
-| `http.max_json_body_bytes` | `1048576` | größter JSON-Körper; größer als `message.max_content_bytes` plus Umschlag |
-| `database.acquire_timeout` | `2s` | Warten auf eine Pool-Verbindung |
-| `database.statement_timeout` | `5s` | Frist je SQL-Anweisung |
-| `database.lock_timeout` | `2s` | Frist für Sperren |
-| `database.idle_in_tx_timeout` | `10s` | offene Transaktion ohne Arbeit |
-| `database.tx_retry_max` | `2` | Wiederholungen des Unit of Work bei `40P01` und `55P03` |
-| `database.listen_reconnect_backoff_cap` | `10s` | größter Abstand beim Neuaufbau von `LISTEN` |
-| `startup.dependency_wait` | `60s` | Warten auf die Datenbank beim Start |
-| `sync.log_poll_interval` | `1s` | Poll des Log-Tails ohne `NOTIFY` |
-| `sync.tail_batch_size` | `1000` | Ereignisse je Lesevorgang des Log-Tails |
-| `gateway.write_timeout` | `10s` | Frist für einen WebSocket-Schreibvorgang |
-| `consumer.batch_size` | `500` | Ereignisse je Runde eines Worker-Verbrauchers |
-| `consumer.poll_interval` | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` |
-| `jobs.schema` | `jobs` | PostgreSQL-Schema der River-Tabellen |
-| `jobs.queue.default.max_workers` | `8` | Parallelität `default` |
-| `jobs.queue.files.max_workers` | `2` | Parallelität `files` |
-| `jobs.queue.delivery.max_workers` | `16` | Parallelität `delivery` |
-| `jobs.queue.maintenance.max_workers` | `2` | Parallelität `maintenance` |
-| `jobs.queue.privacy.max_workers` | `1` | Parallelität `privacy` |
-| `shutdown.drain_delay` | `5s` | Warten nach `ready = false` |
-| `shutdown.http_grace` | `20s` | Frist für laufende HTTP-Anfragen |
-| `shutdown.jobs_soft_timeout` | `20s` | weicher Stopp von River |
-| `shutdown.telemetry_flush_timeout` | `5s` | Telemetrie leeren |
-| `shutdown.total_timeout` | `45s` | gesamte Frist bis zum Ende |
-| `perf.reference_profile` | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 lokal, Rolle all` | Umgebung der Lasttests |
-| `perf.sustained_messages_per_s` | `200` | Dauerlast für `perf.message_create_p99` |
-| `perf.message_create_p99` | `150ms` | Ziel |
-| `perf.event_commit_min_per_s` | `1000` | Ziel (Mindestwert) |
-| `perf.fanout_local_p99` | `200ms` | Ziel |
-| `perf.fanout_cross_node_p99` | `500ms` | Ziel |
-| `perf.invocation_delivery_p99` | `500ms` | Ziel |
-| `perf.run_patch_fanout_p99` | `500ms` | Ziel |
-| `perf.catchup_page_p99` | `250ms` | Ziel |
-| `perf.authorize_cached_p99` | `100us` | Ziel |
-| `perf.ws_connections_per_node` | `5000` | Ziel (Mindestwert) |
-| `perf.ws_idle_conn_mem_max` | `64KiB` | Ziel (Höchstwert) |
-| `perf.idle_rss_max` | `256MiB` | Ziel (Höchstwert) |
-| `perf.startup_ready_max` | `5s` | Ziel (Höchstwert) |
-| `perf.push_handoff_p95` | `2s` | Ziel |
+| Name | Ort | Standard | Bedeutung |
+|---|---|---|---|
+| `cluster.mode` | Server | `single` | `single` oder `multi` (mehrere api-Knoten) |
+| `http.read_header_timeout` | Server | `5s` | Frist für Kopfzeilen |
+| `http.request_timeout` | Server | `15s` | Kontext-Frist normaler Anfragen |
+| `http.transfer_timeout` | Server | `10m` | Frist für Upload und Download |
+| `http.idle_timeout` | Server | `120s` | Leerlauf von Keep-Alive-Verbindungen |
+| `http.max_header_bytes` | Server | `65536` | größte Kopfzeilen |
+| `http.max_json_body_bytes` | Server | `1048576` | größter JSON-Körper; echt größer als `message.max_content_bytes` (13, Punkt 4) |
+| `http.max_json_depth` | Server | `32` | größte Schachtelungstiefe eines JSON-Körpers (SEC-IN-2); ein Test hält, dass jedes Anfrage-Beispiel in `openapi.yaml` darunter bleibt |
+| `http.unavailable_retry_after` | Server | `5s` | `Retry-After` jeder Antwort `503 unavailable` (in ganzen Sekunden) |
+| `database.acquire_timeout` | Server | `2s` | Warten auf eine Pool-Verbindung |
+| `database.statement_timeout` | Server | `5s` | Frist je SQL-Anweisung |
+| `database.lock_timeout` | Server | `2s` | Frist für Sperren |
+| `database.idle_in_tx_timeout` | Server | `10s` | offene Transaktion ohne Arbeit |
+| `database.tx_retry_max` | Server | `2` | Wiederholungen des Unit of Work bei `40P01` und `55P03` |
+| `database.listen_reconnect_backoff_cap` | Server | `10s` | größter Abstand beim Neuaufbau von `LISTEN` |
+| `startup.dependency_wait` | Server | `60s` | Warten auf die Datenbank beim Start |
+| `sync.log_poll_interval` | Server | `1s` | Poll des Log-Tails ohne `NOTIFY` |
+| `sync.tail_batch_size` | Server | `1000` | Ereignisse je Lesevorgang des Log-Tails |
+| `sync.partition_maintenance_interval` | Server | `10m` | Abstand des Jobs `sync.partition_maintenance` |
+| `sync.event_log_partitions_ahead` | Server | `3` | Partitionen von `event_log`, die vor dem Kopf bereitstehen; mit `sync.event_log_partition_size` reichen sie bei `perf.event_commit_min_per_s` länger als zwei Abstände `sync.partition_maintenance_interval` |
+| `gateway.write_timeout` | Server | `10s` | Frist für einen WebSocket-Schreibvorgang |
+| `consumer.batch_size` | Server | `500` | Ereignisse je Runde eines Worker-Verbrauchers |
+| `consumer.poll_interval` | Server | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` |
+| `sync.idempotency_cleanup_interval` | Server | `1h` | Abstand des Jobs `sync.idempotency_cleanup` |
+| `sync.idempotency_cleanup_batch_size` | Server | `1000` | Zeilen je Löschstapel von `sync.idempotency_cleanup` |
+| `ratelimit.max_tracked_keys` | Server | `100000` | höchstens so viele Rate-Limit-Eimer hält ein Prozess; darüber werden volle, dann älteste Eimer entfernt |
+| `ratelimit.sweep_interval` | Server | `1m` | Abstand, in dem volle Eimer entfernt werden (ein voller Eimer entscheidet wie ein fehlender) |
+| `jobs.schema` | Server | `jobs` | PostgreSQL-Schema der River-Tabellen |
+| `jobs.queue.default.max_workers` | Server | `8` | Parallelität `default` |
+| `jobs.queue.files.max_workers` | Server | `2` | Parallelität `files` |
+| `jobs.queue.delivery.max_workers` | Server | `16` | Parallelität `delivery` |
+| `jobs.queue.maintenance.max_workers` | Server | `2` | Parallelität `maintenance` |
+| `jobs.queue.privacy.max_workers` | Server | `1` | Parallelität `privacy` |
+| `shutdown.drain_delay` | Server | `5s` | Warten nach `ready = false` |
+| `shutdown.http_grace` | Server | `20s` | Frist für laufende HTTP-Anfragen |
+| `shutdown.jobs_soft_timeout` | Server | `20s` | weicher Stopp von River |
+| `shutdown.telemetry_flush_timeout` | Server | `5s` | Telemetrie leeren |
+| `shutdown.total_timeout` | Server | `60s` | gesamte Frist bis zum Ende; mindestens die Summe der Schritt-Budgets (15.3) |
+| `perf.reference_profile` | Lasttest | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 lokal, Rolle all` | Umgebung der Lasttests |
+| `perf.sustained_messages_per_s` | Lasttest | `200` | Dauerlast für `perf.message_create_p99` |
+| `perf.message_create_p99` | Lasttest | `150ms` | Ziel |
+| `perf.event_commit_min_per_s` | Lasttest | `1000` | Ziel (Mindestwert) |
+| `perf.fanout_local_p99` | Lasttest | `200ms` | Ziel |
+| `perf.fanout_cross_node_p99` | Lasttest | `500ms` | Ziel |
+| `perf.invocation_delivery_p99` | Lasttest | `500ms` | Ziel |
+| `perf.run_patch_fanout_p99` | Lasttest | `500ms` | Ziel |
+| `perf.catchup_page_p99` | Lasttest | `250ms` | Ziel |
+| `perf.authorize_cached_p99` | Lasttest | `100us` | Ziel |
+| `perf.ws_connections_per_node` | Lasttest | `5000` | Ziel (Mindestwert) |
+| `perf.ws_idle_conn_mem_max` | Lasttest | `64KiB` | Ziel (Höchstwert) |
+| `perf.idle_rss_max` | Lasttest | `256MiB` | Ziel (Höchstwert) |
+| `perf.startup_ready_max` | Lasttest | `5s` | Ziel (Höchstwert) |
+| `perf.push_handoff_p95` | Lasttest | `2s` | Ziel |
 
 ## Quellen
 

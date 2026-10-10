@@ -35,6 +35,16 @@ Regeln:
 3. Ab Hauptversion 2 muss ein Go-Modulpfad auf `/v2` enden (gleiche Quelle) [belegt]. Ein
    Major-Sprung des Servers ist darum auch eine Änderung des Modulpfads.
 4. Die Datei `VERSION` und der Tag stimmen überein; ein Gate-Check prüft es.
+5. Der Server kennt seine Version aus `internal/platform/buildinfo` (`Version()`): eine Konstante
+   gleich `services/server/VERSION`, gehalten von einem Unit-Test; keine Linker-Flags. Grund: Ein
+   `go build` ohne Zusatz ergibt dieselbe Version wie der Release-Build. Sie dient
+   `service.version` (17), dem Vergleich mit `instance.min_server_version` (16, Abschnitt 10) und
+   den Image-Labels (Abschnitt 7).
+6. Neben den eingebetteten Migrationen steht die Konstante `MinServerVersion`: die älteste
+   Server-Version, die mit dem Schema dieser Migrationen laufen darf. Nach Regel M1 aus
+   [upgrade.md](../operations/upgrade.md) ist das die vorige Version; ein bewusster Bruch setzt die
+   eigene; vor dem ersten Release ist es die aktuelle. `bothy migrate up` schreibt sie nach
+   `instance.min_server_version`.
 
 ## 3. Semantische Versionierung je Komponente
 
@@ -114,14 +124,22 @@ belegt [vermutet]; das Release-Ticket prüft ihn am ersten echten Release.
 ## 7. Server-Images
 
 1. Plattformen linux/amd64 und linux/arm64, als ein Multi-Arch-Manifest (B12).
-2. Gebaut je Architektur auf eigenem Runner, nicht per Emulation.
+2. Nie per Emulation gebaut: `bothy-server` kompiliert das Go-Binary im Builder-Schritt auf der
+   Build-Plattform für die Zielarchitektur (ohne cgo, `--platform=$BUILDPLATFORM`); Images mit
+   Schritten, die auf der Zielarchitektur laufen müssen (`bothy-postgres`), entstehen je
+   Architektur auf eigenem Runner.
 3. `bothy-server` ist ein statisches Go-Binary (ohne cgo) auf einem minimalen Basis-Image ohne
-   Shell, Benutzer ohne Root. `HEALTHCHECK` und Compose rufen `bothy healthcheck` auf, weil keine
-   Shell und kein curl im Image sind.
+   Shell. Es läuft als unprivilegierter Benutzer mit uid und gid `65532`; `bothy secrets init`
+   setzt diesen Besitzer für die Geheimnisse von `server` und `migrate` (16, Abschnitt 5.3), und
+   das Image legt `secrets.signing_key_dir` mit diesem Besitzer und Modus `0700` an.
+   `HEALTHCHECK` und Compose rufen `bothy healthcheck` auf, weil keine Shell und kein curl im Image
+   sind.
 4. `bothy-postgres` baut auf dem offiziellen `postgres:18`-Image auf und enthält pgBackRest ab
    2.59.3 und `bothy-backupd` ([16-betrieb.md](16-betrieb.md) 8).
-5. Basis-Images sind per Digest gepinnt; Renovate hält sie aktuell.
-6. Labels nach OCI (`org.opencontainers.image.source`, `.version`, `.revision`, `.licenses`).
+5. Basis-Images sind per Digest gepinnt; Renovate hält sie aktuell; ein Check im Gate lehnt jedes
+   `FROM` ohne Digest ab (SEC-SC-4).
+6. Labels nach OCI (`org.opencontainers.image.source`, `.version`, `.revision`, `.licenses`);
+   Version, Revision und Quelle kommen als Build-Argumente, ein Build ohne Version scheitert.
 
 ## 8. App-Verteilung
 

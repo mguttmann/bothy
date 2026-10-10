@@ -63,11 +63,11 @@ Readiness gehören nicht zur öffentlichen API; sie liegen auf dem internen List
 | Ganzzahlen | `format: int64`. Sequenzen, Versionen und Beträge bleiben unter 2^53, damit JavaScript sie exakt darstellt; ein Server-Test prüft die Grenze bei der Vergabe. | JSON-Zahlen in JavaScript sind Gleitkomma. |
 | Geld | `amount_micros` (int64) plus `currency` (ISO 4217). | 03, R-DM-04. |
 | Kein `null` | Der Server sendet nie JSON `null`. Fehlt ein Feld, hat es keinen Wert. Clients behandeln ein empfangenes `null` wie ein fehlendes Feld. Werte werden über eigene Felder oder Modi entfernt (z. B. `use_global_order: true`, `OperatorSet.mode = none`), nie durch `null`. | dart-dio kennt den Null-Typ nicht [belegt, Q4]; ein Weg für alle Generatoren (R-API-03). |
-| Unbekanntes | Clients ignorieren unbekannte Felder, Enum-Werte, Ereignistypen und Problem-Codes. Der Server ignoriert unbekannte Felder in Anfragen. | Apps und Server werden unabhängig aktualisiert; neue Felder sind additiv (Abschnitt 13). |
+| Unbekanntes | Clients ignorieren unbekannte Felder, Enum-Werte, Ereignistypen und Problem-Codes. Der Server lehnt unbekannte Felder in Anfragen und Gateway-Rahmen ab (`400 validation_failed` bzw. Schließ-Code `4002`); schreibende Schemas haben `additionalProperties: false` ([19-sicherheit.md](19-sicherheit.md), SEC-IN-1; PLAN W7). Ob ein Server ein neues Feld kennt, sieht ein Client an `features` der Discovery. | Ein still verworfenes Feld verschluckt bei einem älteren Server eine Absicht; Antworten und Ereignisse bleiben additiv (Abschnitt 13). |
 | Medientypen | JSON als `application/json` (UTF-8); Fehler als `application/problem+json`; Datei-Teile als `application/octet-stream`; Bilder für Avatar und Logo als `multipart/form-data` (Teil `file`); Exporte als `application/x-ndjson`. | Ein Format je Zweck; NDJSON lässt große Exporte streamen. |
-| Größe | JSON-Körper bis `http.max_json_body_bytes` ([02-architektur.md](02-architektur.md)), sonst `413 payload_too_large`. Der Wert ist größer als `message.max_content_bytes`. | Schutz vor Speicherdruck ohne lange Nachrichten zu verhindern. |
+| Größe | JSON-Körper bis `http.max_json_body_bytes`, Schachtelung bis `http.max_json_depth` ([02-architektur.md](02-architektur.md)), sonst `413 payload_too_large` bzw. `400 malformed_request`. `http.max_json_body_bytes` ist echt größer als `message.max_content_bytes`. | Schutz vor Speicherdruck ohne lange Nachrichten zu verhindern. |
 | Caching | Authentifizierte JSON-Antworten tragen `Cache-Control: no-store`. Datei-Inhalte tragen `Cache-Control: private, immutable`, weil sich der Inhalt einer Datei-ID nie ändert. | Kein Inhalt in fremden Caches; der Client löscht bei `access.changed` selbst (04, 8.3). |
-| Korrelation | Jede Antwort trägt `Correlation-Id` (UUIDv7). Derselbe Wert steht in Problemen, Ereignissen (`correlation_id`) und im Audit. Clients setzen ihn nicht; Tracing läuft über W3C `traceparent` (Kapitel 17). | Ein fälschbarer Client-Wert würde Audit-Spuren verfälschen. |
+| Korrelation | Jede Antwort trägt `Correlation-Id`: die Trace-ID der Anfrage als UUID geschrieben (Schema `CorrelationId`, keine UUIDv7). Derselbe Wert steht in Problemen, Ereignissen (`correlation_id`) und im Audit. Der Server erzeugt ihn; eine gesendete `Correlation-Id` ignoriert er, und ein eingehender `traceparent` wird nur als Span-Link übernommen, nicht als Eltern-Trace ([17-observability.md](17-observability.md), Abschnitt 3). | Ein fälschbarer Client-Wert würde Audit-Spuren verfälschen. |
 | Client-Kennung | `User-Agent: <app>/<version> (<plattform>)`. | Diagnose und `min_client_versions` in der Discovery. |
 | CORS | Aus. Die Web-Konsole läuft auf demselben Origin. Ausnahmen nur über `api.cors_allowed_origins`. | Kleinste Angriffsfläche für Token im Browser. |
 | Client-IP | Für die Rate-Limit-Klasse `rl.public_auth` und das Audit gilt die Quell-IP; `Forwarded` und `X-Forwarded-For` nur von Absendern aus `server.trusted_proxies` ([16-betrieb.md](16-betrieb.md)). | Hinter einem Reverse-Proxy hätten sonst alle Clients dieselbe IP, oder Angreifer setzen sie selbst. |
@@ -172,8 +172,10 @@ Sitzung `auth.step_up_max_age` (03). Agenten- und App-Tokens bekommen bei solche
    in der Abfrage (P2). Sie liefern keine Gesamtzahlen.
 3. Kein Leserecht ergibt `404 not_found`, gleich ob es die Ressource gibt (R-AZ-01). Leserecht ohne
    nötige Stufe oder Zusatzrecht ergibt `403 forbidden`.
-4. Apps: Fehlt der Lese-Scope, verhält sich die API wie ohne Leserecht (`404`). Fehlt nur der
-   Schreib-Scope, antwortet sie `403 scope_missing`.
+4. Apps: Sichtbarkeit folgt der Freigabe. Hat eine App eine Freigabe auf den Kanal, antwortet die
+   API bei fehlendem Scope (lesend oder schreibend) mit `403 scope_missing`; ohne Freigabe ist der
+   Kanal unsichtbar (`404`). Grund: Die App kennt den Kanal aus ihrer Freigabe; ein `404` würde nur
+   die Fehlersuche erschweren ([07-rechte.md](07-rechte.md), Abschnitt 2.10).
 5. Invarianten: I1-Verletzung ergibt `409 i1_violation` mit `hint`; der letzte Owner ergibt
    `409 last_owner`; I3 beim Start eines Laufs `409 billing_mode_mismatch`, eine zu hohe
    Werkzeugklasse `409 tool_class_mismatch`. Ein schreibgeschützter Kanal ergibt
@@ -228,7 +230,7 @@ Bekannte Codes (erzeugt aus derselben Quelle wie openapi.yaml):
 | `forbidden` | 403 | Leserecht vorhanden, Stufe oder Zusatzrecht fehlt (R-AZ-01). | Nicht wiederholen; Bedienelement ausblenden. |
 | `scope_missing` | 403 | App hat den nötigen Scope nicht. | Owner bewilligt den Scope. |
 | `device_pending` | 403 | Gerät wartet auf Freigabe. | Warten, `GET /devices/{device_id}` abfragen. |
-| `channel_read_only` | 403 | Kanal schreibgeschützt (05, Regel 1.8); gilt auch für Owner. | Eingabe sperren und Hinweis zeigen; nicht wiederholen. |
+| `channel_read_only` | 403 | Kanal schreibgeschützt (05, Regel 1.8) oder archiviert (`reason: channel_archived`, 07 Abschnitt 4.5); gilt auch für Owner. | Eingabe sperren und Hinweis zeigen; nicht wiederholen. |
 | `feature_disabled` | 403 | Funktion per Schalter aus (z. B. persönliche Tokens). | Nicht wiederholen. |
 | `agent_invocation_denied` | 403 | `agent.invoke` lehnt ab; `reason` z. B. `billing_mode_personal_not_holder`, `project_not_ready`. | Grund anzeigen; nicht wiederholen. |
 | `invocation_token_invalid` | 403 | Aufruf-Marke falsch signiert, abgelaufen, für anderen Agenten oder `jti` passt nicht. | Adapter startet nichts; Lauf mit `failed` melden. |
@@ -297,12 +299,32 @@ Bekannte Codes (erzeugt aus derselben Quelle wie openapi.yaml):
    `request_in_progress`), `410`, `412`, `413`, `415`, `422`. Nicht gespeichert werden `401`,
    `429` und `5xx`. Darum klappt die Wiederholung nach Step-up, nach Token-Erneuerung und nach
    einer Drosselung mit demselben Schlüssel.
-3. Ohne `Idempotency-Key` bleiben POST-Operationen, die anders geschützt sind: Anmeldeabläufe
-   (einmalige Challenges und Codes, Refresh-Rotation), lesende POSTs (`previewGrant`,
-   `autocompleteCommand`, `validateManifest`, `verifyAuditChain`), die Agenten-Laufzeit
-   (`sendHeartbeat`, `ackAgentEvents` ist monoton, Lauf-Übergänge sind Compare-and-swap) und die
-   Fälle mit Client-ID oben. Die Liste prüft das Gate (Abschnitt 15, G2).
-4. `startRun` mit derselben Aufruf-Marke nach erfolgreichem Start antwortet `200` mit
+3. Ohne `Idempotency-Key` bleiben POST- und PATCH-Operationen, die anders geschützt sind:
+   - Anmelde-, Step-up- und Kopplungsabläufe sowie Zeremonien mit einmaliger Challenge (Identität
+     verknüpfen, Passkey registrieren): Challenges und Codes gelten einmal, Refresh rotiert;
+     `logout` wirkt wiederholt gleich.
+   - Lesende POSTs: `previewGrant`, `autocompleteCommand`, `validateManifest`, `verifyAuditChain`.
+   - `createFileTicket`: zustandslos und kurzlebig; eine Wiederholung erzeugt nur ein weiteres
+     Ticket (12, Abschnitt 9.2).
+   - `submitClientMetrics`: Kennzahlen ohne Inhalt; ein Doppel ist für Telemetrie unerheblich.
+   - Agenten-Laufzeit: `sendHeartbeat`, `ackAgentEvents` (monoton), Lauf-Übergänge und
+     `patchRun` (Compare-and-swap bzw. `base_version`), `answerAutocomplete` (die erste Antwort je
+     Anfrage gilt).
+   - Import: `applyImportBatch` und `createImportFile` über den Herkunftsschlüssel je Objekt
+     ([22-import-migration.md](22-import-migration.md)).
+   - Die Fälle mit Client-ID oben.
+   Die Liste prüft das Gate (Abschnitt 15, G2).
+4. Eine Wiederholung liefert die gespeicherte Antwort, ohne den Handler, die Schema-Prüfung oder
+   `authorize` erneut auszuführen; Authentisierung und Drosselung laufen vorher wie immer. Wer
+   gesperrt oder abgemeldet ist, bekommt also `401`; wem nur Rechte entzogen wurden, bekommt
+   innerhalb von `sync.idempotency_key_ttl` seine eigene frühere Antwort, die er schon einmal
+   bekommen durfte. `Correlation-Id` und `RateLimit` stammen von der aktuellen Anfrage; ein
+   gespeichertes Problem behält seine `correlation_id`. Weil `idempotency_keys` keine Kopfzeilen
+   speichert, bildet der Server ein `ETag` der Wiederholung aus `version` im gespeicherten Körper;
+   jede Operation mit Schlüssel und `ETag` hat darum `version` im Antwortkörper (Generator-Check).
+   Gespeichert wird nur ein Körper mit `application/json`; ein Körper über
+   `http.max_json_body_bytes` wird vor dem Fingerabdruck mit `413` abgelehnt und nicht gespeichert.
+5. `startRun` mit derselben Aufruf-Marke nach erfolgreichem Start antwortet `200` mit
    `Idempotent-Replay: true`; erst eine andere Marke bekommt `409 already_started`. Sonst würde ein
    Adapter, dessen Antwort verloren ging, einen laufenden Lauf nie bearbeiten (03
    `runs.started_jti`, 04 Abschnitt 15.3).
@@ -1077,7 +1099,7 @@ frühere Block "proposed" in docs/api/redocly.yaml ist leer und entfällt.
 | R-API-01 | Hauptversion im Pfad `/api/v1`, nur additive Änderungen innerhalb (ADR 0014). | Sichtbar in Logs und Proxys, einfach für generierte Clients. |
 | R-API-02 | Ressourcen-Pfade plus `POST .../<verb>` für Zustandswechsel. | Eine Aktion je Route; Grund und Audit gehören zum Wechsel. |
 | R-API-03 | Kein JSON `null`; fehlend heißt kein Wert; Entfernen über eigene Felder oder Modi. | dart-dio kennt den Null-Typ nicht; Go `omitempty` passt; PATCH ohne Dreiwertigkeit. |
-| R-API-04 | Clients ignorieren Unbekanntes; der Server ignoriert unbekannte Anfragefelder. | Unabhängige Updates von Apps und Servern. |
+| R-API-04 | Clients ignorieren Unbekanntes in Antworten und Ereignissen; der Server lehnt unbekannte Anfragefelder ab (W7, SEC-IN-1). | Unabhängige Updates von Apps und Servern, ohne dass ein älterer Server eine Absicht still verschluckt. |
 | R-API-05 | `oneOf` nur mit Diskriminator, kein `anyOf`, keine Typ-Arrays (Lint). | oapi-codegen macht aus Mehrtyp-Unions `any` (Baseline R-Stack). |
 | R-API-06 | Alle Schemas in openapi.yaml; asyncapi.yaml referenziert sie. | Eine Quelle für alle Generatoren. |
 | R-API-07 | Problem-`type` relativ mit vollem Pfad, plus `code`. | Kein gemeinsamer Host bei selbst gehosteter Software; RFC 9457 erlaubt es. |
@@ -1094,7 +1116,7 @@ frühere Block "proposed" in docs/api/redocly.yaml ist leer und entfällt.
 | R-API-18 | Generierter Code wird eingecheckt, Drift-Prüfung im Gate. | Review sieht Wirkungen; Builds ohne Generator. |
 | R-API-19 | Titel der Verträge neutral ("Chat Server API"), kein Produktname. | Name ist Konfiguration (Baseline Abschnitt 1, ADR 0044). |
 | R-API-20 | Unpaginierte Listen nur für kleine Mengen. | Weniger Aufrufe für Struktur; Wachstum über neue Endpunkte. |
-| R-API-21 | App ohne Lese-Scope bekommt `404`, mit Lese- ohne Schreib-Scope `403 scope_missing`. | Gleiches Verhalten wie fehlende Freigaben (R-AZ-01). |
+| R-API-21 | App mit Freigabe, aber ohne den Scope der Aktion bekommt `403 scope_missing`; ohne Freigabe `404`. | Sichtbarkeit folgt der Freigabe wie bei Menschen (R-AZ-01, 07 Abschnitt 2.10). |
 | R-API-22 | Jede Operation dokumentiert mindestens eine 4xx-Antwort; ausgenommen sind nur die Webhook-Ereignisse unter `webhooks:` mit Klasse `none`, die der Server sendet. Dafür ersetzt eine eigene Lint-Regel die eingebaute `operation-4xx-response`. | Webhook-Ereignisse beschreiben Anfragen an den Empfänger, keine Antworten des Servers; alles andere muss seine Fehler nennen. |
 
 ## 20. Konfigurationswerte dieses Kapitels
@@ -1109,8 +1131,8 @@ frühere Block "proposed" in docs/api/redocly.yaml ist leer und entfällt.
 | `api.stats_max_buckets` | `1000` | Zeit-Buckets je Statistik-Abfrage; mehr ergibt `400` |
 | `status.history_window` | `7d` | so lange zeigt die Statusseite gelöste Störungen |
 
-Werte anderer Kapitel, auf die dieses Kapitel verweist: `http.max_json_body_bytes`
-([02-architektur.md](02-architektur.md)), `server.trusted_proxies` ([16-betrieb.md](16-betrieb.md)),
+Werte anderer Kapitel, auf die dieses Kapitel verweist: `http.max_json_body_bytes`,
+`http.max_json_depth`, `http.unavailable_retry_after` ([02-architektur.md](02-architektur.md)), `server.trusted_proxies` ([16-betrieb.md](16-betrieb.md)),
 `auth.*` ([08-identitaet.md](08-identitaet.md), `auth.refresh_reuse_grace` in
 [03-datenmodell.md](03-datenmodell.md)), `command.autocomplete_timeout`
 ([09-agenten.md](09-agenten.md)), `file.upload_part_bytes`, `file.upload_session_ttl` und

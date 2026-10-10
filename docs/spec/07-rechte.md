@@ -249,6 +249,7 @@ verrät (bei `404` nie).
 | `dev_environment_foreign_thread` | `forbidden` | SR3, Thread läuft in einer fremden Umgebung |
 | `project_not_ready` | `forbidden` | Projektbindung nicht bereit (05, Abschnitt 5, Punkt 7) |
 | `channel_read_only` | `forbidden` | Kanal schreibgeschützt; schreibende und auslösende Aktionen gesperrt, auch für Owner (05, Regel 1.8); Problem-Code `channel_read_only` |
+| `channel_archived` | `forbidden` | Kanal oder sein Bereich archiviert; schreibende und auslösende Aktionen gesperrt, auch für Owner (Abschnitt 4.5); Problem-Code `channel_read_only` mit `reason` |
 | `run_active_other_agent` | `forbidden` | Thread hat einen aktiven Lauf eines anderen Agenten (05, Abschnitt 5, Punkt 8) |
 | `run_active` | `forbidden` | Modell-Befehl bei aktivem Lauf (05 `command.invoke`) |
 | `billing_mode_mismatch` | `invariant_violation` | `run.start` mit Ist-Modus ungleich Soll (I3); Problem-Code `billing_mode_mismatch` (`409`) |
@@ -327,6 +328,20 @@ Reihenfolge und Grund:
 - Schutzregeln zuletzt: Sie brauchen den vollen Kontext (Stufe, Lauf, Thread) und gelten auch für
   Owner, wo sie das sagen.
 
+Anforderungen, die Fakten einer späteren Etappe brauchen (Läufe, Sitzungen und Befehle der
+Agenten, Komponenten, Dateien, Webhooks, Import), stehen bis dahin als zurückgestellte Einträge im
+Katalog des Codes: Sie verhalten sich wie eine unbekannte Aktion (`500`, Alarm), und die
+Start-Prüfung lehnt jede Route, Op oder jeden Ereignistyp mit einer solchen Aktion ab. Das Ticket,
+das die Fakten liefert, ersetzt den Eintrag in derselben Änderung. Grund: Der Katalog ist ab M1
+geschlossen (AZ-P3), und eine noch nicht prüfbare Anforderung darf nie erlauben. `bedingt` in der
+Spalte "Step-up" (05, Abschnitt 2.4) gilt bis zum Ticket, das die Bedingung liefert, wie `ja`.
+
+Audit nach der Spalte "Audit" in 05: `authorize` übergibt jede Ablehnung und jeden Fehler an
+`kernel/auditing`; sie werden nach dem Rollback in eigener Transaktion geschrieben und je
+`audit.deny_aggregate_window` zusammengefasst (AZ-P13). Erlaubnisse einer Aktion mit Audit `ja`
+schreibt ihr Anwendungsfall in seiner Transaktion mit seinen Details, weil nur er die Details
+kennt; ein Test des Anwendungsfalls findet genau einen Eintrag.
+
 ### 4.3 Sichtbarkeit
 
 `visible(spec, p, eff, res)` ist wahr, wenn eines gilt:
@@ -352,6 +367,28 @@ Reihenfolge und Grund:
 5. Verletzt: Rollback, Antwort `409 invariant_violation` mit Code und Hinweis, Audit-Eintrag mit
    `decision = 'deny'` in eigener Transaktion.
 6. Sonst: `access.changed` je betroffenem Prinzipal, Audit, Commit.
+
+### 4.5 Archivierte Bereiche und Kanäle
+
+`space.archive` und `channel.archive` sind endgültig; 05 hat keine Gegenaktion. Die Daten bleiben
+für Aufbewahrung und Export.
+
+1. In einem archivierten Kanal und in jedem Kanal eines archivierten Bereichs ist die wirksame
+   Stufe jedes Prinzipals, Owner eingeschlossen, höchstens `read`. Aktionen, deren Recht `write`
+   oder `trigger` auf ein Ziel darin braucht, enden mit `forbidden` und Grund `channel_archived`
+   (HTTP `403 channel_read_only` mit `reason`). Lesen bleibt für alle, die vorher lesen durften.
+2. Verwaltende Änderungen an einem archivierten Bereich oder Kanal (Umbenennen, Verschieben,
+   Bediener, Tags) passieren `authorize`, aber `chat` lehnt sie mit `409 conflict` ab.
+3. Archivieren ist eine Rechte-Änderung (Spalte "Rechte" in 05): Rechte-Version erhöhen und
+   `access.changed` mit einem Eintrag in `changed` (Stufe `read`) für jeden, dessen Stufe darüber
+   lag.
+4. Die Listen der Seitenleiste (`listSpaces`, `listSpaceChannels`) zeigen Archiviertes nicht;
+   Einzelabruf, Verlauf und Suche liefern es weiter an Berechtigte.
+5. I1 betrachtet nur nicht archivierte Ziele ([10-backend-richtlinie.md](10-backend-richtlinie.md),
+   Abschnitt 5.3), weil dort niemand `trigger` hat.
+
+Grund: Archivieren soll einen Verlauf einfrieren, nicht verstecken; Lesen ohne Schreiben ist das
+Verhalten, das Menschen von archivierten Kanälen kennen, und ein Owner verliert dabei nichts.
 
 ## 5. Schutzregeln, die keine Freigabe aufhebt
 
@@ -527,6 +564,12 @@ Aufbau:
 7. `valid_until` = kleinstes `expires_at` aller benutzten Freigaben und Mitgliedschaften (oder
    unendlich).
 
+Grenze: Der Rechte-Stand kennt Kanäle, keine Threads. Die Bediener-Regel auf Thread-Ebene
+(Abschnitt 2.9, Punkt 2: `threads.operator_agent_id`) gilt darum bei `authorize` für den einzelnen
+Thread, aber nicht in Listenfiltern über `visible_channel_ids`. Ein Agent, der einen Thread in einem
+sonst nicht lesbaren Kanal bedient, sieht ihn in Listen nicht. Das schließt zu wenig ein und
+verrät nichts. Wie Agenten Threads lesen, entscheidet die Etappe M2 (Agenten-Plattform).
+
 ### 7.3 Gültigkeit des Caches
 
 Ein Cache-Eintrag gilt, solange beides zutrifft:
@@ -626,10 +669,15 @@ Gerät oder Sitzung widerrufen, Bediener geändert) wirkt in dieser Reihenfolge:
 Ein Ablauf ist kein Schreibvorgang. Die Entscheidung ist trotzdem sofort richtig, weil jeder Aufruf
 die Zeit prüft und `valid_until` den Cache ungültig macht. Damit Clients ihren Cache räumen und Läufe
 enden, läuft der Job `authz.expiry_sweep` alle `authz.expiry_sweep_interval`. Er findet Freigaben und
-Mitgliedschaften mit `expires_at` zwischen dem letzten und dem aktuellen Lauf und schreibt in einer
-Transaktion: Rechte-Version erhöhen, `access.changed`, `run.cancel_requested` für betroffene Läufe,
-Audit-Eintrag mit Systemaktion `grant.expire` bzw. `group.member.expire` (05, R-AZ-15). Die größte Verzögerung beim Räumen
-des Client-Caches ist damit `authz.expiry_sweep_interval`; die Zustellung neuer Inhalte endet sofort.
+Mitgliedschaften mit `expires_at` bis jetzt, deren Ablauf noch nicht gemeldet ist
+(`expiry_reported_at IS NULL`, 03), höchstens `authz.expiry_sweep_batch_max` Zeilen je Transaktion,
+und schreibt je Stapel in einer Transaktion: Rechte-Version erhöhen, `expiry_reported_at` setzen,
+`access.changed`, `grant.changed` mit `change = expired` bzw. `group.changed` mit
+`change = member_expired`, `run.cancel_requested` für betroffene Läufe, Audit-Eintrag mit
+Systemaktion `grant.expire` bzw. `group.member.expire` (05, R-AZ-15). Weil die Auswahl am
+gespeicherten Merker hängt und nicht an der Zeit des letzten Laufs, wird jeder Ablauf genau einmal
+gemeldet, auch nach einem Ausfall des worker. Die größte Verzögerung beim Räumen des Client-Caches
+ist `authz.expiry_sweep_interval`; die Zustellung neuer Inhalte endet sofort.
 
 ## 9. Anforderungen an die Admin-Oberfläche
 
@@ -692,9 +740,13 @@ Die Konsole zeigt die Vorschau vor jeder Bestätigung; der Step-up folgt danach.
 
 Der Job `authz.expiry_reminder` läuft mit `authz.expiry_sweep_interval` und findet Freigaben und
 Mitgliedschaften, die innerhalb von `authz.expiry_reminder_lead` ablaufen und noch nicht erinnert
-sind (Spalte `expiry_reminded_at` an `grants` und `group_memberships`, 03). Er schreibt das
-persönliche Ereignis `access.expiring` (05) an das Subjekt (bei Gruppen an die betroffene
-Person bzw. an den Owner) und an den Erteilenden. Die Konsole zeigt die Liste "Läuft bald ab" mit
+sind (Spalte `expiry_reminded_at` an `grants` und `group_memberships`, 03), höchstens
+`authz.expiry_sweep_batch_max` je Transaktion. Er schreibt das persönliche Ereignis
+`access.expiring` (05) an aktive Empfänger, ohne Doppel: bei Freigaben an einen Menschen, Agenten
+oder eine App an das Subjekt und an `granted_by`; bei Freigaben an eine Gruppe an alle aktiven
+Owner und an `granted_by` (eine Gruppe ist kein Prinzipal, der persönliche Ereignisse empfängt);
+bei Mitgliedschaften an das Mitglied und an `added_by`. Bei Freigaben auf die Instanz fehlt
+`target`, weil ein Ziel nur Bereich oder Kanal sein kann. Die Konsole zeigt die Liste "Läuft bald ab" mit
 "Verlängern" (Widerruf plus neue Freigabe mit neuem Grund). Es gibt keine E-Mails (Baseline
 Abschnitt 4).
 
@@ -798,7 +850,7 @@ DM zwischen Alex und Sam. Die Uhr ist in Tests steuerbar.
 | AZ-M32 | Tracker | Support/Eskalation | `message.create` | G-6, Scope `messages:write` | `allow` |
 | AZ-M33 | Tracker | Support/Eskalation | `message.read` | Scope `messages:read` fehlt | `forbidden` `scope_missing` |
 | AZ-M34 | Tracker | Support/Allgemein | `message.create` | keine Freigabe | `not_found` |
-| AZ-M35 | Sam (persönliches Token) | Marketing | `grant.create` | Token ohne Sitzung | `forbidden` `step_up_not_possible` |
+| AZ-M35 | Sam mit `trigger` + `manage` auf Marketing, persönliches Token | Marketing | `grant.create` Robin `read` | Token ohne Sitzung | `forbidden` `step_up_not_possible` |
 | AZ-M36 | Owner | Marketing | `grant.create` | Step-up älter als `auth.step_up_max_age` | `step_up_required` |
 | AZ-M37 | Alex mit `write` + `manage` auf Support | Support/Allgemein | `grant.create` Sam `trigger` | | `forbidden` `delegation_exceeds_own_level` |
 | AZ-M38 | Alex mit `trigger` + `manage` auf Support | Support/Allgemein | `grant.create` Sam `read` + `export` | Alex ohne `export` | `forbidden` `delegation_exceeds_own_capabilities` |
@@ -874,6 +926,7 @@ Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026
 |---|---|---|
 | `authz.expiry_sweep_interval` | `1m` | Abstand des Jobs, der Abläufe meldet und Erinnerungen schreibt |
 | `authz.expiry_reminder_lead` | `48h` | so lange vor Ablauf kommt die Erinnerung (Studie C: zwei Tage) |
+| `authz.expiry_sweep_batch_max` | `500` | Zeilen je Transaktion der Jobs `authz.expiry_sweep` und `authz.expiry_reminder` |
 | `authz.view_as_max_duration` | `15m` | Höchstdauer von "Als Person ansehen" |
 | `authz.snapshot_cache_max_entries` | `10000` | Rechte-Stände im Speicher je Prozess (LRU) |
 | `authz.not_found_timing_tolerance` | `20ms` | erlaubte Abweichung des Medians in AZ-P4 |
