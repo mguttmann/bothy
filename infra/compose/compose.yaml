@@ -67,11 +67,15 @@ x-api: &api
   image: ${BOTHY_REGISTRY:?BOTHY_REGISTRY fehlt in .env}/bothy-server:${BOTHY_VERSION:?BOTHY_VERSION fehlt in .env}
   command: ["serve", "--role=api"]
   restart: unless-stopped
+  # Länger als shutdown.total_timeout (02-architektur 15.3); ein Test hält das.
+  stop_grace_period: 75s
   <<: *hardening
   logging: *logging
   healthcheck: *server-healthcheck
   volumes:
     - files:/var/lib/bothy/files
+    # Schlüsselspeicher der Signierschlüssel, vom Server beschreibbar (ADR 0066).
+    - signing-keys:/var/lib/bothy/signing-keys
     - type: volume
       source: secrets
       target: /run/bothy/secrets
@@ -90,7 +94,8 @@ services:
   # ./secrets und legt je Dienst ein Unterverzeichnis an (nur Lesen für den Dienst).
   secrets-init:
     image: ${BOTHY_REGISTRY}/bothy-server:${BOTHY_VERSION}
-    command: ["secrets", "init", "--source", "/input", "--target", "/run/bothy/secrets"]
+    command: ["secrets", "init", "--source", "/input", "--target", "/run/bothy/secrets",
+              "--owner", "server=65532:65532", "--owner", "migrate=65532:65532"]
     user: "0:0"
     restart: "no"
     network_mode: none
@@ -98,6 +103,8 @@ services:
     volumes:
       - ./secrets:/input:ro
       - secrets:/run/bothy/secrets
+      # nur lesend, damit `bothy secrets export` den Schlüsselspeicher mitsichert (16 5.4)
+      - signing-keys:/var/lib/bothy/signing-keys:ro
 
   postgres:
     # postgres:18 plus pgBackRest; schreibt WAL über den Repository-Host `backup` (TLS).
@@ -162,6 +169,7 @@ services:
     environment:
       <<: *server-env
       BOTHY_SERVER__LISTEN_ADDR: ":8080"
+      BOTHY_SERVER__TRUSTED_PROXIES: ${BOTHY_TRUSTED_PROXIES:-127.0.0.1/32,::1/128}
     ports:
       - "127.0.0.1:${BOTHY_HTTP_PUBLISH_PORT:-8090}:8080"
     networks: [internal, default]
@@ -210,6 +218,7 @@ services:
     image: ${BOTHY_REGISTRY}/bothy-server:${BOTHY_VERSION}
     command: ["serve", "--role=worker"]
     restart: unless-stopped
+    stop_grace_period: 75s
     <<: *hardening
     logging: *logging
     healthcheck: *server-healthcheck
@@ -217,6 +226,7 @@ services:
       <<: *server-env
     volumes:
       - files:/var/lib/bothy/files
+      - signing-keys:/var/lib/bothy/signing-keys
       - type: volume
         source: secrets
         target: /run/bothy/secrets
@@ -456,6 +466,7 @@ networks:
 
 volumes:
   secrets: {}
+  signing-keys: {}
   pgdata: {}
   pgbackrest-repo: {}
   backup-scratch: {}

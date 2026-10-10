@@ -52,7 +52,7 @@ Prüfen: `docker compose ps`, `/readyz`, Statusseite, SLO-Dashboard, Version in 
 | M7 | Daten nachfüllen (Backfill) nie in der Migration, sondern als Hintergrundjob in Stapeln. | Kurze Transaktionen; Fortschritt sichtbar. |
 | M8 | Aufzählungen sind `text` mit `CHECK`; neue Werte sind additiv (R-DM-02). Code von N-1 muss unbekannte Werte vertragen. | Rückweg. |
 | M9 | Nutzlasten von Ereignissen ändern sich nur additiv (`schema_version`, [04-sync-protokoll.md](../spec/04-sync-protokoll.md) 2.2). | Alte Clients lesen weiter. |
-| M10 | Partitionen des Ereignis-Logs legt ein Job im Voraus an, nie eine Migration im Betrieb. | Kein DDL-Lock im heißen Pfad. |
+| M10 | Partitionen des Ereignis-Logs legt ein Job im Voraus an, nie eine Migration im Betrieb. `bothy migrate up` ruft nach den Migrationen dieselbe idempotente Routine, damit eine frische Datenbank Partitionen hat ([16-betrieb.md](../spec/16-betrieb.md) 7.1). | Kein DDL-Lock im heißen Pfad. |
 | M11 | Migrationen von River (Jobs) laufen im selben `migrate`-Lauf, in fester Reihenfolge vor den eigenen. | Ein Startschritt, ein Ergebnis. |
 | M12 | Keine Down-Migrationen in Produktion. Fehler korrigiert eine neue Migration. | Down-Migrationen sind selten getestet und löschen oft Daten. |
 
@@ -62,12 +62,17 @@ N-1).
 
 ## 5. Schema-Prüfung beim Start
 
-1. Jede Binärversion kennt die kleinste Migration, die sie braucht. Ist die angewandte Migration
-   kleiner, meldet `/readyz` `schema_too_old`.
-2. `migrate` schreibt nach jedem Lauf `instance.min_server_version`: die älteste Server-Version,
-   die mit dem neuen Schema laufen darf. Nach Regel M1 ist das die vorige Version; ein Release,
-   das bewusst bricht (Hauptversion), setzt die eigene. Ist die eigene Version kleiner, meldet
-   `/readyz` `schema_requires_newer_server` (03, `instance.min_server_version`).
+1. Jede Binärversion kennt die kleinste Migration, die sie braucht (die höchste eingebettete).
+   Ist die angewandte Migration kleiner, bricht der Start mit Hinweis auf `bothy migrate up` ab
+   (Exitcode `1`, [02-architektur.md](../spec/02-architektur.md) 15.1).
+2. `migrate` schreibt nach jedem Lauf `instance.min_server_version` aus der Konstante
+   `MinServerVersion` neben den eingebetteten Migrationen ([18-release.md](../spec/18-release.md),
+   Abschnitt 2): die älteste Server-Version, die mit dem neuen Schema laufen darf. Nach Regel M1 ist
+   das die vorige Version; ein Release, das bewusst bricht (Hauptversion), setzt die eigene; vor dem
+   ersten Release ist es die aktuelle. Ist die eigene Version kleiner, läuft der Server weiter, wird
+   aber nie bereit: `/readyz` meldet `schema_requires_newer_server` (03,
+   `instance.min_server_version`). Wer das Schema ändert, prüft beim Release, ob die Konstante
+   steigen muss.
 3. Ein neueres Schema ohne diese Sperre ist erlaubt; so funktioniert der Rückweg aus Abschnitt 3.
 4. `instance.schema_version` zeigt den Stand in der Admin-Konsole.
 

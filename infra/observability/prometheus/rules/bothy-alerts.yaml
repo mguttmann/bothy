@@ -90,6 +90,22 @@ groups:
           summary: "Agent {{ $labels.bothy_agent_handle }} reported a billing mode that differs from its policy."
           runbook_url: "docs/observability/alerting.md#bothybillingmodemismatch"
 
+      - alert: BothyAuthzError
+        expr: sum by (bothy_reason) (increase(bothy_authz_errors_total[15m])) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: "Rights check programming error ({{ $labels.bothy_reason }}): a route answered without its authorize check or an unknown action was checked."
+          runbook_url: "docs/observability/alerting.md#bothyauthzerror"
+
+      - alert: BothySecretRefreshFailing
+        expr: sum(increase(bothy_secrets_refresh_failures_total[15m])) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Re-reading a secret failed; the server keeps the previous value, so a rotation has not taken effect."
+          runbook_url: "docs/observability/alerting.md#bothysecretrefreshfailing"
+
       - alert: BothyMalwareScanFailing
         expr: sum(rate(bothy_file_scan_total{bothy_outcome="error"}[15m])) > 0 and sum(rate(bothy_file_scan_total{bothy_outcome=~"clean|infected"}[15m])) == 0
         for: 15m

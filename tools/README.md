@@ -27,5 +27,8 @@ Versionen laufen wie in CI. Einrichtung einmal je Klon: `make bootstrap`.
 
 Regeln für neue Werkzeuge: Python mit Standardbibliothek oder PyYAML (ein MkDocs-Hook
 zusätzlich mit MkDocs und Markdown aus derselben gepinnten Umgebung), eine Testdatei je
-Werkzeug, `SPDX-License-Identifier: Apache-2.0` in jeder Datei, ein make-Ziel, eine Zeile
-in dieser Tabelle und in docs/quality/toolchain.md.
+Werkzeug, `SPDX-License-Identifier: Apache-2.0` in jeder Datei, ein make-Ziel und eine Zeile
+in dieser Tabelle. Ein eigenes Prüfskript bekommt zusätzlich seine Zeile im Gate in
+docs/quality/gates.md; ein neues gepinntes Werkzeug eines Dritten (Binärdatei, Python- oder
+Node-Paket) bekommt seine Zeile in docs/quality/toolchain.md, weil deren Test die Versionen gegen
+die Pins hält.

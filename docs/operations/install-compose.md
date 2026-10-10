@@ -65,9 +65,17 @@ fest (Team C). Der Name des Befehls ist ein Vorschlag dieses Kapitels.
 ### 5.1 Profil `direct`
 
 Der Server ist auf `127.0.0.1:BOTHY_HTTP_PUBLISH_PORT` des Hosts erreichbar. Ein Reverse-Proxy
-terminiert TLS und leitet weiter, auch WebSocket-Upgrades auf `/api/v1/gateway`. Seine Adresse steht
-in `server.trusted_proxies`, damit Rate-Limits je Client-IP greifen. Anmeldung: OIDC oder lokale
-Konten; Header-Identität ist in diesem Profil gesperrt.
+terminiert TLS und leitet weiter, auch WebSocket-Upgrades auf `/api/v1/gateway`. Der Server sieht
+dabei nicht den Proxy, sondern das Gateway des Compose-Netzes als Gegenstelle. Dessen Adresse
+gehört in `BOTHY_TRUSTED_PROXIES` (setzt `server.trusted_proxies`):
+
+```
+docker network inspect <projekt>_default --format '{{(index .IPAM.Config 0).Gateway}}'
+```
+
+Ohne diesen Eintrag weist der Server jede Klartext-Verbindung ab (SEC-TLS-1), und Rate-Limits je
+Client-IP stimmen nicht. Anmeldung: OIDC oder lokale Konten; Header-Identität ist in diesem Profil
+gesperrt.
 
 ### 5.2 Profil `tailscale`
 

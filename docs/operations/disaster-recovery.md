@@ -54,7 +54,9 @@ automatische Wiederherstellungstest misst die Dauer bei jedem Lauf.
 
 ### Fall D: Signierschlüssel kompromittiert
 
-1. `signing_key.rotate` für den betroffenen Zweck (Owner, Step-up).
+1. `signing_key.rotate` mit `mode = emergency` für den betroffenen Zweck (Owner, Step-up): alle
+   Schlüssel des Zwecks werden sofort `retired`, ein neuer wird `active`. War der Schlüsselspeicher
+   (`secrets.signing_key_dir`) selbst betroffen, alle Zwecke rotieren.
 2. Alle Sitzungen widerrufen (`session.revoke` für alle) bei `access_token`; bei `invocation`
    reicht die Rotation, weil Marken nur `agent.invocation_token_ttl` gelten; bei `webhook_out`
    die Empfänger informieren.

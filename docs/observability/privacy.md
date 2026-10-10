@@ -34,14 +34,18 @@ die Mindestlänge meldete `otelcol-contrib validate`) [belegt].
 
 ## 3. Pseudonyme
 
-1. Menschen erscheinen in Spans und Logs nur als `bothy.principal.pseudo_id` =
-   HMAC-SHA-256(`telemetry.pseudonym_key_ref`, Prinzipal-ID), hex, gekürzt auf 32 Zeichen.
-2. Wer die Datenbank und den Schlüssel hat, kann ein Pseudonym einem Menschen zuordnen
-   (`bothy telemetry pseudonym <principal_id>` für die Fehlersuche des Owners). Ein
-   Telemetrie-Anbieter allein kann es nicht.
-3. Der Schlüssel wird jährlich rotiert (Ticket: Erinnerung in der Admin-Konsole). Nach einer
-   Rotation sind alte und neue Pseudonyme nicht verknüpfbar; das begrenzt Profile über lange
-   Zeit.
+1. Menschen erscheinen in Spans und Logs nur als `bothy.principal.pseudo_id`. Ableitung: Zeitraum
+   `p` = ganze Zahl aus Unix-Sekunden geteilt durch `privacy.telemetry_pseudonym_rotation` (UTC);
+   Zeitraum-Schlüssel `K_p` = HMAC-SHA-256(Geheimnis aus `telemetry.pseudonym_key_ref`,
+   `"bothy/telemetry-pseudonym/v1/"` + `p` dezimal); Pseudonym = HMAC-SHA-256(`K_p`, Prinzipal-ID
+   als UUID in Kleinbuchstaben), hex, gekürzt auf 32 Zeichen.
+2. Wer die Datenbank und das Geheimnis hat, kann ein Pseudonym einem Menschen zuordnen
+   (`bothy telemetry pseudonym <principal_id> [--at <Zeitpunkt>]` für die Fehlersuche des Owners).
+   Ein Telemetrie-Anbieter allein kann es nicht.
+3. Pseudonyme wechseln je Zeitraum und sind über Zeiträume ohne das Geheimnis nicht verknüpfbar;
+   das begrenzt Profile über lange Zeit. Es gibt nur ein Geheimnis zu hinterlegen
+   ([16-betrieb.md](../spec/16-betrieb.md) 5.4). Ein Wechsel des Geheimnisses selbst trennt
+   zusätzlich alle alten Pseudonyme.
 4. Agenten und Apps sind keine Menschen; ihre Handles stehen im Klartext.
 5. Objekt-IDs (Thread, Kanal, Nachricht, Lauf, Datei) stehen im Klartext in Spans und Logs, nie
    an Metriken. Sie sind zufällige UUIDs ohne Inhalt; nur mit Datenbankzugang lassen sie sich

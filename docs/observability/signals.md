@@ -49,6 +49,7 @@ Allowlist des Collectors, Dashboards, Regeln und SLOs nutzen nur Namen von hier.
 |---|---|---|---|---|---|
 | `http.server.request.duration` | Histogramm | `s` | `http.request.method`, `http.route`, `http.response.status_code`, `error.type` | otelhttp (Semantic Conventions HTTP, stabil) | `http_server_request_duration_seconds` |
 | `bothy.authz.decisions` | Zähler | `{decision}` | `bothy.action`, `bothy.decision` | api | `bothy_authz_decisions_total` |
+| `bothy.authz.errors` | Zähler | `{check}` | `bothy.reason` (`unknown_action`, `authz_not_checked`) | api: Programmfehler der Rechteprüfung ([02-architektur.md](../spec/02-architektur.md) 9.3, 07 Abschnitt 4.2) | `bothy_authz_errors_total` |
 | `bothy.ratelimit.rejected` | Zähler | `{request}` | `bothy.ratelimit.class` | api | `bothy_ratelimit_rejected_total` |
 | `bothy.gateway.connections.active` | UpDownCounter | `{connection}` | `bothy.principal.kind` | api | `bothy_gateway_connections_active` |
 | `bothy.gateway.connect.duration` | Histogramm | `s` | `bothy.outcome` (`ok`, `client_error`, `server_error`), `bothy.principal.kind` | api: Upgrade bis `ready` oder `resumed` | `bothy_gateway_connect_duration_seconds` |
@@ -103,8 +104,9 @@ Werkzeugnamen stehen nie an Metriken (offene Menge); die Statistik der Werkzeuga
 | `bothy.file.scan.duration` | Histogramm | `s` | `bothy.outcome` | worker | `bothy_file_scan_duration_seconds` |
 | `bothy.file.scan.queue` | Gauge | `{file}` | keine | worker | `bothy_file_scan_queue` |
 | `bothy.search.duration` | Histogramm | `s` | `bothy.outcome` | api | `bothy_search_duration_seconds` |
-| `bothy.job.duration` | Histogramm | `s` | `bothy.job.kind`, `bothy.outcome` | worker | `bothy_job_duration_seconds` |
+| `bothy.job.duration` | Histogramm | `s` | `bothy.job.kind`, `bothy.outcome` (`completed`, `failed`, `cancelled`, `snoozed`) | worker | `bothy_job_duration_seconds` |
 | `bothy.job.queue` | Gauge | `{job}` | `bothy.job.kind` | worker | `bothy_job_queue` |
+| `bothy.egress.blocked` | Zähler | `{request}` | `bothy.reason` (`url_not_allowed`, `scheme_not_allowed`, `host_not_allowed`, `address_blocked`, `redirect_not_allowed`) | api, worker: vom Egress-Client abgewiesene Verbindung ([19-sicherheit.md](../spec/19-sicherheit.md) SEC-NET-5) | `bothy_egress_blocked_total` |
 
 ### 4.5 Datenbank
 
@@ -130,6 +132,7 @@ Werkzeugnamen stehen nie an Metriken (offene Menge); die Statistik der Werkzeuga
 | `bothy.audit.verify.failures` | Zähler | `{run}` | keine | worker: periodische Prüfung der Hash-Kette | `bothy_audit_verify_failures_total` |
 | `bothy.audit.verify.last_success.timestamp` | Gauge | `s` | keine | worker | `bothy_audit_verify_last_success_timestamp_seconds` |
 | `bothy.telemetry.dropped` | Zähler | `{item}` | `bothy.signal` (`traces`, `metrics`, `logs`) | alle Prozesse | `bothy_telemetry_dropped_total` |
+| `bothy.secrets.refresh.failures` | Zähler | `{refresh}` | keine | alle Prozesse: erneutes Lesen eines Geheimnisses scheitert, der alte Wert bleibt ([02-architektur.md](../spec/02-architektur.md) 14.4) | `bothy_secrets_refresh_failures_total` |
 
 `bothy-backupd` sieht die Volumes `pgdata` und `files` nur lesend und misst dort nur den freien
 Platz.
@@ -154,11 +157,16 @@ vergleicht `le` in den SLO-Dateien mit dieser Tabelle.
 
 1. W3C Trace Context (`traceparent`, `tracestate`) an jeder HTTP-Anfrage; Apps erzeugen ihn
    selbst, weil es kein Dart-SDK gibt ([17-observability.md](../spec/17-observability.md) 9).
-2. Der Server übernimmt die Trace-ID und entscheidet das Sampling selbst
-   (`telemetry.traces.trust_remote_sampling`).
+2. Am öffentlichen Listener beginnt der Server für jede Anfrage einen eigenen Trace und hängt
+   einen eingehenden `traceparent` nur als Span-Link an (otelhttp-Option für öffentliche
+   Endpunkte). Trace-ID und Sampling kommen also vom Server. Nur mit
+   `telemetry.traces.trust_remote_parent` wird ein eingehender Kontext Eltern-Kontext; dann gelten
+   seine Trace-ID und sein Sampling-Flag, und ein Client wählt damit die `correlation_id` seiner
+   Anfragen selbst.
 3. `correlation_id` in `event_log` und `audit_events` ist die Trace-ID der auslösenden Anfrage
-   (16 Byte, als UUID geschrieben). Hat eine Anfrage keinen `traceparent`, erzeugt der Server eine
-   Trace-ID; jede Anfrage hat also eine.
+   (16 Byte, als UUID geschrieben, keine UUIDv7). Jede Anfrage hat eine gültige Trace-ID, auch mit
+   `telemetry.enabled = false`: Der Server behält dann einen SDK-Tracer-Provider mit
+   `NeverSample` und ohne Exporter. Jobs ohne Anfrage-Bezug haben keine.
 4. Ereignisse an Adapter tragen `trace_context` (W3C `traceparent`) der auslösenden Anfrage, wenn
    diese aufgezeichnet wurde (Umschlagfeld `trace_context`, 04 Abschnitt 2.2). Der Adapter macht daraus den
    Eltern-Kontext seines `invoke_agent`-Spans und gibt ihn als Umgebungsvariable `TRACEPARENT` an
@@ -178,7 +186,8 @@ vergleicht `le` in den SLO-Dateien mit dieser Tabelle.
 | `push.send` | CLIENT | worker | `bothy.push.provider`, `bothy.outcome` |
 | `webhook.deliver` | CLIENT | worker | `server.address`, `http.response.status_code`, `bothy.outcome` |
 | `file.scan` | CLIENT | worker | `bothy.file.id`, `bothy.outcome` |
-| `job <bothy.job.kind>` | CONSUMER | worker (River) | `bothy.job.kind`, `bothy.outcome` |
+| `job <bothy.job.kind>` | CONSUMER | worker (River) | `bothy.job.kind`, `bothy.outcome` (`completed`, `failed`, `cancelled`, `snoozed`) |
+| `txn.subscribe <Abonnent>` | INTERNAL | api, worker: je In-Tx-Abonnent ([02-architektur.md](../spec/02-architektur.md) 8.3) | `bothy.outcome` (`ok`, `veto`) |
 | Datenbank | CLIENT | otelpgx | `db.system.name`, `db.namespace`, `db.operation.name`, `db.query.text` (mit Platzhaltern, nie Parameter) |
 | `invoke_agent <gen_ai.agent.name>` | CLIENT | Adapter (SDK) | `gen_ai.*` aus Abschnitt 6, `bothy.run.id` |
 | `execute_tool <gen_ai.tool.name>` | INTERNAL | Adapter (SDK) | `gen_ai.tool.name`, `bothy.outcome` |
@@ -222,8 +231,10 @@ Diese Liste ist gleich der Allowlist in [infra/otel/collector.yaml](../../infra/
    "anthropic"` (https://github.com/open-telemetry/semantic-conventions-genai, abgerufen
    2026-10-10) [belegt].
 2. Je Codebasis gibt es genau ein Paket mit allen `gen_ai.*`-Schlüsseln: im Server
-   `internal/telemetry/genai`, in den SDKs ein Modul `telemetry.genai`. Der Rest des Codes nutzt
-   nur dessen Konstanten. Das Paket nennt den Stand der Konvention (Commit des Repositorys).
+   `internal/platform/otel/genai` (02, PLAN W8), in den SDKs ein Modul `telemetry.genai`. Der Rest
+   des Codes nutzt nur dessen Konstanten. Das Paket nennt den Stand der Konvention: Repository,
+   Status und Abrufdatum, dazu den Commit, sobald ihn ein Ticket mit Netzzugang gelesen hat. Der
+   Commit ist bei der Planung nicht festgehalten worden [offen].
 3. Ein Snapshot-Test hält die genutzten Schlüssel fest; eine neue Konvention ändert Paket und
    Snapshot in einer Änderung und Allowlist sowie Dashboards in derselben Änderung.
 4. Nie gesendet: `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`,

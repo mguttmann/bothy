@@ -62,6 +62,8 @@ Tabelle; die Regeldatei muss ihm folgen (Check im Bau-Ticket "Alarm-Schwellen au
 | `BothyAgentConsumerLag` | ticket | über 1000 Ereignisse Rückstand des Verbrauchers | |
 | `BothyAgentOffline` | ticket | kein Heartbeat seit 5 Minuten | über `agent.presence_timeout` |
 | `BothyBillingModeMismatch` | page | Ist-Modus weicht vom Soll ab (I3) | |
+| `BothyAuthzError` | page | Rechteprüfung meldet einen Programmfehler (`authz_not_checked`, `unknown_action`) | |
+| `BothySecretRefreshFailing` | ticket | erneutes Lesen eines Geheimnisses scheitert | |
 | `BothyMalwareScanFailing` | ticket | nur Fehler, kein Ergebnis | |
 | `BothyBackupStale` | page | keine Sicherung seit 26 h | `backup.max_age` |
 | `BothyWalArchiveStale` | page | kein WAL-Segment seit 15 Minuten | über `backup.pg.archive_timeout` |
@@ -105,6 +107,15 @@ Adapter-Prozess und seine Laufzeit prüfen; Status der Komponente des Agenten.
 ### bothybillingmodemismatch
 Sofort prüfen: Läuft ein Agent mit `personal` gegen einen Organisationsschlüssel oder umgekehrt?
 Konfiguration der Laufzeit des Adapters; nichts am Server ändern, bevor die Ursache klar ist.
+
+### bothyauthzerror
+Als Fehler mit Sicherheitsbezug behandeln: Eine Route hat ohne ihre Rechteprüfung geantwortet
+(die Antwort wurde durch `500` ersetzt) oder eine unbekannte Aktion wurde geprüft. Logs mit der
+`correlation_id` und dem Routen-Muster lesen; die betroffene Version nicht weiter ausrollen.
+
+### bothysecretrefreshfailing
+Der Server nutzt weiter den alten Wert. Datei im Secret-Provider prüfen: vorhanden, Modus `0400`
+oder `0600`, Besitzer der Dienstbenutzer (SEC-SEC-1). Bis zur Behebung wirkt eine Rotation nicht.
 
 ### bothymalwarescanfailing
 `docker compose logs clamav`; Signaturen geladen? Speicher reicht? Uploads bleiben bis dahin im
