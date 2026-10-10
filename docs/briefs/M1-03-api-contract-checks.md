@@ -45,7 +45,8 @@ reasons for operations without `Idempotency-Key`, and the deprecation date.
   `tools/pyproject.toml`, `Makefile`, `CHANGELOG.md`, `docs/DECISIONS.md`.
 
 Operations touched: every operation in `paths` and `webhooks` is read; `suspendApp` and
-`resumeApp` gain the `Idempotency-Key` parameter; every POST or PATCH without that parameter gains
+`resumeApp` already carry the `Idempotency-Key` parameter (added in planning, 06 "Idempotenz"
+item 3); every POST or PATCH without that parameter gains
 `x-idempotency-exempt` (list in "Design notes"). No table of chapter 03 and no action id changes.
 
 ## Fixed requirements that apply
@@ -114,9 +115,9 @@ Operations touched: every operation in `paths` and `webhooks` is read; `suspendA
      only as `default` and `ServiceUnavailable` nowhere, so the status of their codes cannot be
      read from `paths`.
    - Every POST and PATCH in `paths` without the `IdempotencyKey` parameter gets
-     `x-idempotency-exempt: <reason>` (list in "Design notes"); `suspendApp` and `resumeApp` get
-     `- $ref: '#/components/parameters/IdempotencyKey'` instead.
-   - `info.version` raised by one MINOR step (new optional header on two operations).
+     `x-idempotency-exempt: <reason>` (list in "Design notes"); `suspendApp` and `resumeApp`
+     keep their `- $ref: '#/components/parameters/IdempotencyKey'`.
+   - `info.version` raised by one MINOR step (new `x-` extensions that tools read).
 4. `docs/api/asyncapi.yaml`: rewrite every `client_action` of `channels.gateway.x-close-codes` in
    English, faithful to 04 "Schließ-Codes" (this also fixes the drift of code `4016`, whose text
    differs from 04 today); `info.version` raised by one PATCH step.
@@ -210,10 +211,13 @@ finding, never a default. Locate columns by header name, because M1-08 may add c
 | `read_only` | liest nur, ändert keinen dauerhaften Zustand | `previewGrant`, `autocompleteCommand`, `validateManifest`, `verifyAuditChain`, `createFileTicket` |
 | `agent_runtime` | Agenten-Laufzeit: monoton oder Compare-and-swap | `sendHeartbeat`, `ackAgentEvents`, `patchRun`, `startRun`, `resumeRun`, `awaitRunInput`, `finishRun`, `answerAutocomplete` |
 | `client_id` | Client-ID im Körper (Tabelle oben) | `createMessage`, `createInteraction`, `postIncomingWebhook` |
-| `origin_key` | Herkunftsschlüssel des Imports ([22-import-migration.md](22-import-migration.md)) | `applyImportBatch`, `createImportFile` |
+| `origin_key` | Herkunftsschlüssel des Imports (`[22-import-migration.md](22-import-migration.md)`) | `applyImportBatch`, `createImportFile` |
 | `telemetry` | anonyme Messwerte; eine Wiederholung zählt eine Stichprobe doppelt | `submitClientMetrics` |
 
-`suspendApp` and `resumeApp` change state with audit and fit no reason; they get the
+The `origin_key` text is written into 06 as a Markdown link relative to `docs/spec/` (shown as code
+here because this brief lives in another folder).
+
+`suspendApp` and `resumeApp` change state with audit and fit no reason; they carry the
 `IdempotencyKey` parameter. If the base branch has other POST or PATCH operations without the
 header, give them the header unless one reason clearly applies, and list each decision in the
 report. The German texts live as a constant mapping in `api_checks.py` because they render a

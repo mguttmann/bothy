@@ -108,7 +108,7 @@ No API operation and no table of chapter 03 changes.
 4. `docs/spec/05-aktionen.md`: wrap each generated table in markers (names in "Design notes"); the
    rows themselves are produced by `make catalog`. Rewrite rule 3 of "Verbindliche Regeln": the
    sentence "Eine maschinenlesbare Fassung ... ist beschlossen (ADR 0049); bis sie steht, hält ein
-   Abgleich ..." becomes: the single source is [actions.yaml](actions.yaml) (ADR 0049); the
+   Abgleich ..." becomes: the single source is `[actions.yaml](actions.yaml)` (ADR 0049); the
    tables of sections 3, 4, 6 and 7 and the lists in `docs/api/redocly.yaml` are generated from it
    (`make catalog`) and `make catalog-check` holds them in the gate. Rule 4: add that sections 6
    and 7 are generated from the same file. No other text of the chapter changes.
