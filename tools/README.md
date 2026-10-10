@@ -17,6 +17,7 @@ Versionen laufen wie in CI. Einrichtung einmal je Klon: `make bootstrap`.
 | `ci/migrations_lint.py` | Migrationsregeln der Go-Module (ADR 0007, Kapitel 14): fortlaufende Nummern, Prüfsummen-Datei `migrations.sha256`, `STORED`, `NO TRANSACTION`; `lock` ergänzt nur neue Prüfsummen | `migrations-lint`, `migrations-lock` | `ci/tests/` |
 | `ci/codegen_check.py` | Generator ausführen und Drift erzeugten Codes über Schnappschüsse vor und nach dem Lauf melden | `codegen-check` | `ci/tests/` |
 | `ci/go_prereqs.py` | Voraussetzungen der Server-Gates: go, Docker-kompatible Laufzeit, Pins von go-arch-lint und sqlc | `codegen-check`, `arch`, `migrations-lint`, `perf`, `test` | `ci/tests/` (Rezepte: `ci/tests/test_make_server_gates.py`) |
+| `conftest.py` | Test-Isolation: entfernt Variablen wie `GIT_DIR`, die Git-Hooks setzen, aus der Umgebung jedes Tests, damit Git-Fixtures nie das echte Repository treffen | `test` | `ci/tests/test_git_env_isolation.py` |
 | `hooks/text_rules.py` | keine Gedankenstriche (U+2013, U+2014) in Textdateien | pre-commit, `lint` | `hooks/tests/` |
 | `hooks/commit_msg.py` | Conventional Commits und DCO-Sign-off | commit-msg, `commitlint` | `hooks/tests/` |
 | `denylist/` | White-Label-Scanner mit privater Liste und öffentlichen Regeln ([README](denylist/README.md)) | `denylist`, `denylist-history` | `denylist/tests/` |
