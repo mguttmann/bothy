@@ -7,7 +7,7 @@ Code-Namen sind Englisch und gelten in API, Datenbank und Code.
 
 | Begriff | Code-Name | Definition |
 |---|---|---|
-| Abruf-Ticket | `file ticket` | Kurzlebige, signierte URL für Medien-Player, die keinen DPoP-Beweis senden können; jeder Abruf prüft `file.read` neu. |
+| Abruf-Ticket | `file ticket` | Kurzlebige, signierte URL für Medien-Player, die keinen DPoP-Beweis senden können; jeder Abruf prüft `file.read` neu ([ADR 0048](../adr/0048-datei-abruf-nur-ueber-den-server-mit-kurzlebigen-tickets.md)). |
 | Agent | `agent` | Prinzipal für ein Bot-Konto, das ein Adapter außerhalb des Servers betreibt; höchstens Stufe `write` und als Zusatzrecht höchstens `upload`; löst nie selbst Agenten aus. |
 | Agenten-Adapter | `adapter` | Programm außerhalb des Servers, das einen Agenten über die öffentliche API mit seiner Laufzeit verbindet (z. B. der Referenz-Adapter für Hermes Agent). |
 | Agenten-Laufzeit | `runtime` | Software, die einen Agenten-Turn wirklich ausführt; läuft nie im Server-Prozess (B6, B10). |
@@ -18,7 +18,7 @@ Code-Namen sind Englisch und gelten in API, Datenbank und Code.
 | Anheften | `pin` | Markierung einer Nachricht, damit sie oben im Thread auffindbar ist. |
 | Anmeldevorgang | `auth_login_flow` | Zustand einer OIDC-Anmeldung oder Verknüpfung zwischen Start, Rückleitung und Einlösen des Server-Codes. |
 | Antwort mit Zitat | `reply_to_message_id` | Verweis einer Nachricht auf eine frühere Nachricht desselben Threads. |
-| API-Token | `api_token` | Langlebiges Zugangstoken für Agenten, Apps oder persönliche Werkzeuge im Format `bothy_<art>_<zufall>_<prüfsumme>`; gespeichert nur als Hash. |
+| API-Token | `api_token` | Langlebiges Zugangstoken für Agenten, Apps oder persönliche Werkzeuge im Format `bothy_<art>_<zufall>_<prüfsumme>` ([ADR 0061](../adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md)); gespeichert nur als Hash. |
 | App | `app` | Prinzipal einer installierten Integration mit Manifest; handelt nur über die öffentliche API, höchstens Stufe `write` und Zusatzrecht `upload`. |
 | App-Installation | `app_installation` | Installation einer App in der Instanz mit bewilligten Scopes und Ereignis-Abos. |
 | App-Manifest | `manifest` | Versionierte Beschreibung einer App: Scopes, Ereignis-Abos, Slash-Befehle, Komponenten, Webhook-Ziele. |

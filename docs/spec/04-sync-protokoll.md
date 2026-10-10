@@ -36,8 +36,8 @@ Abruf geheilt. Die vollständige Liste der dauerhaften Typen mit der Empfangs-Ak
 ### 2.2 Umschlag (Envelope)
 
 Jedes Ereignis, dauerhaft oder kurzlebig, hat denselben Umschlag, auf dem Gateway, im
-REST-Nachholen und in Webhooks (ADR 0052). Auf der Leitung ist es JSON. Es gibt kein JSON-`null`:
-Ein fehlendes Feld heißt "kein Wert" (ADR 0053).
+REST-Nachholen und in Webhooks ([ADR 0052](../adr/0052-ein-ereignis-umschlag-fuer-gateway-rest-und-webhooks.md)). Auf der Leitung ist es JSON. Es gibt kein JSON-`null`:
+Ein fehlendes Feld heißt "kein Wert" ([ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)).
 
 | Feld | Typ | Pflicht | Bedeutung |
 |---|---|---|---|
@@ -48,7 +48,7 @@ Ein fehlendes Feld heißt "kein Wert" (ADR 0053).
 | `occurred_at` | RFC 3339 | ja | Zeit der Transaktion (nur Anzeige, nie Reihenfolge) |
 | `actor` | `{id, kind}` | nein | wer es ausgelöst hat; `kind` ist `user`, `agent`, `app`, `system`; `id` fehlt bei `system` (Systemaktion des Servers, 05 Regel 10); `actor` fehlt bei Ereignissen von Jobs ohne Prinzipal und ohne Systemaktion (03, `event_log.actor_kind`) |
 | `scope` | `{space_id, channel_id, thread_id}` | ja | Ort; nicht zutreffende Felder fehlen |
-| `resource` | `{kind, id, version}` | ja | betroffenes Objekt und seine Version nach der Änderung |
+| `resource` | `{kind, id, version}` | ja | betroffenes Objekt und seine Version nach der Änderung; `version` fehlt, wo das Ereignis keine neue Version genau dieses Objekts meldet (Abschnitt 9, Punkt 3) |
 | `audience` | `"self"` | nein | gesetzt bei persönlichen Ereignissen |
 | `payload` | object | ja | Nutzlast nach Schema `<type>.v<schema_version>` |
 | `redacted` | bool | nein | `true`: Nutzlast wurde nach Löschung geschwärzt |
@@ -59,6 +59,7 @@ Ein fehlendes Feld heißt "kein Wert" (ADR 0053).
 | `permission_version` | int64 | bei dauerhaften | Rechte-Version zur Zeit des Commits |
 | `invocation_token` | string | nein | Zustellfeld: frisch ausgestellte Aufruf-Marke (JWS, I3) bei Ereignissen an Agenten, die einen Aufruf tragen (Abschnitt 15.3) |
 | `redelivered` | bool | nein | Zustellfeld: erneute Zustellung an einen Agenten-Verbraucher nach `agent.ack_timeout` |
+| `sync_epoch` | UUIDv7 | nein | Zustellfeld: Epoche der Zeitlinie (7.5), nur in Webhook-Zustellungen; ein Empfänger, der eine neue Epoche sieht, setzt seinen Stand nach `seq` zurück ([ADR 0059](../adr/0059-sync-epoche-nach-wiederherstellung.md)) |
 
 Zustellfelder entstehen je Zustellung und stehen nie im Ereignis-Log.
 
@@ -152,7 +153,7 @@ immer zuletzt. Schreibende Transaktionen mit Ereignissen dürfen nicht in `REPEA
 `SERIALIZABLE` laufen; dort bricht das Muster mit Serialisierungsfehlern. Die Sperrreihenfolge
 steht in [03-datenmodell.md](03-datenmodell.md), Abschnitt 6.3. Ein Lasttest hält den Durchsatz
 als Qualitäts-Gate fest: mindestens `perf.event_commit_min_per_s` im Referenzprofil
-([02-architektur.md](02-architektur.md), Abschnitt 17; ADR 0063).
+([02-architektur.md](02-architektur.md), Abschnitt 17; [ADR 0063](../adr/0063-leistungs-gate-fuer-das-ereignis-log.md)).
 
 ### 3.3 Weitere Zähler
 
@@ -207,7 +208,12 @@ Ein Endpunkt `wss://<host>/api/v1/gateway`. Die Protokollversion steht in `ident
 Die unterstützten Versionen stehen an einer Stelle: `info.x-protocol-versions` in
 [asyncapi.yaml](../api/asyncapi.yaml); `hello` und die Discovery nennen dieselben.
 Änderungen innerhalb einer Hauptversion sind nur additiv: neue Ops, neue Felder, neue
-Ereignistypen. Clients ignorieren Unbekanntes. Ein Gerät hält genau eine Verbindung.
+Ereignistypen. Clients ignorieren Unbekanntes. Ein Gerät hält genau eine Verbindung: Ein neues
+`identify` oder `resume` desselben Geräts schließt eine ältere offene Verbindung mit `4017`
+(Abschnitt 6.4). Grund: Fokus, Tippen und "Person schaut zu" gelten je Gerät, und ein fehlerhafter
+Client soll nicht beliebig viele Verbindungen halten. Mit `cluster.mode = multi` gilt das über alle
+api-Knoten (Geräte-ID über `NOTIFY ephemeral`, Abschnitt 12 Punkt 3;
+[02-architektur.md](02-architektur.md), Abschnitt 11.6).
 
 ### 6.2 Ops
 
@@ -220,7 +226,7 @@ Client an Server:
 | `heartbeat` | Lebenszeichen mit letzter verarbeiteter `seq` |
 | `reauth` | neuer Zugriffstoken während der Verbindung |
 | `focus` | Liste der Threads, die gerade sichtbar sind (für Live-Box-Patches und Tippen), mit `idle` (bool): `true` heißt "offen, aber unbenutzt"; die Verbindung bekommt weiter Patches, zählt aber nicht als "Person schaut zu" ([13-push-benachrichtigungen.md](13-push-benachrichtigungen.md), Abschnitt 4.4) |
-| `typing.start` / `typing.stop` | Tippen-Anzeige |
+| `typing.start` / `typing.stop` | Tippen-Anzeige; nur Menschen (Abschnitt 12) |
 | `ack` | nur Agenten: Bestätigung bis `seq` |
 | `run.update` | nur Agenten: Patch an einem eigenen Lauf (gleichwertig zu REST) |
 | `command.autocomplete_result` | nur Agenten und Apps: Vorschläge zu einer Anfrage (gleichwertig zu REST, Abschnitt 15.7) |
@@ -240,7 +246,10 @@ Server an Client:
 | `reauth_required` | Zugriffstoken läuft bald ab |
 | `error` | Fehler zu einer Op, Verbindung bleibt |
 
-Jede Op ist in [05-aktionen.md](05-aktionen.md) einer Aktion zugeordnet.
+Jede Op ist in [05-aktionen.md](05-aktionen.md) einer Aktion zugeordnet. Scheitert eine Op an
+ihrer Rate-Limit-Klasse, an `authorize` oder an ihren Regeln, antwortet der Server mit `error` und
+dem Problem-Code aus [06-api.md](06-api.md) (z. B. `rate_limited`, `forbidden`,
+`validation_failed`); die Verbindung bleibt. Geschlossen wird nur mit den Codes aus 6.4.
 
 ### 6.3 Lebenszyklus
 
@@ -270,6 +279,9 @@ Jede Op ist in [05-aktionen.md](05-aktionen.md) einer Aktion zugeordnet.
    (Zusammenfassung), Präsenz der sichtbaren Agenten, Versionen von Einstellungen und Entwürfen,
    die für den Prinzipal ausgewerteten Feature-Flags.
    Inhalte von Threads sind nicht enthalten; der Client lädt sie per REST.
+   Der Server meldet die Verbindung bei der Zustellung an, bevor er `head_seq` liest; jedes
+   spätere Ereignis wird gepuffert oder gesendet, jedes frühere steckt in Momentaufnahme oder
+   Nachholen. So geht zwischen `ready` und Live-Betrieb nichts verloren.
    Hat der Client einen `cursor` gesendet, beginnt danach das Nachholen (Abschnitt 7).
 5. **Heartbeat.** Der Client sendet alle `heartbeat_interval` ein `heartbeat {last_seq}`. Den
    ersten Heartbeat verzögert er um einen Zufallsanteil von `heartbeat_interval`, damit nach
@@ -280,7 +292,9 @@ Jede Op ist in [05-aktionen.md](05-aktionen.md) einer Aktion zugeordnet.
 6. **Token-Erneuerung.** Vor Ablauf des Zugriffstokens sendet der Server `reauth_required`
    (Vorlauf `sync.reauth_lead_time`). Der Client holt per Refresh einen neuen Token und sendet
    `reauth {access_token, dpop}` mit dem aktuellen Nonce. Ohne gültiges `reauth` bis zum Ablauf
-   schließt der Server mit `4011`.
+   schließt der Server mit `4011`. Agenten und Apps bekommen kein `reauth_required`; ihr API-Token
+   hat ein festes `expires_at`, bei dem der Server mit `4011` schließt. Weiter geht es nur mit
+   einem neuen Token, das der Owner ausstellt.
 7. **`resume`.** Nach einer Trennung innerhalb von `resume_window` sendet der Client statt
    `identify` ein `resume {gateway_session_id, access_token, dpop, cursor, sync_epoch}`. Der Server
    prüft Token und Sitzung wie bei `identify`, stellt Fokus und Abos wieder her und antwortet
@@ -303,14 +317,27 @@ Jede Op ist in [05-aktionen.md](05-aktionen.md) einer Aktion zugeordnet.
 | `4005` | already_identified | Fehler melden, neu verbinden |
 | `4006` | session_invalid | `identify` statt `resume` |
 | `4007` | protocol_version_unsupported | App-Update anzeigen, nicht neu verbinden |
-| `4008` | rate_limited | Wartezeit aus dem Schließgrund abwarten |
+| `4008` | rate_limited | nur `rl.gateway_connect` bei `identify` und `resume`: Wartezeit aus dem Schließgrund abwarten |
 | `4009` | heartbeat_timeout | neu verbinden mit Backoff, `resume` versuchen |
 | `4011` | token_expired | Token erneuern, dann `resume` |
 | `4012` | revoked | Sitzung, Gerät oder Prinzipal widerrufen: lokale Daten löschen, abmelden, nicht neu verbinden |
 | `4013` | server_restart | sofort mit Zufallsverzögerung neu verbinden, `resume` versuchen |
-| `4014` | slow_consumer | neu verbinden, Nachholen ab Cursor |
+| `4014` | slow_consumer | Ausgangswarteschlange voll oder Schreibfrist `gateway.write_timeout` verpasst: neu verbinden, Nachholen ab Cursor |
 | `4015` | consumer_replaced | nur Agenten: ein anderer Prozess hat denselben Verbraucher übernommen; nicht neu verbinden |
 | `4016` | device_pending | Gerät wartet auf Freigabe: nicht neu verbinden, bis `GET /api/v1/devices/{id}` den Zustand `active` meldet |
+| `4017` | device_replaced | eine neuere Verbindung desselben Geräts ist aktiv: nicht von selbst neu verbinden, erst bei Rückkehr in den Vordergrund oder auf Bedienung |
+
+Zuordnung beim Verbindungsaufbau (Grund: ein Code je Ursache, damit der Client richtig reagiert):
+
+| Ursache | Code |
+|---|---|
+| kein `identify` und kein `resume` innerhalb von `sync.identify_timeout` | `4003` |
+| Rahmen über `sync.ws_max_frame_bytes`, Binärrahmen, ungültiges JSON oder UTF-8, doppelter Schlüssel, unbekanntes Feld | `4002` |
+| Token oder DPoP-Beweis ungültig, `device_id` passt nicht, sonstige Ablehnung `forbidden` (z. B. `scope_missing`) | `4004` |
+| Zugriffstoken abgelaufen | `4011` |
+| Sitzung, Gerät, Token, Prinzipal oder App-Installation widerrufen bzw. nicht aktiv | `4012` |
+| Gerät oder bereitgestellter Mensch wartet auf Freigabe | `4016` |
+| Datenbank beim Aufbau von `ready` nicht erreichbar | `4000` |
 
 ### 6.5 Neu verbinden
 
@@ -351,6 +378,10 @@ verarbeiteten Seite dauerhaft.
 4. Am Ende sendet der Server `catchup.complete {head_seq}`. Danach ist die Verbindung live.
 5. Übersteigt der Puffer `sync.outbound_queue_max`, schließt der Server mit `4014`. Der Client
    setzt ab seinem Cursor neu auf.
+6. Kurzlebige Ereignisse stellt der Server vor `catchup.complete` nicht zu, und er verwirft sie,
+   wenn die Ausgangswarteschlange voll ist, statt die Verbindung zu schließen (nie `4014`);
+   `run.updated` holt der Zustand nach 11.3 Punkt 3 nach. Grund: Sie sind reine Beschleunigung
+   (2.1) und dürfen keine Verbindung kosten.
 
 ### 7.3 `resync_required`
 
@@ -365,7 +396,10 @@ Der Server sendet `resync_required {reason, head_seq, sync_epoch}` statt Ereigni
 
 Der Client verwirft dann seinen Server-Zustand im Cache (das Ausgangsfach bleibt), lädt
 `GET /api/v1/sync/snapshot`, setzt Cursor und Epoche auf die gelieferten Werte und lädt Threads
-bei Bedarf per REST. Danach verbindet er mit diesem Cursor neu.
+bei Bedarf per REST. Auf dem Gateway bleibt die Verbindung offen und ist ab `head_seq` live;
+Ereignisse bis zum `head_seq` der neuen Momentaufnahme verwirft der Client nach Abschnitt 9,
+Punkt 2. Neu verbinden muss er nicht. Grund: Jeder Schließ-Code würde eine falsche Reaktion
+auslösen, und die Live-Zustellung ab `head_seq` verliert nichts.
 
 ### 7.4 REST-Variante
 
@@ -393,7 +427,7 @@ Die globale Sequenz gilt innerhalb einer Zeitlinie, benannt durch `instance.sync
 ### 7.6 Verbraucher im Worker (Push, Webhooks)
 
 Push und ausgehende Webhooks entstehen im `worker` aus dem Log, nicht im Schreibpfad
-([02-architektur.md](02-architektur.md), Abschnitt 11.5, ADR 0051). Je Verbraucher gibt es eine
+([02-architektur.md](02-architektur.md), Abschnitt 11.5, [ADR 0051](../adr/0051-worker-verbraucher-des-ereignis-logs-mit-cursor.md)). Je Verbraucher gibt es eine
 Zeile in `event_consumer_cursors`. Eine Runde liest ab `last_seq` in `seq`-Reihenfolge, legt je
 Ereignis und Empfänger einen Job an und rückt den Cursor in derselben Transaktion vor. Vor dem
 Versand prüft jeder Job erneut `push.deliver` bzw. `webhook_out.deliver` mit den aktuellen
@@ -432,9 +466,14 @@ und der Job `authz.expiry_sweep` schreibt alle `authz.expiry_sweep_interval` die
 }
 ```
 
-Betroffen sind: das Subjekt, bei Gruppen alle aktuellen Mitglieder, bei Owner-Änderung die
-Person. Die Liste berechnet `authz` als Unterschied der sichtbaren Ziele vor und nach der
-Änderung.
+Betroffen sind alle Prinzipale, deren sichtbare Ziele oder Stufen sich ändern können: bei Freigaben
+das Subjekt (bei Gruppen alle aktuellen Mitglieder), bei Owner-Änderung und Sperre die Person, beim
+Bediener-Wechsel der alte und der neue Bediener-Agent, beim Archivieren eines Bereichs oder Kanals
+jeder mit einer Stufe über `read` auf dem Ziel (Freigaben auf Ziel und Vorfahren, Gruppenmitglieder,
+Owner, Bediener). Ändert eine Aktion ein Ziel statt eines Subjekts, bestimmt `authz` die Betroffenen
+selbst aus dem Ziel ([02-architektur.md](02-architektur.md), Abschnitt 8.1). Den Inhalt berechnet
+`authz` als Unterschied der sichtbaren Ziele vor und nach der Änderung; wer keinen Unterschied hat,
+bekommt kein `access.changed`.
 
 ### 8.3 Was der Client bei Entzug bekommt und tut
 
@@ -473,10 +512,22 @@ damit vor seinem Ablauf wirkungslos.
    Verbindung streng in `seq`-Reihenfolge liefert, reicht dieser Vergleich.
 3. Zusätzlich wendet der Client eine Änderung an einem Objekt nur an, wenn
    `resource.version` größer ist als die lokale Version. Damit sind auch Daten aus REST und aus
-   Ereignissen ohne Konflikt mischbar. Ausnahme: `reaction.*` und `pin.*` erhöhen
-   `messages.version` nicht (sonst bekäme der Autor nach jeder Reaktion `412` beim Bearbeiten);
-   ihre Nutzlast trägt absolute Werte (Anzahl je Emoji, angeheftet ja oder nein), und der Client
-   wendet sie in `seq`-Reihenfolge an.
+   Ereignissen ohne Konflikt mischbar. `resource.version` steht genau dann, wenn die Tabelle des
+   Objekts eine Spalte `version` hat (03) und das Ereignis deren neuen Wert meldet. Es fehlt
+   darum auch bei diesen Typen, deren Objekt eine Version hat, die das Ereignis nicht ändert:
+   - `reaction.*` und `pin.*`: Sie erhöhen `messages.version` nicht (sonst bekäme der Autor nach
+     jeder Reaktion `412` beim Bearbeiten); ihre Nutzlast trägt absolute Werte (Anzahl je Emoji,
+     angeheftet ja oder nein).
+   - `read_state.updated` (Ressource `thread`) und `sidebar.updated` (Ressource `space`): Ihre
+     Nutzlast trägt die Version des persönlichen Teilobjekts; der Client vergleicht diese.
+   - `channel.settings_changed` und `agent.config_changed` (Ressource `channel`, Nutzlast mit
+     `settings_version`), `thread.moved_out` (der Quellkanal ändert sich nicht),
+     `agent_session.changed` (Ressource `thread`), `agent.invocation`, `agent.followup` und
+     `run.cancel_requested` (Ressource `run`), `command.invoked` (Ressource `command`).
+   Ohne `resource.version` wendet der Client das Ereignis in `seq`-Reihenfolge an. Grund: Eine
+   fremde Version im Feld des Objekts würde spätere echte Änderungen verwerfen lassen. Der Katalog
+   ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)) trägt je Ereignistyp, ob er `resource.version` hat; die Rahmen-Konformität (G9,
+   [06-api.md](06-api.md) Abschnitt 15) prüft jede Zustellung dagegen.
 4. Kurzlebige Ereignisse werden höchstens einmal zugestellt (at-most-once).
 
 ## 10. Reihenfolge
@@ -522,7 +573,8 @@ antwortet er `409 base_version_conflict` mit dem aktuellen Dokument. Der Adapter
    speisen sich Seitenleiste und "Läuft gerade".
 2. Inhaltliche Änderungen sind das kurzlebige Ereignis `run.updated {run_id, base_version,
    version, ops}`. Es geht nur an Verbindungen, die den Thread im `focus` haben und
-   `run.read` dürfen. Ein Client fokussiert höchstens `sync.max_focused_threads` Threads.
+   `run.read` dürfen. Ein Client fokussiert höchstens `sync.max_focused_threads` Threads; ein
+   `focus` mit mehr IDs ergibt `error` mit `validation_failed`, und der bisherige Fokus bleibt.
 3. Zusammenfassen: Der Server sammelt je Lauf und Verbindung Änderungen für
    `sync.run_patch_coalesce_interval`. Dann sendet er einen Rahmen von der ältesten
    `base_version` bis zur neuesten `version`. Spätere `replace` auf denselben Pfad ersetzen
@@ -540,10 +592,13 @@ antwortet er `409 base_version_conflict` mit dem aktuellen Dokument. Der Adapter
 
 1. **Tippen.** Der Client sendet `typing.start {thread_id}` höchstens einmal je
    `sync.typing_min_interval`, solange getippt wird, und `typing.stop` beim Leeren oder
-   Senden. Der Server prüft `typing.start` (Aktion in [05-aktionen.md](05-aktionen.md)) und
-   sendet `typing.started {thread_id, principal_id, expires_at}` an Verbindungen mit Fokus auf
-   dem Thread und Leserecht. Ohne Erneuerung endet die Anzeige nach `sync.typing_ttl`. Ein
-   laufender Lauf zeigt das Tippen des Agenten; Agenten senden kein eigenes Tippen.
+   Senden. Der Server prüft `typing.start` (Aktion in [05-aktionen.md](05-aktionen.md); nur
+   Menschen) und sendet `typing.started {thread_id, principal_id, expires_at}` an Verbindungen mit
+   Fokus auf dem Thread und Leserecht, nicht an Verbindungen des Tippenden selbst. Ohne Erneuerung
+   endet die Anzeige nach `sync.typing_ttl`; Clients beenden sie auch bei der nächsten Nachricht
+   dieses Prinzipals im Thread. `typing.stop` erzeugt kein Ereignis; es setzt nur die Drossel der
+   Verbindung zurück, damit ein neues `typing.start` sofort gilt. Ein laufender Lauf zeigt das
+   Tippen des Agenten; Agenten senden kein eigenes Tippen (Ruling L9).
 2. **Präsenz von Agenten.** Adapter senden `POST /api/v1/agents/me/heartbeat` (oder implizit
    über das Gateway-`heartbeat`) mit Zustand, Laufzeit-Version, `reported_billing_mode`,
    `billing_modes_supported`, `billing_evidence`, Werkzeugklasse und aktiven Läufen (Schema
@@ -616,13 +671,18 @@ Gewinnerregel ist die Commit-Reihenfolge im Server, ausgedrückt durch die Versi
 
 | Daten | Ereignis | Regel |
 |---|---|---|
-| Gelesen-Stand | `read_state.updated` | monoton: `last_read_seq = GREATEST(alt, neu)`. Zurücksetzen ("als ungelesen markieren") ist eine eigene Operation mit `If-Match`. Importiertes zählt über `threads.unread_floor_seq` nie als ungelesen (Abschnitt 15.8). Ungelesen- und Erwähnungszähler speichert der Server nicht (03 `read_states`): Momentaufnahme, `listMyReadStates` und `read_state.updated` nennen den berechneten Wert; dazwischen zählt der Client selbst aus `message.created`, `message.updated` und `message.deleted` (`mention_ids`). Eine neue Erwähnung schreibt kein persönliches Ereignis. |
-| Entwürfe | `draft.updated`, `draft.deleted` | letzte Schreibung gewinnt in Server-Reihenfolge; jede Schreibung erhöht `version`. Der Client sendet `base_version`; ist sie älter als die aktuelle, antwortet der Server mit `overwrote_newer: true`, und der Client zeigt einen Hinweis. Eingehende Änderungen eines anderen Geräts übernimmt ein Gerät nur, wenn der Mensch dort gerade nicht in diesem Entwurf tippt; sonst gewinnt die nächste lokale Schreibung. Erfolgreiches Senden mit `clear_draft: true` löscht den Entwurf in derselben Transaktion. |
-| Einstellungen | `settings.updated` | je Schlüssel letzte Schreibung gewinnt; Änderungen an verschiedenen Schlüsseln stören sich nicht |
+| Gelesen-Stand | `read_state.updated` | monoton: `last_read_seq = GREATEST(alt, neu)`. Zurücksetzen ("als ungelesen markieren") ist eine eigene Operation mit `If-Match`. Importiertes zählt über `threads.unread_floor_seq` nie als ungelesen (Abschnitt 15.8). Ungelesen- und Erwähnungszähler speichert der Server nicht (03 `read_states`): Momentaufnahme, `listMyReadStates` und `read_state.updated` nennen den berechneten Wert; dazwischen zählt der Client selbst aus `message.created`, `message.updated` und `message.deleted` (`mention_ids`). Eine neue Erwähnung schreibt kein persönliches Ereignis. Der Server rückt den Gelesen-Stand des Autors beim Senden nicht vor; das tut dessen Client per REST wie jede andere Änderung persönlicher Daten. |
+| Entwürfe | `draft.updated`, `draft.deleted` | letzte Schreibung gewinnt in Server-Reihenfolge; jede Schreibung erhöht `version`. Der Client sendet `base_version`; ist sie älter als die aktuelle, antwortet der Server mit `overwrote_newer: true`, und der Client zeigt einen Hinweis. Eingehende Änderungen eines anderen Geräts übernimmt ein Gerät nur, wenn der Mensch dort gerade nicht in diesem Entwurf tippt; sonst gewinnt die nächste lokale Schreibung. Erfolgreiches Senden mit `clear_draft: true` löscht den Entwurf in derselben Transaktion. Ein leerer Entwurf (kein Text außer Leerraum, keine Dateien) wird gelöscht; ein `PUT` mit leerem Entwurf antwortet `200` mit dem leeren Endzustand. `file_ids` prüft der Server beim Speichern nur in Form und Anzahl (`message.max_attachments`); Eigentum und Zustand prüft das Senden ([12-dateien.md](12-dateien.md), Abschnitt 10). |
+| Einstellungen | `settings.updated` | je Schlüssel letzte Schreibung gewinnt; Änderungen an verschiedenen Schlüsseln stören sich nicht. Standardwerte speichert der Server nicht, weil manche vom Gerät oder der Instanz abhängen; der Client wendet die Standards aus 01 und 13 an. Löschen eines Schlüssels schreibt `settings.updated` mit `deleted: true`. |
 | Seitenleiste | `sidebar.updated` | je Bereich (`user_space_states`) letzte Schreibung gewinnt |
 | Benachrichtigung, Ruhezeiten | `notification_pref.updated`, `quiet_hours.updated` | je Zeile letzte Schreibung gewinnt |
 
 Ein Gerät erkennt sein eigenes Echo an `updated_by_device_id` und ignoriert es.
+
+Listen persönlicher Daten (`listMyReadStates`, `listMyDrafts`, Momentaufnahme) nennen nur Threads
+und Kanäle, die der Mensch noch lesen darf ([07-rechte.md](07-rechte.md), Abschnitt 7.4, Regel 1).
+Die Zeilen bleiben gespeichert, bis ihre Aufbewahrung endet; bekommt der Mensch das Leserecht
+zurück, erscheinen sie wieder.
 
 ## 15. Agenten-Adapter
 
@@ -837,9 +897,9 @@ sequenceDiagram
     AZ-->>GW: Rechte-Stand (permission_version)
     GW-->>C: ready (head_seq = 5300, snapshot)
     alt cursor älter als Aufbewahrung oder zu weit zurück
-        GW-->>C: resync_required (reason)
+        GW-->>C: resync_required (reason), Verbindung bleibt live ab head_seq
         C->>C: Cache verwerfen, Ausgangsfach behalten
-        C->>GW: GET /api/v1/sync/snapshot, danach neu verbinden
+        C->>GW: GET /api/v1/sync/snapshot, Cursor auf dessen head_seq
     else Nachholen möglich
         loop Seiten zu sync.catchup_page_size
             GW->>DB: SELECT event_log WHERE seq > cursor AND sichtbar
@@ -942,9 +1002,9 @@ sequenceDiagram
 | R-SY-13 | Gelesen-Stand ist monoton; Zurücksetzen nur mit Versionsprüfung. | Zwei Geräte können sich nicht gegenseitig auf "ungelesen" zurückwerfen. |
 | R-SY-14 | Bei Geräte- oder Sitzungswiderruf löscht der Client alle lokalen Daten. | Ein verlorenes Gerät behält keine Inhalte. |
 | R-SY-15 | Verteilung an Gateway-Prozesse über `LISTEN/NOTIFY` und Lesen des Logs, kein Broker. | Ein Abhängigkeitspfad weniger; das Log ist ohnehin die Quelle. |
-| R-SY-16 | Kein JSON-`null` im Umschlag; fehlende Felder heißen "kein Wert" (ADR 0053). | Generierte Clients (dart-dio) kennen keinen Null-Typ; Go `omitempty` passt. |
-| R-SY-17 | Aufruf-Marke und `redelivered` sind Zustellfelder im selben Umschlag, nie im Log (ADR 0052). | Ein Umschlag für Gateway, REST und Webhooks; Marken entstehen je Zustellung (R-SY-07). |
-| R-SY-18 | Sync-Epoche nach jeder Wiederherstellung; Abweichung ergibt `resync_required` mit `epoch_changed` (ADR 0059). | Erkennt eine neue Zeitlinie auch dann, wenn ihre Nummern alte Cursor schon überholt haben; R-SY-04 bleibt als zweites Netz. |
+| R-SY-16 | Kein JSON-`null` im Umschlag; fehlende Felder heißen "kein Wert" ([ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)). | Generierte Clients (dart-dio) kennen keinen Null-Typ; Go `omitempty` passt. |
+| R-SY-17 | Aufruf-Marke und `redelivered` sind Zustellfelder im selben Umschlag, nie im Log ([ADR 0052](../adr/0052-ein-ereignis-umschlag-fuer-gateway-rest-und-webhooks.md)). | Ein Umschlag für Gateway, REST und Webhooks; Marken entstehen je Zustellung (R-SY-07). |
+| R-SY-18 | Sync-Epoche nach jeder Wiederherstellung; Abweichung ergibt `resync_required` mit `epoch_changed` ([ADR 0059](../adr/0059-sync-epoche-nach-wiederherstellung.md)). | Erkennt eine neue Zeitlinie auch dann, wenn ihre Nummern alte Cursor schon überholt haben; R-SY-04 bleibt als zweites Netz. |
 | R-SY-19 | Wiederholter `run.start` mit derselben Marke liefert das Ergebnis erneut (`runs.started_jti`). | Eine verlorene Antwort darf keinen Lauf verwaisen lassen; die Marke wechselt bei jeder Zustellung. |
 | R-SY-20 | `agent.invocation` wird später geschrieben, solange Anhänge oder ein Server-Transkript nicht endgültig sind. | Agenten sehen nie ungeprüfte Bytes; ein Halten in der Zustellung würde den Strom des Verbrauchers blockieren. |
 | R-SY-21 | `trigger_state` wechselt erst mit der ersten erfolgreichen Zustellung auf `queued`. | Ist der Agent offline, sieht der Mensch "Server hat es, Agent noch nicht". |

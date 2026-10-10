@@ -21,7 +21,7 @@ Sync und Ereignisse: [04-sync-protokoll.md](04-sync-protokoll.md). Wie `authoriz
    mit Lint-Regeln durch (`authz-action-required`: Feld fehlt; `authz-action-known`: ID nicht im
    Katalog). Zusätzlich prüft der Server beim Start, dass jede registrierte Route eine bekannte
    Aktion hat, und ein Test zählt alle Routen. Eine maschinenlesbare Fassung dieses Katalogs als
-   einzige Quelle für Doku, Lint und Code ist beschlossen (ADR 0049); bis sie steht, hält ein
+   einzige Quelle für Doku, Lint und Code ist beschlossen ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)); bis sie steht, hält ein
    Abgleich im Doku-Gate die Listen in `docs/api/redocly.yaml` und die Tabellen von
    [02-architektur.md](02-architektur.md) gleich mit diesem Kapitel.
 4. **WebSocket und Ereignisse.** Jede Op im AsyncAPI-Dokument trägt `x-authz-action`; jeder
@@ -46,6 +46,9 @@ Sync und Ereignisse: [04-sync-protokoll.md](04-sync-protokoll.md). Wie `authoriz
      mit `authorize`, schaltet sie in derselben Transaktion zuerst auf `organization`, führt die
      eigentliche Änderung aus, prüft I1 und schreibt je Aktion einen Audit-Eintrag mit derselben
      `correlation_id` ([10-backend-richtlinie.md](10-backend-richtlinie.md), Abschnitt 11).
+     Etappe: Das Feld kommt mit M2-21 ([PLAN.md](../PLAN.md)) in die Anfrage-Schemas. Vorher
+     lehnt der Server es wie jedes unbekannte Feld mit `400 validation_failed` ab
+     ([06-api.md](06-api.md), "Unbekanntes").
    - I2 ist Teil von `agent.invoke` und wird bei jeder Zustellung eines Aufrufs erneut geprüft.
    - I3 prüft der Adapter; der Server prüft beim Lauf-Start (`run.start`) die Marke erneut.
 7. **Rechte-Version.** Aktionen mit Spalte "Rechte" = `ja` erhöhen `permission_version` und
@@ -60,10 +63,10 @@ Sync und Ereignisse: [04-sync-protokoll.md](04-sync-protokoll.md). Wie `authoriz
    `read_only` schreibt `run.cancel_requested` mit Grund `channel_read_only` für aktive Läufe im
    Kanal (R-AZ-12).
 9. **Wartungsmodus.** Steht `server.maintenance_mode` auf `read_only`
-   ([16-betrieb.md](16-betrieb.md)), beantwortet eine eigene Schicht vor `authorize` alle
-   schreibenden Aktionen mit `503 maintenance` und `Retry-After`; lesende Aktionen und das
-   Nachholen laufen weiter. Die Schicht ist keine Rechte-Logik; sie kennt nur "schreibend" aus der
-   Spalte "Recht".
+   ([16-betrieb.md](16-betrieb.md)), beantwortet eine eigene Schicht vor `authorize` alle Aktionen
+   mit Wirkung `write` (Abschnitt 2.7) mit `503 maintenance` und `Retry-After`, außer den
+   Ausnahmen aus [ADR 0065](../adr/0065-wartungsmodus-read-only.md); lesende Aktionen und das Nachholen laufen weiter. Die Schicht ist keine
+   Rechte-Logik; sie kennt nur die Wirkung aus dem Katalog.
 10. **Systemaktionen.** Aktionen mit Recht `system` führt nur der Server selbst aus (Job oder
     Server-Befehl auf dem Host). Sie sind über API und Gateway nicht erreichbar. Sie stehen im
     Katalog, damit Audit-Einträge eine bekannte Aktion nennen und der Registrierungstest sie zählt.
@@ -141,7 +144,9 @@ Eine angehängte Datei folgt immer ihrer Nachricht, auch nach dem Verschieben de
   gestohlene Sitzung gewinnt damit nur einen Anmeldeweg, dessen neue Geräte `pending` bleiben
   ([08-identitaet.md](08-identitaet.md), Abschnitt 5).
 - **Audit** `ja`: Erlaubnis und Ablehnung kommen ins Audit-Log. `abl`: nur Ablehnungen. Jede
-  Ablehnung jeder Aktion wird geprüft protokolliert; gleiche Ablehnungen (gleicher Prinzipal bzw.
+  Ablehnung jeder Aktion in einer Anfrage oder Op wird protokolliert; Filter (Empfangsprüfung bei
+  Zustellung und Nachholen, Prüfung je Element einer Liste) schreiben keine Ablehnung
+  ([07-rechte.md](07-rechte.md), Abschnitt 4.2). Gleiche Ablehnungen (gleicher Prinzipal bzw.
   ohne Anmeldung gleiches IP-Pseudonym, gleiche Aktion, gleicher Grund) werden je
   `audit.deny_aggregate_window` zu einem Eintrag mit Zähler zusammengefasst (R-AZ-04). Weil die
   Kette nur anhängt, sammelt jeder Prozess die Ablehnungen im Speicher und schreibt je Schlüssel
@@ -195,6 +200,23 @@ Eine App braucht neben Freigaben einen bewilligten Scope (`app_installations.gra
 Agenten haben alle Scopes außer `users:read` und `costs:reconcile` implizit; ihre Grenze sind die
 Freigaben und die Bediener-Regel.
 
+### 2.7 Wirkung (`effect`)
+
+Jede Aktion hat eine Wirkung. `write` heißt: Die Aktion kann fachlichen Zustand in der Datenbank
+ändern oder schreibt bei Erlaubnis einen Audit-Eintrag (Spalte "Audit" `ja`). `read` heißt: Sie tut
+beides nicht. Der Wartungsmodus nutzt nur dieses Merkmal (Regel 1.9, [ADR 0065](../adr/0065-wartungsmodus-read-only.md)); der
+maschinenlesbare Katalog trägt es je Aktion ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)). `read` haben genau:
+
+- die Aktionen, deren ID auf `.read` oder `.list` endet, dazu `cost.read.thread` und
+  `cost.read.aggregate`, außer `audit.read` (Audit `ja`);
+- `access.explain`, `search.query`, `events.catch_up`, `gateway.connect`, `gateway.focus`,
+  `typing.start`, `command.autocomplete`, `command.autocomplete.respond`, `client_metrics.submit`,
+  `push.deliver` und `webhook_out.deliver`.
+
+Alle anderen haben `write`. Grund für die geschlossene Liste: Eine neue Aktion ohne Eintrag ist
+`write` und wird im Wartungsmodus gesperrt (fail closed); die Spalte "Recht" taugt nicht dafür, weil
+etwa `settings.read` und `settings.update` beide `self` verlangen.
+
 ## 3. Rate-Limit-Klassen
 
 Jede Klasse hat einen Schlüssel (wonach gezählt wird) und zwei Werte
@@ -236,7 +258,7 @@ Abschnitt 6.3).
 | `instance.discovery.read` | JWKS, Protokollversionen, minimales Branding, Branding-Logo | instance | public | nein | nein | nein | nein | `rl.public_auth` |
 | `auth.login.begin` | Anmeldung starten (OIDC, Passkey-Challenge, Header-Login, Geräte-Kopplung) | instance | public | nein | nein | abl | nein | `rl.public_auth` |
 | `auth.login.complete` | Anmeldung abschließen (OIDC-Server-Code, Passkey, Einladungs-Code, Passwort mit TOTP, Kopplung), Gerät und Geräteschlüssel registrieren, Sitzung anlegen | instance | public | nein | nein | ja | nein | `rl.public_auth` |
-| `auth.token.refresh` | Refresh-Token rotieren (mit Nachsicht `auth.refresh_reuse_grace`); Wiederverwendung sperrt die Familie | auth_session | public (gültiges Refresh-Token und DPoP-Beweis der Familie) | nein | nein | abl | nein | `rl.public_auth` |
+| `auth.token.refresh` | Refresh-Token rotieren (mit Nachsicht `auth.refresh_reuse_grace`; im Wartungsmodus ohne Rotation, ADR 0065); Wiederverwendung sperrt die Familie | auth_session | public (gültiges Refresh-Token und DPoP-Beweis der Familie) | nein | nein | abl | nein | `rl.public_auth` |
 | `auth.logout` | eigene Sitzung beenden; Push-Registrierungen dieser Sitzung werden deaktiviert | auth_session | self | nein | nein | ja | nein | `rl.write` |
 | `auth.step_up` | frische Bestätigung erbringen (Passkey, Step-up-Geräteschlüssel, Passwort mit TOTP, erneute OIDC-Anmeldung) | auth_session | self | nein | nein | ja | nein | `rl.public_auth` |
 | `status.public.read` | Statusseite ohne Anmeldung, nur wenn `status.public_enabled` | instance | public | nein | nein | nein | nein | `rl.public_auth` |
@@ -289,7 +311,7 @@ Abschnitt 6.3).
 | `device.expire` | Gerät ohne Bestätigung nach `auth.device_pending_ttl`, abgelaufene bestätigte Kopplung oder Gerät ohne Kontakt nach `auth.device_inactive_revoke_after` widerrufen (Job `identity.auth_cleanup`) | device | system | nein | nein | ja | ja | keine |
 | `session.list` | Anmeldesitzungen lesen | user | self oder owner | nein | nein | nein | nein | `rl.read` |
 | `session.revoke` | Sitzung beenden; ihre Kind-Sitzungen enden ebenfalls | auth_session | self oder owner | nein | nein | ja | ja | `rl.admin` |
-| `session.extension.create` | Kind-Sitzung für eine Erweiterung der eigenen App (Notification- oder Share-Extension) mit eigener Refresh-Familie anlegen; ersetzt eine aktive Kind-Sitzung derselben Komponente | auth_session | self | nein | nein | ja | nein | `rl.write` |
+| `session.extension.create` | Kind-Sitzung für die Share-Extension der eigenen App mit eigener Refresh-Familie anlegen (die Notification Service Extension nutzt das Vorschau-Token, keine Sitzung); ersetzt eine aktive Kind-Sitzung derselben Komponente | auth_session | self | nein | nein | ja | nein | `rl.write` |
 | `token.list` | API-Tokens lesen (nur Präfix) | principal | owner; self bei eigenen | nein | nein | nein | nein | `rl.read` |
 | `token.create` | API-Token für Agent oder App erzeugen; persönliches Token nur für sich selbst und nur mit Schalter `tokens.personal_enabled` | principal | owner; self bei eigenem | nein | ja | ja | nein | `rl.admin` |
 | `token.revoke` | API-Token widerrufen | api_token | owner; self bei eigenem | nein | nein | ja | ja | `rl.admin` |
@@ -344,7 +366,7 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `thread.read` | Thread und Verlauf lesen | thread | read | nein | nein | nein | nein | `rl.read` |
-| `thread.create` | Thread aus Nachricht oder Forum-Beitrag anlegen | channel | write | nein | nein | nein | nein | `rl.message` |
+| `thread.create` | Thread aus Nachricht oder Forum-Beitrag anlegen; Tags beim Anlegen gelten wie bei `thread.tags.set` (Tags mit `restricted` brauchen `manage`) | channel | write | nein | nein | nein | nein | `rl.message` |
 | `thread.title.update` | Titel ändern; setzt `title_source = manual`. Bediener-Agent darf nur bei `auto` setzen, die Quelle bleibt dann `auto` | thread | write und (Ersteller oder manage oder Bediener-Agent) | nein | nein | nein | nein | `rl.write` |
 | `thread.close` | Thread "Erledigt" setzen | thread | write | nein | nein | nein | nein | `rl.write` |
 | `thread.reopen` | Thread wieder öffnen (auch implizit durch neue Nachricht) | thread | write | nein | nein | nein | nein | `rl.write` |
@@ -390,7 +412,7 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | `read_state.update` | Gelesen-Stand vorrücken | thread | self und read | nein | nein | nein | nein | `rl.write` |
 | `read_state.mark_unread` | Gelesen-Stand zurücksetzen, mit `If-Match` | thread | self und read | nein | nein | nein | nein | `rl.write` |
 | `draft.read` | eigene Entwürfe lesen | user | self | nein | nein | nein | nein | `rl.read` |
-| `draft.write` | Entwurf speichern oder löschen | thread, channel | self und write | nein | nein | nein | nein | `rl.write` |
+| `draft.write` | Entwurf speichern oder löschen, auch in schreibgeschützten und archivierten Kanälen (Senden prüft `message.create`) | thread, channel | self und read | nein | nein | nein | nein | `rl.write` |
 | `settings.read` | eigene persönliche Daten lesen: Einstellungen, Gelesen-Stände, Seitenleiste, Benachrichtigungsstufen, Ruhezeiten | user | self | nein | nein | nein | nein | `rl.read` |
 | `settings.update` | eigene Einstellung ändern | user | self | nein | nein | nein | nein | `rl.write` |
 | `notification_pref.update` | Benachrichtigungsstufe für Bereich, Kanal oder Thread | space, channel, thread | self und read | nein | nein | nein | nein | `rl.write` |
@@ -403,7 +425,7 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | `events.catch_up` | `GET /api/v1/events`; jedes Ereignis zusätzlich mit seiner Empfangs-Aktion | instance | auth | nein | nein | nein | nein | `rl.read` |
 | `gateway.connect` | WebSocket `identify` oder `resume` | instance | auth (Mensch mit aktivem Gerät, Agent, App mit `events:subscribe`) | nein | nein | abl | nein | `rl.gateway_connect` |
 | `gateway.focus` | Threads fokussieren; nicht lesbare werden still ignoriert | thread | read | nein | nein | nein | nein | `rl.read` |
-| `typing.start` | Tippen anzeigen | thread | write | nein | nein | nein | nein | `rl.typing` |
+| `typing.start` | Tippen anzeigen; nur Menschen, Agenten zeigen Tippen über ihren Lauf (04, Abschnitt 12) | thread | human und write | nein | nein | nein | nein | `rl.typing` |
 
 ### 4.10 Agenten, Befehle, Läufe, Interaktionen
 
@@ -472,7 +494,7 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | `price.read` | Preistabelle lesen | instance | owner | ja | nein | nein | nein | `rl.read` |
 | `price.manage` | Preise mit Quelle und Abrufzeit pflegen | instance | owner | ja | ja | ja | nein | `rl.admin` |
 | `cost.reconcile` | Schätzungen von Hand mit der Abrechnung abgleichen | instance | owner | ja | ja | ja | nein | `rl.admin` |
-| `cost.reconcile.submit` | Abgleich-App übermittelt `reconciled`-Einträge zu vorhandenen Läufen; löscht nichts ([10-backend-richtlinie.md](10-backend-richtlinie.md), Abschnitt 12.4) | instance | App mit Scope `costs:reconcile` | nein | nein | ja | nein | `rl.admin` |
+| `cost.reconcile.submit` | Abgleich-App übermittelt `reconciled`-Einträge zu vorhandenen Läufen; löscht nichts ([10-backend-richtlinie.md](10-backend-richtlinie.md), Abschnitt 12.4; [ADR 0055](../adr/0055-kostenabgleich-als-eigene-app-admin-key-nie-im-server.md)) | instance | App mit Scope `costs:reconcile` | nein | nein | ja | nein | `rl.admin` |
 | `export.channel` | Kanal-Verlauf exportieren | channel | read und +export | nein | ja | ja | nein | `rl.export` |
 | `gdpr.request.create` | Export oder Löschung für sich selbst; für andere nur Owner | user | self oder owner | nein | ja | ja | nein | `rl.export` |
 | `gdpr.request.read` | Auftrag und Stand lesen | gdpr_request | self oder owner | nein | nein | nein | nein | `rl.read` |
@@ -584,7 +606,7 @@ erlaubt. Persönliche Ereignisse (`audience = self`) gehen nur an den genannten 
 | `agent_session.changed` | thread | `thread.read` | neue Sitzung, Umbinden, Bindung nach Import |
 | `run.state_changed` | run | `run.read` | mit Zusammenfassung |
 | `space.created` | space | `space.read` | |
-| `space.updated` | space | `space.read` | Name, Icon, Reihenfolge, Bediener |
+| `space.updated` | space | `space.read` | Name, Icon, Reihenfolge, Bediener; ändert sich der Standard-Bediener, folgt je erbendem, nicht archiviertem Kanal ein `channel.updated` mit neuer Version, weil sich dessen wirksamer Bediener ändert |
 | `space.archived` | space | `space.read` | |
 | `channel.created` | channel | `channel.read` | |
 | `channel.updated` | channel | `channel.read` | Name, Thema, Reihenfolge, Bediener, `read_only`, `default_notification_level`; Änderungen an Forum-Tags (nur die neue Version, Tags per REST) |
@@ -654,7 +676,7 @@ Ausgehende Webhooks und Push nutzen dieselbe Empfangs-Aktion (`webhook_out.deliv
 | R-AZ-01 | `403` nur bei vorhandenem Leserecht, sonst `404`. | Baseline B7; verrät keine Existenz und bleibt für Berechtigte verständlich. |
 | R-AZ-02 | DM-Kanäle sind nur für Teilnehmer lesbar, auch nicht für Owner. Der einzige Weg im Produkt ist der DSGVO-Export einer Person (`gdpr.request.create` für andere, Owner, Step-up, Audit); er enthält nur deren eigene Nachrichten. Weitere Wege (behördliche Anordnung) liegen außerhalb des Produkts. | Vertraulichkeit zwischen Menschen (Ruling L21); Voreinstellung, die der Owner bestätigt. |
 | R-AZ-03 | Step-up-Aktionen nur durch Menschen in einer Sitzung. | Ein Token kann keine Bestätigung durch den Menschen erbringen; Verwaltung per Token wäre eine Umgehung. |
-| R-AZ-04 | Alle Ablehnungen ins Audit, gleiche Ablehnungen je Fenster zusammengefasst. | Studie C verlangt Protokoll jeder Ablehnung; ohne Zusammenfassung füllt Abtasten das Log. |
+| R-AZ-04 | Alle Ablehnungen von Anfragen und Ops ins Audit, gleiche Ablehnungen je Fenster zusammengefasst; Filter bei Zustellung und in Listen schreiben keine. | Studie C verlangt Protokoll jeder Ablehnung; ohne Zusammenfassung füllt Abtasten das Log; ein Filter ist keine Anfrage, sonst schriebe jedes Ereignis eine Zeile je Nicht-Empfänger. |
 | R-AZ-05 | `manage` darf Freigaben nur bis zur eigenen Stufe, mit eigenen Zusatzrechten (`manage` eingeschlossen), nur an Menschen und Gruppen und nicht auf der Instanz vergeben; Widerruf nur im selben Rahmen. | "delegierbar" laut Baseline, ohne Rechte-Ausweitung über die eigene Freigabe hinaus; Freigaben an Agenten und Apps sind Datenflüsse zu Auftragsverarbeitern und bleiben beim Owner. |
 | R-AZ-06 | Layout-Aktionen (Bereich anlegen, sortieren, umbenennen) ohne Step-up; Rechte, Identität, Agenten, Kosten, Export, Löschung mit Step-up. | Step-up dort, wo Schaden entsteht; sonst wird er zur Gewohnheit weggeklickt. |
 | R-AZ-07 | `run.cancel` nur durch Auslöser, `manage` oder Owner. | Bei Organisations-Agenten sollen sich Menschen nicht gegenseitig Läufe abbrechen. |

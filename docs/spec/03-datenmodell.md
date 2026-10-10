@@ -46,10 +46,11 @@ Migration kommt mit dieser Etappe, der Vertrag gilt schon jetzt.
     Zähler-Muster aus Abschnitt 6 setzen das voraus.
 12. **Zugriff.** Nur das Modul, dem eine Tabelle gehört, schreibt sie. Andere Module lesen über
     dessen Port. Abfragen, die Rechte filtern, bekommen die Menge der sichtbaren Kanäle von
-    `authz` und verknüpfen nie selbst mit `grants` (eine Wahrheit, B7).
+    `authz` und verknüpfen nie selbst mit `grants` (eine Wahrheit, B7). Den Tabellenbesitz hält
+    das Modulregister fest, ein Gate prüft ihn ([ADR 0050](../adr/0050-modulregister-als-quelle-fuer-architektur-gate-und-tabellenbesitz.md)).
 13. **Kein `null` nach außen.** Eine Spalte mit NULL erscheint in API und Ereignissen als
     fehlendes Feld, nie als JSON-`null` ([04-sync-protokoll.md](04-sync-protokoll.md),
-    Abschnitt 2.2). Grund: generierte Clients (dart-dio) kennen keinen Null-Typ.
+    Abschnitt 2.2; [ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)). Grund: generierte Clients (dart-dio) kennen keinen Null-Typ.
 
 ## 2. Module
 
@@ -77,7 +78,8 @@ Migration kommt mit dieser Etappe, der Vertrag gilt schon jetzt.
 
 Die drei Module ohne Tabellen sind eigene Module, weil sie eigene Ports, Abhängigkeiten und
 Leistungsziele haben ([02-architektur.md](02-architektur.md), Abschnitt 4). Technische Tabellen
-außerhalb der Module stehen in Abschnitt 4.13.
+außerhalb der Module stehen in Abschnitt 4.13. Die Zuordnung der Tabellen zu Modulen steht
+maschinenlesbar im Modulregister ([ADR 0050](../adr/0050-modulregister-als-quelle-fuer-architektur-gate-und-tabellenbesitz.md)).
 
 ## 3. Aufbewahrungsklassen
 
@@ -181,7 +183,7 @@ Zweck: Schalter für Funktionen, global oder für Gruppen und Personen. Modul: `
 
 PK: `key`. FK: `updated_by` -> `principals(id)` ON DELETE RESTRICT. Indexe: keine weiteren.
 Aufbewahrung: `config`. Art, Beschreibung, Standard, Modul und `remove_by` stehen in der
-Registrierung im Code, nicht in der Tabelle (ADR 0064); ein registrierter Schlüssel ohne Zeile hat
+Registrierung im Code, nicht in der Tabelle ([ADR 0064](../adr/0064-feature-flag-registrierung-mit-aufraeum-gate.md)); ein registrierter Schlüssel ohne Zeile hat
 seinen Standard und in der API die Version `0`, ein Schlüssel ohne Registrierung ist aus und
 verwaist. Dasselbe gilt für `instance_settings`: Ein registrierter Schlüssel ohne Zeile hat seinen
 Standardwert und die Version `0`.
@@ -384,7 +386,7 @@ Zweck: Anmeldesitzung eines Menschen auf einem Gerät. Jeder Zugriffstoken träg
 | `id` | `uuid` | nein | | |
 | `user_id` | `uuid` | nein | | |
 | `device_id` | `uuid` | nein | | |
-| `client_component` | `text` | nein | `'app'` | `CHECK (client_component IN ('app','notification_ext','share_ext','console'))`; Erweiterungen einer App haben eigene Kind-Sitzungen mit eigener Refresh-Familie |
+| `client_component` | `text` | nein | `'app'` | `CHECK (client_component IN ('app','share_ext','console'))`; die Share-Extension hat eine eigene Kind-Sitzung mit eigener Refresh-Familie; die Notification Service Extension hat keine Sitzung, sie nutzt das Vorschau-Token ([13-push-benachrichtigungen.md](13-push-benachrichtigungen.md), Abschnitt 6.4) |
 | `parent_session_id` | `uuid` | ja | | gesetzt bei Kind-Sitzungen von Erweiterungen; Widerruf der Eltern-Sitzung widerruft alle Kinder mit demselben Grund |
 | `identity_id` | `uuid` | ja | | womit angemeldet; NULL bei lokaler Anmeldung ohne Identität eines Anbieters |
 | `auth_method` | `text` | nein | | `CHECK (auth_method IN ('oidc','trusted_header','passkey','password_totp','enrollment_code','device_pairing'))` |
@@ -402,7 +404,7 @@ PK: `id`. FK: `user_id` -> `users(principal_id)` ON DELETE RESTRICT; `device_id`
 `devices(id)` ON DELETE RESTRICT; `identity_id` -> `user_identities(id)` ON DELETE SET NULL;
 `parent_session_id` -> `auth_sessions(id)` ON DELETE CASCADE.
 Checks: `(client_component = 'console') = (cookie_hash IS NOT NULL)`; `parent_session_id IS NULL OR
-client_component IN ('notification_ext','share_ext')`; `(step_up_at IS NULL) = (step_up_method IS
+client_component = 'share_ext'`; `(step_up_at IS NULL) = (step_up_method IS
 NULL)`. Unique: `cookie_hash` als Teilindex `WHERE cookie_hash IS NOT NULL`.
 Indexe: `(user_id) WHERE revoked_at IS NULL` für "alle Sitzungen beenden"; `(device_id)`;
 `(parent_session_id) WHERE parent_session_id IS NOT NULL`; `(expires_at)` für den Aufräumjob.
@@ -462,7 +464,7 @@ Rotation: In einer Transaktion `SELECT ... FOR UPDATE` auf die Familie, DPoP-Bew
 
 Zweck: langlebige Tokens für Agenten, Apps und (per Feature-Flag) persönliche Werkzeuge.
 Nur Hash und Präfix. Format `bothy_<art>_<zufall>_<prüfsumme>` mit Art `agt`, `app` oder
-`pat` ([08-identitaet.md](08-identitaet.md), Abschnitt 12; Eingangs-Webhooks nutzen dasselbe
+`pat` ([08-identitaet.md](08-identitaet.md), Abschnitt 12; [ADR 0061](../adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md); Eingangs-Webhooks nutzen dasselbe
 Format mit Art `whi` in `incoming_webhooks.token_hash`); das feste Präfix erlaubt die Regel
 `bothy-api-token` im Secret-Scanner (`.gitleaks.toml`). Modul: `identity`.
 
@@ -471,7 +473,7 @@ Format mit Art `whi` in `incoming_webhooks.token_hash`); das feste Präfix erlau
 | `id` | `uuid` | nein | | |
 | `principal_id` | `uuid` | nein | | Inhaber des Tokens |
 | `name` | `text` | nein | | |
-| `token_prefix` | `text` | nein | | `bothy_<art>_` und die ersten 6 Zeichen des Zufallsteils, zum Wiedererkennen in der Konsole (ADR 0061) |
+| `token_prefix` | `text` | nein | | `bothy_<art>_` und die ersten 6 Zeichen des Zufallsteils, zum Wiedererkennen in der Konsole ([ADR 0061](../adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md)) |
 | `token_hash` | `bytea` | nein | | HMAC-SHA-256 |
 | `scopes` | `text[]` | nein | `'{}'` | Teilmenge der Manifest-Scopes bzw. Agenten-Scopes |
 | `dpop_jkt` | `text` | ja | | gesetzt: Anfragen müssen mit diesem Schlüssel DPoP-gebunden sein |
@@ -951,7 +953,7 @@ Zweck: Kanal (Text, Forum oder Direktnachricht) mit Bediener und Verhalten. Modu
 | `space_id` | `uuid` | ja | | NULL genau bei `kind = 'dm'` (R-DM-10) |
 | `kind` | `text` | nein | | `CHECK (kind IN ('text','forum','dm'))` |
 | `name` | `text` | nein | | höchstens `channel.name_max_chars` Zeichen, ohne Steuer- und Bidi-Zeichen; bei `dm` leer, Anzeige aus Teilnehmern |
-| `topic` | `text` | nein | `''` | |
+| `topic` | `text` | nein | `''` | höchstens `channel.topic_max_chars` Zeichen, ohne Steuer- und Bidi-Zeichen |
 | `sort_key` | `text COLLATE "C"` | nein | | Reihenfolge im Bereich |
 | `operator_inherit` | `boolean` | nein | `true` | `true`: Bediener = `spaces.default_operator_agent_id` |
 | `operator_agent_id` | `uuid` | ja | | nur bei `operator_inherit = false`; NULL = kein Bediener |
@@ -1066,7 +1068,7 @@ Zweck: Gesprächseinheit und Agenten-Sitzungseinheit mit fester ID. Modul: `chat
 | `id` | `uuid` | nein | | fest, ändert sich nie, auch nicht beim Verschieben |
 | `channel_id` | `uuid` | nein | | |
 | `kind` | `text` | nein | | `CHECK (kind IN ('main','thread'))`; `main` = durchgehender Verlauf eines Text- oder DM-Kanals (R-DM-11) |
-| `parent_message_id` | `uuid` | ja | | Nachricht im Hauptverlauf, aus der der Thread entstand |
+| `parent_message_id` | `uuid` | ja | | Nachricht im Hauptverlauf, aus der der Thread entstand; bleibt beim Verschieben und zeigt dann in den Quellkanal (abrufbar nur mit Leserecht dort) |
 | `title` | `text` | nein | `''` | Länge bis `thread.title_max_chars` |
 | `title_source` | `text` | nein | `'auto'` | `CHECK (title_source IN ('auto','manual'))`; einmal `manual`, bleibt `manual` |
 | `state` | `text` | nein | `'open'` | `CHECK (state IN ('open','closed'))` |
@@ -1098,7 +1100,8 @@ Erledigt-Bereich; `(operator_agent_id, channel_id) WHERE operator_agent_id IS NO
 I1-Ziele, ohne Bedingung auf `state`, weil eine neue Nachricht einen erledigten Thread wieder
 öffnet (Abschnitt 6.4); GIN `(title_search)` für die Suche. Aufbewahrung: `content`.
 
-Verschieben ändert `channel_id`. Erlaubt nur, wenn der wirksame Bediener des Zielkanals gleich
+Verschieben ändert `channel_id`. Erlaubt nur für `kind = 'thread'` (der Hauptverlauf gehört fest
+zu seinem Kanal, R-DM-11) und nur, wenn der wirksame Bediener des Zielkanals gleich
 `operator_agent_id` ist (Baseline Abschnitt 4). Dieselbe Transaktion ändert die Kopien
 `messages.channel_id`, `read_states.channel_id` und `drafts.channel_id` dieses Threads.
 `cost_entries` und `event_log` behalten den Kanal zur Zeit der Buchung bzw. des Ereignisses.
@@ -1119,8 +1122,10 @@ Zweck: Zuordnung von Forum-Tags zu Threads. Modul: `chat`.
 PK: `(thread_id, tag_id)`. FK: `thread_id` -> `threads(id)` ON DELETE CASCADE; `tag_id` ->
 `forum_tags(id)` ON DELETE CASCADE; `added_by` -> `principals(id)` ON DELETE RESTRICT.
 Indexe: `(tag_id)` für den Tag-Filter der Beitragsliste. Aufbewahrung: `content`.
+Höchstens `thread.max_tags` Tags je Thread.
 
-Beim Verschieben eines Threads in ein anderes Forum werden seine Tags entfernt.
+Beim Verschieben eines Threads in einen anderen Kanal werden seine Tags entfernt, weil ein Tag zum
+Kanal des Threads gehört.
 
 #### `agent_sessions`
 
@@ -1224,6 +1229,29 @@ Löschen leert `content_md`, löscht Anhänge, Revisionen, Erwähnungen, Kompone
 die Anheftung und schwärzt die Nutzlast der zugehörigen Ereignisse (Abschnitt 6.5). Zeile und
 `thread_seq` bleiben. Eine Systemzeile `thread.reopened` schreibt der Server, wenn eine Nachricht
 einen erledigten Thread wieder öffnet; Autor ist die Person, deren Nachricht ihn öffnete.
+
+Inhaltsformat `content_format = 1`: Markdown nach CommonMark 0.31.2
+(https://spec.commonmark.org/0.31.2/, abgerufen 2026-10-10) [belegt], ohne rohes HTML
+([19-sicherheit.md](19-sicherheit.md), SEC-OUT-1). Erweiterungen wie Tabellen bekommen ein neues
+`content_format`, weil sie die Darstellung vorhandener Texte ändern. Erwähnungen stehen als Text im
+Inhalt:
+
+1. Ein Erwähnungs-Token ist `@` gefolgt von einem Handle (`[a-z0-9][a-z0-9._-]*`, Groß- und
+   Kleinschreibung gleich). Vor dem `@` steht der Textanfang oder ein Zeichen, das weder Buchstabe
+   noch Ziffer noch eines von `_ . - @ /` ist; `alex@example.com` ist darum keine Erwähnung.
+   Abschließende `.`, `-` und `_` gehören nicht zum Handle (Satzende).
+2. In Inline-Code und Code-Blöcken (eingezäunt und eingerückt, nach CommonMark) gibt es keine
+   Erwähnungen.
+3. Beim Senden und Bearbeiten löst der Server jedes verschiedene Handle einmal unter aktiven
+   Prinzipalen der Art `user` oder `agent` auf. Wer erwähnt werden kann, regelt
+   [07-rechte.md](07-rechte.md), Abschnitt 4.6; ein nicht auflösbares Token bleibt Text.
+   `@everyone` und `@here` haben keine Sonderbedeutung.
+4. Je aufgelöstem Prinzipal entsteht eine Zeile in `mentions`; `Message.mention_ids` nennt sie
+   sortiert. Sendet der Client `mention_ids`, muss die Menge gleich der aufgelösten sein, sonst
+   `400 validation_failed` mit Code `mention_mismatch`. Der Server ist die Quelle; Clients zeigen
+   ein Token nur dann als Erwähnung, wenn sein Prinzipal in `mention_ids` steht.
+5. Mehr als `message.max_mentions` verschiedene Handles ergeben `400 validation_failed` mit Code
+   `too_many_mentions`. Grund: Die Auflösung ist eine Abfrage je Nachricht und bleibt begrenzt.
 
 #### `message_revisions`
 
@@ -1365,7 +1393,8 @@ Kontingent; `(scan_status) WHERE scan_status = 'pending'` für die Scan-Wartesch
 Uploads; GIN `(search_vector)`. Aufbewahrung: `content`.
 Keine Deduplizierung über Dateien hinweg (R-DM-13). Download nur über den Server nach
 `file.read`, auch für Medien-Player über kurzlebige Abruf-Tickets statt presigned GET
-([12-dateien.md](12-dateien.md), Abschnitt 9); Auslieferung erst bei `scan_status IN
+([12-dateien.md](12-dateien.md), Abschnitt 9;
+[ADR 0048](../adr/0048-datei-abruf-nur-ueber-den-server-mit-kurzlebigen-tickets.md)); Auslieferung erst bei `scan_status IN
 ('clean','skipped')`. Bei JPEG und PNG beschreiben `sha256`, `size_bytes`, `width` und `height`
 das gespeicherte Original nach der verlustfreien Entfernung der Metadaten
 ([12-dateien.md](12-dateien.md), Abschnitt 7).
@@ -1717,7 +1746,7 @@ Zweck: dauerhafte Ereignisse mit globaler, commit-geordneter Sequenz (B8). Modul
 | `resource_id` | `uuid` | ja | | |
 | `resource_version` | `bigint` | ja | | Version des Objekts nach der Änderung |
 | `audience_principal_id` | `uuid` | ja | | gesetzt: persönliches Ereignis, nur für diesen Prinzipal |
-| `receive_action` | `text` | nein | | Aktion, die ein Empfänger auf die Ressource braucht ([05-aktionen.md](05-aktionen.md), Abschnitt 6). Persönliche Ereignisse: `self`, wenn 05 nur "self" nennt; nennt 05 zusätzlich eine Aktion, steht genau diese (z. B. `agent.events.consume` bei `agent.invocation`, `interaction.created` und `command.invoked`, `agent.config.read` bei `agent.config_changed`). Ist der Empfänger eine App, prüft die Zustellung statt `agent.events.consume` den Scope `events:subscribe` (05, Abschnitt 6). Ein Wert je Typ; die Quelle ist der Aktionskatalog (ADR 0049) |
+| `receive_action` | `text` | nein | | Aktion, die ein Empfänger auf die Ressource braucht ([05-aktionen.md](05-aktionen.md), Abschnitt 6). Persönliche Ereignisse: `self`, wenn 05 nur "self" nennt; nennt 05 zusätzlich eine Aktion, steht genau diese (z. B. `agent.events.consume` bei `agent.invocation`, `interaction.created` und `command.invoked`, `agent.config.read` bei `agent.config_changed`). Ist der Empfänger eine App, prüft die Zustellung statt `agent.events.consume` den Scope `events:subscribe` (05, Abschnitt 6). Ein Wert je Typ; die Quelle ist der Aktionskatalog ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)) |
 | `payload` | `jsonb` | nein | | Schema `<type>.v<schema_version>`; Größe bis `sync.event_payload_max_bytes` |
 | `truncated` | `boolean` | nein | `false` | Umschlag `truncated`: der Erzeuger hat eine verkleinerte Nutzlast gebaut, weil das Objekt `sync.event_payload_max_bytes` überschreitet; der Client lädt per REST nach |
 | `redacted_at` | `timestamptz` | ja | | Nutzlast geschwärzt (Löschung) |
@@ -2089,7 +2118,7 @@ Zweck: nur anhängendes, hash-verkettetes Audit-Log (B11). Modul: `audit`.
 | `deny_reason` | `text` | ja | | Grund-Code aus der geschlossenen Liste in [07-rechte.md](07-rechte.md), Abschnitt 4.1, z. B. `no_grant`, `step_up_required`, `i1_violation`, `billing_mode_mismatch`, `malware_detected` |
 | `resource_kind` | `text` | ja | | |
 | `resource_id` | `uuid` | ja | | |
-| `details` | `jsonb` | nein | `'{}'` | Schema `audit_details.v1`; nie Inhalte, nie Geheimnisse; eine IP nur als `ip_hmac` mit `ip_key_id` (Schlüssel wechselt je `privacy.audit_ip_key_period`, [20-datenschutz.md](20-datenschutz.md)) |
+| `details` | `jsonb` | nein | `'{}'` | Schema `audit_details.v1` ([19-sicherheit.md](19-sicherheit.md), SEC-AUD-5); nie Inhalte, nie Geheimnisse; einziger Freitext ist der Pflichtgrund einer Verwaltungsaktion (`reason`); eine IP nur als `ip_hmac` mit `ip_key_id` (Schlüssel wechselt je `privacy.audit_ip_key_period`, [20-datenschutz.md](20-datenschutz.md)) |
 | `correlation_id` | `uuid` | ja | | Trace-ID der auslösenden Anfrage, wie in `event_log` |
 | `prev_hash` | `bytea` | nein | | `hash` der Zeile `seq - 1`; erste Zeile 32 Null-Bytes |
 | `hash` | `bytea` | nein | | `SHA-256(prev_hash || canonical_json(Zeile ohne hash))`; `canonical_json` ist JCS nach RFC 8785 |
@@ -2378,6 +2407,8 @@ Inhalte; der empfangende Knoten liest Inhalte aus der Datenbank. Mit einem Knote
 aus, weil jedes `NOTIFY` beim Commit eine instanzweite Sperre nimmt.
 
 ### 6.7 Sync-Epoche und Wiederherstellung
+
+Entscheidung: [ADR 0059](../adr/0059-sync-epoche-nach-wiederherstellung.md).
 
 Eine Wiederherstellung aus der Sicherung setzt die globale Sequenz zurück. Ohne Gegenmaßnahme
 überholt die neue Zeitlinie nach den ersten Schreibvorgängen alte Cursor, und ein Client
@@ -3086,8 +3117,8 @@ bewusst keine Fremdschlüssel; ihre ID-Felder sind Belege, keine Verknüpfungen.
 | R-DM-23 | Kostenbuchungen verweisen auf den Preissatz zu `provider`, `model` und `occurred_at`, nicht auf eine Preiszeile; benutzte Preiszeilen sind unveränderlich. | Eine Berechnung nutzt mehrere Einheiten; nachrechenbar bleibt sie nur mit unveränderten Zeilen. |
 | R-DM-24 | Dev-Umgebungen laufen in dieser Etappe nur mit `billing_mode = 'organization'`. | Eine persönliche Backend-Richtlinie je Umgebung bräuchte I1 je Umgebung statt je Agent; das ist eine eigene Entscheidung der Etappe "Dev-Umgebung" (Ruling der Leitung). |
 | R-DM-25 | Schreibgeschützte Kanäle (`channels.read_only`) als Spalte, nicht als Freigabe. | Owner haben überall `trigger`; nur ein Zustand am Kanal kann auch Owner am Schreiben hindern, wie der Lese-Spiegel eines Imports es braucht. |
-| R-DM-26 | Sync-Epoche in `instance`, neu nach jeder Wiederherstellung. | Ein Cursor ist nur innerhalb einer Zeitlinie gültig; ohne Epoche überholt die neue Zeitlinie alte Cursor still. |
-| R-DM-27 | Cursor der Worker-Verbraucher in einer eigenen Tabelle (`event_consumer_cursors`) statt Job-Einfügen im Schreibpfad. | Der Schreibpfad muss keine Folgen kennen; ein neuer Verbraucher ändert keinen Erzeuger (ADR 0051). |
+| R-DM-26 | Sync-Epoche in `instance`, neu nach jeder Wiederherstellung ([ADR 0059](../adr/0059-sync-epoche-nach-wiederherstellung.md)). | Ein Cursor ist nur innerhalb einer Zeitlinie gültig; ohne Epoche überholt die neue Zeitlinie alte Cursor still. |
+| R-DM-27 | Cursor der Worker-Verbraucher in einer eigenen Tabelle (`event_consumer_cursors`) statt Job-Einfügen im Schreibpfad. | Der Schreibpfad muss keine Folgen kennen; ein neuer Verbraucher ändert keinen Erzeuger ([ADR 0051](../adr/0051-worker-verbraucher-des-ereignis-logs-mit-cursor.md)). |
 | R-DM-28 | `audit_events.deny_reason` ohne `CHECK`, Liste durch einen Test geschlossen. | Ein Audit-Eintrag darf nie an einem neuen Grund-Code scheitern. |
 | R-DM-29 | `event_log.actor_kind` als eigene Spalte statt Ableitung aus `actor_principal_id`. | NULL kann `system` nicht von "kein Akteur" trennen, und `sync` darf `identity` nicht nach der Art fragen (02, Abschnitt 4.4). |
 | R-DM-30 | Der OIDC-Rückruf speichert nur die geprüfte externe Identität im Anmeldevorgang (`auth_login_flows.external_identity`); Zuordnung, Verknüpfung über Einladungs-Code und Bereitstellung geschehen erst beim Abschluss. | Die `authorization_url` ist an keinen Browser gebunden; wer sie erhält, könnte sonst sein eigenes Anbieter-Konto mit dem Code eines anderen verknüpfen (Login-CSRF). Den Abschluss kann nur die App mit dem `client_verifier`. |
@@ -3109,6 +3140,7 @@ Die Werte sind Standardwerte. Andere Kapitel verweisen nur auf den Namen.
 | `group.description_max_chars` | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen |
 | `space.name_max_chars` | `100` | Länge eines Bereichsnamens in Unicode-Zeichen |
 | `channel.name_max_chars` | `100` | Länge eines Kanalnamens in Unicode-Zeichen |
+| `channel.topic_max_chars` | `1024` | Länge eines Kanal-Themas in Unicode-Zeichen |
 | `forum_tag.name_max_chars` | `50` | Länge eines Tag-Namens in Unicode-Zeichen |
 | `identity.last_active_granularity` | `5m` | höchstens so oft wird `last_active_at` bzw. `last_used_at` geschrieben |
 | `auth.session_max_age` | `30d` | absolutes Ende einer Anmeldesitzung |
@@ -3120,8 +3152,10 @@ Die Werte sind Standardwerte. Andere Kapitel verweisen nur auf den Namen.
 | `channel.history_backfill_limit_max` | `200` | Obergrenze für `history_backfill_limit` |
 | `channel.prompt_max_bytes` | `32768` | Größe eines Kanal-Prompts |
 | `thread.title_max_chars` | `200` | Länge eines Thread-Titels |
+| `thread.max_tags` | `5` | Forum-Tags je Thread |
 | `message.max_content_bytes` | `262144` | Größe einer Nachricht (lange Antworten ohne Teilen) |
 | `message.max_attachments` | `10` | Anhänge je Nachricht |
+| `message.max_mentions` | `50` | verschiedene Erwähnungs-Handles je Nachricht (Inhaltsformat, `messages`) |
 | `reaction.emoji_max_bytes` | `64` | größte Länge eines Reaktions-Emoji in Bytes (ein Graphem-Cluster hat sonst keine Grenze) |
 | `reaction.max_distinct_per_message` | `20` | verschiedene Emoji je Nachricht; begrenzt `Message.reactions` und die Nutzlast der Ereignisse |
 | `pin.max_per_thread` | `50` | Anheftungen je Thread; `listPins` ist nicht seitenweise |

@@ -25,9 +25,9 @@ sequenceDiagram
     GB-->>C: resumed, Fokus wiederhergestellt
   end
   alt cursor zu alt, zu weit zurück oder größer als head_seq
-    GB-->>C: resync_required (retention, too_far_behind oder cursor_ahead)
+    GB-->>C: resync_required (retention, too_far_behind oder cursor_ahead), Verbindung bleibt live ab head_seq
     C->>C: Server-Zustand im Cache verwerfen, Ausgangsfach behalten
-    C->>GB: GET sync/snapshot, danach neu verbinden mit head_seq als Cursor
+    C->>GB: GET sync/snapshot, Cursor auf dessen head_seq, ältere Ereignisse verwerfen
   else Nachholen möglich
     loop Seiten zu sync.catchup_page_size
       GB->>DB: SELECT event_log WHERE seq > cursor AND seq <= head, gefiltert nach sichtbaren Zielen
