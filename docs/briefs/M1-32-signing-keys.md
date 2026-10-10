@@ -1,18 +1,18 @@
 # M1-32: Signing keys, JWKS and rotation
 
-Status: ready | Depends on: M1-14, M1-15, M1-20, M1-24, M1-28 | Etappe: M1
+Status: ready | Depends on: M1-20, M1-28 | Etappe: M1
 
 ## Goal
 
 After this ticket the server owns one Ed25519 signing key per purpose (`access_token`, `invocation`, `webhook_out`, `audit_checkpoint`) with the states `next`, `active`, `retiring` and `retired`. The private part lives only in the Secret-Provider; the database holds the public JWK, the state and a reference. Keys rotate on schedule without invalidating any signature that is still valid, an owner with step-up can rotate on demand or in an emergency that withdraws the old key at once, and the public JWKS is served for clients and agent adapters. Access tokens (M1-34), invocation tokens (M2), outgoing webhooks (M2) and audit checkpoints (M1-50) sign through this ticket's port.
 
-The plan dependencies list M1-14, M1-15 and M1-28; M1-20 (`Idempotency-Key` on `rotateSigningKey`) and M1-24 (audit of `signing_key.rotate`) are needed as well and are merged in earlier waves.
+M1-20 (`Idempotency-Key` on `rotateSigningKey`) and M1-28 are the direct dependencies; M1-14 (jobs), M1-15 (instance) and M1-24 (audit of `signing_key.rotate` and `signing_key.transition`) come with them.
 
 ## Read first
 
 - `docs/PLAN.md`: section 3, section 7 (M1), rows M1-09, M1-23, M1-32, M1-34, M1-37, M1-50, M1-73.
 - `docs/spec/03-datenmodell.md`: 1 (principle 9), 4.1 `instance` and `server_signing_keys`, 4.12 `audit_checkpoints` (column `kid`), 6.3.
-- `docs/spec/05-aktionen.md`: table 4.1 (`instance.discovery.read`), table 4.2 (`signing_key.rotate`), 5 (invocation token header and claims).
+- `docs/spec/05-aktionen.md`: table 4.1 (`instance.discovery.read`), table 4.2 (`signing_key.rotate` with `mode`, system action `signing_key.transition`), 5 (invocation token header and claims), R-AZ-15.
 - `docs/spec/08-identitaet.md`: 4 (bootstrap step 3), 7.1 and 7.2 (access tokens, verification with `active` and `retiring`).
 - `docs/spec/09-agenten.md`: 4.5 (Aufruf-Marke, Schluessel und Rotation).
 - `docs/spec/11-erweiterungen.md`: 7 (Ausgehende Webhooks, key purpose `webhook_out`).
@@ -22,7 +22,7 @@ The plan dependencies list M1-14, M1-15 and M1-28; M1-20 (`Idempotency-Key` on `
 - `docs/spec/20-datenschutz.md`: row `server_signing_keys`.
 - `docs/api/openapi.yaml`: operations `getJwks`, `rotateSigningKey`; schemas `Jwks`, `SigningKeyRotate`, `SigningKeyRotation`, `SigningKeyPurpose`.
 - `docs/operations/configuration.md` section 5 (Geheimnisse), `docs/operations/disaster-recovery.md` (Fall D), `docs/security/threat-model.md` (T-TK-04), `infra/compose/compose.yaml` (service `server`, volume `secrets`), `services/server/Dockerfile` (M1-23).
-- ADRs: 0011, 0012, 0020, 0021, 0023, 0016.
+- ADRs: 0066 (writable key store), 0011, 0012, 0020, 0021, 0023, 0016.
 - Merged code: `internal/platform/secrets` and `bothy secrets` (M1-09), `internal/platform/jobs` (M1-14), `internal/instance` with `instance` and `sequence_counters` (M1-15), the HTTP chain and problem writer (M1-18), idempotency (M1-20), `auditing.Recorder` (M1-24), `authorize` (M1-28), lifecycle and health (M1-11), config loader (M1-07) and generator (M1-08). Their names win where they differ from this brief only in naming.
 - RFC 7517 (JWK), RFC 7638 (JWK thumbprint), RFC 8037 (OKP keys, `EdDSA`).
 
@@ -36,28 +36,26 @@ The plan dependencies list M1-14, M1-15 and M1-28; M1-20 (`Idempotency-Key` on `
 6. Test first: red before green, red output kept for the report.
 7. No en dash or em dash in any file; White Label.
 8. Configuration values only through named keys listed in `docs/operations/configuration.md`; the new keys of this ticket are added to their chapter tables first and the reference is regenerated.
-9. The private part of a signing key exists only in the Secret-Provider; `server_signing_keys` holds the public JWK, the state and `private_key_ref` (03; 19 section 10; SEC-SEC-3). A private key never appears in the database, a log, telemetry, an audit entry, an error or a response.
+9. The private part of a signing key exists only in the key store `secrets.signing_key_dir` of the Secret-Provider (ADR 0066, 16 section 5.2); `server_signing_keys` holds the public JWK, the state and `private_key_ref` (03; 19 section 10; SEC-SEC-3). A private key never appears in the database, a log, telemetry, an audit entry, an error or a response.
 10. States `next`, `active`, `retiring`, `retired`; exactly one `active` key per purpose (partial unique index of 03); a key stays `retiring` until the longest validity of anything signed with it has passed (19 section 10); the JWKS publishes `next`, `active` and `retiring` keys (09 section 4.5).
 11. `invocation` and `webhook_out` keys use only `EdDSA` (03 check). This ticket generates Ed25519 keys for every purpose (08 section 7.1 names `EdDSA` for access tokens).
-12. Scheduled rotation of `invocation` keys after `signing_key.invocation_rotation_interval`, with the new key published for at least `agent.jwks_max_age` before it signs (09 section 4.5).
-13. Emergency rotation withdraws the old key immediately (09 section 4.5 point 3); `signing_key.rotate` is an owner action with step-up and audit (05 table 4.2).
+12. Scheduled rotation of `invocation` keys after `signing_key.invocation_rotation_interval` and of `access_token` keys after `signing_key.access_token_rotation_interval`, with the new key published for at least `agent.jwks_max_age` before it signs (09 section 4.5, 19 section 10). `webhook_out` and `audit_checkpoint` rotate on owner request only.
+13. Emergency rotation (`mode = emergency`) retires every key of the purpose at once (09 section 4.5 point 3, 19 section 10); `signing_key.rotate` is an owner action with step-up and audit (05 table 4.2). Every job-driven transition writes an audit entry with the system action `signing_key.transition` (05, R-AZ-15).
 14. JWKS is public (`instance.discovery.read`, `security: []`), carries no private member, and allows any origin without credentials (SEC-CORS-2).
 
 ## Scope
 
-### 1. Specification first (first commit)
+### 1. Specification (already decided)
 
-The current specification cannot work as written: the `file` and `env` drivers of the Secret-Provider are read-only (16 section 5.2) and the server mounts its secrets read-only (compose), yet the server must create new keys for scheduled and emergency rotation. Resolve it in the documents before the code, as follows.
-
-- New ADR `docs/adr/NNNN-signierschluessel-im-beschreibbaren-schluesselspeicher.md` (next free number at merge time; MADR 4, English MADR headings, German text, status accepted). Options: (a) a writable key store directory owned by the server, written only through `Put` of the `file` driver; (b) keys pre-generated by `bothy secrets init` with spares that the server only switches between; (c) private keys encrypted with a key-encryption key and stored in the database. Decision (a). Reasons: (b) cannot rotate automatically without a host action and an attacker who read the secrets directory also holds every spare; (c) contradicts 03 (private part only in the Secret-Provider). Consequences: one writable volume for the server; the server can create but never read other secrets in it; multi-node operation (M7) needs a shared volume or a writable driver (`azkv`, `awssm`). Confirmation: the tests of this ticket by name.
-- `docs/spec/16-betrieb.md`: 5.2 table, column Schreiben of `file`: only below `secrets.signing_key_dir`; 5.3: signing keys are no longer created by `secrets-init` but by the server in `secrets.signing_key_dir`; 5.4: `bothy secrets export` includes the key store; 14: new key `secrets.signing_key_dir`, default `/var/lib/bothy/signing-keys`, meaning writable directory for the private signing keys, mode 0700, owned by the service user.
-- `docs/spec/19-sicherheit.md`: section 10, row of the private signing keys: created by the server, Ed25519, `kid` = RFC 7638 thumbprint, file `<purpose>-<kid>.pem` in `secrets.signing_key_dir`, private file deleted when the key becomes `retired`; section 16: `signing_key.cache_ttl` (default `30s`, longest time a process accepts a withdrawn key or misses a new one) and `signing_key.rotation_check_interval` (default `1m`, period of `instance.key_rotation`).
-- `docs/spec/02-architektur.md` 15.1: new step after step 5, Signierschluessel sicherstellen (19 section 10); 15.2: `/readyz` also fails with the check name `signing_keys` while a purpose has no `active` key.
-- `docs/spec/09-agenten.md` 4.5 point 3: emergency rotation is `signing_key.rotate` with `mode = emergency`; a manual scheduled rotation uses `mode = scheduled`.
-- `docs/api/openapi.yaml`: `SigningKeyRotate` gets the required member `mode`, enum `[scheduled, emergency]`, with a description of both effects; update the example. Required instead of defaulted, because the two modes have opposite effects and nothing is released yet. Regenerate (`make codegen-check` without drift), `make api-lint`.
-- `docs/operations/configuration.md`: regenerate with the M1-08 tool (`make config-doc-check` green); in section 5 replace the row `signing/<zweck>-<kid>.pem` by the key store row (`<purpose>-<kid>.pem` in `secrets.signing_key_dir`, created by the server).
-- `docs/operations/disaster-recovery.md` Fall D: `signing_key.rotate` with `mode = emergency`.
-- `docs/security/threat-model.md` T-TK-04: countermeasures add key store mode 0700, deletion of retired private keys, emergency rotation.
+ADR 0066 and the chapters already describe this ticket: 16 sections 5.2 to 5.4 and 14
+(`secrets.signing_key_dir`, `Put` only below it), 19 sections 10 and 16 (key format, file name,
+states, windows, `signing_key.cache_ttl`, `signing_key.rotation_check_interval`,
+`signing_key.access_token_rotation_interval`), 02 15.1 step 6 and 15.2 (`signing_keys`), 09 4.5
+(modes, `auth.clock_leeway` as the retiring margin), 05 (`signing_key.transition`), `openapi.yaml`
+(`SigningKeyRotate.mode`), `configuration.md` section 5, `disaster-recovery.md` Fall D, the threat
+model row T-TK-04 and the compose volume `signing-keys`. Change them only if the build proves a
+statement wrong, in the same change; add this ticket's tests to the "Confirmation" of ADR 0066 if
+their names differ.
 
 ### 2. Secret-Provider (`internal/platform/secrets`)
 
@@ -102,7 +100,7 @@ Pure functions over a list of keys and a time `t`, table tested:
 
 | Transition | Condition | Effect |
 |---|---|---|
-| create `next` (scheduled) | purpose has a rotation interval (only `invocation`: `signing_key.invocation_rotation_interval`), no `next` exists, `active.created_at + interval <= t` | new key `next` |
+| create `next` (scheduled) | purpose has a rotation interval (`invocation`: `signing_key.invocation_rotation_interval`; `access_token`: `signing_key.access_token_rotation_interval`), no `next` exists, `active.created_at + interval <= t` | new key `next` |
 | promote | a `next` exists and `next.created_at + agent.jwks_max_age <= t` | old `active` to `retiring` with `not_after = t`; `next` to `active` |
 | retire | `retiring` key with `not_after + window(purpose) <= t` | `retired` |
 | emergency | `Rotate` with `mode = emergency` | every `next`, `active`, `retiring` key of the purpose to `retired` (`not_after = t` where unset); a fresh key `active` |
@@ -143,11 +141,11 @@ Migration `services/server/migrations/<next number>_server_signing_keys.sql` (go
 
 - `internal/wire` and `internal/platform/lifecycle`: start step `EnsureActive` after loading the instance (02 15.1 as updated); `/readyz` check `signing_keys`.
 - `services/server/Dockerfile`: create `/var/lib/bothy/signing-keys` owned by the unprivileged runtime user with mode 0700, so a named volume inherits owner and mode.
-- `infra/compose/compose.yaml`: named volume `signing-keys`, mounted read-write at `/var/lib/bothy/signing-keys` in service `server` only. This keeps the installation compose consistent with the specification; it does not make it startable (P-06). Validate with `docker compose -f infra/compose/compose.yaml config --quiet`.
+- `infra/compose/compose.yaml` already has the named volume `signing-keys`, read-write in `api`, `api-tailscale` and `worker` and read-only in `secrets-init` (for `bothy secrets export`); keep it consistent if the build changes the path.
 
 ### 9. Configuration and documentation
 
-- Schema entries (M1-07): `secrets.signing_key_dir`, `signing_key.cache_ttl`, `signing_key.rotation_check_interval`; wire `signing_key.invocation_rotation_interval`, `agent.jwks_max_age`, `auth.access_token_ttl`, `auth.clock_leeway`, `agent.invocation_token_ttl`, `webhook.delivery_timeout` where not yet wired. Cross check at load: `agent.jwks_max_age` smaller than `signing_key.invocation_rotation_interval`, else start error.
+- Schema entries (M1-07): `secrets.signing_key_dir`, `signing_key.cache_ttl`, `signing_key.rotation_check_interval`, `signing_key.access_token_rotation_interval`; wire `signing_key.invocation_rotation_interval`, `agent.jwks_max_age`, `auth.access_token_ttl`, `auth.clock_leeway`, `agent.invocation_token_ttl`, `webhook.delivery_timeout` where not yet wired. Cross check at load: `agent.jwks_max_age` smaller than both rotation intervals, else start error.
 - `services/server/internal/instance/README.md` (keys section: states, windows, files, cache, job, failure modes, orphan files), `docs/DECISIONS.md`, `services/server/CHANGELOG.md` under Unreleased.
 
 ## Out of scope
@@ -156,7 +154,6 @@ Migration `services/server/migrations/<next number>_server_signing_keys.sql` (go
 - Revoking all sessions after an emergency rotation of `access_token` keys: an owner step in the runbook (Fall D), not automatic.
 - Writable drivers `azkv` and `awssm`: V3-12. Multi-node key store: M7-17.
 - Startable installation compose and the smoke overlay: M7 and M1-73 (the overlay mounts `signing-keys`).
-- Rotation intervals for purposes other than `invocation`: none exist in the specification (see Design notes).
 
 ## Boundaries
 
@@ -171,12 +168,10 @@ Migration `services/server/migrations/<next number>_server_signing_keys.sql` (go
 
 ## Design notes
 
-- Ruling (in the ADR): writable key store, see Scope 1.
-- Ruling: `kid` is the RFC 7638 thumbprint; anyone can recompute it from the public JWK, it is unique per key and safe as a file name. The examples in openapi.yaml are only examples.
-- Ruling: `mode` is required in `SigningKeyRotate`.
-- Ruling: emergency rotation retires every unretired key of the purpose, because a compromise of the key store would expose `next` and `retiring` keys too.
-- Only `invocation` rotates automatically, because only `signing_key.invocation_rotation_interval` exists; the other purposes rotate on owner request. The job is written generically over a purpose table so that further intervals need only a configuration entry.
-- Job-driven transitions write no audit entry: 05 has no system action for them, and recording `signing_key.rotate` without an owner would misstate the catalogue. They are logged. This is reported as a gap of the core contract.
+- `kid` is the RFC 7638 thumbprint (19 section 10); anyone can recompute it from the public JWK, it is unique per key and safe as a file name. The examples in openapi.yaml are only examples.
+- `mode` is required in `SigningKeyRotate`; emergency rotation retires every unretired key of the purpose, because a compromise of the key store would expose `next` and `retiring` keys too (19 section 10).
+- `invocation` and `access_token` rotate automatically; `webhook_out` and `audit_checkpoint` on owner request. The job is written generically over a purpose table so that a further interval needs only a configuration entry.
+- Job-driven transitions write one audit entry each with the system action `signing_key.transition`, no actor, `resource_kind = instance`, details `{purpose, from_state, to_state, kid}` (codes only, 19 SEC-AUD-5), in the transaction of the transition.
 - Lock order: the advisory lock is the domain step of 03 section 6.3; `audit_seq` follows in phase 3.3. Key transactions never take `permission_version`.
 - No network call and no slow work inside a transaction; key generation and the file write happen before the transaction starts.
 - Logs name purpose and `kid` only (SEC-LOG-1, SEC-LOG-4); private keys use the redacting secret type of M1-09 in memory.
@@ -198,7 +193,7 @@ Controllable clock (`kernel/clock`), PostgreSQL 18 through `pgtest`, key store i
 10. `TestSecretsPut_*` (platform): `Put` outside `secrets.signing_key_dir` is `ErrReadOnly`; `env:` refs are `ErrReadOnly`; an existing name is not overwritten; the file has mode 0600; `Delete` outside the directory is refused; the startup check fails for a missing directory, mode 0755 and a foreign owner where the test can create one.
 11. `TestSecretsExport_IncludesKeyStore`: the exported bundle decrypted with the test identity contains the key files.
 12. `TestStartup_SigningKeys`: start fails when the key store is not writable; `/readyz` reports `signing_keys` while a purpose lacks an `active` key and is ready after `EnsureActive`.
-13. `TestKeyRotationJob_Registration`: queue `maintenance`, period `signing_key.rotation_check_interval`, roles `worker` and `all`, no arguments.
+13. `TestKeyRotationJob_Registration`: queue `maintenance`, period `signing_key.rotation_check_interval`, roles `worker` and `all`, no arguments. `TestKeyRotationJob_AuditsTransitions`: every transition of test 4 leaves exactly one audit row `signing_key.transition` with purpose, states and `kid`, in the same transaction.
 14. `TestConfig_JwksMaxAgeBelowRotationInterval`: a configuration with `agent.jwks_max_age` not below `signing_key.invocation_rotation_interval` aborts with a message naming both keys.
 
 Commands that must pass:
@@ -210,7 +205,7 @@ Commands that must pass:
 
 ## Acceptance criteria
 
-- [ ] Specification, ADR, configuration reference, runbook and threat model updated in the first commit; `make docs` and `make config-doc-check` green.
+- [ ] Specification, ADR 0066, configuration reference, runbook and threat model still match what was built; `make docs` and `make config-doc-check` green.
 - [ ] Scheduled rotation: in every state every still valid signature verifies (test 4); a `next` key is published at least `agent.jwks_max_age` before use (test 5).
 - [ ] Emergency rotation withdraws the old key at once in the same process and within `signing_key.cache_ttl` in others (test 6).
 - [ ] `rotateSigningKey` only for owners in a session with fresh step-up, audited (test 7).
@@ -225,7 +220,7 @@ Commands that must pass:
 
 - Code, tests and documentation as listed in Scope; the module README is current (ports, tables, actions, jobs, files).
 - A doc comment on every exported symbol (purpose, parameters, return value, errors, example where useful); comments explain why.
-- The ADR of Scope 1 is written and indexed (`make adr-index`); further rulings go to `docs/DECISIONS.md`.
+- ADR 0066 names this ticket's tests in "Confirmation" and the index is current (`make adr-index`); further rulings go to `docs/DECISIONS.md`.
 - CHANGELOG entry under Unreleased in `services/server/CHANGELOG.md`.
 - `make check` green on the final commit.
 - Independent review of the diff (`make review` plus a code review by a fresh reviewer) and the red team of `docs/quality/red-team-gate.md` over the diff, with attention to PLAN section 7 Red Team point 6 (secrets in logs, telemetry, audit and errors); verdict recorded in the report. On `NEIN`: fix, add a test per finding, re-check the delta.

@@ -23,6 +23,11 @@ etappe before it closes, because their tickets build on what that etappe actuall
    push without the owner's approval.
 5. A brief that finds a gap in the core contract (chapters 00, 03, 04, 05) stops with
    `Verdict: BLOCKED` instead of building a deviation.
+6. The owner's fixed build rule 3 is quoted verbatim in every brief ("API documentation is
+   generated from code (OpenAPI from the routes, ...)"). In this repository it means one source:
+   `docs/api/openapi.yaml` is normative (ADR 0013, spec first), routes, handler interfaces and
+   clients are generated from it, and `make codegen-check` keeps them equal. No session generates
+   OpenAPI from handler code.
 
 ## Waves
 
@@ -73,28 +78,28 @@ are added by the brief-writing step (plan ticket M0-05) under the names listed h
 | 4 | M1-08 | Configuration reference generated from the schema | `M1-08-config-reference.md` | M1-07 |
 | 4 | M1-09 | Secret provider and secrets commands | `M1-09-secret-provider.md` | M1-07 |
 | 5 | M1-10 | Logging and telemetry foundation | `M1-10-telemetry-foundation.md` | M1-09 |
-| 6 | M1-11 | Lifecycle, listeners, health and shutdown | `M1-11-lifecycle-health.md` | M1-10 |
+| 6 | M1-11 | Lifecycle, listeners, health and shutdown | `M1-11-lifecycle-health.md` | M1-10, M1-12, M1-22 |
 | 5 | M1-12 | PostgreSQL access, migrations and schema version | `M1-12-postgres-migrations.md` | M1-09 |
 | 6 | M1-13 | Unit of work with phase hooks and in-transaction events | `M1-13-unit-of-work.md` | M1-12 |
 | 7 | M1-14 | Background jobs with River | `M1-14-background-jobs.md` | M1-11, M1-13 |
-| 7 | M1-15 | Sequence counters and instance record | `M1-15-instance-counters.md` | M1-13 |
+| 7 | M1-15 | Sequence counters and instance record | `M1-15-instance-counters.md` | M1-11, M1-13 |
 | 8 | M1-16 | Event log with commit-ordered sequence | `M1-16-event-log.md` | M1-14, M1-15 |
 | 3 | M1-17 | Server interface generated from openapi.yaml | `M1-17-api-server-stubs.md` | M1-02, M1-05 |
 | 7 | M1-18 | HTTP middleware chain and problem details | `M1-18-http-chain.md` | M1-11, M1-17 |
 | 8 | M1-19 | Rate limits per class | `M1-19-rate-limits.md` | M1-18 |
-| 9 | M1-20 | Idempotency keys | `M1-20-idempotency-keys.md` | M1-16, M1-18 |
+| 9 | M1-20 | Idempotency keys | `M1-20-idempotency-keys.md` | M1-16, M1-18, M1-26 |
 | 8 | M1-21 | Transport protection | `M1-21-transport-protection.md` | M1-18 |
 | 4 | M1-22 | Egress client and SSRF lint | `M1-22-egress-client.md` | M1-07 |
-| 7 | M1-23 | Server container image | `M1-23-server-image.md` | M1-11, M1-12 |
-| 8 | M1-24 | Audit hash chain and recorder | `M1-24-audit-chain.md` | M1-15 |
+| 7 | M1-23 | Server container image | `M1-23-server-image.md` | M1-11 |
+| 8 | M1-24 | Audit hash chain and recorder | `M1-24-audit-chain.md` | M1-15, M1-18, M1-26 |
 | 8 | M1-25 | Action catalogue in code and registration duty | `M1-25-authz-catalogue.md` | M1-18 |
 | 7 | M1-26 | Principal tables and directory | `M1-26-identity-principals.md` | M1-13 |
 | 8 | M1-27 | Grant model storage | `M1-27-authz-grant-store.md` | M1-26 |
-| 9 | M1-28 | Rights snapshot, cache and authorize | `M1-28-authz-core.md` | M1-25, M1-27 |
-| 10 | M1-29 | Rights changes, access.changed and invariants I1 and SR8 | `M1-29-authz-invariants.md` | M1-16, M1-24, M1-28 |
+| 9 | M1-28 | Rights snapshot, cache and authorize | `M1-28-authz-core.md` | M1-24, M1-25, M1-27 |
+| 10 | M1-29 | Rights changes, access.changed and invariants I1 and SR8 | `M1-29-authz-invariants.md` | M1-16, M1-28 |
 | 11 | M1-30 | Expiry of grants and memberships | `M1-30-authz-expiry.md` | M1-29 |
 | 11 | M1-31 | People, owners and own profile | `M1-31-identity-people.md` | M1-20, M1-29 |
-| 10 | M1-32 | Signing keys, JWKS and rotation | `M1-32-signing-keys.md` | M1-14, M1-15, M1-28 |
+| 10 | M1-32 | Signing keys, JWKS and rotation | `M1-32-signing-keys.md` | M1-20, M1-28 |
 | 10 | M1-33 | Devices, device keys and DPoP verification | `M1-33-identity-devices-dpop.md` | M1-28 |
 | 11 | M1-34 | Sessions, access tokens, refresh families and logout | `M1-34-identity-sessions.md` | M1-32, M1-33 |
 | 12 | M1-35 | Step-up with the device key | `M1-35-identity-step-up.md` | M1-34 |
@@ -103,7 +108,7 @@ are added by the brief-writing step (plan ticket M0-05) under the names listed h
 | 15 | M1-38 | Device approval and pairing | `M1-38-identity-device-approval.md` | M1-37 |
 | 15 | M1-39 | Local accounts with password and TOTP | `M1-39-identity-local-accounts.md` | M1-37 |
 | 15 | M1-40 | Passkeys | `M1-40-identity-passkeys.md` | M1-37 |
-| 15 | M1-41 | OIDC login with PKCE | `M1-41-identity-oidc.md` | M1-22, M1-37 |
+| 15 | M1-41 | OIDC login with PKCE | `M1-41-identity-oidc.md` | M1-37 |
 | 16 | M1-42 | Groups from OIDC claims | `M1-42-identity-oidc-groups.md` | M1-41 |
 | 15 | M1-43 | Trusted proxy header login | `M1-43-identity-trusted-header.md` | M1-21, M1-37 |
 | 12 | M1-44 | API tokens with prefix and checksum | `M1-44-identity-api-tokens.md` | M1-34 |
@@ -112,7 +117,7 @@ are added by the brief-writing step (plan ticket M0-05) under the names listed h
 | 14 | M1-47 | Feature flags with registration and cleanup gate | `M1-47-feature-flags.md` | M1-46 |
 | 13 | M1-48 | Groups and grants over the API | `M1-48-authz-api.md` | M1-31, M1-35 |
 | 14 | M1-49 | Who has access, preview and view as | `M1-49-authz-explain.md` | M1-48 |
-| 13 | M1-50 | Audit verification, checkpoints and queries | `M1-50-audit-verify.md` | M1-24, M1-35 |
+| 13 | M1-50 | Audit verification, checkpoints and queries | `M1-50-audit-verify.md` | M1-35 |
 | 13 | M1-51 | Agent records, backend policy and credential holder | `M1-51-agents-records.md` | M1-31, M1-35, M1-44 |
 | 14 | M1-52 | Spaces and sidebar | `M1-52-chat-spaces.md` | M1-46, M1-51 |
 | 15 | M1-53 | Channels and forum tags | `M1-53-chat-channels.md` | M1-52 |
@@ -228,11 +233,14 @@ flowchart TB
   M1_07 --> M1_09
   M1_09 --> M1_10
   M1_10 --> M1_11
+  M1_12 --> M1_11
+  M1_22 --> M1_11
   M1_09 --> M1_12
   M1_12 --> M1_13
   M1_11 --> M1_14
   M1_13 --> M1_14
   M1_13 --> M1_15
+  M1_11 --> M1_15
   M1_14 --> M1_16
   M1_15 --> M1_16
   M1_02 --> M1_17
@@ -242,25 +250,26 @@ flowchart TB
   M1_18 --> M1_19
   M1_16 --> M1_20
   M1_18 --> M1_20
+  M1_26 --> M1_20
   M1_18 --> M1_21
   M1_07 --> M1_22
   M1_11 --> M1_23
-  M1_12 --> M1_23
   M1_15 --> M1_24
+  M1_18 --> M1_24
+  M1_26 --> M1_24
   M1_18 --> M1_25
   M1_13 --> M1_26
   M1_26 --> M1_27
   M1_25 --> M1_28
   M1_27 --> M1_28
+  M1_24 --> M1_28
   M1_16 --> M1_29
-  M1_24 --> M1_29
   M1_28 --> M1_29
   M1_29 --> M1_30
   M1_20 --> M1_31
   M1_29 --> M1_31
-  M1_14 --> M1_32
-  M1_15 --> M1_32
   M1_28 --> M1_32
+  M1_20 --> M1_32
   M1_28 --> M1_33
   M1_32 --> M1_34
   M1_33 --> M1_34
@@ -272,7 +281,6 @@ flowchart TB
   M1_37 --> M1_38
   M1_37 --> M1_39
   M1_37 --> M1_40
-  M1_22 --> M1_41
   M1_37 --> M1_41
   M1_41 --> M1_42
   M1_21 --> M1_43
@@ -286,7 +294,6 @@ flowchart TB
   M1_31 --> M1_48
   M1_35 --> M1_48
   M1_48 --> M1_49
-  M1_24 --> M1_50
   M1_35 --> M1_50
   M1_31 --> M1_51
   M1_35 --> M1_51

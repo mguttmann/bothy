@@ -29,7 +29,7 @@ that breaks the layer and module rules from the first Go commit on. The kernel p
 - `docs/spec/23-qualitaet.md`: "Komponenten-Vertrag", "SonarQube", "Konfigurationswerte dieses
   Kapitels".
 - ADRs: `docs/adr/0004-*`, `0005-*`, `0008-*`, `0015-*`, `0038-*`, `0040-*`; template
-  `docs/adr/0000-vorlage-madr-4.md`. ADR 0050 does not exist yet; you write it (P-12).
+  `docs/adr/0000-vorlage-madr-4.md`; ADR 0050 (exists; this ticket confirms it).
 - `docs/quality/gates.md`, `docs/quality/toolchain.md`, `CONTRIBUTING.md`, `services/server/README.md`,
   `services/server/internal/*/README.md`, `sonar-project.properties`, `quality/licenses/allowed.txt`,
   the root `Makefile` (targets `arch`, `codegen-check`, `lint`, `typecheck`, `test`, `coverage`,
@@ -90,20 +90,22 @@ Create (all paths below `services/server/` unless they start with `docs/`):
 - `internal/kernel/{actor,authorize,txn,eventlog,auditing,idempotency,personaldata}/doc.go`.
 - `internal/wire/doc.go`.
 - `internal/<module>/doc.go` for each of the 19 modules of 02 "Modulliste".
-- `docs/adr/0050-modulregister-als-quelle-fuer-architektur-gate-und-tabellenbesitz.md`.
 
 Change:
 
 - `internal/<module>/README.md` (19 files): status line and a section "Code" (see Design notes).
 - `services/server/README.md`: status, layout incl. `tools/archgen`, health line per ruling L2
   (`/healthz`, `/readyz` on `server.internal_listen_addr`).
-- `docs/spec/02-architektur.md`: "Code-Layout", "Modulregister als Quelle", "go-arch-lint",
-  "Fehlerarten", "Offen" (spec first, details below).
-- `docs/adr/README.md` (only through `make adr-index`).
+- `docs/adr/0050-modulregister-als-quelle-fuer-architektur-gate-und-tabellenbesitz.md` (exists):
+  add the tests of this ticket to "Confirmation" by name; `docs/adr/README.md` only through
+  `make adr-index`.
+- `docs/spec/02-architektur.md` only if the build proves a statement wrong: "Code-Layout",
+  "Modulregister als Quelle", "go-arch-lint" and "Fehlerarten" already describe what this ticket
+  builds (module path, per-package platform components, closed public codes with internal causes).
 - `sonar-project.properties`.
 - Root `Makefile`: only the Go branch of the `test` recipe (export `GO_ARCH_LINT`), and the
   `codegen-check` recipe only if the rule in Design notes requires it.
-- `docs/DECISIONS.md`, root `CHANGELOG.md` (`Changed` for the spec edits).
+- `docs/DECISIONS.md`.
 
 ## Out of scope
 
@@ -194,8 +196,8 @@ vendors: {}                 # <group>: [<import path>, <import path>/**]
 - `make codegen-check` (M1-01) must catch a stale `.go-arch-lint.yml`. Read its recipe: if it runs
   `go generate ./...` in every Go module and then `git diff --exit-code`, the directive is enough.
   Otherwise add exactly one line that runs this generator before the diff, and change nothing else.
-- Generated content (go-arch-lint config version 3; this replaces the single `platform` component
-  of the extract in 02 "go-arch-lint", because M1-14 must restrict River to `platform/jobs`):
+- Generated content (go-arch-lint config version 3, the shape of 02 "go-arch-lint" with one
+  component per platform package, because M1-14 must restrict River to `platform/jobs`):
   - `version: 3`, `workdir: .`, `allow: {depOnAnyVendor: false}`, `exclude:` from the register,
     `excludeFiles: ["^.*_test\\.go$"]`.
   - `vendors`: one entry `v-<group>: {in: [...]}` per register vendor group.
@@ -321,24 +323,13 @@ for concurrent use. The fake lives in the same package so that `kernel-core` kee
   for all generated Go files in this repository: file names end in `.gen.go` (already excluded and
   exempt from SPDX headers in `tools/ci/license_check.py`); record the rule in DECISIONS.md.
 
-### Spec edits in this change (spec first)
+### Documentation of decisions
 
-- 02 "Code-Layout": module path `github.com/OWNER/bothy/services/server` (P-05); add
-  `tools/archgen/`; keep the list of places with the product name.
-- 02 "Modulregister als Quelle": replace the excerpt with the full format above and its rules.
-- 02 "go-arch-lint": replace the extract with the generated shape (per-package platform components,
-  `wire`, `cmd`, `exclude`), with the reason (River only in `platform/jobs`).
-- 02 "Fehlerarten": the kind table above; example codes from 06; a sentence that the internal
-  causes are log and metric labels only.
-- 02 "Offen": remove the module path item (decided by P-05).
-- ADR 0050 (German text, MADR 4 headings, status `accepted`, date of your change): options
-  (1) `modules.yaml` as register that generates the go-arch-lint configuration and feeds the doc
-  checks, (2) a register in Go code read with `go/packages`, (3) the tables of 02 as source parsed
-  by the generator; decision (1); Confirmation: `make arch`, `make codegen-check`, the archgen tests
-  with violation fixtures, and `make register-check` from M1-06. Then `make adr-index`.
-- DECISIONS.md: alignment of 02 "Fehlerarten" with 06; P-05 applied; per-package platform
-  components; own UUIDv7 implementation instead of a library (stdlib only in kernel); YAML library
-  choice; `.gen.go` rule; doc.go fallback if it was needed.
+02 and ADR 0050 already state the register format, the per-package platform components, the
+module path (P-05) and the closed public codes. Record only the remaining choices in
+`docs/DECISIONS.md`: own UUIDv7 implementation instead of a library (stdlib only in kernel); YAML
+library choice; `.gen.go` rule; doc.go fallback if it was needed. Add the tests of this ticket to
+the "Confirmation" of ADR 0050 and run `make adr-index`.
 
 ## Tests (write them first)
 
@@ -423,14 +414,15 @@ make check
       comment.
 - [ ] Go coverage of the module is at least `quality.coverage.go_min_percent`; `make sonar` passes
       the gate "Bothy way".
-- [ ] 02 sections named above are updated; ADR 0050 exists and the ADR index is regenerated.
+- [ ] 02 still matches the built register and generator; ADR 0050 names this ticket's tests and the
+      ADR index is regenerated.
 - [ ] `make check` is green.
 
 ## Definition of done
 
 - Code, tests and docs as above: module READMEs updated, doc comments on every public symbol, ADR
-  0050, DECISIONS.md entries, `services/server/CHANGELOG.md` entry under `[Unreleased]` (`Added`),
-  root `CHANGELOG.md` entry under `[Unreleased]` (`Changed`: chapter 02).
+  0050 "Confirmation", DECISIONS.md entries, `services/server/CHANGELOG.md` entry under
+  `[Unreleased]` (`Added`).
 - `make check` green.
 - Independent review over the diff (a fresh reviewer, `make review`) and the red team gate of
   `docs/quality/red-team-gate.md` over the diff, verdict recorded in the report; fix every finding

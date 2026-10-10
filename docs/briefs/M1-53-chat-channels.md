@@ -124,6 +124,8 @@ Create or change exactly these (paths relative to `services/server/` unless they
      later migration rewrites the table).
    - Privileges for the application role follow the pattern of the existing migrations
      (`grep -n GRANT migrations/*.sql`).
+   - Add the foreign key `grants.target_channel_id -> channels(id) ON DELETE RESTRICT` (03
+     `grants`), which M1-27 could not create before `channels` existed.
 2. `internal/chat` (port): extend the `Structure` port with the channel and forum tag use cases
    below and their DTOs; add the in-transaction event type `ChannelArchived{ChannelID, SpaceID,
    ArchivedAt}` (02 4.3). No subscriber is registered in this ticket.
@@ -148,11 +150,11 @@ Create or change exactly these (paths relative to `services/server/` unless they
 11. `internal/wire`: register handlers and the new in-transaction event type; update the golden
     file of subscriptions.
 12. Documentation: `internal/chat/README.md` (status, ports, tables, actions, events),
-    `services/server/CHANGELOG.md` (Unreleased), `docs/DECISIONS.md` (rulings D1, D2, D3, D6, D8
-    below), `docs/spec/07-rechte.md` (new subsection "Archivierte Kanäle" after 4.4 and a new row
-    `channel_archived` in the reason table 4.1, German, no dashes), `docs/spec/06-api.md`
-    (description of problem code `channel_read_only` extended by archived channels, through the
-    generator source, see D10), `docs/api/openapi.yaml` (description of `archiveChannel`).
+    `services/server/CHANGELOG.md` (Unreleased), `docs/DECISIONS.md` (rulings D1, D3, D6, D8
+    below), `docs/api/openapi.yaml` (description of `archiveChannel` with the rule of 07 "4.5").
+    07 "4.1", "4.5" and 06 (problem code `channel_read_only` with `reason: channel_archived`)
+    already state D2; if the M1-03 generator owns the 06 problem block, keep its source in step
+    (D10).
 
 Public interface (pseudo-Go; follow the naming and error conventions already used in
 `internal/chat` for spaces):
@@ -262,9 +264,8 @@ D1. Channels.
   space gives `400`; none moves to the start. Compute the key with the fractional index helper of
   M1-52; exactly one row changes. Bumps `version`, emits `channel.updated`.
 
-D2. Archived channels (ruling of this ticket, recorded in `docs/DECISIONS.md` and written into
-07 as subsection "Archivierte Kanäle"; spec gap reported at M0-05, because 05 gives
-`channel.archive` the rights column `ja` but does not say what an archived channel allows):
+D2. Archived channels (07 "4.5 Archivierte Bereiche und Kanäle", reason `channel_archived` in 07
+"4.1"):
 1. `archiveChannel` (action `channel.archive`: `manage`, step-up, audit, rights) needs
    `ReasonBody`; it sets `archived_at`, bumps `version`, emits `channel.archived` (payload
    `{channel}`) and publishes `ChannelArchived` in the transaction. It is irreversible; 05 has no
@@ -283,9 +284,8 @@ D2. Archived channels (ruling of this ticket, recorded in `docs/DECISIONS.md` an
    all principals whose effective level on the channel was above `read` before the change
    (direct grants, group members, owners, the operator rule). `authz` writes `access.changed`
    for each with a `changed` entry `{kind: channel, id, level: read, previous_level}` and bumps
-   `permission_version`. 04 8.1 and 02 11.3 call `channel.archived` a structure change without a
-   new permission version; 05 (core contract) says rights `ja`; follow 05 and note the wording
-   conflict in the report.
+   `permission_version` (04 "8.1" and 02 "11.3": archiving is a structure change and a rights
+   change).
 5. `listSpaceChannels` omits archived channels; `getChannel` still returns them.
 
 D3. Forum tags.

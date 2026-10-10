@@ -187,7 +187,7 @@ D1. `Threads.Create`:
 - A second thread for the same parent violates the unique index on `parent_message_id`; map it
   to `409 conflict`.
 - Title: rune count at most `thread.title_max_chars` (`400`, `/title`, `too_long`), no control or
-  bidi characters (SEC-T07 validator). Source: a human with a title that is neither empty nor a
+  bidi characters (shared validator `kernel/textcheck` of M1-26, SEC-T07). Source: a human with a title that is neither empty nor a
   placeholder gives `manual`; empty, absent or placeholder gives `auto`; agents and apps always
   give `auto`. The title text is stored as given.
 - Placeholder rule (09 12 point 2): trim, collapse inner white space to one space, compare

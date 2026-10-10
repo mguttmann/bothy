@@ -132,21 +132,21 @@ Public interface (names fixed; signatures may add an `error` where Go needs one,
 - `architecture/modules.yaml`: register `filippo.io/age` (and `golang.org/x/sync` if you use
   `singleflight`) as vendors allowed for the platform component; regenerate `.go-arch-lint.yml`
   with the M1-05 generator.
-- `infra/compose/compose.yaml`: `secrets-init` command gains
-  `--owner server=65532:65532 --owner migrate=65532:65532` (D7).
+- `infra/compose/compose.yaml` already passes `--owner server=65532:65532 --owner
+  migrate=65532:65532` to `secrets-init` (16 "Geheimnisse im Compose-Stack" item 4); keep it.
 - Docs listed under "Definition of done".
 
 ## Out of scope
 
 - The database pool and how it uses `database.password_ref` (M1-12).
 - The telemetry pseudonym (M1-10); this ticket only guarantees the generated key size.
-- Generators for `signing/<zweck>-<kid>.pem` (signing keys ticket M1-32), `pgbackrest_tls/`
-  (backup tickets in M7) and generated `s3_*` keys for the `s3` profile (files tickets in M3);
-  they stay `pending` in the catalog (D6).
+- Signing keys: the server creates them in `secrets.signing_key_dir` (ADR 0066, M1-32); they are
+  no catalogue entry. Generators for `pgbackrest_tls/` (M7-01) and the generated `s3_*` keys of the
+  `s3` profile (M3) stay `pending` in the catalog (D6, configuration.md section 5).
 - Drivers `azkv` and `awssm` (later etappe).
-- The server image itself (M1-23); you only fix its user id in 18 (D7).
-- The alert rule on `bothy.secrets.refresh.failures` and its promtool test (not part of this
-  ticket; this ticket only emits and catalogs the metric).
+- The server image itself (M1-23; uid and gid `65532` are in 18 "Server-Images").
+- A `promtool` test for the alarm `BothySecretRefreshFailing` (it exists in
+  `infra/observability/prometheus/rules/bothy-alerts.yaml`; rule tests come with M1-04).
 
 ## Boundaries
 
@@ -182,8 +182,7 @@ D2. Env driver (`env:`).
 - 16 shows `env:BOTHY_SECRET_DB_APP_PASSWORD`, but M1-07 aborts on unknown `BOTHY_` variables.
   Rule: after loading file and environment, the loader collects the variable names of all
   effective `env:` references and excludes exactly those from the unknown-variable check. Any
-  other unknown `BOTHY_` variable still aborts. Write this rule into 16 "Konfiguration (ADR 0011)"
-  item 3 and record it in `docs/DECISIONS.md`.
+  other unknown `BOTHY_` variable still aborts (16 "Konfiguration (ADR 0011)" item 3).
 - `env:` stays allowed but not recommended (16); `config check` prints a warning line per key
   that uses it.
 
@@ -237,16 +236,19 @@ D5. Generators (crypto/rand only).
   `db_superuser_password`, `db_owner_password`, `db_app_password`, `db_maint_password`,
   `db_monitor_password`, `pgbackrest_cipher_pass`, `restic_password`, `grafana_admin_password`.
 - `key`: 32 random bytes, lowercase hex (64 ASCII characters, so the collector's HMAC key and the
-  server's key both have at least 32 bytes). Used for `token_pepper`, `telemetry_pseudonym_key`.
+  server's key both have at least 32 bytes). Used for `token_pepper`, `telemetry_pseudonym_key`,
+  `audit_ip_kek` and `file_ticket_key`; consumers that need raw key bytes hex-decode the value.
+  (`totp_key` follows its own ticket, M1-39.)
 
 D6. Catalog.
 - Every row of `docs/operations/configuration.md` "Geheimnisse" is a catalog entry with the same
   name, origin and services. Supplied directory entries: `oidc/` (files matching
   `^[a-z0-9_-]+_client_secret$`) and `offsite/` (any regular files, recursive).
 - Entries whose generator belongs to another ticket get generator `pending` with a code comment
-  naming the owning ticket: `signing/<zweck>-<kid>.pem` (M1-32), `pgbackrest_tls/` (M7 backup),
-  and the generated variant of `s3_access_key`, `s3_secret_key` (M3 storage); until then `s3_*`
-  are handled as supplied. `init` prints `pending` for them and exits 0.
+  naming the owning ticket: `pgbackrest_tls/` (M7-01) and the generated variant of
+  `s3_access_key`, `s3_secret_key` (M3); until then `s3_*` are handled as supplied. `init` prints
+  `pending` for them and exits 0 (configuration.md section 5 lists them). Signing keys are no
+  catalogue entry (ADR 0066).
 - A test parses the Markdown table and fails when name, origin or services differ from the Go
   catalog in either direction.
 
@@ -258,9 +260,8 @@ D7. Owners and modes of service copies.
   directory), and the volume root is `0700`.
 - `server` and `migrate` must have an `--owner` (exit 2 otherwise), because the file driver
   enforces SEC-SEC-1 for them.
-- The `bothy-server` image runs as uid and gid `65532`. Write this into
-  `docs/spec/18-release.md` "Server-Images" item 3 and into the compose command; M1-23 builds the
-  image with exactly this user.
+- The `bothy-server` image runs as uid and gid `65532` (18 "Server-Images" item 3); M1-23 builds
+  the image with exactly this user.
 - Running `init` as a non-root user is allowed when every `--owner` equals the current uid:gid
   (tests do this); copies for services without `--owner` are then owned by the running user
   instead of root. Any other failed `chown` is exit 1 with the entry name.
@@ -363,14 +364,13 @@ make check
 - Code and tests as above; doc comment on every exported symbol.
 - `internal/platform/secrets/README.md` and `internal/platform/secrets/stack/README.md`: purpose,
   interfaces, reference grammar, file rules, cache, init table, owners, export, what is pending.
-- Spec and docs in the same change: 16 "Konfiguration (ADR 0011)" (D2), "Secret-Provider" (D1,
-  D3), "Geheimnisse im Compose-Stack" (D4, D5, D7), "Hinterlegung (Escrow)" (D8 usage line);
-  `docs/spec/02-architektur.md` "Befehle des Binarys" (flags of `secrets init|export`,
-  `config check --secrets`) and the `cmd/bothy/` line in "Code-Layout"; `docs/spec/18-release.md`
-  "Server-Images" (uid and gid `65532`); `docs/observability/signals.md` (metric row);
+- The spec already states D2 (16 5.1 item 3), D4 and D7 (16 5.3), the uid (18), the metric
+  (signals.md) and the alarm. Still to write in the same change: 16 "Secret-Provider" (D1 newline
+  rule, D3 cache), "Hinterlegung (Escrow)" (D8 usage line); `docs/spec/02-architektur.md` "Befehle
+  des Binarys" (flags of `secrets init|export`, `config check --secrets`);
   `docs/operations/disaster-recovery.md` "Fall B" step 2 (`--adopt-source` when the volume
-  already exists); `infra/compose/compose.yaml` (`--owner` flags).
-- `docs/DECISIONS.md`: one entry each for D1 (newline rule), D2, D4, D7, D8, D9.
+  already exists).
+- `docs/DECISIONS.md`: one entry each for D1 (newline rule), D8 and D9.
 - Configuration reference regenerated (`make config-reference`, or the M1-08 target
   `config-doc-check` if it exists) without diff.
 - `services/server/CHANGELOG.md` entry under "Unreleased".

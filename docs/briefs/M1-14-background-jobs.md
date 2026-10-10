@@ -126,7 +126,7 @@ All Go paths are relative to `services/server/`.
    migrations before goose; `status` shows the River migration version next to goose; `validate`
    runs the River validation too.
 3. `internal/platform/lifecycle`: the worker shutdown step "River soft stop then cancel" in the
-   order of 02 "Shutdown" (worker step 3; role `all`: after api steps 1 to 4); start step 7 for
+   order of 02 "Shutdown" (worker step 3; role `all`: after api steps 1 to 4); start step 8 for
    `worker`; a failure on `rt.Failed()` ends the process with a non-zero exit code.
 4. `internal/wire`: one `jobs.Registry` for all roles (no handler registered yet; M1-16 adds the
    first), the `Runtime` per role, config mapping.
@@ -137,11 +137,13 @@ All Go paths are relative to `services/server/`.
 6. `go.mod`: `github.com/riverqueue/river`, `.../riverdriver/riverpgxv5`,
    `.../rivermigrate` at the newest release (v0.49.0 on 2026-10-10), pinned in `go.sum`; license
    MPL-2.0 is on `quality/licenses/allowed.txt`; `make licenses` green.
-7. Docs: `docs/observability/signals.md` row for the span `job <bothy.job.kind>`: list the
-   `bothy.outcome` values `ok`, `error`, `cancelled`; `services/server/README.md` platform table
-   if wording changes; `docs/spec/02-architektur.md` "Einsatz" one sentence on the type check of
-   arguments (allowed field types, see Design notes); CHANGELOG; DECISIONS.md rows for the
-   rulings below.
+7. Docs: the span `job <bothy.job.kind>` and the metric `bothy.job.duration` already list the
+   `bothy.outcome` values `completed`, `failed`, `cancelled`, `snoozed` in signals.md (use exactly
+   these); 02 "Regeln für Jobs" rules 5 and 6 cover River defaults and timeouts;
+   `services/server/README.md` platform table if wording changes; `docs/spec/02-architektur.md`
+   "Einsatz" one sentence on the type check of arguments (allowed field types, see Design notes);
+   the README of `platform/jobs` names the River defaults in force with the River version (02
+   "Regeln für Jobs" rule 5); CHANGELOG; DECISIONS.md rows for the rulings below.
 
 ## Out of scope
 

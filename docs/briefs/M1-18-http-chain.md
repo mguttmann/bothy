@@ -9,8 +9,8 @@ After this ticket every request on the public listener runs through one ordered 
 ## Read first
 
 - `docs/PLAN.md`: section "M1 Fundament" (rows M1-17 to M1-21, M1-25, M1-28, M1-33, M1-34, M1-46, M1-64, M1-71), "Voraussetzungen aus dem Kern-Vertrag" (K2, K4), "Bekannte Widersprüche" (W1 with its name table, W7), "Entscheidungen dieses Plans" (P-08 to P-12).
-- ADRs: `docs/adr/0015-fehlerformat-rfc-9457-idempotenz-paginierung.md`, `docs/adr/0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`, `docs/adr/0013-spec-first-openapi-31-und-asyncapi-30-normativ.md`, `docs/adr/0000-vorlage-madr-4.md`; ADR 0053 (write it if missing, see Scope).
-- `docs/spec/02-architektur.md`: "Request-Pfad" (all three subsections), "Querschnitts-Ports (`internal/kernel`)", "Fehlerarten", "Fristen", "Panics", "Konfigurationswerte dieses Kapitels".
+- ADRs: `docs/adr/0015-fehlerformat-rfc-9457-idempotenz-paginierung.md`, `docs/adr/0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`, `docs/adr/0013-spec-first-openapi-31-und-asyncapi-30-normativ.md`, `docs/adr/0000-vorlage-madr-4.md`; ADR 0053 (exists; add this ticket's tests to its "Confirmation").
+- `docs/spec/02-architektur.md`: "Request-Pfad" (all three subsections: the chain order, the proof in the response writer, the rule on failed credentials), "Querschnitts-Ports (`internal/kernel`)" (`kernel/reqmeta`), "Fehlerarten" (closed public codes of 06, internal causes), "Fristen", "Wiederholungen", "Panics", "Konfigurationswerte dieses Kapitels" (`http.max_json_body_bytes`, `http.max_json_depth`, `http.unavailable_retry_after`).
 - `docs/spec/06-api.md`: "Grundregeln" (rows Kein `null`, Ganzzahlen, Unbekanntes, Medientypen, Größe, Caching, Korrelation, CORS, Client-IP, Sprache), "Authentifizierung je Prinzipal-Art", "Autorisierung in der API", "Fehler" (with the generated problem table), "Nebenläufigkeit", "Vertragstests und Gate" (G7, G8), "Entscheidungen dieses Kapitels" (R-API-03, R-API-04, R-API-07, R-API-08), "Konfigurationswerte dieses Kapitels".
 - `docs/spec/05-aktionen.md`: "Verbindliche Regeln" (rules 2, 5 and 9), "Entscheidung".
 - `docs/spec/07-rechte.md`: "Prinzipal-Kontext", "Die Funktion `authorize`" ("Entscheidungen und Gründe", "Ablauf").
@@ -31,7 +31,7 @@ After this ticket every request on the public listener runs through one ordered 
 4. Documentation in the repo: README per module/service, an ADR for every architecture decision, a CHANGELOG entry per release, docs site kept current. A change without matching documentation is not done.
 5. Quality gates (SonarQube, linters, type checks, security scanners, test coverage) block the merge.
 6. Test first: write the failing test, show it red, then make it green. No en or em dashes in any text. White label everywhere. Configuration values only through named keys from `docs/operations/configuration.md`.
-7. 02 "Request-Pfad" (B7, R-AR-14): every route runs through the chain; a successful response (2xx, 3xx) without an `authorize` check of the route's action is replaced by `500` and raises an alarm counter.
+7. 02 "Request-Pfad" (B7, R-AR-14): every route runs through the chain; a successful response (2xx, 3xx) without an `authorize` check of the route's action is replaced by `500 internal_error` (cause `authz_not_checked` only in log and metric, 02 "Fehlerarten") and increments `bothy.authz.errors` with `bothy.reason = authz_not_checked` (signals.md, alarm `BothyAuthzError`).
 8. 06 "Fehler" and ADR 0015: RFC 9457 body with `type` `/api/v1/problems/{code}`, `title`, `status`, `code`, `correlation_id`, optional `detail` and `instance`; extensions `errors[]`, `current`, `reason`, `hint`; `detail` never contains content, secrets or internal paths (SEC-OUT-5).
 9. 06 "Grundregeln" and ADR 0053 (core contract K2): the server never sends JSON `null`; integers stay below 2^53.
 10. 06 "Nebenläufigkeit" (K4): strong `ETag` with the version; a required `If-Match` that is missing gives `428 precondition_required`, a mismatch `412 version_conflict` with `current`.
@@ -39,7 +39,7 @@ After this ticket every request on the public listener runs through one ordered 
 12. 19 SEC-CORS-1 and SEC-CORS-2 for REST (SEC-T04, REST part). The WebSocket origin check belongs to M1-64.
 13. 19 SEC-IN-1 (schema validation before the handler), SEC-IN-2 (duplicate keys, invalid UTF-8 and too deep nesting rejected), SEC-IN-3 (size limits before reading).
 14. 06 "Grundregeln" row Client-IP and 08 "Schutz der Anmeldung": forwarding headers count only from peers in `server.trusted_proxies` (ID-T25, header part).
-15. 17 "Signale" and R-OB-07: `correlation_id` is the W3C trace ID of the request; the response header `Correlation-Id` carries the same value.
+15. 17 "Signale", R-OB-05 and R-OB-07: `correlation_id` is the W3C trace ID of the server span; an incoming `traceparent` is only a span link unless `telemetry.traces.trust_remote_parent` (M1-10 configures `otelhttp` that way), so a client cannot choose its correlation ID; the response header `Correlation-Id` (schema `CorrelationId`) carries the same value.
 16. W7 resolved as the plan recommends: 19 wins. Writing request schemas get `additionalProperties: false`; unknown request members give `400 validation_failed`; R-API-04 keeps applying to responses and events.
 
 ## Scope
@@ -50,18 +50,15 @@ Paths are relative to `services/server/` unless they start with `docs/` or `infr
 2. `internal/platform/httpserver/httpservertest` (new): a harness that builds the full chain around fake `routes.Operation` values and test handlers, with a fake authenticator, helpers that record authorize checks, a manual OpenTelemetry metric reader and a log capture. M1-19, M1-20 and every handler ticket use it.
 3. `internal/kernel/authorize`: the check log (Design notes "Proof").
 4. `internal/kernel/errs`: kinds, codes and statuses aligned with 06 "Fehler"; header carriage on errors (Design notes "Errors").
-5. `internal/kernel/reqmeta` (new kernel package, stdlib only): correlation ID and client IP of the request in the context. Register it in `architecture/modules.yaml` with the kernel-core packages and add a row to the table in 02 "Querschnitts-Ports". If M1-10 already exposes a correlation helper with the same purpose, reuse it and record that.
+5. `internal/kernel/reqmeta` (new kernel package, stdlib only, 02 "Querschnitts-Ports"): correlation ID and client IP of the request in the context. Register it in `architecture/modules.yaml` with the kernel-core packages. If M1-10 already exposes a correlation helper with the same purpose, reuse it and record that.
 6. `internal/kernel/actor`: the `AnonymousOnly` authenticator and, if the M1-05 port lacks it, a `Credentials` input (Design notes "Authentication").
 7. `api/routes/gen` (M1-17): the W7 check "request schemas closed" with a negative fixture; generation of `api/rest/openapi.gen.yaml`, a byte-identical copy of `docs/api/openapi.yaml` that the validator embeds (`//go:embed`; covered by `make codegen-check`).
 8. `internal/wire`: assemble the chain for roles `api` and `all`; pass the problem writers to `routes.Build` as error handlers.
-9. Spec and contract edits in the same change (spec first):
-   - `docs/api/openapi.yaml`: `additionalProperties: false` on every object schema reachable from a request body, except `JsonObject` (free form by design); new schema `CorrelationId` (string, `format: uuid`, description: W3C trace ID of the request written as UUID, not a UUIDv7), referenced by the `Correlation-Id` header, `Problem.correlation_id` and `EventEnvelope.correlation_id`; descriptions of `FieldError.pointer` and `FieldError.code` list the forms and the vocabulary below; fix every example that becomes invalid. `make api-lint` stays green.
-   - `docs/spec/06-api.md`: "Grundregeln" rows Unbekanntes (W7), Korrelation (trace ID), Größe (name per W1); R-API-04 wording; problem table row `authz_not_checked` (regenerate the block with the M1-03 tool if `tools/api-checks/` exists, otherwise edit the block in its exact format; M1-03 then keeps it); `api.max_json_depth` in "Konfigurationswerte dieses Kapitels".
-   - `docs/spec/02-architektur.md`: "Kette im api-Knoten" with the real order and its reason; "Nachweis der Prüfung" (enforced in the response writer, see Design notes); "Fehlerarten" aligned with the 06 codes; `http.unavailable_retry_after` in "Konfigurationswerte dieses Kapitels"; the `kernel/reqmeta` row.
-   - If M1-08 has not yet renamed `http.max_json_body_bytes` to `api.max_json_body_bytes` (W1), do exactly that rename in 02, 06 and 19 as the W1 table says.
-   - `docs/observability/signals.md`: metric `bothy.authz.unchecked`. `docs/observability/alerting.md` and `infra/observability/prometheus/rules/bothy-alerts.yaml`: alarm `BothyAuthzNotChecked` (stage page, condition `increase(bothy_authz_unchecked_total[5m]) > 0`) with a runbook anchor; a `promtool test rules` case if M1-04 set up rule tests.
-   - `docs/adr/0053-kein-json-null-in-api-und-ereignissen.md` if no ADR 0053 exists (P-12); then `make adr-index`.
-   - `docs/operations/configuration.md` regenerated; `docs/DECISIONS.md` entries listed below; `services/server/CHANGELOG.md` and `internal/platform/httpserver/README.md`.
+9. Spec and contract work in the same change. The spec already says what this ticket builds: 02 "Kette im api-Knoten", "Nachweis der Prüfung", "Fehlerarten" and the keys `http.max_json_body_bytes`, `http.max_json_depth`, `http.unavailable_retry_after`; 06 "Grundregeln" rows Unbekanntes, Korrelation and Größe, R-API-04; schema `CorrelationId` in `openapi.yaml`; metric `bothy.authz.errors` in signals.md and the alarm `BothyAuthzError` with its runbook anchor. Left to do here:
+   - `docs/api/openapi.yaml` (W7): `additionalProperties: false` on every object schema reachable from a request body, except `JsonObject` (free form by design); where a schema is composed with `allOf`, close it in a way the validator and the generators accept (for example `unevaluatedProperties: false` on the composing schema) and prove it with the generator check of Scope 7; descriptions of `FieldError.pointer` and `FieldError.code` list the forms and the vocabulary below; fix every example that becomes invalid. `make api-lint` stays green.
+   - ADR 0053: add the property test of this ticket to its "Confirmation"; then `make adr-index`.
+   - A `promtool test rules` case for `BothyAuthzError` if M1-04 set up rule tests.
+   - `docs/operations/configuration.md` regenerated if the schema adds keys; `services/server/CHANGELOG.md` and `internal/platform/httpserver/README.md`; `docs/DECISIONS.md` only for decisions that the spec does not already state.
 
 ## Out of scope
 
@@ -115,21 +112,19 @@ Per route, wrapping each mounted `routes.Route.Handler`, so `r.Pattern` and the 
 | 14 | `StageProof` | installs the check log | this ticket |
 | 15 | generated wrapper, strict handler, module adapter, use case with `authorize` | | handler tickets |
 
-API: `type Stage int` with the constants above; `type Chain`; `(*Chain).Use(stage Stage, mw func(http.Handler) http.Handler)` panics when a stage is set twice; empty stages pass through. A golden test holds the order. Update the table in 02 "Kette im api-Knoten" to this order. Reason for the change: body limits and deadlines depend on the route class, which is known only after routing.
+API: `type Stage int` with the constants above; `type Chain`; `(*Chain).Use(stage Stage, mw func(http.Handler) http.Handler)` panics when a stage is set twice; empty stages pass through. A golden test holds the order, which is the order of 02 "Kette im api-Knoten". `StageAuthenticate` exposes a hook for failed credentials that M1-19 fills (02: failed credentials count against `rl.public_auth`).
 
 ### Errors
 
-`kernel/errs` holds the closed code list of 06 "Fehler" plus `authz_not_checked` (500). Each code has a status and an English title. Title rule: the code with underscores replaced by spaces and the first letter upper case (`validation_failed` gives `Validation failed`, `i1_violation` gives `I1 violation`), which matches the examples in `openapi.yaml`. A test parses the generated problem block of 06 (`BEGIN GENERATED: problems`) and compares codes and statuses with `kernel/errs`. Add the 06 row for `authz_not_checked`: status 500, meaning "the route answered without checking its action", client reaction like `internal_error`.
-
-The example codes in 02 "Fehlerarten" become 06 codes: `malformed_json` to `malformed_request`, `invalid_cursor` to `cursor_invalid`, `dpop_invalid` to `invalid_dpop_proof`, `insufficient_level` and `capability_missing` to `forbidden` (the reason stays in the audit), `internal` to `internal_error`, `dependency_unavailable`, `db_pool_exhausted`, `shutting_down` and `deadline_exceeded` to `unavailable` (the cause only in the log). `version_conflict` moves to status 412; add `precondition_required` (428), `method_not_allowed` (405) and `unsupported_media_type` (415). Update the 02 table and the M1-05 test of `kernel/errs` in the same change.
+`kernel/errs` (M1-05) holds exactly the closed code list of 06 "Fehler"; internal causes such as `authz_not_checked` are `Cause` labels for log and metric, never a public code (02 "Fehlerarten"). Each code has a status and an English title. Title rule: the code with underscores replaced by spaces and the first letter upper case (`validation_failed` gives `Validation failed`, `i1_violation` gives `I1 violation`), which matches the examples in `openapi.yaml`. A test parses the generated problem block of 06 (`BEGIN GENERATED: problems`) and compares codes and statuses with `kernel/errs`.
 
 Errors carry response headers where the contract needs them (`Retry-After`, `WWW-Authenticate`, `DPoP-Nonce`, `Allow`): add `errs.WithHeader(err, name, value)` or an equivalent; the problem writer applies them. `503 unavailable` always carries `Retry-After` with `http.unavailable_retry_after` in whole seconds. Add `errs.VersionConflict(current any)` and `errs.PreconditionRequired()`.
 
-Problem writer `httpserver.WriteProblem(w http.ResponseWriter, r *http.Request, err error)`: body from the code; `correlation_id` from `reqmeta`; `instance` is the request path, except that a path parameter named `token` is replaced by the literal `{token}` (incoming webhook URLs carry a secret); `detail` only where 06 asks for it (`payload_too_large` names the config key, for example `Body exceeds api.max_json_body_bytes.`); `errors[]` for `validation_failed`; `current` for `version_conflict`; `reason` and `hint` when the error carries them. Errors without a known kind become `500 internal_error`; their text goes only to the log. The same writer is the std-http `ErrorHandlerFunc` (parameter binding: `400 validation_failed`) and the strict `RequestErrorHandlerFunc` (`400 malformed_request`) and `ResponseErrorHandlerFunc` (mapping by kind) in `routes.Options`.
+Problem writer `httpserver.WriteProblem(w http.ResponseWriter, r *http.Request, err error)`: body from the code; `correlation_id` from `reqmeta`; `instance` is the request path, except that a path parameter named `token` is replaced by the literal `{token}` (incoming webhook URLs carry a secret); `detail` only where 06 asks for it (`payload_too_large` names the config key, for example `Body exceeds http.max_json_body_bytes.`); `errors[]` for `validation_failed`; `current` for `version_conflict`; `reason` and `hint` when the error carries them. Errors without a known kind become `500 internal_error`; their text goes only to the log. The same writer is the std-http `ErrorHandlerFunc` (parameter binding: `400 validation_failed`) and the strict `RequestErrorHandlerFunc` (`400 malformed_request`) and `ResponseErrorHandlerFunc` (mapping by kind) in `routes.Options`.
 
 ### Correlation ID
 
-The correlation ID is the trace ID of the server span (16 bytes) written as a lowercase UUID string (8-4-4-4-12 hex). If the span context has no valid trace ID (telemetry off, no-op provider), generate 16 bytes from `crypto/rand`. Store it with `reqmeta.WithCorrelationID`; every response carries `Correlation-Id`; a client-sent `Correlation-Id` header is ignored. The server adopts the trace ID of an incoming `traceparent` as 17 "Traces" says; record in `docs/DECISIONS.md` that this lets a client choose the correlation ID of its own requests. There is no separate request ID; drop "Request-ID" from step 1 in the 02 edit.
+The correlation ID is the trace ID of the server span (16 bytes) written as a lowercase UUID string (8-4-4-4-12 hex). M1-10 guarantees a valid trace ID for every request, also with `telemetry.enabled = false` (17 "Signale"); if a unit test runs without that provider, generate 16 bytes from `crypto/rand` as a fallback. Store it with `reqmeta.WithCorrelationID`; every response carries `Correlation-Id`; a client-sent `Correlation-Id` header is ignored. An incoming `traceparent` is a span link, not the parent, unless `telemetry.traces.trust_remote_parent` (17, R-OB-05), so by default a client cannot choose the correlation ID. There is no separate request ID.
 
 ### Client IP
 
@@ -145,9 +140,9 @@ No `Access-Control-*` header by default. Operations with action `instance.discov
 
 ### Body, JSON guard, preconditions and validation
 
-- Body limit in `StageRoute`: `http.MaxBytesReader` with `api.max_json_body_bytes` for `BodyJSON`, `file.max_upload_bytes` for `BodyMultipart` and `BodyOctetStream`. Exceeding gives `413 payload_too_large` with `detail` naming the key.
-- Deadline in `StageRoute`: context deadline `http.request_timeout`; for multipart or octet-stream operations `http.transfer_timeout`, applied through `http.ResponseController` read and write deadlines (02 "Fristen"). An error that wraps `context.DeadlineExceeded` of the request context becomes `503 unavailable`.
-- `StageBody`: a body whose `Content-Type` media type is not the operation's gives `415 unsupported_media_type`. For JSON: reject invalid UTF-8 (`utf8.Valid`), duplicate member names at any level, and nesting deeper than `api.max_json_depth`, each with `400 malformed_request`; then restore `r.Body` with the same bytes. Implement with `encoding/json` (`Decoder.Token`, `UseNumber`); no third-party JSON parser.
+- Body limit in `StageRoute`: `http.MaxBytesReader` with `http.max_json_body_bytes` for `BodyJSON`, `file.max_upload_bytes` for `BodyMultipart` and `BodyOctetStream`. Exceeding gives `413 payload_too_large` with `detail` naming the key.
+- Deadline in `StageRoute`: context deadline `http.request_timeout`; for multipart or octet-stream operations `http.transfer_timeout`, applied through `http.ResponseController` read and write deadlines (02 "Fristen"). An error that wraps `context.DeadlineExceeded` of the request context becomes `503 unavailable` with `Retry-After` (cause `deadline_exceeded` in the log).
+- `StageBody`: a body whose `Content-Type` media type is not the operation's gives `415 unsupported_media_type`. For JSON: reject invalid UTF-8 (`utf8.Valid`), duplicate member names at any level, and nesting deeper than `http.max_json_depth`, each with `400 malformed_request`; then restore `r.Body` with the same bytes. Implement with `encoding/json` (`Decoder.Token`, `UseNumber`); no third-party JSON parser.
 - `StagePreconditions`: an `IfMatchRequired` operation without `If-Match`, or with `*`, gives `428 precondition_required` (a wildcard would skip the version check the contract demands). Helpers: `FormatETag(version int64) string` returns the decimal in double quotes; `ParseIfMatch(h http.Header) IfMatch` returns `Present`, `Version` and `Valid`; a weak, list or non-decimal value is `Valid == false`, and the use case then answers `412 version_conflict` with `current` (strong comparison fails, RFC 9110).
 - `StageValidate`: validate path, query and header parameters and the body against `api/rest/openapi.gen.yaml` before the generated wrapper runs. Library: `github.com/pb33f/libopenapi-validator` (MIT, OpenAPI 3.1, JSON Schema 2020-12). Write the probe tests `TestValidator_Probe_*` first; if it fails one, try `github.com/getkin/kin-openapi/openapi3filter`; if both fail, stop with `Verdict: BLOCKED` and the probe output. Record the choice in `docs/DECISIONS.md`. Errors become `400 validation_failed` with `errors[]`: `pointer` is a JSON Pointer into the body or `#path/<name>`, `#query/<name>`, `#header/<name>`; `code` is one of `required`, `unknown_member`, `invalid_type`, `invalid_format`, `invalid_enum`, `too_long`, `too_short`, `too_large`, `too_small`, `too_many_items`, `too_few_items`, `pattern_mismatch`, `invalid`; `detail` is a short English text without the submitted value.
 - W7 spec edit and check: add `additionalProperties: false` to every object schema in the closure of request bodies except `JsonObject`. Extend the M1-17 generator with the check "request schemas closed" (fails naming the schema) and a negative fixture, so a new open request schema fails `make codegen-check`.
@@ -160,7 +155,7 @@ ADR 0053, if missing: context 06 R-API-03, 04 "Umschlag (Envelope)", 03 Grundsat
 
 ### Proof of the authorize check
 
-`kernel/authorize` gets a concurrency-safe check log in the request context: `WithCheckLog(ctx) context.Context`, `RecordCheck(ctx context.Context, c Check)` with `Check{Action string; Kind CheckKind; Allowed bool}` (`CheckKind` is `CheckAuthorize` or `CheckScope`), and `Checks(ctx) []Check`. Every `Authorizer` implementation (M1-28) must call `RecordCheck` once per `Authorize` and `Scope` call; say so in the doc comment of the interface. `StageProof` installs the log. The response writer, at the first `WriteHeader` or `Write`, checks: status below 400 and no check whose `Action` equals the route's action means the handler's headers and body are discarded, `500 authz_not_checked` is sent, `bothy.authz.unchecked` (counter, unit `{response}`, attribute `bothy.action`; Prometheus `bothy_authz_unchecked_total`) is incremented and an error is logged with the route pattern. Responses with status 400 or higher pass unchanged. In 02 "Nachweis der Prüfung", replace "Strict-Middleware" with this mechanism; reason: the strict middleware sees a typed response object, not its status.
+`kernel/authorize` gets a concurrency-safe check log in the request context: `WithCheckLog(ctx) context.Context`, `RecordCheck(ctx context.Context, c Check)` with `Check{Action string; Kind CheckKind; Allowed bool}` (`CheckKind` is `CheckAuthorize` or `CheckScope`), and `Checks(ctx) []Check`. Every `Authorizer` implementation (M1-28) must call `RecordCheck` once per `Authorize` and `Scope` call; say so in the doc comment of the interface. `StageProof` installs the log. The response writer, at the first `WriteHeader` or `Write`, checks: status below 400 and no check whose `Action` equals the route's action means the handler's headers and body are discarded, `500 internal_error` is sent (cause `authz_not_checked`), `bothy.authz.errors` with `bothy.reason = authz_not_checked` is incremented and an error is logged with the route pattern and the action. Responses with status 400 or higher pass unchanged (02 "Nachweis der Prüfung").
 
 ### Unmatched requests
 
@@ -172,11 +167,11 @@ The outer handler asks the mux for the handler (`ServeMux.Handler(r)`); if no pa
 
 ### Configuration
 
-Use the names of `docs/operations/configuration.md` and add to the M1-07 schema what is missing: `api.max_json_body_bytes` (W1 name), `api.max_json_depth` (new in 06, default `32`; a test proves every request example in `openapi.yaml` passes), `api.cors_allowed_origins`, `http.request_timeout`, `http.transfer_timeout`, `http.unavailable_retry_after` (new in 02, default `5s`), `file.max_upload_bytes`, `server.trusted_proxies`, `server.public_url`. Regenerate the reference (`make config-reference` or the M1-08 tool).
+Use the names of `docs/operations/configuration.md` and add to the M1-07 schema what is missing: `http.max_json_body_bytes`, `http.max_json_depth` (a test proves every request example in `openapi.yaml` stays below it), `api.cors_allowed_origins`, `http.request_timeout`, `http.transfer_timeout`, `http.unavailable_retry_after`, `file.max_upload_bytes`, `server.trusted_proxies`, `server.public_url`. Defaults come from the chapter tables. Regenerate the reference (`make config-reference` or the M1-08 tool).
 
 ### Decisions to record in `docs/DECISIONS.md`
 
-W7 resolution and its check; correlation ID format and the `traceparent` consequence; chain order versus the former 02 table; proof in the response writer; validator library and probe result; FieldError code vocabulary; `If-Match: *` gives 428; null repair policy; `instance` with `{token}`; title rule; new config names and defaults.
+Validator library and probe result; FieldError code vocabulary; `If-Match: *` gives 428; null repair policy; `instance` with `{token}`; title rule. (W7, the correlation ID, the chain order, the proof and the new configuration names are already in 02, 06 and 17.)
 
 ## Tests (write them first)
 
@@ -205,15 +200,15 @@ Commands that must pass: `cd services/server && go test -race ./internal/platfor
 
 ## Acceptance criteria
 
-- [ ] A test route without `authorize` returns `500 authz_not_checked` and increments `bothy.authz.unchecked`.
-- [ ] Every error kind maps to status and problem body per 06 "Fehler"; `kernel/errs` equals the 06 table, including `authz_not_checked`.
+- [ ] A test route without `authorize` returns `500 internal_error` (log cause `authz_not_checked`) and increments `bothy.authz.errors` with `bothy.reason = authz_not_checked`.
+- [ ] Every error kind maps to status and problem body per 06 "Fehler"; `kernel/errs` equals the 06 table; internal causes never appear in a response body.
 - [ ] The property test finds no JSON `null` in responses; integers beyond 2^53 - 1 never leave the server.
 - [ ] A missing `If-Match` on a required operation gives `428`, a mismatch `412` with `current`.
 - [ ] Forwarding headers count only from trusted peers (ID-T25, header part).
 - [ ] SEC-T03 holds for API and error responses; SEC-T04 holds for REST.
 - [ ] Duplicate keys, invalid UTF-8 and too deep nesting give `400 malformed_request` (SEC-IN-2); unknown request members give `400 validation_failed` (W7).
 - [ ] Request schemas in `openapi.yaml` are closed, the generator check holds it, `make api-lint` is green.
-- [ ] ADR 0053 exists; 02, 06, signals, alerting, alert rules and `docs/DECISIONS.md` are updated; the configuration reference is regenerated.
+- [ ] ADR 0053 names this ticket's property test; `openapi.yaml` request schemas are closed (W7) and the generator check holds them; the configuration reference is regenerated.
 - [ ] `make check` is green.
 
 ## Definition of done

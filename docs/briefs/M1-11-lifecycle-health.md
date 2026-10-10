@@ -1,10 +1,11 @@
 # M1-11: Lifecycle, listeners, health and shutdown
 
-Status: ready | Depends on: M1-10, M1-12 | Etappe: M1
+Status: ready | Depends on: M1-10, M1-12, M1-22 | Etappe: M1
 
-Note on dependencies: the plan lists only M1-10. This brief also needs M1-12 because start steps
-3 and 4 of 02 "Start" (database, schema version) and the readiness check "Datenbank erreichbar"
-are part of the ticket. The wave does not change (M1-12 is in wave 5, this ticket in wave 6).
+Note on dependencies: M1-12 is needed because start steps 3 and 4 of 02 "Start" (database, schema
+version) and the readiness check `database` are part of the ticket; M1-22 because `bothy
+healthcheck` uses the loopback client of `internal/platform/egress` (19 SEC-NET-1). The plan and
+the brief index list both.
 
 ## Goal
 
@@ -63,9 +64,10 @@ R-AR-13, R-AR-16, R-AR-17).
 11. 02 "Start": order config and telemetry, secrets, database within `startup.dependency_wait`,
     schema version (abort with hint on an older schema), instance (later), routes (later), role
     start, ready.
-12. 02 "Health": `/healthz` means the process answers (plus later the log tail and hub for `api`,
-    River for `worker`); `/readyz` means start complete, database reachable, schema fits, no
-    shutdown begun.
+12. 02 "Health": `/healthz` means the process answers (a failing log tail, hub or River client
+    ends the process with exit `1` instead, 02 "Panics"); `/readyz` means start complete, database
+    reachable, version fits the schema, signing keys present (M1-32), no shutdown begun. Answer
+    format and status codes: 16 "Zwei Listener".
 13. 02 "Shutdown": `SIGTERM` and `SIGINT` start it, a second signal ends at once; total budget
     `shutdown.total_timeout`; `api`: ready false, wait `shutdown.drain_delay`, HTTP shutdown with
     `shutdown.http_grace`, close connections (later), stop log tail (later), flush telemetry within
@@ -148,10 +150,10 @@ Register in the schema if M1-07 did not, with type, default and doc from the cha
 
 ### Other files
 
-- `infra/compose/compose.yaml`: `stop_grace_period: 75s` in the `x-api` anchor and for `worker`
-  (D3).
-- `docs/spec/02-architektur.md`, `docs/spec/16-betrieb.md`, `services/server/README.md` as listed
-  under "Definition of done".
+- `infra/compose/compose.yaml` already sets `stop_grace_period: 75s` in the `x-api` anchor and
+  for `worker`, and 02 sets `shutdown.total_timeout` to `60s`; check D8 of M1-08 holds the
+  relation (D3).
+- `services/server/README.md` as listed under "Definition of done".
 
 ## Out of scope
 
@@ -194,7 +196,7 @@ D1. Start sequence and listeners.
   recovers without intervention (02 "Ausfall einer Abhängigkeit").
 - Older schema: exit `1` with the hint text from M1-12, no listener left open.
 
-D2. Health answers (write into 16 "Zwei Listener").
+D2. Health answers (16 "Zwei Listener").
 - `Content-Type: application/json`, `Cache-Control: no-store`.
 - Success: `200` with `{"status":"ok"}`.
 - Failure: `503` with `{"status":"unavailable","failed":["<check>", ...]}`, names sorted.
@@ -211,16 +213,9 @@ D3. Shutdown budget.
 - `http.Server.Shutdown` with the HTTP step budget; hijacked connections are left to
   `PhaseConnections` (M1-65).
 - At wiring time the sum of all registered step budgets must not exceed `shutdown.total_timeout`;
-  otherwise the start fails with exit `2` naming both values. The current defaults violate this
-  as soon as M1-14 registers `shutdown.jobs_soft_timeout`: the defaults of
-  `shutdown.drain_delay`, `shutdown.http_grace`, `shutdown.jobs_soft_timeout` and
-  `shutdown.telemetry_flush_timeout` add up to more than the default of
-  `shutdown.total_timeout`. Change the default of `shutdown.total_timeout` to `60s` in 02
-  "Konfigurationswerte dieses Kapitels" and the schema, and add `stop_grace_period: 75s` to the
-  Compose services `api`, `api-tailscale` (anchor `x-api`) and `worker` (today Compose stops after
-  Docker's default grace and kills the process mid-shutdown). A unit test reads
-  `infra/compose/compose.yaml` and fails if `stop_grace_period` of these services is not greater
-  than the schema default of `shutdown.total_timeout`. Record in DECISIONS.md.
+  otherwise the start fails with exit `2` naming both values (02 "Shutdown"). The defaults of 02
+  satisfy this (`shutdown.total_timeout` is `60s`); Compose waits longer (`stop_grace_period`,
+  held by check D8 of M1-08).
 
 D4. Signals. The runner listens for `SIGTERM` and `SIGINT` with a buffer of two. First signal:
 orderly shutdown. Second signal at any time: log `forced shutdown`, exit `3` immediately without
@@ -231,18 +226,16 @@ D5. `bothy healthcheck`.
   environment).
 - Accepts only `http://` URLs whose host is a loopback address (`127.0.0.0/8`, `::1`) or
   `localhost`; anything else is a usage error (exit `2`). Reason: the command exists for the local
-  container probe; it must not become a general HTTP client (M1-22 forbids those outside
-  `platform/egress`, and this restriction is the documented exception).
-- Own `http.Client` with timeout `--timeout` (default `5s`, matching the Compose healthcheck
-  timeout; a test holds the default), no redirects, no proxy from the environment.
+  container probe; it must not become a general HTTP client.
+- Uses `egress.NewLoopback(timeout)` of `internal/platform/egress` (M1-22; 19 SEC-NET-1), with
+  timeout `--timeout` (default `5s`, matching the Compose healthcheck timeout; a test holds the
+  default); no redirects, no proxy from the environment.
 - Exit `0` for `2xx`, else `1` with one line on stderr naming the status code or the error class.
 
 D6. W2 and W3.
-- W2: 16 is authoritative. In 02 replace the row "Ops-Listener (Health, optional Metriken)" of
-  "Rollen eines Prozesses" with "interner Listener (Health, Eingangs-Webhooks aus dem Stack)",
-  adjust R-AR-13 to "Health auf dem internen Listener außerhalb der öffentlichen API" (the server
-  exports metrics only over OTLP, ADR 0034), and in `services/server/README.md` describe `health`
-  as `/healthz` and `/readyz` on the internal listener. Record W2 in DECISIONS.md.
+- W2 is resolved in 02 ("Rollen eines Prozesses", R-AR-13: health on the internal listener, metrics
+  only over OTLP). In `services/server/README.md` describe `health` as `/healthz` and `/readyz` on
+  the internal listener.
 - W3: if the W3 entry from M1-09 is missing in DECISIONS.md, add it (L1 extended by `secrets`,
   `healthcheck`, `restore`; `setup` replaces `admin`).
 
@@ -313,7 +306,7 @@ make check
 - [ ] An older schema aborts the start with the hint to `bothy migrate up`.
 - [ ] `bothy healthcheck` returns `0` or `1` and refuses non-loopback URLs.
 - [ ] Shutdown budgets cannot exceed the total; Compose waits longer than the total.
-- [ ] 02 and 16 agree on health (W2); DECISIONS.md has W2, W3 and the shutdown budget entry.
+- [ ] 02 and 16 still agree on health and shutdown; DECISIONS.md has W3.
 - [ ] `make check` green; module coverage at or above `quality.coverage.go_min_percent`.
 
 ## Definition of done
@@ -323,11 +316,12 @@ make check
   tickets add components and stop steps), `internal/platform/health/README.md` (check names,
   answer format, how to add checks), `internal/platform/httpserver/README.md` (listener part;
   M1-18 extends it), `internal/wire/README.md` (serve assembly and extension points).
-- Spec and docs in the same change: 02 "Rollen eines Prozesses", "Befehle des Binarys"
-  (`healthcheck` flags, exit codes), "Start", "Health", "Shutdown" (budgets, exit codes, forced
-  exit), R-AR-13, "Konfigurationswerte dieses Kapitels" (`shutdown.total_timeout`); 16
-  "Zwei Listener" (answer format); `services/server/README.md`; `infra/compose/compose.yaml`.
-- `docs/DECISIONS.md`: W2, W3 (if missing), D2, D3, D4, D5.
+- Spec: 02 "Rollen eines Prozesses", "Befehle des Binarys" (exit codes), "Start", "Health",
+  "Shutdown", R-AR-13 and `shutdown.total_timeout`, 16 "Zwei Listener" (answer format) and the
+  Compose `stop_grace_period` already say what this ticket builds; change them only if the build
+  proves a statement wrong. Add the `healthcheck` flags to 02 "Befehle des Binarys";
+  `services/server/README.md`.
+- `docs/DECISIONS.md`: W3 (if missing), D4.
 - Configuration reference regenerated without diff.
 - `services/server/CHANGELOG.md` entry under "Unreleased".
 - No new ADR: the rulings refine 02 and go to DECISIONS.md.

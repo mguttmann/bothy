@@ -169,6 +169,12 @@ Work only in `services/server` and the docs named here.
     rule and the proof profile of "Design notes" (spec first, in the same change);
     `docs/DECISIONS.md` gets the rulings listed in "Design notes"; module README and
     `services/server/CHANGELOG.md` (Unreleased).
+13. **`authz.CredentialSource`, devices part** (02 "Ports, Ereignisse und Quellen je Modul", 07
+    "Ablauf" `check_active`, PLAN row M1-33): implement `DeviceState` (`pending`, `active`,
+    `revoked`) of the request's device in the identity adapter of the source port that M1-28
+    declared, and replace the corresponding empty source in `internal/wire` (fail closed until
+    then). Test: `TestCredentialSource_Devices` against PostgreSQL 18 (active, revoked, expired,
+    foreign principal).
 
 ## Out of scope
 

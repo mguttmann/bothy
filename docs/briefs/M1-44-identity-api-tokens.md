@@ -114,6 +114,12 @@ step-up (SR5).
 - `services/server/internal/identity/README.md`, CHANGELOG entry under "Unreleased" of
   `services/server/CHANGELOG.md`, `docs/DECISIONS.md` entries for the rulings below,
   `docs/security/threat-model.md` T-TK-02 test column with the test names.
+- **`authz.CredentialSource`, API tokens part** (02 "Ports, Ereignisse und Quellen je Modul", 07
+  "Ablauf" `check_active`, PLAN row M1-44): implement `TokenActive` and `TokenExpiresAt` of the
+  request's API token in the identity adapter of the source port that M1-28 declared, and replace
+  the corresponding empty source in `internal/wire` (fail closed until then). Test:
+  `TestCredentialSource_Tokens` against PostgreSQL 18 (active, revoked, expired, foreign
+  principal).
 
 ## Out of scope
 

@@ -124,10 +124,11 @@ Python gate:
 Docs:
 
 - `docs/observability/signals.md`: new definition of `bothy.event.fanout.lag`; extended
-  `client_error` list; outcome values of `bothy.job.duration`; `bothy.authz.decisions` without
-  delivery checks; correct the GenAI package path to the one M1-10 created
-  (`internal/platform/otel/genai`, W8); Quelle column of `db.client.operation.duration` with the
-  verified otelpgx version.
+  `client_error` list; `bothy.authz.decisions` without delivery checks; Quelle column of
+  `db.client.operation.duration` with the verified otelpgx version. (The outcome values of
+  `bothy.job.duration` and the GenAI package path are already there.) Move the declarations of
+  `bothy.authz.errors` (M1-18, M1-25), `bothy.egress.blocked` (M1-22) and
+  `bothy.secrets.refresh.failures` (M1-09) into the registry like `bothy.telemetry.dropped`.
 - Module READMEs of every module that records metrics (German, like the existing files),
   `services/server/CHANGELOG.md` under "Unreleased", `docs/DECISIONS.md` (rulings below).
 

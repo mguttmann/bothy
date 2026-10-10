@@ -75,17 +75,14 @@ storage and transcription build on this client later.
 
 All Go paths are below `services/server/`.
 
-1. **Specification first** (German, in the same change):
-   - `docs/spec/19-sicherheit.md` "8. SSRF-Verbot und ausgehende Verbindungen": the entry format of
-     `egress.allowed_hosts` (design note 1), the full blocked list including the additions of
-     design note 3, the meaning of `allow_private` (design note 4), `http` only for
-     `allow_private` entries, proxies from the environment ignored; matching text in the meaning
-     column of `egress.allowed_hosts` in "16. Konfigurationswerte dieses Kapitels". Add a ruling
-     `R-SE-10` (stricter blocked list, `allow_private` never unlocks link-local, multicast or
-     unspecified addresses) to "15. Entscheidungen dieses Kapitels".
-   - `docs/spec/02-architektur.md` "6. Code-Layout": add `egress/` to the `platform/` line (W9).
-   - `docs/operations/configuration.md`: a row "Egress-Ziel" in "2. Namensregel und Formate" with
-     the entry format; regenerate section 4.
+1. **Specification (already decided):** 19 "8. SSRF-Verbot und ausgehende Verbindungen"
+   (SEC-NET-1 with the loopback client and the OTLP exemption, SEC-NET-2 with `http` only for
+   `allow_private` entries and no environment proxies, SEC-NET-3 with the full blocked list,
+   SEC-NET-5 with the metric), R-SE-10, the meaning of `egress.allowed_hosts` in "16.
+   Konfigurationswerte dieses Kapitels"; 02 "6. Code-Layout" (`egress/`, W9);
+   `docs/operations/configuration.md` "2. Namensregel und Formate" (row Egress-Ziel); the metric
+   `bothy.egress.blocked` in `docs/observability/signals.md`. Change them only if the build proves
+   a statement wrong, in the same change.
 2. **Configuration schema** (`internal/platform/config`, typed config in `internal/wire`):
    `egress.allowed_hosts` (list of entries, default empty, each entry parsed with
    `egress.ParseRule` and rejected at load time if invalid or duplicated), `egress.timeout`
@@ -176,18 +173,15 @@ All Go paths are below `services/server/`.
    `services/server/README.md` platform table gets the row `egress`; if
    `services/server/architecture/modules.yaml` lists platform packages or their vendor
    permissions, add `egress` there (W9); `docs/security/threat-model.md` "2. Systemgrenzen" row TB7
-   names the egress client among the controls; `docs/DECISIONS.md` entries for W9, R-SE-10, the
-   entry format, `http` only with `allow_private`, environment proxies ignored;
-   `services/server/CHANGELOG.md` under `Unreleased` (`Security`).
+   names the egress client among the controls; `services/server/CHANGELOG.md` under `Unreleased`
+   (`Security`).
 
 ## Out of scope
 
 - Consumers: OIDC discovery and JWKS with their host policy (M1-41), push (M3), webhooks (M2),
   object storage (M3), transcription (M3). Do not build clients for them here.
-- Routing the OTLP exporters of `internal/platform/otel` through egress: M1-10 owns the exporter
-  setup; this is reported as a follow-up, not built here.
-- Metrics for blocked attempts: the signal catalogue (`docs/observability/signals.md`) has none;
-  adding one is out of scope. Blocked attempts are logged (design note 8).
+- The OTLP exporters of `internal/platform/otel`: exempt from the egress client by SEC-NET-1
+  (operator-configured collector endpoint); nothing to build here.
 - Extra CA bundles for private PKI beyond `Deps.RootCAs`: no configuration key exists.
 - Incoming TLS and HSTS: M1-21.
 
@@ -236,7 +230,7 @@ All Go paths are below `services/server/`.
    matching `Rule` has `AllowPrivate`: loopback `127.0.0.0/8`, `::1`; RFC 1918 `10.0.0.0/8`,
    `172.16.0.0/12`, `192.168.0.0/16`; shared address space `100.64.0.0/10` (overlay networks);
    unique local `fc00::/7`. Documentation ranges (RFC 5737, RFC 3849) are not blocked; they are not
-   routed on the internet and tests use them as public examples. Record the additions as R-SE-10.
+   routed on the internet and tests use them as public examples (19 SEC-NET-3, R-SE-10).
 4. **`allow_private`** exists only in `egress.allowed_hosts` (operator trust); a consumer policy
    (`Options.Hosts`) never unlocks a private address. Reason: consumer lists can come from data
    such as a discovery document; the operator's file cannot.
@@ -250,10 +244,11 @@ All Go paths are below `services/server/`.
 8. **Limits and logs**: overall time `Options.Timeout` or `egress.timeout` (client timeout plus
    request context); response bodies are wrapped so that reading beyond the limit returns
    `ErrResponseTooLarge` (never silent truncation; decompressed bytes count). A blocked attempt logs
-   once at `Warn` with purpose, reason and host; never path, query, headers or bodies.
-9. **Callers** map egress errors to their own error kinds (usually `unavailable` with
-   `dependency_unavailable`, 02 "14.1 Fehlerarten"); the egress package does not know `kernel/errs`
-   kinds of other modules.
+   once at `Warn` with purpose, reason and host; never path, query, headers or bodies; and
+   increments `bothy.egress.blocked` with `bothy.reason` = the `Reason` value (signals.md).
+9. **Callers** map egress errors to their own error kinds (usually `503 unavailable` with the
+   internal cause `dependency_unavailable`, 02 "14.1 Fehlerarten"); the egress package does not
+   know `kernel/errs` kinds of other modules.
 10. **`NewLoopback`** dials only loopback addresses after resolution, plain `http`, no redirects;
     it exists so that `bothy healthcheck` has an allowed client without opening a hole in the
     lint.
@@ -294,7 +289,8 @@ test hook on the unexported dialer.
 - `TestResponseLimit`: exactly the limit passes, one byte more returns `ErrResponseTooLarge`; also
   with a gzip encoded body.
 - `TestTimeout`, `TestProxyEnvironmentIgnored` (`t.Setenv` of both proxy variables to a counting
-  server; it counts 0), `TestBlockedAttemptLog` (purpose, reason, host; no path or query).
+  server; it counts 0), `TestBlockedAttemptLog` (purpose, reason, host; no path or query) and
+  `TestBlockedAttemptCounted` (`bothy.egress.blocked` with the reason, manual metric reader).
 - `TestLoopbackClientRefusesNonLoopback`: the fake resolver answers the first host address of
   `10.0.0.0/8` (derived as above); refused.
 - Configuration tests in `internal/platform/config` for the three keys and their env names.

@@ -27,7 +27,7 @@ error log. This makes B7 and ADR 0017 hold mechanically before `authorize` itsel
   of the pseudo-code), section 11.2 (AZ-P1, AZ-P2, AZ-P3).
 - `docs/spec/02-architektur.md`: section 4.5 "Querschnitts-Ports" (`kernel/authorize`), 4.6,
   4.7, 5 "Schichten im Modul", 6 "Code-Layout", 7 "Automatische Prüfung der Regeln", 9.3
-  "Nachweis der Prüfung", 14.1 "Fehlerarten", 15.1 "Start" step 6.
+  "Nachweis der Prüfung", 14.1 "Fehlerarten", 15.1 "Start" step 7.
 - `docs/spec/06-api.md`: section 4 "Autorisierung in der API", section 5 "Fehler" (problem code
   `internal_error`).
 - ADRs: `docs/adr/0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`,
@@ -64,7 +64,7 @@ error log. This makes B7 and ADR 0017 hold mechanically before `authorize` itsel
    names; examples use Alex, Sam, Robin and example.com); configuration only through named keys
    from `docs/operations/configuration.md`.
 8. B7 and 05 rule 3: every registered route carries a known action and its rate-limit class; the
-   server checks this at start (02 section 15.1 step 6).
+   server checks this at start (02 section 15.1 step 7).
 9. 05 rule 4 and 07 AZ-P2: a WebSocket op or event type without catalogue entry must not be
    registrable.
 10. 05 rule 5 and 07 AZ-P3: an unknown action is a programming error; it ends in `500` and an
@@ -112,9 +112,10 @@ or `tools/catalogen`, which are relative to `services/server/`.
    later tickets add their types (for example M1-29 registers `access.changed`).
 6. **Start check** in `internal/wire`: build the registry, convert the generated route table of
    M1-17 to `[]authorize.RouteBinding`, call `VerifyRegistrations` in the start step that M1-17
-   uses for its route check (02 section 15.1 step 6). A failure aborts `bothy serve` with exit
-   code 1 and one log line per violation. If M1-17 already validates actions against its own
-   list, replace that list with the catalogue so there is exactly one definition of "known".
+   uses for its route check (02 section 15.1 step 7). A failure aborts `bothy serve` with exit
+   code 1 and one log line per violation. M1-17 passes `routes.SpecCatalog()` to `routes.Build` in
+   `internal/wire`; replace that argument with the closed `authz` catalogue so there is exactly
+   one definition of "known".
 7. **No second constant set**: if `api/routes` (M1-17) declares its own action constants, make
    `kernel/authorize` the only declaration and regenerate `api/routes` to refer to it.
 8. **Semgrep rule** `.semgrep/bothy-go-catalog-id-conversion.yaml` with fixture
@@ -197,7 +198,9 @@ type ActionSpec struct {
     Resources        []string
     Right            string   // raw 05 text, interpreted by M1-28
     Owner            bool
-    StepUp           bool
+    StepUp           bool     // true for "ja" and for "bedingt" (05 2.4; until the ticket that
+                              // supplies the condition, "bedingt" counts as "ja", 07 4.2)
+    StepUpConditional bool    // "bedingt": M1-39 and M1-40 add the condition in authz
     Audit            string   // raw 05 text
     Rights           bool     // the action raises permission_version (05 rule 7)
     RateLimitClass   string   // "" when 05 says "keine"
@@ -231,12 +234,13 @@ listing them, each naming the operation id, op or event type:
 4. An op or event type registered twice by the same module is one registration (idempotent).
 
 **Unknown action.** `Catalog.Spec` with an action that is not in the catalogue returns a
-`kernel/errs` error of kind `internal` with code `unknown_action` (02 section 14.1) and writes
-one ERROR log record with the attributes `bothy.action` (the offending value; it comes from code,
-never from user input) and `error.type=unknown_action`. The HTTP chain of M1-18 renders internal
-errors as `500` with problem code `internal_error` (06 section 5); the action value never appears
-in the response. Every `Authorizer` implementation (M1-28) must start with `Catalog.Spec`.
-There is no metric for this alarm in `docs/observability/signals.md`; do not invent one.
+`kernel/errs` error of kind `internal` with code `internal_error` and cause `unknown_action` (02
+section 14.1), writes one ERROR log record with the attributes `bothy.action` (the offending
+value; it comes from code, never from user input) and `error.type=unknown_action`, and increments
+`bothy.authz.errors` with `bothy.reason = unknown_action` (signals.md; alarm `BothyAuthzError`).
+The HTTP chain of M1-18 renders it as `500 internal_error` (06 section 5); the action value never
+appears in the response. Every `Authorizer` implementation (M1-28) must start with
+`Catalog.Spec`.
 
 **Why a registry instead of reading asyncapi.yaml at run time:** the registry lists what this
 binary actually emits and accepts, which is what AZ-P2 asks; the documents are checked against
@@ -266,8 +270,9 @@ Go tests run with `-race`. Test names carry the AZ id where one applies.
      `authorize.Op("no_such_op")`, with the server-to-client op `hello`, and with one event type
      registered by two modules each fails.
    - `TestAZP3_UnknownActionFailsClosed`: `Spec(authorize.Action("no.such.action"))` returns kind
-     `internal`, code `unknown_action`, and exactly one ERROR record (capture with a test
-     `slog.Handler`).
+     `internal` with cause `unknown_action`, exactly one ERROR record (capture with a test
+     `slog.Handler`) and one increment of `bothy.authz.errors{bothy.reason=unknown_action}`
+     (manual metric reader).
 4. `internal/platform/httpserver` (or wherever M1-18 keeps its chain tests):
    `TestAZP3_UnknownActionIs500`: a test route whose handler returns the error of
    `Catalog.Spec` for an unknown action answers `500`, problem code `internal_error`, and the

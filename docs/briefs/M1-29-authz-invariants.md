@@ -1,6 +1,6 @@
 # M1-29: Rights changes, access.changed and invariants I1 and SR8
 
-Status: ready | Depends on: M1-16, M1-24, M1-28 | Etappe: M1
+Status: ready | Depends on: M1-16, M1-28 | Etappe: M1
 
 ## Goal
 
@@ -103,12 +103,12 @@ If the merged `authorize` from M1-28 has no guard for `grant.create` and `grant.
 - `internal/authz/errors.go`: type `InvariantError` that unwraps to the `kernel/errs` kind `invariant_violation` with code `i1_violation` or `last_owner`, a hint (`Switch the agent to organization first.` resp. `Appoint another owner first.`) and, for I1, `Conflicts []I1Conflict{AgentID, CredentialHolderID, PrincipalIDs}` sorted by `AgentID`, principal IDs sorted. IDs only, never names (10 section 5.4).
 - `internal/kernel/errs`: if missing, add `type ProblemExtender interface { ProblemExtensions() map[string]any }`. `InvariantError` implements it and returns the member `conflicts` for I1.
 - `internal/platform/httpserver`: the problem writer from M1-18 merges `ProblemExtensions()` into the RFC 9457 body; extension keys never override the standard members, and no value is JSON `null`.
-- Specification first, in the first commit: in `docs/api/openapi.yaml` add to schema `Problem` the optional member `conflicts` (array of `InvariantViolation`, description: present with `i1_violation`) and to `InvariantViolation` the optional member `credential_holder_id` (`Uuid`). Regenerate the server code (M1-17 generator) so that `make codegen-check` shows no drift, and run `make api-lint`.
+- `docs/api/openapi.yaml` already has `Problem.conflicts` (array of `InvariantViolation`, present with `i1_violation`) and `InvariantViolation.credential_holder_id` (10 section 5.4). Regenerate the server code (M1-17 generator) if it predates them so that `make codegen-check` shows no drift.
 
 ### 7. In-transaction event and wiring
 
 - `internal/kernel/authorize`: `AccessChanged{PermissionVersion int64; Action Action; Changes []PrincipalAccessChange}` with `PrincipalAccessChange{PrincipalID ids.ID; Added, Removed, Changed []AccessTarget}`, a Go mirror of `AccessChangedPayload`. If M1-25 or M1-28 created a placeholder, complete it.
-- `internal/wire`: register the `authz` hooks for phase 1 and phase 3.1 and `AccessChanged` as an event published by `authz`. There is no production subscriber in M1 (`runs` subscribes in M2, 02 section 4.3). Update the golden file of registrations from M1-13.
+- `internal/wire`: register the `authz` hooks for phase 1 and phase 3.1 as method values of the `authz` hook type (never closures defined in `internal/wire`; the registry derives the owner from the package, 02 "Ablauf") and `AccessChanged` as an event published by `authz`. There is no production subscriber in M1 (`runs` subscribes in M2, 02 section 4.3). Update the golden file of registrations from M1-13.
 
 ### 8. The `access.changed` event
 
@@ -192,7 +192,7 @@ Commands that must pass:
 - [ ] A rejected change leaves no row, no event and no counter change, and exactly one deny audit row.
 - [ ] `access.changed` payloads validate against `AccessChangedPayload`; lists sorted; no null.
 - [ ] The `TriggerSet` reference property test is green.
-- [ ] The problem body of `i1_violation` carries `conflicts`; `openapi.yaml` updated; `make codegen-check` and `make api-lint` green.
+- [ ] The problem body of `i1_violation` carries `conflicts` valid against `openapi.yaml`; `make codegen-check` and `make api-lint` green.
 - [ ] Golden file of in-transaction registrations updated and green.
 - [ ] README, DECISIONS and CHANGELOG updated; every exported symbol has a doc comment.
 - [ ] `make check` green.

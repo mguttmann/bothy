@@ -1,6 +1,6 @@
 # M1-50: Audit verification, checkpoints and queries
 
-Status: ready | Depends on: M1-24, M1-35 | Etappe: M1
+Status: ready | Depends on: M1-35 | Etappe: M1
 
 ## Goal
 
@@ -148,6 +148,9 @@ Code (paths under `services/server/`):
 Chain rules (from 03 and ADR 0021, already implemented by M1-24; reuse, do not copy):
 `hash = SHA-256(prev_hash || canonical_json(row without hash))`, first row `prev_hash` is 32 zero
 bytes, `seq` from `audit_seq` without gaps. Hashes appear in the API as lowercase hex.
+`listAuditEvents` and `exportAuditEvents` deliver each row in exactly the canonical form of 19
+SEC-AUD-4 plus `hash` (the API representation `AuditEvent`), so an exported stream verifies
+offline with nothing but RFC 8785 and SHA-256; a test recomputes the chain from an export.
 
 Checkpoints:
 

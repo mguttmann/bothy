@@ -318,11 +318,10 @@ integration tests never reports a partly green server check.
 ### Rulings for `docs/DECISIONS.md`
 
 1. `migrations-lint` rejects timestamp versions in every run, also on feature branches; branches
-   renumber before their final `make check`. Reason: the local merge follows a green
-   `make check`, so the gate must hold the state of the base branch (ADR 0007 rules 4 and 5).
+   renumber before their final `make check`. This is ADR 0007 rule 4 (no DECISIONS entry needed).
 2. Immutability of merged migrations is held by `<module>/migrations.sha256`, written only by
-   `make migrations-lock`, which never changes an existing line. Reason: ADR 0007 "Confirmation"
-   names a checksum file; a diff against a remote base does not exist before the first push.
+   `make migrations-lock`, which never changes an existing line (ADR 0007 rule 5 and
+   "Confirmation"; a diff against a remote base does not exist before the first push).
 3. Server gates require `go`, a Docker-compatible runtime and the pins as soon as a Go module is
    tracked. Reason: R-QA-02 and P-09.
 4. `codegen-check` detects drift by snapshots before and after the generator instead of

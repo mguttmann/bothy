@@ -143,10 +143,10 @@ All Go paths are relative to `services/server/`.
 ### Configuration
 
 Register in the schema (if M1-07 did not) with type, default and doc: all `database.*` keys of
-02 and 16, `startup.dependency_wait`, `migrate.lock_timeout`, and the new keys of D3. Add the new
-keys to the table "Konfigurationswerte dieses Kapitels" in 16 and regenerate the configuration
-reference. Do not register `migrate.require_recent_backup` and `migrate.recent_backup_max_age`:
-they need `backup_runs` and belong to M7-02.
+02 and 16, `startup.dependency_wait`, `migrate.lock_timeout`, and the keys of D3 (already in the
+16 table); regenerate the configuration reference. Do not register
+`migrate.require_recent_backup` and `migrate.recent_backup_max_age`: they need `backup_runs` and
+apply from M7-02 (16 "Upgrade" item 1).
 
 ### Modules register
 
@@ -205,13 +205,11 @@ D2. Schema version check.
   migrations; older binaries run against newer schemas by the expand and contract rule).
 - `CheckSchema` reads the goose version table (`goose_db_version`, default name). Lower than
   required: `*SchemaTooOldError`. Equal or higher: nil.
-- The start aborts on this error (plan row M1-12, 02 "Start"); 16 "Upgrade" item 4 and
-  upgrade.md "Schema-Prüfung beim Start" item 1 still say `/readyz` reports `schema_too_old`:
-  change both to "the start aborts with the hint" and keep `schema_requires_newer_server` as the
-  readiness case of M1-15. Record in DECISIONS.md with the reason: an older schema needs an
-  operator action (`bothy migrate up`) before the process can ever serve.
+- The start aborts on this error (02 "Start" step 4, 16 "Upgrade" item 4, upgrade.md
+  "Schema-Prüfung beim Start" item 1); `schema_requires_newer_server` is the readiness case of
+  M1-15 (reason in 02 "Start").
 
-D3. New configuration keys (16, table "Konfigurationswerte dieses Kapitels").
+D3. Configuration keys (16, table "Konfigurationswerte dieses Kapitels"; already there).
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -226,7 +224,7 @@ D3. New configuration keys (16, table "Konfigurationswerte dieses Kapitels").
 Reason: the spec names the role passwords and the superuser but no keys; the defaults match the
 secret catalog and the `migrate` subpath, so Compose needs no new variables.
 
-D4. Bootstrap and privileges (16 "Rollen" gets these rules).
+D4. Bootstrap and privileges (16 "Rollen" states these rules).
 - Runs as `migrate.bootstrap_user` against `database.name` (the database must exist; Compose
   creates it with `POSTGRES_DB`; a missing database is an error naming it).
 - Per role: `CREATE ROLE` if missing, else `ALTER ROLE`; always `LOGIN NOSUPERUSER NOCREATEDB
@@ -248,7 +246,7 @@ D4. Bootstrap and privileges (16 "Rollen" gets these rules).
   integration tests, a forgotten revoke would be silent. `00001_base_privileges.sql` grants only
   `SELECT` on `goose_db_version` because the app reads the version at start.
 - Managed services: the OpenTofu module creates roles with the same names and runs the same SQL;
-  `--bootstrap` is then not used. Write this into 16 "Rollen".
+  `--bootstrap` is then not used (16 "Rollen").
 
 D5. Commands.
 - `migrate up`: if `--bootstrap`, resolve the five passwords of D3 and run `Bootstrap` (separate
@@ -270,12 +268,10 @@ D5. Commands.
 - The goose provider gets a `*sql.DB` from `pgx/v5/stdlib.OpenDBFromPool`; verify the provider
   and locker API names against the pinned goose version.
 
-D6. Numbering on branches (record in DECISIONS.md and add one line under "More Information" of
-ADR 0007). ADR 0007 rule 4 lets branches use timestamp versions and `goose fix` at the merge, but
-the M1-01 `migrations-lint` gate rejects timestamp versions and runs in `make check` on every
-branch. Rule from now on: a branch uses the next free sequential number of the base branch; before
-the local merge the session merges the base branch, renumbers its own new migrations if another
-ticket took the number, and reruns `make check`. This ticket's migration is `00001`.
+D6. Numbering on branches (ADR 0007 rule 4): a branch uses the next free sequential number of the
+base branch; before the local merge the session merges the base branch, renumbers its own new
+migrations if another ticket took the number, and reruns `make check`. This ticket's migration is
+`00001`.
 
 D7. `pgtest`.
 - testcontainers-go with the pinned image, Ryuk disabled (its port would be published beyond
@@ -359,11 +355,11 @@ make check
 - READMEs: `internal/platform/pg/README.md` (pool, timeouts, roles, bootstrap, migrator steps,
   schema check), `internal/platform/pg/pgtest/README.md` (usage, Docker requirement, cleanup and
   the label for leaked containers), `migrations/README.md`.
-- Spec and docs in the same change: 16 "Rollen" (D4), 16 "Upgrade" item 4 and upgrade.md
-  "Schema-Prüfung beim Start" (D2), 16 "Konfigurationswerte dieses Kapitels" (D3),
-  `docs/spec/02-architektur.md` "Befehle des Binarys" (`--bootstrap`, exit behaviour),
-  ADR 0007 "More Information" (D6 pointer).
-- `docs/DECISIONS.md`: D2, D3, D4 (privileges and SCRAM), D6.
+- Spec: 16 "Rollen", "Upgrade" and "Konfigurationswerte dieses Kapitels", upgrade.md and ADR 0007
+  already state D2 to D4 and D6; change them only if the build proves a statement wrong. Add
+  `--bootstrap` to 02 "Befehle des Binarys".
+- `docs/DECISIONS.md`: anything decided here that the spec does not state (for example the SCRAM
+  iteration count).
 - Configuration reference regenerated without diff.
 - `services/server/CHANGELOG.md` entry under "Unreleased".
 - No new ADR: ADR 0006 and 0007 decide the stack; the rulings go to DECISIONS.md.

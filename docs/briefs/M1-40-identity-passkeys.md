@@ -64,7 +64,8 @@ reported in the audit log. A virtual authenticator makes every path testable wit
    list, `userVerification = required`, `residentKey = preferred`, `attestation = none`
    (08 "Lokale Konten").
 8. A decrease of `sign_count` is reported in the audit log (03 `passkey_credentials`).
-9. `passkey.register` requires step-up once a passkey exists (05).
+9. `passkey.register` has Step-up `bedingt` (05 "Spalten Owner, Step-up, Audit, Rechte"): step-up
+   once an active passkey exists; the first passkey needs only a human session.
 10. Passkeys serve login of local accounts and step-up (03 `passkey_credentials`, 08 "Step-up-
     Ablauf"); the enrollment code confirms the first device (08 "Einladungs-Code").
 11. Code stays node neutral (PLAN section 20, "Mehrknoten-Betrieb"): no ceremony state in process
@@ -87,7 +88,7 @@ Specification first, on this branch, before production code:
 2. Regenerate the generated blocks of `docs/spec/06-api.md` (M1-03 generator).
 3. `docs/spec/08-identitaet.md`, "Lokale Konten": configuration keys, stateless ceremonies,
    single use rules, algorithms, login only for people with a local identity, decoy, sign counter
-   rule, conditional step-up meaning. "Konfigurationswerte dieses Kapitels": add
+   rule (the meaning of `bedingt` is in 05 2.4). "Konfigurationswerte dieses Kapitels": add
    `auth.webauthn_rp_id` (default empty, meaning the host of `server.public_url`) and
    `auth.webauthn_origins` (default empty list, meaning the origin of `server.public_url`). In 07
    "Ablauf" step 8 add the sentence: "`passkey.register` und `local_credential.set` verlangen
@@ -268,8 +269,7 @@ another key, mark backup flags and produce discoverable assertions with user han
 
 Rulings to record in `docs/DECISIONS.md`: stateless ceremonies (link the ADR); `enrollment_code`
 in `EnrollCompleteRequest`; TTL keys per ceremony; passkey login only with a local identity; decoy
-credential; RP display name; accepted algorithms; sign counter handling; conditional step-up in
-authz.
+credential; RP display name; accepted algorithms; sign counter handling.
 
 ## Tests (write them first)
 

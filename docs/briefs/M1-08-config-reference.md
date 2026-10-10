@@ -88,12 +88,9 @@ Change:
   `files`.
 - `docs/operations/configuration.md`: introduction, section 1, section 4 (generated), section 10
   "Pflege".
-- `docs/spec/02-architektur.md` "Konfigurationswerte dieses Kapitels": add the column `Ort` (`Server`
-  for every row, `Lasttest` for `perf.*`) and adjust the introductory sentence.
-- Chapter tables of 06, 08, 09, 12, 16 and 19: only rows the check finds wrong (W1 residue).
-- `infra/compose/compose.yaml`: `stop_grace_period` for the services that run `bothy serve` (only
-  this key).
-- `docs/PLAN.md`: the W1 table row "größter JSON-Körper" (see Design notes).
+- Chapter tables of 02, 06, 08, 09, 12, 16 and 19: only rows the check finds wrong (W1 residue).
+  02 already has the column `Ort` (`Server`, `Lasttest` for `perf.*`); Compose already sets
+  `stop_grace_period`; the PLAN W1 table already names `http.max_json_body_bytes`.
 - `tools/README.md`, `docs/quality/gates.md` (rows `docs` and `config-doc-check`),
   `docs/DECISIONS.md`, root `CHANGELOG.md`, `services/server/CHANGELOG.md`.
 
@@ -211,17 +208,14 @@ names are legitimate.
 
 The chapters already use one name per term for every W1 row (checked 2026-10-10): listeners
 `server.*` in 16, proxies `server.trusted_proxies`, database `database.*`, shutdown `shutdown.*`,
-enrollment code TTL only in 08, images `file.image.*` in 12, no duplicate rows in 06. One W1 row of
-the plan is out of date: the JSON body limit is `http.max_json_body_bytes` in 02, 06 and 19 (the
-limit is enforced by `platform/httpserver` for every route class, 02 "Request-Pfad" step 3), while
-the plan names `api.max_json_body_bytes`. The chapter wins: keep `http.max_json_body_bytes`, retire
-`api.max_json_body_bytes`, and correct the plan row. Re-verify every row when you build; fix
+enrollment code TTL only in 08, images `file.image.*` in 12, no duplicate rows in 06; the JSON body
+limit is `http.max_json_body_bytes` in 02, 06 and 19 (enforced by `platform/httpserver` for every
+route class), and `api.max_json_body_bytes` is retired. Re-verify every row when you build; fix
 residue in the chapter that P-08 names as leading.
 
-Still open and done here: the guard (D1, D7), `Ort` for `perf.*` (D-rendering: no environment name
-for load test thresholds), and `stop_grace_period`, which `infra/compose/compose.yaml` does not set
-at all. Set `stop_grace_period: 60s` in the `x-api` anchor and in `worker` (60 s is above the 02
-default of `shutdown.total_timeout`; D8 holds the relation). Verify `auth.dpop_nonce_ttl` occurs only
+Still open and done here: the guard (D1, D7), the rendering of `Ort` (D-rendering: no environment
+name for load test thresholds), and the check D8 that holds Compose `stop_grace_period` (`75s`)
+above `shutdown.total_timeout` (`60s` in 02). Verify `auth.dpop_nonce_ttl` occurs only
 in the table of 08 (K-ID-8); if 04 still had a row, that is a core contract change: BLOCKED.
 
 ### Documentation
@@ -232,7 +226,7 @@ in the table of 08 (K-ID-8); if 04 still had a row, that is a core contract chan
   chapter table in the same change; then `go generate ./tools/configschema` and
   `make config-reference`; `make config-doc-check` and `make codegen-check` enforce it.
 - DECISIONS.md: one entry per W1 row with its resolution and evidence (D1, D7 green); P-08 applied;
-  `Ort` column in 02; `stop_grace_period`; generator moved from `tools/docs` to `tools/configdoc`.
+  generator moved from `tools/docs` to `tools/configdoc`.
 
 ## Tests (write them first)
 

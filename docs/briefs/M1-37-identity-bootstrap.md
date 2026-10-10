@@ -320,9 +320,11 @@ Setup gate:
   characters).
 - Uses the normal configuration and the application database role `bothy_app` (same as `serve`):
   the transaction only writes rows, so the schema owner role is not needed (least privilege).
-- Before the transaction: ensure the active signing keys through the `instance` keys port from
-  M1-32 (idempotent; if that function opens its own transaction, call it before the bootstrap
-  transaction).
+- Before the transaction: `Keys.EnsureActive` of the `instance` port from M1-32 (idempotent;
+  ADR 0066: the server creates the keys in `secrets.signing_key_dir`, `secrets-init` does not;
+  if that function opens its own transaction, call it before the bootstrap transaction). The
+  command therefore needs the writable key store like `serve` (Compose: run it in the `api`
+  service).
 - One unit of work with the rights-change option for the new principal (`instance.bootstrap` has
   "Rechte" `ja`), system actor:
   1. Lock the instance record (`SELECT ... FOR UPDATE` through the instance port; if M1-15 creates
@@ -347,8 +349,9 @@ Setup gate:
 - Setup must be complete (else exit `4`). The person must be an active owner (else exit `2` with
   "not an active owner"). Issues a `recovery` code (`created_by = NULL`), prints it once like
   above.
-- Audit: actor NULL, action `user.update`, resource `user`, details `{command: "setup
-  issue-enrollment-code", purpose: "recovery", enrollment_code_id}`. Reason: 05 has no system
+- Audit: actor NULL, action `user.update`, resource `user`, details `{command:
+  "setup.issue_enrollment_code", purpose: "recovery", enrollment_code_id}` (values are codes,
+  19 SEC-AUD-5). Reason: 05 has no system
   action for host-issued recovery codes; 03 allows a NULL actor for host commands.
 - Recovery works for owners with or without a local identity; redemption then creates an active
   device without an identity.
@@ -358,7 +361,8 @@ with step-up through the catalogue): target must be a human with `status = 'acti
 conflict` with `reason: user_not_active`; purpose per the table above; `201` with `code`,
 `purpose`, `expires_at`.
 
-`createUser` with `local_account: true` (extends M1-31): requires an enabled `local` provider (else
+`createUser` with `local_account: true` (extends M1-31 and removes its interim `400` for
+`local_account`): requires an enabled `local` provider (else
 `409 conflict`, `reason: local_provider_disabled`); creates the local identity (`subject` =
 handle) and a `first_login` code in the same unit of work and returns it as `enrollment`.
 

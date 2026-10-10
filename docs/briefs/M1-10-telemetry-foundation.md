@@ -63,13 +63,16 @@ out of telemetry by construction (B11, R-Telemetrie, ADR 0034).
     paths only as route patterns, never raw; query strings never.
 12. signals.md "Logs": log messages are constant English text enforced by a linter; attributes
     only from "Attribute in Spans und Logs"; errors as `error.type`, never a foreign error message.
-13. signals.md "Weitergabe": W3C Trace Context; the server takes over the trace id and decides
-    sampling itself unless `telemetry.traces.trust_remote_sampling`; every request has a trace id,
-    which is also the `correlation_id`.
-14. privacy.md "Pseudonyme" and 20 "Telemetrie": `bothy.principal.pseudo_id` is an HMAC-SHA-256
-    over the principal id, hex, cut to 32 characters, with a key per period
-    `privacy.telemetry_pseudonym_rotation`; `bothy telemetry pseudonym <principal_id>` lets the
-    owner map an id to its pseudonym.
+13. signals.md "Weitergabe" and 17 R-OB-05: W3C Trace Context; on the public listener the server
+    starts its own trace and records an incoming `traceparent` only as a span link (`otelhttp`
+    option for public endpoints), so trace id and sampling come from the server; only with
+    `telemetry.traces.trust_remote_parent` the incoming context becomes the parent (its trace id
+    and sampled flag apply). Every request has a valid trace id, also with
+    `telemetry.enabled = false`, and it is the `correlation_id`.
+14. privacy.md "Pseudonyme" and 20 "Telemetrie": `bothy.principal.pseudo_id` with a period key
+    derived by HMAC from `telemetry.pseudonym_key_ref` per `privacy.telemetry_pseudonym_rotation`
+    (the exact derivation is in privacy.md); `bothy telemetry pseudonym <principal_id> [--at]` lets
+    the owner map an id to its pseudonym.
 15. W8: the package is `internal/platform/otel` (02 wins over `platform/telemetry`).
 
 ## Scope
@@ -80,7 +83,7 @@ API with an alias (for example `otelapi "go.opentelemetry.io/otel"`).
 ### `internal/platform/otel`
 
 - `type Config struct` filled in `internal/wire` from: `telemetry.enabled`,
-  `telemetry.traces.sampler_ratio` (0 to 1), `telemetry.traces.trust_remote_sampling`,
+  `telemetry.traces.sampler_ratio` (0 to 1), `telemetry.traces.trust_remote_parent`,
   `telemetry.logs.exporter` (`otlp`, `stdout`, `both`), `telemetry.logs.level` (`debug`, `info`,
   `warn`, `error`), `telemetry.pseudonym_key_ref`, `privacy.telemetry_pseudonym_rotation`,
   `server.role`, `instance.environment`. Register each key in the config schema if M1-07 did not
@@ -128,11 +131,11 @@ item 4, and `const ConventionRef` naming the convention repository and its statu
 2026-10-10 (no commit is recorded in signals.md; do not invent one). Golden file
 `testdata/keys.golden`.
 
-### `internal/platform/buildinfo` (only if the base branch has no build-version accessor)
+### `internal/platform/buildinfo` (18 "Komponenten" rule 5)
 
 `func Version() string` returning a constant equal to the content of `services/server/VERSION`;
-a unit test reads `../../../VERSION` and fails when they differ. Reason: `service.version` and the
-later `instance.min_server_version` check need the version without depending on linker flags.
+a unit test reads `../../../VERSION` and fails when they differ; no linker flags. This ticket
+creates the package because it is its first user (`service.version`); M1-15 and M1-23 use it.
 
 ### `cmd/bothy`
 
@@ -227,12 +230,13 @@ D3. Never block, always count.
   collector is reachable again.
 - `ForceFlush` and `Shutdown` respect the context deadline and never hang beyond it.
 
-D4. Sampling. `sdktrace.ParentBased(root = TraceIDRatioBased(sampler_ratio))` with remote parent
-samplers: when `trust_remote_sampling` is true, `AlwaysSample` for a sampled remote parent and
-`NeverSample` for a not sampled one; when false, both remote cases use the ratio sampler on the
-incoming trace id. Local parents follow the parent. With `telemetry.enabled = false` the SDK tracer
-provider still exists with `NeverSample` and no exporter, so trace ids and `CorrelationID` exist
-for every request.
+D4. Sampling and remote context. `Middleware` wraps `otelhttp` with the public-endpoint option
+unless `telemetry.traces.trust_remote_parent` is true: an incoming `traceparent` becomes a span
+link and the server span is a new root sampled by `TraceIDRatioBased(sampler_ratio)`. With
+`trust_remote_parent` the incoming context is the parent: `ParentBased` with `AlwaysSample` for a
+sampled remote parent and `NeverSample` for a not sampled one. Local parents follow the parent.
+With `telemetry.enabled = false` the SDK tracer provider still exists with `NeverSample` and no
+exporter, so trace ids and `CorrelationID` exist for every request (17 "Signale").
 
 D5. HTTP spans and routes.
 - `Middleware` wraps `otelhttp.NewHandler` with span name `<METHOD> <http.route>` once the route is
@@ -245,8 +249,7 @@ D5. HTTP spans and routes.
   any future otelhttp attribute). Rebuild spans with `tracetest.SpanStubFromReadOnlySpan(...)` and
   `.Snapshot()` unless the pinned SDK offers a supported attribute filter; document the choice.
 
-D6. Pseudonyms (resolves the contradiction between 20 "Telemetrie" and privacy.md "Pseudonyme";
-record in DECISIONS.md and update privacy.md item 3).
+D6. Pseudonyms (as privacy.md "Pseudonyme" and 20 "Telemetrie" state them).
 - Master key: `telemetry.pseudonym_key_ref` through the secrets provider; fewer than 32 bytes is a
   start error. The provider cache handles rotation of the master key.
 - Period index `p = floor(unix_seconds(at) / seconds(privacy.telemetry_pseudonym_rotation))`, UTC.
@@ -259,8 +262,8 @@ record in DECISIONS.md and update privacy.md item 3).
   Metrics never carry the pseudonym; `attr` documents `bothy.principal.pseudo_id` as span and log
   only.
 
-D7. W8: record in DECISIONS.md that the package is `internal/platform/otel` and fix
-`docs/observability/signals.md` "GenAI-Konventionen" item 2 to `internal/platform/otel/genai`.
+D7. W8: the package is `internal/platform/otel` (02); signals.md "GenAI-Konventionen" item 2
+already names `internal/platform/otel/genai`.
 
 ## Tests (write them first)
 
@@ -273,9 +276,11 @@ D7. W8: record in DECISIONS.md that the package is `internal/platform/otel` and 
   the counter equals N and M per signal.
 - `TestQueueFullDropsAndCounts`: fake exporter that blocks; queue size Q via the variable; end Q+K
   spans; at least K counted, `OnEnd` never blocks.
-- `TestSamplingRemoteFlag`: ratio 0 with incoming sampled `traceparent`: not sampled unless
-  `trust_remote_sampling`; ratio 1 with incoming not sampled: sampled unless trusted; the trace id
-  equals the incoming one in all cases.
+- `TestRemoteParentIsLinkByDefault`: with an incoming `traceparent` the server span has a new
+  trace id, a link to the incoming span context, and its sampling follows the ratio (ratio 0:
+  not sampled although the incoming flag is sampled).
+- `TestTrustRemoteParent`: with `telemetry.traces.trust_remote_parent` the trace id equals the
+  incoming one and the incoming sampled flag decides.
 - `TestEveryRequestHasCorrelationID` (also with `telemetry.enabled = false`).
 - `TestResourceAttributesNotOverridden`: `OTEL_RESOURCE_ATTRIBUTES=service.name=x,bothy.server.role=y,deployment.environment.name=staging`
   gives `bothy-server`, the configured role and `staging`.
@@ -297,7 +302,7 @@ D7. W8: record in DECISIONS.md that the package is `internal/platform/otel` and 
   start error.
 - `TestTelemetryPseudonymCommand`: output for a known test key and id equals the library value.
 - `TestServerErrorLogHasNoDetails`.
-- `buildinfo` test if you created the package.
+- `TestVersionMatchesVERSIONFile` in `internal/platform/buildinfo`.
 
 Commands that must pass:
 
@@ -312,7 +317,8 @@ make check
 
 - [ ] An unreachable collector delays no request and increases `bothy.telemetry.dropped`.
 - [ ] Failed exports and queue overflow are counted per signal.
-- [ ] A remote sampling flag only counts with `telemetry.traces.trust_remote_sampling`.
+- [ ] An incoming `traceparent` is only a span link unless `telemetry.traces.trust_remote_parent`;
+      trace id and sampling come from the server by default.
 - [ ] `Authorization`, `DPoP`, `Cookie`, query strings and raw paths never appear in logs or spans
       (SEC-LOG-2, SEC-LOG-3); routes appear as patterns.
 - [ ] Pseudonyms are stable per key and period and change with key and period; keys under 32
@@ -327,14 +333,11 @@ make check
 - Code and tests; doc comment on every exported symbol.
 - READMEs: `internal/platform/otel/README.md` (setup, signals, allowlists, drop accounting and any
   overflow that is not counted, sampling, pseudonyms, how later tickets add spans, metrics and log
-  keys), `internal/platform/otel/genai/README.md`, `internal/platform/buildinfo/README.md` if
-  created.
-- Docs in the same change: `docs/observability/privacy.md` "Pseudonyme" (D6),
-  `docs/spec/20-datenschutz.md` "Telemetrie" row "Pseudonyme IDs" (refer to the derivation),
-  `docs/observability/signals.md` (D7; `bothy.signal` values listed with
-  `bothy.telemetry.dropped`), `docs/spec/02-architektur.md` "Befehle des Binarys"
-  (`--at` flag), `docs/spec/17-observability.md` only if a rule changed.
-- `docs/DECISIONS.md`: W8, D1 (disabled telemetry keeps stdout logs), D3 (drop accounting), D6.
+  keys), `internal/platform/otel/genai/README.md`, `internal/platform/buildinfo/README.md`.
+- Docs: privacy.md, 20, 17 and signals.md already state D4, D6 and W8; change them only if the
+  build proves a statement wrong. `docs/spec/02-architektur.md` "Befehle des Binarys" gets the
+  `--at` flag.
+- `docs/DECISIONS.md`: D1 (disabled telemetry keeps stdout logs), D3 (drop accounting).
 - Configuration reference regenerated without diff.
 - `services/server/CHANGELOG.md` entry under "Unreleased".
 - No new ADR: ADR 0034 covers the architecture; the rulings go to DECISIONS.md.

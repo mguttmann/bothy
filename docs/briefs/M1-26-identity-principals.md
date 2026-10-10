@@ -72,9 +72,8 @@ Paths are relative to `services/server/` unless noted.
 2. **Shared text validator** `internal/kernel/textcheck` (new kernel package, no dependencies):
    `func DisplayText(s string) error`. Add it to the kernel packages that domain layers may
    import (component `kernel-core` in the generated go-arch-lint configuration) through the
-   source M1-05 uses (`architecture/modules.yaml` or the `tools/archgen` template), regenerate
-   `.go-arch-lint.yml`, and add a row to `docs/spec/02-architektur.md` section 4.5 plus the
-   package to the `kernel-core` list in the excerpt of section 7.2.
+   source M1-05 uses (`architecture/modules.yaml` or the `tools/archgen` template) and regenerate
+   `.go-arch-lint.yml` (02 sections 4.5 and 7.2 already list `kernel/textcheck` in `kernel-core`).
 3. **Domain** `internal/identity/domain`: types `Kind` (`user`, `agent`, `app`), `Status`
    (`pending`, `active`, `disabled`, `deleted`), value objects `Handle` and `DisplayName`,
    entities `Principal`, `User`, `Owner` with constructors that validate (see Design notes).
@@ -86,12 +85,13 @@ Paths are relative to `services/server/` unless noted.
 6. **Port** `internal/identity` (root package): interface `Directory` and its DTOs.
 7. **authz source declaration** `internal/authz/sources.go`: `PrincipalSource`, `PrincipalFacts`,
    `PrincipalStatus` (M1-28 adds further sources to this file later).
-8. **Configuration**: schema entry `principal.handle_max_chars` (integer, default `32`, minimum
-   `1`) in the identity config of `internal/wire`; regenerate `docs/operations/configuration.md`
+8. **Configuration**: schema entries `principal.handle_max_chars` and
+   `principal.display_name_max_chars` (integers, defaults from 03 section 9, minimum `1`) in the
+   identity config of `internal/wire`; regenerate `docs/operations/configuration.md`
    with the M1-08 generator if it exists (`make config-reference` or the target M1-08 named).
 9. **Documentation**: `internal/identity/README.md` (status, port, tables, source it implements),
    package docs of `kernel/textcheck`, `services/server/CHANGELOG.md` under `Unreleased`,
-   ruling R1 below in `docs/DECISIONS.md` (follow the file's table format and next free number).
+   no DECISIONS entry is needed for display names (03 states the rule).
 
 ## Out of scope
 
@@ -150,17 +150,16 @@ NULL`.
 - `domain.NewHandle(s string, maxChars int)`: matches `^[a-z0-9][a-z0-9._-]*$` (Go `regexp`,
   SEC-IN-6), length 1 to `maxChars` (`principal.handle_max_chars`). Upper case is rejected, not
   folded: the database check and the OpenAPI pattern are lower case only.
-- `domain.NewDisplayName(s string)`: `textcheck.DisplayText` plus ruling R1: the name must
-  contain at least one rune that is not Unicode white space. No length limit (the spec has
-  none; see the report section on spec gaps, do not invent a key).
+- `domain.NewDisplayName(s string, maxChars int)`: `textcheck.DisplayText`, at least one rune that
+  is not Unicode white space, and at most `maxChars` runes (`principal.display_name_max_chars`;
+  03 `principals.display_name`).
 - `domain.NewOwner(...)` requires a non-blank `reason` (03: "Pflicht, steht im Audit").
 - Validation errors are `kernel/errs` errors of kind `bad_request` with code
   `validation_failed` and a field error (`/handle`, `/display_name`, `/reason`) in the form
   M1-18 renders as `errors[]`.
 
-**Ruling R1** (record in `docs/DECISIONS.md`): a display name must contain a visible character.
-Reason: a blank name makes a person unidentifiable in mentions, member lists and the audit view;
-the column is `NOT NULL` but the spec sets no rule.
+The rule "not blank" is in 03 (`principals.display_name`). Reason: a blank name makes a person
+unidentifiable in mentions, member lists and the audit view.
 
 **Port `identity.Directory`** (read only, for other modules; it does not call `authorize`
 because callers authorize their own actions):
@@ -247,7 +246,8 @@ fail with a clear message (P-09).
      empty, `-alex`, `.alex`, `Alex`, `al ex`, `alëx`, a name of `maxChars + 1` (run with
      `maxChars` 32 and 5).
    - `TestSECT07_DisplayNameRejectsControlAndBidi` (SEC-T07, people) and
-     `TestNewDisplayName_RejectsBlank` (spaces, U+3000, empty).
+     `TestNewDisplayName_RejectsBlank` (spaces, U+3000, empty), `TestNewDisplayName_MaxChars`
+     (exactly the limit passes, one rune more fails; runes, not bytes).
    - `TestNewOwner_RequiresReason`.
 3. `internal/identity/adapters/postgres` (integration):
    - migration applies on an empty database and a second `up` changes nothing;
@@ -291,7 +291,7 @@ make check
 - [ ] `kernel/textcheck` is importable from domain layers and listed in 02 section 4.5.
 - [ ] `principal.handle_max_chars` is in the configuration schema with default `32` and appears
       in the regenerated configuration reference.
-- [ ] Ruling R1 is in `docs/DECISIONS.md`.
+- [ ] Display names over `principal.display_name_max_chars` runes are rejected (test).
 - [ ] `make check` is green.
 
 ## Definition of done

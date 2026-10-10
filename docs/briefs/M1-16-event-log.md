@@ -26,20 +26,19 @@ delivery, rights cache updates and agent consumers.
 - `docs/spec/02-architektur.md`, "Ablauf", "In-Tx-Ereignisse", "Ereignis-Pfad" ("Schreiben",
   "Log-Tail je api-Prozess", "Kosten der Serialisierung"), "Hintergrundjobs (River)" (job
   `sync.partition_maintenance`), "Fehler- und Timeout-Strategie" ("Ausfall einer Abhängigkeit"
-  row `LISTEN`, "Panics"), "Start" step 7, "Leistungsziele", "Offen" (PollOnly), "Konfigurationswerte
+  row `LISTEN`, "Panics"), "Start" step 8, "Leistungsziele", "Offen" (PollOnly), "Konfigurationswerte
   dieses Kapitels".
 - `docs/spec/05-aktionen.md`, "Dauerhafte Ereignistypen und Empfangs-Aktion".
 - `docs/spec/06-api.md`, "WebSocket-Ops und Ereignisse" (event table), "Abgleich mit dem
   Kern-Vertrag" K2, K3; `docs/api/openapi.yaml` schemas `EventEnvelope`, `EventActor`,
   `EventScope`, `EventResource`, `ActorKind`, `EventPage`.
-- `docs/spec/16-betrieb.md`, "Datenbank" ("Rollen"); `docs/operations/upgrade.md`, "Regeln für
-  Migrationen" (M10).
+- `docs/spec/16-betrieb.md`, "Datenbank" ("Rollen": DDL im Betrieb über `SECURITY DEFINER`);
+  `docs/operations/upgrade.md`, "Regeln für Migrationen" (M10).
 - `docs/spec/17-observability.md`, "Signale" (correlation and `trace_context`), R-OB-07;
   `docs/observability/signals.md`, "Traces" and "Attribute in Spans und Logs".
 - `docs/spec/20-datenschutz.md`, rows for `event_log`.
-- ADR 0009; ADR 0007; ADR template `docs/adr/0000-vorlage-madr-4.md`; `docs/adr/README.md`.
-  ADR 0052, 0053 and 0063 are decided by the lead (table "Weitere ADRs" in DECISIONS.md) and are
-  written by this ticket if absent (P-12).
+- ADR 0009; ADR 0007 (rule 4: sequential migration numbers); ADR 0052, 0053 and 0063 (they exist;
+  this ticket extends their "Confirmation" with the tests named below); `docs/adr/README.md`.
 - What earlier tickets built: `internal/kernel/txn`, `platform/pg` unit of work, `pg.Tx`,
   `txn.Registry` and the golden file (M1-13); `platform/jobs` registry, periodic jobs and
   `Inserter` (M1-14); `instance.Counters` with its phase guard and the static check (M1-15);
@@ -84,8 +83,10 @@ Table: `event_log`. Job: `sync.partition_maintenance`. No API operation and no a
     `sync.event_log_partition_size` numbers per partition, no foreign keys, the listed indexes
     (R-DM-15).
 12. A partition is detached and dropped when its largest `occurred_at` is older than
-    `sync.event_retention` (03 `event_log` "Aufbewahrung"); partitions are created ahead by the job,
-    never by a migration in operation (upgrade.md M10).
+    `sync.event_retention`, never the partition holding the current head (03 `event_log`
+    "Aufbewahrung"); `sync.event_log_partitions_ahead` partitions are created ahead by the job every
+    `sync.partition_maintenance_interval` and once by `bothy migrate up`, never by a migration in
+    operation (upgrade.md M10, 02 "Job-Katalog").
 13. One tail per api process with its own, non-pooled connection for `LISTEN event_log`, polling
     every `sync.log_poll_interval`, reconnecting with backoff up to
     `database.listen_reconnect_backoff_cap`, reading `seq > local_head ORDER BY seq LIMIT
@@ -99,10 +100,9 @@ Table: `event_log`. Job: `sync.partition_maintenance`. No API operation and no a
     `null`; larger objects are delivered with `truncated: true` (04 payload rules).
 17. `make perf` measures `perf.event_commit_min_per_s` on `perf.reference_profile` and fails below
     the threshold; it is not part of `make check` (P-07, ADR 0063).
-18. Core contract precondition (P-11): this ticket needs the `event_log` columns `actor_kind` and
-    `truncated` requested in the M0-05 gap list (see Design notes). If `docs/spec/03-datenmodell.md`
-    on the base branch lacks either column, stop immediately with
-    `Verdict: BLOCKED core contract: event_log.actor_kind/truncated missing` and build nothing.
+18. `event_log.actor_kind` (envelope `actor.kind`; `system` without principal; table check of
+    R-DM-29) and `event_log.truncated` (envelope `truncated`; the producer builds the reduced payload)
+    as 03 defines them; `receive_action` holds one value per type (03 `event_log`).
 
 ## Scope
 
@@ -132,8 +132,8 @@ names below match their briefs.
      returns the number dropped.
    Verify the lock statements against https://www.postgresql.org/docs/18/sql-altertable.html and
    https://www.postgresql.org/docs/18/ddl-partitioning.html and cite them in the module README.
-   Name the file by ADR 0007 rule 4 (timestamp version on the branch, `goose fix` as the last
-   commit before the local merge, `make migrations-lint` green after the fix).
+   Name the file with the next free sequential number of the base branch (ADR 0007 rule 4);
+   renumber before the final `make check` if another ticket took it.
 2. `internal/kernel/eventlog` (keep what M1-05 declared if compatible; final shape):
    - `type ActorKind string` with `ActorUser`, `ActorAgent`, `ActorApp`, `ActorSystem`.
    - `type Event struct { ID ids.ID; Type string; SchemaVersion int; ActorKind ActorKind; ActorPrincipalID ids.ID; SpaceID, ChannelID, ThreadID ids.ID; ResourceKind string; ResourceID ids.ID; ResourceVersion int64; AudiencePrincipalID ids.ID; ReceiveAction string; Payload []byte; Truncated bool; ClientMsgID ids.ID }`
@@ -163,27 +163,20 @@ names below match their briefs.
    `sync.partition_maintenance`, handler, periodic registration (`Interval =
    sync.partition_maintenance_interval`, `RunOnStart = true`, queue `maintenance`).
 8. `internal/wire`: `SetHook(txn.PhaseSync, syncHook.Run)`; the appender as `eventlog.Appender`
-   for all modules; job registration; the tail in roles `api` and `all` (start step 7, empty sink
+   for all modules; job registration; the tail in roles `api` and `all` (start step 8, empty sink
    list today; M1-28 and M1-65 add sinks in this order: rights cache, then hub); regenerate
    `internal/wire/testdata/txn_registrations.golden`.
 9. `cmd/bothy migrate up`: after River and goose, call the partition maintenance use case once with
    the configured values so a fresh or upgraded database has partitions before `serve` starts.
 10. `perf/event_commit/` (build tag `perf`, run by the `perf` frame target of M1-01;
     `make perf` must include it): see Tests.
-11. ADRs (German text, MADR 4 headings, template `0000`, status `accepted`, date of writing, at
-    least two real options, "Confirmation" names the test): if absent on the base branch,
-    `docs/adr/0052-ein-ereignis-umschlag-fuer-gateway-rest-nachholen-und-webhooks.md`,
-    `docs/adr/0053-kein-json-null-in-api-und-ereignissen.md` (M1-18 may have written it; then only
-    add the envelope test to its "Confirmation"), and always
-    `docs/adr/0063-leistungs-gate-fuer-das-ereignis-log.md`; then `make adr-index`.
-12. Docs: `docs/spec/02-architektur.md` "Konfigurationswerte dieses Kapitels" new rows
-    `sync.partition_maintenance_interval` (`10m`, interval of `sync.partition_maintenance`) and
-    `sync.event_log_partitions_ahead` (`3`, partitions kept ahead of the head), with the reason
-    in a sentence under "Log-Tail je api-Prozess" or "Job-Katalog"; `docs/spec/16-betrieb.md`
-    "Rollen": partition maintenance runs through the two `SECURITY DEFINER` functions so
-    `bothy_app` keeps DML only; `docs/operations/upgrade.md` M10: `migrate up` ensures the first
-    partitions through the same function; `internal/sync/README.md`; CHANGELOG; DECISIONS.md
-    rows for the rulings.
+11. ADRs 0052, 0053 and 0063 exist: add the envelope tests (`FuzzEnvelopeHasNoJSONNull`,
+    `TestEnvelope_FieldsMatchOpenAPI`) to the "Confirmation" of 0052 and 0053 and
+    `TestEventCommitThroughput` to 0063 without changing the decisions; then `make adr-index`.
+12. Docs: `internal/sync/README.md` (status, ports, table, job, partition rules with PostgreSQL
+    references); CHANGELOG. The spec already says what this ticket builds (03 `event_log`, 02
+    "Job-Katalog" and "Konfigurationswerte dieses Kapitels", 16 "Rollen", upgrade.md M10); change it
+    only if the build proves it wrong, in the same change.
 
 ## Out of scope
 
@@ -212,10 +205,11 @@ names below match their briefs.
 
 ## Design notes
 
-- Precondition columns (requested in the M0-05 gap list): `actor_kind text NULL CHECK (actor_kind
-  IN ('user','agent','app','system'))` (envelope `actor.kind`; NULL means no actor; `system` has no
-  principal) and `truncated boolean NOT NULL DEFAULT false` (envelope `truncated`). Use the
-  definitions exactly as merged into 03.
+- Columns `actor_kind text NULL CHECK (actor_kind IN ('user','agent','app','system'))` (envelope
+  `actor.kind`; NULL means no actor; `system` has no principal) with the table check
+  `COALESCE(actor_kind IN ('user','agent','app'), false) = (actor_principal_id IS NOT NULL)`, the
+  check `receive_action <> 'self' OR audience_principal_id IS NOT NULL`, and `truncated boolean NOT
+  NULL DEFAULT false` (envelope `truncated`), exactly as 03 defines them.
 - Append validation (domain, before buffering; violations are kind `internal`, they are
   programming errors): unit present and phase `work` or `rights_check` (`txn.CurrentPhase`);
   `Type` matches `^[a-z][a-z_]*(\.[a-z][a-z_]*)+$`; `SchemaVersion >= 1`; `ResourceKind`
@@ -223,8 +217,7 @@ names below match their briefs.
   `AudiencePrincipalID`; `ActorKind` in the set or empty; `user`/`agent`/`app` require
   `ActorPrincipalID`, empty and `system` forbid it; `Payload` is a JSON object, contains no
   `null` token at any depth, and is at most `sync.event_payload_max_bytes`. A producer with a
-  larger object builds a reduced payload and sets `Truncated` (ruling: the appender cannot shorten
-  JSON generically).
+  larger object builds a reduced payload and sets `Truncated` (03 `event_log`, 04 payload rule 2).
 - Correlation (adapter, at append time from the append context): if
   `trace.SpanContextFromContext(ctx)` has a valid trace ID, `correlation_id` is its 16 bytes as
   UUID; `trace_context` is the W3C `traceparent` only if the span context is sampled; without a
@@ -236,8 +229,9 @@ names below match their briefs.
   SQLSTATE `23514` (no partition for the row) is mapped to kind `unavailable` and logged at error
   level with the seq range, never with payloads.
 - Head and minimum: head is `max(seq)` of `event_log` (0 when empty). This equals the committed
-  counter because the partition holding the head is never dropped (ruling; avoids reading
-  `Counters` outside a hook). The minimum retained seq is `min(seq)`; M1-63 uses it.
+  counter because the partition holding the head is never dropped (03 `event_log` "Aufbewahrung";
+  it avoids reading `Counters` outside a hook). The minimum retained seq is `min(seq)`; M1-63 uses
+  it.
 - Tail: at `Run` set `local_head` to the head; open the dedicated connection and `LISTEN
   event_log`; loop on notification or timer (`sync.log_poll_interval`); read batches of
   `sync.tail_batch_size` until a short batch; check that seqs continue `local_head + 1` without
@@ -258,17 +252,17 @@ names below match their briefs.
   sync.event_log_partitions_ahead, head)`; `drop_expired(clock.Now() - sync.event_retention, head,
   database.lock_timeout)`; runs in a unit of work (no events appended); time from `kernel/clock` so
   tests move the cutoff instead of rewriting rows.
-- Configuration: `sync.event_log_partition_size` (03, `1000000`), `sync.event_retention` (04,
-  `30d`), `sync.event_payload_max_bytes` (04, `65536`), `sync.log_poll_interval` (02, `1s`),
-  `sync.tail_batch_size` (02, `1000`), `database.listen_reconnect_backoff_cap` (02, `10s`),
-  `database.lock_timeout` (02, `2s`), new in 02: `sync.partition_maintenance_interval` (`10m`),
-  `sync.event_log_partitions_ahead` (`3`; reason: at `perf.event_commit_min_per_s` one partition
-  lasts longer than two maintenance intervals). Register missing keys in the config schema; `make
-  config-doc-check` green.
-- Perf threshold: resolve `perf.event_commit_min_per_s` through `platform/config` (schema default,
-  environment override `BOTHY_PERF__EVENT_COMMIT_MIN_PER_S`); if the schema has no `perf.*` keys
-  yet, register `perf.event_commit_min_per_s` and `perf.reference_profile` with the defaults from
-  02. No threshold literal in the test.
+- Configuration: `sync.event_log_partition_size` (03), `sync.event_retention` (04),
+  `sync.event_payload_max_bytes` (04), `sync.log_poll_interval`, `sync.tail_batch_size`,
+  `sync.partition_maintenance_interval`, `sync.event_log_partitions_ahead`,
+  `database.listen_reconnect_backoff_cap`, `database.lock_timeout` (all 02). Defaults come from the
+  chapter tables. Register missing keys in the config schema; `make config-doc-check` green.
+- Perf threshold: `perf.*` values are load-test thresholds with place `Lasttest` in 02
+  "Konfigurationswerte dieses Kapitels" and are never in the server configuration schema. Read
+  `perf.event_commit_min_per_s` and `perf.reference_profile` from that table with a small loader in
+  `services/server/perf/internal/report` (untagged, unit tested in `make test`; find the section by
+  its title, a missing row or an unparseable value fails). M1-72 extends the same package. No
+  threshold literal in the test.
 
 ## Tests (write them first)
 
@@ -319,8 +313,8 @@ Integration tests use `pgtest` with roles from `migrate --bootstrap` and run as 
   threshold=<n> cpus=<n>` and fails below the threshold. A second subtest runs the same with an
   idle River worker runtime on the same database and prints its number (evidence for the open
   point PollOnly in 02 "Offen"; both numbers go into the report, not into docs).
-  `TestPerfThresholdOverride`: with `BOTHY_PERF__EVENT_COMMIT_MIN_PER_S` far above any reachable
-  value the perf test fails (run it in the report).
+  `TestReport_FailsBelowThreshold` (untagged, in `perf/internal/report`): a measured value below
+  the threshold fails the comparison, at or above passes; the loader reads the real 02 table.
 
 Commands that must pass:
 
@@ -346,16 +340,17 @@ make check
       the trace ID.
 - [ ] Transactions without events take no counter lock and send no `NOTIFY`.
 - [ ] `make perf` measures `perf.event_commit_min_per_s` and fails below it.
-- [ ] ADR 0052, 0053 and 0063 exist and the ADR index is current; README, 02, 16, upgrade.md,
-      CHANGELOG, DECISIONS.md updated; `make check` green.
+- [ ] ADR 0052, 0053 and 0063 name the tests of this ticket and the ADR index is current; README
+      and CHANGELOG updated; `make check` green.
 
 ## Definition of done
 
 Code, tests and docs are complete: `internal/sync/README.md` current (status, ports, table, job,
 partition rules with PostgreSQL references), doc comment on every public symbol (purpose,
 parameters, return value, errors, example where useful), comments explain why. ADRs 0052, 0053
-(if absent) and 0063 written; rulings in `docs/DECISIONS.md`. CHANGELOG entry under "Unreleased"
-in `services/server/CHANGELOG.md`. The migration has its final sequential number before the merge.
+and 0063 extended as above; any further decision goes to `docs/DECISIONS.md`. CHANGELOG entry
+under "Unreleased" in `services/server/CHANGELOG.md`. The migration has its final sequential number
+before the merge.
 `make check` green and `make perf` run with its output in the report. Independent review
 (`make review` plus a code review over the diff) and the red team gate
 (`docs/quality/red-team-gate.md`) over the whole diff with verdict `Urteil: JA` recorded in the

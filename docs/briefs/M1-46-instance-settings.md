@@ -161,6 +161,11 @@ Paths are relative to `services/server/` unless they start with `docs/`, `design
     version keys as SemVer without `v` when set. Regenerate `docs/operations/configuration.md`
     (`make config-reference`).
 12. **Freischalt-Liste** `api/operations.yaml` (P-04): the six operations.
+12a. **Language of new people** (PLAN row M1-46): `createUser` (M1-31) stores `locale.default` as
+    `users.locale` when the request has no `locale`; M1-31 used the 03 column default until now.
+    Read the setting through the `Settings` port (identity may use `instance`, 02 "Erlaubte
+    Abhängigkeiten"); test `TestCreateUser_UsesLocaleDefault` (setting `en`, request without
+    `locale`, stored `en`).
 13. **Documentation**: `internal/instance/README.md` (settings registry, branding version,
     discovery sources, source port), `internal/kernel` README or package docs,
     `services/server/README.md` ("Namensgebundene Stellen": the default product name constant),

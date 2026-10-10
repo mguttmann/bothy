@@ -161,20 +161,16 @@ contract later tickets (M1-14, M1-15, M1-16, M1-24, M1-29) build on.
    `services/server/internal/platform/pg/` (test files excluded). Message cites 02 "Ablauf".
    If a later ticket needs a raw transaction elsewhere (for example River internals), that is
    library code and not scanned.
-5. Documentation (spec first, same change):
-   - `docs/spec/02-architektur.md` "Ablauf": name the registry (`txn.Registry` with `SetHook`,
-     `Subscribe`, `Seal`), state that `RightsChange` is only valid on the outermost unit, that
-     `Publish` and appending durable events are only allowed in phases `work` and
-     `rights_check`, and that hooks and subscribers are functions of the owning module.
-   - `docs/spec/02-architektur.md` "Wiederholungen": after `database.tx_retry_max` retries the unit
-     ends with error kind `unavailable` (problem code `unavailable`, 503).
-   - `docs/observability/signals.md` "Spans": new row `txn.subscribe <subscriber>`, kind
-     INTERNAL, source api and worker, attribute `bothy.outcome` (`ok`, `veto`).
+5. Documentation: 02 "Ablauf" (registry, outermost `RightsChange`, phases for `Publish` and
+   events, hooks and subscribers as functions of the owning module), 02 "Wiederholungen"
+   (exhausted retries end with `503 unavailable`), 02 "Sperrreihenfolge" (the idempotency wait is
+   not retried) and the span `txn.subscribe <Abonnent>` in signals.md already state this; change
+   them only if the build proves a statement wrong. Write:
    - `services/server/README.md` (kernel and platform tables if wording changes),
      `internal/kernel/txn` doc.go, `internal/platform/pg/README.md` (create if missing): phases,
      retry rule, timeouts, examples.
-   - `services/server/CHANGELOG.md` under "Unreleased"; `docs/DECISIONS.md` rows for the rulings
-     in Design notes marked "ruling".
+   - `services/server/CHANGELOG.md` under "Unreleased"; `docs/DECISIONS.md` rows only for
+     decisions the spec does not state.
 
 ## Out of scope
 
@@ -218,8 +214,8 @@ contract later tickets (M1-14, M1-15, M1-16, M1-24, M1-29) build on.
   code `40P01` or `55P03`, only while `ctx.Err() == nil`, at most `database.tx_retry_max` times
   (attempts = 1 + retries). Each attempt starts with fresh per-unit state and re-runs `fn`, so
   in-transaction events are re-published. After the last failed attempt return an error of kind
-  `unavailable` with code `unavailable` that wraps the last database error (ruling: 06 "Fehler"
-  only knows `unavailable` for 503; the example codes in 02 "Fehlerarten" are not on the wire).
+  `unavailable` with code `unavailable` that wraps the last database error (02 "Fehlerarten",
+  "Wiederholungen"; the SQLSTATE stays in the log).
   Any other error is returned unchanged and not retried.
 - Rollback on every non-nil error and on panic; after rollback a panic is re-raised so the HTTP
   chain (M1-18) turns it into `500`.
@@ -322,7 +318,7 @@ make check
 - [ ] Transactions run at `read committed` even with a serializable database default.
 - [ ] The golden test fails for a subscription in the wrong direction (fixture).
 - [ ] The Semgrep rule flags `Begin`/`BeginTx`/`BeginFunc`/`BeginTxFunc` outside `platform/pg`.
-- [ ] 02, signals.md, READMEs, CHANGELOG and DECISIONS.md updated; `make check` green.
+- [ ] READMEs and CHANGELOG updated; 02 and signals.md still match the build; `make check` green.
 
 ## Definition of done
 

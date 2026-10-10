@@ -2,7 +2,7 @@
 
 Status: ready | Depends on: M1-16, M1-18, M1-26 | Etappe: M1
 
-Note on dependencies: the plan lists M1-16 and M1-18. M1-26 is added because `idempotency_keys.principal_id` references `principals(id)` (03), and that table comes from M1-26. Do not start before all three are merged.
+Note on dependencies: M1-26 is needed because `idempotency_keys.principal_id` references `principals(id)` (03), and that table comes from M1-26. Do not start before all three are merged.
 
 ## Goal
 
@@ -46,8 +46,8 @@ Paths are relative to `services/server/` unless they start with `docs/`.
 5. Canonical JSON (RFC 8785): reuse an implementation already in the tree (M1-24 may have added one). Otherwise add `internal/platform/jsoncanon` as a thin wrapper over `github.com/gowebpki/jcs` (Apache-2.0) with the RFC 8785 test vectors.
 6. `api/routes/gen` (M1-17): checks for keyed operations (Design notes "Generator checks") with negative fixtures.
 7. `internal/wire`: register the stage for roles `api` and `all`; bind the `sync` store to the kernel port; register the periodic job for roles `worker` and `all` through `platform/jobs`.
-8. Configuration schema: `sync.idempotency_key_ttl` (04) if not present; new keys `sync.idempotency_cleanup_interval` (default `1h`) and `sync.idempotency_cleanup_batch_size` (default `1000`) in 02 "Konfigurationswerte dieses Kapitels".
-9. Docs: 02 "Idempotenz im Unit of Work" (storage of final errors in a second transaction, replay headers), 02 "Job-Katalog" (interval name), 06 "Idempotenz" (replay headers, `ETag` derivation, when the header is ignored), `docs/DECISIONS.md`, `docs/operations/configuration.md` regenerated, `services/server/CHANGELOG.md`.
+8. Configuration schema: `sync.idempotency_key_ttl` (04) if not present; `sync.idempotency_cleanup_interval` and `sync.idempotency_cleanup_batch_size` (02 "Konfigurationswerte dieses Kapitels", job row in 02 "Job-Katalog").
+9. Docs: 02 "Idempotenz im Unit of Work" and "Job-Katalog" and 06 "Idempotenz" already state the rules above; add to 06 "Idempotenz" when the header is ignored (anonymous actors, operations without the parameter). `docs/DECISIONS.md`, `docs/operations/configuration.md` regenerated, `services/server/CHANGELOG.md`.
 
 ## Out of scope
 
@@ -97,7 +97,7 @@ SHA-256 over the upper-case method, a line feed, the escaped request path (`r.UR
 
 ### Replay
 
-Status and body from the row; `Content-Type: application/json` for a `2xx` with body, `application/problem+json` for a stored problem; `Idempotent-Replay: true`; `ETag` with the value of `version` from the body in double quotes when the operation declares `ETag` for that status (`routes.Operation.ETagStatuses`; 06 "Nebenläufigkeit" point 1). `Correlation-Id` and the `RateLimit` headers are those of the current request; a stored problem body keeps its original `correlation_id`. The replay does not run the handler, the validator or the proof stage; authentication and rate limiting have run before. Record in `docs/DECISIONS.md` that a principal whose rights changed within `sync.idempotency_key_ttl` still gets its own earlier response (04 "Alle anderen Schreibvorgänge" says the repeat returns the stored response).
+Status and body from the row; `Content-Type: application/json` for a `2xx` with body, `application/problem+json` for a stored problem; `Idempotent-Replay: true`; `ETag` with the value of `version` from the body in double quotes when the operation declares `ETag` for that status (`routes.Operation.ETagStatuses`; 06 "Nebenläufigkeit" point 1). `Correlation-Id` and the `RateLimit` headers are those of the current request; a stored problem body keeps its original `correlation_id`. The replay does not run the handler, the validator or the proof stage; authentication and rate limiting have run before. 06 "Idempotenz" point 4 states the replay rules (no re-run of `authorize`, current `Correlation-Id` and `RateLimit`, `ETag` from `version`).
 
 ### Port `kernel/idempotency`
 
@@ -149,7 +149,7 @@ For every operation that declares `IdempotencyKey`: no query parameters (the fin
 
 ### Decisions to record in `docs/DECISIONS.md`
 
-Fingerprint definition; storage of final errors in a second transaction; header ignored for anonymous actors and for operations without the parameter; `413` before the fingerprint not stored; `ETag` on replay derived from `version`; replay does not re-run `authorize`; the two new configuration values.
+Fingerprint definition; header ignored for anonymous actors and for operations without the parameter. (Final errors in a second transaction, `413` before the fingerprint, `ETag` from `version`, no re-run of `authorize` and the two configuration values are in 02 "Idempotenz im Unit of Work" and 06 "Idempotenz".)
 
 ## Tests (write them first)
 

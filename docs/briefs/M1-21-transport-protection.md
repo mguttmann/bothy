@@ -84,24 +84,12 @@ side of threat T-NW-02.
 
 All Go paths are below `services/server/`.
 
-1. **Specification first** (German, simple sentences, in the same change, before the code):
-   - `docs/spec/16-betrieb.md`: add to "14. Konfigurationswerte dieses Kapitels" the keys
-     `server.tls_cert_ref` (Standard leer; Verweis auf die Zertifikatskette im PEM-Format) and
-     `server.tls_key_ref` (Standard leer; Verweis auf den privaten Schlüssel im PEM-Format). State
-     in "5.2 Secret-Provider" that these two keys have no default reference from the secrets
-     catalogue: empty means the server does not terminate TLS. Reword "4.1 Grundregeln" rule 1:
-     in the Compose stack an edge (reverse proxy, load balancer, `tailscale serve`) provides TLS;
-     without an edge the server can terminate TLS itself (19, SEC-TLS-2). Add to "4.3 Rand und
-     Identität" that in profile `direct` the server sees the gateway of the Compose network as the
-     peer, so `server.trusted_proxies` must name that address.
-   - `docs/spec/19-sicherheit.md`: SEC-TLS-1 names the public listener; add one sentence that the
-     internal listener is exempt (reason in design note 1). SEC-TLS-2 names the two keys. SEC-TLS-3
-     states the condition from design note 6. Add rulings `R-SE-08` (server-side TLS only with both
-     keys, no own cipher list) and `R-SE-09` (internal listener without peer filter) to
-     "15. Entscheidungen dieses Kapitels".
-   - Regenerate section 4 of `docs/operations/configuration.md` with the generator merged by
-     M1-08 (`make config-reference` or its successor); add the row `BOTHY_TRUSTED_PROXIES` to
-     section 9.
+1. **Specification (already decided):** 16 "4.1 Grundregeln" rule 1, "4.3 Rand und Identität",
+   "5.2 Secret-Provider" and "14" (`server.tls_cert_ref`, `server.tls_key_ref`); 19 SEC-TLS-1 to
+   SEC-TLS-3, R-SE-08 and R-SE-09; `docs/operations/configuration.md` sections 4 and 9
+   (`BOTHY_TRUSTED_PROXIES`); `install-compose.md` "5.1"; `infra/compose/.env.example` and the
+   passthrough `BOTHY_SERVER__TRUSTED_PROXIES` in service `api` of `infra/compose/compose.yaml`.
+   Change them only if the build proves a statement wrong, in the same change.
 2. **Configuration schema** (`internal/platform/config`, typed config in `internal/wire`): add
    `server.tls_cert_ref` and `server.tls_key_ref` (type `secret_ref`, default empty) and, if not
    yet present, `http.hsts_max_age` (type duration, default `31536000s`, whole seconds, `>= 0`).
@@ -129,19 +117,15 @@ All Go paths are below `services/server/`.
    load and validate TLS material at start step 2 ("Geheimnisse auflösen", 02 "15.1 Start") so that
    bad material aborts before the database wait. The internal listener keeps its plain
    `net.Listen`.
-6. **Compose contract**: in `infra/compose/compose.yaml` service `api` (profile `direct` only) add
-   `BOTHY_SERVER__TRUSTED_PROXIES: ${BOTHY_TRUSTED_PROXIES:-127.0.0.1/32,::1/128}`; in
-   `infra/compose/.env.example` add `BOTHY_TRUSTED_PROXIES=127.0.0.1/32,::1/128` with a German
-   comment: set it to the gateway address of the Compose network `bothy_default` as shown by
-   `docker network inspect bothy_default`, otherwise every request is refused. Update
-   `docs/operations/install-compose.md` "5.1 Profil direct" accordingly. Profile `tailscale` stays
-   unchanged (the server listens on loopback in the sidecar namespace).
+6. **Compose contract**: already in place (Scope 1). Add a test that reads
+   `infra/compose/compose.yaml` and checks that service `api` passes `BOTHY_SERVER__TRUSTED_PROXIES`
+   from `BOTHY_TRUSTED_PROXIES` with the loopback default. Profile `tailscale` stays unchanged (the
+   server listens on loopback in the sidecar namespace).
 7. **Docs and records**: package doc comment (`doc.go`) of `httpserver` describes the transport
    rules; `services/server/README.md` platform table mentions transport protection;
    `docs/security/threat-model.md` register row T-NW-02 lists SEC-T17 next to SEC-T01 and SEC-T02;
-   `docs/DECISIONS.md` entries for R-SE-08, R-SE-09, the HSTS form (no `includeSubDomains`, no
-   `preload`) and the Compose passthrough; `services/server/CHANGELOG.md` under `Unreleased`
-   (`Security`).
+   `services/server/CHANGELOG.md` under `Unreleased` (`Security`). R-SE-08, R-SE-09, the HSTS
+   form and the Compose passthrough are already in 16 and 19.
 
 ## Out of scope
 
@@ -155,7 +139,7 @@ All Go paths are below `services/server/`.
   download headers SEC-HDR-4: M3. Outgoing TLS and the `InsecureSkipVerify` lint: M1-22. TLS to
   PostgreSQL: M1-12.
 - Making the installation Compose startable and choosing a fixed Compose subnet: M7. The smoke
-  overlay (which must set `BOTHY_TRUSTED_PROXIES` for its own network): M1-73.
+  test (M1-73) probes from the network namespace of `api` and needs no proxy entry.
 
 ## Boundaries
 
@@ -186,7 +170,7 @@ All Go paths are below `services/server/`.
    identity or forwarded headers, and is never published on the host (16 "4.1 Grundregeln" rule 1,
    "4.2 Zwei Listener"). Filtering it would force operators to add the whole Compose network to
    `server.trusted_proxies`, which would also make forwarded headers from any container count on
-   the public listener. Record this as R-SE-09.
+   the public listener (R-SE-09).
 2. **Plaintext mode** (both TLS refs empty). On every accepted connection take
    `conn.RemoteAddr()`, parse it as `netip.AddrPort`, apply `Addr().Unmap()`. Allowed if the
    address is loopback (`127.0.0.0/8`, `::1`) or contained in a prefix of
@@ -218,7 +202,8 @@ All Go paths are below `services/server/`.
    middleware before calling the next handler, so that responses written by inner components
    inherit them. Never set a `Server` header. Kinds: `2xx` JSON of an operation; problem bodies
    for `400` malformed JSON, `401`, `404` unknown path, `405` wrong method, `413` body larger than
-   `api.max_json_body_bytes`, `500` from a recovered panic, `500 authz_not_checked`, `503` while
+   `http.max_json_body_bytes`, `500` from a recovered panic, `500 internal_error` from the proof
+   check (cause `authz_not_checked`), `503` while
    shutting down; `/healthz` and `/readyz` on the internal listener in both states and an unknown
    path there. Where an inner component writes a body that is not `application/problem+json`
    (for example the default `ServeMux` 404 or 405 text, or `http.TimeoutHandler` HTML), replace it

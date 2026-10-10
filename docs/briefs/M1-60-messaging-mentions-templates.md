@@ -41,8 +41,8 @@ stored but never show up in a list or a count.
   `0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`.
 - Code of earlier tickets: `internal/messaging` (M1-56: tables `messages` and `mentions`,
   representation function), `kernel/authorize` (`Scope`; M1-28), the cursor codec of earlier list
-  operations (search for `next_cursor` in `services/server/internal`), the display-text validator
-  for names and titles (M1-52, M1-55), If-Match and ETag helpers (M1-18), the `Idempotency-Key`
+  operations (search for `next_cursor` in `services/server/internal`), the shared display-text
+  validator `kernel/textcheck` for names and titles (M1-26), If-Match and ETag helpers (M1-18), the `Idempotency-Key`
   middleware (M1-20), `pgtest` (M1-12), `api/operations.yaml` (M1-17), the configuration schema
   (M1-07) and `tools/configdoc` (M1-08).
 - `docs/quality/gates.md`, `CONTRIBUTING.md`, `docs/quality/red-team-gate.md`,

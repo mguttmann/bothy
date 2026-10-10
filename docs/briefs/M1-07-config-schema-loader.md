@@ -77,8 +77,8 @@ Change:
   `vendors.yaml: [go.yaml.in/yaml/v3]`; regenerate `.go-arch-lint.yml` (`go generate ./tools/archgen`).
 - `.golangci.yml`: forbidigo rule (see Design notes).
 - `go.mod`/`go.sum` only if needed (the YAML module is already required by M1-05).
-- `docs/spec/02-architektur.md` "Konfigurationsladen" items 2 and 4; `docs/spec/16-betrieb.md`
-  "Konfiguration (ADR 0011)" items 1 and 3; `docs/operations/configuration.md` sections 1 to 3.
+- `docs/operations/configuration.md` section 2 (grammars, see "Specification"); 02 and 16 only if
+  the build proves a statement wrong.
 - `services/server/README.md` (platform table row `config`), `services/server/CHANGELOG.md`, root
   `CHANGELOG.md`, `docs/DECISIONS.md`.
 
@@ -261,21 +261,15 @@ In `.golangci.yml` enable `forbidigo` with `analyze-types: true` and forbid `os.
 `os.LookupEnv`, `os.Environ`, `os.ExpandEnv` and `syscall.Getenv`, with one path exclusion for
 `cmd/bothy/`. M1-09 adds its own exclusion for the `env` secret driver.
 
-### Spec edits in this change (spec first)
+### Specification (already decided)
 
-- 02 "Konfigurationsladen" item 2: the mapping is now fixed (remove "diese ist der Vorschlag"),
-  flags are `--role` and `--config`. Item 4: examples become exactly the two cross-checks above (JSON
-  limit strictly greater than `message.max_content_bytes`; listeners distinct with the port 0
-  exception); the trusted header example moves to a sentence pointing to 16 "Rand und Identität"
-  (readiness check, not configuration).
-- 16 "Konfiguration (ADR 0011)": item 1 precedence including the command line; item 3 names the
-  exempt variables (`BOTHY_CONFIG_FILE`, variables named by `env:` references).
-- `docs/operations/configuration.md` sections 1 to 3: precedence including the command line, the
-  exact grammars of the table above, rows for `list(cidr)` and `url`, and "messages never show
-  values".
-- DECISIONS.md: precedence with flags; exempt variables; no values in messages; duration grammar;
-  port 0 exception; trusted header rule moved to readiness; `Bind` with struct tags as the typed
-  per-consumer mechanism; keys enter the schema with their first consumer.
+02 "Konfigurationsladen" (fixed mapping, flags `--role` and `--config`, the two cross-checks with
+"strictly greater" and the port 0 exception, the trusted header rule as a readiness check, values
+never in messages, keys entering the schema with their first consumer, `Bind` with struct tags in
+the consuming package), 16 "Konfiguration (ADR 0011)" (precedence with the command line, exempt
+variables) and `docs/operations/configuration.md` sections 1 to 3 already say what this ticket
+builds. Add to `configuration.md` section 2 the exact grammars of the kind table above and rows for
+`list(cidr)` and `url` if they are missing. DECISIONS.md: duration grammar.
 
 ## Tests (write them first)
 

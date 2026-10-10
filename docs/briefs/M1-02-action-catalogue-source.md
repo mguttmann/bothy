@@ -188,7 +188,7 @@ Action (05 column in brackets):
 | `resource` | string, verbatim | yes | Ressource |
 | `right` | string, verbatim; the value `system` marks a system action | yes | Recht |
 | `owner` | `true`, `false` or `as_target` | yes | `ja`, `nein`, `wie Zielaktion` (Owner) |
-| `step_up` | boolean | yes | `ja` / `nein` (Step-up) |
+| `step_up` | `true`, `false` or `conditional` | yes | `ja` / `nein` / `bedingt` (Step-up; `bedingt` per 05 "Spalten Owner, Step-up, Audit, Rechte") |
 | `audit` | `always`, `denials`, `never` or `conditional` | yes | `ja`, `abl`, `nein`, or `audit_text` (Audit) |
 | `audit_text` | string | only and always with `conditional` | verbatim cell, for example `ja bei fremder` |
 | `rights_change` | boolean | yes | `ja` / `nein` (Rechte) |
@@ -319,7 +319,7 @@ rewrites only lines between markers and keeps every other byte of the file.
 `tools/catalog/tests/table_import.py` is a test helper with
 `def import_chapter(chapter: str) -> dict`: it parses the pre-migration tables of chapter 05
 (located by their headings in the fixture) into the YAML structure above. Cell mapping:
-`ja`/`nein` to booleans, `wie Zielaktion` to `as_target`, Audit `ja`/`abl`/`nein` to
+`ja`/`nein` to booleans, Step-up `bedingt` to `conditional`, `wie Zielaktion` to `as_target`, Audit `ja`/`abl`/`nein` to
 `always`/`denials`/`never` and any other text to `conditional` plus `audit_text`, `keine` to
 `none`, backticked `rl.x` to `rl.x`, `delivery_check: true` where the class is `keine` and the
 right is not `system`; `app_scope` from 2.6; for event cells that are a single backticked action

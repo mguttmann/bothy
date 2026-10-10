@@ -1,6 +1,6 @@
 # M1-23: Server image (ADR 0012)
 
-Status: ready | Depends on: M1-11, M1-12 | Etappe: M1
+Status: ready | Depends on: M1-11 | Etappe: M1
 
 ## Goal
 
@@ -31,8 +31,8 @@ the release workflow builds the same file with version and revision. The Compose
   `trivy-image`, `lint`), `renovate.json` (`config:best-practices` keeps digests current),
   `docs/quality/toolchain.md` ("Trivy: Version halten"), `docs/quality/gates.md`.
 - Code merged by earlier tickets: `services/server/cmd/bothy` (subcommands `serve`, `migrate`,
-  `healthcheck`, `config`), `services/server/VERSION`, the build-version source that M1-15 uses for
-  `instance.min_server_version`.
+  `healthcheck`, `config`), `services/server/VERSION`, `internal/platform/buildinfo` (M1-10; 18
+  "Komponenten" rule 5: the version is a constant held equal to `VERSION` by a test).
 - `CONTRIBUTING.md`.
 
 ## Fixed requirements that apply
@@ -71,9 +71,8 @@ the release workflow builds the same file with version and revision. The Compose
      `VERSION` is empty or differs from `services/server/VERSION`. Copy `go.mod` and `go.sum` first,
      `go mod download` with a cache mount, then the sources. Build with `CGO_ENABLED=0`,
      `GOOS=$TARGETOS`, `GOARCH=$TARGETARCH`, `GOTOOLCHAIN=local`, `GOFLAGS=-mod=readonly`,
-     `go build -trimpath -buildvcs=false -ldflags "-s -w ..." -o /out/bothy ./cmd/bothy`. If the
-     binary gets its version through `-ldflags -X` (check the source M1-15 uses), set it from
-     `VERSION`; if it embeds `VERSION`, add nothing.
+     `go build -trimpath -buildvcs=false -ldflags "-s -w" -o /out/bothy ./cmd/bothy`. The binary
+     embeds its version through `buildinfo`; add no linker flag for it (18 "Komponenten" rule 5).
    - Final stage `FROM gcr.io/distroless/static-debian<NN>:nonroot@sha256:<index digest>`, using
      the newest Debian line the distroless project lists as supported when you build; record tag
      and digest in the README. `COPY --from=build --chown=0:0 --chmod=0555 /out/bothy
@@ -118,18 +117,19 @@ the release workflow builds the same file with version and revision. The Compose
    (details under Tests).
 6. **Release workflow** `.github/workflows/release.yml`, step "Build and push the multi-arch server
    image by digest only": add `build-args` with `VERSION=${{ needs.resolve.outputs.version }}`,
-   `REVISION=${{ github.sha }}` and `SOURCE_URL=${{ github.server_url }}/${{ github.repository }}`.
-   Nothing else in the workflow changes.
+   `REVISION=${{ github.sha }}` and `SOURCE_URL=${{ github.server_url }}/${{ github.repository }}`,
+   and remove the `docker/setup-qemu-action` step: the server image is cross compiled and needs no
+   emulation (18 "Server-Images" rule 2). Nothing else in the workflow changes; `make lint`
+   (actionlint, zizmor) and `make runners-check` stay green.
 7. **Docs and records**: `services/server/README.md` section "Image" (German: build, local tag,
    user `65532`, read-only root file system, no shell, health check, base images with tag and
    digest, how to create a multi-platform builder); `docs/spec/18-release.md` "7. Server-Images"
-   gets the facts that are now fixed (context, ignore file, numeric user, cross compilation instead
-   of emulation); `docs/quality/gates.md` names `image`, `image-test` and the pin check in the
-   `lint` row; `CONTRIBUTING.md` says that image work needs Docker with buildx and a
-   multi-platform builder; `docs/DECISIONS.md` entries for the base image choice (distroless
-   static instead of `scratch`: maintained CA certificates and time zone data, digest updates by
-   Renovate), the numeric user and the cross compilation; `services/server/CHANGELOG.md` under
-   `Unreleased` (`Added`).
+   already states the numeric user, cross compilation, the digest check and the build arguments;
+   add the build context and the ignore file; `docs/quality/gates.md` names `image`, `image-test`
+   and the pin check in the `lint` row; `CONTRIBUTING.md` says that image work needs Docker with
+   buildx and a multi-platform builder; `docs/DECISIONS.md` entry for the base image choice
+   (distroless static instead of `scratch`: maintained CA certificates and time zone data, digest
+   updates by Renovate); `services/server/CHANGELOG.md` under `Unreleased` (`Added`).
 
 ## Out of scope
 
@@ -170,7 +170,7 @@ the release workflow builds the same file with version and revision. The Compose
 
 1. **Cross compilation instead of emulation.** The builder stage runs on `$BUILDPLATFORM` and
    compiles for `$TARGETOS/$TARGETARCH`; the final stage only copies. This meets 18 "7." rule 2 even
-   on one machine, and the QEMU step in `release.yml` stays unused for this image.
+   on one machine, so `release.yml` loses its QEMU step (Scope 6).
 2. **User.** Numeric `65532:65532` (the `nonroot` user of distroless) so that runtimes that check
    "run as non-root" can verify it without `/etc/passwd`. The binary belongs to root with mode
    `0555`, so the running user cannot replace it. `secrets-init` in Compose overrides the user with

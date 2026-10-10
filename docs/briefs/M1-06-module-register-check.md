@@ -22,7 +22,7 @@ chapter edit cannot silently drift away from the code frame.
   sentence `Modul: \`<module>\`.` in its purpose paragraph), "Technische Tabellen".
 - `docs/spec/05-aktionen.md`: "Verbindliche Regeln" items 3 and 4, "Aktionen", "Dauerhafte
   Ereignistypen und Empfangs-Aktion", "WebSocket-Ops und Aktion".
-- `docs/spec/actions.yaml`, `tools/catalog/` with its README, and ADR 0049 (all from M1-02).
+- `docs/spec/actions.yaml` and `tools/catalog/` with its README (from M1-02), ADR 0049.
 - `services/server/architecture/modules.yaml`, `services/server/tools/archgen`, ADR 0050 (from M1-05).
 - `docs/architecture/c4-3-komponenten-server.mmd`, `services/server/internal/*/README.md`.
 - `tools/README.md` (rules for new tools), `tools/pyproject.toml`, root `Makefile`,

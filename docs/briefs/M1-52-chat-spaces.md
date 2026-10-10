@@ -85,9 +85,7 @@ Specification changes (first):
 - `docs/api/openapi.yaml`, descriptions only: `SpaceView.level` states that a space visible only
   through one of its channels reports `read` and no capabilities; `SpaceCreate.name` and
   `SpaceUpdate.name` name the limit `space.name_max_chars`; `archiveSpace` states the archive rule
-  below.
-- `docs/spec/07-rechte.md` "4.3 Sichtbarkeit": one sentence that archived spaces and everything in
-  them are not visible to anyone (rule below).
+  of 07 "4.5 Archivierte Bereiche und Kanäle" in one sentence.
 - Run `make api-lint`, `make api-checks` and the M1-17 generation target; `make codegen-check`
   shows no diff.
 
@@ -112,10 +110,11 @@ Code (paths under `services/server/`):
     import (anything but `internal/kernel/**`, `identity`, `authz`), move it to
     `internal/kernel/designkeys` (pure data, no imports), repoint its generator and gate check,
     register the package as kernel-core in `architecture/modules.yaml`, add it to 02 "4.5";
-  - the display-text validator of M1-26 (control and bidi characters): same rule, target
-    `internal/kernel/displaytext`, and switch identity to it in the same change.
-- `internal/authz`: only if the base lacks it (each with a test): archived spaces resolve as not
-  found (rule below); `Scope` for spaces can express "all spaces" for owners and principals with
+  - the display-text validator is `internal/kernel/textcheck` (M1-26, kernel-core in 02 "4.5");
+    use it as is.
+- `internal/authz`: only if the base lacks it (each with a test): in an archived space every
+  effective level is capped at `read` (07 "4.5"; M1-53 builds the same cap for channels, share
+  one implementation); `Scope` for spaces can express "all spaces" for owners and principals with
   instance-level `read`, so new spaces are listed without a new rights version; a `RightsChange`
   that names a target (space) so the phase hook derives the affected principals itself; an
   effective level and capabilities query for one target (used for `SpaceView`), built on the same
@@ -198,18 +197,19 @@ Visibility and archive:
   `archived_at IS NULL AND ($all OR id = ANY($visible_spaces))`, then `authorize(space.read)` per
   item (07 "7.4"). Items are `SpaceView` with level and capabilities on the space; a space visible
   only through a channel reports `read` and no capabilities. No pagination (06 "6" rule 6).
-- `getSpace`: `SpaceView` with `ETag`; not visible or unknown gives the same `404`.
-- Archive rule: an archived space and everything in it are not visible to anyone, owners included
-  (`authorize` resolves it as not found). Reasons: 03 frees the name and drops archived rows from
-  the sidebar index, 10 "5.3" excludes archived channels from I1, and 05 has no unarchive action.
-  The data stays for retention and personal-data export. Every operation on an archived space
-  returns `404`.
+- `getSpace`: `SpaceView` with `ETag`; not visible or unknown gives the same `404`; an archived
+  space stays readable for those who could read it (with `archived_at`).
+- Archive rule (07 "4.5 Archivierte Bereiche und Kanäle"): archiving is final; in an archived space
+  every principal, owners included, has at most `read`; writing and triggering actions there end
+  with `403 channel_read_only` and `reason: channel_archived`; management changes of an archived
+  space (`updateSpace`, `moveSpace`, operator) give `409 conflict`; archiving it again returns `200`
+  with the current space and writes nothing; `listSpaces` omits archived spaces. The data stays for
+  retention and export.
 - `archiveSpace` (`ReasonBody`, Idempotency-Key): sets `archived_at`, bumps `version`, runs with a
   target-based `RightsChange` (phase hook: `permission_version` first, affected principals are all
-  who could see the space before, `access.changed` with the space in `removed`), publishes
-  `SpaceArchived`, appends `space.archived`, audit with the reason. By the delivery rule
-  `space.archived` reaches no client after the commit; clients learn the removal through
-  `access.changed`, and the gateway cache applies the event in log order (02 "11.3").
+  whose effective level in the space was above `read`, `access.changed` with a `changed` entry per
+  affected target at level `read`), publishes `SpaceArchived`, appends `space.archived`, audit with
+  the reason. The gateway cache applies `space.archived` in log order (02 "11.3", 04 "8.1").
 - New spaces are visible to owners and instance-level readers without a new rights version: the
   REST path must not depend on a cached list of spaces (see `Scope` above).
 
@@ -230,7 +230,7 @@ Events (all durable, no `null`, scope `{space_id}`): `space.created` (create), `
 (update and move), `space.archived` (archive), payload `SpacePayload`, resource version = space
 version.
 
-Rulings to record in `docs/DECISIONS.md`: archive rule; fractional index scheme and lock for
+Rulings to record in `docs/DECISIONS.md`: fractional index scheme and lock for
 create and move; `SpaceView.level` for channel-only visibility; `space.name_max_chars`; location of
 shared helpers if moved to `internal/kernel`.
 
@@ -261,10 +261,11 @@ them.
 - `TestSpaceCreatedVisibleWithoutRightsVersion`: Robin has an instance-level `read` grant and a
   cached snapshot; the owner creates a space; Robin's next `listSpaces` and `getSpace` show it while
   `permission_version` is unchanged.
-- `TestSpaceArchiveIsRightsChange`: Sam has `read` on Support; archive with step-up: version of
-  `permission_version` + 1, `access.changed` for Sam and the owner with Support in `removed`,
-  `space.archived` in `event_log`, `SpaceArchived` published, audit with reason; afterwards
-  `getSpace` is `404` for both and the space is not listed; archive without step-up `401`.
+- `TestSpaceArchiveIsRightsChange`: Alex has `trigger` on Support, Sam `read`; archive with
+  step-up: `permission_version` + 1, `access.changed` for Alex and the owner with a `changed` entry
+  at level `read` (none for Sam, whose level does not change), `space.archived` in `event_log`,
+  `SpaceArchived` published, audit with reason; afterwards `getSpace` still answers for all three,
+  `listSpaces` omits the space, `updateSpace` gives `409 conflict`; archive without step-up `401`.
 - `TestSpaceOperationsRights`: create and move owner only (`403` for a visible non-owner); update
   with `manage` on the space succeeds, `read` only `403`, no read `404`; owner create needs no
   step-up; every allowed mutation has one audit entry.
@@ -294,7 +295,7 @@ make check
 - [ ] `updateSpace` requires `If-Match`.
 - [ ] Hex values and emoji as colour or icon are rejected; palette keys are accepted.
 - [ ] `space.read` holds with `read` on only one channel.
-- [ ] `space.archive` is a rights change with `access.changed`; archived spaces are not visible.
+- [ ] `space.archive` is a rights change with `access.changed`; archived spaces are read-only for everyone and missing from `listSpaces` (07 "4.5").
 - [ ] Events `space.created`, `space.updated`, `space.archived`, `sidebar.updated` are written as
       specified.
 - [ ] Names with control or bidi characters are rejected.

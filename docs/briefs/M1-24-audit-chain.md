@@ -1,6 +1,6 @@
 # M1-24: Audit: hash chain, recorder and aggregation (ADR 0021)
 
-Status: ready | Depends on: M1-11, M1-15, M1-18 | Etappe: M1
+Status: ready | Depends on: M1-15, M1-18, M1-26 | Etappe: M1
 
 ## Goal
 
@@ -12,21 +12,21 @@ rolled back land in their own transaction, and identical denials are aggregated 
 addresses appear only as keyed HMAC with a key id. M1-50 (verification, checkpoints, API) and every
 audited action of M1 build on this.
 
-PLAN lists M1-15 as the only dependency. M1-11 (shutdown step for the aggregation flush) and M1-18
-(correlation ID and client IP in the request context) are needed as well; both are in earlier
-waves, so the wave of this ticket does not change.
+M1-18 is needed for the correlation ID and the client IP in the request context
+(`internal/kernel/reqmeta`); M1-11 (shutdown step for the aggregation flush) comes with it.
+M1-26 is needed for the shared text validator `internal/kernel/textcheck` that checks `reason`.
 
 ## Read first
 
 - `docs/adr/0021-audit-log-hash-verkettet-und-getrennt-von-telemetrie.md` (all of it).
 - `docs/spec/03-datenmodell.md`: "1. Grundsätze" (1, 2, 8, 9, 11, 13), "3. Aufbewahrungsklassen"
   (`audit`), "4.1" table `sequence_counters`, "4.12 Audit, Datenschutz, Status" tables
-  `audit_events` and `audit_checkpoints`, "6.1 Globale Ereignis-Sequenz", "6.3 Sperrreihenfolge",
+  `audit_events`, `audit_checkpoints` and `audit_ip_keys`, "6.1 Globale Ereignis-Sequenz", "6.3 Sperrreihenfolge",
   "6.4 I1-Prüfung" (denial audit in an own transaction), R-DM-28 in the decisions table.
 - `docs/spec/04-sync-protokoll.md`: "3.2 Muster mit Zähler-Zeile", "3.3 Weitere Zähler".
 - `docs/spec/05-aktionen.md`: "1. Verbindliche Regeln" (rules 5 and 10), "2.4 Spalten Owner,
   Step-up, Audit, Rechte" (aggregation, R-AZ-04), "2.5 Entscheidung", "10. Konfigurationswerte"
-  (`audit.deny_aggregate_window`).
+  (`audit.deny_aggregate_window`, `audit.deny_aggregate_max_keys`).
 - `docs/spec/07-rechte.md`: "4.1 Entscheidungen und Gründe" (closed list of reason codes), "11.2
   Pflicht-Tests" (AZ-P13).
 - `docs/spec/02-architektur.md`: "4.2 Modulliste" (`audit`), "4.3 Ports, Ereignisse und Quellen je
@@ -35,10 +35,12 @@ waves, so the wave of this ticket does not change.
   (phase 3.3), "8.2 Sperrreihenfolge", "8.5 Was nie in einer Transaktion passiert", "14.1
   Fehlerarten", "15.3 Shutdown".
 - `docs/spec/19-sicherheit.md`: "1. Vertrauensannahmen", "9." (SEC-LOG-4, SEC-LOG-5), "10.
-  Geheimnisse" (SEC-SEC-3), "12. Lieferkette, Sicherungen und Audit-Integrität" (SEC-AUD-1),
+  Geheimnisse" (SEC-SEC-3), "12. Lieferkette, Sicherungen und Audit-Integrität" (SEC-AUD-1,
+  SEC-AUD-4 canonical form, SEC-AUD-5 schema `audit_details.v1`, SEC-AUD-6 aggregation),
   "14. Tests" (SEC-T16), "16. Konfigurationswerte".
 - `docs/spec/20-datenschutz.md`: "4.5 Audit-Log und IP-Adressen", "10. Tests" (DP-T02, DP-T06),
-  "13. Konfigurationswerte" (`privacy.audit_ip_key_period`, `privacy.audit_ip_key_retention`).
+  "13. Konfigurationswerte" (`privacy.audit_ip_key_period`, `privacy.audit_ip_key_retention`,
+  `privacy.audit_ip_kek_ref`); `docs/operations/configuration.md` section 5 (`audit_ip_kek`).
 - `docs/spec/16-betrieb.md`: "7.1 Rollen" (`bothy_app`, `bothy_maint`, `bothy_owner`).
 - `docs/spec/17-observability.md` rule 6 and R-OB-07, `docs/observability/audit-vs-telemetry.md`.
 - `docs/api/openapi.yaml` schemas `AuditEvent`, `AuditDecision`, `Timestamp` (the canonical form
@@ -80,11 +82,14 @@ waves, so the wave of this ticket does not change.
     phase hook is phase 3.3.
 11. SEC-AUD-1 and 03: the application role has only `INSERT` and `SELECT` on `audit_events`;
     `UPDATE` and `DELETE` are blocked by `REVOKE` and a trigger.
-12. 05 "2.4" (R-AZ-04): every denial is audited; identical denials of the same principal for the
-    same action are aggregated per `audit.deny_aggregate_window` into one entry with a counter.
+12. 05 "2.4" (R-AZ-04) and SEC-AUD-6: every denial is audited; identical denials (same principal,
+    or same IP pseudonym without login; same action; same reason) are aggregated per
+    `audit.deny_aggregate_window` into one row per key, written at window end, at shutdown or when
+    `audit.deny_aggregate_max_keys` keys are open (then the oldest).
 13. 03 "6.4": a denial whose business transaction rolled back is written in an own transaction.
 14. 20 "4.5" and K-DP-2: IP addresses only as `ip_hmac` with `ip_key_id`, one key per
-    `privacy.audit_ip_key_period`.
+    `privacy.audit_ip_key_period`, stored encrypted in `audit_ip_keys` (03) under the key of
+    `privacy.audit_ip_kek_ref`.
 15. ADR 0021, SEC-LOG-4, SEC-SEC-3: no content, names, e-mail addresses or secrets in `details`.
 16. 17 rule 6: the audit log is not telemetry; no audit rows leave through the collector.
 
@@ -92,25 +97,16 @@ waves, so the wave of this ticket does not change.
 
 All Go paths are below `services/server/`.
 
-0. **Core-contract precondition.** The key store for IP pseudonym keys must exist in
-   `docs/spec/03-datenmodell.md` when you start (requested in M0-05 as a core-contract addition;
-   recommended definition: table `audit_ip_keys`, module `audit`, fields `id uuid` PK (UUIDv7, the
-   value of `ip_key_id`), `valid_from timestamptz NOT NULL` unique, `valid_until timestamptz NOT
-   NULL` with `CHECK (valid_until > valid_from)`, `key bytea NULL` with `CHECK (key IS NULL OR
-   octet_length(key) = 32)`, `created_at timestamptz NOT NULL DEFAULT now()`, `destroyed_at
-   timestamptz NULL`, `CHECK ((key IS NULL) = (destroyed_at IS NOT NULL))`, retention class
-   `audit`, `bothy_app` with `SELECT`, `INSERT`, `UPDATE`). Build exactly what 03 defines; where it
-   differs from this recommendation, 03 wins. If 03 defines no key store, stop with
-   `Verdict: BLOCKED core contract: no key store for audit IP pseudonym keys (20 "4.5")` (P-11).
-1. **Specification first** (German, in the same change, non-core chapters only):
-   - `docs/spec/19-sicherheit.md` "12. ... Audit-Integrität": a paragraph "Kanonische Form" (design
-     note 2), a paragraph "Schema audit_details.v1" (design note 3), the aggregation rule (design
-     note 6); a new row `audit.deny_aggregate_max_keys` (Standard `10000`, "größte Zahl offener
-     Zusammenfassungen je Prozess; darüber wird die älteste sofort geschrieben") in "16.
-     Konfigurationswerte dieses Kapitels".
-   - `docs/spec/20-datenschutz.md` "4.5": where the keys live (03 table), how `ip_hmac` is computed
-     (design note 4), that destroying a key means setting `key` to NULL.
-   - Regenerate section 4 of `docs/operations/configuration.md` with the M1-08 generator.
+0. **Core contract and spec.** 03 defines `audit_ip_keys` (module `audit`; `key_ciphertext`
+   AEAD-encrypted, `key_ref`, `destroyed_at`, checks and rights as listed there); 19 defines the
+   canonical form (SEC-AUD-4), the schema `audit_details.v1` (SEC-AUD-5) and the aggregation
+   (SEC-AUD-6); 05 holds `audit.deny_aggregate_max_keys`; 20 "4.5" says where the keys live.
+   Build exactly that; change a chapter only if the build proves it wrong, in the same change.
+1. **Configuration and secrets.** Schema entries `audit.deny_aggregate_window`,
+   `audit.deny_aggregate_max_keys`, `privacy.audit_ip_key_period`, `privacy.audit_ip_kek_ref`; the
+   catalogue entry `audit_ip_kek` (generator `key`, service `server`) in the secrets catalogue of
+   M1-09 (find it with `grep -rn token_pepper services/server/internal/platform/secrets`).
+   Regenerate section 4 of `docs/operations/configuration.md` if the schema adds keys.
 2. **Port `internal/kernel/auditing`** (fill the package that M1-05 created):
 
    ```go
@@ -126,15 +122,18 @@ All Go paths are below `services/server/`.
        Reason       Reason   // empty for allow
        ResourceKind string   // optional
        ResourceID   ids.ID   // optional; zero value means none
-       Attrs        Attrs    // optional; becomes details.attrs
+       Attrs        Attrs    // optional; flat members of details (19 SEC-AUD-5)
    }
-   type Attrs map[string]Value
+   type Attrs map[string]Value // keys must not collide with ip_hmac, ip_key_id, aggregate, violations
    type Value struct { /* unexported */ }
    func ID(v ids.ID) Value
    func Code(s string) Value // short machine code, never free text
    func Int(n int64) Value
    func Bool(b bool) Value
    func Time(t time.Time) Value
+   func List(vs ...Value) Value // list of one of the kinds above
+   // Violations is the reserved member for i1_violation (19 SEC-AUD-5); M1-29 fills it.
+   type Violation struct { Code string; AgentID, CredentialHolderID ids.ID; PrincipalIDs []ids.ID }
 
    type Recorder interface {
        // Record adds e to the caller's unit of work; the audit phase hook writes it before commit.
@@ -161,7 +160,8 @@ All Go paths are below `services/server/`.
    - `adapters/postgres`: sqlc queries in `queries/audit.sql` (insert rows, read hash by `seq`,
      read current IP key, insert IP key with `ON CONFLICT (valid_from) DO NOTHING`, read key by
      id), repository, `sqlc.yaml` entry for `audit`.
-   - `internal/wire`: construct the recorder, register the hook in the audit slot (phase 3.3) and
+   - `internal/wire`: construct the recorder, register the hook in the audit slot (phase 3.3) as a
+     method value of the `audit` hook type (never a closure in `internal/wire`, 02 "Ablauf") and
      update the golden file of registrations, start the aggregator with the role's lifecycle and
      register a shutdown step that flushes it before the pool closes (both roles), fill the typed
      `audit` and `privacy` config.
@@ -183,9 +183,9 @@ All Go paths are below `services/server/`.
    `internal/audit/README.md` (German: status, tables, port, hook, canonical form, details schema,
    aggregation, keyring, limits); package doc of `kernel/auditing` with an example;
    `docs/security/threat-model.md` row T-DB-01 notes the part of SEC-T16 this ticket proves;
-   `docs/DECISIONS.md` entries for the canonical form, `audit_details.v1`, the aggregation semantics,
-   the IP canonical form, the location of the reason list; `services/server/CHANGELOG.md` under
-   `Unreleased` (`Added`, `Security`).
+   `docs/DECISIONS.md` entries only for the IP canonical form and the location of the reason list
+   (the canonical form, `audit_details.v1` and the aggregation are in 19 and 05);
+   `services/server/CHANGELOG.md` under `Unreleased` (`Added`, `Security`).
 
 ## Out of scope
 
@@ -247,27 +247,32 @@ All Go paths are below `services/server/`.
    read back from `jsonb` are decoded with `UseNumber` so integers stay exact. With this form the
    API representation `AuditEvent` without `hash` is exactly the hashed object, so an exported log
    can be verified offline (M1-50 must export the same form).
-3. **Schema `audit_details.v1`**: an object with the optional members `ip_hmac` (64 lower-case hex
-   characters), `ip_key_id` (UUID), `aggregate` (`count` integer `>= 1`, `first_at`, `last_at` in
-   the canonical time form) and `attrs` (object; keys match `^[a-z][a-z0-9_]*$`; values are only the
-   `Value` kinds of the port: UUID strings, codes, integers, booleans, times). Codes match
-   `^[a-z0-9][a-z0-9_.:-]*$` with a length bound held by a named constant and a test. No free text,
-   no `null`, no floats, no NUL characters. Unknown members are rejected at `Record` time (a
-   programming error); later tickets that need more extend the schema deliberately in the code and
-   in 19.
+3. **Schema `audit_details.v1`** exactly as 19 SEC-AUD-5: a flat object with the reserved members
+   `ip_hmac`, `ip_key_id`, `aggregate` (`count` integer `>= 1`, `first_at`, `last_at` in the
+   canonical time form), `violations` and `reason` (the only free text: the reason a management
+   action requires, checked with `kernel/textcheck`; port function `ReasonText(s string) Value`,
+   accepted only under the key `reason`), plus attribute members whose keys match
+   `^[a-z][a-z0-9_]*$` and whose values are only the `Value` kinds of the port (UUID strings, codes,
+   integers, booleans, times, lists of these). Codes match `^[a-z0-9][a-z0-9_.:-]*$` with a length
+   bound held by a named constant and a test. No free text, no `null`, no floats, no NUL characters.
+   A value outside these forms is rejected at `Record` time (a programming error); later tickets
+   that need more extend the schema deliberately in the code and in 19.
 4. **IP pseudonyms.** Input: the client IP from the request context, `Unmap()`, zone removed,
    text form of `netip.Addr.String()`. `ip_hmac = hex(HMAC-SHA-256(key, text))`, full length.
-   Keys: one row per period; `valid_from = floor(now / period) * period` in Unix time, `valid_until
-   = valid_from + period`; on a cache miss the keyring reads the row covering `now`, or inserts a
-   new one with 32 random bytes from `crypto/rand` (`ON CONFLICT (valid_from) DO NOTHING`, then read
-   again) in an own short transaction; the key is cached until `valid_until`. A destroyed key is
-   never used. Raw IP addresses are stored nowhere in `audit_events`.
+   Keys: one row of `audit_ip_keys` per period; `valid_from = floor(now / period) * period` in Unix
+   time, `valid_until = valid_from + period`; on a cache miss the keyring reads the row covering
+   `now`, or inserts a new one in an own short transaction: 32 random bytes from `crypto/rand`,
+   encrypted with AES-256-GCM under the key behind `privacy.audit_ip_kek_ref` (hex-decoded to 32
+   bytes, generator `key` of M1-09; random nonce stored
+   in front of the ciphertext, the row `id` as additional data), `key_ref` set to that reference
+   (`ON CONFLICT (valid_from) DO NOTHING`, then read again). The decrypted key is cached until
+   `valid_until`. A destroyed key (`key_ciphertext` NULL) is never used. Raw IP addresses are stored
+   nowhere in `audit_events`. The destruction job and DP-T06 belong to M7-05.
 5. **Actor and correlation.** `actor_principal_id`, `actor_device_id`, `actor_session_id` come
    from `kernel/actor`; they are absent for system actions and server commands. `correlation_id`
    is the trace ID that M1-18 puts into the request context, rendered as UUID text; it is not a
-   UUIDv7 and must not be validated as one. If the accessors for correlation ID or client IP are not
-   reachable from an `app` package (they must not come from `platform`), move them into
-   `kernel/actor` and report the move.
+   UUIDv7 and must not be validated as one (02 "Querschnitts-Ports"). Read correlation ID and
+   client IP through `internal/kernel/reqmeta` (M1-18), never from `platform`.
 6. **Aggregation of denials.** Key: actor principal (or, for anonymous requests, `ip_hmac`), action,
    reason. The first denial of a key opens a bucket with `first_at`; later identical denials within
    `audit.deny_aggregate_window` from `first_at` only raise `count` and `last_at`. A bucket is
@@ -278,14 +283,14 @@ All Go paths are below `services/server/`.
    bucket. If writing fails, the buckets stay and the next timer retries; only when the cap is
    reached and the oldest bucket still cannot be written is it dropped with an `Error` log naming
    action, reason and count (principal only as ID). Aggregation is per process; several processes
-   may each write one row per window. A hard crash loses the open buckets of at most one window;
-   record this residual risk in the README and `DECISIONS.md`.
+   may each write one row per window. A hard crash loses the open buckets of at most one window
+   (residual risk, 19 SEC-AUD-6 and threat model T-AZ-04); name it in the README.
 7. **Reason list (R-DM-28).** `kernel/auditing.Reason` is the single closed list of 07 "4.1";
    `authz` reuses it in M1-28 instead of defining its own. The database has no `CHECK` on
    `deny_reason`; the recorder writes an unknown reason anyway (never lose an entry) and logs an
    `Error`.
-8. **Errors.** Storage and chain errors are kind `internal` with code `internal` towards clients
-   (02 "14.1"); details only in the log with the correlation ID.
+8. **Errors.** Storage and chain errors are kind `internal` with code `internal_error` towards
+   clients (02 "14.1"); details only in the log with the correlation ID.
 9. **Never in a transaction:** no network calls (02 "8.5"); the keyring touches only PostgreSQL.
 
 ## Tests (write them first)
@@ -304,10 +309,10 @@ fake storage); integration tests in `internal/audit/adapters/postgres` and `inte
 - `TestCanonicalRow_OmitsNull`, `TestCanonicalRow_KeyOrderIndependent`,
   `TestCanonicalRow_RejectsOutOfDomain` (float, `null`, non-ASCII key, integer above 2^53 - 1, NUL).
 - `TestChainHash_FirstRowZeroPrevHash`, `TestCanonicalRow_TimeHasMilliseconds`.
-- `TestDetailsV1_ClosedSchema`: unknown member, free-text attribute, bad key, bad code rejected.
+- `TestDetailsV1_ClosedSchema`: reserved member with a wrong shape, attribute key colliding with a reserved member, free-text attribute, float, bad key, bad code rejected; `violations` accepted.
 - `TestReasonsMatchChapter07`: parses the table in `docs/spec/07-rechte.md` section "4.1
   Entscheidungen und Gründe" (first column) and compares with `KnownReasons()` both ways.
-- `TestIPHMAC_Vectors` (fixed key, `192.0.2.44` and `2001:db8::44`, literal expected hex),
+- `TestIPKey_EncryptedAtRest` (the stored `key_ciphertext` differs from the key and decrypts only with the configured key), `TestIPHMAC_Vectors` (fixed key, `192.0.2.44` and `2001:db8::44`, literal expected hex),
   `TestIPHMAC_MappedEqualsIPv4`, `TestIPHMAC_ZoneIgnored`.
 - `TestAZP13_IdenticalDenialsInWindowYieldOneEntry` (count equals the number of denials),
   `TestAZP13_DifferentKeysSeparate` (other principal, action or reason),
@@ -346,15 +351,15 @@ Commands that must pass: `make test`, `make migrations-lint`, `make arch`, `make
 - [ ] `details` follows `audit_details.v1`; unknown members, free text, floats and `null` are
       refused.
 - [ ] The reason list equals 07 "4.1" (test).
-- [ ] 19, 20, `configuration.md`, the module README, `modules.yaml` and `DECISIONS.md` describe what
-      was built.
+- [ ] The module README, `modules.yaml` and `configuration.md` describe what was built; 03, 05,
+      19 and 20 still match it.
 - [ ] `make check` is green.
 
 ## Definition of done
 
 - Code, tests and documentation from the scope are complete: doc comment on every public symbol
-  (purpose, parameters, return value, errors, example for `Recorder`), module README, spec updates,
-  `docs/DECISIONS.md` entries, CHANGELOG entry under `Unreleased` in
+  (purpose, parameters, return value, errors, example for `Recorder`), module README,
+  `docs/DECISIONS.md` entries named in Scope, CHANGELOG entry under `Unreleased` in
   `services/server/CHANGELOG.md`. ADR 0021 covers the architecture; write a new ADR only if you take
   a decision it does not cover.
 - `make check` is green.

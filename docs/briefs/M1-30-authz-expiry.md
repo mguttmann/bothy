@@ -38,13 +38,13 @@ After this ticket two periodic jobs in `authz` make expiry visible: `authz.expir
 
 ## Scope
 
-### 0. Precondition (check first)
+### 0. Core contract
 
-`docs/spec/03-datenmodell.md` must define the column `expiry_reported_at timestamptz NULL` on `grants` and on `group_memberships` (set by `authz.expiry_sweep` when it has reported the expiry) and an index on `group_memberships (expires_at) WHERE removed_at IS NULL AND expires_at IS NOT NULL`. These come from the review of this brief: without a durable marker the sweep cannot report every expiry exactly once after the worker was down. If 03 uses other names, use them. If 03 has no such marker, stop with `Verdict: BLOCKED core contract 03 lacks an expiry report marker` (P-11) and build nothing.
+03 defines `expiry_reported_at timestamptz NULL` on `grants` and on `group_memberships` (set by `authz.expiry_sweep` when it has reported the expiry; allowed updates of grants are listed there) and the index `group_memberships (expires_at) WHERE removed_at IS NULL AND expires_at IS NOT NULL`. Without this durable marker the sweep could not report every expiry exactly once after the worker was down.
 
 ### 1. Migration
 
-`services/server/migrations/<next number>_authz_expiry.sql` (goose, next free number, never edit an existing migration): add `expiry_reminded_at` to `grants` and `group_memberships` only if the migration of M1-27 did not create it; add `expiry_reported_at` to both; create the membership index from the precondition and the grant index `(expires_at) WHERE revoked_at IS NULL AND expires_at IS NOT NULL` if M1-27 did not create it. `make migrations-lint` stays green; regenerate sqlc (`make codegen-check` without drift).
+`services/server/migrations/<next number>_authz_expiry.sql` (goose, next free number, never edit an existing migration): M1-27 creates `expiry_reminded_at`, `expiry_reported_at`, both `(expires_at)` indexes and the immutability trigger that allows setting either column once (03); add here only what the merged M1-27 migration lacks, and adjust the trigger only if it does not yet allow `expiry_reported_at`. `make migrations-lint` stays green; regenerate sqlc (`make codegen-check` without drift).
 
 ### 2. Hook extension
 
@@ -75,19 +75,17 @@ Handler in the same file, same roles, queue `maintenance`, period `authz.expiry_
 5. Same for `group_memberships WHERE removed_at IS NULL AND expires_at > t AND expires_at <= t + lead AND expiry_reminded_at IS NULL` of non-deleted groups.
 6. Repeat while a full batch was found. Reminders write no audit entry: they change no right and the catalogue has no action for them.
 
-### 5. Specification first (first commit)
+### 5. Specification (already decided)
 
-- `docs/api/openapi.yaml`: add the value `member_expired` to the `change` enum of `GroupChangedPayload` (description: membership ended by expiry, reported by `authz.expiry_sweep`). Additive; clients ignore unknown values (06 section 2). Regenerate (`make codegen-check` without drift), `make api-lint`.
-- `docs/spec/07-rechte.md` section 14: add `authz.expiry_sweep_batch_max` with default `500` and the meaning rows per transaction of `authz.expiry_sweep` and `authz.expiry_reminder`; mention it in 8.3. Section 9.4: state the recipient rule of this ticket.
-- `docs/spec/04-sync-protokoll.md` is core contract and stays unchanged.
+`openapi.yaml` has `member_expired` in `GroupChangedPayload.change` and the note that `AccessExpiringPayload.target` is absent for instance grants; 07 sections 8.3, 9.4 and 14 state the sweep selection by `expiry_reported_at`, the batch key `authz.expiry_sweep_batch_max` and the recipient rule. Regenerate the server code if it predates these (`make codegen-check` without drift).
 
 ### 6. Configuration
 
-Add `authz.expiry_sweep_batch_max` (integer, at least 1) to the configuration schema of `internal/platform/config` and the typed `authz` configuration in `internal/wire` (M1-07 pattern), and regenerate `docs/operations/configuration.md` with the M1-08 tool so that `make config-doc-check` is green. `authz.expiry_sweep_interval` and `authz.expiry_reminder_lead` already exist; wire them if M1-28 or M1-29 did not.
+Add `authz.expiry_sweep_batch_max` (integer, at least 1, default from 07 section 14) to the configuration schema of `internal/platform/config` and the typed `authz` configuration in `internal/wire` (M1-07 pattern), and regenerate `docs/operations/configuration.md` with the M1-08 tool so that `make config-doc-check` is green. `authz.expiry_sweep_interval` and `authz.expiry_reminder_lead` already exist; wire them if M1-28 or M1-29 did not.
 
 ### 7. Documentation
 
-`services/server/internal/authz/README.md` (jobs table, algorithm, exactly-once argument), `docs/DECISIONS.md` (rulings below), `services/server/CHANGELOG.md` under Unreleased.
+`services/server/internal/authz/README.md` (jobs table, algorithm, exactly-once argument), `services/server/CHANGELOG.md` under Unreleased. The rulings below are in 07 and `openapi.yaml`; `docs/DECISIONS.md` only for anything new.
 
 ## Out of scope
 
@@ -114,10 +112,10 @@ Add `authz.expiry_sweep_batch_max` (integer, at least 1) to the configuration sc
 - Lock order: phase 1 locks `permission_version` before the sweep selects rows `FOR UPDATE` in ascending `id` (03 section 6.3). The reminder takes no `permission_version` lock.
 - The difference uses `AssumeValid`: before = snapshot at `t` with the batch rows treated as valid, after = snapshot at `t`. This isolates the effect of exactly these expiries against the current state of all other rows.
 - A grant revoked or a membership removed before the sweep is not reported as expired; the revocation already produced its own `access.changed`.
-- Ruling: recipients of `access.expiring` for a grant to a group are all active owners and `granted_by`; 07 section 9.4 says an die betroffene Person bzw. an den Owner, and a group is no principal that could receive a personal event. For memberships the member and `added_by`.
-- Ruling: `GroupChangedPayload.change` gets `member_expired`, because `member_removed` would claim a manual removal.
+- Recipients of `access.expiring` (07 section 9.4): for a grant to a group all active owners and `granted_by`, because a group is no principal that could receive a personal event; for memberships the member and `added_by`.
+- `member_expired` instead of `member_removed`, because `member_removed` would claim a manual removal.
 - `access.expiring` for a grant on the instance omits `target`, because `AccessTargetKind` only knows `space` and `channel`.
-- Events of jobs carry no `actor` (04 section 2.2); audit entries have `actor_principal_id` NULL (03 `audit_events`).
+- Events of the sweep carry `actor = {kind: system}` without `id` (system actions `grant.expire`, `group.member.expire`; 04 section 2.2, 03 `event_log.actor_kind`); events of the reminder carry no `actor`; audit entries have `actor_principal_id` NULL (03 `audit_events`).
 - Personal data: no names or e-mail addresses in events beyond the schemas, in audit details or in logs (SEC-LOG-4).
 
 ## Tests (write them first)

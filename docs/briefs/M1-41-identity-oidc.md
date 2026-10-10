@@ -1,6 +1,6 @@
 # M1-41: OIDC login with PKCE
 
-Status: ready | Depends on: M1-22, M1-37 | Etappe: M1
+Status: ready | Depends on: M1-37 | Etappe: M1
 
 ## Goal
 

@@ -141,7 +141,7 @@ stop with `Verdict: BLOCKED dependency M1-16/M1-24 not merged`.
    (issue and verify through `instance.Keys`).
 6. Adapters `internal/identity/adapters/httpapi`: handlers `refreshToken`, `logout`,
    `listMySessions`, `listUserSessions`; registration of the `Authenticator` in the HTTP chain
-   (step 4 of 02 "9.1") through `internal/wire`.
+   (step 7 of 02 "9.1") through `internal/wire`.
 7. `kernel/actor`: if the merged `Actor` lacks any of `SessionID`, `SessionActive`, `DeviceID`,
    `DeviceState`, `DeviceKeyActive`, `StepUpAt`, `StepUpMethod`, `AuthMethod`, `ClientComponent`,
    `KeyThumbprint`, add them with doc comments (the package is implemented by `identity`, 02
@@ -165,6 +165,12 @@ stop with `Verdict: BLOCKED dependency M1-16/M1-24 not merged`.
 12. Docs: `docs/spec/08-identitaet.md` "7.2" gets `aud`, header `typ`, `amr` form and the cap of
     `exp` at the session end; "7.4" gets the refresh outcome table of "Design notes"; rulings in
     `docs/DECISIONS.md`; identity README; `services/server/CHANGELOG.md`.
+13. **`authz.CredentialSource`, sessions part** (02 "Ports, Ereignisse und Quellen je Modul", 07
+    "Ablauf" `check_active`, PLAN row M1-34): implement `SessionActive` and `SessionExpiresAt` of
+    the request's session in the identity adapter of the source port that M1-28 declared, and
+    replace the corresponding empty source in `internal/wire` (fail closed until then). Test:
+    `TestCredentialSource_Sessions` against PostgreSQL 18 (active, revoked, expired, foreign
+    principal).
 
 ## Out of scope
 

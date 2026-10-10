@@ -115,8 +115,8 @@ Paths are relative to `services/server/` unless they start with `docs/`.
    ops that name a deferred action fail the start.
 6. **`internal/authz/adapters/fake`**: in-memory fakes of the four sources, exported for the
    tests of this and later modules (test files only).
-7. **`internal/instance`**: a read-only port method for the current rights version (see Design
-   notes) if M1-15 does not offer one; implementation in instance's adapter.
+7. **`internal/instance`**: the read-only port `instance.Versions` with the current rights
+   version (see Design notes); implementation in instance's adapter.
 8. **`internal/platform/httpserver`**: call `authorize.WithRequestScope` once per request at the
    start of the chain (02 section 9.1 step 1), unless M1-18's request-scoped check-log value can
    carry the memo (then extend that value instead).
@@ -128,15 +128,11 @@ Paths are relative to `services/server/` unless they start with `docs/`.
     `10000`, minimum `1`) and `auth.step_up_max_age` (duration, default `5m`) if absent; the
     authz config receives both. Regenerate `docs/operations/configuration.md` with the M1-08
     generator.
-11. **Specification first** (same change):
-    - `docs/spec/02-architektur.md` section 4.3: row `authz` declares `CredentialSource`; row
-      `identity` implements `authz.CredentialSource`; section 4.4 row `identity` reason column
-      mentions it.
-    - `docs/spec/06-api.md` section 4 point 4 and decision R-API-21: align with 07 section 2.10
-      (a visible channel with a missing read scope answers `403 scope_missing`; without a grant
-      the channel is invisible and answers `404`).
-    - `docs/DECISIONS.md`: rulings D1 to D6 from Design notes (table format and next free
-      numbers of the file).
+11. **Specification**: 02 sections 4.3 and 4.4 (`CredentialSource`, empty sources until their
+    tickets), 06 section 4 point 4 and R-API-21 (aligned with 07 section 2.10), 07 section 4.2
+    (deferred entries, audit of denials), 07 section 7.2 (thread-level operator rule not in list
+    filters) and 08 section 12 (token scopes from M2) already state D1 to D3 and D6. Record D4
+    and D5 in `docs/DECISIONS.md`.
 12. **Documentation**: `internal/authz/README.md` (algorithm, cache, sources, deferred actions,
     how other modules build a `Resource`), package docs, `services/server/CHANGELOG.md` under
     `Unreleased`.
@@ -187,7 +183,9 @@ Paths are relative to `services/server/` unless they start with `docs/`.
 ```go
 type Outcome string // "allow", "not_found", "forbidden", "step_up_required",
                     // "invariant_violation", "unauthenticated"
-type Reason string  // the codes of 07 section 4.1, one constant each (ReasonNoGrant, ...)
+type Reason string  // no constants here: the one closed list of 07 4.1 is kernel/auditing.Reason
+                    // (M1-24, R-DM-28); authz converts those constants. Kernel ports never import
+                    // each other (02 "go-arch-lint"), so the list cannot live in both packages.
 
 type Decision struct { Outcome Outcome; Reason Reason }
 func (d Decision) Allowed() bool
@@ -388,9 +386,9 @@ Overrides by action id (they win over the text rule): `message.create`:
 `stats.read`: `ByKind{instance: Owner, space: Any(Owner, Cap(manage))}`; `grant.read`:
 `ByKind{space: Any(Owner, Cap(manage)), channel: Any(Owner, Cap(manage)), principal: Owner}`.
 
-**Deferred entries** (ruling D3): the requirement of these actions depends on facts that only a
-later etappe defines. Their entry is `Deferred("<etappe>")`; `Authorize` and `Scope` answer an
-internal error with code `unknown_action` (as for an unknown action, because no build of this
+**Deferred entries** (07 section 4.2): the requirement of these actions depends on facts that only
+a later etappe defines. Their entry is `Deferred("<etappe>")`; `Authorize` and `Scope` answer an
+internal error with cause `unknown_action` (as for an unknown action, because no build of this
 etappe may reach them), and `VerifyRegistrations` rejects any route or op that names one:
 `agent_session.reset`, `agent_session.bind`, `run.followup.create`, `command.autocomplete`,
 `command.invoke`, `interaction.create`, `run.start`, `webhook_out.deliver`, `webhook_in.post`
@@ -492,11 +490,11 @@ Effective rights on a path (instance, space S, channel C, optional thread T):
 
 Order of sources: a version pinned with `WithPermissionVersion`; else the memo of the request
 scope (filled by the first read in the request); else a fresh read. The read goes through the
-instance port: use an existing read accessor; otherwise add `PermissionVersion(ctx) (int64,
-error)` to a new port interface `instance.Versions`, implemented with `SELECT value FROM
-sequence_counters WHERE name = 'permission_version'` in the ambient transaction when present.
-Do not use the `Counters` port; it is reserved for the phase hooks (M1-13 golden file). A read
-failure is an error of kind `unavailable`, never an allow.
+instance port `instance.Versions` (02 "Ports, Ereignisse und Quellen je Modul"): create it with
+`PermissionVersion(ctx) (int64, error)`, implemented with `SELECT value FROM sequence_counters
+WHERE name = 'permission_version'` in the ambient transaction when present. Do not use the
+`Counters` port: its phase guard (M1-15) rejects calls outside the phase hooks. A read failure is
+an error of kind `unavailable`, never an allow.
 
 ### Algorithm (`domain/decide.go` pure; `app/authorizer.go` gathers facts)
 
@@ -593,7 +591,7 @@ carries a doc comment naming the ticket that replaces it (M1-52, M1-53, M1-55; M
 M1-34, M1-44). Every request with credentials is therefore `unauthenticated` until M1-34, which
 is correct because no credential can exist before it.
 
-### Rulings to record in `docs/DECISIONS.md`
+### Rulings (D1 to D3 and D6 are in the spec; D4 and D5 go to `docs/DECISIONS.md`)
 
 - D1: `authz.CredentialSource` is a fourth source port; identity implements it. Reason: 07
   section 4.2 checks session, device and token on every call and 04 section 8.5 caches that
@@ -623,7 +621,8 @@ Pure tests run without a database; the test world and fakes live in
    - `TestScopeTableActionsExist`, `TestWritesSetGolden`;
    - `TestReasonsMatchChapter07`: reads `docs/spec/07-rechte.md`, extracts the first-column
      codes of the table in section 4.1 (between the headings "### 4.1" and "### 4.2"), and
-     compares with the `Reason` constants (R-DM-28 keeps the list closed by this test).
+     compares with the `kernel/auditing.Reason` constants that `authz` uses (R-DM-28 keeps the list
+     closed by this test; M1-24 has the same test on its side).
 2. **Mapping**: `TestDecisionErrMapping` covers every row of the mapping table.
 3. **Test world** of 07 section 11.1 built with the fakes: spaces Support (channels Allgemein,
    Eskalation), Marketing (Kampagnen, Intern), Engineering (forum Projekt-A, text Werkzeuge with
@@ -687,8 +686,8 @@ Pure tests run without a database; the test world and fakes live in
     user seeded with plain SQL in the test file): the wired authorizer answers `not_found`
     `no_grant` for that user without credential ids reading an unknown channel, and
     `unauthenticated` `session_revoked` for the same user with a session id.
-11. **Instance**: if you add `instance.Versions`, an integration test against PostgreSQL 18
-    reads the seeded value.
+11. **Instance**: an integration test against PostgreSQL 18 reads the seeded value through
+    `instance.Versions`.
 12. **Benchmark** `BenchmarkAuthorizeCached` (`internal/authz/app/bench_test.go`): warm cache,
     in-memory fakes, `message.read` on a visible channel; records each iteration's duration and
     reports the 99th percentile with `b.ReportMetric(p99, "p99-ns")`. It asserts nothing; M1-72
@@ -716,10 +715,13 @@ make check
 - [ ] The reason constants equal the codes of 07 section 4.1.
 - [ ] No source error, unknown action, deferred action or unknown resource kind can produce an
       allow (tests per case).
-- [ ] Every non-allow decision reaches the audit recorder; allow decisions do not.
+- [ ] Every non-allow decision reaches the audit recorder; allow decisions do not (the use case
+      writes them, 07 section 4.2). AZ-P13 runs end to end: a denied request through the HTTP
+      chain leaves exactly one aggregated row in `audit_events` (with the M1-24 recorder against
+      PostgreSQL 18).
 - [ ] `BenchmarkAuthorizeCached` reports `p99-ns`.
-- [ ] 02 section 4.3, 06 section 4 point 4 and R-API-21, and `docs/DECISIONS.md` (D1 to D6) are
-      updated in the same change.
+- [ ] 02 sections 4.3 and 4.4, 06 section 4 point 4, 07 sections 4.2 and 7.2 still match the
+      build; `docs/DECISIONS.md` has D4 and D5.
 - [ ] `authz.snapshot_cache_max_entries` and `auth.step_up_max_age` are in the schema and the
       regenerated configuration reference.
 - [ ] `make check` is green.

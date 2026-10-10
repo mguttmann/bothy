@@ -284,8 +284,8 @@ Configuration: new `auth.totp_key_ref`; used `auth.local_password_enabled`,
 `auth.argon2id_parallelism`, `auth.login_fail_limit`, `auth.login_fail_window`,
 `auth.login_lock_duration`, `server.public_url`, `authz.not_found_timing_tolerance` (tests).
 
-Rulings to record in `docs/DECISIONS.md`: TOTP confirmation step and the API change; meaning of
-"credentials exist"; conditional step-up in authz through `PrincipalSource`; issuer from
+Rulings to record in `docs/DECISIONS.md`: TOTP confirmation step and the API change; how authz
+learns "credentials exist" (`PrincipalSource`; the rule itself is Step-up `bedingt` in 05 2.4); issuer from
 `server.public_url`; AEAD scheme and AAD; password list source and hashed storage; failure window
 column; one Argon2id computation per request.
 

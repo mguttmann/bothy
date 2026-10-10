@@ -209,7 +209,8 @@ M1-05.
      installation overrides (`migrate`: `BOTHY_DATABASE__USER`, `BOTHY_DATABASE__PASSWORD_REF`);
      `api` additionally `BOTHY_SERVER__LISTEN_ADDR: "127.0.0.1:8080"` and `ports: !reset []`.
    - `secrets-init`: `volumes: !override` with `${SMOKE_SECRETS_INPUT:?set by smoke.sh}:/input:ro`
-     and the `secrets` volume as in the installation.
+     and the `secrets` and `signing-keys` volumes as in the installation. `api` and `worker` keep
+     the installation's `signing-keys` volume (ADR 0066: the server writes its signing keys there).
    - `postgres`: `image:` exactly the reference that `internal/platform/pg/pgtest` uses (M1-12,
      official `postgres:18.x` multi-arch index digest); everything else from the installation.
    - `backup`: `profiles: [smoke-disabled]` (never activated).

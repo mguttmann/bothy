@@ -6,10 +6,10 @@ Status: ready | Depends on: M1-26 | Etappe: M1
 
 After this ticket the tables `groups`, `group_memberships` and `grants` exist with every check
 of the core contract, grants are immutable in the database except for revocation and the expiry
-reminder, and the rules of the grant model are pure, table-tested domain functions: levels and
-capabilities, validity at a point in time (07 section 2.5) and delegation with `manage`
-(R-AZ-05, 07 section 2.6). M1-28 builds the rights snapshot on these functions and this
-repository; M1-29 and M1-48 write through them.
+bookkeeping (`expiry_reminded_at`, `expiry_reported_at`), and the rules of the grant model are
+pure, table-tested domain functions: levels and capabilities, validity at a point in time (07
+section 2.5) and delegation with `manage` (R-AZ-05, 07 section 2.6). M1-28 builds the rights
+snapshot on these functions and this repository; M1-29 and M1-48 write through them.
 
 ## Read first
 
@@ -83,7 +83,8 @@ Paths are relative to `services/server/`.
 - The rights snapshot, cache and `authorize`: M1-28.
 - Rights changes with `permission_version`, `access.changed`, I1, SR8, the admin port: M1-29.
   The repository writes of this ticket raise no version; they are only called by tests here.
-- Expiry jobs and reminders (`expiry_reminded_at` is only a column here): M1-30.
+- Expiry jobs and reminders (`expiry_reminded_at` and `expiry_reported_at` are only columns here):
+  M1-30.
 - Group and grant HTTP operations, "who has access" and preview: M1-48, M1-49.
 - OIDC claim groups: M1-42.
 - The foreign keys from `grants` to `spaces` and `channels`: M1-52 and M1-53 add them in the
@@ -110,9 +111,10 @@ Paths are relative to `services/server/`.
   unique index `lower(name) WHERE deleted_at IS NULL`, partial unique index `(external_ref)
   WHERE source = 'oidc_claim'`.
 - `group_memberships`: FKs `group_id -> groups(id)`, `user_id -> users(principal_id)`,
-  `added_by`, `removed_by -> principals(id)`, all ON DELETE RESTRICT; `expiry_reminded_at`;
-  partial unique index `(group_id, user_id) WHERE removed_at IS NULL`; index `(user_id) WHERE
-  removed_at IS NULL`.
+  `added_by`, `removed_by -> principals(id)`, all ON DELETE RESTRICT; `expiry_reminded_at`,
+  `expiry_reported_at`; partial unique index `(group_id, user_id) WHERE removed_at IS NULL`; index
+  `(user_id) WHERE removed_at IS NULL`; index `(expires_at) WHERE removed_at IS NULL AND
+  expires_at IS NOT NULL`.
 - `grants`: the checks of 03, written as named constraints:
   `grants_subject_kind_check`, `grants_target_kind_check`, `grants_level_check`,
   `grants_capabilities_check` (`capabilities <@ ARRAY['approve_actions','upload','export',
@@ -135,7 +137,8 @@ no code path creates space or channel grants, because no space or channel exists
 
 **Immutability trigger** `authz_grants_immutable` (BEFORE UPDATE ON grants, SQLSTATE `23514`):
 allowed are only (a) setting `revoked_at`, `revoked_by` and `revoke_reason` when `OLD.revoked_at
-IS NULL`, and (b) setting `expiry_reminded_at` when it was null. Every other change, including a
+IS NULL`, and (b) setting `expiry_reminded_at` or `expiry_reported_at` when it was null (03
+`grants`). Every other change, including a
 second revocation and any change of level, capabilities, subject, target, expiry, reason or
 grantor, raises. Deletion is not blocked in the database (retention jobs of M7 may need it), but
 the repository has no delete query. Reason: R-DM-09 says grants are history; the database is the
