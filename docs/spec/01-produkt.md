@@ -944,6 +944,8 @@ Regeln:
   Platzhalter-IDs unter `example.com`.
 - Das Logo wird als Datei hochgeladen und nur über den Server ausgeliefert; die App fällt auf das
   Zeichen des Produkts zurück, solange es fehlt.
+- `branding.product_name` hat höchstens `branding.product_name_max_chars` Zeichen (03) und keine
+  Steuer- oder Bidi-Zeichen ([19-sicherheit.md](19-sicherheit.md), SEC-IN-4).
 
 ## 13. Entscheidungen dieses Kapitels
 

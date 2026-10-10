@@ -154,7 +154,8 @@ einer anderen Form, kann die `simple`-Teilanfrage ihn trotzdem treffen. Die Vern
 1. `authz` liefert die Menge der sichtbaren Kanäle des Prinzipals für `message.read` aus dem
    Rechte-Cache (R-DM-19, [07-rechte.md](07-rechte.md)). Sie enthält DM-Kanäle nur für
    Teilnehmer, auch beim Owner (R-AZ-02).
-2. Jede Abfrage enthält `channel_id = ANY($visible_channel_ids)` ([03-datenmodell.md](03-datenmodell.md)
+2. Jede Abfrage enthält `channel_id = ANY($visible)` mit der Liste, die `Authorizer.Scope` je
+   Anfrage bildet ([07-rechte.md](07-rechte.md), Abschnitt 7.4; [03-datenmodell.md](03-datenmodell.md)
    Abschnitt 5). Threads filtern über `threads.channel_id`, Dateien über den Kanal der
    Nachricht, an der sie hängen.
 3. Die Einträge der ausgelieferten Seite laufen zusätzlich durch `authorize(..., message.read |

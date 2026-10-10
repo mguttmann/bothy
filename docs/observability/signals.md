@@ -49,7 +49,7 @@ Allowlist des Collectors, Dashboards, Regeln und SLOs nutzen nur Namen von hier.
 |---|---|---|---|---|---|
 | `http.server.request.duration` | Histogramm | `s` | `http.request.method`, `http.route`, `http.response.status_code`, `error.type` | otelhttp (Semantic Conventions HTTP, stabil) | `http_server_request_duration_seconds` |
 | `bothy.authz.decisions` | Zähler | `{decision}` | `bothy.action`, `bothy.decision` | api | `bothy_authz_decisions_total` |
-| `bothy.authz.errors` | Zähler | `{check}` | `bothy.reason` (`unknown_action`, `authz_not_checked`) | api: Programmfehler der Rechteprüfung ([02-architektur.md](../spec/02-architektur.md) 9.3, 07 Abschnitt 4.2) | `bothy_authz_errors_total` |
+| `bothy.authz.errors` | Zähler | `{check}` | `bothy.reason` (`unknown_action`, `authz_not_checked`, `filter_mismatch`) | api: Programmfehler der Rechteprüfung ([02-architektur.md](../spec/02-architektur.md) 9.3, 07 Abschnitt 4.2); `filter_mismatch`: ein Element passierte den SQL-Filter einer Liste, aber nicht `authorize`, und wurde verworfen (07 Abschnitt 7.4, Regel 3) | `bothy_authz_errors_total` |
 | `bothy.ratelimit.rejected` | Zähler | `{request}` | `bothy.ratelimit.class` | api | `bothy_ratelimit_rejected_total` |
 | `bothy.gateway.connections.active` | UpDownCounter | `{connection}` | `bothy.principal.kind` | api | `bothy_gateway_connections_active` |
 | `bothy.gateway.connect.duration` | Histogramm | `s` | `bothy.outcome` (`ok`, `client_error`, `server_error`), `bothy.principal.kind` | api: Upgrade bis `ready` oder `resumed` | `bothy_gateway_connect_duration_seconds` |

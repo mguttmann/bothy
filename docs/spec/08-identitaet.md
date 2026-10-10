@@ -62,7 +62,7 @@ Gründe:
 
 - Keine Anbieter-Tokens auf Geräten; ein Token-Format für alle Treiber.
 - Das Client-Secret oder der Client-Schlüssel des Servers liegt nur im Secret-Provider
-  (`identity_providers.config` mit `secret_ref`, 03).
+  (`client_secret_ref` bzw. `client_key_ref` in `identity_providers.config`, Abschnitt 2.6).
 - Der Server erzeugt die gerätegebundenen Tokens selbst; Anbieter kennen DPoP meist nicht.
 - Beim Anbieter ist nur eine `https`-Rückleitung des Servers eingetragen. Die Rückleitung zur App
   (Loopback, eigenes Schema) liegt in der Hand des Servers.
@@ -70,34 +70,52 @@ Gründe:
 Ablauf (Diagramm in Abschnitt 14.1):
 
 1. Die App erzeugt `client_verifier`, `client_challenge` (`S256`) und ihren DPoP-Schlüssel.
-2. `POST /api/v1/auth/oidc/begin` mit `provider_id`, `app_redirect_uri` und `client_challenge`.
-   Der Server legt einen Anmeldevorgang an (Tabelle `auth_login_flows`, Klasse `transient`,
-   Gültigkeit `auth.login_flow_ttl`; in der API `login_attempt_id`) und antwortet mit der
-   `authorization_url` des Anbieters. `app_redirect_uri` muss einer festen Liste entsprechen:
-   `http://127.0.0.1:<port>/callback` (Desktop, Port beliebig, RFC 8252 Abschnitt 7.3) oder das
-   private Schema der App (Mobilgeräte, RFC 8252 Abschnitt 7.1).
+2. `POST /api/v1/auth/oidc/begin` mit `provider_id`, `app_redirect_uri`, `client_challenge` und
+   optional einem Einladungs-Code (`enrollment_code`). Der Server prüft den Code (Abschnitt 3.2),
+   löst ihn aber erst beim Abschluss ein, legt einen Anmeldevorgang an (Tabelle
+   `auth_login_flows`, Klasse `transient`, Gültigkeit `auth.login_flow_ttl`; in der API
+   `login_attempt_id`) und antwortet mit der `authorization_url` des Anbieters.
+   `app_redirect_uri` muss einer festen Liste entsprechen: `http://127.0.0.1:<port>/callback` oder
+   `http://[::1]:<port>/callback` (Desktop, Port beliebig, RFC 8252 Abschnitt 7.3) oder genau ein
+   Eintrag aus `app_redirect_uris` des Anbieters (privates Schema oder beanspruchte
+   `https`-Adresse der App, RFC 8252 Abschnitt 7.1 und 7.2); nie `localhost`.
 3. Die App öffnet die `authorization_url` im **Systembrowser** (iOS und macOS:
    `ASWebAuthenticationSession`; Android: Custom Tabs; Windows: Standardbrowser). Eingebettete
    Web-Views sind verboten (RFC 8252, Abschnitt 8.12; https://www.rfc-editor.org/rfc/rfc8252.txt,
    abgerufen 2026-10-10 [belegt]). Die URL trägt das eigene PKCE des Servers, eigenen `state`,
    `nonce`, `response_type=code` und `scope=openid profile email`.
 4. Rückkehr zu `https://<host>/api/v1/auth/oidc/callback`. Der Server prüft: `state` gegen den
-   Vorgang; `iss`-Parameter nach RFC 9207, falls der Anbieter ihn sendet, sonst `iss` des ID-Tokens
+   Vorgang; den Parameter `iss` nach RFC 9207, falls der Anbieter ihn sendet (Pflicht, wenn seine
+   Discovery `authorization_response_iss_parameter_supported` meldet), sonst `iss` des ID-Tokens
    gegen den konfigurierten Aussteller (Schutz gegen Mix-up, RFC 9700 Abschnitt 4.4;
    https://www.rfc-editor.org/rfc/rfc9700.html, abgerufen 2026-10-10 [belegt]).
 5. Code-Tausch mit Client-Authentisierung (`private_key_jwt` bevorzugt, sonst `client_secret_basic`
-   aus dem Secret-Provider). ID-Token prüfen: Signatur über JWKS des Anbieters (Cache
-   `auth.oidc_jwks_cache_ttl`, bei unbekannter `kid` einmal neu laden), erlaubte Algorithmen nur
-   asymmetrisch (`RS256`, `PS256`, `ES256`, `EdDSA`; nie `none`, nie `HS*`), `iss`, `aud` gleich
-   eigener Client-ID, `azp` falls vorhanden, `exp`, `iat` mit `auth.clock_leeway`, `nonce`.
-6. Zuordnung zum Konto nach Abschnitt 3. Gelingt sie, erzeugt der Server einen einmaligen
-   Server-Code (in der API `login_code`, Gültigkeit `auth.server_code_ttl`), gebunden an
-   `client_challenge` und Vorgang, und leitet zu `app_redirect_uri`.
+   aus dem Secret-Provider). Die Client-Assertion von `private_key_jwt` gilt
+   `auth.oidc_client_assertion_ttl`. ID-Token prüfen: Signatur über JWKS des Anbieters (Discovery
+   und JWKS im Cache `auth.oidc_jwks_cache_ttl`, bei unbekannter `kid` einmal neu laden), erlaubte
+   Algorithmen nur asymmetrisch (`RS256`, `PS256`, `ES256`, `EdDSA`; nie `none`, nie `HS*`),
+   `iss`, `aud` gleich eigener Client-ID, `azp` falls vorhanden, `exp`, `iat` mit
+   `auth.clock_leeway`, `nonce`. Discovery, JWKS und Token-Endpunkt erreicht der Server nur über den
+   Egress-Client; erlaubte Ziele sind der Host des Ausstellers und die Hosts von `token_endpoint`
+   und `jwks_uri` aus dem geprüften Discovery-Dokument, nie eine private Adresse ohne Eintrag in
+   `egress.allowed_hosts` ([19-sicherheit.md](19-sicherheit.md), SEC-NET-2).
+6. Der Server speichert nur die geprüfte externe Identität im Vorgang (`external_identity`, Schema
+   `external_identity.v1`: `issuer`, `subject`, `display_name`, `email_hint`, `auth_time`, `amr`,
+   bei Gruppen-Abgleich `groups_state` und `groups`), erzeugt einen einmaligen Server-Code (in der
+   API `login_code`, Gültigkeit `auth.server_code_ttl`), gebunden an `client_challenge` und Vorgang,
+   und leitet zu `app_redirect_uri` mit `login_code` und `login_attempt_id`. Er ändert hier kein
+   Konto. Nach dem Finden des Vorgangs endet jeder Fehler mit einer Rückleitung mit `error`
+   (`access_denied`, `login_failed`, `flow_expired`) und `login_attempt_id`; ein unbekannter oder
+   abgelaufener `state` ergibt `400` ohne Rückleitung, weil es kein vertrautes Ziel gibt.
 7. Die App tauscht den Server-Code bei `POST /api/v1/auth/oidc/complete` (Aktion
    `auth.login.complete`) mit `client_verifier`, DPoP-Beweis und Geräteregistrierung (Abschnitt 5).
    Der Server prüft die Bindung an `client_challenge`; nur die App-Instanz, die den Vorgang
    begonnen hat, kann den Code einlösen. Ein abgefangener Code ist ohne `client_verifier` wertlos
-   (Schutz nach RFC 9700 Abschnitt 4.8.2 [belegt]).
+   (Schutz nach RFC 9700 Abschnitt 4.8.2 [belegt]). Erst jetzt ordnet der Server das Konto zu
+   (Abschnitt 3.1), verknüpft über den Einladungs-Code oder stellt bereit, registriert das Gerät,
+   legt Sitzung und Tokens an und leert `external_identity`. Grund: Die `authorization_url` ist an
+   keinen Browser gebunden; wer sie erhält, könnte beim Rückruf sein eigenes Anbieter-Konto mit dem
+   Code eines anderen verknüpfen (Login-CSRF, R-DM-30).
 
 ### 2.3 Beispiel Microsoft Entra ID
 
@@ -105,7 +123,7 @@ Ablauf (Diagramm in Abschnitt 14.1):
 |---|---|---|
 | Registrierung | Server als Web-Anwendung (vertraulicher Client), eine Rückleitung `https://<host>/api/v1/auth/oidc/callback` | Redirect-URIs: `https` Pflicht, `http` nur für localhost; https://learn.microsoft.com/en-us/entra/identity-platform/reply-url, abgerufen 2026-10-10 [belegt] |
 | Ablauf | Auth Code mit PKCE; Entra empfiehlt PKCE für alle Client-Typen | https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow, abgerufen 2026-10-10 [belegt] |
-| Aussteller | mandantengebunden `https://login.microsoftonline.com/<tid>/v2.0`; bei `/organizations` Pflicht-Liste erlaubter `tid` in `identity_providers.config` | `tid` immer gegen den Mandanten prüfen; https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation, abgerufen 2026-10-10 [belegt] |
+| Aussteller | mandantengebunden `https://login.microsoftonline.com/<tid>/v2.0`; für mehrere Mandanten mit dem Platzhalter `{tenantid}` im konfigurierten `issuer` und der Pflicht-Liste `allowed_tenant_ids` (Abschnitt 2.6) | `tid` immer gegen den Mandanten prüfen; https://learn.microsoft.com/en-us/entra/identity-platform/claims-validation, abgerufen 2026-10-10 [belegt] |
 | Subjekt | `sub` (paarweise je Anwendung, unveränderlich) als `user_identities.subject`; `oid` nur als zusätzliche Anzeige | https://learn.microsoft.com/en-us/entra/identity-platform/id-token-claims-reference, abgerufen 2026-10-10 [belegt] |
 | E-Mail | `email`, `preferred_username`, `upn` nie für Zuordnung oder Rechte; nur als Anzeige-Hinweis | Microsoft: "Never use claims like email, preferred_username or unique_name ..." (claims-validation) [belegt] |
 | Gruppen | optionaler `groups`-Claim; bei mehr als 200 Gruppen im JWT liefert Entra stattdessen einen Überlauf-Verweis | id-token-claims-reference, "Groups overage claim" [belegt] |
@@ -124,9 +142,14 @@ bei Verkehr von getaggten Geräten, und empfiehlt, dass der Dienst nur auf local
 
 Regeln:
 
-1. **Nur Loopback.** Ist ein `trusted_header`-Treiber aktiv, startet der Server nur, wenn alle
-   HTTP-Listener an Loopback-Adressen gebunden sind (`127.0.0.1`, `::1`). Sonst bricht der Start mit
-   einem Fehler ab. Prüfung beim Start und als Test (ID-T08).
+1. **Nur Loopback.** Der Treiber wirkt nur, wenn der öffentliche Listener an eine
+   Loopback-Adresse gebunden ist (`127.0.0.0/8`, `::1`; maßgeblich ist die gebundene Adresse, nicht
+   der konfigurierte Text). Sonst bleibt er aus: `POST /api/v1/auth/trusted-header/login` antwortet
+   `404`, `/readyz` meldet `trusted_header_requires_loopback`, und `identity_provider.manage`
+   lehnt das Einschalten mit `409 conflict` (`reason: trusted_header_requires_loopback`) ab
+   ([16-betrieb.md](16-betrieb.md), Abschnitt 4.3; PLAN W4). Grund: Der Treiber ist eine
+   Einstellung des Owners zur Laufzeit; ein Fehler darin soll den Server nicht am Start hindern,
+   aber fail closed bleiben (ID-T08).
 2. **Nur aus dem Proxy.** Kopfzeilen werden nur ausgewertet, wenn die Gegenstelle der TCP-Verbindung
    in `server.trusted_proxies` steht ([16-betrieb.md](16-betrieb.md), [19-sicherheit.md](19-sicherheit.md) SEC-TLS-1).
 3. **Fehlende Identität ist anonym.** Fehlt die Login-Kopfzeile (Funnel, getaggtes Gerät, direkter
@@ -134,11 +157,15 @@ Regeln:
 4. **Nur zur Anmeldung.** Die Kopfzeile ersetzt den Anmeldevorgang, nicht Gerät und Token: Die App
    registriert Geräteschlüssel und bekommt DPoP-Tokens wie bei OIDC (`POST /api/v1/auth/trusted-header/login`).
 5. **Bindung je Anfrage.** Mit `auth.trusted_header_bind_requests = true` muss jede weitere Anfrage
-   denselben Header-Login tragen wie die Identität der Sitzung. Abweichung: `401`, Sitzung
-   widerrufen, Audit. Grund: Ein gestohlenes Token samt Schlüssel nützt dann nur auf einem Gerät
-   desselben Menschen im selben Netz.
-6. Kodierte Werte (RFC 2047) werden vor dem Vergleich dekodiert; verglichen wird der Login, nicht
-   der Anzeigename.
+   denselben Header-Login tragen wie die Identität der Sitzung. Abweichung oder fehlender Login:
+   `401 session_revoked`, Sitzung widerrufen mit Grund `trusted_header_mismatch`, Audit. Grund: Ein
+   gestohlenes Token samt Schlüssel nützt dann nur auf einem Gerät desselben Menschen im selben
+   Netz.
+6. Kodierte Werte (RFC 2047, nur `utf-8` und `us-ascii`) werden vor dem Vergleich dekodiert;
+   mehrere Werte, Steuer-, Format- oder Bidi-Zeichen gelten als fehlende Kopfzeile; verglichen wird
+   der Login, nicht der Anzeigename.
+7. Ein unbekannter Login wird nur über einen mitgegebenen Einladungs-Code (`enrollment_code`,
+   Abschnitt 3.1) oder `allow_provisioning` zu einem Konto.
 
 Alternative ohne Kopfzeilen-Vertrauen: Abfrage der Identität über die lokale Schnittstelle des
 Netz-Agenten (bei Tailscale `WhoIs`). Sie ist als späterer Treiber vorgesehen, nicht Teil von M1.
@@ -154,38 +181,91 @@ Für Instanzen ohne Identitätsanbieter. Anmeldewege eines lokalen Kontos:
 | Geräte-Kopplung | jedes weitere Gerät | ein aktives Gerät derselben Person bestätigt mit Step-up, Abschnitt 5.3 |
 | Passwort mit TOTP | Rückfall | abschaltbar über `auth.local_password_enabled` |
 
-WebAuthn mit go-webauthn (gepinnt, Baseline R-Stack): RP-ID ist die Domain der Instanz, erlaubte
-Origins als Liste, `userVerification = required`, `residentKey = preferred`, `attestation = none`.
-Ein Rückschritt von `sign_count` wird im Audit gemeldet (03, `passkey_credentials`).
+WebAuthn mit go-webauthn (gepinnt, Baseline R-Stack): RP-ID `auth.webauthn_rp_id` (leer heißt
+Host von `server.public_url`), erlaubte Origins `auth.webauthn_origins` (leer heißt Origin von
+`server.public_url`), `userVerification = required`, `residentKey = preferred`, `attestation =
+none`, Algorithmen nur `ES256`, `EdDSA` und `RS256` (Windows Hello). Der Zustand jeder Zeremonie
+(Anmeldung, erste Einrichtung mit Einladungs-Code, Registrierung, Step-up) liegt in
+`auth_challenges` (03); jede Herausforderung gilt einmal und `auth.login_flow_ttl` lang (Step-up:
+`auth.step_up_challenge_ttl`). Ein Rückschritt von `sign_count` wird im Audit gemeldet, die
+Zeremonie läuft weiter (03, `passkey_credentials`). Mit Passkey anmelden kann sich nur, wer eine
+aktive Identität beim Treiber `local` hat; Passkeys von Menschen nur mit OIDC dienen dem Step-up.
+Grund: Eine Passkey-Anmeldung umginge sonst `auth.idp_recheck_interval`. Für einen unbekannten
+Login-Namen liefert `beginPasskeyLogin` eine Schein-Credential-ID aus HMAC und Namen, damit die
+Antwort keine Konten verrät.
 
 Passwort mit TOTP (Tabelle `local_credentials` in 03):
 
 - Passwort-Hash Argon2id im PHC-Format. Untergrenze nach OWASP: 19 MiB Speicher, 2 Durchläufe,
   Parallelität 1 (https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html,
   abgerufen 2026-10-10 [belegt]). Standardwerte in Abschnitt 18; ein Test lehnt Werte darunter ab.
-- Mindestlänge `auth.password_min_length`; Prüfung gegen eine lokale Liste häufiger Passwörter.
-  Keine Zusammensetzungsregeln.
+- Login-Name ist das `subject` der lokalen Identität (bei der Einrichtung der Handle).
+- Mindestlänge `auth.password_min_length` (in Unicode-Zeichen nach NFC); Prüfung gegen eine lokale
+  Liste häufiger Passwörter mit erlaubter Lizenz, im Repository nur als gekürzte SHA-256-Werte;
+  Quelle, Stand und Lizenz nennt das README des Adapters. Keine Zusammensetzungsregeln. Weichen
+  die gespeicherten Argon2id-Parameter von der Konfiguration ab, speichert eine erfolgreiche
+  Anmeldung einen neuen Hash.
 - TOTP nach RFC 6238 mit 30-Sekunden-Schritt, höchstens ein Schritt Toleranz, jede Ziffernfolge nur
   einmal gültig (RFC 6238 Abschnitt 5.2: "MUST NOT accept the second attempt";
   https://www.rfc-editor.org/rfc/rfc6238.html, abgerufen 2026-10-10 [belegt]). Darum speichert der
   Server den zuletzt benutzten Zeitschritt.
+- Einrichtung in zwei Schritten: `totp_enroll` liefert einmal das neue Geheimnis als otpauth-URI
+  (Aussteller ist der Host von `server.public_url`), erst ein gültiger `totp_code` macht es wirksam
+  (`totp_enabled_at`). Der Passwortweg gilt als eingerichtet, sobald TOTP bestätigt ist; erst dann
+  verlangt `local_credential.set` Step-up (05, Spalte "Step-up" `bedingt`).
 - Das TOTP-Geheimnis ist ein Geheimnis, das der Server zum Prüfen braucht. Es liegt verschlüsselt
-  (AEAD) in der Datenbank; der Schlüssel liegt nur im Secret-Provider (`secret_ref`).
+  (AES-256-GCM mit der Identität als zusätzlichen Daten) in der Datenbank; der Schlüssel liegt nur
+  im Secret-Provider (`auth.totp_key_ref`, je Zeile in `totp_key_ref` vermerkt, damit ein neuer
+  Schlüssel alte Zeilen lesbar lässt).
 - Wiederherstellungscodes gibt es nicht. Wiederherstellung läuft über einen neuen Einladungs-Code
   des Owners. Grund: ein zweiter dauerhafter Geheimnis-Satz wäre ein weiterer Angriffsweg.
+
+### 2.6 Konfiguration je Treiber
+
+`identity_providers.config` folgt je Art einem Schema. Unbekannte Felder, doppelte Schlüssel und
+JSON-`null` werden mit `400 validation_failed` abgelehnt; Geheimnisse stehen nur als Verweis auf
+den Secret-Provider darin und werden bei der Prüfung nicht aufgelöst.
+
+`identity_provider.oidc.v1`:
+
+| Feld | Pflicht | Bedeutung |
+|---|---|---|
+| `issuer` | ja | genauer Aussteller, `https` ohne Query und Fragment; für mehrere Entra-Mandanten mit dem Platzhalter `{tenantid}` |
+| `client_id` | ja | Client-ID beim Anbieter |
+| `client_auth` | ja | `private_key_jwt` (bevorzugt) oder `client_secret_basic` |
+| `client_secret_ref` | genau mit `client_secret_basic` | Verweis auf das Client-Secret |
+| `client_key_ref` | genau mit `private_key_jwt` | Verweis auf den privaten Schlüssel (PKCS#8, PEM) |
+| `client_key_alg` | nein, Standard `PS256` | `PS256`, `RS256` oder `ES256` für die Client-Assertion |
+| `client_key_id` | nein | `kid` im Kopf der Client-Assertion |
+| `client_cert_x5t_s256` | nein | `x5t#S256` im Kopf (Entra mit Zertifikat) |
+| `allowed_tenant_ids` | ja, wenn `issuer` `{tenantid}` enthält | erlaubte Werte des Claims `tid` |
+| `app_redirect_uris` | nein | erlaubte private Schemata oder beanspruchte `https`-Adressen der Apps (Abschnitt 2.2, Schritt 2) |
+| `groups_claim` | nein | Name des Gruppen-Claims; fehlt er, gibt es keinen Abgleich (Abschnitt 3.4) |
+
+`identity_provider.trusted_header.v1`: `login_header` (Pflicht, Name einer HTTP-Kopfzeile nach RFC
+9110, z. B. `Tailscale-User-Login`) und `name_header` (optional, z. B. `Tailscale-User-Name`).
+`identity_provider.local.v1`: ein leeres Objekt.
 
 ## 3. Konto, Verknüpfung und Bereitstellung
 
 ### 3.1 Zuordnung einer externen Identität
 
+Die Zuordnung läuft beim Abschluss der Anmeldung, in einer Transaktion mit Gerät und Sitzung:
+
 1. Suche `user_identities` nach `(provider_id, subject)` mit `unlinked_at IS NULL` (bei OIDC
    zusätzlich `issuer`). Treffer: Anmeldung für diesen Menschen.
-2. Kein Treffer, aber der Vorgang trägt einen gültigen Einladungs-Code: Verknüpfung mit dem Menschen
-   des Codes, Code verbraucht, Audit `identity.link`.
+2. Kein Treffer, aber der Vorgang trägt einen gültigen Einladungs-Code (Zweck `first_login`,
+   `recovery` oder `identity_link`): Verknüpfung mit dem Menschen des Codes, Code verbraucht, Gerät
+   `active` (Abschnitt 3.2), Audit `identity.link`.
 3. Kein Treffer, `identity_providers.allow_provisioning = true`: neuer Mensch mit Status `pending`,
-   ohne Freigaben, Gerät `pending`. Der Owner aktiviert mit `user.enable` (Step-up).
+   ohne Freigaben, ohne E-Mail (`users.email` bleibt leer, 03), Gerät `pending`. Er hat Tokens,
+   darf aber nur sich selbst lesen (`403 device_pending`, 07 Abschnitt 4.1), bis der Owner ihn mit
+   `user.enable` (Step-up) aktiviert und das Gerät bestätigt ist (Abschnitt 5.2). Handle und
+   Anzeigename leitet der Server aus Claims bzw. Login ab; Steuer- und Bidi-Zeichen werden
+   entfernt, ein belegter Handle bekommt eine zufällige Endung.
 4. Sonst: Ablehnung mit neutraler Meldung ("Kein Zugang. Bitte wende dich an die Verwaltung."),
    Audit `deny`.
+5. Ein Mensch im Zustand `disabled` oder `deleted` meldet sich nie an (`401`).
 
 Nie wird über E-Mail-Adressen oder Anzeigenamen zugeordnet. Grund: Diese Werte sind veränderlich
 und teils vom Mandanten oder der Person steuerbar (Abschnitt 2.3).
@@ -194,27 +274,64 @@ und teils vom Mandanten oder der Person steuerbar (Abschnitt 2.3).
 
 Tabelle `enrollment_codes` (03). Eigenschaften:
 
-- Ausgestellt bei `user.create`, bei der Erstinstallation (Abschnitt 4) oder zur Wiederherstellung
-  durch den Owner bzw. per Server-Befehl.
+- Ausgestellt bei `user.create` mit `local_account`, mit `createEnrollmentCode` durch den Owner, bei
+  der Erstinstallation (Abschnitt 4) und zur Wiederherstellung per Server-Befehl (`owner.recover`).
 - Zufall mit mindestens 128 Bit, angezeigt einmal, gespeichert nur als HMAC (03, Grundsatz 9).
+  Darstellung `en_` plus Gruppen aus Crockford-Base32; bei der Eingabe zählen Groß- und
+  Kleinschreibung, Bindestriche und Leerzeichen nicht.
 - Gültig `auth.enrollment_code_ttl`, einmal verwendbar, höchstens `auth.enrollment_code_max_attempts`
-  Fehlversuche je Code, danach ungültig.
+  Fehlversuche je Code, danach ungültig. Ein Fehlversuch ist eine abgelehnte Einlösung, deren Code
+  passte (z. B. ungültige Geräteregistrierung, falscher DPoP-Schlüssel, gescheiterte
+  WebAuthn-Prüfung); er wird nach dem Rollback in eigener Transaktion gezählt. Ein nicht passender
+  Code lässt sich keiner Zeile zuordnen; ihn begrenzt `rl.public_auth` je Client-IP.
+- Je Person gilt höchstens ein Code; ein neuer beendet die älteren. Jede Ablehnung hat dieselbe
+  Antwort.
 - Übergabe außerhalb des Produkts (persönlich, Telefon). Kein E-Mail-Versand (Baseline Abschnitt 4).
 - Ein Code ist zugleich die Bestätigung des ersten Geräts: Das Gerät, das ihn einlöst, wird `active`.
+  Eingelöst wird nur mit Geräteschlüsseln (`POST /api/v1/auth/enroll/redeem`), zusammen mit einem
+  Passkey (`/api/v1/auth/enroll/begin` und `/complete`) oder über eine Anmeldung mit OIDC bzw. Proxy-Header
+  (Feld `enrollment_code`, Abschnitt 3.1).
+
+| Zweck | Ausgestellt für | Eingelöst über |
+|---|---|---|
+| `first_login` | Menschen mit lokaler Identität ohne Gerät (Erstinstallation, `createUser` mit `local_account`, `createEnrollmentCode`) | Einlösen mit Geräteschlüsseln oder Passkey, Verknüpfung bei OIDC oder Proxy-Header |
+| `recovery` | Menschen mit lokaler Identität und mindestens einem Gerät (`createEnrollmentCode`, `bothy setup issue-enrollment-code`) | wie `first_login` |
+| `identity_link` | Menschen ohne lokale Identität, z. B. für OIDC ohne `allow_provisioning` (`createEnrollmentCode`) | nur Verknüpfung bei OIDC oder Proxy-Header |
 
 ### 3.3 Weitere Identität verknüpfen und lösen
 
 - `identity.link` (05): Mensch mit Step-up startet einen Anmeldevorgang im Modus "verknüpfen". Das
   Subjekt darf nicht schon verknüpft sein.
-- `identity.unlink`: abgelehnt, wenn danach kein Anmeldeweg bleibt (keine Identität, kein Passkey,
-  kein aktives Gerät für Geräte-Kopplung).
+- `identity.unlink`: abgelehnt mit `409 conflict` und `reason: no_login_method_left`, wenn danach
+  kein Anmeldeweg bleibt (keine Identität bei einem eingeschalteten Treiber, kein Passkey, kein
+  aktives Gerät für Geräte-Kopplung). Die Prüfung sperrt die Identitäten der Person, damit zwei
+  parallele Lösungen nicht beide gelingen.
+- Lösen einer Identität beendet die Sitzungen, die mit ihr begonnen wurden (`auth_sessions.identity_id`,
+  Grund `logout` bei der eigenen, `admin` bei fremder Hand); Abschalten eines Treibers (`enabled =
+  false`) beendet die Sitzungen aller seiner Identitäten (`admin`) und verhindert neue Anmeldungen.
+  Grund: Wer einen Weg sperrt, meint auch die Sitzungen, die durch ihn entstanden sind (R-ID-12).
+- Ein Treiber, auf den eine Identität verweist (auch eine gelöste), wird nicht gelöscht
+  (`409 conflict`, abschalten statt löschen); ohne Identitäten ist das Löschen endgültig.
 
 ### 3.4 Gruppen aus Claims
 
-Gruppen mit `source = 'oidc_claim'` werden bei jeder OIDC-Anmeldung abgeglichen: fehlende
-Mitgliedschaften entfernt, neue mit `expires_at = Anmeldezeit + auth.group_claim_max_age` angelegt.
-Jede Änderung ist eine Rechte-Änderung mit I1-Prüfung (07, Abschnitt 4.4). Verletzt der Abgleich I1,
-scheitert die Anmeldung mit Hinweis an den Owner, statt Rechte still zu erweitern.
+Gruppen mit `source = 'oidc_claim'` gehören zu genau einem Anbieter (`groups.provider_id`, 03) und
+nennen den Claim-Wert in `external_ref`. Der Owner legt sie an; unbekannte Claim-Werte erzeugen nie
+eine Gruppe. Beim Abschluss jeder OIDC-Anmeldung eines Anbieters mit `groups_claim` (Systemaktion
+`group.member.sync`, 05):
+
+1. Claim als Liste von Zeichenketten vorhanden (auch leer): neue Mitgliedschaften mit `expires_at =
+   Anmeldezeit + auth.group_claim_max_age` anlegen, bestehende (auch abgelaufene) auf denselben
+   Ablauf verlängern, fehlende entfernen. Der Ablauf gleitet also mit jeder Anmeldung.
+2. Claim fehlt oder Entra meldet einen Überlauf: nichts ändern; die Mitgliedschaften laufen nach
+   `auth.group_claim_max_age` ab (Abschnitt 2.3). Ein Claim anderer Form lässt die Anmeldung
+   scheitern.
+3. Jede Änderung ist eine Rechte-Änderung mit I1-Prüfung (07, Abschnitt 4.4) in der Transaktion
+   der Anmeldung; ohne Änderung bleibt die Rechte-Version gleich. Verletzt der Abgleich I1,
+   scheitert die ganze Anmeldung mit `409 i1_violation` und Hinweis, statt Rechte still zu
+   erweitern; ein Audit-Eintrag nennt Gruppen und Agenten.
+4. Mitgliedschaften dieser Gruppen ändert sonst niemand (`409 conflict`, 07 Abschnitt 2.6).
+   `added_by` und `removed_by` sind die Person, deren Anmeldung den Claim trug.
 
 ### 3.5 Verzögerung bei Sperre im Anbieter
 
@@ -236,23 +353,30 @@ Der erste Owner entsteht nur per Server-Befehl auf dem Host (Name des Programms 
 bothy setup bootstrap-owner --handle alex --display-name "Alex"
 ```
 
-Der Befehl verbindet sich direkt mit der Datenbank (Rolle für Verwaltung, nicht über HTTP) und
-macht in einer Transaktion:
+Der Befehl verbindet sich direkt mit der Datenbank, nicht über HTTP, mit der Anwendungsrolle
+`bothy_app` ([16-betrieb.md](16-betrieb.md), Abschnitt 7.1; er schreibt nur Zeilen). Vor der
+Transaktion stellt er die Signierschlüssel sicher (ADR 0066); dann macht er in einer Transaktion:
 
-1. Prüfen, dass `setup_completed_at IS NULL`; sonst Abbruch.
-2. Prinzipal und Mensch anlegen, Zeile in `owners` mit `granted_by = NULL` und Grund "bootstrap".
-3. Signierschlüssel prüfen bzw. anlegen (öffentlicher Teil in `server_signing_keys`, privater Teil
-   im Secret-Provider).
-4. Einladungs-Code ausstellen und einmal auf die Konsole schreiben.
+1. Prüfen, dass `setup_completed_at IS NULL`; sonst Abbruch ohne Änderung.
+2. Einen Treiber `local` anlegen, falls keiner existiert.
+3. Prinzipal und Mensch anlegen, Zeile in `owners` mit `granted_by = NULL` und Grund "bootstrap",
+   lokale Identität mit dem Handle als `subject`.
+4. Einladungs-Code (`first_login`) ausstellen.
 5. Audit-Eintrag mit `actor_principal_id = NULL` und Systemaktion `instance.bootstrap` (05).
 6. `setup_completed_at = now()`.
+
+Nach dem Commit schreibt er den Code genau einmal auf die Standardausgabe; Logs enthalten ihn nie.
+Exitcodes nach [02-architektur.md](02-architektur.md), Abschnitt 3.3. Die Sperre bis zur
+Einrichtung gilt ab dem nächsten Aufruf ohne Neustart. `createUser` mit `local_account` legt die
+lokale Identität ebenso an.
 
 Der Owner löst den Code in der App ein, mit OIDC (der Code verknüpft die Identität) oder lokal
 (Gerät plus Passkey bzw. Passwort mit TOTP).
 
 Wiederherstellung, wenn alle Owner ihre Geräte verloren haben: `bothy setup issue-enrollment-code
---user <handle>` auf dem Host, nur für aktive Owner, mit Audit. Der Zugang zum Host ist die
-Vertrauenswurzel der Instanz; das steht so im Betriebshandbuch ([16-betrieb.md](16-betrieb.md)).
+--user <handle>` auf dem Host, nur für aktive Owner, Code mit Zweck `recovery`, Audit mit der
+Systemaktion `owner.recover` (05). Der Zugang zum Host ist die Vertrauenswurzel der Instanz
+([16-betrieb.md](16-betrieb.md), Abschnitt 4.3).
 
 ## 5. Geräte
 
@@ -288,9 +412,15 @@ Bestätigen dürfen (`device.approve`, Step-up):
 - ein Owner.
 
 Bestätigungs-Code: Das wartende Gerät zeigt einen Code mit `auth.device_verification_code_digits`
-Ziffern, abgeleitet aus seinem `jkt` und der Anfrage. Die bestätigende Person tippt ihn ein. Ein
-falscher Code lehnt das wartende Gerät ab. Grund: Ein blindes "Erlauben" bestätigt sonst auch das
-Gerät eines Angreifers, der zur selben Zeit eine Anmeldung ausgelöst hat.
+Ziffern. Der Server leitet ihn ab, statt ihn zu speichern: HMAC-SHA-256 mit dem Token-Pepper über
+Geräte-ID und `jkt` des DPoP-Schlüssels, als Zahl modulo `10^digits`. Er erscheint nur in Antworten
+an das wartende Gerät selbst (`Device.verification_code`), nie bei anderen Geräten oder Owner. Die
+bestätigende Person tippt ihn ein (`approveDevice`). Ein falscher Code widerruft das wartende Gerät
+(`revoke_reason = verification_failed`); die Antwort ist trotzdem `200` mit `state` `revoked`, weil
+die Anfrage gewirkt hat. Grund: Ein blindes "Erlauben" bestätigt sonst auch das Gerät eines
+Angreifers, der zur selben Zeit eine Anmeldung ausgelöst hat; ein zweiter Versuch des Angreifers
+zeigt wegen des anderen Schlüssels einen anderen Code. Ein wartendes Gerät über
+`auth.device_pending_ttl` gilt als widerrufen (`pending_expired`, Systemaktion `device.expire`).
 
 ### 5.3 Geräte-Kopplung
 
@@ -302,17 +432,28 @@ wählt die Person "Gerät hinzufügen", gibt den Code ein und bestätigt mit Ste
 (`POST /api/v1/me/devices/pairings`, `device.approve`). Das neue Gerät fragt
 `POST /api/v1/auth/pairing/complete` mit einem DPoP-Beweis desselben Schlüssels ab
 (`auth.login.complete`); nach der Bestätigung wird es `active` und bekommt seine Tokens
-(`auth_sessions.auth_method = 'device_pairing'`). Zustand in `device_pairings` (03). Rate-Limit je
-Code und je IP (Abschnitt 13). Grund für den Code auf dem neuen Gerät: Nur wer beide Geräte vor
-sich hat, kann koppeln; ein fremder Code bindet nie ein fremdes Gerät ohne Step-up der Person.
+(`auth_sessions.auth_method = 'device_pairing'`). Zustand in `device_pairings` (03). Die
+Bestätigung legt das Gerät für die bestätigende Person an (`active`) und öffnet ein neues Fenster
+`auth.pairing_code_ttl` zum Abholen; danach wird die Kopplung `expired` und das nie abgeholte Gerät
+widerrufen (`pairing_expired`). Ein Code, der zu keiner offenen Kopplung passt, beendet den
+Step-up der bestätigenden Sitzung (`404`); jeder weitere Versuch braucht eine neue Bestätigung mit
+Biometrie. Ein Beweis mit einem anderen Schlüssel beim Abholen lehnt die Kopplung ab. Grund für
+den Code auf dem neuen Gerät: Nur wer beide Geräte vor sich hat, kann koppeln; ein fremder Code
+bindet nie ein fremdes Gerät ohne Step-up der Person.
 
 ### 5.4 Verwaltung
 
 - Liste der Geräte mit Plattform, Name, letzter Aktivität, Sitzungen (`device.list`).
 - Ungenutzte Geräte werden nach `auth.device_inactive_revoke_after` ohne Kontakt automatisch
-  widerrufen (Grund `inactive`).
-- Schlüsselwechsel: neues Schlüsselpaar, Bestätigung mit dem alten Step-up-Schlüssel, alter
-  Schlüssel `revoked_at`.
+  widerrufen (Grund `inactive`, Systemaktion `device.expire`, Job `identity.auth_cleanup`) wie bei
+  `device.revoke` (Abschnitt 10).
+- Gründe des Widerrufs in `devices.revoke_reason` (03): `revoked_by_self`, `revoked_by_owner`,
+  `user_disabled`, `inactive`, `verification_failed`, `pending_expired`, `pairing_expired`.
+- Kein Schlüsselwechsel am bestehenden Gerät. Verliert ein Gerät einen Schlüssel (z. B. macht neue
+  Biometrie den Step-up-Schlüssel ungültig, Abschnitt 6.1), meldet sich die App als neues Gerät an
+  (wartend, Bestätigung oder Kopplung), und die Person widerruft das alte. Grund: Ein Wechsel nur
+  mit dem DPoP-Schlüssel ließe Schadcode in der App einen eigenen Step-up-Schlüssel eintragen; mit
+  dem alten Step-up-Schlüssel ginge er gerade im häufigsten Fall nicht (R-ID-11).
 
 ## 6. Geräteschlüssel und Step-up
 
@@ -341,17 +482,31 @@ Etappe vorgesehen.
 
 ### 6.2 Step-up-Ablauf
 
-1. Die App fordert eine Herausforderung an (`POST /api/v1/auth/step-up/challenge`); Antwort: Zufallswert,
-   Gültigkeit `auth.step_up_challenge_ttl`, Anzeigetext ("Verwaltung bestätigen").
-2. Das Betriebssystem fragt Biometrie oder PIN ab; der Step-up-Schlüssel signiert eine JWS über
-   `{challenge, sid, iat}`.
-3. `POST /api/v1/auth/step-up/device-key` bzw. `/passkey` (Aktion `auth.step_up`). Der Server prüft Signatur gegen den aktiven
-   `step_up`-Schlüssel des Geräts der Sitzung, Herausforderung (einmalig), Zeit.
-4. `auth_sessions.step_up_at = now()`, Audit. Gültig für `auth.step_up_max_age` (03).
+1. Die App fordert eine Herausforderung an (`POST /api/v1/auth/step-up/challenge`); Antwort:
+   Zufallswert, Gültigkeit `auth.step_up_challenge_ttl`, bei vorhandenen Passkeys die
+   WebAuthn-Optionen mit demselben Wert. Gespeichert wird nur der HMAC in `auth_challenges` (03).
+   Den Text der Abfrage zeigt der Client in seiner Sprache.
+2. Das Betriebssystem fragt Biometrie oder PIN ab; der Step-up-Schlüssel signiert eine kompakte JWS
+   (Kopf nur `alg`, ohne `jwk`, `jku`, `x5u`, `x5c`, `crit`) über `{challenge, sid, iat}`.
+3. `POST /api/v1/auth/step-up/device-key` bzw. `/passkey` (Aktion `auth.step_up`). Der Server sperrt
+   Sitzung und Herausforderung, prüft die Signatur gegen den aktiven `step_up`-Schlüssel des Geräts
+   der Sitzung (ein anderer Schlüssel scheitert), die Herausforderung (einmalig, dieselbe Sitzung)
+   und `iat` (nicht vor ihrer Ausgabe minus `auth.clock_leeway`, nicht nach jetzt plus
+   `auth.clock_leeway`).
+4. `auth_sessions.step_up_at = now()`, `step_up_method`, Audit. Gültig für `auth.step_up_max_age`
+   (03), nur für diese Sitzung, nicht für ihre Kind-Sitzungen.
+
+Eine falsche Bestätigung (Signatur, Passkey einer anderen Person) setzt die Herausforderung auf
+`failed` und zählt; eine unbekannte, abgelaufene oder schon benutzte Herausforderung zählt nicht.
+Erreichen die gezählten Fehlversuche der Sitzung im Fenster `auth.login_fail_window` die Grenze
+`auth.step_up_fail_limit`, widerruft der Server die Sitzung (`step_up_failed`). Antworten stehen in
+Abschnitt 13.
 
 Web-Konsole: WebAuthn-Assertion mit `userVerification = required` gegen die Passkeys der Person.
 Ohne Passkey: erneute OIDC-Anmeldung mit `prompt=login` und `max_age=0`; der Server verlangt ein
-`auth_time` nach Beginn der Herausforderung. Lokale Konten ohne Passkey: Passwort mit TOTP.
+`auth_time` nach Beginn der Herausforderung. Lokale Konten ohne Passkey: Passwort mit TOTP. Die
+Operationen für die beiden letzten Wege entstehen mit der Konsolen-Sitzung (PLAN M6-01), Spec
+zuerst; native Apps haben immer einen Step-up-Schlüssel und brauchen sie nicht.
 
 Step-up können nur Menschen in einer Sitzung erbringen (07, SR5). Die Bestätigung gilt nur für die
 Sitzung, in der sie erbracht wurde, also für ein Gerät.
@@ -370,9 +525,14 @@ Sitzung, in der sie erbracht wurde, also für ein Gerät.
 
 ### 7.2 Zugriffstoken
 
-Claims: `iss` (`instance_id`, 03), `aud` (API der Instanz), `sub`, `sid`, `did` (Gerät), `jti`,
-`iat`, `nbf`, `exp`, `cnf.jkt`, `amr` (Anmeldeweg). Keine Rechte im Token; Rechte berechnet `authz`
-bei jeder Anfrage (07). Grund: Ein Token mit Rechten wäre bis zum Ablauf veraltet.
+Kopf: `alg` des aktiven Schlüssels mit Zweck `access_token`, `kid`, `typ = at+jwt` (RFC 9068,
+Abschnitt 2.1; trennt Zugriffstokens von jeder anderen JWS). Claims: `iss` (`instance_id` als UUID,
+03), `aud` (Origin von `server.public_url` plus `/api/v1`, z. B. `https://chat.example.com/api/v1`),
+`sub`, `sid`, `did` (Gerät), `jti`, `iat`, `nbf`, `exp` (höchstens `auth_sessions.expires_at`),
+`cnf.jkt`, `amr` (Liste mit dem Anmeldeweg der Sitzung). Keine Rechte im Token; Rechte berechnet
+`authz` bei jeder Anfrage (07). Grund: Ein Token mit Rechten wäre bis zum Ablauf veraltet.
+JWS-Aufbau, Prüfung und JWK-Fingerabdrücke laufen über eine Implementierung mit der
+Standardbibliothek in `kernel/jose` (ADR 0067).
 
 Prüfung je Anfrage: Signatur mit `kid` aus den Schlüsseln im Zustand `active` oder `retiring`,
 `iss`, `aud`, `exp` und `nbf` mit `auth.clock_leeway`, dann DPoP (7.3), dann Sitzung und Gerät über
@@ -387,9 +547,18 @@ Nach RFC 9449 (https://www.rfc-editor.org/rfc/rfc9449.html, abgerufen 2026-10-10
 - Der Server gibt Nonces über die Kopfzeile `DPoP-Nonce` aus und erneuert sie nach
   `auth.dpop_nonce_ttl` (Abschnitt 18). Akzeptiert werden der aktuelle und der vorige Nonce. Einmal mit
   Nonces gestartet, lehnt der Server Beweise ohne `nonce` ab (RFC 9449, Abschnitt 11.3).
+- Nonces sind zustandslos, damit jeder Prozess und jeder Neustart sie annimmt: Fenster `w` = Unix-
+  Sekunden geteilt durch `auth.dpop_nonce_ttl` (abgerundet); Nonce = base64url von `w` (8 Byte)
+  und den ersten 16 Byte eines HMAC-SHA-256 über `w` mit einem Schlüssel, den HKDF-SHA256 aus dem
+  Token-Pepper ableitet. Gilt der Beweis mit dem vorigen Fenster, trägt die Antwort den aktuellen
+  Nonce.
+- `htu` ist der Origin von `server.public_url` plus Pfad der Anfrage, ohne Query und Fragment,
+  verglichen nach Normalisierung (Schema und Host klein, Standard-Port entfernt).
+  `server.public_url` ist darum ein Origin ohne Pfad ([16-betrieb.md](16-betrieb.md)).
 - `iat` höchstens `auth.dpop_proof_max_age` alt und höchstens `auth.clock_leeway` in der Zukunft.
 - `jti` je `htu` innerhalb dieses Fensters nur einmal; gespeichert wird ein Hash (RFC 9449,
-  Abschnitt 11.1). Der Speicher ist je Prozess; über Prozesse hinweg schützt der Nonce.
+  Abschnitt 11.1). Der Speicher ist je Prozess; über Prozesse hinweg schützt der Nonce. Seine Größe
+  begrenzen das Zeitfenster und die Rate-Limits; einen eigenen Grenzwert hat er nicht.
 - Ein DPoP-gebundenes Token als `Bearer` wird abgelehnt (RFC 9449, Abschnitt 7.2).
 - Fehler: `401` mit `WWW-Authenticate: DPoP error="invalid_dpop_proof"` bzw.
   `error="use_dpop_nonce"` und neuem Nonce.
@@ -411,9 +580,12 @@ Nach RFC 9449 (https://www.rfc-editor.org/rfc/rfc9449.html, abgerufen 2026-10-10
 - **Erweiterungs-Sitzungen.** Prozesse einer App, die getrennt laufen und selbst erneuern müssen
   (iOS- und macOS-Notification-Service-Extension, Share-Extension), bekommen je eine eigene
   Kind-Sitzung mit eigener Familie auf demselben Gerät (`auth_sessions.client_component`,
-  `auth_sessions.parent_session_id`, 03). Grund: Zwei Prozesse mit einer Familie erneuern gleichzeitig,
-  und die zweite Erneuerung sähe wie Diebstahl aus. Widerruf der Eltern-Sitzung widerruft alle
-  Kinder.
+  `auth_sessions.parent_session_id`, 03). Die App legt sie an (`POST
+  /api/v1/me/sessions/extensions`, Aktion `session.extension.create`) und reicht die Tokens über
+  die geteilte Keychain-Gruppe weiter; die Familie nutzt denselben DPoP-Schlüssel. Je Eltern-Sitzung
+  und Komponente gibt es höchstens eine aktive Kind-Sitzung; eine neue ersetzt die alte (`logout`).
+  Grund: Zwei Prozesse mit einer Familie erneuern gleichzeitig, und die zweite Erneuerung sähe wie
+  Diebstahl aus. Widerruf der Eltern-Sitzung widerruft alle Kinder.
 
 ### 7.5 Web-Konsole: Sitzung nach dem Backend-for-Frontend-Muster
 
@@ -426,9 +598,10 @@ sicherste und empfiehlt es für Anwendungen mit personenbezogenen Daten
   `Domain` (RFC 10017, Abschnitt 6.1.3.2 [belegt]). Wert: 256 Bit Zufall; gespeichert als HMAC an
   der Sitzung (`auth_sessions.cookie_hash`, 03). Neuer Wert bei Anmeldung und nach Step-up
   (gegen Session Fixation).
-- CSRF: Jede ändernde Anfrage der Konsole trägt eine feste eigene Kopfzeile (Name in
-  [06-api.md](06-api.md)); ohne CORS-Freigabe kann eine fremde Seite sie nicht setzen. Zusätzlich
-  muss `Origin` gleich dem Origin der Konsole sein, auch beim WebSocket-Upgrade.
+- CSRF: Jede ändernde Anfrage der Konsole trägt eine feste eigene Kopfzeile (Name und Wert legt
+  die Konsolen-Sitzung, PLAN M6-01, in openapi.yaml fest; [06-api.md](06-api.md), Abschnitt 3);
+  ohne CORS-Freigabe kann eine fremde Seite sie nicht setzen. Zusätzlich muss `Origin` gleich dem
+  Origin der Konsole sein, auch beim WebSocket-Upgrade.
 - Die Konsole ist ein Gerät mit `platform = 'web'` und `client_component = 'console'`. Statt einer
   Gerätebestätigung verlangt sie direkt nach der Anmeldung einen Step-up (Passkey, sonst erneute
   OIDC-Anmeldung bzw. Passwort mit TOTP); vorher zeigt sie nur das eigene Profil. Grund: Owner lesen
@@ -489,13 +662,15 @@ sicherste und empfiehlt es für Anwendungen mit personenbezogenen Daten
 5. Persönliche API-Tokens widerrufen; Push-Registrierungen deaktivieren.
 6. Rechte-Version erhöhen; I1 prüfen; `access.changed`, `session.revoked`.
 7. Für alle aktiven Läufe, die die Person ausgelöst hat: `run.cancel_requested` mit Grund
-   `user_disabled`. Für Dev-Umgebungen der Person: Zustand `suspended`
+   `user_disabled` (das In-Tx-Ereignis `AccessChanged` trägt die Ursache, [02-architektur.md](02-architektur.md)
+   Abschnitt 4.3). Für Dev-Umgebungen der Person: Zustand `suspended`
    ([21-dev-isolation.md](21-dev-isolation.md)).
 8. Audit-Eintrag.
 
 Nach dem Commit: Gateway schließt Verbindungen mit `4012`; Agenten brechen ab. Freigaben und
 Gruppenmitgliedschaften bleiben stehen, wirken aber nicht; die Konsole bietet "alle Freigaben
-widerrufen" als eigenen, bewussten Schritt. Inhalte bleiben.
+widerrufen" als eigenen, bewussten Schritt. Inhalte bleiben. Sperren, Widerrufen und Beenden von
+schon Gesperrtem oder Widerrufenem gelingt ohne Wirkung (06, Abschnitt 2 "Ohne Wirkung").
 
 Die Konsole zeigt danach eine Liste der Schritte außerhalb des Produkts: Konto beim
 Identitätsanbieter sperren, Zugang zum Netz entziehen, API-Schlüssel externer Systeme tauschen, die
@@ -503,20 +678,32 @@ die Person kannte, Geheimnisse in ihrer Dev-Umgebung rotieren.
 
 ## 12. API-Tokens für Agenten, Apps und Werkzeuge
 
-- **Form.** `<präfix>_<art>_<zufall>_<prüfsumme>`: Präfix `bothy` (eine der gelisteten Stellen mit
-  dem Arbeitsnamen, ADR 0044), Art `agt` (Agent), `app` (App), `pat` (persönlich), `whi`
-  (Eingangs-Webhook), 256 Bit Zufall in Base62, Prüfsumme über den Zufallsteil. Grund: Das Präfix
-  erlaubt eine Regel im Secret-Scanner ([23-qualitaet.md](23-qualitaet.md)); die Prüfsumme weist
-  Tippfehler und Zufallsfunde ohne Datenbankzugriff ab.
-- **Speicher.** Nur HMAC-SHA-256 mit Server-Pepper und die ersten Zeichen als `token_prefix` (03).
-  Anzeige genau einmal bei `token.create`.
-- **Scopes.** Teilmenge der Manifest-Scopes bzw. Agenten-Scopes (03); Rechte zusätzlich aus
-  Freigaben (07). In M1 prüft `authorize` für Apps nur `app_installations.granted_scopes` der
-  Installation des Tokens (07, Abschnitt 2.10); wie die Scopes des Tokens selbst dazukommen und wie
-  lange Verbindungen den Zustand der Installation neu prüfen, legt die Etappe M2 (Apps) fest,
-  bevor ein App-Token ausgegeben wird.
+- **Form.** `<präfix>_<art>_<zufall>_<prüfsumme>` nach ADR 0061: Präfix `bothy` (eine der
+  gelisteten Stellen mit dem Arbeitsnamen, [02-architektur.md](02-architektur.md) Abschnitt 6),
+  Art `agt` (Agent), `app` (App), `pat` (persönlich), `whi` (Eingangs-Webhook), 256 Bit Zufall in
+  Base62 (Alphabet `0-9A-Za-z`) als genau 43 Zeichen, Prüfsumme CRC-32 (IEEE) über die Zeichen des
+  Zufallsteils als genau 6 Base62-Zeichen. Die Art folgt dem Prinzipal: `agt` nur für Agenten,
+  `app` nur für Apps, `pat` nur für Menschen; `whi` stellt nur ein Eingangs-Webhook aus. Grund:
+  Das Präfix erlaubt eine Regel im Secret-Scanner ([23-qualitaet.md](23-qualitaet.md)); die
+  Prüfsumme weist Tippfehler und Zufallsfunde ohne Datenbankzugriff ab.
+- **Speicher.** Nur HMAC-SHA-256 mit Server-Pepper und die ersten 6 Zeichen des Zufallsteils als
+  `token_prefix` (03). Anzeige genau einmal bei `token.create`; eine Wiederholung mit demselben
+  `Idempotency-Key` antwortet `409 conflict` mit `reason: one_time_secret` (06, Abschnitt 7).
+- **Wer.** Persönliche Tokens legt eine Person nur für sich selbst an (sonst `403`, Grund
+  `not_self`), nur mit dem Schalter `tokens.personal_enabled`; Agenten- und App-Tokens legt der
+  Owner an.
+- **Scopes.** Nur App-Tokens tragen Scopes: eine Teilmenge der bewilligten Scopes der Installation.
+  Agenten-Tokens tragen keine (Agenten haben ihre Scopes implizit, 05 Abschnitt 2.6), persönliche
+  auch nicht (sie handeln mit den Freigaben der Person). Rechte zusätzlich aus Freigaben (07). In
+  M1 prüft `authorize` für Apps nur `app_installations.granted_scopes` der Installation des Tokens
+  (07, Abschnitt 2.10); wie die Scopes des Tokens selbst dazukommen und wie lange Verbindungen den
+  Zustand der Installation neu prüfen, legt die Etappe M2 (Apps) fest, bevor ein App-Token
+  ausgegeben wird. Bis dahin antwortet `token.create` für eine App `409 conflict` mit `reason:
+  app_not_installed` (PLAN M2-24).
 - **Bindung.** Agenten-Tokens sind DPoP-gebunden, wenn `agent` in `auth.dpop_required_for` steht
-  (Standard). Der Adapter erzeugt dafür bei der Einrichtung ein Schlüsselpaar.
+  (Standard; erlaubte Werte `agent`, `app`, `personal`). Der Adapter erzeugt dafür bei der
+  Einrichtung ein Schlüsselpaar. Ein gebundenes Token verlangt das Schema `DPoP` und einen Beweis
+  mit genau diesem Schlüssel.
 - **Ablauf.** Pflicht, höchstens `auth.api_token_max_ttl`, persönliche Tokens höchstens
   `auth.personal_token_max_ttl`. Die Konsole listet bald ablaufende Tokens.
 - **Rotation.** Neues Token anlegen, Adapter umstellen, an `last_used_at` sehen, dass das alte
@@ -533,9 +720,10 @@ die Person kannte, Geheimnisse in ihrer Dev-Umgebung rotieren.
 |---|---|---|
 | Anfragen an öffentliche Endpunkte | Client-IP | `ratelimit.rl.public_auth.*` (05) |
 | Fehlversuche je Konto (Passwort, TOTP) | lokaler Login-Name | `auth.login_fail_limit` je `auth.login_fail_window`, danach Sperre des Passwortwegs für `auth.login_lock_duration` |
-| Fehlversuche je Einladungs-Code | Code | `auth.enrollment_code_max_attempts`, danach ungültig |
-| Kopplungs- und Bestätigungs-Codes | Code und IP | ein Fehlversuch macht die Anfrage ungültig |
-| Step-up | Sitzung | `auth.step_up_fail_limit` je `auth.login_fail_window`, danach Sitzung widerrufen |
+| Fehlversuche je Einladungs-Code | Code (nur bei passendem Code, Abschnitt 3.2); sonst Client-IP | `auth.enrollment_code_max_attempts`, danach ungültig; nicht passende Codes über `rl.public_auth` |
+| Bestätigungs-Code eines Geräts | Gerät | ein falscher Code widerruft das wartende Gerät |
+| Kopplungs-Code | Sitzung der bestätigenden Person und IP | ein unbekannter Code beendet den Step-up der Sitzung; das neue Gerät begrenzt `rl.public_auth` |
+| Step-up | Sitzung | `auth.step_up_fail_limit` je `auth.login_fail_window` (gezählt in `auth_challenges`), danach Sitzung widerrufen (`step_up_failed`) |
 
 Regeln:
 
@@ -546,6 +734,20 @@ Regeln:
 - Keine Auskunft über Konten: Unbekannter Login-Name und falsches Passwort ergeben dieselbe Antwort
   in derselben Zeit (der Server berechnet auch bei unbekanntem Namen einen Argon2id-Hash).
 - Jede Sperre und jede Häufung erzeugt einen Audit-Eintrag; der Owner sieht sie in der Konsole.
+- Das Fehlerfenster eines Kontos beginnt mit dem ersten Fehlversuch
+  (`local_credentials.fail_window_started_at`); ein Fehlversuch danach beginnt ein neues Fenster.
+  Jede Anfrage rechnet genau einen Argon2id-Hash, auch bei unbekanntem Namen und bei Sperre.
+
+Antworten, die das Kapitel festlegt:
+
+| Fall | Antwort | Grund |
+|---|---|---|
+| Step-up-Bestätigung falsch, Herausforderung unbekannt, benutzt oder abgelaufen | `401 step_up_required` | Die richtige Reaktion ist ein neuer Step-up, keine neue Anmeldung |
+| Step-up für diesen Aufrufer oder dieses Gerät unmöglich (Token ohne Sitzung, Gerät ohne Step-up-Schlüssel) | `403 forbidden`, Grund `step_up_not_possible` | ein neuer Versuch hilft nicht |
+| Refresh mit einem anderen DPoP-Schlüssel als dem der Familie | `401 invalid_dpop_proof`, Familie bleibt | wer den Schlüssel nicht hat, darf keine fremde Sitzung beenden können |
+| DPoP-gebundenes Token als `Bearer` | `401 invalid_dpop_proof` | RFC 9449, Abschnitt 7.2 |
+| Lösen der letzten Anmeldemöglichkeit | `409 conflict`, `reason: no_login_method_left` | Abschnitt 3.3 |
+| Abweichender Header-Login bei Bindung je Anfrage | `401 session_revoked`, Sitzung widerrufen (`trusted_header_mismatch`) | Abschnitt 2.4 |
 
 ## 14. Abläufe
 
@@ -569,10 +771,11 @@ sequenceDiagram
     S->>S: state und iss prüfen
     S->>I: Code-Tausch mit Client-Authentisierung
     I-->>S: ID-Token
-    S->>S: ID-Token prüfen, Konto zuordnen
+    S->>S: ID-Token prüfen, geprüfte Identität im Vorgang speichern
     S-->>B: Weiterleitung an app_redirect_uri mit login_code
     B-->>A: login_code
     A->>S: POST /api/v1/auth/oidc/complete (client_verifier, DPoP-Beweis, Geräteschlüssel)
+    S->>S: client_verifier prüfen, Konto zuordnen, verknüpfen oder bereitstellen
     alt Gerät aktiv oder Einladungs-Code
         S-->>A: Zugriffstoken (cnf.jkt), Refresh-Token
     else neues Gerät
@@ -598,8 +801,10 @@ sequenceDiagram
         N->>S: GET /api/v1/devices/{id} (DPoP)
         S-->>N: state active, voller Zugriff
     else Code falsch
-        S->>S: Gerät revoked, Audit
-        S-->>N: 401
+        S->>S: Gerät revoked (verification_failed), Audit
+        S-->>G: 200, state revoked
+        N->>S: nächste Anfrage
+        S-->>N: 401 session_revoked
     end
 ```
 
@@ -634,11 +839,11 @@ sequenceDiagram
 | ID-T05 | Entra-Token aus nicht erlaubtem `tid` | abgelehnt |
 | ID-T06 | Anfrage vor Erstinstallation | `503 setup_required` |
 | ID-T07 | `bootstrap-owner` ein zweites Mal | Abbruch, nichts geändert |
-| ID-T08 | `trusted_header` aktiv und Listener auf Nicht-Loopback | Server startet nicht |
+| ID-T08 | `trusted_header` aktiv und Listener auf Nicht-Loopback | Treiber bleibt aus (`404`), `/readyz` meldet `trusted_header_requires_loopback`, Einschalten ergibt `409` |
 | ID-T09 | Header-Anmeldung ohne Login-Kopfzeile (getaggtes Gerät simuliert) | `401` |
 | ID-T10 | Header-Login einer späteren Anfrage weicht ab (Bindung an) | `401`, Sitzung widerrufen |
 | ID-T11 | Einladungs-Code zweimal, abgelaufen, nach zu vielen Fehlversuchen | abgelehnt |
-| ID-T12 | wartendes Gerät ruft eine Route auf | kein Zugriffstoken, kein Zugriff |
+| ID-T12 | wartendes Gerät ruft eine Route auf | Tokens, aber kein Zugriff außer Selbstauskunft (`403 device_pending`) |
 | ID-T13 | Bestätigung mit falschem Code | Gerät `revoked` |
 | ID-T14 | DPoP: falsches `htm`, `htu`, `ath`, alter `iat`, wiederholte `jti`, fehlender oder alter Nonce, Bearer statt DPoP | `401` mit passendem Fehler |
 | ID-T15 | Refresh mit schon benutztem Token | Familie und Sitzung widerrufen, `4012`, Audit |
@@ -669,6 +874,11 @@ sequenceDiagram
 | R-ID-08 | Bestätigungs-Code beim Freigeben neuer Geräte wird eingetippt. | Verhindert das blinde Bestätigen eines fremden Geräts. |
 | R-ID-09 | Keine Wiederherstellungscodes; Wiederherstellung über neuen Einladungs-Code. | Ein Geheimnis-Satz weniger; der Owner bleibt im Ablauf. |
 | R-ID-10 | Kontosperre nur für den Passwortweg. | Angreifer können niemanden aussperren. |
+| R-ID-11 | Kein Schlüsselwechsel am bestehenden Gerät; ein Gerät mit verlorenem Schlüssel meldet sich neu an. | Ein Wechsel nur mit dem DPoP-Schlüssel hebelte den Step-up aus; mit dem alten Step-up-Schlüssel ginge er nach neuer Biometrie nicht. |
+| R-ID-12 | Lösen einer Identität und Abschalten eines Treibers beenden die Sitzungen, die durch sie entstanden. | Wer einen Anmeldeweg sperrt, meint auch die Sitzungen aus ihm; sicherer als Weiterlaufen bis `auth.idp_recheck_interval`. |
+| R-ID-13 | OIDC-Rückruf ohne Kontowirkung; Zuordnung, Verknüpfung und Bereitstellung beim Abschluss (R-DM-30). | Die `authorization_url` ist an keinen Browser gebunden (Login-CSRF). |
+| R-ID-14 | Bereitgestellte Menschen (`pending`) bekommen Tokens, aber nur die Selbstauskunft, wie ein wartendes Gerät. | Mit `401` löschte die App ihre Daten und könnte die Freigabe nicht abwarten. |
+| R-ID-15 | Bestätigungs-Code des Geräts abgeleitet (HMAC über Geräte-ID und Schlüssel), nicht gespeichert. | Keine Spalte nötig; ein zweiter Versuch eines Angreifers zeigt einen anderen Code. |
 
 ## 17. Abgleich mit dem Kern-Vertrag
 
@@ -696,7 +906,8 @@ Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026
 | `auth.dpop_proof_max_age` | `60s` | Höchstalter eines DPoP-Beweises (`iat`) |
 | `auth.login_flow_ttl` | `10m` | Gültigkeit eines Anmeldevorgangs |
 | `auth.server_code_ttl` | `60s` | Gültigkeit des einmaligen Server-Codes |
-| `auth.oidc_jwks_cache_ttl` | `1h` | Cache der Anbieter-Schlüssel |
+| `auth.oidc_jwks_cache_ttl` | `1h` | Cache der Anbieter-Metadaten (Discovery) und -Schlüssel (JWKS) |
+| `auth.oidc_client_assertion_ttl` | `2m` | Gültigkeit einer Client-Assertion bei `private_key_jwt` |
 | `auth.group_claim_max_age` | `30d` | Ablauf von Mitgliedschaften aus Gruppen-Claims nach der letzten Anmeldung |
 | `auth.idp_recheck_interval` | `30d` | spätestens dann neue Anmeldung beim Anbieter |
 | `auth.trusted_header_bind_requests` | `true` | jede Anfrage muss denselben Header-Login tragen |
@@ -707,12 +918,16 @@ Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026
 | `auth.pairing_code_ttl` | `5m` | Gültigkeit eines Kopplungs-Codes |
 | `auth.pairing_code_chars` | `8` | Länge des Kopplungs-Codes (Crockford-Base32, 40 Bit) |
 | `auth.device_inactive_revoke_after` | `180d` | Gerät ohne Kontakt wird widerrufen |
+| `auth.cleanup_interval` | `1h` | Abstand des Jobs `identity.auth_cleanup` (abgelaufene Herausforderungen, Anmeldevorgänge und Kopplungen löschen, wartende und ungenutzte Geräte widerrufen) |
 | `auth.step_up_challenge_ttl` | `2m` | Gültigkeit einer Step-up-Herausforderung |
 | `auth.step_up_fail_limit` | `5` | Fehlversuche beim Step-up je Fenster |
 | `auth.require_key_attestation` | `false` | Plattform-Attestierung der Geräteschlüssel verlangen |
 | `auth.console_session_max_age` | `12h` | absolute Dauer einer Konsolen-Sitzung |
 | `auth.console_session_idle_timeout` | `30m` | Leerlauf bis zum Ende der Konsolen-Sitzung |
 | `auth.local_password_enabled` | `true` | Passwort mit TOTP als Rückfall für lokale Konten |
+| `auth.totp_key_ref` | `file:<secrets.dir>/totp_key` | Verweis auf den Schlüssel (32 Byte), mit dem TOTP-Geheimnisse verschlüsselt werden |
+| `auth.webauthn_rp_id` | leer | RP-ID der Passkeys; leer heißt Host von `server.public_url` |
+| `auth.webauthn_origins` | leer | erlaubte Origins der Passkeys; leer heißt Origin von `server.public_url`; Einträge dürfen auch App-Origins wie `android:apk-key-hash:...` sein |
 | `auth.password_min_length` | `12` | Mindestlänge eines Passworts |
 | `auth.argon2id_memory_kib` | `65536` | Argon2id-Speicher (Untergrenze 19456) |
 | `auth.argon2id_iterations` | `3` | Argon2id-Durchläufe (Untergrenze 2) |

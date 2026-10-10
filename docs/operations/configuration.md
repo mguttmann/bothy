@@ -145,6 +145,12 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 |---|---|---|---|---|
 | `principal.handle_max_chars` | `BOTHY_PRINCIPAL__HANDLE_MAX_CHARS` | Server | `32` | Länge eines Handles |
 | `principal.display_name_max_chars` | `BOTHY_PRINCIPAL__DISPLAY_NAME_MAX_CHARS` | Server | `64` | Länge eines Anzeigenamens in Unicode-Zeichen |
+| `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server | `64` | Länge des Produktnamens im Branding (`instance_settings`, `branding.product_name`) in Unicode-Zeichen |
+| `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server | `100` | Länge eines Gruppennamens in Unicode-Zeichen |
+| `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen |
+| `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server | `100` | Länge eines Bereichsnamens in Unicode-Zeichen |
+| `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server | `100` | Länge eines Kanalnamens in Unicode-Zeichen |
+| `forum_tag.name_max_chars` | `BOTHY_FORUM_TAG__NAME_MAX_CHARS` | Server | `50` | Länge eines Tag-Namens in Unicode-Zeichen |
 | `identity.last_active_granularity` | `BOTHY_IDENTITY__LAST_ACTIVE_GRANULARITY` | Server | `5m` | höchstens so oft wird `last_active_at` bzw. `last_used_at` geschrieben |
 | `auth.session_max_age` | `BOTHY_AUTH__SESSION_MAX_AGE` | Server | `30d` | absolutes Ende einer Anmeldesitzung |
 | `auth.refresh_token_ttl` | `BOTHY_AUTH__REFRESH_TOKEN_TTL` | Server | `14d` | Lebensdauer eines Refresh-Tokens |
@@ -157,6 +163,11 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server | `200` | Länge eines Thread-Titels |
 | `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | `262144` | Größe einer Nachricht (lange Antworten ohne Teilen) |
 | `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | `10` | Anhänge je Nachricht |
+| `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server | `64` | größte Länge eines Reaktions-Emoji in Bytes (ein Graphem-Cluster hat sonst keine Grenze) |
+| `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server | `20` | verschiedene Emoji je Nachricht; begrenzt `Message.reactions` und die Nutzlast der Ereignisse |
+| `pin.max_per_thread` | `BOTHY_PIN__MAX_PER_THREAD` | Server | `50` | Anheftungen je Thread; `listPins` ist nicht seitenweise |
+| `template.name_max_chars` | `BOTHY_TEMPLATE__NAME_MAX_CHARS` | Server | `100` | Länge eines Vorlagennamens in Unicode-Zeichen |
+| `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server | `100` | Vorlagen je Person bzw. je Kanal; `listTemplates` ist nicht seitenweise |
 | `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server | `104857600` | Größe einer Datei |
 | `run.excerpt_max_chars` | `BOTHY_RUN__EXCERPT_MAX_CHARS` | Server | `500` | Länge von `last_text_excerpt` |
 | `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server | `16384` | Größe von `run_steps.detail` |
@@ -258,6 +269,7 @@ Quelle: [06-api.md](../spec/06-api.md), Abschnitt 20.
 | `api.deprecation_min_notice` | `BOTHY_API__DEPRECATION_MIN_NOTICE` | Server | `180d` | Mindestabstand von `Deprecation` zu `Sunset` |
 | `api.major_version_overlap` | `BOTHY_API__MAJOR_VERSION_OVERLAP` | Server | `365d` | so lange bleibt eine alte Hauptversion nach Erscheinen der neuen |
 | `api.stats_max_buckets` | `BOTHY_API__STATS_MAX_BUCKETS` | Server | `1000` | Zeit-Buckets je Statistik-Abfrage; mehr ergibt `400` |
+| `message.list_content_max_bytes` | `BOTHY_MESSAGE__LIST_CONTENT_MAX_BYTES` | Server | `16384` | größter `content_md` je Nachricht in Listen; darüber gekürzt mit `content_truncated` (Abschnitt 6) |
 | `status.history_window` | `BOTHY_STATUS__HISTORY_WINDOW` | Server | `7d` | so lange zeigt die Statusseite gelöste Störungen |
 
 ### 07 Rechte und Autorisierung
@@ -286,7 +298,8 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.dpop_proof_max_age` | `BOTHY_AUTH__DPOP_PROOF_MAX_AGE` | Server | `60s` | Höchstalter eines DPoP-Beweises (`iat`) |
 | `auth.login_flow_ttl` | `BOTHY_AUTH__LOGIN_FLOW_TTL` | Server | `10m` | Gültigkeit eines Anmeldevorgangs |
 | `auth.server_code_ttl` | `BOTHY_AUTH__SERVER_CODE_TTL` | Server | `60s` | Gültigkeit des einmaligen Server-Codes |
-| `auth.oidc_jwks_cache_ttl` | `BOTHY_AUTH__OIDC_JWKS_CACHE_TTL` | Server | `1h` | Cache der Anbieter-Schlüssel |
+| `auth.oidc_jwks_cache_ttl` | `BOTHY_AUTH__OIDC_JWKS_CACHE_TTL` | Server | `1h` | Cache der Anbieter-Metadaten (Discovery) und -Schlüssel (JWKS) |
+| `auth.oidc_client_assertion_ttl` | `BOTHY_AUTH__OIDC_CLIENT_ASSERTION_TTL` | Server | `2m` | Gültigkeit einer Client-Assertion bei `private_key_jwt` |
 | `auth.group_claim_max_age` | `BOTHY_AUTH__GROUP_CLAIM_MAX_AGE` | Server | `30d` | Ablauf von Mitgliedschaften aus Gruppen-Claims nach der letzten Anmeldung |
 | `auth.idp_recheck_interval` | `BOTHY_AUTH__IDP_RECHECK_INTERVAL` | Server | `30d` | spätestens dann neue Anmeldung beim Anbieter |
 | `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server | `true` | jede Anfrage muss denselben Header-Login tragen |
@@ -297,12 +310,16 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server | `5m` | Gültigkeit eines Kopplungs-Codes |
 | `auth.pairing_code_chars` | `BOTHY_AUTH__PAIRING_CODE_CHARS` | Server | `8` | Länge des Kopplungs-Codes (Crockford-Base32, 40 Bit) |
 | `auth.device_inactive_revoke_after` | `BOTHY_AUTH__DEVICE_INACTIVE_REVOKE_AFTER` | Server | `180d` | Gerät ohne Kontakt wird widerrufen |
+| `auth.cleanup_interval` | `BOTHY_AUTH__CLEANUP_INTERVAL` | Server | `1h` | Abstand des Jobs `identity.auth_cleanup` (abgelaufene Herausforderungen, Anmeldevorgänge und Kopplungen löschen, wartende und ungenutzte Geräte widerrufen) |
 | `auth.step_up_challenge_ttl` | `BOTHY_AUTH__STEP_UP_CHALLENGE_TTL` | Server | `2m` | Gültigkeit einer Step-up-Herausforderung |
 | `auth.step_up_fail_limit` | `BOTHY_AUTH__STEP_UP_FAIL_LIMIT` | Server | `5` | Fehlversuche beim Step-up je Fenster |
 | `auth.require_key_attestation` | `BOTHY_AUTH__REQUIRE_KEY_ATTESTATION` | Server | `false` | Plattform-Attestierung der Geräteschlüssel verlangen |
 | `auth.console_session_max_age` | `BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE` | Server | `12h` | absolute Dauer einer Konsolen-Sitzung |
 | `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server | `30m` | Leerlauf bis zum Ende der Konsolen-Sitzung |
 | `auth.local_password_enabled` | `BOTHY_AUTH__LOCAL_PASSWORD_ENABLED` | Server | `true` | Passwort mit TOTP als Rückfall für lokale Konten |
+| `auth.totp_key_ref` | `BOTHY_AUTH__TOTP_KEY_REF` | Server | `file:<secrets.dir>/totp_key` | Verweis auf den Schlüssel (32 Byte), mit dem TOTP-Geheimnisse verschlüsselt werden |
+| `auth.webauthn_rp_id` | `BOTHY_AUTH__WEBAUTHN_RP_ID` | Server | leer | RP-ID der Passkeys; leer heißt Host von `server.public_url` |
+| `auth.webauthn_origins` | `BOTHY_AUTH__WEBAUTHN_ORIGINS` | Server | leer | erlaubte Origins der Passkeys; leer heißt Origin von `server.public_url`; Einträge dürfen auch App-Origins wie `android:apk-key-hash:...` sein |
 | `auth.password_min_length` | `BOTHY_AUTH__PASSWORD_MIN_LENGTH` | Server | `12` | Mindestlänge eines Passworts |
 | `auth.argon2id_memory_kib` | `BOTHY_AUTH__ARGON2ID_MEMORY_KIB` | Server | `65536` | Argon2id-Speicher (Untergrenze 19456) |
 | `auth.argon2id_iterations` | `BOTHY_AUTH__ARGON2ID_ITERATIONS` | Server | `3` | Argon2id-Durchläufe (Untergrenze 2) |
@@ -530,7 +547,7 @@ Quelle: [16-betrieb.md](../spec/16-betrieb.md), Abschnitt 14.
 | `server.role` | `BOTHY_SERVER__ROLE` | Server | `all` | `api`, `worker` oder `all` |
 | `server.listen_addr` | `BOTHY_SERVER__LISTEN_ADDR` | Server | `127.0.0.1:8080` | öffentlicher Listener (REST, Gateway) |
 | `server.internal_listen_addr` | `BOTHY_SERVER__INTERNAL_LISTEN_ADDR` | Server | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack |
-| `server.public_url` | `BOTHY_SERVER__PUBLIC_URL` | Server | keiner, Pflicht | Basis-URL, unter der Apps den Server erreichen |
+| `server.public_url` | `BOTHY_SERVER__PUBLIC_URL` | Server | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](../spec/08-identitaet.md), Abschnitte 7.2 und 7.3) |
 | `server.trusted_proxies` | `BOTHY_SERVER__TRUSTED_PROXIES` | Server | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](../spec/19-sicherheit.md), SEC-TLS-1) |
 | `server.maintenance_mode` | `BOTHY_SERVER__MAINTENANCE_MODE` | Server | `off` | `off` oder `read_only` (Umzug, Upgrade) |
 | `secrets.dir` | `BOTHY_SECRETS__DIR` | Server | `/run/bothy/secrets` | Basis der Standardverweise `file:` |
@@ -622,7 +639,8 @@ Quelle: [19-sicherheit.md](../spec/19-sicherheit.md), Abschnitt 16.
 | `egress.timeout` | `BOTHY_EGRESS__TIMEOUT` | Server | `15s` | Zeitgrenze einer ausgehenden Anfrage |
 | `egress.max_response_bytes` | `BOTHY_EGRESS__MAX_RESPONSE_BYTES` | Server | `1048576` | größte Antwort einer ausgehenden Anfrage |
 | `audit.checkpoint_interval` | `BOTHY_AUDIT__CHECKPOINT_INTERVAL` | Server | `1h` | Abstand der signierten Prüfpunkte des Audit-Logs |
-| `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server | leer | Ablageziel der Prüfpunkte außerhalb der Datenbank (z. B. Objektspeicher-Präfix mit Aufbewahrungssperre); leer erzeugt eine Warnung |
+| `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server | leer | Ablageziel der Prüfpunkte außerhalb der Datenbank: leer (Warnung, SEC-AUD-2) oder `file://<absoluter Pfad>` auf einem Speicher außerhalb des Datenbank-Volumes; andere Schemata lehnt `bothy config check` ab. Ein Objektspeicher mit Aufbewahrungssperre als Ziel ist das empfohlene Ziel für Produktion und kommt mit PLAN M7-22 |
+| `audit.reason_max_chars` | `BOTHY_AUDIT__REASON_MAX_CHARS` | Server | `500` | größte Länge eines Pflichtgrunds einer Verwaltungsaktion in Unicode-Zeichen (SEC-AUD-5) |
 | `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server | `30s` | längste Zeit, die ein Prozess einen zurückgezogenen Schlüssel noch annimmt oder einen neuen nicht kennt |
 | `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server | `1m` | Abstand des Jobs `instance.key_rotation` |
 | `signing_key.access_token_rotation_interval` | `BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL` | Server | `30d` | planmäßiger Wechsel des Schlüssels für Zugriffstokens |
@@ -704,6 +722,7 @@ kopiert.
 | `db_maint_password` | erzeugt | server, migrate | Rolle `bothy_maint` (Aufbewahrungsjob) |
 | `db_monitor_password` | erzeugt | collector, migrate | Rolle `bothy_monitor`, Empfänger `postgresql` |
 | `token_pepper` | erzeugt | server | `auth.token_pepper_ref` |
+| `totp_key` | erzeugt, 32 Byte | server | `auth.totp_key_ref`: AES-256-GCM-Schlüssel der TOTP-Geheimnisse in `local_credentials` ([08-identitaet.md](../spec/08-identitaet.md) 2.5) |
 | `telemetry_pseudonym_key` | erzeugt, mindestens 32 Byte | server, collector | `telemetry.pseudonym_key_ref`, `hmac_key` der Allowlist |
 | `audit_ip_kek` | erzeugt, 32 Byte | server | `privacy.audit_ip_kek_ref`: verschlüsselt die IP-Schlüssel in `audit_ip_keys` |
 | `file_ticket_key` | erzeugt, 32 Byte | server | `file.ticket_key_ref`: HMAC der Abruf-Tickets ([12-dateien.md](../spec/12-dateien.md) 9.2) |
@@ -714,7 +733,8 @@ kopiert.
 | `grafana_admin_password` | erzeugt | grafana | Admin-Konto im lokalen Grafana |
 | `apns_key.p8` | geliefert | server | Push iOS und macOS, `push.apns.private_key_ref` |
 | `fcm_service_account.json` | geliefert | server | Push Android |
-| `oidc/<anbieter>_client_secret` | geliefert | server | OIDC (`identity_providers.config`) |
+| `oidc/<anbieter>_client_secret` | geliefert | server | OIDC mit `client_secret_basic` (`client_secret_ref` in `identity_providers.config`) |
+| `oidc/<anbieter>_client_key.pem` | geliefert | server | OIDC mit `private_key_jwt`: privater Schlüssel der Client-Assertion, PKCS#8 (`client_key_ref`, [08-identitaet.md](../spec/08-identitaet.md) 2.6) |
 | `offsite/` | geliefert | backup | Zugang zum Off-site-Ziel (S3-Schlüssel oder SSH-Schlüssel) |
 | `alertmanager_bothy_webhook_url` | geliefert | alertmanager | Eingangs-Webhook des Meldungskanals |
 | `alertmanager_external_webhook_url` | geliefert | alertmanager | externer Bereitschaftskanal |
@@ -741,12 +761,12 @@ gegen das Schema des Schlüssels.
 
 | Schlüssel | Typ | Standard | Bedeutung |
 |---|---|---|---|
-| `branding.product_name` | string | `Bothy` | angezeigter Produktname (ADR 0044) |
+| `branding.product_name` | string | `Bothy` | angezeigter Produktname (ADR 0044); höchstens `branding.product_name_max_chars` Zeichen, ohne Steuer- und Bidi-Zeichen |
 | `branding.accent_color` | Schlüssel der Kategorie-Farben | `spruce` | Akzentfarbe; nur Schlüssel aus der geprüften Palette (ADR 0044), kein freier Farbwert |
 | `branding.logo_file_id` | uuid | leer | Logo als Datei |
 | `locale.default` | BCP 47 | `de` | Standardsprache neuer Menschen |
 
-Die Liste der Schlüssel führt [01-produkt.md](../spec/01-produkt.md), Abschnitt 11; persönliche
+Die Schlüssel des Brandings beschreibt [01-produkt.md](../spec/01-produkt.md), Abschnitt 12; persönliche
 Einstellungen (`user_settings`, z. B. `notify.*`) stehen in [13-push-benachrichtigungen.md](../spec/13-push-benachrichtigungen.md),
 Abschnitt 3.3.
 

@@ -152,7 +152,9 @@ flowchart LR
 
 Ein dauerhaftes Ereignis wird nur angewendet, wenn `resource.version` größer als die lokale Version
 ist ([04](04-sync-protokoll.md) Abschnitt 9). Dadurch mischen sich REST-Seiten und Ereignisse ohne
-Konflikt, und Doppel nach Wiederverbinden sind harmlos.
+Konflikt, und Doppel nach Wiederverbinden sind harmlos. Ausnahme: `reaction.*` und `pin.*` ändern
+die Version der Nachricht nicht; sie tragen absolute Werte und werden in `seq`-Reihenfolge
+angewendet (04 Abschnitt 9, Punkt 3).
 
 ## 6. Lokale Datenbank
 
@@ -328,10 +330,14 @@ eigene Einträge vor der Nachricht, die sie anhängt; die Nachricht wartet, bis 
   wiederholt das Ausgangsfach.
 - **DPoP:** Beweis je Anfrage (RFC 9449) mit dem Geräteschlüssel, ES256 (Abschnitt 9); Server-Nonce
   wird übernommen. Gateway-Beweis in `identify` ([04](04-sync-protokoll.md) R-SY-01).
-- **Refresh:** genau ein Refresh zur Zeit (Single-Flight). Weil auf iOS und macOS auch die
-  Erweiterungen erneuern können, läuft der Refresh unter einer prozessübergreifenden Sperre im
-  App-Group-Container; das neue Token wird vor dem Freigeben der Sperre gespeichert. Grund: Ein
-  zweiter Refresh mit demselben Token würde als Wiederverwendung die ganze Familie sperren
+- **Refresh:** genau ein Refresh je Refresh-Familie zur Zeit (Single-Flight); das neue Token wird
+  gespeichert, bevor es benutzt wird. Erweiterungen, die selbst erneuern müssen (iOS- und
+  macOS-NSE, Share Extension), teilen nie die Familie der App: Die App legt für jede eine
+  Kind-Sitzung mit eigener Familie an (`createExtensionSession`, [08](08-identitaet.md) Abschnitt
+  7.4) und legt deren Tokens in die geteilte Keychain-Gruppe. Fehlt die Kind-Sitzung oder ist sie
+  widerrufen, zeigt die Erweiterung ihren Platzhalter, und die App legt beim nächsten Start eine
+  neue an. Grund: Zwei Prozesse mit einer Familie erneuerten gleichzeitig, und die zweite
+  Erneuerung sähe als Wiederverwendung wie Diebstahl aus und sperrte die Familie
   ([03](03-datenmodell.md), `refresh_tokens`).
 - **Anmeldung:** OIDC mit PKCE im System-Browser (ASWebAuthenticationSession, Custom Tabs,
   Standard-Browser), nie in einer Web-View; Rückleitung mobil über ein eigenes URL-Schema aus der
@@ -359,7 +365,7 @@ Darum nutzen alle Clients **ES256** für DPoP und Step-up, obwohl das Datenmodel
 | macOS | Secure Enclave (Macs mit Apple-Chip oder mit Touch Bar und Touch ID laut Apple-Doku), sonst Keychain-Schlüssel ohne Enclave, dem Server als "nicht hardwaregebunden" gemeldet | wie iOS | Data-Protection-Keychain |
 | Android | Android Keystore, StrongBox wenn vorhanden (`setIsStrongBoxBacked`, Rückfall bei `StrongBoxUnavailableException`), P-256 | Keystore-Schlüssel mit Nutzer-Authentifizierung je Operation über `BiometricPrompt` | `flutter_secure_storage` (RSA-OAEP plus AES-GCM, Schlüssel im Keystore laut Paket-Doku) |
 | Windows | CNG mit Microsoft Platform Crypto Provider (TPM), ECDSA P-256 nach Prüfung mit `NCryptIsAlgSupported`; ohne TPM Software-Schlüssel, gemeldet als nicht hardwaregebunden | TPM-Schlüssel mit Windows-Hello-Bestätigung [vermutet, Details nicht belegt] | `flutter_secure_storage` (Windows Credential Manager plus AES-GCM-Dateien laut Paket-README [belegt über Suche, Quelltext nicht gelesen]) |
-| Web (Konsole) | WebCrypto, P-256, nicht extrahierbar, in IndexedDB | WebAuthn-Passkey | Refresh-Token in IndexedDB; ohne Schlüssel wertlos (DPoP) |
+| Web (Konsole) | keiner: Cookie-Sitzung nach dem Backend-for-Frontend-Muster, Tokens nur im Server ([08](08-identitaet.md) Abschnitt 7.5) | WebAuthn-Passkey, sonst erneute OIDC-Anmeldung bzw. Passwort mit TOTP | keine im Browser; Cookie `HttpOnly` |
 
 Belege: https://pub.dev/packages/flutter_secure_storage (Version 11.2.0, abgerufen 2026-10-10
 [belegt]); Microsoft CNG `NCryptCreatePersistedKey` mit `MS_PLATFORM_CRYPTO_PROVIDER`
@@ -406,10 +412,10 @@ sequenceDiagram
   participant API as Server-API
   S->>A: alert, mutable-content, nur IDs, Platzhalter
   A->>N: Push zustellen
-  N->>K: Zugriffstoken aus geteilter Keychain
-  alt Token abgelaufen und Sperre frei
-    K->>API: Refresh mit DPoP (Secure Enclave)
-    API-->>K: neues Token, gespeichert vor Freigabe der Sperre
+  N->>K: Token der eigenen Kind-Sitzung aus geteilter Keychain
+  alt Zugriffstoken abgelaufen
+    K->>API: Refresh der eigenen Familie mit DPoP (Secure Enclave)
+    API-->>K: neues Token-Paar, gespeichert vor der Benutzung
   end
   K->>API: GET Nachricht und Thread mit DPoP
   alt Antwort innerhalb client.push.fetch_timeout
@@ -611,7 +617,7 @@ zufällig auftreten.
 | R-CL-04 | ES256 für alle Geräteschlüssel. | Secure Enclave und StrongBox können nur P-256 |
 | R-CL-05 | Zwei Geräteschlüssel: DPoP ohne Nutzerbestätigung, Step-up mit. | DPoP signiert jede Anfrage, auch in der NSE; Step-up braucht frische Bestätigung |
 | R-CL-06 | NSE, Share Extension und Android-Push-Dienst nativ, ohne Flutter-Engine. | Zeit- und Speichergrenzen der Erweiterungen; Apple-Erweiterungen können die App nicht öffnen |
-| R-CL-07 | Refresh nur unter prozessübergreifender Sperre. | Wiederverwendung eines Refresh-Tokens sperrt die Familie |
+| R-CL-07 | Jede Erweiterung erneuert nur die Familie ihrer eigenen Kind-Sitzung; je Familie ein Refresh zur Zeit. | Wiederverwendung eines Refresh-Tokens sperrt die Familie; eine Sperre über Prozesse hinweg ersetzt keine getrennten Familien (08 Abschnitt 7.4) |
 | R-CL-08 | Lokale Datenbank verschlüsselt (SQLite3MultipleCiphers), iOS-Schutzklasse `complete`. | verlorenes Gerät verrät nichts; Erweiterungen brauchen die DB nicht |
 | R-CL-09 | Sparkle nativ statt `auto_updater`; Windows über `.appinstaller`. | Paket veraltet, DSA auf Windows; MSIX liefert Updates und Identität |
 | R-CL-10 | Client-Kennzahlen über den eigenen Server an den Collector. | kein offizielles Dart-OTel-SDK; ein Endpunkt mit Autorisierung statt offenem Collector |

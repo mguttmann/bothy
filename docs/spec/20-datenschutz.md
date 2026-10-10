@@ -94,8 +94,9 @@ personenbezogene Daten enthalten, auch von Dritten und auch besondere Kategorien
 | `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | nein | Betriebsstatus, Sicherungsläufe | `ops` | `retention.ops` |
 | `local_credentials` (03, 08) | indirekt | Passwort-Hash, verschlüsseltes TOTP-Geheimnis | `security` | bei Kontolöschung sofort |
 | `enrollment_codes` (03, 08) | indirekt | Hash, Zeiten | `security` | `retention.security_after_end` |
-| `auth_login_flows` (03, 08) | indirekt | Anmeldevorgang | `transient` | `auth.login_flow_ttl` |
+| `auth_login_flows` (03, 08) | direkt | Anmeldevorgang; zwischen Rückruf und Abschluss die geprüfte Identität des Anbieters (`external_identity`: Subjekt, Anzeigename, E-Mail-Hinweis), danach leer | `transient` | `auth.login_flow_ttl` |
 | `device_pairings` (03, 08) | indirekt | Kopplungsvorgang mit öffentlichen Geräteschlüsseln | `transient` | `auth.pairing_code_ttl` |
+| `auth_challenges` (03, 08) | indirekt | einmalige Herausforderungen für Step-up und Passkeys, gezählte Fehlversuche | `transient` | `auth.step_up_challenge_ttl` bzw. `auth.login_flow_ttl`, gelöscht vom Job `identity.auth_cleanup` |
 | `dev_environments` (03, 21; Etappe) | indirekt | Umgebung einer Person, Prüfergebnisse | `security` | nach `retired` plus `retention.security_after_end` |
 
 Daten außerhalb der Datenbank:
@@ -152,8 +153,9 @@ der Verantwortliche festlegen; ein stiller Standard wäre eine versteckte Entsch
 ### 4.2 Nachricht löschen
 
 In einer Transaktion (03, Abschnitt 6.5): `content_md` leeren, `deleted_at`, Revisionen,
-Erwähnungen, Komponenten, Anhänge entfernen, Suchvektor wird durch die generierte Spalte leer,
-Nutzlasten der zugehörigen Ereignisse schwärzen, Ereignis `message.deleted`. Danach:
+Erwähnungen, Komponenten, Reaktionen, Anheftung und Anhänge entfernen, Suchvektor wird durch die
+generierte Spalte leer, Nutzlasten der zugehörigen Ereignisse schwärzen (Formen in 04, Abschnitt
+2.2), Ereignis `message.deleted`. Danach:
 
 - Clients entfernen die Nachricht aus Cache und Suchindex beim Ereignis.
 - Agenten-Adapter bekommen `message.deleted` und müssen die Nachricht in ihrer Laufzeit nach

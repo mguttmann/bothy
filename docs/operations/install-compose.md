@@ -43,11 +43,15 @@ Reihenfolge, die Compose durchsetzt: `secrets-init` (einmalig), `postgres`, `mig
 Erster Owner (nur per Server-Befehl, Baseline 3):
 
 ```
-docker compose exec api bothy owner create --login <login> --display-name "<Name>"
+docker compose exec api bothy setup bootstrap-owner --handle <handle> --display-name "<Name>"
 ```
 
-Wie sich der Owner danach zum ersten Mal anmeldet und sein erstes Gerät bindet, legt Kapitel 08
-fest (Team C). Der Name des Befehls ist ein Vorschlag dieses Kapitels.
+Der Befehl gibt einmalig einen Einladungs-Code aus; damit löst der Owner in der App sein erstes
+Gerät ein ([08-identitaet.md](../spec/08-identitaet.md), Abschnitt 4). Haben später alle Owner ihre
+Geräte verloren, stellt `docker compose exec api bothy setup issue-enrollment-code --user <handle>`
+einen Code zur Wiederherstellung aus. Der Zugang zum Host ist die Vertrauenswurzel der Instanz
+([16-betrieb.md](../spec/16-betrieb.md), Abschnitt 4.3): Shell und Container-Laufzeit nur für
+Personen, die auch Owner sein dürften.
 
 ## 4. Prüfung nach dem Start
 

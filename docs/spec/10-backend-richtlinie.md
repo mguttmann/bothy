@@ -116,7 +116,10 @@ flowchart LR
 
 ### 5.1 Welche Änderungen
 
-05 Regel 1.6 nennt die Aktionen. Je Aktion sind diese persönlichen Agenten betroffen:
+05 Regel 1.6 nennt die Aktionen. Geprüft werden nur aktive Agenten (Prinzipal-Status `active`):
+Ein gesperrter Agent kann nicht ausgelöst werden, und `agent.enable` steht gerade deshalb in der
+Liste, weil ein Verstoß entstehen kann, während der Agent gesperrt ist. Je Aktion sind diese
+persönlichen Agenten betroffen:
 
 | Aktion | Betroffene persönliche Agenten |
 |---|---|
@@ -124,9 +127,9 @@ flowchart LR
 | `grant.create` mit Stufe `trigger`, Ziel Bereich S | die einen Kanal in S bedienen (5.2) |
 | `grant.create` mit Stufe `trigger`, Ziel Kanal K | die K bedienen |
 | `grant.revoke`, `group.delete`, `group.member.remove`, `user.disable` | keine Erweiterung möglich; Prüfung läuft trotzdem (Regel 1.6), weil sie billig ist |
-| `group.member.add`, `owner.add`, `owner.remove`, `user.enable` | alle (03 Abschnitt 6.4) |
+| `group.member.add`, `group.member.sync`, `owner.add`, `owner.remove`, `user.enable` | alle (03 Abschnitt 6.4) |
 | `space.operator.set`, `channel.operator.set` | der neue Bediener, falls `personal` |
-| `agent.billing_mode.set` auf `personal`, `agent.credential_holder.set` | dieser Agent |
+| `agent.billing_mode.set` auf `personal`, `agent.credential_holder.set`, `agent.enable` | dieser Agent |
 | `agent.billing_mode.set_all` auf `personal` | alle umgestellten |
 
 Freigaben und Gruppenmitgliedschaften mit Ablaufdatum werden bei der Anlage geprüft. Ein Ablauf
@@ -141,7 +144,9 @@ Ziele von Agent A sind:
    der Kanal inzwischen einen anderen Bediener hat und auch wenn der Thread erledigt ist. Grund:
    `threads.operator_agent_id` ist fest (R-DM-12), und eine neue Nachricht öffnet einen erledigten
    Thread wieder; dort löst also weiter A aus.
-3. Die Bereiche dieser Kanäle.
+3. Die Bereiche dieser Kanäle und jeder Bereich, dessen Standard-Bediener A ist, auch ohne Kanal.
+   Grund: `channel.create` ist keine Aktion mit I1-Prüfung; ohne diesen Punkt machte ein neuer
+   Kanal A zum Bediener eines Ziels, auf dessen Bereich schon ein anderer `trigger` hat.
 4. Die Instanz.
 
 Punkt 2 nutzt den Index `threads (operator_agent_id, channel_id)` ohne Bedingung auf `state`
@@ -158,7 +163,7 @@ Moduls `chat`. Muster in SQL, ausgeführt nach der Änderung und vor dem Commit,
 von `permission_version` (03 Abschnitt 6.3), darum ohne `SERIALIZABLE` korrekt:
 
 ```sql
--- $a: Agent mit billing_mode = 'personal'
+-- $a: aktiver Agent mit billing_mode = 'personal'
 WITH served_channels AS (           -- Port des Moduls chat
   SELECT c.id, c.space_id
     FROM channels c
@@ -182,7 +187,10 @@ trigger_grants AS (
      AND g.level = 'trigger'
      AND (g.target_kind = 'instance'
           OR (g.target_kind = 'space'
-              AND g.target_space_id IN (SELECT space_id FROM served_channels))
+              AND (g.target_space_id IN (SELECT space_id FROM served_channels)
+                   OR g.target_space_id IN (SELECT s.id FROM spaces s       -- Punkt 3, Port von chat
+                                             WHERE s.default_operator_agent_id = $a
+                                               AND s.archived_at IS NULL)))
           OR (g.target_kind = 'channel'
               AND g.target_channel_id IN (SELECT id FROM served_channels)))
 ),

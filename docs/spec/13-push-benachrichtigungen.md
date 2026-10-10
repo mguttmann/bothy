@@ -454,9 +454,9 @@ darf nach 15 Minuten wiederholt werden, `TooManyRequests` mit Verzögerung [Q15,
 
 ## 8. Badge und Abgleich
 
-Badge-Zahl für r = Zahl der für r sichtbaren Threads mit
-(`read_states.mention_count > 0`) oder (ungelesen und wirksame Stufe `all`) oder (ungelesener
-DM-Thread). Der Server rechnet sie beim Senden und schreibt sie in `aps.badge` bzw. `data.badge`.
+Badge-Zahl für r = Zahl der für r sichtbaren Threads mit mindestens einer ungelesenen Erwähnung
+(berechnet aus `mentions` und `read_states.last_read_seq`, [03-datenmodell.md](03-datenmodell.md),
+`read_states`) oder (ungelesen und wirksame Stufe `all`) oder (ungelesener DM-Thread). Der Server rechnet sie beim Senden und schreibt sie in `aps.badge` bzw. `data.badge`.
 
 Liest r auf einem anderen Gerät und sinkt die Zahl, sendet der Server an mobile Geräte höchstens
 einmal je `notify.badge_sync_min_interval` einen Abgleich: iOS ein Push nur mit `badge` (ohne

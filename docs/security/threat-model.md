@@ -96,7 +96,7 @@ E = Elevation of Privilege. "Register" verweist auf Abschnitt 6.
 | R | Person bestreitet eine Freigabe | Step-up mit Biometrie, Audit mit Gerät und Sitzung | T-AZ-04 |
 | I | Lokaler Cache auf verlorenem Gerät | verschlüsselte DB, App-Sperre, Löschen bei `4012` (08, 9 und 10) | T-DV-01 |
 | D | Massenhaftes Wiederverbinden nach Neustart | Full-Jitter-Backoff (04, 6.5), `rl.gateway_connect` | T-DS-01 |
-| E | Wartendes Gerät verschafft sich Zugriff | kein Token vor Bestätigung, eingetippter Bestätigungs-Code (08, 5.2) | T-ID-05 |
+| E | Wartendes Gerät verschafft sich Zugriff | Tokens nur für die Selbstauskunft (`403 device_pending` für alles andere, kein Gateway), eingetippter Bestätigungs-Code (08, 5.2) | T-ID-05 |
 
 ### 5.2 Admin-Konsole im Browser
 

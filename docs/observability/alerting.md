@@ -62,7 +62,7 @@ Tabelle; die Regeldatei muss ihm folgen (Check im Bau-Ticket "Alarm-Schwellen au
 | `BothyAgentConsumerLag` | ticket | über 1000 Ereignisse Rückstand des Verbrauchers | |
 | `BothyAgentOffline` | ticket | kein Heartbeat seit 5 Minuten | über `agent.presence_timeout` |
 | `BothyBillingModeMismatch` | page | Ist-Modus weicht vom Soll ab (I3) | |
-| `BothyAuthzError` | page | Rechteprüfung meldet einen Programmfehler (`authz_not_checked`, `unknown_action`) | |
+| `BothyAuthzError` | page | Rechteprüfung meldet einen Programmfehler (`authz_not_checked`, `unknown_action`) oder einen Unterschied zwischen SQL-Filter und `authorize` (`filter_mismatch`) | |
 | `BothySecretRefreshFailing` | ticket | erneutes Lesen eines Geheimnisses scheitert | |
 | `BothyMalwareScanFailing` | ticket | nur Fehler, kein Ergebnis | |
 | `BothyBackupStale` | page | keine Sicherung seit 26 h | `backup.max_age` |

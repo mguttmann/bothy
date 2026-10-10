@@ -129,6 +129,13 @@ Kopfzeilen selbst setzen. Tailscale nennt das ausdrücklich
 (https://tailscale.com/kb/1312/serve, abgerufen 2026-10-10) [belegt]. Details:
 [tailscale.md](../operations/tailscale.md).
 
+Der Zugang zum Host ist die Vertrauenswurzel der Instanz: Wer Server-Befehle ausführen kann, legt
+den ersten Owner an (`bothy setup bootstrap-owner`) und stellt Owner-Codes zur Wiederherstellung
+aus (`bothy setup issue-enrollment-code`, Systemaktion `owner.recover`;
+[08-identitaet.md](08-identitaet.md), Abschnitt 4). Kein Weg über die API ersetzt das, und keiner
+umgeht es. Darum gehören Shell-Zugang, Container-Laufzeit und Secret-Provider des Hosts zum
+geschützten Kern; der Betreiber gibt sie nur Personen, die auch Owner sein dürften.
+
 ## 5. Konfiguration und Geheimnisse
 
 ### 5.1 Konfiguration (ADR 0011)
@@ -272,7 +279,7 @@ Regeln:
 |---|---|---|
 | `postgres` | Superuser (`migrate.bootstrap_user`) | nur `migrate --bootstrap` und `bothy-backupd` |
 | `bothy_owner` | Eigentümer der Datenbank, des Schemas `public` und von `jobs.schema`; DDL | `migrate` |
-| `bothy_app` | DML; auf `audit_events` nur `INSERT` und `SELECT` | `api`, `worker` |
+| `bothy_app` | DML; auf `audit_events` nur `INSERT` und `SELECT` | `api`, `worker`, Server-Befehle `bothy setup ...` (sie schreiben nur Zeilen) |
 | `bothy_maint` | Kürzen des Audit-Logs am Fristende mit Anker-Eintrag | Aufbewahrungsjob ([03-datenmodell.md](03-datenmodell.md) 4.12) |
 | `bothy_monitor` | `pg_monitor` | `otel-collector` |
 
@@ -523,7 +530,7 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | `server.role` | `all` | `api`, `worker` oder `all` |
 | `server.listen_addr` | `127.0.0.1:8080` | öffentlicher Listener (REST, Gateway) |
 | `server.internal_listen_addr` | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack |
-| `server.public_url` | keiner, Pflicht | Basis-URL, unter der Apps den Server erreichen |
+| `server.public_url` | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](08-identitaet.md), Abschnitte 7.2 und 7.3) |
 | `server.trusted_proxies` | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](19-sicherheit.md), SEC-TLS-1) |
 | `server.maintenance_mode` | `off` | `off` oder `read_only` (Umzug, Upgrade) |
 | `secrets.dir` | `/run/bothy/secrets` | Basis der Standardverweise `file:` |

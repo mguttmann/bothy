@@ -56,8 +56,21 @@ Fähigkeit abschalten können, aber nie eine einschalten, die der Adapter nicht 
 | Titelvorschlag | `supports_title` | `title: true` | Abschnitt 12 |
 | Dateien senden | `supports_files_out` | `files_out: true` | Agent braucht zusätzlich `+upload` |
 
-`supports_title` und `supports_files_out` sind Schlüssel in `agent_operator_config.v1` (03,
-`agents`). `operator_config` enthält nie Geheimnisse.
+Schema `agent_operator_config.v1` (03, `agents`): ein JSON-Objekt ohne weitere Schlüssel
+(`additionalProperties: false`); jeder Schlüssel ist optional. `operator_config` enthält nie
+Geheimnisse; ein ungültiger Wert ergibt `400 validation_failed` mit JSON Pointer.
+
+| Schlüssel | Typ | Fehlt der Schlüssel | Bedeutung |
+|---|---|---|---|
+| `default_model` | Text, Muster `^[A-Za-z0-9._:/@-]+$` | der Adapter wählt | Modell, das der Adapter ohne Wahl in der Sitzung nutzt; der Server gibt es nur weiter |
+| `supports_followups` | Boolean | erlaubt | Erlaubnis für Nachträge |
+| `supports_components` | Boolean | erlaubt | Erlaubnis für Komponenten |
+| `supports_voice` | Boolean | erlaubt | Erlaubnis für Spracheingabe |
+| `supports_title` | Boolean | erlaubt | Erlaubnis für Titelvorschläge |
+| `supports_files_out` | Boolean | erlaubt | Erlaubnis zum Senden von Dateien |
+
+Ein fehlender Schlüssel erlaubt, weil der Owner Fähigkeiten abschaltet und der Adapter ohnehin nur
+meldet, was er kann; ein leeres Objekt heißt "alles erlaubt, was der Adapter meldet".
 
 ### 2.3 Freigaben eines Agenten
 
