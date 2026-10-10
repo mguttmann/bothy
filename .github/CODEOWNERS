@@ -1,0 +1,19 @@
+# Code owners request reviews automatically (GOVERNANCE.md). Replace @OWNER with the
+# maintainer handle or team before the repository is public (docs/quality/public-switch.md).
+# Later rules win.
+
+*                       @OWNER
+
+# Supply chain and policy: workflows, gates, release tooling, the license
+/.github/               @OWNER
+/tools/                 @OWNER
+/quality/               @OWNER
+/Makefile               @OWNER
+/.pre-commit-config.yaml @OWNER
+/.gitleaks.toml         @OWNER
+/LICENSE                @OWNER
+
+# Normative contract and decisions
+/docs/spec/             @OWNER
+/docs/adr/              @OWNER
+/docs/api/              @OWNER

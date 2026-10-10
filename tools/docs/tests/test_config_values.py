@@ -1,0 +1,125 @@
+# SPDX-License-Identifier: Apache-2.0
+"""Number guard: every named value of docs/spec/23-qualitaet.md equals the value that the
+tool configuration or community file actually uses. A changed threshold must change both."""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+import tomllib
+from pathlib import Path
+
+import pytest
+import yaml
+
+REPO = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(REPO / "tools" / "hooks"))
+sys.path.insert(0, str(REPO / "tools" / "ci"))
+
+import commit_msg  # noqa: E402
+import license_check  # noqa: E402
+
+_ROW = re.compile(r"^\| `(?P<name>[a-z0-9_.]+)` \| `(?P<value>[^`]+)` \|", re.MULTILINE)
+_DOC_ROW = re.compile(r"\(`(?P<name>[a-z0-9_.]+)`\) \| (?P<value>\d+)\b")
+
+
+def chapter_values() -> dict[str, str]:
+    text = (REPO / "docs" / "spec" / "23-qualitaet.md").read_text(encoding="utf-8")
+    table = text.split("## 11. Konfigurationswerte dieses Kapitels", 1)[1]
+    return {m.group("name"): m.group("value") for m in _ROW.finditer(table)}
+
+
+def _makefile_var(name: str) -> str:
+    text = (REPO / "Makefile").read_text(encoding="utf-8")
+    m = re.search(rf"^{name} \?= (\S+)$", text, re.MULTILINE)
+    assert m, f"{name} not set in Makefile"
+    return m.group(1)
+
+
+def _gate_value(key: str) -> str:
+    gate = json.loads((REPO / "quality" / "sonar" / "quality-gate.json").read_text())
+    [cond] = [c for c in gate["conditions"] if c["config_key"] == key]
+    return str(cond["error"])
+
+
+def _max_file_kb() -> str:
+    config = yaml.safe_load((REPO / ".pre-commit-config.yaml").read_text())
+    for repo in config["repos"]:
+        for hook in repo["hooks"]:
+            if hook["id"] == "check-added-large-files":
+                [arg] = [a for a in hook["args"] if a.startswith("--maxkb=")]
+                return arg.split("=", 1)[1]
+    raise AssertionError("check-added-large-files hook missing")
+
+
+def _sonar_port() -> str:
+    compose = (REPO / "tools" / "sonarqube" / "compose.yaml").read_text()
+    m = re.search(r'"127\.0\.0\.1:\$\{SONARQUBE_PORT:-(\d+)\}:9000"', compose)
+    assert m, "port mapping not found in compose.yaml"
+    host_url = _makefile_var("SONAR_HOST_URL")
+    assert host_url == f"http://127.0.0.1:{m.group(1)}", host_url
+    return m.group(1)
+
+
+def _doc_values(path: str) -> dict[str, str]:
+    text = (REPO / path).read_text(encoding="utf-8")
+    return {m.group("name"): m.group("value") for m in _DOC_ROW.finditer(text)}
+
+
+SOURCES = {
+    "quality.coverage.tools_min_percent": lambda: str(
+        tomllib.loads((REPO / "tools" / "pyproject.toml").read_text())["tool"]["coverage"][
+            "report"
+        ]["fail_under"]
+    ),
+    "quality.coverage.go_min_percent": lambda: _makefile_var("COVERAGE_GO_MIN"),
+    "quality.coverage.dart_min_percent": lambda: _makefile_var("COVERAGE_DART_MIN"),
+    "quality.sonar.new_issues_max": lambda: _gate_value("quality.sonar.new_issues_max"),
+    "quality.sonar.new_hotspots_reviewed_min_percent": lambda: _gate_value(
+        "quality.sonar.new_hotspots_reviewed_min_percent"
+    ),
+    "quality.sonar.new_coverage_min_percent": lambda: _gate_value(
+        "quality.sonar.new_coverage_min_percent"
+    ),
+    "quality.sonar.new_duplication_max_percent": lambda: _gate_value(
+        "quality.sonar.new_duplication_max_percent"
+    ),
+    "quality.sonar.startup_timeout_s": lambda: _makefile_var("SONAR_STARTUP_TIMEOUT_S"),
+    "quality.sonar.local_port": _sonar_port,
+    "commit.header_max_length": lambda: str(commit_msg.HEADER_MAX_LENGTH),
+    "repo.max_file_kb": _max_file_kb,
+    "license.spdx_header_lines": lambda: str(license_check.HEADER_SEARCH_LINES),
+    "deps.min_release_age": lambda: json.loads((REPO / "renovate.json").read_text())[
+        "minimumReleaseAge"
+    ],
+    "security.report_ack_target": lambda: _doc_values("SECURITY.md")["security.report_ack_target"],
+    "security.assessment_target": lambda: _doc_values("SECURITY.md")["security.assessment_target"],
+    "security.fix_target_critical": lambda: _doc_values("SECURITY.md")[
+        "security.fix_target_critical"
+    ],
+    "security.fix_target_high": lambda: _doc_values("SECURITY.md")["security.fix_target_high"],
+    "security.disclosure_deadline": lambda: _doc_values("SECURITY.md")[
+        "security.disclosure_deadline"
+    ],
+    "triage.first_response_target": lambda: _doc_values("GOVERNANCE.md")[
+        "triage.first_response_target"
+    ],
+    "triage.needs_info_close_after": lambda: _doc_values("GOVERNANCE.md")[
+        "triage.needs_info_close_after"
+    ],
+}
+
+
+def test_every_named_value_has_a_source() -> None:
+    assert set(chapter_values()) == set(SOURCES)
+
+
+@pytest.mark.parametrize("name", sorted(SOURCES))
+def test_named_value_matches_its_source(name: str) -> None:
+    assert chapter_values()[name] == SOURCES[name](), name
+
+
+def test_coverage_threshold_in_makefile_is_not_duplicated() -> None:
+    """The tools threshold lives only in tools/pyproject.toml."""
+    assert "--fail-under" not in (REPO / "Makefile").read_text(encoding="utf-8")

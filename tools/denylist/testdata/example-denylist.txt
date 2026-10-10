@@ -1,0 +1,8 @@
+# Example deny list for the scanner tests. Neutral, invented terms only.
+# Format: one rule per line; '#' starts a comment; 're:' marks a regular expression;
+# everything else is a literal. Matching ignores case.
+
+acme-widgets
+globex.test
+re:\bproject[- ]falcon\b
+re:\b[a-z]+@initech\.test\b

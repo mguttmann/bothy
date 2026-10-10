@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/OWNER/bothy/security/advisories/new
+    about: Private report to the maintainers (SECURITY.md). Never open a public issue for this.
+  - name: Questions and help
+    url: https://github.com/OWNER/bothy/blob/main/SUPPORT.md
+    about: Where to ask questions and what support to expect.

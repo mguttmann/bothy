@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Git hooks (install once with `make bootstrap`). Fast checks on every commit, the
+# commit message on commit-msg, and the full gate (`make check`) before every push.
+# The local hooks run the same pinned tools as the Makefile (tools/uv.lock,
+# tools/bin/tools.lock.json); only the generic file hygiene hooks come from a remote
+# repository, pinned to a full commit SHA. `make lint` runs the commit stage over all files.
+
+minimum_pre_commit_version: "4.0.0"
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+default_stages: [pre-commit]
+exclude: '^(tools/node/node_modules/|\.cache/|site/)'
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # frozen: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+        exclude: '\.svg$'
+      - id: end-of-file-fixer
+        exclude: '\.svg$'
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+        # mkdocs.yml uses !!python tags; --unsafe checks syntax only.
+        args: [--unsafe]
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        # Named value repo.max_file_kb (docs/spec/23-qualitaet.md).
+        args: [--maxkb=1024, --enforce-all]
+      - id: detect-private-key
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  - repo: local
+    hooks:
+      - id: text-rules
+        name: no en or em dashes (U+2013, U+2014)
+        entry: uv run --project tools --locked --quiet python tools/hooks/text_rules.py
+        language: system
+        types: [text]
+      - id: ruff-format
+        name: ruff format (tools)
+        entry: uv run --project tools --locked --quiet ruff format --check
+        language: system
+        types: [python]
+        files: '^tools/'
+      - id: ruff-check
+        name: ruff check (tools)
+        entry: uv run --project tools --locked --quiet ruff check
+        language: system
+        types: [python]
+        files: '^tools/'
+      - id: gitleaks-staged
+        name: gitleaks (staged changes)
+        entry: make gitleaks-staged
+        language: system
+        pass_filenames: false
+      - id: commit-msg
+        name: Conventional Commits and DCO sign-off
+        entry: uv run --project tools --locked --quiet python tools/hooks/commit_msg.py --require-signoff
+        language: system
+        stages: [commit-msg]
+      - id: make-check
+        name: make check (every gate, as in CI)
+        entry: make check
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

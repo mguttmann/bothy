@@ -1,0 +1,91 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# gitleaks configuration of the repository (docs/quality/gates.md, gate "gitleaks").
+# Used by `make gitleaks` (whole history of all refs), the pre-commit hook (staged
+# changes) and CI. The default rule set stays on; the rules below add credential
+# formats this product handles. Each custom rule names its public source.
+#
+# Allowlisting: narrow, by exact fake value, never by whole file, and only with a
+# reason in the pull request. Real secrets are revoked first, then removed from history
+# (docs/quality/public-switch.md).
+
+title = "Bothy gitleaks config"
+
+[extend]
+useDefault = true
+
+# Standard Webhooks signing secrets: "base64 encoded, prefixed with whsec_" (HMAC) and
+# "whsk_" (ed25519 secret key). Source: github.com/standard-webhooks/standard-webhooks,
+# spec/standard-webhooks.md, retrieved 2026-10-10.
+[[rules]]
+id = "standard-webhooks-secret"
+description = "Standard Webhooks signing secret (whsec_/whsk_)"
+regex = '''\b((?:whsec|whsk)_[A-Za-z0-9+/]{32,88}={0,2})'''
+secretGroup = 1
+entropy = 3.5
+keywords = ["whsec_", "whsk_"]
+
+# Any Anthropic credential, not only the API key formats of the default rules. The
+# server must never hold Claude credentials (ADR 0024, invariant I5); a hit anywhere
+# in the repository is a leak. Prefix family per the public Anthropic key formats
+# (sk-ant-api03-, sk-ant-admin01-) and OAuth tokens of the same family.
+[[rules]]
+id = "anthropic-credential-any"
+description = "Anthropic credential of any type (sk-ant-<type><nn>-...)"
+regex = '''\b(sk-ant-[a-z]{2,8}[0-9]{2}-[A-Za-z0-9_\-]{20,})'''
+secretGroup = 1
+entropy = 3.5
+keywords = ["sk-ant-"]
+
+# Tailscale keys "tskey-<type>-<key id>-<secret>" with the types api, auth, client,
+# scim, webhook. Source: tailscale.com/docs/reference/key-prefixes, retrieved 2026-10-10.
+# Relevant because the product documents `tailscale serve` as one access option.
+[[rules]]
+id = "tailscale-key"
+description = "Tailscale API, auth, OAuth client, SCIM or webhook key"
+regex = '''\b(tskey-(?:api|auth|client|scim|webhook)-[A-Za-z0-9]+-[A-Za-z0-9]{16,})'''
+secretGroup = 1
+entropy = 3.0
+keywords = ["tskey-"]
+
+# SonarQube tokens without a "sonar" keyword nearby (the default rule needs one).
+# Prefixes squ_ (user), sqp_ (project), sqa_ (global analysis) as in the default rule.
+[[rules]]
+id = "sonarqube-token-prefixed"
+description = "SonarQube token with type prefix"
+regex = '''\b((?:squ|sqp|sqa)_[a-z0-9]{40})\b'''
+secretGroup = 1
+entropy = 3.0
+keywords = ["squ_", "sqp_", "sqa_"]
+
+[[allowlists]]
+description = "Example credentials in documentation and tests carry the marker EXAMPLE (CONTRIBUTING.md); real credentials never do"
+stopwords = ["example"]
+
+[[allowlists]]
+description = "UUIDs are identifiers in this product (UUIDv7, docs/spec/03-datenmodell.md), never credentials"
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = ['''^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$''']
+
+[[allowlists]]
+description = "Unsigned example JWTs whose signature part is the literal word sig or signature"
+targetRules = ["generic-api-key", "jwt"]
+regexTarget = "secret"
+regexes = ['''^eyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]*\.(?:sig|signature)$''']
+
+[[allowlists]]
+description = "Checksum manifests: one line maps a file name to its sha256"
+regexTarget = "line"
+regexes = ['''^\s*"[^"]+\.[A-Za-z0-9]+": "[0-9a-f]{64}",?\s*$''']
+
+[[allowlists]]
+description = "Generated lock files and vendored dependencies carry checksums, not secrets"
+paths = [
+  '''(^|/)uv\.lock$''',
+  '''(^|/)package-lock\.json$''',
+  '''(^|/)pubspec\.lock$''',
+  '''(^|/)node_modules/''',
+  '''(^|/)\.cache/''',
+  '''(^|/)\.venv/''',
+]

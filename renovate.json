@@ -1,0 +1,84 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Dependency updates (ADR 0041). Grouped, weekly, with a cooldown before an update is proposed. Actions and images stay pinned to digests.",
+  "extends": [
+    "config:best-practices",
+    ":semanticCommits",
+    ":semanticCommitTypeAll(chore)",
+    ":semanticCommitScopeDisabled"
+  ],
+  "schedule": ["before 6am on monday"],
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "labels": ["dependencies"],
+  "commitMessagePrefix": "chore(deps):",
+  "vulnerabilityAlerts": {
+    "minimumReleaseAge": null,
+    "schedule": ["at any time"]
+  },
+  "packageRules": [
+    {
+      "description": "GitHub Actions: one weekly pull request, pinned to full commit SHAs",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Python development tools of the repository gates",
+      "matchManagers": ["pep621"],
+      "matchFileNames": ["tools/pyproject.toml"],
+      "groupName": "dev tools (Python)"
+    },
+    {
+      "description": "Node development tools of the repository gates",
+      "matchManagers": ["npm"],
+      "matchFileNames": ["tools/node/package.json"],
+      "groupName": "dev tools (Node)"
+    },
+    {
+      "description": "Release binaries: Renovate bumps the version, a maintainer refreshes the sha256 pins with `make tools-lock` (CI fails until then, on purpose)",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": ["tools/bin/tools.lock.json"],
+      "groupName": "release binaries",
+      "prBodyNotes": [
+        "Refresh the pins before merging: `make tools-lock TOOL=<name> VERSION=<version>` per tool, then review the sha256 diff."
+      ]
+    },
+    {
+      "description": "Trivy stays on the release the vendor advisory GHSA-69fq-xp46-6x23 names as safe; a newer one needs the manual check in docs/quality/toolchain.md",
+      "matchDepNames": ["trivy"],
+      "enabled": false
+    },
+    {
+      "description": "Local SonarQube and its database",
+      "matchFileNames": ["tools/sonarqube/compose.yaml"],
+      "groupName": "local SonarQube"
+    },
+    {
+      "description": "Major updates wait for approval on the dependency dashboard",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Release binaries in tools/bin/tools.lock.json",
+      "managerFilePatterns": ["/^tools/bin/tools\\.lock\\.json$/"],
+      "matchStrings": [
+        "\"(?<depName>[a-z0-9-]+)\": \\{\\s*\"version\": \"(?<currentValue>[^\"]+)\",\\s*\"repo\": \"(?<packageName>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^(?:lychee-)?v?(?<version>.+)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Versions pinned in the Makefile, each marked with a renovate comment",
+      "managerFilePatterns": ["/^Makefile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n[A-Z_]+ := (?<currentValue>\\S+)"
+      ]
+    }
+  ]
+}

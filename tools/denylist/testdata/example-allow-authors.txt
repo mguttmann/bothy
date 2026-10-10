@@ -1,0 +1,2 @@
+# Allowed commit identities for the scanner tests. One per line: 'Name <email>' or '<email>'.
+Robin Example <robin@initech.test>

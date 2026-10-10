@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Portability test: the complete stack from the released images on a fresh Linux
+# machine, then the smoke test (docs/spec/16-betrieb.md). Runs at product and server
+# release tags and on demand.
+#
+# Release-class workflow (ADR 0039): it runs on a GitHub-hosted Linux runner in both
+# phases on purpose, because the point is a machine that has never seen the project.
+# That costs hosted minutes in the private phase, a few per release (ci-budget.md).
+
+name: portability
+
+on:
+  push:
+    tags:
+      - "v[0-9]*"
+      - "server/v[0-9]*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portability-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  stack:
+    name: full stack on a fresh runner
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read # pull the released images from ghcr.io
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Start the stack and run the smoke test
+        run: make portability
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose -f infra/compose/compose.yaml logs --no-color --tail 200 || true

@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+rules:
+  - id: bothy-go-sql-string-building
+    languages: [go]
+    severity: ERROR
+    message: >-
+      SQL lives in sqlc query files with parameters (ADR 0007). Building a statement
+      at runtime with fmt.Sprintf or string concatenation invites SQL injection.
+    patterns:
+      - pattern-either:
+          - pattern: $DB.$METHOD(..., fmt.Sprintf(...), ...)
+          - pattern: $DB.$METHOD(..., "..." + $X, ...)
+      - metavariable-regex:
+          metavariable: $METHOD
+          regex: '^(Query|QueryRow|Exec|Prepare|QueryContext|QueryRowContext|ExecContext|PrepareContext|SendBatch)$'

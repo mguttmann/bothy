@@ -1,0 +1,43 @@
+# Local configuration that must never be committed
+.denylist-path
+.env
+.env.*
+!.env.example
+tools/sonarqube/.env
+
+# Tool caches and build outputs of the repository gates
+.cache/
+site/
+dist/
+
+# Python and uv
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+
+# Node
+node_modules/
+
+# Go
+coverage.out
+
+# Flutter and Dart (design/build/ is generated but committed on purpose)
+.dart_tool/
+apps/**/build/
+packages/**/build/
+apps/**/coverage/
+packages/**/coverage/
+
+# Editors, operating systems and local agent state
+.DS_Store
+.idea/
+.vscode/
+*.swp
+.claude/worktrees/
+.claude/settings.local.json

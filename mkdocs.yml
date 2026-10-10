@@ -1,0 +1,170 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Documentation site (ADR 0045). Build: `make docs` (mkdocs build --strict); versions are
+# pinned in tools/uv.lock. The navigation lists every page that must exist; a missing
+# page fails the strict build. Pages not listed here are still built and reachable through
+# links (for example single ADRs through the ADR index).
+
+site_name: Bothy
+site_description: Selbst gehosteter Team-Chat, in dem KI-Agenten vollwertige Teilnehmer sind.
+site_url: https://OWNER.github.io/bothy/
+repo_url: https://github.com/OWNER/bothy
+repo_name: bothy
+edit_uri: edit/main/docs/
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  language: de
+  # System fonts: reading the site sends no request to a font service.
+  font: false
+  features:
+    - content.code.copy
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Systemvorgabe
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Dunkel
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Hell
+
+plugins:
+  - search:
+      lang: [de, en]
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      # GitHub-style anchors, so that links work the same on GitHub and in the site.
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+validation:
+  nav:
+    omitted_files: info
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: info
+    unrecognized_links: warn
+
+nav:
+  - Start: index.md
+  - Überblick:
+      - Spezifikation: SPEC.md
+      - Plan: PLAN.md
+      - Roadmap: roadmap.md
+  - Spezifikation:
+      - 00 Glossar: spec/00-glossar.md
+      - 01 Produkt: spec/01-produkt.md
+      - 02 Architektur: spec/02-architektur.md
+      - 03 Datenmodell: spec/03-datenmodell.md
+      - 04 Sync-Protokoll: spec/04-sync-protokoll.md
+      - 05 Aktionen: spec/05-aktionen.md
+      - 06 API: spec/06-api.md
+      - 07 Rechte: spec/07-rechte.md
+      - 08 Identität: spec/08-identitaet.md
+      - 09 Agenten: spec/09-agenten.md
+      - 10 Backend-Richtlinie: spec/10-backend-richtlinie.md
+      - 11 Erweiterungen: spec/11-erweiterungen.md
+      - 12 Dateien: spec/12-dateien.md
+      - 13 Push und Benachrichtigungen: spec/13-push-benachrichtigungen.md
+      - 14 Suche: spec/14-suche.md
+      - 15 Client-Architektur: spec/15-client-architektur.md
+      - 16 Betrieb: spec/16-betrieb.md
+      - 17 Observability: spec/17-observability.md
+      - 18 Release: spec/18-release.md
+      - 19 Sicherheit: spec/19-sicherheit.md
+      - 20 Datenschutz: spec/20-datenschutz.md
+      - 21 Dev-Abschottung: spec/21-dev-isolation.md
+      - 22 Import und Migration: spec/22-import-migration.md
+      - 23 Qualität: spec/23-qualitaet.md
+  - Architektur: architecture/README.md
+  - API:
+      - Übersicht: api/README.md
+      - Webhooks: api/webhooks.md
+  - Design:
+      - Übersicht: design/README.md
+      - Farbpalette: design/palette.md
+      - Kontraste: design/contrast.md
+      - Typografie: design/typography.md
+      - Abstände, Radien, Erhebung, Bewegung: design/spacing-radii-elevation-motion.md
+      - Icons: design/icons.md
+      - Komponenten: design/components.md
+      - Name: design/naming.md
+  - Betrieb:
+      - Konfiguration: operations/configuration.md
+      - Installation mit Compose: operations/install-compose.md
+      - Sicherung und Wiederherstellung: operations/backup-restore.md
+      - Notfall: operations/disaster-recovery.md
+      - Umzug in die Cloud: operations/cloud-migration.md
+      - Upgrade: operations/upgrade.md
+      - Tailscale: operations/tailscale.md
+      - Umgebungen und Feature-Flags: operations/environments-and-flags.md
+      - Release: operations/release.md
+  - Observability:
+      - Signale: observability/signals.md
+      - Datenschutz: observability/privacy.md
+      - Collector: observability/collector.md
+      - Dashboards: observability/dashboards.md
+      - SLOs: observability/slos.md
+      - Alarme: observability/alerting.md
+      - Backends: observability/backends.md
+      - Admin-Statistik: observability/admin-statistics.md
+      - Audit und Telemetrie: observability/audit-vs-telemetry.md
+  - Qualität:
+      - Übersicht: quality/README.md
+      - Gates: quality/gates.md
+      - Werkzeugkette: quality/toolchain.md
+      - Push-Disziplin: quality/push-discipline.md
+      - Red-Team-Gate: quality/red-team-gate.md
+      - SonarQube lokal: quality/sonarqube-local.md
+      - CI-Budget: quality/ci-budget.md
+      - Self-hosted Runner: quality/self-hosted-runner.md
+      - Öffentlich schalten: quality/public-switch.md
+      - Lizenzen: quality/licenses.md
+  - Sicherheit:
+      - Bedrohungsmodell: security/threat-model.md
+  - Compliance:
+      - Verzeichnis der Verarbeitungstätigkeiten: compliance/ropa-template.md
+      - Auftragsverarbeiter: compliance/processors-template.md
+  - Entscheidungen:
+      - ADR-Index: adr/README.md
+      - Ruling-Log: DECISIONS.md
+      - Offene Fragen: OPEN-QUESTIONS.md
+      - Risiken: RISKS.md
+  - Wiederverwendung: REUSE.md
+  - Bau-Briefs: briefs/README.md

@@ -1,0 +1,15 @@
+{
+  "comment": "Quality profiles of the project. Each language profile inherits from `parent` and activates the rules of its XML file in addition. Applied and checked by tools/sonarqube/quality_sync.py on SonarQube Community Build and SonarQube Cloud alike.",
+  "profile_name": "Bothy way",
+  "parent": "Sonar way",
+  "languages": {
+    "dart": "quality-profile-dart.xml",
+    "docker": "quality-profile-docker.xml",
+    "go": "quality-profile-go.xml",
+    "js": "quality-profile-js.xml",
+    "kotlin": "quality-profile-kotlin.xml",
+    "py": "quality-profile-py.xml",
+    "swift": "quality-profile-swift.xml",
+    "ts": "quality-profile-ts.xml"
+  }
+}
