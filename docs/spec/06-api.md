@@ -1,0 +1,1104 @@
+# 06 Öffentliche API
+
+Status: Entwurf M0. Normativ sind [docs/api/openapi.yaml](../api/openapi.yaml) (REST, OpenAPI 3.1),
+[docs/api/asyncapi.yaml](../api/asyncapi.yaml) (Gateway, AsyncAPI 3.0) und dieses Kapitel
+(Konventionen). Webhooks: [docs/api/webhooks.md](../api/webhooks.md). Begriffe:
+[00-glossar.md](00-glossar.md). Tabellen: [03-datenmodell.md](03-datenmodell.md). Sync:
+[04-sync-protokoll.md](04-sync-protokoll.md). Aktionen: [05-aktionen.md](05-aktionen.md).
+Entscheidungen: ADR 0013 bis 0016.
+
+Rangfolge bei Widerspruch: 05 für Aktionen und Rechte, 04 für Sync-Semantik, die YAML-Dateien für
+Formen (Pfade, Felder, Typen), dieses Kapitel für Konventionen. Ein Widerspruch ist ein Fehler und
+wird in derselben Änderung behoben, die ihn findet.
+
+Alle Grenzen, Fenster und Fristen sind benannte Konfigurationswerte. Neue Werte dieses Kapitels
+stehen nur in Abschnitt 20.
+
+## 1. Überblick
+
+```mermaid
+flowchart LR
+    subgraph Clients
+        A[Apps: iOS, Android, macOS, Windows]
+        K[Web-Konsole]
+    end
+    subgraph Erweiterungen
+        AD[Agenten-Adapter]
+        AP[Apps mit Manifest]
+    end
+    EX[Externe Systeme]
+    S[(Server: /api/v1)]
+    A -- REST + Gateway --> S
+    K -- REST --> S
+    AD -- REST + Gateway, API-Token --> S
+    AP -- REST + Gateway, API-Token --> S
+    S -- signierte Webhooks --> AP
+    EX -- Eingangs-Webhook --> S
+```
+
+| Fläche | Ort | Vertrag |
+|---|---|---|
+| REST | `https://<host>/api/v1/...` | openapi.yaml, Abschnitte 2 bis 10 |
+| Gateway (WebSocket) | `wss://<host>/api/v1/gateway` | asyncapi.yaml, 04, Abschnitt 11 |
+| Ausgehende Webhooks | HTTPS-Ziel der App | `webhooks:` in openapi.yaml, webhooks.md |
+| Eingangs-Webhooks | `POST /api/v1/hooks/{webhook_id}/{token}` | openapi.yaml, webhooks.md |
+
+Der Server-Eintrag in openapi.yaml ist relativ (`/api/v1`), weil jede Instanz ihren eigenen Host
+hat. 04 nennt Pfade ohne `/api` (z. B. `/v1/gateway`, `/v1/events`); dieses Kapitel setzt das
+Präfix `/api/v1` für alle Flächen (Kern-Vertrag: Ergänzung beantragt, Abschnitt 18.2).
+
+## 2. Grundregeln
+
+| Thema | Regel | Grund |
+|---|---|---|
+| Pfade | Kleinbuchstaben, Nomen im Plural, kebab-case (`/gdpr-requests`). Pfad-Parameter heißen `{<ressource>_id}`. Pfade enthalten nur IDs, nie Handles oder Namen. | Stabile URLs; Umbenennen ändert keine Adresse. |
+| Zustandswechsel | Wechsel mit Nebenwirkung, Grund oder Audit sind `POST /<ressource>/{id}/<verb>` (`close`, `reopen`, `move`, `revoke`, `approve`, `archive`, `cancel`, `disable`). | Eine Aktion je Route, auditierbar mit Grund, kein verstecktes Feld in einem PATCH. |
+| Selbstbezug | `/me/...` für den aufrufenden Menschen; Agenten-Laufzeit unter `/agents/me/...`. | Kein Sonderwert `me` in ID-Parametern; Codegeneratoren typisieren IDs als UUID. |
+| Felder | snake_case, gleich wie Datenbank (03) und Ereignisse (04). | Ein Name je Begriff über alle Schichten. |
+| operationId | lowerCamelCase, Verb plus Nomen (`createMessage`). Lint-Regel `rule/operation-id-camel-case`. | Generatoren bilden Methodennamen daraus; eine Umbenennung bricht SDKs. |
+| Aufzählungen | snake_case-Strings. Wiederholte Wertemengen sind benannte Schemas (z. B. `ThreadState`). | Gleiche Typen in allen Generatoren, keine Namenskollisionen. |
+| IDs | UUIDv7 (RFC 9562) in Kleinschreibung. Der Server akzeptiert Großschreibung beim Lesen. | 03, R-DM-01. |
+| Zeit | RFC 3339 in UTC mit `Z` und Millisekunden. Dauern als Ganzzahl in Millisekunden (`_ms`). Clients lesen jede gültige RFC-3339-Form. | Eindeutig, sortierbar, sprachneutral. |
+| Ganzzahlen | `format: int64`. Sequenzen, Versionen und Beträge bleiben unter 2^53, damit JavaScript sie exakt darstellt; ein Server-Test prüft die Grenze bei der Vergabe. | JSON-Zahlen in JavaScript sind Gleitkomma. |
+| Geld | `amount_micros` (int64) plus `currency` (ISO 4217). | 03, R-DM-04. |
+| Kein `null` | Der Server sendet nie JSON `null`. Fehlt ein Feld, hat es keinen Wert. Clients behandeln ein empfangenes `null` wie ein fehlendes Feld. Werte werden über eigene Felder oder Modi entfernt (z. B. `use_global_order: true`, `OperatorSet.mode = none`), nie durch `null`. | dart-dio kennt den Null-Typ nicht [belegt, Q4]; ein Weg für alle Generatoren (R-API-03). |
+| Unbekanntes | Clients ignorieren unbekannte Felder, Enum-Werte, Ereignistypen und Problem-Codes. Der Server ignoriert unbekannte Felder in Anfragen. | Apps und Server werden unabhängig aktualisiert; neue Felder sind additiv (Abschnitt 13). |
+| Medientypen | JSON als `application/json` (UTF-8); Fehler als `application/problem+json`; Datei-Teile als `application/octet-stream`; Bilder für Avatar und Logo als `multipart/form-data` (Teil `file`); Exporte als `application/x-ndjson`. | Ein Format je Zweck; NDJSON lässt große Exporte streamen. |
+| Größe | JSON-Körper bis `api.max_json_body_bytes`, sonst `413 payload_too_large`. Der Wert ist größer als `message.max_content_bytes`. | Schutz vor Speicherdruck ohne lange Nachrichten zu verhindern. |
+| Caching | Authentifizierte JSON-Antworten tragen `Cache-Control: no-store`. Datei-Inhalte tragen `Cache-Control: private, immutable`, weil sich der Inhalt einer Datei-ID nie ändert. | Kein Inhalt in fremden Caches; der Client löscht bei `access.changed` selbst (04, 8.3). |
+| Korrelation | Jede Antwort trägt `Correlation-Id` (UUIDv7). Derselbe Wert steht in Problemen, Ereignissen (`correlation_id`) und im Audit. Clients setzen ihn nicht; Tracing läuft über W3C `traceparent` (Kapitel 17). | Ein fälschbarer Client-Wert würde Audit-Spuren verfälschen. |
+| Client-Kennung | `User-Agent: <app>/<version> (<plattform>)`. | Diagnose und `min_client_versions` in der Discovery. |
+| CORS | Aus. Die Web-Konsole läuft auf demselben Origin. Ausnahmen nur über `api.cors_allowed_origins`. | Kleinste Angriffsfläche für Token im Browser. |
+| Client-IP | Für die Rate-Limit-Klasse `rl.public_auth` und das Audit gilt die Quell-IP; `Forwarded` und `X-Forwarded-For` nur von Absendern aus `api.trusted_proxy_cidrs`. | Hinter einem Reverse-Proxy hätten sonst alle Clients dieselbe IP, oder Angreifer setzen sie selbst. |
+| Sprache | `title` und `detail` in Problemen sind Englisch. Clients übersetzen über `code`. Beschreibungen in den YAML-Dateien sind Englisch, weil sie als Kommentare in generierten Code wandern. | Stabile Texte für Logs; Lokalisierung gehört in den Client. |
+
+## 3. Authentifizierung je Prinzipal-Art
+
+| Prinzipal | Anmeldung | Kopfzeilen je Anfrage | Bindung | Gültigkeit | Step-up |
+|---|---|---|---|---|---|
+| Mensch in einer App | OIDC, Header eines vertrauenswürdigen Reverse-Proxys, lokales Konto mit Passkey oder Passwort plus TOTP; Ergebnis ist ein Token-Paar | `Authorization: DPoP <access_token>` und `DPoP: <Beweis>` | Geräteschlüssel (`cnf.jkt`), RFC 9449 | Zugriffstoken `auth.access_token_ttl` (Kapitel 08), Refresh `auth.refresh_token_ttl` | Passkey oder Geräteschlüssel mit Nutzerbestätigung |
+| Mensch in der Web-Konsole | wie oben, Plattform `web`, Schlüssel nicht exportierbar in WebCrypto | wie oben | wie oben | wie oben | Passkey |
+| Agent | API-Token, vom Owner erzeugt (`token.create`) | `Authorization: Bearer <token>`; bei Token mit `dpop_jkt` `Authorization: DPoP` plus `DPoP` | optional `dpop_jkt` | bis Widerruf oder `expires_at` | nie (R-AZ-03) |
+| App | API-Token mit Scopes (05, 2.6) | wie Agent | optional | wie Agent | nie |
+| Eingangs-Webhook | geheimer Token im Pfad | keine | keine | bis Widerruf | nie |
+| Anonym | keine | keine | keine | | nie |
+
+Anonym erreichbar sind nur Operationen mit `security: []`: Discovery, JWKS, Webhook-Schlüssel,
+Logo, Problem-Typen, Health, öffentliche Statusseite, Anmeldeabläufe und Eingangs-Webhooks. Sie
+laufen trotzdem durch `authorize` mit dem Prinzipal `anonymous` (05, 2.1).
+
+### 3.1 DPoP
+
+1. Der Server stellt Zugriffstokens als JWS mit `sub`, `sid` (Sitzung) und `cnf.jkt` aus
+   (RFC 9449 [belegt, Q3]). Jede Anfrage trägt einen frischen DPoP-Beweis mit `htm`, `htu` (ohne
+   Query), `iat`, `jti` und `ath` (Hash des Zugriffstokens).
+2. Verlangt der Server einen Nonce, antwortet er `401` mit `WWW-Authenticate: DPoP
+   error="use_dpop_nonce"` und `DPoP-Nonce` (Problem `use_dpop_nonce`). Der Client bildet den
+   Beweis mit diesem Nonce neu und wiederholt genau einmal. Jede Antwort darf einen neuen
+   `DPoP-Nonce` tragen; der Client nimmt immer den neuesten. Am Gateway kommt der Nonce aus
+   `hello` und `reauth_required` (04, 6.3).
+3. Anmelde-Endpunkte haben noch kein Zugriffstoken. Sie verlangen die Kopfzeile `DPoP` ohne
+   `ath`; der Server bindet die neuen Tokens an genau diesen Schlüssel.
+4. Refresh (`POST /auth/token/refresh`) verlangt einen Beweis mit dem Schlüssel der Sitzung. Eine
+   Wiederverwendung eines schon rotierten Refresh-Tokens sperrt Familie und Sitzung
+   (`session_revoked`, 03). Ausnahme: dieselbe Wiederholung mit demselben Schlüssel innerhalb von
+   `auth.refresh_reuse_grace`, z. B. nach verlorener Antwort; sie bekommt ein neues Paar
+   (Kern-Vertrag: Ergänzung beantragt, Abschnitt 18.2).
+5. `jti`-Speicher, Zeitfenster für `iat` und Algorithmen legt Kapitel 08 fest.
+
+### 3.2 Anmeldeabläufe
+
+Jede Anmeldeart hat eigene Endpunkte statt eines Endpunkts mit Union-Körper; das hält die
+Schemas frei von `oneOf` und die Fehlerbilder getrennt (R-API-12).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App as App (Alex)
+    participant API as Server
+    participant IdP as OIDC-Anbieter
+    App->>App: Geräteschlüssel und client_verifier erzeugen
+    App->>API: POST /auth/oidc/begin (provider_id, app_redirect_uri, client_challenge)
+    API-->>App: authorization_url, login_attempt_id
+    App->>IdP: System-Browser öffnet authorization_url
+    IdP->>API: GET /auth/oidc/callback (code, state)
+    API->>IdP: Code tauschen (Client-Secret aus dem Secret-Provider)
+    API-->>App: Redirect auf app_redirect_uri mit login_code
+    App->>API: POST /auth/oidc/complete (login_code, client_verifier, device) + DPoP
+    API->>API: Identität zuordnen, Gerät pending oder active, Sitzung anlegen
+    API-->>App: 201 TokenResponse (token_type DPoP, device.state)
+    opt Gerät wartet auf Freigabe
+        App->>API: GET /devices/{device_id}
+        Note over App,API: Freigabe von einem aktiven eigenen Gerät oder durch einen Owner
+    end
+```
+
+1. **OIDC.** Der Server ist der vertrauliche Client beim Anbieter. Die App öffnet den
+   System-Browser; `app_redirect_uri` ist ein eigenes URI-Schema, eine beanspruchte
+   `https`-Adresse oder Loopback (RFC 8252 [belegt, Q12]). Nach dem Rückruf leitet der Server
+   mit einem einmaligen `login_code` (gültig `auth.login_code_ttl`) auf `app_redirect_uri` um.
+   Nur wer den passenden `client_verifier` zur `client_challenge` hat, kann ihn einlösen; ein
+   fremdes Programm, das die Umleitung abfängt, kann es nicht. Der Versuch gilt
+   `auth.login_attempt_ttl`.
+2. **Proxy-Header.** `POST /auth/trusted-header/login` liest die Identität aus der Kopfzeile des
+   Proxys. Der Endpunkt antwortet `404`, wenn kein Treiber `trusted_header` aktiv ist oder der
+   Server nicht nur auf Loopback lauscht (B9).
+3. **Lokale Konten.** Der Owner legt den Menschen an (`createUser` mit `local_account`) und
+   bekommt einmalig einen Einladungs-Code (gültig `auth.enrollment_code_ttl`). Damit registriert
+   der Mensch seinen ersten Passkey (`/auth/enroll/...`). Danach meldet er sich mit Passkey an
+   (`/auth/passkey/...`) oder, solange `auth.local_password_enabled` gilt, mit Passwort plus TOTP
+   (`/auth/password/login`). Grund für den Rückfall: native Apple-Apps brauchen für Passkeys eine
+   öffentlich erreichbare Associated Domain (Baseline R-Passkeys).
+4. **Gerät wartet.** Ein neues Gerät bekommt Tokens, ist aber `pending`. Alle Aktionen außer
+   `self.read`, `device.list` für das eigene Gerät, `auth.token.refresh` und `auth.logout`
+   antworten `403 device_pending`. Das Gateway lehnt `identify` ab (04, 6.3).
+
+### 3.3 Step-up
+
+Aktionen mit Step-up (05, Spalte "Step-up") antworten ohne frische Bestätigung `401
+step_up_required`. Der Client holt `POST /auth/step-up/challenge`, lässt den Menschen mit Passkey
+oder Geräteschlüssel bestätigen (`/auth/step-up/passkey` oder `/auth/step-up/device-key`) und
+wiederholt die ursprüngliche Anfrage mit demselben `Idempotency-Key`. Die Bestätigung gilt für die
+Sitzung `auth.step_up_max_age` (03). Agenten- und App-Tokens bekommen bei solchen Aktionen
+`403 forbidden` (R-AZ-03).
+
+## 4. Autorisierung in der API
+
+1. Jede Operation trägt `x-authz-action` mit genau einer Aktion aus 05 und `x-rate-limit-class`
+   mit deren Klasse. Lint-Regeln: `rule/authz-action-required`, `rule/authz-action-known`,
+   `rule/rate-limit-class-required`, `rule/rate-limit-class-known` (docs/api/redocly.yaml).
+2. Listen-Endpunkte prüfen die Aktion gegen den Container (Kanal, Bereich, Instanz) und filtern
+   in der Abfrage (P2). Sie liefern keine Gesamtzahlen.
+3. Kein Leserecht ergibt `404 not_found`, gleich ob es die Ressource gibt (R-AZ-01). Leserecht ohne
+   nötige Stufe oder Zusatzrecht ergibt `403 forbidden`.
+4. Apps: Fehlt der Lese-Scope, verhält sich die API wie ohne Leserecht (`404`). Fehlt nur der
+   Schreib-Scope, antwortet sie `403 scope_missing`.
+5. Invarianten: I1-Verletzung ergibt `409 i1_violation` mit `hint`; der letzte Owner ergibt
+   `409 last_owner`.
+6. Agenten-Auslösung: Eine Nachricht wird gespeichert, auch wenn `agent.invoke` ablehnt; dann gilt
+   `trigger_state = failed` mit `trigger_failure_reason` (05, Abschnitt 5). Befehle und
+   Interaktionen ohne Auslöserecht antworten `403 agent_invocation_denied` mit `reason`.
+7. Aktionen ohne eigene REST-Route: `agent.invoke` und `run.followup.create` (geprüft in
+   `createMessage`, `createInteraction`, `invokeCommand`), `gateway.connect`, `gateway.focus`,
+   `typing.start` (Gateway), `push.deliver` (intern), `webhook_out.deliver` (an jedem Eintrag in
+   `webhooks:`).
+
+## 5. Fehler
+
+1. Jeder Fehler ist `application/problem+json` nach RFC 9457 [belegt, Q2] mit `type`, `title`,
+   `status`, `code`, `correlation_id`, optional `detail` und `instance`.
+2. `type` ist ein relativer URI mit vollem Pfad `/api/v1/problems/{code}`. RFC 9457 empfiehlt
+   absolute URIs "when possible" und erlaubt relative mit vollem Pfad [belegt, Q2]. Eine
+   selbst gehostete Software hat keinen gemeinsamen Host; jede Instanz liefert die Beschreibung
+   unter genau diesem Pfad (`getProblemType`). Clients vergleichen `type` als Zeichenkette oder
+   `code`. Eine spätere Umstellung auf absolute URIs wäre ein Bruch und kommt nur mit `v2`.
+3. Erweiterungen: `errors[]` (JSON Pointer, Code, Text) bei `validation_failed`; `current` bei
+   `version_conflict` und `base_version_conflict`; `reason` und `hint` bei Ablehnungen und
+   Invarianten. `detail` enthält nie Inhalte, Geheimnisse oder interne Pfade.
+4. `400` steht für Schema- und Regelverstöße. `422` gibt es nur für `idempotency_key_reuse` (04,
+   5.1). `409` für Zustandskonflikte, `412` für `If-Match`.
+5. Eine per Schalter ausgeschaltete Funktion antwortet angemeldeten Prinzipalen mit `403
+   feature_disabled`, damit die Oberfläche den Grund zeigen kann. Öffentliche Endpunkte
+   (Passwort-Anmeldung, Proxy-Header, öffentliche Statusseite) antworten `404`, damit sie die
+   Konfiguration nicht verraten.
+6. Das Gateway nutzt dieselben Codes im Rahmen `error`.
+
+Bekannte Codes (erzeugt aus derselben Quelle wie openapi.yaml):
+
+<!-- BEGIN GENERATED: problems -->
+| Code | Status | Bedeutung | Client-Reaktion |
+|---|---|---|---|
+| `validation_failed` | 400 | Anfrage verletzt Schema oder Regeln; `errors[]` nennt die Felder. | Eingabe korrigieren; nicht wiederholen. |
+| `malformed_request` | 400 | Körper ist kein gültiges JSON oder hat den falschen Medientyp. | Programmfehler; nicht wiederholen. |
+| `cursor_invalid` | 400 | Cursor ist unbekannt oder passt nicht zu den Filtern. | Ohne Cursor neu beginnen. |
+| `webhook_host_not_allowed` | 400 | Ziel-Host steht nicht in `webhook.allowed_hosts`. | Owner fragt die Freigabe des Hosts an. |
+| `unauthenticated` | 401 | Kein gültiger Prinzipal (Token fehlt, ist ungültig oder abgelaufen). | Token erneuern; scheitert das, neu anmelden. |
+| `token_expired` | 401 | Zugriffstoken abgelaufen. | Refresh, dann wiederholen. |
+| `session_revoked` | 401 | Sitzung, Gerät oder Prinzipal widerrufen. | Lokale Daten löschen, abmelden (R-SY-14). |
+| `step_up_required` | 401 | Aktion verlangt eine frische Bestätigung (`auth.step_up_max_age`). | Step-up durchführen, dann dieselbe Anfrage mit demselben `Idempotency-Key` wiederholen. |
+| `use_dpop_nonce` | 401 | Server verlangt einen frischen Nonce im DPoP-Beweis; Kopfzeile `DPoP-Nonce`. | Beweis mit Nonce neu bilden, einmal wiederholen. |
+| `invalid_dpop_proof` | 401 | DPoP-Beweis fehlt, ist falsch signiert, abgelaufen oder passt nicht zu `cnf.jkt`. | Programmfehler oder Geräteschlüssel verloren; neu anmelden. |
+| `forbidden` | 403 | Leserecht vorhanden, Stufe oder Zusatzrecht fehlt (R-AZ-01). | Nicht wiederholen; Bedienelement ausblenden. |
+| `scope_missing` | 403 | App hat den nötigen Scope nicht. | Owner bewilligt den Scope. |
+| `device_pending` | 403 | Gerät wartet auf Freigabe. | Warten, `GET /devices/{device_id}` abfragen. |
+| `feature_disabled` | 403 | Funktion per Schalter aus (z. B. persönliche Tokens). | Nicht wiederholen. |
+| `agent_invocation_denied` | 403 | `agent.invoke` lehnt ab; `reason` z. B. `billing_mode_personal_not_holder`, `project_not_ready`. | Grund anzeigen; nicht wiederholen. |
+| `invocation_token_invalid` | 403 | Aufruf-Marke falsch signiert, abgelaufen, für anderen Agenten oder `jti` passt nicht. | Adapter startet nichts; Lauf mit `failed` melden. |
+| `not_found` | 404 | Ressource fehlt oder ist nicht sichtbar; beides gleich (R-AZ-01). | Eintrag im Ausgangsfach als fehlgeschlagen markieren. |
+| `method_not_allowed` | 405 | Methode auf diesem Pfad nicht definiert. | Programmfehler. |
+| `conflict` | 409 | Zustand verhindert die Änderung (z. B. Name vergeben). | Zustand neu laden, Mensch entscheidet. |
+| `request_in_progress` | 409 | Erste Anfrage mit diesem `Idempotency-Key` läuft noch. | Mit Backoff wiederholen. |
+| `i1_violation` | 409 | Änderung würde I1 verletzen; `hint` nennt den Ausweg. | Zuerst auf `organization` umstellen. |
+| `last_owner` | 409 | Mindestens ein aktiver Owner muss bleiben. | Erst weiteren Owner ernennen. |
+| `already_started` | 409 | Lauf ist nicht mehr `queued`. | Adapter startet nichts. |
+| `billing_mode_mismatch` | 409 | Gemeldeter Ist-Modus weicht vom Soll ab; Lauf wird `failed`. | Adapter-Konfiguration prüfen. |
+| `invalid_state_transition` | 409 | Übergang ist im Zustandsautomaten nicht erlaubt. | Zustand neu laden. |
+| `base_version_conflict` | 409 | `base_version` eines Lauf-Patches veraltet; `current` enthält das Dokument. | Auf `current` neu aufsetzen. |
+| `component_used` | 409 | Komponente ist benutzt, abgelaufen oder deaktiviert. | Ansicht aktualisieren. |
+| `operator_mismatch` | 409 | Zielkanal hat einen anderen wirksamen Bediener. | Anderen Zielkanal wählen. |
+| `file_not_ready` | 409 | Upload unvollständig oder Scan läuft. | Auf `file.updated` warten. |
+| `resync_required` | 410 | Nachholen unmöglich; `reason` wie im Gateway. | Momentaufnahme laden (04, 7.3). |
+| `message_deleted` | 410 | Nachricht wurde inzwischen gelöscht. | Eintrag verwerfen, Text zum Kopieren behalten. |
+| `gone` | 410 | Objekt ist abgelaufen (Upload, Exportpaket, Autovervollständigung). | Neu anstoßen. |
+| `version_conflict` | 412 | `If-Match` passt nicht; `current` enthält die aktuelle Fassung. | Beide Fassungen zeigen, Mensch entscheidet. |
+| `payload_too_large` | 413 | Körper oder Datei über der Grenze; `detail` nennt den Konfigurationswert. | Nicht wiederholen. |
+| `unsupported_media_type` | 415 | Medientyp nicht erlaubt. | Nicht wiederholen. |
+| `range_not_satisfiable` | 416 | `Range` liegt außerhalb der Datei. | Ohne `Range` laden. |
+| `idempotency_key_reuse` | 422 | Gleiche Client-ID oder gleicher `Idempotency-Key` mit anderem Inhalt. | Neue ID erzeugen, nur wenn der Mensch neu sendet. |
+| `precondition_required` | 428 | `If-Match` fehlt. | Programmfehler. |
+| `rate_limited` | 429 | Rate-Limit-Klasse erschöpft. | `Retry-After` abwarten. |
+| `internal_error` | 500 | Unerwarteter Fehler; `correlation_id` für die Suche im Log. | Mit Backoff wiederholen. |
+| `unavailable` | 503 | Server nicht bereit (Start, Wartung, Abhängigkeit fehlt). | `Retry-After` abwarten. |
+<!-- END GENERATED: problems -->
+
+## 6. Paginierung
+
+1. Listen mit offener Menge sind cursor-basiert: Anfrage mit `cursor` und `limit`, Antwort
+   `{items, next_cursor}`. Fehlt `next_cursor`, ist das die letzte Seite.
+2. Der Cursor ist undurchsichtig, an Filter und Sortierung gebunden und stabil gegen neue Zeilen
+   (Keyset über Sortierschlüssel und ID). Ein fremder oder veralteter Cursor ergibt `400
+   cursor_invalid`.
+3. `limit` hat den Standard `api.page_size_default`; größere Werte als `api.page_size_max` werden
+   gekappt, nicht abgelehnt.
+4. Keine Gesamtzahlen. Sie kosten eine zweite Abfrage und verraten über Rechtefilter hinweg
+   Mengen.
+5. Sonderfälle mit öffentlichen Nummern: Verlauf eines Threads über `before_seq`, `after_seq`,
+   `around_seq` (Thread-Sequenz, Lücken erkennbar, 04 Abschnitt 4); Ereignisse über `after`
+   (globale Sequenz, 04 Abschnitt 7.4); Agenten-Verbraucher ab `acked_seq + 1`.
+6. Ohne Paginierung bleiben nur Listen, deren Menge klein ist (Bereiche, Kanäle eines Bereichs,
+   Tags, Einstellungen, Owner, Gruppenliste einer Person). Wächst eine davon, kommt ein neuer,
+   paginierter Endpunkt; die alte Antwortform bleibt (Abschnitt 13).
+
+## 7. Idempotenz
+
+| Fall | Mechanismus | Antwort bei Wiederholung |
+|---|---|---|
+| Nachricht senden | `client_msg_id` im Körper, eindeutig je Autor (04, 5.1) | `200` mit Original und `Idempotent-Replay: true`; anderer Inhalt `422 idempotency_key_reuse` |
+| Interaktion | `client_interaction_id` im Körper | wie oben |
+| Eingangs-Webhook | optional `client_msg_id` im Körper | wie oben |
+| andere POST und PATCH | Kopfzeile `Idempotency-Key` (UUIDv7, 04 5.2) | gespeicherte Antwort mit `Idempotent-Replay: true`; anderer Inhalt `422`; erste Anfrage läuft noch `409 request_in_progress` |
+| PUT und DELETE | idempotent nach HTTP-Semantik | gleiche Wirkung; DELETE einer schon gelöschten Ressource `204`, einer nie sichtbaren `404` |
+
+1. Der Schlüssel gilt je Prinzipal für `sync.idempotency_key_ttl`. Clients setzen ihn bei jedem
+   Eintrag im Ausgangsfach (04, 13.2). Name und Verhalten folgen dem verbreiteten Muster aus
+   draft-ietf-httpapi-idempotency-key-header; der Entwurf -07 ist abgelaufen, kein RFC
+   [belegt, Q10]. Maßgeblich ist darum 04, Abschnitt 5.2.
+2. Gespeichert werden nur endgültige Antworten: `2xx`, `400`, `403`, `404`, `409` (außer
+   `request_in_progress`), `410`, `412`, `413`, `415`, `422`. Nicht gespeichert werden `401`,
+   `429` und `5xx`. Darum klappt die Wiederholung nach Step-up, nach Token-Erneuerung und nach
+   einer Drosselung mit demselben Schlüssel.
+3. Ohne `Idempotency-Key` bleiben POST-Operationen, die anders geschützt sind: Anmeldeabläufe
+   (einmalige Challenges und Codes, Refresh-Rotation), lesende POSTs (`previewGrant`,
+   `autocompleteCommand`, `validateManifest`, `verifyAuditChain`), die Agenten-Laufzeit
+   (`sendHeartbeat`, `ackAgentEvents` ist monoton, Lauf-Übergänge sind Compare-and-swap) und die
+   Fälle mit Client-ID oben. Die Liste prüft das Gate (Abschnitt 15, G2).
+4. `startRun` mit derselben Aufruf-Marke nach erfolgreichem Start antwortet `200` mit
+   `Idempotent-Replay: true`; erst eine andere Marke bekommt `409 already_started`. Sonst würde ein
+   Adapter, dessen Antwort verloren ging, einen laufenden Lauf nie bearbeiten
+   (Kern-Vertrag: Ergänzung beantragt, Abschnitt 18.2).
+
+## 8. Nebenläufigkeit
+
+1. Versionierte Ressourcen (Spalte `version` in 03) liefern `ETag: "<version>"` (stark). Beim
+   Kanal-Verhalten ist das ETag `settings_version`; beim Branding, das aus mehreren
+   Einstellungsschlüsseln besteht, ein aus deren Versionen abgeleiteter Wert. Clients behandeln
+   jedes ETag als undurchsichtige Zeichenkette.
+2. Änderungen an gemeinsam genutzten Objekten verlangen `If-Match` (in openapi.yaml als Parameter
+   `IfMatchRequired`): Nachrichten, Thread-Titel, Bereiche, Kanäle, Kanal-Verhalten, Bediener,
+   Agenten, Backend-Richtlinie, Zugangsdaten-Inhaber, Vorlagen, Komponenten, Befehle, Branding und
+   "als ungelesen markieren". Fehlt `If-Match`: `428 precondition_required`. Passt er nicht:
+   `412 version_conflict` mit der aktuellen Fassung in `current`.
+3. Wo "letzte Schreibung gewinnt" gilt (Instanz-Einstellungen, Schalter, Projektbindung,
+   Thread-Tags), ist `If-Match` optional und wird geprüft, wenn er kommt.
+4. Persönliche Sync-Daten folgen 04, Abschnitt 14: Entwürfe mit `base_version` und
+   `overwrote_newer`, Gelesen-Stand monoton. Lauf-Patches nutzen `base_version` und `409
+   base_version_conflict` (04, 11.2).
+5. 04 (13.3) nennt `409 version_conflict` mit `expected_version`. RFC 9110 verbietet bei
+   gescheitertem `If-Match` die Ausführung und sieht dafür `412 (Precondition Failed)` vor
+   [belegt, Q9]; HTTP-Bibliotheken kennen genau diesen Status. Dieses Kapitel nutzt `412`; die
+   Client-Regel aus 04 bleibt gleich (Kern-Vertrag: Ergänzung beantragt, Abschnitt 18.2). Kommt
+   eine Wiederholung, deren Änderung schon gilt, liefert der `Idempotency-Key` die gespeicherte
+   Antwort statt `412`.
+6. Kein `If-None-Match` und kein `304` in v1, weil JSON-Antworten `no-store` sind. Ein späteres
+   Nachrüsten ist additiv.
+
+## 9. Rate-Limits
+
+1. Jede Operation gehört über ihre Aktion zu einer Klasse aus 05, Abschnitt 3 (Token-Bucket mit
+   `ratelimit.<klasse>.per_minute` und `.burst`). Die Prüfung läuft vor `authorize`.
+2. Jede gedrosselte Klasse meldet ihren Stand mit den Kopfzeilen aus
+   draft-ietf-httpapi-ratelimit-headers-11 (Arbeitsstand, kein RFC) [belegt, Q5]:
+   `RateLimit-Policy: "<klasse>";q=<per_minute>;w=60` und `RateLimit: "<klasse>";r=<ganze
+   Token>;t=<Sekunden bis voll>`. Die Abbildung eines Token-Buckets auf `q`, `w`, `r`, `t` ist
+   eigene Festlegung [abgeleitet].
+3. Erschöpft: `429 rate_limited` mit `Retry-After` (RFC 9110). Clients warten mindestens so lange;
+   das Ausgangsfach nutzt danach seinen Backoff (04, 13.2). Das Gateway schließt mit `4008`.
+4. Ändern sich die Kopfzeilen, wenn der Entwurf ein RFC wird, sendet der Server die neuen Namen
+   zusätzlich für `api.deprecation_min_notice` (Abschnitt 13). Health-Endpunkte haben keine
+   Klasse (Aktion `health.read`, beantragt).
+
+## 10. Dateien
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant C as Client
+    participant API as Server
+    participant OS as Objektspeicher
+    C->>API: POST /channels/{id}/uploads (name, size_bytes, sha256)
+    API-->>C: 201 UploadSession (file_id, mode, parts)
+    alt mode direct (Dateisystem-Treiber)
+        C->>API: PUT /uploads/{file_id}/parts/{n} (Bytes)
+        API->>OS: Teil speichern
+    else mode presigned (S3-Treiber)
+        C->>OS: PUT presigned URL (Bytes)
+    end
+    C->>API: POST /uploads/{file_id}/complete (parts mit ETag)
+    API-->>C: 200 File (scan_status pending)
+    API-->>C: Ereignis file.updated (scan_status clean)
+    C->>API: POST /threads/{id}/messages (attachment_file_ids)
+```
+
+1. Upload ist eine Sitzung aus Teilen; beide Treiber (B4, R-Objektspeicher) haben denselben
+   Ablauf, der Client folgt nur den URLs der Antwort. Teile lassen sich parallel und erneut senden.
+   Teilgröße `file.upload_part_bytes`, Gültigkeit der Sitzung `file.upload_session_ttl`,
+   presigned URLs `file.presigned_url_ttl`.
+2. `complete` prüft Größe und optional SHA-256, erkennt den MIME-Typ selbst und stellt den
+   Virenscan an. Herunterladen geht erst bei `scan_status` `clean` oder `skipped`; vorher
+   `409 file_not_ready`, bei `infected` `404`.
+3. `GET /files/{id}/content` liefert die Bytes mit `Range`-Unterstützung oder `302` auf eine kurz
+   gültige presigned URL. Der Server prüft `file.read` vor jeder Auslieferung (B7).
+4. Avatar und Logo kommen als `multipart/form-data`; der Server kodiert Bilder neu und entfernt
+   Metadaten (R-Objektspeicher).
+5. Sprachnachrichten: Audio hochladen, Nachricht mit `kind = voice`. Transkript über
+   `requestTranscription` (Dienst-Port, Schalter `voice.enabled`) oder `submitTranscript` durch
+   den Agenten (Aktion `file.transcript.submit`, beantragt).
+
+## 11. Echtzeit-Gateway
+
+1. Ein Endpunkt `wss://<host>/api/v1/gateway`. Rahmen sind JSON-Textrahmen
+   `{"op": <name>, "d": <körper>}` (04, 2.3). asyncapi.yaml beschreibt jede Op als Nachricht,
+   jedes Ereignis als Nachricht `dispatch` mit `x-receive-action`, und die Schließ-Codes aus 04
+   (6.4) in `x-close-codes`.
+2. Alle Körper-Schemas liegen in `components.schemas` von openapi.yaml (`Gateway*`, `*Event`,
+   `*Payload`). So erzeugen alle Generatoren die Typen aus einer Quelle (R-API-06).
+3. Ereignis-Schemas sind `allOf` aus `EventEnvelope` und einem Teil mit `type` und `payload`.
+   `Event` ist die Union aller dauerhaften Typen mit Diskriminator `type`; AsyncAPI referenziert nur
+   die Einzeltypen, weil AsyncAPI-Parser `discriminator` als String erwarten und das
+   OpenAPI-Objekt ablehnen [belegt, eigene Probe 2026-10-10 mit @asyncapi/cli 6.2.0].
+4. Felder nur für die Zustellung: `invocation_token` (frische Aufruf-Marke, 04 15.3) und
+   `redelivered` (04 15.2) stehen im Umschlag, nicht im Rahmen, und nie im Ereignis-Log
+   (Kern-Vertrag: Ergänzung beantragt, Abschnitt 18.2).
+5. REST-Alternativen: `GET /events` (04, 7.4) und `GET /agents/me/consumers/{consumer}/events`
+   mit `POST .../ack` für Adapter ohne WebSocket.
+6. Autovervollständigung von Befehlen: `autocompleteCommand` schickt das kurzlebige Ereignis
+   `command.autocomplete_requested` an den Eigentümer des Befehls und wartet bis
+   `command.autocomplete_timeout` auf `answerAutocomplete` (Kern-Vertrag: Ergänzung beantragt).
+
+Ops und Ereignisse stehen in Abschnitt 17.
+
+## 12. Webhooks
+
+Ausgehende Webhooks folgen Standard Webhooks; Signatur `v1a` (Ed25519) immer, `v1` (HMAC) auf
+Wunsch je Abo. Zustellung, Wiederholung, Prüfung beim Empfänger und Eingangs-Webhooks:
+[docs/api/webhooks.md](../api/webhooks.md), Entscheidung ADR 0016.
+
+## 13. Versionierung, Deprecation, Kompatibilität
+
+1. **Hauptversion im Pfad** (`/api/v1`). Innerhalb von v1 gibt es nur additive Änderungen.
+   `info.version` von openapi.yaml und asyncapi.yaml ist SemVer: MINOR für additive Änderungen,
+   PATCH für reine Doku. Bis zur ersten Veröffentlichung gilt `0.x`. Die Discovery meldet
+   `api_versions`, `spec_version` und `features`.
+2. **Gateway.** Protokollversionen stehen in `hello` und `identify`; nicht unterstützt schließt mit
+   `4007` (04, 6.1). Ereignis-Nutzlasten ändern sich nur additiv; `schema_version` steigt dabei,
+   damit Clients neue Felder erkennen.
+
+| Additiv, in v1 erlaubt | Bruch, nur in einer neuen Hauptversion |
+|---|---|
+| neuer Endpunkt, neue Op, neuer Ereignistyp, neuer Webhook-Typ | Endpunkt, Feld, Parameter, Op oder Ereignistyp entfernen oder umbenennen |
+| neues optionales Anfragefeld, neuer optionaler Query-Parameter | optionales Anfragefeld wird Pflicht, neues Pflichtfeld in Anfragen |
+| neues Antwortfeld | Typ, Format oder Bedeutung eines Feldes ändern |
+| neuer Enum-Wert in Antworten und Ereignissen | Enum-Wert entfernen |
+| neuer Problem-Code bei bestehendem Status | Status-Code einer bestehenden Situation ändern |
+| neue Kopfzeile, neue Rate-Limit-Klasse | Sortierung, Paginierungsart oder Idempotenz-Regel einer Op ändern |
+| Grenzen lockern (Konfigurationswerte) | `x-authz-action` einer Op auf eine andere Aktion setzen |
+
+3. Neue Enum-Werte sind nur additiv, weil jeder Client sie toleriert: TypeScript ohne
+   Laufzeitprüfung, Dart mit `enumUnknownDefaultCase=true` [belegt, Q4], Go-Server ohne Bedarf,
+   Python nur mit Handschicht. openapi-python-client 0.29.1 wirft bei unbekannten Werten einen
+   Fehler, auch mit `literal_enums` [belegt, eigene Probe 2026-10-10]. Das Gate hält das mit dem
+   Toleranz-Test G5 (Abschnitt 15).
+4. **Deprecation.** Eine Op oder ein Feld bekommt `deprecated: true`, `x-deprecated-since`
+   (Spec-Version) und `x-sunset` (Datum). Der Server sendet bei jeder Antwort dieser Op
+   `Deprecation: @<unix-zeit>` (RFC 9745 [belegt, Q7]), `Sunset: <HTTP-Datum>` (RFC 8594) und
+   `Link: <...>; rel="deprecation"` auf die Änderungsnotiz. `Sunset` liegt mindestens
+   `api.deprecation_min_notice` nach `Deprecation`; RFC 9745 verlangt nur "nicht früher"
+   [belegt, Q7]. Entfernt wird erst in der nächsten Hauptversion.
+5. **Hauptversionen überlappen.** Server-Releases, die `v2` anbieten, bedienen `v1` weiter für
+   mindestens `api.major_version_overlap` ab dem ersten Release mit `v2`. Grund: Apps aus den
+   Stores und selbst gehostete Server werden nicht gleichzeitig aktualisiert.
+6. **Ausnahme Sicherheit.** Eine Sicherheitslücke darf Verhalten sofort ändern; das steht im
+   Sicherheitshinweis und im Changelog.
+7. **Prüfung.** Das Gate vergleicht die Spec mit der zuletzt veröffentlichten Fassung (G6). oasdiff
+   (Apache-2.0) erkennt Brüche; seine OpenAPI-3.1-Unterstützung ist nur als Beta-Stand zu sehen
+   [vermutet, Q8]. Ob es mit dieser Spec arbeitet, klärt Ticket B-6; bis dahin prüft das Review die
+   Tabelle oben.
+
+## 14. Codegenerierung
+
+| Ziel | Werkzeug (gepinnt) | Einstellungen | Probe am 2026-10-10 |
+|---|---|---|---|
+| Go-Server (Modul `api`) | oapi-codegen v2.8.0, Laufzeit `oapi-codegen/runtime` ab v1.6.0, Go ab 1.25 [belegt, Q1] | `std-http-server`, `strict-server`, `models`, `output-options.skip-prune: true` (Gateway-Typen) | erzeugt, `go vet` ohne Befund, Test der `Event`-Union grün; unbekannter Typ liefert Fehler aus `ValueByDiscriminator`, die Seite dekodiert trotzdem |
+| TypeScript-SDK | openapi-typescript 7.13.0 mit openapi-fetch | Standard | `tsc --strict` ohne Fehler; Union über `type` wird eingeengt |
+| Python-SDK und Hermes-Adapter | openapi-python-client 0.29.1 | Standard | erzeugt, kompiliert, importierbar; ohne typisierte Antwort bleiben `image/*`, `application/zip` und NDJSON (Endpunkte existieren, die Handschicht streamt); strenge Enums und Unions (siehe 13.3) |
+| Dart-Paket der Apps | openapi-generator 7.26.0 `dart-dio` (built_value) | `enumUnknownDefaultCase=true`, `legacyDiscriminatorBehavior=false` | erzeugt, `build_runner` erfolgreich, `dart analyze` ohne Fehler (nur Warnungen im generierten Code); DPoP-Schema und `application/octet-stream`-Körper unterstützt der Generator nicht, beides übernimmt die Handschicht; OpenAPI 3.1 dort nur Beta [belegt, Q6] |
+
+1. Generierter Code wird eingecheckt. Das Gate erzeugt ihn neu und bricht bei einem Unterschied
+   ab (G4). Grund: Review sieht die Wirkung einer Spec-Änderung, Builds brauchen keinen Generator.
+2. Jedes SDK hat eine Handschicht über dem generierten Kern (ADR 0026, Team D): DPoP-Beweise und
+   Nonce-Wiederholung, IDs für das Ausgangsfach, Toleranz für Unbekanntes, Paginierungs-Iteratoren,
+   Abbildung der Problem-Codes, Gateway-Rahmen.
+3. Für AsyncAPI gibt es keinen Generator im Gate. Die Typen kommen aus openapi.yaml; den
+   Rahmen-Router schreibt jedes SDK von Hand.
+4. Schemas bleiben konservativ (Lint): kein `null`, keine Typ-Arrays, kein `anyOf`, `oneOf` nur
+   mit Diskriminator, wiederholte Enums als benannte Schemas.
+
+## 15. Vertragstests und Gate
+
+| Nr | Prüfung | Werkzeug | Hält |
+|---|---|---|---|
+| G1 | Lint beider Dateien ohne Fehler und Warnungen | Redocly CLI 2.62.1 mit docs/api/redocly.yaml | Struktur, Beispiele gegen Schemas, Regeln aus 05 (Aktion, Klasse, Empfangs-Aktion), konservative Schemas |
+| G2 | Katalog-Abgleich `api-catalogue-sync` | Skript (Ticket B-1) | Aktionsliste in redocly.yaml gleich 05 plus Abschnitt 18; `x-rate-limit-class` gleich Klasse der Aktion; Ops, Ereignisse und Empfangs-Aktionen in asyncapi.yaml gleich 05 (6, 7); Schließ-Codes gleich 04 (6.4); Liste der POST ohne `Idempotency-Key` gleich Abschnitt 7.3 |
+| G3 | Erzeugte Tabellen dieses Kapitels `api-tables` | Skript (Ticket B-1) | Abschnitte 5, 16, 17, 18.1 und webhooks.md entsprechen den YAML-Dateien |
+| G4 | Codegenerierung | vier Generatoren aus Abschnitt 14 | erzeugen, kompilieren, keine Abweichung zum eingecheckten Code |
+| G5 | Toleranz-Test | je SDK ein Test mit Fixture | unbekanntes Feld, unbekannter Enum-Wert, unbekannter Ereignistyp werden ohne Fehler übersprungen |
+| G6 | Bruch-Prüfung gegen die letzte Veröffentlichung | oasdiff, falls Ticket B-6 es belegt | Tabelle in Abschnitt 13 |
+| G7 | Eigenschaftsbasierte Tests gegen den laufenden Server | Schemathesis gegen den Compose-Stack | Statuscodes, Medientypen, Antwort-Schemas und Kopfzeilen jeder Op; zustandsbehaftete Folgen über abgeleitete Links; eigene Prüfungen: Problem-Format, `Correlation-Id`, kein `null`, 404-Gleichheit für fremde und fehlende IDs |
+| G8 | Antwort-Validierung in Integrationstests | Middleware im Test-Build | jede Antwort jedes Integrationstests passt zur Spec |
+| G9 | Gateway-Rahmen | Integrationstests mit Mitschnitt | jeder gesendete Rahmen passt zu seinem Schema; Register von Ops und Ereignistypen gleich 05 (05, Abschnitt 9) |
+| G10 | Webhook-Konformität | Testvektoren und unabhängige Prüfung | `v1` mit der Referenzbibliothek, `v1a` mit Ed25519 aus der Standardbibliothek |
+
+1. Schemathesis (MIT) leitet zustandsbehaftete Folgen aus den Operationen ab und erlaubt eigene
+   Anmelde-Logik [belegt, Q11]. Es lädt diese Spec mit allen Operationen und erzeugt für jede einen
+   Fall [belegt, eigene Probe mit 4.30.1 am 2026-10-10]. Die Anmeldung übernimmt ein Python-Hook,
+   der DPoP-Beweise bildet.
+2. Pact ist nicht nötig. Alle Verbraucher (Apps, SDKs, Adapter) werden im selben Repo aus derselben
+   Spec erzeugt und im Gate kompiliert; G7 und G8 prüfen den Anbieter gegen dieselbe Spec.
+   Verbrauchergetriebene Verträge brächten einen Broker und eine zweite Wahrheit, ohne ein Risiko
+   zu decken, das G4 bis G8 offen lassen. Das ändert sich erst, wenn fremde Teams eigene Clients
+   ohne diese Spec bauen.
+3. G1 bis G6 laufen im einen lokalen Gate-Befehl, der mit CI identisch ist (ADR 0038, Team H);
+   G7 bis G10 laufen mit den Integrationstests gegen den Compose-Stack.
+
+## 16. Endpunkte
+
+Erzeugt aus openapi.yaml. "(beantragt)" markiert Aktionen aus Abschnitt 18.1.
+
+<!-- BEGIN GENERATED: endpoints -->
+#### Discovery
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/instance/discovery` | `getDiscovery` | `instance.discovery.read` | Public instance metadata |
+| GET | `/api/v1/instance/jwks` | `getJwks` | `instance.discovery.read` | Public keys for access and invocation tokens |
+| GET | `/api/v1/instance/webhook-keys` | `getWebhookKeys` | `instance.discovery.read` | Public keys for webhook signatures |
+| GET | `/api/v1/instance/branding/logo` | `getBrandingLogo` | `instance.discovery.read` | Download the instance logo |
+| GET | `/api/v1/problems/{code}` | `getProblemType` | `instance.discovery.read` | Documentation of a problem type |
+| GET | `/api/v1/health/live` | `getLiveness` | `health.read` (beantragt) | Liveness probe |
+| GET | `/api/v1/health/ready` | `getReadiness` | `health.read` (beantragt) | Readiness probe |
+
+#### Auth
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| POST | `/api/v1/auth/oidc/begin` | `beginOidcLogin` | `auth.login.begin` | Start an OIDC login |
+| GET | `/api/v1/auth/oidc/callback` | `handleOidcCallback` | `auth.login.begin` | OIDC redirect target of the identity provider |
+| POST | `/api/v1/auth/oidc/complete` | `completeOidcLogin` | `auth.login.complete` | Finish an OIDC login and register the device |
+| POST | `/api/v1/auth/trusted-header/login` | `loginWithTrustedHeader` | `auth.login.complete` | Log in with the identity header of a trusted reverse proxy |
+| POST | `/api/v1/auth/passkey/begin` | `beginPasskeyLogin` | `auth.login.begin` | Start a passkey login |
+| POST | `/api/v1/auth/passkey/complete` | `completePasskeyLogin` | `auth.login.complete` | Finish a passkey login and register the device |
+| POST | `/api/v1/auth/enroll/begin` | `beginEnrollment` | `auth.login.begin` | Start the first passkey registration with an enrollment code |
+| POST | `/api/v1/auth/enroll/complete` | `completeEnrollment` | `auth.login.complete` | Register the first passkey and log in |
+| POST | `/api/v1/auth/password/login` | `loginWithPassword` | `auth.login.complete` | Log in with local password and TOTP |
+| POST | `/api/v1/auth/token/refresh` | `refreshToken` | `auth.token.refresh` | Rotate the refresh token |
+| POST | `/api/v1/auth/logout` | `logout` | `auth.logout` | End the current session |
+| POST | `/api/v1/auth/step-up/challenge` | `createStepUpChallenge` | `auth.step_up` | Create a step-up challenge |
+| POST | `/api/v1/auth/step-up/passkey` | `completeStepUpWithPasskey` | `auth.step_up` | Confirm step-up with a passkey |
+| POST | `/api/v1/auth/step-up/device-key` | `completeStepUpWithDeviceKey` | `auth.step_up` | Confirm step-up with the device key after user verification |
+
+#### Me
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/me` | `getMe` | `self.read` (beantragt) | Read the calling principal |
+| PATCH | `/api/v1/me/profile` | `updateMyProfile` | `self.profile.update` | Change own profile |
+| PUT | `/api/v1/me/avatar` | `setMyAvatar` | `self.profile.update` | Upload own avatar |
+| DELETE | `/api/v1/me/avatar` | `deleteMyAvatar` | `self.profile.update` | Remove own avatar |
+| GET | `/api/v1/me/credentials` | `getMyCredentials` | `identity.read` (beantragt) | List own identities and passkeys |
+| POST | `/api/v1/me/identities/begin` | `beginIdentityLink` | `identity.link` | Start linking another identity |
+| POST | `/api/v1/me/identities/complete` | `completeIdentityLink` | `identity.link` | Finish linking another identity |
+| POST | `/api/v1/me/passkeys/begin` | `beginPasskeyRegistration` | `passkey.register` | Start registering a passkey |
+| POST | `/api/v1/me/passkeys/complete` | `completePasskeyRegistration` | `passkey.register` | Finish registering a passkey |
+| PUT | `/api/v1/me/local-credential` | `setMyLocalCredential` | `local_credential.set` (beantragt) | Set local password and enroll TOTP |
+| GET | `/api/v1/me/mentions` | `listMyMentions` | `mention.list` | List own mentions |
+| POST | `/api/v1/me/templates` | `createPersonalTemplate` | `template.manage` | Create a personal template |
+
+#### Users
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/users` | `listUsers` | `user.read` | List people |
+| POST | `/api/v1/users` | `createUser` | `user.create` | Create a person |
+| GET | `/api/v1/users/{user_id}` | `getUser` | `user.read` | Read a person |
+| PATCH | `/api/v1/users/{user_id}` | `updateUser` | `user.update` | Change another person's profile |
+| POST | `/api/v1/users/{user_id}/disable` | `disableUser` | `user.disable` | Disable a person |
+| POST | `/api/v1/users/{user_id}/enable` | `enableUser` | `user.enable` | Enable a person |
+| POST | `/api/v1/users/{user_id}/enrollment-codes` | `createEnrollmentCode` | `user.update` | Issue an enrollment code for a local account |
+| GET | `/api/v1/users/{user_id}/credentials` | `getUserCredentials` | `identity.read` (beantragt) | List identities and passkeys of a person |
+| DELETE | `/api/v1/users/{user_id}/identities/{identity_id}` | `unlinkIdentity` | `identity.unlink` | Unlink an identity |
+| DELETE | `/api/v1/users/{user_id}/passkeys/{passkey_id}` | `revokePasskey` | `passkey.revoke` | Revoke a passkey |
+| GET | `/api/v1/owners` | `listOwners` | `user.read` | List owners |
+| POST | `/api/v1/owners` | `addOwner` | `owner.add` | Make a person owner |
+| POST | `/api/v1/owners/{user_id}/revoke` | `revokeOwner` | `owner.remove` | Remove the owner role |
+
+#### Devices
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/users/{user_id}/devices` | `listUserDevices` | `device.list` | List devices of a person |
+| GET | `/api/v1/users/{user_id}/sessions` | `listUserSessions` | `session.list` | List sessions of a person |
+| GET | `/api/v1/me/devices` | `listMyDevices` | `device.list` | List own devices |
+| GET | `/api/v1/devices/{device_id}` | `getDevice` | `device.list` | Read a device |
+| POST | `/api/v1/devices/{device_id}/approve` | `approveDevice` | `device.approve` | Approve a pending device |
+| POST | `/api/v1/devices/{device_id}/revoke` | `revokeDevice` | `device.revoke` | Revoke a device |
+| POST | `/api/v1/me/devices/current/push-registrations` | `registerPush` | `push.register` | Register a push target for the current device |
+| DELETE | `/api/v1/push-registrations/{registration_id}` | `unregisterPush` | `push.unregister` | Remove a push target |
+| GET | `/api/v1/me/sessions` | `listMySessions` | `session.list` | List own sessions |
+| POST | `/api/v1/sessions/{session_id}/revoke` | `revokeSession` | `session.revoke` | End a session |
+
+#### Tokens
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/principals/{principal_id}/tokens` | `listTokens` | `token.list` | List API tokens of a principal |
+| POST | `/api/v1/principals/{principal_id}/tokens` | `createToken` | `token.create` | Create an API token |
+| DELETE | `/api/v1/tokens/{token_id}` | `revokeToken` | `token.revoke` | Revoke an API token |
+
+#### Groups
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/groups` | `listGroups` | `group.read` | List groups |
+| POST | `/api/v1/groups` | `createGroup` | `group.create` | Create a group |
+| GET | `/api/v1/groups/{group_id}` | `getGroup` | `group.read` | Read a group |
+| PATCH | `/api/v1/groups/{group_id}` | `updateGroup` | `group.update` | Rename a group |
+| DELETE | `/api/v1/groups/{group_id}` | `deleteGroup` | `group.delete` | Delete a group and revoke its grants |
+| GET | `/api/v1/groups/{group_id}/members` | `listGroupMembers` | `group.read` | List members |
+| POST | `/api/v1/groups/{group_id}/members` | `addGroupMember` | `group.member.add` | Add a member |
+| DELETE | `/api/v1/groups/{group_id}/members/{user_id}` | `removeGroupMember` | `group.member.remove` | Remove a member |
+
+#### Access
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/users/{user_id}/view-as` | `viewAsUser` | `access.view_as` | See the instance as a person sees it |
+| GET | `/api/v1/grants` | `listGrants` | `grant.read` | List grants of a target or subject |
+| POST | `/api/v1/grants` | `createGrant` | `grant.create` | Create a grant |
+| POST | `/api/v1/grants/preview` | `previewGrant` | `access.explain` | Show what a grant would change |
+| GET | `/api/v1/grants/{grant_id}` | `getGrant` | `grant.read` | Read a grant |
+| POST | `/api/v1/grants/{grant_id}/revoke` | `revokeGrant` | `grant.revoke` | Revoke a grant |
+| GET | `/api/v1/spaces/{space_id}/access` | `explainSpaceAccess` | `access.explain` | Who has access to a space |
+| GET | `/api/v1/channels/{channel_id}/access` | `explainChannelAccess` | `access.explain` | Who has access to a channel |
+
+#### Admin
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/instance` | `getInstance` | `instance.read` | Instance settings for clients |
+| GET | `/api/v1/instance/settings` | `listInstanceSettings` | `instance.settings.read` (beantragt) | List all instance settings |
+| PUT | `/api/v1/instance/settings/{key}` | `putInstanceSetting` | `instance.settings.update` | Set an instance setting |
+| PUT | `/api/v1/instance/branding` | `updateBranding` | `instance.branding.update` | Change branding |
+| PUT | `/api/v1/instance/branding/logo` | `uploadBrandingLogo` | `instance.branding.update` | Upload the logo |
+| DELETE | `/api/v1/instance/branding/logo` | `deleteBrandingLogo` | `instance.branding.update` | Remove the logo |
+| GET | `/api/v1/feature-flags` | `listFeatureFlags` | `feature_flag.read` | List feature flags |
+| PUT | `/api/v1/feature-flags/{key}` | `putFeatureFlag` | `feature_flag.update` | Set a feature flag |
+| POST | `/api/v1/signing-keys/rotate` | `rotateSigningKey` | `signing_key.rotate` | Rotate a server signing key |
+| GET | `/api/v1/identity-providers` | `listIdentityProviders` | `identity_provider.read` | List identity providers |
+| POST | `/api/v1/identity-providers` | `createIdentityProvider` | `identity_provider.manage` | Add an identity provider |
+| GET | `/api/v1/identity-providers/{provider_id}` | `getIdentityProvider` | `identity_provider.read` | Read an identity provider |
+| PATCH | `/api/v1/identity-providers/{provider_id}` | `updateIdentityProvider` | `identity_provider.manage` | Change an identity provider |
+| DELETE | `/api/v1/identity-providers/{provider_id}` | `deleteIdentityProvider` | `identity_provider.manage` | Remove an identity provider |
+
+#### Spaces
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/spaces` | `listSpaces` | `space.read` | List visible spaces |
+| POST | `/api/v1/spaces` | `createSpace` | `space.create` | Create a space |
+| GET | `/api/v1/spaces/{space_id}` | `getSpace` | `space.read` | Read a space |
+| PATCH | `/api/v1/spaces/{space_id}` | `updateSpace` | `space.update` | Change name, icon or color |
+| POST | `/api/v1/spaces/{space_id}/move` | `moveSpace` | `space.reorder` | Change the global position of a space |
+| POST | `/api/v1/spaces/{space_id}/archive` | `archiveSpace` | `space.archive` | Archive a space |
+| PUT | `/api/v1/spaces/{space_id}/operator` | `setSpaceOperator` | `space.operator.set` | Set the default operator of a space |
+
+#### Channels
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/spaces/{space_id}/channels` | `listSpaceChannels` | `channel.read` | List visible channels of a space |
+| POST | `/api/v1/spaces/{space_id}/channels` | `createChannel` | `channel.create` | Create a channel |
+| GET | `/api/v1/channels/{channel_id}` | `getChannel` | `channel.read` | Read a channel |
+| PATCH | `/api/v1/channels/{channel_id}` | `updateChannel` | `channel.update` | Change name or topic |
+| POST | `/api/v1/channels/{channel_id}/move` | `moveChannel` | `channel.reorder` | Change the position of a channel in its space |
+| POST | `/api/v1/channels/{channel_id}/archive` | `archiveChannel` | `channel.archive` | Archive a channel |
+| GET | `/api/v1/channels/{channel_id}/behavior` | `getChannelBehavior` | `channel.behavior.read` | Read prompt, skills and mention rules |
+| PUT | `/api/v1/channels/{channel_id}/behavior` | `putChannelBehavior` | `channel.behavior.update` | Change prompt, skills and mention rules |
+| PUT | `/api/v1/channels/{channel_id}/operator` | `setChannelOperator` | `channel.operator.set` | Set or inherit the operator of a channel |
+| PUT | `/api/v1/channels/{channel_id}/project-binding` | `putProjectBinding` | `channel.project.bind` | Bind a forum to a project |
+| DELETE | `/api/v1/channels/{channel_id}/project-binding` | `deleteProjectBinding` | `channel.project.bind` | Remove the project binding |
+| GET | `/api/v1/channels/{channel_id}/tags` | `listForumTags` | `channel.read` | List forum tags |
+| POST | `/api/v1/channels/{channel_id}/tags` | `createForumTag` | `forum_tag.manage` | Create a forum tag |
+| PATCH | `/api/v1/channels/{channel_id}/tags/{tag_id}` | `updateForumTag` | `forum_tag.manage` | Change a forum tag |
+| DELETE | `/api/v1/channels/{channel_id}/tags/{tag_id}` | `deleteForumTag` | `forum_tag.manage` | Delete a forum tag |
+| GET | `/api/v1/channels/{channel_id}/templates` | `listTemplates` | `template.read` | List own and channel templates |
+| POST | `/api/v1/channels/{channel_id}/templates` | `createChannelTemplate` | `template.manage` | Create a channel template |
+| PATCH | `/api/v1/templates/{template_id}` | `updateTemplate` | `template.manage` | Change a template |
+| DELETE | `/api/v1/templates/{template_id}` | `deleteTemplate` | `template.manage` | Delete a template |
+| GET | `/api/v1/me/dms` | `listMyDms` | `channel.read` | List own direct message channels |
+| POST | `/api/v1/dms` | `createDm` | `dm.create` | Open a direct message channel |
+| POST | `/api/v1/channels/{channel_id}/leave` | `leaveDm` | `dm.leave` | Leave a direct message channel |
+
+#### Threads
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/channels/{channel_id}/threads` | `listChannelThreads` | `thread.read` | List threads or forum posts of a channel |
+| POST | `/api/v1/channels/{channel_id}/threads` | `createThread` | `thread.create` | Create a forum post or a thread from a message |
+| GET | `/api/v1/threads/{thread_id}` | `getThread` | `thread.read` | Read a thread |
+| PUT | `/api/v1/threads/{thread_id}/title` | `setThreadTitle` | `thread.title.update` | Set the title |
+| POST | `/api/v1/threads/{thread_id}/close` | `closeThread` | `thread.close` | Mark a thread as done |
+| POST | `/api/v1/threads/{thread_id}/reopen` | `reopenThread` | `thread.reopen` | Reopen a thread |
+| POST | `/api/v1/threads/{thread_id}/move` | `moveThread` | `thread.move` | Move a thread to another channel |
+| PUT | `/api/v1/threads/{thread_id}/tags` | `setThreadTags` | `thread.tags.set` | Set forum tags of a thread |
+| GET | `/api/v1/threads/{thread_id}/agent-sessions` | `listAgentSessions` | `agent_session.read` | List current and earlier agent sessions |
+| POST | `/api/v1/threads/{thread_id}/agent-sessions/reset` | `resetAgentSession` | `agent_session.reset` | Start a new agent session in the thread |
+| POST | `/api/v1/threads/{thread_id}/agent-sessions/bind` | `bindAgentSession` | `agent_session.bind` | Bind an existing external session |
+
+#### Messages
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/threads/{thread_id}/pins` | `listPins` | `thread.read` | List pinned messages |
+| GET | `/api/v1/threads/{thread_id}/messages` | `listThreadMessages` | `thread.read` | Read thread history |
+| POST | `/api/v1/threads/{thread_id}/messages` | `createMessage` | `message.create` | Send a message |
+| GET | `/api/v1/messages/{message_id}` | `getMessage` | `message.read` | Read a message |
+| PATCH | `/api/v1/messages/{message_id}` | `updateMessage` | `message.update` | Edit own message |
+| DELETE | `/api/v1/messages/{message_id}` | `deleteMessage` | `message.delete` | Delete a message |
+| GET | `/api/v1/messages/{message_id}/revisions` | `listMessageRevisions` | `message.revisions.read` | Read earlier versions |
+| GET | `/api/v1/messages/{message_id}/reactions` | `listReactions` | `message.read` | List who reacted |
+| PUT | `/api/v1/messages/{message_id}/reactions/{emoji}` | `addReaction` | `reaction.add` | Add own reaction |
+| DELETE | `/api/v1/messages/{message_id}/reactions/{emoji}` | `removeReaction` | `reaction.remove` | Remove own reaction |
+| PUT | `/api/v1/messages/{message_id}/pin` | `pinMessage` | `pin.create` | Pin a message |
+| DELETE | `/api/v1/messages/{message_id}/pin` | `unpinMessage` | `pin.delete` | Unpin a message |
+
+#### Interactions
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| POST | `/api/v1/components/{component_id}/interactions` | `createInteraction` | `interaction.create` | Use a button, select or form |
+| PATCH | `/api/v1/components/{component_id}` | `updateComponent` | `component.update` | Disable or change an own component |
+
+#### Files
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| POST | `/api/v1/channels/{channel_id}/uploads` | `createUpload` | `file.upload` | Start an upload |
+| PUT | `/api/v1/uploads/{file_id}/parts/{part_number}` | `uploadPart` | `file.upload` | Upload one part in direct mode |
+| POST | `/api/v1/uploads/{file_id}/complete` | `completeUpload` | `file.upload` | Finish an upload |
+| DELETE | `/api/v1/uploads/{file_id}` | `abortUpload` | `file.delete` | Abort an upload |
+| GET | `/api/v1/files/{file_id}` | `getFile` | `file.read` | Read file metadata |
+| GET | `/api/v1/files/{file_id}/content` | `downloadFile` | `file.read` | Download a file |
+| GET | `/api/v1/files/{file_id}/thumbnails/{variant}` | `downloadThumbnail` | `file.read` | Download a thumbnail |
+| GET | `/api/v1/files/{file_id}/transcript` | `getTranscript` | `file.read` | Read the transcript of a voice message |
+| POST | `/api/v1/files/{file_id}/transcribe` | `requestTranscription` | `file.transcribe` | Request a transcript |
+| DELETE | `/api/v1/files/{file_id}` | `deleteFile` | `file.delete` | Delete an unattached file |
+
+#### Search
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/search` | `search` | `search.query` | Full-text search |
+
+#### Sync
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/sync/snapshot` | `getSnapshot` | `sync.snapshot.read` | Load a snapshot |
+| GET | `/api/v1/events` | `listEvents` | `events.catch_up` | Catch up on events after a sequence |
+
+#### Preferences
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/me/sidebar` | `getMySidebar` | `settings.read` | Read own sidebar state |
+| PUT | `/api/v1/me/sidebar/spaces/{space_id}` | `putMySidebarSpace` | `sidebar.update` | Collapse or reorder a space for oneself |
+| PUT | `/api/v1/threads/{thread_id}/read-state` | `putReadState` | `read_state.update` | Advance the read position |
+| POST | `/api/v1/threads/{thread_id}/read-state/mark-unread` | `markThreadUnread` | `read_state.mark_unread` | Move the read position back |
+| PUT | `/api/v1/threads/{thread_id}/draft` | `putThreadDraft` | `draft.write` | Save the draft of a thread |
+| DELETE | `/api/v1/threads/{thread_id}/draft` | `deleteThreadDraft` | `draft.write` | Delete the draft of a thread |
+| PUT | `/api/v1/channels/{channel_id}/draft` | `putChannelDraft` | `draft.write` | Save the draft of a new forum post |
+| DELETE | `/api/v1/channels/{channel_id}/draft` | `deleteChannelDraft` | `draft.write` | Delete the draft of a new forum post |
+| GET | `/api/v1/me/read-states` | `listMyReadStates` | `settings.read` | List own read positions |
+| GET | `/api/v1/me/drafts` | `listMyDrafts` | `draft.read` | List own drafts |
+| GET | `/api/v1/me/settings` | `listMySettings` | `settings.read` | List own settings |
+| PUT | `/api/v1/me/settings/{key}` | `putMySetting` | `settings.update` | Set an own setting |
+| DELETE | `/api/v1/me/settings/{key}` | `deleteMySetting` | `settings.update` | Reset an own setting to default |
+| GET | `/api/v1/me/notification-preferences` | `listMyNotificationPreferences` | `settings.read` | List notification levels |
+| PUT | `/api/v1/me/notification-preferences/{target_kind}/{target_id}` | `putNotificationPreference` | `notification_pref.update` | Set the notification level of a target |
+| DELETE | `/api/v1/me/notification-preferences/{target_kind}/{target_id}` | `deleteNotificationPreference` | `notification_pref.update` | Inherit the notification level again |
+| GET | `/api/v1/me/quiet-hours` | `listMyQuietHours` | `settings.read` | List quiet hours |
+| POST | `/api/v1/me/quiet-hours` | `createQuietHoursRule` | `quiet_hours.update` | Add a quiet hours rule |
+| PUT | `/api/v1/me/quiet-hours/{rule_id}` | `putQuietHoursRule` | `quiet_hours.update` | Change a quiet hours rule |
+| DELETE | `/api/v1/me/quiet-hours/{rule_id}` | `deleteQuietHoursRule` | `quiet_hours.update` | Delete a quiet hours rule |
+
+#### Agents
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| PUT | `/api/v1/instance/agent-billing-mode` | `setAllAgentsBillingMode` | `agent.billing_mode.set_all` | Switch the backend policy of all agents |
+| GET | `/api/v1/agents` | `listAgents` | `agent.read` | List visible agents |
+| POST | `/api/v1/agents` | `createAgent` | `agent.create` | Create an agent |
+| GET | `/api/v1/agents/{agent_id}` | `getAgent` | `agent.read` | Read an agent with reported state |
+| PATCH | `/api/v1/agents/{agent_id}` | `updateAgent` | `agent.update` | Change an agent |
+| POST | `/api/v1/agents/{agent_id}/disable` | `disableAgent` | `agent.disable` | Disable an agent |
+| POST | `/api/v1/agents/{agent_id}/enable` | `enableAgent` | `agent.enable` (beantragt) | Enable an agent |
+| PUT | `/api/v1/agents/{agent_id}/billing-mode` | `setAgentBillingMode` | `agent.billing_mode.set` | Switch the backend policy of an agent |
+| PUT | `/api/v1/agents/{agent_id}/credential-holder` | `setCredentialHolder` | `agent.credential_holder.set` | Change the credential holder |
+
+#### Agent runtime
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| POST | `/api/v1/threads/{thread_id}/agent-sessions/report` | `reportAgentSession` | `agent_session.report` | Report the external session reference and model |
+| POST | `/api/v1/interactions/{interaction_id}/respond` | `respondToInteraction` | `interaction.respond` | Acknowledge or answer an interaction |
+| PUT | `/api/v1/files/{file_id}/transcript` | `submitTranscript` | `file.transcript.submit` (beantragt) | Store a transcript created by the agent |
+| POST | `/api/v1/agents/me/heartbeat` | `sendHeartbeat` | `agent.heartbeat` | Report state and actual billing mode |
+| GET | `/api/v1/agents/me/consumers/{consumer}` | `getConsumerState` | `agent.events.consume` | Read the cursor of a consumer |
+| GET | `/api/v1/agents/me/consumers/{consumer}/events` | `pollAgentEvents` | `agent.events.consume` | Fetch events for a consumer without WebSocket |
+| POST | `/api/v1/agents/me/consumers/{consumer}/ack` | `ackAgentEvents` | `agent.events.consume` | Acknowledge events up to a sequence |
+| GET | `/api/v1/agents/me/channels` | `listServedChannels` | `agent.config.read` | List channels the agent serves |
+| GET | `/api/v1/agents/me/channels/{channel_id}/config` | `getServedChannelConfig` | `agent.config.read` | Read prompt, skills and project binding of a served channel |
+| PATCH | `/api/v1/runs/{run_id}` | `patchRun` | `run.update` | Apply a live-box patch |
+| POST | `/api/v1/runs/{run_id}/start` | `startRun` | `run.start` | Start a queued run |
+| POST | `/api/v1/runs/{run_id}/resume` | `resumeRun` | `run.start` | Resume a run that waited for input |
+| POST | `/api/v1/runs/{run_id}/await-input` | `awaitRunInput` | `run.finish` | Wait for input from a person |
+| POST | `/api/v1/runs/{run_id}/finish` | `finishRun` | `run.finish` | End a run |
+| POST | `/api/v1/command-autocompletions/{request_id}/answer` | `answerAutocomplete` | `command.autocomplete.respond` (beantragt) | Answer an autocomplete request |
+
+#### Runs
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/threads/{thread_id}/runs` | `listThreadRuns` | `run.read` | List runs of a thread |
+| GET | `/api/v1/runs` | `listActiveRuns` | `run.overview.read` | Running now |
+| GET | `/api/v1/runs/{run_id}` | `getRun` | `run.read` | Read the run document |
+| GET | `/api/v1/runs/{run_id}/steps` | `listRunSteps` | `run.read` | List steps in order |
+| POST | `/api/v1/runs/{run_id}/cancel` | `cancelRun` | `run.cancel` | Cancel a run |
+
+#### Commands
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/channels/{channel_id}/commands` | `listChannelCommands` | `command.read` | List commands usable in a channel |
+| POST | `/api/v1/commands` | `registerCommand` | `command.register` | Register a command |
+| GET | `/api/v1/commands/{command_id}` | `getCommand` | `command.read` | Read a command |
+| PUT | `/api/v1/commands/{command_id}` | `updateCommand` | `command.register` | Replace a command definition |
+| DELETE | `/api/v1/commands/{command_id}` | `removeCommand` | `command.remove` | Remove a command |
+| POST | `/api/v1/channels/{channel_id}/commands/{command_id}/autocomplete` | `autocompleteCommand` | `command.autocomplete` | Get suggestions for an option |
+| POST | `/api/v1/channels/{channel_id}/commands/{command_id}/invoke` | `invokeCommand` | `command.invoke` | Run a command |
+
+#### Apps
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/apps` | `listApps` | `app.read` | List installed apps |
+| POST | `/api/v1/apps` | `installApp` | `app.install` | Install an app from its manifest |
+| POST | `/api/v1/app-manifests/validate` | `validateManifest` | `app.read` | Validate a manifest without installing |
+| GET | `/api/v1/apps/{app_id}` | `getApp` | `app.read` | Read an app |
+| PUT | `/api/v1/apps/{app_id}/manifest` | `upgradeAppManifest` | `app.install` | Install a new manifest version |
+| PUT | `/api/v1/apps/{app_id}/scopes` | `setAppScopes` | `app.scopes.update` | Change granted scopes and subscriptions |
+| POST | `/api/v1/apps/{app_id}/uninstall` | `uninstallApp` | `app.uninstall` | Uninstall an app |
+
+#### Webhooks
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/channels/{channel_id}/incoming-webhooks` | `listIncomingWebhooks` | `webhook_in.read` (beantragt) | List incoming webhooks of a channel |
+| POST | `/api/v1/channels/{channel_id}/incoming-webhooks` | `createIncomingWebhook` | `webhook_in.create` | Create an incoming webhook |
+| DELETE | `/api/v1/incoming-webhooks/{webhook_id}` | `revokeIncomingWebhook` | `webhook_in.revoke` | Revoke an incoming webhook |
+| POST | `/api/v1/hooks/{webhook_id}/{token}` | `postIncomingWebhook` | `webhook_in.post` | Post a message through an incoming webhook |
+| GET | `/api/v1/apps/{app_id}/webhooks` | `listWebhookSubscriptions` | `webhook_out.read` | List outgoing webhook subscriptions |
+| POST | `/api/v1/apps/{app_id}/webhooks` | `createWebhookSubscription` | `webhook_out.manage` | Subscribe a URL to events |
+| PATCH | `/api/v1/webhooks/{subscription_id}` | `updateWebhookSubscription` | `webhook_out.manage` | Change, pause or rotate a subscription |
+| DELETE | `/api/v1/webhooks/{subscription_id}` | `deleteWebhookSubscription` | `webhook_out.manage` | Delete a subscription |
+| GET | `/api/v1/webhooks/{subscription_id}/deliveries` | `listWebhookDeliveries` | `webhook_out.read` | List delivery attempts |
+| POST | `/api/v1/webhook-deliveries/{delivery_id}/redeliver` | `redeliverWebhook` | `webhook_out.redeliver` | Deliver an event again |
+
+#### Audit
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/audit/events` | `listAuditEvents` | `audit.read` | Query the audit log |
+| GET | `/api/v1/audit/export` | `exportAuditEvents` | `audit.read` | Export the audit log |
+| POST | `/api/v1/audit/verify` | `verifyAuditChain` | `audit.verify` | Verify the hash chain |
+
+#### Stats
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/threads/{thread_id}/costs` | `getThreadCosts` | `cost.read.thread` | Costs of a thread per run |
+| GET | `/api/v1/stats/usage` | `getUsageStats` | `stats.read` | Usage per space |
+| GET | `/api/v1/stats/runs` | `getRunStats` | `stats.read` | Runs per agent |
+| GET | `/api/v1/stats/tool-calls` | `getToolCallStats` | `stats.read` | Tool calls by tool name |
+| GET | `/api/v1/stats/errors` | `getErrorStats` | `stats.read` | Error rates of runs and deliveries |
+| GET | `/api/v1/stats/costs` | `getCostStats` | `cost.read.aggregate` | Costs per space, agent or instance |
+| GET | `/api/v1/prices` | `listPrices` | `price.read` | List prices |
+| POST | `/api/v1/prices` | `createPrice` | `price.manage` | Add a price with source |
+| POST | `/api/v1/prices/{price_id}/close` | `closePrice` | `price.manage` | End the validity of a price |
+| POST | `/api/v1/costs/reconcile` | `reconcileCosts` | `cost.reconcile` | Reconcile estimates with invoices |
+
+#### Status
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/status` | `getStatus` | `status.read` | Status page |
+| GET | `/api/v1/status/public` | `getPublicStatus` | `status.public.read` | Status page without login |
+| POST | `/api/v1/status/components` | `createStatusComponent` | `status.manage` | Add a status component |
+| PATCH | `/api/v1/status/components/{component_id}` | `updateStatusComponent` | `status.manage` | Change a status component |
+| DELETE | `/api/v1/status/components/{component_id}` | `deleteStatusComponent` | `status.manage` | Remove a status component |
+| POST | `/api/v1/status/incidents` | `createStatusIncident` | `status.manage` | Open an incident or maintenance |
+| POST | `/api/v1/status/incidents/{incident_id}/updates` | `addStatusIncidentUpdate` | `status.manage` | Add an update to an incident |
+
+#### Import
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/imports` | `listImports` | `import.read` | List import sources |
+| POST | `/api/v1/imports` | `createImport` | `import.manage` | Add an import source |
+| GET | `/api/v1/imports/{import_id}` | `getImport` | `import.read` | Read progress of an import |
+| GET | `/api/v1/imports/{import_id}/items` | `listImportItems` | `import.read` | List imported items |
+| POST | `/api/v1/imports/{import_id}/dry-run` | `startImportDryRun` | `import.manage` | Run without writing |
+| POST | `/api/v1/imports/{import_id}/start` | `startImport` | `import.manage` | Start or continue an import |
+| POST | `/api/v1/imports/{import_id}/pause` | `pauseImport` | `import.manage` | Pause an import |
+| POST | `/api/v1/imports/{import_id}/cancel` | `cancelImport` | `import.manage` | Cancel an import |
+
+#### Privacy
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/channels/{channel_id}/export` | `exportChannel` | `export.channel` | Export the history of a channel |
+| GET | `/api/v1/gdpr-requests` | `listGdprRequests` | `gdpr.request.read` | List privacy requests |
+| POST | `/api/v1/gdpr-requests` | `createGdprRequest` | `gdpr.request.create` | Request export, deletion or rectification |
+| GET | `/api/v1/gdpr-requests/{request_id}` | `getGdprRequest` | `gdpr.request.read` | Read a privacy request |
+| POST | `/api/v1/gdpr-requests/{request_id}/decide` | `decideGdprRequest` | `gdpr.request.decide` | Approve or reject a privacy request |
+| GET | `/api/v1/gdpr-requests/{request_id}/export` | `downloadGdprExport` | `gdpr.export.download` | Download the export package |
+<!-- END GENERATED: endpoints -->
+
+## 17. WebSocket-Ops und Ereignisse
+
+Ops (Aktion nach 05, Abschnitt 7):
+
+<!-- BEGIN GENERATED: ws_ops -->
+| Op | Richtung | Aktion | Körper-Schema | Antwort |
+|---|---|---|---|---|
+| `identify` | Client an Server | `gateway.connect` | `GatewayIdentify` | `ready` |
+| `resume` | Client an Server | `gateway.connect` | `GatewayResume` | `resumed` |
+| `heartbeat` | Client an Server | `gateway.connect` | `GatewayHeartbeat` | `heartbeat_ack` |
+| `reauth` | Client an Server | `gateway.connect` | `GatewayReauth` |  |
+| `focus` | Client an Server | `gateway.focus` | `GatewayFocus` |  |
+| `typing.start` | Client an Server | `typing.start` | `GatewayTyping` |  |
+| `typing.stop` | Client an Server | `typing.start` | `GatewayTyping` |  |
+| `ack` | Client an Server | `agent.events.consume` | `GatewayAck` |  |
+| `run.update` | Client an Server | `run.update` | `GatewayRunUpdate` |  |
+| `hello` | Server an Client | `gateway.connect` | `GatewayHello` | |
+| `ready` | Server an Client | `gateway.connect` | `GatewayReady` | |
+| `resumed` | Server an Client | `gateway.connect` | `GatewayResumed` | |
+| `cursor` | Server an Client | `gateway.connect` | `GatewayCursor` | |
+| `catchup.complete` | Server an Client | `gateway.connect` | `GatewayCatchupComplete` | |
+| `resync_required` | Server an Client | `gateway.connect` | `GatewayResyncRequired` | |
+| `heartbeat_ack` | Server an Client | `gateway.connect` | `GatewayHeartbeatAck` | |
+| `reauth_required` | Server an Client | `gateway.connect` | `GatewayReauthRequired` | |
+| `error` | Server an Client | `gateway.connect` | `GatewayError` | |
+| `dispatch` | Server an Client | Empfangs-Aktion des Ereignistyps | `<Typ>Event` | |
+<!-- END GENERATED: ws_ops -->
+
+Ereignisse (Empfangs-Aktion nach 05, Abschnitt 6; Schema in openapi.yaml):
+
+<!-- BEGIN GENERATED: events -->
+| Ereignistyp | Art | Empfangs-Aktion | Zielgruppe | Schema | Webhook |
+|---|---|---|---|---|---|
+| `message.created` | dauerhaft | `message.read` |  | `MessageCreatedEvent` | ja |
+| `message.updated` | dauerhaft | `message.read` |  | `MessageUpdatedEvent` | ja |
+| `message.deleted` | dauerhaft | `message.read` |  | `MessageDeletedEvent` | ja |
+| `reaction.added` | dauerhaft | `message.read` |  | `ReactionAddedEvent` | ja |
+| `reaction.removed` | dauerhaft | `message.read` |  | `ReactionRemovedEvent` | ja |
+| `pin.added` | dauerhaft | `thread.read` |  | `PinAddedEvent` | ja |
+| `pin.removed` | dauerhaft | `thread.read` |  | `PinRemovedEvent` | ja |
+| `thread.created` | dauerhaft | `thread.read` |  | `ThreadCreatedEvent` | ja |
+| `thread.updated` | dauerhaft | `thread.read` |  | `ThreadUpdatedEvent` | ja |
+| `thread.closed` | dauerhaft | `thread.read` |  | `ThreadClosedEvent` | ja |
+| `thread.reopened` | dauerhaft | `thread.read` |  | `ThreadReopenedEvent` | ja |
+| `thread.moved` | dauerhaft | `thread.read` |  | `ThreadMovedEvent` | ja |
+| `thread.moved_out` | dauerhaft | `channel.read` |  | `ThreadMovedOutEvent` | ja |
+| `agent_session.changed` | dauerhaft | `thread.read` |  | `AgentSessionChangedEvent` | ja |
+| `run.state_changed` | dauerhaft | `run.read` |  | `RunStateChangedEvent` | ja |
+| `space.created` | dauerhaft | `space.read` |  | `SpaceCreatedEvent` | ja |
+| `space.updated` | dauerhaft | `space.read` |  | `SpaceUpdatedEvent` | ja |
+| `space.archived` | dauerhaft | `space.read` |  | `SpaceArchivedEvent` | ja |
+| `channel.created` | dauerhaft | `channel.read` |  | `ChannelCreatedEvent` | ja |
+| `channel.updated` | dauerhaft | `channel.read` |  | `ChannelUpdatedEvent` | ja |
+| `channel.settings_changed` | dauerhaft | `channel.read` |  | `ChannelSettingsChangedEvent` | ja |
+| `channel.archived` | dauerhaft | `channel.read` |  | `ChannelArchivedEvent` | ja |
+| `command.changed` | dauerhaft | `command.read` |  | `CommandChangedEvent` | ja |
+| `file.updated` | dauerhaft | `file.read` |  | `FileUpdatedEvent` | ja |
+| `user.updated` | dauerhaft | `user.read` |  | `UserUpdatedEvent` | ja |
+| `agent.updated` | dauerhaft | `agent.read` |  | `AgentUpdatedEvent` | ja |
+| `instance.updated` | dauerhaft | `instance.read` |  | `InstanceUpdatedEvent` | ja |
+| `status.updated` | dauerhaft | `status.read` |  | `StatusUpdatedEvent` | ja |
+| `grant.changed` | dauerhaft | `grant.read` |  | `GrantChangedEvent` |  |
+| `group.changed` | dauerhaft | `group.read` |  | `GroupChangedEvent` |  |
+| `access.changed` | dauerhaft | `self` | self | `AccessChangedEvent` | ja |
+| `session.revoked` | dauerhaft | `self` | self | `SessionRevokedEvent` |  |
+| `read_state.updated` | dauerhaft | `self` | self | `ReadStateUpdatedEvent` |  |
+| `draft.updated` | dauerhaft | `self` | self | `DraftUpdatedEvent` |  |
+| `draft.deleted` | dauerhaft | `self` | self | `DraftDeletedEvent` |  |
+| `settings.updated` | dauerhaft | `self` | self | `SettingsUpdatedEvent` |  |
+| `sidebar.updated` | dauerhaft | `self` | self | `SidebarUpdatedEvent` |  |
+| `notification_pref.updated` | dauerhaft | `self` | self | `NotificationPrefUpdatedEvent` |  |
+| `quiet_hours.updated` | dauerhaft | `self` | self | `QuietHoursUpdatedEvent` |  |
+| `gdpr.request_updated` | dauerhaft | `gdpr.request.read` |  | `GdprRequestUpdatedEvent` |  |
+| `import.progress` | dauerhaft | `import.read` |  | `ImportProgressEvent` |  |
+| `agent.invocation` | dauerhaft | `agent.events.consume` | self | `AgentInvocationEvent` |  |
+| `agent.followup` | dauerhaft | `agent.events.consume` | self | `AgentFollowupEvent` |  |
+| `run.cancel_requested` | dauerhaft | `agent.events.consume` | self | `RunCancelRequestedEvent` |  |
+| `interaction.created` | dauerhaft | `agent.events.consume` | self | `InteractionCreatedEvent` | ja |
+| `command.invoked` | dauerhaft | `agent.events.consume` | self | `CommandInvokedEvent` | ja |
+| `agent.config_changed` | dauerhaft | `agent.config.read` | self | `AgentConfigChangedEvent` |  |
+| `typing.started` | kurzlebig | `thread.read` |  | `TypingStartedEvent` |  |
+| `run.updated` | kurzlebig | `run.read` |  | `RunUpdatedEvent` |  |
+| `agent.presence_changed` | kurzlebig | `agent.read` |  | `AgentPresenceChangedEvent` |  |
+| `command.autocomplete_requested` (beantragt) | kurzlebig | `agent.events.consume` | self | `CommandAutocompleteRequestedEvent` |  |
+<!-- END GENERATED: events -->
+
+## 18. Beantragte Ergänzungen des Kern-Vertrags
+
+Diese Punkte sind so geplant, wie es richtig wäre. Bis 03, 04 oder 05 sie aufnehmen, stehen die
+neuen Aktionen im Block "proposed" von docs/api/redocly.yaml.
+
+### 18.1 Neue Aktionen für 05
+
+<!-- BEGIN GENERATED: proposed -->
+| ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
+|---|---|---|---|---|---|---|---|---|
+| `health.read` | Liveness und Readiness abfragen | instance | public | nein | nein | nein | nein | keine |
+| `instance.settings.read` | alle Instanz-Einstellungen lesen (Konsole) | instance | owner | ja | nein | nein | nein | `rl.read` |
+| `identity.read` | Identitäten, Passkeys und lokale Anmeldedaten eines Menschen lesen (ohne Geheimnisse) | user | self oder owner | nein | nein | nein | nein | `rl.read` |
+| `self.read` | eigenen Prinzipal lesen (`GET /me`), für Menschen, Agenten und Apps | principal | auth und self | nein | nein | nein | nein | `rl.read` |
+| `agent.enable` | Sperre eines Agenten aufheben (I1 wird geprüft) | agent | owner | ja | ja | ja | ja | `rl.admin` |
+| `file.transcript.submit` | Transkript einer Sprachnachricht speichern (`transcript_source = agent`) | file | agent-self mit Lauf im Thread der Nachricht | nein | nein | nein | nein | `rl.agent_runtime` |
+| `command.autocomplete.respond` | Vorschläge zu einer Autovervollständigungs-Anfrage liefern | command | agent-self bzw. App, Eigentümer des Befehls | nein | nein | nein | nein | `rl.agent_runtime` |
+| `webhook_in.read` | Eingangs-Webhooks eines Kanals lesen (ohne Token) | channel | manage | nein | nein | nein | nein | `rl.read` |
+| `local_credential.set` | lokales Passwort setzen und TOTP einrichten; Step-up, wenn schon Anmeldedaten bestehen | user | self | nein | ja | ja | nein | `rl.admin` |
+<!-- END GENERATED: proposed -->
+
+### 18.2 Weitere Punkte
+
+| Nr | Ort | Punkt | Vorschlag |
+|---|---|---|---|
+| K1 | 04 (6.1, 7.3, 7.4, 11.2, 12, 15) | Pfade ohne `/api` (`/v1/...`) | Präfix `/api/v1` wie hier |
+| K2 | 04 (2.2) | `seq`, `actor`, `correlation_id` als "oder null" mit Pflicht "ja" | "fehlt = kein Wert" (R-API-03) |
+| K3 | 04 (2.3, 15.2, 15.3) | Aufruf-Marke und `redelivered` "im Rahmen" | als Zustell-Felder im Umschlag, nie im Log |
+| K4 | 04 (13.3) | `409 version_conflict` bei Bearbeiten | `412 version_conflict` mit `If-Match`, wie RFC 9110 es für gescheiterte Vorbedingungen vorsieht |
+| K5 | 04 (15.3), 03 `runs` | erneutes `start` nach verlorener Antwort ergibt `409` | Wiederholung mit derselben Marke liefert `200`; dafür `runs.started_jti`, weil `invocation_jti` bei erneuter Zustellung wechselt |
+| K6 | 04 (15.3) | Übergang `waiting_input -> running` hat keinen Weg | `resumeRun` mit der Marke der Interaktion oder des Nachtrags, Aktion `run.start` |
+| K7 | 04 (6.2, 15.1) | kein Weg für Autovervollständigung zum Agenten | kurzlebiges Ereignis `command.autocomplete_requested`, Antwort per REST |
+| K8 | 03 `messages` | Grund für `trigger_state = failed` hat keine Spalte | `messages.trigger_failure_reason text` |
+| K9 | 03 Identität | lokale Konten mit Passwort plus TOTP (R-Passkeys) und Einladungs-Codes fehlen; `auth_sessions.auth_method` kennt kein `password_totp` | Tabellen für lokale Anmeldedaten und Einladungs-Codes, Wert `password_totp` (Team C, Kapitel 08) |
+| K10 | 03 `refresh_tokens` | jede Wiederverwendung sperrt die Familie, auch nach verlorener Antwort | Nachsicht `auth.refresh_reuse_grace` mit demselben Geräteschlüssel |
+| K11 | 05 (6), 05 (2.6) | `interaction.created` und `command.invoked` nur für Agenten; Apps besitzen auch Befehle und Komponenten | Empfänger "self (Agent oder App)"; Scopes für `command.read`, `agent.read`, `instance.read`, `status.read` nennen |
+| K12 | 05 (4.10) | `agent.read` deckt den Agenten selbst nicht ab | Recht um "agent-self" ergänzen |
+| K13 | 05 (2.5), 08 | Gerät `pending` hat keine Entscheidung | `403` mit Code `device_pending` |
+| K14 | 03 `webhook_subscriptions` | HMAC-Signatur `v1` fehlt | Spalten `hmac_enabled`, `hmac_generation`; Geheimnis abgeleitet, nicht gespeichert (webhooks.md) |
+| K15 | 05 (4.7) | `template.manage` nennt Ressource `channel`, persönliche Vorlagen haben keinen Kanal | Ressource "channel oder user" |
+
+## 19. Entscheidungen dieses Kapitels
+
+| Nr | Entscheidung | Grund |
+|---|---|---|
+| R-API-01 | Hauptversion im Pfad `/api/v1`, nur additive Änderungen innerhalb (ADR 0014). | Sichtbar in Logs und Proxys, einfach für generierte Clients. |
+| R-API-02 | Ressourcen-Pfade plus `POST .../<verb>` für Zustandswechsel. | Eine Aktion je Route; Grund und Audit gehören zum Wechsel. |
+| R-API-03 | Kein JSON `null`; fehlend heißt kein Wert; Entfernen über eigene Felder oder Modi. | dart-dio kennt den Null-Typ nicht; Go `omitempty` passt; PATCH ohne Dreiwertigkeit. |
+| R-API-04 | Clients ignorieren Unbekanntes; der Server ignoriert unbekannte Anfragefelder. | Unabhängige Updates von Apps und Servern. |
+| R-API-05 | `oneOf` nur mit Diskriminator, kein `anyOf`, keine Typ-Arrays (Lint). | oapi-codegen macht aus Mehrtyp-Unions `any` (Baseline R-Stack). |
+| R-API-06 | Alle Schemas in openapi.yaml; asyncapi.yaml referenziert sie. | Eine Quelle für alle Generatoren. |
+| R-API-07 | Problem-`type` relativ mit vollem Pfad, plus `code`. | Kein gemeinsamer Host bei selbst gehosteter Software; RFC 9457 erlaubt es. |
+| R-API-08 | `If-Match` mit `412` statt `expected_version` mit `409`. | HTTP-Standardmechanismus (RFC 9110); Standard-Middleware und Bibliotheken nutzbar. |
+| R-API-09 | `Idempotency-Key` auf POST und PATCH außer den Fällen in 7.3; nur endgültige Antworten werden gespeichert. | Wiederholung nach Step-up und Drosselung muss wirken. |
+| R-API-10 | Cursor ohne Gesamtzahl; Verlauf über `thread_seq`. | Keyset ist stabil und billig; Zahlen verraten Mengen. |
+| R-API-11 | RateLimit-Kopfzeilen nach Entwurf -11, als vorläufig markiert. | Clients können vorab drosseln; Wechsel auf den RFC ist additiv. |
+| R-API-12 | Eigene Endpunkte je Anmeldeart; OIDC mit Server als vertraulichem Client, `login_code` plus `client_verifier`. | Keine Unions; abgefangene Umleitungen sind wertlos. |
+| R-API-13 | Uploads als Sitzung aus Teilen mit gleichem Ablauf für beide Treiber. | Ein Client-Pfad; Wiederaufnahme und Parallelität. |
+| R-API-14 | Webhooks: `v1a` immer, `v1` je Abo zuschaltbar (ADR 0016). | Asymmetrisch bevorzugt, HMAC für verbreitete Bibliotheken. |
+| R-API-15 | Beschreibungen in den YAML-Dateien Englisch, Kapitel Deutsch. | Beschreibungen werden Kommentare im generierten Code. |
+| R-API-16 | Health unter `/api/v1/health/live` und `/ready`, ohne Rate-Limit-Klasse, Aktion `health.read` (beantragt). | Proben dürfen nie gedrosselt werden; B7 verlangt trotzdem eine Aktion. |
+| R-API-17 | Lauf-Ende über `POST /runs/{id}/finish` mit Zielzustand statt der Beispielpfade `/fail`, `/complete`, `/cancelled` aus 04. | Ein Schema, eine Aktion (`run.finish`), kein Verwechseln von `cancel` und `cancelled`. |
+| R-API-18 | Generierter Code wird eingecheckt, Drift-Prüfung im Gate. | Review sieht Wirkungen; Builds ohne Generator. |
+| R-API-19 | Titel der Verträge neutral ("Chat Server API"), kein Produktname. | Name ist Konfiguration (Baseline Abschnitt 1, ADR 0044). |
+| R-API-20 | Unpaginierte Listen nur für kleine Mengen. | Weniger Aufrufe für Struktur; Wachstum über neue Endpunkte. |
+| R-API-21 | App ohne Lese-Scope bekommt `404`, mit Lese- ohne Schreib-Scope `403 scope_missing`. | Gleiches Verhalten wie fehlende Freigaben (R-AZ-01). |
+| R-API-22 | Jede Operation dokumentiert mindestens eine 4xx-Antwort; ausgenommen sind nur Ops mit Klasse `none` (Health-Proben). Dafür ersetzt eine eigene Lint-Regel die eingebaute `operation-4xx-response`. | Proben haben keinen Client-Fehler; alles andere muss seine Fehler nennen. |
+
+## 20. Konfigurationswerte dieses Kapitels
+
+| Name | Standard | Bedeutung |
+|---|---|---|
+| `api.page_size_default` | `50` | Seitengröße ohne `limit` |
+| `api.page_size_max` | `200` | größere `limit` werden gekappt |
+| `api.max_json_body_bytes` | `1048576` | größter JSON-Körper; größer als `message.max_content_bytes` |
+| `api.trusted_proxy_cidrs` | leer | Absender, deren `Forwarded`-Kopfzeilen gelten |
+| `api.cors_allowed_origins` | leer | zusätzliche Origins für CORS |
+| `api.deprecation_min_notice` | `180d` | Mindestabstand von `Deprecation` zu `Sunset` |
+| `api.major_version_overlap` | `365d` | so lange bleibt eine alte Hauptversion nach Erscheinen der neuen |
+| `api.stats_max_buckets` | `1000` | Zeit-Buckets je Statistik-Abfrage; mehr ergibt `400` |
+| `status.history_window` | `7d` | so lange zeigt die Statusseite gelöste Störungen |
+| `command.autocomplete_timeout` | `3s` | Wartezeit auf Vorschläge des Befehls-Eigentümers |
+| `auth.login_attempt_ttl` | `10m` | Gültigkeit eines OIDC-Anmeldeversuchs |
+| `auth.login_code_ttl` | `60s` | Gültigkeit des `login_code` nach dem Rückruf |
+| `auth.enrollment_code_ttl` | `7d` | Gültigkeit eines Einladungs-Codes für lokale Konten |
+| `auth.refresh_reuse_grace` | `30s` | Nachsicht für wiederholten Refresh mit demselben Schlüssel |
+| `auth.local_password_enabled` | `true` | Passwort plus TOTP für lokale Konten |
+| `file.upload_part_bytes` | `8388608` | Teilgröße einer Upload-Sitzung |
+| `file.upload_session_ttl` | `24h` | Gültigkeit einer Upload-Sitzung |
+| `file.presigned_url_ttl` | `5m` | Gültigkeit presigned URLs für Teile und Downloads |
+
+Die `auth.*`-Werte gehören fachlich zu Kapitel 08, die `file.*`-Werte zu Kapitel 12. Übernimmt das
+jeweilige Kapitel einen Wert, wird die Zeile dort geführt und hier gestrichen.
+
+## Quellen
+
+Alle abgerufen am 2026-10-10.
+
+| Nr | Quelle | Inhalt | Marker |
+|---|---|---|---|
+| Q1 | https://github.com/oapi-codegen/oapi-codegen/releases | v2.8.0: erste OpenAPI-3.1-Unterstützung, Go 1.25, Laufzeit ab v1.6.0, `type: [T, "null"]`, Webhooks | [belegt] |
+| Q2 | https://www.rfc-editor.org/rfc/rfc9457.html | Problem Details: `type` als URI-Referenz, absolute URIs empfohlen, relative mit vollem Pfad erlaubt, Erweiterungen | [belegt] |
+| Q3 | https://www.rfc-editor.org/rfc/rfc9449.html | DPoP: Schema `DPoP`, Beweis-Claims, `use_dpop_nonce`, `DPoP-Nonce`, `token_type` `DPoP` | [belegt] |
+| Q4 | https://openapi-generator.tech/docs/generators/dart-dio/ | dart-dio: Null-Typ nicht unterstützt, `enumUnknownDefaultCase`, `oneOf` und Diskriminator unterstützt | [belegt] |
+| Q5 | https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/ | Entwurf -11 (Mai 2026), Felder `RateLimit-Policy` und `RateLimit` | [belegt] |
+| Q6 | https://github.com/OpenAPITools/openapi-generator | Version 7.26.0, Apache-2.0; OpenAPI 3.1 "beta support" (auch als Warnung der Generator-Ausgabe in der eigenen Probe) | [belegt] |
+| Q7 | https://www.rfc-editor.org/rfc/rfc9745.html | `Deprecation` als Structured-Field-Datum, `Sunset` nicht früher, Link-Relation `deprecation` | [belegt] |
+| Q8 | https://github.com/oasdiff/oasdiff | Lizenz Apache-2.0; OpenAPI-3.1-Arbeit nur als Beta-Stände sichtbar | [vermutet] |
+| Q9 | https://www.rfc-editor.org/rfc/rfc9110.html | `If-Match` scheitert: `412`; `Retry-After` | [belegt] |
+| Q10 | https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/ | Entwurf -07 abgelaufen; Kopfzeile `Idempotency-Key` als verbreitetes Muster | [belegt] |
+| Q11 | https://github.com/schemathesis/schemathesis | MIT, zustandsbehaftete Tests über abgeleitete Links, eigene Anmelde-Logik | [belegt] |
+| Q12 | https://www.rfc-editor.org/rfc/rfc8252.html | Native Apps nutzen den externen Browser; Redirect über eigenes Schema, beanspruchtes `https` oder Loopback | [belegt] |

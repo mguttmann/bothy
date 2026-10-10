@@ -1,0 +1,493 @@
+# Lint configuration for the API contracts (ADR 0013, docs/spec/06-api.md section 15).
+# Run from the repository root (pinned version, updated by Renovate):
+#   npx -y @redocly/cli@2.62.1 lint --config docs/api/redocly.yaml
+# Without file arguments both APIs below are linted. A single file:
+#   npx -y @redocly/cli@2.62.1 lint docs/api/openapi.yaml --config docs/api/redocly.yaml
+#
+# The action lists mirror docs/spec/05-aktionen.md (closed catalogue). The block "proposed"
+# holds actions that docs/spec/06-api.md requests as additions to the core contract
+# ("Kern-Vertrag: Ergänzung beantragt"); it must be empty once 05 is amended or the routes are
+# changed. The gate check `api-catalogue-sync` compares these lists with 05 (docs/spec/06-api.md).
+
+extends:
+  - recommended
+
+apis:
+  rest@v1:
+    root: ./openapi.yaml
+    rules:
+      rule/operation-id-camel-case:
+        subject:
+          type: Operation
+          property: operationId
+        assertions:
+          pattern: /^[a-z][a-zA-Z0-9]*$/
+        message: operationId must be lowerCamelCase.
+  gateway@v1:
+    root: ./asyncapi.yaml
+    rules:
+      # Authentication is in-band (`identify`/`resume` frames with DPoP proof), not part of the
+      # WebSocket handshake, so AsyncAPI security schemes cannot express it.
+      security-defined: off
+
+rules:
+  # Schemas for gateway frames are only referenced from asyncapi.yaml.
+  no-unused-components: off
+  # OpenAPI 3.1 allows `description` next to `$ref` (JSON Schema 2020-12); we use it for field docs.
+  spec-ref-siblings: off
+  # Replaced by rule/operation-4xx-response below, which exempts operations without a
+  # rate-limit class (health probes): they have no client error to report.
+  operation-4xx-response: off
+  rule/operation-4xx-response:
+    subject:
+      type: Responses
+    where:
+      - subject:
+          type: Operation
+          property: x-rate-limit-class
+        assertions:
+          notPattern: /^none$/
+    assertions:
+      requireAny: ['400', '401', '403', '404', '409', '410', '412', '413', '415', '416', '422', '428', '429']
+    message: Operation must document at least one 4xx response.
+  operation-summary: error
+  tag-description: error
+  no-invalid-media-type-examples: error
+  no-invalid-schema-examples: error
+
+  # 05-aktionen.md rule 3: every operation names exactly one known action.
+  rule/authz-action-required:
+    subject:
+      type: Operation
+    assertions:
+      required:
+        - x-authz-action
+    message: Every operation needs x-authz-action from docs/spec/05-aktionen.md.
+  rule/authz-action-known:
+    subject:
+      type: Operation
+      property: x-authz-action
+    assertions:
+      enum:
+        # catalogue (docs/spec/05-aktionen.md section 4)
+        - access.explain
+        - access.view_as
+        - agent.billing_mode.set
+        - agent.billing_mode.set_all
+        - agent.config.read
+        - agent.create
+        - agent.credential_holder.set
+        - agent.disable
+        - agent.events.consume
+        - agent.heartbeat
+        - agent.invoke
+        - agent.read
+        - agent.update
+        - agent_session.bind
+        - agent_session.read
+        - agent_session.report
+        - agent_session.reset
+        - app.install
+        - app.read
+        - app.scopes.update
+        - app.uninstall
+        - audit.read
+        - audit.verify
+        - auth.login.begin
+        - auth.login.complete
+        - auth.logout
+        - auth.step_up
+        - auth.token.refresh
+        - channel.archive
+        - channel.behavior.read
+        - channel.behavior.update
+        - channel.create
+        - channel.operator.set
+        - channel.project.bind
+        - channel.read
+        - channel.reorder
+        - channel.update
+        - command.autocomplete
+        - command.invoke
+        - command.read
+        - command.register
+        - command.remove
+        - component.update
+        - cost.read.aggregate
+        - cost.read.thread
+        - cost.reconcile
+        - device.approve
+        - device.list
+        - device.revoke
+        - dm.create
+        - dm.leave
+        - draft.read
+        - draft.write
+        - events.catch_up
+        - export.channel
+        - feature_flag.read
+        - feature_flag.update
+        - file.delete
+        - file.read
+        - file.transcribe
+        - file.upload
+        - forum_tag.manage
+        - gateway.connect
+        - gateway.focus
+        - gdpr.export.download
+        - gdpr.request.create
+        - gdpr.request.decide
+        - gdpr.request.read
+        - grant.create
+        - grant.read
+        - grant.revoke
+        - group.create
+        - group.delete
+        - group.member.add
+        - group.member.remove
+        - group.read
+        - group.update
+        - identity.link
+        - identity.unlink
+        - identity_provider.manage
+        - identity_provider.read
+        - import.manage
+        - import.read
+        - instance.branding.update
+        - instance.discovery.read
+        - instance.read
+        - instance.settings.update
+        - interaction.create
+        - interaction.respond
+        - mention.list
+        - message.create
+        - message.delete
+        - message.read
+        - message.revisions.read
+        - message.update
+        - notification_pref.update
+        - owner.add
+        - owner.remove
+        - passkey.register
+        - passkey.revoke
+        - pin.create
+        - pin.delete
+        - price.manage
+        - price.read
+        - push.deliver
+        - push.register
+        - push.unregister
+        - quiet_hours.update
+        - reaction.add
+        - reaction.remove
+        - read_state.mark_unread
+        - read_state.update
+        - run.cancel
+        - run.finish
+        - run.followup.create
+        - run.overview.read
+        - run.read
+        - run.start
+        - run.update
+        - search.query
+        - self.profile.update
+        - session.list
+        - session.revoke
+        - settings.read
+        - settings.update
+        - sidebar.update
+        - signing_key.rotate
+        - space.archive
+        - space.create
+        - space.operator.set
+        - space.read
+        - space.reorder
+        - space.update
+        - stats.read
+        - status.manage
+        - status.public.read
+        - status.read
+        - sync.snapshot.read
+        - template.manage
+        - template.read
+        - thread.close
+        - thread.create
+        - thread.move
+        - thread.read
+        - thread.reopen
+        - thread.tags.set
+        - thread.title.update
+        - token.create
+        - token.list
+        - token.revoke
+        - typing.start
+        - user.create
+        - user.disable
+        - user.enable
+        - user.read
+        - user.update
+        - webhook_in.create
+        - webhook_in.post
+        - webhook_in.revoke
+        - webhook_out.deliver
+        - webhook_out.manage
+        - webhook_out.read
+        - webhook_out.redeliver
+        # proposed (docs/spec/06-api.md section 18)
+        - agent.enable
+        - command.autocomplete.respond
+        - file.transcript.submit
+        - health.read
+        - identity.read
+        - instance.settings.read
+        - local_credential.set
+        - self.read
+        - webhook_in.read
+    message: x-authz-action is not in the action catalogue.
+
+  rule/rate-limit-class-required:
+    subject:
+      type: Operation
+    assertions:
+      required:
+        - x-rate-limit-class
+    message: Every operation needs x-rate-limit-class.
+  rule/rate-limit-class-known:
+    subject:
+      type: Operation
+      property: x-rate-limit-class
+    assertions:
+      enum:
+        - none
+        - rl.admin
+        - rl.agent_runtime
+        - rl.export
+        - rl.gateway_connect
+        - rl.interaction
+        - rl.message
+        - rl.public_auth
+        - rl.read
+        - rl.search
+        - rl.trigger
+        - rl.typing
+        - rl.upload
+        - rl.webhook_in
+        - rl.write
+    message: x-rate-limit-class is not a class of docs/spec/05-aktionen.md section 3 (or none).
+
+  # 05-aktionen.md rule 4: every event type names its receive action.
+  rule/event-receive-action-required:
+    subject:
+      type: Message
+    where:
+      - subject:
+          type: Message
+          property: x-event-kind
+        assertions:
+          defined: true
+    assertions:
+      required:
+        - x-receive-action
+    message: Every event message needs x-receive-action.
+  # Receive actions: catalogue actions plus `self` (05-aktionen.md section 6).
+  rule/receive-action-known-message:
+    subject:
+      type: Message
+      property: x-receive-action
+    assertions:
+      enum: &receive_actions
+        - access.explain
+        - access.view_as
+        - agent.billing_mode.set
+        - agent.billing_mode.set_all
+        - agent.config.read
+        - agent.create
+        - agent.credential_holder.set
+        - agent.disable
+        - agent.events.consume
+        - agent.heartbeat
+        - agent.invoke
+        - agent.read
+        - agent.update
+        - agent_session.bind
+        - agent_session.read
+        - agent_session.report
+        - agent_session.reset
+        - app.install
+        - app.read
+        - app.scopes.update
+        - app.uninstall
+        - audit.read
+        - audit.verify
+        - auth.login.begin
+        - auth.login.complete
+        - auth.logout
+        - auth.step_up
+        - auth.token.refresh
+        - channel.archive
+        - channel.behavior.read
+        - channel.behavior.update
+        - channel.create
+        - channel.operator.set
+        - channel.project.bind
+        - channel.read
+        - channel.reorder
+        - channel.update
+        - command.autocomplete
+        - command.invoke
+        - command.read
+        - command.register
+        - command.remove
+        - component.update
+        - cost.read.aggregate
+        - cost.read.thread
+        - cost.reconcile
+        - device.approve
+        - device.list
+        - device.revoke
+        - dm.create
+        - dm.leave
+        - draft.read
+        - draft.write
+        - events.catch_up
+        - export.channel
+        - feature_flag.read
+        - feature_flag.update
+        - file.delete
+        - file.read
+        - file.transcribe
+        - file.upload
+        - forum_tag.manage
+        - gateway.connect
+        - gateway.focus
+        - gdpr.export.download
+        - gdpr.request.create
+        - gdpr.request.decide
+        - gdpr.request.read
+        - grant.create
+        - grant.read
+        - grant.revoke
+        - group.create
+        - group.delete
+        - group.member.add
+        - group.member.remove
+        - group.read
+        - group.update
+        - identity.link
+        - identity.unlink
+        - identity_provider.manage
+        - identity_provider.read
+        - import.manage
+        - import.read
+        - instance.branding.update
+        - instance.discovery.read
+        - instance.read
+        - instance.settings.update
+        - interaction.create
+        - interaction.respond
+        - mention.list
+        - message.create
+        - message.delete
+        - message.read
+        - message.revisions.read
+        - message.update
+        - notification_pref.update
+        - owner.add
+        - owner.remove
+        - passkey.register
+        - passkey.revoke
+        - pin.create
+        - pin.delete
+        - price.manage
+        - price.read
+        - push.deliver
+        - push.register
+        - push.unregister
+        - quiet_hours.update
+        - reaction.add
+        - reaction.remove
+        - read_state.mark_unread
+        - read_state.update
+        - run.cancel
+        - run.finish
+        - run.followup.create
+        - run.overview.read
+        - run.read
+        - run.start
+        - run.update
+        - search.query
+        - self
+        - self.profile.update
+        - session.list
+        - session.revoke
+        - settings.read
+        - settings.update
+        - sidebar.update
+        - signing_key.rotate
+        - space.archive
+        - space.create
+        - space.operator.set
+        - space.read
+        - space.reorder
+        - space.update
+        - stats.read
+        - status.manage
+        - status.public.read
+        - status.read
+        - sync.snapshot.read
+        - template.manage
+        - template.read
+        - thread.close
+        - thread.create
+        - thread.move
+        - thread.read
+        - thread.reopen
+        - thread.tags.set
+        - thread.title.update
+        - token.create
+        - token.list
+        - token.revoke
+        - typing.start
+        - user.create
+        - user.disable
+        - user.enable
+        - user.read
+        - user.update
+        - webhook_in.create
+        - webhook_in.post
+        - webhook_in.revoke
+        - webhook_out.deliver
+        - webhook_out.manage
+        - webhook_out.read
+        - webhook_out.redeliver
+  rule/receive-action-known-webhook:
+    subject:
+      type: Operation
+      property: x-receive-action
+    assertions:
+      enum: *receive_actions
+
+  # Conservative schemas for code generators (oapi-codegen, dart-dio): no null type,
+  # no type arrays, oneOf only with a discriminator.
+  rule/no-type-arrays-or-null:
+    subject:
+      type: Schema
+      property: type
+    assertions:
+      pattern: /^(string|integer|number|boolean|object|array)$/
+    message: Use one JSON type per schema; express "no value" by omitting the member.
+  rule/oneof-needs-discriminator:
+    subject:
+      type: Schema
+    assertions:
+      mutuallyRequired:
+        - oneOf
+        - discriminator
+    message: oneOf is only allowed together with a discriminator.
+  rule/no-anyof:
+    subject:
+      type: Schema
+    assertions:
+      disallowed:
+        - anyOf
+    message: anyOf is not allowed; use oneOf with a discriminator.
