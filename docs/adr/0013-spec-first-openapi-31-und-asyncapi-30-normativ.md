@@ -94,6 +94,11 @@ Siehe docs/spec/06-api.md, Abschnitt 15.
 ## More Information
 
 * docs/spec/06-api.md (Konventionen, Codegenerierung, Gate), docs/api/README.md (Befehle).
+* Die feste Bau-Vorgabe des Owners "API-Doku entsteht aus dem Code (OpenAPI aus den Routen)" gilt
+  hier als "eine Quelle": Quelle ist `docs/api/openapi.yaml`, Routen, Handler-Schnittstellen und
+  Clients entstehen daraus, und `make codegen-check` hält beide gleich. Keine Bau-Sitzung erzeugt
+  OpenAPI aus Handler-Code; Ziel der Vorgabe (keine Abweichung zwischen Doku und Routen) ist damit
+  erfüllt.
 * oapi-codegen v2.8.0 Release Notes: https://github.com/oapi-codegen/oapi-codegen/releases
   (abgerufen 2026-10-10) [belegt].
 * dart-dio Generator: https://openapi-generator.tech/docs/generators/dart-dio/ (abgerufen

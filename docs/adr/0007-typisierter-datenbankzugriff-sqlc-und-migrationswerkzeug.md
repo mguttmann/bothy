@@ -45,10 +45,17 @@ Regeln:
 3. Migrationen sind eingebettet und laufen nur über `bothy migrate` (02, R-AR-16). Anweisungen, die
    keine Transaktion vertragen (z. B. `CREATE INDEX CONCURRENTLY`), stehen in eigenen Dateien mit
    `-- +goose NO TRANSACTION`. [belegt, Q4]
-4. Versionierung nach dem hybriden Verfahren von goose: Branches erzeugen Migrationen mit
-   Zeitstempel, der lokale Merge nach `main` wandelt sie mit `goose fix` in fortlaufende Nummern um.
-   Auf `main` gibt es nur fortlaufende Nummern; Produktion nutzt nie `-allow-missing`. [belegt, Q4]
-5. Eine Migration auf `main` ist unveränderlich (Prüfsummen-Datei im Gate).
+4. Versionierung mit fortlaufenden Nummern überall, auch auf Branches: Ein Branch nimmt die
+   nächste freie Nummer des Ausgangsbranchs (`NNNNN_<name>.sql`). Hat ein anderes Ticket die
+   Nummer inzwischen belegt, nummeriert der später gemergte Branch seine eigenen neuen Migrationen
+   vor seinem letzten `make check` um. Das Gate `migrations-lint` lehnt Zeitstempel-Versionen in
+   jedem Lauf ab. Produktion nutzt nie `-allow-missing`. Grund: Der lokale Merge folgt erst auf ein
+   grünes `make check` des Branchs; das Gate muss darum schon auf dem Branch den Stand des
+   Ausgangsbranchs halten. Das hybride Verfahren von goose (Zeitstempel auf Branches, `goose fix`
+   beim Merge) [belegt, Q4] passt dazu nicht, weil ein Branch mit Zeitstempel nie grün wäre.
+5. Eine Migration auf dem Ausgangsbranch ist unveränderlich: Die Prüfsummen-Datei
+   `<modul>/migrations.sha256` (Format von `shasum -a 256`, außerhalb von `migrations/`) schreibt
+   nur `make migrations-lock`, das nie eine bestehende Zeile ändert; das Gate vergleicht.
 6. Erweitern und Zusammenziehen: Eine Release-Version darf nur additive Änderungen voraussetzen;
    Entfernen folgt frühestens eine Release-Version später. Der Server startet mit jeder Schema-Version
    ab der kleinsten, die er braucht (02, 15.1).
@@ -59,17 +66,19 @@ Regeln:
 
 * Good, because SQL im Review lesbar bleibt und Rechtefilter sichtbar sind.
 * Good, because Schemaänderungen ohne Codegenerierung Bau-Fehler ergeben.
-* Good, because parallele Branches mit Zeitstempeln nicht um Nummern konkurrieren.
-* Bad, because der Merge-Schritt `goose fix` ausführen und committen muss; vergisst er es, fängt das
-  Gate es (nur fortlaufende Nummern auf `main`).
+* Good, because jeder Branch schon vor dem Merge genau den Zustand hat, den der Ausgangsbranch
+  danach hat, und das Gate das in jedem Lauf prüft.
+* Bad, because parallele Branches um dieselbe Nummer konkurrieren; der später gemergte Branch
+  nummeriert um. Das Gate fängt doppelte Nummern und unveränderte Prüfsummen ab.
 * Bad, because dynamische Abfragen (Filter mit vielen optionalen Teilen) in sqlc umständlich sind;
   dafür sind mehrere feste Abfragen oder nullbare Parameter vorgesehen.
 
 ### Confirmation
 
 * Gate: `sqlc generate` und `git diff --exit-code` (erzeugter Code aktuell).
-* Gate: `goose validate`; auf `main` nur fortlaufende, lückenlose Nummern; Prüfsummen unveränderter
-  Migrationen.
+* Gate `migrations-lint` (`tools/ci/migrations_lint.py`, Bau-Ticket M1-01): nur fortlaufende,
+  lückenlose fünfstellige Nummern, keine Zeitstempel-Versionen, Prüfsummen gemergter Migrationen
+  unverändert; dazu `goose validate`.
 * Integrationstest: alle Migrationen auf leerem PostgreSQL 18.
 * Kompatibilitätstest: Der Server der Vorversion läuft gegen das Schema der neuen Version
   (Erweitern und Zusammenziehen).
@@ -82,7 +91,8 @@ Regeln:
 * Good, because sqlc (MIT) v1.31.1 `pgx/v5` als Paket unterstützt. [belegt, Q1, Q2]
 * Good, because goose (MIT) v3.28.0 reines SQL, eingebettete Migrationen und Go-Migrationen kann.
   [belegt, Q4]
-* Good, because goose ein hybrides Verfahren mit `fix` für Teams beschreibt. [belegt, Q4]
+* Good, because goose ein hybrides Verfahren mit `fix` für Teams beschreibt [belegt, Q4]; dieses
+  Projekt nutzt es nicht (Regel 4), die fortlaufenden Nummern reichen.
 * Bad, because goose kein Schema-Diff erzeugt; Migrationen schreibt man von Hand.
 
 ### sqlc mit pgx v5 und golang-migrate

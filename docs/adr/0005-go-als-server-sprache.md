@@ -48,8 +48,11 @@ jede benötigte Schicht eine gepflegte Bibliothek hat. `go.mod` setzt die älter
 
 ### Confirmation
 
-* Ein Gate-Check vergleicht die `go`-Direktive in `services/server/go.mod` mit der ältesten
-  gepflegten Go-Version und die `toolchain`-Direktive mit der gebauten.
+* `make typecheck` und `make test` bauen und testen `services/server` mit `go` (Gate).
+* Die `go`-Direktive in `services/server/go.mod` nennt die ältere gepflegte Go-Linie, die
+  `toolchain`-Direktive die gebaute Version. Neue Go-Versionen kommen als Renovate-Vorschlag
+  (ADR 0041); die Regel hält das Review. Einen Gate-Check gibt es dafür nicht, weil "gepflegt" ohne
+  Netzzugang nicht feststellbar ist.
 * Der Build erzeugt Images für linux/amd64 und linux/arm64 (18-release.md).
 
 ## Pros and Cons of the Options

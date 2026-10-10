@@ -58,4 +58,24 @@ fehl, wenn sie veraltet ist. Nicht von Hand bearbeiten.
 | [0044](0044-arbeitsname-und-branding-als-konfiguration.md) | Arbeitsname und Branding als Konfiguration | accepted | 2026-10-10 |
 | [0045](0045-dokumentations-site-generator.md) | Dokumentations-Site-Generator | accepted | 2026-10-10 |
 | [0046](0046-mehrbenutzer-dev-umgebung-nur-mit-abschottung.md) | Mehrbenutzer-Dev-Umgebung nur mit Abschottung | accepted | 2026-10-10 |
+| [0047](0047-bild-metadaten-verlustfrei-entfernen.md) | Bild-Metadaten verlustfrei entfernen | accepted | 2026-10-10 |
+| [0048](0048-datei-abruf-nur-ueber-den-server-mit-kurzlebigen-tickets.md) | Datei-Abruf nur über den Server mit kurzlebigen Tickets statt presigned GET | accepted | 2026-10-10 |
+| [0049](0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md) | Maschinenlesbarer Aktionskatalog als einzige Quelle für Doku, Lint und Code | accepted | 2026-10-10 |
+| [0050](0050-modulregister-als-quelle-fuer-architektur-gate-und-tabellenbesitz.md) | Modulregister als Quelle für Architektur-Gate und Tabellenbesitz | accepted | 2026-10-10 |
+| [0051](0051-worker-verbraucher-des-ereignis-logs-mit-cursor.md) | Worker-Verbraucher des Ereignis-Logs mit Cursor statt Job-Einfügen im Schreibpfad | accepted | 2026-10-10 |
+| [0052](0052-ein-ereignis-umschlag-fuer-gateway-rest-und-webhooks.md) | Ein Ereignis-Umschlag für Gateway, REST-Nachholen und Webhooks | accepted | 2026-10-10 |
+| [0053](0053-kein-json-null-in-api-und-ereignissen.md) | Kein JSON-null in API und Ereignissen | accepted | 2026-10-10 |
+| [0054](0054-herkunfts-und-vertrauensmarkierung-im-agenten-kontext.md) | Herkunfts- und Vertrauensmarkierung fremder Inhalte im Agenten-Kontext | accepted | 2026-10-10 |
+| [0055](0055-kostenabgleich-als-eigene-app-admin-key-nie-im-server.md) | Kostenabgleich als eigene App, Admin-Key nie im Server | accepted | 2026-10-10 |
+| [0056](0056-native-erweiterungen-ohne-flutter-engine.md) | Native Erweiterungen ohne Flutter-Engine (NSE, Share, Android-Push) | accepted | 2026-10-10 |
+| [0057](0057-client-telemetrie-ueber-einen-server-endpunkt.md) | Client-Telemetrie über einen Server-Endpunkt statt Client-OTel-SDK | accepted | 2026-10-10 |
+| [0058](0058-sicherung-mit-pgbackrest-objektsicherung-und-restore-test.md) | Sicherung mit pgBackRest, Objekt-Sicherung und automatischem Restore-Test | accepted | 2026-10-10 |
+| [0059](0059-sync-epoche-nach-wiederherstellung.md) | Sync-Epoche nach Wiederherstellung | accepted | 2026-10-10 |
+| [0060](0060-release-automatisierung-im-monorepo.md) | Release-Automatisierung im Monorepo | accepted | 2026-10-10 |
+| [0061](0061-token-format-mit-festem-praefix-und-pruefsumme.md) | Token-Format mit festem Präfix und Prüfsumme | accepted | 2026-10-10 |
+| [0062](0062-release-signaturen-solange-das-repo-privat-ist.md) | Release-Signaturen solange das Repo privat ist | accepted | 2026-10-10 |
+| [0063](0063-leistungs-gate-fuer-das-ereignis-log.md) | Leistungs-Gate für das Ereignis-Log | accepted | 2026-10-10 |
+| [0064](0064-feature-flag-registrierung-mit-aufraeum-gate.md) | Feature-Flag-Registrierung mit Aufräum-Gate | accepted | 2026-10-10 |
+| [0065](0065-wartungsmodus-read-only.md) | Wartungsmodus read_only | accepted | 2026-10-10 |
+| [0066](0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md) | Signierschlüssel im beschreibbaren Schlüsselspeicher | accepted | 2026-10-10 |
 <!-- adr-index:end -->

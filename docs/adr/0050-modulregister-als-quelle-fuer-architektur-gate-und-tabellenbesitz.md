@@ -41,12 +41,17 @@ Gewählte Option: "Register `modules.yaml` als einzige Quelle", weil es alle Mod
 einer lesbaren Stelle hält und daraus jede Prüfung im lokalen Gate entsteht. Format und Beispiel:
 [02-architektur.md](../spec/02-architektur.md), Abschnitt 7.1.
 
-1. Je Modul nennt das Register `tables`, `actions`, `depends_on` und `adapter_vendors`; dazu die
-   Liste `vendors` mit den Importpfaden je Fremdbibliothek. Technische Tabellen außerhalb der
-   Module (River im Schema `jobs.schema`, 03 Abschnitt 4.13) stehen unter `platform/jobs`.
+1. Je Modul nennt das Register `tables`, `actions`, `events`, `ephemeral_events`, `ws_ops`,
+   `depends_on` und `adapter_vendors`; dazu die Kernel-Pakete (`kernel.core`, `kernel.ports`), je
+   Plattform-Paket einen Eintrag mit `depends_on` und `vendors`, die Einträge `wire`, `cmd` und
+   `api` mit ihren Vendor-Gruppen und die Liste `vendors` mit den Importpfaden je
+   Fremdbibliothek. Technische Tabellen (River im Schema `jobs.schema`, Versionstabelle von goose; 03
+   Abschnitt 4.13) gehören keinem Modul und stehen nicht unter `modules`; eine Abfrage eines
+   Moduls, die sie nennt, ist ein Fund der Prüfung des Tabellenbesitzes.
 2. Daraus entstehen:
-   - `.go-arch-lint.yml` mit vier Komponenten je Modul: Port, `domain`, `app`, `adapters`
-     (ADR 0008);
+   - `.go-arch-lint.yml` mit vier Komponenten je Modul (Port, `domain`, `app`, `adapters`, ADR
+     0008), einer Komponente je Plattform-Paket und den Komponenten `wire`, `cmd`, `api`; nur so
+     lässt sich eine Fremdbibliothek auf genau ein Plattform-Paket begrenzen (02 Abschnitt 7.2);
    - die Prüfung des Tabellenbesitzes: Jede SQL-Datei unter
      `internal/<modul>/adapters/postgres/queries/` nennt nur Tabellen dieses Moduls;
    - die Vollständigkeit: Jede Tabelle der Migrationen und aus 03 steht genau einmal im Register,
@@ -54,7 +59,7 @@ einer lesbaren Stelle hält und daraus jede Prüfung im lokalen Gate entsteht. F
    - die Routen-Prüfung: Der Handler einer Operation liegt im Modul, dem ihre Aktion gehört;
    - die Richtung der In-Tx-Abonnements: Ein Modul abonniert nur Ereignisse von Modulen, von denen
      es abhängt (Golden-Datei in `internal/wire`, 02 Abschnitt 8.3);
-   - der Doku-Abgleich: Die Tabellen 4.2, 4.4 und 4.6 in 02 entsprechen dem Register.
+   - der Doku-Abgleich: Die Tabellen 4.2, 4.4, 4.6 und 4.7 in 02 entsprechen dem Register.
 3. Ein neues Paket ohne Komponente bricht go-arch-lint ab ("not attached to any component"); das
    ist gewollt (02, Abschnitt 7.2).
 
@@ -77,7 +82,8 @@ einer lesbaren Stelle hält und daraus jede Prüfung im lokalen Gate entsteht. F
   gleich dem Generator-Ergebnis) im Ziel `gates`.
 - `go test ./tools/archgen/...` mit Fixture-Modulen: Domain importiert einen Treiber, App importiert
   einen fremden Port, App importiert fremde App, Paket ohne Komponente; alle vier scheitern
-  erwartet ([02-architektur.md](../spec/02-architektur.md), Abschnitt 7.2).
+  erwartet ([02-architektur.md](../spec/02-architektur.md), Abschnitt 7.2). Die Form mit
+  Plattform-Komponenten belegt M1-05 mit denselben vier Verstößen.
 - Fixture für den Tabellenbesitz: Eine Abfrage in Modul A nennt eine Tabelle von Modul B; der
   Check scheitert mit Datei und Tabelle.
 - Vollständigkeits-Check gegen Migrationen, 03 und `actions.yaml`; Doku-Abgleich mit 02.
