@@ -90,29 +90,26 @@ breaks the gate, and every failure prints a reproducible `curl` command.
    "Beispiele je Operation in G7", held by `Makefile` (`CONTRACT_MAX_EXAMPLES`), in 23
    "Konfigurationswerte dieses Kapitels"; matching entry in `SOURCES` of
    `tools/docs/tests/test_config_values.py`.
-7. Module register: vendor entry for the validator library allowed only for `platform` (and the
-   `testsupport` component, see the shared harness); `make arch` green.
-8. Shared test harness `services/server/test/harness` (create or extend, text below); this ticket
+7. Module register: vendor entry for the validator library allowed only for `platform` (the
+   `testsupport` component may use any vendor, M1-05); `make arch` green.
+8. Shared test harness `services/server/test/harness` (create, text below); this ticket
    adds `Options.EgressDenyAll`.
 9. Fixes for every non-conformance found: server code in the owning module, or the specification
    when the specification is wrong (spec first, outside the core contract only; a needed change in
    00, 03, 04 or 05 ends the ticket with `BLOCKED`).
 10. Documentation: `docs/quality/gates.md` (row `contract-test`, note that G8 runs inside `test`),
-    `docs/spec/06-api.md` "Vertragstests und Gate" (G7 "Werkzeug" cell: Schemathesis against the
-    server built from the working tree with a disposable PostgreSQL in `make contract-test`; the
-    Compose stack is covered by the smoke test; item 3 accordingly), `docs/quality/toolchain.md`,
+    `docs/quality/toolchain.md`,
     `services/server/README.md`, `services/server/CHANGELOG.md` and root `CHANGELOG.md` under
     "Unreleased".
 
-### Shared test harness (identical text in the briefs M1-69 to M1-72)
+### Shared test harness (the same interface in the briefs M1-69 to M1-72)
 
-If `services/server/test/harness` exists on the base branch, use it and extend it only additively.
-If it does not exist, first search for an existing full-server test helper
-(`grep -rn "pgtest" services/server/internal/wire services/server/test`); wrap it if it builds the
-real `internal/wire` graph, otherwise create the package with exactly this interface. Parallel
-tickets build the same interface, so merges converge.
+This ticket creates `services/server/test/harness` with exactly this interface (PLAN M1-71); M1-69,
+M1-70 and M1-72 depend on this ticket and extend it only additively. Before creating it, search for
+an existing full-server test helper (`grep -rn "pgtest" services/server/internal/wire
+services/server/test`) and wrap it if it builds the real `internal/wire` graph.
 
-- Package `harness`, non-test Go files, architecture component `testsupport` (Design notes).
+- Package `harness`, non-test Go files, architecture component `testsupport` (M1-05).
 - `func Start(tb testing.TB, opts Options) *Server`: the real `internal/wire` graph with role `all`
   in this process; PostgreSQL 18 from `internal/platform/pg/pgtest`; migrations as
   `bothy migrate up --bootstrap` runs them; secrets created as `bothy secrets init` creates them, in
@@ -129,7 +126,8 @@ tickets build the same interface, so merges converge.
   of the disposable container; assertions only).
 - `func (s *Server) NewUser(tb, UserSpec{Handle, DisplayName, Email string}) *Client` and
   `func (s *Server) NewAgent(tb, AgentSpec{Handle, DisplayName, BillingMode, CredentialHolder string}) *Client`,
-  only through the public API (`createUser`, `createEnrollmentCode`, `completeEnrollment`;
+  only through the public API (`createUser` with `local_account: true`, which returns the
+  enrollment code, then `redeemEnrollmentCode` with device keys and DPoP, 08 section 3.2;
   `createAgent`, `createToken`), owner step-up via `createStepUpChallenge` and
   `completeStepUpWithDeviceKey`.
 - `type Client struct { PrincipalID, DeviceID string; ... }` with `Do(ctx, Request) Response`
@@ -159,8 +157,8 @@ tickets build the same interface, so merges converge.
 
 - G4 and G5 (generated clients, M2 and M4), G6 (break check against a release, M7), G9 (gateway
   frames, M1-67), G10 (webhooks, M2).
-- Running Schemathesis against the Compose stack (M1-73 smoke, M7 installation).
-- Adding OpenAPI `links` to openapi.yaml (a spec change for the API owner; see Design notes).
+- Running Schemathesis against the Compose stack (06 G7: the smoke test of M1-73 and M7 cover it).
+- Adding OpenAPI `links` to openapi.yaml (06 G7 relies on the links Schemathesis infers).
 - Rate-limit semantics (M1-19), authorize semantics (M1-28), 404 timing (M1-70).
 
 ## Boundaries
@@ -205,8 +203,7 @@ G7 run:
 
 1. `TestG7_SchemathesisAllEnabledOperations` (tag `contract_live`) starts `harness.Start` with
    `EgressDenyAll: true` and every `ratelimit.<class>.per_minute` and `.burst` raised through
-   `Options.Config` (G7 checks conformance, not throttling; M1-19 owns throttling; written in the
-   README), builds `BuildMatrixWorld`, starts the credential broker and runs
+   `Options.Config` (23 R-QA-11: G7 checks conformance, not throttling; M1-19 owns throttling), builds `BuildMatrixWorld`, starts the credential broker and runs
    `uv run --project tools --locked pytest -p no:cacheprovider tools/contract/live_contract.py`
    from the repository root with the environment `BOTHY_CONTRACT_BASE_URL` (the `APIBase`),
    `BOTHY_CONTRACT_BROKER_URL`, `BOTHY_CONTRACT_OPERATIONS` (path of operations.yaml),
@@ -258,9 +255,8 @@ G7 run:
 9. SEC-T06 extra tests in `live_contract.py`:
    - `test_sec_t06_unknown_field_rejected`: for every enabled operation with a JSON request body, a
      valid body plus the property `x_unknown_field` gives `400 validation_failed` (W7).
-   - `test_sec_t06_duplicate_json_keys_rejected`: a raw body with one key twice gives `400` with the
-     problem code that M1-18 assigns to SEC-IN-2 (read it from its decoder tests; do not invent a
-     code).
+   - `test_sec_t06_duplicate_json_keys_rejected`: a raw body with one key twice gives
+     `400 malformed_request` (19 SEC-IN-2, 06 "Fehler").
    - Any `5xx` fails. No `5xx` is expected in this run; if an operation documents `503` for a
      condition the run does not induce, a `503` is still a failure.
 10. Reproduction: on every failure the message contains `curl` for the request with `Authorization`
@@ -268,12 +264,9 @@ G7 run:
     contract.dpop --key <file> --htm <M> --htu <URL>)"`, and the seed. `reporting.py` builds it;
     `dpop.py` has that command line entry point.
 
-Architecture register and coverage (shared with M1-70 and M1-72): `test/**` and `perf/**` under
-`services/server` are test support. If M1-05's generator (`tools/archgen`) has no component for
-them, add `testsupport` with the go-arch-lint v3 keys `anyProjectDeps: true` and `anyVendorDeps:
-true` (verify against the pinned version) and a generator test that no production component may
-depend on it; exclude `services/server/test/**` and `services/server/perf/**` from the Go coverage
-total in the `coverage` target.
+Architecture register and coverage: `test/**` and `perf/**` under `services/server` form the
+component `testsupport` (M1-05; 02 "Code-Layout"), and the Go coverage total leaves them out
+(M1-01). Nothing to add here unless the build proves the component wrong.
 
 ## Tests (write them first)
 
@@ -333,7 +326,7 @@ make check
 ## Definition of done
 
 - Code and tests as above; README in `services/server/test/contract/`, `tools/contract/`, the
-  `contractcheck` package and the harness (if created); doc comments and docstrings on every public
+  `contractcheck` package and the harness; doc comments and docstrings on every public
   symbol.
 - No new ADR (ADR 0013 holds the decision); the hard-exit ruling and the place of G7 go into
   `docs/DECISIONS.md` if it exists, otherwise into the README and the report.

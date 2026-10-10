@@ -121,7 +121,7 @@ API: `type Stage int` with the constants above; `type Chain`; `(*Chain).Use(stag
 
 Errors carry response headers where the contract needs them (`Retry-After`, `WWW-Authenticate`, `DPoP-Nonce`, `Allow`): add `errs.WithHeader(err, name, value)` or an equivalent; the problem writer applies them. `503 unavailable` always carries `Retry-After` with `http.unavailable_retry_after` in whole seconds. Add `errs.VersionConflict(current any)` and `errs.PreconditionRequired()`.
 
-Problem writer `httpserver.WriteProblem(w http.ResponseWriter, r *http.Request, err error)`: body from the code; `correlation_id` from `reqmeta`; `instance` is the request path, except that a path parameter named `token` is replaced by the literal `{token}` (incoming webhook URLs carry a secret); `detail` only where 06 asks for it (`payload_too_large` names the config key, for example `Body exceeds http.max_json_body_bytes.`); `errors[]` for `validation_failed`; `current` for `version_conflict`; `reason` and `hint` when the error carries them. Errors without a known kind become `500 internal_error`; their text goes only to the log. The same writer is the std-http `ErrorHandlerFunc` (parameter binding: `400 validation_failed`) and the strict `RequestErrorHandlerFunc` (`400 malformed_request`) and `ResponseErrorHandlerFunc` (mapping by kind) in `routes.Options`.
+Problem writer `httpserver.WriteProblem(w http.ResponseWriter, r *http.Request, err error)`: body from the code; `correlation_id` from `reqmeta`; `instance` is the request path without query, except that every path parameter carrying a secret (today only `{token}` of `postIncomingWebhook`) appears as its template, e.g. the literal `{token}` (06 "Fehler" point 1, SEC-LOG-3); `detail` only where 06 asks for it (`payload_too_large` names the config key, for example `Body exceeds http.max_json_body_bytes.`); `errors[]` for `validation_failed`; `current` for `version_conflict`; `reason` and `hint` when the error carries them. Errors without a known kind become `500 internal_error`; their text goes only to the log. The same writer is the std-http `ErrorHandlerFunc` (parameter binding: `400 validation_failed`) and the strict `RequestErrorHandlerFunc` (`400 malformed_request`) and `ResponseErrorHandlerFunc` (mapping by kind) in `routes.Options`.
 
 ### Correlation ID
 
@@ -172,7 +172,7 @@ Use the names of `docs/operations/configuration.md` and add to the M1-07 schema 
 
 ### Decisions to record in `docs/DECISIONS.md`
 
-Validator library and probe result; FieldError code vocabulary; `If-Match: *` gives 428; null repair policy; `instance` with `{token}`; title rule. (W7, the correlation ID, the chain order, the proof and the new configuration names are already in 02, 06 and 17.)
+Validator library and probe result; FieldError code vocabulary; `If-Match: *` gives 428; null repair policy; title rule. (W7, the correlation ID, the chain order, the proof, `instance` with `{token}` and the new configuration names are already in 02, 06 and 17.)
 
 ## Tests (write them first)
 

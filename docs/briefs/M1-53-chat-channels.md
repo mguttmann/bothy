@@ -39,7 +39,7 @@ build directly on this.
   3.2 row "Bediener je Kanal sichtbar im Kanal-Kopf".
 - `docs/api/openapi.yaml`, operationIds: `listSpaceChannels`, `createChannel`, `getChannel`,
   `updateChannel`, `moveChannel`, `archiveChannel`, `listForumTags`, `createForumTag`,
-  `updateForumTag`, `deleteForumTag`. Schemas: `Channel`, `ChannelView`, `ChannelViewList`,
+  `updateForumTag`, `moveForumTag`, `deleteForumTag`. Schemas: `Channel`, `ChannelView`, `ChannelViewList`,
   `ChannelCreate`, `ChannelUpdate`, `ChannelOperator`, `MovePosition`, `ReasonBody`, `ForumTag`,
   `ForumTagList`, `ForumTagCreate`, `ForumTagUpdate`, `ForumSort`, `ChannelCreatedEvent`,
   `ChannelUpdatedEvent`, `ChannelArchivedEvent`, `ThreadCreatedEvent`, `Problem`.
@@ -96,7 +96,8 @@ Product requirements implemented here:
     point 5).
 13. Channel names are unique per space, case-insensitive, among non-archived channels; tag names
     unique per channel among non-deleted tags (03 unique indexes). Channel names at most
-    `channel.name_max_chars`, tag names at most `forum_tag.name_max_chars` (03 9). Display texts
+    `channel.name_max_chars`, topics at most `channel.topic_max_chars`, tag names at most
+    `forum_tag.name_max_chars` (03 9). Display texts
     with control or bidi control characters are rejected (SEC-IN-4, SEC-T07).
 14. No read right gives `404`, identical to an unknown ID; lists filter in SQL and then run
     `authorize` per item (05 rule 1.2, 07 7.4).
@@ -135,19 +136,24 @@ Create or change exactly these (paths relative to `services/server/` unless they
    `MovePosition` rule.
 4. `internal/chat/app`: use cases `ListSpaceChannels`, `CreateChannel`, `GetChannel`,
    `UpdateChannel`, `MoveChannel`, `ArchiveChannel`, `ListForumTags`, `CreateForumTag`,
-   `UpdateForumTag`, `DeleteForumTag`.
+   `UpdateForumTag`, `MoveForumTag`, `DeleteForumTag`.
 5. `internal/chat/adapters/postgres`: `queries/channels.sql`, `queries/forum_tags.sql`,
    `queries/threads_main.sql` (insert of the main thread only), sqlc output, repository.
-6. `internal/chat/adapters/httpapi`: handlers for the ten operations above.
+6. `internal/chat/adapters/httpapi`: handlers for the eleven operations above.
 7. The chat adapter that implements `authz.StructureSource` (find it with
    `grep -rn "StructureSource" internal/chat`): the channel part, see "Design notes" D7.
 8. `internal/authz` and `internal/kernel/authorize`, only as far as "Design notes" D8 and D9
-   require (archived cap, rights of channels created after a snapshot, list scope fields,
-   target-scoped rights change, effective rights for `ChannelView`), each with tests.
-9. `api/operations.yaml`: enable the ten operations; regenerate `api/rest` and `api/routes` with
+   require (archived cap, effective rights for `ChannelView`), each with tests. Rights of
+   channels created after a snapshot and the list scope fields are built by M1-28 (07 7.2,
+   ruling D5 there); this ticket only adds the integration test against real channels. The
+   target-based `RightsChange` comes from M1-29.
+9. `api/operations.yaml`: enable the eleven operations; regenerate `api/rest` and `api/routes` with
    the generator target documented in `services/server/api/README.md` (M1-17).
-10. `internal/platform/config` schema: add `channel.history_backfill_limit_default` and
-    `channel.history_backfill_limit_max` with the defaults of 03 if they are not there yet.
+10. `internal/platform/config` schema: register `channel.name_max_chars`,
+    `channel.topic_max_chars` and `forum_tag.name_max_chars` (positive integers, defaults from 03
+    section 9) in the typed `chat` config, the same way M1-52 registers `space.name_max_chars`;
+    add `channel.history_backfill_limit_default` and `channel.history_backfill_limit_max` with the
+    defaults of 03 if they are not there yet.
 11. `internal/wire`: register handlers and the new in-transaction event type; update the golden
     file of subscriptions.
 12. Documentation: `internal/chat/README.md` (status, ports, tables, actions, events),
@@ -173,6 +179,7 @@ ArchiveChannel(ctx, ArchiveChannelCmd) (Channel, error)          // reason
 ListForumTags(ctx, channelID uuid.UUID) ([]ForumTag, error)
 CreateForumTag(ctx, CreateForumTagCmd) (ForumTag, error)
 UpdateForumTag(ctx, UpdateForumTagCmd) (ForumTag, error)
+MoveForumTag(ctx, MoveForumTagCmd) (ForumTag, error)               // channel id, tag id, MovePosition
 DeleteForumTag(ctx, channelID, tagID uuid.UUID) error
 ```
 
@@ -228,8 +235,9 @@ D1. Channels.
   `ChannelCreate`. `kind` is `text` or `forum`. `name`: trim leading and trailing Unicode white
   space, then at least one character; reject C0 and C1 control characters and bidi controls
   (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069) with `400 validation_failed`,
-  field error `/name` code `invalid_characters`; reuse the validator of SEC-T07 from M1-26/M1-52
-  instead of writing a second one. The same check applies to `topic`. `forum_default_sort` only
+  field error `/name` code `invalid_characters`; reuse the shared validator `kernel/textcheck`
+  (M1-26) instead of writing a second one. The same check applies to `topic`, which is at most
+  `channel.topic_max_chars` characters (`/topic`, `too_long`). `forum_default_sort` only
   for `forum`, else `400` (`/forum_default_sort`, `not_allowed_for_kind`). `after_channel_id`
   must be a non-archived channel of the same space, else `400` (`/after_channel_id`,
   `not_a_sibling`); absent means at the end. Defaults from 03; `history_backfill_limit` is set to
@@ -253,8 +261,8 @@ D1. Channels.
 - `listSpaceChannels`: first `authorize(space.read, space)`, invisible space gives `404`; then
   `Scope(channel.read)`; SQL filter `space_id = $space AND archived_at IS NULL AND (id = ANY($visible)
   OR space_id = ANY($fully_visible_spaces) OR $instance_wide)`, ordered by `sort_key`; then
-  `authorize(channel.read)` per item, an item that fails is dropped and counted as an alarm
-  (07 7.4 rule 3). Unpaginated (06 "Paginierung" point 6). Archived channels are not listed.
+  `authorize(channel.read)` per item in filter mode `authorize.Filter(ctx)` (M1-28; no denial audit, 07 4.2), an item that fails is dropped and counted as an
+  alarm (07 7.4 rule 3). Unpaginated (06 "Paginierung" point 6). Archived channels are not listed.
 - `updateChannel`: action `channel.update` (`manage`, audit), `If-Match` required (`428`
   without, `412 version_conflict` with `current` on mismatch, through the helpers of M1-18). At
   least one field, else `400`. `default_notification_level` and
@@ -281,7 +289,7 @@ D2. Archived channels (07 "4.5 Archivierte Bereiche und Kanäle", reason `channe
    problem code). Reading stays allowed for everyone who could read before.
 3. Actions with right `manage` or `owner` pass `authorize`, but chat rejects every state change of
    an archived channel or its tags (`updateChannel`, `moveChannel`, forum tag create, update,
-   delete) with `409 conflict`.
+   move, delete) with `409 conflict`.
 4. Rights change: the unit of work runs with the `RightsChange` option. Affected principals are
    all principals whose effective level on the channel was above `read` before the change
    (direct grants, group members, owners, the operator rule). `authz` writes `access.changed`
@@ -298,10 +306,14 @@ D3. Forum tags.
   category colour key of the design system (reuse the palette validator of M1-52; a hex value or
   unknown key gives `400`). `restricted` defaults to `false`. `after_tag_id` must be a non-deleted
   tag of the same channel, else `400`; absent means at the end.
-- `updateForumTag`: at least one field, else `400`; no change gives `200` without event.
+- `updateForumTag`: at least one field, else `400`; `clear_color` removes the colour and together
+  with `color` gives `400` (`/clear_color`, `not_allowed_with_color`); no change gives `200`
+  without event.
+- `moveForumTag`: action `forum_tag.manage`, body `MovePosition` with the rules of `moveChannel`
+  among the non-deleted tags of the channel; sets `sort_key`.
 - `deleteForumTag`: sets `deleted_at`; deleting a deleted tag gives `204`; a tag ID that never
   belonged to this visible channel gives `404`.
-- Events (03 `forum_tags`, 05 section 6 row `channel.updated`): every tag create, update or delete
+- Events (03 `forum_tags`, 05 section 6 row `channel.updated`): every tag create, update, move or delete
   bumps `channels.version` and emits `channel.updated`; clients reload `listForumTags` when the
   channel version changes. Audit details `{op, tag_id, name}`.
 
@@ -324,17 +336,17 @@ resolve a channel ID to `{space_id, kind, archived (own or space), read_only}`; 
 non-archived channel IDs of a space and of the instance where `authz` needs them. Lookups run in
 the ambient transaction when one exists, so rows written earlier in the same unit of work are seen.
 
-D8. Rights of channels created after a snapshot (requirement 16). `authorize` must derive a
-channel's level at decision time from the freshly resolved path: channel grants, space grants,
-instance grants, owner, operator rule. The snapshot may cache grant data per target, never a
-per-channel result that a new channel makes stale. `Scope` returns `visible_channel_ids`,
-`fully_visible_space_ids` (spaces with a grant on the space) and `instance_wide` (owner or instance
-grant), as 04 7.2 needs. If M1-28 already behaves like this, only add the tests below; otherwise
-change `internal/authz` and extend the differential test AZ-P8 with worlds where a channel is
-created after the snapshot. The archived cap of D2 point 2 is implemented in the same place, with
+D8. Rights of channels created after a snapshot (requirement 16). M1-28 builds this (07 7.2,
+ruling D5 of M1-28): `authorize` derives a channel's level at decision time from the freshly
+resolved path, the snapshot caches grant data per target only, and `Scope` returns
+`visible_channel_ids`, `fully_visible_space_ids` and `instance_wide`, as 04 7.2 needs; AZ-P8 in
+M1-28 already covers channels created after the snapshot. This ticket does not change that core;
+it adds the integration test below against the real chat `StructureSource`. If the test fails,
+stop with `Verdict: BLOCKED M1-28 does not follow 07 7.2` instead of changing the cache. The
+archived cap of D2 point 2 is implemented in `authorize`'s path evaluation, with
 reason `channel_archived` added to the closed reason list that `audit_events.deny_reason` is tested
-against. If the `RightsChange` option only accepts explicit principals, add a target-scoped variant
-that computes the affected principals of D2 point 4 inside `authz`.
+against. The archive runs with the target-based `RightsChange` of M1-29 (02 8.1), which computes the
+affected principals of D2 point 4 inside `authz`.
 
 D9. `ChannelView.level` and `capabilities` come from an `authz` port method that returns the
 caller's effective level and capabilities on a channel (owner: `trigger` and all capabilities;
@@ -357,6 +369,10 @@ Unit (`internal/chat/domain`, table tests):
 - `TestSEC_T07_ChannelAndTagNamesRejectControlAndBidi`: every listed code point rejected in name,
   topic and tag name.
 - `TestCreateChannel_ForumSortOnlyForForum`.
+- `TestChannelAndTagTextLimits`: a name over `channel.name_max_chars`, a topic over
+  `channel.topic_max_chars` and a tag name over `forum_tag.name_max_chars` each give
+  `400 validation_failed` with field error code `too_long` on `/name` or `/topic`; a value of
+  exactly the limit is accepted (limits read from the config, not hard-coded in the test).
 - `TestMovePosition_ExactlyOneNeighbour`: both set rejected, none means start.
 - `TestChannelOperatorRepresentation`: inherit, none, agent and the effective agent; no empty
   fields emitted.
@@ -380,8 +396,6 @@ validator):
   is unchanged; Alex's `getChannel` gives `200` and `listSpaceChannels` lists it; the
   `channel.created` row in `event_log` carries `space_id` and `channel_id`; `Scope` for Alex lists
   Support in `fully_visible_space_ids`.
-- `TestAZ_P8_ChannelCreatedAfterSnapshot` (extension of the existing differential test, if D8
-  changed `authz`).
 - `TestListSpaceChannels_FiltersInvisibleAndArchived`: channel grant only on one channel of the
   space lists only that channel; archived channels absent; level and capabilities per item.
 - `TestGetChannel_ForeignAndUnknownIdentical404` (AZ-P4 style): status, headers and body equal
@@ -398,9 +412,9 @@ validator):
 - `TestArchiveChannel_Idempotent` and `TestArchivedChannel_Mutations409` (update, move, tag create).
 - `TestForumTags_CRUD`: rights (`manage` needed, read-only member gets `403`, outsider `404`),
   `restricted`, palette colour accepted, hex colour `400`, duplicate name `409`, text channel
-  `400 not_a_forum`, delete twice `204`, each change emits `channel.updated` with a higher channel
-  version.
-- `TestAZ_P1_RouteCount`: the existing route count test passes with the ten new operations.
+  `400 not_a_forum`, delete twice `204`, `clear_color` removes the colour, `moveForumTag` changes
+  the order, each change emits `channel.updated` with a higher channel version.
+- `TestAZ_P1_RouteCount`: the existing route count test passes with the eleven new operations.
 
 Commands that must pass (from the repository root unless noted):
 
@@ -421,7 +435,7 @@ make check
 
 - [ ] The migration creates the four tables as in 03 with exactly the two documented deviations;
       `make migrations-lint` is green.
-- [ ] The ten operations are enabled in `api/operations.yaml`, generated code has no drift, and
+- [ ] The eleven operations are enabled in `api/operations.yaml`, generated code has no drift, and
       every registered route has a known action (AZ-P1).
 - [ ] Every text channel has exactly one main thread; forum channels none.
 - [ ] A channel created in a visible space is visible over REST without a new permission version,

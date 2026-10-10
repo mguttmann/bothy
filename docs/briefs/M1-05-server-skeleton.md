@@ -154,6 +154,7 @@ platform: {}                # <name>: {depends_on: [<platform names>], vendors: 
 wire: {vendors: []}
 cmd: {vendors: []}
 # api: {vendors: [...]}     # added by M1-17 together with api/
+testsupport: {paths: [test, perf]}   # test code across modules (02 "Code-Layout"); nobody may use it
 modules:
   instance:
     tables: [instance, instance_settings, server_signing_keys, feature_flags, sequence_counters]
@@ -217,6 +218,12 @@ vendors: {}                 # <group>: [<import path>, <import path>/**]
     canUse: [...]}`. `<m>-domain` and `kernel-ports` get no `deps` entry: go-arch-lint rejects an
     empty `mayDependOn`, and without an entry a component may use only the common component. Omit
     empty `canUse` and omit a whole entry whose lists are both empty.
+  - `testsupport` (`in: [test/**, perf/**]` from `testsupport.paths`): `deps` entry with
+    `anyProjectDeps: true` and `anyVendorDeps: true` (verify both keys against the pinned
+    go-arch-lint; if they differ, use its equivalent and record it); it appears in no other
+    component's `mayDependOn`. Reason: shared test harnesses and load tests use the real wire graph
+    (M1-16 creates `perf/internal/report`, M1-71 `test/harness`), and production code must never
+    import them (02 "Code-Layout").
 - If the pinned go-arch-lint reports an error for a component whose `in` matches no package, add a
   `doc.go` (package comment only) to `domain` and `app` of every module and record it in
   DECISIONS.md; never make the generator drop declared components.
@@ -263,11 +270,14 @@ for concurrent use. The fake lives in the same package so that `kernel-core` kee
   `invocation_token_invalid` to `forbidden`; `not_found`; `method_not_allowed`; `conflict`,
   `request_in_progress`, `already_started`, `billing_mode_mismatch`, `tool_class_mismatch`,
   `invalid_state_transition`, `base_version_conflict`, `component_used`, `operator_mismatch`,
-  `file_not_ready` to `conflict`; `i1_violation`, `last_owner` to `invariant_violation`;
+  `file_not_ready`, `file_blocked`, `title_manual` to `conflict`; `i1_violation`, `last_owner` to
+  `invariant_violation`;
   `resync_required`, `message_deleted`, `gone` to `gone`; `version_conflict` to
   `precondition_failed`; `payload_too_large` to `too_large`; `unsupported_media_type`;
   `range_not_satisfiable`; `idempotency_key_reuse` to `unprocessable`; `precondition_required`;
-  `rate_limited`; `internal_error` to `internal`; `unavailable`, `maintenance` to `unavailable`.
+  `rate_limited`; `internal_error` to `internal`; `unavailable`, `maintenance`, `setup_required` to
+  `unavailable`. The code list follows `x-problem-codes`; a code added there later gets its kind
+  in the same change (the test over `AllCodes()` compares both).
 - `type Error struct` with fields `Code Code`, `Detail string`, `Reason string`, `Hint string`,
   `Cause string`, `Fields []FieldError`, `Current any`, `RetryAfter time.Duration` and an unexported
   wrapped error; `type FieldError struct{ Pointer, Code, Detail string }`. Constructors
@@ -383,6 +393,8 @@ the "Confirmation" of ADR 0050 and run `make adr-index`.
   `GOPROXY=off`, `GOTOOLCHAIN=local`, `GOWORK=off`, and assert exit code 0 for the clean case and
   exit code 1 plus the offending package path in the output for each violation (the four kinds of
   02 "go-arch-lint"). Fixture `.go` files carry the SPDX line and are gofmt-clean.
+- `TestArchLintTestSupport`: in the skeleton, a package under `test/` importing a module adapter
+  passes; a module adapter importing a package under `test/` fails with exit code 1.
 - The tests find go-arch-lint through the environment variable `GO_ARCH_LINT`. If it is unset they
   fail with `set GO_ARCH_LINT to the pinned go-arch-lint (make test does this)`; they never skip
   (R-QA-02). In the root `Makefile`, the Go branch of `test` sets

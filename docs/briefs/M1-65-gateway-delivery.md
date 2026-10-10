@@ -92,7 +92,8 @@ open connections immediately, also across processes, and shutdown closes every c
     after `sync.cursor_advance_every` and at the end of every page; live events buffered and sent
     after `catchup.complete {head_seq}` in `seq` order, never mixed (04 "Cursor", "Ablauf").
 14. `resync_required {reason, head_seq, sync_epoch}` instead of events for the reasons `retention`,
-    `too_far_behind` and `cursor_ahead` (04 "`resync_required`").
+    `too_far_behind` and `cursor_ahead` (04 "`resync_required`"). The epoch check (`epoch_changed`)
+    runs once at `identify` and `resume` in M1-64 through `sync.CatchUp.Check` (M1-63), not here.
 15. After `access.changed` nothing more from removed targets: buffered and queued frames of those
     targets are discarded (04 "Was der Client bei Entzug bekommt und tut", items 1 and 2).
 16. Revocation of a session, device, principal or token closes the affected connections with
@@ -121,10 +122,11 @@ place, use this layout (it satisfies 02 "Schichten im Modul"):
   deadline `gateway.write_timeout`; the handshake registers the connection in the hub before it
   reads `head_seq` (see "Connection phases").
 - `internal/kernel/authorize/`: add `Observe` to the `Authorizer` interface if M1-28 did not, the
-  type `LogEvent`, and the context marker `Delivery(ctx)`.
+  type `LogEvent`, and the context marker `Delivery(ctx)`, which implies the filter mode
+  `Filter(ctx)` of M1-28 (no denial audit, not counted).
 - `internal/authz/`: implement `Observe` and the delivery mode of `Authorize` (`observe.go`,
-  tests). If M1-62 already added handling of `thread.moved` to the cache, integrate it instead of
-  writing a second path.
+  tests), including `thread.moved` (this ticket owns the cache side of moves; M1-62 builds the move
+  itself, 04 "Grundregel").
 - `internal/kernel/actor/` and `internal/identity/`: `Revalidate` (see "Revocation") if the
   `Authenticator` has no equivalent yet.
 - `internal/sync/` port: expose what M1-63 built so the gateway can reuse it without copying:
@@ -134,7 +136,7 @@ place, use this layout (it satisfies 02 "Schichten im Modul"):
   process, register the shutdown step and the liveness check.
 - Docs: `services/server/internal/gateway/README.md` and `services/server/internal/authz/README.md`
   (German, like the existing files), `docs/spec/02-architektur.md` table "Querschnitts-Ports"
-  (rows `kernel/authorize` and `kernel/actor` gain `Delivery` and `Revalidate`),
+  (already names `Delivery` and `Revalidate`; change it only where the build proves it wrong),
   `docs/security/threat-model.md` row T-AZ-03 (add the new test names), `services/server/CHANGELOG.md`
   under "Unreleased", `docs/DECISIONS.md` (rulings listed below).
 
@@ -158,8 +160,8 @@ type Authorizer interface {
     Observe(ctx context.Context, ev LogEvent)
 }
 // Delivery marks ctx as a delivery check (hub, gateway catch-up): cached state is validated
-// against the Observe floor instead of reading sequence_counters, and denials are filters,
-// not requests, so they write no audit entry.
+// against the Observe floor instead of reading sequence_counters, and it implies Filter(ctx) of
+// M1-28: denials are filters, not requests, so they write no audit entry.
 func Delivery(ctx context.Context) context.Context
 
 // internal/kernel/actor (only if no equivalent exists)
@@ -185,7 +187,8 @@ func (h *Hub) CloseAll(code int, reason string)         // shutdown
 - Frame conformance harness G9 (M1-67); metrics (M1-68; do not add instruments here).
 - Agent consumers: durable cursor, `ack`, redelivery, `4015`, `agent_consumer_cursors` (M2-07);
   invocation tokens and `runs.Delivery` (M2); `run.cancel_requested` handling (M2).
-- `resync_required` with `epoch_changed` and the epoch comparison (M7-04).
+- The epoch check: it runs once at `identify` and `resume` in M1-64 through `sync.CatchUp.Check`
+  (M1-63); the epoch only changes through a restore (M7-04).
 - `cluster.mode = multi` and `NOTIFY ephemeral` (M7-17).
 - Load tests and `make perf` targets (M1-72); leak tests (M1-70).
 - Changes to the REST behaviour of `listEvents` or `getSnapshot` (M1-63).
@@ -229,8 +232,8 @@ Rights cache in delivery mode (`internal/authz`)
   recomputed snapshot reads current database state, which can only be newer than the log
   position; that is allowed (rights at delivery time).
 - REST mode is unchanged: it keeps reading `permission_version` per request (R-RE-02).
-- Delivery checks write no audit entry for denials (they are filters, like the per-event check of
-  `listEvents`; reuse whatever no-audit mode M1-63 uses). Requests and ops keep R-AZ-04.
+- Delivery checks write no audit entry for denials (they are filters, 07 4.2; `Delivery(ctx)`
+  implies `Filter(ctx)` of M1-28, which `listEvents` in M1-63 uses). Requests and ops keep R-AZ-04.
 - A delivery decision `unauthenticated` for a connection means its credential was revoked: close
   that connection with `4012`.
 
@@ -260,19 +263,19 @@ Per-connection queue
   `heartbeat_ack`) are never purged.
 - Overflow: mark the connection `closing`, drop its queue and close it with `4014` from the
   writer side. The writer writes each frame with deadline `gateway.write_timeout`; a write that
-  misses the deadline also closes with `4014` (best effort, ruling below).
+  misses the deadline also closes with `4014` (04 'Schließ-Codes', 02 'Gateway').
 
 Connection phases and catch-up (04 "Ablauf")
 
-1. Registration: the handshake registers the connection in the hub (phase `catching_up`) before
-   it reads `head_seq` for `ready` or `resumed`. Call the value H. Adjust M1-64's handshake if it
-   reads the head earlier. Every event with `seq > H` the tail delivers from now on is either
+1. Registration: the handshake calls `Delivery.Register` (M1-64) before it reads `head_seq` for
+   `ready` or `resumed` (04 'Lebenszyklus' step 4); this ticket's implementation puts the
+   connection into the hub in phase `catching_up`. Call the value H. Every event with `seq > H` the tail delivers from now on is either
    buffered or sent; every event with `seq <= H` is covered by the snapshot or the catch-up.
 2. No cursor in `identify`: no catch-up frames; switch to `live` with base H immediately after
    `ready` (04 "Lebenszyklus" step 4: catch-up only when a cursor was sent).
 3. Cursor c (from `identify` or `resume`): `sync.Check(c)`. On a resync reason send
    `resync_required {reason, head_seq: H, sync_epoch}` and switch to `live` with base H (the
-   connection stays open; ruling below). Otherwise read pages `after = c`, `upTo = H`,
+   connection stays open, 04 '`resync_required`'). Otherwise read pages `after = c`, `upTo = H`,
    `limit = sync.catchup_page_size` and enqueue each admitted event as `dispatch`.
 4. `cursor {seq}` frames: at the end of every page with the page's last checked `seq` (equal to H
    after the last page), and in addition whenever the number of skipped sequence numbers since
@@ -326,15 +329,11 @@ Configuration keys used (defaults in their chapter tables): `sync.catchup_page_s
 `sync.log_poll_interval`, `gateway.write_timeout`, `database.listen_reconnect_backoff_cap`,
 `authz.snapshot_cache_max_entries`, `shutdown.total_timeout`.
 
-Rulings to record in `docs/DECISIONS.md` (each with its reason):
-
-1. After `resync_required` the connection stays open and is live from `head_seq`; 04 names no
-   close and every close code would mislead the client.
-2. A write that misses `gateway.write_timeout` closes with `4014`, like a full queue.
-3. Delivery checks are filters and write no denial audit; R-AZ-04 targets requests.
-4. Structure events invalidate all cached snapshots through a generation counter.
-5. AZ-P9 "two processes" is tested with two independent server instances in one test binary
-   (own pool, tail, cache and hub each, one shared database), because they share no memory.
+Ruling to record in `docs/DECISIONS.md` (with its reason): structure events invalidate all
+cached snapshots through a generation counter. The other decisions of this ticket are in the
+specification: the connection stays open after `resync_required` (04 7.3), a missed write
+deadline closes with `4014` (04 6.4), delivery checks write no denial audit (07 4.2, R-AZ-04), and
+AZ-P9 runs with two independent server instances in one test binary (07 "Pflicht-Tests").
 
 If a change to 04 or 05 (core contract) turns out to be necessary, stop with
 `Verdict: BLOCKED` (P-11). Changes to 02 named above are allowed.

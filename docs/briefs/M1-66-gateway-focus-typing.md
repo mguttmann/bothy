@@ -71,12 +71,19 @@ single path for ephemeral events that `runs`, `agents` and `notify` use from M2 
     thread and may read it; without renewal the display ends after `sync.typing_ttl` (04 "Tippen
     und Agenten-Präsenz" item 1).
 13. Agents send no typing of their own; a running run shows the agent's typing (04 "Tippen und
-    Agenten-Präsenz" item 1; ruling L9; 01 "Tippen-Anzeige (Menschen)").
+    Agenten-Präsenz" item 1; ruling L9; 01 "Tippen-Anzeige (Menschen)"). 05 gives `typing.start`
+    the right "human und write", so `authorize` denies agents and apps.
 14. Ephemeral events have no `seq` and no `permission_version`, are delivered at most once and are
     lost during a pause (04 "Zwei Arten", "Zustellgarantie" item 4, "Lebenszyklus" step 7).
 15. When `access.changed` removes a target, the focus on threads of that target ends (04 "Was der
     Client bei Entzug bekommt und tut" item 2).
 16. `resume` restores the focus (04 "Lebenszyklus" step 7).
+17. A failing op answers `error` with a problem code and keeps the connection; `4008` is only for
+    `rl.gateway_connect` (04 "Ops", "Schließ-Codes"). `focus` over `sync.max_focused_threads`
+    answers `validation_failed` and keeps the previous set (04 11.3 item 2). `typing.stop` sends
+    nothing and resets the throttle; `typing.started` never reaches the typist's own connections
+    (04 12 item 1). Ephemeral frames are dropped when the queue is full (never `4014`) and never
+    sent before `catchup.complete` (04 7.2 item 6).
 
 ## Scope
 
@@ -109,11 +116,13 @@ type EphemeralPublisher interface {
   `EphemeralPublisher` on top of the hub; the hub gains the index thread -> focused connections
   and focus pruning.
 - `internal/gateway/adapters/ws/`: register the ops `focus`, `typing.start`, `typing.stop` in the
-  op register (M1-64/M1-25) with action and rate class as in 05 and asyncapi.yaml.
+  op register (M1-64/M1-25) with action and rate class as in 05 and asyncapi.yaml, and move them
+  from `gateway_ops.later` to `gateway_ops.enabled` in `services/server/api/operations.yaml`
+  (P-04).
 - `internal/wire/`: provide the gateway publisher as the process's
   `kernel/eventlog.EphemeralPublisher`.
 - Docs: `services/server/internal/gateway/README.md` (German, like the existing file),
-  `services/server/CHANGELOG.md` under "Unreleased", `docs/DECISIONS.md` (rulings below).
+  `services/server/CHANGELOG.md` under "Unreleased", `docs/DECISIONS.md` (only decisions beyond the specification).
 
 ## Out of scope
 
@@ -145,7 +154,7 @@ Op `focus` (order of steps as in 05 "Entscheidung": rate limit before `authorize
 2. Decode `GatewayFocus`; malformed body follows M1-64's decode rule (`4002`).
 3. Deduplicate `thread_ids`. More than `sync.max_focused_threads` distinct ids: frame
    `error {op: "focus", code: "validation_failed", detail: "sync.max_focused_threads"}` and the
-   previous set stays (ruling below).
+   previous set stays (04 11.3 item 2).
 4. For each id: load the thread through the `chat` port, then
    `authorize(principal, gateway.focus, thread)` in the normal request context (denials are
    audited per R-AZ-04 by authz; no error frame). Unknown and unreadable ids are both dropped
@@ -156,8 +165,11 @@ Op `focus` (order of steps as in 05 "Entscheidung": rate limit before `authorize
 
 Ops `typing.start` and `typing.stop`
 
-1. Only connections of people (principal kind `user`) may send them; agent and app connections
-   get `error {op, code: "forbidden"}` and the frame has no effect (requirement 13; ruling below).
+1. Only people may send them: `authorize` denies agents and apps with `forbidden`
+   (`subject_kind_not_allowed`, 05 right "human und write"); they get `error {op, code:
+   "forbidden"}` and the frame has no effect (requirement 13). If the requirement step of M1-28
+   lacks the `human` part of a combined right, add it there with a test (no rights logic in the
+   gateway).
 2. Rate limit `rl.typing` keyed by connection (`ratelimit.rl.typing.*`); over the limit:
    `error {op, code: "rate_limited"}`.
 3. Decode `GatewayTyping`; load the thread; `authorize(principal, typing.start, thread)`. A denial
@@ -175,7 +187,7 @@ Ops `typing.start` and `typing.stop`
    "typing stopped" type. Clients end the display at `expires_at` or on the next message of that
    person.
 6. Recipients of `typing.started`: connections in phase `live` that focus the thread, minus every
-   connection of the typing principal (ruling below), each admitted with `thread.read` in
+   connection of the typing principal (04 12 item 1), each admitted with `thread.read` in
    `authorize.Delivery(ctx)` (05 "Kurzlebige Ereignisse").
 
 Publisher and hub
@@ -187,7 +199,7 @@ Publisher and hub
 - Ephemeral frames are never delivered to a connection before its `catchup.complete` and are
   never buffered (at most once; 04 "Ablauf" item 3 forbids mixing).
 - If enqueuing an ephemeral frame would exceed `sync.outbound_queue_max`, drop that frame; never
-  close with `4014` for an ephemeral frame (ruling below). Durable frames keep M1-65's rule.
+  close with `4014` for an ephemeral frame (04 7.2 item 6). Durable frames keep M1-65's rule.
 - `PublishEphemeral` never blocks; it validates the type against the register and the payload
   size against `sync.event_payload_max_bytes`.
 - Focus pruning: on P's `access.changed` (inside M1-65's revocation step, before dispatch),
@@ -197,28 +209,17 @@ Publisher and hub
 - `resume`: the focus set lives in the in-memory gateway session; when M1-64's `resume` restores
   the session, re-check each thread as in pruning and keep the readable ones.
 
-Metrics: if M1-68 is already merged when you start, record `bothy.delivery.duration` with
-`bothy.event.durability = ephemeral` through the gateway metrics port it created; otherwise M1-68
-does it. Whichever lands second wires it.
+Metrics: none in this ticket. M1-68 depends on this ticket and records `bothy.delivery.duration`
+for the durable and the ephemeral path.
 
 Configuration keys used: `sync.max_focused_threads`, `sync.typing_min_interval`,
 `sync.typing_ttl`, `sync.outbound_queue_max`, `sync.event_payload_max_bytes`,
 `ratelimit.rl.typing.per_minute`, `ratelimit.rl.typing.burst`, `ratelimit.rl.read.per_minute`,
 `ratelimit.rl.read.burst`.
 
-Rulings to record in `docs/DECISIONS.md`:
-
-1. `focus` over `sync.max_focused_threads` is rejected with `validation_failed` and keeps the old
-   set; truncating would silently drop focus the client believes it has.
-2. Op-level rate limits answer `error` with `rate_limited` and keep the connection; `4008` stays
-   for the connection limit (`GatewayError` uses `rate_limited` as its example).
-3. `typing.start` and `typing.stop` are available to people only (`error forbidden` otherwise),
-   enforcing 04 "Agenten senden kein eigenes Tippen" as op availability, like `ack` is
-   agents-only.
-4. `typing.stop` sends nothing and resets the throttle.
-5. `typing.started` is not sent to the typing person's own connections.
-6. Ephemeral frames are dropped instead of triggering `4014` and are not delivered before
-   `catchup.complete`.
+No rulings of its own: the behaviour of requirements 10 to 17 is in 04 ("Ops", "Ablauf",
+"Vom Server zu den Clients", "Tippen und Agenten-Präsenz") and 05 (`typing.start`). Record in
+`docs/DECISIONS.md` only what the build had to decide beyond them.
 
 ## Tests (write them first)
 

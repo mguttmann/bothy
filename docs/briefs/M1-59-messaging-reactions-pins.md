@@ -231,7 +231,8 @@ All paths below `services/server/` unless stated.
 12. `listPins`: `authorize(thread.read, thread)`; `SELECT` joins `messages` with
     `m.channel_id = ANY(@visible_channel_ids)` and `m.deleted_at IS NULL`; order `pinned_at DESC`,
     then `message_id DESC`; items `Pin{message_id, thread_id, pinned_by, pinned_at}`; unpaginated
-    (`PinList`, bounded by `pin.max_per_thread`). Each item passes `authorize(message.read)`; a
+    (`PinList`, bounded by `pin.max_per_thread`). Each item passes `authorize(message.read)`
+    in filter mode `authorize.Filter(ctx)` (M1-28; no denial audit, 07 4.2); a
     denied item is dropped, logged with only action and resource kind and counted in
     `bothy.authz.errors` with `bothy.reason = filter_mismatch` (07 7.4 rule 3).
 13. Every `SELECT`, `UPDATE` or `DELETE` on `reactions` or `pins` joins `messages` with

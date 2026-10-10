@@ -253,13 +253,9 @@ Bind `app.PersonalTokensDefault{}` in `internal/wire`, which returns the registe
 (16 6.2: unknown or unregistered flags are off); M1-47 registers `tokens.personal_enabled` and
 rebinds `PersonalTokenSwitch` over its `Flags` port. Tests use a fake switch for both values.
 
-**ADR 0061** `docs/adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md`, MADR 4 like
-`0000-vorlage-madr-4.md` (headings English, text German, status `accepted`, date of the build).
-Options: (1) fixed prefix plus Base62 random plus CRC-32 checksum (chosen); (2) opaque random
-without prefix; (3) signed self-contained tokens (JWT); (4) prefix plus keyed checksum (HMAC
-truncated). Drivers: secret scanners need a fixed prefix (L6), offline rejection of typos, instant
-revocation, no secret in the database. Confirmation: `TestFormat_*`, the checksum vectors in Go and
-Python, the gitleaks rule test.
+**ADR 0061** exists (accepted). Keep it current: if the implementation changes a rule or the
+confirmation (`TestFormat_*`, the checksum vectors in Go and Python, the gitleaks rule test),
+update the ADR in the same change and run `make adr-index`.
 
 ## Tests (write them first)
 

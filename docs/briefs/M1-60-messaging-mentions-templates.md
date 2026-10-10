@@ -19,7 +19,7 @@ stored but never show up in a list or a count.
 - `docs/spec/01-produkt.md`: "Funktionsliste" 3.3 (templates) and 3.5 (mention counter, view
   "Erwähnungen").
 - `docs/spec/02-architektur.md`: 4.1, 4.3 rows `messaging` (ports `Mentions`, `Templates`) and
-  `sync` (subscribes `MessagePosted` for the mention counter), 4.4, "Schichten im Modul",
+  `sync` (reads unread mentions through `Mentions.CountUnread`; no stored counter, R-DM-32), 4.4, "Schichten im Modul",
   "Transaktionen und Unit of Work", "Request-Pfad".
 - `docs/spec/03-datenmodell.md`: "Grundsätze" (items 7, 10, 12, 13), tables `mentions`,
   `message_templates`, `messages`, `read_states` (computed counters, R-DM-32), 9
@@ -171,7 +171,7 @@ All paths below `services/server/` unless stated.
    mn.message_id WHERE mn.principal_id = @caller AND m.channel_id = ANY(@visible) AND m.deleted_at
    IS NULL`, keyset `(mn.created_at DESC, mn.message_id DESC)`, `LIMIT L + 1` with `L` from
    `api.page_size_default` and `api.page_size_max` (index `(principal_id, created_at DESC)`). Each
-   item passes `authorize(message.read)`; a denied item is dropped, logged with only action and
+   item passes `authorize(message.read)` in filter mode `authorize.Filter(ctx)` (M1-28; no denial audit, 07 4.2); a denied item is dropped, logged with only action and
    resource kind and counted in `bothy.authz.errors` with `bothy.reason = filter_mismatch` (07 7.4
    rule 3). Items `MentionItem{message,
    created_at}` with the REST representation of M1-56. `next_cursor` only when more exist.

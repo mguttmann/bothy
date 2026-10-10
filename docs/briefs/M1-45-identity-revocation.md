@@ -295,7 +295,7 @@ Test names carry the spec IDs.
    `TestDeviceRevokeTransition`.
 2. Integration, `internal/identity/app` and HTTP through the real chain:
    - `TestIDT22_DisableUserAllSteps`: Alex with one active device (app session plus a
-     `notification_ext` child session), one pending device, two refresh families, both device
+     `share_ext` child session), one pending device, two refresh families, both device
      keys, one personal token (created through the identity helper, so the test does not depend
      on the flag `tokens.personal_enabled`); the owner disables Alex with fresh step-up. Assert
      each row of the table above, one `access.changed` for Alex, one `session.revoked` per

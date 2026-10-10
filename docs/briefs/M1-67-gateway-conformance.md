@@ -1,6 +1,6 @@
 # M1-67: Gateway frame conformance (G9)
 
-Status: ready | Depends on: M1-66 | Etappe: M1
+Status: ready | Depends on: M1-62, M1-66 | Etappe: M1
 
 ## Goal
 
@@ -63,6 +63,8 @@ from 06 "Vertragstests und Gate" and exit criterion 6 of M1.
     "Umschlag"); a connection delivers durable events in strictly increasing `seq` (04
     "Zustellgarantie" item 2).
 14. Every close code the server sends is one of 04 "Schließ-Codes" and of `x-close-codes`.
+15. `resource.version` is present exactly for event types whose catalogue entry says so (04
+    "Zustellgarantie" item 3; `EventSpec.ResourceVersion` from M1-25).
 
 ## Scope
 
@@ -76,7 +78,8 @@ from 06 "Vertragstests und Gate" and exit criterion 6 of M1.
 // know, so a new reference style cannot silently skip validation.
 func Load(repoRoot string) (*Contract, error)
 // ValidateServerFrame checks one frame the server sent: message lookup by op (and by d.type for
-// dispatch), schema, no null, integer bound, frame size, durable/ephemeral envelope rule.
+// dispatch), schema, no null, integer bound, frame size, durable/ephemeral envelope rule, and
+// presence of resource.version against the catalogue.
 func (c *Contract) ValidateServerFrame(raw []byte) error
 // ValidateClientFrame checks one frame a test client sent.
 func (c *Contract) ValidateClientFrame(raw []byte) error
@@ -103,16 +106,17 @@ func (c *Contract) CloseCodes() map[int]string
   function `Compare(reg Register, actions Catalogue, async AsyncAPI) []Problem` so a fixture test
   can feed it a broken register.
 - `TestConformance_M1EventCorpus`: one scenario that makes every event type an M1 producer emits
-  reach a client (messages, reactions, pins, threads including `thread.moved` if M1-62 is merged,
+  reach a client (messages, reactions, pins, threads including `thread.moved` (M1-62),
   spaces, channels, `user.updated`, `agent.updated`, `instance.updated`, `grant.changed`,
   `group.changed`, `access.changed`, `access.expiring`, `session.revoked`, personal sync events,
   `typing.started`) and every server op M1 sends (`hello`, `ready`, `resumed`, `dispatch`,
   `cursor`, `catchup.complete`, `resync_required`, `heartbeat_ack`, `reauth_required`, `error`).
   It fails if a listed type or op was not observed. Keep the list in the test with a comment, and
   assert that each listed type is registered.
-- Gateway op enable list: if neither M1-17 nor M1-64 created one, add a section `gateway_ops`
-  with `enabled` (op names) and `later` (op, etappe) to `services/server/api/operations.yaml`,
-  mirroring P-04 (`ack`, `run.update` and `command.autocomplete_result` are `later`, M2).
+- Gateway op enable list: M1-64 created the section `gateway_ops` of
+  `services/server/api/operations.yaml` (PLAN P-04, which carries this decision). The register test also compares it: every op in
+  `enabled` is registered, every op in `later` is not, and together they are all client ops of
+  `asyncapi.yaml`.
 - Dependency: a JSON Schema validator with draft 2020-12 support including
   `unevaluatedProperties`. Reuse one if the module already has it; otherwise add
   `github.com/santhosh-tekuri/jsonschema/v6` (Apache-2.0) pinned in `go.mod`; `make licenses` must
@@ -190,7 +194,8 @@ Rulings to record in `docs/DECISIONS.md`:
 1. G9 validates on the client side of the test harness, not with a hook in production code; a
    parser test keeps the harness the only entry point.
 2. Server frames are validated strictly (no undeclared properties) by the bundle rule above.
-3. Gateway ops of later etappen are listed in `gateway_ops.later` (analog P-04).
+
+The gateway op enable list is not a ruling of this ticket; PLAN P-04 carries it.
 
 ## Tests (write them first)
 

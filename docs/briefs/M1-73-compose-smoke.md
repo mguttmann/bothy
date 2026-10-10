@@ -55,8 +55,7 @@ Specification:
   0038 (local gates), 0039 (release class), 0053 (no JSON null).
 
 API (`docs/api/openapi.yaml`, server prefix `/api/v1`) by operationId: `getDiscovery`,
-`beginEnrollment`, `completeEnrollment` (as amended by M1-37 for enrollment with device keys
-without passkey, plan W5), `getMe`, `createSpace`, `createChannel`, `createThread`,
+`redeemEnrollmentCode` (enrollment with device keys without passkey, 08 3.2), `getMe`, `createSpace`, `createChannel`, `createThread`,
 `createMessage`, `listEvents`, `createStepUpChallenge`, `completeStepUpWithDeviceKey`,
 `revokeDevice`. Schemas: `DeviceRegistration`, `DeviceKeyRegistration`, `TokenResponse`,
 `Channel` (`main_thread_id`), `ThreadCreate` (thread from a main-thread message via
@@ -74,13 +73,13 @@ Existing files and outputs of the dependencies:
   allowlist and `blocked_values`) and `infra/otel/exporters/*.yaml`.
 - `docs/operations/configuration.md` sections 4 and 5 (key catalogue, secrets catalogue).
 - `services/server/Dockerfile`, `.dockerignore` and the `image` target (M1-23).
-- `services/server/internal/identity/README.md` and `bothy setup --help` (M1-37: output of
-  `setup bootstrap-owner`, the database role it uses, whether a running server needs a restart
-  after setup; M1-35: step-up JWS format; M1-33: DPoP rules and `kernel/jose`, ADR 0067).
+- `services/server/internal/identity/README.md` and `bothy setup --help` (M1-37; 08 4: the code is
+  the only line on stdout, the command uses `bothy_app`, a running server needs no restart;
+  M1-35: step-up JWS format; M1-33: DPoP rules and `kernel/jose`, ADR 0067).
 - `services/server/internal/platform/otel/README.md` (M1-10: `service.name`, log exporter).
 - `services/server/internal/platform/pg/pgtest` (M1-12: the PostgreSQL 18 image reference).
-- `services/server/test/canary` (M1-69) and `architecture/modules.yaml` (M1-05: how test
-  harness packages are registered).
+- `services/server/test/canary` (M1-69) and `architecture/modules.yaml` (M1-05: `test/**` is the
+  component `testsupport`).
 - `tools/opscheck` (M1-04: list of collector configurations it validates).
 
 ## Fixed requirements that apply
@@ -177,12 +176,13 @@ M1-05.
    - **Idempotence.** `compose run --rm --no-deps secrets-init` and `compose run --rm --no-deps
      migrate` exit 0 a second time.
    - **Precheck.** `compose run --rm --no-deps --user "$(id -u):$(id -g)" smoke-probe precheck`.
-   - **Bootstrap.** `compose run --rm --no-deps -T bothy-cli setup bootstrap-owner --handle alex
-     --display-name "Alex <canary>"`, stdout to `$tmp/out/setup.out` (mode 0600, never printed,
+   - **Bootstrap.** `compose exec -T api bothy setup bootstrap-owner --handle alex
+     --display-name "Alex <canary>"` (the path of `docs/operations/install-compose.md`), stdout to
+     `$tmp/out/setup.out` (mode 0600, never printed,
      never scanned), stderr to `$tmp/logs/setup.err` (scanned). A second identical call must exit
      non-zero; its stdout goes to `$tmp/out/setup-second.out`, its stderr is appended to
-     `setup.err`. If the M1-37 documentation says a running server picks up setup only after a
-     restart, `compose restart api worker` and wait until healthy; otherwise nothing.
+     `setup.err`. No restart: the server reads the setup state per request until it is set (02
+     15.1 step 5).
    - **Probe.** `compose run --rm --no-deps --user "$(id -u):$(id -g)" smoke-probe run` (see 5).
      Its stdout and stderr are shown; it never prints values.
    - **Flush.** `compose stop api worker` (graceful shutdown flushes telemetry, 02 15.3), wait
@@ -221,9 +221,6 @@ M1-05.
    - `otel-out-init`: the same pinned PostgreSQL image (already pulled, has a shell),
      `user: "0:0"`, `network_mode: none`, `restart: "no"`, `entrypoint: ["/bin/sh", "-c"]`,
      `command: ["chmod 1777 /out"]`, volume `otel-smoke-out:/out`.
-   - `bothy-cli`: profile `smoke`, `image: ${SMOKE_SERVER_IMAGE}`, `pull_policy: never`, hardening
-     as `migrate` (`read_only`, `cap_drop: [ALL]`, `no-new-privileges`), network `internal`, and
-     the database role, environment and secrets subpath that M1-37 documents for `bothy setup`.
    - `smoke-probe`: profile `smoke`, `build: {context: ../../services/server, dockerfile:
      Dockerfile, target: smoke}`, `image: bothy-smoke:${SMOKE_RUN_ID:?set by smoke.sh}`,
      `network_mode: service:api`, `read_only: true`, `cap_drop: [ALL]`,
@@ -257,9 +254,9 @@ M1-05.
      1. `getDiscovery`: `setup_required` is not `true`.
      2. Read the enrollment code from `/out/setup.out` (see Design notes "Enrollment code").
      3. Generate two ECDSA P-256 keys in memory: `dpop` and `step_up`; `device_id` a fresh UUIDv7;
-        device `name` `"smoke <canary>"`, `platform` `cli`, `alg` `ES256`. `beginEnrollment` and
-        `completeEnrollment` with the device registration and a DPoP proof without `ath`; expect
-        `201`, `token_type: DPoP`, `device.state: active`. Keep access token, refresh token,
+        device `name` `"smoke <canary>"`, `platform` `cli`, `alg` `ES256`. `redeemEnrollmentCode`
+        with the code, the device registration and a DPoP proof without `ath`; expect `201`,
+        `token_type: DPoP`, `device.state: active`. Keep access token, refresh token,
         `session.id`, `session.user_id`, `device.id`.
      4. `getMe`: handle `alex`.
      5. Gateway connection A: dial `ws://127.0.0.1:8080/api/v1/gateway` without `Origin`; expect
@@ -328,10 +325,9 @@ M1-05.
      - `scan.go`: `func Scan(canaries Canaries, roots []string) ([]Hit, error)`,
        `func CheckTelemetry(otelDir, serviceName, route string) error`.
      - `enroll.go`: `func ReadEnrollmentCode(stdout []byte) (string, error)`.
-   - Register the package in `architecture/modules.yaml` as a test harness the way M1-69
-     registered `test/canary`, allowing exactly `api/rest` and `github.com/coder/websocket`;
-     regenerate `.go-arch-lint.yml` with `tools/archgen`; no import of any
-     `internal/...` package.
+   - The package lies under `test/` and belongs to the component `testsupport` (M1-05). It is a
+     black box: it imports only `api/rest` and `github.com/coder/websocket`, never an
+     `internal/...` package; a test with `go list -deps` holds this.
 6. `services/server/Dockerfile` (change): two stages before the production stage, which stays
    the last stage and unchanged: `smoke-build` (from the existing builder stage, builds
    `./test/smoke/cmd/bothy-smoke` with `CGO_ENABLED=0` and `-trimpath`) and `smoke` (from the same
@@ -407,9 +403,11 @@ M1-05.
   shares the namespace (`network_mode: service:api`) and dials `127.0.0.1:8080`, like the
   `tailscale` sidecar pattern. No host port is published (P-10).
 - **D2 Overlay changes are removals or the listed overrides only.** Keys of later etappen are
-  dropped; a value the M1 server rejects (for example `database.sslmode=disable` under SEC-TLS-5)
-  is not changed in the overlay: stop with `BLOCKED` and quote the `config check` message, because
-  it needs a specification decision.
+  dropped (P-06; the installation file is reconciled with each etappe's schema in M7-14).
+  `database.sslmode=disable` on the network `internal` and plaintext OTLP to the collector on the
+  Compose network are allowed (19 SEC-TLS-5). Any other value the M1 server rejects is not changed
+  in the overlay: stop with `BLOCKED` and quote the `config check` message, because it needs a
+  specification decision.
 - **D3 Isolation of each run.** Own project name, explicit `--env-file`, sanitised environment,
   empty owner-secrets input directory: the smoke test can neither read nor change a real
   installation on the same host, and parallel worktrees do not collide.
@@ -432,15 +430,9 @@ M1-05.
 - **D8 Telemetry flush.** Graceful stop of `api` and `worker` flushes the SDK (02 15.3); then the
   settle wait; then a graceful stop of the collector; then `compose cp` (works on stopped
   containers with named volumes, unlike tmpfs).
-- **Readiness before setup.** 08 4 says health checks answer before setup. If M1-11 or M1-37
-  document that `/readyz` stays not ready until setup, start with `--wait` only on `migrate`
-  completion and `api` running, and require `healthy` after the bootstrap step; do not change the
-  server for the test.
-- **Enrollment code.** M1-37 writes the code once to the console (08 4 step 4). Read it as M1-37
-  documents (expected: the only stdout line, logs on stderr). If no stable machine-readable form
-  exists, add `--output json` (`{"enrollment_code": "...", "expires_at": "..."}`) to
-  `bothy setup bootstrap-owner` and `bothy setup issue-enrollment-code`, specification first
-  (08 "Erstinstallation", 02 command table), with unit tests, in this ticket.
+- **Readiness before setup.** `/readyz` does not depend on setup (02 15.1 step 5), so `--wait`
+  works before the bootstrap step.
+- **Enrollment code.** The code is the only line on stdout; logs go to stderr (08 4, 02 3.3).
 - **Setup lock.** Before setup every operation except Discovery answers `503 setup_required`
   (08 4); the probe checks this through the public listener, so ID-T06 is proven end to end.
 - **IDs and keys.** `device_id`, `client_msg_id` and `Idempotency-Key` are UUIDv7 (RFC 9562).

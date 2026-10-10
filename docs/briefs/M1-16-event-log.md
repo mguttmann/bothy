@@ -98,8 +98,9 @@ Table: `event_log`. Job: `sync.partition_maintenance`. No API operation and no a
     when the request was recorded (03 `event_log`, 17 "Signale", R-OB-07).
 16. Payload is a JSON object below `sync.event_payload_max_bytes`, contains no secrets and no JSON
     `null`; larger objects are delivered with `truncated: true` (04 payload rules).
-17. `make perf` measures `perf.event_commit_min_per_s` on `perf.reference_profile` and fails below
-    the threshold; it is not part of `make check` (P-07, ADR 0063).
+17. `make perf` measures `perf.event_commit_min_per_s` on `perf.reference_profile` with the
+    durability settings of production (`fsync` and `synchronous_commit` on, ADR 0063 point 2) and
+    fails below the threshold; it is not part of `make check` (P-07, ADR 0063).
 18. `event_log.actor_kind` (envelope `actor.kind`; `system` without principal; table check of
     R-DM-29) and `event_log.truncated` (envelope `truncated`; the producer builds the reduced payload)
     as 03 defines them; `receive_action` holds one value per type (03 `event_log`).
@@ -169,7 +170,11 @@ names below match their briefs.
 9. `cmd/bothy migrate up`: after River and goose, call the partition maintenance use case once with
    the configured values so a fresh or upgraded database has partitions before `serve` starts.
 10. `perf/event_commit/` (build tag `perf`, run by the `perf` frame target of M1-01;
-    `make perf` must include it): see Tests.
+    `make perf` must include it): see Tests. This ticket is the first user of a durable test
+    database and adds the additive option `pgtest.Durable()` to `internal/platform/pg/pgtest`: it
+    leaves out the speed flags of M1-12 D7 (`fsync=off`, `synchronous_commit=off`,
+    `full_page_writes=off`), so the server runs with the PostgreSQL defaults. Normal tests keep the
+    speed flags. M1-72 uses the same option for every perf and chaos database.
 11. ADRs 0052, 0053 and 0063 exist: add the envelope tests (`FuzzEnvelopeHasNoJSONNull`,
     `TestEnvelope_FieldsMatchOpenAPI`) to the "Confirmation" of 0052 and 0053 and
     `TestEventCommitThroughput` to 0063 without changing the decisions; then `make adr-index`.
@@ -307,7 +312,8 @@ Integration tests use `pgtest` with roles from `migrate --bootstrap` and run as 
 - `TestTxnRegistrationsGolden` (M1-13) passes with the new hook line;
   `TestCountersOnlyUsedByPhaseHooks` (M1-15) passes with the sync hook package.
 - Perf (`perf/event_commit`, build tag `perf`): `TestEventCommitThroughput` starts PostgreSQL 18
-  through `pgtest`, migrates, creates a scratch table as owner, runs writers (flag
+  through `pgtest` with `pgtest.Durable()`, reads `SHOW fsync` and `SHOW synchronous_commit` before
+  measuring and fails when one of them is not `on` (ADR 0063 point 2), migrates, creates a scratch table as owner, runs writers (flag
   `-perf.writers`, default `4 * GOMAXPROCS`) for a duration (flag `-perf.duration`) where each unit
   updates one scratch row and appends one event; prints `perf.event_commit_min_per_s measured=<n>
   threshold=<n> cpus=<n>` and fails below the threshold. A second subtest runs the same with an
@@ -315,11 +321,14 @@ Integration tests use `pgtest` with roles from `migrate --bootstrap` and run as 
   point PollOnly in 02 "Offen"; both numbers go into the report, not into docs).
   `TestReport_FailsBelowThreshold` (untagged, in `perf/internal/report`): a measured value below
   the threshold fails the comparison, at or above passes; the loader reads the real 02 table.
+- `TestDurableKeepsDurabilitySettings` (pgtest, needs the container runtime like every pgtest
+  test): a database from `pgtest.Durable()` reports `fsync`, `synchronous_commit` and
+  `full_page_writes` as `on`; a database without the option reports them as `off`.
 
 Commands that must pass:
 
 ```sh
-cd services/server && go test -race -count=1 ./internal/sync/... ./internal/kernel/eventlog/... ./internal/wire/... ./cmd/...
+cd services/server && go test -race -count=1 ./internal/sync/... ./internal/kernel/eventlog/... ./internal/wire/... ./internal/platform/pg/... ./cmd/...
 make migrations-lint
 make codegen-check
 make arch
@@ -339,7 +348,8 @@ make check
 - [ ] Envelopes contain no JSON `null`; their members match `EventEnvelope`; `correlation_id` is
       the trace ID.
 - [ ] Transactions without events take no counter lock and send no `NOTIFY`.
-- [ ] `make perf` measures `perf.event_commit_min_per_s` and fails below it.
+- [ ] `make perf` measures `perf.event_commit_min_per_s` on a database from `pgtest.Durable()`
+      and fails below it or when `fsync` or `synchronous_commit` is not `on`.
 - [ ] ADR 0052, 0053 and 0063 name the tests of this ticket and the ADR index is current; README
       and CHANGELOG updated; `make check` green.
 

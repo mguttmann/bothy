@@ -48,7 +48,7 @@ Product requirements implemented here:
 13. Settings: last write wins per key; only the keys and values of 01 'Einstellungen der Person' and 13 'Persönliche Schalter'; unknown keys and values outside the list are rejected (03 `user_settings`).
 14. Every change writes a durable personal event with `audience = self`: `read_state.updated`, `draft.updated`, `draft.deleted`, `settings.updated` (04, 05). Payloads carry `updated_by_device_id` of the writing device, so a device recognises its own echo (04 'Geräteübergreifende Synchronisation', last sentence).
 15. Sending with `clear_draft: true` deletes the draft in the same transaction as the message (04, 12 'Anhängen und Agenten-Aufruf' point 4).
-16. Unread mentions are never stored (03 `read_states`, R-DM-32): `ReadState.mention_count` in responses and in `read_state.updated` is computed with `messaging.Mentions.CountUnread` (M1-60) at the time of the answer; a new mention writes no personal event (04 'Konflikte', row Gelesen-Stand). `sync` subscribes `messaging.MessagePosted` only to clear drafts (02 4.3).
+16. Unread mentions are never stored (03 `read_states`, R-DM-32): `ReadState.mention_count` in responses and in `read_state.updated` is computed with `messaging.Mentions.CountUnread` (M1-60) at the time of the answer; a new mention writes no personal event (04 'Geräteübergreifende Synchronisation', row Gelesen-Stand). `sync` subscribes `messaging.MessagePosted` only to clear drafts (02 4.3).
 17. Every operation runs through `authorize` with its catalogue action; no read right gives `404`, never `403` (B7, 05 rules 1 and 2). Nobody but the owner can read a read state (20, DP-T10).
 18. No JSON `null` in responses or events (06 'Grundregeln', 04 'Umschlag (Envelope)').
 
@@ -70,9 +70,8 @@ Change:
 
 - `api/operations.yaml`: move the twelve operations from `later` into the enabled list and rerun the route generator.
 - `internal/wire`: register the handlers and the in-transaction subscription `messaging.MessagePosted -> sync.OnMessagePosted`; update the golden file of subscriptions (mechanism of M1-13) in the same commit.
-- `internal/messaging` port, additive only: `MessagePosted` must carry `MessageID`, `ThreadID`, `ChannelID`, `AuthorID`, `AuthorDeviceID` (absent when the author has no device), `ClearDraft` and `CreatedThread` (true when the message is the first message of a thread created in the same transaction). Add what M1-56 did not provide and set it in the create use cases. Unread mention counts come from `Mentions.CountUnread` of M1-60 (a dependency of this ticket); add no second counting method.
+- `internal/messaging` port: `MessagePosted` of M1-56 already carries `MessageID`, `ThreadID`, `ChannelID`, `AuthorID`, `AuthorDeviceID`, `ClearDraft` and `CreatedThread`; use them. Unread mention counts come from `Mentions.CountUnread` of M1-60 (a dependency of this ticket); add no second counting method.
 - `internal/chat` port, additive only, unless M1-52 or M1-55 already offer them: `Threads.InfoForShare(ctx, threadID) (ThreadInfo, error)` returning `ChannelID`, `SpaceID`, `ChannelKind`, `LastMessageSeq` and `UnreadFloorSeq` under `FOR SHARE` on the thread row, and `Structure.ListSidebarStates(ctx, userID) ([]SidebarState, error)`.
-- `docs/spec/01-produkt.md`, section 'Einstellungen der Person': in the row `layout.column_widths` replace the value 'Objekt' with the shape from Design note 14.
 - READMEs `internal/sync/README.md`, `internal/messaging/README.md`, `internal/chat/README.md`; `services/server/CHANGELOG.md`; `docs/DECISIONS.md`.
 
 ## Out of scope
@@ -81,7 +80,7 @@ Change:
 - Moving threads and the subscription `chat.ThreadMoved` that updates `read_states.channel_id` and `drafts.channel_id` (M1-62).
 - `GET /api/v1/events`, the snapshot and the per-recipient filter for personal events (M1-63); gateway delivery (M1-64, M1-65).
 - The mention list and templates (M1-60); notification preferences and quiet hours (`notify`, M3).
-- Checking that `drafts.file_ids` belong to the person and are attachable: `sync` has no dependency on `files` (02 'Erlaubte Abhängigkeiten'); attachability is checked when the message is sent (12 'Anhängen und Agenten-Aufruf').
+- Checking that `drafts.file_ids` belong to the person and are attachable: saving checks form and count only (04 'Geräteübergreifende Synchronisation'); attachability is checked when the message is sent (12 'Anhängen und Agenten-Aufruf'), and file cleanup protects only files of the draft's author (12 'Aufbewahrung', M3-08).
 - Export and deletion of these tables for data subject requests (`kernel/personaldata.Participant`, M7, P-14).
 
 ## Boundaries
@@ -105,24 +104,24 @@ Read state
 2. On a real change: `version = version + 1`, `updated_by_device_id` = device of the actor, `updated_at = now()`, `channel_id` from `Threads.InfoForShare`, one `read_state.updated` whose payload and the response carry `mention_count` computed by `Mentions.CountUnread` for this thread with the new `last_read_seq` (never stored).
 3. `markThreadUnread`: `If-Match` is required (`428 precondition_required` when missing; use the M1-18 helpers). The ETag of a read state is its `version` in the format of 06 'Nebenläufigkeit' point 1; a missing row has version `0`. Mismatch gives `412 version_conflict` with the current `ReadState` in `current`. The body value must be at most the current `last_read_seq`, otherwise `400 validation_failed` (`out_of_range`; advancing is `putReadState`). An equal value answers `200` without event. Otherwise store exactly that value, raise `version`, compute `mention_count` as in note 2, write the event and answer with the `ETag` header. The middleware of M1-20 handles `Idempotency-Key`.
 4. Unread counts are never stored: unread is `threads.last_message_seq - GREATEST(last_read_seq, threads.unread_floor_seq)` (03 `read_states`), computed by readers (M1-63).
-5. `OnMessagePosted` runs in the message transaction and only clears drafts (`ClearDraft`, note 15). It writes no read state and no event for mentions: clients count new mentions from `message.created` (`mention_ids`) between two read-state answers (04 'Konflikte'). The server does not move the author's own read position; clients advance it over REST (04: personal data changes over REST).
-6. `listMyReadStates` (`settings.read` on the own user): rows of the given channel only if the actor can read the channel (visible set from `Authorizer.Scope`), each row additionally checked with `authorize(actor, thread.read, thread)` and dropped on deny (07 'Abfrage-Muster' rule 3). An invisible and an unknown channel give the same `200` with `items: []`. Every query on the three tables has the predicate `user_id = <actor>`.
+5. `OnMessagePosted` runs in the message transaction and only clears drafts (`ClearDraft`, note 12). It writes no read state and no event for mentions: clients count new mentions from `message.created` (`mention_ids`) between two read-state answers. The server does not move the author's own read position; clients advance it over REST (04 'Geräteübergreifende Synchronisation', row Gelesen-Stand).
+6. `listMyReadStates` (`settings.read` on the own user): rows of the given channel only if the actor can read the channel (visible set from `Authorizer.Scope`), each row additionally checked with `authorize(actor, thread.read, thread)` in filter mode `authorize.Filter(ctx)` (M1-28; no denial audit, 07 4.2) and dropped on deny (07 'Abfrage-Muster' rule 3). An invisible and an unknown channel give the same `200` with `items: []`. Every query on the three tables has the predicate `user_id = <actor>`.
 
 Drafts
 
-7. `putThreadDraft` and `deleteThreadDraft`: `authorize(actor, draft.write, thread)`. `putChannelDraft` and `deleteChannelDraft`: `authorize(actor, draft.write, channel)`; the channel must have `kind = forum` (a text channel drafts on its main thread), otherwise `400 validation_failed` with a `detail`; `reply_to_message_id` is not allowed on a channel draft (`400`, pointer `/reply_to_message_id`). A read-only channel answers `403 channel_read_only` from `authorize` (05 rule 8; `draft.write` needs `write`).
+7. `putThreadDraft` and `deleteThreadDraft`: `authorize(actor, draft.write, thread)`. `putChannelDraft` and `deleteChannelDraft`: `authorize(actor, draft.write, channel)`; the channel must have `kind = forum` (a text channel drafts on its main thread), otherwise `400 validation_failed` with a `detail`; `reply_to_message_id` is not allowed on a channel draft (`400`, pointer `/reply_to_message_id`). `draft.write` needs `self und read` (05), so drafts can be saved and deleted in read-only and archived channels; sending checks `message.create`.
 8. Validation: `content_md` at most `message.max_content_bytes` bytes (`400 validation_failed`, pointer `/content_md`, code `too_long`; if M1-56 answers an over-long message with another status or code, use exactly that and say so in the report); `file_ids` without duplicates and at most `message.max_attachments` entries, each a UUIDv7 (`400`, pointer `/file_ids/<index>`); `reply_to_message_id` must name a message of the same thread, checked through the messaging port, otherwise `400`, pointer `/reply_to_message_id`, code `not_in_thread`, identical for unknown and foreign ids.
-9. Empty draft: `content_md` without any non-whitespace character and no `file_ids`. A PUT of an empty draft deletes the row like DELETE, writes `draft.deleted` if a row existed, and answers `200` with `draft` as the final state (`content_md` empty, `file_ids` empty, `version` = last version plus one, or `1` if none existed) and `overwrote_newer` per note 10. Record as ruling.
+9. Empty draft (04 'Geräteübergreifende Synchronisation', row Entwürfe): `content_md` without any non-whitespace character and no `file_ids`. A PUT of an empty draft deletes the row like DELETE, writes `draft.deleted` if a row existed, and answers `200` with `draft` as the final state (`content_md` empty, `file_ids` empty, `version` = last version plus one, or `1` if none existed) and `overwrote_newer` per note 10.
 10. `overwrote_newer = row exists AND (base_version absent OR base_version < row.version)`. Create: new UUIDv7 `id`, `version = 1`; update: `version + 1`; `channel_id` of a thread draft from `Threads.InfoForShare`. Concurrent first writes must not fail on the unique index: use `INSERT ... ON CONFLICT ... DO UPDATE` on the partial unique index and compute `overwrote_newer` from the version seen under the row lock.
 11. Deleting: delete if present and write `draft.deleted` with `DraftDeletedPayload`; answer `204` also when there was no draft (06 'Idempotenz').
 12. `clear_draft` in `OnMessagePosted`: if `ClearDraft`, then when `CreatedThread` is true and the channel is a forum, delete the author's channel draft (`thread_id IS NULL`) of that channel; otherwise delete the author's draft of `ThreadID`. Write `draft.deleted` when a row was deleted. A rollback of the message transaction keeps the draft.
-13. `listMyDrafts` (`draft.read`): own drafts whose channel is still readable (visible set plus `authorize(actor, thread.read, thread)` for thread drafts or `authorize(actor, channel.read, channel)` for channel drafts). Drafts of lost channels stay stored (class `personal_sync`) but are not listed.
+13. `listMyDrafts` (`draft.read`): own drafts whose channel is still readable (visible set plus `authorize(actor, thread.read, thread)` for thread drafts or `authorize(actor, channel.read, channel)` for channel drafts, in filter mode `authorize.Filter(ctx)`). Drafts of lost channels stay stored (class `personal_sync`) but are not listed (04 'Geräteübergreifende Synchronisation').
 
 Settings
 
-14. The registry holds exactly the keys of 01 'Einstellungen der Person' and 13 'Persönliche Schalter'. Enumerations (`appearance.theme`, `appearance.density`, `appearance.reduce_motion`, `notify.default_level`, `notify.preview_mode`) accept exactly the listed strings. Booleans (`composer.enter_sends`, `privacy.crash_reports`, `privacy.client_metrics`, `notify.input_needed_breaks_quiet_hours`, `notify.admin_enabled`) accept JSON `true` or `false`. `layout.column_widths` accepts a JSON object whose member names match `^[a-z][a-z0-9_]*$` and whose values are non-negative integers (logical pixels); write this shape into 01 in the same change. JSON `null` is never a valid value.
+14. The registry holds exactly the keys of 01 'Einstellungen der Person' and 13 'Persönliche Schalter'. Enumerations (`appearance.theme`, `appearance.density`, `appearance.reduce_motion`, `notify.default_level`, `notify.preview_mode`) accept exactly the listed strings. Booleans (`composer.enter_sends`, `privacy.crash_reports`, `privacy.client_metrics`, `notify.input_needed_breaks_quiet_hours`, `notify.admin_enabled`) accept JSON `true` or `false`. `layout.column_widths` accepts a JSON object whose member names match `^[a-z][a-z0-9_]*$` and whose values are non-negative integers (logical pixels), as 01 states. JSON `null` is never a valid value.
 15. `putMySetting`: unknown key `404 not_found` (the path names no resource); invalid value `400 validation_failed`, pointer `/value`. A value equal to the stored one answers `200` without event and without version change. Otherwise insert with `version = 1` or update with `version + 1`, set `updated_by_device_id`, write `settings.updated` with `SettingsPayload {setting}`.
-16. `deleteMySetting`: unknown key `404`; known but unset `204`; set: delete the row, write `settings.updated` with `SettingsPayload {setting: {key, value: last stored value, version: last version + 1}, deleted: true}`, answer `204`. Defaults are neither stored nor returned; clients apply the defaults of 01 and 13 because some depend on the device or the instance (`composer.enter_sends`, `privacy.crash_reports`). A later PUT of the key starts again at `version = 1`; clients drop the local entry on `deleted: true`, so the new entry applies. Record as ruling.
+16. `deleteMySetting`: unknown key `404`; known but unset `204`; set: delete the row, write `settings.updated` with `SettingsPayload {setting: {key, value: last stored value, version: last version + 1}, deleted: true}`, answer `204`. Defaults are neither stored nor returned; clients apply the defaults of 01 and 13 (04 'Geräteübergreifende Synchronisation', row Einstellungen). A later PUT of the key starts again at `version = 1`; clients drop the local entry on `deleted: true`, so the new entry applies (ruling: restart at 1).
 17. `listMySettings`: all stored rows of the person.
 18. `getMySidebar` (`settings.read`): the person's `user_space_states` from `Structure.ListSidebarStates`, only for spaces that are not archived and that the actor may read (`space.read`), as `SidebarStateList`.
 
@@ -137,7 +136,7 @@ Events
 | `draft.deleted` | `{kind: draft, id, version: last + 1}` | as `draft.updated` | `DraftDeletedPayload` |
 | `settings.updated` | `{kind: user, id: user_id}` without `version` | empty | `SettingsPayload` |
 
-20. Why `resource.version` is absent on `read_state.updated` and `settings.updated`: the resource kinds `thread` and `user` have their own object versions, and a per-read-state or per-key version in the same field would make clients drop later updates (04 'Zustellgarantie' point 3). Clients compare the version inside the payload. Record as ruling and report it as a spec gap of 04.
+20. `resource.version` is absent on `read_state.updated` and `settings.updated` (04 'Zustellgarantie' point 3): their resource kinds `thread` and `user` have their own or no object version. Clients compare the version inside the payload.
 21. If an encoded `DraftPayload` exceeds `sync.event_payload_max_bytes`, cut `content_md` at a UTF-8 boundary so that the payload fits and set `truncated: true`, with the same mechanism M1-56 uses for `message.created`; clients reload through `listMyDrafts`.
 
 Rights, concurrency, limits
@@ -147,7 +146,7 @@ Rights, concurrency, limits
 24. Rate limits and idempotency keys come from the HTTP chain (M1-19, M1-20); do not reimplement them.
 25. Configuration keys used (all listed in `docs/operations/configuration.md`): `message.max_content_bytes`, `message.max_attachments`, `sync.event_payload_max_bytes`. If the schema of M1-07 lacks one, add it from its chapter table and run `make config-doc-check`.
 
-Rulings for `docs/DECISIONS.md`: notes 5 (author's read position), 9 (empty draft PUT), 14 (shape of `layout.column_widths`), 16 (defaults on the client, DELETE semantics) and 20 (no `resource.version` on two personal event types).
+Ruling for `docs/DECISIONS.md`: note 16 (a deleted setting restarts at `version = 1`). Notes 5, 9, 14, 20 and the defaults of note 16 are in 01 and 04.
 
 ## Tests (write them first)
 
@@ -175,7 +174,7 @@ Integration (PostgreSQL 18 via `internal/platform/pg/pgtest`, real modules throu
 - `TestDraftsConcurrentFirstWrite`: two parallel first PUTs without base: both `200`, one row, versions 1 and 2, exactly one response with `overwrote_newer = true`.
 - `TestClearDraftSameTransaction`: a draft exists; `createMessage` with `clear_draft: true` removes it; `draft.deleted` and `message.created` carry the same `correlation_id`; a unit of work that runs `OnMessagePosted` and then rolls back keeps the draft.
 - `TestClearDraftForumPost`: `createThread` in a forum with `first_message.clear_draft: true` deletes the channel draft.
-- `TestEmptyDraftPutDeletes`, `TestDraftReadOnlyChannel` (`403 channel_read_only`), `TestDraftEventTruncated` (content near `message.max_content_bytes`: payload within `sync.event_payload_max_bytes`, `truncated = true`).
+- `TestEmptyDraftPutDeletes`, `TestDraftReadOnlyChannel` (save and delete succeed in a read-only and in an archived channel; sending from there gives `403 channel_read_only`), `TestDraftEventTruncated` (content near `message.max_content_bytes`: payload within `sync.event_payload_max_bytes`, `truncated = true`).
 - `TestSettingsPutValidation` (`404` unknown key, `400` invalid value), `TestSettingsPutSameValueNoEvent`, `TestSettingsDeleteWritesDeletedEvent`, `TestSettingsDeleteUnset204`.
 - `TestDPT10ForeignReadStateNotRetrievable`: Sam sees none of Alex's read states through any of the twelve operations; Alex's events carry `audience_principal_id` = Alex (the per-recipient filter is tested in M1-63).
 - `TestListMyReadStatesInvisibleChannel`: a foreign and an unknown channel give identical status, body and headers.
@@ -208,7 +207,7 @@ Commands that must pass, from the repository root:
 
 - Code and tests as specified; doc comment on every public symbol (purpose, parameters, return value, errors, example where useful); comments explain why.
 - READMEs of `sync`, `messaging` and `chat` updated (status, ports, tables, actions, events, subscriptions).
-- `docs/spec/01-produkt.md` updated for `layout.column_widths`; rulings recorded in `docs/DECISIONS.md` (one row each with reason).
+- Ruling of note 16 recorded in `docs/DECISIONS.md` with its reason.
 - `services/server/CHANGELOG.md` entry under 'Unreleased'.
 - An ADR only if you take an architecture decision beyond this brief (MADR 4 as in `docs/adr/0000-vorlage-madr-4.md`, headings English, text German, next free number, `make adr-index`).
 - `make check` green.

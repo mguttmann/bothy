@@ -13,9 +13,10 @@ channel message can be created together with their first message.
 
 ## Read first
 
-- `docs/spec/03-datenmodell.md`: tables `messages`, `mentions`, `threads`; "Grundsätze" points 1,
-  7, 9, 13; "Transaktionsregeln" 6.1 to 6.3; R-DM-11, R-DM-12, R-DM-18; config table
-  (`message.max_content_bytes`).
+- `docs/spec/03-datenmodell.md`: tables `messages` (with the paragraph "Inhaltsformat" for
+  `content_format = 1` and mention tokens), `mentions`, `threads`; "Grundsätze" points 1, 7, 9, 13;
+  "Transaktionsregeln" 6.1 to 6.3; R-DM-11, R-DM-12, R-DM-18; config table
+  (`message.max_content_bytes`, `message.max_mentions`).
 - `docs/spec/04-sync-protokoll.md`: "Umschlag (Envelope)" with the payload rules,
   "Globale, commit-geordnete Sequenz" 3.2, "Thread-Sequenz", "Nachrichten: `client_msg_id`"
   (5.1), "Alle anderen Schreibvorgänge" (5.2), "Ausgangsfach" 13.2, "Bearbeiten und Löschen"
@@ -34,7 +35,7 @@ channel message can be created together with their first message.
 - `docs/spec/02-architektur.md`: 4.3 (`messaging` publishes `MessagePosted`; `chat.Threads` with
   `AppendToThread`), 4.4 (`messaging` may use `identity`, `chat`, `files`), 4.6 "Begründungen für
   Grenzfälle", 8.1 to 8.4, 9.2.
-- `docs/spec/07-rechte.md` 4.3, 7.4; `docs/spec/13-push-benachrichtigungen.md` 2 (what mentions are
+- `docs/spec/07-rechte.md` 4.3, 4.6 "Erwähnungen auflösen", 7.4; `docs/spec/13-push-benachrichtigungen.md` 2 (what mentions are
   for, built in M3); `docs/spec/19-sicherheit.md` SEC-IN-2, SEC-IN-4, SEC-OUT-3.
 - `docs/api/openapi.yaml`: operationIds `createMessage`, `createThread`; schemas `MessageCreate`,
   `Message`, `MessageOrigin`, `MessageKind`, `PrincipalRef`, `ThreadCreate`, `ThreadCreated`,
@@ -85,8 +86,8 @@ Product requirements implemented here:
 13. Content up to `message.max_content_bytes`, stored unchanged; larger events are cut to
     `sync.event_payload_max_bytes` with `truncated` (04 2.2 rule 2; 01 6.4).
 14. Reply with quote only to a message of the same thread (03 `messages.reply_to_message_id`).
-15. Mentions only of people and agents the author may see; no collective mentions (01 3.3;
-    03 `mentions`).
+15. Mentions follow the content format of 03 `messages` and are resolved by the rule of 07 4.6;
+    no collective mentions; at most `message.max_mentions` distinct handles.
 16. A new message reopens a done thread and a system line says so (glossary "Erledigt", 01 6.1).
 17. `MessagePosted` is published in the transaction for every new message (02 4.3, 8.3).
 18. Forum posts and threads from a channel message through `createThread` (01 3.1).
@@ -121,10 +122,12 @@ type MessagePosted struct {
     Origin          string      // "human", "agent", "app", "system" ("import" in M8)
     Kind            string      // "text" or "system" in M1
     ClientMsgID     uuid.UUID
+    AuthorDeviceID  *uuid.UUID  // device of the author's session; absent for agents, apps, system
     ReplyToID       *uuid.UUID
     MentionedIDs    []uuid.UUID // resolved, sorted, without duplicates
     Silent          bool
     ClearDraft      bool
+    CreatedThread   bool        // first message of a thread created in the same transaction
     ReopenedThread  bool        // this message reopened the thread
     CreatedAt       time.Time
 }
@@ -141,7 +144,7 @@ type MessagePosted struct {
    `identity`.
 8. `internal/kernel/eventlog`, only if missing: a way to mark an appended event as `truncated`.
 9. `api/operations.yaml`: enable `createMessage` and `createThread`; regenerate.
-10. `internal/platform/config` schema: `message.max_content_bytes` (03),
+10. `internal/platform/config` schema: `message.max_content_bytes`, `message.max_mentions` (03),
     `sync.event_payload_max_bytes` (04) if missing.
 11. `internal/wire`: register `MessagePosted` (no subscriber in this ticket) and the handlers;
     update the golden file.
@@ -151,7 +154,7 @@ type MessagePosted struct {
     "Begründungen für Grenzfälle"); `architecture/modules.yaml` lists `thread.create` under
     `messaging` (M1-06 holds it).
 14. Documentation: `internal/messaging/README.md`, `services/server/CHANGELOG.md`,
-    `docs/DECISIONS.md` (rulings D2 rejected members and D5; D6 and D8 link the spec).
+    `docs/DECISIONS.md` (only decisions beyond the specification; D2, D5, D6 and D8 link it).
 
 ## Out of scope
 
@@ -215,9 +218,9 @@ D2. Body rules (`MessageCreate`):
   else `400` (`/client_msg_id`, `not_uuid_v7`).
 - `kind` absent means `text`. In M1 only `text` is enabled; `voice` and `card` give `400`
   (`/kind`, `not_enabled`). Non-empty `attachment_file_ids`, non-empty `components` or any `run_id`
-  give `400` with the member as pointer and code `not_enabled`. Ruling: rejecting is correct,
-  because a silently dropped member would lose an intent (W7); the tickets that build the feature
-  lift the rejection.
+  give `400` with the member as pointer and code `not_enabled` (06 "Fehler" item 3); a silently
+  dropped member would lose an intent (W7). M2-15, M2-19, M3-07 and M3-09 lift the rejection
+  (PLAN).
 - `content_md` must contain a non-white-space character, else `400` (`/content_md`, `empty`); at
   most `message.max_content_bytes` UTF-8 bytes, else `413 payload_too_large` with `detail` naming
   `message.max_content_bytes`. Content is stored byte for byte (SEC-IN-4).
@@ -226,7 +229,8 @@ D2. Body rules (`MessageCreate`):
   unknown ID, so nothing leaks.
 - `silent` is stored; `clear_draft` is not stored and travels in `MessagePosted`.
 - `mention_ids`, when present, must equal the resolved set (D5) as a set, else `400`
-  (`/mention_ids`, `mention_mismatch`).
+  (`/mention_ids`, `mention_mismatch`); more than `message.max_mentions` distinct handles give
+  `400` (`/content_md`, `too_many_mentions`) (03 `messages`, "Inhaltsformat").
 
 D3. Canonical request hash (`client_payload_sha256`, 04 5.1 point 3): SHA-256 over a versioned,
 length-prefixed encoding, not over JSON text, so key order and white space cannot change it:
@@ -238,18 +242,22 @@ encoding later is a new version prefix, never an edit.
 D4. Origin: `user` gives `human`, `agent` gives `agent`, `app` gives `app` (from `kernel/actor`).
 `trigger_state`, `trigger_state_reason`, `trigger_state_at` stay NULL in M1.
 
-D5. Mentions (ruling, spec gap reported because 01 and 03 do not define the syntax of
-`content_format = 1`):
-- A mention token is `@` followed by a handle (`[a-z0-9][a-z0-9._-]*`, case-insensitive); the `@`
-  must be at the start of the text or follow a character that is not a letter, digit, `_`, `.`,
-  `-`, `@` or `/` (so `alex@example.com` is no mention). Trailing `.`, `-` and `_` are cut off the
-  handle (end of sentence). Text inside inline code spans and fenced code blocks is skipped.
+D5. Mentions (03 `messages` "Inhaltsformat" and 07 4.6 are normative; this is the build view):
+- The scanner implements the token rule of 03 exactly: `@` plus handle `[a-z0-9][a-z0-9._-]*`
+  (case-insensitive), preceded by the start of the text or a character that is not a letter,
+  digit, `_`, `.`, `-`, `@` or `/`; trailing `.`, `-` and `_` cut off. Code spans and code blocks
+  (fenced and indented) as CommonMark 0.31.2 defines them are skipped; use a CommonMark parser
+  for the code structure (pinned, license checked by `make licenses`) or a scanner that passes the
+  code-span and code-block examples of the CommonMark specification as test fixtures.
 - Each distinct handle is looked up once among active principals of kind `user` or `agent`
-  (batched, scope item 7). A found principal becomes a mention only if `authorize(author, user.read,
-  person)` or `authorize(author, agent.read, agent)` allows; otherwise the token stays plain text.
-  `@everyone` and `@here` have no collective meaning; they resolve only like any other handle.
+  (batched, scope item 7). A found person becomes a mention if `authorize(author, user.read,
+  person)` allows or, for authors without `user.read` (agents, apps without `users:read`), if
+  `authorize(person, thread.read, thread)` allows; a found agent if `authorize(author, agent.read,
+  agent)` allows (07 4.6). Otherwise the token stays plain text. These checks are filters
+  (`authorize.Filter(ctx)`, M1-28): a token that stays text writes no audit entry.
+- `@everyone` and `@here` have no collective meaning; they resolve only like any other handle.
 - One `mentions` row per resolved principal (`thread_id` copied), also for the author and for
-  principals without read access to the channel (03 `mentions`: stored, no notification later).
+  people without read access to the channel (03 `mentions`: stored, no notification later).
 - `Message.mention_ids` lists the resolved IDs, sorted.
 
 D6. System line on reopen (03 `messages`, R-DM-34; `Message.system_code` in `openapi.yaml`): a
@@ -297,9 +305,9 @@ D9. Performance: the write path uses a fixed number of statements (one batched m
 ## Tests (write them first)
 
 Unit (`internal/messaging/domain`):
-- `TestMentionScanner`: start of text, after punctuation, e-mail address not a mention, inline code
-  and fenced block skipped, trailing dot cut, upper case handle, duplicates once, `@everyone`
-  without such principal gives nothing.
+- `TestMentionScanner`: start of text, after punctuation, e-mail address not a mention, inline code,
+  fenced and indented code blocks skipped, trailing dot cut, upper case handle, duplicates once,
+  `@everyone` without such principal gives nothing.
 - `TestRequestHash_StableAndSensitive`: same input same hash; each field change changes it; JSON
   key order of the request has no influence.
 - `TestTruncateForEvent_UTF8Boundary`: multi-byte characters at the cut; result fits the limit.
@@ -321,7 +329,10 @@ the response validator):
   full content.
 - `TestCreateMessage_Mentions`: visible person and readable agent resolved; agent without
   `agent.read` for the author stays text; `mention_ids` mismatch `400`; a mentioned person without
-  channel access still gets a `mentions` row.
+  channel access still gets a `mentions` row; an agent author mentions a person who can read the
+  thread (resolved) and one who cannot (text, no row); more than `message.max_mentions` distinct
+  handles give `400 too_many_mentions`; `MessagePosted` carries `AuthorDeviceID` and, for
+  `createThread`, `CreatedThread`.
 - `TestCreateMessage_ReopensClosedThread`: closed thread; events in order `thread.reopened`,
   system `message.created`, user `message.created`; sequences n and n+1; system line fields as D6;
   `MessagePosted` twice with `ReopenedThread` on the user message.
@@ -378,7 +389,7 @@ make check
 - [ ] A message in a closed thread reopens it and writes the system line of D6.
 - [ ] `MessagePosted` carries the fields of the port type and can veto.
 - [ ] The test for sequence diagram 04 16.1 is green up to the log tail.
-- [ ] The module README and `docs/DECISIONS.md` describe D5; D6 and D8 match 02 4.6, 03 and
+- [ ] The module README describes D5; D5, D6 and D8 match 03, 07 4.6, 02 4.6 and
       `openapi.yaml` (changed only where proven wrong).
 - [ ] `make check` is green.
 

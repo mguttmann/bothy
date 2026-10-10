@@ -1,6 +1,6 @@
 # M1-70: Leak tests and 404 equality
 
-Status: ready | Depends on: M1-62, M1-65 | Etappe: M1
+Status: ready | Depends on: M1-65, M1-71 | Etappe: M1
 
 ## Goal
 
@@ -86,7 +86,7 @@ unless it is on a reviewed exception list (AZ-P12). These are the tests behind t
    - `normalize.go`: response normalisation (Design notes).
    - `world.go`: random world generator for AZ-P5.
    - `notfound_test.go`, `counters_test.go`, `README.md`.
-2. Shared test harness `services/server/test/harness` (create or extend, text below).
+2. Shared test harness `services/server/test/harness` (extend, text below).
 3. SQL lint: `tools/lint/sql_visibility.py` (Python 3.12, PyYAML only), configuration
    `tools/lint/sql_visibility.yaml`, tests `tools/lint/tests/test_sql_visibility.py` with fixtures
    in `tools/lint/tests/fixtures/`, `tools/lint/README.md`.
@@ -101,15 +101,12 @@ unless it is on a reviewed exception list (AZ-P12). These are the tests behind t
    `services/server/README.md` ("Regeln, die das Gate hält" and test packages),
    `services/server/CHANGELOG.md` and root `CHANGELOG.md` (tool) under "Unreleased".
 
-### Shared test harness (identical text in the briefs M1-69 to M1-72)
+### Shared test harness (the same interface in the briefs M1-69 to M1-72)
 
-If `services/server/test/harness` exists on the base branch, use it and extend it only additively.
-If it does not exist, first search for an existing full-server test helper
-(`grep -rn "pgtest" services/server/internal/wire services/server/test`); wrap it if it builds the
-real `internal/wire` graph, otherwise create the package with exactly this interface. Parallel
-tickets build the same interface, so merges converge.
+M1-71 (a dependency of this ticket) created `services/server/test/harness` with this interface.
+Use it and extend it only additively; the parts this ticket adds are named in "Scope".
 
-- Package `harness`, non-test Go files, architecture component `testsupport` (Design notes).
+- Package `harness`, non-test Go files, architecture component `testsupport` (M1-05).
 - `func Start(tb testing.TB, opts Options) *Server`: the real `internal/wire` graph with role `all`
   in this process; PostgreSQL 18 from `internal/platform/pg/pgtest`; migrations as
   `bothy migrate up --bootstrap` runs them; secrets created as `bothy secrets init` creates them, in
@@ -126,7 +123,8 @@ tickets build the same interface, so merges converge.
   of the disposable container; assertions only).
 - `func (s *Server) NewUser(tb, UserSpec{Handle, DisplayName, Email string}) *Client` and
   `func (s *Server) NewAgent(tb, AgentSpec{Handle, DisplayName, BillingMode, CredentialHolder string}) *Client`,
-  only through the public API (`createUser`, `createEnrollmentCode`, `completeEnrollment`;
+  only through the public API (`createUser` with `local_account: true`, which returns the
+  enrollment code, then `redeemEnrollmentCode` with device keys and DPoP, 08 section 3.2;
   `createAgent`, `createToken`), owner step-up via `createStepUpChallenge` and
   `completeStepUpWithDeviceKey`.
 - `type Client struct { PrincipalID, DeviceID string; ... }` with `Do(ctx, Request) Response`
@@ -181,7 +179,7 @@ tickets build the same interface, so merges converge.
 AZ-P4 (route-driven, `notfound_test.go`):
 
 1. Server: `harness.Start` with every `ratelimit.<class>.per_minute` and `.burst` raised through
-   `Options.Config` (rate limits are not under test here; recorded in the README), then
+   `Options.Config` (rate limits are not under test here; 23 R-QA-11), then
    `BuildMatrixWorld`.
 2. Requesters: Alex (human, DPoP) and Lotse (agent token). For each selected route, requester and
    path parameter set: build request A with the foreign IDs from the fixtures and request B with
@@ -262,13 +260,9 @@ SQL lint (`tools/lint/sql_visibility.py`, AZ-P12):
 7. Output: one line per finding `file:line: <module>.<Name>: <rule>`; exit code 1 on findings, 0
    otherwise, 2 on usage errors. Usage: `python tools/lint/sql_visibility.py [--repo DIR]`.
 
-Architecture register: `test/**` and `perf/**` under `services/server` are test support. If
-M1-05's generator (`tools/archgen`) has no component for them, add a component `testsupport`
-covering both, with the go-arch-lint v3 keys `anyProjectDeps: true` and `anyVendorDeps: true`
-(verify against the pinned version), and a generator test proving that no production component may
-depend on `testsupport`. Exclude `services/server/test/**` and `services/server/perf/**` from the
-Go coverage total in the `coverage` target (they are test code; Sonar already classifies
-`**/test/**` as tests).
+Architecture register and coverage: `test/**` and `perf/**` under `services/server` form the
+component `testsupport` (M1-05; 02 "Code-Layout"), and the Go coverage total leaves them out
+(M1-01). Nothing to add here unless the build proves the component wrong.
 
 ## Tests (write them first)
 
@@ -317,9 +311,10 @@ make check
 ## Definition of done
 
 - Code and tests as above; README in `services/server/test/leak/`, `tools/lint/` and the harness
-  (if created); doc comment on every exported symbol and docstrings on every public Python function.
-- No new ADR (the decision is ADR 0017); if you add the `testsupport` component, describe it in
-  `services/server/README.md` and in 02 "Code-Layout" (one line).
+  (updated for what this ticket adds); doc comment on every exported symbol and docstrings on
+  every public Python function.
+- No new ADR (the decision is ADR 0017). The `testsupport` component exists (M1-05); describe any
+  change to it in `services/server/README.md` and in 02 "Code-Layout".
 - CHANGELOG entries under "Unreleased" in `services/server/CHANGELOG.md` and root `CHANGELOG.md`.
 - `make check` green.
 - Independent review and red team over the diff (`docs/quality/red-team-gate.md`) with verdict

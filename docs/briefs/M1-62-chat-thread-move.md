@@ -44,7 +44,7 @@ Product requirements implemented here:
 12. `thread.move` needs `manage` on source and target, is audited (Audit `ja`), uses rate-limit class `rl.admin` and accepts `Idempotency-Key` (05, openapi).
 13. The thread id never changes (03 `threads.id`). The same transaction changes `messages.channel_id`, `read_states.channel_id` and `drafts.channel_id`; `cost_entries` and `event_log` keep the old channel; attached files follow their message and `files.scope_channel_id` stays (03 `threads`, 05 'Ziel einer Ressource').
 14. Events `thread.moved` (place: target channel, receive action `thread.read`) and `thread.moved_out` (place: source channel, resource `channel`, receive action `channel.read`; it never names the target) (05, openapi).
-15. The rights cache follows `thread.moved` in log order; after the commit no decision uses the old location (04 'Grundregel', 02 'Rechte-Cache').
+15. After the commit no REST decision uses the old location: `authorize` resolves the thread's path at decision time (07 4.2). The gateway's rights cache applies `thread.moved` in log order; that side is M1-65 (04 'Grundregel', 02 'Rechte-Cache').
 16. No read right gives `404`; `403` only with read right but missing `manage` (05 rules 1 and 2, R-AZ-01).
 
 ## Scope
@@ -63,15 +63,14 @@ Change:
 
 - `internal/chat` port: `Threads.Move(ctx, MoveThread{ThreadID, TargetChannelID uuid; Reason string}) (Thread, error)`; in-transaction event type `ThreadMoved{ThreadID, FromChannelID, FromSpaceID, ToChannelID, ToSpaceID uuid; ThreadVersion int64}`.
 - `internal/chat/adapters/httpapi`: the strict-server method for `moveThread`.
-- `internal/authz` and `internal/kernel/authorize`: the requirement for `thread.move` checks `manage` on the thread's path and on the target channel's path. The resource descriptor carries the target channel; add an optional field `Target` (channel id) to the descriptor type of `kernel/authorize` if it has none, used only by actions whose catalogue row names a source and a target. Plus the cache handling in Design note 4.
+- `internal/authz` and `internal/kernel/authorize`: the requirement for `thread.move` checks `manage` on the thread's path and on the target channel's path, with the second target in the resource descriptor (07 4.2 "Aktionen mit zwei Zielen"; 02 4.5). M1-28 already provides the descriptor field `TargetChannelID` (`thread.move`: destination channel) and the requirement `All(Cap(manage), TargetCap(manage))` for "manage auf Quelle und Ziel"; set `TargetChannelID` in the descriptor and add no second field.
 - `internal/wire`: register `chat.ThreadMoved -> messaging.OnThreadMoved` and `chat.ThreadMoved -> sync.OnThreadMoved` (in this order) and the handler; update the golden file of subscriptions.
 - `api/operations.yaml`: enable `moveThread`; rerun the route generator.
-- `docs/api/openapi.yaml`: the `200` example of `moveThread` shows `kind: main`, which can never move; replace it with a thread of `kind: thread` with `moved_at` and `tag_ids: []`. Rerun the generated tables if `make api-checks` reports a difference.
 - READMEs of `chat`, `messaging`, `sync`, `authz`; `services/server/CHANGELOG.md`; `docs/DECISIONS.md`.
 
 ## Out of scope
 
-- Delivery of `thread.moved` and `thread.moved_out` over the gateway and the hub indices (M1-65); this ticket writes the events and makes `authz` follow them.
+- Delivery of `thread.moved` and `thread.moved_out` over the gateway, the hub indices and the gateway's rights cache (M1-65); this ticket writes the events and makes REST decisions follow the move.
 - The lint for the visible-channel predicate (AZ-P12, M1-70) and the full leak tests (M1-70).
 - Moving a channel between spaces (`moveChannel`, M1-53) and space reordering (M1-52).
 - Runs, agent sessions and costs of a moved thread (M2); none reference the channel (03 `runs`, `agent_sessions`; `cost_entries` keeps the booking channel by design).
@@ -93,7 +92,7 @@ Change:
 ## Design notes
 
 1. Use case `Threads.Move`, one unit of work:
-   a. Load the thread (unknown id gives `404`). Build the descriptor `{kind: thread, id, Target: target_channel_id}` and call `authorize(actor, thread.move, descriptor)`. `authz` decides in this order: no read right on the thread gives `not_found`; no read right on the target or an unknown target gives `not_found` with exactly the body and headers of an unknown thread id; missing `manage` on the source or the target gives `forbidden` (`capability_missing`). Owners have `manage` everywhere except DM channels (05 'Wirksame Stufe').
+   a. Load the thread (unknown id gives `404`). Build the descriptor `{kind: thread, id, TargetChannelID: target_channel_id}` and call `authorize(actor, thread.move, descriptor)`. `authz` decides in this order: no read right on the thread gives `not_found`; no read right on the target or an unknown target gives `not_found` with exactly the body and headers of an unknown thread id; missing `manage` on the source or the target gives `forbidden` (`capability_missing`). Owners have `manage` everywhere except DM channels (05 'Wirksame Stufe').
    b. Domain checks after `authorize`, in this order: thread `kind = main` gives `409 conflict` (each text channel keeps exactly one main thread, R-DM-11 and the unique index); target equal to the source gives `400 validation_failed` with pointer `/target_channel_id`; archived target gives `409 conflict`; a DM channel as source or target gives `409 conflict` (not reachable after `authorize`, kept as defence in depth); effective operator of the target differs from `threads.operator_agent_id` gives `409 operator_mismatch`. Operators compare with `IS NOT DISTINCT FROM` semantics: a thread without operator moves only into a channel without effective operator.
    c. `reason` (required by `ThreadMove`): non-empty after trimming, no control or bidi characters (reuse the shared validator `kernel/textcheck` of M1-26, SEC-IN-4), otherwise `400 validation_failed` with pointer `/reason`.
    d. Locks, in this order: `threads` row `FOR UPDATE`; target `channels` row `FOR SHARE`; when the target inherits its operator, the target's `spaces` row `FOR SHARE`. Compute the effective operator only after these locks. Reason: `channel.operator.set` and `space.operator.set` update these rows, so the share lock serializes the operator check against a concurrent operator change and the move cannot break I1 (03 'I1-Prüfung', target kind 2). Deadlocks are retried by the unit of work (`database.tx_retry_max`).
@@ -105,10 +104,10 @@ Change:
    h. Audit in the same transaction through `auditing.Recorder`: action `thread.move`, resource the thread, details `from_channel_id`, `to_channel_id` and `reason`, nothing else. Denials are audited by the authz layer like every action with Audit `ja` (R-AZ-04).
    i. Answer `200` with the `Thread` after the move. `Idempotency-Key` is handled by the middleware of M1-20.
 2. The rights version is not raised and no `access.changed` is written (05: Rechte `nein`). I1 needs no extra check: the target's effective operator is the thread's operator, so the target already is one of that agent's targets, and the source can only drop out (03 'I1-Prüfung'); note 1d keeps this true under concurrency.
-3. A thread created from a main-thread message keeps `parent_message_id`, which now points into the source channel; readers of the target without read right on the source get `404` for that message. Record as ruling.
-4. Rights cache: REST decisions resolve the thread's channel at authorization time. If `authz` caches thread-to-channel resolutions or structure, the move must invalidate the entry for this thread: in the writing process right after commit, and in other processes by applying `thread.moved` in log order through the same structure-event path that M1-53 built for `channel.created` (02 'Rechte-Cache', 04 'Grundregel'). If `authz` resolves the location on every call without a cache, state that in the authz README; the test `TestMoveThreadAuthorizeFollowsMove` guards both variants.
-5. `MoveThreadMessages` has no visible-channel predicate by design: it is a system update keyed by a thread that was authorized in the same transaction. Name it in the messaging README as an exception with this reason, so M1-70 can put it on the lint exception list.
-6. Rulings for `docs/DECISIONS.md`: main threads never move (derived from R-DM-11); tags are removed on every move (derived from 03 `thread_tags`); event order `thread.moved_out` before `thread.moved`; `thread.moved_out` without `resource.version`; `parent_message_id` stays; threads without operator move only to channels without effective operator; status codes for same channel (`400`) and archived target (`409 conflict`).
+3. A thread created from a main-thread message keeps `parent_message_id`, which now points into the source channel; readers of the target without read right on the source get `404` for that message (03 `threads.parent_message_id`).
+4. Rights: REST decisions resolve the thread's channel at decision time (07 4.2) and cache no thread-to-channel resolution across requests; state that in the authz README. The gateway's cache side of `thread.moved` is M1-65.
+5. `MoveThreadMessages` has no visible-channel predicate by design: it writes the rows of a thread that `authorize` checked in the same transaction (07 7.4 rule 1: writes are outside the lint). Name it in the messaging README with this reason.
+6. Rulings for `docs/DECISIONS.md`: event order `thread.moved_out` before `thread.moved`; threads without operator move only to channels without effective operator; status codes for same channel (`400`) and archived target (`409 conflict`). Main threads never move, tags fall away on every move, `thread.moved_out` has no `resource.version` and `parent_message_id` stays: these are in 03 and 04.
 
 ## Tests (write them first)
 
@@ -126,7 +125,7 @@ Integration (PostgreSQL 18 via `pgtest`, real modules through `internal/wire`, H
 - `TestMoveThreadSameChannel`: `400 validation_failed`.
 - `TestMoveThreadEvents`: exactly `thread.moved_out` followed by `thread.moved` with consecutive `seq`; the `thread.moved_out` row contains the target channel id nowhere; both payloads validate against their schemas; no JSON `null`.
 - `TestMoveThreadAudit`: one allow entry with from, to and reason; a denied attempt by Sam produces a deny entry.
-- `TestMoveThreadAuthorizeFollowsMove`: two `Authorizer` instances with warm caches, the second fed the log events in order through the structure-event path: after the move a person who reads only the target gets `allow` for `thread.read` and a person who reads only the source gets `not_found`, in both instances.
+- `TestMoveThreadAuthorizeFollowsMove`: two `Authorizer` instances with warm snapshot caches (REST mode, no log events fed): after the move a person who reads only the target gets `allow` for `thread.read` and a person who reads only the source gets `not_found`, in both instances.
 - `TestMoveThreadConcurrentReadState`: parallel `putReadState` of Alex and the move: afterwards `read_states.channel_id` equals `threads.channel_id`.
 - `TestMoveThreadConcurrentOperatorChange`: parallel `setChannelOperator` on the target to another agent and the move: both requests end with a defined status (no deadlock reaches the client) and `VerifyInvariants` of `authz` passes afterwards.
 - `TestMoveThreadIdempotencyKey`: a replay returns the stored response with `Idempotent-Replay: true` and writes no second set of events.
@@ -145,9 +144,8 @@ Commands that must pass, from the repository root:
 - [ ] The thread id stays; `messages.channel_id`, `read_states.channel_id` and `drafts.channel_id` follow in the same transaction; tags are removed.
 - [ ] `thread.moved_out` (source, without target) and `thread.moved` (target) are written in this order and validate against their schemas.
 - [ ] The move is audited with from, to and reason; denials are audited.
-- [ ] After the commit no `authorize` call in any process instance evaluates the thread at the source.
+- [ ] After the commit no REST `authorize` call in any process instance evaluates the thread at the source.
 - [ ] Concurrent read-state writes and operator changes leave consistent copies and I1 intact.
-- [ ] The `moveThread` example in openapi.yaml shows a movable thread.
 - [ ] `make check` is green.
 
 ## Definition of done

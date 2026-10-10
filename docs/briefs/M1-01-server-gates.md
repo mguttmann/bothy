@@ -207,6 +207,9 @@ lock_path: Path = fetch_tools.DEFAULT_LOCK) -> list[str]`. Import `fetch_tools` 
   reported as drift, not as a confusing compile error.
 - The Go branch of `test` runs `$(GO_PREREQS) test` before the loop, so a missing Docker runtime
   fails with a clear message before any integration test starts (P-09).
+- The Go coverage total counts production code only: the `coverage` target removes the lines of
+  packages under `<module>/test/` and `<module>/perf/` from `coverage.out` before `go tool cover`
+  (02 "Code-Layout", 23 "Komponenten-Vertrag"; they are test code).
 - Print SKIP lines with the existing `skip` macro. Where the reason contains a shell variable
   (the per-module skip of `migrations-lint`), use `printf '  SKIP  %-14s %s\n' migrations-lint
   "$$m has no migrations/ directory yet"`, because the macro single-quotes its argument.

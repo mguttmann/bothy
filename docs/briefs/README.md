@@ -59,9 +59,10 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 21 | M1-62, M1-63 |
 | 22 | M1-64, M1-71 |
 | 23 | M1-65 |
-| 24 | M1-66, M1-68, M1-70, M1-72 |
-| 25 | M1-67, M1-69 |
-| 26 | M1-73 |
+| 24 | M1-66, M1-70, M1-72 |
+| 25 | M1-67, M1-68 |
+| 26 | M1-69 |
+| 27 | M1-73 |
 
 ## Index
 
@@ -136,13 +137,13 @@ are added by the brief-writing step (plan ticket M0-05) under the names listed h
 | 22 | M1-64 | Gateway connection and session | `M1-64-gateway-connection.md` | M1-19, M1-21, M1-63 |
 | 23 | M1-65 | Gateway hub, delivery and revocation | `M1-65-gateway-delivery.md` | M1-45, M1-64 |
 | 24 | M1-66 | Focus and typing | `M1-66-gateway-focus-typing.md` | M1-65 |
-| 25 | M1-67 | Gateway frame conformance | `M1-67-gateway-conformance.md` | M1-66 |
-| 24 | M1-68 | Server core metrics per catalogue | `M1-68-core-metrics.md` | M1-04, M1-65 |
-| 25 | M1-69 | Canary test across all outputs | `M1-69-canary-test.md` | M1-50, M1-68 |
-| 24 | M1-70 | Leak tests and 404 equality | `M1-70-leak-tests.md` | M1-62, M1-65 |
+| 25 | M1-67 | Gateway frame conformance | `M1-67-gateway-conformance.md` | M1-62, M1-66 |
+| 25 | M1-68 | Server core metrics per catalogue | `M1-68-core-metrics.md` | M1-04, M1-50, M1-66 |
+| 26 | M1-69 | Canary test across all outputs | `M1-69-canary-test.md` | M1-68, M1-71 |
+| 24 | M1-70 | Leak tests and 404 equality | `M1-70-leak-tests.md` | M1-65, M1-71 |
 | 22 | M1-71 | Contract tests with Schemathesis | `M1-71-contract-tests.md` | M1-50, M1-62, M1-63 |
-| 24 | M1-72 | Load tests and performance gate | `M1-72-performance-gate.md` | M1-57, M1-65 |
-| 26 | M1-73 | Compose smoke test | `M1-73-compose-smoke.md` | M1-23, M1-37, M1-69 |
+| 24 | M1-72 | Load tests and performance gate | `M1-72-performance-gate.md` | M1-57, M1-65, M1-71 |
+| 27 | M1-73 | Compose smoke test | `M1-73-compose-smoke.md` | M1-23, M1-37, M1-69 |
 | 3 | M1-74 | CodeQL for Go | `M1-74-codeql-go.md` | M1-05 |
 
 ## Dependency graph
@@ -320,18 +321,21 @@ flowchart TB
   M1_45 --> M1_65
   M1_64 --> M1_65
   M1_65 --> M1_66
+  M1_62 --> M1_67
   M1_66 --> M1_67
   M1_04 --> M1_68
-  M1_65 --> M1_68
-  M1_50 --> M1_69
+  M1_50 --> M1_68
+  M1_66 --> M1_68
   M1_68 --> M1_69
-  M1_62 --> M1_70
+  M1_71 --> M1_69
   M1_65 --> M1_70
+  M1_71 --> M1_70
   M1_50 --> M1_71
   M1_62 --> M1_71
   M1_63 --> M1_71
   M1_57 --> M1_72
   M1_65 --> M1_72
+  M1_71 --> M1_72
   M1_23 --> M1_73
   M1_37 --> M1_73
   M1_69 --> M1_73

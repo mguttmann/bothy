@@ -202,10 +202,11 @@ built instead of adding a second version.
    3. In the unit of work: lock the message row (`SELECT ... FOR UPDATE` with the visible
       predicate); `deleted_at` set gives `410 message_deleted`; version different from `If-Match`
       gives `412 version_conflict` with `current` = REST representation.
-   4. Resulting state: `content_md` = given or current; mentions = given `mention_ids` or current.
-      Content above `message.max_content_bytes` gives `413 payload_too_large` (detail names the
-      key); the pair (content, mentions) goes through M1-56's mention validation (same function,
-      same errors, `400 validation_failed`).
+   4. Resulting state: `content_md` = given or current; mentions = resolved again from the
+      resulting content with M1-56's scanner and resolution (03 `messages` "Inhaltsformat", 07
+      4.6); a given `mention_ids` must equal that set (same function, same errors,
+      `400 validation_failed`). Content above `message.max_content_bytes` gives
+      `413 payload_too_large` (detail names the key).
    5. No change (same content, same mention set, also an empty body): `200` with the current
       representation and its ETag; no write, no revision, no event.
    6. Otherwise: unless `kind = 'run'`, insert `message_revisions(revision = max + 1 or 1,
@@ -289,7 +290,8 @@ Integration against PostgreSQL 18 (`pgtest`, world of 07 "Beispiele", HTTP throu
 - `TestUpdateMessage_StoresRevisions`: two edits give revisions 1 (original) and 2 with the
   previous contents; `edited_at` set; version raised by two.
 - `TestUpdateMessage_NoChangeIsNoop`: no revision, no event, same version.
-- `TestUpdateMessage_ReplacesMentions` and `TestUpdateMessage_MentionMismatch400`.
+- `TestUpdateMessage_ReplacesMentions` (new content without `mention_ids` resolves its tokens;
+  removed tokens remove rows) and `TestUpdateMessage_MentionMismatch400`.
 - `TestUpdateMessage_TooLarge413`.
 - `TestUpdateMessage_AppendsMessageUpdated`: one `message.updated` with the new `resource.version`.
 - `TestUpdateMessage_NeverTriggers`: a test subscriber sees no `MessagePosted`; `trigger_state`

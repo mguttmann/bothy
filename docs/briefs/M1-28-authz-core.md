@@ -87,7 +87,7 @@ changes, structure, messaging, sync, gateway) calls this function.
     included.
 14. 05 section 2.5: a pending device may only use `self.read`, `device.list` for itself,
     `auth.token.refresh`, `auth.logout`.
-15. 05 section 2.4 and R-AZ-04: every denial is audited (the M1-24 recorder aggregates).
+15. 05 section 2.4, 07 4.2 and R-AZ-04: every denial of a request or op is audited (the M1-24 recorder aggregates); decisions in filter mode write none.
 16. 05 section 5 points 1 to 5, 7 and 8 for message triggers of `agent.invoke`.
 17. 02 section 17: `BenchmarkAuthorizeCached` produces the value for `perf.authorize_cached_p99`.
 
@@ -236,7 +236,15 @@ type Authorizer interface {
 
 func WithPermissionVersion(ctx context.Context, v int64) context.Context // pin (gateway, tests)
 func WithRequestScope(ctx context.Context) context.Context               // memo for one request
+func Filter(ctx context.Context) context.Context                        // filter mode (07 4.2)
 ```
+
+Filter mode (`Filter(ctx)`, 07 section 4.2, 05 section 2.4): decisions for delivery checks and
+per-element checks of lists, searches and snapshots are filters, not requests. In this mode
+`Authorize` decides exactly as otherwise but never calls the recorder and does not count towards
+`bothy.authz.decisions` (signals.md). Every later ticket that filters per element (M1-53, M1-55,
+M1-57, M1-59, M1-60, M1-61, M1-63) uses this marker; the gateway's delivery mode of M1-65
+(`Delivery(ctx)`) implies it; requests and ops never use it.
 
 `Authorize` returns an `error` only for failures (unknown or deferred action, unknown resource
 kind, contradictory path hints, source errors); policy results are always a `Decision`. Use the
@@ -443,10 +451,16 @@ thread's channel) is an internal error. A missing thread, channel or space gives
 
 ### Snapshot and effective rights (`domain/snapshot.go`, `domain/effective.go`)
 
-The snapshot holds the result of 07 section 7.2 steps 1, 3 and 7 for one principal at one rights
-version; propagation to channels (step 2), the operator rule (step 4), DMs (step 5) and the bot
-limits (step 6) are applied when a path is evaluated, so a channel created after the snapshot is
-judged correctly by `Authorize` (ruling D5; AZ-P8 proves equivalence with the 07 definition):
+The snapshot holds the result of 07 section 7.2 "Aufbau" steps 1, 2 and 4 (grants per target,
+owner, `valid_until`) for one principal at one rights version. Following the paragraph "Der Stand
+speichert Stufen je Ziel" of 07 7.2, everything that depends on the structure is applied when a
+path is evaluated: propagation along instance, space and channel, the operator rule (07 2.9), the
+limits for agents and apps (07 2.1) and the archive cap (07 4.5, built in M1-53). DM participation
+(07 7.2 step 3) is read from the resolved channel (path evaluation step 1 below) and, for lists,
+from `StructureSource.DMChannelsOf` per request; this gives the same decisions as storing it and
+also covers a DM created after the snapshot. So a channel created after the snapshot is judged
+correctly by `Authorize` (ruling D5; AZ-P8 proves equivalence with the 07 definition). This ticket
+owns that behaviour; M1-53 only adds an integration test against real channels:
 
 ```text
 Snapshot {
@@ -654,7 +668,13 @@ Pure tests run without a database; the test world and fakes live in
      raises the version), clock advances (including landing exactly on an expiry) and queries
      over `message.read`, `message.create`, `thread.read`, `channel.read`, `space.read`,
      `channel.update`, `export.channel`, `file.upload`; decisions, reasons and `Scope` channel
-     sets must be equal;
+     sets must be equal; the mutations include creating a channel, a space and a DM through the
+     fake `StructureSource` without raising the version;
+   - `TestChannelCreatedAfterSnapshotVisibleWithoutNewVersion`: Alex has `read` on space Support;
+     warm the cache; add a channel to Support in the fake `StructureSource` without changing the
+     rights version; `Authorize(channel.read)` on it allows, `Scope` lists it in
+     `visible_channel_ids` and Support in `fully_visible_space_ids`, and the snapshot was not
+     rebuilt (the fake grant store sees no second read);
    - `TestAZP10_ExpiryWithoutJob`: warm cache, advance the clock to exactly `expires_at` of a
      grant and of a membership, no version change: `not_found`.
 6. **Rules** (`internal/authz/app` and `domain`):
@@ -689,7 +709,8 @@ Pure tests run without a database; the test world and fakes live in
    `authz.snapshot_cache_max_entries` (run with a small value); one version read per request
    scope however many `Authorize` calls (count reads on a fake); pinned version wins.
 8. **Audit and check log**: the fake recorder sees one denial call per non-allow decision and
-   none for allow; the M1-18 check log contains `(action, outcome)` for `Authorize` and `Scope`.
+   none for allow; in filter mode (`Filter(ctx)`) it sees none, with the same decisions; the
+   M1-18 check log contains `(action, outcome)` for `Authorize` and `Scope`.
 9. **Registration**: `VerifyRegistrations` rejects a route and an op naming a deferred action.
 10. **Wire**: `TestWireAuthorizerWithEmptySources` (PostgreSQL 18 through `pgtest`, one active
     user seeded with plain SQL in the test file): the wired authorizer answers `not_found`
@@ -724,8 +745,8 @@ make check
 - [ ] The reason constants equal the codes of 07 section 4.1.
 - [ ] No source error, unknown action, deferred action or unknown resource kind can produce an
       allow (tests per case).
-- [ ] Every non-allow decision reaches the audit recorder; allow decisions do not (the use case
-      writes them, 07 section 4.2). AZ-P13 runs end to end: a denied request through the HTTP
+- [ ] Every non-allow decision of a request or op reaches the audit recorder; allow decisions and
+      decisions in filter mode do not (the use case writes allows, 07 section 4.2). AZ-P13 runs end to end: a denied request through the HTTP
       chain leaves exactly one aggregated row in `audit_events` (with the M1-24 recorder against
       PostgreSQL 18).
 - [ ] `BenchmarkAuthorizeCached` reports `p99-ns`.

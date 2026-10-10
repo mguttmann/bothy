@@ -205,6 +205,7 @@ type ActionSpec struct {
     Rights           bool     // the action raises permission_version (05 rule 7)
     RateLimitClass   string   // "" when 05 says "keine"
     System           bool     // Right == "system" (05 rule 10)
+    Effect           string   // "read" or "write" (05 2.7); used by the maintenance layer (M7-08)
 }
 type EventSpec struct {
     Type             string
@@ -213,6 +214,7 @@ type EventSpec struct {
     ReceiveAction    string   // raw 05 text
     MentionedActions []string
     AudienceSelf     bool
+    ResourceVersion  bool     // the envelope carries resource.version (04 "Zustellgarantie" 3)
 }
 type OpSpec struct {
     Op               string

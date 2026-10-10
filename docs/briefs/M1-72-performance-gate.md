@@ -1,6 +1,6 @@
 # M1-72: Load tests and performance gate of the server core (ADR 0063)
 
-Status: ready | Depends on: M1-57, M1-65 | Etappe: M1
+Status: ready | Depends on: M1-57, M1-65, M1-71 | Etappe: M1
 
 ## Goal
 
@@ -26,12 +26,13 @@ values of 16 into measured facts.
   "Konfigurationswerte dieses Kapitels" (`database.max_conns`, start value until the load test).
 - `docs/observability/signals.md`: `bothy.delivery.duration`, `bothy.db.event_seq.lock_wait`,
   `bothy.db.pool.connections`.
-- ADRs 0009 (Confirmation), 0004; ADR 0063 "Leistungs-Gate für das Ereignis-Log" if M1-16 wrote it.
+- ADRs 0009 (Confirmation), 0004, 0063 "Leistungs-Gate für das Ereignis-Log" (profile modes in its
+  decision, point 3).
 - `docs/PLAN.md`: "Arbeitsweise je Ticket" item 6, "Abschluss einer Etappe" item 3, M1
   "Exit-Kriterien" item 7, rows M1-16, M1-28 and M1-72, decisions P-07, P-09, P-10, P-12.
 - Operations: `createMessage`, `listEvents`, `getSnapshot`, `verifyAuditChain`, `createSpace`,
-  `createChannel`, `createThread`, `createGrant`, `createUser`, `createEnrollmentCode`,
-  `completeEnrollment`, `refreshToken`; gateway ops `hello`, `identify`, `ready`, `heartbeat`,
+  `createChannel`, `createThread`, `createGrant`, `createUser`, `redeemEnrollmentCode`,
+  `refreshToken`; gateway ops `hello`, `identify`, `ready`, `heartbeat`,
   `heartbeat_ack`, `dispatch`, `reauth`.
 - Code: `perf/event_commit` and the `perf` target from M1-16, `BenchmarkAuthorizeCached` from
   M1-28, `internal/platform/pg/pgtest` (M1-12), `internal/sync` log tail and `LISTEN` (M1-16),
@@ -81,32 +82,32 @@ values of 16 into measured facts.
    in its test file to record per-operation durations and `b.ReportMetric(p99, "p99-ns")`.
 4. `internal/platform/pg/pgtest`: additive options for perf and chaos: resource limits for the
    container (`--cpus`, `--memory`) and a restart that keeps the host port (pick a free loopback
-   port first, publish it explicitly as `127.0.0.1:<port>:5432`, retry on a bind conflict).
-5. Shared test harness `services/server/test/harness` (create or extend, text below); this ticket
-   adds `StartProcess`.
+   port first, publish it explicitly as `127.0.0.1:<port>:5432`, retry on a bind conflict). Every
+   perf and chaos database uses `pgtest.Durable()` from M1-16 (no `fsync=off`,
+   `synchronous_commit=off`, `full_page_writes=off`; ADR 0063 point 2); the speed flags of M1-12 D7
+   stay for normal tests.
+5. Shared test harness `services/server/test/harness` (extend, text below); this ticket
+   adds `StartProcess` and the field `Options.DurableDB bool`, which passes `pgtest.Durable()`;
+   every perf and chaos test sets it.
 6. `Makefile` target `perf` (keep M1-01's frame): builds nothing into the repository; runs
    `cd services/server && go test -tags perf -count=1 -timeout $(PERF_TIMEOUT) ./perf/... ./test/chaos/...`
    without `-race`; prints the result table; exits non-zero when any target fails or any chaos test
    fails. `make check` compiles and vets the tagged code (`go vet -tags perf ./perf/...
    ./test/chaos/...` in `lint`, golangci-lint with the tag) so it cannot rot between etappen.
-7. ADR 0063: if `docs/adr/0063-*.md` exists, extend its "Confirmation" and "More Information" with
-   the M1-72 targets and chaos tests without changing the decision; otherwise write it (P-12) as
-   `docs/adr/0063-leistungs-gate-fuer-das-ereignis-log.md` (Design notes) and run `make adr-index`.
+7. ADR 0063 exists: extend its "Confirmation" and "More Information" with the M1-72 targets, the
+   chaos tests, `TestProfileModes` and `TestProfileRejectsNonDurable` without changing the decision; run `make adr-index`.
 8. Documentation: `docs/quality/gates.md` (a section "Nicht in `make check`" with `perf` and
    `portability`), `docs/spec/16-betrieb.md` "Kapazität und Ressourcen" and the `database.max_conns`
    row (Design notes), `sonar-project.properties` (`services/server/perf/**` in
    `sonar.test.inclusions`), `services/server/README.md`, `services/server/CHANGELOG.md` under
    "Unreleased".
 
-### Shared test harness (identical text in the briefs M1-69 to M1-72)
+### Shared test harness (the same interface in the briefs M1-69 to M1-72)
 
-If `services/server/test/harness` exists on the base branch, use it and extend it only additively.
-If it does not exist, first search for an existing full-server test helper
-(`grep -rn "pgtest" services/server/internal/wire services/server/test`); wrap it if it builds the
-real `internal/wire` graph, otherwise create the package with exactly this interface. Parallel
-tickets build the same interface, so merges converge.
+M1-71 (a dependency of this ticket) created `services/server/test/harness` with this interface.
+Use it and extend it only additively; the parts this ticket adds are named in "Scope".
 
-- Package `harness`, non-test Go files, architecture component `testsupport` (Design notes).
+- Package `harness`, non-test Go files, architecture component `testsupport` (M1-05).
 - `func Start(tb testing.TB, opts Options) *Server`: the real `internal/wire` graph with role `all`
   in this process; PostgreSQL 18 from `internal/platform/pg/pgtest`; migrations as
   `bothy migrate up --bootstrap` runs them; secrets created as `bothy secrets init` creates them, in
@@ -123,7 +124,8 @@ tickets build the same interface, so merges converge.
   of the disposable container; assertions only).
 - `func (s *Server) NewUser(tb, UserSpec{Handle, DisplayName, Email string}) *Client` and
   `func (s *Server) NewAgent(tb, AgentSpec{Handle, DisplayName, BillingMode, CredentialHolder string}) *Client`,
-  only through the public API (`createUser`, `createEnrollmentCode`, `completeEnrollment`;
+  only through the public API (`createUser` with `local_account: true`, which returns the
+  enrollment code, then `redeemEnrollmentCode` with device keys and DPoP, 08 section 3.2;
   `createAgent`, `createToken`), owner step-up via `createStepUpChallenge` and
   `completeStepUpWithDeviceKey`.
 - `type Client struct { PrincipalID, DeviceID string; ... }` with `Do(ctx, Request) Response`
@@ -194,7 +196,7 @@ Thresholds and units (`perf/internal/report`):
    "Ziel (Höchstwert)" and plain "Ziel" mean value <= threshold.
 3. Percentiles: nearest-rank over all samples of the measured window; warm-up samples excluded.
 4. Results: `.cache/perf/results.json` at the repository root (directory already used for coverage),
-   schema `{"profile":{"mode","cpus","memory_bytes","os","postgres_version","gomaxprocs"},
+   schema `{"profile":{"mode","cpus","memory_bytes","os","postgres_version","gomaxprocs","fsync","synchronous_commit"},
    "results":[{"name","value","unit","threshold","comparison","pass","samples","test"}],
    "extra":{...}}`, plus a table on standard output. `extra` holds supporting measurements: pool
    acquire wait p99, `bothy.db.event_seq.lock_wait` p99, database and index size per thousand
@@ -203,8 +205,12 @@ Thresholds and units (`perf/internal/report`):
    has exactly that many logical CPUs and at least that memory; `emulated` when the host is larger:
    the server process gets `GOMAXPROCS` equal to the reference vCPU count and the PostgreSQL
    container `--cpus` and `--memory` from the profile; `below` when the host is smaller. Targets are
-   enforced in every mode; the mode is printed first and stored. Which modes count for the etappe
-   close is written in ADR 0063.
+   checked in every mode and the mode is printed first and stored; only `match` and `emulated` can
+   end green, `below` never does (ADR 0063, point 3).
+6. Durability: before the first measurement `make perf` reads `SHOW fsync` and
+   `SHOW synchronous_commit` of every measured database and stores the values in `profile`. A value
+   other than `on` ends the run not green; the measurements are still printed and stored (ADR 0063,
+   points 2 and 3).
 
 Measurements (parameters such as durations, warm-ups, sender and receiver counts are named
 constants in each package, documented in `perf/README.md`, and copied into `results.json`):
@@ -225,8 +231,8 @@ constants in each package, documented in `perf/README.md`, and copied into `resu
    samples). Every receiver must get every event exactly once in `seq` order.
 4. `catchup` (`perf.catchup_page_p99`): a log with many events across many channels; the principal
    sees a fraction. Measure `listEvents` with `limit` = `sync.catchup_page_size` per full page.
-   Second variant: the principal sees a large number of channels (07 "Abfrage-Muster" rule 5); the
-   same threshold holds.
+   Second variant: the principal sees a large number of channels (07 "Abfrage-Muster" rule 5 names
+   this test); the same threshold holds.
 5. `authorize_cached` (`perf.authorize_cached_p99`): run `BenchmarkAuthorizeCached` with
    `-run '^$' -bench '^BenchmarkAuthorizeCached$'` and read `p99-ns`.
 6. `ws_soak` (`perf.ws_connections_per_node`, `perf.ws_idle_conn_mem_max`): server subprocess; open
@@ -265,22 +271,9 @@ Chaos tests (`test/chaos`, all under load from several writers and with gateway 
    reports a valid chain; every receiver saw a gapless, duplicate-free (after `seq` dedupe) stream
    in `seq` order.
 
-ADR 0063 (only if missing; MADR 4, headings English, text German, status `accepted`): context is the
-global serialisation point of ADR 0009 and that numbers only mean something on a fixed profile.
-Decision drivers: reproducibility, no flaky pre-push gate, one source per threshold. Options: (a)
-separate `make perf` at etappe close and release with thresholds from 02 and a recorded profile
-(chosen); (b) load tests inside `make check` (rejected: hardware-dependent, slow, flaky); (c)
-relative benchmarks against a stored baseline (rejected: a stored baseline is a value that must be
-re-derived with every hardware change, and the product promise is absolute); (d) an external
-benchmarking service (rejected: external account and cost). Confirmation: `make perf` with every
-target of M1 including `perf.event_commit_min_per_s`, the chaos tests, and the rule that the etappe
-close needs mode `match` or `emulated`.
-
-Architecture register and coverage (shared with M1-70 and M1-71): if M1-05's generator has no
-component for `test/**` and `perf/**`, add `testsupport` with the go-arch-lint v3 keys
-`anyProjectDeps: true` and `anyVendorDeps: true` (verify against the pinned version) and a generator
-test that no production component may depend on it; exclude `services/server/test/**` and
-`services/server/perf/**` from the Go coverage total.
+Architecture register and coverage: `test/**` and `perf/**` under `services/server` form the
+component `testsupport` (M1-05; 02 "Code-Layout"), and the Go coverage total leaves them out
+(M1-01). Nothing to add here unless the build proves the component wrong.
 
 ## Tests (write them first)
 
@@ -289,7 +282,9 @@ Unit tests (untagged, in `make test`):
 1. `perf/internal/report`: `TestThresholdsFromChapterTable` (all M1 names found in a fixture copy
    and in the real 02), `TestThresholdMissingFails`, `TestUnitParsing` (`100us`, `150ms`, `5s`,
    `64KiB`, `256MiB`, plain counts), `TestComparisonFromMeaning`, `TestNearestRankPercentile`,
-   `TestProfileModes` (`match`, `emulated`, `below` from fixture hosts), `TestResultsJSONSchema`,
+   `TestProfileModes` (`match`, `emulated`, `below` from fixture hosts),
+   `TestProfileRejectsNonDurable` (fixture settings with `synchronous_commit = off` and with
+   `fsync = off` each end not green although every target passes), `TestResultsJSONSchema`,
    `TestClockSkewCorrection`.
 2. Harness: `TestRSSParsing` (Linux and macOS formats), `TestStartProcessPicksLoopbackPorts`.
 3. pgtest: `TestRestartKeepsHostPort`.
@@ -316,6 +311,9 @@ make check
 - [ ] `make perf` exits non-zero when one target is missed (proved by a unit test of the report
       exit logic with a failing fixture).
 - [ ] Thresholds come only from the 02 table; no `perf.*` value appears as a literal in code.
+- [ ] Every perf and chaos database runs with `fsync` and `synchronous_commit` on
+      (`pgtest.Durable()`); `results.json` stores both values, and a run with one of them off ends
+      not green (`TestProfileRejectsNonDurable`).
 - [ ] The three chaos tests pass and check every invariant listed.
 - [ ] `database.max_conns` is confirmed or changed with evidence; 16 updated accordingly.
 - [ ] ADR 0063 exists and names the M1 targets and the profile rule; `make docs` passes.
@@ -327,8 +325,8 @@ make check
 ## Definition of done
 
 - Code and tests as above; README in `services/server/perf/`, `services/server/test/chaos/` and the
-  harness (if created); doc comment on every exported symbol.
-- ADR 0063 written or extended (P-12).
+  harness (updated for what this ticket adds); doc comment on every exported symbol.
+- ADR 0063 "Confirmation" extended with the M1 targets and the profile modes.
 - CHANGELOG entry under "Unreleased" in `services/server/CHANGELOG.md`.
 - `make check` green and `make perf` run with its table in the report.
 - Independent review and red team over the diff (`docs/quality/red-team-gate.md`) with verdict

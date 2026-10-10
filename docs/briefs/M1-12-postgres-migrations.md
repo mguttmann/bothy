@@ -65,11 +65,13 @@ uses the test helper `pgtest` with a disposable PostgreSQL 18 container on a ran
     `worker`; `bothy_maint` trims the audit log; `bothy_monitor` has `pg_monitor`;
     `migrate --bootstrap` creates missing roles idempotently and sets their passwords from the
     secrets.
-13. 02 "Fristen" and 16 "Einstellungen": `database.acquire_timeout` (pool overload becomes `503
-    db_pool_exhausted`), `database.statement_timeout` per transaction via `SET LOCAL`,
+13. 02 "Fristen" and 16 "Einstellungen": `database.acquire_timeout` (pool overload becomes
+    `503 unavailable`; the internal cause `db_pool_exhausted` appears only in log and metric, 02
+    "Fehlerarten"), `database.statement_timeout` per transaction via `SET LOCAL`,
     `database.lock_timeout`, `database.idle_in_tx_timeout`; isolation `READ COMMITTED`.
 14. upgrade.md rule M6: every migration step runs with `lock_timeout = migrate.lock_timeout`.
-15. SEC-TLS-5: PostgreSQL over a Unix socket or with `sslmode=verify-full`.
+15. SEC-TLS-5: PostgreSQL over a Unix socket, with `sslmode=verify-full`, or with
+    `sslmode=disable` only inside the internal Compose network without egress and host port.
 16. P-09 and P-10: integration tests need a Docker-compatible runtime and fail (never skip)
     without one; containers listen only on `127.0.0.1` on a random port.
 

@@ -98,9 +98,9 @@ Paths relative to `services/server/` unless they start with `docs/`:
 5. `internal/chat/adapters/httpapi`: handlers `setSpaceOperator`, `setChannelOperator`.
 6. `api/operations.yaml`: enable both operations; regenerate.
 7. `internal/authz`, only if D5 or D7 finds a missing capability (served spaces in the I1 query,
-   change kinds, target-scoped affected principals), with tests.
-8. `docs/api/openapi.yaml`, only if the `Problem` schema lacks the `conflicts` member that 10 5.4
-   requires (D7).
+   change kinds), with tests. Affected principals come from the `RightsChange` of M1-29 (D3).
+8. `docs/api/openapi.yaml` already has `Problem.conflicts` (M1-29 regenerated the code); change it
+   only where the implementation proves it wrong.
 9. `test/integration/` (cross-module tests with all real modules): a world builder for the world
    of 07 "Beispiele" and "Testmatrix" if none exists yet, and the I1 tests below.
 10. Documentation: `internal/chat/README.md`, `services/server/CHANGELOG.md`, `docs/DECISIONS.md`
@@ -174,7 +174,8 @@ D4. Events and versions:
 - `setSpaceOperator`: `spaces.version` plus one, `space.updated` with payload `{space}`; then for
   every non-archived channel of the space with `operator_inherit = true`, in ascending `id`:
   `channels.version` plus one and `channel.updated`, because its effective operator changed and
-  clients apply a change only with a higher `resource.version` (04 "Zustellgarantie" point 3).
+  clients apply a change only with a higher `resource.version` (05 section 6 row `space.updated`;
+  04 "Zustellgarantie" point 3).
 - No `thread.updated`: thread operators are fixed (R-DM-12); the main thread has no stored operator
   (R-DM-21) and clients read it from `Channel.operator.effective_agent_id`.
 - Audit allow details `{target_kind, target_id, old_mode, old_agent_id, new_mode, new_agent_id,
@@ -196,16 +197,15 @@ Guest channels (`allow_mentioned_agents`) never count (10 5.2).
 
 D6. Operator rule data for the snapshot and `authorize` (07 7.2 step 4): for agent principal P,
 the channel IDs where P is the effective operator (non-archived) and the thread IDs with fixed
-operator P. `authorize` computes the rule from the freshly resolved path as well (M1-53 D8), so a
+operator P. `authorize` computes the rule from the freshly resolved path as well (M1-28, 07 7.2), so a
 channel that starts inheriting P is writable for P at once. On archived channels the operator rule
 gives nothing beyond `read` (M1-53 D2).
 
 D7. I1 error answer: `409`, problem code `i1_violation`, `reason: i1_violation`, `hint` meaning
 "switch the agent to organization first", and `conflicts`: per agent `agent_id`,
-`credential_holder_id`, `extra_principal_ids` (10 5.4), produced by the mapping M1-29 built. If
-`Problem` in `docs/api/openapi.yaml` has no `conflicts` member yet, add it (array of objects with
-those three members, all `Uuid`, the last an array) in this ticket and regenerate. Names of other
-principals never appear in the body.
+`credential_holder_id` (absent if the agent has none), `principal_ids` (the other principals that
+would gain `trigger`; schema `InvariantViolation` in `openapi.yaml`, 10 5.4), produced by the
+mapping M1-29 built (`Problem.conflicts`). Names of other principals never appear in the body.
 
 D8. Ruling recorded in `docs/DECISIONS.md`: `OperatorSet` does not accept `resolve_i1` before
 M2-21, although 05 rule 1.6 names it for both actions; the guided flow is an M2 feature.

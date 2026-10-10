@@ -107,8 +107,7 @@ Code (paths under `services/server/`):
 - `internal/authz`: only if the base lacks it (each with a test): in an archived space every
   effective level is capped at `read` (07 "4.5"; M1-53 builds the same cap for channels, share
   one implementation); `Scope` for spaces can express "all spaces" for owners and principals with
-  instance-level `read`, so new spaces are listed without a new rights version; a `RightsChange`
-  that names a target (space) so the phase hook derives the affected principals itself; an
+  instance-level `read`, so new spaces are listed without a new rights version; an
   effective level and capabilities query for one target (used for `SpaceView`), built on the same
   snapshot as `authorize`.
 - `internal/wire`: register handlers and the space part of the structure source; keep the channel
@@ -199,7 +198,7 @@ Visibility and archive:
   with the current space and writes nothing; `listSpaces` omits archived spaces. The data stays for
   retention and export.
 - `archiveSpace` (`ReasonBody`, Idempotency-Key): sets `archived_at`, bumps `version`, runs with a
-  target-based `RightsChange` (phase hook: `permission_version` first, affected principals are all
+  target-based `RightsChange` of M1-29 (`Targets`, 02 8.1; phase hook: `permission_version` first, affected principals are all
   whose effective level in the space was above `read`, `access.changed` with a `changed` entry per
   affected target at level `read`), publishes `SpaceArchived`, appends `space.archived`, audit with
   the reason. The gateway cache applies `space.archived` in log order (02 "11.3", 04 "8.1").

@@ -1,6 +1,6 @@
 # M1-69: Canary test across all outputs (SEC-T10)
 
-Status: ready | Depends on: M1-50, M1-68 | Etappe: M1
+Status: ready | Depends on: M1-68, M1-71 | Etappe: M1
 
 ## Goal
 
@@ -8,8 +8,8 @@ After this ticket a Go test package `services/server/test/canary` runs a scenari
 enabled operation and every client gateway op of the server core with run-unique canary values
 (content, names, e-mail addresses, IP addresses, tokens and server secrets). It proves that none of
 them appears in logs, traces, metrics, audit rows, error responses or events delivered to
-principals without read rights, and that principal and device IDs appear in telemetry only as
-pseudonyms (DP-T09). This is the test behind threat T-LG-01 and the regression guard for every
+principals without read rights, and that human principal IDs appear in telemetry only as
+pseudonyms and device IDs never (DP-T09). This is the test behind threat T-LG-01 and the regression guard for every
 later ticket: a new operation that is not in the scenario makes the test fail.
 
 ## Read first
@@ -64,8 +64,9 @@ later ticket: a new operation that is not in the scenario makes the test fail.
    prose.
 9. SEC-T10: canary values through all ways of the server core; none appears in logs, traces,
    metrics, audit details, error responses or foreign events (19 "Tests").
-10. DP-T09: no content and no clear IDs in telemetry (20 "Tests"); principal and device IDs only
-    as HMAC pseudonyms (20 "Telemetrie", privacy.md "Pseudonyme").
+10. DP-T09: no content and no clear IDs in telemetry (20 "Tests"); human principal IDs only
+    as `bothy.principal.pseudo_id`; device IDs never (19 SEC-LOG-4, 20 "Telemetrie", privacy.md
+    "Pseudonyme").
 11. SEC-LOG-2, SEC-LOG-3, SEC-LOG-4, SEC-LOG-5, SEC-LOG-6: header allow list, route patterns,
     no content, IP addresses only pseudonymised in the audit log, telemetry attributes only from
     the catalogue.
@@ -90,7 +91,7 @@ later ticket: a new operation that is not in the scenario makes the test fail.
    - `canary_test.go`, `scan_test.go`: the tests below.
    - `README.md`: purpose, sinks, allow matrix, how to add a new operation to the scenario, what
      the test does not cover.
-2. Shared test harness `services/server/test/harness` (create or extend, see "Shared test
+2. Shared test harness `services/server/test/harness` (extend, see "Shared test
    harness" below). This ticket adds `Options.LogWriter` and `Options.Telemetry`.
 3. Production seams, only if missing: `internal/platform/otel` must accept injected exporters for
    tests (`SpanExporter`, `MetricReader`, `LogExporter` and a log `io.Writer` in its options
@@ -103,15 +104,12 @@ later ticket: a new operation that is not in the scenario makes the test fail.
    sentence naming `services/server/test/canary` as the in-process part and M1-73 as the collector
    part.
 
-### Shared test harness (identical text in the briefs M1-69 to M1-72)
+### Shared test harness (the same interface in the briefs M1-69 to M1-72)
 
-If `services/server/test/harness` exists on the base branch, use it and extend it only additively.
-If it does not exist, first search for an existing full-server test helper
-(`grep -rn "pgtest" services/server/internal/wire services/server/test`); wrap it if it builds the
-real `internal/wire` graph, otherwise create the package with exactly this interface. Parallel
-tickets build the same interface, so merges converge.
+M1-71 (a dependency of this ticket) created `services/server/test/harness` with this interface.
+Use it and extend it only additively; the parts this ticket adds are named in "Scope".
 
-- Package `harness`, non-test Go files, architecture component `testsupport` (Design notes).
+- Package `harness`, non-test Go files, architecture component `testsupport` (M1-05).
 - `func Start(tb testing.TB, opts Options) *Server`: the real `internal/wire` graph with role `all`
   in this process; PostgreSQL 18 from `internal/platform/pg/pgtest`; migrations as
   `bothy migrate up --bootstrap` runs them; secrets created as `bothy secrets init` creates them, in
@@ -128,7 +126,8 @@ tickets build the same interface, so merges converge.
   of the disposable container; assertions only).
 - `func (s *Server) NewUser(tb, UserSpec{Handle, DisplayName, Email string}) *Client` and
   `func (s *Server) NewAgent(tb, AgentSpec{Handle, DisplayName, BillingMode, CredentialHolder string}) *Client`,
-  only through the public API (`createUser`, `createEnrollmentCode`, `completeEnrollment`;
+  only through the public API (`createUser` with `local_account: true`, which returns the
+  enrollment code, then `redeemEnrollmentCode` with device keys and DPoP, 08 section 3.2;
   `createAgent`, `createToken`), owner step-up via `createStepUpChallenge` and
   `completeStepUpWithDeviceKey`.
 - `type Client struct { PrincipalID, DeviceID string; ... }` with `Do(ctx, Request) Response`
@@ -158,7 +157,8 @@ tickets build the same interface, so merges converge.
 
 - The canary through the real OTel Collector with the `file` exporter and container stdout (M1-73).
 - File names, transcripts, search terms, channel prompts, push tokens, component form values and
-  tool arguments (their features arrive in M2 and M3; those tickets extend this scenario).
+  tool arguments (their features arrive in M2 and M3; those tickets extend this scenario, 19
+  SEC-T10 and PLAN).
 - App crash reports (M4, M5), console cookies (M6).
 - Output of the CLI commands `bothy setup` and `bothy secrets` (M1-37, M1-09, M1-73).
 - Logs of the PostgreSQL server itself (operator configuration).
@@ -205,7 +205,7 @@ Allow matrix (a value found in a sink not allowed for its class is a finding):
 | Class | Examples | Allowed only in |
 |---|---|---|
 | `content` | message text and edits, thread titles, space and channel names, forum tag names, template names and content, draft content, group names and descriptions, human display names, human handles, e-mail addresses, OIDC claim values from the Fake-IdP, agent display names | success responses and events to principals with read rights on its scope; never in sinks 1 to 4, never in 5, never in 6 for a scoped value |
-| `admin_reason` | `reason` of grants, owners, user disable, revocations | additionally `audit_events.details` (03 `owners.reason` "steht im Audit", I4) |
+| `admin_reason` | `reason` of grants, owners, user disable, revocations | additionally `audit_events.details` as the reserved field `reason` (19 SEC-AUD-5, 03 `audit_events.details`, I4) |
 | `secret` | access and refresh tokens, API tokens, enrollment and pairing codes, `login_code`, step-up challenges, DPoP proofs (signature segment), passwords, TOTP codes and secrets, Fake-IdP codes and ID tokens, every file in the secrets directory (token pepper, private signing keys, telemetry pseudonym key, database passwords) | only the one response that issues it and the request that carries it; never in any sink |
 | `network` | one IPv4 from 198.51.100.0/24 and one IPv6 from 2001:db8::/32 per run, random host part, sent as `X-Forwarded-For` from the loopback trusted proxy | `auth_sessions.last_ip` and API fields the schema documents for it (session lists); never in sinks 1 to 4 (audit holds only `ip_hmac` with `ip_key_id`), never in 5 or 6 |
 | `identity` | every principal ID and device ID created in the run | anywhere except sinks 1 to 3 (logs, traces, metrics), where only `bothy.principal.pseudo_id` may appear |
@@ -309,7 +309,7 @@ make check
 ## Definition of done
 
 - Code and tests as above; README in `services/server/test/canary/` and in
-  `services/server/test/harness/` (if created); doc comment on every exported symbol (purpose,
+  `services/server/test/harness/` (updated for what this ticket adds); doc comment on every exported symbol (purpose,
   parameters, return value, errors).
 - No ADR needed unless you change a production interface beyond the otel seam; if you do, write
   the ADR (MADR 4, `docs/adr/0000-vorlage-madr-4.md`).

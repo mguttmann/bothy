@@ -177,7 +177,7 @@ established inside `internal/messaging`; the names below are the required public
       and invisible threads take the same code path and return the same error value (02 9.2).
    3. Get the visible channel IDs for `message.read` from `Authorizer.Scope`.
    4. Run the one statement for the mode (note 4); then call `authorize(message.read, message)`
-      per item (cached snapshot). A denied item is dropped, logged at error level with only the
+      per item (cached snapshot) in filter mode `authorize.Filter(ctx)` (M1-28; no denial audit, 07 4.2). A denied item is dropped, logged at error level with only the
       action and the resource kind (no IDs, no content), and counted in `bothy.authz.errors` with
       `bothy.reason = filter_mismatch` (07 7.4 rule 3, signals.md, alert `BothyAuthzError`).
    5. Build each item with the single representation function of M1-56.

@@ -36,8 +36,9 @@ exactly once.
 - `docs/operations/install-compose.md`: section "Start".
 - `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 "Bekannte Widersprüche" W3, W5.
 - ADR 0013, ADR 0015, ADR 0019, ADR 0020, ADR 0021.
-- `docs/api/openapi.yaml`: operations `createEnrollmentCode`, `createUser`, `beginEnrollment`,
-  `completeEnrollment`, `getJwks`, `getDiscovery`; schemas `DeviceRegistration`, `TokenResponse`,
+- `docs/api/openapi.yaml`: operations `createEnrollmentCode`, `createUser`,
+  `redeemEnrollmentCode`, `getJwks`, `getDiscovery` (`beginEnrollment` and `completeEnrollment`
+  only for context, built in M1-40); schemas `EnrollRedeemRequest`, `DeviceRegistration`, `TokenResponse`,
   `EnrollmentCode`, `UserCreate`, `UserCreated`; responses `ServiceUnavailable`, `Unauthorized`.
 - `docs/security/threat-model.md`: T-ID-03, T-ID-04.
 - Code of the dependencies: `services/server/internal/identity` (M1-26, M1-31, M1-33, M1-34,
@@ -311,8 +312,10 @@ Setup gate:
   5. Audit: actor NULL, action `instance.bootstrap`, decision `allow`, resource `instance`, details
      `{owner_principal_id, enrollment_code_id, local_provider_id}`.
   6. Set `setup_completed_at` through the instance port.
-- After commit print to stdout, once: the handle, the principal ID, the code in display form and
-  `expires_at` in RFC 3339 UTC. Nothing else prints the code.
+- After commit write exactly one line to stdout: the code in display form, nothing else (08
+  section 4, 02 section 3.3), so scripts read it without a format. Logs go to stderr: one info
+  line with the handle and `expires_at` in RFC 3339 UTC, the person only as pseudonym (19
+  SEC-LOG-4), never the code. Nothing else prints the code.
 - Exit codes: `0` success; `1` infrastructure error (configuration, secrets, database); `2`
   invalid arguments; `3` setup already completed (nothing changed).
 
@@ -390,8 +393,9 @@ Integration:
   `setup_completed_at` NULL.
 - `TestBootstrapConcurrent`: two parallel runs, exactly one succeeds.
 - `TestBootstrapAuditEntry`: one entry `instance.bootstrap`, actor NULL, details without the code.
-- `TestBootstrapPrintsCodeOnce`: captured stdout contains the code exactly once; captured logs
-  contain it zero times.
+- `TestBootstrapPrintsCodeOnce`: captured stdout is exactly one line and that line equals the
+  code in display form; captured stderr and logs contain it zero times. Same check for
+  `setup issue-enrollment-code`.
 - `TestRedeemActivatesFirstDevice`: `201`; device `active`; session `auth_method =
   'enrollment_code'`; refresh family `dpop_jkt` equals the proof thumbprint; `used_at` and
   `used_by_device_id` set; one audit entry `auth.login.complete`.

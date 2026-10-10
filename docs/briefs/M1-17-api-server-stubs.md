@@ -100,7 +100,6 @@ Filling `later` in this ticket, per operationId: (1) if a ticket row in a table 
 | `submitClientMetrics` | M4 | M4-31 |
 | `setAgentToolClass`, `getAgentTriggerers`, `suspendApp`, `resumeApp` | M2 | |
 | `getRunContext` | M2 | M2-13 |
-| `submitCostReconciliation` | M2 | M2-28 |
 | `listAgentWebhookSubscriptions`, `createAgentWebhookSubscription`, `listWebhookSubscriptions`, `createWebhookSubscription`, `updateWebhookSubscription`, `deleteWebhookSubscription`, `listWebhookDeliveries`, `redeliverWebhook` | M2 | M2-26 |
 | `getStatus`, `getPublicStatus`, `createStatusComponent`, `updateStatusComponent`, `deleteStatusComponent`, `createStatusIncident`, `addStatusIncidentUpdate` | M7 | M7-09 |
 | `listGdprRequests`, `createGdprRequest`, `getGdprRequest`, `decideGdprRequest`, `downloadGdprExport` | M7 | |

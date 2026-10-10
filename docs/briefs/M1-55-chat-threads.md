@@ -95,8 +95,9 @@ Paths relative to `services/server/` unless they start with `docs/`:
 
 ```go
 // Create inserts a thread of kind "thread" in a text or forum channel, captures the effective
-// operator of the channel, sets tags and appends thread.created. It authorizes thread.create
-// (and thread.tags.set for tags) itself. It must run inside the caller's unit of work.
+// operator of the channel, sets tags and appends thread.created. It does not authorize
+// thread.create (messaging did, 02 4.6); restricted tags it checks with thread.tags.set, because
+// only chat knows the tags. It must run inside the caller's unit of work.
 Create(ctx, CreateThreadCmd) (Thread, error)
 // CreateThreadCmd{ChannelID uuid; Parent *ParentMessage; Title *string; TagIDs []uuid}
 // ParentMessage{MessageID, ThreadID uuid}: verified by the caller (messaging) to exist and be
@@ -133,14 +134,15 @@ SetTags(ctx, SetTagsCmd) (Thread, error)          // optional expected version
 8. `internal/authz`, only where D8 finds a missing requirement check, with tests.
 9. `api/operations.yaml`: enable the six operations above (not `createThread`, see "Out of
    scope"); regenerate.
-10. `internal/platform/config` schema: `thread.title_max_chars` (03) and
+10. `internal/platform/config` schema: `thread.title_max_chars`, `thread.max_tags` (03) and
     `thread.placeholder_titles` (09) if missing; `api.page_size_default`, `api.page_size_max` (06)
     if missing.
 11. `docs/api/openapi.yaml` already has the `409` responses of `setThreadTitle` and `closeThread`
     and `title_manual` in `x-problem-codes` (planning, spec first); the generated table in 06
     "Fehler", the `Conflict` description and `getProblemType` include it.
 12. Documentation: `internal/chat/README.md`, `services/server/CHANGELOG.md`,
-    `docs/DECISIONS.md` (rulings D1 tags at creation, D6 unknown tag filter, D7).
+    `docs/DECISIONS.md` (ruling D6 unknown tag filter; D1 and D7 are in 05, 02 4.6 and
+    `openapi.yaml`).
 
 ## Out of scope
 
@@ -197,10 +199,10 @@ rights check of its own):
 - `kind = 'thread'`, `state = 'open'`, `operator_agent_id` = effective operator of the channel
   now (space default when inheriting), NULL when none; `parent_message_id` from `Parent`;
   `created_by` = actor.
-- Tags (forum only): same rules as `SetTags` (D5); when any tag is restricted, authorize
-  `thread.tags.set` with the restricted flag for the new thread (descriptor with its known
-  channel path, D8). Ruling: 05 names the restricted rule for `thread.tags.set`; it applies to
-  tags given at creation as well, otherwise creation would bypass it.
+- Tags (forum only): same rules as `SetTags` (D5), at most `thread.max_tags` (`400`,
+  `/tag_ids`, `limit_reached`); when any tag is restricted, authorize `thread.tags.set` with the
+  restricted flag for the new thread (descriptor with its known channel path, D8). 05 row
+  `thread.create` states that tags at creation follow `thread.tags.set`.
 - Appends `thread.created` with payload `{thread}`.
 
 D2. `AppendToThread`: inside the ambient unit of work only (error otherwise). `SELECT ... FOR
@@ -232,7 +234,8 @@ D4. Title (`setThreadTitle`, action `thread.title.update`, `If-Match` required):
 D5. Tags (`setThreadTags`, action `thread.tags.set`, `If-Match` optional, 06 8.3):
 - Only `kind = 'thread'` in a forum channel (`400`, `/tag_ids`, `not_a_forum_post`).
 - Duplicates in `tag_ids` give `400` (`/tag_ids`, `duplicate`); every ID must be a non-deleted tag
-  of the thread's channel (`400`, `/tag_ids`, `unknown_tag`).
+  of the thread's channel (`400`, `/tag_ids`, `unknown_tag`); more than `thread.max_tags` give
+  `400` (`/tag_ids`, `limit_reached`, 03 `thread_tags`).
 - Compute the difference to the current set; if any added or removed tag is `restricted`, the
   request needs `manage`: pass the restricted flag in the resource descriptor so that `authz`
   requires `manage` (`403 forbidden`, reason `capability_missing`). No rights logic in chat.
@@ -253,13 +256,13 @@ D6. List (`listChannelThreads`, action `thread.read` against the channel as cont
   versioned and bound to channel, filters and sort; a cursor from another query gives
   `400 cursor_invalid`. Reuse the existing cursor codec; if none exists, implement it in
   `internal/chat/adapters/httpapi` (decoding is an adapter concern) and document it in the README.
-- No totals. Rows are filtered by `authorize` per item as 07 7.4 rule 3 requires.
+- No totals. Rows are filtered by `authorize` per item as 07 7.4 rule 3 requires, in filter mode `authorize.Filter(ctx)` (M1-28; no denial audit, 07 4.2).
 
 D7. Representation (`Thread` schema): all stored fields; `tag_ids` = non-deleted tags, ordered by
 tag `sort_key`; for `kind = 'thread'` with an operator: `operator_agent_id` and `billing_mode`
 from `authz.AgentPolicySource` (chat may use `authz`, 02 4.4; the implementation from `agents` is
 injected in `internal/wire`); for main threads both fields are absent and clients use
-`Channel.operator.effective_agent_id` (ruling). `unread_floor_seq` only when not 0. No JSON
+`Channel.operator.effective_agent_id` (`openapi.yaml` `Thread`). `unread_floor_seq` only when not 0. No JSON
 `null`. `ETag: "<version>"` on `getThread` and `setThreadTitle`.
 
 D8. `StructureSource`, thread part: resolve a thread ID to `{channel_id, space_id, kind,

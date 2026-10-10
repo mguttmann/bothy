@@ -142,8 +142,8 @@ No API operation and no table of chapter 03 changes.
 - Go constants and the closed catalogue in code: M1-25.
 - The "Konfigurationswerte dieses Kapitels" table of 05 stays hand-written (it feeds
   `docs/operations/configuration.md`); this ticket only cross-checks it.
-- The scope table "Scopes für Apps" (2.6) stays hand-written (its rows mix prose such as
-  "Ereignis-Abos"); this ticket cross-checks it.
+- The scope table "Scopes für Apps" (2.6) and the list "Wirkung (`effect`)" (2.7) stay
+  hand-written (prose); this ticket cross-checks both against the YAML.
 
 ## Boundaries
 
@@ -193,6 +193,7 @@ Action (05 column in brackets):
 | `rights_change` | boolean | yes | `ja` / `nein` (Rechte) |
 | `rl_class` | a class id or `none` | yes | `` `rl.x` `` or `keine` (RL-Klasse) |
 | `delivery_check` | boolean, default `false` | no | marks the internal delivery checks (`push.deliver`, `webhook_out.deliver`) |
+| `effect` | `read` or `write` | yes | not rendered; the closed rule of 05 "Wirkung (`effect`)" (2.7): `read` exactly for the actions listed there, `write` for all others; the check derives the expected value from 2.7 and compares |
 | `app_scope` | one of `messages:read`, `messages:write`, `files:read`, `files:write`, `commands:write`, `components:write`, `users:read`, `events:subscribe`, `costs:reconcile`, `none` | no | not rendered; mirrors 2.6 (`none`: usable by apps without a scope; absent: 2.6 names no scope) |
 
 Event:
@@ -207,6 +208,7 @@ Event:
 | `receivers` | `principal`, `agent` or `agent_or_app` | only with `audience: self`, default `principal` | who can be that principal; M1-03 uses it for the webhook table |
 | `receive_text` | string | no | verbatim cell override when the cell is more than the action |
 | `note` | string | no | Hinweis (durable) or Zusatzbedingung (ephemeral); empty when absent |
+| `resource_version` | boolean | yes for `durable` | not rendered; whether the envelope carries `resource.version` (04 "Zustellgarantie" point 3: only when the table of the resource has a `version` column and the event reports its new value; the listed exceptions are `false`). M1-25 carries it into `EventSpec`, and the frame conformance test of M1-67 checks every dispatched event against it |
 
 Receive cell: `receive_text` if set; else `self` (no backticks) for `self`; else `` `id` ``.
 `receive_action: self` requires `audience: self`. When set, `receive_text` must contain
@@ -373,6 +375,8 @@ paths, apply one mutation, run `check(tmp_root)` and assert a finding naming the
 - `test_app_scope_mismatch_with_scope_table_fails` (change one `app_scope`), and
   `test_scope_table_names_unknown_action_fails`.
 - `test_missing_ratelimit_config_row_fails`.
+- `test_effect_mismatch_with_effect_list_fails` (flip one `effect`) and
+  `test_durable_event_without_resource_version_flag_fails`.
 - `test_edited_chapter_block_fails` (change one cell in `actions.identity`),
   `test_edited_redocly_list_fails`, `test_unknown_block_name_fails`,
   `test_unbalanced_markers_fail`.

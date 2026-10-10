@@ -52,10 +52,12 @@ type RightsChange struct {
     Action     authorize.Action      // catalogue action that causes the change
     Resource   authorize.ResourceRef // kind and id written into the deny audit entry
     Principals []ids.ID              // principals whose visible targets may change
+    Targets    []authorize.ResourceRef // spaces or channels whose rights change (archive);
+                                       // authz derives the affected principals (02 8.1)
 }
 ```
 
-- `Begin(ctx, rc)`, phase 1, the first statement of the transaction: lock and increment `sequence_counters('permission_version')` through `instance.Counters`, keep the new value in the transaction state, and compute the before snapshot of every principal in `rc.Principals` from the sources inside the ambient transaction. Never use the snapshot cache here; it is keyed by committed versions and would hide uncommitted state.
+- `Begin(ctx, rc)`, phase 1, the first statement of the transaction: lock and increment `sequence_counters('permission_version')` through `instance.Counters`, keep the new value in the transaction state, and compute the before snapshot of every principal in `rc.Principals` from the sources inside the ambient transaction. For each entry of `rc.Targets` add the affected principals that `authz` derives itself (02 8.1, 04 8.2): subjects of valid grants on the target and its ancestors with group members expanded, all active owners, and the agents that serve the target under the operator rule (`StructureSource`); the difference step later drops everyone without a change. Never use the snapshot cache here; it is keyed by committed versions and would hide uncommitted state.
 - Phase 2 belongs to the use case. A use case that learns about further affected principals during phase 2 calls `AddAffected(ctx, principals...)` on the transaction state before it writes rows that concern them; their before snapshot is computed at that moment.
 - `BeforeCommit(ctx)`, phase 3.1: call `VerifyInvariants`. On a violation return the error (the unit of work rolls back) and schedule the deny entry (Design notes). Otherwise compute the after snapshot of each affected principal, the difference, append one `access.changed` per principal with a non-empty difference through `kernel/eventlog.Appender`, and publish the in-transaction event `authorize.AccessChanged` once with all differences.
 
@@ -170,6 +172,7 @@ Integration tests in `internal/authz/app` against PostgreSQL:
 8. SR8 race: with two active owners, two concurrent declared owner removals (a test use case that updates `owners` and declares `owner.remove`) end with exactly one success and one `last_owner`.
 9. `access.changed` content: revoking G-1 of Alex gives `removed` with space Support and its channels; a level change gives `changed` with `level` and `previous_level`; a capability-only change gives `changed` with `capabilities`; the payload validates against `AccessChangedPayload`, contains no null, and its `permission_version` equals the new counter value.
 10. In-transaction delivery: a test subscriber to `AccessChanged` runs inside the transaction and its veto rolls everything back.
+10a. Target-based change: a test use case that caps a channel at `read` (the shape of M1-53's archive) declares `Targets` only; Alex (grant on the space), Sam (group grant on the channel), the owner and the operator agent of the fake `StructureSource` each get `access.changed` with a `changed` entry; Robin without rights on the channel gets none.
 11. After the commit of a revocation, a new `Authorizer` instance with its own cache answers `not_found` for the revoked target.
 12. Admin use cases: AZ-M31, AZ-M36 (step-up older than `auth.step_up_max_age`), AZ-M37, AZ-M38, AZ-M39 with actor values; `group.delete` revokes the group grants and members lose access; duplicate membership `409 conflict`; archived target `409 conflict`; a group the caller may not see `404`.
 13. Audit: one allow entry per Admin use case with action, actor and resource; details contain no names.

@@ -91,9 +91,10 @@ through the dependencies (M1-32 needs M1-20, which needs M1-16; M1-28 needs M1-2
 13. Rotation, grace and reuse exactly as 03 `refresh_tokens` items 1 to 3 with
     `auth.refresh_reuse_grace`; reuse revokes family and session (`refresh_reuse`), writes audit
     and `session.revoked` (08 "7.4").
-14. Child sessions for extensions (`notification_ext`, `share_ext`) with their own family on the
-    same device; revoking the parent revokes all children with the same reason (08 "7.4",
-    R-ID-05, 03 `auth_sessions`).
+14. Child sessions for the share extension (`share_ext`) with their own family on the same
+    device; revoking the parent revokes all children with the same reason (08 "7.4", R-ID-05, 03
+    `auth_sessions`). The notification service extension has no session; it uses the preview
+    token of its push registration (13 "6.4", ADR 0056).
 15. Session absolute end `auth.session_max_age` (03, 08 "8").
 16. `auth.logout` ends the own session; `session.list` is self or owner (05 "4.1", "4.3").
 17. A pending device may refresh and log out but nothing else except `self.read` and its own
@@ -113,7 +114,7 @@ through the dependencies (M1-32 needs M1-20, which needs M1-16; M1-28 needs M1-2
    repository `adapters/postgres/sessions.go`; the authentication lookup is one query: session by
    id joined with its device and the device's active `dpop` key.
 3. Port in `internal/identity/auth.go` (names fixed):
-   - `ClientComponent` (`app`, `notification_ext`, `share_ext`, `console`), `AuthMethod` (the six
+   - `ClientComponent` (`app`, `share_ext`, `console`), `AuthMethod` (the six
      values of 03), `SessionRevokeReason` (the values of 03 `auth_sessions.revoke_reason`).
    - `StartSession{UserID, DeviceID, AuthMethod, IdentityID *ID}` (component `app`; `console`
      comes with M6-01).
@@ -269,7 +270,7 @@ of the device's active `dpop` key, `current_generation` 0; refresh token generat
 No audit here; the calling login ticket audits `auth.login.complete`.
 
 Child session (`StartChildSession`): parent active, `client_component = 'app'`, not itself a
-child; component `notification_ext` or `share_ext`; same user, device, `auth_method`,
+child; component `share_ext`; same user, device, `auth_method`,
 `identity_id`; `parent_session_id` = parent; `expires_at` = parent `expires_at`; own family with
 the parent family's `dpop_jkt` (extensions share the device key through the keychain group, 15
 "9"). An active child of the same parent and component is revoked (`logout`, with its family and

@@ -1,6 +1,6 @@
 # M1-68: Server core metrics per catalogue
 
-Status: ready | Depends on: M1-04, M1-65 | Etappe: M1
+Status: ready | Depends on: M1-04, M1-50, M1-66 | Etappe: M1
 
 ## Goal
 
@@ -33,8 +33,8 @@ Without this the dashboards, alerts and SLOs shipped in `infra/observability/` m
 - Code you build on: `internal/platform/otel` (M1-10, meter provider, `bothy.telemetry.dropped`),
   `internal/platform/httpserver` (M1-18), `internal/platform/ratelimit` (M1-19),
   `internal/platform/jobs` (M1-14), `internal/platform/pg` (M1-12), `internal/sync` (M1-16),
-  `internal/authz` (M1-28), `internal/messaging` (M1-56), `internal/gateway` (M1-64, M1-65, and
-  M1-66 if merged), `internal/audit` (M1-50), `api/routes` and `api/operations.yaml` (M1-17).
+  `internal/authz` (M1-28), `internal/messaging` (M1-56), `internal/gateway` (M1-64, M1-65,
+  M1-66), `internal/audit` (M1-50), `api/routes` and `api/operations.yaml` (M1-17).
 - `tools/README.md` (rules for new tools), `tools/pyproject.toml`, `Makefile`,
   `docs/quality/gates.md`, `docs/quality/toolchain.md`, `CONTRIBUTING.md`.
 
@@ -79,7 +79,7 @@ Go (module `services/server`):
   histogram, attribute allow-filters per instrument, including the ones created by otelhttp and
   otelpgx), and typed recording wrappers. Unknown attribute values map to `other` in production
   and fail the test in test builds (a strict switch the test helpers turn on).
-- Recording, in the layer where the fact is known (02 "Schichten im Modul"): app-layer code records
+- Recording, in the layer where the fact is known (02 "Schichten im Modul", rule 5): app-layer code records
   through a small outbound port in `internal/<module>/app/metrics.go` with a no-op default for
   unit tests; the implementation lives in `internal/<module>/adapters/otelmetrics/metrics.go`;
   platform packages record in `internal/platform/<pkg>/metrics.go`. Wire everything in
@@ -90,10 +90,10 @@ Go (module `services/server`):
 | Instrument | Recorded in | Rule |
 |---|---|---|
 | `http.server.request.duration` | `platform/httpserver` (otelhttp) | attributes exactly `http.request.method`, `http.route`, `http.response.status_code`, `error.type`; `http.route` = `/api/v1` plus the path template of each enabled operation, `/api/v1/gateway`, or `unmatched`; drop every other key with a view (otelhttp adds keys such as `server.address` whose values come from the client) |
-| `bothy.authz.decisions` | `authz` | requests and ops only; delivery checks in `authorize.Delivery(ctx)` are filters and are not counted (ruling below) |
+| `bothy.authz.decisions` | `authz` | requests and ops only; checks in filter mode (`authorize.Filter(ctx)`, implied by the gateway's `Delivery(ctx)`) are not counted (signals.md) |
 | `bothy.ratelimit.rejected` | `platform/ratelimit` | class from the generated catalogue |
 | `bothy.gateway.connections.active` | `gateway` | +1 at `ready`/`resumed`, -1 when such a connection closes; kinds `user`, `agent`, `app` |
-| `bothy.gateway.connect.duration` | `gateway` | upgrade to `ready`/`resumed`, or to the close before it; `client_error` for `4001` to `4008`, `4012`, `4016` and client aborts before `identify`; everything else without `ready` is `server_error`; kind `anonymous` before identification |
+| `bothy.gateway.connect.duration` | `gateway` | upgrade to `ready`/`resumed`, or to the close before it; `client_error` and `server_error` exactly as signals.md 4.1 defines them; kind `anonymous` before identification |
 | `bothy.gateway.catchup.duration` | `gateway` | `ready`/`resumed` to `catchup.complete` (`complete`) or `resync_required` |
 | `bothy.gateway.resync` | `gateway` | reasons of 04 "`resync_required`" |
 | `bothy.gateway.close` | `gateway` | every close in both directions; codes of 04 "Schließ-Codes" as strings, any other code `other` |
@@ -102,13 +102,13 @@ Go (module `services/server`):
 | `bothy.event.appended` | `sync` phase hook | after commit, per durable type |
 | `bothy.db.event_seq.lock_wait` | `sync` phase hook | duration of the `UPDATE sequence_counters` statement for `event_seq` |
 | `bothy.event.fanout.lag` | `gateway` (fed by the tail) | 0 when the hub has distributed every event the tail knows of; otherwise now minus the time the oldest undistributed event became known (NOTIFY or poll) |
-| `bothy.delivery.duration` | `gateway` writer | `occurred_at` to successful write, phase `live` only; `ephemeral` path too if M1-66 is merged |
+| `bothy.delivery.duration` | `gateway` writer | `occurred_at` to successful write, phase `live` only; durable and ephemeral path (M1-66) |
 | `bothy.job.duration` | `platform/jobs` | kinds from the job registry; outcome `completed`, `failed`, `cancelled`, `snoozed` |
 | `bothy.job.queue` | `platform/jobs`, role `worker` | observable gauge: jobs per kind in states `available`, `scheduled`, `retryable` |
 | `db.client.operation.duration` | `platform/pg` | from otelpgx if its installed version emits it with closed `db.operation.name` and `db.collection.name`; otherwise an own pgx query tracer in `platform/pg` |
 | `bothy.db.pool.connections` | `platform/pg` | observable gauge from the pool statistics: `idle`, `acquired`, `max` |
 | `bothy.telemetry.dropped` | `platform/otel` | already from M1-10; move its declaration into the registry |
-| `bothy.audit.verify.failures`, `bothy.audit.verify.last_success.timestamp` | `audit` (job `audit.chain_verify`) | only if M1-50 did not already record them; the alert rules use them |
+| `bothy.audit.verify.failures`, `bothy.audit.verify.last_success.timestamp` | `audit` (job `audit.chain_verify`) | recorded by M1-50; this ticket only moves their declaration into the registry |
 
 Python gate:
 
@@ -123,14 +123,15 @@ Python gate:
 
 Docs:
 
-- `docs/observability/signals.md`: new definition of `bothy.event.fanout.lag`; extended
-  `client_error` list; `bothy.authz.decisions` without delivery checks; Quelle column of
-  `db.client.operation.duration` with the verified otelpgx version. (The outcome values of
-  `bothy.job.duration` and the GenAI package path are already there.) Move the declarations of
+- `docs/observability/signals.md` already carries the definition of `bothy.event.fanout.lag`, the
+  `client_error` list, `bothy.authz.decisions` without filters, the view rule for library
+  instruments (2, item 5), the outcome values of `bothy.job.duration` and the GenAI package path.
+  Change only the Quelle column of `db.client.operation.duration` (verified otelpgx version) and
+  what the build proves wrong. Move the declarations of
   `bothy.authz.errors` (M1-18, M1-25), `bothy.egress.blocked` (M1-22) and
   `bothy.secrets.refresh.failures` (M1-09) into the registry like `bothy.telemetry.dropped`.
 - Module READMEs of every module that records metrics (German, like the existing files),
-  `services/server/CHANGELOG.md` under "Unreleased", `docs/DECISIONS.md` (rulings below).
+  `services/server/CHANGELOG.md` under "Unreleased", `docs/DECISIONS.md` (only decisions beyond the specification).
 
 ## Out of scope
 
@@ -208,18 +209,10 @@ Go registry and checks
 Fixes to existing files: if the real dashboards, rules or Sloth files fail a rule, fix the file
 or, when the file is right, the catalogue, in this change, each with a line in the report.
 
-Rulings to record in `docs/DECISIONS.md`:
-
-1. Metric ports: app layers record through `app/metrics.go` ports, adapters and platform packages
-   through `internal/platform/otel/metrics`; the plan path `internal/*/metrics.go` is read this way
-   because 02 forbids `platform` and third-party imports in `app`.
-2. `bothy.event.fanout.lag` measures pending, not last, events; the catalogue wording would fire
-   `BothyEventFanoutLag` on an idle system and stay quiet on a stuck one.
-3. `client_error` of `bothy.gateway.connect.duration` also covers `4001` to `4003`, `4005`, `4006`,
-   `4012` and `4016`: a pending device, a revoked session or a protocol error by the client is
-   not a server failure and must not burn the `bothy-sync/reconnect` budget.
-4. `bothy.authz.decisions` counts requests and ops, not delivery filters.
-5. Outcome values of `bothy.job.duration`: `completed`, `failed`, `cancelled`, `snoozed`.
+No rulings of its own: metric ports (02 "Schichten im Modul" rule 5), the fan-out lag, the
+`client_error` set, the scope of `bothy.authz.decisions`, the views for library instruments and the
+job outcomes are in the specification. Record in `docs/DECISIONS.md` only what the build had to
+decide beyond them.
 
 ## Tests (write them first)
 
