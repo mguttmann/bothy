@@ -73,6 +73,16 @@ Regeln für die Nutzlast:
    (03, `event_log.truncated`); der Anhänger lehnt eine zu große Nutzlast ab, statt sie zu
    kürzen. Der Client lädt per REST nach.
 3. Sie enthält keine Geheimnisse und keine Tokens.
+4. Nachrichteninhalte stehen nur in Ereignissen mit Ressource `message` (`message.*`; `reaction.*`
+   tragen das Emoji). Alle anderen Ereignisse nennen Nachrichten nur per ID, auch `agent.invocation`
+   und `agent.followup`; den Inhalt liest der Empfänger per REST mit einer Prüfung durch
+   `authorize`. Grund: Das Schwärzen bei Löschung (03, Abschnitt 6.5) erreicht so jeden Inhalt.
+5. Eine geschwärzte Nutzlast bleibt gültig nach ihrem Schema: `message.created` und
+   `message.updated` tragen die Löschmarke der Nachricht (`content_md` leer, ohne Anhänge,
+   Erwähnungen, Komponenten und Reaktionen, mit `deleted_at`); `reaction.added` und
+   `reaction.removed` tragen `emoji: ""` und `count: 0`; `pin.added` und `pin.removed` bleiben
+   unverändert, weil sie keinen Inhalt tragen. Ein neuer Ereignistyp mit Ressource `message` legt
+   seine Schwärzung mit seinem Schema fest; ohne sie scheitert das Löschen (Test).
 
 ### 2.3 Rahmen auf dem WebSocket
 
@@ -194,6 +204,8 @@ zusätzlich durch die Version geschützt.
 ### 6.1 Endpunkt und Version
 
 Ein Endpunkt `wss://<host>/api/v1/gateway`. Die Protokollversion steht in `identify` und `hello`.
+Die unterstützten Versionen stehen an einer Stelle: `info.x-protocol-versions` in
+[asyncapi.yaml](../api/asyncapi.yaml); `hello` und die Discovery nennen dieselben.
 Änderungen innerhalb einer Hauptversion sind nur additiv: neue Ops, neue Felder, neue
 Ereignistypen. Clients ignorieren Unbekanntes. Ein Gerät hält genau eine Verbindung.
 
@@ -461,7 +473,10 @@ damit vor seinem Ablauf wirkungslos.
    Verbindung streng in `seq`-Reihenfolge liefert, reicht dieser Vergleich.
 3. Zusätzlich wendet der Client eine Änderung an einem Objekt nur an, wenn
    `resource.version` größer ist als die lokale Version. Damit sind auch Daten aus REST und aus
-   Ereignissen ohne Konflikt mischbar.
+   Ereignissen ohne Konflikt mischbar. Ausnahme: `reaction.*` und `pin.*` erhöhen
+   `messages.version` nicht (sonst bekäme der Autor nach jeder Reaktion `412` beim Bearbeiten);
+   ihre Nutzlast trägt absolute Werte (Anzahl je Emoji, angeheftet ja oder nein), und der Client
+   wendet sie in `seq`-Reihenfolge an.
 4. Kurzlebige Ereignisse werden höchstens einmal zugestellt (at-most-once).
 
 ## 10. Reihenfolge
@@ -601,7 +616,7 @@ Gewinnerregel ist die Commit-Reihenfolge im Server, ausgedrückt durch die Versi
 
 | Daten | Ereignis | Regel |
 |---|---|---|
-| Gelesen-Stand | `read_state.updated` | monoton: `last_read_seq = GREATEST(alt, neu)`. Zurücksetzen ("als ungelesen markieren") ist eine eigene Operation mit `If-Match`. Importiertes zählt über `threads.unread_floor_seq` nie als ungelesen (Abschnitt 15.8). |
+| Gelesen-Stand | `read_state.updated` | monoton: `last_read_seq = GREATEST(alt, neu)`. Zurücksetzen ("als ungelesen markieren") ist eine eigene Operation mit `If-Match`. Importiertes zählt über `threads.unread_floor_seq` nie als ungelesen (Abschnitt 15.8). Ungelesen- und Erwähnungszähler speichert der Server nicht (03 `read_states`): Momentaufnahme, `listMyReadStates` und `read_state.updated` nennen den berechneten Wert; dazwischen zählt der Client selbst aus `message.created`, `message.updated` und `message.deleted` (`mention_ids`). Eine neue Erwähnung schreibt kein persönliches Ereignis. |
 | Entwürfe | `draft.updated`, `draft.deleted` | letzte Schreibung gewinnt in Server-Reihenfolge; jede Schreibung erhöht `version`. Der Client sendet `base_version`; ist sie älter als die aktuelle, antwortet der Server mit `overwrote_newer: true`, und der Client zeigt einen Hinweis. Eingehende Änderungen eines anderen Geräts übernimmt ein Gerät nur, wenn der Mensch dort gerade nicht in diesem Entwurf tippt; sonst gewinnt die nächste lokale Schreibung. Erfolgreiches Senden mit `clear_draft: true` löscht den Entwurf in derselben Transaktion. |
 | Einstellungen | `settings.updated` | je Schlüssel letzte Schreibung gewinnt; Änderungen an verschiedenen Schlüsseln stören sich nicht |
 | Seitenleiste | `sidebar.updated` | je Bereich (`user_space_states`) letzte Schreibung gewinnt |

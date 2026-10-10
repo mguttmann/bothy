@@ -80,7 +80,7 @@ erDiagram
     uuid device_id FK
     uuid identity_id FK
     uuid parent_session_id FK "Erweiterungen"
-    text client_component "app, console, notification_ext, share_ext, cli"
+    text client_component "app, notification_ext, share_ext, console"
     text auth_method
     timestamptz step_up_at
     text step_up_method
@@ -109,6 +109,7 @@ erDiagram
     uuid identity_id PK, FK
     text password_hash
     bytea totp_secret_ciphertext
+    timestamptz fail_window_started_at
     timestamptz locked_until
   }
   enrollment_codes {
@@ -124,9 +125,20 @@ erDiagram
     uuid provider_id FK
     text mode "login, link"
     uuid user_id FK
+    uuid enrollment_code_id FK
     bytea oidc_state_hash UK
     bytea login_code_hash UK
+    jsonb external_identity "geprüft beim Rückruf, bis zum Abschluss"
     text status "started, code_issued, completed, failed"
+    timestamptz expires_at
+  }
+  auth_challenges {
+    uuid id PK
+    text purpose "step_up, passkey_login, passkey_enroll, passkey_register"
+    uuid session_id FK
+    uuid enrollment_code_id FK
+    bytea challenge_hash UK
+    text status "issued, used, failed"
     timestamptz expires_at
   }
   device_pairings {
@@ -159,6 +171,9 @@ erDiagram
   devices |o--o{ enrollment_codes : "eingelöst von"
   identity_providers ||--o{ auth_login_flows : "Anbieter"
   users |o--o{ auth_login_flows : "verknüpft"
+  enrollment_codes |o--o{ auth_login_flows : "vorgelegt"
+  auth_sessions |o--o{ auth_challenges : "Step-up, Passkey"
+  enrollment_codes |o--o{ auth_challenges : "Einrichtung mit Passkey"
   users |o--o{ device_pairings : "koppelt"
   devices |o--o{ device_pairings : "bestätigt, entsteht"
   auth_sessions ||--o{ refresh_token_families : "hat"

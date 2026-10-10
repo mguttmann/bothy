@@ -148,7 +148,7 @@ Diagramm: [c4-3-komponenten-server.svg](../architecture/c4-3-komponenten-server.
 | `audit` | Audit-Log mit Hash-Kette, signierte Prüfpunkte, Schlüssel der IP-Pseudonyme, Abfrage, Prüfung, Kürzung mit Anker | `audit_events`, `audit_checkpoints`, `audit_ip_keys` | 19, 20 |
 | `authz` | `authorize`, Rechte-Cache, sichtbare Ziele, Gruppen, Freigaben, Rechte-Version, I1-Prüfung, "Wer hat Zugriff", "Als Person ansehen" | `groups`, `group_memberships`, `grants` | 07 |
 | `billing` | Preistabelle, Kostenbuchungen, Summen je Lauf, Thread, Bereich, Agent, Abgleich | `price_table`, `cost_entries` | 10 |
-| `identity` | Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten, Einladungs-Codes, Anmeldevorgänge, Geräte-Kopplung, Passkeys, Geräte und Geräteschlüssel, Sitzungen, Refresh-Familien, API-Tokens, Step-up, Zugriffstokens | `principals`, `users`, `owners`, `identity_providers`, `user_identities`, `local_credentials`, `enrollment_codes`, `auth_login_flows`, `device_pairings`, `passkey_credentials`, `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`, `refresh_tokens`, `api_tokens` | 08 |
+| `identity` | Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten, Einladungs-Codes, Anmeldevorgänge, Geräte-Kopplung, Passkeys, Geräte und Geräteschlüssel, Sitzungen, Refresh-Familien, API-Tokens, Step-up, Zugriffstokens | `principals`, `users`, `owners`, `identity_providers`, `user_identities`, `local_credentials`, `enrollment_codes`, `auth_login_flows`, `auth_challenges`, `device_pairings`, `passkey_credentials`, `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`, `refresh_tokens`, `api_tokens` | 08 |
 | `chat` | Bereiche, Seitenleisten-Zustand, Kanäle mit Verhalten, Skills, Projektbindung, DM-Teilnehmer, Forum-Tags, Threads mit Thread-Sequenz | `spaces`, `user_space_states`, `channels`, `channel_skill_bindings`, `project_bindings`, `dm_participants`, `forum_tags`, `threads`, `thread_tags` | 01, 07, 09 |
 | `agents` | Agenten, Backend-Richtlinie und Werkzeugklasse (Soll), gemeldeter Ist-Zustand, Verbraucher-Cursor mit Fencing, Befehlsregister, Agenten-Sitzungen, Dev-Umgebungen (Etappe) | `agents`, `agent_consumer_cursors`, `commands`, `agent_sessions`, `dev_environments` | 09, 10, 21 |
 | `files` | Upload-Sitzungen in Teilen, Objektspeicher-Treiber, Scan, Metadaten-Entfernung, Vorschaubilder, Anhänge, Transkripte, Dateitext | `files`, `file_upload_sessions`, `file_upload_parts`, `file_thumbnails`, `message_attachments`, `file_text_extracts` | 12, 14 |
@@ -178,17 +178,17 @@ tieferer Module, die das Modul implementiert.
 
 | Modul | Port (Auszug) | Gibt aus (In-Tx) | Abonniert (In-Tx) | Implementiert Quellen |
 |---|---|---|---|---|
-| `instance` | `Settings`, `Flags`, `Keys` (Signer je Zweck, JWKS, Rotation), `Counters` (nur für die Phasen-Hooks von `authz`, `sync`, `audit`), `Versions` (Zählerstände ohne Sperre lesen, z. B. `permission_version` für den Rechte-Cache, `event_seq` für Catch-up) | | | |
+| `instance` | `Settings`, `Flags`, `Keys` (Signer je Zweck, JWKS, Rotation), `Counters` (nur für die Phasen-Hooks von `authz`, `sync`, `audit`), `Versions` (Zählerstände ohne Sperre lesen, z. B. `permission_version` für den Rechte-Cache, `event_seq` für Catch-up); deklariert `LoginOptionsSource` (Anmelde-Treiber und Passwortweg für die Discovery), `FlagUserSource` (Menschen eines Rollouts), `FlagGroupSource` (gültige Gruppen eines Menschen für die Auswertung) | | | |
 | `audit` | `Log` (Abfrage, Prüfung) | | | kernel `auditing.Recorder` |
-| `authz` | `Admin` (Gruppen, Freigaben, Erklärung, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource` | kernel `authorize.AccessChanged` | | kernel `authorize.Authorizer` |
+| `authz` | `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource` | kernel `authorize.AccessChanged` (mit der auslösenden Aktion; `runs` bricht bei `user.disable` mit Grund `user_disabled` ab, sonst mit `access_revoked`) | | kernel `authorize.Authorizer`, `instance.FlagGroupSource` |
 | `billing` | `Costs` (Buchen, Korrektur, Summen), `Prices` | | | |
-| `identity` | `Auth` (Anmeldung, Refresh, Logout, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`; deklariert `AvatarFiles` | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), kernel `personaldata.Participant` |
-| `chat` | `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen, `AppendToThread`, Schließen, Öffnen, Verschieben, Info), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
+| `identity` | `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`; deklariert `AvatarFiles` | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant` |
+| `chat` | `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen für `messaging`, `AppendToThread`, Nachrichtenzahl bei Löschung, Schließen, Öffnen, Verschieben, Info), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
 | `agents` | `Agents` (Verwaltung, Richtlinie, Werkzeugklasse), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe) | `AgentDisabled` | | `authz.AgentPolicySource` (Richtlinie, Werkzeugklasse, Bereitschaft der Dev-Umgebung), kernel `personaldata.Participant` |
 | `files` | `Uploads` (Sitzungen, Teile), `Files` (Lesen, Öffnen, Vorschau, Abruf-Tickets, Löschen), `Attachments`, `Transcripts`, `TextExtracts`; deklariert `AttachmentLocator` | `FileFinalized` (Scan und gegebenenfalls Transkript endgültig) | | `identity.AvatarFiles`, kernel `personaldata.Participant` |
-| `messaging` | `Messages` (Anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker), `Reactions`, `Pins`, `Templates`, `Mentions`, `Export`; deklariert `ComponentReader` | `MessagePosted`, `MessageDeleted` | `chat.ThreadMoved` | `files.AttachmentLocator`, kernel `personaldata.Participant` |
+| `messaging` | `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader` | `MessagePosted`, `MessageDeleted` | `chat.ThreadMoved` | `files.AttachmentLocator`, kernel `personaldata.Participant` |
 | `runs` | `Runs` (Lesen, Kontext, Start, Wiederaufnahme, Patch, Ende, Abbruch, Übersicht), `Delivery` (Zustellvorbereitung mit I2, Schutzregeln und Marke), `Interactions`, `CommandExec` (inklusive Autovervollständigung) | | `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (zurückgehaltenen Aufruf schreiben), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged` | `messaging.ComponentReader`, kernel `personaldata.Participant` |
-| `sync` | `Tail`, `CatchUp`, `Snapshot`, `Consumers` (Worker-Cursor), `ReadStates`, `Drafts`, `Settings` | | `messaging.MessagePosted` (Entwurf leeren, Erwähnungszähler), `chat.ThreadMoved` (Kopien von `channel_id`) | kernel `eventlog.Appender`, kernel `idempotency.Store`, kernel `personaldata.Participant` |
+| `sync` | `Tail`, `CatchUp`, `Snapshot`, `Consumers` (Worker-Cursor), `ReadStates`, `Drafts`, `Settings` | | `messaging.MessagePosted` (Entwurf leeren), `chat.ThreadMoved` (Kopien von `channel_id`) | kernel `eventlog.Appender`, kernel `eventlog.Redactor`, kernel `idempotency.Store`, kernel `personaldata.Participant` |
 | `notify` | `Preferences`, `QuietHours`, `PushRegistrations` | | `identity.DeviceRevoked`, `identity.SessionEnded` (Registrierungen der Sitzung deaktivieren), `chat.ChannelArchived`, `chat.SpaceArchived` | kernel `personaldata.Participant` |
 | `gateway` | keiner für andere Module | | | kernel `eventlog.EphemeralPublisher` |
 | `search` | `Search` | | | |
@@ -246,10 +246,12 @@ Tickets der Module `identity`, `chat`, `agents`).
 | `kernel/errs` | Fehlerarten mit stabilem Code (Abschnitt 14.1) | kernel selbst | allen |
 | `kernel/textcheck` | Prüfung von Anzeige-Texten nach SEC-IN-4 (ungültiges UTF-8, Steuerzeichen, Bidi-Steuerzeichen); keine Längenprüfung | kernel selbst | `domain`-Pakete aller Module mit Anzeige-Texten |
 | `kernel/reqmeta` | `correlation_id` (Trace-ID der Anfrage, als UUID geschrieben, keine UUIDv7) und Client-IP der Anfrage im Kontext; nur Standardbibliothek | `platform/httpserver` setzt die Werte | `audit`, `sync`, `platform/*` |
+| `kernel/jose` | Kompakte JWS lesen, bauen und prüfen (`ES256`, `EdDSA`, `RS256`, `PS256`), JWK lesen und Fingerabdruck nach RFC 7638; nur Standardbibliothek (ADR 0067) | kernel selbst | `identity` (DPoP, Zugriffstokens, Step-up, ID-Tokens, Client-Assertion), `instance` (JWKS, Prüfung von Prüfpunkten), `audit`, später `runs` |
+| `kernel/designkeys` | erlaubte Schlüssel des Design-Systems als Daten: Kategorie-Farben, Akzente, Bereichs-Icons; erzeugt aus `design/build/tokens.resolved.json` (PLAN M1-46) | Generator | `instance` (Branding), `chat` (Bereiche, Tags) |
 | `kernel/actor` | Prinzipal einer Anfrage (ID, Art, Gerät, Sitzung, Step-up-Zeit, Scopes); `Authenticator` | `identity` | `platform/httpserver`, `gateway` |
 | `kernel/authorize` | Aktionen (generiert aus 05), Ressourcen-Deskriptor, `Decision`, `Authorizer` (`Authorize`, `Scope` für Listen, `Observe` für `access.changed`), In-Tx-Ereignis `AccessChanged` | `authz` | allen |
 | `kernel/txn` | Unit of Work, Phasen vor dem Commit, In-Tx-Ereignisbus (Abschnitt 8) | `platform/pg`; Phasen-Hooks von `authz`, `sync`, `audit` | allen `app`-Paketen |
-| `kernel/eventlog` | `Appender` für dauerhafte Ereignisse, `EphemeralPublisher` für kurzlebige | `sync` bzw. `gateway` | allen |
+| `kernel/eventlog` | `Appender` für dauerhafte Ereignisse, `Redactor` zum Schwärzen der Nutzlasten einer gelöschten Nachricht (03, Abschnitt 6.5), `EphemeralPublisher` für kurzlebige | `sync` bzw. `gateway` | allen; `Redactor` nur `messaging` (und `files` mit M3) |
 | `kernel/auditing` | `Recorder`: in der Transaktion oder getrennt (für Ablehnungen nach Rollback) | `audit` | allen |
 | `kernel/idempotency` | `Store` für `Idempotency-Key` im Unit of Work | `sync` | `platform/httpserver` |
 | `kernel/personaldata` | `Participant`: Export und Löschung je Modul für einen Menschen | Module mit personenbezogenen Tabellen | `privacy` |
@@ -267,14 +269,14 @@ Tabelle mit dem Katalog (Abschnitt 7.3).
 
 | Modul | Aktionen |
 |---|---|
-| `instance` | `instance.discovery.read`, `instance.read`, `instance.settings.read`, `instance.settings.update`, `instance.branding.update`, `instance.bootstrap`, `feature_flag.read`, `feature_flag.update`, `signing_key.rotate`, `signing_key.transition` |
+| `instance` | `instance.discovery.read`, `instance.read`, `instance.settings.read`, `instance.settings.update`, `instance.branding.update`, `feature_flag.read`, `feature_flag.update`, `signing_key.rotate`, `signing_key.transition` |
 | `audit` | `audit.read`, `audit.verify` |
-| `authz` | `access.explain`, `access.preview`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `group.member.expire`, `grant.read`, `grant.create`, `grant.revoke`, `grant.expire` |
-| `identity` | `auth.login.begin`, `auth.login.complete`, `auth.token.refresh`, `auth.logout`, `auth.step_up`, `identity_provider.read`, `identity_provider.manage`, `owner.add`, `owner.remove`, `self.read`, `user.read`, `user.create`, `user.update`, `user.disable`, `user.enable`, `self.profile.update`, `identity.read`, `identity.link`, `identity.unlink`, `local_credential.set`, `passkey.register`, `passkey.revoke`, `device.list`, `device.approve`, `device.revoke`, `session.list`, `session.revoke`, `token.list`, `token.create`, `token.revoke` |
-| `chat` | `space.read`, `space.create`, `space.update`, `space.reorder`, `space.archive`, `space.operator.set`, `sidebar.update`, `channel.read`, `channel.create`, `channel.update`, `channel.reorder`, `channel.behavior.read`, `channel.behavior.update`, `channel.operator.set`, `channel.project.bind`, `channel.read_only.set`, `channel.archive`, `forum_tag.manage`, `dm.create`, `dm.leave`, `thread.read`, `thread.create`, `thread.title.update`, `thread.close`, `thread.reopen`, `thread.move`, `thread.tags.set`, `agent.config.read` |
+| `authz` | `access.explain`, `access.preview`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `group.member.expire`, `group.member.sync`, `grant.read`, `grant.create`, `grant.revoke`, `grant.expire` |
+| `identity` | `instance.bootstrap`, `auth.login.begin`, `auth.login.complete`, `auth.token.refresh`, `auth.logout`, `auth.step_up`, `identity_provider.read`, `identity_provider.manage`, `owner.add`, `owner.remove`, `owner.recover`, `self.read`, `user.read`, `user.create`, `user.update`, `user.disable`, `user.enable`, `self.profile.update`, `identity.read`, `identity.link`, `identity.unlink`, `local_credential.set`, `passkey.register`, `passkey.revoke`, `device.list`, `device.approve`, `device.revoke`, `device.expire`, `session.list`, `session.revoke`, `session.extension.create`, `token.list`, `token.create`, `token.revoke` |
+| `chat` | `space.read`, `space.create`, `space.update`, `space.reorder`, `space.archive`, `space.operator.set`, `sidebar.update`, `channel.read`, `channel.create`, `channel.update`, `channel.reorder`, `channel.behavior.read`, `channel.behavior.update`, `channel.operator.set`, `channel.project.bind`, `channel.read_only.set`, `channel.archive`, `forum_tag.manage`, `dm.create`, `dm.leave`, `thread.read`, `thread.title.update`, `thread.close`, `thread.reopen`, `thread.move`, `thread.tags.set`, `agent.config.read` |
 | `agents` | `agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report` |
 | `files` | `file.upload`, `file.read`, `file.delete`, `file.transcribe`, `file.transcript.submit` |
-| `messaging` | `message.read`, `message.create`, `message.update`, `message.delete`, `message.revisions.read`, `reaction.add`, `reaction.remove`, `pin.create`, `pin.delete`, `mention.list`, `template.read`, `template.manage`, `export.channel` |
+| `messaging` | `thread.create`, `message.read`, `message.create`, `message.update`, `message.delete`, `message.revisions.read`, `reaction.add`, `reaction.remove`, `pin.create`, `pin.delete`, `mention.list`, `template.read`, `template.manage`, `export.channel` |
 | `runs` | `agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke` |
 | `billing` | `cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `cost.reconcile`, `cost.reconcile.submit` |
 | `sync` | `read_state.update`, `read_state.mark_unread`, `draft.read`, `draft.write`, `settings.read`, `settings.update`, `sync.snapshot.read`, `events.catch_up` |
@@ -292,6 +294,13 @@ Begründungen für Grenzfälle:
 - `agent.invoke` gehört zu `runs`, weil die Folge immer ein Lauf, ein Nachtrag oder ein
   Befehlsaufruf ist. Die Regeln aus 05 Abschnitt 5 wertet trotzdem `authz` aus.
 - `agent.config.read` gehört zu `chat`, weil Prompt, Skills und Projektbindung dort liegen.
+- `thread.create` gehört zu `messaging`: Ein neuer Thread (Forum-Beitrag oder Thread aus einer
+  Nachricht) entsteht mit seiner ersten Nachricht, und `chat` darf `messaging` nicht nutzen.
+  `chat` legt die Zeile über den Port `Threads` an, prüft dabei aber keine Rechte; den
+  Hauptverlauf eines neuen Kanals legt `chat` selbst als Teil von `channel.create` an (R-DM-11).
+- `instance.bootstrap` und `owner.recover` gehören zu `identity`, weil sie Menschen, Owner,
+  Identitäten und Einladungs-Codes schreiben; `instance` setzt nur `setup_completed_at` über
+  seinen Port.
 - `command.invoke` und `command.autocomplete` gehören zu `runs` (Zustellung an den Agenten mit
   `agent.invoke`), das Register (`command.register`, `command.remove`, `command.read`) zu `agents`.
 - `export.channel` gehört zu `messaging`; das Paket legt `files` ab.
@@ -329,7 +338,7 @@ Ein Ereignistyp hat genau ein erzeugendes Modul. Die Empfangs-Aktion steht in 05
 | Schicht | Paket | Enthält | Darf importieren | Darf nicht |
 |---|---|---|---|---|
 | Port | `internal/<modul>` | Eingehende Schnittstellen, Befehls- und Ergebnis-Typen (DTOs), In-Tx-Ereignisse, deklarierte Quellen-Ports | `kernel` | `domain`, `app`, `adapters`, fremde Module, Fremdbibliotheken |
-| Domain | `internal/<modul>/domain` | Entitäten, Wertobjekte, Zustandsmaschinen (z. B. Lauf-Übergänge), Invarianten, reine Funktionen | Pakete aus `kernel-core` (`kernel/ids`, `kernel/clock`, `kernel/errs`, `kernel/textcheck`, `kernel/reqmeta`) | Ein- und Ausgabe, SQL, HTTP, Kontext mit Transaktion, Fremdbibliotheken |
+| Domain | `internal/<modul>/domain` | Entitäten, Wertobjekte, Zustandsmaschinen (z. B. Lauf-Übergänge), Invarianten, reine Funktionen | Pakete aus `kernel-core` (`kernel/ids`, `kernel/clock`, `kernel/errs`, `kernel/textcheck`, `kernel/reqmeta`, `kernel/jose`, `kernel/designkeys`) | Ein- und Ausgabe, SQL, HTTP, Kontext mit Transaktion, Fremdbibliotheken |
 | Anwendung | `internal/<modul>/app` | Anwendungsfälle: `authorize`, Unit of Work, Domain aufrufen, Ereignisse anhängen; ausgehende Ports (Repository, Uhr, Fremddienst) als Schnittstellen | eigener Port, eigene Domain, `kernel`, Ports erlaubter Module | `adapters`, `platform`, `api`, Fremdbibliotheken |
 | Adapter | `internal/<modul>/adapters/<art>` | `postgres` (sqlc-Code und Repository), `httpapi` (Teil des generierten Server-Interfaces), weitere wie `objectstore`, `clamav`, `apns` | alles des eigenen Moduls, `kernel`, `platform`, `api`, Ports erlaubter Module, zugelassene Fremdbibliotheken | `app` oder `domain` fremder Module |
 
@@ -374,13 +383,26 @@ services/server/
         ...                   weitere Adapter des Moduls
       README.md               Zweck, Ports, Abhängigkeiten, Tabellen, Kapitel
   tools/archgen/              Generator: architecture/modules.yaml -> .go-arch-lint.yml
+  tools/flagcheck/            Gate: Registrierung der Feature-Flags gegen VERSION (ADR 0064)
   sqlc.yaml                   ein Eintrag je Modul, Schema aus migrations/
   .go-arch-lint.yml           generiert aus architecture/modules.yaml
 ```
 
-Stellen mit dem Produktnamen (Baseline Abschnitt 1, damit ein Wechsel billig bleibt): Go-Modulpfad in
-`go.mod`, Binary-Name `bothy` (`cmd/bothy`), Präfix der Umgebungsvariablen `BOTHY_`, Image-Name.
-Eine Liste dieser Stellen führt [18-release.md](18-release.md); weitere Stellen sind ein Fehler.
+Testhilfen, die Tests mehrerer Pakete nutzen, liegen im Baum der Komponente, deren Typen sie bauen,
+damit das Architektur-Gate sie einer Komponente zuordnet: `internal/platform/<p>/<p>test` (z. B.
+`pgtest`, `httpservertest`) und `internal/<modul>/adapters/<modul>test` (z. B. `identitytest` mit
+Geräteschlüsseln, DPoP-Beweisen und echter Anmeldung). Nur `_test.go`-Dateien importieren sie; ein
+Test (`go list -deps ./cmd/bothy`) hält sie aus dem Binary. Fachliche Teilbereiche eines Moduls
+(OIDC, Flags, Konsole) sind Dateien oder Unterpakete von `domain`, `app` und `adapters`, nie
+eigene Pakete daneben; ein Paket ohne Komponente scheitert im Gate (7.1).
+
+Stellen mit dem Produktnamen (Baseline Abschnitt 1, ADR 0044; damit ein Wechsel billig bleibt),
+nach Art: Go-Modulpfad in `go.mod`; Binary `bothy` (`cmd/bothy`); Präfix der Umgebungsvariablen
+`BOTHY_`; Namen der Images (`bothy-server`, `bothy-postgres`, `bothy-backupd`) und Pfade im Container
+(`/run/bothy`, `/var/lib/bothy`); Rollen der Datenbank (`bothy_*`); Präfix der Telemetrie-, Alarm-
+und SLO-Namen (`bothy.`, `bothy_`, `Bothy`); Präfix der API-Tokens `bothy_` mit der gitleaks-Regel
+(ADR 0061); Standardwert der Einstellung `branding.product_name`. Diese Liste ist die einzige; ein
+Test (PLAN M1-46) erlaubt den Namen in Code und Konfiguration nur an Stellen dieser Arten.
 
 ## 7. Automatische Prüfung der Regeln
 
@@ -396,7 +418,7 @@ Einträge, nie Felder):
 version: 1
 exclude: [tools]                  # Verzeichnisse, die go-arch-lint nicht prüft (Werkzeuge)
 kernel:
-  core: [ids, clock, errs, textcheck, reqmeta]   # von jedem Paket nutzbar
+  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys]   # von jedem Paket nutzbar
   ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata]
 platform:                         # je Plattform-Paket eine Komponente
   jobs: {depends_on: [pg], vendors: [river]}
@@ -447,7 +469,8 @@ vendors:
   v-river: { in: [github.com/riverqueue/river, github.com/riverqueue/river/**] }
 components:
   kernel-core:   { in: [internal/kernel/ids, internal/kernel/clock, internal/kernel/errs,
-                        internal/kernel/textcheck, internal/kernel/reqmeta] }
+                        internal/kernel/textcheck, internal/kernel/reqmeta, internal/kernel/jose,
+                        internal/kernel/designkeys] }
   kernel-ports:  { in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn,
                         internal/kernel/eventlog, internal/kernel/auditing,
                         internal/kernel/idempotency, internal/kernel/personaldata] }
@@ -798,11 +821,11 @@ und Webhooks nicht verzögern. Importe laufen nicht als Job im Server, sondern i
 | `runs.invocation_hold_timeout` | `runs` | terminiert, `file.invocation_hold_max` bzw. `voice.transcript_hold_max` | `default` | 04, 12 |
 | `authz.expiry_reminder` | `authz` | periodisch, `access.expiring` vor Ablauf | `maintenance` | 07 |
 | `authz.expiry_sweep` | `authz` | periodisch, `access.changed` nach Ablauf (Systemaktionen `grant.expire`, `group.member.expire`) | `maintenance` | 07 |
-| `identity.session_cleanup` | `identity` | periodisch | `maintenance` | 08 |
+| `identity.auth_cleanup` | `identity` | periodisch alle `auth.cleanup_interval`: abgelaufene Zeilen von `auth_challenges`, `auth_login_flows` und `device_pairings` löschen; wartende Geräte über `auth.device_pending_ttl`, nie abgeholte gekoppelte und ungenutzte Geräte über `auth.device_inactive_revoke_after` widerrufen (Systemaktion `device.expire`); die Entscheidung je Anfrage hängt nie am Job | `maintenance` | 08, 20 |
 | `instance.key_rotation` | `instance` | periodisch, Zustände `next` bis `retired` | `maintenance` | 19 |
 | `sync.partition_maintenance` | `sync` | periodisch alle `sync.partition_maintenance_interval` und beim Start des worker: `sync.event_log_partitions_ahead` Partitionen vor dem Kopf anlegen, nach `sync.event_retention` abhängen, nie die Partition mit dem Kopf (03 `event_log`); `bothy migrate up` ruft dieselbe Routine | `maintenance` | 03, 04 |
 | `sync.idempotency_cleanup` | `sync` | periodisch alle `sync.idempotency_cleanup_interval`, löscht abgelaufene Zeilen in Stapeln von `sync.idempotency_cleanup_batch_size` | `maintenance` | 04 |
-| `audit.chain_verify` | `audit` | periodisch | `maintenance` | 19 |
+| `audit.chain_verify` | `audit` | periodisch alle `audit.checkpoint_interval`: den Abschnitt seit dem letzten Prüfpunkt nachrechnen, erst dann den nächsten Prüfpunkt signieren, speichern und an `audit.checkpoint_sink` ablegen; ein Bruch endet ohne Prüfpunkt und ohne Wiederholung (nie eine ungeprüfte Kette signieren) | `maintenance` | 19 |
 | `audit.retention_trim` | `audit` | periodisch, eigene Wartungsrolle der Datenbank | `maintenance` | 20 |
 | `privacy.export`, `privacy.erase` | `privacy` | Freigabe eines Auftrags | `privacy` | 20 |
 | `billing.reconcile` | `billing` | `cost.reconcile` oder periodisch, falls eingeschaltet | `default` | 10 |

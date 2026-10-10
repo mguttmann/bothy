@@ -34,7 +34,8 @@ Sync und Ereignisse: [04-sync-protokoll.md](04-sync-protokoll.md). Wie `authoriz
    Interaktion, Sitzungswechsel, Autovervollständigung) prüft zusätzlich `agent.invoke`
    (Abschnitt 5). Die Invarianten I1 bis I3 der Baseline hängen an diesen Aktionen:
    - I1 wird bei `grant.create`, `grant.revoke`, `grant.expire`, `group.member.add`,
-     `group.member.remove`, `group.member.expire`, `group.delete`, `owner.add`, `owner.remove`,
+     `group.member.remove`, `group.member.expire`, `group.member.sync`, `group.delete`,
+     `owner.add`, `owner.remove`,
      `space.operator.set`, `channel.operator.set`, `agent.billing_mode.set`,
      `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.enable`, `user.disable`
      und `user.enable` transaktional geprüft (Prüfung in [03-datenmodell.md](03-datenmodell.md),
@@ -163,10 +164,12 @@ Eine angehängte Datei folgt immer ihrer Nachricht, auch nach dem Verschieben de
 | `invariant_violation` | `409` | Änderung würde I1 oder eine andere Invariante verletzen |
 | `unauthenticated` | `401` | kein gültiger Prinzipal |
 
-Ein Gerät im Zustand `pending` hat Tokens, aber jede Aktion außer `self.read`, `device.list` für
-das eigene Gerät, `auth.token.refresh` und `auth.logout` endet mit `403 device_pending`
-([08-identitaet.md](08-identitaet.md), Abschnitt 5.2). Das Gateway lehnt `identify` eines
-wartenden Geräts mit `4016` ab.
+Ein Gerät im Zustand `pending` und ein bereitgestellter Mensch im Zustand `pending`
+([08-identitaet.md](08-identitaet.md), Abschnitt 3.1) haben Tokens, aber jede Aktion außer
+`self.read`, `device.list` für das eigene Gerät, `auth.token.refresh` und `auth.logout` endet mit
+`403 device_pending` ([08-identitaet.md](08-identitaet.md), Abschnitt 5.2). Das Gateway lehnt
+`identify` eines wartenden Geräts mit `4016` ab. Grund für den Menschen: Mit `401` müsste die App
+ihre Daten löschen und könnte nicht nachfragen, ob der Owner sie freigegeben hat.
 
 Rate-Limits prüft eine eigene Schicht vor `authorize` mit der Klasse aus dem Katalog (`429`);
 den Wartungsmodus eine weitere (Regel 1.9).
@@ -255,11 +258,12 @@ Abschnitt 6.3).
 | `identity_provider.manage` | Anmelde-Treiber anlegen, ändern, abschalten | instance | owner | ja | ja | ja | nein | `rl.admin` |
 | `owner.add` | Menschen zum Owner machen; optional mit `resolve_i1` (Regel 1.6) | user | owner | ja | ja | ja | ja | `rl.admin` |
 | `owner.remove` | Owner-Rolle entziehen; mindestens ein aktiver Owner bleibt (SR8) | user | owner | ja | ja | ja | ja | `rl.admin` |
+| `owner.recover` | Einladungs-Code zur Wiederherstellung für einen aktiven Owner per Server-Befehl auf dem Host (`bothy setup issue-enrollment-code`, [08-identitaet.md](08-identitaet.md), Abschnitt 4) | user | system | nein | nein | ja | nein | keine |
 | `audit.read` | Audit-Log lesen und filtern | instance | owner | ja | ja | ja | nein | `rl.admin` |
 | `audit.verify` | Hash-Kette und Prüfpunkte prüfen | instance | owner | ja | ja | ja | nein | `rl.admin` |
 | `stats.read` | Statistik lesen; Instanz nur Owner, Bereich mit `manage` | instance, space | owner oder manage | nein | nein | nein | nein | `rl.read` |
 | `access.explain` | "Wer hat Zugriff?" mit Herkunft (direkt, Gruppe, geerbt, Bediener, indirekt über Agent) | space, channel | owner oder manage | nein | nein | nein | nein | `rl.read` |
-| `access.preview` | Trockenlauf einer Aktion mit Spalte "Rechte" = `ja`: Unterschiede je Prinzipal, I1, SR8, Hinweise in Klartext; die Transaktion wird zurückgerollt ([07-rechte.md](07-rechte.md), Abschnitt 9.3) | wie die Zielaktion | Recht der Zielaktion | wie Zielaktion | nein | nein | nein | `rl.admin` |
+| `access.preview` | Trockenlauf einer Aktion mit Spalte "Rechte" = `ja`: Unterschiede je Prinzipal, I1, SR8, Hinweise in Klartext; die Transaktion wird zurückgerollt; Grenzen der Delegation ergeben `allowed = false` statt einer Ablehnung ([07-rechte.md](07-rechte.md), Abschnitt 9.3) | wie die Zielaktion | Recht der Zielaktion | wie Zielaktion | nein | nein | nein | `rl.admin` |
 | `access.view_as` | "Als Person ansehen", nur lesend | user | owner | ja | ja | ja | nein | `rl.admin` |
 
 ### 4.3 Menschen, Identität, Geräte, Tokens
@@ -282,10 +286,12 @@ Abschnitt 6.3).
 | `device.list` | Geräte lesen; ein wartendes Gerät liest sich selbst | user, device | self oder owner | nein | nein | nein | nein | `rl.read` |
 | `device.approve` | wartendes Gerät freigeben; eigenes Gerät von einem aktiven eigenen Gerät aus, mit Bestätigungs-Code oder Kopplungs-Code ([08-identitaet.md](08-identitaet.md), Abschnitt 5.3) | device | owner oder self | nein | ja | ja | ja | `rl.admin` |
 | `device.revoke` | Gerät sperren; Verbindungen schließen mit `4012` | device | self oder owner | nein | ja | ja | ja | `rl.admin` |
+| `device.expire` | Gerät ohne Bestätigung nach `auth.device_pending_ttl`, abgelaufene bestätigte Kopplung oder Gerät ohne Kontakt nach `auth.device_inactive_revoke_after` widerrufen (Job `identity.auth_cleanup`) | device | system | nein | nein | ja | ja | keine |
 | `session.list` | Anmeldesitzungen lesen | user | self oder owner | nein | nein | nein | nein | `rl.read` |
 | `session.revoke` | Sitzung beenden; ihre Kind-Sitzungen enden ebenfalls | auth_session | self oder owner | nein | nein | ja | ja | `rl.admin` |
+| `session.extension.create` | Kind-Sitzung für eine Erweiterung der eigenen App (Notification- oder Share-Extension) mit eigener Refresh-Familie anlegen; ersetzt eine aktive Kind-Sitzung derselben Komponente | auth_session | self | nein | nein | ja | nein | `rl.write` |
 | `token.list` | API-Tokens lesen (nur Präfix) | principal | owner; self bei eigenen | nein | nein | nein | nein | `rl.read` |
-| `token.create` | API-Token für Agent oder App erzeugen; persönliches Token nur mit Schalter `tokens.personal_enabled` | principal | owner; self bei eigenem | nein | ja | ja | nein | `rl.admin` |
+| `token.create` | API-Token für Agent oder App erzeugen; persönliches Token nur für sich selbst und nur mit Schalter `tokens.personal_enabled` | principal | owner; self bei eigenem | nein | ja | ja | nein | `rl.admin` |
 | `token.revoke` | API-Token widerrufen | api_token | owner; self bei eigenem | nein | nein | ja | ja | `rl.admin` |
 
 ### 4.4 Gruppen und Freigaben
@@ -296,10 +302,11 @@ Abschnitt 6.3).
 | `group.create` | Gruppe anlegen | instance | owner | ja | ja | ja | nein | `rl.admin` |
 | `group.update` | Gruppe umbenennen | group | owner | ja | ja | ja | nein | `rl.admin` |
 | `group.delete` | Gruppe löschen (weich); ihre Freigaben werden widerrufen | group | owner | ja | ja | ja | ja | `rl.admin` |
-| `group.member.add` | Mitglied hinzufügen, optional mit Ablauf und `resolve_i1` | group | owner | ja | ja | ja | ja | `rl.admin` |
-| `group.member.remove` | Mitglied entfernen | group | owner | ja | ja | ja | ja | `rl.admin` |
+| `group.member.add` | Mitglied hinzufügen, optional mit Ablauf und `resolve_i1`; nicht in Gruppen mit `source = oidc_claim` | group | owner | ja | ja | ja | ja | `rl.admin` |
+| `group.member.remove` | Mitglied entfernen; nicht in Gruppen mit `source = oidc_claim` | group | owner | ja | ja | ja | ja | `rl.admin` |
 | `group.member.expire` | abgelaufene Mitgliedschaft melden (Job `authz.expiry_sweep`): Rechte-Version, `access.changed`, Abbruch betroffener Läufe | group | system | nein | nein | ja | ja | keine |
-| `grant.read` | Freigaben eines Ziels oder Subjekts lesen | space, channel, principal | owner oder manage | nein | nein | nein | nein | `rl.read` |
+| `group.member.sync` | Mitgliedschaften einer Person in Gruppen mit `source = oidc_claim` ihres Anbieters beim Abschluss einer OIDC-Anmeldung dem Gruppen-Claim angleichen; ein Audit-Eintrag je Anmeldung mit den Gruppen ([08-identitaet.md](08-identitaet.md), Abschnitt 3.4) | user | system | nein | nein | ja | ja | keine |
+| `grant.read` | Freigaben eines Ziels oder Subjekts lesen; mit `manage` nur Freigaben auf Zielen im eigenen `manage`-Bereich ([07-rechte.md](07-rechte.md), Abschnitt 2.6) | space, channel, principal | owner oder manage | nein | nein | nein | nein | `rl.read` |
 | `grant.create` | Freigabe anlegen. Mit `manage` nur bis zur eigenen Stufe, nur eigene Zusatzrechte, nur an Menschen und Gruppen, nie auf der Instanz (R-AZ-05). Freigaben an Agenten und Apps nur Owner; Agenten und Apps nie `trigger`, als Zusatzrecht nur `upload`. Optional `resolve_i1` | instance, space, channel | owner oder manage | nein | ja | ja | ja | `rl.admin` |
 | `grant.revoke` | Freigabe widerrufen; mit `manage` nur Freigaben, die man nach R-AZ-05 selbst hätte anlegen dürfen | grant | owner oder manage | nein | ja | ja | ja | `rl.admin` |
 | `grant.expire` | abgelaufene Freigabe melden (Job `authz.expiry_sweep`): Rechte-Version, `access.changed`, Abbruch betroffener Läufe | grant | system | nein | nein | ja | ja | keine |
@@ -580,13 +587,13 @@ erlaubt. Persönliche Ereignisse (`audience = self`) gehen nur an den genannten 
 | `space.updated` | space | `space.read` | Name, Icon, Reihenfolge, Bediener |
 | `space.archived` | space | `space.read` | |
 | `channel.created` | channel | `channel.read` | |
-| `channel.updated` | channel | `channel.read` | Name, Thema, Reihenfolge, Bediener, `read_only`, `default_notification_level` |
+| `channel.updated` | channel | `channel.read` | Name, Thema, Reihenfolge, Bediener, `read_only`, `default_notification_level`; Änderungen an Forum-Tags (nur die neue Version, Tags per REST) |
 | `channel.settings_changed` | channel | `channel.read` | nur `settings_version`; Inhalte per `channel.behavior.read` bzw. `agent.config.read` |
 | `channel.archived` | channel | `channel.read` | |
 | `command.changed` | command | `command.read` | registriert, geändert, entfernt |
 | `file.updated` | file | `file.read` | Scan-Ergebnis, Vorschaubild, Transkript |
 | `user.updated` | user | `user.read` | |
-| `agent.updated` | agent | `agent.read` | inklusive Wechsel der Backend-Richtlinie und der Werkzeugklasse; erreicht auch den Agenten selbst (Soll-Änderung) |
+| `agent.updated` | agent | `agent.read` | auch beim Anlegen (es gibt keinen eigenen Typ); inklusive Wechsel der Backend-Richtlinie und der Werkzeugklasse; erreicht auch den Agenten selbst (Soll-Änderung) |
 | `instance.updated` | instance | `instance.read` | Branding, Schalter (nur Schlüssel, Werte per REST) |
 | `status.updated` | instance | `status.read` | |
 | `grant.changed` | grant | `grant.read` | für Verwaltende; das Subjekt bekommt `access.changed` |
@@ -658,7 +665,7 @@ Ausgehende Webhooks und Push nutzen dieselbe Empfangs-Aktion (`webhook_out.deliv
 | R-AZ-12 | Schreibschutz eines Kanals sperrt alle `write`- und `trigger`-Aktionen für alle Prinzipale, auch Owner; nur `import.apply` schreibt. | Ein Lese-Spiegel hat genau einen führenden Ort; im Spiegel darf kein Agent ausgelöst werden. Freigaben können Owner nicht beschränken. |
 | R-AZ-13 | Bediener-Regel: Der wirksame Bediener hat implizit `write`; `space.operator.set` und `channel.operator.set` verlangen keine eigene Freigabe des Agenten. | Folgt dem Bediener ohne zweite, leicht vergessene Freigabe; beim Wechsel bleibt kein Rest. Ersetzt den Vorschlag, beim Setzen eine Freigabe zu verlangen. |
 | R-AZ-14 | Owner-Rechte nur in einer Sitzung, nie über ein persönliches API-Token. | Ein gestohlenes Token ohne Gerätebindung darf nie die ganze Instanz öffnen. |
-| R-AZ-15 | Abläufe, die Erstinstallation und planmäßige Schlüsselwechsel sind Systemaktionen im Katalog (`grant.expire`, `group.member.expire`, `instance.bootstrap`, `signing_key.transition`). | Jeder Audit-Eintrag nennt eine bekannte Aktion; Abläufe erreichen Clients und Läufe über `access.changed`; Schlüsselwechsel sind sicherheitsrelevant und gehören ins Audit. |
+| R-AZ-15 | Abläufe, die Erstinstallation, die Wiederherstellung am Host, der Abgleich von Claim-Gruppen, der automatische Widerruf von Geräten und planmäßige Schlüsselwechsel sind Systemaktionen im Katalog (`grant.expire`, `group.member.expire`, `group.member.sync`, `instance.bootstrap`, `owner.recover`, `device.expire`, `signing_key.transition`). | Jeder Audit-Eintrag nennt eine bekannte Aktion; Abläufe erreichen Clients und Läufe über `access.changed`; diese Vorgänge sind sicherheitsrelevant und gehören ins Audit, ohne eine Aktion eines Menschen vorzutäuschen. |
 | R-AZ-16 | Ein wartendes Gerät bekommt Tokens, darf aber nur sich selbst lesen (`403 device_pending`). | Die App kann ohne neue Anmeldung auf die Freigabe warten; Inhalte erreicht sie erst danach. |
 | R-AZ-17 | `resolve_i1` führt "erst umstellen, dann freigeben" in einer Transaktion aus, mit beiden Prüfungen. | Der geführte Ablauf der Konsole braucht kein Zwischenstadium, in dem I1 verletzt wäre. |
 | R-AZ-18 | App-Befehle und App-Komponenten ohne `agent.invoke` und I2. | Keine Agenten-Laufzeit, kein Abo; Grenze sind Freigaben, Scope und `required_level`. |

@@ -56,7 +56,7 @@ Migration kommt mit dieser Etappe, der Vertrag gilt schon jetzt.
 | Modul | Verantwortung | Tabellen |
 |---|---|---|
 | `instance` | Instanz, Einstellungen, Branding, Feature-Flags, Signierschlüssel, Zähler, Sync-Epoche | ja |
-| `identity` | Prinzipale, Menschen, Identitäten, Passkeys, lokale Anmeldedaten, Einladungs-Codes, Anmeldevorgänge, Geräte-Kopplung, Geräte, Sitzungen, Tokens, Owner | ja |
+| `identity` | Prinzipale, Menschen, Identitäten, Passkeys, lokale Anmeldedaten, Einladungs-Codes, Anmeldevorgänge, Herausforderungen (Step-up, Passkeys), Geräte-Kopplung, Geräte, Sitzungen, Tokens, Owner | ja |
 | `authz` | Gruppen, Freigaben, Rechte-Version, `authorize` | ja |
 | `chat` | Bereiche, Kanäle, Threads, Tags, Projektbindung, Seitenleisten-Zustand | ja |
 | `messaging` | Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen | ja |
@@ -175,13 +175,16 @@ Zweck: Schalter für Funktionen, global oder für Gruppen und Personen. Modul: `
 | `key` | `text` | nein | | z. B. `dm.enabled`, `voice.enabled` |
 | `enabled` | `boolean` | nein | `false` | globaler Wert |
 | `rollout` | `jsonb` | nein | `'{}'` | Schema `feature_flag_rollout.v1`: Listen von `user_ids` und `group_ids`, für die der Schalter abweichend gilt |
-| `description` | `text` | nein | | |
 | `version` | `bigint` | nein | `1` | |
 | `updated_by` | `uuid` | ja | | |
 | `updated_at` | `timestamptz` | nein | `now()` | |
 
 PK: `key`. FK: `updated_by` -> `principals(id)` ON DELETE RESTRICT. Indexe: keine weiteren.
-Aufbewahrung: `config`.
+Aufbewahrung: `config`. Art, Beschreibung, Standard, Modul und `remove_by` stehen in der
+Registrierung im Code, nicht in der Tabelle (ADR 0064); ein registrierter Schlüssel ohne Zeile hat
+seinen Standard und in der API die Version `0`, ein Schlüssel ohne Registrierung ist aus und
+verwaist. Dasselbe gilt für `instance_settings`: Ein registrierter Schlüssel ohne Zeile hat seinen
+Standardwert und die Version `0`.
 
 #### `sequence_counters`
 
@@ -227,7 +230,7 @@ Zweck: Zusatzdaten für Menschen. Modul: `identity`.
 | Feld | Typ | Null | Standard | Regeln / Hinweise |
 |---|---|---|---|---|
 | `principal_id` | `uuid` | nein | | `kind = 'user'` per Trigger geprüft |
-| `email` | `text` | ja | | nur zur Anzeige und zum Abgleich mit OIDC; nie für Benachrichtigungen |
+| `email` | `text` | ja | | nur zur Anzeige; nie für Zuordnung, Rechte oder Benachrichtigungen; nie aus Daten eines Anbieters gesetzt, weil der Wert eindeutig ist und ein Anbieter sonst Anmeldungen blockieren könnte ([08-identitaet.md](08-identitaet.md), Abschnitt 3.1) |
 | `locale` | `text` | nein | `'de'` | BCP 47 |
 | `time_zone` | `text` | nein | `'UTC'` | IANA-Name, für Ruhezeiten |
 | `last_active_at` | `timestamptz` | ja | | grob, höchstens einmal je `identity.last_active_granularity` geschrieben |
@@ -267,7 +270,7 @@ Zweck: konfigurierte Anmelde-Treiber (B9). Modul: `identity`.
 | `id` | `uuid` | nein | | |
 | `kind` | `text` | nein | | `CHECK (kind IN ('oidc','trusted_header','local'))` |
 | `name` | `text` | nein | | Anzeige, z. B. "Firmen-SSO" |
-| `config` | `jsonb` | nein | | Schema `identity_provider.<kind>.v1`; OIDC-Client-Secret nur als `secret_ref` |
+| `config` | `jsonb` | nein | | Schema `identity_provider.<kind>.v1` ([08-identitaet.md](08-identitaet.md), Abschnitt 2.6); Geheimnisse nur als Verweise (`client_secret_ref`, `client_key_ref`) |
 | `enabled` | `boolean` | nein | `true` | |
 | `allow_provisioning` | `boolean` | nein | `false` | `false`: unbekannte Subjekte bekommen keinen Zugang (kein Selbst-Registrieren) |
 | `created_at` | `timestamptz` | nein | `now()` | |
@@ -336,14 +339,15 @@ Modul: `identity`.
 | `approved_at` | `timestamptz` | ja | | |
 | `revoked_by` | `uuid` | ja | | |
 | `revoked_at` | `timestamptz` | ja | | |
-| `revoke_reason` | `text` | ja | | |
+| `revoke_reason` | `text` | ja | | `CHECK (revoke_reason IN ('revoked_by_self','revoked_by_owner','user_disabled','inactive','verification_failed','pending_expired','pairing_expired'))`; ein Code, nie Freitext; der Grund einer Anfrage steht nur im Audit |
 | `created_at` | `timestamptz` | nein | `now()` | |
 | `last_seen_at` | `timestamptz` | ja | | |
 
 PK: `id`. FK: `user_id` -> `users(principal_id)` ON DELETE RESTRICT; `approved_by`,
 `revoked_by` -> `principals(id)` ON DELETE RESTRICT. Unique: keine weiteren.
 Indexe: `(user_id, state)` für Geräteliste; `(state) WHERE state = 'pending'` für die
-Freigabe-Warteschlange der Admin-Konsole. Aufbewahrung: `security`.
+Freigabe-Warteschlange der Admin-Konsole. Aufbewahrung: `security`. Checks: `(state = 'revoked') =
+(revoked_at IS NOT NULL)`; `revoke_reason IS NULL OR state = 'revoked'`.
 
 #### `device_keys`
 
@@ -362,7 +366,7 @@ Abschnitt 6.1). Modul: `identity`.
 | `alg` | `text` | nein | | `CHECK (alg IN ('ES256','EdDSA'))`; ob Windows Hello `ES256` liefert, ist offen ([08-identitaet.md](08-identitaet.md), Abschnitt 6.1); eine Erweiterung um `PS256` ist eine additive Migration |
 | `attestation` | `jsonb` | ja | | Plattform-Attestierung, falls vorhanden |
 | `created_at` | `timestamptz` | nein | `now()` | |
-| `revoked_at` | `timestamptz` | ja | | Schlüsselwechsel oder Gerätesperre |
+| `revoked_at` | `timestamptz` | ja | | Gerätesperre; einen Schlüsselwechsel am bestehenden Gerät gibt es nicht ([08-identitaet.md](08-identitaet.md), Abschnitt 5.4) |
 
 PK: `id`. FK: `device_id` -> `devices(id)` ON DELETE CASCADE. Unique: `jkt`; Teilindex
 `(device_id, purpose) WHERE revoked_at IS NULL` (ein aktiver Schlüssel je Gerät und Zweck).
@@ -392,7 +396,7 @@ Zweck: Anmeldesitzung eines Menschen auf einem Gerät. Jeder Zugriffstoken träg
 | `last_seen_at` | `timestamptz` | ja | | |
 | `last_ip` | `inet` | ja | | nur für Sicherheitsansicht, Klasse `security` |
 | `revoked_at` | `timestamptz` | ja | | |
-| `revoke_reason` | `text` | ja | | `CHECK (revoke_reason IN ('logout','admin','device_revoked','refresh_reuse','user_disabled','expired','inactive'))` |
+| `revoke_reason` | `text` | ja | | `CHECK (revoke_reason IN ('logout','admin','device_revoked','refresh_reuse','user_disabled','expired','inactive','step_up_failed','trusted_header_mismatch'))`; `logout`, wenn die Person ihre eigene Sitzung beendet, `admin`, wenn ein anderer es tut |
 
 PK: `id`. FK: `user_id` -> `users(principal_id)` ON DELETE RESTRICT; `device_id` ->
 `devices(id)` ON DELETE RESTRICT; `identity_id` -> `user_identities(id)` ON DELETE SET NULL;
@@ -467,11 +471,11 @@ Format mit Art `whi` in `incoming_webhooks.token_hash`); das feste Präfix erlau
 | `id` | `uuid` | nein | | |
 | `principal_id` | `uuid` | nein | | Inhaber des Tokens |
 | `name` | `text` | nein | | |
-| `token_prefix` | `text` | nein | | `bothy_<art>_` und die ersten Zeichen des Zufallsteils, zum Wiedererkennen in der Konsole |
+| `token_prefix` | `text` | nein | | `bothy_<art>_` und die ersten 6 Zeichen des Zufallsteils, zum Wiedererkennen in der Konsole (ADR 0061) |
 | `token_hash` | `bytea` | nein | | HMAC-SHA-256 |
 | `scopes` | `text[]` | nein | `'{}'` | Teilmenge der Manifest-Scopes bzw. Agenten-Scopes |
 | `dpop_jkt` | `text` | ja | | gesetzt: Anfragen müssen mit diesem Schlüssel DPoP-gebunden sein |
-| `expires_at` | `timestamptz` | ja | | |
+| `expires_at` | `timestamptz` | nein | | Pflicht, höchstens `auth.api_token_max_ttl` bzw. `auth.personal_token_max_ttl` nach der Anlage ([08-identitaet.md](08-identitaet.md), Abschnitt 12) |
 | `created_by` | `uuid` | nein | | |
 | `created_at` | `timestamptz` | nein | `now()` | |
 | `last_used_at` | `timestamptz` | ja | | grob, höchstens einmal je `identity.last_active_granularity` |
@@ -497,10 +501,11 @@ Zweck: Passwort mit TOTP als abschaltbarer Rückfall für lokale Konten (Baselin
 | `totp_last_step` | `bigint` | ja | | zuletzt angenommener Zeitschritt; jede Ziffernfolge gilt nur einmal (RFC 6238, Abschnitt 5.2) |
 | `totp_enabled_at` | `timestamptz` | ja | | |
 | `failed_count` | `integer` | nein | `0` | Fehlversuche im laufenden Fenster `auth.login_fail_window` |
+| `fail_window_started_at` | `timestamptz` | ja | | Beginn des laufenden Fensters; NULL ohne Fehlversuch. Ein Fehlversuch nach `fail_window_started_at + auth.login_fail_window` beginnt ein neues Fenster |
 | `locked_until` | `timestamptz` | ja | | Sperre nur des Passwortwegs |
 
 PK: `identity_id`. FK: `identity_id` -> `user_identities(id)` ON DELETE CASCADE.
-Checks: `(totp_secret_ciphertext IS NULL) = (totp_key_ref IS NULL)`. Indexe: über den PK.
+Checks: `(totp_secret_ciphertext IS NULL) = (totp_key_ref IS NULL)`; `(failed_count = 0) = (fail_window_started_at IS NULL)`. Indexe: über den PK.
 Aufbewahrung: `security`. Das TOTP-Geheimnis ist eine der zwei Ausnahmen von Grundsatz 9 (die
 andere: `audit_ip_keys`): der Server braucht es zum Prüfen; darum liegt es verschlüsselt in der
 Datenbank und der Schlüssel nur im Secret-Provider.
@@ -517,7 +522,7 @@ Wiederherstellung ([08-identitaet.md](08-identitaet.md), Abschnitt 3.2). Modul: 
 | `purpose` | `text` | nein | | `CHECK (purpose IN ('first_login','identity_link','recovery'))` |
 | `code_hash` | `bytea` | nein | | HMAC-SHA-256 des Codes; der Code erscheint genau einmal |
 | `expires_at` | `timestamptz` | nein | | `created_at + auth.enrollment_code_ttl` |
-| `attempts` | `integer` | nein | `0` | Fehlversuche; ab `auth.enrollment_code_max_attempts` ungültig |
+| `attempts` | `integer` | nein | `0` | Fehlversuche mit diesem Code (eine abgelehnte Einlösung, deren Code passte); ab `auth.enrollment_code_max_attempts` ungültig |
 | `created_by` | `uuid` | ja | | NULL bei Ausgabe per Server-Befehl |
 | `created_at` | `timestamptz` | nein | `now()` | |
 | `used_at` | `timestamptz` | ja | | |
@@ -526,7 +531,9 @@ Wiederherstellung ([08-identitaet.md](08-identitaet.md), Abschnitt 3.2). Modul: 
 PK: `id`. FK: `user_id` -> `users(principal_id)` ON DELETE CASCADE; `created_by` ->
 `principals(id)` ON DELETE RESTRICT; `used_by_device_id` -> `devices(id)` ON DELETE SET NULL.
 Unique: `code_hash`. Indexe: `(user_id) WHERE used_at IS NULL`; `(expires_at)` für den
-Aufräumjob. Aufbewahrung: `security`.
+Aufräumjob. Aufbewahrung: `security`. Je Person gilt höchstens ein Code: Das Ausstellen setzt
+`expires_at = now()` an jedem anderen unbenutzten Code der Person ([08-identitaet.md](08-identitaet.md),
+Abschnitt 3.2).
 
 #### `auth_login_flows`
 
@@ -547,17 +554,54 @@ Abschnitt 2.2). In der API heißt die ID `login_attempt_id`. Modul: `identity`.
 | `app_redirect_uri` | `text` | nein | | aus der festen Liste (Loopback oder privates Schema) |
 | `login_code_hash` | `bytea` | ja | | HMAC des einmaligen Server-Codes (`login_code`) nach der Rückleitung |
 | `login_code_expires_at` | `timestamptz` | ja | | `auth.server_code_ttl` nach der Rückleitung |
+| `enrollment_code_id` | `uuid` | ja | | beim Beginn vorgelegter und geprüfter Einladungs-Code; eingelöst wird er erst beim Abschluss |
+| `external_identity` | `jsonb` | ja | | Schema `external_identity.v1` ([08-identitaet.md](08-identitaet.md), Abschnitt 2.2): die beim Rückruf geprüfte Identität des Anbieters; gesetzt mit `status = 'code_issued'`, beim Abschluss oder Scheitern wieder NULL |
 | `status` | `text` | nein | `'started'` | `CHECK (status IN ('started','code_issued','completed','failed'))` |
 | `error` | `text` | ja | | Code ohne Inhalte |
 | `created_at` | `timestamptz` | nein | `now()` | |
 | `expires_at` | `timestamptz` | nein | | `created_at + auth.login_flow_ttl` |
 
 PK: `id`. FK: `provider_id` -> `identity_providers(id)` ON DELETE CASCADE; `user_id` ->
-`users(principal_id)` ON DELETE CASCADE. Unique: `oidc_state_hash`; `login_code_hash` als
-Teilindex `WHERE login_code_hash IS NOT NULL`. Indexe: `(expires_at)` für den Aufräumjob.
+`users(principal_id)` ON DELETE CASCADE; `enrollment_code_id` -> `enrollment_codes(id)` ON DELETE
+SET NULL. Checks: `(status = 'code_issued') = (external_identity IS NOT NULL)`; `mode = 'link'`
+hat keinen `enrollment_code_id`. Unique: `oidc_state_hash`; `login_code_hash` als Teilindex
+`WHERE login_code_hash IS NOT NULL`. Indexe: `(expires_at)` für den Aufräumjob.
 Aufbewahrung: `transient`. Der PKCE-Verifier des Servers gegenüber dem Anbieter wird nicht
 gespeichert, sondern aus `id` und dem Token-Pepper abgeleitet (HMAC-SHA-256); so liegt kein
-weiteres Geheimnis in der Tabelle.
+weiteres Geheimnis in der Tabelle. Der Rückruf ändert kein Konto: Zuordnung, Verknüpfung und
+Bereitstellung geschehen erst beim Abschluss, den nur die App mit dem `client_verifier` auslösen
+kann (R-DM-30).
+
+#### `auth_challenges`
+
+Zweck: einmalige Herausforderungen für Step-up (Geräteschlüssel und Passkey) und für die
+WebAuthn-Zeremonien Anmeldung, erste Einrichtung mit Einladungs-Code und Registrierung
+([08-identitaet.md](08-identitaet.md), Abschnitte 2.5 und 6.2). In der API heißt die ID
+`challenge_id`. Modul: `identity`.
+
+| Feld | Typ | Null | Standard | Regeln / Hinweise |
+|---|---|---|---|---|
+| `id` | `uuid` | nein | | UUIDv7 |
+| `purpose` | `text` | nein | | `CHECK (purpose IN ('step_up','passkey_login','passkey_enroll','passkey_register'))` |
+| `session_id` | `uuid` | ja | | Sitzung, für die sie gilt; gesetzt genau bei `step_up` und `passkey_register` |
+| `enrollment_code_id` | `uuid` | ja | | geprüfter Einladungs-Code; gesetzt genau bei `passkey_enroll` |
+| `challenge_hash` | `bytea` | nein | | HMAC-SHA-256 des Zufallswerts mit dem Token-Pepper; der Wert erscheint nur in der Antwort |
+| `webauthn_session` | `jsonb` | ja | | Schema `webauthn_session.v1`: RP-ID, verlangte Nutzerbestätigung, erlaubte Credential-IDs, Benutzer-Handle; ohne Challenge und ohne Geheimnisse; NULL bei Step-up mit Geräteschlüssel |
+| `status` | `text` | nein | `'issued'` | `CHECK (status IN ('issued','used','failed'))` |
+| `created_at` | `timestamptz` | nein | `now()` | |
+| `expires_at` | `timestamptz` | nein | | `created_at + auth.step_up_challenge_ttl` bei `step_up`, sonst `created_at + auth.login_flow_ttl` |
+| `finished_at` | `timestamptz` | ja | | gesetzt mit `used` oder `failed` |
+
+PK: `id`. FK: `session_id` -> `auth_sessions(id)` ON DELETE CASCADE; `enrollment_code_id` ->
+`enrollment_codes(id)` ON DELETE CASCADE. Checks: `(status = 'issued') = (finished_at IS NULL)`;
+`(session_id IS NOT NULL) = (purpose IN ('step_up','passkey_register'))`;
+`(enrollment_code_id IS NOT NULL) = (purpose = 'passkey_enroll')`. Unique: `challenge_hash`.
+Indexe: `(session_id, finished_at) WHERE status = 'failed'` für die Fehlversuche beim Step-up;
+`(expires_at)` für den Aufräumjob. Aufbewahrung: `transient`.
+Einlösen: In einer Transaktion `SELECT ... FOR UPDATE` auf die Zeile; nur `issued` und nicht
+abgelaufen gilt, danach `used` bzw. bei falscher Bestätigung `failed`. Grund für eine Tabelle statt
+abgeleiteter Werte: einmalige Nutzung und gezählte Fehlversuche gelten so auf jedem Knoten ohne
+Abhängigkeit von synchronen Uhren (R-DM-31).
 
 #### `device_pairings`
 
@@ -597,14 +641,20 @@ Zweck: benannte Menge von Menschen als Subjekt von Freigaben. Modul: `authz`.
 | `name` | `text` | nein | | z. B. "Support" |
 | `description` | `text` | nein | `''` | |
 | `source` | `text` | nein | `'local'` | `CHECK (source IN ('local','oidc_claim'))` |
+| `provider_id` | `uuid` | ja | | OIDC-Anbieter, dessen Gruppen-Claim die Mitglieder bestimmt; gesetzt genau bei `oidc_claim` |
 | `external_ref` | `text` | ja | | Claim-Wert bei `oidc_claim` |
 | `created_by` | `uuid` | nein | | |
 | `created_at` | `timestamptz` | nein | `now()` | |
 | `deleted_at` | `timestamptz` | ja | | |
 
-PK: `id`. FK: `created_by` -> `principals(id)` ON DELETE RESTRICT. Unique: Teilindex
-`lower(name) WHERE deleted_at IS NULL`; Teilindex `(external_ref) WHERE source = 'oidc_claim'`.
-Indexe: über die Unique-Indexe. Aufbewahrung: `account`.
+PK: `id`. FK: `created_by` -> `principals(id)` ON DELETE RESTRICT; `provider_id` ->
+`identity_providers(id)` ON DELETE RESTRICT. Checks: `(source = 'oidc_claim') = (provider_id IS
+NOT NULL)`; `(source = 'oidc_claim') = (external_ref IS NOT NULL)`. Unique: Teilindex `lower(name)
+WHERE deleted_at IS NULL`; Teilindex `(provider_id, external_ref) WHERE source = 'oidc_claim' AND
+deleted_at IS NULL`. Indexe: über die Unique-Indexe. Aufbewahrung: `account`. `name` höchstens
+`group.name_max_chars`, `description` höchstens `group.description_max_chars` Zeichen, beide ohne
+Steuer- und Bidi-Zeichen. Grund für `provider_id`: Ohne Bindung könnte ein zweiter Anbieter
+Claim-Werte behaupten, die für den ersten gemeint sind.
 
 #### `group_memberships`
 
@@ -630,6 +680,9 @@ Indexe: `(user_id) WHERE removed_at IS NULL` für "Gruppen einer Person" beim Re
 `(expires_at) WHERE removed_at IS NULL AND expires_at IS NOT NULL` für Erinnerung und
 Ablaufmeldung.
 Aufbewahrung: `account`.
+Mitgliedschaften in Gruppen mit `source = 'oidc_claim'` ändert nur der Abgleich bei der Anmeldung
+(Systemaktion `group.member.sync`, [08-identitaet.md](08-identitaet.md), Abschnitt 3.4); dort sind
+`added_by` und `removed_by` die Person, deren Anmeldung den Claim trug.
 
 #### `grants`
 
@@ -695,7 +748,7 @@ Modul: `agents`.
 | `principal_id` | `uuid` | nein | | `kind = 'agent'` per Trigger geprüft |
 | `adapter_kind` | `text` | nein | | freier Bezeichner des Adapters, z. B. `hermes`, `code_runner`, `custom` |
 | `description` | `text` | nein | `''` | |
-| `operator_config` | `jsonb` | nein | `'{}'` | Schema `agent_operator_config.v1`: Standard-Modell, erlaubte Fähigkeiten (`supports_followups`, `supports_components`, `supports_voice`, `supports_title`, `supports_files_out`), Anzeige-Optionen; keine Geheimnisse. Wirksam ist eine Fähigkeit nur, wenn der Adapter sie auch meldet ([09-agenten.md](09-agenten.md), Abschnitt 2.2) |
+| `operator_config` | `jsonb` | nein | `'{}'` | Schema `agent_operator_config.v1` ([09-agenten.md](09-agenten.md), Abschnitt 2.2): Standard-Modell (`default_model`) und erlaubte Fähigkeiten (`supports_followups`, `supports_components`, `supports_voice`, `supports_title`, `supports_files_out`); ein fehlender Schlüssel erlaubt; keine Geheimnisse. Wirksam ist eine Fähigkeit nur, wenn der Adapter sie auch meldet ([09-agenten.md](09-agenten.md), Abschnitt 2.2) |
 | `billing_mode` | `text` | nein | `'organization'` | `CHECK (billing_mode IN ('personal','organization'))` |
 | `credential_holder_id` | `uuid` | ja | | Pflicht bei `personal`, sonst NULL |
 | `billing_mode_changed_at` | `timestamptz` | ja | | |
@@ -854,8 +907,8 @@ Zweck: Bereich, oberste Gruppe der Seitenleiste. Modul: `chat`.
 | Feld | Typ | Null | Standard | Regeln / Hinweise |
 |---|---|---|---|---|
 | `id` | `uuid` | nein | | |
-| `name` | `text` | nein | | z. B. "Support" |
-| `icon` | `text` | ja | | Icon-Schlüssel des Design-Systems (`design/build/tokens.resolved.json`), kein Emoji |
+| `name` | `text` | nein | | z. B. "Support"; höchstens `space.name_max_chars` Zeichen, ohne Steuer- und Bidi-Zeichen |
+| `icon` | `text` | ja | | Glyphen-Name aus der Liste `space-icons` der Design-Tokens (`kernel/designkeys`), kein Emoji |
 | `color` | `text` | ja | | Schlüssel einer Kategorie-Farbe des Design-Systems, kein Hex-Wert |
 | `sort_key` | `text COLLATE "C"` | nein | | globale Reihenfolge durch Admin |
 | `default_operator_agent_id` | `uuid` | ja | | Standard-Bediener; NULL = keiner |
@@ -897,7 +950,7 @@ Zweck: Kanal (Text, Forum oder Direktnachricht) mit Bediener und Verhalten. Modu
 | `id` | `uuid` | nein | | |
 | `space_id` | `uuid` | ja | | NULL genau bei `kind = 'dm'` (R-DM-10) |
 | `kind` | `text` | nein | | `CHECK (kind IN ('text','forum','dm'))` |
-| `name` | `text` | nein | | bei `dm` leer, Anzeige aus Teilnehmern |
+| `name` | `text` | nein | | höchstens `channel.name_max_chars` Zeichen, ohne Steuer- und Bidi-Zeichen; bei `dm` leer, Anzeige aus Teilnehmern |
 | `topic` | `text` | nein | `''` | |
 | `sort_key` | `text COLLATE "C"` | nein | | Reihenfolge im Bereich |
 | `operator_inherit` | `boolean` | nein | `true` | `true`: Bediener = `spaces.default_operator_agent_id` |
@@ -1000,7 +1053,9 @@ Zweck: Tags eines Forums. Modul: `chat`.
 
 PK: `id`. FK: `channel_id` -> `channels(id)` ON DELETE CASCADE. Unique: Teilindex
 `(channel_id, lower(name)) WHERE deleted_at IS NULL`. Indexe: über den Unique-Index.
-Aufbewahrung: `content`.
+Aufbewahrung: `content`. `name` höchstens `forum_tag.name_max_chars` Zeichen. Jede Änderung an
+Tags erhöht `channels.version` und schreibt `channel.updated`; Clients laden die Tags dann neu
+(05, Abschnitt 6).
 
 #### `threads`
 
@@ -1127,7 +1182,8 @@ Modul: `messaging`.
 | `client_payload_sha256` | `bytea` | nein | | Hash der kanonischen Anfrage; erkennt Wiederverwendung mit anderem Inhalt |
 | `origin` | `text` | nein | | `CHECK (origin IN ('human','agent','app','import','system'))`; nur `human` löst Agenten aus |
 | `kind` | `text` | nein | `'text'` | `CHECK (kind IN ('text','voice','run','card','system'))`; `run` = Anker der Live-Box; `card` = Nachricht mit Komponenten (Rückfrage, Freigabe) |
-| `content_md` | `text` | nein | `''` | Markdown; Größe bis `message.max_content_bytes`; nach Löschung leer |
+| `system_code` | `text` | ja | | `CHECK (system_code IN ('thread.reopened'))`; gesetzt genau bei `kind = 'system'`; Clients bilden die Zeile in ihrer Sprache aus Code und Autor |
+| `content_md` | `text` | nein | `''` | Markdown; Größe bis `message.max_content_bytes`; nach Löschung und bei Systemzeilen leer |
 | `content_format` | `smallint` | nein | `1` | Version des Markdown-Dialekts |
 | `reply_to_message_id` | `uuid` | ja | | Antwort mit Zitat; gleicher Thread |
 | `run_id` | `uuid` | ja | | bei `kind = 'run'`: der Lauf, dessen Live-Box hier steht |
@@ -1136,7 +1192,7 @@ Modul: `messaging`.
 | `trigger_state_at` | `timestamptz` | ja | | |
 | `silent` | `boolean` | nein | `false` | keine Benachrichtigung (z. B. Import) |
 | `import_item_id` | `uuid` | ja | | Herkunft beim Import |
-| `version` | `bigint` | nein | `1` | steigt bei Bearbeiten, Löschen, Statuswechsel |
+| `version` | `bigint` | nein | `1` | steigt bei Bearbeiten, Löschen, Statuswechsel; Reaktionen und Anheften erhöhen sie nicht ([04-sync-protokoll.md](04-sync-protokoll.md), Abschnitt 9) |
 | `edited_at` | `timestamptz` | ja | | |
 | `deleted_at` | `timestamptz` | ja | | |
 | `deleted_by` | `uuid` | ja | | |
@@ -1151,7 +1207,8 @@ RESTRICT; `author_principal_id`, `deleted_by` -> `principals(id)` ON DELETE REST
 SET NULL (aufgeschoben); `import_item_id` -> `import_items(id)` ON DELETE SET NULL.
 Checks: `(kind = 'run') = (run_id IS NOT NULL)`; `trigger_state IS NULL OR origin = 'human'`;
 `trigger_state_reason IS NULL OR trigger_state IN ('failed','cancelled')`;
-`deleted_at IS NULL OR content_md = ''`.
+`deleted_at IS NULL OR content_md = ''`; `(kind = 'system') = (system_code IS NOT NULL)`;
+`kind <> 'system' OR (origin = 'system' AND silent AND content_md = '')`.
 Unique: `(thread_id, thread_seq)`; `(author_principal_id, client_msg_id)`; Teilindex `(run_id)
 WHERE run_id IS NOT NULL` (ein Live-Box-Anker je Lauf).
 Indexe:
@@ -1163,9 +1220,10 @@ Indexe:
 - GIN `(search_vector)` für die Volltextsuche.
 
 Aufbewahrung: `content`.
-Löschen leert `content_md`, löscht Anhänge, Revisionen, Erwähnungen und Komponenten und
-schwärzt die Nutzlast der zugehörigen Ereignisse (Abschnitt 6.5). Zeile und `thread_seq`
-bleiben.
+Löschen leert `content_md`, löscht Anhänge, Revisionen, Erwähnungen, Komponenten, Reaktionen und
+die Anheftung und schwärzt die Nutzlast der zugehörigen Ereignisse (Abschnitt 6.5). Zeile und
+`thread_seq` bleiben. Eine Systemzeile `thread.reopened` schreibt der Server, wenn eine Nachricht
+einen erledigten Thread wieder öffnet; Autor ist die Person, deren Nachricht ihn öffnete.
 
 #### `message_revisions`
 
@@ -1199,8 +1257,10 @@ Modul: `messaging`.
 
 PK: `(message_id, principal_id)`. FK: `message_id` -> `messages(id)` ON DELETE CASCADE;
 `principal_id` -> `principals(id)` ON DELETE RESTRICT; `thread_id` -> `threads(id)` ON DELETE
-CASCADE. Indexe: `(principal_id, created_at DESC)` für "meine Erwähnungen" und
-Erwähnungszähler. Aufbewahrung: `content`.
+CASCADE. Indexe: `(principal_id, created_at DESC)` für "meine Erwähnungen"; `(principal_id,
+thread_id)` für ungelesene Erwähnungen je Thread. Aufbewahrung: `content`. Bearbeiten ersetzt die
+Zeilen einer Nachricht, Löschen entfernt sie; ein gespeicherter Zähler muss darum nicht folgen
+(`read_states`, R-DM-32).
 Eine Erwähnung eines Prinzipals ohne Leserecht wird gespeichert, erzeugt aber keine
 Benachrichtigung und verrät nichts (P3).
 
@@ -1212,12 +1272,14 @@ Zweck: freie Unicode-Reaktionen. Status ist keine Reaktion. Modul: `messaging`.
 |---|---|---|---|---|
 | `message_id` | `uuid` | nein | | |
 | `principal_id` | `uuid` | nein | | |
-| `emoji` | `text` | nein | | genau ein Unicode-Graphem-Cluster, Prüfung in der Anwendung |
+| `emoji` | `text` | nein | | genau ein Unicode-Graphem-Cluster, höchstens `reaction.emoji_max_bytes` Bytes, Prüfung in der Anwendung |
 | `created_at` | `timestamptz` | nein | `now()` | |
 
 PK: `(message_id, principal_id, emoji)`. FK: `message_id` -> `messages(id)` ON DELETE CASCADE;
 `principal_id` -> `principals(id)` ON DELETE RESTRICT. Indexe: über den PK (Zählung je
-Nachricht). Aufbewahrung: `content`.
+Nachricht). Aufbewahrung: `content`. Je Nachricht höchstens `reaction.max_distinct_per_message`
+verschiedene Emoji; ein weiteres neues Emoji ergibt `400 validation_failed` mit Code
+`limit_reached`.
 
 #### `pins`
 
@@ -1233,7 +1295,8 @@ Zweck: angeheftete Nachrichten je Thread. Modul: `messaging`.
 PK: `message_id`. FK: `message_id` -> `messages(id)` ON DELETE CASCADE; `thread_id` ->
 `threads(id)` ON DELETE CASCADE; `pinned_by` -> `principals(id)` ON DELETE RESTRICT.
 Indexe: `(thread_id, pinned_at DESC)` für die Liste angehefteter Nachrichten.
-Aufbewahrung: `content`.
+Aufbewahrung: `content`. Je Thread höchstens `pin.max_per_thread` Anheftungen (sonst `400
+validation_failed`, Code `limit_reached`).
 
 #### `message_templates`
 
@@ -1254,7 +1317,9 @@ Zweck: Vorlagen für häufige Eingaben, persönlich oder je Kanal. Modul: `messa
 PK: `id`. FK: `owner_user_id` -> `users(principal_id)` ON DELETE CASCADE; `channel_id` ->
 `channels(id)` ON DELETE CASCADE; `created_by` -> `principals(id)` ON DELETE RESTRICT.
 Checks: genau eines von `owner_user_id` und `channel_id`. Indexe: `(owner_user_id) WHERE
-deleted_at IS NULL`; `(channel_id) WHERE deleted_at IS NULL`. Aufbewahrung: `content`.
+deleted_at IS NULL`; `(channel_id) WHERE deleted_at IS NULL`. Aufbewahrung: `content`. `name`
+höchstens `template.name_max_chars` Zeichen ohne Steuer- und Bidi-Zeichen; je Person bzw. je Kanal
+höchstens `template.max_per_scope` Vorlagen (sonst `400 validation_failed`, Code `limit_reached`).
 Rechte: persönliche Vorlagen über den Menschen (Ressource `user`, `self`), Kanal-Vorlagen über den
 Kanal (`manage`), siehe `template.manage` in [05-aktionen.md](05-aktionen.md).
 
@@ -1742,7 +1807,6 @@ Zweck: Gelesen-Stand je Mensch und Thread. Modul: `sync`.
 | `thread_id` | `uuid` | nein | | |
 | `channel_id` | `uuid` | nein | | Kopie für Zähler je Kanal, beim Verschieben mitgeändert |
 | `last_read_seq` | `bigint` | nein | `0` | höchste gelesene `thread_seq` |
-| `mention_count` | `integer` | nein | `0` | ungelesene Erwähnungen |
 | `version` | `bigint` | nein | `1` | |
 | `updated_by_device_id` | `uuid` | ja | | |
 | `updated_at` | `timestamptz` | nein | `now()` | |
@@ -1753,7 +1817,11 @@ CASCADE; `updated_by_device_id` -> `devices(id)` ON DELETE SET NULL.
 Indexe: `(user_id, channel_id)` für Ungelesen-Zähler je Kanal.
 Aufbewahrung: `personal_sync`.
 Ungelesen = `threads.last_message_seq - GREATEST(coalesce(last_read_seq, 0),
-threads.unread_floor_seq)`, nur für sichtbare Threads. Schreiber ist nur der Mensch selbst
+threads.unread_floor_seq)`, nur für sichtbare Threads. Ungelesene Erwähnungen = Zeilen in
+`mentions` des Menschen, deren Nachricht nicht gelöscht ist und deren `thread_seq` über
+`GREATEST(last_read_seq, threads.unread_floor_seq)` liegt. Beide Zähler berechnet der Leser
+(Momentaufnahme, `listMyReadStates`, Ereignis `read_state.updated`, Badge); keiner wird gespeichert
+(R-DM-32). Schreiber ist nur der Mensch selbst
 (`read_state.update`, `read_state.mark_unread`). Damit Importiertes nicht als ungelesen
 erscheint, setzt der Import `threads.unread_floor_seq` statt Zeilen für alle Leser anzulegen; das
 kostet je Stapel eine Zeile statt einer je Mensch.
@@ -2045,8 +2113,8 @@ werden (ADR 0021, [19-sicherheit.md](19-sicherheit.md)). Modul: `audit`.
 |---|---|---|---|---|
 | `seq` | `bigint` | nein | | letzte erfasste `audit_events.seq` |
 | `hash` | `bytea` | nein | | `audit_events.hash` dieser Zeile |
-| `previous_checkpoint_hash` | `bytea` | ja | | Verkettung der Prüfpunkte; NULL beim ersten |
-| `signature` | `bytea` | nein | | JWS-Signatur über `{instance_id, seq, hash, occurred_at, previous_checkpoint_hash}` (JCS) |
+| `previous_checkpoint_hash` | `bytea` | ja | | SHA-256 der kanonischen Nutzlast des vorigen Prüfpunkts; NULL beim ersten |
+| `signature` | `bytea` | nein | | die vollständige kompakte JWS (UTF-8) über die Nutzlast `{instance_id, seq, hash, occurred_at, previous_checkpoint_hash}` nach JCS; `occurred_at` ist die Zeit der erfassten Zeile `seq`; Kopf und Format in [19-sicherheit.md](19-sicherheit.md), Abschnitt 12 |
 | `kid` | `text` | nein | | Server-Schlüssel mit Zweck `audit_checkpoint` |
 | `created_at` | `timestamptz` | nein | `now()` | |
 | `exported_at` | `timestamptz` | ja | | abgelegt an `audit.checkpoint_sink` |
@@ -2223,7 +2291,7 @@ Sprache und unveränderte Wörter (`simple`) mit eigenem Gewicht; eine GIN-Abfra
 PostgreSQL 18 legt generierte Spalten ohne `STORED` als virtuelle Spalten an; jede Migration
 schreibt `STORED` ausdrücklich, ein Migrations-Lint prüft das.
 Jede Spalte hat einen GIN-Index. Rechtefilter: Jede Suchabfrage verknüpft mit
-`channel_id = ANY($visible_channel_ids)`; die Liste kommt aus `authz` (P2). Gelöschte
+`channel_id = ANY($visible)`; die Liste bildet `authz` je Anfrage (P2, [07-rechte.md](07-rechte.md) Abschnitt 7.4). Gelöschte
 Nachrichten haben leeren Inhalt und damit einen leeren Vektor. Sprachwahl, Ranking,
 Hervorhebung und mögliche weitere Indexe (z. B. Trigramme) legt [14-suche.md](14-suche.md) fest;
 eine Änderung eines Ausdrucks ist eine Migration, die die Spalte neu erzeugt, und wird in dieser
@@ -2261,7 +2329,8 @@ Rechte-Änderungen sind damit untereinander vollständig serialisiert. Das macht
 ### 6.4 I1-Prüfung
 
 In jeder Transaktion, die die Rechte-Version erhöht, berechnet `authz` nach der Änderung und
-vor dem Commit für jeden betroffenen Agenten mit `billing_mode = 'personal'` die Menge der
+vor dem Commit für jeden betroffenen aktiven Agenten (Prinzipal-Status `active`) mit
+`billing_mode = 'personal'` die Menge der
 Prinzipale mit wirksamer Stufe `trigger` auf irgendeinem Ziel, das der Agent bedient (inklusive
 Owner, Gruppenmitglieder, Vererbung, nicht abgelaufener Freigaben). Ziele des Agenten A sind:
 
@@ -2269,7 +2338,9 @@ Owner, Gruppenmitglieder, Vererbung, nicht abgelaufener Freigaben). Ziele des Ag
 2. Kanäle mit mindestens einem Thread mit `threads.operator_agent_id = A`, offen oder erledigt,
    auch wenn der Kanal inzwischen einen anderen Bediener hat; eine neue Nachricht öffnet einen
    erledigten Thread wieder, und dort löst weiter A aus (R-DM-12),
-3. die Bereiche dieser Kanäle,
+3. die Bereiche dieser Kanäle und jeder Bereich, dessen Standard-Bediener A ist, auch ohne Kanal;
+   sonst machte `channel.create` (keine Aktion mit I1-Prüfung) A später zum Bediener eines Kanals,
+   auf dessen Bereich schon ein anderer `trigger` hat,
 4. die Instanz.
 
 Gast-Kanäle (`allow_mentioned_agents`) zählen nicht dazu, weil ein Agent mit `personal` nie
@@ -2393,7 +2464,15 @@ erDiagram
         uuid id PK
         uuid provider_id FK
         uuid user_id FK
+        uuid enrollment_code_id FK
         text mode
+    }
+    auth_challenges {
+        uuid id PK
+        text purpose
+        uuid session_id FK
+        uuid enrollment_code_id FK
+        text status
     }
     device_pairings {
         uuid id PK
@@ -2442,6 +2521,7 @@ erDiagram
     }
     groups {
         uuid id PK
+        uuid provider_id FK
         text name
     }
     group_memberships {
@@ -2472,6 +2552,9 @@ erDiagram
     devices |o--o{ enrollment_codes : "eingelöst von"
     identity_providers ||--o{ auth_login_flows : "Anmeldevorgang"
     users |o--o{ auth_login_flows : "verknüpft"
+    enrollment_codes |o--o{ auth_login_flows : "vorgelegt"
+    auth_sessions |o--o{ auth_challenges : "Step-up, Passkey"
+    enrollment_codes |o--o{ auth_challenges : "Einrichtung mit Passkey"
     users |o--o{ device_pairings : "koppelt"
     devices |o--o{ device_pairings : "bestätigt, entsteht"
     users ||--o{ passkey_credentials : "hat"
@@ -2484,6 +2567,7 @@ erDiagram
     auth_sessions ||--o{ refresh_token_families : "hat"
     refresh_token_families ||--o{ refresh_tokens : "rotiert"
     principals ||--o{ api_tokens : "besitzt"
+    identity_providers |o--o{ groups : "Claim-Gruppen"
     groups ||--o{ group_memberships : "hat"
     users ||--o{ group_memberships : "ist Mitglied"
     principals |o--o{ grants : "Subjekt"
@@ -3006,6 +3090,11 @@ bewusst keine Fremdschlüssel; ihre ID-Felder sind Belege, keine Verknüpfungen.
 | R-DM-27 | Cursor der Worker-Verbraucher in einer eigenen Tabelle (`event_consumer_cursors`) statt Job-Einfügen im Schreibpfad. | Der Schreibpfad muss keine Folgen kennen; ein neuer Verbraucher ändert keinen Erzeuger (ADR 0051). |
 | R-DM-28 | `audit_events.deny_reason` ohne `CHECK`, Liste durch einen Test geschlossen. | Ein Audit-Eintrag darf nie an einem neuen Grund-Code scheitern. |
 | R-DM-29 | `event_log.actor_kind` als eigene Spalte statt Ableitung aus `actor_principal_id`. | NULL kann `system` nicht von "kein Akteur" trennen, und `sync` darf `identity` nicht nach der Art fragen (02, Abschnitt 4.4). |
+| R-DM-30 | Der OIDC-Rückruf speichert nur die geprüfte externe Identität im Anmeldevorgang (`auth_login_flows.external_identity`); Zuordnung, Verknüpfung über Einladungs-Code und Bereitstellung geschehen erst beim Abschluss. | Die `authorization_url` ist an keinen Browser gebunden; wer sie erhält, könnte sonst sein eigenes Anbieter-Konto mit dem Code eines anderen verknüpfen (Login-CSRF). Den Abschluss kann nur die App mit dem `client_verifier`. |
+| R-DM-31 | Herausforderungen für Step-up und WebAuthn liegen in `auth_challenges` statt als abgeleitete Werte ohne Speicher. | Einmalige Nutzung und gezählte Fehlversuche gelten so auf jedem Knoten, ohne von synchronen Uhren abzuhängen; eine Tabelle braucht nur einen Aufräumjob. |
+| R-DM-32 | Ungelesen- und Erwähnungszähler werden nie gespeichert, sondern beim Lesen berechnet. | Ein gespeicherter Zähler müsste jedem Bearbeiten, Löschen und Verschieben folgen und veraltet sonst still; `mentions` und `threads` tragen schon alles Nötige. |
+| R-DM-33 | Gruppen aus Claims sind an ihren Anbieter gebunden (`groups.provider_id`). | Claim-Werte sind nur innerhalb eines Anbieters eindeutig; ohne Bindung bestimmte ein zweiter Anbieter Mitgliedschaften des ersten. |
+| R-DM-34 | Systemzeilen tragen einen Code (`messages.system_code`) statt Text. | Clients zeigen sie in ihrer Sprache; ein Text im Inhalt wäre an eine Sprache gebunden und durchsuchbar. |
 
 ## 9. Konfigurationswerte dieses Kapitels
 
@@ -3015,6 +3104,12 @@ Die Werte sind Standardwerte. Andere Kapitel verweisen nur auf den Namen.
 |---|---|---|
 | `principal.handle_max_chars` | `32` | Länge eines Handles |
 | `principal.display_name_max_chars` | `64` | Länge eines Anzeigenamens in Unicode-Zeichen |
+| `branding.product_name_max_chars` | `64` | Länge des Produktnamens im Branding (`instance_settings`, `branding.product_name`) in Unicode-Zeichen |
+| `group.name_max_chars` | `100` | Länge eines Gruppennamens in Unicode-Zeichen |
+| `group.description_max_chars` | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen |
+| `space.name_max_chars` | `100` | Länge eines Bereichsnamens in Unicode-Zeichen |
+| `channel.name_max_chars` | `100` | Länge eines Kanalnamens in Unicode-Zeichen |
+| `forum_tag.name_max_chars` | `50` | Länge eines Tag-Namens in Unicode-Zeichen |
 | `identity.last_active_granularity` | `5m` | höchstens so oft wird `last_active_at` bzw. `last_used_at` geschrieben |
 | `auth.session_max_age` | `30d` | absolutes Ende einer Anmeldesitzung |
 | `auth.refresh_token_ttl` | `14d` | Lebensdauer eines Refresh-Tokens |
@@ -3027,6 +3122,11 @@ Die Werte sind Standardwerte. Andere Kapitel verweisen nur auf den Namen.
 | `thread.title_max_chars` | `200` | Länge eines Thread-Titels |
 | `message.max_content_bytes` | `262144` | Größe einer Nachricht (lange Antworten ohne Teilen) |
 | `message.max_attachments` | `10` | Anhänge je Nachricht |
+| `reaction.emoji_max_bytes` | `64` | größte Länge eines Reaktions-Emoji in Bytes (ein Graphem-Cluster hat sonst keine Grenze) |
+| `reaction.max_distinct_per_message` | `20` | verschiedene Emoji je Nachricht; begrenzt `Message.reactions` und die Nutzlast der Ereignisse |
+| `pin.max_per_thread` | `50` | Anheftungen je Thread; `listPins` ist nicht seitenweise |
+| `template.name_max_chars` | `100` | Länge eines Vorlagennamens in Unicode-Zeichen |
+| `template.max_per_scope` | `100` | Vorlagen je Person bzw. je Kanal; `listTemplates` ist nicht seitenweise |
 | `file.max_upload_bytes` | `104857600` | Größe einer Datei |
 | `run.excerpt_max_chars` | `500` | Länge von `last_text_excerpt` |
 | `run.step_detail_max_bytes` | `16384` | Größe von `run_steps.detail` |

@@ -126,6 +126,15 @@ diesen Grenzen (R-AZ-05, präzisiert):
    LLM-Anbieter sendet. Das ist ein Datenfluss zu einem Auftragsverarbeiter und eine Änderung des
    Lesehorizonts ([20-datenschutz.md](20-datenschutz.md), Abschnitt 6). (05 `grant.create`.)
 5. Freigaben auf der Instanz legt nur der Owner an.
+6. Lesen (`grant.read`): Owner sehen alle Freigaben. Wer nur `manage` hat, sieht die Freigaben auf
+   Zielen, auf denen er `manage` hat, und darunter; Filter nach Ziel oder Subjekt verkleinern
+   diese Menge, sie vergrößern sie nie. Ein Filter auf ein Subjekt zeigt also nicht dessen
+   Freigaben außerhalb des eigenen Bereichs.
+
+Mitgliedschaften in Gruppen mit `source = 'oidc_claim'` bestimmt allein der Gruppen-Claim des
+Anbieters ([08-identitaet.md](08-identitaet.md), Abschnitt 3.4); `group.member.add` und
+`group.member.remove` auf solchen Gruppen enden mit `409 conflict` und `reason:
+claim_managed_group`, weil die nächste Anmeldung eine Handänderung sonst still überschriebe.
 
 ### 2.7 Owner
 
@@ -221,7 +230,8 @@ verrät (bei `404` nie).
 | Grund | Entscheidung | Bedeutung |
 |---|---|---|
 | `unauthenticated` | `unauthenticated` | kein gültiger Prinzipal |
-| `principal_inactive` | `unauthenticated` | Prinzipal `pending`, `disabled` oder `deleted` |
+| `principal_inactive` | `unauthenticated` | Prinzipal `disabled` oder `deleted` |
+| `principal_pending` | `forbidden` | bereitgestellter Mensch im Zustand `pending` ([08-identitaet.md](08-identitaet.md), Abschnitt 3.1); Problem-Code `device_pending`; erlaubt sind dieselben Aktionen wie für ein wartendes Gerät |
 | `session_revoked` | `unauthenticated` | Sitzung widerrufen oder abgelaufen |
 | `device_inactive` | `unauthenticated` | Gerät `revoked` oder Schlüssel widerrufen |
 | `device_pending` | `forbidden` | Problem-Code `device_pending`; Gerät wartet auf Freigabe; erlaubt sind nur `self.read`, `device.list` für das eigene Gerät, `auth.token.refresh`, `auth.logout` (05, Abschnitt 2.5) |
@@ -275,6 +285,8 @@ authorize(p, action, ref) -> Decision:
       return spec.right == public ? ALLOW : DENY(unauthenticated)
   d := check_active(p, t)                            # Status, Sitzung, Gerät, Token, Installation
   if d: return d                                     # unauthenticated mit Grund
+  if p.status == pending and action nicht in PENDING_ALLOWED:
+      return DENY(forbidden, principal_pending)      # bereitgestellt, 05 Abschnitt 2.5
   if p.device_state == pending and action nicht in PENDING_ALLOWED:
       return DENY(forbidden, device_pending)         # 05, Abschnitt 2.5
 
@@ -303,10 +315,12 @@ authorize(p, action, ref) -> Decision:
   if p.view_as and spec.writes: return DENY(forbidden, view_as_read_only)
 
   # 8. Step-up
-  if spec.step_up:
+  if spec.step_up == ja or (spec.step_up == bedingt and hat_anmeldedaten(p, action)):
       if p.kind != user or p.session_id fehlt: return DENY(forbidden, step_up_not_possible)
       if p.step_up_at fehlt or t - p.step_up_at > auth.step_up_max_age:
           return DENY(step_up_required)
+  if spec.step_up == bedingt and (p.kind != user or p.session_id fehlt):
+      return DENY(forbidden, step_up_not_possible)   # erste Einrichtung nur in einer Sitzung
 
   # 9. Schutzregeln der Aktion (Abschnitt 5)
   d := guards[action](p, res, eff, snap, t)           # z. B. agent.invoke: SR1 (I2), SR2, SR3, SR4
@@ -335,6 +349,10 @@ Start-Prüfung lehnt jede Route, Op oder jeden Ereignistyp mit einer solchen Akt
 das die Fakten liefert, ersetzt den Eintrag in derselben Änderung. Grund: Der Katalog ist ab M1
 geschlossen (AZ-P3), und eine noch nicht prüfbare Anforderung darf nie erlauben. `bedingt` in der
 Spalte "Step-up" (05, Abschnitt 2.4) gilt bis zum Ticket, das die Bedingung liefert, wie `ja`.
+`hat_anmeldedaten(p, action)` ist eine Frage an `PrincipalSource`: bei `passkey.register` ein
+Passkey der Person mit `revoked_at IS NULL`, bei `local_credential.set` eine Zeile in
+`local_credentials` mit `totp_enabled_at IS NOT NULL` (ein eingerichteter Passwortweg). Die Regel
+selbst bleibt in `authz` (B7).
 
 Audit nach der Spalte "Audit" in 05: `authorize` übergibt jede Ablehnung und jeden Fehler an
 `kernel/auditing`; sie werden nach dem Rollback in eigener Transaktion geschrieben und je
@@ -468,9 +486,11 @@ Abschnitt 5.2). Weitere Wege, etwa eine behördliche Anordnung, liegen außerhal
 
 ### SR7 Gesperrt heißt ohne Rechte
 
-Ein Prinzipal mit Status ungleich `active`, eine widerrufene Sitzung, ein nicht aktives Gerät, ein
-widerrufenes Token oder eine nicht aktive App-Installation ergibt `unauthenticated`, bevor Freigaben
-gelesen werden. Freigaben gesperrter Prinzipale bleiben stehen, wirken aber nicht.
+Ein Prinzipal mit Status `disabled` oder `deleted`, eine widerrufene Sitzung, ein widerrufenes
+Gerät, ein widerrufenes Token oder eine nicht aktive App-Installation ergibt `unauthenticated`,
+bevor Freigaben gelesen werden. Ein Mensch im Zustand `pending` und ein wartendes Gerät ergeben
+`forbidden` außer für die Selbstauskunft (4.1). Freigaben gesperrter oder wartender Prinzipale
+bleiben stehen, wirken aber nicht.
 
 ### SR8 Letzter Owner
 
@@ -543,10 +563,15 @@ derselben Funktion wie `authorize` entsteht, kann nicht abweichen, ohne dass der
 RightsSnapshot {
   principal_id, permission_version, computed_at, valid_until
   owner: bool
-  level_by_channel: map[channel_id]level        # inklusive DM-Kanäle der Teilnahme
+  instance_level, instance_caps                  # aus Freigaben auf der Instanz
+  level_by_space:   map[space_id]level           # aus Freigaben auf Bereichen
+  caps_by_space:    map[space_id]set
+  level_by_channel: map[channel_id]level         # aus Freigaben auf Kanälen; DM-Kanäle der Teilnahme
   caps_by_channel:  map[channel_id]set
-  visible_channel_ids: sortierte Liste           # Parameter für SQL
-  visible_space_ids:   sortierte Liste
+  instance_wide: bool                            # Owner oder read auf der Instanz
+  fully_visible_space_ids: sortierte Liste       # Bereiche mit read auf dem Bereich
+  visible_channel_ids:     sortierte Liste       # Kanäle mit read auf dem Kanal, DM der Teilnahme
+  visible_space_ids:       sortierte Liste       # Bereiche mit mindestens einem sichtbaren Kanal
   provenance (nur für access.explain, nicht im Cache)
 }
 ```
@@ -554,19 +579,26 @@ RightsSnapshot {
 Aufbau:
 
 1. Gültige Freigaben des Prinzipals, bei Menschen zusätzlich die seiner gültigen Gruppen, alle mit
-   der Zeit `t` aus Abschnitt 2.5.
-2. Abwärts ausbreiten: Instanz auf alle Bereiche und Kanäle, Bereich auf seine Kanäle. Höchste
-   Stufe je Kanal, Vereinigung der Zusatzrechte.
-3. Owner: alle Kanäle außer DM mit `trigger` und allen Zusatzrechten.
-4. Bediener-Regel für Agenten (Abschnitt 2.9).
-5. DM-Kanäle der Teilnahme mit `write` und `upload`.
-6. Begrenzung für Agenten und Apps (Abschnitt 2.1).
-7. `valid_until` = kleinstes `expires_at` aller benutzten Freigaben und Mitgliedschaften (oder
+   der Zeit `t` aus Abschnitt 2.5, je Ziel (Instanz, Bereich, Kanal): höchste Stufe, Vereinigung
+   der Zusatzrechte.
+2. Owner: `trigger` und alle Zusatzrechte auf der Instanz (gilt nie für DM-Kanäle).
+3. DM-Kanäle der Teilnahme mit `write` und `upload`.
+4. `valid_until` = kleinstes `expires_at` aller benutzten Freigaben und Mitgliedschaften (oder
    unendlich).
 
-Grenze: Der Rechte-Stand kennt Kanäle, keine Threads. Die Bediener-Regel auf Thread-Ebene
+Der Stand speichert Stufen je Ziel, nicht je Kanal ausgebreitet. Die wirksame Stufe auf einer
+Ressource bildet `authorize` erst beim Aufruf aus dem Pfad, den `resolve` liefert (Kanal, Bereich,
+Instanz): höchste Stufe entlang des Pfads, dazu die Bediener-Regel aus dem aufgelösten wirksamen
+Bediener (Abschnitt 2.9), die Begrenzung für Agenten und Apps (2.1) und die Grenze archivierter
+Ziele (4.5). Ebenso bildet `Scope` die Listen für Abfragen je Anfrage (7.4). Grund: Ein neuer Kanal
+oder Bereich ändert keine Rechte-Version (05, `channel.create` und `space.create` haben "Rechte"
+`nein`); mit ausgebreiteten Kanallisten im Cache wäre er bis zur nächsten Rechte-Änderung für jeden
+mit Freigabe auf Bereich oder Instanz unsichtbar. Das Nachholen nutzt dieselben Namen direkt in
+seiner Abfrage, weil `event_log` die Spalte `space_id` trägt (04, Abschnitt 7.2).
+
+Grenze: Der Rechte-Stand kennt Ziele, keine Threads. Die Bediener-Regel auf Thread-Ebene
 (Abschnitt 2.9, Punkt 2: `threads.operator_agent_id`) gilt darum bei `authorize` für den einzelnen
-Thread, aber nicht in Listenfiltern über `visible_channel_ids`. Ein Agent, der einen Thread in einem
+Thread, aber nicht in Listenfiltern (7.4). Ein Agent, der einen Thread in einem
 sonst nicht lesbaren Kanal bedient, sieht ihn in Listen nicht. Das schließt zu wenig ein und
 verrät nichts. Wie Agenten Threads lesen, entscheidet die Etappe M2 (Agenten-Plattform).
 
@@ -590,7 +622,7 @@ je Prinzipal würde den Fall "Gruppe mit vielen Mitgliedern" teuer machen und is
 ### 7.4 Abfrage-Muster
 
 ```sql
--- Nachrichtensuche, $1 = visible_channel_ids aus dem Snapshot,
+-- Nachrichtensuche, $1 = sichtbare Kanäle aus Scope (je Anfrage gebildet, 7.2),
 -- $2 = Suchausdruck, gebaut vom Modul Suche (14-suche.md)
 SELECT m.id, m.thread_id, m.channel_id, ts_rank(m.search_vector, $2::tsquery) AS rank
   FROM messages m
@@ -600,7 +632,7 @@ SELECT m.id, m.thread_id, m.channel_id, ts_rank(m.search_vector, $2::tsquery) AS
  ORDER BY rank DESC, m.id DESC
  LIMIT $3;
 
--- Ungelesen-Zähler je Kanal
+-- Ungelesen-Zähler je Kanal, $1 = angefragte Kanäle, geschnitten mit Scope
 SELECT t.channel_id,
        sum(t.last_message_seq - greatest(coalesce(r.last_read_seq, 0), t.unread_floor_seq)) AS unread
   FROM threads t
@@ -612,13 +644,20 @@ SELECT t.channel_id,
 Regeln:
 
 1. Jede Abfrage über Inhalte, Threads, Kanäle, Bereiche, Läufe, Dateien oder Erwähnungen hat das
-   Prädikat `channel_id = ANY($visible)` (bzw. `space_id = ANY($visible_spaces)`). Ein Lint im
-   Repository-Layer lehnt sqlc-Abfragen auf diesen Tabellen ohne dieses Prädikat ab, außer sie
-   stehen auf einer geprüften Ausnahmeliste (Jobs mit Systemrecht, z. B. Aufbewahrung).
+   Prädikat `channel_id = ANY($visible)` (bzw. `space_id = ANY($visible_spaces)`). Die Listen
+   bildet `Authorizer.Scope` je Anfrage aus dem Rechte-Stand und der aktuellen Struktur
+   (`StructureSource`): Kanäle mit eigener Freigabe und DM-Kanäle der Teilnahme, alle Kanäle der
+   Bereiche in `fully_visible_space_ids`, bei `instance_wide` alle Kanäle außer DM, bei Agenten die
+   nach der Bediener-Regel bedienten. Neue Kanäle und Bereiche erscheinen so ohne neue
+   Rechte-Version. Ein Lint im Repository-Layer lehnt sqlc-Abfragen auf diesen Tabellen ohne dieses
+   Prädikat ab, außer sie stehen auf einer geprüften Ausnahmeliste (Jobs mit Systemrecht, z. B.
+   Aufbewahrung).
 2. Gesamtzahlen (`total`), Facetten und "weitere Treffer" zählen nur innerhalb dieses Prädikats.
 3. Nach dem SQL-Filter läuft für jedes Ergebnis zusätzlich `authorize` mit der Lese-Aktion (z. B.
    `message.read`). Der SQL-Filter ist die Leistung, `authorize` die Wahrheit. Ein Unterschied
-   zwischen beiden löst einen Alarm aus und das Element wird verworfen.
+   zwischen beiden verwirft das Element, schreibt ein Log ohne IDs und Inhalte und erhöht
+   `bothy.authz.errors` mit `bothy.reason = filter_mismatch`; daran hängt der Alarm
+   `BothyAuthzError` ([signals.md](../observability/signals.md)).
 4. Vorschläge (Erwähnungen, Befehle, Kanal-Schnellwechsel) folgen denselben Regeln: ein Mensch, den
    der Fragende nicht sehen darf, erscheint nicht, und die Anzahl verrät nichts.
 5. Große Instanzen: Wird die Liste so lang, dass der Planer kippt, ist die Abhilfe eine temporäre
@@ -697,16 +736,26 @@ Herkunft als Kette. Herkunftsarten:
 | indirekt über Agent | "kann über Agent Lotse Inhalte dieses Kanals erfahren" (Hinweis H1) |
 | gesperrt durch Schutzregel | "trigger, aber Auslösen gesperrt: Dev-Umgebung nicht bereit (SR3)" |
 
-Gesperrte Prinzipale erscheinen durchgestrichen. Die Ansicht braucht `owner` oder `manage` (05).
+In der API heißen die Herkunftsarten `owner`, `direct`, `group`, `inherited`, `operator`,
+`dm_participant`, `via_agent` und `guard_blocked` (Schema `AccessSource`, mit Agent, Regel,
+Ablauf und Grund der Freigabe); ein Eintrag nur aus `via_agent` hat die Stufe `none`.
+Gesperrte Prinzipale erscheinen durchgestrichen (`inactive`) mit der Stufe, die ihre Freigaben
+gäben. Die Ansicht braucht `owner` oder `manage` (05).
 
 ### 9.2 "Als Person ansehen" (`access.view_as`)
 
 - Nur Owner, mit Step-up, Audit beim Start und Ende.
 - Der Server setzt `view_as` im Prinzipal-Kontext für höchstens `authz.view_as_max_duration`.
 - Wirksame Rechte sind die Schnittmenge aus Owner und Person. DM-Kanäle der Person bleiben
-  unsichtbar (SR6). Alle schreibenden Aktionen enden mit `view_as_read_only`.
+  unsichtbar (SR6). Alle schreibenden Aktionen enden mit `view_as_read_only`; nach Ablauf endet
+  jede Entscheidung mit `step_up_required`.
 - Die Konsole zeigt durchgehend einen Hinweisbalken mit Name und Restzeit.
 - Zweck: prüfen, was eine Person sieht und auslösen kann, ohne ihre Zugangsdaten zu kennen.
+- In M1 ist "Als Person ansehen" eine Momentaufnahme: `viewAsUser` liefert die Bereiche und
+  Kanäle, die die Person sieht, mit Stufe und `expires_at`; `view_as` lebt nur innerhalb dieser
+  Anfrage. Das Durchblättern von Inhalten als andere Person in der Konsole braucht einen Zustand an
+  der Konsolen-Sitzung (Ziel-Person, Beginn) und Operationen zum Starten und Beenden; beides
+  ergänzt die Konsolen-Sitzung (PLAN M6-01) im Kern-Vertrag, bevor sie gebaut wird.
 
 ### 9.3 Vorschau in Klartext
 
@@ -721,8 +770,17 @@ Antwort enthält:
 - das Ergebnis von I1 und SR8 (würde die Änderung abgelehnt, mit Hinweis "zuerst auf
   organization umstellen"),
 - Hinweise: SR2 und SR3 sperren die Auslösung, H1 Lesehorizont, Freigabe an eine Gruppe erreicht
-  n Menschen, Ablaufdatum fehlt bei Personen außerhalb von Gruppen,
-- einen Text in der Sprache der Konsole, erzeugt aus Vorlagen (kein Modell erzeugt ihn).
+  n Menschen, Ablaufdatum fehlt bei Personen außerhalb von Gruppen (API: `hints`),
+- einen Text aus Vorlagen (kein Modell erzeugt ihn), in der Sprache des Aufrufers (Hauptteil von
+  `users.locale`, `de` oder `en`, sonst `de`, wie 01 "Sprachen"; API: `text`, `text_locale`).
+  Daten stehen in der Zeitzone des Aufrufers (`users.time_zone`). Die Vorlagen liegen als Katalog
+  je Sprache im Code von `authz`; ein Golden-Test hält das Beispiel unten Byte für Byte.
+
+Recht der Zielaktion heißt bei Freigaben: Leserecht auf das Ziel (sonst `404`) und `owner` oder
+`manage` darauf (sonst `403`). Die Grenzen der Delegation (2.6: eigene Stufe, eigene Zusatzrechte,
+Agenten und Apps nur durch Owner, Instanz nur durch Owner) lassen die Vorschau gelingen: `200` mit
+`allowed = false` und `denial_reason` mit dem Grund aus 4.1. Grund: Die Vorschau soll zeigen,
+warum eine Freigabe scheitern würde.
 
 Beispiel:
 
@@ -730,8 +788,7 @@ Beispiel:
 Sam erhält bis 31.12.2026 die Stufe "Auslösen" im Kanal Marketing/Kampagnen.
 Sam kann damit: Nachrichten lesen und schreiben, Threads anlegen, Agent Texter auslösen.
 Dateien hochladen: nein. Freigabe-Karten bestätigen: nein.
-Hinweis: Texter liest auch Marketing/Intern. Sam darf Marketing/Intern nicht lesen, kann aber
-über Texter Inhalte daraus erfahren.
+Hinweis: Texter liest auch Marketing/Intern. Sam darf Marketing/Intern nicht lesen, kann aber über Texter Inhalte daraus erfahren.
 ```
 
 Die Konsole zeigt die Vorschau vor jeder Bestätigung; der Step-up folgt danach.

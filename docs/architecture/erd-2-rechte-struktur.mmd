@@ -7,6 +7,8 @@ erDiagram
     uuid id PK
     text name
     text source "local, oidc_claim"
+    uuid provider_id FK "nur oidc_claim"
+    text external_ref "nur oidc_claim"
     timestamptz deleted_at
   }
   group_memberships {
@@ -94,6 +96,9 @@ erDiagram
   users {
     uuid principal_id PK
   }
+  identity_providers {
+    uuid id PK
+  }
   agents {
     uuid principal_id PK
   }
@@ -104,6 +109,7 @@ erDiagram
     uuid id PK
   }
 
+  identity_providers |o--o{ groups : "Claim-Gruppen"
   groups ||--o{ group_memberships : "hat"
   users ||--o{ group_memberships : "ist Mitglied"
   principals |o--o{ grants : "Subjekt"
