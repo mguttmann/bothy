@@ -75,6 +75,7 @@ SOURCES = {
     ),
     "quality.coverage.go_min_percent": lambda: _makefile_var("COVERAGE_GO_MIN"),
     "quality.coverage.dart_min_percent": lambda: _makefile_var("COVERAGE_DART_MIN"),
+    "quality.perf.timeout": lambda: _makefile_var("PERF_TIMEOUT"),
     "quality.sonar.new_issues_max": lambda: _gate_value("quality.sonar.new_issues_max"),
     "quality.sonar.new_hotspots_reviewed_min_percent": lambda: _gate_value(
         "quality.sonar.new_hotspots_reviewed_min_percent"

@@ -9,8 +9,10 @@ passes, and how commits, pull requests and decisions work. The detailed rules li
 You need git, GNU make, [uv](https://docs.astral.sh/uv/) and Node.js (an LTS release;
 `make bootstrap` checks the minimum version). Working on the server needs Go, working on
 the apps needs Flutter; their versions come from `services/server/go.mod` and the app's
-`pubspec.yaml`. A Docker-compatible runtime is only needed for the local SonarQube.
-Windows contributors use WSL.
+`pubspec.yaml`. A Docker-compatible runtime is needed for the local SonarQube and for server
+work: integration tests run against PostgreSQL in throwaway containers, and `make perf` runs
+the load tests. As soon as a Go module exists, every server gate fails without Go, a
+Docker-compatible runtime or the pinned tools; there is no skip. Windows contributors use WSL.
 
 ```sh
 git clone https://github.com/OWNER/bothy.git
@@ -37,6 +39,17 @@ Contributors from forks do not have that list: set `export DENYLIST_FLAGS=--allo
 in your shell, so that `make check` runs the public generic rules only. If you do not run
 the local SonarQube, also set `export SONAR_SKIP=1`. CI checks fork pull requests the same
 way, and a maintainer runs the full scan and SonarQube before merging.
+
+## Database migrations
+
+Server migrations are plain SQL files run by goose (ADR 0007). Create the next free number of
+the base branch as `migrations/NNNNN_<slug>.sql` (five digits, a lower-case slug) and run
+`make migrations-lock`; it records the checksum of the new file in
+`<module>/migrations.sha256`. Never edit or delete a migration that is merged into the base
+branch; write a new one. If another branch took your number first, renumber your file, remove
+your own line from `migrations.sha256` and lock again before your final `make check`. A
+timestamp version is fine for a draft, but `make migrations-lint` rejects it in every run.
+Details: [docs/quality/gates.md](docs/quality/gates.md#migrationen).
 
 ## Branches and commits
 

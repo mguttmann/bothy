@@ -36,7 +36,7 @@ Die vollständige Liste mit Werkzeug, Schwelle und Lauf-Ort steht in
 
 | Gruppe | make-Ziele | Prüft |
 |---|---|---|
-| Code | `fmt-check`, `lint`, `typecheck`, `test`, `coverage` | Format, Linter, Typen, Tests mit Abdeckung je Komponente |
+| Code | `fmt-check`, `codegen-check`, `lint`, `typecheck`, `arch`, `migrations-lint`, `test`, `coverage` | Format, erzeugter Code ohne Drift, Linter, Typen, Modulgrenzen der Go-Module, Migrationsregeln, Tests mit Abdeckung je Komponente |
 | Commits | `commitlint` | Conventional Commits und DCO-Sign-off der neuen Commits |
 | Doku | `docs`, `linkcheck`, `diagrams`, `api-lint`, `api-clients`, `tokens` | Site-Build strikt, Links und Anker, Diagramme, API-Verträge, generierte Clients, Design-Tokens |
 | CI-Regeln | `runners-check`, `labels-check` | Runner-Weiche, Trigger, SHA-Pinning, Timeouts, Rechte; Labels |
@@ -58,7 +58,7 @@ gilt je Art:
 
 | Art | Erwartet von der Komponente |
 |---|---|
-| Go-Modul | `go.mod` und `go.sum`; Tests mit `go test`; golangci-lint-Konfiguration im Modul (Abhängigkeitsregeln: Kapitel 02); die Abdeckung zählt `test/**` und `perf/**` nicht mit, weil sie selbst Testcode sind (02, Abschnitt 6) |
+| Go-Modul | `go.mod` und `go.sum`; Tests mit `go test`; golangci-lint-Konfiguration im Modul (Abhängigkeitsregeln: Kapitel 02); `.go-arch-lint.yml`, erzeugt aus `architecture/modules.yaml` (Gate `arch`); Migrationen unter `migrations/` mit der Prüfsummen-Datei `migrations.sha256` daneben (Gate `migrations-lint`, sobald es Migrationen gibt); Lasttests unter `perf/` mit dem Build-Tag `perf` (`make perf`); die Abdeckung zählt `test/**` und `perf/**` nicht mit, weil sie selbst Testcode sind (02, Abschnitt 6) |
 | Dart-Paket | `pubspec.yaml`, Tests unter `test/`; `custom_lint` als dev-Abhängigkeit, wenn eigene Regeln gelten |
 | Python-Projekt | `pyproject.toml` mit uv-Lock; ruff, mypy und pytest in der dev-Gruppe; Abdeckungsschwelle in der eigenen pytest-Konfiguration |
 | TypeScript-Projekt | `package.json` mit den Skripten `format`, `format:check`, `lint`, `typecheck`, `test` (Abdeckungsschwelle im Test-Runner) |
@@ -160,6 +160,7 @@ oder NEIN. Bei NEIN wird behoben und das Delta erneut geprüft; das Bedrohungsmo
 | `quality.coverage.tools_min_percent` | `90` | Prozent | Mindestabdeckung der Repository-Werkzeuge | `tools/pyproject.toml` (`fail_under`) |
 | `quality.coverage.go_min_percent` | `80` | Prozent | Mindestabdeckung je Go-Modul | `Makefile` (`COVERAGE_GO_MIN`) |
 | `quality.coverage.dart_min_percent` | `80` | Prozent | Mindestabdeckung je Dart-Paket | `Makefile` (`COVERAGE_DART_MIN`) |
+| `quality.perf.timeout` | `60m` | Dauer | Zeitlimit von `make perf` je Go-Modul | `Makefile` (`PERF_TIMEOUT`) |
 | `quality.sonar.new_issues_max` | `0` | Anzahl | Neue Befunde im neuen Code | `quality/sonar/quality-gate.json` |
 | `quality.sonar.new_hotspots_reviewed_min_percent` | `100` | Prozent | Geprüfte Security Hotspots im neuen Code | `quality/sonar/quality-gate.json` |
 | `quality.sonar.new_coverage_min_percent` | `80` | Prozent | Abdeckung des neuen Codes | `quality/sonar/quality-gate.json` |

@@ -32,3 +32,9 @@ Planning stage (milestone M0). Nothing is installable yet.
   code of conduct, support, governance, issue and pull request templates.
 - Architecture decision records 0000 to 0003, 0038 to 0042 and 0045; quality chapter
   `docs/spec/23-qualitaet.md` and the guides under `docs/quality/`.
+- Server gates in the make contract: `codegen-check`, `arch` and `migrations-lint` in
+  `make gates`, `make perf` beside them. The gates and `make perf` skip until the first Go
+  module is tracked and then fail without Go, a Docker-compatible runtime or the pinned
+  go-arch-lint and sqlc. The migration rules of ADR 0007 are checked by
+  `tools/ci/migrations_lint.py`; `make migrations-lock` records the checksums of new
+  migrations.
