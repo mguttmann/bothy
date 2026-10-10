@@ -1,0 +1,123 @@
+%% ERD Teil 2: Module authz und chat. Quelle: 03-datenmodell.md, 4.3 und 4.5.
+%% Reine Protokoll-Spalten (created_by, updated_by, granted_by, revoked_by und ähnliche) zeigen auf
+%% principals(id) und sind nicht als Beziehung gezeichnet.
+%% Tabellen anderer Module nur mit Schlüssel.
+erDiagram
+  groups {
+    uuid id PK
+    text name
+    text source "local, oidc_claim"
+    timestamptz deleted_at
+  }
+  group_memberships {
+    uuid id PK
+    uuid group_id FK
+    uuid user_id FK
+    timestamptz expires_at
+    timestamptz removed_at
+  }
+  grants {
+    uuid id PK
+    text subject_kind "user, group, agent, app"
+    uuid subject_principal_id FK
+    uuid subject_group_id FK
+    text target_kind "instance, space, channel"
+    uuid target_space_id FK
+    uuid target_channel_id FK
+    text level "read, write, trigger"
+    text[] capabilities
+    timestamptz expires_at
+    timestamptz revoked_at
+  }
+  spaces {
+    uuid id PK
+    text sort_key
+    uuid default_operator_agent_id FK
+    timestamptz archived_at
+  }
+  user_space_states {
+    uuid user_id PK, FK
+    uuid space_id PK, FK
+    boolean collapsed
+    uuid updated_by_device_id FK
+  }
+  channels {
+    uuid id PK
+    uuid space_id FK "NULL genau bei dm"
+    text kind "text, forum, dm"
+    boolean operator_inherit
+    uuid operator_agent_id FK
+    bigint settings_version
+  }
+  channel_skill_bindings {
+    uuid channel_id PK, FK
+    integer position PK
+    text skill_ref
+  }
+  project_bindings {
+    uuid channel_id PK, FK
+    text workspace_ref UK
+    boolean ready
+  }
+  dm_participants {
+    uuid channel_id PK, FK
+    uuid user_id PK, FK
+    timestamptz left_at
+  }
+  forum_tags {
+    uuid id PK
+    uuid channel_id FK
+    boolean restricted
+  }
+  threads {
+    uuid id PK
+    uuid channel_id FK
+    text kind "main, thread"
+    uuid parent_message_id FK
+    text title_source "auto, manual"
+    text state "open, closed"
+    uuid operator_agent_id FK
+    bigint last_message_seq
+  }
+  thread_tags {
+    uuid thread_id PK, FK
+    uuid tag_id PK, FK
+  }
+  principals {
+    uuid id PK
+  }
+  users {
+    uuid principal_id PK
+  }
+  agents {
+    uuid principal_id PK
+  }
+  devices {
+    uuid id PK
+  }
+  messages {
+    uuid id PK
+  }
+
+  groups ||--o{ group_memberships : "hat"
+  users ||--o{ group_memberships : "ist Mitglied"
+  principals |o--o{ grants : "Subjekt"
+  groups |o--o{ grants : "Subjekt"
+  spaces |o--o{ grants : "Ziel"
+  channels |o--o{ grants : "Ziel"
+  agents |o--o{ spaces : "Standard-Bediener"
+  users ||--o{ user_space_states : "hat"
+  spaces ||--o{ user_space_states : "Zustand"
+  devices |o--o{ user_space_states : "zuletzt von"
+  spaces |o--o{ channels : "enthält"
+  agents |o--o{ channels : "bedient"
+  channels ||--o{ channel_skill_bindings : "lädt"
+  channels ||--o| project_bindings : "gebunden an"
+  channels ||--o{ dm_participants : "Teilnehmer"
+  users ||--o{ dm_participants : "nimmt teil"
+  channels ||--o{ forum_tags : "hat"
+  channels ||--o{ threads : "enthält"
+  messages |o--o| threads : "startet"
+  agents |o--o{ threads : "Bediener bei Anlage"
+  threads ||--o{ thread_tags : "trägt"
+  forum_tags ||--o{ thread_tags : "an"

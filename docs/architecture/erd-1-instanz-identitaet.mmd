@@ -1,0 +1,115 @@
+%% ERD Teil 1: Module instance und identity. Quelle: 03-datenmodell.md, 4.1 und 4.2.
+%% Gezeigt: Schlüssel, Fremdschlüssel und Spalten mit Zustand. Reine Protokoll-Spalten (created_by,
+%% updated_by, granted_by, revoked_by und ähnliche) zeigen auf principals(id) und sind nicht als
+%% Beziehung gezeichnet. Tabellen anderer Module nur mit Schlüssel.
+erDiagram
+  instance {
+    smallint id PK "CHECK id = 1"
+    uuid instance_id UK
+    timestamptz setup_completed_at
+  }
+  instance_settings {
+    text key PK
+    jsonb value
+    bigint version
+  }
+  server_signing_keys {
+    text kid PK
+    text purpose "access_token, invocation, webhook_out"
+    text state "next, active, retiring, retired"
+  }
+  feature_flags {
+    text key PK
+    boolean enabled
+    jsonb rollout
+  }
+  sequence_counters {
+    text name PK "event_seq, audit_seq, permission_version"
+    bigint value
+  }
+  principals {
+    uuid id PK
+    text kind "user, agent, app"
+    text status "pending, active, disabled, deleted"
+    text handle UK
+    uuid avatar_file_id FK
+  }
+  users {
+    uuid principal_id PK, FK
+    text email UK
+    text time_zone
+  }
+  owners {
+    uuid id PK
+    uuid user_id FK
+    timestamptz revoked_at
+  }
+  identity_providers {
+    uuid id PK
+    text kind "oidc, trusted_header, local"
+    boolean allow_provisioning
+  }
+  user_identities {
+    uuid id PK
+    uuid user_id FK
+    uuid provider_id FK
+    text subject
+  }
+  passkey_credentials {
+    uuid id PK
+    uuid user_id FK
+    bytea credential_id UK
+  }
+  devices {
+    uuid id PK
+    uuid user_id FK
+    text state "pending, active, revoked"
+  }
+  device_keys {
+    uuid id PK
+    uuid device_id FK
+    text jkt UK
+  }
+  auth_sessions {
+    uuid id PK
+    uuid user_id FK
+    uuid device_id FK
+    uuid identity_id FK
+    timestamptz step_up_at
+    timestamptz revoked_at
+  }
+  refresh_token_families {
+    uuid id PK
+    uuid session_id FK
+    integer current_generation
+  }
+  refresh_tokens {
+    uuid id PK
+    uuid family_id FK
+    integer generation
+    bytea token_hash UK
+  }
+  api_tokens {
+    uuid id PK
+    uuid principal_id FK
+    bytea token_hash UK
+    text[] scopes
+  }
+  files {
+    uuid id PK
+  }
+
+  principals ||--o| users : "ist Mensch"
+  files |o--o{ principals : "Avatar"
+  users ||--o{ owners : "ist Owner"
+  users ||--o{ user_identities : "hat"
+  identity_providers ||--o{ user_identities : "liefert"
+  users ||--o{ passkey_credentials : "hat"
+  users ||--o{ devices : "hat"
+  devices ||--o{ device_keys : "hat"
+  users ||--o{ auth_sessions : "hat"
+  devices ||--o{ auth_sessions : "trägt"
+  user_identities |o--o{ auth_sessions : "meldet an"
+  auth_sessions ||--o{ refresh_token_families : "hat"
+  refresh_token_families ||--o{ refresh_tokens : "rotiert"
+  principals ||--o{ api_tokens : "besitzt"

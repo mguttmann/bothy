@@ -1,0 +1,73 @@
+---
+config:
+  layout: elk
+---
+%% C4 Ebene 2: Container. C4-Notation als Mermaid-Flowchart (siehe README).
+%% Secret-Quelle (Datei, Env, später Key Vault) ist nicht gezeichnet: api und worker lesen sie beim
+%% Start und bei Rotation (02-architektur.md, Abschnitt Konfigurationsladen).
+flowchart TB
+  classDef person fill:#0b3d6e,stroke:#062440,color:#ffffff
+  classDef container fill:#1565c0,stroke:#0b3c75,color:#ffffff
+  classDef store fill:#0d7a5f,stroke:#08523f,color:#ffffff
+  classDef ext fill:#6d6d6d,stroke:#474747,color:#ffffff
+
+  member["<b>Mitglied, Owner</b><br/>[Person]"]:::person
+
+  subgraph devices["Geräte der Menschen"]
+    direction LR
+    apps["<b>Apps</b><br/>[Flutter: iOS, Android, macOS, Windows]<br/>Chat, Offline-Ausgangsfach,<br/>Notification Service Extension"]:::container
+    console["<b>Web-Konsole</b><br/>[Flutter Web]<br/>nur Verwaltung und Statistik"]:::container
+  end
+
+  subgraph agenthost["Agenten-Host (außerhalb des Servers)"]
+    direction LR
+    adapter["<b>Agenten-Adapter</b><br/>[Hermes-Agent-Plugin, Claude-Code-Runner,<br/>eigene mit SDK]<br/>Verbraucher mit Cursor, prüft Marke"]:::container
+    runtime["<b>Agenten-Laufzeit</b><br/>[Hermes Agent, Claude Code, ...]"]:::ext
+  end
+
+  subgraph inst["Bothy-Instanz (Betreiber)"]
+    proxy["<b>Reverse-Proxy</b><br/>[vom Betreiber gewählt]<br/>TLS, optional Identitäts-Header"]:::ext
+    subgraph bin["Ein Image, ein Binary bothy"]
+      direction LR
+      api["<b>bothy serve --role=api</b><br/>[Go]<br/>REST, Gateway-WebSocket,<br/>Log-Tail und Fan-out im Prozess"]:::container
+      worker["<b>bothy serve --role=worker</b><br/>[Go]<br/>River-Jobs, Ereignis-Verbraucher,<br/>Dateiverarbeitung, Wartung"]:::container
+    end
+    subgraph data["Zustand"]
+      direction LR
+      pg[("<b>PostgreSQL 18</b><br/>[Datenbank]<br/>Domänendaten, event_log,<br/>River-Tabellen")]:::store
+      objects[("<b>Objektspeicher</b><br/>[Dateisystem oder S3-kompatibel]<br/>Dateien, Vorschaubilder")]:::store
+    end
+    clamd["<b>ClamAV clamd</b><br/>[eigener Prozess, optional]"]:::container
+    otelcol["<b>OTel Collector</b><br/>[eigener Prozess]"]:::container
+  end
+
+  idp["<b>Identitätsanbieter</b><br/>[OIDC]"]:::ext
+  pushsvc["<b>Push-Dienste</b><br/>[APNs, FCM]"]:::ext
+  llm["<b>KI-Anbieter</b>"]:::ext
+  integr["<b>Integrationen</b><br/>[Apps, externe Systeme]"]:::ext
+  backends["<b>Telemetrie-Backends</b>"]:::ext
+  stt["<b>Transkriptions-Dienst</b><br/>[optional]"]:::ext
+
+  member --> apps
+  member --> console
+  apps -->|"HTTPS REST mit DPoP, WSS Gateway"| proxy
+  console -->|"HTTPS REST"| proxy
+  adapter -->|"WSS Gateway als Agent, REST"| proxy
+  integr -->|"REST, Eingangs-Webhooks"| proxy
+  apps -.->|"Anmeldung im Systembrowser"| idp
+  adapter -->|"Plugin oder Kindprozess"| runtime
+  runtime -->|"Modellaufrufe"| llm
+  proxy -->|"HTTP, intern"| api
+  api -->|"SQL, LISTEN"| pg
+  worker -->|"SQL, River, LISTEN"| pg
+  api -->|"Upload, Download"| objects
+  worker -->|"Scan, Vorschau"| objects
+  worker -->|"INSTREAM"| clamd
+  api -->|"Code-Austausch, JWKS"| idp
+  worker -->|"HTTPS, nur IDs"| pushsvc
+  pushsvc -.->|"Push ohne Inhalt"| apps
+  worker -->|"signierte Webhooks"| integr
+  worker -.->|"Audio, optional"| stt
+  api -->|"OTLP"| otelcol
+  worker -->|"OTLP"| otelcol
+  otelcol -->|"Exporter je Backend"| backends

@@ -1,0 +1,99 @@
+---
+config:
+  layout: elk
+---
+%% C4 Ebene 3: Komponenten des Servers = Module des Monolithen.
+%% Pfeil A --> B heißt: A darf den Port von B aufrufen (Abhängigkeitstabelle in 02-architektur.md, 5.3).
+%% Alle Module nutzen zusätzlich die Querschnitts-Ports aus internal/kernel; diese Kanten sind nicht gezeichnet.
+flowchart TB
+  classDef top fill:#5e35b1,stroke:#3b1f78,color:#ffffff
+  classDef mid fill:#1565c0,stroke:#0b3c75,color:#ffffff
+  classDef base fill:#0d7a5f,stroke:#08523f,color:#ffffff
+  classDef shared fill:#6d6d6d,stroke:#474747,color:#ffffff
+
+  subgraph edge["Rand: Verbindungen, Verbraucher, Querschnitt"]
+    gateway["<b>gateway</b><br/>WebSocket, Fan-out, Fokus, Tippen"]:::top
+    notify["<b>notify</b><br/>Benachrichtigung, Push"]:::top
+    apps["<b>apps</b><br/>Apps, Webhooks ein und aus"]:::top
+    stats["<b>stats</b><br/>Statistik"]:::top
+    privacy["<b>privacy</b><br/>DSGVO-Aufträge"]:::top
+    importer["<b>importer</b><br/>Import"]:::top
+    search["<b>search</b><br/>Volltextsuche"]:::top
+  end
+
+  subgraph core["Fachkern"]
+    sync["<b>sync</b><br/>Ereignis-Log, Nachholen, Momentaufnahme,<br/>Gelesen-Stand, Entwürfe, Einstellungen"]:::mid
+    runs["<b>runs</b><br/>Auslösung, Läufe, Live-Box,<br/>Komponenten, Interaktionen"]:::mid
+    messaging["<b>messaging</b><br/>Nachrichten, Reaktionen, Anheften"]:::mid
+    status["<b>status</b><br/>Statusseite"]:::mid
+    agents["<b>agents</b><br/>Agenten, Sitzungen, Befehle,<br/>Verbraucher-Cursor"]:::mid
+    files["<b>files</b><br/>Dateien, Scan, Vorschau"]:::mid
+    chat["<b>chat</b><br/>Bereiche, Kanäle, Threads"]:::mid
+  end
+
+  subgraph foundation["Fundament"]
+    identity["<b>identity</b><br/>Prinzipale, Geräte, Sitzungen, Tokens"]:::base
+    authz["<b>authz</b><br/>authorize, Gruppen, Freigaben, I1"]:::base
+    audit["<b>audit</b><br/>Audit-Log"]:::base
+    billing["<b>billing</b><br/>Kosten, Preise"]:::base
+    instance["<b>instance</b><br/>Einstellungen, Schalter,<br/>Schlüssel, Zähler"]:::base
+  end
+
+  kernel["<b>internal/kernel</b><br/>Querschnitts-Ports: authorize, txn, eventlog,<br/>auditing, idempotency, actor, personaldata"]:::shared
+  platform["<b>internal/platform</b><br/>pg, httpserver, jobs, otel, config,<br/>secrets, ratelimit, lifecycle"]:::shared
+
+  gateway --> chat
+  gateway --> agents
+  gateway --> runs
+  gateway --> sync
+  notify --> identity
+  notify --> chat
+  notify --> messaging
+  notify --> sync
+  apps --> instance
+  apps --> identity
+  apps --> chat
+  apps --> agents
+  apps --> messaging
+  apps --> sync
+  stats --> chat
+  stats --> agents
+  stats --> messaging
+  stats --> runs
+  stats --> billing
+  privacy --> identity
+  privacy --> files
+  importer --> identity
+  importer --> chat
+  importer --> messaging
+  importer --> files
+  search --> chat
+  search --> messaging
+  search --> files
+  sync --> instance
+  sync --> chat
+  sync --> agents
+  sync --> messaging
+  sync --> runs
+  runs --> instance
+  runs --> chat
+  runs --> agents
+  runs --> messaging
+  runs --> billing
+  messaging --> identity
+  messaging --> chat
+  messaging --> files
+  status --> agents
+  agents --> identity
+  agents --> authz
+  agents --> chat
+  files --> identity
+  files --> chat
+  chat --> identity
+  chat --> authz
+  identity --> instance
+  identity --> authz
+  authz --> instance
+  audit --> instance
+  foundation ~~~ kernel
+  kernel ~~~ platform

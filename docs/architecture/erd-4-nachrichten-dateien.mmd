@@ -1,0 +1,104 @@
+%% ERD Teil 4: Module messaging und files. Quelle: 03-datenmodell.md, 4.6 und 4.7.
+%% Reine Protokoll-Spalten (created_by, updated_by, granted_by, revoked_by und ähnliche) zeigen auf
+%% principals(id) und sind nicht als Beziehung gezeichnet.
+%% Tabellen anderer Module nur mit Schlüssel.
+erDiagram
+  messages {
+    uuid id PK
+    uuid thread_id FK
+    uuid channel_id FK "Kopie für Rechtefilter"
+    bigint thread_seq "UK mit thread_id"
+    uuid author_principal_id FK
+    uuid client_msg_id "UK mit author_principal_id"
+    text origin "human, agent, app, import, system"
+    text kind "text, voice, run, card, system"
+    uuid reply_to_message_id FK
+    uuid run_id FK
+    text trigger_state
+    uuid import_item_id FK
+    bigint version
+    timestamptz deleted_at
+  }
+  message_revisions {
+    uuid id PK
+    uuid message_id FK
+    integer revision
+  }
+  mentions {
+    uuid message_id PK, FK
+    uuid principal_id PK, FK
+    uuid thread_id FK
+  }
+  reactions {
+    uuid message_id PK, FK
+    uuid principal_id PK, FK
+    text emoji PK
+  }
+  pins {
+    uuid message_id PK, FK
+    uuid thread_id FK
+  }
+  message_templates {
+    uuid id PK
+    uuid owner_user_id FK
+    uuid channel_id FK
+  }
+  files {
+    uuid id PK
+    text object_key UK
+    bytea sha256
+    uuid scope_channel_id FK
+    text upload_state "pending, complete, failed"
+    text scan_status "pending, clean, infected, error, skipped"
+    text transcript_status
+  }
+  file_thumbnails {
+    uuid file_id PK, FK
+    text variant PK "small, medium, large, poster"
+    text object_key UK
+  }
+  message_attachments {
+    uuid message_id PK, FK
+    smallint position PK
+    uuid file_id FK
+  }
+  principals {
+    uuid id PK
+  }
+  users {
+    uuid principal_id PK
+  }
+  threads {
+    uuid id PK
+  }
+  channels {
+    uuid id PK
+  }
+  runs {
+    uuid id PK
+  }
+  import_items {
+    uuid id PK
+  }
+
+  threads ||--o{ messages : "enthält"
+  channels ||--o{ messages : "Filter"
+  principals ||--o{ messages : "Autor"
+  messages |o--o{ messages : "Antwort auf"
+  runs |o--o| messages : "Live-Box-Anker"
+  import_items |o--o{ messages : "Herkunft"
+  messages ||--o{ message_revisions : "Fassungen"
+  messages ||--o{ mentions : "erwähnt"
+  principals ||--o{ mentions : "wird erwähnt"
+  threads ||--o{ mentions : "Kopie"
+  messages ||--o{ reactions : "hat"
+  principals ||--o{ reactions : "reagiert"
+  messages ||--o| pins : "angeheftet"
+  threads ||--o{ pins : "Liste"
+  users |o--o{ message_templates : "persönlich"
+  channels |o--o{ message_templates : "Kanal"
+  principals ||--o{ files : "lädt hoch"
+  channels |o--o{ files : "Upload-Ziel"
+  files ||--o{ file_thumbnails : "Vorschau"
+  messages ||--o{ message_attachments : "Anhänge"
+  files ||--o{ message_attachments : "hängt an"

@@ -1,0 +1,55 @@
+# Modul `billing`
+
+Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
+[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+
+## Zweck
+
+Preistabelle, Kostenbuchungen, Summen je Lauf, Thread, Bereich, Agent, Abgleich.
+
+## Port (Wurzelpaket `internal/billing`)
+
+- Eingehend: `Costs` (Buchen, Korrektur, Summen), `Prices`.
+- Gibt In-Tx-Ereignisse aus: keine.
+- Abonniert In-Tx-Ereignisse: keine.
+- Implementiert Quellen-Ports und Querschnitts-Ports: keine.
+
+## Abhängigkeiten
+
+Darf die Ports dieser Module nutzen: nichts.
+
+Grund: Kostenzeilen tragen Kopien von Thread, Kanal, Bereich und Agent (03); keine Rückfrage nötig.
+
+Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
+Geprüft durch go-arch-lint (ADR 0008).
+
+## Tabellen
+
+`price_table`, `cost_entries`.
+
+Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+
+## Aktionen (05-aktionen.md)
+
+`cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `cost.reconcile`.
+
+## Ereignisse und WebSocket-Ops
+
+- Dauerhaft: keine.
+- Kurzlebig: keine.
+- WebSocket-Ops (Client an Server): keine.
+
+## Hintergrundjobs
+
+| Job | Auslöser | Warteschlange |
+|---|---|---|
+| `billing.reconcile` | `cost.reconcile` oder periodisch, falls eingeschaltet | `default` |
+
+## Hinweise für den Bau
+
+- Beträge in Mikro-Einheiten mit Währung; Korrekturen nur als neue Zeile mit `supersedes_id` (03, 4.9).
+- Bei `billing_mode = personal` sind Beträge nur Information.
+
+## Kapitel
+
+[02-architektur.md](../../../../docs/spec/02-architektur.md), [10-backend-richtlinie.md](../../../../docs/spec/10-backend-richtlinie.md)

@@ -1,0 +1,36 @@
+%% C4 Ebene 1: Systemkontext. C4-Notation als Mermaid-Flowchart (siehe README).
+flowchart TB
+  classDef person fill:#0b3d6e,stroke:#062440,color:#ffffff
+  classDef system fill:#1565c0,stroke:#0b3c75,color:#ffffff
+  classDef ext fill:#6d6d6d,stroke:#474747,color:#ffffff
+
+  member["<b>Mitglied</b><br/>[Person]<br/>Mensch mit Freigaben auf<br/>Bereichen oder Kanälen"]:::person
+  owner["<b>Owner</b><br/>[Person]<br/>verwaltet Rechte, Agenten,<br/>Backend-Richtlinie"]:::person
+  operator["<b>Betreiber</b><br/>[Person]<br/>installiert, konfiguriert,<br/>sichert die Instanz"]:::person
+  dev["<b>Bot-Entwicklerin</b><br/>[Person]<br/>baut Adapter und Apps<br/>gegen die öffentliche API"]:::person
+
+  bothy["<b>Bothy-Instanz</b><br/>[Software-System]<br/>Server, Apps für iOS, Android,<br/>macOS, Windows, Web-Konsole"]:::system
+
+  proxy["<b>Reverse-Proxy</b><br/>[extern]<br/>TLS, optional Identitäts-Header"]:::ext
+  idp["<b>Identitätsanbieter</b><br/>[extern]<br/>OIDC, z. B. Microsoft Entra ID"]:::ext
+  push["<b>Push-Dienste</b><br/>[extern]<br/>APNs, FCM"]:::ext
+  agents["<b>Agenten</b><br/>[extern zum Server]<br/>Adapter plus Laufzeit,<br/>z. B. Hermes Agent, Claude Code"]:::ext
+  llm["<b>KI-Anbieter</b><br/>[extern]<br/>Modell-API oder persönliches Abo<br/>in der Laufzeit"]:::ext
+  integr["<b>Integrationen</b><br/>[extern]<br/>Apps mit Manifest,<br/>Systeme mit Webhooks"]:::ext
+  telemetry["<b>Telemetrie-Backends</b><br/>[extern]<br/>über OpenTelemetry Collector"]:::ext
+  discord["<b>Discord</b><br/>[extern]<br/>Import-Quelle, nur lesend"]:::ext
+  stt["<b>Transkriptions-Dienst</b><br/>[extern, optional]<br/>hinter einem Port"]:::ext
+
+  member -->|"chattet, löst Agenten aus"| bothy
+  owner -->|"verwaltet mit Step-up"| bothy
+  operator -->|"installiert, konfiguriert"| bothy
+  dev -->|"entwickelt gegen API und SDK"| integr
+  proxy -->|"HTTPS, WebSocket"| bothy
+  bothy -->|"OIDC Auth-Code mit PKCE"| idp
+  bothy -->|"Push ohne Inhalt"| push
+  agents -->|"WebSocket, REST,<br/>Aufruf-Marke"| bothy
+  agents -->|"Modellaufrufe mit<br/>eigenen Zugangsdaten"| llm
+  integr -->|"REST, Webhooks"| bothy
+  bothy -->|"OTLP"| telemetry
+  bothy -->|"liest beim Import"| discord
+  bothy -->|"Audio zur Transkription"| stt
