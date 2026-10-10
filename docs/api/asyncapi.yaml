@@ -7,6 +7,7 @@ asyncapi: 3.0.0
 info:
   title: Chat Server Gateway
   version: 0.1.0
+  x-protocol-versions: [1]
   description: |-
     WebSocket gateway for people, agents and apps. Frames are JSON text frames `{"op": <name>, "d":
     <body>}`. Authentication happens in-band with `identify` or `resume` (DPoP proof with the nonce
@@ -185,58 +186,58 @@ channels:
     x-close-codes:
     - code: 1000
       name: normal
-      client_action: nicht neu verbinden, außer die App ist im Vordergrund
+      client_action: do not reconnect unless the app is in the foreground
     - code: 1001
       name: going_away
-      client_action: neu verbinden mit Backoff, `resume` versuchen
+      client_action: reconnect with backoff, try `resume`
     - code: 4000
       name: unknown_error
-      client_action: neu verbinden mit Backoff
+      client_action: reconnect with backoff
     - code: 4001
       name: unknown_op
-      client_action: Fehler melden, neu verbinden
+      client_action: report the error, reconnect
     - code: 4002
       name: decode_error
-      client_action: Fehler melden, neu verbinden
+      client_action: report the error, reconnect
     - code: 4003
       name: not_identified
-      client_action: Op vor `identify` gesendet; neu verbinden
+      client_action: an op was sent before `identify`; reconnect
     - code: 4004
       name: authentication_failed
-      client_action: Token erneuern; scheitert das, abmelden
+      client_action: renew the token; if that fails, log out
     - code: 4005
       name: already_identified
-      client_action: Fehler melden, neu verbinden
+      client_action: report the error, reconnect
     - code: 4006
       name: session_invalid
-      client_action: '`identify` statt `resume`'
+      client_action: '`identify` instead of `resume`'
     - code: 4007
       name: protocol_version_unsupported
-      client_action: App-Update anzeigen, nicht neu verbinden
+      client_action: show the app update note, do not reconnect
     - code: 4008
       name: rate_limited
-      client_action: Wartezeit aus dem Schließgrund abwarten
+      client_action: wait for the time given in the close reason
     - code: 4009
       name: heartbeat_timeout
-      client_action: neu verbinden mit Backoff, `resume` versuchen
+      client_action: reconnect with backoff, try `resume`
     - code: 4011
       name: token_expired
-      client_action: Token erneuern, dann `resume`
+      client_action: renew the token, then `resume`
     - code: 4012
       name: revoked
-      client_action: 'Sitzung, Gerät oder Prinzipal widerrufen: lokale Daten löschen, abmelden, nicht neu verbinden'
+      client_action: 'session, device or principal revoked: delete local data, log out, do not reconnect'
     - code: 4013
       name: server_restart
-      client_action: sofort mit Zufallsverzögerung neu verbinden, `resume` versuchen
+      client_action: reconnect at once with a random delay, try `resume`
     - code: 4014
       name: slow_consumer
-      client_action: neu verbinden, Nachholen ab Cursor
+      client_action: reconnect, catch up from the cursor
     - code: 4015
       name: consumer_replaced
-      client_action: 'nur Agenten: ein anderer Prozess hat denselben Verbraucher übernommen; nicht neu verbinden'
+      client_action: 'agents only: another process took over the same consumer; do not reconnect'
     - code: 4016
       name: device_pending
-      client_action: 'Gerät wartet auf Freigabe: Hinweis zeigen, nach der Freigabe neu verbinden'
+      client_action: 'device pending approval: do not reconnect until `GET /api/v1/devices/{id}` reports state `active`'
 
 operations:
   receive.identify:

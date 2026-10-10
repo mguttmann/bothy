@@ -212,6 +212,7 @@ rules:
         - search.query
         - self.profile.update
         - self.read
+        - session.extension.create
         - session.list
         - session.revoke
         - settings.read
@@ -451,6 +452,7 @@ rules:
         - self
         - self.profile.update
         - self.read
+        - session.extension.create
         - session.list
         - session.revoke
         - settings.read

@@ -121,6 +121,7 @@ paths:
                   summary: Response
                   value:
                     instance_id: 0192f4a0-7b1c-7db7-89b9-2fe4c48dcb3e
+                    setup_required: false
                     api_versions: [v1]
                     spec_version: 1.0.0
                     gateway:
@@ -359,6 +360,7 @@ paths:
       tags: [Auth]
       x-authz-action: auth.login.begin
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       requestBody:
         required: true
         content:
@@ -411,8 +413,7 @@ paths:
       summary: OIDC redirect target of the identity provider
       tags: [Auth]
       description: |-
-        Exchanges the code at the provider, then redirects to `app_redirect_uri` with a one-time
-        `login_code`. Failures redirect with `error`.
+        Exchanges the code at the provider and verifies the ID token. It stores only the verified external identity in the login flow; mapping, linking and provisioning happen at `completeOidcLogin` (08, 2.2). Then it redirects to `app_redirect_uri` with the query parameters `login_code` (one-time, valid `auth.server_code_ttl`) and `login_attempt_id`. After the flow was found, every failure redirects with `error` and `login_attempt_id`; `error` is one of `access_denied` (the provider sent an error), `login_failed` (a check failed) and `flow_expired`. An unknown or expired `state` gets `400` without a redirect.
       x-authz-action: auth.login.begin
       x-rate-limit-class: rl.public_auth
       parameters:
@@ -422,6 +423,11 @@ paths:
         schema:
           type: string
         required: true
+      - name: iss
+        in: query
+        description: Issuer of the authorization response (RFC 9207). Required when the provider announces `authorization_response_iss_parameter_supported`.
+        schema:
+          type: string
       - name: code
         in: query
         description: Authorization code.
@@ -434,7 +440,7 @@ paths:
           type: string
       responses:
         '302':
-          description: Redirect.
+          description: Redirect to `app_redirect_uri` with `login_code` and `login_attempt_id`, or with `error` and `login_attempt_id`.
           headers:
             Correlation-Id:
               $ref: '#/components/headers/Correlation-Id'
@@ -461,6 +467,7 @@ paths:
       tags: [Auth]
       x-authz-action: auth.login.complete
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       parameters:
       - $ref: '#/components/parameters/DpopProof'
       requestBody:
@@ -543,6 +550,7 @@ paths:
         otherwise 404.
       x-authz-action: auth.login.complete
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       parameters:
       - $ref: '#/components/parameters/DpopProof'
       requestBody:
@@ -617,9 +625,11 @@ paths:
     post:
       operationId: beginPasskeyLogin
       summary: Start a passkey login
+      description: 'Starts a passkey login. The ceremony state is stored on the server (`auth_challenges`) and is valid once for `auth.login_flow_ttl`. Only people with an active identity of the `local` driver can log in with a passkey. For an unknown login name the options carry one decoy credential ID derived by HMAC, so the answer reveals no accounts.'
       tags: [Auth]
       x-authz-action: auth.login.begin
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       requestBody:
         required: true
         content:
@@ -666,9 +676,11 @@ paths:
     post:
       operationId: completePasskeyLogin
       summary: Finish a passkey login and register the device
+      description: 'Completes a passkey login with a DPoP proof of the device key. A new device stays `pending` until approved; a known active device stays active. Every rejection gives the same `401` body.'
       tags: [Auth]
       x-authz-action: auth.login.complete
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       parameters:
       - $ref: '#/components/parameters/DpopProof'
       requestBody:
@@ -743,9 +755,11 @@ paths:
     post:
       operationId: beginEnrollment
       summary: Start the first passkey registration with an enrollment code
+      description: 'Starts the first passkey registration with an enrollment code of purpose `first_login` or `recovery`. The code is checked but not redeemed; the stored challenge keeps a reference to it. Every rejected code gives `401`.'
       tags: [Auth]
       x-authz-action: auth.login.begin
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       requestBody:
         required: true
         content:
@@ -792,9 +806,11 @@ paths:
     post:
       operationId: completeEnrollment
       summary: Register the first passkey and log in
+      description: 'Registers the first passkey and logs in; the enrollment code of the challenge is redeemed in the same transaction and the device becomes `active`. A failed verification counts as a failed attempt of the code. Every rejection gives `401`.'
       tags: [Auth]
       x-authz-action: auth.login.complete
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       parameters:
       - $ref: '#/components/parameters/DpopProof'
       requestBody:
@@ -866,6 +882,87 @@ paths:
           $ref: '#/components/responses/Error'
       security: []
 
+  /auth/enroll/redeem:
+    post:
+      operationId: redeemEnrollmentCode
+      summary: Redeem an enrollment code with device keys and log in
+      tags: [Auth]
+      description: |-
+        Redeems an enrollment code without a passkey; the redeeming device becomes `active` (08, 3.2). Every rejected code (unknown, used, expired, exhausted, wrong purpose, person not active) gets the same `401` body. Code and device keys are checked in one transaction; a failed attempt with a matching code counts against `auth.enrollment_code_max_attempts`.
+      x-authz-action: auth.login.complete
+      x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
+      parameters:
+      - $ref: '#/components/parameters/DpopProof'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrollRedeemRequest'
+            examples:
+              default:
+                summary: Request
+                value:
+                  enrollment_code: en_EXAMPLE
+                  device:
+                    device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                    name: Alex iPhone
+                    platform: ios
+                    app_version: 1.4.0
+                    public_jwk: {}
+                    alg: ES256
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
+                    token_type: DPoP
+                    expires_in: 900
+                    refresh_token: rt_q2Z0
+                    refresh_expires_at: '2026-10-10T09:30:00.000Z'
+                    session:
+                      id: 0192f4a0-7b1c-75c3-8a09-bf22e12411b6
+                      user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                      auth_method: enrollment_code
+                      created_at: '2026-10-10T09:30:00.000Z'
+                      expires_at: '2026-10-10T09:30:00.000Z'
+                    device:
+                      id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                      user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      name: Alex iPhone
+                      platform: ios
+                      state: active
+                      app_version: 1.4.0
+                      key_thumbprint: 0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I
+                      created_at: '2026-10-10T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+      security: []
+
   /auth/pairing/begin:
     post:
       operationId: beginPairing
@@ -875,6 +972,7 @@ paths:
         The new device registers its public keys and shows the returned code. An active device of the same person approves it with `approvePairing` (08, 5.3).
       x-authz-action: auth.login.begin
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       security: []
       parameters:
       - $ref: '#/components/parameters/DpopProof'
@@ -934,9 +1032,10 @@ paths:
       summary: Collect the tokens of an approved pairing
       tags: [Auth]
       description: |-
-        The DPoP proof must be signed with the `dpop` key registered at `beginPairing`. Before approval the answer is `202` with the status; after expiry or rejection `410`.
+        The DPoP proof must be signed with the `dpop` key registered at `beginPairing`; a proof signed by another key rejects the pairing. Before approval the answer is `202` with the status; after expiry or rejection `410`.
       x-authz-action: auth.login.complete
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       security: []
       parameters:
       - $ref: '#/components/parameters/DpopProof'
@@ -1019,9 +1118,10 @@ paths:
       operationId: loginWithPassword
       summary: Log in with local password and TOTP
       tags: [Auth]
-      description: Fallback for local accounts. 404 when `auth.local_password_enabled` is false.
+      description: Fallback for local accounts. 404 when `auth.local_password_enabled` is false. A new device stays `pending` until approved (08, 5.2). Unknown names, wrong passwords and locked accounts give the same `401`.
       x-authz-action: auth.login.complete
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       parameters:
       - $ref: '#/components/parameters/DpopProof'
       requestBody:
@@ -1106,6 +1206,7 @@ paths:
         with the same key.
       x-authz-action: auth.token.refresh
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       parameters:
       - $ref: '#/components/parameters/DpopProof'
       requestBody:
@@ -1175,6 +1276,7 @@ paths:
       tags: [Auth]
       x-authz-action: auth.logout
       x-rate-limit-class: rl.write
+      x-idempotency-exempt: auth_flow
       responses:
         '204':
           description: No content.
@@ -1201,6 +1303,7 @@ paths:
       tags: [Auth]
       x-authz-action: auth.step_up
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       responses:
         '200':
           description: OK.
@@ -1235,9 +1338,11 @@ paths:
     post:
       operationId: completeStepUpWithPasskey
       summary: Confirm step-up with a passkey
+      description: 'Completes a step-up with a passkey assertion over the step-up challenge. A passkey of another person fails and counts toward `auth.step_up_fail_limit`.'
       tags: [Auth]
       x-authz-action: auth.step_up
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       requestBody:
         required: true
         content:
@@ -1288,6 +1393,7 @@ paths:
       tags: [Auth]
       x-authz-action: auth.step_up
       x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
       requestBody:
         required: true
         content:
@@ -1569,6 +1675,7 @@ paths:
       tags: [Me]
       x-authz-action: identity.link
       x-rate-limit-class: rl.admin
+      x-idempotency-exempt: auth_flow
       requestBody:
         required: true
         content:
@@ -1621,6 +1728,7 @@ paths:
       tags: [Me]
       x-authz-action: identity.link
       x-rate-limit-class: rl.admin
+      x-idempotency-exempt: auth_flow
       requestBody:
         required: true
         content:
@@ -1677,6 +1785,7 @@ paths:
       tags: [Me]
       x-authz-action: passkey.register
       x-rate-limit-class: rl.admin
+      x-idempotency-exempt: auth_flow
       responses:
         '200':
           description: OK.
@@ -1714,6 +1823,7 @@ paths:
       tags: [Me]
       x-authz-action: passkey.register
       x-rate-limit-class: rl.admin
+      x-idempotency-exempt: auth_flow
       requestBody:
         required: true
         content:
@@ -1765,6 +1875,7 @@ paths:
       operationId: setMyLocalCredential
       summary: Set local password and enroll TOTP
       tags: [Me]
+      description: 'Needs a local identity (else `409 conflict`) and `auth.local_password_enabled` (else `403 feature_disabled`). Step-up is required once the password path is established (TOTP confirmed, 07 4.2 step 8). The TOTP URI in the response is shown once; the call is a PUT and stores no response.'
       x-authz-action: local_credential.set
       x-rate-limit-class: rl.admin
       requestBody:
@@ -1797,6 +1908,7 @@ paths:
                   summary: Response
                   value:
                     password_set: true
+                    totp_enabled: false
                     totp_secret_uri: otpauth://totp/Team%20Chat:alex?secret=JBSWY3DPEHPK3PXP
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -1804,6 +1916,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '404':
           $ref: '#/components/responses/NotFound'
         '429':
@@ -1904,6 +2018,45 @@ paths:
           $ref: '#/components/responses/Error'
 
   /me/templates:
+    get:
+      operationId: listMyTemplates
+      summary: List own personal templates
+      tags: [Me]
+      description: Personal templates of the caller, without a channel context. Channel templates come from `listTemplates`.
+      x-authz-action: template.read
+      x-rate-limit-class: rl.read
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateList'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - id: 0192f4a0-7b1c-777d-8541-d21a5b1c8fe4
+                      scope: personal
+                      name: Escalation
+                      content_md: Please escalate this ticket to second level.
+                      version: 3
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
     post:
       operationId: createPersonalTemplate
       summary: Create a personal template
@@ -2021,6 +2174,8 @@ paths:
       operationId: createUser
       summary: Create a person
       tags: [Users]
+      description: |-
+        With `local_account` the server creates the local identity (subject = handle) and a `first_login` enrollment code. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7).
       x-authz-action: user.create
       x-rate-limit-class: rl.admin
       parameters:
@@ -2320,8 +2475,10 @@ paths:
   /users/{user_id}/enrollment-codes:
     post:
       operationId: createEnrollmentCode
-      summary: Issue an enrollment code for a local account
+      summary: Issue an enrollment code
       tags: [Users]
+      description: |-
+        Issues a code for an active person: `first_login` for a person with a local identity and no device yet, `recovery` for a person with a local identity and a device, `identity_link` for a person without a local identity (08, 3.2). Issuing ends every other unused code of the person. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` instead of repeating it (06, 7).
       x-authz-action: user.update
       x-rate-limit-class: rl.admin
       parameters:
@@ -2346,6 +2503,7 @@ paths:
                   summary: Response
                   value:
                     code: en_4KX9-2MQA
+                    purpose: first_login
                     expires_at: '2026-10-10T09:30:00.000Z'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -2591,6 +2749,7 @@ paths:
       operationId: viewAsUser
       summary: See the instance as a person sees it
       tags: [Access]
+      description: 'Owner only, with step-up and audit. Returns the spaces and channels the person sees, with level and the end of the view (`authz.view_as_max_duration`). The person''s direct messages stay invisible (SR6). In M1 the view lives only within this request (07, 9.2).'
       x-authz-action: access.view_as
       x-rate-limit-class: rl.admin
       parameters:
@@ -2618,6 +2777,7 @@ paths:
                       kind: user
                       handle: alex
                       display_name: Alex
+                    expires_at: '2026-10-10T09:45:00.000Z'
                     spaces:
                     - space:
                         id: 0192f4a0-7b1c-7881-8522-0a58634abc14
@@ -2861,7 +3021,7 @@ paths:
       summary: Approve a device pairing with its code
       tags: [Devices]
       description: |-
-        Called from an active device of the person, with step-up. Creates the new device as `active` for the calling person; the new device collects its tokens with `completePairing`.
+        Called from an active device of the person, with step-up. Creates the new device as `active` for the calling person; the new device collects its tokens with `completePairing` within `auth.pairing_code_ttl`, otherwise it is revoked. A code that matches no open pairing answers `404` and ends the step-up of the calling session, so every further attempt needs a new confirmation with biometrics.
       x-authz-action: device.approve
       x-rate-limit-class: rl.admin
       parameters:
@@ -2968,11 +3128,24 @@ paths:
       operationId: approveDevice
       summary: Approve a pending device
       tags: [Devices]
+      description: |-
+        The approving person types the verification code shown on the pending device (08, 5.2). A wrong code revokes the pending device; the answer is then `200` with `state` `revoked`, because the request had an effect.
       x-authz-action: device.approve
       x-rate-limit-class: rl.admin
       parameters:
       - $ref: '#/components/parameters/DeviceIdPath'
       - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceApprove'
+            examples:
+              default:
+                summary: Request
+                value:
+                  verification_code: '042517'
       responses:
         '200':
           description: OK.
@@ -3278,6 +3451,80 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /me/sessions/extensions:
+    post:
+      operationId: createExtensionSession
+      summary: Create a child session for an app extension
+      tags: [Devices]
+      description: |-
+        Creates a child session of the calling app session for the notification or share extension, with its own refresh family on the same device key (08, 7.4). An active child of the same component is replaced. The refresh token is shown once; the request carries no `Idempotency-Key` because a repeat only replaces the child.
+      x-authz-action: session.extension.create
+      x-rate-limit-class: rl.write
+      x-idempotency-exempt: auth_flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExtensionSessionCreate'
+            examples:
+              default:
+                summary: Request
+                value:
+                  client_component: notification_ext
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
+                    token_type: DPoP
+                    expires_in: 900
+                    refresh_token: rt_q2Z0
+                    refresh_expires_at: '2026-10-10T09:30:00.000Z'
+                    session:
+                      id: 0192f4a0-7b1c-75c3-8a09-bf22e12411b6
+                      user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                      auth_method: oidc
+                      client_component: notification_ext
+                      created_at: '2026-10-10T09:30:00.000Z'
+                      expires_at: '2026-10-10T09:30:00.000Z'
+                    device:
+                      id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                      user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      name: Alex iPhone
+                      platform: ios
+                      state: active
+                      app_version: 1.4.0
+                      key_thumbprint: 0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I
+                      created_at: '2026-10-10T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /sessions/{session_id}/revoke:
     post:
       operationId: revokeSession
@@ -3365,6 +3612,8 @@ paths:
       operationId: createToken
       summary: Create an API token
       tags: [Tokens]
+      description: |-
+        Kind follows the principal (`agt` agent, `app` app, `pat` person, 08 section 12). A personal token only for oneself and only with the flag `tokens.personal_enabled`. Until app installations exist (M2) a token for an app answers `409 conflict` with `reason` `app_not_installed`. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7).
       x-authz-action: token.create
       x-rate-limit-class: rl.admin
       parameters:
@@ -3381,6 +3630,8 @@ paths:
                 summary: Request
                 value:
                   name: Adapter production
+                  dpop_jkt: 0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I
+                  expires_at: '2027-10-10T00:00:00.000Z'
       responses:
         '201':
           description: Created.
@@ -3992,8 +4243,13 @@ paths:
       description: |-
         Dry run of `createGrant` (action `access.preview`): affected principals, level changes and
         invariant violations. No step-up needed; the transaction is rolled back, nothing is stored.
+        The caller needs read access to the target (else `404`) and `owner` or `manage` on it (else
+        `403`); limits of delegation give `200` with `allowed: false` and `denial_reason`. `text`
+        is in the caller's language (`de` or `en`, else `de`) with dates in the caller's time zone
+        (07, 9.3).
       x-authz-action: access.preview
       x-rate-limit-class: rl.admin
+      x-idempotency-exempt: read_only
       requestBody:
         required: true
         content:
@@ -4030,19 +4286,23 @@ paths:
                     allowed: true
                     effects:
                     - principal:
-                        id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                        id: 0192f4a0-7b1c-733c-835c-6d67630008cd
                         kind: user
-                        handle: alex
-                        display_name: Alex
-                      target_kind: instance
+                        handle: sam
+                        display_name: Sam
+                      target_kind: channel
+                      target_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                       before_level: none
-                      after_level: none
-                      capabilities_added: [approve_actions]
-                    invariant_violations:
-                    - code: i1_violation
+                      after_level: trigger
+                      capabilities_added: []
+                    invariant_violations: []
+                    hints:
+                    - code: read_horizon
                       agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
-                      principal_ids: [0192f4a0-7b1c-733c-835c-6d67630008cd]
-                      hint: Switch the agent to organization first
+                      principal_id: 0192f4a0-7b1c-733c-835c-6d67630008cd
+                      channel_id: 0192f4a0-7b1c-7c2a-8e1d-41a6b2c3d4e5
+                    text: "Sam gets the level \"Trigger\" in channel Marketing/Kampagnen until 2026-12-31.\nSam can then: read and write messages, create threads, trigger agent Texter.\nUpload files: no. Confirm approval cards: no.\nNote: Texter also reads Marketing/Intern. Sam may not read Marketing/Intern but can learn its contents through Texter."
+                    text_locale: en
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -4173,6 +4433,7 @@ paths:
       operationId: explainSpaceAccess
       summary: Who has access to a space
       tags: [Access]
+      description: 'Every principal with access and the chain of sources (direct, group, inherited, operator, via agent, blocked by a guard rule). An entry only through an agent has level `none`; disabled principals are marked `inactive` (07, 9.1).'
       x-authz-action: access.explain
       x-rate-limit-class: rl.read
       parameters:
@@ -4225,6 +4486,7 @@ paths:
       operationId: explainChannelAccess
       summary: Who has access to a channel
       tags: [Access]
+      description: 'Every principal with access and the chain of sources (direct, group, inherited, operator, direct-message participant, via agent, blocked by a guard rule). An entry only through an agent has level `none`; disabled principals are marked `inactive` (07, 9.1).'
       x-authz-action: access.explain
       x-rate-limit-class: rl.read
       parameters:
@@ -4494,13 +4756,13 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BillingModeSet'
+              $ref: '#/components/schemas/BillingModeSetAll'
             examples:
               default:
                 summary: Request
                 value:
-                  billing_mode: personal
-                  reason: Team uses the agent now
+                  billing_mode: organization
+                  reason: Switch all agents to the company key
       responses:
         '200':
           description: OK.
@@ -4560,9 +4822,13 @@ paths:
                   value:
                     items:
                     - key: voice.enabled
+                      kind: option
+                      description: Voice messages with transcription
+                      default: false
+                      module: files
+                      orphaned: false
                       enabled: true
                       rollout: {}
-                      description: Voice messages with transcription
                       version: 3
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -4594,6 +4860,7 @@ paths:
                 summary: Request
                 value:
                   enabled: true
+                  reason: Pilot with the support team
       responses:
         '200':
           description: OK.
@@ -4615,9 +4882,13 @@ paths:
                   summary: Response
                   value:
                     key: voice.enabled
+                    kind: option
+                    description: Voice messages with transcription
+                    default: false
+                    module: files
+                    orphaned: false
                     enabled: true
                     rollout: {}
-                    description: Voice messages with transcription
                     version: 3
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -5217,6 +5488,7 @@ paths:
       operationId: archiveSpace
       summary: Archive a space
       tags: [Spaces]
+      description: 'Final; there is no unarchive. Every channel of the space becomes read-only for everyone, owners included; reading stays for those who could read before. Archiving is a rights change with `access.changed`; archived spaces leave `listSpaces` (07, 4.5).'
       x-authz-action: space.archive
       x-rate-limit-class: rl.admin
       parameters:
@@ -5753,6 +6025,7 @@ paths:
       operationId: archiveChannel
       summary: Archive a channel
       tags: [Channels]
+      description: 'Final; there is no unarchive. The channel becomes read-only for everyone, owners included (`403 channel_read_only` with `reason: channel_archived`); reading stays for those who could read before. Archiving is a rights change with `access.changed`; archived channels leave `listSpaceChannels` (07, 4.5).'
       x-authz-action: channel.archive
       x-rate-limit-class: rl.admin
       parameters:
@@ -6925,6 +7198,7 @@ paths:
         app` and never trigger agents. Unknown or revoked webhooks give 404.
       x-authz-action: webhook_in.post
       x-rate-limit-class: rl.webhook_in
+      x-idempotency-exempt: client_id
       parameters:
       - $ref: '#/components/parameters/WebhookIdPath'
       - $ref: '#/components/parameters/TokenPath'
@@ -7095,6 +7369,39 @@ paths:
                       created_at: '2026-10-10T09:30:00.000Z'
                       version: 3
                       tag_ids: [0192f4a0-7b1c-712d-8017-1dad64203598]
+        '200':
+          description: 'Replay: the thread created by an earlier request with the same `first_message.client_msg_id` or `Idempotency-Key`.'
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            Idempotent-Replay:
+              $ref: '#/components/headers/Idempotent-Replay'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreadCreated'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    thread:
+                      id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                      channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                      kind: main
+                      title: Invoice export fails
+                      title_source: auto
+                      state: open
+                      last_message_seq: 5301
+                      last_activity_at: '2026-10-10T09:30:00.000Z'
+                      message_count: 1
+                      created_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      created_at: '2026-10-10T09:30:00.000Z'
+                      version: 3
+                      tag_ids: [0192f4a0-7b1c-712d-8017-1dad64203598]
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -7230,6 +7537,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
         '428':
@@ -7288,6 +7597,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
         '429':
@@ -8324,6 +8635,7 @@ paths:
         denial sets `trigger_state = failed` with `trigger_state_reason`.
       x-authz-action: message.create
       x-rate-limit-class: rl.message
+      x-idempotency-exempt: client_id
       parameters:
       - $ref: '#/components/parameters/ThreadIdPath'
       requestBody:
@@ -8861,6 +9173,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -8924,6 +9238,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -8969,6 +9285,7 @@ paths:
         Idempotent by `(principal, client_interaction_id)`.
       x-authz-action: interaction.create
       x-rate-limit-class: rl.interaction
+      x-idempotency-exempt: client_id
       parameters:
       - $ref: '#/components/parameters/ComponentIdPath'
       requestBody:
@@ -9647,6 +9964,7 @@ paths:
         For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
       x-authz-action: file.read
       x-rate-limit-class: rl.read
+      x-idempotency-exempt: read_only
       parameters:
       - $ref: '#/components/parameters/FileIdPath'
       requestBody:
@@ -10795,6 +11113,7 @@ paths:
         Only when `privacy.client_metrics` is on; otherwise `403 feature_disabled`. At most once per `client.metrics.flush_interval` (15, section 17).
       x-authz-action: client_metrics.submit
       x-rate-limit-class: rl.write
+      x-idempotency-exempt: telemetry
       requestBody:
         required: true
         content:
@@ -11554,6 +11873,7 @@ paths:
       tags: [Agent runtime]
       x-authz-action: agent.heartbeat
       x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: agent_runtime
       requestBody:
         required: true
         content:
@@ -11758,6 +12078,7 @@ paths:
       tags: [Agent runtime]
       x-authz-action: agent.events.consume
       x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: agent_runtime
       parameters:
       - $ref: '#/components/parameters/ConsumerPath'
       requestBody:
@@ -12085,6 +12406,7 @@ paths:
         `base_version` gives 409 `base_version_conflict` with the current document in `current`.
       x-authz-action: run.update
       x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: agent_runtime
       parameters:
       - $ref: '#/components/parameters/RunIdPath'
       requestBody:
@@ -12263,6 +12585,7 @@ paths:
         `billing_mode_mismatch`.
       x-authz-action: run.start
       x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: agent_runtime
       parameters:
       - $ref: '#/components/parameters/RunIdPath'
       requestBody:
@@ -12350,6 +12673,7 @@ paths:
       description: '`waiting_input -> running` with the token of the interaction or follow-up delivery.'
       x-authz-action: run.start
       x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: agent_runtime
       parameters:
       - $ref: '#/components/parameters/RunIdPath'
       requestBody:
@@ -12436,6 +12760,7 @@ paths:
       tags: [Agent runtime]
       x-authz-action: run.finish
       x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: agent_runtime
       parameters:
       - $ref: '#/components/parameters/RunIdPath'
       requestBody:
@@ -12520,6 +12845,7 @@ paths:
       description: Repeating the same final state is idempotent and returns 200.
       x-authz-action: run.finish
       x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: agent_runtime
       parameters:
       - $ref: '#/components/parameters/RunIdPath'
       requestBody:
@@ -12958,6 +13284,7 @@ paths:
         no choices when the owner does not answer in time.
       x-authz-action: command.autocomplete
       x-rate-limit-class: rl.trigger
+      x-idempotency-exempt: read_only
       parameters:
       - $ref: '#/components/parameters/ChannelIdPath'
       - $ref: '#/components/parameters/CommandIdPath'
@@ -13074,6 +13401,7 @@ paths:
       tags: [Agent runtime]
       x-authz-action: command.autocomplete.respond
       x-rate-limit-class: rl.agent_runtime
+      x-idempotency-exempt: agent_runtime
       parameters:
       - $ref: '#/components/parameters/RequestIdPath'
       requestBody:
@@ -13255,6 +13583,7 @@ paths:
       tags: [Apps]
       x-authz-action: app.read
       x-rate-limit-class: rl.read
+      x-idempotency-exempt: read_only
       requestBody:
         required: true
         content:
@@ -14036,7 +14365,7 @@ paths:
       operationId: exportAuditEvents
       summary: Export the audit log
       tags: [Audit]
-      description: Streams one `AuditEvent` per line in `seq` order, with hashes for offline verification.
+      description: Streams one `AuditEvent` per line in `seq` order, with hashes for offline verification. A stream cut short is detectable through the hash links (`prev_hash`).
       x-authz-action: audit.read
       x-rate-limit-class: rl.admin
       parameters:
@@ -14084,6 +14413,7 @@ paths:
       tags: [Audit]
       x-authz-action: audit.verify
       x-rate-limit-class: rl.admin
+      x-idempotency-exempt: read_only
       requestBody:
         required: true
         content:
@@ -14113,8 +14443,11 @@ paths:
                   summary: Response
                   value:
                     ok: true
-                    checked_from_seq: 5301
+                    checked_from_seq: 1
                     checked_to_seq: 5301
+                    checkpoints_compared: 12
+                    last_checkpoint_seq: 5290
+                    warnings: []
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -15637,6 +15970,7 @@ paths:
         One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
       x-authz-action: import.apply
       x-rate-limit-class: rl.import
+      x-idempotency-exempt: origin_key
       parameters:
       - $ref: '#/components/parameters/ImportIdPath'
       requestBody:
@@ -15710,6 +16044,7 @@ paths:
         Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A repeated call with the same key returns the same ID (22, 7.2).
       x-authz-action: import.apply
       x-rate-limit-class: rl.import
+      x-idempotency-exempt: origin_key
       parameters:
       - $ref: '#/components/parameters/ImportIdPath'
       requestBody:
@@ -18239,6 +18574,7 @@ components:
         type: string
   responses:
     BadRequest:
+      x-status: 400
       description: 'Problem codes: `validation_failed`, `malformed_request`, `cursor_invalid`, `webhook_host_not_allowed`.'
       content:
         application/problem+json:
@@ -18262,6 +18598,7 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     Unauthorized:
+      x-status: 401
       description: 'Problem codes: `unauthenticated`, `token_expired`, `session_revoked`, `step_up_required`, `use_dpop_nonce`, `invalid_dpop_proof`.'
       content:
         application/problem+json:
@@ -18285,6 +18622,7 @@ components:
         DPoP-Nonce:
           $ref: '#/components/headers/DPoP-Nonce'
     Forbidden:
+      x-status: 403
       description: 'Problem codes: `forbidden`, `scope_missing`, `device_pending`, `channel_read_only`, `feature_disabled`, `agent_invocation_denied`, `invocation_token_invalid`.'
       content:
         application/problem+json:
@@ -18304,6 +18642,7 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     NotFound:
+      x-status: 404
       description: 'Problem codes: `not_found`.'
       content:
         application/problem+json:
@@ -18323,7 +18662,8 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     Conflict:
-      description: 'Problem codes: `conflict`, `request_in_progress`, `i1_violation`, `last_owner`, `already_started`, `billing_mode_mismatch`, `tool_class_mismatch`, `invalid_state_transition`, `base_version_conflict`, `component_used`, `operator_mismatch`, `file_not_ready`.'
+      x-status: 409
+      description: 'Problem codes: `conflict`, `request_in_progress`, `i1_violation`, `last_owner`, `already_started`, `billing_mode_mismatch`, `tool_class_mismatch`, `invalid_state_transition`, `base_version_conflict`, `component_used`, `operator_mismatch`, `file_not_ready`, `title_manual`.'
       content:
         application/problem+json:
           schema:
@@ -18342,6 +18682,7 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     Gone:
+      x-status: 410
       description: 'Problem codes: `resync_required`, `message_deleted`, `gone`.'
       content:
         application/problem+json:
@@ -18361,6 +18702,7 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     PreconditionFailed:
+      x-status: 412
       description: 'Problem codes: `version_conflict`.'
       content:
         application/problem+json:
@@ -18383,6 +18725,7 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     PayloadTooLarge:
+      x-status: 413
       description: 'Problem codes: `payload_too_large`.'
       content:
         application/problem+json:
@@ -18402,6 +18745,7 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     UnsupportedMediaType:
+      x-status: 415
       description: 'Problem codes: `unsupported_media_type`.'
       content:
         application/problem+json:
@@ -18421,6 +18765,7 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     RangeNotSatisfiable:
+      x-status: 416
       description: 'Problem codes: `range_not_satisfiable`.'
       content:
         application/problem+json:
@@ -18440,6 +18785,7 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     UnprocessableEntity:
+      x-status: 422
       description: 'Problem codes: `idempotency_key_reuse`.'
       content:
         application/problem+json:
@@ -18459,6 +18805,7 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     PreconditionRequired:
+      x-status: 428
       description: 'Problem codes: `precondition_required`.'
       content:
         application/problem+json:
@@ -18478,6 +18825,7 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     TooManyRequests:
+      x-status: 429
       description: 'Problem codes: `rate_limited`.'
       content:
         application/problem+json:
@@ -18503,7 +18851,8 @@ components:
         RateLimit-Policy:
           $ref: '#/components/headers/RateLimit-Policy'
     ServiceUnavailable:
-      description: 'Problem codes: `unavailable`, `maintenance`.'
+      x-status: 503
+      description: 'Problem codes: `unavailable`, `maintenance`, `setup_required`.'
       content:
         application/problem+json:
           schema:
@@ -18524,6 +18873,7 @@ components:
         Retry-After:
           $ref: '#/components/headers/Retry-After'
     Error:
+      x-status: 500
       description: Any other error, e.g. `internal_error` (500).
       headers:
         Correlation-Id:
@@ -18664,6 +19014,238 @@ components:
       description: |
         Error body after RFC 9457 (`application/problem+json`). `type` is a relative URI with full
         path `/api/v1/problems/{code}`; `code` repeats its last segment for convenience.
+      x-problem-codes:
+      - code: validation_failed
+        status: 400
+        title: 'Validation failed'
+        description: 'The request violates the schema or a rule; `errors[]` names the fields.'
+        client_action: 'Correct the input; do not retry.'
+      - code: malformed_request
+        status: 400
+        title: 'Malformed request'
+        description: 'The body is not valid JSON or has the wrong media type.'
+        client_action: 'Programming error; do not retry.'
+      - code: cursor_invalid
+        status: 400
+        title: 'Invalid cursor'
+        description: 'The cursor is unknown or does not match the filters.'
+        client_action: 'Start again without a cursor.'
+      - code: webhook_host_not_allowed
+        status: 400
+        title: 'Webhook host not allowed'
+        description: 'The target host is not in `webhook.allowed_hosts`.'
+        client_action: 'The owner requests approval of the host.'
+      - code: unauthenticated
+        status: 401
+        title: 'Unauthenticated'
+        description: 'No valid principal (token missing, invalid or expired).'
+        client_action: 'Renew the token; if that fails, log in again.'
+      - code: token_expired
+        status: 401
+        title: 'Token expired'
+        description: 'The access token has expired.'
+        client_action: 'Refresh, then retry.'
+      - code: session_revoked
+        status: 401
+        title: 'Session revoked'
+        description: 'Session, device or principal revoked.'
+        client_action: 'Delete local data and log out (R-SY-14).'
+      - code: step_up_required
+        status: 401
+        title: 'Step-up required'
+        description: 'The action needs a fresh confirmation (`auth.step_up_max_age`), or a step-up confirmation failed.'
+        client_action: 'Perform step-up, then repeat the same request with the same `Idempotency-Key`.'
+      - code: use_dpop_nonce
+        status: 401
+        title: 'Use DPoP nonce'
+        description: 'The server requires a fresh nonce in the DPoP proof; header `DPoP-Nonce`.'
+        client_action: 'Build the proof again with the nonce and retry once.'
+      - code: invalid_dpop_proof
+        status: 401
+        title: 'Invalid DPoP proof'
+        description: 'The DPoP proof is missing, wrongly signed, expired or does not match `cnf.jkt`.'
+        client_action: 'Programming error or device key lost; log in again.'
+      - code: forbidden
+        status: 403
+        title: 'Forbidden'
+        description: 'Read access exists, but the level or a capability is missing (R-AZ-01).'
+        client_action: 'Do not retry; hide the control.'
+      - code: scope_missing
+        status: 403
+        title: 'Scope missing'
+        description: 'The app lacks the required scope.'
+        client_action: 'The owner grants the scope.'
+      - code: device_pending
+        status: 403
+        title: 'Device pending'
+        description: 'The device or the provisioned account waits for approval.'
+        client_action: 'Wait; poll `GET /devices/{device_id}` or `GET /me`.'
+      - code: channel_read_only
+        status: 403
+        title: 'Channel read-only'
+        description: 'The channel is read-only (05 rule 1.8) or archived (`reason: channel_archived`, 07 section 4.5); applies to owners too.'
+        client_action: 'Lock the input and show a note; do not retry.'
+      - code: feature_disabled
+        status: 403
+        title: 'Feature disabled'
+        description: 'The feature is switched off (for example personal tokens).'
+        client_action: 'Do not retry.'
+      - code: agent_invocation_denied
+        status: 403
+        title: 'Agent invocation denied'
+        description: '`agent.invoke` denies; `reason` for example `billing_mode_personal_not_holder`, `project_not_ready`.'
+        client_action: 'Show the reason; do not retry.'
+      - code: invocation_token_invalid
+        status: 403
+        title: 'Invocation token invalid'
+        description: 'The invocation token is wrongly signed, expired, issued for another agent, or its `jti` does not match.'
+        client_action: 'The adapter starts nothing and reports the run as `failed`.'
+      - code: not_found
+        status: 404
+        title: 'Not found'
+        description: 'The resource does not exist or is not visible; both answer the same (R-AZ-01).'
+        client_action: 'Mark the outbox entry as failed.'
+      - code: method_not_allowed
+        status: 405
+        title: 'Method not allowed'
+        description: 'The method is not defined on this path.'
+        client_action: 'Programming error.'
+        router: true
+      - code: conflict
+        status: 409
+        title: 'Conflict'
+        description: 'The state prevents the change (for example a name is taken); `reason` names the cause where one is defined.'
+        client_action: 'Reload the state; a person decides.'
+      - code: request_in_progress
+        status: 409
+        title: 'Request in progress'
+        description: 'The first request with this `Idempotency-Key` is still running.'
+        client_action: 'Retry with backoff.'
+      - code: i1_violation
+        status: 409
+        title: 'I1 violation'
+        description: 'The change would violate I1; `hint` names the way out.'
+        client_action: 'Switch to `organization` first.'
+      - code: last_owner
+        status: 409
+        title: 'Last owner'
+        description: 'At least one active owner must remain.'
+        client_action: 'Appoint another owner first.'
+      - code: already_started
+        status: 409
+        title: 'Already started'
+        description: 'The run is no longer `queued`.'
+        client_action: 'The adapter starts nothing.'
+      - code: billing_mode_mismatch
+        status: 409
+        title: 'Billing mode mismatch'
+        description: 'The reported actual mode differs from the target; the run becomes `failed`.'
+        client_action: 'Check the adapter configuration.'
+      - code: tool_class_mismatch
+        status: 409
+        title: 'Tool class mismatch'
+        description: 'The reported tool class is above the one in the invocation token; the run becomes `failed`.'
+        client_action: 'Check the adapter configuration.'
+      - code: invalid_state_transition
+        status: 409
+        title: 'Invalid state transition'
+        description: 'The state machine does not allow the transition.'
+        client_action: 'Reload the state.'
+      - code: base_version_conflict
+        status: 409
+        title: 'Base version conflict'
+        description: '`base_version` of a run patch is outdated; `current` holds the document.'
+        client_action: 'Rebase on `current`.'
+      - code: component_used
+        status: 409
+        title: 'Component used'
+        description: 'The component is used, expired or disabled.'
+        client_action: 'Refresh the view.'
+      - code: operator_mismatch
+        status: 409
+        title: 'Operator mismatch'
+        description: 'The target channel has another effective operator.'
+        client_action: 'Choose another target channel.'
+      - code: file_not_ready
+        status: 409
+        title: 'File not ready'
+        description: 'Upload incomplete or scan still running.'
+        client_action: 'Wait for `file.updated`.'
+      - code: title_manual
+        status: 409
+        title: 'Title set manually'
+        description: 'The operator agent sets a thread title only while `title_source` is `auto` (09 section 12).'
+        client_action: 'The agent keeps the manual title.'
+      - code: resync_required
+        status: 410
+        title: 'Resync required'
+        description: 'Catch-up is not possible; `reason` as in the gateway.'
+        client_action: 'Load a snapshot (04, 7.3).'
+      - code: message_deleted
+        status: 410
+        title: 'Message deleted'
+        description: 'The message was deleted in the meantime.'
+        client_action: 'Discard the entry; keep the text for copying.'
+      - code: gone
+        status: 410
+        title: 'Gone'
+        description: 'The object has expired (upload, export package, autocomplete).'
+        client_action: 'Start again.'
+      - code: version_conflict
+        status: 412
+        title: 'Version conflict'
+        description: '`If-Match` does not match; `current` holds the current version.'
+        client_action: 'Show both versions; a person decides.'
+      - code: payload_too_large
+        status: 413
+        title: 'Payload too large'
+        description: 'Body or file above the limit; `detail` names the configuration value.'
+        client_action: 'Do not retry.'
+      - code: unsupported_media_type
+        status: 415
+        title: 'Unsupported media type'
+        description: 'The media type is not allowed.'
+        client_action: 'Do not retry.'
+      - code: range_not_satisfiable
+        status: 416
+        title: 'Range not satisfiable'
+        description: '`Range` lies outside the file.'
+        client_action: 'Load without `Range`.'
+      - code: idempotency_key_reuse
+        status: 422
+        title: 'Idempotency key reused'
+        description: 'The same client ID or `Idempotency-Key` with different content.'
+        client_action: 'Create a new ID only when the person sends again.'
+      - code: precondition_required
+        status: 428
+        title: 'Precondition required'
+        description: '`If-Match` is missing.'
+        client_action: 'Programming error.'
+      - code: rate_limited
+        status: 429
+        title: 'Too many requests'
+        description: 'The rate-limit class is exhausted.'
+        client_action: 'Wait for `Retry-After`.'
+      - code: internal_error
+        status: 500
+        title: 'Internal error'
+        description: 'Unexpected error; `correlation_id` for the log search.'
+        client_action: 'Retry with backoff.'
+      - code: unavailable
+        status: 503
+        title: 'Service unavailable'
+        description: 'The server is not ready (start, missing dependency).'
+        client_action: 'Wait for `Retry-After`.'
+      - code: maintenance
+        status: 503
+        title: 'Maintenance'
+        description: 'Maintenance mode (`server.maintenance_mode = read_only`); only writing actions are blocked.'
+        client_action: 'Wait for `Retry-After`; reading continues, the outbox keeps drafts.'
+      - code: setup_required
+        status: 503
+        title: 'Setup required'
+        description: 'The instance is not set up yet; only discovery answers (08 section 4).'
+        client_action: 'The owner sets up the instance on the host; there is no `Retry-After`.'
       required: [type, title, status, code, correlation_id]
       properties:
         type:
@@ -18686,7 +19268,7 @@ components:
           examples: [/api/v1/threads/0192f4a0-7b1c-7000-8a00-000000000301]
         code:
           type: string
-          description: Stable machine code. Known values are listed in docs/spec/06-api.md. Clients treat unknown codes by HTTP status.
+          description: Stable machine code; the known values are `x-problem-codes` of this schema. Clients treat unknown codes by HTTP status.
           examples: [not_found]
         correlation_id:
           $ref: '#/components/schemas/CorrelationId'
@@ -18715,7 +19297,7 @@ components:
       properties:
         pointer:
           type: string
-          description: JSON Pointer to the offending member of the request body, or `#query/<name>`.
+          description: JSON Pointer to the offending member of the request body, or `#path/<name>`, `#query/<name>`, `#header/<name>` for parameters; empty for a rule of the whole request.
           examples: [/content_md]
         code:
           type: string
@@ -18753,9 +19335,13 @@ components:
       - auth_providers
       - jwks_uri
       - webhook_keys_uri
+      - setup_required
       properties:
         instance_id:
           $ref: '#/components/schemas/Uuid'
+        setup_required:
+          type: boolean
+          description: True until the first owner exists (08, 4); every other operation answers `503 setup_required` until then.
         api_versions:
           type: array
           items:
@@ -18813,7 +19399,12 @@ components:
           $ref: '#/components/schemas/DevicePlatform'
         min_version:
           type: string
+          description: Below this version the app does not connect (`client.min_version.<platform>`, 18 section 9).
           examples: [1.0.0]
+        recommended_version:
+          type: string
+          description: Below this version the app shows an update note (`client.recommended_version.<platform>`).
+          examples: [1.2.0]
     AuthProviderInfo:
       type: object
       required: [id, kind, name]
@@ -18968,7 +19559,8 @@ components:
           examples: [900000]
     InstanceSetting:
       type: object
-      required: [key, value, version, updated_at]
+      description: A registered key without a stored row has its default value and `version` 0, without `updated_by` and `updated_at`.
+      required: [key, value, version]
       properties:
         key:
           type: string
@@ -18998,21 +19590,43 @@ components:
             $ref: '#/components/schemas/InstanceSetting'
     FeatureFlag:
       type: object
-      required: [key, enabled, rollout, description, version]
+      description: Registration from the code plus the stored value (ADR 0064). A key without a stored row has its default and `version` 0; a stored key without registration is `orphaned` and off.
+      required: [key, enabled, rollout, version, orphaned]
       properties:
         key:
           type: string
           examples: [voice.enabled]
-        enabled:
-          type: boolean
-        rollout:
-          $ref: '#/components/schemas/FlagRollout'
+        kind:
+          type: string
+          enum: [release, option]
+          description: Absent for orphaned keys.
         description:
           type: string
+          description: From the registration (English); absent for orphaned keys.
           examples: [Voice messages with transcription]
+        default:
+          type: boolean
+          description: Registered default; absent for orphaned keys.
+        remove_by:
+          type: string
+          description: Server version by which a `release` flag is removed.
+          examples: [1.4.0]
+        module:
+          type: string
+          description: Module that owns the flag.
+          examples: [files]
+        orphaned:
+          type: boolean
+        enabled:
+          type: boolean
+          description: Global value; the stored value or the registered default.
+        rollout:
+          $ref: '#/components/schemas/FlagRollout'
         version:
           type: integer
           format: int64
+        updated_by:
+          $ref: '#/components/schemas/Uuid'
         updated_at:
           $ref: '#/components/schemas/Timestamp'
     FlagRollout:
@@ -19029,14 +19643,16 @@ components:
             $ref: '#/components/schemas/Uuid'
     FeatureFlagPut:
       type: object
-      required: [enabled]
+      required: [enabled, reason]
       properties:
         enabled:
           type: boolean
         rollout:
           $ref: '#/components/schemas/FlagRollout'
-        description:
+        reason:
           type: string
+          minLength: 1
+          examples: [Pilot with the support team]
     FeatureFlagList:
       type: object
       required: [items]
@@ -19189,6 +19805,15 @@ components:
           examples: [7KQ2-M9XD]
         expires_at:
           $ref: '#/components/schemas/Timestamp'
+    DeviceApprove:
+      type: object
+      required: [verification_code]
+      properties:
+        verification_code:
+          type: string
+          pattern: '^[0-9]+$'
+          description: Code shown on the pending device, typed by the approving person.
+          examples: ['042517']
     PairingApprove:
       type: object
       required: [pairing_code]
@@ -19228,6 +19853,10 @@ components:
           type: string
           description: Base64url SHA-256 of a client verifier, binds the later `login_code` to this app instance.
           examples: [E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM]
+        enrollment_code:
+          type: string
+          description: Optional enrollment code (purpose `first_login`, `recovery` or `identity_link`). Checked at begin, consumed at complete; an unknown subject is then linked to the person of the code (08, 3.1).
+          examples: [en_EXAMPLE]
     OidcBeginResponse:
       type: object
       required: [login_attempt_id, authorization_url, expires_at]
@@ -19259,12 +19888,35 @@ components:
       properties:
         device:
           $ref: '#/components/schemas/DeviceRegistration'
+        enrollment_code:
+          type: string
+          description: Optional enrollment code; links an unknown header login to the person of the code (08, 3.1).
+          examples: [en_EXAMPLE]
+    EnrollRedeemRequest:
+      type: object
+      description: Redeems an enrollment code with device keys only; the redeeming device becomes `active` (08, 3.2).
+      required: [enrollment_code, device]
+      properties:
+        enrollment_code:
+          type: string
+          examples: [en_EXAMPLE]
+        device:
+          $ref: '#/components/schemas/DeviceRegistration'
+    ExtensionSessionCreate:
+      type: object
+      description: Child session of the calling app session for an app extension with its own refresh family (08, 7.4).
+      required: [client_component]
+      properties:
+        client_component:
+          type: string
+          enum: [notification_ext, share_ext]
     WebAuthnChallenge:
       type: object
       required: [challenge_id, public_key, expires_at]
       properties:
         challenge_id:
           $ref: '#/components/schemas/Uuid'
+          description: ID of the stored ceremony challenge; valid once until `expires_at`.
         public_key:
           $ref: '#/components/schemas/JsonObject'
           description: WebAuthn `PublicKeyCredentialRequestOptions` or `PublicKeyCredentialCreationOptions` in JSON form.
@@ -19369,11 +20021,11 @@ components:
           $ref: '#/components/schemas/Uuid'
         challenge:
           type: string
-          description: Base64url random value to sign.
+          description: Base64url random value to sign. Single use, valid `auth.step_up_challenge_ttl`. Clients show their own localized prompt text.
           examples: [Zm9vYmFyYmF6]
         passkey_options:
           $ref: '#/components/schemas/JsonObject'
-          description: WebAuthn request options when the user has passkeys.
+          description: WebAuthn request options when the user has passkeys; their challenge is this step-up challenge.
         expires_at:
           $ref: '#/components/schemas/Timestamp'
     StepUpPasskeyRequest:
@@ -19392,8 +20044,8 @@ components:
           $ref: '#/components/schemas/Uuid'
         signature:
           type: string
-          description: Compact JWS over the challenge, signed by the active device key after user verification on the device.
-          examples: [eyJhbGciOiJFUzI1NiJ9.eyJjIjoiWm05dlltRnlZbUY2In0.sig]
+          description: 'Compact JWS signed by the active `step_up` key of the session''s device after user verification on the device. Header `alg` only (no `jwk`, `jku`, `x5u`, `x5c`, `crit`); payload `{"challenge": <challenge>, "sid": <session id>, "iat": <NumericDate>}` (08, 6.2).'
+          examples: [eyJhbGciOiJFUzI1NiJ9.EXAMPLEpayload.EXAMPLEsignature]
     StepUpResult:
       type: object
       required: [step_up_at, valid_until]
@@ -19516,12 +20168,15 @@ components:
           examples: [Europe/Berlin]
     EnrollmentCode:
       type: object
-      description: One-time code shown once to the owner, handed to the person out of band.
-      required: [code, expires_at]
+      description: 'One-time code shown once to the owner, handed to the person out of band. A replay of the creating request with the same `Idempotency-Key` does not repeat it (`409 conflict`, `reason: one_time_secret`).'
+      required: [code, purpose, expires_at]
       properties:
         code:
           type: string
           examples: [en_4KX9-2MQA]
+        purpose:
+          type: string
+          enum: [first_login, recovery, identity_link]
         expires_at:
           $ref: '#/components/schemas/Timestamp'
     ReasonBody:
@@ -19652,20 +20307,27 @@ components:
           examples: [Laptop]
     LocalCredentialSet:
       type: object
-      description: Sets or replaces the local password; with `totp_enroll` the response carries a new TOTP secret.
-      required: [password]
+      description: Sets or replaces the local password, starts a TOTP enrollment (`totp_enroll`, the response carries the new secret once) or confirms it (`totp_code`). At least one member; the first call sets `password`. The password path counts as established once TOTP is confirmed (08, 2.5).
       properties:
         password:
           type: string
           format: password
         totp_enroll:
           type: boolean
+        totp_code:
+          type: string
+          pattern: '^[0-9]{6}$'
+          description: Current code of the enrolled TOTP secret; confirms the enrollment.
+          examples: ['492039']
     LocalCredentialResult:
       type: object
-      required: [password_set]
+      required: [password_set, totp_enabled]
       properties:
         password_set:
           type: boolean
+        totp_enabled:
+          type: boolean
+          description: True once a TOTP enrollment is confirmed.
         totp_secret_uri:
           type: string
           description: otpauth URI, returned once when `totp_enroll` was set.
@@ -19697,6 +20359,13 @@ components:
         step_up_key_thumbprint:
           type: string
           description: RFC 7638 thumbprint of the active `step_up` device key, if the device has one.
+        verification_code:
+          type: string
+          pattern: '^[0-9]+$'
+          description: Only in responses to the pending device itself (`TokenResponse`, `getDevice`, `listMyDevices` for its own entry); never shown to other devices or owners (08, 5.2).
+        revoke_reason:
+          type: string
+          enum: [revoked_by_self, revoked_by_owner, user_disabled, inactive, verification_failed, pending_expired, pairing_expired]
         approved_at:
           $ref: '#/components/schemas/Timestamp'
         revoked_at:
@@ -19776,21 +20445,22 @@ components:
           $ref: '#/components/schemas/Timestamp'
     ApiTokenCreate:
       type: object
-      required: [name]
+      required: [name, expires_at]
       properties:
         name:
           type: string
           examples: [Adapter production]
         scopes:
           type: array
-          description: Subset of the granted scopes of the principal. Empty for agents (all agent scopes).
+          description: Only for app tokens, a subset of the granted scopes of the installation. Agent tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none.
           items:
             $ref: '#/components/schemas/AppScope'
         dpop_jkt:
           type: string
-          description: Bind the token to this key thumbprint; requests must then use DPoP.
+          description: RFC 7638 thumbprint (43 base64url characters) of the key the token is bound to; requests must then use DPoP. Required for the kinds in `auth.dpop_required_for`.
         expires_at:
           $ref: '#/components/schemas/Timestamp'
+          description: Required; at most `auth.api_token_max_ttl` (agents, apps) or `auth.personal_token_max_ttl` (personal) ahead.
     ApiTokenCreated:
       type: object
       required: [token, secret]
@@ -19826,8 +20496,12 @@ components:
           examples: [Support team]
         source:
           $ref: '#/components/schemas/GroupSource'
+        provider_id:
+          $ref: '#/components/schemas/Uuid'
+          description: OIDC provider whose group claim manages the members; set exactly for `source = oidc_claim`.
         external_ref:
           type: string
+          description: Claim value of the provider; set exactly for `source = oidc_claim`.
         member_count:
           type: integer
         created_at:
@@ -19843,8 +20517,12 @@ components:
           type: string
         source:
           $ref: '#/components/schemas/GroupSource'
+        provider_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Required with `source = oidc_claim`; the OIDC provider whose claim manages the members.
         external_ref:
           type: string
+          description: Required with `source = oidc_claim`; the claim value.
     GroupUpdate:
       type: object
       properties:
@@ -19950,12 +20628,16 @@ components:
           examples: [Support team works in this space]
     GrantPreview:
       type: object
-      description: Effect of a grant before it is created. No state changes.
-      required: [allowed, effects, invariant_violations]
+      description: Effect of a grant before it is created. No state changes (07, 9.3).
+      required: [allowed, effects, invariant_violations, hints, text, text_locale]
       properties:
         allowed:
           type: boolean
-          description: False if the caller could not create this grant or an invariant would break.
+          description: False if a delegation limit of the caller (`denial_reason`) or an invariant would reject the grant.
+        denial_reason:
+          type: string
+          description: Reason code of 07 section 4.1 when a delegation limit rejects the grant, for example `delegation_exceeds_own_level`.
+          examples: [delegation_exceeds_own_level]
         effects:
           type: array
           items:
@@ -19964,6 +20646,36 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InvariantViolation'
+        hints:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreviewHint'
+        text:
+          type: string
+          description: Plain text from templates in `text_locale`, lines separated by a line feed, no trailing line feed.
+        text_locale:
+          type: string
+          enum: [de, en]
+    PreviewHint:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          enum: [read_horizon, trigger_blocked_tool_class, group_reach, expiry_missing]
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        principal_id:
+          $ref: '#/components/schemas/Uuid'
+        group_id:
+          $ref: '#/components/schemas/Uuid'
+        space_id:
+          $ref: '#/components/schemas/Uuid'
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        count:
+          type: integer
+          format: int64
     AccessEffect:
       type: object
       required:
@@ -20004,6 +20716,9 @@ components:
           description: Principals that would gain `trigger` next to the credential holder.
           items:
             $ref: '#/components/schemas/Uuid'
+        organization_ready:
+          type: boolean
+          description: True when the agent reports `organization` among its `billing_modes_supported`.
         hint:
           type: string
           examples: [Switch the agent to organization first]
@@ -20026,7 +20741,11 @@ components:
         principal:
           $ref: '#/components/schemas/PrincipalRef'
         level:
-          $ref: '#/components/schemas/Level'
+          $ref: '#/components/schemas/LevelOrNone'
+          description: '`none` only for entries whose sources are all `via_agent`.'
+        inactive:
+          type: boolean
+          description: True when the principal is not `active`; the level is what its grants would give (07, 9.1).
         capabilities:
           type: array
           items:
@@ -20041,7 +20760,7 @@ components:
       properties:
         kind:
           type: string
-          enum: [owner, direct, group, inherited, dm_participant]
+          enum: [owner, direct, group, inherited, dm_participant, operator, via_agent, guard_blocked]
         grant_id:
           $ref: '#/components/schemas/Uuid'
         group_id:
@@ -20050,6 +20769,21 @@ components:
           $ref: '#/components/schemas/TargetKind'
         from_target_id:
           $ref: '#/components/schemas/Uuid'
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Agent of an `operator`, `via_agent` or `guard_blocked` source.
+        rule:
+          type: string
+          enum: [sr2, sr3]
+          description: Protection rule of a `guard_blocked` source.
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Expiry of the grant.
+        membership_expires_at:
+          $ref: '#/components/schemas/Timestamp'
+        reason:
+          type: string
+          description: Reason of the grant.
     AccessTarget:
       type: object
       required: [kind, id]
@@ -20077,8 +20811,8 @@ components:
           examples: [Support]
         icon:
           type: string
-          description: Icon token of the design system. No emoji.
-          examples: [icon.headset]
+          description: Glyph name from the list `space-icons` of the design tokens (`kernel/designkeys`). No emoji.
+          examples: [headset]
         color:
           type: string
           description: Key of a category color of the design system, never a hex value.
@@ -20103,10 +20837,12 @@ components:
         name:
           type: string
           minLength: 1
+          description: At most `space.name_max_chars` characters.
           examples: [Research]
         icon:
           type: string
-          examples: [icon.flask]
+          description: Glyph name from the list `space-icons` of the design tokens.
+          examples: [flask]
         color:
           type: string
           description: Key of a category color of the design system, never a hex value.
@@ -20116,15 +20852,19 @@ components:
           description: Insert after this space; absent inserts at the end.
     SpaceUpdate:
       type: object
+      description: Changes only the fields sent; `icon` and `color` cannot be cleared.
       properties:
         name:
           type: string
           minLength: 1
+          description: At most `space.name_max_chars` characters.
           examples: [Research]
         icon:
           type: string
+          description: Glyph name from the list `space-icons` of the design tokens.
         color:
           type: string
+          description: Key of a category colour of the design system, never a hex value.
     MovePosition:
       type: object
       description: New position relative to siblings. Exactly one of both fields; none moves to the start.
@@ -20154,6 +20894,7 @@ components:
           $ref: '#/components/schemas/Space'
         level:
           $ref: '#/components/schemas/Level'
+          description: Effective level on the space. A space visible only through one of its channels reports `read` and no capabilities.
         capabilities:
           type: array
           items:
@@ -20748,15 +21489,20 @@ components:
           $ref: '#/components/schemas/MessageOrigin'
         kind:
           $ref: '#/components/schemas/MessageKind'
+        system_code:
+          type: string
+          enum: [thread.reopened]
+          description: Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then.
         content_md:
           type: string
+          description: Markdown. In lists longer contents are cut at `message.list_content_max_bytes` with `content_truncated`.
           examples: ['@support-agent the invoice export fails since this morning.']
         content_format:
           type: integer
           examples: [1]
         content_truncated:
           type: boolean
-          description: Set in events when `content_md` was cut; load the message via REST.
+          description: Set when `content_md` was cut (events above `sync.event_payload_max_bytes`, lists above `message.list_content_max_bytes`); `getMessage` returns the full content.
         reply_to_message_id:
           $ref: '#/components/schemas/Uuid'
         run_id:
@@ -21267,6 +22013,7 @@ components:
           examples: [41]
         mention_count:
           type: integer
+          description: Unread mentions of the caller in this thread, computed when the response or event is built (03 `read_states`); never stored.
         version:
           type: integer
           format: int64
@@ -21737,7 +22484,27 @@ components:
           description: Required for `personal`.
         reason:
           type: string
+          minLength: 1
           examples: [Team uses the agent now]
+    BillingModeSetAll:
+      type: object
+      description: Switches several agents in one transaction, all or nothing (10, 9.1).
+      required: [billing_mode, reason]
+      properties:
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        credential_holder_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Required for `personal`.
+        agent_ids:
+          type: array
+          description: Required for `personal`. Without it `organization` affects every agent not yet on `organization`.
+          items:
+            $ref: '#/components/schemas/Uuid'
+        reason:
+          type: string
+          minLength: 1
+          examples: [Switch all agents to the company key]
     BillingModeSetAllResult:
       type: object
       required: [changed_agent_ids]
@@ -21754,6 +22521,7 @@ components:
           $ref: '#/components/schemas/Uuid'
         reason:
           type: string
+          minLength: 1
           examples: [Handover to deputy]
     Heartbeat:
       type: object
@@ -23016,7 +23784,7 @@ components:
           format: int64
     AuditVerifyResult:
       type: object
-      required: [ok, checked_from_seq, checked_to_seq]
+      required: [ok, checked_from_seq, checked_to_seq, checkpoints_compared, warnings]
       properties:
         ok:
           type: boolean
@@ -23029,6 +23797,20 @@ components:
         first_broken_seq:
           type: integer
           format: int64
+        failure_reason:
+          type: string
+          enum: [hash_mismatch, link_mismatch, seq_gap, checkpoint_mismatch, checkpoint_invalid]
+        checkpoints_compared:
+          type: integer
+          format: int64
+        last_checkpoint_seq:
+          type: integer
+          format: int64
+        warnings:
+          type: array
+          description: Known value `checkpoint_sink_not_configured`.
+          items:
+            type: string
     StatsBucket:
       type: object
       description: One time bucket. `group_key` is set when the query groups (space, agent, tool).
@@ -23533,11 +24315,14 @@ components:
           examples: [Identity verified]
     ViewAsSnapshot:
       type: object
-      description: Read-only view of what a person can see, for owners.
-      required: [user, spaces, channels]
+      description: Read-only view of what a person can see, for owners (07, 9.2). Direct messages never appear.
+      required: [user, spaces, channels, expires_at]
       properties:
         user:
           $ref: '#/components/schemas/PrincipalRef'
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: End of the view, `authz.view_as_max_duration` after its start.
         spaces:
           type: array
           items:
@@ -23858,6 +24643,9 @@ components:
           - refresh_reuse
           - user_disabled
           - expired
+          - inactive
+          - step_up_failed
+          - trusted_header_mismatch
     ReadStatePayload:
       type: object
       required: [read_state]
@@ -23945,8 +24733,9 @@ components:
         trigger_kind:
           type: string
           enum: [message, interaction, command]
-        message:
-          $ref: '#/components/schemas/Message'
+        message_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Triggering message; the adapter reads its content with `run.context.read` (09, 4.6). Events outside resource `message` never carry message content (04, 2.2).
         interaction_id:
           $ref: '#/components/schemas/Uuid'
         command_invocation_id:
@@ -23963,14 +24752,15 @@ components:
           description: Channel settings version; reload `agent.config.read` when newer than cached.
     AgentFollowupPayload:
       type: object
-      required: [run_id, thread_id, message]
+      required: [run_id, thread_id, message_id]
       properties:
         run_id:
           $ref: '#/components/schemas/Uuid'
         thread_id:
           $ref: '#/components/schemas/Uuid'
-        message:
-          $ref: '#/components/schemas/Message'
+        message_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Follow-up message; the adapter reads its content with `run.context.read`.
     RunCancelRequestedPayload:
       type: object
       required: [run_id, thread_id, reason]
