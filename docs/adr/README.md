@@ -78,4 +78,5 @@ fehl, wenn sie veraltet ist. Nicht von Hand bearbeiten.
 | [0064](0064-feature-flag-registrierung-mit-aufraeum-gate.md) | Feature-Flag-Registrierung mit Aufräum-Gate | accepted | 2026-10-10 |
 | [0065](0065-wartungsmodus-read-only.md) | Wartungsmodus read_only | accepted | 2026-10-10 |
 | [0066](0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md) | Signierschlüssel im beschreibbaren Schlüsselspeicher | accepted | 2026-10-10 |
+| [0067](0067-jose-profil-mit-der-standardbibliothek.md) | JOSE-Profil mit der Standardbibliothek statt einer JOSE-Bibliothek | accepted | 2026-10-10 |
 <!-- adr-index:end -->

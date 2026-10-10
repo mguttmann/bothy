@@ -41,11 +41,14 @@ Bauzeit feststehen müssen und je Instanz eigen sind.
 |---|---|---|
 | Laufzeit | `branding.product_name`, `branding.logo_file_id`, `branding.accent_color` | `instance_settings`, Aktion `instance.branding.update` |
 | Build | App-Name, Bundle- und Paket-IDs, App-Icons aus einer SVG-Quelle, URL-Schema, Push (APNs-Topic, Firebase-Projekt), Sparkle-Feed und EdDSA-Schlüssel, MSIX-Identität und `.appinstaller`-URL, Absturzdienst, Standard-Server | `branding.yaml` der Instanz im Betreiber-Repo; das Produkt-Repo enthält nur ein Beispiel mit `example.com` |
-| Code | Go-Modulpfad, Paketnamen, Binary `bothy`, Präfix der API-Tokens `bothy_` (03 `api_tokens`) | gelistet in `docs/branding-code-locations.md` (Ticket), geprüft durch einen Test |
+| Code | Go-Modulpfad, Paketnamen, Binary `bothy`, Präfix der API-Tokens `bothy_` (03 `api_tokens`), weitere Arten | gelistet nach Art in [02-architektur.md](../spec/02-architektur.md), Abschnitt 6 (die einzige Liste), geprüft durch einen Test (PLAN M1-46) |
 
 Der Akzent ist ein Schlüssel aus der geprüften Kategorie-Palette (`spruce`, `loch`, `heather`,
 `rowan`, `amber`, `gorse`, `moss`), kein freier Farbwert, damit jede Kombination im Kontrast-Gate
-liegt (ADR 0030).
+liegt (ADR 0030). Die Kategorie-Farbe `granite` ist neutral und darum kein Akzent. Die Liste der
+Akzente steht hier und in [01-produkt.md](../spec/01-produkt.md), Abschnitt 12, nicht in den
+Design-Tokens; `kernel/designkeys` führt sie als Konstante. Eine neue Kategorie-Farbe wird erst
+Akzent, wenn sie in diese Liste kommt und das Kontrast-Gate besteht.
 
 ### Consequences
 
@@ -61,8 +64,9 @@ liegt (ADR 0030).
 
 - Ein Test sucht den Arbeitsnamen im Repo und erlaubt ihn nur an den gelisteten Stellen, in Doku
   und im Beispiel des Builds.
-- Der Server prüft `branding.accent_color` gegen die Schlüssel aus
-  `design/build/tokens.resolved.json` (Ticket "Erlaubte Farb- und Icon-Schlüssel im Server").
+- Der Server prüft `branding.accent_color` gegen die Akzent-Liste in `kernel/designkeys`; ein
+  Test hält jeden Eintrag als Kategorie-Farbe in `design/build/tokens.resolved.json` und die Liste
+  gleich 01, Abschnitt 12 (PLAN M1-46).
 - Der App-Build bricht ab, wenn ein Pflichtfeld in `branding.yaml` fehlt.
 
 ## Pros and Cons of the Options

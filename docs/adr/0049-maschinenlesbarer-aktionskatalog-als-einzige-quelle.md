@@ -47,10 +47,15 @@ Python und Go sie ohne Parser-Tricks laden und jede Kopie mechanisch entsteht.
    ihrer Empfangs-Aktion (05, Abschnitt 6) und die WebSocket-Ops mit ihrer Aktion (Abschnitt 7).
    Weitere Merkmale kommen nur über eine ADR dazu (zum Beispiel die Wirkung für den Wartungsmodus,
    ADR 0065).
-2. Erzeugt werden: die Tabellen in 05 zwischen Markierungen, die Aktionslisten in
-   `docs/api/redocly.yaml`, die Konstanten und Merkmale in `kernel/authorize` und die Zuordnung
-   `operationId` zu Aktion in `api/routes` ([02-architektur.md](../spec/02-architektur.md),
-   Abschnitte 4.5 und 6).
+2. Erzeugt werden: die Tabellen der Abschnitte 3, 4, 6 und 7 in 05 zwischen Markierungen, die
+   Aktionslisten in `docs/api/redocly.yaml` (ohne Systemaktionen, weil keine Route sie nennen
+   darf), die Konstanten und Merkmale in `kernel/authorize` und die Zuordnung `operationId` zu
+   Aktion in `api/routes` ([02-architektur.md](../spec/02-architektur.md), Abschnitte 4.5 und 6).
+   Von Hand bleiben die Tabelle "Scopes für Apps" (05, Abschnitt 2.6; ihre Zeilen enthalten
+   Prosa) und die Konfigurationswerte von 05 (Quelle der Konfigurationsreferenz); der Check
+   vergleicht sie mit der Datei. Zellen der Empfangs-Aktion, die mehrere Fälle in Worten nennen
+   (z. B. "self (Agent) und `agent.events.consume`"), behalten ihren Text; der maschinelle Wert
+   steht daneben und gleicht `x-receive-action` in asyncapi.yaml.
 3. Die Zuordnung Aktion zu Modul steht nicht hier, sondern im Modulregister (ADR 0050). Ein Check
    verlangt, dass beide Dateien genau dieselbe Menge an Aktionen nennen.
 4. Neue Aktionen entstehen zuerst in `actions.yaml`, dann in den Verträgen (06, Lint).

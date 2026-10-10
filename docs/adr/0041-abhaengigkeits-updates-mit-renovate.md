@@ -36,7 +36,7 @@ pflegt (Manager pep621, https://docs.renovatebot.com/modules/manager/pep621/, ab
 (https://docs.renovatebot.com/presets-config/, abgerufen 2026-10-10) [belegt].
 
 Konfiguration (`renovate.json`): wöchentlich, gruppiert (Actions, Python-Werkzeuge,
-Node-Werkzeuge, Release-Binärdateien, lokaler SonarQube), Wartezeit
+Node-Werkzeuge, Release-Binärdateien, lokaler SonarQube, Compose-Images), Wartezeit
 `deps.min_release_age`, Major-Updates erst nach Freigabe im Dependency Dashboard.
 Ausnahmen:
 
@@ -45,6 +45,14 @@ Ausnahmen:
   so durch eine menschliche Prüfung.
 * Trivy ist für Renovate abgeschaltet und bleibt auf der im Advisory als sicher genannten
   Version, bis die Prüfung aus docs/quality/toolchain.md eine neuere freigibt.
+* Images der Hilfsdienste im Compose-Stack: Ein Regex-Manager liest die Kommentare
+  `# renovate: datasource=docker depName=<image>` über den Variablen in
+  `infra/compose/.env.example` und erhöht Variable und Standardwert `${BOTHY_<X>_VERSION:-...}` in
+  `infra/compose/compose.yaml` in einem Pull Request (Gruppe "Compose-Images"). Die Validatoren
+  derselben Komponenten (`otelcol-contrib`, `promtool`, `amtool`, `loki`, `tempo` in
+  `tools/bin/tools.lock.json`) sind für Renovate abgeschaltet; der Maintainer zieht sie im selben
+  Pull Request mit `make tools-lock` nach. Bis dahin schlägt der Check `tool-versions` fehl, weil ein
+  Validator einer anderen Version andere Schlüssel annimmt oder ablehnt (PLAN M1-04).
 
 ### Consequences
 
@@ -60,6 +68,8 @@ Ausnahmen:
   `deps.min_release_age` in Kapitel 23.
 * `tools/bin/tests/test_fetch_tools.py` prüft, dass eine Binärdatei ohne passende sha256
   nicht installiert wird.
+* Check `tool-versions` (PLAN M1-04): Validator-Pins gleich den Image-Versionen in
+  `.env.example` und den Standardwerten in `compose.yaml`.
 
 ## Pros and Cons of the Options
 

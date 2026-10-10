@@ -42,18 +42,20 @@ finden und die Prüfsumme Fehlalarme ohne Datenbank verwirft. Normativ in
 
 1. **Form.** `bothy_<art>_<zufall>_<prüfsumme>`. Art: `agt` (Agent), `app` (App), `pat`
    (persönlich), `whi` (Eingangs-Webhook). Zufall: 256 Bit aus einem kryptografischen
-   Zufallsgenerator, in Base62 als genau 43 Zeichen. Prüfsumme: CRC-32 (IEEE) über die Zeichen des
+   Zufallsgenerator, in Base62 als genau 43 Zeichen. Base62 nutzt das Alphabet `0-9A-Za-z` in
+   dieser Reihenfolge (Ziffernwert 0 bis 61). Prüfsumme: CRC-32 (IEEE) über die Zeichen des
    Zufallsteils, in Base62 als genau 6 Zeichen mit führenden Nullen.
 2. **Prüfreihenfolge** bei jeder Anfrage: Form, Prüfsumme, dann Suche über
    HMAC-SHA-256 mit dem Server-Pepper, dann Ablauf, Widerruf und DPoP-Bindung. Ein Fehler in Form
    oder Prüfsumme ergibt `401` ohne Datenbankzugriff.
 3. **Speicher.** Nur der HMAC (`token_hash`) und `token_prefix` (`bothy_<art>_` plus die ersten
-   Zeichen des Zufallsteils) zum Wiedererkennen in der Konsole. Anzeige genau einmal bei
+   6 Zeichen des Zufallsteils) zum Wiedererkennen in der Konsole. Anzeige genau einmal bei
    `token.create`.
 4. **Grenzen** wie in 08, Abschnitt 12: Pflicht-Ablauf bis `auth.api_token_max_ttl` bzw.
    `auth.personal_token_max_ttl`, DPoP-Bindung nach `auth.dpop_required_for`, kein Step-up, keine
    Owner-Rechte über persönliche Tokens.
-5. **Scanner.** Die gitleaks-Regel `bothy-api-token` (`.gitleaks.toml`) erkennt das Format.
+5. **Scanner.** Die gitleaks-Regel `bothy-api-token` (`.gitleaks.toml`) erkennt genau dieses
+   Format, mit genau 6 Zeichen Prüfsumme.
 
 Die Prüfsumme ist kein Schutz gegen Fälschung, sondern ein Filter: CRC-32 erkennt Tippfehler und
 zufällige Treffer; die Echtheit prüft der HMAC-Vergleich. Dasselbe Muster (Präfix, Unterstrich,
