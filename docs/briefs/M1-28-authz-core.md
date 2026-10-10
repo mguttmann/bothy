@@ -212,7 +212,7 @@ type Resource struct {
 }
 type GrantFacts struct {
     SubjectKind string; Level string; Caps []string
-    TargetKind string; TargetSpaceID, TargetChannelID ids.ID
+    TargetKind string; TargetSpaceID, TargetChannelID, TargetHostID ids.ID
 }
 type InvokeFacts struct {
     AgentID          ids.ID
@@ -366,7 +366,7 @@ table.
 | `self oder owner`, `owner oder self`, `owner; self bei eigenem`, `owner; self bei eigenen`, `self (Betroffene Person) oder owner` | `Any(Self, Owner)` |
 | `agent-self`, `agent-self (Runner der Umgebung)` | `AgentSelf` |
 | `auth`, `auth (Mensch mit aktivem Gerät, Agent, App mit events:subscribe)` | `Auth` |
-| `owner oder manage` | `Any(Owner, Cap(manage))` |
+| `owner oder manage`, `owner oder manage (auf host nur owner)` | `Any(Owner, Cap(manage))`; a grant on a host target has no path in the tree, so only `Owner` passes there (see Resolution) |
 | `self und read` | `All(Self, Level(read))` |
 | `public`, `public (gültiges Refresh-Token und DPoP-Beweis der Familie)` | `Public` |
 | `self oder manage` | `Any(Self, Cap(manage))` |
@@ -396,15 +396,18 @@ Overrides by action id (they win over the text rule): `message.create`:
 `All(Level(write), CapIf(upload, HasAttachments))`; `thread.tags.set`:
 `All(Level(write), CapIf(manage, RestrictedTags))`; `group.read`: `Any(Owner, GroupMember)`;
 `stats.read`: `ByKind{instance: Owner, space: Any(Owner, Cap(manage))}`; `grant.read`:
-`ByKind{space: Any(Owner, Cap(manage)), channel: Any(Owner, Cap(manage)), principal: Owner}`.
+`ByKind{space: Any(Owner, Cap(manage)), channel: Any(Owner, Cap(manage)), host: Owner, principal: Owner}`.
 
 **Deferred entries** (07 section 4.2): the requirement of these actions depends on facts that only
 a later etappe defines. Their entry is `Deferred("<etappe>")`; `Authorize` and `Scope` answer an
 internal error with cause `unknown_action` (as for an unknown action, because no build of this
 etappe may reach them), and `VerifyRegistrations` rejects any route or op that names one:
 `agent_session.reset`, `agent_session.bind`, `run.followup.create`, `command.autocomplete`,
-`command.invoke`, `interaction.create`, `run.start`, `webhook_out.deliver`, `webhook_in.post`
-(M2); `file.read`, `file.transcript.submit` (M3); `import.apply` (M8). The ticket that builds one
+`command.invoke`, `interaction.create`, `run.start`, `webhook_out.deliver`, `webhook_in.post`,
+and the terminal actions of 05 section 4.14 `host.read`, `host.manage`, `host.pair`,
+`host.connect`, `terminal.open`, `terminal.attach`, `terminal.stream`, `terminal.read_own`,
+`terminal.close` (M2, tickets M2-39 and M2-40; `terminal.terminate` is a system action);
+`file.read`, `file.transcript.submit` (M3); `import.apply` (M8). The ticket that builds one
 of them replaces its entry and removes it from the golden list.
 
 ### App scopes (`domain/scopes.go`, 05 section 2.6)
@@ -436,6 +439,8 @@ evaluated in this ticket (ruling D6).
 | `group` | effective owner, or a member in effect |
 | `device`, `auth_session`, `api_token`, `passkey`, `push_registration`, `draft`, `gdpr_request`, `dev_environment` | `r.OwnerID` is the principal, or the principal is effective owner and the requirement contains `Owner` |
 | `app`, `webhook_delivery`, `import_source` | effective owner |
+| `host` | effective owner (only reached through `grant.read`; M2-39 adds the holder of the host and a grant `terminal`) |
+| `terminal_session` | not reachable in M1 (all its actions are deferred); internal error |
 
 A resource kind missing from this table is an internal error. Invisible gives `not_found` with
 reason `no_grant` (`not_self` for the principal-owned kinds; `acting_for_insufficient` when only
@@ -447,7 +452,9 @@ The path comes from `StructureSource`, never from the caller alone: `ThreadID` g
 its channel and the channel's space; `ChannelID` gives channel and space; `SpaceID` is checked
 with `Space`. A hint that contradicts the source (for example `ChannelID` not equal to the
 thread's channel) is an internal error. A missing thread, channel or space gives `not_found`
-`no_grant`. For `grant` resources the path is the target in `r.Grant`.
+`no_grant`. For `grant` resources the path is the target in `r.Grant`. A grant whose target is a
+host (`TargetKind = host`) has no path in the tree (07 section 2.12, 05 R-AZ-24): `Level` and
+`Cap` are false there, so only `Owner` passes.
 
 ### Snapshot and effective rights (`domain/snapshot.go`, `domain/effective.go`)
 
@@ -478,7 +485,10 @@ Snapshot {
 
 Grants in effect: the principal's own grants (`Store.ActiveGrantsOfPrincipal`) and, for people
 only, the grants of their groups in effect (`ActiveMembershipsOfUser`, `ActiveGrantsOfGroups`),
-filtered with `Grant.InEffect(t)` and `Membership.InEffect(group, t)` from M1-27.
+filtered with `Grant.InEffect(t)` and `Membership.InEffect(group, t)` from M1-27. Grants on a host
+target never enter `Instance`, `Spaces` or `Channels`: the host is outside the tree, and its only
+capability `terminal` gives nothing in it (07 section 2.12, AZ-M60). M2-39 adds a `Hosts` map for
+them; until then the snapshot skips them (test with a host grant row next to an instance grant).
 
 Effective rights on a path (instance, space S, channel C, optional thread T):
 1. dm channel: participant gives `write` and `{upload}`; anyone else nothing (owners too, SR6).

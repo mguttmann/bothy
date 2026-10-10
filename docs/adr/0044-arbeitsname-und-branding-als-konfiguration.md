@@ -41,7 +41,7 @@ Bauzeit feststehen müssen und je Instanz eigen sind.
 |---|---|---|
 | Laufzeit | `branding.product_name`, `branding.logo_file_id`, `branding.accent_color` | `instance_settings`, Aktion `instance.branding.update` |
 | Build | App-Name, Bundle- und Paket-IDs, App-Icons aus einer SVG-Quelle, URL-Schema, Push (APNs-Topic, Firebase-Projekt), Sparkle-Feed und EdDSA-Schlüssel, MSIX-Identität und `.appinstaller`-URL, Absturzdienst, Standard-Server | `branding.yaml` der Instanz im Betreiber-Repo; das Produkt-Repo enthält nur ein Beispiel mit `example.com` |
-| Code | Go-Modulpfad, Paketnamen, Binary `bothy`, Präfix der API-Tokens `bothy_` (03 `api_tokens`), weitere Arten | gelistet nach Art in [02-architektur.md](../spec/02-architektur.md), Abschnitt 6 (die einzige Liste), geprüft durch einen Test (PLAN M1-46) |
+| Code | Go-Modulpfade, Paketnamen (darunter die Dart-Pakete `bothy_viz` und `bothy_noise`), Binary `bothy`, Binary und Dienst `bothy-host` des Terminals, Plugin-ID `bothy-live-panel` und Ordner `grafana-bothy-live` des Grafana-Plugins, Protokoll-Kennungen des Terminals (`bothy-terminal/1`, `bothy-host-fp/1`), Präfix der API-Tokens und Kopplungs-Codes `bothy_` (03 `api_tokens`), weitere Arten | gelistet nach Art in [02-architektur.md](../spec/02-architektur.md), Abschnitt 6 (die einzige Liste), geprüft durch einen Test (PLAN M1-46) |
 
 Der Akzent ist ein Schlüssel aus der geprüften Kategorie-Palette (`spruce`, `loch`, `heather`,
 `rowan`, `amber`, `gorse`, `moss`), kein freier Farbwert, damit jede Kombination im Kontrast-Gate
@@ -53,7 +53,13 @@ Akzent, wenn sie in diese Liste kommt und das Kontrast-Gate besteht.
 ### Consequences
 
 - Good, because ein Namenswechsel `branding.*`, die gelisteten Code-Stellen (darunter das
-  Token-Präfix `bothy_`) und die Beispiel-Konfiguration betrifft, sonst nichts.
+  Token-Präfix `bothy_`, das Binary `bothy-host` und die Plugin-ID) und die Beispiel-Konfiguration
+  betrifft, sonst nichts.
+- Bad, because zwei Stellen außerhalb des Repos am Namen hängen: die Plugin-ID im Katalog von
+  Grafana (nach einer Signatur nicht mehr frei änderbar, der erste Teil muss zum Grafana-Konto
+  passen, [25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 8.3) und die
+  Protokoll-Kennungen des Terminals (Wechsel nur mit neuer Protokollversion). Darum fällt die
+  endgültige Namenswahl vor der Signatur des Plugins (PLAN V1-06 vor der Signatur in V3).
 - Good, because Instanzen eigene, signierte Apps bauen, ohne das Produkt zu verzweigen.
 - Good, because Kontrast AA auch mit Instanz-Akzent gilt.
 - Bad, because jede Instanz mit eigenen Apps eigene Apple-, Google- und Microsoft-Konten,

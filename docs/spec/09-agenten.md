@@ -440,6 +440,7 @@ Der Adapter sendet den Heartbeat über das Gateway oder per REST. Schema `agent_
 | `capabilities` | Abschnitt 2.2 |
 | `reported_tool_class` | tatsächlich geladene Werkzeugklasse, Abschnitt 2.4 |
 | `active_runs` | IDs der Läufe in `running` oder `waiting_input`, die der Adapter gerade hält |
+| `rate_limit` | optional: Zustand der Rate-Limits der Laufzeit beim Anbieter: `state` (`ok`, `near_limit`, `limited`, `unknown`) und `resets_at`, wenn bekannt; nur Zustand und Zeit, nie Kontingente eines Kontos, Schlüssel oder Abo-Namen. Anzeige in der Backend-Ansicht ([25-visualisierung.md](25-visualisierung.md), Abschnitt 6.2) |
 | `projects` | nur Runner: `workspace_ref`, `ready`, `reason` (setzt `project_bindings.ready`) |
 
 Der Server vergleicht bei jedem Heartbeat:

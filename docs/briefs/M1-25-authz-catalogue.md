@@ -161,7 +161,9 @@ or `tools/catalogen`, which are relative to `services/server/`.
 **Input contract.** The generator needs, per action: `id`, resource kinds, right (as written in
 05), owner, step-up, audit (as written in 05), rights, rate-limit class (`keine` meaning none);
 per event type: type, durable or ephemeral, resource kind, receive action (as written in 05),
-audience self or not; per op: name(s), direction, action(s). Use the field names M1-02 chose.
+audience self or not; per op: name(s), direction, action(s); per channel op (M1-02 `channel_ops`, the
+terminal channels of 05 section 7): channel, op name(s), direction, action. Use the field names
+M1-02 chose.
 Decode strictly (unknown keys are an error; use the YAML module already required in
 `services/server/go.mod`, do not add a second YAML library).
 
@@ -170,6 +172,7 @@ Decode strictly (unknown keys are an error; use the YAML module already required
 | Field | Accepted input | Output |
 |---|---|---|
 | owner, step-up, rights | `ja`, `nein` (or YAML booleans) | `bool` |
+| step-up | additionally `bedingt` / `conditional` and `frisch` / `fresh` | `StepUp = true` plus `StepUpConditional` or `StepUpFresh` |
 | rate-limit class | a class from 05 section 3, or `keine` | class string, `""` for none |
 | resource | a list of kind names, or 05 text: comma-separated kind names, each optionally followed by a parenthetical note (dropped), or the literal `wie die Zielaktion` | `[]string` (empty for `wie die Zielaktion`) |
 | right, audit, receive action, op action | any text | stored raw in `Right`, `Audit`, `ReceiveAction`, `ActionsText` |
@@ -201,6 +204,9 @@ type ActionSpec struct {
     StepUp           bool     // true for "ja" and for "bedingt" (05 2.4; until the ticket that
                               // supplies the condition, "bedingt" counts as "ja", 07 4.2)
     StepUpConditional bool    // "bedingt": M1-39 and M1-40 add the condition in authz
+    StepUpFresh      bool     // "frisch" (05 2.4): a fresh, unconsumed step-up that the action
+                              // consumes; only the terminal actions of 05 4.14, deferred until
+                              // M2-40, which evaluates it
     Audit            string   // raw 05 text
     Rights           bool     // the action raises permission_version (05 rule 7)
     RateLimitClass   string   // "" when 05 says "keine"
@@ -222,7 +228,19 @@ type OpSpec struct {
     ActionsText      string   // raw 05 text
     MentionedActions []string
 }
+type ChannelOpSpec struct {   // terminal channels (05 section 7, second table); not gateway ops
+    Channel          string   // terminal_stream, host_control, host_data
+    Op               string   // message name; noise_frame for binary frames
+    Direction        string
+    Action           string
+}
 ```
+
+Channel ops get their own constants of type `ChannelOp` (value `<channel>/<op>`, identifier
+`ChannelOp` plus channel plus op, for example `ChannelOpHostControlSessionOpen`), the lookup
+`LookupChannelOp(channel, op string) (ChannelOpSpec, bool)` and the registry methods
+`(*Registry) ChannelOp(module string, op ChannelOp)` and `ChannelOps()`. No module registers one in
+M1; the terminal tickets of M2 (M2-43, M2-44) do.
 
 **VerifyRegistrations** collects all violations (never stops at the first) and returns one error
 listing them, each naming the operation id, op or event type:
@@ -233,6 +251,8 @@ listing them, each naming the operation id, op or event type:
    ops are never registered); every mentioned action is known and not `System`.
 3. Event type: the type is in the catalogue; every mentioned action of its receive action is
    known; no type is registered by two modules.
+3a. Channel op: the pair of channel and op is in the catalogue and its action is not `System`; a
+   gateway op name never counts as a channel op and the reverse.
 4. An op or event type registered twice by the same module is one registration (idempotent).
 
 **Unknown action.** `Catalog.Spec` with an action that is not in the catalogue returns a
@@ -253,8 +273,8 @@ the catalogue by M1-03 and M1-67.
 Go tests run with `-race`. Test names carry the AZ id where one applies.
 
 1. `tools/catalogen`: golden test on `testdata/valid.yaml` (a small catalogue with at least one
-   action of each normalisation case, one durable and one ephemeral event, one op row with two
-   names) against checked-in golden outputs; `TestGenerate_Deterministic` (two runs, equal
+   action of each normalisation case including `frisch`, one durable and one ephemeral event, one
+   op row with two names, one channel op row) against checked-in golden outputs; `TestGenerate_Deterministic` (two runs, equal
    bytes); failure cases, each with its own fixture and an assertion on the message:
    duplicate action id, identifier collision (`a.b_c` and `a_b.c`), unknown key, owner value
    `vielleicht`, unknown rate-limit class, resource text `thread oder channel`, id `Message.Read`.

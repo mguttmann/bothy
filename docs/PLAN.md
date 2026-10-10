@@ -9,10 +9,12 @@ angepasst. Die Briefs der Etappe M1 mit Wellen und Abhängigkeitsgraph stehen im
 Schreibweise: Verweise auf Kapitel nennen Nummer und Abschnittstitel in Anführungszeichen, zum
 Beispiel 02 "Request-Pfad", weil sich Abschnittsnummern ändern können. Test-IDs stammen aus den
 Kapiteln: `AZ-*` aus 07, `ID-T*` aus 08, `SEC-T*` aus 19, `BR-*` aus 10, `AG-*` aus 09, `DEV-T*`
-aus 21, `DP-T*` aus 20, `G1` bis `G10` aus 06. Grenzen und Schwellen stehen nur als Name; ihre Werte
+aus 21, `DP-T*` aus 20, `TM-T*` aus 24, `VZ-T*` aus 25, `G1` bis `G10` aus 06. Grenzen und Schwellen stehen nur als Name; ihre Werte
 stehen in den Kapiteltabellen und in der [Konfigurationsreferenz](operations/configuration.md).
-`B1` bis `B13` und `I1` bis `I5` sind die Grundsatzentscheidungen und Invarianten, `L1` bis `L24`
-die Entscheidungen der Leitung zu Team-Abweichungen; alle stehen in [DECISIONS.md](DECISIONS.md).
+`B1` bis `B13` und `I1` bis `I6` sind die Grundsatzentscheidungen und Invarianten, `L1` bis `L24`
+die Entscheidungen der Leitung zu Team-Abweichungen, `T1` bis `T11` die Rulings der Leitung zum
+Nachtrag vom 2026-10-10 (Terminal, Visualisierung, Schaufenster); alle stehen in
+[DECISIONS.md](DECISIONS.md).
 Entscheidungen dieses Plans tragen die Nummern `P-01` und folgende (Abschnitt 19), bekannte
 Widersprüche der Spezifikation die Nummern `W1` und folgende (Abschnitt 7).
 
@@ -50,16 +52,25 @@ Mehrbenutzer-Dev-Umgebung (V2), sobald eine weitere Person Dev-Zugang braucht, u
 Funktionen, die 01 als "später" führt (V3). Etappen überlappen: Ein Ticket beginnt, sobald seine
 Abhängigkeiten gemergt sind; die letzte Spalte nennt, was schon nach M1 beginnen kann (P-01).
 
+Nachtrag vom 2026-10-10: Das Terminal ist Kern ab M2 neben den Agenten. M2 baut Server-Modul,
+Host-Dienst, Ende-zu-Ende-Strom, Rechte mit I6 und die Konformitäts- und Chaos-Tests; die Ansichten
+folgen den Clients in M4 (Desktop), M5 (Mobil) und M6 (Konsole), jede Etappe mit Red Team für das
+Terminal (P-20). Die Visualisierungen beginnen als Spur nach M1: Tokens, Paket `bothy_viz`,
+Fixtures und Harness entstehen gegen Fixtures und den Schein-Server, sobald die frühen Tickets aus
+M4 stehen; eigene Messung, Live-Strom und Ansichten in Apps und Konsole schließen in M6, das
+Grafana-Panel-Plugin in M7 (P-21). Das Schaufenster (Demo-Instanz, Bilder, Video, Startseiten,
+Release-Vorlage) ist der letzte Schritt von M7 vor V1 (P-22).
+
 | Etappe | Ziel | Abschluss braucht | Tickets, die nach M1 beginnen können |
 |---|---|---|---|
 | M0 Planung | Spezifikation, Entscheidungen, Werkzeugkette, Plan und M1-Briefs | | |
 | M1 Fundament | Werkzeugkette und Server-Kern mit Rechten: Identität, Geräte, Freigaben, `authorize`, I1, Audit, Struktur, Nachrichten, Ereignis-Log, Sync, Gateway, Observability-Grundlage, Server-Image | M0 | |
-| M2 Agenten-Plattform und Erweiterungen | Läufe mit Live-Box, Aufruf-Marke, Adapter-Vertrag, Nachträge, Komponenten, Befehle, Sitzungen, Backend-Richtlinie mit Kosten, Apps, Webhooks, SDKs, Referenz-Adapter | M1 | alle |
+| M2 Agenten-Plattform, Erweiterungen und Terminal | Läufe mit Live-Box, Aufruf-Marke, Adapter-Vertrag, Nachträge, Komponenten, Befehle, Sitzungen, Backend-Richtlinie mit Kosten, Apps, Webhooks, SDKs, Referenz-Adapter; Terminal mit Host-Dienst, Kopplung, Ende-zu-Ende-Strom, Rechten und I6 | M1 | alle |
 | M3 Plattformdienste | Dateien mit Scan, Bilder, Sprachnachrichten, Suche, Benachrichtigungen und Push-Versand | M1, M2 | M3-01 bis M3-06, M3-10, M3-11, M3-13 bis M3-18 |
-| M4 Clients Desktop | Design-System, Client-Grundlage, Desktop-App für macOS und Windows mit Verwaltung | M1, M2, M3 | M4-01 bis M4-20, M4-25 bis M4-27, M4-29, M4-31 |
-| M5 Clients Mobil | iOS und Android mit Push-Empfang, Teilen, Sprachaufnahme, App-Sperre, Notfall-Aktionen | M3, M4 | keine |
-| M6 Admin-Konsole und Statistik | Web-Konsole mit BFF-Sitzung und strenger CSP, Statistik, Verwaltung | M1 bis M4 | M6-01 |
-| M7 Betrieb, Datenschutz und Release | Sicherung, Wiederherstellung, Sync-Epoche, DSGVO-Abläufe, Wartungsmodus, Statusseite, Release-Kette, App-Verteilung, Portabilität, Mehrknoten-Betrieb | M1 bis M6 | M7-01 bis M7-04, M7-10, M7-11, M7-15, M7-16, M7-19 |
+| M4 Clients Desktop | Design-System, Client-Grundlage, Desktop-App für macOS und Windows mit Verwaltung und Terminal-Ansicht | M1, M2, M3 | M4-01 bis M4-20, M4-25 bis M4-27, M4-29, M4-31 |
+| M5 Clients Mobil | iOS und Android mit Push-Empfang, Teilen, Sprachaufnahme, App-Sperre, Notfall-Aktionen und Terminal mit Sondertasten-Leiste | M3, M4 | keine |
+| M6 Admin-Konsole, Statistik und Visualisierung | Web-Konsole mit BFF-Sitzung und strenger CSP, Statistik, Verwaltung und Terminal; eigene Messung, Live-Strom und Visualisierungen in Apps und Konsole | M1 bis M4 | M6-01; Visualisierungs-Spur M6-10 bis M6-12 |
+| M7 Betrieb, Datenschutz, Release und Schaufenster | Sicherung, Wiederherstellung, Sync-Epoche, DSGVO-Abläufe, Wartungsmodus, Statusseite, Release-Kette mit Host-Dienst, App-Verteilung, Portabilität, Mehrknoten-Betrieb, Grafana-Panel-Plugin, Demo-Instanz und Schaufenster | M1 bis M6 | M7-01 bis M7-04, M7-10, M7-11, M7-15, M7-16, M7-19, M7-24 |
 | M8 Migration aus Discord | Import, Lese-Spiegel, Umschalten je Kanal und Durchführung | M1 bis M3, M5 bis M7 | M8-01, M8-02 |
 | V1 Veröffentlichung | Repository öffentlich nach der Checkliste | M6, M7, Bau-Tickets von M8 (P-15) | keine |
 | V2 Mehrbenutzer-Dev-Umgebung | Abgeschottete Dev-Umgebungen je Person | M2; Standard nach V1 | keine |
@@ -71,12 +82,12 @@ Tickets beginnen schon nach M1 bzw. Standard-Reihenfolge):
 ```mermaid
 flowchart LR
   M0["M0 Planung"] --> M1["M1 Fundament"]
-  M1 --> M2["M2 Agenten-Plattform und Erweiterungen"]
+  M1 --> M2["M2 Agenten-Plattform, Erweiterungen und Terminal"]
   M2 --> M3["M3 Plattformdienste"]
   M3 --> M4["M4 Clients Desktop"]
   M4 --> M5["M5 Clients Mobil"]
-  M4 --> M6["M6 Admin-Konsole und Statistik"]
-  M5 --> M7["M7 Betrieb, Datenschutz und Release"]
+  M4 --> M6["M6 Admin-Konsole, Statistik und Visualisierung"]
+  M5 --> M7["M7 Betrieb, Datenschutz, Release und Schaufenster"]
   M6 --> M7
   M7 --> M8["M8 Migration aus Discord"]
   M8 --> V1["V1 Veröffentlichung"]
@@ -86,6 +97,7 @@ flowchart LR
   M1 -. "frühe Tickets" .-> M3
   M1 -. "frühe Tickets" .-> M4
   M1 -. "frühe Tickets" .-> M7
+  M1 -. "Visualisierungs-Spur" .-> M6
 ```
 
 ## 3. Arbeitsweise je Ticket
@@ -150,11 +162,12 @@ Eine Etappe ist fertig, wenn alles gilt:
 |---|---|---|---|
 | Unit | reine Domänen-Funktionen, Zustandsmaschinen, Parser | `go test`, `pytest`, `dart test` | `make check` |
 | Integration Server | Anwendungsfälle gegen PostgreSQL 18 im Wegwerf-Container; fremde Module über ihre Ports als Fakes, im Integrationstest echt | `go test` mit der Testhilfe aus M1-12 | `make check` |
-| Testdoppel | Fake-IdP (M1-41), virtueller WebAuthn-Authentifikator (M1-40), Fake-Agent und FakeServer (M2-29, M2-31), Fake-Hermes und Fake-Claude (M2-33, M2-34), Fake-APNs und Fake-FCM (M3-20, M3-21), clamd- und SeaweedFS-Container (M3-02, M3-04), Dart-Fake-Server (M4-17) | nach 09 "Testdoppel" und den Fachkapiteln | mit ihren Tests |
+| Testdoppel | Fake-IdP (M1-41), virtueller WebAuthn-Authentifikator (M1-40), Fake-Agent und FakeServer (M2-29, M2-31), Fake-Hermes und Fake-Claude (M2-33, M2-34), Fake-Host und Go-Testgerät für das Terminal (M2-44, M2-48), Host-Dienst im Linux-Container (M2-48), Fake-`claude` für `doctor` (M2-42), Fake-APNs und Fake-FCM (M3-20, M3-21), clamd- und SeaweedFS-Container (M3-02, M3-04), Dart-Fake-Server (M4-17), Fixtures und Harness von `bothy_viz` (M6-11) | nach 09 "Testdoppel" und den Fachkapiteln | mit ihren Tests |
 | Vertrag | G1 bis G10 aus 06 "Vertragstests und Gate" | Redocly, Prüfskripte, Generatoren, Schemathesis, Mitschnitt der Gateway-Rahmen | alle in `make check`: G1 bis G6 als eigene Gates, G7 als `make contract-test`, G8 bis G10 in den Integrationstests |
-| Ende zu Ende | Compose-Rauchtest (M1), Desktop (M4), Geräte (M5), Konsole (M6), Portabilität (M7) | `make portability`, `integration_test`, `patrol` | je Etappe, vor Releases |
-| Last, Dauer, Chaos | Leistungsziele aus 02 "Leistungsziele", 14 und 15; Chaos der Ereignis-Kette | `make perf`, `test/chaos` | Etappenabschluss und Release (P-07) |
-| Sicherheit | SEC-T01 bis SEC-T17, Rechte-Matrix und Pflicht-Tests aus 07, ID-T01 bis ID-T27, Go-Fuzzing der Parser | wie oben | `make check` |
+| Ende zu Ende | Compose-Rauchtest (M1), Terminal mit echtem Host-Dienst (M2-48), Desktop (M4), Geräte (M5), Konsole (M6), Portabilität mit Grafana-Plugin (M7) | `make portability`, `integration_test`, `patrol` | je Etappe, vor Releases |
+| Last, Dauer, Chaos | Leistungsziele aus 02 "Leistungsziele", 14, 15 und 25; Chaos der Ereignis-Kette und des Terminals (TM-T16) | `make perf`, `test/chaos` | Etappenabschluss und Release (P-07) |
+| Sicherheit | SEC-T01 bis SEC-T19, Rechte-Matrix und Pflicht-Tests aus 07, ID-T01 bis ID-T28, TM-T01 bis TM-T20, VZ-T01 bis VZ-T16, Go-Fuzzing der Parser (auch Noise-Rahmen und Sitzungs-Marke) | wie oben | `make check` |
+| Golden | Komponenten, Ansichten von `bothy_viz` und Terminal-Ansicht nach 15 "Teststrategie" | `alchemist` | `make check` |
 | Barrierefreiheit | Prüfliste mit VoiceOver, TalkBack und Narrator | von Hand mit Prüfliste | vor jedem App-Release |
 
 ## 6. M0 Planung (Abschluss)
@@ -257,6 +270,7 @@ M1; ist eine davon nicht übernommen, endet das betroffene Ticket mit `BLOCKED` 
 | Token-Format mit Präfix und Prüfsumme (08 "API-Tokens für Agenten, Apps und Werkzeuge") | M1-44 |
 | Rechte-Cache folgt Struktur-Ereignissen; Kopien beim Thread-Verschieben; `agent.read` für den Agenten selbst; Module ohne Tabellen; River-Tabellen (02 "Ergänzungen am Kern-Vertrag" Punkte 2, 4, 6, 10, 11) | M1-05, M1-14, M1-51, M1-53, M1-62, M1-63, M1-65 |
 | persönliche Vorlagen ohne Kanal (06 K15); maschinenlesbarer Aktionskatalog (ADR 0049) | M1-02, M1-60 |
+| Nachtrag vom 2026-10-10: Ziel `host` mit Zusatzrecht `terminal` und Spalte `target_host_id` in `grants` (03, R-DM-35), Aktionen 4.14 mit Step-up `frisch`, Ops `stats.subscribe` und `stats.unsubscribe`, Ops der Terminal-Kanäle (05 Abschnitt 7), Zweck `terminal` der Signierschlüssel, `auth_sessions.step_up_consumed_at`; gebaut wird davon in M1 nur, was Katalog, Tabellen und Listen vollständig hält, die Terminal-Aktionen bleiben bis M2 aufgeschoben (P-24); M1-32 und M1-34 legen Zweck und Spalte mit ihren Tabellen nach 03 an, ohne sie zu nutzen | M1-02, M1-03, M1-25, M1-27, M1-28, M1-32, M1-34, M1-64 |
 
 ### Bekannte Widersprüche, die M1 auflöst
 
@@ -485,25 +499,33 @@ Abhängigkeitsgraph: [Brief-Index](briefs/README.md).
 | M1-73 | Compose-Rauchtest | `make portability` startet den Server-Kern aus dem Image mit dem Test-Overlay (P-06) und prüft den Weg vom Einrichten bis zur Zustellung über WebSocket. | `infra/compose/smoke.sh`, `infra/compose/test/compose.smoke.yaml` (offizielles PostgreSQL-18-Image per Digest, ohne Dienst `backup`, ohne Schlüssel späterer Etappen, mit dem Volume `signing-keys`; der Prüfer teilt den Netz-Namespace von `api` und braucht darum keinen Eintrag in `server.trusted_proxies`), Collector-Overlay `infra/compose/test/otel/file.yaml` (nicht im Release-Bündel), Go-Client für den Rauchtest mit Geräteschlüsseln und DPoP | `make portability` grün: `secrets init`, `migrate up --bootstrap`, `setup bootstrap-owner` (Code als einzige Zeile der Standardausgabe), Einladungs-Code mit Geräteschlüsseln einlösen (`redeemEnrollmentCode`), Bereich, Kanal, Thread und Nachricht anlegen, Empfang über WebSocket in Reihenfolge, Wiederverbinden mit Nachholen, Gerät widerrufen ergibt `4012`; ohne Image klarer Fehler; Collector mit Overlay `file` findet keinen Kanarienwert | M1-23, M1-37, M1-69 |
 | M1-74 | CodeQL für Go | CodeQL analysiert Go, sobald das Repository öffentlich ist; der Workflow bleibt im privaten Zustand aus. | `.github/workflows/codeql.yml` (Matrix mit Go) | `make runners-check`, actionlint und zizmor grün; der Job läuft nur mit der Öffentlich-Bedingung aus ADR 0039 | M1-05 |
 
-## 8. M2 Agenten-Plattform und Erweiterungen
+## 8. M2 Agenten-Plattform, Erweiterungen und Terminal
 
 ### Ziel
 
 Jeder Thread kann eine Agenten-Sitzung sein: Agenten außerhalb des Servers verbinden sich als
 Verbraucher, starten Läufe nur mit gültiger Aufruf-Marke und passendem Ist-Modus, zeigen die
 Live-Box und nehmen Nachträge, Komponenten und Befehle an. Apps und Webhooks nutzen dieselbe
-öffentliche API (P-18).
+öffentliche API (P-18). Ein Terminal öffnet sich nur für einen berechtigten Menschen mit frischem
+Step-up auf einem gekoppelten Rechner, läuft Ende-zu-Ende verschlüsselt durch das Relais des
+Servers und endet sofort bei Entzug; I6 hält persönliche LLM-Anmeldungen bei ihrem Inhaber.
 
 ### Umfang
 
-09 ohne Dev-Abschottung; 10 mit I2 bis I4, Soll und Ist, Kosten und Abgleich; 11; Webhooks aus 06
-und `docs/api/webhooks.md`; ADR 0016, 0022 bis 0026, 0051, 0054, 0055; Referenz-Adapter für Hermes
-Agent und den Claude-Code-Runner; SDKs für Python und TypeScript; Leitfaden für eigene Agenten.
+09 ohne Dev-Abschottung; 10 mit I2 bis I4 und I6, Soll und Ist, Kosten und Abgleich; 11; Webhooks
+aus 06 und `docs/api/webhooks.md`; ADR 0016, 0022 bis 0026, 0051, 0054, 0055; Referenz-Adapter für
+Hermes Agent und den Claude-Code-Runner; SDKs für Python und TypeScript; Leitfaden für eigene
+Agenten. Terminal nach 24 ohne die Ansichten der Clients: Modul `terminal`, Host-Dienst
+`services/host` mit PTY für macOS, Linux und Windows, `doctor` und Profilen, Noise und
+Sitzungs-Marke, Paket `bothy_noise` (Dart, ohne Oberfläche), Rechte mit SR10 und I6, Mehrknoten-Relais,
+Konformitäts- und Chaos-Tests; ADR 0068.
 
 ### Nicht-Umfang
 
 Dateien in Agenten-Aufrufen und Sprachnachrichten (M3); SR3 und Dev-Umgebungen (V2); Fencing über
-mehrere Knoten (M7); Oberfläche (M4).
+mehrere Knoten (M7); Oberfläche (M4). Terminal-Ansichten (M4 bis M6), Release-Kette des
+Host-Dienstes (M7), Terminal in Dev-Umgebungen (V2), Übernahme eines Runner-Threads ins Terminal
+und Dateiübertragung über den Terminal-Kanal (V3).
 
 ### Exit-Kriterien
 
@@ -515,14 +537,23 @@ mehrere Knoten (M7); Oberfläche (M4).
    Hermes-Version ist vor und nach dem Test unverändert.
 6. `make perf` erreicht `perf.invocation_delivery_p99` und `perf.run_patch_fanout_p99`.
 7. Der Leitfaden-Prüflauf ist grün (M2-37).
-8. Das Red Team urteilt `JA`.
+8. Terminal (M2-48): TM-T01 bis TM-T13, TM-T15 bis TM-T17, TM-T19 und TM-T20, AZ-M54 bis AZ-M60
+   und ID-T28 ohne den Teil der Konsole sind grün; `bothy-host doctor` verweigert den Start auf
+   macOS, Linux und Windows bei jedem Verstoß gegen HD1 bis HD3; die PTY-Tests laufen auf allen
+   drei Systemen; das Bedrohungsmodell, Abschnitt 6.7, nennt für jede Bedrohung ihren Test.
+9. Das Red Team urteilt `JA`, auch über die Terminal-Punkte unten.
 
 ### Teststrategie
 
 Fake-Agent in der Konformitätssuite, FakeServer im SDK, Fake-Hermes mit gepinnter Version und
 Fake-Modell (keine Kosten), Fake-Claude mit aufgezeichneten Stream-Fixtures; Verträge G4, G5, G10;
 Last auf dem Agenten-Pfad; Chaos: Absturz des Adapters nach der Zusage, doppelte Zustellung,
-Neustart des Servers mit offenen Bestätigungen (AG-09, AG-10).
+Neustart des Servers mit offenen Bestätigungen (AG-09, AG-10). Terminal: Noise mit den öffentlichen
+Testvektoren und Kreuztest Go gegen Dart; Fake-Host im Server-Test; Go-Testgerät mit dem
+Noise-Paket des Host-Dienstes als Gegenstelle; echter Host-Dienst im Linux-Container; PTY-Tests auf
+macOS und Windows auf eigenen Rechnern (kein gehosteter Runner); Fake-`claude` für die Prüfung der
+LLM-Anmeldung; Chaos: Neustart des Servers, Netzabbruch von Gerät und Host-Dienst (TM-T16); zwei
+api-Knoten mit und ohne Hash-Routing (TM-T15).
 
 ### Red Team
 
@@ -533,9 +564,21 @@ Autovervollständigung); Confused Deputy über die Server-API; Kartenkopf nachah
 private Ziele; Scopes einer App überschreiten. Bedrohungsmodell: Adapter, Laufzeiten, Apps und
 Webhook-Ziele als Grenzen.
 
+Terminal (Bedrohungsmodell, Abschnitt 6.7): T-TM-01 bis T-TM-06, T-TM-08, T-TM-09 und T-TM-11.
+Geprüft: Inhalt in Relais, Proxy, Logs, Audit, Telemetrie, Ereignis-Log und Sicherung (TM-T06);
+Wiedereinspielen der ersten Nachricht und Tausch der Marke am Relais; Öffnen ohne frischen oder mit
+verbrauchtem Step-up, über Gruppen-Freigaben auf einem Rechner mit `personal`, durch einen zweiten
+Owner bei I6, auf dem Server-Host durch Nicht-Owner, auf fremden Rechnern trotz Freigabe (SR10),
+durch Agenten-, App- und persönliche Tokens; Profil oder Befehlszeile vom Client einschleusen;
+Rechteausweitung aus der Shell auf dem Rechner und Umgehen von `doctor`; Sitzung nach jeder Art von
+Entzug; Kopplung mit abgefangenem oder erratenem Code; Fehlrouting über mehrere Knoten. Restrisiko
+"bösartiger Server-Betreiber" (T-TM-01) bleibt ehrlich dokumentiert. Bedrohungsmodell: Host-Dienst,
+Relais und Rechner als Grenzen.
+
 ### Abhängigkeiten
 
-M1. M2-32 (Mitschnitt) hängt an keinem Ticket und kann jederzeit laufen.
+M1. M2-32 (Mitschnitt) und M2-38 (Noise-Kern) hängen an keinem Ticket der Etappe und können
+jederzeit laufen.
 
 ### Risiken
 
@@ -544,8 +587,15 @@ misst vor dem Bau); die Claude-Code-CLI ändert Stream-Nachrichten; der Beleg de
 Hermes Agent hängt an einer nicht öffentlichen Oberfläche (fail closed bei `unknown`);
 Prompt-Injection; der Python-Generator wirft bei unbekannten Werten (Handschicht, G5);
 Kostenschätzung weicht von der Rechnung ab (Kennzeichnung "Schätzung" in M2-22, Abgleich in M2-28).
+Terminal: die Go-Bibliothek für Noise wird wenig gepflegt (Testvektoren halten sie, M2-38); die
+Ausgabe von `claude auth status` kann sich ändern (Fake-`claude` mit gepinnter Fassung, `doctor`
+fail closed, M2-42); der Weg der langlebigen Anmeldung für Dienst-Benutzer ist nicht belegt
+(M2-45 prüft ihn vor dem Bau gegen die aktuelle Doku); ConPTY verhält sich anders als Unix-PTY
+(eigene Tests auf Windows); ein bösartiger Server-Betreiber bleibt ein Restrisiko (T-TM-01).
 
 ### Tickets
+
+#### Block Agenten und Erweiterungen
 
 | ID | Titel | Ziel | Dateien und Module | Akzeptanztests | Abhängig von |
 |---|---|---|---|---|---|
@@ -586,6 +636,26 @@ Kostenschätzung weicht von der Rechnung ab (Kennzeichnung "Schätzung" in M2-22
 | M2-35 | Claude-Code-Runner: Nachträge, Stopp und Fehlerpfade | Nachträge über stdin, Stopp mit Eskalation, einmaliges Kompaktieren und fehlende Sitzung mit fail open. | `plugins/claude-code-runner` | je Fehlerpfad aus 09 "Fehlerpfade" ein Szenario grün | M2-34 |
 | M2-36 | Leistungsziele des Agenten-Pfads | Lasttests für Zustellung und Live-Box-Patches. | `perf/invocation`, `perf/run_patch` | `make perf` misst `perf.invocation_delivery_p99` und `perf.run_patch_fanout_p99` und scheitert bei Überschreitung | M2-31 |
 | M2-37 | Leitfaden "eigenen Agenten anbinden" mit Prüflauf | Die Schritte aus 11 "Leitfaden: eigenen Agenten anbinden" laufen als automatischer Test gegen einen frischen Server. | `docs/` (Leitfaden), `sdk/python/examples`, Test | der Test führt jeden Schritt aus und scheitert, wenn ein Schritt vom Text abweicht | M2-30, M2-31 |
+
+#### Block Terminal
+
+Normativ: [24-terminal.md](spec/24-terminal.md), ADR 0068, Rulings T1 bis T6, T9, T10. Reihenfolge:
+Noise-Kern, Datensätze, Rechte, Kopplung, Host-Dienst, Steuerverbindung, Sitzungen, PTY, Entzug,
+Mehrknoten, Konformität.
+
+| ID | Titel | Ziel | Dateien und Module | Akzeptanztests | Abhängig von |
+|---|---|---|---|---|---|
+| M2-38 | Host-Dienst-Modul und Noise-Kern in Go und Dart (ADR 0068) | Das Go-Modul des Host-Dienstes und das Dart-Paket `bothy_noise` setzen `Noise_NK_25519_ChaChaPoly_SHA256` mit Prolog, Transport-Zuständen, Rahmen und Fingerabdruck aus 24 "Ende-zu-Ende-Strom" und "Fingerabdruck" gleich um. | `services/host` (`go.mod`, `VERSION`, `CHANGELOG.md`, `Makefile` mit `release-build`, `internal/noise`, `internal/frame`, `internal/fingerprint`), `packages/bothy_noise` (eigenes `pubspec.yaml`; M4-01 nimmt es in den Workspace), Mitschnitte unter `testdata/noise` | TM-T01 in Go und Dart (gleiche Bytes); TM-T02 als Kreuztest über eingecheckte Mitschnitte in beide Richtungen; unbekannter Rahmentyp und Nachricht über der Grenze der Spezifikation abgelehnt; Fingerabdruck in Go und Dart gleich; Go-Fuzzing des Rahmen-Parsers; Lizenz-Gate grün für `github.com/flynn/noise` und `cryptography`, Stand und offene Sicherheitsmeldungen beider im Bericht | M1-01 |
+| M2-39 | terminal: Rechner-Datensätze und Ziel `host` | Das Modul `terminal` mit `hosts` und `terminal_sessions`, dem Lebenszyklus aus 24 "Zustände", der Quelle `authz.HostSource` und dem Ziel `host` im Rechte-Stand (Atome für Inhaber und `terminal`, Sichtbarkeit), lesen und verwalten durch Owner. | `internal/terminal` (Port, `domain`, `app`, `adapters/postgres`, `adapters/httpapi`), `internal/authz` (Rechte-Stand je Rechner, Einträge `host.read` und `host.manage` statt aufgeschoben, Sichtbarkeit `host`), Migrationen `hosts`, `terminal_sessions` und Fremdschlüssel `grants.target_host_id` (aus M1-27 aufgeschoben), Zweck `terminal` in `EnsureActive` (M1-32), Operationen `listHosts`, `createHost`, `getHost`, `updateHost`, `setHostState`, Ereignis `host.updated` | jeder Übergang aus 24 "Zustände" erlaubt, jeder andere abgelehnt; ein Übergang aus `active` beendet alle Sitzungen des Rechners und erhöht `permission_version` in derselben Transaktion; `host.read`: Owner alle, Inhaber den eigenen, Freigabe `terminal` den Rechner, sonst `404`; AZ-M60 (Instanz-Freigabe gibt keinen Rechner); jede Änderung mit Step-up, Grund und Audit; `host.updated` nie mit Schlüsseln; das Kanarien-Szenario (SEC-T10) enthält einen Rechnernamen | M1-29, M1-32, M1-48 |
+| M2-40 | authz: Terminal-Rechte, SR10, I6 und frischer Step-up | `terminal.*` nach 07 "Rechner und Zusatzrecht `terminal`" mit SR10 und SR11, I6 transaktional bei `grant.create` auf `host` und bei der Erklärung der LLM-Anmeldung, Step-up `frisch` mit Verbrauch in der öffnenden Transaktion. | `internal/authz` (Einträge `terminal.open`, `terminal.attach`, `terminal.stream`, `terminal.read_own`, `terminal.close` statt aufgeschoben; Schutzregeln SR10, SR11; Prüfung I6), `internal/identity` (Step-up `frisch`, `auth_sessions.step_up_consumed_at`), `internal/terminal` (Erklärung), Operation `setHostLlmCredentials`, Hinweis `terminal_not_effective` in `access.preview` | AZ-M54 bis AZ-M59; TM-T08 und TM-T09 als Entscheidungen von `authorize`; ID-T28 ohne den Teil der Konsole (gleichzeitige Öffnungen mit einer Bestätigung ergeben genau eine Erlaubnis); Wechsel auf `personal` mit Freigaben an andere ergibt `409 i6_violation`; Wechsel des Inhabers beendet fremde Sitzungen in derselben Transaktion; die Vorschau einer Freigabe an einen Nicht-Inhaber sagt "wirkt nicht" | M2-39, M1-35, M1-49 |
+| M2-41 | terminal: Kopplung und Fingerabdruck | Kopplungs-Code im Token-Format (ADR 0061, Art `hpc`), Einlösen durch den Host-Dienst, Bestätigung durch Eintippen des Fingerabdrucks mit Erklärung der LLM-Anmeldung und des Server-Hosts, Neukopplung mit neuer Schlüssel-Generation. | `internal/terminal` (pairing), Operationen `issueHostPairingCode`, `pairHost`, `confirmHost`; Token-Erzeugung aus M1-44 um die Art `hpc` erweitert | TM-T19, TM-T20; falscher Fingerabdruck `409 fingerprint_mismatch`; nur der HMAC des Codes gespeichert; Neukopplung verwirft die Schlüssel sofort, beendet Sitzungen mit `host_rekeyed`, Audit mit altem und neuem Fingerabdruck, `host.updated` mit `key_changed` an alle Owner; `make gitleaks` erkennt einen erzeugten Code im Testlauf | M2-40, M1-44 |
+| M2-42 | bothy-host: Installation, Zustand, `doctor` und `pair` | Der Host-Dienst richtet Dienstbenutzer und Sitzungsbenutzer ohne Administratorrechte ein (24 "Host-Dienst `bothy-host`"), legt seine Schlüssel nach 24 "Ablage auf dem Rechner" ab, prüft HD1 bis HD8 vor jedem Start und koppelt sich mit `pair`. | `services/host/cmd/bothy-host` (`install`, `pair`, `doctor`, `run`, `pty-helper`), `internal/doctor`, `internal/localchan` (lokaler Kanal mit Prüfung der Gegenstelle), `internal/state` (Datei `0600`, unter Windows DPAPI), Dienst-Definitionen für launchd, systemd und Windows-Dienst, `docs/spec/16-betrieb.md` (Installation, Abschnitt 4.4), Fake-`claude` in `testdata` | TM-T13 und TM-T22 auf macOS, Linux und Windows; der Weg, den PTY-Helfer ohne Administratorrechte und ohne setuid als Sitzungsbenutzer zu starten, ist je Plattform belegt; HD6 erkennt eine Abo-Anmeldung über `authMethod` und die Anmeldeorte aus 24 "Durchsetzung auf dem Rechner" mit Fake-`claude` und verweigert den Start bei `none` oder `organization`; `doctor` meldet nur Codes, nie Pfade oder Werte (Test über die Meldung); `pair` gegen den echten Server zeigt den Fingerabdruck und legt beide Schlüssel nur lokal ab | M2-38, M2-41 |
+| M2-43 | Steuerverbindung zwischen Host-Dienst und Server | Die Steuerverbindung `/hosts/connect` mit Anmeldung über den Ed25519-Schlüssel, Heartbeat, Meldungen von Profilen, Prüfergebnissen und Server-Host, Präsenz und Versionsprüfung; der Server schließt sie bei Sperre, Rückzug und Neukopplung. | `internal/terminal/adapters/wsrelay` (Steuerung), `services/host/internal/control`, Ereignis `host.presence_changed`, Kanal `hostControl` aus asyncapi.yaml | Anmeldung nur mit gültiger Signatur über die Herausforderung aus `hello` und innerhalb `terminal.host_auth_timeout`; fehlende Heartbeats nach `terminal.host_heartbeat_miss_limit` schließen; Audit von `host.connect` nur bei Ablehnung, bei Wechsel von Server-Host oder Prüfergebnis und bei einer zweiten Steuerverbindung; TM-T23 (zweite lebende Verbindung sperrt den Rechner, tote ältere wird ersetzt); ein Host-Dienst unter der Mindestversion bekommt `4114` (18 "Host-Dienst und Server"); Rahmen gegen asyncapi.yaml geprüft | M2-42, M2-39 |
+| M2-44 | terminal: Sitzungen, Sitzungs-Marke und Relais | Öffnen, Anhängen, Lesen und Schließen von Sitzungen mit Sitzungs-Marke (JWS, Zweck `terminal`, ADR 0067), Anweisung `session.open` an den Host-Dienst und Relais beider Datenverbindungen im Speicher eines Knotens. | `internal/terminal` (sessions, token, `adapters/wsrelay` für `/terminal/sessions/{id}/stream` und `/hosts/sessions/{id}/stream`), Operationen `openTerminalSession`, `attachTerminalSession`, `listTerminalSessions`, `getTerminalSession`, `closeTerminalSession`, Ereignis `terminal_session.changed`, Fake-Host in `test/terminal/fakehost` | TM-T07 ohne den Teil der Konsole, TM-T12; Marke mit den Claims aus 24 "Sitzungs-Marke" (Schema-Test), `pin_changed` im Audit; das Relais leitet Binärrahmen unverändert weiter und schreibt nur Länge, Zeit und Sitzungs-ID; volle Puffer schließen mit `4014`, fehlende Gegenseite nach `terminal.open_timeout` ergibt `open_failed`; ein zweites Gerät schließt das ältere mit `4103`; Textrahmen nach `identify` ergeben `4002` | M2-40, M2-43 |
+| M2-45 | bothy-host: Sitzungen, PTY und Profile | Der Host-Dienst prüft die Marke in der festen Reihenfolge aus 24 "Sitzungs-Marke", führt den Handshake, startet die PTY erst nach `start`, bedient die Profile `shell`, `claude` und `command` und hält den Rückblick nur im Speicher. | `services/host/internal/session`, `internal/pty` (Unix-PTY für macOS und Linux, ConPTY für Windows), `internal/profiles`, `internal/confirm` (`host_service.require_local_confirm`) | TM-T03, TM-T04, TM-T05 (mit den Schließ-Codes `4101` und `4104` nach 24 "Sitzungs-Marke"), TM-T21; HD6 vor jeder PTY und alle `host_service.credential_check_interval`; jede Sitzung in eigener Prozessgruppe, cgroup bzw. Job Object nach 24 "Ende einer Sitzung auf dem Rechner"; die Umgebung jedes Profils ist eine Erlaubnisliste plus `TERM`; das Profil `claude` baut seine Umgebung nach 24 "Durchsetzung auf dem Rechner" (Test je Erklärung, ohne echten Modellaufruf); der Weg der langlebigen Anmeldung ist vor dem Bau gegen die aktuelle Doku belegt oder das Profil fällt bei `personal` mit Hinweis weg; Wiederanhängen spielt den Rückblick zwischen `replay_begin` und `replay_end` ein; PTY-Tests auf macOS, Linux und Windows | M2-42, M2-44 |
+| M2-46 | terminal: Entzug, Grenzen, Audit und Kennzahlen | Jede Art von Entzug aus 24 "Entzug" beendet Sitzungen sofort, alle Grenzen aus 24 "Grenzen" wirken auch ohne Mitwirkung des Host-Dienstes, und Audit und Telemetrie tragen nie Inhalte. | `internal/terminal` (Abonnent von `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded`; Leerlauf- und Dauer-Prüfung im Relais), Kennzahlen `bothy.terminal.*` nach signals.md, Aufbewahrungsklasse `security` für `terminal_sessions` | TM-T06, TM-T10, TM-T11; `close_reason` und `close_detail` nur aus den Listen in 24 "Gründe für das Ende"; `terminal.max_sessions_per_person` und `terminal.max_sessions_per_host` ergeben `terminal_session_limit`; Rate-Limits `rl.terminal` und `rl.host`; das Kanarien-Szenario (SEC-T10) enthält eine Terminal-Eingabe und eine Ausgabe | M2-44, M2-45 |
+| M2-47 | Terminal-Relais über mehrere Knoten (T6) | Mit `cluster.mode = multi` erreicht `session.open` den Knoten der Steuerverbindung über `NOTIFY ephemeral`, und der Rand leitet beide Strom-Pfade einer Sitzung per Hash auf denselben Knoten. | `internal/terminal/adapters/wsrelay`, Beispiel-Konfiguration des Rands mit Hash-Routing in `infra/compose` (Overlay mit zwei api-Knoten), `docs/spec/16-betrieb.md` (4.4) | TM-T15; ohne Hash-Routing schließt die einzelne Seite nach `terminal.open_timeout` mit `4102`, `bothy.terminal.relay.unpaired` steigt, `/readyz` bleibt bereit | M2-44 |
+| M2-48 | Konformitäts- und Chaos-Suite des Terminals | Die Tests aus 24 "Tests" laufen datengetrieben gegen den echten Server, einen echten Host-Dienst im Linux-Container und ein Go-Testgerät; die PTY-Tests laufen zusätzlich auf macOS und Windows. | `services/server/test/terminal` (Suite, Testgerät), `test/chaos` (TM-T16), Compose-Overlay mit Host-Dienst, Liste der Plattform-Läufe im Bericht | TM-T01 bis TM-T13, TM-T15 bis TM-T17, TM-T19 bis TM-T23 in `make check` grün; TM-T16 in `make perf` (Chaos); jedes Szenario war vor seiner Umsetzung rot (Nachweis im Bericht des umsetzenden Tickets); das Bedrohungsmodell 6.7 nennt je Bedrohung ihren Test | M2-46, M2-47 |
 
 ## 9. M3 Plattformdienste
 
@@ -668,18 +738,20 @@ zurück; presigned Uploads binden die Teil-Länge eventuell nicht (Modus `direct
 ### Ziel
 
 Eine Desktop-App für macOS und Windows mit Design-System, offline-fähiger Sync-Engine, Live-Box,
-Dateien, Suche, Tastenkürzeln und Verwaltung, gebaut auf Paketen, die Mobil und Konsole
-wiederverwenden.
+Dateien, Suche, Tastenkürzeln, Verwaltung und Terminal-Ansicht, gebaut auf Paketen, die Mobil und
+Konsole wiederverwenden.
 
 ### Umfang
 
 15; aus 01 die Desktop-Screens, "Interaktionsregeln", "Tastenkürzel", "Barrierefreiheit",
-"Sprachen" und "Einstellungen der Person"; `docs/design/`; ADR 0027, 0029, 0030, 0057.
+"Sprachen" und "Einstellungen der Person"; `docs/design/`; ADR 0027, 0029, 0030, 0057. Terminal:
+15 "Terminal-Ansicht", 24 "Clients" für den Desktop, Screens D11 und A8, Paket `terminal_ui`.
 
 ### Nicht-Umfang
 
 iOS, Android, Notification Service Extension und Teilen (M5); Konsole (M6); Verteilung und
-Auto-Update (M7); mehrere Fenster (V3).
+Auto-Update (M7); mehrere Fenster (V3). Terminal mobil (M5) und in der Konsole (M6); Live-Ansichten
+der Statistik (M6).
 
 ### Exit-Kriterien
 
@@ -687,29 +759,43 @@ Auto-Update (M7); mehrere Fenster (V3).
 2. Die Integrationstests gegen den Fake-Server decken alle Abläufe aus 04 "Sequenzdiagramme" ab.
 3. Desktop-E2E gegen den Compose-Stack ist grün, und die Ziele `client.perf.*` für Desktop sind
    erreicht (M4-34).
-4. Die Prüfliste Barrierefreiheit mit VoiceOver und Narrator ist vollständig (M4-32).
-5. SEC-T13 und SEC-T14 sind grün; das Red Team urteilt `JA`.
+4. Die Prüfliste Barrierefreiheit mit VoiceOver und Narrator ist vollständig (M4-32), auch für die
+   Terminal-Ansicht.
+5. Terminal am Desktop: TM-T14 und TM-T18 sind grün; das Terminal-E2E ist grün, und
+   `client.perf.terminal_frame_to_paint_p95` und `client.perf.terminal_throughput_min` sind am
+   Desktop erreicht (M4-38).
+6. SEC-T13 und SEC-T14 sind grün; das Red Team urteilt `JA`, auch über die Terminal-Punkte unten.
 
 ### Teststrategie
 
 Unit, Vertrag, Widget, Golden, Migration und Integration nach 15 "Teststrategie"; Dart-Fake-Server
 mit Fehler-Einspielung; E2E auf macOS mit `patrol` und auf Windows mit `integration_test`;
-Leistung mit Profil-Builds.
+Leistung mit Profil-Builds. Terminal: Widget-Tests der Sperren und der Pin-Warnung, Integration
+gegen einen Host-Dienst im Container und den Fake-Server, Ausgabe-Generator für die Leistungsziele.
 
 ### Red Team
 
 T-DV-01 (lokaler Cache, Löschen bei Widerruf), T-AI-05 und T-AI-06 (Kartenkopf, keine fremden
 Ressourcen); Geräteschlüssel nicht exportierbar; Tokens nie in Logs und Absturzberichten.
 
+Terminal: T-TM-10 (Escape-Sequenzen: Zwischenablage, Hyperlinks, Abfragen), T-TM-01 aus Sicht des
+Geräts (Pinning, Warnung bei Schlüsselwechsel, `pin_changed` im Audit), T-TM-03 (gestohlene
+Sitzung ohne Step-up). Geprüft: Terminal-Inhalte in lokaler Datenbank, Logs, Absturzberichten und
+Client-Kennzahlen; Einfügen mehrzeiliger Texte ohne Rückfrage; Kürzel der App, die Eingaben der
+Shell verschlucken; Speichern des ephemeren Schlüssels.
+
 ### Abhängigkeiten
 
-M1; aus M2 und M3 für die Funktions-Tickets M4-21 bis M4-23, M4-28, M4-30 und M4-33.
+M1; aus M2 und M3 für die Funktions-Tickets M4-21 bis M4-23, M4-28, M4-30, M4-33 und das Terminal
+(M4-35 bis M4-38).
 
 ### Risiken
 
 Verweise auf [RISKS.md](RISKS.md): Barrierefreiheit von Flutter auf macOS; Windows ohne TPM 2.0
 oder ohne P-256; Lizenz und FTS5 der Verschlüsselungs-Bibliothek der lokalen Datenbank;
-Windows-E2E ohne `patrol` deckt Systemdialoge nicht ab.
+Windows-E2E ohne `patrol` deckt Systemdialoge nicht ab. Terminal: Der Renderer `xterm` wurde lange
+nicht veröffentlicht (24 "Clients"; M4-35 prüft Stand und Sicherheitsmeldungen und hält die
+Sperren mit eigenen Tests); seine Semantik für Screenreader ist nicht belegt.
 
 ### Tickets
 
@@ -749,18 +835,23 @@ Windows-E2E ohne `patrol` deckt Systemdialoge nicht ab.
 | M4-32 | Barrierefreiheit am Desktop | Prüfung mit VoiceOver unter macOS und Narrator unter Windows nach 01 "Barrierefreiheit". | `apps/client`, `packages/design_system` | Prüfliste vollständig; jede gefundene Lücke als behobener Test | M4-21 |
 | M4-33 | Kanal-Menü: Benachrichtigungsstufe und Export | Benachrichtigungsstufe je Bereich, Kanal und Thread sowie der Kanal-Export aus dem Menü der Seitenleiste. | `apps/client/lib` | Integrationstests: Stufe wirkt nach 13 "Wirksame Stufe"; Export nur mit Zusatzrecht `export` und Step-up | M4-19, M3-11, M3-18 |
 | M4-34 | Desktop-E2E und Leistungsziele | E2E gegen den Compose-Stack und die Ziele `client.perf.*` für Desktop. | `apps/client/integration_test` | `integration_test` auf Windows und `patrol` auf macOS grün; Ziele aus 15 "Leistungsziele" für Desktop erreicht | M4-21, M4-22, M4-24, M4-30, M4-33 |
+| M4-35 | Paket `terminal_ui` und Terminal-Ansicht | Das Terminal-Widget aus 15 "Terminal-Ansicht" mit Renderer, Ports für Strom, Pin-Speicher, Step-up und Ereignisse, Öffnen, Trennen und Wiederanhängen, Pinning und den Sperren der Escape-Sequenzen. | `packages/terminal_ui`, `packages/bothy_noise` (in den Workspace aufgenommen), `packages/domain` (Fingerabdruck-Anzeige) | TM-T14; TM-T18 als Widget-Test mit `pin_changed`; Goldens hell und dunkel mit Warnung, getrennt und Sondertasten-Leiste; Semantik der Zeile am Cursor; Stand und offene Sicherheitsmeldungen von `xterm` im Bericht, Lizenz-Gate grün; kein Import von `sync_engine` oder `local_store` (Architekturtest) | M4-07, M4-09, M2-38, M2-44 |
+| M4-36 | Terminal am Desktop | Die Desktop-App zeigt die Gruppe "Rechner", öffnet Sitzungen nach Screen D11 mit Step-up über den Step-up-Schlüssel, hält Pins in der lokalen Datenbank und folgt den Ereignissen der Rechner und Sitzungen. | `apps/client/lib`, `packages/local_store` (Tabelle `host_key_pins`), `packages/sync_engine` (`host.updated`, `host.presence_changed`, `terminal_session.changed`), `packages/auth` (Identify des Stroms mit DPoP) | Integrationstests gegen einen Host-Dienst im Container und den Fake-Server: Öffnen, Trennen, Wiederanhängen mit Rückblick, Entzug (`4100`), anderes Gerät (`4103`), geänderter Schlüssel mit Warnung; Kürzel aus 01 "Tastenkürzel" im Terminal, kein Kürzel verschluckt Strg+C; Kanarie einer Terminal-Ausgabe weder in `local_store` noch in Logs, Absturzberichten oder Client-Kennzahlen; `host_key_pins` überlebt Migration und Aufräumen | M4-35, M4-24, M4-14 |
+| M4-37 | Verwaltung: Rechner, Kopplung und Freigabe `terminal` | Screen A8 aus 01 im Paket `admin_ui`: Rechner anlegen, Kopplungs-Code mit Befehl, Fingerabdruck bestätigen, LLM-Anmeldung und Server-Host erklären, Prüfergebnisse, Sperren, Neukoppeln, Zurückziehen; Freigabe-Assistent für das Ziel Rechner. | `packages/admin_ui` | Widget- und Integrationstests: falscher Fingerabdruck zeigt `fingerprint_mismatch` mit verbleibenden Versuchen; eine I6-Verletzung wird erklärt, nicht nur abgelehnt; die Vorschau einer Freigabe an einen Nicht-Inhaber sagt "wirkt nicht" (SR10); jede Änderung verlangt Step-up | M4-27, M2-41 |
+| M4-38 | Terminal-E2E und Leistungsziele am Desktop | E2E gegen den Compose-Stack mit Host-Dienst-Container und die Leistungsziele des Terminals am Desktop. | `apps/client/integration_test`, Compose-Overlay mit Host-Dienst und Ausgabe-Generator | `patrol` auf macOS und `integration_test` auf Windows: Rechner koppeln, Terminal öffnen, Befehl ausführen, trennen, wiederanhängen, beenden; `client.perf.terminal_frame_to_paint_p95` und `client.perf.terminal_throughput_min` erreicht | M4-36, M4-37, M4-34 |
 
 ## 11. M5 Clients Mobil
 
 ### Ziel
 
-iPhone- und Android-App mit Push ohne Inhalt, Teilen aus anderen Apps, Sprachaufnahme, App-Sperre
-und Notfall-Aktionen der Verwaltung.
+iPhone- und Android-App mit Push ohne Inhalt, Teilen aus anderen Apps, Sprachaufnahme, App-Sperre,
+Notfall-Aktionen der Verwaltung und Terminal mit Sondertasten-Leiste.
 
 ### Umfang
 
-Aus 15 "Hintergrundverhalten und Push", "Teilen aus anderen Apps", "Sprachaufnahme"; aus 01
-"iPhone", "Android", "Benachrichtigungen"; 08 "App-Sperre"; ADR 0056.
+Aus 15 "Hintergrundverhalten und Push", "Teilen aus anderen Apps", "Sprachaufnahme",
+"Terminal-Ansicht"; aus 01 "iPhone", "Android", "Benachrichtigungen" und die Screens M8 und M9; 08
+"App-Sperre"; ADR 0056.
 
 ### Nicht-Umfang
 
@@ -773,12 +864,15 @@ iPad-Layout (V3); Verteilung über TestFlight und Testkanal (M7).
    den Platzhalter, und die Notification Service Extension erneuert nie Tokens.
 3. Die Ziele `client.perf.*` für Mobil sind erreicht; die Prüfliste mit VoiceOver und TalkBack ist
    vollständig.
-4. Das Red Team urteilt `JA`.
+4. Terminal mobil: Sondertasten-Leiste, Trennen im Hintergrund, verdecktes App-Umschalter-Bild und
+   Wiederanhängen nach `terminal.quick_reattach_window` sind auf iOS und Android grün (M5-13).
+5. Das Red Team urteilt `JA`, auch über die Terminal-Punkte unten.
 
 ### Teststrategie
 
 XCTest für ClientKit, instrumentierte Android-Tests, `patrol` auf Geräten für Systemdialoge,
-Mitteilungen und Teilen, Leistung mit Profil-Builds.
+Mitteilungen und Teilen, Leistung mit Profil-Builds. Terminal: Widget-Tests der Sondertasten,
+Gerätetests für Hintergrund, App-Umschalter und Netzabbruch gegen einen Host-Dienst im Container.
 
 ### Red Team
 
@@ -786,9 +880,14 @@ T-DV-01, T-PU-01; geteilte Keychain; getrennte Refresh-Familie der Share Extensi
 Notification Service Extension nur mit Vorschau-Token; Erweiterungs-Sitzungen; Teilen in nicht
 sichtbare Ziele; Umgehen der App-Sperre.
 
+Terminal: T-TM-03 mit einem entsperrten, gestohlenen Telefon (Wiederanhängen ohne Step-up nur im
+Fenster `terminal.quick_reattach_window` und nur nach App-Sperre), T-TM-10 auf mobilen Renderern;
+Terminal-Inhalt im App-Umschalter-Bild, in Tastatur-Vorschlägen und in Bildschirmaufnahmen des
+Systems; Hardware-Tastaturen mit eigenen Kürzeln.
+
 ### Abhängigkeiten
 
-M3 (Push-Versand, Uploads, Sprache) und M4 (Client-Grundlage).
+M3 (Push-Versand, Uploads, Sprache) und M4 (Client-Grundlage, Terminal-Ansicht aus M4-36).
 
 ### Risiken
 
@@ -810,46 +909,76 @@ Share Extension (gelöst über Kind-Sitzungen aus M1-34; die NSE nutzt das Vorsc
 | M5-09 | Notfall-Aktionen mobil | Gerät sperren, Freigabe widerrufen, Person sperren und Lauf stoppen auf dem Telefon. | `packages/admin_ui`, `apps/client` | Integrationstests mit Step-up am Gerät | M4-26, M5-02 |
 | M5-10 | Barrierefreiheit mobil | Prüfung mit VoiceOver und TalkBack. | `apps/client` | Prüfliste vollständig; Lücken als behobene Tests | M5-02, M5-03 |
 | M5-11 | Geräte-E2E und Leistungsziele mobil | E2E auf Geräten gegen den Compose-Stack mit Anmeldung, Push-Erlaubnis, Antippen einer Mitteilung, Teilen und Offline-Senden. | `apps/client/integration_test` | `patrol` auf iOS und Android grün; Ziele `client.perf.*` mobil erreicht | M5-04, M5-05, M5-06, M5-07, M5-08, M5-09 |
+| M5-12 | Terminal mobil mit Sondertasten-Leiste | Screens M8 und M9 aus 01: Sondertasten-Leiste mit einmal wirkenden und gehaltenen Modifikatoren, Hardware-Tastatur, Trennen im Hintergrund mit verdecktem App-Umschalter-Bild, Wiederanhängen mit Biometrie. | `packages/terminal_ui` (Sondertasten-Leiste), `apps/client/lib`, `apps/client/ios`, `apps/client/android` (Schutz des App-Umschalter-Bilds) | Widget-Tests: Ctrl einmal und gehalten, Alt, Pfeile, Zeichen der Leiste; Goldens M8 hell und dunkel, Textskalierung 1 und 2; Integrationstest: Hintergrund trennt, Vordergrund innerhalb `terminal.quick_reattach_window` ohne Step-up, danach mit; System-Zurück trennt auf Android | M4-36, M5-02, M5-03 |
+| M5-13 | Terminal-E2E mobil | E2E auf Geräten gegen den Compose-Stack mit Host-Dienst-Container. | `apps/client/integration_test` | `patrol` auf iOS und Android: Öffnen mit Biometrie, Strg+C über die Leiste beendet einen laufenden Befehl, Netzabbruch und Wiederanhängen mit Rückblick, App-Umschalter-Bild ohne Terminal-Inhalt; Prüfliste VoiceOver und TalkBack für M8 vollständig | M5-12, M5-11 |
 
-## 12. M6 Admin-Konsole und Statistik
+## 12. M6 Admin-Konsole, Statistik und Visualisierung
 
 ### Ziel
 
-Verwaltung und Statistik im Browser, ohne Chat, mit BFF-Sitzung, strenger CSP und denselben Screens
-wie am Desktop; Statistik ohne Leistungskontrolle einzelner Menschen.
+Verwaltung, Statistik und Terminal im Browser, ohne Chat, mit BFF-Sitzung, strenger CSP und
+denselben Screens wie am Desktop; Statistik ohne Leistungskontrolle einzelner Menschen. Die
+Visualisierungen aus 25 laufen nativ in Desktop-App, mobiler App und Konsole (TV-Modus ohne mobil) und
+lesen nur die eigene Messung des Servers, nie den Telemetrie-Stack.
 
 ### Umfang
 
-ADR 0028; 08 "Web-Konsole: Sitzung nach dem Backend-for-Frontend-Muster"; 19 "Content Security
-Policy der Web-Konsole"; `docs/observability/admin-statistics.md`; 01 "Web-Konsole".
+ADR 0028, 0069, 0070; 08 "Web-Konsole: Sitzung nach dem Backend-for-Frontend-Muster"; 19 "Content
+Security Policy der Web-Konsole"; `docs/observability/admin-statistics.md`; 01 "Web-Konsole" und
+die Screens D12 und D13; 25 ohne das Grafana-Plugin (eigene Messung, `stats_minutes`, Live-Strom
+`stats.live`, Paket `bothy_viz` mit Fixtures und Harness, Ansichten, optionale Einbettung in der
+Konsole); 24 "Clients" für die Konsole.
 
 ### Nicht-Umfang
 
-Chat im Browser (nie, ADR 0028); tiefe technische Dashboards bleiben im Telemetrie-Backend.
+Chat im Browser (nie, ADR 0028); tiefe technische Dashboards bleiben im Telemetrie-Backend;
+Grafana-Panel-Plugin und Token-Ausgabe für TypeScript (M7); iframes oder WebViews in den Apps (nie,
+ADR 0069).
 
 ### Exit-Kriterien
 
 1. ID-T19, SEC-T05 und DP-T11 sind grün.
 2. Die `patrol`-Web-Tests aller Verwaltungs-Abläufe der Konsole sind grün.
-3. Das Red Team urteilt `JA`.
+3. Visualisierung: VZ-T01 bis VZ-T12 und VZ-T14 bis VZ-T16 sowie DP-T12 sind grün; die Goldens
+   jeder Ansicht mit jeder Fixture sind grün; `viz.perf.frame_build_p95` ist erreicht.
+4. Terminal in der Konsole: ID-T28 und TM-T07 für die Konsole sind grün; SEC-T05 läuft mit
+   geöffnetem Terminal ohne Verletzung; SEC-T19 ist für die Konsole grün (M6-17, M6-18).
+5. Das Red Team urteilt `JA`, auch über die Punkte zu Terminal und Visualisierung unten.
 
 ### Teststrategie
 
 Server-Tests für Sitzung und Statistik, Headless-Browser mit erzwungener CSP, `patrol` für Web.
+Visualisierung: gesteuerte Uhr und zwei Prozesse für die eigene Messung, Fixtures gegen die
+OpenAPI-Schemas, Harness und Goldens ohne Server, Leistungstest der Live-Topologie, Lasttest mit
+vielen Abos. Terminal in der Konsole: Headless-Browser mit virtuellem WebAuthn-Authentifikator
+(Nutzerprüfung an und aus) und einem Host-Dienst im Container.
 
 ### Red Team
 
 T-AC-01, T-AC-02, T-OW-01: XSS, CSRF, Clickjacking, Sitzungsdiebstahl, "Als Person ansehen",
 Statistik als Überwachungswerkzeug (Mindestgruppe).
 
+Terminal in der Konsole: T-TM-07 (XSS und Browser-Erweiterungen), Cross-Site WebSocket Hijacking
+des Strom-Pfads (Origin-Prüfung beim Upgrade), Step-up ohne Passkey oder ohne Nutzerprüfung,
+gepinnte Schlüssel nach Abmelden, CSP mit geöffnetem Terminal. Visualisierung: T-VZ-01 bis
+T-VZ-04 und T-VZ-06: Clickjacking über die Einbettung, Abfluss über den Live-Strom an
+Bereichsverwalter, Inhalte oder Personen in Rahmen, Timeline und `stats_minutes`, TV-Bildschirm
+ohne Aufsicht, Überlast durch viele Zuschauer.
+
 ### Abhängigkeiten
 
-M1 (Identität), M2 (Kosten), M3 (Logo), M4 (Verwaltungs-Pakete).
+M1 (Identität), M2 (Kosten, Terminal), M3 (Logo, Push-Messung), M4 (Verwaltungs-Pakete, Terminal-
+Ansicht). Die Visualisierungs-Spur M6-10 bis M6-12 braucht nur frühe Tickets aus M4 und beginnt nach
+M1 (P-21).
 
 ### Risiken
 
 Verweise auf [RISKS.md](RISKS.md): Flutter Web ist mit Trusted Types, Nonce und COEP nicht sofort
-verträglich (M6-03 belegt es mit dem Headless-Test).
+verträglich (M6-03 belegt es mit dem Headless-Test). Terminal: `xterm` und `cryptography` unter
+Flutter Web (Canvas-Rendering, Web Crypto) sind für diesen Zweck nicht belegt (M6-18 misst es);
+eine bösartige Browser-Erweiterung bleibt ein Restrisiko (T-TM-07). Visualisierung: eigene
+Grundformen mit `CustomPainter` kosten mehr als eine Bibliothek (R-VZ-10); die eigene Messung
+weicht von Prometheus ab und heißt darum "eigene Messung".
 
 ### Tickets
 
@@ -865,17 +994,44 @@ verträglich (M6-03 belegt es mit dem Headless-Test).
 | M6-08 | Apps, Webhooks und Eingangs-Webhooks verwalten | Installation mit Zustimmung zu Scopes, Abos, Zustellungen und Eingangs-Webhooks in Desktop und Konsole. | `packages/admin_ui` | Widget- und `patrol`-Web-Tests; das Token eines Eingangs-Webhooks erscheint genau einmal | M2-26, M2-27, M6-04 |
 | M6-09 | Instanz, Branding, Anmelde-Anbieter und Feature-Flags verwalten | Einstellungen, Branding mit Logo und Akzent, Anbieter und Flags in Desktop und Konsole. | `packages/admin_ui` | Widget- und `patrol`-Web-Tests; Akzent nur aus der Palette wählbar; jede Änderung verlangt Step-up | M1-47, M3-10, M6-04 |
 
-## 13. M7 Betrieb, Datenschutz und Release
+#### Block Visualisierung
+
+Normativ: [25-visualisierung.md](spec/25-visualisierung.md), ADR 0069, Rulings T7, T8. M6-10 bis
+M6-12 sind die Visualisierungs-Spur: Sie brauchen nur frühe Tickets aus M4 und laufen gegen
+Fixtures und den Schein-Server, bevor der Server misst (P-21).
+
+| ID | Titel | Ziel | Dateien und Module | Akzeptanztests | Abhängig von |
+|---|---|---|---|---|---|
+| M6-10 | Design-Tokens für Diagramme | Die Rollen `color.viz.*` aus 25 "Gemeinsame Designsprache" mit Paarungen und Kontrast-Gate. | `design/tokens`, `design/design-rules.json`, `tools/design-tokens`, `docs/design/contrast.md` | `make tokens` grün; jede Serie erreicht den Kontrast `ui` gegen die Fläche in beiden Themes; eine Prüfung mit simulierter Rot-Grün-Schwäche unterscheidet alle Serien; die Ampel nutzt nur die vorhandenen Zustandsrollen | M4-03 |
+| M6-11 | `bothy_viz`: Grundformen, Modelle, Fixtures und Harness | Das Paket aus 25 "Paket `packages/bothy_viz`" mit Ansichtsmodellen aus dem erzeugten Client, Ports für Live-Strom und Abfragen, Grundformen, Fixtures mit Schema-Prüfung im Gate, Harness und dem Generator der SLO-Grenzen; jedes SLO bekommt das Label `bothy_sli_metric` nach slos.md Abschnitt 2, die Prometheus-Regeln werden neu erzeugt. | `packages/bothy_viz` (`lib/src/model`, `sources`, `marks`, `slo`, `fixtures`, `harness`), `tools/observability/sli_bounds.py` mit Gate-Check, `services/server/internal/stats/domain/slibounds.gen.go`, `infra/observability/slo/*.yaml` (Labels), `infra/observability/prometheus/rules/slo-*.yaml` (neu erzeugt) | VZ-T03; VZ-T11 (Fixtures gegen die OpenAPI-Schemas; eine Schemaänderung ohne angepasste Fixture scheitert); Goldens jeder Grundform; kein Import von `sync_engine` oder `local_store` (Architekturtest); der Harness startet ohne Server | M4-02, M4-04, M4-06, M4-08, M6-10 |
+| M6-12 | `bothy_viz`: sechs Ansichten | Live-Topologie, Backend-Ansicht, Zustellung und Sync live, Executive-Seite, abspielbare Timeline und TV-Modus nach 25 "Ansichten", je mit Tabellenansicht. | `packages/bothy_viz` (`lib/src/views`) | Goldens jeder Ansicht mit jeder Fixture in hell und dunkel, `comfortable`, `compact` und `touch`, Textskalierung 1 und 2, de und en; Widget-Tests für Semantik, Tabellenansicht und reduzierte Bewegung; Leistungstest der Live-Topologie mit `stats.live_max_runs` Läufen gegen `viz.perf.frame_build_p95`; keine Kosten ohne Kostenfelder in der Fixture | M6-11 |
+| M6-13 | stats: eigene Messung | Der Port `kernel/measure` mit Zählern im Speicher, Messpunkten aller Metriken aus 25 "Metriken", Flush in `stats_minutes` mit additivem Upsert, verworfenem Rückstau, Aufbewahrung und Prüfung der Frist. | `internal/kernel/measure`, `internal/stats` (Recorder, Flush, Job `stats.retention`), Migration `stats_minutes` (nach Tag partitioniert), Messpunkte in `messaging`, `runs`, `billing`, `agents`, `notify`, `gateway`, `platform/httpserver`, `bothy config check` | VZ-T01, VZ-T02, VZ-T04, VZ-T14, VZ-T15; Messpunkte schreiben nie in die Datenbank (Test mit gesperrter Datenbank im Fachpfad); geordnetes Herunterfahren schreibt einmal; der zweite Check aus 25 "Grenzen aus den Sloth-Dateien" vergleicht SLOs und `sli.*`-Werte | M6-11, M2-21, M2-22, M3-20, M3-21 |
+| M6-14 | stats: Timeline, SLO-Ampel und Backend-Ansicht | Die Abfragen für Timeline, Ampel "eigene Messung" und Backend-Ansicht mit den Rechten aus 25 "Rechte und Datenschutz" und das Heartbeat-Feld `rate_limit`. | `internal/stats`, Operationen `getStatsTimeline`, `getStatsSlo`, `getStatsBackends`, `sendHeartbeat` (Feld `rate_limit`), Handschicht der SDKs (Python, TypeScript) | VZ-T05 für REST; VZ-T09; Zeitraum über `stats.timeline_max_range` oder außerhalb `retention.stats_minutes` ergibt `400`; Kostenfelder fehlen ohne `cost.read.aggregate`; die Backend-Ansicht nennt keine Laufzeit-Namen einer Instanz (Ruling T8) | M6-13, M6-05, M2-30 |
+| M6-15 | stats: Live-Strom `stats.live` | Abo über das Gateway, ein Basis-Rahmen je Knoten und Intervall, Filter je Verbindung im Zustellmodus von `authorize`, Ende bei Entzug und `getStatsLive` aus dem zuletzt gebauten Rahmen. | `internal/stats` (Live), `internal/gateway` (Ops `stats.subscribe`, `stats.unsubscribe` aus `gateway_ops.later` freigeschaltet), Operation `getStatsLive` | VZ-T05 für den Strom, VZ-T06, VZ-T07, VZ-T08, VZ-T10; DP-T12; mehr als `stats.live_max_subscribers` Abos je Knoten ergibt `error` `rate_limited`; ohne Abo baut der Knoten keinen Rahmen (Zähler im Test) | M6-13, M1-65 |
+| M6-16 | Visualisierungen in Desktop-App, Konsole und mobil | Die Ansichten aus `bothy_viz` in der Desktop-App und der mobilen App (Live-Strom über `sync_engine`, mobil nur im Vordergrund, Screen M10 aus 01) und in der Konsole (Abfrage von `getStatsLive`); TV-Modus in Desktop-App und Konsole; Link "In Grafana öffnen" nur mit `telemetry.dashboard_url`. | `apps/client/lib`, `apps/console`, `packages/sync_engine` (Abo), `packages/admin_ui` (Navigation "Live") | VZ-T16 (keine WebView, kein iframe in `apps/client`); Integrationstests mit Fake-Server und Fixtures; `patrol`-Web-Test der Konsole; `patrol`-Test auf iOS und Android für alle Ansichten aus M10 mit Tabellenansicht und Trennen im Hintergrund; TV-Modus endet mit Taste oder Klick und zeigt Kosten nur mit `viz.tv_show_costs`; "veraltet" nach `viz.stale_after` ohne Rahmen | M6-12, M6-14, M6-15, M6-06, M5-02 |
+| M6-17 | Optionale Grafana-Einbettung in der Konsole | Mit gesetzter `console.grafana_embed_url` bettet die Konsole ein Dashboard nach 25 "Web-Konsole (optional, Standard aus)" ein; ohne Wert gibt es keine Einbettung und keine Lockerung der CSP. | `apps/console`, Server-Auslieferung der CSP, `bothy config check` (Warnung bei fremder Site), Beispiel des Auth-Proxys in `docs/operations/` | VZ-T12; SEC-T19 für die Konsole mit einem Test-Proxy; SEC-T05 mit eingebettetem Dashboard ohne Verletzung; nur Owner sehen die Einbettung, beschriftet "Betrieb (Grafana)" | M6-03, M6-16 |
+
+#### Block Terminal in der Konsole
+
+| ID | Titel | Ziel | Dateien und Module | Akzeptanztests | Abhängig von |
+|---|---|---|---|---|---|
+| M6-18 | Terminal in der Konsole (ADR 0070) | Die Konsole öffnet Terminals mit `terminal_ui`, nur nach Step-up per Passkey mit `userVerification = required`, meldet den Strom über die Cookie-Sitzung mit Origin-Prüfung an und pinnt Rechner-Schlüssel im Speicher des Origins bis zum Abmelden; A8 in der Konsole. | `apps/console` (Ports `TerminalTransport`, `HostKeyPinStore` mit IndexedDB, `StepUpPrompt`), `internal/terminal/adapters/wsrelay` (Anmeldung des Stroms über die Konsolen-Sitzung nach `TerminalStreamIdentify`), `internal/identity` (Passkey-Pflicht für `terminal.open` und `terminal.attach` in der Konsole) | ID-T28 und TM-T07 für die Konsole (Passwort-Step-up und Passkey ohne Nutzerprüfung ergeben `401 step_up_required` mit `passkey_required`); TM-T12 für die Konsole (Wiederanhängen innerhalb von `terminal.quick_reattach_window` ohne Passkey ergibt `401` mit `passkey_required`); die Ansicht behauptet keinen Schutz durch Pinning gegen den Server (24 "Schutzziel"); SEC-T05 mit geöffnetem Terminal ohne Verletzung; ein Upgrade mit fremdem `Origin` wird abgelehnt; ein `identify` ohne Token aus einer anderen als der Konsolen-Sitzung ergibt `4004`; nach Abmelden sind die Pins gelöscht; `patrol`-Web-Test öffnet, trennt und hängt wieder an | M4-35, M4-37, M6-03, M6-04 |
+
+## 13. M7 Betrieb, Datenschutz, Release und Schaufenster
 
 ### Ziel
 
 Eine Instanz kann echte Daten tragen: gesichert, mit geprüfter Wiederherstellung, DSGVO-fähig,
-wartbar, beobachtbar und mit signierten Artefakten auf jeden Host umziehbar.
+wartbar, beobachtbar und mit signierten Artefakten auf jeden Host umziehbar. Der Betrieb sieht die
+Live-Ansichten im eigenen Grafana, der Host-Dienst kommt signiert auf jeden Rechner, und wer das
+Projekt zum ersten Mal sieht, versteht in einer Minute, was es kann (Schaufenster).
 
 ### Umfang
 
 16, 18, 20; 17 "SLOs und Alarme"; `docs/operations/`; ADR 0011, 0012, 0035 bis 0037, 0058 bis
-0060, 0062, 0065.
+0060, 0062, 0065. 25 "Ebene b: Grafana-Panel-Plugin" und "Gemeinsame Designsprache" (Ausgabe für
+TypeScript); Release-Komponenten `host` und `grafana-bothy-live` aus 18; Demo-Instanz und
+Schaufenster (Bildschirmfotos, Video, README- und Doku-Startseite, Release-Vorlage).
 
 ### Nicht-Umfang
 
@@ -893,7 +1049,11 @@ des Owners (Kosten).
 5. Der Mehrknoten-Test erreicht `perf.fanout_cross_node_p99` ohne doppelte Lauf-Ausführung
    (M7-17).
 6. Ein Testalarm erreicht den Meldungskanal der Instanz (M7-20).
-7. Das Red Team urteilt `JA`.
+7. Das Probe-Release des Host-Dienstes ist auf allen Zielen mit Signatur, SBOM und Prüfsummen
+   geprüft (M7-23); VZ-T13 ist im Portabilitätstest grün (M7-26).
+8. Das Schaufenster ist aus der Demo-Instanz neu erzeugt und ohne Fund der Deny-Liste (M7-27,
+   M7-28).
+9. Das Red Team urteilt `JA`.
 
 ### Teststrategie
 
@@ -904,7 +1064,9 @@ lokale VM für OpenTofu, zwei api-Knoten für den Mehrknoten-Betrieb.
 ### Red Team
 
 T-BK-01, T-BK-02, T-SC-01 bis T-SC-04, T-DB-01, T-LG-01: Gelöschtes nach Wiederherstellung,
-Geheimnisse in Sicherungen, Release-Signaturen und Update-Feeds, Fencing über Knoten.
+Geheimnisse in Sicherungen, Release-Signaturen und Update-Feeds, Fencing über Knoten. Dazu T-VZ-05
+(Lieferkette und Freigabe des unsignierten Plugins nur mit seiner ID) und die Signaturen der
+Binärdateien des Host-Dienstes; Firmen- oder Personendaten in Demo-Daten, Bildern und Video.
 
 ### Abhängigkeiten
 
@@ -912,7 +1074,9 @@ M1 bis M6 (die frühen Tickets nach M1 siehe Abschnitt 2).
 
 ### Risiken
 
-Verweise auf [RISKS.md](RISKS.md): pgBackRest mit TLS und eigenem Image ist aufwendig;
+Verweise auf [RISKS.md](RISKS.md): Das unsignierte Grafana-Plugin erzeugt Warnungen und läuft nicht
+in Grafana Cloud (25 "Verteilung"); Bildschirmfotos und Video der Mac- und iPhone-Apps entstehen
+nur auf einem Mac (M7-28); pgBackRest mit TLS und eigenem Image ist aufwendig;
 Wiederherstellung bringt Gelöschtes zurück (Lösch-Journal, M7-07); das Herausgeber-Modell verlangt
 Konten und Signatur je Organisation; SmartScreen warnt anfangs; die Tag-Form für das Go-Modul unter
 `services/server` weicht von der Begründung in 18 "Komponenten" ab: Go nimmt für ein Modul in einem
@@ -946,6 +1110,12 @@ importiert wird, klärt M7-10 die Form und korrigiert die Begründung.
 | M7-20 | Alarme in die Instanz und nach außen | Alertmanager meldet über einen Eingangs-Webhook in einen Kanal der Instanz und für `page` an einen externen Kanal; ein Watchdog meldet einen toten Alarmweg. | `infra/observability/alertmanager`, Einrichtung des Meldungskanals | `promtool test rules` und `amtool` grün; Integrationstest: ein Testalarm erscheint als Nachricht im Meldungskanal | M2-27, M1-04 |
 | M7-21 | Statusseite in Apps und Konsole | Komponenten, Störungen und Wartung in Desktop, Mobil und Konsole; öffentlich nur mit `status.public_enabled`. | `apps/client`, `packages/admin_ui` | Widget-Tests; Agenten-Komponenten nur mit `agent.read` sichtbar; "Server nicht erreichbar" bei Ausfall | M7-09, M6-02, M5-02 |
 | M7-22 | Prüfpunkte des Audit-Logs im Objektspeicher | `audit.checkpoint_sink` bekommt neben `file://` ein Ziel im Objektspeicher mit Aufbewahrungssperre, das empfohlene Ziel für Produktion (19 SEC-AUD-2). | `internal/audit` (Ablageziel-Port, neuer Adapter), Schema in 19 "Konfigurationswerte", `bothy config check` | Konformitätsreihe des Ablageziels gegen `file://` und den Objektspeicher-Testdienst: Ablegen, Lesen in `seq`-Reihenfolge, Überschreiben abgelehnt; `audit.verify` erkennt eine neu geschriebene Kette über die Prüfpunkte im Objektspeicher; ein Ziel ohne wirksame Aufbewahrungssperre lässt `bothy config check` scheitern | M1-50, M3-02 |
+| M7-23 | Release-Kette des Host-Dienstes | Binärdateien `bothy-host` für macOS (arm64, amd64), Linux (amd64, arm64) und Windows (amd64) mit Signatur, SBOM, Prüfsummen und Installationspaketen der Dienste; Tags `host/v<version>` (18). | `services/host` (`release-build`), `.github/workflows/release.yml`, `infra/host/` (Dienst-Definitionen der Pakete) | Probe-Release: `cosign verify`, `codesign`/`spctl` auf macOS und `signtool verify` auf Windows mit Test-Herausgeber grün; fehlende SBOM bricht ab; `VERSION` gleich Tag; ein Host-Dienst unter der Mindestversion zeigt den Update-Weg (18 "Host-Dienst und Server") | M7-10, M7-12, M2-48 |
+| M7-24 | Token-Ausgabe für TypeScript | `tools/design-tokens` erzeugt `design/build/ts/tokens.gen.ts` (Farben je Theme, Schriften, Größen, Radien) und kopiert die Schriftdateien mit Lizenz nach `design/build/ts/fonts/` (25 "Gemeinsame Designsprache"). | `tools/design-tokens`, `design/build/ts` | `make tokens` erzeugt und vergleicht die neue Ausgabe; eine geänderte Token-Datei ohne Neuerzeugung scheitert; die OFL-Lizenz liegt neben den Schriften | M6-10 |
+| M7-25 | Grafana-Panel-Plugin "Bothy Live" | Das Panel aus 25 "Ebene b" mit `@grafana/create-plugin` (gepinnt), den Ansichten aus Metriken, Abfragen aus `queries.yaml` als erzeugte Datei, Theme aus den Tokens und dem Dashboard `bothy-live`. | `plugins/grafana-bothy-live` (`queries.yaml`, `src/queries.gen.ts`, Ansichten, Tests), `infra/observability/grafana/dashboards/bothy-live.json`, `CHANGELOG.md` und `VERSION` der Komponente | Unit-Tests der Ansichten; der Namens-Test aus 17 "Tests, die diese Regeln halten" prüft jede Metrik in `queries.yaml` gegen den Katalog; eine geänderte `queries.yaml` ohne Neuerzeugung scheitert; Farben nur aus `tokens.gen.ts` (Lint gegen Farbwerte im Code); Lizenz-Gate für npm grün; der Kiosk-Weg des TV-Modus ist gegen die Doku der gepinnten Grafana-Version belegt | M7-24, M1-68 |
+| M7-26 | Plugin im Compose-Stack, Portabilität und Release | Der Compose-Stack provisioniert den Build unsigniert nur mit seiner ID; das Release liefert ein ZIP mit SBOM (18, Komponente `grafana-bothy-live`). | `infra/compose` (Grafana-Dienst, `GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=bothy-live-panel`), `infra/observability/grafana/provisioning`, `.github/workflows/portability.yml`, Release-Workflow | VZ-T13 im Portabilitätstest; ein Gate-Check lehnt jede andere ID, Platzhalter oder Liste in der Freigabe ab (SEC-VZ-5); Probe-Release mit SBOM und Prüfsumme | M7-25, M7-14, M7-10 |
+| M7-27 | Demo-Instanz mit erfundenen Daten (`bothy setup --demo`) | Eine Instanz zeigt mit einem Befehl alles Sichtbare mit erfundenen, white-label Daten: Menschen Alex, Sam, Robin, Bereiche Support, Marketing, Engineering, Research, Agenten mit laufenden Läufen über das Testdoppel des SDK, Kosten, Statistik-Verlauf und einen Rechner mit Host-Dienst im Container. Spezifikation zuerst: neuer Abschnitt "Demo-Instanz" in 16. | `cmd/bothy` (`setup --demo`), `infra/compose/demo.yaml` (Demo-Agent aus `sdk/python/testing`, Host-Dienst-Container), Datensatz `infra/demo/`, `docs/spec/16-betrieb.md` | Lauf auf leerer Instanz gelingt und ist mit gleichem Startwert wiederholbar; auf einer Instanz mit Daten bricht er ohne Schreiben ab; alle Daten entstehen über öffentliche Anwendungsfälle mit `authorize` und Audit, nie über SQL; `make denylist` und `make gitleaks` über den Datensatz ohne Fund; die Demo zeigt jede Ansicht aus 25 und ein Terminal ohne echten Modellaufruf | M7-14, M6-15, M2-48, M2-29 |
+| M7-28 | Schaufenster: Bilder, Video, Startseiten und Release-Vorlage | Bildschirmfotos aller Apps (Desktop macOS und Windows, iPhone, Android, Konsole, TV-Modus, Terminal, Grafana-Plugin) in beiden Themes und ein kurzes Video eines Ablaufs (Thread, Live-Box, Freigabe, Terminal, Live-Topologie) entstehen per Skript aus der Demo-Instanz; README-Startseite (Nutzen in einem Satz mit der Produktbeschreibung aus 01, Bilder, Schnellstart in einem Befehl, Leseweg), Doku-Startseite, Vorlage der Release-Seiten, Changelog mit lesbarer Zusammenfassung je Release und Architektur-Grafiken, die auf der Doku-Site in hell und dunkel lesbar sind. | `tools/showcase/` (Skripte und Manifest), `docs/assets/showcase/`, `README.md`, `docs/index.md`, `.github/release-template.md`, `CHANGELOG.md` und Changelogs der Komponenten (Vorlage), `docs/architecture/` (Darstellung hell und dunkel), `docs/quality/push-discipline.md` (Verweis) | `make showcase` erzeugt alle Bilder neu; jeder Release-Abschnitt jedes Changelogs beginnt mit einer Zusammenfassung für Nutzer vor den technischen Einträgen (Check in `make check`, ein Abschnitt ohne Zusammenfassung scheitert); jede Grafik unter `docs/architecture/` rendert mit `make diagrams` und ist auf der Doku-Site im hellen und im dunklen Theme lesbar (Bildschirmfoto beider Themes im Bericht, Kontrast der Linien und Texte gegen den Hintergrund mit dem Kontrast-Gate aus M4-03); Ein-Minuten-Probe: ein frischer, nur lesender Prüfer ohne Vorwissen liest nur README und Doku-Startseite und beantwortet drei feste Fragen (Was ist das? Für wen? Wie starte ich es?) richtig, Fragen, Antworten und Zeit im Bericht; ein Manifest nennt je Bild Skript, Commit und Demo-Startwert; Bilder ohne Metadaten (EXIF, Text-Chunks); `make docs` und `make linkcheck` grün; die README nennt keine Firma, Person außer Alex, Sam, Robin, keinen Host (Deny-Liste); Video und Bilder der Apple-Apps entstehen auf einem Mac gegen die Demo-Instanz, nie gegen echte Daten | M7-27, M7-25, M6-16, M6-18, M5-13, M4-38 |
 
 ## 14. M8 Migration aus Discord
 
@@ -1030,7 +1200,9 @@ public-switch.md; ADR 0002, 0003, 0039, 0040, 0042, 0044; externer Penetrationst
 1. Jeder Punkt von public-switch.md ist mit Beleg im Ops-Repository abgearbeitet.
 2. Der externe Test hat keinen offenen Befund mit Schwere "hoch" oder "kritisch".
 3. Die Freischalt-Liste ist vollständig (V1-01).
-4. Das Red Team urteilt `JA` über den ganzen Stand.
+4. Das Schaufenster aus M7-28 ist auf dem Stand des Umschaltens neu erzeugt: README-Startseite,
+   Doku-Startseite, Bilder und Video zeigen den veröffentlichten Stand.
+5. Das Red Team urteilt `JA` über den ganzen Stand.
 
 ### Owner
 
@@ -1088,6 +1260,7 @@ Mengengrenzen für macOS-VMs.
 | V2-04 | Referenz-Umgebung Linux-VM | Abbild, Egress-Erlaubnisliste und Grenzen aus `dev.*` als Werkzeug und Anleitung. | `infra/dev-env`, Doku | Selbsttest der Umgebung meldet D1 bis D10 grün | V2-01 |
 | V2-05 | Red Team P3 je Umgebungsart | Die Aufgaben aus 21 "Red Team" je Kombination aus Isolationsart und Abbild. | Bericht, `red_team_passed_at` | 1 bis 5, 8 und 9 unmöglich; 6 und 7 begrenzt, protokolliert und mit dokumentiertem Restrisiko | V2-03, V2-04 |
 | V2-06 | Backend-Richtlinie je Dev-Umgebung (nur nach Owner-Entscheidung) | `personal` je Umgebung mit I1 je Umgebung, gesichert durch SR3 (K-DV-2). | `internal/authz`, `internal/agents` | BR-Tests je Umgebung; ohne Entscheidung des Owners nicht gebaut | V2-05 |
+| V2-07 | Terminal in der eigenen Dev-Umgebung | Eine Dev-Umgebung ist ein Rechner mit `hosts.dev_environment_id`; SR10 erlaubt Nicht-Ownern das Terminal nur in ihrer eigenen bereiten Umgebung; das Abbild der Referenz-Umgebung enthält den Host-Dienst. | `internal/authz` (SR10 mit Dev-Umgebung), `internal/terminal`, `infra/dev-env` | DEV-T08; eine Umgebung mit `personal` erfüllt I6 nur für ihre Person; der Host-Dienst besteht `doctor` im Abbild | V2-02, V2-04, M2-48 |
 
 ## 17. V3 Ausbau
 
@@ -1118,6 +1291,9 @@ Je Ticket; jedes Ticket durchläuft das Red-Team-Gate vor dem Merge.
 | V3-12 | Secret-Treiber für Key Vault und Secrets Manager | Schemata `azkv` und `awssm` im Secret-Provider. | `internal/platform/secrets` | Tests mit Fakes der Dienste; Rotation ohne Neustart | V1-05 |
 | V3-13 | Helm-Chart | Optionale Installation auf Kubernetes (B12). | `infra/helm` | `helm lint` und Trivy grün; Portabilitätstest auf einem Wegwerf-Cluster | V1-05 |
 | V3-14 | Wechsel des Doku-Generators | Wechsel nach den Kriterien aus ADR 0045, sobald sie erfüllt sind. | Doku-Build | `make docs` mit dem neuen Generator ohne Warnung | V1-05 |
+| V3-15 | Thread eines Runners im Terminal übernehmen | Eine Claude-Code-Sitzung eines Runner-Threads im Terminal fortsetzen, wenn Runner und Host-Dienst in einer Dev-Umgebung als derselbe Benutzer laufen (24 "Claude-Code-Sitzungen", Ruling T5). | `plugins/claude-code-runner`, `services/host`, `internal/terminal` | eigene ADR; Sitzungssperre des Runners bleibt wirksam; Test mit Fake-Claude | V2-07 |
+| V3-16 | Dateiübertragung und Zwischenablage über den Terminal-Kanal | Neue Rahmentypen mit eigener Rechteprüfung und Grenzen; OSC 52 bleibt gesperrt. | `services/host`, `packages/bothy_noise`, `packages/terminal_ui`, 24 | eigene ADR; Konformitätstests in Go und Dart; Kanarie in keiner Telemetrie | V1-05 |
+| V3-17 | Grafana-Plugin als Community-Plugin signieren (Owner-Konto) | Signatur und Antrag im Katalog von Grafana nach 25 "Verteilung", nach der endgültigen Namenswahl. | `plugins/grafana-bothy-live`, Release-Workflow | Grafana lädt das Plugin ohne Freigabe für unsignierte Plugins; `allow_loading_unsigned_plugins` entfällt im Compose-Stack | V1-06 |
 
 ## 18. Abdeckung
 
@@ -1163,6 +1339,9 @@ Die nummerierten Anforderungen des Owners, sinngemäß und ohne instanzspezifisc
 | 21 | Öffentliches Open-Source-Projekt: generisch, generischer Agenten-Adapter, Selbst-Hosting mit einem Befehl, Konfigurationsreferenz, Upgrade-Leitfaden, sichere Standards, keine Tailscale-Pflicht, Community-Dateien, Apache-2.0 mit DCO, öffentliche Roadmap, Triage, Namensprüfung | 11, 16, ADR 0003, 0044 | M1-08, M1-21, M1-43, M2-29, M2-37, M7-14, V1-06 |
 | 22 | White Label: nichts Instanzspezifisches; Branding je Instanz als Konfiguration; gleicher Scan vor jedem Push und in CI mit Liste aus dem Ops-Repository; Scan der ganzen Historie vor dem Öffentlich-Schalten; Autor-Identität nach Owner-Entscheidung | ADR 0042, 0044, 23 "White Label" | M0 (Gate `denylist`), M0-08, M1-46, V1-04 |
 | 23 | Push-Disziplin: lokal fertig, `make check` identisch zu CI, lokales Review und Red Team, Commits zusammengefasst, geschütztes `main`, ein Pull Request je Feature, Nachbesserung nach dem Push als Prozessfehler | `docs/quality/push-discipline.md`, ADR 0038 | Abschnitt 3; V1-05 (Rulesets) |
+| 24 | Nachtrag vom 2026-10-10: Terminal als Pflichtbestandteil (Shell und Claude-Code-Sitzungen auf angebundenen Rechnern) in Desktop, Handy mit Sondertasten und Web-Konsole; Recht `terminal` je Rechner, Passkey-Bestätigung beim Öffnen, privates Netz oder Ende-zu-Ende-Tunnel, Audit, Leerlauf-Abbruch, eigener Benutzer ohne Admin-Rechte, eigenes Bedrohungsmodell und Red Team; Kern ab M2 | 24, 07, 10 (I6), ADR 0068, 0070 | M2-38 bis M2-48, M4-35 bis M4-38, M5-12, M5-13, M6-18, M7-23, V2-07 |
+| 25 | Nachtrag vom 2026-10-10: Visualisierung auf zwei Ebenen in einer Designsprache: native Ansichten in Apps und Konsole aus der eigenen Statistik, Grafana-Panel-Plugin für den Betrieb, keine iframes in Apps, Einbettung nur optional in der Konsole; Spur ab M1, Kit und Ansichten in M6, Plugin in M7 | 25, 17, ADR 0069 | M6-10 bis M6-17, M7-24 bis M7-26, V3-17 |
+| 26 | Nachtrag vom 2026-10-10: Schaufenster-Anspruch für alles Sichtbare (README mit Bildern und Video, Schnellstart in einem Befehl, Doku-Site, Architektur-Grafiken, Changelog, Release-Seiten; in einer Minute verständlich); nichts wird abgespeckt; Produktbeschreibung "Kommandozentrale für KI-Agenten in Chat-Form" | 01 "Vision" | M7-27, M7-28, V1 Exit-Kriterium 4 |
 
 ### 18.2 Grundsatzentscheidungen und Invarianten
 
@@ -1185,7 +1364,9 @@ Die nummerierten Anforderungen des Owners, sinngemäß und ohne instanzspezifisc
 | I2 vor jedem Aufruf | M2-08 |
 | I3 signierte Aufruf-Marke, Prüfung im Adapter | M2-06, M2-09, M2-29, M2-33, M2-34 |
 | I4 Umschalten mit Step-up, Grund und Audit | M1-51, M2-21 |
-| I5 keine Zugangsdaten im Server | M1-51, M2-28, M2-33, M2-34 |
+| I5 keine Zugangsdaten im Server | M1-51, M2-28, M2-33, M2-34, M2-45 |
+| I6 Terminal und persönliche LLM-Anmeldung | M2-40, M2-41, M2-42 (HD6), M2-44, M2-45 |
+| Terminal-Inhalte nie im Server, in Telemetrie oder Audit (SEC-TERM-1) | M2-38, M2-44, M2-46, M4-36 |
 | Anzeige der Richtlinie und der Kosten | M2-22, M4-21, M4-28 |
 
 ### 18.3 Funktionsliste aus 01
@@ -1250,6 +1431,19 @@ den Ausschluss hält, nennt ihn das Kapitel.
 | | Import aus Discord | M8-03 bis M8-08 |
 | | Apps installieren, Webhooks | M2-24 bis M2-27, M6-08 |
 | | Notfall-Aktionen auf dem Telefon | M5-09 |
+| | Live-Topologie, Backend-Ansicht, Zustellung live, Timeline (Desktop, mobil, Konsole) | M6-10 bis M6-16 |
+| | Executive-Seite mit SLO-Ampel "eigene Messung" | M6-13, M6-14, M6-16 |
+| | TV-Modus | M6-12, M6-16 |
+| | Grafana-Panel-Plugin | M7-24 bis M7-26; Signatur V3-17 |
+| | Grafana-Einbettung nur in der Konsole, optional | M6-17 |
+| Terminal | Terminal öffnen (Shell) | M2-38 bis M2-48, M4-35, M4-36, M5-12, M6-18 |
+| | Claude-Code-Sitzung im Terminal | M2-42, M2-45 |
+| | Sitzungsliste, Trennen und Wiederanhängen, Beenden | M2-44, M4-36, M5-12, M6-18 |
+| | Sondertasten-Leiste mobil | M5-12 |
+| | Fingerabdruck und Schlüssel-Pinning | M2-41, M4-35, M4-36, M6-18 |
+| | Rechner koppeln und verwalten, Freigabe `terminal` | M2-39 bis M2-41, M4-37 |
+| | Thread eines Runners im Terminal übernehmen (später) | V3-15 |
+| | Dateiübertragung und Zwischenablage (später) | V3-16 |
 
 ## 19. Entscheidungen dieses Plans
 
@@ -1274,6 +1468,13 @@ den Ausschluss hält, nennt ihn das Kapitel.
 | P-17 | Statusseite und Wartungsmodus gehören zu M7. | Beide gehören zum Betrieb mit echten Daten; die Statusseite braucht Präsenz und Push-Kennzahlen aus M2 und M3. |
 | P-18 | Apps und Webhooks gehören mit den Agenten zu M2. | Beides sind Prinzipale außerhalb des Servers mit derselben API, denselben SDKs und denselben Signaturschlüsseln. |
 | P-19 | Ticket-IDs `<Etappe>-<zweistellige Nummer>`; Abhängigkeiten zeigen nur auf kleinere Nummern derselben Etappe oder auf frühere Etappen. | Zyklen sind damit ausgeschlossen, und die Reihenfolge ist an der ID ablesbar. |
+| P-20 | Das Terminal ist ein eigener Block in M2 (Server, Host-Dienst, Protokoll, Rechte, Mehrknoten-Relais, Konformität); seine Ansichten kommen mit den Clients in M4, M5 und M6, je mit Red Team. | Vorgabe des Owners "Kern ab M2"; die Apps bauen gegen einen geprüften Vertrag statt gegen Annahmen. |
+| P-21 | Die Visualisierungs-Spur (M6-10 bis M6-12) trägt M6-Nummern, braucht aber nur frühe M4-Tickets und läuft gegen Fixtures, bevor der Server misst. | Vorgabe des Owners "Spur parallel gegen Schein-Server und Fixtures"; P-19 hält die Nummern geordnet. |
+| P-22 | Das Schaufenster ist M7-27 und M7-28 statt ein V1-Ticket; V1 prüft nur, dass es zum Stand des Umschaltens passt. | Es muss vor V1 fertig sein; P-19 erlaubt einem kleineren V1-Ticket keine Abhängigkeit auf ein größeres, und M7 ist Voraussetzung von V1. |
+| P-23 | Zusätzlich zu `bothy_viz` und `bothy_noise` gibt es das Paket `terminal_ui`. | Desktop-App und Konsole brauchen dieselbe Terminal-Ansicht; `admin_ui` ist Verwaltung, und die Konsole darf weder Gateway noch lokale Datenbank nutzen (15 "Abhängigkeitsregeln"). |
+| P-24 | Die M1-Briefs M1-02, M1-03, M1-25, M1-27, M1-28 und M1-64 sind nur so weit angeglichen, dass Katalog, Freigabe-Tabelle und Gateway-Liste die Einträge des Nachtrags kennen; die Terminal-Aktionen bleiben aufgeschoben, bis M2 sie baut. | Der Kern-Vertrag ist normativ; ohne Angleichung endeten diese Tickets mit `BLOCKED` (P-11). Mehr in M1 zu bauen hieße Code ohne Nutzer (P-13). |
+| P-25 | Das Mehrknoten-Relais des Terminals kommt in M2 (M2-47), unabhängig vom übrigen Mehrknoten-Betrieb in M7. | Ruling T6; ohne Prüfung mit zwei Knoten wäre der Terminal-Vertrag halb geprüft, und das Relais ist im Server-Teil des Terminals enthalten. |
+| P-26 | Demo-Daten entstehen nur über öffentliche Anwendungsfälle mit `authorize` und Audit; Läufe kommen vom Testdoppel des SDK, das Terminal von einem Host-Dienst im Container. | Bilder und Video zeigen echtes Verhalten; ein zweiter Schreibweg am Rechte-Modell vorbei wäre ein Risiko und eine zweite Wahrheit. |
 
 ## 20. Voreinstellungen für Fragen an den Owner
 
@@ -1293,3 +1494,5 @@ Voreinstellungen:
 | Externer Penetrationstest | vor der Veröffentlichung beauftragen | V1-02 |
 | Name und Marke | Bothy bleibt Arbeitsname | V1-06 |
 | Persönliches Abo in Dev-Umgebungen | nein; V2-06 entfällt ohne Entscheidung | V2 |
+| Aufzeichnung von Terminal-Inhalten für Nachweispflichten | nein, nur Metadaten (24 "Datenschutz") | M2-46 |
+| Grafana-Cloud-Konto für die Signatur des Plugins | unsigniert und lokal provisioniert bis V1; Konto bei der Veröffentlichung (Ruling T11) | V3-17 |

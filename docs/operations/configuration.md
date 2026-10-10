@@ -148,6 +148,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server | `64` | Länge des Produktnamens im Branding (`instance_settings`, `branding.product_name`) in Unicode-Zeichen |
 | `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server | `100` | Länge eines Gruppennamens in Unicode-Zeichen |
 | `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen |
+| `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server | `100` | Länge eines Rechnernamens in Unicode-Zeichen |
 | `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server | `100` | Länge eines Bereichsnamens in Unicode-Zeichen |
 | `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server | `100` | Länge eines Kanalnamens in Unicode-Zeichen |
 | `channel.topic_max_chars` | `BOTHY_CHANNEL__TOPIC_MAX_CHARS` | Server | `1024` | Länge eines Kanal-Themas in Unicode-Zeichen |
@@ -259,6 +260,10 @@ Quelle: [05-aktionen.md](../spec/05-aktionen.md), Abschnitt 10.
 | `ratelimit.rl.webhook_in.burst` | `BOTHY_RATELIMIT__RL__WEBHOOK_IN__BURST` | Server | `20` | je Eingangs-Webhook |
 | `ratelimit.rl.import.per_minute` | `BOTHY_RATELIMIT__RL__IMPORT__PER_MINUTE` | Server | `120` | je Owner für `import.apply` |
 | `ratelimit.rl.import.burst` | `BOTHY_RATELIMIT__RL__IMPORT__BURST` | Server | `30` | je Owner für `import.apply` |
+| `ratelimit.rl.terminal.per_minute` | `BOTHY_RATELIMIT__RL__TERMINAL__PER_MINUTE` | Server | `20` | je Mensch |
+| `ratelimit.rl.terminal.burst` | `BOTHY_RATELIMIT__RL__TERMINAL__BURST` | Server | `5` | je Mensch |
+| `ratelimit.rl.host.per_minute` | `BOTHY_RATELIMIT__RL__HOST__PER_MINUTE` | Server | `120` | je Rechner |
+| `ratelimit.rl.host.burst` | `BOTHY_RATELIMIT__RL__HOST__BURST` | Server | `30` | je Rechner |
 
 ### 06 Öffentliche API
 
@@ -539,6 +544,10 @@ Quelle: [15-client-architektur.md](../spec/15-client-architektur.md), Abschnitt 
 | `client.perf.catchup_events_per_s_min` |  | App | `2000` | Mindestrate beim Nachholen |
 | `client.perf.memory_mobile_max` |  | App | `300MiB` | Speicher mobil |
 | `client.perf.memory_desktop_max` |  | App | `500MiB` | Speicher Desktop |
+| `client.perf.terminal_frame_to_paint_p95` |  | App | `16ms` | Ziel Terminal-Rahmen bis Frame |
+| `client.perf.terminal_throughput_min` |  | App | `1MiB/s` | Mindestrate der Terminal-Ansicht bei Dauerausgabe |
+| `client.terminal.scrollback_lines` |  | App | `10000` | Zeilen im Rückblick des Renderers im Arbeitsspeicher; der Puffer für das Wiederanhängen liegt im Host-Dienst (`host_service.scrollback_bytes`) |
+| `client.terminal.font_size_default` |  | App | `14` | Schriftgröße der Terminal-Ansicht in logischen Pixeln, bis die Person sie ändert |
 
 ### 16 Betrieb
 
@@ -661,6 +670,7 @@ Quelle: [20-datenschutz.md](../spec/20-datenschutz.md), Abschnitt 13.
 | `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server | `90d` | Import-Zustand nach Abschluss |
 | `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server | `1095d` | DSGVO-Aufträge (ohne Exportpakete) |
 | `retention.ops` | `BOTHY_RETENTION__OPS` | Server | `395d` | Statusseite |
+| `retention.stats_minutes` | `BOTHY_RETENTION__STATS_MINUTES` | Server | `90d` | Minuten-Aggregate der eigenen Messung (`stats_minutes`); mindestens der längste SLO-Zeitraum |
 | `retention.webhook_deliveries` | `BOTHY_RETENTION__WEBHOOK_DELIVERIES` | Server | `30d` | Zustellversuche ausgehender Webhooks |
 | `privacy.export_ttl` | `BOTHY_PRIVACY__EXPORT_TTL` | Server | `7d` | Bereitstellung eines Exportpakets |
 | `privacy.export_requires_approval` | `BOTHY_PRIVACY__EXPORT_REQUIRES_APPROVAL` | Server | `false` | Export der eigenen Daten braucht Freigabe des Owners |
@@ -708,6 +718,66 @@ Quelle: [22-import-migration.md](../spec/22-import-migration.md), Abschnitt 19.
 | `import.follow.busy_reactions` |  | Werkzeug `bothy import` | `👀` | Reaktionen, die "Agent arbeitet noch" bedeuten |
 | `import.follow.busy_lookback` |  | Werkzeug `bothy import` | `10` | Nachrichten vor der ersten neuen, die auf Markierung geprüft werden |
 | `import.follow.max_backoff` |  | Werkzeug `bothy import` | `5m` | größter Abstand nach fehlgeschlagenen Runden |
+
+### 24 Terminal
+
+Quelle: [24-terminal.md](../spec/24-terminal.md), Abschnitt 17.
+
+| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+|---|---|---|---|---|
+| `terminal.pairing_code_ttl` | `BOTHY_TERMINAL__PAIRING_CODE_TTL` | Server | `15m` | Gültigkeit eines Kopplungs-Codes für einen Rechner |
+| `terminal.fingerprint_confirm_chars` | `BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS` | Server | `8` | so viele Zeichen des Fingerabdrucks tippt der Owner bei der Bestätigung |
+| `terminal.fingerprint_max_attempts` | `BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS` | Server | `3` | Fehlversuche bei der Bestätigung, danach Rückfall auf `pairing` |
+| `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server | `60s` | so jung muss der Step-up für `terminal.open` und `terminal.attach` sein |
+| `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | `30s` | Gültigkeit einer Sitzungs-Marke |
+| `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server | `20s` | Frist, bis beide Seiten im Relais verbunden sind und der Handshake steht |
+| `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server | `15m` | so lange bleibt eine getrennte Sitzung anhängbar |
+| `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server | `60s` | Wiederanhängen vom selben Gerät ohne neuen Step-up innerhalb dieser Zeit nach der Trennung |
+| `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server | `30m` | ohne Eingabe des Geräts endet die Sitzung |
+| `terminal.idle_grace` | `BOTHY_TERMINAL__IDLE_GRACE` | Server | `2m` | Zuschlag, nach dem der Server selbst wegen Leerlaufs beendet |
+| `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server | `12h` | Höchstdauer einer Sitzung |
+| `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server | `5` | offene Sitzungen je Mensch |
+| `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server | `10` | offene Sitzungen je Rechner |
+| `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server | `262144` | Puffer des Relais je Richtung und Sitzung |
+| `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server | `20s` | Abstand der Heartbeats der Steuerverbindung (in `hello` gemeldet) |
+| `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server | `3` | fehlende Heartbeats bis zum Schließen der Steuerverbindung |
+| `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server | `10s` | Frist zwischen `hello` und `identify` der Steuer- und Datenverbindung |
+| `terminal.sweep_interval` | `BOTHY_TERMINAL__SWEEP_INTERVAL` | Server | `30s` | Abstand des Jobs `terminal.sweep` ([02-architektur.md](../spec/02-architektur.md), Abschnitt 12.3) |
+| `terminal.host_duplicate_probe_timeout` | `BOTHY_TERMINAL__HOST_DUPLICATE_PROBE_TIMEOUT` | Server | `5s` | so lange wartet der Server auf die Antwort der älteren Steuerverbindung (3.4) |
+| `host_service.state_dir` |  | Host-Dienst | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | Zustandsordner mit Schlüsseln und Anmeldedateien des Profils `claude` |
+| `host_service.session_user` |  | Host-Dienst | `bothy-session` | Benutzer, unter dem PTY-Helfer und Sitzungen laufen; nie der Dienstbenutzer (2.2) |
+| `host_service.extra_forbidden_groups` |  | Host-Dienst | leer | weitere Gruppen, die HD2 zusätzlich zur festen Liste sperrt |
+| `host_service.credential_check_interval` |  | Host-Dienst | `60s` | Abstand der Prüfung HD6 während des Betriebs (7.4) |
+| `host_service.profiles` |  | Host-Dienst | `[shell]` | angebotene Profile (11.1) |
+| `host_service.claude_workdirs` |  | Host-Dienst | leer | erlaubte Arbeitsordner des Profils `claude`; leer heißt kein Profil `claude` |
+| `host_service.scrollback_bytes` |  | Host-Dienst | `1048576` | Rückblick-Puffer je Sitzung, nur im Speicher |
+| `host_service.require_local_confirm` |  | Host-Dienst | `false` | jede PTY erst nach Zustimmung am Rechner (6.4) |
+| `host_service.local_confirm_timeout` |  | Host-Dienst | `60s` | Frist für die Zustimmung am Rechner |
+
+### 25 Visualisierung
+
+Quelle: [25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 15.
+
+| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+|---|---|---|---|---|
+| `stats.live_enabled` | `BOTHY_STATS__LIVE_ENABLED` | Server | `true` | Live-Strom und `getStatsLive` an; aus: `403 feature_disabled` |
+| `stats.live_interval` | `BOTHY_STATS__LIVE_INTERVAL` | Server | `1s` | Abstand der Live-Rahmen; zugleich Lebensdauer des Basis-Rahmens für `getStatsLive` |
+| `stats.live_max_runs` | `BOTHY_STATS__LIVE_MAX_RUNS` | Server | `200` | höchstens so viele aktive Läufe je Rahmen |
+| `stats.live_max_subscribers` | `BOTHY_STATS__LIVE_MAX_SUBSCRIBERS` | Server | `200` | Abos von `stats.live` je api-Knoten |
+| `stats.live_sli_window` | `BOTHY_STATS__LIVE_SLI_WINDOW` | Server | `5m` | Zeitraum der SLI-Werte im Live-Rahmen |
+| `stats.flush_interval` | `BOTHY_STATS__FLUSH_INTERVAL` | Server | `10s` | Abstand, in dem ein Prozess seine Zähler in `stats_minutes` schreibt |
+| `stats.flush_queue_max` | `BOTHY_STATS__FLUSH_QUEUE_MAX` | Server | `20000` | Zählerschlüssel im Speicher je Prozess; darüber werden die ältesten verworfen |
+| `stats.timeline_max_range` | `BOTHY_STATS__TIMELINE_MAX_RANGE` | Server | `24h` | größter Zeitraum einer Timeline-Abfrage |
+| `stats.timeline_max_runs` | `BOTHY_STATS__TIMELINE_MAX_RUNS` | Server | `5000` | höchstens so viele Läufe in einer Timeline-Antwort |
+| `stats.slo_warn_budget_ratio` | `BOTHY_STATS__SLO_WARN_BUDGET_RATIO` | Server | `0.25` | unter diesem Restbudget wird die Ampel gelb |
+| `stats.slo_min_events` | `BOTHY_STATS__SLO_MIN_EVENTS` | Server | `100` | unter so vielen Ereignissen im SLO-Zeitraum ist die Ampel grau |
+| `console.grafana_embed_url` | `BOTHY_CONSOLE__GRAFANA_EMBED_URL` | Server | leer | Dashboard-URL für die Einbettung in die Konsole; leer heißt keine Einbettung und kein `frame-src` |
+| `viz.live_poll_interval` |  | App | `2s` | Abfrage von `getStatsLive` in der Web-Konsole |
+| `viz.stale_after` |  | App | `5s` | ohne neuen Rahmen zeigt die Ansicht "veraltet" |
+| `viz.timeline_speeds` |  | App | `60, 300, 900` | Abspielgeschwindigkeiten der Timeline (Sekunden Tageszeit je Sekunde) |
+| `viz.tv_rotation_interval` |  | App | `30s` | Wechsel der Ansichten im TV-Modus |
+| `viz.tv_show_costs` |  | App | `false` | Kosten im TV-Modus zeigen |
+| `viz.perf.frame_build_p95` |  | App | `8ms` | Ziel: Aufbau eines Frames der Live-Topologie mit `stats.live_max_runs` Läufen |
 <!-- config-reference:end -->
 
 ## 5. Geheimnisse

@@ -14,6 +14,7 @@ geladen.
 |---|---|---|---|
 | `hermes-adapter/` | Agenten-Adapter | Plattform-Plugin für das Open-Source-Framework Hermes Agent | geplant |
 | `claude-code-runner/` | Agenten-Adapter | Startet Claude-Code-Sitzungen je Thread in Dev-Foren | geplant |
+| `grafana-bothy-live/` | Grafana-Panel-Plugin | Ansichten der Live-Statistik für den Betrieb aus OTel-Metriken (ID `bothy-live-panel`, [25-visualisierung.md](../docs/spec/25-visualisierung.md), Abschnitt 8) | geplant (M7) |
 | weitere Ordner je Referenz-App | App | Beispiele aus docs/spec/11-erweiterungen.md Abschnitt 10 (Code-Hosting, Tickets) | geplant, Ordner entsteht mit dem Bau-Ticket |
 
 ## Regeln für alle Programme hier
@@ -26,3 +27,8 @@ geladen.
 - Tests mit den Testdoppeln aus docs/spec/09-agenten.md Abschnitt 16; echte Modellaufrufe nur
   hinter einem ausdrücklichen Schalter.
 - White Label: keine Firmen-, Personen- oder Hostnamen; Beispiele mit example.com.
+
+Ausnahme `grafana-bothy-live/`: Das Panel-Plugin läuft in Grafana, nicht als Client der API. Es
+spricht nie mit dem Server und liest nur Grafana-Datenquellen; Vertrag ist
+docs/spec/25-visualisierung.md, Abschnitt 8. Die Regeln zu Geheimnissen, Version und White Label
+gelten auch dort.

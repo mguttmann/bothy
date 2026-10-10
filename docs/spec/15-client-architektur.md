@@ -1,7 +1,8 @@
 # 15 Client-Architektur
 
 Status: Entwurf M0. Gilt für `apps/client` (iOS, Android, macOS, Windows), `apps/console` (Web)
-und `packages/`. Begriffe: [00-glossar.md](00-glossar.md). Sync: [04-sync-protokoll.md](04-sync-protokoll.md)
+und `packages/`. Terminal: [24-terminal.md](24-terminal.md) (normativ für Protokoll und Rechte),
+hier Abschnitt 23. Visualisierungen: [25-visualisierung.md](25-visualisierung.md). Begriffe: [00-glossar.md](00-glossar.md). Sync: [04-sync-protokoll.md](04-sync-protokoll.md)
 (normativ für alles, was hier über Ereignisse, Cursor und Ausgangsfach steht). Bedienung:
 [01-produkt.md](01-produkt.md). Gestaltung: [docs/design/](../design/README.md). Entscheidungen:
 ADR 0027 (Flutter), ADR 0028 (Web nur Konsole), ADR 0029 (Zustand, lokale DB, Ausgangsfach),
@@ -53,7 +54,7 @@ apps/
     android/              MainActivity, Push-Dienst, Teilen-Activity (Kotlin)
     windows/              Runner, Infobereich, MSIX-Manifest, Share Target, Toast-Aktivierung (C++)
     integration_test/     Integrationstests gegen den Fake-Server
-  console/                Flutter Web: nur Verwaltung und Statistik
+  console/                Flutter Web: Verwaltung, Statistik und Terminal (ADR 0028, ADR 0070)
 packages/
   design_system/          Tokens (erzeugt), Theme, Komponenten, Icons, Schriften (Flutter)
   l10n/                   ARB-Dateien de und en, erzeugte Lokalisierung (Flutter)
@@ -64,11 +65,20 @@ packages/
   local_store/            drift-Datenbank, Schema-Spiegel, Migrationen, Verschlüsselung (Dart)
   sync_engine/            Gateway, Nachholen, Ausgangsfach, Abgleich, Lauf-Dokumente (Dart)
   admin_ui/               Verwaltungs-Screens für Desktop, Konsole und Notfall-Aktionen mobil (Flutter)
+  bothy_viz/              Visualisierungen der Statistik: Ansichten, Grundformen, Fixtures, Harness (Flutter)
+  bothy_noise/            Noise-Handshake NK, Transport-Verschlüsselung und Rahmen des Terminals (Dart)
+  terminal_ui/            Terminal-Ansicht: Renderer, Sitzungen, Pinning, Sondertasten-Leiste (Flutter)
 ```
 
 Abweichung von der Grundliste des Auftrags: `auth`, `device_key` und `admin_ui` sind zusätzliche
 Pakete. Gründe: Anmeldung und Schlüssel brauchen beide Apps und die nativen Erweiterungen dieselbe
-Logik; die Verwaltung erscheint in zwei Apps und darf nicht doppelt entstehen.
+Logik; die Verwaltung erscheint in zwei Apps und darf nicht doppelt entstehen. `bothy_viz` (Nachtrag
+vom 2026-10-10) hält die Visualisierungen aus [25-visualisierung.md](25-visualisierung.md) an einer
+Stelle für Desktop-App, mobile App und Konsole, mit eigenem Harness und eigenen Fixtures.
+`bothy_noise` und `terminal_ui` (Nachtrag vom 2026-10-10) tragen das Terminal: `bothy_noise` ist
+reines Dart und gegen öffentliche Testvektoren (24, Abschnitt 5.2) geprüft, damit dieselbe Krypto-Schicht in App
+und Konsole läuft; `terminal_ui` hält die Ansicht für Desktop-App, mobile App und Konsole an einer
+Stelle (Abschnitt 23).
 
 ### 3.1 Abhängigkeitsregeln
 
@@ -89,11 +99,22 @@ flowchart TB
   client --> sync
   client --> ds
   client --> key
+  client --> term["terminal_ui"]
   console --> admin
   console --> key
+  console --> term
+  term --> ds
+  term --> auth
+  term --> api
+  term --> noise["bothy_noise"]
+  term --> domain
   admin --> ds
   admin --> auth
   admin --> api
+  admin --> viz["bothy_viz"]
+  viz --> ds
+  viz --> api
+  viz --> domain
   ds --> l10n
   ds --> domain
   sync --> store
@@ -113,6 +134,15 @@ Regeln (geprüft durch einen Architekturtest im Gate, Ticket "Abhängigkeitsrege
 4. Nur `device_key` und `apps/client/{ios,macos,android,windows}` enthalten Plattform-Code.
 5. `api_client` ist erzeugt und eingecheckt; ein Gate erzeugt ihn neu und vergleicht (wie die
    anderen generierten Clients, Baseline R-Clients).
+6. `bothy_viz` hängt nicht von `sync_engine` und `local_store` ab. Den Live-Strom bekommt es über
+   den Port `LiveFrameSource`: in der Desktop-App aus `sync_engine` (Gateway-Abo `stats.subscribe`),
+   in der Konsole aus REST-Abfragen von `getStatsLive` ([25-visualisierung.md](25-visualisierung.md),
+   Abschnitt 7.1). Kein Paket und keine App bettet eine WebView oder ein iframe für Statistik ein
+   (SEC-VZ-1).
+7. `bothy_noise` importiert kein `package:flutter` und hat außer `cryptography` keine Abhängigkeit
+   mit Krypto-Code. `terminal_ui` hängt nicht von `sync_engine` und `local_store` ab; Strom,
+   Speicher der gepinnten Schlüssel und Step-up bekommt es über Ports (Abschnitt 23.1). Grund: Die
+   Konsole hat weder Gateway noch lokale Datenbank (Regel 3).
 
 ## 4. Zustand
 
@@ -205,6 +235,7 @@ Nur lokal:
 | `file_cache` | Pfad, Größe, letzter Zugriff je Datei und Vorschaubild |
 | `search_index` | FTS5-Index über zwischengespeicherte Nachrichten für Offline-Suche |
 | `share_inbox` | aus Erweiterungen übernommene Teilen-Einträge |
+| `host_key_pins` | gepinnte Noise-Schlüssel der Rechner je Gerät (Abschnitt 23.3); nie vom Aufräumen nach `client.cache_max_age` erfasst, weil ein verlorener Pin eine Warnung bei einem Schlüsseltausch verhindern würde |
 
 ### 6.2 Migrationen
 
@@ -213,7 +244,7 @@ Schema-Datei, schrittweise Migrationen (`stepByStep`) und erzeugte Migrationstes
 (https://drift.simonbinder.eu/migrations/, abgerufen 2026-10-10 [belegt]). Zusätzliche Regel: Der
 Cache darf bei einer Migration verworfen und neu geladen werden (Spiegel-Tabellen, Cursor auf
 `resync`); `outbox`, `drafts` und `share_inbox` werden immer verlustfrei migriert, weil sie nicht
-gesendete Arbeit enthalten. Ein Test prüft das je Version.
+gesendete Arbeit enthalten; `host_key_pins` ebenso, weil sie Vertrauensanker sind. Ein Test prüft das je Version.
 
 ### 6.3 Verschlüsselung und Aufräumen
 
@@ -349,7 +380,11 @@ eigene Einträge vor der Nachricht, die sie anhängt; die Nachricht wartet, bis 
   öffentlicher Domain (Associated Domains), Baseline R-Passkeys; sonst lokale Konten mit Passwort
   und TOTP als Rückfall.
 - **Step-up:** native Apps signieren eine Server-Challenge mit einem zweiten Geräteschlüssel, der
-  Nutzerbestätigung verlangt (Biometrie oder PIN); die Web-Konsole nutzt WebAuthn-Passkeys.
+  Nutzerbestätigung verlangt (Biometrie oder PIN); die Web-Konsole nutzt WebAuthn-Passkeys. Für
+  `terminal.open` und `terminal.attach` ist der Step-up frisch und wird verbraucht (08, Abschnitt
+  6.3); die Konsole nutzt dafür nur einen Passkey mit `userVerification = required`.
+- **Terminal-Strom:** je Sitzung eine eigene WebSocket-Verbindung neben dem Gateway (Abschnitt
+  23.2); er läuft nie über `sync_engine`.
 
 ## 9. Sichere Speicherung und Geräteschlüssel
 
@@ -588,6 +623,8 @@ Windows-Laptop mit 8 GB RAM, Mac mit Apple-Chip der ersten Generation. Tests in 
 | `client.perf.catchup_events_per_s_min` | angewendete Ereignisse je Sekunde beim Nachholen |
 | `client.perf.memory_mobile_max` | Speicher mobil mit fünf geöffneten Threads |
 | `client.perf.memory_desktop_max` | Speicher Desktop mit zwanzig Threads im Fokus |
+| `client.perf.terminal_frame_to_paint_p95` | Rahmen `data` des Terminals entschlüsselt bis gezeichnet |
+| `client.perf.terminal_throughput_min` | Bytes je Sekunde, die die Terminal-Ansicht bei Dauerausgabe ohne Rückstau zeichnet |
 
 Standardwerte stehen in Abschnitt 22.
 
@@ -595,13 +632,13 @@ Standardwerte stehen in Abschnitt 22.
 
 | Stufe | Was | Werkzeug | Läuft |
 |---|---|---|---|
-| Unit | `domain`, `auth`, `sync_engine` (Fake-Uhr, Fake-Transport), `local_store` (SQLite im Speicher) | `dart test` | jeder Lauf des Gates |
+| Unit | `domain`, `auth`, `sync_engine` (Fake-Uhr, Fake-Transport), `local_store` (SQLite im Speicher), `bothy_noise` (offizielle Noise-Testvektoren, Kreuztest gegen Mitschnitte des Go-Host-Dienstes, TM-T01, TM-T02) | `dart test` | jeder Lauf des Gates |
 | Vertrag | erzeugter `api_client` gegen OpenAPI; Gateway-Rahmen gegen die JSON-Schemas des AsyncAPI-Dokuments; gemeinsame Beispiel-Rahmen mit den Server-Tests | `dart test` | jeder Lauf |
 | Widget | Komponenten, Zustände, Semantik, Richtlinien `textContrastGuideline`, `androidTapTargetGuideline`, `iOSTapTargetGuideline`, `labeledTapTargetGuideline` (https://api.flutter.dev/flutter/flutter_test/meetsGuideline.html, abgerufen 2026-10-10 [belegt]) | `flutter test` | jeder Lauf |
-| Golden | jede Kern-Komponente in hell und dunkel, `comfortable`, `compact`, `touch`, Textskalierung 1 und 2, de und en | `alchemist` (MIT, betterment.dev): CI-Goldens mit Ahem-Schrift sind auf allen Hosts gleich; Plattform-Goldens nur auf macOS (https://pub.dev/packages/alchemist, abgerufen 2026-10-10 [belegt]) | jeder Lauf (CI-Goldens), macOS-Runner (Plattform-Goldens) |
+| Golden | jede Kern-Komponente und jede Ansicht von `bothy_viz` mit ihren Fixtures in hell und dunkel, `comfortable`, `compact`, `touch`, Textskalierung 1 und 2, de und en | `alchemist` (MIT, betterment.dev): CI-Goldens mit Ahem-Schrift sind auf allen Hosts gleich; Plattform-Goldens nur auf macOS (https://pub.dev/packages/alchemist, abgerufen 2026-10-10 [belegt]) | jeder Lauf (CI-Goldens), macOS-Runner (Plattform-Goldens) |
 | Migration | erzeugte drift-Migrationstests plus "Ausgangsfach überlebt" | `drift_dev make-migrations` | jeder Lauf |
 | Integration | ganze App gegen einen Fake-Server in Dart (Gateway und REST, Teilmenge mit Fehler-Einspielung: Trennung, Doppel, Verzögerung, `resync_required`, `4012`, `409`, `410`) | `integration_test` | Desktop-Runner je Plattform |
-| E2E auf Geräten | Anmeldung, Push-Erlaubnis, Antippen einer Mitteilung, Teilen, Offline-Senden, gegen den echten Server im Compose-Stack | `patrol` (Apache-2.0, leancode.co; Android, iOS, macOS, Web; https://pub.dev/packages/patrol, abgerufen 2026-10-10 [belegt]) für Mobil, macOS, Konsole; `integration_test` für Windows, weil `patrol` Windows nicht unterstützt | nächtlich und vor Release |
+| E2E auf Geräten | Anmeldung, Push-Erlaubnis, Antippen einer Mitteilung, Teilen, Offline-Senden, Terminal öffnen, trennen und wiederanhängen gegen einen Host-Dienst im Container, gegen den echten Server im Compose-Stack | `patrol` (Apache-2.0, leancode.co; Android, iOS, macOS, Web; https://pub.dev/packages/patrol, abgerufen 2026-10-10 [belegt]) für Mobil, macOS, Konsole; `integration_test` für Windows, weil `patrol` Windows nicht unterstützt | nächtlich und vor Release |
 | Leistung | Ziele aus Abschnitt 19 mit Profil-Build und Timeline-Auswertung | `flutter drive --profile` | nächtlich |
 | Barrierefreiheit von Hand | VoiceOver, TalkBack, Narrator je Release mit Prüfliste | Prüfliste | vor Release |
 
@@ -626,6 +663,11 @@ zufällig auftreten.
 | R-CL-10 | Client-Kennzahlen über den eigenen Server an den Collector. | kein offizielles Dart-OTel-SDK; ein Endpunkt mit Autorisierung statt offenem Collector |
 | R-CL-11 | `patrol` für Geräte-E2E, `integration_test` für Windows und Fake-Server-Tests. | Systemdialoge und Mitteilungen sind Kernwege; `patrol` hat kein Windows |
 | R-CL-12 | Mindestversion Windows 10 2004. | Share Target und Paket-Identität verlangen Build 19041 |
+| R-CL-13 | Paket `bothy_viz` für alle Visualisierungen, ohne Transport-Code, mit Port für den Live-Strom. | Gleiche Ansichten in Desktop, Mobil und Konsole; Fixtures und Schein-Server ersetzen den Server in Tests ([25-visualisierung.md](25-visualisierung.md)). |
+| R-CL-14 | Pakete `bothy_noise` (reines Dart) und `terminal_ui` (Flutter) mit Ports für Strom, Pin-Speicher und Step-up. | Ein Widget und eine Krypto-Schicht für Desktop, Mobil und Konsole; die Konsole hat weder Gateway noch lokale Datenbank. |
+| R-CL-15 | Ephemerer Noise-Schlüssel je Handshake nur im Arbeitsspeicher; gepinnte Rechner-Schlüssel in der verschlüsselten lokalen Datenbank, in der Konsole im Speicher des Origins mit Löschen bei Abmeldung. | Der ephemere Schlüssel hat keinen Zweck nach dem Handshake; das Pinning braucht nur den öffentlichen Schlüssel, der aber nicht unbemerkt tauschbar sein darf ([ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)). |
+| R-CL-16 | Der Pin wird vor dem Öffnen gegen `getHost` geprüft, eine Abweichung erst nach ausdrücklicher Bestätigung mit `pin_changed = true` geöffnet. | Die Bestätigung muss im Audit des Öffnens stehen (24, Abschnitt 5.5); nach dem Öffnen wäre es zu spät. |
+| R-CL-17 | Terminal-Inhalte verlassen die Ansicht nie: kein Cache, keine lokale Datenbank, keine Absturzberichte, keine Kennzahlen mit Inhalt; App-Umschalter-Bild verdeckt. | Der Server sieht keinen Inhalt; ein Gerät darf ihn nicht nebenbei speichern (SEC-TERM-1). |
 
 ## 22. Konfigurationswerte dieses Kapitels
 
@@ -645,7 +687,99 @@ zufällig auftreten.
 | `client.perf.catchup_events_per_s_min` | `2000` | Mindestrate beim Nachholen |
 | `client.perf.memory_mobile_max` | `300MiB` | Speicher mobil |
 | `client.perf.memory_desktop_max` | `500MiB` | Speicher Desktop |
+| `client.perf.terminal_frame_to_paint_p95` | `16ms` | Ziel Terminal-Rahmen bis Frame |
+| `client.perf.terminal_throughput_min` | `1MiB/s` | Mindestrate der Terminal-Ansicht bei Dauerausgabe |
+| `client.terminal.scrollback_lines` | `10000` | Zeilen im Rückblick des Renderers im Arbeitsspeicher; der Puffer für das Wiederanhängen liegt im Host-Dienst (`host_service.scrollback_bytes`) |
+| `client.terminal.font_size_default` | `14` | Schriftgröße der Terminal-Ansicht in logischen Pixeln, bis die Person sie ändert |
 
 `client.share.recent_targets` steht in [01-produkt.md](01-produkt.md), `voice.max_duration` in
-[12-dateien.md](12-dateien.md); `client.cache_max_age`, `client.outbox_retry_base` und
+[12-dateien.md](12-dateien.md); `terminal.*` und `host_service.*` in [24-terminal.md](24-terminal.md); `client.cache_max_age`, `client.outbox_retry_base` und
 `client.outbox_retry_cap` in [04-sync-protokoll.md](04-sync-protokoll.md).
+
+## 23. Terminal-Ansicht
+
+Normativ für Protokoll, Rechte, Grenzen und Tests: [24-terminal.md](24-terminal.md). Dieser
+Abschnitt legt fest, wie die Clients es bauen. Bedienung: [01-produkt.md](01-produkt.md), Screens
+D11, M8, M9 und Abschnitt 7 (Kürzel im Terminal).
+
+### 23.1 Pakete und Ports
+
+| Paket | Inhalt | Nicht |
+|---|---|---|
+| `bothy_noise` | Handshake `Noise_NK_25519_ChaChaPoly_SHA256` als Initiator (Gerät) und, nur für Tests, als Antwortender; Transport-Zustände; Prolog aus Protokollversion, Sitzungs-ID und Rechner-ID; Kodierung der Rahmen `start`, `data`, `resize`, `close`, `exit`, `replay_begin`, `replay_end` (24, Abschnitt 5.4); Fingerabdruck nach 24, Abschnitt 4.3. Primitive aus dem Paket `cryptography` (24, Abschnitt 5.2). | kein Flutter, kein Netzwerk, keine Speicherung |
+| `terminal_ui` | Widget mit dem Renderer `xterm` (24, Abschnitt 12), Kopf mit Rechner, Abzeichen der LLM-Anmeldung, Fingerabdruck und Restzeit; Reiter je Sitzung; Dialoge "Terminal öffnen" und "Schlüssel geändert"; Sondertasten-Leiste; Ablauf aus 23.2 | keine Rechte-Logik (Grundsatz 1), kein Gateway, keine lokale Datenbank |
+
+Ports von `terminal_ui`, umgesetzt je App:
+
+| Port | Desktop-App und mobile App | Web-Konsole |
+|---|---|---|
+| `TerminalTransport` (WebSocket je Sitzung, Text bis `identify`, danach nur Binärrahmen) | eigener WebSocket-Client mit `identify` aus Zugriffstoken und DPoP-Beweis des Geräts (`auth`) | WebSocket des Browsers auf demselben Origin; die Cookie-Sitzung des Upgrades meldet an, `identify` trägt kein Token ([08-identitaet.md](08-identitaet.md), Abschnitt 7.5) |
+| `HostKeyPinStore` (je Rechner `noise_public_key`, `key_generation`, Fingerabdruck, erstes Sehen) | Tabelle `host_key_pins` in `local_store` (verschlüsselt, Abschnitt 6.3); gelöscht mit allen lokalen Daten beim Abmelden | Speicher des Origins (IndexedDB), gelöscht beim Abmelden ([ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)) |
+| `StepUpPrompt` | Step-up-Geräteschlüssel mit Biometrie bzw. PIN (Abschnitt 9) | Passkey mit `userVerification = required`, sonst Hinweis auf die Einrichtung eines Passkeys |
+| `HostEvents` (Änderungen an Rechnern und eigenen Sitzungen) | `sync_engine`: `host.updated`, `host.presence_changed`, `terminal_session.changed` | Neuladen per REST beim Öffnen der Ansicht und nach jeder eigenen Aktion; keine Live-Aktualisierung |
+
+### 23.2 Öffnen, Strom und Wiederanhängen
+
+1. Die Ansicht lädt den Rechner (`getHost`) und prüft den Pin (23.3).
+2. Sie erzeugt im Arbeitsspeicher ein ephemeres X25519-Schlüsselpaar je Handshake und berechnet
+   `client_ephemeral_key_hash`. Der private Teil wird nie gespeichert und nach dem Handshake
+   verworfen.
+3. Step-up über `StepUpPrompt`, dann `openTerminalSession` mit Profil, Größe, Hash und, falls
+   bestätigt, `pin_changed`. Weicht `noise_public_key` oder `key_generation` der Antwort von dem
+   geprüften Wert ab, bricht die Ansicht ab und schließt die Sitzung (`closeTerminalSession`).
+4. Sie öffnet den Strom-Pfad aus der Antwort, sendet `identify`, dann Noise-Nachricht 1 mit der
+   Sitzungs-Marke, prüft Nachricht 2 und sendet den Rahmen `start`. Erst danach nimmt sie Eingaben
+   an.
+5. Eingaben gehen als Rahmen `data`, Größenänderungen als `resize` (zusammengefasst, höchstens ein
+   `resize` je Frame). `exit` zeigt den Exitcode und schließt den Reiter nicht von selbst.
+6. Bricht der Strom ab, zeigt die Ansicht "getrennt" und hängt mit `attachTerminalSession` neu an:
+   neuer ephemerer Schlüssel, neuer Handshake; der Host-Dienst spielt den Rückblick zwischen
+   `replay_begin` und `replay_end` ein, die Ansicht ersetzt dabei ihren Bildschirm. Ob ein neuer
+   Step-up nötig ist, entscheidet der Server (`terminal.quick_reattach_window`, 24, Abschnitt 6.2);
+   die Ansicht folgt der Antwort `401 step_up_required`.
+7. Mobil trennt die App beim Wechsel in den Hintergrund und verdeckt die Ansicht im
+   App-Umschalter (R-PR-12 in 01); im Vordergrund hängt sie wieder an.
+8. Schließ-Codes des Stroms (asyncapi.yaml, Kanal `terminalStream`) zeigt die Ansicht mit Grund:
+   `4100` Sitzung beendet mit `close_reason` aus dem Schließgrund (z. B. `access_revoked`), kein
+   neuer Versuch; `4101` Marke abgelaufen oder schon verbraucht, mit neuem Step-up neu öffnen bzw.
+   anhängen; `4102` Gegenseite fehlt, später anhängen; `4103` an einem anderen Gerät
+   angehängt, kein eigener neuer Versuch; `4104` Handshake oder Marke manipuliert (24, Abschnitt
+   5.3), harte Warnung ohne neuen Versuch.
+
+### 23.3 Schlüssel-Pinning
+
+- Ohne Pin für den Rechner speichert die Ansicht nach dem ersten erfolgreichen Handshake
+  `noise_public_key`, `key_generation` und den Fingerabdruck (24, Abschnitt 5.5).
+- Mit Pin und gleichem Schlüssel: kein Hinweis.
+- Mit Pin und anderem Schlüssel: harte Warnung mit beiden Fingerabdrücken (Screen D11). Verbinden
+  erst nach ausdrücklicher Bestätigung; dann `pin_changed = true` und neuer Pin nach erfolgreichem
+  Handshake. "Nicht verbinden" öffnet keine Sitzung. Eine höhere `key_generation` allein ändert die
+  Warnung nicht: Auch eine Neukopplung durch einen Owner muss die Person bewusst annehmen.
+- Der Pin ist je Gerät; die Konsole pinnt je Browser-Profil. Grund und Grenzen: 24, Abschnitt 5.1.
+  In der Konsole schützt der Pin nicht gegen einen bösartigen Server, weil dieser den Code der
+  Konsole liefert; die Ansicht behauptet dort nichts anderes.
+
+### 23.4 Darstellung und Eingabe
+
+- Escape-Sequenzen nach 24, Abschnitt 11.2 (SEC-TERM-6): OSC 52 wird ignoriert, Hyperlinks
+  öffnen erst nach Klick mit sichtbarem Ziel und Bestätigung, Abfragen von Fenstertitel und
+  Zwischenablage bleiben unbeantwortet. Die Sperren liegen in `terminal_ui` vor dem Renderer, damit
+  sie nicht von dessen Version abhängen (Test TM-T14).
+- Kopieren nur durch die Person (Auswahl und Kürzel bzw. Menü); Einfügen von mehr als einer Zeile
+  zeigt vorher den Text ("Einfügen mit Zeilenumbrüchen?").
+- Mobil: Sondertasten-Leiste nach 01, Screen M8; Ctrl und Alt als einmal wirkende bzw. gehaltene
+  Modifikatoren; Hardware-Tastatur blendet die Leiste aus.
+- Desktop: Kürzel nach 01, Abschnitt 7; Windows-Kürzel der App nur mit Strg+Shift.
+- Terminal-Inhalte gelangen nie in `local_store`, Absturzberichte, Client-Kennzahlen oder Logs
+  (R-CL-17); der Rückblick lebt nur im Arbeitsspeicher (`client.terminal.scrollback_lines`).
+
+### 23.5 Tests
+
+| Stufe | Was |
+|---|---|
+| Unit | `bothy_noise`: Testvektoren, Kreuztest mit Mitschnitten des Go-Host-Dienstes, falscher Prolog und falscher Schlüssel scheitern (TM-T01, TM-T02); Rahmen-Codec mit unbekanntem Typ |
+| Widget | Sperren der Escape-Sequenzen (TM-T14); Pin-Warnung und `pin_changed` (TM-T18); Sondertasten mit Modifikatoren; Semantik |
+| Golden | Terminal-Ansicht hell und dunkel, mit Warnung, getrennt, Sondertasten-Leiste |
+| Integration | gegen einen Host-Dienst im Container und den Fake-Server: Öffnen, Trennen, Wiederanhängen mit Rückblick, Entzug (`4100`), anderes Gerät (`4103`) |
+| E2E | Desktop (M4), Geräte (M5), Konsole mit erzwungener CSP (M6, SEC-T05 mit geöffnetem Terminal) |
+| Leistung | `client.perf.terminal_frame_to_paint_p95` und `client.perf.terminal_throughput_min` mit einem Ausgabe-Generator im Host-Dienst |

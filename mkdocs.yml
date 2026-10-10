@@ -6,7 +6,7 @@
 # links (for example single ADRs through the ADR index).
 
 site_name: Bothy
-site_description: Selbst gehosteter Team-Chat, in dem KI-Agenten vollwertige Teilnehmer sind.
+site_description: Kommandozentrale für KI-Agenten in Chat-Form. Chat, Live-Ansicht, Freigaben, Terminal, Kosten und Statistik, selbst gehostet.
 site_url: https://OWNER.github.io/bothy/
 repo_url: https://github.com/OWNER/bothy
 repo_name: bothy
@@ -117,6 +117,8 @@ nav:
       - 21 Dev-Abschottung: spec/21-dev-isolation.md
       - 22 Import und Migration: spec/22-import-migration.md
       - 23 Qualität: spec/23-qualitaet.md
+      - 24 Terminal: spec/24-terminal.md
+      - 25 Visualisierung: spec/25-visualisierung.md
   - Architektur: architecture/README.md
   - API:
       - Übersicht: api/README.md

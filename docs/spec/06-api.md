@@ -240,7 +240,7 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `unauthenticated` | 401 | No valid principal (token missing, invalid or expired). | Renew the token; if that fails, log in again. |
 | `token_expired` | 401 | The access token has expired. | Refresh, then retry. |
 | `session_revoked` | 401 | Session, device or principal revoked. | Delete local data and log out (R-SY-14). |
-| `step_up_required` | 401 | The action needs a fresh confirmation (`auth.step_up_max_age`), or a step-up confirmation failed. | Perform step-up, then repeat the same request with the same `Idempotency-Key`. |
+| `step_up_required` | 401 | The action needs a fresh confirmation (`auth.step_up_max_age`), or a step-up confirmation failed. For `terminal.open` and `terminal.attach`: younger than `terminal.step_up_max_age`, not yet consumed, by passkey or step-up device key; in the console only by passkey with `userVerification = required`, otherwise `reason: passkey_required` (08 section 6.3). The quick reattach without step-up never applies in the console. | Perform step-up, then repeat the same request with the same `Idempotency-Key`. |
 | `use_dpop_nonce` | 401 | The server requires a fresh nonce in the DPoP proof; header `DPoP-Nonce`. | Build the proof again with the nonce and retry once. |
 | `invalid_dpop_proof` | 401 | The DPoP proof is missing, wrongly signed, expired or does not match `cnf.jkt`. | Programming error or device key lost; log in again. |
 | `forbidden` | 403 | Read access exists, but the level or a capability is missing (R-AZ-01). | Do not retry; hide the control. |
@@ -249,16 +249,20 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `channel_read_only` | 403 | The channel is read-only (05 rule 1.8) or archived (`reason: channel_archived`, 07 section 4.5); applies to owners too. | Lock the input and show a note; do not retry. |
 | `feature_disabled` | 403 | The feature is switched off (for example personal tokens). | Do not retry. |
 | `agent_invocation_denied` | 403 | `agent.invoke` denies; `reason` for example `billing_mode_personal_not_holder`, `project_not_ready`. | Show the reason; do not retry. |
+| `terminal_denied` | 403 | The `terminal` right exists, but a guard rule or limit blocks; `reason` is `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `session_limit` or `profile_unknown` (24 section 13). | Show the reason; do not retry. |
 | `invocation_token_invalid` | 403 | The invocation token is wrongly signed, expired, issued for another agent, or its `jti` does not match. | The adapter starts nothing and reports the run as `failed`. |
 | `not_found` | 404 | The resource does not exist or is not visible; both answer the same (R-AZ-01). | Mark the outbox entry as failed. |
 | `method_not_allowed` | 405 | The method is not defined on this path. | Programming error. |
 | `conflict` | 409 | The state prevents the change (for example a name is taken); `reason` names the cause where one is defined. | Reload the state; a person decides. |
 | `request_in_progress` | 409 | The first request with this `Idempotency-Key` is still running. | Retry with backoff. |
 | `i1_violation` | 409 | The change would violate I1; `hint` names the way out. | Switch to `organization` first. |
+| `i6_violation` | 409 | The change would let someone other than the holder of a personal LLM login open a terminal on the host (I6); `hint` names the way out. | Revoke the other grants or declare `organization` first. |
 | `last_owner` | 409 | At least one active owner must remain. | Appoint another owner first. |
 | `already_started` | 409 | The run is no longer `queued`. | The adapter starts nothing. |
 | `billing_mode_mismatch` | 409 | The reported actual mode differs from the target; the run becomes `failed`. | Check the adapter configuration. |
 | `tool_class_mismatch` | 409 | The reported tool class is above the one in the invocation token; the run becomes `failed`. | Check the adapter configuration. |
+| `host_unavailable` | 409 | The host is not `active` or its host service is not connected. | Show the host state; retry when `host.presence_changed` reports it connected. |
+| `fingerprint_mismatch` | 409 | The typed fingerprint prefix does not match the keys the host service registered. | Compare with the output of `bothy-host pair` and type it again; after too many failures pair again. |
 | `invalid_state_transition` | 409 | The state machine does not allow the transition. | Reload the state. |
 | `base_version_conflict` | 409 | `base_version` of a run patch is outdated; `current` holds the document. | Rebase on `current`. |
 | `component_used` | 409 | The component is used, expired or disabled. | Refresh the view. |
@@ -499,6 +503,10 @@ sequenceDiagram
    `command.autocomplete_requested` an den Eigentümer des Befehls und wartet bis
    `command.autocomplete_timeout` auf `answerAutocomplete` oder die Gateway-Op
    `command.autocomplete_result` (04 Abschnitt 15.7).
+7. Terminal: Die Strom-Verbindung des Geräts und die Steuer- und Datenverbindungen des
+   Host-Dienstes sind eigene Kanäle in asyncapi.yaml (`terminalStream`, `hostControl`, `hostData`)
+   mit eigenen Schließ-Codes `4100` bis `4114`; nach `hello` und `identify` tragen sie nur
+   Binärrahmen mit je einer Noise-Nachricht ([24-terminal.md](24-terminal.md), Abschnitt 5).
 
 Ops und Ereignisse stehen in Abschnitt 17.
 
@@ -989,6 +997,10 @@ Erzeugt aus openapi.yaml.
 | GET | `/api/v1/stats/tool-calls` | `getToolCallStats` | `stats.read` | Tool calls by tool name |
 | GET | `/api/v1/stats/errors` | `getErrorStats` | `stats.read` | Error rates of runs and deliveries |
 | GET | `/api/v1/stats/costs` | `getCostStats` | `cost.read.aggregate` | Costs per space, agent or instance |
+| GET | `/api/v1/stats/live` | `getStatsLive` | `stats.read` | Current live frame |
+| GET | `/api/v1/stats/timeline` | `getStatsTimeline` | `stats.read` | Minute buckets and runs for playback |
+| GET | `/api/v1/stats/slo` | `getStatsSlo` | `stats.read` | SLO traffic light from own measurement |
+| GET | `/api/v1/stats/backends` | `getStatsBackends` | `stats.read` | Backend policy view per agent |
 | GET | `/api/v1/prices` | `listPrices` | `price.read` | List prices |
 | POST | `/api/v1/prices` | `createPrice` | `price.manage` | Add a price with source |
 | POST | `/api/v1/prices/{price_id}/close` | `closePrice` | `price.manage` | End the validity of a price |
@@ -1034,6 +1046,30 @@ Erzeugt aus openapi.yaml.
 | GET | `/api/v1/gdpr-requests/{request_id}` | `getGdprRequest` | `gdpr.request.read` | Read a privacy request |
 | POST | `/api/v1/gdpr-requests/{request_id}/decide` | `decideGdprRequest` | `gdpr.request.decide` | Approve or reject a privacy request |
 | GET | `/api/v1/gdpr-requests/{request_id}/export` | `downloadGdprExport` | `gdpr.export.download` | Download the export package |
+
+#### Hosts
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| GET | `/api/v1/hosts` | `listHosts` | `host.read` | List hosts |
+| POST | `/api/v1/hosts` | `createHost` | `host.manage` | Register a host and issue its pairing code |
+| POST | `/api/v1/hosts/pair` | `pairHost` | `host.pair` | Redeem a pairing code from the host service |
+| GET | `/api/v1/hosts/{host_id}` | `getHost` | `host.read` | Read a host |
+| PATCH | `/api/v1/hosts/{host_id}` | `updateHost` | `host.manage` | Change name or assignee of a host |
+| POST | `/api/v1/hosts/{host_id}/pairing-code` | `issueHostPairingCode` | `host.manage` | Issue a new pairing code (re-pairing) |
+| POST | `/api/v1/hosts/{host_id}/confirm` | `confirmHost` | `host.manage` | Confirm the fingerprint and declare the LLM login |
+| PUT | `/api/v1/hosts/{host_id}/llm-credentials` | `setHostLlmCredentials` | `host.manage` | Declare the LLM login of a host |
+| POST | `/api/v1/hosts/{host_id}/state` | `setHostState` | `host.manage` | Disable, enable or retire a host |
+
+#### Terminal
+
+| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+|---|---|---|---|---|
+| POST | `/api/v1/hosts/{host_id}/terminal/sessions` | `openTerminalSession` | `terminal.open` | Open a terminal session |
+| GET | `/api/v1/terminal/sessions` | `listTerminalSessions` | `terminal.read_own` | List terminal sessions |
+| GET | `/api/v1/terminal/sessions/{session_id}` | `getTerminalSession` | `terminal.read_own` | Read a terminal session |
+| POST | `/api/v1/terminal/sessions/{session_id}/attach` | `attachTerminalSession` | `terminal.attach` | Attach to an own session again |
+| POST | `/api/v1/terminal/sessions/{session_id}/close` | `closeTerminalSession` | `terminal.close` | End a terminal session |
 <!-- END GENERATED: endpoints -->
 
 ## 17. WebSocket-Ops und Ereignisse
@@ -1053,6 +1089,8 @@ Ops (Aktion nach 05, Abschnitt 7):
 | `ack` | Client an Server | `agent.events.consume` | `GatewayAck` |  |
 | `run.update` | Client an Server | `run.update` | `GatewayRunUpdate` |  |
 | `command.autocomplete_result` | Client an Server | `command.autocomplete.respond` | `GatewayAutocompleteResult` |  |
+| `stats.subscribe` | Client an Server | `stats.read` | `GatewayStatsSubscribe` |  |
+| `stats.unsubscribe` | Client an Server | `stats.read` | `GatewayStatsUnsubscribe` |  |
 | `hello` | Server an Client | `gateway.connect` | `GatewayHello` |  |
 | `ready` | Server an Client | `gateway.connect` | `GatewayReady` |  |
 | `resumed` | Server an Client | `gateway.connect` | `GatewayResumed` |  |
@@ -1118,11 +1156,15 @@ Ereignisse (Empfangs-Aktion nach 05, Abschnitt 6; Schema in openapi.yaml):
 | `interaction.created` | dauerhaft | `agent.events.consume` | self | `InteractionCreatedEvent` | ja |
 | `command.invoked` | dauerhaft | `agent.events.consume` | self | `CommandInvokedEvent` | ja |
 | `agent.config_changed` | dauerhaft | `agent.config.read` | self | `AgentConfigChangedEvent` | ja |
+| `host.updated` | dauerhaft | `host.read` |  | `HostUpdatedEvent` |  |
+| `terminal_session.changed` | dauerhaft | `self` | self | `TerminalSessionChangedEvent` |  |
 | `typing.started` | kurzlebig | `thread.read` |  | `TypingStartedEvent` |  |
 | `run.updated` | kurzlebig | `run.read` |  | `RunUpdatedEvent` |  |
 | `agent.presence_changed` | kurzlebig | `agent.read` |  | `AgentPresenceChangedEvent` |  |
 | `command.autocomplete_requested` | kurzlebig | `agent.events.consume` | self | `CommandAutocompleteRequestedEvent` |  |
 | `notification.created` | kurzlebig | `push.deliver` | self | `NotificationCreatedEvent` |  |
+| `host.presence_changed` | kurzlebig | `host.read` |  | `HostPresenceChangedEvent` |  |
+| `stats.live` | kurzlebig | `stats.read` |  | `StatsLiveEvent` |  |
 <!-- END GENERATED: events -->
 
 ## 18. Abgleich mit dem Kern-Vertrag

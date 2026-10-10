@@ -44,12 +44,14 @@ NO_COMPONENT_ROOT_FILES = re.compile(r"^[^/]+\.md$|^(?:LICENSE|NOTICE)$")
 RELEASE_COMPONENTS: dict[str, tuple[str, str]] = {
     "bothy": (".", "all"),
     "server": ("services/server", "server"),
+    "host": ("services/host", "server"),
     "client": ("apps/client", "apps"),
     "console": ("apps/console", "apps"),
     "sdk-python": ("sdk/python", "sdk-python"),
     "sdk-typescript": ("sdk/typescript", "sdk-typescript"),
     "hermes-adapter": ("plugins/hermes-adapter", "plugins"),
     "claude-code-runner": ("plugins/claude-code-runner", "plugins"),
+    "grafana-bothy-live": ("plugins/grafana-bothy-live", "plugins"),
 }
 _SEMVER = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"

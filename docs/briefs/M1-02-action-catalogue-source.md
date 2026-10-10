@@ -17,7 +17,7 @@ ADR 0049 records the decision.
   "Voraussetzungen aus dem Kern-Vertrag", row "maschinenlesbarer Aktionskatalog"); P-11, P-12 in
   "Entscheidungen dieses Plans".
 - `docs/spec/05-aktionen.md`, the whole chapter, especially "Verbindliche Regeln" (rules 3, 4, 10),
-  "Scopes für Apps" (2.6), "Rate-Limit-Klassen", "Aktionen" (4.1 to 4.13), "Dauerhafte
+  "Scopes für Apps" (2.6), "Rate-Limit-Klassen", "Aktionen" (4.1 to 4.14), "Dauerhafte
   Ereignistypen und Empfangs-Aktion", "WebSocket-Ops und Aktion", "Tests, die diesen Katalog
   halten", "Konfigurationswerte dieses Kapitels".
 - `docs/spec/00-glossar.md` (terms), `docs/spec/04-sync-protokoll.md` "Ops" (6.2) and "Zwei Arten"
@@ -170,10 +170,11 @@ Top level, exactly these keys in this order; unknown keys anywhere are findings:
 |---|---|---|
 | `version` | integer `1` | schema version |
 | `rate_limit_classes` | list of class | row order of 05 "Rate-Limit-Klassen" |
-| `sections` | list of strings | keys of the action tables, in order: `public` (4.1), `instance` (4.2), `identity` (4.3), `grants` (4.4), `structure` (4.5), `threads` (4.6), `messages` (4.7), `files` (4.8), `personal` (4.9), `agents` (4.10), `apps` (4.11), `operations` (4.12), `dev` (4.13) |
+| `sections` | list of strings | keys of the action tables, in order: `public` (4.1), `instance` (4.2), `identity` (4.3), `grants` (4.4), `structure` (4.5), `threads` (4.6), `messages` (4.7), `files` (4.8), `personal` (4.9), `agents` (4.10), `apps` (4.11), `operations` (4.12), `dev` (4.13), `terminal` (4.14) |
 | `actions` | list of action | row order of 05 section 4 |
 | `events` | list of event | durable rows, then ephemeral rows, in 05 row order |
-| `ws_ops` | list of op | row order of 05 "WebSocket-Ops und Aktion" |
+| `ws_ops` | list of op | row order of the first table of 05 "WebSocket-Ops und Aktion" (gateway) |
+| `channel_ops` | list of channel op | row order of the second table of 05 "WebSocket-Ops und Aktion" ("Terminal-Kanäle") |
 
 Class: `id` (`rl.<name>`), `key` (cell "Schlüssel"), `purpose` (cell "Zweck").
 
@@ -187,7 +188,7 @@ Action (05 column in brackets):
 | `resource` | string, verbatim | yes | Ressource |
 | `right` | string, verbatim; the value `system` marks a system action | yes | Recht |
 | `owner` | `true`, `false` or `as_target` | yes | `ja`, `nein`, `wie Zielaktion` (Owner) |
-| `step_up` | `true`, `false` or `conditional` | yes | `ja` / `nein` / `bedingt` (Step-up; `bedingt` per 05 "Spalten Owner, Step-up, Audit, Rechte") |
+| `step_up` | `true`, `false`, `conditional` or `fresh` | yes | `ja` / `nein` / `bedingt` / `frisch` (Step-up; `bedingt` and `frisch` per 05 "Spalten Owner, Step-up, Audit, Rechte"; `frisch` is used by the terminal actions of 4.14) |
 | `audit` | `always`, `denials`, `never` or `conditional` | yes | `ja`, `abl`, `nein`, or `audit_text` (Audit) |
 | `audit_text` | string | only and always with `conditional` | verbatim cell, for example `ja bei fremder` |
 | `rights_change` | boolean | yes | `ja` / `nein` (Rechte) |
@@ -244,8 +245,29 @@ Current values: `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.st
 action `gateway.connect`, `per_event_receive_action: true` and the action text "Empfangs-Aktion
 des Ereignistyps (Abschnitt 6)"; `heartbeat` has `also_actions: [agent.heartbeat]` and the action
 text "`gateway.connect` (Sitzung muss gültig sein); bei Agenten zusätzlich `agent.heartbeat`";
-`focus` has the action text "`gateway.focus` je Thread". These actions equal `x-authz-action` in
-`docs/api/asyncapi.yaml` today; M1-03 keeps them equal.
+`focus` has the action text "`gateway.focus` je Thread"; `stats.subscribe` and `stats.unsubscribe`
+are `client_to_server` with action `stats.read`, `row_group: stats` and the action text "`stats.read`
+auf Instanz bzw. Bereich". These actions equal `x-authz-action` in `docs/api/asyncapi.yaml` today;
+M1-03 keeps them equal.
+
+Channel op (one row of the table "Terminal-Kanäle" of 05 section 7; these channels are not the
+gateway and have their own operations in `docs/api/asyncapi.yaml`):
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `channel` | `terminal_stream`, `host_control`, `host_data` | yes | asyncapi channel `terminalStream`, `hostControl`, `hostData` |
+| `channel_text` | string | only on the first row of a channel | verbatim cell "Kanal"; continuation rows render an empty cell |
+| `ops` | list of op names; the name `noise_frame` stands for binary Noise frames | yes | cell "Op": backticked names joined by `, `; `noise_frame` renders as `Binärrahmen (Noise)` |
+| `direction` | `server_to_device`, `device_to_server`, `server_to_host`, `host_to_server`, `both` | yes | `Server an Gerät`, `Gerät an Server`, `Server an Rechner`, `Rechner an Server`, `beide` |
+| `action` | non-system action id | yes | equals `x-authz-action` of the matching asyncapi operations |
+| `action_text` | string | no | verbatim cell override (for example "`terminal.stream` (Sitzung muss gültig sein)") |
+
+Current values follow the six rows of that table: `terminal_stream` with `hello` (server to device),
+`identify` (device to server) and `noise_frame` (both), action `terminal.stream`; `host_control`
+with the server-to-host ops `hello`, `ready`, `heartbeat_ack`, `error`, `session.open`,
+`session.close` and the host-to-server ops `identify`, `heartbeat`, `report`, `session.started`,
+`session.ended`, action `host.connect`; `host_data` with `hello`, `identify`, `noise_frame`
+(both), action `host.connect`.
 
 ### Validation rules (`load_catalog` and `check`)
 
@@ -265,6 +287,8 @@ redocly file for block rules):
    action; the `audience`, `receivers` and `receive_text` rules above.
 7. Ops: `action` present ("op without action"), known, not a system action; `also_actions` known;
    members of a `row_group` are consecutive and share `direction`, `action` and `action_text`.
+   Channel ops: `action` known and not a system action; rows of one channel are consecutive and
+   only the first carries `channel_text`; an op name is unique within its channel and direction.
 8. 2.6 consistency: parse the table under "Scopes für Apps". In column one every backticked token
    is an action id or a pattern ending in `.*` (prefix match); prose without backticks is ignored.
    In column two the first backticked token is the scope; a cell without one means `none`. Every
@@ -282,15 +306,17 @@ separator line:
 | Block name | Table | Header |
 |---|---|---|
 | `rate_limit_classes` | "Rate-Limit-Klassen" | `\| Klasse \| Schlüssel \| Zweck \|` |
-| `actions.<section key>` (13 blocks) | each table of section 4 | `\| ID \| Beschreibung \| Ressource \| Recht \| Owner \| Step-up \| Audit \| Rechte \| RL-Klasse \|` |
+| `actions.<section key>` (14 blocks) | each table of section 4 | `\| ID \| Beschreibung \| Ressource \| Recht \| Owner \| Step-up \| Audit \| Rechte \| RL-Klasse \|` |
 | `events.durable` | first table of section 6 | `\| Ereignistyp \| Ressource \| Empfangs-Aktion \| Hinweis \|` |
 | `events.ephemeral` | second table of section 6 | `\| Ereignistyp \| Ressource \| Empfangs-Aktion \| Zusatzbedingung \|` |
-| `ws_ops` | section 7 | `\| Op \| Richtung \| Aktion \|` |
+| `ws_ops` | first table of section 7 | `\| Op \| Richtung \| Aktion \|` |
+| `channel_ops` | second table of section 7 ("Terminal-Kanäle") | `\| Kanal \| Op \| Richtung \| Aktion \|` |
 
 Separator lines are `|---|---|...` with one `---` per column. Row rendering in chapter 05:
 `"|" + "".join(f" {cell} |" if cell else " |" for cell in cells)`; an empty cell renders as a
 single space (`| |`), as in the current chapter. All prose between the tables (for example
-"Kurzlebige Ereignisse:", the paragraph after 4.4, the intro of 4.13) stays outside the markers
+"Kurzlebige Ereignisse:", the paragraph after 4.4, the intros of 4.13 and 4.14, the paragraph after
+4.14, the line "Terminal-Kanäle ..." before the second table of section 7) stays outside the markers
 and hand-written. Marker lines stand directly before the header line and directly after the last
 row, without blank lines, like in chapter 06.
 
@@ -320,7 +346,7 @@ rewrites only lines between markers and keeps every other byte of the file.
 `tools/catalog/tests/table_import.py` is a test helper with
 `def import_chapter(chapter: str) -> dict`: it parses the pre-migration tables of chapter 05
 (located by their headings in the fixture) into the YAML structure above. Cell mapping:
-`ja`/`nein` to booleans, Step-up `bedingt` to `conditional`, `wie Zielaktion` to `as_target`, Audit `ja`/`abl`/`nein` to
+`ja`/`nein` to booleans, Step-up `bedingt` to `conditional` and `frisch` to `fresh`, `wie Zielaktion` to `as_target`, Audit `ja`/`abl`/`nein` to
 `always`/`denials`/`never` and any other text to `conditional` plus `audit_text`, `keine` to
 `none`, backticked `rl.x` to `rl.x`, `delivery_check: true` where the class is `keine` and the
 right is not `system`; `app_scope` from 2.6; for event cells that are a single backticked action

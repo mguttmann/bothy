@@ -4,8 +4,9 @@ Status: Entwurf M0. Begriffe: [00-glossar.md](00-glossar.md). Daten: [03-datenmo
 Sync und Offline: [04-sync-protokoll.md](04-sync-protokoll.md). Rechte und Aktionen:
 [05-aktionen.md](05-aktionen.md), [07-rechte.md](07-rechte.md). Agenten: [09-agenten.md](09-agenten.md),
 [10-backend-richtlinie.md](10-backend-richtlinie.md). Push: [13-push-benachrichtigungen.md](13-push-benachrichtigungen.md).
-Apps technisch: [15-client-architektur.md](15-client-architektur.md). Gestaltung:
-[docs/design/](../design/README.md).
+Apps technisch: [15-client-architektur.md](15-client-architektur.md). Terminal:
+[24-terminal.md](24-terminal.md). Visualisierung: [25-visualisierung.md](25-visualisierung.md).
+Gestaltung: [docs/design/](../design/README.md).
 
 Dieses Kapitel beschreibt, was Menschen sehen und bedienen. Es legt keine Rechte fest; jede
 Bedienung nennt die Aktion aus dem Aktionskatalog, die der Server prüft. Die App zeigt nur an, was
@@ -13,13 +14,31 @@ der Server erlaubt, und enthält keine eigene Rechte-Logik.
 
 ## 1. Vision
 
-1. Ein selbst gehosteter Team-Chat, aufgebaut und bedient wie Discord, in dem KI-Agenten
-   vollwertige Teilnehmer sind.
-2. Jeder Thread ist eine Agenten-Sitzung: Man sieht den Agenten arbeiten (Live-Box), beantwortet
-   seine Rückfragen und gibt Aktionen per Knopf frei; jede Person sieht und steuert nur, was ihr
-   freigegeben ist.
-3. Eine Instanz gehört einer Organisation und läuft auf eigener Hardware oder in der eigenen Cloud;
-   über die öffentliche API schließt jedes Agenten-Framework an, Hermes Agent ist eines davon.
+Bothy ist eine **Kommandozentrale für KI-Agenten in Chat-Form**: Chat, Live-Ansicht, Freigaben,
+Terminal, Kosten und Statistik in einer selbst gehosteten, quelloffenen App. Agenten sind Hermes
+Agent, Claude Code und weitere, die über die öffentliche API anschließen.
+
+1. **Chat wie Discord.** Aufbau und Bedienung wie Discord; KI-Agenten sind vollwertige Teilnehmer.
+2. **Live-Ansicht.** Jeder Thread ist eine Agenten-Sitzung: Man sieht den Agenten arbeiten
+   (Live-Box mit Werkzeug- und Statuszeilen), beantwortet seine Rückfragen und gibt Aktionen per
+   Knopf frei.
+3. **Freigaben.** Jede Person sieht und steuert nur, was ihr freigegeben ist; das prüft der Server
+   bei jedem Zugriff ([07-rechte.md](07-rechte.md)).
+4. **Terminal.** Eine echte Shell oder eine interaktive Claude-Code-Sitzung auf einem angebundenen
+   Rechner, in Desktop-App, Handy und Web-Konsole. Sicherheit ist eingebaut, nicht abschaltbar:
+   eigenes Recht je Rechner, Bestätigung bei jedem Öffnen, Ende-zu-Ende-verschlüsselter Strom,
+   Audit, Leerlauf-Abbruch ([24-terminal.md](24-terminal.md)).
+5. **Kosten.** Jeder Agent zeigt, worauf er läuft (persönliches Abo oder Organisations-Schlüssel),
+   und im Organisationsmodus, was ein Lauf, ein Thread, ein Bereich kostet
+   ([10-backend-richtlinie.md](10-backend-richtlinie.md)).
+6. **Statistik.** Eigene, native Visualisierungen in Apps und Konsole: Live-Topologie der Läufe,
+   Backend-Ansicht, Zustellung live, Executive-Seite, abspielbare Timeline, TV-Modus; für den
+   Betrieb dieselben Ansichten als Grafana-Panel-Plugin ([25-visualisierung.md](25-visualisierung.md)).
+7. **Eigene Instanz.** Eine Instanz gehört einer Organisation und läuft auf eigener Hardware oder in
+   der eigenen Cloud. Hermes Agent ist ein Agenten-Framework unter mehreren, nicht der Kern.
+8. **Schaufenster-Anspruch.** Was man sieht (Apps, Konsole, Grafana-Plugin, README, Doku-Site,
+   Release-Seiten), soll ein Mensch beim ersten Ansehen in einer Minute verstehen. Bilder und Video
+   entstehen aus einer Demo-Instanz mit erfundenen Daten (PLAN, Etappe M7).
 
 ## 2. Personas
 
@@ -28,17 +47,19 @@ Rechte-Art (Baseline Abschnitt 3).
 
 | Persona | Ziel | Typische Aufgaben | Geräte | Freigaben (Beispiel) |
 |---|---|---|---|---|
-| **Owner** (Alex) | Mit Agenten arbeiten und die Instanz inhaltlich führen | Chats mit Agenten in allen Bereichen, Freigaben vergeben, Agenten und Backend-Richtlinie einstellen, Kosten im Blick, Audit lesen | Desktop (Mac oder Windows), iPhone | Owner: alles außer fremden Direktnachrichten |
-| **Vertretung** (Sam) | Freigegebene Bereiche im Alltag bedienen | Agenten im Bereich Support auslösen, Rückfragen beantworten, Entwürfe prüfen; Freigaben von Aktionen nur, wenn das Zusatzrecht erteilt ist | iPhone, Android, Laptop | `trigger` auf Bereich Support, Zusatz `upload`; kein `approve_actions` |
-| **Entwicklerin** (Robin) | Mit einem Runner-Agenten an Code arbeiten | Beiträge in Dev-Foren, Werkzeugausgaben lesen, Läufe stoppen, Kosten und Kontext beobachten, Sitzungen fortsetzen | Desktop mit Tastatur | `trigger` auf einem Dev-Forum mit Projektbindung; Abschottung siehe [21-dev-isolation.md](21-dev-isolation.md) |
-| **Betreiberin einer Instanz** | Die Instanz installieren und am Laufen halten | Compose-Installation, Anmelde-Anbieter, Sicherung, Updates, Statusseite, Beobachtung | Web-Konsole, Kommandozeile | Owner oder eigene Person mit Owner-Rolle; nicht zu verwechseln mit dem Bediener-Agenten (`operator`) |
+| **Owner** (Alex) | Mit Agenten arbeiten und die Instanz inhaltlich führen | Chats mit Agenten in allen Bereichen, Freigaben vergeben, Agenten und Backend-Richtlinie einstellen, Kosten im Blick, Audit lesen; unterwegs vom iPhone ein Terminal auf dem eigenen Rechner öffnen; Live-Topologie und Executive-Seite | Desktop (Mac oder Windows), iPhone | Owner: alles außer fremden Direktnachrichten; Terminal auf jedem Rechner, außer I6 sperrt ([24-terminal.md](24-terminal.md), Abschnitt 7) |
+| **Vertretung** (Sam) | Freigegebene Bereiche im Alltag bedienen | Agenten im Bereich Support auslösen, Rückfragen beantworten, Entwürfe prüfen; Freigaben von Aktionen nur, wenn das Zusatzrecht erteilt ist | iPhone, Android, Laptop | `trigger` auf Bereich Support, Zusatz `upload`; kein `approve_actions`; kein Terminal |
+| **Entwicklerin** (Robin) | Mit einem Runner-Agenten an Code arbeiten | Beiträge in Dev-Foren, Werkzeugausgaben lesen, Läufe stoppen, Kosten und Kontext beobachten, Sitzungen fortsetzen; im Terminal auf dem eigenen Rechner `claude` interaktiv nutzen | Desktop mit Tastatur | `trigger` auf einem Dev-Forum mit Projektbindung; Freigabe `terminal` nur auf dem Rechner, dessen Inhaberin sie ist (SR10); Abschottung siehe [21-dev-isolation.md](21-dev-isolation.md) |
+| **Betreiberin einer Instanz** | Die Instanz installieren und am Laufen halten | Compose-Installation, Anmelde-Anbieter, Sicherung, Updates, Statusseite, Beobachtung; Rechner koppeln und LLM-Anmeldung erklären; Grafana mit dem Panel-Plugin; TV-Modus im Büro | Web-Konsole, Kommandozeile, Grafana | Owner oder eigene Person mit Owner-Rolle; nicht zu verwechseln mit dem Bediener-Agenten (`operator`) |
 | **Bot-Entwickler** | Einen Agenten oder eine App anbinden | Adapter oder App mit SDK bauen, Manifest schreiben, Token beim Owner anfordern, Webhooks testen | eigene Umgebung, Web-Konsole des Owners | App- oder Agenten-Prinzipal mit Scopes; höchstens `write` (R-DM-08) |
 
 ## 3. Funktionsliste
 
 Spalte "Etappe": **Kern** = Inhalt einer Bau-Etappe (Reihenfolge legt der Plan fest), **später** =
 gewollt, aber nach den Kern-Etappen, **nie** = bewusst ausgeschlossen, mit Grund. Spalte "Wo":
-D = Desktop (macOS, Windows), M = Mobil (iOS, Android), W = Web-Konsole.
+D = Desktop (macOS, Windows), M = Mobil (iOS, Android), W = Web-Konsole. Wo eine Funktion des
+Nachtrags vom 2026-10-10 in mehreren Etappen entsteht, nennt die Bemerkung die Bau-Etappen aus dem
+[Plan](../PLAN.md).
 
 ### 3.1 Struktur und Gespräche
 
@@ -131,7 +152,7 @@ D = Desktop (macOS, Windows), M = Mobil (iOS, Android), W = Web-Konsole.
 | Senden offline mit Warteschlange, Zustände sichtbar | Kern | D, M | | Abschnitt 6.6 |
 | Gelesen-Stand, Entwürfe, Einstellungen, Seitenleiste synchron | Kern | D, M | | |
 | Gerät freigeben, sperren; Sitzungen beenden | Kern | D, M, W | `device.approve`, `device.revoke`, `session.revoke` | neue Geräte warten |
-| Ende-zu-Ende-Verschlüsselung | nie | | | Agenten müssen lesen (Baseline 4) |
+| Ende-zu-Ende-Verschlüsselung von Chat-Inhalten | nie | | | Agenten müssen lesen (Baseline 4); der Terminal-Strom ist dagegen Ende-zu-Ende verschlüsselt (3.8) |
 | Chat im Browser | nie | | | Web nur für Konsole (ADR 0028) |
 
 ### 3.7 Verwaltung, Betrieb, Integration
@@ -145,11 +166,36 @@ D = Desktop (macOS, Windows), M = Mobil (iOS, Android), W = Web-Konsole.
 | Agenten: Backend-Schalter, Kosten, Tokens, Befehle | Kern | D, W | `agent.billing_mode.set`, `cost.read.aggregate`, `token.create` | |
 | Audit filtern, Kette prüfen | Kern | D, W | `audit.read`, `audit.verify` | |
 | Statistik | Kern | D, W | `stats.read` | |
+| Live-Topologie der Agenten-Läufe, Backend-Ansicht, Zustellung und Sync live, abspielbare Tages-Timeline | Kern | D, M, W | `stats.read`, `cost.read.aggregate` | eigene Messung, keine Werte je Person; [25-visualisierung.md](25-visualisierung.md); mobil Screen M10; Bau: Visualisierungs-Spur nach den frühen M4-Tickets gegen Fixtures, Server und Apps M6 |
+| Executive-Seite mit SLO-Ampel "eigene Messung" | Kern | D, M, W | `stats.read`, `cost.read.aggregate` | Ampel nur Owner; Bau M6 |
+| TV-Modus (Vollbild, dunkel, rotierende Ansichten) | Kern | D, W | `stats.read` | Kosten standardmäßig verborgen; Bau M6; Screen D13 |
+| Grafana-Panel-Plugin "Bothy Live" für den Betrieb | Kern | Grafana | keine (Rechte von Grafana) | Bau M7; unsigniert lokal bis V1, Signatur später |
+| Grafana-Dashboards in Apps einbetten | nie | | | nur optional in der Web-Konsole, Standard aus ([ADR 0069](../adr/0069-visualisierung-auf-zwei-ebenen-ohne-iframes-in-apps.md)) |
 | Statusseite | Kern | D, M, W | `status.read` | öffentlich nur mit `status.public_enabled` |
 | Import aus Discord | Kern | W | `import.manage` | [22-import-migration.md](22-import-migration.md) |
 | Apps installieren, Webhooks | Kern | W | `app.install`, `webhook_out.manage`, `webhook_in.create` | |
 | Notfall-Aktionen auf dem Telefon: Gerät sperren, Freigabe widerrufen, Person sperren, Lauf stoppen | Kern | M | `device.revoke`, `grant.revoke`, `user.disable`, `run.cancel` | große Abläufe (Freigabe anlegen, Audit, Statistik) nur Desktop und Web |
 | Marktplatz für Bots | nie | | | Apps installiert der Owner bewusst; kein Katalog fremder Anbieter |
+
+### 3.8 Terminal
+
+Normativ: [24-terminal.md](24-terminal.md). Bau: Server und Host-Dienst M2, Desktop M4, Mobil M5,
+Web-Konsole M6.
+
+| Funktion | Etappe | Wo | Aktion(en) | Bemerkung |
+|---|---|---|---|---|
+| Terminal öffnen: Login-Shell auf einem angebundenen Rechner (macOS, Linux, Windows) | Kern | D, M, W | `terminal.open` | frischer Step-up je Öffnung, in der Konsole nur Passkey ([ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)); Screens D11, M8 |
+| Claude-Code-Sitzung im Terminal (Profil `claude`) | Kern | D, M, W | `terminal.open` | interaktives `claude` im Arbeitsordner aus einer Erlaubnisliste, getrennt vom Runner; nur auf Rechnern mit erklärter LLM-Anmeldung (I6) |
+| Sitzungsliste je Rechner, Trennen und Wiederanhängen, auch von einem anderen Gerät | Kern | D, M, W | `terminal.read_own`, `terminal.attach` | die Sitzung läuft `terminal.detach_grace` weiter; anderes Gerät mit neuem Step-up |
+| Sitzung beenden | Kern | D, M, W | `terminal.close` | Owner beenden jede Sitzung |
+| Sondertasten-Leiste (Esc, Tab, Ctrl, Alt, Pfeile, `\|`, `~`, `/`, `-`) und Hardware-Tastatur | Kern | M | | Bau M5; Screen M8 |
+| Fingerabdruck des Rechners und Schlüssel-Pinning je Gerät mit harter Warnung bei Wechsel | Kern | D, M, W | | [24-terminal.md](24-terminal.md), Abschnitt 5.5 |
+| Rechner anlegen, koppeln, Fingerabdruck bestätigen, LLM-Anmeldung erklären, sperren, zurückziehen | Kern | D, W | `host.read`, `host.manage` | nur Owner, Step-up, Audit; Screen A8 |
+| Freigabe `terminal` je Rechner | Kern | D, W | `grant.create` | nur Owner; für Nicht-Owner wirkt sie nur auf dem Rechner, dessen Inhaber sie sind (SR10); die Vorschau sagt es |
+| Thread eines Runners im Terminal übernehmen | später | D | | erst wenn Runner und Host-Dienst in einer Dev-Umgebung als derselbe Benutzer laufen ([24-terminal.md](24-terminal.md), Abschnitt 11.3) |
+| Dateiübertragung und Zwischenablage über den Terminal-Kanal | später | D, M, W | | in dieser Fassung gesperrt (OSC 52, [24-terminal.md](24-terminal.md), Abschnitt 11.2) |
+| Aufzeichnung von Terminal-Inhalten | nie | | | nur Metadaten; ob Nachweispflichten eine Aufzeichnung verlangen, ist eine Owner-Frage (Voreinstellung: nein) |
+| Terminal für Agenten oder Apps | nie | | | ein Agent, den Prompt-Injection steuert, darf keinen Rechner erreichen (T-TM-09) |
 
 ## 4. Informationsarchitektur
 
@@ -160,6 +206,8 @@ Instanz (Branding, Statusseite)
 |   +-- Forum       -> Beitragsliste -> je Beitrag ein Thread (Tags, Erledigt-Bereich)
 +-- Direktnachrichten (später)
 +-- Querschnitt: Läuft gerade, Erwähnungen, Suche, Schnellwechsel, Einstellungen
++-- Rechner (Terminal): je Rechner Profile und eigene Sitzungen
++-- Live und Statistik: Live-Topologie, Executive-Seite, Timeline, TV-Modus
 +-- Verwaltung (Desktop und Web-Konsole; Notfall-Aktionen mobil)
 ```
 
@@ -400,6 +448,94 @@ erlaubt ist (Auslöser, `manage`, Owner).
 +----------------------------------------------------------------------------------------------------+
 ```
 
+**D11 Terminal.** Seitenleiste mit der Gruppe "Rechner" unter den Bereichen; rechts die
+Terminal-Ansicht mit einem Reiter je eigener Sitzung des Rechners. Der Kopf zeigt Rechner,
+Verbindung, Abzeichen der LLM-Anmeldung, den Anfang des Fingerabdrucks und die Restzeit bis
+`terminal.max_session_duration`. "Trennen" lässt die Sitzung laufen (wiederanhängbar), "Beenden"
+schließt sie. Öffnen verlangt die Bestätigung mit Passkey bzw. Step-up-Geräteschlüssel; der Dialog
+nennt Rechner und Profil. Alle Tasten gehen an die Shell, außer den Kürzeln aus Abschnitt 7.
+
+```text
++----------------------------+-------------------------------------------------------------------------------+
+| [^] Bothy                  | Build-Rechner  [online]  [Organisation]  Fp 7KQ2 9XTA ..  Rest 11:42  [i]     |
+| [Springen zu ...  Cmd+K]   | [shell 1 x] [claude: server x] [+ Neue Sitzung v]       [Trennen] [Beenden]   |
+| (o) Läuft gerade      (2)  +-------------------------------------------------------------------------------+
+|                            | ~/src/server $ go test ./internal/sync/...                                    |
+| > [H] Support              | ok      internal/sync           4.212s                                        |
+| v [<>] Engineering         | ok      internal/sync/gateway   1.874s                                        |
+|     = server         *     | ~/src/server $ git status --short                                             |
+|     # releases             |  M internal/sync/gateway.go                                                   |
+|                            | ~/src/server $ _                                                              |
+| v Rechner                  |                                                                               |
+|   (o) Build-Rechner  (2)   |                                                                               |
+|   ( ) Linux-VM             |                                                                               |
+|   (-) Test-Windows         |                                                                               |
+|       gesperrt             |                                                                               |
+|                            +-------------------------------------------------------------------------------+
+| (AL) Alex         [Einst.] | Ende-zu-Ende verschlüsselt | Profil shell | Leerlauf-Abbruch aktiv            |
++----------------------------+-------------------------------------------------------------------------------+
+```
+
+Bestätigung beim Öffnen und Warnung bei geändertem Schlüssel (24, Abschnitt 5.5):
+
+```text
++------------------------------------------------------------+  +------------------------------------------------------------+
+| Terminal öffnen                                            |  | [!] Schlüssel des Rechners hat sich geändert               |
++------------------------------------------------------------+  +------------------------------------------------------------+
+| Rechner   Build-Rechner                                    |  | Gespeichert:  7KQ2 9XTA M4PB 1C8D ...                      |
+| Profil    (x) shell   ( ) claude [Arbeitsordner: server v] |  | Jetzt:        Q0ZJ 55RW 2HNE K7TS ...                      |
+| Anmeldung [Organisation]  Kosten trägt die Organisation    |  | Ohne Neukopplung durch einen Owner ist das ein Hinweis auf |
+|                                                            |  | einen Angriff. Erst verbinden, wenn du den neuen           |
+| Jede Öffnung wird protokolliert.                           |  | Fingerabdruck am Rechner geprüft hast.                     |
+| [Abbrechen]              [Bestätigen mit Passkey / Gerät]  |  | [Nicht verbinden]           [Neuen Schlüssel annehmen]     |
++------------------------------------------------------------+  +------------------------------------------------------------+
+```
+
+**D12 Live-Topologie.** Bahnen je Bereich, Lauf-Karten mit Zustand, Werkzeug, Abzeichen und Kosten;
+Klick öffnet den Thread. Gleiche Daten als Tabelle über "Tabelle". Normativ:
+[25-visualisierung.md](25-visualisierung.md), Abschnitt 6.1.
+
+```text
++----------------------------+-------------------------------------------------------------------------------+
+| [^] Bothy                  | Live  [Topologie] [Backend] [Zustellung] [Executive] [Timeline]               |
+| (o) Läuft gerade      (3)  | Bereich [alle v]                    12:04:31  live   [Tabelle] [TV-Modus]     |
+| v Live und Statistik       +-------------------------------------------------------------------------------+
+|   > Live                   | Engineering | = server   +- dev-runner ------------------+                    |
+|     Statistik              |             |            | (o) running  4:12             |                    |
+|                            |             |            | [.. Bash] go test             |                    |
+| > [H] Support              |             |            | [Org.] 0,62 USD Schätzung     |                    |
+| v [<>] Engineering         |             |            +-------------------------------+                    |
+|     = server         *     |             | # releases  (keine aktiven Läufe)                               |
+| v Rechner                  | Support     | = anfragen +- support-agent ---------------+                    |
+|   (o) Build-Rechner  (2)   |             |            | [!] waiting_input             |                    |
+|                            |             |            | Freigabe wartet  [Persönlich] |                    |
+|                            |             |            +-------------------------------+                    |
+|                            +-------------------------------------------------------------------------------+
+|                            | Letzte Minute: Nachrichten 14 | Läufe 3 | Werkzeugaufrufe 41 | Fehler 0       |
++----------------------------+-------------------------------------------------------------------------------+
+```
+
+**D13 TV-Modus.** Vollbild, dunkles Theme, größere Schrift, keine Bedienelemente; rotiert alle
+`viz.tv_rotation_interval` durch die gewählten Ansichten. Kosten nur mit `viz.tv_show_costs`.
+Tastatur oder Klick beendet ihn. Desktop und Web-Konsole, nicht mobil.
+
+```text
++--------------------------------------------------------------------------------------------------------+
+|  BOTHY LIVE                        Live-Topologie  (1 von 3)                         12:04   [=  =  =] |
++--------------------------------------------------------------------------------------------------------+
+|                                                                                                        |
+|   ENGINEERING        server     [ (o) dev-runner    running   Bash      Organisation ]                 |
+|                      releases   [ (v) research-bot  completed 2 min                  ]                 |
+|                                                                                                        |
+|   SUPPORT            anfragen   [ [!] support-agent waiting_input   Freigabe wartet  ]                 |
+|                                                                                                        |
+|   RESEARCH           (keine aktiven Läufe)                                                             |
+|                                                                                                        |
++--------------------------------------------------------------------------------------------------------+
+|   Läufe aktiv 3      Werkzeugaufrufe/min 41      Zustellung im Ziel [ok]      eigene Messung           |
++--------------------------------------------------------------------------------------------------------+
+```
+
 ### 5.2 Verwaltung (Desktop und Web-Konsole)
 
 Jede ändernde Verwaltungsaktion mit Step-up zeigt vor dem Absenden die Bestätigung mit Passkey
@@ -536,6 +672,49 @@ aus dem Server; die Konsole zeigt dieselbe Ansicht in voller Breite.
 +----------------------------------------------------------------------------------------------------+
 ```
 
+**A8 Rechner.** Nur Owner. Rechner anlegen mit Name, optionalem Inhaber und Grund; einmaliger
+Kopplungs-Code mit Befehl für den Rechner; Bestätigung durch Eintippen der ersten
+`terminal.fingerprint_confirm_chars` Zeichen des Fingerabdrucks, den `bothy-host pair` dort zeigt;
+Pflichtfragen zur LLM-Anmeldung (I6) und zum Server-Host; Prüfergebnisse von `bothy-host doctor`;
+Sperren, Neukoppeln, Zurückziehen. Jede Änderung mit Step-up und Grund.
+
+```text
++------------------------+----------------------------------------------------------------------------+
+| Verwaltung             | Rechner > Build-Rechner                         [aktiv]   [Sperren v]      |
++------------------------+----------------------------------------------------------------------------+
+|   Personen             | Inhaber       (RO) Robin                                   [Ändern]        |
+|   Gruppen              | Plattform     macOS, Host-Dienst 1.2.0          verbunden seit 07:58       |
+|   Freigaben            | Fingerabdruck 7KQ2 9XTA M4PB 1C8D ...   Schlüssel-Generation 2             |
+|   Geräte               | LLM-Anmeldung (x) Organisation  ( ) Persönlich von [Person v]  ( ) Keine   |
+|   Agenten              |               Persönlich: nur diese Person darf hier ein Terminal öffnen   |
+| > Rechner (3)          |               (I6), auch andere Owner nicht.                               |
+|   Apps                 | Server-Host   ( ) ja  (x) nein   Meldung des Host-Dienstes: nein           |
+|   Audit                | Prüfungen     HD1 ok  HD2 ok  HD3 ok  HD4 ok  HD5 ok  HD6 ok  HD7 Warnung  |
+|   Statistik            | Profile       shell, claude (Arbeitsordner: server, apps)                  |
+|   Instanz              | Freigaben     (RO) Robin  terminal   wirkt (Inhaberin)                     |
+|                        |               (SA) Sam    terminal   wirkt nicht: nicht Inhaber (SR10)     |
+|                        | [Neu koppeln]  [Sitzungen (2)]  [Zurückziehen]                             |
++------------------------+----------------------------------------------------------------------------+
+```
+
+Kopplung eines neuen Rechners:
+
+```text
++----------------------------------------------------------------------------------------------+
+| Rechner koppeln                                                          Schritt 2 von 3     |
++----------------------------------------------------------------------------------------------+
+| Auf dem Rechner als Benutzer des Host-Dienstes ausführen (Code einmalig, läuft bald ab):     |
+|   bothy-host pair --server https://chat.example.com --code bothy_hpc_EXAMPLE...              |
+| [Kopieren]                                                       Gültig noch 14:12           |
++----------------------------------------------------------------------------------------------+
+| Schritt 3: Fingerabdruck vom Rechner abtippen (erste Zeichen) [7KQ2 9XTA]                    |
+|            LLM-Anmeldung auf diesem Rechner  ( ) Keine  ( ) Persönlich  ( ) Organisation     |
+|            Läuft der Server auf diesem Rechner?  ( ) ja  ( ) nein                            |
++----------------------------------------------------------------------------------------------+
+| [Zurück]                                         [Bestätigen mit Passkey / Gerät]            |
++----------------------------------------------------------------------------------------------+
+```
+
 ### 5.3 iPhone
 
 Navigationsstapel: Bereiche -> Kanal oder Beitragsliste -> Verlauf. Zurück per Wischen vom Rand.
@@ -667,10 +846,91 @@ Grund und Knöpfen; nichts wird still verworfen.
 +--------------------------------------+
 ```
 
+**M8 Terminal mit Sondertasten-Leiste.** Vollbild-Ansicht einer Sitzung. Über der System-Tastatur
+liegt die Sondertasten-Leiste: Esc, Tab, Ctrl, Alt, Pfeile, `|`, `~`, `/`, `-`. Ctrl und Alt
+wirken einmal für die nächste Taste; zweimal tippen hält sie bis zum nächsten Tippen (Anzeige
+gefüllt). Mit Hardware-Tastatur blendet die App die Leiste aus. Wischen mit zwei Fingern blättert
+im Rückblick; langes Drücken markiert Text zum Kopieren. Geht die App in den Hintergrund, trennt sie
+die Sitzung (sie läuft auf dem Rechner weiter) und verdeckt die Ansicht im App-Umschalter; zurück
+in der App hängt sie innerhalb von `terminal.quick_reattach_window` ohne neue Bestätigung wieder an,
+danach mit Face ID bzw. Fingerabdruck.
+
+```text
++--------------------------------------+
+| < Rechner   Build-Rechner   [Org.]   |
+| shell 1  v   Rest 11:42   [Trennen]  |
++--------------------------------------+
+| ~/src/server $ git status            |
+| On branch main                       |
+| nothing to commit, working tree clean|
+| ~/src/server $ tail -f run.log       |
+| 12:04:31 sync: resume ok             |
+| 12:04:32 sync: catch-up 14 events    |
+| _                                    |
++--------------------------------------+
+| [Esc][Tab][Ctrl][Alt] [<][^][v][>]   |
+| [ | ] [ ~ ] [ / ] [ - ]     [Tastat.]|
++--------------------------------------+
+|  q  w  e  r  t  z  u  i  o  p        |
+|   a  s  d  f  g  h  j  k  l          |
+|  [^]  y  x  c  v  b  n  m  [<-]      |
+|  [123]   [  Leerzeichen  ]  [Enter]  |
++--------------------------------------+
+```
+
+**M9 Rechner und Sitzungen.** Liste der Rechner, die die Person sehen darf, mit Verbindung,
+Abzeichen der LLM-Anmeldung und eigenen Sitzungen; Antippen einer Sitzung hängt an.
+
+```text
++--------------------------------------+
+| < Ich        Rechner                 |
++--------------------------------------+
+| (o) Build-Rechner        [Org.]      |
+|     shell 1     getrennt  vor 3 min  |
+|     claude: server   aktiv           |
+|     [+ Neue Sitzung]                 |
+| ( ) Linux-VM             [Keine]     |
+|     offline seit 08:12               |
++--------------------------------------+
+| Fingerabdruck und Anmeldung: [i]     |
++--------------------------------------+
+```
+
+**M10 Live.** Dieselben Ansichten wie D12 aus `bothy_viz` in Dichte `touch`, je Ansicht ein Reiter:
+Topologie, Backend, Zustellung, Executive, Timeline. Die Topologie stapelt die Bahnen untereinander;
+Antippen einer Lauf-Karte öffnet den Thread. Jede Ansicht hat die Tabellenansicht. Der Live-Strom
+läuft nur im Vordergrund. Kein TV-Modus. Normativ: [25-visualisierung.md](25-visualisierung.md),
+Abschnitt 6.
+
+```text
++--------------------------------------+
+| < Ich   Live      12:04:31   live    |
+| [Topo][Backend][Zustell.][Exec][Zeit]|
++--------------------------------------+
+| Engineering                          |
+|  = server                            |
+|   +- dev-runner -------------------+ |
+|   | (o) running 4:12   [.. Bash]   | |
+|   | [Org.] 0,62 USD Schätzung      | |
+|   +--------------------------------+ |
+| Support                              |
+|  = anfragen                          |
+|   +- support-agent ----------------+ |
+|   | [!] waiting_input              | |
+|   | Freigabe wartet  [Persönlich]  | |
+|   +--------------------------------+ |
++--------------------------------------+
+| Letzte Minute: Läufe 3 | Fehler 0    |
+| [Tabelle]                            |
++--------------------------------------+
+```
+
 ### 5.4 Android
 
 Gleiche Screens wie iPhone, mit Android-Bedienung: System-Zurück, obere App-Leiste,
-Mitteilungskanäle des Systems, Teilen über das System-Teilen-Blatt in dieselbe Ziel-Auswahl.
+Mitteilungskanäle des Systems, Teilen über das System-Teilen-Blatt in dieselbe Ziel-Auswahl. Im
+Terminal (M8) trennt System-Zurück die Sitzung, statt sie zu beenden; die Sondertasten-Leiste ist
+dieselbe.
 
 ```text
 +--------------------------------------+
@@ -688,20 +948,24 @@ Mitteilungskanäle des Systems, Teilen über das System-Teilen-Blatt in dieselbe
 +--------------------------------------+
 ```
 
-### 5.5 Web-Konsole (nur Verwaltung und Statistik)
+### 5.5 Web-Konsole (Verwaltung, Statistik und Terminal)
 
-Gleiche Verwaltungs-Screens wie A1 bis A7, Navigation links. Kein Chat (ADR 0028); Links auf
-Threads öffnen die App per Deep Link.
+Gleiche Verwaltungs-Screens wie A1 bis A8, die Ansichten aus D12 und D13 und das Terminal aus D11,
+Navigation links. Kein Chat (ADR 0028); Links auf Threads öffnen die App per Deep Link. Das Terminal
+öffnet nur nach Bestätigung mit einem Passkey mit Nutzerprüfung; andere Step-up-Wege der Konsole
+gelten dafür nicht ([ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)).
 
 ```text
 +--------------------------+------------------------------------------------------------------------+
 | [^] Bothy Konsole        | Statistik                     Angemeldet: Alex (Passkey)               |
 +--------------------------+------------------------------------------------------------------------+
-| > Statistik              | (wie Desktop-Statistik, volle Breite)                                  |
-|   Personen               |                                                                        |
-|   Gruppen, Freigaben     | Kein Chat im Browser. Links in Threads öffnen die App:                 |
-|   Geräte                 | [In der App öffnen]  (Deep Link)                                       |
-|   Agenten, Kosten        |                                                                        |
+|   Live                   | (wie Desktop-Statistik, volle Breite)                                  |
+| > Statistik              |                                                                        |
+|   Rechner und Terminal   | Kein Chat im Browser. Links in Threads öffnen die App:                 |
+|   Personen               | [In der App öffnen]  (Deep Link)                                       |
+|   Gruppen, Freigaben     |                                                                        |
+|   Geräte                 | Terminal: Öffnen nur mit Passkey; gepinnte Rechner-Schlüssel liegen    |
+|   Agenten, Kosten        | im Speicher dieses Browsers und werden beim Abmelden gelöscht.         |
 |   Apps, Webhooks         |                                                                        |
 |   Audit                  |                                                                        |
 |   Import                 |                                                                        |
@@ -812,6 +1076,22 @@ Win-Taste). Es gibt kein Kürzel, das eine Freigabe auslöst.
 | Erwähnungen | Cmd+Shift+M | Strg+Shift+M |
 | Einstellungen | Cmd+, | Strg+, |
 | Liste der Kürzel | Cmd+/ | Strg+/ |
+| Rechner und Terminal öffnen | Cmd+Shift+T | Strg+Shift+T |
+
+**Im Terminal** gehen alle Tasten an die Shell, auch Strg-Kombinationen wie Strg+C, Strg+D und
+Strg+K. Kürzel der App wirken dort nur mit dem Modifikator der Plattform: auf macOS mit Cmd, auf
+Windows mit Strg+Shift. Grund: Shells und Coding-Agenten belegen Strg und Alt selbst; ein Kürzel der
+App darf keine Eingabe verschlucken (R-PR-10).
+
+| Aktion im Terminal | macOS | Windows |
+|---|---|---|
+| Kopieren / Einfügen | Cmd+C / Cmd+V | Strg+Shift+C / Strg+Shift+V |
+| Schnellwechsel | Cmd+K | Strg+Shift+K |
+| Neue Sitzung auf diesem Rechner | Cmd+T | Strg+Shift+N |
+| Nächste bzw. vorherige Sitzung | Cmd+Shift+] / [ | Strg+Shift+Pfeil rechts / links |
+| Sitzung trennen (läuft weiter) | Cmd+Shift+D | Strg+Shift+D |
+| Im Rückblick suchen | Cmd+F | Strg+Shift+F |
+| Schrift größer / kleiner | Cmd+Plus / Cmd+Minus | Strg+Shift+Plus / Strg+Shift+Minus |
 
 ## 8. Barrierefreiheit
 
@@ -829,6 +1109,8 @@ Konsole, geprüft durch Tests, nicht durch Absicht.
 | Bewegung | Systemeinstellung "Bewegung reduzieren" und eigene Einstellung schalten auf `motion.reduced` | Golden-Test im Kontext `reduced` |
 | Farbe | Zustände nie nur über Farbe; Icons unterscheiden sich in der Form | Review-Liste in components.md |
 | Sprache | Sprache der App im Semantik-Baum gesetzt; Agenten-Text ohne Sprachangabe wird nicht umgeschaltet | |
+| Terminal | Die Zeile am Cursor und auf Befehl der sichtbare Bildschirm sind für Screenreader lesbar; laufende Ausgabe wird nicht vorgelesen; Sondertasten-Leiste mit Labels; Schriftgröße folgt der Systemeinstellung und ist im Terminal getrennt einstellbar. Wie weit der Renderer `xterm` Semantik liefert, ist nicht belegt [vermutet: wenig]; das Bau-Ticket prüft es und ergänzt eine eigene Semantik-Schicht | Widget-Test der Semantik; Prüfliste mit VoiceOver, TalkBack, Narrator |
+| Visualisierungen | Jede Ansicht hat eine Tabellenansicht mit denselben Werten; Zustände mit Icon und Text ([25-visualisierung.md](25-visualisierung.md), Abschnitt 7.4) | Golden- und Widget-Tests von `bothy_viz` |
 
 Bekanntes Risiko: Die Barrierefreiheit von Flutter auf macOS war laut einer internen Vorstudie im
 Umbau [vermutet, nicht selbst geprüft]; sie wird vor der ersten macOS-Auslieferung mit VoiceOver
@@ -864,6 +1146,17 @@ geprüft (Ticket in 15-client-architektur.md).
 | Aktionen freigeben | Approve actions | `approve_actions` |
 | Persönlich, Organisation | Personal, Organization | `personal`, `organization` |
 | Schätzung | Estimate | `cost_is_estimate` |
+| Rechner | Host | `host` |
+| Host-Dienst | Host service | `bothy-host` |
+| Kopplung, Kopplungs-Code | Pairing, pairing code | `host.pair` |
+| Fingerabdruck | Fingerprint | `key_fingerprint` |
+| Terminal-Sitzung | Terminal session | `terminal_session` |
+| Trennen, Wiederanhängen | Detach, reattach | `detached`, `terminal.attach` |
+| Sondertasten-Leiste | Extra keys bar | |
+| LLM-Anmeldung | LLM login | `llm_credentials` |
+| Live-Topologie | Live topology | |
+| TV-Modus | TV mode | |
+| Eigene Messung | Own measurement | `stats_minutes` |
 
 ## 10. Benachrichtigungen
 
@@ -960,6 +1253,10 @@ Regeln:
 | R-PR-07 | Mobil gibt es Notfall-Aktionen der Verwaltung, nicht die ganze Verwaltung. | Kleine Bildschirme für komplexe Rechte sind fehleranfällig; Sperren muss aber unterwegs gehen. |
 | R-PR-08 | Akzent je Instanz nur aus der geprüften Palette. | Kontrast AA ist ein Test, keine Hoffnung. |
 | R-PR-09 | Link-Vorschau im Client nur später und nur mit Opt-in. | Der Server lädt keine fremden URLs; der Client würde fremde Server kontaktieren. |
+| R-PR-10 | Im Terminal gehen alle Tasten an die Shell; Kürzel der App nur mit Cmd (macOS) bzw. Strg+Shift (Windows). | Shells und Coding-Agenten belegen Strg und Alt; ein verschlucktes Strg+C wäre ein Bedienfehler mit Folgen. |
+| R-PR-11 | Mobil eine Sondertasten-Leiste mit einmal wirkenden Modifikatoren statt einer eigenen Tastatur. | Die System-Tastatur bleibt (Diktat, Sprachen, Barrierefreiheit); es fehlen nur die Tasten, die eine Shell braucht. |
+| R-PR-12 | Die App trennt das Terminal beim Wechsel in den Hintergrund und verdeckt es im App-Umschalter. | Mobile Systeme beenden Verbindungen im Hintergrund ohnehin; das Bild im App-Umschalter würde Terminal-Inhalte zeigen. |
+| R-PR-13 | Produktbeschreibung "Kommandozentrale für KI-Agenten in Chat-Form" mit sechs Säulen (Chat, Live-Ansicht, Freigaben, Terminal, Kosten, Statistik). | Vorgabe des Owners (Nachtrag vom 2026-10-10); sie bestimmt Startseite, Doku und Schaufenster. |
 
 ## 14. Konfigurationswerte dieses Kapitels
 

@@ -119,24 +119,31 @@ Paths are relative to `services/server/`.
   `(user_id) WHERE removed_at IS NULL`; index `(expires_at) WHERE removed_at IS NULL AND
   expires_at IS NOT NULL`.
 - `grants`: the checks of 03, written as named constraints:
-  `grants_subject_kind_check`, `grants_target_kind_check`, `grants_level_check`,
+  `grants_subject_kind_check`, `grants_target_kind_check` (`instance`, `space`, `channel`,
+  `host`), `grants_level_check` (`level` is nullable: NULL exactly for `target_kind = 'host'`,
+  check `(target_kind = 'host') = (level IS NULL)`),
   `grants_capabilities_check` (`capabilities <@ ARRAY['approve_actions','upload','export',
-  'manage']::text[]`), `grants_subject_shape_check` (exactly one of `subject_principal_id`,
-  `subject_group_id`, matching `subject_kind`), `grants_target_shape_check` (`target_space_id`
-  set exactly for `space`, `target_channel_id` set exactly for `channel`, both null for
-  `instance`), `grants_bot_limits_check` (`subject_kind NOT IN ('agent','app') OR (level <>
-  'trigger' AND capabilities <@ ARRAY['upload']::text[])`); `capabilities text[] NOT NULL
-  DEFAULT '{}'`; `reason text NOT NULL`; FKs `subject_principal_id`, `granted_by`,
-  `revoked_by -> principals(id)`, `subject_group_id -> groups(id)`, all ON DELETE RESTRICT; the
-  five partial indexes of 03 (`subject_principal_id`, `subject_group_id`, `target_space_id`,
-  `target_channel_id` each `WHERE revoked_at IS NULL`, and `(expires_at) WHERE revoked_at IS
-  NULL AND expires_at IS NOT NULL`). No unique constraint (03).
+  'manage','terminal']::text[]`), `grants_subject_shape_check` (exactly one of
+  `subject_principal_id`, `subject_group_id`, matching `subject_kind`), `grants_target_shape_check`
+  (`target_space_id` set exactly for `space`, `target_channel_id` set exactly for `channel`,
+  `target_host_id` set exactly for `host`, all null for `instance`), `grants_bot_limits_check`
+  (`subject_kind NOT IN ('agent','app') OR (level <> 'trigger' AND capabilities <@
+  ARRAY['upload']::text[])`), `grants_host_shape_check` (`target_kind <> 'host' OR (capabilities =
+  ARRAY['terminal'] AND subject_kind IN ('user','group'))`) and `grants_terminal_only_on_host_check`
+  (`target_kind = 'host' OR NOT ('terminal' = ANY(capabilities))`) (03 R-DM-35);
+  `capabilities text[] NOT NULL DEFAULT '{}'`; `reason text NOT NULL`; FKs
+  `subject_principal_id`, `granted_by`, `revoked_by -> principals(id)`, `subject_group_id ->
+  groups(id)`, all ON DELETE RESTRICT; the six partial indexes of 03 (`subject_principal_id`,
+  `subject_group_id`, `target_space_id`, `target_channel_id`, `target_host_id` each `WHERE
+  revoked_at IS NULL`, and `(expires_at) WHERE revoked_at IS NULL AND expires_at IS NOT NULL`). No
+  unique constraint (03).
 
-**Deferred target foreign keys.** `spaces` and `channels` do not exist before M1-52 and M1-53.
-Create `target_space_id` and `target_channel_id` as plain `uuid` columns. The migration carries a
-comment that names M1-52 (`grants.target_space_id -> spaces(id) ON DELETE RESTRICT`) and M1-53
-(`grants.target_channel_id -> channels(id) ON DELETE RESTRICT`); the README repeats it. Until then
-no code path creates space or channel grants, because no space or channel exists.
+**Deferred target foreign keys.** `spaces` and `channels` do not exist before M1-52 and M1-53,
+`hosts` not before M2-39. Create `target_space_id`, `target_channel_id` and `target_host_id` as
+plain `uuid` columns. The migration carries a comment that names M1-52 (`grants.target_space_id ->
+spaces(id) ON DELETE RESTRICT`), M1-53 (`grants.target_channel_id -> channels(id) ON DELETE
+RESTRICT`) and M2-39 (`grants.target_host_id -> hosts(id) ON DELETE RESTRICT`); the README repeats
+it. Until then no code path creates space, channel or host grants, because no such target exists.
 
 **Immutability trigger** `authz_grants_immutable` (BEFORE UPDATE ON grants, SQLSTATE `23514`):
 allowed are only (a) setting `revoked_at`, `revoked_by` and `revoke_reason` when `OLD.revoked_at
@@ -161,7 +168,7 @@ func (l Level) String() string
 func MaxLevel(a, b Level) Level
 func MinLevel(a, b Level) Level
 
-type Capability uint8 // CapApproveActions, CapUpload, CapExport, CapManage
+type Capability uint8 // CapApproveActions, CapUpload, CapExport, CapManage, CapTerminal
 type Caps uint8       // bit set
 func ParseCaps(names []string) (Caps, error)       // rejects unknown names; duplicates collapse
 func (c Caps) Has(x Capability) bool
@@ -171,9 +178,9 @@ func (c Caps) SubsetOf(o Caps) bool
 func (c Caps) Names() []string                      // sorted, for the text[] column
 
 type SubjectKind string // "user", "group", "agent", "app"
-type TargetKind  string // "instance", "space", "channel"
+type TargetKind  string // "instance", "space", "channel", "host"
 type Subject struct { Kind SubjectKind; PrincipalID, GroupID ids.ID }
-type Target  struct { Kind TargetKind;  SpaceID, ChannelID ids.ID }
+type Target  struct { Kind TargetKind;  SpaceID, ChannelID, HostID ids.ID }
 
 type Grant struct {
     ID ids.ID; Subject Subject; Target Target; Level Level; Caps Caps
@@ -185,8 +192,9 @@ type Grant struct {
 }
 func NewGrant(id ids.ID, s Subject, tg Target, l Level, c Caps, expiresAt time.Time,
     reason string, by ids.ID, at time.Time) (Grant, error)
-// NewGrant checks shape (subject and target ids match their kinds), level not None, a
-// non-blank reason and expiresAt zero or after at. Errors: kernel/errs bad_request
+// NewGrant checks shape (subject and target ids match their kinds), level not None except on a
+// host target, where level is None and caps are exactly {terminal} for user or group subjects
+// (03 R-DM-35), terminal only on a host target, a non-blank reason and expiresAt zero or after at. Errors: kernel/errs bad_request
 // validation_failed with a field (/subject, /target, /level, /expires_at, /reason).
 // It does not judge the bot limits (agent and app subjects: level at most write, caps
 // subset of {upload}): CheckCreate decides them with reason subject_kind_not_allowed, and
@@ -226,7 +234,8 @@ Order of checks in `CheckCreate`, first failing rule wins:
 1. subject `agent` or `app` with level `trigger` or capabilities beyond `upload`:
    `subject_kind_not_allowed` (applies to owners too; AZ-M31).
 2. not owner and subject `agent` or `app`: `subject_kind_not_allowed`.
-3. not owner and target `instance`: `owner_only`.
+3. not owner and target `instance` or `host`: `owner_only` (05 `grant.create`: on a host only
+   owners).
 4. not owner and `g.Level > d.Level`: `delegation_exceeds_own_level`.
 5. not owner and `g.Caps` not a subset of `d.Caps`: `delegation_exceeds_own_capabilities`.
 
@@ -291,7 +300,9 @@ adapters.
    - migration applies after the identity migration and a second `up` changes nothing;
    - `TestGrantChecks`: agent with `trigger`, app with `manage`, agent with `upload` (passes),
      unknown capability, user grant with group id set, space target without space id, instance
-     target with channel id: each rejected or accepted as 03 says;
+     target with channel id, host target with a level, host target with `upload`, `terminal` on a
+     space, host grant to an agent: each rejected or accepted as 03 says (the host rows use a
+     random `target_host_id`, the foreign key comes with M2-39);
    - `TestGrantImmutable`: update of level fails; revocation once passes; second revocation
      fails; reminder once passes, twice fails;
    - `TestGroupMembersArePeople`: membership for an agent principal fails (no `users` row);
