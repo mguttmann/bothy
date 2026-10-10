@@ -134,10 +134,19 @@ Eine angehängte Datei folgt immer ihrer Nachricht, auch nach dem Verschieben de
   ([08-identitaet.md](08-identitaet.md), Abschnitt 6). Sonst `401 step_up_required`.
   Step-up-Aktionen können nur Menschen ausführen; Agenten- und App-Tokens und persönliche Tokens
   werden abgelehnt (R-AZ-03).
+- **Step-up** `bedingt`: wie `ja`, sobald die Person schon Anmeldedaten der Art hat, die die Aktion
+  einrichtet (die Beschreibung nennt die Bedingung); die erste Einrichtung braucht nur die Sitzung
+  eines Menschen. Grund: Die erste Einrichtung muss ohne vorhandene Anmeldedaten gehen, und eine
+  gestohlene Sitzung gewinnt damit nur einen Anmeldeweg, dessen neue Geräte `pending` bleiben
+  ([08-identitaet.md](08-identitaet.md), Abschnitt 5).
 - **Audit** `ja`: Erlaubnis und Ablehnung kommen ins Audit-Log. `abl`: nur Ablehnungen. Jede
-  Ablehnung jeder Aktion wird geprüft protokolliert; gleiche Ablehnungen desselben Prinzipals
-  für dieselbe Aktion werden je `audit.deny_aggregate_window` zu einem Eintrag mit Zähler
-  zusammengefasst (R-AZ-04).
+  Ablehnung jeder Aktion wird geprüft protokolliert; gleiche Ablehnungen (gleicher Prinzipal bzw.
+  ohne Anmeldung gleiches IP-Pseudonym, gleiche Aktion, gleicher Grund) werden je
+  `audit.deny_aggregate_window` zu einem Eintrag mit Zähler zusammengefasst (R-AZ-04). Weil die
+  Kette nur anhängt, sammelt jeder Prozess die Ablehnungen im Speicher und schreibt je Schlüssel
+  eine Zeile am Ende des Fensters, beim Herunterfahren oder sobald `audit.deny_aggregate_max_keys`
+  Schlüssel offen sind (dann die älteste). Ein harter Absturz verliert höchstens die offenen
+  Zusammenfassungen eines Fensters ([19-sicherheit.md](19-sicherheit.md), Abschnitt 12).
 - **Rechte** `ja`: siehe Regel 1.7.
 
 ### 2.5 Entscheidung
@@ -191,8 +200,8 @@ Abschnitt 10.
 
 | Klasse | Schlüssel | Zweck |
 |---|---|---|
-| `rl.public_auth` | Client-IP | Anmeldung, Refresh, öffentliche Endpunkte |
-| `rl.gateway_connect` | Gerät bzw. Token | WebSocket-Verbindungsaufbau |
+| `rl.public_auth` | Client-IP (IPv6: das /64-Präfix) | Anmeldung, Refresh, öffentliche Endpunkte; zählt zusätzlich jede gescheiterte Prüfung vorgelegter Anmeldedaten ([02-architektur.md](02-architektur.md), Abschnitt 9.1) |
+| `rl.gateway_connect` | Gerät bzw. Token, geprüft bei `identify` und `resume`, sobald Anmeldedaten geprüft sind | WebSocket-Sitzung aufbauen |
 | `rl.read` | Prinzipal | lesende Abfragen |
 | `rl.write` | Prinzipal | allgemeine Schreibvorgänge |
 | `rl.message` | Prinzipal | Nachrichten senden und bearbeiten |
@@ -208,6 +217,12 @@ Abschnitt 10.
 | `rl.import` | Prinzipal | Stapel eines laufenden Imports (`import.apply`) |
 
 Systemaktionen und die internen Zustellprüfungen haben keine Klasse (`keine`).
+
+Gründe der Schlüssel: IPv6-Clients bekommen meist ein ganzes /64-Präfix; je Adresse gezählt, könnte
+ein Client durch Adresswechsel beliebig viele Eimer füllen. `rl.gateway_connect` zählt nach der
+Prüfung der Anmeldedaten, damit niemand den Eimer eines fremden Geräts leeren kann; vor `identify`
+begrenzt `sync.identify_timeout` eine offene Verbindung ([04-sync-protokoll.md](04-sync-protokoll.md),
+Abschnitt 6.3).
 
 ## 4. Aktionen
 
@@ -234,7 +249,8 @@ Systemaktionen und die internen Zustellprüfungen haben keine Klasse (`keine`).
 | `instance.bootstrap` | erster Owner per Server-Befehl auf dem Host ([08-identitaet.md](08-identitaet.md), Abschnitt 4) | instance | system | nein | nein | ja | ja | keine |
 | `feature_flag.read` | alle Schalter mit Regeln lesen | instance | owner | ja | nein | nein | nein | `rl.read` |
 | `feature_flag.update` | Schalter ändern | instance | owner | ja | ja | ja | nein | `rl.admin` |
-| `signing_key.rotate` | Server-Schlüssel wechseln | instance | owner | ja | ja | ja | nein | `rl.admin` |
+| `signing_key.rotate` | Server-Schlüssel wechseln: `mode = scheduled` (nächsten Schlüssel ankündigen) oder `mode = emergency` (alle Schlüssel des Zwecks sofort `retired`) | instance | owner | ja | ja | ja | nein | `rl.admin` |
+| `signing_key.transition` | planmäßiger Zustandswechsel eines Signierschlüssels durch den Job `instance.key_rotation` (`next` anlegen, `active` machen, `retired` setzen) | instance | system | nein | nein | ja | nein | keine |
 | `identity_provider.read` | Anmelde-Treiber lesen | instance | owner | ja | nein | nein | nein | `rl.read` |
 | `identity_provider.manage` | Anmelde-Treiber anlegen, ändern, abschalten | instance | owner | ja | ja | ja | nein | `rl.admin` |
 | `owner.add` | Menschen zum Owner machen; optional mit `resolve_i1` (Regel 1.6) | user | owner | ja | ja | ja | ja | `rl.admin` |
@@ -260,8 +276,8 @@ Systemaktionen und die internen Zustellprüfungen haben keine Klasse (`keine`).
 | `identity.read` | Identitäten, Passkeys und lokale Anmeldedaten eines Menschen lesen, ohne Geheimnisse | user | self oder owner | nein | nein | nein | nein | `rl.read` |
 | `identity.link` | weitere Identität verknüpfen | user | self | nein | ja | ja | nein | `rl.admin` |
 | `identity.unlink` | Identität lösen; abgelehnt, wenn kein Anmeldeweg bleibt | user | self oder owner | nein | ja | ja | nein | `rl.admin` |
-| `local_credential.set` | lokales Passwort setzen und TOTP einrichten; Step-up, sobald schon Anmeldedaten bestehen | user | self | nein | ja | ja | nein | `rl.admin` |
-| `passkey.register` | Passkey hinzufügen; Step-up, wenn schon einer existiert | user | self | nein | ja | ja | nein | `rl.admin` |
+| `local_credential.set` | lokales Passwort setzen und TOTP einrichten; Step-up, sobald ein Passwortweg mit TOTP eingerichtet ist | user | self | nein | bedingt | ja | nein | `rl.admin` |
+| `passkey.register` | Passkey hinzufügen; Step-up, sobald ein aktiver Passkey existiert | user | self | nein | bedingt | ja | nein | `rl.admin` |
 | `passkey.revoke` | Passkey widerrufen | passkey | self oder owner | nein | ja | ja | nein | `rl.admin` |
 | `device.list` | Geräte lesen; ein wartendes Gerät liest sich selbst | user, device | self oder owner | nein | nein | nein | nein | `rl.read` |
 | `device.approve` | wartendes Gerät freigeben; eigenes Gerät von einem aktiven eigenen Gerät aus, mit Bestätigungs-Code oder Kopplungs-Code ([08-identitaet.md](08-identitaet.md), Abschnitt 5.3) | device | owner oder self | nein | ja | ja | ja | `rl.admin` |
@@ -642,7 +658,7 @@ Ausgehende Webhooks und Push nutzen dieselbe Empfangs-Aktion (`webhook_out.deliv
 | R-AZ-12 | Schreibschutz eines Kanals sperrt alle `write`- und `trigger`-Aktionen für alle Prinzipale, auch Owner; nur `import.apply` schreibt. | Ein Lese-Spiegel hat genau einen führenden Ort; im Spiegel darf kein Agent ausgelöst werden. Freigaben können Owner nicht beschränken. |
 | R-AZ-13 | Bediener-Regel: Der wirksame Bediener hat implizit `write`; `space.operator.set` und `channel.operator.set` verlangen keine eigene Freigabe des Agenten. | Folgt dem Bediener ohne zweite, leicht vergessene Freigabe; beim Wechsel bleibt kein Rest. Ersetzt den Vorschlag, beim Setzen eine Freigabe zu verlangen. |
 | R-AZ-14 | Owner-Rechte nur in einer Sitzung, nie über ein persönliches API-Token. | Ein gestohlenes Token ohne Gerätebindung darf nie die ganze Instanz öffnen. |
-| R-AZ-15 | Abläufe und die Erstinstallation sind Systemaktionen im Katalog (`grant.expire`, `group.member.expire`, `instance.bootstrap`). | Jeder Audit-Eintrag nennt eine bekannte Aktion; Abläufe erreichen Clients und Läufe über `access.changed`. |
+| R-AZ-15 | Abläufe, die Erstinstallation und planmäßige Schlüsselwechsel sind Systemaktionen im Katalog (`grant.expire`, `group.member.expire`, `instance.bootstrap`, `signing_key.transition`). | Jeder Audit-Eintrag nennt eine bekannte Aktion; Abläufe erreichen Clients und Läufe über `access.changed`; Schlüsselwechsel sind sicherheitsrelevant und gehören ins Audit. |
 | R-AZ-16 | Ein wartendes Gerät bekommt Tokens, darf aber nur sich selbst lesen (`403 device_pending`). | Die App kann ohne neue Anmeldung auf die Freigabe warten; Inhalte erreicht sie erst danach. |
 | R-AZ-17 | `resolve_i1` führt "erst umstellen, dann freigeben" in einer Transaktion aus, mit beiden Prüfungen. | Der geführte Ablauf der Konsole braucht kein Zwischenstadium, in dem I1 verletzt wäre. |
 | R-AZ-18 | App-Befehle und App-Komponenten ohne `agent.invoke` und I2. | Keine Agenten-Laufzeit, kein Abo; Grenze sind Freigaben, Scope und `required_level`. |
@@ -671,6 +687,7 @@ Ausgehende Webhooks und Push nutzen dieselbe Empfangs-Aktion (`webhook_out.deliv
 | Name | Standard | Bedeutung |
 |---|---|---|
 | `audit.deny_aggregate_window` | `60s` | Zusammenfassungsfenster für gleiche Ablehnungen |
+| `audit.deny_aggregate_max_keys` | `10000` | höchstens so viele offene Zusammenfassungen je Prozess; begrenzt den Speicher bei Fluten ohne Anmeldung |
 | `status.public_enabled` | `false` | Statusseite ohne Anmeldung |
 | `ratelimit.rl.public_auth.per_minute` / `.burst` | `30` / `10` | je Client-IP |
 | `ratelimit.rl.gateway_connect.per_minute` / `.burst` | `12` / `4` | je Gerät oder Token |

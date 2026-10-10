@@ -67,7 +67,7 @@ Migration kommt mit dieser Etappe, der Vertrag gilt schon jetzt.
 | `billing` | Kosteneinträge, Preistabelle | ja |
 | `sync` | Ereignis-Log, Cursor der Worker-Verbraucher, Idempotenz-Schlüssel, Gelesen-Stand, Entwürfe, Einstellungen | ja |
 | `notify` | Benachrichtigungs-Einstellungen, Ruhezeiten, Push-Registrierungen | ja |
-| `audit` | Audit-Log, Prüfpunkte | ja |
+| `audit` | Audit-Log, Prüfpunkte, Schlüssel der IP-Pseudonyme | ja |
 | `privacy` | DSGVO-Aufträge | ja |
 | `importer` | Import-Quellen und importierte Objekte | ja |
 | `status` | Statusseite, Sicherungsläufe | ja |
@@ -115,15 +115,19 @@ Zweck: genau eine Zeile mit der Identität dieser Installation. Modul: `instance
 | Feld | Typ | Null | Standard | Regeln / Hinweise |
 |---|---|---|---|---|
 | `id` | `smallint` | nein | `1` | `CHECK (id = 1)`; erzwingt eine Zeile |
-| `instance_id` | `uuid` | nein | | UUIDv7, bei der Einrichtung erzeugt; Aussteller (`iss`) in Tokens |
+| `instance_id` | `uuid` | nein | | UUIDv7, beim ersten `bothy migrate up` erzeugt (die Zeile entsteht dort, über den Port von `instance`); Aussteller (`iss`) in Tokens |
 | `setup_completed_at` | `timestamptz` | ja | | NULL bis der erste Owner per Server-Befehl angelegt ist |
 | `schema_version` | `bigint` | nein | | letzte angewandte Migration, nur zur Anzeige |
 | `min_server_version` | `text` | ja | | SemVer; kleinste Server-Version, die mit diesem Schema laufen darf; gesetzt von `bothy migrate`. Ein Server mit kleinerer Version meldet nicht bereit ([16-betrieb.md](16-betrieb.md), Abschnitt 10) |
-| `sync_epoch` | `uuid` | nein | | UUIDv7 der aktuellen Zeitlinie des Ereignis-Logs; bei der Einrichtung erzeugt, nach jeder Wiederherstellung neu (Abschnitt 6.7) |
+| `sync_epoch` | `uuid` | nein | | UUIDv7 der aktuellen Zeitlinie des Ereignis-Logs; beim ersten `bothy migrate up` erzeugt, nach jeder Wiederherstellung neu (Abschnitt 6.7) |
 | `created_at` | `timestamptz` | nein | `now()` | |
 
 PK: `id`. FK: keine. Unique: `instance_id`. Indexe: keine weiteren.
-Aufbewahrung: `config`.
+Aufbewahrung: `config`. `bothy migrate up` legt die Zeile an, falls sie fehlt
+(`INSERT ... ON CONFLICT (id) DO NOTHING`), und setzt danach `schema_version` und
+`min_server_version`; `instance_id`, `sync_epoch` und `setup_completed_at` ändert es nie. Grund:
+`migrate` ist der erste Schritt jeder Installation, und die Bereitschaftsprüfung braucht
+`min_server_version`, bevor es einen Owner gibt.
 
 #### `instance_settings`
 
@@ -207,7 +211,7 @@ auf "wer hat es getan" zeigen immer hierher. Modul: `identity`.
 | `kind` | `text` | nein | | `CHECK (kind IN ('user','agent','app'))`; nie änderbar |
 | `status` | `text` | nein | `'active'` | `CHECK (status IN ('pending','active','disabled','deleted'))` |
 | `handle` | `text` | nein | | für Erwähnungen, `CHECK (handle ~ '^[a-z0-9][a-z0-9._-]*$')`, Länge bis `principal.handle_max_chars` |
-| `display_name` | `text` | nein | | nach Löschung pseudonymisiert |
+| `display_name` | `text` | nein | | nicht leer und nicht nur Leerraum, höchstens `principal.display_name_max_chars` Zeichen, ohne Steuer- und Bidi-Zeichen ([19-sicherheit.md](19-sicherheit.md), SEC-IN-4); nach Löschung pseudonymisiert |
 | `avatar_file_id` | `uuid` | ja | | |
 | `created_at` | `timestamptz` | nein | `now()` | |
 | `disabled_at` | `timestamptz` | ja | | |
@@ -497,9 +501,9 @@ Zweck: Passwort mit TOTP als abschaltbarer Rückfall für lokale Konten (Baselin
 
 PK: `identity_id`. FK: `identity_id` -> `user_identities(id)` ON DELETE CASCADE.
 Checks: `(totp_secret_ciphertext IS NULL) = (totp_key_ref IS NULL)`. Indexe: über den PK.
-Aufbewahrung: `security`. Das TOTP-Geheimnis ist die einzige Ausnahme von Grundsatz 9: der Server
-braucht es zum Prüfen; darum liegt es verschlüsselt in der Datenbank und der Schlüssel nur im
-Secret-Provider.
+Aufbewahrung: `security`. Das TOTP-Geheimnis ist eine der zwei Ausnahmen von Grundsatz 9 (die
+andere: `audit_ip_keys`): der Server braucht es zum Prüfen; darum liegt es verschlüsselt in der
+Datenbank und der Schlüssel nur im Secret-Provider.
 
 #### `enrollment_codes`
 
@@ -615,13 +619,16 @@ Zweck: Mitgliedschaft eines Menschen in einer Gruppe, mit Verlauf. Modul: `authz
 | `added_at` | `timestamptz` | nein | `now()` | |
 | `expires_at` | `timestamptz` | ja | | bei jedem `authorize` geprüft |
 | `expiry_reminded_at` | `timestamptz` | ja | | Erinnerung vor Ablauf geschrieben (`access.expiring`) |
+| `expiry_reported_at` | `timestamptz` | ja | | Ablauf gemeldet (`access.changed`, Systemaktion `group.member.expire`); genau einmal je Mitgliedschaft |
 | `removed_at` | `timestamptz` | ja | | |
 | `removed_by` | `uuid` | ja | | |
 
 PK: `id`. FK: `group_id` -> `groups(id)` ON DELETE RESTRICT; `user_id` ->
 `users(principal_id)` ON DELETE RESTRICT; `added_by`, `removed_by` -> `principals(id)` ON DELETE
 RESTRICT. Unique: Teilindex `(group_id, user_id) WHERE removed_at IS NULL`.
-Indexe: `(user_id) WHERE removed_at IS NULL` für "Gruppen einer Person" beim Rechte-Aufbau.
+Indexe: `(user_id) WHERE removed_at IS NULL` für "Gruppen einer Person" beim Rechte-Aufbau;
+`(expires_at) WHERE removed_at IS NULL AND expires_at IS NOT NULL` für Erinnerung und
+Ablaufmeldung.
 Aufbewahrung: `account`.
 
 #### `grants`
@@ -642,6 +649,7 @@ Zweck: eine Freigabe: Subjekt x Ziel x Stufe x Zusatzrechte x Ablauf x Grund. Wi
 | `capabilities` | `text[]` | nein | `'{}'` | Teilmenge von `approve_actions`, `upload`, `export`, `manage` |
 | `expires_at` | `timestamptz` | ja | | bei jedem `authorize` geprüft; der Job `authz.expiry_sweep` meldet den Ablauf nur (Abschnitt 6.4) |
 | `expiry_reminded_at` | `timestamptz` | ja | | Erinnerung vor Ablauf geschrieben (`access.expiring`) |
+| `expiry_reported_at` | `timestamptz` | ja | | Ablauf gemeldet (`access.changed`, Systemaktion `grant.expire`); genau einmal je Freigabe |
 | `reason` | `text` | nein | | Pflicht |
 | `granted_by` | `uuid` | nein | | |
 | `granted_at` | `timestamptz` | nein | `now()` | |
@@ -665,7 +673,11 @@ IS NULL` und `(target_channel_id) WHERE revoked_at IS NULL` für "Wer hat Zugrif
 I1-Prüfung; `(expires_at) WHERE revoked_at IS NULL AND expires_at IS NOT NULL` für Erinnerung und
 Ablaufmeldung. Aufbewahrung: `account`.
 
-Freigaben werden nie geändert, nur widerrufen und neu angelegt (R-DM-09). Jede Transaktion,
+Freigaben werden nie geändert, nur widerrufen und neu angelegt (R-DM-09). Erlaubte Updates sind
+nur die Widerruf-Spalten und die Buchhaltung des Ablaufs (`expiry_reminded_at`,
+`expiry_reported_at`). Der Job `authz.expiry_sweep` meldet jede abgelaufene, noch nicht gemeldete
+Zeile (`expires_at <= now()` und `expiry_reported_at IS NULL`) und setzt die Spalte in derselben
+Transaktion; so wird nach einem Ausfall des worker jeder Ablauf genau einmal gemeldet. Jede Transaktion,
 die `grants`, `group_memberships`, `owners`, Bediener-Zuordnungen, `agents.billing_mode`,
 `agents.credential_holder_id`, `agents.tool_class`, den Zustand einer Dev-Umgebung oder den Status
 eines Prinzipals ändert, erhöht `sequence_counters.permission_version` (Abschnitt 6.3). Das gilt
@@ -1631,7 +1643,8 @@ Zweck: dauerhafte Ereignisse mit globaler, commit-geordneter Sequenz (B8). Modul
 | `type` | `text` | nein | | Ereignistyp aus [05-aktionen.md](05-aktionen.md) |
 | `schema_version` | `smallint` | nein | `1` | Version der Nutzlast dieses Typs |
 | `occurred_at` | `timestamptz` | nein | `now()` | Zeit der Transaktion |
-| `actor_principal_id` | `uuid` | ja | | NULL bei Systemereignissen |
+| `actor_kind` | `text` | ja | | `CHECK (actor_kind IN ('user','agent','app','system'))`; Umschlag `actor.kind`. NULL: kein Akteur (Job ohne Prinzipal) |
+| `actor_principal_id` | `uuid` | ja | | gesetzt genau dann, wenn `actor_kind` `user`, `agent` oder `app` ist; NULL bei `system` (Systemaktion ohne Prinzipal, z. B. `grant.expire`) und ohne Akteur |
 | `space_id` | `uuid` | ja | | Geltungsbereich für den Filter |
 | `channel_id` | `uuid` | ja | | |
 | `thread_id` | `uuid` | ja | | |
@@ -1639,8 +1652,9 @@ Zweck: dauerhafte Ereignisse mit globaler, commit-geordneter Sequenz (B8). Modul
 | `resource_id` | `uuid` | ja | | |
 | `resource_version` | `bigint` | ja | | Version des Objekts nach der Änderung |
 | `audience_principal_id` | `uuid` | ja | | gesetzt: persönliches Ereignis, nur für diesen Prinzipal |
-| `receive_action` | `text` | nein | | Aktion, die ein Empfänger auf die Ressource braucht |
+| `receive_action` | `text` | nein | | Aktion, die ein Empfänger auf die Ressource braucht ([05-aktionen.md](05-aktionen.md), Abschnitt 6). Persönliche Ereignisse: `self`, wenn 05 nur "self" nennt; nennt 05 zusätzlich eine Aktion, steht genau diese (z. B. `agent.events.consume` bei `agent.invocation`, `interaction.created` und `command.invoked`, `agent.config.read` bei `agent.config_changed`). Ist der Empfänger eine App, prüft die Zustellung statt `agent.events.consume` den Scope `events:subscribe` (05, Abschnitt 6). Ein Wert je Typ; die Quelle ist der Aktionskatalog (ADR 0049) |
 | `payload` | `jsonb` | nein | | Schema `<type>.v<schema_version>`; Größe bis `sync.event_payload_max_bytes` |
+| `truncated` | `boolean` | nein | `false` | Umschlag `truncated`: der Erzeuger hat eine verkleinerte Nutzlast gebaut, weil das Objekt `sync.event_payload_max_bytes` überschreitet; der Client lädt per REST nach |
 | `redacted_at` | `timestamptz` | ja | | Nutzlast geschwärzt (Löschung) |
 | `correlation_id` | `uuid` | ja | | W3C-Trace-ID der auslösenden Anfrage (16 Byte, als UUID geschrieben); hat eine Anfrage keinen `traceparent`, erzeugt der Server eine. NULL nur bei Jobs ohne Anfrage-Bezug |
 | `trace_context` | `text` | ja | | W3C `traceparent` der auslösenden Anfrage, nur wenn sie aufgezeichnet wurde; geht an Adapter, damit ihr Span ein Kind der Anfrage wird ([17-observability.md](17-observability.md)) |
@@ -1648,9 +1662,13 @@ Zweck: dauerhafte Ereignisse mit globaler, commit-geordneter Sequenz (B8). Modul
 | `permission_version` | `bigint` | nein | | Rechte-Version zur Zeit des Commits |
 
 PK: `seq`. Partitionierung: `PARTITION BY RANGE (seq)`, je Partition
-`sync.event_log_partition_size` Nummern (R-DM-15). FK: keine (bewusst; das Log überdauert
-gelöschte Objekte und darf Partitionen frei abhängen). Unique: `(id, seq)` (muss den
-Partitionsschlüssel enthalten).
+`sync.event_log_partition_size` Nummern (R-DM-15), keine Standard-Partition. FK: keine (bewusst;
+das Log überdauert gelöschte Objekte und darf Partitionen frei abhängen). Unique: `(id, seq)`
+(muss den Partitionsschlüssel enthalten). Check: `COALESCE(actor_kind IN ('user','agent','app'), false) =
+(actor_principal_id IS NOT NULL)` als Tabellen-Check, damit ein Prinzipal nie ohne Art und
+`system` nie mit Prinzipal steht (R-DM-29); `receive_action <> 'self' OR audience_principal_id IS
+NOT NULL`. Der Anhänger lehnt eine zu große Nutzlast ab; kürzen
+kann nur der Erzeuger, weil JSON nicht allgemein kürzbar ist.
 Indexe:
 - `(channel_id, seq)` für Nachholen gefiltert nach Kanälen.
 - `(space_id, seq)` für Nachholen gefiltert nach vollständig sichtbaren Bereichen
@@ -1661,7 +1679,15 @@ Indexe:
 - BRIN `(occurred_at)` für die Aufbewahrung je Partition.
 
 Aufbewahrung: `event_log` (Fenster `sync.event_retention`). Eine Partition wird abgehängt und
-gelöscht, wenn ihr größtes `occurred_at` älter als das Fenster ist.
+gelöscht, wenn ihr größtes `occurred_at` älter als das Fenster ist, außer der Partition mit dem
+aktuellen Kopf (`max(seq)`): sie bleibt immer. Grund: Sonst wäre auf einer ruhenden Instanz
+`max(seq)` nicht mehr der Zählerstand, und Lückenerkennung und `min_retained_seq`
+([04-sync-protokoll.md](04-sync-protokoll.md), Abschnitt 7.3) brächen. Partitionen legt der Job
+`sync.partition_maintenance` im Voraus an ([02-architektur.md](02-architektur.md), Abschnitt
+12.3); `bothy migrate up` ruft dieselbe idempotente Routine, damit eine frische Datenbank vor dem
+ersten `serve` Partitionen hat. Weil `bothy_app` nur DML darf, laufen Anlegen, Anhängen und
+Abhängen über zwei `SECURITY DEFINER`-Funktionen von `bothy_owner` ([16-betrieb.md](16-betrieb.md),
+Abschnitt 7.1).
 Kurzlebige Ereignisse (Tippen, Live-Box-Patches, Präsenz, Hinweise, Anfragen zur
 Autovervollständigung) stehen nie in dieser Tabelle. Zustellfelder (Aufruf-Marke,
 `redelivered`) entstehen je Zustellung und werden nie gespeichert.
@@ -2027,6 +2053,32 @@ werden (ADR 0021, [19-sicherheit.md](19-sicherheit.md)). Modul: `audit`.
 
 PK: `seq`. FK: `kid` -> `server_signing_keys(kid)` ON DELETE RESTRICT. Indexe: `(exported_at)
 WHERE exported_at IS NULL` für den Export. Aufbewahrung: `audit`. Rechte wie `audit_events`.
+
+#### `audit_ip_keys`
+
+Zweck: ein HMAC-Schlüssel je Zeitraum `privacy.audit_ip_key_period` für die IP-Pseudonyme im
+Audit-Log (`audit_events.details.ip_hmac`, [20-datenschutz.md](20-datenschutz.md) Abschnitt 4.5).
+Modul: `audit`.
+
+| Feld | Typ | Null | Standard | Regeln / Hinweise |
+|---|---|---|---|---|
+| `id` | `uuid` | nein | | UUIDv7; steht als `ip_key_id` in `audit_events.details` |
+| `valid_from` | `timestamptz` | nein | | Beginn des Zeitraums, auf `privacy.audit_ip_key_period` ausgerichtet |
+| `valid_until` | `timestamptz` | nein | | `valid_from + privacy.audit_ip_key_period` |
+| `key_ciphertext` | `bytea` | ja | | 32 zufällige Bytes, AEAD-verschlüsselt mit dem Schlüssel aus `key_ref`; NULL nach der Vernichtung |
+| `key_ref` | `text` | nein | | Verweis auf den Verschlüsselungsschlüssel im Secret-Provider (`privacy.audit_ip_kek_ref` zur Zeit der Anlage) |
+| `created_at` | `timestamptz` | nein | `now()` | |
+| `destroyed_at` | `timestamptz` | ja | | gesetzt, sobald `valid_until + privacy.audit_ip_key_retention` vorbei ist |
+
+PK: `id`. FK: keine. Unique: `valid_from`. Checks: `valid_until > valid_from`;
+`(key_ciphertext IS NULL) = (destroyed_at IS NOT NULL)`. Indexe: über PK und Unique.
+Aufbewahrung: `audit` (die Zeile bleibt als Beleg, nur der Schlüssel wird vernichtet).
+Rechte: Die Anwendungsrolle darf `SELECT`, `INSERT` und `UPDATE` nur auf `key_ciphertext` und
+`destroyed_at`. Der Server legt die Zeile eines Zeitraums beim ersten Bedarf an
+(`ON CONFLICT (valid_from) DO NOTHING`, dann erneut lesen). Wie das TOTP-Geheimnis ist der Schlüssel
+eine Ausnahme von Grundsatz 9: Er muss vernichtbar sein, der Datei-Treiber des Secret-Providers
+kann aber keine Schlüssel je Zeitraum anlegen; darum liegt er verschlüsselt in der Datenbank und
+der Schlüssel dafür nur im Secret-Provider.
 
 #### `gdpr_requests`
 
@@ -2860,6 +2912,11 @@ erDiagram
         bytea hash
         text kid FK
     }
+    audit_ip_keys {
+        uuid id PK
+        timestamptz valid_from
+        bytea key_ciphertext
+    }
     gdpr_requests {
         uuid id PK
         uuid subject_user_id FK
@@ -2913,8 +2970,8 @@ erDiagram
     agents |o--o{ status_components : "überwacht"
 ```
 
-`event_log`, `event_consumer_cursors`, `audit_events` und `backup_runs` haben bewusst keine
-Fremdschlüssel; ihre ID-Felder sind Belege, keine Verknüpfungen.
+`event_log`, `event_consumer_cursors`, `audit_events`, `audit_ip_keys` und `backup_runs` haben
+bewusst keine Fremdschlüssel; ihre ID-Felder sind Belege, keine Verknüpfungen.
 
 ## 8. Entscheidungen dieses Kapitels
 
@@ -2948,6 +3005,7 @@ Fremdschlüssel; ihre ID-Felder sind Belege, keine Verknüpfungen.
 | R-DM-26 | Sync-Epoche in `instance`, neu nach jeder Wiederherstellung. | Ein Cursor ist nur innerhalb einer Zeitlinie gültig; ohne Epoche überholt die neue Zeitlinie alte Cursor still. |
 | R-DM-27 | Cursor der Worker-Verbraucher in einer eigenen Tabelle (`event_consumer_cursors`) statt Job-Einfügen im Schreibpfad. | Der Schreibpfad muss keine Folgen kennen; ein neuer Verbraucher ändert keinen Erzeuger (ADR 0051). |
 | R-DM-28 | `audit_events.deny_reason` ohne `CHECK`, Liste durch einen Test geschlossen. | Ein Audit-Eintrag darf nie an einem neuen Grund-Code scheitern. |
+| R-DM-29 | `event_log.actor_kind` als eigene Spalte statt Ableitung aus `actor_principal_id`. | NULL kann `system` nicht von "kein Akteur" trennen, und `sync` darf `identity` nicht nach der Art fragen (02, Abschnitt 4.4). |
 
 ## 9. Konfigurationswerte dieses Kapitels
 
@@ -2956,6 +3014,7 @@ Die Werte sind Standardwerte. Andere Kapitel verweisen nur auf den Namen.
 | Name | Standard | Bedeutung |
 |---|---|---|
 | `principal.handle_max_chars` | `32` | Länge eines Handles |
+| `principal.display_name_max_chars` | `64` | Länge eines Anzeigenamens in Unicode-Zeichen |
 | `identity.last_active_granularity` | `5m` | höchstens so oft wird `last_active_at` bzw. `last_used_at` geschrieben |
 | `auth.session_max_age` | `30d` | absolutes Ende einer Anmeldesitzung |
 | `auth.refresh_token_ttl` | `14d` | Lebensdauer eines Refresh-Tokens |

@@ -46,7 +46,7 @@ Ein fehlendes Feld heißt "kein Wert" (ADR 0053).
 | `type` | string | ja | Ereignistyp, z. B. `message.created` |
 | `schema_version` | int | ja | Version der Nutzlast dieses Typs; Änderungen nur additiv |
 | `occurred_at` | RFC 3339 | ja | Zeit der Transaktion (nur Anzeige, nie Reihenfolge) |
-| `actor` | `{id, kind}` | nein | wer es ausgelöst hat; `kind` ist `user`, `agent`, `app`, `system`; fehlt bei Ereignissen von Jobs ohne Prinzipal |
+| `actor` | `{id, kind}` | nein | wer es ausgelöst hat; `kind` ist `user`, `agent`, `app`, `system`; `id` fehlt bei `system` (Systemaktion des Servers, 05 Regel 10); `actor` fehlt bei Ereignissen von Jobs ohne Prinzipal und ohne Systemaktion (03, `event_log.actor_kind`) |
 | `scope` | `{space_id, channel_id, thread_id}` | ja | Ort; nicht zutreffende Felder fehlen |
 | `resource` | `{kind, id, version}` | ja | betroffenes Objekt und seine Version nach der Änderung |
 | `audience` | `"self"` | nein | gesetzt bei persönlichen Ereignissen |
@@ -68,8 +68,10 @@ Regeln für die Nutzlast:
    Daten, die mehr Rechte brauchen (z. B. Kanal-Prompt, Skills, Projektbindung), stehen nie in
    Ereignissen. Das Ereignis nennt dann nur die neue Version (`channels.settings_version`);
    Berechtigte laden per REST nach.
-2. Sie ist kleiner als `sync.event_payload_max_bytes`. Größere Objekte (lange Nachricht)
-   werden mit `truncated: true` und Verweis geliefert; der Client lädt per REST nach.
+2. Sie ist kleiner als `sync.event_payload_max_bytes`. Für größere Objekte (lange Nachricht)
+   baut der Erzeuger eine verkleinerte Nutzlast mit Verweis und setzt `truncated: true`
+   (03, `event_log.truncated`); der Anhänger lehnt eine zu große Nutzlast ab, statt sie zu
+   kürzen. Der Client lädt per REST nach.
 3. Sie enthält keine Geheimnisse und keine Tokens.
 
 ### 2.3 Rahmen auf dem WebSocket
@@ -231,7 +233,8 @@ Jede Op ist in [05-aktionen.md](05-aktionen.md) einer Aktion zugeordnet.
 ### 6.3 Lebenszyklus
 
 1. **Upgrade.** Der Client öffnet die Verbindung. Der Server prüft beim Upgrade nichts außer
-   Herkunft und Rate-Limit-Klasse `rl.gateway_connect`.
+   der Herkunft. Die Rate-Limit-Klasse `rl.gateway_connect` zählt bei `identify` und `resume`,
+   sobald Gerät bzw. Token geprüft sind (05, Abschnitt 3); erschöpft: Schließen mit `4008`.
 2. **`hello`.** Der Server sendet sofort `{heartbeat_interval, resume_window, protocol_versions,
    dpop_nonce, server_time, sync_epoch}`. `dpop_nonce` ist frisch und gilt `auth.dpop_nonce_ttl`
    ([08-identitaet.md](08-identitaet.md)).
@@ -391,10 +394,11 @@ Rechten.
 Es gelten die Rechte zum Zeitpunkt der Zustellung, nicht die zum Zeitpunkt des Ereignisses.
 Ein Gateway-Prozess aktualisiert den Rechte-Cache eines Prinzipals, wenn er im Log an dessen
 Ereignis `access.changed` ankommt. Alle Ereignisse danach prüft er mit dem neuen Stand.
-Strukturänderungen ohne neue Rechte-Version (`channel.created`, `channel.updated` mit
-`read_only`, `channel.archived`, `space.archived`, `thread.moved`) wendet er ebenfalls in
-Log-Reihenfolge auf den Cache an, weil sie den Pfad oder den Schreibschutz einer Ressource
-ändern.
+Strukturänderungen (`channel.created`, `channel.updated` mit `read_only`, `channel.archived`,
+`space.archived`, `thread.moved`) wendet er ebenfalls in Log-Reihenfolge auf den Cache an, weil sie
+den Pfad oder den Schreibschutz einer Ressource ändern. `channel.archived` und `space.archived` sind
+zusätzlich Rechte-Änderungen mit eigenem `access.changed` (05, Spalte "Rechte";
+[07-rechte.md](07-rechte.md), Abschnitt 4.5); die übrigen kommen ohne neue Rechte-Version.
 
 ### 8.2 Was beim Ändern passiert
 
