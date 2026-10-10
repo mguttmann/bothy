@@ -40,6 +40,8 @@ FETCH := $(UVRUN) python tools/bin/fetch_tools.py
 SEMGREP := $(UV)x --quiet --python 3.12 --from semgrep==$(SEMGREP_VERSION) semgrep
 # Path of a pinned release binary, resolved (and fetched on first use) inside a recipe.
 tool = "$$($(FETCH) path $(1))"
+# A pinned Node tool must be installed (`make bootstrap`); without it the gate fails with a hint.
+need_node = [ -x $(NODE_BIN)/$(1) ] || { echo "$(1): $(NODE_BIN)/$(1) not found; run \`make bootstrap\`" >&2; exit 2; }
 skip = printf '  SKIP  %-14s %s\n' '$(1)' '$(2)'
 want = $(if $(filter all $(1),$(COMPONENTS)),yes,)
 
@@ -120,7 +122,7 @@ fmt-check: ## Formatting is clean (no changes)
 lint: ## Linters: file hygiene hooks, ruff, bandit, actionlint, zizmor, component linters
 	SKIP=ruff-format,ruff-check,gitleaks-staged $(UVRUN) pre-commit run --all-files --hook-stage pre-commit
 	$(UVRUN) ruff check tools
-	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/bin tools/ci tools/denylist tools/docs tools/hooks tools/sonarqube
+	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/bin tools/ci tools/denylist tools/design-tokens tools/docs tools/hooks tools/sonarqube
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -214,7 +216,7 @@ api-lint: ## Redocly lint of the OpenAPI and AsyncAPI documents
 	@if [ ! -f docs/api/openapi.yaml ]; then $(call skip,api-lint,docs/api/openapi.yaml does not exist yet); \
 	else cfg=""; [ -f docs/api/redocly.yaml ] && cfg="--config docs/api/redocly.yaml"; \
 	  files="docs/api/openapi.yaml"; [ -f docs/api/asyncapi.yaml ] && files="$$files docs/api/asyncapi.yaml"; \
-	  REDOCLY_TELEMETRY=off $(NODE_BIN)/redocly lint $$cfg $$files; fi
+	  $(call need_node,redocly); REDOCLY_TELEMETRY=off $(NODE_BIN)/redocly lint $$cfg $$files; fi
 
 api-clients: ## Generated API clients compile (contract: each SDK/app provides `make -C <dir> generate-check`)
 	@found=""; for d in sdk/python sdk/typescript packages/api_client; do \
@@ -252,9 +254,13 @@ semgrep: ## Project Semgrep rules (.semgrep/) and their rule tests
 	$(SEMGREP) scan --config .semgrep --exclude .semgrep --error --metrics=off --disable-version-check --quiet .
 
 trivy: ## Trivy misconfiguration scan of Dockerfiles, Kubernetes, Helm and Terraform files
+	@# Trivy walks a directory; it scans a copy of the committable files (tools/ci/tracked_tree.py),
+	@# so ignored content such as other worktrees or caches cannot change the result.
 	@files=$$(git ls-files -- '*Dockerfile*' '*.tf' '*Chart.yaml' 'infra/k8s/*'); \
 	if [ -z "$$files" ]; then $(call skip,trivy,no Dockerfile or Helm chart or Kubernetes or Terraform file yet); \
-	else $(call tool,trivy) config --skip-check-update --exit-code 1 --severity HIGH,CRITICAL --quiet .; fi
+	else trivy=$(call tool,trivy); tree=$$(mktemp -d); trap 'rm -rf "$$tree"' EXIT; \
+	  $(UVRUN) python tools/ci/tracked_tree.py "$$tree/repo"; \
+	  (cd "$$tree/repo" && "$$trivy" config --skip-check-update --exit-code 1 --severity HIGH,CRITICAL --quiet .); fi
 
 trivy-image: ## Trivy vulnerability scan of a built image: make trivy-image IMAGE=<ref@digest>
 	@[ -n "$${IMAGE:-}" ] || { echo "usage: make trivy-image IMAGE=<ref@digest>"; exit 2; }
@@ -284,7 +290,7 @@ sonar: test ## SonarQube analysis with the shared gate (local Community Build or
 	@if [ -z "$(PRODUCT_SOURCES)" ]; then $(call skip,sonar,no product source code yet (tools are covered by ruff/mypy/bandit)); \
 	elif [ "$${SONAR_SKIP:-0}" = 1 ]; then $(call skip,sonar,SONAR_SKIP=1 for fork contributors; maintainers and CI run it); \
 	elif [ -z "$${SONAR_TOKEN:-}" ]; then echo "sonar: SONAR_TOKEN is not set (docs/quality/sonarqube-local.md)"; exit 1; \
-	else $(NODE_BIN)/sonar-scanner-npm -Dsonar.host.url=$(SONAR_HOST_URL) -Dsonar.projectKey=$(SONAR_PROJECT_KEY) \
+	else $(call need_node,sonar-scanner-npm); $(NODE_BIN)/sonar-scanner-npm -Dsonar.host.url=$(SONAR_HOST_URL) -Dsonar.projectKey=$(SONAR_PROJECT_KEY) \
 	  $(if $(SONAR_ORGANIZATION),-Dsonar.organization=$(SONAR_ORGANIZATION)) -Dsonar.qualitygate.wait=true; fi
 
 sonar-up: ## Start the local SonarQube Community Build (tools/sonarqube/compose.yaml)

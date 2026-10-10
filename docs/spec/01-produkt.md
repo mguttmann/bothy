@@ -173,7 +173,8 @@ ungelesen oder Lauf aktiv, `(3)` Zähler, `[ ]` Knopf oder Feld, `[A]` Agent (ab
 `(AL)` Mensch (rund), `(o)` läuft, `[!]` wartet auf dich, `(@)` Erwähnung, `(z)` Warteschlange,
 `(v)` erledigt, `(x)` fehlgeschlagen, `(-)` abgebrochen. Auslöser-Status an Nachrichten in
 geschweiften Klammern: `{ok}` erledigt, `{..}` in Arbeit, `{z}` Warteschlange, `{x}` fehlgeschlagen,
-`{->}` Nachtrag zugestellt. Gerenderte Gestaltung: [docs/design/previews](../design/previews/).
+`{->}` Nachtrag zugestellt. Gerenderte Gestaltung: [Design-System](../design/README.md) mit den
+Bildern aus `docs/design/previews/`.
 
 ### 5.1 Desktop (macOS, Windows)
 

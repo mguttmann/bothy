@@ -1,9 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # gitleaks configuration of the repository (docs/quality/gates.md, gate "gitleaks").
-# Used by `make gitleaks` (whole history of all refs), the pre-commit hook (staged
-# changes) and CI. The default rule set stays on; the rules below add credential
-# formats this product handles. Each custom rule names its public source.
+# Used by `make gitleaks` (every commit reachable from HEAD; all refs with
+# GITLEAKS_LOG_OPTS=--all), the pre-commit hook (staged changes) and CI. The default rule
+# set stays on; the rules below add credential formats this product handles. Each custom
+# rule names its public source.
 #
 # Allowlisting: narrow, by exact fake value, never by whole file, and only with a
 # reason in the pull request. Real secrets are revoked first, then removed from history
@@ -74,6 +75,16 @@ description = "Example credentials in documentation and tests carry the marker E
 stopwords = ["example"]
 
 [[allowlists]]
+description = "Fake example values in the history of docs/api/openapi.yaml, committed before the EXAMPLE marker rule. Exact values only; the history rewrite before publication replaces them and deletes this entry (docs/quality/public-switch.md, step 2)"
+targetRules = ["standard-webhooks-secret", "generic-api-key"]
+regexTarget = "secret"
+regexes = [
+  '''^whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw$''',
+  '''^agt_7Hq2\.kJ8sV2pQ0wX5yZ1aB3cD4eF6gH$''',
+  '''^a1b2c3d4e5f6$''',
+]
+
+[[allowlists]]
 description = "UUIDs are identifiers in this product (UUIDv7, docs/spec/03-datenmodell.md), never credentials"
 targetRules = ["generic-api-key"]
 regexTarget = "secret"
@@ -91,12 +102,9 @@ regexTarget = "line"
 regexes = ['''^\s*"[^"]+\.[A-Za-z0-9]+": "[0-9a-f]{64}",?\s*$''']
 
 [[allowlists]]
-description = "Generated lock files and vendored dependencies carry checksums, not secrets"
+description = "Generated lock files carry checksums, not secrets"
 paths = [
   '''(^|/)uv\.lock$''',
   '''(^|/)package-lock\.json$''',
   '''(^|/)pubspec\.lock$''',
-  '''(^|/)node_modules/''',
-  '''(^|/)\.cache/''',
-  '''(^|/)\.venv/''',
 ]

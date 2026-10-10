@@ -3,7 +3,8 @@
 Status: Entwurf M0. Normativ für den Aufbau von `services/server/`.
 Begriffe: [00-glossar.md](00-glossar.md). Tabellen: [03-datenmodell.md](03-datenmodell.md).
 Ereignisse und Sync: [04-sync-protokoll.md](04-sync-protokoll.md). Aktionen:
-[05-aktionen.md](05-aktionen.md). Entscheidungen: ADR 0004 bis 0009 in [../adr/](../adr/).
+[05-aktionen.md](05-aktionen.md). Entscheidungen: ADR 0004 bis 0009, siehe
+[ADR-Index](../adr/README.md).
 Diagramme: [../architecture/README.md](../architecture/README.md).
 
 Schreibweise: REST-Pfade stehen ohne Versions-Präfix; das Präfix legt [06-api.md](06-api.md) fest.

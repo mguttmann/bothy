@@ -12,7 +12,9 @@ die öffentlichen Dienste anbinden.
    E-Mail, zum Beispiel die No-Reply-Adresse von GitHub) und ist in `allow-authors.txt` der
    privaten Liste eingetragen. Ältere Commits mit anderer Identität werden vorher
    umgeschrieben (git-filter-repo mit Mailmap) oder das Repository startet mit neuer
-   Historie.
+   Historie. Beim Umschreiben ersetzt `--replace-text` auch die alten Beispielwerte,
+   die `.gitleaks.toml` als Ausnahme für die Historie führt; danach wird diese Ausnahme
+   gelöscht, und Schritt 3 zeigt, dass die Werte fort sind.
 3. **Historien-Scan.** `make denylist-history` und
    `make gitleaks GITLEAKS_LOG_OPTS=--all` sind grün. Jeder Treffer wird entfernt; Treffer
    in alten Commits erzwingen ein Umschreiben der Historie, danach beide Scans erneut.

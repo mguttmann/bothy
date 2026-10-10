@@ -11,6 +11,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import tracked_tree
 
 REPO = Path(__file__).resolve().parents[3]
 
@@ -74,6 +75,10 @@ def test_custom_rule_detects_its_format(tmp_path: Path, rule: str) -> None:
     assert rule in found
 
 
+# Fake values of the first API draft that stay in the history until it is rewritten
+# (.gitleaks.toml, allowlist "Fake example values in the history ...").
+HISTORICAL_WEBHOOK_EXAMPLE = "wh" + "sec_" + "MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
+
 ALLOWED = {
     "marked example": "webhook_secret = " + "wh" + "sec_" + "EXAMPLE" + _rand(36) + "=",
     "uuid identifier": "credential_"
@@ -81,6 +86,9 @@ ALLOWED = {
     + "-".join(_rand(n, "0123456789abcdef") for n in (8, 4, 4, 4, 12)),
     "unsigned example jwt": "access_token: eyJ" + _rand(30) + ".e30.sig",
     "checksum manifest": '    "icons/key.svg": "' + _rand(64, "0123456789abcdef") + '",',
+    "historical webhook example": "hmac_secret: " + HISTORICAL_WEBHOOK_EXAMPLE,
+    "historical agent token example": "secret: " + "agt_7Hq2." + "kJ8sV2pQ0wX5yZ1aB3cD4eF6gH",
+    "historical push token example": "token: " + "a1b2" + "c3d4e5f6",
 }
 
 
@@ -104,12 +112,46 @@ def test_allowlists_skip_documented_examples(tmp_path: Path, case: str) -> None:
     assert proc.returncode == 0, proc.stdout + proc.stderr
 
 
-def test_repository_tree_is_clean() -> None:
+def test_history_allowlist_takes_exact_values_only(tmp_path: Path) -> None:
+    """One changed character makes the historical example a finding again."""
+    near = HISTORICAL_WEBHOOK_EXAMPLE[:-1] + "x"
+    (tmp_path / "sample.txt").write_text("hmac_secret: " + near + "\n")
+    report = tmp_path / "report.json"
     proc = subprocess.run(
         [
             str(_gitleaks()),
             "dir",
-            str(REPO),
+            str(tmp_path / "sample.txt"),
+            "--config",
+            str(REPO / ".gitleaks.toml"),
+            "--no-banner",
+            "--redact",
+            "--report-format",
+            "json",
+            "--report-path",
+            str(report),
+            "--exit-code",
+            "0",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    found = {item["RuleID"] for item in json.loads(report.read_text())}
+    assert "standard-webhooks-secret" in found
+
+
+def test_repository_tree_is_clean(tmp_path: Path) -> None:
+    """The working tree as a commit would see it; ignored caches and other worktrees are not
+    part of the repository (tracked_tree.py)."""
+    tree = tmp_path / "tree"
+    tracked_tree.snapshot(REPO, tree)
+    proc = subprocess.run(
+        [
+            str(_gitleaks()),
+            "dir",
+            str(tree),
             "--config",
             str(REPO / ".gitleaks.toml"),
             "--no-banner",

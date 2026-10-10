@@ -20,17 +20,17 @@ Quelle des Diagramms: `docs/quality/pipeline.mmd`.
 | `test` | pytest, go test -race, flutter test, Skript `test` | Tests mit Abdeckungsdaten | | Werkzeuge |
 | `coverage` | coverage, go tool cover, LCOV-Auswertung | Mindestabdeckung | `quality.coverage.tools_min_percent`, `quality.coverage.go_min_percent`, `quality.coverage.dart_min_percent` | Werkzeuge |
 | `commitlint` | `tools/hooks/commit_msg.py` | Conventional Commits und DCO der Commits, die noch nicht auf `origin/main` sind | `commit.header_max_length` | ab erstem Remote |
-| `docs` | `tools/docs/adr_index.py`, `tools/docs/config_reference.py`, MkDocs `--strict` | ADR-Index und Konfigurationsreferenz aktuell, kein Konfigurationsname doppelt (Ruling L4), Site baut ohne Warnung | | ja |
+| `docs` | `tools/docs/adr_index.py`, `tools/docs/config_reference.py`, MkDocs `--strict` mit dem Hook `tools/docs/mkdocs_repo_links.py` | ADR-Index und Konfigurationsreferenz aktuell, kein Konfigurationsname doppelt (Ruling L4), Site baut ohne Warnung; Links auf vorhandene Dateien außerhalb von `docs/` zeigen in der Site auf das Repository, ein fehlendes Ziel bleibt ein Fehler | | ja |
 | `linkcheck` | lychee `--offline --include-fragments` | lokale Links und Anker aller getrackten Markdown-Dateien | | ja |
 | `diagrams` | `tools/docs/render_diagrams.py` mit mermaid-cli | jedes Mermaid-Diagramm rendert, jede `.mmd` hat ihre `.svg` | | ja |
 | `api-lint` | Redocly CLI mit `docs/api/redocly.yaml` | OpenAPI und AsyncAPI, Pflicht von `x-authz-action` | | sobald `docs/api/openapi.yaml` existiert |
 | `api-clients` | Ziel `generate-check` der Client-Pakete | generierte Clients sind aktuell und kompilieren | | ab erstem Client-Paket |
-| `tokens` | Ziel `check` in `tools/design-tokens/` | Design-Tokens bauen, Kontraste bestehen | | sobald `tools/design-tokens/` existiert |
+| `tokens` | Ziel `check` in `tools/design-tokens/` | Tests des Generators; Design-Tokens bauen, Kontraste und Palettenwächter bestehen, erzeugte Dateien aktuell, eingebettete Dateien passen zu `vendor/MANIFEST.json` | | ja |
 | `runners-check` | `tools/ci/check_runners.py` | Runner-Weiche, Trigger, SHA-Pinning, Timeouts, Rechte | | ja |
 | `labels-check` | `tools/ci/labels.py` | Label-Datei gültig, Vorlagen und GOVERNANCE.md nutzen nur definierte Labels | | ja |
 | `gitleaks` | gitleaks mit `.gitleaks.toml` | Secrets in jedem von `HEAD` erreichbaren Commit; vor dem Öffentlich-Schalten in allen Refs | | ja |
 | `semgrep` | Semgrep mit `.semgrep/` | Projektregeln und ihre Regel-Tests | | ja |
-| `trivy` | Trivy `config` | Fehlkonfiguration in Dockerfiles, Kubernetes, Helm, Terraform | `HIGH`, `CRITICAL` | sobald solche Dateien existieren |
+| `trivy` | Trivy `config` auf einer Kopie der getrackten und nicht ignorierten Dateien (`tools/ci/tracked_tree.py`) | Fehlkonfiguration in Dockerfiles, Kubernetes, Helm, Terraform | `HIGH`, `CRITICAL` | sobald solche Dateien existieren |
 | `osv` | OSV-Scanner, govulncheck | bekannte Schwachstellen aller Lock-Dateien; erreichbare Go-Schwachstellen | | ja |
 | `licenses` | `tools/ci/license_check.py`, OSV-Scanner `--licenses`, go-licenses | Lizenztext, SPDX-Kopfzeilen, Lizenzen ausgelieferter Abhängigkeiten | `quality/licenses/allowed.txt`, `license.spdx_header_lines` | ja (Abhängigkeiten ab erster Komponente) |
 | `denylist` | `tools/denylist/denylist_scan.py` | White Label in Inhalten, Namen, Commits, Identitäten, Refs | | ja, braucht die private Liste |
@@ -82,6 +82,10 @@ Beispiel ein JSON-Bericht), `DENYLIST_FLAGS` (zum Beispiel `--reveal` lokal).
 ## Was die Gates nicht abdecken
 
 * Links ins Internet: `make linkcheck-external` bei Bedarf (R-QA-09).
+* Ob eine `.svg` zum Stand ihrer `.mmd` passt: `make diagrams` prüft nur, dass die Quelle
+  rendert und die `.svg` daneben liegt. Die Ausgabe von mermaid-cli hängt von der
+  Browser-Version ab, ein Byte-Vergleich wäre auf jedem Rechner anders. Wer eine `.mmd`
+  ändert, rendert die `.svg` im selben Commit neu.
 * Shell-Code in Workflows prüft actionlint ohne shellcheck, weil shellcheck nicht gepinnt
   verfügbar ist; Workflows rufen darum nur kurze Befehle und make-Ziele auf.
 * Die Gleichheit von lokalem SonarQube und Cloud prüft `make sonar-config-check`, nicht

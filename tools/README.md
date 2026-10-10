@@ -13,16 +13,19 @@ Versionen laufen wie in CI. Einrichtung einmal je Klon: `make bootstrap`.
 | `ci/components.py` | Komponenten-Karte: Pfadfilter in CI, Auflösung von Release-Tags | (CI) | `ci/tests/` |
 | `ci/license_check.py` | Lizenztext und SPDX-Kopfzeilen | `licenses` | `ci/tests/` |
 | `ci/labels.py` | Labels prüfen und auf GitHub anlegen | `labels-check`, `labels-sync` | `ci/tests/` |
+| `ci/tracked_tree.py` | getrackte und nicht ignorierte Dateien in einen Ordner kopieren, damit Scanner, die Ordner durchlaufen, nur das Repository sehen | `trivy`, Test `ci/tests/test_gitleaks_rules.py` | `ci/tests/` |
 | `hooks/text_rules.py` | keine Gedankenstriche (U+2013, U+2014) in Textdateien | pre-commit, `lint` | `hooks/tests/` |
 | `hooks/commit_msg.py` | Conventional Commits und DCO-Sign-off | commit-msg, `commitlint` | `hooks/tests/` |
 | `denylist/` | White-Label-Scanner mit privater Liste und öffentlichen Regeln ([README](denylist/README.md)) | `denylist`, `denylist-history` | `denylist/tests/` |
 | `docs/adr_index.py` | ADR-Index erzeugen und prüfen | `adr-index`, `docs` | `docs/tests/` |
 | `docs/config_reference.py` | Abschnitt 4 der Konfigurationsreferenz aus den Kapiteltabellen erzeugen und prüfen, doppelte Namen ablehnen | `config-reference`, `docs` | `docs/tests/` |
 | `docs/render_diagrams.py` | jedes Mermaid-Diagramm rendert | `diagrams` | `docs/tests/` |
+| `docs/mkdocs_repo_links.py` | MkDocs-Hook: Links auf vorhandene Dateien außerhalb von `docs/` zeigen in der Site auf das Repository | `docs` | `docs/tests/` |
 | `docs/tests/test_config_values.py`, `docs/tests/test_toolchain_doc.py` | Zahlen- und Versionswächter für die Doku | `test` | |
 | `sonarqube/` | lokaler SonarQube und Abgleich von Profil und Gate ([README](sonarqube/README.md)) | `sonar-up`, `sonar-config`, `sonar-config-check` | `sonarqube/tests/` |
-| `design-tokens/` | Design-Tokens in CSS, Dart, Kontrasttabelle und Vorschau übersetzen (Kapitel 15, Design-System) | `tokens` | im Ordner |
+| `design-tokens/` | Design-Tokens in CSS, Dart, Kontrasttabelle und Vorschau übersetzen (Kapitel 15, Design-System) | `tokens` (`design-tokens/Makefile`, Ziel `check`) | `design-tokens/tests/` (unittest, über `make tokens`) |
 
-Regeln für neue Werkzeuge: Python mit Standardbibliothek oder PyYAML, eine Testdatei je
+Regeln für neue Werkzeuge: Python mit Standardbibliothek oder PyYAML (ein MkDocs-Hook
+zusätzlich mit MkDocs und Markdown aus derselben gepinnten Umgebung), eine Testdatei je
 Werkzeug, `SPDX-License-Identifier: Apache-2.0` in jeder Datei, ein make-Ziel, eine Zeile
 in dieser Tabelle und in docs/quality/toolchain.md.

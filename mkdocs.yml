@@ -46,6 +46,11 @@ plugins:
   - search:
       lang: [de, en]
 
+# Links to repository files outside docs/ point to the repository host (the target must
+# exist; tools/docs/mkdocs_repo_links.py).
+hooks:
+  - tools/docs/mkdocs_repo_links.py
+
 markdown_extensions:
   - admonition
   - attr_list
