@@ -17,7 +17,7 @@ erDiagram
   }
   server_signing_keys {
     text kid PK
-    text purpose "access_token, invocation, webhook_out, audit_checkpoint"
+    text purpose "access_token, invocation, terminal, webhook_out, audit_checkpoint"
     text state "next, active, retiring, retired"
   }
   feature_flags {
@@ -84,6 +84,7 @@ erDiagram
     text auth_method
     timestamptz step_up_at
     text step_up_method
+    timestamptz step_up_consumed_at
     timestamptz revoked_at
   }
   refresh_token_families {

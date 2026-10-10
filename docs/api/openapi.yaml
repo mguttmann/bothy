@@ -90,6 +90,10 @@ tags:
   description: Import jobs.
 - name: Privacy
   description: Privacy requests and exports.
+- name: Hosts
+  description: 'Connected hosts for the terminal: registration, pairing, fingerprint, LLM login declaration (I6).'
+- name: Terminal
+  description: Terminal sessions on connected hosts; the stream itself is end-to-end encrypted and runs over the channels in asyncapi.yaml.
 - name: Webhook events
   description: Events delivered to subscribed apps (Standard Webhooks).
 
@@ -14903,6 +14907,301 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /stats/live:
+    get:
+      operationId: getStatsLive
+      summary: Current live frame
+      tags: [Stats]
+      description: |-
+        The latest live frame (`StatsLiveFrame`) of the instance or of one space, the same frame the gateway sends as `stats.live` (docs/spec/25-visualisierung.md, section 5). The server returns the base frame built for the current `stats.live_interval`; polling does not rebuild it. Filtered to the channels visible to the caller; cost members only with `cost.read.aggregate`. `403 feature_disabled` when `stats.live_enabled` is off.
+      x-authz-action: stats.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - name: space_id
+        in: query
+        description: Restrict to a space; required without owner role.
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsLiveFrame'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    at: '2026-10-10T09:30:00.000Z'
+                    interval_ms: 1000
+                    scope:
+                      kind: instance
+                    runs:
+                    - run_id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
+                      thread_id: 0192f4a0-7b1c-7000-8a00-000000000301
+                      channel_id: 0192f4a0-7b1c-7000-8a00-000000000201
+                      space_id: 0192f4a0-7b1c-7000-8a00-000000000101
+                      agent_id: 0192f4a0-7b1c-7000-8a00-000000000401
+                      state: running
+                      queued_at: '2026-10-10T09:29:10.000Z'
+                      started_at: '2026-10-10T09:29:11.000Z'
+                      billing_mode: organization
+                      step:
+                        kind: tool_call
+                        name: Bash
+                      approval_pending: false
+                      cost_micros: 420000
+                      currency: USD
+                      cost_is_estimate: true
+                    runs_truncated: false
+                    agents:
+                    - agent_id: 0192f4a0-7b1c-7000-8a00-000000000401
+                      presence: online
+                      billing_mode: organization
+                      reported_billing_mode: organization
+                      rate_limit:
+                        state: ok
+                    rates:
+                    - metric: messages_created
+                      last_minute: 14
+                      current_minute: 3
+                    sli:
+                    - metric: sli.delivery_latency
+                      total: 5210
+                      good: 5207
+                      ratio: 0.99942
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /stats/timeline:
+    get:
+      operationId: getStatsTimeline
+      summary: Minute buckets and runs for playback
+      tags: [Stats]
+      description: |-
+        Minute aggregates from `stats_minutes` and run intervals for a range of at most `stats.timeline_max_range` inside `retention.stats_minutes` (docs/spec/25-visualisierung.md, section 6.5). Filtered to the channels visible to the caller. Rows without a channel (`sli.*`, gateway metrics) only with `stats.read` on the instance; `cost` only with `cost.read.aggregate`.
+      x-authz-action: stats.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - name: from
+        in: query
+        description: Start of the range (inclusive), a full minute.
+        schema:
+          $ref: '#/components/schemas/Timestamp'
+        required: true
+      - name: to
+        in: query
+        description: End of the range (exclusive), a full minute.
+        schema:
+          $ref: '#/components/schemas/Timestamp'
+        required: true
+      - name: space_id
+        in: query
+        description: Restrict to a space; required without owner role.
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      - name: metric
+        in: query
+        description: Metrics to return; absent means all metrics the caller may see.
+        style: form
+        explode: true
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatsMetric'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsTimeline'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    from: '2026-10-10T00:00:00.000Z'
+                    to: '2026-10-11T00:00:00.000Z'
+                    buckets:
+                    - start: '2026-10-10T09:30:00.000Z'
+                      metric: runs_finished
+                      channel_id: 0192f4a0-7b1c-7000-8a00-000000000201
+                      agent_id: 0192f4a0-7b1c-7000-8a00-000000000401
+                      dimension: completed
+                      count: 2
+                      sum: 84000
+                      good: 0
+                    runs:
+                    - run_id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
+                      channel_id: 0192f4a0-7b1c-7000-8a00-000000000201
+                      agent_id: 0192f4a0-7b1c-7000-8a00-000000000401
+                      queued_at: '2026-10-10T09:29:10.000Z'
+                      started_at: '2026-10-10T09:29:11.000Z'
+                      finished_at: '2026-10-10T09:30:35.000Z'
+                      state: completed
+                    runs_truncated: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /stats/slo:
+    get:
+      operationId: getStatsSlo
+      summary: SLO traffic light from own measurement
+      tags: [Stats]
+      description: |-
+        One entry per SLO of the Sloth files, computed from `stats_minutes` over the SLO period (docs/spec/25-visualisierung.md, section 6.4). Label "own measurement": values may differ from Prometheus. Requires `stats.read` on the instance (owner); a space manager gets `403 forbidden`.
+      x-authz-action: stats.read
+      x-rate-limit-class: rl.read
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsSloReport'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    at: '2026-10-10T09:30:00.000Z'
+                    measured_by: own
+                    items:
+                    - slo: bothy-sync/delivery-latency
+                      metric: sli.delivery_latency
+                      objective: 99.5
+                      threshold_ms: 500
+                      period_days: 30
+                      total: 1250000
+                      good: 1246100
+                      ratio: 0.99688
+                      budget_remaining: 0.376
+                      state: green
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /stats/backends:
+    get:
+      operationId: getStatsBackends
+      summary: Backend policy view per agent
+      tags: [Stats]
+      description: |-
+        Per agent: configured and reported billing mode, supported modes, switches, denied invocations (I2, I3), cost per mode and the rate-limit state reported by the adapter (docs/spec/25-visualisierung.md, section 6.2). Agents of channels visible to the caller; cost members only with `cost.read.aggregate`. Never credentials, subscriptions or runtime names of an instance.
+      x-authz-action: stats.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - name: from
+        in: query
+        description: Start of the range (inclusive).
+        schema:
+          $ref: '#/components/schemas/Timestamp'
+        required: true
+      - name: to
+        in: query
+        description: End of the range (exclusive).
+        schema:
+          $ref: '#/components/schemas/Timestamp'
+        required: true
+      - name: space_id
+        in: query
+        description: Restrict to a space; required without owner role.
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsBackendReport'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - agent_id: 0192f4a0-7b1c-7000-8a00-000000000401
+                      billing_mode: organization
+                      reported_billing_mode: organization
+                      billing_modes_supported: [organization]
+                      switches: 1
+                      invocations_denied:
+                        i2_denied: 0
+                        billing_mode_mismatch: 0
+                      costs:
+                      - billing_mode: organization
+                        currency: USD
+                        amount_micros: 12400000
+                        is_estimate: true
+                      rate_limit:
+                        state: near_limit
+                        resets_at: '2026-10-10T10:00:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /prices:
     get:
       operationId: listPrices
@@ -16515,6 +16814,1005 @@ paths:
           $ref: '#/components/responses/Conflict'
         '410':
           $ref: '#/components/responses/Gone'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /hosts:
+    get:
+      operationId: listHosts
+      summary: List hosts
+      tags: [Hosts]
+      description: |-
+        Owners see every host; other people see hosts they are assigned to or hold a `terminal` grant on (07, 2.12). Ordered by name.
+      x-authz-action: host.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HostPage'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                      name: Build server
+                      state: active
+                      platform: linux
+                      assigned_user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      llm_credentials: organization
+                      declared_server_host: false
+                      key_fingerprint: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+                      key_generation: 1
+                      profiles:
+                      - name: shell
+                        display_name: Shell
+                        kind: shell
+                      - name: claude
+                        display_name: Claude Code
+                        kind: claude
+                        workdirs: [Project A]
+                      doctor:
+                      - check: hd1_user
+                        ok: true
+                      connected: true
+                      host_version: 1.0.0
+                      created_at: '2026-10-10T09:30:00.000Z'
+                      version: 3
+
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createHost
+      summary: Register a host and issue its pairing code
+      tags: [Hosts]
+      description: |-
+        Creates a host in state `pairing` and returns the pairing code `bothy_hpc_...` exactly once; it is valid for `terminal.pairing_code_ttl` (24, 3.2). Needs step-up.
+      x-authz-action: host.manage
+      x-rate-limit-class: rl.admin
+      x-idempotency-exempt: auth_flow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostCreate'
+            examples:
+              default:
+                summary: Request
+                value:
+                  name: Build server
+                  assigned_user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                  reason: Shared build machine for Alex
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HostPairingCode'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                    pairing_code: bothy_hpc_EXAMPLE000000000000000000000000000000000000_EXAMPL
+                    expires_at: '2026-10-10T09:45:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /hosts/pair:
+    post:
+      operationId: pairHost
+      summary: Redeem a pairing code from the host service
+      tags: [Hosts]
+      description: |-
+        Called by `bothy-host pair` without login. Registers the static X25519 key (Noise) and the Ed25519 key (login) of the host. The host becomes `confirming`; an owner confirms the fingerprint (24, 3.2).
+      x-authz-action: host.pair
+      x-rate-limit-class: rl.public_auth
+      x-idempotency-exempt: auth_flow
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostPairRequest'
+            examples:
+              default:
+                summary: Request
+                value:
+                  pairing_code: bothy_hpc_EXAMPLE000000000000000000000000000000000000_EXAMPL
+                  noise_public_key: Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI
+                  auth_public_jwk:
+                    kty: OKP
+                    crv: Ed25519
+                    x: EXAMPLE-ed25519-public-key-base64url-0000000
+                  platform: linux
+                  os_version: Debian 13
+                  host_version: 1.0.0
+                  profiles:
+                  - name: shell
+                    display_name: Shell
+                    kind: shell
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HostPairResult'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                    key_fingerprint: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+                    instance_id: 0192f4a0-7b1c-7000-8a00-000000000001
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /hosts/{host_id}:
+    get:
+      operationId: getHost
+      summary: Read a host
+      tags: [Hosts]
+      x-authz-action: host.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/HostIdPath'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                    name: Build server
+                    state: active
+                    platform: linux
+                    assigned_user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    llm_credentials: organization
+                    declared_server_host: false
+                    key_fingerprint: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+                    key_generation: 1
+                    profiles:
+                    - name: shell
+                      display_name: Shell
+                      kind: shell
+                    - name: claude
+                      display_name: Claude Code
+                      kind: claude
+                      workdirs: [Project A]
+                    doctor:
+                    - check: hd1_user
+                      ok: true
+                    connected: true
+                    host_version: 1.0.0
+                    created_at: '2026-10-10T09:30:00.000Z'
+                    version: 3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      operationId: updateHost
+      summary: Change name or assignee of a host
+      tags: [Hosts]
+      description: |-
+        A new `assigned_user_id` ends the sessions of people who no longer qualify under SR10 (`access_revoked`). Needs step-up.
+      x-authz-action: host.manage
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/HostIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostUpdate'
+            examples:
+              default:
+                summary: Request
+                value:
+                  assigned_user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                  reason: Robin hands the machine to Alex
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                    name: Build server
+                    state: active
+                    platform: linux
+                    assigned_user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    llm_credentials: organization
+                    declared_server_host: false
+                    key_fingerprint: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+                    key_generation: 1
+                    profiles:
+                    - name: shell
+                      display_name: Shell
+                      kind: shell
+                    - name: claude
+                      display_name: Claude Code
+                      kind: claude
+                      workdirs: [Project A]
+                    doctor:
+                    - check: hd1_user
+                      ok: true
+                    connected: true
+                    host_version: 1.0.0
+                    created_at: '2026-10-10T09:30:00.000Z'
+                    version: 3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /hosts/{host_id}/pairing-code:
+    post:
+      operationId: issueHostPairingCode
+      summary: Issue a new pairing code (re-pairing)
+      tags: [Hosts]
+      description: |-
+        Sets the host to `pairing`, drops its keys at once, closes its connections and ends its sessions (`host_rekeyed`). Every owner gets `host.updated` with `key_changed` (24, 3.3). Needs step-up.
+      x-authz-action: host.manage
+      x-rate-limit-class: rl.admin
+      x-idempotency-exempt: auth_flow
+      parameters:
+      - $ref: '#/components/parameters/HostIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonBody'
+            examples:
+              default:
+                summary: Request
+                value:
+                  reason: Host reinstalled
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HostPairingCode'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                    pairing_code: bothy_hpc_EXAMPLE000000000000000000000000000000000000_EXAMPL
+                    expires_at: '2026-10-10T09:45:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /hosts/{host_id}/confirm:
+    post:
+      operationId: confirmHost
+      summary: Confirm the fingerprint and declare the LLM login
+      tags: [Hosts]
+      description: |-
+        The owner types the first `terminal.fingerprint_confirm_chars` characters shown by `bothy-host pair`. A mismatch gives `409 fingerprint_mismatch`; after `terminal.fingerprint_max_attempts` failures the host falls back to `pairing`. I6 is checked in the same transaction (`409 i6_violation`). Needs step-up.
+      x-authz-action: host.manage
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/HostIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostConfirm'
+            examples:
+              default:
+                summary: Request
+                value:
+                  fingerprint_prefix: 7K2QM9XD
+                  llm_credentials: organization
+                  declared_server_host: false
+                  reason: Build machine of the engineering team
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                    name: Build server
+                    state: active
+                    platform: linux
+                    assigned_user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    llm_credentials: organization
+                    declared_server_host: false
+                    key_fingerprint: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+                    key_generation: 1
+                    profiles:
+                    - name: shell
+                      display_name: Shell
+                      kind: shell
+                    - name: claude
+                      display_name: Claude Code
+                      kind: claude
+                      workdirs: [Project A]
+                    doctor:
+                    - check: hd1_user
+                      ok: true
+                    connected: true
+                    host_version: 1.0.0
+                    created_at: '2026-10-10T09:30:00.000Z'
+                    version: 3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /hosts/{host_id}/llm-credentials:
+    put:
+      operationId: setHostLlmCredentials
+      summary: Declare the LLM login of a host
+      tags: [Hosts]
+      description: |-
+        `personal` needs `credential_holder_id`. Fails with `409 i6_violation` if any grant on the host names another subject than the holder; switching to `personal` or changing the holder ends sessions of other people (`i6_violation`, 24, 7.3). Needs step-up.
+      x-authz-action: host.manage
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/HostIdPath'
+      - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostLlmCredentialsSet'
+            examples:
+              default:
+                summary: Request
+                value:
+                  llm_credentials: personal
+                  credential_holder_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                  reason: Alex uses the own subscription on this laptop
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                    name: Build server
+                    state: active
+                    platform: linux
+                    assigned_user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    llm_credentials: organization
+                    declared_server_host: false
+                    key_fingerprint: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+                    key_generation: 1
+                    profiles:
+                    - name: shell
+                      display_name: Shell
+                      kind: shell
+                    - name: claude
+                      display_name: Claude Code
+                      kind: claude
+                      workdirs: [Project A]
+                    doctor:
+                    - check: hd1_user
+                      ok: true
+                    connected: true
+                    host_version: 1.0.0
+                    created_at: '2026-10-10T09:30:00.000Z'
+                    version: 3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /hosts/{host_id}/state:
+    post:
+      operationId: setHostState
+      summary: Disable, enable or retire a host
+      tags: [Hosts]
+      description: |-
+        `disabled` and `retired` end all sessions (`host_disabled`, `host_retired`) and close the connections of the host service. `retired` is final. Needs step-up.
+      x-authz-action: host.manage
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/HostIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HostStateSet'
+            examples:
+              default:
+                summary: Request
+                value:
+                  state: disabled
+                  reason: Machine sent for repair
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                    name: Build server
+                    state: active
+                    platform: linux
+                    assigned_user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    llm_credentials: organization
+                    declared_server_host: false
+                    key_fingerprint: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+                    key_generation: 1
+                    profiles:
+                    - name: shell
+                      display_name: Shell
+                      kind: shell
+                    - name: claude
+                      display_name: Claude Code
+                      kind: claude
+                      workdirs: [Project A]
+                    doctor:
+                    - check: hd1_user
+                      ok: true
+                    connected: true
+                    host_version: 1.0.0
+                    created_at: '2026-10-10T09:30:00.000Z'
+                    version: 3
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /hosts/{host_id}/terminal/sessions:
+    post:
+      operationId: openTerminalSession
+      summary: Open a terminal session
+      tags: [Terminal]
+      description: |-
+        Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10 and SR11 (I6). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+      x-authz-action: terminal.open
+      x-rate-limit-class: rl.terminal
+      x-idempotency-exempt: auth_flow
+      parameters:
+      - $ref: '#/components/parameters/HostIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TerminalSessionOpen'
+            examples:
+              default:
+                summary: Request
+                value:
+                  profile: shell
+                  cols: 120
+                  rows: 40
+                  client_ephemeral_key_hash: EXAMPLE-sha256-of-ephemeral-key-base64url00
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminalSessionGrant'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    session:
+                      id: 0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f
+                      host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                      user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                      profile: shell
+                      state: active
+                      opened_at: '2026-10-10T09:31:00.000Z'
+                      started_at: '2026-10-10T09:31:01.000Z'
+                      bytes_in: 4096
+                      bytes_out: 65536
+                      version: 2
+                    session_token: eyJhbGciOiJFZERTQSIsImtpZCI6InRlcm0tMjAyNi0xMCIsInR5cCI6InRlcm1pbmFsLXNlc3Npb24rand0In0.EXAMPLE.EXAMPLE
+                    session_token_expires_at: '2026-10-10T09:31:30.000Z'
+                    stream_path: /api/v1/terminal/sessions/0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f/stream
+                    noise_public_key: Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI
+                    key_fingerprint: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+                    key_generation: 1
+                    noise_protocol: Noise_NK_25519_ChaChaPoly_SHA256
+                    prologue_version: bothy-terminal/1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /terminal/sessions:
+    get:
+      operationId: listTerminalSessions
+      summary: List terminal sessions
+      tags: [Terminal]
+      description: |-
+        Own sessions; owners see all sessions. Metadata only, never content.
+      x-authz-action: terminal.read_own
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - $ref: '#/components/parameters/HostIdQuery'
+      - $ref: '#/components/parameters/TerminalSessionStateQuery'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminalSessionPage'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - id: 0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f
+                      host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                      user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                      profile: shell
+                      state: active
+                      opened_at: '2026-10-10T09:31:00.000Z'
+                      started_at: '2026-10-10T09:31:01.000Z'
+                      bytes_in: 4096
+                      bytes_out: 65536
+                      version: 2
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /terminal/sessions/{session_id}:
+    get:
+      operationId: getTerminalSession
+      summary: Read a terminal session
+      tags: [Terminal]
+      x-authz-action: terminal.read_own
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/TerminalSessionIdPath'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminalSession'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f
+                    host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                    user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                    profile: shell
+                    state: active
+                    opened_at: '2026-10-10T09:31:00.000Z'
+                    started_at: '2026-10-10T09:31:01.000Z'
+                    bytes_in: 4096
+                    bytes_out: 65536
+                    version: 2
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /terminal/sessions/{session_id}/attach:
+    post:
+      operationId: attachTerminalSession
+      summary: Attach to an own session again
+      tags: [Terminal]
+      description: |-
+        For a session in state `opening`, `active` or `detached`. Needs a fresh step-up, except from the same device in the same login session within `terminal.quick_reattach_window` after the disconnect. Returns a new session token; older tokens become worthless. A connection of another device is closed with `4103` (24, 6.2).
+      x-authz-action: terminal.attach
+      x-rate-limit-class: rl.terminal
+      x-idempotency-exempt: auth_flow
+      parameters:
+      - $ref: '#/components/parameters/TerminalSessionIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TerminalSessionAttach'
+            examples:
+              default:
+                summary: Request
+                value:
+                  cols: 120
+                  rows: 40
+                  client_ephemeral_key_hash: EXAMPLE-sha256-of-ephemeral-key-base64url00
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminalSessionGrant'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    session:
+                      id: 0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f
+                      host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                      user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                      profile: shell
+                      state: active
+                      opened_at: '2026-10-10T09:31:00.000Z'
+                      started_at: '2026-10-10T09:31:01.000Z'
+                      bytes_in: 4096
+                      bytes_out: 65536
+                      version: 2
+                    session_token: eyJhbGciOiJFZERTQSIsImtpZCI6InRlcm0tMjAyNi0xMCIsInR5cCI6InRlcm1pbmFsLXNlc3Npb24rand0In0.EXAMPLE.EXAMPLE
+                    session_token_expires_at: '2026-10-10T09:31:30.000Z'
+                    stream_path: /api/v1/terminal/sessions/0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f/stream
+                    noise_public_key: Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI
+                    key_fingerprint: 7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000
+                    key_generation: 1
+                    noise_protocol: Noise_NK_25519_ChaChaPoly_SHA256
+                    prologue_version: bothy-terminal/1
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /terminal/sessions/{session_id}/close:
+    post:
+      operationId: closeTerminalSession
+      summary: End a terminal session
+      tags: [Terminal]
+      description: |-
+        Own sessions; owners any session (`closed_by_owner`). The server closes both connections and tells the host service to end the PTY.
+      x-authz-action: terminal.close
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/TerminalSessionIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReasonBody'
+            examples:
+              default:
+                summary: Request
+                value:
+                  reason: Done
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TerminalSession'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f
+                    host_id: 0192f4a0-7b1c-7a11-8c3e-4f5a6b7c8d9e
+                    user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                    profile: shell
+                    state: closed
+                    opened_at: '2026-10-10T09:31:00.000Z'
+                    started_at: '2026-10-10T09:31:01.000Z'
+                    bytes_in: 4096
+                    bytes_out: 65536
+                    version: 2
+                    closed_at: '2026-10-10T10:00:00.000Z'
+                    close_reason: client_closed
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -18731,6 +20029,30 @@ components:
       required: true
       schema:
         $ref: '#/components/schemas/Uuid'
+    HostIdPath:
+      name: host_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    TerminalSessionIdPath:
+      name: session_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    HostIdQuery:
+      name: host_id
+      in: query
+      description: Only sessions on this host.
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    TerminalSessionStateQuery:
+      name: state
+      in: query
+      description: Only sessions in this state; without it, all states.
+      schema:
+        $ref: '#/components/schemas/TerminalSessionState'
     ConsumerPath:
       name: consumer
       in: path
@@ -18894,7 +20216,7 @@ components:
           $ref: '#/components/headers/DPoP-Nonce'
     Forbidden:
       x-status: 403
-      description: 'Problem codes: `forbidden`, `scope_missing`, `device_pending`, `channel_read_only`, `feature_disabled`, `agent_invocation_denied`, `invocation_token_invalid`.'
+      description: 'Problem codes: `forbidden`, `scope_missing`, `device_pending`, `channel_read_only`, `feature_disabled`, `agent_invocation_denied`, `invocation_token_invalid`, `terminal_denied`.'
       content:
         application/problem+json:
           schema:
@@ -18934,7 +20256,7 @@ components:
           $ref: '#/components/headers/Correlation-Id'
     Conflict:
       x-status: 409
-      description: 'Problem codes: `conflict`, `request_in_progress`, `i1_violation`, `last_owner`, `already_started`, `billing_mode_mismatch`, `tool_class_mismatch`, `invalid_state_transition`, `base_version_conflict`, `component_used`, `operator_mismatch`, `file_not_ready`, `title_manual`.'
+      description: 'Problem codes: `conflict`, `request_in_progress`, `i1_violation`, `i6_violation`, `last_owner`, `already_started`, `billing_mode_mismatch`, `tool_class_mismatch`, `invalid_state_transition`, `base_version_conflict`, `component_used`, `operator_mismatch`, `file_not_ready`, `title_manual`, `host_unavailable`, `fingerprint_mismatch`.'
       content:
         application/problem+json:
           schema:
@@ -19187,8 +20509,8 @@ components:
       enum: [read, write, trigger]
     Capability:
       type: string
-      description: Additional right next to the level.
-      enum: [approve_actions, upload, export, manage]
+      description: Additional right next to the level. `terminal` exists only on the target `host`.
+      enum: [approve_actions, upload, export, manage, terminal]
     PrincipalKind:
       type: string
       enum: [user, agent, app]
@@ -19324,7 +20646,7 @@ components:
       - code: step_up_required
         status: 401
         title: 'Step-up required'
-        description: 'The action needs a fresh confirmation (`auth.step_up_max_age`), or a step-up confirmation failed.'
+        description: 'The action needs a fresh confirmation (`auth.step_up_max_age`), or a step-up confirmation failed. For `terminal.open` and `terminal.attach`: younger than `terminal.step_up_max_age`, not yet consumed, by passkey or step-up device key; in the console only by passkey with `userVerification = required`, otherwise `reason: passkey_required` (08 section 6.3). The quick reattach without step-up never applies in the console.'
         client_action: 'Perform step-up, then repeat the same request with the same `Idempotency-Key`.'
       - code: use_dpop_nonce
         status: 401
@@ -19366,6 +20688,11 @@ components:
         title: 'Agent invocation denied'
         description: '`agent.invoke` denies; `reason` for example `billing_mode_personal_not_holder`, `project_not_ready`.'
         client_action: 'Show the reason; do not retry.'
+      - code: terminal_denied
+        status: 403
+        title: 'Terminal denied'
+        description: 'The `terminal` right exists, but a guard rule or limit blocks; `reason` is `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `session_limit` or `profile_unknown` (24 section 13).'
+        client_action: 'Show the reason; do not retry.'
       - code: invocation_token_invalid
         status: 403
         title: 'Invocation token invalid'
@@ -19397,6 +20724,11 @@ components:
         title: 'I1 violation'
         description: 'The change would violate I1; `hint` names the way out.'
         client_action: 'Switch to `organization` first.'
+      - code: i6_violation
+        status: 409
+        title: 'I6 violation'
+        description: 'The change would let someone other than the holder of a personal LLM login open a terminal on the host (I6); `hint` names the way out.'
+        client_action: 'Revoke the other grants or declare `organization` first.'
       - code: last_owner
         status: 409
         title: 'Last owner'
@@ -19417,6 +20749,16 @@ components:
         title: 'Tool class mismatch'
         description: 'The reported tool class is above the one in the invocation token; the run becomes `failed`.'
         client_action: 'Check the adapter configuration.'
+      - code: host_unavailable
+        status: 409
+        title: 'Host unavailable'
+        description: 'The host is not `active` or its host service is not connected.'
+        client_action: 'Show the host state; retry when `host.presence_changed` reports it connected.'
+      - code: fingerprint_mismatch
+        status: 409
+        title: 'Fingerprint mismatch'
+        description: 'The typed fingerprint prefix does not match the keys the host service registered.'
+        client_action: 'Compare with the output of `bothy-host pair` and type it again; after too many failures pair again.'
       - code: invalid_state_transition
         status: 409
         title: 'Invalid state transition'
@@ -19735,7 +21077,7 @@ components:
           examples: [loch]
     Jwks:
       type: object
-      description: JSON Web Key Set (RFC 7517) with the public keys for access tokens and invocation tokens.
+      description: JSON Web Key Set (RFC 7517) with the public keys for access tokens, invocation tokens and terminal session tokens.
       required: [keys]
       properties:
         keys:
@@ -20829,7 +22171,8 @@ components:
           $ref: '#/components/schemas/Timestamp'
     TargetKind:
       type: string
-      enum: [instance, space, channel]
+      description: '`host` is a connected host for the terminal; it has no level and only the capability `terminal` (24, 8.1).'
+      enum: [instance, space, channel, host]
     GrantSubjectKind:
       type: string
       enum: [user, group, agent, app]
@@ -20840,7 +22183,6 @@ components:
       - subject_kind
       - subject_id
       - target_kind
-      - level
       - capabilities
       - reason
       - granted_by
@@ -20860,6 +22202,7 @@ components:
           description: Absent for `instance`.
         level:
           $ref: '#/components/schemas/Level'
+          description: Absent exactly for `target_kind = host`.
         capabilities:
           type: array
           items:
@@ -20881,7 +22224,8 @@ components:
           type: string
     GrantCreate:
       type: object
-      required: [subject_kind, subject_id, target_kind, level, reason]
+      description: '`level` is required for every target except `host`, where it must be absent and `capabilities` must be exactly `[terminal]` (07, 2.12).'
+      required: [subject_kind, subject_id, target_kind, reason]
       properties:
         subject_kind:
           $ref: '#/components/schemas/GrantSubjectKind'
@@ -20938,7 +22282,7 @@ components:
       properties:
         code:
           type: string
-          enum: [read_horizon, trigger_blocked_tool_class, group_reach, expiry_missing]
+          enum: [read_horizon, trigger_blocked_tool_class, group_reach, expiry_missing, terminal_not_effective]
         agent_id:
           $ref: '#/components/schemas/Uuid'
         principal_id:
@@ -20977,12 +22321,15 @@ components:
             $ref: '#/components/schemas/Capability'
     InvariantViolation:
       type: object
-      required: [code, agent_id, principal_ids]
+      description: '`i1_violation` names `agent_id`; `i6_violation` names `host_id`.'
+      required: [code, principal_ids]
       properties:
         code:
           type: string
           examples: [i1_violation]
         agent_id:
+          $ref: '#/components/schemas/Uuid'
+        host_id:
           $ref: '#/components/schemas/Uuid'
         credential_holder_id:
           $ref: '#/components/schemas/Uuid'
@@ -22738,6 +24085,8 @@ components:
         billing_mode_matches:
           type: boolean
           description: False when the reported mode differs from the configured `billing_mode`.
+        rate_limit:
+          $ref: '#/components/schemas/AgentRateLimitState'
     AgentCreate:
       type: object
       required: [handle, display_name, adapter_kind]
@@ -22838,6 +24187,8 @@ components:
           $ref: '#/components/schemas/BillingEvidence'
         reported_tool_class:
           $ref: '#/components/schemas/ToolClass'
+        rate_limit:
+          $ref: '#/components/schemas/AgentRateLimitState'
         details:
           $ref: '#/components/schemas/JsonObject'
           description: Further fields of schema `agent_heartbeat.v1` (capabilities, active runs). No secrets, no content.
@@ -25496,6 +26847,388 @@ components:
           $ref: '#/components/schemas/Uuid'
         thread_id:
           $ref: '#/components/schemas/Uuid'
+    StatsMetric:
+      type: string
+      description: Metric of the own measurement in `stats_minutes` (docs/spec/25-visualisierung.md, section 3.2).
+      enum:
+      - messages_created
+      - threads_created
+      - runs_started
+      - runs_finished
+      - tool_calls
+      - approval_cards
+      - cost
+      - invocations_denied
+      - billing_mode_switches
+      - catchups
+      - resyncs
+      - slow_consumer_closes
+      - sli.api_availability
+      - sli.delivery_latency
+      - sli.reconnect
+      - sli.push_acceptance
+      - sli.run_start
+      - sli.turn_duration
+    StatsScope:
+      type: object
+      required: [kind]
+      properties:
+        kind:
+          type: string
+          enum: [instance, space]
+        space_id:
+          $ref: '#/components/schemas/Uuid'
+    AgentRateLimitState:
+      type: object
+      description: Rate-limit state of the agent runtime at its provider as reported by the adapter (`agent_heartbeat.v1`). Never quotas of an account, keys or subscription names.
+      required: [state]
+      properties:
+        state:
+          type: string
+          enum: [ok, near_limit, limited, unknown]
+        resets_at:
+          $ref: '#/components/schemas/Timestamp'
+    StatsLiveStep:
+      type: object
+      description: Current step of a run; only kind and name (for tools the tool name), never title or detail.
+      required: [kind, name]
+      properties:
+        kind:
+          type: string
+          enum: [tool_call, status, subagent, workflow, background_job]
+        name:
+          type: string
+          examples: [Bash]
+    StatsLiveRun:
+      type: object
+      required: [run_id, thread_id, channel_id, space_id, agent_id, state, queued_at, billing_mode, approval_pending]
+      properties:
+        run_id:
+          $ref: '#/components/schemas/Uuid'
+        thread_id:
+          $ref: '#/components/schemas/Uuid'
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        space_id:
+          $ref: '#/components/schemas/Uuid'
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        state:
+          type: string
+          enum: [queued, running, waiting_input]
+        queued_at:
+          $ref: '#/components/schemas/Timestamp'
+        started_at:
+          $ref: '#/components/schemas/Timestamp'
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+          description: Mode used by the run, else the configured mode.
+        step:
+          $ref: '#/components/schemas/StatsLiveStep'
+        approval_pending:
+          type: boolean
+          description: An approval card of this run waits for a decision.
+        cost_micros:
+          type: integer
+          format: int64
+          description: Cost so far; only with `cost.read.aggregate`.
+        currency:
+          type: string
+          examples: [USD]
+        cost_is_estimate:
+          type: boolean
+    StatsLiveAgent:
+      type: object
+      required: [agent_id, presence, billing_mode]
+      properties:
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        presence:
+          $ref: '#/components/schemas/AgentRuntimeState'
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        reported_billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+          description: Absent when the adapter follows the configured mode per run.
+        rate_limit:
+          $ref: '#/components/schemas/AgentRateLimitState'
+    StatsLiveRate:
+      type: object
+      description: Sum of `count` (and `sum` where meaningful) of one metric over the last full minute and the current minute up to `at`.
+      required: [metric, last_minute, current_minute]
+      properties:
+        metric:
+          $ref: '#/components/schemas/StatsMetric'
+        dimension:
+          type: string
+          description: Dimension code; absent means all dimensions summed.
+        last_minute:
+          type: integer
+          format: int64
+        current_minute:
+          type: integer
+          format: int64
+        last_minute_sum:
+          type: integer
+          format: int64
+          description: Sum of values (milliseconds or micro units) of the last full minute.
+        currency:
+          type: string
+          description: Only for metric `cost`.
+    StatsLiveSli:
+      type: object
+      required: [metric, total, good]
+      properties:
+        metric:
+          $ref: '#/components/schemas/StatsMetric'
+        total:
+          type: integer
+          format: int64
+        good:
+          type: integer
+          format: int64
+        ratio:
+          type: number
+          format: double
+          description: '`good / total`; absent when `total` is 0.'
+    StatsLiveConnections:
+      type: object
+      description: Gateway connections of this node; only with `cluster.mode = single`.
+      required: [user, agent, app]
+      properties:
+        user:
+          type: integer
+        agent:
+          type: integer
+        app:
+          type: integer
+    StatsLiveFrame:
+      type: object
+      description: Live frame (docs/spec/25-visualisierung.md, section 5.2). No person values, no content.
+      required: [at, interval_ms, scope, runs, runs_truncated, agents, rates]
+      properties:
+        at:
+          $ref: '#/components/schemas/Timestamp'
+        interval_ms:
+          type: integer
+          examples: [1000]
+        scope:
+          $ref: '#/components/schemas/StatsScope'
+        runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatsLiveRun'
+        runs_truncated:
+          type: boolean
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatsLiveAgent'
+        rates:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatsLiveRate'
+        sli:
+          type: array
+          description: Only for the instance scope.
+          items:
+            $ref: '#/components/schemas/StatsLiveSli'
+        connections:
+          $ref: '#/components/schemas/StatsLiveConnections'
+    StatsTimelineBucket:
+      type: object
+      description: One row of `stats_minutes`.
+      required: [start, metric, dimension, count, sum, good]
+      properties:
+        start:
+          $ref: '#/components/schemas/Timestamp'
+        metric:
+          $ref: '#/components/schemas/StatsMetric'
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        dimension:
+          type: string
+          description: Code from the closed list per metric; empty string when the metric has none.
+        currency:
+          type: string
+        count:
+          type: integer
+          format: int64
+        sum:
+          type: integer
+          format: int64
+        good:
+          type: integer
+          format: int64
+    StatsTimelineRun:
+      type: object
+      required: [run_id, channel_id, agent_id, queued_at, state]
+      properties:
+        run_id:
+          $ref: '#/components/schemas/Uuid'
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        queued_at:
+          $ref: '#/components/schemas/Timestamp'
+        started_at:
+          $ref: '#/components/schemas/Timestamp'
+        finished_at:
+          $ref: '#/components/schemas/Timestamp'
+        state:
+          $ref: '#/components/schemas/RunState'
+    StatsTimeline:
+      type: object
+      required: [from, to, buckets, runs, runs_truncated]
+      properties:
+        from:
+          $ref: '#/components/schemas/Timestamp'
+        to:
+          $ref: '#/components/schemas/Timestamp'
+        buckets:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatsTimelineBucket'
+        runs:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatsTimelineRun'
+        runs_truncated:
+          type: boolean
+    StatsSloState:
+      type: string
+      enum: [green, amber, red, insufficient_data]
+      description: Traffic light of one SLO (docs/spec/25-visualisierung.md, section 6.4).
+    StatsSloEntry:
+      type: object
+      required: [slo, metric, objective, period_days, total, good, state]
+      properties:
+        slo:
+          type: string
+          description: '`service/name` of the Sloth file.'
+          examples: [bothy-sync/delivery-latency]
+        metric:
+          $ref: '#/components/schemas/StatsMetric'
+        objective:
+          type: number
+          format: double
+          description: Objective in percent from the Sloth file.
+        threshold_ms:
+          type: integer
+          description: Threshold of a latency SLO; absent for ratio SLOs.
+        period_days:
+          type: integer
+        total:
+          type: integer
+          format: int64
+        good:
+          type: integer
+          format: int64
+        ratio:
+          type: number
+          format: double
+        budget_remaining:
+          type: number
+          format: double
+          description: Remaining error budget, `1 - (1 - ratio) / (1 - objective/100)`; may be negative.
+        state:
+          $ref: '#/components/schemas/StatsSloState'
+    StatsSloReport:
+      type: object
+      required: [at, measured_by, items]
+      properties:
+        at:
+          $ref: '#/components/schemas/Timestamp'
+        measured_by:
+          type: string
+          enum: [own]
+          description: Always `own`; the values come from the own measurement, not from Prometheus.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatsSloEntry'
+    StatsBackendCost:
+      type: object
+      required: [billing_mode, currency, amount_micros, is_estimate]
+      properties:
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        currency:
+          type: string
+        amount_micros:
+          type: integer
+          format: int64
+        is_estimate:
+          type: boolean
+    StatsBackendDenials:
+      type: object
+      required: [i2_denied, billing_mode_mismatch]
+      properties:
+        i2_denied:
+          type: integer
+          format: int64
+        billing_mode_mismatch:
+          type: integer
+          format: int64
+    StatsBackendAgent:
+      type: object
+      required: [agent_id, billing_mode, billing_modes_supported, switches, invocations_denied]
+      properties:
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        reported_billing_mode:
+          $ref: '#/components/schemas/BillingMode'
+        billing_modes_supported:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillingMode'
+        switches:
+          type: integer
+          format: int64
+          description: Billing mode switches in the range.
+        invocations_denied:
+          $ref: '#/components/schemas/StatsBackendDenials'
+        costs:
+          type: array
+          description: Only with `cost.read.aggregate`.
+          items:
+            $ref: '#/components/schemas/StatsBackendCost'
+        rate_limit:
+          $ref: '#/components/schemas/AgentRateLimitState'
+    StatsBackendReport:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/StatsBackendAgent'
+    GatewayStatsSubscribe:
+      type: object
+      description: Subscribe to `stats.live`; without `space_id` the instance (owner). Replaces an earlier subscription of the connection.
+      properties:
+        space_id:
+          $ref: '#/components/schemas/Uuid'
+    GatewayStatsUnsubscribe:
+      type: object
+      description: End the `stats.live` subscription of the connection.
+    StatsLiveEvent:
+      description: Ephemeral event `stats.live` (no `seq`, at most once), only to connections with a subscription.
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [stats.live]
+          payload:
+            $ref: '#/components/schemas/StatsLiveFrame'
     StatsGranularity:
       type: string
       enum: [hour, day, week, month]
@@ -25514,7 +27247,8 @@ components:
       description: State derived from heartbeats.
     SigningKeyPurpose:
       type: string
-      enum: [access_token, invocation, webhook_out]
+      description: Purpose of a server signing key (03 `server_signing_keys.purpose`). `terminal` signs terminal session tokens (24 section 5.3); `audit_checkpoint` signs audit checkpoints (19 SEC-AUD-7).
+      enum: [access_token, invocation, terminal, webhook_out, audit_checkpoint]
     UserStatus:
       type: string
       enum: [pending, active, disabled, deleted]
@@ -25527,7 +27261,8 @@ components:
       description: Level including `none` for no access.
     AccessTargetKind:
       type: string
-      enum: [space, channel]
+      description: '`host` appears only in `access.changed` and `access.expiring` (terminal right, no level).'
+      enum: [space, channel, host]
     OperatorMode:
       type: string
       enum: [inherit, none, agent]
@@ -26449,6 +28184,8 @@ components:
       - $ref: '#/components/schemas/InteractionCreatedEvent'
       - $ref: '#/components/schemas/CommandInvokedEvent'
       - $ref: '#/components/schemas/AgentConfigChangedEvent'
+      - $ref: '#/components/schemas/HostUpdatedEvent'
+      - $ref: '#/components/schemas/TerminalSessionChangedEvent'
       discriminator:
         propertyName: type
         mapping:
@@ -26500,6 +28237,8 @@ components:
           interaction.created: '#/components/schemas/InteractionCreatedEvent'
           command.invoked: '#/components/schemas/CommandInvokedEvent'
           agent.config_changed: '#/components/schemas/AgentConfigChangedEvent'
+          host.updated: '#/components/schemas/HostUpdatedEvent'
+          terminal_session.changed: '#/components/schemas/TerminalSessionChangedEvent'
     MentionItemPage:
       type: object
       description: One page. `next_cursor` is absent on the last page.
@@ -26763,3 +28502,571 @@ components:
             $ref: '#/components/schemas/GdprRequest'
         next_cursor:
           $ref: '#/components/schemas/Cursor'
+    HostState:
+      type: string
+      description: Life cycle of a host (24, 3.1). Only `active` allows sessions.
+      enum: [pairing, confirming, active, disabled, retired]
+    LlmCredentials:
+      type: string
+      description: Owner declaration of the LLM login on a host (24, 7.2). `personal` needs `credential_holder_id` (I6).
+      enum: [none, personal, organization]
+    HostPlatform:
+      type: string
+      enum: [macos, linux, windows]
+    HostProfile:
+      type: object
+      description: Profile reported by the host service (`host_profiles.v1`). Never a command line, path or environment.
+      required: [name, display_name, kind]
+      properties:
+        name:
+          type: string
+          pattern: ^[a-z0-9][a-z0-9_-]*$
+          examples: [shell]
+        display_name:
+          type: string
+          examples: [Shell]
+        kind:
+          type: string
+          enum: [shell, claude, command]
+        workdirs:
+          type: array
+          description: Display names of the allowed working directories of a `claude` profile; the client sends the index, never a path.
+          items:
+            type: string
+            examples: [Project A]
+    HostDoctorCheck:
+      type: object
+      description: Result of one self-check of the host service (`host_doctor.v1`, checks HD1 to HD8 in 24, 2.2). Codes only.
+      required: [check, ok]
+      properties:
+        check:
+          type: string
+          enum: [hd1_user, hd2_groups, hd3_sudo, hd4_state_dir, hd5_server_host, hd6_llm_login, hd7_profiles, hd8_separation]
+        ok:
+          type: boolean
+        code:
+          type: string
+          pattern: ^[a-z0-9_]+$
+          examples: [subscription_login_detected]
+    Host:
+      type: object
+      description: A connected host. Keys are public; the client pins `noise_public_key` per device (24, 5.5).
+      required: [id, name, state, llm_credentials, declared_server_host, key_generation, profiles, doctor, connected, created_at, version]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+          examples: [Build server]
+        state:
+          $ref: '#/components/schemas/HostState'
+        disabled_reason:
+          type: string
+          description: Present exactly with `state = disabled`. `duplicate_connection` means a second live control connection with the same keys; only re-pairing helps (24, 3.4).
+          enum: [owner, duplicate_connection]
+        platform:
+          $ref: '#/components/schemas/HostPlatform'
+        assigned_user_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Person the host is assigned to (SR10); absent means owners only.
+        llm_credentials:
+          $ref: '#/components/schemas/LlmCredentials'
+        credential_holder_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Present exactly with `llm_credentials = personal`.
+        declared_server_host:
+          type: boolean
+        reported_is_server_host:
+          type: boolean
+          description: Report of the host service (24, 2.3); absent before the first report.
+        noise_public_key:
+          type: string
+          description: Static X25519 key of the host, 32 bytes base64url without padding; absent before pairing.
+          examples: [Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyMTI]
+        key_fingerprint:
+          type: string
+          examples: [7K2Q-M9XD-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000-0000]
+        key_generation:
+          type: integer
+          examples: [1]
+        profiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostProfile'
+        doctor:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostDoctorCheck'
+        require_local_confirm:
+          type: boolean
+          description: Report whether `host_service.require_local_confirm` is on.
+        connected:
+          type: boolean
+          description: The control connection of the host service is open (memory of the server).
+        host_version:
+          type: string
+          examples: [1.0.0]
+        os_version:
+          type: string
+          examples: [Debian 13]
+        last_seen_at:
+          $ref: '#/components/schemas/Timestamp'
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        version:
+          type: integer
+          format: int64
+    HostPage:
+      type: object
+      description: One page. `next_cursor` is absent on the last page.
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Host'
+        next_cursor:
+          $ref: '#/components/schemas/Cursor'
+    HostCreate:
+      type: object
+      required: [name, reason]
+      properties:
+        name:
+          type: string
+          examples: [Build server]
+        assigned_user_id:
+          $ref: '#/components/schemas/Uuid'
+        reason:
+          type: string
+          examples: [Shared build machine for Alex]
+    HostPairingCode:
+      type: object
+      description: The pairing code is shown exactly once; the server stores only its HMAC.
+      required: [host_id, pairing_code, expires_at]
+      properties:
+        host_id:
+          $ref: '#/components/schemas/Uuid'
+        pairing_code:
+          type: string
+          pattern: ^bothy_hpc_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$
+          examples: [bothy_hpc_EXAMPLE000000000000000000000000000000000000_EXAMPL]
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+    HostPairRequest:
+      type: object
+      required: [pairing_code, noise_public_key, auth_public_jwk, platform, host_version, profiles]
+      properties:
+        pairing_code:
+          type: string
+          pattern: ^bothy_hpc_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$
+        noise_public_key:
+          type: string
+          description: Static X25519 public key, 32 bytes base64url without padding.
+        auth_public_jwk:
+          $ref: '#/components/schemas/JsonObject'
+          description: Ed25519 public key as JWK (`kty = OKP`, `crv = Ed25519`); a private member is rejected.
+        platform:
+          $ref: '#/components/schemas/HostPlatform'
+        os_version:
+          type: string
+        host_version:
+          type: string
+          examples: [1.0.0]
+        profiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostProfile'
+    HostPairResult:
+      type: object
+      required: [host_id, key_fingerprint, instance_id]
+      properties:
+        host_id:
+          $ref: '#/components/schemas/Uuid'
+        key_fingerprint:
+          type: string
+        instance_id:
+          $ref: '#/components/schemas/Uuid'
+    HostUpdate:
+      type: object
+      description: Members that are absent stay unchanged. To remove the assignee send `clear_assigned_user` (no JSON null, ADR 0053).
+      required: [reason]
+      properties:
+        name:
+          type: string
+        assigned_user_id:
+          $ref: '#/components/schemas/Uuid'
+        clear_assigned_user:
+          type: boolean
+        reason:
+          type: string
+    HostConfirm:
+      type: object
+      required: [fingerprint_prefix, llm_credentials, declared_server_host, reason]
+      properties:
+        fingerprint_prefix:
+          type: string
+          description: First `terminal.fingerprint_confirm_chars` characters of the fingerprint without separators, case-insensitive.
+          examples: [7K2QM9XD]
+        llm_credentials:
+          $ref: '#/components/schemas/LlmCredentials'
+        credential_holder_id:
+          $ref: '#/components/schemas/Uuid'
+        declared_server_host:
+          type: boolean
+        reason:
+          type: string
+    HostLlmCredentialsSet:
+      type: object
+      required: [llm_credentials, reason]
+      properties:
+        llm_credentials:
+          $ref: '#/components/schemas/LlmCredentials'
+        credential_holder_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Required exactly with `personal`.
+        reason:
+          type: string
+    HostStateSet:
+      type: object
+      required: [state, reason]
+      properties:
+        state:
+          type: string
+          enum: [active, disabled, retired]
+        reason:
+          type: string
+    TerminalSessionState:
+      type: string
+      enum: [opening, active, detached, closed]
+    TerminalCloseReason:
+      type: string
+      description: Why a session ended (24, 10.3).
+      enum: [client_closed, closed_by_owner, process_exited, idle_timeout, max_duration, detach_expired, access_revoked, i6_violation, host_disabled, host_retired, host_rekeyed, user_disabled, device_revoked, session_revoked, logout, open_failed, host_policy_violation]
+    TerminalCloseDetail:
+      type: string
+      enum: [token_invalid, token_expired, token_replayed, handshake_failed, profile_unknown, server_host_owner_only, local_confirm_denied, subscription_login_detected, pty_failed, open_timeout]
+    TerminalSession:
+      type: object
+      description: Metadata of a terminal session. Never content.
+      required: [id, host_id, user_id, device_id, profile, state, opened_at, bytes_in, bytes_out, version]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        host_id:
+          $ref: '#/components/schemas/Uuid'
+        user_id:
+          $ref: '#/components/schemas/Uuid'
+        device_id:
+          $ref: '#/components/schemas/Uuid'
+        profile:
+          type: string
+          examples: [shell]
+        state:
+          $ref: '#/components/schemas/TerminalSessionState'
+        opened_at:
+          $ref: '#/components/schemas/Timestamp'
+        started_at:
+          $ref: '#/components/schemas/Timestamp'
+        detached_at:
+          $ref: '#/components/schemas/Timestamp'
+        closed_at:
+          $ref: '#/components/schemas/Timestamp'
+        close_reason:
+          $ref: '#/components/schemas/TerminalCloseReason'
+        close_detail:
+          $ref: '#/components/schemas/TerminalCloseDetail'
+        exit_code:
+          type: integer
+        bytes_in:
+          type: integer
+          format: int64
+        bytes_out:
+          type: integer
+          format: int64
+        version:
+          type: integer
+          format: int64
+    TerminalSessionPage:
+      type: object
+      description: One page. `next_cursor` is absent on the last page.
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TerminalSession'
+        next_cursor:
+          $ref: '#/components/schemas/Cursor'
+    TerminalSessionOpen:
+      type: object
+      required: [profile, cols, rows, client_ephemeral_key_hash]
+      properties:
+        profile:
+          type: string
+          examples: [shell]
+        workdir_index:
+          type: integer
+          description: Index into `workdirs` of a `claude` profile.
+        cols:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        rows:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        client_ephemeral_key_hash:
+          type: string
+          description: SHA-256 of the ephemeral X25519 public key the device sends in Noise message 1, base64url without padding; becomes the claim `cek`.
+        pin_changed:
+          type: boolean
+          default: false
+          description: '`true` when the person confirmed a host key that differs from the key this device pinned earlier (docs/spec/24-terminal.md section 5.5, docs/spec/15-client-architektur.md section 23.3); recorded in the audit entry of `terminal.open`.'
+    TerminalSessionAttach:
+      type: object
+      required: [cols, rows, client_ephemeral_key_hash]
+      properties:
+        cols:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        rows:
+          type: integer
+          minimum: 1
+          maximum: 65535
+        client_ephemeral_key_hash:
+          type: string
+        pin_changed:
+          type: boolean
+          default: false
+          description: Same as in `TerminalSessionOpen`; recorded in the audit entry of `terminal.attach`.
+    TerminalSessionGrant:
+      type: object
+      description: Everything the device needs for the Noise handshake (24, 5). The token is valid once and for `terminal.session_token_ttl`.
+      required: [session, session_token, session_token_expires_at, stream_path, noise_public_key, key_fingerprint, key_generation, noise_protocol, prologue_version]
+      properties:
+        session:
+          $ref: '#/components/schemas/TerminalSession'
+        session_token:
+          type: string
+          description: Compact JWS, `typ = terminal-session+jwt`, `alg = EdDSA`.
+        session_token_expires_at:
+          $ref: '#/components/schemas/Timestamp'
+        stream_path:
+          type: string
+          examples: [/api/v1/terminal/sessions/0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f/stream]
+        noise_public_key:
+          type: string
+        key_fingerprint:
+          type: string
+        key_generation:
+          type: integer
+        noise_protocol:
+          type: string
+          enum: [Noise_NK_25519_ChaChaPoly_SHA256]
+        prologue_version:
+          type: string
+          enum: [bothy-terminal/1]
+    HostUpdatedPayload:
+      type: object
+      required: [host]
+      properties:
+        host:
+          $ref: '#/components/schemas/Host'
+        key_changed:
+          type: boolean
+          description: True after a re-pairing (24, 3.3).
+    HostUpdatedEvent:
+      description: Durable event `host.updated`.
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [host.updated]
+          payload:
+            $ref: '#/components/schemas/HostUpdatedPayload'
+    TerminalSessionChangedEvent:
+      description: Durable personal event `terminal_session.changed` to the person of the session.
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [terminal_session.changed]
+          payload:
+            $ref: '#/components/schemas/TerminalSession'
+    HostPresencePayload:
+      type: object
+      required: [host_id, connected]
+      properties:
+        host_id:
+          $ref: '#/components/schemas/Uuid'
+        connected:
+          type: boolean
+    HostPresenceChangedEvent:
+      description: Ephemeral event `host.presence_changed` (no `seq`, at most once).
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [host.presence_changed]
+          payload:
+            $ref: '#/components/schemas/HostPresencePayload'
+    TerminalStreamHello:
+      type: object
+      description: First text frame of the device stream; the binary Noise frames follow `identify`.
+      required: [protocol_versions, dpop_nonce, server_time]
+      properties:
+        protocol_versions:
+          type: array
+          items:
+            type: integer
+            examples: [1]
+        dpop_nonce:
+          type: string
+        server_time:
+          $ref: '#/components/schemas/Timestamp'
+    TerminalStreamIdentify:
+      type: object
+      description: 'Native apps send an access token with DPoP proof (`htm = GET`, `htu` = HTTPS form of the stream URL, `nonce` from `hello`, `ath`). The web console sends neither: its stream authenticates with the console session cookie of the upgrade request and the same-origin check of the upgrade (docs/spec/08-identitaet.md section 7.5, docs/spec/15-client-architektur.md section 23.2); the server rejects an identify without token from any other session. Only the device of the current session token passes (`terminal.stream`).'
+      required: [protocol_version, device_id]
+      properties:
+        protocol_version:
+          type: integer
+          examples: [1]
+        access_token:
+          type: string
+        dpop:
+          type: string
+        device_id:
+          $ref: '#/components/schemas/Uuid'
+    HostChannelHello:
+      type: object
+      description: First text frame on the control and data connections of a host service.
+      required: [protocol_versions, challenge, server_time, heartbeat_interval_ms, jwks]
+      properties:
+        protocol_versions:
+          type: array
+          items:
+            type: integer
+            examples: [1]
+        challenge:
+          type: string
+          description: Random value; the host signs it with its Ed25519 key in `identify`.
+        server_time:
+          $ref: '#/components/schemas/Timestamp'
+        heartbeat_interval_ms:
+          type: integer
+          format: int64
+          examples: [20000]
+        jwks:
+          $ref: '#/components/schemas/Jwks'
+          description: Public keys with purpose `terminal` for checking session tokens.
+    HostIdentify:
+      type: object
+      description: Login of a host service. `proof` is a compact JWS (`alg = EdDSA`, `typ = host-auth+jwt`) over `{challenge, host_id, iat}` with the registered Ed25519 key.
+      required: [protocol_version, host_id, proof, host_version]
+      properties:
+        protocol_version:
+          type: integer
+          examples: [1]
+        host_id:
+          $ref: '#/components/schemas/Uuid'
+        proof:
+          type: string
+        host_version:
+          type: string
+        session_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Only on a data connection; the session the connection belongs to.
+    HostReady:
+      type: object
+      required: [host_id, state]
+      properties:
+        host_id:
+          $ref: '#/components/schemas/Uuid'
+        state:
+          $ref: '#/components/schemas/HostState'
+    HostHeartbeat:
+      type: object
+      required: [active_sessions]
+      properties:
+        active_sessions:
+          type: integer
+    HostHeartbeatAck:
+      type: object
+      properties:
+        server_time:
+          $ref: '#/components/schemas/Timestamp'
+    HostReport:
+      type: object
+      description: Report of profiles and self-checks; never content, paths or values.
+      required: [profiles, doctor, is_server_host, require_local_confirm]
+      properties:
+        profiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostProfile'
+        doctor:
+          type: array
+          items:
+            $ref: '#/components/schemas/HostDoctorCheck'
+        is_server_host:
+          type: boolean
+        require_local_confirm:
+          type: boolean
+        os_version:
+          type: string
+    HostSessionOpen:
+      type: object
+      description: The server asks the host service to open the data connection of a session.
+      required: [session_id, data_path, profile, expires_at]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/Uuid'
+        data_path:
+          type: string
+          examples: [/api/v1/hosts/sessions/0192f4a0-7b1c-7b22-9d4f-5a6b7c8d9e0f/stream]
+        profile:
+          type: string
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+          description: Without a valid handshake until then the host service drops the request (`terminal.open_timeout`).
+    HostSessionClose:
+      type: object
+      required: [session_id, close_reason]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/Uuid'
+        close_reason:
+          $ref: '#/components/schemas/TerminalCloseReason'
+    HostSessionStarted:
+      type: object
+      required: [session_id]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/Uuid'
+    HostSessionEnded:
+      type: object
+      required: [session_id, close_reason]
+      properties:
+        session_id:
+          $ref: '#/components/schemas/Uuid'
+        close_reason:
+          $ref: '#/components/schemas/TerminalCloseReason'
+        close_detail:
+          $ref: '#/components/schemas/TerminalCloseDetail'
+        exit_code:
+          type: integer
+    NoiseFrame:
+      type: string
+      format: binary
+      description: One binary WebSocket message carrying exactly one Noise message (at most 65535 bytes). After the handshake each transport message holds one frame `type (1 byte) || body` (24, 5.4). The relay never decrypts it.

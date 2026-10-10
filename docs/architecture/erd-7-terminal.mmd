@@ -1,0 +1,53 @@
+%% ERD Teil 7: Modul terminal. Quelle: 03-datenmodell.md, 4.14; 24-terminal.md.
+%% Reine Protokoll-Spalten (created_by, confirmed_by, llm_credentials_declared_by, closed_by) zeigen auf
+%% principals(id) und sind nicht als Beziehung gezeichnet.
+%% Tabellen anderer Module nur mit Schlüssel. Freigaben auf Rechner stehen in Teil 2 (grants).
+erDiagram
+  hosts {
+    uuid id PK
+    text state "pairing, confirming, active, disabled, retired"
+    text platform "macos, linux, windows"
+    uuid assigned_user_id FK "Rechner-Inhaber (SR10)"
+    uuid dev_environment_id FK "Etappe Dev-Umgebung"
+    text llm_credentials "none, personal, organization"
+    uuid credential_holder_id FK "Pflicht genau bei personal (I6)"
+    boolean declared_server_host
+    bytea noise_public_key "X25519"
+    text auth_jkt "Ed25519"
+    text key_fingerprint
+    integer key_generation
+    bigint version
+  }
+  terminal_sessions {
+    uuid id PK
+    uuid host_id FK
+    uuid user_id FK
+    uuid opened_by_device_id FK
+    uuid device_id FK
+    uuid auth_session_id FK
+    text profile
+    text state "opening, active, detached, closed"
+    uuid token_jti
+    text close_reason
+  }
+  users {
+    uuid principal_id PK
+  }
+  devices {
+    uuid id PK
+  }
+  auth_sessions {
+    uuid id PK
+  }
+  dev_environments {
+    uuid id PK
+  }
+
+  users |o--o{ hosts : "Inhaber"
+  users |o--o{ hosts : "Inhaber der LLM-Anmeldung"
+  dev_environments |o--o| hosts : "ist"
+  hosts ||--o{ terminal_sessions : "führt"
+  users ||--o{ terminal_sessions : "öffnet"
+  devices ||--o{ terminal_sessions : "geöffnet von"
+  devices ||--o{ terminal_sessions : "verbunden"
+  auth_sessions ||--o{ terminal_sessions : "erlaubt"

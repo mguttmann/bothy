@@ -24,10 +24,11 @@ erDiagram
     text subject_kind "user, group, agent, app"
     uuid subject_principal_id FK
     uuid subject_group_id FK
-    text target_kind "instance, space, channel"
+    text target_kind "instance, space, channel, host"
     uuid target_space_id FK
     uuid target_channel_id FK
-    text level "read, write, trigger"
+    uuid target_host_id FK
+    text level "read, write, trigger; NULL bei host"
     text[] capabilities
     timestamptz expires_at
     timestamptz expiry_reminded_at
@@ -108,6 +109,9 @@ erDiagram
   messages {
     uuid id PK
   }
+  hosts {
+    uuid id PK
+  }
 
   identity_providers |o--o{ groups : "Claim-Gruppen"
   groups ||--o{ group_memberships : "hat"
@@ -116,6 +120,7 @@ erDiagram
   groups |o--o{ grants : "Subjekt"
   spaces |o--o{ grants : "Ziel"
   channels |o--o{ grants : "Ziel"
+  hosts |o--o{ grants : "Ziel"
   agents |o--o{ spaces : "Standard-Bediener"
   users ||--o{ user_space_states : "hat"
   spaces ||--o{ user_space_states : "Zustand"

@@ -33,6 +33,18 @@ sind reine Beschleunigung; ihr Verlust wird durch den nächsten dauerhaften Zust
 Abruf geheilt. Die vollständige Liste der dauerhaften Typen mit der Empfangs-Aktion steht in
 [05-aktionen.md](05-aktionen.md), Abschnitt 6.
 
+Terminal ([24-terminal.md](24-terminal.md)): Zustände von Rechnern (`host.updated`) und eigenen
+Terminal-Sitzungen (`terminal_session.changed`, persönlich) sind dauerhafte Ereignisse, die
+Verbindung eines Rechners (`host.presence_changed`) ist kurzlebig. Der Terminal-Strom selbst ist
+kein Ereignis: Er läuft Ende-zu-Ende verschlüsselt über eigene WebSocket-Verbindungen außerhalb des
+Gateways und steht nie im Ereignis-Log, in Momentaufnahmen oder im Nachholen. Grund: Das Log ist für
+Zustände, nicht für Byte-Ströme, und alles darin lesen Server und Sicherungen im Klartext.
+
+Live-Statistik ([25-visualisierung.md](25-visualisierung.md)): Der Live-Rahmen `stats.live` ist
+ein kurzlebiges Ereignis, das nur Verbindungen mit einem Abo (`stats.subscribe`) bekommen
+(Abschnitt 12, Punkt 4). Er steht nie im Ereignis-Log; der nächste Rahmen ersetzt einen
+verlorenen.
+
 ### 2.2 Umschlag (Envelope)
 
 Jedes Ereignis, dauerhaft oder kurzlebig, hat denselben Umschlag, auf dem Gateway, im
@@ -230,6 +242,7 @@ Client an Server:
 | `ack` | nur Agenten: Bestätigung bis `seq` |
 | `run.update` | nur Agenten: Patch an einem eigenen Lauf (gleichwertig zu REST) |
 | `command.autocomplete_result` | nur Agenten und Apps: Vorschläge zu einer Anfrage (gleichwertig zu REST, Abschnitt 15.7) |
+| `stats.subscribe` / `stats.unsubscribe` | Live-Statistik abonnieren (`space_id` optional, sonst Instanz) bzw. beenden; höchstens ein Abo je Verbindung (Abschnitt 12, Punkt 4) |
 
 Server an Client:
 
@@ -326,6 +339,11 @@ dem Problem-Code aus [06-api.md](06-api.md) (z. B. `rate_limited`, `forbidden`,
 | `4015` | consumer_replaced | nur Agenten: ein anderer Prozess hat denselben Verbraucher übernommen; nicht neu verbinden |
 | `4016` | device_pending | Gerät wartet auf Freigabe: nicht neu verbinden, bis `GET /api/v1/devices/{id}` den Zustand `active` meldet |
 | `4017` | device_replaced | eine neuere Verbindung desselben Geräts ist aktiv: nicht von selbst neu verbinden, erst bei Rückkehr in den Vordergrund oder auf Bedienung |
+
+Die Terminal-Verbindungen (Strom des Geräts, Steuer- und Datenverbindung des Host-Dienstes) sind
+eigene WebSocket-Kanäle mit eigenen Schließ-Codes `4100` bis `4114`
+([24-terminal.md](24-terminal.md), [asyncapi.yaml](../api/asyncapi.yaml)); die Codes dieser Tabelle
+gelten dort nur, wo der Kanal sie nennt.
 
 Zuordnung beim Verbindungsaufbau (Grund: ein Code je Ursache, damit der Client richtig reagiert):
 
@@ -465,6 +483,11 @@ und der Job `authz.expiry_sweep` schreibt alle `authz.expiry_sweep_interval` die
   "changed": [{"kind": "channel", "id": "...", "level": "read", "previous_level": "trigger"}]
 }
 ```
+
+Ein Eintrag kann `kind: "host"` haben: Er meldet das Zusatzrecht `terminal` auf einem Rechner,
+ohne `level`, mit `capabilities: ["terminal"]` ([24-terminal.md](24-terminal.md), Abschnitt 8). Wer
+es verliert, dessen Terminal-Sitzungen auf dem Rechner enden in derselben Transaktion
+(`access_revoked`).
 
 Betroffen sind alle Prinzipale, deren sichtbare Ziele oder Stufen sich ändern können: bei Freigaben
 das Subjekt (bei Gruppen alle aktuellen Mitglieder), bei Owner-Änderung und Sperre die Person, beim
@@ -614,6 +637,16 @@ antwortet er `409 base_version_conflict` mit dem aktuellen Dokument. Der Adapter
    Hinweise und Live-Box-Wechsel zusätzlich über `pg_notify('ephemeral', ...)`, nur mit IDs und
    Versionen; der empfangende Knoten liest Inhalte aus der Datenbank
    ([03-datenmodell.md](03-datenmodell.md), Abschnitt 6.6).
+4. **Live-Statistik.** Ein Mensch mit `stats.read` sendet `stats.subscribe {space_id?}`. Der
+   Server prüft `stats.read` auf Instanz bzw. Bereich und sendet danach alle `stats.live_interval`
+   das kurzlebige Ereignis `stats.live` mit einem Live-Rahmen (Schema `StatsLiveFrame`,
+   [25-visualisierung.md](25-visualisierung.md), Abschnitt 5) an diese Verbindung. Ein neues
+   `stats.subscribe` ersetzt das Abo, `stats.unsubscribe` beendet es, `resume` stellt es wieder
+   her. Jeder Rahmen läuft durch den Zustellmodus mit der Empfangs-Aktion `stats.read` und ist auf
+   die sichtbaren Kanäle des Empfängers gefiltert. Verliert der Empfänger das Recht, endet das Abo
+   mit einem `error` (`forbidden`). Agenten und Apps können nicht abonnieren (`stats.read` verlangt
+   Owner oder `manage`). Mit `cluster.mode = multi` baut jeder Knoten seine Rahmen selbst; Raten
+   kommen aus `stats_minutes` und sind darum auf allen Knoten gleich.
 
 ## 13. Offline-Verhalten des Clients
 
@@ -1012,6 +1045,7 @@ sequenceDiagram
 | R-SY-23 | Fencing der Agenten-Verbraucher über `holder_session_id`. | Die Regel "ein Verbraucher, eine Verbindung" gilt auch über mehrere api-Knoten. |
 | R-SY-24 | Import-Stapel schreiben `thread.updated` statt `message.created` je Nachricht und setzen `threads.unread_floor_seq`. | Ein Import kann ein Vielfaches des normalen Verkehrs schreiben; Clients sollen nicht jede Nachricht einzeln empfangen. |
 | R-SY-25 | Kurzlebige Ereignisse zwischen api-Knoten über `NOTIFY ephemeral` nur mit IDs, nur im Modus `multi`. | `NOTIFY` bleibt Wecksignal ohne Inhalt (R-Stack); ein Knoten braucht den Kanal nicht. |
+| R-SY-26 | Live-Statistik als Abo-Op mit kurzlebigem Rahmen je Intervall auf dem Gateway, nicht als dauerhaftes Ereignis und nicht als eigener WebSocket-Kanal. | Ein Rahmen ist nach einem Intervall wertlos; das Gateway bringt Anmeldung, Rechteprüfung und Schließ-Codes schon mit ([25-visualisierung.md](25-visualisierung.md), R-VZ-05). |
 
 ## 18. Konfigurationswerte dieses Kapitels
 
@@ -1052,4 +1086,5 @@ Werte anderer Kapitel, auf die dieses Kapitel verweist: `auth.dpop_nonce_ttl`
 ([02-architektur.md](02-architektur.md)), `file.invocation_hold_max` und
 `voice.transcript_hold_max` ([12-dateien.md](12-dateien.md)), `command.autocomplete_timeout` und
 `command.autocomplete_max_choices` ([09-agenten.md](09-agenten.md)),
-`authz.expiry_sweep_interval` ([07-rechte.md](07-rechte.md)).
+`authz.expiry_sweep_interval` ([07-rechte.md](07-rechte.md)), `stats.live_interval`
+([25-visualisierung.md](25-visualisierung.md)).

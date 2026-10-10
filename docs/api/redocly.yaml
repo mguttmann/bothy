@@ -163,6 +163,10 @@ rules:
         - group.member.remove
         - group.read
         - group.update
+        - host.connect
+        - host.manage
+        - host.pair
+        - host.read
         - identity.link
         - identity.read
         - identity.unlink
@@ -233,6 +237,11 @@ rules:
         - sync.snapshot.read
         - template.manage
         - template.read
+        - terminal.attach
+        - terminal.close
+        - terminal.open
+        - terminal.read_own
+        - terminal.stream
         - thread.close
         - thread.create
         - thread.move
@@ -277,12 +286,14 @@ rules:
         - rl.agent_runtime
         - rl.export
         - rl.gateway_connect
+        - rl.host
         - rl.import
         - rl.interaction
         - rl.message
         - rl.public_auth
         - rl.read
         - rl.search
+        - rl.terminal
         - rl.trigger
         - rl.typing
         - rl.upload
@@ -402,6 +413,10 @@ rules:
         - group.member.remove
         - group.read
         - group.update
+        - host.connect
+        - host.manage
+        - host.pair
+        - host.read
         - identity.link
         - identity.read
         - identity.unlink
@@ -473,6 +488,11 @@ rules:
         - sync.snapshot.read
         - template.manage
         - template.read
+        - terminal.attach
+        - terminal.close
+        - terminal.open
+        - terminal.read_own
+        - terminal.stream
         - thread.close
         - thread.create
         - thread.move

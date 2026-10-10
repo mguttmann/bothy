@@ -70,6 +70,12 @@ Sync und Ereignisse: [04-sync-protokoll.md](04-sync-protokoll.md). Wie `authoriz
 10. **Systemaktionen.** Aktionen mit Recht `system` führt nur der Server selbst aus (Job oder
     Server-Befehl auf dem Host). Sie sind über API und Gateway nicht erreichbar. Sie stehen im
     Katalog, damit Audit-Einträge eine bekannte Aktion nennen und der Registrierungstest sie zählt.
+11. **Terminal und I6.** Die Aktionen aus Abschnitt 4.14 prüfen zusätzlich die Schutzregeln SR10
+    und SR11 aus [07-rechte.md](07-rechte.md). I6 wird bei `grant.create` mit Ziel `host` und bei
+    `host.manage` transaktional geprüft ([03-datenmodell.md](03-datenmodell.md), Abschnitt 6.8;
+    [24-terminal.md](24-terminal.md), Abschnitt 7.3) und bei jedem `terminal.open` und
+    `terminal.attach` erneut. Die Terminal-Verbindungen sind eigene WebSocket-Kanäle außerhalb des
+    Gateways; ihre Ops stehen in Abschnitt 7.
 
 ## 2. Begriffe der Tabellen
 
@@ -88,6 +94,9 @@ Sync und Ereignisse: [04-sync-protokoll.md](04-sync-protokoll.md). Wie `authoriz
 | `agent-self` | Prinzipal ist der Agent, dem die Ressource gehört (eigener Lauf, eigene Sitzung) |
 | `app-self` | Prinzipal ist die App, der die Ressource gehört (eigener Befehl, eigene Komponente) |
 | `participant` | Mensch ist Teilnehmer des DM-Kanals |
+| `+terminal` | Zusatzrecht `terminal` auf dem Rechner (implizit für Owner, außer I6 sperrt; [07-rechte.md](07-rechte.md), Abschnitt 2.12) |
+| `assignee` | Mensch ist Rechner-Inhaber (`hosts.assigned_user_id`) |
+| `host-self` | Prinzipal ist der Rechner selbst, angemeldet mit seinem Anmeldeschlüssel ([24-terminal.md](24-terminal.md), Abschnitt 4.1) |
 | `system` | nur der Server selbst (Regel 1.10) |
 
 Mehrere Werte mit "oder" sind Alternativen. "und" heißt beides.
@@ -108,6 +117,7 @@ Das Ziel bestimmt, auf welchem Pfad Freigaben gelten:
 | `space` | Bereich -> Instanz |
 | `instance` | Instanz |
 | DM-Kanal und alles darin | nur `dm_participants`; Freigaben gelten nicht |
+| `host`, `terminal_session` | Rechner (bei der Sitzung: ihr Rechner); eigenes Ziel außerhalb von Instanz, Bereich und Kanal, nur Freigaben auf diesen Rechner und die Owner-Regel ([07-rechte.md](07-rechte.md), Abschnitt 2.12) |
 
 Eine angehängte Datei folgt immer ihrer Nachricht, auch nach dem Verschieben des Threads;
 `files.scope_channel_id` gilt nur vor dem Anhängen.
@@ -143,6 +153,11 @@ Eine angehängte Datei folgt immer ihrer Nachricht, auch nach dem Verschieben de
   eines Menschen. Grund: Die erste Einrichtung muss ohne vorhandene Anmeldedaten gehen, und eine
   gestohlene Sitzung gewinnt damit nur einen Anmeldeweg, dessen neue Geräte `pending` bleiben
   ([08-identitaet.md](08-identitaet.md), Abschnitt 5).
+- **Step-up** `frisch`: wie `ja`, aber die Bestätigung ist jünger als `terminal.step_up_max_age`,
+  stammt aus einem Passkey oder einem Step-up-Geräteschlüssel (in der Web-Konsole nur Passkey mit
+  `userVerification = required`) und ist noch nicht verbraucht; die Aktion verbraucht sie
+  (`auth_sessions.step_up_consumed_at`, [08-identitaet.md](08-identitaet.md), Abschnitt 6.3).
+  Sonst `401 step_up_required`.
 - **Audit** `ja`: Erlaubnis und Ablehnung kommen ins Audit-Log. `abl`: nur Ablehnungen. Jede
   Ablehnung jeder Aktion in einer Anfrage oder Op wird protokolliert; Filter (Empfangsprüfung bei
   Zustellung und Nachholen, Prüfung je Element einer Liste) schreiben keine Ablehnung
@@ -211,7 +226,7 @@ maschinenlesbare Katalog trägt es je Aktion ([ADR 0049](../adr/0049-maschinenle
   `cost.read.aggregate`, außer `audit.read` (Audit `ja`);
 - `access.explain`, `search.query`, `events.catch_up`, `gateway.connect`, `gateway.focus`,
   `typing.start`, `command.autocomplete`, `command.autocomplete.respond`, `client_metrics.submit`,
-  `push.deliver` und `webhook_out.deliver`.
+  `push.deliver`, `webhook_out.deliver` und `terminal.read_own`.
 
 Alle anderen haben `write`. Grund für die geschlossene Liste: Eine neue Aktion ohne Eintrag ist
 `write` und wird im Wartungsmodus gesperrt (fail closed); die Spalte "Recht" taugt nicht dafür, weil
@@ -240,6 +255,8 @@ Abschnitt 10.
 | `rl.agent_runtime` | Agent | Heartbeat, Lauf-Patches, Bestätigungen |
 | `rl.webhook_in` | Eingangs-Webhook | eingehende Webhooks |
 | `rl.import` | Prinzipal | Stapel eines laufenden Imports (`import.apply`) |
+| `rl.terminal` | Prinzipal | Terminal öffnen, anhängen, Strom verbinden |
+| `rl.host` | Rechner (nach der Prüfung des Anmeldeschlüssels) | Steuer- und Datenverbindungen des Host-Dienstes |
 
 Systemaktionen und die internen Zustellprüfungen haben keine Klasse (`keine`).
 
@@ -283,7 +300,7 @@ Abschnitt 6.3).
 | `owner.recover` | Einladungs-Code zur Wiederherstellung für einen aktiven Owner per Server-Befehl auf dem Host (`bothy setup issue-enrollment-code`, [08-identitaet.md](08-identitaet.md), Abschnitt 4) | user | system | nein | nein | ja | nein | keine |
 | `audit.read` | Audit-Log lesen und filtern | instance | owner | ja | ja | ja | nein | `rl.admin` |
 | `audit.verify` | Hash-Kette und Prüfpunkte prüfen | instance | owner | ja | ja | ja | nein | `rl.admin` |
-| `stats.read` | Statistik lesen; Instanz nur Owner, Bereich mit `manage` | instance, space | owner oder manage | nein | nein | nein | nein | `rl.read` |
+| `stats.read` | Statistik lesen, auch Live-Rahmen, Timeline, SLO-Ampel und Backend-Ansicht und das Abo `stats.subscribe` ([25-visualisierung.md](25-visualisierung.md)); Instanz nur Owner, Bereich mit `manage`; immer auf die sichtbaren Kanäle gefiltert, Kostenfelder nur mit `cost.read.aggregate` | instance, space | owner oder manage | nein | nein | nein | nein | `rl.read` |
 | `access.explain` | "Wer hat Zugriff?" mit Herkunft (direkt, Gruppe, geerbt, Bediener, indirekt über Agent) | space, channel | owner oder manage | nein | nein | nein | nein | `rl.read` |
 | `access.preview` | Trockenlauf einer Aktion mit Spalte "Rechte" = `ja`: Unterschiede je Prinzipal, I1, SR8, Hinweise in Klartext; die Transaktion wird zurückgerollt; Grenzen der Delegation ergeben `allowed = false` statt einer Ablehnung ([07-rechte.md](07-rechte.md), Abschnitt 9.3) | wie die Zielaktion | Recht der Zielaktion | wie Zielaktion | nein | nein | nein | `rl.admin` |
 | `access.view_as` | "Als Person ansehen", nur lesend | user | owner | ja | ja | ja | nein | `rl.admin` |
@@ -328,8 +345,8 @@ Abschnitt 6.3).
 | `group.member.remove` | Mitglied entfernen; nicht in Gruppen mit `source = oidc_claim` | group | owner | ja | ja | ja | ja | `rl.admin` |
 | `group.member.expire` | abgelaufene Mitgliedschaft melden (Job `authz.expiry_sweep`): Rechte-Version, `access.changed`, Abbruch betroffener Läufe | group | system | nein | nein | ja | ja | keine |
 | `group.member.sync` | Mitgliedschaften einer Person in Gruppen mit `source = oidc_claim` ihres Anbieters beim Abschluss einer OIDC-Anmeldung dem Gruppen-Claim angleichen; ein Audit-Eintrag je Anmeldung mit den Gruppen ([08-identitaet.md](08-identitaet.md), Abschnitt 3.4) | user | system | nein | nein | ja | ja | keine |
-| `grant.read` | Freigaben eines Ziels oder Subjekts lesen; mit `manage` nur Freigaben auf Zielen im eigenen `manage`-Bereich ([07-rechte.md](07-rechte.md), Abschnitt 2.6) | space, channel, principal | owner oder manage | nein | nein | nein | nein | `rl.read` |
-| `grant.create` | Freigabe anlegen. Mit `manage` nur bis zur eigenen Stufe, nur eigene Zusatzrechte, nur an Menschen und Gruppen, nie auf der Instanz (R-AZ-05). Freigaben an Agenten und Apps nur Owner; Agenten und Apps nie `trigger`, als Zusatzrecht nur `upload`. Optional `resolve_i1` | instance, space, channel | owner oder manage | nein | ja | ja | ja | `rl.admin` |
+| `grant.read` | Freigaben eines Ziels oder Subjekts lesen; mit `manage` nur Freigaben auf Zielen im eigenen `manage`-Bereich ([07-rechte.md](07-rechte.md), Abschnitt 2.6); Freigaben auf Rechner nur Owner | space, channel, host, principal | owner oder manage | nein | nein | nein | nein | `rl.read` |
+| `grant.create` | Freigabe anlegen. Mit `manage` nur bis zur eigenen Stufe, nur eigene Zusatzrechte, nur an Menschen und Gruppen, nie auf der Instanz (R-AZ-05). Freigaben an Agenten und Apps nur Owner; Agenten und Apps nie `trigger`, als Zusatzrecht nur `upload`. Auf einem Rechner (`host`) nur Owner, nur an Menschen und Gruppen, ohne Stufe, genau `terminal`; I6 (Regel 1.11). Optional `resolve_i1` | instance, space, channel, host | owner oder manage (auf `host` nur owner) | nein | ja | ja | ja | `rl.admin` |
 | `grant.revoke` | Freigabe widerrufen; mit `manage` nur Freigaben, die man nach R-AZ-05 selbst hätte anlegen dürfen | grant | owner oder manage | nein | ja | ja | ja | `rl.admin` |
 | `grant.expire` | abgelaufene Freigabe melden (Job `authz.expiry_sweep`): Rechte-Version, `access.changed`, Abbruch betroffener Läufe | grant | system | nein | nein | ja | ja | keine |
 
@@ -514,6 +531,27 @@ Gehören zur Etappe "Mehrbenutzer-Dev-Umgebung"; Routen entstehen mit ihr
 | `dev_environment.manage` | Umgebung anlegen, freigeben, sperren, zurückziehen | dev_environment | owner | ja | ja | ja | ja | `rl.admin` |
 | `dev_environment.report` | Runner meldet Prüfergebnisse und Bereitschaft | dev_environment | agent-self (Runner der Umgebung) | nein | nein | ja | nein | `rl.agent_runtime` |
 
+### 4.14 Rechner und Terminal
+
+Normativ zusammen mit [24-terminal.md](24-terminal.md). Etappe M2.
+
+| ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
+|---|---|---|---|---|---|---|---|---|
+| `host.read` | Rechner lesen: Name, Zustand, Plattform, Profile, Fingerabdruck, LLM-Erklärung, Prüfergebnisse; Owner alle, sonst Rechner, deren Inhaber man ist oder auf denen man eine Freigabe `terminal` hat | host | owner oder assignee oder +terminal | nein | nein | nein | nein | `rl.read` |
+| `host.manage` | Rechner anlegen, ändern (Name, Inhaber), Kopplungs-Code ausstellen (auch Neukopplung), Fingerabdruck bestätigen, LLM-Anmeldung erklären, sperren, entsperren, zurückziehen; I6 (Regel 1.11) | instance, host | owner | ja | ja | ja | ja | `rl.admin` |
+| `host.pair` | Host-Dienst löst einen Kopplungs-Code ein und meldet seine öffentlichen Schlüssel | host | public (gültiger Kopplungs-Code) | nein | nein | ja | nein | `rl.public_auth` |
+| `host.connect` | Steuerverbindung und Datenverbindungen des Host-Dienstes; Meldungen (Profile, Prüfergebnisse, Start und Ende von Sitzungen) | host | host-self | nein | nein | abl; ja bei Wechsel von Server-Host oder Prüfergebnis | nein | `rl.host` |
+| `terminal.open` | Terminal-Sitzung öffnen; SR10, SR11 (I6), Grenzen; gibt die Sitzungs-Marke aus | host | human und +terminal | nein | frisch | ja | nein | `rl.terminal` |
+| `terminal.attach` | an eine eigene, nicht geschlossene Sitzung anhängen, auch von einem anderen Gerät; neue Marke. Step-up frisch, außer vom selben Gerät in derselben Anmeldesitzung innerhalb von `terminal.quick_reattach_window` nach der Trennung; diese Ausnahme gilt nie in der Web-Konsole | terminal_session | self und +terminal | nein | frisch | ja | nein | `rl.terminal` |
+| `terminal.stream` | Strom-Verbindung des Geräts zu einer eigenen Sitzung öffnen; nur das Gerät der aktuellen Marke | terminal_session | self | nein | nein | abl | nein | `rl.terminal` |
+| `terminal.read_own` | eigene Terminal-Sitzungen lesen; Owner lesen alle | terminal_session, host | self oder owner | nein | nein | nein | nein | `rl.read` |
+| `terminal.close` | Sitzung beenden; eigene, Owner jede | terminal_session | self oder owner | nein | nein | ja | nein | `rl.write` |
+| `terminal.terminate` | Sitzung durch den Server beenden: Entzug, Leerlauf, Höchstdauer, Trennung über `terminal.detach_grace`, Sperre, Abmeldung, Zustandswechsel des Rechners, Ende des Prozesses | terminal_session | system | nein | nein | ja | nein | keine |
+
+Agenten, Apps und persönliche Tokens erreichen keine dieser Aktionen außer `host.pair` und
+`host.connect`, die keinen Prinzipal aus `principals` haben (`subject_kind_not_allowed`, SR5).
+Einen Scope für Apps gibt es nicht.
+
 ## 5. Agenten-Aufruf `agent.invoke`
 
 `authorize(P, agent.invoke, {thread T, agent A, trigger_message M | interaction I | command C})`
@@ -638,6 +676,8 @@ erlaubt. Persönliche Ereignisse (`audience = self`) gehen nur an den genannten 
 | `interaction.created` | interaction | self (Agent oder App, Eigentümer der Komponente); Agent zusätzlich `agent.events.consume`, App `events:subscribe` | vor Zustellung an Agenten `agent.invoke` |
 | `command.invoked` | command | self (Agent oder App, Eigentümer des Befehls); Agent zusätzlich `agent.events.consume`, App `events:subscribe` | vor Zustellung an Agenten `agent.invoke` |
 | `agent.config_changed` | channel | self (Agent) und `agent.config.read` | Prompt, Skills, Projektbindung geändert |
+| `host.updated` | host | `host.read` | auch beim Anlegen; Zustand, Inhaber, LLM-Erklärung, Profile, Prüfergebnisse; `key_changed` bei Neukopplung; nie Schlüssel |
+| `terminal_session.changed` | terminal_session | self | an die Person der Sitzung: Zustand, Gerät, `close_reason`; nie Inhalte |
 
 Kurzlebige Ereignisse:
 
@@ -646,6 +686,8 @@ Kurzlebige Ereignisse:
 | `typing.started` | thread | `thread.read` | Thread im Fokus |
 | `run.updated` | run | `run.read` | Thread im Fokus |
 | `agent.presence_changed` | agent | `agent.read` | |
+| `host.presence_changed` | host | `host.read` | |
+| `stats.live` | instance, space | `stats.read` | nur an Verbindungen mit Abo `stats.subscribe`; Inhalt gefiltert auf die sichtbaren Kanäle, Kosten nur mit `cost.read.aggregate` ([25-visualisierung.md](25-visualisierung.md), Abschnitt 5) |
 | `notification.created` | thread | self und `push.deliver` | nur an Verbindungen des Empfängers, statt eines Pushes an dieses Gerät ([13-push-benachrichtigungen.md](13-push-benachrichtigungen.md), Abschnitt 6.3) |
 | `command.autocomplete_requested` | command | self (Eigentümer des Befehls); Agent zusätzlich `agent.events.consume` | trägt eine Marke mit `trigger_kind = autocomplete`; nur an eine Gateway-Verbindung des Eigentümers |
 
@@ -666,8 +708,22 @@ Ausgehende Webhooks und Push nutzen dieselbe Empfangs-Aktion (`webhook_out.deliv
 | `ack` | Agent an Server | `agent.events.consume` |
 | `run.update` | Agent an Server | `run.update` |
 | `command.autocomplete_result` | Agent oder App an Server | `command.autocomplete.respond` |
+| `stats.subscribe`, `stats.unsubscribe` | Client an Server | `stats.read` auf Instanz bzw. Bereich |
 | `hello`, `ready`, `resumed`, `cursor`, `catchup.complete`, `resync_required`, `heartbeat_ack`, `reauth_required`, `error` | Server an Client | keine eigene; Teil der Sitzung aus `gateway.connect` |
 | `dispatch` | Server an Client | Empfangs-Aktion des Ereignistyps (Abschnitt 6) |
+
+Terminal-Kanäle ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/asyncapi.yaml)):
+
+| Kanal | Op | Richtung | Aktion |
+|---|---|---|---|
+| Strom des Geräts `/terminal/sessions/{session_id}/stream` | `hello` | Server an Gerät | `terminal.stream` |
+| | `identify` | Gerät an Server | `terminal.stream` |
+| | Binärrahmen (Noise) | beide | `terminal.stream` (Sitzung muss gültig sein) |
+| | `error` | Server an Gerät | `terminal.stream` |
+| Steuerung `/hosts/connect` | `hello`, `ready`, `heartbeat_ack`, `error`, `session.open`, `session.close` | Server an Rechner | `host.connect` |
+| | `identify`, `heartbeat`, `report`, `session.started`, `session.ended` | Rechner an Server | `host.connect` |
+| Daten `/hosts/sessions/{session_id}/stream` | `hello`, `identify`, Binärrahmen (Noise) | beide | `host.connect` (Sitzung gehört dem Rechner) |
+| | `error` | Server an Rechner | `host.connect` |
 
 ## 8. Entscheidungen dieses Kapitels
 
@@ -695,6 +751,8 @@ Ausgehende Webhooks und Push nutzen dieselbe Empfangs-Aktion (`webhook_out.deliv
 | R-AZ-20 | Auslösung eines anderen Agenten bei aktivem Lauf wird abgelehnt (`run_active_other_agent`), nicht zum Nachtrag. | Ein Nachtrag gehört zum Lauf seines Agenten; ein fremder Agent bekäme sonst Text, der nicht an ihn ging. |
 | R-AZ-21 | `settings.read` deckt alle eigenen persönlichen Daten ab; keine eigene Lese-Aktion je Art. | Alle sind `self`, ohne Unterschied in Rechten; weniger Aktionen, gleiche Wirkung. |
 | R-AZ-22 | Health hat keine Aktion; Liveness und Readiness liegen auf dem internen Listener außerhalb der öffentlichen API (Ruling L2, [16-betrieb.md](16-betrieb.md)). | Betriebs-Vertrag, kein Produkt-API; kein Auth-Bypass im öffentlichen Listener. |
+| R-AZ-23 | Terminal-Aktionen nur für Menschen in einer Sitzung, mit Step-up `frisch` je Öffnung; der Rechner handelt nur über `host.pair` und `host.connect`. | Owner verlangt Passkey beim Öffnen; ein Terminal ist Fernzugriff auf einen Rechner ([24-terminal.md](24-terminal.md), R-TM-07). |
+| R-AZ-24 | Rechner sind ein eigenes Ziel außerhalb des Baums; Freigaben dort nur durch Owner. | Eine Freigabe auf Instanz oder Bereich darf nie still einen Rechner öffnen; `manage` ist auf Rechnern sinnlos. |
 
 ## 9. Tests, die diesen Katalog halten
 
@@ -710,6 +768,9 @@ Ausgehende Webhooks und Push nutzen dieselbe Empfangs-Aktion (`webhook_out.deliv
    und mit `resolve_i1`, das sie zulässig macht.
 6. I2-Test: Rechte-Entzug zwischen Annahme und Zustellung führt zu Lauf `failed`, kein Aufruf.
 7. Systemaktionen: keine Route und keine Op nennt eine Aktion mit Recht `system`.
+8. Terminal: jede Op der Terminal-Kanäle hat einen Eintrag in Abschnitt 7; die Fälle AZ-M54 bis
+   AZ-M60 aus [07-rechte.md](07-rechte.md) und TM-T07 bis TM-T10 aus
+   [24-terminal.md](24-terminal.md) laufen in der Fall-Tabelle.
 
 ## 10. Konfigurationswerte dieses Kapitels
 
@@ -733,3 +794,5 @@ Ausgehende Webhooks und Push nutzen dieselbe Empfangs-Aktion (`webhook_out.deliv
 | `ratelimit.rl.agent_runtime.per_minute` / `.burst` | `1200` / `200` | je Agent |
 | `ratelimit.rl.webhook_in.per_minute` / `.burst` | `60` / `20` | je Eingangs-Webhook |
 | `ratelimit.rl.import.per_minute` / `.burst` | `120` / `30` | je Owner für `import.apply` |
+| `ratelimit.rl.terminal.per_minute` / `.burst` | `20` / `5` | je Mensch |
+| `ratelimit.rl.host.per_minute` / `.burst` | `120` / `30` | je Rechner |

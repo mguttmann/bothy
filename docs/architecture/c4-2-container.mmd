@@ -16,13 +16,18 @@ flowchart TB
   subgraph devices["Geräte der Menschen"]
     direction LR
     apps["<b>Apps</b><br/>[Flutter: iOS, Android, macOS, Windows]<br/>Chat, Offline-Ausgangsfach,<br/>Notification Service Extension"]:::container
-    console["<b>Web-Konsole</b><br/>[Flutter Web]<br/>nur Verwaltung und Statistik"]:::container
+    console["<b>Web-Konsole</b><br/>[Flutter Web]<br/>Verwaltung, Statistik, Terminal"]:::container
   end
 
   subgraph agenthost["Agenten-Host (außerhalb des Servers)"]
     direction LR
     adapter["<b>Agenten-Adapter</b><br/>[Hermes-Agent-Plugin, Claude-Code-Runner,<br/>eigene mit SDK]<br/>Verbraucher mit Cursor, prüft Marke"]:::container
     runtime["<b>Agenten-Laufzeit</b><br/>[Hermes Agent, Claude Code, ...]"]:::ext
+  end
+
+  subgraph termhost["Angebundener Rechner"]
+    direction LR
+    hostd["<b>Host-Dienst bothy-host</b><br/>[Go, eigener Benutzer ohne Admin]<br/>PTY, Noise-Gegenstelle, Profile"]:::container
   end
 
   subgraph inst["Bothy-Instanz (Betreiber)"]
@@ -54,6 +59,8 @@ flowchart TB
   console -->|"HTTPS REST"| proxy
   adapter -->|"WSS Gateway als Agent, REST"| proxy
   integr -->|"REST, Eingangs-Webhooks"| proxy
+  hostd -->|"WSS ausgehend: Steuerung und Daten je Sitzung"| proxy
+  apps -->|"WSS Terminal-Strom, Ende-zu-Ende verschlüsselt"| proxy
   apps -.->|"Anmeldung im Systembrowser"| idp
   adapter -->|"Plugin oder Kindprozess"| runtime
   runtime -->|"Modellaufrufe"| llm

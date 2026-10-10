@@ -42,6 +42,7 @@ Diagramm: [c4-1-kontext.svg](../architecture/c4-1-kontext.svg)
 | Telemetrie-Backends | extern | OTLP über einen Collector | bekommen keine Inhalte (B11) |
 | Discord | extern | nur lesend beim Import | Quelle, keine Rückschreibung |
 | Transkriptions-Dienst | extern, optional | Port im worker | bekommt Audio nur bei eingeschaltetem Schalter `voice.enabled` |
+| Host-Dienst `bothy-host` | extern, auf angebundenen Rechnern | nur ausgehend: WebSocket-Steuerverbindung und je Sitzung eine Datenverbindung ([24-terminal.md](24-terminal.md)) | angemeldet mit eigenem Schlüssel; der Server sieht keinen Terminal-Inhalt (Noise) |
 
 ## 3. Container (C4 Ebene 2)
 
@@ -59,8 +60,9 @@ Diagramm: [c4-2-container.svg](../architecture/c4-2-container.svg)
 | ClamAV `clamd` | eigener Prozess, optional | Malware-Scan per `INSTREAM` | Signaturen | eigener Container |
 | OTel Collector | eigener Prozess | nimmt OTLP an, exportiert je Backend | Puffer | eigener Container |
 | Apps | Flutter (iOS, Android, macOS, Windows) | Chat, Ausgangsfach, lokale Datenbank, Notification Service Extension | lokaler Cache, nie maßgeblich | je Gerät |
-| Web-Konsole | Flutter Web | nur Verwaltung und Statistik (B5) | keiner | statische Dateien |
+| Web-Konsole | Flutter Web | Verwaltung, Statistik und Terminal (B5, [ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)); kein Chat | keiner | statische Dateien |
 | Agenten-Adapter | außerhalb des Servers (Referenz: Hermes-Agent-Plugin, Claude-Code-Runner) | Verbraucher mit dauerhaftem Cursor, prüft Aufruf-Marke, meldet Läufe | eigener | beim Betreiber der Laufzeit |
+| Host-Dienst `bothy-host` | eigenes Go-Binary (`services/host`), auf jedem angebundenen Rechner | PTY je Terminal-Sitzung, Noise-Gegenstelle, Profile, Selbstprüfung ([24-terminal.md](24-terminal.md)) | Schlüssel und Rückblick-Puffer auf dem Rechner | je Rechner |
 
 Die Secret-Quelle (Datei, Umgebung, später Key Vault oder Secrets Manager) ist kein eigener Container
 im Diagramm. api und worker lesen sie beim Start und bei Rotation (Abschnitt 13).
@@ -138,9 +140,11 @@ Diagramm: [c4-3-komponenten-server.svg](../architecture/c4-3-komponenten-server.
    von genau einem Modul implementiert (Tabelle 4.5).
 6. Jede Tabelle aus 03 gehört genau einem Modul. Jede Aktion aus 05 wird von genau einem Modul als
    Anwendungsfall ausgeführt. Die Rechte-Logik jeder Aktion liegt trotzdem nur in `authz` (B7).
-7. Drei Module besitzen keine Tabellen: `gateway`, `search`, `stats` (03, Abschnitt 2; Ruling L3).
-   Sie sind eigene Module, weil sie eigene Ports, eigene Abhängigkeiten und eigene Leistungsziele
-   haben.
+7. Zwei Module besitzen keine Tabellen: `gateway`, `search` (03, Abschnitt 2; Ruling L3). Sie
+   sind eigene Module, weil sie eigene Ports, eigene Abhängigkeiten und eigene Leistungsziele haben.
+   `stats` war ebenfalls ohne Tabellen geplant und besitzt seit dem Nachtrag vom 2026-10-10 die
+   Minuten-Aggregate der eigenen Messung (`stats_minutes`, Ruling T7,
+   [25-visualisierung.md](25-visualisierung.md)).
 
 ### 4.2 Modulliste
 
@@ -160,11 +164,12 @@ Diagramm: [c4-3-komponenten-server.svg](../architecture/c4-3-komponenten-server.
 | `notify` | Benachrichtigungsstufen, Ruhezeiten, Push-Registrierungen, Push-Verbraucher und Versand | `notification_preferences`, `quiet_hours`, `push_registrations` | 13 |
 | `gateway` | WebSocket-Endpunkt, Gateway-Sitzungen, Hub, Fokus, Tippen, Weitergabe kurzlebiger Ereignisse, Agenten-Verbindungen | keine | 04, 06 |
 | `search` | Suchabfrage über Nachrichten, Thread-Titel und Dateien mit Rechtefilter, Rangfolge | keine | 14 |
-| `stats` | Statistik für Konsole: Nutzung je Bereich, Läufe, Werkzeugaufrufe, Kosten, Fehlerraten | keine | 01, 17 |
+| `stats` | Statistik für Konsole und Apps: Nutzung je Bereich, Läufe, Werkzeugaufrufe, Kosten, Fehlerraten; eigene Messung (Zähler im Speicher, Flush, Aufbewahrung), SLO-Ampel, Live-Rahmen `stats.live`, Timeline | `stats_minutes` | 01, 17, 25 |
 | `apps` | Apps und Manifeste, Installationen, Scopes, ausgehende Webhooks mit Verbraucher und Zustellung, Eingangs-Webhooks | `apps`, `app_installations`, `webhook_subscriptions`, `webhook_deliveries`, `incoming_webhooks` | 11 |
 | `importer` | Import-Quellen, Stapel mit Herkunftsschlüssel (`import.apply`), Eigentumsliste und Schreibschutz gespiegelter Kanäle; der Trockenlauf liegt im Werkzeug | `import_sources`, `import_items` | 22 |
 | `privacy` | DSGVO-Aufträge, Export und Löschung über die Teilnehmer aller Module | `gdpr_requests` | 20 |
 | `status` | Statusseite, Komponenten, Störungen, automatische Prüfungen, Sicherungsläufe | `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | 16, 17 |
+| `terminal` | Rechner und Kopplung, Erklärung der LLM-Anmeldung (I6), Terminal-Sitzungen, Sitzungs-Marken, Steuerverbindungen der Host-Dienste, Relais der Ströme | `hosts`, `terminal_sessions` | 24 |
 
 Technische Tabellen außerhalb der Module ([03-datenmodell.md](03-datenmodell.md), Abschnitt
 4.13): River legt eigene Tabellen mit Präfix `river_` an (u. a. `river_migration`, `river_job`,
@@ -182,7 +187,7 @@ tieferer Module, die das Modul implementiert.
 |---|---|---|---|---|
 | `instance` | `Settings`, `Flags`, `Keys` (Signer je Zweck, JWKS, Rotation), `Counters` (nur für die Phasen-Hooks von `authz`, `sync`, `audit`), `Versions` (Zählerstände ohne Sperre lesen, z. B. `permission_version` für den Rechte-Cache, `event_seq` für Catch-up); deklariert `LoginOptionsSource` (Anmelde-Treiber und Passwortweg für die Discovery), `FlagUserSource` (Menschen eines Rollouts), `FlagGroupSource` (gültige Gruppen eines Menschen für die Auswertung) | | | |
 | `audit` | `Log` (Abfrage, Prüfung) | | | kernel `auditing.Recorder` |
-| `authz` | `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource` | kernel `authorize.AccessChanged` (mit der auslösenden Aktion; `runs` bricht bei `user.disable` mit Grund `user_disabled` ab, sonst mit `access_revoked`) | | kernel `authorize.Authorizer`, `instance.FlagGroupSource` |
+| `authz` | `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource` | kernel `authorize.AccessChanged` (mit der auslösenden Aktion; `runs` bricht bei `user.disable` mit Grund `user_disabled` ab, sonst mit `access_revoked`) | | kernel `authorize.Authorizer`, `instance.FlagGroupSource` |
 | `billing` | `Costs` (Buchen, Korrektur, Summen), `Prices` | | | |
 | `identity` | `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`; deklariert `AvatarFiles` | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant` |
 | `chat` | `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen für `messaging`, `AppendToThread`, Nachrichtenzahl bei Löschung, Schließen, Öffnen, Verschieben, Info), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
@@ -194,11 +199,12 @@ tieferer Module, die das Modul implementiert.
 | `notify` | `Preferences`, `QuietHours`, `PushRegistrations` | | `identity.DeviceRevoked`, `identity.SessionEnded` (Registrierungen der Sitzung deaktivieren), `chat.ChannelArchived`, `chat.SpaceArchived` | kernel `personaldata.Participant` |
 | `gateway` | keiner für andere Module | | | kernel `eventlog.EphemeralPublisher` |
 | `search` | `Search` | | | |
-| `stats` | `Stats` | | | |
+| `stats` | `Stats` (Abfragen, Timeline, Ampel, Backend-Ansicht), `Live` (Basis-Rahmen je Intervall, Filter je Empfänger) | | | kernel `measure.Recorder` |
 | `apps` | `Apps`, `Webhooks`, `IncomingWebhooks` | | `chat.ChannelArchived` | |
 | `importer` | `Imports` (Quellen, Stapel über `import.apply`) | | | |
 | `privacy` | `Requests` | | | sammelt alle kernel `personaldata.Participant` |
 | `status` | `Status`, `BackupRuns` (für `bothy-backupd`) | | `agents.AgentDisabled` | |
+| `terminal` | `Hosts` (Verwaltung, Kopplung, Erklärung), `Sessions` (Öffnen, Anhängen, Schließen, Liste), `Relay` (Strom- und Host-Verbindungen, nur im Adapter `wsrelay`) | | kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (Sitzungen beenden) | `authz.HostSource` (Zustand, Inhaber, LLM-Erklärung, Server-Host des Rechners) |
 
 ### 4.4 Erlaubte Abhängigkeiten
 
@@ -225,11 +231,12 @@ andere ist verboten und schlägt im Gate fehl (Abschnitt 7).
 | `stats` | `chat`, `agents`, `messaging`, `runs`, `billing` | liest Kennzahlen über Ports |
 | `notify` | `identity`, `chat`, `messaging`, `sync` | Geräte und Zeitzone; Ziel-Pfad für Einstellungen; Erwähnungen; Gelesen-Stand |
 | `apps` | `instance`, `identity`, `chat`, `agents`, `messaging`, `sync` | Webhook-Signierschlüssel; App-Prinzipal und Tokens; Ziel der Eingangs-Webhooks; Befehle von Apps; Nachrichten aus Webhooks; Verbraucher für ausgehende Webhooks |
-| `gateway` | `chat`, `agents`, `runs`, `sync` | Thread zu Kanal für Fokus und Tippen; Verbraucher-Cursor und Präsenz; Lauf-Patches und Zustellvorbereitung; Tail, Nachholen, Momentaufnahme |
+| `gateway` | `chat`, `agents`, `runs`, `sync`, `stats` | Thread zu Kanal für Fokus und Tippen; Verbraucher-Cursor und Präsenz; Lauf-Patches und Zustellvorbereitung; Tail, Nachholen, Momentaufnahme; Live-Rahmen für `stats.subscribe` |
+| `terminal` | `instance`, `identity`, `authz`, `agents` | Signer für Sitzungs-Marken (Zweck `terminal`); Menschen, Geräte, Owner, Verbrauch des Step-up; Freigaben auf Rechner und I6; Bereitschaft der Dev-Umgebung (Etappe) |
 
 Ebenen (von unten): `instance`, `billing` · `audit`, `authz` · `identity` · `chat` · `agents`,
-`files` · `messaging`, `status` · `runs`, `search`, `importer`, `privacy` · `sync`, `stats` ·
-`notify`, `apps`, `gateway`. Jede Kante zeigt nach unten.
+`files` · `messaging`, `status`, `terminal` · `runs`, `search`, `importer`, `privacy` · `sync`,
+`stats` · `notify`, `apps`, `gateway`. Jede Kante zeigt nach unten.
 
 Zusätzlich gilt für alle Module: `kernel` ja, `platform` nur in `adapters`, `api` (generierter Code)
 nur in `adapters`, River nur in `platform/jobs`.
@@ -257,6 +264,7 @@ Tickets der Module `identity`, `chat`, `agents`).
 | `kernel/auditing` | `Recorder`: in der Transaktion oder getrennt (für Ablehnungen nach Rollback) | `audit` | allen |
 | `kernel/idempotency` | `Store` für `Idempotency-Key` im Unit of Work | `sync` | `platform/httpserver` |
 | `kernel/personaldata` | `Participant`: Export und Löschung je Modul für einen Menschen | Module mit personenbezogenen Tabellen | `privacy` |
+| `kernel/measure` | `Recorder.Record(metric, key, value)` der eigenen Messung; nur Zähler im Speicher, nie blockierend ([25-visualisierung.md](25-visualisierung.md), Abschnitt 3) | `stats` | `messaging`, `runs`, `billing`, `agents`, `notify`, `gateway`, `platform/httpserver` |
 
 `kernel/ids` prüft nur IDs nach R-DM-01. `correlation_id` ist keine UUIDv7 und wird nie mit
 `kernel/ids` geprüft; sie kommt nur aus `kernel/reqmeta` bzw. dem Span-Kontext.
@@ -290,6 +298,7 @@ Tabelle mit dem Katalog (Abschnitt 7.3).
 | `importer` | `import.read`, `import.manage`, `import.apply` |
 | `privacy` | `gdpr.request.create`, `gdpr.request.read`, `gdpr.request.decide`, `gdpr.export.download` |
 | `status` | `status.public.read`, `status.read`, `status.manage` |
+| `terminal` | `host.read`, `host.manage`, `host.pair`, `host.connect`, `terminal.open`, `terminal.attach`, `terminal.stream`, `terminal.read_own`, `terminal.close`, `terminal.terminate` |
 
 Begründungen für Grenzfälle:
 
@@ -333,6 +342,8 @@ Ein Ereignistyp hat genau ein erzeugendes Modul. Die Empfangs-Aktion steht in 05
 | `privacy` | `gdpr.request_updated` | | |
 | `importer` | `import.progress` | | |
 | `gateway` | | `typing.started` | `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.start`, `typing.stop` |
+| `stats` | | `stats.live` | `stats.subscribe`, `stats.unsubscribe` (über den Hub des Gateways) |
+| `terminal` | `host.updated`, `terminal_session.changed` | `host.presence_changed` | keine im Gateway; eigene Kanäle mit eigenen Ops (05, Abschnitt 7) |
 
 `message.updated` für `trigger_state` erzeugt `messaging`, auch wenn `runs` den Wechsel auslöst
 (über `Messages.SetTriggerState`). Grund: ein Ereignistyp, ein Erzeuger, eine Nutzlast-Definition.
@@ -398,6 +409,9 @@ services/server/
   tools/flagcheck/            Gate: Registrierung der Feature-Flags gegen VERSION (ADR 0064)
   sqlc.yaml                   ein Eintrag je Modul, Schema aus migrations/
   .go-arch-lint.yml           generiert aus architecture/modules.yaml
+services/host/                Host-Dienst bothy-host (eigenes Go-Modul, eigene Version; 24-terminal.md)
+  cmd/bothy-host/             main: Unterbefehle install, pair, doctor, run
+  internal/                   noise, frame, control, pty (unix, windows), profiles, doctor, state
 ```
 
 Testhilfen, die Tests mehrerer Pakete nutzen, liegen im Baum der Komponente, deren Typen sie bauen,
@@ -412,12 +426,26 @@ selbst Testcode ist. Fachliche Teilbereiche eines Moduls
 eigene Pakete daneben; ein Paket ohne Komponente scheitert im Gate (7.1).
 
 Stellen mit dem Produktnamen (Baseline Abschnitt 1, ADR 0044; damit ein Wechsel billig bleibt),
-nach Art: Go-Modulpfad in `go.mod`; Binary `bothy` (`cmd/bothy`); Präfix der Umgebungsvariablen
-`BOTHY_`; Namen der Images (`bothy-server`, `bothy-postgres`, `bothy-backupd`) und Pfade im Container
-(`/run/bothy`, `/var/lib/bothy`); Rollen der Datenbank (`bothy_*`); Präfix der Telemetrie-, Alarm-
-und SLO-Namen (`bothy.`, `bothy_`, `Bothy`); Präfix der API-Tokens `bothy_` mit der gitleaks-Regel
-([ADR 0061](../adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md)); Standardwert der Einstellung `branding.product_name`. Diese Liste ist die einzige; ein
-Test (PLAN M1-46) erlaubt den Namen in Code und Konfiguration nur an Stellen dieser Arten.
+nach Art:
+
+- Server: Go-Modulpfad in `go.mod`; Binary `bothy` (`cmd/bothy`); Präfix der Umgebungsvariablen
+  `BOTHY_`; Namen der Images (`bothy-server`, `bothy-postgres`, `bothy-backupd`) und Pfade im
+  Container (`/run/bothy`, `/var/lib/bothy`); Rollen der Datenbank (`bothy_*`).
+- Host-Dienst ([24-terminal.md](24-terminal.md)): Go-Modulpfad unter `services/host`; Binary,
+  Dienst- und Benutzername `bothy-host`; Zustandsordner (`/var/lib/bothy-host`,
+  `%ProgramData%\bothy-host`); Protokoll-Kennungen `bothy-terminal/1` (Noise-Prolog) und
+  `bothy-host-fp/1` (Fingerabdruck); Release-Komponente `host`.
+- Pakete der Apps: Dart-Pakete mit Präfix `bothy_` (`bothy_viz`, `bothy_noise`).
+- Grafana-Plugin ([25-visualisierung.md](25-visualisierung.md), Abschnitt 8): Ordner und
+  Release-Komponente `grafana-bothy-live`, Plugin-ID `bothy-live-panel`, Dashboard `bothy-live`.
+- Querschnitt: Präfix der Telemetrie-, Alarm- und SLO-Namen (`bothy.`, `bothy_`, `Bothy`); Präfix
+  der API-Tokens und Kopplungs-Codes `bothy_` mit der gitleaks-Regel
+  ([ADR 0061](../adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md)); Standardwert der
+  Einstellung `branding.product_name`.
+
+Diese Liste ist die einzige; ein Test (PLAN M1-46) erlaubt den Namen in Code und Konfiguration nur
+an Stellen dieser Arten. Ein Wechsel des Namens ändert die Protokoll-Kennungen nicht still: Sie
+sind Teil des Terminal-Protokolls und wechseln nur mit einer neuen Protokollversion.
 
 ## 7. Automatische Prüfung der Regeln
 
@@ -434,7 +462,7 @@ version: 1
 exclude: [tools]                  # Verzeichnisse, die go-arch-lint nicht prüft (Werkzeuge)
 kernel:
   core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys]   # von jedem Paket nutzbar
-  ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata]
+  ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure]
 platform:                         # je Plattform-Paket eine Komponente
   jobs: {depends_on: [pg], vendors: [river]}
   pg: {vendors: [pgx]}
@@ -864,6 +892,8 @@ Grund: Jeder andere Job schriebe Zustand, der auf dem Ziel fehlen würde.
 | `billing.reconcile` | `billing` | `cost.reconcile` (von Hand) und `cost.reconcile.submit` (Abgleich-App): übermittelte Einträge anwenden, Summen an Läufen und Sitzungen nachziehen; nie periodisch, weil der Server keine Abrechnung abruft und keinen Admin-Schlüssel hält ([ADR 0055](../adr/0055-kostenabgleich-als-eigene-app-admin-key-nie-im-server.md)) | `default` | 10 |
 | `status.probe` | `status` | periodisch | `maintenance` | 16 |
 | `retention.<klasse>` | besitzendes Modul | periodisch je Aufbewahrungsklasse | `maintenance` | 20 |
+| `stats.retention` | `stats` | periodisch: Tages-Partitionen von `stats_minutes` im Voraus anlegen, Partitionen älter als `retention.stats_minutes` abhängen; ersetzt für die Klasse `stats` den allgemeinen `retention.<klasse>`, weil die Tabelle partitioniert ist | `maintenance` | 25 |
+| `terminal.sweep` | `terminal` | periodisch alle `terminal.sweep_interval`: abgelaufene Kopplungs-Codes verwerfen (`pairing_expires_at`); Sitzungen beenden, die `terminal.detach_grace`, `terminal.max_session_duration` oder `terminal.idle_timeout` plus `terminal.idle_grace` überschritten haben (`terminal.terminate`). Rückfall für die Prüfung im Relais, falls ein Knoten ausfiel | `maintenance` | 24 |
 
 ### 12.4 Regeln für Jobs
 
@@ -1163,7 +1193,7 @@ ist das Ziel "ungeprüft" (Tickets). Wann und auf welcher Umgebung gemessen wird
 | [07-rechte.md](07-rechte.md) | Freigabe-Modell, `authorize`, Filter, Entzug | `authz`, Rechte-Cache in `gateway` und `sync` |
 | [08-identitaet.md](08-identitaet.md) | Anbieter, Geräte, Tokens, Step-up, Einrichtung | `identity` |
 | [09-agenten.md](09-agenten.md) | Adapter-Vertrag, Läufe, Komponenten, Befehle, Sitzungen | `agents`, `runs`, Teile von `chat` |
-| [10-backend-richtlinie.md](10-backend-richtlinie.md) | I1 bis I5, Umschalten, Kosten | `agents`, `authz` (I1), `runs` (I2, I3), `billing` |
+| [10-backend-richtlinie.md](10-backend-richtlinie.md) | I1 bis I6, Umschalten, Kosten | `agents`, `authz` (I1, I6), `runs` (I2, I3), `billing`, `terminal` (I6) |
 | [11-erweiterungen.md](11-erweiterungen.md) | Apps, Manifest, Webhooks, SDK | `apps` |
 | [12-dateien.md](12-dateien.md) | Upload, Speicher, Scan, Vorschau | `files` |
 | [13-push-benachrichtigungen.md](13-push-benachrichtigungen.md) | Benachrichtigung, Push | `notify` |
@@ -1177,13 +1207,15 @@ ist das Ziel "ungeprüft" (Tickets). Wann und auf welcher Umgebung gemessen wird
 | [21-dev-isolation.md](21-dev-isolation.md) | Mehrbenutzer-Dev-Umgebung | `chat` (Projektbindung), `runs` (Prüfung `ready`) |
 | [22-import-migration.md](22-import-migration.md) | Discord-Import | `importer` |
 | [23-qualitaet.md](23-qualitaet.md) | Gates, Tests, Werkzeuge | Abschnitt 7, Lasttests aus Abschnitt 17 |
+| [24-terminal.md](24-terminal.md) | Rechner, Host-Dienst, Noise-Strom, I6, Terminal-Sitzungen | `terminal`; Host-Dienst `services/host` außerhalb des Servers |
+| [25-visualisierung.md](25-visualisierung.md) | Eigene Messung, Live-Rahmen, Visualisierungen, Grafana-Plugin | `stats`, `kernel/measure`; Plugin `plugins/grafana-bothy-live` außerhalb des Servers |
 
 ## 19. Entscheidungen dieses Kapitels
 
 | Nr | Entscheidung | Grund |
 |---|---|---|
 | R-AR-01 | Ein Binary `bothy` mit Unterbefehlen; Rollen über `--role`. | Baseline nennt den Binary-Namen `bothy`; B1 beschreibt die Server-Rolle. Ein Image für alle Rollen. |
-| R-AR-02 | Module `gateway`, `search`, `stats` ohne eigene Tabellen. | Eigene Ports, Abhängigkeiten und Leistungsziele; sonst würden sie `sync`, `messaging` oder `runs` aufblähen. |
+| R-AR-02 | Module `gateway` und `search` ohne eigene Tabellen; `stats` mit genau einer Tabelle (`stats_minutes`). | Eigene Ports, Abhängigkeiten und Leistungsziele; sonst würden sie `sync`, `messaging` oder `runs` aufblähen. Die eigene Messung braucht einen Speicher, der keinem Fachmodul gehört (Ruling T7). |
 | R-AR-03 | Port ist das Wurzelpaket mit eigenen DTOs. | Domain bleibt intern änderbar; spätere Prozessgrenze ohne Umbau der Aufrufer. |
 | R-AR-04 | Modul-Abhängigkeiten bilden einen Graphen ohne Zyklen; Gegenrichtung nur über Quellen-Ports oder In-Tx-Ereignisse. | Abspaltbarkeit und Verständlichkeit; Go verbietet ohnehin Import-Zyklen. |
 | R-AR-05 | Querschnitts-Ports in `internal/kernel`. | Jedes Modul braucht `authorize`, Ereignisse, Audit, Unit of Work; als Modul-Kanten entstünden Zyklen. |
@@ -1219,7 +1251,7 @@ Kern-Vertrag (Integration vom 2026-10-10):
 | Pfad-Präfix `/api/v1` | 04, Kopf und Abschnitt 6.1 |
 | Maschinenlesbarer Aktionskatalog | beschlossen ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)); bis dahin Abgleich im Doku-Gate (05, Regel 3) |
 | Health ohne Aktion, auf dem internen Listener | 05, R-AZ-22; Abschnitt 15.2 |
-| Module `gateway`, `search`, `stats` ohne Tabellen | 03, Abschnitt 2 |
+| Module `gateway`, `search` ohne Tabellen; `stats` mit `stats_minutes` | 03, Abschnitte 2 und 4.15 |
 | `agent.read` für den Agenten selbst | 05, Abschnitt 4.10 |
 | Eindeutiger Live-Box-Anker | 03 `messages`, Teilindex auf `run_id` |
 | Kanal `ephemeral` im Modus `multi` | 03, Abschnitt 6.6; 04, Abschnitt 12 |

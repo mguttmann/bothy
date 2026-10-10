@@ -15,7 +15,7 @@ flowchart TB
     gateway["<b>gateway</b><br/>WebSocket, Fan-out, Fokus, Tippen"]:::top
     notify["<b>notify</b><br/>Benachrichtigung, Push"]:::top
     apps["<b>apps</b><br/>Apps, Webhooks ein und aus"]:::top
-    stats["<b>stats</b><br/>Statistik"]:::top
+    stats["<b>stats</b><br/>Statistik, eigene Messung,<br/>Live-Rahmen"]:::top
     privacy["<b>privacy</b><br/>DSGVO-Aufträge"]:::top
     importer["<b>importer</b><br/>Import"]:::top
     search["<b>search</b><br/>Volltextsuche"]:::top
@@ -29,23 +29,25 @@ flowchart TB
     agents["<b>agents</b><br/>Agenten, Sitzungen, Befehle,<br/>Verbraucher-Cursor"]:::mid
     files["<b>files</b><br/>Dateien, Scan, Vorschau"]:::mid
     chat["<b>chat</b><br/>Bereiche, Kanäle, Threads"]:::mid
+    terminal["<b>terminal</b><br/>Rechner, Terminal-Sitzungen,<br/>Sitzungs-Marken, Relais"]:::mid
   end
 
   subgraph foundation["Fundament"]
     identity["<b>identity</b><br/>Prinzipale, Geräte, Sitzungen, Tokens"]:::base
-    authz["<b>authz</b><br/>authorize, Gruppen, Freigaben, I1"]:::base
+    authz["<b>authz</b><br/>authorize, Gruppen, Freigaben, I1, I6"]:::base
     audit["<b>audit</b><br/>Audit-Log"]:::base
     billing["<b>billing</b><br/>Kosten, Preise"]:::base
     instance["<b>instance</b><br/>Einstellungen, Schalter,<br/>Schlüssel, Zähler"]:::base
   end
 
-  kernel["<b>internal/kernel</b><br/>Querschnitts-Ports: authorize, txn, eventlog,<br/>auditing, idempotency, actor, personaldata"]:::shared
+  kernel["<b>internal/kernel</b><br/>Querschnitts-Ports: authorize, txn, eventlog,<br/>auditing, idempotency, actor, personaldata,<br/>measure"]:::shared
   platform["<b>internal/platform</b><br/>pg, httpserver, jobs, otel, config,<br/>secrets, ratelimit, lifecycle"]:::shared
 
   gateway --> chat
   gateway --> agents
   gateway --> runs
   gateway --> sync
+  gateway --> stats
   notify --> identity
   notify --> chat
   notify --> messaging
@@ -86,6 +88,10 @@ flowchart TB
   messaging --> chat
   messaging --> files
   status --> agents
+  terminal --> instance
+  terminal --> identity
+  terminal --> authz
+  terminal --> agents
   agents --> identity
   agents --> authz
   agents --> chat

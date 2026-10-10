@@ -1,0 +1,50 @@
+%% Terminal öffnen: Step-up, authorize mit SR10 und I6, Sitzungs-Marke, Noise NK über das Relais.
+%% Fachliche Details: 24-terminal.md, Abschnitte 5 und 6. Pfade ohne Präfix /api/v1.
+sequenceDiagram
+  autonumber
+  participant G as Gerät (Terminal-Ansicht)
+  box api-Knoten (Hash-Routing über session_id)
+    participant T as terminal
+    participant AZ as authz
+    participant ID as identity
+    participant R as Relais
+  end
+  participant DB as PostgreSQL
+  participant H as Host-Dienst bothy-host
+  participant P as PTY
+
+  Note over H,T: Steuerverbindung /hosts/connect besteht, angemeldet mit Ed25519
+  G->>ID: Step-up mit Passkey oder Step-up-Geräteschlüssel
+  G->>G: ephemeres X25519-Paar e erzeugen
+  G->>T: POST hosts/{id}/terminal/sessions (Profil, Größe, Hash von e)
+  T->>AZ: authorize(Person, terminal.open, Rechner)
+  AZ->>AZ: terminal-Recht, SR10, SR11 (I6), Step-up frisch und unverbraucht, Grenzen
+  alt abgelehnt
+    AZ-->>T: Entscheidung mit Grund
+    T->>DB: eigene Transaktion: Audit deny
+    T-->>G: 401, 403 oder 404
+  else erlaubt
+    T->>DB: BEGIN, Step-up verbrauchen, terminal_sessions opening, Audit, terminal_session.changed, COMMIT
+    T->>T: Sitzungs-Marke signieren (Zweck terminal, jti, cek)
+    T-->>G: 201: session_id, Marke, noise_public_key, Fingerabdruck
+    G->>G: Schlüssel gegen Pin prüfen, sonst harte Warnung
+    T->>H: session.open (session_id, Datenpfad)
+    H->>R: WSS /hosts/sessions/{id}/stream, identify mit Ed25519
+    G->>R: WSS /terminal/sessions/{id}/stream, identify mit DPoP
+    G->>R: Noise Nachricht 1: e, es, Nutzlast Marke
+    R->>H: unverändert weiterleiten
+    H->>H: Prolog, Signatur, aud, sid, exp, jti einmalig, cek gleich Hash von e, Profil, own
+    H-->>R: Noise Nachricht 2: e, ee
+    R-->>G: unverändert weiterleiten
+    G->>R: erste Transportnachricht: start (Spalten, Zeilen)
+    R->>H: weiterleiten
+    H->>P: PTY starten (Profil, eigener Benutzer)
+    H->>T: session.started
+    T->>DB: state active, terminal_session.changed
+    loop Sitzung
+      G->>R: data, resize (verschlüsselt)
+      R->>H: weiterleiten, nur Länge zählen
+      H-->>R: data (verschlüsselt)
+      R-->>G: weiterleiten
+    end
+  end

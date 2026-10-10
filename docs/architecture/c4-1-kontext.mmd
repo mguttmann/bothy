@@ -20,6 +20,7 @@ flowchart TB
   telemetry["<b>Telemetrie-Backends</b><br/>[extern]<br/>über OpenTelemetry Collector"]:::ext
   discord["<b>Discord</b><br/>[extern]<br/>Import-Quelle, nur lesend"]:::ext
   stt["<b>Transkriptions-Dienst</b><br/>[extern, optional]<br/>hinter einem Port"]:::ext
+  hosts["<b>Angebundene Rechner</b><br/>[extern zum Server]<br/>Host-Dienst bothy-host,<br/>Terminal-Sitzungen"]:::ext
 
   member -->|"chattet, löst Agenten aus"| bothy
   owner -->|"verwaltet mit Step-up"| bothy
@@ -34,3 +35,4 @@ flowchart TB
   bothy -->|"OTLP"| telemetry
   bothy -->|"liest beim Import"| discord
   bothy -->|"Audio zur Transkription"| stt
+  hosts -->|"WebSocket ausgehend,<br/>Noise-Strom Ende-zu-Ende"| bothy

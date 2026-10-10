@@ -13,7 +13,7 @@ stammen aus dem Kern-Vertrag ([00](../spec/00-glossar.md), [03](../spec/03-daten
 | Diagramm | Inhalt | Quelle | Bild |
 |---|---|---|---|
 | Kontext | Eine Instanz mit Menschen und Fremdsystemen, je Beziehung das Protokoll. | [c4-1-kontext.mmd](c4-1-kontext.mmd) | [c4-1-kontext.svg](c4-1-kontext.svg) |
-| Container | Rollen `api` und `worker` des Binarys, PostgreSQL, Objektspeicher, clamd, Collector, Apps, Adapter. | [c4-2-container.mmd](c4-2-container.mmd) | [c4-2-container.svg](c4-2-container.svg) |
+| Container | Rollen `api` und `worker` des Binarys, PostgreSQL, Objektspeicher, clamd, Collector, Apps, Adapter, Host-Dienst. | [c4-2-container.mmd](c4-2-container.mmd) | [c4-2-container.svg](c4-2-container.svg) |
 | Komponenten des Servers | Module des Monolithen mit allen erlaubten Abhängigkeiten nach 02-architektur.md, 4.4. | [c4-3-komponenten-server.mmd](c4-3-komponenten-server.mmd) | [c4-3-komponenten-server.svg](c4-3-komponenten-server.svg) |
 
 ### Abläufe im Server
@@ -34,6 +34,7 @@ stammen aus dem Kern-Vertrag ([00](../spec/00-glossar.md), [03](../spec/03-daten
 | Backend-Modus umschalten | Umschalten auf `personal` mit Step-up, I1-Prüfung, Soll und Ist am Adapter. | [seq-5-backend-modus.mmd](seq-5-backend-modus.mmd) | [seq-5-backend-modus.svg](seq-5-backend-modus.svg) |
 | Push mit Extension | Push ohne Inhalt, Notification Service Extension holt die Nachricht über die API. | [seq-6-push-nse.mmd](seq-6-push-nse.mmd) | [seq-6-push-nse.svg](seq-6-push-nse.svg) |
 | Datei-Upload | Upload-Sitzung, Upload direkt oder über presigned URL, Scan mit clamd, Vorschaubild. | [seq-7-datei-upload.mmd](seq-7-datei-upload.mmd) | [seq-7-datei-upload.svg](seq-7-datei-upload.svg) |
+| Terminal öffnen | Step-up, `terminal.open` mit SR10 und I6, Sitzungs-Marke, Noise `NK` über das Relais, PTY erst nach `start`. | [seq-8-terminal-oeffnen.mmd](seq-8-terminal-oeffnen.mmd) | [seq-8-terminal-oeffnen.svg](seq-8-terminal-oeffnen.svg) |
 
 ### Datenmodell (ERD, aus 03-datenmodell.md, nach Modulen geteilt)
 
@@ -45,6 +46,7 @@ stammen aus dem Kern-Vertrag ([00](../spec/00-glossar.md), [03](../spec/03-daten
 | Nachrichten und Dateien | Module `messaging` und `files`. | [erd-4-nachrichten-dateien.mmd](erd-4-nachrichten-dateien.mmd) | [erd-4-nachrichten-dateien.svg](erd-4-nachrichten-dateien.svg) |
 | Läufe und Kosten | Module `runs` und `billing`. | [erd-5-laeufe-kosten.mmd](erd-5-laeufe-kosten.mmd) | [erd-5-laeufe-kosten.svg](erd-5-laeufe-kosten.svg) |
 | Sync und Betrieb | Module `sync`, `notify`, `importer`, `audit`, `privacy`, `status`. | [erd-6-sync-betrieb.mmd](erd-6-sync-betrieb.mmd) | [erd-6-sync-betrieb.svg](erd-6-sync-betrieb.svg) |
+| Terminal | Modul `terminal`: Rechner und Terminal-Sitzungen. | [erd-7-terminal.mmd](erd-7-terminal.mmd) | [erd-7-terminal.svg](erd-7-terminal.svg) |
 
 ## Konventionen
 

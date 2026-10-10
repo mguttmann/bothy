@@ -74,9 +74,10 @@ Migration kommt mit dieser Etappe, der Vertrag gilt schon jetzt.
 | `status` | Statusseite, Sicherungsläufe | ja |
 | `gateway` | WebSocket-Endpunkt, Gateway-Sitzungen, Fokus, Tippen, kurzlebige Ereignisse | keine |
 | `search` | Such-Koordinator über die Lese-Ports von `messaging`, `chat` und `files` ([14-suche.md](14-suche.md)) | keine |
-| `stats` | Statistik der Konsole aus den Lese-Ports anderer Module | keine |
+| `stats` | Statistik der Konsole aus den Lese-Ports anderer Module, eigene Messung als Minuten-Aggregate ([25-visualisierung.md](25-visualisierung.md)) | ja |
+| `terminal` | Rechner, Kopplung, Terminal-Sitzungen, Sitzungs-Marken, Relais der Ströme ([24-terminal.md](24-terminal.md)) | ja |
 
-Die drei Module ohne Tabellen sind eigene Module, weil sie eigene Ports, Abhängigkeiten und
+Die zwei Module ohne Tabellen sind eigene Module, weil sie eigene Ports, Abhängigkeiten und
 Leistungsziele haben ([02-architektur.md](02-architektur.md), Abschnitt 4). Technische Tabellen
 außerhalb der Module stehen in Abschnitt 4.13. Die Zuordnung der Tabellen zu Modulen steht
 maschinenlesbar im Modulregister ([ADR 0050](../adr/0050-modulregister-als-quelle-fuer-architektur-gate-und-tabellenbesitz.md)).
@@ -101,6 +102,7 @@ nur die Zuordnung fest.
 | `import` | Import-Zustand. Löschbar nach Abschluss des Imports. |
 | `privacy_job` | DSGVO-Aufträge und Exportpakete. |
 | `ops` | Statusseite und Sicherungsläufe. |
+| `stats` | Minuten-Aggregate der eigenen Messung, ohne Personen. Frist `retention.stats_minutes`. |
 
 ## 4. Tabellen
 
@@ -156,8 +158,8 @@ Modul: `instance`.
 | Feld | Typ | Null | Standard | Regeln / Hinweise |
 |---|---|---|---|---|
 | `kid` | `text` | nein | | Schlüssel-ID im JWS-Kopf |
-| `purpose` | `text` | nein | | `CHECK (purpose IN ('access_token','invocation','webhook_out','audit_checkpoint'))` |
-| `alg` | `text` | nein | | `CHECK (alg IN ('EdDSA','ES256'))`; bei `purpose IN ('invocation','webhook_out')` nur `EdDSA` (Check), weil Aufruf-Marken genau einen Algorithmus erlauben und Standard Webhooks `v1a` nur Ed25519 kennt |
+| `purpose` | `text` | nein | | `CHECK (purpose IN ('access_token','invocation','terminal','webhook_out','audit_checkpoint'))`; `terminal` signiert Sitzungs-Marken ([24-terminal.md](24-terminal.md), Abschnitt 5.3) |
+| `alg` | `text` | nein | | `CHECK (alg IN ('EdDSA','ES256'))`; bei `purpose IN ('invocation','terminal','webhook_out')` nur `EdDSA` (Check), weil Aufruf- und Sitzungs-Marken genau einen Algorithmus erlauben und Standard Webhooks `v1a` nur Ed25519 kennt |
 | `public_jwk` | `jsonb` | nein | | JWK nach RFC 7517, ohne privaten Teil |
 | `private_key_ref` | `text` | nein | | Verweis auf den Secret-Provider |
 | `state` | `text` | nein | `'active'` | `CHECK (state IN ('next','active','retiring','retired'))` |
@@ -395,6 +397,7 @@ Zweck: Anmeldesitzung eines Menschen auf einem Gerät. Jeder Zugriffstoken träg
 | `expires_at` | `timestamptz` | nein | | absolutes Ende, `created_at + auth.session_max_age` (Konsole: `auth.console_session_max_age`) |
 | `step_up_at` | `timestamptz` | ja | | letzte frische Bestätigung durch den Menschen; gültig für `auth.step_up_max_age` |
 | `step_up_method` | `text` | ja | | `CHECK (step_up_method IN ('passkey','device_key','password_totp','oidc_reauth'))`; gesetzt mit `step_up_at` |
+| `step_up_consumed_at` | `timestamptz` | ja | | gesetzt, wenn `terminal.open` oder `terminal.attach` den Step-up mit `step_up_at` verbraucht hat; ein verbrauchter Step-up (`step_up_consumed_at >= step_up_at`) erlaubt keine weitere Terminal-Öffnung ([08-identitaet.md](08-identitaet.md), Abschnitt 6.3) |
 | `last_seen_at` | `timestamptz` | ja | | |
 | `last_ip` | `inet` | ja | | nur für Sicherheitsansicht, Klasse `security` |
 | `revoked_at` | `timestamptz` | ja | | |
@@ -405,7 +408,7 @@ PK: `id`. FK: `user_id` -> `users(principal_id)` ON DELETE RESTRICT; `device_id`
 `parent_session_id` -> `auth_sessions(id)` ON DELETE CASCADE.
 Checks: `(client_component = 'console') = (cookie_hash IS NOT NULL)`; `parent_session_id IS NULL OR
 client_component = 'share_ext'`; `(step_up_at IS NULL) = (step_up_method IS
-NULL)`. Unique: `cookie_hash` als Teilindex `WHERE cookie_hash IS NOT NULL`.
+NULL)`; `step_up_consumed_at IS NULL OR step_up_at IS NOT NULL`. Unique: `cookie_hash` als Teilindex `WHERE cookie_hash IS NOT NULL`.
 Indexe: `(user_id) WHERE revoked_at IS NULL` für "alle Sitzungen beenden"; `(device_id)`;
 `(parent_session_id) WHERE parent_session_id IS NOT NULL`; `(expires_at)` für den Aufräumjob.
 Aufbewahrung: `security`.
@@ -697,11 +700,12 @@ Zweck: eine Freigabe: Subjekt x Ziel x Stufe x Zusatzrechte x Ablauf x Grund. Wi
 | `subject_kind` | `text` | nein | | `CHECK (subject_kind IN ('user','group','agent','app'))` |
 | `subject_principal_id` | `uuid` | ja | | gesetzt bei `user`, `agent`, `app` |
 | `subject_group_id` | `uuid` | ja | | gesetzt bei `group` |
-| `target_kind` | `text` | nein | | `CHECK (target_kind IN ('instance','space','channel'))` |
+| `target_kind` | `text` | nein | | `CHECK (target_kind IN ('instance','space','channel','host'))` |
 | `target_space_id` | `uuid` | ja | | gesetzt genau bei `space` |
 | `target_channel_id` | `uuid` | ja | | gesetzt genau bei `channel` |
-| `level` | `text` | nein | | `CHECK (level IN ('read','write','trigger'))` |
-| `capabilities` | `text[]` | nein | `'{}'` | Teilmenge von `approve_actions`, `upload`, `export`, `manage` |
+| `target_host_id` | `uuid` | ja | | gesetzt genau bei `host` ([24-terminal.md](24-terminal.md), Abschnitt 8.1) |
+| `level` | `text` | ja | | `CHECK (level IN ('read','write','trigger'))`; NULL genau bei `target_kind = 'host'`, weil Stufen auf Rechnern nicht gelten |
+| `capabilities` | `text[]` | nein | `'{}'` | Teilmenge von `approve_actions`, `upload`, `export`, `manage`, `terminal`; `terminal` nur und genau auf dem Ziel `host` |
 | `expires_at` | `timestamptz` | ja | | bei jedem `authorize` geprüft; der Job `authz.expiry_sweep` meldet den Ablauf nur (Abschnitt 6.4) |
 | `expiry_reminded_at` | `timestamptz` | ja | | Erinnerung vor Ablauf geschrieben (`access.expiring`) |
 | `expiry_reported_at` | `timestamptz` | ja | | Ablauf gemeldet (`access.changed`, Systemaktion `grant.expire`); genau einmal je Freigabe |
@@ -715,17 +719,19 @@ Zweck: eine Freigabe: Subjekt x Ziel x Stufe x Zusatzrechte x Ablauf x Grund. Wi
 PK: `id`.
 FK: `subject_principal_id` -> `principals(id)` ON DELETE RESTRICT; `subject_group_id` ->
 `groups(id)` ON DELETE RESTRICT; `target_space_id` -> `spaces(id)` ON DELETE RESTRICT;
-`target_channel_id` -> `channels(id)` ON DELETE RESTRICT; `granted_by`, `revoked_by` ->
-`principals(id)` ON DELETE RESTRICT.
+`target_channel_id` -> `channels(id)` ON DELETE RESTRICT; `target_host_id` -> `hosts(id)` ON DELETE
+RESTRICT; `granted_by`, `revoked_by` -> `principals(id)` ON DELETE RESTRICT.
 Checks: genau eines von `subject_principal_id` und `subject_group_id` ist gesetzt, passend zu
 `subject_kind`; Ziel-Spalten passend zu `target_kind`; `capabilities <@ ARRAY['approve_actions',
-'upload','export','manage']`; bei `subject_kind IN ('agent','app')` gilt `level <> 'trigger' AND
-capabilities <@ ARRAY['upload']` (R-DM-08, R-DM-20).
+'upload','export','manage','terminal']`; bei `subject_kind IN ('agent','app')` gilt `level <> 'trigger' AND
+capabilities <@ ARRAY['upload']` (R-DM-08, R-DM-20); `(target_kind = 'host') = (level IS NULL)`;
+`target_kind <> 'host' OR (capabilities = ARRAY['terminal'] AND subject_kind IN ('user','group'))`;
+`target_kind = 'host' OR NOT ('terminal' = ANY(capabilities))` (R-DM-35).
 Unique: keine (mehrere Freigaben auf dasselbe Paar sind erlaubt; die höchste gültige gilt).
 Indexe: `(subject_principal_id) WHERE revoked_at IS NULL` und `(subject_group_id) WHERE
 revoked_at IS NULL` für den Rechte-Aufbau eines Prinzipals; `(target_space_id) WHERE revoked_at
 IS NULL` und `(target_channel_id) WHERE revoked_at IS NULL` für "Wer hat Zugriff?" und die
-I1-Prüfung; `(expires_at) WHERE revoked_at IS NULL AND expires_at IS NOT NULL` für Erinnerung und
+I1-Prüfung; `(target_host_id) WHERE revoked_at IS NULL` für die I6-Prüfung und SR10; `(expires_at) WHERE revoked_at IS NULL AND expires_at IS NOT NULL` für Erinnerung und
 Ablaufmeldung. Aufbewahrung: `account`.
 
 Freigaben werden nie geändert, nur widerrufen und neu angelegt (R-DM-09). Erlaubte Updates sind
@@ -734,8 +740,9 @@ nur die Widerruf-Spalten und die Buchhaltung des Ablaufs (`expiry_reminded_at`,
 Zeile (`expires_at <= now()` und `expiry_reported_at IS NULL`) und setzt die Spalte in derselben
 Transaktion; so wird nach einem Ausfall des worker jeder Ablauf genau einmal gemeldet. Jede Transaktion,
 die `grants`, `group_memberships`, `owners`, Bediener-Zuordnungen, `agents.billing_mode`,
-`agents.credential_holder_id`, `agents.tool_class`, den Zustand einer Dev-Umgebung oder den Status
-eines Prinzipals ändert, erhöht `sequence_counters.permission_version` (Abschnitt 6.3). Das gilt
+`agents.credential_holder_id`, `agents.tool_class`, den Zustand einer Dev-Umgebung, an einem Rechner
+`state`, `assigned_user_id`, `dev_environment_id`, `llm_credentials`, `credential_holder_id` oder
+`declared_server_host` oder den Status eines Prinzipals ändert, erhöht `sequence_counters.permission_version` (Abschnitt 6.3). Das gilt
 auch für den Job `authz.expiry_sweep`, der abgelaufene Freigaben und Mitgliedschaften meldet.
 
 ### 4.4 Agenten und Apps (`agents`, `apps`)
@@ -760,7 +767,7 @@ Modul: `agents`.
 | `reported_runtime_state` | `text` | nein | `'unknown'` | `CHECK (reported_runtime_state IN ('unknown','online','degraded','offline'))` |
 | `reported_billing_mode` | `text` | ja | | letzter Ist-Modus aus dem Heartbeat, `personal` oder `organization`; NULL ohne Heartbeat oder bei Adaptern, die je Lauf dem Soll folgen (dann nennt `reported_details.billing_modes_supported` die belegbaren Modi; bindend ist die Prüfung je Lauf) |
 | `reported_runtime_version` | `text` | ja | | |
-| `reported_details` | `jsonb` | nein | `'{}'` | Schema `agent_heartbeat.v1` ([09-agenten.md](09-agenten.md), Abschnitt 4.8): `capabilities`, `billing_modes_supported`, `billing_evidence` (`provider`, `key_type`, `method`, nie ein Wert), `active_runs`, `degraded_reasons`; ohne Geheimnisse und ohne Inhalte |
+| `reported_details` | `jsonb` | nein | `'{}'` | Schema `agent_heartbeat.v1` ([09-agenten.md](09-agenten.md), Abschnitt 4.8): `capabilities`, `billing_modes_supported`, `billing_evidence` (`provider`, `key_type`, `method`, nie ein Wert), `active_runs`, `degraded_reasons`, `rate_limit`; ohne Geheimnisse und ohne Inhalte |
 | `last_heartbeat_at` | `timestamptz` | ja | | |
 | `version` | `bigint` | nein | `1` | |
 
@@ -2302,6 +2309,146 @@ Diese Tabellen gehören keinem Fachmodul; ihr Schema legt das jeweilige Werkzeug
 
 Fachmodule lesen und schreiben diese Tabellen nie direkt.
 
+### 4.14 Terminal (`terminal`)
+
+Normativ zusammen mit [24-terminal.md](24-terminal.md). Etappe M2.
+
+#### `hosts`
+
+Zweck: ein angebundener Rechner mit Host-Dienst, seine öffentlichen Schlüssel, seine Erklärung zur
+LLM-Anmeldung (I6) und sein gemeldeter Zustand. Modul: `terminal`.
+
+| Feld | Typ | Null | Standard | Regeln / Hinweise |
+|---|---|---|---|---|
+| `id` | `uuid` | nein | | UUIDv7; Rechner-ID im Prolog und in `aud` der Sitzungs-Marke |
+| `name` | `text` | nein | | nicht leer, höchstens `host.name_max_chars` Zeichen, ohne Steuer- und Bidi-Zeichen |
+| `state` | `text` | nein | `'pairing'` | `CHECK (state IN ('pairing','confirming','active','disabled','retired'))` (24, Abschnitt 3.1) |
+| `platform` | `text` | ja | | `CHECK (platform IN ('macos','linux','windows'))`; gemeldet bei `host.pair` |
+| `assigned_user_id` | `uuid` | ja | | Rechner-Inhaber (SR10); NULL heißt nur Owner |
+| `dev_environment_id` | `uuid` | ja | | Dev-Umgebung, die dieser Rechner ist (Etappe "Mehrbenutzer-Dev-Umgebung") |
+| `llm_credentials` | `text` | nein | `'none'` | `CHECK (llm_credentials IN ('none','personal','organization'))` (24, Abschnitt 7.2) |
+| `credential_holder_id` | `uuid` | ja | | Inhaber der Anmeldung bei `personal` (I6) |
+| `llm_credentials_declared_by` | `uuid` | ja | | Owner der letzten Erklärung |
+| `llm_credentials_declared_at` | `timestamptz` | ja | | |
+| `declared_server_host` | `boolean` | nein | `false` | Erklärung des Owners: Der Server läuft auf diesem Rechner (24, Abschnitt 2.3) |
+| `pairing_code_hash` | `bytea` | ja | | HMAC-SHA-256 des Kopplungs-Codes (`bothy_hpc_...`); gesetzt genau bei `state = 'pairing'` |
+| `pairing_expires_at` | `timestamptz` | ja | | `terminal.pairing_code_ttl` nach der Ausgabe |
+| `noise_public_key` | `bytea` | ja | | X25519, genau 32 Byte (`CHECK (octet_length(noise_public_key) = 32)`) |
+| `auth_public_jwk` | `jsonb` | ja | | Ed25519 als JWK (`kty = OKP`, `crv = Ed25519`), ohne privaten Teil |
+| `auth_jkt` | `text` | ja | | JWK-Thumbprint (RFC 7638) des Anmeldeschlüssels |
+| `key_fingerprint` | `text` | ja | | 24, Abschnitt 4.3 |
+| `key_generation` | `integer` | nein | `0` | steigt bei jeder Kopplung um eins |
+| `fingerprint_failures` | `integer` | nein | `0` | Fehlversuche der laufenden Bestätigung |
+| `paired_at` | `timestamptz` | ja | | letzte erfolgreiche `host.pair` |
+| `confirmed_by` | `uuid` | ja | | Owner, der den Fingerabdruck bestätigt hat |
+| `confirmed_at` | `timestamptz` | ja | | |
+| `reported_profiles` | `jsonb` | nein | `'[]'` | Schema `host_profiles.v1`: je Profil `name`, `display_name`, `kind` (`shell`, `claude`, `command`), bei `claude` die Anzeigenamen der Arbeitsordner; nie Befehlszeilen, Pfade oder Umgebung |
+| `reported_doctor` | `jsonb` | nein | `'{}'` | Schema `host_doctor.v1`: Ergebnis und Code je Prüfung HD1 bis HD8 (24, Abschnitt 2.2); nie Inhalte |
+| `reported_is_server_host` | `boolean` | ja | | Meldung des Host-Dienstes (24, Abschnitt 2.3) |
+| `reported_require_local_confirm` | `boolean` | ja | | Meldung, ob `host_service.require_local_confirm` an ist |
+| `reported_os_version` | `text` | ja | | |
+| `reported_host_version` | `text` | ja | | SemVer des Host-Dienstes |
+| `last_seen_at` | `timestamptz` | ja | | grob, höchstens einmal je `identity.last_active_granularity` |
+| `created_by` | `uuid` | nein | | |
+| `created_at` | `timestamptz` | nein | `now()` | |
+| `disabled_at` | `timestamptz` | ja | | |
+| `disabled_reason` | `text` | ja | | `CHECK (disabled_reason IN ('owner','duplicate_connection'))`; `duplicate_connection` setzt der Server bei einer zweiten lebenden Steuerverbindung (24, Abschnitt 3.4) |
+| `retired_at` | `timestamptz` | ja | | |
+| `version` | `bigint` | nein | `1` | optimistische Sperre |
+
+PK: `id`. FK: `assigned_user_id`, `credential_holder_id` -> `users(principal_id)` ON DELETE
+RESTRICT; `dev_environment_id` -> `dev_environments(id)` ON DELETE RESTRICT;
+`llm_credentials_declared_by`, `confirmed_by`, `created_by` -> `principals(id)` ON DELETE RESTRICT.
+Checks: `(llm_credentials = 'personal') = (credential_holder_id IS NOT NULL)`;
+`(state = 'pairing') = (pairing_code_hash IS NOT NULL)`; `state NOT IN ('confirming','active',
+'disabled') OR (noise_public_key IS NOT NULL AND auth_public_jwk IS NOT NULL AND auth_jkt IS NOT
+NULL AND key_fingerprint IS NOT NULL)`; `state NOT IN ('active','disabled') OR confirmed_at IS NOT
+NULL`; `(state = 'retired') = (retired_at IS NOT NULL)`; `(state = 'disabled') = (disabled_reason IS
+NOT NULL)`.
+Unique: `auth_jkt` als Teilindex `WHERE auth_jkt IS NOT NULL`; `pairing_code_hash` als Teilindex
+`WHERE pairing_code_hash IS NOT NULL`; Teilindex `lower(name) WHERE state <> 'retired'`.
+Indexe: `(assigned_user_id) WHERE state = 'active'` für SR10; `(credential_holder_id) WHERE
+llm_credentials = 'personal'` für I6; `(pairing_expires_at) WHERE state = 'pairing'` für den
+Aufräumjob `terminal.sweep` ([02-architektur.md](02-architektur.md), Abschnitt 12.3). Aufbewahrung: `security`.
+Verbindungszustand (verbunden, getrennt) hält der Server nur im Speicher; er erscheint als
+kurzlebiges Ereignis `host.presence_changed` (05).
+
+#### `terminal_sessions`
+
+Zweck: Metadaten einer Terminal-Sitzung. Nie Inhalte, nie Befehle. Modul: `terminal`.
+
+| Feld | Typ | Null | Standard | Regeln / Hinweise |
+|---|---|---|---|---|
+| `id` | `uuid` | nein | | UUIDv7; Sitzungs-ID im Prolog und in `sid` der Marke |
+| `host_id` | `uuid` | nein | | |
+| `user_id` | `uuid` | nein | | Mensch der Sitzung; nur Menschen |
+| `opened_by_device_id` | `uuid` | nein | | Gerät beim Öffnen |
+| `device_id` | `uuid` | nein | | Gerät der letzten Öffnung oder des letzten Anhängens |
+| `auth_session_id` | `uuid` | nein | | Anmeldesitzung der letzten Öffnung oder des letzten Anhängens; ihr Widerruf beendet die Sitzung |
+| `profile` | `text` | nein | | Name des Profils aus `hosts.reported_profiles` |
+| `state` | `text` | nein | `'opening'` | `CHECK (state IN ('opening','active','detached','closed'))` (24, Abschnitt 6.6) |
+| `token_jti` | `uuid` | nein | | `jti` der aktuell gültigen Sitzungs-Marke; ältere Marken sind wertlos |
+| `key_generation` | `integer` | nein | | `hosts.key_generation` beim Öffnen |
+| `opened_at` | `timestamptz` | nein | `now()` | Beginn; Grundlage von `terminal.max_session_duration` |
+| `started_at` | `timestamptz` | ja | | PTY gestartet (`session.started` des Host-Dienstes) |
+| `detached_at` | `timestamptz` | ja | | letzte Trennung; NULL, solange ein Gerät verbunden ist |
+| `last_input_at` | `timestamptz` | ja | | grob, vom Relais; Grundlage der Leerlauf-Prüfung des Servers |
+| `closed_at` | `timestamptz` | ja | | |
+| `closed_by` | `uuid` | ja | | Mensch bei `client_closed` und `closed_by_owner`; sonst NULL |
+| `close_reason` | `text` | ja | | `CHECK (close_reason IN ('client_closed','closed_by_owner','process_exited','idle_timeout','max_duration','detach_expired','access_revoked','i6_violation','host_disabled','host_retired','host_rekeyed','user_disabled','device_revoked','session_revoked','logout','open_failed','host_policy_violation'))` (24, Abschnitt 10.3) |
+| `close_detail` | `text` | ja | | Code aus der geschlossenen Liste in 24, Abschnitt 10.3; nie Freitext |
+| `exit_code` | `integer` | ja | | Exitcode des Prozesses, wenn gemeldet |
+| `bytes_in` | `bigint` | nein | `0` | Bytes der Transportnachrichten vom Gerät, gezählt im Relais |
+| `bytes_out` | `bigint` | nein | `0` | Bytes der Transportnachrichten zum Gerät, gezählt im Relais |
+| `version` | `bigint` | nein | `1` | |
+
+PK: `id`. FK: `host_id` -> `hosts(id)` ON DELETE RESTRICT; `user_id` -> `users(principal_id)` ON
+DELETE RESTRICT; `opened_by_device_id`, `device_id` -> `devices(id)` ON DELETE RESTRICT;
+`auth_session_id` -> `auth_sessions(id)` ON DELETE RESTRICT; `closed_by` -> `principals(id)` ON
+DELETE RESTRICT.
+Checks: `(state = 'closed') = (closed_at IS NOT NULL)`; `(state = 'closed') = (close_reason IS NOT
+NULL)`; `close_detail IS NULL OR state = 'closed'`; `(state = 'detached') = (detached_at IS NOT
+NULL)`.
+Unique: `token_jti`. Indexe: `(user_id) WHERE state <> 'closed'` für `terminal.max_sessions_per_person`
+und das Beenden bei Entzug; `(host_id) WHERE state <> 'closed'`; `(auth_session_id) WHERE state <>
+'closed'`; `(device_id) WHERE state <> 'closed'`; BRIN `(opened_at)` für die Aufbewahrung.
+Aufbewahrung: `security` (Frist `retention.security_after_end` nach `closed_at`).
+
+### 4.15 Statistik (`stats`)
+
+Normativ zusammen mit [25-visualisierung.md](25-visualisierung.md). Etappe M6.
+
+#### `stats_minutes`
+
+Zweck: Minuten-Aggregate der eigenen Messung des Servers (Nutzung, Läufe, Kosten, SLI-Zähler) für
+Live-Ansicht, Timeline und SLO-Ampel ([25-visualisierung.md](25-visualisierung.md), Abschnitt 3).
+Keine Personen, keine Inhalte. Modul: `stats`. Jede Zeile ist ein Aggregat ohne eigene Identität;
+darum gibt es keine Spalte `id` und keinen Primärschlüssel, sondern einen eindeutigen Schlüssel
+über alle Dimensionen.
+
+| Feld | Typ | Null | Standard | Regeln / Hinweise |
+|---|---|---|---|---|
+| `bucket_start` | `timestamptz` | nein | | Beginn der Minute; `CHECK (bucket_start = date_trunc('minute', bucket_start))`; Partitionsschlüssel |
+| `metric` | `text` | nein | | `CHECK (metric IN ('messages_created','threads_created','runs_started','runs_finished','tool_calls','approval_cards','cost','invocations_denied','billing_mode_switches','catchups','resyncs','slow_consumer_closes','sli.api_availability','sli.delivery_latency','sli.reconnect','sli.push_acceptance','sli.run_start','sli.turn_duration'))` (25, Abschnitt 3.2) |
+| `channel_id` | `uuid` | ja | | Kanal der Messung; NULL bei Werten der ganzen Instanz |
+| `agent_id` | `uuid` | ja | | Agent der Messung, wo die Metrik einen hat |
+| `dimension` | `text` | nein | `''` | Code aus der geschlossenen Liste je Metrik (25, Abschnitt 3.2), Schema `stats_dimension.v1`; nie Freitext, nie Werkzeugnamen |
+| `currency` | `text` | ja | | ISO 4217; genau bei `metric = 'cost'` gesetzt |
+| `count` | `bigint` | nein | `0` | Anzahl der Ereignisse |
+| `sum` | `bigint` | nein | `0` | Summe der Werte: Millisekunden bei Dauern, Mikro-Einheiten bei `cost`, sonst 0 |
+| `good` | `bigint` | nein | `0` | gute Ereignisse eines SLI; bei anderen Metriken 0 |
+| `updated_at` | `timestamptz` | nein | `now()` | letzter Flush in diese Zeile |
+
+PK: keiner. FK: keine (Belege wie `event_log`; ein archivierter Kanal behält seine Zahlen).
+Checks: `count >= 0 AND sum >= 0 AND good >= 0`; `good <= count`; `(currency IS NOT NULL) = (metric
+= 'cost')`; `metric LIKE 'sli.%' OR good = 0`.
+Unique: `(bucket_start, metric, channel_id, agent_id, dimension, currency) NULLS NOT DISTINCT`
+(Ziel des additiven Upserts, 25 Abschnitt 3.4). Indexe: `(metric, bucket_start)` für Timeline und
+Ampel; `(channel_id, bucket_start) WHERE channel_id IS NOT NULL` für den Rechtefilter.
+Partitionierung: nach `bucket_start` je Tag (`PARTITION BY RANGE`); der Job `stats.retention` legt
+Partitionen im Voraus an und hängt abgelaufene ab.
+Aufbewahrung: `stats` (Frist `retention.stats_minutes`).
+
 ## 5. Suchvektoren
 
 Volltextsuche nutzt PostgreSQL-`tsvector` als gespeicherte, generierte Spalten. Damit ist der
@@ -2402,8 +2549,8 @@ liest daraufhin `event_log WHERE seq > <eigener Stand> ORDER BY seq`. Kein weite
 
 Mit mehreren api-Knoten (`cluster.mode = multi`, [02-architektur.md](02-architektur.md),
 Abschnitt 11.6) verteilt ein zweiter Kanal `pg_notify('ephemeral', ...)` kurzlebige Ereignisse
-zwischen den Knoten. Er trägt nur IDs und Versionen (Thread, Prinzipal, Lauf, Agent), nie
-Inhalte; der empfangende Knoten liest Inhalte aus der Datenbank. Mit einem Knoten ist der Kanal
+zwischen den Knoten. Er trägt nur IDs und Versionen (Thread, Prinzipal, Lauf, Agent, Rechner,
+Terminal-Sitzung), nie Inhalte; der empfangende Knoten liest Inhalte aus der Datenbank. Mit einem Knoten ist der Kanal
 aus, weil jedes `NOTIFY` beim Commit eine instanzweite Sperre nimmt.
 
 ### 6.7 Sync-Epoche und Wiederherstellung
@@ -2422,9 +2569,23 @@ Eine Wiederherstellung aus der Sicherung setzt die globale Sequenz zurück. Ohne
    laden ([04-sync-protokoll.md](04-sync-protokoll.md), Abschnitt 7.5).
 3. Ein Umzug ohne Datenverlust ([16-betrieb.md](16-betrieb.md), Abschnitt 11) behält die Epoche.
 
+### 6.8 I6-Prüfung
+
+Gilt für `grant.create` mit `target_kind = 'host'` und für `host.manage`, wenn es `llm_credentials`,
+`credential_holder_id` oder den Zustand eines Rechners setzt ([24-terminal.md](24-terminal.md),
+Abschnitt 7.3). Die Transaktion sperrt zuerst `permission_version` (6.3), dann die Zeile in `hosts`
+(`SELECT ... FOR UPDATE`), schreibt die Änderung und prüft vor dem Commit: Bei
+`llm_credentials = 'personal'` hat keine gültige Freigabe auf den Rechner ein anderes Subjekt als
+`subject_kind = 'user'` mit `subject_principal_id = credential_holder_id`. Sonst Rollback mit
+`409 invariant_violation` (Code `i6_violation`) und einem Audit-Eintrag `deny` in eigener
+Transaktion. Owner zählen nicht, weil I6 ihre implizite Berechtigung auf diesem Rechner aufhebt.
+Gruppen-Freigaben werden immer abgelehnt, weil eine Gruppe sich ohne Rechte-Prüfung am Rechner
+ändern kann. Dieselbe Transaktion beendet beim Wechsel auf `personal` oder des Inhabers alle nicht
+geschlossenen Sitzungen anderer Menschen (`close_reason = 'i6_violation'`).
+
 ## 7. ERD
 
-Die Diagramme zeigen alle Tabellen der Abschnitte 4.1 bis 4.12 in vier Domänen. Beziehungen über
+Die Diagramme zeigen alle Tabellen der Abschnitte 4.1 bis 4.12 und 4.14 in fünf Domänen. Beziehungen über
 Domänen hinweg stehen in dem Diagramm, in dem die Kind-Tabelle liegt; die Eltern-Tabelle erscheint
 dort nur mit Schlüssel. Die technischen Tabellen aus Abschnitt 4.13 fehlen bewusst.
 
@@ -2605,6 +2766,7 @@ erDiagram
     groups |o--o{ grants : "Subjekt"
     spaces |o--o{ grants : "Ziel"
     channels |o--o{ grants : "Ziel"
+    hosts |o--o{ grants : "Ziel"
     principals ||--o{ instance_settings : "ändert"
     principals ||--o{ feature_flags : "ändert"
 ```
@@ -3085,8 +3247,54 @@ erDiagram
     agents |o--o{ status_components : "überwacht"
 ```
 
-`event_log`, `event_consumer_cursors`, `audit_events`, `audit_ip_keys` und `backup_runs` haben
-bewusst keine Fremdschlüssel; ihre ID-Felder sind Belege, keine Verknüpfungen.
+`event_log`, `event_consumer_cursors`, `audit_events`, `audit_ip_keys`, `backup_runs` und
+`stats_minutes` haben bewusst keine Fremdschlüssel; ihre ID-Felder sind Belege, keine Verknüpfungen.
+
+### 7.5 Terminal
+
+```mermaid
+erDiagram
+    users {
+        uuid principal_id PK
+    }
+    devices {
+        uuid id PK
+    }
+    auth_sessions {
+        uuid id PK
+    }
+    dev_environments {
+        uuid id PK
+    }
+    hosts {
+        uuid id PK
+        text state
+        uuid assigned_user_id FK
+        uuid dev_environment_id FK
+        text llm_credentials
+        uuid credential_holder_id FK
+        bytea noise_public_key
+        text auth_jkt
+        integer key_generation
+    }
+    terminal_sessions {
+        uuid id PK
+        uuid host_id FK
+        uuid user_id FK
+        uuid device_id FK
+        uuid auth_session_id FK
+        text state
+        uuid token_jti
+        text close_reason
+    }
+    users |o--o{ hosts : "Inhaber"
+    users |o--o{ hosts : "Inhaber der LLM-Anmeldung"
+    dev_environments |o--o| hosts : "ist"
+    hosts ||--o{ terminal_sessions : "führt"
+    users ||--o{ terminal_sessions : "öffnet"
+    devices ||--o{ terminal_sessions : "verbunden"
+    auth_sessions ||--o{ terminal_sessions : "erlaubt"
+```
 
 ## 8. Entscheidungen dieses Kapitels
 
@@ -3126,6 +3334,10 @@ bewusst keine Fremdschlüssel; ihre ID-Felder sind Belege, keine Verknüpfungen.
 | R-DM-32 | Ungelesen- und Erwähnungszähler werden nie gespeichert, sondern beim Lesen berechnet. | Ein gespeicherter Zähler müsste jedem Bearbeiten, Löschen und Verschieben folgen und veraltet sonst still; `mentions` und `threads` tragen schon alles Nötige. |
 | R-DM-33 | Gruppen aus Claims sind an ihren Anbieter gebunden (`groups.provider_id`). | Claim-Werte sind nur innerhalb eines Anbieters eindeutig; ohne Bindung bestimmte ein zweiter Anbieter Mitgliedschaften des ersten. |
 | R-DM-34 | Systemzeilen tragen einen Code (`messages.system_code`) statt Text. | Clients zeigen sie in ihrer Sprache; ein Text im Inhalt wäre an eine Sprache gebunden und durchsuchbar. |
+| R-DM-35 | Rechner sind ein eigenes Ziel in `grants` (`target_kind = 'host'`) ohne Stufe, mit genau dem Zusatzrecht `terminal`, nur für Menschen und Gruppen (Checks). | Eine Freigabe-Tabelle für alle Rechte hält `authz` als einzige Wahrheit (B7); Stufen haben auf einem Rechner keine Bedeutung, und Agenten und Apps öffnen nie ein Terminal ([24-terminal.md](24-terminal.md), Abschnitt 8.1). |
+| R-DM-36 | `terminal_sessions` hält nur Metadaten; Inhalte gibt es im Server nicht. | Ende-zu-Ende-Verschlüsselung ohne Speicher im Server; Nachweis über Audit und Metadaten ([24-terminal.md](24-terminal.md), Abschnitt 10.4). |
+| R-DM-37 | Verbrauch eines Step-up für das Terminal als Spalte `auth_sessions.step_up_consumed_at`. | Eine Bestätigung gilt für genau eine Öffnung; eine Spalte an der Sitzung genügt, weil die Bestätigung ohnehin je Sitzung gilt ([08-identitaet.md](08-identitaet.md), Abschnitt 6.3). |
+| R-DM-38 | Eigene Messung als Minuten-Aggregate in `stats_minutes` ohne Primärschlüssel, mit eindeutigem Schlüssel über alle Dimensionen (`NULLS NOT DISTINCT`), additivem Upsert und Tagespartitionen. | Mehrere Prozesse und Knoten addieren ohne Koordinator in dieselbe Zeile; Aufbewahrung durch Abhängen ganzer Partitionen wie R-DM-15; die Statistik liest nie aus der Telemetrie (R-OB-08, Ruling T7). |
 
 ## 9. Konfigurationswerte dieses Kapitels
 
@@ -3138,6 +3350,7 @@ Die Werte sind Standardwerte. Andere Kapitel verweisen nur auf den Namen.
 | `branding.product_name_max_chars` | `64` | Länge des Produktnamens im Branding (`instance_settings`, `branding.product_name`) in Unicode-Zeichen |
 | `group.name_max_chars` | `100` | Länge eines Gruppennamens in Unicode-Zeichen |
 | `group.description_max_chars` | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen |
+| `host.name_max_chars` | `100` | Länge eines Rechnernamens in Unicode-Zeichen |
 | `space.name_max_chars` | `100` | Länge eines Bereichsnamens in Unicode-Zeichen |
 | `channel.name_max_chars` | `100` | Länge eines Kanalnamens in Unicode-Zeichen |
 | `channel.topic_max_chars` | `1024` | Länge eines Kanal-Themas in Unicode-Zeichen |

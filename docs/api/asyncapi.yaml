@@ -55,6 +55,10 @@ channels:
         $ref: '#/components/messages/op.run.update'
       op.command.autocomplete_result:
         $ref: '#/components/messages/op.command.autocomplete_result'
+      op.stats.subscribe:
+        $ref: '#/components/messages/op.stats.subscribe'
+      op.stats.unsubscribe:
+        $ref: '#/components/messages/op.stats.unsubscribe'
       op.hello:
         $ref: '#/components/messages/op.hello'
       op.ready:
@@ -179,6 +183,14 @@ channels:
         $ref: '#/components/messages/event.command.autocomplete_requested'
       event.notification.created:
         $ref: '#/components/messages/event.notification.created'
+      event.host.updated:
+        $ref: '#/components/messages/event.host.updated'
+      event.terminal_session.changed:
+        $ref: '#/components/messages/event.terminal_session.changed'
+      event.host.presence_changed:
+        $ref: '#/components/messages/event.host.presence_changed'
+      event.stats.live:
+        $ref: '#/components/messages/event.stats.live'
     bindings:
       ws:
         method: GET
@@ -241,6 +253,201 @@ channels:
     - code: 4017
       name: device_replaced
       client_action: 'a newer connection of the same device is active: do not reconnect on your own, only when the app returns to the foreground or on user action'
+
+  terminalStream:
+    address: /terminal/sessions/{session_id}/stream
+    title: Terminal stream of a device
+    description: 'End-to-end encrypted terminal stream (Noise_NK_25519_ChaChaPoly_SHA256, docs/spec/24-terminal.md section 5). After `hello` and `identify` only binary frames, each one Noise message; the first is handshake message 1 with the session token. Not part of the gateway; nothing of it enters the event log.'
+    x-protocol-versions: [1]
+    parameters:
+      session_id:
+        description: Terminal session ID (UUIDv7). The proxy routes both stream paths of a session by this segment to the same node (docs/spec/16-betrieb.md, section 4.4).
+    messages:
+      terminal.hello:
+        $ref: '#/components/messages/terminal.hello'
+      terminal.identify:
+        $ref: '#/components/messages/terminal.identify'
+      terminal.error:
+        $ref: '#/components/messages/terminal.error'
+      noise.frame:
+        $ref: '#/components/messages/noise.frame'
+    bindings:
+      ws:
+        method: GET
+        bindingVersion: 0.1.0
+    x-close-codes:
+    - code: 1000
+      name: normal
+      client_action: session ended normally; do not reconnect
+    - code: 1001
+      name: going_away
+      client_action: the node shuts down; attach again with `terminal.attach` within `terminal.detach_grace`
+    - code: 4002
+      name: decode_error
+      client_action: text frame after `identify`, invalid JSON or frame over the Noise limit; report the error
+    - code: 4004
+      name: authentication_failed
+      client_action: renew the token; if that fails, log out
+    - code: 4008
+      name: rate_limited
+      client_action: wait for the time given in the close reason
+    - code: 4012
+      name: revoked
+      client_action: session, device or person revoked; delete local data, log out
+    - code: 4013
+      name: server_restart
+      client_action: attach again with `terminal.attach` within `terminal.detach_grace`
+    - code: 4014
+      name: slow_consumer
+      client_action: relay buffer full; attach again
+    - code: 4100
+      name: terminal_closed
+      client_action: 'the session ended; the close reason holds `close_reason`; do not reconnect'
+    - code: 4101
+      name: terminal_token_invalid
+      client_action: 'session token expired (`token_expired`) or already used (`token_replayed`); open or attach again with a fresh step-up'
+    - code: 4102
+      name: terminal_host_unavailable
+      client_action: the other side is missing (host offline or no counterpart on this node); the session is `detached`; attach again later
+    - code: 4103
+      name: terminal_replaced
+      client_action: another device attached; do not reconnect on your own
+    - code: 4104
+      name: terminal_handshake_failed
+      client_action: 'Noise handshake or prologue failed, token signature or binding (`kid`, `typ`, `aud`, `sid`, `cek`) invalid, profile unknown, server host without owner, or unknown frame; show a hard warning, do not reconnect'
+  hostControl:
+    address: /hosts/connect
+    title: Control connection of a host service
+    description: 'Outgoing connection of `bothy-host`, one per host. A second connection with the same keys makes the server probe the older one: if the older does not answer it is closed with `4009`; if it answers, both are closed with `4112` and the host is disabled (24, 3.4). Login with the Ed25519 key registered at pairing. The server sends `session.open` per session; the host service answers with a data connection.'
+    x-protocol-versions: [1]
+    messages:
+      host.hello:
+        $ref: '#/components/messages/host.hello'
+      host.identify:
+        $ref: '#/components/messages/host.identify'
+      host.ready:
+        $ref: '#/components/messages/host.ready'
+      host.heartbeat:
+        $ref: '#/components/messages/host.heartbeat'
+      host.heartbeat_ack:
+        $ref: '#/components/messages/host.heartbeat_ack'
+      host.report:
+        $ref: '#/components/messages/host.report'
+      host.session.open:
+        $ref: '#/components/messages/host.session.open'
+      host.session.close:
+        $ref: '#/components/messages/host.session.close'
+      host.session.started:
+        $ref: '#/components/messages/host.session.started'
+      host.session.ended:
+        $ref: '#/components/messages/host.session.ended'
+      host.error:
+        $ref: '#/components/messages/host.error'
+    bindings:
+      ws:
+        method: GET
+        bindingVersion: 0.1.0
+    x-close-codes:
+    - code: 1000
+      name: normal
+      client_action: reconnect with backoff
+    - code: 1001
+      name: going_away
+      client_action: reconnect with backoff
+    - code: 4002
+      name: decode_error
+      client_action: report the error, reconnect
+    - code: 4008
+      name: rate_limited
+      client_action: wait for the time given in the close reason
+    - code: 4009
+      name: heartbeat_timeout
+      client_action: reconnect with backoff
+    - code: 4013
+      name: server_restart
+      client_action: reconnect at once with a random delay; keep PTYs until `terminal.detach_grace`
+    - code: 4014
+      name: slow_consumer
+      client_action: relay buffer full; reconnect the data connection
+    - code: 4100
+      name: terminal_closed
+      client_action: 'data connection only: the session ended; end the PTY'
+    - code: 4110
+      name: host_unpaired
+      client_action: keys unknown or replaced by a re-pairing; stop and run `bothy-host pair` again
+    - code: 4111
+      name: host_disabled
+      client_action: the host is disabled or retired; end all PTYs, reconnect only after a long backoff
+    - code: 4112
+      name: host_duplicate
+      client_action: 'a second live host service with the same keys was found; the host is disabled; stop, do not reconnect, an owner must re-pair (24, 3.4)'
+    - code: 4113
+      name: host_auth_failed
+      client_action: proof invalid; check clock and keys, reconnect with backoff
+    - code: 4114
+      name: host_version_unsupported
+      client_action: protocol version too old; update the host service, do not reconnect
+  hostData:
+    address: /hosts/sessions/{session_id}/stream
+    title: Data connection of a host service for one session
+    description: 'Opened by the host service after `session.open`. After `hello` and `identify` (with `session_id`) only binary Noise frames, forwarded unchanged to and from the device stream of the same session.'
+    x-protocol-versions: [1]
+    parameters:
+      session_id:
+        description: Terminal session ID (UUIDv7). The proxy routes both stream paths of a session by this segment to the same node (docs/spec/16-betrieb.md, section 4.4).
+    messages:
+      host.hello:
+        $ref: '#/components/messages/host.hello'
+      host.identify:
+        $ref: '#/components/messages/host.identify'
+      host.error:
+        $ref: '#/components/messages/host.error'
+      noise.frame:
+        $ref: '#/components/messages/noise.frame'
+    bindings:
+      ws:
+        method: GET
+        bindingVersion: 0.1.0
+    x-close-codes:
+    - code: 1000
+      name: normal
+      client_action: reconnect with backoff
+    - code: 1001
+      name: going_away
+      client_action: reconnect with backoff
+    - code: 4002
+      name: decode_error
+      client_action: report the error, reconnect
+    - code: 4008
+      name: rate_limited
+      client_action: wait for the time given in the close reason
+    - code: 4009
+      name: heartbeat_timeout
+      client_action: reconnect with backoff
+    - code: 4013
+      name: server_restart
+      client_action: reconnect at once with a random delay; keep PTYs until `terminal.detach_grace`
+    - code: 4014
+      name: slow_consumer
+      client_action: relay buffer full; reconnect the data connection
+    - code: 4100
+      name: terminal_closed
+      client_action: 'data connection only: the session ended; end the PTY'
+    - code: 4110
+      name: host_unpaired
+      client_action: keys unknown or replaced by a re-pairing; stop and run `bothy-host pair` again
+    - code: 4111
+      name: host_disabled
+      client_action: the host is disabled or retired; end all PTYs, reconnect only after a long backoff
+    - code: 4112
+      name: host_duplicate
+      client_action: 'a second live host service with the same keys was found; the host is disabled; stop, do not reconnect, an owner must re-pair (24, 3.4)'
+    - code: 4113
+      name: host_auth_failed
+      client_action: proof invalid; check clock and keys, reconnect with backoff
+    - code: 4114
+      name: host_version_unsupported
+      client_action: protocol version too old; update the host service, do not reconnect
 
 operations:
   receive.identify:
@@ -348,6 +555,24 @@ operations:
     - $ref: '#/channels/gateway/messages/op.command.autocomplete_result'
     x-authz-action: command.autocomplete.respond
     x-rate-limit-class: rl.agent_runtime
+  receive.stats.subscribe:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Subscribe to the live frames `stats.live` of the instance or of one space (docs/spec/25-visualisierung.md, section 5). One subscription per connection; a new one replaces it.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.stats.subscribe'
+    x-authz-action: stats.read
+    x-rate-limit-class: rl.read
+  receive.stats.unsubscribe:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: End the `stats.live` subscription of the connection.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.stats.unsubscribe'
+    x-authz-action: stats.read
+    x-rate-limit-class: rl.read
   send.hello:
     action: send
     channel:
@@ -489,8 +714,212 @@ operations:
     - $ref: '#/channels/gateway/messages/event.agent.presence_changed'
     - $ref: '#/channels/gateway/messages/event.command.autocomplete_requested'
     - $ref: '#/channels/gateway/messages/event.notification.created'
+    - $ref: '#/channels/gateway/messages/event.host.updated'
+    - $ref: '#/channels/gateway/messages/event.terminal_session.changed'
+    - $ref: '#/channels/gateway/messages/event.host.presence_changed'
+    - $ref: '#/channels/gateway/messages/event.stats.live'
     x-authz-action: gateway.connect
     x-rate-limit-class: rl.gateway_connect
+
+  terminal.send.hello:
+    action: send
+    channel:
+      $ref: '#/channels/terminalStream'
+    summary: First frame with the DPoP nonce.
+    messages:
+    - $ref: '#/channels/terminalStream/messages/terminal.hello'
+    x-authz-action: terminal.stream
+    x-rate-limit-class: rl.terminal
+  terminal.receive.identify:
+    action: receive
+    channel:
+      $ref: '#/channels/terminalStream'
+    summary: Authenticate the device; only the device of the current session token passes.
+    messages:
+    - $ref: '#/channels/terminalStream/messages/terminal.identify'
+    x-authz-action: terminal.stream
+    x-rate-limit-class: rl.terminal
+  terminal.send.error:
+    action: send
+    channel:
+      $ref: '#/channels/terminalStream'
+    summary: Error before the handshake; a close code follows.
+    messages:
+    - $ref: '#/channels/terminalStream/messages/terminal.error'
+    x-authz-action: terminal.stream
+    x-rate-limit-class: rl.terminal
+  terminal.receive.frame:
+    action: receive
+    channel:
+      $ref: '#/channels/terminalStream'
+    summary: Noise message from the device, forwarded to the host.
+    messages:
+    - $ref: '#/channels/terminalStream/messages/noise.frame'
+    x-authz-action: terminal.stream
+    x-rate-limit-class: rl.terminal
+  terminal.send.frame:
+    action: send
+    channel:
+      $ref: '#/channels/terminalStream'
+    summary: Noise message from the host, forwarded to the device.
+    messages:
+    - $ref: '#/channels/terminalStream/messages/noise.frame'
+    x-authz-action: terminal.stream
+    x-rate-limit-class: rl.terminal
+  hostControl.send.hello:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: First frame with challenge and JWKS.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.hello'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.identify:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Login of the host service.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.identify'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+    reply:
+      channel:
+        $ref: '#/channels/hostControl'
+      messages:
+      - $ref: '#/channels/hostControl/messages/host.ready'
+  hostControl.send.ready:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Control connection accepted.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.ready'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.heartbeat:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Liveness; missing `terminal.host_heartbeat_miss_limit` heartbeats close with `4009`.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.heartbeat'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+    reply:
+      channel:
+        $ref: '#/channels/hostControl'
+      messages:
+      - $ref: '#/channels/hostControl/messages/host.heartbeat_ack'
+  hostControl.send.heartbeat_ack:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Answer to `heartbeat`.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.heartbeat_ack'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.report:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Profiles and self-checks; a change of the server-host flag or a check result is audited.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.report'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.send.session.open:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Ask for the data connection of a session.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.session.open'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.send.session.close:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: End the PTY of a session (revocation, owner, limits).
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.session.close'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.session.started:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: The PTY runs.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.session.started'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.session.ended:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: A session ended on the host.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.session.ended'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.send.error:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Error for one op.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.error'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostData.send.hello:
+    action: send
+    channel:
+      $ref: '#/channels/hostData'
+    summary: First frame with challenge.
+    messages:
+    - $ref: '#/channels/hostData/messages/host.hello'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostData.receive.identify:
+    action: receive
+    channel:
+      $ref: '#/channels/hostData'
+    summary: Login with `session_id`; the session must belong to this host and not be closed.
+    messages:
+    - $ref: '#/channels/hostData/messages/host.identify'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostData.send.error:
+    action: send
+    channel:
+      $ref: '#/channels/hostData'
+    summary: Error before the first Noise frame.
+    messages:
+    - $ref: '#/channels/hostData/messages/host.error'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostData.receive.frame:
+    action: receive
+    channel:
+      $ref: '#/channels/hostData'
+    summary: Noise message from the host, forwarded to the device.
+    messages:
+    - $ref: '#/channels/hostData/messages/noise.frame'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostData.send.frame:
+    action: send
+    channel:
+      $ref: '#/channels/hostData'
+    summary: Noise message from the device, forwarded to the host.
+    messages:
+    - $ref: '#/channels/hostData/messages/noise.frame'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
 
 components:
   messages:
@@ -611,6 +1040,32 @@ components:
             enum: [run.update]
           d:
             $ref: ./openapi.yaml#/components/schemas/GatewayRunUpdate
+    op.stats.subscribe:
+      name: stats.subscribe
+      title: stats.subscribe
+      summary: Subscribe to `stats.live` for the instance or one space. Needs `stats.read`; a denial answers `error` and keeps the connection.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [stats.subscribe]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayStatsSubscribe
+    op.stats.unsubscribe:
+      name: stats.unsubscribe
+      title: stats.unsubscribe
+      summary: End the `stats.live` subscription of the connection.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [stats.unsubscribe]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayStatsUnsubscribe
     op.command.autocomplete_result:
       name: command.autocomplete_result
       title: command.autocomplete_result
@@ -1556,3 +2011,255 @@ components:
           d:
             $ref: ./openapi.yaml#/components/schemas/NotificationCreatedEvent
       x-audience: self
+    terminal.hello:
+      name: hello
+      title: hello
+      summary: First frame on the device stream with the DPoP nonce.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [hello]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/TerminalStreamHello
+    terminal.identify:
+      name: identify
+      title: identify
+      summary: Authenticate the device stream with access token and DPoP proof.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [identify]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/TerminalStreamIdentify
+    terminal.error:
+      name: error
+      title: error
+      summary: Error before the Noise handshake; the connection closes afterwards.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [error]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayError
+    noise.frame:
+      name: noise_frame
+      title: noise_frame
+      summary: One Noise message as a binary frame; the relay forwards it unchanged.
+      contentType: application/octet-stream
+      payload:
+        $ref: ./openapi.yaml#/components/schemas/NoiseFrame
+    host.hello:
+      name: hello
+      title: hello
+      summary: First frame on a host connection with the challenge and the JWKS of purpose `terminal`.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [hello]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostChannelHello
+    host.identify:
+      name: identify
+      title: identify
+      summary: Login of the host service with an Ed25519 proof over the challenge.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [identify]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostIdentify
+    host.ready:
+      name: ready
+      title: ready
+      summary: Control connection accepted.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [ready]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostReady
+    host.heartbeat:
+      name: heartbeat
+      title: heartbeat
+      summary: Liveness of the host service.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [heartbeat]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostHeartbeat
+    host.heartbeat_ack:
+      name: heartbeat_ack
+      title: heartbeat_ack
+      summary: Answer to `heartbeat`.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [heartbeat_ack]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostHeartbeatAck
+    host.report:
+      name: report
+      title: report
+      summary: Profiles, self-checks and server-host flag; codes only.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [report]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostReport
+    host.session.open:
+      name: session.open
+      title: session.open
+      summary: Open the data connection for a session.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [session.open]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostSessionOpen
+    host.session.close:
+      name: session.close
+      title: session.close
+      summary: End the PTY of a session.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [session.close]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostSessionClose
+    host.session.started:
+      name: session.started
+      title: session.started
+      summary: The PTY of a session runs.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [session.started]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostSessionStarted
+    host.session.ended:
+      name: session.ended
+      title: session.ended
+      summary: A session ended on the host (exit, idle, refused handshake).
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [session.ended]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostSessionEnded
+    host.error:
+      name: error
+      title: error
+      summary: Error for one op; the connection stays open unless a close code follows.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [error]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayError
+    event.host.updated:
+      name: host.updated
+      title: dispatch host.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: host.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostUpdatedEvent
+    event.terminal_session.changed:
+      name: terminal_session.changed
+      title: dispatch terminal_session.changed
+      summary: Durable event, at least once, in `seq` order.
+      description: Only to the person of the session. Never content (docs/spec/24-terminal.md, section 10.2).
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/TerminalSessionChangedEvent
+      x-audience: self
+    event.host.presence_changed:
+      name: host.presence_changed
+      title: dispatch host.presence_changed
+      summary: Ephemeral event, at most once.
+      x-event-kind: ephemeral
+      x-receive-action: host.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostPresenceChangedEvent
+    event.stats.live:
+      name: stats.live
+      title: dispatch stats.live
+      summary: Ephemeral event, at most once.
+      description: Every `stats.live_interval` to connections with a `stats.subscribe` subscription; filtered to the channels visible to the recipient, cost members only with `cost.read.aggregate`. Loss of `stats.read` ends the subscription with one `error` (`forbidden`). Never in the event log (docs/spec/25-visualisierung.md, section 5).
+      x-event-kind: ephemeral
+      x-receive-action: stats.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/StatsLiveEvent
