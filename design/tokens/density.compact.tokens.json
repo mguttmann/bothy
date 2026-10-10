@@ -1,0 +1,16 @@
+{
+  "$description": "Dichte, Kontext compact: wählbar auf Desktop (appearance.density = compact). Mehr Zeilen je Bildschirm, gleiche Schriftgröße.",
+  "density": {
+    "$type": "dimension",
+    "row-channel": {"$value": {"value": 28, "unit": "px"}},
+    "row-post": {"$value": {"value": 44, "unit": "px"}},
+    "row-suggestion": {"$value": {"value": 30, "unit": "px"}},
+    "control-height": {"$value": {"value": 28, "unit": "px"}},
+    "target-min": {"$value": {"value": 24, "unit": "px"}},
+    "message-gap": {"$value": {"value": 8, "unit": "px"}},
+    "message-pad-y": {"$value": {"value": 2, "unit": "px"}},
+    "message-font-size": {"$value": {"value": 15, "unit": "px"}},
+    "livebox-pad": {"$value": {"value": 8, "unit": "px"}},
+    "composer-min-height": {"$value": {"value": 40, "unit": "px"}}
+  }
+}

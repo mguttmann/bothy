@@ -1,0 +1,19 @@
+{
+  "$description": "Bewegung, Kontext reduced: gilt bei Systemeinstellung 'Bewegung reduzieren' oder Einstellung appearance.reduce_motion = on. Keine Bewegung, nur kurzes Überblenden.",
+  "motion": {
+    "duration": {
+      "$type": "duration",
+      "move-fast": {"$value": {"value": 0, "unit": "ms"}},
+      "move": {"$value": {"value": 0, "unit": "ms"}},
+      "move-slow": {"$value": {"value": 0, "unit": "ms"}},
+      "fade": {"$value": {"value": 80, "unit": "ms"}},
+      "pulse": {"$value": {"value": 0, "unit": "ms"}}
+    },
+    "easing": {
+      "$type": "cubicBezier",
+      "standard": {"$value": [0, 0, 1, 1]},
+      "enter": {"$value": [0, 0, 1, 1]},
+      "exit": {"$value": [0, 0, 1, 1]}
+    }
+  }
+}

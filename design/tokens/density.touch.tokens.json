@@ -1,0 +1,16 @@
+{
+  "$description": "Dichte, Kontext touch: fest auf iPhone und Android. target-min deckt Material (48 dp) und damit auch Apples 44 pt ab; die sichtbare Fläche darf kleiner sein, die Trefferfläche nie.",
+  "density": {
+    "$type": "dimension",
+    "row-channel": {"$value": {"value": 44, "unit": "px"}},
+    "row-post": {"$value": {"value": 64, "unit": "px"}},
+    "row-suggestion": {"$value": {"value": 48, "unit": "px"}},
+    "control-height": {"$value": {"value": 44, "unit": "px"}},
+    "target-min": {"$value": {"value": 48, "unit": "px"}},
+    "message-gap": {"$value": {"value": 16, "unit": "px"}},
+    "message-pad-y": {"$value": {"value": 6, "unit": "px"}},
+    "message-font-size": {"$value": {"value": 16, "unit": "px"}},
+    "livebox-pad": {"$value": {"value": 12, "unit": "px"}},
+    "composer-min-height": {"$value": {"value": 48, "unit": "px"}}
+  }
+}

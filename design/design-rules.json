@@ -1,0 +1,98 @@
+{
+  "$comment": "Prüfregeln des Design-Systems. Jede Paarung, die eine Komponente in docs/design/components.md nutzt, steht hier; der Generator prüft sie für jedes Theme und bricht unter AA ab. kind: text = 4.5:1 (WCAG 1.4.3), large-text = 3:1, ui = 3:1 (WCAG 1.4.11).",
+  "contrast_pairs": [
+    {"usage": "Fließtext und Titel", "kind": "text", "fg": "color.text.primary",
+     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.raised", "color.surface.overlay", "color.surface.hover", "color.surface.selected", "color.surface.input", "color.surface.sunken", "color.attention.subtle", "color.accent.subtle", "color.success.subtle", "color.warning.subtle", "color.danger.subtle", "color.info.subtle"]},
+    {"usage": "Metadaten, Zeitstempel", "kind": "text", "fg": "color.text.secondary",
+     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.raised", "color.surface.overlay", "color.surface.hover", "color.surface.selected", "color.surface.input", "color.surface.sunken", "color.attention.subtle"]},
+    {"usage": "Platzhalter, Hinweise, Erledigt-Bereich", "kind": "text", "fg": "color.text.muted",
+     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.raised", "color.surface.overlay", "color.surface.hover", "color.surface.input", "color.surface.sunken"]},
+    {"usage": "Links, Erwähnungs-Pillen", "kind": "text", "fg": "color.text.link",
+     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.raised", "color.surface.overlay", "color.surface.sunken", "color.attention.subtle"]},
+    {"usage": "Text auf Primärknopf", "kind": "text", "fg": "color.text.on-accent",
+     "bg": ["color.accent.bg", "color.accent.bg-hover", "color.accent.bg-pressed"]},
+    {"usage": "Seitenleiste: Bereichs-Titel, ungelesene Kanäle", "kind": "text", "fg": "color.text.on-sidebar",
+     "bg": ["color.surface.sidebar", "color.surface.sidebar-hover", "color.surface.sidebar-selected"]},
+    {"usage": "Seitenleiste: gelesene Kanäle", "kind": "text", "fg": "color.text.on-sidebar-secondary",
+     "bg": ["color.surface.sidebar", "color.surface.sidebar-hover", "color.surface.sidebar-selected"]},
+    {"usage": "Seitenleiste: stumme Kanäle", "kind": "text", "fg": "color.text.on-sidebar-muted",
+     "bg": ["color.surface.sidebar", "color.surface.sidebar-hover"]},
+    {"usage": "Akzent als Text (Textknöpfe)", "kind": "text", "fg": "color.accent.fg",
+     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.raised", "color.surface.overlay"]},
+    {"usage": "Zustandstexte in Banner und Live-Box", "kind": "text",
+     "fg": ["color.attention.fg", "color.success.fg", "color.warning.fg", "color.danger.fg", "color.info.fg"],
+     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.raised", "color.surface.overlay"]},
+    {"usage": "Zustandstext auf eigener Hinterlegung", "kind": "text", "fg": "color.attention.fg", "bg": "color.attention.subtle"},
+    {"usage": "Zustandstext auf eigener Hinterlegung", "kind": "text", "fg": "color.success.fg", "bg": "color.success.subtle"},
+    {"usage": "Zustandstext auf eigener Hinterlegung", "kind": "text", "fg": "color.warning.fg", "bg": "color.warning.subtle"},
+    {"usage": "Zustandstext auf eigener Hinterlegung", "kind": "text", "fg": "color.danger.fg", "bg": "color.danger.subtle"},
+    {"usage": "Zustandstext auf eigener Hinterlegung", "kind": "text", "fg": "color.info.fg", "bg": "color.info.subtle"},
+    {"usage": "Starke Abzeichen und Knöpfe", "kind": "text", "fg": "color.attention.on-bg", "bg": "color.attention.bg"},
+    {"usage": "Starke Abzeichen und Knöpfe", "kind": "text", "fg": "color.success.on-bg", "bg": "color.success.bg"},
+    {"usage": "Starke Abzeichen und Knöpfe", "kind": "text", "fg": "color.warning.on-bg", "bg": "color.warning.bg"},
+    {"usage": "Starke Abzeichen und Knöpfe", "kind": "text", "fg": "color.danger.on-bg", "bg": "color.danger.bg"},
+    {"usage": "Starke Abzeichen und Knöpfe", "kind": "text", "fg": "color.info.on-bg", "bg": "color.info.bg"},
+    {"usage": "Abzeichen Backend-Richtlinie", "kind": "text", "fg": "color.badge.personal-fg", "bg": "color.badge.personal-bg"},
+    {"usage": "Abzeichen Backend-Richtlinie", "kind": "text", "fg": "color.badge.organization-fg", "bg": "color.badge.organization-bg"},
+    {"usage": "Code", "kind": "text", "fg": "color.code.fg", "bg": "color.code.bg"},
+    {"usage": "Tag-Chip", "kind": "text", "fg": "color.category.spruce.chip-fg", "bg": "color.category.spruce.chip-bg"},
+    {"usage": "Tag-Chip", "kind": "text", "fg": "color.category.loch.chip-fg", "bg": "color.category.loch.chip-bg"},
+    {"usage": "Tag-Chip", "kind": "text", "fg": "color.category.heather.chip-fg", "bg": "color.category.heather.chip-bg"},
+    {"usage": "Tag-Chip", "kind": "text", "fg": "color.category.rowan.chip-fg", "bg": "color.category.rowan.chip-bg"},
+    {"usage": "Tag-Chip", "kind": "text", "fg": "color.category.amber.chip-fg", "bg": "color.category.amber.chip-bg"},
+    {"usage": "Tag-Chip", "kind": "text", "fg": "color.category.gorse.chip-fg", "bg": "color.category.gorse.chip-bg"},
+    {"usage": "Tag-Chip", "kind": "text", "fg": "color.category.moss.chip-fg", "bg": "color.category.moss.chip-bg"},
+    {"usage": "Tag-Chip", "kind": "text", "fg": "color.category.granite.chip-fg", "bg": "color.category.granite.chip-bg"},
+
+    {"usage": "Rand von Eingabefeldern und sekundären Knöpfen", "kind": "ui", "fg": "color.border.control",
+     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.raised", "color.surface.overlay"]},
+    {"usage": "Fokusring", "kind": "ui", "fg": "color.focus.ring",
+     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.raised", "color.surface.overlay", "color.surface.input", "color.surface.selected"]},
+    {"usage": "Fokusring in der Seitenleiste", "kind": "ui", "fg": "color.focus.ring-on-sidebar",
+     "bg": ["color.surface.sidebar", "color.surface.sidebar-hover", "color.surface.sidebar-selected"]},
+    {"usage": "Primärknopf und Freigabe-Knöpfe gegen die Fläche", "kind": "ui",
+     "fg": ["color.accent.bg", "color.success.bg", "color.danger.bg"],
+     "bg": ["color.surface.canvas", "color.surface.raised", "color.surface.overlay"]},
+    {"usage": "Live-Box-Rückgrat und Lauf-Icons", "kind": "ui",
+     "fg": ["color.run.queued", "color.run.running", "color.run.waiting", "color.run.completed", "color.run.failed", "color.run.cancelled"],
+     "bg": ["color.surface.raised", "color.surface.canvas", "color.surface.sunken", "color.surface.list"]},
+    {"usage": "Auslöser-Status-Icons an Nachrichten", "kind": "ui",
+     "fg": ["color.trigger.received", "color.trigger.queued", "color.trigger.working", "color.trigger.done", "color.trigger.failed", "color.trigger.followup"],
+     "bg": ["color.surface.canvas", "color.surface.hover", "color.attention.subtle", "color.surface.list"]},
+    {"usage": "Erwähnungs-Balken", "kind": "ui", "fg": "color.attention.border", "bg": ["color.surface.canvas", "color.attention.subtle"]},
+    {"usage": "Bereichs-Icon in der Seitenleiste", "kind": "ui",
+     "fg": ["color.category.spruce.on-sidebar", "color.category.loch.on-sidebar", "color.category.heather.on-sidebar", "color.category.rowan.on-sidebar", "color.category.amber.on-sidebar", "color.category.gorse.on-sidebar", "color.category.moss.on-sidebar", "color.category.granite.on-sidebar"],
+     "bg": ["color.surface.sidebar", "color.surface.sidebar-hover", "color.surface.sidebar-selected"]},
+    {"usage": "Kategorie-Punkt und Icon auf Inhaltsflächen", "kind": "ui",
+     "fg": ["color.category.spruce.fg", "color.category.loch.fg", "color.category.heather.fg", "color.category.rowan.fg", "color.category.amber.fg", "color.category.gorse.fg", "color.category.moss.fg", "color.category.granite.fg"],
+     "bg": ["color.surface.canvas", "color.surface.list", "color.surface.overlay"]}
+  ],
+  "palette_guards": [
+    {
+      "name": "Marke und Akzent",
+      "scope": ["palette.spruce.", "color.accent."],
+      "forbidden_colors": [
+        {"name": "Discord Blurple", "hex": "#5865f2", "min_delta_e_ok": 0.12, "source": "https://discord.com/branding"}
+      ],
+      "forbidden_hue_ranges": [
+        {"name": "Terrakotta, Orange, Sand", "from": 20, "to": 80, "min_chroma": 0.03},
+        {"name": "Lila und Violett", "from": 270, "to": 330, "min_chroma": 0.03}
+      ]
+    },
+    {
+      "name": "Neutrale und Flächen: kein reines Grau, kein Beige, keine Creme",
+      "scope": ["palette.granite.", "color.surface.", "color.border."],
+      "min_chroma": 0.003,
+      "forbidden_hue_ranges": [
+        {"name": "warmer Stich (Beige, Sand, Creme)", "from": 30, "to": 115, "min_chroma": 0.0}
+      ]
+    },
+    {
+      "name": "Keine Discord-Nähe in der ganzen Palette",
+      "scope": ["palette."],
+      "forbidden_colors": [
+        {"name": "Discord Blurple", "hex": "#5865f2", "min_delta_e_ok": 0.08, "source": "https://discord.com/branding"}
+      ]
+    }
+  ]
+}

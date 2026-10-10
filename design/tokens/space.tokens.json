@@ -1,0 +1,54 @@
+{
+  "$description": "Abstände, Radien und feste Maße. Raster 4 px, mit 2 px und 6 px für dichte Listen.",
+  "space": {
+    "$type": "dimension",
+    "0": {"$value": {"value": 0, "unit": "px"}},
+    "2": {"$value": {"value": 2, "unit": "px"}},
+    "4": {"$value": {"value": 4, "unit": "px"}},
+    "6": {"$value": {"value": 6, "unit": "px"}},
+    "8": {"$value": {"value": 8, "unit": "px"}},
+    "12": {"$value": {"value": 12, "unit": "px"}},
+    "16": {"$value": {"value": 16, "unit": "px"}},
+    "20": {"$value": {"value": 20, "unit": "px"}},
+    "24": {"$value": {"value": 24, "unit": "px"}},
+    "32": {"$value": {"value": 32, "unit": "px"}},
+    "40": {"$value": {"value": 40, "unit": "px"}},
+    "48": {"$value": {"value": 48, "unit": "px"}},
+    "64": {"$value": {"value": 64, "unit": "px"}}
+  },
+  "radius": {
+    "$type": "dimension",
+    "$description": "Knappe Radien: Werkzeug, kein Spielzeug. pill nur für Zähler und Abzeichen.",
+    "none": {"$value": {"value": 0, "unit": "px"}},
+    "xs": {"$value": {"value": 2, "unit": "px"}},
+    "sm": {"$value": {"value": 4, "unit": "px"}},
+    "md": {"$value": {"value": 6, "unit": "px"}},
+    "lg": {"$value": {"value": 8, "unit": "px"}},
+    "xl": {"$value": {"value": 12, "unit": "px"}},
+    "pill": {"$value": {"value": 999, "unit": "px"}}
+  },
+  "border-width": {
+    "$type": "dimension",
+    "hairline": {"$value": {"value": 1, "unit": "px"}},
+    "focus": {"$value": {"value": 2, "unit": "px"}, "$description": "Fokusring, immer mindestens 2 px (WCAG 2.4.13 als Ziel)."},
+    "spine": {"$value": {"value": 3, "unit": "px"}, "$description": "Rückgrat links an Live-Box und Erwähnungen; Farbe aus color.run.* bzw. color.attention.border."}
+  },
+  "layout": {
+    "$type": "dimension",
+    "$description": "Spaltenbreiten Desktop (Startwerte; Personen ziehen die Grenzen, der Wert wird als Einstellung gespeichert).",
+    "sidebar-width": {"$value": {"value": 248, "unit": "px"}},
+    "list-width": {"$value": {"value": 340, "unit": "px"}},
+    "session-width": {"$value": {"value": 296, "unit": "px"}},
+    "column-min": {"$value": {"value": 200, "unit": "px"}},
+    "message-max-width": {"$value": {"value": 880, "unit": "px"}, "$description": "Lesbare Zeilenlänge im Verlauf auf sehr breiten Fenstern."},
+    "overlay-width": {"$value": {"value": 560, "unit": "px"}, "$description": "Schnellwechsel und Dialoge."}
+  },
+  "size": {
+    "$type": "dimension",
+    "avatar-sm": {"$value": {"value": 20, "unit": "px"}},
+    "avatar-md": {"$value": {"value": 32, "unit": "px"}},
+    "avatar-lg": {"$value": {"value": 40, "unit": "px"}},
+    "status-dot": {"$value": {"value": 8, "unit": "px"}},
+    "badge-height": {"$value": {"value": 20, "unit": "px"}}
+  }
+}

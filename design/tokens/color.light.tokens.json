@@ -1,0 +1,188 @@
+{
+  "$description": "Semantische Farbrollen, Theme light. Gleiche Schlüssel wie im anderen Theme; nur Verweise auf palette.*, außer den durchscheinenden Rollen scrim und shadow.",
+  "color": {
+    "$type": "color",
+    "surface": {
+      "$description": "Flächen in Ebenen. Die Seitenleiste ist in beiden Themes eine Markenfläche.",
+      "sidebar": {"$value": "{palette.spruce.900}", "$description": "Spalte Bereiche und Kanäle (Markenfläche)."},
+      "sidebar-hover": {"$value": "{palette.spruce.850}", "$description": "Zeile unter dem Zeiger in der Seitenleiste."},
+      "sidebar-selected": {"$value": "{palette.spruce.800}", "$description": "Gewählter Kanal in der Seitenleiste."},
+      "list": {"$value": "{palette.granite.50}", "$description": "Beitragsliste und rechte Sitzungs-Spalte."},
+      "canvas": {"$value": "{palette.granite.0}", "$description": "Verlauf, Hauptfläche."},
+      "raised": {"$value": "{palette.granite.25}", "$description": "Live-Box, Karten, Komponenten-Gruppen."},
+      "overlay": {"$value": "{palette.granite.0}", "$description": "Menüs, Dialoge, Schnellwechsel, Vorschlagsliste."},
+      "hover": {"$value": "{palette.granite.100}", "$description": "Zeile unter dem Zeiger auf Liste und Verlauf."},
+      "selected": {"$value": "{palette.spruce.100}", "$description": "Gewählte Zeile in Liste und Vorschlagsliste."},
+      "input": {"$value": "{palette.granite.25}", "$description": "Eingabefeld und Formularfelder."},
+      "sunken": {"$value": "{palette.granite.100}", "$description": "Code-Blöcke, Zitate, eingeklappte Live-Box."}
+    },
+    "text": {
+      "$description": "Textfarben. Jede Paarung mit einer Fläche steht in design/design-rules.json.",
+      "primary": {"$value": "{palette.granite.950}", "$description": "Fließtext, Titel."},
+      "secondary": {"$value": "{palette.granite.700}", "$description": "Metadaten, Zeitstempel, Beschriftungen."},
+      "muted": {"$value": "{palette.granite.600}", "$description": "Platzhalter, Hinweise, Erledigt-Bereich."},
+      "link": {"$value": "{palette.spruce.700}", "$description": "Links und Erwähnungs-Pillen."},
+      "on-accent": {"$value": "{palette.granite.0}", "$description": "Text auf Akzent-Knöpfen."},
+      "on-sidebar": {"$value": "{palette.spruce.50}", "$description": "Kanalname ungelesen, Bereichs-Titel."},
+      "on-sidebar-secondary": {"$value": "{palette.spruce.200}", "$description": "Kanalname gelesen."},
+      "on-sidebar-muted": {"$value": "{palette.spruce.300}", "$description": "Stumm geschaltete Kanäle, Zähler-Beschriftung."}
+    },
+    "border": {
+      "$description": "Linien. subtle und default sind Schmuck; control trägt eine Bedeutung (WCAG 1.4.11).",
+      "subtle": {"$value": "{palette.granite.150}", "$description": "Trennlinien zwischen Zeilen."},
+      "default": {"$value": "{palette.granite.200}", "$description": "Spaltengrenzen, Karten."},
+      "control": {"$value": "{palette.granite.500}", "$description": "Rand von Eingabefeldern und sekundären Knöpfen."},
+      "on-sidebar": {"$value": "{palette.spruce.800}", "$description": "Trennlinien in der Seitenleiste."}
+    },
+    "focus": {
+      "$description": "Fokusring. Immer sichtbar, nie nur Farbe: zusätzlich zwei Pixel Breite.",
+      "ring": {"$value": "{palette.spruce.600}", "$description": "Fokus auf allen Inhaltsflächen."},
+      "ring-on-sidebar": {"$value": "{palette.gorse.300}", "$description": "Fokus in der Seitenleiste."}
+    },
+    "accent": {
+      "$description": "Markenakzent: primäre Aktion, Auswahl, laufender Agent.",
+      "bg": {"$value": "{palette.spruce.700}", "$description": "Primärer Knopf."},
+      "bg-hover": {"$value": "{palette.spruce.800}", "$description": "Primärer Knopf unter dem Zeiger."},
+      "bg-pressed": {"$value": "{palette.spruce.900}", "$description": "Primärer Knopf gedrückt."},
+      "fg": {"$value": "{palette.spruce.700}", "$description": "Akzent als Text oder Icon."},
+      "subtle": {"$value": "{palette.spruce.50}", "$description": "Hinterlegung eigener Nachrichten-Aktionen, Info-Chips."}
+    },
+    "attention": {
+      "$description": "Ginster: Erwähnungen und alles, was auf einen Menschen wartet (waiting_input, Freigabe).",
+      "fg": {"$value": "{palette.gorse.700}", "$description": "Text und Icon."},
+      "subtle": {"$value": "{palette.gorse.50}", "$description": "Hinterlegung einer Nachricht mit Erwähnung."},
+      "border": {"$value": "{palette.gorse.600}", "$description": "Balken links an Erwähnungen und wartenden Läufen."},
+      "bg": {"$value": "{palette.gorse.200}", "$description": "Starkes Abzeichen 'Wartet auf dich'."},
+      "on-bg": {"$value": "{palette.gorse.950}", "$description": "Text auf attention.bg."}
+    },
+    "success": {
+      "$description": "Moos: erledigt, bestanden.",
+      "fg": {"$value": "{palette.moss.700}"},
+      "subtle": {"$value": "{palette.moss.50}"},
+      "border": {"$value": "{palette.moss.600}"},
+      "bg": {"$value": "{palette.moss.700}"},
+      "on-bg": {"$value": "{palette.granite.0}"}
+    },
+    "warning": {
+      "$description": "Bernstein: Stillstand, gestört, Schätzung überschritten.",
+      "fg": {"$value": "{palette.amber.700}"},
+      "subtle": {"$value": "{palette.amber.50}"},
+      "border": {"$value": "{palette.amber.600}"},
+      "bg": {"$value": "{palette.amber.300}"},
+      "on-bg": {"$value": "{palette.amber.950}"}
+    },
+    "danger": {
+      "$description": "Vogelbeere: Fehler, zerstörende Aktionen.",
+      "fg": {"$value": "{palette.rowan.700}"},
+      "subtle": {"$value": "{palette.rowan.50}"},
+      "border": {"$value": "{palette.rowan.600}"},
+      "bg": {"$value": "{palette.rowan.700}"},
+      "on-bg": {"$value": "{palette.granite.0}"}
+    },
+    "info": {
+      "$description": "See: Hinweise, zugestellte Nachträge.",
+      "fg": {"$value": "{palette.loch.700}"},
+      "subtle": {"$value": "{palette.loch.50}"},
+      "border": {"$value": "{palette.loch.600}"},
+      "bg": {"$value": "{palette.loch.700}"},
+      "on-bg": {"$value": "{palette.granite.0}"}
+    },
+    "run": {
+      "$description": "Zustände eines Laufs (runs.state): Farbe des Live-Box-Rückgrats und des Zustands-Icons.",
+      "queued": {"$value": "{palette.granite.500}", "$description": "queued"},
+      "running": {"$value": "{palette.spruce.600}", "$description": "running"},
+      "waiting": {"$value": "{palette.gorse.600}", "$description": "waiting_input"},
+      "completed": {"$value": "{palette.moss.600}", "$description": "completed"},
+      "failed": {"$value": "{palette.rowan.600}", "$description": "failed"},
+      "cancelled": {"$value": "{palette.granite.600}", "$description": "cancelled"}
+    },
+    "trigger": {
+      "$description": "Auslöser-Status (messages.trigger_state) als Icon-Farbe. Ersetzt die Status-Emoji.",
+      "received": {"$value": "{palette.granite.500}", "$description": "received"},
+      "queued": {"$value": "{palette.granite.600}", "$description": "queued"},
+      "working": {"$value": "{palette.spruce.600}", "$description": "working"},
+      "done": {"$value": "{palette.moss.600}", "$description": "done"},
+      "failed": {"$value": "{palette.rowan.600}", "$description": "failed"},
+      "followup": {"$value": "{palette.loch.600}", "$description": "followup_delivered"}
+    },
+    "badge": {
+      "$description": "Abzeichen der Backend-Richtlinie (billing_mode) in Thread-Kopf und Agenten-Karte.",
+      "personal-bg": {"$value": "{palette.heather.100}", "$description": "Persönlich"},
+      "personal-fg": {"$value": "{palette.heather.800}", "$description": "Persönlich"},
+      "organization-bg": {"$value": "{palette.loch.100}", "$description": "Organisation"},
+      "organization-fg": {"$value": "{palette.loch.800}", "$description": "Organisation"}
+    },
+    "code": {
+      "$description": "Code in Nachrichten und Werkzeug-Details.",
+      "fg": {"$value": "{palette.granite.900}"},
+      "bg": {"$value": "{palette.granite.100}"}
+    },
+    "category": {
+      "$description": "Kategorie-Farben für Bereiche (spaces.color) und Forum-Tags (forum_tags.color). Der gespeicherte Wert ist der Schlüssel, z. B. 'heather'.",
+      "spruce": {
+        "on-sidebar": {"$value": "{palette.spruce.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
+        "fg": {"$value": "{palette.spruce.700}", "$description": "Icon und Punkt auf Inhaltsflächen."},
+        "chip-bg": {"$value": "{palette.spruce.100}", "$description": "Tag-Chip."},
+        "chip-fg": {"$value": "{palette.spruce.800}", "$description": "Text auf dem Tag-Chip."}
+      },
+      "loch": {
+        "on-sidebar": {"$value": "{palette.loch.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
+        "fg": {"$value": "{palette.loch.700}", "$description": "Icon und Punkt auf Inhaltsflächen."},
+        "chip-bg": {"$value": "{palette.loch.100}", "$description": "Tag-Chip."},
+        "chip-fg": {"$value": "{palette.loch.800}", "$description": "Text auf dem Tag-Chip."}
+      },
+      "heather": {
+        "on-sidebar": {"$value": "{palette.heather.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
+        "fg": {"$value": "{palette.heather.700}", "$description": "Icon und Punkt auf Inhaltsflächen."},
+        "chip-bg": {"$value": "{palette.heather.100}", "$description": "Tag-Chip."},
+        "chip-fg": {"$value": "{palette.heather.800}", "$description": "Text auf dem Tag-Chip."}
+      },
+      "rowan": {
+        "on-sidebar": {"$value": "{palette.rowan.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
+        "fg": {"$value": "{palette.rowan.700}", "$description": "Icon und Punkt auf Inhaltsflächen."},
+        "chip-bg": {"$value": "{palette.rowan.100}", "$description": "Tag-Chip."},
+        "chip-fg": {"$value": "{palette.rowan.800}", "$description": "Text auf dem Tag-Chip."}
+      },
+      "amber": {
+        "on-sidebar": {"$value": "{palette.amber.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
+        "fg": {"$value": "{palette.amber.700}", "$description": "Icon und Punkt auf Inhaltsflächen."},
+        "chip-bg": {"$value": "{palette.amber.100}", "$description": "Tag-Chip."},
+        "chip-fg": {"$value": "{palette.amber.800}", "$description": "Text auf dem Tag-Chip."}
+      },
+      "gorse": {
+        "on-sidebar": {"$value": "{palette.gorse.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
+        "fg": {"$value": "{palette.gorse.700}", "$description": "Icon und Punkt auf Inhaltsflächen."},
+        "chip-bg": {"$value": "{palette.gorse.100}", "$description": "Tag-Chip."},
+        "chip-fg": {"$value": "{palette.gorse.800}", "$description": "Text auf dem Tag-Chip."}
+      },
+      "moss": {
+        "on-sidebar": {"$value": "{palette.moss.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
+        "fg": {"$value": "{palette.moss.700}", "$description": "Icon und Punkt auf Inhaltsflächen."},
+        "chip-bg": {"$value": "{palette.moss.100}", "$description": "Tag-Chip."},
+        "chip-fg": {"$value": "{palette.moss.800}", "$description": "Text auf dem Tag-Chip."}
+      },
+      "granite": {
+        "on-sidebar": {"$value": "{palette.granite.200}", "$description": "Icon des Bereichs in der Seitenleiste."},
+        "fg": {"$value": "{palette.granite.700}", "$description": "Icon und Punkt auf Inhaltsflächen."},
+        "chip-bg": {"$value": "{palette.granite.100}", "$description": "Tag-Chip."},
+        "chip-fg": {"$value": "{palette.granite.800}", "$description": "Text auf dem Tag-Chip."}
+      }
+    },
+    "scrim": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [0.178, 0.021, 210],
+        "alpha": 0.48
+      },
+      "$description": "Abdunklung hinter Dialogen. Durchscheinend, darum nie in Kontrast-Paaren."
+    },
+    "shadow": {
+      "$value": {
+        "colorSpace": "oklch",
+        "components": [0.2, 0.023, 210],
+        "alpha": 0.16
+      },
+      "$description": "Schattenfarbe für elevation.*."
+    }
+  }
+}

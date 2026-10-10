@@ -1,0 +1,91 @@
+{
+  "$description": "Schriften und Typo-Rollen. Größen in px; die Apps skalieren sie mit der Systemeinstellung (dynamische Schriftgröße).",
+  "font": {
+    "family": {
+      "$type": "fontFamily",
+      "sans": {
+        "$value": ["Atkinson Hyperlegible Next", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
+        "$description": "Oberfläche und Nachrichten. OFL-1.1, variabel (wght 200 bis 800). Begründung in docs/design/typography.md."
+      },
+      "mono": {
+        "$value": ["Atkinson Hyperlegible Mono", "ui-monospace", "SF Mono", "Cascadia Mono", "Consolas", "monospace"],
+        "$description": "Code, Werkzeugnamen, IDs. OFL-1.1, variabel (wght 200 bis 800)."
+      }
+    },
+    "weight": {
+      "$type": "fontWeight",
+      "regular": {"$value": 400},
+      "medium": {"$value": 500},
+      "semibold": {"$value": 600},
+      "bold": {"$value": 700},
+      "extrabold": {"$value": 800}
+    },
+    "size": {
+      "$type": "dimension",
+      "12": {"$value": {"value": 12, "unit": "px"}},
+      "13": {"$value": {"value": 13, "unit": "px"}},
+      "14": {"$value": {"value": 14, "unit": "px"}},
+      "15": {"$value": {"value": 15, "unit": "px"}},
+      "16": {"$value": {"value": 16, "unit": "px"}},
+      "18": {"$value": {"value": 18, "unit": "px"}},
+      "20": {"$value": {"value": 20, "unit": "px"}},
+      "24": {"$value": {"value": 24, "unit": "px"}},
+      "30": {"$value": {"value": 30, "unit": "px"}}
+    },
+    "tracking": {
+      "$type": "dimension",
+      "tight": {"$value": {"value": -0.4, "unit": "px"}},
+      "snug": {"$value": {"value": -0.15, "unit": "px"}},
+      "normal": {"$value": {"value": 0, "unit": "px"}},
+      "wide": {"$value": {"value": 0.3, "unit": "px"}}
+    }
+  },
+  "type": {
+    "$type": "typography",
+    "$description": "Typo-Rollen. Komponenten nutzen nur diese Rollen, nie font.size direkt.",
+    "display": {
+      "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.30}", "fontWeight": "{font.weight.extrabold}", "letterSpacing": "{font.tracking.tight}", "lineHeight": 1.2},
+      "$description": "Leere Zustände, Einrichtung, Kennzahl-Kacheln der Statistik."
+    },
+    "title": {
+      "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.20}", "fontWeight": "{font.weight.bold}", "letterSpacing": "{font.tracking.snug}", "lineHeight": 1.3},
+      "$description": "Titel einer Ansicht, Dialog-Titel, Thread-Titel im Kopf."
+    },
+    "heading": {
+      "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.16}", "fontWeight": "{font.weight.semibold}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.375},
+      "$description": "Kanal-Kopf, Abschnitte in Einstellungen und Konsole."
+    },
+    "body": {
+      "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.15}", "fontWeight": "{font.weight.regular}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.467},
+      "$description": "Nachrichtentext (Desktop). Auf Touch-Geräten gilt density.message.font-size."
+    },
+    "body-strong": {
+      "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.15}", "fontWeight": "{font.weight.semibold}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.467},
+      "$description": "Autorname, Hervorhebung im Text."
+    },
+    "body-sm": {
+      "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.14}", "fontWeight": "{font.weight.regular}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.43},
+      "$description": "Listenzeilen, Kanalnamen, Live-Box-Inhalt."
+    },
+    "label": {
+      "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.13}", "fontWeight": "{font.weight.semibold}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.385},
+      "$description": "Knöpfe, Chips, Abzeichen, Spaltenköpfe."
+    },
+    "section": {
+      "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.12}", "fontWeight": "{font.weight.bold}", "letterSpacing": "{font.tracking.wide}", "lineHeight": 1.333},
+      "$description": "Bereichs-Titel in der Seitenleiste, Gruppen-Überschriften. Keine Großschreibung per Transformation (lange deutsche Wörter)."
+    },
+    "caption": {
+      "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.12}", "fontWeight": "{font.weight.regular}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.333},
+      "$description": "Zeitstempel, Kennzahlen, Hilfetexte."
+    },
+    "code": {
+      "$value": {"fontFamily": "{font.family.mono}", "fontSize": "{font.size.14}", "fontWeight": "{font.weight.regular}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.43},
+      "$description": "Code-Blöcke und Inline-Code."
+    },
+    "code-sm": {
+      "$value": {"fontFamily": "{font.family.mono}", "fontSize": "{font.size.12}", "fontWeight": "{font.weight.medium}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.333},
+      "$description": "Werkzeug-Chips, IDs, Kosten und Token-Zahlen in der Live-Box."
+    }
+  }
+}
