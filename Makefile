@@ -18,6 +18,8 @@ MAKEFLAGS += --no-builtin-rules --no-print-directory
 COMPONENTS ?= all
 COVERAGE_GO_MIN ?= 80
 COVERAGE_DART_MIN ?= 80
+# Time limit of `make perf` per Go module (named value quality.perf.timeout).
+PERF_TIMEOUT ?= 60m
 SONAR_HOST_URL ?= http://127.0.0.1:9000
 SONAR_ORGANIZATION ?=
 SONAR_PROJECT_KEY ?= bothy
@@ -37,6 +39,10 @@ UV := uv
 UVRUN := $(UV) run --project tools --locked --quiet
 NODE_BIN := tools/node/node_modules/.bin
 FETCH := $(UVRUN) python tools/bin/fetch_tools.py
+# go, a Docker-compatible runtime and the pins of the server gates; a gap fails (R-QA-02).
+GO_PREREQS := $(UVRUN) python tools/ci/go_prereqs.py
+CODEGEN_CHECK := $(UVRUN) python tools/ci/codegen_check.py
+MIGRATIONS_LINT := $(UVRUN) python tools/ci/migrations_lint.py
 SEMGREP := $(UV)x --quiet --python 3.12 --from semgrep==$(SEMGREP_VERSION) semgrep
 # Path of a pinned release binary, resolved (and fetched on first use) inside a recipe.
 tool = "$$($(FETCH) path $(1))"
@@ -63,7 +69,8 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
         sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-clients runners-check commitlint \
-        review labels-check labels-sync tools-lock release-build clean
+        review labels-check labels-sync tools-lock release-build clean \
+        codegen-check arch migrations-lint migrations-lock perf
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -77,8 +84,8 @@ bootstrap: bootstrap-ci ## Install pinned tools and the git hooks (once per clon
 	  echo "  deny list: NOT configured; set BOTHY_DENYLIST_FILE or write its path to .denylist-path"; \
 	  echo "             (maintainers only; contributors see CONTRIBUTING.md)"; \
 	fi
-	@docker info >/dev/null 2>&1 && echo "  docker: ok (needed for make sonar-up)" || \
-	  echo "  docker: not reachable; make sonar-up needs a Docker-compatible runtime"
+	@docker info >/dev/null 2>&1 && echo "  docker: ok (needed for make sonar-up and the server gates)" || \
+	  echo "  docker: not reachable; make sonar-up and the server gates (once a Go module exists) need a Docker-compatible runtime"
 
 bootstrap-ci: ## Install pinned tools without git hooks (CI)
 	@command -v $(UV) >/dev/null || { echo "uv is required: https://docs.astral.sh/uv/"; exit 1; }
@@ -96,7 +103,10 @@ check: gates denylist sonar ## Every gate, identical to CI (before every push)
 	@echo "check: all gates passed"
 
 gates: ## All gates except denylist and sonar (CI job "gates")
-gates: fmt-check lint typecheck test coverage commitlint docs linkcheck diagrams api-lint \
+# Generated code is checked before lint and type checks, so that stale generator output is
+# reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
+gates: fmt-check codegen-check lint typecheck arch migrations-lint test coverage commitlint \
+       docs linkcheck diagrams api-lint \
        api-clients tokens runners-check labels-check gitleaks semgrep trivy osv licenses
 
 # ---- code quality ---------------------------------------------------------------------
@@ -155,8 +165,10 @@ typecheck: ## Type checks: mypy (strict), go build, flutter analyze, tsc
 test: ## All tests with coverage data
 	@mkdir -p .cache/coverage
 	cd tools && uv run --locked --quiet pytest --cov --cov-report=xml:../.cache/coverage/tools.xml --cov-report=term
+	@# Prerequisites first: without a Docker runtime the integration tests fail clearly (P-09).
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-test,no Go module selected); \
-	else for m in $(GO_MODS); do (cd $$m && go test -race -covermode=atomic -coverprofile=coverage.out ./...); done; fi
+	else $(GO_PREREQS) test || exit 1; \
+	  for m in $(GO_MODS); do (cd $$m && go test -race -covermode=atomic -coverprofile=coverage.out ./...) || exit 1; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-test,no Dart package selected); \
 	else for p in $(DART_PKGS); do (cd $$p && if [ -d test ]; then flutter test --coverage; fi); done; fi
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-test,no Python project selected); \
@@ -166,9 +178,21 @@ test: ## All tests with coverage data
 
 coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	cd tools && uv run --locked --quiet coverage report >/dev/null && echo "  tools coverage: ok (fail_under in tools/pyproject.toml)"
+	@# Production code only: packages under <module>/test/ and <module>/perf/ are test code
+	@# (docs/spec/02-architektur.md "Code-Layout"). The total comes from a filtered copy;
+	@# coverage.out stays as go test wrote it, so SonarQube reads the same file in
+	@# `make check` and in the CI job that runs `make sonar` alone.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-coverage,no Go module selected); \
-	else for m in $(GO_MODS); do total=$$(cd $$m && go tool cover -func=coverage.out | awk '/^total:/ {sub("%","",$$3); print $$3}'); \
-	  awk -v t="$$total" -v min=$(COVERAGE_GO_MIN) -v m=$$m 'BEGIN { if (t+0 < min) { printf "%s: coverage %s%% < %s%%\n", m, t, min; exit 1 } }'; done; fi
+	else for m in $(GO_MODS); do \
+	  mod=$$(awk '$$1 == "module" { gsub(/"/, "", $$2); print $$2; exit }' $$m/go.mod); \
+	  [ -n "$$mod" ] || { echo "coverage: no module path in $$m/go.mod" >&2; exit 1; }; \
+	  f=$$(mktemp "$${TMPDIR:-/tmp}/bothy-coverage.XXXXXX") || exit 1; \
+	  awk -v p="$$mod/" 'NR == 1 || (index($$0, p "test/") != 1 && index($$0, p "perf/") != 1)' \
+	    $$m/coverage.out > "$$f" || { rm -f "$$f"; exit 1; }; \
+	  out=$$(cd $$m && go tool cover -func="$$f") || { rm -f "$$f"; exit 1; }; rm -f "$$f"; \
+	  total=$$(printf '%s\n' "$$out" | awk '/^total:/ {sub("%","",$$3); print $$3}'); \
+	  [ -n "$$total" ] || { echo "coverage: go tool cover printed no total for $$m" >&2; exit 1; }; \
+	  awk -v t="$$total" -v min=$(COVERAGE_GO_MIN) -v m=$$m 'BEGIN { if (t+0 < min) { printf "%s: coverage %s%% < %s%%\n", m, t, min; exit 1 } }' || exit 1; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-coverage,no Dart package selected); \
 	else for p in $(DART_PKGS); do [ -f $$p/coverage/lcov.info ] || continue; \
 	  awk -F: -v min=$(COVERAGE_DART_MIN) -v p=$$p '/^LF:/ {lf+=$$2} /^LH:/ {lh+=$$2} END { pct = lf ? 100*lh/lf : 100; if (pct < min) { printf "%s: coverage %.1f%% < %s%%\n", p, pct, min; exit 1 } }' $$p/coverage/lcov.info; done; fi
@@ -184,6 +208,51 @@ commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the 
 	@# The pull request title becomes the squash commit on main (CI sets PR_TITLE).
 	@if [ -n "$${PR_TITLE:-}" ]; then f=$$(mktemp); printf '%s\n' "$$PR_TITLE" > "$$f"; \
 	  rc=0; $(UVRUN) python tools/hooks/commit_msg.py "$$f" || rc=$$?; rm -f "$$f"; exit $$rc; fi
+
+# ---- server gates ---------------------------------------------------------------------
+# Each server gate checks its prerequisites first (go, a Docker-compatible runtime, the pins
+# of go-arch-lint and sqlc; tools/ci/go_prereqs.py). Every step ends with `|| exit 1`,
+# because GNU make 3.81 (macOS) ignores .SHELLFLAGS and would run on after a failure.
+codegen-check: ## Generated code equals a fresh generation (sqlc, go generate)
+	@if [ -z "$(GO_ON)" ]; then $(call skip,codegen-check,no Go module selected under services/); \
+	else $(GO_PREREQS) codegen-check || exit 1; \
+	  gal=$(call tool,go-arch-lint) || exit 1; sqlc=$(call tool,sqlc) || exit 1; \
+	  for m in $(GO_MODS); do \
+	    if [ -f $$m/sqlc.yaml ]; then $(CODEGEN_CHECK) --dir $$m -- "$$sqlc" generate -f sqlc.yaml || exit 1; fi; \
+	    PATH="$$(dirname "$$gal"):$$(dirname "$$sqlc"):$$PATH" $(CODEGEN_CHECK) --dir $$m -- go generate ./... || exit 1; \
+	  done; fi
+
+arch: ## Module boundaries of the Go modules (go-arch-lint, config generated from the module register)
+	@if [ -z "$(GO_ON)" ]; then $(call skip,arch,no Go module selected under services/); \
+	else $(GO_PREREQS) arch || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
+	  for m in $(GO_MODS); do \
+	    [ -f $$m/.go-arch-lint.yml ] || { echo "arch: $$m/.go-arch-lint.yml is missing (generated from $$m/architecture/modules.yaml, docs/spec/02-architektur.md \"Automatische Prüfung der Regeln\")" >&2; exit 1; }; \
+	    (cd $$m && "$$gal" check --project-path "$$(pwd -P)" --arch-file .go-arch-lint.yml --output-color=false) || exit 1; \
+	  done; fi
+
+migrations-lint: ## Migration rules: sequential numbers, locked checksums, STORED, NO TRANSACTION (ADR 0007)
+	@if [ -z "$(GO_ON)" ]; then $(call skip,migrations-lint,no Go module selected under services/); \
+	else $(GO_PREREQS) migrations-lint || exit 1; \
+	  for m in $(GO_MODS); do \
+	    if [ ! -d $$m/migrations ] && [ ! -e $$m/migrations.sha256 ]; then \
+	      printf '  SKIP  %-14s %s\n' migrations-lint "$$m has no migrations/ directory yet"; \
+	    else $(MIGRATIONS_LINT) check --dir $$m/migrations --sum $$m/migrations.sha256 || exit 1; fi; \
+	  done; fi
+
+migrations-lock: ## Record the checksums of new migrations in <module>/migrations.sha256 (not a gate)
+	@found=""; for m in $(GO_MODS); do \
+	  if [ -d $$m/migrations ]; then found=1; \
+	    $(MIGRATIONS_LINT) lock --dir $$m/migrations --sum $$m/migrations.sha256 || exit 1; fi; \
+	done; [ -n "$$found" ] || echo "  migrations-lock: no Go module with a migrations/ directory"
+
+perf: ## Load tests against the performance targets (end of an etappe and releases, not a gate; P-07)
+	@if [ -z "$(GO_ON)" ]; then $(call skip,perf,no Go module selected under services/); \
+	else $(GO_PREREQS) perf || exit 1; \
+	  for m in $(GO_MODS); do \
+	    [ -d $$m/perf ] || { echo "perf: $$m/perf does not exist; load tests live there (docs/spec/02-architektur.md \"Leistungsziele\")" >&2; exit 1; }; \
+	    echo "  perf: targets hold only on perf.reference_profile"; \
+	    (cd $$m && go test -tags perf -count=1 -timeout $(PERF_TIMEOUT) ./perf/...) || exit 1; \
+	  done; fi
 
 # ---- documentation --------------------------------------------------------------------
 docs: ## Documentation site builds strictly; ADR index and configuration reference are current
