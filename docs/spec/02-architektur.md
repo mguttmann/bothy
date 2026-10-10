@@ -107,6 +107,8 @@ erzwungenes Ende durch ein zweites Signal (Abschnitt 15.3); `setup bootstrap-own
 Einrichtung schon abgeschlossen ist; `setup issue-enrollment-code` `4`, wenn sie es noch nicht ist
 ([08-identitaet.md](08-identitaet.md)). Grund: Orchestrator und Skripte unterscheiden "falsch
 aufgerufen" von "zur Laufzeit gescheitert" und erkennen erwartete Zustände ohne Textvergleich.
+Ausgaben: Was ein Skript lesen soll (z. B. der Einladungs-Code von `setup`), steht allein auf der
+Standardausgabe; Logs gehen auf die Standardfehlerausgabe.
 
 Migrationen laufen nie implizit beim Start von `serve` (R-AR-16). Grund: Bei mehreren Knoten würden
 sie gleichzeitig starten, und ein fehlgeschlagener Schritt soll den Betrieb nicht in einer
@@ -219,7 +221,7 @@ andere ist verboten und schlägt im Gate fehl (Abschnitt 7).
 | `search` | `chat`, `messaging`, `files` | Thread-Titel, Nachrichten, Dateinamen und Transkripte |
 | `importer` | `identity`, `chat`, `agents`, `messaging`, `files` | legt Menschen, Struktur, Nachrichten, frühere Sitzungs-Referenzen und Dateien an; setzt den Schreibschutz der gespiegelten Kanäle |
 | `privacy` | `identity`, `files` | betroffene Person; Exportpaket speichern |
-| `sync` | `instance`, `chat`, `agents`, `messaging`, `runs` | Zähler `event_seq`; Momentaufnahme aus Struktur, Präsenz, laufenden Läufen; Abo auf Nachrichten |
+| `sync` | `instance`, `identity`, `chat`, `agents`, `messaging`, `runs` | Zähler `event_seq`; Prinzipal der Momentaufnahme (Handle, Anzeigename); Momentaufnahme aus Struktur, Präsenz, laufenden Läufen; Abo auf Nachrichten |
 | `stats` | `chat`, `agents`, `messaging`, `runs`, `billing` | liest Kennzahlen über Ports |
 | `notify` | `identity`, `chat`, `messaging`, `sync` | Geräte und Zeitzone; Ziel-Pfad für Einstellungen; Erwähnungen; Gelesen-Stand |
 | `apps` | `instance`, `identity`, `chat`, `agents`, `messaging`, `sync` | Webhook-Signierschlüssel; App-Prinzipal und Tokens; Ziel der Eingangs-Webhooks; Befehle von Apps; Nachrichten aus Webhooks; Verbraucher für ausgehende Webhooks |
@@ -246,10 +248,10 @@ Tickets der Module `identity`, `chat`, `agents`).
 | `kernel/errs` | Fehlerarten mit stabilem Code (Abschnitt 14.1) | kernel selbst | allen |
 | `kernel/textcheck` | Prüfung von Anzeige-Texten nach SEC-IN-4 (ungültiges UTF-8, Steuerzeichen, Bidi-Steuerzeichen); keine Längenprüfung | kernel selbst | `domain`-Pakete aller Module mit Anzeige-Texten |
 | `kernel/reqmeta` | `correlation_id` (Trace-ID der Anfrage, als UUID geschrieben, keine UUIDv7) und Client-IP der Anfrage im Kontext; nur Standardbibliothek | `platform/httpserver` setzt die Werte | `audit`, `sync`, `platform/*` |
-| `kernel/jose` | Kompakte JWS lesen, bauen und prüfen (`ES256`, `EdDSA`, `RS256`, `PS256`), JWK lesen und Fingerabdruck nach RFC 7638; nur Standardbibliothek (ADR 0067) | kernel selbst | `identity` (DPoP, Zugriffstokens, Step-up, ID-Tokens, Client-Assertion), `instance` (JWKS, Prüfung von Prüfpunkten), `audit`, später `runs` |
+| `kernel/jose` | Kompakte JWS lesen, bauen und prüfen (`ES256`, `EdDSA`, `RS256`, `PS256`), JWK lesen und Fingerabdruck nach RFC 7638; nur Standardbibliothek ([ADR 0067](../adr/0067-jose-profil-mit-der-standardbibliothek.md)) | kernel selbst | `identity` (DPoP, Zugriffstokens, Step-up, ID-Tokens, Client-Assertion), `instance` (JWKS, Prüfung von Prüfpunkten), `audit`, später `runs` |
 | `kernel/designkeys` | erlaubte Schlüssel des Design-Systems als Daten: Kategorie-Farben, Akzente, Bereichs-Icons; erzeugt aus `design/build/tokens.resolved.json` (PLAN M1-46) | Generator | `instance` (Branding), `chat` (Bereiche, Tags) |
-| `kernel/actor` | Prinzipal einer Anfrage (ID, Art, Gerät, Sitzung, Step-up-Zeit, Scopes); `Authenticator` | `identity` | `platform/httpserver`, `gateway` |
-| `kernel/authorize` | Aktionen (generiert aus 05), Ressourcen-Deskriptor, `Decision`, `Authorizer` (`Authorize`, `Scope` für Listen, `Observe` für `access.changed`), In-Tx-Ereignis `AccessChanged` | `authz` | allen |
+| `kernel/actor` | Prinzipal einer Anfrage (ID, Art, Gerät, Sitzung, Step-up-Zeit, Scopes); `Authenticator` mit `Revalidate` (geprüften Prinzipal ohne neuen Beweis erneut prüfen: Sitzung, Gerät, Token, Status; schließt Gateway-Verbindungen nach Widerruf von Tokens und Agenten, die kein `session.revoked` haben) | `identity` | `platform/httpserver`, `gateway` |
+| `kernel/authorize` | Aktionen (generiert aus `docs/spec/actions.yaml`, [ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)), Ressourcen-Deskriptor (mit optionalem zweitem Ziel, 07 Abschnitt 4.2), `Decision`, `Authorizer` (`Authorize`, `Scope` für Listen, `Observe` für Ereignisse des Logs), Filtermodus `Filter(ctx)` für Elemente von Listen, Suche und Momentaufnahme (keine Ablehnung im Audit, 07 Abschnitt 4.2), Zustellmodus `Delivery(ctx)` des Gateways (Filtermodus plus Rechte-Stand aus `Observe` statt einer Leseabfrage je Ereignis), In-Tx-Ereignis `AccessChanged` | `authz` | allen |
 | `kernel/txn` | Unit of Work, Phasen vor dem Commit, In-Tx-Ereignisbus (Abschnitt 8) | `platform/pg`; Phasen-Hooks von `authz`, `sync`, `audit` | allen `app`-Paketen |
 | `kernel/eventlog` | `Appender` für dauerhafte Ereignisse, `Redactor` zum Schwärzen der Nutzlasten einer gelöschten Nachricht (03, Abschnitt 6.5), `EphemeralPublisher` für kurzlebige | `sync` bzw. `gateway` | allen; `Redactor` nur `messaging` (und `files` mit M3) |
 | `kernel/auditing` | `Recorder`: in der Transaktion oder getrennt (für Ablehnungen nach Rollback) | `audit` | allen |
@@ -296,8 +298,10 @@ Begründungen für Grenzfälle:
 - `agent.config.read` gehört zu `chat`, weil Prompt, Skills und Projektbindung dort liegen.
 - `thread.create` gehört zu `messaging`: Ein neuer Thread (Forum-Beitrag oder Thread aus einer
   Nachricht) entsteht mit seiner ersten Nachricht, und `chat` darf `messaging` nicht nutzen.
-  `chat` legt die Zeile über den Port `Threads` an, prüft dabei aber keine Rechte; den
-  Hauptverlauf eines neuen Kanals legt `chat` selbst als Teil von `channel.create` an (R-DM-11).
+  `chat` legt die Zeile über den Port `Threads` an und prüft `thread.create` nicht noch einmal;
+  nur Tags mit `restricted` prüft `chat` dabei mit `thread.tags.set`, weil nur `chat` die Tags
+  kennt (05, Zeile `thread.create`). Den Hauptverlauf eines neuen Kanals legt `chat` selbst als
+  Teil von `channel.create` an (R-DM-11).
 - `instance.bootstrap` und `owner.recover` gehören zu `identity`, weil sie Menschen, Owner,
   Identitäten und Einladungs-Codes schreiben; `instance` setzt nur `setup_completed_at` über
   seinen Port.
@@ -305,7 +309,7 @@ Begründungen für Grenzfälle:
   `agent.invoke`), das Register (`command.register`, `command.remove`, `command.read`) zu `agents`.
 - `export.channel` gehört zu `messaging`; das Paket legt `files` ab.
 - `client_metrics.submit` gehört zu `stats`: Der Endpunkt nimmt Kennzahlen ohne Inhalte an und gibt
-  sie an die Telemetrie weiter (ADR 0057); er schreibt keine Tabelle.
+  sie an die Telemetrie weiter ([ADR 0057](../adr/0057-client-telemetrie-ueber-einen-server-endpunkt.md)); er schreibt keine Tabelle.
 - Die Dev-Umgebungs-Aktionen gehören zu `agents`, weil die Umgebung an einen Runner-Agenten
   gebunden ist (Etappe).
 
@@ -355,6 +359,11 @@ Regeln mit Grund:
    das Interface nicht).
 4. Fremdbibliotheken sind je Adapter-Art zugelassen (Liste in `modules.yaml`, Abschnitt 7.1).
    Beispiel: nur `gateway/adapters` darf `github.com/coder/websocket` importieren.
+5. Metriken: Ein Anwendungsfall zeichnet Kennzahlen über einen ausgehenden Port auf
+   (`internal/<modul>/app/metrics.go`, mit einer Umsetzung ohne Wirkung für Unit-Tests); die
+   Umsetzung mit OpenTelemetry liegt in `internal/<modul>/adapters/otelmetrics`. Plattform-Pakete
+   zeichnen direkt über `platform/otel` auf. Grund: Regel 2; Namen und Attribute kommen nur aus
+   dem Signal-Katalog ([signals.md](../observability/signals.md)).
 
 ## 6. Code-Layout
 
@@ -382,6 +391,9 @@ services/server/
         httpapi/              Handler für die Operationen des Moduls
         ...                   weitere Adapter des Moduls
       README.md               Zweck, Ports, Abhängigkeiten, Tabellen, Kapitel
+  test/                       Testunterstützung über Modulgrenzen: harness/ (echter Server, M1-71),
+                              integration/, leak/, contract/, canary/, smoke/
+  perf/                       Lasttests (Build-Tag perf) und internal/report (Schwellen aus Abschnitt 22)
   tools/archgen/              Generator: architecture/modules.yaml -> .go-arch-lint.yml
   tools/flagcheck/            Gate: Registrierung der Feature-Flags gegen VERSION (ADR 0064)
   sqlc.yaml                   ein Eintrag je Modul, Schema aus migrations/
@@ -392,7 +404,10 @@ Testhilfen, die Tests mehrerer Pakete nutzen, liegen im Baum der Komponente, der
 damit das Architektur-Gate sie einer Komponente zuordnet: `internal/platform/<p>/<p>test` (z. B.
 `pgtest`, `httpservertest`) und `internal/<modul>/adapters/<modul>test` (z. B. `identitytest` mit
 Geräteschlüsseln, DPoP-Beweisen und echter Anmeldung). Nur `_test.go`-Dateien importieren sie; ein
-Test (`go list -deps ./cmd/bothy`) hält sie aus dem Binary. Fachliche Teilbereiche eines Moduls
+Test (`go list -deps ./cmd/bothy`) hält sie aus dem Binary. `test/**` und `perf/**` bilden die
+Komponente `testsupport` (7.1): Sie darf alles nutzen, keine Produktions-Komponente darf sie nutzen,
+und die Abdeckung je Go-Modul (`quality.coverage.go_min_percent`, 23) zählt sie nicht mit, weil sie
+selbst Testcode ist. Fachliche Teilbereiche eines Moduls
 (OIDC, Flags, Konsole) sind Dateien oder Unterpakete von `domain`, `app` und `adapters`, nie
 eigene Pakete daneben; ein Paket ohne Komponente scheitert im Gate (7.1).
 
@@ -401,14 +416,14 @@ nach Art: Go-Modulpfad in `go.mod`; Binary `bothy` (`cmd/bothy`); Präfix der Um
 `BOTHY_`; Namen der Images (`bothy-server`, `bothy-postgres`, `bothy-backupd`) und Pfade im Container
 (`/run/bothy`, `/var/lib/bothy`); Rollen der Datenbank (`bothy_*`); Präfix der Telemetrie-, Alarm-
 und SLO-Namen (`bothy.`, `bothy_`, `Bothy`); Präfix der API-Tokens `bothy_` mit der gitleaks-Regel
-(ADR 0061); Standardwert der Einstellung `branding.product_name`. Diese Liste ist die einzige; ein
+([ADR 0061](../adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md)); Standardwert der Einstellung `branding.product_name`. Diese Liste ist die einzige; ein
 Test (PLAN M1-46) erlaubt den Namen in Code und Konfiguration nur an Stellen dieser Arten.
 
 ## 7. Automatische Prüfung der Regeln
 
 ### 7.1 Modulregister als Quelle
 
-`services/server/architecture/modules.yaml` ist die einzige Quelle für Modulgrenzen (ADR 0050).
+`services/server/architecture/modules.yaml` ist die einzige Quelle für Modulgrenzen ([ADR 0050](../adr/0050-modulregister-als-quelle-fuer-architektur-gate-und-tabellenbesitz.md)).
 Daraus entstehen die go-arch-lint-Konfiguration, die Prüfungen aus 7.3 und der Abgleich mit den
 Tabellen 4.2, 4.4, 4.6 und 4.7 dieses Kapitels. Format (normativ; spätere Tickets ergänzen
 Einträge, nie Felder):
@@ -426,6 +441,7 @@ platform:                         # je Plattform-Paket eine Komponente
 wire: {vendors: []}
 cmd: {vendors: []}
 api: {vendors: []}               # mit dem ersten generierten Code (M1-17)
+testsupport: {paths: [test, perf]}   # Testcode über Modulgrenzen; darf alles, niemand darf ihn nutzen
 modules:
   chat:
     tables: [spaces, user_space_states, channels, channel_skill_bindings, project_bindings,
@@ -452,8 +468,9 @@ Eintrag und seine Vendor-Gruppe in derselben Änderung ein; ein Paket ohne Eintr
 
 Werkzeug: go-arch-lint (MIT), aktuell v1.19.0 vom 2026-09-07 [Q8, belegt]. Der Generator
 `tools/archgen` erzeugt aus `modules.yaml` je Modul vier Komponenten (`<m>`, `<m>-domain`,
-`<m>-app`, `<m>-adapters`), je Plattform-Paket eine Komponente `platform-<p>`, dazu `wire`, `cmd`
-und `api`, und die Regeln aus Abschnitt 5. Grund für eine Komponente je Plattform-Paket: Nur so
+`<m>-app`, `<m>-adapters`), je Plattform-Paket eine Komponente `platform-<p>`, dazu `wire`, `cmd`,
+`api` und `testsupport` (alle Projekt- und Fremdabhängigkeiten erlaubt, in keinem `mayDependOn`
+einer anderen Komponente), und die Regeln aus Abschnitt 5. Grund für eine Komponente je Plattform-Paket: Nur so
 lässt sich eine Fremdbibliothek auf genau ein Paket begrenzen (River nur in `platform/jobs`,
 Abschnitt 12.1). Erzeugter Auszug für `chat`:
 
@@ -505,7 +522,7 @@ alle gemeldet, Exitcode 1: `chat/domain` importiert pgx; `chat/app` importiert d
 `messaging`; `messaging/app` importiert `runs/app`; ein neues Paket `chat/util` ohne Komponente
 ("not attached to any component"). Der letzte Punkt ist gewollt: Neue Pakete müssen ins Register.
 Die Form mit Plattform-Komponenten ist an diesem Gerüst noch nicht gelaufen; M1-05 belegt sie mit
-denselben vier Verstößen (ADR 0050, "Confirmation").
+denselben vier Verstößen ([ADR 0050](../adr/0050-modulregister-als-quelle-fuer-architektur-gate-und-tabellenbesitz.md), "Confirmation").
 
 ### 7.3 Weitere Prüfungen im Gate
 
@@ -530,10 +547,15 @@ Moduls, schreibt dieses Modul in derselben Transaktion (ambiente Transaktion). N
 
 Phasen (Diagramm [fluss-ereignis-pfad.svg](../architecture/fluss-ereignis-pfad.svg)):
 
-1. **Beginn.** Bei Rechte-Änderungen (Option `RightsChange` mit betroffenen Prinzipalen) ruft
-   `platform/pg` zuerst den Phasen-Hook von `authz`. Er sperrt `sequence_counters('permission_version')`
-   über `instance.Counters`, erhöht ihn (03, 6.3) und hält die sichtbaren Ziele der Betroffenen vor
-   der Änderung fest.
+1. **Beginn.** Bei Rechte-Änderungen (Option `RightsChange`) ruft `platform/pg` zuerst den
+   Phasen-Hook von `authz`. Er sperrt `sequence_counters('permission_version')` über
+   `instance.Counters`, erhöht ihn (03, 6.3) und hält die sichtbaren Ziele der Betroffenen vor der
+   Änderung fest. `RightsChange` nennt die Betroffenen direkt (Prinzipale, z. B. das Subjekt einer
+   Freigabe) oder ein Ziel (Bereich oder Kanal, z. B. beim Archivieren); bei einem Ziel bestimmt
+   `authz` die Betroffenen selbst: Subjekte gültiger Freigaben auf dem Ziel und seinen Vorfahren
+   (Gruppen aufgelöst), aktive Owner und die Agenten, die das Ziel nach der Bediener-Regel
+   bedienen. Erfährt der Anwendungsfall in der Arbeit weitere Betroffene (z. B. den neuen
+   Bediener), meldet er sie vor dem Schreiben nach (04, Abschnitt 8.2).
 2. **Arbeit.** Domänenzeilen schreiben, In-Tx-Ereignisse veröffentlichen, dauerhafte Ereignisse
    anhängen (im Kontext gepuffert, noch ohne Nummer).
 3. **Vor dem Commit, feste Reihenfolge:**
@@ -678,7 +700,9 @@ prüft. Die Lint-Regel in der Spec hält nur die Deklaration; dieser Nachweis h�
 
 Das Gateway ist Teil der Rolle `api`. Je Verbindung laufen eine Lese- und eine Schreib-Goroutine. Der
 Schreiber liest aus einer begrenzten Warteschlange (`sync.outbound_queue_max`) und schreibt mit Frist
-`gateway.write_timeout`. Läuft die Warteschlange über, schließt der Server mit `4014` (04, 7.2).
+`gateway.write_timeout`. Läuft die Warteschlange über oder verpasst ein Schreibvorgang die Frist,
+schließt der Server mit `4014` (04, 6.4 und 7.2). Kurzlebige Ereignisse verwirft er bei voller
+Warteschlange (04, 7.2 Punkt 6).
 
 Gateway-Sitzungen leben nur im Speicher des Knotens. Ein `resume` auf einem anderen Knoten endet mit
 `4006`; der Client macht `identify` mit seinem Cursor und erhält dasselbe Nachholen (R-AR-11,
@@ -738,7 +762,7 @@ neuer Kanäle nicht fehlen (04, Abschnitt 7.2).
 Folgen nach außen entstehen im worker aus dem Log, nicht im Schreibpfad (R-AR-08):
 
 1. Je Verbraucher-Name (`push`, `webhooks`) gibt es eine Cursor-Zeile in `event_consumer_cursors`
-   (03, ADR 0051).
+   (03, [ADR 0051](../adr/0051-worker-verbraucher-des-ereignis-logs-mit-cursor.md)).
 2. Eine Runde: Transaktion öffnen, Zeile mit `FOR UPDATE SKIP LOCKED` sperren (läuft schon ein
    anderer worker, endet die Runde sofort), bis zu `consumer.batch_size` Ereignisse ab Cursor lesen,
    je Ereignis Empfänger bestimmen und River-Jobs mit `InsertTx` einfügen, Cursor vorrücken,
@@ -758,6 +782,7 @@ den eindeutigen Schlüssel `(subscription_id, event_seq)` (03).
 | `typing.started` | `gateway` (Op `typing.start`) | direkt an den Hub | zusätzlich `NOTIFY ephemeral` mit Thread-ID und Prinzipal-ID |
 | `run.updated` | `runs` (Patch gespeichert, Transaktion ohne `event_log`) | Hub sammelt je `sync.run_patch_coalesce_interval` | `NOTIFY ephemeral` mit Lauf-ID und Version; der andere Knoten lädt das Lauf-Dokument und sendet `run.updated` mit `snapshot` |
 | `agent.presence_changed` | `agents` (Heartbeat) | direkt an den Hub | `NOTIFY ephemeral` mit Agent-ID und Zustand |
+| Ablösung einer Geräte-Verbindung (`4017`, 04 Abschnitt 6.1) | `gateway` (`identify`, `resume`) | direkt an die ältere Verbindung | `NOTIFY ephemeral` mit Geräte-ID und Gateway-Sitzung |
 
 Grund: R-Stack erlaubt `LISTEN/NOTIFY` nur als Wecksignal ohne Inhalt. Lauf-Inhalte gehen darum
 nicht über `NOTIFY`; der Empfängerknoten liest sie aus der Datenbank. Der Kanal `ephemeral` ist nur
@@ -803,6 +828,14 @@ Grund für getrennte Warteschlangen: Viele Vorschaubilder oder ein großer DSGVO
 und Webhooks nicht verzögern. Importe laufen nicht als Job im Server, sondern im Werkzeug
 `bothy import` über die API ([22-import-migration.md](22-import-migration.md), Abschnitt 2).
 
+Im Wartungsmodus (`server.maintenance_mode = read_only`,
+[ADR 0065](../adr/0065-wartungsmodus-read-only.md)) arbeitet der `worker` nur die Verbraucher
+`push` und `webhooks` ([ADR 0051](../adr/0051-worker-verbraucher-des-ereignis-logs-mit-cursor.md)),
+die Warteschlange `delivery` und den Job `runs.cancel_timeout` ab; ihre Transaktionen sind von der
+lesenden Unit of Work ausgenommen. Alle anderen Warteschlangen und periodischen Jobs setzen aus und
+laufen erst nach dem Neustart ohne Modus weiter, beim Umzug auf dem Ziel ab dem kopierten Stand.
+Grund: Jeder andere Job schriebe Zustand, der auf dem Ziel fehlen würde.
+
 ### 12.3 Job-Katalog
 
 | Job | Modul | Auslöser | Warteschlange | Fachregel in |
@@ -828,7 +861,7 @@ und Webhooks nicht verzögern. Importe laufen nicht als Job im Server, sondern i
 | `audit.chain_verify` | `audit` | periodisch alle `audit.checkpoint_interval`: den Abschnitt seit dem letzten Prüfpunkt nachrechnen, erst dann den nächsten Prüfpunkt signieren, speichern und an `audit.checkpoint_sink` ablegen; ein Bruch endet ohne Prüfpunkt und ohne Wiederholung (nie eine ungeprüfte Kette signieren) | `maintenance` | 19 |
 | `audit.retention_trim` | `audit` | periodisch, eigene Wartungsrolle der Datenbank | `maintenance` | 20 |
 | `privacy.export`, `privacy.erase` | `privacy` | Freigabe eines Auftrags | `privacy` | 20 |
-| `billing.reconcile` | `billing` | `cost.reconcile` oder periodisch, falls eingeschaltet | `default` | 10 |
+| `billing.reconcile` | `billing` | `cost.reconcile` (von Hand) und `cost.reconcile.submit` (Abgleich-App): übermittelte Einträge anwenden, Summen an Läufen und Sitzungen nachziehen; nie periodisch, weil der Server keine Abrechnung abruft und keinen Admin-Schlüssel hält ([ADR 0055](../adr/0055-kostenabgleich-als-eigene-app-admin-key-nie-im-server.md)) | `default` | 10 |
 | `status.probe` | `status` | periodisch | `maintenance` | 16 |
 | `retention.<klasse>` | besitzendes Modul | periodisch je Aufbewahrungsklasse | `maintenance` | 20 |
 
@@ -990,12 +1023,16 @@ Clients nehmen nach 04 wieder auf.
 4. Schema-Version prüfen: Das Binary kennt die kleinste nötige Version. Ist die Datenbank älter,
    bricht der Start mit Hinweis auf `bothy migrate up` ab (Exitcode `1`). Neuere Versionen sind
    erlaubt, weil Migrationen nach Erweitern und Zusammenziehen gebaut sind (ADR 0007).
-5. Instanz laden (fehlt die Zeile: Abbruch mit Hinweis auf `bothy migrate up`); ohne
-   `setup_completed_at` startet nur der Einrichtungsweg (08). Verlangt
+5. Instanz laden (fehlt die Zeile: Abbruch mit Hinweis auf `bothy migrate up`). Ohne
+   `setup_completed_at` startet der Server vollständig, beantwortet aber nur Health-Checks und
+   Discovery, alles andere mit `503 setup_required` (08, Abschnitt 4); er prüft den Zustand je
+   Anfrage, bis er gesetzt ist, und braucht nach der Einrichtung keinen Neustart. `/readyz` hängt
+   nicht an der Einrichtung, sonst öffnete ein Orchestrator den Weg zum Einlösen des Codes nie.
+   Verlangt
    `instance.min_server_version` eine neuere Version als die eigene, läuft der Prozess weiter,
    wird aber nie bereit: `/readyz` scheitert mit `schema_requires_newer_server`.
 6. Signierschlüssel sicherstellen: Jeder Zweck ohne `active`-Schlüssel bekommt einen
-   ([19-sicherheit.md](19-sicherheit.md), Abschnitt 10; ADR 0066).
+   ([19-sicherheit.md](19-sicherheit.md), Abschnitt 10; [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)).
 7. Routen registrieren und Routen-Metadaten prüfen: Jede Operation hat eine bekannte Aktion, sonst
    Abbruch (05, Regel 3).
 8. Rolle `api`: Log-Tail starten, `local_head` auf den aktuellen Kopf, öffentlichen Listener
@@ -1098,8 +1135,8 @@ braucht es eine neue Entscheidung (z. B. Sequenzen je Bereich) mit eigenem ADR.
 
 ## 17. Leistungsziele
 
-Ziele sind benannte Werte (Abschnitt 22). Jedes Ziel hält ein Test im Gate; bis es ihn gibt, ist
-das Ziel "ungeprüft" (Tickets).
+Ziele sind benannte Werte (Abschnitt 22). Jedes Ziel hält ein Test in `make perf`; bis es ihn gibt,
+ist das Ziel "ungeprüft" (Tickets). Wann und auf welcher Umgebung gemessen wird, regelt [ADR 0063](../adr/0063-leistungs-gate-fuer-das-ereignis-log.md).
 
 | Name | Was gemessen wird | Test |
 |---|---|---|
@@ -1163,8 +1200,8 @@ das Ziel "ungeprüft" (Tickets).
 | R-AR-16 | Migrationen nur über `bothy migrate`, nie implizit beim Start; Server prüft die Schema-Version. | Kein gleichzeitiges Migrieren mehrerer Knoten, keine Neustart-Schleife. |
 | R-AR-17 | Shutdown schließt WebSockets mit `4013` und sichert Agenten-Cursor vorher. | `http.Server.Shutdown` deckt übernommene Verbindungen nicht ab; Clients nehmen geordnet wieder auf. |
 | R-AR-18 | Im Anfragepfad nur Wiederholung des ganzen Unit of Work bei Deadlock und Sperr-Zeitüberschreitung. | Andere Wiederholungen gehören in Jobs oder Clients. |
-| R-AR-19 | Architektur-Gate mit go-arch-lint, Konfiguration aus `modules.yaml` erzeugt. | Eine Quelle für Modulgrenzen; Werkzeug prüft Pakete und Fremdbibliotheken. |
-| R-AR-20 | Leistungsziele als benannte Werte, gehalten durch Lasttests im Gate. | Keine Zahl ohne Test. |
+| R-AR-19 | Architektur-Gate mit go-arch-lint, Konfiguration aus `modules.yaml` erzeugt ([ADR 0050](../adr/0050-modulregister-als-quelle-fuer-architektur-gate-und-tabellenbesitz.md)). | Eine Quelle für Modulgrenzen; Werkzeug prüft Pakete und Fremdbibliotheken. |
+| R-AR-20 | Leistungsziele als benannte Werte, gehalten durch Lasttests in `make perf` ([ADR 0063](../adr/0063-leistungs-gate-fuer-das-ereignis-log.md)). | Keine Zahl ohne Test. |
 
 ## 20. Abgleich mit dem Kern-Vertrag
 
@@ -1173,14 +1210,14 @@ Kern-Vertrag (Integration vom 2026-10-10):
 
 | Punkt | Wo |
 |---|---|
-| Tabelle `event_consumer_cursors` für die Worker-Verbraucher | 03, Abschnitt 4.10; ADR 0051 |
+| Tabelle `event_consumer_cursors` für die Worker-Verbraucher | 03, Abschnitt 4.10; [ADR 0051](../adr/0051-worker-verbraucher-des-ereignis-logs-mit-cursor.md) |
 | River-Tabellen als technische Tabellen | 03, Abschnitt 4.13 |
 | Fencing der Agenten-Verbraucher (`holder_session_id`) | 03 `agent_consumer_cursors`; 04, Abschnitt 15.1 |
 | Nachholen mit vollständig sichtbaren Bereichen; Cache folgt Strukturereignissen | 04, Abschnitte 7.2 und 8.1 |
 | Ablauf erzeugt `access.changed` über `authz.expiry_sweep` | 04, Abschnitt 8.2; 05 `grant.expire`, `group.member.expire` |
 | Thread verschieben: Kopien von `channel_id`, Dateien folgen der Nachricht | 03 `threads`; 05, Abschnitt 2.2 |
 | Pfad-Präfix `/api/v1` | 04, Kopf und Abschnitt 6.1 |
-| Maschinenlesbarer Aktionskatalog | beschlossen (ADR 0049); bis dahin Abgleich im Doku-Gate (05, Regel 3) |
+| Maschinenlesbarer Aktionskatalog | beschlossen ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)); bis dahin Abgleich im Doku-Gate (05, Regel 3) |
 | Health ohne Aktion, auf dem internen Listener | 05, R-AZ-22; Abschnitt 15.2 |
 | Module `gateway`, `search`, `stats` ohne Tabellen | 03, Abschnitt 2 |
 | `agent.read` für den Agenten selbst | 05, Abschnitt 4.10 |
@@ -1198,7 +1235,7 @@ Kern-Vertrag (Integration vom 2026-10-10):
 
 Standardwerte. Leistungsziele (`perf.*`, Ort `Lasttest`) sind Schwellen für Tests, keine
 Laufzeit-Konfiguration: Sie haben keinen Umgebungsnamen, stehen nicht im Konfigurationsschema des
-Servers, und `make perf` liest sie aus dieser Tabelle (ADR 0063).
+Servers, und `make perf` liest sie aus dieser Tabelle ([ADR 0063](../adr/0063-leistungs-gate-fuer-das-ereignis-log.md)).
 Listener, Rolle, öffentliche URL, vertrauenswürdige Proxys und die Verbindungsdaten der Datenbank
 (`server.*`, `database.host` bis `database.max_conns`) führt [16-betrieb.md](16-betrieb.md); die
 Grenzen ausgehender Aufrufe (`egress.*`) führt [19-sicherheit.md](19-sicherheit.md).
@@ -1243,7 +1280,7 @@ Grenzen ausgehender Aufrufe (`egress.*`) führt [19-sicherheit.md](19-sicherheit
 | `shutdown.jobs_soft_timeout` | Server | `20s` | weicher Stopp von River |
 | `shutdown.telemetry_flush_timeout` | Server | `5s` | Telemetrie leeren |
 | `shutdown.total_timeout` | Server | `60s` | gesamte Frist bis zum Ende; mindestens die Summe der Schritt-Budgets (15.3) |
-| `perf.reference_profile` | Lasttest | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 lokal, Rolle all` | Umgebung der Lasttests |
+| `perf.reference_profile` | Lasttest | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 lokal mit fsync und synchronous_commit an, Rolle all` | Umgebung der Lasttests; Modi der Messung in ADR 0063 |
 | `perf.sustained_messages_per_s` | Lasttest | `200` | Dauerlast für `perf.message_create_p99` |
 | `perf.message_create_p99` | Lasttest | `150ms` | Ziel |
 | `perf.event_commit_min_per_s` | Lasttest | `1000` | Ziel (Mindestwert) |

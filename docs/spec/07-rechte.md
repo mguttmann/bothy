@@ -354,9 +354,20 @@ Passkey der Person mit `revoked_at IS NULL`, bei `local_credential.set` eine Zei
 `local_credentials` mit `totp_enabled_at IS NOT NULL` (ein eingerichteter Passwortweg). Die Regel
 selbst bleibt in `authz` (B7).
 
+Aktionen mit zwei Zielen (`thread.move`: Thread und Zielkanal, Recht "manage auf Quelle und Ziel")
+tragen das zweite Ziel im Ressourcen-Verweis (`ref.target`). `resolve` löst beide Pfade auf;
+Sichtbarkeit und Anforderung gelten auf beiden. Ohne Leserecht auf das Ziel ist die Antwort `404`,
+gleich wie bei einer unbekannten ID. Grund: Eine zweite Prüfung im Anwendungsfall wäre Rechte-Logik
+außerhalb von `authz` (05, Regel 1.1).
+
 Audit nach der Spalte "Audit" in 05: `authorize` übergibt jede Ablehnung und jeden Fehler an
 `kernel/auditing`; sie werden nach dem Rollback in eigener Transaktion geschrieben und je
-`audit.deny_aggregate_window` zusammengefasst (AZ-P13). Erlaubnisse einer Aktion mit Audit `ja`
+`audit.deny_aggregate_window` zusammengefasst (AZ-P13). Ausgenommen sind Filter: die
+Empfangsprüfung je Empfänger bei Zustellung und Nachholen (Gateway, `GET /api/v1/events`, Push,
+Webhooks) und die Prüfung je Element einer Liste, Suche oder Momentaufnahme (7.4, Regel 3). Sie
+laufen im Filtermodus (`authorize.Filter(ctx)`, 02 Abschnitt 4.5) und schreiben keine Ablehnung.
+Grund: Sonst schriebe jedes Ereignis für jeden Nicht-Empfänger eine Zeile; geprüft werden
+Anfragen und Ops. Erlaubnisse einer Aktion mit Audit `ja`
 schreibt ihr Anwendungsfall in seiner Transaktion mit seinen Details, weil nur er die Details
 kennt; ein Test des Anwendungsfalls findet genau einen Eintrag.
 
@@ -407,6 +418,23 @@ für Aufbewahrung und Export.
 
 Grund: Archivieren soll einen Verlauf einfrieren, nicht verstecken; Lesen ohne Schreiben ist das
 Verhalten, das Menschen von archivierten Kanälen kennen, und ein Owner verliert dabei nichts.
+
+### 4.6 Erwähnungen auflösen
+
+Ein Erwähnungs-Token im Inhalt ([03-datenmodell.md](03-datenmodell.md), `messages`,
+Inhaltsformat) wird beim Senden und Bearbeiten nur dann zur Erwähnung, wenn gilt:
+
+| Erwähnter | Bedingung |
+|---|---|
+| Mensch | `authorize(autor, user.read, mensch)` erlaubt, oder der Mensch darf den Thread der Nachricht lesen (`authorize(mensch, thread.read, thread)`) |
+| Agent | `authorize(autor, agent.read, agent)` erlaubt |
+
+Sonst bleibt das Token Text. Grund für die zweite Bedingung bei Menschen: Agenten haben keinen
+Scope `users:read` und sehen das Verzeichnis nicht (05, Abschnitt 2.6); ihre Erwähnung soll trotzdem
+den Menschen erreichen, der den Thread liest ([13-push-benachrichtigungen.md](13-push-benachrichtigungen.md),
+Abschnitt 2.1). Der Autor erfährt so nur, ob ein Handle den Thread lesen darf, in den er selbst
+schreibt; das Verzeichnis bleibt verborgen. Ein Mensch ohne Leserecht auf den Kanal, den ein Mensch
+erwähnt, bekommt eine Zeile in `mentions`, aber nie einen Hinweis (8.1, Zeile Push).
 
 ## 5. Schutzregeln, die keine Freigabe aufhebt
 
@@ -649,9 +677,11 @@ Regeln:
    (`StructureSource`): Kanäle mit eigener Freigabe und DM-Kanäle der Teilnahme, alle Kanäle der
    Bereiche in `fully_visible_space_ids`, bei `instance_wide` alle Kanäle außer DM, bei Agenten die
    nach der Bediener-Regel bedienten. Neue Kanäle und Bereiche erscheinen so ohne neue
-   Rechte-Version. Ein Lint im Repository-Layer lehnt sqlc-Abfragen auf diesen Tabellen ohne dieses
-   Prädikat ab, außer sie stehen auf einer geprüften Ausnahmeliste (Jobs mit Systemrecht, z. B.
-   Aufbewahrung).
+   Rechte-Version. Ein Lint im Repository-Layer lehnt lesende sqlc-Abfragen auf diesen Tabellen
+   ohne dieses Prädikat ab, außer sie stehen auf einer geprüften Ausnahmeliste (Auflösung für
+   `authorize`, Laden einer schon geprüften Ressource, Jobs mit Systemrecht wie die Aufbewahrung,
+   Log-Tail). Schreibende Abfragen treffen nur Zeilen einer Ressource, die `authorize` vorher
+   geprüft hat (z. B. die Kopien von `channel_id` beim Verschieben); der Lint prüft sie nicht.
 2. Gesamtzahlen (`total`), Facetten und "weitere Treffer" zählen nur innerhalb dieses Prädikats.
 3. Nach dem SQL-Filter läuft für jedes Ergebnis zusätzlich `authorize` mit der Lese-Aktion (z. B.
    `message.read`). Der SQL-Filter ist die Leistung, `authorize` die Wahrheit. Ein Unterschied
@@ -662,7 +692,11 @@ Regeln:
    der Fragende nicht sehen darf, erscheint nicht, und die Anzahl verrät nichts.
 5. Große Instanzen: Wird die Liste so lang, dass der Planer kippt, ist die Abhilfe eine temporäre
    Tabelle aus demselben Snapshot in derselben Transaktion, nie eine dauerhafte Rechte-Tabelle.
-   Der Lasttest in [23-qualitaet.md](23-qualitaet.md) hält die Grenze fest.
+   Der Lasttest `perf/catchup` (`perf.catchup_page_p99`, [02-architektur.md](02-architektur.md),
+   Abschnitt 17) läuft auch mit einer großen Menge sichtbarer Kanäle und hält die Grenze fest.
+6. Die Beispiele oben zeigen das Ergebnis, nicht den Ort der Abfrage: Liegen die Tabellen in
+   verschiedenen Modulen (hier `threads` in `chat`, `read_states` in `sync`), setzt der Code die
+   Teile über Ports zusammen (02, Abschnitt 4.1); kein Modul liest fremde Tabellen.
 
 ## 8. Zustellfilter je Empfänger und sofortige Wirkung
 
@@ -675,7 +709,7 @@ Regeln:
 | Agenten-Verbraucher | wie Menschen nach eigenen Freigaben, plus persönliche Ereignisse an den Agenten; vor `agent.invocation`, `agent.followup`, `interaction.created`, `command.invoked` zusätzlich `agent.invoke` für den Auslöser | 04, Abschnitt 15 |
 | Push | `push.deliver` (Leserecht auf den Thread), Benachrichtigungs-Einstellung, Ruhezeiten, nicht der Autor; Erwähnungen ohne Leserecht erzeugen nichts | 05; [13-push-benachrichtigungen.md](13-push-benachrichtigungen.md) |
 | Ausgehende Webhooks | `webhook_out.deliver`: Empfangs-Aktion des Ereignisses für die App nach Freigaben und Scope, Abo des Typs | 05 |
-| Datei-Abruf | `file.read` bei jedem Abruf über den Server; keine dauerhaften Links an Clients | [12-dateien.md](12-dateien.md) |
+| Datei-Abruf | `file.read` bei jedem Abruf über den Server, auch mit Abruf-Ticket; keine dauerhaften Links an Clients | [12-dateien.md](12-dateien.md), [ADR 0048](../adr/0048-datei-abruf-nur-ueber-den-server-mit-kurzlebigen-tickets.md) |
 | Suche, Zähler, Listen | SQL-Filter plus `authorize` je Element (Abschnitt 7.4) | dieses Kapitel |
 
 ### 8.2 Sofortige Wirkung bei Entzug
@@ -934,16 +968,16 @@ DM zwischen Alex und Sam. Die Uhr ist in Tests steuerbar.
 | AZ-P1 | Routen-Test: zählt alle registrierten HTTP-Routen | eine Route keine bekannte `x-authz-action` hat (05, Regel 3) |
 | AZ-P2 | Op- und Ereignis-Test | eine WebSocket-Op oder ein Ereignistyp ohne Eintrag in 05, Abschnitt 6 bzw. 7 registriert ist |
 | AZ-P3 | Katalog geschlossen | eine unbekannte Aktion nicht mit `500` und Alarm endet |
-| AZ-P4 | 404-Gleichheit | Antwort für fremde ID und unbekannte ID sich in Status, Körper oder Kopfzeilen unterscheidet, oder der Median der Antwortzeit mehr als `authz.not_found_timing_tolerance` abweicht |
+| AZ-P4 | 404-Gleichheit | Antwort für fremde ID und unbekannte ID sich in Status, Körper oder Kopfzeilen unterscheidet, oder der Median der Antwortzeit mehr als `authz.not_found_timing_tolerance` abweicht. Routen, deren Ressource der Anfragende immer sehen darf (z. B. `user.read` für Menschen), haben keine fremde unsichtbare Instanz und stehen mit Grund als "nicht anwendbar" in der Liste des Tests |
 | AZ-P5 | Zähler und Suche verraten keine fremden Kanäle | in zufällig erzeugten Welten (Eigenschaftstest) Ungelesen-Zähler, Erwähnungszähler, Such-Treffer, `total`, Facetten, Vorschläge, "Läuft gerade" oder Snapshot einen Kanal ohne Leserecht berücksichtigen |
 | AZ-P6 | Adapter ohne gültige Marke tut nichts | der Referenz-Adapter oder ein SDK-Adapter bei fehlender Marke, falscher Signatur, falschem `aud`, abgelaufener Marke, wiederholter `jti`, abweichendem `billing_mode` oder abweichender `tool_class` die Laufzeit startet (Konformitätstest der SDKs, [09-agenten.md](09-agenten.md)) |
 | AZ-P7 | I1 bei jeder Änderungsart | für eine der Aktionen aus 05, Regel 1.6, eine Änderung, die I1 verletzt, committet wird; je Aktion ein Fall |
 | AZ-P8 | Differenztest Cache gegen Referenz | `authorize` mit Cache in zufälligen Welten anders entscheidet als eine langsame Referenz ohne Cache |
-| AZ-P9 | Entzug sofort | nach dem Commit eines Widerrufs in Prozess A eine Anfrage an Prozess B noch erlaubt wird |
+| AZ-P9 | Entzug sofort | nach dem Commit eines Widerrufs in Prozess A eine Anfrage an Prozess B noch erlaubt wird. Prozess heißt eine eigene Server-Instanz mit eigenem Pool, Log-Tail, Rechte-Cache und Hub an derselben Datenbank; zwei solche Instanzen in einem Test-Binary genügen, weil sie keinen Speicher teilen |
 | AZ-P10 | Ablauf ohne Job | bei abgeschaltetem `authz.expiry_sweep` eine abgelaufene Freigabe noch wirkt |
 | AZ-P11 | Auftragsbindung | ein Agent im Lauf eines Menschen Inhalte liest oder schreibt, die der Mensch nicht lesen bzw. schreiben darf |
-| AZ-P12 | SQL-Prädikat | eine sqlc-Abfrage auf Inhaltstabellen ohne `= ANY($visible)` und ohne Eintrag in der Ausnahmeliste existiert |
-| AZ-P13 | Ablehnungen im Audit | eine Ablehnung nicht oder nicht zusammengefasst (`audit.deny_aggregate_window`) im Audit-Log steht |
+| AZ-P12 | SQL-Prädikat | eine lesende sqlc-Abfrage auf Inhaltstabellen ohne `= ANY($visible)` und ohne Eintrag in der Ausnahmeliste existiert (Abschnitt 7.4, Regel 1) |
+| AZ-P13 | Ablehnungen im Audit | eine Ablehnung einer Anfrage oder Op nicht oder nicht zusammengefasst (`audit.deny_aggregate_window`) im Audit-Log steht, oder ein Filter (Abschnitt 4.2) eine Ablehnung schreibt |
 
 ## 12. Entscheidungen dieses Kapitels
 

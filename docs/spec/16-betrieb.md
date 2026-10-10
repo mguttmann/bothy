@@ -172,7 +172,7 @@ Jedes Geheimnis ist ein Verweis `secret_ref` (Spalten `secret_ref`, `private_key
 
 | Schema | Beispiel | Treiber | Schreiben | Status |
 |---|---|---|---|---|
-| `file` | `file:/run/bothy/secrets/db_app_password` | Datei lesen | nur unter `secrets.signing_key_dir` (ADR 0066) | M1 |
+| `file` | `file:/run/bothy/secrets/db_app_password` | Datei lesen | nur unter `secrets.signing_key_dir` ([ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) | M1 |
 | `env` | `env:BOTHY_SECRET_DB_APP_PASSWORD` | Umgebungsvariable lesen | nein | M1, nur wo die Plattform nichts anderes kann |
 | `azkv` | `azkv://vault-name/secret-name` | Azure Key Vault | ja | später |
 | `awssm` | `awssm://eu-central-1/bothy/db_app_password` | AWS Secrets Manager | ja | später |
@@ -191,7 +191,7 @@ Server beendet kein TLS); eine eingeschaltete Funktion ohne Verweis bricht den S
 
 Signierschlüssel des Servers sind die einzige Ausnahme vom Lesen: Der Server erzeugt sie selbst
 in `secrets.signing_key_dir` (Verzeichnis im Besitz des Dienstbenutzers, Modus `0700`, Dateien
-`0600`) über `Put` des Datei-Treibers; jeder andere Verweis bleibt nur lesbar (ADR 0066,
+`0600`) über `Put` des Datei-Treibers; jeder andere Verweis bleibt nur lesbar ([ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md),
 [19-sicherheit.md](19-sicherheit.md) Abschnitt 10). Grund: Planmäßige und Notfall-Rotation
 brauchen neue Schlüssel ohne Handgriff auf dem Host.
 
@@ -258,6 +258,8 @@ Regeln:
 
 ### 6.2 Feature-Flags
 
+Entscheidung: [ADR 0064](../adr/0064-feature-flag-registrierung-mit-aufraeum-gate.md).
+
 | Thema | Regel |
 |---|---|
 | Speicher | Tabelle `feature_flags` ([03-datenmodell.md](03-datenmodell.md) 4.1): globaler Wert plus `rollout` mit Personen und Gruppen, für die der Wert abweichend gilt |
@@ -284,7 +286,9 @@ Regeln:
 | `bothy_monitor` | `pg_monitor` | `otel-collector` |
 
 `migrate --bootstrap` legt fehlende Rollen idempotent an und setzt ihre Passwörter aus den
-Geheimnissen (`migrate.*_password_ref`). Regeln:
+Geheimnissen (`migrate.*_password_ref`). Dafür verbindet es sich als `migrate.bootstrap_user` mit
+`migrate.bootstrap_password_ref`; die Migrationen danach laufen als `database.user` (`bothy_owner`)
+mit `database.password_ref`, wie ohne `--bootstrap`. Regeln:
 
 1. Je Rolle `CREATE ROLE` bzw. `ALTER ROLE` mit `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
    NOREPLICATION NOBYPASSRLS`; das Passwort geht nur als SCRAM-SHA-256-Verifier an die Datenbank,
@@ -321,6 +325,8 @@ Spätere DDL-Jobs nutzen dasselbe Muster.
 | `statement_timeout` je Anwendungsverbindung | `database.statement_timeout` | keine hängenden Abfragen |
 
 ## 8. Sicherung und Wiederherstellung
+
+Entscheidung: [ADR 0058](../adr/0058-sicherung-mit-pgbackrest-objektsicherung-und-restore-test.md) (R-OP-06 bis R-OP-10).
 
 ### 8.1 Was gesichert wird
 
@@ -392,7 +398,7 @@ Eine Wiederherstellung setzt die globale Sequenz zurück. R-SY-04 erkennt das nu
 `cursor > head_seq` gilt. Nach neuen Schreibvorgängen überholt die neue Zeitlinie alte Cursor,
 und ein Client würde fremde Ereignisse mit alten Nummern still überspringen.
 
-Lösung (03 Abschnitt 6.7, 04 Abschnitt 7.5, ADR 0059): `instance.sync_epoch` (UUIDv7) benennt
+Lösung (03 Abschnitt 6.7, 04 Abschnitt 7.5, [ADR 0059](../adr/0059-sync-epoche-nach-wiederherstellung.md)): `instance.sync_epoch` (UUIDv7) benennt
 die Zeitlinie. `bothy restore finalize` setzt sie nach jeder Wiederherstellung neu. `hello`,
 `ready` und `GET /api/v1/events` nennen die Epoche; der Client speichert sie mit dem Cursor. Passt
 sie nicht, antwortet der Server `resync_required` mit Grund `epoch_changed`. Derselbe Befehl setzt
@@ -442,9 +448,11 @@ Ein Umzug ist eine Wiederherstellung auf einem anderen Ziel ohne Datenverlust:
 
 1. Ziel bereitstellen (OpenTofu), gleiche Version, Secrets-Bündel einspielen.
 2. Probe: letzte Sicherung zurückspielen, Prüfungen aus 8.3 grün.
-3. Wartungsmodus `server.maintenance_mode = read_only` auf der alten Instanz. Schreibende Anfragen
-   bekommen `503` mit Fehlercode `maintenance` und `Retry-After` (Kapitel 06 legt Code und Format
-   fest). Clients halten ihr Ausgangsfach.
+3. Wartungsmodus `server.maintenance_mode = read_only` auf der alten Instanz
+   ([ADR 0065](../adr/0065-wartungsmodus-read-only.md)). Aktionen mit `effect: write`
+   (05, Abschnitt 2.7) bekommen `503` mit Fehlercode `maintenance` und `Retry-After` (Kapitel 06
+   legt Code und Format fest). Clients halten ihr Ausgangsfach. Ausnahmen nennt ADR 0065, Punkt 4:
+   Abschluss laufender Läufe, Token-Erneuerung ohne Rotation, Notfall-Widerrufe und Zustellungen.
 4. Abschluss-Sicherung, Restore auf dem Ziel, Manifest vergleichen.
 5. DNS und Identität umstellen: Redirect-URIs bei OIDC, RP-ID der Passkeys (gleiche Domain behält
    die Passkeys), Tailscale-Gerät. Push-Schlüssel und App-Identität bleiben gleich, darum bleiben
@@ -459,7 +467,10 @@ Anleitung: [cloud-migration.md](../operations/cloud-migration.md).
 
 ### 11.1 Portabilitätstest in CI
 
-Ein Test belegt die Portabilität bei jedem Release-Kandidaten und nachts:
+Ein Test belegt die Portabilität bei jedem Release-Tag und auf Anforderung (`workflow_dispatch`),
+nicht nächtlich: Er braucht gehostete Runner, die in der privaten Phase Kosten verursachen
+([ADR 0039](../adr/0039-runner-strategie-privat-oeffentlich-und-release-ausnahmen.md),
+[ci-budget.md](../quality/ci-budget.md)):
 
 1. Frischer Linux-Runner (amd64 und arm64), nur Docker; Images per Digest aus der Registry.
 2. `docker compose up` mit `direct,scan` und einmal mit `direct,scan,s3`.
@@ -498,8 +509,9 @@ Menschen sehen. Ihr Zustand steht in der Admin-Konsole (`backup_runs`) und in de
 
 ## 13. Kapazität und Ressourcen
 
-Feste Größen gibt es erst nach dem Lasttest (Ticket). Bis dahin gelten Startwerte aus der
-Konfiguration und dieses Modell:
+Feste Größen gibt es erst nach dem Lasttest: M1-72 bestätigt oder ändert `database.max_conns` mit
+Messwerten, M7-18 füllt die Kapazitätstabelle. Bis dahin gelten Startwerte aus der Konfiguration
+und dieses Modell:
 
 | Engpass | Kennzahl | Hebel |
 |---|---|---|
@@ -532,10 +544,10 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | `server.internal_listen_addr` | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack |
 | `server.public_url` | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](08-identitaet.md), Abschnitte 7.2 und 7.3) |
 | `server.trusted_proxies` | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](19-sicherheit.md), SEC-TLS-1) |
-| `server.maintenance_mode` | `off` | `off` oder `read_only` (Umzug, Upgrade) |
+| `server.maintenance_mode` | `off` | `off` oder `read_only` (Umzug, Upgrade; [ADR 0065](../adr/0065-wartungsmodus-read-only.md)) |
 | `secrets.dir` | `/run/bothy/secrets` | Basis der Standardverweise `file:` |
 | `secrets.cache_ttl` | `5m` | so lange gilt ein gelesenes Geheimnis |
-| `secrets.signing_key_dir` | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, ADR 0066) |
+| `secrets.signing_key_dir` | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) |
 | `server.tls_cert_ref` | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) |
 | `server.tls_key_ref` | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` |
 | `database.host` | `localhost` | Host der Datenbank |
@@ -589,16 +601,16 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | R-OP-03 | Tailscale als Sidecar mit geteiltem Netz-Namespace und Kernel-Netz (kein Userspace-Modus), statt `tailscale serve` auf dem Host; dazu Tailnet-Richtlinie nur Port 443. | Nur so lauscht der Server im Container nachweisbar nur auf Loopback; ob der Userspace-Modus an Loopback weiterreicht, ist nicht dokumentiert. |
 | R-OP-04 | Unbekannte Konfigurationsschlüssel brechen den Start ab. | Ein Tippfehler darf nie still einen Standard setzen. |
 | R-OP-05 | Geheimnisse als Dateien je Dienst (`subpath`), nie als Umgebungsvariablen. | Kindprozesse, Absturzberichte und `docker inspect` zeigen keine Werte; jeder Dienst sieht nur seine Geheimnisse. |
-| R-OP-06 | pgBackRest für physische Sicherung und PITR, `pg_dump` für Portabilität, restic für Objekte. | Bewährte Werkzeuge mit Prüfsummen, Verschlüsselung und Aufbewahrung; kein Eigenbau. |
+| R-OP-06 | pgBackRest für physische Sicherung und PITR, `pg_dump` für Portabilität, restic für Objekte ([ADR 0058](../adr/0058-sicherung-mit-pgbackrest-objektsicherung-und-restore-test.md)). | Bewährte Werkzeuge mit Prüfsummen, Verschlüsselung und Aufbewahrung; kein Eigenbau. |
 | R-OP-07 | Eigenes Image `bothy-postgres` (postgres:18 plus pgBackRest und `bothy-backupd`). | `archive_command` läuft im Datenbank-Container; ein Image für beide Rollen hält Versionen gleich. |
 | R-OP-08 | Repository-Host `backup` per pgBackRest-TLS; der Datenbank-Container bleibt ohne Ausgang. | Off-site-Zugangsdaten liegen nur dort, wo sie gebraucht werden. |
 | R-OP-09 | Off-site-Sicherungen nur anhängend; Löschen nur mit getrenntem Konto. | Ein übernommener Server darf seine Sicherungen nicht zerstören. |
-| R-OP-10 | Automatischer Wiederherstellungstest mit Manifest-Vergleich, Sequenz- und Hash-Prüfung, Stichproben. | Eine Sicherung ist erst belegt, wenn sie zurückgespielt wurde. |
-| R-OP-11 | Wiederherstellung setzt eine neue Sync-Epoche (03, 04, ADR 0059). | Ohne Epoche überholt die neue Zeitlinie alte Cursor still. |
+| R-OP-10 | Automatischer Wiederherstellungstest mit Manifest-Vergleich, Sequenz- und Hash-Prüfung, Stichproben ([ADR 0058](../adr/0058-sicherung-mit-pgbackrest-objektsicherung-und-restore-test.md)). | Eine Sicherung ist erst belegt, wenn sie zurückgespielt wurde. |
+| R-OP-11 | Wiederherstellung setzt eine neue Sync-Epoche (03, 04, [ADR 0059](../adr/0059-sync-epoche-nach-wiederherstellung.md)). | Ohne Epoche überholt die neue Zeitlinie alte Cursor still. |
 | R-OP-12 | Expand/Contract mit Rückweg um genau eine Version; keine Down-Migrationen in Produktion. | Rückweg ohne Datenbank-Rückbau; zwei Versionen zurück braucht eine Wiederherstellung. |
 | R-OP-13 | `migrate` verlangt eine frische Sicherung. | Erzwingt den wichtigsten Schritt vor jeder Schemaänderung. |
-| R-OP-14 | Feature-Flags mit Art `release` und `remove_by`, Gate-Check; Flags nie für Sicherheitsgrenzen. | Verhindert tote Flags und versteckte Sicherheitsschalter. |
+| R-OP-14 | Feature-Flags mit Art `release` und `remove_by`, Gate-Check; Flags nie für Sicherheitsgrenzen ([ADR 0064](../adr/0064-feature-flag-registrierung-mit-aufraeum-gate.md)). | Verhindert tote Flags und versteckte Sicherheitsschalter. |
 | R-OP-15 | Statusseite im Server, automatische Zustände aus internen Prüfungen, nicht aus Prometheus. | Funktioniert ohne optionalen Observability-Stack. |
 | R-OP-16 | Produktionsdaten nie in `dev` oder `staging`. | Kein Anonymisierungswerkzeug; ein Abzug wäre ein Datenschutzvorfall. |
 | R-OP-17 | DDL im Betrieb nur über `SECURITY DEFINER`-Funktionen von `bothy_owner`; Tabellenrechte je Migration ausdrücklich, keine Standardrechte in `public`. | Die Anwendungsrolle bleibt bei DML; ein fehlendes Recht fällt im Test auf. |
-| R-OP-18 | Signierschlüssel erzeugt der Server in einem eigenen beschreibbaren Verzeichnis (ADR 0066). | Rotation ohne Handgriff auf dem Host; alle anderen Geheimnisse bleiben nur lesbar. |
+| R-OP-18 | Signierschlüssel erzeugt der Server in einem eigenen beschreibbaren Verzeichnis ([ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)). | Rotation ohne Handgriff auf dem Host; alle anderen Geheimnisse bleiben nur lesbar. |

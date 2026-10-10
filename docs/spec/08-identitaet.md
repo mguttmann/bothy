@@ -355,7 +355,7 @@ bothy setup bootstrap-owner --handle alex --display-name "Alex"
 
 Der Befehl verbindet sich direkt mit der Datenbank, nicht über HTTP, mit der Anwendungsrolle
 `bothy_app` ([16-betrieb.md](16-betrieb.md), Abschnitt 7.1; er schreibt nur Zeilen). Vor der
-Transaktion stellt er die Signierschlüssel sicher (ADR 0066); dann macht er in einer Transaktion:
+Transaktion stellt er die Signierschlüssel sicher ([ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)); dann macht er in einer Transaktion:
 
 1. Prüfen, dass `setup_completed_at IS NULL`; sonst Abbruch ohne Änderung.
 2. Einen Treiber `local` anlegen, falls keiner existiert.
@@ -365,8 +365,10 @@ Transaktion stellt er die Signierschlüssel sicher (ADR 0066); dann macht er in 
 5. Audit-Eintrag mit `actor_principal_id = NULL` und Systemaktion `instance.bootstrap` (05).
 6. `setup_completed_at = now()`.
 
-Nach dem Commit schreibt er den Code genau einmal auf die Standardausgabe; Logs enthalten ihn nie.
-Exitcodes nach [02-architektur.md](02-architektur.md), Abschnitt 3.3. Die Sperre bis zur
+Nach dem Commit schreibt er den Code genau einmal auf die Standardausgabe, als einzige Zeile dort;
+Logs gehen auf die Standardfehlerausgabe und enthalten ihn nie. So lesen Skripte den Code ohne
+eigenes Format. `bothy setup issue-enrollment-code` gibt seinen Code ebenso aus. Exitcodes nach
+[02-architektur.md](02-architektur.md), Abschnitt 3.3. Die Sperre bis zur
 Einrichtung gilt ab dem nächsten Aufruf ohne Neustart. `createUser` mit `local_account` legt die
 lokale Identität ebenso an.
 
@@ -532,7 +534,7 @@ Abschnitt 2.1; trennt Zugriffstokens von jeder anderen JWS). Claims: `iss` (`ins
 `cnf.jkt`, `amr` (Liste mit dem Anmeldeweg der Sitzung). Keine Rechte im Token; Rechte berechnet
 `authz` bei jeder Anfrage (07). Grund: Ein Token mit Rechten wäre bis zum Ablauf veraltet.
 JWS-Aufbau, Prüfung und JWK-Fingerabdrücke laufen über eine Implementierung mit der
-Standardbibliothek in `kernel/jose` (ADR 0067).
+Standardbibliothek in `kernel/jose` ([ADR 0067](../adr/0067-jose-profil-mit-der-standardbibliothek.md)).
 
 Prüfung je Anfrage: Signatur mit `kid` aus den Schlüsseln im Zustand `active` oder `retiring`,
 `iss`, `aud`, `exp` und `nbf` mit `auth.clock_leeway`, dann DPoP (7.3), dann Sitzung und Gerät über
@@ -577,15 +579,24 @@ Nach RFC 9449 (https://www.rfc-editor.org/rfc/rfc9449.html, abgerufen 2026-10-10
   oder ältere Token widerruft Familie und Sitzung (`refresh_reuse`), schließt Verbindungen mit `4012`,
   schreibt Audit und `session.revoked`. RFC 9700 verlangt für öffentliche Clients Sender-Bindung oder
   Rotation (Abschnitt 2.2.2 [belegt]); das Produkt macht beides.
-- **Erweiterungs-Sitzungen.** Prozesse einer App, die getrennt laufen und selbst erneuern müssen
-  (iOS- und macOS-Notification-Service-Extension, Share-Extension), bekommen je eine eigene
-  Kind-Sitzung mit eigener Familie auf demselben Gerät (`auth_sessions.client_component`,
+- **Wartungsmodus.** Bei `server.maintenance_mode = read_only` gibt `auth.token.refresh` ein neues
+  Zugriffstoken aus und liefert dasselbe Refresh-Token zurück, ohne Rotation und ohne Schreibvorgang
+  ([ADR 0065](../adr/0065-wartungsmodus-read-only.md), Punkt 4). Grund: Sonst endet das Lesen nach
+  `auth.access_token_ttl`, und eine Rotation nach der Abschluss-Sicherung fehlte auf dem Ziel des
+  Umzugs und meldete die Person dort ab. Die Bindung an den DPoP-Schlüssel bleibt; RFC 9700 nennt
+  sie als Alternative zur Rotation (Abschnitt 2.2.2 [belegt]). Die Wiederverwendungs-Erkennung
+  bleibt: Ein schon rotiertes Token widerruft Familie und Sitzung wie sonst.
+- **Erweiterungs-Sitzungen.** Die Share-Extension (iOS, macOS) läuft getrennt von der App und muss
+  selbst erneuern; sie bekommt eine eigene Kind-Sitzung mit eigener Familie auf demselben Gerät (`auth_sessions.client_component`,
   `auth_sessions.parent_session_id`, 03). Die App legt sie an (`POST
   /api/v1/me/sessions/extensions`, Aktion `session.extension.create`) und reicht die Tokens über
   die geteilte Keychain-Gruppe weiter; die Familie nutzt denselben DPoP-Schlüssel. Je Eltern-Sitzung
   und Komponente gibt es höchstens eine aktive Kind-Sitzung; eine neue ersetzt die alte (`logout`).
   Grund: Zwei Prozesse mit einer Familie erneuern gleichzeitig, und die zweite Erneuerung sähe wie
-  Diebstahl aus. Widerruf der Eltern-Sitzung widerruft alle Kinder.
+  Diebstahl aus. Widerruf der Eltern-Sitzung widerruft alle Kinder. Die Notification Service
+  Extension hat keine Sitzung und erneuert nie Tokens: Sie holt nur die Vorschau mit dem
+  Vorschau-Token ihrer Push-Registrierung ([13-push-benachrichtigungen.md](13-push-benachrichtigungen.md),
+  Abschnitt 6.4; [ADR 0056](../adr/0056-native-erweiterungen-ohne-flutter-engine.md)).
 
 ### 7.5 Web-Konsole: Sitzung nach dem Backend-for-Frontend-Muster
 
@@ -678,7 +689,7 @@ die Person kannte, Geheimnisse in ihrer Dev-Umgebung rotieren.
 
 ## 12. API-Tokens für Agenten, Apps und Werkzeuge
 
-- **Form.** `<präfix>_<art>_<zufall>_<prüfsumme>` nach ADR 0061: Präfix `bothy` (eine der
+- **Form.** `<präfix>_<art>_<zufall>_<prüfsumme>` nach [ADR 0061](../adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md): Präfix `bothy` (eine der
   gelisteten Stellen mit dem Arbeitsnamen, [02-architektur.md](02-architektur.md) Abschnitt 6),
   Art `agt` (Agent), `app` (App), `pat` (persönlich), `whi` (Eingangs-Webhook), 256 Bit Zufall in
   Base62 (Alphabet `0-9A-Za-z`) als genau 43 Zeichen, Prüfsumme CRC-32 (IEEE) über die Zeichen des
@@ -847,7 +858,7 @@ sequenceDiagram
 | ID-T13 | Bestätigung mit falschem Code | Gerät `revoked` |
 | ID-T14 | DPoP: falsches `htm`, `htu`, `ath`, alter `iat`, wiederholte `jti`, fehlender oder alter Nonce, Bearer statt DPoP | `401` mit passendem Fehler |
 | ID-T15 | Refresh mit schon benutztem Token | Familie und Sitzung widerrufen, `4012`, Audit |
-| ID-T16 | gleichzeitige Erneuerung von App und Notification-Extension | keine Wiederverwendungs-Erkennung (getrennte Familien) |
+| ID-T16 | gleichzeitige Erneuerung von App und Share-Extension | keine Wiederverwendungs-Erkennung (getrennte Familien) |
 | ID-T17 | Refresh mit anderem DPoP-Schlüssel als die Familie | abgelehnt |
 | ID-T18 | Step-up fehlt, zu alt, mit Agenten-Token, mit falschem Schlüssel | `401` bzw. `403` wie in 07 |
 | ID-T19 | Konsole: Cookie-Attribute, fehlende CSRF-Kopfzeile, fremder `Origin`, WebSocket mit fremdem `Origin`, Zugriff nach Anmeldung ohne Step-up | Attribute gesetzt; Anfragen abgelehnt; ohne Step-up nur eigenes Profil |

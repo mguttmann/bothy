@@ -263,7 +263,7 @@ stateDiagram-v2
   Identifying --> Backoff: 4004 oder 4006, siehe Text
   CatchingUp --> Live: catchup.complete
   CatchingUp --> Resyncing: resync_required
-  Resyncing --> Connecting: Momentaufnahme geladen, Cursor gesetzt
+  Resyncing --> Live: Momentaufnahme geladen, Cursor auf head_seq
   Live --> Backoff: Trennung, 4009, 4013, 4014
   Backoff --> Connecting: Wartezeit vorbei oder Netzwechsel
   Live --> Suspended: App im Hintergrund (iOS, Android)
@@ -288,7 +288,8 @@ verbunden, solange die App läuft.
 1. Verbinden mit gespeichertem Cursor; Seiten anwenden; Cursor nach jeder Seite in derselben
    Transaktion wie die Seite speichern.
 2. Bei `resync_required`: Spiegel-Tabellen leeren (nicht Ausgangsfach, Entwürfe, Teilen-Eingang),
-   `GET /api/v1/sync/snapshot`, Cursor auf `head_seq`, geöffnete Threads neu laden.
+   `GET /api/v1/sync/snapshot`, Cursor auf `head_seq`, geöffnete Threads neu laden. Die Verbindung
+   bleibt offen und ist ab `head_seq` live; kein Neuverbinden (04, 7.3).
 3. Nach `catchup.complete` sendet das Ausgangsfach in Reihenfolge.
 4. Lücken in `thread_seq` (Ereignis passt nicht an die geladenen Bereiche) lädt der Fetcher per REST
    nach, bevor er die Nachricht anzeigt.
@@ -331,12 +332,12 @@ eigene Einträge vor der Nachricht, die sie anhängt; die Nachricht wartet, bis 
 - **DPoP:** Beweis je Anfrage (RFC 9449) mit dem Geräteschlüssel, ES256 (Abschnitt 9); Server-Nonce
   wird übernommen. Gateway-Beweis in `identify` ([04](04-sync-protokoll.md) R-SY-01).
 - **Refresh:** genau ein Refresh je Refresh-Familie zur Zeit (Single-Flight); das neue Token wird
-  gespeichert, bevor es benutzt wird. Erweiterungen, die selbst erneuern müssen (iOS- und
-  macOS-NSE, Share Extension), teilen nie die Familie der App: Die App legt für jede eine
-  Kind-Sitzung mit eigener Familie an (`createExtensionSession`, [08](08-identitaet.md) Abschnitt
-  7.4) und legt deren Tokens in die geteilte Keychain-Gruppe. Fehlt die Kind-Sitzung oder ist sie
-  widerrufen, zeigt die Erweiterung ihren Platzhalter, und die App legt beim nächsten Start eine
-  neue an. Grund: Zwei Prozesse mit einer Familie erneuerten gleichzeitig, und die zweite
+  gespeichert, bevor es benutzt wird. Die Share Extension (iOS, macOS) muss selbst erneuern und
+  teilt nie die Familie der App: Die App legt für sie eine Kind-Sitzung mit eigener Familie an
+  (`createExtensionSession`, [08](08-identitaet.md) Abschnitt 7.4) und legt deren Tokens in die
+  geteilte Keychain-Gruppe. Fehlt die Kind-Sitzung oder ist sie widerrufen, legt die Erweiterung
+  den Eintrag in `share_inbox`, und die App legt beim nächsten Start eine neue an. Die
+  Notification Service Extension erneuert nie Tokens; sie nutzt das Vorschau-Token (10.1). Grund: Zwei Prozesse mit einer Familie erneuerten gleichzeitig, und die zweite
   Erneuerung sähe als Wiederverwendung wie Diebstahl aus und sperrte die Familie
   ([03](03-datenmodell.md), `refresh_tokens`).
 - **Anmeldung:** OIDC mit PKCE im System-Browser (ASWebAuthenticationSession, Custom Tabs,
@@ -399,7 +400,7 @@ Versand: [13-push-benachrichtigungen.md](13-push-benachrichtigungen.md).
 Die NSE läuft nur bei Pushes mit `mutable-content: 1` und sichtbarem `alert` und hat etwa 30
 Sekunden (https://developer.apple.com/documentation/usernotifications/modifying-content-in-newly-delivered-notifications,
 abgerufen 2026-10-10 [belegt laut Recherche]). Sie ist Swift ohne Flutter-Engine, weil Speicher und
-Zeit knapp sind, und nutzt `ClientKit` (Swift Package in `apps/client`), das auch die Share
+Zeit knapp sind ([ADR 0056](../adr/0056-native-erweiterungen-ohne-flutter-engine.md)), und nutzt `ClientKit` (Swift Package in `apps/client`), das auch die Share
 Extension nutzt.
 
 ```mermaid
@@ -412,14 +413,10 @@ sequenceDiagram
   participant API as Server-API
   S->>A: alert, mutable-content, nur IDs, Platzhalter
   A->>N: Push zustellen
-  N->>K: Token der eigenen Kind-Sitzung aus geteilter Keychain
-  alt Zugriffstoken abgelaufen
-    K->>API: Refresh der eigenen Familie mit DPoP (Secure Enclave)
-    API-->>K: neues Token-Paar, gespeichert vor der Benutzung
-  end
-  K->>API: GET Nachricht und Thread mit DPoP
+  N->>K: Vorschau-Token der Push-Registrierung aus geteilter Keychain
+  K->>API: GET /api/v1/push/preview mit Vorschau-Token und DPoP (Geräteschlüssel ohne Bestätigung)
   alt Antwort innerhalb client.push.fetch_timeout
-    API-->>K: Titel, Autor, Text gekürzt
+    API-->>K: Namen und Auszug nach notify.preview_mode
     K-->>N: Inhalt
     N-->>A: Mitteilung mit Text, Gruppe je Thread
   else kein Netz zum Server oder Zeit vorbei
@@ -505,9 +502,14 @@ Transkript erscheint, sobald `file.updated` es meldet.
 Größe vor dem Senden gegen `file.max_upload_bytes` prüfen (Server prüft erneut). Upload-Protokoll
 (Teile, Wiederaufnahme, vorab signierte URLs) legt [12-dateien.md](12-dateien.md) fest; der Client
 setzt es als Eintrag im Ausgangsfach mit Fortschritt um, nimmt nach Abbruch beim letzten bestätigten
-Teil wieder auf und hängt die Datei erst an, wenn `upload_state = complete`. Bilder werden nicht im
-Client neu kodiert; das Entfernen von Metadaten macht der Server (Baseline R-Objektspeicher).
-Vorschau vor dem Senden lokal; nach dem Senden aus `file_thumbnails` über den Server.
+Teil wieder auf und hängt die Datei erst an, wenn `upload_state = complete`. Fotos aus der
+Mediathek lädt die App als JPEG hoch: Sie fordert beim System eine JPEG-Darstellung an oder wandelt
+selbst ([12-dateien.md](12-dateien.md), Abschnitt 7.1;
+[ADR 0047](../adr/0047-bild-metadaten-verlustfrei-entfernen.md)). Grund: HEIC entfernt der Server
+nicht verlustfrei; es soll ihn nur als bewusst gesendete Datei erreichen. Alle anderen Bilder
+sendet die App unverändert; das Entfernen von Metadaten macht der Server (Baseline
+R-Objektspeicher). Vorschau vor dem Senden lokal; nach dem Senden aus `file_thumbnails` über den
+Server.
 
 ## 15. Auto-Update
 
@@ -548,18 +550,19 @@ Recherche]). Darum schickt der Client wenige, feste Kennzahlen gebündelt an den
 sie an den OTel Collector weitergibt (B11: Export nur über den Collector). Der Client spricht nie
 direkt mit einem Collector im Internet.
 
-| Kennzahl | Art |
+| Kennzahl | Namen ([signals.md](../observability/signals.md) 4.6a) |
 |---|---|
-| Kaltstart bis bedienbar, Thread öffnen (aus Cache), Senden bis lokale Anzeige | Histogramm |
-| Frames über Budget beim Scrollen | Zähler und Anteil |
-| Nachhol-Dauer, Ereignisse je Sekunde, `resync_required` | Histogramm, Zähler |
-| Wiederverbindungen nach Schließ-Code, Tiefe des Ausgangsfachs | Zähler, Messwert |
-| Push bis Anzeige (NSE bzw. Android-Dienst), Platzhalter statt Text | Histogramm, Zähler |
+| Kaltstart bis bedienbar, Thread öffnen (aus Cache), Senden bis lokale Anzeige | `client.cold_start.duration`, `client.thread_open.duration`, `client.send_local.duration` |
+| Frames über Budget beim Scrollen (Anteil aus beiden Zählern) | `client.frames`, `client.frames.over_budget` |
+| Nachhol-Dauer, Ereignisse, `resync_required` | `client.catchup.duration`, `client.catchup.events`, `client.resync` |
+| Wiederverbindungen nach Schließ-Code, Tiefe des Ausgangsfachs | `client.reconnects`, `client.outbox.depth` |
+| Push bis Anzeige (NSE bzw. Android-Dienst), Platzhalter statt Text | `client.push_display.duration`, `client.push.placeholder` |
 
 Keine Inhalte, keine IDs von Threads, Kanälen oder Personen; Merkmale nur Plattform, App-Version,
-Dichte, Theme. Senden höchstens alle `client.metrics.flush_interval`, abschaltbar
+Dichte, Theme. Die Liste ist geschlossen; der Server verwirft Einträge mit anderem Namen oder
+unpassendem `kind` einzeln und nimmt den Rest des Stapels an (`202`). Senden höchstens alle `client.metrics.flush_interval`, abschaltbar
 (`privacy.client_metrics`). Endpunkt `POST /api/v1/client-metrics` mit der Aktion
-`client_metrics.submit` (05; ADR 0057).
+`client_metrics.submit` (05; [ADR 0057](../adr/0057-client-telemetrie-ueber-einen-server-endpunkt.md)).
 
 ## 18. Schalter (Feature-Flags)
 
@@ -616,8 +619,8 @@ zufällig auftreten.
 | R-CL-03 | Oberfläche liest nur aus der lokalen Datenbank und kurzlebigen Speichern. | ein Weg für online, offline, Nachholen; testbar |
 | R-CL-04 | ES256 für alle Geräteschlüssel. | Secure Enclave und StrongBox können nur P-256 |
 | R-CL-05 | Zwei Geräteschlüssel: DPoP ohne Nutzerbestätigung, Step-up mit. | DPoP signiert jede Anfrage, auch in der NSE; Step-up braucht frische Bestätigung |
-| R-CL-06 | NSE, Share Extension und Android-Push-Dienst nativ, ohne Flutter-Engine. | Zeit- und Speichergrenzen der Erweiterungen; Apple-Erweiterungen können die App nicht öffnen |
-| R-CL-07 | Jede Erweiterung erneuert nur die Familie ihrer eigenen Kind-Sitzung; je Familie ein Refresh zur Zeit. | Wiederverwendung eines Refresh-Tokens sperrt die Familie; eine Sperre über Prozesse hinweg ersetzt keine getrennten Familien (08 Abschnitt 7.4) |
+| R-CL-06 | NSE, Share Extension und Android-Push-Dienst nativ, ohne Flutter-Engine ([ADR 0056](../adr/0056-native-erweiterungen-ohne-flutter-engine.md)). | Zeit- und Speichergrenzen der Erweiterungen; Apple-Erweiterungen können die App nicht öffnen |
+| R-CL-07 | Die Share Extension erneuert nur die Familie ihrer eigenen Kind-Sitzung; je Familie ein Refresh zur Zeit; die NSE erneuert nie und nutzt das Vorschau-Token ([ADR 0056](../adr/0056-native-erweiterungen-ohne-flutter-engine.md)). | Wiederverwendung eines Refresh-Tokens sperrt die Familie; eine Sperre über Prozesse hinweg ersetzt keine getrennten Familien (08 Abschnitt 7.4) |
 | R-CL-08 | Lokale Datenbank verschlüsselt (SQLite3MultipleCiphers), iOS-Schutzklasse `complete`. | verlorenes Gerät verrät nichts; Erweiterungen brauchen die DB nicht |
 | R-CL-09 | Sparkle nativ statt `auto_updater`; Windows über `.appinstaller`. | Paket veraltet, DSA auf Windows; MSIX liefert Updates und Identität |
 | R-CL-10 | Client-Kennzahlen über den eigenen Server an den Collector. | kein offizielles Dart-OTel-SDK; ein Endpunkt mit Autorisierung statt offenem Collector |

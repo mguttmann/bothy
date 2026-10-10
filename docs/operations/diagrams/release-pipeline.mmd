@@ -10,7 +10,7 @@ flowchart LR
     prov --> publish
     publish --> verify["Prüfung durch Betreiber: cosign verify, gh attestation verify"]
 
-    apptag["Tag apps/vX.Y.Z"] --> appgates["Gates und Tests der Apps"]
+    apptag["Tag client/vX.Y.Z"] --> appgates["Gates und Tests der Apps"]
     appgates --> ios["iOS: TestFlight (intern, extern)"]
     appgates --> mac["macOS: Developer ID, Notarisierung, Sparkle-Appcast stable/beta"]
     appgates --> win["Windows: MSIX signiert, .appinstaller stable/beta"]

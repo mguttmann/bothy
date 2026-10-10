@@ -260,7 +260,7 @@ fremde Aufträge über ein persönliches Abo führen.
 | Feld | Bedeutung | Quelle |
 |---|---|---|
 | `agents.billing_mode` | Soll | Owner (I4) |
-| `agents.reported_billing_mode` | Ist der Laufzeit-Konfiguration; `null` bei Adaptern, die je Lauf dem Soll folgen | Heartbeat |
+| `agents.reported_billing_mode` | Ist der Laufzeit-Konfiguration; nicht gesetzt (Spalte NULL, im Heartbeat und in der API fehlend) bei Adaptern, die je Lauf dem Soll folgen | Heartbeat |
 | `agents.reported_details.billing_modes_supported` | Modi, die der Adapter belegen kann | Heartbeat |
 | `runs.billing_mode_expected` | Soll zur Zustellzeit | Server ([09-agenten.md](09-agenten.md) 5.1) |
 | `runs.billing_mode_used` | Ist des Laufs | Adapter bei `run.start` |
@@ -270,7 +270,7 @@ Warnungen an der Agenten-Karte und in der Konsole:
 
 | Lage | Anzeige | Folge |
 |---|---|---|
-| `reported_billing_mode` ist nicht `null` und ungleich Soll, länger als `billing.mismatch_alert_after` | "Adapter meldet Persönlich, eingestellt ist Organisation" (bzw. umgekehrt) | Aufrufe scheitern mit `billing_mode_mismatch`, bis der Adapter umgestellt ist; Alarm an Owner ([17-observability.md](17-observability.md)) |
+| `reported_billing_mode` ist gesetzt und ungleich Soll, länger als `billing.mismatch_alert_after` | "Adapter meldet Persönlich, eingestellt ist Organisation" (bzw. umgekehrt) | Aufrufe scheitern mit `billing_mode_mismatch`, bis der Adapter umgestellt ist; Alarm an Owner ([17-observability.md](17-observability.md)) |
 | Soll nicht in `billing_modes_supported` | "Adapter kann diesen Modus nicht belegen" | wie oben |
 | `billing_evidence.key_type = unknown` | "Anmeldeart der Laufzeit unbekannt" | alle Aufrufe scheitern |
 
@@ -492,8 +492,8 @@ Ablauf:
 Berechtigung: `cost.reconcile` verlangt Step-up und ist damit für eine App unmöglich (R-AZ-03).
 Die App nutzt darum die eigene Aktion `cost.reconcile.submit` mit Scope `costs:reconcile` (05),
 ohne Step-up; sie legt nur `reconciled`-Einträge zu vorhandenen Läufen an und löscht nichts
-(ADR 0055). Grund: Der Abgleich ändert nur Schätzbeträge, keine Rechte;
-ein Job kann keinen Passkey bestätigen.
+([ADR 0055](../adr/0055-kostenabgleich-als-eigene-app-admin-key-nie-im-server.md)). Grund: Der
+Abgleich ändert nur Schätzbeträge, keine Rechte; ein Job kann keinen Passkey bestätigen.
 
 ## 13. Anzeige in der App
 

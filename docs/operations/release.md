@@ -17,7 +17,8 @@ ADR 0038 und 0039 fest (Team H); dieser Ablauf nennt nur die Schritte, die zum R
 
 ## 2. Server
 
-1. `VERSION` setzen, Changelog-Abschnitt abschließen, Commit.
+1. `make release-prep COMPONENT=server [CHANNEL=beta]` setzt `VERSION` und schließt den
+   Changelog-Abschnitt ab ([ADR 0060](../adr/0060-release-automatisierung-im-monorepo.md)); Commit.
 2. Signierten Tag setzen: `server/vX.Y.Z` (Beta: `server/vX.Y.Z-beta.N`).
 3. Die Release-Kette baut je Architektur, erzeugt das Multi-Arch-Manifest, SBOMs, Signaturen,
    Prüfsummen und (im öffentlichen Repository) die Attestation, und veröffentlicht nach `ghcr.io`.
@@ -26,7 +27,8 @@ ADR 0038 und 0039 fest (Team H); dieser Ablauf nennt nur die Schritte, die zum R
 
 ## 3. SDKs und Adapter
 
-1. `VERSION`, Changelog, Tag `<komponente>/vX.Y.Z`.
+1. `make release-prep COMPONENT=<komponente>`, Commit, Tag `<komponente>/vX.Y.Z` (Namen aus
+   `tools/ci/components.py`).
 2. Build, SBOM, Signatur der Dateien (`cosign sign-blob`), Veröffentlichung auf PyPI bzw. npm über
    Trusted Publishing des Registers, wo vorhanden [vermutet: Verfügbarkeit je Register im Ticket
    prüfen].
@@ -51,7 +53,7 @@ Absturzberichte konfiguriert ist) und keine offenen Fehler der Stufe kritisch.
 
 ```
 cosign verify ghcr.io/<owner>/bothy-server@sha256:<digest> \
-  --certificate-identity-regexp '^https://github.com/<owner>/bothy/.github/workflows/release-server.yaml@refs/tags/server/v' \
+  --certificate-identity-regexp '^https://github.com/<owner>/bothy/.github/workflows/release.yml@refs/tags/server/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 gh attestation verify oci://ghcr.io/<owner>/bothy-server@sha256:<digest> --repo <owner>/bothy
 cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \
@@ -60,7 +62,10 @@ cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \
 sha256sum --check SHA256SUMS
 ```
 
-Der Name der Workflow-Datei `release-server.yaml` ist ein Vorschlag; Team H legt ihn fest.
+Diese Befehle gelten im öffentlichen Zustand (keyless). Im privaten Zustand prüft der Betreiber
+mit dem öffentlichen Schlüssel aus dem Repository (`cosign verify --key`, ohne Transparenz-Log;
+der genaue Befehl für die gepinnte cosign-Version steht nach M7-10 hier, [ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md)). Der
+Release-Workflow ist `.github/workflows/release.yml`.
 
 ## 6. Rückruf
 

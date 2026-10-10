@@ -18,7 +18,7 @@ versioniert, getaggt, signiert und dokumentiert?
 ## Decision Drivers
 
 * unabhängige Releases ohne künstliche Versionssprünge
-* Go-Module in Unterverzeichnissen brauchen Tags mit Verzeichnis-Präfix
+* Tags müssen je Komponente eindeutig und für Werkzeuge auflösbar sein
 * prüfbare Herkunft ohne langlebige Signierschlüssel
 * SBOM für Lizenz- und Schwachstellenprüfung beim Betreiber
 * Release Notes, die sagen, ob ein Upgrade Handarbeit braucht
@@ -36,11 +36,15 @@ versioniert, getaggt, signiert und dokumentiert?
 Chosen option: "SemVer je Komponente; cosign keyless, SBOM, Provenance", weil Komponenten
 unabhängig veröffentlicht werden und die Herkunft ohne Schlüsselverwaltung prüfbar ist.
 
-1. Tags `server/vX.Y.Z`, `apps/vX.Y.Z`, `sdk-python/vX.Y.Z` usw.; für Go-Module in
-   Unterverzeichnissen ist diese Form Pflicht (https://go.dev/ref/mod, abgerufen 2026-10-10).
+1. Tags `<komponente>/vX.Y.Z` (`server/vX.Y.Z`, `client/vX.Y.Z`, `sdk-python/vX.Y.Z` usw.), das
+   Installationsbündel `vX.Y.Z`; Namen und Präfixe aus `tools/ci/components.py`
+   ([18-release.md](../spec/18-release.md) 2). Die Tag-Regel von Go für Module in
+   Unterverzeichnissen (https://go.dev/ref/mod, abgerufen 2026-10-10) gilt für das Server-Modul
+   nicht, weil es als Hauptmodul nie geladen wird (PLAN P-05).
 2. Kanäle stable und beta; Apps befördern denselben Build, Server und Pakete eine Vorabversion
    aus demselben Commit ([18-release.md](../spec/18-release.md) 5).
-3. Jedes Artefakt: SBOM (SPDX und CycloneDX), cosign-Signatur, Prüfsummen; Attestation über
+3. Jedes Artefakt: SBOM (SPDX und CycloneDX), cosign-Signatur (keyless; solange das Repository
+   privat ist, ein Schlüsselpaar ohne Transparenz-Log nach ADR 0062), Prüfsummen; Attestation über
    `actions/attest`, sobald das Repository öffentlich ist (in Free, Pro und Team nur für
    öffentliche Repositorys verfügbar; https://github.com/actions/attest-build-provenance,
    abgerufen 2026-10-10).
@@ -52,7 +56,8 @@ unabhängig veröffentlicht werden und die Herkunft ohne Schlüsselverwaltung pr
 * Gut, weil Betreiber mit `cosign verify` und `gh attestation verify` die Herkunft prüfen.
 * Schlecht, weil mehrere Changelogs und Tags zu pflegen sind (Werkzeug erzeugt Entwürfe).
 * Schlecht, weil bis zur Veröffentlichung des Repositorys keine Attestation entsteht.
-* Neutral, weil ein Major-Sprung des Servers den Go-Modulpfad ändert (`/v2`).
+* Neutral, weil der Go-Modulpfad des Servers bei einem Major-Sprung gleich bleibt, solange das
+  Modul nie als Abhängigkeit geladen wird (PLAN P-05).
 
 ### Confirmation
 
@@ -87,5 +92,6 @@ unabhängig veröffentlicht werden und die Herkunft ohne Schlüsselverwaltung pr
 ## More Information
 
 * Ablauf: [docs/operations/release.md](../operations/release.md).
-* Werkzeug für Changelog-Entwürfe: eigener ADR-Vorschlag (Kandidaten release-please im
-  Manifest-Modus oder git-cliff; nicht geprüft).
+* Werkzeug für Changelog-Entwürfe: git-cliff hinter `make release-prep`
+  ([ADR 0060](0060-release-automatisierung-im-monorepo.md)).
+* Signaturen in der privaten Phase: [ADR 0062](0062-release-signaturen-solange-das-repo-privat-ist.md).

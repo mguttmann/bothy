@@ -225,7 +225,7 @@ Für jedes aktive Gerät von r (`devices.state = 'active'`):
   erlaubt [Q2, belegt]).
 - **Notification Service Extension (NSE).** Sie läuft nur bei `mutable-content: 1` und einem
   sichtbaren `alert` [Q4, belegt] und hat etwa 30 Sekunden [Q4, belegt]. Sie holt den Inhalt über
-  den Vorschau-Endpunkt (6.4) und ersetzt Titel und Text. Scheitert der Abruf (Server nicht
+  den Vorschau-Endpunkt (6.4) und ersetzt Titel und Text ([ADR 0056](../adr/0056-native-erweiterungen-ohne-flutter-engine.md)). Scheitert der Abruf (Server nicht
   erreichbar, z. B. weil das Gerät das private Netz gerade nicht erreicht), bleibt der Platzhalter
   stehen [Q4, belegt]. Die NSE gibt es auch auf macOS [Q5, belegt]; dasselbe Muster gilt dort
   [abgeleitet].

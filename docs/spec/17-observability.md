@@ -110,7 +110,9 @@ gibt es nicht. Einzelheiten: [admin-statistics.md](../observability/admin-statis
 
 1. Es gibt kein offizielles OpenTelemetry-SDK für Dart
    (https://opentelemetry.io/blog/2026/dart-flutter-opentelemetry/, abgerufen 2026-10-10)
-   [belegt]. Die Apps senden darum keine Spans. Sie setzen `traceparent` an jeder Anfrage; der
+   [belegt]. Die Apps senden darum keine Spans, nur feste Kennzahlen über den Server
+   ([signals.md](../observability/signals.md) 4.6a;
+   [ADR 0057](../adr/0057-client-telemetrie-ueber-einen-server-endpunkt.md)). Sie setzen `traceparent` an jeder Anfrage; der
    Server verknüpft ihn als Span-Link, sodass App-Fehlerberichte und Server-Traces auffindbar
    verbunden sind.
 2. Trace-ID und Sampling-Entscheid trifft der Server (`telemetry.traces.trust_remote_parent`

@@ -921,10 +921,10 @@ unbekannte Schlüssel und Werte außerhalb der Liste ab.
 | `appearance.theme` | `system`, `light`, `dark` | `system` | Theme; `system` folgt dem Gerät |
 | `appearance.density` | `comfortable`, `compact` | `comfortable` | nur Desktop; Mobil fest `touch` |
 | `appearance.reduce_motion` | `system`, `on`, `off` | `system` | Bewegung reduzieren |
-| `composer.enter_sends` | `true`, `false` | `true` auf Desktop, `false` auf Mobil (je Gerät gemerkt) | Enter sendet |
+| `composer.enter_sends` | `true`, `false` | ohne gespeicherten Wert `true` auf Desktop und `false` auf Mobil; ein gespeicherter Wert gilt auf allen Geräten | Enter sendet |
 | `privacy.crash_reports` | `true`, `false` | `true`, wenn die Instanz einen Absturzdienst eingerichtet hat | Absturzberichte senden |
 | `privacy.client_metrics` | `true`, `false` | `true` | Leistungsdaten ohne Inhalte senden |
-| `layout.column_widths` | Objekt | leer | Spaltenbreiten Desktop |
+| `layout.column_widths` | Objekt: Namen `^[a-z][a-z0-9_]*$` (Spalte, z. B. `sidebar`, `post_list`, `session`), Werte nicht negative Ganzzahlen in logischen Pixeln | leer | Spaltenbreiten Desktop; der Client deutet die Namen |
 
 ## 12. Branding je Instanz
 

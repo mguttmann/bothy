@@ -417,20 +417,22 @@ Bereinigung bei der Anmeldung, Ergebnis in `original_name`:
 
 ### 7.1 Regel
 
-Bilder sind frei von Metadaten, sobald sie gespeichert sind (Ruling L16, ADR 0047 "Bild-Metadaten
-verlustfrei entfernen"). Zwei Wege:
+Bilder sind frei von Metadaten, sobald sie gespeichert sind (Ruling L16, [ADR 0047](../adr/0047-bild-metadaten-verlustfrei-entfernen.md)). Zwei Wege:
 
 1. **Original, verlustfrei.** Bei JPEG und PNG entfernt der Server die Metadaten beim Abschluss
    des Uploads aus dem Original, ohne die Bilddaten neu zu kodieren. Er arbeitet mit einer
    Erlaubnisliste: Nur Segmente bzw. Chunks, die zum Dekodieren oder zur richtigen Farbe und
    Lage nötig sind, bleiben; alles andere fällt weg (Grund für die Liste statt einer Sperrliste:
-   R-SE-03 in [19-sicherheit.md](19-sicherheit.md)).
+   R-SE-03 in [19-sicherheit.md](19-sicherheit.md)). Scheitert der Filter an einer Datei, die als
+   JPEG oder PNG erkannt wurde (beschädigte Struktur), wird sie nicht gespeichert
+   (`upload_state = 'failed'`), weil sie unverändert Ortsdaten tragen könnte.
 2. **Vorschaubilder, neu kodiert.** Alle Varianten aus 7.3 entstehen durch Dekodieren und
-   Neukodieren in reinem Go (Baseline R-Objektspeicher) und tragen nie Metadaten.
+   Neukodieren in reinem Go (Baseline R-Objektspeicher) mit angewendeter Orientierung. Sie tragen
+   keine Metadaten außer dem unveränderten Farbprofil des Originals.
 
 | Typ | Was bleibt im Original | Was wegfällt |
 |---|---|---|
-| `image/jpeg` | Markierungen für Kopf, Tabellen, Rahmen und Bilddaten (`SOI`, `DQT`, `DHT`, `DRI`, `SOFn`, `SOS` mit Daten, `EOI`), `APP0` (JFIF), `APP2` (ICC-Profil), `APP14` (Adobe-Farbumwandlung) und ein neu geschriebenes `APP1` mit nur dem EXIF-Tag "Orientation" | alle übrigen `APPn` (EXIF mit Ort und Gerät, XMP, IPTC), `COM` |
+| `image/jpeg` | Markierungen für Kopf, Tabellen, Rahmen und Bilddaten (`SOI`, `DQT`, `DHT`, `DRI`, `SOFn`, `SOS` mit Daten, `EOI`), `APP0` (JFIF), `APP2` nur mit der Kennung `ICC_PROFILE` (alle Teile eines mehrteiligen Profils), `APP14` (Adobe-Farbumwandlung) und ein neu geschriebenes `APP1` mit nur dem EXIF-Tag "Orientation" | alle übrigen `APPn` (EXIF samt eingebettetem Vorschaubild, XMP, IPTC, Multi-Picture-Format), `COM` und jedes Byte nach dem ersten `EOI` (angehängte Bilder, z. B. Gain-Maps) |
 | `image/png` | kritische Chunks (`IHDR`, `PLTE`, `IDAT`, `IEND`) sowie `tRNS`, `cHRM`, `gAMA`, `iCCP`, `sBIT`, `sRGB`, `cICP`, `mDCV`, `cLLI`, `bKGD`, `pHYs`, `acTL`, `fcTL`, `fdAT` | `tEXt`, `zTXt`, `iTXt`, `eXIf`, `tIME`, `hIST`, `sPLT` und unbekannte Chunks |
 | `image/gif` | wird neu kodiert (verlustfrei, Palette); Kommentare und Anwendungsblöcke außer der Schleifen-Angabe fallen weg | |
 | `image/webp` (unbewegt) | wird dekodiert (`x/image/webp` kann nur lesen [Q18, belegt]) und als PNG (mit Alpha) oder JPEG (ohne Alpha, `file.image.jpeg_quality`) gespeichert; mit libvips als WebP neu kodiert | |
@@ -533,8 +535,9 @@ additive Migration in den Kern-Vertrag; bis dahin hat `file_thumbnails.variant` 
 
 ### 9.1 Durchreichen durch den Server
 
-Entscheidung R-FI-03: Der Server liefert alle Bytes selbst aus (`GET .../content`). Es gibt
-keine presigned GET-URLs auf den Speicher.
+Entscheidung R-FI-03 ([ADR 0048](../adr/0048-datei-abruf-nur-ueber-den-server-mit-kurzlebigen-tickets.md)):
+Der Server liefert alle Bytes selbst aus (`GET .../content`). Es gibt keine presigned GET-URLs auf
+den Speicher.
 
 Gründe: Jeder Abruf muss durch `authorize` zur Abrufzeit (B7, [04-sync-protokoll.md](04-sync-protokoll.md)
 Abschnitt 8: Rechte gelten bei jeder Zustellung). Eine presigned URL bleibt bis zu ihrem Ablauf
@@ -565,7 +568,7 @@ Medien-Player (Audio, Video) und "Öffnen mit" senden ihre eigenen HTTP-Anfragen
 | Kopfzeile | Wert |
 |---|---|
 | `Content-Type` | erkannter Typ; für Typen außerhalb der Inline-Liste `application/octet-stream` |
-| `Content-Disposition` | `inline` nur für die Inline-Liste: neu kodierte Bilder (`image/jpeg`, `image/png`, `image/gif`), Vorschaubilder, `audio/mp4`, `audio/mpeg`, `video/mp4`. Alles andere `attachment`. Immer `filename="<ASCII-Ersatz>"` zuerst, dann `filename*=UTF-8''<prozentkodiert>` [Q15, belegt]. |
+| `Content-Disposition` | `inline` nur für die Inline-Liste: gespeicherte Bilder nach Abschnitt 7.1 (`image/jpeg`, `image/png` verlustfrei bereinigt, `image/gif` neu kodiert), Vorschaubilder, `audio/mp4`, `audio/mpeg`, `video/mp4`. Alles andere `attachment`. Immer `filename="<ASCII-Ersatz>"` zuerst, dann `filename*=UTF-8''<prozentkodiert>` [Q15, belegt]. |
 | `X-Content-Type-Options` | `nosniff` |
 | `Content-Security-Policy` | `default-src 'none'; sandbox` |
 | `Cross-Origin-Resource-Policy` | `same-origin` |
@@ -637,7 +640,7 @@ damit ein großer Import Live-Uploads nicht verzögert; kein Kontingent; die Nac
 |---|---|
 | Nachricht gelöscht | In derselben Transaktion: `message_attachments` weg ([03-datenmodell.md](03-datenmodell.md)), `files.deleted_at` gesetzt, Job `file_delete` eingereiht. Der Job löscht Original und Varianten über ihre bekannten Schlüssel. |
 | `file.delete` | nur nicht angehängte eigene Dateien (oder mit `manage`); gleicher Weg |
-| Nie angehängt | Dateien mit `purpose = 'attachment'`, `upload_state = 'complete'`, ohne Anhang und ohne Verweis aus `drafts.file_ids`, älter als `file.unattached_ttl`: löschen |
+| Nie angehängt | Dateien mit `purpose = 'attachment'`, `upload_state = 'complete'`, ohne Anhang und ohne Verweis aus einem Entwurf des Hochladenden (`drafts.file_ids` mit `drafts.user_id = files.uploaded_by`), älter als `file.unattached_ttl`: löschen. Grund für "des Hochladenden": Ein Entwurf prüft `file_ids` beim Speichern nur in der Form (04 Abschnitt 14); eine fremde ID darin darf keine Datei am Leben halten |
 | Session offen und abgelaufen | nach `file.upload_session_ttl`: Teile löschen, Multipart-Upload abbrechen, `upload_state = 'failed'`, Session `expired` |
 | Fehlgeschlagen oder blockiert | Objekte sofort löschen; Zeile bleibt bis `file.failed_row_ttl` für die Anzeige beim Hochladenden |
 | Aufbewahrungsfristen | Klasse `content`; Fristen und DSGVO-Löschung in [20-datenschutz.md](20-datenschutz.md) |
@@ -695,7 +698,8 @@ Signaturnamen nur im Audit-Log.
 | Startprüfung | Server startet nicht bei `file.max_upload_bytes` > `file.scan.clamd_stream_max_bytes` und `required` |
 | Gesamt-Prüfsumme falsch (manipulierter Teil im presigned-Modus, Fake-S3) | `upload_state = 'failed'` |
 | Teil doppelt, gleich bzw. anders | `204` bzw. `409 part_conflict` |
-| JPEG mit GPS-EXIF und Orientierung 6 | gespeichertes Original ohne EXIF, Pixel gedreht, ICC-Profil vorhanden |
+| JPEG mit GPS-EXIF, XMP, `APP2` mit Multi-Picture-Format, angehängtem Bild und Orientierung 6 | gespeichertes Original mit genau einem `APP1` (nur "Orientation" = 6), `APP2` nur `ICC_PROFILE`, Scan-Daten Byte für Byte gleich, nichts nach dem Bildende; Vorschaubilder mit angewendeter Orientierung und gleichem Farbprofil |
+| abgeschnittenes JPEG | `upload_state = 'failed'`, kein Objekt im Speicher |
 | Bild mit riesigen Maßen und kleiner Dateigröße | kein Dekodieren, keine Vorschau, kein Speicherspitzen-Anstieg über eine Testgrenze |
 | HTML- und SVG-Upload | `Content-Disposition: attachment`, `nosniff`, Sandbox-CSP |
 | Dateiname mit U+202E, `../`, Steuerzeichen | bereinigter Name, beide `filename`-Parameter korrekt |
@@ -712,11 +716,11 @@ Signaturnamen nur im Audit-Log.
 |---|---|---|
 | R-FI-01 | Upload immer über eine Session mit Vorab-Anmeldung von Größe, Typ und SHA-256, in Teilen fester Größe. | Frühe Ablehnung; mobile Uploads fortsetzbar; ein Teilplan für beide Treiber. |
 | R-FI-02 | Modus `direct` ist Standard; `presigned` nur S3 und erst nach Nachweis der Längenbindung. | Private Netze erreichen den Speicher oft nicht; ohne Längenbindung kann ein Client mehr ablegen als angemeldet. |
-| R-FI-03 | Abruf nur durch den Server, kein presigned GET; Tickets für Player. | `authorize` zur Abrufzeit; Entzug wirkt sofort; Kopfzeilen unter Kontrolle. |
+| R-FI-03 | Abruf nur durch den Server, kein presigned GET; Tickets für Player. | `authorize` zur Abrufzeit; Entzug wirkt sofort; Kopfzeilen unter Kontrolle. ([ADR 0048](../adr/0048-datei-abruf-nur-ueber-den-server-mit-kurzlebigen-tickets.md)) |
 | R-FI-04 | Ein Lesedurchlauf für Prüfsumme, Typ und Scan. | Große Dateien werden nur einmal gelesen; gleicher Weg für alle Modi. |
 | R-FI-05 | Scan fail closed (`required`) als Standard; `off` nur ausdrücklich, sichtbar markiert. | Kein ungeprüftes Byte an Empfänger oder Agenten. |
 | R-FI-06 | `AlertExceedsMax yes` ist Pflicht; Limit-Treffer werden `error`. | Sonst gelten nicht geprüfte Inhalte still als sauber. |
-| R-FI-07 | Metadaten werden bei JPEG und PNG verlustfrei aus dem Original entfernt (Erlaubnisliste der Segmente und Chunks), Vorschaubilder neu kodiert; Orientierung und ICC-Profil bleiben; nicht unterstützte Formate nur als Download. | Ruling L16, ADR 0047: Standortdaten verlassen nie den Absender, das Original behält seine Qualität, Farben und Lage bleiben richtig. |
+| R-FI-07 | Metadaten werden bei JPEG und PNG verlustfrei aus dem Original entfernt (Erlaubnisliste der Segmente und Chunks), Vorschaubilder neu kodiert; Orientierung und ICC-Profil bleiben; nicht unterstützte Formate nur als Download. | Ruling L16, [ADR 0047](../adr/0047-bild-metadaten-verlustfrei-entfernen.md): Standortdaten verlassen nie den Absender, das Original behält seine Qualität, Farben und Lage bleiben richtig. |
 | R-FI-08 | Eine Datei hängt an höchstens einer Nachricht. | Eindeutiges Löschen, keine Referenzzählung. |
 | R-FI-09 | Agenten-Aufruf mit Anhängen erst nach endgültigem Zustand, mit Zeitlimit. | Agenten sehen nie ungeprüfte Bytes; kein Blockieren des Ereignisstroms. |
 | R-FI-10 | Transkript standardmäßig durch den Agenten; Dienst nur auf Owner-Konfiguration. | Kein zusätzlicher Auftragsverarbeiter ohne Entscheidung des Owners. |

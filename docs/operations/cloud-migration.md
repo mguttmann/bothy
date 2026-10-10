@@ -32,29 +32,42 @@ damit bleiben Tokens, Geräte und Aufruf-Marken gültig.
 
 ## 3. Umzug (im Wartungsfenster)
 
-1. Alte Instanz: `server.maintenance_mode = read_only`, Neustart von `api` und `worker`.
-   Schreibende Anfragen bekommen `503` mit Code `maintenance`; Apps halten ihr Ausgangsfach.
-   Ausnahme: Für schon aktive Läufe nimmt der Server weiter `run.update` und `run.finish` des
-   Adapters an, damit diese Läufe sauber enden. Neue Läufe entstehen nicht, weil Nachrichten
-   nicht angenommen werden.
+1. Alte Instanz: `server.maintenance_mode = read_only`, Neustart von `api` und `worker`
+   ([ADR 0065](../adr/0065-wartungsmodus-read-only.md)). Schreibende Aktionen bekommen `503` mit
+   Code `maintenance` und `Retry-After`; Apps halten ihr Ausgangsfach. Ausnahmen (ADR 0065,
+   Punkt 4):
+   - Antworten laufender Läufe: Ein Agent mit einem Lauf in `running` darf weiter `run.update`,
+     `run.finish`, `agent.heartbeat` und `ack` senden, dazu Nachrichten und Dateien im Thread
+     dieses Laufs. `run.start` ist gesperrt; Läufe in `queued` und `waiting_input` warten und
+     ziehen mit um.
+   - Token-Erneuerung gibt neue Zugriffstokens aus, ohne das Refresh-Token zu rotieren.
+   - Notfall-Widerrufe bleiben möglich: `auth.step_up`, `session.revoke`, `device.revoke`,
+     `token.revoke`, `user.disable` und der Widerruf einer Refresh-Familie bei Wiederverwendung.
+   - Zustellungen (`push`, `webhooks`) und der Job `runs.cancel_timeout` laufen im `worker` weiter;
+     alle anderen Warteschlangen und periodischen Jobs setzen aus.
 2. Warten, bis keine Läufe aktiv sind ("Läuft gerade" leer). Laufen sie zu lange, bricht der
    Owner sie ab (`run.cancel`); nach `agent.cancel_grace` setzt der Server sie selbst auf
    `cancelled`.
-3. Abschluss-Sicherung: `pg_dump`, Objektsicherung, Manifest.
+3. Abschluss-Sicherung: `pg_dump`, Objektsicherung, Manifest. Den Zeitpunkt notieren: Jeder
+   Notfall-Widerruf danach fehlt auf dem Ziel.
 4. Ziel: Restore des logischen Abzugs und der Objekte; Manifest vergleichen (Zeilenzahlen,
    `head_seq`, Audit-Kopf, Dateizahl). Abweichung heißt: abbrechen, alte Instanz wieder schreibbar.
 5. Ziel starten, Wiederherstellungstest von Hand, Smoke-Tests ([16-betrieb.md](../spec/16-betrieb.md) 11.1).
-6. DNS bzw. Tailscale-Namen umstellen.
-7. Alte Instanz stoppen (nicht löschen).
+6. Notfall-Widerrufe, die nach der Abschluss-Sicherung auf der alten Instanz fielen (Audit-Log
+   der alten Instanz ab dem notierten Zeitpunkt), auf dem Ziel wiederholen.
+7. DNS bzw. Tailscale-Namen umstellen.
+8. Alte Instanz stoppen (nicht löschen).
 
 ## 4. Nach dem Umzug
 
-1. Clients verbinden neu, setzen mit ihrem Cursor fort und senden ihr Ausgangsfach.
-2. Agenten-Adapter verbinden mit ihrem Verbraucher neu; ihr `acked_seq` ist mit umgezogen.
-3. Prüfen: Statusseite grün, SLO-Dashboards ohne Einbruch, erste Sicherung auf dem Ziel und
+1. Push-Mitteilungen und Webhooks, die die alte Instanz nach der Abschluss-Sicherung zustellte,
+   kann das Ziel ein zweites Mal zustellen (mindestens einmal, gleiche `webhook-id`).
+2. Clients verbinden neu, setzen mit ihrem Cursor fort und senden ihr Ausgangsfach.
+3. Agenten-Adapter verbinden mit ihrem Verbraucher neu; ihr `acked_seq` ist mit umgezogen.
+4. Prüfen: Statusseite grün, SLO-Dashboards ohne Einbruch, erste Sicherung auf dem Ziel und
    erster automatischer Wiederherstellungstest erfolgreich.
-4. Alte Redirect-URIs beim OIDC-Anbieter entfernen.
-5. Alte Instanz nach einer Frist, die der Owner festlegt, löschen (Volumes, Sicherungen des alten
+5. Alte Redirect-URIs beim OIDC-Anbieter entfernen.
+6. Alte Instanz nach einer Frist, die der Owner festlegt, löschen (Volumes, Sicherungen des alten
    Ziels nach deren Frist).
 
 ## 5. Neuer Hostname

@@ -37,6 +37,8 @@ sind gleich.
 
 ## 2. Feature-Flags
 
+Registrierung und Aufräum-Gate: [ADR 0064](../adr/0064-feature-flag-registrierung-mit-aufraeum-gate.md).
+
 ### 2.1 Arten
 
 | Art | Zweck | Lebensdauer | Beispiel |

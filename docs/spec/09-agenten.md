@@ -209,7 +209,7 @@ nennt nur den Sinn.
 Ein Gast-Agent ist ein erwähnter Agent, der nicht Bediener des Threads ist. Er wird ausgelöst,
 wenn `allow_mentioned_agents` gesetzt ist und er selbst wirksam `write` auf C hat (05 Abschnitt 5
 Punkt 3). Ein Gast-Lauf hat keine Agenten-Sitzung (`runs.agent_session_id = NULL`); der Adapter
-bekommt `session = null` und arbeitet nur mit dem Kontext aus 4.6. Grund: Je Thread gibt es genau
+bekommt kein Feld `session` und arbeitet nur mit dem Kontext aus 4.6. Grund: Je Thread gibt es genau
 eine aktuelle Sitzung (03, `agent_sessions`); ein Gast darf die Sitzung des Bedieners nicht
 verdrängen. Antworten im Thread ohne Erwähnung lösen danach wieder den Bediener aus, nicht den
 Gast.
@@ -264,7 +264,7 @@ der Lauf mit `run.finish` abgelehnt ist.
 
 | Ereignis | Wann | Nutzlast (Schema `<typ>.v1`, Auszug) | Marke |
 |---|---|---|---|
-| `agent.invocation` | neuer Lauf | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, Auslöser), `session` (4.9 oder `null`), `capabilities_effective` | ja |
+| `agent.invocation` | neuer Lauf | `run`, `thread`, `channel` (`id`, `kind`, `settings_version`), `trigger` (`kind`, IDs, Auslöser), `session` (4.9; fehlt beim Gast-Lauf), `capabilities_effective` | ja |
 | `agent.followup` | Nachtrag (Abschnitt 7) | `run_id`, `message_id`, Auslöser | ja |
 | `interaction.created` | Komponente bedient | `interaction_id`, `component` (`custom_id`, Typ), `values`, `run_id`, Bediener | ja |
 | `command.invoked` | Steuerbefehl ausgeführt (10.4) | `command_id`, `name`, `options`, Ort, Auslöser | ja |
@@ -386,10 +386,13 @@ Pflicht für jeden Adapter: Inhalte mit `unverified` gibt er an die Laufzeit nur
 Daten weiter, nie als Anweisung, mit einem festen Hinweis vor dem Block. Der Kontext erreicht die
 Laufzeit als fester Systemteil mit Autor und Marke, getrennt vom Text des Auslösers. Grund:
 Prompt-Injection über fremde Inhalte (Bedrohungsmodell in [19-sicherheit.md](19-sicherheit.md));
-die Laufzeit kann Absender nicht selbst unterscheiden.
+die Laufzeit kann Absender nicht selbst unterscheiden ([ADR 0054](../adr/0054-herkunfts-und-vertrauensmarkierung-im-agenten-kontext.md)).
 
 Anhänge lädt der Adapter mit `file.read`. Dateien vor `scan_status IN ('clean','skipped')` sind
-nicht abrufbar ([12-dateien.md](12-dateien.md)).
+nicht abrufbar ([12-dateien.md](12-dateien.md)). Inhalte von Dateien sind immer markierte Daten,
+auch wenn der Auslöser sie hochgeladen hat: Ein Dokument aus dem Netz kann Anweisungen enthalten,
+die nicht vom Menschen stammen (T-AI-03). Das Transkript einer Sprachnachricht trägt dagegen die
+Marke ihrer Nachricht, weil es die Worte ihres Autors sind ([ADR 0054](../adr/0054-herkunfts-und-vertrauensmarkierung-im-agenten-kontext.md)).
 
 ### 4.7 Operationen des Adapters
 
@@ -431,7 +434,7 @@ Der Adapter sendet den Heartbeat über das Gateway oder per REST. Schema `agent_
 | `adapter` | `name`, `version` |
 | `runtime` | `name`, `version` (z. B. Laufzeit-Version), nie Pfade |
 | `protocol_version` | Gateway-Protokoll |
-| `reported_billing_mode` | `personal`, `organization` oder `null` für Adapter, die je Lauf dem Soll folgen (17.8, 18.3) |
+| `reported_billing_mode` | `personal` oder `organization`; fehlt bei Adaptern, die je Lauf dem Soll folgen (17.8, 18.3; kein JSON-`null`, [ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)) |
 | `billing_modes_supported` | Liste der Modi, die der Adapter belegen kann |
 | `billing_evidence` | `provider`, `key_type` (`api_key`, `oauth`, `cloud`, `none`, `unknown`), `method`; nie ein Wert, nie ein Präfix |
 | `capabilities` | Abschnitt 2.2 |
@@ -743,7 +746,7 @@ Sitzungsspalte ([01-produkt.md](01-produkt.md)).
 ### 9.4 Umbinden (`/resume`)
 
 `agent_session.bind` bindet eine vorhandene externe Sitzung an den aktuellen Thread. Körper:
-`external_session_ref`, `expected_current_session_id` (oder `null`), `take_over` (bool).
+`external_session_ref`, `expected_current_session_id` (fehlt, wenn der Thread noch keine Sitzung hat), `take_over` (bool).
 
 1. Prüfung: `trigger` und `agent.invoke` auf diesem Thread; ist die Referenz in einem anderen
    Thread aktuell, zusätzlich dort, und `take_over` muss gesetzt sein, sonst `409
@@ -1046,7 +1049,7 @@ kosten.
 | AG-17 | `/resume` mit veraltetem `expected_current_session_id`; Übernahme ohne `take_over` | `409` |
 | AG-18 | Import-Bindung mit fehlender alter Sitzung | neue Sitzung, Hinweis einmal, Lauf läuft |
 | AG-19 | Agent setzt Titel bei `manual` | `409 title_manual` |
-| AG-20 | Kontext: Autor ohne `trigger`, anderer Agent, Import | `trust = unverified`; Adapter-Test: Text erscheint nur im markierten Block |
+| AG-20 | Kontext: Autor ohne `trigger`, anderer Agent, Import; Anhang des Auslösers; Transkript einer Sprachnachricht des Auslösers | `trust = unverified`; Adapter-Test: Text erscheint nur im markierten Block; Dateiinhalt des Anhangs erscheint nur im markierten Datenblock, auch vom Auslöser hochgeladen; das Transkript trägt die Marke seiner Nachricht (`trigger`) (4.6, ADR 0054) |
 | AG-21 | Kontext über `agent.context_max_bytes` | Kürzung von alt nach neu, Auslöser vollständig |
 | AG-22 | Schlüsselrotation planmäßig und Notfall | keine fehlgeschlagenen Läufe planmäßig; im Notfall höchstens eine verzögerte Zustellung |
 | AG-23 | Autovervollständigung ohne Antwort | leere Liste nach `command.autocomplete_timeout` |
@@ -1315,7 +1318,7 @@ bindend. Der eigene `CLAUDE_CONFIG_DIR` im Modus `organization` setzt die Beding
 Key, gibt es keine Abo-Anmeldung, auf die Claude Code ausweichen könnte. Der Runner liest oder
 kopiert nie Anmeldedateien.
 
-Kann ein Runner beide Modi belegen, meldet er `reported_billing_mode = null` und
+Kann ein Runner beide Modi belegen, lässt er `reported_billing_mode` weg und meldet
 `billing_modes_supported` mit beiden Werten.
 
 ### 18.4 Live-Box aus dem Stream
@@ -1443,7 +1446,7 @@ sequenceDiagram
 | R-AG-04 | Gast-Läufe haben keine Sitzung. | Eine aktuelle Sitzung je Thread; der Gast verdrängt den Bediener nicht. |
 | R-AG-22 | Persönliche Agenten sind nie Gast-Agenten. | Sonst wären sie auf Kanälen auslösbar, die I1 nicht prüft. |
 | R-AG-05 | Ohne `trigger` gibt es eine Fehlermeldung nur bei ausdrücklicher Erwähnung. | Keine Fehlerflut in freien Kanälen, aber Antwort auf gezielte Ansprache. |
-| R-AG-06 | Kontext baut der Server mit Vertrauensmarke je Nachricht. | Nur `authz` kennt die Rechte der Autoren; Schutz gegen Prompt-Injection. |
+| R-AG-06 | Kontext baut der Server mit Vertrauensmarke je Nachricht ([ADR 0054](../adr/0054-herkunfts-und-vertrauensmarkierung-im-agenten-kontext.md)). | Nur `authz` kennt die Rechte der Autoren; Schutz gegen Prompt-Injection. |
 | R-AG-07 | Adapter startet die Laufzeit erst nach Zusage durch `run.start`. | Höchstens eine Ausführung je Aufruf. |
 | R-AG-08 | `run.start` deckt auch `waiting_input -> running` ab. | Eine Rückfrage ist eine Auslösung wie jede andere und braucht eine Marke. |
 | R-AG-09 | `trigger_state` trennt `received` (Server) und `queued` (Adapter); neuer Wert `cancelled`. | Mensch sieht, ob der Agent den Auftrag hat; Stopp ist kein Fehler. |

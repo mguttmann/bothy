@@ -121,7 +121,7 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `shutdown.jobs_soft_timeout` | `BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT` | Server | `20s` | weicher Stopp von River |
 | `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server | `5s` | Telemetrie leeren |
 | `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server | `60s` | gesamte Frist bis zum Ende; mindestens die Summe der Schritt-Budgets (15.3) |
-| `perf.reference_profile` |  | Lasttest | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 lokal, Rolle all` | Umgebung der Lasttests |
+| `perf.reference_profile` |  | Lasttest | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 lokal mit fsync und synchronous_commit an, Rolle all` | Umgebung der Lasttests; Modi der Messung in ADR 0063 |
 | `perf.sustained_messages_per_s` |  | Lasttest | `200` | Dauerlast für `perf.message_create_p99` |
 | `perf.message_create_p99` |  | Lasttest | `150ms` | Ziel |
 | `perf.event_commit_min_per_s` |  | Lasttest | `1000` | Ziel (Mindestwert) |
@@ -150,6 +150,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen |
 | `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server | `100` | Länge eines Bereichsnamens in Unicode-Zeichen |
 | `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server | `100` | Länge eines Kanalnamens in Unicode-Zeichen |
+| `channel.topic_max_chars` | `BOTHY_CHANNEL__TOPIC_MAX_CHARS` | Server | `1024` | Länge eines Kanal-Themas in Unicode-Zeichen |
 | `forum_tag.name_max_chars` | `BOTHY_FORUM_TAG__NAME_MAX_CHARS` | Server | `50` | Länge eines Tag-Namens in Unicode-Zeichen |
 | `identity.last_active_granularity` | `BOTHY_IDENTITY__LAST_ACTIVE_GRANULARITY` | Server | `5m` | höchstens so oft wird `last_active_at` bzw. `last_used_at` geschrieben |
 | `auth.session_max_age` | `BOTHY_AUTH__SESSION_MAX_AGE` | Server | `30d` | absolutes Ende einer Anmeldesitzung |
@@ -161,8 +162,10 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server | `200` | Obergrenze für `history_backfill_limit` |
 | `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server | `32768` | Größe eines Kanal-Prompts |
 | `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server | `200` | Länge eines Thread-Titels |
+| `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server | `5` | Forum-Tags je Thread |
 | `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | `262144` | Größe einer Nachricht (lange Antworten ohne Teilen) |
 | `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | `10` | Anhänge je Nachricht |
+| `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server | `50` | verschiedene Erwähnungs-Handles je Nachricht (Inhaltsformat, `messages`) |
 | `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server | `64` | größte Länge eines Reaktions-Emoji in Bytes (ein Graphem-Cluster hat sonst keine Grenze) |
 | `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server | `20` | verschiedene Emoji je Nachricht; begrenzt `Message.reactions` und die Nutzlast der Ereignisse |
 | `pin.max_per_thread` | `BOTHY_PIN__MAX_PER_THREAD` | Server | `50` | Anheftungen je Thread; `listPins` ist nicht seitenweise |
@@ -549,10 +552,10 @@ Quelle: [16-betrieb.md](../spec/16-betrieb.md), Abschnitt 14.
 | `server.internal_listen_addr` | `BOTHY_SERVER__INTERNAL_LISTEN_ADDR` | Server | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack |
 | `server.public_url` | `BOTHY_SERVER__PUBLIC_URL` | Server | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](../spec/08-identitaet.md), Abschnitte 7.2 und 7.3) |
 | `server.trusted_proxies` | `BOTHY_SERVER__TRUSTED_PROXIES` | Server | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](../spec/19-sicherheit.md), SEC-TLS-1) |
-| `server.maintenance_mode` | `BOTHY_SERVER__MAINTENANCE_MODE` | Server | `off` | `off` oder `read_only` (Umzug, Upgrade) |
+| `server.maintenance_mode` | `BOTHY_SERVER__MAINTENANCE_MODE` | Server | `off` | `off` oder `read_only` (Umzug, Upgrade; [ADR 0065](../adr/0065-wartungsmodus-read-only.md)) |
 | `secrets.dir` | `BOTHY_SECRETS__DIR` | Server | `/run/bothy/secrets` | Basis der Standardverweise `file:` |
 | `secrets.cache_ttl` | `BOTHY_SECRETS__CACHE_TTL` | Server | `5m` | so lange gilt ein gelesenes Geheimnis |
-| `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, ADR 0066) |
+| `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) |
 | `server.tls_cert_ref` | `BOTHY_SERVER__TLS_CERT_REF` | Server | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) |
 | `server.tls_key_ref` | `BOTHY_SERVER__TLS_KEY_REF` | Server | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` |
 | `database.host` | `BOTHY_DATABASE__HOST` | Server | `localhost` | Host der Datenbank |

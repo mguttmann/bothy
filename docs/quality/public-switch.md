@@ -14,7 +14,9 @@ die öffentlichen Dienste anbinden.
    umgeschrieben (git-filter-repo mit Mailmap) oder das Repository startet mit neuer
    Historie. Beim Umschreiben ersetzt `--replace-text` auch die alten Beispielwerte,
    die `.gitleaks.toml` als Ausnahme für die Historie führt; danach wird diese Ausnahme
-   gelöscht, und Schritt 3 zeigt, dass die Werte fort sind.
+   gelöscht, und Schritt 3 zeigt, dass die Werte fort sind. Jede bisherige interne
+   Identität wird aus `allow-authors.txt` entfernt, bevor Schritt 3 läuft; nur dann belegt
+   ein Scan ohne Fund, dass das Umschreiben vollständig war.
 3. **Historien-Scan.** `make denylist-history` und
    `make gitleaks GITLEAKS_LOG_OPTS=--all` sind grün. Jeder Treffer wird entfernt; Treffer
    in alten Commits erzwingen ein Umschreiben der Historie, danach beide Scans erneut.
@@ -60,6 +62,10 @@ die öffentlichen Dienste anbinden.
     ein Pull Request aus dem Repository (volle Liste, SonarQube Cloud, CodeQL). Prüfen, dass
     alle Jobs auf GitHub-gehosteten Runnern liefen und CodeQL und Scorecard starten.
 19. **DCO** prüfen: ein Pull Request ohne Sign-off muss an `ci-ok` scheitern.
+20. **Release-Signaturen umstellen** ([ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md)):
+    `release.yml` auf cosign keyless und Attestations stellen (ADR 0036), den privaten
+    cosign-Schlüssel und sein Passwort aus der Umgebung `release` löschen; der öffentliche
+    Schlüssel bleibt im Repository, damit ältere Releases prüfbar bleiben.
 
 ## Zurück auf privat
 

@@ -1,7 +1,8 @@
 # Sicherung und Wiederherstellung
 
-Status: Entwurf M0. Anleitung zu [16-betrieb.md](../spec/16-betrieb.md) 8. Gilt für den
-Compose-Stack; mit einem verwalteten PostgreSQL-Dienst entfallen die Schritte zu pgBackRest
+Status: Entwurf M0. Anleitung zu [16-betrieb.md](../spec/16-betrieb.md) 8
+([ADR 0058](../adr/0058-sicherung-mit-pgbackrest-objektsicherung-und-restore-test.md)). Gilt für
+den Compose-Stack; mit einem verwalteten PostgreSQL-Dienst entfallen die Schritte zu pgBackRest
 (Abschnitt 6).
 
 ![Sicherung](diagrams/backup-flow.svg)

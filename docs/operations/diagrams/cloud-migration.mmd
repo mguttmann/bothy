@@ -9,10 +9,11 @@ sequenceDiagram
     O->>N: Secrets-Bundle einspielen (gleiche instance_id, Pepper, Signierschlüssel, Push-Schlüssel)
     O->>N: Probelauf: letzte Sicherung zurückspielen, Prüfungen grün
     O->>D: DNS-TTL vorab senken
-    O->>A: Wartungsmodus nur Lesen (Statusseite: Wartung)
+    O->>A: Wartungsmodus read_only, ADR 0065 (Statusseite: Wartung)
     A-->>C: Schreiben ergibt 503 maintenance, Ausgangsfach wartet
     O->>A: Abschluss-Sicherung (pg_dump, Objekte, Manifest)
     O->>N: Abschluss-Sicherung zurückspielen, Manifest vergleichen
+    O->>N: Notfall-Widerrufe seit der Abschluss-Sicherung wiederholen
     O->>D: DNS umstellen, OIDC-Redirect-URIs prüfen
     C->>N: Wiederverbinden mit gleichem Cursor (gleiche Zeitlinie, kein resync)
     N-->>C: Nachholen, dann Ausgangsfach senden

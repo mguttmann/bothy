@@ -47,7 +47,9 @@ die Mindestlänge meldete `otelcol-contrib validate`) [belegt].
    ([16-betrieb.md](../spec/16-betrieb.md) 5.4). Ein Wechsel des Geheimnisses selbst trennt
    zusätzlich alle alten Pseudonyme.
 4. Agenten und Apps sind keine Menschen; ihre Handles stehen im Klartext.
-5. Objekt-IDs (Thread, Kanal, Nachricht, Lauf, Datei) stehen im Klartext in Spans und Logs, nie
+5. Geräte-IDs stehen nie in Spans, Logs oder Metriken, auch nicht als Pseudonym
+   ([19-sicherheit.md](../spec/19-sicherheit.md) SEC-LOG-4).
+6. Objekt-IDs (Thread, Kanal, Nachricht, Lauf, Datei) stehen im Klartext in Spans und Logs, nie
    an Metriken. Sie sind zufällige UUIDs ohne Inhalt; nur mit Datenbankzugang lassen sie sich
    auflösen, und dann gelten die Rechte aus `authorize`.
 
@@ -84,7 +86,9 @@ sind kurz.
    Anzeigename, E-Mail).
 2. Ein Szenario läuft durch API, Gateway, Push (Testanbieter), Adapter und Collector.
 3. Der Collector exportiert mit dem Overlay `local` und zusätzlich in eine Datei (Test-Overlay
-   mit `file`-Exporter); stdout der Container wird mitgeschnitten.
+   `infra/compose/test/otel/file.yaml` mit `file`-Exporter, nur für Tests, nicht im
+   Release-Bündel; geprüft mit `otelcol-contrib validate` in `tools/opscheck`); stdout der
+   Container wird mitgeschnitten.
 4. Das Geheimwort darf in keiner Ausgabe stehen. Ein Treffer bricht das Gate und nennt die Stelle.
 5. Zusätzlich: Jede Prinzipal-ID der Testdaten darf im Klartext nicht vorkommen.
 

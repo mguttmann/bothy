@@ -50,8 +50,14 @@ macht. Grundlage: [02-architektur.md](../spec/02-architektur.md), Abschnitt 17, 
    (`fsync` und `synchronous_commit` an). Grund: Ohne Haltbarkeit wäre der Commit kürzer und die
    Zahl wertlos.
 3. `make perf` schreibt je Ziel Messwert, Schwelle und gemessene Umgebung und scheitert bei
-   Unterschreitung. Weicht die Umgebung vom Profil ab, gilt der Lauf nicht als Beleg und endet
-   nicht grün; ein ausdrücklicher Informationsmodus zeigt die Messung trotzdem an.
+   Unterschreitung. Die Umgebung bekommt einen Modus aus der vCPU-Zahl und dem Speicher von
+   `perf.reference_profile`: `match` (genau so viele logische CPUs, mindestens so viel Speicher),
+   `emulated` (größerer Rechner, begrenzt auf das Profil: `GOMAXPROCS` gleich der vCPU-Zahl,
+   PostgreSQL-Container mit `--cpus` und `--memory` aus dem Profil) oder `below` (kleinerer
+   Rechner). Nur `match` und `emulated` gelten als Beleg; ein Lauf mit `below` oder ohne die
+   Haltbarkeits-Einstellungen aus Punkt 2 endet nicht grün, zeigt die Messung aber an. Grund für
+   `emulated`: Ein eigener Rechner genau im Profil wäre eine Kostenfrage; Begrenzung auf das Profil
+   misst dieselbe Parallelität, die eine CPU-Zahl im Profil meint.
 4. `make perf` läuft am Abschluss jeder Etappe, im Release und in jedem Ticket, das ein
    Leistungsziel berührt ([PLAN.md](../PLAN.md), Abschnitt 3, Regel 6); nicht im Pre-Push.
 5. Kein Ticket senkt die Schwelle, außer sein Brief nennt es ausdrücklich (PLAN, Abschnitt 3,
@@ -78,8 +84,9 @@ macht. Grundlage: [02-architektur.md](../spec/02-architektur.md), Abschnitt 17, 
 - Bau-Ticket M1-72: `make perf` schreibt je Ziel Messwert und Schwelle; Chaos-Tests der
   Ereignis-Kette (Verlust der `LISTEN`-Verbindung, Datenbank-Neustart, SIGKILL im Commit)
   hinterlassen keine Lücke.
-- Test des Werkzeugs: Ein Lauf mit abweichender Umgebung (andere CPU-Zahl oder
-  `synchronous_commit = off`) endet nicht grün.
+- Test des Werkzeugs: Die Modi `match`, `emulated` und `below` entstehen aus festen
+  Beispiel-Rechnern; ein Lauf im Modus `below` oder mit `synchronous_commit = off` endet nicht grün;
+  `results.json` nennt den Modus (Bau-Ticket M1-72).
 - Exit-Kriterium jeder Etappe ([PLAN.md](../PLAN.md), Abschnitt 4, Punkt 3).
 
 ## Pros and Cons of the Options

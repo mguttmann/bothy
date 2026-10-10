@@ -29,6 +29,9 @@ Allowlist des Collectors, Dashboards, Regeln und SLOs nutzen nur Namen von hier.
 3. IDs (Thread, Kanal, Nachricht, Lauf, Datei) stehen nur in Spans und Logs.
 4. Ein Unit-Test zählt die möglichen Werte jedes Metrik-Attributs; ein neues offenes Attribut
    bricht den Test.
+5. Instrumente aus Bibliotheken (otelhttp, otelpgx) laufen durch eine SDK-View mit einer
+   Erlaubnisliste genau der Attribute dieses Katalogs. Grund: otelhttp setzt weitere Attribute,
+   z. B. `server.address` aus der `Host`-Kopfzeile des Clients, also eine offene Menge.
 
 ## 3. Resource-Attribute
 
@@ -48,7 +51,7 @@ Allowlist des Collectors, Dashboards, Regeln und SLOs nutzen nur Namen von hier.
 | Name | Typ | Einheit | Attribute | Quelle | Prometheus |
 |---|---|---|---|---|---|
 | `http.server.request.duration` | Histogramm | `s` | `http.request.method`, `http.route`, `http.response.status_code`, `error.type` | otelhttp (Semantic Conventions HTTP, stabil) | `http_server_request_duration_seconds` |
-| `bothy.authz.decisions` | Zähler | `{decision}` | `bothy.action`, `bothy.decision` | api | `bothy_authz_decisions_total` |
+| `bothy.authz.decisions` | Zähler | `{decision}` | `bothy.action`, `bothy.decision` | api: Entscheidungen für Anfragen und Ops; Filter bei Zustellung und in Listen (07 Abschnitt 4.2) zählen nicht, sonst überdeckte die Zustellung jede andere Zahl | `bothy_authz_decisions_total` |
 | `bothy.authz.errors` | Zähler | `{check}` | `bothy.reason` (`unknown_action`, `authz_not_checked`, `filter_mismatch`) | api: Programmfehler der Rechteprüfung ([02-architektur.md](../spec/02-architektur.md) 9.3, 07 Abschnitt 4.2); `filter_mismatch`: ein Element passierte den SQL-Filter einer Liste, aber nicht `authorize`, und wurde verworfen (07 Abschnitt 7.4, Regel 3) | `bothy_authz_errors_total` |
 | `bothy.ratelimit.rejected` | Zähler | `{request}` | `bothy.ratelimit.class` | api | `bothy_ratelimit_rejected_total` |
 | `bothy.gateway.connections.active` | UpDownCounter | `{connection}` | `bothy.principal.kind` | api | `bothy_gateway_connections_active` |
@@ -58,8 +61,10 @@ Allowlist des Collectors, Dashboards, Regeln und SLOs nutzen nur Namen von hier.
 | `bothy.gateway.close` | Zähler | `{connection}` | `bothy.close.code` | api | `bothy_gateway_close_total` |
 | `bothy.gateway.outbound.dropped` | Zähler | `{frame}` | `bothy.reason` (`patch_replaced_by_snapshot`, `slow_consumer`) | api | `bothy_gateway_outbound_dropped_total` |
 
-`client_error` umfasst die Schließ-Codes `4004`, `4007`, `4008` und Abbrüche des Clients vor
-`identify`; alles andere ohne `ready` ist `server_error`.
+`client_error` umfasst die Schließ-Codes `4001` bis `4008`, `4011`, `4012`, `4016`, `4017` und
+Abbrüche des Clients vor `ready`; alles andere ohne `ready` oder `resumed` ist `server_error` (z. B.
+`4000`, `4013`). Grund: Wartende Geräte, widerrufene Sitzungen und Protokollfehler des Clients
+dürfen das Fehlerbudget von `bothy-sync/reconnect` nicht verbrauchen.
 
 ### 4.2 Ereignisse und Zustellung
 
@@ -68,7 +73,7 @@ Allowlist des Collectors, Dashboards, Regeln und SLOs nutzen nur Namen von hier.
 | `bothy.message.created` | Zähler | `{message}` | `bothy.message.origin` (`human`, `agent`, `app`, `import`, `system`), `bothy.message.kind` | api, worker | `bothy_message_created_total` |
 | `bothy.event.appended` | Zähler | `{event}` | `bothy.event.type` | api, worker | `bothy_event_appended_total` |
 | `bothy.db.event_seq.lock_wait` | Histogramm | `s` | keine | api, worker: Warten auf die Zähler-Zeile | `bothy_db_event_seq_lock_wait_seconds` |
-| `bothy.event.fanout.lag` | Gauge | `s` | keine | api: Alter des zuletzt verteilten Ereignisses | `bothy_event_fanout_lag_seconds` |
+| `bothy.event.fanout.lag` | Gauge | `s` | keine | api: Alter des ältesten Ereignisses, das der Log-Tail kennt und der Hub noch nicht verteilt hat (jetzt minus Zeitpunkt, zu dem es per `NOTIFY` oder Poll bekannt wurde); `0`, wenn alles verteilt ist. Grund: Das Alter des zuletzt verteilten Ereignisses wüchse auf einer ruhigen Instanz und bliebe bei einem hängenden Hub stehen | `bothy_event_fanout_lag_seconds` |
 | `bothy.delivery.duration` | Histogramm | `s` | `bothy.event.durability` (`durable`, `ephemeral`), `bothy.principal.kind` | api: `occurred_at` bis Schreiben des Rahmens, nur Live-Zustellung | `bothy_delivery_duration_seconds` |
 
 ### 4.3 Agenten und Läufe
@@ -136,6 +141,34 @@ Werkzeugnamen stehen nie an Metriken (offene Menge); die Statistik der Werkzeuga
 
 `bothy-backupd` sieht die Volumes `pgdata` und `files` nur lesend und misst dort nur den freien
 Platz.
+
+### 4.6a Kennzahlen der Apps
+
+Die Apps senden diese Kennzahlen gebündelt an `POST /api/v1/client-metrics` (`ClientMetricsBatch`,
+[15-client-architektur.md](../spec/15-client-architektur.md) Abschnitt 17, [ADR 0057](../adr/0057-client-telemetrie-ueber-einen-server-endpunkt.md)). Der Server
+nimmt nur die Namen dieser Tabelle an und gibt sie unter `bothy.client.*` an den Collector weiter.
+Einen Eintrag mit anderem Namen oder mit einem `kind`, das nicht zum Typ der Tabelle passt
+(`histogram`, `counter`, `gauge`), verwirft er einzeln; der Rest des Stapels gilt, die Antwort
+bleibt `202`. So verliert eine neuere App gegen einen älteren Server nicht den ganzen Stapel. Attribute aller Kennzahlen: `bothy.client.platform` (`ios`, `android`,
+`macos`, `windows`, `web`), `bothy.client.density` (`comfortable`, `compact`, `touch`),
+`bothy.client.theme` (`light`, `dark`) und `bothy.client.app_major` (Hauptversion der App, Werte
+außerhalb `^[0-9]{1,2}$` werden `other`). Kein Prinzipal, kein Gerät. Histogramme kommen mit den
+Grenzen "Dauern bis Sekunden" aus 4.7; andere Grenzen verwirft der Server.
+
+| Name in der App | Typ | Einheit | Weitere Attribute | Server-Name und Prometheus |
+|---|---|---|---|---|
+| `client.cold_start.duration` | Histogramm | `s` | keine | `bothy.client.cold_start.duration`, `bothy_client_cold_start_duration_seconds` |
+| `client.thread_open.duration` | Histogramm | `s` | keine | `bothy.client.thread_open.duration`, `bothy_client_thread_open_duration_seconds` |
+| `client.send_local.duration` | Histogramm | `s` | keine | `bothy.client.send_local.duration`, `bothy_client_send_local_duration_seconds` |
+| `client.frames` | Zähler | `{frame}` | keine | `bothy.client.frames`, `bothy_client_frames_total` |
+| `client.frames.over_budget` | Zähler | `{frame}` | keine | `bothy.client.frames.over_budget`, `bothy_client_frames_over_budget_total` |
+| `client.catchup.duration` | Histogramm | `s` | keine | `bothy.client.catchup.duration`, `bothy_client_catchup_duration_seconds` |
+| `client.catchup.events` | Zähler | `{event}` | keine | `bothy.client.catchup.events`, `bothy_client_catchup_events_total` |
+| `client.resync` | Zähler | `{connection}` | keine | `bothy.client.resync`, `bothy_client_resync_total` |
+| `client.reconnects` | Zähler | `{connection}` | `bothy.close.code` (Codes aus 04 "Schließ-Codes", sonst `other`) | `bothy.client.reconnects`, `bothy_client_reconnects_total` |
+| `client.outbox.depth` | Gauge | `{entry}` | keine | `bothy.client.outbox.depth`, `bothy_client_outbox_depth` |
+| `client.push_display.duration` | Histogramm | `s` | keine | `bothy.client.push_display.duration`, `bothy_client_push_display_duration_seconds` |
+| `client.push.placeholder` | Zähler | `{notification}` | keine | `bothy.client.push.placeholder`, `bothy_client_push_placeholder_total` |
 
 ### 4.7 Histogramm-Grenzen
 

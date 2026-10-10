@@ -45,7 +45,9 @@ Die vollständige Liste mit Werkzeug, Schwelle und Lauf-Ort steht in
 | Analyse | `sonar` | SonarQube mit gemeinsamem Profil und Gate |
 
 Am Release kommen hinzu: SBOM, Provenance, Signatur, Image-Scan (`trivy-image`) und der
-Portabilitätstest (`portability`). Siehe [toolchain.md](../quality/toolchain.md).
+Portabilitätstest (`portability`). Am Abschluss jeder Etappe und im Release läuft `make perf`
+mit den Leistungszielen aus 02 ([ADR 0063](../adr/0063-leistungs-gate-fuer-das-ereignis-log.md),
+PLAN P-07). Siehe [toolchain.md](../quality/toolchain.md).
 
 ## 3. Komponenten-Vertrag
 
@@ -56,7 +58,7 @@ gilt je Art:
 
 | Art | Erwartet von der Komponente |
 |---|---|
-| Go-Modul | `go.mod` und `go.sum`; Tests mit `go test`; golangci-lint-Konfiguration im Modul (Abhängigkeitsregeln: Kapitel 02) |
+| Go-Modul | `go.mod` und `go.sum`; Tests mit `go test`; golangci-lint-Konfiguration im Modul (Abhängigkeitsregeln: Kapitel 02); die Abdeckung zählt `test/**` und `perf/**` nicht mit, weil sie selbst Testcode sind (02, Abschnitt 6) |
 | Dart-Paket | `pubspec.yaml`, Tests unter `test/`; `custom_lint` als dev-Abhängigkeit, wenn eigene Regeln gelten |
 | Python-Projekt | `pyproject.toml` mit uv-Lock; ruff, mypy und pytest in der dev-Gruppe; Abdeckungsschwelle in der eigenen pytest-Konfiguration |
 | TypeScript-Projekt | `package.json` mit den Skripten `format`, `format:check`, `lint`, `typecheck`, `test` (Abdeckungsschwelle im Test-Runner) |
@@ -149,6 +151,7 @@ oder NEIN. Bei NEIN wird behoben und das Delta erneut geprüft; das Bedrohungsmo
 | R-QA-08 | Der Deny-List-Scan prüft ohne Remote alle Commits von `HEAD`. | Der erste Push ist der gefährlichste; Identitäten alter Commits müssen vorher stimmen. |
 | R-QA-09 | Links ins Internet sind kein Gate (`linkcheck-external` manuell). | Fremde Server machen ein Gate sonst nicht reproduzierbar. Lokale Links und Anker prüft `linkcheck` streng. |
 | R-QA-10 | Keine `.sonarcloud.properties`; SonarQube Cloud analysiert über CI, die automatische Analyse bleibt aus. | Abdeckung und Pull-Request-Dekoration brauchen die CI-Analyse; beide Wege zugleich stören sich. |
+| R-QA-11 | Testserver, die große Welten über die öffentliche API aufbauen (Vertrags-, Leck-, Kanarien-Tests, Vorbereitung der Lasttests), heben `ratelimit.*` über ihre Konfiguration an; gemessene Lasttests und Tests der Rate-Limits laufen mit den Standardwerten. | Aufbau über die API prüft die echten Wege, scheitert aber an Limits für Menschen; Messungen und Limit-Tests müssen die ausgelieferten Werte sehen. |
 
 ## 11. Konfigurationswerte dieses Kapitels
 

@@ -15,25 +15,33 @@ Gates und Runner: ADR 0038 und 0039 (Team H). API-Versionierung: ADR 0014 (Team 
 
 ## 2. Komponenten
 
-| Komponente | Tag-Präfix | Artefakte | Kanäle |
-|---|---|---|---|
-| `server` | `server/` | Images `bothy-server`, `bothy-postgres` (linux/amd64, linux/arm64), Binärdateien `bothy`, Compose-Bündel `infra/compose` | stable, beta |
-| `apps` | `apps/` | iOS, Android, macOS, Windows, Web-Konsole (eine Flutter-Codebasis, B5) | stable, beta |
-| `sdk-python` | `sdk-python/` | Paket auf PyPI | stable, Vorabversionen |
-| `sdk-typescript` | `sdk-typescript/` | Paket auf npm | stable, Vorabversionen |
-| `adapter-hermes` | `adapter-hermes/` | Plugin für Hermes Agent | stable, Vorabversionen |
-| `adapter-code-runner` | `adapter-code-runner/` | Dev-Runner für Claude Code | stable, Vorabversionen |
-| `api` | keiner | OpenAPI- und AsyncAPI-Dokument; Version im Dokument (ADR 0013, 0014) | mit `server` |
+Die Namen, Verzeichnisse und Tag-Präfixe stehen an einer Stelle: `RELEASE_COMPONENTS` in
+`tools/ci/components.py` ([ADR 0060](../adr/0060-release-automatisierung-im-monorepo.md)). Diese Tabelle gibt sie wieder.
+
+| Komponente | Verzeichnis | Tag-Präfix | Artefakte | Kanäle |
+|---|---|---|---|---|
+| `bothy` | Wurzel | keiner (`vX.Y.Z`) | Installationsbündel aus `make release-build`: `infra/compose` ohne `infra/compose/test` (Test-Overlays), `LICENSE`, `NOTICE`, `CHANGELOG.md`, `VERSION` | stable, beta |
+| `server` | `services/server` | `server/` | Images `bothy-server`, `bothy-postgres` (linux/amd64, linux/arm64), Binärdateien `bothy` | stable, beta |
+| `client` | `apps/client` | `client/` | iOS, Android, macOS, Windows (eine Flutter-Codebasis, B5) | stable, beta |
+| `console` | `apps/console` | `console/` | Web-Konsole | mit `server` |
+| `sdk-python` | `sdk/python` | `sdk-python/` | Paket auf PyPI | stable, Vorabversionen |
+| `sdk-typescript` | `sdk/typescript` | `sdk-typescript/` | Paket auf npm | stable, Vorabversionen |
+| `hermes-adapter` | `plugins/hermes-adapter` | `hermes-adapter/` | Plugin für Hermes Agent | stable, Vorabversionen |
+| `claude-code-runner` | `plugins/claude-code-runner` | `claude-code-runner/` | Dev-Runner für Claude Code | stable, Vorabversionen |
+| `api` | `docs/api` | keiner | OpenAPI- und AsyncAPI-Dokument; Version im Dokument (ADR 0013, 0014) | mit `server` |
 
 Regeln:
 
 1. Jede Komponente hat in ihrem Verzeichnis eine Datei `VERSION` (eine Zeile, SemVer ohne `v`)
    und eine `CHANGELOG.md`. Die Verzeichnisse legt die Repo-Struktur fest (Team H).
-2. Tags heißen `<präfix>v<SemVer>`, z. B. `server/v1.2.3`. Für Go-Module in Unterverzeichnissen
-   ist genau diese Form vorgeschrieben (https://go.dev/ref/mod, Abschnitt "Module paths",
-   abgerufen 2026-10-10) [belegt]. Tags sind signiert.
-3. Ab Hauptversion 2 muss ein Go-Modulpfad auf `/v2` enden (gleiche Quelle) [belegt]. Ein
-   Major-Sprung des Servers ist darum auch eine Änderung des Modulpfads.
+2. Tags heißen `<präfix>v<SemVer>`, z. B. `server/v1.2.3`; das Präfix ist eine Regel dieses
+   Repositorys. Go verlangt für ein Modul im Unterverzeichnis das Verzeichnis als Präfix
+   (`services/server/v1.2.3`) und ab Hauptversion 2 einen Modulpfad auf `/v2` nur, wenn das Modul
+   als Abhängigkeit geladen wird (https://go.dev/ref/mod, Abschnitt "Module paths", abgerufen
+   2026-10-10) [belegt]. Das Server-Modul ist ein Hauptmodul, das nie geladen wird (PLAN P-05);
+   beides gilt für es darum nicht. Tags sind signiert.
+3. Soll das Server-Modul je als Abhängigkeit nutzbar werden, ist das eine eigene Entscheidung
+   (Tag-Form und `/v2`-Pfad nach der Go-Regel).
 4. Die Datei `VERSION` und der Tag stimmen überein; ein Gate-Check prüft es.
 5. Der Server kennt seine Version aus `internal/platform/buildinfo` (`Version()`): eine Konstante
    gleich `services/server/VERSION`, gehalten von einem Unit-Test; keine Linker-Flags. Grund: Ein
@@ -51,7 +59,7 @@ Regeln:
 | Komponente | Major | Minor | Patch |
 |---|---|---|---|
 | `server` | Entfernen einer unterstützten API-Hauptversion oder Protokollversion; Entfernen oder Umdeuten eines Konfigurationsschlüssels; Upgrade, das Handarbeit an Daten verlangt | neue Funktionen, neue Schlüssel, neue Ereignistypen (additiv) | Fehlerbehebung ohne Verhaltensänderung |
-| `apps` | Mindest-Serverversion steigt über eine Server-Hauptversion | neue Funktionen | Fehlerbehebung |
+| `client`, `console` | Mindest-Serverversion steigt über eine Server-Hauptversion | neue Funktionen | Fehlerbehebung |
 | SDKs, Adapter | inkompatible Änderung der öffentlichen Schnittstelle | additive Änderung | Fehlerbehebung |
 
 Vor 1.0.0 gilt SemVer 0.x: Minor darf brechen; die Release Notes nennen jeden Bruch.
@@ -61,8 +69,8 @@ Vor 1.0.0 gilt SemVer 0.x: Minor darf brechen; die Release Notes nennen jeden Br
 1. `CHANGELOG.md` folgt "Keep a Changelog" mit den Abschnitten Added, Changed, Deprecated,
    Removed, Fixed, Security. Die Einträge sind Englisch (Community-Sprache).
 2. Commits folgen Conventional Commits mit der Komponente als Scope. Ein Werkzeug erzeugt daraus
-   einen Entwurf; ein Mensch oder Agent prüft ihn vor dem Tag. Werkzeugwahl: ADR-Vorschlag im
-   Bericht.
+   einen Entwurf; ein Mensch oder Agent prüft ihn vor dem Tag. Werkzeug: git-cliff hinter
+   `make release-prep` ([ADR 0060](../adr/0060-release-automatisierung-im-monorepo.md)).
 3. Release Notes des Servers haben feste Abschnitte: Upgrade-Hinweise (Handarbeit ja oder nein),
    Migrationen (Expand oder Contract, Dauer auf großen Tabellen), Kompatibilität (unterstützte
    Protokollversionen, Mindest-App-Version), Sicherheit, bekannte Probleme.
@@ -97,8 +105,8 @@ Regeln:
 | Schritt | Werkzeug | Ergebnis |
 |---|---|---|
 | SBOM | Syft (über anchore/sbom-action) | SPDX-JSON und CycloneDX-JSON je Image und Binärdatei, am Release angehängt |
-| Signatur Images | cosign keyless (Fulcio, Rekor), Identität = Release-Workflow | Signatur je Digest |
-| Signatur Dateien | cosign `sign-blob` mit Bundle | `*.sigstore.json` neben jeder Datei |
+| Signatur Images | öffentlich: cosign keyless (Fulcio, Rekor), Identität = Release-Workflow; privat: cosign-Schlüsselpaar ohne Transparenz-Log ([ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md)) | Signatur je Digest |
+| Signatur Dateien | cosign `sign-blob` mit Bundle, Verfahren wie bei den Images | `*.sigstore.json` neben jeder Datei |
 | Herkunft | `actions/attest` (SLSA Build Provenance) | Attestation im Repository |
 | Prüfsummen | SHA-256 | `SHA256SUMS`, selbst signiert |
 
@@ -108,12 +116,14 @@ https://github.com/actions/attest-build-provenance [belegt].
 
 Grenze: Artifact Attestations sind in GitHub Free, Pro und Team nur für öffentliche Repositorys
 verfügbar (https://github.com/actions/attest-build-provenance, abgerufen 2026-10-10) [belegt].
-Bis das Produkt-Repository öffentlich ist, gibt es Signatur und SBOM, aber keine Attestation.
-Der Betreiber prüft so:
+Bis das Produkt-Repository öffentlich ist, gibt es Signatur und SBOM, aber keine Attestation,
+und signiert wird mit dem Schlüsselpaar der privaten Phase ([ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md)); geprüft wird dann mit
+`cosign verify --key` und dem öffentlichen Schlüssel aus dem Repository. Im öffentlichen Zustand
+prüft der Betreiber so:
 
 ```
 cosign verify ghcr.io/<owner>/bothy-server@sha256:<digest> \
-  --certificate-identity-regexp '^https://github.com/<owner>/bothy/.github/workflows/release-server.yaml@refs/tags/server/v' \
+  --certificate-identity-regexp '^https://github.com/<owner>/bothy/.github/workflows/release.yml@refs/tags/server/v' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com
 gh attestation verify oci://ghcr.io/<owner>/bothy-server@sha256:<digest> --repo <owner>/bothy
 ```
@@ -226,10 +236,10 @@ beta und dann mit derselben Build-Nummer in stable.
 
 | Nr | Entscheidung | Grund |
 |---|---|---|
-| R-RL-01 | Version und Changelog je Komponente, Tags `<komponente>/vX.Y.Z`. | Unabhängige Releases; Go verlangt diese Tag-Form für Module in Unterverzeichnissen. |
+| R-RL-01 | Version und Changelog je Komponente, Tags `<komponente>/vX.Y.Z` (Produktbündel `vX.Y.Z`). | Unabhängige Releases; eine Quelle für Namen und Präfixe in `tools/ci/components.py`; die Go-Tag-Regel gilt für das nie geladene Hauptmodul nicht (P-05). |
 | R-RL-02 | Kein Tag `latest`; Compose und OpenTofu pinnen Versionen. | Wiederholbare Installation; ein Upgrade ist eine bewusste Änderung. |
 | R-RL-03 | Apps: derselbe Build wandert von beta nach stable. Server, SDKs, Adapter: stable aus demselben Commit wie die letzte Beta, nur die Versionsnummer ändert sich. | Was getestet wurde, wird ausgeliefert; wo die Version im Artefakt steht, ist ein Neubau unvermeidbar und auf die Nummer begrenzt. |
-| R-RL-04 | Alle Artefakte signiert (cosign keyless) mit SBOM; Attestation sobald das Repository öffentlich ist. | Prüfbare Herkunft ohne Schlüsselverwaltung; Attestation hängt an der Sichtbarkeit. |
+| R-RL-04 | Alle Artefakte signiert mit SBOM: im öffentlichen Zustand cosign keyless mit Attestation, im privaten mit einem Schlüsselpaar ohne Transparenz-Log ([ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md)). | Prüfbare Herkunft ohne Schlüsselverwaltung; Attestation hängt an der Sichtbarkeit. |
 | R-RL-05 | Apps sind White Label; jede Organisation baut und signiert selbst mit `distribution.yaml`. | Push-Schlüssel, Bundle-IDs und Update-Feeds gehören dem Herausgeber; keine zentrale Push-Weiterleitung nötig. |
 | R-RL-06 | macOS nur als Developer-ID-Ausgabe mit Sparkle, keine zweite TestFlight-Ausgabe. | Eine Ausgabe, kein Sandbox-Zwang, eigener Update-Kanal. |
 | R-RL-07 | Apps werden vorwärts korrigiert, nie zurückgerollt. | Keine Plattform installiert ältere Versionen zuverlässig. |

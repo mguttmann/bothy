@@ -188,7 +188,7 @@ Eine App darf eine Aktion nur, wenn **beides** gilt (05 Abschnitt 2.6):
 | `components:write` | `component.update`, `interaction.respond` | Knöpfe, Formulare |
 | `users:read` | `user.read` | Namen auflösen |
 | `events:subscribe` | Ereignis-Abos, `gateway.connect` | jede abonnierende App |
-| `costs:reconcile` | `cost.reconcile.submit` | Kostenabgleich ([10-backend-richtlinie.md](10-backend-richtlinie.md) 12.4) |
+| `costs:reconcile` | `cost.reconcile.submit` | Kostenabgleich ([10-backend-richtlinie.md](10-backend-richtlinie.md) 12.4; [ADR 0055](../adr/0055-kostenabgleich-als-eigene-app-admin-key-nie-im-server.md)) |
 
 Grund für beides: Freigaben sagen "wo", Scopes sagen "was". Eine App mit `write` auf einem Kanal,
 aber ohne `messages:read`, kann posten, ohne mitzulesen.
@@ -215,7 +215,7 @@ zu überspringen.
 | Regel | Inhalt |
 |---|---|
 | Abo | `webhook_subscriptions` je Installation; `event_types` Teilmenge der bewilligten Ereignisse. Agenten nutzen dieselbe Tabelle mit `agent_id` als Transport ([09-agenten.md](09-agenten.md) Abschnitt 4.2) |
-| Format | Körper = Ereignis-Umschlag wie auf dem Gateway (04 Abschnitt 2.2) |
+| Format | Körper = Ereignis-Umschlag wie auf dem Gateway (04 Abschnitt 2.2, [ADR 0052](../adr/0052-ein-ereignis-umschlag-fuer-gateway-rest-und-webhooks.md)) |
 | Signatur | Standard Webhooks, Kopfzeilen `webhook-id` (= Ereignis-ID), `webhook-timestamp`, `webhook-signature` mit Schema `v1a` (Ed25519) |
 | Schlüssel | `server_signing_keys` mit Zweck `webhook_out` und `alg = 'EdDSA'`; ES256 ist für diesen Zweck nicht erlaubt, weil `v1a` nur Ed25519 kennt |
 | Reihenfolge | je Abo streng nach `seq`; das nächste Ereignis erst nach Erfolg des vorigen |

@@ -28,7 +28,7 @@ Datenschutz: [20-datenschutz.md](20-datenschutz.md). Dev-Abschottung:
 | SEC-TLS-2 | Wo der Server selbst TLS beendet (`server.tls_cert_ref` und `server.tls_key_ref`, beide gesetzt oder beide leer; mit TLS muss `server.public_url` `https` sein): mindestens TLS 1.2, TLS 1.3 bevorzugt, Cipher-Suites aus der Go-Standardbibliothek ohne eigene Liste. Grund: Eine eigene Liste veraltet; die Standardauswahl wird mit Go gepflegt [abgeleitet]. Kein Umleitungs-Listener für Klartext. |
 | SEC-TLS-3 | HSTS mit `http.hsts_max_age` auf jeder Antwort, sobald `server.public_url` `https` nutzt (auch hinter einem TLS-Proxy): `Strict-Transport-Security: max-age=<Sekunden>`, ohne `includeSubDomains` (andere Subdomains gehören dem Betreiber) und ohne `preload` (nicht rücknehmbar). Mit `http`-URL (Entwicklung auf Loopback) fehlt die Kopfzeile. |
 | SEC-TLS-4 | Ausgehende TLS-Verbindungen prüfen immer Zertifikat und Hostnamen. `InsecureSkipVerify` ist per Lint verboten. |
-| SEC-TLS-5 | PostgreSQL über Unix-Socket, mit `sslmode=verify-full` oder im internen Compose-Netz `internal` ohne Ausgang und ohne Host-Port mit `sslmode=disable` ([16-betrieb.md](16-betrieb.md), Abschnitt 4.1, Regel 2). Virenscanner nur über Unix-Socket (clamd hat keine Anmeldung im Protokoll; ClamAV empfiehlt den lokalen Modus; https://raw.githubusercontent.com/Cisco-Talos/clamav/main/etc/clamd.conf.sample, abgerufen 2026-10-10 [belegt]). OTel Collector über Loopback oder TLS. |
+| SEC-TLS-5 | PostgreSQL über Unix-Socket, mit `sslmode=verify-full` oder im internen Compose-Netz `internal` ohne Ausgang und ohne Host-Port mit `sslmode=disable` ([16-betrieb.md](16-betrieb.md), Abschnitt 4.1, Regel 2). Virenscanner nur über Unix-Socket (clamd hat keine Anmeldung im Protokoll; ClamAV empfiehlt den lokalen Modus; https://raw.githubusercontent.com/Cisco-Talos/clamav/main/etc/clamd.conf.sample, abgerufen 2026-10-10 [belegt]). OTel Collector über Loopback, TLS oder ein Compose-Netz desselben Hosts ohne veröffentlichten Port für den Empfang (Telemetrie trägt keine Inhalte und keine Geheimnisse, Baseline B11 und SEC-LOG-6); jeder Weg über ein anderes Netz mit TLS. |
 | SEC-TLS-6 | Hostnamen mit öffentlichen Zertifikaten erscheinen in Certificate-Transparency-Logs (https://tailscale.com/kb/1153/enabling-https, abgerufen 2026-10-10 [belegt]). Die Betriebsdoku empfiehlt neutrale Hostnamen. |
 
 ## 3. HTTP-Sicherheitskopfzeilen
@@ -38,7 +38,7 @@ Datenschutz: [20-datenschutz.md](20-datenschutz.md). Dev-Abschottung:
 | SEC-HDR-1 | alle | `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Strict-Transport-Security` (SEC-TLS-3), keine Versionsangabe in `Server` |
 | SEC-HDR-2 | API (JSON) | `Cache-Control: no-store`, `Cross-Origin-Resource-Policy: same-origin`, `Content-Type: application/json` bzw. `application/problem+json` |
 | SEC-HDR-3 | Konsole (HTML und Assets) | CSP nach Abschnitt 5, `Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: require-corp`, `X-Frame-Options: DENY`, `Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()` |
-| SEC-HDR-4 | Datei-Abruf | `Content-Disposition: attachment` mit `filename*` (RFC 6266), außer für neu kodierte Rastervorschauen; `Content-Security-Policy: default-src 'none'; sandbox`; `Cache-Control: private, no-store` |
+| SEC-HDR-4 | Datei-Abruf | `Content-Disposition: attachment` mit `filename*` (RFC 6266), außer für die Inline-Liste aus [12-dateien.md](12-dateien.md), Abschnitt 9.3; `Content-Security-Policy: default-src 'none'; sandbox`; `Cache-Control` nach 12, Abschnitt 9.3 (immer `private`, mit Ticket `no-store`) |
 
 COOP und COEP machen die Konsole "cross-origin isolated". Flutter braucht das für mehrfädiges
 Rendern mit WebAssembly; ohne die Kopfzeilen läuft es einfädig
@@ -105,7 +105,7 @@ Regeln:
 | ID | Kontrolle |
 |---|---|
 | SEC-IN-1 | Jede Anfrage wird gegen das OpenAPI- bzw. AsyncAPI-Schema geprüft, bevor ein Handler läuft ([06-api.md](06-api.md), ADR 0013). Schreibende Schemas haben `additionalProperties: false`. |
-| SEC-IN-2 | JSON-Dekodierung lehnt doppelte Schlüssel, ungültiges UTF-8 und zu tiefe Schachtelung ab. Grund: `client_payload_sha256` (03) und Verarbeitung dürfen keine verschiedenen Lesarten derselben Anfrage sehen. |
+| SEC-IN-2 | JSON-Dekodierung lehnt doppelte Schlüssel, ungültiges UTF-8 und zu tiefe Schachtelung ab, mit `400 malformed_request` ([06-api.md](06-api.md), Abschnitt 5; auf dem Gateway Schließ-Code `4002`). Grund: `client_payload_sha256` (03) und Verarbeitung dürfen keine verschiedenen Lesarten derselben Anfrage sehen. |
 | SEC-IN-3 | Größengrenzen vor dem Lesen: `http.max_json_body_bytes` für JSON, `http.max_header_bytes` (beide 02), `sync.ws_max_frame_bytes` (04), `file.max_upload_bytes` (03) als Stream-Grenze. Zeitgrenzen: `http.read_header_timeout`, `http.idle_timeout` (02). |
 | SEC-IN-4 | Anzeige-Texte (Anzeigenamen, Namen von Kanälen, Bereichen, Gruppen, Tags und Vorlagen, Titel, Dateinamen, Produktname des Brandings, Gründe von Verwaltungsaktionen) werden auf Steuerzeichen und Bidi-Steuerzeichen geprüft und abgelehnt. Nachrichteninhalte bleiben unverändert; Clients isolieren fremde Namen beim Darstellen (Unicode-Isolation). |
 | SEC-IN-5 | Datenbankzugriff nur über sqlc mit Parametern. Ein Lint verbietet zusammengesetzte SQL-Texte außerhalb des generierten Codes. |
@@ -129,15 +129,15 @@ Regeln:
 |---|---|
 | SEC-UP-1 | Größe vor dem Speichern begrenzt (`file.max_upload_bytes`, 03); Abbruch mit `413`, sobald die Grenze im Stream erreicht ist. |
 | SEC-UP-2 | Der MIME-Typ wird vom Server erkannt, nie vom Client übernommen (03, `files.mime_type`). |
-| SEC-UP-3 | Inline-Darstellung nur für Rasterbilder, die der Server neu kodiert hat (Vorschaubilder). SVG, HTML, PDF und alles andere nur als Anhang (SEC-HDR-4). |
+| SEC-UP-3 | Inline-Darstellung nur für die Inline-Liste aus [12-dateien.md](12-dateien.md), Abschnitt 9.3: Rasterbilder, die der Server nach 12, Abschnitt 7.1 bereinigt oder neu kodiert hat, ihre Vorschaubilder und die dort genannten Audio- und Videotypen. SVG, HTML, PDF und alles andere nur als Anhang (SEC-HDR-4). |
 | SEC-UP-4 | Bildgröße wird vor dem Dekodieren aus dem Dateikopf gelesen; über `file.image.max_pixels` ([12-dateien.md](12-dateien.md)) keine Vorschau. Schutz gegen Dekompressionsbomben. |
 | SEC-UP-5 | Parser für nicht vertrauenswürdige Formate laufen in einem eigenen Prozess mit Speicher- und Zeitgrenze, nie im API-Prozess. M1 hat nur Bildvorschau in reinem Go (Baseline R-Objektspeicher). |
 | SEC-UP-6 | Virenscan als getrennter Dienst (ADR 0033). Auslieferung erst bei `scan_status IN ('clean','skipped')` (03). Ist der Scanner nicht bereit, bleiben Dateien `pending` (fail closed). `infected`: nie auslieferbar, Hinweis an den Owner. |
 | SEC-UP-7 | Archive werden im Server nie entpackt. |
 | SEC-UP-8 | Objektschlüssel sind zufällig und enthalten keine Namen (03). Originalnamen nur bereinigt in `Content-Disposition`. |
 | SEC-UP-9 | Eine Datei hängt nur an Nachrichten ihres Kanals `scope_channel_id` (03). Damit gelangt eine Datei nicht über Bereichsgrenzen in den Kontext eines anderen Agenten. |
-| SEC-UP-10 | Ortsdaten und andere persönliche Metadaten werden aus gespeicherten Bildern immer entfernt: bei JPEG und PNG verlustfrei beim Upload (Segment- und Chunk-Filter), Vorschaubilder neu kodiert (Ruling L16, ADR 0047, [12-dateien.md](12-dateien.md) Abschnitt 7). |
-| SEC-UP-11 | Clients bekommen keine dauerhaften Objektspeicher-URLs; jeder Abruf läuft über `file.read` (07, Abschnitt 8.1). |
+| SEC-UP-10 | Ortsdaten und andere persönliche Metadaten werden aus gespeicherten Bildern immer entfernt: bei JPEG und PNG verlustfrei beim Upload (Segment- und Chunk-Filter), Vorschaubilder neu kodiert (Ruling L16, [ADR 0047](../adr/0047-bild-metadaten-verlustfrei-entfernen.md), [12-dateien.md](12-dateien.md) Abschnitt 7). |
+| SEC-UP-11 | Clients bekommen keine dauerhaften Objektspeicher-URLs; jeder Abruf läuft über `file.read` (07, Abschnitt 8.1; [ADR 0048](../adr/0048-datei-abruf-nur-ueber-den-server-mit-kurzlebigen-tickets.md)). |
 
 Speicherorte, Vorschau-Varianten, Kontingente und der Scan-Dienst im Detail: [12-dateien.md](12-dateien.md).
 
@@ -161,7 +161,7 @@ Baseline Abschnitt 4: kein serverseitiges Laden fremder URLs.
 | SEC-LOG-1 | Strukturierte Logs (`log/slog`). Geheimnisse haben im Code einen eigenen Typ, der beim Ausgeben immer `[redacted]` schreibt. |
 | SEC-LOG-2 | Kopfzeilen werden über eine Erlaubnisliste geloggt, nicht über eine Sperrliste. `Authorization`, `DPoP`, `Cookie`, `Set-Cookie`, Aufruf-Marken, `X-Forwarded-*` und Identitäts-Kopfzeilen eines Proxys erscheinen nie. Grund: Bei einer Sperrliste rutscht jede neue Kopfzeile durch. |
 | SEC-LOG-3 | Pfade werden als Routen-Muster geloggt (`/api/v1/hooks/{webhook_id}/{token}`), nie roh; Query-Strings nie. |
-| SEC-LOG-4 | Nie im Log: Nachrichteninhalte, Dateinamen, Kanal-Prompts, Transkripte, Suchbegriffe, Anzeigenamen, E-Mail-Adressen, Push-Tokens. Prinzipale erscheinen nur als ID. |
+| SEC-LOG-4 | Nie im Log: Nachrichteninhalte, Dateinamen, Kanal-Prompts, Transkripte, Suchbegriffe, Anzeigenamen, E-Mail-Adressen, Push-Tokens. Menschen erscheinen nur als HMAC-Pseudonym (`bothy.principal.pseudo_id`, R-OB-03, [privacy.md](../observability/privacy.md) Abschnitt 3), Agenten und Apps mit Handle; Geräte-IDs nie. Das gilt für Logs und Spans, nicht für das Audit-Log ([20-datenschutz.md](20-datenschutz.md)). |
 | SEC-LOG-5 | IP-Adressen nur im Audit-Log und nur pseudonymisiert ([20-datenschutz.md](20-datenschutz.md), Abschnitt 4.5), nicht in allgemeinen Logs. |
 | SEC-LOG-6 | Telemetrie-Attribute über eine Erlaubnisliste je Signal ([17-observability.md](17-observability.md)); keine Inhalte (Baseline B11). |
 | SEC-LOG-7 | Absturzberichte von Apps werden vor dem Senden bereinigt; Inhalte, Tokens und Namen sind nicht enthalten. |
@@ -173,7 +173,7 @@ nur Hashes, verschlüsselte Werte mit externem Schlüssel oder Verweise (`secret
 
 | Geheimnis | Ort | Wechsel |
 |---|---|---|
-| Private Signierschlüssel (Zugriffstoken, Aufruf-Marke, ausgehende Webhooks, Audit-Prüfpunkte) | vom Server erzeugt im Schlüsselspeicher `secrets.signing_key_dir` (ADR 0066): Ed25519, `kid` = Fingerabdruck nach RFC 7638, Datei `<zweck>-<kid>.pem`; öffentlicher Teil in `server_signing_keys` | Zustände `next`, `active`, `retiring`, `retired`. Planmäßig nach `signing_key.invocation_rotation_interval` (Aufruf-Marke, 09) bzw. `signing_key.access_token_rotation_interval` (Zugriffstoken), Job `instance.key_rotation` alle `signing_key.rotation_check_interval`, Systemaktion `signing_key.transition`; `webhook_out` und `audit_checkpoint` nur auf Anforderung (`signing_key.rotate` mit `mode = scheduled`). Ein Schlüssel bleibt `retiring`, bis die längste damit signierte Gültigkeit plus `auth.clock_leeway` abgelaufen ist; dann `retired`, und die private Datei wird gelöscht. Notfall: `signing_key.rotate` mit `mode = emergency` setzt alle Schlüssel des Zwecks sofort auf `retired`, weil ein Leck des Speichers auch `next` und `retiring` offenlegt. Prozesse übernehmen Änderungen spätestens nach `signing_key.cache_ttl` |
+| Private Signierschlüssel (Zugriffstoken, Aufruf-Marke, ausgehende Webhooks, Audit-Prüfpunkte) | vom Server erzeugt im Schlüsselspeicher `secrets.signing_key_dir` ([ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)): Ed25519, `kid` = Fingerabdruck nach RFC 7638, Datei `<zweck>-<kid>.pem`; öffentlicher Teil in `server_signing_keys` | Zustände `next`, `active`, `retiring`, `retired`. Planmäßig nach `signing_key.invocation_rotation_interval` (Aufruf-Marke, 09) bzw. `signing_key.access_token_rotation_interval` (Zugriffstoken), Job `instance.key_rotation` alle `signing_key.rotation_check_interval`, Systemaktion `signing_key.transition`; `webhook_out` und `audit_checkpoint` nur auf Anforderung (`signing_key.rotate` mit `mode = scheduled`). Ein Schlüssel bleibt `retiring`, bis die längste damit signierte Gültigkeit plus `auth.clock_leeway` abgelaufen ist; dann `retired`, und die private Datei wird gelöscht. Notfall: `signing_key.rotate` mit `mode = emergency` setzt alle Schlüssel des Zwecks sofort auf `retired`, weil ein Leck des Speichers auch `next` und `retiring` offenlegt. Prozesse übernehmen Änderungen spätestens nach `signing_key.cache_ttl` |
 | Pepper für Token-Hashes | Secret-Provider | nur nach Kompromittierung; dann werden alle Tokens neu ausgegeben, weil Hashes unbekannter Tokens nicht umgerechnet werden können |
 | Schlüssel für TOTP-Geheimnisse | Secret-Provider, `totp_key_ref` je Zeile | neuer Schlüssel für neue Einträge, alte bleiben lesbar bis zum Umschlüsseln |
 | Datenbank-Zugang | Secret-Provider oder Umgebung | Betrieb |
@@ -198,7 +198,7 @@ Regeln:
 
 | ID | Kontrolle | Ort |
 |---|---|---|
-| SEC-AI-1 | Jeder Inhalt, den der Server einem Agenten liefert, trägt seine Herkunft: Autor, `origin` (`human`, `agent`, `app`, `import`, `system`), Art (Nachricht, Datei, Transkript, Zitat) und Kanal. Der Kanal-Prompt ist ein eigenes Feld. Adapter müssen fremde Inhalte als Daten kennzeichnen, nicht als Anweisung. | [09-agenten.md](09-agenten.md) |
+| SEC-AI-1 | Jeder Inhalt, den der Server einem Agenten liefert, trägt seine Herkunft: Autor, `origin` (`human`, `agent`, `app`, `import`, `system`), Art (Nachricht, Datei, Transkript, Zitat) und Kanal. Der Kanal-Prompt ist ein eigenes Feld. Adapter müssen fremde Inhalte als Daten kennzeichnen, nicht als Anweisung; Inhalte von Dateien sind immer Daten. | [09-agenten.md](09-agenten.md), [ADR 0054](../adr/0054-herkunfts-und-vertrauensmarkierung-im-agenten-kontext.md) |
 | SEC-AI-2 | Werkzeugklasse mit Soll und Ist; `host` nur für Owner oder eigene Dev-Umgebung. | 07, SR2 |
 | SEC-AI-3 | Auftragsbindung: Agent im Lauf hat höchstens die Rechte des Auslösers. | 07, SR9 |
 | SEC-AI-4 | Komponenten mit `required_capability = 'approve_actions'` haben standardmäßig `restricted_to = 'run_starter'`. | [09-agenten.md](09-agenten.md) |
@@ -247,7 +247,7 @@ Format der Prüfpunkte (03, `audit_checkpoints`):
 | Teil | Festlegung |
 |---|---|
 | Nutzlast | `{instance_id, seq, hash, occurred_at, previous_checkpoint_hash}` nach RFC 8785 (JCS); `seq`, `hash` und `occurred_at` gehören zur erfassten Zeile von `audit_events`, Zeit in der Form von SEC-AUD-4; `hash` und `previous_checkpoint_hash` als Hex in Kleinbuchstaben; `previous_checkpoint_hash` ist SHA-256 der kanonischen Nutzlast des vorigen Prüfpunkts und fehlt beim ersten |
-| Signatur | kompakte JWS mit Kopf `{alg, kid, typ: "audit-checkpoint+json"}`, Schlüssel mit Zweck `audit_checkpoint` (ADR 0066); `audit_checkpoints.signature` speichert die ganze JWS als UTF-8; geprüft werden nur die Algorithmen aus 03 `server_signing_keys`, nie `none` |
+| Signatur | kompakte JWS mit Kopf `{alg, kid, typ: "audit-checkpoint+json"}`, Schlüssel mit Zweck `audit_checkpoint` ([ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)); `audit_checkpoints.signature` speichert die ganze JWS als UTF-8; geprüft werden nur die Algorithmen aus 03 `server_signing_keys`, nie `none` |
 | Ablage mit `file://` | Datei `<pfad>/<instance_id>/<seq mit 20 Stellen, vorne Nullen>.jws` mit der JWS; Ordner `0700`, Datei `0600`; angelegt über eine temporäre Datei im selben Ordner mit `O_EXCL`, Umbenennen und `fsync` von Datei und Ordner; eine vorhandene Datei mit anderem Inhalt ist ein Fehler und wird nie überschrieben |
 
 ## 13. Penetrationstest-Plan
@@ -283,7 +283,7 @@ Format der Prüfpunkte (03, `audit_checkpoints`):
 | SEC-T07 | Bidi- und Steuerzeichen in Anzeigenamen abgelehnt | SEC-IN-4 |
 | SEC-T08 | Uploads: falsche Typ-Angabe, SVG mit Skript, Dekompressionsbombe, Größe über Grenze, Scanner nicht bereit, infizierte Testdatei (EICAR) | SEC-UP-1 bis 7 |
 | SEC-T09 | Egress: je eine Adresse aus jedem gesperrten Bereich aus SEC-NET-3 (IPv4 und IPv6, inklusive der Metadaten-Adresse), DNS-Name mit privater Antwort, Weiterleitung auf private Adresse: alle abgewiesen | SEC-NET-1 bis 5 |
-| SEC-T10 | Kanarien-Test: definierte Kanarienwerte (Token, Nachrichtentext, Dateiname, Prompt, E-Mail, IP) durch alle Wege schicken; keiner erscheint in Logs, Traces, Metriken, Audit-Details, Fehlerantworten oder fremden Ereignissen | SEC-LOG-1 bis 7, SEC-SEC-3 |
+| SEC-T10 | Kanarien-Test: definierte Kanarienwerte (Token, Nachrichtentext, Anzeigename, E-Mail, IP; mit ihren Etappen Dateiname, Prompt, Suchbegriff, Push-Token, Formularwert) durch alle Wege schicken; keiner erscheint in Logs, Traces, Metriken, Audit-Details, Fehlerantworten oder fremden Ereignissen; Prinzipal-IDs von Menschen erscheinen in Logs und Traces nur als Pseudonym (SEC-LOG-4). Das Ticket, das einen neuen Weg für ein solches Feld baut, erweitert das Szenario (PLAN) | SEC-LOG-1 bis 7, SEC-SEC-3 |
 | SEC-T11 | Secret-Provider-Datei mit Modus `0644` | Startabbruch, SEC-SEC-1 |
 | SEC-T12 | `config print` mit gesetzten Geheimnissen | keine Geheimnisse in der Ausgabe |
 | SEC-T13 | Client-Darstellung: Markdown mit HTML, `javascript:`-Link, Bild-URL, Link-Vorschau | nichts ausgeführt, nichts geladen |

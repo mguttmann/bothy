@@ -63,7 +63,7 @@ Readiness gehören nicht zur öffentlichen API; sie liegen auf dem internen List
 | Zeit | RFC 3339 in UTC mit `Z` und Millisekunden. Dauern als Ganzzahl in Millisekunden (`_ms`). Clients lesen jede gültige RFC-3339-Form. | Eindeutig, sortierbar, sprachneutral. |
 | Ganzzahlen | `format: int64`. Sequenzen, Versionen und Beträge bleiben unter 2^53, damit JavaScript sie exakt darstellt; ein Server-Test prüft die Grenze bei der Vergabe. | JSON-Zahlen in JavaScript sind Gleitkomma. |
 | Geld | `amount_micros` (int64) plus `currency` (ISO 4217). | 03, R-DM-04. |
-| Kein `null` | Der Server sendet nie JSON `null`. Fehlt ein Feld, hat es keinen Wert. Clients behandeln ein empfangenes `null` wie ein fehlendes Feld. Werte werden über eigene Felder oder Modi entfernt (z. B. `use_global_order: true`, `OperatorSet.mode = none`), nie durch `null`. | dart-dio kennt den Null-Typ nicht [belegt, Q4]; ein Weg für alle Generatoren (R-API-03). |
+| Kein `null` | Der Server sendet nie JSON `null`. Fehlt ein Feld, hat es keinen Wert. Clients behandeln ein empfangenes `null` wie ein fehlendes Feld. Werte werden über eigene Felder oder Modi entfernt (z. B. `use_global_order: true`, `OperatorSet.mode = none`), nie durch `null`. | dart-dio kennt den Null-Typ nicht [belegt, Q4]; ein Weg für alle Generatoren (R-API-03, [ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)). |
 | Unbekanntes | Clients ignorieren unbekannte Felder, Enum-Werte, Ereignistypen und Problem-Codes. Der Server lehnt unbekannte Felder in Anfragen und Gateway-Rahmen ab (`400 validation_failed` bzw. Schließ-Code `4002`); schreibende Schemas haben `additionalProperties: false` ([19-sicherheit.md](19-sicherheit.md), SEC-IN-1; PLAN W7). Ob ein Server ein neues Feld kennt, sieht ein Client an `features` der Discovery. | Ein still verworfenes Feld verschluckt bei einem älteren Server eine Absicht; Antworten und Ereignisse bleiben additiv (Abschnitt 13). |
 | Medientypen | JSON als `application/json` (UTF-8); Fehler als `application/problem+json`; Datei-Teile als `application/octet-stream`; Bilder für Avatar und Logo als `multipart/form-data` (Teil `file`); Exporte als `application/x-ndjson`. | Ein Format je Zweck; NDJSON lässt große Exporte streamen. |
 | Größe | JSON-Körper bis `http.max_json_body_bytes`, Schachtelung bis `http.max_json_depth` ([02-architektur.md](02-architektur.md)), sonst `413 payload_too_large` bzw. `400 malformed_request`. `http.max_json_body_bytes` ist echt größer als `message.max_content_bytes`. | Schutz vor Speicherdruck ohne lange Nachrichten zu verhindern. |
@@ -185,7 +185,8 @@ Sitzung `auth.step_up_max_age` (03). Agenten- und App-Tokens bekommen bei solche
    `409 last_owner`; I3 beim Start eines Laufs `409 billing_mode_mismatch`, eine zu hohe
    Werkzeugklasse `409 tool_class_mismatch`. Ein schreibgeschützter Kanal ergibt
    `403 channel_read_only`, ein wartendes Gerät `403 device_pending`, der Wartungsmodus
-   `503 maintenance` (05, Regeln 1.8 und 1.9).
+   `503 maintenance` mit `Retry-After` für Aktionen mit Wirkung `write` außer den Ausnahmen aus
+   [ADR 0065](../adr/0065-wartungsmodus-read-only.md) (05, Regeln 1.8 und 1.9, Abschnitt 2.7).
 6. Agenten-Auslösung: Eine Nachricht wird gespeichert, auch wenn `agent.invoke` ablehnt; dann gilt
    `trigger_state = failed` mit `trigger_state_reason` (05, Abschnitt 5). Befehle und
    Interaktionen ohne Auslöserecht antworten `403 agent_invocation_denied` mit `reason`.
@@ -201,7 +202,10 @@ Sitzung `auth.step_up_max_age` (03). Agenten- und App-Tokens bekommen bei solche
 ## 5. Fehler
 
 1. Jeder Fehler ist `application/problem+json` nach RFC 9457 [belegt, Q2] mit `type`, `title`,
-   `status`, `code`, `correlation_id`, optional `detail` und `instance`.
+   `status`, `code`, `correlation_id`, optional `detail` und `instance`. `instance` ist der Pfad
+   der Anfrage ohne Query; Pfad-Parameter, die ein Geheimnis tragen (heute nur `{token}` von
+   `postIncomingWebhook`), erscheinen als Platzhalter, wie in Logs ([19-sicherheit.md](19-sicherheit.md),
+   SEC-LOG-3).
 2. `type` ist ein relativer URI mit vollem Pfad `/api/v1/problems/{code}`. RFC 9457 empfiehlt
    absolute URIs "when possible" und erlaubt relative mit vollem Pfad [belegt, Q2]. Eine
    selbst gehostete Software hat keinen gemeinsamen Host; jede Instanz liefert die Beschreibung
@@ -210,7 +214,8 @@ Sitzung `auth.step_up_max_age` (03). Agenten- und App-Tokens bekommen bei solche
 3. Erweiterungen: `errors[]` bei `validation_failed` mit `pointer` (JSON Pointer in den Körper,
    `#path/<name>`, `#query/<name>` oder `#header/<name>` für Parameter, leer für eine Regel der
    ganzen Anfrage), `code` (z. B. `required`, `too_long`, `limit_reached` für eine erreichte
-   Mengen-Grenze) und `detail`; `current` bei `version_conflict` und `base_version_conflict`;
+   Mengen-Grenze, `not_enabled` für ein Feld, dessen Funktion diese Server-Version noch nicht baut)
+   und `detail`; `current` bei `version_conflict` und `base_version_conflict`;
    `reason` und `hint` bei Ablehnungen, Invarianten und Konflikten mit benanntem Grund (z. B.
    `one_time_secret`, Abschnitt 7). `detail` enthält nie Inhalte, Geheimnisse oder interne Pfade.
 4. `400` steht für Schema- und Regelverstöße. `422` gibt es nur für `idempotency_key_reuse` (04,
@@ -229,7 +234,7 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | Code | Status | Bedeutung (aus openapi.yaml) | Client-Reaktion (aus openapi.yaml) |
 |---|---|---|---|
 | `validation_failed` | 400 | The request violates the schema or a rule; `errors[]` names the fields. | Correct the input; do not retry. |
-| `malformed_request` | 400 | The body is not valid JSON or has the wrong media type. | Programming error; do not retry. |
+| `malformed_request` | 400 | The body is not valid JSON, has a duplicate member name, invalid UTF-8 or nesting deeper than `http.max_json_depth` (SEC-IN-2). | Programming error; do not retry. |
 | `cursor_invalid` | 400 | The cursor is unknown or does not match the filters. | Start again without a cursor. |
 | `webhook_host_not_allowed` | 400 | The target host is not in `webhook.allowed_hosts`. | The owner requests approval of the host. |
 | `unauthenticated` | 401 | No valid principal (token missing, invalid or expired). | Renew the token; if that fails, log in again. |
@@ -259,6 +264,7 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `component_used` | 409 | The component is used, expired or disabled. | Refresh the view. |
 | `operator_mismatch` | 409 | The target channel has another effective operator. | Choose another target channel. |
 | `file_not_ready` | 409 | Upload incomplete or scan still running. | Wait for `file.updated`. |
+| `file_blocked` | 409 | The file is never delivered: malware found, scan error or failed upload (12, 9.3). | Show the file as blocked; do not retry. |
 | `title_manual` | 409 | The operator agent sets a thread title only while `title_source` is `auto` (09 section 12). | The agent keeps the manual title. |
 | `resync_required` | 410 | Catch-up is not possible; `reason` as in the gateway. | Load a snapshot (04, 7.3). |
 | `message_deleted` | 410 | The message was deleted in the meantime. | Discard the entry; keep the text for copying. |
@@ -424,7 +430,9 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
    Token>;t=<Sekunden bis voll>`. Die Abbildung eines Token-Buckets auf `q`, `w`, `r`, `t` ist
    eigene Festlegung [abgeleitet].
 3. Erschöpft: `429 rate_limited` mit `Retry-After` (RFC 9110). Clients warten mindestens so lange;
-   das Ausgangsfach nutzt danach seinen Backoff (04, 13.2). Das Gateway schließt mit `4008`.
+   das Ausgangsfach nutzt danach seinen Backoff (04, 13.2). Am Gateway schließt nur
+   `rl.gateway_connect` bei `identify` und `resume` mit `4008`; jede andere Op antwortet `error`
+   mit `rate_limited`, die Verbindung bleibt (04, 6.2 und 6.4).
 4. Ändern sich die Kopfzeilen, wenn der Entwurf ein RFC wird, sendet der Server die neuen Namen
    zusätzlich für `api.deprecation_min_notice` (Abschnitt 13).
 
@@ -457,14 +465,15 @@ sequenceDiagram
    ([12-dateien.md](12-dateien.md), Abschnitt 3).
 2. `complete` prüft Größe und optional SHA-256, erkennt den MIME-Typ selbst und stellt den
    Virenscan an. Herunterladen geht erst bei `scan_status` `clean` oder `skipped`; vorher
-   `409 file_not_ready`, bei `infected` `404`.
+   `409 file_not_ready`, bei `infected`, `error` oder gescheitertem Upload `409 file_blocked`
+   ([12-dateien.md](12-dateien.md), Abschnitt 9.3); ohne Leserecht immer `404`.
 3. `GET /files/{id}/content` liefert die Bytes immer selbst, mit `Range`-Unterstützung; es gibt
-   keine presigned GET-URLs (ADR 0048, [12-dateien.md](12-dateien.md), Abschnitt 9). Medien-Player
+   keine presigned GET-URLs ([ADR 0048](../adr/0048-datei-abruf-nur-ueber-den-server-mit-kurzlebigen-tickets.md), [12-dateien.md](12-dateien.md), Abschnitt 9). Medien-Player
    ohne DPoP holen ein kurzlebiges Abruf-Ticket (`POST /files/{id}/tickets`). Der Server prüft
    `file.read` vor jeder Auslieferung, auch mit Ticket (B7).
 4. Avatar und Logo kommen als `multipart/form-data`; der Server entfernt Metadaten, bei JPEG und
    PNG verlustfrei, und erzeugt neu kodierte Vorschaubilder ([12-dateien.md](12-dateien.md),
-   Abschnitt 7; Ruling L16).
+   Abschnitt 7; Ruling L16; [ADR 0047](../adr/0047-bild-metadaten-verlustfrei-entfernen.md)).
 5. Sprachnachrichten: Audio hochladen, Nachricht mit `kind = voice`. Transkript über
    `requestTranscription` (Dienst-Port, Schalter `voice.enabled`) oder `submitTranscript` durch
    den Agenten (Aktion `file.transcript.submit`).
@@ -483,7 +492,7 @@ sequenceDiagram
    OpenAPI-Objekt ablehnen [belegt, eigene Probe 2026-10-10 mit @asyncapi/cli 6.2.0].
 4. Felder nur für die Zustellung: `invocation_token` (frische Aufruf-Marke, 04 15.3) und
    `redelivered` (04 15.2) stehen im Umschlag, nicht im Rahmen, und nie im Ereignis-Log (04
-   Abschnitt 2.2, ADR 0052).
+   Abschnitt 2.2, [ADR 0052](../adr/0052-ein-ereignis-umschlag-fuer-gateway-rest-und-webhooks.md)).
 5. REST-Alternativen: `GET /events` (04, 7.4) und `GET /agents/me/consumers/{consumer}/events`
    mit `POST .../ack` für Adapter ohne WebSocket.
 6. Autovervollständigung von Befehlen: `autocompleteCommand` schickt das kurzlebige Ereignis
@@ -565,12 +574,12 @@ Wunsch je Abo. Zustellung, Wiederholung, Prüfung beim Empfänger und Eingangs-W
 | Nr | Prüfung | Werkzeug | Hält |
 |---|---|---|---|
 | G1 | Lint beider Dateien ohne Fehler und Warnungen | Redocly CLI 2.62.1 mit docs/api/redocly.yaml | Struktur, Beispiele gegen Schemas, Regeln aus 05 (Aktion, Klasse, Empfangs-Aktion), konservative Schemas |
-| G2 | Katalog-Abgleich `api-catalogue-sync` | `tools/api-checks` (M1-03), `make api-checks` | `x-authz-action` und `x-rate-limit-class` gleich `docs/spec/actions.yaml`; Ops, Ereignisse und Empfangs-Aktionen in asyncapi.yaml gleich actions.yaml; Schließ-Codes gleich 04 (6.4, Code und Name); jede POST- und PATCH-Operation hat `Idempotency-Key` oder `x-idempotency-exempt` mit bekanntem Grund; Deprecation-Daten nach 13.4; `x-problem-codes` und `x-status` vollständig. Die Listen in redocly.yaml hält `catalog-check` (M1-02) |
+| G2 | Katalog-Abgleich `api-catalogue-sync` | `tools/api-checks` (M1-03), `make api-checks` | `x-authz-action` und `x-rate-limit-class` gleich `docs/spec/actions.yaml` ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)); Ops, Ereignisse und Empfangs-Aktionen in asyncapi.yaml gleich actions.yaml; Schließ-Codes gleich 04 (6.4, Code und Name); jede POST- und PATCH-Operation hat `Idempotency-Key` oder `x-idempotency-exempt` mit bekanntem Grund; Deprecation-Daten nach 13.4; `x-problem-codes` und `x-status` vollständig. Die Listen in redocly.yaml hält `catalog-check` (M1-02) |
 | G3 | Erzeugte Tabellen dieses Kapitels `api-tables` | `tools/api-checks` (M1-03), `make api-tables` | Blöcke der Abschnitte 5, 7, 16 und 17 und `webhook_events` in webhooks.md entsprechen den YAML-Dateien |
 | G4 | Codegenerierung | vier Generatoren aus Abschnitt 14 | erzeugen, kompilieren, keine Abweichung zum eingecheckten Code |
 | G5 | Toleranz-Test | je SDK ein Test mit Fixture | unbekanntes Feld, unbekannter Enum-Wert, unbekannter Ereignistyp werden ohne Fehler übersprungen |
 | G6 | Bruch-Prüfung gegen die letzte Veröffentlichung | oasdiff, falls Ticket B-6 es belegt | Tabelle in Abschnitt 13 |
-| G7 | Eigenschaftsbasierte Tests gegen den laufenden Server | Schemathesis gegen den Compose-Stack | Statuscodes, Medientypen, Antwort-Schemas und Kopfzeilen jeder Op; zustandsbehaftete Folgen über abgeleitete Links; eigene Prüfungen: Problem-Format, `Correlation-Id`, kein `null`, 404-Gleichheit für fremde und fehlende IDs |
+| G7 | Eigenschaftsbasierte Tests gegen den laufenden Server | Schemathesis gegen den Server aus dem Arbeitsbaum mit Wegwerf-PostgreSQL (`make contract-test`); den Compose-Stack prüft der Rauchtest (`make portability`) | Statuscodes, Medientypen, Antwort-Schemas und Kopfzeilen jeder Op; zustandsbehaftete Folgen über die Links, die Schemathesis ableitet (die Spec hat keine `links`; leitet die gepinnte Version keine Übergänge ab, gilt dieser Teil als nicht bewiesen); eigene Prüfungen: Problem-Format, `Correlation-Id`, kein `null`, 404-Gleichheit für fremde und fehlende IDs |
 | G8 | Antwort-Validierung in Integrationstests | Middleware im Test-Build | jede Antwort jedes Integrationstests passt zur Spec |
 | G9 | Gateway-Rahmen | Integrationstests mit Mitschnitt | jeder gesendete Rahmen passt zu seinem Schema; Register von Ops und Ereignistypen gleich 05 (05, Abschnitt 9) |
 | G10 | Webhook-Konformität | Testvektoren und unabhängige Prüfung | `v1` mit der Referenzbibliothek, `v1a` mit Ed25519 aus der Standardbibliothek |
@@ -584,8 +593,11 @@ Wunsch je Abo. Zustellung, Wiederholung, Prüfung beim Empfänger und Eingangs-W
    Verbrauchergetriebene Verträge brächten einen Broker und eine zweite Wahrheit, ohne ein Risiko
    zu decken, das G4 bis G8 offen lassen. Das ändert sich erst, wenn fremde Teams eigene Clients
    ohne diese Spec bauen.
-3. G1 bis G6 laufen im einen lokalen Gate-Befehl, der mit CI identisch ist (ADR 0038, Team H);
-   G7 bis G10 laufen mit den Integrationstests gegen den Compose-Stack.
+3. G1 bis G6 laufen im einen lokalen Gate-Befehl, der mit CI identisch ist (ADR 0038, Team H).
+   G7 (`make contract-test`) und G8 (in jedem Integrationstest) laufen ebenfalls in `make check`,
+   G9 und G10 mit den Integrationstests. Grund gegen den Compose-Stack für G7: Er braucht das
+   fertige Image und den Rauchtest der Etappe; der Server aus dem Arbeitsbaum prüft jede Änderung
+   vor dem Merge.
 
 ## 16. Endpunkte
 
@@ -763,6 +775,7 @@ Erzeugt aus openapi.yaml.
 | POST | `/api/v1/channels/{channel_id}/tags` | `createForumTag` | `forum_tag.manage` | Create a forum tag |
 | PATCH | `/api/v1/channels/{channel_id}/tags/{tag_id}` | `updateForumTag` | `forum_tag.manage` | Change a forum tag |
 | DELETE | `/api/v1/channels/{channel_id}/tags/{tag_id}` | `deleteForumTag` | `forum_tag.manage` | Delete a forum tag |
+| POST | `/api/v1/channels/{channel_id}/tags/{tag_id}/move` | `moveForumTag` | `forum_tag.manage` | Change the position of a forum tag |
 | GET | `/api/v1/channels/{channel_id}/templates` | `listTemplates` | `template.read` | List own and channel templates |
 | POST | `/api/v1/channels/{channel_id}/templates` | `createChannelTemplate` | `template.manage` | Create a channel template |
 | PATCH | `/api/v1/templates/{template_id}` | `updateTemplate` | `template.manage` | Change a template |
@@ -1136,8 +1149,8 @@ frühere Block "proposed" in docs/api/redocly.yaml ist leer und entfällt.
 | Nr | Punkt | Entscheidung, Ort |
 |---|---|---|
 | K1 | Pfad-Präfix | `/api/v1` für alle Flächen, 04 |
-| K2 | kein JSON `null` im Umschlag | übernommen, 04 Abschnitt 2.2, ADR 0053 |
-| K3 | Aufruf-Marke und `redelivered` als Zustellfelder im Umschlag | übernommen, 04 Abschnitt 2.2, ADR 0052 |
+| K2 | kein JSON `null` im Umschlag | übernommen, 04 Abschnitt 2.2, [ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md) |
+| K3 | Aufruf-Marke und `redelivered` als Zustellfelder im Umschlag | übernommen, 04 Abschnitt 2.2, [ADR 0052](../adr/0052-ein-ereignis-umschlag-fuer-gateway-rest-und-webhooks.md) |
 | K4 | `412 version_conflict` mit `If-Match` | übernommen, 03 Grundsatz 10, 04 Abschnitt 13.3 |
 | K5 | Wiederholung von `run.start` mit derselben Marke | übernommen, 03 `runs.started_jti`, 04 Abschnitt 15.3 |
 | K6 | `waiting_input -> running` mit der Marke von Interaktion oder Nachtrag | übernommen, 04 Abschnitt 15.3 Schritt 5 (`resumeRun`, Aktion `run.start`) |
@@ -1163,7 +1176,7 @@ frühere Block "proposed" in docs/api/redocly.yaml ist leer und entfällt.
 |---|---|---|
 | R-API-01 | Hauptversion im Pfad `/api/v1`, nur additive Änderungen innerhalb (ADR 0014). | Sichtbar in Logs und Proxys, einfach für generierte Clients. |
 | R-API-02 | Ressourcen-Pfade plus `POST .../<verb>` für Zustandswechsel. | Eine Aktion je Route; Grund und Audit gehören zum Wechsel. |
-| R-API-03 | Kein JSON `null`; fehlend heißt kein Wert; Entfernen über eigene Felder oder Modi. | dart-dio kennt den Null-Typ nicht; Go `omitempty` passt; PATCH ohne Dreiwertigkeit. |
+| R-API-03 | Kein JSON `null`; fehlend heißt kein Wert; Entfernen über eigene Felder oder Modi ([ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)). | dart-dio kennt den Null-Typ nicht; Go `omitempty` passt; PATCH ohne Dreiwertigkeit. |
 | R-API-04 | Clients ignorieren Unbekanntes in Antworten und Ereignissen; der Server lehnt unbekannte Anfragefelder ab (W7, SEC-IN-1). | Unabhängige Updates von Apps und Servern, ohne dass ein älterer Server eine Absicht still verschluckt. |
 | R-API-05 | `oneOf` nur mit Diskriminator, kein `anyOf`, keine Typ-Arrays (Lint). | oapi-codegen macht aus Mehrtyp-Unions `any` (Baseline R-Stack). |
 | R-API-06 | Alle Schemas in openapi.yaml; asyncapi.yaml referenziert sie. | Eine Quelle für alle Generatoren. |

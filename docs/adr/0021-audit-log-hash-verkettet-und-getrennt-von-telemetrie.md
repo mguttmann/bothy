@@ -60,9 +60,11 @@ Festlegungen:
 - `audit.verify` rechnet die Kette ab dem letzten Anker nach und vergleicht mit den Prüfpunkten
   vom Ziel, nicht aus der Datenbank.
 - Inhalt: nur IDs, Aktion, Entscheidung, Grund-Code, Ressource, `details` nach Schema
-  `audit_details.v1`; nie Inhalte, Namen, E-Mails oder Geheimnisse. IP-Adressen nur als HMAC mit
-  vernichtbarem Schlüssel je Zeitraum ([../spec/20-datenschutz.md](../spec/20-datenschutz.md),
-  Abschnitt 4.5).
+  `audit_details.v1` ([../spec/19-sicherheit.md](../spec/19-sicherheit.md), SEC-AUD-5); nie Inhalte,
+  Namen, E-Mails oder Geheimnisse. Einziger Freitext ist der Pflichtgrund einer Verwaltungsaktion
+  (`reason`, z. B. bei I4), weil die Aktion ihn verlangt und er zur Nachvollziehbarkeit gehört.
+  IP-Adressen nur als HMAC mit vernichtbarem Schlüssel je Zeitraum
+  ([../spec/20-datenschutz.md](../spec/20-datenschutz.md), Abschnitt 4.5).
 - Telemetrie bekommt höchstens Zähler (z. B. Ablehnungen je Aktion), nie Audit-Zeilen.
 - Gleiche Ablehnungen desselben Prinzipals werden je `audit.deny_aggregate_window` zusammengefasst
   (R-AZ-04).
