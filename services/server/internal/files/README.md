@@ -5,12 +5,12 @@ Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
 
 ## Zweck
 
-Upload, Objektspeicher-Treiber, Scan, Vorschaubilder, Anhänge, Transkripte.
+Upload-Sitzungen in Teilen, Objektspeicher-Treiber, Scan, Metadaten-Entfernung, Vorschaubilder, Anhänge, Transkripte, Dateitext.
 
 ## Port (Wurzelpaket `internal/files`)
 
-- Eingehend: `Uploads`, `Files` (Lesen, Öffnen, Vorschau, Löschen), `Attachments`, `Transcripts`; deklariert `AttachmentLocator`.
-- Gibt In-Tx-Ereignisse aus: keine.
+- Eingehend: `Uploads` (Sitzungen, Teile), `Files` (Lesen, Öffnen, Vorschau, Abruf-Tickets, Löschen), `Attachments`, `Transcripts`, `TextExtracts`; deklariert `AttachmentLocator`.
+- Gibt In-Tx-Ereignisse aus: `FileFinalized` (Scan und gegebenenfalls Transkript endgültig).
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: `identity.AvatarFiles`, kernel `personaldata.Participant`.
 
@@ -25,13 +25,13 @@ Geprüft durch go-arch-lint (ADR 0008).
 
 ## Tabellen
 
-`files`, `file_thumbnails`, `message_attachments`.
+`files`, `file_upload_sessions`, `file_upload_parts`, `file_thumbnails`, `message_attachments`, `file_text_extracts`.
 
 Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
 
 ## Aktionen (05-aktionen.md)
 
-`file.upload`, `file.read`, `file.delete`, `file.transcribe`.
+`file.upload`, `file.read`, `file.delete`, `file.transcribe`, `file.transcript.submit`.
 
 ## Ereignisse und WebSocket-Ops
 
@@ -45,6 +45,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 |---|---|---|
 | `files.scan` | `InsertTx` beim Abschluss eines Uploads | `files` |
 | `files.thumbnail` | nach `clean` | `files` |
+| `files.extract_text` | nach `clean`, unterstützter Typ | `files` |
 | `files.transcribe` | `file.transcribe` bei Server-Transkription | `files` |
 | `files.cleanup_pending` | periodisch | `maintenance` |
 | `files.purge_objects` | periodisch, gelöschte Dateien | `maintenance` |

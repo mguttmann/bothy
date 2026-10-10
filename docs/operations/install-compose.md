@@ -65,7 +65,7 @@ fest (Team C). Der Name des Befehls ist ein Vorschlag dieses Kapitels.
 ### 5.1 Profil `direct`
 
 Der Server ist auf `127.0.0.1:BOTHY_HTTP_PUBLISH_PORT` des Hosts erreichbar. Ein Reverse-Proxy
-terminiert TLS und leitet weiter, auch WebSocket-Upgrades auf `/v1/gateway`. Seine Adresse steht
+terminiert TLS und leitet weiter, auch WebSocket-Upgrades auf `/api/v1/gateway`. Seine Adresse steht
 in `server.trusted_proxies`, damit Rate-Limits je Client-IP greifen. Anmeldung: OIDC oder lokale
 Konten; Header-Identität ist in diesem Profil gesperrt.
 

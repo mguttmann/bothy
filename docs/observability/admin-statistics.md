@@ -16,7 +16,7 @@ Installation gleich und vollständig sein und denselben Rechten folgen wie die D
 |---|---|---|---|
 | Nutzung | Nachrichten je Tag nach Herkunft (`human`, `agent`, `app`, `import`) | `messages` (ohne gelöschte) | Bereich, Kanal, Tag |
 | Nutzung | neue Threads, erledigte Threads | `threads` | Bereich, Kanal, Tag |
-| Nutzung | aktive Menschen (mindestens eine Nachricht) | `messages.author_principal_id` | Bereich, Woche; nur ab `stats.min_group_size` |
+| Nutzung | aktive Menschen (mindestens eine Nachricht) | `messages.author_principal_id` | Bereich, Woche; nur ab `privacy.stats_min_group_size` |
 | Nutzung | Speicher der Dateien | `files.size_bytes` über `scope_channel_id` | Bereich |
 | Läufe | Läufe nach Endzustand, Dauer (Median, p95) | `runs` | Agent, Bereich, Tag |
 | Läufe | Fehlergründe | `runs.state_reason` bei `failed` | Agent, Tag |
@@ -40,8 +40,8 @@ nicht.
 
 1. Keine Kennzahl je Mensch. Weder Nachrichten noch Läufe noch Kosten werden nach Person
    gruppiert. Auslöser eines Laufs (`triggered_by`) erscheinen nicht in der Statistik.
-2. Zähler über Menschen (z. B. aktive Menschen je Bereich) unter `stats.min_group_size` zeigt die
-   Konsole als "weniger als `stats.min_group_size`". Grund: kleine Gruppen machen Einzelne
+2. Zähler über Menschen (z. B. aktive Menschen je Bereich) unter `privacy.stats_min_group_size` zeigt die
+   Konsole als "weniger als `privacy.stats_min_group_size`". Grund: kleine Gruppen machen Einzelne
    erkennbar.
 3. Die Kostenansicht je Thread ist keine Statistik, sondern Teil des Threads (`cost.read.thread`).
 4. Export der Statistik als CSV enthält nur dieselben Aggregate.
@@ -65,7 +65,8 @@ sieht keine Zahlen aus Kanälen, die er nicht lesen darf.
 2. Ergebnisse gelten `stats.cache_ttl`; der Zeitraum ist höchstens `stats.max_range`.
 3. Tagesaggregate: Wird eine Abfrage zu teuer (Lasttest), schreibt ein nächtlicher Job Zeilen in
    eine Tabelle `stats_daily` (Bereich, Kanal, Agent, Tag, Kennzahl, Wert) und die Konsole liest
-   von dort (Kern-Vertrag: Ergänzung beantragt, sobald der Lasttest es verlangt).
+   von dort. Die Tabelle ist noch nicht im Kern-Vertrag; sie kommt als additive Migration erst,
+   wenn der Lasttest es verlangt (Integrations-Entscheid vom 2026-10-10).
 4. Die Zeitzone der Tagesgrenze ist die der Instanz (`locale.default` legt sie nicht fest; Ticket
    für eine Instanz-Einstellung `stats.time_zone` bei Team E).
 

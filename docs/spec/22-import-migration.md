@@ -191,15 +191,14 @@ Regeln:
 - Titel ist der Thread-Name, gekürzt auf `thread.title_max_chars`. Ist der Name ein Platzhalter
   nach der Auto-Titel-Regel (REUSE.md, Abschnitt 5.1), wird `title_source = auto`, sonst `manual`.
 - `threads.created_at` und `last_activity_at` kommen aus der Quelle (Zeit im Snowflake der
-  Thread-ID bzw. der letzten Nachricht) (Kern-Vertrag: Ergänzung beantragt, Abschnitt 18).
+  Thread-ID bzw. der letzten Nachricht) (03, Abschnitt 4.11).
 - Erledigt: Ein Thread wird `closed`, wenn `thread_metadata.archived` genau `true` ist und er nicht
   in der Liste aktiver Threads steht, oder wenn er ein Tag aus `import.discord.closed_tags` trägt.
   `closed_at` ist `archive_timestamp`. Fehlende Metadaten, `false` oder ein Thread in beiden Listen
   gelten als offen. Grund: ein zu Unrecht offener Thread schadet nicht, ein zu Unrecht
   geschlossener versteckt Arbeit.
 - `threads.operator_agent_id` kommt aus `planned_operator` des Kanals in der Zuordnungsdatei, nicht
-  aus dem (im Lese-Spiegel leeren) wirksamen Bediener (Kern-Vertrag: Ergänzung beantragt,
-  Abschnitt 18). Grund: R-DM-12 hält den Bediener fest; ohne diese Regel bliebe jeder importierte
+  aus dem (im Lese-Spiegel leeren) wirksamen Bediener (03, `threads.operator_agent_id`). Grund: R-DM-12 hält den Bediener fest; ohne diese Regel bliebe jeder importierte
   Thread nach dem Umschalten für immer ohne Agent.
 
 ### 5.2 Zuordnungsdatei
@@ -316,12 +315,13 @@ nie geteilt; der Herkunftsschlüssel braucht keinen Teil-Index.
 
 1. `messages.silent = true`, keine `mentions`, kein Push, kein `trigger_state`.
 2. Der Server schreibt je Stapel und Thread ein `thread.updated` statt eines `message.created` je
-   Nachricht (Kern-Vertrag: Ergänzung beantragt, Abschnitt 18). Clients laden den Thread per REST,
+   Nachricht (04, Abschnitt 15.8). Clients laden den Thread per REST,
    wenn sie ihn anzeigen. Grund: ein Import kann ein Vielfaches des normalen Verkehrs schreiben;
    Clients sollen nicht jede Nachricht einzeln empfangen.
-3. Der Server rückt `read_states.last_read_seq` aller Menschen mit Leserecht auf den Thread auf das
-   Ende des Stapels vor, nach der Regel `GREATEST` (Kern-Vertrag: Ergänzung beantragt). Grund:
-   Importiertes ist alt; es soll nicht als ungelesen leuchten.
+3. Der Server setzt `threads.unread_floor_seq` auf das Ende des Stapels; Importiertes zählt damit
+   für keinen Menschen mit Leserecht als ungelesen (03, `read_states`). Grund: Importiertes ist
+   alt; es soll nicht als ungelesen leuchten. Eine Zeile je Thread statt einer je Leser hält den
+   Stapel billig.
 4. Agenten-Adapter bekommen kein `agent.invocation` und kein `agent.followup` aus importierten
    Nachrichten, weil `origin = import` nie auslöst.
 
@@ -405,22 +405,27 @@ nicht, wenn die Quelle schon `running` ist, außer mit `--takeover`.
 
 ## 8. Import-Schnittstelle des Servers
 
-Vorschlag an [06-api.md](06-api.md). Alle Routen sind nur für Owner.
+Verbindlich ist `docs/api/openapi.yaml` (Tag `Import`); diese Tabelle gibt den Stand der Spec
+wieder. Alle Routen sind nur für Owner.
 
-| Operation | Aktion | Step-up |
-|---|---|---|
-| Quelle anlegen (`kind = discord`, Zuordnung) | `import.manage` | ja |
-| Quelle starten, pausieren, fortsetzen, abbrechen, abschließen | `import.manage` | ja |
-| Eigentumsliste je Kanal ändern (`lead`) | `import.manage` | ja |
-| Quelle, Fortschritt, Objekte nach Zustand lesen | `import.read` | nein |
-| Stapel von Objekten mit Herkunftsschlüsseln schreiben (Abschnitt 7.2) | `import.apply` (Kern-Vertrag: Ergänzung beantragt) | nein |
-| Datei-Objekt mit Herkunftsschlüssel hochladen | `import.apply` | nein |
-| Cursor und Zähler fortschreiben | `import.apply` | nein |
+| Operation | Route | Aktion | Step-up |
+|---|---|---|---|
+| Quelle anlegen (`kind = discord`, Zuordnung) | `POST /api/v1/imports` | `import.manage` | ja |
+| Quelle starten oder fortsetzen, pausieren, abbrechen, abschließen | `POST /api/v1/imports/{import_id}/start`, `/pause`, `/cancel`, `/complete` | `import.manage` | ja |
+| Eigentumsliste je Kanal ändern (`lead`, setzt den Schreibschutz mit) | `PUT /api/v1/imports/{import_id}/leads` | `import.manage` | ja |
+| Quelle, Fortschritt, Objekte nach Zustand lesen | `GET /api/v1/imports`, `/imports/{import_id}`, `/imports/{import_id}/items` | `import.read` | nein |
+| Stapel von Objekten mit Herkunftsschlüsseln schreiben (Abschnitt 7.2) | `POST /api/v1/imports/{import_id}/batches` | `import.apply` | nein |
+| Datei-Objekt mit Herkunftsschlüssel anlegen; die Bytes folgen über die Upload-Session ([12-dateien.md](12-dateien.md)) | `POST /api/v1/imports/{import_id}/files` | `import.apply` | nein |
+| Cursor und Zähler fortschreiben | `PUT /api/v1/imports/{import_id}/cursor` | `import.apply` | nein |
+
+Einen Trockenlauf gibt es auf dem Server nicht: das Werkzeug liest nur (Abschnitt 10.2) und
+legt dabei keine Quelle an.
 
 `import.apply` verlangt: Prinzipal ist aktiver Owner, Quelle im Zustand `running`, jedes Ziel liegt
 in einem Kanal dieser Quelle. Kein Step-up je Stapel, weil der Start Step-up verlangt und ein
 Lese-Spiegel tagelang läuft. Ein Stapel betrifft genau einen Thread und hat höchstens
-`import.batch_max_items` Objekte; er ist eine Transaktion. Jeder Stapel schreibt `import.progress`
+`import.batch_max_items` Objekte; er ist eine Transaktion. Strukturobjekte (Bereiche, Kanäle,
+Forum-Tags, Personen) kommen in eigenen Stapeln ohne Thread. Jeder Stapel schreibt `import.progress`
 und `thread.updated` (Abschnitt 6.4). Start, Abbruch und Abschluss stehen im Audit-Log.
 
 Wie die Kommandozeile sich als Owner anmeldet und Step-up leistet (Gerät `platform = cli`), legt
@@ -459,8 +464,7 @@ im Fehlerfall ohne Blockade.
    aktuelle Sitzung hatte. Ein späteres Zurücksetzen (`agent_session.reset`) bindet nie erneut.
 7. **Kosten.** Laufzeiten, die kumulierte Sitzungskosten melden, brauchen den Stand vor der
    Bindung als Sockel, sonst bucht der erste Lauf die alten Kosten noch einmal. Die Datei darf
-   dafür `cost_baseline_micros` und `currency` je Zeile tragen (Kern-Vertrag: Ergänzung beantragt,
-   Abschnitt 18).
+   dafür `cost_baseline_micros` und `currency` je Zeile tragen (03, `agent_sessions`).
 
 Wer binden darf, regelt `agent.invoke`: Die Bindung entsteht nur aus einer erlaubten Auslösung
 (Stufe `trigger`, I2).
@@ -532,8 +536,9 @@ Jeder zugeordnete Kanal hat in der Quelle genau einen führenden Ort, `lead`:
 | `bothy` | schreibgeschützt (Schritt des Owners in Discord), Agent dort abgemeldet | Kanal beschreibbar, Bediener gesetzt; kein Spiegel |
 
 Schreibgeschützt in Bothy heißt: Kein Prinzipal, auch kein Owner, darf im Kanal Nachrichten,
-Threads, Reaktionen oder Interaktionen anlegen; nur `import.apply` schreibt (Kern-Vertrag:
-Ergänzung beantragt, Abschnitt 18). Damit kann im Spiegel kein Agent ausgelöst werden, und ein
+Threads, Reaktionen oder Interaktionen anlegen; nur `import.apply` schreibt (`channels.read_only`,
+03; 05 Regel 1.8). Den Schalter setzt `import.manage` mit der Eigentumsliste; von Hand setzt ihn
+`channel.read_only.set`. Damit kann im Spiegel kein Agent ausgelöst werden, und ein
 Kanal hat nie zwei führende Orte.
 
 ### 12.2 Runde
@@ -695,24 +700,25 @@ Die Import-Schnittstelle ist quellneutral. Ein Zulip-Import wäre ein weiterer B
 | R-IM-11 | Archiviert nur bei `archived = true` und nicht in der aktiven Liste. | Ein falsch offener Thread schadet nicht, ein falsch geschlossener versteckt Arbeit. |
 | R-IM-12 | Der Rückweg kopiert nichts nach Discord. | Das Werkzeug schreibt Discord nie; der Owner entscheidet über die wenigen Nachrichten. |
 
-## 18. Kern-Vertrag: beantragte Ergänzungen
+## 18. Abgleich mit dem Kern-Vertrag
 
-Dieses Kapitel plant mit den folgenden Ergänzungen; bis zur Entscheidung gelten sie als beantragt.
+Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026-10-10):
 
-| Nr | Ergänzung | Kapitel |
+| Nr | Ergänzung | Entscheidung, Ort |
 |---|---|---|
-| K-IM-1 | Aktion `import.apply`: Objekte einer laufenden Quelle schreiben; Recht `owner`; Step-up nein; Audit `abl`; RL-Klasse `rl.import` (neu, Standard in 19) | 05 |
-| K-IM-2 | `channels.read_only boolean` (Standard `false`) mit Aktion zum Setzen (`manage`, Audit); verbietet `message.create`, `thread.create`, `reaction.add`, `interaction.create` für alle Prinzipale außer über `import.apply`; laufende Läufe im Kanal erhalten `run.cancel_requested` | 03, 05 |
-| K-IM-3 | Import setzt `threads.operator_agent_id` aus der Zuordnung, `threads.created_at` und `last_activity_at` aus der Quelle | 03 |
-| K-IM-4 | Import-Stapel schreiben `thread.updated` je Thread statt `message.created` je Nachricht und rücken `read_states` der Leser vor | 04 |
-| K-IM-5 | Bedeutung von `agent_sessions.end_reason = import` festlegen (übernommene frühere Referenz); Bindungsregel aus Abschnitt 9 aufnehmen; `agent_session.report` um die Meldung "Fortsetzen gescheitert, neue Referenz" ergänzen | 03, 04, 05 |
-| K-IM-6 | Sockel für kumulierte Sitzungskosten bei übernommenen Sitzungen, z. B. `agent_sessions.cost_baseline_micros` | 03 |
-| K-IM-7 | Die I1-Prüfung muss Kanäle einschließen, in denen Threads (offen oder erledigt) den Agenten als `operator_agent_id` tragen; ein erledigter Thread öffnet mit einer neuen Nachricht wieder | 03 Abschnitt 6.4 |
-| K-IM-8 | `import_items.item_kind` um `forum_tag` ergänzen; `import_sources.state = dry_run` wird vom Trockenlauf nicht benutzt | 03 |
+| K-IM-1 | Aktion `import.apply`, RL-Klasse `rl.import` | übernommen, 05 Abschnitte 3, 4.12 und 10 |
+| K-IM-2 | `channels.read_only` mit Aktion zum Setzen | übernommen, 03 `channels`, 05 Regel 1.8 und `channel.read_only.set` (mit Step-up, weil der Schalter auch Owner sperrt) |
+| K-IM-3 | Bediener und Zeiten importierter Threads aus Zuordnung und Quelle | übernommen, 03 Abschnitt 4.11 |
+| K-IM-4 | `thread.updated` je Stapel; Importiertes nicht ungelesen | übernommen, 04 Abschnitt 15.8; statt Gelesen-Stände je Leser vorzurücken setzt der Import `threads.unread_floor_seq` (eine Zeile je Thread) |
+| K-IM-5 | Bedeutung von `end_reason = import`, Bindungsregel, Meldung "Fortsetzen gescheitert" | übernommen, 03 `agent_sessions`, 05 `agent_session.report` (`bind_failed`) |
+| K-IM-6 | Sockel für kumulierte Sitzungskosten | übernommen, 03 `agent_sessions.cost_baseline_micros` |
+| K-IM-7 | I1-Ziele mit Threads des Agenten, offen oder erledigt | übernommen, 03 Abschnitt 6.4 |
+| K-IM-8 | `forum_tag` als Objektart; Zustand `dry_run` entfällt | übernommen, 03 `import_items`, `import_sources` |
 
 ## 19. Konfigurationswerte dieses Kapitels
 
-Werte des Werkzeugs (Datei oder Umgebung des Werkzeugs), außer `ratelimit.rl.import.*` (Server).
+Werte des Werkzeugs (Datei oder Umgebung des Werkzeugs). Die Rate-Limit-Klasse `rl.import` des
+Servers steht in [05-aktionen.md](05-aktionen.md), Abschnitt 10.
 
 | Name | Standard | Bedeutung |
 |---|---|---|
@@ -732,7 +738,6 @@ Werte des Werkzeugs (Datei oder Umgebung des Werkzeugs), außer `ratelimit.rl.im
 | `import.follow.busy_reactions` | `👀` | Reaktionen, die "Agent arbeitet noch" bedeuten |
 | `import.follow.busy_lookback` | `10` | Nachrichten vor der ersten neuen, die auf Markierung geprüft werden |
 | `import.follow.max_backoff` | `5m` | größter Abstand nach fehlgeschlagenen Runden |
-| `ratelimit.rl.import.per_minute` / `.burst` | `120` / `30` | Server: je Owner für `import.apply` |
 
 Die Werte für Seitengröße, Wiederholungen, Wartegrenze, Ruhe-Regel und Backoff sind aus dem
 Vorgänger übernommen, dort gegen Fake-Server getestet und nicht gegen das echte Discord gemessen

@@ -57,9 +57,8 @@ gesetzt und danach nicht mehr geändert, außer durch eine Neuindizierung (Absch
 - Agent, App, Import, System: `search.locale_map[instance_settings['locale.default']]`.
 - Kein Eintrag in der Abbildung: `simple`.
 
-Threads bekommen dieselbe Regel über den Ersteller; dafür braucht `threads` eine Spalte
-`search_language` (Kern-Vertrag: Ergänzung beantragt). Dateitext bekommt die Sprache der
-Instanz.
+Threads bekommen dieselbe Regel über den Ersteller (Spalte `threads.search_language`, 03).
+Dateitext bekommt die Sprache der Instanz.
 
 `search.languages` nennt alle Konfigurationen, mit denen Anfragen gebaut werden. Der Server
 startet nicht, wenn ein Wert aus `search.locale_map` dort fehlt; sonst fänden Anfragen die
@@ -69,9 +68,8 @@ Stämme dieser Sprache nie. PostgreSQL bringt Konfigurationen für viele Sprache
 ### 3.2 Ausdrücke
 
 Die Spalten sind gespeicherte, generierte Spalten mit GIN-Index wie in
-[03-datenmodell.md](03-datenmodell.md) Abschnitt 5. Dieses Kapitel ändert die Ausdrücke (beide
-mit Gewicht und `simple`-Anteil) und fügt eine Tabelle hinzu (Kern-Vertrag: Ergänzung beantragt,
-Abschnitt 14):
+[03-datenmodell.md](03-datenmodell.md) Abschnitt 5; die Ausdrücke dort entsprechen diesem
+Abschnitt (mit Gewicht und `simple`-Anteil, dazu die Tabelle `file_text_extracts`):
 
 ```sql
 -- messages
@@ -119,9 +117,10 @@ Gewicht. Eine GIN-Abfrage reicht, kein ODER über zwei Indexe.
 
 - Text `q` in der Syntax von `websearch_to_tsquery`: Wörter (UND), `"Phrase"`, `or`, `-Wort`.
   Diese Funktion wirft nie einen Syntaxfehler [Q2, belegt]; jede Eingabe ist sicher.
-- Länge höchstens `search.query_max_chars`, sonst `400 search_query_too_long`.
+- Länge höchstens `search.query_max_chars`, sonst `400 validation_failed` mit `errors[]` auf
+  `q` und Code `too_long` ([06-api.md](06-api.md), Abschnitt 5).
 - Bleibt nach der Verarbeitung kein Begriff übrig (nur Satzzeichen), antwortet der Server
-  `400 search_query_empty`.
+  `400 validation_failed` mit `errors[]` auf `q` und Code `empty`.
 - Filter kommen als eigene Parameter, nicht als Text in `q` (4.4). Die App darf eine
   Schreibweise wie `von:Alex` anbieten und in Parameter übersetzen; der Server deutet `q` nicht.
 
@@ -164,8 +163,7 @@ einer anderen Form, kann die `simple`-Teilanfrage ihn trotzdem treffen. Die Vern
 4. Es gibt keine Gesamtzahl und keine Zähler je Kanal. Die Antwort sagt nur, ob es weitere
    Seiten gibt und ob die Kandidaten-Grenze erreicht wurde.
 5. Agenten suchen mit ihren Freigaben. Apps brauchen dafür den Scope `messages:read`
-   (Kern-Vertrag: Ergänzung beantragt, [05-aktionen.md](05-aktionen.md) 2.6 nennt
-   `search.query` nicht).
+   ([05-aktionen.md](05-aktionen.md) 2.6).
 
 Restrisiko: Die Dauer einer Suche hängt auch von Treffern in fremden Kanälen ab, weil der Index
 erst danach nach Kanal filtert. Ein Angreifer könnte über viele gemessene Anfragen auf die
@@ -218,7 +216,7 @@ Fehler (sonst verriete der Fehler die Existenz).
 
 Cursor nach (Wert, ID) bei `relevance` und (`created_at`, ID) bei `newest`, undurchsichtig
 kodiert, mit einem Hash aus `q`, Filtern und Sortierung. Passt der Hash nicht zur Anfrage:
-`400 cursor_mismatch`. Seitengröße `search.page_size_default`, höchstens
+`400 cursor_invalid` (06, Abschnitt 5). Seitengröße `search.page_size_default`, höchstens
 `search.page_size_max`.
 
 ### 4.8 Beispiel: Nachrichten
@@ -280,7 +278,8 @@ Präfix-Anfragen sind in `to_tsquery` mit `:*` vorgesehen [Q2, belegt]. Gleicher
 
 1. Ist eine Datei auslieferbar ([12-dateien.md](12-dateien.md) Abschnitt 2) und ihr Typ
    unterstützt, legt der Worker eine Zeile `file_text_extracts` (`state = 'pending'`) an und
-   reiht den Job `file_extract_text` in die Warteschlange niedriger Priorität.
+   reiht den Job `files.extract_text` in die Warteschlange `files`
+   ([02-architektur.md](02-architektur.md), Abschnitt 12.3).
 2. Der Job ruft den Port `TextExtractor` (`Extract(ctx, reader, mime) -> text, truncated`).
 3. Ergebnis: `state = 'done'`, Text höchstens `search.extract.max_text_bytes` (`truncated`
    markiert Kürzung), `extractor` mit Name und Version, `extracted_at`. Fehler: `failed` mit
@@ -409,7 +408,8 @@ das ist im Rückgabebericht an Team A gemeldet.
 
 ## 11. Endpunkte
 
-Vorschlag für [06-api.md](06-api.md) (verbindlich ist `docs/api/openapi.yaml`, Team B):
+Verbindlich ist `docs/api/openapi.yaml` (`search`, `searchThreadTitles`); diese Tabelle gibt den
+Stand der Spec wieder.
 
 | Methode und Pfad | Aktion | RL-Klasse | Zweck |
 |---|---|---|---|
@@ -426,14 +426,14 @@ und Bereichsname, `segments`, bei `relevance` der Wert. Dazu `next_cursor` und
 |---|---|
 | "Rechnungen" findet "Rechnung" (Deutsch), "invoice run" findet "invoices are running" (Englisch), `err_conn_reset` findet die Kennung | Abschnitt 3 |
 | "Rechnung" findet "Rechnungsadresse" nicht | dokumentierte Grenze 3.3 |
-| Zufällige Eingaben (Fuzzing) | nie ein Fehler außer `400 search_query_empty` bzw. `_too_long` |
+| Zufällige Eingaben (Fuzzing) | nie ein Fehler außer `400 validation_failed` auf `q` (`empty` bzw. `too_long`) |
 | Zwei Prinzipale, gleiche Anfrage, verschiedene Freigaben | Treffer nur aus eigenen sichtbaren Kanälen; keine Zähler |
 | Owner sucht | keine Treffer aus fremden DMs |
 | Entzug, dann Suche | keine Treffer aus dem entzogenen Kanal; Seitenprüfung fängt einen Wettlauf ab (Test mit Entzug zwischen Kanalmenge und Abfrage) |
 | Filter auf unsichtbaren Kanal | leeres Ergebnis, gleiche Antwort wie für einen unbekannten Kanal |
 | Gelöschte Nachricht, Datei `pending` oder `infected`, nie angehängte Datei | kein Treffer |
 | Inhalt mit `<b>` und Text, der wie eine Markierung aussieht | Segmente korrekt, kein HTML |
-| Cursor mit geänderter Anfrage | `400 cursor_mismatch` |
+| Cursor mit geänderter Anfrage | `400 cursor_invalid` |
 | Migrations-Lint | `GENERATED ALWAYS AS` ohne `STORED` schlägt fehl |
 | Start mit Sprache in `search.locale_map`, die in `search.languages` fehlt | Startfehler |
 | Office-Datei mit Zip-Bombe, XML mit externer Entität | `failed`, kein Nachladen |
@@ -454,19 +454,17 @@ und Bereichsname, `segments`, bei `relevance` der Wert. Dazu `next_cursor` und
 | R-SU-08 | Lauf-Schritte sind nicht durchsuchbar. | Werkzeugausgaben enthalten Geheimnisse und Lärm. |
 | R-SU-09 | Suche als Koordinator mit Lese-Ports der besitzenden Module. | Hält die Modulregel aus 03; ein externer Adapter ersetzt nur den Koordinator. |
 
-## 14. Kern-Vertrag: beantragte Ergänzungen
+## 14. Abgleich mit dem Kern-Vertrag
 
-1. Neue Ausdrücke für `messages.search_vector` und `threads.title_search` (3.2). Die Befugnis
-   dafür gibt [03-datenmodell.md](03-datenmodell.md) Abschnitt 5 diesem Kapitel; die Tabelle in
-   03 muss nachgezogen werden.
-2. Spalte `threads.search_language regconfig NOT NULL DEFAULT 'simple'`.
-3. Tabelle `file_text_extracts` (Modul `files`, Klasse `content`): `file_id` PK und FK auf
-   `files` ON DELETE CASCADE; `state` (`pending`, `done`, `failed`, `unsupported`);
-   `extractor`; `text_content`; `truncated`; `search_language`; `extracted_at`; `error`;
-   `search_vector` (3.2) mit GIN-Index.
-4. Scope für Apps bei `search.query`: `messages:read` ([05-aktionen.md](05-aktionen.md) 2.6).
-5. Modul `search` als Koordinator ohne Tabellen in der Modulliste
-   ([03-datenmodell.md](03-datenmodell.md) Abschnitt 2).
+Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026-10-10):
+
+| Nr | Ergänzung | Entscheidung, Ort |
+|---|---|---|
+| 1 | neue Ausdrücke für `messages.search_vector` und `threads.title_search` | übernommen, 03 Abschnitt 5 |
+| 2 | Spalte `threads.search_language` | übernommen, 03 `threads` |
+| 3 | Tabelle `file_text_extracts` | übernommen, 03 Abschnitt 4.7 |
+| 4 | Scope `messages:read` für `search.query` | übernommen, 05 Abschnitt 2.6 |
+| 5 | Modul `search` als Koordinator ohne Tabellen | übernommen, 03 Abschnitt 2 |
 
 ## 15. Konfigurationswerte dieses Kapitels
 

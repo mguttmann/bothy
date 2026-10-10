@@ -5,12 +5,12 @@ Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
 
 ## Zweck
 
-Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, Passkeys, Geräte und Geräteschlüssel, Sitzungen, Refresh-Familien, API-Tokens, Step-up, Zugriffstokens.
+Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten, Einladungs-Codes, Anmeldevorgänge, Passkeys, Geräte und Geräteschlüssel, Sitzungen, Refresh-Familien, API-Tokens, Step-up, Zugriffstokens.
 
 ## Port (Wurzelpaket `internal/identity`)
 
 - Eingehend: `Auth` (Anmeldung, Refresh, Logout, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`; deklariert `AvatarFiles`.
-- Gibt In-Tx-Ereignisse aus: `DeviceRevoked`.
+- Gibt In-Tx-Ereignisse aus: `DeviceRevoked`, `SessionEnded`.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `actor.Authenticator`, `authz.PrincipalSource`, kernel `personaldata.Participant`.
 
@@ -25,13 +25,13 @@ Geprüft durch go-arch-lint (ADR 0008).
 
 ## Tabellen
 
-`principals`, `users`, `owners`, `identity_providers`, `user_identities`, `passkey_credentials`, `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`, `refresh_tokens`, `api_tokens`.
+`principals`, `users`, `owners`, `identity_providers`, `user_identities`, `local_credentials`, `enrollment_codes`, `auth_login_flows`, `passkey_credentials`, `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`, `refresh_tokens`, `api_tokens`.
 
 Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
 
 ## Aktionen (05-aktionen.md)
 
-`auth.login.begin`, `auth.login.complete`, `auth.token.refresh`, `auth.logout`, `auth.step_up`, `identity_provider.read`, `identity_provider.manage`, `owner.add`, `owner.remove`, `user.read`, `user.create`, `user.update`, `user.disable`, `user.enable`, `self.profile.update`, `identity.link`, `identity.unlink`, `passkey.register`, `passkey.revoke`, `device.list`, `device.approve`, `device.revoke`, `session.list`, `session.revoke`, `token.list`, `token.create`, `token.revoke`.
+`auth.login.begin`, `auth.login.complete`, `auth.token.refresh`, `auth.logout`, `auth.step_up`, `identity_provider.read`, `identity_provider.manage`, `owner.add`, `owner.remove`, `self.read`, `user.read`, `user.create`, `user.update`, `user.disable`, `user.enable`, `self.profile.update`, `identity.read`, `identity.link`, `identity.unlink`, `local_credential.set`, `passkey.register`, `passkey.revoke`, `device.list`, `device.approve`, `device.revoke`, `session.list`, `session.revoke`, `token.list`, `token.create`, `token.revoke`.
 
 ## Ereignisse und WebSocket-Ops
 

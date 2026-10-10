@@ -67,7 +67,8 @@ muss.
 - Schlecht, weil VMs Betrieb, Abbilder, Netzregeln und Kosten verursachen.
 - Schlecht, weil macOS-VMs je Mac begrenzt sind.
 - Schlecht, weil das persönliche Abo einer Person in ihrer eigenen Umgebung erst nach einer Änderung
-  an I1 möglich wird (beantragt in 21, K-DV-2).
+  an I1 möglich wird (21, K-DV-2: auf die Etappe verschoben; bis dahin nur `organization`,
+  R-DM-24).
 
 ### Confirmation
 

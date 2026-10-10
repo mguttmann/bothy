@@ -67,7 +67,7 @@ N-1).
 2. `migrate` schreibt nach jedem Lauf `instance.min_server_version`: die älteste Server-Version,
    die mit dem neuen Schema laufen darf. Nach Regel M1 ist das die vorige Version; ein Release,
    das bewusst bricht (Hauptversion), setzt die eigene. Ist die eigene Version kleiner, meldet
-   `/readyz` `schema_requires_newer_server` (Kern-Vertrag: Ergänzung beantragt).
+   `/readyz` `schema_requires_newer_server` (03, `instance.min_server_version`).
 3. Ein neueres Schema ohne diese Sperre ist erlaubt; so funktioniert der Rückweg aus Abschnitt 3.
 4. `instance.schema_version` zeigt den Stand in der Admin-Konsole.
 

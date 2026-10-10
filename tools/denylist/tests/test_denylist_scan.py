@@ -287,6 +287,7 @@ def test_generic_rules_catch_leaks(repo: Path, text: str) -> None:
         "clone git@github.com:OWNER/bothy.git",
         "reserved test@initech.test",
         "path " + "/" + "Users/<user>/project",
+        'svg d="M-312.40625 42.75 C0.1515133509874999' + '6 42.75"',
     ],
 )
 def test_generic_rules_allow_documentation_values(repo: Path, text: str) -> None:

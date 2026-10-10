@@ -14,6 +14,7 @@ erDiagram
     uuid group_id FK
     uuid user_id FK
     timestamptz expires_at
+    timestamptz expiry_reminded_at
     timestamptz removed_at
   }
   grants {
@@ -27,6 +28,7 @@ erDiagram
     text level "read, write, trigger"
     text[] capabilities
     timestamptz expires_at
+    timestamptz expiry_reminded_at
     timestamptz revoked_at
   }
   spaces {
@@ -47,6 +49,8 @@ erDiagram
     text kind "text, forum, dm"
     boolean operator_inherit
     uuid operator_agent_id FK
+    boolean read_only "Schreibschutz, auch für Owner"
+    text default_notification_level
     bigint settings_version
   }
   channel_skill_bindings {
@@ -76,8 +80,9 @@ erDiagram
     uuid parent_message_id FK
     text title_source "auto, manual"
     text state "open, closed"
-    uuid operator_agent_id FK
+    uuid operator_agent_id FK "NULL beim Hauptverlauf"
     bigint last_message_seq
+    bigint unread_floor_seq
   }
   thread_tags {
     uuid thread_id PK, FK

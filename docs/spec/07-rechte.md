@@ -10,7 +10,7 @@ Entscheidungen: ADR 0017 (eine Autorisierungsfunktion), ADR 0018 (Freigabe-Model
 
 Dieses Kapitel legt fest, wie `authorize(principal, action, resource) -> Decision` entscheidet. Der
 Aktionskatalog (welche Aktion welche Stufe braucht) steht in 05 und wird hier nicht wiederholt.
-Stellen, die den Kern-Vertrag erweitern, tragen den Vermerk "(Kern-Vertrag: Ergänzung beantragt)".
+Die beim Entwurf beantragten Ergänzungen stehen jetzt im Kern-Vertrag (Abschnitt 13).
 
 ## 1. Grundsätze
 
@@ -37,17 +37,16 @@ Stellen, die den Kern-Vertrag erweitern, tragen den Vermerk "(Kern-Vertrag: Erg�
 |---|---|---|---|---|
 | Mensch | `user` | ja | `trigger` | alle |
 | Gruppe | `group` | ja (wirkt für ihre gültigen Mitglieder) | `trigger` | alle |
-| Agent | `agent` | ja | `write` (R-DM-08) | nur `upload` (Kern-Vertrag: Ergänzung beantragt) |
-| App | `app` | ja | `write` (R-DM-08) | nur `upload` (Kern-Vertrag: Ergänzung beantragt) |
+| Agent | `agent` | ja | `write` (R-DM-08) | nur `upload` (R-DM-20) |
+| App | `app` | ja | `write` (R-DM-08) | nur `upload` (R-DM-20) |
 
 Gruppen enthalten nur Menschen (R-DM-07). Gruppen sind keine handelnden Prinzipale.
 
 Begründung für "Agenten und Apps nur `upload`": `approve_actions` an einem Agenten hieße, dass ein
 Agent seine eigenen Freigabe-Karten bestätigen könnte. `manage` hieße, dass ein Agent Freigaben
 vergibt und Kanal-Prompts liest. `export` hieße, dass ein Agent Verläufe gesammelt abzieht. Keines
-davon braucht ein Agent für seine Arbeit. Der Kern-Vertrag verbietet für Agenten und Apps bisher
-nur `trigger`; die Prüfung `capabilities <@ ARRAY['upload']` für `subject_kind IN ('agent','app')`
-gehört als Check in die Tabelle `grants`.
+davon braucht ein Agent für seine Arbeit. Die Tabelle `grants` hält das mit einem Check (03,
+R-DM-20).
 
 ### 2.2 Ziele und Vererbung
 
@@ -121,13 +120,11 @@ diesen Grenzen (R-AZ-05, präzisiert):
    eingeschlossen; wer `manage` hat, darf es weitergeben).
 3. Widerruf nur für Freigaben, die man nach 1 und 2 selbst hätte anlegen dürfen. Sonst könnte eine
    Person mit `write` und `manage` die stärkere Freigabe einer anderen Person entfernen, die der
-   Owner gesetzt hat. (Kern-Vertrag: Ergänzung beantragt; 05 begrenzt den Widerruf bisher nur
-   nach Ziel.)
+   Owner gesetzt hat (05 `grant.revoke`, R-AZ-05).
 4. Subjekte nur Menschen und Gruppen. Freigaben an Agenten und Apps legt nur der Owner an.
    Grund: Eine Freigabe an einen Agenten erweitert, was dessen Laufzeit liest und an einen
    LLM-Anbieter sendet. Das ist ein Datenfluss zu einem Auftragsverarbeiter und eine Änderung des
-   Lesehorizonts ([20-datenschutz.md](20-datenschutz.md), Abschnitt 6). (Kern-Vertrag: Ergänzung
-   beantragt.)
+   Lesehorizonts ([20-datenschutz.md](20-datenschutz.md), Abschnitt 6). (05 `grant.create`.)
 5. Freigaben auf der Instanz legt nur der Owner an.
 
 ### 2.7 Owner
@@ -153,12 +150,11 @@ keine Agenten.
    jedem Thread mit `threads.operator_agent_id` gleich ihm mindestens `write`, ohne Freigabe-Zeile.
    Grund: Ohne diese Regel müsste jeder Bediener-Wechsel eine zweite, leicht vergessene Freigabe
    nach sich ziehen; beim Wechsel bliebe die alte Freigabe stehen. Die Regel folgt dem Bediener
-   automatisch. (Kern-Vertrag: Ergänzung beantragt; 05, Abschnitt 2.3 nennt die Herkunft der
-   Schreibstufe eines Bedieners bisher nicht.)
+   automatisch (05, Abschnitt 2.3 Punkt 4; R-AZ-13).
 3. Agenten lösen nie selbst aus. Ihre Nachrichten haben `origin = 'agent'` (Schutzregel SR4).
 4. Agenten führen keine Step-up-Aktionen aus (R-AZ-03).
-5. Agenten haben implizit alle Scopes außer `users:read` (05, Abschnitt 2.6); ihre Grenze sind die
-   Freigaben und die Bediener-Regel.
+5. Agenten haben implizit alle Scopes außer `users:read` und `costs:reconcile` (05, Abschnitt
+   2.6); ihre Grenze sind die Freigaben und die Bediener-Regel.
 6. Handelt ein Agent im Rahmen eines Laufs, gilt zusätzlich die Auftragsbindung (SR9).
 
 ### 2.10 Apps
@@ -173,7 +169,7 @@ sichtbar. Fehlt ihr nur der Scope, ist die Antwort `403` mit Grund `scope_missin
 die App kennt den Kanal ohnehin aus ihrer Freigabe. Eingangs-Webhooks schreiben als ihre App, mit
 `origin = 'app'`, und lösen nie aus.
 
-### 2.11 Werkzeugklasse eines Agenten (Kern-Vertrag: Ergänzung beantragt)
+### 2.11 Werkzeugklasse eines Agenten
 
 Rechte regeln, wer einen Agenten erreicht. Was der Agent dann tun kann, bestimmt seine Laufzeit.
 Damit der Server dafür eine Grenze ziehen kann, hat jeder Agent eine Werkzeugklasse:
@@ -184,15 +180,15 @@ Damit der Server dafür eine Grenze ziehen kann, hat jeder Agent eine Werkzeugkl
 | Begrenzt | `scoped` | benannte Werkzeuge mit eigenen, minimalen Zugangsdaten; Wirkung nach außen nur nach Freigabe-Karte | eine benannte, begrenzte Wirkung |
 | Host | `host` | Shell, freies Dateisystem oder freier Netzzugang mit den Rechten des Laufzeit-Benutzers (z. B. ein Coding-Agent mit abgeschalteten Werkzeug-Rückfragen) | Übernahme des Rechners, auf dem die Laufzeit läuft, und aller dort erreichbaren Geheimnisse |
 
-Datenmodell (beantragt): `agents.tool_class text NOT NULL DEFAULT 'chat' CHECK (tool_class IN
-('chat','scoped','host'))`, `agents.reported_tool_class text NULL`. Setzen ist die neue Aktion
+Datenmodell (03, `agents`): `tool_class text NOT NULL DEFAULT 'chat' CHECK (tool_class IN
+('chat','scoped','host'))` und `reported_tool_class text NULL`. Setzen ist die Aktion
 `agent.tool_class.set` (Owner, Step-up, Audit, Rechte `ja`).
 
 Soll und Ist wie bei der Backend-Richtlinie: Die Aufruf-Marke trägt `tool_class` (Soll). Der
 Adapter meldet seine tatsächliche Klasse im Heartbeat und startet keinen Lauf, wenn die tatsächliche
 Klasse höher ist als das Soll (Grund `tool_class_mismatch`). Die Reihenfolge `chat` < `scoped` <
-`host` ist dabei maßgeblich. Das Protokoll legt [09-agenten.md](09-agenten.md) fest; die
-Claims sind beantragt (Abschnitt 13).
+`host` ist dabei maßgeblich. Das Protokoll legt [09-agenten.md](09-agenten.md) fest; der Claim
+`tool_class` steht in 05, Abschnitt 5.
 
 ## 3. Prinzipal-Kontext
 
@@ -227,7 +223,8 @@ verrät (bei `404` nie).
 | `unauthenticated` | `unauthenticated` | kein gültiger Prinzipal |
 | `principal_inactive` | `unauthenticated` | Prinzipal `pending`, `disabled` oder `deleted` |
 | `session_revoked` | `unauthenticated` | Sitzung widerrufen oder abgelaufen |
-| `device_inactive` | `unauthenticated` | Gerät nicht `active` oder Schlüssel widerrufen |
+| `device_inactive` | `unauthenticated` | Gerät `revoked` oder Schlüssel widerrufen |
+| `device_pending` | `forbidden` | Problem-Code `device_pending`; Gerät wartet auf Freigabe; erlaubt sind nur `self.read`, `device.list` für das eigene Gerät, `auth.token.refresh`, `auth.logout` (05, Abschnitt 2.5) |
 | `token_revoked` | `unauthenticated` | API-Token widerrufen oder abgelaufen |
 | `app_not_installed` | `unauthenticated` | App-Installation nicht `active` |
 | `no_grant` | `not_found` | kein Leserecht oder Ressource fehlt |
@@ -250,7 +247,15 @@ verrät (bei `404` nie).
 | `tool_class_owner_only` | `forbidden` | SR2 |
 | `dev_environment_not_ready` | `forbidden` | SR3 |
 | `dev_environment_foreign_thread` | `forbidden` | SR3, Thread läuft in einer fremden Umgebung |
-| `project_not_ready` | `forbidden` | Projektbindung nicht bereit (05, Abschnitt 5, Punkt 6) |
+| `project_not_ready` | `forbidden` | Projektbindung nicht bereit (05, Abschnitt 5, Punkt 7) |
+| `channel_read_only` | `forbidden` | Kanal schreibgeschützt; schreibende und auslösende Aktionen gesperrt, auch für Owner (05, Regel 1.8); Problem-Code `channel_read_only` |
+| `run_active_other_agent` | `forbidden` | Thread hat einen aktiven Lauf eines anderen Agenten (05, Abschnitt 5, Punkt 8) |
+| `run_active` | `forbidden` | Modell-Befehl bei aktivem Lauf (05 `command.invoke`) |
+| `billing_mode_mismatch` | `invariant_violation` | `run.start` mit Ist-Modus ungleich Soll (I3); Problem-Code `billing_mode_mismatch` (`409`) |
+| `tool_class_mismatch` | `invariant_violation` | Adapter meldet eine höhere Werkzeugklasse als die Marke; Problem-Code `tool_class_mismatch` (`409`) |
+| `invocation_token_invalid` | `forbidden` | Aufruf-Marke ungültig, abgelaufen oder nicht die aktuelle (`run.start`) |
+| `import_not_running` | `forbidden` | `import.apply` ohne laufende Quelle oder mit Ziel außerhalb ihrer Kanäle |
+| `malware_detected` | kein `authorize`-Ergebnis | Grund des Audit-Eintrags zu `file.upload` bei einem Malware-Fund ([12-dateien.md](12-dateien.md), Abschnitt 5.2) |
 | `component_inactive` | `forbidden` | Komponente benutzt, abgelaufen oder deaktiviert |
 | `component_restricted` | `forbidden` | `restricted_to = 'run_starter'` und Prinzipal ist weder Auslöser noch Owner |
 | `acting_for_insufficient` | `not_found` bzw. `forbidden` | Auftragsbindung: der auslösende Mensch hat das Recht nicht |
@@ -269,6 +274,8 @@ authorize(p, action, ref) -> Decision:
       return spec.right == public ? ALLOW : DENY(unauthenticated)
   d := check_active(p, t)                            # Status, Sitzung, Gerät, Token, Installation
   if d: return d                                     # unauthenticated mit Grund
+  if p.device_state == pending and action nicht in PENDING_ALLOWED:
+      return DENY(forbidden, device_pending)         # 05, Abschnitt 2.5
 
   # 2. Rechte-Stand (Abschnitt 7)
   snap := snapshot(p, t)                             # Cache je (p, permission_version), gültig bis snap.valid_until
@@ -388,7 +395,7 @@ Für Kanäle mit Projektbindung (`project_bindings`) gilt zusätzlich zu 05, Abs
    (`dev_environments`, [21-dev-isolation.md](21-dev-isolation.md), Abschnitt 6). Sonst
    `dev_environment_not_ready`.
 2. Die Agenten-Sitzung eines Threads ist an die Umgebung gebunden, in der ihr erster Lauf lief
-   (`agent_sessions.dev_environment_id`, beantragt). Löst ein anderer Mensch in diesem Thread aus,
+   (`agent_sessions.dev_environment_id`, 03). Löst ein anderer Mensch in diesem Thread aus,
    ist das `dev_environment_foreign_thread`. Grund: Eine Sitzung liest und schreibt die Dateien
    ihrer Umgebung; ein fremder Auslöser würde in der Umgebung einer anderen Person arbeiten.
 3. Owner-Läufe laufen in der Umgebung des Owners. Das ist der heutige Ein-Personen-Betrieb.
@@ -410,13 +417,17 @@ welche Freigaben bestehen.
 - Owner-Aktionen nur durch aktive Owner, auch wenn eine Freigabe `manage` auf der Instanz besteht.
 - Owner-Status wirkt nur in einer Sitzung. Ein persönliches API-Token eines Owners handelt mit den
   Freigaben dieses Menschen, ohne Owner-Rechte. Grund: Ein gestohlenes Token ohne Gerätebindung darf
-  nie die ganze Instanz öffnen ([08-identitaet.md](08-identitaet.md), Abschnitt 12).
-  (Kern-Vertrag: Ergänzung beantragt.)
+  nie die ganze Instanz öffnen ([08-identitaet.md](08-identitaet.md), Abschnitt 12; 05,
+  Abschnitt 2.3; R-AZ-14).
 
 ### SR6 Direktnachrichten nur für Teilnehmer
 
-Kein Owner-Status, keine Freigabe und kein "Als Person ansehen" öffnet einen DM-Kanal. Zugriff
-für Dritte nur über einen DSGVO- oder Rechtsweg außerhalb des Produkts (R-AZ-02).
+Kein Owner-Status, keine Freigabe und kein "Als Person ansehen" öffnet einen DM-Kanal (Ruling
+L21). Der einzige Weg im Produkt ist der DSGVO-Export einer Person: `gdpr.request.create` für eine
+andere Person, Freigabe und Download, jeweils durch einen Owner mit Step-up und Audit; das Paket
+enthält nur die eigenen Nachrichten dieser Person ([20-datenschutz.md](20-datenschutz.md),
+Abschnitt 5.2). Weitere Wege, etwa eine behördliche Anordnung, liegen außerhalb des Produkts
+(R-AZ-02).
 
 ### SR7 Gesperrt heißt ohne Rechte
 
@@ -428,8 +439,7 @@ gelesen werden. Freigaben gesperrter Prinzipale bleiben stehen, wirken aber nich
 
 Keine Transaktion darf den letzten aktiven Owner entfernen: weder `owner.remove` noch `user.disable`
 auf einen Owner, wenn danach kein Owner mit `principals.status = 'active'` bleibt. Code
-`last_owner`. (Kern-Vertrag: Ergänzung beantragt; 03 nennt die Regel nur für den Widerruf in
-`owners`, nicht für das Sperren der Person.)
+`last_owner` (03 `owners`).
 
 ### SR9 Auftragsbindung (Confused Deputy)
 
@@ -548,7 +558,8 @@ SELECT m.id, m.thread_id, m.channel_id, ts_rank(m.search_vector, $2::tsquery) AS
  LIMIT $3;
 
 -- Ungelesen-Zähler je Kanal
-SELECT t.channel_id, sum(t.last_message_seq - coalesce(r.last_read_seq, 0)) AS unread
+SELECT t.channel_id,
+       sum(t.last_message_seq - greatest(coalesce(r.last_read_seq, 0), t.unread_floor_seq)) AS unread
   FROM threads t
   LEFT JOIN read_states r ON r.thread_id = t.id AND r.user_id = $2
  WHERE t.channel_id = ANY($1::uuid[])
@@ -577,7 +588,7 @@ Regeln:
 
 | Weg | Prüfung je Empfänger | Quelle |
 |---|---|---|
-| Dauerhafte Ereignisse (Gateway, `GET /v1/events`) | `authorize(empfänger, receive_action, resource)`; persönliche Ereignisse nur an `audience_principal_id` | 05, Abschnitt 6; 04, Abschnitt 7 |
+| Dauerhafte Ereignisse (Gateway, `GET /api/v1/events`) | `authorize(empfänger, receive_action, resource)`; persönliche Ereignisse nur an `audience_principal_id` | 05, Abschnitt 6; 04, Abschnitt 7 |
 | Kurzlebige Ereignisse (Tippen, `run.updated`, Präsenz) | Empfangs-Aktion und Fokus | 05, Abschnitt 6; 04, Abschnitte 11, 12 |
 | Agenten-Verbraucher | wie Menschen nach eigenen Freigaben, plus persönliche Ereignisse an den Agenten; vor `agent.invocation`, `agent.followup`, `interaction.created`, `command.invoked` zusätzlich `agent.invoke` für den Auslöser | 04, Abschnitt 15 |
 | Push | `push.deliver` (Leserecht auf den Thread), Benachrichtigungs-Einstellung, Ruhezeiten, nicht der Autor; Erwähnungen ohne Leserecht erzeugen nichts | 05; [13-push-benachrichtigungen.md](13-push-benachrichtigungen.md) |
@@ -617,8 +628,7 @@ die Zeit prüft und `valid_until` den Cache ungültig macht. Damit Clients ihren
 enden, läuft der Job `authz.expiry_sweep` alle `authz.expiry_sweep_interval`. Er findet Freigaben und
 Mitgliedschaften mit `expires_at` zwischen dem letzten und dem aktuellen Lauf und schreibt in einer
 Transaktion: Rechte-Version erhöhen, `access.changed`, `run.cancel_requested` für betroffene Läufe,
-Audit-Eintrag mit Systemaktion `grant.expire` bzw. `group.member.expire` (Kern-Vertrag: Ergänzung
-beantragt; der Katalog hat keine Systemaktionen für Abläufe). Die größte Verzögerung beim Räumen
+Audit-Eintrag mit Systemaktion `grant.expire` bzw. `group.member.expire` (05, R-AZ-15). Die größte Verzögerung beim Räumen
 des Client-Caches ist damit `authz.expiry_sweep_interval`; die Zustellung neuer Inhalte endet sofort.
 
 ## 9. Anforderungen an die Admin-Oberfläche
@@ -650,10 +660,12 @@ Gesperrte Prinzipale erscheinen durchgestrichen. Die Ansicht braucht `owner` ode
 - Die Konsole zeigt durchgehend einen Hinweisbalken mit Name und Restzeit.
 - Zweck: prüfen, was eine Person sieht und auslösen kann, ohne ihre Zugangsdaten zu kennen.
 
-### 9.3 Vorschau in Klartext (Kern-Vertrag: Ergänzung beantragt)
+### 9.3 Vorschau in Klartext
 
-Jede Aktion mit Spalte "Rechte" = `ja` hat eine Vorschau ohne Wirkung: die neue Aktion
-`access.preview` (Recht wie die Zielaktion, ohne Step-up, ohne Audit, `rl.admin`). Der Server führt
+Jede Aktion mit Spalte "Rechte" = `ja` hat eine Vorschau ohne Wirkung: die Aktion
+`access.preview` (05; Recht wie die Zielaktion, ohne Step-up, ohne Audit, `rl.admin`). Für
+Freigaben ist der Weg `POST /api/v1/grants/preview`; Vorschauen weiterer Aktionen kommen mit
+ihren Routen. Der Server führt
 die Änderung in einer Transaktion aus, berechnet Unterschiede und Invarianten und rollt zurück. Die
 Antwort enthält:
 
@@ -676,12 +688,12 @@ Hinweis: Texter liest auch Marketing/Intern. Sam darf Marketing/Intern nicht les
 
 Die Konsole zeigt die Vorschau vor jeder Bestätigung; der Step-up folgt danach.
 
-### 9.4 Erinnerung vor Ablauf (Kern-Vertrag: Ergänzung beantragt)
+### 9.4 Erinnerung vor Ablauf
 
 Der Job `authz.expiry_reminder` läuft mit `authz.expiry_sweep_interval` und findet Freigaben und
 Mitgliedschaften, die innerhalb von `authz.expiry_reminder_lead` ablaufen und noch nicht erinnert
-sind (beantragte Spalte `expiry_reminded_at` an `grants` und `group_memberships`). Er schreibt das
-persönliche Ereignis `access.expiring` (beantragt) an das Subjekt (bei Gruppen an die betroffene
+sind (Spalte `expiry_reminded_at` an `grants` und `group_memberships`, 03). Er schreibt das
+persönliche Ereignis `access.expiring` (05) an das Subjekt (bei Gruppen an die betroffene
 Person bzw. an den Owner) und an den Erteilenden. Die Konsole zeigt die Liste "Läuft bald ab" mit
 "Verlängern" (Widerruf plus neue Freigabe mit neuem Grund). Es gibt keine E-Mails (Baseline
 Abschnitt 4).
@@ -839,20 +851,22 @@ DM zwischen Alex und Sam. Die Uhr ist in Tests steuerbar.
 | R-RE-09 | Ablauf-Job meldet nur; die Entscheidung hängt nie an ihm. | Studie C: Ablauf je Aufruf geprüft; Clients räumen trotzdem auf. |
 | R-RE-10 | Vorschau als Trockenlauf in der echten Transaktion mit Rollback. | Dieselbe Logik wie der echte Schreibvorgang; Klartext aus Vorlagen, nicht aus einem Modell. |
 
-## 13. Ergänzungen am Kern-Vertrag (beantragt)
+## 13. Abgleich mit dem Kern-Vertrag
 
-| Nr | Ergänzung | Datei |
+Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026-10-10):
+
+| Nr | Ergänzung | Entscheidung, Ort |
 |---|---|---|
-| K-RE-1 | Check `capabilities <@ ARRAY['upload']` für `subject_kind IN ('agent','app')` | 03 `grants` |
-| K-RE-2 | Bediener-Regel als Punkt in "Wirksame Stufe" | 05, Abschnitt 2.3 |
-| K-RE-3 | `agents.tool_class`, `agents.reported_tool_class`; Aktion `agent.tool_class.set`; Claim `tool_class` in der Aufruf-Marke | 03, 05 |
-| K-RE-4 | Tabelle `dev_environments`, Spalten `agent_sessions.dev_environment_id` und `runs.dev_environment_id`, Claim `dev_environment_id`, Aktionen `dev_environment.read`, `dev_environment.manage`, `dev_environment.report` | 03, 05; Schema in 21 |
-| K-RE-5 | SR8 auch für `user.disable` | 03 `owners`, 05 |
-| K-RE-6 | `grant.revoke` mit `manage` nur im Rahmen von R-AZ-05; `grant.create` an Agenten und Apps nur Owner | 05 |
-| K-RE-7 | Aktion `access.preview` | 05 |
-| K-RE-8 | Systemaktionen `grant.expire`, `group.member.expire`; Ereignis `access.expiring`; Spalte `expiry_reminded_at` an `grants` und `group_memberships` | 03, 05 |
-| K-RE-9 | Grund-Codes aus Abschnitt 4.1 als Werte von `audit_events.deny_reason` | 03 |
-| K-RE-10 | Owner-Rechte nur mit Sitzung, nie über ein persönliches API-Token (SR5) | 05, Abschnitt 2.3 |
+| K-RE-1 | Check: Agenten und Apps als Zusatzrecht nur `upload` | übernommen, 03 `grants`, R-DM-20 |
+| K-RE-2 | Bediener-Regel in "Wirksame Stufe" | übernommen, 05 Abschnitt 2.3 Punkt 4, R-AZ-13 |
+| K-RE-3 | `agents.tool_class`, `agents.reported_tool_class`, `agent.tool_class.set`, Claim `tool_class` | übernommen, 03, 05 |
+| K-RE-4 | `dev_environments`, `dev_environment_id` an Sitzungen und Läufen, Claim, Aktionen | übernommen als Etappe "Mehrbenutzer-Dev-Umgebung", 03, 05 Abschnitt 4.13 |
+| K-RE-5 | SR8 auch für `user.disable` | übernommen, 03 `owners`, 05 |
+| K-RE-6 | `grant.revoke` im Rahmen von R-AZ-05; Freigaben an Agenten und Apps nur Owner | übernommen, 05 Abschnitt 4.4, R-AZ-05 |
+| K-RE-7 | Aktion `access.preview` | übernommen, 05 Abschnitt 4.2 |
+| K-RE-8 | Systemaktionen `grant.expire`, `group.member.expire`, Ereignis `access.expiring`, `expiry_reminded_at` | übernommen, 03, 05 |
+| K-RE-9 | Grund-Codes aus 4.1 als Werte von `audit_events.deny_reason` | übernommen ohne Datenbank-Check: Liste geschlossen per Test (R-DM-28) |
+| K-RE-10 | Owner-Rechte nur mit Sitzung | übernommen, 05 Abschnitt 2.3, R-AZ-14 |
 
 ## 14. Konfigurationswerte dieses Kapitels
 

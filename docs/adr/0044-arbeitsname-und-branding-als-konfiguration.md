@@ -41,7 +41,7 @@ Bauzeit feststehen müssen und je Instanz eigen sind.
 |---|---|---|
 | Laufzeit | `branding.product_name`, `branding.logo_file_id`, `branding.accent_color` | `instance_settings`, Aktion `instance.branding.update` |
 | Build | App-Name, Bundle- und Paket-IDs, App-Icons aus einer SVG-Quelle, URL-Schema, Push (APNs-Topic, Firebase-Projekt), Sparkle-Feed und EdDSA-Schlüssel, MSIX-Identität und `.appinstaller`-URL, Absturzdienst, Standard-Server | `branding.yaml` der Instanz im Betreiber-Repo; das Produkt-Repo enthält nur ein Beispiel mit `example.com` |
-| Code | Go-Modulpfad, Paketnamen, Binary `bothy` | gelistet in `docs/branding-code-locations.md` (Ticket), geprüft durch einen Test |
+| Code | Go-Modulpfad, Paketnamen, Binary `bothy`, Präfix der API-Tokens `bothy_` (03 `api_tokens`) | gelistet in `docs/branding-code-locations.md` (Ticket), geprüft durch einen Test |
 
 Der Akzent ist ein Schlüssel aus der geprüften Kategorie-Palette (`spruce`, `loch`, `heather`,
 `rowan`, `amber`, `gorse`, `moss`), kein freier Farbwert, damit jede Kombination im Kontrast-Gate
@@ -49,8 +49,8 @@ liegt (ADR 0030).
 
 ### Consequences
 
-- Good, because ein Namenswechsel `branding.*`, die gelisteten Code-Stellen und die
-  Beispiel-Konfiguration betrifft, sonst nichts.
+- Good, because ein Namenswechsel `branding.*`, die gelisteten Code-Stellen (darunter das
+  Token-Präfix `bothy_`) und die Beispiel-Konfiguration betrifft, sonst nichts.
 - Good, because Instanzen eigene, signierte Apps bauen, ohne das Produkt zu verzweigen.
 - Good, because Kontrast AA auch mit Instanz-Akzent gilt.
 - Bad, because jede Instanz mit eigenen Apps eigene Apple-, Google- und Microsoft-Konten,

@@ -9,14 +9,24 @@ Prozess; sie nutzen die öffentliche API (B6, B10).
 
 ## Rollen und Befehle
 
+Das Register aller Unterbefehle steht in 02-architektur.md, Abschnitt 3.3 (Ruling L1); hier nur
+der Überblick.
+
 | Befehl | Zweck |
 |---|---|
 | `bothy serve --role=api` | REST, Gateway-WebSocket, Log-Tail und Fan-out |
 | `bothy serve --role=worker` | River-Jobs, Ereignis-Verbraucher (Push, Webhooks), Dateiverarbeitung, Wartung |
 | `bothy serve --role=all` | beides in einem Prozess (Standard) |
 | `bothy migrate up\|status\|validate` | Migrationen (goose, rivermigrate); nie implizit beim Start |
-| `bothy setup ...` | Einrichtung, erster Owner (08-identitaet.md) |
+| `bothy setup bootstrap-owner\|issue-enrollment-code` | Einrichtung, erster Owner, Einladungs-Code (08-identitaet.md) |
 | `bothy config check\|print` | Konfiguration prüfen und redigiert ausgeben |
+| `bothy import discord ...` | Import und Lese-Spiegel über die API (22-import-migration.md) |
+| `bothy restore finalize` | nach einer Wiederherstellung: neue Sync-Epoche (16-betrieb.md) |
+| `bothy secrets init\|export` | Geheimnisse anlegen und sichern (16-betrieb.md) |
+| `bothy healthcheck --url` | Gesundheitsprüfung gegen den internen Listener (16-betrieb.md) |
+| `bothy files rescan` | Dateien erneut prüfen lassen (12-dateien.md) |
+| `bothy telemetry pseudonym` | Pseudonym eines Prinzipals für die Fehlersuche |
+| `bothy dev seed` | Testdaten, nur in der Umgebung `dev` |
 
 ## Aufbau
 

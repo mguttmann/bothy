@@ -41,6 +41,7 @@ SAMPLES = {
     + _rand(60, string.ascii_letters + string.digits + "_-"),
     "tailscale-key": "TS_AUTHKEY=" + "ts" + "key-auth-" + _rand(12) + "-" + _rand(32),
     "sonarqube-token-prefixed": "token " + "sq" + "u_" + _rand(40, string.digits + "abcdef"),
+    "bothy-api-token": "BOTHY_TOKEN=" + "bothy" + "_agt_" + _rand(43) + "_" + _rand(6),
 }
 
 

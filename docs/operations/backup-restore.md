@@ -40,7 +40,7 @@ Jeder Lauf schreibt ein Manifest (JSON, verschlüsselt neben der Sicherung). Fel
 |---|---|
 | `backup_id`, `kind`, `started_at`, `finished_at` | Lauf |
 | `server_version`, `schema_version` | Stand des Codes und der Migrationen |
-| `instance_id`, `sync_epoch` | Identität und Zeitlinie (Ergänzung beantragt) |
+| `instance_id`, `sync_epoch` | Identität und Zeitlinie (03, `instance`) |
 | `event_log.head_seq`, `event_log.min_retained_seq` | Grenzen des Ereignis-Logs |
 | `audit.last_seq`, `audit.last_hash` | Kopf der Audit-Kette |
 | `row_counts` | Zeilen je Tabelle |
@@ -88,7 +88,7 @@ Audit-Kette sind `page`. Der Test schreibt nie in die produktive Datenbank.
 5. `docker compose start postgres`; PostgreSQL spielt WAL bis zum Ziel und beginnt eine neue
    Zeitlinie.
 6. `docker compose run --rm migrate bothy restore finalize`: neue `sync_epoch`, Cursor der
-   Agenten und Webhooks auf `head_seq`, Audit-Eintrag (Ergänzung beantragt).
+   Agenten, Webhooks und Worker-Verbraucher auf `head_seq`, Audit-Eintrag (03 Abschnitt 6.7).
 7. Wiederherstellungstest gegen den neuen Stand von Hand auslösen.
 8. `docker compose start api worker`. Clients bekommen `resync_required` mit Grund
    `epoch_changed` und laden neu; ihr Ausgangsfach bleibt erhalten.
@@ -119,6 +119,7 @@ Audit-Kette sind `page`. Der Test schreibt nie in die produktive Datenbank.
    nicht zurückholen. Darum führt `bothy restore finalize` Löschaufträge erneut aus, die nach dem
    Zielzeitpunkt erledigt wurden. Die Liste dieser Aufträge liegt nicht in der wiederhergestellten
    Datenbank; `bothy-backupd` schreibt sie darum bei jedem Lauf zusätzlich ins Manifest
-   (Ergänzung beantragt bei Kapitel 20).
+   ([20-datenschutz.md](../spec/20-datenschutz.md), R-DP-04: Lösch-Journal außerhalb der
+   Datenbank).
 3. Gewöhnliche Löschungen nach dem Zielzeitpunkt (eigene Nachricht gelöscht) sind mit der neuen
    Zeitlinie verloren; die Inhalte erscheinen wieder. Die Störungsmeldung nennt das.

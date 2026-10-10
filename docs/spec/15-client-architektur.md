@@ -286,7 +286,7 @@ verbunden, solange die App läuft.
 1. Verbinden mit gespeichertem Cursor; Seiten anwenden; Cursor nach jeder Seite in derselben
    Transaktion wie die Seite speichern.
 2. Bei `resync_required`: Spiegel-Tabellen leeren (nicht Ausgangsfach, Entwürfe, Teilen-Eingang),
-   `GET /v1/sync/snapshot`, Cursor auf `head_seq`, geöffnete Threads neu laden.
+   `GET /api/v1/sync/snapshot`, Cursor auf `head_seq`, geöffnete Threads neu laden.
 3. Nach `catchup.complete` sendet das Ausgangsfach in Reihenfolge.
 4. Lücken in `thread_seq` (Ereignis passt nicht an die geladenen Bereiche) lädt der Fetcher per REST
    nach, bevor er die Nachricht anzeigt.
@@ -297,7 +297,7 @@ verbunden, solange die App läuft.
 
 Fokus auf einen Thread mit aktivem Lauf liefert einmal das ganze Dokument, danach Patches.
 `base_version` gleich lokal: anwenden; `version` kleiner oder gleich lokal: ignorieren; sonst Lücke:
-`GET /v1/runs/{id}`. Die Oberfläche zeichnet höchstens einmal je Frame (Patches werden je Frame
+`GET /api/v1/runs/{id}`. Die Oberfläche zeichnet höchstens einmal je Frame (Patches werden je Frame
 gesammelt). Endet der Lauf, verwirft der `RunStore` das Dokument; die eingeklappte Zeile kommt aus
 der Tabelle `runs`.
 
@@ -421,7 +421,7 @@ sequenceDiagram
   end
 ```
 
-Ist `notify.preview_content` aus, holt die NSE nichts. Antippen öffnet die App per Deep Link
+Steht `notify.preview_mode` auf `none` ([13-push-benachrichtigungen.md](13-push-benachrichtigungen.md)), holt die NSE nichts. Antippen öffnet die App per Deep Link
 (Abschnitt 11). Ob die NSE einen nur im privaten Netz erreichbaren Server erreicht, hängt am VPN des
 Geräts; das ist ein Gerätetest (Risiko im Bericht).
 
@@ -488,7 +488,7 @@ Speicher.
 Paket `record` (7.1.2, Herausgeber cow-level.ovh): AAC-LC ist das einzige komprimierte Format, das
 auf allen Zielen aufnimmt; Opus ist auf iOS nur im CAF-Container nutzbar
 (https://pub.dev/packages/record, abgerufen 2026-10-10 [belegt laut Recherche]). Darum: AAC-LC in
-MP4-Container (`.m4a`), Mono, Bitrate `client.voice.bitrate`, Höchstdauer `client.voice.max_duration`.
+MP4-Container (`.m4a`), Mono, Bitrate `client.voice.bitrate`, Höchstdauer `voice.max_duration` ([12-dateien.md](12-dateien.md)).
 Ablauf: Rechte des Mikrofons beim ersten Gebrauch erfragen; Aufnahme in eine temporäre Datei; beim
 Senden Upload als Datei mit `kind = voice` am Eintrag des Ausgangsfachs; danach `file.transcribe`,
 wenn der Kanal-Agent oder ein Dienst transkribiert. Abspielen mit Geschwindigkeit 1, 1.5, 2; das
@@ -552,8 +552,8 @@ direkt mit einem Collector im Internet.
 
 Keine Inhalte, keine IDs von Threads, Kanälen oder Personen; Merkmale nur Plattform, App-Version,
 Dichte, Theme. Senden höchstens alle `client.metrics.flush_interval`, abschaltbar
-(`privacy.client_metrics`). Der Endpunkt ist eine neue Aktion
-`client_metrics.submit` (Kern-Vertrag: Ergänzung beantragt).
+(`privacy.client_metrics`). Endpunkt `POST /api/v1/client-metrics` mit der Aktion
+`client_metrics.submit` (05; ADR 0057).
 
 ## 18. Schalter (Feature-Flags)
 
@@ -637,6 +637,6 @@ zufällig auftreten.
 | `client.perf.memory_mobile_max` | `300MiB` | Speicher mobil |
 | `client.perf.memory_desktop_max` | `500MiB` | Speicher Desktop |
 
-`client.voice.max_duration` und `client.share.recent_targets` stehen in
-[01-produkt.md](01-produkt.md); `client.cache_max_age`, `client.outbox_retry_base` und
+`client.share.recent_targets` steht in [01-produkt.md](01-produkt.md), `voice.max_duration` in
+[12-dateien.md](12-dateien.md); `client.cache_max_age`, `client.outbox_retry_base` und
 `client.outbox_retry_cap` in [04-sync-protokoll.md](04-sync-protokoll.md).

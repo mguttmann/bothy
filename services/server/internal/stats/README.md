@@ -25,13 +25,11 @@ Geprüft durch go-arch-lint (ADR 0008).
 
 ## Tabellen
 
-Keine eigenen Tabellen; Daten anderer Module nur über deren Ports.
-
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Keine. Das Modul liest über die Ports anderer Module (03-datenmodell.md, Grundsatz 12).
 
 ## Aktionen (05-aktionen.md)
 
-`stats.read`.
+`stats.read`, `client_metrics.submit`.
 
 ## Ereignisse und WebSocket-Ops
 

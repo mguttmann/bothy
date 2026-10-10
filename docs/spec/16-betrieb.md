@@ -287,7 +287,7 @@ Begründungen:
 3. Off-site-Repositorys sind verschlüsselt und nur anhängend: Object Lock oder ein
    Append-only-Zugang. Löschen nach Ablauf der Frist darf nur ein getrenntes Konto. Grund: Wer den
    Server übernimmt, darf die Sicherungen nicht löschen können (Ransomware).
-4. Jeder Lauf schreibt eine Zeile in `backup_runs` (Kern-Vertrag: Ergänzung beantragt) und meldet
+4. Jeder Lauf schreibt eine Zeile in `backup_runs` (03, Modul `status`) und meldet
    Kennzahlen (Kapitel 17). Die Admin-Konsole und die Statusseite lesen die Tabelle.
 
 ![Sicherung](../operations/diagrams/backup-flow.svg)
@@ -311,19 +311,19 @@ Das Ergebnis geht in `backup_runs` (Art `restore_test`) und in die Kennzahlen. F
 erfolgreicher Test länger als `backup.restore_test.max_age`, alarmiert das System. Anleitung:
 [backup-restore.md](../operations/backup-restore.md).
 
-### 8.4 Wiederherstellung und Sync (Kern-Vertrag: Ergänzung beantragt)
+### 8.4 Wiederherstellung und Sync
 
 Eine Wiederherstellung setzt die globale Sequenz zurück. R-SY-04 erkennt das nur, solange
 `cursor > head_seq` gilt. Nach neuen Schreibvorgängen überholt die neue Zeitlinie alte Cursor,
 und ein Client würde fremde Ereignisse mit alten Nummern still überspringen.
 
-Geplante Lösung: Die Tabelle `instance` bekommt `sync_epoch` (UUIDv7). `bothy restore finalize`
-setzt sie nach jeder Wiederherstellung neu. `hello`, `ready` und `GET /v1/events` nennen die
-Epoche; der Client speichert sie mit dem Cursor. Passt sie nicht, antwortet der Server
-`resync_required` mit Grund `epoch_changed`. Derselbe Befehl setzt alle
-`agent_consumer_cursors.acked_seq` und `webhook_subscriptions.last_delivered_seq` auf den neuen
-`head_seq` und schreibt einen Audit-Eintrag. Ein Umzug ohne Datenverlust (Abschnitt 11) ändert
-die Epoche nicht.
+Lösung (03 Abschnitt 6.7, 04 Abschnitt 7.5, ADR 0059): `instance.sync_epoch` (UUIDv7) benennt
+die Zeitlinie. `bothy restore finalize` setzt sie nach jeder Wiederherstellung neu. `hello`,
+`ready` und `GET /api/v1/events` nennen die Epoche; der Client speichert sie mit dem Cursor. Passt
+sie nicht, antwortet der Server `resync_required` mit Grund `epoch_changed`. Derselbe Befehl setzt
+alle `agent_consumer_cursors.acked_seq`, `webhook_subscriptions.last_delivered_seq` und
+`event_consumer_cursors.last_seq` auf den neuen `head_seq` und schreibt einen Audit-Eintrag. Ein
+Umzug ohne Datenverlust (Abschnitt 11) ändert die Epoche nicht.
 
 ## 9. Disaster Recovery
 
@@ -350,8 +350,8 @@ Ziele: `dr.rpo_target` (Datenverlust) und `dr.rto_target` (Dauer bis zum Betrieb
    Image-Wechsel ohne Datenbank-Rückbau.
 3. Down-Migrationen gibt es in Produktion nicht. Fehler korrigiert die nächste Version.
 4. Der Server prüft beim Start das Schema: Ist es älter als nötig, oder verlangt es eine neuere
-   Server-Version (`instance.min_server_version`, gesetzt von `migrate`; Kern-Vertrag: Ergänzung
-   beantragt), meldet `/readyz` einen Fehler und der Server nimmt keinen Betrieb auf. Ein
+   Server-Version (`instance.min_server_version`, gesetzt von `migrate`; 03), meldet `/readyz`
+   einen Fehler und der Server nimmt keinen Betrieb auf. Ein
    neueres, aber verträgliches Schema ist erlaubt; das ist der Rückweg aus Punkt 2.
 5. Ein Major-Upgrade von PostgreSQL ist ein eigener Schritt mit Wartungsfenster.
 
@@ -452,8 +452,7 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | `server.listen_addr` | `127.0.0.1:8080` | öffentlicher Listener (REST, Gateway) |
 | `server.internal_listen_addr` | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack |
 | `server.public_url` | keiner, Pflicht | Basis-URL, unter der Apps den Server erreichen |
-| `server.trusted_proxies` | leer | CIDR-Liste, deren `X-Forwarded-For` gilt |
-| `server.shutdown_grace` | `30s` | Zeit zum Leeren beim Beenden; Verbindungen schließen mit `4013` |
+| `server.trusted_proxies` | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](19-sicherheit.md), SEC-TLS-1) |
 | `server.maintenance_mode` | `off` | `off` oder `read_only` (Umzug, Upgrade) |
 | `secrets.dir` | `/run/bothy/secrets` | Basis der Standardverweise `file:` |
 | `secrets.cache_ttl` | `5m` | so lange gilt ein gelesenes Geheimnis |
@@ -464,7 +463,6 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | `database.password_ref` | `file:<secrets.dir>/db_app_password` | Verweis auf das Passwort |
 | `database.sslmode` | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` |
 | `database.max_conns` | `20` | Größe des Verbindungspools je Prozess (Startwert bis zum Lasttest) |
-| `database.statement_timeout` | `30s` | Abbruch einzelner Abfragen |
 | `migrate.require_recent_backup` | `true` | `migrate` verlangt eine frische Sicherung |
 | `migrate.recent_backup_max_age` | `24h` | so alt darf diese Sicherung sein |
 | `migrate.lock_timeout` | `5s` | `lock_timeout` je Migrationsschritt |
@@ -507,7 +505,7 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | R-OP-08 | Repository-Host `backup` per pgBackRest-TLS; der Datenbank-Container bleibt ohne Ausgang. | Off-site-Zugangsdaten liegen nur dort, wo sie gebraucht werden. |
 | R-OP-09 | Off-site-Sicherungen nur anhängend; Löschen nur mit getrenntem Konto. | Ein übernommener Server darf seine Sicherungen nicht zerstören. |
 | R-OP-10 | Automatischer Wiederherstellungstest mit Manifest-Vergleich, Sequenz- und Hash-Prüfung, Stichproben. | Eine Sicherung ist erst belegt, wenn sie zurückgespielt wurde. |
-| R-OP-11 | Wiederherstellung setzt eine neue Sync-Epoche (Ergänzung beantragt). | Ohne Epoche überholt die neue Zeitlinie alte Cursor still. |
+| R-OP-11 | Wiederherstellung setzt eine neue Sync-Epoche (03, 04, ADR 0059). | Ohne Epoche überholt die neue Zeitlinie alte Cursor still. |
 | R-OP-12 | Expand/Contract mit Rückweg um genau eine Version; keine Down-Migrationen in Produktion. | Rückweg ohne Datenbank-Rückbau; zwei Versionen zurück braucht eine Wiederherstellung. |
 | R-OP-13 | `migrate` verlangt eine frische Sicherung. | Erzwingt den wichtigsten Schritt vor jeder Schemaänderung. |
 | R-OP-14 | Feature-Flags mit Art `release` und `remove_by`, Gate-Check; Flags nie für Sicherheitsgrenzen. | Verhindert tote Flags und versteckte Sicherheitsschalter. |

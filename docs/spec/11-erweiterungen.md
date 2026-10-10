@@ -9,7 +9,7 @@ Begriffe: [00-glossar.md](00-glossar.md). Tabellen: [03-datenmodell.md](03-daten
 Entscheidungen: [ADR 0022](../adr/0022-agenten-und-plugins-ausserhalb-des-server-prozesses.md),
 [ADR 0026](../adr/0026-sdks-generierter-kern-plus-handschicht.md).
 
-Stellen mit "(Kern-Vertrag: Ergänzung beantragt)" sind in Abschnitt 15 gesammelt.
+Die beim Entwurf beantragten Ergänzungen stehen jetzt im Kern-Vertrag (Abschnitt 15).
 
 ## 1. Grundsätze
 
@@ -64,7 +64,7 @@ ignoriert werden.
 | `delivery.interactions_url` | wenn Befehle oder Komponenten ohne Gateway | HTTPS-Adresse für synchrone Anfragen (Abschnitt 9) |
 | `commands` | nein | Befehle nach [09-agenten.md](09-agenten.md) Abschnitt 10, ohne reservierte Namen |
 | `components` | nein | genutzte Komponententypen (`button`, `select`, `form`); nur für die Zustimmung |
-| `requested_grants` | nein | je Eintrag `target_kind`, `level` (`read` oder `write`), `capabilities` (nur `upload`, `export`), `purpose` |
+| `requested_grants` | nein | je Eintrag `target_kind`, `level` (`read` oder `write`), `capabilities` (nur `upload`, R-DM-20), `purpose` |
 | `incoming_webhooks` | nein | erwartete Eingangs-Webhooks mit `name` und `purpose` |
 | `data_egress` | ja, wenn `events` oder Interaktionen | Klartext, welche Daten die Instanz verlassen und wohin |
 
@@ -81,10 +81,10 @@ seinen Hash (`apps.manifest_sha256`).
 3. Alle Adressen sind `https`; ihr Host steht bei der Installation in `webhook.allowed_hosts`
    (R-DM-17). Fehlt er, bietet die Zustimmung an, ihn in derselben bestätigten Aktion
    aufzunehmen.
-4. `requested_grants` enthält nie `trigger` (R-DM-08) und nie `manage`. Grund für `manage`: Eine
-   App mit `manage` könnte selbst Freigaben vergeben (R-AZ-05) und Kanal-Prompts lesen; das ist
-   für eine Integration nie nötig (Kern-Vertrag: Ergänzung beantragt, Check in `grants` für
-   `subject_kind = 'app'`).
+4. `requested_grants` enthält nie `trigger` (R-DM-08) und als Zusatzrecht höchstens `upload`
+   (R-DM-20; Check in `grants`). Grund für den Ausschluss von `manage`: Eine App mit `manage`
+   könnte selbst Freigaben vergeben (R-AZ-05) und Kanal-Prompts lesen; das ist für eine
+   Integration nie nötig. `export` hieße Massenabzug von Verläufen.
 5. Befehle wie in [09-agenten.md](09-agenten.md) Abschnitt 10.2, höchstens
    `command.max_per_principal`.
 
@@ -159,7 +159,7 @@ inaktiv. Entfernte Scopes, Ereignisse und Befehle wirken sofort.
 
 ### 4.3 Abschalten und Deinstallation
 
-| Schritt | `app.suspend` (Kern-Vertrag: Ergänzung beantragt) | `app.uninstall` |
+| Schritt | `app.suspend` | `app.uninstall` |
 |---|---|---|
 | Tokens | gesperrt, nicht widerrufen | widerrufen |
 | Zustellungen | pausiert, Stand bleibt | Abos `disabled` |
@@ -168,9 +168,9 @@ inaktiv. Entfernte Scopes, Ereignisse und Befehle wirken sofort.
 | Freigaben, Eingangs-Webhooks | bleiben | widerrufen |
 | Nachrichten der App | bleiben | bleiben (Autor bleibt erhalten, Prinzipal `disabled`) |
 
-`app_installations.state = 'suspended'` existiert in 03, aber keine Aktion setzt es; darum die
-beantragte Aktion `app.suspend` mit Gegenstück `app.resume` (Owner, Step-up, Audit). Grund: Ein
-Not-Aus darf keine Neuinstallation mit neuer Zustimmung erzwingen.
+`app_installations.state = 'suspended'` setzt die Aktion `app.suspend`, zurück mit `app.resume`
+(beide Owner, Step-up, Audit; 05). Grund: Ein Not-Aus darf keine Neuinstallation mit neuer
+Zustimmung erzwingen.
 
 ## 5. Scopes und Freigaben
 
@@ -188,7 +188,7 @@ Eine App darf eine Aktion nur, wenn **beides** gilt (05 Abschnitt 2.6):
 | `components:write` | `component.update`, `interaction.respond` | Knöpfe, Formulare |
 | `users:read` | `user.read` | Namen auflösen |
 | `events:subscribe` | Ereignis-Abos, `gateway.connect` | jede abonnierende App |
-| `costs:reconcile` | `cost.reconcile.submit` | Kostenabgleich ([10-backend-richtlinie.md](10-backend-richtlinie.md) 12.4; Kern-Vertrag: Ergänzung beantragt) |
+| `costs:reconcile` | `cost.reconcile.submit` | Kostenabgleich ([10-backend-richtlinie.md](10-backend-richtlinie.md) 12.4) |
 
 Grund für beides: Freigaben sagen "wo", Scopes sagen "was". Eine App mit `write` auf einem Kanal,
 aber ohne `messages:read`, kann posten, ohne mitzulesen.
@@ -214,7 +214,7 @@ zu überspringen.
 
 | Regel | Inhalt |
 |---|---|
-| Abo | `webhook_subscriptions` je Installation; `event_types` Teilmenge der bewilligten Ereignisse |
+| Abo | `webhook_subscriptions` je Installation; `event_types` Teilmenge der bewilligten Ereignisse. Agenten nutzen dieselbe Tabelle mit `agent_id` als Transport ([09-agenten.md](09-agenten.md) Abschnitt 4.2) |
 | Format | Körper = Ereignis-Umschlag wie auf dem Gateway (04 Abschnitt 2.2) |
 | Signatur | Standard Webhooks, Kopfzeilen `webhook-id` (= Ereignis-ID), `webhook-timestamp`, `webhook-signature` mit Schema `v1a` (Ed25519) |
 | Schlüssel | `server_signing_keys` mit Zweck `webhook_out` und `alg = 'EdDSA'`; ES256 ist für diesen Zweck nicht erlaubt, weil `v1a` nur Ed25519 kennt |
@@ -223,7 +223,7 @@ zu überspringen.
 | Erfolg | nur `2xx`; `410` schaltet das Abo ab; `429`, `502`, `504` drosseln und beachten `retry-after` |
 | Wiederholung | Backoff mit Zufall zwischen `webhook.retry_backoff_base` und `webhook.retry_backoff_cap` (03) |
 | Zeitgrenze | `webhook.delivery_timeout`; der Antwortkörper wird nicht gespeichert |
-| SSRF-Schutz | nur `https`, Host in `webhook.allowed_hosts`, aufgelöste Adresse nicht in `webhook.denied_ip_ranges`, Verbindung an die geprüfte Adresse gebunden, keine Weiterleitungen |
+| SSRF-Schutz | nur `https`, Host in `webhook.allowed_hosts`, Zustellung über den Egress-Client mit Adressprüfung nach der DNS-Auflösung ([19-sicherheit.md](19-sicherheit.md), SEC-NET-1 bis SEC-NET-5), Verbindung an die geprüfte Adresse gebunden, keine Weiterleitungen |
 
 Belege Standard Webhooks (https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md,
 abgerufen 2026-10-10, [belegt]): die drei Kopfzeilen; `v1` symmetrisch mit HMAC-SHA256, `v1a`
@@ -321,8 +321,7 @@ selbst über die API antwortet. Ohne Antwort in der Frist sieht der Mensch "App 
 die Komponente bleibt `used` (gleiche Begründung wie [09-agenten.md](09-agenten.md) 11.4).
 
 Für Apps entfallen `agent.invoke` und I2; geprüft werden `required_level`, `restricted_to`,
-`required_capability`, Freigaben und Scope (Kern-Vertrag: Ergänzung beantragt, siehe
-[09-agenten.md](09-agenten.md) E-AG-17).
+`required_capability`, Freigaben und Scope (05 `command.invoke`, R-AZ-18).
 
 ## 10. Fertige Integrationen als Beispiele
 
@@ -469,15 +468,17 @@ Gliederung für den Entwickler-Leitfaden der Doku-Site:
 | R-EX-09 | Eingangs-Webhooks lösen keine Erwähnungen auf; Token auch im Pfad erlaubt, aber geschwärzt. | Kein Benachrichtigungs-Missbrauch; Absender ohne Kopfzeilen. |
 | R-EX-10 | SDK = erzeugter Kern plus Handschicht; Kern nie von Hand geändert. | Spec bleibt Quelle der Wahrheit; Handschicht trägt die schwierigen Teile einmal. |
 
-## 15. Kern-Vertrag: beantragte Ergänzungen
+## 15. Abgleich mit dem Kern-Vertrag
 
-| Nr | Ergänzung | Betrifft |
+Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026-10-10):
+
+| Nr | Ergänzung | Entscheidung, Ort |
 |---|---|---|
-| E-EX-01 | Aktionen `app.suspend`, `app.resume` | 05 Abschnitt 4.11 |
-| E-EX-02 | Check in `grants`: für `subject_kind = 'app'` kein `manage` | 03 `grants`, 07 |
-| E-EX-03 | Scope `costs:reconcile` | 05 Abschnitt 2.6 |
-| E-EX-04 | `server_signing_keys` mit Zweck `webhook_out` nur `EdDSA` | 03 `server_signing_keys` |
-| E-EX-05 | Persönliche Ereignisse für Apps (`command.invoked`, `interaction.created`), App-Befehle ohne `agent.invoke` | 05 Abschnitt 4.10 und 6 (gleich E-AG-17) |
+| E-EX-01 | Aktionen `app.suspend`, `app.resume` | übernommen, 05 Abschnitt 4.11 |
+| E-EX-02 | kein `manage` für Apps | übernommen in schärferer Form: Agenten und Apps als Zusatzrecht nur `upload` (03 `grants`, R-DM-20) |
+| E-EX-03 | Scope `costs:reconcile` | übernommen, 05 Abschnitt 2.6 |
+| E-EX-04 | `webhook_out`-Schlüssel nur `EdDSA` | übernommen, 03 `server_signing_keys` |
+| E-EX-05 | persönliche Ereignisse für Apps, App-Befehle ohne `agent.invoke` | übernommen, 05 Abschnitte 4.10 und 6, R-AZ-18 |
 
 ## 16. Konfigurationswerte dieses Kapitels
 
@@ -487,7 +488,6 @@ Gliederung für den Entwickler-Leitfaden der Doku-Site:
 | `app.interaction_timeout` | Server | `3s` | Frist für synchrone Antworten über `interactions_url` |
 | `webhook.delivery_timeout` | Server | `15s` | Zeitgrenze einer Zustellung |
 | `webhook.max_pending_per_subscription` | Server | `10000` | offene Zustellungen je Abo, darüber `paused` |
-| `webhook.denied_ip_ranges` | Server | `127.0.0.0/8, ::1/128, 0.0.0.0/8, 169.254.0.0/16, fe80::/10` | nie erlaubte Zieladressen, auch bei erlaubtem Host |
 | `webhook_in.max_body_bytes` | Server | `1048576` | Größe eines eingehenden Körpers |
 | `webhook_in.formats_enabled` | Server | `native, alertmanager` | eingeschaltete Eingangsformate |
 | `sdk.http_timeout` | SDK | `30s` | Zeitgrenze einer REST-Anfrage |

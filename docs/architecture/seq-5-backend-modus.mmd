@@ -29,7 +29,7 @@ sequenceDiagram
     AG->>DB: Ereignisse agent.updated, access.changed für Betroffene, Audit allow, COMMIT
     AG-->>O: 200
     HUB-->>APP: agent.updated: Abzeichen Persönlich
-    HUB-->>AD: agent.updated mit neuem Soll (Kern-Vertrag: Ergänzung beantragt)
+    HUB-->>AD: agent.updated mit neuem Soll (Empfang über agent.read als agent-self)
   end
   AD->>AG: Heartbeat: reported_billing_mode organization
   AG->>AG: Soll und Ist weichen ab: Zustand degraded, Warnung in Konsole und Agenten-Karte

@@ -52,7 +52,7 @@ Diagramm: [c4-2-container.svg](../architecture/c4-2-container.svg)
 | Container | Technik | Verantwortung | Zustand | Skalierung |
 |---|---|---|---|---|
 | `bothy serve --role=api` | Go, ein Binary, OCI-Image | REST, Gateway-WebSocket, Log-Tail und Fan-out im Prozess, Agenten-Verbraucher | nur flüchtig im Speicher (Verbindungen, Rechte-Cache, Rate-Limit-Eimer) | waagerecht ab Stufe 2 (Abschnitt 16) |
-| `bothy serve --role=worker` | gleiches Binary und Image | River-Jobs, Ereignis-Verbraucher (Push, Webhooks), Dateiverarbeitung, Wartung, Importe | keiner außerhalb der Datenbank | waagerecht ab Stufe 3 |
+| `bothy serve --role=worker` | gleiches Binary und Image | River-Jobs, Ereignis-Verbraucher (Push, Webhooks), Dateiverarbeitung, Wartung | keiner außerhalb der Datenbank | waagerecht ab Stufe 3 |
 | PostgreSQL 18 | Datenbank | alle Domänendaten, `event_log`, Audit, River-Tabellen im Schema `jobs.schema` | maßgeblich | senkrecht; Lese-Replikat ab Stufe 4 |
 | Objektspeicher | Dateisystem-Treiber (Standard) oder S3-kompatibel | Dateien, Vorschaubilder, Exportpakete | maßgeblich für Bytes | über den Speicherdienst |
 | ClamAV `clamd` | eigener Prozess, optional | Malware-Scan per `INSTREAM` | Signaturen | eigener Container |
@@ -82,12 +82,22 @@ Zeile Konfiguration, weil beide Rollen dasselbe Binary und dieselbe Datenbank nu
 
 ### 3.3 Befehle des Binarys
 
+Ein Binary `bothy` mit Unterbefehlen (Ruling L1). Diese Tabelle ist das Register; andere Kapitel
+nennen nur Befehle von hier.
+
 | Befehl | Zweck | Kapitel |
 |---|---|---|
 | `bothy serve --role=api\|worker\|all` | Server starten | dieses Kapitel |
-| `bothy migrate up\|status\|validate` | Migrationen des Domänenschemas (goose) und der River-Tabellen (rivermigrate) | ADR 0007 |
-| `bothy setup ...` | Einrichtung, erster Owner per Server-Befehl | [08-identitaet.md](08-identitaet.md) |
+| `bothy migrate up\|status\|validate` | Migrationen des Domänenschemas (goose) und der River-Tabellen (rivermigrate); setzt `instance.min_server_version` | ADR 0007, [16-betrieb.md](16-betrieb.md) |
+| `bothy setup bootstrap-owner\|issue-enrollment-code` | Einrichtung: erster Owner per Server-Befehl (Systemaktion `instance.bootstrap`), Einladungs-Code zur Wiederherstellung | [08-identitaet.md](08-identitaet.md) |
 | `bothy config check\|print` | Konfiguration prüfen, redigiert ausgeben | Abschnitt 13 |
+| `bothy import discord ...` | Import und Lese-Spiegel über die Import-API (`import.apply`) | [22-import-migration.md](22-import-migration.md) |
+| `bothy restore finalize` | nach einer Wiederherstellung: neue Sync-Epoche, Cursor auf `head_seq`, Audit | [16-betrieb.md](16-betrieb.md), [03-datenmodell.md](03-datenmodell.md) 6.7 |
+| `bothy secrets init\|export` | Geheimnisse anlegen und sichern | [16-betrieb.md](16-betrieb.md) |
+| `bothy healthcheck --url` | Gesundheitsprüfung für Container ohne Shell gegen den internen Listener | [16-betrieb.md](16-betrieb.md) |
+| `bothy files rescan` | Wartung: Dateien erneut prüfen lassen | [12-dateien.md](12-dateien.md) |
+| `bothy telemetry pseudonym` | Pseudonym eines Prinzipals für die Fehlersuche des Owners | [../observability/privacy.md](../observability/privacy.md) |
+| `bothy dev seed` | Testdaten, nur in `instance.environment = dev` | [../operations/environments-and-flags.md](../operations/environments-and-flags.md) |
 
 Migrationen laufen nie implizit beim Start von `serve` (R-AR-16). Grund: Bei mehreren Knoten würden
 sie gleichzeitig starten, und ein fehlgeschlagener Schritt soll den Betrieb nicht in einer
@@ -117,38 +127,39 @@ Diagramm: [c4-3-komponenten-server.svg](../architecture/c4-3-komponenten-server.
    von genau einem Modul implementiert (Tabelle 4.5).
 6. Jede Tabelle aus 03 gehört genau einem Modul. Jede Aktion aus 05 wird von genau einem Modul als
    Anwendungsfall ausgeführt. Die Rechte-Logik jeder Aktion liegt trotzdem nur in `authz` (B7).
-7. Drei Module besitzen keine Tabellen: `gateway`, `search`, `stats` (Kern-Vertrag: Ergänzung
-   beantragt, Abschnitt 20). Sie sind eigene Module, weil sie eigene Ports, eigene Abhängigkeiten
-   und eigene Leistungsziele haben.
+7. Drei Module besitzen keine Tabellen: `gateway`, `search`, `stats` (03, Abschnitt 2; Ruling L3).
+   Sie sind eigene Module, weil sie eigene Ports, eigene Abhängigkeiten und eigene Leistungsziele
+   haben.
 
 ### 4.2 Modulliste
 
 | Modul | Verantwortung | Besitzt Tabellen | Kapitel |
 |---|---|---|---|
-| `instance` | Instanz-Identität, Einstellungen und Branding, Feature-Flags, Server-Signierschlüssel mit JWKS und Rotation, Sequenz-Zähler | `instance`, `instance_settings`, `server_signing_keys`, `feature_flags`, `sequence_counters` | 06, 16, 19 |
-| `audit` | Audit-Log mit Hash-Kette, Abfrage, Prüfung, Kürzung mit Anker | `audit_events` | 19, 20 |
+| `instance` | Instanz-Identität, Sync-Epoche, Mindest-Server-Version, Einstellungen und Branding, Feature-Flags, Server-Signierschlüssel mit JWKS und Rotation, Sequenz-Zähler | `instance`, `instance_settings`, `server_signing_keys`, `feature_flags`, `sequence_counters` | 06, 16, 19 |
+| `audit` | Audit-Log mit Hash-Kette, signierte Prüfpunkte, Abfrage, Prüfung, Kürzung mit Anker | `audit_events`, `audit_checkpoints` | 19, 20 |
 | `authz` | `authorize`, Rechte-Cache, sichtbare Ziele, Gruppen, Freigaben, Rechte-Version, I1-Prüfung, "Wer hat Zugriff", "Als Person ansehen" | `groups`, `group_memberships`, `grants` | 07 |
 | `billing` | Preistabelle, Kostenbuchungen, Summen je Lauf, Thread, Bereich, Agent, Abgleich | `price_table`, `cost_entries` | 10 |
-| `identity` | Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, Passkeys, Geräte und Geräteschlüssel, Sitzungen, Refresh-Familien, API-Tokens, Step-up, Zugriffstokens | `principals`, `users`, `owners`, `identity_providers`, `user_identities`, `passkey_credentials`, `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`, `refresh_tokens`, `api_tokens` | 08 |
+| `identity` | Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten, Einladungs-Codes, Anmeldevorgänge, Geräte-Kopplung, Passkeys, Geräte und Geräteschlüssel, Sitzungen, Refresh-Familien, API-Tokens, Step-up, Zugriffstokens | `principals`, `users`, `owners`, `identity_providers`, `user_identities`, `local_credentials`, `enrollment_codes`, `auth_login_flows`, `device_pairings`, `passkey_credentials`, `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`, `refresh_tokens`, `api_tokens` | 08 |
 | `chat` | Bereiche, Seitenleisten-Zustand, Kanäle mit Verhalten, Skills, Projektbindung, DM-Teilnehmer, Forum-Tags, Threads mit Thread-Sequenz | `spaces`, `user_space_states`, `channels`, `channel_skill_bindings`, `project_bindings`, `dm_participants`, `forum_tags`, `threads`, `thread_tags` | 01, 07, 09 |
-| `agents` | Agenten, Backend-Richtlinie (Soll), gemeldeter Ist-Zustand, Verbraucher-Cursor, Befehlsregister, Agenten-Sitzungen | `agents`, `agent_consumer_cursors`, `commands`, `agent_sessions` | 09, 10 |
-| `files` | Upload, Objektspeicher-Treiber, Scan, Vorschaubilder, Anhänge, Transkripte | `files`, `file_thumbnails`, `message_attachments` | 12 |
+| `agents` | Agenten, Backend-Richtlinie und Werkzeugklasse (Soll), gemeldeter Ist-Zustand, Verbraucher-Cursor mit Fencing, Befehlsregister, Agenten-Sitzungen, Dev-Umgebungen (Etappe) | `agents`, `agent_consumer_cursors`, `commands`, `agent_sessions`, `dev_environments` | 09, 10, 21 |
+| `files` | Upload-Sitzungen in Teilen, Objektspeicher-Treiber, Scan, Metadaten-Entfernung, Vorschaubilder, Anhänge, Transkripte, Dateitext | `files`, `file_upload_sessions`, `file_upload_parts`, `file_thumbnails`, `message_attachments`, `file_text_extracts` | 12, 14 |
 | `messaging` | Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen, Kanal-Export | `messages`, `message_revisions`, `mentions`, `reactions`, `pins`, `message_templates` | 06, 14 |
 | `runs` | Auslöse-Entscheidung, Läufe und Lauf-Dokument, Schritte, Nachträge, Komponenten, Interaktionen, Befehlsausführung, Aufruf-Marken | `runs`, `run_steps`, `run_followups`, `message_components`, `interactions` | 09, 10 |
-| `sync` | Ereignis-Log (Anhängen, Tail, Nachholen, Schwärzen, Partitionen), Momentaufnahme, Idempotenz-Schlüssel, Gelesen-Stand, Entwürfe, persönliche Einstellungen, Cursor der Worker-Verbraucher | `event_log`, `idempotency_keys`, `read_states`, `drafts`, `user_settings`; beantragt: `event_consumer_cursors` | 04, 15 |
+| `sync` | Ereignis-Log (Anhängen, Tail, Nachholen, Schwärzen, Partitionen), Momentaufnahme, Idempotenz-Schlüssel, Gelesen-Stand, Entwürfe, persönliche Einstellungen, Cursor der Worker-Verbraucher | `event_log`, `event_consumer_cursors`, `idempotency_keys`, `read_states`, `drafts`, `user_settings` | 04, 15 |
 | `notify` | Benachrichtigungsstufen, Ruhezeiten, Push-Registrierungen, Push-Verbraucher und Versand | `notification_preferences`, `quiet_hours`, `push_registrations` | 13 |
 | `gateway` | WebSocket-Endpunkt, Gateway-Sitzungen, Hub, Fokus, Tippen, Weitergabe kurzlebiger Ereignisse, Agenten-Verbindungen | keine | 04, 06 |
 | `search` | Suchabfrage über Nachrichten, Thread-Titel und Dateien mit Rechtefilter, Rangfolge | keine | 14 |
 | `stats` | Statistik für Konsole: Nutzung je Bereich, Läufe, Werkzeugaufrufe, Kosten, Fehlerraten | keine | 01, 17 |
 | `apps` | Apps und Manifeste, Installationen, Scopes, ausgehende Webhooks mit Verbraucher und Zustellung, Eingangs-Webhooks | `apps`, `app_installations`, `webhook_subscriptions`, `webhook_deliveries`, `incoming_webhooks` | 11 |
-| `importer` | Import-Quellen, Trockenlauf, Import mit Herkunftsschlüssel | `import_sources`, `import_items` | 22 |
+| `importer` | Import-Quellen, Stapel mit Herkunftsschlüssel (`import.apply`), Eigentumsliste und Schreibschutz gespiegelter Kanäle; der Trockenlauf liegt im Werkzeug | `import_sources`, `import_items` | 22 |
 | `privacy` | DSGVO-Aufträge, Export und Löschung über die Teilnehmer aller Module | `gdpr_requests` | 20 |
-| `status` | Statusseite, Komponenten, Störungen, automatische Prüfungen | `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components` | 16, 17 |
+| `status` | Statusseite, Komponenten, Störungen, automatische Prüfungen, Sicherungsläufe | `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | 16, 17 |
 
-Technische Tabellen außerhalb der Module: River legt eigene Tabellen mit Präfix `river_` an
-(u. a. `river_migration`, `river_job`, `river_leader`, `river_queue`) [Q6, belegt]. Sie liegen im
-Schema `jobs.schema` und gehören `internal/platform/jobs` (Kern-Vertrag: Ergänzung beantragt). Die
-Versionstabelle von goose liegt im selben Schema wie die Domänentabellen.
+Technische Tabellen außerhalb der Module ([03-datenmodell.md](03-datenmodell.md), Abschnitt
+4.13): River legt eigene Tabellen mit Präfix `river_` an (u. a. `river_migration`, `river_job`,
+`river_leader`, `river_queue`) [Q6, belegt]. Sie liegen im Schema `jobs.schema` und gehören
+`internal/platform/jobs`. Die Versionstabelle von goose liegt im selben Schema wie die
+Domänentabellen.
 
 ### 4.3 Ports, Ereignisse und Quellen je Modul
 
@@ -162,21 +173,21 @@ tieferer Module, die das Modul implementiert.
 | `audit` | `Log` (Abfrage, Prüfung) | | | kernel `auditing.Recorder` |
 | `authz` | `Admin` (Gruppen, Freigaben, Erklärung, Ansicht als Person); deklariert `PrincipalSource`, `StructureSource`, `AgentPolicySource` | kernel `authorize.AccessChanged` | | kernel `authorize.Authorizer` |
 | `billing` | `Costs` (Buchen, Korrektur, Summen), `Prices` | | | |
-| `identity` | `Auth` (Anmeldung, Refresh, Logout, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`; deklariert `AvatarFiles` | `DeviceRevoked` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, kernel `personaldata.Participant` |
-| `chat` | `Structure` (Bereiche, Kanäle), `Threads` (Anlegen, `AppendToThread`, Schließen, Öffnen, Verschieben, Info), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
-| `agents` | `Agents` (Verwaltung, Richtlinie), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme), `Commands` (Register), `Sessions` | `AgentDisabled` | | `authz.AgentPolicySource`, kernel `personaldata.Participant` |
-| `files` | `Uploads`, `Files` (Lesen, Öffnen, Vorschau, Löschen), `Attachments`, `Transcripts`; deklariert `AttachmentLocator` | | | `identity.AvatarFiles`, kernel `personaldata.Participant` |
+| `identity` | `Auth` (Anmeldung, Refresh, Logout, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`; deklariert `AvatarFiles` | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, kernel `personaldata.Participant` |
+| `chat` | `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen, `AppendToThread`, Schließen, Öffnen, Verschieben, Info), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
+| `agents` | `Agents` (Verwaltung, Richtlinie, Werkzeugklasse), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe) | `AgentDisabled` | | `authz.AgentPolicySource` (Richtlinie, Werkzeugklasse, Bereitschaft der Dev-Umgebung), kernel `personaldata.Participant` |
+| `files` | `Uploads` (Sitzungen, Teile), `Files` (Lesen, Öffnen, Vorschau, Abruf-Tickets, Löschen), `Attachments`, `Transcripts`, `TextExtracts`; deklariert `AttachmentLocator` | `FileFinalized` (Scan und gegebenenfalls Transkript endgültig) | | `identity.AvatarFiles`, kernel `personaldata.Participant` |
 | `messaging` | `Messages` (Anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker), `Reactions`, `Pins`, `Templates`, `Mentions`, `Export`; deklariert `ComponentReader` | `MessagePosted`, `MessageDeleted` | `chat.ThreadMoved` | `files.AttachmentLocator`, kernel `personaldata.Participant` |
-| `runs` | `Runs` (Lesen, Start, Patch, Ende, Abbruch, Übersicht), `Delivery` (Zustellvorbereitung mit I2 und Marke), `Interactions`, `CommandExec` | | `messaging.MessagePosted`, `messaging.MessageDeleted`, `agents.AgentDisabled`, kernel `authorize.AccessChanged` | `messaging.ComponentReader`, kernel `personaldata.Participant` |
-| `sync` | `Tail`, `CatchUp`, `Snapshot`, `Consumers` (Worker-Cursor), `ReadStates`, `Drafts`, `Settings` | | `messaging.MessagePosted` (Entwurf leeren, Erwähnungszähler), `chat.ThreadMoved` | kernel `eventlog.Appender`, kernel `idempotency.Store`, kernel `personaldata.Participant` |
-| `notify` | `Preferences`, `QuietHours`, `PushRegistrations` | | `identity.DeviceRevoked`, `chat.ChannelArchived`, `chat.SpaceArchived` | kernel `personaldata.Participant` |
+| `runs` | `Runs` (Lesen, Kontext, Start, Wiederaufnahme, Patch, Ende, Abbruch, Übersicht), `Delivery` (Zustellvorbereitung mit I2, Schutzregeln und Marke), `Interactions`, `CommandExec` (inklusive Autovervollständigung) | | `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (zurückgehaltenen Aufruf schreiben), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged` | `messaging.ComponentReader`, kernel `personaldata.Participant` |
+| `sync` | `Tail`, `CatchUp`, `Snapshot`, `Consumers` (Worker-Cursor), `ReadStates`, `Drafts`, `Settings` | | `messaging.MessagePosted` (Entwurf leeren, Erwähnungszähler), `chat.ThreadMoved` (Kopien von `channel_id`) | kernel `eventlog.Appender`, kernel `idempotency.Store`, kernel `personaldata.Participant` |
+| `notify` | `Preferences`, `QuietHours`, `PushRegistrations` | | `identity.DeviceRevoked`, `identity.SessionEnded` (Registrierungen der Sitzung deaktivieren), `chat.ChannelArchived`, `chat.SpaceArchived` | kernel `personaldata.Participant` |
 | `gateway` | keiner für andere Module | | | kernel `eventlog.EphemeralPublisher` |
 | `search` | `Search` | | | |
 | `stats` | `Stats` | | | |
 | `apps` | `Apps`, `Webhooks`, `IncomingWebhooks` | | `chat.ChannelArchived` | |
-| `importer` | `Imports` | | | |
+| `importer` | `Imports` (Quellen, Stapel über `import.apply`) | | | |
 | `privacy` | `Requests` | | | sammelt alle kernel `personaldata.Participant` |
-| `status` | `Status` | | `agents.AgentDisabled` | |
+| `status` | `Status`, `BackupRuns` (für `bothy-backupd`) | | `agents.AgentDisabled` | |
 
 ### 4.4 Erlaubte Abhängigkeiten
 
@@ -197,7 +208,7 @@ andere ist verboten und schlägt im Gate fehl (Abschnitt 7).
 | `status` | `agents` | Agenten-Präsenz als Status-Komponente |
 | `runs` | `instance`, `chat`, `agents`, `messaging`, `billing` | Marke signieren; Bediener, Erwähnungsregel, Projektbindung; Richtlinie und Sitzung; Anker und `trigger_state`; Kosten buchen |
 | `search` | `chat`, `messaging`, `files` | Thread-Titel, Nachrichten, Dateinamen und Transkripte |
-| `importer` | `identity`, `chat`, `messaging`, `files` | legt Menschen, Struktur, Nachrichten und Dateien an |
+| `importer` | `identity`, `chat`, `agents`, `messaging`, `files` | legt Menschen, Struktur, Nachrichten, frühere Sitzungs-Referenzen und Dateien an; setzt den Schreibschutz der gespiegelten Kanäle |
 | `privacy` | `identity`, `files` | betroffene Person; Exportpaket speichern |
 | `sync` | `instance`, `chat`, `agents`, `messaging`, `runs` | Zähler `event_seq`; Momentaufnahme aus Struktur, Präsenz, laufenden Läufen; Abo auf Nachrichten |
 | `stats` | `chat`, `agents`, `messaging`, `runs`, `billing` | liest Kennzahlen über Ports |
@@ -237,23 +248,23 @@ Tabelle mit dem Katalog (Abschnitt 7.3).
 
 | Modul | Aktionen |
 |---|---|
-| `instance` | `instance.discovery.read`, `instance.read`, `instance.settings.update`, `instance.branding.update`, `feature_flag.read`, `feature_flag.update`, `signing_key.rotate` |
+| `instance` | `instance.discovery.read`, `instance.read`, `instance.settings.read`, `instance.settings.update`, `instance.branding.update`, `instance.bootstrap`, `feature_flag.read`, `feature_flag.update`, `signing_key.rotate` |
 | `audit` | `audit.read`, `audit.verify` |
-| `authz` | `access.explain`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `grant.read`, `grant.create`, `grant.revoke` |
-| `identity` | `auth.login.begin`, `auth.login.complete`, `auth.token.refresh`, `auth.logout`, `auth.step_up`, `identity_provider.read`, `identity_provider.manage`, `owner.add`, `owner.remove`, `user.read`, `user.create`, `user.update`, `user.disable`, `user.enable`, `self.profile.update`, `identity.link`, `identity.unlink`, `passkey.register`, `passkey.revoke`, `device.list`, `device.approve`, `device.revoke`, `session.list`, `session.revoke`, `token.list`, `token.create`, `token.revoke` |
-| `chat` | `space.read`, `space.create`, `space.update`, `space.reorder`, `space.archive`, `space.operator.set`, `sidebar.update`, `channel.read`, `channel.create`, `channel.update`, `channel.reorder`, `channel.behavior.read`, `channel.behavior.update`, `channel.operator.set`, `channel.project.bind`, `channel.archive`, `forum_tag.manage`, `dm.create`, `dm.leave`, `thread.read`, `thread.create`, `thread.title.update`, `thread.close`, `thread.reopen`, `thread.move`, `thread.tags.set`, `agent.config.read` |
-| `agents` | `agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.heartbeat`, `agent.events.consume`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove` |
-| `files` | `file.upload`, `file.read`, `file.delete`, `file.transcribe` |
+| `authz` | `access.explain`, `access.preview`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `group.member.expire`, `grant.read`, `grant.create`, `grant.revoke`, `grant.expire` |
+| `identity` | `auth.login.begin`, `auth.login.complete`, `auth.token.refresh`, `auth.logout`, `auth.step_up`, `identity_provider.read`, `identity_provider.manage`, `owner.add`, `owner.remove`, `self.read`, `user.read`, `user.create`, `user.update`, `user.disable`, `user.enable`, `self.profile.update`, `identity.read`, `identity.link`, `identity.unlink`, `local_credential.set`, `passkey.register`, `passkey.revoke`, `device.list`, `device.approve`, `device.revoke`, `session.list`, `session.revoke`, `token.list`, `token.create`, `token.revoke` |
+| `chat` | `space.read`, `space.create`, `space.update`, `space.reorder`, `space.archive`, `space.operator.set`, `sidebar.update`, `channel.read`, `channel.create`, `channel.update`, `channel.reorder`, `channel.behavior.read`, `channel.behavior.update`, `channel.operator.set`, `channel.project.bind`, `channel.read_only.set`, `channel.archive`, `forum_tag.manage`, `dm.create`, `dm.leave`, `thread.read`, `thread.create`, `thread.title.update`, `thread.close`, `thread.reopen`, `thread.move`, `thread.tags.set`, `agent.config.read` |
+| `agents` | `agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report` |
+| `files` | `file.upload`, `file.read`, `file.delete`, `file.transcribe`, `file.transcript.submit` |
 | `messaging` | `message.read`, `message.create`, `message.update`, `message.delete`, `message.revisions.read`, `reaction.add`, `reaction.remove`, `pin.create`, `pin.delete`, `mention.list`, `template.read`, `template.manage`, `export.channel` |
-| `runs` | `agent.invoke`, `run.read`, `run.overview.read`, `run.start`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.invoke` |
-| `billing` | `cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `cost.reconcile` |
+| `runs` | `agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke` |
+| `billing` | `cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `cost.reconcile`, `cost.reconcile.submit` |
 | `sync` | `read_state.update`, `read_state.mark_unread`, `draft.read`, `draft.write`, `settings.read`, `settings.update`, `sync.snapshot.read`, `events.catch_up` |
 | `notify` | `notification_pref.update`, `quiet_hours.update`, `push.register`, `push.unregister`, `push.deliver` |
 | `gateway` | `gateway.connect`, `gateway.focus`, `typing.start` |
 | `search` | `search.query` |
-| `stats` | `stats.read` |
-| `apps` | `app.read`, `app.install`, `app.scopes.update`, `app.uninstall`, `webhook_out.read`, `webhook_out.manage`, `webhook_out.redeliver`, `webhook_out.deliver`, `webhook_in.create`, `webhook_in.revoke`, `webhook_in.post` |
-| `importer` | `import.read`, `import.manage` |
+| `stats` | `stats.read`, `client_metrics.submit` |
+| `apps` | `app.read`, `app.install`, `app.scopes.update`, `app.suspend`, `app.resume`, `app.uninstall`, `webhook_out.read`, `webhook_out.manage`, `webhook_out.redeliver`, `webhook_out.deliver`, `webhook_in.read`, `webhook_in.create`, `webhook_in.revoke`, `webhook_in.post` |
+| `importer` | `import.read`, `import.manage`, `import.apply` |
 | `privacy` | `gdpr.request.create`, `gdpr.request.read`, `gdpr.request.decide`, `gdpr.export.download` |
 | `status` | `status.public.read`, `status.read`, `status.manage` |
 
@@ -265,6 +276,10 @@ Begründungen für Grenzfälle:
 - `command.invoke` und `command.autocomplete` gehören zu `runs` (Zustellung an den Agenten mit
   `agent.invoke`), das Register (`command.register`, `command.remove`, `command.read`) zu `agents`.
 - `export.channel` gehört zu `messaging`; das Paket legt `files` ab.
+- `client_metrics.submit` gehört zu `stats`: Der Endpunkt nimmt Kennzahlen ohne Inhalte an und gibt
+  sie an die Telemetrie weiter (ADR 0057); er schreibt keine Tabelle.
+- Die Dev-Umgebungs-Aktionen gehören zu `agents`, weil die Umgebung an einen Runner-Agenten
+  gebunden ist (Etappe).
 
 ### 4.7 Ereignistypen und WebSocket-Ops je Modul
 
@@ -273,15 +288,15 @@ Ein Ereignistyp hat genau ein erzeugendes Modul. Die Empfangs-Aktion steht in 05
 | Modul | Dauerhafte Ereignisse | Kurzlebige Ereignisse | WebSocket-Ops (Client an Server) |
 |---|---|---|---|
 | `instance` | `instance.updated` | | |
-| `authz` | `grant.changed`, `group.changed`, `access.changed` | | |
+| `authz` | `grant.changed`, `group.changed`, `access.changed`, `access.expiring` | | |
 | `identity` | `user.updated`, `session.revoked` | | |
 | `chat` | `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved`, `thread.moved_out`, `space.created`, `space.updated`, `space.archived`, `channel.created`, `channel.updated`, `channel.settings_changed`, `channel.archived`, `sidebar.updated`, `agent.config_changed` | | |
 | `agents` | `agent_session.changed`, `command.changed`, `agent.updated` | `agent.presence_changed` | `ack` |
 | `files` | `file.updated` | | |
 | `messaging` | `message.created`, `message.updated`, `message.deleted`, `reaction.added`, `reaction.removed`, `pin.added`, `pin.removed` | | |
-| `runs` | `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked` | `run.updated` | `run.update` |
+| `runs` | `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked` | `run.updated`, `command.autocomplete_requested` | `run.update`, `command.autocomplete_result` |
 | `sync` | `read_state.updated`, `draft.updated`, `draft.deleted`, `settings.updated` | | |
-| `notify` | `notification_pref.updated`, `quiet_hours.updated` | | |
+| `notify` | `notification_pref.updated`, `quiet_hours.updated` | `notification.created` | |
 | `status` | `status.updated` | | |
 | `privacy` | `gdpr.request_updated` | | |
 | `importer` | `import.progress` | | |
@@ -467,7 +482,7 @@ Die Reihenfolge aus 03 Abschnitt 6.3 setzt die Unit of Work durch, nicht der ein
 Anwendungsfall: Zähler sperren nur diese Phasen-Hooks über `instance.Counters`; sonst ruft kein
 Modul `Counters` auf (Prüfung über die Golden-Datei der Registrierungen, 7.3). Mehrere Zeilen derselben Tabelle sperrt ein Modul in
 aufsteigender `id`. Schlägt eine Transaktion mit Deadlock (`40P01`) oder Sperr-Zeitüberschreitung
-(`55P03`) fehl, wiederholt `platform/pg` den ganzen Unit of Work höchstens `db.tx_retry_max` Mal.
+(`55P03`) fehl, wiederholt `platform/pg` den ganzen Unit of Work höchstens `database.tx_retry_max` Mal.
 Das ist sicher, weil der Unit of Work vollständig zurückgerollt ist und keine externen Aufrufe enthält.
 
 ### 8.3 In-Tx-Ereignisse
@@ -490,7 +505,7 @@ Das ist sicher, weil der Unit of Work vollständig zurückgerollt ist und keine 
   Work, legt die Zeile in `idempotency_keys` mit `in_progress` an, ruft den Anwendungsfall (der der
   Transaktion beitritt), speichert Status und Antwortkörper und committet alles zusammen. Eine
   gleichzeitige Wiederholung wartet am Primärschlüssel, bis die erste Transaktion endet, und liest
-  dann die gespeicherte Antwort. Endet die Wartezeit mit `db.lock_timeout`, antwortet der Server
+  dann die gespeicherte Antwort. Endet die Wartezeit mit `database.lock_timeout`, antwortet der Server
   `409 request_in_progress` (04, 5.2).
 - Grund: Schlüssel und Wirkung entstehen in einer Transaktion. Ein Absturz dazwischen hinterlässt
   keinen Schlüssel ohne Wirkung und keine Wirkung ohne Schlüssel.
@@ -570,7 +585,7 @@ Benachrichtigung erst nach dem Commit zu [Q1, belegt].
   event_log`. Er hält `local_head` und liest `event_log WHERE seq > local_head ORDER BY seq LIMIT
   sync.tail_batch_size`.
 - Wecksignal ist `NOTIFY`; zusätzlich liest er alle `sync.log_poll_interval`. Geht die
-  `LISTEN`-Verbindung verloren, verbindet er mit Backoff bis `db.listen_reconnect_backoff_cap` neu
+  `LISTEN`-Verbindung verloren, verbindet er mit Backoff bis `database.listen_reconnect_backoff_cap` neu
   und liest ab `local_head`. Weil `seq` lückenlos ist, geht dabei nichts verloren.
 - Er gibt Ereignisse in `seq`-Reihenfolge an den Rechte-Cache und dann an den Hub, in einer
   Goroutine. Grund: Reihenfolge ist nur dann einfach zu garantieren, wenn ein Leser sie erzeugt.
@@ -581,8 +596,10 @@ Der Cache liegt in `authz`, je Prozess, je Prinzipal, mit Schlüssel `permission
 Log-Tail meldet jedes `access.changed` über `Authorizer.Observe`, bevor der Hub spätere Ereignisse
 verteilt (R-SY-02). Einträge tragen eine Gültigkeit bis zum frühesten Ablauf einer beteiligten
 Freigabe oder Mitgliedschaft und werden danach neu berechnet. Strukturänderungen ohne neue
-Rechte-Version (`channel.created`, `channel.archived`, `space.archived`, `thread.moved`) muss der
-Cache ebenfalls in Log-Reihenfolge beachten (Kern-Vertrag: Ergänzung beantragt, Abschnitt 20).
+Rechte-Version (`channel.created`, `channel.updated` mit Schreibschutz, `channel.archived`,
+`space.archived`, `thread.moved`) wendet der Cache ebenfalls in Log-Reihenfolge an (04, Abschnitt
+8.1). Das Nachholen filtert zusätzlich nach vollständig sichtbaren Bereichen, damit Ereignisse
+neuer Kanäle nicht fehlen (04, Abschnitt 7.2).
 
 ### 11.4 Hub und Zustellung
 
@@ -599,7 +616,7 @@ Cache ebenfalls in Log-Reihenfolge beachten (Kern-Vertrag: Ergänzung beantragt,
 Folgen nach außen entstehen im worker aus dem Log, nicht im Schreibpfad (R-AR-08):
 
 1. Je Verbraucher-Name (`push`, `webhooks`) gibt es eine Cursor-Zeile in `event_consumer_cursors`
-   (Kern-Vertrag: Ergänzung beantragt).
+   (03, ADR 0051).
 2. Eine Runde: Transaktion öffnen, Zeile mit `FOR UPDATE SKIP LOCKED` sperren (läuft schon ein
    anderer worker, endet die Runde sofort), bis zu `consumer.batch_size` Ereignisse ab Cursor lesen,
    je Ereignis Empfänger bestimmen und River-Jobs mit `InsertTx` einfügen, Cursor vorrücken,
@@ -623,7 +640,8 @@ den eindeutigen Schlüssel `(subscription_id, event_seq)` (03).
 Grund: R-Stack erlaubt `LISTEN/NOTIFY` nur als Wecksignal ohne Inhalt. Lauf-Inhalte gehen darum
 nicht über `NOTIFY`; der Empfängerknoten liest sie aus der Datenbank. Der Kanal `ephemeral` ist nur
 im Modus `multi` aktiv, weil jedes `NOTIFY` beim Commit eine instanzweite Sperre nimmt [Q2, belegt]
-und ein Knoten ihn nicht braucht (Kern-Vertrag: Ergänzung beantragt).
+und ein Knoten ihn nicht braucht (03, Abschnitt 6.6). `notification.created` und
+`command.autocomplete_requested` gehen denselben Weg mit IDs.
 
 ### 11.7 Kosten der Serialisierung
 
@@ -657,11 +675,11 @@ nehmen weder Zähler noch `NOTIFY`. Den Durchsatz hält das Ziel `perf.event_com
 | `files` | Scan, Vorschaubilder, Transkription (CPU, Speicher) | `jobs.queue.files.max_workers` |
 | `delivery` | Push, Webhooks (Netz) | `jobs.queue.delivery.max_workers` |
 | `maintenance` | Aufräumen, Partitionen, Prüfungen | `jobs.queue.maintenance.max_workers` |
-| `import` | Importläufe | `jobs.queue.import.max_workers` |
 | `privacy` | Export und Löschung | `jobs.queue.privacy.max_workers` |
 
-Grund für getrennte Warteschlangen: Ein großer Import oder viele Vorschaubilder dürfen Push und
-Webhooks nicht verzögern.
+Grund für getrennte Warteschlangen: Viele Vorschaubilder oder ein großer DSGVO-Export dürfen Push
+und Webhooks nicht verzögern. Importe laufen nicht als Job im Server, sondern im Werkzeug
+`bothy import` über die API ([22-import-migration.md](22-import-migration.md), Abschnitt 2).
 
 ### 12.3 Job-Katalog
 
@@ -669,6 +687,7 @@ Webhooks nicht verzögern.
 |---|---|---|---|---|
 | `files.scan` | `files` | `InsertTx` beim Abschluss eines Uploads | `files` | 12 |
 | `files.thumbnail` | `files` | nach `clean` | `files` | 12 |
+| `files.extract_text` | `files` | nach `clean`, unterstützter Typ | `files` | 14 |
 | `files.transcribe` | `files` | `file.transcribe` bei Server-Transkription | `files` | 09, 12 |
 | `files.cleanup_pending` | `files` | periodisch | `maintenance` | 12 |
 | `files.purge_objects` | `files` | periodisch, gelöschte Dateien | `maintenance` | 12, 20 |
@@ -677,8 +696,9 @@ Webhooks nicht verzögern.
 | `runs.cancel_timeout` | `runs` | periodisch, `agent.cancel_grace` | `maintenance` | 09 |
 | `runs.stall_check` | `runs` | periodisch, `run.stall_after` | `maintenance` | 09 |
 | `runs.component_expiry` | `runs` | periodisch, `component.default_ttl` | `maintenance` | 09 |
-| `authz.expiry_reminder` | `authz` | periodisch, Erinnerung vor Ablauf | `maintenance` | 07 |
-| `authz.expiry_sweep` | `authz` | periodisch, `access.changed` nach Ablauf (beantragt) | `maintenance` | 07 |
+| `runs.invocation_hold_timeout` | `runs` | terminiert, `file.invocation_hold_max` bzw. `voice.transcript_hold_max` | `default` | 04, 12 |
+| `authz.expiry_reminder` | `authz` | periodisch, `access.expiring` vor Ablauf | `maintenance` | 07 |
+| `authz.expiry_sweep` | `authz` | periodisch, `access.changed` nach Ablauf (Systemaktionen `grant.expire`, `group.member.expire`) | `maintenance` | 07 |
 | `identity.session_cleanup` | `identity` | periodisch | `maintenance` | 08 |
 | `instance.key_rotation` | `instance` | periodisch, Zustände `next` bis `retired` | `maintenance` | 19 |
 | `sync.partition_maintenance` | `sync` | periodisch, Partitionen anlegen und nach `sync.event_retention` abhängen | `maintenance` | 04 |
@@ -686,7 +706,6 @@ Webhooks nicht verzögern.
 | `audit.chain_verify` | `audit` | periodisch | `maintenance` | 19 |
 | `audit.retention_trim` | `audit` | periodisch, eigene Wartungsrolle der Datenbank | `maintenance` | 20 |
 | `privacy.export`, `privacy.erase` | `privacy` | Freigabe eines Auftrags | `privacy` | 20 |
-| `importer.run` | `importer` | `import.manage` | `import` | 22 |
 | `billing.reconcile` | `billing` | `cost.reconcile` oder periodisch, falls eingeschaltet | `default` | 10 |
 | `status.probe` | `status` | periodisch | `maintenance` | 16 |
 | `retention.<klasse>` | besitzendes Modul | periodisch je Aufbewahrungsklasse | `maintenance` | 20 |
@@ -697,7 +716,7 @@ Webhooks nicht verzögern.
    Schlüssel wie `(subscription_id, event_seq)`).
 2. Jeder Job reicht seinen Kontext weiter und gibt bei Abbruch `ctx.Err()` zurück; ein `nil` gilt in
    River als Erfolg [Q4, belegt].
-3. Externe Aufrufe haben eine Frist (`outbound.default_timeout` oder einen eigenen Namen des
+3. Externe Aufrufe haben eine Frist (`egress.timeout` oder einen eigenen Namen des
    Fachkapitels).
 4. Wiederholung mit Backoff übernimmt River; Fachkapitel mit eigener Regel (Webhooks:
    `webhook.retry_backoff_base`, `webhook.retry_backoff_cap`) setzen eine eigene Wiederholungs-Regel.
@@ -719,13 +738,13 @@ Server lädt.
    wie die Namen) < Umgebung (`BOTHY_` plus Name in Großbuchstaben, `.` wird `__`, Beispiel
    `sync.event_retention` wird `BOTHY_SYNC__EVENT_RETENTION`) < Kommandozeile (nur `--role` und
    `--config`). Die genaue Abbildung legt ADR 0011 fest; diese ist der Vorschlag.
-3. **Geheimnisse** nur als Verweis in Schlüsseln mit Endung `_ref` (z. B. `db.url_ref`). Der
+3. **Geheimnisse** nur als Verweis in Schlüsseln mit Endung `_ref` (z. B. `database.password_ref`). Der
    Secret-Provider löst sie beim Start auf. Werte erscheinen nie in Logs, Fehlertexten oder
    `bothy config print` (dort `<redacted>`).
 4. **Prüfung beim Start, fail fast:** unbekannte Schlüssel brechen ab (Tippfehler sind sonst
    still); Typen und Bereiche; Querbedingungen. Beispiele: Identitäts-Header-Treiber nur mit
-   Loopback-`http.listen_addr`; `http.max_json_body_bytes` größer als `message.max_content_bytes`
-   plus Umschlag; `http.ops_listen_addr` ungleich `http.listen_addr`.
+   Loopback-`server.listen_addr`; `http.max_json_body_bytes` größer als `message.max_content_bytes`
+   plus Umschlag; `server.internal_listen_addr` ungleich `server.listen_addr`.
 5. **Typisiert je Modul.** Jedes Modul hat eine eigene `Config`-Struktur; `internal/wire` füllt sie
    aus `platform/config`. Module lesen nie Umgebungsvariablen. Grund: Testbarkeit und eine Stelle
    für Prüfungen.
@@ -769,12 +788,12 @@ Interne Details (SQL-Fehler, Stack) stehen nur im Log mit `correlation_id`, nie 
 | normale Anfrage (Kontext) | `http.request_timeout` | begrenzt Wartezeit und Ressourcen |
 | Upload und Download (über `ResponseController`) | `http.transfer_timeout` | große Dateien |
 | Leerlauf Keep-Alive | `http.idle_timeout` | Verbindungen freigeben |
-| Verbindung aus dem Pool holen | `db.acquire_timeout` | Überlast wird `503`, nicht Warteschlange |
-| SQL-Anweisung | `db.statement_timeout` (je Transaktion per `SET LOCAL`) | kein Abfrage-Ausreißer blockiert |
-| Sperre warten | `db.lock_timeout` | Zähler-Sperren nie unbegrenzt |
-| offene Transaktion ohne Arbeit | `db.idle_in_tx_timeout` | schützt die serialisierte Commit-Phase |
+| Verbindung aus dem Pool holen | `database.acquire_timeout` | Überlast wird `503`, nicht Warteschlange |
+| SQL-Anweisung | `database.statement_timeout` (je Transaktion per `SET LOCAL`) | kein Abfrage-Ausreißer blockiert |
+| Sperre warten | `database.lock_timeout` | Zähler-Sperren nie unbegrenzt |
+| offene Transaktion ohne Arbeit | `database.idle_in_tx_timeout` | schützt die serialisierte Commit-Phase |
 | WebSocket schreiben | `gateway.write_timeout` | langsame Leser blockieren nicht |
-| Aufrufe nach außen | `outbound.default_timeout` oder Name des Fachkapitels | jeder Netzaufruf hat eine Frist |
+| Aufrufe nach außen | `egress.timeout` ([19-sicherheit.md](19-sicherheit.md)) oder Name des Fachkapitels | jeder Netzaufruf hat eine Frist |
 
 Der Kontext eines abgebrochenen Clients bricht die Transaktion ab. Hat sie schon committet, deckt die
 Idempotenz die Wiederholung des Clients.
@@ -827,13 +846,16 @@ Clients nehmen nach 04 wieder auf.
 
 ### 15.2 Health
 
-Auf dem Ops-Listener `http.ops_listen_addr`, nicht in der öffentlichen API (R-AR-13):
+Auf dem internen Listener `server.internal_listen_addr`, nicht in der öffentlichen API
+(R-AR-13, Ruling L2); Pfade und Fehlercodes legt [16-betrieb.md](16-betrieb.md), Abschnitt 4.2 fest:
 
-- `live`: Prozess antwortet, Log-Tail und Hub laufen (api) bzw. River-Client läuft (worker).
-- `ready`: Start abgeschlossen, Datenbank erreichbar, kein Shutdown begonnen.
+- `/healthz` (lebt): Prozess antwortet, Log-Tail und Hub laufen (api) bzw. River-Client läuft
+  (worker).
+- `/readyz` (bereit): Start abgeschlossen, Datenbank erreichbar, Schema passend
+  (`instance.min_server_version`), kein Shutdown begonnen.
 
 Grund für den eigenen Listener: Health braucht keine Anmeldung und keine Aktion, darf aber nicht
-öffentlich erreichbar sein.
+öffentlich erreichbar sein. Darum hat Health keinen Eintrag im Aktionskatalog (05, R-AZ-22).
 
 ### 15.3 Shutdown
 
@@ -882,7 +904,7 @@ Mehrere Knoten im Detail (Stufe 2):
 - Agenten-Verbraucher: Ein neues `identify` auf Knoten B muss die alte Verbindung auf Knoten A beenden
   (`4015`). Knoten B schreibt beim Übernehmen seine Gateway-Sitzungs-ID in die Cursor-Zeile; Knoten A
   stellt beim nächsten Speichern von `acked_seq` fest, dass die Zeile nicht mehr ihm gehört, und
-  schließt mit `4015` (Fencing, Spalte beantragt). Ein Signal über `NOTIFY ephemeral` beschleunigt
+  schließt mit `4015` (Fencing über `agent_consumer_cursors.holder_session_id`, 03). Ein Signal über `NOTIFY ephemeral` beschleunigt
   das. Bis dahin verhindern Ereignis-ID und Lauf-Start per Compare-and-swap doppelte Arbeit (04,
   15.3).
 - Rate-Limits: Eimer im Prozess. Bei `n` Knoten gilt bis zu `n`-fach; der Betreiber teilt die Werte
@@ -971,48 +993,26 @@ das Ziel "ungeprüft" (Tickets).
 | R-AR-19 | Architektur-Gate mit go-arch-lint, Konfiguration aus `modules.yaml` erzeugt. | Eine Quelle für Modulgrenzen; Werkzeug prüft Pakete und Fremdbibliotheken. |
 | R-AR-20 | Leistungsziele als benannte Werte, gehalten durch Lasttests im Gate. | Keine Zahl ohne Test. |
 
-## 20. Ergänzungen am Kern-Vertrag (beantragt)
+## 20. Abgleich mit dem Kern-Vertrag
 
-Diese Punkte plant dieses Kapitel so, wie es richtig wäre. Der Kern-Vertrag ist dafür noch nicht
-geändert.
+Die Punkte, die dieses Kapitel beim Entwurf als Ergänzung beantragt hatte, stehen jetzt im
+Kern-Vertrag (Integration vom 2026-10-10):
 
-1. **Tabelle `event_consumer_cursors`** (Modul `sync`): `name text` PK, `last_seq bigint`,
-   `updated_at timestamptz`; Aufbewahrung `config`. Für die Worker-Verbraucher `push` und `webhooks`
-   (Abschnitt 11.5).
-2. **River-Tabellen** (`river_*`) als technische Tabellen im Schema `jobs.schema` in 03 nennen;
-   Eigentümer `platform/jobs`, Aufbewahrung `transient`.
-3. **Fencing der Agenten-Verbraucher:** Spalte `agent_consumer_cursors.holder_session_id uuid` für
-   die Exklusivität über Knoten (Abschnitt 16).
-4. **Nachholen bei neuen Kanälen:** 04 Abschnitt 7.2 filtert nur nach `$visible_channels`. Kanäle,
-   die nach dem Aufbau des Caches in einem sichtbaren Bereich entstehen, fehlen dann. Vorschlag:
-   zusätzlich `space_id = ANY($fully_visible_spaces)` und ein Merker für instanzweite Sicht; der
-   Rechte-Cache folgt auch `channel.created`, `channel.archived`, `space.archived`, `thread.moved` in
-   Log-Reihenfolge, weil diese `permission_version` nicht erhöhen.
-5. **Ablauf ohne `access.changed`:** Ablaufende Freigaben und Mitgliedschaften erzeugen keine
-   Transaktion und damit kein `access.changed`. Vorschlag: Job `authz.expiry_sweep` erhöht die
-   Rechte-Version und schreibt `access.changed` für Betroffene. Die Durchsetzung bleibt bei jedem
-   `authorize` (03, `grants.expires_at`).
-6. **Thread verschieben:** 03 sollte festlegen, dass `files.scope_channel_id` nur vor dem Anhängen
-   gilt und angehängte Dateien über `message_attachments` und `messages.channel_id` aufgelöst werden
-   (05, 2.2). Die Kopien `read_states.channel_id` und `drafts.channel_id` ändern sich beim Verschieben
-   mit.
-7. **Pfad-Präfix:** 04 nennt `/v1/...` und `wss://<host>/v1/gateway`, der Auftrag an das API-Kapitel
-   `/api/v1`. Eine Form muss in 04 stehen.
-8. **Maschinenlesbarer Aktionskatalog:** 05 ist eine Markdown-Tabelle. Codegenerierung (Konstanten in
-   `kernel/authorize`), die Lint-Regel `authz-action-known` und der Routen-Test brauchen eine
-   Datenquelle. Vorschlag: `docs/spec/actions.yaml` als Quelle, Tabelle in 05 daraus erzeugt.
-9. **Health ohne Aktion:** Bleibt Health auf dem Ops-Listener (R-AR-13), ist nichts zu tun. Führt die
-   öffentliche API Health doch, braucht 05 eine Aktion (z. B. `health.read`, `public`).
-10. **Modulliste in 03 Abschnitt 2:** `gateway`, `search`, `stats` ergänzen (ohne Tabellen).
-11. **Soll-Änderung an den Agenten:** `agent.updated` hat die Empfangs-Aktion `agent.read`; der Agent
-    selbst ist dort nicht genannt. Der Adapter braucht die Soll-Änderung der Backend-Richtlinie
-    (Diagramm [seq-5-backend-modus.svg](../architecture/seq-5-backend-modus.svg)). Vorschlag:
-    `agent.read` gilt auch für `agent-self`.
-12. **Live-Box-Anker eindeutig:** Das ERD in 03 zeigt `runs` zu `messages` als eins zu eins, die
-    Tabelle hat keinen eindeutigen Index. Vorschlag: `UNIQUE (run_id) WHERE run_id IS NOT NULL` auf
-    `messages`.
-13. **Kanal `ephemeral`:** 03 Abschnitt 6.6 und 04 kennen nur `NOTIFY event_log`. Ergänzung für
-    `cluster.mode = multi` nach Abschnitt 11.6.
+| Punkt | Wo |
+|---|---|
+| Tabelle `event_consumer_cursors` für die Worker-Verbraucher | 03, Abschnitt 4.10; ADR 0051 |
+| River-Tabellen als technische Tabellen | 03, Abschnitt 4.13 |
+| Fencing der Agenten-Verbraucher (`holder_session_id`) | 03 `agent_consumer_cursors`; 04, Abschnitt 15.1 |
+| Nachholen mit vollständig sichtbaren Bereichen; Cache folgt Strukturereignissen | 04, Abschnitte 7.2 und 8.1 |
+| Ablauf erzeugt `access.changed` über `authz.expiry_sweep` | 04, Abschnitt 8.2; 05 `grant.expire`, `group.member.expire` |
+| Thread verschieben: Kopien von `channel_id`, Dateien folgen der Nachricht | 03 `threads`; 05, Abschnitt 2.2 |
+| Pfad-Präfix `/api/v1` | 04, Kopf und Abschnitt 6.1 |
+| Maschinenlesbarer Aktionskatalog | beschlossen (ADR 0049); bis dahin Abgleich im Doku-Gate (05, Regel 3) |
+| Health ohne Aktion, auf dem internen Listener | 05, R-AZ-22; Abschnitt 15.2 |
+| Module `gateway`, `search`, `stats` ohne Tabellen | 03, Abschnitt 2 |
+| `agent.read` für den Agenten selbst | 05, Abschnitt 4.10 |
+| Eindeutiger Live-Box-Anker | 03 `messages`, Teilindex auf `run_id` |
+| Kanal `ephemeral` im Modus `multi` | 03, Abschnitt 6.6; 04, Abschnitt 12 |
 
 ## 21. Offen
 
@@ -1026,41 +1026,36 @@ geändert.
 ## 22. Konfigurationswerte dieses Kapitels
 
 Standardwerte. Leistungsziele (`perf.*`) sind Schwellen für Tests, keine Laufzeit-Konfiguration.
+Listener, Rolle, öffentliche URL, vertrauenswürdige Proxys und die Verbindungsdaten der Datenbank
+(`server.*`, `database.host` bis `database.max_conns`) führt [16-betrieb.md](16-betrieb.md); die
+Grenzen ausgehender Aufrufe (`egress.*`) führt [19-sicherheit.md](19-sicherheit.md).
 
 | Name | Standard | Bedeutung |
 |---|---|---|
-| `server.role` | `all` | Rolle des Prozesses: `api`, `worker`, `all` |
 | `cluster.mode` | `single` | `single` oder `multi` (mehrere api-Knoten) |
-| `http.listen_addr` | `127.0.0.1:8700` | Adresse der öffentlichen API und des Gateways |
-| `http.ops_listen_addr` | `127.0.0.1:8701` | Adresse für Health und optionale Metriken |
-| `http.public_base_url` | leer, Pflicht | öffentliche Basis-URL (DPoP `htu`, Rückruf-URLs) |
 | `http.read_header_timeout` | `5s` | Frist für Kopfzeilen |
 | `http.request_timeout` | `15s` | Kontext-Frist normaler Anfragen |
 | `http.transfer_timeout` | `10m` | Frist für Upload und Download |
 | `http.idle_timeout` | `120s` | Leerlauf von Keep-Alive-Verbindungen |
 | `http.max_header_bytes` | `65536` | größte Kopfzeilen |
-| `http.max_json_body_bytes` | `1048576` | größter JSON-Körper |
-| `db.url_ref` | leer, Pflicht | Verweis auf die Verbindungs-URL im Secret-Provider |
-| `db.max_conns` | `32` | Verbindungen im Pool je Prozess |
-| `db.acquire_timeout` | `2s` | Warten auf eine Pool-Verbindung |
-| `db.statement_timeout` | `5s` | Frist je SQL-Anweisung |
-| `db.lock_timeout` | `2s` | Frist für Sperren |
-| `db.idle_in_tx_timeout` | `10s` | offene Transaktion ohne Arbeit |
-| `db.tx_retry_max` | `2` | Wiederholungen des Unit of Work bei `40P01` und `55P03` |
-| `db.listen_reconnect_backoff_cap` | `10s` | größter Abstand beim Neuaufbau von `LISTEN` |
+| `http.max_json_body_bytes` | `1048576` | größter JSON-Körper; größer als `message.max_content_bytes` plus Umschlag |
+| `database.acquire_timeout` | `2s` | Warten auf eine Pool-Verbindung |
+| `database.statement_timeout` | `5s` | Frist je SQL-Anweisung |
+| `database.lock_timeout` | `2s` | Frist für Sperren |
+| `database.idle_in_tx_timeout` | `10s` | offene Transaktion ohne Arbeit |
+| `database.tx_retry_max` | `2` | Wiederholungen des Unit of Work bei `40P01` und `55P03` |
+| `database.listen_reconnect_backoff_cap` | `10s` | größter Abstand beim Neuaufbau von `LISTEN` |
 | `startup.dependency_wait` | `60s` | Warten auf die Datenbank beim Start |
 | `sync.log_poll_interval` | `1s` | Poll des Log-Tails ohne `NOTIFY` |
 | `sync.tail_batch_size` | `1000` | Ereignisse je Lesevorgang des Log-Tails |
 | `gateway.write_timeout` | `10s` | Frist für einen WebSocket-Schreibvorgang |
 | `consumer.batch_size` | `500` | Ereignisse je Runde eines Worker-Verbrauchers |
 | `consumer.poll_interval` | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` |
-| `outbound.default_timeout` | `10s` | Frist für Aufrufe nach außen ohne eigenen Namen |
 | `jobs.schema` | `jobs` | PostgreSQL-Schema der River-Tabellen |
 | `jobs.queue.default.max_workers` | `8` | Parallelität `default` |
 | `jobs.queue.files.max_workers` | `2` | Parallelität `files` |
 | `jobs.queue.delivery.max_workers` | `16` | Parallelität `delivery` |
 | `jobs.queue.maintenance.max_workers` | `2` | Parallelität `maintenance` |
-| `jobs.queue.import.max_workers` | `1` | Parallelität `import` |
 | `jobs.queue.privacy.max_workers` | `1` | Parallelität `privacy` |
 | `shutdown.drain_delay` | `5s` | Warten nach `ready = false` |
 | `shutdown.http_grace` | `20s` | Frist für laufende HTTP-Anfragen |

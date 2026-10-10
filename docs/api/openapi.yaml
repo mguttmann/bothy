@@ -33,7 +33,7 @@ security:
 
 tags:
 - name: Discovery
-  description: Public metadata, keys, problem types and health probes.
+  description: Public metadata, keys and problem types. Health probes are not part of this API (internal listener).
 - name: Auth
   description: Login flows, token refresh with DPoP, logout and step-up.
 - name: Me
@@ -128,7 +128,7 @@ paths:
                       protocol_versions: [1]
                     branding:
                       product_name: Team Chat
-                      accent_color: accent.blue
+                      accent_color: loch
                       logo_url: /api/v1/instance/branding/logo
                     auth_providers:
                     - id: 0192f4a0-7b1c-7474-8636-4dbb076ee0db
@@ -270,7 +270,7 @@ paths:
                   summary: Response
                   value:
                     product_name: Team Chat
-                    accent_color: accent.blue
+                    accent_color: loch
                     version: 3
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -348,64 +348,6 @@ paths:
           $ref: '#/components/responses/NotFound'
         '429':
           $ref: '#/components/responses/TooManyRequests'
-        default:
-          $ref: '#/components/responses/Error'
-      security: []
-
-  /health/live:
-    get:
-      operationId: getLiveness
-      summary: Liveness probe
-      tags: [Discovery]
-      description: Answers while the process serves HTTP. No dependency checks.
-      x-authz-action: health.read
-      x-rate-limit-class: none
-      responses:
-        '200':
-          description: OK.
-          headers:
-            Correlation-Id:
-              $ref: '#/components/headers/Correlation-Id'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Health'
-              examples:
-                default:
-                  summary: Response
-                  value:
-                    status: ok
-        default:
-          $ref: '#/components/responses/Error'
-      security: []
-
-  /health/ready:
-    get:
-      operationId: getReadiness
-      summary: Readiness probe
-      tags: [Discovery]
-      description: |-
-        Checks database, object storage and migrations. Returns 503 with the same body when a check
-        fails.
-      x-authz-action: health.read
-      x-rate-limit-class: none
-      responses:
-        '200':
-          description: OK.
-          headers:
-            Correlation-Id:
-              $ref: '#/components/headers/Correlation-Id'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Health'
-              examples:
-                default:
-                  summary: Response
-                  value:
-                    status: ok
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
         default:
           $ref: '#/components/responses/Error'
       security: []
@@ -923,6 +865,154 @@ paths:
         default:
           $ref: '#/components/responses/Error'
       security: []
+
+  /auth/pairing/begin:
+    post:
+      operationId: beginPairing
+      summary: Start a device pairing without login
+      tags: [Auth]
+      description: |-
+        The new device registers its public keys and shows the returned code. An active device of the same person approves it with `approvePairing` (08, 5.3).
+      x-authz-action: auth.login.begin
+      x-rate-limit-class: rl.public_auth
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/DpopProof'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairingBeginRequest'
+            examples:
+              default:
+                summary: Request
+                value:
+                  device:
+                    device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                    name: Alex Laptop
+                    platform: macos
+                    app_version: 1.4.0
+                    public_jwk: {}
+                    alg: ES256
+                    step_up_key:
+                      public_jwk: {}
+                      alg: ES256
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PairingStarted'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    pairing_id: 0192f4a0-7b1c-7e21-8f3a-5b6c7d8e9f10
+                    pairing_code: 7KQ2-M9XD
+                    expires_at: '2026-10-10T09:35:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /auth/pairing/complete:
+    post:
+      operationId: completePairing
+      summary: Collect the tokens of an approved pairing
+      tags: [Auth]
+      description: |-
+        The DPoP proof must be signed with the `dpop` key registered at `beginPairing`. Before approval the answer is `202` with the status; after expiry or rejection `410`.
+      x-authz-action: auth.login.complete
+      x-rate-limit-class: rl.public_auth
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/DpopProof'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairingCompleteRequest'
+            examples:
+              default:
+                summary: Request
+                value:
+                  pairing_id: 0192f4a0-7b1c-7e21-8f3a-5b6c7d8e9f10
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    access_token: eyJhbGciOiJFZERTQSJ9.e30.sig
+                    token_type: DPoP
+                    expires_in: 900
+                    refresh_token: rt_q2Z0
+                    refresh_expires_at: '2026-10-10T09:30:00.000Z'
+                    session:
+                      id: 0192f4a0-7b1c-75c3-8a09-bf22e12411b6
+                      user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      device_id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                      auth_method: device_pairing
+                      created_at: '2026-10-10T09:30:00.000Z'
+                      expires_at: '2026-10-10T09:30:00.000Z'
+                    device:
+                      id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                      user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      name: Alex Laptop
+                      platform: macos
+                      state: active
+                      app_version: 1.4.0
+                      key_thumbprint: 0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I
+                      created_at: '2026-10-10T09:30:00.000Z'
+        '202':
+          description: Not yet approved.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PairingStatus'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
 
   /auth/password/login:
     post:
@@ -1774,6 +1864,7 @@ paths:
                             mime_type: image/png
                             original_name: screenshot.png
                             uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                            purpose: attachment
                             upload_state: complete
                             scan_status: clean
                             transcript_status: none
@@ -2543,6 +2634,7 @@ paths:
                         name: tickets
                         topic: Customer tickets
                         sort_key: a1
+                        read_only: false
                         operator:
                           mode: inherit
                         version: 3
@@ -2763,6 +2855,65 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /me/devices/pairings:
+    post:
+      operationId: approvePairing
+      summary: Approve a device pairing with its code
+      tags: [Devices]
+      description: |-
+        Called from an active device of the person, with step-up. Creates the new device as `active` for the calling person; the new device collects its tokens with `completePairing`.
+      x-authz-action: device.approve
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PairingApprove'
+            examples:
+              default:
+                summary: Request
+                value:
+                  pairing_code: 7KQ2-M9XD
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7848-8501-1716705c7dbe
+                    user_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    name: Alex Laptop
+                    platform: macos
+                    state: active
+                    created_at: '2026-10-10T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /devices/{device_id}:
     get:
       operationId: getDevice
@@ -2948,7 +3099,7 @@ paths:
                 summary: Request
                 value:
                   provider: apns
-                  token: a1b2c3d4e5f6
+                  token: example-device-token-a1b2
                   app_id: com.example.teamchat
       responses:
         '201':
@@ -3012,6 +3163,68 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /push/preview:
+    get:
+      operationId: getPushPreview
+      summary: Load the preview of a notification
+      tags: [Devices]
+      description: |-
+        Called by the notification extension with the preview token of the push registration (`Authorization: DPoP <token>` and a proof with the device key). Answers `404` if access is gone or the message was deleted (13, 6.4).
+      x-authz-action: message.read
+      x-rate-limit-class: rl.read
+      security:
+      - dpopAuth: []
+      parameters:
+      - name: nid
+        in: query
+        required: true
+        description: Notification ID from the push.
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      - name: message_id
+        in: query
+        required: true
+        description: Message of the notification.
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PushPreview'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    kind: mention
+                    thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                    message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                    badge: 3
+                    space_name: Support
+                    channel_name: tickets
+                    thread_title: Invoice export fails
+                    sender_display_name: Alex
+                    excerpt: '@Sam can you check the export?'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '429':
@@ -3133,7 +3346,7 @@ paths:
                     - id: 0192f4a0-7b1c-703d-85ae-fdc884c55554
                       principal_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                       name: Adapter production
-                      token_prefix: agt_7Hq2
+                      token_prefix: bothy_agt_example
                       scopes: ['messages:read']
                       created_at: '2026-10-10T09:30:00.000Z'
         '400':
@@ -3190,10 +3403,10 @@ paths:
                       id: 0192f4a0-7b1c-703d-85ae-fdc884c55554
                       principal_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                       name: Adapter production
-                      token_prefix: agt_7Hq2
+                      token_prefix: bothy_agt_example
                       scopes: ['messages:read']
                       created_at: '2026-10-10T09:30:00.000Z'
-                    secret: agt_7Hq2.kJ8sV2pQ0wX5yZ1aB3cD4eF6gH
+                    secret: bothy_agt_exampleOnlyNotAToken7Hq2_c3f1
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -3777,10 +3990,10 @@ paths:
       summary: Show what a grant would change
       tags: [Access]
       description: |-
-        Dry run of `createGrant`: affected principals, level changes and invariant violations. No
-        step-up needed; nothing is stored.
-      x-authz-action: access.explain
-      x-rate-limit-class: rl.read
+        Dry run of `createGrant` (action `access.preview`): affected principals, level changes and
+        invariant violations. No step-up needed; the transaction is rolled back, nothing is stored.
+      x-authz-action: access.preview
+      x-rate-limit-class: rl.admin
       requestBody:
         required: true
         content:
@@ -4089,7 +4302,7 @@ paths:
                     instance_id: 0192f4a0-7b1c-7db7-89b9-2fe4c48dcb3e
                     branding:
                       product_name: Team Chat
-                      accent_color: accent.blue
+                      accent_color: loch
                       version: 3
                     locale_default: de
                     spec_version: 1.0.0
@@ -4101,6 +4314,7 @@ paths:
                       message_max_attachments: 10
                       file_max_upload_bytes: 104857600
                       thread_title_max_chars: 200
+                      voice_max_duration_ms: 900000
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4229,7 +4443,7 @@ paths:
                 summary: Request
                 value:
                   product_name: Team Chat
-                  accent_color: accent.blue
+                  accent_color: loch
       responses:
         '200':
           description: OK.
@@ -4251,7 +4465,7 @@ paths:
                   summary: Response
                   value:
                     product_name: Team Chat
-                    accent_color: accent.blue
+                    accent_color: loch
                     version: 3
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -4776,7 +4990,7 @@ paths:
                 value:
                   name: Research
                   icon: icon.flask
-                  color: accent.purple
+                  color: heather
       responses:
         '201':
           description: Created.
@@ -4798,7 +5012,7 @@ paths:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
                     icon: icon.headset
-                    color: accent.green
+                    color: moss
                     sort_key: a0
                     version: 3
                     created_at: '2026-10-10T09:30:00.000Z'
@@ -4850,7 +5064,7 @@ paths:
                       id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                       name: Support
                       icon: icon.headset
-                      color: accent.green
+                      color: moss
                       sort_key: a0
                       version: 3
                       created_at: '2026-10-10T09:30:00.000Z'
@@ -4912,7 +5126,7 @@ paths:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
                     icon: icon.headset
-                    color: accent.green
+                    color: moss
                     sort_key: a0
                     version: 3
                     created_at: '2026-10-10T09:30:00.000Z'
@@ -4978,7 +5192,7 @@ paths:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
                     icon: icon.headset
-                    color: accent.green
+                    color: moss
                     sort_key: a0
                     version: 3
                     created_at: '2026-10-10T09:30:00.000Z'
@@ -5039,7 +5253,7 @@ paths:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
                     icon: icon.headset
-                    color: accent.green
+                    color: moss
                     sort_key: a0
                     version: 3
                     created_at: '2026-10-10T09:30:00.000Z'
@@ -5103,7 +5317,7 @@ paths:
                     id: 0192f4a0-7b1c-7881-8522-0a58634abc14
                     name: Support
                     icon: icon.headset
-                    color: accent.green
+                    color: moss
                     sort_key: a0
                     version: 3
                     created_at: '2026-10-10T09:30:00.000Z'
@@ -5254,6 +5468,7 @@ paths:
                         name: tickets
                         topic: Customer tickets
                         sort_key: a1
+                        read_only: false
                         operator:
                           mode: inherit
                         version: 3
@@ -5317,6 +5532,7 @@ paths:
                     name: tickets
                     topic: Customer tickets
                     sort_key: a1
+                    read_only: false
                     operator:
                       mode: inherit
                     version: 3
@@ -5374,6 +5590,7 @@ paths:
                       name: tickets
                       topic: Customer tickets
                       sort_key: a1
+                      read_only: false
                       operator:
                         mode: inherit
                       version: 3
@@ -5439,6 +5656,7 @@ paths:
                     name: tickets
                     topic: Customer tickets
                     sort_key: a1
+                    read_only: false
                     operator:
                       mode: inherit
                     version: 3
@@ -5508,6 +5726,7 @@ paths:
                     name: tickets
                     topic: Customer tickets
                     sort_key: a1
+                    read_only: false
                     operator:
                       mode: inherit
                     version: 3
@@ -5572,6 +5791,7 @@ paths:
                     name: tickets
                     topic: Customer tickets
                     sort_key: a1
+                    read_only: false
                     operator:
                       mode: inherit
                     version: 3
@@ -5763,6 +5983,7 @@ paths:
                     name: tickets
                     topic: Customer tickets
                     sort_key: a1
+                    read_only: false
                     operator:
                       mode: inherit
                     version: 3
@@ -5778,6 +5999,78 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /channels/{channel_id}/read-only:
+    put:
+      operationId: setChannelReadOnly
+      summary: Switch the write protection of a channel
+      tags: [Channels]
+      description: |-
+        Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
+      x-authz-action: channel.read_only.set
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/ChannelIdPath'
+      - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChannelReadOnlySet'
+            examples:
+              default:
+                summary: Request
+                value:
+                  read_only: true
+                  reason: Channel is mirrored from the old system
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Channel'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                    kind: text
+                    name: tickets
+                    topic: Customer tickets
+                    sort_key: a1
+                    read_only: true
+                    operator:
+                      mode: inherit
+                    version: 4
+                    settings_version: 1
+                    created_at: '2026-10-10T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '412':
           $ref: '#/components/responses/PreconditionFailed'
         '428':
@@ -5915,7 +6208,7 @@ paths:
                     - id: 0192f4a0-7b1c-7f24-8f76-a5de0ed16c6f
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                       name: bug
-                      color: accent.red
+                      color: rowan
                       sort_key: a0
                       restricted: false
         '400':
@@ -5950,7 +6243,7 @@ paths:
                 summary: Request
                 value:
                   name: bug
-                  color: accent.red
+                  color: rowan
       responses:
         '201':
           description: Created.
@@ -5972,7 +6265,7 @@ paths:
                     id: 0192f4a0-7b1c-7f24-8f76-a5de0ed16c6f
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     name: bug
-                    color: accent.red
+                    color: rowan
                     sort_key: a0
                     restricted: false
         '400':
@@ -6035,7 +6328,7 @@ paths:
                     id: 0192f4a0-7b1c-7f24-8f76-a5de0ed16c6f
                     channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                     name: bug
-                    color: accent.red
+                    color: rowan
                     sort_key: a0
                     restricted: false
         '400':
@@ -6366,6 +6659,7 @@ paths:
                         name: tickets
                         topic: Customer tickets
                         sort_key: a1
+                        read_only: false
                         operator:
                           mode: inherit
                         version: 3
@@ -6428,6 +6722,7 @@ paths:
                     name: tickets
                     topic: Customer tickets
                     sort_key: a1
+                    read_only: false
                     operator:
                       mode: inherit
                     version: 3
@@ -7976,6 +8271,7 @@ paths:
                           mime_type: image/png
                           original_name: screenshot.png
                           uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                          purpose: attachment
                           upload_state: complete
                           scan_status: clean
                           transcript_status: none
@@ -8024,7 +8320,7 @@ paths:
         Idempotent by `(author, client_msg_id)`: a repeat with the same body returns the original with
         200 and `Idempotent-Replay: true`; with a different body 422 `idempotency_key_reuse`. Sending
         into a closed thread reopens it. Agent invocation and follow-ups are evaluated after storing;
-        denial sets `trigger_state = failed` with `trigger_failure_reason`.
+        denial sets `trigger_state = failed` with `trigger_state_reason`.
       x-authz-action: message.create
       x-rate-limit-class: rl.message
       parameters:
@@ -8082,6 +8378,7 @@ paths:
                         mime_type: image/png
                         original_name: screenshot.png
                         uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                        purpose: attachment
                         upload_state: complete
                         scan_status: clean
                         transcript_status: none
@@ -8150,6 +8447,7 @@ paths:
                         mime_type: image/png
                         original_name: screenshot.png
                         uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                        purpose: attachment
                         upload_state: complete
                         scan_status: clean
                         transcript_status: none
@@ -8247,6 +8545,7 @@ paths:
                         mime_type: image/png
                         original_name: screenshot.png
                         uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                        purpose: attachment
                         upload_state: complete
                         scan_status: clean
                         transcript_status: none
@@ -8350,6 +8649,7 @@ paths:
                         mime_type: image/png
                         original_name: screenshot.png
                         uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                        purpose: attachment
                         upload_state: complete
                         scan_status: clean
                         transcript_status: none
@@ -9060,6 +9360,7 @@ paths:
                     mime_type: image/png
                     original_name: screenshot.png
                     uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    purpose: attachment
                     upload_state: complete
                     scan_status: clean
                     transcript_status: none
@@ -9087,6 +9388,53 @@ paths:
           $ref: '#/components/responses/Error'
 
   /uploads/{file_id}:
+    get:
+      operationId: getUpload
+      summary: Read the state of an own upload
+      tags: [Files]
+      description: |-
+        Confirmed parts of an unfinished upload, so a client can resume after a network loss (12, 4).
+      x-authz-action: file.upload
+      x-rate-limit-class: rl.upload
+      parameters:
+      - $ref: '#/components/parameters/FileIdPath'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadState'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    file_id: 0192f4a0-7b1c-75c7-88f6-199cc394b56a
+                    upload_state: uploading
+                    part_size_bytes: 8388608
+                    completed_parts:
+                    - part_number: 1
+                      etag: '"9b2cf535f27731c974343645a3985328"'
+                    expires_at: '2026-10-10T09:30:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/Gone'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
     delete:
       operationId: abortUpload
       summary: Abort an upload
@@ -9151,6 +9499,7 @@ paths:
                     mime_type: image/png
                     original_name: screenshot.png
                     uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                    purpose: attachment
                     upload_state: complete
                     scan_status: clean
                     transcript_status: none
@@ -9211,8 +9560,9 @@ paths:
       summary: Download a file
       tags: [Files]
       description: |-
-        Answers 200 with the bytes (supports `Range`) or 302 to a short-lived presigned URL. 409
-        `file_not_ready` while the scan is pending; infected files give 404.
+        Answers 200 with the bytes (supports `Range`); there are no presigned GET URLs (ADR 0048).
+        Media players without DPoP use a ticket (`createFileTicket`). 409 `file_not_ready` while
+        the scan is pending; infected files give 404.
       x-authz-action: file.read
       x-rate-limit-class: rl.read
       parameters:
@@ -9232,13 +9582,6 @@ paths:
               schema:
                 type: string
                 format: binary
-        '302':
-          description: Redirect to a short-lived presigned URL of the object store.
-          headers:
-            Location:
-              $ref: '#/components/headers/Location'
-            Correlation-Id:
-              $ref: '#/components/headers/Correlation-Id'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -9281,13 +9624,6 @@ paths:
               schema:
                 type: string
                 format: binary
-        '302':
-          description: Redirect to a short-lived presigned URL of the object store.
-          headers:
-            Location:
-              $ref: '#/components/headers/Location'
-            Correlation-Id:
-              $ref: '#/components/headers/Correlation-Id'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -9296,6 +9632,63 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /files/{file_id}/tickets:
+    post:
+      operationId: createFileTicket
+      summary: Create a short-lived fetch ticket
+      tags: [Files]
+      description: |-
+        For media players and "open with" that cannot send a DPoP proof. Every fetch with the ticket checks signature, expiry, session and `file.read` again (12, 9.2).
+      x-authz-action: file.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/FileIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FileTicketCreate'
+            examples:
+              default:
+                summary: Request
+                value:
+                  variant: original
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileTicket'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    url: '/api/v1/files/0192f4a0-7b1c-75c7-88f6-199cc394b56a/content?ticket=c2lnbmVk'
+                    expires_at: '2026-10-10T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -9469,25 +9862,38 @@ paths:
           type: string
           minLength: 1
         required: true
-      - name: kinds
+      - name: type
         in: query
-        description: Result kinds; default all.
+        description: Result type; default `messages` (14, 11).
+        schema:
+          type: string
+          enum: [messages, threads, files]
+          default: messages
+      - name: sort
+        in: query
+        description: Order of the hits (14, 4.5).
+        schema:
+          type: string
+          enum: [relevance, newest]
+          default: relevance
+      - name: space_id
+        in: query
+        description: Only channels of these spaces, intersected with the visible ones.
         schema:
           type: array
           items:
-            $ref: '#/components/schemas/SearchHitKind'
+            $ref: '#/components/schemas/Uuid'
         style: form
-        explode: false
-      - name: space_id
-        in: query
-        description: Restrict to a space.
-        schema:
-          $ref: '#/components/schemas/Uuid'
+        explode: true
       - name: channel_id
         in: query
-        description: Restrict to a channel.
+        description: Only these channels, intersected with the visible ones.
         schema:
-          $ref: '#/components/schemas/Uuid'
+          type: array
+          items:
+            $ref: '#/components/schemas/Uuid'
+        style: form
+        explode: true
       - name: thread_id
         in: query
         description: Restrict to a thread.
@@ -9495,19 +9901,43 @@ paths:
           $ref: '#/components/schemas/Uuid'
       - name: author_id
         in: query
-        description: Restrict to an author.
+        description: Author of the message or uploader of the file.
         schema:
           $ref: '#/components/schemas/Uuid'
-      - name: from
+      - name: agent_id
+        in: query
+        description: Threads operated by this agent.
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      - name: after
         in: query
         description: Created at or after.
         schema:
           $ref: '#/components/schemas/Timestamp'
-      - name: to
+      - name: before
         in: query
         description: Created before.
         schema:
           $ref: '#/components/schemas/Timestamp'
+      - name: has_file
+        in: query
+        description: Only messages with at least one attachment.
+        schema:
+          type: boolean
+      - name: thread_state
+        in: query
+        description: Only open or closed threads.
+        schema:
+          $ref: '#/components/schemas/ThreadState'
+      - name: tag_id
+        in: query
+        description: Forum tags of the thread.
+        schema:
+          type: array
+          items:
+            $ref: '#/components/schemas/Uuid'
+        style: form
+        explode: true
       responses:
         '200':
           description: OK.
@@ -9528,8 +9958,70 @@ paths:
                   value:
                     items:
                     - kind: message
-                      rank: 1.5
-                      highlight: the <mark>invoice</mark> export fails
+                      score: 1.5
+                      thread_title: Invoice export fails
+                      channel_name: tickets
+                      space_name: Support
+                      segments:
+                      - text: 'the '
+                        match: false
+                      - text: invoice
+                        match: true
+                      - text: ' export fails'
+                        match: false
+                    candidates_capped: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /search/thread-titles:
+    get:
+      operationId: searchThreadTitles
+      summary: Prefix search over thread titles
+      tags: [Search]
+      description: |-
+        For the quick switcher (14, 4.9): words shorter than `search.prefix_min_chars` are dropped; same access filter as `/search`, newest activity first.
+      x-authz-action: search.query
+      x-rate-limit-class: rl.search
+      parameters:
+      - $ref: '#/components/parameters/Limit'
+      - name: q
+        in: query
+        required: true
+        description: Typed prefix text.
+        schema:
+          type: string
+          minLength: 1
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ThreadTitleHitList'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - thread_id: 0192f4a0-7b1c-78f9-8074-fa94e84bab7d
+                      channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                      title: Invoice export fails
+                      last_activity_at: '2026-10-10T09:30:00.000Z'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -9567,6 +10059,7 @@ paths:
                   summary: Response
                   value:
                     head_seq: 5300
+                    sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
                     permission_version: 418
                     principal:
                       id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
@@ -9590,6 +10083,7 @@ paths:
                         name: tickets
                         topic: Customer tickets
                         sort_key: a1
+                        read_only: false
                         operator:
                           mode: inherit
                         version: 3
@@ -9721,6 +10215,7 @@ paths:
                               mime_type: image/png
                               original_name: screenshot.png
                               uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                              purpose: attachment
                               upload_state: complete
                               scan_status: clean
                               transcript_status: none
@@ -9745,6 +10240,7 @@ paths:
                           created_at: '2026-10-10T09:30:00.000Z'
                     next_cursor: 1
                     head_seq: 5301
+                    sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -10289,6 +10785,58 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /client-metrics:
+    post:
+      operationId: submitClientMetrics
+      summary: Submit anonymous client measurements
+      tags: [Stats]
+      description: |-
+        Only when `privacy.client_metrics` is on; otherwise `403 feature_disabled`. At most once per `client.metrics.flush_interval` (15, section 17).
+      x-authz-action: client_metrics.submit
+      x-rate-limit-class: rl.write
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientMetricsBatch'
+            examples:
+              default:
+                summary: Request
+                value:
+                  platform: ios
+                  app_version: 1.4.0
+                  metrics:
+                  - name: client.thread_open_ms
+                    kind: histogram
+                    buckets:
+                    - le: 100
+                      count: 12
+                    - le: 250
+                      count: 3
+      responses:
+        '202':
+          description: Accepted.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /agents:
     get:
       operationId: listAgents
@@ -10323,6 +10871,7 @@ paths:
                       display_name: Support Agent
                       status: active
                       adapter_kind: hermes
+                      tool_class: chat
                       description: Answers support tickets
                       billing_mode: personal
                       presence:
@@ -10384,6 +10933,7 @@ paths:
                     display_name: Support Agent
                     status: active
                     adapter_kind: hermes
+                    tool_class: chat
                     description: Answers support tickets
                     billing_mode: personal
                     presence:
@@ -10440,6 +10990,7 @@ paths:
                     display_name: Support Agent
                     status: active
                     adapter_kind: hermes
+                    tool_class: chat
                     description: Answers support tickets
                     billing_mode: personal
                     presence:
@@ -10505,6 +11056,7 @@ paths:
                     display_name: Support Agent
                     status: active
                     adapter_kind: hermes
+                    tool_class: chat
                     description: Answers support tickets
                     billing_mode: personal
                     presence:
@@ -10575,6 +11127,7 @@ paths:
                     display_name: Support Agent
                     status: active
                     adapter_kind: hermes
+                    tool_class: chat
                     description: Answers support tickets
                     billing_mode: personal
                     presence:
@@ -10641,6 +11194,7 @@ paths:
                     display_name: Support Agent
                     status: active
                     adapter_kind: hermes
+                    tool_class: chat
                     description: Answers support tickets
                     billing_mode: personal
                     presence:
@@ -10715,6 +11269,7 @@ paths:
                     display_name: Support Agent
                     status: active
                     adapter_kind: hermes
+                    tool_class: chat
                     description: Answers support tickets
                     billing_mode: personal
                     presence:
@@ -10788,6 +11343,7 @@ paths:
                     display_name: Support Agent
                     status: active
                     adapter_kind: hermes
+                    tool_class: chat
                     description: Answers support tickets
                     billing_mode: personal
                     presence:
@@ -10809,6 +11365,182 @@ paths:
           $ref: '#/components/responses/PreconditionFailed'
         '428':
           $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /agents/{agent_id}/tool-class:
+    put:
+      operationId: setAgentToolClass
+      summary: Set the tool class of an agent
+      tags: [Agents]
+      description: |-
+        Target tool class (`chat` < `scoped` < `host`, 07 2.11). `authorize` uses the higher of target and reported class; a guest run needs a matching tool class (SR2).
+      x-authz-action: agent.tool_class.set
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/AgentIdPath'
+      - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ToolClassSet'
+            examples:
+              default:
+                summary: Request
+                value:
+                  tool_class: scoped
+                  reason: Agent now works in a project checkout
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                    handle: support-agent
+                    display_name: Support Agent
+                    status: active
+                    adapter_kind: hermes
+                    tool_class: scoped
+                    description: Answers support tickets
+                    billing_mode: organization
+                    presence:
+                      state: unknown
+                    operator_config: {}
+                    version: 4
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '412':
+          $ref: '#/components/responses/PreconditionFailed'
+        '428':
+          $ref: '#/components/responses/PreconditionRequired'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /agents/{agent_id}/webhooks:
+    get:
+      operationId: listAgentWebhookSubscriptions
+      summary: List webhook subscriptions of an agent
+      tags: [Webhooks]
+      description: |-
+        Webhook as transport for adapters without a running process (04, 15.6).
+      x-authz-action: webhook_out.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/AgentIdPath'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscriptionList'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - id: 0192f4a0-7b1c-7b8e-8d3f-2a9c4e6f0b15
+                      agent_id: 0192f4a0-7b1c-7d07-84b0-358556a08a99
+                      url: https://hooks.example.com/agent
+                      event_types: [agent.invocation]
+                      state: active
+                      consecutive_failures: 0
+                      signature_schemes: [v1a]
+                      signing_key_kid: whk-2026-10
+                      created_at: '2026-10-10T09:30:00.000Z'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      operationId: createAgentWebhookSubscription
+      summary: Subscribe an agent to webhooks
+      tags: [Webhooks]
+      description: |-
+        Delivery is strictly in `seq` order per subscription; `2xx` acknowledges up to that `seq`. Every delivery carries a freshly issued invocation token.
+      x-authz-action: webhook_out.manage
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/AgentIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookSubscriptionCreate'
+            examples:
+              default:
+                summary: Request
+                value:
+                  url: https://hooks.example.com/agent
+                  event_types: [agent.invocation, agent.followup, run.cancel_requested]
+      responses:
+        '201':
+          description: Created.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookSubscriptionCreated'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -10979,6 +11711,7 @@ paths:
                               mime_type: image/png
                               original_name: screenshot.png
                               uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                              purpose: attachment
                               upload_state: complete
                               scan_status: clean
                               transcript_status: none
@@ -11003,6 +11736,7 @@ paths:
                           created_at: '2026-10-10T09:30:00.000Z'
                     next_cursor: 1
                     head_seq: 5301
+                    sync_epoch: 0192f4a0-7b1c-7a3e-8c41-5d2e9b7f1a60
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -11164,6 +11898,44 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /agents/me/triggerers:
+    get:
+      operationId: getAgentTriggerers
+      summary: List who may trigger this agent
+      tags: [Agent runtime]
+      description: |-
+        Principals with effective `trigger` on a channel the agent operates, with `permission_version`. The adapter keeps it as allow list and reloads on `access.changed` (09, 15).
+      x-authz-action: agent.triggerers.read
+      x-rate-limit-class: rl.agent_runtime
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentTriggerers'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    principal_ids: [0192f4a0-7b1c-7f89-8d6b-6960453241bc]
+                    permission_version: 418
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -11409,6 +12181,64 @@ paths:
                       started_at: '2026-10-10T09:30:00.000Z'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /runs/{run_id}/context:
+    get:
+      operationId: getRunContext
+      summary: Load the context of an own active run
+      tags: [Runs]
+      description: |-
+        Agent-self, only for own active runs (09, 4.6).
+      x-authz-action: run.context.read
+      x-rate-limit-class: rl.agent_runtime
+      parameters:
+      - $ref: '#/components/parameters/RunIdPath'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunContext'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    run_id: 0192f4a0-7b1c-7c4b-8f0e-4d2a6b1c9e30
+                    context_floor_seq: 0
+                    trigger_message:
+                      message_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                      thread_seq: 42
+                      created_at: '2026-10-10T09:30:00.000Z'
+                      author:
+                        id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                        kind: user
+                        handle: alex
+                        display_name: Alex
+                      role: user
+                      origin: human
+                      kind: text
+                      content_md: '@support-agent the invoice export fails since this morning.'
+                      attachments: []
+                      trust: trigger
+                    thread_context: []
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -12682,6 +13512,72 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /apps/{app_id}/suspend:
+    post:
+      operationId: suspendApp
+      summary: Suspend an app
+      tags: [Apps]
+      description: |-
+        Emergency stop without losing grants: tokens blocked, deliveries paused, commands hidden, components disabled (11, 6).
+      x-authz-action: app.suspend
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/AppIdPath'
+      responses:
+        '204':
+          description: No content.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /apps/{app_id}/resume:
+    post:
+      operationId: resumeApp
+      summary: Resume a suspended app
+      tags: [Apps]
+      x-authz-action: app.resume
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/AppIdPath'
+      responses:
+        '204':
+          description: No content.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /apps/{app_id}/uninstall:
     post:
       operationId: uninstallApp
@@ -12827,7 +13723,7 @@ paths:
                       signature_schemes: [v1a]
                       signing_key_kid: whk-2026-10
                       created_at: '2026-10-10T09:30:00.000Z'
-                    hmac_secret: whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw
+                    hmac_secret: whsec_exampleOnlyNotASecret0000000000
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -12893,7 +13789,7 @@ paths:
                       signature_schemes: [v1a]
                       signing_key_kid: whk-2026-10
                       created_at: '2026-10-10T09:30:00.000Z'
-                    hmac_secret: whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw
+                    hmac_secret: whsec_exampleOnlyNotASecret0000000000
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -13813,6 +14709,50 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /costs/reconciliations:
+    post:
+      operationId: submitCostReconciliation
+      summary: Submit reconciled cost entries (app)
+      tags: [Stats]
+      description: |-
+        For the reconciliation app with scope `costs:reconcile`, without step-up. Only adds `reconciled` entries to existing runs; deletes nothing (10, 12.4).
+      x-authz-action: cost.reconcile.submit
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CostReconcile'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostReconcileResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /status:
     get:
       operationId: getStatus
@@ -14414,58 +15354,6 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
-  /imports/{import_id}/dry-run:
-    post:
-      operationId: startImportDryRun
-      summary: Run without writing
-      tags: [Import]
-      x-authz-action: import.manage
-      x-rate-limit-class: rl.admin
-      parameters:
-      - $ref: '#/components/parameters/ImportIdPath'
-      - $ref: '#/components/parameters/IdempotencyKey'
-      responses:
-        '202':
-          description: Accepted; processing continues asynchronously.
-          headers:
-            Correlation-Id:
-              $ref: '#/components/headers/Correlation-Id'
-            RateLimit:
-              $ref: '#/components/headers/RateLimit'
-            RateLimit-Policy:
-              $ref: '#/components/headers/RateLimit-Policy'
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ImportSource'
-              examples:
-                default:
-                  summary: Response
-                  value:
-                    id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
-                    kind: discord
-                    name: Old community server
-                    config: {}
-                    state: draft
-                    stats: {}
-                    created_at: '2026-10-10T09:30:00.000Z'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
-        '422':
-          $ref: '#/components/responses/UnprocessableEntity'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        default:
-          $ref: '#/components/responses/Error'
-
   /imports/{import_id}/start:
     post:
       operationId: startImport
@@ -14617,6 +15505,313 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /imports/{import_id}/complete:
+    post:
+      operationId: completeImport
+      summary: Complete an import
+      tags: [Import]
+      description: |-
+        When every channel is led by this server: stop the mirror, source `completed` (22, 13.5).
+      x-authz-action: import.manage
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/ImportIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportSource'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
+                    kind: discord
+                    name: Old community server
+                    config: {}
+                    state: completed
+                    stats: {}
+                    created_at: '2026-10-10T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /imports/{import_id}/leads:
+    put:
+      operationId: setImportLead
+      summary: Set the leading side of a channel
+      tags: [Import]
+      description: |-
+        Switches `lead` of one mapped channel and the write protection of its target channel in one transaction (22, 12.1 and 13).
+      x-authz-action: import.manage
+      x-rate-limit-class: rl.admin
+      parameters:
+      - $ref: '#/components/parameters/ImportIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportLeadSet'
+            examples:
+              default:
+                summary: Request
+                value:
+                  source_channel: '1029384000'
+                  lead: bothy
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportSource'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
+                    kind: discord
+                    name: Old community server
+                    config: {}
+                    state: completed
+                    stats: {}
+                    created_at: '2026-10-10T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /imports/{import_id}/batches:
+    post:
+      operationId: applyImportBatch
+      summary: Write a batch of imported objects
+      tags: [Import]
+      description: |-
+        One transaction, at most `import.batch_max_items` objects. Every target must lie in a channel of this running source. Existing `posted` keys return their target without a duplicate or event (22, 7.2). Writes `thread.updated` and `import.progress` instead of one event per message.
+      x-authz-action: import.apply
+      x-rate-limit-class: rl.import
+      parameters:
+      - $ref: '#/components/parameters/ImportIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportBatch'
+            examples:
+              default:
+                summary: Request
+                value:
+                  thread_origin_key: 'thread:1029384700'
+                  items:
+                  - origin_key: 'message:1029384756'
+                    item_kind: message
+                    data:
+                      author_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      content_md: The invoice export fails.
+                      created_at: '2025-03-01T08:00:00.000Z'
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportBatchResult'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - id: 0192f4a0-7b1c-7e43-8919-6113546a4c70
+                      origin_key: 'message:1029384756'
+                      item_kind: message
+                      target_kind: message
+                      target_id: 0192f4a0-7b1c-7353-8d8c-dea659467151
+                      state: posted
+                      created_at: '2026-10-10T09:30:00.000Z'
+                    unread_floor_seq: 42
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /imports/{import_id}/files:
+    post:
+      operationId: createImportFile
+      summary: Reserve an imported file
+      tags: [Import]
+      description: |-
+        Writes the `pending` item and reserves the file ID; the bytes follow over the upload session. A repeated call with the same key returns the same ID (22, 7.2).
+      x-authz-action: import.apply
+      x-rate-limit-class: rl.import
+      parameters:
+      - $ref: '#/components/parameters/ImportIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportFileCreate'
+            examples:
+              default:
+                summary: Request
+                value:
+                  origin_key: 'file:1029384799'
+                  channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
+                  author_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                  name: report.pdf
+                  size_bytes: 48213
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportFileSlot'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
+  /imports/{import_id}/cursor:
+    put:
+      operationId: setImportCursor
+      summary: Advance the import cursor
+      tags: [Import]
+      description: |-
+        Only after a successful batch (22, 7.3).
+      x-authz-action: import.apply
+      x-rate-limit-class: rl.import
+      parameters:
+      - $ref: '#/components/parameters/ImportIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportCursorSet'
+            examples:
+              default:
+                summary: Request
+                value:
+                  cursor: {}
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportSource'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    id: 0192f4a0-7b1c-78d2-8a6a-ec465435b8a0
+                    kind: discord
+                    name: Old community server
+                    config: {}
+                    state: completed
+                    stats: {}
+                    created_at: '2026-10-10T09:30:00.000Z'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -14877,13 +16072,6 @@ paths:
               schema:
                 type: string
                 format: binary
-        '302':
-          description: Redirect to a short-lived presigned URL of the object store.
-          headers:
-            Location:
-              $ref: '#/components/headers/Location'
-            Correlation-Id:
-              $ref: '#/components/headers/Correlation-Id'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -14958,6 +16146,7 @@ webhooks:
                           mime_type: image/png
                           original_name: screenshot.png
                           uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                          purpose: attachment
                           upload_state: complete
                           scan_status: clean
                           transcript_status: none
@@ -15049,6 +16238,7 @@ webhooks:
                           mime_type: image/png
                           original_name: screenshot.png
                           uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                          purpose: attachment
                           upload_state: complete
                           scan_status: clean
                           transcript_status: none
@@ -15921,6 +17111,7 @@ webhooks:
                       name: tickets
                       topic: Customer tickets
                       sort_key: a1
+                      read_only: false
                       operator:
                         mode: inherit
                       version: 3
@@ -15973,6 +17164,7 @@ webhooks:
                       name: tickets
                       topic: Customer tickets
                       sort_key: a1
+                      read_only: false
                       operator:
                         mode: inherit
                       version: 3
@@ -16068,6 +17260,7 @@ webhooks:
                       name: tickets
                       topic: Customer tickets
                       sort_key: a1
+                      read_only: false
                       operator:
                         mode: inherit
                       version: 3
@@ -16176,6 +17369,7 @@ webhooks:
                       mime_type: image/png
                       original_name: screenshot.png
                       uploaded_by: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
+                      purpose: attachment
                       upload_state: complete
                       scan_status: clean
                       transcript_status: none
@@ -16280,6 +17474,7 @@ webhooks:
                       display_name: Support Agent
                       status: active
                       adapter_kind: hermes
+                      tool_class: chat
                       description: Answers support tickets
                       billing_mode: personal
                       presence:
@@ -16431,6 +17626,122 @@ webhooks:
         default:
           description: Failure; the server retries with backoff (docs/api/webhooks.md).
       description: Only for the subscribing app itself.
+  agent.invocation:
+    post:
+      operationId: onAgentInvocationEvent
+      summary: Event `agent.invocation`
+      tags: [Webhook events]
+      x-authz-action: webhook_out.deliver
+      x-rate-limit-class: none
+      x-receive-action: agent.events.consume
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/WebhookId'
+      - $ref: '#/components/parameters/WebhookTimestamp'
+      - $ref: '#/components/parameters/WebhookSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentInvocationEvent'
+      responses:
+        '204':
+          description: Accepted. Any 2xx status acknowledges every event up to this `seq`.
+        '410':
+          description: The receiver gave up the endpoint; the server disables the subscription.
+        '429':
+          description: The server slows down and honors `Retry-After`; same for 502, 503 and 504.
+        default:
+          description: Failure; the server retries this event with backoff and sends nothing newer before it succeeds.
+      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protokoll.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
+  agent.followup:
+    post:
+      operationId: onAgentFollowupEvent
+      summary: Event `agent.followup`
+      tags: [Webhook events]
+      x-authz-action: webhook_out.deliver
+      x-rate-limit-class: none
+      x-receive-action: agent.events.consume
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/WebhookId'
+      - $ref: '#/components/parameters/WebhookTimestamp'
+      - $ref: '#/components/parameters/WebhookSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentFollowupEvent'
+      responses:
+        '204':
+          description: Accepted. Any 2xx status acknowledges every event up to this `seq`.
+        '410':
+          description: The receiver gave up the endpoint; the server disables the subscription.
+        '429':
+          description: The server slows down and honors `Retry-After`; same for 502, 503 and 504.
+        default:
+          description: Failure; the server retries this event with backoff and sends nothing newer before it succeeds.
+      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protokoll.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
+  run.cancel_requested:
+    post:
+      operationId: onRunCancelRequestedEvent
+      summary: Event `run.cancel_requested`
+      tags: [Webhook events]
+      x-authz-action: webhook_out.deliver
+      x-rate-limit-class: none
+      x-receive-action: agent.events.consume
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/WebhookId'
+      - $ref: '#/components/parameters/WebhookTimestamp'
+      - $ref: '#/components/parameters/WebhookSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RunCancelRequestedEvent'
+      responses:
+        '204':
+          description: Accepted. Any 2xx status acknowledges every event up to this `seq`.
+        '410':
+          description: The receiver gave up the endpoint; the server disables the subscription.
+        '429':
+          description: The server slows down and honors `Retry-After`; same for 502, 503 and 504.
+        default:
+          description: Failure; the server retries this event with backoff and sends nothing newer before it succeeds.
+      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protokoll.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
+  agent.config_changed:
+    post:
+      operationId: onAgentConfigChangedEvent
+      summary: Event `agent.config_changed`
+      tags: [Webhook events]
+      x-authz-action: webhook_out.deliver
+      x-rate-limit-class: none
+      x-receive-action: agent.config.read
+      security: []
+      parameters:
+      - $ref: '#/components/parameters/WebhookId'
+      - $ref: '#/components/parameters/WebhookTimestamp'
+      - $ref: '#/components/parameters/WebhookSignature'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentConfigChangedEvent'
+      responses:
+        '204':
+          description: Accepted. Any 2xx status acknowledges every event up to this `seq`.
+        '410':
+          description: The receiver gave up the endpoint; the server disables the subscription.
+        '429':
+          description: The server slows down and honors `Retry-After`; same for 502, 503 and 504.
+        default:
+          description: Failure; the server retries this event with backoff and sends nothing newer before it succeeds.
+      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protokoll.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
   interaction.created:
     post:
       operationId: onInteractionCreatedEvent
@@ -16971,7 +18282,7 @@ components:
         DPoP-Nonce:
           $ref: '#/components/headers/DPoP-Nonce'
     Forbidden:
-      description: 'Problem codes: `forbidden`, `scope_missing`, `device_pending`, `feature_disabled`, `agent_invocation_denied`, `invocation_token_invalid`.'
+      description: 'Problem codes: `forbidden`, `scope_missing`, `device_pending`, `channel_read_only`, `feature_disabled`, `agent_invocation_denied`, `invocation_token_invalid`.'
       content:
         application/problem+json:
           schema:
@@ -17009,7 +18320,7 @@ components:
         Correlation-Id:
           $ref: '#/components/headers/Correlation-Id'
     Conflict:
-      description: 'Problem codes: `conflict`, `request_in_progress`, `i1_violation`, `last_owner`, `already_started`, `billing_mode_mismatch`, `invalid_state_transition`, `base_version_conflict`, `component_used`, `operator_mismatch`, `file_not_ready`.'
+      description: 'Problem codes: `conflict`, `request_in_progress`, `i1_violation`, `last_owner`, `already_started`, `billing_mode_mismatch`, `tool_class_mismatch`, `invalid_state_transition`, `base_version_conflict`, `component_used`, `operator_mismatch`, `file_not_ready`.'
       content:
         application/problem+json:
           schema:
@@ -17189,7 +18500,7 @@ components:
         RateLimit-Policy:
           $ref: '#/components/headers/RateLimit-Policy'
     ServiceUnavailable:
-      description: 'Problem codes: `unavailable`.'
+      description: 'Problem codes: `unavailable`, `maintenance`.'
       content:
         application/problem+json:
           schema:
@@ -17259,6 +18570,34 @@ components:
       type: string
       description: Backend policy of an agent. `personal` runs on the subscription of exactly one person.
       enum: [personal, organization]
+    ToolClass:
+      type: string
+      enum: [chat, scoped, host]
+      description: Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
+    ToolClassSet:
+      type: object
+      required: [tool_class, reason]
+      properties:
+        tool_class:
+          $ref: '#/components/schemas/ToolClass'
+        reason:
+          type: string
+          maxLength: 500
+          examples: [Agent now works in a project checkout]
+    BillingEvidence:
+      type: object
+      description: How the runtime proves its actual billing mode. Never a key value or prefix (schema `billing_evidence.v1`).
+      required: [key_type]
+      properties:
+        provider:
+          type: string
+          examples: [anthropic]
+        key_type:
+          type: string
+          enum: [api_key, oauth, cloud, none, unknown]
+        method:
+          type: string
+          examples: [resolved_credentials]
     Money:
       type: object
       description: Amount in micro units of the currency. Never a float.
@@ -17482,8 +18821,8 @@ components:
           examples: [Team Chat]
         accent_color:
           type: string
-          description: Design-system color token.
-          examples: [accent.blue]
+          description: Key of a category color of the design system (`spruce`, `loch`, `heather`, `rowan`, `amber`, `gorse`, `moss`), never a free color value (ADR 0044).
+          examples: [loch]
         logo_url:
           type: string
           format: uri-reference
@@ -17497,7 +18836,7 @@ components:
           examples: [Team Chat]
         accent_color:
           type: string
-          examples: [accent.blue]
+          examples: [loch]
         logo_file_id:
           $ref: '#/components/schemas/Uuid'
         version:
@@ -17513,7 +18852,7 @@ components:
           examples: [Team Chat]
         accent_color:
           type: string
-          examples: [accent.blue]
+          examples: [loch]
     Jwks:
       type: object
       description: JSON Web Key Set (RFC 7517) with the public keys for access tokens and invocation tokens.
@@ -17548,26 +18887,6 @@ components:
           enum: [next, active, retiring]
         not_after:
           $ref: '#/components/schemas/Timestamp'
-    Health:
-      type: object
-      required: [status]
-      properties:
-        status:
-          $ref: '#/components/schemas/HealthStatus'
-        checks:
-          type: array
-          description: Names and states of readiness checks. No details, no versions, no hosts.
-          items:
-            $ref: '#/components/schemas/HealthCheck'
-    HealthCheck:
-      type: object
-      required: [name, status]
-      properties:
-        name:
-          type: string
-          examples: [database]
-        status:
-          $ref: '#/components/schemas/HealthStatus'
     InstanceInfo:
       type: object
       description: Instance view for an authenticated principal.
@@ -17613,6 +18932,7 @@ components:
       - message_max_attachments
       - file_max_upload_bytes
       - thread_title_max_chars
+      - voice_max_duration_ms
       properties:
         message_max_content_bytes:
           type: integer
@@ -17628,6 +18948,11 @@ components:
         thread_title_max_chars:
           type: integer
           examples: [200]
+        voice_max_duration_ms:
+          type: integer
+          format: int64
+          description: Longest voice message (`voice.max_duration`, 12).
+          examples: [900000]
     InstanceSetting:
       type: object
       required: [key, value, version, updated_at]
@@ -17789,7 +19114,7 @@ components:
       enum: [ios, android, macos, windows, web, cli]
     DeviceRegistration:
       type: object
-      description: Device and device key sent with every login completion. The DPoP proof of the request must be signed with this key.
+      description: Device and device keys sent with every login completion. The DPoP proof of the request must be signed with the `dpop` key (`public_jwk`); `step_up_key` is the second key with user verification (08, 6.1), absent where no secure key store exists.
       required: [device_id, name, platform, public_jwk, alg]
       properties:
         device_id:
@@ -17811,6 +19136,63 @@ components:
         attestation:
           $ref: '#/components/schemas/JsonObject'
           description: Platform attestation, if the platform provides one.
+        step_up_key:
+          $ref: '#/components/schemas/DeviceKeyRegistration'
+    DeviceKeyRegistration:
+      type: object
+      required: [public_jwk, alg]
+      properties:
+        public_jwk:
+          $ref: '#/components/schemas/JsonObject'
+          description: Public JWK (RFC 7517) without private members.
+        alg:
+          type: string
+          enum: [ES256, EdDSA]
+        attestation:
+          $ref: '#/components/schemas/JsonObject'
+    PairingBeginRequest:
+      type: object
+      required: [device]
+      properties:
+        device:
+          $ref: '#/components/schemas/DeviceRegistration'
+    PairingStarted:
+      type: object
+      required: [pairing_id, pairing_code, expires_at]
+      properties:
+        pairing_id:
+          $ref: '#/components/schemas/Uuid'
+        pairing_code:
+          type: string
+          description: Shown on the new device only; `auth.pairing_code_chars` characters (Crockford Base32).
+          examples: [7KQ2-M9XD]
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+    PairingApprove:
+      type: object
+      required: [pairing_code]
+      properties:
+        pairing_code:
+          type: string
+          examples: [7KQ2-M9XD]
+    PairingCompleteRequest:
+      type: object
+      required: [pairing_id]
+      properties:
+        pairing_id:
+          $ref: '#/components/schemas/Uuid'
+    PairingStatus:
+      type: object
+      required: [pairing_id, status, expires_at]
+      properties:
+        pairing_id:
+          $ref: '#/components/schemas/Uuid'
+        status:
+          type: string
+          enum: [requested]
+          description: Not yet approved; ask again after a short wait.
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
     OidcBeginRequest:
       type: object
       required: [provider_id, app_redirect_uri, client_challenge]
@@ -18289,8 +19671,11 @@ components:
           examples: [1.4.0]
         key_thumbprint:
           type: string
-          description: RFC 7638 thumbprint of the active device key (`cnf.jkt`).
+          description: RFC 7638 thumbprint of the active `dpop` device key (`cnf.jkt`).
           examples: [0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I]
+        step_up_key_thumbprint:
+          type: string
+          description: RFC 7638 thumbprint of the active `step_up` device key, if the device has one.
         approved_at:
           $ref: '#/components/schemas/Timestamp'
         revoked_at:
@@ -18321,13 +19706,19 @@ components:
           $ref: '#/components/schemas/Uuid'
         auth_method:
           type: string
-          enum: [oidc, trusted_header, passkey, password_totp]
+          enum: [oidc, trusted_header, passkey, password_totp, enrollment_code, device_pairing]
+        client_component:
+          type: string
+          enum: [app, notification_ext, share_ext, console]
         created_at:
           $ref: '#/components/schemas/Timestamp'
         expires_at:
           $ref: '#/components/schemas/Timestamp'
         step_up_at:
           $ref: '#/components/schemas/Timestamp'
+        step_up_method:
+          type: string
+          enum: [passkey, device_key, password_totp, oidc_reauth]
         last_seen_at:
           $ref: '#/components/schemas/Timestamp'
         current:
@@ -18346,7 +19737,8 @@ components:
           examples: [Adapter production]
         token_prefix:
           type: string
-          examples: [agt_7Hq2]
+          description: '`bothy_<kind>_` plus the first characters of the random part (03 `api_tokens`).'
+          examples: [bothy_agt_example]
         scopes:
           type: array
           items:
@@ -18386,8 +19778,8 @@ components:
           $ref: '#/components/schemas/ApiToken'
         secret:
           type: string
-          description: Full token value. Shown exactly once.
-          examples: [agt_7Hq2.kJ8sV2pQ0wX5yZ1aB3cD4eF6gH]
+          description: Full token value `bothy_<kind>_<random>_<checksum>` (prefix for secret scanners). Shown exactly once.
+          examples: [bothy_agt_exampleOnlyNotAToken7Hq2_c3f1]
     AppScope:
       type: string
       enum:
@@ -18665,7 +20057,8 @@ components:
           examples: [icon.headset]
         color:
           type: string
-          examples: [accent.green]
+          description: Key of a category color of the design system, never a hex value.
+          examples: [moss]
         sort_key:
           type: string
           description: Fractional index, compared bytewise.
@@ -18692,7 +20085,8 @@ components:
           examples: [icon.flask]
         color:
           type: string
-          examples: [accent.purple]
+          description: Key of a category color of the design system, never a hex value.
+          examples: [heather]
         after_space_id:
           $ref: '#/components/schemas/Uuid'
           description: Insert after this space; absent inserts at the end.
@@ -18766,6 +20160,7 @@ components:
       - version
       - settings_version
       - created_at
+      - read_only
       properties:
         id:
           $ref: '#/components/schemas/Uuid'
@@ -18787,6 +20182,12 @@ components:
           $ref: '#/components/schemas/ChannelOperator'
         forum_default_sort:
           $ref: '#/components/schemas/ForumSort'
+        default_notification_level:
+          $ref: '#/components/schemas/NotificationLevel'
+          description: Default for people without an own setting (13, 3.1); absent means none.
+        read_only:
+          type: boolean
+          description: Write-protected for every principal including owners; only a running import writes (05, rule 1.8).
         main_thread_id:
           $ref: '#/components/schemas/Uuid'
           description: Thread with `kind = main` of text and DM channels.
@@ -18832,6 +20233,21 @@ components:
           type: string
         forum_default_sort:
           $ref: '#/components/schemas/ForumSort'
+        default_notification_level:
+          $ref: '#/components/schemas/NotificationLevel'
+        clear_default_notification_level:
+          type: boolean
+          description: Removes the channel default; there is no JSON null (R-API-03).
+    ChannelReadOnlySet:
+      type: object
+      required: [read_only, reason]
+      properties:
+        read_only:
+          type: boolean
+        reason:
+          type: string
+          maxLength: 500
+          examples: [Channel is mirrored from the old system]
     ChannelView:
       type: object
       required: [channel, level, capabilities]
@@ -19030,7 +20446,8 @@ components:
           examples: [bug]
         color:
           type: string
-          examples: [accent.red]
+          description: Key of a category color of the design system, never a hex value.
+          examples: [rowan]
         sort_key:
           type: string
           examples: [a0]
@@ -19045,7 +20462,8 @@ components:
           examples: [bug]
         color:
           type: string
-          examples: [accent.red]
+          description: Key of a category color of the design system, never a hex value.
+          examples: [rowan]
         restricted:
           type: boolean
         after_tag_id:
@@ -19114,6 +20532,10 @@ components:
         last_message_seq:
           type: integer
           format: int64
+        unread_floor_seq:
+          type: integer
+          format: int64
+          description: Messages up to this `thread_seq` never count as unread (import); absent means 0.
         last_activity_at:
           $ref: '#/components/schemas/Timestamp'
         message_count:
@@ -19260,6 +20682,7 @@ components:
       - working
       - done
       - failed
+      - cancelled
       - followup_delivered
     Message:
       type: object
@@ -19318,9 +20741,9 @@ components:
           $ref: '#/components/schemas/TriggerState'
         trigger_state_at:
           $ref: '#/components/schemas/Timestamp'
-        trigger_failure_reason:
+        trigger_state_reason:
           type: string
-          description: Reason when `trigger_state = failed`, e.g. `billing_mode_personal_not_holder`, `project_not_ready`.
+          description: Reason when `trigger_state` is `failed` or `cancelled`, e.g. `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`.
         silent:
           type: boolean
         attachments:
@@ -19544,6 +20967,7 @@ components:
       - transcript_status
       - thumbnails
       - created_at
+      - purpose
       properties:
         id:
           $ref: '#/components/schemas/Uuid'
@@ -19564,6 +20988,9 @@ components:
           examples: [screenshot.png]
         uploaded_by:
           $ref: '#/components/schemas/Uuid'
+        purpose:
+          type: string
+          enum: [attachment, avatar, branding, gdpr_export]
         scope_channel_id:
           $ref: '#/components/schemas/Uuid'
         upload_state:
@@ -19648,6 +21075,52 @@ components:
             $ref: '#/components/schemas/UploadPart'
         expires_at:
           $ref: '#/components/schemas/Timestamp'
+    UploadState:
+      type: object
+      description: State of an own upload session, for resuming after a network loss.
+      required: [file_id, upload_state, part_size_bytes, completed_parts, expires_at]
+      properties:
+        file_id:
+          $ref: '#/components/schemas/Uuid'
+        upload_state:
+          type: string
+          enum: [pending, uploading, complete]
+        part_size_bytes:
+          type: integer
+          format: int64
+        completed_parts:
+          type: array
+          description: Parts the server has confirmed, with their ETag.
+          items:
+            type: object
+            required: [part_number, etag]
+            properties:
+              part_number:
+                type: integer
+                minimum: 1
+              etag:
+                type: string
+                examples: ['"9b2cf535f27731c974343645a3985328"']
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
+    FileTicketCreate:
+      type: object
+      required: [variant]
+      properties:
+        variant:
+          type: string
+          enum: [original, small, medium, large, poster]
+    FileTicket:
+      type: object
+      description: Short-lived fetch URL for media players without DPoP (12, 9.2). Checked again on every fetch.
+      required: [url, expires_at]
+      properties:
+        url:
+          type: string
+          format: uri-reference
+          examples: ['/api/v1/files/0192f4a0-7b1c-75c7-88f6-199cc394b56a/content?ticket=c2lnbmVk']
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
     UploadPart:
       type: object
       required: [part_number, url, headers]
@@ -19720,23 +21193,37 @@ components:
     SearchHit:
       type: object
       description: One hit. `kind` names which of the optional objects is set.
-      required: [kind, rank]
+      required: [kind, segments]
       properties:
         kind:
           $ref: '#/components/schemas/SearchHitKind'
-        rank:
+        score:
           type: number
           format: double
+          description: Only with `sort = relevance`.
         message:
           $ref: '#/components/schemas/Message'
         thread:
           $ref: '#/components/schemas/Thread'
         file:
           $ref: '#/components/schemas/File'
-        highlight:
+        thread_title:
           type: string
-          description: Excerpt with matches wrapped in `<mark>`; no other markup.
-          examples: [the <mark>invoice</mark> export fails]
+        channel_name:
+          type: string
+        space_name:
+          type: string
+        segments:
+          type: array
+          description: Excerpt split at the matches; no markup, HTML in the content stays text (14, 4.6).
+          items:
+            type: object
+            required: [text, match]
+            properties:
+              text:
+                type: string
+              match:
+                type: boolean
     ReadState:
       type: object
       required:
@@ -19994,7 +21481,7 @@ components:
         token:
           type: string
           description: Push token or endpoint of the provider. Never returned.
-          examples: [a1b2c3d4e5f6]
+          examples: [example-device-token-a1b2]
         environment:
           $ref: '#/components/schemas/PushEnvironment'
         app_id:
@@ -20063,6 +21550,7 @@ components:
       - agents
       - settings
       - drafts
+      - sync_epoch
       properties:
         head_seq:
           type: integer
@@ -20072,6 +21560,9 @@ components:
           type: integer
           format: int64
           examples: [418]
+        sync_epoch:
+          $ref: '#/components/schemas/Uuid'
+          description: Time line of the event log (04, 7.5).
         principal:
           $ref: '#/components/schemas/PrincipalRef'
         is_owner:
@@ -20122,6 +21613,7 @@ components:
       - presence
       - operator_config
       - version
+      - tool_class
       properties:
         id:
           $ref: '#/components/schemas/Uuid'
@@ -20148,6 +21640,8 @@ components:
           $ref: '#/components/schemas/Uuid'
         billing_mode_changed_at:
           $ref: '#/components/schemas/Timestamp'
+        tool_class:
+          $ref: '#/components/schemas/ToolClass'
         presence:
           $ref: '#/components/schemas/AgentRuntimeStatus'
         operator_config:
@@ -20170,6 +21664,12 @@ components:
           examples: [2.3.1]
         last_heartbeat_at:
           $ref: '#/components/schemas/Timestamp'
+        billing_modes_supported:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillingMode'
+        reported_tool_class:
+          $ref: '#/components/schemas/ToolClass'
         billing_mode_matches:
           type: boolean
           description: False when the reported mode differs from the configured `billing_mode`.
@@ -20233,7 +21733,7 @@ components:
           examples: [Handover to deputy]
     Heartbeat:
       type: object
-      required: [state, reported_billing_mode]
+      required: [state]
       properties:
         state:
           type: string
@@ -20243,9 +21743,18 @@ components:
           examples: [2.3.1]
         reported_billing_mode:
           $ref: '#/components/schemas/BillingMode'
+          description: Absent when the adapter follows the configured mode per run; then `billing_modes_supported` names both modes and the per-run check binds (ruling L8).
+        billing_modes_supported:
+          type: array
+          items:
+            $ref: '#/components/schemas/BillingMode'
+        billing_evidence:
+          $ref: '#/components/schemas/BillingEvidence'
+        reported_tool_class:
+          $ref: '#/components/schemas/ToolClass'
         details:
           $ref: '#/components/schemas/JsonObject'
-          description: Schema `agent_heartbeat.v1`. No secrets, no content.
+          description: Further fields of schema `agent_heartbeat.v1` (capabilities, active runs). No secrets, no content.
         project_readiness:
           type: array
           items:
@@ -20318,12 +21827,152 @@ components:
         tokens_cache_write:
           type: integer
           format: int64
+          description: Cache writes with 5 minutes (or without a stated duration).
+        tokens_cache_write_1h:
+          type: integer
+          format: int64
+          description: Cache writes with 1 hour, counted separately.
         subagents:
           type: integer
         background_jobs:
           type: integer
         api_retries:
           type: integer
+        last_api_retry:
+          $ref: '#/components/schemas/RunApiRetry'
+    RunApiRetry:
+      type: object
+      description: Last retry of a model API call, shown in the live box while set.
+      required: [attempt]
+      properties:
+        attempt:
+          type: integer
+          examples: [2]
+        max_retries:
+          type: integer
+          examples: [5]
+        retry_delay_ms:
+          type: integer
+          format: int64
+          examples: [4000]
+        error:
+          type: string
+          examples: [overloaded]
+    RunPlan:
+      type: object
+      description: Schema `run_plan.v1`, shown in the live box.
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [id, text, status]
+            properties:
+              id:
+                type: string
+                examples: [step-1]
+              text:
+                type: string
+                examples: [Reproduce the export error]
+              status:
+                type: string
+                enum: [pending, in_progress, completed]
+    RunContext:
+      type: object
+      description: Context of an own active run, schema `run_context.v1` (09, 4.6). Built by the server because only `authz` knows how trustworthy each author is.
+      required: [run_id, trigger_message, thread_context, context_floor_seq]
+      properties:
+        run_id:
+          $ref: '#/components/schemas/Uuid'
+        trigger_message:
+          $ref: '#/components/schemas/RunContextMessage'
+        thread_context:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunContextMessage'
+        channel_context:
+          type: array
+          description: Only on the first run of a session in a thread with `parent_message_id`.
+          items:
+            $ref: '#/components/schemas/RunContextMessage'
+        context_floor_seq:
+          type: integer
+          format: int64
+        truncated_before_seq:
+          type: integer
+          format: int64
+          description: Set when older messages are missing; load them with `thread.read`.
+    RunContextMessage:
+      type: object
+      required: [message_id, thread_seq, created_at, author, role, origin, kind, content_md, attachments, trust]
+      properties:
+        message_id:
+          $ref: '#/components/schemas/Uuid'
+        thread_seq:
+          type: integer
+          format: int64
+        created_at:
+          $ref: '#/components/schemas/Timestamp'
+        author:
+          $ref: '#/components/schemas/PrincipalRef'
+        role:
+          type: string
+          enum: [user, assistant, other]
+        origin:
+          $ref: '#/components/schemas/MessageOrigin'
+        kind:
+          $ref: '#/components/schemas/MessageKind'
+        content_md:
+          type: string
+        truncated:
+          type: boolean
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/RunContextAttachment'
+        reply_to_message_id:
+          $ref: '#/components/schemas/Uuid'
+        trust:
+          type: string
+          enum: [trigger, authorized, self, unverified, system]
+          description: How the runtime must treat the content; `unverified` only as marked data, never as instruction.
+        already_delivered:
+          type: boolean
+          description: Already delivered to this session as a follow-up.
+    RunContextAttachment:
+      type: object
+      required: [file_id, original_name, mime_type, size_bytes, scan_status]
+      properties:
+        file_id:
+          $ref: '#/components/schemas/Uuid'
+        original_name:
+          type: string
+          examples: [screenshot.png]
+        mime_type:
+          type: string
+          examples: [image/png]
+        size_bytes:
+          type: integer
+          format: int64
+        scan_status:
+          type: string
+          examples: [clean]
+        transcript:
+          type: string
+    AgentTriggerers:
+      type: object
+      description: Principals that may trigger the calling agent (allow list of the adapter).
+      required: [principal_ids, permission_version]
+      properties:
+        principal_ids:
+          type: array
+          items:
+            $ref: '#/components/schemas/Uuid'
+        permission_version:
+          type: integer
+          format: int64
+          examples: [418]
     RunSummary:
       type: object
       description: Summary for sidebars, "running now" and collapsed live boxes.
@@ -20409,7 +22058,12 @@ components:
           $ref: '#/components/schemas/Uuid'
         agent_session_id:
           $ref: '#/components/schemas/Uuid'
+        trigger_kind:
+          type: string
+          enum: [message, command, interaction]
         triggering_message_id:
+          $ref: '#/components/schemas/Uuid'
+        triggering_command_id:
           $ref: '#/components/schemas/Uuid'
         triggering_interaction_id:
           $ref: '#/components/schemas/Uuid'
@@ -20459,6 +22113,8 @@ components:
         duration_ms:
           type: integer
           format: int64
+        plan:
+          $ref: '#/components/schemas/RunPlan'
     RunStep:
       type: object
       required: [id, ordinal, kind, name, title, status, started_at]
@@ -20540,10 +22196,13 @@ components:
           $ref: '#/components/schemas/BillingMode'
         external_session_ref:
           type: string
+          description: Absent when the runtime creates the reference only during the run; then the first `reportAgentSession` creates the session row.
           examples: [sess-7f3a]
         model:
           type: string
           examples: [model-large]
+        billing_evidence:
+          $ref: '#/components/schemas/BillingEvidence'
     RunAwaitInput:
       type: object
       required: [status_line]
@@ -20594,6 +22253,11 @@ components:
         tokens_cache_write:
           type: integer
           format: int64
+          description: Cache writes with 5 minutes (or without a stated duration).
+        tokens_cache_write_1h:
+          type: integer
+          format: int64
+          description: Cache writes with 1 hour, priced with `cache_write_1h_mtok`.
         amount_micros:
           type: integer
           format: int64
@@ -21077,7 +22741,6 @@ components:
       type: object
       required:
       - id
-      - app_id
       - url
       - event_types
       - state
@@ -21090,6 +22753,10 @@ components:
           $ref: '#/components/schemas/Uuid'
         app_id:
           $ref: '#/components/schemas/Uuid'
+          description: Set for subscriptions of an app.
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+          description: Set for subscriptions of an agent (agent transport, 04 15.6); exactly one of `app_id` and `agent_id`.
         url:
           type: string
           examples: ['https://hooks.example.com/chat']
@@ -21154,7 +22821,7 @@ components:
         hmac_secret:
           type: string
           description: Standard Webhooks secret with prefix `whsec_`. Shown once.
-          examples: [whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw]
+          examples: [whsec_exampleOnlyNotASecret0000000000]
     WebhookSubscriptionList:
       type: object
       required: [items]
@@ -21516,6 +23183,55 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Uuid'
+    ClientMetricsBatch:
+      type: object
+      description: Anonymous client measurements (15, section 17). No contents, no IDs of threads, channels or people.
+      required: [platform, app_version, metrics]
+      properties:
+        platform:
+          type: string
+          enum: [ios, android, macos, windows, linux, web]
+        app_version:
+          type: string
+          examples: [1.4.0]
+        density:
+          type: string
+          enum: [compact, comfortable]
+        theme:
+          type: string
+          enum: [light, dark]
+        metrics:
+          type: array
+          maxItems: 200
+          items:
+            $ref: '#/components/schemas/ClientMetric'
+    ClientMetric:
+      type: object
+      required: [name, kind]
+      properties:
+        name:
+          type: string
+          examples: [client.thread_open_ms]
+        kind:
+          type: string
+          enum: [histogram, counter, gauge]
+        value:
+          type: number
+          format: double
+          description: Counter increment or gauge value.
+        buckets:
+          type: array
+          description: Histogram buckets (upper bound and count).
+          items:
+            type: object
+            required: [le, count]
+            properties:
+              le:
+                type: number
+                format: double
+              count:
+                type: integer
+                format: int64
     StatusComponentState:
       type: string
       enum:
@@ -21677,7 +23393,8 @@ components:
           description: Schema `import_source.<kind>.v1`; credentials only as `secret_ref` names.
         state:
           type: string
-          enum: [draft, dry_run, running, paused, completed, failed]
+          enum: [draft, running, paused, completed, failed]
+          description: A dry run writes nothing and keeps the state.
         stats:
           $ref: '#/components/schemas/JsonObject'
           description: Counters per item kind and state, without content.
@@ -21712,6 +23429,7 @@ components:
           enum:
           - space
           - channel
+          - forum_tag
           - thread
           - message
           - file
@@ -21870,6 +23588,11 @@ components:
           description: The payload was cut to `sync.event_payload_max_bytes`; load the resource via REST.
         correlation_id:
           $ref: '#/components/schemas/Uuid'
+          description: W3C trace ID of the triggering request, written as UUID.
+        trace_context:
+          type: string
+          description: W3C `traceparent` of the triggering request; only in deliveries to agent adapters and only if the request was recorded.
+          examples: [00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01]
         client_msg_id:
           $ref: '#/components/schemas/Uuid'
         permission_version:
@@ -22077,6 +23800,24 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AccessTarget'
+    AccessExpiringPayload:
+      type: object
+      description: A grant or group membership ends within `authz.expiry_reminder_lead`.
+      required: [kind, subject_id, expires_at]
+      properties:
+        kind:
+          type: string
+          enum: [grant, group_membership]
+        grant_id:
+          $ref: '#/components/schemas/Uuid'
+        group_id:
+          $ref: '#/components/schemas/Uuid'
+        subject_id:
+          $ref: '#/components/schemas/Uuid'
+        target:
+          $ref: '#/components/schemas/AccessTarget'
+        expires_at:
+          $ref: '#/components/schemas/Timestamp'
     SessionRevokedPayload:
       type: object
       required: [session_id, reason]
@@ -22306,7 +24047,7 @@ components:
           $ref: '#/components/schemas/BillingMode'
     CommandAutocompleteRequestedPayload:
       type: object
-      description: Sent to the owner of the command (Kern-Vertrag Ergänzung beantragt).
+      description: Sent to one gateway connection of the command owner (04, 15.7); agents get an invocation token with `trigger_kind = autocomplete` in the delivery fields.
       required:
       - request_id
       - command_id
@@ -22340,7 +24081,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     EventPage:
       type: object
-      required: [events, next_cursor, head_seq]
+      required: [events, next_cursor, head_seq, sync_epoch]
       properties:
         events:
           type: array
@@ -22353,6 +24094,9 @@ components:
         head_seq:
           type: integer
           format: int64
+        sync_epoch:
+          $ref: '#/components/schemas/Uuid'
+          description: Time line of the event log; a client stores it with its cursor (04, 7.5).
     GatewayHello:
       type: object
       required:
@@ -22361,6 +24105,7 @@ components:
       - protocol_versions
       - dpop_nonce
       - server_time
+      - sync_epoch
       properties:
         heartbeat_interval_ms:
           type: integer
@@ -22380,6 +24125,9 @@ components:
           examples: [eyJ7S_zG.eyJH0-Z.HX4w-7v]
         server_time:
           $ref: '#/components/schemas/Timestamp'
+        sync_epoch:
+          $ref: '#/components/schemas/Uuid'
+          description: Time line of the event log; a client stores it with its cursor (04, 7.5).
     GatewayClientInfo:
       type: object
       required: [platform, version]
@@ -22414,6 +24162,10 @@ components:
         cursor:
           type: integer
           format: int64
+          description: Last processed `seq`; absent on first connect.
+        sync_epoch:
+          $ref: '#/components/schemas/Uuid'
+          description: Epoch stored with the cursor; absent on first connect. A mismatch gives `resync_required` with `epoch_changed`.
         client:
           $ref: '#/components/schemas/GatewayClientInfo'
     GatewayReady:
@@ -22424,6 +24176,7 @@ components:
       - permission_version
       - head_seq
       - snapshot
+      - sync_epoch
       properties:
         gateway_session_id:
           $ref: '#/components/schemas/Uuid'
@@ -22439,6 +24192,9 @@ components:
           format: int64
         snapshot:
           $ref: '#/components/schemas/Snapshot'
+        sync_epoch:
+          $ref: '#/components/schemas/Uuid'
+          description: Time line of the event log; a client stores it with its cursor (04, 7.5).
     GatewayResume:
       type: object
       required: [gateway_session_id, cursor]
@@ -22454,15 +24210,20 @@ components:
         cursor:
           type: integer
           format: int64
+        sync_epoch:
+          $ref: '#/components/schemas/Uuid'
     GatewayResumed:
       type: object
-      required: [gateway_session_id, head_seq]
+      required: [gateway_session_id, head_seq, sync_epoch]
       properties:
         gateway_session_id:
           $ref: '#/components/schemas/Uuid'
         head_seq:
           type: integer
           format: int64
+        sync_epoch:
+          $ref: '#/components/schemas/Uuid'
+          description: Time line of the event log; a client stores it with its cursor (04, 7.5).
     GatewayHeartbeat:
       type: object
       required: [last_seq]
@@ -22504,6 +24265,9 @@ components:
           description: Complete set of focused threads; replaces the previous set.
           items:
             $ref: '#/components/schemas/Uuid'
+        idle:
+          type: boolean
+          description: True when the window is open but unused; live-box patches continue, but the person does not count as watching (13, 4.4).
     GatewayTyping:
       type: object
       required: [thread_id]
@@ -22533,6 +24297,22 @@ components:
         ref:
           type: string
           description: Client reference echoed in `error` frames for this op.
+    GatewayAutocompleteResult:
+      type: object
+      description: Answer of the command owner to `command.autocomplete_requested` (action `command.autocomplete.respond`).
+      required: [request_id, choices]
+      properties:
+        request_id:
+          $ref: '#/components/schemas/Uuid'
+        choices:
+          type: array
+          maxItems: 25
+          description: At most `command.autocomplete_max_choices`.
+          items:
+            $ref: '#/components/schemas/CommandChoice'
+        ref:
+          type: string
+          description: Client reference echoed in `error` frames for this op.
     GatewayCursor:
       type: object
       required: [seq]
@@ -22549,14 +24329,17 @@ components:
           format: int64
     GatewayResyncRequired:
       type: object
-      required: [reason, head_seq]
+      required: [reason, head_seq, sync_epoch]
       properties:
         reason:
           type: string
-          enum: [retention, too_far_behind, cursor_ahead]
+          enum: [epoch_changed, retention, too_far_behind, cursor_ahead]
         head_seq:
           type: integer
           format: int64
+        sync_epoch:
+          $ref: '#/components/schemas/Uuid'
+          description: Time line of the event log; a client stores it with its cursor (04, 7.5).
     GatewayError:
       type: object
       required: [op, code]
@@ -22608,9 +24391,6 @@ components:
       type: string
       enum: [unknown, online, degraded, offline]
       description: State derived from heartbeats.
-    HealthStatus:
-      type: string
-      enum: [ok, failing]
     SigningKeyPurpose:
       type: string
       enum: [access_token, invocation, webhook_out]
@@ -22654,8 +24434,8 @@ components:
       enum: [button, select, form]
     ComponentRestriction:
       type: string
-      enum: [any, run_starter]
-      description: '`run_starter`: only the person who started the run, or an owner.'
+      enum: [any, run_starter, owner]
+      description: '`run_starter`: only the person who started the run, or an owner. `owner`: only owners.'
     CommandLevel:
       type: string
       enum: [write, trigger]
@@ -22672,6 +24452,7 @@ components:
       - output_mtok
       - cache_read_mtok
       - cache_write_mtok
+      - cache_write_1h_mtok
       - request
     StatusIncidentKind:
       type: string
@@ -22685,6 +24466,101 @@ components:
     ImportItemState:
       type: string
       enum: [pending, posted, skipped, failed]
+    ImportObject:
+      type: object
+      required: [origin_key, item_kind, data]
+      properties:
+        origin_key:
+          type: string
+          examples: ['message:1029384756']
+        item_kind:
+          type: string
+          enum: [space, channel, forum_tag, thread, message, user, pin]
+        content_sha256:
+          type: string
+          description: Hex SHA-256 of the converted content; a different value on a later run is counted as changed at the source.
+        data:
+          $ref: '#/components/schemas/JsonObject'
+          description: Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6).
+    ImportBatch:
+      type: object
+      description: One transaction. Objects of one thread, in source order; structure objects (space, channel, forum tag, person) come in batches without `thread_origin_key`.
+      required: [items]
+      properties:
+        thread_origin_key:
+          type: string
+          examples: ['thread:1029384700']
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          description: At most `import.batch_max_items`.
+          items:
+            $ref: '#/components/schemas/ImportObject'
+    ImportBatchResult:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportItem'
+        unread_floor_seq:
+          type: integer
+          format: int64
+          description: New `threads.unread_floor_seq` of the thread of this batch.
+    ImportFileCreate:
+      type: object
+      required: [origin_key, channel_id, author_id, name, size_bytes]
+      properties:
+        origin_key:
+          type: string
+          examples: ['file:1029384799']
+        channel_id:
+          $ref: '#/components/schemas/Uuid'
+        author_id:
+          $ref: '#/components/schemas/Uuid'
+        name:
+          type: string
+          examples: [report.pdf]
+        size_bytes:
+          type: integer
+          format: int64
+          minimum: 1
+        declared_mime_type:
+          type: string
+          examples: [application/pdf]
+    ImportFileSlot:
+      type: object
+      description: The `pending` item reserves the file ID; a repeated call with the same key returns the same ID (22, 7.2).
+      required: [item]
+      properties:
+        item:
+          $ref: '#/components/schemas/ImportItem'
+        upload:
+          $ref: '#/components/schemas/UploadSession'
+          description: Absent when the file is already `posted`.
+    ImportCursorSet:
+      type: object
+      required: [cursor]
+      properties:
+        cursor:
+          $ref: '#/components/schemas/JsonObject'
+          description: Progress per source channel and thread; only after a successful batch.
+        stats:
+          $ref: '#/components/schemas/JsonObject'
+    ImportLeadSet:
+      type: object
+      required: [source_channel, lead]
+      properties:
+        source_channel:
+          type: string
+          description: ID of the channel in the source.
+          examples: ['1029384000']
+        lead:
+          type: string
+          enum: [discord, bothy]
+          description: '`discord`: the source leads, the channel here is read-only and mirrored; `bothy`: this server leads (22, 12.1).'
     GdprRequestKind:
       type: string
       enum: [export, deletion, rectification]
@@ -23070,6 +24946,18 @@ components:
             enum: [access.changed]
           payload:
             $ref: '#/components/schemas/AccessChangedPayload'
+    AccessExpiringEvent:
+      description: Durable event `access.expiring`.
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [access.expiring]
+          payload:
+            $ref: '#/components/schemas/AccessExpiringPayload'
     SessionRevokedEvent:
       description: Durable event `session.revoked`.
       allOf:
@@ -23310,6 +25198,85 @@ components:
             enum: [command.autocomplete_requested]
           payload:
             $ref: '#/components/schemas/CommandAutocompleteRequestedPayload'
+    NotificationCreatedEvent:
+      description: Ephemeral event `notification.created` (no `seq`, at most once), only to connections of the recipient instead of a push (13, 6.3).
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [notification.created]
+          payload:
+            $ref: '#/components/schemas/NotificationCreatedPayload'
+    NotificationCreatedPayload:
+      type: object
+      required: [nid, kind, quiet, count]
+      properties:
+        nid:
+          $ref: '#/components/schemas/Uuid'
+        kind:
+          $ref: '#/components/schemas/NotificationKind'
+        thread_id:
+          $ref: '#/components/schemas/Uuid'
+        message_id:
+          $ref: '#/components/schemas/Uuid'
+        quiet:
+          type: boolean
+          description: Inside quiet hours; show without sound.
+        count:
+          type: integer
+          description: Bundled notifications of this thread.
+        space_name:
+          type: string
+        channel_name:
+          type: string
+        thread_title:
+          type: string
+        sender_display_name:
+          type: string
+        excerpt:
+          type: string
+          description: Plain text, at most `notify.preview_max_chars`; only with `notify.preview_mode = full`.
+        attachment_count:
+          type: integer
+        image_url:
+          type: string
+          format: uri-reference
+          description: Fetch ticket for the `small` variant of the first image.
+    NotificationKind:
+      type: string
+      enum: [message, mention, dm, run_done, run_failed, input_needed, security, admin]
+    PushPreview:
+      type: object
+      description: Preview for the notification extension, fields depend on `notify.preview_mode` (13, 6.4).
+      required: [kind, badge]
+      properties:
+        kind:
+          $ref: '#/components/schemas/NotificationKind'
+        thread_id:
+          $ref: '#/components/schemas/Uuid'
+        message_id:
+          $ref: '#/components/schemas/Uuid'
+        badge:
+          type: integer
+        space_name:
+          type: string
+        channel_name:
+          type: string
+        thread_title:
+          type: string
+        sender_display_name:
+          type: string
+        excerpt:
+          type: string
+        attachment_count:
+          type: integer
+        image_url:
+          type: string
+          format: uri-reference
+          description: Fetch ticket for the `small` variant of the first image.
     Event:
       description: Any durable event, discriminated by `type`. Clients skip unknown types and still advance their cursor.
       oneOf:
@@ -23344,6 +25311,7 @@ components:
       - $ref: '#/components/schemas/GrantChangedEvent'
       - $ref: '#/components/schemas/GroupChangedEvent'
       - $ref: '#/components/schemas/AccessChangedEvent'
+      - $ref: '#/components/schemas/AccessExpiringEvent'
       - $ref: '#/components/schemas/SessionRevokedEvent'
       - $ref: '#/components/schemas/ReadStateUpdatedEvent'
       - $ref: '#/components/schemas/DraftUpdatedEvent'
@@ -23394,6 +25362,7 @@ components:
           grant.changed: '#/components/schemas/GrantChangedEvent'
           group.changed: '#/components/schemas/GroupChangedEvent'
           access.changed: '#/components/schemas/AccessChangedEvent'
+          access.expiring: '#/components/schemas/AccessExpiringEvent'
           session.revoked: '#/components/schemas/SessionRevokedEvent'
           read_state.updated: '#/components/schemas/ReadStateUpdatedEvent'
           draft.updated: '#/components/schemas/DraftUpdatedEvent'
@@ -23566,6 +25535,28 @@ components:
             $ref: '#/components/schemas/SearchHit'
         next_cursor:
           $ref: '#/components/schemas/Cursor'
+        candidates_capped:
+          type: boolean
+          description: The candidate limit `search.max_candidates` was reached; ask for a narrower query.
+    ThreadTitleHitList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [thread_id, channel_id, title, last_activity_at]
+            properties:
+              thread_id:
+                $ref: '#/components/schemas/Uuid'
+              channel_id:
+                $ref: '#/components/schemas/Uuid'
+              title:
+                type: string
+                examples: [Invoice export fails]
+              last_activity_at:
+                $ref: '#/components/schemas/Timestamp'
     AgentPage:
       type: object
       description: One page. `next_cursor` is absent on the last page.

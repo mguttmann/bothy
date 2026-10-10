@@ -7,6 +7,8 @@ erDiagram
     smallint id PK "CHECK id = 1"
     uuid instance_id UK
     timestamptz setup_completed_at
+    text min_server_version
+    uuid sync_epoch "Zeitlinie des Ereignis-Logs"
   }
   instance_settings {
     text key PK
@@ -15,7 +17,7 @@ erDiagram
   }
   server_signing_keys {
     text kid PK
-    text purpose "access_token, invocation, webhook_out"
+    text purpose "access_token, invocation, webhook_out, audit_checkpoint"
     text state "next, active, retiring, retired"
   }
   feature_flags {
@@ -68,20 +70,28 @@ erDiagram
   device_keys {
     uuid id PK
     uuid device_id FK
+    text purpose "dpop, step_up"
     text jkt UK
+    timestamptz revoked_at
   }
   auth_sessions {
     uuid id PK
     uuid user_id FK
     uuid device_id FK
     uuid identity_id FK
+    uuid parent_session_id FK "Erweiterungen"
+    text client_component "app, console, notification_ext, share_ext, cli"
+    text auth_method
     timestamptz step_up_at
+    text step_up_method
     timestamptz revoked_at
   }
   refresh_token_families {
     uuid id PK
     uuid session_id FK
+    text dpop_jkt
     integer current_generation
+    timestamptz rotated_at
   }
   refresh_tokens {
     uuid id PK
@@ -94,6 +104,39 @@ erDiagram
     uuid principal_id FK
     bytea token_hash UK
     text[] scopes
+  }
+  local_credentials {
+    uuid identity_id PK, FK
+    text password_hash
+    bytea totp_secret_ciphertext
+    timestamptz locked_until
+  }
+  enrollment_codes {
+    uuid id PK
+    uuid user_id FK
+    text purpose "first_login, identity_link, recovery"
+    bytea code_hash UK
+    uuid used_by_device_id FK
+    timestamptz expires_at
+  }
+  auth_login_flows {
+    uuid id PK
+    uuid provider_id FK
+    text mode "login, link"
+    uuid user_id FK
+    bytea oidc_state_hash UK
+    bytea login_code_hash UK
+    text status "started, code_issued, completed, failed"
+    timestamptz expires_at
+  }
+  device_pairings {
+    uuid id PK
+    bytea pairing_code_hash UK
+    text status "requested, approved, completed, rejected, expired"
+    uuid user_id FK
+    uuid approved_by_device_id FK
+    uuid device_id FK
+    timestamptz expires_at
   }
   files {
     uuid id PK
@@ -110,6 +153,14 @@ erDiagram
   users ||--o{ auth_sessions : "hat"
   devices ||--o{ auth_sessions : "trägt"
   user_identities |o--o{ auth_sessions : "meldet an"
+  auth_sessions |o--o{ auth_sessions : "Kind-Sitzung"
+  user_identities ||--o| local_credentials : "Passwort, TOTP"
+  users ||--o{ enrollment_codes : "Code für"
+  devices |o--o{ enrollment_codes : "eingelöst von"
+  identity_providers ||--o{ auth_login_flows : "Anbieter"
+  users |o--o{ auth_login_flows : "verknüpft"
+  users |o--o{ device_pairings : "koppelt"
+  devices |o--o{ device_pairings : "bestätigt, entsteht"
   auth_sessions ||--o{ refresh_token_families : "hat"
   refresh_token_families ||--o{ refresh_tokens : "rotiert"
   principals ||--o{ api_tokens : "besitzt"

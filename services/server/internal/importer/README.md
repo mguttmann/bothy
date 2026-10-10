@@ -5,20 +5,20 @@ Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
 
 ## Zweck
 
-Import-Quellen, Trockenlauf, Import mit Herkunftsschlüssel.
+Import-Quellen, Stapel mit Herkunftsschlüssel (`import.apply`), Eigentumsliste und Schreibschutz gespiegelter Kanäle; der Trockenlauf liegt im Werkzeug.
 
 ## Port (Wurzelpaket `internal/importer`)
 
-- Eingehend: `Imports`.
+- Eingehend: `Imports` (Quellen, Stapel über `import.apply`).
 - Gibt In-Tx-Ereignisse aus: keine.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: keine.
 
 ## Abhängigkeiten
 
-Darf die Ports dieser Module nutzen: `identity`, `chat`, `messaging`, `files`.
+Darf die Ports dieser Module nutzen: `identity`, `chat`, `agents`, `messaging`, `files`.
 
-Grund: legt Menschen, Struktur, Nachrichten und Dateien an.
+Grund: legt Menschen, Struktur, Nachrichten, frühere Sitzungs-Referenzen und Dateien an; setzt den Schreibschutz der gespiegelten Kanäle.
 
 Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
 Geprüft durch go-arch-lint (ADR 0008).
@@ -31,19 +31,13 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Aktionen (05-aktionen.md)
 
-`import.read`, `import.manage`.
+`import.read`, `import.manage`, `import.apply`.
 
 ## Ereignisse und WebSocket-Ops
 
 - Dauerhaft: `import.progress`.
 - Kurzlebig: keine.
 - WebSocket-Ops (Client an Server): keine.
-
-## Hintergrundjobs
-
-| Job | Auslöser | Warteschlange |
-|---|---|---|
-| `importer.run` | `import.manage` | `import` |
 
 ## Hinweise für den Bau
 

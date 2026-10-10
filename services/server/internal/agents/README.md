@@ -5,14 +5,14 @@ Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
 
 ## Zweck
 
-Agenten, Backend-Richtlinie (Soll), gemeldeter Ist-Zustand, Verbraucher-Cursor, Befehlsregister, Agenten-Sitzungen.
+Agenten, Backend-Richtlinie und Werkzeugklasse (Soll), gemeldeter Ist-Zustand, Verbraucher-Cursor mit Fencing, Befehlsregister, Agenten-Sitzungen, Dev-Umgebungen (Etappe).
 
 ## Port (Wurzelpaket `internal/agents`)
 
-- Eingehend: `Agents` (Verwaltung, Richtlinie), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme), `Commands` (Register), `Sessions`.
+- Eingehend: `Agents` (Verwaltung, Richtlinie, Werkzeugklasse), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe).
 - Gibt In-Tx-Ereignisse aus: `AgentDisabled`.
 - Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: `authz.AgentPolicySource`, kernel `personaldata.Participant`.
+- Implementiert Quellen-Ports und Querschnitts-Ports: `authz.AgentPolicySource` (Richtlinie, Werkzeugklasse, Bereitschaft der Dev-Umgebung), kernel `personaldata.Participant`.
 
 ## Abhängigkeiten
 
@@ -25,13 +25,13 @@ Geprüft durch go-arch-lint (ADR 0008).
 
 ## Tabellen
 
-`agents`, `agent_consumer_cursors`, `commands`, `agent_sessions`.
+`agents`, `agent_consumer_cursors`, `commands`, `agent_sessions`, `dev_environments`.
 
 Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
 
 ## Aktionen (05-aktionen.md)
 
-`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.heartbeat`, `agent.events.consume`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`.
+`agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
 
 ## Ereignisse und WebSocket-Ops
 

@@ -8,9 +8,9 @@ groups:
   rules:
   - record: slo:sli_error:ratio_rate5m
     expr: |
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway",http_response_status_code=~"5.."}[5m])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway",http_response_status_code=~"5.."}[5m])))
       /
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway"}[5m])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway"}[5m])))
     labels:
       component: api
       sloth_id: bothy-api-requests-availability
@@ -19,9 +19,9 @@ groups:
       sloth_window: 5m
   - record: slo:sli_error:ratio_rate30m
     expr: |
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway",http_response_status_code=~"5.."}[30m])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway",http_response_status_code=~"5.."}[30m])))
       /
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway"}[30m])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway"}[30m])))
     labels:
       component: api
       sloth_id: bothy-api-requests-availability
@@ -30,9 +30,9 @@ groups:
       sloth_window: 30m
   - record: slo:sli_error:ratio_rate1h
     expr: |
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway",http_response_status_code=~"5.."}[1h])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway",http_response_status_code=~"5.."}[1h])))
       /
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway"}[1h])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway"}[1h])))
     labels:
       component: api
       sloth_id: bothy-api-requests-availability
@@ -41,9 +41,9 @@ groups:
       sloth_window: 1h
   - record: slo:sli_error:ratio_rate2h
     expr: |
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway",http_response_status_code=~"5.."}[2h])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway",http_response_status_code=~"5.."}[2h])))
       /
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway"}[2h])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway"}[2h])))
     labels:
       component: api
       sloth_id: bothy-api-requests-availability
@@ -52,9 +52,9 @@ groups:
       sloth_window: 2h
   - record: slo:sli_error:ratio_rate6h
     expr: |
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway",http_response_status_code=~"5.."}[6h])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway",http_response_status_code=~"5.."}[6h])))
       /
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway"}[6h])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway"}[6h])))
     labels:
       component: api
       sloth_id: bothy-api-requests-availability
@@ -63,9 +63,9 @@ groups:
       sloth_window: 6h
   - record: slo:sli_error:ratio_rate1d
     expr: |
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway",http_response_status_code=~"5.."}[1d])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway",http_response_status_code=~"5.."}[1d])))
       /
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway"}[1d])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway"}[1d])))
     labels:
       component: api
       sloth_id: bothy-api-requests-availability
@@ -74,9 +74,9 @@ groups:
       sloth_window: 1d
   - record: slo:sli_error:ratio_rate3d
     expr: |
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway",http_response_status_code=~"5.."}[3d])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway",http_response_status_code=~"5.."}[3d])))
       /
-      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway"}[3d])))
+      (sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway"}[3d])))
     labels:
       component: api
       sloth_id: bothy-api-requests-availability

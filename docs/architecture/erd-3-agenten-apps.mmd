@@ -1,4 +1,5 @@
 %% ERD Teil 3: Module agents und apps. Quelle: 03-datenmodell.md, 4.4, 4.5 (agent_sessions) und 4.11.
+%% dev_environments gehört zur Etappe Dev-Umgebung (21-dev-isolation.md).
 %% Reine Protokoll-Spalten (created_by, updated_by, granted_by, revoked_by und ähnliche) zeigen auf
 %% principals(id) und sind nicht als Beziehung gezeichnet.
 %% Tabellen anderer Module nur mit Schlüssel.
@@ -9,6 +10,8 @@ erDiagram
     text billing_mode "personal, organization"
     uuid credential_holder_id FK "Pflicht genau bei personal"
     text reported_billing_mode
+    text tool_class "chat, scoped, host"
+    text reported_tool_class
     text reported_runtime_state
     bigint version
   }
@@ -16,6 +19,15 @@ erDiagram
     uuid agent_id PK, FK
     text consumer_name PK
     bigint acked_seq
+    uuid holder_session_id "Fencing"
+  }
+  dev_environments {
+    uuid id PK
+    uuid user_id FK
+    uuid runner_agent_id FK
+    text billing_mode "organization"
+    text state "provisioning, verifying, ready, suspended, retired"
+    bigint version
   }
   commands {
     uuid id PK
@@ -30,8 +42,10 @@ erDiagram
     uuid id PK
     uuid thread_id FK
     uuid agent_id FK
+    uuid dev_environment_id FK
     text external_session_ref
     boolean is_current
+    text end_reason
     bigint version
   }
   apps {
@@ -48,7 +62,8 @@ erDiagram
   }
   webhook_subscriptions {
     uuid id PK
-    uuid app_installation_id FK
+    uuid app_installation_id FK "genau eines von beiden"
+    uuid agent_id FK "Webhook als Agenten-Transport"
     text signing_key_kid FK
     text state "active, paused, disabled"
     bigint last_delivered_seq
@@ -87,6 +102,10 @@ erDiagram
 
   principals ||--o| agents : "ist Agent"
   users |o--o{ agents : "credential_holder"
+  users ||--o{ dev_environments : "gehört"
+  agents ||--o{ dev_environments : "Runner"
+  dev_environments |o--o{ agent_sessions : "läuft in"
+  agents |o--o{ webhook_subscriptions : "abonniert"
   agents ||--o{ agent_consumer_cursors : "liest"
   principals ||--o{ commands : "registriert"
   spaces |o--o{ commands : "Geltung"
@@ -95,7 +114,7 @@ erDiagram
   agents ||--o{ agent_sessions : "führt"
   principals ||--o| apps : "ist App"
   apps ||--o{ app_installations : "installiert"
-  app_installations ||--o{ webhook_subscriptions : "abonniert"
+  app_installations |o--o{ webhook_subscriptions : "abonniert"
   server_signing_keys ||--o{ webhook_subscriptions : "signiert"
   webhook_subscriptions ||--o{ webhook_deliveries : "Versuche"
   apps ||--o{ incoming_webhooks : "schreibt als"

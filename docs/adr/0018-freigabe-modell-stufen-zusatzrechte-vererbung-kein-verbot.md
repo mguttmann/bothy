@@ -65,7 +65,8 @@ Festlegungen (Details in [../spec/07-rechte.md](../spec/07-rechte.md)):
   Agent im fremden Bereich (07, Abschnitt 11.1).
 - Differenztest Cache gegen langsame Referenz in zufälligen Welten (07, AZ-P8).
 - I1-Test je Änderungsart (AZ-P7).
-- Check in `grants`: Agenten und Apps nie `trigger`, Zusatzrechte nur `upload` (beantragt).
+- Check in `grants`: Agenten und Apps nie `trigger`, Zusatzrechte nur `upload` (03 `grants`,
+  R-DM-20).
 
 ## Pros and Cons of the Options
 

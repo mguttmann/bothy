@@ -53,8 +53,8 @@ Festlegungen:
   (03).
 - Prüfpunkte: Alle `audit.checkpoint_interval` signiert der Worker `{instance_id, seq, hash,
   occurred_at, previous_checkpoint_hash}` mit einem eigenen Server-Schlüssel (Zweck
-  `audit_checkpoint`, beantragt) und legt ihn in der Datenbank (beantragte Tabelle
-  `audit_checkpoints`) und am Ziel `audit.checkpoint_sink` ab. Der Owner wählt ein Ziel außerhalb
+  `audit_checkpoint`, 03 `server_signing_keys`) und legt ihn in der Datenbank (Tabelle
+  `audit_checkpoints`, 03) und am Ziel `audit.checkpoint_sink` ab. Der Owner wählt ein Ziel außerhalb
   der Reichweite der Datenbank-Verwaltung (z. B. Objektspeicher mit Aufbewahrungssperre in einem
   anderen Konto).
 - `audit.verify` rechnet die Kette ab dem letzten Anker nach und vergleicht mit den Prüfpunkten
@@ -122,5 +122,6 @@ Festlegungen:
 - Aktionen mit Audit-Pflicht: [../spec/05-aktionen.md](../spec/05-aktionen.md), Spalte "Audit".
 - Kontrollen und Konfigurationswerte der Prüfpunkte: [../spec/19-sicherheit.md](../spec/19-sicherheit.md),
   Abschnitt 12.
-- Beantragte Ergänzungen: `server_signing_keys.purpose` um `audit_checkpoint`, Tabelle
-  `audit_checkpoints (seq, hash, signature, kid, created_at, exported_at)`.
+- Kern-Vertrag: `server_signing_keys.purpose` mit `audit_checkpoint` und Tabelle
+  `audit_checkpoints` stehen in [../spec/03-datenmodell.md](../spec/03-datenmodell.md),
+  Abschnitt 4.12.

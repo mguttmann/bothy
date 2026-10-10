@@ -24,7 +24,7 @@ Datenschutz: [20-datenschutz.md](20-datenschutz.md). Dev-Abschottung:
 
 | ID | Kontrolle |
 |---|---|
-| SEC-TLS-1 | Klartext-HTTP nimmt der Server nur auf Loopback oder von Gegenstellen in `net.trusted_proxies` an (Reverse-Proxy im selben Host oder Container-Netz). Jede andere Klartext-Verbindung wird beim Verbindungsaufbau abgewiesen. |
+| SEC-TLS-1 | Klartext-HTTP nimmt der Server nur auf Loopback oder von Gegenstellen in `server.trusted_proxies` ([16-betrieb.md](16-betrieb.md)) an (Reverse-Proxy im selben Host oder Container-Netz). Jede andere Klartext-Verbindung wird beim Verbindungsaufbau abgewiesen. |
 | SEC-TLS-2 | Wo der Server selbst TLS beendet: mindestens TLS 1.2, TLS 1.3 bevorzugt, Cipher-Suites aus der Go-Standardbibliothek ohne eigene Liste. Grund: Eine eigene Liste veraltet; die Standardauswahl wird mit Go gepflegt [abgeleitet]. |
 | SEC-TLS-3 | HSTS mit `http.hsts_max_age`, sobald die Instanz über HTTPS erreichbar ist (auch hinter einem TLS-Proxy). |
 | SEC-TLS-4 | Ausgehende TLS-Verbindungen prüfen immer Zertifikat und Hostnamen. `InsecureSkipVerify` ist per Lint verboten. |
@@ -106,7 +106,7 @@ Regeln:
 |---|---|
 | SEC-IN-1 | Jede Anfrage wird gegen das OpenAPI- bzw. AsyncAPI-Schema geprüft, bevor ein Handler läuft ([06-api.md](06-api.md), ADR 0013). Schreibende Schemas haben `additionalProperties: false`. |
 | SEC-IN-2 | JSON-Dekodierung lehnt doppelte Schlüssel, ungültiges UTF-8 und zu tiefe Schachtelung ab. Grund: `client_payload_sha256` (03) und Verarbeitung dürfen keine verschiedenen Lesarten derselben Anfrage sehen. |
-| SEC-IN-3 | Größengrenzen vor dem Lesen: `http.max_body_bytes` für JSON, `http.max_header_bytes`, `sync.ws_max_frame_bytes` (04), `file.max_upload_bytes` (03) als Stream-Grenze. Zeitgrenzen: `http.read_header_timeout`, `http.idle_timeout`. |
+| SEC-IN-3 | Größengrenzen vor dem Lesen: `http.max_json_body_bytes` für JSON, `http.max_header_bytes` (beide 02), `sync.ws_max_frame_bytes` (04), `file.max_upload_bytes` (03) als Stream-Grenze. Zeitgrenzen: `http.read_header_timeout`, `http.idle_timeout` (02). |
 | SEC-IN-4 | Anzeige-Texte (Anzeigenamen, Kanal- und Bereichsnamen, Titel, Dateinamen) werden auf Steuerzeichen und Bidi-Steuerzeichen geprüft und abgelehnt. Nachrichteninhalte bleiben unverändert; Clients isolieren fremde Namen beim Darstellen (Unicode-Isolation). |
 | SEC-IN-5 | Datenbankzugriff nur über sqlc mit Parametern. Ein Lint verbietet zusammengesetzte SQL-Texte außerhalb des generierten Codes. |
 | SEC-IN-6 | Reguläre Ausdrücke nur mit der Go-Bibliothek `regexp` (lineare Laufzeit). |
@@ -130,13 +130,13 @@ Regeln:
 | SEC-UP-1 | Größe vor dem Speichern begrenzt (`file.max_upload_bytes`, 03); Abbruch mit `413`, sobald die Grenze im Stream erreicht ist. |
 | SEC-UP-2 | Der MIME-Typ wird vom Server erkannt, nie vom Client übernommen (03, `files.mime_type`). |
 | SEC-UP-3 | Inline-Darstellung nur für Rasterbilder, die der Server neu kodiert hat (Vorschaubilder). SVG, HTML, PDF und alles andere nur als Anhang (SEC-HDR-4). |
-| SEC-UP-4 | Bildgröße wird vor dem Dekodieren aus dem Dateikopf gelesen; über `upload.image_max_pixels` keine Vorschau. Schutz gegen Dekompressionsbomben. |
+| SEC-UP-4 | Bildgröße wird vor dem Dekodieren aus dem Dateikopf gelesen; über `file.image.max_pixels` ([12-dateien.md](12-dateien.md)) keine Vorschau. Schutz gegen Dekompressionsbomben. |
 | SEC-UP-5 | Parser für nicht vertrauenswürdige Formate laufen in einem eigenen Prozess mit Speicher- und Zeitgrenze, nie im API-Prozess. M1 hat nur Bildvorschau in reinem Go (Baseline R-Objektspeicher). |
 | SEC-UP-6 | Virenscan als getrennter Dienst (ADR 0033). Auslieferung erst bei `scan_status IN ('clean','skipped')` (03). Ist der Scanner nicht bereit, bleiben Dateien `pending` (fail closed). `infected`: nie auslieferbar, Hinweis an den Owner. |
 | SEC-UP-7 | Archive werden im Server nie entpackt. |
 | SEC-UP-8 | Objektschlüssel sind zufällig und enthalten keine Namen (03). Originalnamen nur bereinigt in `Content-Disposition`. |
 | SEC-UP-9 | Eine Datei hängt nur an Nachrichten ihres Kanals `scope_channel_id` (03). Damit gelangt eine Datei nicht über Bereichsgrenzen in den Kontext eines anderen Agenten. |
-| SEC-UP-10 | Ortsdaten und andere persönliche Metadaten werden aus gespeicherten Bildern entfernt, verlustfrei wo das Format es erlaubt (`upload.strip_image_metadata`). |
+| SEC-UP-10 | Ortsdaten und andere persönliche Metadaten werden aus gespeicherten Bildern immer entfernt: bei JPEG und PNG verlustfrei beim Upload (Segment- und Chunk-Filter), Vorschaubilder neu kodiert (Ruling L16, ADR 0047, [12-dateien.md](12-dateien.md) Abschnitt 7). |
 | SEC-UP-11 | Clients bekommen keine dauerhaften Objektspeicher-URLs; jeder Abruf läuft über `file.read` (07, Abschnitt 8.1). |
 
 Speicherorte, Vorschau-Varianten, Kontingente und der Scan-Dienst im Detail: [12-dateien.md](12-dateien.md).
@@ -160,7 +160,7 @@ Baseline Abschnitt 4: kein serverseitiges Laden fremder URLs.
 |---|---|
 | SEC-LOG-1 | Strukturierte Logs (`log/slog`). Geheimnisse haben im Code einen eigenen Typ, der beim Ausgeben immer `[redacted]` schreibt. |
 | SEC-LOG-2 | Kopfzeilen werden über eine Erlaubnisliste geloggt, nicht über eine Sperrliste. `Authorization`, `DPoP`, `Cookie`, `Set-Cookie`, Aufruf-Marken, `X-Forwarded-*` und Identitäts-Kopfzeilen eines Proxys erscheinen nie. Grund: Bei einer Sperrliste rutscht jede neue Kopfzeile durch. |
-| SEC-LOG-3 | Pfade werden als Routen-Muster geloggt (`/v1/webhooks/in/{id}`), nie roh; Query-Strings nie. |
+| SEC-LOG-3 | Pfade werden als Routen-Muster geloggt (`/api/v1/hooks/{webhook_id}/{token}`), nie roh; Query-Strings nie. |
 | SEC-LOG-4 | Nie im Log: Nachrichteninhalte, Dateinamen, Kanal-Prompts, Transkripte, Suchbegriffe, Anzeigenamen, E-Mail-Adressen, Push-Tokens. Prinzipale erscheinen nur als ID. |
 | SEC-LOG-5 | IP-Adressen nur im Audit-Log und nur pseudonymisiert ([20-datenschutz.md](20-datenschutz.md), Abschnitt 4.5), nicht in allgemeinen Logs. |
 | SEC-LOG-6 | Telemetrie-Attribute über eine Erlaubnisliste je Signal ([17-observability.md](17-observability.md)); keine Inhalte (Baseline B11). |
@@ -289,23 +289,22 @@ Audit-Integrität (ADR 0021):
 | R-SE-03 | Erlaubnislisten für Log-Kopfzeilen und Telemetrie-Attribute statt Sperrlisten. | Neue Felder sind sonst standardmäßig sichtbar; das ist die falsche Fehlerklasse. |
 | R-SE-04 | Ein Egress-Client mit IP-Prüfung beim Verbindungsaufbau. | SSRF-Schutz an einer Stelle, wirksam auch gegen DNS-Rebinding. |
 | R-SE-05 | Clients laden keine fremden Ressourcen aus Inhalten. | Schließt Daten-Abfluss über Bild-URLs und Tracking der Lesenden. |
-| R-SE-06 | Bild-Metadaten werden standardmäßig entfernt. | Ortsdaten in Fotos sind ein häufiges, unbemerktes Leck. |
+| R-SE-06 | Bild-Metadaten werden immer entfernt, ohne Schalter. | Ortsdaten in Fotos sind ein häufiges, unbemerktes Leck; ein Schalter zum Abschalten wäre eine Falle ohne Nutzen für einen Team-Chat. |
 | R-SE-07 | Externer Penetrationstest vor der zweiten produktiven Person und vor der Veröffentlichung. | Studie C: Red Team vor erster echter zweiter Person; öffentliches Produkt braucht unabhängige Prüfung. |
 
 ## 16. Konfigurationswerte dieses Kapitels
 
 | Name | Standard | Bedeutung |
 |---|---|---|
-| `net.trusted_proxies` | `["127.0.0.1/32", "::1/128"]` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen |
 | `http.hsts_max_age` | `31536000s` | `max-age` für HSTS |
-| `http.max_body_bytes` | `1048576` | größter JSON-Körper (Uploads haben eigene Grenze) |
-| `http.max_header_bytes` | `65536` | größte Summe der Kopfzeilen |
-| `http.read_header_timeout` | `10s` | Zeit bis zum Ende der Kopfzeilen |
-| `http.idle_timeout` | `120s` | Leerlauf einer Keep-Alive-Verbindung |
 | `egress.allowed_hosts` | leer | zusätzliche erlaubte Ziele mit optional `allow_private` |
 | `egress.timeout` | `15s` | Zeitgrenze einer ausgehenden Anfrage |
 | `egress.max_response_bytes` | `1048576` | größte Antwort einer ausgehenden Anfrage |
-| `upload.image_max_pixels` | `50000000` | über dieser Pixelzahl keine Vorschau |
-| `upload.strip_image_metadata` | `true` | Metadaten aus gespeicherten Bildern entfernen |
 | `audit.checkpoint_interval` | `1h` | Abstand der signierten Prüfpunkte des Audit-Logs |
 | `audit.checkpoint_sink` | leer | Ablageziel der Prüfpunkte außerhalb der Datenbank (z. B. Objektspeicher-Präfix mit Aufbewahrungssperre); leer erzeugt eine Warnung |
+
+Werte anderer Kapitel, auf die dieses Kapitel verweist: `server.trusted_proxies`
+([16-betrieb.md](16-betrieb.md)), `http.max_json_body_bytes`, `http.max_header_bytes`,
+`http.read_header_timeout`, `http.idle_timeout` ([02-architektur.md](02-architektur.md)),
+`file.image.max_pixels` ([12-dateien.md](12-dateien.md)). Jeder Name steht in genau einer
+Kapiteltabelle (Ruling L4).

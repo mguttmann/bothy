@@ -2,7 +2,7 @@
 status: accepted
 date: 2026-10-10
 decision-makers: Planungsleitung, Team Agenten-Plattform
-consulted: Owner (offene Frage zur Owner-Ausnahme, siehe More Information)
+consulted: Owner (Owner-Ausnahme verworfen, Ruling L22, siehe More Information)
 ---
 
 # Backend-Richtlinie personal/organization mit Invariante
@@ -92,7 +92,7 @@ bei einem persönlichen Agenten nie nutzen könnte.
 ## More Information
 
 - Baseline Abschnitt 5 (I1 bis I5); docs/spec/10-backend-richtlinie.md.
-- Offene Frage an den Owner: Soll ein zweiter Owner möglich sein, ohne persönliche Agenten
-  umzustellen? Möglich wäre eine Owner-Ausnahme: Owner außer dem Inhaber zählen nicht zur I1-Menge
-  und werden durch I2 abgewiesen. Empfehlung bis zur Entscheidung: strenge Fassung behalten. Eine
-  Änderung wäre eine neue ADR, die diese ersetzt.
+- Owner-Ausnahme: Erwogen wurde, dass Owner außer dem Inhaber nicht zur I1-Menge zählen und durch
+  I2 abgewiesen werden. Die Leitung hat das verworfen (Ruling L22): `personal` geht nur, solange der
+  `credential_holder` der einzige Owner ist, weil Owner überall `trigger` haben und "Owner darf
+  alles" keine Ausnahme bekommen soll. Eine Änderung wäre eine neue ADR, die diese ersetzt.

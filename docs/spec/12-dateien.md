@@ -31,7 +31,7 @@ Nicht Ziel: Bearbeiten von Dateien, Ordner, Freigabe-Links nach außen, Link-Vor
 
 Eine Datei hat zwei Zustandsfelder aus [03-datenmodell.md](03-datenmodell.md): `upload_state`
 (Bytes vollständig und geprüft?) und `scan_status` (Malware-Scan). Dazu kommt der Zustand der
-Upload-Session (Abschnitt 3.1, Kern-Vertrag: Ergänzung beantragt).
+Upload-Session (Abschnitt 3.1; Tabelle `file_upload_sessions` in 03).
 
 | Sicht | `upload_state` | `scan_status` | Session `state` | Auslieferung |
 |---|---|---|---|---|
@@ -104,7 +104,7 @@ Der Server prüft in dieser Reihenfolge:
 Danach legt er in einer Transaktion an: eine Zeile in `files` (`upload_state = 'pending'`,
 `scan_status = 'pending'`, `mime_type = 'application/octet-stream'` bis zur Erkennung,
 `scope_channel_id` = Kanal, `sha256` und `size_bytes` = angemeldete Werte) und eine Zeile
-`file_upload_sessions` (Kern-Vertrag: Ergänzung beantragt, Abschnitt 17). Die Antwort nennt
+`file_upload_sessions` (03). Die Antwort nennt
 `file_id`, `mode`, `part_size_bytes`, `part_count`, `expires_at` und bei `mode = presigned` die
 Ziel-URLs je Teil.
 
@@ -228,8 +228,7 @@ sequenceDiagram
 ### 3.7 Zweck einer Datei
 
 Nicht jede Datei gehört zu einem Kanal. [05-aktionen.md](05-aktionen.md) Abschnitt 2.2 regelt den
-Pfad nur für Anhänge. Dieses Kapitel plant eine Spalte `files.purpose` (Kern-Vertrag: Ergänzung
-beantragt) mit eigener Rechte-Regel je Zweck:
+Pfad je Zweck. Die Spalte `files.purpose` (03) trägt eine eigene Rechte-Regel je Zweck:
 
 | `purpose` | Upload-Aktion | `scope_channel_id` | Lesen |
 |---|---|---|---|
@@ -341,8 +340,7 @@ Ein eigener kleiner Client genügt; das Protokoll ist klein, und die bekannte Go
 
 Bei `infected` entsteht ein Audit-Eintrag mit `action = 'file.upload'`, `decision = 'deny'`,
 `deny_reason = 'malware_detected'` und in `details` die Signatur, die SHA-256 und die Größe,
-nie Inhalte (Kern-Vertrag: Ergänzung beantragt, weil `file.upload` im Katalog nicht auditiert
-ist). Der Hochladende und Owner sehen den Grund; alle anderen sehen nur "blockiert".
+nie Inhalte (05: `file.upload` mit Audit bei Malware-Fund). Der Hochladende und Owner sehen den Grund; alle anderen sehen nur "blockiert".
 
 ### 5.3 Wenn ClamAV fehlt oder nicht bereit ist
 
@@ -419,34 +417,48 @@ Bereinigung bei der Anmeldung, Ergebnis in `original_name`:
 
 ### 7.1 Regel
 
-Bilder, die der Client inline zeigt, sind frei von Metadaten. Der Server erreicht das durch
-**Neukodieren** in reinem Go (Baseline R-Objektspeicher): Dekodieren verwirft EXIF, XMP, IPTC
-und Kommentare, weil `image/jpeg` nur Pixel liefert und beim Kodieren nur die Qualität kennt
-[Q16, belegt; Verwerfen abgeleitet]. libvips ist optional (`file.image.libvips_enabled`, eigener
-Build mit cgo; libvips LGPL-2.1, govips MIT [Q17, belegt]).
+Bilder sind frei von Metadaten, sobald sie gespeichert sind (Ruling L16, ADR 0047 "Bild-Metadaten
+verlustfrei entfernen"). Zwei Wege:
 
-| Erkannter Typ | Ohne libvips | Mit libvips |
+1. **Original, verlustfrei.** Bei JPEG und PNG entfernt der Server die Metadaten beim Abschluss
+   des Uploads aus dem Original, ohne die Bilddaten neu zu kodieren. Er arbeitet mit einer
+   Erlaubnisliste: Nur Segmente bzw. Chunks, die zum Dekodieren oder zur richtigen Farbe und
+   Lage nötig sind, bleiben; alles andere fällt weg (Grund für die Liste statt einer Sperrliste:
+   R-SE-03 in [19-sicherheit.md](19-sicherheit.md)).
+2. **Vorschaubilder, neu kodiert.** Alle Varianten aus 7.3 entstehen durch Dekodieren und
+   Neukodieren in reinem Go (Baseline R-Objektspeicher) und tragen nie Metadaten.
+
+| Typ | Was bleibt im Original | Was wegfällt |
 |---|---|---|
-| `image/jpeg` | Orientierung aus EXIF anwenden, neu kodieren mit `file.image.jpeg_quality`, ICC-Profil übernehmen | wie links, über libvips |
-| `image/png` | neu kodieren (verlustfrei), ICC-Profil übernehmen | wie links |
-| `image/gif` | alle Bilder dekodieren und neu kodieren; Kommentare und Anwendungsblöcke außer der Schleifen-Angabe fallen weg | wie links |
-| `image/webp` (unbewegt) | dekodieren (`x/image/webp` kann nur lesen [Q18, belegt]) und als PNG (mit Alpha) oder JPEG (ohne Alpha) speichern | WebP neu kodieren |
-| `image/webp` (bewegt), `image/heic`, `image/heif`, `image/avif`, `image/tiff`, andere | kein Inline-Bild: Ablage unverändert als Datei, Anzeige als Download-Karte | in JPEG wandeln, dann wie JPEG |
-| `image/svg+xml` | nie inline, nie Vorschaubild, immer Download | gleich |
+| `image/jpeg` | Markierungen für Kopf, Tabellen, Rahmen und Bilddaten (`SOI`, `DQT`, `DHT`, `DRI`, `SOFn`, `SOS` mit Daten, `EOI`), `APP0` (JFIF), `APP2` (ICC-Profil), `APP14` (Adobe-Farbumwandlung) und ein neu geschriebenes `APP1` mit nur dem EXIF-Tag "Orientation" | alle übrigen `APPn` (EXIF mit Ort und Gerät, XMP, IPTC), `COM` |
+| `image/png` | kritische Chunks (`IHDR`, `PLTE`, `IDAT`, `IEND`) sowie `tRNS`, `cHRM`, `gAMA`, `iCCP`, `sBIT`, `sRGB`, `cICP`, `mDCV`, `cLLI`, `bKGD`, `pHYs`, `acTL`, `fcTL`, `fdAT` | `tEXt`, `zTXt`, `iTXt`, `eXIf`, `tIME`, `hIST`, `sPLT` und unbekannte Chunks |
+| `image/gif` | wird neu kodiert (verlustfrei, Palette); Kommentare und Anwendungsblöcke außer der Schleifen-Angabe fallen weg | |
+| `image/webp` (unbewegt) | wird dekodiert (`x/image/webp` kann nur lesen [Q18, belegt]) und als PNG (mit Alpha) oder JPEG (ohne Alpha, `file.image.jpeg_quality`) gespeichert; mit libvips als WebP neu kodiert | |
+| `image/webp` (bewegt), `image/heic`, `image/heif`, `image/avif`, `image/tiff`, andere | kein Inline-Bild: Ablage unverändert als Datei, Anzeige als Download-Karte; mit libvips (`file.image.libvips_enabled`, eigener Build mit cgo; libvips LGPL-2.1, govips MIT [Q17, belegt]) in JPEG gewandelt, dann wie JPEG | |
+| `image/svg+xml` | nie inline, nie Vorschaubild, immer Download | |
 
-Das neu kodierte Bild wird `orig-2` (4.4); `sha256`, `size_bytes`, `mime_type`, `width` und
+Belege: `APPn`-Segmente (`X'FFE0'` bis `X'FFEF'`) und `COM` (`X'FFFE'`) sind für die Anwendung
+reserviert und werden beim Dekodieren nur ausgewertet, soweit sie es nicht stören (ITU-T T.81,
+Anhang B, https://www.w3.org/Graphics/JPEG/itu-t81.pdf, abgerufen 2026-10-10 [belegt]); ihr
+Entfernen ändert die Bilddaten darum nicht [abgeleitet]. PNG führt `tEXt`, `zTXt` und `iTXt` als
+Text-Chunks und `eXIf` als Exif-Profil mit Daten wie Belichtung und Orientierung
+(https://www.w3.org/TR/png-3/, abgerufen 2026-10-10 [belegt]).
+
+Das bereinigte Original wird `orig-2` (4.4); `sha256`, `size_bytes`, `mime_type`, `width` und
 `height` beschreiben danach das gespeicherte Objekt ([03-datenmodell.md](03-datenmodell.md):
-"über die gespeicherten Bytes"). Die angemeldete Prüfsumme bleibt in der Upload-Session.
+"über die gespeicherten Bytes"). Die angemeldete Prüfsumme bleibt in der Upload-Session
+(`declared_sha256`). Die App zeigt im Verlauf die Variante `medium` und im Vollbild `large`; das
+Original gibt es als Download in voller Qualität.
 
 Grenze der Zusage: Metadaten **in** anderen Dateien (PDF-Autor, Office-Eigenschaften, Fotos in
 einem ZIP) entfernt der Server nicht. Die App wandelt Fotos aus der Mediathek vor dem Upload in
 JPEG ([15-client-architektur.md](15-client-architektur.md)); HEIC erreicht den Server dann nur
 als bewusst gesendete Datei.
 
-ICC-Profil und Orientierung sind Pflicht, weil Fotos aktueller Telefone oft ein großes
-Farbprofil tragen und gedreht gespeichert sind; ohne beides sähen sie blass oder gekippt aus.
-Die Orientierung muss der Server selbst aus EXIF lesen, weil das Dekodieren sie verwirft [Q16,
-abgeleitet].
+Orientierung und ICC-Profil bleiben, weil Fotos aktueller Telefone oft ein großes Farbprofil
+tragen und gedreht gespeichert sind; ohne beides sähen sie blass oder gekippt aus. Beim
+Neukodieren der Vorschaubilder wendet der Server die Orientierung selbst an, weil das Dekodieren
+sie verwirft [Q16, abgeleitet].
 
 ### 7.2 Schutz vor Dekompressions-Bomben
 
@@ -492,7 +504,7 @@ liest der Server aus den Container-Boxen (`mvhd`, `tkhd`) mit einem kleinen eige
 | Wert | Wer transkribiert | Ablauf |
 |---|---|---|
 | `off` | niemand | nur Audio |
-| `agent` (Standard) | der Bediener-Agent | Der Adapter bekommt die Sprachnachricht beim Aufruf als Anhang, transkribiert selbst und meldet das Ergebnis mit `PUT /api/v1/files/{id}/transcript` (Aktion `file.transcript.submit`, Kern-Vertrag: Ergänzung beantragt). `transcript_source = 'agent'`. |
+| `agent` (Standard) | der Bediener-Agent | Der Adapter bekommt die Sprachnachricht beim Aufruf als Anhang, transkribiert selbst und meldet das Ergebnis mit `PUT /api/v1/files/{id}/transcript` (Aktion `file.transcript.submit`, 05). `transcript_source = 'agent'`. |
 | `service` | ein Transkriptions-Dienst | Nach `clean` ruft der Worker den Port `Transcriber` auf. Adapter `openai_compatible`: HTTP-Endpunkt `voice.transcription_url` (z. B. ein selbst gehosteter Whisper-Dienst), Schlüssel aus dem Secret-Provider, Zeitlimit `voice.transcription_timeout`, Sprach-Hinweis aus `users.locale`. `transcript_source = 'service'`. |
 
 Standard `agent`, weil damit kein weiterer Auftragsverarbeiter Audio bekommt. `service` sendet
@@ -514,8 +526,8 @@ Transkodierung nötig. Bedarf entsteht bei Importen (z. B. OGG/Opus-Sprachnachri
 [22-import-migration.md](22-import-migration.md)) und bei Agenten mit anderen Formaten. Dafür
 gibt es den Port `MediaTranscoder`. Ein Adapter (z. B. `ffmpeg` als eigener Prozess) ist
 "später"; bis dahin sind solche Dateien normale Audio-Anhänge mit Download. Ablage des
-Ergebnisses: eigene Variante `playback` in `file_thumbnails` mit nullbaren Maßen (Kern-Vertrag:
-Ergänzung beantragt, Etappe "später").
+Ergebnisses: eine eigene Variante `playback` in `file_thumbnails`. Sie kommt mit dieser Etappe als
+additive Migration in den Kern-Vertrag; bis dahin hat `file_thumbnails.variant` den Wert nicht.
 
 ## 9. Abruf
 
@@ -579,8 +591,8 @@ Regeln beim Senden einer Nachricht mit `file_ids` (`message.create` mit `+upload
    `scope_channel_id` = Kanal der Nachricht, eine Session im Zustand `completed`, ist nicht
    `failed` und hängt noch an keiner Nachricht. Sonst `409 file_not_attachable`.
 2. Höchstens `message.max_attachments` Dateien.
-3. Eine Datei hängt an höchstens einer Nachricht (Kern-Vertrag: Ergänzung beantragt, eindeutiger
-   Index auf `message_attachments(file_id)`). Grund: Löschen einer Nachricht löscht ihre
+3. Eine Datei hängt an höchstens einer Nachricht (03, eindeutiger Index auf
+   `message_attachments(file_id)`, R-DM-22). Grund: Löschen einer Nachricht löscht ihre
    Dateien eindeutig, ohne Referenzzählung. Weiterleiten erzeugt eine neue Datei.
 4. Erfolgreiches Senden mit `clear_draft: true` entfernt die Datei aus `drafts.file_ids`.
 
@@ -590,9 +602,10 @@ bei `kind = 'voice'` im Modus `service` zusätzlich das Transkript `done` oder `
 Bis dahin bleibt `trigger_state = 'received'`. Spätestens nach `file.invocation_hold_max` (bzw.
 `voice.transcript_hold_max`) wird der Aufruf trotzdem geschrieben; die Anhänge erscheinen dann
 mit ihrem Zustand, nicht mit Inhalt. Umsetzung: Der Job, der den letzten Anhang endgültig macht,
-ruft im Modul `runs` den Port `ReleaseInvocation(run_id)` auf; ein Zeitgeber-Job deckt das
-Zeitlimit ab. Das weicht von [04-sync-protokoll.md](04-sync-protokoll.md) 15.3 Schritt 1 ab
-(Ereignis in derselben Transaktion wie die Nachricht) und ist dort als Ergänzung beantragt.
+veröffentlicht in seiner Transaktion das In-Tx-Ereignis `files.FileFinalized`; das Modul `runs`
+abonniert es und schreibt den zurückgehaltenen Aufruf ([02-architektur.md](02-architektur.md),
+Abschnitt 4.3). Der terminierte Job `runs.invocation_hold_timeout` deckt das Zeitlimit ab. So
+steht es in [04-sync-protokoll.md](04-sync-protokoll.md), 15.3 Schritt 1.
 
 Gründe: Ein Agent bekommt nie ungeprüfte Bytes. Halten in der Gateway-Zustellung würde die
 Ereignisse eines Verbrauchers hinter dem wartenden Aufruf blockieren, weil sie in
@@ -641,22 +654,22 @@ Kanal als Rechte-Anker. Preis: doppelter Speicher bei mehrfach geteilten Dateien
 
 ## 13. Endpunkte und Aktionen
 
-Vorschlag für [06-api.md](06-api.md) und `docs/api/openapi.yaml` (verbindlich ist die Spec von
-Team B). Präfix nach Vorgabe `/api/v1`.
+Verbindlich sind `docs/api/openapi.yaml` und [06-api.md](06-api.md); diese Tabelle gibt den Stand
+der Spec wieder.
 
 | Methode und Pfad | Aktion | RL-Klasse |
 |---|---|---|
 | `POST /api/v1/channels/{channel_id}/uploads` | `file.upload` | `rl.upload` |
-| `GET /api/v1/uploads/{file_id}` | `file.upload` (eigene Session) | `rl.read` |
+| `GET /api/v1/uploads/{file_id}` | `file.upload` (eigene Session, bestätigte Teile) | `rl.upload` |
 | `PUT /api/v1/uploads/{file_id}/parts/{n}` | `file.upload` (eigene Session) | `rl.upload` |
 | `POST /api/v1/uploads/{file_id}/complete` | `file.upload` (eigene Session) | `rl.upload` |
-| `DELETE /api/v1/uploads/{file_id}` | `file.upload` (eigene Session) | `rl.write` |
+| `DELETE /api/v1/uploads/{file_id}` | `file.delete` (eigene, nicht angehängte Datei) | `rl.write` |
 | `GET /api/v1/files/{id}` | `file.read` (Metadaten) | `rl.read` |
 | `GET /api/v1/files/{id}/content` | `file.read` | `rl.read` |
 | `GET /api/v1/files/{id}/thumbnails/{variant}` | `file.read` | `rl.read` |
 | `POST /api/v1/files/{id}/tickets` | `file.read` | `rl.read` |
 | `POST /api/v1/files/{id}/transcribe` | `file.transcribe` | `rl.upload` |
-| `PUT /api/v1/files/{id}/transcript` | `file.transcript.submit` (beantragt) | `rl.agent_runtime` |
+| `PUT /api/v1/files/{id}/transcript` | `file.transcript.submit` | `rl.agent_runtime` |
 | `DELETE /api/v1/files/{id}` | `file.delete` | `rl.write` |
 
 Uploads für Avatare und Logo nutzen dieselben Session-Endpunkte unter dem jeweiligen Pfad der
@@ -703,33 +716,26 @@ Signaturnamen nur im Audit-Log.
 | R-FI-04 | Ein Lesedurchlauf für Prüfsumme, Typ und Scan. | Große Dateien werden nur einmal gelesen; gleicher Weg für alle Modi. |
 | R-FI-05 | Scan fail closed (`required`) als Standard; `off` nur ausdrücklich, sichtbar markiert. | Kein ungeprüftes Byte an Empfänger oder Agenten. |
 | R-FI-06 | `AlertExceedsMax yes` ist Pflicht; Limit-Treffer werden `error`. | Sonst gelten nicht geprüfte Inhalte still als sauber. |
-| R-FI-07 | Inline-Bilder werden neu kodiert, mit Orientierung und ICC-Profil; andere Formate nur als Download. | Baseline R-Objektspeicher; Standortdaten verlassen nie den Absender, Farben und Lage bleiben richtig. |
+| R-FI-07 | Metadaten werden bei JPEG und PNG verlustfrei aus dem Original entfernt (Erlaubnisliste der Segmente und Chunks), Vorschaubilder neu kodiert; Orientierung und ICC-Profil bleiben; nicht unterstützte Formate nur als Download. | Ruling L16, ADR 0047: Standortdaten verlassen nie den Absender, das Original behält seine Qualität, Farben und Lage bleiben richtig. |
 | R-FI-08 | Eine Datei hängt an höchstens einer Nachricht. | Eindeutiges Löschen, keine Referenzzählung. |
 | R-FI-09 | Agenten-Aufruf mit Anhängen erst nach endgültigem Zustand, mit Zeitlimit. | Agenten sehen nie ungeprüfte Bytes; kein Blockieren des Ereignisstroms. |
 | R-FI-10 | Transkript standardmäßig durch den Agenten; Dienst nur auf Owner-Konfiguration. | Kein zusätzlicher Auftragsverarbeiter ohne Entscheidung des Owners. |
 | R-FI-11 | Keine Deduplizierung (R-DM-13 bestätigt). | Kein Existenz-Seitenkanal, sicheres Löschen. |
 
-## 17. Kern-Vertrag: beantragte Ergänzungen
+## 17. Abgleich mit dem Kern-Vertrag
 
-Dieses Kapitel plant die folgenden Punkte so, wie sie richtig wären. Sie sind im Rückgabebericht
-beantragt und werden erst mit Zustimmung in den Kern-Vertrag übernommen.
+Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026-10-10):
 
-1. Tabelle `file_upload_sessions` (Modul `files`, Klasse `transient`): `file_id` PK und FK auf
-   `files` ON DELETE CASCADE; `mode` (`direct`, `presigned`); `state` (`open`, `completed`,
-   `aborted`, `expired`); `declared_size_bytes`; `declared_sha256`; `part_size_bytes`;
-   `part_count`; `storage_upload_id` (S3, nullbar); `failure_reason` (nullbar); `created_at`;
-   `completed_at`; `expires_at`. Index `(expires_at) WHERE state = 'open'`.
-2. Tabelle `file_upload_parts` (Klasse `transient`): PK `(file_id, part_number)`, FK auf die
-   Session ON DELETE CASCADE; `size_bytes`; `sha256`; `etag` (nullbar); `received_at`.
-3. Spalte `files.purpose` mit `CHECK (purpose IN ('attachment','avatar','branding','gdpr_export'))`
-   und die Lese-Regeln aus 3.7 in [05-aktionen.md](05-aktionen.md) 2.2.
-4. Eindeutiger Index `message_attachments(file_id)`.
-5. Aktion `file.transcript.submit`: Ressource `file`, Recht "wirksamer Bediener-Agent des
-   Threads der Nachricht und `read`", RL `rl.agent_runtime`, kein Step-up, Audit `nein`.
-6. Audit bei `infected` (5.2), obwohl `file.upload` sonst nicht auditiert wird.
-7. [04-sync-protokoll.md](04-sync-protokoll.md) 15.3: `agent.invocation` darf später als die
-   Nachricht geschrieben werden, wenn Anhänge noch nicht endgültig sind (Abschnitt 10).
-8. Später: Variante `playback` in `file_thumbnails` mit nullbaren `width` und `height`.
+| Nr | Ergänzung | Entscheidung, Ort |
+|---|---|---|
+| 1 | Tabelle `file_upload_sessions` | übernommen, 03 Abschnitt 4.7 |
+| 2 | Tabelle `file_upload_parts` | übernommen, 03 Abschnitt 4.7 |
+| 3 | `files.purpose` und Lese-Regeln je Zweck | übernommen, 03 `files`, 05 Abschnitt 2.2 |
+| 4 | eindeutiger Index `message_attachments(file_id)` | übernommen, 03, R-DM-22 |
+| 5 | Aktion `file.transcript.submit` | übernommen, 05 Abschnitt 4.8 |
+| 6 | Audit bei `infected` | übernommen, 05 `file.upload` (Audit bei Malware-Fund), Grund `malware_detected` in [07-rechte.md](07-rechte.md) |
+| 7 | späteres Schreiben von `agent.invocation` | übernommen, 04 Abschnitt 15.3 Schritt 1 |
+| 8 | Variante `playback` in `file_thumbnails` | nicht jetzt: kommt mit der Etappe, die Transkodierung baut (8.3), als additive Migration |
 
 ## 18. Konfigurationswerte dieses Kapitels
 
@@ -771,7 +777,7 @@ Werte aus anderen Kapiteln (nur Verweis): `file.max_upload_bytes`, `message.max_
 | `file.invocation_hold_max` | `120s` | längstes Warten des Agenten-Aufrufs auf Anhänge |
 | `file.image.libvips_enabled` | `false` | libvips-Build nutzen |
 | `file.image.max_pixels` | `50000000` | größte dekodierte Pixelzahl |
-| `file.image.jpeg_quality` | `90` | Qualität beim Neukodieren des Originals |
+| `file.image.jpeg_quality` | `90` | Qualität beim Umwandeln unbewegter WebP-Bilder ohne Alpha in JPEG |
 | `file.image.processing_timeout` | `60s` | Zeitlimit eines Bild-Jobs |
 | `file.image.max_concurrent` | `2` | Bild-Jobs je Worker-Prozess |
 | `file.thumbnail.small_px` | `320` | längste Kante `small` |

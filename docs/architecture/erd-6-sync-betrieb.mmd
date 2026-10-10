@@ -1,5 +1,6 @@
 %% ERD Teil 6: Module sync, notify, importer, audit, privacy, status. Quelle: 03-datenmodell.md,
-%% 4.10, 4.11 (Import) und 4.12. event_log und audit_events haben bewusst keine Fremdschlüssel.
+%% 4.10, 4.11 (Import) und 4.12. event_log, event_consumer_cursors, audit_events und backup_runs
+%% haben bewusst keine Fremdschlüssel.
 %% Reine Protokoll-Spalten (created_by, updated_by, granted_by, revoked_by und ähnliche) zeigen auf
 %% principals(id) und sind nicht als Beziehung gezeichnet.
 %% Tabellen anderer Module nur mit Schlüssel.
@@ -16,7 +17,13 @@ erDiagram
     uuid audience_principal_id
     text receive_action
     jsonb payload
+    uuid correlation_id
+    text trace_context
     bigint permission_version
+  }
+  event_consumer_cursors {
+    text name PK "push, webhooks"
+    bigint last_seq
   }
   idempotency_keys {
     uuid principal_id PK, FK
@@ -61,19 +68,23 @@ erDiagram
     uuid id PK
     uuid user_id FK
     uuid device_id FK
+    uuid auth_session_id FK
     text provider "apns, fcm, unifiedpush, wns"
     text token "UK mit provider"
+    bytea preview_token_hash UK
     timestamptz disabled_at
+    text disabled_reason
   }
   import_sources {
     uuid id PK
     text kind "discord, archive"
-    text state
+    text state "draft, running, paused, completed, failed"
   }
   import_items {
     uuid id PK
     uuid source_id FK
     text origin_key "UK mit source_id"
+    text item_kind
     text state "pending, posted, skipped, failed"
   }
   audit_events {
@@ -83,6 +94,12 @@ erDiagram
     text decision "allow, deny, error"
     bytea prev_hash
     bytea hash UK
+  }
+  audit_checkpoints {
+    bigint seq PK "letzte erfasste audit_events.seq"
+    bytea hash
+    text kid FK
+    timestamptz exported_at
   }
   gdpr_requests {
     uuid id PK
@@ -108,6 +125,12 @@ erDiagram
     uuid incident_id PK, FK
     uuid component_id PK, FK
   }
+  backup_runs {
+    uuid id PK
+    text kind "pg_full, pg_diff, logical, objects, restore_test"
+    text state "running, succeeded, failed"
+    timestamptz finished_at
+  }
   principals {
     uuid id PK
   }
@@ -132,6 +155,12 @@ erDiagram
   agents {
     uuid principal_id PK
   }
+  auth_sessions {
+    uuid id PK
+  }
+  server_signing_keys {
+    text kid PK
+  }
 
   principals ||--o{ idempotency_keys : "nutzt"
   users ||--o{ read_states : "hat"
@@ -149,6 +178,8 @@ erDiagram
   users ||--o{ quiet_hours : "hat"
   users ||--o{ push_registrations : "hat"
   devices ||--o{ push_registrations : "empfängt"
+  auth_sessions ||--o{ push_registrations : "Sitzung"
+  server_signing_keys ||--o{ audit_checkpoints : "signiert"
   import_sources ||--o{ import_items : "enthält"
   users ||--o{ gdpr_requests : "betroffen"
   files |o--o{ gdpr_requests : "Exportpaket"

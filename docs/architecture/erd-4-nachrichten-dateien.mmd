@@ -14,7 +14,8 @@ erDiagram
     text kind "text, voice, run, card, system"
     uuid reply_to_message_id FK
     uuid run_id FK
-    text trigger_state
+    text trigger_state "received, queued, working, done, failed, cancelled, followup_delivered"
+    text trigger_state_reason
     uuid import_item_id FK
     bigint version
     timestamptz deleted_at
@@ -47,10 +48,27 @@ erDiagram
     uuid id PK
     text object_key UK
     bytea sha256
-    uuid scope_channel_id FK
+    text purpose "attachment, avatar, branding, gdpr_export"
+    uuid scope_channel_id FK "genau bei attachment"
     text upload_state "pending, complete, failed"
     text scan_status "pending, clean, infected, error, skipped"
     text transcript_status
+  }
+  file_upload_sessions {
+    uuid file_id PK, FK
+    text mode "direct, presigned"
+    text state "open, completed, aborted, expired"
+    timestamptz expires_at
+  }
+  file_upload_parts {
+    uuid file_id PK, FK
+    integer part_number PK
+    bytea sha256
+  }
+  file_text_extracts {
+    uuid file_id PK, FK
+    text state "pending, done, failed, unsupported"
+    tsvector search_vector
   }
   file_thumbnails {
     uuid file_id PK, FK
@@ -60,7 +78,7 @@ erDiagram
   message_attachments {
     uuid message_id PK, FK
     smallint position PK
-    uuid file_id FK
+    uuid file_id FK, UK
   }
   principals {
     uuid id PK
@@ -100,5 +118,8 @@ erDiagram
   principals ||--o{ files : "lädt hoch"
   channels |o--o{ files : "Upload-Ziel"
   files ||--o{ file_thumbnails : "Vorschau"
+  files ||--o| file_upload_sessions : "Upload"
+  file_upload_sessions ||--o{ file_upload_parts : "Teile"
+  files ||--o| file_text_extracts : "Dateitext"
   messages ||--o{ message_attachments : "Anhänge"
-  files ||--o{ message_attachments : "hängt an"
+  files ||--o| message_attachments : "hängt an"

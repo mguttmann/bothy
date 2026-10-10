@@ -11,7 +11,7 @@ Benachrichtigungsstufen, Ruhezeiten, Push-Registrierungen, Push-Verbraucher und 
 
 - Eingehend: `Preferences`, `QuietHours`, `PushRegistrations`.
 - Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: `identity.DeviceRevoked`, `chat.ChannelArchived`, `chat.SpaceArchived`.
+- Abonniert In-Tx-Ereignisse: `identity.DeviceRevoked`, `identity.SessionEnded` (Registrierungen der Sitzung deaktivieren), `chat.ChannelArchived`, `chat.SpaceArchived`.
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `personaldata.Participant`.
 
 ## Abhängigkeiten
@@ -36,7 +36,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 ## Ereignisse und WebSocket-Ops
 
 - Dauerhaft: `notification_pref.updated`, `quiet_hours.updated`.
-- Kurzlebig: keine.
+- Kurzlebig: `notification.created`.
 - WebSocket-Ops (Client an Server): keine.
 
 ## Hintergrundjobs

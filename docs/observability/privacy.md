@@ -51,7 +51,7 @@ die Mindestlänge meldete `otelcol-contrib validate`) [belegt].
 
 1. Metriken tragen nie Attribute, die einen Menschen bezeichnen.
 2. Dashboards und Alarme zeigen keine Werte je Person.
-3. Die In-App-Statistik zeigt Zähler zu Menschen nur ab `stats.min_group_size`
+3. Die In-App-Statistik zeigt Zähler zu Menschen nur ab `privacy.stats_min_group_size`
    ([admin-statistics.md](admin-statistics.md)).
 4. Grund: Telemetrie dient dem Betrieb. Eine Auswertung von Verhalten oder Leistung einzelner
    Beschäftigter kann in Deutschland mitbestimmungspflichtig sein (§ 87 Abs. 1 Nr. 6

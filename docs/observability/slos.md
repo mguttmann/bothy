@@ -20,7 +20,7 @@ Ein Check vergleicht Tabelle und Dateien (Bau-Ticket "SLO-Docs-Check").
 
 | SLO (`service/name`) | SLI: gut | SLI: alle | Schwelle | Ziel | Alarm |
 |---|---|---|---|---|---|
-| `bothy-api/requests-availability` | REST-Anfragen ohne 5xx | REST-Anfragen ohne `/v1/gateway` | keine | 99.9 % | Page, Ticket |
+| `bothy-api/requests-availability` | REST-Anfragen ohne 5xx | REST-Anfragen ohne `/api/v1/gateway` | keine | 99.9 % | Page, Ticket |
 | `bothy-sync/delivery-latency` | Live-Zustellungen dauerhafter Ereignisse bis Schwelle | alle Live-Zustellungen dauerhafter Ereignisse | 0.5 s | 99.5 % | Page, Ticket |
 | `bothy-sync/reconnect` | Verbindungen mit `ok` bis Schwelle | Verbindungen ohne `client_error` | 2.5 s | 99.0 % | Page, Ticket |
 | `bothy-push/provider-acceptance` | Sendungen `accepted` | Sendungen ohne `rejected_token` | keine | 99.5 % | Page, Ticket |

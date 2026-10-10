@@ -24,7 +24,7 @@ Allowlist des Collectors, Dashboards, Regeln und SLOs nutzen nur Namen von hier.
 1. Metrik-Attribute kommen nur aus geschlossenen Mengen im Code (Aufzählungen) oder aus Mengen,
    die der Betreiber begrenzt (Agenten-Handles, Push-Anbieter, Ereignistypen, Aktionen aus dem
    Katalog). Nie IDs, nie Eingaben von Menschen, nie Fehlertexte, nie ungetemplatete Pfade.
-2. `http.route` ist immer das Muster (`/v1/threads/{id}/messages`). Anfragen ohne passende Route
+2. `http.route` ist immer das Muster (`/api/v1/threads/{id}/messages`). Anfragen ohne passende Route
    tragen `http.route = "unmatched"`.
 3. IDs (Thread, Kanal, Nachricht, Lauf, Datei) stehen nur in Spans und Logs.
 4. Ein Unit-Test zählt die möglichen Werte jedes Metrik-Attributs; ein neues offenes Attribut
@@ -160,7 +160,7 @@ vergleicht `le` in den SLO-Dateien mit dieser Tabelle.
    (16 Byte, als UUID geschrieben). Hat eine Anfrage keinen `traceparent`, erzeugt der Server eine
    Trace-ID; jede Anfrage hat also eine.
 4. Ereignisse an Adapter tragen `trace_context` (W3C `traceparent`) der auslösenden Anfrage, wenn
-   diese aufgezeichnet wurde (Kern-Vertrag: Ergänzung beantragt). Der Adapter macht daraus den
+   diese aufgezeichnet wurde (Umschlagfeld `trace_context`, 04 Abschnitt 2.2). Der Adapter macht daraus den
    Eltern-Kontext seines `invoke_agent`-Spans und gibt ihn als Umgebungsvariable `TRACEPARENT` an
    die Laufzeit weiter. Claude Code liest `TRACEPARENT` in `-p` und im Agent SDK
    (https://code.claude.com/docs/en/monitoring-usage, abgerufen 2026-10-10) [belegt].
@@ -250,7 +250,7 @@ bleibt stdout als Rückfall.
 
 | Ablauf | Signale |
 |---|---|
-| Nachricht senden | Span `POST /v1/threads/{id}/messages` mit DB-Spans; `bothy.event.appended`, `bothy.db.event_seq.lock_wait`; Span `event.fanout` mit Link; `bothy.delivery.duration` je Empfänger |
+| Nachricht senden | Span `POST /api/v1/threads/{id}/messages` mit DB-Spans; `bothy.event.appended`, `bothy.db.event_seq.lock_wait`; Span `event.fanout` mit Link; `bothy.delivery.duration` je Empfänger |
 | Agenten-Lauf | wie oben, dazu `agent.dispatch`, beim Adapter `invoke_agent` (Kind von `trace_context`), Laufzeit-Spans darunter; `bothy.run.start.latency`, `bothy.run.steps`, `bothy.run.duration`, `bothy.run.tokens`, `bothy.run.cost` |
 | Push | Span `push.send` im Trace des Fan-outs; `bothy.push.sent`; später `bothy.push.fetch` beim Abruf durch die App |
 | Wiederverbinden | Span `gateway.connect`, `gateway.catchup`; `bothy.gateway.connect.duration`, `bothy.gateway.catchup.duration`, ggf. `bothy.gateway.resync` |

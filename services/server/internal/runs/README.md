@@ -9,9 +9,9 @@ Auslöse-Entscheidung, Läufe und Lauf-Dokument, Schritte, Nachträge, Komponent
 
 ## Port (Wurzelpaket `internal/runs`)
 
-- Eingehend: `Runs` (Lesen, Start, Patch, Ende, Abbruch, Übersicht), `Delivery` (Zustellvorbereitung mit I2 und Marke), `Interactions`, `CommandExec`.
+- Eingehend: `Runs` (Lesen, Kontext, Start, Wiederaufnahme, Patch, Ende, Abbruch, Übersicht), `Delivery` (Zustellvorbereitung mit I2, Schutzregeln und Marke), `Interactions`, `CommandExec` (inklusive Autovervollständigung).
 - Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: `messaging.MessagePosted`, `messaging.MessageDeleted`, `agents.AgentDisabled`, kernel `authorize.AccessChanged`.
+- Abonniert In-Tx-Ereignisse: `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (zurückgehaltenen Aufruf schreiben), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged`.
 - Implementiert Quellen-Ports und Querschnitts-Ports: `messaging.ComponentReader`, kernel `personaldata.Participant`.
 
 ## Abhängigkeiten
@@ -31,13 +31,13 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Aktionen (05-aktionen.md)
 
-`agent.invoke`, `run.read`, `run.overview.read`, `run.start`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.invoke`.
+`agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke`.
 
 ## Ereignisse und WebSocket-Ops
 
 - Dauerhaft: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`.
-- Kurzlebig: `run.updated`.
-- WebSocket-Ops (Client an Server): `run.update`.
+- Kurzlebig: `run.updated`, `command.autocomplete_requested`.
+- WebSocket-Ops (Client an Server): `run.update`, `command.autocomplete_result`.
 
 ## Hintergrundjobs
 
@@ -46,6 +46,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 | `runs.cancel_timeout` | periodisch, `agent.cancel_grace` | `maintenance` |
 | `runs.stall_check` | periodisch, `run.stall_after` | `maintenance` |
 | `runs.component_expiry` | periodisch, `component.default_ttl` | `maintenance` |
+| `runs.invocation_hold_timeout` | terminiert, `file.invocation_hold_max` bzw. `voice.transcript_hold_max` | `default` |
 
 ## Hinweise für den Bau
 

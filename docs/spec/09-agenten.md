@@ -7,11 +7,8 @@ Ereignisse, Cursor, Live-Box-Patches: [04-sync-protokoll.md](04-sync-protokoll.m
 `agent.invoke`: [05-aktionen.md](05-aktionen.md). Backend-Richtlinie (I1 bis I5):
 [10-backend-richtlinie.md](10-backend-richtlinie.md). Apps, Webhooks, SDK:
 [11-erweiterungen.md](11-erweiterungen.md). Rechte und Schutzregeln: [07-rechte.md](07-rechte.md).
-Pfade von REST-Endpunkten folgen dem Kern-Vertrag (04); das verbindliche Präfix legt
-[06-api.md](06-api.md) fest.
-
-Stellen mit dem Vermerk "(Kern-Vertrag: Ergänzung beantragt)" planen so, wie es richtig wäre. Sie
-sind in Abschnitt 20 gesammelt und gelten erst, wenn der Kern-Vertrag sie übernimmt.
+Alle REST-Pfade stehen unter `/api/v1` ([06-api.md](06-api.md)). Die Ergänzungen, die dieses
+Kapitel beim Entwurf beantragt hatte, sind entschieden (Abschnitt 20).
 
 ## 1. Grundsätze
 
@@ -59,25 +56,25 @@ Fähigkeit abschalten können, aber nie eine einschalten, die der Adapter nicht 
 | Titelvorschlag | `supports_title` | `title: true` | Abschnitt 12 |
 | Dateien senden | `supports_files_out` | `files_out: true` | Agent braucht zusätzlich `+upload` |
 
-`supports_title` und `supports_files_out` sind neue Schlüssel in `agent_operator_config.v1`
-(Kern-Vertrag: Ergänzung beantragt). `operator_config` enthält nie Geheimnisse.
+`supports_title` und `supports_files_out` sind Schlüssel in `agent_operator_config.v1` (03,
+`agents`). `operator_config` enthält nie Geheimnisse.
 
 ### 2.3 Freigaben eines Agenten
 
-Ein Agent hat höchstens `write` (R-DM-08). Er braucht `write` auf jedem Kanal, den er bedient, um
-dort zu antworten, und `+upload`, um Dateien zu senden. `space.operator.set` und
-`channel.operator.set` lehnen ab, wenn der Agent auf dem Ziel nicht wirksam `write` hat (Code
-`operator_lacks_write`). Die Konsole bietet dafür eine bestätigte Aktion "Bediener setzen und
-Freigabe `write` anlegen" in einer Transaktion an (Kern-Vertrag: Ergänzung beantragt). Grund:
-Ein Bediener, der nicht schreiben darf, erzeugt nur fehlschlagende Läufe.
+Ein Agent hat höchstens `write` und als Zusatzrecht höchstens `upload` (R-DM-08, R-DM-20). Auf
+jedem Kanal, den er bedient, und in jedem Thread mit ihm als festem Bediener hat er `write` ohne
+Freigabe-Zeile (Bediener-Regel, 05 Abschnitt 2.3, R-AZ-13). Für Dateien braucht er zusätzlich eine
+Freigabe mit `upload`; als Gast-Agent oder in Meldungskanälen braucht er eine Freigabe mit `write`.
+Grund für die Bediener-Regel: Ein Bediener, der nicht schreiben darf, erzeugt nur fehlschlagende
+Läufe, und eine zweite, getrennt gepflegte Freigabe bliebe nach einem Bedienerwechsel stehen.
 
 ### 2.4 Werkzeugklasse
 
 Die Schutzregel "Werkzeugklasse eines Agenten" steht in [07-rechte.md](07-rechte.md). Sie braucht
-ein typisiertes Feld am Agenten, nicht nur `jsonb` (Grundsatz 8 in 03): `agents.tool_class`
-(Kern-Vertrag: Ergänzung beantragt). Der Adapter meldet die tatsächlich geladene Klasse im
-Heartbeat (`tool_class_reported`); weicht sie ab, zeigt die Konsole eine Warnung, und
-`authorize` rechnet mit der höheren der beiden Klassen.
+ein typisiertes Feld am Agenten, nicht nur `jsonb` (Grundsatz 8 in 03): `agents.tool_class`,
+gesetzt mit `agent.tool_class.set`. Der Adapter meldet die tatsächlich geladene Klasse im
+Heartbeat (`reported_tool_class`, gespeichert in `agents.reported_tool_class`); weicht sie ab,
+zeigt die Konsole eine Warnung, und `authorize` rechnet mit der höheren der beiden Klassen.
 
 ## 3. Bediener und Auslöse-Regeln
 
@@ -86,8 +83,7 @@ Heartbeat (`tool_class_reported`); weicht sie ab, zeigt die Konsole eine Warnung
 - **Thread (`threads.kind = 'thread'`).** Der Bediener ist `threads.operator_agent_id`, fest seit
   der Anlage (R-DM-12). Ein späterer Bedienerwechsel am Kanal ändert laufende Gespräche nicht.
 - **Hauptverlauf (`threads.kind = 'main'`).** Der Bediener ist der wirksame Bediener des Kanals zum
-  Zeitpunkt der Auslösung; `operator_agent_id` bleibt `NULL` (Kern-Vertrag: Präzisierung
-  beantragt). Wechselt der Bediener, endet die aktuelle Sitzung des Hauptverlaufs beim nächsten
+  Zeitpunkt der Auslösung; `operator_agent_id` bleibt `NULL` (03, R-DM-21). Wechselt der Bediener, endet die aktuelle Sitzung des Hauptverlaufs beim nächsten
   Lauf mit `end_reason = 'agent_changed'`. Grund: Ein Hauptverlauf ist kein einzelnes Gespräch;
   ein eingefrorener Bediener würde einen Kanal nach dem Wechsel stumm schalten.
 - Ohne Bediener antwortet kein Agent, außer ein erlaubter Gast-Agent wird erwähnt (3.6).
@@ -142,16 +138,15 @@ Für eine neue Nachricht M eines Prinzipals P im Thread T des Kanals C gilt in d
 5. Ziel-Thread: Ist T der Hauptverlauf und `auto_thread` gesetzt, legt der Server in derselben
    Transaktion einen Thread T' mit `parent_message_id = M` an; Ziel ist T'. Sonst ist Ziel T.
 6. Hat das Ziel einen aktiven Lauf R: Ist R vom Kandidaten, wird M ein Nachtrag (Abschnitt 7).
-   Sonst Ablehnung `run_active_other_agent` (Kern-Vertrag: Ergänzung beantragt; 05 Regel 7 macht
-   heute jede Auslösung zum Nachtrag, auch für einen anderen Agenten).
+   Sonst Ablehnung `run_active_other_agent` (05 Abschnitt 5 Punkt 8, R-AZ-20).
 7. `authorize(P, agent.invoke, {Ziel, Kandidat, M})` nach 05 Abschnitt 5 (Rechte, Agent aktiv,
    I2, Projekt bereit). Bei `allow`: Lauf `queued`, Live-Box-Anker, Ereignis `agent.invocation`,
    `trigger_state = received`. Bei Ablehnung: M bleibt gespeichert, `trigger_state = failed` mit
    Grund.
 
-Eine Nachricht mit `trigger_state = failed` zeigt ihren Grund. Dafür braucht `messages` ein Feld
-`trigger_state_reason` (Kern-Vertrag: Ergänzung beantragt), weil eine Ablehnung bei der Annahme
-keinen Lauf erzeugt, an dem `state_reason` stehen könnte.
+Eine Nachricht mit `trigger_state = failed` zeigt ihren Grund aus `messages.trigger_state_reason`
+(03). Grund für das eigene Feld: Eine Ablehnung bei der Annahme erzeugt keinen Lauf, an dem
+`state_reason` stehen könnte.
 
 ```mermaid
 flowchart TD
@@ -206,8 +201,7 @@ eine aktuelle Sitzung (03, `agent_sessions`); ein Gast darf die Sitzung des Bedi
 verdrängen. Antworten im Thread ohne Erwähnung lösen danach wieder den Bediener aus, nicht den
 Gast.
 
-Ein Agent mit `billing_mode = personal` ist nie Gast-Agent (Kern-Vertrag: Ergänzung beantragt,
-05 Abschnitt 5 Punkt 3). Grund: Als Gast wäre er auf jedem Kanal auslösbar, auf dem er `write` hat
+Ein Agent mit `billing_mode = personal` ist nie Gast-Agent (05 Abschnitt 5 Punkt 3, R-AZ-19). Grund: Als Gast wäre er auf jedem Kanal auslösbar, auf dem er `write` hat
 und Gäste erlaubt sind; diese Kanäle zählt I1 nicht zu seinen Zielen
 ([10-backend-richtlinie.md](10-backend-richtlinie.md) Abschnitt 5.2).
 
@@ -234,9 +228,9 @@ Antworten und Sitzung gehören zu T'.
 
 | Transport | Für | Bestätigung | Stand |
 |---|---|---|---|
-| Gateway-WebSocket | Standard für jeden dauerhaft laufenden Adapter | `ack {seq}` (04 Abschnitt 15.2) | Kern-Vertrag |
-| REST-Abruf `GET /v1/events?after=` | Adapter ohne dauerhafte Verbindung, Tests | Cursor im Adapter; dauerhaft per `ack`-Endpunkt | Kern-Vertrag (04 Abschnitt 7.4) |
-| Webhook (Push) | Adapter als Funktion ohne laufenden Prozess | Antwort `2xx` gilt als `ack` bis zu dieser `seq` | Kern-Vertrag: Ergänzung beantragt |
+| Gateway-WebSocket | Standard für jeden dauerhaft laufenden Adapter | `ack {seq}` (04 Abschnitt 15.2) | 04 Abschnitt 15.1 |
+| REST-Abruf `GET /api/v1/agents/me/consumers/{consumer}/events` | Adapter ohne dauerhafte Verbindung, Tests | dauerhaft per `ack`-Endpunkt | 04 Abschnitt 7.4 |
+| Webhook (Push) | Adapter als Funktion ohne laufenden Prozess | Antwort `2xx` gilt als `ack` bis zu dieser `seq` | 04 Abschnitt 15.6 |
 
 Webhook-Zustellung an Agenten braucht ein Abo, das an einen Agenten statt an eine
 App-Installation gebunden ist (`webhook_subscriptions.agent_id`, genau eines von beiden gesetzt).
@@ -278,8 +272,7 @@ des Zwecks `invocation` (`server_signing_keys`).
 nach RFC 8725 Abschnitt 3.11, damit kein anderes JWT des Servers (Zugriffstoken) als Marke
 durchgeht (https://www.rfc-editor.org/rfc/rfc8725.html, abgerufen 2026-10-10, [belegt]).
 
-**Claims.** Die Liste aus 05 Abschnitt 5 plus drei Zusätze (Kern-Vertrag: Ergänzung beantragt;
-alle additiv):
+**Claims.** Die normative Liste steht in 05 Abschnitt 5; hier mit Herkunft:
 
 | Claim | Inhalt | Herkunft |
 |---|---|---|
@@ -339,7 +332,7 @@ Schlüssel des Zwecks `invocation` in den Zuständen `next`, `active` und `retir
 ### 4.6 Kontext eines Laufs
 
 Der Adapter holt den Kontext per REST mit der Aktion `run.context.read` (agent-self, nur für eigene
-aktive Läufe; Kern-Vertrag: Ergänzung beantragt). Der Server baut ihn, weil nur `authz` weiß,
+aktive Läufe; `GET /api/v1/runs/{id}/context`). Der Server baut ihn, weil nur `authz` weiß,
 welche Autoren wie vertrauenswürdig sind. Schema `run_context.v1`:
 
 | Teil | Inhalt | Grenze |
@@ -389,7 +382,7 @@ Rate-Limit-Klasse aus 05.
 
 | Zweck | Aktion | Idempotenz | Regel |
 |---|---|---|---|
-| Lauf starten | `run.start` | CAS auf Zustand, `jti` | Körper: `invocation_token`, `billing_mode_used`, `external_session_ref`, optional `model`, `billing_evidence` (Ergänzung, additiv). Gilt für `queued -> running` und `waiting_input -> running` (5.1). |
+| Lauf starten | `run.start` | CAS auf Zustand, `jti`; Wiederholung mit derselben Marke liefert das Ergebnis erneut | Körper: `invocation_token`, `billing_mode_used`, optional `external_session_ref`, `model`, `billing_evidence`. Gilt für `queued -> running` (`/start`) und `waiting_input -> running` (`/resume`) (5.1). |
 | Live-Box ändern | `run.update` | `base_version` | erlaubte Pfade in 5.3; Drossel `agent.run_update_min_interval` |
 | Schritt melden | `run.update` auf `/steps/<id>` | Schritt-ID (UUIDv7) vom Adapter | `ordinal` vergibt der Server |
 | Nachtrag quittieren | `run.update` auf `/followups/<message_id>/state` | Zustand nur vorwärts | `delivered`, dann `absorbed` |
@@ -399,12 +392,12 @@ Rate-Limit-Klasse aus 05.
 | Rückfrage, Freigabe | `message.create` mit `kind = card` und Komponenten | `client_msg_id` | danach `run.finish` mit `waiting_input` (Abschnitt 11) |
 | Komponenten ändern | `component.update` | `version` | nur eigene Nachrichten |
 | Interaktion beantworten | `interaction.respond` | Zustand nur vorwärts | Abschnitt 11.4 |
-| Titel vorschlagen | `thread.title.update` | `expected_version` | nur bei `title_source = auto`; Quelle bleibt `auto` (Abschnitt 12) |
+| Titel vorschlagen | `thread.title.update` | `If-Match` | nur bei `title_source = auto`; Quelle bleibt `auto` (Abschnitt 12) |
 | Thread schließen | `thread.close` | idempotent | nur auf ausdrücklichen Wunsch eines Menschen |
-| Sitzung melden | `agent_session.report` | `expected_version` (CAS) | Abschnitt 9 |
+| Sitzung melden | `agent_session.report` | `If-Match` (CAS über `agent_sessions.version`) | Abschnitt 9 |
 | Befehle pflegen | `command.register`, `command.remove` | Sammelabgleich | Abschnitt 10 |
 | Heartbeat | `agent.heartbeat` | letzter gewinnt | Abschnitt 4.8 |
-| Transkript liefern | `file.transcript.submit` | `expected_version` | Kern-Vertrag: Ergänzung beantragt (Abschnitt 13) |
+| Transkript liefern | `file.transcript.submit` | `If-Match` | Abschnitt 13 |
 
 **Tippen.** Agenten senden kein eigenes Tippen (04 Abschnitt 12.1). Der Client zeigt "Agent
 arbeitet", solange der Lauf `running` ist. Adapter, deren Laufzeit Tipp-Signale erzeugt,
@@ -413,7 +406,7 @@ verwerfen sie.
 ### 4.8 Heartbeat und Ist-Zustand
 
 Der Adapter sendet den Heartbeat über das Gateway oder per REST. Schema `agent_heartbeat.v1`
-(Inhalt von `agents.reported_details`; Kern-Vertrag nennt nur den Namen):
+(Inhalt von `agents.reported_details`, 03):
 
 | Feld | Inhalt |
 |---|---|
@@ -426,7 +419,7 @@ Der Adapter sendet den Heartbeat über das Gateway oder per REST. Schema `agent_
 | `billing_modes_supported` | Liste der Modi, die der Adapter belegen kann |
 | `billing_evidence` | `provider`, `key_type` (`api_key`, `oauth`, `cloud`, `none`, `unknown`), `method`; nie ein Wert, nie ein Präfix |
 | `capabilities` | Abschnitt 2.2 |
-| `tool_class_reported` | Abschnitt 2.4 |
+| `reported_tool_class` | tatsächlich geladene Werkzeugklasse, Abschnitt 2.4 |
 | `active_runs` | IDs der Läufe in `running` oder `waiting_input`, die der Adapter gerade hält |
 | `projects` | nur Runner: `workspace_ref`, `ready`, `reason` (setzt `project_bindings.ready`) |
 
@@ -501,12 +494,10 @@ Die Übergänge stehen in 03 (`runs`); diese Tabelle nennt, wer sie auslöst
 | `waiting_input` | `running` | Adapter, `run.start` mit der Marke der Antwort (Interaktion oder Nachtrag) | |
 | `waiting_input` | `failed`, `cancelled` | wie bei `running` | |
 
-`run.start` deckt beide Starts ab (Kern-Vertrag: Präzisierung beantragt; 05 nennt nur
-`queued -> running`). Jede Zustellung, die einen Start erlaubt (`agent.invocation`; bei
-`waiting_input` auch `agent.followup` und `interaction.created`), ersetzt `runs.invocation_jti`.
-Zustellungen während `running` ändern es nicht. Bei jeder Zustellung setzt der Server
-`runs.billing_mode_expected` auf das aktuelle Soll (Kern-Vertrag: Präzisierung beantragt; 03 sagt
-"beim Aufruf").
+`run.start` deckt beide Starts ab (05, 04 Abschnitt 15.3). Jede Zustellung, die einen Start
+erlaubt (`agent.invocation`; bei `waiting_input` auch `agent.followup` und `interaction.created`),
+ersetzt `runs.invocation_jti`. Zustellungen während `running` ändern es nicht. Bei jeder
+Zustellung setzt der Server `runs.billing_mode_expected` auf das aktuelle Soll (03).
 
 ```mermaid
 stateDiagram-v2
@@ -560,9 +551,9 @@ Adapter ändert es nur über RFC-6902-Patches mit `add`, `replace`, `remove`.
 | `/last_text_excerpt` | Text, gekürzt auf `run.excerpt_max_chars` | `add`, `replace` | `runs.last_text_excerpt` |
 | `/model` | Text | `replace` | `runs.model` |
 | `/metrics/<feld>` | Zahl | `add`, `replace` | `runs.metrics` (`run_metrics.v1`) |
-| `/metrics/last_api_retry` | Objekt `attempt`, `max_retries`, `retry_delay_ms`, `error` | `add`, `replace`, `remove` | `runs.metrics` (Ergänzung beantragt) |
+| `/metrics/last_api_retry` | Objekt `attempt`, `max_retries`, `retry_delay_ms`, `error` | `add`, `replace`, `remove` | `runs.metrics` (`run_metrics.v1`) |
 | `/cost` | Objekt `amount_micros`, `currency`, `is_estimate` | `replace` | `runs.cost_micros` u. a. |
-| `/plan` | Objekt `items` (`id`, `text`, `status`) | `add`, `replace`, `remove` | `runs.plan` (Kern-Vertrag: Ergänzung beantragt, Schema `run_plan.v1`) |
+| `/plan` | Objekt `items` (`id`, `text`, `status`) | `add`, `replace`, `remove` | `runs.plan` (Schema `run_plan.v1`) |
 | `/steps/<id>` | Schritt ohne `ordinal` | `add`; danach `replace` auf `status`, `title`, `detail`, `finished_at` | `run_steps` |
 | `/followups/<message_id>/state` | `delivered`, `absorbed` | `replace`, nur vorwärts | `run_followups` |
 
@@ -623,11 +614,11 @@ schlimmer als eine sichtbare Ablehnung.
 | Zustand | Bedeutung | Gesetzt bei |
 |---|---|---|
 | `received` | Server hat angenommen, Lauf `queued` oder Nachtrag angelegt | Annahme (3.4 Punkt 7) |
-| `queued` | Aufruf an den Adapter zugestellt, Start steht aus | erste erfolgreiche Zustellung von `agent.invocation` (Kern-Vertrag: Präzisierung beantragt) |
+| `queued` | Aufruf an den Adapter zugestellt, Start steht aus | erste erfolgreiche Zustellung von `agent.invocation` (04 Abschnitt 15.3) |
 | `working` | Lauf läuft (auch `waiting_input`) | `run.start` |
 | `done` | Lauf `completed` | `run.finish` |
 | `failed` | Ablehnung oder Lauf `failed` | Annahme, Zustellung oder Laufende; Grund in `trigger_state_reason` |
-| `cancelled` | Lauf gestoppt | Laufende mit `cancelled` (Kern-Vertrag: Ergänzung beantragt, neuer Wert) |
+| `cancelled` | Lauf gestoppt | Laufende mit `cancelled`; Grund in `trigger_state_reason` |
 | `followup_delivered` | Nachtrag an die Laufzeit übergeben | Adapter meldet `delivered` |
 
 Grund für die Trennung `received` und `queued`: Ist der Agent offline, sieht der Mensch "Server
@@ -715,8 +706,8 @@ Ablauf bei `new`: Kennt der Adapter die Referenz vor dem Start (Runner: vorab ve
 meldet er sie in `run.start`; der Server legt die Zeile an (`is_current`, `started = false`) und
 setzt `runs.agent_session_id`. Entsteht die Referenz erst in der Laufzeit (Hermes: Sitzungs-ID),
 lässt der Adapter sie in `run.start` weg und meldet sie mit `agent_session.report`, sobald sie
-existiert; der Server legt die Zeile bei dieser Meldung an (Kern-Vertrag: Präzisierung beantragt;
-04 nennt die Referenz als Teil von `run.start`). Sobald die Laufzeit die Sitzung bestätigt
+existiert; der Server legt die Zeile bei dieser Meldung an (04 Abschnitt 15.3, 05
+`agent_session.report`). Sobald die Laufzeit die Sitzung bestätigt
 (Runner: `system/init` mit `session_id`), meldet der Adapter `started = true`. Scheitert der erste
 Turn vorher, bleibt `started = false`; der nächste Lauf bekommt wieder `new` mit derselben
 Referenz (Runner: wieder `--session-id` mit derselben UUID).
@@ -751,20 +742,26 @@ Der nächste Lauf bekommt `session.mode = bind`.
 
 ### 9.5 Import-Bindung und fail open
 
-Der Import legt für einen importierten Thread mit früherer Sitzung eine aktuelle Zeile an
-(`started = true`, Referenz der alten Sitzung; [22-import-migration.md](22-import-migration.md)).
-Die eigentliche Übernahme passiert beim ersten Schreiben:
+Der Import legt für einen importierten Thread mit früherer Sitzung eine frühere Referenz an
+(`is_current = false`, `started = true`, `end_reason = 'import'`, optional
+`cost_baseline_micros`; [22-import-migration.md](22-import-migration.md) Abschnitt 9, 03
+`agent_sessions`). Die Übernahme passiert beim ersten Auslösen:
 
-1. Erster Lauf: `session.mode = bind`.
+1. Hat der Thread seit dem Import keine aktuelle Sitzung, legt der Server in der Transaktion des
+   Laufs eine aktuelle Zeile mit derselben `external_session_ref` und `started = true` an
+   (Compare-and-swap über die Teilindizes in 03; genau eine von zwei gleichzeitigen Auslösungen
+   bindet). Audit `agent_session.bind`, Ereignis `agent_session.changed`. Der Lauf bekommt
+   `session.mode = bind`.
 2. Der Adapter übernimmt die Sitzung mit den Mitteln der Laufzeit (Hermes: wie `/resume`, an das
    lebende Ende einer Kompressionskette; Runner: `--resume`).
-3. Er meldet `agent_session.report` mit `expected_version` und der tatsächlich benutzten Referenz.
-   Compare-and-swap: genau ein Erfolg, auch bei zwei gleichzeitigen Läufen.
-4. Fail open: Existiert die alte Sitzung in der Laufzeit nicht, startet der Adapter eine neue,
-   meldet sie mit `bind_failed: session_missing`, und der Server beendet die Importzeile
-   (`end_reason = 'import'`). Der Lauf geht weiter. Die Box zeigt einmal "Frühere Sitzung nicht
-   gefunden, neue Sitzung begonnen". Grund: Ein fehlender Verlauf darf das Weiterarbeiten nicht
-   blockieren.
+3. Er meldet `agent_session.report` mit `If-Match` und der tatsächlich benutzten Referenz.
+4. Fail open: Existiert die alte Sitzung in der Laufzeit nicht, startet der Adapter eine neue und
+   meldet sie mit `bind_failed: session_missing`. Der Server beendet die gebundene Zeile
+   (`end_reason = 'rebind'`), legt die neue an und schreibt genau einmal eine Systemnachricht in
+   den Thread. Der Lauf geht weiter; die Box zeigt einmal "Frühere Sitzung nicht gefunden, neue
+   Sitzung begonnen". Grund: Ein fehlender Verlauf darf das Weiterarbeiten nicht blockieren.
+5. Eine Import-Zeile wird nur gebunden, solange der Thread seit dem Import keine aktuelle Sitzung
+   hatte; ein späteres `agent_session.reset` bindet nie erneut.
 
 ## 10. Slash-Befehle
 
@@ -811,13 +808,12 @@ Bei gleichem Namen stehen die des Bedieners zuerst; andere werden mit dem Handle
 | `true` | `command.invoked` mit Marke sofort an den Agenten, auch während eines Laufs. Kein Lauf, nie an das Modell. Antwort optional als Nachricht des Agenten. |
 | `false` | wie eine auslösende Nachricht: Lauf `queued`, `agent.invocation` mit `trigger.kind = command` und den geparsten Optionen. Bei aktivem Lauf: Ablehnung `run_active` mit Hinweis, nicht als Nachtrag. |
 
-Ein Modell-Befehl braucht eine Spur am Lauf: `runs.trigger_kind` und `runs.triggering_command_id`
-(Kern-Vertrag: Ergänzung beantragt). Grund: Heute hat ein Lauf aus einem Befehl weder auslösende
-Nachricht noch Interaktion; Box und Statistik könnten seine Herkunft nicht zeigen.
+Ein Modell-Befehl hinterlässt seine Spur am Lauf: `runs.trigger_kind = 'command'` und
+`runs.triggering_command_id` (03). Grund: Ein Lauf aus einem Befehl hat weder auslösende Nachricht
+noch Interaktion; ohne die Spur könnten Box und Statistik seine Herkunft nicht zeigen.
 
 Befehle von Apps prüfen `required_level` und Scope; `agent.invoke` und I2 entfallen, weil keine
-Agenten-Laufzeit beteiligt ist (Kern-Vertrag: Präzisierung beantragt; 05 nennt `agent.invoke`
-für jeden Befehl).
+Agenten-Laufzeit beteiligt ist (05 `command.invoke`, R-AZ-18).
 
 ### 10.5 Autovervollständigung
 
@@ -826,8 +822,7 @@ Für Optionen mit `autocomplete = true` fragt der Server den Besitzer des Befehl
 1. Client sendet Befehl, Option und Teiltext (`command.autocomplete`, `rl.trigger`).
 2. Server prüft wie `agent.invoke` ohne Lauf (inklusive I2) und sendet ein kurzlebiges Ereignis
    `command.autocomplete_requested` mit `request_id`, Marke (`trigger_kind = autocomplete`) und
-   Teiltext an die Verbindung des Agenten (Kern-Vertrag: Ergänzung beantragt; 04 kennt nur Ops
-   ohne Antwort).
+   Teiltext an die Verbindung des Agenten (04 Abschnitt 15.7).
 3. Der Adapter antwortet mit der Gateway-Op `command.autocomplete_result {request_id, choices}`
    oder per REST. Höchstens `command.autocomplete_max_choices` Einträge.
 4. Ohne Antwort in `command.autocomplete_timeout` liefert der Server eine leere Liste. Der Client
@@ -844,7 +839,7 @@ Apps beantworten Autovervollständigung über ihre Interaktions-Adresse
 
 | Typ | Felder der Definition |
 |---|---|
-| `button` | `label`, `style` (`primary`, `secondary`, `danger`), `icon` (Token des Design-Systems), `value` |
+| `button` | `label`, `style` (Rolle des Design-Systems: `primary`, `secondary`, `success`, `danger`, `ghost`; keine freie Farbe), `icon` (Token des Design-Systems), `value` |
 | `select` | `placeholder`, `options` (`label`, `value`, `description`), `min_values`, `max_values` |
 | `form` | `title`, `submit_label`, `fields` (`name`, `label`, `type` aus `text`, `textarea`, `number`, `boolean`, `choice`; `required`, `max_length`, `choices`) |
 
@@ -859,8 +854,7 @@ prüft eingereichte Werte gegen die Definition (`422 interaction_values_invalid`
 1. P hat `trigger` auf dem Kanal und `agent.invoke` gilt (inklusive I2 bei persönlichen Agenten).
 2. Komponente `active`, nicht abgelaufen (`expires_at`, Standard `component.default_ttl`).
 3. P hat `required_capability`, falls gesetzt (z. B. `approve_actions`).
-4. `restricted_to`: `any`; `run_starter` (Auslöser des Laufs oder Owner); `owner` (nur Owner;
-   Kern-Vertrag: Ergänzung beantragt, neuer Wert).
+4. `restricted_to`: `any`; `run_starter` (Auslöser des Laufs oder Owner); `owner` (nur Owner).
 
 Wer nicht bedienen darf, sieht die Komponente deaktiviert mit Hinweis. Wer die Nachricht nicht
 lesen darf, sieht sie nicht (404-Regel).
@@ -875,8 +869,8 @@ Grund: Eine Freigabe-Karte hat genau eine Entscheidung; ein zweiter Klick auf "A
 Sperrfolge (03 Abschnitt 6.3 Punkt 2): `SELECT ... FROM message_components WHERE message_id = $m
 AND single_use AND state = 'active' ORDER BY id FOR UPDATE`, dann prüfen, ob die gewählte
 Komponente dabei ist, dann `used` bzw. `disabled` setzen. Wer die gewählte Komponente nicht mehr
-`active` vorfindet, verliert (`409 component_used`). Das erweitert die Einmal-Regel in 03 von
-einer Komponente auf die Gruppe (Kern-Vertrag: Präzisierung beantragt).
+`active` vorfindet, verliert (`409 component_used`). Die Regel steht so in 03
+(`message_components`).
 
 ### 11.4 Ablauf einer Interaktion
 
@@ -956,12 +950,13 @@ Dauer und Speicherung legt [12-dateien.md](12-dateien.md) fest. Für Agenten gil
 
 | Lage | Weg |
 |---|---|
-| Fähigkeit `voice_input` wirksam | Der Agent transkribiert selbst. Der Aufruf enthält die Datei; der Adapter liefert das Transkript mit `file.transcript.submit` (`transcript_source = 'agent'`, Kern-Vertrag: Ergänzung beantragt). |
-| sonst, Transkriptions-Port konfiguriert | Der Server transkribiert nach dem Virenscan über den Port `TranscriptionProvider` (`transcription.provider`). Der Lauf wartet in `queued`, bis das Transkript da ist (`transcript_source = 'service'`), höchstens `transcription.timeout`. Der Kontext enthält Text und Datei. |
+| `voice.transcription_mode = agent` und Fähigkeit `voice_input` wirksam | Der Agent transkribiert selbst. Der Aufruf enthält die Datei; der Adapter liefert das Transkript mit `file.transcript.submit` (`transcript_source = 'agent'`). |
+| `voice.transcription_mode = service` | Der Server transkribiert nach dem Virenscan über den Port `Transcriber` ([12-dateien.md](12-dateien.md), Abschnitt 8.2). Der Aufruf wird erst geschrieben, wenn das Transkript da ist (`transcript_source = 'service'`), höchstens nach `voice.transcript_hold_max` (04 Abschnitt 15.3). Der Kontext enthält Text und Datei. |
 | sonst | Ablehnung bei der Annahme mit `voice_unsupported` |
 
 Der Port hat einen Treiber je Anbieter (z. B. ein OpenAI-kompatibler Transkriptions-Endpunkt oder
-ein lokaler Dienst); Adresse und Schlüssel sind Betreiber-Konfiguration und Secret-Provider. Der
+ein lokaler Dienst); Adresse und Schlüssel sind Betreiber-Konfiguration und Secret-Provider
+(`voice.*` in [12-dateien.md](12-dateien.md)). Der
 Server sendet Audio nur an die konfigurierte Adresse, nie an eine Adresse aus Nutzerdaten. Ein
 externer Anbieter ist ein Auftragsverarbeiter ([20-datenschutz.md](20-datenschutz.md)).
 Das Transkript sehen alle mit `file.read` unter der Nachricht.
@@ -989,7 +984,7 @@ Leser alles sehen dürfen, was die Laufzeit des Agenten kennt ([19-sicherheit.md
 | Zustellung doppelt (Neustart, Zeitüberschreitung) | `run.start` antwortet `409 already_started`; Adapter startet nichts | R-SY-10, 4.9 |
 | Adapter stirbt nach Zusage, vor Laufzeit | Lauf `interrupted`, keine Wiederholung | 4.9, 5.5 |
 | Adapter stirbt während des Laufs | `interrupted` bzw. `stale`; Nachträge `deferred` | 5.5, 7 |
-| Server-Neustart | Läufe bleiben; Adapter verbindet mit `resume` oder `identify`; Patches nach `409` mit `GET /v1/runs/{id}` neu aufsetzen | 04 Abschnitt 11 |
+| Server-Neustart | Läufe bleiben; Adapter verbindet mit `resume` oder `identify`; Patches nach `409` mit `GET /api/v1/runs/{id}` neu aufsetzen | 04 Abschnitt 11 |
 | Antwort beim Senden verloren | gleiche `client_msg_id` erneut; Server liefert das Original | 04 Abschnitt 5.1 |
 | Adapter lange offline | Läufe `queued`, nach `run.queued_max_age` `agent_unavailable` | 5.5 |
 | Rechte-Entzug während des Laufs | `run.cancel_requested` mit `access_revoked` | 04 Abschnitt 8.3 |
@@ -1179,7 +1174,7 @@ Drei Schichten, jede für sich ausreichend für "kein Fremder löst aus":
 2. **Adapter:** Nur Ereignisse mit gültiger Marke erreichen Hermes. Der Adapter setzt
    `enforces_own_access_policy = True` mit Richtlinie "allowlist". Die Liste ist die Menge der
    Prinzipale, die diesen Agenten auslösen dürfen, vom Server gelesen (`agent.triggerers.read`,
-   agent-self, liefert IDs und `permission_version`; Kern-Vertrag: Ergänzung beantragt). Neu
+   agent-self, `GET /api/v1/agents/me/triggerers`, liefert IDs und `permission_version`). Neu
    geladen wird sie, wenn eine Marke eine höhere `permission_version` trägt (4.5 Punkt 9).
 3. **Hermes:** Bei `personal` schreibt der Installer zusätzlich Hermes' Erlaubnisliste der
    Plattform (`allowed_users_env`) mit genau dem `credential_holder`. Sie ändert sich nur bei
@@ -1449,31 +1444,34 @@ sequenceDiagram
 | R-AG-20 | Runner: Ist-Modus per Vorab-Prüfung mit kontrollierter Umgebung, `apiKeySource` nur als Gegenprobe. | `apiKeySource = none` unterscheidet Abo und andere Wege nicht. |
 | R-AG-21 | Runner: `--permission-prompts none` statt wartender Rückfragen. | Unbeaufsichtigte Turns hängen nicht. |
 
-## 20. Kern-Vertrag: beantragte Ergänzungen
+## 20. Abgleich mit dem Kern-Vertrag
 
-| Nr | Ergänzung | Betrifft |
+Die Ergänzungen, die dieses Kapitel beim Entwurf beantragt hatte, sind entschieden (Integration
+vom 2026-10-10). Alle außer E-AG-16 stehen im Kern-Vertrag.
+
+| Nr | Ergänzung | Entscheidung, Ort |
 |---|---|---|
-| E-AG-01 | `messages.trigger_state_reason` | 03 `messages` |
-| E-AG-02 | `trigger_state` Wert `cancelled` | 03 `messages`, 00 |
-| E-AG-03 | Ablehnung `run_active_other_agent` statt Nachtrag für fremden Agenten | 05 Abschnitt 5 Punkt 7 |
-| E-AG-04 | Hauptverlauf ohne festen Bediener (`operator_agent_id` bleibt `NULL`) | 03 `threads`, R-DM-12 |
-| E-AG-05 | `run.start` auch für `waiting_input -> running`; Regel, welche Zustellungen `invocation_jti` ersetzen; `billing_mode_expected` je Zustellung | 03 `runs`, 04 Abschnitt 15.3, 05 |
-| E-AG-06 | Aktion `run.context.read` und Schema `run_context.v1` | 05 Abschnitt 4.10, 04 |
-| E-AG-07 | `runs.plan` (`run_plan.v1`), `run_metrics.v1.last_api_retry` | 03 `runs`, 04 Abschnitt 11.1 |
-| E-AG-08 | `runs.trigger_kind`, `runs.triggering_command_id` | 03 `runs` |
-| E-AG-09 | Claims `space_id`, `trigger_kind`, `command_id`; Kopf `typ` | 05 Abschnitt 5 |
-| E-AG-10 | `restricted_to` Wert `owner`; Einmal-Regel je Nachricht | 03 `message_components` |
-| E-AG-11 | Kurzlebiges Ereignis `command.autocomplete_requested`, Op `command.autocomplete_result` | 04 Abschnitt 6.2, 05 Abschnitt 6 und 7 |
-| E-AG-12 | Aktion `file.transcript.submit` (agent-self) | 05 Abschnitt 4.8 |
-| E-AG-13 | Aktion `agent.triggerers.read` (agent-self) | 05 Abschnitt 4.10 |
-| E-AG-14 | Webhook-Zustellung an Agenten (`webhook_subscriptions.agent_id`) | 03, 04 Abschnitt 15 |
-| E-AG-15 | `agents.tool_class` als Spalte | 03 `agents` |
-| E-AG-16 | Bediener setzen verlangt `write` des Agenten (`operator_lacks_write`) | 05 `space.operator.set`, `channel.operator.set` |
-| E-AG-17 | App-Befehle ohne `agent.invoke`; persönliche Ereignisse `interaction.created` und `command.invoked` auch für Apps | 05 Abschnitt 4.10 und 6 |
-| E-AG-18 | `agent_operator_config.v1` um `supports_title`, `supports_files_out` | 03 `agents` |
-| E-AG-19 | `external_session_ref` in `run.start` optional; erste `agent_session.report` legt die Zeile an | 04 Abschnitt 15.3, 05 `agent_session.report` |
-| E-AG-20 | Ablehnungsgrund `run_active` für Modell-Befehle während eines Laufs | 05 `command.invoke` |
-| E-AG-21 | Gast-Agent nur mit `billing_mode = organization` | 05 Abschnitt 5 Punkt 3 |
+| E-AG-01 | `messages.trigger_state_reason` | übernommen, 03 `messages` |
+| E-AG-02 | `trigger_state` Wert `cancelled` | übernommen, 03 `messages`, 00 |
+| E-AG-03 | Ablehnung `run_active_other_agent` statt Nachtrag für fremden Agenten | übernommen, 05 Abschnitt 5 Punkt 8, R-AZ-20 |
+| E-AG-04 | Hauptverlauf ohne festen Bediener | übernommen, 03 `threads`, R-DM-21 |
+| E-AG-05 | `run.start` für beide Starts; Regel für `invocation_jti`; `billing_mode_expected` je Zustellung | übernommen, 03 `runs`, 04 Abschnitt 15.3, 05 |
+| E-AG-06 | Aktion `run.context.read`, Schema `run_context.v1` | übernommen, 05 Abschnitt 4.10 |
+| E-AG-07 | `runs.plan`, `run_metrics.v1.last_api_retry` | übernommen, 03 `runs`, 04 Abschnitt 11.1 |
+| E-AG-08 | `runs.trigger_kind`, `runs.triggering_command_id` | übernommen, 03 `runs` |
+| E-AG-09 | Claims `space_id`, `trigger_kind`, `command_id`; Kopf `typ` | übernommen, 05 Abschnitt 5 |
+| E-AG-10 | `restricted_to` Wert `owner`; Einmal-Regel je Nachricht | übernommen, 03 `message_components` |
+| E-AG-11 | `command.autocomplete_requested`, Op `command.autocomplete_result` | übernommen, 04 Abschnitt 15.7, 05 Abschnitte 6 und 7 |
+| E-AG-12 | Aktion `file.transcript.submit` | übernommen, 05 Abschnitt 4.8 |
+| E-AG-13 | Aktion `agent.triggerers.read` | übernommen, 05 Abschnitt 4.10 |
+| E-AG-14 | Webhook-Zustellung an Agenten | übernommen, 03 `webhook_subscriptions.agent_id`, 04 Abschnitt 15.6 |
+| E-AG-15 | `agents.tool_class` als Spalte | übernommen, 03 `agents` |
+| E-AG-16 | Bediener setzen verlangt `write` des Agenten | nicht übernommen; stattdessen Bediener-Regel (05 Abschnitt 2.3, R-AZ-13), weil sie dem Bediener ohne zweite Freigabe folgt |
+| E-AG-17 | App-Befehle ohne `agent.invoke`; persönliche Ereignisse für Apps | übernommen, 05 Abschnitte 4.10 und 6, R-AZ-18 |
+| E-AG-18 | `supports_title`, `supports_files_out` | übernommen, 03 `agents` |
+| E-AG-19 | `external_session_ref` in `run.start` optional | übernommen, 04 Abschnitt 15.3, 05 `agent_session.report` |
+| E-AG-20 | Ablehnungsgrund `run_active` für Modell-Befehle | übernommen, 05 `command.invoke` |
+| E-AG-21 | Gast-Agent nur mit `billing_mode = organization` | übernommen, 05 Abschnitt 5 Punkt 3, R-AZ-19 |
 
 ## 21. Konfigurationswerte dieses Kapitels
 
@@ -1497,8 +1495,6 @@ Konfiguration des jeweiligen Programms außerhalb des Servers.
 | `component.custom_id_max_chars` | Server | `100` | Länge von `custom_id` |
 | `component.form_max_fields` | Server | `10` | Felder je Formular |
 | `thread.placeholder_titles` | Server | `["", "Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung |
-| `transcription.provider` | Server | `none` | Treiber des Transkriptions-Ports |
-| `transcription.timeout` | Server | `120s` | Wartezeit auf ein Server-Transkript |
 | `adapter.invocation_token_leeway` | Adapter | `10s` | Uhren-Toleranz bei `exp` und `iat` |
 | `adapter.jwks_refresh_min_interval` | Adapter | `60s` | höchstens so oft JWKS neu laden |
 | `hermes_adapter.platform_key` | Hermes-Adapter | `bothy` | Plattformname in Hermes; nach Inbetriebnahme nie ändern |

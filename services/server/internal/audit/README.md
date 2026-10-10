@@ -5,7 +5,7 @@ Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
 
 ## Zweck
 
-Audit-Log mit Hash-Kette, Abfrage, Prüfung, Kürzung mit Anker.
+Audit-Log mit Hash-Kette, signierte Prüfpunkte, Abfrage, Prüfung, Kürzung mit Anker.
 
 ## Port (Wurzelpaket `internal/audit`)
 
@@ -25,7 +25,7 @@ Geprüft durch go-arch-lint (ADR 0008).
 
 ## Tabellen
 
-`audit_events`.
+`audit_events`, `audit_checkpoints`.
 
 Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
 

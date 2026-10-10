@@ -4,10 +4,9 @@
 # Without file arguments both APIs below are linted. A single file:
 #   npx -y @redocly/cli@2.62.1 lint docs/api/openapi.yaml --config docs/api/redocly.yaml
 #
-# The action lists mirror docs/spec/05-aktionen.md (closed catalogue). The block "proposed"
-# holds actions that docs/spec/06-api.md requests as additions to the core contract
-# ("Kern-Vertrag: Ergänzung beantragt"); it must be empty once 05 is amended or the routes are
-# changed. The gate check `api-catalogue-sync` compares these lists with 05 (docs/spec/06-api.md).
+# The action lists mirror docs/spec/05-aktionen.md section 4 (closed catalogue), the rate-limit
+# classes section 3. The gate check `api-catalogue-sync` compares these lists with 05
+# (docs/spec/06-api.md); a new action enters 05 first, then this file.
 
 extends:
   - recommended
@@ -35,8 +34,8 @@ rules:
   no-unused-components: off
   # OpenAPI 3.1 allows `description` next to `$ref` (JSON Schema 2020-12); we use it for field docs.
   spec-ref-siblings: off
-  # Replaced by rule/operation-4xx-response below, which exempts operations without a
-  # rate-limit class (health probes): they have no client error to report.
+  # Replaced by rule/operation-4xx-response below, which exempts operations with rate-limit
+  # class `none` (webhook event descriptions under `webhooks:`): they have no client error.
   operation-4xx-response: off
   rule/operation-4xx-response:
     subject:
@@ -71,6 +70,7 @@ rules:
       enum:
         # catalogue (docs/spec/05-aktionen.md section 4)
         - access.explain
+        - access.preview
         - access.view_as
         - agent.billing_mode.set
         - agent.billing_mode.set_all
@@ -78,10 +78,13 @@ rules:
         - agent.create
         - agent.credential_holder.set
         - agent.disable
+        - agent.enable
         - agent.events.consume
         - agent.heartbeat
         - agent.invoke
         - agent.read
+        - agent.tool_class.set
+        - agent.triggerers.read
         - agent.update
         - agent_session.bind
         - agent_session.read
@@ -89,7 +92,9 @@ rules:
         - agent_session.reset
         - app.install
         - app.read
+        - app.resume
         - app.scopes.update
+        - app.suspend
         - app.uninstall
         - audit.read
         - audit.verify
@@ -105,9 +110,12 @@ rules:
         - channel.operator.set
         - channel.project.bind
         - channel.read
+        - channel.read_only.set
         - channel.reorder
         - channel.update
+        - client_metrics.submit
         - command.autocomplete
+        - command.autocomplete.respond
         - command.invoke
         - command.read
         - command.register
@@ -116,6 +124,10 @@ rules:
         - cost.read.aggregate
         - cost.read.thread
         - cost.reconcile
+        - cost.reconcile.submit
+        - dev_environment.manage
+        - dev_environment.read
+        - dev_environment.report
         - device.approve
         - device.list
         - device.revoke
@@ -130,6 +142,7 @@ rules:
         - file.delete
         - file.read
         - file.transcribe
+        - file.transcript.submit
         - file.upload
         - forum_tag.manage
         - gateway.connect
@@ -139,26 +152,33 @@ rules:
         - gdpr.request.decide
         - gdpr.request.read
         - grant.create
+        - grant.expire
         - grant.read
         - grant.revoke
         - group.create
         - group.delete
         - group.member.add
+        - group.member.expire
         - group.member.remove
         - group.read
         - group.update
         - identity.link
+        - identity.read
         - identity.unlink
         - identity_provider.manage
         - identity_provider.read
+        - import.apply
         - import.manage
         - import.read
+        - instance.bootstrap
         - instance.branding.update
         - instance.discovery.read
         - instance.read
+        - instance.settings.read
         - instance.settings.update
         - interaction.create
         - interaction.respond
+        - local_credential.set
         - mention.list
         - message.create
         - message.delete
@@ -183,6 +203,7 @@ rules:
         - read_state.mark_unread
         - read_state.update
         - run.cancel
+        - run.context.read
         - run.finish
         - run.followup.create
         - run.overview.read
@@ -191,6 +212,7 @@ rules:
         - run.update
         - search.query
         - self.profile.update
+        - self.read
         - session.list
         - session.revoke
         - settings.read
@@ -228,21 +250,12 @@ rules:
         - user.update
         - webhook_in.create
         - webhook_in.post
+        - webhook_in.read
         - webhook_in.revoke
         - webhook_out.deliver
         - webhook_out.manage
         - webhook_out.read
         - webhook_out.redeliver
-        # proposed (docs/spec/06-api.md section 18)
-        - agent.enable
-        - command.autocomplete.respond
-        - file.transcript.submit
-        - health.read
-        - identity.read
-        - instance.settings.read
-        - local_credential.set
-        - self.read
-        - webhook_in.read
     message: x-authz-action is not in the action catalogue.
 
   rule/rate-limit-class-required:
@@ -263,6 +276,7 @@ rules:
         - rl.agent_runtime
         - rl.export
         - rl.gateway_connect
+        - rl.import
         - rl.interaction
         - rl.message
         - rl.public_auth
@@ -297,6 +311,7 @@ rules:
     assertions:
       enum: &receive_actions
         - access.explain
+        - access.preview
         - access.view_as
         - agent.billing_mode.set
         - agent.billing_mode.set_all
@@ -304,10 +319,13 @@ rules:
         - agent.create
         - agent.credential_holder.set
         - agent.disable
+        - agent.enable
         - agent.events.consume
         - agent.heartbeat
         - agent.invoke
         - agent.read
+        - agent.tool_class.set
+        - agent.triggerers.read
         - agent.update
         - agent_session.bind
         - agent_session.read
@@ -315,7 +333,9 @@ rules:
         - agent_session.reset
         - app.install
         - app.read
+        - app.resume
         - app.scopes.update
+        - app.suspend
         - app.uninstall
         - audit.read
         - audit.verify
@@ -331,9 +351,12 @@ rules:
         - channel.operator.set
         - channel.project.bind
         - channel.read
+        - channel.read_only.set
         - channel.reorder
         - channel.update
+        - client_metrics.submit
         - command.autocomplete
+        - command.autocomplete.respond
         - command.invoke
         - command.read
         - command.register
@@ -342,6 +365,10 @@ rules:
         - cost.read.aggregate
         - cost.read.thread
         - cost.reconcile
+        - cost.reconcile.submit
+        - dev_environment.manage
+        - dev_environment.read
+        - dev_environment.report
         - device.approve
         - device.list
         - device.revoke
@@ -356,6 +383,7 @@ rules:
         - file.delete
         - file.read
         - file.transcribe
+        - file.transcript.submit
         - file.upload
         - forum_tag.manage
         - gateway.connect
@@ -365,26 +393,33 @@ rules:
         - gdpr.request.decide
         - gdpr.request.read
         - grant.create
+        - grant.expire
         - grant.read
         - grant.revoke
         - group.create
         - group.delete
         - group.member.add
+        - group.member.expire
         - group.member.remove
         - group.read
         - group.update
         - identity.link
+        - identity.read
         - identity.unlink
         - identity_provider.manage
         - identity_provider.read
+        - import.apply
         - import.manage
         - import.read
+        - instance.bootstrap
         - instance.branding.update
         - instance.discovery.read
         - instance.read
+        - instance.settings.read
         - instance.settings.update
         - interaction.create
         - interaction.respond
+        - local_credential.set
         - mention.list
         - message.create
         - message.delete
@@ -409,6 +444,7 @@ rules:
         - read_state.mark_unread
         - read_state.update
         - run.cancel
+        - run.context.read
         - run.finish
         - run.followup.create
         - run.overview.read
@@ -418,6 +454,7 @@ rules:
         - search.query
         - self
         - self.profile.update
+        - self.read
         - session.list
         - session.revoke
         - settings.read
@@ -455,6 +492,7 @@ rules:
         - user.update
         - webhook_in.create
         - webhook_in.post
+        - webhook_in.read
         - webhook_in.revoke
         - webhook_out.deliver
         - webhook_out.manage

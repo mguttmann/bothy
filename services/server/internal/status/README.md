@@ -5,11 +5,11 @@ Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
 
 ## Zweck
 
-Statusseite, Komponenten, Störungen, automatische Prüfungen.
+Statusseite, Komponenten, Störungen, automatische Prüfungen, Sicherungsläufe.
 
 ## Port (Wurzelpaket `internal/status`)
 
-- Eingehend: `Status`.
+- Eingehend: `Status`, `BackupRuns` (für `bothy-backupd`).
 - Gibt In-Tx-Ereignisse aus: keine.
 - Abonniert In-Tx-Ereignisse: `agents.AgentDisabled`.
 - Implementiert Quellen-Ports und Querschnitts-Ports: keine.
@@ -25,7 +25,7 @@ Geprüft durch go-arch-lint (ADR 0008).
 
 ## Tabellen
 
-`status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`.
+`status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs`.
 
 Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
 

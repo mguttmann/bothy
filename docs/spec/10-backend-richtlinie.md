@@ -8,7 +8,7 @@ Adapter-Vertrag und Aufruf-Marke: [09-agenten.md](09-agenten.md). Rechte-Modell:
 [07-rechte.md](07-rechte.md). Entscheidung:
 [ADR 0024](../adr/0024-backend-richtlinie-personal-organization-mit-invariante.md).
 
-Stellen mit "(Kern-Vertrag: Ergänzung beantragt)" sind in Abschnitt 16 gesammelt.
+Die beim Entwurf beantragten Ergänzungen stehen jetzt im Kern-Vertrag (Abschnitt 16).
 
 ## 1. Zweck
 
@@ -82,8 +82,8 @@ einer bestimmten Installation; instanzbezogene Angaben gehören nicht ins Produk
 
 Folge von I1 (03 Abschnitt 6.4): Jeder Owner hat überall `trigger`, also gehört jeder Owner zur
 Menge. `personal` ist darum nur möglich, solange der `credential_holder` der einzige Owner ist.
-Ein zweiter Owner verlangt vorher die Umstellung aller persönlichen Agenten (Abschnitt 11). Ob das
-so bleiben soll, ist eine Frage an den Owner (ADR 0024, "More Information").
+Ein zweiter Owner verlangt vorher die Umstellung aller persönlichen Agenten (Abschnitt 11). Eine
+Owner-Ausnahme gibt es nicht (Ruling L22, ADR 0024).
 
 ## 4. Prüfstellen im Überblick
 
@@ -144,8 +144,8 @@ Ziele von Agent A sind:
 3. Die Bereiche dieser Kanäle.
 4. Die Instanz.
 
-Punkt 2 braucht einen Index auf `threads (operator_agent_id)` ohne Bedingung `state = 'open'`;
-der Index aus 03 genügt dafür nicht (Kern-Vertrag: Ergänzung beantragt).
+Punkt 2 nutzt den Index `threads (operator_agent_id, channel_id)` ohne Bedingung auf `state`
+(03, `threads`; Prüfung in 03 Abschnitt 6.4).
 
 Gast-Kanäle (`allow_mentioned_agents`) zählen nicht zu den Zielen, weil ein persönlicher Agent nie
 Gast-Agent ist ([09-agenten.md](09-agenten.md) Abschnitt 3.6). Ohne diese Regel müsste I1 auch bei
@@ -265,8 +265,7 @@ Warnungen an der Agenten-Karte und in der Konsole:
 | `billing_evidence.key_type = unknown` | "Anmeldeart der Laufzeit unbekannt" | alle Aufrufe scheitern |
 
 Ein Wechsel von `reported_billing_mode` schreibt einen Audit-Eintrag (Aktion `agent.heartbeat`,
-`decision = allow`, alte und neue Werte in den Details). 05 sieht für `agent.heartbeat` heute
-kein Audit vor (Kern-Vertrag: Ergänzung beantragt: Audit bei Änderung des Ist-Modus). Grund: Der
+`decision = allow`, alte und neue Werte in den Details; 05, `agent.heartbeat`). Grund: Der
 Ist-Modus ist der Beleg für I3; seine Geschichte muss prüfbar sein.
 
 ## 9. Umschalten (I4)
@@ -352,8 +351,7 @@ durch eine bestätigte Aktion:
    umgestellt ist."
 3. Der Owner gibt einen Grund ein und bestätigt mit Step-up.
 4. Eine Anfrage: `grant.create` mit `resolve_i1 = {switch_to_organization: [agent_ids], reason}`
-   (Kern-Vertrag: Ergänzung beantragt; gleiches Feld für `group.member.add`, `owner.add` und die
-   Bediener-Aktionen). Der Server prüft beide Aktionen einzeln mit `authorize`, führt sie in einer
+   (05, Regel 1.6; gleiches Feld für `group.member.add`, `owner.add` und die Bediener-Aktionen). Der Server prüft beide Aktionen einzeln mit `authorize`, führt sie in einer
    Transaktion aus (erst Umschalten, dann Freigabe), prüft I1 und schreibt zwei Audit-Einträge mit
    derselben `correlation_id`.
 5. Die Konsole zeigt danach die Agenten-Karte mit dem Stand des Adapters (Abschnitt 8) und die
@@ -397,16 +395,17 @@ Am Laufende ([09-agenten.md](09-agenten.md) 4.10) schreibt der Server je Modell 
 |---|---|---|
 | Preis für `provider`, `model` zur Zeit `occurred_at` in `price_table` | `computed` | Token je Einheit mal Preis je Einheit |
 | kein Preis, aber Betrag vom Adapter | `adapter_reported` | Betrag des Adapters |
-| weder noch | `unpriced` (Kern-Vertrag: Ergänzung beantragt, neuer Wert) | `0`; Anzeige "Preis fehlt" |
+| weder noch | `unpriced` | `0`; Anzeige "Preis fehlt" |
 
 `computed` hat Vorrang vor `adapter_reported`. Grund: Eine Preistabelle mit Quelle und Abrufzeit
 ist prüfbar und für alle Adapter gleich; Laufzeiten rechnen mit eigenen, versionsabhängigen
 Tabellen (Claude Code nennt seine Werte "client-side estimates",
 https://code.claude.com/docs/en/headless, abgerufen 2026-10-10, [belegt]).
 
-Eine Berechnung nutzt bis zu vier Preiszeilen (Eingabe, Ausgabe, Cache lesen, Cache schreiben).
-`cost_entries.price_id` kann nur eine nennen. Vorschlag: den Preissatz über `provider`, `model`
-und `valid_from` referenzieren (Kern-Vertrag: Ergänzung beantragt).
+Eine Berechnung nutzt bis zu fünf Preiszeilen (Eingabe, Ausgabe, Cache lesen, Cache schreiben mit
+5 Minuten und mit 1 Stunde). Darum verweist eine Buchung `computed` nicht auf eine Preiszeile,
+sondern auf den Preissatz zu `provider`, `model` und `occurred_at`; benutzte Preiszeilen ändern
+sich nicht mehr (03, R-DM-23).
 
 Alle Einträge sind Schätzungen (`is_estimate = true`), bis ein Abgleich sie ersetzt (12.4).
 Beträge verschiedener Währungen werden nie umgerechnet; Summen stehen je Währung.
@@ -440,9 +439,11 @@ Cache-Treffer und Ausgabe sowie Zu- und Abschläge für Batch-Verarbeitung, US-I
 (`inference_geo`), Fast Mode und lange Prompts bei einem Modell [belegt]. Die Schätzung bildet
 davon nur die Grundpreise je Einheit ab. Daraus folgt [abgeleitet]:
 
-- `price_table.unit` kennt nur `cache_write_mtok` ohne Dauer. Nutzt eine Laufzeit Cache mit
-  1 Stunde, schätzt der Server zu niedrig (Kern-Vertrag: Ergänzung beantragt, Einheit
-  `cache_write_1h_mtok`).
+- `price_table.unit` unterscheidet Cache-Schreiben mit 5 Minuten (`cache_write_mtok`) und mit
+  1 Stunde (`cache_write_1h_mtok`); der Verbrauch kommt getrennt als `tokens_cache_write` und
+  `tokens_cache_write_1h` (03). Meldet eine Laufzeit die Dauer nicht, zählt alles als
+  5 Minuten, und die Schätzung ist bei Cache mit 1 Stunde zu niedrig, bis der Abgleich sie
+  korrigiert.
 - Zuschläge, Rabatte und Preisstufen fehlen in der Schätzung; der Abgleich (12.4) korrigiert sie.
 
 ### 12.4 Abgleich mit der Abrechnung
@@ -479,9 +480,9 @@ Ablauf:
    `reconciler.lookback` Tage.
 
 Berechtigung: `cost.reconcile` verlangt Step-up und ist damit für eine App unmöglich (R-AZ-03).
-Beantragt ist eine eigene Aktion `cost.reconcile.submit` für Apps mit Scope `costs:reconcile`,
-ohne Step-up, die nur `reconciled`-Einträge zu vorhandenen Läufen anlegt und nichts löscht
-(Kern-Vertrag: Ergänzung beantragt). Grund: Der Abgleich ändert nur Schätzbeträge, keine Rechte;
+Die App nutzt darum die eigene Aktion `cost.reconcile.submit` mit Scope `costs:reconcile` (05),
+ohne Step-up; sie legt nur `reconciled`-Einträge zu vorhandenen Läufen an und löscht nichts
+(ADR 0055). Grund: Der Abgleich ändert nur Schätzbeträge, keine Rechte;
 ein Job kann keinen Passkey bestätigen.
 
 ## 13. Anzeige in der App
@@ -507,7 +508,7 @@ Sinn.
 | I1-Ablehnung | auslösende Aktion, `deny`, `i1_violation` | Agenten und zusätzliche Prinzipal-IDs |
 | I2-Ablehnung | `agent.invoke`, `deny`, `billing_mode_personal_not_holder` | Lauf, Auslöser, Agent |
 | I3-Abweichung | `run.start` bzw. Meldung des Adapters, `deny`, `billing_mode_mismatch` | Soll, gemeldetes Ist, `billing_evidence` ohne Werte |
-| Ist-Modus geändert | `agent.heartbeat` (Ergänzung, Abschnitt 8) | alt, neu, `method` |
+| Ist-Modus geändert | `agent.heartbeat` (Abschnitt 8) | alt, neu, `method` |
 | Kostenabgleich | `cost.reconcile.submit` | Zeitraum, Anzahl Einträge, Summen je Währung |
 | Preise | `price.manage` | Zeile, Quelle, Abrufzeit |
 
@@ -529,18 +530,20 @@ Sinn.
 | BR-12 | Runner im Modus `organization` ohne Key | kein Rückfall auf ein Abo; `runtime_not_authenticated` |
 | BR-13 | Antworten und Protokolle auf Schlüsselwerte durchsuchen (Geheimtext in allen Feldern) | Wert erscheint nirgends |
 
-## 16. Kern-Vertrag: beantragte Ergänzungen
+## 16. Abgleich mit dem Kern-Vertrag
 
-| Nr | Ergänzung | Betrifft |
+Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026-10-10):
+
+| Nr | Ergänzung | Entscheidung, Ort |
 |---|---|---|
-| E-BR-01 | Index `threads (operator_agent_id)` ohne Bedingung auf `state` für I1 | 03 `threads` |
-| E-BR-02 | Feld `resolve_i1` an `grant.create`, `group.member.add`, `owner.add`, Bediener-Aktionen | 05, 06 |
-| E-BR-03 | Audit bei Änderung von `reported_billing_mode` | 05 `agent.heartbeat` |
-| E-BR-04 | `cost_entries.source` Wert `unpriced` | 03 `cost_entries` |
-| E-BR-05 | Preissatz statt einzelner `price_id` | 03 `cost_entries` |
-| E-BR-06 | Einheit `cache_write_1h_mtok` | 03 `price_table` |
-| E-BR-07 | Aktion `cost.reconcile.submit` mit Scope `costs:reconcile` | 05 Abschnitt 2.6 und 4.12 |
-| E-BR-08 | `billing_evidence` in `run.start` und im Heartbeat | 04 Abschnitt 15.3, 03 `agent_heartbeat.v1` |
+| E-BR-01 | I1-Ziele mit Threads, deren fester Bediener der Agent ist, auch erledigt | übernommen, 03 Abschnitt 6.4 und Index an `threads` |
+| E-BR-02 | Feld `resolve_i1` | übernommen, 05 Regel 1.6, R-AZ-17 |
+| E-BR-03 | Audit bei Änderung von `reported_billing_mode` | übernommen, 05 `agent.heartbeat` |
+| E-BR-04 | `cost_entries.source` Wert `unpriced` | übernommen, 03 |
+| E-BR-05 | Preissatz statt einzelner `price_id` | übernommen, 03 `cost_entries`, R-DM-23 |
+| E-BR-06 | Einheit `cache_write_1h_mtok` | übernommen, dazu `tokens_cache_write_1h` (03) |
+| E-BR-07 | Aktion `cost.reconcile.submit` mit Scope `costs:reconcile` | übernommen, 05 |
+| E-BR-08 | `billing_evidence` in `run.start` und im Heartbeat | übernommen, 03 `runs.billing_evidence`, `agent_heartbeat.v1` |
 
 ## 17. Konfigurationswerte dieses Kapitels
 

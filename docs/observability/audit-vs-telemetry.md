@@ -41,5 +41,5 @@ ADR 0021 (Team C) legen Inhalt und Prüfung des Audit-Logs fest.
 |---|---|
 | `audit_events` | `action = grant.revoke`, `decision = allow`, Akteur, Gerät, Sitzung, `resource_id` der Freigabe, `correlation_id` |
 | `event_log` | `access.changed` an Betroffene, ggf. `run.cancel_requested`, gleiche `correlation_id` |
-| Trace | Span `POST /v1/grants/{id}/revoke` mit `bothy.action = grant.revoke`, `bothy.decision = allow`, Pseudonym des Akteurs |
+| Trace | Span `POST /api/v1/grants/{id}/revoke` mit `bothy.action = grant.revoke`, `bothy.decision = allow`, Pseudonym des Akteurs |
 | Metrik | `bothy.authz.decisions{bothy.action="grant.revoke", bothy.decision="allow"}` plus eins |

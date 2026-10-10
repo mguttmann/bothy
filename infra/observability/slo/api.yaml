@@ -13,8 +13,8 @@ slos:
     description: "Share of REST requests answered without a 5xx status."
     sli:
       events:
-        error_query: sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway",http_response_status_code=~"5.."}[{{.window}}]))
-        total_query: sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/v1/gateway"}[{{.window}}]))
+        error_query: sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway",http_response_status_code=~"5.."}[{{.window}}]))
+        total_query: sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway"}[{{.window}}]))
     alerting:
       name: BothyApiAvailabilityBudgetBurn
       labels:

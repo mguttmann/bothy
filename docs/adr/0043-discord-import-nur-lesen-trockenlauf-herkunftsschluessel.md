@@ -65,7 +65,7 @@ Festlegungen:
 - Gut, weil ein abgebrochener Lauf auf jedem Rechner fortsetzt; der Zustand liegt im Server.
 - Gut, weil derselbe Weg einen späteren Zulip-Import trägt.
 - Schlecht, weil die API eine Owner-Schnittstelle mit Rückdatierung und fremdem Autor bekommt
-  (`import.apply`, Kern-Vertrag: Ergänzung beantragt). Ausgleich: nur Owner, nur für eine laufende
+  (`import.apply`, 05 Abschnitt 4.12). Ausgleich: nur Owner, nur für eine laufende
   Quelle, nur mit `origin = import`, Start mit Step-up, Audit.
 - Schlecht, weil ein langer Lese-Spiegel einen laufenden Client-Prozess braucht. Ausgleich: Der
   Prozess ist zustandslos und kann als eigener Container mit Neustart-Regel laufen.
@@ -118,6 +118,6 @@ Diese Tests halten die Entscheidung im Repo (Kapitel 22, Abschnitt 16):
   [08-identitaet.md](../spec/08-identitaet.md).
 - Lehren der Vorgänger (Trockenlauf-Beweis, Herkunftsschlüssel, Ruhe-Regel, CDN-Abruf):
   [REUSE.md](../REUSE.md).
-- Beantragte Ergänzungen des Kern-Vertrags: Kapitel 22, Abschnitt 18.
+- Abgleich mit dem Kern-Vertrag: Kapitel 22, Abschnitt 18.
 - Neu bewerten, wenn ein Quell-Typ nur über einen Server-Push (Webhook) erreichbar ist; dann
   braucht der Server einen Eingang, aber weiterhin keinen ausgehenden Abruf.

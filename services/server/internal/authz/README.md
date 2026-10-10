@@ -31,11 +31,11 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Aktionen (05-aktionen.md)
 
-`access.explain`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `grant.read`, `grant.create`, `grant.revoke`.
+`access.explain`, `access.preview`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `group.member.expire`, `grant.read`, `grant.create`, `grant.revoke`, `grant.expire`.
 
 ## Ereignisse und WebSocket-Ops
 
-- Dauerhaft: `grant.changed`, `group.changed`, `access.changed`.
+- Dauerhaft: `grant.changed`, `group.changed`, `access.changed`, `access.expiring`.
 - Kurzlebig: keine.
 - WebSocket-Ops (Client an Server): keine.
 
@@ -43,8 +43,8 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 | Job | Auslöser | Warteschlange |
 |---|---|---|
-| `authz.expiry_reminder` | periodisch, Erinnerung vor Ablauf | `maintenance` |
-| `authz.expiry_sweep` | periodisch, `access.changed` nach Ablauf (beantragt) | `maintenance` |
+| `authz.expiry_reminder` | periodisch, `access.expiring` vor Ablauf | `maintenance` |
+| `authz.expiry_sweep` | periodisch, `access.changed` nach Ablauf (Systemaktionen `grant.expire`, `group.member.expire`) | `maintenance` |
 
 ## Hinweise für den Bau
 

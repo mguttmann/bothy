@@ -3,7 +3,7 @@ config:
   layout: elk
 ---
 %% C4 Ebene 3: Komponenten des Servers = Module des Monolithen.
-%% Pfeil A --> B heißt: A darf den Port von B aufrufen (Abhängigkeitstabelle in 02-architektur.md, 5.3).
+%% Pfeil A --> B heißt: A darf den Port von B aufrufen (Abhängigkeitstabelle in 02-architektur.md, 4.4).
 %% Alle Module nutzen zusätzlich die Querschnitts-Ports aus internal/kernel; diese Kanten sind nicht gezeichnet.
 flowchart TB
   classDef top fill:#5e35b1,stroke:#3b1f78,color:#ffffff
@@ -65,6 +65,7 @@ flowchart TB
   privacy --> files
   importer --> identity
   importer --> chat
+  importer --> agents
   importer --> messaging
   importer --> files
   search --> chat

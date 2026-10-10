@@ -59,8 +59,8 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
 
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
-        gitleaks-staged denylist denylist-history licenses docs adr-index linkcheck trivy-image portability \
-        linkcheck-external diagrams tokens api-lint api-clients runners-check commitlint \
+        gitleaks-staged denylist denylist-history licenses docs adr-index config-reference linkcheck \
+        trivy-image portability linkcheck-external diagrams tokens api-lint api-clients runners-check commitlint \
         review labels-check labels-sync tools-lock release-build clean
 
 help: ## Show the targets
@@ -184,13 +184,17 @@ commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the 
 	  rc=0; $(UVRUN) python tools/hooks/commit_msg.py "$$f" || rc=$$?; rm -f "$$f"; exit $$rc; fi
 
 # ---- documentation --------------------------------------------------------------------
-docs: ## Documentation site builds strictly; ADR index is current
+docs: ## Documentation site builds strictly; ADR index and configuration reference are current
 	$(UVRUN) python tools/docs/adr_index.py --check
+	$(UVRUN) python tools/docs/config_reference.py --check
 	@# No --quiet: it hides the warnings that --strict turns into a failure.
 	$(UVRUN) mkdocs build --strict --site-dir site
 
 adr-index: ## Regenerate the ADR index in docs/adr/README.md
 	$(UVRUN) python tools/docs/adr_index.py
+
+config-reference: ## Regenerate section 4 of docs/operations/configuration.md from the chapter tables
+	$(UVRUN) python tools/docs/config_reference.py
 
 linkcheck: ## Local links and anchors of every tracked Markdown file (offline)
 	git ls-files -z -- '*.md' | xargs -0 $(call tool,lychee) --offline --include-fragments --no-progress --quiet

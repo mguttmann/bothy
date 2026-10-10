@@ -604,7 +604,7 @@ Antippen öffnet die volle Live-Box als Blatt. Freigabe-Knöpfe untereinander in
 als System-Auswahlliste.
 
 **M5 Sprachnachricht aufnehmen.** Mikrofon gedrückt halten; Wischen nach links verwirft, nach oben
-sperrt die Aufnahme; Loslassen sendet. Höchstdauer `client.voice.max_duration`; vor Ablauf ein
+sperrt die Aufnahme; Loslassen sendet. Höchstdauer `voice.max_duration` ([12-dateien.md](12-dateien.md), von `instance.read` geliefert); vor Ablauf ein
 Hinweis.
 
 ```text
@@ -866,31 +866,34 @@ geprüft (Ticket in 15-client-architektur.md).
 
 ## 10. Benachrichtigungen
 
-### 10.1 Wann ein Push kommt
+### 10.1 Wann ein Hinweis kommt
 
-Wirksame Stufe: Thread vor Kanal vor Bereich vor `notify.default_level` ([03](03-datenmodell.md),
-`notification_preferences`).
+Normativ für Arten, Empfänger, wirksame Stufe und Ruhezeiten ist
+[13-push-benachrichtigungen.md](13-push-benachrichtigungen.md), Abschnitte 2 bis 4. Für die
+Oberfläche gilt kurz:
 
 | Ereignis | Stufe `all` | Stufe `mentions` | Stufe `mute` |
 |---|---|---|---|
 | Neue Nachricht in einem sichtbaren Thread (nicht eigene) | ja | nein | nein |
-| Erwähnung meiner Person, Antwort mit Zitat auf meine Nachricht | ja | ja | nein |
-| Lauf, den ich ausgelöst habe, wartet auf mich (`waiting_input`) oder hat eine Komponente für mich | ja | ja | ja, wenn `notify.my_runs` |
-| Lauf, den ich ausgelöst habe, ist fertig oder fehlgeschlagen | wenn `notify.my_runs` | wenn `notify.my_runs` | wenn `notify.my_runs` |
+| Erwähnung meiner Person, Nachricht in meiner Direktnachricht | ja | ja | nein |
+| Lauf, den ich ausgelöst habe, wartet auf mich (`waiting_input`) | ja | ja | ja |
+| Lauf, den ich ausgelöst habe, ist fertig oder fehlgeschlagen | ja | ja | nein |
 | Nachrichten von Agenten ohne Erwähnung | ja | nein | nein |
 | Importierte oder stille Nachrichten (`silent`) | nein | nein | nein |
 
-Ruhezeiten unterdrücken Pushes; Zähler und Abzeichen laufen weiter. Es gibt keine Ausnahme für
-"dringend", damit Ruhezeiten verlässlich bleiben. Jeder Push läuft vorher durch `push.deliver`.
+In Ruhezeiten kommen Hinweise leise (kein Ton, kein Wecken); Zähler und Abzeichen laufen weiter.
+Laut bleibt nur eine Rückfrage eines eigenen Laufs, und nur wenn die Person
+`notify.input_needed_breaks_quiet_hours` eingeschaltet hat. Jeder Hinweis läuft vorher durch
+`push.deliver`.
 
 ### 10.2 Inhalt
 
 Der Push selbst trägt nur IDs und einen neutralen Platzhalter ("Neue Nachricht"). Die App holt den
 Text selbst ([15](15-client-architektur.md), Hintergrundverhalten) und zeigt danach
 "<Kanal> · <Thread-Titel>" als Titel und "<Autor>: <Text, gekürzt>" als Text. Klappt das Holen
-nicht (kein Netz zum Server, Zeit abgelaufen), bleibt der Platzhalter. Mit
-`notify.preview_content = off` holt die App nie Text; dann steht dort nur der Platzhalter mit dem
-Kanalnamen, den die App lokal kennt.
+nicht (kein Netz zum Server, Zeit abgelaufen), bleibt der Platzhalter. Was die Vorschau zeigen
+darf, steuert `notify.preview_mode` (`full`, `names`, `none`); bei `none` holt die App nie Text,
+dann steht dort nur der Platzhalter mit dem Kanalnamen, den die App lokal kennt.
 
 ### 10.3 Plattform
 
@@ -906,8 +909,11 @@ aktiv ist; ein eigener Push nur zum Aufräumen ist später zu prüfen.
 
 ## 11. Einstellungen der Person
 
-Synchronisiert über `user_settings` ([04](04-sync-protokoll.md) Abschnitt 14). Schema je Schlüssel
-in der Konfigurationsreferenz (Kern-Vertrag: Ergänzung beantragt).
+Synchronisiert über `user_settings` ([04](04-sync-protokoll.md) Abschnitt 14). Diese Tabelle ist
+für alle persönlichen Schlüssel außer `notify.*` normativ ([03-datenmodell.md](03-datenmodell.md),
+`user_settings`); die Schlüssel `notify.*` stehen in
+[13-push-benachrichtigungen.md](13-push-benachrichtigungen.md), Abschnitt 3.3. Der Server lehnt
+unbekannte Schlüssel und Werte außerhalb der Liste ab.
 
 | Schlüssel | Werte | Standard | Bedeutung |
 |---|---|---|---|
@@ -915,9 +921,6 @@ in der Konfigurationsreferenz (Kern-Vertrag: Ergänzung beantragt).
 | `appearance.density` | `comfortable`, `compact` | `comfortable` | nur Desktop; Mobil fest `touch` |
 | `appearance.reduce_motion` | `system`, `on`, `off` | `system` | Bewegung reduzieren |
 | `composer.enter_sends` | `true`, `false` | `true` auf Desktop, `false` auf Mobil (je Gerät gemerkt) | Enter sendet |
-| `notify.default_level` | `all`, `mentions`, `mute` | `mentions` | Standardstufe |
-| `notify.my_runs` | `true`, `false` | `true` | Ende und Rückfragen eigener Läufe melden |
-| `notify.preview_content` | `true`, `false` | `true` | Text in Mitteilungen laden |
 | `privacy.crash_reports` | `true`, `false` | `true`, wenn die Instanz einen Absturzdienst eingerichtet hat | Absturzberichte senden |
 | `privacy.client_metrics` | `true`, `false` | `true` | Leistungsdaten ohne Inhalte senden |
 | `layout.column_widths` | Objekt | leer | Spaltenbreiten Desktop |
@@ -935,7 +938,7 @@ Regeln:
 
 - `branding.accent_color` ist ein Schlüssel aus den Kategorie-Farben (`spruce`, `loch`, `heather`,
   `rowan`, `amber`, `gorse`, `moss`), kein freier Farbwert; nur diese Kombinationen sind im
-  Kontrast-Test (Kern-Vertrag: Ergänzung beantragt, siehe Bericht).
+  Kontrast-Test (03, `instance_settings`; Schema in der Konfigurationsreferenz).
 - Ohne eigene Build-Konfiguration baut das Repo eine neutrale Fassung mit dem Arbeitsnamen und
   Platzhalter-IDs unter `example.com`.
 - Das Logo wird als Datei hochgeladen und nur über den Server ausgeliefert; die App fällt auf das
@@ -949,8 +952,8 @@ Regeln:
 | R-PR-02 | Präsenz nur für Agenten, nie für Menschen. | Datenschutz und Mitbestimmung; für Agenten ist Präsenz Betriebsinformation. |
 | R-PR-03 | Keine Lesebestätigungen für andere; Gelesen-Stand bleibt persönlich. | Leistungskontrolle vermeiden; nicht im Baseline-Umfang. |
 | R-PR-04 | Kein Tastenkürzel löst eine Freigabe aus. | Fehlbedienung bei Freigaben ist teuer. |
-| R-PR-05 | Rückfragen eigener Läufe melden sich auch bei Stufe "stumm" (abschaltbar über `notify.my_runs`). | Ein wartender Agent blockiert die Arbeit der Person, die ihn gestartet hat. |
-| R-PR-06 | Ruhezeiten kennen keine Ausnahme. | Verlässlichkeit vor Dringlichkeit; Dringendes gehört nicht in einen Chat. |
+| R-PR-05 | Rückfragen eigener Läufe melden sich auch bei Stufe "stumm" (13, Art `input_needed`). | Ein wartender Agent blockiert die Arbeit der Person, die ihn gestartet hat. |
+| R-PR-06 | Ruhezeiten machen Hinweise leise; laut wird nur eine Rückfrage eines eigenen Laufs, wenn die Person es selbst einschaltet (13). | Verlässlichkeit vor Dringlichkeit; die einzige Ausnahme liegt in der Hand der Person. |
 | R-PR-07 | Mobil gibt es Notfall-Aktionen der Verwaltung, nicht die ganze Verwaltung. | Kleine Bildschirme für komplexe Rechte sind fehleranfällig; Sperren muss aber unterwegs gehen. |
 | R-PR-08 | Akzent je Instanz nur aus der geprüften Palette. | Kontrast AA ist ein Test, keine Hoffnung. |
 | R-PR-09 | Link-Vorschau im Client nur später und nur mit Opt-in. | Der Server lädt keine fremden URLs; der Client würde fremde Server kontaktieren. |
@@ -968,5 +971,4 @@ Regeln:
 | `ui.desktop_min_width_four_columns` | `1280px` | darunter klappt die Sitzungs-Spalte ein |
 | `ui.desktop_min_width_three_columns` | `960px` | darunter wird die Beitragsliste zum Stapel |
 | `a11y.live_announce_min_interval` | `10s` | höchstens so oft sagt die Live-Box einen Wechsel an |
-| `client.voice.max_duration` | `15m` | Höchstdauer einer Sprachnachricht (abzustimmen mit 12-dateien.md) |
 | `client.share.recent_targets` | `8` | zuletzt genutzte Ziele im Teilen-Blatt |

@@ -5,7 +5,7 @@ Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
 
 ## Zweck
 
-Instanz-Identität, Einstellungen und Branding, Feature-Flags, Server-Signierschlüssel mit JWKS und Rotation, Sequenz-Zähler.
+Instanz-Identität, Sync-Epoche, Mindest-Server-Version, Einstellungen und Branding, Feature-Flags, Server-Signierschlüssel mit JWKS und Rotation, Sequenz-Zähler.
 
 ## Port (Wurzelpaket `internal/instance`)
 
@@ -16,7 +16,7 @@ Instanz-Identität, Einstellungen und Branding, Feature-Flags, Server-Signiersch
 
 ## Abhängigkeiten
 
-Darf die Ports dieser Module nutzen: nichts.
+Darf die Ports keines anderen Moduls nutzen.
 
 Grund: Fundament.
 
@@ -31,7 +31,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Aktionen (05-aktionen.md)
 
-`instance.discovery.read`, `instance.read`, `instance.settings.update`, `instance.branding.update`, `feature_flag.read`, `feature_flag.update`, `signing_key.rotate`.
+`instance.discovery.read`, `instance.read`, `instance.settings.read`, `instance.settings.update`, `instance.branding.update`, `instance.bootstrap`, `feature_flag.read`, `feature_flag.update`, `signing_key.rotate`.
 
 ## Ereignisse und WebSocket-Ops
 

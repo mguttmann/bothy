@@ -20,7 +20,7 @@ Quelle des Diagramms: `docs/quality/pipeline.mmd`.
 | `test` | pytest, go test -race, flutter test, Skript `test` | Tests mit Abdeckungsdaten | | Werkzeuge |
 | `coverage` | coverage, go tool cover, LCOV-Auswertung | Mindestabdeckung | `quality.coverage.tools_min_percent`, `quality.coverage.go_min_percent`, `quality.coverage.dart_min_percent` | Werkzeuge |
 | `commitlint` | `tools/hooks/commit_msg.py` | Conventional Commits und DCO der Commits, die noch nicht auf `origin/main` sind | `commit.header_max_length` | ab erstem Remote |
-| `docs` | `tools/docs/adr_index.py`, MkDocs `--strict` | ADR-Index aktuell, Site baut ohne Warnung | | ja |
+| `docs` | `tools/docs/adr_index.py`, `tools/docs/config_reference.py`, MkDocs `--strict` | ADR-Index und Konfigurationsreferenz aktuell, kein Konfigurationsname doppelt (Ruling L4), Site baut ohne Warnung | | ja |
 | `linkcheck` | lychee `--offline --include-fragments` | lokale Links und Anker aller getrackten Markdown-Dateien | | ja |
 | `diagrams` | `tools/docs/render_diagrams.py` mit mermaid-cli | jedes Mermaid-Diagramm rendert, jede `.mmd` hat ihre `.svg` | | ja |
 | `api-lint` | Redocly CLI mit `docs/api/redocly.yaml` | OpenAPI und AsyncAPI, Pflicht von `x-authz-action` | | sobald `docs/api/openapi.yaml` existiert |

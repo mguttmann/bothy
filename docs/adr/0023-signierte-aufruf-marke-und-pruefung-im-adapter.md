@@ -96,5 +96,5 @@ wird bei jeder Zustellung neu ausgestellt (R-SY-07); der Server prüft sie beim 
 
 - Baseline I2, I3; docs/spec/04-sync-protokoll.md Abschnitt 15.3; docs/spec/05-aktionen.md
   Abschnitt 5; docs/spec/09-agenten.md Abschnitt 4.5.
-- Beantragte Zusätze zu den Claims (`space_id`, `trigger_kind`, `command_id`, Kopf `typ`) stehen
-  in docs/spec/09-agenten.md Abschnitt 20.
+- Die Claims einschließlich `space_id`, `trigger_kind`, `command_id`, `tool_class` und Kopf `typ`
+  stehen in docs/spec/05-aktionen.md Abschnitt 5.

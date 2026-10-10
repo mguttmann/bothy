@@ -46,8 +46,8 @@ Einheiten und Attribute. Kurzfassung:
 
 Traces folgen einer Anfrage über W3C Trace Context: App, REST, Ereignis-Log, Fan-out, Adapter,
 Laufzeit. `correlation_id` in Ereignissen und Audit ist die Trace-ID der auslösenden Anfrage.
-Für die Weitergabe an Adapter braucht der Dispatch-Rahmen ein Feld `trace_context`
-(Kern-Vertrag: Ergänzung beantragt).
+Für die Weitergabe an Adapter trägt der Umschlag das Feld `trace_context` (W3C `traceparent`,
+gespeichert in `event_log.trace_context`; 03, 04 Abschnitt 2.2).
 
 ![Trace-Weitergabe](../observability/diagrams/trace-propagation.svg)
 
@@ -100,7 +100,7 @@ Sicherung, SLO-Übersicht. Einzelheiten: [dashboards.md](../observability/dashbo
 ## 8. In-App-Statistik
 
 Die Admin-Konsole zeigt Nutzung je Bereich, Läufe, Werkzeugaufrufe, Kosten und Fehlerraten aus
-eigenen Tabellen. Zähler zu Menschen erscheinen nur ab `stats.min_group_size`; Werte je Person
+eigenen Tabellen. Zähler zu Menschen erscheinen nur ab `privacy.stats_min_group_size` ([20-datenschutz.md](20-datenschutz.md)); Werte je Person
 gibt es nicht. Einzelheiten: [admin-statistics.md](../observability/admin-statistics.md).
 
 ## 9. Apps
@@ -140,7 +140,6 @@ gibt es nicht. Einzelheiten: [admin-statistics.md](../observability/admin-statis
 | `telemetry.pseudonym_key_ref` | `file:<secrets.dir>/telemetry_pseudonym_key` | Schlüssel für HMAC-Pseudonyme; mindestens 32 Byte |
 | `telemetry.dashboard_url` | leer | Link aus der Admin-Konsole zum Telemetrie-Backend |
 | `stats.cache_ttl` | `5m` | so lange gilt ein berechnetes Statistik-Ergebnis |
-| `stats.min_group_size` | `5` | kleinere Zähler zu Menschen werden als "weniger als" angezeigt |
 | `stats.max_range` | `400d` | größter abfragbarer Zeitraum |
 
 ## 12. Entscheidungen dieses Kapitels

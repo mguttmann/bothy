@@ -16,7 +16,7 @@ Preistabelle, Kostenbuchungen, Summen je Lauf, Thread, Bereich, Agent, Abgleich.
 
 ## Abhängigkeiten
 
-Darf die Ports dieser Module nutzen: nichts.
+Darf die Ports keines anderen Moduls nutzen.
 
 Grund: Kostenzeilen tragen Kopien von Thread, Kanal, Bereich und Agent (03); keine Rückfrage nötig.
 
@@ -31,7 +31,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Aktionen (05-aktionen.md)
 
-`cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `cost.reconcile`.
+`cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `cost.reconcile`, `cost.reconcile.submit`.
 
 ## Ereignisse und WebSocket-Ops
 

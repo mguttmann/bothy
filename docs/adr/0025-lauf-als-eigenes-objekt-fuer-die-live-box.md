@@ -90,5 +90,5 @@ Sitzung und Marke macht.
 ## More Information
 
 - docs/spec/04-sync-protokoll.md Abschnitt 11; docs/spec/09-agenten.md Abschnitte 5 und 6.
-- Beantragte Ergänzungen (`runs.plan`, `metrics.last_api_retry`, `run.start` für
-  `waiting_input`) stehen in docs/spec/09-agenten.md Abschnitt 20.
+- `runs.plan`, `metrics.last_api_retry` und `run.start` für den Übergang aus `waiting_input`
+  stehen in docs/spec/03-datenmodell.md (`runs`) und docs/spec/04-sync-protokoll.md Abschnitt 11.

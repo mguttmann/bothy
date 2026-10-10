@@ -85,41 +85,22 @@ allgemein beschrieben:
    Runner bedient ein Forum, auf dem jeder Owner `trigger` hat; ein Runner im Modus `personal` mit
    einer anderen Person als `credential_holder` verletzt I1 immer. Eine Backend-Richtlinie je
    Dev-Umgebung (die Person nutzt ihr eigenes Abo, nur sie löst in ihrer Umgebung aus, SR3 sichert
-   das) ist als Ergänzung beantragt (Abschnitt 11) und braucht eine Entscheidung zu I1.
+   das) braucht I1 je Umgebung statt je Agent. Die Leitung hat sie auf die Etappe
+   "Mehrbenutzer-Dev-Umgebung" verschoben; bis dahin gilt nur `organization` (03, R-DM-24).
 
-## 6. Datensatz `dev_environments` und Bereitschaftsprüfung (Kern-Vertrag: Ergänzung beantragt)
+## 6. Datensatz `dev_environments` und Bereitschaftsprüfung
 
 ### 6.1 Tabelle
 
-| Feld | Typ | Null | Standard | Regeln / Hinweise |
-|---|---|---|---|---|
-| `id` | `uuid` | nein | | UUIDv7 |
-| `user_id` | `uuid` | nein | | Person, der die Umgebung gehört |
-| `runner_agent_id` | `uuid` | nein | | Runner, der die Umgebung betreibt |
-| `isolation_kind` | `text` | nein | | `CHECK (isolation_kind IN ('macos_vm','linux_vm','cloud_vm'))` |
-| `environment_ref` | `text` | nein | | undurchsichtiger Verweis, den der Runner auflöst; kein Pfad und kein Hostname des Servers |
-| `image_ref` | `text` | nein | | Version des sauberen Abbilds |
-| `billing_mode` | `text` | nein | `'organization'` | `CHECK (billing_mode IN ('organization'))` in dieser Etappe; Erweiterung beantragt |
-| `state` | `text` | nein | `'provisioning'` | `CHECK (state IN ('provisioning','verifying','ready','suspended','retired'))` |
-| `checks` | `jsonb` | nein | `'{}'` | Schema `dev_environment_checks.v1`: Ergebnis und Zeit je Prüfung D1 bis D10 |
-| `verified_at` | `timestamptz` | ja | | letzte vollständig bestandene Prüfung |
-| `red_team_passed_at` | `timestamptz` | ja | | Red Team für Art und Abbild bestanden |
-| `red_team_ref` | `text` | ja | | Verweis auf den Bericht |
-| `approved_by`, `approved_at` | `uuid`, `timestamptz` | ja | | Owner mit Step-up |
-| `suspended_reason` | `text` | ja | | z. B. `check_failed`, `user_disabled`, `manual` |
-| `created_at` | `timestamptz` | nein | `now()` | |
-| `retired_at` | `timestamptz` | ja | | |
-| `version` | `bigint` | nein | `1` | |
-
-PK: `id`. FK: `user_id` -> `users(principal_id)`, `runner_agent_id` -> `agents(principal_id)`,
-`approved_by` -> `principals(id)`, alle ON DELETE RESTRICT. Unique: Teilindex `(user_id,
-runner_agent_id) WHERE state <> 'retired'`. Aufbewahrung: `security`. Modul: `agents`.
-
-Zusätzlich beantragt: `agent_sessions.dev_environment_id` und `runs.dev_environment_id` (FK auf diese
-Tabelle, NULL bei Owner-Läufen in der Owner-Umgebung), Claim `dev_environment_id` in der
-Aufruf-Marke, Aktionen `dev_environment.read` (Owner oder die Person selbst),
-`dev_environment.manage` (Owner, Step-up, Audit, Rechte `ja`: anlegen, freigeben, sperren,
-zurückziehen) und `dev_environment.report` (Runner, `agent-self`: Prüfergebnisse melden).
+Die Tabelle `dev_environments` steht normativ in [03-datenmodell.md](03-datenmodell.md),
+Abschnitt 4.4 (Modul `agents`, Aufbewahrung `security`, Etappe "Mehrbenutzer-Dev-Umgebung"). Dazu
+gehören `agent_sessions.dev_environment_id` und `runs.dev_environment_id` (NULL bei Owner-Läufen
+in der Owner-Umgebung), der Claim `dev_environment_id` in der Aufruf-Marke
+([05-aktionen.md](05-aktionen.md), Abschnitt 5) und die Aktionen `dev_environment.read` (Owner
+oder die Person selbst), `dev_environment.manage` (Owner, Step-up, Audit, Rechte `ja`: anlegen,
+freigeben, sperren, zurückziehen) und `dev_environment.report` (Runner, `agent-self`:
+Prüfergebnisse melden) in 05, Abschnitt 4.13. Das Feld `checks` (Schema
+`dev_environment_checks.v1`) hält Ergebnis und Zeit je Prüfung D1 bis D10 aus Abschnitt 6.3.
 
 ### 6.2 Bereit
 
@@ -244,15 +225,17 @@ neues Red Team.
 ## 10. Offene Punkte
 
 - Ort der Umgebungen (eigener Rechner, Firmen-Hardware, Cloud): Owner.
-- Persönliches Abo in der eigenen Umgebung: braucht die beantragte Erweiterung von I1.
+- Persönliches Abo in der eigenen Umgebung: braucht I1 je Umgebung; Entscheidung in der Etappe "Mehrbenutzer-Dev-Umgebung".
 - Gemeinsame Sitzungen zweier Menschen in einem Thread: bewusst ausgeschlossen (Studie C).
 
-## 11. Ergänzungen am Kern-Vertrag (beantragt)
+## 11. Abgleich mit dem Kern-Vertrag
 
-| Nr | Ergänzung |
-|---|---|
-| K-DV-1 | Tabelle `dev_environments` (Abschnitt 6.1), Spalten `agent_sessions.dev_environment_id`, `runs.dev_environment_id`, Claim `dev_environment_id`, Aktionen `dev_environment.read`, `dev_environment.manage`, `dev_environment.report` (gleich K-RE-4 in 07). |
-| K-DV-2 | Backend-Richtlinie je Dev-Umgebung: `dev_environments.billing_mode IN ('organization','personal')`, bei `personal` ist der `credential_holder` die Person der Umgebung; I1 für Runner-Agenten je Umgebung statt je Agent, gesichert durch SR3. Entscheidung durch die Leitung bzw. den Owner nötig. |
+Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026-10-10):
+
+| Nr | Ergänzung | Entscheidung, Ort |
+|---|---|---|
+| K-DV-1 | Tabelle `dev_environments`, `dev_environment_id` an Sitzungen und Läufen, Claim, Aktionen | übernommen als Etappe, 03 Abschnitt 4.4, 05 Abschnitte 4.13 und 5 |
+| K-DV-2 | Backend-Richtlinie je Dev-Umgebung mit I1 je Umgebung | nicht jetzt: auf die Etappe "Mehrbenutzer-Dev-Umgebung" verschoben (Leitung); bis dahin nur `organization` (R-DM-24) |
 
 ## 12. Konfigurationswerte dieses Kapitels
 

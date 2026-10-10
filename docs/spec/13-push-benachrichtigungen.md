@@ -63,8 +63,8 @@ aber keinen Push; sonst würden ganze Gruppen bei jeder Freigabe geweckt.
 Ein Meldungskanal ist ein normaler Kanal, in den Agenten ohne Auslöser (Cron, Hintergrund) oder
 Integrationen über eingehende Webhooks (z. B. Alertmanager) schreiben. Diese Nachrichten sind
 `message`-Hinweise. Damit Mitglieder ohne eigene Einstellung benachrichtigt werden, plant dieses
-Kapitel eine Kanal-Voreinstellung `channels.default_notification_level` (`all`, `mentions`,
-`mute`, nullbar; Kern-Vertrag: Ergänzung beantragt). Sie setzt, wer `channel.update` darf.
+Kapitel die Kanal-Voreinstellung `channels.default_notification_level` (`all`, `mentions`,
+`mute`, nullbar; 03). Sie setzt, wer `channel.update` darf.
 
 ## 3. Einstellungen
 
@@ -76,13 +76,13 @@ Stufe eines Menschen für einen Thread ist der erste vorhandene Wert in dieser R
 1. eigene Einstellung für den Thread,
 2. eigene Einstellung für den Kanal,
 3. eigene Einstellung für den Bereich,
-4. Kanal-Voreinstellung `channels.default_notification_level` (beantragt),
+4. Kanal-Voreinstellung `channels.default_notification_level`,
 5. bei DM-Kanälen `all`,
 6. persönlicher Standard `user_settings['notify.default_level']`,
 7. Instanz-Standard `notify.user_default_level`.
 
-Ist bei der gewählten Zeile `muted_until` in der Zukunft, gilt `mute`. Die Schritte 1 bis 3
-entsprechen der Regel in [03-datenmodell.md](03-datenmodell.md); Schritt 4 und 5 sind neu.
+Ist bei der gewählten Zeile `muted_until` in der Zukunft, gilt `mute`. Dieselbe Reihenfolge steht
+in [03-datenmodell.md](03-datenmodell.md) (`notification_preferences`).
 
 ### 3.2 Automatisches Folgen
 
@@ -95,7 +95,9 @@ Hauptverlauf gilt das nicht, sonst folgte man nach einer Nachricht dem ganzen Ka
 
 ### 3.3 Persönliche Schalter
 
-Schlüssel in `user_settings`, Schema in der Konfigurationsreferenz; Standard in Abschnitt 17:
+Schlüssel in `user_settings` (03). Diese Tabelle ist für alle Schlüssel `notify.*` normativ; die
+übrigen persönlichen Schlüssel stehen in [01-produkt.md](01-produkt.md), Abschnitt 11. Standard
+ohne eigene Einstellung: Abschnitt 17.
 
 | Schlüssel | Werte | Wirkung |
 |---|---|---|
@@ -170,7 +172,7 @@ Erwähnung eines Menschen ohne Leserecht erzeugt nichts und verrät nichts
 
 - **Im Thread aktiv:** Ein Gerät von r hat eine Gateway-Verbindung, deren `focus` den Thread
   enthält, und meldet nicht `idle`. Dann bekommt r für diesen Thread keinen Hinweis, auf keinem
-  Gerät. Das Feld `idle` in der Op `focus` ist neu (Kern-Vertrag: Ergänzung beantragt): Ein
+  Gerät. Das Feld `idle` in der Op `focus` ([04-sync-protokoll.md](04-sync-protokoll.md), 6.2): Ein
   Desktop-Fenster, das offen, aber unbenutzt ist, soll Live-Box-Patches weiter bekommen, aber
   nicht als "Person schaut zu" zählen. Ab wann ein Client `idle` meldet, legt
   [15-client-architektur.md](15-client-architektur.md) fest.
@@ -199,7 +201,7 @@ eindeutig nach Argumenten machen und zu einem Zeitpunkt ausführen [Q1, belegt].
 Für jedes aktive Gerät von r (`devices.state = 'active'`):
 
 1. Hat das Gerät gerade eine Gateway-Verbindung, geht das kurzlebige Ereignis
-   `notification.created` über diese Verbindung (Kern-Vertrag: Ergänzung beantragt, 6.3). Die
+   `notification.created` über diese Verbindung (6.3; 05 Abschnitt 6). Die
    App zeigt eine eigene Mitteilung oder ein Banner in der App. Kein Push für dieses Gerät.
 2. Sonst geht ein Push an jede aktive Push-Registrierung des Geräts (`disabled_at IS NULL`).
 3. Hat das Gerät weder Verbindung noch Registrierung (z. B. Windows-App geschlossen), entsteht
@@ -352,8 +354,7 @@ Werte in `data` sind Zeichenketten. Zusätzlich gibt es `k = "sync"` mit `badge`
 ### 6.3 Gateway-Ereignis `notification.created`
 
 Kurzlebig, nur an Verbindungen des Empfängers (`audience = self`), Empfangs-Aktion `push.deliver`
-(Kern-Vertrag: Ergänzung beantragt, [05-aktionen.md](05-aktionen.md) Abschnitt 6, kurzlebige
-Ereignisse). Nutzlast: `nid`, `kind`, `thread_id`, `message_id`, `quiet`, `count` und die
+([05-aktionen.md](05-aktionen.md) Abschnitt 6, kurzlebige Ereignisse). Nutzlast: `nid`, `kind`, `thread_id`, `message_id`, `quiet`, `count` und die
 Vorschau-Felder aus 6.4. Die Vorschau darf hier mitkommen, weil die Verbindung angemeldet ist und
 `message.read` schon geprüft wurde; es gibt keinen Dritten auf dem Weg.
 
@@ -363,10 +364,10 @@ Vorschau-Felder aus 6.4. Die Vorschau darf hier mitkommen, weil die Verbindung a
 
 - **Anmeldung:** Vorschau-Token im Kopf `Authorization: DPoP <token>` plus DPoP-Beweis mit dem
   Geräteschlüssel. Das Token entsteht bei `push.register`, wird genau einmal ausgegeben, nur als
-  HMAC gespeichert (`push_registrations.preview_token_hash`, Kern-Vertrag: Ergänzung beantragt)
+  HMAC gespeichert (`push_registrations.preview_token_hash`, 03)
   und bei jeder neuen Registrierung rotiert. Es gilt nur für diesen Endpunkt.
 - **Gültig nur, solange** die Registrierung aktiv ist, das Gerät `active` ist, die Sitzung der
-  Registrierung (`push_registrations.auth_session_id`, beantragt) nicht widerrufen ist und der
+  Registrierung (`push_registrations.auth_session_id`, 03) nicht widerrufen ist und der
   Mensch aktiv ist. Abmelden (`auth.logout`) deaktiviert die Registrierungen dieser Sitzung mit
   `disabled_reason = 'logout'`; danach kommen keine Pushes mehr auf dieses Gerät.
 - **Prüfung:** `authorize(r, message.read, message)` mit aktuellen Rechten. Kein Recht, Nachricht
@@ -540,16 +541,17 @@ keine Personen-, Geräte- oder Thread-IDs.
 
 ## 13. Endpunkte und Aktionen
 
-Vorschlag für [06-api.md](06-api.md) (verbindlich ist `docs/api/openapi.yaml`, Team B):
+Verbindlich ist `docs/api/openapi.yaml`; diese Tabelle gibt den Stand der Spec wieder.
 
 | Methode und Pfad | Aktion | RL-Klasse |
 |---|---|---|
-| `POST /api/v1/devices/{device_id}/push-registrations` | `push.register` | `rl.write` |
-| `DELETE /api/v1/push-registrations/{id}` | `push.unregister` | `rl.write` |
+| `POST /api/v1/me/devices/current/push-registrations` | `push.register` | `rl.write` |
+| `DELETE /api/v1/push-registrations/{registration_id}` | `push.unregister` | `rl.write` |
 | `GET /api/v1/push/preview` | `message.read` (mit Vorschau-Token) | `rl.read` |
 | `GET /api/v1/me/notification-preferences` | `settings.read` | `rl.read` |
-| `PUT /api/v1/me/notification-preferences/{target_kind}/{target_id}` | `notification_pref.update` | `rl.write` |
-| `GET /api/v1/me/quiet-hours`, `PUT /api/v1/me/quiet-hours` | `settings.read`, `quiet_hours.update` | `rl.read`, `rl.write` |
+| `PUT`, `DELETE /api/v1/me/notification-preferences/{target_kind}/{target_id}` | `notification_pref.update` | `rl.write` |
+| `GET /api/v1/me/quiet-hours` | `settings.read` | `rl.read` |
+| `POST /api/v1/me/quiet-hours`, `PUT` und `DELETE /api/v1/me/quiet-hours/{rule_id}` | `quiet_hours.update` | `rl.write` |
 | `PATCH /api/v1/channels/{id}` mit `default_notification_level` | `channel.update` | `rl.admin` |
 
 `push.register` nimmt `provider`, `token`, `environment`, `app_id` und liefert `id` und das
@@ -592,20 +594,17 @@ deaktiviert), weil Tokens zwischen Installationen wandern können.
 | R-PN-10 | Zentraler Push-Relay später; jede Instanz nutzt eigene Schlüssel. | Kein Metadaten-Sammelpunkt, kein Betriebsdienst in den ersten Etappen. |
 | R-PN-11 | Kein Hinweis durch Bearbeiten. | Einfach, kein Missbrauch durch nachträgliches Erwähnen. |
 
-## 16. Kern-Vertrag: beantragte Ergänzungen
+## 16. Abgleich mit dem Kern-Vertrag
 
-1. `channels.default_notification_level` (`all`, `mentions`, `mute`, nullbar), gesetzt mit
-   `channel.update`; neue Schritte 4 und 5 der Reihenfolge in
-   [03-datenmodell.md](03-datenmodell.md) (`notification_preferences`, "Wirksame Stufe").
-2. `push_registrations.auth_session_id` (FK auf `auth_sessions`, ON DELETE CASCADE) und
-   `push_registrations.preview_token_hash` (bytea, eindeutig, nullbar);
-   `disabled_reason` um `logout`, `topic_mismatch`, `sender_mismatch`, `repeated_failures`
-   ergänzen (heute nur Beispiele).
-3. Kurzlebiges Ereignis `notification.created`, Ressource `thread`, Empfangs-Aktion `push.deliver`,
-   nur an den Empfänger ([05-aktionen.md](05-aktionen.md) Abschnitt 6).
-4. Op `focus` bekommt das Feld `idle` (bool) ([04-sync-protokoll.md](04-sync-protokoll.md) 6.2).
-5. Lese-Aktion für eigene Benachrichtigungs-Einstellungen: hier auf `settings.read` abgebildet;
-   falls das Kern-Team eine eigene Aktion will, `notification_pref.read`.
+Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026-10-10):
+
+| Nr | Ergänzung | Entscheidung, Ort |
+|---|---|---|
+| 1 | `channels.default_notification_level` und die Reihenfolge der wirksamen Stufe | übernommen, 03 `channels` und `notification_preferences` |
+| 2 | `push_registrations.auth_session_id`, `preview_token_hash`, feste Werte von `disabled_reason` | übernommen, 03 `push_registrations` |
+| 3 | kurzlebiges Ereignis `notification.created` | übernommen, 05 Abschnitt 6 |
+| 4 | Feld `idle` in der Op `focus` | übernommen, 04 Abschnitt 6.2 |
+| 5 | eigene Lese-Aktion für Benachrichtigungs-Einstellungen | nicht übernommen: `settings.read` deckt alle eigenen persönlichen Daten ab (05, R-AZ-21) |
 
 ## 17. Konfigurationswerte dieses Kapitels
 

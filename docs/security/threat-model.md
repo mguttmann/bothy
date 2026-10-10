@@ -38,7 +38,7 @@ Quelle: [diagrams/trust-boundaries.mmd](diagrams/trust-boundaries.mmd). Neu rend
 | Grenze | Zwischen | Was sie schützt | Kontrollen |
 |---|---|---|---|
 | TB1 | Endgerät und Netzrand | Tokens, Inhalte im Transport, Identität | TLS, DPoP, Konsole-Cookie, SEC-CORS-* |
-| TB2 | Netzrand und Server-Prozess | Echtheit von Proxy-Kopfzeilen, Klartext nur intern | SEC-TLS-1, `net.trusted_proxies`, 08 Abschnitt 2.4 |
+| TB2 | Netzrand und Server-Prozess | Echtheit von Proxy-Kopfzeilen, Klartext nur intern | SEC-TLS-1, `server.trusted_proxies`, 08 Abschnitt 2.4 |
 | TB3 | Server und Datenhaltung | Inhalte, Hashes, Audit-Integrität | Rollen in PostgreSQL, Unix-Socket, `verify-full`, ADR 0021 |
 | TB4 | Server und Agenten-Adapter | wer welchen Agenten auslöst, was der Agent sieht | API-Token mit DPoP, Aufruf-Marke (I3), `authorize` bei Zustellung, SR9 |
 | TB5 | Laufzeit und LLM-Anbieter bzw. Werkzeuge | Inhalte an Dritte, Wirkung von Werkzeugen | Werkzeugklasse (SR2), Backend-Richtlinie (SR1), Auftragsverarbeitung |

@@ -67,6 +67,8 @@ personenbezogene Daten enthalten, auch von Dritten und auch besondere Kategorien
 | `pins` | indirekt | angeheftet durch | `content` | mit der Nachricht |
 | `message_templates` | Inhalt | Vorlagentext | `content` | persönliche mit dem Konto |
 | `files`, `file_thumbnails` | Inhalt | Datei, Name, Transkript, Bilder | `content` | 4.3 |
+| `file_upload_sessions`, `file_upload_parts` | indirekt | angemeldete Größe und Prüfsumme, Teile | `transient` | mit Abschluss oder Ablauf der Sitzung |
+| `file_text_extracts` | Inhalt | aus Dateien gewonnener Text | `content` | mit der Datei |
 | `message_attachments` | nein | Zuordnung | `content` | mit der Nachricht |
 | `runs` | Inhalt | Auslöser, Statuszeile, letzter Textauszug, Kennzahlen | `content` | mit dem Thread |
 | `run_steps` | Inhalt | Werkzeugnamen, Details (können Pfade, Befehle, Daten enthalten) | `content` | mit dem Lauf |
@@ -76,6 +78,7 @@ personenbezogene Daten enthalten, auch von Dritten und auch besondere Kategorien
 | `price_table` | nein | Preise | `cost` | `retention.cost` |
 | `cost_entries` | indirekt | Kosten je Lauf (über den Lauf einer Person zuordenbar) | `cost` | `retention.cost` |
 | `event_log` | Inhalt | Kopien von Änderungen in Nutzlasten | `event_log` | Fenster `sync.event_retention` (04); Schwärzen bei Löschung |
+| `event_consumer_cursors` | nein | Lesestand der Worker-Verbraucher | `config` | bleibt |
 | `idempotency_keys` | Inhalt | gespeicherte Antworten | `transient` | `sync.idempotency_key_ttl` (04) |
 | `read_states` | indirekt | Lesestand je Thread | `personal_sync` | mit dem Konto; nie für andere sichtbar (Abschnitt 9) |
 | `drafts` | Inhalt | Entwürfe | `personal_sync` | mit dem Konto |
@@ -86,12 +89,14 @@ personenbezogene Daten enthalten, auch von Dritten und auch besondere Kategorien
 | `webhook_deliveries` | nein | Zustellversuche | `transient` | `retention.webhook_deliveries` |
 | `import_sources`, `import_items` | indirekt | Kennungen der Quelle (auch fremde Personen-IDs im Herkunftsschlüssel) | `import` | `retention.import_after_completion` |
 | `audit_events` | indirekt | Akteur, Aktion, Entscheidung, Ressource, pseudonymisierte IP | `audit` | `retention.audit`, Kürzen mit Anker (03) |
+| `audit_checkpoints` | nein | Sequenz, Hash, Signatur | `audit` | wie `audit_events` |
 | `gdpr_requests` | direkt | betroffene Person, Art, Grund, Stand | `privacy_job` | `retention.privacy_job` |
-| `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components` | nein | Betriebsstatus | `ops` | `retention.ops` |
-| `local_credentials` (beantragt, 08) | indirekt | Passwort-Hash, verschlüsseltes TOTP-Geheimnis | `security` | bei Kontolöschung sofort |
-| `enrollment_codes` (beantragt, 08) | indirekt | Hash, Zeiten | `security` | `retention.security_after_end` |
-| `auth_login_flows` (beantragt, 08) | indirekt | Anmeldevorgang | `transient` | `auth.login_flow_ttl` |
-| `dev_environments` (beantragt, 21) | indirekt | Umgebung einer Person, Prüfergebnisse | `security` | nach `retired` plus `retention.security_after_end` |
+| `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs` | nein | Betriebsstatus, Sicherungsläufe | `ops` | `retention.ops` |
+| `local_credentials` (03, 08) | indirekt | Passwort-Hash, verschlüsseltes TOTP-Geheimnis | `security` | bei Kontolöschung sofort |
+| `enrollment_codes` (03, 08) | indirekt | Hash, Zeiten | `security` | `retention.security_after_end` |
+| `auth_login_flows` (03, 08) | indirekt | Anmeldevorgang | `transient` | `auth.login_flow_ttl` |
+| `device_pairings` (03, 08) | indirekt | Kopplungsvorgang mit öffentlichen Geräteschlüsseln | `transient` | `auth.pairing_code_ttl` |
+| `dev_environments` (03, 21; Etappe) | indirekt | Umgebung einer Person, Prüfergebnisse | `security` | nach `retired` plus `retention.security_after_end` |
 
 Daten außerhalb der Datenbank:
 
@@ -371,12 +376,14 @@ DSGVO) prüft der Betreiber; Anlass können Agenten mit Zugriff auf Beschäftigt
 | R-DP-05 | Gesetzliche Fristen (Art. 12) sind keine Konfigurationswerte. | Eine konfigurierbare gesetzliche Frist lädt zum Fehler ein. |
 | R-DP-06 | Mitbestimmungsfreundliche Voreinstellungen. | Einführung im Unternehmen ohne Umbau; Überwachungsfunktionen sind bewusste Schalter. |
 
-## 12. Ergänzungen am Kern-Vertrag (beantragt)
+## 12. Abgleich mit dem Kern-Vertrag
 
-| Nr | Ergänzung |
-|---|---|
-| K-DP-1 | Automatische Freigabe von Export-Aufträgen der Person selbst (Zustand `requested -> approved` durch das System, wenn `privacy.export_requires_approval = false`). |
-| K-DP-2 | Audit-Details: IP nur als `ip_hmac` mit `ip_key_id`; Schema `audit_details.v1` ergänzen. |
+Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026-10-10):
+
+| Nr | Ergänzung | Entscheidung, Ort |
+|---|---|---|
+| K-DP-1 | Automatische Freigabe des Exports der eigenen Daten | übernommen, 03 `gdpr_requests.approved_by` (NULL = System), 05 `gdpr.request.decide` |
+| K-DP-2 | IP im Audit nur als `ip_hmac` mit `ip_key_id` | übernommen, 03 `audit_events.details` |
 
 ## 13. Konfigurationswerte dieses Kapitels
 

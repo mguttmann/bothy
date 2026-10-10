@@ -63,7 +63,7 @@ webhook-signature: v1a,<Ed25519-Signatur in Base64> v1,<HMAC-SHA256 in Base64>
    Generation)`, Hauptschlüssel aus dem Secret-Provider (B12). Der Server zeigt es einmal als
    `whsec_<base64>` an. `rotate_hmac_secret` erhöht die Generation; für
    `webhook.secret_rotation_overlap` signiert der Server mit alter und neuer Generation
-   (Kern-Vertrag: Ergänzung beantragt, 06 Abschnitt 18.2, K14).
+   (03 `webhook_subscriptions.hmac_generation` und `hmac_rotated_at`).
 4. Grund für zwei Verfahren: Standard Webhooks empfiehlt asymmetrische Signaturen [belegt, W1];
    die Referenzbibliotheken nennen in ihren Beschreibungen aber HMAC, `v1a` ist dort nicht belegt
    [vermutet, W2]. HMAC hält die Hürde für Empfänger niedrig.
@@ -77,7 +77,7 @@ webhook-signature: v1a,<Ed25519-Signatur in Base64> v1,<HMAC-SHA256 in Base64>
    Anfrage übernehmen [belegt, W1]. HMAC zeitkonstant vergleichen.
 4. Doppel erkennen: `webhook-id` merken, mindestens für die Dauer der Wiederholungen
    (`webhook.retry_max_age`).
-5. Schnell mit `2xx` antworten, innerhalb `webhook.request_timeout`; die Arbeit danach erledigen.
+5. Schnell mit `2xx` antworten, innerhalb `webhook.delivery_timeout` ([11-erweiterungen.md](../spec/11-erweiterungen.md)); die Arbeit danach erledigen.
 6. Reihenfolge über `seq` herstellen, Objektstand über `resource.version` (04, 9).
 
 ## 4. Wiederholungen und Abschalten
@@ -106,27 +106,35 @@ webhook-signature: v1a,<Ed25519-Signatur in Base64> v1,<HMAC-SHA256 in Base64>
 ## 5. Reihenfolge und Doppel
 
 1. Zustellung mindestens einmal (at-least-once).
-2. Erste Versuche gehen je Abo in `seq`-Reihenfolge hinaus. Wiederholungen können spätere
-   Ereignisse überholen; ein dauerhaft scheiterndes Ereignis blockiert die anderen nicht.
-3. `webhook_subscriptions.last_delivered_seq` ist der Stand, bis zu dem Zustellungen angelegt
-   sind, nicht der Erfolgsstand.
+2. Je Abo streng in `seq`-Reihenfolge, wie auf dem Gateway: Das nächste Ereignis geht erst
+   hinaus, wenn das vorige mit `2xx` angenommen ist ([11-erweiterungen.md](../spec/11-erweiterungen.md),
+   Abschnitt 7). Grund: Empfänger können Ereignisse wie im Gateway der Reihe nach anwenden, und
+   bei Abos von Agenten gilt `2xx` als Bestätigung bis zu dieser `seq`
+   ([04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 15.6).
+3. `webhook_subscriptions.last_delivered_seq` ist die höchste mit `2xx` angenommene `seq`.
+   Scheitert ein Ereignis bis `webhook.retry_max_age`, wird die Zustellung `dead` und das Abo
+   `disabled`; nach dem Wiedereinschalten durch den Owner geht es mit dem Folgeereignis weiter.
 
 ## 6. Sicherheit der Zustellung
 
 1. Nur `https`, nur Hosts aus `webhook.allowed_hosts`, keine Umleitungen.
-2. Vor jedem Versuch löst der Server den Host neu auf und lehnt Loopback-, Link-Local- und private
-   Adressen ab, außer `webhook.allow_private_networks` ist an. Grund: Schutz vor DNS-Rebinding und
-   SSRF (Baseline Abschnitt 4).
-3. Zeitlimit je Versuch `webhook.request_timeout`; Standard Webhooks empfiehlt 15 bis 30 Sekunden
+2. Zustellungen laufen über den Egress-Client des Servers ([19-sicherheit.md](../spec/19-sicherheit.md),
+   SEC-NET-1 bis SEC-NET-5): Er prüft die Adresse nach der DNS-Auflösung beim Verbindungsaufbau
+   und lehnt Loopback-, Link-Local- und private Adressen ab, außer für Einträge in
+   `egress.allowed_hosts` mit `allow_private`. Grund: Schutz vor DNS-Rebinding und SSRF
+   (Baseline Abschnitt 4).
+3. Zeitlimit je Versuch `webhook.delivery_timeout`; Standard Webhooks empfiehlt 15 bis 30 Sekunden
    [belegt, W1].
 
-## 7. Ereignistypen für Apps
+## 7. Ereignistypen für Apps und Agenten
 
-Erzeugt aus openapi.yaml. Ereignisse mit Zielgruppe `self` bekommt nur die App, die selbst
-Empfänger ist (eigene Befehle, eigene Komponenten, eigene Rechte).
+Erzeugt aus openapi.yaml. Ereignisse mit Zielgruppe `self` bekommt nur die App oder der Agent, die
+selbst Empfänger sind (eigene Befehle, eigene Komponenten, eigene Rechte). Ereignisse mit
+"nur Agenten-Abo" gehen nur an Abos eines Agenten (Webhook als Transport,
+[04-sync-protokoll.md](../spec/04-sync-protokoll.md) Abschnitt 15.6).
 
 <!-- BEGIN GENERATED: webhook_events -->
-| Ereignistyp | Empfangs-Aktion | Scope zusätzlich zu `events:subscribe` | Schema |
+| Ereignistyp | Empfangs-Aktion | Empfänger und Scope zusätzlich zu `events:subscribe` | Schema |
 |---|---|---|---|
 | `message.created` | `message.read` | `messages:read` | `MessageCreatedEvent` |
 | `message.updated` | `message.read` | `messages:read` | `MessageUpdatedEvent` |
@@ -150,15 +158,19 @@ Empfänger ist (eigene Befehle, eigene Komponenten, eigene Rechte).
 | `channel.updated` | `channel.read` | `messages:read` | `ChannelUpdatedEvent` |
 | `channel.settings_changed` | `channel.read` | `messages:read` | `ChannelSettingsChangedEvent` |
 | `channel.archived` | `channel.read` | `messages:read` | `ChannelArchivedEvent` |
-| `command.changed` | `command.read` | keiner (Kern-Vertrag: Ergänzung beantragt) | `CommandChangedEvent` |
+| `command.changed` | `command.read` | keiner (Metadaten, 05 Abschnitt 2.6) | `CommandChangedEvent` |
 | `file.updated` | `file.read` | `files:read` | `FileUpdatedEvent` |
 | `user.updated` | `user.read` | `users:read` | `UserUpdatedEvent` |
-| `agent.updated` | `agent.read` | keiner (Kern-Vertrag: Ergänzung beantragt) | `AgentUpdatedEvent` |
-| `instance.updated` | `instance.read` | keiner (Kern-Vertrag: Ergänzung beantragt) | `InstanceUpdatedEvent` |
-| `status.updated` | `status.read` | keiner (Kern-Vertrag: Ergänzung beantragt) | `StatusUpdatedEvent` |
-| `access.changed` | `self` | nur eigene (App ist Empfänger) | `AccessChangedEvent` |
-| `interaction.created` | `agent.events.consume` | nur eigene (App ist Empfänger) | `InteractionCreatedEvent` |
-| `command.invoked` | `agent.events.consume` | nur eigene (App ist Empfänger) | `CommandInvokedEvent` |
+| `agent.updated` | `agent.read` | keiner (Metadaten, 05 Abschnitt 2.6) | `AgentUpdatedEvent` |
+| `instance.updated` | `instance.read` | keiner (Metadaten, 05 Abschnitt 2.6) | `InstanceUpdatedEvent` |
+| `status.updated` | `status.read` | keiner (Metadaten, 05 Abschnitt 2.6) | `StatusUpdatedEvent` |
+| `access.changed` | `self` | nur eigene (App oder Agent ist Empfänger) | `AccessChangedEvent` |
+| `agent.invocation` | `agent.events.consume` | nur Agenten-Abo (Agent ist Empfänger) | `AgentInvocationEvent` |
+| `agent.followup` | `agent.events.consume` | nur Agenten-Abo (Agent ist Empfänger) | `AgentFollowupEvent` |
+| `run.cancel_requested` | `agent.events.consume` | nur Agenten-Abo (Agent ist Empfänger) | `RunCancelRequestedEvent` |
+| `agent.config_changed` | `agent.config.read` | nur Agenten-Abo (Agent ist Empfänger) | `AgentConfigChangedEvent` |
+| `interaction.created` | `agent.events.consume` | nur eigene (App oder Agent ist Empfänger) | `InteractionCreatedEvent` |
+| `command.invoked` | `agent.events.consume` | nur eigene (App oder Agent ist Empfänger) | `CommandInvokedEvent` |
 <!-- END GENERATED: webhook_events -->
 
 Persönliche Ereignisse von Menschen (Gelesen-Stand, Entwürfe, Einstellungen), Verwaltungsereignisse
@@ -185,14 +197,14 @@ Webhook.
 
 | Name | Standard | Bedeutung |
 |---|---|---|
-| `webhook.request_timeout` | `15s` | Zeitlimit je Zustellversuch |
 | `webhook.retry_max_age` | `72h` | danach wird eine Zustellung `dead` |
 | `webhook.secret_rotation_overlap` | `24h` | so lange gelten alte und neue HMAC-Generation |
-| `webhook.allow_private_networks` | `false` | Zustellung an private Adressen erlauben |
 | `webhook.receiver_tolerance` | `5m` | empfohlene Toleranz für `webhook-timestamp` beim Empfänger |
 
 `webhook.allowed_hosts`, `webhook.max_consecutive_failures`, `webhook.retry_backoff_base` und
-`webhook.retry_backoff_cap` stehen in 03, Abschnitt 9. Der Standard für `webhook.retry_max_age`
+`webhook.retry_backoff_cap` stehen in 03, Abschnitt 9; `webhook.delivery_timeout` in
+[11-erweiterungen.md](../spec/11-erweiterungen.md); `egress.allowed_hosts` in
+[19-sicherheit.md](../spec/19-sicherheit.md). Der Standard für `webhook.retry_max_age`
 liegt nahe dem Beispielplan von Standard Webhooks (rund 75 Stunden) [abgeleitet, W1].
 
 ## Quellen

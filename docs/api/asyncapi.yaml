@@ -52,6 +52,8 @@ channels:
         $ref: '#/components/messages/op.ack'
       op.run.update:
         $ref: '#/components/messages/op.run.update'
+      op.command.autocomplete_result:
+        $ref: '#/components/messages/op.command.autocomplete_result'
       op.hello:
         $ref: '#/components/messages/op.hello'
       op.ready:
@@ -132,6 +134,8 @@ channels:
         $ref: '#/components/messages/event.group.changed'
       event.access.changed:
         $ref: '#/components/messages/event.access.changed'
+      event.access.expiring:
+        $ref: '#/components/messages/event.access.expiring'
       event.session.revoked:
         $ref: '#/components/messages/event.session.revoked'
       event.read_state.updated:
@@ -172,6 +176,8 @@ channels:
         $ref: '#/components/messages/event.agent.presence_changed'
       event.command.autocomplete_requested:
         $ref: '#/components/messages/event.command.autocomplete_requested'
+      event.notification.created:
+        $ref: '#/components/messages/event.notification.created'
     bindings:
       ws:
         method: GET
@@ -228,6 +234,9 @@ channels:
     - code: 4015
       name: consumer_replaced
       client_action: 'nur Agenten: ein anderer Prozess hat denselben Verbraucher übernommen; nicht neu verbinden'
+    - code: 4016
+      name: device_pending
+      client_action: 'Gerät wartet auf Freigabe: Hinweis zeigen, nach der Freigabe neu verbinden'
 
 operations:
   receive.identify:
@@ -325,6 +334,15 @@ operations:
     messages:
     - $ref: '#/channels/gateway/messages/op.run.update'
     x-authz-action: run.update
+    x-rate-limit-class: rl.agent_runtime
+  receive.command.autocomplete_result:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: 'Agents and apps: answer a `command.autocomplete_requested`, same as `POST /command-autocompletions/{request_id}/answer`.'
+    messages:
+    - $ref: '#/channels/gateway/messages/op.command.autocomplete_result'
+    x-authz-action: command.autocomplete.respond
     x-rate-limit-class: rl.agent_runtime
   send.hello:
     action: send
@@ -445,6 +463,7 @@ operations:
     - $ref: '#/channels/gateway/messages/event.grant.changed'
     - $ref: '#/channels/gateway/messages/event.group.changed'
     - $ref: '#/channels/gateway/messages/event.access.changed'
+    - $ref: '#/channels/gateway/messages/event.access.expiring'
     - $ref: '#/channels/gateway/messages/event.session.revoked'
     - $ref: '#/channels/gateway/messages/event.read_state.updated'
     - $ref: '#/channels/gateway/messages/event.draft.updated'
@@ -465,6 +484,7 @@ operations:
     - $ref: '#/channels/gateway/messages/event.run.updated'
     - $ref: '#/channels/gateway/messages/event.agent.presence_changed'
     - $ref: '#/channels/gateway/messages/event.command.autocomplete_requested'
+    - $ref: '#/channels/gateway/messages/event.notification.created'
     x-authz-action: gateway.connect
     x-rate-limit-class: rl.gateway_connect
 
@@ -587,6 +607,19 @@ components:
             enum: [run.update]
           d:
             $ref: ./openapi.yaml#/components/schemas/GatewayRunUpdate
+    op.command.autocomplete_result:
+      name: command.autocomplete_result
+      title: command.autocomplete_result
+      summary: 'Agents and apps: suggestions for an autocomplete request (04, 15.7).'
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [command.autocomplete_result]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayAutocompleteResult
     op.hello:
       name: hello
       title: hello
@@ -1170,6 +1203,22 @@ components:
           d:
             $ref: ./openapi.yaml#/components/schemas/AccessChangedEvent
       x-audience: self
+    event.access.expiring:
+      name: access.expiring
+      title: dispatch access.expiring
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/AccessExpiringEvent
+      x-audience: self
     event.session.revoked:
       name: session.revoked
       title: dispatch session.revoked
@@ -1485,4 +1534,21 @@ components:
           d:
             $ref: ./openapi.yaml#/components/schemas/CommandAutocompleteRequestedEvent
       x-audience: self
-      description: 'Kern-Vertrag: Ergänzung beantragt (docs/spec/06-api.md).'
+      description: Only to one gateway connection of the command owner (docs/spec/04-sync-protokoll.md, section 15.7).
+    event.notification.created:
+      name: notification.created
+      title: dispatch notification.created
+      summary: Ephemeral event, at most once.
+      description: Only to connections of the recipient, instead of a push to this device (docs/spec/13-push-benachrichtigungen.md, section 6.3).
+      x-event-kind: ephemeral
+      x-receive-action: push.deliver
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/NotificationCreatedEvent
+      x-audience: self

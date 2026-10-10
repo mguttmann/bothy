@@ -11,7 +11,7 @@ Ereignis-Log (Anhängen, Tail, Nachholen, Schwärzen, Partitionen), Momentaufnah
 
 - Eingehend: `Tail`, `CatchUp`, `Snapshot`, `Consumers` (Worker-Cursor), `ReadStates`, `Drafts`, `Settings`.
 - Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: `messaging.MessagePosted` (Entwurf leeren, Erwähnungszähler), `chat.ThreadMoved`.
+- Abonniert In-Tx-Ereignisse: `messaging.MessagePosted` (Entwurf leeren, Erwähnungszähler), `chat.ThreadMoved` (Kopien von `channel_id`).
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `eventlog.Appender`, kernel `idempotency.Store`, kernel `personaldata.Participant`.
 
 ## Abhängigkeiten
@@ -25,7 +25,7 @@ Geprüft durch go-arch-lint (ADR 0008).
 
 ## Tabellen
 
-`event_log`, `idempotency_keys`, `read_states`, `drafts`, `user_settings`; beantragt: `event_consumer_cursors`.
+`event_log`, `event_consumer_cursors`, `idempotency_keys`, `read_states`, `drafts`, `user_settings`.
 
 Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
 
