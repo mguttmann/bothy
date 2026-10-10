@@ -18,14 +18,19 @@ Ein Check vergleicht Tabelle und Dateien (Bau-Ticket "SLO-Docs-Check").
 
 ## 2. SLOs
 
-| SLO (`service/name`) | SLI: gut | SLI: alle | Schwelle | Ziel | Alarm |
-|---|---|---|---|---|---|
-| `bothy-api/requests-availability` | REST-Anfragen ohne 5xx | REST-Anfragen ohne `/api/v1/gateway` | keine | 99.9 % | Page, Ticket |
-| `bothy-sync/delivery-latency` | Live-Zustellungen dauerhafter Ereignisse bis Schwelle | alle Live-Zustellungen dauerhafter Ereignisse | 0.5 s | 99.5 % | Page, Ticket |
-| `bothy-sync/reconnect` | Verbindungen mit `ok` bis Schwelle | Verbindungen ohne `client_error` | 2.5 s | 99.0 % | Page, Ticket |
-| `bothy-push/provider-acceptance` | Sendungen `accepted` | Sendungen ohne `rejected_token` | keine | 99.5 % | Page, Ticket |
-| `bothy-agents/run-start` | Läufe `started` bis Schwelle | Läufe ohne `cancelled` | 7.5 s | 99.0 % | Page, Ticket |
-| `bothy-agents/turn-duration` | abgeschlossene Läufe bis Schwelle | abgeschlossene Läufe | 600 s | 95.0 % | nur Ticket |
+| SLO (`service/name`) | SLI: gut | SLI: alle | Schwelle | Ziel | Alarm | Metrik der eigenen Messung |
+|---|---|---|---|---|---|---|
+| `bothy-api/requests-availability` | REST-Anfragen ohne 5xx | REST-Anfragen ohne `/api/v1/gateway` | keine | 99.9 % | Page, Ticket | `sli.api_availability` |
+| `bothy-sync/delivery-latency` | Live-Zustellungen dauerhafter Ereignisse bis Schwelle | alle Live-Zustellungen dauerhafter Ereignisse | 0.5 s | 99.5 % | Page, Ticket | `sli.delivery_latency` |
+| `bothy-sync/reconnect` | Verbindungen mit `ok` bis Schwelle | Verbindungen ohne `client_error` | 2.5 s | 99.0 % | Page, Ticket | `sli.reconnect` |
+| `bothy-push/provider-acceptance` | Sendungen `accepted` | Sendungen ohne `rejected_token` | keine | 99.5 % | Page, Ticket | `sli.push_acceptance` |
+| `bothy-agents/run-start` | Läufe `started` bis Schwelle | Läufe ohne `cancelled` | 7.5 s | 99.0 % | Page, Ticket | `sli.run_start` |
+| `bothy-agents/turn-duration` | abgeschlossene Läufe bis Schwelle | abgeschlossene Läufe | 600 s | 95.0 % | nur Ticket | `sli.turn_duration` |
+
+Die Spalte "Metrik der eigenen Messung" gibt das Label `bothy_sli_metric` des SLO in der
+Sloth-Datei wieder; es ordnet das SLO seiner Metrik in `stats_minutes` zu
+([25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 3.3). Die Labels setzt das
+Bau-Ticket PLAN M6-11; bis dahin ist diese Spalte die Vorgabe dafür.
 
 Begründungen:
 
@@ -71,3 +76,11 @@ mit `promtool` aus Prometheus v3.15.0 geprüft: gültig [belegt].
 Das Dashboard `bothy-slo-overview` zeigt Ziel, Erfüllung, Restbudget und Burn-Rate aus den
 Recording-Regeln `slo:objective:ratio`, `slo:sli_error:ratio_rate30d`,
 `slo:period_error_budget_remaining:ratio` und `slo:current_burn_rate:ratio`.
+
+## 6. Eigene Messung in den Apps
+
+Die SLO-Ampel der Apps und der Konsole rechnet nicht mit Prometheus, sondern mit der eigenen
+Messung des Servers (`stats_minutes`, [25-visualisierung.md](../spec/25-visualisierung.md),
+Abschnitt 3 und 6.4). Ziele, Schwellen und Zeitraum erzeugt ein Generator aus denselben
+Sloth-Dateien; ein Check hält sie gleich. Die Ampel trägt das Etikett "eigene Messung" und
+alarmiert nicht; Alarme bleiben bei den Burn-Rate-Regeln aus Abschnitt 3.

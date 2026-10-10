@@ -1,12 +1,15 @@
 # Statistik in der Admin-Konsole
 
 Status: Entwurf M0. Regeln: [17-observability.md](../spec/17-observability.md) 8. Darstellung in
-der Konsole: Kapitel 01 (Team E). Rechte: `stats.read` und `cost.read.aggregate`
+der Konsole: Kapitel 01 (Team E); Visualisierungen, eigene Messung und Live-Strom:
+[25-visualisierung.md](../spec/25-visualisierung.md). Rechte: `stats.read` und `cost.read.aggregate`
 ([05-aktionen.md](../spec/05-aktionen.md) 4.2, 4.12).
 
 ## 1. Grundsatz
 
-Die Statistik liest eigene Tabellen in PostgreSQL, nie ein Telemetrie-Backend. Grund: Der
+Die Statistik liest eigene Tabellen in PostgreSQL, nie ein Telemetrie-Backend. Dazu gehört seit
+dem Nachtrag vom 2026-10-10 auch `stats_minutes`, die Minuten-Aggregate der eigenen Messung
+(Abschnitt 7). Grund: Der
 Observability-Stack ist optional, gesampelt und hat kurze Fristen; die Statistik muss in jeder
 Installation gleich und vollständig sein und denselben Rechten folgen wie die Daten.
 
@@ -74,3 +77,21 @@ sieht keine Zahlen aus Kanälen, die er nicht lesen darf.
 
 Für Betriebsfragen (Latenz, 5xx, Verbindungen) verlinkt die Konsole auf `telemetry.dashboard_url`,
 wenn gesetzt. Die Statistik selbst rechnet nie mit Telemetrie-Werten.
+
+## 7. Eigene Messung und Visualisierungen
+
+1. Werte ohne Fachtabelle (Zustell-Latenz, Wiederverbinden, Annahme beim Push-Anbieter,
+   Verfügbarkeit der API) und die Raten der Live-Ansichten zählt der Server selbst und schreibt sie
+   je Minute nach `stats_minutes` ([25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 3).
+   Die Tabelle hat keine Spalte für Menschen; Werkzeugnamen stehen nicht darin.
+2. Neue Abfragen: `getStatsLive` (Live-Rahmen), `getStatsTimeline` (Minuten und Läufe eines
+   Zeitraums), `getStatsSlo` (Ampel "eigene Messung", nur Owner), `getStatsBackends`
+   (Backend-Ansicht je Agent). Alle mit `stats.read` und demselben Rechtefilter wie Abschnitt 4;
+   Kostenfelder nur mit `cost.read.aggregate`. Dazu das Gateway-Abo `stats.subscribe` mit dem
+   kurzlebigen Ereignis `stats.live`.
+3. Zeilen ohne Kanal (SLI, Gateway-Werte, Wechsel der Backend-Richtlinie) sieht nur, wer
+   `stats.read` auf der Instanz hat.
+4. Die Mindestgruppe aus Abschnitt 3 betrifft nur Zähler über Menschen; Live-Rahmen, Timeline und
+   `stats_minutes` enthalten keine. Aktive Menschen zeigt weiter nur `getUsageStats`.
+5. Lange Zeiträume, Exporte und die Tabellen aus Abschnitt 2 rechnen weiter aus den Fachtabellen;
+   `stats_minutes` lebt nur `retention.stats_minutes` lang.

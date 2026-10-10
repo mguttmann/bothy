@@ -95,6 +95,29 @@ dürfen das Fehlerbudget von `bothy-sync/reconnect` nicht verbrauchen.
 Werkzeugnamen stehen nie an Metriken (offene Menge); die Statistik der Werkzeugaufrufe kommt aus
 `run_steps` ([admin-statistics.md](admin-statistics.md)).
 
+### 4.3a Terminal
+
+Ohne IDs von Menschen, ohne Rechnernamen, ohne Inhalte ([24-terminal.md](../spec/24-terminal.md),
+Abschnitt 10.4).
+
+| Name | Typ | Einheit | Attribute | Quelle | Prometheus |
+|---|---|---|---|---|---|
+| `bothy.terminal.sessions.active` | UpDownCounter | `{session}` | `bothy.terminal.state` (`opening`, `active`, `detached`) | api | `bothy_terminal_sessions_active` |
+| `bothy.terminal.sessions.closed` | Zähler | `{session}` | `bothy.reason` (Codes aus 24, Abschnitt 10.3) | api | `bothy_terminal_sessions_closed_total` |
+| `bothy.terminal.relay.unpaired` | Zähler | `{connection}` | `bothy.terminal.side` (`client`, `host`) | api: eine Seite fand innerhalb von `terminal.open_timeout` keine Gegenseite (24, Abschnitt 9) | `bothy_terminal_relay_unpaired_total` |
+| `bothy.terminal.hosts.connected` | UpDownCounter | `{host}` | keine | api | `bothy_terminal_hosts_connected` |
+
+### 4.3b Eigene Messung und Live-Statistik
+
+Betriebswerte der eigenen Messung ([25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt
+3); die gemessenen Werte selbst stehen in `stats_minutes`, nicht in der Telemetrie.
+
+| Name | Typ | Einheit | Attribute | Quelle | Prometheus |
+|---|---|---|---|---|---|
+| `bothy.stats.flush.dropped` | Zähler | `{key}` | `bothy.reason` (`queue_full`, `db_error`) | api, worker: verworfene Zählerschlüssel der eigenen Messung | `bothy_stats_flush_dropped_total` |
+| `bothy.stats.flush.duration` | Histogramm | `s` | `bothy.outcome` (`ok`, `error`) | api, worker: ein Flush nach `stats_minutes` | `bothy_stats_flush_duration_seconds` |
+| `bothy.stats.live.subscribers` | UpDownCounter | `{subscription}` | keine | api: Abos von `stats.live` auf diesem Knoten | `bothy_stats_live_subscribers` |
+
 ### 4.4 Push, Dateien, Suche, Jobs
 
 | Name | Typ | Einheit | Attribute | Quelle | Prometheus |
@@ -174,7 +197,7 @@ Grenzen "Dauern bis Sekunden" aus 4.7; andere Grenzen verwirft der Server.
 
 | Histogramme | Grenzen |
 |---|---|
-| Dauern bis Sekunden (`http.server.request.duration`, `bothy.delivery.duration`, `bothy.gateway.connect.duration`, `bothy.run.start.latency`, `bothy.push.send.duration`, `bothy.db.event_seq.lock_wait`, `bothy.search.duration`, `db.client.operation.duration`) | 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10 |
+| Dauern bis Sekunden (`http.server.request.duration`, `bothy.delivery.duration`, `bothy.gateway.connect.duration`, `bothy.run.start.latency`, `bothy.push.send.duration`, `bothy.db.event_seq.lock_wait`, `bothy.search.duration`, `bothy.stats.flush.duration`, `db.client.operation.duration`) | 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10 |
 | lange Dauern (`bothy.run.duration`, `bothy.gateway.catchup.duration`, `bothy.job.duration`, `bothy.file.scan.duration`) | 1, 2.5, 5, 10, 30, 60, 120, 300, 600, 1800, 3600, 7200 |
 | Größen (`bothy.file.upload.size`) | 1024, 16384, 131072, 1048576, 8388608, 67108864, 536870912 |
 

@@ -52,3 +52,21 @@ Die Dashboards nutzen PromQL und LogQL. Bei New Relic, Datadog, Azure Monitor od
 deren eigene Ansichten; diese Datei liefert die Liste der Fragen, die jedes Backend beantworten
 muss (Abschnitt 1, Spalte Inhalt). Ein Ticket je Backend kann sie dort nachbauen; das Produkt
 liefert nur die Grafana-Fassung.
+
+## 5. Panel-Plugin "Bothy Live"
+
+Mit M7 kommt das eigene Panel-Plugin `bothy-live-panel` aus `plugins/grafana-bothy-live` dazu
+([25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 8):
+
+1. Es zeigt die Ansichten der Apps (Live-Topologie je Agent, Backend-Ansicht, Zustellung und Sync,
+   SLO-Ampel), soweit Metriken sie tragen, in den Farben und Schriften der Design-Tokens. Daten
+   kommen nur über die Datenquellen dieses Repositorys (`prometheus`, `tempo`).
+2. Ein siebtes Dashboard `bothy-live.json` (UID `bothy-live`, Titel "Bothy / Live") nutzt das Panel;
+   es folgt den Regeln aus Abschnitt 3. Die sechs Dashboards aus Abschnitt 1 bleiben unverändert.
+3. Abfragen stehen in `plugins/grafana-bothy-live/queries.yaml`; der Namens-Test
+   ([17-observability.md](../spec/17-observability.md) 10) prüft sie wie die Dashboards.
+4. Bis V1 ist das Plugin unsigniert und wird lokal provisioniert; Grafana lädt es nur, weil
+   `allow_loading_unsigned_plugins` genau diese ID nennt (Ruling T11). Signatur später nach
+   Entscheid des Owners.
+5. Einbettung von Dashboards in die Web-Konsole ist optional und standardmäßig aus; in Apps gibt es
+   sie nie ([25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 9).

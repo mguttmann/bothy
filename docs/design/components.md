@@ -304,7 +304,31 @@ Höhe `size.badge-height`, Radius `radius.pill`, Text `type.label`. Weicht der g
 bei `organization` mit Zusatz "Schätzung", bis abgeglichen; bei `personal` mit Zusatz "nur
 Information". Label: "Backend: Persönlich, läuft auf dem Abo von <Name>".
 
-## 11. Review-Liste (nicht automatisch prüfbar)
+## 11. Visualisierungen (`bothy_viz`)
+
+Zweck: Grundformen für die Ansichten aus [25-visualisierung.md](../spec/25-visualisierung.md) in
+Apps und Konsole; dieselben Rollen nutzt das Grafana-Panel über die TypeScript-Ausgabe der Tokens.
+
+| Grundform | Aussehen | Tokens |
+|---|---|---|
+| Bahn (Bereich) | Zeile mit Kopf links (Kategorie-Farbe und Icon des Bereichs), Linie `color.viz.grid` zwischen Bahnen | `color.border.*`, `space.*` |
+| Lauf-Karte | wie eine eingeklappte Live-Box: Rückgrat links in der Zustandsfarbe des Laufs, Agent, Werkzeug-Chip (Abschnitt 3), Abzeichen Backend-Richtlinie (Abschnitt 10), Kosten in Mono | Rollen der Live-Box, `type.code` |
+| Kennzahl-Kachel | Zahl groß in Mono, Etikett darüber, Vergleich zum Vorzeitraum als Text mit Icon (nie nur Farbe) | `type.display`, `type.label` |
+| Fläche und Balken | Serien in `color.viz.series.1` bis `.8` in fester Reihenfolge; Achsen `color.viz.axis`; Füllung `color.viz.area-fill` | neue Rollen (Ticket "Viz-Tokens") |
+| SLO-Ampel | Punkt mit Icon und Text "im Ziel", "Budget knapp", "Ziel verfehlt", "zu wenig Daten" und Etikett "eigene Messung" | `color.success.*`, `color.warning.*`, `color.danger.*`, neutrale Rolle für "zu wenig Daten" |
+| Zeitleiste | Abspielkopf als senkrechte Linie, Steuerung mit Icons aus `icon.tokens.json` | `motion.*` |
+
+Regeln:
+
+- Kein Verlauf, kein Leuchten, keine 3D-Optik (Verbotsliste in [README.md](README.md)).
+- Jede Grundform hat Semantik und eine Tabellenansicht mit denselben Werten.
+- Neue Rollen `color.viz.*` brauchen Paarungen in `design/design-rules.json` mit Kontrast `ui`
+  gegen die Fläche in beiden Themes; die kategorialen Serien müssen ohne Rot-Grün-Unterscheidung
+  unterscheidbar sein (Muster oder Beschriftung als zweites Merkmal).
+- TV-Modus: dunkles Theme, Dichte `comfortable`, Schriftgrößen eine Stufe größer; keine Bewegung im
+  Kontext `reduced`.
+
+## 12. Review-Liste (nicht automatisch prüfbar)
 
 - Keine Glas-, Unschärfe- oder Leuchteffekte; keine Verläufe.
 - Keine schwebenden Karten mit großem Schatten; Schatten nur aus `elevation.*`.
@@ -314,7 +338,7 @@ Information". Label: "Backend: Persönlich, läuft auf dem Abo von <Name>".
 - Golden-Tests in hell und dunkel, in `comfortable` und `touch`, mit Textskalierung 1 und 2
   (15-client-architektur.md, Teststrategie).
 
-## 12. Konfigurationswerte
+## 13. Konfigurationswerte
 
 Die Werte `ui.*` und `a11y.*`, die diese Seite nennt, stehen mit Standard in
 [01-produkt.md](../spec/01-produkt.md), Abschnitt "Konfigurationswerte dieses Kapitels".

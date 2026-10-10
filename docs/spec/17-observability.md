@@ -98,13 +98,41 @@ Kanal; ein Watchdog meldet einen toten Alarmweg. Einzelheiten: [slos.md](../obse
 
 Sechs Grafana-Dashboards als Dateien unter `infra/observability/grafana/dashboards/`, geladen
 per Datei-Provisioning: Server, Zustellung und Sync, Agenten-Läufe, Push, Datenbank und
-Sicherung, SLO-Übersicht. Einzelheiten: [dashboards.md](../observability/dashboards.md).
+Sicherung, SLO-Übersicht. Mit M7 kommt ein siebtes Dashboard `bothy-live` mit dem eigenen
+Panel-Plugin dazu ([25-visualisierung.md](25-visualisierung.md), Abschnitt 8). Einzelheiten:
+[dashboards.md](../observability/dashboards.md).
 
 ## 8. In-App-Statistik
 
 Die Admin-Konsole zeigt Nutzung je Bereich, Läufe, Werkzeugaufrufe, Kosten und Fehlerraten aus
 eigenen Tabellen. Zähler zu Menschen erscheinen nur ab `privacy.stats_min_group_size` ([20-datenschutz.md](20-datenschutz.md)); Werte je Person
 gibt es nicht. Einzelheiten: [admin-statistics.md](../observability/admin-statistics.md).
+
+### 8.1 Eigene SLI-Messung
+
+Für Live-Ansichten und die SLO-Ampel der Apps misst der Server selbst
+([25-visualisierung.md](25-visualisierung.md), Abschnitt 3; Ruling T7):
+
+1. Jeder Messpunkt eines SLI (Abschnitt 6) meldet seinen Wert zweimal: an das OTel-Instrument und
+   über `kernel/measure` an das Modul `stats`. Die eigene Messung zählt je Minute `count` und
+   `good` in die Tabelle `stats_minutes` (03, Abschnitt 4.15); sie liest nie aus der Telemetrie
+   (Regel 7, R-OB-08 bleibt).
+2. Die Grenze für "gut" und das Ziel kommen aus denselben Sloth-Dateien wie die Prometheus-Regeln;
+   ein Generator erzeugt sie für Server und App, ein Check hält sie gleich (25, Abschnitt 3.3). Die
+   Grenze ist eine Bucket-Grenze der Histogramme (R-OB-06), darum zählen beide Wege dieselben
+   Ereignisse als gut.
+3. Die Ampel heißt "eigene Messung" und alarmiert nicht. Alarme kommen weiter aus Prometheus
+   (Abschnitt 6). Abweichungen sind möglich: Fehler vor dem Server (Proxy) fehlen in der eigenen
+   Messung, und ein Absturz verliert höchstens ein `stats.flush_interval`.
+4. Wie die Telemetrie blockiert die eigene Messung nie den Nachrichtenpfad (Regel 4): Zähler im
+   Speicher, Schreiben im Hintergrund, Verlust gezählt in `bothy.stats.flush.dropped`.
+
+### 8.2 Visualisierungen
+
+Die Ansichten der Apps und der Konsole (Live-Topologie, Backend-Ansicht, Zustellung und Sync live,
+Executive-Seite, Tages-Timeline, TV-Modus) und das Grafana-Panel-Plugin `bothy-live-panel` regelt
+[25-visualisierung.md](25-visualisierung.md). Das Plugin liest nur Metriken und Traces dieses
+Kapitels; die Ansichten der Apps lesen nur die eigene Statistik-API.
 
 ## 9. Apps
 
@@ -134,6 +162,8 @@ gibt es nicht. Einzelheiten: [admin-statistics.md](../observability/admin-statis
    im Portabilitätstest.
 6. SLO-Docs-Check: Ziele und Schwellen in [slos.md](../observability/slos.md) gleich den
    Sloth-Dateien; erzeugte Regeln gleich einer frischen Erzeugung.
+7. SLI-Grenzen-Check: die erzeugten Grenzen der eigenen Messung gleich einer frischen Erzeugung
+   aus den Sloth-Dateien; jedes SLO hat eine `sli.*`-Metrik in `stats_minutes` (25, VZ-T02, VZ-T03).
 
 ## 11. Konfigurationswerte dieses Kapitels
 
@@ -162,3 +192,4 @@ gibt es nicht. Einzelheiten: [admin-statistics.md](../observability/admin-statis
 | R-OB-07 | `correlation_id` ist die Trace-ID der auslösenden Anfrage. | Ereignisse, Audit und Traces lassen sich ohne zweite ID verbinden. |
 | R-OB-08 | Statusseite und Statistik hängen nicht vom Observability-Stack ab. | Der Stack ist optional; Betriebsfunktionen der App nicht. |
 | R-OB-09 | Laufzeit-Texte in Ops-Artefakten (Alarm-Texte, Dashboard-Titel) sind Englisch. | Betreiber weltweit; Planungsdokumente bleiben Deutsch. |
+| R-OB-10 | Die Apps messen SLIs selbst (eigene Messung in `stats_minutes`) mit Grenzen aus den Sloth-Dateien; Prometheus bleibt die Quelle für Alarme. | R-OB-08 verbietet das Lesen aus der Telemetrie; eine Quelle für Grenzen hält beide Wege vergleichbar (Ruling T7, [25-visualisierung.md](25-visualisierung.md)). |
