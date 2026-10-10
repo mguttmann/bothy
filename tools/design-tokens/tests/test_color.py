@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for colour conversion and WCAG contrast maths."""
 
 import unittest

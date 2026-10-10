@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Dart constants and ThemeExtension classes for packages/design_system (Flutter).
 
 Theme-dependent tokens become ThemeExtension subclasses with one const instance per context

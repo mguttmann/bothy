@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for DTCG 2025.10 parsing, type inheritance and alias resolution."""
 
 import unittest

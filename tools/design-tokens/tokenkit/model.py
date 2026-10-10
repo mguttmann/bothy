@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Builds the token model: theme-independent base tokens plus one token map per modifier context."""
 
 from __future__ import annotations

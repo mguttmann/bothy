@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Colour maths: OKLCH <-> sRGB, WCAG 2.x relative luminance and contrast, OKLab distance.
 
 Formulas:

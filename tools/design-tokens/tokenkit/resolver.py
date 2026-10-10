@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Subset of the DTCG Resolver Module 2025.10 (https://www.designtokens.org/tr/2025.10/resolver/).
 
 Supported: root `version` (must be "2025.10"), `sets` with `sources`, `modifiers` with

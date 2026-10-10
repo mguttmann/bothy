@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for the model split and the CSS and Dart emitters."""
 
 import json

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for the DTCG Resolver Module 2025.10 subset used by the token pipeline."""
 
 import json

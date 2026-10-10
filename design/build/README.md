@@ -9,4 +9,4 @@ GENERIERT von tools/design-tokens/tokens.py aus design/tokens. Nicht bearbeiten;
 | `tokens.resolved.json` | alle Tokens aufgelöst, je Kontext | Server-Prüfung erlaubter Farb- und Icon-Schlüssel, Design-Werkzeuge |
 | `preview.html` | eigenständige Vorschau (Schriften und Icons eingebettet) | Menschen, Playwright für `docs/design/previews/` |
 
-Befehl: `uv run tools/design-tokens/tokens.py build` (später `make tokens`).
+Erzeugen: `uv run tools/design-tokens/tokens.py build`. Prüfen: `make tokens`.

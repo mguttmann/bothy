@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Subset of the Design Tokens Format Module 2025.10 (https://www.designtokens.org/tr/2025.10/format/).
 
 Supported: groups with inherited `$type`, `$description`, `$extensions`, `$deprecated`,

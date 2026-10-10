@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Generated documentation pages: docs/design/palette.md, contrast.md and tokens.md."""
 
 from __future__ import annotations

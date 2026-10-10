@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Self-contained preview page: palette, desktop layout, component sheet and mobile screens.
 
 Fonts and icons are embedded (base64 and an SVG sprite) so the file renders the same everywhere,

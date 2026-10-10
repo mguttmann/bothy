@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """CSS custom properties for the docs site, the preview page and any HTML surface (status page).
 
 Selection rules:

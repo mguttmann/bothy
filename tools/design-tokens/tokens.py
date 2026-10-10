@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 # /// script
 # requires-python = ">=3.12"
 # dependencies = []
@@ -87,7 +88,7 @@ def _build_readme() -> str:
         "| Server-Prüfung erlaubter Farb- und Icon-Schlüssel, Design-Werkzeuge |\n"
         "| `preview.html` | eigenständige Vorschau (Schriften und Icons eingebettet) "
         "| Menschen, Playwright für `docs/design/previews/` |\n\n"
-        "Befehl: `uv run tools/design-tokens/tokens.py build` (später `make tokens`).\n"
+        "Erzeugen: `uv run tools/design-tokens/tokens.py build`. Prüfen: `make tokens`.\n"
     )
 
 
@@ -134,13 +135,16 @@ def cmd_build(_args) -> int:
 def cmd_check(_args) -> int:
     outputs, problems = generate()
     stale = [p for p, text in outputs.items() if not p.exists() or p.read_text(encoding="utf-8") != text]
+    vendor = vendor_problems(VENDOR)
     for p in problems:
         print("gate: " + p, file=sys.stderr)
     for p in stale:
         print(f"stale: {p.relative_to(ROOT)} (run: uv run tools/design-tokens/tokens.py build)", file=sys.stderr)
-    if problems or stale:
+    for p in vendor:
+        print("vendor: " + p, file=sys.stderr)
+    if problems or stale or vendor:
         return 1
-    print(f"ok: {len(outputs)} generated files up to date, all design gates pass")
+    print(f"ok: {len(outputs)} generated files up to date, all design gates pass, vendor/ matches MANIFEST.json")
     return 0
 
 
@@ -183,8 +187,45 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def as_stored(data: bytes) -> bytes:
+    """Bytes as the repository stores them: text with LF line endings (.gitattributes), binary as is.
+
+    A file without NUL byte counts as text, as in git's `text=auto`. Hashing the stored form
+    keeps MANIFEST.json valid in every checkout, whatever line endings the upstream package used.
+    """
+    return data if b"\0" in data else data.replace(b"\r\n", b"\n")
+
+
+def _copy_as_stored(src: Path, dst: Path) -> None:
+    dst.write_bytes(as_stored(src.read_bytes()))
+
+
+def vendor_problems(vendor: Path) -> list[str]:
+    """Every file under fonts/ and phosphor/ is listed in MANIFEST.json with its sha256, and nothing else."""
+    recorded: dict[str, str] = json.loads((vendor / "MANIFEST.json").read_text(encoding="utf-8"))["sha256"]
+    present = {
+        f.relative_to(vendor).as_posix(): f
+        for sub in ("fonts", "phosphor")
+        if (vendor / sub).is_dir()
+        for f in (vendor / sub).iterdir()
+        if f.is_file()
+    }
+    problems = [f"{name}: not listed in MANIFEST.json" for name in sorted(present.keys() - recorded.keys())]
+    problems += [f"{name}: listed in MANIFEST.json but missing" for name in sorted(recorded.keys() - present.keys())]
+    problems += [
+        f"{name}: sha256 differs from MANIFEST.json (re-vendor with `tokens.py vendor`)"
+        for name in sorted(present.keys() & recorded.keys())
+        if _sha256(present[name]) != recorded[name]
+    ]
+    return problems
+
+
 def cmd_vendor(args) -> int:
-    """Copy the font files and the used Phosphor SVGs into vendor/ and write MANIFEST.json."""
+    """Copy the font files and the used Phosphor SVGs into vendor/ and write MANIFEST.json.
+
+    Text files are stored with LF line endings (`as_stored`); MANIFEST.json records the sha256 of
+    the stored bytes, and `check` verifies it.
+    """
     m = model.build(RESOLVER)
     icons = emit_dart.icon_extension(m)
     phosphor = Path(args.phosphor)
@@ -199,17 +240,17 @@ def cmd_vendor(args) -> int:
             (Path(args.mono), "atkinson-hyperlegible-mono"),
         ):
             for name in (f"{family}-latin-wght-normal.woff2", f"{family}-latin-ext-wght-normal.woff2"):
-                shutil.copy2(src_dir / "files" / name, staging / "fonts" / name)
-            shutil.copy2(src_dir / "LICENSE", staging / "fonts" / f"{family}.OFL.txt")
+                _copy_as_stored(src_dir / "files" / name, staging / "fonts" / name)
+            _copy_as_stored(src_dir / "LICENSE", staging / "fonts" / f"{family}.OFL.txt")
         needed = {(g["name"], g["weight"]) for g in icons["glyphs"].values()} | {
             (n, "regular") for n in icons["space-icons"]
         }
         for name, weight in sorted(needed):
             suffix = "" if weight == "regular" else f"-{weight}"
-            shutil.copy2(
+            _copy_as_stored(
                 phosphor / "assets" / weight / f"{name}{suffix}.svg", staging / "phosphor" / f"{name}{suffix}.svg"
             )
-        shutil.copy2(phosphor / "LICENSE", staging / "phosphor" / "LICENSE")
+        _copy_as_stored(phosphor / "LICENSE", staging / "phosphor" / "LICENSE")
         for sub in ("fonts", "phosphor"):
             target = VENDOR / sub
             if target.exists():
@@ -217,11 +258,13 @@ def cmd_vendor(args) -> int:
             shutil.copytree(staging / sub, target)
     for sub_dir in (fonts_dir, icons_dir):
         for f in sorted(sub_dir.iterdir()):
-            files[str(f.relative_to(VENDOR))] = _sha256(f)
+            files[f.relative_to(VENDOR).as_posix()] = _sha256(f)
     manifest = {
         "$comment": (
             "Herkunft der eingebetteten Dateien. Nur für Vorschau und Doku; "
-            "die Apps beziehen Schriften und Icons im Paket-Build aus denselben Quellen."
+            "die Apps beziehen Schriften und Icons im Paket-Build aus denselben Quellen. "
+            "sha256 der gespeicherten Bytes (Textdateien mit LF wie in .gitattributes); "
+            "tokens.py check prüft sie."
         ),
         "sources": {
             "fonts/atkinson-hyperlegible-next-*": (

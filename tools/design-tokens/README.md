@@ -16,19 +16,16 @@ Aus dem Wurzelverzeichnis des Repositorys:
 | `uv run tools/design-tokens/tokens.py build` | Gates prüfen, dann alle Ausgaben schreiben. Exit 1 bei Verstoß, nichts wird geschrieben. |
 | `uv run tools/design-tokens/tokens.py check` | Gates prüfen und vergleichen; Exit 1, wenn eine erzeugte Datei nicht zur Quelle passt. Für das lokale Gate und CI. |
 | `uv run tools/design-tokens/tokens.py previews` | PNG-Vorschauen nach `docs/design/previews/` mit dem Playwright-CLI (`npx`, gepinnte Version in `tokens.py`). Braucht Node und einen installierten Chromium. Nicht Teil von `check`, weil Pixel je Maschine abweichen. |
-| `uv run tools/design-tokens/tokens.py vendor --phosphor DIR --sans DIR --mono DIR` | Schriften und benutzte Phosphor-SVGs nach `vendor/` kopieren, `vendor/MANIFEST.json` mit SHA-256 schreiben. |
-| `uv run --no-project python -m unittest discover -s tools/design-tokens/tests -t tools/design-tokens` | Unit-Tests |
-| `uvx ruff check tools/design-tokens` | Lint (Konfiguration `ruff.toml`) |
-
-`make tokens` ruft später `build` auf; `make check` ruft `check` und die Tests auf (Verdrahtung durch
-das Qualitäts-Team).
+| `uv run tools/design-tokens/tokens.py vendor --phosphor DIR --sans DIR --mono DIR` | Schriften und benutzte Phosphor-SVGs nach `vendor/` kopieren (Textdateien mit LF), `vendor/MANIFEST.json` mit SHA-256 der gespeicherten Bytes schreiben. |
+| `make tokens` | Das Gate (Teil von `make gates`): ruft `make -C tools/design-tokens check` auf, also die Tests unter `tests/` und danach `tokens.py check`, beides in der gepinnten Umgebung `tools/`. |
+| `make lint`, `make fmt-check` | ruff mit der Konfiguration `ruff.toml` dieses Ordners, dazu bandit. |
 
 Zusätzliche Schema-Prüfung gegen die offiziellen JSON-Schemas der DTCG (braucht Netz für den ersten
 Abruf):
 
 ```bash
-uvx check-jsonschema --schemafile https://www.designtokens.org/schemas/2025.10/format.json design/tokens/*.tokens.json
-uvx check-jsonschema --schemafile https://www.designtokens.org/schemas/2025.10/resolver.json design/tokens/theme.resolver.json
+uv run --project tools --locked check-jsonschema --schemafile https://www.designtokens.org/schemas/2025.10/format.json design/tokens/*.tokens.json
+uv run --project tools --locked check-jsonschema --schemafile https://www.designtokens.org/schemas/2025.10/resolver.json design/tokens/theme.resolver.json
 ```
 
 ## Ausgaben
@@ -58,6 +55,8 @@ der benutzten Flutter-Typen; gegen das echte Flutter-SDK ist sie noch nicht übe
 3. **Palettenwächter:** verbotene Referenzfarben (OKLab-Abstand), verbotene Farbtonbereiche,
    Mindest-Chroma für Neutrale. Regeln und Quellen stehen in `design/design-rules.json`.
 4. **Aktualität:** `check` vergleicht jede erzeugte Datei Byte für Byte.
+5. **Herkunft:** `check` vergleicht jede Datei unter `vendor/fonts/` und `vendor/phosphor/` mit ihrem
+   SHA-256 in `vendor/MANIFEST.json`; eine fehlende, zusätzliche oder veränderte Datei schlägt fehl.
 
 ## Bewusste Grenzen
 

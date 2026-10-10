@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Tests for the contrast gate and the palette guard rules."""
 
 import unittest
