@@ -5,6 +5,7 @@ Server-Code. Heute nur Planung, kein Code.
 | Ordner | Inhalt | Kapitel |
 |---|---|---|
 | `server/` | Der Go-Server als modularer Monolith: ein Binary mit den Rollen `api` und `worker` | [02 Architektur](../docs/spec/02-architektur.md) |
+| `host/` | Host-Dienst `bothy-host` für das Terminal auf angebundenen Rechnern | [24 Terminal](../docs/spec/24-terminal.md) |
 
 Für die Gates ist jedes getrackte `go.mod` unter `services/` ein Go-Modul (Format, Lint,
 Build, Tests mit Abdeckung, Schwachstellen, Lizenzen); Einzelheiten in

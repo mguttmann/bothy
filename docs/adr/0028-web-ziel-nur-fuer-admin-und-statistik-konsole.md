@@ -8,6 +8,10 @@ informed: alle Teams
 
 # Web-Ziel nur für Admin- und Statistik-Konsole
 
+Status-Hinweis (2026-10-10): Teilweise ersetzt durch
+[ADR 0070](0070-terminal-in-der-web-konsole.md). Die Konsole bekommt zusätzlich das Terminal mit
+Passkey-Pflicht; alles andere dieser Entscheidung gilt weiter, insbesondere kein Chat im Browser.
+
 ## Context and Problem Statement
 
 Betreiberinnen und Owner brauchen Verwaltung und Statistik auch ohne installierte App, etwa vom

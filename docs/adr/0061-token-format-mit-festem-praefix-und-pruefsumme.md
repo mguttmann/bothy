@@ -41,7 +41,8 @@ finden und die Prüfsumme Fehlalarme ohne Datenbank verwirft. Normativ in
 [03-datenmodell.md](../spec/03-datenmodell.md), Tabelle `api_tokens`.
 
 1. **Form.** `bothy_<art>_<zufall>_<prüfsumme>`. Art: `agt` (Agent), `app` (App), `pat`
-   (persönlich), `whi` (Eingangs-Webhook). Zufall: 256 Bit aus einem kryptografischen
+   (persönlich), `whi` (Eingangs-Webhook), `hpc` (Kopplungs-Code eines Rechners für das Terminal,
+   Nachtrag 2026-10-10, [24-terminal.md](../spec/24-terminal.md) Abschnitt 3.2). Zufall: 256 Bit aus einem kryptografischen
    Zufallsgenerator, in Base62 als genau 43 Zeichen. Base62 nutzt das Alphabet `0-9A-Za-z` in
    dieser Reihenfolge (Ziffernwert 0 bis 61). Prüfsumme: CRC-32 (IEEE) über die Zeichen des
    Zufallsteils, in Base62 als genau 6 Zeichen mit führenden Nullen.

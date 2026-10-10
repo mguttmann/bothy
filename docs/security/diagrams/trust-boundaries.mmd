@@ -25,6 +25,11 @@ flowchart LR
         DEV["Dev-Umgebung je Person<br/>VM"]
     end
 
+    subgraph Z8["Zone 8: Angebundene Rechner (halb vertrauenswürdig)"]
+        HOSTD["Host-Dienst bothy-host<br/>eigener Benutzer ohne Admin"]
+        PTY["PTY: Shell oder Coding-Agent"]
+    end
+
     subgraph Z5["Zone 5: Integrationen (nicht vertrauenswürdig)"]
         APPS["Apps und Plugins"]
         EXT["Externe Systeme<br/>Eingangs-Webhooks"]
@@ -64,3 +69,6 @@ flowchart LR
     PUSH -- "TB7" --> APP
     OPS -- "TB8: Verwaltungsrolle" --> DB
     CI -- "TB8: signierte Artefakte" --> OPS
+    APP -- "TB10: Noise-Strom Ende-zu-Ende" --> PRX
+    HOSTD -- "TB10: WSS ausgehend, Anmeldeschlüssel" --> PRX
+    HOSTD --> PTY

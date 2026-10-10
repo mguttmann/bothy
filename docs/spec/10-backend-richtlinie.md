@@ -80,6 +80,22 @@ einer bestimmten Installation; instanzbezogene Angaben gehören nicht ins Produk
 - **I5:** Der Server kennt keine Zugangsdaten. Der API-Key kommt beim Adapter aus dessen
   Secret-Provider; das persönliche Abo bleibt in der Laufzeit der Person.
 
+Ergänzt durch den Nachtrag Terminal (Owner-Vorgabe 2026-10-10, Ruling T2):
+
+- **I6:** Ist auf einem Rechner `hosts.llm_credentials = personal`, darf nur
+  `hosts.credential_holder_id` dort ein Terminal öffnen oder anhängen, auch kein anderer Owner.
+  Freigaben `terminal` auf diesen Rechner gibt es nur als Einzel-Freigabe an den Inhaber der
+  Anmeldung. Der Server prüft I6 transaktional bei `grant.create` mit Ziel `host` und bei
+  `host.manage` (03 Abschnitt 6.8) und bei jedem `terminal.open` und `terminal.attach` (07, SR11).
+  Details: [24-terminal.md](24-terminal.md), Abschnitt 7.
+
+Abgrenzung: I1 regelt, wer einen Agenten auf einem Abo auslöst, und kennt keine Owner-Ausnahme
+(Ruling L22). I6 regelt, wer auf einem Rechner mit einem Abo eine Shell bekommt, und hat eine
+Owner-Ausnahme, weil ein Terminal Zugriff auf einen bestimmten Rechner ist und keine vererbte Stufe
+([ADR 0068](../adr/0068-terminal-ueber-host-dienst-mit-noise-strom-und-invariante-i6.md)). Beide
+setzen dieselbe Anthropic-Bedingung durch (Abschnitt 2): ein persönliches Abo nur für die eigene
+Nutzung.
+
 Folge von I1 (03 Abschnitt 6.4): Jeder Owner hat überall `trigger`, also gehört jeder Owner zur
 Menge. `personal` ist darum nur möglich, solange der `credential_holder` der einzige Owner ist.
 Ein zweiter Owner verlangt vorher die Umstellung aller persönlichen Agenten (Abschnitt 11). Eine

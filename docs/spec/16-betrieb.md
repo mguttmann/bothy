@@ -136,6 +136,42 @@ aus (`bothy setup issue-enrollment-code`, Systemaktion `owner.recover`;
 umgeht es. Darum gehören Shell-Zugang, Container-Laufzeit und Secret-Provider des Hosts zum
 geschützten Kern; der Betreiber gibt sie nur Personen, die auch Owner sein dürften.
 
+### 4.4 Terminal: Weiterleitung und Host-Dienst
+
+Normativ zusammen mit [24-terminal.md](24-terminal.md).
+
+Rand und Proxy:
+
+1. Der Rand leitet WebSocket-Upgrades für `/api/v1/terminal/sessions/{session_id}/stream`,
+   `/api/v1/hosts/connect` und `/api/v1/hosts/sessions/{session_id}/stream` weiter, mit einer
+   Leerlauf-Frist über `terminal.host_heartbeat_interval` (sonst schneidet der Proxy ruhige
+   Terminals ab).
+2. Mit `cluster.mode = multi` leitet der Rand beide Strom-Pfade derselben Sitzung per Hash über die
+   Sitzungs-ID auf denselben api-Knoten (konsistentes Hashing über das Pfadsegment
+   `{session_id}`). Beide Pfade haben die Sitzungs-ID an derselben Stelle nach dem festen Präfix, damit
+   eine Regel beide trifft. Ohne diese Regel scheitert jede zweite Sitzung sichtbar mit `4102`
+   (Ruling T6, TM-T15). Mit einem Knoten ist nichts zu tun.
+3. Der Rand puffert diese Verbindungen nicht und schreibt keine Inhalte in Logs (Zugriffslog nur mit
+   Routen-Muster, [19-sicherheit.md](19-sicherheit.md), SEC-LOG-*).
+
+Installation des Host-Dienstes auf einem Rechner:
+
+1. Zwei Benutzer ohne Administratorrechte: der Dienstbenutzer `bothy-host` mit dem Zustandsordner
+   `host_service.state_dir` (Modus `0700`) und der Sitzungsbenutzer `host_service.session_user`
+   ohne Leserecht darauf (24, Abschnitt 2.2). Keiner der beiden in `docker`, `lxd`, `libvirt`,
+   `disk` oder einer Admin-Gruppe (HD2).
+2. Dienste des Betriebssystems: launchd (macOS), systemd (Linux), Windows-Dienst; einer für den
+   Host-Dienst, einer für den PTY-Helfer; Neustart bei Absturz. Der Installationsbefehl
+   `bothy-host install` legt Benutzer, Ordner, lokalen Kanal und Dienste an und braucht dafür
+   einmal Administratorrechte; die Dienste laufen danach ohne sie.
+3. `bothy-host pair --server <url> --code <code>` koppelt (24, Abschnitt 3.2); `bothy-host doctor`
+   prüft HD1 bis HD8 vor jedem Start.
+4. Nicht auf dem Server-Host installieren. Wo es doch nötig ist, erklärt der Owner den Rechner als
+   Server-Host; dann bekommen nur Owner ein Terminal dort (07, SR10).
+5. Für das Profil `claude` legt der Betreiber je nach LLM-Erklärung den API-Schlüssel oder das
+   langlebige Token des Inhabers als Datei mit Modus `0600` in den Zustandsordner
+   ([24-terminal.md](24-terminal.md), Abschnitt 7.4). Nie als Umgebungsvariable des Dienstes.
+
 ## 5. Konfiguration und Geheimnisse
 
 ### 5.1 Konfiguration (ADR 0011)
@@ -614,3 +650,4 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | R-OP-16 | Produktionsdaten nie in `dev` oder `staging`. | Kein Anonymisierungswerkzeug; ein Abzug wäre ein Datenschutzvorfall. |
 | R-OP-17 | DDL im Betrieb nur über `SECURITY DEFINER`-Funktionen von `bothy_owner`; Tabellenrechte je Migration ausdrücklich, keine Standardrechte in `public`. | Die Anwendungsrolle bleibt bei DML; ein fehlendes Recht fällt im Test auf. |
 | R-OP-18 | Signierschlüssel erzeugt der Server in einem eigenen beschreibbaren Verzeichnis ([ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)). | Rotation ohne Handgriff auf dem Host; alle anderen Geheimnisse bleiben nur lesbar. |
+| R-OP-19 | Hash-Routing über die Sitzungs-ID für beide Strom-Pfade des Terminals als Betriebsanforderung mit mehreren Knoten. | Kein Broker im Server; ein Knoten hält beide Enden einer Sitzung ([24-terminal.md](24-terminal.md), Abschnitt 9). |

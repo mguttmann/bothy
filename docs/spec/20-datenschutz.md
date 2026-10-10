@@ -98,6 +98,9 @@ personenbezogene Daten enthalten, auch von Dritten und auch besondere Kategorien
 | `device_pairings` (03, 08) | indirekt | Kopplungsvorgang mit öffentlichen Geräteschlüsseln | `transient` | `auth.pairing_code_ttl` |
 | `auth_challenges` (03, 08) | indirekt | einmalige Herausforderungen für Step-up und Passkeys, gezählte Fehlversuche | `transient` | `auth.step_up_challenge_ttl` bzw. `auth.login_flow_ttl`, gelöscht vom Job `identity.auth_cleanup` |
 | `dev_environments` (03, 21; Etappe) | indirekt | Umgebung einer Person, Prüfergebnisse | `security` | nach `retired` plus `retention.security_after_end` |
+| `hosts` (03, 24) | indirekt | Rechnername (oft mit Personennamen), Inhaber, Inhaber der LLM-Anmeldung, öffentliche Schlüssel, Betriebssystem, Prüfergebnisse, letzte Sichtung | `security` | nach `retired` plus `retention.security_after_end` |
+| `terminal_sessions` (03, 24) | indirekt | wer wann von welchem Gerät auf welchem Rechner mit welchem Profil gearbeitet hat, Dauer, Bytes je Richtung, Grund des Endes; nie Inhalte | `security` | nach `closed_at` plus `retention.security_after_end`; bei Kontolöschung mit pseudonymer ID |
+| `stats_minutes` (03, 25) | nein | Minuten-Aggregate je Kanal, Agent und Code (Anzahl, Summe, gute Ereignisse); keine Spalte für Menschen, keine Inhalte. In Kanälen mit einem einzigen Menschen mittelbar auf ihn beziehbar (Abschnitt 9) | `stats` | Abhängen der Tagespartitionen nach `retention.stats_minutes` |
 
 Daten außerhalb der Datenbank:
 
@@ -109,6 +112,7 @@ Daten außerhalb der Datenbank:
 | Sicherungen | Abbild von Datenbank und Objektspeicher | Abschnitt 4.6 |
 | Client-Cache | Kopien von Inhalten auf Geräten | 04, Abschnitt 13.1; Löschen bei Entzug und Widerruf |
 | Agenten-Laufzeiten und LLM-Anbieter | Inhalte, die ein Agent bekommt | Abschnitt 6 |
+| Angebundene Rechner | Terminal-Inhalte, Rückblick-Puffer nur im Speicher des Host-Dienstes; was die Shell dort schreibt | außerhalb des Servers; Verantwortung des Betreibers des Rechners ([24-terminal.md](24-terminal.md), Abschnitt 10.4) |
 
 ## 3. Rechtsgrundlagen
 
@@ -144,6 +148,7 @@ Verzeichnis (Vorlage, Abschnitt "Tätigkeiten"):
 | `import` | `retention.import_after_completion` nach Abschluss des Imports | Job |
 | `privacy_job` | `retention.privacy_job`; Exportpakete `privacy.export_ttl` | Job |
 | `ops` | `retention.ops` | Job |
+| `stats` | `retention.stats_minutes` | Job `stats.retention` hängt ganze Tagespartitionen ab; nie kürzer als der längste SLO-Zeitraum ([25-visualisierung.md](25-visualisierung.md), Abschnitt 3.5) |
 
 `retention.content` ist bewusst ohne Standardfrist: Wie lange ein Team-Verlauf gebraucht wird, weiß
 nur der Betreiber. Die Konsole zeigt einen Hinweis, bis der Owner einen Wert gesetzt oder "keine
@@ -352,6 +357,8 @@ Voreinstellungen:
 | Kosten je Person | nur Owner; in Threads sieht man Kosten je Lauf |
 | Audit-Log | nur Owner mit Step-up; jeder Lesezugriff steht selbst im Audit-Log (05, `audit.read`) |
 | "Als Person ansehen" | Step-up, Zeitgrenze, Audit, DMs ausgeschlossen (07, 9.2) |
+| Terminal-Sitzungen | Metadaten nur für die Person selbst und Owner; keine Inhaltsaufzeichnung; nicht in der Statistik je Person ([24-terminal.md](24-terminal.md), Abschnitt 10) |
+| Live-Statistik und Visualisierungen | an (`stats.live_enabled`); nur für Owner und Bereichsverwaltung, ohne Werte je Person, ohne Auslöser eines Laufs, ohne Zähler über Menschen; in Kanälen mit nur einem Menschen lässt sich aus Läufen auf ihn schließen, darum abschaltbar ([25-visualisierung.md](25-visualisierung.md), Abschnitt 4) |
 
 Jede Änderung dieser Schalter steht im Audit-Log. Eine Datenschutz-Folgenabschätzung (Art. 35
 DSGVO) prüft der Betreiber; Anlass können Agenten mit Zugriff auf Beschäftigtendaten sein.
@@ -371,6 +378,7 @@ DSGVO) prüft der Betreiber; Anlass können Agenten mit Zugriff auf Beschäftigt
 | DP-T09 | Telemetrie-Kanarien (19, SEC-T10) | keine Inhalte, keine Klar-IDs |
 | DP-T10 | Gelesen-Stand eines anderen Menschen über API oder Ereignisse abrufen | nicht möglich (`not_found`) |
 | DP-T11 | Statistik je Person bei ausgeschaltetem Schalter oder zu kleiner Gruppe | keine Ausgabe |
+| DP-T12 | Live-Rahmen, Timeline und `stats_minutes` mit `privacy.per_person_stats_enabled = true` | weiterhin keine Prinzipal-IDs von Menschen, kein Auslöser, keine Zähler über Menschen (25, VZ-T05, VZ-T07) |
 
 ## 11. Entscheidungen dieses Kapitels
 
@@ -382,6 +390,8 @@ DSGVO) prüft der Betreiber; Anlass können Agenten mit Zugriff auf Beschäftigt
 | R-DP-04 | Lösch-Journal außerhalb der Datenbank. | Wiederherstellung darf Gelöschtes nicht zurückbringen. |
 | R-DP-05 | Gesetzliche Fristen (Art. 12) sind keine Konfigurationswerte. | Eine konfigurierbare gesetzliche Frist lädt zum Fehler ein. |
 | R-DP-06 | Mitbestimmungsfreundliche Voreinstellungen. | Einführung im Unternehmen ohne Umbau; Überwachungsfunktionen sind bewusste Schalter. |
+| R-DP-07 | Terminal ohne Inhaltsaufzeichnung; nur Metadaten mit Klasse `security`. | Ein Terminal zeigt beliebige Daten des Rechners; Aufzeichnung wäre ein Abzug ohne Zweckbindung. Ob Nachweispflichten sie verlangen, entscheidet der Owner (offene Frage, Voreinstellung nein). |
+| R-DP-08 | Minuten-Aggregate der eigenen Messung ohne Personen in eigener Klasse `stats` mit eigener Frist; Live-Strom abschaltbar. | Live-Ansichten brauchen feine Zeitauflösung, aber keine Personen; die Frist ist kürzer als die der Fachdaten, weil die Aggregate nur Ansicht und Ampel tragen. |
 
 ## 12. Abgleich mit dem Kern-Vertrag
 
@@ -403,6 +413,7 @@ Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026
 | `retention.import_after_completion` | `90d` | Import-Zustand nach Abschluss |
 | `retention.privacy_job` | `1095d` | DSGVO-Aufträge (ohne Exportpakete) |
 | `retention.ops` | `395d` | Statusseite |
+| `retention.stats_minutes` | `90d` | Minuten-Aggregate der eigenen Messung (`stats_minutes`); mindestens der längste SLO-Zeitraum |
 | `retention.webhook_deliveries` | `30d` | Zustellversuche ausgehender Webhooks |
 | `privacy.export_ttl` | `7d` | Bereitstellung eines Exportpakets |
 | `privacy.export_requires_approval` | `false` | Export der eigenen Daten braucht Freigabe des Owners |

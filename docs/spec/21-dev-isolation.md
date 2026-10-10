@@ -176,6 +176,27 @@ flowchart LR
 5. Stopp beendet die Prozessgruppe in der VM. Der Runner hält die Steuerverbindung zur VM, nicht der
    Server.
 
+### 7.1 Dev-Umgebung als Rechner für das Terminal
+
+Eine bereite Dev-Umgebung kann zugleich ein Rechner mit Host-Dienst sein
+([24-terminal.md](24-terminal.md)); `hosts.dev_environment_id` verbindet beide (03). Regeln:
+
+1. Ein Nicht-Owner bekommt dort ein Terminal nur, wenn es seine eigene Umgebung ist und sie nach
+   Abschnitt 6.2 bereit ist (07, SR10, Ruling T1). Wird sie `suspended` oder `retired`, enden seine
+   Sitzungen (`access_revoked`).
+2. Die LLM-Erklärung des Rechners folgt Abschnitt 5, Punkt 5: in Umgebungen anderer Personen nur
+   `organization` oder `none`, nie `personal` mit einer anderen Person als Inhaberin. Bis die Etappe
+   über eine persönliche Richtlinie je Umgebung entscheidet, gilt das auch für die eigene Person
+   (R-DM-24).
+3. Der Host-Dienst läuft in der VM, nie auf dem Host der VMs. Grund: Eine Shell auf dem Host wäre
+   genau der Ausbruch, den Abschnitt 8.2 prüft.
+4. "Thread im Terminal übernehmen" (eine Sitzung des Runners interaktiv fortsetzen) geht erst, wenn
+   Runner und Host-Dienst in der Umgebung als derselbe Benutzer laufen; das ist eine spätere Etappe
+   (Ruling T5). Bis dahin sind Runner-Sitzungen und Terminal getrennt.
+5. Die Prüfungen D1 bis D10 gelten unverändert; der Host-Dienst ändert sie nicht, weil er nur
+   ausgehend zum Server spricht und der Server laut D3 aus dem Gast nur über den Rand erreichbar
+   ist. D3 erlaubt dafür genau den Rand des Servers als Ziel, nicht den Server direkt.
+
 ## 8. Tests und Red Team vor Freischaltung
 
 ### 8.1 Automatische Tests
@@ -189,6 +210,8 @@ flowchart LR
 | DEV-T05 | Marke mit fremder `dev_environment_id` an den Runner | kein Start |
 | DEV-T06 | `user.disable` der Person | Umgebung `suspended` |
 | DEV-T07 | Runner meldet `isolation_kind` außerhalb der erlaubten Werte | abgelehnt |
+| DEV-T08 | Nicht-Owner öffnet ein Terminal in fremder, in eigener nicht bereiter und in eigener bereiter Umgebung | `terminal_not_host_assignee`, `terminal_not_host_assignee`, erlaubt |
+| DEV-T09 | eigene Umgebung wird `suspended` während einer Terminal-Sitzung | Sitzung endet mit `access_revoked` |
 
 ### 8.2 Red Team
 
@@ -221,6 +244,7 @@ neues Red Team.
 | R-DV-03 | Bereitschaft ist ein Datensatz mit Prüfungen, Red Team und Owner-Freigabe; SR3 prüft ihn bei jedem Aufruf. | Bereitschaft ändert sich; nur eine Prüfung beim Aufruf ist immer aktuell. |
 | R-DV-04 | Threads in Dev-Projekten sind an die Umgebung ihres ersten Laufs gebunden. | Eine Sitzung arbeitet auf den Dateien ihrer Umgebung. |
 | R-DV-05 | Fremde Umgebungen in dieser Etappe nur mit Organisations-Schlüssel. | I1 ist je Agent definiert; ein persönlicher Modus je Umgebung braucht eine Änderung an I1. |
+| R-DV-06 | Terminal in einer Dev-Umgebung nur für ihre Person und nur bei Bereitschaft; Host-Dienst in der VM. | OS-Benutzer allein ist keine Grenze (R-DV-01); das Terminal soll den Ausbruch nicht wieder öffnen (Ruling T1, T5). |
 
 ## 10. Offene Punkte
 

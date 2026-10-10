@@ -1,11 +1,12 @@
 # Bedrohungsmodell
 
-Status: Entwurf M0, Stand Etappe M0 (Planung). Lebendes Dokument; Pflegeregel in Abschnitt 9.
+Status: Entwurf M0, Stand Etappe M0 (Planung), Nachtrag Terminal vom 2026-10-10. Lebendes Dokument; Pflegeregel in Abschnitt 9.
 Kontrollen mit IDs `SEC-...`: [../spec/19-sicherheit.md](../spec/19-sicherheit.md). Rechte und
-Schutzregeln `SR1` bis `SR9`: [../spec/07-rechte.md](../spec/07-rechte.md). Identität:
+Schutzregeln `SR1` bis `SR11`: [../spec/07-rechte.md](../spec/07-rechte.md). Identität:
 [../spec/08-identitaet.md](../spec/08-identitaet.md). Datenschutz:
 [../spec/20-datenschutz.md](../spec/20-datenschutz.md). Dev-Abschottung:
-[../spec/21-dev-isolation.md](../spec/21-dev-isolation.md).
+[../spec/21-dev-isolation.md](../spec/21-dev-isolation.md). Terminal:
+[../spec/24-terminal.md](../spec/24-terminal.md).
 
 Methode: Systemgrenzen und Datenflüsse, Assets, Angreifer, STRIDE je Komponente, dann ein Register
 der wichtigsten Bedrohungen mit Bewertung, Gegenmaßnahme, Test und Restrisiko. KI-spezifische
@@ -16,7 +17,7 @@ Bedrohungen folgen der Einteilung der OWASP Top 10 für LLM-Anwendungen 2025
 
 Im Modell: Server (alle Rollen), Datenhaltung, native Apps, Admin-Konsole, Agenten-Protokoll und
 Referenz-Adapter, Apps und Webhooks, Push, Telemetrie, Sicherungen, Lieferkette, Mehrbenutzer-Dev-
-Umgebung.
+Umgebung, Terminal (Kopplung, Relais, Host-Dienst, Terminal-Ansicht der Clients).
 
 Nicht im Modell, mit Grund:
 
@@ -46,6 +47,7 @@ Quelle: [diagrams/trust-boundaries.mmd](diagrams/trust-boundaries.mmd). Neu rend
 | TB7 | Server und externe Dienste | Identität, Push-Metadaten, Telemetrie | OIDC-Prüfung, Push nur mit IDs, Telemetrie ohne Inhalte |
 | TB8 | Betrieb und Lieferkette und Instanz | Vertrauenswurzel, Code-Integrität | Server-Befehl nur am Host, signierte Releases, gepinnte Actions |
 | TB9 | Dev-Umgebung einer Person und Host des Runners | Host, Geheimnisse des Owners, andere Personen | VM-Grenze, Egress-Regeln, Bereitschaftsprüfung (21) |
+| TB10 | Gerät, Server-Relais und Host-Dienst eines angebundenen Rechners | Terminal-Inhalte, Shell auf dem Rechner, LLM-Anmeldung des Rechners | Noise `NK` Ende-zu-Ende, Einmal-Marke, frischer Step-up, SR10, I6, Host-Dienst ohne Admin (24) |
 
 ## 3. Assets
 
@@ -65,6 +67,8 @@ Quelle: [diagrams/trust-boundaries.mmd](diagrams/trust-boundaries.mmd). Neu rend
 | A12 | Metadaten (wer, wann, mit wem, Geräte, IPs) | Vertraulichkeit, Datensparsamkeit |
 | A13 | Verfügbarkeit von Chat und Agenten | Verfügbarkeit |
 | A14 | Code, Abhängigkeiten, Releases | Integrität |
+| A15 | Shell auf angebundenen Rechnern und ihre Terminal-Inhalte | Vertraulichkeit, Integrität |
+| A16 | Schlüssel der Host-Dienste (Noise, Anmeldung) und gepinnte Schlüssel in den Geräten | Vertraulichkeit, Echtheit |
 
 ## 4. Angreifer
 
@@ -81,6 +85,8 @@ Quelle: [diagrams/trust-boundaries.mmd](diagrams/trust-boundaries.mmd). Neu rend
 | E9 | Netz-Angreifer | liest oder verändert Verkehr | Tokens, Inhalte |
 | E10 | Dienstleister mit Einblick | sieht Push-, Telemetrie- oder LLM-Daten | Profilbildung |
 | E11 | Dieb einer Sicherung | hat eine Sicherungsdatei | Inhalte, Hashes |
+| E12 | Bösartiger Server-Betreiber | kontrolliert Server, Schlüsselverteilung und Relais | Terminal-Sitzungen mitlesen oder ohne Bediener öffnen |
+| E13 | Angreifer auf einem angebundenen Rechner | Konto auf dem Rechner, ohne Rechte des Host-Dienstes | Rechte des Host-Dienstes erlangen, Schlüssel stehlen |
 
 ## 5. STRIDE je Komponente
 
@@ -233,6 +239,29 @@ E = Elevation of Privilege. "Register" verweist auf Abschnitt 6.
 | E | Code aus fremdem PR auf eigenem Runner | keine self-hosted Runner für fremde PRs (SEC-SC-3) | T-SC-03 |
 | S | Gefälschtes Release | Signatur, Provenance, SBOM (ADR 0036) | T-SC-04 |
 
+### 5.16 Terminal
+
+Kopplung, Relais, Host-Dienst und Terminal-Ansicht ([24-terminal.md](../spec/24-terminal.md)).
+
+| Teil | STRIDE | Bedrohung | Gegenmaßnahme | Register |
+|---|---|---|---|---|
+| Kopplung | S | Fremder Rechner löst einen abgefangenen Kopplungs-Code ein | Code einmalig und kurzlebig, Owner tippt den Fingerabdruck ein, Fehlversuche begrenzt | T-TM-06 |
+| Kopplung | T | Server tauscht den Schlüssel eines Rechners | Pinning je Gerät, harte Warnung, Audit jeder Neukopplung, Meldung an alle Owner | T-TM-01 |
+| Relais | I | Relais, Proxy, Logs oder Datenbank-Abzug lesen Terminal-Inhalte | Noise `NK` Ende-zu-Ende; nur Länge und Zeit sichtbar | T-TM-01 |
+| Relais | T | Relais spielt das erste Paket erneut ein oder setzt die Marke in einen eigenen Handshake | Einmal-Marke, `cek`, Prolog, PTY erst nach `start` | T-TM-02 |
+| Relais | D | Flut von Öffnungen, langsames Ende | `rl.terminal`, `rl.host`, Sitzungsgrenzen, Puffergrenze mit `4014` | T-DS-01 |
+| Host-Dienst | E | Shell eskaliert zu root oder Administrator auf dem Rechner | Benutzer ohne Admin und ohne Gruppen mit Rechten auf root-Niveau (z. B. `docker`), `doctor` verweigert den Start (HD1 bis HD3) | T-TM-04 |
+| Host-Dienst | I | Person mit Terminal kopiert die Schlüssel des Host-Dienstes und vertritt den Rechner von anderswo | Sitzungen als eigener Sitzungsbenutzer ohne Leserecht auf die Schlüssel (HD8); zweite lebende Steuerverbindung sperrt den Rechner; Neukopplung | T-TM-05 |
+| Host-Dienst | E | Hintergrundprozess oder Dauerläufer überlebt den Entzug | Prozessgruppe, cgroup bzw. Job Object je Sitzung; Hinweis zur Prüfung von Autostart nach Entzug | T-TM-11 |
+| Host-Dienst | R | Wer hat wann auf welchem Rechner gearbeitet? | Audit je Öffnung, Anhängen und Ende mit Gerät und Grund | T-AZ-04 |
+| Rechte | E | Person mit Freigabe öffnet einen fremden Rechner oder den Server-Host | SR10, Server-Host nur Owner, doppelt geprüft | T-TM-03 |
+| Rechte | E | Zweite Person nutzt das persönliche Abo auf einem Rechner | I6 transaktional und bei jedem Öffnen; `doctor` HD6 | T-TM-08 |
+| Rechte | E | Agent öffnet nach Prompt-Injection ein Terminal | Terminal nur für Menschen in einer Sitzung mit frischem Step-up | T-TM-09 |
+| Gerät | S | Gestohlene Sitzung oder gestohlenes Gerät öffnet ein Terminal | Step-up `frisch` mit Biometrie oder Passkey je Öffnung | T-TM-03 |
+| Gerät | T | Escape-Sequenzen schreiben in die Zwischenablage oder öffnen Links | SEC-TERM-6 | T-TM-10 |
+| Konsole | I | Browser-Erweiterung liest eine geöffnete Sitzung | Passkey-Pflicht, CSP, Empfehlung eigenes Browser-Profil | T-TM-07 |
+| Konsole | S | Fremde Seite öffnet den Strom-Pfad mit dem Cookie der Konsole (Cross-Site WebSocket Hijacking) | Origin-Prüfung beim Upgrade (08, Abschnitt 7.5), `SameSite=Strict`; ohne Sitzungs-Marke des Servers und Noise-Schlüssel des Tabs entsteht keine PTY | T-TM-07 |
+
 ## 6. Bedrohungsregister
 
 ### 6.1 Bewertung
@@ -315,11 +344,45 @@ E = Elevation of Privilege. "Register" verweist auf Abschnitt 6.
 | T-SC-04 | **Gefälschtes Release oder Update.** | niedrig | hoch | Signatur, Notarisierung, Sparkle-EdDSA, Provenance, SBOM (Baseline R-Desktop-Verteilung, ADR 0036) | Release-Prüfung in 18 | niedrig |
 | T-DEV-01 | **Dev-Runner als Hintertür zum Host.** Ein Coding-Agent ohne Werkzeug-Rückfragen läuft mit den Rechten des Host-Benutzers; jede Person mit `trigger` und jede Injektion im Repository hat damit Shell auf dem Host. | hoch | hoch | SR2 und SR3: nur Owner, bis eine Umgebung je Person mit VM-Grenze bereit ist (21) | AZ-M15 bis AZ-M20, Red Team P3 | heute niedrig, weil nur Owner auslösen; nach Freischaltung mittel, abhängig von der Umgebung |
 
+### 6.7 Terminal
+
+| ID | Bedrohung | W | A | Gegenmaßnahmen | Tests | Restrisiko |
+|---|---|---|---|---|---|---|
+| T-TM-01 | **Mitlesen von Terminal-Inhalten im Server** (Relais, Proxy, Log, Datenbank-Abzug, Sicherung, Speicherabzug eines api-Prozesses). | mittel | hoch | Noise `NK` Ende-zu-Ende (SEC-TERM-1); keine Inhalte in Log, Audit, Telemetrie, Ereignis-Log | TM-T01, TM-T02, TM-T06 | niedrig gegen diese Angreifer. **Nicht geschützt** gegen einen bösartigen Server-Betreiber (E12): Er kann einen eigenen Schlüssel verteilen und Sitzungen erlauben. Gegenmittel nur Pinning je Gerät (warnt erst bei Wechsel nach dem ersten Öffnen; in der Web-Konsole wirkungslos, weil der Server den Code der Konsole liefert), Audit der Neukopplung und `host_service.require_local_confirm`; Restrisiko mittel, ehrlich dokumentiert (Ruling T3) |
+| T-TM-02 | **Wiedereinspielen und Tausch am Relais.** Das Relais wiederholt Nachricht 1 oder setzt eine fremde Marke ein, um eine PTY ohne Bediener zu starten. | mittel | hoch | Einmal-Marke mit `jti`, `cek` an den ephemeren Schlüssel gebunden, Prolog mit Sitzung und Rechner, PTY erst nach `start` (SEC-TERM-2) | TM-T03 bis TM-T05 | niedrig |
+| T-TM-03 | **Unberechtigtes Öffnen** über gestohlene Sitzung, Delegation, fremden Rechner oder Server-Host. | mittel | hoch | Step-up `frisch` je Öffnung, Ziel `host` außerhalb des Baums, nur Owner vergeben, SR10, Server-Host nur Owner (SEC-TERM-3, 5, 10) | TM-T07, TM-T08, AZ-M54, AZ-M55, AZ-M58, AZ-M60 | niedrig |
+| T-TM-04 | **Rechteausweitung auf dem Rechner.** Die Shell läuft als Benutzer mit Admin-Rechten, passwortlosem sudo oder in einer Gruppe mit Rechten auf root-Niveau (`docker`, `lxd`, `libvirt`, `disk`). | mittel | hoch | `doctor` HD1 bis HD3 verweigert den Start (feste Sperrliste der Gruppen plus `host_service.extra_forbidden_groups`, Docker-Socket); Installation mit eigenem Benutzer (16, 4.4) | TM-T13 | mittel: Lücken im Betriebssystem des Rechners und lokale Dienste bleiben; der Rechner gehört zum Vertrauensbereich seines Inhabers |
+| T-TM-05 | **Diebstahl der Schlüssel des Host-Dienstes**, z. B. durch eine Person mit Terminal auf dem Rechner (auch nach ihrem Entzug) oder aus einer Sicherung des Zustandsordners. Mit beiden Schlüsseln meldet sich der Angreifer von anderswo als Rechner an, bekommt jedes `session.open`, besteht den Handshake und liest jede spätere Sitzung mit, auch die von Ownern samt eingegebener Passwörter. Ein Relais braucht er dafür nicht. | mittel | hoch | Sitzungen laufen als Sitzungsbenutzer ohne Leserecht auf den Zustandsordner (HD8, 24 Abschnitt 2.2); Datei `0600` bzw. DPAPI; eine zweite lebende Steuerverbindung sperrt den Rechner mit Audit und Meldung an alle Owner (24, Abschnitt 3.4); Neukopplung verwirft beide Schlüssel | TM-T18, TM-T22, TM-T23 | mittel: Wer auf dem Rechner zum Dienstbenutzer aufsteigt, hat die Schlüssel; ist der echte Rechner dann aus, empfängt der Angreifer Sitzungen, bis der echte Rechner zurückkommt und die Sperre auslöst. `host_service.require_local_confirm` schließt das für Rechner mit einer Person davor |
+| T-TM-06 | **Kopplung eines fremden Rechners** mit abgefangenem Code. | niedrig | hoch | Code einmalig, kurzlebig, Format mit Prüfsumme und Secret-Scanner-Regel; Owner tippt den Fingerabdruck ein; Fehlversuche begrenzt | TM-T19, TM-T20 | niedrig |
+| T-TM-07 | **Browser-Erweiterung oder XSS in der Konsole** liest oder steuert eine geöffnete Sitzung. | mittel | hoch | Passkey-Pflicht je Öffnung, CSP mit Trusted Types, kein HTML aus Ausgaben, Origin-Prüfung beim Upgrade des Strom-Pfads (SEC-TERM-7, ADR 0070) | SEC-T05, ID-T28, Origin-Test (PLAN M6-18) | mittel: eine bösartige Erweiterung mit Zugriff auf den Origin bleibt; Empfehlung eigenes Browser-Profil |
+| T-TM-08 | **Missbrauch einer fremden LLM-Anmeldung** über das Terminal, auch durch eine Abo-Anmeldung, die jemand während einer Sitzung anlegt, oder durch Lesen des API-Schlüssels aus der Umgebung des Profils `claude`. | mittel | hoch | I6 mit Einzel-Freigabe, Prüfung bei jedem Öffnen; `doctor` HD6 verweigert den Start bei Widerspruch und läuft vor jeder PTY und periodisch (Treffer beendet alle Sitzungen); Schlüssel je Rechner mit Ausgabengrenze und neuer Schlüssel nach Entzug; Profil `claude` mit kontrollierter Umgebung (24, 7) | TM-T09, TM-T13, AZ-M56, AZ-M57 | mittel: Die Erklärung des Owners ist nicht prüfbar; eine falsche Erklärung `organization` mit verstecktem Abo erkennt `doctor` nur an bekannten Orten |
+| T-TM-09 | **Prompt-Injection öffnet ein Terminal.** | hoch | hoch | Terminal-Aktionen nur für Menschen in einer Sitzung mit Step-up; Agenten- und App-Tokens abgelehnt | TM-T17, AZ-M59 | niedrig |
+| T-TM-10 | **Escape-Sequenzen** schreiben die Zwischenablage, öffnen Links oder fragen Daten ab. | mittel | mittel | SEC-TERM-6 | TM-T14 | niedrig |
+| T-TM-11 | **Sitzung oder Prozesse bleiben nach Entzug.** Die Sitzung bleibt offen, oder Prozesse der Person laufen weiter (`nohup`, `setsid`, Kindprozesse außerhalb der ConPTY, Dauerläufer wie crontab, systemd-Dienste des Benutzers, LaunchAgent, geplante Aufgabe). | mittel | hoch | Entzug beendet Sitzungen in derselben Transaktion; der Server misst Leerlauf zusätzlich; jede Sitzung in eigener Prozessgruppe, cgroup bzw. Job Object, deren Ende den ganzen Baum beendet (24, 6.3, 6.5 und 8.3) | TM-T10, TM-T11 | mittel: Dauerläufer, die als Sitzungsbenutzer eingerichtet wurden, beendet kein Sitzungsende; sie erreichen die Schlüssel nicht (HD8), können aber spätere Sitzungen desselben Sitzungsbenutzers auf dem Rechner beobachten. Die Konsole rät nach dem Entzug einer Person, die nicht Owner ist, Autostart und geplante Aufgaben zu prüfen oder die Umgebung neu aufzusetzen; Nicht-Owner arbeiten nur auf ihrem eigenen Rechner (SR10) |
+
+### 6.8 Visualisierung
+
+Normativ zusammen mit [25-visualisierung.md](../spec/25-visualisierung.md); Kontrollen SEC-VZ-* in
+[19-sicherheit.md](../spec/19-sicherheit.md), Abschnitt 11b.
+
+| ID | Bedrohung | W | A | Gegenmaßnahmen | Tests | Restrisiko |
+|---|---|---|---|---|---|---|
+| T-VZ-01 | **Clickjacking über eine Grafana-Einbettung.** Mit `allow_embedding` sendet Grafana kein `X-Frame-Options` mehr; eine fremde Seite rahmt Grafana ein und lockt einen angemeldeten Owner zu Klicks. | niedrig | mittel | Einbettung standardmäßig aus; nur hinter Auth-Proxy, der `frame-ancestors` auf den Origin der Konsole setzt; `frame-src` der Konsole genau dieses Origins (SEC-VZ-2) | VZ-T12, SEC-T19 | niedrig, solange der Proxy richtig konfiguriert ist; die Konfiguration des Proxys liegt beim Betreiber |
+| T-VZ-02 | **Abfluss über den Live-Strom.** Ein Bereichsverwalter sieht Läufe, Kosten oder Instanz-Werte außerhalb seiner Kanäle, oder Inhalte geraten in Rahmen. | mittel | mittel | Zustellmodus je Rahmen, Filter auf sichtbare Kanäle, Kosten nur mit `cost.read.aggregate`, Zeilen ohne Kanal nur für Owner, keine Titel und Details (SEC-VZ-3, SEC-VZ-4) | VZ-T05, VZ-T06, VZ-T07 | niedrig |
+| T-VZ-03 | **Leistungsüberwachung einzelner Menschen** über Läufe in Kanälen mit nur einem Menschen. | mittel | mittel | keine Werte je Person, kein Auslöser, keine Zähler über Menschen; Live-Strom abschaltbar; Hinweis für die Mitbestimmung (20, Abschnitt 9) | DP-T12 | mittel: aus Läufen in einem Kanal mit einem Menschen lässt sich auf ihn schließen; der Owner kann ohnehin den Thread lesen |
+| T-VZ-04 | **Unbeaufsichtigter TV-Bildschirm** zeigt Kosten oder Läufe Besuchern, oder die Sitzung dahinter wird missbraucht. | mittel | niedrig | TV-Modus ohne Bedienelemente, Kosten standardmäßig verborgen (`viz.tv_show_costs`), Verwaltungsaktionen brauchen Step-up, kein Kiosk-Token (R-VZ-09) | | mittel: die Sitzung am Bildschirm hat die Leserechte der angemeldeten Person; Empfehlung eine eigene Person mit nur `manage` auf den gezeigten Bereichen |
+| T-VZ-05 | **Bösartiges oder verändertes Grafana-Plugin.** | niedrig | mittel | Plugin aus dem eigenen Repository mit Lieferkettenprüfung; unsigniert nur mit eigener ID freigegeben (SEC-VZ-5); Signatur nach V1 | VZ-T13 | niedrig |
+| T-VZ-06 | **Überlast durch viele Zuschauer** des Live-Stroms. | mittel | niedrig | ein Basis-Rahmen je Knoten und Intervall, Höchstzahl Abos je Knoten, Rate-Limit `rl.read` für die REST-Abfrage, zwischengespeicherter Rahmen | VZ-T08 | niedrig |
+
 ## 7. Was offen bleibt
 
 - Prompt-Injection ist ungelöst. Das Produkt verlässt sich nicht auf Erkennung, sondern auf
   Grenzen: wer auslöst, was der Agent erreicht, was nur mit Karte wirkt.
 - Das Gedächtnis einer Laufzeit über Läufe hinweg sieht der Server nicht (T-AI-01, H1).
+- Der Terminal-Strom schützt nicht gegen einen bösartigen Server-Betreiber (T-TM-01); das Produkt
+  setzt den Server als vertrauenswürdig voraus.
+- Dauerläufer, die eine Person als Sitzungsbenutzer auf einem Rechner einrichtet, überleben ihren
+  Entzug (T-TM-11).
 - Ein Host trägt alles (T-DS-01). Mehr Verfügbarkeit heißt mehrere Rollen auf mehreren Hosts
   (Baseline B1), nicht Teil von M1.
 

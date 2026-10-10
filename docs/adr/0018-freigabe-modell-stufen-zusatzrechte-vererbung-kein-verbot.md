@@ -47,7 +47,7 @@ Festlegungen (Details in [../spec/07-rechte.md](../spec/07-rechte.md)):
 - Freigaben sind unveränderlich; Änderung ist Widerruf plus neue Freigabe (R-DM-09).
 - Delegation mit `manage` nur bis zur eigenen Stufe und zu eigenen Zusatzrechten, Widerruf im selben
   Rahmen; Freigaben an Agenten und Apps nur durch den Owner.
-- Schutzregeln (SR1 bis SR9) stehen über Freigaben.
+- Schutzregeln (SR1 bis SR11 in 07) stehen über Freigaben.
 
 ### Consequences
 

@@ -22,12 +22,14 @@ Die Namen, Verzeichnisse und Tag-Präfixe stehen an einer Stelle: `RELEASE_COMPO
 |---|---|---|---|---|
 | `bothy` | Wurzel | keiner (`vX.Y.Z`) | Installationsbündel aus `make release-build`: `infra/compose` ohne `infra/compose/test` (Test-Overlays), `LICENSE`, `NOTICE`, `CHANGELOG.md`, `VERSION` | stable, beta |
 | `server` | `services/server` | `server/` | Images `bothy-server`, `bothy-postgres` (linux/amd64, linux/arm64), Binärdateien `bothy` | stable, beta |
+| `host` | `services/host` | `host/` | Binärdateien `bothy-host` für macOS (arm64, amd64), Linux (amd64, arm64) und Windows (amd64), je mit Signatur und SBOM; Installationspakete der Dienste ([24-terminal.md](24-terminal.md), [16-betrieb.md](16-betrieb.md) Abschnitt 4.4) | stable, beta |
 | `client` | `apps/client` | `client/` | iOS, Android, macOS, Windows (eine Flutter-Codebasis, B5) | stable, beta |
 | `console` | `apps/console` | `console/` | Web-Konsole | mit `server` |
 | `sdk-python` | `sdk/python` | `sdk-python/` | Paket auf PyPI | stable, Vorabversionen |
 | `sdk-typescript` | `sdk/typescript` | `sdk-typescript/` | Paket auf npm | stable, Vorabversionen |
 | `hermes-adapter` | `plugins/hermes-adapter` | `hermes-adapter/` | Plugin für Hermes Agent | stable, Vorabversionen |
 | `claude-code-runner` | `plugins/claude-code-runner` | `claude-code-runner/` | Dev-Runner für Claude Code | stable, Vorabversionen |
+| `grafana-bothy-live` | `plugins/grafana-bothy-live` | `grafana-bothy-live/` | Grafana-Panel-Plugin `bothy-live-panel` als ZIP mit SBOM; bis V1 unsigniert für lokales Provisioning ([25-visualisierung.md](25-visualisierung.md), Abschnitt 8.3) | stable, Vorabversionen |
 | `api` | `docs/api` | keiner | OpenAPI- und AsyncAPI-Dokument; Version im Dokument (ADR 0013, 0014) | mit `server` |
 
 Regeln:
@@ -80,6 +82,7 @@ Vor 1.0.0 gilt SemVer 0.x: Minor darf brechen; die Release Notes nennen jeden Br
 | Artefakt | stable | beta |
 |---|---|---|
 | Server-Images | Tag `X.Y.Z` und Digest | Tag `X.Y.Z-beta.N` |
+| Host-Dienst `bothy-host` | Version `X.Y.Z` | `X.Y.Z-beta.N` |
 | iOS | App Store, sobald freigegeben; bis dahin TestFlight-Gruppe "stable" | TestFlight-Gruppe "beta" |
 | macOS | Sparkle-Appcast ohne Kanal (Standard) | Sparkle-Kanal `beta` |
 | Windows | `stable.appinstaller` | `beta.appinstaller` |
@@ -91,7 +94,7 @@ Regeln:
 1. Apps: Die Version enthält keinen Kanal. Derselbe Build (gleiche Build-Nummer, gleiche
    Signatur) wandert von beta nach stable: TestFlight-Gruppe wechseln, im Appcast das Element
    `sparkle:channel` entfernen, `stable.appinstaller` auf dasselbe MSIX zeigen lassen.
-2. Server, SDKs, Adapter: Beta ist eine SemVer-Vorabversion (`X.Y.Z-beta.N`), weil die Version im
+2. Server, Host-Dienst, SDKs, Adapter: Beta ist eine SemVer-Vorabversion (`X.Y.Z-beta.N`), weil die Version im
    Binary und im Paket steht. Stable entsteht aus demselben Commit wie die letzte Beta; zwischen
    beiden ändert sich nur die Versionsnummer, und alle Gates laufen erneut.
 3. Images haben keinen beweglichen Tag `latest`. Compose und OpenTofu pinnen `BOTHY_VERSION`;
@@ -197,6 +200,16 @@ Folgen:
    die älteste App, die laut Deprecation-Policy noch unterstützt wird.
 5. Adapter melden ihre Version im Heartbeat (`reported_runtime_version`); die Admin-Konsole zeigt
    Adapter, deren SDK-Version nicht mehr unterstützt ist.
+
+### 9.1 Host-Dienst und Server
+
+Der Host-Dienst meldet seine Version in `identify` der Steuerverbindung. Der Server nimmt die
+Versionen an, deren Protokollversion er unterstützt (Prolog `bothy-terminal/1` und
+`x-protocol-versions` des Kanals in [asyncapi.yaml](../api/asyncapi.yaml)); eine zu alte schließt er
+mit `4114`, und Konsole und Rechner-Karte zeigen "Host-Dienst aktualisieren". Der Host-Dienst
+aktualisiert sich nicht selbst. Grund: Ein Programm, das sich selbst ersetzt, bräuchte
+Schreibrechte auf sein eigenes Binary; der Dienstbenutzer hat sie bewusst nicht
+([24-terminal.md](24-terminal.md), Abschnitt 2.2). Updates laufen über den Paketweg des Betreibers.
 
 ## 10. Rollback
 

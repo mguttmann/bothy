@@ -51,7 +51,8 @@ R-DM-20).
 ### 2.2 Ziele und Vererbung
 
 Ziele sind `instance`, `space` und `channel` (03, `grants.target_kind`). Threads und alles darin
-haben keine eigenen Freigaben; sie erben vom Kanal. Der Pfad einer Ressource steht in 05,
+haben keine eigenen Freigaben; sie erben vom Kanal. Rechner (`host`) sind ein viertes Ziel
+außerhalb dieses Baums (Abschnitt 2.12). Der Pfad einer Ressource steht in 05,
 Abschnitt 2.2.
 
 ```text
@@ -89,6 +90,7 @@ Abschnitt 3).
 | `approve_actions` | Komponenten mit `required_capability = 'approve_actions'` bedienen (Freigabe-Karten) | `trigger` |
 | `export` | Kanal-Verlauf exportieren (`export.channel`) | `read` |
 | `manage` | Verwaltung des Ziels: Kanäle anlegen und ändern, Verhalten, Tags, Anheften, fremde Nachrichten löschen, Threads verschieben, Eingangs-Webhooks, "Wer hat Zugriff?", Freigaben im eigenen Rahmen (Abschnitt 2.6) | Stufe beliebig |
+| `terminal` | Terminal auf einem Rechner öffnen (`terminal.open`, `terminal.attach`); nur auf dem Ziel `host`, nur für Menschen und Gruppen (Abschnitt 2.12) | keine Stufe; SR10 und SR11 |
 
 Zusatzrechte sind die Vereinigung über alle gültigen Freigaben des Prinzipals und seiner gültigen
 Gruppen auf dem Pfad (05, Abschnitt 2.3). Ein Zusatzrecht ersetzt nie die nötige Stufe.
@@ -199,6 +201,25 @@ Klasse höher ist als das Soll (Grund `tool_class_mismatch`). Die Reihenfolge `c
 `host` ist dabei maßgeblich. Das Protokoll legt [09-agenten.md](09-agenten.md) fest; der Claim
 `tool_class` steht in 05, Abschnitt 5.
 
+### 2.12 Rechner und Zusatzrecht `terminal`
+
+Normativ zusammen mit [24-terminal.md](24-terminal.md), Abschnitt 8.
+
+1. Ein Rechner ist ein eigenes Ziel. Er erbt nichts von Instanz, Bereich oder Kanal; eine Freigabe
+   auf die Instanz gibt kein Terminal (R-AZ-24).
+2. Auf einem Rechner gibt es keine Stufe und genau ein Zusatzrecht: `terminal`. Empfänger sind nur
+   Menschen und Gruppen (03, R-DM-35). Freigaben dort legt nur der Owner an.
+3. Wirksames `terminal(P, H)` für einen Menschen `P` auf dem Rechner `H`:
+   - `P` ist aktiver Owner in einer Sitzung, und nicht (`H.llm_credentials = 'personal'` und
+     `P <> H.credential_holder_id`); oder
+   - eine gültige Freigabe (2.5) mit Ziel `H` und `terminal` an `P` oder eine seiner gültigen
+     Gruppen.
+4. Wirksames `terminal` reicht nicht: SR10 und SR11 (Abschnitt 5) sperren danach. Die Vorschau
+   einer Freigabe, die wegen SR10 nicht wirkt, sagt das (Hinweis `terminal_not_effective`).
+5. Lesen eines Rechners (`host.read`): Owner, der Rechner-Inhaber (`hosts.assigned_user_id`) und
+   jeder mit einer gültigen Freigabe `terminal` auf ihn, auch wenn SR10 sie sperrt (damit die
+   Person den Grund sieht). Sonst `404`.
+
 ## 3. Prinzipal-Kontext
 
 `authorize` bekommt nicht nur eine ID, sondern den geprüften Kontext der Anfrage. Die
@@ -206,7 +227,7 @@ Authentisierung ([08-identitaet.md](08-identitaet.md)) baut ihn; `authz` vertrau
 
 | Feld | Inhalt | Quelle |
 |---|---|---|
-| `id`, `kind` | Prinzipal und Art (`user`, `agent`, `app`, `anonymous`) | Token |
+| `id`, `kind` | Prinzipal und Art (`user`, `agent`, `app`, `anonymous`, `host`); `host` ist ein Rechner, angemeldet über seinen Anmeldeschlüssel ([24-terminal.md](24-terminal.md), Abschnitt 4.1), ohne Zeile in `principals` | Token bzw. Anmeldung des Rechners |
 | `session_id` | `auth_sessions.id` (nur Menschen) | `sid` im Zugriffstoken oder Konsole-Cookie |
 | `device_id` | Gerät (nur Menschen) | Token, DPoP-Schlüssel |
 | `step_up_at` | letzte frische Bestätigung der Sitzung | `auth_sessions.step_up_at` |
@@ -270,6 +291,15 @@ verrät (bei `404` nie).
 | `component_inactive` | `forbidden` | Komponente benutzt, abgelaufen oder deaktiviert |
 | `component_restricted` | `forbidden` | `restricted_to = 'run_starter'` und Prinzipal ist weder Auslöser noch Owner |
 | `acting_for_insufficient` | `not_found` bzw. `forbidden` | Auftragsbindung: der auslösende Mensch hat das Recht nicht |
+| `terminal_not_host_assignee` | `forbidden` | SR10: Nicht-Owner auf einem Rechner, dessen Inhaber er nicht ist; Problem-Code `terminal_denied` mit `reason: not_host_assignee` |
+| `terminal_server_host_owner_only` | `forbidden` | SR10: Server-Host nur für Owner; Problem-Code `terminal_denied` mit `reason: server_host_owner_only` |
+| `i6_holder_only` | `forbidden` | SR11: Rechner mit persönlicher LLM-Anmeldung, Prinzipal ist nicht ihr Inhaber; Problem-Code `terminal_denied` mit `reason: i6_holder_only` |
+| `i6_violation` | `invariant_violation` | Änderung würde I6 verletzen; Problem-Code `i6_violation` (`409`) |
+| `terminal_profile_unknown` | `forbidden` | Profil nicht in `hosts.reported_profiles` oder Index des Arbeitsordners ungültig; Problem-Code `terminal_denied` mit `reason: profile_unknown` |
+| `terminal_session_limit` | `forbidden` | `terminal.max_sessions_per_person` oder `terminal.max_sessions_per_host` erreicht; Problem-Code `terminal_denied` mit `reason: session_limit` |
+| `terminal_step_up_not_fresh` | `step_up_required` | Step-up älter als `terminal.step_up_max_age`, schon verbraucht oder (Konsole) nicht per Passkey; in der Konsole gilt das schnelle Wiederanhängen ohne Step-up nie |
+| `host_not_active` | `forbidden` | Rechner nicht `active` oder Host-Dienst nicht verbunden; Problem-Code `host_unavailable` (`409`) |
+| `host_auth_failed` | `unauthenticated` | Anmeldung eines Rechners mit unbekanntem Schlüssel oder falscher Signatur |
 | `unknown_action` | Fehler `500` | Programmfehler, Alarm |
 
 ### 4.2 Ablauf
@@ -383,6 +413,8 @@ kennt; ein Test des Anwendungsfalls findet genau einen Eintrag.
 - Ressource gehört `p` selbst (eigenes Gerät, eigene Sitzung, eigene Einstellung, eigener
   DSGVO-Auftrag), oder `p` ist Owner und die Aktion erlaubt `owner`.
 - DM-Kanal oder Inhalt darin: `p` ist Teilnehmer.
+- Ressource ist ein Rechner und 2.12, Punkt 5 gilt; bei einer Terminal-Sitzung: `p` ist ihr Mensch
+  oder Owner.
 
 ### 4.4 Invarianten in der Transaktion
 
@@ -548,6 +580,33 @@ SDKs ([09-agenten.md](09-agenten.md)) binden die Marke während eines Laufs auto
 API-Aufruf. Was die Laufzeit außerhalb der Server-API weiß (eigener Speicher, frühere Sitzungen),
 deckt die Regel nicht; dafür gibt es den Lesehorizont-Hinweis (Abschnitt 6) und die Bedrohung
 T-AI-02 im Bedrohungsmodell.
+
+### SR10 Terminal nur auf eigenem Rechner
+
+Ein Mensch, der nicht aktiver Owner ist, bekommt `terminal.open` und `terminal.attach` nur auf einem
+Rechner, der
+
+- ihm zugewiesen ist (`hosts.assigned_user_id = P`), oder
+- seine eigene bereite Dev-Umgebung ist (`hosts.dev_environment_id` mit `dev_environments.user_id =
+  P` und Bereitschaft nach [21-dev-isolation.md](21-dev-isolation.md), Abschnitt 6.2; Etappe
+  "Mehrbenutzer-Dev-Umgebung").
+
+Sonst `terminal_not_host_assignee`. Auf einem Server-Host (`hosts.declared_server_host` oder
+`hosts.reported_is_server_host`) nur Owner (`terminal_server_host_owner_only`); der Host-Dienst
+prüft das zusätzlich am Claim `own` der Sitzungs-Marke. Geprüft bei jedem Öffnen und Anhängen und
+bei jeder Änderung von `assigned_user_id`, `dev_environment_id` oder des Owner-Status: Fällt die
+Bedingung weg, enden die Sitzungen (`access_revoked`). Grund: [21-dev-isolation.md](21-dev-isolation.md)
+und ADR 0046 verwerfen den OS-Benutzer als alleinige Grenze zwischen Personen; ein gemeinsames
+Home teilt Geheimnisse und LLM-Anmeldungen (Ruling T1).
+
+### SR11 Terminal und LLM-Anmeldung (I6)
+
+Ist `hosts.llm_credentials = 'personal'`, erlauben `terminal.open` und `terminal.attach` nur
+`hosts.credential_holder_id`, auch keinem anderen Owner (`i6_holder_only`). Freigaben auf solche
+Rechner an andere Subjekte als den Inhaber, auch an Gruppen, lehnt die Transaktion ab
+(`i6_violation`, 03 Abschnitt 6.8). Abgrenzung zu SR1: I1 hat keine Owner-Ausnahme, I6 hat eine,
+weil ein Terminal Zugriff auf einen bestimmten Rechner ist und keine vererbte Stufe
+([24-terminal.md](24-terminal.md), Abschnitt 7.3; ADR 0068).
 
 ## 6. Lesehorizont von Agenten
 
@@ -733,7 +792,12 @@ Gerät oder Sitzung widerrufen, Bediener geändert) wirkt in dieser Reihenfolge:
    (04, Abschnitt 15.3).
 6. **Komponenten.** Eine Interaktion prüft `trigger` beim Klick; offene Karten werden nicht
    umgeschrieben.
-7. **Tokens.** Zugriffstokens bleiben bis zu ihrem Ablauf formal gültig, aber `authorize` prüft
+7. **Terminal-Sitzungen.** Verliert ein Mensch das wirksame `terminal` auf einem Rechner oder
+   greift SR10 oder SR11, beendet dieselbe Transaktion seine Sitzungen dort (`access_revoked` bzw.
+   `i6_violation`); der Server schließt die Verbindungen und weist den Host-Dienst an, die PTY zu
+   beenden. Sperre der Person, Widerruf von Gerät oder Anmeldesitzung und Abmeldung beenden die
+   Sitzungen, die daran hängen ([24-terminal.md](24-terminal.md), Abschnitt 8.3).
+8. **Tokens.** Zugriffstokens bleiben bis zu ihrem Ablauf formal gültig, aber `authorize` prüft
    Sitzung und Rechte bei jeder Anfrage. Aufruf-Marken laufen nach `agent.invocation_token_ttl` ab
    und werden bei `run.start` erneut geprüft.
 
@@ -803,7 +867,8 @@ Antwort enthält:
 - je betroffenem Prinzipal: hinzugekommene, entfallene und geänderte Stufen und Zusatzrechte,
 - das Ergebnis von I1 und SR8 (würde die Änderung abgelehnt, mit Hinweis "zuerst auf
   organization umstellen"),
-- Hinweise: SR2 und SR3 sperren die Auslösung, H1 Lesehorizont, Freigabe an eine Gruppe erreicht
+- Hinweise: SR2 und SR3 sperren die Auslösung, SR10 sperrt ein Terminal
+  (`terminal_not_effective`), H1 Lesehorizont, Freigabe an eine Gruppe erreicht
   n Menschen, Ablaufdatum fehlt bei Personen außerhalb von Gruppen (API: `hints`),
 - einen Text aus Vorlagen (kein Modell erzeugt ihn), in der Sprache des Aufrufers (Hauptteil von
   `users.locale`, `de` oder `en`, sonst `de`, wie 01 "Sprachen"; API: `text`, `text_locale`).
@@ -960,6 +1025,13 @@ DM zwischen Alex und Sam. Die Uhr ist in Tests steuerbar.
 | AZ-M51 | Alex | Support/Allgemein | `agent.invoke` | Entzug zwischen Annahme und Zustellung | Lauf `failed` `access_revoked`, keine Zustellung (I2) |
 | AZ-M52 | Alex | Marketing/Kampagnen | `GET` Nachricht mit fremder ID | | gleich wie zufällige ID (Status, Körper, Kopfzeilen) |
 | AZ-M53 | Eingangs-Webhook von Tracker | Support/Eskalation | `webhook_in.post` mit Erwähnung von Lotse | Kanal mit `free_response` | Nachricht `origin = app`, kein Lauf (SR4) |
+| AZ-M54 | Alex | Rechner R1 (Inhaber Alex, `organization`) | `terminal.open` | Freigabe `terminal` an Alex, frischer Step-up | `allow` |
+| AZ-M55 | Sam | Rechner R1 | `terminal.open` | Freigabe `terminal` an Sam | `forbidden` `terminal_not_host_assignee` (SR10) |
+| AZ-M56 | Owner | Rechner R2 (`personal`, Inhaber der Anmeldung Robin, Robin ist zweiter Owner) | `terminal.open` | | `forbidden` `i6_holder_only` (SR11) |
+| AZ-M57 | Owner | Rechner R2 | `grant.create` Gruppe Leser `terminal` | | `invariant_violation` `i6_violation` |
+| AZ-M58 | Alex | Rechner R1 | `terminal.open` | Step-up schon für eine andere Öffnung verbraucht | `step_up_required` `terminal_step_up_not_fresh` |
+| AZ-M59 | Lotse | Rechner R1 | `terminal.open` | Agent-Token | `forbidden` `subject_kind_not_allowed` |
+| AZ-M60 | Alex | Rechner R1 | `terminal.open` | Freigabe an die Instanz mit `trigger` und allen Zusatzrechten, keine Freigabe auf R1 | `not_found` (Rechner nicht sichtbar) |
 
 ### 11.2 Pflicht-Tests
 
@@ -993,6 +1065,7 @@ DM zwischen Alex und Sam. Die Uhr ist in Tests steuerbar.
 | R-RE-08 | `manage` widerruft nur, was es selbst hätte anlegen dürfen; Freigaben an Agenten und Apps nur durch den Owner. | Keine Rechte-Ausweitung über Delegation; Agenten-Freigaben sind Datenflüsse zu Auftragsverarbeitern. |
 | R-RE-09 | Ablauf-Job meldet nur; die Entscheidung hängt nie an ihm. | Studie C: Ablauf je Aufruf geprüft; Clients räumen trotzdem auf. |
 | R-RE-10 | Vorschau als Trockenlauf in der echten Transaktion mit Rollback. | Dieselbe Logik wie der echte Schreibvorgang; Klartext aus Vorlagen, nicht aus einem Modell. |
+| R-RE-11 | Rechner als eigenes Ziel mit nur `terminal`; SR10 und SR11 als Schutzregeln. | Ein Terminal ist Fernzugriff auf einen Rechner; weder Vererbung noch Delegation dürfen ihn öffnen (Ruling T1, T2). |
 
 ## 13. Abgleich mit dem Kern-Vertrag
 

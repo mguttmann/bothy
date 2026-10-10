@@ -97,6 +97,12 @@ Regeln:
    SEC-T05 prüft auch das. Scheitert es, kommt `wss://<host>` hinzu.
 6. Verstöße gehen an einen Endpunkt der Instanz (`report-to`), mit Rate-Limit und ohne Inhalte im
    Log.
+7. `frame-src` steht nur in der CSP, wenn `console.grafana_embed_url` gesetzt ist, und nennt genau
+   deren Origin (`frame-src https://grafana.example.com`); sonst sperrt `default-src 'none'` jedes
+   iframe. Die Einbettung ist optional und standardmäßig aus; ihre Bedingungen (Auth-Proxy,
+   `allow_embedding`, `frame-ancestors`, COEP und CORP am Proxy) stehen in
+   [25-visualisierung.md](25-visualisierung.md), Abschnitt 9.2 (SEC-VZ-2). `frame-ancestors 'none'`
+   und `X-Frame-Options: DENY` der Konsole selbst bleiben unverändert.
 
 ## 6. Eingaben und Ausgaben
 
@@ -207,6 +213,38 @@ Regeln:
 | SEC-AI-7 | Rate-Limits je Agent (`rl.agent_runtime`) und Auslösungen je Mensch (`rl.trigger`); Kostengrenzen je Agent. | 05; [10-backend-richtlinie.md](10-backend-richtlinie.md) |
 | SEC-AI-8 | Kanal-Prompts sind kein Ort für Geheimnisse. Die Konsole sagt das beim Bearbeiten. Grund: Ein Agent kann seinen Prompt in der Antwort wiedergeben. | R-AZ-09 |
 
+## 11a. Kontrollen für das Terminal
+
+Normativ zusammen mit [24-terminal.md](24-terminal.md); Bedrohungen T-TM-* in
+[../security/threat-model.md](../security/threat-model.md), Abschnitt 6.7.
+
+| ID | Kontrolle | Ort |
+|---|---|---|
+| SEC-TERM-1 | Terminal-Inhalte nur Ende-zu-Ende verschlüsselt (Noise `NK`); das Relais leitet Binärrahmen unverändert weiter und protokolliert nur Länge, Zeit und Sitzungs-ID. Kein Inhalt in Log, Audit, Telemetrie, Ereignis-Log, Suche, Push oder Lauf-Kontext. | 24, Abschnitte 5 und 10 |
+| SEC-TERM-2 | Sitzungs-Marke genau einmal gültig, an `sid` im Prolog und an den ephemeren Schlüssel des Geräts (`cek`) gebunden; PTY erst nach der ersten gültigen Transportnachricht. | 24, Abschnitt 5.3 |
+| SEC-TERM-3 | Step-up `frisch` je Öffnung (Passkey oder Step-up-Geräteschlüssel; in der Konsole nur Passkey mit `userVerification = required`), verbraucht in der Transaktion der Öffnung. | 08, Abschnitt 6.3 |
+| SEC-TERM-4 | Host-Dienst und Sitzungen als zwei getrennte Benutzer ohne Administratorrechte; der Sitzungsbenutzer kann die Schlüssel nicht lesen (HD8); keiner der beiden in einer Gruppe mit Rechten auf root-Niveau (HD2, z. B. `docker`); Start nur nach bestandenem `doctor`; Schlüssel `0600` bzw. DPAPI; keine Anmeldedaten als Umgebungsvariablen des Dienstes. Eine zweite lebende Steuerverbindung mit denselben Schlüsseln sperrt den Rechner. | 24, Abschnitte 2.2, 3.4 und 4.2 |
+| SEC-TERM-5 | Rechte: Ziel `host` nur mit `terminal`, nur Menschen und Gruppen; SR10 und SR11 (I6); Entzug beendet Sitzungen sofort. | 07, Abschnitte 2.12 und 5 |
+| SEC-TERM-6 | Renderer sperrt OSC 52 (Zwischenablage), öffnet Hyperlinks (OSC 8) nur nach Klick mit sichtbarem Ziel und beantwortet keine Abfragen von Fenstertitel oder Zwischenablage. | 24, Abschnitt 11.2 |
+| SEC-TERM-7 | Web-Konsole: das Terminal läuft unter derselben CSP (Abschnitt 5) ohne Ausnahme; es rendert in den Canvas und erzeugt kein HTML aus Ausgaben; `connect-src 'self'` deckt den Strom. Trusted Types bleibt Pflicht; das Terminal-Widget braucht keine eigene Richtlinie [abgeleitet aus der Bauart von Flutter Web], SEC-T05 prüft es mit geöffnetem Terminal. | [ADR 0070](../adr/0070-terminal-in-der-web-konsole.md) |
+| SEC-TERM-8 | Schlüssel-Pinning je Gerät mit harter Warnung bei Wechsel; jede Neukopplung im Audit und als Ereignis an alle Owner. In der Web-Konsole schützt das Pinning nicht gegen einen bösartigen Server, weil er den Code der Konsole liefert; dort hilft gegen ihn nur `host_service.require_local_confirm`. | 24, Abschnitte 3.3, 5.1 und 5.5 |
+| SEC-TERM-9 | Profile nur aus der Konfiguration des Host-Dienstes; der Client wählt Namen und Index, nie Befehlszeilen oder Pfade. | 24, Abschnitt 11.1 |
+| SEC-TERM-10 | Server-Host nur für Owner, doppelt geprüft (Server und Host-Dienst). | 07, SR10 |
+| SEC-TERM-11 | Jede Sitzung in eigener Prozessgruppe, unter Linux in eigener cgroup, unter Windows in einem Job Object; ihr Ende beendet den ganzen Prozessbaum. Abo-Anmeldung (HD6) vor jeder PTY und periodisch geprüft. | 24, Abschnitte 6.5 und 7.4 |
+
+## 11b. Kontrollen für Visualisierungen
+
+Normativ zusammen mit [25-visualisierung.md](25-visualisierung.md); Bedrohungen T-VZ-* in
+[../security/threat-model.md](../security/threat-model.md), Abschnitt 6.8.
+
+| ID | Kontrolle | Ort |
+|---|---|---|
+| SEC-VZ-1 | Keine iframes und keine WebViews mit Grafana oder anderen Web-Inhalten für Statistik in iOS, Android, macOS und Windows. | 25, Abschnitt 9.1 |
+| SEC-VZ-2 | Einbettung in der Konsole nur mit gesetzter `console.grafana_embed_url`, deren Origin sich vom Origin der Konsole unterscheidet (sonst lehnt `bothy config check` ab, weil `allow-scripts allow-same-origin` die Sandbox bei gleichem Origin aufhebt); dann `frame-src` genau dieses Origins, iframe mit `sandbox` und `referrerpolicy="no-referrer"`; Grafana nur hinter Auth-Proxy mit Absenderliste, der `frame-ancestors` auf den Origin der Konsole setzt. | Abschnitt 5, Regel 7; 25, Abschnitt 9.2 |
+| SEC-VZ-3 | Live-Rahmen, Timeline und `stats_minutes` ohne Inhalte und ohne Personen; Werkzeuge nur mit Namen. | 25, Abschnitt 1 und 5.2 |
+| SEC-VZ-4 | Jeder Live-Rahmen durch den Zustellmodus von `authorize` mit `stats.read`, gefiltert auf sichtbare Kanäle; Kosten nur mit `cost.read.aggregate`. | 25, Abschnitt 4 |
+| SEC-VZ-5 | Grafana-Plugin unsigniert nur mit seiner eigenen ID in `allow_loading_unsigned_plugins`, nie mit Platzhalter oder anderen IDs. | 25, Abschnitt 8.3 |
+
 ## 12. Lieferkette, Sicherungen und Audit-Integrität
 
 Lieferkette (Details und Werkzeuge in [23-qualitaet.md](23-qualitaet.md) und
@@ -258,8 +296,9 @@ Format der Prüfpunkte (03, `audit_checkpoints`):
 |---|---|---|---|
 | P0 automatisch | jedes lokale Gate und CI | Werkzeuge | SAST (gosec, Semgrep für Go, Python, TypeScript; `dart analyze` und custom_lint für Dart), Abhängigkeiten (OSV-Scanner), Geheimnisse (gitleaks), Workflow-Analyse (zizmor, actionlint), schemabasiertes Fuzzing der API gegen das OpenAPI-Dokument, Go-Fuzzing der Parser (DPoP, JWS, Markdown, Patches, Uploads), Rechte-Testmatrix und Pflicht-Tests aus 07 und 08, CSP-Test der Konsole |
 | P1 internes Red Team | Ende jeder Etappe, vor dem Merge nach `main` | frischer, nur lesender Prüfer plus Angriffstests auf einer Test-Instanz | Bedrohungsregister (alle Einträge mit Wahrscheinlichkeit `mittel` oder `hoch`), Diff gegen das Systemgrenzen-Diagramm, Prüfliste nach OWASP ASVS 5.0 Stufe 2 für Server und Konsole (https://owasp.org/www-project-application-security-verification-standard/, abgerufen 2026-10-10 [belegt]: 5.0.0 ist die aktuelle Fassung), OWASP Top 10 für LLM-Anwendungen 2025 für Agenten-Pfade (https://genai.owasp.org/llm-top-10/, abgerufen 2026-10-10 [belegt]) |
-| P2 externer Test | vor der ersten produktiven Nutzung durch eine zweite Person und vor der Veröffentlichung | externer Dienstleister (Kosten: Entscheidung des Owners) | Rechte-Umgehung (IDOR, 404/403), Tokens und DPoP, WebSocket, Konsole (XSS, CSRF, Clickjacking), Uploads, SSRF, Aufruf-Marken, Prompt-Injection über Bereichsgrenzen, Apps und Webhooks, mobile Apps (Speicher, Schlüssel, Transport) |
+| P2 externer Test | vor der ersten produktiven Nutzung durch eine zweite Person und vor der Veröffentlichung | externer Dienstleister (Kosten: Entscheidung des Owners) | Rechte-Umgehung (IDOR, 404/403), Tokens und DPoP, WebSocket, Konsole (XSS, CSRF, Clickjacking), Uploads, SSRF, Aufruf-Marken, Prompt-Injection über Bereichsgrenzen, Apps und Webhooks, mobile Apps (Speicher, Schlüssel, Transport), Terminal (Relais, Host-Dienst, Konsole) |
 | P3 Dev-Abschottung | vor der Freischaltung jeder Umgebungsart | Red Team | Ausbruchs- und Abflusstests nach [21-dev-isolation.md](21-dev-isolation.md), Abschnitt 8 |
+| P4 Terminal | am Ende von M2, M4, M5 und M6 | Red Team | Angriffe aus dem Bedrohungsmodell, Abschnitt 6.7 (T-TM-*): Wiedereinspielen und Tausch am Relais, Marken, Step-up, SR10 und I6, Rechteausweitung auf dem Rechner, Escape-Sequenzen, Konsole mit Erweiterungen; Bericht vor dem Merge |
 
 ### 13.2 Regeln
 
@@ -291,6 +330,8 @@ Format der Prüfpunkte (03, `audit_checkpoints`):
 | SEC-T15 | Wiederherstellung einer Sicherung mit danach gelöschter Nachricht | Nachricht bleibt gelöscht (Lösch-Journal) |
 | SEC-T16 | Audit: Änderung einer Zeile über die Wartungsrolle, Neuschreiben der ganzen Kette, `UPDATE` mit der Anwendungsrolle | erkannt bzw. verweigert (SEC-AUD-1 bis 3) |
 | SEC-T17 | TLS-Handshake mit einer Version unter 1.2 gegen einen Listener mit eigenem TLS | abgewiesen (SEC-TLS-2) |
+| SEC-T18 | Terminal: Tests TM-T01 bis TM-T20 aus [24-terminal.md](24-terminal.md), Abschnitt 14; SEC-T05 und SEC-T10 mit geöffnetem Terminal | SEC-TERM-1 bis 10 |
+| SEC-T19 | Konsole ohne und mit `console.grafana_embed_url`: CSP ohne bzw. mit genau einem `frame-src`-Origin; mit dem Origin der Konsole als Wert scheitert `bothy config check`; SEC-T05 mit eingebettetem Dashboard hinter einem Test-Proxy; statische Prüfung der App auf WebView-Pakete; Kanarien aus VZ-T07 | SEC-VZ-1 bis 5 |
 
 ## 15. Entscheidungen dieses Kapitels
 
@@ -307,6 +348,8 @@ Format der Prüfpunkte (03, `audit_checkpoints`):
 | R-SE-09 | Der interne Listener hat keinen Filter nach Gegenstelle. | Er liefert nur Health und stack-interne Webhooks, wertet keine Identitäts- oder Weiterleitungs-Kopfzeilen aus und ist nie am Host veröffentlicht. Ein Filter zwänge den Betreiber, das ganze Compose-Netz in `server.trusted_proxies` einzutragen; dann zählten Weiterleitungs-Kopfzeilen jedes Containers auch am öffentlichen Listener. |
 | R-SE-10 | Strengere Sperrliste für ausgehende Verbindungen; `allow_private` öffnet nie Link-Local, Multicast oder unspezifizierte Adressen. | Bekannte SSRF-Umgehungen (gemappte IPv6, NAT64, 6to4, Teredo) und Metadaten-Dienste der Clouds; ein Operator-Eintrag soll ein internes Ziel öffnen, nicht die Metadaten. |
 | R-SE-11 | Audit-Prüfung offline: kanonische Form gleich API-Darstellung, festes Schema der Details ohne Freitext. | Ein Export lässt sich ohne Server prüfen; Freitext wäre ein Ort für Inhalte und Geheimnisse. |
+| R-SE-12 | Terminal-Strom Ende-zu-Ende verschlüsselt; Schutzziel ohne bösartigen Server-Betreiber, mit Pinning und lokaler Bestätigung als Rückfall. | Server ist vertrauenswürdig (Abschnitt 1); die Verschlüsselung schützt gegen Relais, Logs, Datenbank-Abzug und mitlesende Prozesse ([ADR 0068](../adr/0068-terminal-ueber-host-dienst-mit-noise-strom-und-invariante-i6.md)). |
+| R-SE-13 | Grafana-Einbettung nur optional in der Konsole, nie in Apps; `frame-src` nur mit gesetzter URL. | Mit `allow_embedding` fällt der Clickjacking-Schutz von Grafana weg; der Proxy ersetzt ihn mit `frame-ancestors`. Apps brauchen keine Web-Inhalte ([ADR 0069](../adr/0069-visualisierung-auf-zwei-ebenen-ohne-iframes-in-apps.md)). |
 
 ## 16. Konfigurationswerte dieses Kapitels
 
@@ -326,5 +369,6 @@ Format der Prüfpunkte (03, `audit_checkpoints`):
 Werte anderer Kapitel, auf die dieses Kapitel verweist: `server.trusted_proxies`
 ([16-betrieb.md](16-betrieb.md)), `http.max_json_body_bytes`, `http.max_header_bytes`,
 `http.read_header_timeout`, `http.idle_timeout` ([02-architektur.md](02-architektur.md)),
-`file.image.max_pixels` ([12-dateien.md](12-dateien.md)). Jeder Name steht in genau einer
+`file.image.max_pixels` ([12-dateien.md](12-dateien.md)), `console.grafana_embed_url`
+([25-visualisierung.md](25-visualisierung.md)). Jeder Name steht in genau einer
 Kapiteltabelle (Ruling L4).

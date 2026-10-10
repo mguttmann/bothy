@@ -513,6 +513,33 @@ zuerst; native Apps haben immer einen Step-up-Schlüssel und brauchen sie nicht.
 Step-up können nur Menschen in einer Sitzung erbringen (07, SR5). Die Bestätigung gilt nur für die
 Sitzung, in der sie erbracht wurde, also für ein Gerät.
 
+### 6.3 Frischer Step-up für das Terminal
+
+`terminal.open` und `terminal.attach` verlangen Step-up `frisch` (05, Abschnitt 2.4;
+[24-terminal.md](24-terminal.md), Abschnitt 6):
+
+1. `auth_sessions.step_up_at` ist jünger als `terminal.step_up_max_age`.
+2. `step_up_method` ist `passkey` oder `device_key`. Passwort mit TOTP und erneute OIDC-Anmeldung
+   reichen nicht. Grund: Der Owner verlangt eine Passkey-Bestätigung; ein Geräteschlüssel mit
+   Biometrie ist dafür auf nativen Geräten der gleichwertige Weg (Baseline R-Passkeys).
+3. In der Web-Konsole (`client_component = 'console'`) nur `passkey`, und die gespeicherte
+   WebAuthn-Sitzung der Herausforderung (`auth_challenges.webauthn_session`) verlangte
+   `userVerification = required`. Es gibt keinen Ersatzweg ([ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)).
+4. Der Step-up ist unverbraucht: `step_up_consumed_at IS NULL OR step_up_consumed_at < step_up_at`.
+   Die Aktion setzt in ihrer Transaktion `step_up_consumed_at = now()` (Sperre der Sitzungszeile).
+   Eine Bestätigung öffnet also genau eine Sitzung; zwei gleichzeitige Öffnungen mit derselben
+   Bestätigung scheitern bis auf eine.
+5. Ausnahme: Wiederanhängen vom selben Gerät in derselben Anmeldesitzung innerhalb von
+   `terminal.quick_reattach_window` nach der Trennung braucht keinen neuen Step-up
+   ([24-terminal.md](24-terminal.md), Abschnitt 6.2). Nicht in der Web-Konsole
+   (`client_component = 'console'`): Dort beweist kein Geräteschlüssel die Anfrage, nur das Cookie;
+   jedes Anhängen braucht einen frischen Passkey.
+
+Fehlt eine Bedingung, antwortet der Server `401 step_up_required` (Grund
+`terminal_step_up_not_fresh`, in der Konsole mit `reason: passkey_required`, wenn Punkt 3 fehlt).
+Andere Step-up-Aktionen verbrauchen den Step-up nicht; ein für das Terminal verbrauchter Step-up
+gilt für sie bis `auth.step_up_max_age` weiter.
+
 ## 7. Token-Modell
 
 ### 7.1 Übersicht
@@ -870,6 +897,7 @@ sequenceDiagram
 | ID-T25 | gefälschtes `X-Forwarded-For` von einer nicht vertrauten Gegenstelle | Rate-Limit zählt die echte Gegenstelle |
 | ID-T26 | `device.revoke`: alle Schritte aus Abschnitt 10 | Schlüssel, Sitzungen, Familien, Push-Registrierungen widerrufen, Verbindungen mit `4012` geschlossen, Audit |
 | ID-T27 | Zufallsteile von Refresh-Token, Konsole-Cookie und API-Token je 256 Bit, Einladungs-Code mindestens 128 Bit, alle aus dem kryptografischen Zufallsgenerator; TOTP mit 30-Sekunden-Schritt und höchstens einem Schritt Toleranz | Längen und Quelle wie angegeben |
+| ID-T28 | Terminal: Step-up mit Passwort und TOTP, älter als `terminal.step_up_max_age`, zweimal für zwei Öffnungen, in der Konsole mit Passkey ohne `userVerification = required`, Wiederanhängen in der Konsole innerhalb von `terminal.quick_reattach_window` ohne Passkey, gleichzeitige Öffnungen mit einer Bestätigung | jeweils `401 step_up_required` (in der Konsole mit `reason: passkey_required`); bei Gleichzeitigkeit genau eine Sitzung |
 
 ## 16. Entscheidungen dieses Kapitels
 
@@ -890,6 +918,7 @@ sequenceDiagram
 | R-ID-13 | OIDC-Rückruf ohne Kontowirkung; Zuordnung, Verknüpfung und Bereitstellung beim Abschluss (R-DM-30). | Die `authorization_url` ist an keinen Browser gebunden (Login-CSRF). |
 | R-ID-14 | Bereitgestellte Menschen (`pending`) bekommen Tokens, aber nur die Selbstauskunft, wie ein wartendes Gerät. | Mit `401` löschte die App ihre Daten und könnte die Freigabe nicht abwarten. |
 | R-ID-15 | Bestätigungs-Code des Geräts abgeleitet (HMAC über Geräte-ID und Schlüssel), nicht gespeichert. | Keine Spalte nötig; ein zweiter Versuch eines Angreifers zeigt einen anderen Code. |
+| R-ID-16 | Step-up für das Terminal nur per Passkey oder Step-up-Geräteschlüssel, jung und je Öffnung verbraucht. | Owner-Vorgabe "erneute Passkey-Bestätigung beim Öffnen"; ein Terminal ist Fernzugriff, nicht Verwaltung. |
 
 ## 17. Abgleich mit dem Kern-Vertrag
 

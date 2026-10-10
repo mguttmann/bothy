@@ -49,17 +49,18 @@ secretGroup = 1
 entropy = 3.0
 keywords = ["tskey-"]
 
-# API tokens of this product: "bothy_<kind>_<random>_<checksum>" with kind agt, app, pat or whi,
+# API tokens of this product: "bothy_<kind>_<random>_<checksum>" with kind agt, app, pat, whi or
+# hpc (pairing code of a terminal host, docs/spec/24-terminal.md section 3.2),
 # 256 bit of randomness in Base62 (43 characters) and a CRC-32 checksum over the random part as
 # exactly 6 Base62 characters. Source: docs/spec/08-identitaet.md section 12, ADR 0061 and
 # docs/spec/03-datenmodell.md `api_tokens`.
 [[rules]]
 id = "bothy-api-token"
 description = "API token of this product (bothy_<kind>_<random>_<checksum>)"
-regex = '''\b(bothy_(?:agt|app|pat|whi)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6})\b'''
+regex = '''\b(bothy_(?:agt|app|pat|whi|hpc)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6})\b'''
 secretGroup = 1
 entropy = 3.0
-keywords = ["bothy_agt_", "bothy_app_", "bothy_pat_", "bothy_whi_"]
+keywords = ["bothy_agt_", "bothy_app_", "bothy_pat_", "bothy_whi_", "bothy_hpc_"]
 
 # SonarQube tokens without a "sonar" keyword nearby (the default rule needs one).
 # Prefixes squ_ (user), sqp_ (project), sqa_ (global analysis) as in the default rule.
