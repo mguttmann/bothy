@@ -78,6 +78,13 @@ def test_repository_lock_is_valid() -> None:
         assert set(tool["assets"]) == set(fetch_tools.PLATFORMS)
 
 
+def test_repository_lock_has_the_refresh_layout() -> None:
+    """`make tools-lock` rewrites the file with json.dumps(indent=2); any other layout would
+    turn every refresh into a whole-file diff and hide the changed sha256 lines."""
+    text = REPO_LOCK.read_text(encoding="utf-8")
+    assert text == json.dumps(json.loads(text), indent=2) + "\n"
+
+
 def test_lock_rejects_missing_sha(tmp_path: Path) -> None:
     lock = _lock("demo.tar.gz", "demo", b"x")
     del lock["tools"]["demo"]["assets"]["linux-amd64"]["sha256"]

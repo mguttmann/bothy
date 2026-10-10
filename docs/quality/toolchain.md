@@ -34,6 +34,8 @@ selben make-Ziel in GitHub Actions. Alle Gate-Werkzeuge laufen an beiden Orten.
 | `actionlint` | `1.7.12` | Syntax und Ausdrücke der Workflows | MIT | Pflicht laut Planungsgrundlage |
 | `gitleaks` | `8.30.1` | Secrets in allen Commits | MIT | als CLI, nicht als Action (Lizenzpflicht der Action in Organisationen) |
 | `golangci-lint` | `2.14.0` | Go-Linter-Bündel inklusive gosec und depguard | GPL-3.0 | Standard für Go; Abhängigkeitsregeln der Module (Kapitel 02) |
+| `go-arch-lint` | `1.19.0` | Modulgrenzen der Go-Module aus dem Modulregister | MIT | in 02 "go-arch-lint" an einem Gerüst aller Module geprüft; prüft Pakete und Fremdbibliotheken |
+| `sqlc` | `1.31.1` | typisierter Go-Code aus SQL, Drift-Prüfung | MIT | ADR 0007 |
 | `govulncheck` | `v1.8.0` | erreichbare Go-Schwachstellen | BSD-3-Clause | prüft Aufrufgraphen statt nur Versionen |
 | `go-licenses` | `v2.0.1` | Lizenzen gelinkter Go-Pakete | Apache-2.0 | vom Recherche-Ruling gefordert |
 | `lychee` | `0.24.2` | Links und Anker in Markdown | Apache-2.0 OR MIT | prüft Anker in Markdown-Dateien offline |
