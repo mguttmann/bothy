@@ -268,6 +268,12 @@ def test_history_scans_unmerged_branches(repo: Path) -> None:
         "connect to 192.168.10.4",
         "connect to 100.101.102.103",
         "channel " + "1234567890" + "12345678",
+        # Host addresses stay findings, also with a prefix length or a URL path behind them.
+        "interface 10.1.2.3/24",
+        "host route 172.16.5.9/32",
+        "open http://192.168.1.20/admin",
+        "open http://10.0.0.1/8",
+        "network 192.168.1.128/25",
     ],
 )
 def test_generic_rules_catch_leaks(repo: Path, text: str) -> None:
@@ -288,6 +294,10 @@ def test_generic_rules_catch_leaks(repo: Path, text: str) -> None:
         "reserved test@initech.test",
         "path " + "/" + "Users/<user>/project",
         'svg d="M-312.40625 42.75 C0.1515133509874999' + '6 42.75"',
+        # CIDR notation of a whole range (network address, prefix length up to /24), as SSRF
+        # and egress documentation needs it.
+        "blocked: `10.0.0.0/8`, `172.16.0.0/12`, 192.168.0.0/16 and 100.64.0.0/10.",
+        "deny 10.20.30.0/24,10.0.0.0/0",
     ],
 )
 def test_generic_rules_allow_documentation_values(repo: Path, text: str) -> None:

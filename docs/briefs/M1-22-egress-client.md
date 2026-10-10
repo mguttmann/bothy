@@ -265,9 +265,14 @@ In `services/server/internal/platform/egress`; real servers are `httptest` serve
 test hook on the unexported dialer.
 
 - `TestSECT09_BlockedRanges`: table with one address per blocked range in IPv4 and IPv6, including
-  `169.254.169.254`, `fe80::1`, `100.64.0.1`, `fc00::1`, `fd00::1`, `0.0.0.0`, `::`, `224.0.0.1`,
-  `ff02::1`, `::ffff:127.0.0.1`, `::ffff:169.254.169.254`, `64:ff9b::a9fe:a9fe`, `2002:a9fe:a9fe::1`,
-  `2001::1`; expected verdict with and without `allow_private`.
+  `169.254.169.254`, `fe80::1`, `fc00::1`, `fd00::1`, `0.0.0.0`, `::`, `224.0.0.1`, `ff02::1`,
+  `::ffff:127.0.0.1`, `::ffff:169.254.169.254`, `64:ff9b::a9fe:a9fe`, `2002:a9fe:a9fe::1`,
+  `2001::1`, and the first host address of `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16` and
+  `100.64.0.0/10`; expected verdict with and without `allow_private`. Private IPv4 host addresses
+  are derived from their range in code (`netip.MustParsePrefix("10.0.0.0/8").Addr().Next()`) and
+  never written as literals: the generic white-label rule (tools/denylist/generic.rules) flags
+  literal private IPv4 host addresses in every tracked file and allows only whole ranges in CIDR
+  notation.
 - `TestAllowedPublicAddresses`: `192.0.2.10`, `198.51.100.1`, `203.0.113.5`, `2001:db8::10` pass.
 - `TestParseRule`: valid forms, IPv6 with port, upper case normalised, and rejections (wildcard,
   scheme, path, port `0` or above `65535`, unknown flag).
@@ -290,7 +295,8 @@ test hook on the unexported dialer.
   with a gzip encoded body.
 - `TestTimeout`, `TestProxyEnvironmentIgnored` (`t.Setenv` of both proxy variables to a counting
   server; it counts 0), `TestBlockedAttemptLog` (purpose, reason, host; no path or query).
-- `TestLoopbackClientRefusesNonLoopback`: the fake resolver answers `10.0.0.1`; refused.
+- `TestLoopbackClientRefusesNonLoopback`: the fake resolver answers the first host address of
+  `10.0.0.0/8` (derived as above); refused.
 - Configuration tests in `internal/platform/config` for the three keys and their env names.
 - Semgrep rule tests through the fixtures (`ruleid:` and `ok:` annotations). SEC-T02 also covers
   raw SQL; the existing rule `bothy-go-sql-string-building` stays green.

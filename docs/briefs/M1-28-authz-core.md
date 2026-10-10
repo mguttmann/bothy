@@ -627,7 +627,7 @@ Pure tests run without a database; the test world and fakes live in
 2. **Mapping**: `TestDecisionErrMapping` covers every row of the mapping table.
 3. **Test world** of 07 section 11.1 built with the fakes: spaces Support (channels Allgemein,
    Eskalation), Marketing (Kampagnen, Intern), Engineering (forum Projekt-A, text Werkzeuge with
-   operator Runner), Research (Notizen); agents Helpdesk (default operator of Support,
+   operator Runner), Research (Notizen); agents Lotse (default operator of Support,
    organization, chat), Texter (Marketing, organization, scoped), Runner (Projekt-A and
    Werkzeuge, organization, host), Assistent (Research, personal, holder Owner, scoped); grants
    G-1 to G-6 exactly as in 07 sections 10 and 11.1; group Leser with member Sam (membership
@@ -636,7 +636,7 @@ Pure tests run without a database; the test world and fakes live in
 4. **Matrix** (`internal/authz/app`), one test function per id with the expected outcome and
    reason of 07 section 11.1: `TestAZM01` to `TestAZM14`, `TestAZM18`, `TestAZM27`,
    `TestAZM28`, `TestAZM29`, `TestAZM31` to `TestAZM34`, `TestAZM40`, `TestAZM41`, `TestAZM50`.
-   For AZ-M04 and AZ-M11 the trigger message mentions Helpdesk.
+   For AZ-M04 and AZ-M11 the trigger message mentions Lotse.
 5. **Mandatory tests**:
    - `TestAZP3_UnknownActionFailsClosed` through `Authorize` (internal error, no allow, one
      ERROR log record, recorder called with decision `error`);

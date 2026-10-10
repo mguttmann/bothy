@@ -295,10 +295,11 @@ Tests use the Argon2id floor parameters (19456, 2, 1) to stay fast; one test use
 
 Unit:
 
-- `TestIDT27_TOTPVectorsRFC6238`: the SHA-1 vectors of RFC 6238 Appendix B with 8 digits (secret
-  ASCII `12345678901234567890`; T = 59 gives `94287082`, 1111111109 gives `07081804`,
-  1111111111 gives `14050471`, 1234567890 gives `89005924`, 2000000000 gives `69279037`,
-  20000000000 gives `65353130`); step size 30 seconds and tolerance of exactly one step.
+- `TestIDT27_TOTPVectorsRFC6238`: the SHA-1 vectors of RFC 6238 Appendix B with 8 digits (secret:
+  the ASCII string "1234567890" repeated twice, 20 bytes, as in the RFC; T = 59 gives `94287082`,
+  1111111109 gives `07081804`, 1111111111 gives `14050471`, 1234567890 gives `89005924`,
+  2000000000 gives `69279037`, 20000000000 gives `65353130`); step size 30 seconds and tolerance
+  of exactly one step.
 - `TestIDT20_TOTPCodeOnlyOnce`: same code twice in the same step, second rejected; a code of the
   previous step after a newer step was used, rejected.
 - `TestTOTPWindowEdges`: steps -2 and +2 rejected, -1 and +1 accepted.
