@@ -1,0 +1,40 @@
+flowchart LR
+    subgraph sources["Quellen"]
+        server["Server api und worker (OTel Go SDK)"]
+        backupd["bothy-backupd"]
+        adapter["Agenten-Adapter (SDK, gen_ai-Spans)"]
+        runtime["Agenten-Laufzeit (eigene OTel-Daten, optional)"]
+        pgrecv["PostgreSQL (Empfänger im Collector)"]
+    end
+
+    subgraph collector["OpenTelemetry Collector (Basis)"]
+        recv["OTLP-Empfang"]
+        guard["memory_limiter"]
+        scrub["transform/scrub: Inhalte löschen"]
+        allow["redaction: Allowlist und HMAC-Pseudonyme"]
+        tail["tail_sampling: Fehler, langsam, Anteil"]
+        fwd["forward-Connectoren"]
+    end
+
+    subgraph overlays["Overlays (0 bis 2)"]
+        local["local: Prometheus, Loki, Tempo"]
+        ext["newrelic, grafana, datadog, azure-monitor, sentry"]
+        nop["none: verwerfen"]
+    end
+
+    audit[("audit_events in PostgreSQL: nie über den Collector")]
+    stats[("Admin-Statistik: eigene Tabellen")]
+    sentryapps["Sentry (App-Abstürze direkt aus den Apps)"]
+
+    server --> recv
+    backupd --> recv
+    adapter --> recv
+    runtime -. "nur Metadaten" .-> recv
+    pgrecv --> guard
+    recv --> guard --> scrub --> allow --> tail --> fwd
+    fwd --> local
+    fwd --> ext
+    fwd --> nop
+    server -- "gleiche Transaktion" --> audit
+    server --> stats
+    server -. "kein Weg" .-x sentryapps

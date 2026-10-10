@@ -1,0 +1,163 @@
+# Handgeschriebene Alarme neben den SLO-Regeln (slo-*.yaml, erzeugt aus infra/observability/slo).
+# Schwellen sind Startwerte; ihre Begründung und Pflege stehen in docs/observability/alerting.md.
+# Laufzeit-Texte (summary) sind Englisch, wie alle Alarm-Texte des Produkts.
+
+groups:
+  - name: bothy-pipeline
+    rules:
+      # Dauerhaft feuernder Alarm. Alertmanager schickt ihn an einen externen Herzschlag-Dienst;
+      # bleibt er dort aus, ist die Alarmkette selbst tot.
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: heartbeat
+        annotations:
+          summary: "Alerting pipeline is alive."
+          runbook_url: "docs/observability/alerting.md#watchdog"
+
+      - alert: BothyServerTelemetryMissing
+        expr: absent_over_time(target_info{job="bothy/bothy-server"}[10m])
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "No telemetry from the Bothy server for 10 minutes (server down or export broken)."
+          runbook_url: "docs/observability/alerting.md#bothyservertelemetrymissing"
+
+      - alert: BothyCollectorDown
+        expr: up{job="otel-collector"} == 0
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "OpenTelemetry Collector does not answer."
+          runbook_url: "docs/observability/alerting.md#bothycollectordown"
+
+      # Exporter-Fehler des Collectors. Die Namen der Eigenmetriken ändern sich zwischen
+      # Versionen (mit oder ohne _total); darum der Regex über den Namen.
+      - alert: BothyTelemetryExportFailing
+        expr: sum by (exporter) (rate({__name__=~"otelcol_exporter_send_failed_(spans|metric_points|log_records)(_total)?"}[15m])) > 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Collector exporter {{ $labels.exporter }} fails to send telemetry."
+          runbook_url: "docs/observability/alerting.md#bothytelemetryexportfailing"
+
+      - alert: BothyTelemetryDropped
+        expr: sum(rate(bothy_telemetry_dropped_total[15m])) > 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "The server drops telemetry because the export queue is full."
+          runbook_url: "docs/observability/alerting.md#bothytelemetrydropped"
+
+  - name: bothy-runtime
+    rules:
+      - alert: BothyEventFanoutLag
+        expr: max(bothy_event_fanout_lag_seconds{job="bothy/bothy-server"}) > 5
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Event fan-out lags behind the event log by more than 5 s."
+          runbook_url: "docs/observability/alerting.md#bothyeventfanoutlag"
+
+      - alert: BothyAgentConsumerLag
+        expr: max by (bothy_agent_handle) (bothy_agent_consumer_lag{job="bothy/bothy-server"}) > 1000
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Agent {{ $labels.bothy_agent_handle }} has more than 1000 unacknowledged events."
+          runbook_url: "docs/observability/alerting.md#bothyagentconsumerlag"
+
+      - alert: BothyAgentOffline
+        expr: max by (bothy_agent_handle) (bothy_agent_heartbeat_age_seconds{job="bothy/bothy-server"}) > 300
+        for: 5m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Agent {{ $labels.bothy_agent_handle }} sent no heartbeat for 5 minutes."
+          runbook_url: "docs/observability/alerting.md#bothyagentoffline"
+
+      - alert: BothyBillingModeMismatch
+        expr: sum by (bothy_agent_handle) (increase(bothy_agent_billing_mode_mismatch_total[1h])) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: "Agent {{ $labels.bothy_agent_handle }} reported a billing mode that differs from its policy."
+          runbook_url: "docs/observability/alerting.md#bothybillingmodemismatch"
+
+      - alert: BothyMalwareScanFailing
+        expr: sum(rate(bothy_file_scan_total{bothy_outcome="error"}[15m])) > 0 and sum(rate(bothy_file_scan_total{bothy_outcome=~"clean|infected"}[15m])) == 0
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "Malware scanning fails; uploads stay in state pending."
+          runbook_url: "docs/observability/alerting.md#bothymalwarescanfailing"
+
+  - name: bothy-data
+    rules:
+      - alert: BothyBackupStale
+        expr: time() - max by (bothy_backup_kind) (bothy_backup_last_success_timestamp_seconds) > 93600
+        for: 15m
+        labels:
+          severity: page
+        annotations:
+          summary: "No successful {{ $labels.bothy_backup_kind }} backup for more than 26 hours."
+          runbook_url: "docs/observability/alerting.md#bothybackupstale"
+
+      - alert: BothyWalArchiveStale
+        expr: time() - max(bothy_backup_wal_last_archived_timestamp_seconds) > 900
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "No WAL segment archived for 15 minutes; point-in-time recovery is at risk."
+          runbook_url: "docs/observability/alerting.md#bothywalarchivestale"
+
+      - alert: BothyRestoreTestStale
+        expr: time() - max(bothy_backup_restore_test_last_success_timestamp_seconds) > 691200
+        for: 1h
+        labels:
+          severity: ticket
+        annotations:
+          summary: "No successful automatic restore test for more than 8 days."
+          runbook_url: "docs/observability/alerting.md#bothyrestoreteststale"
+
+      - alert: BothyAuditChainBroken
+        expr: sum(increase(bothy_audit_verify_failures_total[1d])) > 0
+        labels:
+          severity: page
+        annotations:
+          summary: "Audit log hash chain verification failed."
+          runbook_url: "docs/observability/alerting.md#bothyauditchainbroken"
+
+      - alert: BothyVolumeFull
+        expr: min by (bothy_volume) (bothy_storage_volume_free_bytes / bothy_storage_volume_size_bytes) < 0.1
+        for: 30m
+        labels:
+          severity: page
+        annotations:
+          summary: "Volume {{ $labels.bothy_volume }} has less than 10 percent free space."
+          runbook_url: "docs/observability/alerting.md#bothyvolumefull"
+
+      - alert: BothyDatabaseConnectionsHigh
+        expr: sum(postgresql_backends) / max(postgresql_connection_max) > 0.8
+        for: 15m
+        labels:
+          severity: ticket
+        annotations:
+          summary: "PostgreSQL uses more than 80 percent of max_connections."
+          runbook_url: "docs/observability/alerting.md#bothydatabaseconnectionshigh"
+
+      - alert: BothyDatabaseDeadlocks
+        expr: sum(increase(postgresql_deadlocks_total[1h])) > 0
+        labels:
+          severity: ticket
+        annotations:
+          summary: "PostgreSQL reported deadlocks; check the lock order rule (03-datenmodell 6.3)."
+          runbook_url: "docs/observability/alerting.md#bothydatabasedeadlocks"

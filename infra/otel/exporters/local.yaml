@@ -1,0 +1,30 @@
+# Overlay "local": lokaler Standard-Stack aus dem Compose-Profil observability.
+# Metriken -> Prometheus (OTLP-Empfänger, kumulative Temporalität wie vom SDK geliefert),
+# Logs -> Loki (OTLP über HTTP), Traces -> Tempo (OTLP über gRPC).
+# Belege und Grenzen: docs/observability/backends.md, Abschnitt "Grafana-Stack lokal".
+
+exporters:
+  otlp_http/prometheus:
+    endpoint: http://prometheus:9090/api/v1/otlp
+    tls:
+      insecure: true
+  otlp_http/loki:
+    endpoint: http://loki:3100/otlp
+    tls:
+      insecure: true
+  otlp_grpc/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+service:
+  pipelines:
+    traces/local:
+      receivers: [forward/traces]
+      exporters: [otlp_grpc/tempo]
+    metrics/local:
+      receivers: [forward/metrics]
+      exporters: [otlp_http/prometheus]
+    logs/local:
+      receivers: [forward/logs]
+      exporters: [otlp_http/loki]

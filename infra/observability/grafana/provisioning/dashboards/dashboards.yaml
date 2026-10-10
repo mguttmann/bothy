@@ -1,0 +1,16 @@
+# Dashboard-Provider: lädt alle JSON-Dateien aus infra/observability/grafana/dashboards
+# (im Container /var/lib/grafana/dashboards). Änderungen nur über das Repository:
+# in Grafana bearbeiten, als JSON exportieren, Datei ersetzen, committen (docs/observability/dashboards.md).
+apiVersion: 1
+
+providers:
+  - name: bothy
+    orgId: 1
+    folder: Bothy
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

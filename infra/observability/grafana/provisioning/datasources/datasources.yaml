@@ -1,0 +1,58 @@
+# Grafana-Datenquellen für den lokalen Standard-Stack (Datei-Provisioning).
+# Beleg (abgerufen 2026-10-10): https://grafana.com/docs/grafana/latest/administration/provisioning/
+# Feste UIDs, weil die Dashboards unter infra/observability/grafana/dashboards sie referenzieren.
+apiVersion: 1
+
+prune: true
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      derivedFields:
+        - name: TraceID
+          matcherType: label
+          matcherRegex: trace_id
+          datasourceUid: tempo
+          url: "$${__value.raw}"
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    editable: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        filterByTraceID: true
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+
+  - name: Alertmanager
+    uid: alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    editable: false
+    jsonData:
+      implementation: prometheus

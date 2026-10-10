@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    participant App as App (Alex)
+    participant API as api: HTTP-Span
+    participant DB as PostgreSQL: event_log
+    participant GW as api: Fan-out-Span
+    participant AD as Adapter: invoke_agent-Span
+    participant RT as Laufzeit (TRACEPARENT)
+    App->>API: POST message, traceparent (Trace-ID T, Sampling entscheidet der Server)
+    API->>DB: Commit, correlation_id = T, trace_context gespeichert
+    DB-->>GW: NOTIFY
+    GW->>GW: Span event.fanout mit Link auf T
+    GW-->>AD: dispatch agent.invocation mit trace_context
+    AD->>AD: Span invoke_agent, Eltern-Kontext aus trace_context
+    AD->>RT: Lauf starten, TRACEPARENT in der Umgebung
+    RT-->>AD: Werkzeuge, Text (eigene Spans unter T)
+    AD->>API: POST /runs/{id}/start und PATCH, traceparent unter T
+    AD->>API: POST message (origin agent), traceparent unter T
+    API-->>App: dispatch message.created (Span event.fanout mit Link auf T)

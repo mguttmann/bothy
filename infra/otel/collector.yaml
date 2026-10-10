@@ -1,0 +1,247 @@
+# OpenTelemetry Collector: Basis-Konfiguration für Bothy (otelcol-contrib, gepinnte Version siehe
+# infra/compose/.env.example). Erklärung: docs/observability/collector.md.
+#
+# Aufbau:
+#   1. Empfang (OTLP vom Server, von bothy-backupd und von Adaptern; PostgreSQL-Kennzahlen).
+#   2. Schutz und Datenschutz (memory_limiter, Inhaltsfilter, Allowlist mit HMAC-Pseudonymen,
+#      Tail-Sampling, batch).
+#   3. Verteilung: Die Eingangs-Pipelines enden in forward-Connectoren. Jedes Overlay unter
+#      exporters/ hängt eigene Pipelines an diese Connectoren an. Weil Pipelines Maps sind, lassen
+#      sich mehrere Overlays mit mehreren --config-Angaben kombinieren.
+#   4. Ohne Overlay enden die Daten im nop-Exporter (Telemetrie aus, Konfiguration gültig).
+#
+# Regeln: keine Nachrichteninhalte, keine Geheimnisse; Telemetrie blockiert nie den Server
+# (der Server exportiert asynchron und verwirft bei Rückstau, siehe docs/observability/signals.md).
+
+extensions:
+  health_check:
+    endpoint: ":13133"
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: ":4317"
+      http:
+        endpoint: ":4318"
+  postgresql:
+    endpoint: postgres:5432
+    transport: tcp
+    username: bothy_monitor
+    password: ${file:/run/bothy/secrets/db_monitor_password}
+    databases: [bothy]
+    collection_interval: 30s
+    tls:
+      insecure: true                         # internes Compose-Netz; in der Cloud TLS einschalten
+    metrics:
+      postgresql.deadlocks:
+        enabled: true
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: ${env:BOTHY_OTEL_MEMORY_LIMIT_PERCENT:-80}
+    spike_limit_percentage: 20
+
+  resource/instance:
+    attributes:
+      - key: deployment.environment.name
+        value: ${env:BOTHY_ENVIRONMENT:-prod}
+        action: insert
+
+  # Entfernt Felder, die Inhalte oder personenbezogene Daten tragen können, bevor die Allowlist
+  # greift. Doppelte Absicherung zum Verbot an der Quelle.
+  transform/scrub:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - delete_key(attributes, "url.query")
+          - delete_key(attributes, "url.full")
+          - delete_key(attributes, "client.address")
+          - delete_key(attributes, "network.peer.address")
+          - delete_matching_keys(attributes, "^gen_ai\\.(input|output)\\.messages$")
+          - delete_matching_keys(attributes, "^gen_ai\\.(system_instructions|tool\\.definitions)$")
+          - delete_matching_keys(attributes, "^gen_ai\\.tool\\.call\\.(arguments|result)$")
+          - delete_matching_keys(attributes, "^db\\.query\\.parameter\\..*")
+      - context: spanevent
+        statements:
+          - delete_key(attributes, "exception.message")
+          - delete_key(attributes, "exception.stacktrace")
+    log_statements:
+      - context: log
+        statements:
+          - delete_key(attributes, "client.address")
+          - delete_key(attributes, "url.query")
+          - delete_key(attributes, "exception.message")
+
+  # Metriken: Bothy-eigene Attribute sind im Code begrenzt. Fremde Quellen (z. B. die
+  # OTel-Daten einer Agenten-Laufzeit über einen Adapter) können Personen-Attribute mitbringen;
+  # diese fallen hier weg.
+  transform/scrub_metrics:
+    error_mode: ignore
+    metric_statements:
+      - context: resource
+        statements:
+          - delete_matching_keys(attributes, "^(user|enduser)\\..*")
+          - delete_key(attributes, "session.id")
+          - delete_key(attributes, "organization.id")
+      - context: datapoint
+        statements:
+          - delete_matching_keys(attributes, "^(user|enduser)\\..*")
+          - delete_key(attributes, "session.id")
+          - delete_key(attributes, "organization.id")
+          - delete_key(attributes, "client.address")
+
+  # Allowlist: nur Schlüssel aus dem Signal-Katalog (docs/observability/signals.md) überleben.
+  # Werte, die wie Tokens oder E-Mail-Adressen aussehen, werden per HMAC-SHA-256 ersetzt.
+  # Der Prozessor filtert auch Resource-Attribute (lokal geprüft mit 0.162.0); darum stehen
+  # die Resource-Schlüssel hier mit in der Liste.
+  redaction/allowlist:
+    allow_all_keys: false
+    allowed_keys:
+      # Resource
+      - service.name
+      - service.namespace
+      - service.version
+      - service.instance.id
+      - deployment.environment.name
+      - telemetry.sdk.name
+      - telemetry.sdk.language
+      - telemetry.sdk.version
+      # Semantische Konventionen (HTTP, DB, RPC, Fehler)
+      - http.request.method
+      - http.response.status_code
+      - http.route
+      - url.scheme
+      - server.address
+      - server.port
+      - network.protocol.name
+      - network.protocol.version
+      - user_agent.original
+      - error.type
+      - db.system.name
+      - db.namespace
+      - db.operation.name
+      - db.collection.name
+      - db.query.text
+      - db.response.status_code
+      - exception.type
+      - otel.status_code
+      - otel.status_description
+      - code.function.name
+      # GenAI-Konventionen, nur Metadaten (gekapselt, siehe signals.md)
+      - gen_ai.operation.name
+      - gen_ai.provider.name
+      - gen_ai.request.model
+      - gen_ai.response.model
+      - gen_ai.response.finish_reasons
+      - gen_ai.usage.input_tokens
+      - gen_ai.usage.output_tokens
+      - gen_ai.usage.cache_read.input_tokens
+      - gen_ai.usage.cache_write.input_tokens
+      - gen_ai.agent.id
+      - gen_ai.agent.name
+      - gen_ai.conversation.id
+      - gen_ai.tool.name
+      # Bothy-Attribute
+      - bothy.action
+      - bothy.agent.handle
+      - bothy.agent.adapter_kind
+      - bothy.backup.kind
+      - bothy.billing_mode
+      - bothy.channel.id
+      - bothy.close.code
+      - bothy.correlation_id
+      - bothy.decision
+      - bothy.event.durability
+      - bothy.event.seq
+      - bothy.event.type
+      - bothy.file.id
+      - bothy.job.kind
+      - bothy.message.id
+      - bothy.outcome
+      - bothy.principal.kind
+      - bothy.principal.pseudo_id
+      - bothy.push.provider
+      - bothy.ratelimit.class
+      - bothy.reason
+      - bothy.run.id
+      - bothy.run.state
+      - bothy.server.role
+      - bothy.space.id
+      - bothy.step.kind
+      - bothy.thread.id
+    blocked_values:
+      - "eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}"
+      - "(?i)bearer\\s+[A-Za-z0-9._~+/=-]{16,}"
+      - "sk-ant-[A-Za-z0-9_-]{16,}"
+      - "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+    hash_function: hmac-sha256
+    hmac_key: ${file:/run/bothy/secrets/telemetry_pseudonym_key}
+    summary: info
+
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    policies:
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: slow
+        type: latency
+        latency:
+          threshold_ms: ${env:BOTHY_TRACE_SLOW_THRESHOLD_MS:-2000}
+      - name: sample-rest
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: ${env:BOTHY_TRACE_SAMPLE_PERCENT:-10}
+
+  batch:
+    send_batch_size: 2048
+    timeout: 5s
+
+connectors:
+  forward/traces: {}
+  forward/metrics: {}
+  forward/logs: {}
+
+exporters:
+  nop: {}
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: "0.0.0.0"
+                port: 8888
+  pipelines:
+    traces/in:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/instance, transform/scrub, redaction/allowlist, tail_sampling, batch]
+      exporters: [forward/traces]
+    metrics/in:
+      receivers: [otlp, postgresql]
+      processors: [memory_limiter, resource/instance, transform/scrub_metrics, batch]
+      exporters: [forward/metrics]
+    logs/in:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/instance, transform/scrub, redaction/allowlist, batch]
+      exporters: [forward/logs]
+    # Ziel ohne Overlay: verwerfen. Overlays fügen weitere Pipelines an die forward-Connectoren an.
+    traces/default:
+      receivers: [forward/traces]
+      exporters: [nop]
+    metrics/default:
+      receivers: [forward/metrics]
+      exporters: [nop]
+    logs/default:
+      receivers: [forward/logs]
+      exporters: [nop]

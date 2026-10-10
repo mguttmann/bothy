@@ -1,0 +1,27 @@
+# Overlay "grafana": Grafana Cloud über das OTLP-Gateway (alle drei Signale an einen Endpunkt),
+# oder ein entfernter, selbst betriebener Grafana-Stack mit gleichem Gateway-Verhalten.
+# Beleg (abgerufen 2026-10-10): https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/
+#   Gateway https://otlp-gateway-<REGION>.grafana.net/otlp, Basic-Auth aus der Stack-Kachel.
+# Geheimnis: secrets/collector/grafana_otlp_authorization mit dem vollständigen Kopfzeilenwert
+# "Basic <base64(instanz-id:token)>". Ohne Erweiterung, damit dieses Overlay mit jedem anderen
+# kombinierbar bleibt (Listen wie service.extensions werden beim Zusammenführen ersetzt).
+# Für den lokalen Stack aus Compose gilt das Overlay "local", nicht dieses.
+
+exporters:
+  otlp_http/grafana:
+    endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
+    headers:
+      Authorization: ${file:/run/bothy/secrets/grafana_otlp_authorization}
+    compression: gzip
+
+service:
+  pipelines:
+    traces/grafana:
+      receivers: [forward/traces]
+      exporters: [otlp_http/grafana]
+    metrics/grafana:
+      receivers: [forward/metrics]
+      exporters: [otlp_http/grafana]
+    logs/grafana:
+      receivers: [forward/logs]
+      exporters: [otlp_http/grafana]

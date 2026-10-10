@@ -1,0 +1,30 @@
+# SLO-Spezifikation (Sloth, Format prometheus/v1) für Push.
+# Erzeugte Regeln: infra/observability/prometheus/rules/slo-push.yaml (nie von Hand ändern).
+# Gemessen wird die Annahme beim Anbieter (APNs, FCM, ...). Ob das Gerät die Meldung zeigt,
+# sieht der Server nicht; dafür gibt es die Kennzahl bothy.push.fetch (signals.md), ohne SLO.
+version: "prometheus/v1"
+service: "bothy-push"
+labels:
+  component: push
+slos:
+  # Ungültige Tokens sind kein Fehler des Dienstes (Gerät abgemeldet); sie zählen nicht mit.
+  - name: "provider-acceptance"
+    objective: 99.5
+    description: "Share of push sends accepted by the provider, excluding invalid device tokens."
+    sli:
+      events:
+        error_query: sum(rate(bothy_push_sent_total{job="bothy/bothy-server",bothy_outcome=~"provider_error|throttled|rejected_other"}[{{.window}}]))
+        total_query: sum(rate(bothy_push_sent_total{job="bothy/bothy-server",bothy_outcome!="rejected_token"}[{{.window}}]))
+    alerting:
+      name: BothyPushAcceptanceBudgetBurn
+      labels:
+        category: availability
+      annotations:
+        summary: "Push providers reject or fail too many notifications."
+        runbook_url: "docs/observability/alerting.md#bothypushacceptancebudgetburn"
+      page_alert:
+        labels:
+          severity: page
+      ticket_alert:
+        labels:
+          severity: ticket

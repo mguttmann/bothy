@@ -1,0 +1,59 @@
+# SLO-Spezifikation (Sloth, Format prometheus/v1) für Zustellung und Wiederverbindung.
+# Erzeugte Regeln: infra/observability/prometheus/rules/slo-sync.yaml (nie von Hand ändern).
+# Schwellen müssen Bucket-Grenzen der Histogramme sein (docs/observability/signals.md).
+version: "prometheus/v1"
+service: "bothy-sync"
+labels:
+  component: sync
+slos:
+  # Zustell-Latenz: Commit eines dauerhaften Ereignisses bis zum Schreiben des dispatch-Rahmens
+  # an eine verbundene Sitzung (Live-Zustellung, nicht Nachholen). Schwelle 0.5 s.
+  - name: "delivery-latency"
+    objective: 99.5
+    description: "Share of live deliveries written to the socket within 0.5 s after commit."
+    sli:
+      events:
+        error_query: >-
+          sum(rate(bothy_delivery_duration_seconds_count{job="bothy/bothy-server",bothy_event_durability="durable"}[{{.window}}]))
+          -
+          sum(rate(bothy_delivery_duration_seconds_bucket{job="bothy/bothy-server",bothy_event_durability="durable",le="0.5"}[{{.window}}]))
+        total_query: sum(rate(bothy_delivery_duration_seconds_count{job="bothy/bothy-server",bothy_event_durability="durable"}[{{.window}}]))
+    alerting:
+      name: BothyDeliveryLatencyBudgetBurn
+      labels:
+        category: latency
+      annotations:
+        summary: "Live delivery of events is slower than the objective allows."
+        runbook_url: "docs/observability/alerting.md#bothydeliverylatencybudgetburn"
+      page_alert:
+        labels:
+          severity: page
+      ticket_alert:
+        labels:
+          severity: ticket
+
+  # Wiederverbindung: WebSocket-Upgrade bis `ready` oder `resumed`, erfolgreich und innerhalb 2.5 s.
+  # Vom Client verursachte Abbrüche (Anmeldung, Protokollversion, Rate-Limit) zählen nicht.
+  - name: "reconnect"
+    objective: 99.0
+    description: "Share of gateway connects that reach ready or resumed within 2.5 s."
+    sli:
+      events:
+        error_query: >-
+          sum(rate(bothy_gateway_connect_duration_seconds_count{job="bothy/bothy-server",bothy_outcome!="client_error"}[{{.window}}]))
+          -
+          sum(rate(bothy_gateway_connect_duration_seconds_bucket{job="bothy/bothy-server",bothy_outcome="ok",le="2.5"}[{{.window}}]))
+        total_query: sum(rate(bothy_gateway_connect_duration_seconds_count{job="bothy/bothy-server",bothy_outcome!="client_error"}[{{.window}}]))
+    alerting:
+      name: BothyReconnectBudgetBurn
+      labels:
+        category: latency
+      annotations:
+        summary: "Clients cannot reconnect quickly enough."
+        runbook_url: "docs/observability/alerting.md#bothyreconnectbudgetburn"
+      page_alert:
+        labels:
+          severity: page
+      ticket_alert:
+        labels:
+          severity: ticket

@@ -1,0 +1,54 @@
+# Alertmanager für den lokalen Standard-Stack. Erklärung: docs/observability/alerting.md.
+#
+# Zwei Wege, weil ein Alarm über einen Ausfall des Chats nicht nur im Chat landen darf:
+#   bothy-ops        Meldungskanal in der eigenen Instanz (Eingangs-Webhook, Format alertmanager).
+#   external-oncall  externer Kanal (z. B. Bereitschafts-Dienst), nur für severity=page.
+#   external-heartbeat  externer Herzschlag-Dienst für den Watchdog (Totmannschalter).
+# Die URLs sind Geheimnisse (enthalten Tokens) und liegen als Dateien in secrets/alertmanager.
+
+route:
+  receiver: bothy-ops
+  group_by: [alertname, sloth_service, sloth_slo]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  routes:
+    - matchers: ['alertname = "Watchdog"']
+      receiver: external-heartbeat
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 5m
+    - matchers: ['severity = "page"']
+      receiver: external-oncall
+      repeat_interval: 1h
+      continue: true
+    - matchers: ['severity = "page"']
+      receiver: bothy-ops
+      repeat_interval: 1h
+    - matchers: ['severity = "ticket"']
+      receiver: bothy-ops
+      repeat_interval: 24h
+
+inhibit_rules:
+  # Ein Page-Alarm unterdrückt den Ticket-Alarm desselben SLO.
+  - source_matchers: ['severity = "page"']
+    target_matchers: ['severity = "ticket"']
+    equal: [alertname, sloth_service, sloth_slo]
+  # Fehlt jede Telemetrie vom Server, sind Folgealarme aus Server-Metriken wertlos.
+  - source_matchers: ['alertname = "BothyServerTelemetryMissing"']
+    target_matchers: ['alertname =~ "Bothy(Api|Delivery|Reconnect|Push|RunStart|TurnDuration).*"']
+
+receivers:
+  - name: bothy-ops
+    webhook_configs:
+      - url_file: /run/bothy/secrets/alertmanager_bothy_webhook_url
+        send_resolved: true
+        max_alerts: 20
+  - name: external-oncall
+    webhook_configs:
+      - url_file: /run/bothy/secrets/alertmanager_external_webhook_url
+        send_resolved: true
+  - name: external-heartbeat
+    webhook_configs:
+      - url_file: /run/bothy/secrets/alertmanager_heartbeat_url
+        send_resolved: false

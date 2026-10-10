@@ -1,0 +1,42 @@
+# Tempo 3 (Einzelprozess, -target=all) für den lokalen Standard-Stack. Traces kommen per OTLP
+# vom Collector. Grundlage: Beispiel "single-binary" im Tempo-Repository, Tag v3.1.0
+# (https://github.com/grafana/tempo/tree/v3.1.0/example/docker-compose/single-binary).
+# Aufbewahrung: BOTHY_TEMPO_RETENTION (Compose-Variable).
+
+stream_over_http_enabled: true
+
+server:
+  http_listen_port: 3200
+  log_level: warn
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "tempo:4317"
+        http:
+          endpoint: "tempo:4318"
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+# Tempo 3 kennt keinen Block `compactor:` mehr; die Aufbewahrung steht an Scheduler und Worker
+# (Konfigurations-Manifest v3.1.0, docs/sources/tempo/configuration/manifest.md).
+backend_scheduler:
+  provider:
+    compaction:
+      compaction:
+        block_retention: ${BOTHY_TEMPO_RETENTION:-168h}
+
+backend_worker:
+  compaction:
+    block_retention: ${BOTHY_TEMPO_RETENTION:-168h}
+
+usage_report:
+  reporting_enabled: false
