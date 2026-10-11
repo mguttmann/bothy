@@ -141,6 +141,14 @@ operated, and the order of the build.
 - The alert `BothyMalwareScanFailing` now fires when no malware scan has ever produced a
   result; before, it stayed silent exactly when the scanner never worked since the start.
 
+### Changed
+
+- Chapter 02 "Configuration loading" and the configuration reference describe the loader as built
+  by the server: built-in defaults live in the schema, `bothy config print` shows secret
+  references instead of `<redacted>`, and `docs/operations/configuration.md` sections 1 to 3 give
+  the exact grammar of every kind (now with `list(cidr)` and `url`), the file rules and the output
+  of `bothy config check` and `bothy config print`.
+
 ### Security
 
 - Development tools: `katex` (pulled in by mermaid-cli) is pinned through `overrides` to

@@ -12,7 +12,7 @@ is then generated from the schema, and the check compares it with the chapter ta
 
 | Source | Content | Change | Effect |
 |---|---|---|---|
-| Process configuration | all keys from section 4 with place `Server` | environment (`BOTHY_*`) or YAML file (`BOTHY_CONFIG_FILE`) | at startup; secrets after `secrets.cache_ttl` |
+| Process configuration | all keys from section 4 with place `Server` | environment (`BOTHY_*`), YAML file (`--config` or `BOTHY_CONFIG_FILE`) or, for `server.role`, the flag `--role` | at startup; secrets after `secrets.cache_ttl` |
 | Instance settings | section 6, table `instance_settings` | admin console, `instance.settings.update`, `instance.branding.update` (owner, step-up, audit) | immediately, event `instance.updated` |
 | Feature flags | section 7, table `feature_flags` | admin console, `feature_flag.update` (owner, step-up, audit) | immediately, event `instance.updated` |
 | OpenTelemetry | section 8, variables `OTEL_*` | environment | at startup |
@@ -26,16 +26,27 @@ a key from the ticket that builds its first user ([02-architecture.md](../spec/0
 
 ## 2. Naming rule and formats
 
+Every kind has exactly one parser; default value, environment, file and flag go through the same
+one. Error messages never name the checked text.
+
 | Topic | Rule | Example |
 |---|---|---|
+| Key | at least two segments separated by `.`, each segment `[a-z][a-z0-9]*(_[a-z0-9]+)*`; exactly the keys of the kind `secret_ref` end in `_ref` | `sync.event_retention` |
 | Environment name | `BOTHY_` plus the key in uppercase, a dot becomes `__` | `sync.event_retention` -> `BOTHY_SYNC__EVENT_RETENTION` |
-| File | YAML, keys nested by dots | `sync: {event_retention: 30d}` |
-| Duration (`duration`) | number plus unit `ms`, `s`, `m`, `h`, `d` (`d` = 24 h) | `250ms`, `30d` |
-| List (`list(...)`) | environment: separated by commas; file: YAML list | `BOTHY_SERVER__TRUSTED_PROXIES=192.0.2.10/32,198.51.100.0/24` |
-| `cron` | five fields, time zone UTC | `0 2 * * 0` |
-| `secret_ref` | `<scheme>:<path>`, schemes in [16-operations.md](../spec/16-operations.md) 5.2 | `file:/run/bothy/secrets/db_app_password` |
-| `listen address` | `host:port`; `:port` means all interfaces | `127.0.0.1:8080` |
-| `semver` | SemVer without `v` | `1.4.0` |
+| File | YAML with exactly one document, keys nested by dots. Scalars count as the written text and go to the parser of the kind, so YAML typing changes no value (`yes` stays `yes`, `1.10` stays `1.10`, `0x10` is no number). Duplicate and dotted keys, anchors, aliases, merge keys (`<<`) and explicit tags (`!!str`) are errors, as are a list or a mapping where a value stands, and a scalar or `null` where a section stands. A key whose text does not have the form of a key appears in the message only with its line, because a typo can make a value part of the key (`{role:value}` without a space after the colon) | `sync: {event_retention: 30d}` |
+| `string` | any text, also empty | `bothy` |
+| `enum` | exactly one of the values the chapter names; case matters | `worker` |
+| `bool` | `true` or `false` | `true` |
+| `int` | whole number in base ten in the range of int64, optionally with a leading `-`; no `+`, no separator, no exponent, no hexadecimal number | `1048576` |
+| `float` | finite decimal number: optional `-`, digits with an optional fractional part or only a fractional part (`.5`), optionally an exponent `e` or `E` with an optional sign; no leading `+`, no `inf`, no `NaN`, no hexadecimal number | `0.05` |
+| Duration (`duration`) | exactly `(0\|[1-9][0-9]*)(ms\|s\|m\|h\|d)`: a number without sign, fraction or leading zero and exactly one unit, `d` = 24 h. No composition such as `1h30m`; a duration above the largest duration of Go (`time.Duration`, int64 nanoseconds) is an error, so the largest whole number depends on the unit (`106751d`, `2562047h`) | `250ms`, `30d` |
+| List (`list(string)`) | environment and default value: a JSON array of strings if the text starts with `[`, otherwise separated by commas with the whitespace around each element removed; empty text is the empty list; an empty element is an error. File: YAML list of scalars or one scalar in the form of the environment | `a.example.com, b.example.com`, `["x,y"]` |
+| Prefix list (`list(cidr)`) | like `list(string)`; every element is an IPv4 or IPv6 prefix in CIDR form without set host bits (`192.0.2.10/24` is an error) | `BOTHY_SERVER__TRUSTED_PROXIES=192.0.2.10/32,198.51.100.0/24` |
+| `listen address` | `host:port`; host empty (`:port` means all interfaces) or an IP literal, IPv6 in brackets, no DNS name; port in decimal from 0 to 65535 without a leading zero | `127.0.0.1:8080`, `[::1]:8081`, `:8080` |
+| `cron` | five fields separated by whitespace, in UTC: minute 0 to 59, hour 0 to 23, day 1 to 31, month 1 to 12, weekday 0 to 6 (0 = Sunday). A field is a comma list of `*`, `*/n`, `a`, `a-b` and `a-b/n` with `a <= b` and a step `n` from 1 to the highest value of the field; numbers without a leading zero, no names, no shortcuts such as `@daily` | `0 2 * * 0`, `*/15 0-6 * * 1-5` |
+| `semver` | SemVer 2.0.0 without a leading `v`, with optional pre-release and build parts | `1.4.0`, `1.4.0-rc.1` |
+| `secret_ref` | `<scheme>:<reference>` ([16-operations.md](../spec/16-operations.md) 5.2): `file:` with an absolute path, `env:` with a variable name from `[A-Z_][A-Z0-9_]*` that is neither `BOTHY_CONFIG_FILE` nor has the form of a key variable (`BOTHY_A__B`); usual is `BOTHY_SECRET_<NAME>`. This server version reports `azkv` and `awssm` as not supported; any other scheme, a missing scheme and empty text are errors. A default value may contain `<key>` of a string key; when loading, the effective value of that key stands there. Nothing is replaced in set values | `file:/run/bothy/secrets/db_app_password`, `file:<secrets.dir>/db_app_password` |
+| `url` | scheme `http` or `https`, host not empty, no user part, no fragment (`#`), port, if given, in decimal from 1 to 65535 without a leading zero | `https://chat.example.com` |
 | Egress target (`egress.allowed_hosts`) | `host[:port][;allow_private]`; host as a DNS name (lowercase, without a trailing dot) or an IP literal (IPv6 in brackets when a port follows); no wildcard, no scheme, no path; port 1 to 65535; the only switch is `allow_private` | `api.example.com:443`, `[2001:db8::10]:8443;allow_private` |
 
 Keys never contain two consecutive underscores; this makes the naming rule reversible.
@@ -43,12 +54,39 @@ Keys never contain two consecutive underscores; this makes the naming rule rever
 ## 3. Check
 
 1. Unknown `BOTHY_*` variables and unknown keys in the file abort the startup.
-   Exempt are `BOTHY_CONFIG_FILE` and variables that an effective reference `env:` names
-   ([16-operations.md](../spec/16-operations.md) 5.1).
-2. Type and range errors abort the startup; the message names the key and the source, never a
-   value (a secret can be in the wrong key).
-3. `bothy config check` checks without starting. `bothy config print --redacted` shows the
-   effective values and their source, secrets only as a reference.
+   Exempt are `BOTHY_CONFIG_FILE` and variables that a valid reference `env:` in the
+   effective value of a key `*_ref` names ([16-operations.md](../spec/16-operations.md) 5.1).
+   Variables without the prefix `BOTHY_` are ignored. If a variable appears twice in the
+   environment of the process, the server sees only the first entry (this is how the Go runtime
+   passes the environment); it does not check the second. `BOTHY_CONFIG_FILE` applies only when
+   `--config` is missing; empty means no file. `--config` with an empty path is a usage error.
+2. Type and range errors abort the startup, also for a value that a higher source overrides. A
+   required key needs a non-empty value from file, environment or flag. After that, the cross
+   checks from [02-architecture.md](../spec/02-architecture.md) 13, item 4, run as soon as their
+   keys are loaded without error; a key of a rejected file or under a rejected section of the
+   file is not.
+3. All problems come together, sorted by key, one per line
+   `config: <key>: <message> (source: <source>)`, for unknown names
+   `config: unknown variable BOTHY_X (source: environment)` or
+   `config: unknown key "a.b" (source: file <path>)`; a file key without the form of a key
+   appears only with its line (`config: unknown key at line 3 below "server" (source: file
+   <path>)`). No message names a value (a secret can be in the wrong key).
+   Paths and variable names with invalid UTF-8, non-printable characters, whitespace at the edge or
+   a quotation mark at the start stand in quotation marks with Go escapes, so that every problem
+   stays one line.
+4. `bothy config check [--config FILE] [--role ROLE]` checks without starting: `configuration ok`
+   and exit code 0, otherwise every problem on standard error and exit code 1; a usage error
+   gives exit code 2.
+5. `bothy config print [--redacted] [--config FILE] [--role ROLE]` shows in the first line
+   `# configuration file: <path>` or `# configuration file: none`, then per key, sorted by name,
+   `<key> = <value>  # <source>` with the source `default`, `file <path>`, `env BOTHY_X` or
+   `flag --role`. Secrets appear only as a reference; nothing is resolved. The output is always
+   redacted, `--redacted` only states this, `--redacted=false` is a usage error. Values stand in
+   canonical form that can be read in again: a duration in the largest whole unit (`120s` as
+   `2m`), lists separated by `, ` or as a JSON array if an element has a comma or whitespace at
+   the edge or the first one starts with `[`, IP addresses in normal form. Text with invalid UTF-8,
+   non-printable characters, whitespace at the edge or a quotation mark at the start stands in
+   quotation marks with Go escapes.
 
 ## 4. Named values of all chapters
 

@@ -976,21 +976,23 @@ server loads.
       the API with audit, effective immediately, event `instance.updated`. Reason for the
       separation: infrastructure belongs to the instance operator, domain matters to the owner, and
       only settings need a permission check.
-2. **Sources, precedence from low to high:** built-in defaults (generated from the
-   configuration reference) < file (`--config` or `BOTHY_CONFIG_FILE`, YAML, nested
-   like the names) < environment (`BOTHY_` plus the name in upper case, `.` becomes `__`, example
-   `sync.event_retention` becomes `BOTHY_SYNC__EVENT_RETENTION`) < command line (only `--role` and
-   `--config`). The mapping is reversible (ADR 0011, [16-operations.md](16-operations.md) 5.1).
+2. **Sources, precedence from low to high:** built-in defaults (in the schema,
+   `internal/wire/configkeys_*.go`, equal to the chapter table of the key) < file (`--config` or
+   `BOTHY_CONFIG_FILE`, YAML, nested like the names) < environment (`BOTHY_` plus the name in upper
+   case, `.` becomes `__`, example `sync.event_retention` becomes `BOTHY_SYNC__EVENT_RETENTION`) <
+   command line (only `--role` and `--config`). The mapping is reversible (ADR 0011, [16-operations.md](16-operations.md) 5.1).
 3. **Secrets** only as a reference in keys ending in `_ref` (for example `database.password_ref`).
    The secret provider resolves them at start. Values never appear in logs, error texts or
-   `bothy config print` (there `<redacted>`).
+   `bothy config print` (there only the reference appears; `bothy config` resolves nothing).
 4. **Check at start, fail fast:** unknown keys and unknown `BOTHY_` variables
    abort (typos would otherwise be silent; exceptions in [16-operations.md](16-operations.md) 5.1);
    types and ranges; cross conditions. Cross conditions today: `http.max_json_body_bytes` strictly
    greater than `message.max_content_bytes` (the envelope of a message is small compared to the
    gap between the defaults; a value of its own for it would be a guess without a measurement);
-   `server.internal_listen_addr` not equal to `server.listen_addr` (port `0` may occur twice,
-   because tests bind port 0). The rule "identity headers only with a loopback listener" is not a
+   `server.internal_listen_addr` and `server.listen_addr` share no port other than `0` when their
+   hosts are equal or one of the hosts is empty, `0.0.0.0` or `::` (also with an IPv6 zone; an
+   IPv4-mapped IPv6 address counts as its IPv4 address). Port `0` may occur twice, because tests
+   bind port 0. The rule "identity headers only with a loopback listener" is not a
    configuration check, because the driver is a setting of the owner in the database; it
    applies at readiness ([16-operations.md](16-operations.md) 4.3). Messages name the key and the
    source, never the value.

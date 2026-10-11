@@ -1,7 +1,8 @@
 # services/server
 
-Status: skeleton (M1-05). The Go module builds; every module of 02 exists as a port package, the
-kernel packages `ids`, `clock` and `errs` are complete, and `make arch` enforces the module
+Status: skeleton (M1-05) with configuration (M1-07). The Go module builds; every module of 02
+exists as a port package, the kernel packages `ids`, `clock` and `errs` and the platform package
+`config` with `bothy config check|print` are complete, and `make arch` enforces the module
 boundaries from the register. The normative source is
 [docs/spec/02-architecture.md](../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
@@ -128,7 +129,7 @@ Technology without domain logic; only `adapters/`, `wire` and `cmd` may import i
 
 | Package | Content |
 |---|---|
-| `config` | loading and checking the configuration (02, section 13) |
+| [`config`](internal/platform/config/README.md) | schema, loading and checking of the configuration, `Bind` to the `Config` structs (02, section 13; built in M1-07) |
 | `secrets` | secret provider (ADR 0011) |
 | `pg` | pool, Unit of Work with lock order, `LISTEN` connection, retry on deadlock |
 | `httpserver` | server, middleware chain, `problem+json`, proof check of `authorize` (02, section 9) |
