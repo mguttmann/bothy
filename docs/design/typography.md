@@ -1,88 +1,88 @@
-# Typografie
+# Typography
 
-Quelle: `design/tokens/typography.tokens.json`. Werte in px; die Apps skalieren sie mit der
-Systemeinstellung (iOS Dynamic Type, Android Schriftgröße, Windows Textgröße) über
-`MediaQuery.textScaler`. Bilder: [Komponenten](previews/components-dark.png).
+Source: `design/tokens/typography.tokens.json`. Values in px; the apps scale them with the
+system setting (iOS Dynamic Type, Android font size, Windows text size) through
+`MediaQuery.textScaler`. Images: [Components](previews/components-dark.png).
 
-## Schriftwahl
+## Font choice
 
-| Rolle | Schrift | Lizenz | Achsen |
+| Role | Font | License | Axes |
 |---|---|---|---|
-| Oberfläche, Nachrichten | Atkinson Hyperlegible Next | SIL Open Font License 1.1 | variabel, Gewicht 200 bis 800, mit Kursiv |
-| Code, Werkzeugnamen, IDs, Kennzahlen | Atkinson Hyperlegible Mono | SIL Open Font License 1.1 | variabel, Gewicht 200 bis 800, mit Kursiv |
+| Interface, messages | Atkinson Hyperlegible Next | SIL Open Font License 1.1 | variable, weight 200 to 800, with italic |
+| Code, tool names, IDs, metrics | Atkinson Hyperlegible Mono | SIL Open Font License 1.1 | variable, weight 200 to 800, with italic |
 
-Belege: Paketdaten von `@fontsource-variable/atkinson-hyperlegible-next@5.3.0` und
-`@fontsource-variable/atkinson-hyperlegible-mono@5.3.0` (Lizenz OFL-1.1, Achse `wght` 200 bis
-800; https://fontsource.org/fonts/atkinson-hyperlegible-next, abgerufen 2026-10-10 [belegt]).
-Quell-Repositorys: https://github.com/googlefonts/atkinson-hyperlegible-next und
-https://github.com/googlefonts/atkinson-hyperlegible-next-mono (abgerufen 2026-10-10 [belegt]).
-Die Schriftfamilie stammt vom Braille Institute und ist für Menschen mit Sehschwäche entworfen;
-die Fassung "Next" erschien 2025 mit sieben Gewichten und einer Mono-Variante [belegt über die
-Fontsource-Seite und Presseberichte, Primärseite des Braille Institute nicht gelesen].
+Evidence: package data of `@fontsource-variable/atkinson-hyperlegible-next@5.3.0` and
+`@fontsource-variable/atkinson-hyperlegible-mono@5.3.0` (license OFL-1.1, axis `wght` 200 to
+800; https://fontsource.org/fonts/atkinson-hyperlegible-next, retrieved 2026-10-10 [verified]).
+Source repositories: https://github.com/googlefonts/atkinson-hyperlegible-next and
+https://github.com/googlefonts/atkinson-hyperlegible-next-mono (retrieved 2026-10-10 [verified]).
+The font family comes from the Braille Institute and is designed for people with low vision;
+the "Next" version appeared in 2025 with seven weights and a mono variant [verified through the
+Fontsource page and press reports, primary page of the Braille Institute not read].
 
-Gründe:
+Reasons:
 
-1. **Lesbarkeit als Eigenschaft der Schrift.** Verwechselbare Zeichen (I, l, 1; 0, O) sind klar
-   getrennt. In einem Chat mit IDs, Pfaden, Befehlen und Code ist das ein Arbeitsvorteil, kein
-   Schmuck.
-2. **Eigenes Gesicht.** Die Schrift ist erkennbar anders als die üblichen Grotesken (Inter,
-   Systemschriften) des generischen Looks und anders als Discords Hausschrift.
-3. **Eine Familie für Text und Code.** Next und Mono teilen Formen und Laufweite; Kennzahlen in
-   der Live-Box (Mono) stehen ruhig neben Fließtext.
-4. **Variabel.** Ein Font-File je Stil deckt alle Gewichte ab; das hält App-Bundles klein.
-5. **Freie Lizenz.** OFL erlaubt Einbetten in Apps und Weitergabe; der Lizenztext liegt bei
-   (`tools/design-tokens/vendor/fonts/*.OFL.txt`, im App-Paket ebenso).
+1. **Readability as a property of the font.** Confusable characters (I, l, 1; 0, O) are clearly
+   distinct. In a chat with IDs, paths, commands and code, this is a working advantage, not
+   decoration.
+2. **A face of its own.** The font is recognizably different from the usual grotesques (Inter,
+   system fonts) of the generic look and different from Discord's house font.
+3. **One family for text and code.** Next and Mono share shapes and letter spacing; metrics in
+   the live box (mono) sit calmly next to running text.
+4. **Variable.** One font file per style covers all weights; this keeps app bundles small.
+5. **Free license.** OFL allows embedding in apps and redistribution; the license text is included
+   (`tools/design-tokens/vendor/fonts/*.OFL.txt`, likewise in the app package).
 
-Studie B empfahl Systemschriften (SF, Segoe UI). Die Anforderung "unverwechselbar" und die
-Lesbarkeit wiegen schwerer; die Systemschriften bleiben als Rückfall in `font.family.*` stehen.
+Study B recommended system fonts (SF, Segoe UI). The requirement "unmistakable" and
+readability weigh more; the system fonts remain as fallback in `font.family.*`.
 
-Verworfen: Inter (generischer Look), Systemschrift allein (kein eigenes Gesicht, je Plattform
-anders), Bricolage Grotesque (stark, aber für dichte Listen zu eigenwillig), Material- oder
-Discord-nahe Schriften.
+Rejected: Inter (generic look), system font alone (no face of its own, different per
+platform), Bricolage Grotesque (strong, but too idiosyncratic for dense lists), fonts close to
+Material or Discord.
 
-## Rollen
+## Roles
 
-Komponenten nutzen nur diese Rollen, nie `font.size.*` direkt.
+Components use only these roles, never `font.size.*` directly.
 
-| Rolle | Charakter | Verwendung |
+| Role | Character | Use |
 |---|---|---|
-| `type.display` | sehr groß, extra fett, enger gesetzt | leere Zustände, Einrichtung, Kennzahl-Kacheln |
-| `type.title` | groß, fett | Titel einer Ansicht, Dialog |
-| `type.heading` | mittel, halbfett | Kanal- und Thread-Kopf, Abschnitte |
-| `type.body` | Grundgröße, normal | Nachrichtentext Desktop |
-| `type.body-strong` | Grundgröße, halbfett | Autorname |
-| `type.body-sm` | eine Stufe kleiner | Listenzeilen, Kanalnamen, Live-Box |
-| `type.label` | klein, halbfett | Knöpfe, Chips, Abzeichen |
-| `type.section` | klein, fett, weiter gesetzt | Bereichs-Titel in der Seitenleiste |
-| `type.caption` | klein, normal | Zeitstempel, Hilfetexte |
-| `type.code` | Mono, eine Stufe unter Grundgröße | Code-Blöcke, Inline-Code |
-| `type.code-sm` | Mono, klein, mittel | Werkzeug-Chips, Kosten, Token-Zahlen |
+| `type.display` | very large, extra bold, set tighter | empty states, setup, metric tiles |
+| `type.title` | large, bold | title of a view, dialog |
+| `type.heading` | medium, semibold | channel and thread header, sections |
+| `type.body` | base size, regular | message text on desktop |
+| `type.body-strong` | base size, semibold | author name |
+| `type.body-sm` | one step smaller | list rows, channel names, live box |
+| `type.label` | small, semibold | buttons, chips, badges |
+| `type.section` | small, bold, set wider | space titles in the sidebar |
+| `type.caption` | small, regular | timestamps, help texts |
+| `type.code` | mono, one step below base size | code blocks, inline code |
+| `type.code-sm` | mono, small, medium | tool chips, costs, token counts |
 
-Größen, Gewichte, Zeilenhöhen und Laufweiten stehen in der erzeugten
-[Token-Referenz](tokens.md); diese Seite nennt nur Namen und Absicht.
+Sizes, weights, line heights and letter spacing are in the generated
+[Token reference](tokens.md); this page gives only names and intent.
 
-Nachrichtentext auf Touch-Geräten: `density.message-font-size` (Kontext `touch`) statt der Größe
-aus `type.body`, damit das iPhone nicht kleiner als die Systemvorgabe liest.
+Message text on touch devices: `density.message-font-size` (context `touch`) instead of the size
+from `type.body`, so that the iPhone does not read smaller than the system default.
 
-## Regeln
+## Rules
 
-- **Keine Großschreibung per Transformation.** Lange deutsche Wörter ("Benachrichtigungen")
-  werden in Versalien unlesbar. Bereichs-Titel unterscheiden sich durch Gewicht und Laufweite.
-- **Zahlen in Mono, wo sie sich ändern.** Laufzeit, Kosten, Token, Kontext in der Live-Box nutzen
-  `type.code-sm`, damit die Zeile beim Hochzählen nicht springt.
-- **Dynamische Schriftgröße bis 200 Prozent** ohne Verlust von Inhalt (WCAG 2.2 SC 1.4.4,
-  https://www.w3.org/TR/WCAG22/, abgerufen 2026-10-10 [belegt]). Zeilen wachsen in der Höhe;
-  Spalten brechen auf schmalen Fenstern in den Navigationsstapel um (siehe 01-produkt.md).
-- **Markdown.** Überschriften in Nachrichten nutzen höchstens `type.heading`; ein Agent kann den
-  Verlauf nicht mit Display-Größen füllen.
-- **Rückfall.** Fehlt ein Zeichen in Atkinson (z. B. CJK), greift die Rückfall-Liste aus
-  `font.family.*`; die Apps bündeln keine weiteren Schriften.
+- **No uppercase by transformation.** Long German words ("Benachrichtigungen")
+  become unreadable in capitals. Space titles differ through weight and letter spacing.
+- **Numbers in mono where they change.** Run time, cost, tokens, context in the live box use
+  `type.code-sm`, so that the line does not jump while counting up.
+- **Dynamic type size up to 200 percent** without loss of content (WCAG 2.2 SC 1.4.4,
+  https://www.w3.org/TR/WCAG22/, retrieved 2026-10-10 [verified]). Rows grow in height;
+  columns collapse into the navigation stack on narrow windows (see 01-product.md).
+- **Markdown.** Headings in messages use at most `type.heading`; an agent cannot fill the
+  history with display sizes.
+- **Fallback.** If a character is missing in Atkinson (for example CJK), the fallback list from
+  `font.family.*` applies; the apps bundle no further fonts.
 
-## Einbindung
+## Integration
 
-- Flutter: `packages/design_system` bündelt die variablen TTF-Dateien aus den Quell-Repositorys
-  in gepinnter Version mit Lizenztext; `DsType` (erzeugt) liefert die `TextStyle`-Konstanten.
-- Web-Konsole und Doku-Site: WOFF2 aus demselben Stand; `tokens.css` liefert die Variablen
+- Flutter: `packages/design_system` bundles the variable TTF files from the source repositories
+  in a pinned version with license text; `DsType` (generated) provides the `TextStyle` constants.
+- Web console and docs site: WOFF2 from the same version; `tokens.css` provides the variables
   `--ds-type-*`.
-- Vorschau: die WOFF2-Dateien liegen unter `tools/design-tokens/vendor/fonts/` und werden
-  eingebettet.
+- Preview: the WOFF2 files are under `tools/design-tokens/vendor/fonts/` and are
+  embedded.

@@ -1,49 +1,49 @@
-# Modul `gateway`
+# Module `gateway`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-## Zweck
+## Purpose
 
-WebSocket-Endpunkt, Gateway-Sitzungen, Hub, Fokus, Tippen, Weitergabe kurzlebiger Ereignisse, Agenten-Verbindungen.
+WebSocket endpoint, gateway sessions, hub, focus, typing, forwarding of ephemeral events, agent connections.
 
-## Port (Wurzelpaket `internal/gateway`)
+## Port (root package `internal/gateway`)
 
-- Eingehend: keiner für andere Module.
-- Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: kernel `eventlog.EphemeralPublisher`.
+- Inbound: none for other modules.
+- Emits in-tx events: none.
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: kernel `eventlog.EphemeralPublisher`.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `chat`, `agents`, `runs`, `sync`, `stats`.
+May use the ports of these modules: `chat`, `agents`, `runs`, `sync`, `stats`.
 
-Grund: Thread zu Kanal für Fokus und Tippen; Verbraucher-Cursor und Präsenz; Lauf-Patches und Zustellvorbereitung; Tail, Nachholen, Momentaufnahme; Live-Rahmen für `stats.subscribe`.
+Reason: thread to channel for focus and typing; consumer cursor and presence; run patches and delivery preparation; tail, catch-up, snapshot; live frame for `stats.subscribe`.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
-Keine. Das Modul liest über die Ports anderer Module (03-datenmodell.md, Grundsatz 12).
+None. The module reads through the ports of other modules (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `gateway.connect`, `gateway.focus`, `typing.start`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: keine.
-- Kurzlebig: `typing.started`.
-- WebSocket-Ops (Client an Server): `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.start`, `typing.stop`.
+- Durable: none.
+- Ephemeral: `typing.started`.
+- WebSocket ops (client to server): `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.start`, `typing.stop`.
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Je Verbindung eine Lese- und eine Schreib-Goroutine mit begrenzter Warteschlange; Überlauf schließt mit `4014` (04, 7.2).
-- Gateway-Sitzungen leben nur im Prozess; `resume` auf einem anderen Knoten endet mit `4006` (02, Abschnitt 10).
-- Beim Shutdown zuerst Agenten-Cursor sichern, dann alle Verbindungen mit `4013` schließen (02, 15.3).
-- Einziges Modul, das `github.com/coder/websocket` importieren darf.
+- Per connection one read goroutine and one write goroutine with a bounded queue; an overflow closes with `4014` (04, 7.2).
+- Gateway sessions live only in the process; `resume` on another node ends with `4006` (02, section 10).
+- At shutdown, first save the agent cursors, then close all connections with `4013` (02, 15.3).
+- The only module that may import `github.com/coder/websocket`.
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [04-sync-protokoll.md](../../../../docs/spec/04-sync-protokoll.md), [06-api.md](../../../../docs/spec/06-api.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [04-sync-protocol.md](../../../../docs/spec/04-sync-protocol.md), [06-api.md](../../../../docs/spec/06-api.md)

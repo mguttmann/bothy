@@ -1,55 +1,55 @@
-# Modul `status`
+# Module `status`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
-## Zweck
+## Purpose
 
-Statusseite, Komponenten, Störungen, automatische Prüfungen, Sicherungsläufe.
+Status page, components, incidents, automatic checks, backup runs.
 
-## Port (Wurzelpaket `internal/status`)
+## Port (root package `internal/status`)
 
-- Eingehend: `Status`, `BackupRuns` (für `bothy-backupd`).
-- Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: `agents.AgentDisabled`.
-- Implementiert Quellen-Ports und Querschnitts-Ports: keine.
+- Inbound: `Status`, `BackupRuns` (for `bothy-backupd`).
+- Emits in-tx events: none.
+- Subscribes to in-tx events: `agents.AgentDisabled`.
+- Implements source ports and cross-cutting ports: none.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `agents`.
+May use the ports of these modules: `agents`.
 
-Grund: Agenten-Präsenz als Status-Komponente.
+Reason: agent presence as a status component.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `status_components`, `status_incidents`, `status_incident_updates`, `status_incident_components`, `backup_runs`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables via SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `status.public.read`, `status.read`, `status.manage`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: `status.updated`.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: `status.updated`.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hintergrundjobs
+## Background jobs
 
-| Job | Auslöser | Warteschlange |
+| Job | Trigger | Queue |
 |---|---|---|
-| `status.probe` | periodisch | `maintenance` |
+| `status.probe` | periodic | `maintenance` |
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Öffentliche Statusseite nur bei `status.public_enabled` (05, `status.public.read`).
-- Agenten-Komponenten folgen der Präsenz aus `agents`.
+- Public status page only with `status.public_enabled` (05, `status.public.read`).
+- Agent components follow the presence from `agents`.
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [16-betrieb.md](../../../../docs/spec/16-betrieb.md), [17-observability.md](../../../../docs/spec/17-observability.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [16-operations.md](../../../../docs/spec/16-operations.md), [17-observability.md](../../../../docs/spec/17-observability.md)

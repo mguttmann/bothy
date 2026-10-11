@@ -1,28 +1,28 @@
-# Modul generic-vm
+# Module generic-vm
 
-Richtet einen vorhandenen Linux-Host für Bothy ein. Basis aller VM-Ziele; die Module `azure`,
-`aws` und `hetzner` rufen es nach dem Anlegen ihres Hosts auf.
+Sets up an existing Linux host for Bothy. Base of all VM targets; the modules `azure`, `aws` and
+`hetzner` call it after they have created their host.
 
-## Eingaben
+## Inputs
 
-Gemeinsame Eingaben siehe [variables.tf](variables.tf). Zusätzlich: `ssh_host`, `ssh_user`.
+For the shared inputs see [variables.tf](variables.tf). In addition: `ssh_host`, `ssh_user`.
 
-## Geplante Ressourcen
+## Planned resources
 
-| Teil | Inhalt |
+| Part | Content |
 |---|---|
-| cloud-init bzw. Bereitstellung per SSH | Docker Engine und Compose-Plugin aus den Paketquellen von Docker, Benutzer `bothy`, Verzeichnis für den Stack |
-| Compose-Bündel | `infra/compose` und `infra/otel`, `infra/observability` der Version `bothy_version`, Signatur geprüft ([18-release.md](../../../../docs/spec/18-release.md) 6) |
-| `.env` | aus den Eingaben erzeugt; enthält keine Geheimnisse |
-| Systemdienst | startet `docker compose up -d` beim Boot |
-| Rand | `edge_mode = reverse_proxy`: Caddy oder ein anderer Proxy auf dem Host mit TLS; `tailscale`: Profil `tailscale`; `private`: kein öffentlicher Port |
+| cloud-init or provisioning by SSH | Docker Engine and Compose plugin from the Docker package repositories, user `bothy`, directory for the stack |
+| Compose bundle | `infra/compose` and `infra/otel`, `infra/observability` of version `bothy_version`, signature checked ([18-release.md](../../../../docs/spec/18-release.md) 6) |
+| `.env` | generated from the inputs; contains no secrets |
+| System service | starts `docker compose up -d` at boot |
+| Edge | `edge_mode = reverse_proxy`: Caddy or another proxy on the host with TLS; `tailscale`: profile `tailscale`; `private`: no public port |
 
-## Ausgaben
+## Outputs
 
-Siehe [infra/tofu/README.md](../../README.md). `database_endpoint` und `object_storage_bucket` bleiben
-leer, außer die Eingaben verweisen auf externe Dienste.
+See [infra/tofu/README.md](../../README.md). `database_endpoint` and `object_storage_bucket` stay
+empty unless the inputs point to external services.
 
-## Offen
+## Open
 
-Welches Werkzeug den Host per SSH einrichtet (cloud-init für neue Hosts, ein Provider für
-vorhandene Hosts), entscheidet das Bau-Ticket.
+Which tool sets up the host by SSH (cloud-init for new hosts, a provider for existing hosts) is
+decided by the build ticket.

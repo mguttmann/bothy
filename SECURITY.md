@@ -15,7 +15,7 @@ secrets from your report.
 ## What happens next
 
 The times below are targets, not guarantees. They are maintained as named values in
-docs/spec/23-qualitaet.md; a test keeps this table and that chapter equal.
+docs/spec/23-quality.md; a test keeps this table and that chapter equal.
 
 | Step | Target |
 |---|---|

@@ -1,89 +1,89 @@
 # Bothy
 
-**Kommandozentrale für KI-Agenten in Chat-Form.** Dein Team und deine Agenten arbeiten an einem
-Ort: Du siehst jedem Agenten live bei der Arbeit zu, beantwortest seine Rückfragen, gibst seine
-Aktionen frei, öffnest ein Terminal auf deinen eigenen Rechnern und siehst, was es kostet. Jede
-Person sieht nur, was ihr freigegeben ist.
+**A command center for AI agents in chat form.** Your team and your agents work in one
+place: you watch each agent work live, answer its questions, approve its
+actions, open a terminal on your own hosts and see what it costs. Every
+person sees only what has been granted to them.
 
-![Desktop-Vorschau: Seitenleiste mit Bereichen und Kanälen, Beitragsliste mit Agenten-Threads, ein Thread mit laufendem Agenten in der Live-Box mit Werkzeugaufrufen, Tokens und Kosten, eine Freigabe-Karte mit Erlauben und Ablehnen und die Sitzungs-Spalte mit Backend, Kontext und früheren Sitzungen](design/previews/layout-dark.png#only-dark)
-![Desktop-Vorschau: Seitenleiste mit Bereichen und Kanälen, Beitragsliste mit Agenten-Threads, ein Thread mit laufendem Agenten in der Live-Box mit Werkzeugaufrufen, Tokens und Kosten, eine Freigabe-Karte mit Erlauben und Ablehnen und die Sitzungs-Spalte mit Backend, Kontext und früheren Sitzungen](design/previews/layout-light.png#only-light)
+![Desktop preview: sidebar with spaces and channels, post list with agent threads, a thread with a running agent in the live box with tool calls, tokens and costs, an approval card with Allow and Deny, and the session column with backend, context and earlier sessions](design/previews/layout-dark.png#only-dark)
+![Desktop preview: sidebar with spaces and channels, post list with agent threads, a thread with a running agent in the live box with tool calls, tokens and costs, an approval card with Allow and Deny, and the session column with backend, context and earlier sessions](design/previews/layout-light.png#only-light)
 
-Vorschau aus dem [Design-System](design/README.md); Bildschirmfotos der echten Apps entstehen mit
-der Demo-Instanz ([Plan](PLAN.md), M7-27 und M7-28). Das Projekt ist in der Planung: Es gibt noch
-keinen Produktcode.
+Preview from the [design system](design/README.md); screenshots of the real apps are made with
+the demo instance ([Plan](PLAN.md), M7-27 and M7-28). The project is in planning: there is no
+product code yet.
 
-## Was Bothy kann
+## What Bothy can do
 
 <div class="grid cards" markdown>
 
-- **Chat wie Discord**
+- **Chat like Discord**
 
     ---
 
-    Bereiche, Kanäle, Foren und Threads. Agenten wie Hermes Agent, Claude Code und eigene sind
-    vollwertige Teilnehmer über die öffentliche API. [Produkt](spec/01-produkt.md)
+    Spaces, channels, forums and threads. Agents such as Hermes Agent, Claude Code and your own are
+    full participants through the public API. [Product](spec/01-product.md)
 
-- **Live-Ansicht**
-
-    ---
-
-    Jeder Thread kann eine Agenten-Sitzung sein, mit Live-Box für Werkzeugaufrufe und
-    Statuszeilen und Nachträgen, während der Agent arbeitet. [Agenten](spec/09-agenten.md)
-
-- **Freigaben und Rechte**
+- **Live view**
 
     ---
 
-    Knöpfe, Auswahl und Formulare für Rückfragen; Rechte je Person und Bereich, geprüft vom
-    Server bei jedem Zugriff. [Rechte](spec/07-rechte.md)
+    Every thread can be an agent session, with a live box for tool calls and
+    status lines and follow-ups while the agent works. [Agents](spec/09-agents.md)
+
+- **Approvals and permissions**
+
+    ---
+
+    Buttons, selects and forms for questions; permissions per person and space, checked by the
+    server on every access. [Permissions](spec/07-permissions.md)
 
 - **Terminal**
 
     ---
 
-    Shells und Sitzungen eines Coding-Agenten auf angebundenen Rechnern, vom Desktop, Telefon und
-    der Web-Konsole, Ende-zu-Ende verschlüsselt. [Terminal](spec/24-terminal.md)
+    Shells and coding-agent sessions on connected hosts, from desktop, phone and
+    the web console, end-to-end encrypted. [Terminal](spec/24-terminal.md)
 
-- **Kosten**
-
-    ---
-
-    Jeder Agent zeigt, worauf er läuft und was er kostet; der Backend-Schalter hält persönliche
-    Abos bei ihrem Inhaber. [Backend-Richtlinie](spec/10-backend-richtlinie.md)
-
-- **Statistik**
+- **Costs**
 
     ---
 
-    Native Ansichten für Live-Topologie, Zustellung und Kosten, dazu ein Grafana-Panel für den
-    Betrieb in derselben Designsprache. [Visualisierung](spec/25-visualisierung.md)
+    Every agent shows what it runs on and what it costs; the backend switch keeps personal
+    subscriptions with their holder. [Backend policy](spec/10-backend-policy.md)
+
+- **Statistics**
+
+    ---
+
+    Native views for live topology, delivery and costs, plus a Grafana panel for
+    operations in the same design language. [Visualization](spec/25-visualization.md)
 
 </div>
 
-## Schnellstart
+## Quick start
 
-Geplant: ein Befehl auf einem Linux- oder macOS-Host mit Docker Compose. Der
-Einrichtungsassistent prüft den Host, fragt nach Adresse, Rand und erstem Owner, startet die
-Instanz und zeigt den Einladungs-Code für die App ([16 Betrieb](spec/16-betrieb.md), Abschnitt
-3.1). Schritt für Schritt: [Installation mit Docker Compose](operations/install-compose.md).
+Planned: one command on a Linux or macOS host with Docker Compose. The
+setup wizard checks the host, asks for the address, the edge and the first owner, starts the
+instance and shows the enrollment code for the app ([16 Operations](spec/16-operations.md), section
+3.1). Step by step: [Installation with Docker Compose](operations/install-compose.md).
 
 ```sh
-# geplant; erscheint mit dem ersten Release
+# planned; ships with the first release
 curl -fsSL https://github.com/OWNER/bothy/releases/download/v0.0.0/install.sh | sh
 ```
 
-## Leseweg
+## Reading path
 
-| Du willst | Lies zuerst | Dann |
+| You want to | Read first | Then |
 |---|---|---|
-| verstehen, was Bothy ist | [Spezifikation: Überblick](SPEC.md) | [01 Produkt](spec/01-produkt.md), [Roadmap](roadmap.md) |
-| eine Instanz betreiben | [Installation](operations/install-compose.md) | [16 Betrieb](spec/16-betrieb.md), [Konfiguration](operations/configuration.md) |
-| einen Agenten oder eine App anbinden | [11 Erweiterungen](spec/11-erweiterungen.md) | [09 Agenten](spec/09-agenten.md), [API](spec/06-api.md) |
-| die Sicherheit prüfen | [19 Sicherheit](spec/19-sicherheit.md) | [Bedrohungsmodell](security/threat-model.md) |
-| mitbauen | [Plan](PLAN.md) | [Entscheidungen](adr/README.md), [Qualität](quality/README.md), [CONTRIBUTING](../CONTRIBUTING.md) |
+| understand what Bothy is | [Specification: overview](SPEC.md) | [01 Product](spec/01-product.md), [Roadmap](roadmap.md) |
+| run an instance | [Installation](operations/install-compose.md) | [16 Operations](spec/16-operations.md), [Configuration](operations/configuration.md) |
+| connect an agent or an app | [11 Extensions](spec/11-extensions.md) | [09 Agents](spec/09-agents.md), [API](spec/06-api.md) |
+| review the security | [19 Security](spec/19-security.md) | [Threat model](security/threat-model.md) |
+| help build it | [Plan](PLAN.md) | [Decisions](adr/README.md), [Quality](quality/README.md), [CONTRIBUTING](../CONTRIBUTING.md) |
 
-**English.** Bothy (working name) is a command center for AI agents in chat form: chat, live
-view, approvals, terminal, costs and statistics in one open-source app that you host yourself. Most
-documents on this site are in German with English identifiers; the community files
-([CONTRIBUTING](../CONTRIBUTING.md), [SECURITY](../SECURITY.md)) and the build briefs are in
-English. Start with the [specification overview](SPEC.md) and the [roadmap](roadmap.md).
+Bothy (working name) is a command center for AI agents in chat form: chat, live
+view, approvals, terminal, costs and statistics in one open-source app that you host yourself. All
+documents on this site are in English, including the community files
+([CONTRIBUTING](../CONTRIBUTING.md), [SECURITY](../SECURITY.md)) and the build briefs. Start with
+the [specification overview](SPEC.md) and the [roadmap](roadmap.md).

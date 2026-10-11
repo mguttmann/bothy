@@ -1,7 +1,7 @@
 # Overlay "local": local default stack from the Compose profile observability.
 # Metrics -> Prometheus (OTLP receiver, cumulative temporality as delivered by the SDK),
 # Logs -> Loki (OTLP over HTTP), traces -> Tempo (OTLP over gRPC).
-# Sources and limits: docs/observability/backends.md, section "Grafana-Stack lokal".
+# Sources and limits: docs/observability/backends.md, section "Local Grafana stack".
 
 exporters:
   otlp_http/prometheus:

@@ -1,61 +1,61 @@
-# Red-Team-Gate
+# Red-team gate
 
-Ein unabhängiger Prüfer sucht aktiv nach Wegen, die Regeln des Produkts zu brechen. Sein
-Urteil ist `JA` (darf gemergt, gepusht oder veröffentlicht werden) oder `NEIN` mit Grund.
+An independent reviewer actively looks for ways to break the rules of the product. Its
+verdict is `JA` (yes: may be merged, pushed or published) or `NEIN` (no) with a reason.
 
-## Wann
+## When
 
-| Anlass | Umfang | Nachweis |
+| Occasion | Scope | Evidence |
 |---|---|---|
-| Vor jedem Push und jedem lokalen Merge eines Tickets (Anforderung 23, PLAN 3.9) | Diff des Branches gegen `main` | `.review/<sha>.md` des gepushten oder gemergten Commits; der pre-push-Hook prüft ihn (`tools/hooks/review_gate.py`) |
-| Am Ende jeder Etappe | ganzer Stand gegen den Stand der letzten Etappe | Bericht im Ops-Repository, verlinkt im Abschluss der Etappe |
-| Vor dem Öffentlich-Schalten | ganzer Stand | Bericht im Ops-Repository (public-switch.md, Schritt 1) |
+| Before every push and every local merge of a ticket (requirement 23, PLAN 3.9) | diff of the branch against `main` | `.review/<sha>.md` of the pushed or merged commit; the pre-push hook checks it (`tools/hooks/review_gate.py`) |
+| At the end of every milestone | whole state against the state of the last milestone | report in the ops repository, linked in the close of the milestone |
+| Before going public | whole state | report in the ops repository (public-switch.md, step 1) |
 
-Das Review je Push ist kurz und auf den Diff beschränkt; das Gesamt-Review findet, was
-erst im Zusammenspiel mehrerer Tickets sichtbar wird.
+The review per push is short and limited to the diff; the overall review finds what
+only becomes visible in the interplay of several tickets.
 
-## Wer prüft
+## Who checks
 
-* Unabhängig: nicht die Person oder Sitzung, die den Stand gebaut hat. Im
-  Ein-Personen-Betrieb ist das eine frische Sitzung eines KI-Prüfers ohne Kontext aus der
-  Bau-Sitzung, oder eine zweite Person.
-* Nur lesend: der Prüfer ändert nichts am Arbeitsbaum, pusht nicht und hat keine Secrets.
-  Er bekommt den Diff, die Spezifikation und das Bedrohungsmodell.
+* Independent: not the person or session that built the state. In
+  single-person operation, this is a fresh session of an AI reviewer without context from the
+  build session, or a second person.
+* Read-only: the reviewer changes nothing in the working tree, does not push and has no secrets.
+  It gets the diff, the specification and the threat model.
 
-## Was geprüft wird
+## What is checked
 
-1. **Rechte.** Jede neue Route, jedes Ereignis, jede Zustellung geht durch `authorize`
-   mit einer Aktion aus Kapitel 05; kein Sichtrecht ergibt 404. Gibt es einen Weg, Daten
-   eines fremden Bereichs zu sehen (Zähler, Suche, Vorschläge, Push, Webhooks)?
-2. **Backend-Richtlinie.** Kann eine andere Person als der `credential_holder` einen
-   Agenten mit `billing_mode = personal` auslösen (I1 bis I3)?
-3. **Agenten.** Kann Inhalt aus einem Bereich einen Agenten in einem anderen Bereich
-   steuern? Kann ein Agent mit mächtigen Werkzeugen von einer Person mit wenig Rechten
-   ausgelöst werden?
-4. **Lieferkette und CI.** Neue Actions gepinnt, keine neuen Trigger mit fremdem Code,
-   keine Secrets in Jobs, die sie nicht brauchen; neue Abhängigkeiten mit erlaubter
-   Lizenz.
-5. **White Label und Datenschutz.** Nichts Instanzspezifisches, keine Inhalte in
-   Telemetrie, keine personenbezogenen Daten in Logs.
-6. **Gates.** Wurde ein Gate abgeschwächt, eine Schwelle gesenkt, ein Test gelöscht oder
-   übersprungen?
+1. **Permissions.** Every new route, every event, every delivery goes through `authorize`
+   with an action from chapter 05; no view permission results in 404. Is there a way to see data
+   of a foreign space (counters, search, suggestions, push, webhooks)?
+2. **Backend policy.** Can a person other than the `credential_holder` trigger an
+   agent with `billing_mode = personal` (I1 to I3)?
+3. **Agents.** Can content from one space control an agent in another space?
+   Can an agent with powerful tools be triggered by a person with few
+   permissions?
+4. **Supply chain and CI.** New actions pinned, no new triggers with foreign code,
+   no secrets in jobs that do not need them; new dependencies with an allowed
+   license.
+5. **White label and privacy.** Nothing instance-specific, no contents in
+   telemetry, no personal data in logs.
+6. **Gates.** Was a gate weakened, a threshold lowered, a test deleted or
+   skipped?
 
-## Ablauf
+## Flow
 
-1. Bau-Sitzung meldet "fertig" mit grünem `make check`.
-2. Prüfer erhält den Diff (`git diff <basis>...HEAD`), Kapitel 07, 10, 19 und diese Seite.
-3. Prüfer schreibt einen Bericht: Befunde mit Datei und Zeile, Schweregrad, und als letzte
-   Zeile `Urteil: JA` oder `Urteil: NEIN <Grund>`. Beim Review je Push liegt er unter
-   `.review/<sha>.md` (`<sha>` aus `git rev-parse HEAD`).
-4. Bei `NEIN`: beheben, Tests für jeden Befund, dann prüft der Prüfer nur das Delta
-   erneut. Kommt dasselbe `NEIN` erneut, entscheidet der Owner, nicht eine weitere Runde.
-5. Bei `JA`: Merge beziehungsweise Abschluss der Etappe. Der Bericht je Push steht im Text des
-   Pull Requests (Abschnitt "Review report" der Vorlage); eine git-ignorierte Datei lässt sich
-   nicht verlinken.
-6. Das Bedrohungsmodell (`docs/security/threat-model.md`) wird mit neuen Bedrohungen und
-   Gegenmaßnahmen nachgezogen, bevor die Etappe als fertig gilt.
+1. The build session reports "done" with a green `make check`.
+2. The reviewer receives the diff (`git diff <base>...HEAD`), chapters 07, 10, 19 and this page.
+3. The reviewer writes a report: findings with file and line, severity, and as the last
+   line `Urteil: JA` or `Urteil: NEIN <reason>`. For the review per push, it is located at
+   `.review/<sha>.md` (`<sha>` from `git rev-parse HEAD`).
+4. On `NEIN`: fix, tests for every finding, then the reviewer checks only the delta
+   again. If the same `NEIN` comes again, the owner decides, not another round.
+5. On `JA`: merge or close of the milestone, respectively. The report per push is in the text of the
+   pull request (section "Review report" of the template); a git-ignored file cannot
+   be linked.
+6. The threat model (`docs/security/threat-model.md`) is updated with new threats and
+   mitigations before the milestone counts as done.
 
-## Was das Gate nicht ersetzt
+## What the gate does not replace
 
-Es ersetzt keine Penetrationstests (Kapitel 19) und keine Gates; es prüft, was Werkzeuge
-nicht prüfen können: Absicht, Zusammenspiel und fehlende Prüfungen.
+It does not replace penetration tests (chapter 19) or gates; it checks what tools
+cannot check: intent, interplay and missing checks.

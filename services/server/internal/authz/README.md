@@ -1,58 +1,58 @@
-# Modul `authz`
+# Module `authz`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-## Zweck
+## Purpose
 
-`authorize`, Rechte-Cache, sichtbare Ziele, Gruppen, Freigaben, Rechte-Version, I1-Prüfung, "Wer hat Zugriff", "Als Person ansehen".
+`authorize`, permission cache, visible targets, groups, grants, permission version, I1 check, "Who has access", "View as person".
 
-## Port (Wurzelpaket `internal/authz`)
+## Port (root package `internal/authz`)
 
-- Eingehend: `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`.
-- Gibt In-Tx-Ereignisse aus: kernel `authorize.AccessChanged` (mit der auslösenden Aktion; `runs` bricht bei `user.disable` mit Grund `user_disabled` ab, sonst mit `access_revoked`).
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: kernel `authorize.Authorizer`, `instance.FlagGroupSource`.
+- Inbound: `Admin` (groups, grants, reconciliation of the claim groups, explanation, preview, view as person); declares `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`.
+- Emits in-tx events: kernel `authorize.AccessChanged` (with the triggering action; `runs` cancels with reason `user_disabled` on `user.disable`, otherwise with `access_revoked`).
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: kernel `authorize.Authorizer`, `instance.FlagGroupSource`.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `instance`.
+May use the ports of these modules: `instance`.
 
-Grund: Zähler `permission_version`; alle anderen Daten über Quellen-Ports.
+Reason: counter `permission_version`; all other data through source ports.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `groups`, `group_memberships`, `grants`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `access.explain`, `access.preview`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `group.member.expire`, `group.member.sync`, `grant.read`, `grant.create`, `grant.revoke`, `grant.expire`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: `grant.changed`, `group.changed`, `access.changed`, `access.expiring`.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: `grant.changed`, `group.changed`, `access.changed`, `access.expiring`.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hintergrundjobs
+## Background jobs
 
-| Job | Auslöser | Warteschlange |
+| Job | Trigger | Queue |
 |---|---|---|
-| `authz.expiry_reminder` | periodisch, `access.expiring` vor Ablauf | `maintenance` |
-| `authz.expiry_sweep` | periodisch, `access.changed` nach Ablauf (Systemaktionen `grant.expire`, `group.member.expire`) | `maintenance` |
+| `authz.expiry_reminder` | periodic, `access.expiring` before expiry | `maintenance` |
+| `authz.expiry_sweep` | periodic, `access.changed` after expiry (system actions `grant.expire`, `group.member.expire`) | `maintenance` |
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Einzige Stelle mit Rechte-Logik (B7). Andere Module rufen `authorize` über `kernel/authorize` und verknüpfen nie selbst mit `grants`.
-- Daten anderer Module kommen über die Quellen-Ports `PrincipalSource`, `StructureSource`, `AgentPolicySource`; `authz` importiert keine Fachmodule.
-- I1-Prüfung und `access.changed` laufen in Phase 3.1 der Unit of Work (02, 8.1).
-- Der Rechte-Cache folgt `access.changed` über `Observe` in Log-Reihenfolge (02, 11.3).
+- The only place with permission logic (B7). Other modules call `authorize` through `kernel/authorize` and never join with `grants` themselves.
+- Data of other modules comes through the source ports `PrincipalSource`, `StructureSource`, `AgentPolicySource`; `authz` imports no domain modules.
+- The I1 check and `access.changed` run in phase 3.1 of the Unit of Work (02, 8.1).
+- The permission cache follows `access.changed` through `Observe` in log order (02, 11.3).
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [07-rechte.md](../../../../docs/spec/07-rechte.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [07-permissions.md](../../../../docs/spec/07-permissions.md)

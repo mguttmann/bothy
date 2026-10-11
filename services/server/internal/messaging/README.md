@@ -1,50 +1,50 @@
-# Modul `messaging`
+# Module `messaging`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-## Zweck
+## Purpose
 
-Nachrichten, Revisionen, Erwähnungen, Reaktionen, Anheften, Vorlagen, Kanal-Export.
+Messages, revisions, mentions, reactions, pins, templates, channel export.
 
-## Port (Wurzelpaket `internal/messaging`)
+## Port (root package `internal/messaging`)
 
-- Eingehend: `Messages` (Anlegen, Thread mit erster Nachricht anlegen, Bearbeiten, Löschen, Verlauf, `SetTriggerState`, Anker), `Reactions`, `Pins`, `Templates`, `Mentions` (Liste, ungelesene je Thread), `Export`; deklariert `ComponentReader`.
-- Gibt In-Tx-Ereignisse aus: `MessagePosted`, `MessageDeleted`.
-- Abonniert In-Tx-Ereignisse: `chat.ThreadMoved`.
-- Implementiert Quellen-Ports und Querschnitts-Ports: `files.AttachmentLocator`, kernel `personaldata.Participant`.
+- Inbound: `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader`.
+- Emits in-tx events: `MessagePosted`, `MessageDeleted`.
+- Subscribes to in-tx events: `chat.ThreadMoved`.
+- Implements source ports and cross-cutting ports: `files.AttachmentLocator`, kernel `personaldata.Participant`.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `identity`, `chat`, `files`.
+May use the ports of these modules: `identity`, `chat`, `files`.
 
-Grund: Erwähnungen auflösen; Thread-Sequenz und Wiederöffnen; Anhänge binden und lesen.
+Reason: resolve mentions; thread sequence and reopening; bind and read attachments.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `messages`, `message_revisions`, `mentions`, `reactions`, `pins`, `message_templates`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `thread.create`, `message.read`, `message.create`, `message.update`, `message.delete`, `message.revisions.read`, `reaction.add`, `reaction.remove`, `pin.create`, `pin.delete`, `mention.list`, `template.read`, `template.manage`, `export.channel`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: `message.created`, `message.updated`, `message.deleted`, `reaction.added`, `reaction.removed`, `pin.added`, `pin.removed`.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: `message.created`, `message.updated`, `message.deleted`, `reaction.added`, `reaction.removed`, `pin.added`, `pin.removed`.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Idempotenz über das Paar aus Autor und `client_msg_id` (04, 5.1).
-- Löschen leert den Inhalt und schwärzt die Nutzlast der Ereignisse in derselben Transaktion (03, 6.5).
-- Eine Erwähnung eines Prinzipals ohne Leserecht wird gespeichert, löst aber nichts aus (03, `mentions`).
+- Idempotency through the pair of author and `client_msg_id` (04, 5.1).
+- Deletion empties the content and redacts the payload of the events in the same transaction (03, 6.5).
+- A mention of a principal without read permission is stored but triggers nothing (03, `mentions`).
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [06-api.md](../../../../docs/spec/06-api.md), [14-suche.md](../../../../docs/spec/14-suche.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [06-api.md](../../../../docs/spec/06-api.md), [14-search.md](../../../../docs/spec/14-search.md)

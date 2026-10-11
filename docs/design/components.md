@@ -1,383 +1,388 @@
-# Komponenten
+# Components
 
-Status: Entwurf M0. Spezifikation der Kern-Komponenten für `packages/design_system`. Maße und
-Farben nur als Token-Namen; Zahlen in [tokens.md](tokens.md) und [palette.md](palette.md). Jede
-Text- oder Icon-Farbe auf einer Fläche steht als Paarung in `design/design-rules.json` und ist in
-[contrast.md](contrast.md) für hell und dunkel geprüft. Bilder:
-[Komponenten dunkel](previews/components-dark.png), [hell](previews/components-light.png);
-Terminal [dunkel](previews/terminal-dark.png), [hell](previews/terminal-light.png); Statistik
-[dunkel](previews/viz-dark.png), [hell](previews/viz-light.png).
-Datenfelder nach [03-datenmodell.md](../spec/03-datenmodell.md), Ereignisse nach
-[04-sync-protokoll.md](../spec/04-sync-protokoll.md).
+Status: draft M0. Specification of the core components for `packages/design_system`. Sizes and
+colors only as token names; numbers in [tokens.md](tokens.md) and [palette.md](palette.md). Every
+text or icon color on a surface is listed as a pairing in `design/design-rules.json` and checked in
+[contrast.md](contrast.md) for light and dark. Images:
+[Components dark](previews/components-dark.png), [light](previews/components-light.png);
+Terminal [dark](previews/terminal-dark.png), [light](previews/terminal-light.png); Statistics
+[dark](previews/viz-dark.png), [light](previews/viz-light.png).
+Data fields according to [03-data-model.md](../spec/03-data-model.md), events according to
+[04-sync-protocol.md](../spec/04-sync-protocol.md).
 
-Gemeinsame Regeln für alle Komponenten:
+Common rules for all components:
 
-- **Zustände:** Ruhe, Hover (nur Zeiger), gedrückt, Fokus (Ring `color.focus.ring`,
-  `border-width.focus`, Abstand außen), deaktiviert, lädt, Fehler. Fokus ist immer sichtbar.
-- **Trefferfläche** mindestens `density.target-min`, auch wenn die sichtbare Fläche kleiner ist.
-- **Semantik:** Jede Komponente setzt Rolle und Label für Screenreader (Flutter `Semantics`,
-  im Web als ARIA). Labels kommen aus `packages/l10n`, nie aus Daten des Agenten allein.
-- **Farbe nie allein:** Zustände unterscheiden sich in Icon-Form und Text.
-- **Bewegung** nur über `motion.*`; im Kontext `reduced` keine Bewegung.
+- **States:** rest, hover (pointer only), pressed, focus (ring `color.focus.ring`,
+  `border-width.focus`, offset outside), disabled, loading, error. Focus is always visible.
+- **Hit area** at least `density.target-min`, even when the visible area is smaller.
+- **Semantics:** Every component sets role and label for screen readers (Flutter `Semantics`,
+  on the web as ARIA). Labels come from `packages/l10n`, never from the agent's data alone.
+- **Never color alone:** States differ in icon shape and text.
+- **Motion** only through `motion.*`; no motion in the `reduced` context.
 
-## 1. Nachricht
+## 1. Message
 
-Zweck: ein Beitrag in einem Thread (`messages`), von Mensch, Agent, App, Import oder System.
+Purpose: a post in a thread (`messages`), from a person, agent, app, import or system.
 
-Anatomie: Avatar (Mensch rund, Agent abgerundetes Quadrat `radius.md`, App mit kleinem Abzeichen),
-Kopfzeile (Name, bei Agenten Abzeichen "AGENT", Zeitstempel, bei auslösenden Nachrichten der
-Auslöser-Status), Inhalt (Markdown), Anhänge, Komponenten (bei `kind = card`), Reaktionen,
-Antwort-Bezug (Zitatzeile über dem Inhalt), Hover-Leiste (Antworten, Reaktion, Bearbeiten,
-Anheften, Mehr).
+Anatomy: avatar (person round, agent rounded square `radius.md`, app with a small badge),
+header (name, for agents the badge "AGENT", timestamp, for triggering messages the
+trigger state), content (Markdown), attachments, components (for `kind = card`), reactions,
+reply reference (quote line above the content), hover bar (Reply, React, Edit,
+Pin, More).
 
-| Variante | Daten | Darstellung |
+| Variant | Data | Rendering |
 |---|---|---|
-| Text | `kind = text` | Markdown in `type.body` bzw. `density.message-font-size` |
-| Folge-Nachricht | gleicher Autor innerhalb von `ui.message_group_window` | ohne Avatar und Kopf; Zeitstempel beim Hover |
-| Sprachnachricht | `kind = voice` | Abspielknopf, Dauer, Fortschritt; Transkript darunter, sobald `transcript_status = done` |
-| Live-Box-Anker | `kind = run` | rendert die Live-Box (Abschnitt 2) an dieser Stelle |
-| Karte | `kind = card` | Inhalt plus Komponenten (Abschnitt 8) in `color.surface.raised` |
-| System | `kind = system` | eine Zeile in `type.caption`, `color.text.secondary`, Icon links |
-| Erwähnt mich | ich in `mentions` | Hinterlegung `color.attention.subtle`, Rückgrat `color.attention.border` mit `border-width.spine` |
-| wird gesendet | Eintrag im Ausgangsfach | Deckkraft reduziert, Zeile "wird gesendet" mit `trigger.queued`-Icon |
-| fehlgeschlagen | Ausgangsfach, dauerhafter Fehler | Zeile in `color.danger.fg` mit Grund, Knöpfe "Erneut senden", "Bearbeiten", "Verwerfen" |
-| bearbeitet | `edited_at` gesetzt | Zusatz "(bearbeitet)" in `color.text.muted`; Fassungen per `message.revisions.read` |
-| gelöscht | `deleted_at` gesetzt | Zeile "Nachricht gelöscht" in `color.text.muted`; keine Hover-Leiste |
+| Text | `kind = text` | Markdown in `type.body` or `density.message-font-size` |
+| Continuation message | same author within `ui.message_group_window` | without avatar and header; timestamp on hover |
+| Voice message | `kind = voice` | play button, duration, progress; transcript below as soon as `transcript_status = done` |
+| Live box anchor | `kind = run` | renders the live box (section 2) at this position |
+| Card | `kind = card` | content plus components (section 8) in `color.surface.raised` |
+| System | `kind = system` | one line in `type.caption`, `color.text.secondary`, icon on the left |
+| Mentions me | me in `mentions` | tinted background `color.attention.subtle`, spine `color.attention.border` with `border-width.spine` |
+| sending | entry in the outbox | reduced opacity, line "Sending" with the `trigger.queued` icon |
+| failed | outbox, permanent error | line in `color.danger.fg` with the reason, buttons "Resend", "Edit", "Discard" |
+| edited | `edited_at` set | suffix "(edited)" in `color.text.muted`; versions via `message.revisions.read` |
+| deleted | `deleted_at` set | line "Message deleted" in `color.text.muted`; no hover bar |
 
-Lange Antworten: Inhalt über `ui.message_collapse_lines` Zeilen wird eingeklappt; ein Textknopf
-"Mehr anzeigen" (`color.text.link`) klappt auf. Code-Blöcke in `type.code` auf `color.code.bg`,
-horizontal scrollbar, mit Kopierknopf.
+Long replies: content over `ui.message_collapse_lines` lines is collapsed; a text button
+"Show more" (`color.text.link`) expands it. Code blocks in `type.code` on `color.code.bg`,
+horizontally scrollable, with a copy button.
 
-Maße: Avatar `size.avatar-md`; Abstand Avatar zu Inhalt `space.12`; Gruppenabstand
-`density.message-gap`; Zeilen-Innenabstand `density.message-pad-y`; Lesebreite höchstens
+Sizes: avatar `size.avatar-md`; gap from avatar to content `space.12`; group gap
+`density.message-gap`; row padding `density.message-pad-y`; reading width at most
 `layout.message-max-width`.
 
-Barrierefreiheit: Eine Nachricht ist ein Semantik-Knoten mit Label "<Name>, <Zeit>, <Text>"; der
-Auslöser-Status ist ein eigener Knoten mit Label (Abschnitt 5). Die Hover-Leiste ist per Tastatur
-über die Nachricht erreichbar (Fokus auf Nachricht, dann Tab). Erwähnung wird im Label mit
-"Erwähnt dich" eingeleitet.
+Accessibility: A message is a semantics node with the label "<Name>, <Time>, <Text>"; the
+trigger state is a separate node with a label (section 5). The hover bar is reachable by keyboard
+through the message (focus on the message, then Tab). A mention is introduced in the label with
+"Mentions you".
 
-## 2. Live-Box
+## 2. Live box
 
-Zweck: Darstellung eines Laufs (`runs`) mit Zustand, Kennzahlen, Statuszeile, Schritten und
-letztem Text. Sie ist angeheftet oben im Thread, solange der Lauf aktiv ist, und klappt am Ende zu
-einer Zeile zusammen.
+Purpose: display of a run (`runs`) with state, metrics, status line, steps and
+last text. It is pinned at the top of the thread while the run is active, and at the end it
+collapses into one line.
 
-Daten: Lauf-Dokument `run_document.v1` (04, Abschnitt 11): `state`, `version`, `status_line`,
-`last_text_excerpt`, `metrics` (`context_pct`, Tokens, Unteragenten, Hintergrundjobs,
-API-Wiederholungen), `cost`, `billing_mode_used`, `steps`, `followups`. Zustandswechsel kommen als
-dauerhaftes `run.state_changed`, Inhalte als kurzlebiges `run.updated` (nur bei Fokus).
+Data: run document `run_document.v1` (04, section 11): `state`, `version`, `status_line`,
+`last_text_excerpt`, `metrics` (`context_pct`, tokens, subagents, background jobs,
+API retries), `cost`, `billing_mode_used`, `steps`, `followups`. State changes arrive as the
+durable `run.state_changed`, content as the ephemeral `run.updated` (only with focus).
 
-### 2.1 Laufend (`queued`, `running`, `waiting_input`)
+### 2.1 In progress (`queued`, `running`, `waiting_input`)
 
-Anatomie, von oben:
+Anatomy, from the top:
 
-1. **Kopfzeile:** Zustands-Icon und Zustandswort (`run.*`), Laufzeit, Kontext in Prozent,
-   Tokens, Kosten (alle in `type.code-sm`), Abzeichen Backend-Richtlinie (Abschnitt 10),
-   Aufklapp-Pfeil.
-2. **Statuszeile** (Abschnitt 4).
-3. **Schritte:** Werkzeug-Chips (Abschnitt 3) in Reihenfolge `ordinal`, Unterschritte eingerückt
-   (`parent_step_id`). Sichtbar sind die letzten `ui.livebox_visible_steps`; ältere hinter
-   "n frühere Schritte".
-4. **Letzter Text:** `last_text_excerpt` als Zitat mit Linie links in `color.border.default`.
-5. **Fuß:** Knopf "Stopp" (Variante danger-outline, Icon `action.stop`), Hinweis zu Nachträgen.
-   Bei `waiting_input` statt Hinweis das Formular oder die Knöpfe der Rückfrage (Abschnitt 8).
-6. **Stillstand:** Nach `run.stall_after` ohne Fortschritt erscheint ein Banner in
-   `color.warning.*` ("Seit n Minuten kein Fortschritt").
+1. **Header:** state icon and state word (`run.*`), run time, context in percent,
+   tokens, cost (all in `type.code-sm`), backend policy badge (section 10),
+   expand arrow.
+2. **Status line** (section 4).
+3. **Steps:** tool chips (section 3) in `ordinal` order, substeps indented
+   (`parent_step_id`). The last `ui.livebox_visible_steps` are visible; older ones are behind
+   "n earlier steps".
+4. **Last text:** `last_text_excerpt` as a quote with a line on the left in `color.border.default`.
+5. **Footer:** button "Stop" (variant danger-outline, icon `action.stop`), note about follow-ups.
+   For `waiting_input`, the form or the buttons of the question (section 8) instead of the note.
+6. **Stall:** After `run.stall_after` without progress, a banner appears in
+   `color.warning.*` ("No progress for n minutes").
 
-Fläche `color.surface.raised`, Rand `color.border.default`, Radius `radius.md`, Innenabstand
-`density.livebox-pad`. Rückgrat links in `border-width.spine` mit der Farbe des Zustands:
+Surface `color.surface.raised`, border `color.border.default`, radius `radius.md`, padding
+`density.livebox-pad`. Spine on the left in `border-width.spine` with the color of the state:
 
-| Zustand | Rückgrat und Icon | Icon | Wort |
+| State | Spine and icon | Icon | Word |
 |---|---|---|---|
-| `queued` | `color.run.queued` | `run.queued` | "In Warteschlange" |
-| `running` | `color.run.running` | `run.running` (dreht) | "Läuft" |
-| `waiting_input` | `color.run.waiting` | `run.waiting` | "Wartet auf dich" bzw. "Wartet auf Alex" |
-| `completed` | `color.run.completed` | `run.completed` | "Erledigt" |
-| `failed` | `color.run.failed` | `run.failed` | "Fehlgeschlagen" plus Grund |
-| `cancelled` | `color.run.cancelled` | `run.cancelled` | "Abgebrochen" |
+| `queued` | `color.run.queued` | `run.queued` | "Queued" |
+| `running` | `color.run.running` | `run.running` (spins) | "Running" |
+| `waiting_input` | `color.run.waiting` | `run.waiting` | "Waiting for you" or "Waiting for Alex" |
+| `completed` | `color.run.completed` | `run.completed` | "Done" |
+| `failed` | `color.run.failed` | `run.failed` | "Failed" plus reason |
+| `cancelled` | `color.run.cancelled` | `run.cancelled` | "Canceled" |
 
-Gründe (`state_reason`) werden übersetzt, nie roh gezeigt: `billing_mode_mismatch` ->
-"Backend passt nicht", `access_revoked` -> "Zugriff entzogen", `stale` -> "Abgebrochen nach
-Stillstand", `user_cancelled` -> "Von <Name> abgebrochen", `adapter_error` -> "Fehler im Adapter",
-`cancel_timeout` -> "Adapter hat den Abbruch nicht bestätigt", `project_not_ready` -> "Projekt
-nicht bereit". Unbekannte Gründe: "Fehlgeschlagen" plus Code in `type.code-sm`.
+Reasons (`state_reason`) are translated, never shown raw: `billing_mode_mismatch` ->
+"Backend does not match", `access_revoked` -> "Access revoked", `stale` -> "Canceled after
+stall", `user_cancelled` -> "Canceled by <Name>", `adapter_error` -> "Error in the adapter",
+`cancel_timeout` -> "Adapter did not confirm the cancellation", `project_not_ready` -> "Project
+not ready". Unknown reasons: "Failed" plus the code in `type.code-sm`.
 
-### 2.2 Eingeklappt (Endzustände)
+### 2.2 Collapsed (final states)
 
-Eine Zeile auf `color.surface.sunken`, Radius `radius.md`: Icon, "Lief <Dauer>", Zahl der
-Werkzeuge, Unteragenten, Kosten mit "Schätzung", solange `cost_is_estimate`. Die Zusammenfassung
-kommt aus `run.state_changed`; Aufklappen lädt das Dokument per REST (`run.read`). Studie B
-schlug das Format "Lief 28 min · 3 Agenten · 1,20 USD" vor; es ist übernommen.
+One line on `color.surface.sunken`, radius `radius.md`: icon, "Ran <Duration>", number of
+tools, subagents, cost with "Estimate" as long as `cost_is_estimate`. The summary
+comes from `run.state_changed`; expanding loads the document via REST (`run.read`). Study B
+proposed the format "Ran 28 min · 3 agents · USD 1.20"; it is adopted.
 
-### 2.3 Mobil
+### 2.3 Mobile
 
-Kompakte Zeile unter der Navigationsleiste (Höhe `density.control-height` plus Innenabstand):
-Zustands-Icon, Zustand und Laufzeit, Statuszeile einzeilig gekürzt, Stopp-Knopf rechts mit
-Trefferfläche `density.target-min`. Antippen öffnet die volle Live-Box als Blatt.
+Compact line below the navigation bar (height `density.control-height` plus padding):
+state icon, state and run time, status line truncated to one line, stop button on the right with
+hit area `density.target-min`. Tapping opens the full live box as a sheet.
 
-### 2.4 Barrierefreiheit
+### 2.4 Accessibility
 
-- Die Live-Box ist ein Semantik-Container mit Label "Lauf von <Agent>: <Zustand>, seit <Dauer>,
-  Kontext <n> Prozent".
-- Live-Region: Nur Zustandswechsel und neue Rückfragen werden angesagt (höflich), höchstens einmal
-  je `a11y.live_announce_min_interval`. Patches an Schritten und Zahlen werden nie angesagt; sie
-  würden Screenreader überfluten.
-- Der Stopp-Knopf hat das Label "Lauf von <Agent> stoppen" und ist per Kürzel erreichbar
-  (01-produkt.md, Tastenkürzel).
+- The live box is a semantics container with the label "Run of <Agent>: <State>, for <Duration>,
+  context <n> percent".
+- Live region: only state changes and new questions are announced (polite), at most once
+  per `a11y.live_announce_min_interval`. Patches to steps and numbers are never announced; they
+  would flood screen readers.
+- The stop button has the label "Stop run of <Agent>" and is reachable by a shortcut
+  (01-product.md, Keyboard shortcuts).
 
-## 3. Werkzeug-Chip
+## 3. Tool chip
 
-Zweck: ein Schritt der Live-Box (`run_steps`).
+Purpose: one step of the live box (`run_steps`).
 
-Anatomie: Icon nach `kind` (`step.*`), Name (`name`, z. B. Werkzeugname) in `type.code-sm`,
-Kurzbeschreibung (`title`) in `color.text.secondary`, Dauer bzw. "läuft n s". Fläche
-`color.surface.sunken`, Radius `radius.sm`, Höhe `density.row-channel` minus Innenabstand.
+Anatomy: icon by `kind` (`step.*`), name (`name`, for example the tool name) in `type.code-sm`,
+short description (`title`) in `color.text.secondary`, duration or "running n s". Surface
+`color.surface.sunken`, radius `radius.sm`, height `density.row-channel` minus padding.
 
-| `status` | Icon-Farbe | Zusatz |
+| `status` | Icon color | Suffix |
 |---|---|---|
-| `pending` | `color.run.queued` | "wartet" |
-| `running` | `color.run.running`, Icon dreht | Laufzeit |
-| `completed` | `color.run.completed` | Dauer |
-| `failed` | `color.run.failed` | "fehlgeschlagen", Detail beim Aufklappen |
-| `cancelled` | `color.run.cancelled` | "abgebrochen" |
+| `pending` | `color.run.queued` | "waiting" |
+| `running` | `color.run.running`, icon spins | run time |
+| `completed` | `color.run.completed` | duration |
+| `failed` | `color.run.failed` | "failed", detail on expand |
+| `cancelled` | `color.run.cancelled` | "canceled" |
 
-Klick oder Enter öffnet `detail` (`run_step_detail.v1`) in einem Ausklapper; Inhalte sind gekürzt
-auf `run.step_detail_max_bytes`. Label: "<Art> <Name>, <Status>, <Dauer>".
+Click or Enter opens `detail` (`run_step_detail.v1`) in a disclosure; contents are truncated
+to `run.step_detail_max_bytes`. Label: "<Kind> <Name>, <Status>, <Duration>".
 
-## 4. Statuszeile
+## 4. Status line
 
-Ein Satz, was der Agent gerade tut (`runs.status_line`), in `type.body-sm`, `color.text.primary`,
-eine Zeile, am Ende gekürzt mit Tooltip. Inline-Code erlaubt. Leer: Zeile entfällt. Nicht Teil der
-Live-Region (siehe 2.4).
+One sentence on what the agent is doing right now (`runs.status_line`), in `type.body-sm`,
+`color.text.primary`, one line, truncated at the end with a tooltip. Inline code allowed. Empty:
+the line is omitted. Not part of the live region (see 2.4).
 
-## 5. Auslöser-Status
+## 5. Trigger state
 
-Zweck: Zustand an der auslösenden Nachricht eines Menschen (`messages.trigger_state`); ersetzt
-die Status-Emoji aus Discord.
+Purpose: state on the triggering message of a person (`messages.trigger_state`); replaces
+the status emoji from Discord.
 
-Platz: in der Kopfzeile der Nachricht nach dem Zeitstempel, Größe `icon.size.sm`. Antippen oder
-Hover zeigt die Beschriftung und springt zur Live-Box.
+Placement: in the header of the message after the timestamp, size `icon.size.sm`. Tapping or
+hovering shows the caption and jumps to the live box.
 
-| `trigger_state` | Icon | Farbe | Label (DE) | Label (EN) |
+<!-- language-check: off -->
+
+| `trigger_state` | Icon | Color | Label (DE) | Label (EN) |
 |---|---|---|---|---|
 | `received` | `trigger.received` | `color.trigger.received` | Empfangen | Received |
 | `queued` | `trigger.queued` | `color.trigger.queued` | In Warteschlange | Queued |
-| `working` | `trigger.working` (dreht) | `color.trigger.working` | Wird bearbeitet | Working |
+| `working` | `trigger.working` (spins) | `color.trigger.working` | Wird bearbeitet | Working |
 | `done` | `trigger.done` | `color.trigger.done` | Erledigt | Done |
 | `failed` | `trigger.failed` | `color.trigger.failed` | Fehlgeschlagen | Failed |
 | `followup_delivered` | `trigger.followup` | `color.trigger.followup` | Nachtrag zugestellt | Follow-up delivered |
 
-Bei `failed` steht der Grund im Tooltip und im Semantik-Label ("Fehlgeschlagen: Projekt nicht
-bereit"). Nachrichten ohne Auslösung (`trigger_state` leer) zeigen nichts.
+<!-- language-check: on -->
 
-## 6. Thread-Liste mit Status (Forum)
+For `failed`, the reason is in the tooltip and in the semantics label ("Failed: Project not
+ready"). Messages without a trigger (`trigger_state` empty) show nothing.
 
-Zweck: dichte Liste der Beiträge eines Forums, sortiert nach letzter Aktivität
-(`threads.last_activity_at`) oder Anlage (`forum_default_sort`).
+## 6. Thread list with status (forum)
 
-Zeile (Höhe `density.row-post`, zwei Zeilen):
+Purpose: dense list of the posts of a forum, sorted by last activity
+(`threads.last_activity_at`) or by creation (`forum_default_sort`).
 
-- links Zustands-Icon: aktiver Lauf (`run.*` aus "Läuft gerade"), sonst Erwähnung
-  (`color.attention.fg`), sonst nichts;
-- Titel in `type.body-sm`, fett bei Ungelesenem; Zeit rechts in `type.caption`;
-- zweite Zeile: Abzeichen "Wartet auf dich" (`color.attention.bg`), Bediener-Agent,
-  Erwähnungszähler, Tags (`category.<name>.chip-*`), bei Fehler der Grund in `color.danger.fg`.
+Row (height `density.row-post`, two lines):
 
-Zustände der Zeile: Ruhe, Hover (`color.surface.hover`), gewählt (`color.surface.selected`),
-Fokus. Kopf: Forum-Name, Knopf "Neuer Beitrag" (primär), Filter-Chips (Offen, Wartet auf mich,
-Tags, Sortierung). Unten der Erledigt-Bereich: Zeile "Erledigt (n)", standardmäßig eingeklappt;
-aufgeklappt folgen erledigte Beiträge mit `color.text.muted`.
+- on the left a state icon: active run (`run.*` from "Running now"), otherwise mention
+  (`color.attention.fg`), otherwise nothing;
+- title in `type.body-sm`, bold when unread; time on the right in `type.caption`;
+- second line: badge "Waiting for you" (`color.attention.bg`), operator agent,
+  mention counter, tags (`category.<name>.chip-*`), on error the reason in `color.danger.fg`.
 
-Barrierefreiheit: Liste mit Rolle "Liste", Zeilen mit Label "<Titel>, <Zustand>, <Zeit>,
-<n> ungelesen". Pfeiltasten bewegen, Enter öffnet.
+States of the row: rest, hover (`color.surface.hover`), selected (`color.surface.selected`),
+focus. Header: forum name, button "New post" (primary), filter chips (Open, Waiting for me,
+Tags, Sort). At the bottom the done area: row "Done (n)", collapsed by default;
+when expanded, done posts follow in `color.text.muted`.
 
-## 7. Bereichs- und Kanalbaum
+Accessibility: list with the role "list", rows with the label "<Title>, <State>, <Time>,
+<n> unread". Arrow keys move, Enter opens.
 
-Zweck: Seitenleiste mit Bereichen (`spaces`) und Kanälen (`channels`), persönlich einklappbar und
-sortierbar (`user_space_states`).
+## 7. Space and channel tree
 
-Bereichs-Zeile: Pfeil (`action.expand` bzw. `action.collapse`), Icon des Bereichs aus
-`space-icons` in der Kategorie-Farbe (`category.<name>.on-sidebar`, auf einer leicht getönten
-Kachel derselben Farbe), Name in `type.section`, `color.text.on-sidebar`. Eingeklappt mit Ungelesenem: Punkt
-rechts.
+Purpose: sidebar with spaces (`spaces`) and channels (`channels`), collapsible and sortable per
+person (`user_space_states`).
 
-Kanal-Zeile (Höhe `density.row-channel`): Icon nach Art (`channel.text`, `channel.forum`), Name in
+Space row: arrow (`action.expand` or `action.collapse`), icon of the space from
+`space-icons` in the category color (`category.<name>.on-sidebar`, on a lightly tinted
+tile of the same color), name in `type.section`, `color.text.on-sidebar`. Collapsed with unread
+items: dot on the right.
+
+Channel row (height `density.row-channel`): icon by kind (`channel.text`, `channel.forum`), name in
 `type.body-sm`.
 
-| Zustand | Darstellung |
+| State | Rendering |
 |---|---|
-| gelesen | `color.text.on-sidebar-secondary` |
-| ungelesen | `color.text.on-sidebar`, fett, Balken links |
-| Erwähnungen | Zähler (`color.attention.bg`, `radius.pill`) |
-| aktiver Lauf | Lauf-Punkt `category.spruce.on-sidebar` mit Puls `motion.duration.pulse` |
-| stumm | `color.text.on-sidebar-muted`, Icon `action.mute` |
-| gewählt | `color.surface.sidebar-selected` |
-| Hover | `color.surface.sidebar-hover` |
-| Fokus | Ring `color.focus.ring-on-sidebar` |
+| read | `color.text.on-sidebar-secondary` |
+| unread | `color.text.on-sidebar`, bold, bar on the left |
+| mentions | counter (`color.attention.bg`, `radius.pill`) |
+| active run | run dot `category.spruce.on-sidebar` with pulse `motion.duration.pulse` |
+| muted | `color.text.on-sidebar-muted`, icon `action.mute` |
+| selected | `color.surface.sidebar-selected` |
+| hover | `color.surface.sidebar-hover` |
+| focus | ring `color.focus.ring-on-sidebar` |
 
-Oben: Zeichen und Produktname (`branding.product_name`), Schnellwechsel-Feld ("Springen zu" mit
-Kürzel), Eintrag "Läuft gerade" mit Zähler. Unten: eigener Avatar, Einstellungen.
+Top: mark and product name (`branding.product_name`), quick switcher field ("Jump to" with a
+shortcut), entry "Running now" with a counter. Bottom: own avatar, settings.
 
-Verhalten: Einklappen per Klick, Enter oder Pfeil links/rechts; Zustand wird per `sidebar.update`
-synchronisiert. Ziehen ändert die persönliche Reihenfolge (`user_space_states.sort_key`); die
-globale Reihenfolge ändert nur `space.reorder` in der Verwaltung.
+Behavior: collapse by click, Enter or arrow left/right; the state is synchronized via
+`sidebar.update`. Dragging changes the personal order (`user_space_states.sort_key`); the
+global order is changed only by `space.reorder` in the administration.
 
-Barrierefreiheit: Baum mit Rolle "Baum"; Bereiche sind ausklappbare Knoten mit Zustand
-"eingeklappt" bzw. "ausgeklappt"; Kanal-Label "<Name>, <n> ungelesen, <m> Erwähnungen, Lauf
-aktiv".
+Accessibility: tree with the role "tree"; spaces are expandable nodes with the state
+"collapsed" or "expanded"; channel label "<Name>, <n> unread, <m> mentions, run
+active".
 
-## 8. Komponenten an Nachrichten (Knöpfe, Auswahl, Formular)
+## 8. Components on messages (buttons, select, form)
 
-Zweck: interaktive Elemente eines Agenten oder einer App (`message_components`), z. B.
-Befehlsfreigabe ("Einmal erlauben", "Für diese Sitzung", "Immer", "Ablehnen"), Modellwahl,
-Rückfragen.
+Purpose: interactive elements of an agent or an app (`message_components`), for example
+command approval ("Allow once", "For this session", "Always", "Deny"), model choice,
+questions.
 
-| Typ | Darstellung |
+| Type | Rendering |
 |---|---|
-| `button` | Knopf; Stil aus `definition.style`: primär (`color.accent.bg`), Erfolg (`color.success.bg`), Gefahr (`color.danger.bg`), sekundär (Rand `color.border.control`), ruhig |
-| `select` | Auswahlfeld mit Menü (`elevation.menu`), Einfach- oder Mehrfachauswahl |
-| `form` | Felder mit Beschriftung über dem Feld, Absenden-Knopf; Prüfung nach Schema der Komponente |
+| `button` | button; style from `definition.style`: primary (`color.accent.bg`), success (`color.success.bg`), danger (`color.danger.bg`), secondary (border `color.border.control`), quiet |
+| `select` | select field with a menu (`elevation.menu`), single or multiple selection |
+| `form` | fields with the label above the field, submit button; validation against the schema of the component |
 
-Zustände (`message_components.state`):
+States (`message_components.state`):
 
-| Zustand | Darstellung |
+| State | Rendering |
 |---|---|
-| `active`, berechtigt | bedienbar |
-| `active`, nicht berechtigt | sichtbar, deaktiviert, Hinweis mit `security.lock`: "Nur <Auslöser> oder ein Owner kann das freigeben" bzw. "Dafür fehlt dir das Recht 'Aktionen freigeben'" |
-| gesendet, Antwort offen | gedrückter Knopf zeigt Lade-Icon; andere Knöpfe gesperrt |
-| `used` | alle Knöpfe weg; Zeile "<Name> hat '<Wahl>' gewählt, <Zeit>" mit `trigger.done` |
-| `expired` | Zeile "Abgelaufen" in `color.text.muted` |
-| `disabled` | Zeile "Nicht mehr verfügbar" |
-| Fehler | Banner in `color.danger.*` mit Grund; Knöpfe wieder bedienbar, wenn die Komponente noch `active` ist |
+| `active`, permitted | operable |
+| `active`, not permitted | visible, disabled, note with `security.lock`: "Only <Triggering person> or an owner can approve this" or "You do not have the permission 'Approve actions' for this" |
+| sent, answer pending | the pressed button shows a loading icon; other buttons locked |
+| `used` | all buttons gone; line "<Name> chose '<Choice>', <Time>" with `trigger.done` |
+| `expired` | line "Expired" in `color.text.muted` |
+| `disabled` | line "No longer available" |
+| error | banner in `color.danger.*` with the reason; buttons operable again if the component is still `active` |
 
-Regeln: Eine Bedienung ist eine Interaktion mit `client_interaction_id` aus dem Ausgangsfach; ein
-Doppelklick erzeugt keine zweite. Zerstörende Wahl ("Immer") verlangt keine zweite Bestätigung,
-weil sie den Rechten folgt; die Karte zeigt aber, was "Immer" bedeutet. Knöpfe in einer Reihe,
-auf Mobilgeräten untereinander in voller Breite (Bild "Mobil").
+Rules: One use is one interaction with a `client_interaction_id` from the outbox; a
+double click creates no second one. A destructive choice ("Always") requires no second
+confirmation, because it follows the permissions; the card does show, however, what "Always"
+means. Buttons in a row, on mobile devices stacked at full width (image "Mobile").
 
-Barrierefreiheit: Gruppe mit Label aus dem Kartentitel; Knöpfe in Lesereihenfolge; kein Kürzel
-löst eine Freigabe global aus (Fehlbedienung); Enter oder Leertaste nur auf dem fokussierten
-Knopf.
+Accessibility: group with a label from the card title; buttons in reading order; no shortcut
+triggers an approval globally (accidental operation); Enter or Space only on the focused
+button.
 
-## 9. Eingabe mit Slash-Vorschlägen
+## 9. Input with slash suggestions
 
-Zweck: Nachricht verfassen, Befehle (`commands`) mit Optionen und Autovervollständigung,
-Erwähnungen, Anhänge, Sprachaufnahme.
+Purpose: compose a message, commands (`commands`) with options and autocompletion,
+mentions, attachments, voice recording.
 
-Anatomie: Feld (Fläche `color.surface.input`, Rand `color.border.control`, Radius `radius.lg`,
-Mindesthöhe `density.composer-min-height`, wächst bis `ui.composer_max_lines`), links Anhang,
-rechts Mikrofon und Senden. Darüber die Zeile "Tippen" ("Sam schreibt gerade"), bei aktivem Lauf
-Platzhalter "Nachtrag an <Agent>".
+Anatomy: field (surface `color.surface.input`, border `color.border.control`, radius `radius.lg`,
+minimum height `density.composer-min-height`, grows up to `ui.composer_max_lines`), attachment on
+the left, microphone and send on the right. Above it the "typing" line ("Sam is typing"), during an
+active run the placeholder "Follow-up to <Agent>".
 
-Vorschlagsliste (Overlay `color.surface.overlay`, `elevation.menu`): öffnet bei "/" am
-Zeilenanfang und bei "@". Zeilen (`density.row-suggestion`): Befehl in Mono, Beschreibung,
-Herkunft (Agent) und Hinweis "Steuerbefehl" bei `control = true`. Reihenfolge: Befehle des
-Bedieners dieses Kanals zuerst; gleiche Namen anderer Agenten werden mit dem Handle qualifiziert
-(03-datenmodell.md, `commands`). Nach Auswahl eines Befehls zeigt die Eingabe die Optionen als
-Platzhalter; Optionen mit `autocomplete` holen Vorschläge über `command.autocomplete`, gedrosselt
-mit `ui.autocomplete_debounce`. Erwähnungs-Vorschläge zeigen nur Personen und Agenten, die die
-Person sehen darf.
+Suggestion list (overlay `color.surface.overlay`, `elevation.menu`): opens on "/" at the start of
+a line and on "@". Rows (`density.row-suggestion`): command in mono, description,
+origin (agent) and the hint "Control command" for `control = true`. Order: commands of the
+operator of this channel first; equal names of other agents are qualified with the handle
+(03-data-model.md, `commands`). After a command is selected, the input shows the options as
+placeholders; options with `autocomplete` fetch suggestions through `command.autocomplete`,
+throttled by `ui.autocomplete_debounce`. Mention suggestions show only people and agents that
+the person may see.
 
-Zustände: leer, Text, Befehl gewählt, Optionen unvollständig (Senden deaktiviert mit Grund),
-offline (Senden landet im Ausgangsfach), keine Schreibrechte (Feld ersetzt durch Hinweis "Nur
-lesen in diesem Kanal").
+States: empty, text, command selected, options incomplete (send disabled with a reason),
+offline (sending goes to the outbox), no write permission (field replaced by the note "Read
+only in this channel").
 
-Tastatur: Pfeile wählen, Tab oder Enter übernimmt, Escape schließt; Enter sendet, Shift+Enter
-macht eine neue Zeile (umkehrbar über `composer.enter_sends`); Pfeil hoch im leeren Feld bearbeitet
-die eigene letzte Nachricht.
+Keyboard: arrows select, Tab or Enter accepts, Escape closes; Enter sends, Shift+Enter
+makes a new line (reversible through `composer.enter_sends`); arrow up in the empty field edits
+your own last message.
 
-Barrierefreiheit: Feld mit Label "Nachricht an <Kanal oder Thread>"; Vorschlagsliste als Listbox
-mit aktivem Eintrag; Anzahl der Vorschläge wird angesagt.
+Accessibility: field with the label "Message to <channel or thread>"; suggestion list as a listbox
+with an active entry; the number of suggestions is announced.
 
-## 10. Abzeichen Backend-Richtlinie
+## 10. Backend policy badge
 
-Zweck: zeigt in Thread-Kopf, Live-Box und Agenten-Karte, worauf der Agent läuft
-(`agents.billing_mode`, Baseline Abschnitt 5).
+Purpose: shows in the thread header, live box and agent card what the agent runs on
+(`agents.billing_mode`, baseline section 5).
 
-| Modus | Icon | Farbe | Text |
+| Mode | Icon | Color | Text |
 |---|---|---|---|
-| `personal` | `billing.personal` | `color.badge.personal-bg`, `-fg` | "Persönlich" |
-| `organization` | `billing.organization` | `color.badge.organization-bg`, `-fg` | "Organisation" |
+| `personal` | `billing.personal` | `color.badge.personal-bg`, `-fg` | "Personal" |
+| `organization` | `billing.organization` | `color.badge.organization-bg`, `-fg` | "Organization" |
 
-Höhe `size.badge-height`, Radius `radius.pill`, Text `type.label`. Weicht der gemeldete Ist-Modus
-(`reported_billing_mode`) vom Soll ab, zeigt die Agenten-Karte zusätzlich ein Warn-Abzeichen
-(`color.warning.*`, "Ist: Organisation"); Läufe scheitern dann mit `billing_mode_mismatch`. Kosten
-bei `organization` mit Zusatz "Schätzung", bis abgeglichen; bei `personal` mit Zusatz "nur
-Information". Label: "Backend: Persönlich, läuft auf dem Abo von <Name>".
+Height `size.badge-height`, radius `radius.pill`, text `type.label`. If the reported mode
+(`reported_billing_mode`) differs from the configured mode, the agent card also shows a warning
+badge (`color.warning.*`, "Reported: Organization"); runs then fail with `billing_mode_mismatch`.
+Costs for `organization` carry the suffix "Estimate" until reconciled; for `personal` the suffix "for
+information only". Label: "Backend: Personal, runs on the subscription of <Name>".
 
-## 11. Visualisierungen (`bothy_viz`)
+## 11. Visualizations (`bothy_viz`)
 
-Zweck: Grundformen für die Ansichten aus [25-visualisierung.md](../spec/25-visualisierung.md) in
-Apps und Konsole; dieselben Rollen nutzt das Grafana-Panel über die TypeScript-Ausgabe der Tokens.
+Purpose: basic forms for the views from [25-visualization.md](../spec/25-visualization.md) in
+apps and console; the Grafana panel uses the same roles through the TypeScript output of the tokens.
 
-| Grundform | Aussehen | Tokens |
+| Basic form | Appearance | Tokens |
 |---|---|---|
-| Bahn (Bereich) | Zeile mit Kopf links (Kategorie-Farbe und Icon des Bereichs), Linie `color.viz.grid` zwischen Bahnen | `color.border.*`, `space.*` |
-| Lauf-Karte | wie eine eingeklappte Live-Box: Rückgrat links in der Zustandsfarbe des Laufs, Agent, Werkzeug-Chip (Abschnitt 3), Abzeichen Backend-Richtlinie (Abschnitt 10), Kosten in Mono | Rollen der Live-Box, `type.code` |
-| Kennzahl-Kachel | Zahl groß in Mono, Etikett darüber, Vergleich zum Vorzeitraum als Text mit Icon (nie nur Farbe) | `type.display`, `type.label` |
-| Fläche und Balken | Serien in `color.viz.series.1` bis `.8` in fester Reihenfolge; Achsen `color.viz.axis`; Füllung `color.viz.area-fill`; Hilfslinien `color.viz.grid` | `color.viz.*` |
-| SLO-Ampel | Punkt mit Icon und Text "im Ziel", "Budget knapp", "Ziel verfehlt", "zu wenig Daten" und Etikett "eigene Messung" | `color.success.*`, `color.warning.*`, `color.danger.*`, neutrale Rolle für "zu wenig Daten" |
-| Zeitleiste | Abspielkopf als senkrechte Linie, Steuerung mit Icons aus `icon.tokens.json` | `motion.*` |
+| Lane (space) | row with a header on the left (category color and icon of the space), line `color.viz.grid` between lanes | `color.border.*`, `space.*` |
+| Run card | like a collapsed live box: spine on the left in the state color of the run, agent, tool chip (section 3), backend policy badge (section 10), cost in mono | roles of the live box, `type.code` |
+| Metric tile | large number in mono, label above it, comparison with the previous period as text with an icon (never only color) | `type.display`, `type.label` |
+| Area and bar | series in `color.viz.series.1` to `.8` in a fixed order; axes `color.viz.axis`; fill `color.viz.area-fill`; guide lines `color.viz.grid` | `color.viz.*` |
+| SLO traffic light | dot with icon and text "on target", "budget tight", "target missed", "not enough data" and the label "own measurement" | `color.success.*`, `color.warning.*`, `color.danger.*`, neutral role for "not enough data" |
+| Timeline | playhead as a vertical line, controls with icons from `icon.tokens.json` | `motion.*` |
 
-Regeln:
+Rules:
 
-- Kein Verlauf, kein Leuchten, keine 3D-Optik (Verbotsliste in [README.md](README.md)).
-- Jede Grundform hat Semantik und eine Tabellenansicht mit denselben Werten.
-- Die Rollen `color.viz.*` stehen in den Tokens; Serien und Achse sind gegen `surface.canvas`,
-  `surface.list` und `surface.raised` mit Kontrast `ui` in beiden Themes geprüft
-  ([contrast.md](contrast.md)). `grid` und `area-fill` tragen keine Information allein und haben
-  darum keine Kontrast-Pflicht. Die Reihenfolge der Serien beginnt mit Blau und Orange, die bei
-  Rot-Grün-Schwäche unterscheidbar bleiben; ein zweites Merkmal (Beschriftung oder Muster) ist
-  trotzdem Pflicht. Die Prüfung mit simulierter Farbschwäche baut M6-10.
-- TV-Modus: dunkles Theme, Dichte `comfortable`, Schriftgrößen eine Stufe größer; keine Bewegung im
-  Kontext `reduced`.
+- No gradient, no glow, no 3D look (ban list in [README.md](README.md)).
+- Every basic form has semantics and a table view with the same values.
+- The roles `color.viz.*` are in the tokens; series and axis are checked against `surface.canvas`,
+  `surface.list` and `surface.raised` with contrast `ui` in both themes
+  ([contrast.md](contrast.md)). `grid` and `area-fill` carry no information alone and therefore
+  have no contrast requirement. The order of the series starts with blue and orange, which stay
+  distinguishable with red-green color blindness; a second feature (label or pattern) is
+  still required. The check with simulated color blindness is built by M6-10.
+- TV mode: dark theme, density `comfortable`, font sizes one step larger; no motion in the
+  `reduced` context.
 
-## 12. Terminal-Ansicht
+## 12. Terminal view
 
-Zweck: zeigt eine Terminal-Sitzung auf einem angebundenen Rechner
-([24-terminal.md](../spec/24-terminal.md)); Screens D11 (Desktop und Konsole) und M8 (Telefon) in
-[01-produkt.md](../spec/01-produkt.md). Paket `packages/terminal_ui`, Renderer `xterm` (PLAN M4-35).
+Purpose: shows a terminal session on a connected host
+([24-terminal.md](../spec/24-terminal.md)); screens D11 (desktop and console) and M8 (phone) in
+[01-product.md](../spec/01-product.md). Package `packages/terminal_ui`, renderer `xterm` (PLAN M4-35).
 
-| Teil | Aussehen | Tokens |
+| Part | Appearance | Tokens |
 |---|---|---|
-| Kopf | Icon `terminal-window`, Rechnername (`type.heading`), Verbindung als Punkt mit Text, Abzeichen der LLM-Anmeldung (Abschnitt 10), Anfang des Fingerabdrucks in Mono, Restzeit als Text | `color.text.*`, `color.badge.*`, `font.family.mono` |
-| Reiter | ein Reiter je eigener Sitzung des Rechners; gewählt wie eine gewählte Zeile; rechts "Trennen" (sekundär) und "Beenden" (Gefahr, umrandet) | `color.surface.selected`, Knöpfe |
-| Bildschirm | Fläche `color.terminal.bg`, Text `color.terminal.fg` in `font.family.mono` mit Größe aus `type.code`, getrennt einstellbar (01, Abschnitt 8); Cursor als Block `color.terminal.cursor` mit Zeichen in `color.terminal.cursor-text`; Auswahl `color.terminal.selection-bg` | `color.terminal.*` |
-| ANSI-Farben | SGR 30 bis 37 und 90 bis 97 auf `color.terminal.ansi.<name>` und `color.terminal.ansi.bright-<name>`; 256 Farben und Truecolor zeigt der Renderer unverändert, weil das Programm sie wählt | `color.terminal.ansi.*` |
-| Fußzeile | "Ende-zu-Ende verschlüsselt" mit Schloss-Icon, Profil, "Leerlauf-Abbruch aktiv" | `type.caption`, `color.text.secondary` |
-| Sondertasten-Leiste (mobil) | Tasten Esc, Tab, Ctrl, Alt, Pfeile, senkrechter Strich, `~`, `/`, `-` mit Höhe `density.control-height`; ein eingerasteter Modifikator ist gefüllt in `color.accent.bg` mit `color.text.on-accent` | Knopf-Rollen, `density.*` |
-| Bestätigung beim Öffnen | Dialog mit Rechner, Profil und Abzeichen; Hauptknopf "Mit Passkey bestätigen" bzw. Geräteschlüssel; Hinweis "Jede Öffnung wird protokolliert" | `elevation.dialog`, `color.surface.overlay` |
-| Warnung Schlüsselwechsel | Dialog mit Rand `color.danger.border`, alter und neuer Fingerabdruck in Mono; der Gefahrknopf "Nicht verbinden" ist die Hauptaktion | `color.danger.*` |
-| Zustände | verbunden, getrennt (Banner `info` mit "Wieder anhängen"), beendet (Grund als Text, Bildschirm bleibt lesbar), gesperrt durch Entzug (Banner `danger`) | Banner-Rollen |
+| Header | icon `terminal-window`, host name (`type.heading`), connection as a dot with text, LLM login badge (section 10), start of the fingerprint in mono, remaining time as text | `color.text.*`, `color.badge.*`, `font.family.mono` |
+| Tabs | one tab per own session on the host; selected like a selected row; on the right "Detach" (secondary) and "End" (danger, outlined) | `color.surface.selected`, buttons |
+| Screen | surface `color.terminal.bg`, text `color.terminal.fg` in `font.family.mono` with the size from `type.code`, adjustable separately (01, section 8); cursor as a block `color.terminal.cursor` with the character in `color.terminal.cursor-text`; selection `color.terminal.selection-bg` | `color.terminal.*` |
+| ANSI colors | SGR 30 to 37 and 90 to 97 map to `color.terminal.ansi.<name>` and `color.terminal.ansi.bright-<name>`; the renderer shows 256 colors and truecolor unchanged, because the program chooses them | `color.terminal.ansi.*` |
+| Footer | "End-to-end encrypted" with a lock icon, profile, "Idle timeout active" | `type.caption`, `color.text.secondary` |
+| Extra keys bar (mobile) | keys Esc, Tab, Ctrl, Alt, arrows, vertical bar, `~`, `/`, `-` with height `density.control-height`; a latched modifier is filled in `color.accent.bg` with `color.text.on-accent` | button roles, `density.*` |
+| Confirmation on opening | dialog with host, profile and badge; main button "Confirm with passkey" or device key; note "Every opening is logged" | `elevation.dialog`, `color.surface.overlay` |
+| Key change warning | dialog with border `color.danger.border`, old and new fingerprint in mono; the danger button "Do not connect" is the main action | `color.danger.*` |
+| States | connected, detached (banner `info` with "Reattach"), ended (reason as text, screen stays readable), blocked by revocation (banner `danger`) | banner roles |
 
-Regeln:
+Rules:
 
-- Die Rollen `color.terminal.*` gelten nur im Bildschirm des Terminals. Kopf, Reiter, Dialoge und
-  Leisten folgen dem Theme der App.
-- Kontrast: Standard-Text und die zwölf Buntfarben sowie Hellschwarz (ANSI 8, oft für gedimmten
-  Text) erreichen `text` gegen `color.terminal.bg`; die Grautöne an den Enden (ANSI 0, 7, 15) und
-  der Cursor erreichen `ui`. Grund: Programme nutzen diese drei Grautöne als Hintergrund oder
-  Rahmen; voller Textkontrast ist in beiden Themes für alle drei zugleich nicht möglich. Alle
-  Paarungen stehen in `design/design-rules.json` und in [contrast.md](contrast.md).
-- Kein Leuchten, kein Scanline-Effekt, keine Nachahmung alter Bildschirme.
-- Bewegung: Der Cursor blinkt nur im Kontext `full` von `motion.*`; im Kontext `reduced` steht er.
-- Semantik: Zeile am Cursor und auf Befehl der sichtbare Bildschirm sind lesbar; laufende Ausgabe
-  wird nicht vorgelesen (01, Abschnitt 8). Sondertasten tragen Labels ("Steuerung, eingerastet").
-- Golden-Tests in hell und dunkel mit Warnung, getrennt und Sondertasten-Leiste (M4-35).
+- The roles `color.terminal.*` apply only in the screen of the terminal. Header, tabs, dialogs and
+  bars follow the theme of the app.
+- Contrast: default text and the twelve chromatic colors as well as bright black (ANSI 8, often for
+  dimmed text) reach `text` against `color.terminal.bg`; the grays at the ends (ANSI 0, 7, 15) and
+  the cursor reach `ui`. Reason: programs use these three grays as background or
+  border; full text contrast is not possible in both themes for all three at once. All
+  pairings are in `design/design-rules.json` and in [contrast.md](contrast.md).
+- No glow, no scanline effect, no imitation of old screens.
+- Motion: the cursor blinks only in the `full` context of `motion.*`; in the `reduced` context it
+  stays still.
+- Semantics: the line at the cursor and, on command, the visible screen are readable; running output
+  is not read aloud (01, section 8). Extra keys carry labels ("Control, latched").
+- Golden tests in light and dark with warning, detached and extra keys bar (M4-35).
 
-## 13. Review-Liste (nicht automatisch prüfbar)
+## 13. Review list (not automatically checkable)
 
-- Keine Glas-, Unschärfe- oder Leuchteffekte; keine Verläufe.
-- Keine schwebenden Karten mit großem Schatten; Schatten nur aus `elevation.*`.
-- Kein Willkommens-Banner, keine Terminal-Optik in Chat und Verwaltung (die Terminal-Ansicht in
-  Abschnitt 12 ist eine eigene Komponente), keine Deko-Illustrationen.
-- Kein Emoji in UI-Texten oder als Icon; Status nie als Reaktion.
-- Jede neue Farbe ist eine Rolle mit Paarung in `design/design-rules.json`.
-- Golden-Tests in hell und dunkel, in `comfortable` und `touch`, mit Textskalierung 1 und 2
-  (15-client-architektur.md, Teststrategie).
+- No glass, blur or glow effects; no gradients.
+- No floating cards with a large shadow; shadows only from `elevation.*`.
+- No welcome banner, no terminal look in chat and administration (the terminal view in
+  section 12 is a separate component), no decorative illustrations.
+- No emoji in UI texts or as an icon; status never as a reaction.
+- Every new color is a role with a pairing in `design/design-rules.json`.
+- Golden tests in light and dark, in `comfortable` and `touch`, with text scaling 1 and 2
+  (15-client-architecture.md, Test strategy).
 
-## 14. Konfigurationswerte
+## 14. Configuration values
 
-Die Werte `ui.*` und `a11y.*`, die diese Seite nennt, stehen mit Standard in
-[01-produkt.md](../spec/01-produkt.md), Abschnitt "Konfigurationswerte dieses Kapitels".
+The values `ui.*` and `a11y.*` that this page names are listed with their defaults in
+[01-product.md](../spec/01-product.md), section "Configuration values of this chapter".

@@ -6,7 +6,7 @@ labels:
   component: agents
 slos:
   # Run start: from `queued` to `running` within 7.5 s. Runs that fail without starting
-  # (adapter offline, actual mode does not match) count as errors; cancellations by people do not.
+  # (adapter offline, reported mode does not match) count as errors; cancellations by people do not.
   - name: "run-start"
     objective: 99.0
     description: "Share of runs that leave queued and start running within 7.5 s."

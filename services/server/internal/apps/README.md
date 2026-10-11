@@ -1,56 +1,56 @@
-# Modul `apps`
+# Module `apps`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-## Zweck
+## Purpose
 
-Apps und Manifeste, Installationen, Scopes, ausgehende Webhooks mit Verbraucher und Zustellung, Eingangs-Webhooks.
+Apps and manifests, installations, scopes, outgoing webhooks with consumer and delivery, incoming webhooks.
 
-## Port (Wurzelpaket `internal/apps`)
+## Port (root package `internal/apps`)
 
-- Eingehend: `Apps`, `Webhooks`, `IncomingWebhooks`.
-- Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: `chat.ChannelArchived`.
-- Implementiert Quellen-Ports und Querschnitts-Ports: keine.
+- Inbound: `Apps`, `Webhooks`, `IncomingWebhooks`.
+- Emits in-tx events: none.
+- Subscribes to in-tx events: `chat.ChannelArchived`.
+- Implements source ports and cross-cutting ports: none.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `instance`, `identity`, `chat`, `agents`, `messaging`, `sync`.
+May use the ports of these modules: `instance`, `identity`, `chat`, `agents`, `messaging`, `sync`.
 
-Grund: Webhook-Signierschlüssel; App-Prinzipal und Tokens; Ziel der Eingangs-Webhooks; Befehle von Apps; Nachrichten aus Webhooks; Verbraucher für ausgehende Webhooks.
+Reason: webhook signing key; app principal and tokens; target of the incoming webhooks; commands of apps; messages from webhooks; consumer for outgoing webhooks.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `apps`, `app_installations`, `webhook_subscriptions`, `webhook_deliveries`, `incoming_webhooks`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `app.read`, `app.install`, `app.scopes.update`, `app.suspend`, `app.resume`, `app.uninstall`, `webhook_out.read`, `webhook_out.manage`, `webhook_out.redeliver`, `webhook_out.deliver`, `webhook_in.read`, `webhook_in.create`, `webhook_in.revoke`, `webhook_in.post`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: keine.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: none.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hintergrundjobs
+## Background jobs
 
-| Job | Auslöser | Warteschlange |
+| Job | Trigger | Queue |
 |---|---|---|
-| `apps.webhook_deliver` | Verbraucher `webhooks`, `webhook_out.redeliver` | `delivery` |
+| `apps.webhook_deliver` | consumer `webhooks`, `webhook_out.redeliver` | `delivery` |
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Apps laufen nie im Server-Prozess; sie handeln nur mit Token, Scopes und Freigaben (B6).
-- Ausgehende Webhooks nur an `https`-Ziele aus `webhook.allowed_hosts` (R-DM-17); vor jeder Zustellung `webhook_out.deliver`.
-- Nachrichten aus Eingangs-Webhooks haben `origin = app` und lösen nie Agenten aus.
+- Apps never run in the server process; they act only with a token, scopes and grants (B6).
+- Outgoing webhooks only to `https` targets from `webhook.allowed_hosts` (R-DM-17); before every delivery, `webhook_out.deliver`.
+- Messages from incoming webhooks have `origin = app` and never trigger agents.
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [11-erweiterungen.md](../../../../docs/spec/11-erweiterungen.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [11-extensions.md](../../../../docs/spec/11-extensions.md)

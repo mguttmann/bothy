@@ -1,62 +1,62 @@
 {
-  "$description": "Semantische Farbrollen, Theme dark. Gleiche Schlüssel wie im anderen Theme; nur Verweise auf palette.*, außer den durchscheinenden Rollen scrim und shadow.",
+  "$description": "Semantic color roles, theme dark. Same keys as in the other theme; only references to palette.*, except for the translucent roles scrim and shadow.",
   "color": {
     "$type": "color",
     "surface": {
-      "$description": "Flächen in Ebenen. Die Seitenleiste ist in beiden Themes eine Markenfläche.",
-      "sidebar": {"$value": "{palette.spruce.950}", "$description": "Spalte Bereiche und Kanäle (Markenfläche)."},
-      "sidebar-hover": {"$value": "{palette.spruce.925}", "$description": "Zeile unter dem Zeiger in der Seitenleiste."},
-      "sidebar-selected": {"$value": "{palette.spruce.900}", "$description": "Gewählter Kanal in der Seitenleiste."},
-      "list": {"$value": "{palette.granite.900}", "$description": "Beitragsliste und rechte Sitzungs-Spalte."},
-      "canvas": {"$value": "{palette.granite.875}", "$description": "Verlauf, Hauptfläche."},
-      "raised": {"$value": "{palette.granite.850}", "$description": "Live-Box, Karten, Komponenten-Gruppen."},
-      "overlay": {"$value": "{palette.granite.800}", "$description": "Menüs, Dialoge, Schnellwechsel, Vorschlagsliste."},
-      "hover": {"$value": "{palette.granite.850}", "$description": "Zeile unter dem Zeiger auf Liste und Verlauf."},
-      "selected": {"$value": "{palette.spruce.925}", "$description": "Gewählte Zeile in Liste und Vorschlagsliste."},
-      "input": {"$value": "{palette.granite.850}", "$description": "Eingabefeld und Formularfelder."},
-      "sunken": {"$value": "{palette.granite.925}", "$description": "Code-Blöcke, Zitate, eingeklappte Live-Box."}
+      "$description": "Surfaces in layers. The sidebar is a brand surface in both themes.",
+      "sidebar": {"$value": "{palette.spruce.950}", "$description": "Column with spaces and channels (brand surface)."},
+      "sidebar-hover": {"$value": "{palette.spruce.925}", "$description": "Row under the pointer in the sidebar."},
+      "sidebar-selected": {"$value": "{palette.spruce.900}", "$description": "Selected channel in the sidebar."},
+      "list": {"$value": "{palette.granite.900}", "$description": "Post list and right session column."},
+      "canvas": {"$value": "{palette.granite.875}", "$description": "History, main surface."},
+      "raised": {"$value": "{palette.granite.850}", "$description": "Live box, cards, component groups."},
+      "overlay": {"$value": "{palette.granite.800}", "$description": "Menus, dialogs, quick switcher, suggestion list."},
+      "hover": {"$value": "{palette.granite.850}", "$description": "Row under the pointer in the list and the history."},
+      "selected": {"$value": "{palette.spruce.925}", "$description": "Selected row in the list and the suggestion list."},
+      "input": {"$value": "{palette.granite.850}", "$description": "Input field and form fields."},
+      "sunken": {"$value": "{palette.granite.925}", "$description": "Code blocks, quotes, collapsed live box."}
     },
     "text": {
-      "$description": "Textfarben. Jede Paarung mit einer Fläche steht in design/design-rules.json.",
-      "primary": {"$value": "{palette.granite.25}", "$description": "Fließtext, Titel."},
-      "secondary": {"$value": "{palette.granite.200}", "$description": "Metadaten, Zeitstempel, Beschriftungen."},
-      "muted": {"$value": "{palette.granite.300}", "$description": "Platzhalter, Hinweise, Erledigt-Bereich."},
-      "link": {"$value": "{palette.spruce.300}", "$description": "Links und Erwähnungs-Pillen."},
-      "on-accent": {"$value": "{palette.spruce.975}", "$description": "Text auf Akzent-Knöpfen."},
-      "on-sidebar": {"$value": "{palette.spruce.50}", "$description": "Kanalname ungelesen, Bereichs-Titel."},
-      "on-sidebar-secondary": {"$value": "{palette.spruce.200}", "$description": "Kanalname gelesen."},
-      "on-sidebar-muted": {"$value": "{palette.spruce.300}", "$description": "Stumm geschaltete Kanäle, Zähler-Beschriftung."}
+      "$description": "Text colors. Every pairing with a surface is listed in design/design-rules.json.",
+      "primary": {"$value": "{palette.granite.25}", "$description": "Body text, titles."},
+      "secondary": {"$value": "{palette.granite.200}", "$description": "Metadata, timestamps, labels."},
+      "muted": {"$value": "{palette.granite.300}", "$description": "Placeholders, hints, Done section."},
+      "link": {"$value": "{palette.spruce.300}", "$description": "Links and mention pills."},
+      "on-accent": {"$value": "{palette.spruce.975}", "$description": "Text on accent buttons."},
+      "on-sidebar": {"$value": "{palette.spruce.50}", "$description": "Unread channel name, space title."},
+      "on-sidebar-secondary": {"$value": "{palette.spruce.200}", "$description": "Read channel name."},
+      "on-sidebar-muted": {"$value": "{palette.spruce.300}", "$description": "Muted channels, counter label."}
     },
     "border": {
-      "$description": "Linien. subtle und default sind Schmuck; control trägt eine Bedeutung (WCAG 1.4.11).",
-      "subtle": {"$value": "{palette.granite.800}", "$description": "Trennlinien zwischen Zeilen."},
-      "default": {"$value": "{palette.granite.750}", "$description": "Spaltengrenzen, Karten."},
-      "control": {"$value": "{palette.granite.500}", "$description": "Rand von Eingabefeldern und sekundären Knöpfen."},
-      "on-sidebar": {"$value": "{palette.spruce.900}", "$description": "Trennlinien in der Seitenleiste."}
+      "$description": "Lines. subtle and default are decoration; control carries meaning (WCAG 1.4.11).",
+      "subtle": {"$value": "{palette.granite.800}", "$description": "Dividers between rows."},
+      "default": {"$value": "{palette.granite.750}", "$description": "Column borders, cards."},
+      "control": {"$value": "{palette.granite.500}", "$description": "Border of input fields and secondary buttons."},
+      "on-sidebar": {"$value": "{palette.spruce.900}", "$description": "Dividers in the sidebar."}
     },
     "focus": {
-      "$description": "Fokusring. Immer sichtbar, nie nur Farbe: zusätzlich zwei Pixel Breite.",
-      "ring": {"$value": "{palette.gorse.300}", "$description": "Fokus auf allen Inhaltsflächen."},
-      "ring-on-sidebar": {"$value": "{palette.gorse.300}", "$description": "Fokus in der Seitenleiste."}
+      "$description": "Focus ring. Always visible, never color alone: in addition, two pixels wide.",
+      "ring": {"$value": "{palette.gorse.300}", "$description": "Focus on all content surfaces."},
+      "ring-on-sidebar": {"$value": "{palette.gorse.300}", "$description": "Focus in the sidebar."}
     },
     "accent": {
-      "$description": "Markenakzent: primäre Aktion, Auswahl, laufender Agent.",
-      "bg": {"$value": "{palette.spruce.400}", "$description": "Primärer Knopf."},
-      "bg-hover": {"$value": "{palette.spruce.300}", "$description": "Primärer Knopf unter dem Zeiger."},
-      "bg-pressed": {"$value": "{palette.spruce.200}", "$description": "Primärer Knopf gedrückt."},
-      "fg": {"$value": "{palette.spruce.300}", "$description": "Akzent als Text oder Icon."},
-      "subtle": {"$value": "{palette.spruce.950}", "$description": "Hinterlegung eigener Nachrichten-Aktionen, Info-Chips."}
+      "$description": "Brand accent: primary action, selection, running agent.",
+      "bg": {"$value": "{palette.spruce.400}", "$description": "Primary button."},
+      "bg-hover": {"$value": "{palette.spruce.300}", "$description": "Primary button under the pointer."},
+      "bg-pressed": {"$value": "{palette.spruce.200}", "$description": "Primary button, pressed."},
+      "fg": {"$value": "{palette.spruce.300}", "$description": "Accent as text or icon."},
+      "subtle": {"$value": "{palette.spruce.950}", "$description": "Tinted background of own message actions, info chips."}
     },
     "attention": {
-      "$description": "Ginster: Erwähnungen und alles, was auf einen Menschen wartet (waiting_input, Freigabe).",
-      "fg": {"$value": "{palette.gorse.300}", "$description": "Text und Icon."},
-      "subtle": {"$value": "{palette.gorse.950}", "$description": "Hinterlegung einer Nachricht mit Erwähnung."},
-      "border": {"$value": "{palette.gorse.400}", "$description": "Balken links an Erwähnungen und wartenden Läufen."},
-      "bg": {"$value": "{palette.gorse.300}", "$description": "Starkes Abzeichen 'Wartet auf dich'."},
-      "on-bg": {"$value": "{palette.gorse.950}", "$description": "Text auf attention.bg."}
+      "$description": "Gorse: mentions and everything that waits for a person (waiting_input, approval).",
+      "fg": {"$value": "{palette.gorse.300}", "$description": "Text and icon."},
+      "subtle": {"$value": "{palette.gorse.950}", "$description": "Tinted background of a message with a mention."},
+      "border": {"$value": "{palette.gorse.400}", "$description": "Bar on the left of mentions and waiting runs."},
+      "bg": {"$value": "{palette.gorse.300}", "$description": "Strong badge 'Waiting for you'."},
+      "on-bg": {"$value": "{palette.gorse.950}", "$description": "Text on attention.bg."}
     },
     "success": {
-      "$description": "Moos: erledigt, bestanden.",
+      "$description": "Moss: done, passed.",
       "fg": {"$value": "{palette.moss.300}"},
       "subtle": {"$value": "{palette.moss.950}"},
       "border": {"$value": "{palette.moss.400}"},
@@ -64,7 +64,7 @@
       "on-bg": {"$value": "{palette.moss.950}"}
     },
     "warning": {
-      "$description": "Bernstein: Stillstand, gestört, Schätzung überschritten.",
+      "$description": "Amber: stall, degraded, estimate exceeded.",
       "fg": {"$value": "{palette.amber.300}"},
       "subtle": {"$value": "{palette.amber.950}"},
       "border": {"$value": "{palette.amber.400}"},
@@ -72,7 +72,7 @@
       "on-bg": {"$value": "{palette.amber.950}"}
     },
     "danger": {
-      "$description": "Vogelbeere: Fehler, zerstörende Aktionen.",
+      "$description": "Rowan: errors, destructive actions.",
       "fg": {"$value": "{palette.rowan.300}"},
       "subtle": {"$value": "{palette.rowan.950}"},
       "border": {"$value": "{palette.rowan.400}"},
@@ -80,7 +80,7 @@
       "on-bg": {"$value": "{palette.rowan.950}"}
     },
     "info": {
-      "$description": "See: Hinweise, zugestellte Nachträge.",
+      "$description": "Loch: notes, delivered follow-ups.",
       "fg": {"$value": "{palette.loch.300}"},
       "subtle": {"$value": "{palette.loch.950}"},
       "border": {"$value": "{palette.loch.400}"},
@@ -88,7 +88,7 @@
       "on-bg": {"$value": "{palette.loch.950}"}
     },
     "run": {
-      "$description": "Zustände eines Laufs (runs.state): Farbe des Live-Box-Rückgrats und des Zustands-Icons.",
+      "$description": "States of a run (runs.state): color of the live box spine and of the state icon.",
       "queued": {"$value": "{palette.granite.400}", "$description": "queued"},
       "running": {"$value": "{palette.spruce.400}", "$description": "running"},
       "waiting": {"$value": "{palette.gorse.300}", "$description": "waiting_input"},
@@ -97,7 +97,7 @@
       "cancelled": {"$value": "{palette.granite.400}", "$description": "cancelled"}
     },
     "trigger": {
-      "$description": "Auslöser-Status (messages.trigger_state) als Icon-Farbe. Ersetzt die Status-Emoji.",
+      "$description": "Trigger state (messages.trigger_state) as an icon color. Replaces the status emoji.",
       "received": {"$value": "{palette.granite.400}", "$description": "received"},
       "queued": {"$value": "{palette.granite.300}", "$description": "queued"},
       "working": {"$value": "{palette.spruce.400}", "$description": "working"},
@@ -106,26 +106,26 @@
       "followup": {"$value": "{palette.loch.400}", "$description": "followup_delivered"}
     },
     "badge": {
-      "$description": "Abzeichen der Backend-Richtlinie (billing_mode) in Thread-Kopf und Agenten-Karte.",
-      "personal-bg": {"$value": "{palette.heather.900}", "$description": "Persönlich"},
-      "personal-fg": {"$value": "{palette.heather.200}", "$description": "Persönlich"},
-      "organization-bg": {"$value": "{palette.loch.900}", "$description": "Organisation"},
-      "organization-fg": {"$value": "{palette.loch.200}", "$description": "Organisation"}
+      "$description": "Backend policy badge (billing_mode) in the thread header and on the agent card.",
+      "personal-bg": {"$value": "{palette.heather.900}", "$description": "Personal"},
+      "personal-fg": {"$value": "{palette.heather.200}", "$description": "Personal"},
+      "organization-bg": {"$value": "{palette.loch.900}", "$description": "Organization"},
+      "organization-fg": {"$value": "{palette.loch.200}", "$description": "Organization"}
     },
     "code": {
-      "$description": "Code in Nachrichten und Werkzeug-Details.",
+      "$description": "Code in messages and tool details.",
       "fg": {"$value": "{palette.granite.100}"},
       "bg": {"$value": "{palette.granite.925}"}
     },
     "terminal": {
-      "$description": "Terminal-Ansicht (components.md, Abschnitt 12): Fläche, Text, Cursor, Auswahl und die 16 ANSI-Farben. Paarungen in design-rules.json.",
-      "bg": {"$value": "{palette.granite.950}", "$description": "Fläche des Terminals."},
-      "fg": {"$value": "{palette.granite.100}", "$description": "Standard-Text (SGR 39)."},
-      "cursor": {"$value": "{palette.gorse.300}", "$description": "Block- und Balken-Cursor."},
-      "cursor-text": {"$value": "{palette.granite.950}", "$description": "Zeichen unter dem Block-Cursor."},
-      "selection-bg": {"$value": "{palette.spruce.850}", "$description": "Hinterlegung markierten Texts; Text darauf in terminal.fg."},
+      "$description": "Terminal view (components.md, section 12): surface, text, cursor, selection and the 16 ANSI colors. Pairings in design-rules.json.",
+      "bg": {"$value": "{palette.granite.950}", "$description": "Surface of the terminal."},
+      "fg": {"$value": "{palette.granite.100}", "$description": "Default text (SGR 39)."},
+      "cursor": {"$value": "{palette.gorse.300}", "$description": "Block and bar cursor."},
+      "cursor-text": {"$value": "{palette.granite.950}", "$description": "Character under the block cursor."},
+      "selection-bg": {"$value": "{palette.spruce.850}", "$description": "Background of selected text; text on it in terminal.fg."},
       "ansi": {
-        "$description": "ANSI-Farben 0 bis 7 (SGR 30 bis 37) und 8 bis 15 (bright, SGR 90 bis 97). Die Grautöne 0, 7 und 15 sind die Enden zur Fläche hin und brauchen nur 3:1; alle anderen sind Text mit 4.5:1.",
+        "$description": "ANSI colors 0 to 7 (SGR 30 to 37) and 8 to 15 (bright, SGR 90 to 97). The gray tones 0, 7 and 15 are the ends toward the surface and need only 3:1; all others are text with 4.5:1.",
         "black": {"$value": "{palette.granite.600}", "$description": "0"},
         "red": {"$value": "{palette.rowan.400}", "$description": "1"},
         "green": {"$value": "{palette.moss.400}", "$description": "2"},
@@ -145,9 +145,9 @@
       }
     },
     "viz": {
-      "$description": "Diagramme in bothy_viz und im Grafana-Panel (components.md, Abschnitt 11; 25-visualisierung.md, Abschnitt 10).",
+      "$description": "Charts in bothy_viz and in the Grafana panel (components.md, section 11; 25-visualization.md, section 10).",
       "series": {
-        "$description": "Kategoriale Serien in fester Reihenfolge; Blau und Orange zuerst, weil sie bei Rot-Grün-Schwäche unterscheidbar bleiben. Zweites Merkmal (Beschriftung oder Muster) ist Pflicht.",
+        "$description": "Categorical series in a fixed order; blue and orange first, because they stay distinguishable with red-green color blindness. A second cue (label or pattern) is required.",
         "1": {"$value": "{palette.loch.400}"},
         "2": {"$value": "{palette.amber.400}"},
         "3": {"$value": "{palette.spruce.400}"},
@@ -157,59 +157,59 @@
         "7": {"$value": "{palette.rowan.400}"},
         "8": {"$value": "{palette.granite.400}"}
       },
-      "axis": {"$value": "{palette.granite.400}", "$description": "Achsenlinien und Teilstriche; Beschriftung in color.text.secondary."},
-      "grid": {"$value": "{palette.granite.800}", "$description": "Hilfslinien und Linie zwischen Bahnen; rein ordnend, ohne Kontrast-Pflicht."},
-      "area-fill": {"$value": "{palette.spruce.900}", "$description": "Füllung unter einer Linie; die Linie trägt die Information, die Füllung nicht."}
+      "axis": {"$value": "{palette.granite.400}", "$description": "Axis lines and tick marks; labels in color.text.secondary."},
+      "grid": {"$value": "{palette.granite.800}", "$description": "Grid lines and the line between lanes; purely structural, no contrast requirement."},
+      "area-fill": {"$value": "{palette.spruce.900}", "$description": "Fill under a line; the line carries the information, the fill does not."}
     },
     "category": {
-      "$description": "Kategorie-Farben für Bereiche (spaces.color) und Forum-Tags (forum_tags.color). Der gespeicherte Wert ist der Schlüssel, z. B. 'heather'.",
+      "$description": "Category colors for spaces (spaces.color) and forum tags (forum_tags.color). The stored value is the key, for example 'heather'.",
       "spruce": {
-        "on-sidebar": {"$value": "{palette.spruce.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
-        "fg": {"$value": "{palette.spruce.300}", "$description": "Icon und Punkt auf Inhaltsflächen."},
-        "chip-bg": {"$value": "{palette.spruce.900}", "$description": "Tag-Chip."},
-        "chip-fg": {"$value": "{palette.spruce.200}", "$description": "Text auf dem Tag-Chip."}
+        "on-sidebar": {"$value": "{palette.spruce.300}", "$description": "Icon of the space in the sidebar."},
+        "fg": {"$value": "{palette.spruce.300}", "$description": "Icon and dot on content surfaces."},
+        "chip-bg": {"$value": "{palette.spruce.900}", "$description": "Tag chip."},
+        "chip-fg": {"$value": "{palette.spruce.200}", "$description": "Text on the tag chip."}
       },
       "loch": {
-        "on-sidebar": {"$value": "{palette.loch.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
-        "fg": {"$value": "{palette.loch.300}", "$description": "Icon und Punkt auf Inhaltsflächen."},
-        "chip-bg": {"$value": "{palette.loch.900}", "$description": "Tag-Chip."},
-        "chip-fg": {"$value": "{palette.loch.200}", "$description": "Text auf dem Tag-Chip."}
+        "on-sidebar": {"$value": "{palette.loch.300}", "$description": "Icon of the space in the sidebar."},
+        "fg": {"$value": "{palette.loch.300}", "$description": "Icon and dot on content surfaces."},
+        "chip-bg": {"$value": "{palette.loch.900}", "$description": "Tag chip."},
+        "chip-fg": {"$value": "{palette.loch.200}", "$description": "Text on the tag chip."}
       },
       "heather": {
-        "on-sidebar": {"$value": "{palette.heather.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
-        "fg": {"$value": "{palette.heather.300}", "$description": "Icon und Punkt auf Inhaltsflächen."},
-        "chip-bg": {"$value": "{palette.heather.900}", "$description": "Tag-Chip."},
-        "chip-fg": {"$value": "{palette.heather.200}", "$description": "Text auf dem Tag-Chip."}
+        "on-sidebar": {"$value": "{palette.heather.300}", "$description": "Icon of the space in the sidebar."},
+        "fg": {"$value": "{palette.heather.300}", "$description": "Icon and dot on content surfaces."},
+        "chip-bg": {"$value": "{palette.heather.900}", "$description": "Tag chip."},
+        "chip-fg": {"$value": "{palette.heather.200}", "$description": "Text on the tag chip."}
       },
       "rowan": {
-        "on-sidebar": {"$value": "{palette.rowan.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
-        "fg": {"$value": "{palette.rowan.300}", "$description": "Icon und Punkt auf Inhaltsflächen."},
-        "chip-bg": {"$value": "{palette.rowan.900}", "$description": "Tag-Chip."},
-        "chip-fg": {"$value": "{palette.rowan.200}", "$description": "Text auf dem Tag-Chip."}
+        "on-sidebar": {"$value": "{palette.rowan.300}", "$description": "Icon of the space in the sidebar."},
+        "fg": {"$value": "{palette.rowan.300}", "$description": "Icon and dot on content surfaces."},
+        "chip-bg": {"$value": "{palette.rowan.900}", "$description": "Tag chip."},
+        "chip-fg": {"$value": "{palette.rowan.200}", "$description": "Text on the tag chip."}
       },
       "amber": {
-        "on-sidebar": {"$value": "{palette.amber.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
-        "fg": {"$value": "{palette.amber.300}", "$description": "Icon und Punkt auf Inhaltsflächen."},
-        "chip-bg": {"$value": "{palette.amber.900}", "$description": "Tag-Chip."},
-        "chip-fg": {"$value": "{palette.amber.200}", "$description": "Text auf dem Tag-Chip."}
+        "on-sidebar": {"$value": "{palette.amber.300}", "$description": "Icon of the space in the sidebar."},
+        "fg": {"$value": "{palette.amber.300}", "$description": "Icon and dot on content surfaces."},
+        "chip-bg": {"$value": "{palette.amber.900}", "$description": "Tag chip."},
+        "chip-fg": {"$value": "{palette.amber.200}", "$description": "Text on the tag chip."}
       },
       "gorse": {
-        "on-sidebar": {"$value": "{palette.gorse.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
-        "fg": {"$value": "{palette.gorse.300}", "$description": "Icon und Punkt auf Inhaltsflächen."},
-        "chip-bg": {"$value": "{palette.gorse.900}", "$description": "Tag-Chip."},
-        "chip-fg": {"$value": "{palette.gorse.200}", "$description": "Text auf dem Tag-Chip."}
+        "on-sidebar": {"$value": "{palette.gorse.300}", "$description": "Icon of the space in the sidebar."},
+        "fg": {"$value": "{palette.gorse.300}", "$description": "Icon and dot on content surfaces."},
+        "chip-bg": {"$value": "{palette.gorse.900}", "$description": "Tag chip."},
+        "chip-fg": {"$value": "{palette.gorse.200}", "$description": "Text on the tag chip."}
       },
       "moss": {
-        "on-sidebar": {"$value": "{palette.moss.300}", "$description": "Icon des Bereichs in der Seitenleiste."},
-        "fg": {"$value": "{palette.moss.300}", "$description": "Icon und Punkt auf Inhaltsflächen."},
-        "chip-bg": {"$value": "{palette.moss.900}", "$description": "Tag-Chip."},
-        "chip-fg": {"$value": "{palette.moss.200}", "$description": "Text auf dem Tag-Chip."}
+        "on-sidebar": {"$value": "{palette.moss.300}", "$description": "Icon of the space in the sidebar."},
+        "fg": {"$value": "{palette.moss.300}", "$description": "Icon and dot on content surfaces."},
+        "chip-bg": {"$value": "{palette.moss.900}", "$description": "Tag chip."},
+        "chip-fg": {"$value": "{palette.moss.200}", "$description": "Text on the tag chip."}
       },
       "granite": {
-        "on-sidebar": {"$value": "{palette.granite.200}", "$description": "Icon des Bereichs in der Seitenleiste."},
-        "fg": {"$value": "{palette.granite.300}", "$description": "Icon und Punkt auf Inhaltsflächen."},
-        "chip-bg": {"$value": "{palette.granite.900}", "$description": "Tag-Chip."},
-        "chip-fg": {"$value": "{palette.granite.200}", "$description": "Text auf dem Tag-Chip."}
+        "on-sidebar": {"$value": "{palette.granite.200}", "$description": "Icon of the space in the sidebar."},
+        "fg": {"$value": "{palette.granite.300}", "$description": "Icon and dot on content surfaces."},
+        "chip-bg": {"$value": "{palette.granite.900}", "$description": "Tag chip."},
+        "chip-fg": {"$value": "{palette.granite.200}", "$description": "Text on the tag chip."}
       }
     },
     "scrim": {
@@ -218,7 +218,7 @@
         "components": [0.178, 0.021, 210],
         "alpha": 0.64
       },
-      "$description": "Abdunklung hinter Dialogen. Durchscheinend, darum nie in Kontrast-Paaren."
+      "$description": "Dimming behind dialogs. Translucent, so never in contrast pairs."
     },
     "shadow": {
       "$value": {
@@ -226,7 +226,7 @@
         "components": [0.178, 0.021, 210],
         "alpha": 0.5
       },
-      "$description": "Schattenfarbe für elevation.*."
+      "$description": "Shadow color for elevation.*."
     }
   }
 }

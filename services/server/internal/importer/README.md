@@ -1,49 +1,49 @@
-# Modul `importer`
+# Module `importer`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-## Zweck
+## Purpose
 
-Import-Quellen, Stapel mit Herkunftsschlüssel (`import.apply`), Eigentumsliste und Schreibschutz gespiegelter Kanäle; der Trockenlauf liegt im Werkzeug.
+Import sources, batches with origin key (`import.apply`), ownership list and read-only state of mirrored channels; the dry run lives in the tool.
 
-## Port (Wurzelpaket `internal/importer`)
+## Port (root package `internal/importer`)
 
-- Eingehend: `Imports` (Quellen, Stapel über `import.apply`).
-- Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: keine.
+- Inbound: `Imports` (sources, batches through `import.apply`).
+- Emits in-tx events: none.
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: none.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `identity`, `chat`, `agents`, `messaging`, `files`.
+May use the ports of these modules: `identity`, `chat`, `agents`, `messaging`, `files`.
 
-Grund: legt Menschen, Struktur, Nachrichten, frühere Sitzungs-Referenzen und Dateien an; setzt den Schreibschutz der gespiegelten Kanäle.
+Reason: creates people, structure, messages, earlier session references and files; sets the read-only state of the mirrored channels.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `import_sources`, `import_items`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `import.read`, `import.manage`, `import.apply`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: `import.progress`.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: `import.progress`.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Liest die Quelle nur; Trockenlauf vor dem echten Lauf (ADR 0043).
-- `import_items` wird vor dem Anlegen `pending` und in derselben Transaktion wie das Zielobjekt `posted` (03, 4.11).
+- Only reads the source; dry run before the real run (ADR 0043).
+- `import_items` becomes `pending` before the creation and `posted` in the same transaction as the target object (03, 4.11).
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [22-import-migration.md](../../../../docs/spec/22-import-migration.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [22-import-migration.md](../../../../docs/spec/22-import-migration.md)

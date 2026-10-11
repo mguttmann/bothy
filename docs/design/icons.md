@@ -1,81 +1,81 @@
 # Icons
 
-Quelle: `design/tokens/icon.tokens.json`. Größen sind Tokens (`icon.size.sm`, `.md`, `.lg`); die
-Zuordnung semantischer Namen zu Glyphen steht als Erweiterung `ds.icons` am Gruppenknoten `icon`,
-weil DTCG 2025.10 keinen Icon-Typ kennt und eigene Typen verbietet
-(https://www.designtokens.org/tr/2025.10/format/, abgerufen 2026-10-10 [belegt]).
+Source: `design/tokens/icon.tokens.json`. Sizes are tokens (`icon.size.sm`, `.md`, `.lg`); the
+mapping of semantic names to glyphs is stored as the extension `ds.icons` on the group node `icon`,
+because DTCG 2025.10 knows no icon type and forbids custom types
+(https://www.designtokens.org/tr/2025.10/format/, retrieved 2026-10-10 [verified]).
 
-## Wahl: Phosphor
+## Choice: Phosphor
 
-| Kriterium | Phosphor | Lucide | Material Symbols |
+| Criterion | Phosphor | Lucide | Material Symbols |
 |---|---|---|---|
-| Lizenz | MIT [belegt] | ISC [belegt, npm `lucide-static`] | Apache-2.0 [belegt, npm `material-symbols`] |
-| Strichstärken | thin, light, regular, bold, fill, duotone [belegt] | eine Strichform, Breite einstellbar | variable Achsen (Füllung, Gewicht) |
-| gefüllte Variante für "aktiv" | ja (`fill`) | nein | ja |
-| Wirkung | freundlich, geometrisch, eigenständig | neutral, häufig im generischen Look | sofort als Google/Android erkennbar |
-| Flutter | Paket `phosphor_flutter` 2.1.0, zuletzt vor zwei Jahren veröffentlicht [belegt] | Community-Pakete | Paket `material_symbols_icons` |
+| License | MIT [verified] | ISC [verified, npm `lucide-static`] | Apache-2.0 [verified, npm `material-symbols`] |
+| Stroke weights | thin, light, regular, bold, fill, duotone [verified] | one stroke form, width adjustable | variable axes (fill, weight) |
+| Filled variant for "active" | yes (`fill`) | no | yes |
+| Effect | friendly, geometric, distinctive | neutral, common in the generic look | instantly recognizable as Google/Android |
+| Flutter | package `phosphor_flutter` 2.1.0, last published two years ago [verified] | community packages | package `material_symbols_icons` |
 
-Belege: https://github.com/phosphor-icons/core (MIT), Paket `@phosphor-icons/core@2.1.1` (Lizenz
-MIT, Ordner `assets/<weight>`), https://pub.dev/packages/phosphor_flutter (Version 2.1.0,
-Herausgeber phosphoricons.com, Stile Thin, Light, Regular, Bold, Fill, Duotone); alle abgerufen
+Evidence: https://github.com/phosphor-icons/core (MIT), package `@phosphor-icons/core@2.1.1` (license
+MIT, folder `assets/<weight>`), https://pub.dev/packages/phosphor_flutter (version 2.1.0,
+publisher phosphoricons.com, styles Thin, Light, Regular, Bold, Fill, Duotone); all retrieved
 2026-10-10.
 
-Gründe: Die gefüllte Variante zeigt "aktiv" und "Zustand erreicht" ohne zweites Icon-Set; die
-Stärke `bold` bleibt bei kleiner Größe lesbar; die Formen passen zu den offenen Formen von
-Atkinson Hyperlegible. Material Symbols würde die App wie Android aussehen lassen; Lucide hat keine
-gefüllte Variante.
+Reasons: The filled variant shows "active" and "state reached" without a second icon set; the
+weight `bold` stays readable at small sizes; the shapes match the open shapes of
+Atkinson Hyperlegible. Material Symbols would make the app look like Android; Lucide has no
+filled variant.
 
-**Einbindung ohne veraltetes Paket.** Weil `phosphor_flutter` seit zwei Jahren ruht, bindet
-`packages/design_system` Phosphor selbst ein: Der Paket-Build nimmt die SVGs der benutzten Glyphen
-aus `@phosphor-icons/core` in gepinnter Version und erzeugt daraus eine Icon-Schrift mit nur diesen
-Glyphen (oder Vektor-Assets mit `vector_graphics_compiler`, flutter.dev); die Wahl trifft das
-Ticket "Icons im Design-System-Paket" nach einem Größen- und Schärfevergleich. Die erzeugte Klasse
-`DsIcons` liefert die semantischen Namen (`DsIcons.triggerWorking`). Die Vorschau nutzt dieselben
-SVGs aus `tools/design-tokens/vendor/phosphor/` (mit MIT-Lizenztext).
+**Integration without an outdated package.** Because `phosphor_flutter` has been dormant for two
+years, `packages/design_system` integrates Phosphor itself: the package build takes the SVGs of the
+used glyphs from `@phosphor-icons/core` in a pinned version and generates an icon font with only
+these glyphs from them (or vector assets with `vector_graphics_compiler`, flutter.dev); the ticket
+"Icons in the design system package" makes the choice after a comparison of size and sharpness. The
+generated class `DsIcons` provides the semantic names (`DsIcons.triggerWorking`). The preview uses
+the same SVGs from `tools/design-tokens/vendor/phosphor/` (with the MIT license text).
 
-## Regeln
+## Rules
 
-- **Icons nur über semantische Namen.** Eine Komponente fragt `trigger.working`, nicht
-  `circle-notch`. Ein Tausch der Glyphe ist eine Änderung an einer Stelle.
-- **Kein Emoji als Icon.** Emoji gibt es nur als freie Reaktion von Menschen. Status ist nie ein
-  Emoji und nie eine Reaktion.
-- **Icon nie allein.** Jedes Icon mit Bedeutung hat eine Beschriftung oder ein Screenreader-Label
-  (siehe components.md). Farbe ist nie das einzige Merkmal; Zustände unterscheiden sich in der
-  Form.
-- **Gewichte:** `regular` als Standard, `fill` für aktiv und für erreichte Endzustände, `bold`
-  für kleine Steuerzeichen (Pfeile, Plus, Schließen).
-- **Drehen** nur für `trigger.working`, `run.running` und `state.reconnecting`, und nur im
-  Bewegungs-Kontext `full`.
+- **Icons only through semantic names.** A component asks for `trigger.working`, not
+  `circle-notch`. Swapping the glyph is a change in one place.
+- **No emoji as an icon.** Emoji exist only as free reactions of people. Status is never an
+  emoji and never a reaction.
+- **Never an icon alone.** Every icon with meaning has a caption or a screen reader label
+  (see components.md). Color is never the only feature; states differ in
+  shape.
+- **Weights:** `regular` as the default, `fill` for active and for reached final states, `bold`
+  for small control glyphs (arrows, plus, close).
+- **Spinning** only for `trigger.working`, `run.running` and `state.reconnecting`, and only in the
+  `full` motion context.
 
-## Zuordnung (Auszug)
+## Mapping (excerpt)
 
-Vollständige Liste: `design/tokens/icon.tokens.json`, aufgelöst in
+Full list: `design/tokens/icon.tokens.json`, resolved in
 `design/build/tokens.resolved.json`.
 
-| Semantischer Name | Glyphe | Stärke | Bedeutung |
+| Semantic name | Glyph | Weight | Meaning |
 |---|---|---|---|
-| `trigger.received` | `check` | regular | Server hat die auslösende Nachricht angenommen |
-| `trigger.queued` | `hourglass-medium` | regular | Lauf wartet in der Warteschlange |
-| `trigger.working` | `circle-notch` | bold, dreht | Agent arbeitet |
-| `trigger.done` | `check-circle` | fill | Lauf erfolgreich beendet |
-| `trigger.failed` | `x-circle` | fill | Lauf oder Auslösung fehlgeschlagen |
-| `trigger.followup` | `arrow-bend-down-right` | regular | Nachtrag an den laufenden Lauf zugestellt |
-| `run.waiting` | `bell-ringing` | fill | Lauf wartet auf eine Antwort (waiting_input) |
-| `run.failed` | `warning-octagon` | fill | Lauf fehlgeschlagen |
-| `run.cancelled` | `prohibit` | regular | Lauf abgebrochen |
-| `step.tool_call`, `step.subagent`, `step.workflow`, `step.background_job` | `wrench`, `robot`, `flow-arrow`, `clock-countdown` | regular | Schritt-Arten (`run_steps.kind`) |
-| `channel.text`, `channel.forum` | `hash`, `chats-circle` | bold, regular | Kanal-Arten |
-| `billing.personal`, `billing.organization` | `user-circle`, `buildings` | fill | Abzeichen Backend-Richtlinie |
-| `security.step-up` | `shield-check` | fill | frische Bestätigung nötig, Freigabe-Karten |
-| `action.stop` | `stop-circle` | fill | Lauf stoppen |
+| `trigger.received` | `check` | regular | Server has accepted the triggering message |
+| `trigger.queued` | `hourglass-medium` | regular | Run waits in the queue |
+| `trigger.working` | `circle-notch` | bold, spins | Agent is working |
+| `trigger.done` | `check-circle` | fill | Run finished successfully |
+| `trigger.failed` | `x-circle` | fill | Run or trigger failed |
+| `trigger.followup` | `arrow-bend-down-right` | regular | Follow-up delivered to the running run |
+| `run.waiting` | `bell-ringing` | fill | Run waits for an answer (waiting_input) |
+| `run.failed` | `warning-octagon` | fill | Run failed |
+| `run.cancelled` | `prohibit` | regular | Run canceled |
+| `step.tool_call`, `step.subagent`, `step.workflow`, `step.background_job` | `wrench`, `robot`, `flow-arrow`, `clock-countdown` | regular | Step kinds (`run_steps.kind`) |
+| `channel.text`, `channel.forum` | `hash`, `chats-circle` | bold, regular | Channel kinds |
+| `billing.personal`, `billing.organization` | `user-circle`, `buildings` | fill | Backend policy badge |
+| `security.step-up` | `shield-check` | fill | Fresh confirmation needed, approval cards |
+| `action.stop` | `stop-circle` | fill | Stop run |
 
-Die Auslöser-Zustände ersetzen die früheren Status-Zeichen aus Discord eins zu eins: empfangen,
-Warteschlange, in Arbeit, fertig, Fehler, Nachtrag. Ihre Form ist verschieden, damit sie auch ohne
-Farbe und bei kleiner Größe unterscheidbar bleiben.
+The trigger states replace the earlier status markers from Discord one to one: received,
+queue, in progress, finished, error, follow-up. Their shapes differ so that they stay
+distinguishable even without color and at small sizes.
 
-## Bereichs-Icons
+## Space icons
 
-`spaces.icon` speichert einen Glyphen-Namen aus der Liste `space-icons` in `icon.tokens.json`
-(zum Beispiel `headset`, `code`, `megaphone`, `flask`). Der Server prüft gegen dieselbe Liste
-(aus `design/build/tokens.resolved.json`, Ticket "Erlaubte Farb- und Icon-Schlüssel im Server");
-ein Emoji oder ein freier Name wird abgelehnt.
+`spaces.icon` stores a glyph name from the list `space-icons` in `icon.tokens.json`
+(for example `headset`, `code`, `megaphone`, `flask`). The server checks against the same list
+(from `design/build/tokens.resolved.json`, ticket "Allowed color and icon keys in the server");
+an emoji or a free name is rejected.

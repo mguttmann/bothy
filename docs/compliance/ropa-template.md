@@ -1,175 +1,175 @@
-# Vorlage: Verzeichnis der Verarbeitungstätigkeiten (Art. 30 DSGVO)
+# Template: record of processing activities (Art. 30 GDPR)
 
-Status: Vorlage M0. Für Betreiber einer Instanz. Keine Rechtsberatung.
+Status: template M0. For instance operators. Not legal advice.
 
-So benutzt du die Vorlage:
+How to use the template:
 
-1. Datei in die eigene Dokumentation kopieren (nicht im Produkt-Repository pflegen).
-2. Alles in `<spitzen Klammern>` ersetzen. Vorbefüllte Angaben beschreiben, was das Produkt tut;
-   prüfe sie gegen deine Konfiguration (Agenten, Apps, Telemetrie, Push).
-3. Bei jeder Änderung an Agenten, Apps, Anbietern oder Fristen das Verzeichnis nachziehen.
+1. Copy the file into your own documentation (do not maintain it in the product repository).
+2. Replace everything in `<angle brackets>`. Prefilled information describes what the product does;
+   check it against your configuration (agents, apps, telemetry, push).
+3. Update the record on every change to agents, apps, providers or periods.
 
-Pflicht und Ausnahme: Art. 30 Abs. 5 DSGVO befreit Organisationen mit weniger als 250 Beschäftigten.
-Die Befreiung gilt nicht, wenn die Verarbeitung ein Risiko birgt, nicht nur gelegentlich erfolgt
-oder besondere Kategorien bzw. Daten über Straftaten betrifft (https://gdpr-info.eu/art-30-gdpr/,
-abgerufen 2026-10-10 [belegt]). Ein Team-Chat verarbeitet laufend; die Befreiung greift daher in
-der Regel nicht [abgeleitet].
+Obligation and exemption: Art. 30(5) GDPR exempts organizations with fewer than 250 employees.
+The exemption does not apply if the processing involves a risk, is not only occasional
+or concerns special categories or data about criminal offenses (https://gdpr-info.eu/art-30-gdpr/,
+retrieved 2026-10-10 [verified]). A team chat processes data continuously; the exemption therefore
+usually does not apply [derived].
 
-Grundlage der Inhalte: [../spec/20-datenschutz.md](../spec/20-datenschutz.md) (Datenkategorien je
-Tabelle, Fristen), [../spec/19-sicherheit.md](../spec/19-sicherheit.md) (technische Maßnahmen),
-[processors-template.md](processors-template.md) (Empfänger und Auftragsverarbeiter).
+Basis of the contents: [../spec/20-privacy.md](../spec/20-privacy.md) (data categories per
+table, periods), [../spec/19-security.md](../spec/19-security.md) (technical measures),
+[processors-template.md](processors-template.md) (recipients and processors).
 
-## 1. Verantwortlicher (Art. 30 Abs. 1 lit. a)
+## 1. Controller (Art. 30(1)(a))
 
-| Feld | Angabe |
+| Field | Information |
 |---|---|
-| Name | `<Organisation>` |
-| Anschrift | `<Anschrift>` |
-| Kontakt | `<E-Mail oder Telefon der verantwortlichen Stelle>` |
-| Vertretung in der EU (falls nötig) | `<...>` |
-| Datenschutzbeauftragte Person | `<Name, Kontakt oder "nicht bestellt">` |
-| Gemeinsam Verantwortliche | `<keine oder Name>` |
-| Stand des Verzeichnisses | `<Datum>` |
-| Produktversion | `<Version der Instanz>` |
+| Name | `<organization>` |
+| Address | `<address>` |
+| Contact | `<email or phone of the controller>` |
+| Representative in the EU (if needed) | `<...>` |
+| Data protection officer | `<name, contact or "not appointed">` |
+| Joint controllers | `<none or name>` |
+| Record as of | `<date>` |
+| Product version | `<version of the instance>` |
 
-## 2. Tätigkeiten
+## 2. Activities
 
-Jede Tätigkeit hat die Pflichtfelder aus Art. 30 Abs. 1 lit. b bis g.
+Every activity has the mandatory fields from Art. 30(1)(b) to (g) GDPR.
 
-### V1 Team-Chat
+### V1 Team chat
 
-| Feld | Angabe |
+| Field | Information |
 |---|---|
-| Zweck (b) | interne Kommunikation in Bereichen, Kanälen und Threads; Dateien und Sprachnachrichten teilen; Suche |
-| Rechtsgrundlage | `<vom Betreiber einzutragen>` |
-| Betroffene (c) | Beschäftigte und weitere Mitglieder der Instanz; Dritte, die in Inhalten vorkommen |
-| Datenkategorien (c) | Stammdaten (Handle, Anzeigename, Avatar, E-Mail zur Anzeige), Inhalte (Nachrichten, Dateien, Transkripte, Reaktionen, Erwähnungen), Kommunikationsmetadaten (Zeitpunkte, Thread, Kanal, DM-Teilnehmer), persönliche Einstellungen (Gelesen-Stand, Entwürfe, Ruhezeiten). Inhalte können besondere Kategorien nach Art. 9 enthalten: `<Einschätzung des Betreibers>` |
-| Empfänger (d) | Mitglieder mit Freigabe auf den jeweiligen Kanal; Owner (außer Direktnachrichten); Hosting `<Anbieter oder eigener Betrieb>`; Objektspeicher `<...>` |
-| Drittland (e) | `<keine oder Land und Garantie>` |
-| Löschfristen (f) | Inhalte `retention.content` = `<Wert>`; Löschen durch Personen jederzeit; Konten nach DSGVO-Auftrag pseudonymisiert (`privacy.account_deletion_content` = `<Wert>`); Ereignis-Log `sync.event_retention` = `<Wert>`; Sicherungen `<Sicherungsfrist>` |
-| Technische und organisatorische Maßnahmen (g) | siehe Abschnitt 3, Bezug M1 bis M8 |
+| Purpose (b) | internal communication in spaces, channels and threads; sharing files and voice messages; search |
+| Legal basis | `<to be filled in by the instance operator>` |
+| Data subjects (c) | employees and other members of the instance; third parties who appear in contents |
+| Data categories (c) | master data (handle, display name, avatar, email for display), contents (messages, files, transcripts, reactions, mentions), communication metadata (times, thread, channel, DM participants), personal settings (read state, drafts, quiet hours). Contents can include special categories under Art. 9: `<assessment of the instance operator>` |
+| Recipients (d) | members with a grant on the respective channel; owners (except direct messages); hosting `<provider or own operation>`; object storage `<...>` |
+| Third country (e) | `<none, or country and safeguard>` |
+| Deletion periods (f) | contents `retention.content` = `<value>`; deletion by people at any time; accounts pseudonymized after a privacy request (`privacy.account_deletion_content` = `<value>`); event log `sync.event_retention` = `<value>`; backups `<backup period>` |
+| Technical and organizational measures (g) | see section 3, references M1 to M8 |
 
-### V2 Agenten-Verarbeitung
+### V2 Agent processing
 
-| Feld | Angabe |
+| Field | Information |
 |---|---|
-| Zweck | Aufgaben durch KI-Agenten in Kanälen und Threads (Antworten, Werkzeuge, Freigabe-Karten) |
-| Rechtsgrundlage | `<...>` |
-| Betroffene | Menschen, die Agenten auslösen; Personen, deren Nachrichten im Kontext eines Laufs stehen; Dritte in Inhalten |
-| Datenkategorien | Inhalte des Threads und bis zu `history_backfill_limit` frühere Nachrichten, Dateien des Threads, Autor als Handle und Art, Kanal-Prompt, Lauf-Kennzahlen, Kosten |
-| Empfänger | je Agent eintragen: Laufzeit `<Name, Betreiber, Standort>`, LLM-Anbieter `<Name>`, Werkzeuge mit externer Wirkung `<Liste>`; Agenten mit Werkzeugklasse `host` oder `scoped` gesondert nennen |
-| Drittland | `<je LLM-Anbieter; Region der Verarbeitung>` |
-| Löschfristen | im Produkt wie V1; bei Laufzeit und LLM-Anbieter nach deren Fristen `<eintragen>` |
-| Maßnahmen | M2, M3, M6; Agenten-Abzeichen und KI-Hinweis (20, Abschnitt 8) |
+| Purpose | tasks performed by AI agents in channels and threads (answers, tools, approval cards) |
+| Legal basis | `<...>` |
+| Data subjects | people who trigger agents; people whose messages are in the context of a run; third parties in contents |
+| Data categories | contents of the thread and up to `history_backfill_limit` earlier messages, files of the thread, author as handle and kind, channel prompt, run metrics, costs |
+| Recipients | enter per agent: runtime `<name, run by, location>`, LLM provider `<name>`, tools with external effect `<list>`; name agents with tool class `host` or `scoped` separately |
+| Third country | `<per LLM provider; region of processing>` |
+| Deletion periods | in the product as in V1; at the runtime and the LLM provider according to their periods `<enter>` |
+| Measures | M2, M3, M6; agent badge and AI notice (20, section 8) |
 
-Tabelle der Agenten (je Agent eine Zeile):
+Table of agents (one row per agent):
 
-| Agent | Bediente Bereiche und Kanäle | Werkzeugklasse | Backend-Richtlinie | Laufzeit | LLM-Anbieter, Region | Gedächtnis über Läufe hinweg |
+| Agent | Served spaces and channels | Tool class | Backend policy | Runtime | LLM provider, region | Memory across runs |
 |---|---|---|---|---|---|---|
-| `<Name>` | `<...>` | `<chat, scoped, host>` | `<personal, organization>` | `<...>` | `<...>` | `<ja, nein, unbekannt>` |
+| `<name>` | `<...>` | `<chat, scoped, host>` | `<personal, organization>` | `<...>` | `<...>` | `<yes, no, unknown>` |
 
-### V3 Anmeldung, Geräte und Sicherheitsprotokoll
+### V3 Login, devices and security log
 
-| Feld | Angabe |
+| Field | Information |
 |---|---|
-| Zweck | Zugangsschutz, Gerätebindung, Nachweis von Verwaltungsaktionen und Ablehnungen |
-| Rechtsgrundlage | `<...>` |
-| Betroffene | Mitglieder, Owner |
-| Datenkategorien | Identitäten beim Anbieter (Subjekt), Geräte (Name, Plattform, öffentliche Schlüssel), Sitzungen (Zeiten, Anmeldeweg, letzte IP), Audit-Log (Akteur-ID, Aktion, Entscheidung, IP nur als Pseudonym) |
-| Empfänger | Owner; Identitätsanbieter `<Name>` |
-| Drittland | `<...>` |
-| Löschfristen | Sicherheitsdaten `retention.security_after_end` = `<Wert>`; Audit-Log `retention.audit` = `<Wert>`; IP-Pseudonym-Schlüssel nach `privacy.audit_ip_key_retention` = `<Wert>` vernichtet |
-| Maßnahmen | M1, M4, M5 |
+| Purpose | access protection, device binding, evidence of administrative actions and denials |
+| Legal basis | `<...>` |
+| Data subjects | members, owners |
+| Data categories | identities at the provider (subject), devices (name, platform, public keys), sessions (times, login method, last IP), audit log (actor ID, action, decision, IP only as a pseudonym) |
+| Recipients | owners; identity provider `<name>` |
+| Third country | `<...>` |
+| Deletion periods | security data `retention.security_after_end` = `<value>`; audit log `retention.audit` = `<value>`; IP pseudonym key destroyed after `privacy.audit_ip_key_retention` = `<value>` |
+| Measures | M1, M4, M5 |
 
-### V4 Push-Benachrichtigungen
+### V4 Push notifications
 
-| Feld | Angabe |
+| Field | Information |
 |---|---|
-| Zweck | Hinweis auf neue Nachrichten auf Mobilgeräten und Desktop |
-| Rechtsgrundlage | `<...>` |
-| Betroffene | Mitglieder mit registrierten Geräten |
-| Datenkategorien | Push-Token des Geräts, App-Kennung, IDs von Nachricht und Thread, neutraler Platzhaltertext, Zeitpunkt. Keine Inhalte. |
-| Empfänger | `<Apple Push Notification service, Firebase Cloud Messaging, ggf. Windows Push Notification Services>` |
-| Drittland | `<...>` |
-| Löschfristen | Registrierung mit Gerät oder Konto; beim Anbieter nach dessen Fristen |
-| Maßnahmen | M6 |
+| Purpose | notice of new messages on mobile devices and desktop |
+| Legal basis | `<...>` |
+| Data subjects | members with registered devices |
+| Data categories | push token of the device, app identifier, IDs of message and thread, neutral placeholder text, time. No contents. |
+| Recipients | `<Apple Push Notification service, Firebase Cloud Messaging, if needed Windows Push Notification Services>` |
+| Third country | `<...>` |
+| Deletion periods | registration together with the device or account; at the provider according to its periods |
+| Measures | M6 |
 
-### V5 Betrieb und Telemetrie
+### V5 Operations and telemetry
 
-| Feld | Angabe |
+| Field | Information |
 |---|---|
-| Zweck | Stabilität, Fehlersuche, Kapazität, Statusseite |
-| Rechtsgrundlage | `<...>` |
-| Betroffene | Mitglieder (pseudonym) |
-| Datenkategorien | Kennzahlen, Traces und Logs ohne Inhalte; Prinzipal-IDs nur als wechselnde Pseudonyme; keine IP-Adressen |
-| Empfänger | Telemetrie-Backend `<Name oder eigener Betrieb>`; Absturzberichte der Apps `<Anbieter oder "aus">` |
-| Drittland | `<...>` |
-| Löschfristen | `<Frist im Backend>`; Pseudonym-Schlüssel wechseln nach `privacy.telemetry_pseudonym_rotation` = `<Wert>` |
-| Maßnahmen | M7 |
+| Purpose | stability, debugging, capacity, status page |
+| Legal basis | `<...>` |
+| Data subjects | members (pseudonymous) |
+| Data categories | metrics, traces and logs without contents; principal IDs only as rotating pseudonyms; no IP addresses |
+| Recipients | telemetry backend `<name or own operation>`; crash reports of the apps `<provider or "off">` |
+| Third country | `<...>` |
+| Deletion periods | `<period in the backend>`; pseudonym keys rotate after `privacy.telemetry_pseudonym_rotation` = `<value>` |
+| Measures | M7 |
 
-### V6 Kostenerfassung für Agenten
+### V6 Cost tracking for agents
 
-| Feld | Angabe |
+| Field | Information |
 |---|---|
-| Zweck | Zuordnung und Abgleich von Kosten der Agenten je Lauf, Thread, Bereich, Agent |
-| Rechtsgrundlage | `<...>` |
-| Betroffene | Menschen, die Läufe auslösen |
-| Datenkategorien | Kostenbuchungen je Lauf, Modell, Tokenzahlen; über den Lauf einer Person zuordenbar |
-| Empfänger | Owner; Bereichsverwaltung für eigene Bereiche |
-| Löschfristen | `retention.cost` = `<Wert>` |
-| Maßnahmen | M2; Statistik je Person standardmäßig aus (20, Abschnitt 9) |
+| Purpose | attribution and reconciliation of agent costs per run, thread, space, agent |
+| Legal basis | `<...>` |
+| Data subjects | people who trigger runs |
+| Data categories | cost entries per run, model, token counts; attributable to a person through the run |
+| Recipients | owners; space administration for its own spaces |
+| Deletion periods | `retention.cost` = `<value>` |
+| Measures | M2; statistics per person off by default (20, section 9) |
 
-### V7 Import aus früheren Systemen
+### V7 Import from earlier systems
 
-| Feld | Angabe |
+| Field | Information |
 |---|---|
-| Zweck | Übernahme früherer Verläufe `<z. B. aus einem Discord-Server>` |
-| Rechtsgrundlage | `<...>` |
-| Betroffene | Personen der Quelle, auch solche ohne Konto in der Instanz |
-| Datenkategorien | importierte Nachrichten, Dateien, Namen der Quelle, Herkunftsschlüssel mit Kennungen der Quelle |
-| Empfänger | wie V1 |
-| Löschfristen | Import-Zustand `retention.import_after_completion` = `<Wert>`; Inhalte wie V1 |
-| Maßnahmen | wie V1; Import ist nur lesend gegenüber der Quelle ([../spec/22-import-migration.md](../spec/22-import-migration.md)) |
+| Purpose | transfer of earlier histories `<for example from a Discord server>` |
+| Legal basis | `<...>` |
+| Data subjects | people of the source, including those without an account in the instance |
+| Data categories | imported messages, files, names from the source, origin keys with identifiers of the source |
+| Recipients | as in V1 |
+| Deletion periods | import state `retention.import_after_completion` = `<value>`; contents as in V1 |
+| Measures | as in V1; the import only reads from the source ([../spec/22-import-migration.md](../spec/22-import-migration.md)) |
 
-### V8 Betroffenenanfragen
+### V8 Data subject requests
 
-| Feld | Angabe |
+| Field | Information |
 |---|---|
-| Zweck | Erfüllung der Rechte nach Art. 15 bis 22 DSGVO |
-| Rechtsgrundlage | Art. 6 Abs. 1 lit. c DSGVO |
-| Betroffene | antragstellende Personen |
-| Datenkategorien | Auftrag, Stand, Exportpaket |
-| Empfänger | Owner, betroffene Person |
-| Löschfristen | Exportpakete `privacy.export_ttl` = `<Wert>`; Aufträge `retention.privacy_job` = `<Wert>` |
-| Maßnahmen | Step-up beim Abruf, Zeitgrenze, Audit |
+| Purpose | fulfillment of the rights under Art. 15 to 22 GDPR |
+| Legal basis | Art. 6(1)(c) GDPR |
+| Data subjects | requesting persons |
+| Data categories | request, status, export package |
+| Recipients | owners, the data subject |
+| Deletion periods | export packages `privacy.export_ttl` = `<value>`; requests `retention.privacy_job` = `<value>` |
+| Measures | step-up on download, time limit, audit |
 
-### V9 Sicherungen
+### V9 Backups
 
-| Feld | Angabe |
+| Field | Information |
 |---|---|
-| Zweck | Wiederherstellung nach Ausfall |
-| Rechtsgrundlage | `<...>` |
-| Betroffene | alle aus V1 bis V8 |
-| Datenkategorien | Abbild von Datenbank und Objektspeicher, verschlüsselt |
-| Empfänger | Sicherungsziel `<Anbieter oder Ort>` |
-| Löschfristen | `<Sicherungsfrist>`; gelöschte Daten kommen bei Wiederherstellung nicht zurück (Lösch-Journal, 20 Abschnitt 4.6) |
-| Maßnahmen | M8 |
+| Purpose | restore after an outage |
+| Legal basis | `<...>` |
+| Data subjects | all from V1 to V8 |
+| Data categories | image of the database and the object storage, encrypted |
+| Recipients | backup target `<provider or location>` |
+| Deletion periods | `<backup period>`; deleted data does not come back on a restore (deletion journal, 20 section 4.6) |
+| Measures | M8 |
 
-`<weitere Tätigkeiten, z. B. Apps und Integrationen: je installierter App eine Tätigkeit oder ein Empfänger-Eintrag>`
+`<further activities, for example apps and integrations: one activity or one recipient entry per installed app>`
 
-## 3. Technische und organisatorische Maßnahmen (Art. 30 Abs. 1 lit. g, Art. 32)
+## 3. Technical and organizational measures (Art. 30(1)(g), Art. 32)
 
-Vorbefüllt mit Produktmaßnahmen; ergänze den Betrieb (Host, Netz, Personal).
+Prefilled with product measures; add the operations side (host, network, staff).
 
-| Nr | Maßnahme | Produkt | Betrieb `<ergänzen>` |
+| No. | Measure | Product | Operations `<add>` |
 |---|---|---|---|
-| M1 | Zugangskontrolle | kein Selbst-Registrieren, Gerätebestätigung, gerätegebundene Tokens (DPoP), Step-up für Verwaltung ([../spec/08-identitaet.md](../spec/08-identitaet.md)) | `<Identitätsanbieter, MFA-Pflicht>` |
-| M2 | Zugriffskontrolle | Freigaben je Bereich und Kanal, eine Prüfstelle, Schutzregeln, Direktnachrichten auch vor Owner geschützt ([../spec/07-rechte.md](../spec/07-rechte.md)) | `<Freigabe-Prozess, Überprüfung>` |
-| M3 | Trennung | Werkzeugklassen, Dev-Umgebungen je Person mit VM-Grenze ([../spec/21-dev-isolation.md](../spec/21-dev-isolation.md)) | `<...>` |
-| M4 | Transportverschlüsselung | TLS, HSTS, keine Klartext-Verbindungen von außen ([../spec/19-sicherheit.md](../spec/19-sicherheit.md)) | `<Zertifikate, Proxy>` |
-| M5 | Protokollierung | Audit-Log hash-verkettet, IP pseudonymisiert, getrennt von Telemetrie | `<Prüfintervall der Hash-Kette>` |
-| M6 | Datensparsamkeit | Push ohne Inhalt, keine Link-Vorschau, keine fremden Ressourcen in Clients, Metadaten aus Bildern entfernt | `<...>` |
-| M7 | Pseudonymisierung | Telemetrie ohne Inhalte mit wechselnden Pseudonymen | `<...>` |
-| M8 | Verfügbarkeit und Wiederherstellung | verschlüsselte Sicherungen, Lösch-Journal, Wiederherstellungsprobe | `<Sicherungsziel, Probe-Rhythmus>` |
-| M9 | Verschlüsselung ruhender Daten | Tokens nur als Hash, Geheimnisse nur im Secret-Provider; lokale Caches verschlüsselt | `<Datenträgerverschlüsselung des Hosts>` |
-| M10 | Prüfung der Wirksamkeit | Tests je Kontrolle, Red Team je Etappe, externer Test vor Veröffentlichung | `<...>` |
+| M1 | System access control | no self-registration, device confirmation, device-bound tokens (DPoP), step-up for administration ([../spec/08-identity.md](../spec/08-identity.md)) | `<identity provider, mandatory MFA>` |
+| M2 | Data access control | grants per space and channel, a single decision point, guard rules, direct messages protected even from owners ([../spec/07-permissions.md](../spec/07-permissions.md)) | `<grant process, review>` |
+| M3 | Separation | tool classes, dev environments per person with a VM boundary ([../spec/21-dev-isolation.md](../spec/21-dev-isolation.md)) | `<...>` |
+| M4 | Transport encryption | TLS, HSTS, no plaintext connections from outside ([../spec/19-security.md](../spec/19-security.md)) | `<certificates, proxy>` |
+| M5 | Logging | hash-chained audit log, IP pseudonymized, separate from telemetry | `<check interval of the hash chain>` |
+| M6 | Data minimization | push without content, no link preview, no external resources in clients, metadata removed from images | `<...>` |
+| M7 | Pseudonymization | telemetry without contents with rotating pseudonyms | `<...>` |
+| M8 | Availability and recovery | encrypted backups, deletion journal, restore drill | `<backup target, drill schedule>` |
+| M9 | Encryption of data at rest | tokens only as hashes, secrets only in the secret provider; local caches encrypted | `<disk encryption of the host>` |
+| M10 | Testing of effectiveness | tests per control, red team per milestone, external test before publication | `<...>` |

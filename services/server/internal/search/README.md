@@ -1,47 +1,47 @@
-# Modul `search`
+# Module `search`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
-## Zweck
+## Purpose
 
-Suchabfrage über Nachrichten, Thread-Titel und Dateien mit Rechtefilter, Rangfolge.
+Search query over messages, thread titles and files with a permission filter, ranking.
 
-## Port (Wurzelpaket `internal/search`)
+## Port (root package `internal/search`)
 
-- Eingehend: `Search`.
-- Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: keine.
+- Inbound: `Search`.
+- Emits in-tx events: none.
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: none.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `chat`, `messaging`, `files`.
+May use the ports of these modules: `chat`, `messaging`, `files`.
 
-Grund: Thread-Titel, Nachrichten, Dateinamen und Transkripte.
+Reason: thread titles, messages, file names and transcripts.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
-Keine. Das Modul liest über die Ports anderer Module (03-datenmodell.md, Grundsatz 12).
+None. The module reads through the ports of other modules (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `search.query`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: keine.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: none.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Rechtefilter kommt aus `Authorizer.Scope`; jede Abfrage verknüpft mit `channel_id = ANY(...)` (03, Abschnitt 5). Keine eigene Rechte-Logik.
-- Liest Nachrichten, Thread-Titel und Dateien nur über die Ports von `messaging`, `chat`, `files`.
+- The permission filter comes from `Authorizer.Scope`; every query is combined with `channel_id = ANY(...)` (03, section 5). No permission logic of its own.
+- Reads messages, thread titles and files only through the ports of `messaging`, `chat`, `files`.
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [14-suche.md](../../../../docs/spec/14-suche.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [14-search.md](../../../../docs/spec/14-search.md)

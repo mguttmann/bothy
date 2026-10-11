@@ -1,65 +1,65 @@
-# Vorlage: Auftragsverarbeiter und Empfänger
+# Template: processors and recipients
 
-Status: Vorlage M0. Für Betreiber einer Instanz. Keine Rechtsberatung.
+Status: template M0. For instance operators. Not legal advice.
 
-Zweck: Liste aller Dienste, an die eine Instanz personenbezogene Daten gibt, mit dem, was das Produkt
-dorthin sendet. Grundlage für Verträge nach Art. 28 DSGVO, für das Verzeichnis
-([ropa-template.md](ropa-template.md), Feld "Empfänger") und für Übermittlungen in Drittländer.
+Purpose: a list of all services to which an instance passes personal data, with what the product
+sends there. Basis for contracts under Art. 28 GDPR, for the record
+([ropa-template.md](ropa-template.md), field "Recipients") and for transfers to third countries.
 
-So benutzt du die Vorlage:
+How to use the template:
 
-1. Datei in die eigene Dokumentation kopieren.
-2. Je tatsächlich genutztem Dienst eine Zeile in Abschnitt 2 ausfüllen; nicht genutzte Zeilen
-   löschen. Die Spalte "Was das Produkt sendet" beschreibt das Produkt und gilt für jede Instanz.
-3. Rolle (Auftragsverarbeiter, eigener Verantwortlicher, kein Empfänger) bewertet der Betreiber.
-4. Bei jedem neuen Agenten, jeder neuen App und jedem neuen Anbieter nachziehen.
+1. Copy the file into your own documentation.
+2. Fill in one row in section 2 per service that is actually used; delete rows that are not used.
+   The column "What the product sends" describes the product and applies to every instance.
+3. The instance operator assesses the role (processor, independent controller, not a recipient).
+4. Update the list for every new agent, every new app and every new provider.
 
-## 1. Was das Produkt an Dienste gibt
+## 1. What the product passes to services
 
-| Dienstart | Was das Produkt sendet | Was es nie sendet | Quelle |
+| Service type | What the product sends | What it never sends | Source |
 |---|---|---|---|
-| Push (APNs, FCM, WNS) | Push-Token, App-Kennung, IDs von Thread und Nachricht, neutraler Platzhaltertext, Zeitpunkt | Nachrichteninhalte, Namen, Dateien | ADR 0031, [../spec/13-push-benachrichtigungen.md](../spec/13-push-benachrichtigungen.md) |
-| Identitätsanbieter (OIDC) | Anmeldeanfrage mit `state`, `nonce`, PKCE; der Anbieter liefert Subjekt, Name, optional E-Mail und Gruppen | Inhalte | [../spec/08-identitaet.md](../spec/08-identitaet.md) |
-| LLM-Anbieter (über die Agenten-Laufzeit, nicht über den Server) | Thread-Inhalte, frühere Nachrichten bis `history_backfill_limit`, Dateien, Autoren als Handle, Kanal-Prompt | Zugangsdaten anderer Personen; E-Mail-Adressen | [../spec/20-datenschutz.md](../spec/20-datenschutz.md), Abschnitt 6 |
-| Telemetrie-Backend | Kennzahlen, Traces, Logs ohne Inhalte, pseudonyme IDs | Inhalte, IP-Adressen, Namen | [../spec/20-datenschutz.md](../spec/20-datenschutz.md), Abschnitt 7 |
-| Absturzberichte der Apps | bereinigte Stacktraces, App-Version, Plattform | Inhalte, Tokens, Namen | [../spec/19-sicherheit.md](../spec/19-sicherheit.md), SEC-LOG-7 |
-| Objektspeicher in der Cloud | Dateien, Vorschaubilder, Exportpakete, Lösch-Journal | | [../spec/12-dateien.md](../spec/12-dateien.md) |
-| Hosting (Cloud-VM, verwaltete Datenbank) | alles, was die Instanz speichert | | [../spec/16-betrieb.md](../spec/16-betrieb.md) |
-| Transkriptions-Dienst | Audio von Sprachnachrichten, Sprache | Namen, andere Inhalte | [../spec/12-dateien.md](../spec/12-dateien.md) |
-| Apps und Integrationen | Ereignisse ihrer Abos im Rahmen von Scopes und Freigaben | was ihre Freigaben nicht erlauben | [../spec/07-rechte.md](../spec/07-rechte.md), Abschnitt 2.10 |
-| Sicherungsziel | verschlüsselte Abbilder | Schlüssel der Sicherung | [../spec/19-sicherheit.md](../spec/19-sicherheit.md), SEC-BAK-* |
+| Push (APNs, FCM, WNS) | push token, app identifier, IDs of thread and message, neutral placeholder text, time | message contents, names, files | ADR 0031, [../spec/13-push-notifications.md](../spec/13-push-notifications.md) |
+| Identity provider (OIDC) | login request with `state`, `nonce`, PKCE; the provider returns subject, name, optionally email and groups | contents | [../spec/08-identity.md](../spec/08-identity.md) |
+| LLM provider (through the agent runtime, not through the server) | thread contents, earlier messages up to `history_backfill_limit`, files, authors as handles, channel prompt | credentials of other people; email addresses | [../spec/20-privacy.md](../spec/20-privacy.md), section 6 |
+| Telemetry backend | metrics, traces, logs without contents, pseudonymous IDs | contents, IP addresses, names | [../spec/20-privacy.md](../spec/20-privacy.md), section 7 |
+| Crash reports of the apps | sanitized stack traces, app version, platform | contents, tokens, names | [../spec/19-security.md](../spec/19-security.md), SEC-LOG-7 |
+| Object storage in the cloud | files, thumbnails, export packages, deletion journal | | [../spec/12-files.md](../spec/12-files.md) |
+| Hosting (cloud VM, managed database) | everything the instance stores | | [../spec/16-operations.md](../spec/16-operations.md) |
+| Transcription service | audio of voice messages, language | names, other contents | [../spec/12-files.md](../spec/12-files.md) |
+| Apps and integrations | events of their subscriptions within scopes and grants | whatever their grants do not allow | [../spec/07-permissions.md](../spec/07-permissions.md), section 2.10 |
+| Backup target | encrypted images | keys of the backup | [../spec/19-security.md](../spec/19-security.md), SEC-BAK-* |
 
-Kein Empfänger im Sinne dieser Liste: der Virenscanner, solange er lokal läuft (er lädt nur
-Signaturen herunter); der Hersteller des Produkts.
+Not a recipient in the sense of this list: the virus scanner, as long as it runs locally (it only
+downloads signatures); the maker of the product.
 
-## 2. Liste
+## 2. List
 
-| Dienst | Anbieter | Rolle | Zweck | Daten | Betroffene | Ort der Verarbeitung | Drittland-Garantie | Vertrag (AVV) | Unterauftragsverarbeiter | Löschfrist beim Anbieter | Geprüft am |
+| Service | Provider | Role | Purpose | Data | Data subjects | Place of processing | Third-country safeguard | Contract (DPA) | Subprocessors | Deletion period at the provider | Checked on |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Push iOS, macOS | `<Apple>` | `<...>` | Benachrichtigung | siehe 1 | Mitglieder mit Apple-Geräten | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| Push Android | `<Google Firebase>` | `<...>` | Benachrichtigung | siehe 1 | Mitglieder mit Android-Geräten | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| Push Windows (falls genutzt) | `<Microsoft>` | `<...>` | Benachrichtigung | siehe 1 | Mitglieder mit Windows | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| Identitätsanbieter | `<z. B. Microsoft Entra ID>` | `<...>` | Anmeldung | siehe 1 | alle Mitglieder | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| LLM-Anbieter je Agent | `<z. B. Anthropic>` | `<...>` | Agenten-Verarbeitung | siehe 1 | siehe Verzeichnis V2 | `<Region>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| Agenten-Laufzeit, falls nicht selbst betrieben | `<...>` | `<...>` | Ausführung der Agenten | siehe 1 | siehe V2 | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| Telemetrie | `<z. B. Grafana-Stack selbst betrieben, New Relic, Datadog, Azure Monitor>` | `<...>` | Betrieb | siehe 1 | Mitglieder (pseudonym) | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| Absturzberichte | `<z. B. Sentry oder "aus">` | `<...>` | Fehlersuche Apps | siehe 1 | Mitglieder | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| Hosting | `<Anbieter oder eigener Betrieb>` | `<...>` | Betrieb der Instanz | alle | alle | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| Objektspeicher | `<Anbieter oder lokal>` | `<...>` | Dateien | Inhalte | alle | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| Transkription | `<Anbieter oder lokal>` | `<...>` | Sprachnachrichten | Audio | Sprechende | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| Sicherungsziel | `<Anbieter oder Ort>` | `<...>` | Sicherung | verschlüsselt alle | alle | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
-| App `<Name>` | `<Anbieter der App>` | `<...>` | `<...>` | Abos: `<Ereignistypen>`, Scopes: `<...>` | `<...>` | `<...>` | `<...>` | `<Link>` | `<Link>` | `<...>` | `<Datum>` |
+| Push iOS, macOS | `<Apple>` | `<...>` | notification | see 1 | members with Apple devices | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| Push Android | `<Google Firebase>` | `<...>` | notification | see 1 | members with Android devices | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| Push Windows (if used) | `<Microsoft>` | `<...>` | notification | see 1 | members with Windows | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| Identity provider | `<for example Microsoft Entra ID>` | `<...>` | login | see 1 | all members | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| LLM provider per agent | `<for example Anthropic>` | `<...>` | agent processing | see 1 | see record V2 | `<region>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| Agent runtime, if not self-operated | `<...>` | `<...>` | execution of the agents | see 1 | see V2 | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| Telemetry | `<for example self-operated Grafana stack, New Relic, Datadog, Azure Monitor>` | `<...>` | operations | see 1 | members (pseudonymous) | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| Crash reports | `<for example Sentry or "off">` | `<...>` | debugging of the apps | see 1 | members | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| Hosting | `<provider or own operation>` | `<...>` | operation of the instance | all | all | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| Object storage | `<provider or local>` | `<...>` | files | contents | all | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| Transcription | `<provider or local>` | `<...>` | voice messages | audio | speakers | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| Backup target | `<provider or location>` | `<...>` | backup | all, encrypted | all | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
+| App `<name>` | `<provider of the app>` | `<...>` | `<...>` | subscriptions: `<event types>`, scopes: `<...>` | `<...>` | `<...>` | `<...>` | `<link>` | `<link>` | `<...>` | `<date>` |
 
-## 3. Beispiel mit öffentlichen Angaben: Anthropic API
+## 3. Example with public information: Anthropic API
 
-Nur zur Orientierung; vor Verwendung erneut prüfen. Alle Angaben abgerufen 2026-10-10.
+For orientation only; check again before use. All information retrieved 2026-10-10.
 
-| Feld | Angabe | Quelle |
+| Field | Information | Source |
 |---|---|---|
-| Vertrag | Das Data Processing Addendum ist per Verweis Teil der Commercial Terms; Kunde ist Verantwortlicher, Anthropic Auftragsverarbeiter | https://www.anthropic.com/legal/data-processing-addendum [belegt] |
-| Unterauftragsverarbeiter | Liste mit Widerspruchsfrist laut DPA | https://www.anthropic.com/subprocessors [belegt] |
-| Training | "Anthropic may not train models on Customer Content from Services." | https://www.anthropic.com/legal/commercial-terms [belegt] |
-| Löschfrist | API-Ein- und Ausgaben "within 30 days"; bei Verstoß gegen Richtlinien bis zu 2 Jahre | https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data [belegt] |
-| Region | `inference_geo` mit Werten `global` und `us`; keine EU-Option genannt | https://platform.claude.com/docs/en/manage-claude/usage-cost-api [belegt] |
-| Hinweis an Nutzer | Kunde weist Nutzer darauf hin, dass Ausgaben ohne Prüfung nicht verlässlich sind | Commercial Terms, D.3 [belegt] |
-| Anmeldung | Persönliche Abos (OAuth) nur für die eigene, gewöhnliche Nutzung; Produkte Dritter dürfen keine Claude.ai-Zugangsdaten sammeln, speichern oder vermitteln | https://code.claude.com/docs/en/legal-and-compliance [belegt] |
+| Contract | The Data Processing Addendum is part of the Commercial Terms by reference; the customer is the controller, Anthropic the processor | https://www.anthropic.com/legal/data-processing-addendum [verified] |
+| Subprocessors | List with an objection period according to the DPA | https://www.anthropic.com/subprocessors [verified] |
+| Training | "Anthropic may not train models on Customer Content from Services." | https://www.anthropic.com/legal/commercial-terms [verified] |
+| Deletion period | API inputs and outputs "within 30 days"; in case of a policy violation up to 2 years | https://privacy.claude.com/en/articles/7996866-how-long-do-you-store-my-organization-s-data [verified] |
+| Region | `inference_geo` with the values `global` and `us`; no EU option named | https://platform.claude.com/docs/en/manage-claude/usage-cost-api [verified] |
+| Notice to users | The customer informs users that outputs are not reliable without review | Commercial Terms, D.3 [verified] |
+| Login | Personal subscriptions (OAuth) only for one's own, ordinary use; third-party products must not collect, store or relay Claude.ai credentials | https://code.claude.com/docs/en/legal-and-compliance [verified] |

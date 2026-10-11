@@ -1,114 +1,115 @@
-# Abstände, Radien, Erhebung, Bewegung, Dichte
+# Spacing, radii, elevation, motion, density
 
-Quellen: `design/tokens/space.tokens.json`, `elevation.tokens.json`, `motion.*.tokens.json`,
-`density.*.tokens.json`. Erzeugte Werte: `design/build/tokens.css`, `design/build/dart/`.
-Maßgeblich sind die JSON-Dateien; Tabellen hier zeigen nur die Namen und die Absicht.
+Sources: `design/tokens/space.tokens.json`, `elevation.tokens.json`, `motion.*.tokens.json`,
+`density.*.tokens.json`. Generated values: `design/build/tokens.css`, `design/build/dart/`.
+The JSON files are authoritative; the tables here show only the names and the intent.
 
-## Abstände
+## Spacing
 
-Raster 4 px. Dazu 2 px und 6 px für dichte Listen und Chips. Namen sind die Pixelwerte
-(`space.4`, `space.12`), weil das Raster primitiv ist; Bedeutung bekommen Abstände in den
-Komponenten-Spezifikationen.
+Grid 4 px. In addition 2 px and 6 px for dense lists and chips. The names are the pixel values
+(`space.4`, `space.12`), because the grid is primitive; spacing gets its meaning in the
+component specifications.
 
-| Token | Typische Verwendung |
+| Token | Typical use |
 |---|---|
-| `space.2`, `space.4` | Abstand Icon zu Text in Chips, Zeilen-Innenabstand compact |
-| `space.6`, `space.8` | Chips untereinander, Listenzeilen, Knopf-Gruppen |
-| `space.12`, `space.16` | Spalteninnenrand, Live-Box-Innenabstand, Abstand Avatar zu Text |
-| `space.20`, `space.24` | Abschnitte in Einstellungen und Konsole |
-| `space.32` bis `space.64` | leere Zustände, Einrichtung |
+| `space.2`, `space.4` | gap from icon to text in chips, row padding compact |
+| `space.6`, `space.8` | chips next to each other, list rows, button groups |
+| `space.12`, `space.16` | column inner margin, live box padding, gap from avatar to text |
+| `space.20`, `space.24` | sections in settings and console |
+| `space.32` to `space.64` | empty states, setup |
 
-## Radien
+## Radii
 
-Knappe Radien: das Produkt ist ein Werkzeug. `radius.pill` nur für Zähler und Abzeichen.
+Tight radii: the product is a tool. `radius.pill` only for counters and badges.
 
-| Token | Verwendung |
+| Token | Use |
 |---|---|
-| `radius.xs` | Inline-Code, Tastenkappen |
-| `radius.sm` | Knöpfe, Chips, Kanalzeilen, Eingabefelder |
-| `radius.md` | Live-Box, Karten, Agenten-Avatare, Code-Blöcke |
-| `radius.lg` | Eingabe, Menüs, Schnellwechsel |
-| `radius.xl` | Telefon-Rahmen in der Vorschau, große Dialoge |
-| `radius.pill` | Zähler, Abzeichen |
+| `radius.xs` | inline code, keycaps |
+| `radius.sm` | buttons, chips, channel rows, input fields |
+| `radius.md` | live box, cards, agent avatars, code blocks |
+| `radius.lg` | input, menus, quick switcher |
+| `radius.xl` | phone frame in the preview, large dialogs |
+| `radius.pill` | counters, badges |
 
-Formsprache: Menschen haben runde Avatare, Agenten abgerundete Quadrate (`radius.md`). So ist auf
-einen Blick klar, wer geschrieben hat, auch ohne Farbe.
+Shape language: people have round avatars, agents rounded squares (`radius.md`). This makes it
+clear at a glance who wrote, even without color.
 
-## Linien
+## Borders
 
-| Token | Wert und Zweck |
+| Token | Value and purpose |
 |---|---|
-| `border-width.hairline` | Spaltengrenzen, Karten, Zeilentrenner |
-| `border-width.focus` | Fokusring, mindestens 2 px (Ziel WCAG 2.2 SC 2.4.13) |
-| `border-width.spine` | Rückgrat links an Live-Box und Erwähnungen, Farbe aus dem Zustand |
+| `border-width.hairline` | column borders, cards, row separators |
+| `border-width.focus` | focus ring, at least 2 px (target WCAG 2.2 SC 2.4.13) |
+| `border-width.spine` | spine on the left of the live box and mentions, color from the state |
 
-## Erhebung
+## Elevation
 
-Flächen liegen flach und trennen sich durch Farbe (`color.surface.*`) und Linien. Schatten gibt es
-nur für Ebenen über dem Inhalt:
+Surfaces lie flat and are separated by color (`color.surface.*`) and lines. Shadows exist
+only for layers above the content:
 
-| Token | Verwendung |
+| Token | Use |
 |---|---|
-| `elevation.menu` | Kontextmenü, Vorschlagsliste, Tooltip |
-| `elevation.dialog` | Dialog, Schnellwechsel, Freigabe-Assistent |
+| `elevation.menu` | context menu, suggestion list, tooltip |
+| `elevation.dialog` | dialog, quick switcher, grant wizard |
 
-Die Schattenfarbe `color.shadow` ist je Theme eigen (im dunklen Theme dunkler und dichter, damit
-der Schatten auf dunklen Flächen überhaupt trägt). Kein Glühen, keine farbigen Schatten, keine
-Unschärfe hinter Ebenen.
+The shadow color `color.shadow` is specific to each theme (darker and denser in the dark theme, so
+that the shadow shows at all on dark surfaces). No glow, no colored shadows, no
+blur behind layers.
 
-## Bewegung
+## Motion
 
-Bewegung zeigt einen Zustandswechsel und schmückt nie. Zwei Kontexte im Resolver:
+Motion shows a state change and never decorates. Two contexts in the resolver:
 
-| Token | `full` | `reduced` | Verwendung |
+| Token | `full` | `reduced` | Use |
 |---|---|---|---|
-| `motion.duration.move-fast` | kurz | 0 | Einklappen von Bereichen, Hover |
-| `motion.duration.move` | mittel | 0 | Live-Box klappt zusammen, Spalten |
-| `motion.duration.move-slow` | lang | 0 | eigene Übergänge im Navigationsstapel (Plattformübergang hat Vorrang) |
-| `motion.duration.fade` | kurz | kürzer | Überblenden ohne Bewegung |
-| `motion.duration.pulse` | Periode | 0 | Drehen des Lauf-Icons, Puls des Lauf-Punkts; 0 heißt statisch |
-| `motion.easing.standard`, `.enter`, `.exit` | Kurven | linear | |
+| `motion.duration.move-fast` | short | 0 | collapsing spaces, hover |
+| `motion.duration.move` | medium | 0 | live box collapses, columns |
+| `motion.duration.move-slow` | long | 0 | own transitions in the navigation stack (the platform transition takes precedence) |
+| `motion.duration.fade` | short | shorter | cross-fade without movement |
+| `motion.duration.pulse` | period | 0 | spinning of the run icon, pulse of the run dot; 0 means static |
+| `motion.easing.standard`, `.enter`, `.exit` | curves | linear | |
 
-Regeln:
+Rules:
 
-- `reduced` gilt, wenn die Systemeinstellung "Bewegung reduzieren" aktiv ist oder die Person
-  `appearance.reduce_motion = on` gewählt hat (`off` erzwingt `full`). WCAG 2.2 SC 2.3.3 ist das
-  Ziel (https://www.w3.org/TR/WCAG22/, abgerufen 2026-10-10 [belegt]).
-- Ein laufender Agent zeigt im Kontext `reduced` ein statisches Icon; der Zustand bleibt über
-  Icon-Form und Beschriftung erkennbar.
-- Live-Box-Patches animieren nichts. Neue Schritte erscheinen ohne Einfliegen; nur der Puls des
-  Zustands-Icons zeigt "läuft".
-- Kein Parallax, kein Wackeln bei Fehlern, keine Konfetti-Effekte.
+- `reduced` applies when the system setting "Reduce motion" is active or the person
+  has chosen `appearance.reduce_motion = on` (`off` forces `full`). WCAG 2.2 SC 2.3.3 is the
+  target (https://www.w3.org/TR/WCAG22/, retrieved 2026-10-10 [verified]).
+- A running agent shows a static icon in the `reduced` context; the state stays recognizable
+  through icon shape and caption.
+- Live box patches animate nothing. New steps appear without flying in; only the pulse of the
+  state icon shows "running".
+- No parallax, no shaking on errors, no confetti effects.
 
-## Dichte
+## Density
 
-Drei Kontexte im Resolver; die App wählt ihn, nicht die Person allein:
+Three contexts in the resolver; the app chooses the context, not the person alone:
 
-| Kontext | Gilt für | Wahl |
+| Context | Applies to | Choice |
 |---|---|---|
-| `comfortable` | Desktop, Web-Konsole | Standard |
-| `compact` | Desktop | Einstellung `appearance.density = compact` |
-| `touch` | iPhone, Android | fest |
+| `comfortable` | desktop, web console | default |
+| `compact` | desktop | setting `appearance.density = compact` |
+| `touch` | iPhone, Android | fixed |
 
-| Token | Bedeutung |
+| Token | Meaning |
 |---|---|
-| `density.row-channel` | Höhe einer Kanalzeile |
-| `density.row-post` | Höhe einer Beitragszeile im Forum (zweizeilig) |
-| `density.row-suggestion` | Zeile in Vorschlagsliste und Schnellwechsel |
-| `density.control-height` | Knöpfe, Auswahlfelder |
-| `density.target-min` | kleinste Trefferfläche: WCAG 2.2 SC 2.5.8 auf Desktop, 48 dp auf Touch |
-| `density.message-gap`, `density.message-pad-y` | Abstände im Verlauf |
-| `density.message-font-size` | Nachrichtentext |
-| `density.livebox-pad` | Innenabstand der Live-Box |
-| `density.composer-min-height` | Mindesthöhe der Eingabe |
+| `density.row-channel` | height of a channel row |
+| `density.row-post` | height of a post row in the forum (two lines) |
+| `density.row-suggestion` | row in the suggestion list and the quick switcher |
+| `density.control-height` | buttons, select fields |
+| `density.target-min` | smallest hit area: WCAG 2.2 SC 2.5.8 on desktop, 48 dp on touch |
+| `density.message-gap`, `density.message-pad-y` | spacing in the history |
+| `density.message-font-size` | message text |
+| `density.livebox-pad` | padding of the live box |
+| `density.composer-min-height` | minimum height of the input |
 
-Belege Trefferflächen: WCAG 2.2 SC 2.5.8 verlangt 24 mal 24 CSS-Pixel
-(https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html, abgerufen 2026-10-10
-[belegt]); Android empfiehlt 48 dp (https://support.google.com/accessibility/android/answer/7101858,
-abgerufen 2026-10-10 [belegt]); Apple nennt 44 pt [abgeleitet aus Sekundärquellen, Primärseite der
-Human Interface Guidelines nicht gelesen]. `touch` nutzt den größeren Material-Wert, damit beide
-Plattformen erfüllt sind. Alle Zahlen: [Token-Referenz](tokens.md).
+Evidence for hit areas: WCAG 2.2 SC 2.5.8 requires 24 by 24 CSS pixels
+(https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html, retrieved 2026-10-10
+[verified]); Android recommends 48 dp
+(https://support.google.com/accessibility/android/answer/7101858, retrieved 2026-10-10 [verified]);
+Apple names 44 pt [derived from secondary sources, primary page of the Human Interface Guidelines
+not read]. `touch` uses the larger Material value so that both
+platforms are satisfied. All numbers: [Token reference](tokens.md).
 
-Die sichtbare Fläche eines Elements darf kleiner sein als `density.target-min`; die Trefferfläche
-nie. Flutter-Tests prüfen das mit `androidTapTargetGuideline` und `iOSTapTargetGuideline`
-(https://api.flutter.dev/flutter/flutter_test/meetsGuideline.html, abgerufen 2026-10-10 [belegt]).
+The visible area of an element may be smaller than `density.target-min`; the hit area must never be.
+Flutter tests check this with `androidTapTargetGuideline` and `iOSTapTargetGuideline`
+(https://api.flutter.dev/flutter/flutter_test/meetsGuideline.html, retrieved 2026-10-10 [verified]).

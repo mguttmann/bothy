@@ -1,162 +1,162 @@
 # Gates
 
-`make check` führt alle Gates in fester Reihenfolge aus und bricht beim ersten Fehler ab.
-CI führt dieselben Ziele aus: Job `gates` ruft `make gates`, Job `denylist` ruft
-`make denylist`, Job `sonar` ruft `make sonar`; `check` ist genau `gates denylist sonar`
-(Kapitel 23, R-QA-01). Schwellen stehen als Namen; ihre Standardwerte stehen nur in
-Kapitel 23, Abschnitt 11.
+`make check` runs all gates in a fixed order and stops at the first failure.
+CI runs the same targets: job `gates` calls `make gates`, job `denylist` calls
+`make denylist`, job `sonar` calls `make sonar`; `check` is exactly `gates denylist sonar`
+(chapter 23, R-QA-01). Thresholds appear as names; their default values appear only in
+chapter 23, section 11.
 
-![Ablauf vom Commit bis zum Release](pipeline.svg)
+![Flow from commit to release](pipeline.svg)
 
-Quelle des Diagramms: `docs/quality/pipeline.mmd`.
+Source of the diagram: `docs/quality/pipeline.mmd`.
 
-## Liste
+## List
 
-| make-Ziel | Werkzeug | Prüft | Schwelle | Heute aktiv |
+| make target | Tool | Checks | Threshold | Active today |
 |---|---|---|---|---|
-| `fmt-check` | ruff format, gofmt, dart format, Skript `format:check` der TypeScript-Projekte | Format ohne Änderungen | | Werkzeuge |
-| `codegen-check` | `tools/ci/codegen_check.py` mit sqlc und `go generate` (go-arch-lint und sqlc aus den Pins vorn im `PATH`) | erzeugter Code (sqlc-Code, `.go-arch-lint.yml`, API-Code) entspricht einer frischen Erzeugung; es zählen nur Änderungen durch den Generator, nicht Handänderungen im Arbeitsbaum | | ab erstem Go-Modul |
-| `lint` | pre-commit-Hooks über alle Dateien (Text-Regeln, Stripe webhook secret format `whsec_` of GitHub secret scanning, Leerzeichen, YAML/TOML/JSON, Merge-Marker, private Schlüssel, Dateigröße), ruff (mit Docstring-Pflicht `D`, Abschnitt "Doku im Code" in Kapitel 23), bandit, check-jsonschema (Issue-Formulare, Renovate, CodeRabbit), actionlint, zizmor, go vet und golangci-lint, flutter analyze und custom_lint, Skript `lint` | Stil, Fehlerquellen, Workflow-Sicherheit | `repo.max_file_kb` | ja |
-| `typecheck` | mypy (strict), go build, tsc | Typen | | Werkzeuge |
-| `arch` | go-arch-lint mit `<modul>/.go-arch-lint.yml`, erzeugt aus `architecture/modules.yaml` | Modulgrenzen und erlaubte Fremdbibliotheken der Go-Module (Kapitel 02 "go-arch-lint") | | ab erstem Go-Modul |
-| `migrations-lint` | `tools/ci/migrations_lint.py` | fortlaufende, lückenlose fünfstellige Nummern ohne Zeitstempel-Versionen, Prüfsummen gemergter Migrationen unverändert (`migrations.sha256`), `STORED` bei `GENERATED ALWAYS AS`, `-- +goose NO TRANSACTION` bei `CONCURRENTLY` (ADR 0007, Kapitel 14) | | ab erster Migration |
-| `test` | pytest, go test -race, flutter test, Skript `test` | Tests mit Abdeckungsdaten | | Werkzeuge |
-| `coverage` | coverage, go tool cover, LCOV-Auswertung | Mindestabdeckung; Go ohne die Pakete unter `test/` und `perf/` (Testcode, Kapitel 23 "Komponenten-Vertrag") | `quality.coverage.tools_min_percent`, `quality.coverage.go_min_percent`, `quality.coverage.dart_min_percent` | Werkzeuge |
-| `commitlint` | `tools/hooks/commit_msg.py` | Conventional Commits und DCO der Commits, die noch nicht auf `origin/main` sind | `commit.header_max_length` | ab erstem Remote |
-| `docs` | `tools/docs/adr_index.py`, `tools/docs/config_reference.py`, `tools/docs/problem_code_refs.py`, `tools/docs/brief_deps.py`, `tools/docs/register_ids.py`, `tools/docs/risk_ranking.py`, MkDocs `--strict` mit dem Hook `tools/docs/mkdocs_repo_links.py` | ADR-Index und Konfigurationsreferenz aktuell, kein Konfigurationsname doppelt (Ruling L4), jedes Paar aus Status und Problem-Code in Markdown und API-Dateien steht so in `x-problem-codes` (06 Abschnitt 5 Punkt 7), Index, Wellen und Graph der Briefs stimmen mit dem Plan überein und kein Brief ruft ein `make`-Ziel, das erst ein Ticket außerhalb seiner Abhängigkeiten anlegt, jede ID, die eine Tabelle in `docs/**/*.md` in der ersten Spalte definiert (Rulings, Tests, Schutzregeln, Bedrohungen, Entscheidungen, Risiken, offene Fragen, Tickets), steht im ganzen Repository genau einmal so (D-W-60), jede Tabellenzeile hat so viele Zellen wie ihr Kopf (D-W-71), Übersicht und Abschnitte der offenen Fragen nennen dieselben IDs, die Rangliste der größten Risiken nennt die Bewertung des Registers und lässt kein höher bewertetes Risiko aus (D-W-78), und die Liste hinter ihrem letzten Rang nennt genau die übrigen Risiken mit dessen Bewertung (D-W-79), Site baut ohne Warnung; Links auf vorhandene Dateien außerhalb von `docs/` zeigen in der Site auf das Repository, ein fehlendes Ziel bleibt ein Fehler | | ja |
-| `linkcheck` | lychee `--offline --include-fragments`; `tools/docs/placeholder_links.py` | lokale Links und Anker aller getrackten Markdown-Dateien; kein Link außerhalb von Code auf das Platzhalter-Repository `OWNER` (P-05), weil er nach dem Veröffentlichen ins Leere führt | | ja |
-| `diagrams` | `tools/docs/render_diagrams.py` mit mermaid-cli, `tools/docs/erd_check.py` | jedes Mermaid-Diagramm rendert; jede `.mmd` hat ihre `.svg`, gerendert mit dem Design-Thema (`design/build/mermaid.config.json`), gestempelt mit dem SHA-256 von `.mmd` und Thema (sonst veraltet, D-W-56) und nicht breiter oder höher als `MAX_ASPECT`; `.mmd` nennen nur Token-Farben; die ERDs zeigen jede Tabelle und jeden Fremdschlüssel aus 03 | | ja |
-| `api-lint` | Redocly CLI mit `docs/api/redocly.yaml` | OpenAPI und AsyncAPI, Pflicht von `x-authz-action` | | sobald `docs/api/openapi.yaml` existiert |
-| `api-clients` | Ziel `generate-check` der Client-Pakete | generierte Clients sind aktuell und kompilieren | | ab erstem Client-Paket |
-| `tokens` | Ziel `check` in `tools/design-tokens/` | Tests des Generators; Design-Tokens bauen, Kontraste und Palettenwächter bestehen, erzeugte Dateien aktuell, eingebettete Dateien passen zu `vendor/MANIFEST.json` | | ja |
-| `runners-check` | `tools/ci/check_runners.py` | Nur feste GitHub-gehostete Runner-Labels (ADR 0039), Trigger, SHA-Pinning, Timeouts, Rechte; in Jobs mit Umgebung `release*` Ausgaben von Jobs ohne diese Umgebung nur im `if:` des Jobs oder eines Schritts (Erlaubnisliste D-W-61, D-W-72), Artefakte nur per `artifact-ids` (D-W-52); Matrix-Werte in `runs-on` je Kombination geprüft, keine Laufzeit-Matrix hinter `runs-on` (D-W-53); Release-Workflows ruft nur ein Job von `release.yml` ohne Matrix auf (D-W-73); `push` nur auf Tags, außer `denylist-main.yml` auf `main` | | ja |
-| `labels-check` | `tools/ci/labels.py` | Label-Datei gültig, Vorlagen und GOVERNANCE.md nutzen nur definierte Labels | | ja |
-| `gitleaks` | gitleaks mit `.gitleaks.toml` | Secrets in jedem von `HEAD` erreichbaren Commit; vor dem Öffentlich-Schalten in allen Refs; the EXAMPLE marker exempts only this product's own token formats and generic key-like values | | ja |
-| `semgrep` | Semgrep mit `.semgrep/` | Projektregeln und ihre Regel-Tests | | ja |
-| `trivy` | Trivy `config` auf einer Kopie der getrackten und nicht ignorierten Dateien (`tools/ci/tracked_tree.py`) | Fehlkonfiguration in Dockerfiles, Kubernetes, Helm, Terraform | `HIGH`, `CRITICAL` | sobald solche Dateien existieren |
-| `osv` | OSV-Scanner, govulncheck | bekannte Schwachstellen aller Lock-Dateien; erreichbare Go-Schwachstellen | | ja |
-| `licenses` | `tools/ci/license_check.py`, OSV-Scanner `--licenses`, go-licenses | Lizenztext, SPDX-Kopfzeilen, Lizenzen ausgelieferter Abhängigkeiten | `quality/licenses/allowed.txt`, `license.spdx_header_lines` | ja (Abhängigkeiten ab erster Komponente) |
-| `denylist` | `tools/denylist/denylist_scan.py` | White Label in Inhalten, Namen, Commits, Identitäten, Refs | | ja, braucht die private Liste |
-| `sonar` | SonarScanner (npm) gegen den lokalen Server oder SonarQube Cloud | Gate "Bothy way" | `quality.sonar.*` | ab erstem Produkt-Code |
+| `fmt-check` | ruff format, gofmt, dart format, script `format:check` of the TypeScript projects | format without changes | | tools |
+| `codegen-check` | `tools/ci/codegen_check.py` with sqlc and `go generate` (go-arch-lint and sqlc from the pins at the front of `PATH`) | generated code (sqlc code, `.go-arch-lint.yml`, API code) matches a fresh generation; only changes by the generator count, not manual changes in the working tree | | from the first Go module |
+| `lint` | pre-commit hooks over all files (text rules, Stripe webhook secret format `whsec_` of GitHub secret scanning, whitespace, YAML/TOML/JSON, merge markers, private keys, file size), ruff (with required docstrings `D`, section "Documentation in code" in chapter 23), bandit, check-jsonschema (issue forms, Renovate, CodeRabbit), actionlint, zizmor, go vet and golangci-lint, flutter analyze and custom_lint, script `lint` | style, sources of errors, workflow security | `repo.max_file_kb` | yes |
+| `typecheck` | mypy (strict), go build, tsc | types | | tools |
+| `arch` | go-arch-lint with `<module>/.go-arch-lint.yml`, generated from `architecture/modules.yaml` | module boundaries and allowed third-party libraries of the Go modules (chapter 02 "go-arch-lint") | | from the first Go module |
+| `migrations-lint` | `tools/ci/migrations_lint.py` | consecutive five-digit numbers without gaps and without timestamp versions, checksums of merged migrations unchanged (`migrations.sha256`), `STORED` with `GENERATED ALWAYS AS`, `-- +goose NO TRANSACTION` with `CONCURRENTLY` (ADR 0007, chapter 14) | | from the first migration |
+| `test` | pytest, go test -race, flutter test, script `test` | tests with coverage data | | tools |
+| `coverage` | coverage, go tool cover, LCOV evaluation | minimum coverage; Go without the packages under `test/` and `perf/` (test code, chapter 23 "Component contract") | `quality.coverage.tools_min_percent`, `quality.coverage.go_min_percent`, `quality.coverage.dart_min_percent` | tools |
+| `commitlint` | `tools/hooks/commit_msg.py` | Conventional Commits and DCO of the commits that are not yet on `origin/main` | `commit.header_max_length` | from the first remote |
+| `docs` | `tools/docs/language_check.py`, `tools/docs/adr_index.py`, `tools/docs/config_reference.py`, `tools/docs/problem_code_refs.py`, `tools/docs/brief_deps.py`, `tools/docs/register_ids.py`, `tools/docs/risk_ranking.py`, MkDocs `--strict` with the hook `tools/docs/mkdocs_repo_links.py` | ADR index and configuration reference up to date, no configuration name twice (ruling L4), every pair of status and problem code in Markdown and API files appears as such in `x-problem-codes` (06 section 5 item 7), index, waves and graph of the briefs match the plan and no brief calls a `make` target that only a ticket outside its dependencies creates, every ID that a table in `docs/**/*.md` defines in the first column (rulings, tests, guard rules, threats, decisions, risks, open questions, tickets) appears as such exactly once in the whole repository (D-W-60), every table row has as many cells as its header (D-W-71), the overview and the sections of the open questions name the same IDs, the ranking of the largest risks names the rating of the register and leaves out no higher-rated risk (D-W-78), and the list behind its last rank names exactly the remaining risks with that rank's rating (D-W-79), the site builds without a warning; links to existing files outside `docs/` point to the repository in the site, a missing target stays an error; no tracked text file contains German prose or a word with an umlaut, except the exceptions in `tools/docs/language-allow.txt` and text between the marker lines `language-check: off` and `language-check: on` (D-W-94) | | yes |
+| `linkcheck` | lychee `--offline --include-fragments`; `tools/docs/placeholder_links.py` | local links and anchors of all tracked Markdown files; no link outside code to the placeholder repository `OWNER` (P-05), because it leads nowhere after publishing | | yes |
+| `diagrams` | `tools/docs/render_diagrams.py` with mermaid-cli, `tools/docs/erd_check.py` | every Mermaid diagram renders; every `.mmd` has its `.svg`, rendered with the design theme (`design/build/mermaid.config.json`), stamped with the SHA-256 of `.mmd` and theme (otherwise stale, D-W-56) and not wider or taller than `MAX_ASPECT`; `.mmd` files name only token colors; the ERDs show every table and every foreign key from 03 | | yes |
+| `api-lint` | Redocly CLI with `docs/api/redocly.yaml` | OpenAPI and AsyncAPI, requirement of `x-authz-action` | | once `docs/api/openapi.yaml` exists |
+| `api-clients` | target `generate-check` of the client packages | generated clients are up to date and compile | | from the first client package |
+| `tokens` | target `check` in `tools/design-tokens/` | tests of the generator; design tokens build, contrast and palette guard checks pass, generated files up to date, embedded files match `vendor/MANIFEST.json` | | yes |
+| `runners-check` | `tools/ci/check_runners.py` | Only fixed GitHub-hosted runner labels (ADR 0039), triggers, SHA pinning, timeouts, permissions; in jobs with environment `release*`, outputs of jobs without this environment only in the `if:` of the job or of a step (allow-list D-W-61, D-W-72), artifacts only via `artifact-ids` (D-W-52); matrix values in `runs-on` checked per combination, no runtime matrix behind `runs-on` (D-W-53); release workflows are called only by a job of `release.yml` without a matrix (D-W-73); `push` only on tags, except `denylist-main.yml` on `main` | | yes |
+| `labels-check` | `tools/ci/labels.py` | label file valid, templates and GOVERNANCE.md use only defined labels | | yes |
+| `gitleaks` | gitleaks with `.gitleaks.toml` | secrets in every commit reachable from `HEAD`; before going public, in all refs; the EXAMPLE marker exempts only this product's own token formats and generic key-like values | | yes |
+| `semgrep` | Semgrep with `.semgrep/` | project rules and their rule tests | | yes |
+| `trivy` | Trivy `config` on a copy of the tracked and not ignored files (`tools/ci/tracked_tree.py`) | misconfiguration in Dockerfiles, Kubernetes, Helm, Terraform | `HIGH`, `CRITICAL` | once such files exist |
+| `osv` | OSV-Scanner, govulncheck | known vulnerabilities of all lock files; reachable Go vulnerabilities | | yes |
+| `licenses` | `tools/ci/license_check.py`, OSV-Scanner `--licenses`, go-licenses | license text, SPDX header lines, licenses of shipped dependencies | `quality/licenses/allowed.txt`, `license.spdx_header_lines` | yes (dependencies from the first component) |
+| `denylist` | `tools/denylist/denylist_scan.py` | white label in contents, names, commits, identities, refs | | yes, needs the private list |
+| `sonar` | SonarScanner (npm) against the local server or SonarQube Cloud | gate "Bothy way" | `quality.sonar.*` | from the first product code |
 
-Release-Workflow zusätzlich: `trivy-image` (Schwachstellen im gebauten Image), SBOM
-(Syft über `anchore/sbom-action`), Build-Provenance und SBOM-Attestation (öffentlich),
-`portability` (ganzer Stack auf frischer Maschine).
+In addition, the release workflow runs: `trivy-image` (vulnerabilities in the built image), SBOM
+(Syft via `anchore/sbom-action`), build provenance and SBOM attestation (public),
+`portability` (whole stack on a fresh machine).
 
-## Überspringen und Fehlschlagen
+## Skipping and failing
 
-* Ein Gate schreibt `SKIP <name> <Grund>` und gilt als bestanden, wenn die Komponente
-  keinen Code hat. Der Makefile entscheidet das aus `git ls-files`: ein Go-Modul ist ein
-  getracktes `go.mod` unter `services/`, ein Dart-Paket ein `pubspec.yaml` unter `apps/`
-  oder `packages/`, ein Python-Projekt ein `pyproject.toml` unter `sdk/python/` oder
-  `plugins/`, ein TypeScript-Projekt ein `package.json` unter `sdk/typescript/` oder
-  `plugins/`. Neue Dateien zählen erst nach `git add`.
-* Ein fehlendes Werkzeug, eine fehlende Liste, ein fehlendes Token oder ein fehlender
-  Teil des Komponenten-Vertrags (Kapitel 23, Abschnitt 3) ist ein Fehler.
-* Beitragende aus Forks schalten ausdrücklich ab, was sie nicht haben:
-  `DENYLIST_FLAGS=--allow-missing` (nur öffentliche Regeln), `SONAR_SKIP=1` und
-  `REVIEW_SKIP=1` (kein eigenes unabhängiges Review). Alles steht sichtbar in der Ausgabe;
-  CI behandelt Fork-Pull-Requests genauso (R-QA-02). Was der Fork nicht prüfen konnte,
-  holt der Maintainer vor dem Merge nach; die private Liste prüft nach dem Merge zusätzlich
-  `denylist-main.yml` jeden Push auf `main`.
-* `COMPONENTS=<liste>` beschränkt die Komponenten-Gates; CI setzt es aus den geänderten
-  Pfaden. Lokal ist der Standard `all`.
-* Server-Voraussetzungen: Sobald ein Go-Modul ausgewählt ist, prüfen alle Server-Gates
-  (`codegen-check`, `arch`, `migrations-lint`, `perf`) und der Go-Teil von `test` zuerst
-  `go` auf dem `PATH`, eine erreichbare Docker-kompatible Laufzeit (`docker info`) und die
-  Pins von go-arch-lint und sqlc (`tools/ci/go_prereqs.py`, lädt fehlende Pins und prüft
-  ihre sha256). Fehlt etwas, scheitert das Gate mit einer Zeile je fehlendem Teil; ein
-  `SKIP` gibt es dafür nicht (R-QA-02, PLAN P-09). Docker ist für jedes Server-Gate
-  Pflicht, nicht nur für die Tests, damit ein Rechner, der die Integrationstests nicht
-  ausführen kann, nie einen halb grünen Server-Stand meldet.
-* `migrations-lint` überspringt ein Go-Modul mit einer `SKIP`-Zeile, solange es weder
-  `migrations/` noch `migrations.sha256` hat (keine Migration, nichts zu prüfen). Liegt nur
-  noch die Prüfsummen-Datei da, scheitert es.
+* A gate writes `SKIP <name> <reason>` and counts as passed when the component
+  has no code. The Makefile decides this from `git ls-files`: a Go module is a
+  tracked `go.mod` under `services/`, a Dart package a `pubspec.yaml` under `apps/`
+  or `packages/`, a Python project a `pyproject.toml` under `sdk/python/` or
+  `plugins/`, a TypeScript project a `package.json` under `sdk/typescript/` or
+  `plugins/`. New files count only after `git add`.
+* A missing tool, a missing list, a missing token or a missing
+  part of the component contract (chapter 23, section 3) is an error.
+* Contributors from forks explicitly switch off what they do not have:
+  `DENYLIST_FLAGS=--allow-missing` (public rules only), `SONAR_SKIP=1` and
+  `REVIEW_SKIP=1` (no independent review of their own). Everything is visible in the output;
+  CI treats fork pull requests the same way (R-QA-02). What the fork could not check,
+  the maintainer catches up on before the merge; after the merge, `denylist-main.yml` also
+  checks every push to `main` with the private list.
+* `COMPONENTS=<list>` limits the component gates; CI sets it from the changed
+  paths. Locally the default is `all`.
+* Server prerequisites: as soon as a Go module is selected, all server gates
+  (`codegen-check`, `arch`, `migrations-lint`, `perf`) and the Go part of `test` first check
+  `go` on the `PATH`, a reachable Docker-compatible runtime (`docker info`) and the
+  pins of go-arch-lint and sqlc (`tools/ci/go_prereqs.py`, downloads missing pins and checks
+  their sha256). If something is missing, the gate fails with one line per missing part; there
+  is no `SKIP` for this (R-QA-02, PLAN P-09). Docker is required for every server gate,
+  not only for the tests, so that a host that cannot run the integration tests
+  never reports a half-green server state.
+* `migrations-lint` skips a Go module with a `SKIP` line as long as it has neither
+  `migrations/` nor `migrations.sha256` (no migration, nothing to check). If only
+  the checksum file is left, it fails.
 
-## Leistung (`make perf`)
+## Performance (`make perf`)
 
-`make perf` führt die Lasttests jedes Go-Moduls aus: `go test -tags perf -count=1` über
-`<modul>/perf/...`, mit dem Zeitlimit `quality.perf.timeout` je Modul. Es läuft am
-Abschluss jeder Etappe und im Release, nie in `gates` und nie im pre-push-Hook (PLAN P-07):
-Die Leistungsziele aus Kapitel 02 "Leistungsziele" gelten nur auf `perf.reference_profile`,
-auf beliebiger Hardware wären die Messwerte nicht vergleichbar (ADR 0063). Darum steht vor
-jedem Modul der Hinweis auf `perf.reference_profile` in der Ausgabe.
+`make perf` runs the load tests of every Go module: `go test -tags perf -count=1` over
+`<module>/perf/...`, with the time limit `quality.perf.timeout` per module. It runs at the
+close of every milestone and in the release, never in `gates` and never in the pre-push hook
+(PLAN P-07): the performance targets from chapter 02 "Performance targets" apply only on
+`perf.reference_profile`; on arbitrary hardware the measurements would not be comparable
+(ADR 0063). That is why the output shows the note about `perf.reference_profile` before every
+module.
 
-Lasttests tragen das Build-Tag `perf`, damit `make test` sie nicht ausführt. Ihre Pakete
-liegen unter `<modul>/perf/` und zählen nicht zur Abdeckung. Ohne Go-Modul meldet
-`make perf` `SKIP`; ein Go-Modul ohne `perf/` ist ein Fehler. Wie die Server-Gates braucht
-`make perf` go, eine Docker-kompatible Laufzeit und die Pins.
+Load tests carry the build tag `perf`, so that `make test` does not run them. Their packages
+are under `<module>/perf/` and do not count toward coverage. Without a Go module,
+`make perf` reports `SKIP`; a Go module without `perf/` is an error. Like the server gates,
+`make perf` needs go, a Docker-compatible runtime and the pins.
 
-## Migrationen
+## Migrations
 
-Ablauf für die Migrationen eines Go-Moduls (ADR 0007, Gate `migrations-lint`):
+Flow for the migrations of a Go module (ADR 0007, gate `migrations-lint`):
 
-1. Die nächste freie Nummer des Ausgangsbranchs nehmen: `migrations/NNNNN_<slug>.sql`
-   (fünf Ziffern, Slug aus Kleinbuchstaben, Ziffern und einzelnen Unterstrichen) mit genau
-   einer Zeile `-- +goose Up`.
-2. `make migrations-lock` aufrufen. Es trägt die Prüfsumme jeder neuen Datei in
-   `<modul>/migrations.sha256` ein und ändert oder entfernt nie eine bestehende Zeile.
-3. Eine Migration, die im Ausgangsbranch gemergt ist, wird nie geändert oder gelöscht;
-   eine Korrektur ist eine neue Migration.
-4. Haben zwei Branches dieselbe Nummer gewählt, nummeriert der später gemergte Branch seine
-   Datei um, entfernt seine eigene Zeile aus `migrations.sha256` und ruft
-   `make migrations-lock` erneut auf, vor seinem letzten `make check`.
-5. Ein Entwurf darf eine Zeitstempel-Version tragen. Das Gate lehnt sie in jedem Lauf ab,
-   auch auf Feature-Branches, weil der lokale Merge erst nach einem grünen `make check`
-   folgt.
+1. Take the next free number of the base branch: `migrations/NNNNN_<slug>.sql`
+   (five digits, slug of lowercase letters, digits and single underscores) with exactly
+   one line `-- +goose Up`.
+2. Call `make migrations-lock`. It enters the checksum of every new file in
+   `<module>/migrations.sha256` and never changes or removes an existing line.
+3. A migration that is merged in the base branch is never changed or deleted;
+   a correction is a new migration.
+4. If two branches chose the same number, the branch merged later renumbers its
+   file, removes its own line from `migrations.sha256` and calls
+   `make migrations-lock` again, before its last `make check`.
+5. A draft may carry a timestamp version. The gate rejects it in every run,
+   also on feature branches, because the local merge only follows after a green `make check`.
 
-Jede Spalte `GENERATED ALWAYS AS (...)` schreibt `STORED`, weil PostgreSQL 18 sonst eine
-virtuelle Spalte anlegt (Kapitel 14 "Ausdrücke"). Eine Anweisung mit `CONCURRENTLY` (außer
-`REFRESH MATERIALIZED VIEW CONCURRENTLY`) steht in einer eigenen Datei mit der Zeile
-`-- +goose NO TRANSACTION` (ADR 0007, Regel 3). Kommentare, Zeichenketten und Bezeichner in
-Anführungszeichen zählen für beide Regeln nicht. Die Prüfsummen-Datei hat das Format von
-`shasum -a 256` (zwei Leerzeichen, nach Dateiname sortiert, Zeilenende am Schluss) und liegt
-neben `migrations/`, damit weder das Einbettungsmuster `*.sql` noch sqlc sie liest.
+Every column `GENERATED ALWAYS AS (...)` writes `STORED`, because PostgreSQL 18 otherwise creates
+a virtual column (chapter 14 "Expressions"). A statement with `CONCURRENTLY` (except
+`REFRESH MATERIALIZED VIEW CONCURRENTLY`) stands in its own file with the line
+`-- +goose NO TRANSACTION` (ADR 0007, rule 3). Comments, strings and quoted identifiers
+do not count for either rule. The checksum file has the format of
+`shasum -a 256` (two spaces, sorted by file name, line ending at the end) and is located
+next to `migrations/`, so that neither the embedding pattern `*.sql` nor sqlc reads it.
 
 ## Hooks
 
-`make bootstrap` installiert drei Hooks aus `.pre-commit-config.yaml`:
+`make bootstrap` installs three hooks from `.pre-commit-config.yaml`:
 
-| Hook | Läuft | Inhalt |
+| Hook | Runs | Content |
 |---|---|---|
-| pre-commit | bei jedem Commit, auf den geänderten Dateien | Text-Regeln (keine Gedankenstriche), Stripe webhook secret format `whsec_` (`tools/hooks/secret_formats.py`), Datei-Hygiene, ruff für `tools/`, gitleaks auf den gestagten Änderungen |
-| commit-msg | bei jedem Commit | Conventional Commits und DCO-Sign-off |
-| pre-push | vor jedem Push | `tools/hooks/review_gate.py` (Bericht `.review/<sha>.md` des gepushten Commits endet mit `Urteil: JA`, [red-team-gate.md](red-team-gate.md)), dann `make check` |
+| pre-commit | on every commit, on the changed files | text rules (no en or em dashes), Stripe webhook secret format `whsec_` (`tools/hooks/secret_formats.py`), file hygiene, ruff for `tools/`, gitleaks on the staged changes |
+| commit-msg | on every commit | Conventional Commits and DCO sign-off |
+| pre-push | before every push | `tools/hooks/review_gate.py` (report `.review/<sha>.md` of the pushed commit ends with `Urteil: JA`, [red-team-gate.md](red-team-gate.md)), then `make check` |
 
-## Einzelne Gates
+## Individual gates
 
-Jedes Gate läuft auch allein, zum Beispiel `make lint` oder `make diagrams`. Für die
-Diagramme kann `MMDC_PUPPETEER_CONFIG` auf eine Puppeteer-Konfiguration zeigen. Nennt sie
-ein eigenes Chromium (`executablePath`), lädt `make bootstrap` keinen Browser; sonst lädt
-es den zu Puppeteer passenden. CI nutzt `tools/node/puppeteer-ci.json` (Chromium ohne
-Sandbox, weil Runner Benutzer-Namensräume einschränken können; gerendert werden nur die
-eigenen Diagramme).
+Every gate also runs alone, for example `make lint` or `make diagrams`. For the
+diagrams, `MMDC_PUPPETEER_CONFIG` can point to a Puppeteer configuration. If it names
+its own Chromium (`executablePath`), `make bootstrap` downloads no browser; otherwise it downloads
+the one that matches Puppeteer. CI uses `tools/node/puppeteer-ci.json` (Chromium without
+sandbox, because runners can restrict user namespaces; only the project's
+own diagrams are rendered).
 
-Weitere Schalter: `COMMIT_RANGE` und `DENYLIST_RANGE` (Commit-Bereich statt
-`origin/main..HEAD`), `GITLEAKS_LOG_OPTS` (Standard `HEAD`, alle Refs mit `--all`), `GITLEAKS_FLAGS` (zum
-Beispiel ein JSON-Bericht), `DENYLIST_FLAGS` (zum Beispiel `--reveal` lokal).
+Further switches: `COMMIT_RANGE` and `DENYLIST_RANGE` (commit range instead of
+`origin/main..HEAD`), `GITLEAKS_LOG_OPTS` (default `HEAD`, all refs with `--all`), `GITLEAKS_FLAGS` (for
+example a JSON report), `DENYLIST_FLAGS` (for example `--reveal` locally).
 
-## Was die Gates nicht abdecken
+## What the gates do not cover
 
-* Links ins Internet: `make linkcheck-external` bei Bedarf (R-QA-09).
-* Ob der Inhalt einer `.svg` dem entspricht, was mermaid-cli heute aus ihrer `.mmd` rendern
-  würde: Die Ausgabe hängt von der Browser-Version ab, ein Byte-Vergleich wäre auf jedem
-  Rechner anders. `make diagrams` prüft stattdessen den Stempel, den `render_diagrams.py
-  --write` aus `.mmd` und Thema schreibt (D-W-56); eine von Hand bearbeitete `.svg` mit altem
-  Stempel fällt nicht auf.
-* Shell-Code in Workflows prüft actionlint ohne shellcheck, weil shellcheck nicht gepinnt
-  verfügbar ist; Workflows rufen darum nur kurze Befehle und make-Ziele auf.
-* Die Gleichheit von lokalem SonarQube und Cloud prüft `make sonar-config-check`, nicht
-  jeder Lauf (sonarqube-local.md).
-* Ob eine Migration auf PostgreSQL läuft, prüft `migrations-lint` nicht; das zeigt der
-  Integrationstest mit allen Migrationen auf leerem PostgreSQL 18 (ADR 0007,
-  "Confirmation"). `goose validate` prüft die Dateien ohne Datenbank; es kommt mit
-  `bothy migrate validate` (PLAN M1-12) und ist noch kein Teil von `migrations-lint`.
-* `migrations-lint` vergleicht gemergte Migrationen nur mit `migrations.sha256` im
-  Arbeitsbaum, nicht mit dem Stand des Ausgangsbranchs. Wer eine Migration und ihre Zeile in
-  der Prüfsummen-Datei zugleich von Hand ändert, die neueste Migration samt ihrer Zeile
-  entfernt oder `migrations/` samt `migrations.sha256` löscht, besteht das Gate; das muss
-  das Review des Diffs sehen.
+* Links to the internet: `make linkcheck-external` when needed (R-QA-09).
+* Whether the content of an `.svg` matches what mermaid-cli would render today from its `.mmd`:
+  the output depends on the browser version, so a byte comparison would differ on every
+  host. Instead, `make diagrams` checks the stamp that `render_diagrams.py
+  --write` writes from `.mmd` and theme (D-W-56); a hand-edited `.svg` with an old
+  stamp goes unnoticed.
+* actionlint checks shell code in workflows without shellcheck, because shellcheck is not available
+  pinned; workflows therefore call only short commands and make targets.
+* The equality of local SonarQube and the cloud is checked by `make sonar-config-check`, not by
+  every run (sonarqube-local.md).
+* `migrations-lint` does not check whether a migration runs on PostgreSQL; that is shown by the
+  integration test with all migrations on an empty PostgreSQL 18 (ADR 0007,
+  "Confirmation"). `goose validate` checks the files without a database; it comes with
+  `bothy migrate validate` (PLAN M1-12) and is not yet part of `migrations-lint`.
+* `migrations-lint` compares merged migrations only with `migrations.sha256` in the
+  working tree, not with the state of the base branch. Anyone who changes a migration and its line in
+  the checksum file by hand at the same time, removes the newest migration together with its line
+  or deletes `migrations/` together with `migrations.sha256` passes the gate; the review of the diff
+  must catch that.
 * GitHub secret scanning has its own patterns
   ([supported patterns](https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns),
   retrieved 2026-10-11): it knows provider formats that gitleaks does not, and its

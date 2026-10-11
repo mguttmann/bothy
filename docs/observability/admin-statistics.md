@@ -1,98 +1,97 @@
-# Statistik in der Admin-Konsole
+# Statistics in the admin console
 
-Status: Entwurf M0. Regeln: [17-observability.md](../spec/17-observability.md) 8. Darstellung in
-der Konsole: [01-produkt.md](../spec/01-produkt.md); Visualisierungen, eigene Messung und Live-Strom:
-[25-visualisierung.md](../spec/25-visualisierung.md). Rechte: `stats.read` und `cost.read.aggregate`
-([05-aktionen.md](../spec/05-aktionen.md) 4.2, 4.12).
+Status: draft M0. Rules: [17-observability.md](../spec/17-observability.md) 8. Presentation in
+the console: [01-product.md](../spec/01-product.md); visualizations, own measurement and live stream:
+[25-visualization.md](../spec/25-visualization.md). Permissions: `stats.read` and `cost.read.aggregate`
+([05-actions.md](../spec/05-actions.md) 4.2, 4.12).
 
-## 1. Grundsatz
+## 1. Principle
 
-Die Statistik liest eigene Tabellen in PostgreSQL, nie ein Telemetrie-Backend. Dazu gehört seit
-dem Nachtrag vom 2026-10-10 auch `stats_minutes`, die Minuten-Aggregate der eigenen Messung
-(Abschnitt 7). Grund: Der
-Observability-Stack ist optional, gesampelt und hat kurze Fristen; die Statistik muss in jeder
-Installation gleich und vollständig sein und denselben Rechten folgen wie die Daten.
+The statistics read their own tables in PostgreSQL, never a telemetry backend. Since the
+addendum of 2026-10-10 this also includes `stats_minutes`, the minute aggregates of the own
+measurement (section 7). Reason: The
+observability stack is optional, sampled and has short retention periods; the statistics must be
+the same and complete in every installation and follow the same permissions as the data.
 
-## 2. Kennzahlen
+## 2. Key figures
 
-| Bereich | Kennzahl | Quelle | Gruppierung |
+| Area | Key figure | Source | Grouping |
 |---|---|---|---|
-| Nutzung | Nachrichten je Tag nach Herkunft (`human`, `agent`, `app`, `import`) | `messages` (ohne gelöschte) | Bereich, Kanal, Tag |
-| Nutzung | neue Threads, erledigte Threads | `threads` | Bereich, Kanal, Tag |
-| Nutzung | aktive Menschen (mindestens eine Nachricht) | `messages.author_principal_id` | Bereich, Woche; nur ab `privacy.stats_min_group_size` |
-| Nutzung | Speicher der Dateien | `files.size_bytes` über `scope_channel_id` | Bereich |
-| Läufe | Läufe nach Endzustand, Dauer (Median, p95) | `runs` | Agent, Bereich, Tag |
-| Läufe | Fehlergründe | `runs.state_reason` bei `failed` | Agent, Tag |
-| Werkzeuge | Werkzeugaufrufe nach Name, Anteil `failed` | `run_steps` mit `kind = 'tool_call'` | Agent, Werkzeug, Tag |
-| Kosten | gültige Summe, Anteil Schätzung, nach Modell | `cost_entries` ohne Nachfolger | Bereich, Agent, Modell, Tag, Währung |
-| Fehlerraten | Läufe `failed` je Läufe | `runs` | Agent, Tag |
-| Fehlerraten | Webhook-Zustellungen `failed` und `dead` | `webhook_deliveries` (solange in der Frist) | App, Tag |
-| Fehlerraten | Scans `error` und `infected` | `files.scan_status` | Tag |
-| Fehlerraten | Push-Registrierungen deaktiviert | `push_registrations.disabled_reason` | Anbieter |
+| Usage | Messages per day by origin (`human`, `agent`, `app`, `import`) | `messages` (without deleted ones) | Space, channel, day |
+| Usage | New threads, done threads | `threads` | Space, channel, day |
+| Usage | Active people (at least one message) | `messages.author_principal_id` | Space, week; only from `privacy.stats_min_group_size` |
+| Usage | Storage of the files | `files.size_bytes` via `scope_channel_id` | Space |
+| Runs | Runs by end state, duration (median, p95) | `runs` | Agent, space, day |
+| Runs | Failure reasons | `runs.state_reason` for `failed` | Agent, day |
+| Tools | Tool calls by name, share of `failed` | `run_steps` with `kind = 'tool_call'` | Agent, tool, day |
+| Costs | Valid sum, share of estimates, by model | `cost_entries` without a successor | Space, agent, model, day, currency |
+| Error rates | Runs `failed` per runs | `runs` | Agent, day |
+| Error rates | Webhook deliveries `failed` and `dead` | `webhook_deliveries` (while within the retention period) | App, day |
+| Error rates | Scans `error` and `infected` | `files.scan_status` | Day |
+| Error rates | Push registrations disabled | `push_registrations.disabled_reason` | Provider |
 
-Kosten im Modus `personal` sind nur Information, nie Rechnung
-([03-datenmodell.md](../spec/03-datenmodell.md) 4.9); die Konsole kennzeichnet beide Modi getrennt
-und Schätzungen als "Schätzung".
+Costs in the mode `personal` are information only, never an invoice
+([03-data-model.md](../spec/03-data-model.md) 4.9); the console labels the two modes separately
+and estimates as "Estimate".
 
-Grenzen der Quellen: `run_steps` fasst ab `run.max_steps_persisted` ältere Schritte zusammen;
-sehr lange Läufe zählen darum zu wenige Werkzeugaufrufe. `webhook_deliveries` liegt in der
-Klasse `transient` und reicht nur so weit zurück wie deren Frist. Gelöschte Nachrichten zählen
-nicht.
+Limits of the sources: from `run.max_steps_persisted` on, `run_steps` merges older steps; very
+long runs therefore count too few tool calls. `webhook_deliveries` is in the class `transient`
+and reaches back only as far as its retention period. Deleted messages do not count.
 
-## 3. Datenschutz
+## 3. Privacy
 
-1. Keine Kennzahl je Mensch. Weder Nachrichten noch Läufe noch Kosten werden nach Person
-   gruppiert. Auslöser eines Laufs (`triggered_by`) erscheinen nicht in der Statistik.
-2. Zähler über Menschen (z. B. aktive Menschen je Bereich) unter `privacy.stats_min_group_size` zeigt die
-   Konsole als "weniger als `privacy.stats_min_group_size`". Grund: kleine Gruppen machen Einzelne
-   erkennbar.
-3. Die Kostenansicht je Thread ist keine Statistik, sondern Teil des Threads (`cost.read.thread`).
-4. Export der Statistik als CSV enthält nur dieselben Aggregate.
+1. No key figure per person. Neither messages nor runs nor costs are grouped by person. The
+   triggering person of a run (`triggered_by`) does not appear in the statistics.
+2. The console shows counters over people (for example active people per space) below
+   `privacy.stats_min_group_size` as "fewer than `privacy.stats_min_group_size`". Reason: small
+   groups make individuals recognizable.
+3. The cost view per thread is not statistics but part of the thread (`cost.read.thread`).
+4. An export of the statistics as CSV contains only the same aggregates.
 
-## 4. Rechte
+## 4. Permissions
 
-| Sicht | Aktion | Wer |
+| View | Action | Who |
 |---|---|---|
-| ganze Instanz | `stats.read` auf `instance` | Owner |
-| ein Bereich | `stats.read` auf `space` | `manage` auf dem Bereich |
-| Kosten gesamt | `cost.read.aggregate` auf `instance` | Owner |
-| Kosten eines Bereichs | `cost.read.aggregate` auf `space` | `manage` auf dem Bereich |
+| Whole instance | `stats.read` on `instance` | Owner |
+| One space | `stats.read` on `space` | `manage` on the space |
+| Total costs | `cost.read.aggregate` on `instance` | Owner |
+| Costs of a space | `cost.read.aggregate` on `space` | `manage` on the space |
 
-Jede Abfrage filtert auf die Kanäle, die `authz` für den Prinzipal liefert; ein Bereichsverwalter
-sieht keine Zahlen aus Kanälen, die er nicht lesen darf.
+Every query filters to the channels that `authz` returns for the principal; a space manager
+sees no figures from channels they may not read.
 
-## 5. Abfragen und Leistung
+## 5. Queries and performance
 
-1. Abfragen laufen über die vorhandenen Indexe (`runs (agent_id, finished_at)`,
+1. Queries use the existing indexes (`runs (agent_id, finished_at)`,
    `cost_entries (space_id, occurred_at)`, `messages (channel_id, created_at)`).
-2. Ergebnisse gelten `stats.cache_ttl`; der Zeitraum ist höchstens `stats.max_range`.
-3. Tagesaggregate: Wird eine Abfrage zu teuer (Lasttest), schreibt ein nächtlicher Job Zeilen in
-   eine Tabelle `stats_daily` (Bereich, Kanal, Agent, Tag, Kennzahl, Wert) und die Konsole liest
-   von dort. Die Tabelle ist noch nicht im Kern-Vertrag; sie kommt als additive Migration erst,
-   wenn der Lasttest es verlangt (Integrations-Entscheid vom 2026-10-10).
-4. Die Zeitzone der Tagesgrenze ist `stats.time_zone` (Standard `UTC`, IANA-Name;
-   [17-observability.md](../spec/17-observability.md)). `locale.default` legt sie nicht fest. Ein
-   Wechsel gilt ab dem Neustart; schon geschriebene Tagesaggregate behalten ihre alte Grenze.
+2. Results are valid for `stats.cache_ttl`; the period is at most `stats.max_range`.
+3. Daily aggregates: If a query becomes too expensive (load test), a nightly job writes rows into
+   a table `stats_daily` (space, channel, agent, day, key figure, value) and the console reads
+   from there. The table is not yet in the core contract; it comes as an additive migration only
+   when the load test requires it (integration decision of 2026-10-10).
+4. The time zone of the day boundary is `stats.time_zone` (default `UTC`, IANA name;
+   [17-observability.md](../spec/17-observability.md)). `locale.default` does not set it. A
+   change applies from the restart on; daily aggregates already written keep their old boundary.
 
-## 6. Bezug zur Telemetrie
+## 6. Relation to telemetry
 
-Für Betriebsfragen (Latenz, 5xx, Verbindungen) verlinkt die Konsole auf `telemetry.dashboard_url`,
-wenn gesetzt. Die Statistik selbst rechnet nie mit Telemetrie-Werten.
+For operational questions (latency, 5xx, connections) the console links to `telemetry.dashboard_url`,
+if set. The statistics themselves never compute with telemetry values.
 
-## 7. Eigene Messung und Visualisierungen
+## 7. Own measurement and visualizations
 
-1. Werte ohne Fachtabelle (Zustell-Latenz, Wiederverbinden, Annahme beim Push-Anbieter,
-   Verfügbarkeit der API) und die Raten der Live-Ansichten zählt der Server selbst und schreibt sie
-   je Minute nach `stats_minutes` ([25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 3).
-   Die Tabelle hat keine Spalte für Menschen; Werkzeugnamen stehen nicht darin.
-2. Neue Abfragen: `getStatsLive` (Live-Rahmen), `getStatsTimeline` (Minuten und Läufe eines
-   Zeitraums), `getStatsSlo` (Ampel "eigene Messung", nur Owner), `getStatsBackends`
-   (Backend-Ansicht je Agent). Alle mit `stats.read` und demselben Rechtefilter wie Abschnitt 4;
-   Kostenfelder nur mit `cost.read.aggregate`. Dazu das Gateway-Abo `stats.subscribe` mit dem
-   kurzlebigen Ereignis `stats.live`.
-3. Zeilen ohne Kanal (SLI, Gateway-Werte, Wechsel der Backend-Richtlinie) sieht nur, wer
-   `stats.read` auf der Instanz hat.
-4. Die Mindestgruppe aus Abschnitt 3 betrifft nur Zähler über Menschen; Live-Rahmen, Timeline und
-   `stats_minutes` enthalten keine. Aktive Menschen zeigt weiter nur `getUsageStats`.
-5. Lange Zeiträume, Exporte und die Tabellen aus Abschnitt 2 rechnen weiter aus den Fachtabellen;
-   `stats_minutes` lebt nur `retention.stats_minutes` lang.
+1. The server itself counts values without a domain table (delivery latency, reconnects,
+   acceptance by the push provider, availability of the API) and the rates of the live views, and
+   writes them per minute to `stats_minutes` ([25-visualization.md](../spec/25-visualization.md), section 3).
+   The table has no column for people; tool names are not in it.
+2. New queries: `getStatsLive` (live frame), `getStatsTimeline` (minutes and runs of a
+   period), `getStatsSlo` (traffic light "Own measurement", owner only), `getStatsBackends`
+   (backend view per agent). All with `stats.read` and the same permission filter as section 4;
+   cost fields only with `cost.read.aggregate`. In addition, the gateway subscription
+   `stats.subscribe` with the ephemeral event `stats.live`.
+3. Rows without a channel (SLI, gateway values, changes of the backend policy) are visible only
+   to whoever has `stats.read` on the instance.
+4. The minimum group from section 3 applies only to counters over people; the live frame, the
+   timeline and `stats_minutes` contain none. Active people are still shown only by `getUsageStats`.
+5. Long periods, exports and the tables from section 2 are still computed from the domain tables;
+   `stats_minutes` lives only for `retention.stats_minutes`.

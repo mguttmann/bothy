@@ -1,153 +1,153 @@
-# Alarme
+# Alerts
 
-Status: Entwurf M0. Regeln: [infra/observability/prometheus/rules/](../../infra/observability/prometheus/rules/)
-(SLO-Regeln erzeugt, `bothy-alerts.yaml` von Hand). Wege:
+Status: draft M0. Rules: [infra/observability/prometheus/rules/](../../infra/observability/prometheus/rules/)
+(SLO rules generated, `bothy-alerts.yaml` by hand). Routes:
 [infra/observability/alertmanager/alertmanager.yaml](../../infra/observability/alertmanager/alertmanager.yaml).
 
-## 1. Stufen und Wege
+## 1. Levels and routes
 
-| Stufe | Bedeutung | Weg |
+| Level | Meaning | Route |
 |---|---|---|
-| `page` | Menschen spüren es jetzt oder bald; sofort handeln | externer Kanal (`external-oncall`) und Meldungskanal der Instanz (`bothy-ops`) |
-| `ticket` | handeln an einem der nächsten Arbeitstage | Meldungskanal der Instanz |
-| `heartbeat` | Watchdog; feuert immer | externer Herzschlag-Dienst |
+| `page` | People feel it now or soon; act immediately | External channel (`external-oncall`) and alert channel of the instance (`bothy-ops`) |
+| `ticket` | Act on one of the next working days | Alert channel of the instance |
+| `heartbeat` | Watchdog; always fires | External heartbeat service |
 
-Warum zwei Wege: Ein Ausfall des Servers darf seine eigene Meldung nicht verschlucken. Der
-Watchdog meldet den Ausfall von Prometheus oder Alertmanager: Bleibt sein Herzschlag beim externen
-Dienst aus, meldet dieser. Die Wahl dieses Dienstes trifft der Betreiber.
+Why two routes: A failure of the server must not swallow its own alert. The
+watchdog reports a failure of Prometheus or Alertmanager: if its heartbeat stops arriving at the
+external service, that service reports it. The instance operator chooses this service.
 
-Routing lokal geprüft mit `amtool config routes test` (Alertmanager v0.34.1) am 2026-10-10: `page`
-geht an `external-oncall` und `bothy-ops`, `ticket` an `bothy-ops`, `Watchdog` an
-`external-heartbeat` [belegt].
+Routing checked locally with `amtool config routes test` (Alertmanager v0.34.1) on 2026-10-10: `page`
+goes to `external-oncall` and `bothy-ops`, `ticket` to `bothy-ops`, `Watchdog` to
+`external-heartbeat` [verified].
 
-## 2. Meldungskanal in der Instanz
+## 2. Alert channel in the instance
 
-1. Der Owner legt einen Kanal "Betrieb" an (nur Owner und Vertretung mit `read`) und dort einen
-   Eingangs-Webhook ([05-aktionen.md](../spec/05-aktionen.md) `webhook_in.create`).
-2. Alertmanager sendet sein eigenes JSON-Format. Der Eingangs-Webhook braucht dafür ein Format
-   `alertmanager`, das daraus eine Nachricht macht (Alarmname, Stufe, Zusammenfassung,
-   Runbook-Link, Zustand firing oder resolved). Das ist eine Anforderung an Kapitel 06 und 11
-   (Bericht, Ticket).
-3. Die URL des Webhooks ist ein Geheimnis und liegt in
-   `secrets/alertmanager/alertmanager_bothy_webhook_url`. Alertmanager erreicht den Server über den
-   internen Listener (`http://api:8081`).
-4. Nachrichten aus Eingangs-Webhooks lösen nie Agenten aus (`origin = app`).
+1. The owner creates a channel "Operations" (only owner and deputy with `read`) and in it an
+   incoming webhook ([05-actions.md](../spec/05-actions.md) `webhook_in.create`).
+2. Alertmanager sends its own JSON format. For this, the incoming webhook needs a format
+   `alertmanager` that turns it into a message (alert name, level, summary,
+   runbook link, state firing or resolved). This is a requirement for chapters 06 and 11
+   (report, ticket).
+3. The URL of the webhook is a secret and is stored in
+   `secrets/alertmanager/alertmanager_bothy_webhook_url`. Alertmanager reaches the server through
+   the internal listener (`http://api:8081`).
+4. Messages from incoming webhooks never trigger agents (`origin = app`).
 
-## 3. Alarme
+## 3. Alerts
 
-### 3.1 SLO-Alarme (erzeugt)
+### 3.1 SLO alerts (generated)
 
-| Alarm | SLO | Stufen | Erste Schritte |
+| Alert | SLO | Levels | First steps |
 |---|---|---|---|
-| `BothyApiAvailabilityBudgetBurn` | `bothy-api/requests-availability` | page, ticket | Dashboard Server: Routen mit 5xx; Logs `ERROR`; Datenbank erreichbar? |
-| `BothyDeliveryLatencyBudgetBurn` | `bothy-sync/delivery-latency` | page, ticket | Dashboard Delivery: Fan-out-Verzug, Warten am Sequenz-Zähler, CPU |
-| `BothyReconnectBudgetBurn` | `bothy-sync/reconnect` | page, ticket | Rand (Proxy, Tailscale) und Zertifikat; Anmeldung (OIDC erreichbar?) |
-| `BothyPushAcceptanceBudgetBurn` | `bothy-push/provider-acceptance` | page, ticket | Push-Dashboard: Ergebnis je Anbieter; Schlüssel abgelaufen? Statusseite des Anbieters |
-| `BothyRunStartBudgetBurn` | `bothy-agents/run-start` | page, ticket | Agenten-Dashboard: Heartbeat, Verbraucher-Rückstand, Ablehnungen, Modus-Abweichungen |
-| `BothyTurnDurationBudgetBurn` | `bothy-agents/turn-duration` | ticket | Turn-Dauer je Agent; Modell oder Anbieter langsam? Kein Eingriff am Server nötig |
+| `BothyApiAvailabilityBudgetBurn` | `bothy-api/requests-availability` | page, ticket | Dashboard Server: routes with 5xx; logs `ERROR`; database reachable? |
+| `BothyDeliveryLatencyBudgetBurn` | `bothy-sync/delivery-latency` | page, ticket | Dashboard Delivery: fan-out lag, waiting at the sequence counter, CPU |
+| `BothyReconnectBudgetBurn` | `bothy-sync/reconnect` | page, ticket | Edge (proxy, Tailscale) and certificate; login (OIDC reachable?) |
+| `BothyPushAcceptanceBudgetBurn` | `bothy-push/provider-acceptance` | page, ticket | Push dashboard: result per provider; key expired? Status page of the provider |
+| `BothyRunStartBudgetBurn` | `bothy-agents/run-start` | page, ticket | Agents dashboard: heartbeat, consumer backlog, rejections, mode mismatches |
+| `BothyTurnDurationBudgetBurn` | `bothy-agents/turn-duration` | ticket | Turn duration per agent; model or provider slow? No intervention on the server needed |
 
-### 3.2 Weitere Alarme (`bothy-alerts.yaml`)
+### 3.2 Further alerts (`bothy-alerts.yaml`)
 
-Schwellen sind Startwerte. Wo eine Schwelle einem Konfigurationswert entspricht, steht er in der
-Tabelle; die Regeldatei muss ihm folgen (Check im Bau-Ticket "Alarm-Schwellen aus Konfiguration").
+Thresholds are starting values. Where a threshold corresponds to a configuration value, the table
+names it; the rule file must follow it (check in the build ticket "Alert thresholds from configuration").
 
-| Alarm | Stufe | Bedingung | Konfigurationswert |
+| Alert | Level | Condition | Configuration value |
 |---|---|---|---|
-| `Watchdog` | heartbeat | immer | |
-| `BothyServerTelemetryMissing` | page | keine `target_info` des Servers seit 10 Minuten | |
-| `BothyCollectorDown` | page | Collector antwortet nicht | |
-| `BothyTelemetryExportFailing` | ticket | Exporter des Collectors scheitert | |
-| `BothyTelemetryDropped` | ticket | Server verwirft Telemetrie | |
-| `BothyEventFanoutLag` | page | Fan-out-Verzug über 5 s | `status.fanout_lag_degraded` |
-| `BothyAgentConsumerLag` | ticket | über 1000 Ereignisse Rückstand des Verbrauchers | |
-| `BothyAgentOffline` | ticket | kein Heartbeat seit 5 Minuten | über `agent.presence_timeout` |
-| `BothyBillingModeMismatch` | page | Ist-Modus weicht vom Soll ab (I3) | |
-| `BothyAuthzError` | page | Rechteprüfung meldet einen Programmfehler (`authz_not_checked`, `unknown_action`) oder einen Unterschied zwischen SQL-Filter und `authorize` (`filter_mismatch`) | |
-| `BothySecretRefreshFailing` | ticket | erneutes Lesen eines Geheimnisses scheitert | |
-| `BothyMalwareScanFailing` | ticket | nur Fehler, kein Ergebnis | |
-| `BothyBackupStale` | page | keine Sicherung seit 26 h | `backup.max_age` |
-| `BothyWalArchiveStale` | page | kein WAL-Segment seit 15 Minuten | über `backup.pg.archive_timeout` |
-| `BothyRestoreTestStale` | ticket | kein Wiederherstellungstest seit 8 Tagen | `backup.restore_test.max_age` |
-| `BothyAuditChainBroken` | page | Prüfung der Hash-Kette scheitert | |
-| `BothyVolumeFull` | page | unter 10 Prozent frei | |
-| `BothyDatabaseConnectionsHigh` | ticket | über 80 Prozent von `max_connections` | |
-| `BothyDatabaseDeadlocks` | ticket | Deadlock gemeldet | Sperrreihenfolge [03-datenmodell.md](../spec/03-datenmodell.md) 6.3 |
+| `Watchdog` | heartbeat | always | |
+| `BothyServerTelemetryMissing` | page | no `target_info` from the server for 10 minutes | |
+| `BothyCollectorDown` | page | collector does not respond | |
+| `BothyTelemetryExportFailing` | ticket | exporter of the collector fails | |
+| `BothyTelemetryDropped` | ticket | server discards telemetry | |
+| `BothyEventFanoutLag` | page | fan-out lag over 5 s | `status.fanout_lag_degraded` |
+| `BothyAgentConsumerLag` | ticket | consumer backlog of over 1000 events | |
+| `BothyAgentOffline` | ticket | no heartbeat for 5 minutes | above `agent.presence_timeout` |
+| `BothyBillingModeMismatch` | page | reported mode differs from the configured mode (I3) | |
+| `BothyAuthzError` | page | permission check reports a programming error (`authz_not_checked`, `unknown_action`) or a difference between the SQL filter and `authorize` (`filter_mismatch`) | |
+| `BothySecretRefreshFailing` | ticket | re-reading a secret fails | |
+| `BothyMalwareScanFailing` | ticket | only errors, no result | |
+| `BothyBackupStale` | page | no backup for 26 h | `backup.max_age` |
+| `BothyWalArchiveStale` | page | no WAL segment for 15 minutes | above `backup.pg.archive_timeout` |
+| `BothyRestoreTestStale` | ticket | no restore test for 8 days | `backup.restore_test.max_age` |
+| `BothyAuditChainBroken` | page | check of the hash chain fails | |
+| `BothyVolumeFull` | page | under 10 percent free | |
+| `BothyDatabaseConnectionsHigh` | ticket | over 80 percent of `max_connections` | |
+| `BothyDatabaseDeadlocks` | ticket | deadlock reported | Lock order [03-data-model.md](../spec/03-data-model.md) 6.3 |
 
-## 4. Runbook-Anker
+## 4. Runbook anchors
 
-Jede Regel nennt `runbook_url` auf einen Anker dieser Datei (Alarmname in Kleinbuchstaben). Die
-ersten Schritte stehen in 3.1; für 3.2:
+Every rule names a `runbook_url` that points to an anchor of this file (alert name in lowercase).
+The first steps are in 3.1; for 3.2:
 
 ### watchdog
-Kein Handeln nötig. Fehlt der Herzschlag beim externen Dienst: Prometheus und Alertmanager prüfen.
+No action needed. If the heartbeat is missing at the external service: check Prometheus and Alertmanager.
 
 ### bothyservertelemetrymissing
-`docker compose ps`; läuft `api`? Wenn ja: Collector und `OTEL_EXPORTER_OTLP_ENDPOINT` prüfen.
+`docker compose ps`; is `api` running? If yes: check the collector and `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ### bothycollectordown
-`docker compose logs otel-collector`; häufig ein fehlendes Geheimnis eines Overlays.
+`docker compose logs otel-collector`; often a missing secret of an overlay.
 
 ### bothytelemetryexportfailing
-Ziel des Overlays erreichbar? Schlüssel gültig? Bis zur Lösung gehen Daten dieses Backends
-verloren; andere Overlays laufen weiter.
+Target of the overlay reachable? Key valid? Until this is resolved, data of this backend is
+lost; other overlays keep running.
 
 ### bothytelemetrydropped
-Collector überlastet oder nicht erreichbar; `memory_limiter` und Exporter prüfen.
+Collector overloaded or not reachable; check `memory_limiter` and the exporters.
 
 ### bothyeventfanoutlag
-Datenbank-Last (Dashboard Database), lange Transaktionen, `pg_stat_activity`. Ein `api`-Prozess
-hängt: neu starten.
+Database load (dashboard Database), long transactions, `pg_stat_activity`. An `api` process
+hangs: restart it.
 
 ### bothyagentconsumerlag
-Adapter verarbeitet oder bestätigt nicht. Adapter-Logs, `ack`-Verhalten, Verbindung.
+The adapter does not process or does not acknowledge. Adapter logs, `ack` behavior, connection.
 
 ### bothyagentoffline
-Adapter-Prozess und seine Laufzeit prüfen; Status der Komponente des Agenten.
+Check the adapter process and its runtime; status of the agent's component.
 
 ### bothybillingmodemismatch
-Sofort prüfen: Läuft ein Agent mit `personal` gegen einen Organisationsschlüssel oder umgekehrt?
-Konfiguration der Laufzeit des Adapters; nichts am Server ändern, bevor die Ursache klar ist.
+Check immediately: is an agent with `personal` running against an organization key or vice versa?
+Configuration of the adapter's runtime; change nothing on the server before the cause is clear.
 
 ### bothyauthzerror
-Als Fehler mit Sicherheitsbezug behandeln: Eine Route hat ohne ihre Rechteprüfung geantwortet
-(die Antwort wurde durch `500` ersetzt) oder eine unbekannte Aktion wurde geprüft. Logs mit der
-`correlation_id` und dem Routen-Muster lesen; die betroffene Version nicht weiter ausrollen.
+Treat as an error with a security impact: a route answered without its permission check
+(the answer was replaced by `500`) or an unknown action was checked. Read the logs with the
+`correlation_id` and the route pattern; do not roll out the affected version any further.
 
 ### bothysecretrefreshfailing
-Der Server nutzt weiter den alten Wert. Datei im Secret-Provider prüfen: vorhanden, Modus `0400`
-oder `0600`, Besitzer der Dienstbenutzer (SEC-SEC-1). Bis zur Behebung wirkt eine Rotation nicht.
+The server keeps using the old value. Check the file in the secret provider: present, mode `0400`
+or `0600`, owned by the service user (SEC-SEC-1). Until this is fixed, a rotation has no effect.
 
 ### bothymalwarescanfailing
-`docker compose logs clamav`; Signaturen geladen? Speicher reicht? Uploads bleiben bis dahin im
-Zustand `pending` und werden nicht ausgeliefert.
+`docker compose logs clamav`; signatures loaded? Enough memory? Until then, uploads stay in the
+state `pending` and are not served.
 
 ### bothybackupstale
-`backup_runs` in der Admin-Konsole; Off-site-Ziel erreichbar? Platz im Repository?
+`backup_runs` in the admin console; off-site target reachable? Space in the repository?
 
 ### bothywalarchivestale
-pgBackRest `check` im Container `backup`; TLS zwischen `postgres` und `backup`; Platz in `pg_wal`.
-Füllt sich `pg_wal`, hält PostgreSQL an (PANIC), Daten bleiben erhalten
-(https://www.postgresql.org/docs/18/continuous-archiving.html, abgerufen 2026-10-10) [belegt].
+pgBackRest `check` in the container `backup`; TLS between `postgres` and `backup`; space in `pg_wal`.
+If `pg_wal` fills up, PostgreSQL stops (PANIC), and the data is preserved
+(https://www.postgresql.org/docs/18/continuous-archiving.html, retrieved 2026-10-10) [verified].
 
 ### bothyrestoreteststale
-Letzten Testlauf in `backup_runs` ansehen; welche Prüfung scheitert?
+Look at the last test run in `backup_runs`; which check fails?
 
 ### bothyauditchainbroken
-Als Sicherheitsvorfall behandeln: Wer hatte Schreibzugriff auf die Datenbank? Letzte gute Stelle
-der Kette bestimmen, Sicherungen vergleichen, Owner informieren.
+Treat as a security incident: who had write access to the database? Determine the last good point
+of the chain, compare backups, inform the owner.
 
 ### bothyvolumefull
-Welches Volume? `files`: Aufbewahrung, Kontingente; `pgdata`: Ereignis-Log-Partitionen, Bloat;
-`pgbackrest-repo`: lokale Aufbewahrung.
+Which volume? `files`: retention, quotas; `pgdata`: event log partitions, bloat;
+`pgbackrest-repo`: local retention.
 
 ### bothydatabaseconnectionshigh
-`database.max_conns` je Prozess mal Prozesse gegen `max_connections`; hängende Verbindungen.
+`database.max_conns` per process times processes against `max_connections`; hanging connections.
 
 ### bothydatabasedeadlocks
-Logs nach `deadlock detected`; die beteiligten Abfragen gegen die Sperrreihenfolge prüfen.
+Search the logs for `deadlock detected`; check the queries involved against the lock order.
 
-## 5. Prüfen
+## 5. Check
 
-`promtool check rules` und `amtool check-config` am 2026-10-10 mit Prometheus v3.15.0 und
-Alertmanager v0.34.1: gültig [belegt]. Zusätzlich empfohlen: `promtool test rules` mit
-Testreihen je handgeschriebenem Alarm (Ticket).
+`promtool check rules` and `amtool check-config` on 2026-10-10 with Prometheus v3.15.0 and
+Alertmanager v0.34.1: valid [verified]. Also recommended: `promtool test rules` with
+test series per hand-written alert (ticket).

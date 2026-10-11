@@ -1,29 +1,29 @@
 # sdk/python
 
-Status: geplant. Dieser Ordner enthält noch keinen Code.
+Status: planned. This folder contains no code yet.
 
-## Zweck
+## Purpose
 
-Python-SDK für Agenten-Adapter (darunter der Hermes-Adapter) und Apps.
+Python SDK for agent adapters (among them the Hermes adapter) and apps.
 
-## Aufbau (geplant)
+## Structure (planned)
 
-| Schicht | Inhalt |
+| Layer | Content |
 |---|---|
-| Kern | erzeugt mit openapi-python-client aus `docs/api/openapi.yaml`; nie von Hand geändert; im Gate erzeugt und geprüft |
-| Handschicht | Module `auth`, `gateway`, `invocation`, `runs`, `components`, `commands`, `outbox`, `retry`, `heartbeat`, `webhooks`, `testing` nach docs/spec/11-erweiterungen.md Abschnitt 11.2 |
+| Core | generated with openapi-python-client from `docs/api/openapi.yaml`; never changed by hand; generated and checked in the gate |
+| Hand-written layer | modules `auth`, `gateway`, `invocation`, `runs`, `components`, `commands`, `outbox`, `retry`, `heartbeat`, `webhooks`, `testing` according to docs/spec/11-extensions.md section 11.2 |
 
-## Leitlinien
+## Guidelines
 
-- Asynchrone API zuerst, synchrone Hülle für Skripte.
-- Unterstützt werden die CPython-Versionen, die laut python.org gepflegt werden.
-- Wenige Abhängigkeiten, verträglich mit dem Umfeld von Hermes Agent (Prüfung im Fake-Hermes-Test).
-- Prüfung der Aufruf-Marke nur mit `EdDSA` und `typ = agent-invocation+jwt`
-  (docs/spec/09-agenten.md Abschnitt 4.5).
-- Fehler typisiert nach dem Problem-Format aus docs/spec/06-api.md.
+- Asynchronous API first, a synchronous wrapper for scripts.
+- Supported are the CPython versions that python.org lists as maintained.
+- Few dependencies, compatible with the environment of Hermes Agent (checked in the fake Hermes test).
+- Check of the invocation token only with `EdDSA` and `typ = agent-invocation+jwt`
+  (docs/spec/09-agents.md section 4.5).
+- Errors typed according to the problem format from docs/spec/06-api.md.
 
-## Testdoppel
+## Test doubles
 
-`testing` liefert einen FakeServer im Prozess (127.0.0.1, Port 0) mit Fehlerinjektion und die
-Vertragsszenarien aus docs/spec/09-agenten.md Abschnitt 16, damit jeder Adapter sie gegen sich
-laufen lassen kann.
+`testing` provides an in-process FakeServer (127.0.0.1, port 0) with fault injection and the
+contract scenarios from docs/spec/09-agents.md section 16, so that every adapter can run them
+against itself.

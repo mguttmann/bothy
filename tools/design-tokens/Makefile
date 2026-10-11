@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 #
-# Gate of the design-token generator (component contract: docs/spec/23-qualitaet.md,
+# Gate of the design-token generator (component contract: docs/spec/23-quality.md,
 # section 3). The root target `make tokens` calls `check`. The generator uses only the
 # Python standard library; it runs in the pinned tool environment of the repository
 # (tools/pyproject.toml), like every other gate. Lint and format: root `make lint` and

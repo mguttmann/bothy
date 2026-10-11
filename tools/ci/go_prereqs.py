@@ -3,7 +3,7 @@
 
 Every server gate (`codegen-check`, `arch`, `migrations-lint`, `perf`) and the Go branch of
 `make test` call this first, as soon as a Go module is tracked under `services/`. A
-missing prerequisite is an error, never a skip (docs/spec/23-qualitaet.md R-QA-02):
+missing prerequisite is an error, never a skip (docs/spec/23-quality.md R-QA-02):
 integration and load tests need a Docker-compatible runtime (docs/PLAN.md P-09), and a
 machine that cannot run them must not report a partly green server check. All problems
 are collected before the tool exits, so one run names every missing piece.

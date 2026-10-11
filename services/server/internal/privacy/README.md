@@ -1,55 +1,55 @@
-# Modul `privacy`
+# Module `privacy`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
-## Zweck
+## Purpose
 
-DSGVO-Aufträge, Export und Löschung über die Teilnehmer aller Module.
+Privacy requests, export and deletion through the participants of all modules.
 
-## Port (Wurzelpaket `internal/privacy`)
+## Port (root package `internal/privacy`)
 
-- Eingehend: `Requests`.
-- Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: sammelt alle kernel `personaldata.Participant`.
+- Inbound: `Requests`.
+- Emits in-tx events: none.
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: collects all kernel `personaldata.Participant`.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `identity`, `files`.
+May use the ports of these modules: `identity`, `files`.
 
-Grund: betroffene Person; Exportpaket speichern.
+Reason: data subject; store the export package.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `gdpr_requests`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables via SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `gdpr.request.create`, `gdpr.request.read`, `gdpr.request.decide`, `gdpr.export.download`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: `gdpr.request_updated`.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: `gdpr.request_updated`.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hintergrundjobs
+## Background jobs
 
-| Job | Auslöser | Warteschlange |
+| Job | Trigger | Queue |
 |---|---|---|
-| `privacy.export`, `privacy.erase` | Freigabe eines Auftrags | `privacy` |
+| `privacy.export`, `privacy.erase` | approval of a privacy request | `privacy` |
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Sammelt alle Implementierungen von `kernel/personaldata.Participant`; ein neues Modul mit personenbezogenen Tabellen muss einen Teilnehmer registrieren.
-- Exportpakete liegen als Datei über den Port von `files`; Frist `due_at` laut 20-datenschutz.md.
+- Collects all implementations of `kernel/personaldata.Participant`; a new module with tables of personal data must register a participant.
+- Export packages are stored as a file through the port of `files`; deadline `due_at` as defined in 20-privacy.md.
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [20-datenschutz.md](../../../../docs/spec/20-datenschutz.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [20-privacy.md](../../../../docs/spec/20-privacy.md)

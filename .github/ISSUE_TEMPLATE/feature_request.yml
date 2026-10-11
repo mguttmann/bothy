@@ -1,11 +1,11 @@
 name: Feature request
-description: Propose a new capability or a change of behaviour.
+description: Propose a new capability or a change of behavior.
 labels: ["type: feature", "status: triage"]
 body:
   - type: markdown
     attributes:
       value: >-
-        Please check docs/roadmap.md and the "never" list in docs/spec/01-produkt.md first.
+        Please check docs/roadmap.md and the "never" list in docs/spec/01-product.md first.
         Larger changes start as a discussion in the issue and end with an ADR.
   - type: textarea
     id: problem

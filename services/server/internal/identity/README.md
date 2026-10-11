@@ -1,56 +1,56 @@
-# Modul `identity`
+# Module `identity`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-## Zweck
+## Purpose
 
-Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten, Einladungs-Codes, Anmeldevorgänge, Passkeys, Geräte und Geräteschlüssel, Sitzungen, Refresh-Familien, API-Tokens, Step-up, Zugriffstokens.
+Principals, people, owners, login drivers, identities, local credentials, enrollment codes, login flows, passkeys, devices and device keys, sessions, refresh families, API tokens, step-up, access tokens.
 
-## Port (Wurzelpaket `internal/identity`)
+## Port (root package `internal/identity`)
 
-- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen, Step-up), `Directory`, `Devices`, `Tokens`, `Owners`; deklariert `AvatarFiles`.
-- Gibt In-Tx-Ereignisse aus: `DeviceRevoked`, `SessionEnded`.
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.
+- Inbound: `Auth` (login, refresh, logout, child sessions, step-up), `Directory`, `Devices`, `Tokens`, `Owners`; declares `AvatarFiles`.
+- Emits in-tx events: `DeviceRevoked`, `SessionEnded`.
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `instance`, `authz`.
+May use the ports of these modules: `instance`, `authz`.
 
-Grund: Signierschlüssel für Zugriffstokens; implementiert `PrincipalSource` und `CredentialSource`.
+Reason: signing keys for access tokens; implements `PrincipalSource` and `CredentialSource`.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `principals`, `users`, `owners`, `identity_providers`, `user_identities`, `local_credentials`, `enrollment_codes`, `auth_login_flows`, `auth_challenges`, `device_pairings`, `passkey_credentials`, `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`, `refresh_tokens`, `api_tokens`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `instance.bootstrap`, `auth.login.begin`, `auth.login.complete`, `auth.token.refresh`, `auth.logout`, `auth.step_up`, `identity_provider.read`, `identity_provider.manage`, `owner.add`, `owner.remove`, `owner.recover`, `self.read`, `user.read`, `user.create`, `user.update`, `user.disable`, `user.enable`, `self.profile.update`, `identity.read`, `identity.link`, `identity.unlink`, `local_credential.set`, `passkey.register`, `passkey.revoke`, `device.list`, `device.approve`, `device.revoke`, `device.expire`, `session.list`, `session.revoke`, `session.extension.create`, `token.list`, `token.create`, `token.revoke`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: `user.updated`, `session.revoked`.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: `user.updated`, `session.revoked`.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hintergrundjobs
+## Background jobs
 
-| Job | Auslöser | Warteschlange |
+| Job | Trigger | Queue |
 |---|---|---|
-| `identity.session_cleanup` | periodisch | `maintenance` |
+| `identity.session_cleanup` | periodic | `maintenance` |
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Tokens nur als HMAC mit Server-Pepper; Refresh-Rotation mit Sperre auf der Familie, Wiederverwendung widerruft Familie und Sitzung (03, 4.2).
-- Implementiert `kernel/actor.Authenticator` für `platform/httpserver` und `gateway`.
-- Widerruf von Gerät oder Sitzung erhöht die Rechte-Version (05, Spalte Rechte) und schließt Verbindungen mit `4012` über das Ereignis `session.revoked`.
+- Tokens only as HMAC with a server pepper; refresh rotation with a lock on the family; reuse revokes the family and the session (03, 4.2).
+- Implements `kernel/actor.Authenticator` for `platform/httpserver` and `gateway`.
+- Revoking a device or a session increments the permission version (05, column Permissions) and closes connections with `4012` through the event `session.revoked`.
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [08-identitaet.md](../../../../docs/spec/08-identitaet.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [08-identity.md](../../../../docs/spec/08-identity.md)

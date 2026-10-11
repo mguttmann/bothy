@@ -1,15 +1,15 @@
 {
-  "$description": "Schriften und Typo-Rollen. Größen in px; die Apps skalieren sie mit der Systemeinstellung (dynamische Schriftgröße).",
+  "$description": "Fonts and type roles. Sizes in px; the apps scale them with the system setting (dynamic font size).",
   "font": {
     "family": {
       "$type": "fontFamily",
       "sans": {
         "$value": ["Atkinson Hyperlegible Next", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
-        "$description": "Oberfläche und Nachrichten. OFL-1.1, variabel (wght 200 bis 800). Begründung in docs/design/typography.md."
+        "$description": "Interface and messages. OFL-1.1, variable (wght 200 to 800). Rationale in docs/design/typography.md."
       },
       "mono": {
         "$value": ["Atkinson Hyperlegible Mono", "ui-monospace", "SF Mono", "Cascadia Mono", "Consolas", "monospace"],
-        "$description": "Code, Werkzeugnamen, IDs. OFL-1.1, variabel (wght 200 bis 800)."
+        "$description": "Code, tool names, IDs. OFL-1.1, variable (wght 200 to 800)."
       }
     },
     "weight": {
@@ -42,50 +42,50 @@
   },
   "type": {
     "$type": "typography",
-    "$description": "Typo-Rollen. Komponenten nutzen nur diese Rollen, nie font.size direkt.",
+    "$description": "Type roles. Components use only these roles, never font.size directly.",
     "display": {
       "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.30}", "fontWeight": "{font.weight.extrabold}", "letterSpacing": "{font.tracking.tight}", "lineHeight": 1.2},
-      "$description": "Leere Zustände, Einrichtung, Kennzahl-Kacheln der Statistik."
+      "$description": "Empty states, setup, metric tiles of the statistics."
     },
     "title": {
       "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.20}", "fontWeight": "{font.weight.bold}", "letterSpacing": "{font.tracking.snug}", "lineHeight": 1.3},
-      "$description": "Titel einer Ansicht, Dialog-Titel, Thread-Titel im Kopf."
+      "$description": "Title of a view, dialog title, thread title in the header."
     },
     "heading": {
       "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.16}", "fontWeight": "{font.weight.semibold}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.375},
-      "$description": "Kanal-Kopf, Abschnitte in Einstellungen und Konsole."
+      "$description": "Channel header, sections in settings and console."
     },
     "body": {
       "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.15}", "fontWeight": "{font.weight.regular}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.467},
-      "$description": "Nachrichtentext (Desktop). Auf Touch-Geräten gilt density.message.font-size."
+      "$description": "Message text (desktop). On touch devices, density.message.font-size applies."
     },
     "body-strong": {
       "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.15}", "fontWeight": "{font.weight.semibold}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.467},
-      "$description": "Autorname, Hervorhebung im Text."
+      "$description": "Author name, emphasis in text."
     },
     "body-sm": {
       "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.14}", "fontWeight": "{font.weight.regular}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.43},
-      "$description": "Listenzeilen, Kanalnamen, Live-Box-Inhalt."
+      "$description": "List rows, channel names, live box content."
     },
     "label": {
       "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.13}", "fontWeight": "{font.weight.semibold}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.385},
-      "$description": "Knöpfe, Chips, Abzeichen, Spaltenköpfe."
+      "$description": "Buttons, chips, badges, column headers."
     },
     "section": {
       "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.12}", "fontWeight": "{font.weight.bold}", "letterSpacing": "{font.tracking.wide}", "lineHeight": 1.333},
-      "$description": "Bereichs-Titel in der Seitenleiste, Gruppen-Überschriften. Keine Großschreibung per Transformation (lange deutsche Wörter)."
+      "$description": "Space titles in the sidebar, group headings. No uppercase by text transform (long German words)."
     },
     "caption": {
       "$value": {"fontFamily": "{font.family.sans}", "fontSize": "{font.size.12}", "fontWeight": "{font.weight.regular}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.333},
-      "$description": "Zeitstempel, Kennzahlen, Hilfetexte."
+      "$description": "Timestamps, metrics, help texts."
     },
     "code": {
       "$value": {"fontFamily": "{font.family.mono}", "fontSize": "{font.size.14}", "fontWeight": "{font.weight.regular}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.43},
-      "$description": "Code-Blöcke und Inline-Code."
+      "$description": "Code blocks and inline code."
     },
     "code-sm": {
       "$value": {"fontFamily": "{font.family.mono}", "fontSize": "{font.size.12}", "fontWeight": "{font.weight.medium}", "letterSpacing": "{font.tracking.normal}", "lineHeight": 1.333},
-      "$description": "Werkzeug-Chips, IDs, Kosten und Token-Zahlen in der Live-Box."
+      "$description": "Tool chips, IDs, costs and token counts in the live box."
     }
   }
 }

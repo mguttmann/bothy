@@ -1,423 +1,428 @@
-# Wiederverwendung: Lehren aus drei Vorgängern
+# Reuse: lessons from three predecessors
 
-Status: Entwurf M0. Dieses Dokument hält fest, was Bothy aus drei Vorgängerprojekten übernimmt:
-Konzepte, Testmuster und höchstens drei kleine Code-Stücke zum Neuschreiben. Es übernimmt keinen
-Code durch Kopieren. Die Vorgänger, ihre Dateien und Belege stehen nur im privaten Ops-Repo; hier
-heißen sie neutral V1, V2 und V3.
+Status: draft M0. This document records what Bothy adopts from three predecessor projects:
+concepts, test patterns and at most three small code pieces to rewrite. It adopts no code by
+copying. The predecessors, their files and evidence are only in the private ops repo; here they
+are called neutrally V1, V2 and V3.
 
-## 1. Regeln
+## 1. Rules
 
-1. Übernommen wird ein Konzept, wenn es ein Problem löst, das auch Bothy hat. Löst ein Konzept nur
-   eine Eigenheit der damaligen Plattform, wird es nicht übernommen (Abschnitt 6).
-2. Jede Lehre nennt: Problem, Lehre, wo Bothy sie umsetzt (Kapitel oder ADR) und den Test, der sie
-   hält. Ein Test, der hier steht, ist ein Bau-Auftrag; er gilt erst als vorhanden, wenn er im Repo
-   läuft.
-3. Code-Stücke werden neu geschrieben, nicht kopiert (Abschnitt 5, Lizenzhinweis).
+1. A concept is adopted if it solves a problem that Bothy has as well. If a concept only solves
+   a quirk of the platform of that time, it is not adopted (section 6).
+2. Every lesson names: problem, lesson, where Bothy implements it (chapter or ADR) and the test
+   that holds it. A test listed here is a build brief; it only counts as present once it runs in
+   the repo.
+3. Code pieces are rewritten, not copied (section 5, license note).
 
-## 2. Die Vorgänger
+## 2. The predecessors
 
-| Kürzel | Was es war | Was davon zählt |
+| Short name | What it was | What of it counts |
 |---|---|---|
-| V1 | Plattform-Adapter für einen fremden Chat-Server: Plugin für das Agenten-Framework Hermes Agent, dazu Struktur-Spiegel, History-Import und Live-Abgleich aus Discord | Zustellung und Doppel, Nachholen, Kanal-Verhalten, Import-Werkzeug, Ruhe-Regel, CDN-Abruf, Testgerüst |
-| V2 | Dev-Foren-Runner: je Forum-Beitrag eine Claude-Code-Sitzung im Projektordner, mit Live-Box und Nachträgen | Sitzungsvertrag, Prozessvertrag, Nachträge, Steuerbefehle, Fehlerpfade, Kosten |
-| V3 | Chat- und Import-Plugin: neue Chats aus einem Übergabekanal, Auto-Titel, Import alter Threads mit Bindung an frühere Sitzungen | Auto-Titel, Sitzungsbindung wie `/resume`, Import-Regeln, Temp-Wächter |
+| V1 | Platform adapter for a third-party chat server: a plugin for the agent framework Hermes Agent, plus a structure mirror, history import and live sync from Discord | Delivery and duplicates, catch-up, channel behavior, import tool, settle rule, CDN fetch, test harness |
+| V2 | Dev forum runner: one Claude Code session in the project folder per forum post, with a live box and follow-ups | Session contract, process contract, follow-ups, control commands, error paths, costs |
+| V3 | Chat and import plugin: new chats from a handoff channel, auto title, import of old threads with binding to earlier sessions | Auto title, session binding like `/resume`, import rules, temp guard |
 
-Alle drei sind Plugins für Hermes Agent (github.com/NousResearch/hermes-agent). V2 und V3 arbeiten
-in Discord, V1 liest aus Discord. Getestet wurden sie vor allem gegen Fake-Server.
+All three are plugins for Hermes Agent (github.com/NousResearch/hermes-agent). V2 and V3 work
+in Discord, V1 reads from Discord. They were tested mainly against fake servers.
 
-## 3. Lehren
+## 3. Lessons
 
-### L01 Identität an einem Namen (V1)
+### L01 Identity tied to a name (V1)
 
-- Problem: Der fremde Chat-Server kannte Gespräche nur über ihren Namen. Umbenennen und
-  Verschieben brachen die Zuordnung zur Agenten-Sitzung; ein eigenes Register flickte das, und
-  Umbenennungen bei gestopptem Adapter gingen verloren.
-- Lehre: Gespräch und Sitzung hängen an einer festen ID, nie an einem Namen.
-- Umsetzung: `threads.id` bleibt beim Verschieben gleich; `agent_sessions` je Thread
-  ([03-datenmodell.md](spec/03-datenmodell.md)); Sitzungsschlüssel des Hermes-Adapters aus der
-  Thread-ID ([09-agenten.md](spec/09-agenten.md)).
-- Test: Thread mit aktiver Sitzung umbenennen und verschieben; dieselbe `agent_sessions`-Zeile
-  bleibt aktuell, der nächste Lauf setzt dieselbe externe Sitzung fort.
+- Problem: The third-party chat server knew conversations only by their name. Renaming and
+  moving broke the mapping to the agent session; a separate register patched that, and renames
+  while the adapter was stopped were lost.
+- Lesson: Conversation and session hang on a fixed ID, never on a name.
+- Implementation: `threads.id` stays the same when moving; `agent_sessions` per thread
+  ([03-data-model.md](spec/03-data-model.md)); session key of the Hermes adapter from the
+  thread ID ([09-agents.md](spec/09-agents.md)).
+- Test: Rename and move a thread with an active session; the same `agent_sessions` row
+  stays current, the next run continues the same external session.
 
-### L02 Unsichere Zustellung erzeugt Doppel (V1, zweimal)
+### L02 Uncertain delivery creates duplicates (V1, twice)
 
-- Problem: Bei Zeitüberschreitung, `500`, `502` oder `504` hatte der Server manchmal schon
-  gespeichert. Raten führte zu Doppeln oder Verlust. Dieselbe Fehlerklasse kam zweimal; die
-  Lösung war eine Nachfrage per Inhaltsvergleich.
-- Lehre: Jede Schreibanfrage trägt einen vom Client erzeugten Schlüssel, den der Server eindeutig
-  erzwingt; eine Wiederholung liefert das Original.
-- Umsetzung: `client_msg_id`, `client_interaction_id`, `Idempotency-Key`
-  ([04-sync-protokoll.md](spec/04-sync-protokoll.md), Abschnitt 5); ADR 0015.
-- Test: Testmuster 4.1 mit "gespeichert, dann 502"; die Wiederholung ergibt genau eine Nachricht
-  und `Idempotent-Replay: true`.
+- Problem: On a timeout, `500`, `502` or `504` the server had sometimes already stored the
+  write. Guessing led to duplicates or loss. The same class of error came twice; the
+  solution was a re-query by content comparison.
+- Lesson: Every write request carries a key generated by the client, which the server enforces
+  as unique; a retry returns the original.
+- Implementation: `client_msg_id`, `client_interaction_id`, `Idempotency-Key`
+  ([04-sync-protocol.md](spec/04-sync-protocol.md), section 5); ADR 0015.
+- Test: Test pattern 4.1 with "stored, then 502"; the retry yields exactly one message
+  and `Idempotent-Replay: true`.
 
-### L03 Nachholen nach Ausfall, dreimal gebaut (V1, V2, V3)
+### L03 Catch-up after an outage, built three times (V1, V2, V3)
 
-- Problem: Jeder Vorgänger baute ein eigenes Nachholen mit eigenen Grenzen (Seiten, Alter, "nie
-  vor der Aktivierung"). V1 brauchte zusätzlich ein Lücken-Modell, zurückgehaltene
-  Live-Ereignisse und Hinweise auf verspätete Nachrichten.
-- Lehre: Ein Ereignis-Log mit commit-geordneter Sequenz und ein dauerhafter Cursor je
-  Verbraucher. "Nie vor der Aktivierung" ist der Startpunkt des Cursors.
-- Umsetzung: [04-sync-protokoll.md](spec/04-sync-protokoll.md), Abschnitte 3, 7 und 15.1; ADR 0009.
-- Test: Absturz eines Adapters mitten im Nachholen, Neustart: kein Ereignis doppelt verarbeitet
-  (Dedupe über Ereignis-ID), keines fehlt; Live-Ereignisse erst nach `catchup.complete`.
+- Problem: Every predecessor built its own catch-up with its own limits (pages, age, "never
+  before activation"). V1 additionally needed a gap model, held-back
+  live events and notices about late messages.
+- Lesson: An event log with a commit-ordered sequence and a durable cursor per
+  consumer. "Never before activation" is the starting point of the cursor.
+- Implementation: [04-sync-protocol.md](spec/04-sync-protocol.md), sections 3, 7 and 15.1;
+  ADR 0009.
+- Test: Crash of an adapter in the middle of catch-up, restart: no event processed twice
+  (dedupe by event ID), none missing; live events only after `catchup.complete`.
 
-### L04 Antwort im falschen Kanal (V1, Konzept-Studie)
+### L04 Reply in the wrong channel (V1, concept study)
 
-- Problem: Freigaben standen verstreut in mehreren Listen je Plattform (erlaubte, ignorierte,
-  freie Kanäle). Ein Agent antwortete in einem Kanal, der ihm nicht gehörte.
-- Lehre: Genau ein Bediener je Kanal; ohne Bediener antwortet niemand; eine Prüfstelle.
-- Umsetzung: Bediener in `channels` ([03-datenmodell.md](spec/03-datenmodell.md)), `agent.invoke`
-  ([05-aktionen.md](spec/05-aktionen.md), Abschnitt 5); ADR 0017.
-- Test: In einem Kanal ohne Bediener erzeugt keine Nachricht einen Lauf; der Routen-Test findet
-  keine Route ohne Aktion.
+- Problem: Grants were scattered across several lists per platform (allowed, ignored,
+  free channels). An agent replied in a channel that did not belong to it.
+- Lesson: Exactly one operator per channel; without an operator nobody replies; one single
+  decision point.
+- Implementation: operator in `channels` ([03-data-model.md](spec/03-data-model.md)),
+  `agent.invoke` ([05-actions.md](spec/05-actions.md), section 5); ADR 0017.
+- Test: In a channel without an operator no message creates a run; the route test finds
+  no route without an action.
 
-### L05 Schleifen im Doppelbetrieb (V1)
+### L05 Loops in dual operation (V1)
 
-- Problem: Kopien und Agenten-Antworten sahen für den Adapter aus wie Eingaben. Der
-  Schleifenschutz hing an Kopfzeilen-Mustern im Text.
-- Lehre: Herkunft ist ein Datenfeld; nur Menschen lösen aus.
-- Umsetzung: `messages.origin`; `agent.invoke` Regel 1.
-- Test: Nachrichten mit `origin` `agent`, `app`, `import` und `system` in einem Kanal mit
-  `free_response` erzeugen keinen Lauf.
+- Problem: Copies and agent replies looked like input to the adapter. The
+  loop protection depended on header line patterns in the text.
+- Lesson: Origin is a data field; only people trigger.
+- Implementation: `messages.origin`; `agent.invoke` rule 1.
+- Test: Messages with `origin` `agent`, `app`, `import` and `system` in a channel with
+  `free_response` create no run.
 
-### L06 Kanal-Verhalten als lose Schlüssel (V1)
+### L06 Channel behavior as loose keys (V1)
 
-- Problem: Verhalten je Kanal kam aus untypisierten Zusatzschlüsseln der Framework-Konfiguration.
-  Ein Tippfehler blieb still ungelesen und war nur live zu bemerken.
-- Lehre: Kanal-Verhalten als typisierte Felder mit Schema; Unbekanntes wird abgelehnt.
-- Umsetzung: `require_mention`, `thread_require_mention`, `free_response`, `auto_thread`,
+- Problem: Behavior per channel came from untyped extra keys of the framework configuration.
+  A typo silently stayed unread and could only be noticed live.
+- Lesson: Channel behavior as typed fields with a schema; anything unknown is rejected.
+- Implementation: `require_mention`, `thread_require_mention`, `free_response`, `auto_thread`,
   `history_backfill_limit`, `prompt`, `channel_skill_bindings` in
-  [03-datenmodell.md](spec/03-datenmodell.md); striktes Schema in [06-api.md](spec/06-api.md).
-- Test: `channel.behavior.update` mit unbekanntem Feld ergibt `400`.
+  [03-data-model.md](spec/03-data-model.md); strict schema in [06-api.md](spec/06-api.md).
+- Test: `channel.behavior.update` with an unknown field yields `400`.
 
-### L07 Plattform-Grenzen formen die Fortschrittsanzeige (V1, V2)
+### L07 Platform limits shape the progress display (V1, V2)
 
-- Problem: Bearbeitungsfrist für Bot-Nachrichten, Längengrenze und Rate-Limits beim Bearbeiten
-  zwangen die Live-Box zu Verdichtung, Drosselung, Teilung und Löschen vor der Antwort.
-- Lehre: Der Lauf ist ein eigenes Objekt mit Patches; keine Frist, kein Teilen.
-- Umsetzung: `runs`, `run_steps`, `run.updated` ([04-sync-protokoll.md](spec/04-sync-protokoll.md),
-  Abschnitt 11); ADR 0025.
-- Test: Lauf mit vielen Patches über lange Zeit: jeder Patch wird angenommen, das Dokument ist am
-  Ende vollständig; eine Antwort bis `message.max_content_bytes` bleibt eine Nachricht.
+- Problem: An edit deadline for bot messages, a length limit and rate limits on editing
+  forced the live box into condensing, throttling, splitting and deleting before the reply.
+- Lesson: The run is an object of its own with patches; no deadline, no splitting.
+- Implementation: `runs`, `run_steps`, `run.updated`
+  ([04-sync-protocol.md](spec/04-sync-protocol.md), section 11); ADR 0025.
+- Test: A run with many patches over a long time: every patch is accepted, the document is
+  complete at the end; a reply up to `message.max_content_bytes` stays one message.
 
-### L08 "Erledigt" als Wort, Tag oder Präfix (V1, V2, V3)
+### L08 "Done" as a word, tag or prefix (V1, V2, V3)
 
-- Problem: Erledigt war je Vorgänger ein Wort, ein Tag, ein Archiv-Merkmal oder ein
-  Namenspräfix. Jede Bot-Nachricht holte einen archivierten Thread zurück.
-- Lehre: `open` und `closed` als Feld; eine neue Nachricht öffnet wieder; die Sitzung bleibt.
-- Umsetzung: `threads.state`; `thread.close`, `thread.reopen`.
-- Test: Nachricht in einem erledigten Thread: Zustand `open`, dieselbe aktuelle Sitzung.
+- Problem: Done was, depending on the predecessor, a word, a tag, an archive marker or a
+  name prefix. Every bot message brought an archived thread back.
+- Lesson: `open` and `closed` as a field; a new message reopens; the session stays.
+- Implementation: `threads.state`; `thread.close`, `thread.reopen`.
+- Test: A message in a done thread: state `open`, the same current session.
 
-### L09 Fremde Konfiguration per Textmuster geändert (V1, V3)
+### L09 Foreign configuration changed by text pattern (V1, V3)
 
-- Problem: Ein Installer änderte die YAML-Konfiguration des Agenten-Frameworks per Textpatch.
-  Das Framework schreibt Listen in Blockform; dieselbe Fehlerklasse trat an drei Stellen auf;
-  `[]` und `null` bedeuten dort Verschiedenes.
-- Lehre: Fremde Konfiguration nie per Text raten. Vorher und nachher mit dem echten Parser des
-  Frameworks lesen und vergleichen; bei unklarem Zustand abbrechen.
-- Umsetzung: Installationshilfe des Hermes-Referenz-Adapters ([09-agenten.md](spec/09-agenten.md),
-  [11-erweiterungen.md](spec/11-erweiterungen.md)).
-- Test: Installer gegen Fixtures in Block- und Inline-Form; danach liest der Parser des Frameworks
-  genau die alte Konfiguration plus den neuen Abschnitt.
+- Problem: An installer changed the YAML configuration of the agent framework by a text patch.
+  The framework writes lists in block form; the same class of error occurred in three places;
+  `[]` and `null` mean different things there.
+- Lesson: Never guess foreign configuration by text. Read and compare it before and after with
+  the real parser of the framework; abort on an unclear state.
+- Implementation: installation helper of the Hermes reference adapter
+  ([09-agents.md](spec/09-agents.md), [11-extensions.md](spec/11-extensions.md)).
+- Test: Installer against fixtures in block and inline form; afterwards the parser of the framework
+  reads exactly the old configuration plus the new section.
 
-### L10 Geheimnisse rutschen durch eine Sperrliste (V2, zweimal)
+### L10 Secrets slip through a denylist (V2, twice)
 
-- Problem: Der Runner gab dem Kindprozess seine Umgebung ohne gesperrte Schlüssel. Zweimal kamen
-  Geheimnisse des Agenten-Frameworks trotzdem durch.
-- Lehre: Die Umgebung von Kindprozessen ist eine Erlaubnisliste.
-- Umsetzung: Dev-Runner-Adapter ([09-agenten.md](spec/09-agenten.md), Baseline-Ruling zum
-  Claude-Code-Runner); [21-dev-isolation.md](spec/21-dev-isolation.md).
-- Test: Eine Kanarienvariable in der Umgebung des Adapters; der gestartete Fake-Prozess meldet
-  seine Umgebung; sie enthält nur Schlüssel der Erlaubnisliste, die Kanarie fehlt.
+- Problem: The runner gave the child process its environment without the blocked keys. Twice,
+  secrets of the agent framework still got through.
+- Lesson: The environment of child processes is an allowlist.
+- Implementation: dev runner adapter ([09-agents.md](spec/09-agents.md), baseline ruling on the
+  Claude Code runner); [21-dev-isolation.md](spec/21-dev-isolation.md).
+- Test: A canary variable in the environment of the adapter; the started fake process reports
+  its environment; it contains only keys of the allowlist, the canary is missing.
 
-### L11 Abgebrochene Turns automatisch wiederholen (V2)
+### L11 Automatically retrying aborted turns (V2)
 
-- Problem: Ein Neustart des Turns nach einem Absturz hätte Nebenwirkungen doppelt ausgeführt.
-- Lehre: Nie automatisch wiederholen; als unterbrochen melden; der Mensch entscheidet.
-- Umsetzung: Lauf `failed` mit `state_reason = stale` ([03-datenmodell.md](spec/03-datenmodell.md));
-  [09-agenten.md](spec/09-agenten.md).
-- Test: Adapter-Neustart während eines Laufs: Lauf `failed` mit `stale`; ein zweiter Start mit
-  derselben Aufruf-Marke ergibt `409 already_started`.
+- Problem: Restarting the turn after a crash would have executed side effects twice.
+- Lesson: Never retry automatically; report as interrupted; the person decides.
+- Implementation: run `failed` with `state_reason = stale`
+  ([03-data-model.md](spec/03-data-model.md)); [09-agents.md](spec/09-agents.md).
+- Test: Adapter restart during a run: run `failed` with `stale`; a second start with
+  the same invocation token yields `409 already_started`.
 
-### L12 Nachträge während der Arbeit (V2, Busy-Modus des Frameworks)
+### L12 Follow-ups during work (V2, busy mode of the framework)
 
-- Problem: Nachrichten während eines Turns gingen je nach Weg verloren, unterbrachen den Turn
-  oder wurden ein eigener Turn. Sichtbar war das nur über Reaktionen.
-- Lehre: Ein Nachtrag hat einen eigenen Zustand (wartet, übergeben, aufgenommen, verschoben). Den
-  Modus des Frameworks immer ausdrücklich setzen, nie den Standard erben.
-- Umsetzung: `run_followups`, `trigger_state = followup_delivered`
-  ([04-sync-protokoll.md](spec/04-sync-protokoll.md), Abschnitt 15.4); Hermes-Adapter mit
-  `busy_input_mode` `steer` oder `queue` (Baseline-Ruling zum Hermes-Adapter).
-- Test: Nachtrag während eines Laufs durchläuft die Zustände in Reihenfolge; nicht aufgenommene
-  Nachträge am Laufende werden ein neuer Lauf.
+- Problem: Messages during a turn, depending on the path, were lost, interrupted the turn
+  or became a turn of their own. This was only visible through reactions.
+- Lesson: A follow-up has a state of its own (waiting, handed over, taken up, deferred). Always
+  set the mode of the framework explicitly, never inherit the default.
+- Implementation: `run_followups`, `trigger_state = followup_delivered`
+  ([04-sync-protocol.md](spec/04-sync-protocol.md), section 15.4); Hermes adapter with
+  `busy_input_mode` `steer` or `queue` (baseline ruling on the Hermes adapter).
+- Test: A follow-up during a run goes through the states in order; follow-ups not taken up
+  at the end of the run become a new run.
 
-### L13 Steuerbefehle als Prompt (V2)
+### L13 Control commands as a prompt (V2)
 
-- Problem: `stop` und `status` dürfen nie an das Modell gehen und nicht hinter einem Turn warten.
-- Lehre: Steuerbefehle sind ein eigener Typ.
-- Umsetzung: `commands.control`; [04-sync-protokoll.md](spec/04-sync-protokoll.md), Abschnitt 15.4.
-- Test: `stop` während eines Laufs: sofort `command.invoked`, kein Nachtrag, Lauf `cancelled`.
+- Problem: `stop` and `status` must never go to the model and must not wait behind a turn.
+- Lesson: Control commands are a type of their own.
+- Implementation: `commands.control`; [04-sync-protocol.md](spec/04-sync-protocol.md), section
+  15.4.
+- Test: `stop` during a run: immediately `command.invoked`, no follow-up, run `cancelled`.
 
-### L14 Sitzungs-ID erst nach dem Start bekannt (V2)
+### L14 Session ID known only after the start (V2)
 
-- Problem: Ohne vorab vergebene ID ließ sich ein Lauf nach einem frühen Absturz keiner Sitzung
-  zuordnen.
-- Lehre: Die Sitzungs-ID wird vor dem ersten Lauf vergeben und gespeichert; der erste Lauf legt
-  an, jeder weitere setzt fort.
-- Umsetzung: `agent_sessions.external_session_ref` und `started`; Dev-Runner mit vorab vergebener
-  Sitzungs-ID (Baseline-Ruling zum Claude-Code-Runner).
-- Test: Absturz vor der ersten Antwort; der nächste Lauf setzt dieselbe ID fort und legt keine
-  zweite an.
+- Problem: Without an ID assigned in advance, a run could not be mapped to any session after
+  an early crash.
+- Lesson: The session ID is assigned and stored before the first run; the first run creates,
+  every further one continues.
+- Implementation: `agent_sessions.external_session_ref` and `started`; dev runner with a session
+  ID assigned in advance (baseline ruling on the Claude Code runner).
+- Test: Crash before the first reply; the next run continues the same ID and does not create a
+  second one.
 
-### L15 Kosten sind kumulativ je Sitzung (V2)
+### L15 Costs are cumulative per session (V2)
 
-- Problem: Die Laufzeit meldet Kosten erst am Turn-Ende und als Summe der ganzen Sitzung.
-  Aufaddieren zählt doppelt.
-- Lehre: Delta selbst rechnen und als Schätzung kennzeichnen; übernommene Sitzungen brauchen einen
-  Sockel.
-- Umsetzung: `cost_entries.is_estimate`; [10-backend-richtlinie.md](spec/10-backend-richtlinie.md);
-  [22-import-migration.md](spec/22-import-migration.md), Abschnitt 9.
-- Test: Zwei Turns derselben Sitzung mit kumulativen Werten: Summe der Einträge gleich letzter Wert
-  minus Sockel.
+- Problem: The runtime reports costs only at the end of a turn and as the sum of the whole session.
+  Adding them up counts twice.
+- Lesson: Compute the delta yourself and mark it as an estimate; taken-over sessions need a
+  baseline.
+- Implementation: `cost_entries.is_estimate`;
+  [10-backend-policy.md](spec/10-backend-policy.md);
+  [22-import-migration.md](spec/22-import-migration.md), section 9.
+- Test: Two turns of the same session with cumulative values: the sum of the entries equals the
+  last value minus the baseline.
 
-### L16 Alte Sitzung nach einem Import fortsetzen (V3)
+### L16 Continuing an old session after an import (V3)
 
-- Problem: Importierte Threads sollten ihren alten Verlauf behalten. Umstellen ohne Nachricht ging
-  nicht, doppeltes Umstellen hätte Verlauf verschoben, und eine Störung durfte den Menschen nicht
-  stumm schalten.
-- Lehre: Referenz beim Import speichern, beim ersten Schreiben binden wie `/resume`, genau einmal
-  mit Compare-and-swap, fail open mit genau einem Hinweis. Fehlt die alte Sitzung, beginnt eine
-  neue.
-- Umsetzung: [22-import-migration.md](spec/22-import-migration.md), Abschnitt 9.
-- Test: Zwei gleichzeitige erste Auslösungen binden genau einmal; bei fehlender alter Sitzung
-  entsteht eine neue, genau eine Systemnachricht, und die Nachricht des Menschen erreicht den
-  Agenten.
+- Problem: Imported threads should keep their old history. Switching without a message was not
+  possible, switching twice would have shifted history, and a failure must not mute the
+  person.
+- Lesson: Store the reference at import, bind it on the first write like `/resume`, exactly once
+  with compare-and-swap, fail open with exactly one notice. If the old session is missing, a new
+  one begins.
+- Implementation: [22-import-migration.md](spec/22-import-migration.md), section 9.
+- Test: Two simultaneous first triggers bind exactly once; with a missing old session
+  a new one is created, there is exactly one system message, and the message of the person
+  reaches the agent.
 
-### L17 Werkzeug schreibt bei vergessenem Schalter (V1, V3)
+### L17 Tool writes when a flag is forgotten (V1, V3)
 
-- Problem: V3 verlangte einen von zwei Schaltern, V1 machte den Trockenlauf zum Standard. Beide
-  wollten verhindern, dass ein versehentlicher Aufruf anlegt.
-- Lehre: Trockenlauf ist der Standard; widersprüchliche Optionen und eine ungültige Auswahl
-  brechen vor jedem Aufruf ab.
-- Umsetzung: [22-import-migration.md](spec/22-import-migration.md), Abschnitt 10; ADR 0043.
-- Test: Testmuster 4.7; eine unbekannte ID in `--only-thread` bricht vor jedem Schreiben ab.
+- Problem: V3 required one of two flags, V1 made the dry run the default. Both
+  wanted to prevent an accidental invocation from creating anything.
+- Lesson: The dry run is the default; contradictory options and an invalid selection
+  abort before any call.
+- Implementation: [22-import-migration.md](spec/22-import-migration.md), section 10; ADR 0043.
+- Test: Test pattern 4.7; an unknown ID in `--only-thread` aborts before any write.
 
-### L18 Idempotenz über das Ziel, nicht über eine lokale Datei (V1, V3)
+### L18 Idempotency through the target, not through a local file (V1, V3)
 
-- Problem: Ein lokaler Zustand schützt nicht, wenn er verloren geht oder ein Lauf zwischen
-  Anlegen und Vermerk abbricht. V1 fragte nach unsicheren Sendungen per Inhaltsvergleich nach.
-- Lehre: Der Herkunftsschlüssel ist im Zielsystem eindeutig; `pending` vor dem Anlegen, `posted`
-  in derselben Transaktion wie das Ziel.
-- Umsetzung: `import_items`; [22-import-migration.md](spec/22-import-migration.md), Abschnitt 7;
+- Problem: A local state does not protect if it gets lost or a run aborts between
+  creating and recording. V1 queried uncertain sends again by content comparison.
+- Lesson: The origin key is unique in the target system; `pending` before creating, `posted`
+  in the same transaction as the target.
+- Implementation: `import_items`; [22-import-migration.md](spec/22-import-migration.md), section 7;
   ADR 0043.
-- Test: Abbruch zwischen Stapel und Cursor, Neustart auf einem anderen Rechner ohne lokale Datei:
-  jedes Objekt genau einmal.
+- Test: Abort between batch and cursor, restart on a different host without a local file:
+  every item exactly once.
 
-### L19 Archiviert nur bei ausdrücklichem Merkmal (V3)
+### L19 Archived only with an explicit marker (V3)
 
-- Problem: Ein zwischen zwei Abrufen archivierter Thread stand in beiden Listen; fehlende
-  Metadaten waren mehrdeutig.
-- Lehre: Zweifel heißt offen. Ein falsch offener Thread schadet nicht, ein falsch geschlossener
-  versteckt Arbeit.
-- Umsetzung: [22-import-migration.md](spec/22-import-migration.md), Abschnitt 5.1.1.
-- Test: Thread in aktiver und archivierter Liste, Thread ohne Metadaten: beide `open`.
+- Problem: A thread archived between two fetches was in both lists; missing
+  metadata was ambiguous.
+- Lesson: Doubt means open. A thread that is wrongly open does no harm, a wrongly closed one
+  hides work.
+- Implementation: [22-import-migration.md](spec/22-import-migration.md), section 5.1.1.
+- Test: A thread in the active and the archived list, a thread without metadata: both `open`.
 
-### L20 Import ohne Benachrichtigung (V3)
+### L20 Import without notification (V3)
 
-- Problem: Ein Import alter Threads hätte eine Flut von Erwähnungen und Benachrichtigungen
-  ausgelöst.
-- Lehre: Importiertes ist still, ohne Erwähnungs-Zeilen, und gilt als gelesen.
-- Umsetzung: [22-import-migration.md](spec/22-import-migration.md), Abschnitt 6.4.
-- Test: Nach einem Import gibt es keinen Push, keine Zeile in `mentions`, und `read_states` steht
-  am Ende jedes importierten Threads.
+- Problem: An import of old threads would have set off a flood of mentions and notifications.
+- Lesson: Imported content is silent, without mention rows, and counts as read.
+- Implementation: [22-import-migration.md](spec/22-import-migration.md), section 6.4.
+- Test: After an import there is no push, no row in `mentions`, and `read_states` is set
+  to the end of every imported thread.
 
-### L21 Halbfertige Agenten-Ausgaben im Parallelbetrieb (V1)
+### L21 Half-finished agent output in parallel operation (V1)
 
-- Problem: Agenten bearbeiten ihre Antwort, während sie arbeiten. Eine zu früh kopierte Nachricht
-  bleibt halbfertig, weil spätere Bearbeitungen nicht nachgeführt werden.
-- Lehre: Ruhe-Regel: nicht kopieren, solange eine Arbeits-Markierung da ist oder die letzte
-  Änderung zu jung ist; je Thread streng der Reihe nach, Halt an der ersten unruhigen Nachricht.
-- Umsetzung: [22-import-migration.md](spec/22-import-migration.md), Abschnitt 12.3; Code-Stück 5.3.
-- Test: Tabelle aus Nachrichtenfolgen mit Markierung, Bearbeitungszeit und Typ; erwartet ist der
-  kopierbare Anfang.
+- Problem: Agents edit their reply while they work. A message copied too early
+  stays half-finished, because later edits are not carried over.
+- Lesson: Settle rule: do not copy while a work marker is present or the last
+  change is too recent; strictly in order per thread, stopping at the first unsettled message.
+- Implementation: [22-import-migration.md](spec/22-import-migration.md), section 12.3; code piece
+  5.3.
+- Test: A table of message sequences with marker, edit time and type; the expected result is the
+  copyable beginning.
 
-### L22 Ablaufende CDN-Links und Lecks in Fehlertexten (V1)
+### L22 Expiring CDN links and leaks in error texts (V1)
 
-- Problem: Anhang-URLs sind signiert und laufen ab; Fehlertexte und Fehlerkörper konnten die
-  signierte URL oder das Token enthalten.
-- Lehre: Nur erlaubte Hosts, nur `GET`, kein Token an den CDN, Größe vor dem Lesen begrenzen,
-  Fehlertexte nur mit Schema, Host und Pfad, bei Ablauf einmal neu lesen, sonst Sprunglink.
-- Umsetzung: [22-import-migration.md](spec/22-import-migration.md), Abschnitt 6.5; Code-Stück 5.2.
-- Test: Testmuster 4.3 gegen Fake-CDN, das Query und Token in Fehlerkörpern spiegelt.
+- Problem: Attachment URLs are signed and expire; error texts and error bodies could contain the
+  signed URL or the token.
+- Lesson: Only allowed hosts, only `GET`, no token to the CDN, limit the size before reading,
+  error texts only with scheme, host and path, on expiry read again once, otherwise a jump link.
+- Implementation: [22-import-migration.md](spec/22-import-migration.md), section 6.5; code piece
+  5.2.
+- Test: Test pattern 4.3 against a fake CDN that mirrors query and token in error bodies.
 
-### L23 Auto-Titel überschreibt echte Titel (V3)
+### L23 Auto title overwrites real titles (V3)
 
-- Problem: Der Agent sollte Gesprächen einen Titel geben, aber nie einen Titel überschreiben, den
-  ein Mensch gewählt hat. Kurze echte Namen ("KI", "M365") sahen aus wie Platzhalter.
-- Lehre: Titelquelle als Feld; automatische Titel nur bei `auto`; eine Platzhalter-Regel mit
-  geschützten kurzen Namen entscheidet, ob ein menschlicher Titel als `auto` startet.
-- Umsetzung: `threads.title_source`, `thread.title.update` ([05-aktionen.md](spec/05-aktionen.md));
-  Code-Stück 5.1.
-- Test: Tabellen-Test mit Platzhaltern und geschützten kurzen Namen.
+- Problem: The agent should give conversations a title, but never overwrite a title that
+  a person chose. Short real names ("AI", "M365") looked like placeholders.
+- Lesson: Title source as a field; automatic titles only with `auto`; a placeholder rule with
+  protected short names decides whether a human title starts as `auto`.
+- Implementation: `threads.title_source`, `thread.title.update`
+  ([05-actions.md](spec/05-actions.md)); code piece 5.1.
+- Test: A table test with placeholders and protected short names.
 
-### L24 Neuer Chat über einen Umweg-Kanal (V3)
+### L24 New chat through a detour channel (V3)
 
-- Problem: Die Plattform hatte keinen Knopf "Neuer Chat". Ein Plugin legte aus einer Nachricht in
-  einem Übergabekanal einen Beitrag an und brauchte eine eigene Zustandsmaschine gegen Doppel und
-  Waisen.
-- Lehre: Ein neuer Thread ist eine Server-Funktion; kein Umweg.
-- Umsetzung: `thread.create`; [01-produkt.md](spec/01-produkt.md).
-- Test: `thread.create` mit derselben `client_msg_id` der ersten Nachricht legt bei Wiederholung
-  keinen zweiten Thread an.
+- Problem: The platform had no "New chat" button. A plugin created a post from a message in
+  a handoff channel and needed a state machine of its own against duplicates and
+  orphans.
+- Lesson: A new thread is a server function; no detour.
+- Implementation: `thread.create`; [01-product.md](spec/01-product.md).
+- Test: `thread.create` with the same `client_msg_id` of the first message does not create a
+  second thread on a retry.
 
-### L25 Nur gegen Fakes bewiesen (V1, V2, V3)
+### L25 Proven only against fakes (V1, V2, V3)
 
-- Problem: Der Eingang eines Menschen auf der fremden Plattform war live nicht prüfbar; mehrere
-  Verhalten blieben "nur gegen Fakes geprüft".
-- Lehre: Auf dem eigenen Server laufen End-to-End-Tests mit Testpersonen und Test-Agenten; die
-  Kopplung an das Agenten-Framework wird gegen dessen echten Loader geprüft (Testmuster 4.8).
-- Umsetzung: [23-qualitaet.md](spec/23-qualitaet.md).
-- Test: E2E-Suite legt eine Testperson und einen Test-Agenten an, sendet, prüft Lauf, Live-Box und
-  Antwort.
+- Problem: The input of a person on the third-party platform could not be checked live; several
+  behaviors stayed "only checked against fakes".
+- Lesson: On Bothy's own server, end-to-end tests run with test people and test agents; the
+  coupling to the agent framework is checked against its real loader (test pattern 4.8).
+- Implementation: [23-quality.md](spec/23-quality.md).
+- Test: The E2E suite creates a test person and a test agent, sends, checks the run, live box and
+  reply.
 
-### L26 Blockierende Verbindung beim Stoppen (V1)
+### L26 Blocking connection on stop (V1)
 
-- Problem: Ein blockierender Abruf hielt den Prozess beim Herunterfahren länger, als der
-  Dienst-Manager erlaubte.
-- Lehre: Jede Verbindung eines Adapters ist abbrechbar; Stoppen endet in einer festen Frist.
-- Umsetzung: Adapter-Vertrag ([09-agenten.md](spec/09-agenten.md)); SDKs (ADR 0026).
-- Test: Stopp-Signal bei offener Verbindung; der Prozess endet innerhalb der konfigurierten Frist.
+- Problem: A blocking fetch held the process during shutdown longer than the
+  service manager allowed.
+- Lesson: Every connection of an adapter can be aborted; stopping ends within a fixed deadline.
+- Implementation: adapter contract ([09-agents.md](spec/09-agents.md)); SDKs (ADR 0026).
+- Test: A stop signal with an open connection; the process ends within the configured deadline.
 
-## 4. Testmuster
+## 4. Test patterns
 
-### 4.1 Fake-Server mit Fehlerinjektion (V1, V3)
+### 4.1 Fake server with fault injection (V1, V3)
 
-- Aufbau: Ein HTTP-Fake im Testprozess, nur auf `127.0.0.1`, Port vom System vergeben, mit
-  Anfrage-Log und gezielten Fehlern: Status zurückgeben; speichern, dann mit Status antworten oder
-  die Verbindung kappen ("gespeichert, dann 502"); erst nach der Antwort speichern ("spät
-  gespeichert"); Rate-Limit bis zu einem Zeitpunkt; Verzögerung.
-- Beweist: Wiederholungen nach unsicherer Zustellung erzeugen kein Doppel und keinen Verlust.
-- Einsatz: Fake-Bothy für SDKs, Adapter und Import-Werkzeug; Fake-Discord und Fake-CDN für den
-  Import. In Go mit `httptest`, in Python mit der Standardbibliothek.
+- Setup: An HTTP fake in the test process, only on `127.0.0.1`, port assigned by the system, with
+  a request log and targeted faults: return a status; store, then respond with a status or
+  cut the connection ("stored, then 502"); store only after the response ("stored
+  late"); rate limit until a point in time; delay.
+- Proves: Retries after uncertain delivery create no duplicate and no loss.
+- Use: fake Bothy for SDKs, adapters and the import tool; fake Discord and fake CDN for the
+  import. In Go with `httptest`, in Python with the standard library.
 
-### 4.2 Szenario-Register mit genau einer RESULT-Zeile (V1)
+### 4.2 Scenario register with exactly one RESULT line (V1)
 
-- Aufbau: Szenarien sind registrierte Funktionen. Ein Test startet ein Szenario als Kindprozess
-  mit sauberer Umgebung; das Szenario druckt genau eine Zeile `RESULT <json>`. Der Test verlangt
-  Exit-Code `0` und genau eine solche Zeile und prüft das JSON. Arbeitsregel: jede
-  Verhaltensänderung bekommt ein Szenario, das vorher rot war.
-- Beweist: Verhalten im echten Laufzeit-Kontext (fremdes Interpreter-venv, echte Loader) ohne
-  Testcode in diesem Kontext.
-- Einsatz: Tests des Hermes-Referenz-Adapters und des Dev-Runners.
+- Setup: Scenarios are registered functions. A test starts a scenario as a child process
+  with a clean environment; the scenario prints exactly one line `RESULT <json>`. The test requires
+  exit code `0` and exactly one such line and checks the JSON. Working rule: every
+  behavior change gets a scenario that was red before.
+- Proves: Behavior in the real runtime context (foreign interpreter venv, real loaders) without
+  test code in that context.
+- Use: tests of the Hermes reference adapter and of the dev runner.
 
-### 4.3 Geheimnis-Leck-Test (V1, V3)
+### 4.3 Secret leak test (V1, V3)
 
-- Aufbau: Der Fake spiegelt Token, Schlüssel und signierte Query in Fehlerkörpern und
-  Fehlermeldungen. Der Test fängt alle Log-Zeilen auf Debug-Stufe, Standardausgabe, Fehlerausgabe
-  und Berichte und sucht den Wert und abgeleitete Formen (Basic-Auth-Kodierung, Präfixe).
-- Beweist: Kein Geheimnis erscheint in Log, Ausgabe oder Fehlertext, auch im Fehlerpfad.
-- Einsatz: Server-Logs, SDKs, Adapter, Import-Werkzeug.
+- Setup: The fake mirrors token, key and signed query in error bodies and
+  error messages. The test captures all log lines at debug level, standard output, error output
+  and reports and searches for the value and derived forms (Basic Auth encoding, prefixes).
+- Proves: No secret appears in a log, output or error text, even in the error path.
+- Use: server logs, SDKs, adapters, import tool.
 
-### 4.4 Temp-Ordner-Wächter (V3, V1)
+### 4.4 Temp folder guard (V3, V1)
 
-- Aufbau: Ein Test startet alle Testmodule in einem Kindprozess mit frischem, leerem `TMPDIR` und
-  verlangt, dass der Ordner danach leer ist. Die Modulliste liest er aus dem Verzeichnis, damit neue
-  Module ohne Pflege dabei sind. Ein absichtlich scheiterndes Modul (ein Fehlschlag, Fehler in
-  `setUp` und im Test) beweist das Aufräumen im Fehlerpfad.
-- Beweist: Tests hinterlassen keine Reste, auch wenn sie scheitern.
-- Einsatz: Python-Suiten (SDK, Adapter, Werkzeuge); für Go-Tests derselbe Wächter über `make check`
-  mit eigenem `TMPDIR`.
+- Setup: A test starts all test modules in a child process with a fresh, empty `TMPDIR` and requires
+  that the folder is empty afterwards. It reads the module list from the directory, so that new
+  modules are included without upkeep. A deliberately failing module (one failure, errors in `setUp`
+  and in the test) proves the cleanup in the error path.
+- Proves: Tests leave no leftovers, even when they fail.
+- Use: Python suites (SDK, adapters, tools); for Go tests the same guard through `make check`
+  with its own `TMPDIR`.
 
-### 4.5 Doku-Zahlen-Wächter (V1, V2)
+### 4.5 Doc number guard (V1, V2)
 
-- Aufbau: Zahlen in README und Entscheidungen stammen aus benannten Konstanten; ein Test vergleicht
-  sie und findet nackte Zahlen außerhalb von Code-Spans, Daten und Versionen; Backticks müssen
-  paarweise stehen, sonst liest die Prüfung Code als Prosa.
-- Beweist: Doku und Code nennen dieselben Grenzen.
-- Einsatz: Bothy führt Grenzen nur als Konfigurationswerte mit einer Standard-Tabelle je Kapitel
-  und einer Konfigurationsreferenz; die Prüfung ([23-qualitaet.md](spec/23-qualitaet.md)) verlangt,
-  dass jeder genannte Schlüssel in der Referenz steht.
+- Setup: Numbers in the README and decisions come from named constants; a test compares
+  them and finds bare numbers outside of code spans, dates and versions; backticks must
+  come in pairs, otherwise the check reads code as prose.
+- Proves: Docs and code name the same limits.
+- Use: Bothy keeps limits only as configuration values with a default table per chapter
+  and a configuration reference; the check ([23-quality.md](spec/23-quality.md)) requires
+  that every named key is in the reference.
 
-### 4.6 Gedankenstrich-Wächter (V1, V2, V3)
+### 4.6 Dash guard (V1, V2, V3)
 
-- Aufbau: Alle getrackten Textdateien werden auf die Zeichen U+2013 und U+2014 geprüft.
-- Beweist: Die Hausregel hält ohne Handarbeit.
-- Einsatz: pre-commit und `make check` ([23-qualitaet.md](spec/23-qualitaet.md)).
+- Setup: All tracked text files are checked for the characters U+2013 and U+2014.
+- Proves: The house rule holds without manual work.
+- Use: pre-commit and `make check` ([23-quality.md](spec/23-quality.md)).
 
-### 4.7 Trockenlauf-nur-GET-Beweis (V1, V3)
+### 4.7 Dry-run GET-only proof (V1, V3)
 
-- Aufbau: Die Fakes zählen alle Methoden; erwartet ist genau die Menge `{GET}`. Kein
-  Registrierungs- oder Schreib-Endpunkt erscheint im Log. Ein vorher fehlender Zustandsordner wird
-  nicht angelegt; ein vorhandener bleibt leer.
-- Beweist: Der Trockenlauf schreibt nirgends.
-- Einsatz: `bothy import discord` ([22-import-migration.md](spec/22-import-migration.md),
-  Abschnitt 16) und jedes andere Werkzeug mit Trockenlauf.
+- Setup: The fakes count all methods; the expected result is exactly the set `{GET}`. No
+  registration or write endpoint appears in the log. A state folder that was missing before is
+  not created; an existing one stays empty.
+- Proves: The dry run writes nowhere.
+- Use: `bothy import discord` ([22-import-migration.md](spec/22-import-migration.md),
+  section 16) and every other tool with a dry run.
 
-### 4.8 Test gegen das echte Laden des Hermes-Plugins (V1, V3)
+### 4.8 Test against the real loading of the Hermes plugin (V1, V3)
 
-- Aufbau: Kindprozess im Python-venv von Hermes Agent mit Wegwerf-`HOME`, Wegwerf-`HERMES_HOME`
-  und eigenem `TMPDIR`; das Plugin liegt als Verweis unter `HERMES_HOME/plugins`; die
-  Konfiguration schaltet es über den Manifest-Namen ein; Hermes findet es über seine echte
-  Plugin-Suche. Vor und nach der Klasse vergleicht der Test `git status --porcelain --ignored` und
-  `git diff HEAD` des Hermes-Checkouts.
-- Beweist: Das Plugin lädt im echten Framework, und die Tests verändern das Framework nicht.
-- Einsatz: Hermes-Referenz-Adapter, gegen die in CI gepinnte Hermes-Version
-  ([09-agenten.md](spec/09-agenten.md), [23-qualitaet.md](spec/23-qualitaet.md)).
+- Setup: A child process in the Python venv of Hermes Agent with a throwaway `HOME`, a throwaway
+  `HERMES_HOME` and its own `TMPDIR`; the plugin lies as a link under `HERMES_HOME/plugins`; the
+  configuration enables it by the manifest name; Hermes finds it through its real plugin discovery.
+  Before and after the class, the test compares `git status --porcelain --ignored` and
+  `git diff HEAD` of the Hermes checkout.
+- Proves: The plugin loads in the real framework, and the tests do not change the framework.
+- Use: Hermes reference adapter, against the Hermes version pinned in CI
+  ([09-agents.md](spec/09-agents.md), [23-quality.md](spec/23-quality.md)).
 
-## 5. Code, der sich zu portieren lohnt
+## 5. Code worth porting
 
-Lizenzhinweis: Die drei Stücke sind eigener Code des Owners aus privaten Vorgänger-Repos ohne
-Fremdlizenz; sie nutzen nur die Python-Standardbibliothek. Übernahme heißt Neuschreiben in Go unter
-der Lizenz des Produkts (Apache-2.0, DCO, ADR 0003), mit neu geschriebenen Tests nach den alten
-Testfällen. Der alte Quelltext wird nicht kopiert. Wo die Stücke liegen, steht nur im Ops-Repo.
+License note: The three pieces are the owner's own code from private predecessor repos without a
+third-party license; they use only the Python standard library. Adopting means rewriting in Go under
+the license of the product (Apache-2.0, DCO, ADR 0003), with newly written tests based on the old
+test cases. The old source code is not copied. Where the pieces are is recorded only in the ops
+repo.
 
-### 5.1 Auto-Titel-Platzhalterregel (V3)
+### 5.1 Auto title placeholder rule (V3)
 
-- Ziel: Go, Modul `chat`; genutzt beim Anlegen eines Threads durch einen Menschen und beim Import
-  (Titelquelle `auto` oder `manual`).
-- Regel: leer ist Platzhalter; nur Satzzeichen bis zu einer kleinen festen Länge ist Platzhalter,
-  Emoji und Symbole nicht; nach Unicode-NFKC und Groß-/Kleinschreibung-Faltung ist ein Wort aus der
-  Platzhalter-Liste ein Platzhalter; einige davon auch mit angehängter Zahl ("Test 2"). Kurze echte
-  Namen bleiben echt ("KI", "M365", "C#", "PC 2").
-- Anpassung: Die Wortlisten werden Daten je Sprache (Deutsch und Englisch), nicht Code; die feste
-  Länge wird eine benannte Konstante.
+- Target: Go, module `chat`; used when a person creates a thread and at import
+  (title source `auto` or `manual`).
+- Rule: empty is a placeholder; only punctuation up to a small fixed length is a placeholder, emoji
+  and symbols are not; after Unicode NFKC and case folding, a word from the placeholder list is a
+  placeholder; some of them also with an appended number ("Test 2"). Short real names stay real
+  ("AI", "M365", "C#", "PC 2").
+- Adaptation: The word lists become data per language (German and English), not code; the fixed
+  length becomes a named constant.
 
-### 5.2 CDN-Abruf mit Host-Liste (V1)
+### 5.2 CDN fetch with a host list (V1)
 
-- Ziel: Go, Import-Werkzeug.
-- Regel: nur `GET`; ein Transport je erlaubtem Host; nur `https` (V1 ließ in einer Prüfung noch
-  `http` zu, das wird beim Port behoben); keine Weiterleitungen; kein Proxy aus der Umgebung; kein
-  Token an den CDN; Lese-Grenze Maximum plus ein Byte und Prüfung von `content-length`; `429` mit
-  Wartegrenze; Fehlertexte nur mit Schema, Host und Pfad; der Fehlerkörper des CDN wird nie
-  gezeigt.
-- Anpassung: Neu lesen der Nachricht bei abgelaufener Signatur
-  ([22-import-migration.md](spec/22-import-migration.md), Abschnitt 6.5).
+- Target: Go, import tool.
+- Rule: only `GET`; one transport per allowed host; only `https` (V1 still allowed `http` in one
+  check, this is fixed in the port); no redirects; no proxy from the environment; no token to the
+  CDN; read limit of the maximum plus one byte and a check of `content-length`; `429` with a wait
+  limit; error texts only with scheme, host and path; the error body of the CDN is never shown.
+- Adaptation: Reading the message again on an expired signature
+  ([22-import-migration.md](spec/22-import-migration.md), section 6.5).
 
-### 5.3 Ruhe-Regel (V1)
+### 5.3 Settle rule (V1)
 
-- Ziel: Go, Lese-Spiegel des Import-Werkzeugs.
-- Regel: Eine Nachricht ist beschäftigt, wenn sie oder ihre Ausgangsnachricht eine
-  Arbeits-Markierung trägt; unruhig, wenn ihre letzte Änderung jünger als die Ruhezeit ist;
-  kopierbar ist der Anfang bis vor die erste beschäftigte oder unruhige Nachricht; nicht kopierte
-  Typen halten nicht an; ein Rückblick auf frühere Nachrichten fängt späte Markierungen.
-- Anpassung: Markierungen, Ruhezeit und Rückblick sind Konfigurationswerte
-  ([22-import-migration.md](spec/22-import-migration.md), Abschnitt 19).
+- Target: Go, read mirror of the import tool.
+- Rule: A message is busy if it or its source message carries a work marker; unsettled if its last
+  change is more recent than the settle time; the copyable part is the beginning up to just before
+  the first busy or unsettled message; types that are not copied do not stop; a lookback on
+  earlier messages catches late markers.
+- Adaptation: Markers, settle time and lookback are configuration values
+  ([22-import-migration.md](spec/22-import-migration.md), section 19).
 
-## 6. Ausdrücklich nicht übernommen
+## 6. Explicitly not adopted
 
-| Konzept | Grund |
+| Concept | Reason |
 |---|---|
-| Register für Umbenennen und Verschieben von Gesprächen | Bothy hat feste Thread-IDs (L01). |
-| Bearbeitungsfenster mit logischen Nachrichten-IDs | Keine Bearbeitungsfrist für Agenten; die Live-Box ist ein Lauf (L07). |
-| Lücken-Modell, Zurückhalten und Hinweise auf verspätete Nachrichten | Commit-geordnete Sequenz und Cursor (L03). |
-| Namensfaltung nach Art des fremden Servers | Keine Identität über Namen (L01). |
-| Nachfrage nach unsicheren Sendungen per Inhaltsvergleich | Idempotenz-Schlüssel und Herkunftsschlüssel (L02, L18). |
-| Kopfzeile "Name und Zeit" in kopierten Nachrichten | Bothy speichert Original-Autor und Original-Zeit; Herkunft ist `origin`. |
-| Teilen langer Nachrichten und Verdichten der Live-Box | Große Nachrichtengrenze; Lauf-Dokument statt Textblase. |
-| Status-Reaktionen als Zeichen | `trigger_state` mit Icons; Status ist keine Reaktion. |
-| Datei-Eingang mit Ordnern für wartend, in Arbeit und gesehen | Ereignis-Log, Verbraucher-Cursor und `ack`. |
-| Abfangen von Plattform-Slash-Befehlen im Plugin | Befehle sind Server-Objekte (`commands`). |
-| Übergabekanal für neue Chats | `thread.create` (L24). |
-| Eigene Discord-REST-Schicht für Antworten | Bothy schreibt Discord nie; Antworten laufen über die eigene API. |
-| Kopie der Konvertierung aus einem Spiegel-Werkzeug | Der Import wandelt Discord-Formatierung selbst um (22, Abschnitt 6.3). |
+| Register for renaming and moving conversations | Bothy has fixed thread IDs (L01). |
+| Edit window with logical message IDs | No edit deadline for agents; the live box is a run (L07). |
+| Gap model, holding back and notices about late messages | Commit-ordered sequence and cursor (L03). |
+| Name folding in the style of the third-party server | No identity by name (L01). |
+| Re-querying uncertain sends by content comparison | Idempotency key and origin key (L02, L18). |
+| Header line "name and time" in copied messages | Bothy stores the original author and original time; origin is `origin`. |
+| Splitting long messages and condensing the live box | Large message limit; run document instead of a text bubble. |
+| Status reactions as signs | `trigger_state` with icons; a status is not a reaction. |
+| File inbox with folders for waiting, in progress and seen | Event log, consumer cursor and `ack`. |
+| Intercepting platform slash commands in the plugin | Commands are server objects (`commands`). |
+| Handoff channel for new chats | `thread.create` (L24). |
+| Own Discord REST layer for replies | Bothy never writes to Discord; replies go through its own API. |
+| Copy of the conversion from a mirror tool | The import converts Discord formatting itself (22, section 6.3). |

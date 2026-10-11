@@ -7,7 +7,7 @@
 # any navigation entry without a page fail the strict build (`omitted_files: warn`).
 
 site_name: Bothy
-site_description: Kommandozentrale für KI-Agenten in Chat-Form. Chat, Live-Ansicht, Freigaben, Terminal, Kosten und Statistik, selbst gehostet.
+site_description: A command center for AI agents in chat form. Chat, live view, grants, terminal, costs and statistics, self-hosted.
 site_url: https://OWNER.github.io/bothy/
 repo_url: https://github.com/OWNER/bothy
 repo_name: bothy
@@ -17,7 +17,7 @@ site_dir: site
 
 theme:
   name: material
-  language: de
+  language: en
   # System fonts: reading the site sends no request to a font service.
   font: false
   features:
@@ -31,30 +31,30 @@ theme:
     - media: "(prefers-color-scheme)"
       toggle:
         icon: material/brightness-auto
-        name: Systemvorgabe
+        name: System default
     - media: "(prefers-color-scheme: light)"
       scheme: default
       primary: custom
       accent: custom
       toggle:
         icon: material/brightness-7
-        name: Dunkel
+        name: Dark
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       primary: custom
       accent: custom
       toggle:
         icon: material/brightness-4
-        name: Hell
+        name: Light
 
-# Colours of the site and of its Mermaid blocks come from the design tokens (generated file,
+# Colors of the site and of its Mermaid blocks come from the design tokens (generated file,
 # tools/design-tokens/tokens.py).
 extra_css:
   - design/site-theme.css
 
 plugins:
   - search:
-      lang: [de, en]
+      lang: [en]
 
 # Links to repository files outside docs/ point to the repository host (the target must
 # exist; tools/docs/mkdocs_repo_links.py).
@@ -102,95 +102,96 @@ not_in_nav: |
   /adr/0*.md
 
 nav:
-  - Start: index.md
-  - Überblick:
-      - Spezifikation: SPEC.md
+  - Home: index.md
+  - Overview:
+      - Specification: SPEC.md
       - Roadmap: roadmap.md
       - Plan: PLAN.md
-      - Lehren der Vorgänger: REUSE.md
-  - Spezifikation:
-      - 00 Glossar: spec/00-glossar.md
-      - 01 Produkt: spec/01-produkt.md
-      - 02 Architektur: spec/02-architektur.md
-      - 03 Datenmodell: spec/03-datenmodell.md
-      - 04 Sync-Protokoll: spec/04-sync-protokoll.md
-      - 05 Aktionen: spec/05-aktionen.md
+      - Lessons from predecessors: REUSE.md
+      - Glossary: glossary.md
+  - Specification:
+      - 00 Glossary: spec/00-glossary.md
+      - 01 Product: spec/01-product.md
+      - 02 Architecture: spec/02-architecture.md
+      - 03 Data model: spec/03-data-model.md
+      - 04 Sync protocol: spec/04-sync-protocol.md
+      - 05 Actions: spec/05-actions.md
       - 06 API: spec/06-api.md
-      - 07 Rechte: spec/07-rechte.md
-      - 08 Identität: spec/08-identitaet.md
-      - 09 Agenten: spec/09-agenten.md
-      - 10 Backend-Richtlinie: spec/10-backend-richtlinie.md
-      - 11 Erweiterungen: spec/11-erweiterungen.md
-      - 12 Dateien: spec/12-dateien.md
-      - 13 Push und Benachrichtigungen: spec/13-push-benachrichtigungen.md
-      - 14 Suche: spec/14-suche.md
-      - 15 Client-Architektur: spec/15-client-architektur.md
-      - 16 Betrieb: spec/16-betrieb.md
+      - 07 Permissions: spec/07-permissions.md
+      - 08 Identity: spec/08-identity.md
+      - 09 Agents: spec/09-agents.md
+      - 10 Backend policy: spec/10-backend-policy.md
+      - 11 Extensions: spec/11-extensions.md
+      - 12 Files: spec/12-files.md
+      - 13 Push and notifications: spec/13-push-notifications.md
+      - 14 Search: spec/14-search.md
+      - 15 Client architecture: spec/15-client-architecture.md
+      - 16 Operations: spec/16-operations.md
       - 17 Observability: spec/17-observability.md
       - 18 Release: spec/18-release.md
-      - 19 Sicherheit: spec/19-sicherheit.md
-      - 20 Datenschutz: spec/20-datenschutz.md
-      - 21 Dev-Abschottung: spec/21-dev-isolation.md
-      - 22 Import und Migration: spec/22-import-migration.md
-      - 23 Qualität: spec/23-qualitaet.md
+      - 19 Security: spec/19-security.md
+      - 20 Privacy: spec/20-privacy.md
+      - 21 Dev isolation: spec/21-dev-isolation.md
+      - 22 Import and migration: spec/22-import-migration.md
+      - 23 Quality: spec/23-quality.md
       - 24 Terminal: spec/24-terminal.md
-      - 25 Visualisierung: spec/25-visualisierung.md
-  - Architektur: architecture/README.md
+      - 25 Visualization: spec/25-visualization.md
+  - Architecture: architecture/README.md
   - API:
-      - Übersicht: api/README.md
+      - Overview: api/README.md
       - Webhooks: api/webhooks.md
-  - Sicherheit:
-      - Bedrohungsmodell: security/threat-model.md
+  - Security:
+      - Threat model: security/threat-model.md
   - Compliance:
-      - Verzeichnis der Verarbeitungstätigkeiten: compliance/ropa-template.md
-      - Auftragsverarbeiter: compliance/processors-template.md
+      - Record of processing activities: compliance/ropa-template.md
+      - Processors: compliance/processors-template.md
   - Design:
-      - Übersicht: design/README.md
-      - Farbpalette: design/palette.md
-      - Kontraste: design/contrast.md
-      - Typografie: design/typography.md
-      - Abstände, Radien, Erhebung, Bewegung: design/spacing-radii-elevation-motion.md
-      - Token-Referenz: design/tokens.md
+      - Overview: design/README.md
+      - Color palette: design/palette.md
+      - Contrasts: design/contrast.md
+      - Typography: design/typography.md
+      - Spacing, radii, elevation, motion: design/spacing-radii-elevation-motion.md
+      - Token reference: design/tokens.md
       - Icons: design/icons.md
-      - Komponenten: design/components.md
+      - Components: design/components.md
       - Name: design/naming.md
-  - Betrieb:
-      - Konfiguration: operations/configuration.md
-      - Installation mit Compose: operations/install-compose.md
-      - Sicherung und Wiederherstellung: operations/backup-restore.md
-      - Notfall: operations/disaster-recovery.md
-      - Umzug in die Cloud: operations/cloud-migration.md
+  - Operations:
+      - Configuration: operations/configuration.md
+      - Installation with Compose: operations/install-compose.md
+      - Backup and restore: operations/backup-restore.md
+      - Emergency: operations/disaster-recovery.md
+      - Moving to the cloud: operations/cloud-migration.md
       - Upgrade: operations/upgrade.md
       - Tailscale: operations/tailscale.md
-      - Umgebungen und Feature-Flags: operations/environments-and-flags.md
+      - Environments and feature flags: operations/environments-and-flags.md
       - Release: operations/release.md
   - Observability:
-      - Signale: observability/signals.md
-      - Datenschutz: observability/privacy.md
+      - Signals: observability/signals.md
+      - Privacy: observability/privacy.md
       - Collector: observability/collector.md
       - Dashboards: observability/dashboards.md
       - SLOs: observability/slos.md
-      - Alarme: observability/alerting.md
+      - Alerts: observability/alerting.md
       - Backends: observability/backends.md
-      - Admin-Statistik: observability/admin-statistics.md
-      - Audit und Telemetrie: observability/audit-vs-telemetry.md
-  - Qualität:
-      - Übersicht: quality/README.md
+      - Admin statistics: observability/admin-statistics.md
+      - Audit and telemetry: observability/audit-vs-telemetry.md
+  - Quality:
+      - Overview: quality/README.md
       - Gates: quality/gates.md
-      - Werkzeugkette: quality/toolchain.md
-      - Push-Disziplin: quality/push-discipline.md
-      - Red-Team-Gate: quality/red-team-gate.md
-      - SonarQube lokal: quality/sonarqube-local.md
-      - Veröffentlichen: quality/public-switch.md
-      - Lizenzen: quality/licenses.md
-  - Entscheidungen:
-      - ADR-Index: adr/README.md
-      - Ruling-Log: DECISIONS.md
-      - Offene Fragen: OPEN-QUESTIONS.md
-      - Risiken: RISKS.md
-  - Bau-Briefs:
+      - Toolchain: quality/toolchain.md
+      - Push discipline: quality/push-discipline.md
+      - Red-team gate: quality/red-team-gate.md
+      - SonarQube locally: quality/sonarqube-local.md
+      - Publishing: quality/public-switch.md
+      - Licenses: quality/licenses.md
+  - Decisions:
+      - ADR index: adr/README.md
+      - Ruling log: DECISIONS.md
+      - Open questions: OPEN-QUESTIONS.md
+      - Risks: RISKS.md
+  - Build briefs:
       - briefs/README.md
-      - Etappe M1:
+      - Milestone M1:
           - "M1-01: Server gates in the make contract": briefs/M1-01-server-gates.md
           - "M1-02: Action catalogue as the single data source (ADR 0049)": briefs/M1-02-action-catalogue-source.md
           - "M1-03: API contract checks in the gate (G2, G3)": briefs/M1-03-api-contract-checks.md
@@ -218,8 +219,8 @@ nav:
           - "M1-25: Action catalogue in code and registration duty": briefs/M1-25-authz-catalogue.md
           - "M1-26: Principal tables and directory": briefs/M1-26-identity-principals.md
           - "M1-27: Grant model storage": briefs/M1-27-authz-grant-store.md
-          - "M1-28: Rights snapshot, cache and authorize": briefs/M1-28-authz-core.md
-          - "M1-29: Rights changes, access.changed and invariants I1 and SR8": briefs/M1-29-authz-invariants.md
+          - "M1-28: Permission snapshot, cache and authorize": briefs/M1-28-authz-core.md
+          - "M1-29: Permission changes, access.changed and invariants I1 and SR8": briefs/M1-29-authz-invariants.md
           - "M1-30: Expiry of grants and memberships": briefs/M1-30-authz-expiry.md
           - "M1-31: People, owners and own profile": briefs/M1-31-identity-people.md
           - "M1-32: Signing keys, JWKS and rotation": briefs/M1-32-signing-keys.md

@@ -2,20 +2,20 @@
 #
 # Portability test: the complete stack from the released images on a fresh Linux
 # machine, installed with the documented options of install.sh, then the smoke test
-# (docs/spec/16-betrieb.md, 3.1 and 11.1). release.yml calls it after its publish job for
+# (docs/spec/16-operations.md, 3.1 and 11.1). release.yml calls it after its publish job for
 # product tags (vX.Y.Z, also beta); before that, install.sh and the bundle do not exist
 # under the tag. Server tags do not start it: no install.sh lives under them; a server
 # version is tested by the product release that installs it (BOTHY_VERSION in the bundle).
 # By hand: workflow_dispatch with a product tag; the job checks out that tag, not the
 # ref it was started from.
 #
-# Source of install.sh (16, 3.1): the documented curl command of the tag, as an operator
-# runs it. The images come from BOTHY_REGISTRY and BOTHY_VERSION in the bundle
+# Source of install.sh (16, 3.1): the documented curl command of the tag, as an instance
+# operator runs it. The images come from BOTHY_REGISTRY and BOTHY_VERSION in the bundle
 # (docs/spec/18-release.md, 2.1) and are pulled without a login.
 #
 # Runners (ADR 0039): fresh GitHub-hosted Linux runners, because the point is a machine that
 # has never seen the project; the matrix runs it once on amd64 and once on arm64
-# (docs/spec/16-betrieb.md, 11.1).
+# (docs/spec/16-operations.md, 11.1).
 
 name: portability
 
@@ -65,9 +65,9 @@ jobs:
         with:
           ref: refs/tags/${{ inputs.tag }}
           persist-credentials: false
-      # Interface of make portability (docs/spec/16-betrieb.md, 11.1); the options after
+      # Interface of make portability (docs/spec/16-operations.md, 11.1); the options after
       # `sh -s --` live in tests/portability/install-options. The images are pulled without a
-      # login, as an operator does; a package that is still private fails the test
+      # login, as an instance operator does; a package that is still private fails the test
       # (docs/quality/public-switch.md, step 21).
       - name: Install with the documented options and run the smoke test
         env:

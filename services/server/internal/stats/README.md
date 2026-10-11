@@ -1,49 +1,49 @@
-# Modul `stats`
+# Module `stats`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
-## Zweck
+## Purpose
 
-Statistik für Konsole: Nutzung je Bereich, Läufe, Werkzeugaufrufe, Kosten, Fehlerraten.
+Statistics for the console: usage per space, runs, tool calls, costs, error rates.
 
-## Port (Wurzelpaket `internal/stats`)
+## Port (root package `internal/stats`)
 
-- Eingehend: `Stats` (Abfragen, Timeline, Ampel, Backend-Ansicht), `Live` (Basis-Rahmen je Intervall, Filter je Empfänger).
-- Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: kernel `measure.Recorder`.
+- Inbound: `Stats` (queries, timeline, traffic light, backend view), `Live` (base frame per interval, filter per receiver).
+- Emits in-tx events: none.
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: kernel `measure.Recorder`.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `chat`, `agents`, `messaging`, `runs`, `billing`.
+May use the ports of these modules: `chat`, `agents`, `messaging`, `runs`, `billing`.
 
-Grund: liest Kennzahlen über Ports.
+Reason: reads metrics through ports.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `stats_minutes`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables via SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `stats.read`, `client_metrics.submit`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: keine.
-- Kurzlebig: `stats.live`.
-- WebSocket-Ops (Client an Server): `stats.subscribe`, `stats.unsubscribe` (über den Hub des Gateways).
+- Durable: none.
+- Ephemeral: `stats.live`.
+- WebSocket ops (client to server): `stats.subscribe`, `stats.unsubscribe` (through the hub of the gateway).
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Kennzahlen ohne Inhalte; Instanz-Sicht nur für Owner, Bereich mit `manage` (05, `stats.read`).
-- Abgrenzung zur Telemetrie: `stats` zeigt Fachzahlen in der Konsole, Betriebsmetriken laufen über OpenTelemetry (17-observability.md).
+- Metrics without content; instance view only for the owner, space view with `manage` (05, `stats.read`).
+- Distinction from telemetry: `stats` shows domain figures in the console, operational metrics run through OpenTelemetry (17-observability.md).
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [01-produkt.md](../../../../docs/spec/01-produkt.md), [17-observability.md](../../../../docs/spec/17-observability.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [01-product.md](../../../../docs/spec/01-product.md), [17-observability.md](../../../../docs/spec/17-observability.md)

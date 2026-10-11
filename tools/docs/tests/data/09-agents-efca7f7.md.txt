@@ -1,0 +1,29 @@
+<!-- Translated excerpt of docs/spec/09-agents.md at efca7f7: R-AG-22 stood twice in the first column (finding K3-05). Suffix .txt so that link and Markdown checks do not evaluate the old relative links. -->
+
+
+| No. | Decision | Reason |
+|---|---|---|
+| R-AG-01 | Effective feature = owner allowance and adapter report. | The owner can switch off, but cannot force anything that the adapter cannot do. |
+| R-AG-02 | Main threads use the current operator; threads their fixed one. | A frozen operator would mute channels after a change. |
+| R-AG-03 | More than one mentioned agent is a visible rejection. | At most one active run per thread; the server does not guess. |
+| R-AG-04 | Guest runs have no session. | One current session per thread; the guest does not displace the operator. |
+| R-AG-22 | Personal agents are never guest agents. | Otherwise they could be triggered in channels that I1 does not check. |
+| R-AG-05 | Without `trigger` there is an error message only on an explicit mention. | No flood of errors in free-response channels, but a reply to a targeted mention. |
+| R-AG-06 | The server builds the context with a trust marker per message ([ADR 0054](../adr/0054-origin-and-trust-marking-in-the-agent-context.md)). | Only `authz` knows the permissions of the authors; protection against prompt injection. |
+| R-AG-07 | The adapter starts the runtime only after the commitment through `run.start`. | At most one execution per invocation. |
+| R-AG-08 | `run.start` also covers `waiting_input -> running`. | A question is a trigger like any other and needs a token. |
+| R-AG-09 | `trigger_state` separates `received` (server) and `queued` (adapter); new value `cancelled`. | The person sees whether the agent has the request; a stop is not an error. |
+| R-AG-10 | After a stop, open follow-ups are discarded; after an error, they are processed later. | Stop means "nothing more"; errors leave new requests unprocessed. |
+| R-AG-11 | The single-use rule applies per message to all `single_use` components. | A card has exactly one decision. |
+| R-AG-12 | "Always allow" only for the owner. | Changes the permanent allowance of the runtime for all triggering people. |
+| R-AG-13 | Built-in control commands with reserved names; no keyword in free text. | Unambiguous, translatable, never sent to the model. |
+| R-AG-14 | Autocomplete never calls a model and answers empty after the timeout. | Typing costs nothing and never hangs. |
+| R-AG-15 | Placeholder detection at creation decides `auto` or `manual`. | Real titles are never overwritten, placeholders are. |
+| R-AG-16 | Voice input: the agent transcribes, otherwise the server port, otherwise a visible rejection. | No silent loss of a voice message. |
+| R-AG-17 | No automatic retry after `interrupted`, `stale`; button "Send again". | Side effects of the runtime must not happen twice. |
+| R-AG-18 | Hermes: tool display as run steps, drafts into the box, replies as a message only when finished. | No flood of revisions, one live box instead of progress bubbles. |
+| R-AG-19 | Hermes: allowlist in the adapter from the server; Hermes' own list only with `personal`. | Three layers without a restart on every grant. |
+| R-AG-20 | Runner: reported mode by a pre-check with a controlled environment, `apiKeySource` only as a cross-check. | `apiKeySource = none` does not distinguish subscription and other ways. |
+| R-AG-21 | Runner: `--permission-prompts none` instead of waiting permission prompts. | Unattended turns do not hang. |
+| R-AG-22 | Ack after acceptance into the inbox, not after `run.start`; renew an expired token through `run.token.renew`; a token error at the start is always `403 invocation_token_invalid` with `reason`. | Otherwise a slow start triggered a redelivery whose token replaces the old one and which duplicate detection discards; the run would hang (D-W-15). |
+| R-AG-23 | Tool class in the protocol: claim `tool_class`, check in the adapter, `tool_class_used` in `run.start`, flags per class in the runner. | SR2 needs a checkable reported class at the start; `full` did not exist (D-W-16). |

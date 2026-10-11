@@ -1,77 +1,77 @@
 # tools/design-tokens
 
-Generator des Design-Systems. Liest `design/tokens/` (W3C Design Tokens Format Module 2025.10 und
-Resolver Module 2025.10), prüft Kontrast und Palettenwächter und schreibt alle Ausgaben. Entscheidung
-und Gründe: ADR 0030. Gestaltung: [docs/design/README.md](../../docs/design/README.md).
+Generator of the design system. Reads `design/tokens/` (W3C Design Tokens Format Module 2025.10 and
+Resolver Module 2025.10), checks contrast and palette guards and writes all outputs. Decision
+and reasons: ADR 0030. Design: [docs/design/README.md](../../docs/design/README.md).
 
-Nur Python-Standardbibliothek; `uv` stellt die Python-Version (PEP 723 im Kopf von `tokens.py`).
-Keine Paket-Abhängigkeit, damit das Gate ohne Netz und ohne Lieferkette läuft.
+Python standard library only; `uv` provides the Python version (PEP 723 in the header of `tokens.py`).
+No package dependency, so that the gate runs without a network and without a supply chain.
 
-## Befehle
+## Commands
 
-Aus dem Wurzelverzeichnis des Repositorys:
+From the root directory of the repository:
 
-| Befehl | Wirkung |
+| Command | Effect |
 |---|---|
-| `uv run tools/design-tokens/tokens.py build` | Gates prüfen, dann alle Ausgaben schreiben. Exit 1 bei Verstoß, nichts wird geschrieben. |
-| `uv run tools/design-tokens/tokens.py check` | Gates prüfen und vergleichen; Exit 1, wenn eine erzeugte Datei nicht zur Quelle passt. Für das lokale Gate und CI. |
-| `uv run tools/design-tokens/tokens.py previews [--view NAME]` | PNG-Vorschauen nach `docs/design/previews/` mit dem Playwright-CLI (`npx`, gepinnte Version in `tokens.py`). Braucht Node und einen installierten Chromium. Nicht Teil von `check`, weil Pixel je Maschine abweichen. `--view` (wiederholbar: `palette`, `layout`, `components`, `mobile`, `terminal`, `viz`) rendert nur diese Ansichten und lässt die übrigen Bilder unverändert. |
-| `uv run tools/design-tokens/tokens.py vendor --phosphor DIR --sans DIR --mono DIR` | Schriften und benutzte Phosphor-SVGs nach `vendor/` kopieren (Textdateien mit LF), `vendor/MANIFEST.json` mit SHA-256 der gespeicherten Bytes schreiben. |
-| `make tokens` | Das Gate (Teil von `make gates`): ruft `make -C tools/design-tokens check` auf, also die Tests unter `tests/` und danach `tokens.py check`, beides in der gepinnten Umgebung `tools/`. |
-| `make lint`, `make fmt-check` | ruff mit der Konfiguration `ruff.toml` dieses Ordners, dazu bandit. |
+| `uv run tools/design-tokens/tokens.py build` | Check the gates, then write all outputs. Exit 1 on a violation, nothing is written. |
+| `uv run tools/design-tokens/tokens.py check` | Check the gates and compare; exit 1 if a generated file does not match the source. For the local gate and CI. |
+| `uv run tools/design-tokens/tokens.py previews [--view NAME]` | PNG previews to `docs/design/previews/` with the Playwright CLI (`npx`, pinned version in `tokens.py`). Needs Node and an installed Chromium. Not part of `check`, because pixels differ per machine. `--view` (repeatable: `palette`, `layout`, `components`, `mobile`, `terminal`, `viz`) renders only these views and leaves the other images unchanged. |
+| `uv run tools/design-tokens/tokens.py vendor --phosphor DIR --sans DIR --mono DIR` | Copy fonts and the used Phosphor SVGs to `vendor/` (text files with LF), write `vendor/MANIFEST.json` with the SHA-256 of the stored bytes. |
+| `make tokens` | The gate (part of `make gates`): calls `make -C tools/design-tokens check`, that is the tests under `tests/` and then `tokens.py check`, both in the pinned environment `tools/`. |
+| `make lint`, `make fmt-check` | ruff with the configuration `ruff.toml` of this folder, plus bandit. |
 
-Zusätzliche Schema-Prüfung gegen die offiziellen JSON-Schemas der DTCG (braucht Netz für den ersten
-Abruf):
+Additional schema check against the official JSON schemas of the DTCG (needs a network for the first
+download):
 
 ```bash
 uv run --project tools --locked check-jsonschema --schemafile https://www.designtokens.org/schemas/2025.10/format.json design/tokens/*.tokens.json
 uv run --project tools --locked check-jsonschema --schemafile https://www.designtokens.org/schemas/2025.10/resolver.json design/tokens/theme.resolver.json
 ```
 
-## Ausgaben
+## Outputs
 
-| Datei | Inhalt |
+| File | Content |
 |---|---|
-| `design/build/tokens.css` | CSS-Variablen `--ds-*`; Theme über `data-theme` oder `prefers-color-scheme`, Dichte über `data-density`, Bewegung über `data-motion` oder `prefers-reduced-motion` |
-| `design/build/dart/design_tokens.g.dart` | `DsPalette`, `DsColors`, `DsElevation`, `DsDensity`, `DsMotion` (je `ThemeExtension` mit Instanzen je Kontext), `DsSpace`, `DsRadius`, `DsBorderWidth`, `DsLayout`, `DsSize`, `DsIconSize`, `DsFonts`, `DsType`, `DsIcons` |
-| `design/build/tokens.resolved.json` | alle Tokens aufgelöst, je Kontext, plus Icon-Zuordnung und erlaubte Bereichs-Icons |
-| `design/build/preview.html` | eigenständige Vorschau mit eingebetteten Schriften und Icons |
-| `design/build/README.md` | Hinweis "generiert" |
-| `docs/design/palette.md`, `contrast.md`, `tokens.md` | erzeugte Doku |
+| `design/build/tokens.css` | CSS variables `--ds-*`; theme via `data-theme` or `prefers-color-scheme`, density via `data-density`, motion via `data-motion` or `prefers-reduced-motion` |
+| `design/build/dart/design_tokens.g.dart` | `DsPalette`, `DsColors`, `DsElevation`, `DsDensity`, `DsMotion` (each a `ThemeExtension` with instances per context), `DsSpace`, `DsRadius`, `DsBorderWidth`, `DsLayout`, `DsSize`, `DsIconSize`, `DsFonts`, `DsType`, `DsIcons` |
+| `design/build/tokens.resolved.json` | all tokens resolved, per context, plus the icon mapping and the allowed space icons |
+| `design/build/preview.html` | standalone preview with embedded fonts and icons |
+| `design/build/README.md` | note "generated" |
+| `docs/design/palette.md`, `contrast.md`, `tokens.md` | generated docs |
 
-Die Dart-Datei ist nicht `dart format`-formatiert; `packages/design_system` übernimmt sie in seinem
-Build und formatiert dort. Geprüft wurde sie mit `dart analyze` (Dart 3.13.5) gegen Stellvertreter
-der benutzten Flutter-Typen; gegen das echte Flutter-SDK ist sie noch nicht übersetzt (Ticket
-"design_system-Paket").
+The Dart file is not formatted with `dart format`; `packages/design_system` takes it over in its
+build and formats it there. It was checked with `dart analyze` (Dart 3.13.5) against stand-ins
+for the Flutter types it uses; it has not yet been compiled against the real Flutter SDK (ticket
+"design_system package").
 
 ## Gates
 
-1. **DTCG-Struktur:** Namen, Typen (alle Typen der Spezifikation außer `gradient`),
-   Aliase, Zyklen, Werte je Typ; Farben außerhalb des sRGB-Gamuts werden abgelehnt.
-2. **Kontrast:** jede Paarung aus `design/design-rules.json` in jedem Theme; Schwellen
-   `text` 4.5, `large-text` 3, `ui` 3 (WCAG 2.2 SC 1.4.3 und 1.4.11). Luminanz nach WCAG mit der
-   Schwelle 0.04045 der sRGB-Norm (https://www.w3.org/WAI/GL/wiki/Relative_luminance, abgerufen
+1. **DTCG structure:** names, types (all types of the specification except `gradient`),
+   aliases, cycles, values per type; colors outside the sRGB gamut are rejected.
+2. **Contrast:** every pairing from `design/design-rules.json` in every theme; thresholds
+   `text` 4.5, `large-text` 3, `ui` 3 (WCAG 2.2 SC 1.4.3 and 1.4.11). Luminance per WCAG with the
+   threshold 0.04045 of the sRGB standard (https://www.w3.org/WAI/GL/wiki/Relative_luminance, retrieved
    2026-10-10).
-3. **Palettenwächter:** verbotene Referenzfarben (OKLab-Abstand), verbotene Farbtonbereiche,
-   Mindest-Chroma für Neutrale. Regeln und Quellen stehen in `design/design-rules.json`.
-4. **Aktualität:** `check` vergleicht jede erzeugte Datei Byte für Byte.
-5. **Herkunft:** `check` vergleicht jede Datei unter `vendor/fonts/` und `vendor/phosphor/` mit ihrem
-   SHA-256 in `vendor/MANIFEST.json`; eine fehlende, zusätzliche oder veränderte Datei schlägt fehl.
+3. **Palette guards:** forbidden reference colors (OKLab distance), forbidden hue ranges,
+   minimum chroma for neutrals. Rules and sources are in `design/design-rules.json`.
+4. **Freshness:** `check` compares every generated file byte for byte.
+5. **Provenance:** `check` compares every file under `vendor/fonts/` and `vendor/phosphor/` with its
+   SHA-256 in `vendor/MANIFEST.json`; a missing, extra or changed file fails.
 
-## Bewusste Grenzen
+## Deliberate limitations
 
-- Unterstützt wird die Teilmenge der Spezifikation, die das Design-System nutzt. `$extends` und
-  JSON-Pointer-`$ref` in Token-Dateien lehnt das Werkzeug mit Fehler ab, statt sie still zu
-  übergehen.
-- Farbräume: `oklch` und `srgb` werden gerechnet; andere Farbräume brauchen `hex` als Rückfall.
-- Ein Token darf nur von einem Modifikator abhängen; sonst bricht `build` ab (die Ausgaben wären
-  nicht eindeutig).
+- The tool supports the subset of the specification that the design system uses. It rejects
+  `$extends` and JSON Pointer `$ref` in token files with an error instead of silently
+  skipping them.
+- Color spaces: `oklch` and `srgb` are computed; other color spaces need `hex` as a fallback.
+- A token may depend on only one modifier; otherwise `build` aborts (the outputs would not be
+  unambiguous).
 
 ## vendor/
 
-Eingebettete Dateien für Vorschau und Doku, mit Herkunft und SHA-256 in `vendor/MANIFEST.json`:
-Atkinson Hyperlegible Next und Mono (WOFF2, Teilmengen latin und latin-ext, SIL Open Font License
-1.1, Lizenztexte daneben) und die benutzten Phosphor-SVGs (MIT, `vendor/phosphor/LICENSE`).
-Erneuern: die Pakete `@fontsource-variable/atkinson-hyperlegible-next`,
-`@fontsource-variable/atkinson-hyperlegible-mono` und `@phosphor-icons/core` in der Version aus
-`MANIFEST.json` mit `npm pack` holen, entpacken und `tokens.py vendor` aufrufen.
+Embedded files for the preview and the docs, with provenance and SHA-256 in `vendor/MANIFEST.json`:
+Atkinson Hyperlegible Next and Mono (WOFF2, subsets latin and latin-ext, SIL Open Font License
+1.1, license texts next to them) and the used Phosphor SVGs (MIT, `vendor/phosphor/LICENSE`).
+Renew: fetch the packages `@fontsource-variable/atkinson-hyperlegible-next`,
+`@fontsource-variable/atkinson-hyperlegible-mono` and `@phosphor-icons/core` in the version from
+`MANIFEST.json` with `npm pack`, unpack them and call `tokens.py vendor`.

@@ -1,323 +1,323 @@
-# Signal-Katalog
+# Signal catalogue
 
-Status: Entwurf M0. Einzige Liste aller Telemetrie-Namen, Einheiten und Attribute. Regeln:
-[17-observability.md](../spec/17-observability.md). Was hier fehlt, darf der Code nicht senden;
-Allowlist des Collectors, Dashboards, Regeln und SLOs nutzen nur Namen von hier.
+Status: draft M0. The single list of all telemetry names, units and attributes. Rules:
+[17-observability.md](../spec/17-observability.md). What is missing here, the code must not send;
+the collector allowlist, dashboards, rules and SLOs use only names from here.
 
-## 1. Namen und Einheiten
+## 1. Names and units
 
-1. Eigene Namen beginnen mit `bothy.`; Namen aus den Semantic Conventions bleiben unverändert.
-2. Namen in Kleinbuchstaben mit Punkten; die Einheit steht im Feld `unit` (UCUM), nie im Namen.
-3. Zähler zählen Ereignisse (`{event}`, `{run}`), Dauern sind Sekunden (`s`), Größen Byte (`By`).
-4. Prometheus übersetzt beim OTLP-Empfang: Punkte werden `_`, die Einheit wird angehängt (`s`
-   wird `_seconds`, `By` wird `_bytes`), Zähler bekommen `_total`, Einheiten in geschweiften
-   Klammern entfallen. `job` ist `<service.namespace>/<service.name>`, `instance` ist
-   `service.instance.id` (https://prometheus.io/docs/guides/opentelemetry/, abgerufen 2026-10-10)
-   [belegt]. Lokal geprüft mit Prometheus v3.15.0 und otelcol-contrib 0.162.0 am 2026-10-10:
-   `bothy.delivery.duration` (Histogramm, `s`) wird `bothy_delivery_duration_seconds_bucket`,
-   `bothy.message.created` (Zähler) wird `bothy_message_created_total`, ganzzahlige
-   Bucket-Grenzen erscheinen ohne Nachkommastelle (`le="1"`, `le="5"`) [belegt].
-5. Die Spalte "Prometheus" unten ist die Übersetzung; Dashboards und Regeln nutzen sie.
+1. Own names begin with `bothy.`; names from the Semantic Conventions stay unchanged.
+2. Names in lowercase with dots; the unit is in the `unit` field (UCUM), never in the name.
+3. Counters count events (`{event}`, `{run}`), durations are seconds (`s`), sizes are bytes (`By`).
+4. Prometheus translates on OTLP ingestion: dots become `_`, the unit is appended (`s`
+   becomes `_seconds`, `By` becomes `_bytes`), counters get `_total`, units in curly
+   braces are dropped. `job` is `<service.namespace>/<service.name>`, `instance` is
+   `service.instance.id` (https://prometheus.io/docs/guides/opentelemetry/, retrieved 2026-10-10)
+   [verified]. Checked locally with Prometheus v3.15.0 and otelcol-contrib 0.162.0 on 2026-10-10:
+   `bothy.delivery.duration` (histogram, `s`) becomes `bothy_delivery_duration_seconds_bucket`,
+   `bothy.message.created` (counter) becomes `bothy_message_created_total`, integer
+   bucket boundaries appear without decimal places (`le="1"`, `le="5"`) [verified].
+5. The "Prometheus" column below is the translation; dashboards and rules use it.
 
-## 2. Kardinalität
+## 2. Cardinality
 
-1. Metrik-Attribute kommen nur aus geschlossenen Mengen im Code (Aufzählungen) oder aus Mengen,
-   die der Betreiber begrenzt (Agenten-Handles, Push-Anbieter, Ereignistypen, Aktionen aus dem
-   Katalog). Nie IDs, nie Eingaben von Menschen, nie Fehlertexte, nie ungetemplatete Pfade.
-2. `http.route` ist immer das Muster (`/api/v1/threads/{id}/messages`). Anfragen ohne passende Route
-   tragen `http.route = "unmatched"`.
-3. IDs (Thread, Kanal, Nachricht, Lauf, Datei) stehen nur in Spans und Logs.
-4. Ein Unit-Test zählt die möglichen Werte jedes Metrik-Attributs; ein neues offenes Attribut
-   bricht den Test.
-5. Instrumente aus Bibliotheken (otelhttp, otelpgx) laufen durch eine SDK-View mit einer
-   Erlaubnisliste genau der Attribute dieses Katalogs. Grund: otelhttp setzt weitere Attribute,
-   z. B. `server.address` aus der `Host`-Kopfzeile des Clients, also eine offene Menge.
+1. Metric attributes come only from closed sets in the code (enumerations) or from sets
+   that the instance operator limits (agent handles, push providers, event types, actions from the
+   catalogue). Never IDs, never input from people, never error texts, never untemplated paths.
+2. `http.route` is always the pattern (`/api/v1/threads/{id}/messages`). Requests without a matching route
+   carry `http.route = "unmatched"`.
+3. IDs (thread, channel, message, run, file) appear only in spans and logs.
+4. A unit test counts the possible values of every metric attribute; a new open attribute
+   breaks the test.
+5. Instruments from libraries (otelhttp, otelpgx) run through an SDK view with an
+   allowlist of exactly the attributes of this catalogue. Reason: otelhttp sets further attributes,
+   for example `server.address` from the client's `Host` header, which is an open set.
 
-## 3. Resource-Attribute
+## 3. Resource attributes
 
-| Attribut | Wert | Quelle |
+| Attribute | Value | Source |
 |---|---|---|
-| `service.name` | `bothy-server`, `bothy-backupd`, `bothy-adapter-<art>` | Prozess |
-| `service.namespace` | `bothy` | Prozess |
-| `service.version` | Version des Artefakts | Build |
-| `service.instance.id` | eindeutig je Prozess (Container-Hostname plus Startzeit) | Prozess |
-| `deployment.environment.name` | `dev`, `staging`, `prod` | `instance.environment` bzw. `OTEL_RESOURCE_ATTRIBUTES` |
+| `service.name` | `bothy-server`, `bothy-backupd`, `bothy-adapter-<kind>` | process |
+| `service.namespace` | `bothy` | process |
+| `service.version` | version of the artifact | build |
+| `service.instance.id` | unique per process (container hostname plus start time) | process |
+| `deployment.environment.name` | `dev`, `staging`, `prod` | `instance.environment` or `OTEL_RESOURCE_ATTRIBUTES` |
 | `bothy.server.role` | `api`, `worker`, `all` | `server.role` |
 
-## 4. Metriken
+## 4. Metrics
 
-### 4.1 REST und Gateway
+### 4.1 REST and gateway
 
-| Name | Typ | Einheit | Attribute | Quelle | Prometheus |
+| Name | Type | Unit | Attributes | Source | Prometheus |
 |---|---|---|---|---|---|
-| `http.server.request.duration` | Histogramm | `s` | `http.request.method`, `http.route`, `http.response.status_code`, `error.type` | otelhttp (Semantic Conventions HTTP, stabil) | `http_server_request_duration_seconds` |
-| `bothy.authz.decisions` | Zähler | `{decision}` | `bothy.action`, `bothy.decision` | api: Entscheidungen für Anfragen und Ops; Filter bei Zustellung und in Listen (07 Abschnitt 4.2) zählen nicht, sonst überdeckte die Zustellung jede andere Zahl | `bothy_authz_decisions_total` |
-| `bothy.authz.errors` | Zähler | `{check}` | `bothy.reason` (`unknown_action`, `authz_not_checked`, `filter_mismatch`) | api: Programmfehler der Rechteprüfung ([02-architektur.md](../spec/02-architektur.md) 9.3, 07 Abschnitt 4.2); `filter_mismatch`: ein Element passierte den SQL-Filter einer Liste, aber nicht `authorize`, und wurde verworfen (07 Abschnitt 7.4, Regel 3) | `bothy_authz_errors_total` |
-| `bothy.ratelimit.rejected` | Zähler | `{request}` | `bothy.ratelimit.class` | api | `bothy_ratelimit_rejected_total` |
+| `http.server.request.duration` | Histogram | `s` | `http.request.method`, `http.route`, `http.response.status_code`, `error.type` | otelhttp (Semantic Conventions HTTP, stable) | `http_server_request_duration_seconds` |
+| `bothy.authz.decisions` | Counter | `{decision}` | `bothy.action`, `bothy.decision` | api: decisions for requests and ops; filters at delivery and in lists (07 section 4.2) do not count, otherwise delivery would mask every other number | `bothy_authz_decisions_total` |
+| `bothy.authz.errors` | Counter | `{check}` | `bothy.reason` (`unknown_action`, `authz_not_checked`, `filter_mismatch`) | api: program errors of the permission check ([02-architecture.md](../spec/02-architecture.md) 9.3, 07 section 4.2); `filter_mismatch`: an element passed the SQL filter of a list but not `authorize` and was discarded (07 section 7.4, rule 3) | `bothy_authz_errors_total` |
+| `bothy.ratelimit.rejected` | Counter | `{request}` | `bothy.ratelimit.class` | api | `bothy_ratelimit_rejected_total` |
 | `bothy.gateway.connections.active` | UpDownCounter | `{connection}` | `bothy.principal.kind` | api | `bothy_gateway_connections_active` |
-| `bothy.gateway.connect.duration` | Histogramm | `s` | `bothy.outcome` (`ok`, `client_error`, `server_error`), `bothy.principal.kind` | api: Upgrade bis `ready` oder `resumed` | `bothy_gateway_connect_duration_seconds` |
-| `bothy.gateway.catchup.duration` | Histogramm | `s` | `bothy.outcome` (`complete`, `resync_required`) | api: `ready`/`resumed` bis `catchup.complete` | `bothy_gateway_catchup_duration_seconds` |
-| `bothy.gateway.resync` | Zähler | `{connection}` | `bothy.reason` (`retention`, `too_far_behind`, `cursor_ahead`, `epoch_changed`) | api | `bothy_gateway_resync_total` |
-| `bothy.gateway.close` | Zähler | `{connection}` | `bothy.close.code` | api | `bothy_gateway_close_total` |
-| `bothy.gateway.outbound.dropped` | Zähler | `{frame}` | `bothy.reason` (`patch_replaced_by_snapshot`, `slow_consumer`) | api | `bothy_gateway_outbound_dropped_total` |
+| `bothy.gateway.connect.duration` | Histogram | `s` | `bothy.outcome` (`ok`, `client_error`, `server_error`), `bothy.principal.kind` | api: upgrade until `ready` or `resumed` | `bothy_gateway_connect_duration_seconds` |
+| `bothy.gateway.catchup.duration` | Histogram | `s` | `bothy.outcome` (`complete`, `resync_required`) | api: `ready`/`resumed` until `catchup.complete` | `bothy_gateway_catchup_duration_seconds` |
+| `bothy.gateway.resync` | Counter | `{connection}` | `bothy.reason` (`retention`, `too_far_behind`, `cursor_ahead`, `epoch_changed`) | api | `bothy_gateway_resync_total` |
+| `bothy.gateway.close` | Counter | `{connection}` | `bothy.close.code` | api | `bothy_gateway_close_total` |
+| `bothy.gateway.outbound.dropped` | Counter | `{frame}` | `bothy.reason` (`patch_replaced_by_snapshot`, `slow_consumer`) | api | `bothy_gateway_outbound_dropped_total` |
 
-`client_error` umfasst die Schließ-Codes `4001` bis `4008`, `4011`, `4012`, `4016` bis `4018` und
-Abbrüche des Clients vor `ready`; alles andere ohne `ready` oder `resumed` ist `server_error` (z. B.
-`4000`, `4013`). Grund: Wartende Geräte, widerrufene Sitzungen und Protokollfehler des Clients
-dürfen das Fehlerbudget von `bothy-sync/reconnect` nicht verbrauchen.
+`client_error` covers the close codes `4001` to `4008`, `4011`, `4012`, `4016` to `4018` and
+client aborts before `ready`; everything else without `ready` or `resumed` is `server_error` (for example
+`4000`, `4013`). Reason: waiting devices, revoked sessions and protocol errors of the client
+must not consume the error budget of `bothy-sync/reconnect`.
 
-### 4.2 Ereignisse und Zustellung
+### 4.2 Events and delivery
 
-| Name | Typ | Einheit | Attribute | Quelle | Prometheus |
+| Name | Type | Unit | Attributes | Source | Prometheus |
 |---|---|---|---|---|---|
-| `bothy.message.created` | Zähler | `{message}` | `bothy.message.origin` (`human`, `agent`, `app`, `import`, `system`), `bothy.message.kind` | api, worker | `bothy_message_created_total` |
-| `bothy.event.appended` | Zähler | `{event}` | `bothy.event.type` | api, worker | `bothy_event_appended_total` |
-| `bothy.db.event_seq.lock_wait` | Histogramm | `s` | keine | api, worker: Warten auf die Zähler-Zeile | `bothy_db_event_seq_lock_wait_seconds` |
-| `bothy.event.fanout.lag` | Gauge | `s` | keine | api: Alter des ältesten Ereignisses, das der Log-Tail kennt und der Hub noch nicht verteilt hat (jetzt minus Zeitpunkt, zu dem es per `NOTIFY` oder Poll bekannt wurde); `0`, wenn alles verteilt ist. Grund: Das Alter des zuletzt verteilten Ereignisses wüchse auf einer ruhigen Instanz und bliebe bei einem hängenden Hub stehen | `bothy_event_fanout_lag_seconds` |
-| `bothy.delivery.duration` | Histogramm | `s` | `bothy.event.durability` (`durable`, `ephemeral`), `bothy.principal.kind` | api: `occurred_at` bis Schreiben des Rahmens, nur Live-Zustellung | `bothy_delivery_duration_seconds` |
+| `bothy.message.created` | Counter | `{message}` | `bothy.message.origin` (`human`, `agent`, `app`, `import`, `system`), `bothy.message.kind` | api, worker | `bothy_message_created_total` |
+| `bothy.event.appended` | Counter | `{event}` | `bothy.event.type` | api, worker | `bothy_event_appended_total` |
+| `bothy.db.event_seq.lock_wait` | Histogram | `s` | none | api, worker: waiting for the counter row | `bothy_db_event_seq_lock_wait_seconds` |
+| `bothy.event.fanout.lag` | Gauge | `s` | none | api: age of the oldest event that the log tail knows and the hub has not yet distributed (now minus the time at which it became known through `NOTIFY` or poll); `0` when everything is distributed. Reason: the age of the last distributed event would grow on a quiet instance and would stand still with a hung hub | `bothy_event_fanout_lag_seconds` |
+| `bothy.delivery.duration` | Histogram | `s` | `bothy.event.durability` (`durable`, `ephemeral`), `bothy.principal.kind` | api: `occurred_at` until the frame is written, live delivery only | `bothy_delivery_duration_seconds` |
 
-### 4.3 Agenten und Läufe
+### 4.3 Agents and runs
 
-| Name | Typ | Einheit | Attribute | Quelle | Prometheus |
+| Name | Type | Unit | Attributes | Source | Prometheus |
 |---|---|---|---|---|---|
-| `bothy.run.active` | Gauge | `{run}` | `bothy.agent.handle`, `bothy.run.state` (`queued`, `running`, `waiting_input`) | worker: Abfrage je Intervall | `bothy_run_active` |
-| `bothy.run.start.latency` | Histogramm | `s` | `bothy.agent.handle`, `bothy.outcome` (`started`, `failed`, `cancelled`), `bothy.billing_mode` | api: `queued_at` bis Verlassen von `queued` | `bothy_run_start_latency_seconds` |
-| `bothy.run.duration` | Histogramm | `s` | `bothy.agent.handle`, `bothy.run.state` (`completed`, `failed`, `cancelled`) | api: `started_at` bis Ende | `bothy_run_duration_seconds` |
-| `bothy.run.finished` | Zähler | `{run}` | `bothy.agent.handle`, `bothy.run.state`, `bothy.reason` (`state_reason` aus fester Liste, sonst `other`) | api | `bothy_run_finished_total` |
-| `bothy.run.steps` | Zähler | `{step}` | `bothy.agent.handle`, `bothy.step.kind` | api | `bothy_run_steps_total` |
-| `bothy.run.tokens` | Zähler | `{token}` | `bothy.agent.handle`, `bothy.token.type` (`input`, `output`, `cache_read`, `cache_write`), `gen_ai.provider.name`, `gen_ai.request.model` | api: aus `runs.metrics` am Laufende | `bothy_run_tokens_total` |
-| `bothy.run.cost` | Zähler | `{currency_unit}` | `bothy.agent.handle`, `bothy.billing_mode`, `bothy.currency`, `bothy.cost.estimate` (`true`, `false`) | api: aus `cost_entries` | `bothy_run_cost_total` |
-| `bothy.agent.consumer.lag` | Gauge | `{event}` | `bothy.agent.handle` | api: `head_seq - acked_seq`, Maximum über Verbraucher | `bothy_agent_consumer_lag` |
+| `bothy.run.active` | Gauge | `{run}` | `bothy.agent.handle`, `bothy.run.state` (`queued`, `running`, `waiting_input`) | worker: query per interval | `bothy_run_active` |
+| `bothy.run.start.latency` | Histogram | `s` | `bothy.agent.handle`, `bothy.outcome` (`started`, `failed`, `cancelled`), `bothy.billing_mode` | api: `queued_at` until leaving `queued` | `bothy_run_start_latency_seconds` |
+| `bothy.run.duration` | Histogram | `s` | `bothy.agent.handle`, `bothy.run.state` (`completed`, `failed`, `cancelled`) | api: `started_at` until the end | `bothy_run_duration_seconds` |
+| `bothy.run.finished` | Counter | `{run}` | `bothy.agent.handle`, `bothy.run.state`, `bothy.reason` (`state_reason` from a fixed list, otherwise `other`) | api | `bothy_run_finished_total` |
+| `bothy.run.steps` | Counter | `{step}` | `bothy.agent.handle`, `bothy.step.kind` | api | `bothy_run_steps_total` |
+| `bothy.run.tokens` | Counter | `{token}` | `bothy.agent.handle`, `bothy.token.type` (`input`, `output`, `cache_read`, `cache_write`), `gen_ai.provider.name`, `gen_ai.request.model` | api: from `runs.metrics` at the end of the run | `bothy_run_tokens_total` |
+| `bothy.run.cost` | Counter | `{currency_unit}` | `bothy.agent.handle`, `bothy.billing_mode`, `bothy.currency`, `bothy.cost.estimate` (`true`, `false`) | api: from `cost_entries` | `bothy_run_cost_total` |
+| `bothy.agent.consumer.lag` | Gauge | `{event}` | `bothy.agent.handle` | api: `head_seq - acked_seq`, maximum over consumers | `bothy_agent_consumer_lag` |
 | `bothy.agent.heartbeat.age` | Gauge | `s` | `bothy.agent.handle` | api | `bothy_agent_heartbeat_age_seconds` |
-| `bothy.agent.invocation.denied` | Zähler | `{invocation}` | `bothy.agent.handle`, `bothy.reason` | api: Ablehnung vor Zustellung (I2) | `bothy_agent_invocation_denied_total` |
-| `bothy.agent.billing_mode_mismatch` | Zähler | `{run}` | `bothy.agent.handle` | api: I3 | `bothy_agent_billing_mode_mismatch_total` |
+| `bothy.agent.invocation.denied` | Counter | `{invocation}` | `bothy.agent.handle`, `bothy.reason` | api: rejection before delivery (I2) | `bothy_agent_invocation_denied_total` |
+| `bothy.agent.billing_mode_mismatch` | Counter | `{run}` | `bothy.agent.handle` | api: I3 | `bothy_agent_billing_mode_mismatch_total` |
 
-Werkzeugnamen stehen nie an Metriken (offene Menge); die Statistik der Werkzeugaufrufe kommt aus
+Tool names never appear on metrics (open set); the statistics of the tool calls come from
 `run_steps` ([admin-statistics.md](admin-statistics.md)).
 
 ### 4.3a Terminal
 
-Ohne IDs von Menschen, ohne Rechnernamen, ohne Inhalte ([24-terminal.md](../spec/24-terminal.md),
-Abschnitt 10.4).
+Without IDs of people, without host names, without contents ([24-terminal.md](../spec/24-terminal.md),
+section 10.4).
 
-| Name | Typ | Einheit | Attribute | Quelle | Prometheus |
+| Name | Type | Unit | Attributes | Source | Prometheus |
 |---|---|---|---|---|---|
 | `bothy.terminal.sessions.active` | UpDownCounter | `{session}` | `bothy.terminal.state` (`opening`, `active`, `detached`) | api | `bothy_terminal_sessions_active` |
-| `bothy.terminal.sessions.closed` | Zähler | `{session}` | `bothy.reason` (Codes aus 24, Abschnitt 10.3) | api | `bothy_terminal_sessions_closed_total` |
-| `bothy.terminal.relay.unpaired` | Zähler | `{connection}` | `bothy.terminal.side` (`client`, `host`) | api: eine Seite fand innerhalb von `terminal.open_timeout` keine Gegenseite (24, Abschnitt 9) | `bothy_terminal_relay_unpaired_total` |
-| `bothy.terminal.hosts.connected` | UpDownCounter | `{host}` | keine | api | `bothy_terminal_hosts_connected` |
+| `bothy.terminal.sessions.closed` | Counter | `{session}` | `bothy.reason` (codes from 24, section 10.3) | api | `bothy_terminal_sessions_closed_total` |
+| `bothy.terminal.relay.unpaired` | Counter | `{connection}` | `bothy.terminal.side` (`client`, `host`) | api: one side found no counterpart within `terminal.open_timeout` (24, section 9) | `bothy_terminal_relay_unpaired_total` |
+| `bothy.terminal.hosts.connected` | UpDownCounter | `{host}` | none | api | `bothy_terminal_hosts_connected` |
 
-### 4.3b Eigene Messung und Live-Statistik
+### 4.3b Own measurement and live statistics
 
-Betriebswerte der eigenen Messung ([25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt
-3); die gemessenen Werte selbst stehen in `stats_minutes`, nicht in der Telemetrie.
+Operating values of the own measurement ([25-visualization.md](../spec/25-visualization.md), section
+3); the measured values themselves are in `stats_minutes`, not in the telemetry.
 
-| Name | Typ | Einheit | Attribute | Quelle | Prometheus |
+| Name | Type | Unit | Attributes | Source | Prometheus |
 |---|---|---|---|---|---|
-| `bothy.stats.flush.dropped` | Zähler | `{key}` | `bothy.reason` (`queue_full`, `db_error`) | api, worker: verworfene Zählerschlüssel der eigenen Messung | `bothy_stats_flush_dropped_total` |
-| `bothy.stats.flush.duration` | Histogramm | `s` | `bothy.outcome` (`ok`, `error`) | api, worker: ein Flush nach `stats_minutes` | `bothy_stats_flush_duration_seconds` |
-| `bothy.stats.live.subscribers` | UpDownCounter | `{subscription}` | keine | api: Abos von `stats.live` auf diesem Knoten | `bothy_stats_live_subscribers` |
+| `bothy.stats.flush.dropped` | Counter | `{key}` | `bothy.reason` (`queue_full`, `db_error`) | api, worker: discarded counter keys of the own measurement | `bothy_stats_flush_dropped_total` |
+| `bothy.stats.flush.duration` | Histogram | `s` | `bothy.outcome` (`ok`, `error`) | api, worker: one flush to `stats_minutes` | `bothy_stats_flush_duration_seconds` |
+| `bothy.stats.live.subscribers` | UpDownCounter | `{subscription}` | none | api: subscriptions to `stats.live` on this node | `bothy_stats_live_subscribers` |
 
-### 4.4 Push, Dateien, Suche, Jobs
+### 4.4 Push, files, search, jobs
 
-| Name | Typ | Einheit | Attribute | Quelle | Prometheus |
+| Name | Type | Unit | Attributes | Source | Prometheus |
 |---|---|---|---|---|---|
-| `bothy.push.sent` | Zähler | `{notification}` | `bothy.push.provider`, `bothy.outcome` (`accepted`, `rejected_token`, `rejected_other`, `throttled`, `provider_error`) | worker | `bothy_push_sent_total` |
-| `bothy.push.send.duration` | Histogramm | `s` | `bothy.push.provider` | worker | `bothy_push_send_duration_seconds` |
-| `bothy.push.skipped` | Zähler | `{notification}` | `bothy.reason` (`quiet_hours`, `preference`, `no_access`, `no_registration`) | worker | `bothy_push_skipped_total` |
-| `bothy.push.fetch` | Zähler | `{notification}` | `bothy.push.provider` | api: Abruf durch Notification Service Extension bzw. Android-Handler | `bothy_push_fetch_total` |
+| `bothy.push.sent` | Counter | `{notification}` | `bothy.push.provider`, `bothy.outcome` (`accepted`, `rejected_token`, `rejected_other`, `throttled`, `provider_error`) | worker | `bothy_push_sent_total` |
+| `bothy.push.send.duration` | Histogram | `s` | `bothy.push.provider` | worker | `bothy_push_send_duration_seconds` |
+| `bothy.push.skipped` | Counter | `{notification}` | `bothy.reason` (`quiet_hours`, `preference`, `no_access`, `no_registration`) | worker | `bothy_push_skipped_total` |
+| `bothy.push.fetch` | Counter | `{notification}` | `bothy.push.provider` | api: fetch by the Notification Service Extension or the Android handler | `bothy_push_fetch_total` |
 | `bothy.push.registrations.active` | Gauge | `{registration}` | `bothy.push.provider` | worker | `bothy_push_registrations_active` |
-| `bothy.file.upload.size` | Histogramm | `By` | keine | api | `bothy_file_upload_size_bytes` |
-| `bothy.file.scan` | Zähler | `{file}` | `bothy.outcome` (`clean`, `infected`, `error`, `skipped`) | worker | `bothy_file_scan_total` |
-| `bothy.file.scan.duration` | Histogramm | `s` | `bothy.outcome` | worker | `bothy_file_scan_duration_seconds` |
-| `bothy.file.scan.queue` | Gauge | `{file}` | keine | worker | `bothy_file_scan_queue` |
-| `bothy.search.duration` | Histogramm | `s` | `bothy.outcome` | api | `bothy_search_duration_seconds` |
-| `bothy.job.duration` | Histogramm | `s` | `bothy.job.kind`, `bothy.outcome` (`completed`, `failed`, `cancelled`, `snoozed`) | worker | `bothy_job_duration_seconds` |
+| `bothy.file.upload.size` | Histogram | `By` | none | api | `bothy_file_upload_size_bytes` |
+| `bothy.file.scan` | Counter | `{file}` | `bothy.outcome` (`clean`, `infected`, `error`, `skipped`) | worker | `bothy_file_scan_total` |
+| `bothy.file.scan.duration` | Histogram | `s` | `bothy.outcome` | worker | `bothy_file_scan_duration_seconds` |
+| `bothy.file.scan.queue` | Gauge | `{file}` | none | worker | `bothy_file_scan_queue` |
+| `bothy.search.duration` | Histogram | `s` | `bothy.outcome` | api | `bothy_search_duration_seconds` |
+| `bothy.job.duration` | Histogram | `s` | `bothy.job.kind`, `bothy.outcome` (`completed`, `failed`, `cancelled`, `snoozed`) | worker | `bothy_job_duration_seconds` |
 | `bothy.job.queue` | Gauge | `{job}` | `bothy.job.kind` | worker | `bothy_job_queue` |
-| `bothy.egress.blocked` | Zähler | `{request}` | `bothy.reason` (`url_not_allowed`, `scheme_not_allowed`, `host_not_allowed`, `address_blocked`, `redirect_not_allowed`) | api, worker: vom Egress-Client abgewiesene Verbindung ([19-sicherheit.md](../spec/19-sicherheit.md) SEC-NET-5) | `bothy_egress_blocked_total` |
+| `bothy.egress.blocked` | Counter | `{request}` | `bothy.reason` (`url_not_allowed`, `scheme_not_allowed`, `host_not_allowed`, `address_blocked`, `redirect_not_allowed`) | api, worker: connection rejected by the egress client ([19-security.md](../spec/19-security.md) SEC-NET-5) | `bothy_egress_blocked_total` |
 
-### 4.5 Datenbank
+### 4.5 Database
 
-| Name | Typ | Einheit | Attribute | Quelle | Prometheus |
+| Name | Type | Unit | Attributes | Source | Prometheus |
 |---|---|---|---|---|---|
-| `db.client.operation.duration` | Histogramm | `s` | `db.operation.name`, `db.collection.name` | otelpgx (Namen der installierten Version im Ticket prüfen) | `db_client_operation_duration_seconds` |
+| `db.client.operation.duration` | Histogram | `s` | `db.operation.name`, `db.collection.name` | otelpgx (check the names of the installed version in the ticket) | `db_client_operation_duration_seconds` |
 | `bothy.db.pool.connections` | Gauge | `{connection}` | `bothy.pool.state` (`idle`, `acquired`, `max`) | api, worker | `bothy_db_pool_connections` |
-| `postgresql.backends`, `postgresql.connection.max`, `postgresql.commits`, `postgresql.rollbacks`, `postgresql.db_size`, `postgresql.table.size`, `postgresql.deadlocks` | wie vom Empfänger | wie vom Empfänger | Resource `postgresql.database.name`, `postgresql.table.name` (als Labels übernommen) | Collector, Empfänger `postgresql` (https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.162.0/receiver/postgresqlreceiver/documentation.md, abgerufen 2026-10-10) [belegt] | `postgresql_backends`, `postgresql_connection_max`, `postgresql_commits_total`, `postgresql_rollbacks_total`, `postgresql_db_size_bytes`, `postgresql_table_size_bytes`, `postgresql_deadlocks_total` |
+| `postgresql.backends`, `postgresql.connection.max`, `postgresql.commits`, `postgresql.rollbacks`, `postgresql.db_size`, `postgresql.table.size`, `postgresql.deadlocks` | as from the receiver | as from the receiver | resource `postgresql.database.name`, `postgresql.table.name` (taken over as labels) | collector, receiver `postgresql` (https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.162.0/receiver/postgresqlreceiver/documentation.md, retrieved 2026-10-10) [verified] | `postgresql_backends`, `postgresql_connection_max`, `postgresql_commits_total`, `postgresql_rollbacks_total`, `postgresql_db_size_bytes`, `postgresql_table_size_bytes`, `postgresql_deadlocks_total` |
 
-### 4.6 Sicherung, Audit, Telemetrie
+### 4.6 Backup, audit, telemetry
 
-| Name | Typ | Einheit | Attribute | Quelle | Prometheus |
+| Name | Type | Unit | Attributes | Source | Prometheus |
 |---|---|---|---|---|---|
 | `bothy.backup.last_success.timestamp` | Gauge | `s` | `bothy.backup.kind` (`physical`, `logical`, `objects`) | bothy-backupd | `bothy_backup_last_success_timestamp_seconds` |
-| `bothy.backup.wal.last_archived.timestamp` | Gauge | `s` | keine | bothy-backupd | `bothy_backup_wal_last_archived_timestamp_seconds` |
-| `bothy.backup.duration` | Gauge | `s` | `bothy.backup.kind` | bothy-backupd (letzter Lauf) | `bothy_backup_duration_seconds` |
+| `bothy.backup.wal.last_archived.timestamp` | Gauge | `s` | none | bothy-backupd | `bothy_backup_wal_last_archived_timestamp_seconds` |
+| `bothy.backup.duration` | Gauge | `s` | `bothy.backup.kind` | bothy-backupd (last run) | `bothy_backup_duration_seconds` |
 | `bothy.backup.size` | Gauge | `By` | `bothy.backup.kind` | bothy-backupd | `bothy_backup_size_bytes` |
-| `bothy.backup.restore_test.last_success.timestamp` | Gauge | `s` | keine | bothy-backupd | `bothy_backup_restore_test_last_success_timestamp_seconds` |
-| `bothy.backup.restore_test.duration` | Gauge | `s` | keine | bothy-backupd (letzter Lauf) | `bothy_backup_restore_test_duration_seconds` |
-| `bothy.backup.restore_test.failures` | Zähler | `{check}` | `bothy.reason` (Name der Prüfung) | bothy-backupd | `bothy_backup_restore_test_failures_total` |
+| `bothy.backup.restore_test.last_success.timestamp` | Gauge | `s` | none | bothy-backupd | `bothy_backup_restore_test_last_success_timestamp_seconds` |
+| `bothy.backup.restore_test.duration` | Gauge | `s` | none | bothy-backupd (last run) | `bothy_backup_restore_test_duration_seconds` |
+| `bothy.backup.restore_test.failures` | Counter | `{check}` | `bothy.reason` (name of the check) | bothy-backupd | `bothy_backup_restore_test_failures_total` |
 | `bothy.storage.volume.free` | Gauge | `By` | `bothy.volume` (`pgdata`, `files`, `pgbackrest-repo`, `backup-scratch`) | bothy-backupd | `bothy_storage_volume_free_bytes` |
 | `bothy.storage.volume.size` | Gauge | `By` | `bothy.volume` | bothy-backupd | `bothy_storage_volume_size_bytes` |
-| `bothy.audit.verify.failures` | Zähler | `{run}` | keine | worker: periodische Prüfung der Hash-Kette | `bothy_audit_verify_failures_total` |
-| `bothy.audit.verify.last_success.timestamp` | Gauge | `s` | keine | worker | `bothy_audit_verify_last_success_timestamp_seconds` |
-| `bothy.telemetry.dropped` | Zähler | `{item}` | `bothy.signal` (`traces`, `metrics`, `logs`) | alle Prozesse | `bothy_telemetry_dropped_total` |
-| `bothy.secrets.refresh.failures` | Zähler | `{refresh}` | keine | alle Prozesse: erneutes Lesen eines Geheimnisses scheitert, der alte Wert bleibt ([02-architektur.md](../spec/02-architektur.md) 14.4) | `bothy_secrets_refresh_failures_total` |
+| `bothy.audit.verify.failures` | Counter | `{run}` | none | worker: periodic check of the hash chain | `bothy_audit_verify_failures_total` |
+| `bothy.audit.verify.last_success.timestamp` | Gauge | `s` | none | worker | `bothy_audit_verify_last_success_timestamp_seconds` |
+| `bothy.telemetry.dropped` | Counter | `{item}` | `bothy.signal` (`traces`, `metrics`, `logs`) | all processes | `bothy_telemetry_dropped_total` |
+| `bothy.secrets.refresh.failures` | Counter | `{refresh}` | none | all processes: re-reading a secret fails, the old value stays ([02-architecture.md](../spec/02-architecture.md) 14.4) | `bothy_secrets_refresh_failures_total` |
 
-`bothy-backupd` sieht die Volumes `pgdata` und `files` nur lesend und misst dort nur den freien
-Platz.
+`bothy-backupd` sees the volumes `pgdata` and `files` read-only and measures only the free
+space there.
 
-### 4.6a Kennzahlen der Apps
+### 4.6a App metrics
 
-Die Apps senden diese Kennzahlen gebündelt an `POST /api/v1/client-metrics` (`ClientMetricsBatch`,
-[15-client-architektur.md](../spec/15-client-architektur.md) Abschnitt 17, [ADR 0057](../adr/0057-client-telemetrie-ueber-einen-server-endpunkt.md)). Der Server
-nimmt nur die Namen dieser Tabelle an und gibt sie unter `bothy.client.*` an den Collector weiter.
-Einen Eintrag mit anderem Namen oder mit einem `kind`, das nicht zum Typ der Tabelle passt
-(`histogram`, `counter`, `gauge`), verwirft er einzeln; der Rest des Stapels gilt, die Antwort
-bleibt `202`. So verliert eine neuere App gegen einen älteren Server nicht den ganzen Stapel. Attribute aller Kennzahlen: `bothy.client.platform` (`ios`, `android`,
+The apps send these metrics batched to `POST /api/v1/client-metrics` (`ClientMetricsBatch`,
+[15-client-architecture.md](../spec/15-client-architecture.md) section 17, [ADR 0057](../adr/0057-client-telemetry-through-a-server-endpoint.md)). The server
+accepts only the names of this table and passes them on to the collector under `bothy.client.*`.
+It discards, one by one, each entry with another name or with a `kind` that does not match the type
+of the table (`histogram`, `counter`, `gauge`); the rest of the batch is valid, the response
+stays `202`. This way a newer app does not lose the whole batch against an older server. Attributes of all metrics: `bothy.client.platform` (`ios`, `android`,
 `macos`, `windows`, `web`), `bothy.client.density` (`comfortable`, `compact`, `touch`),
-`bothy.client.theme` (`light`, `dark`) und `bothy.client.app_major` (Hauptversion der App, Werte
-außerhalb `^[0-9]{1,2}$` werden `other`). Kein Prinzipal, kein Gerät. Histogramme kommen mit den
-Grenzen "Dauern bis Sekunden" aus 4.7; andere Grenzen verwirft der Server.
+`bothy.client.theme` (`light`, `dark`) and `bothy.client.app_major` (major version of the app, values
+outside `^[0-9]{1,2}$` become `other`). No principal, no device. Histograms come with the
+boundaries "Durations up to seconds" from 4.7; the server discards other boundaries.
 
-| Name in der App | Typ | Einheit | Weitere Attribute | Server-Name und Prometheus |
+| Name in the app | Type | Unit | Further attributes | Server name and Prometheus |
 |---|---|---|---|---|
-| `client.cold_start.duration` | Histogramm | `s` | keine | `bothy.client.cold_start.duration`, `bothy_client_cold_start_duration_seconds` |
-| `client.thread_open.duration` | Histogramm | `s` | keine | `bothy.client.thread_open.duration`, `bothy_client_thread_open_duration_seconds` |
-| `client.send_local.duration` | Histogramm | `s` | keine | `bothy.client.send_local.duration`, `bothy_client_send_local_duration_seconds` |
-| `client.frames` | Zähler | `{frame}` | keine | `bothy.client.frames`, `bothy_client_frames_total` |
-| `client.frames.over_budget` | Zähler | `{frame}` | keine | `bothy.client.frames.over_budget`, `bothy_client_frames_over_budget_total` |
-| `client.catchup.duration` | Histogramm | `s` | keine | `bothy.client.catchup.duration`, `bothy_client_catchup_duration_seconds` |
-| `client.catchup.events` | Zähler | `{event}` | keine | `bothy.client.catchup.events`, `bothy_client_catchup_events_total` |
-| `client.resync` | Zähler | `{connection}` | keine | `bothy.client.resync`, `bothy_client_resync_total` |
-| `client.reconnects` | Zähler | `{connection}` | `bothy.close.code` (Codes aus 04 "Schließ-Codes", sonst `other`) | `bothy.client.reconnects`, `bothy_client_reconnects_total` |
-| `client.outbox.depth` | Gauge | `{entry}` | keine | `bothy.client.outbox.depth`, `bothy_client_outbox_depth` |
-| `client.push_display.duration` | Histogramm | `s` | keine | `bothy.client.push_display.duration`, `bothy_client_push_display_duration_seconds` |
-| `client.push.placeholder` | Zähler | `{notification}` | keine | `bothy.client.push.placeholder`, `bothy_client_push_placeholder_total` |
+| `client.cold_start.duration` | Histogram | `s` | none | `bothy.client.cold_start.duration`, `bothy_client_cold_start_duration_seconds` |
+| `client.thread_open.duration` | Histogram | `s` | none | `bothy.client.thread_open.duration`, `bothy_client_thread_open_duration_seconds` |
+| `client.send_local.duration` | Histogram | `s` | none | `bothy.client.send_local.duration`, `bothy_client_send_local_duration_seconds` |
+| `client.frames` | Counter | `{frame}` | none | `bothy.client.frames`, `bothy_client_frames_total` |
+| `client.frames.over_budget` | Counter | `{frame}` | none | `bothy.client.frames.over_budget`, `bothy_client_frames_over_budget_total` |
+| `client.catchup.duration` | Histogram | `s` | none | `bothy.client.catchup.duration`, `bothy_client_catchup_duration_seconds` |
+| `client.catchup.events` | Counter | `{event}` | none | `bothy.client.catchup.events`, `bothy_client_catchup_events_total` |
+| `client.resync` | Counter | `{connection}` | none | `bothy.client.resync`, `bothy_client_resync_total` |
+| `client.reconnects` | Counter | `{connection}` | `bothy.close.code` (codes from 04 "Close codes", otherwise `other`) | `bothy.client.reconnects`, `bothy_client_reconnects_total` |
+| `client.outbox.depth` | Gauge | `{entry}` | none | `bothy.client.outbox.depth`, `bothy_client_outbox_depth` |
+| `client.push_display.duration` | Histogram | `s` | none | `bothy.client.push_display.duration`, `bothy_client_push_display_duration_seconds` |
+| `client.push.placeholder` | Counter | `{notification}` | none | `bothy.client.push.placeholder`, `bothy_client_push_placeholder_total` |
 
-### 4.7 Histogramm-Grenzen
+### 4.7 Histogram boundaries
 
-| Histogramme | Grenzen |
+| Histograms | Boundaries |
 |---|---|
-| Dauern bis Sekunden (`http.server.request.duration`, `bothy.delivery.duration`, `bothy.gateway.connect.duration`, `bothy.run.start.latency`, `bothy.push.send.duration`, `bothy.db.event_seq.lock_wait`, `bothy.search.duration`, `bothy.stats.flush.duration`, `db.client.operation.duration`) | 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10 |
-| lange Dauern (`bothy.run.duration`, `bothy.gateway.catchup.duration`, `bothy.job.duration`, `bothy.file.scan.duration`) | 1, 2.5, 5, 10, 30, 60, 120, 300, 600, 1800, 3600, 7200 |
-| Größen (`bothy.file.upload.size`) | 1024, 16384, 131072, 1048576, 8388608, 67108864, 536870912 |
+| Durations up to seconds (`http.server.request.duration`, `bothy.delivery.duration`, `bothy.gateway.connect.duration`, `bothy.run.start.latency`, `bothy.push.send.duration`, `bothy.db.event_seq.lock_wait`, `bothy.search.duration`, `bothy.stats.flush.duration`, `db.client.operation.duration`) | 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10 |
+| long durations (`bothy.run.duration`, `bothy.gateway.catchup.duration`, `bothy.job.duration`, `bothy.file.scan.duration`) | 1, 2.5, 5, 10, 30, 60, 120, 300, 600, 1800, 3600, 7200 |
+| sizes (`bothy.file.upload.size`) | 1024, 16384, 131072, 1048576, 8388608, 67108864, 536870912 |
 
-Die erste Reihe ist die Empfehlung (`ExplicitBucketBoundaries`) der Semantic Conventions für
+The first row is the recommendation (`ExplicitBucketBoundaries`) of the Semantic Conventions for
 `http.server.request.duration`
 (https://github.com/open-telemetry/semantic-conventions/blob/main/docs/http/http-metrics.md,
-abgerufen 2026-10-10) [belegt]. Jede SLO-Schwelle ist eine dieser Grenzen (R-OB-06); ein Check
-vergleicht `le` in den SLO-Dateien mit dieser Tabelle.
+retrieved 2026-10-10) [verified]. Every SLO threshold is one of these boundaries (R-OB-06); a check
+compares `le` in the SLO files with this table.
 
 ## 5. Traces
 
-### 5.1 Weitergabe
+### 5.1 Propagation
 
-1. W3C Trace Context (`traceparent`, `tracestate`) an jeder HTTP-Anfrage; Apps erzeugen ihn
-   selbst, weil es kein Dart-SDK gibt ([17-observability.md](../spec/17-observability.md) 9).
-2. Am öffentlichen Listener beginnt der Server für jede Anfrage einen eigenen Trace und hängt
-   einen eingehenden `traceparent` nur als Span-Link an (otelhttp-Option für öffentliche
-   Endpunkte). Trace-ID und Sampling kommen also vom Server. Nur mit
-   `telemetry.traces.trust_remote_parent` wird ein eingehender Kontext Eltern-Kontext; dann gelten
-   seine Trace-ID und sein Sampling-Flag, und ein Client wählt damit die `correlation_id` seiner
-   Anfragen selbst.
-3. `correlation_id` in `event_log` und `audit_events` ist die Trace-ID der auslösenden Anfrage
-   (16 Byte, als UUID geschrieben, keine UUIDv7). Jede Anfrage hat eine gültige Trace-ID, auch mit
-   `telemetry.enabled = false`: Der Server behält dann einen SDK-Tracer-Provider mit
-   `NeverSample` und ohne Exporter. Jobs ohne Anfrage-Bezug haben keine.
-4. Ereignisse an Adapter tragen `trace_context` (W3C `traceparent`) der auslösenden Anfrage, wenn
-   diese aufgezeichnet wurde (Umschlagfeld `trace_context`, 04 Abschnitt 2.2). Der Adapter macht daraus den
-   Eltern-Kontext seines `invoke_agent`-Spans und gibt ihn als Umgebungsvariable `TRACEPARENT` an
-   die Laufzeit weiter. Claude Code liest `TRACEPARENT` in `-p` und im Agent SDK
-   (https://code.claude.com/docs/en/monitoring-usage, abgerufen 2026-10-10) [belegt].
-5. Der Fan-out ist kein Kind der Anfrage, sondern ein eigener Trace mit Link auf sie.
+1. W3C Trace Context (`traceparent`, `tracestate`) on every HTTP request; apps create it
+   themselves because there is no Dart SDK ([17-observability.md](../spec/17-observability.md) 9).
+2. At the public listener the server starts its own trace for every request and attaches
+   an incoming `traceparent` only as a span link (otelhttp option for public
+   endpoints). Trace ID and sampling therefore come from the server. Only with
+   `telemetry.traces.trust_remote_parent` does an incoming context become the parent context; then
+   its trace ID and its sampling flag apply, and a client thereby chooses the `correlation_id` of its
+   requests itself.
+3. `correlation_id` in `event_log` and `audit_events` is the trace ID of the triggering request
+   (16 bytes, written as a UUID, not a UUIDv7). Every request has a valid trace ID, even with
+   `telemetry.enabled = false`: the server then keeps an SDK tracer provider with
+   `NeverSample` and without an exporter. Jobs without a request context have none.
+4. Events to adapters carry `trace_context` (W3C `traceparent`) of the triggering request if
+   it was recorded (envelope field `trace_context`, 04 section 2.2). The adapter makes it the
+   parent context of its `invoke_agent` span and passes it on to the runtime as the environment
+   variable `TRACEPARENT`. Claude Code reads `TRACEPARENT` in `-p` and in the Agent SDK
+   (https://code.claude.com/docs/en/monitoring-usage, retrieved 2026-10-10) [verified].
+5. The fan-out is not a child of the request but its own trace with a link to it.
 
 ### 5.2 Spans
 
-| Span | Art | Quelle | Wichtige Attribute |
+| Span | Kind | Source | Important attributes |
 |---|---|---|---|
-| `<METHOD> <http.route>` | SERVER | otelhttp | HTTP-Konventionen, `bothy.principal.kind`, `bothy.principal.pseudo_id`, `bothy.action`, `bothy.decision` |
+| `<METHOD> <http.route>` | SERVER | otelhttp | HTTP conventions, `bothy.principal.kind`, `bothy.principal.pseudo_id`, `bothy.action`, `bothy.decision` |
 | `gateway.connect` | SERVER | api | `bothy.outcome`, `bothy.close.code`, `bothy.principal.kind` |
-| `gateway.catchup` | INTERNAL | api | `bothy.outcome`, `bothy.event.seq` (Start) |
-| `event.fanout` | INTERNAL | api, mit Links auf die Anfragen der Ereignisse | `bothy.event.seq` (erste Nummer), Anzahl |
+| `gateway.catchup` | INTERNAL | api | `bothy.outcome`, `bothy.event.seq` (start) |
+| `event.fanout` | INTERNAL | api, with links to the requests of the events | `bothy.event.seq` (first number), count |
 | `agent.dispatch` | PRODUCER | api | `bothy.run.id`, `bothy.agent.handle`, `bothy.decision` |
 | `push.send` | CLIENT | worker | `bothy.push.provider`, `bothy.outcome` |
 | `webhook.deliver` | CLIENT | worker | `server.address`, `http.response.status_code`, `bothy.outcome` |
 | `file.scan` | CLIENT | worker | `bothy.file.id`, `bothy.outcome` |
 | `job <bothy.job.kind>` | CONSUMER | worker (River) | `bothy.job.kind`, `bothy.outcome` (`completed`, `failed`, `cancelled`, `snoozed`) |
-| `txn.subscribe <Abonnent>` | INTERNAL | api, worker: je In-Tx-Abonnent ([02-architektur.md](../spec/02-architektur.md) 8.3) | `bothy.outcome` (`ok`, `veto`) |
-| Datenbank | CLIENT | otelpgx | `db.system.name`, `db.namespace`, `db.operation.name`, `db.query.text` (mit Platzhaltern, nie Parameter) |
-| `invoke_agent <gen_ai.agent.name>` | CLIENT | Adapter (SDK) | `gen_ai.*` aus Abschnitt 6, `bothy.run.id` |
-| `execute_tool <gen_ai.tool.name>` | INTERNAL | Adapter (SDK) | `gen_ai.tool.name`, `bothy.outcome` |
+| `txn.subscribe <Subscriber>` | INTERNAL | api, worker: per in-tx subscriber ([02-architecture.md](../spec/02-architecture.md) 8.3) | `bothy.outcome` (`ok`, `veto`) |
+| Database | CLIENT | otelpgx | `db.system.name`, `db.namespace`, `db.operation.name`, `db.query.text` (with placeholders, never parameters) |
+| `invoke_agent <gen_ai.agent.name>` | CLIENT | adapter (SDK) | `gen_ai.*` from section 6, `bothy.run.id` |
+| `execute_tool <gen_ai.tool.name>` | INTERNAL | adapter (SDK) | `gen_ai.tool.name`, `bothy.outcome` |
 
-Ein Span lebt nie länger als eine Operation. Eine WebSocket-Verbindung ist kein Span.
+A span never lives longer than one operation. A WebSocket connection is not a span.
 
-### 5.3 Attribute in Spans und Logs
+### 5.3 Attributes in spans and logs
 
-Diese Liste ist gleich der Allowlist in [infra/otel/collector.yaml](../../infra/otel/collector.yaml)
-(Bothy-Teil); ein Check hält beide gleich.
+This list equals the allowlist in [infra/otel/collector.yaml](../../infra/otel/collector.yaml)
+(Bothy part); a check keeps both equal.
 
-| Attribut | Werte | Hinweis |
+| Attribute | Values | Note |
 |---|---|---|
-| `bothy.action` | Aktions-ID aus [05-aktionen.md](../spec/05-aktionen.md) | |
-| `bothy.agent.handle` | Handle des Agenten | vom Owner vergeben, kein Mensch |
+| `bothy.action` | action ID from [05-actions.md](../spec/05-actions.md) | |
+| `bothy.agent.handle` | handle of the agent | assigned by the owner, not a person |
 | `bothy.agent.adapter_kind` | `agents.adapter_kind` | |
 | `bothy.backup.kind` | `physical`, `logical`, `objects`, `restore_test` | |
 | `bothy.billing_mode` | `personal`, `organization` | |
-| `bothy.channel.id`, `bothy.space.id`, `bothy.thread.id`, `bothy.message.id`, `bothy.run.id`, `bothy.file.id` | UUID | nie an Metriken |
-| `bothy.close.code` | Schließ-Code aus [04-sync-protokoll.md](../spec/04-sync-protokoll.md) 6.4 | |
-| `bothy.correlation_id` | UUID | nur in Logs; in Spans ist es die Trace-ID |
-| `bothy.decision` | Entscheidung aus [05-aktionen.md](../spec/05-aktionen.md) 2.5 | |
+| `bothy.channel.id`, `bothy.space.id`, `bothy.thread.id`, `bothy.message.id`, `bothy.run.id`, `bothy.file.id` | UUID | never on metrics |
+| `bothy.close.code` | close code from [04-sync-protocol.md](../spec/04-sync-protocol.md) 6.4 | |
+| `bothy.correlation_id` | UUID | only in logs; in spans it is the trace ID |
+| `bothy.decision` | decision from [05-actions.md](../spec/05-actions.md) 2.5 | |
 | `bothy.event.durability` | `durable`, `ephemeral` | |
-| `bothy.event.seq` | globale Sequenz | nie an Metriken |
-| `bothy.event.type` | Ereignistyp aus [05-aktionen.md](../spec/05-aktionen.md) 6 | |
-| `bothy.job.kind` | Job-Art aus dem Code | |
-| `bothy.outcome` | feste Liste je Signal | |
+| `bothy.event.seq` | global sequence | never on metrics |
+| `bothy.event.type` | event type from [05-actions.md](../spec/05-actions.md) 6 | |
+| `bothy.job.kind` | job kind from the code | |
+| `bothy.outcome` | fixed list per signal | |
 | `bothy.principal.kind` | `user`, `agent`, `app`, `anonymous` | |
-| `bothy.principal.pseudo_id` | HMAC-SHA-256 der Prinzipal-ID, gekürzt | [privacy.md](privacy.md) 3 |
+| `bothy.principal.pseudo_id` | HMAC-SHA-256 of the principal ID, truncated | [privacy.md](privacy.md) 3 |
 | `bothy.push.provider` | `apns`, `fcm`, `unifiedpush`, `wns` | |
-| `bothy.ratelimit.class` | Klasse aus [05-aktionen.md](../spec/05-aktionen.md) 3 | |
-| `bothy.reason` | feste Liste je Signal | nie freier Text |
-| `bothy.run.state` | Lauf-Zustand | |
-| `bothy.server.role` | `api`, `worker`, `all` | Resource |
+| `bothy.ratelimit.class` | class from [05-actions.md](../spec/05-actions.md) 3 | |
+| `bothy.reason` | fixed list per signal | never free text |
+| `bothy.run.state` | run state | |
+| `bothy.server.role` | `api`, `worker`, `all` | resource |
 | `bothy.step.kind` | `tool_call`, `status`, `subagent`, `workflow`, `background_job` | |
 
-## 6. GenAI-Konventionen (gekapselt)
+## 6. GenAI conventions (encapsulated)
 
-1. Die GenAI-Konventionen liegen im Repository `open-telemetry/semantic-conventions-genai` und
-   sind vollständig im Status "Development"; für Anthropic gilt `gen_ai.provider.name =
-   "anthropic"` (https://github.com/open-telemetry/semantic-conventions-genai, abgerufen
-   2026-10-10) [belegt].
-2. Je Codebasis gibt es genau ein Paket mit allen `gen_ai.*`-Schlüsseln: im Server
-   `internal/platform/otel/genai` (02, PLAN W8), in den SDKs ein Modul `telemetry.genai`. Der Rest
-   des Codes nutzt nur dessen Konstanten. Das Paket nennt den Stand der Konvention: Repository,
-   Status und Abrufdatum, dazu den Commit, sobald ihn ein Ticket mit Netzzugang gelesen hat. Der
-   Commit ist bei der Planung nicht festgehalten worden [offen].
-3. Ein Snapshot-Test hält die genutzten Schlüssel fest; eine neue Konvention ändert Paket und
-   Snapshot in einer Änderung und Allowlist sowie Dashboards in derselben Änderung.
-4. Nie gesendet: `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`,
-   `gen_ai.tool.definitions`, Argumente und Ergebnisse von Werkzeugen. Der Collector löscht sie
-   zusätzlich.
+1. The GenAI conventions live in the repository `open-telemetry/semantic-conventions-genai` and
+   are entirely in the status "Development"; for Anthropic, `gen_ai.provider.name =
+   "anthropic"` applies (https://github.com/open-telemetry/semantic-conventions-genai, retrieved
+   2026-10-10) [verified].
+2. Per code base there is exactly one package with all `gen_ai.*` keys: in the server
+   `internal/platform/otel/genai` (02, PLAN W8), in the SDKs a module `telemetry.genai`. The rest
+   of the code uses only its constants. The package names the state of the convention: repository,
+   status and retrieval date, plus the commit as soon as a ticket with network access has read it. The
+   commit was not recorded during planning [open].
+3. A snapshot test records the keys in use; a new convention changes package and
+   snapshot in one change, and allowlist and dashboards in the same change.
+4. Never sent: `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`,
+   `gen_ai.tool.definitions`, arguments and results of tools. The collector also deletes
+   them.
 
 ## 7. Logs
 
-| Feld | Regel |
+| Field | Rule |
 |---|---|
-| Zeit, Stufe | aus dem Log-Record |
-| Nachricht (`body`) | konstanter englischer Text aus dem Code, nie zusammengesetzt aus Eingaben; ein Linter erzwingt konstante Nachrichten |
-| `trace_id`, `span_id` | aus dem Kontext |
-| Attribute | nur aus 5.3 |
-| Fehler | `error.type` (Klasse oder Code), nie die Fehlermeldung einer fremden Bibliothek mit Eingabewerten |
+| Time, level | from the log record |
+| Message (`body`) | constant English text from the code, never composed from input; a linter enforces constant messages |
+| `trace_id`, `span_id` | from the context |
+| Attributes | only from 5.3 |
+| Error | `error.type` (class or code), never the error message of a third-party library with input values |
 
-Der Server schreibt Logs je nach `telemetry.logs.exporter` als OTLP an den Collector, als JSON auf
-stdout oder beides. Im Compose-Stack begrenzt der Log-Treiber stdout (`BOTHY_LOG_MAX_SIZE`,
-`BOTHY_LOG_MAX_FILE`). Logs in Go sind im OTel-SDK "Release candidate", in Python "Development"
-(https://opentelemetry.io/docs/languages/go/ und /python/, abgerufen 2026-10-10) [belegt]; darum
-bleibt stdout als Rückfall.
+Depending on `telemetry.logs.exporter`, the server writes logs as OTLP to the collector, as JSON to
+stdout or both. In the Compose stack the log driver limits stdout (`BOTHY_LOG_MAX_SIZE`,
+`BOTHY_LOG_MAX_FILE`). Logs in Go are "Release candidate" in the OTel SDK, in Python "Development"
+(https://opentelemetry.io/docs/languages/go/ and /python/, retrieved 2026-10-10) [verified]; therefore
+stdout stays as a fallback.
 
-## 8. Ende-zu-Ende-Beispiele
+## 8. End-to-end examples
 
-| Ablauf | Signale |
+| Flow | Signals |
 |---|---|
-| Nachricht senden | Span `POST /api/v1/threads/{id}/messages` mit DB-Spans; `bothy.event.appended`, `bothy.db.event_seq.lock_wait`; Span `event.fanout` mit Link; `bothy.delivery.duration` je Empfänger |
-| Agenten-Lauf | wie oben, dazu `agent.dispatch`, beim Adapter `invoke_agent` (Kind von `trace_context`), Laufzeit-Spans darunter; `bothy.run.start.latency`, `bothy.run.steps`, `bothy.run.duration`, `bothy.run.tokens`, `bothy.run.cost` |
-| Push | Span `push.send` im Trace des Fan-outs; `bothy.push.sent`; später `bothy.push.fetch` beim Abruf durch die App |
-| Wiederverbinden | Span `gateway.connect`, `gateway.catchup`; `bothy.gateway.connect.duration`, `bothy.gateway.catchup.duration`, ggf. `bothy.gateway.resync` |
+| Send a message | span `POST /api/v1/threads/{id}/messages` with DB spans; `bothy.event.appended`, `bothy.db.event_seq.lock_wait`; span `event.fanout` with link; `bothy.delivery.duration` per recipient |
+| Agent run | as above, plus `agent.dispatch`, at the adapter `invoke_agent` (child of `trace_context`), runtime spans below it; `bothy.run.start.latency`, `bothy.run.steps`, `bothy.run.duration`, `bothy.run.tokens`, `bothy.run.cost` |
+| Push | span `push.send` in the trace of the fan-out; `bothy.push.sent`; later `bothy.push.fetch` when the app fetches |
+| Reconnect | span `gateway.connect`, `gateway.catchup`; `bothy.gateway.connect.duration`, `bothy.gateway.catchup.duration`, if needed `bothy.gateway.resync` |

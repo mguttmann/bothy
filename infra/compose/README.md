@@ -1,63 +1,63 @@
 # infra/compose
 
-Docker-Compose-Stack einer Bothy-Instanz. Regeln: [docs/spec/16-betrieb.md](../../docs/spec/16-betrieb.md).
-Anleitung: [docs/operations/install-compose.md](../../docs/operations/install-compose.md).
+Docker Compose stack of a Bothy instance. Rules: [docs/spec/16-operations.md](../../docs/spec/16-operations.md).
+Guide: [docs/operations/install-compose.md](../../docs/operations/install-compose.md).
 
-## Dateien
+## Files
 
-| Datei | Inhalt |
+| File | Content |
 |---|---|
-| `compose.yaml` | alle Dienste, Profile, Netze, Volumes |
-| `.env.example` | Vorlage für `.env`; nur Platzhalter und Standardwerte, keine Geheimnisse |
-| `secrets/` | nicht im Repository: vom Owner gelieferte Geheimnisse als Dateien (Katalog in [configuration.md](../../docs/operations/configuration.md) 5) |
+| `compose.yaml` | all services, profiles, networks, volumes |
+| `.env.example` | template for `.env`; only placeholders and default values, no secrets |
+| `secrets/` | not in the repository: secrets delivered by the owner as files (catalogue in [configuration.md](../../docs/operations/configuration.md) 5) |
 
-Der Stack bindet außerdem `../otel` (Collector) und `../observability` (Prometheus, Alertmanager,
-Loki, Tempo, Grafana) nur lesend ein.
+The stack also mounts `../otel` (Collector) and `../observability` (Prometheus, Alertmanager,
+Loki, Tempo, Grafana), read-only.
 
-## Kurzform
+## Short form
 
-Ein Befehl: der Einrichtungsassistent `install.sh` (geplant, PLAN M7-29; Ablauf in
-[docs/spec/16-betrieb.md](../../docs/spec/16-betrieb.md), Abschnitt 3.1). Er entsteht als
-`install.sh` in diesem Ordner und wird mit jedem Release der Komponente `bothy` veröffentlicht. Der
-Handweg:
+One command: the setup wizard `install.sh` (planned, PLAN M7-29; flow in
+[docs/spec/16-operations.md](../../docs/spec/16-operations.md), section 3.1). It is created as
+`install.sh` in this folder and is published with every release of the component `bothy`. The
+manual path:
 
 ```
-cp .env.example .env          # Werte setzen
-mkdir -m 700 secrets          # gelieferte Geheimnisse ablegen
-docker compose config --quiet # prüfen
-docker compose up --no-start  # Netze anlegen; im Profil direct jetzt BOTHY_TRUSTED_PROXIES setzen
-                              # (docs/operations/install-compose.md, Abschnitt 5.1)
+cp .env.example .env          # set values
+mkdir -m 700 secrets          # store the delivered secrets
+docker compose config --quiet # check
+docker compose up --no-start  # create networks; in the profile direct set BOTHY_TRUSTED_PROXIES now
+                              # (docs/operations/install-compose.md, section 5.1)
 docker compose up -d
 ```
 
-## Profile
+## Profiles
 
-| Profil | Dienste | Hinweis |
+| Profile | Services | Note |
 |---|---|---|
-| (immer) | `secrets-init`, `postgres`, `migrate`, `worker`, `backup`, `otel-collector` | |
-| `direct` | `api` auf `127.0.0.1:${BOTHY_HTTP_PUBLISH_PORT}` | TLS und Anmeldung über Reverse-Proxy oder OIDC |
-| `tailscale` | `tailscale`, `api-tailscale` | Header-Identität; siehe [tailscale.md](../../docs/operations/tailscale.md) |
-| `scan` | `clamav` | braucht viel Speicher (Hersteller: mindestens 3 GiB) |
-| `s3` | `seaweedfs` | S3-Treiber auf einem Host; `BOTHY_STORAGE_DRIVER=s3` setzen |
-| `observability` | `prometheus`, `alertmanager`, `loki`, `tempo`, `grafana` | dazu `BOTHY_OTEL_EXPORTER=local` |
+| (always) | `secrets-init`, `postgres`, `migrate`, `worker`, `backup`, `otel-collector` | |
+| `direct` | `api` on `127.0.0.1:${BOTHY_HTTP_PUBLISH_PORT}` | TLS and login through a reverse proxy or OIDC |
+| `tailscale` | `tailscale`, `api-tailscale` | header identity; see [tailscale.md](../../docs/operations/tailscale.md) |
+| `scan` | `clamav` | needs a lot of memory (vendor: at least 3 GiB) |
+| `s3` | `seaweedfs` | S3 driver on one host; set `BOTHY_STORAGE_DRIVER=s3` |
+| `observability` | `prometheus`, `alertmanager`, `loki`, `tempo`, `grafana` | together with `BOTHY_OTEL_EXPORTER=local` |
 
-Genau eines von `direct` und `tailscale`.
+Exactly one of `direct` and `tailscale`.
 
-## Sicherheitsregeln in dieser Datei
+## Security rules in this file
 
-1. Ports nur auf `127.0.0.1`. PostgreSQL, Loki, Tempo und SeaweedFS hängen nur am Netz `internal`
-   ohne Ausgang und sind nie am Host veröffentlicht.
-2. Geheimnisse nie in Umgebungsvariablen; jeder Dienst bindet nur sein Unterverzeichnis des
-   Volumes `secrets` ein (`subpath`, Docker Engine 26 oder neuer).
-3. `api`, `worker`, `migrate`: Dateisystem nur lesend, alle Capabilities entfernt,
-   `no-new-privileges`. Nur der Sidecar `tailscale` bekommt `NET_ADMIN` und `/dev/net/tun`
-   (Kernel-Netz, siehe [tailscale.md](../../docs/operations/tailscale.md) 2).
-4. Images der Hilfsdienste sind auf Versionen gepinnt; Bothy-Images auf `BOTHY_VERSION`.
-5. Container-Logs werden vom Log-Treiber rotiert.
+1. Ports only on `127.0.0.1`. PostgreSQL, Loki, Tempo and SeaweedFS are attached only to the
+   network `internal` without egress and are never published on the host.
+2. Secrets never in environment variables; each service mounts only its own subdirectory of the
+   volume `secrets` (`subpath`, Docker Engine 26 or newer).
+3. `api`, `worker`, `migrate`: read-only file system, all capabilities dropped,
+   `no-new-privileges`. Only the sidecar `tailscale` gets `NET_ADMIN` and `/dev/net/tun`
+   (kernel networking, see [tailscale.md](../../docs/operations/tailscale.md) 2).
+4. Images of the auxiliary services are pinned to versions; Bothy images to `BOTHY_VERSION`.
+5. Container logs are rotated by the log driver.
 
-## Geprüft
+## Checked
 
-`docker compose config --quiet` (Docker Compose v5.6.0) mit `.env.example` und allen Profilen am
-2026-10-10: gültig. Ein Start war nicht möglich, weil die Bothy-Images noch nicht existieren und
-auf dem Prüfrechner kein Docker-Daemon lief. `secrets-init`, `bothy-backupd`, `bothy healthcheck`,
-`migrate --bootstrap` und die TLS-Verbindung von pgBackRest sind Verträge für Bau-Tickets.
+`docker compose config --quiet` (Docker Compose v5.6.0) with `.env.example` and all profiles on
+2026-10-10: valid. A start was not possible because the Bothy images do not exist yet and no
+Docker daemon was running on the checking host. `secrets-init`, `bothy-backupd`, `bothy healthcheck`,
+`migrate --bootstrap` and the TLS connection of pgBackRest are contracts for build tickets.

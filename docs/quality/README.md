@@ -1,23 +1,23 @@
-# Qualität und Repository
+# Quality and repository
 
-Wie jede Änderung geprüft wird, bevor sie `main` erreicht, und wie das Repository
-veröffentlicht wird. Die verbindlichen Regeln stehen in
-Kapitel [23 Qualität](../spec/23-qualitaet.md); diese Seiten sind die Anleitungen dazu.
+How every change is checked before it reaches `main`, and how the repository
+is published. The binding rules are in
+chapter [23 Quality](../spec/23-quality.md); these pages are the guides for them.
 
-| Seite | Inhalt |
+| Page | Content |
 |---|---|
-| [gates.md](gates.md) | Jedes Gate mit Werkzeug, Schwelle und Lauf-Ort; Hooks; Komponenten-Erkennung |
-| [toolchain.md](toolchain.md) | Jedes Werkzeug mit Version, Zweck, Lizenz und Grund; Update-Regeln |
-| [push-discipline.md](push-discipline.md) | Vom Branch zum Merge: Commits, Push, Pull Request, Prozessfehler |
-| [red-team-gate.md](red-team-gate.md) | Unabhängiges Review vor jedem Push (Nachweis `.review/<sha>.md`) und je Etappe, Urteil JA oder NEIN |
-| [sonarqube-local.md](sonarqube-local.md) | Lokaler SonarQube, Token, Profil und Gate, Abgleich mit der Cloud |
-| [public-switch.md](public-switch.md) | Checkliste der Veröffentlichung: Push, sofort öffentlich, SonarQube Cloud und CodeRabbit, Branch-Schutz, danach jedes Ticket als Pull Request |
-| [licenses.md](licenses.md) | Erlaubte Lizenzen, Lizenz-Gate, SBOM und Prüfung von Releases |
+| [gates.md](gates.md) | Every gate with tool, threshold and where it runs; hooks; component detection |
+| [toolchain.md](toolchain.md) | Every tool with version, purpose, license and reason; update rules |
+| [push-discipline.md](push-discipline.md) | From branch to merge: commits, push, pull request, process failures |
+| [red-team-gate.md](red-team-gate.md) | Independent review before every push (evidence `.review/<sha>.md`) and per milestone, verdict `Urteil: JA` or `Urteil: NEIN` |
+| [sonarqube-local.md](sonarqube-local.md) | Local SonarQube, token, profile and gate, reconciliation with the cloud |
+| [public-switch.md](public-switch.md) | Checklist for publishing: push, public right away, SonarQube Cloud and CodeRabbit, branch protection, afterwards every ticket as a pull request |
+| [licenses.md](licenses.md) | Allowed licenses, license gate, SBOM and checking releases |
 
-Kurzfassung für den Alltag:
+Short version for everyday use:
 
 ```sh
-make bootstrap   # einmal je Klon
-make check       # vor jedem Push (der pre-push-Hook tut es automatisch)
-make help        # alle Ziele
+make bootstrap   # once per clone
+make check       # before every push (the pre-push hook does it automatically)
+make help        # all targets
 ```
