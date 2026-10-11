@@ -98,3 +98,13 @@ operated, and the order of the build.
   go-arch-lint and sqlc. The migration rules of ADR 0007 are checked by
   `tools/ci/migrations_lint.py`; `make migrations-lock` records the checksums of new
   migrations.
+
+### Security
+
+- Development tools: `katex` (pulled in by mermaid-cli) is pinned through `overrides` to
+  0.18.10, which has the fix for GHSA-238p-pmpm-9mq7; mermaid still asks for 0.16, so the
+  Dependabot update could not resolve it. mermaid's own bundle still carries katex 0.16
+  code, which the diagrams do not reach because they contain no math (D-DEPS-1).
+- Development tools: GHSA-86w9-cpqp-85rv in node-forge (pulled in by `@sonar/scan`) has no
+  fixed release and is not reachable from the scanner's use of node-forge; the alert is
+  dismissed and the OSV exception keeps its expiry date (D-DEPS-2).

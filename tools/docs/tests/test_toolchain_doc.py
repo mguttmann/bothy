@@ -76,7 +76,9 @@ def test_tool_version_matches_pin(name: str) -> None:
 def test_every_pinned_gate_tool_is_documented() -> None:
     documented = set(doc_versions("Gate tools"))
     binaries = json.loads((REPO / "tools" / "bin" / "tools.lock.json").read_text())["tools"]
-    npm = json.loads((REPO / "tools" / "node" / "package.json").read_text())["devDependencies"]
+    node = json.loads((REPO / "tools" / "node" / "package.json").read_text())
+    # A transitive package pinned through `overrides` is a tool decision of its own.
+    npm = set(node["devDependencies"]) | set(node.get("overrides", {}))
     project = tomllib.loads((REPO / "tools" / "pyproject.toml").read_text())
     direct = [re.split(r"[=<>]", d)[0].lower() for d in project["project"]["dependencies"]]
     direct += [re.split(r"[=<>]", d)[0].lower() for d in project["dependency-groups"]["dev"]]

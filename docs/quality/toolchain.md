@@ -29,6 +29,7 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `semgrep` | `1.180.0` | project rules (`.semgrep/`) | LGPL-2.1 | pattern rules for project invariants without an own parser (R-QA-05) |
 | `@mermaid-js/mermaid-cli` | `11.17.0` | rendering diagrams | MIT | reference renderer of Mermaid; major 11 as at planning time |
 | `puppeteer` | `25.13.0` | browser control for mermaid-cli | Apache-2.0 | dependency of mermaid-cli; determines the browser version |
+| `katex` | `0.18.10` | math typesetting inside Mermaid diagrams | MIT | dependency of mermaid-cli and mermaid, which still ask for 0.16; pinned through `overrides` in `tools/node/package.json` to a release with the fix for GHSA-238p-pmpm-9mq7 (D-DEPS-1) |
 | `@redocly/cli` | `2.62.1` | lint of OpenAPI and AsyncAPI | MIT | lints both formats with its own rules |
 | `@sonar/scan` | `5.0.1` | SonarScanner without a local Java installation | LGPL-3.0 | same scanner locally and in CI, no Docker for the scan |
 | `actionlint` | `1.7.12` | syntax and expressions of the workflows | MIT | required by the planning basis |
@@ -83,6 +84,9 @@ tags, the commit SHA behind the tag).
   VERSION=<version>`; the command takes over the sha256 values that GitHub reports for the
   release files. Check the diff, then `make bootstrap` and `make check`.
 * New tools come with a row on this page, a pin, a license check and a reason.
+* A transitive Node package pinned through `overrides` in `tools/node/package.json` (for a
+  security fix that the tool releases do not take yet) also gets a row here; the test
+  enforces this. Remove the override once the tool asks for a fixed version itself.
 
 ## Trivy: keep the version
 
