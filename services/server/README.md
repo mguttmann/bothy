@@ -5,6 +5,9 @@ jedes Modul aus 02 existiert als Port-Paket, die Kernel-Pakete `ids`, `clock` un
 Plattform-Paket `config` mit `bothy config check|print` und das Plattform-Paket
 [`secrets`](internal/platform/secrets/README.md) mit `bothy secrets init|export` sind fertig, und
 `make arch` hält die Modulgrenzen aus dem Register.
+Since M1-11 `bothy serve` starts every role with the internal listener, health, the database
+and schema check and the public listener, shuts down within `shutdown.total_timeout`, and
+`bothy healthcheck` probes a loopback health endpoint.
 Normativ ist [docs/spec/02-architektur.md](../../docs/spec/02-architektur.md); bei Abweichung gilt
 das Kapitel.
 
@@ -40,6 +43,14 @@ der Überblick.
 Health: `/healthz` (der Prozess lebt) und `/readyz` (bereit) nur auf dem internen Listener
 `server.internal_listen_addr`, außerhalb der öffentlichen API und ohne Aktion (Ruling L2,
 [16-betrieb.md](../../docs/spec/16-betrieb.md)).
+
+Health (W2 resolved in 02 "Rollen eines Prozesses", R-AR-13): `health` means `/healthz` and
+`/readyz` on the internal listener only; metrics leave the process only over OTLP. The public
+listener answers both paths with `404`. Answer format and check names:
+[`internal/platform/health`](internal/platform/health/README.md). Exit codes of `bothy serve`:
+`0` graceful end, `1` failed start, fatal runtime error or shutdown over
+`shutdown.total_timeout`, `2` usage or configuration error, `3` forced by a second signal
+([`internal/platform/lifecycle`](internal/platform/lifecycle/README.md)).
 
 ## Aufbau
 
@@ -136,12 +147,12 @@ Technik ohne Fachlogik; nur `adapters/`, `wire` und `cmd` dürfen sie importiere
 | [`config`](internal/platform/config/README.md) | Schema, Laden und Prüfen der Konfiguration, `Bind` an die `Config`-Strukturen (02, Abschnitt 13; gebaut in M1-07) |
 | `secrets` | Secret-Provider (ADR 0011) |
 | `pg` | Pool, Unit of Work mit Sperrreihenfolge, `LISTEN`-Verbindung, Wiederholung bei Deadlock |
-| `httpserver` | Server, Middleware-Kette, `problem+json`, Nachweis-Prüfung von `authorize` (02, Abschnitt 9) |
+| [`httpserver`](internal/platform/httpserver/README.md) | Server, Middleware-Kette, `problem+json`, Nachweis-Prüfung von `authorize` (02, Abschnitt 9); listener part built in M1-11 |
 | `ratelimit` | Token-Buckets je Klasse aus 05 |
 | `jobs` | einzige Stelle mit River: Client je Rolle, Warteschlangen, Schema `jobs.schema` |
 | `otel` | Telemetrie-Setup, gekapselte `gen_ai.*`-Attribute (R-Telemetrie) |
-| `health` | `/healthz` und `/readyz` auf dem internen Listener `server.internal_listen_addr` (L2) |
-| `lifecycle` | Start-Reihenfolge und Shutdown je Rolle (02, Abschnitt 15) |
+| [`health`](internal/platform/health/README.md) | `/healthz` und `/readyz` auf dem internen Listener `server.internal_listen_addr` (L2); built in M1-11 |
+| [`lifecycle`](internal/platform/lifecycle/README.md) | Start-Reihenfolge und Shutdown je Rolle (02, Abschnitt 15); built in M1-11 |
 | [`egress`](internal/platform/egress/README.md) | einziger Client für ausgehende HTTP-Verbindungen: Ziel-Erlaubnisliste, IP-Prüfung beim Verbindungsaufbau, geprüfte Weiterleitungen, Fristen und Größengrenzen, Loopback-Client für den Health-Check (19-sicherheit.md, Abschnitt 8; gebaut in M1-22) |
 | `buildinfo` | Version des Servers als Konstante gleich `VERSION` (18-release.md) |
 

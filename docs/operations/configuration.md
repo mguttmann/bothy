@@ -146,11 +146,11 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
 | `cluster.mode` | `BOTHY_CLUSTER__MODE` | Server |  | `single` | `single` oder `multi` (mehrere api-Knoten) | geplant (M2) |
-| `http.read_header_timeout` | `BOTHY_HTTP__READ_HEADER_TIMEOUT` | Server |  | `5s` | Frist für Kopfzeilen | geplant (M1) |
+| `http.read_header_timeout` | `BOTHY_HTTP__READ_HEADER_TIMEOUT` | Server | duration | `5s` | Frist für Kopfzeilen | aktiv |
 | `http.request_timeout` | `BOTHY_HTTP__REQUEST_TIMEOUT` | Server |  | `15s` | Kontext-Frist normaler Anfragen | geplant (M1) |
 | `http.transfer_timeout` | `BOTHY_HTTP__TRANSFER_TIMEOUT` | Server |  | `10m` | Frist für Upload und Download | geplant (M1) |
-| `http.idle_timeout` | `BOTHY_HTTP__IDLE_TIMEOUT` | Server |  | `120s` | Leerlauf von Keep-Alive-Verbindungen | geplant (M1) |
-| `http.max_header_bytes` | `BOTHY_HTTP__MAX_HEADER_BYTES` | Server |  | `65536` | größte Kopfzeilen | geplant (M1) |
+| `http.idle_timeout` | `BOTHY_HTTP__IDLE_TIMEOUT` | Server | duration | `120s` | Leerlauf von Keep-Alive-Verbindungen | aktiv |
+| `http.max_header_bytes` | `BOTHY_HTTP__MAX_HEADER_BYTES` | Server | int | `65536` | größte Kopfzeilen | aktiv |
 | `http.max_json_body_bytes` | `BOTHY_HTTP__MAX_JSON_BODY_BYTES` | Server | int | `1048576` | größter JSON-Körper; echt größer als `message.max_content_bytes` (13, Punkt 4) | aktiv |
 | `http.max_json_depth` | `BOTHY_HTTP__MAX_JSON_DEPTH` | Server |  | `32` | größte Schachtelungstiefe eines JSON-Körpers (SEC-IN-2); ein Test hält, dass jedes Anfrage-Beispiel in `openapi.yaml` darunter bleibt | geplant (M1) |
 | `http.unavailable_retry_after` | `BOTHY_HTTP__UNAVAILABLE_RETRY_AFTER` | Server |  | `5s` | `Retry-After` jeder Antwort `503 unavailable` (in ganzen Sekunden) | geplant (M1) |
@@ -178,11 +178,11 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `jobs.queue.delivery.max_workers` | `BOTHY_JOBS__QUEUE__DELIVERY__MAX_WORKERS` | Server |  | `16` | Parallelität `delivery` | geplant (M1) |
 | `jobs.queue.maintenance.max_workers` | `BOTHY_JOBS__QUEUE__MAINTENANCE__MAX_WORKERS` | Server |  | `2` | Parallelität `maintenance` | geplant (M1) |
 | `jobs.queue.privacy.max_workers` | `BOTHY_JOBS__QUEUE__PRIVACY__MAX_WORKERS` | Server |  | `1` | Parallelität `privacy` | geplant (M1) |
-| `shutdown.drain_delay` | `BOTHY_SHUTDOWN__DRAIN_DELAY` | Server |  | `5s` | Warten nach `ready = false` | geplant (M1) |
-| `shutdown.http_grace` | `BOTHY_SHUTDOWN__HTTP_GRACE` | Server |  | `20s` | Frist für laufende HTTP-Anfragen | geplant (M1) |
+| `shutdown.drain_delay` | `BOTHY_SHUTDOWN__DRAIN_DELAY` | Server | duration | `5s` | Warten nach `ready = false` | aktiv |
+| `shutdown.http_grace` | `BOTHY_SHUTDOWN__HTTP_GRACE` | Server | duration | `20s` | Frist für laufende HTTP-Anfragen | aktiv |
 | `shutdown.jobs_soft_timeout` | `BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT` | Server |  | `20s` | weicher Stopp von River | geplant (M1) |
-| `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server |  | `5s` | Telemetrie leeren | geplant (M1) |
-| `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server |  | `60s` | gesamte Frist bis zum Ende; mindestens die Summe der Schritt-Budgets (15.3) | geplant (M1) |
+| `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server | duration | `5s` | Telemetrie leeren | aktiv |
+| `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server | duration | `60s` | gesamte Frist bis zum Ende; mindestens die Summe der Schritt-Budgets (15.3) | aktiv |
 | `perf.reference_profile` |  | Lasttest |  | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 lokal mit fsync und synchronous_commit an, Rolle all` | Umgebung der Lasttests; Modi der Messung in ADR 0063 |  |
 | `perf.sustained_messages_per_s` |  | Lasttest |  | `200` | Dauerlast für `perf.message_create_p99` |  |
 | `perf.message_create_p99` |  | Lasttest |  | `150ms` | Ziel |  |

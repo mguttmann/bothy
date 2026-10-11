@@ -25,10 +25,12 @@ func TestRunWithoutArgumentsPrintsUsageAndExits2(t *testing.T) {
 		t.Errorf("stdout = %q, want empty", stdout.String())
 	}
 	want := usageHeader +
-		"  config     Check or print the configuration without starting the server\n" +
-		"  migrate    Apply, list or validate the database migrations\n" +
-		"  secrets    Create the secrets of the Compose stack or export them encrypted\n" +
-		"  telemetry  Map a principal id to its telemetry pseudonym for the owner\n"
+		"  config       Check or print the configuration without starting the server\n" +
+		"  healthcheck  Probe a loopback health endpoint for a container without shell\n" +
+		"  migrate      Apply, list or validate the database migrations\n" +
+		"  secrets      Create the secrets of the Compose stack or export them encrypted\n" +
+		"  serve        Start the server in the role api, worker or all\n" +
+		"  telemetry    Map a principal id to its telemetry pseudonym for the owner\n"
 	if stderr.String() != want {
 		t.Errorf("stderr = %q, want %q", stderr.String(), want)
 	}

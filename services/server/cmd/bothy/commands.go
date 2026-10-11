@@ -23,8 +23,23 @@ type command struct {
 }
 
 // commands is the table of registered subcommands. Order does not matter: the usage text sorts
-// by name. Each ticket that builds a command of the register adds it here (M1-11 adds serve).
+// by name. Each ticket that builds a command of the register adds it here.
 var commands = []command{
+	{
+		name:    "serve",
+		summary: "Start the server in the role api, worker or all",
+		run: func(ctx context.Context, args, env []string, stdout, stderr io.Writer) int {
+			return serveCommand(ctx, args, env, stdout, stderr, nil)
+		},
+	},
+	{
+		name:    "healthcheck",
+		summary: "Probe a loopback health endpoint for a container without shell",
+		// The probe needs no configuration, secrets or database (brief M1-11 D5).
+		run: func(ctx context.Context, args, _ []string, stdout, stderr io.Writer) int {
+			return healthcheckCommand(ctx, args, stdout, stderr)
+		},
+	},
 	{
 		name:    "config",
 		summary: "Check or print the configuration without starting the server",
