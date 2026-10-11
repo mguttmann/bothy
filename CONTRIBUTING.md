@@ -109,8 +109,11 @@ file name and, with `BOTHY_CODERABBIT=1`, also runs the CodeRabbit CLI.
 - No en dashes or em dashes anywhere (the `text-rules` hook rejects them); use a hyphen
   or rephrase.
 - Example credentials in documentation and tests contain the word `EXAMPLE` (for example
-  `whsec_EXAMPLE...`), so that the secret scan can tell them from real ones. Identifiers
-  in examples are UUIDs, people are Alex, Sam and Robin, domains are `example.com`.
+  `whsec_EXAMPLE`), so that the secret scan can tell them from real ones. GitHub secret
+  scanning ignores that word: an example in a provider's format stays short of it, and a
+  test assembles such a sample at runtime (the `secret-formats` hook rejects the format).
+  Identifiers in examples are UUIDs, people are Alex, Sam and Robin, domains are
+  `example.com`.
 - Diagrams are Mermaid sources (`.mmd`) with the rendered `.svg` next to them, or
   ```` ```mermaid ```` blocks in Markdown; `make diagrams` renders all of them.
 - Every component has a `CHANGELOG.md` in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)

@@ -20,6 +20,7 @@ Versionen laufen wie in CI. Einrichtung einmal je Klon: `make bootstrap`.
 | `conftest.py` | Test isolation: removes variables such as `GIT_DIR`, which git hooks set, from the environment of every test, so that git fixtures never reach the real repository; runs every test without a git identity, like a fresh CI runner (no global or system configuration, `user.useConfigOnly`) | `test` | `ci/tests/test_git_env_isolation.py` |
 | `testing/git_fixtures.py` | throw-away git repositories for tests with their own identity, no signing and no hooks; every fixture that commits or tags uses it | `test` | `ci/tests/test_git_env_isolation.py` |
 | `hooks/text_rules.py` | keine Gedankenstriche (U+2013, U+2014) in Textdateien | pre-commit, `lint` | `hooks/tests/` |
+| `hooks/secret_formats.py` | no values in a provider secret format that GitHub secret scanning reports (`whsec_` with 16 or more base64 characters); examples stay short of the format, tests assemble their samples at runtime | pre-commit, `lint`, `test` | `hooks/tests/` |
 | `hooks/commit_msg.py` | Conventional Commits und DCO-Sign-off | commit-msg, `commitlint` | `hooks/tests/` |
 | `denylist/` | White-Label-Scanner mit privater Liste und öffentlichen Regeln ([README](denylist/README.md)) | `denylist`, `denylist-history` | `denylist/tests/` |
 | `docs/adr_index.py` | ADR-Index erzeugen und prüfen | `adr-index`, `docs` | `docs/tests/` |

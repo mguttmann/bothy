@@ -16,7 +16,7 @@ Quelle des Diagramms: `docs/quality/pipeline.mmd`.
 |---|---|---|---|---|
 | `fmt-check` | ruff format, gofmt, dart format, Skript `format:check` der TypeScript-Projekte | Format ohne Änderungen | | Werkzeuge |
 | `codegen-check` | `tools/ci/codegen_check.py` mit sqlc und `go generate` (go-arch-lint und sqlc aus den Pins vorn im `PATH`) | erzeugter Code (sqlc-Code, `.go-arch-lint.yml`, API-Code) entspricht einer frischen Erzeugung; es zählen nur Änderungen durch den Generator, nicht Handänderungen im Arbeitsbaum | | ab erstem Go-Modul |
-| `lint` | pre-commit-Hooks über alle Dateien (Text-Regeln, Leerzeichen, YAML/TOML/JSON, Merge-Marker, private Schlüssel, Dateigröße), ruff (mit Docstring-Pflicht `D`, Abschnitt "Doku im Code" in Kapitel 23), bandit, check-jsonschema (Issue-Formulare, Renovate, CodeRabbit), actionlint, zizmor, go vet und golangci-lint, flutter analyze und custom_lint, Skript `lint` | Stil, Fehlerquellen, Workflow-Sicherheit | `repo.max_file_kb` | ja |
+| `lint` | pre-commit-Hooks über alle Dateien (Text-Regeln, provider secret formats of GitHub secret scanning, Leerzeichen, YAML/TOML/JSON, Merge-Marker, private Schlüssel, Dateigröße), ruff (mit Docstring-Pflicht `D`, Abschnitt "Doku im Code" in Kapitel 23), bandit, check-jsonschema (Issue-Formulare, Renovate, CodeRabbit), actionlint, zizmor, go vet und golangci-lint, flutter analyze und custom_lint, Skript `lint` | Stil, Fehlerquellen, Workflow-Sicherheit | `repo.max_file_kb` | ja |
 | `typecheck` | mypy (strict), go build, tsc | Typen | | Werkzeuge |
 | `arch` | go-arch-lint mit `<modul>/.go-arch-lint.yml`, erzeugt aus `architecture/modules.yaml` | Modulgrenzen und erlaubte Fremdbibliotheken der Go-Module (Kapitel 02 "go-arch-lint") | | ab erstem Go-Modul |
 | `migrations-lint` | `tools/ci/migrations_lint.py` | fortlaufende, lückenlose fünfstellige Nummern ohne Zeitstempel-Versionen, Prüfsummen gemergter Migrationen unverändert (`migrations.sha256`), `STORED` bei `GENERATED ALWAYS AS`, `-- +goose NO TRANSACTION` bei `CONCURRENTLY` (ADR 0007, Kapitel 14) | | ab erster Migration |
@@ -119,7 +119,7 @@ neben `migrations/`, damit weder das Einbettungsmuster `*.sql` noch sqlc sie lie
 
 | Hook | Läuft | Inhalt |
 |---|---|---|
-| pre-commit | bei jedem Commit, auf den geänderten Dateien | Text-Regeln (keine Gedankenstriche), Datei-Hygiene, ruff für `tools/`, gitleaks auf den gestagten Änderungen |
+| pre-commit | bei jedem Commit, auf den geänderten Dateien | Text-Regeln (keine Gedankenstriche), provider secret formats (`tools/hooks/secret_formats.py`), Datei-Hygiene, ruff für `tools/`, gitleaks auf den gestagten Änderungen |
 | commit-msg | bei jedem Commit | Conventional Commits und DCO-Sign-off |
 | pre-push | vor jedem Push | `tools/hooks/review_gate.py` (Bericht `.review/<sha>.md` des gepushten Commits endet mit `Urteil: JA`, [red-team-gate.md](red-team-gate.md)), dann `make check` |
 

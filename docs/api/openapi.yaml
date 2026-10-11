@@ -14236,7 +14236,7 @@ paths:
                       signature_schemes: [v1a]
                       signing_key_kid: whk-2026-10
                       created_at: '2026-10-10T09:30:00.000Z'
-                    hmac_secret: whsec_exampleOnlyNotASecret0000000000
+                    hmac_secret: whsec_EXAMPLE
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -14302,7 +14302,7 @@ paths:
                       signature_schemes: [v1a]
                       signing_key_kid: whk-2026-10
                       created_at: '2026-10-10T09:30:00.000Z'
-                    hmac_secret: whsec_exampleOnlyNotASecret0000000000
+                    hmac_secret: whsec_EXAMPLE
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -25417,7 +25417,7 @@ components:
         hmac_secret:
           type: string
           description: Standard Webhooks secret with prefix `whsec_`. Shown once.
-          examples: [whsec_exampleOnlyNotASecret0000000000]
+          examples: [whsec_EXAMPLE]
     WebhookSubscriptionList:
       type: object
       required: [items]
