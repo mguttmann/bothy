@@ -1,24 +1,24 @@
 flowchart TB
-    tag["Tag server/vX.Y.Z (signiert)"] --> gates["Lokale Gates = CI-Gates (Team H)"]
-    gates --> build["Build je Architektur: linux/amd64, linux/arm64"]
-    build --> manifest["Multi-Arch-Manifest bothy-server, bothy-postgres"]
-    manifest --> sbom["SBOM: SPDX und CycloneDX (Syft)"]
-    manifest --> sign["cosign keyless: Signatur je Digest"]
-    manifest --> prov["Build-Provenance (actions/attest)"]
-    sbom --> publish["ghcr.io: Images, Release mit Notes, Checksummen"]
+    tag["Tag server/vX.Y.Z (signed)"] --> gates["Local gates = CI gates (Team H)"]
+    gates --> build["Build per architecture: linux/amd64, linux/arm64"]
+    build --> manifest["Multi-arch manifest bothy-server, bothy-postgres"]
+    manifest --> sbom["SBOM: SPDX and CycloneDX (Syft)"]
+    manifest --> sign["cosign keyless: signature per digest"]
+    manifest --> prov["Build provenance (actions/attest)"]
+    sbom --> publish["ghcr.io: images, release with notes, checksums"]
     sign --> publish
     prov --> publish
-    publish --> verify["Prüfung durch Betreiber: cosign verify, gh attestation verify"]
+    publish --> verify["Check by the instance operator: cosign verify, gh attestation verify"]
 
-    prodtag["Tag vA.B.C (signiert), BOTHY_VERSION im Commit gepinnt"] --> prodgates["Gates des ganzen Repositorys"]
-    prodgates --> bundle["release-build: Bündel, BOTHY_REGISTRY aus dem Owner"]
-    publish -. "Images der gepinnten Version vorhanden, sonst Abbruch" .-> bundle
-    bundle --> install["install.sh mit Version und SHA-256 des Bündels"]
-    install --> prodpublish["Release: Bündel, install.sh, Signaturen, SBOM, Checksummen"]
-    prodpublish --> port["Portabilitätstest mit install.sh (16 11.1)"]
+    prodtag["Tag vA.B.C (signed), BOTHY_VERSION pinned in the commit"] --> prodgates["Gates of the whole repository"]
+    prodgates --> bundle["release-build: bundle, BOTHY_REGISTRY from the owner"]
+    publish -. "images of the pinned version present, otherwise abort" .-> bundle
+    bundle --> install["install.sh with version and SHA-256 of the bundle"]
+    install --> prodpublish["Release: bundle, install.sh, signatures, SBOM, checksums"]
+    prodpublish --> port["Portability test with install.sh (16 11.1)"]
 
-    apptag["Tag client/vX.Y.Z"] --> appgates["Gates und Tests der Apps"]
-    appgates --> ios["iOS: TestFlight (intern, extern)"]
-    appgates --> mac["macOS: Developer ID, Notarisierung, Sparkle-Appcast stable/beta"]
-    appgates --> win["Windows: MSIX signiert, .appinstaller stable/beta"]
-    appgates --> android["Android: interner Testkanal"]
+    apptag["Tag client/vX.Y.Z"] --> appgates["Gates and tests of the apps"]
+    appgates --> ios["iOS: TestFlight (internal, external)"]
+    appgates --> mac["macOS: Developer ID, notarization, Sparkle appcast stable/beta"]
+    appgates --> win["Windows: MSIX signed, .appinstaller stable/beta"]
+    appgates --> android["Android: internal test track"]

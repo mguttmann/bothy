@@ -1,247 +1,247 @@
-# 06 Öffentliche API
+# 06 Public API
 
-Status: Entwurf M0. Normativ sind [docs/api/openapi.yaml](../api/openapi.yaml) (REST, OpenAPI 3.1),
-[docs/api/asyncapi.yaml](../api/asyncapi.yaml) (Gateway, AsyncAPI 3.0) und dieses Kapitel
-(Konventionen). Webhooks: [docs/api/webhooks.md](../api/webhooks.md). Begriffe:
-[00-glossar.md](00-glossar.md). Tabellen: [03-datenmodell.md](03-datenmodell.md). Sync:
-[04-sync-protokoll.md](04-sync-protokoll.md). Aktionen: [05-aktionen.md](05-aktionen.md).
-Entscheidungen: ADR 0013 bis 0016.
+Status: draft M0. Normative are [docs/api/openapi.yaml](../api/openapi.yaml) (REST, OpenAPI 3.1),
+[docs/api/asyncapi.yaml](../api/asyncapi.yaml) (gateway, AsyncAPI 3.0) and this chapter
+(conventions). Webhooks: [docs/api/webhooks.md](../api/webhooks.md). Terms:
+[00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md). Sync:
+[04-sync-protocol.md](04-sync-protocol.md). Actions: [05-actions.md](05-actions.md).
+Decisions: ADR 0013 to 0016.
 
-Rangfolge bei Widerspruch: 05 für Aktionen und Rechte, 04 für Sync-Semantik, die YAML-Dateien für
-Formen (Pfade, Felder, Typen), dieses Kapitel für Konventionen. Ein Widerspruch ist ein Fehler und
-wird in derselben Änderung behoben, die ihn findet.
+Precedence in case of contradiction: 05 for actions and permissions, 04 for sync semantics, the YAML
+files for shapes (paths, fields, types), this chapter for conventions. A contradiction is a bug and
+is fixed in the same change that finds it.
 
-Alle Grenzen, Fenster und Fristen sind benannte Konfigurationswerte. Neue Werte dieses Kapitels
-stehen nur in Abschnitt 20.
+All limits, windows and deadlines are named configuration values. New values of this chapter
+appear only in section 20.
 
-## 1. Überblick
+## 1. Overview
 
 ```mermaid
 flowchart LR
     subgraph Clients
         A[Apps: iOS, Android, macOS, Windows]
-        K[Web-Konsole]
+        K[Web console]
     end
-    subgraph Erweiterungen
-        AD[Agenten-Adapter]
-        AP[Apps mit Manifest]
+    subgraph Extensions
+        AD[Agent adapters]
+        AP[Apps with manifest]
     end
-    EX[Externe Systeme]
+    EX[External systems]
     S[(Server: /api/v1)]
     A -- REST + Gateway --> S
     K -- REST --> S
-    AD -- REST + Gateway, API-Token --> S
-    AP -- REST + Gateway, API-Token --> S
-    S -- signierte Webhooks --> AP
-    EX -- Eingangs-Webhook --> S
+    AD -- REST + Gateway, API token --> S
+    AP -- REST + Gateway, API token --> S
+    S -- signed webhooks --> AP
+    EX -- incoming webhook --> S
 ```
 
-| Fläche | Ort | Vertrag |
+| Surface | Location | Contract |
 |---|---|---|
-| REST | `https://<host>/api/v1/...` | openapi.yaml, Abschnitte 2 bis 10 |
-| Gateway (WebSocket) | `wss://<host>/api/v1/gateway` | asyncapi.yaml, 04, Abschnitt 11 |
-| Ausgehende Webhooks | HTTPS-Ziel der App | `webhooks:` in openapi.yaml, webhooks.md |
-| Eingangs-Webhooks | `POST /api/v1/hooks/{webhook_id}/{token}` | openapi.yaml, webhooks.md |
+| REST | `https://<host>/api/v1/...` | openapi.yaml, sections 2 to 10 |
+| Gateway (WebSocket) | `wss://<host>/api/v1/gateway` | asyncapi.yaml, 04, section 11 |
+| Outgoing webhooks | HTTPS target of the app | `webhooks:` in openapi.yaml, webhooks.md |
+| Incoming webhooks | `POST /api/v1/hooks/{webhook_id}/{token}` | openapi.yaml, webhooks.md |
 
-Der Server-Eintrag in openapi.yaml ist relativ (`/api/v1`), weil jede Instanz ihren eigenen Host
-hat. Das Präfix `/api/v1` gilt für alle Flächen, auch im Kern-Vertrag (04). Liveness und
-Readiness gehören nicht zur öffentlichen API; sie liegen auf dem internen Listener
-([16-betrieb.md](16-betrieb.md), Abschnitt 4.2; Ruling L2).
+The server entry in openapi.yaml is relative (`/api/v1`), because every instance has its own host.
+The prefix `/api/v1` applies to all surfaces, also in the core contract (04). Liveness and
+readiness are not part of the public API; they are on the internal listener
+([16-operations.md](16-operations.md), section 4.2; ruling L2).
 
-## 2. Grundregeln
+## 2. Basic rules
 
-| Thema | Regel | Grund |
+| Topic | Rule | Reason |
 |---|---|---|
-| Pfade | Kleinbuchstaben, Nomen im Plural, kebab-case (`/gdpr-requests`). Pfad-Parameter heißen `{<ressource>_id}`. Pfade enthalten nur IDs, nie Handles oder Namen. | Stabile URLs; Umbenennen ändert keine Adresse. |
-| Zustandswechsel | Wechsel mit Nebenwirkung, Grund oder Audit sind `POST /<ressource>/{id}/<verb>` (`close`, `reopen`, `move`, `revoke`, `approve`, `archive`, `cancel`, `disable`). | Eine Aktion je Route, auditierbar mit Grund, kein verstecktes Feld in einem PATCH. |
-| Ohne Wirkung | Ist der Zielzustand schon erreicht (Sperren eines Gesperrten, Widerruf eines Widerrufenen, Schließen eines Erledigten) oder ändert ein PATCH nichts, antwortet der Server wie beim Wechsel mit der aktuellen Darstellung, ohne neue Version, ohne Ereignis und ohne Rechte-Version; Aktionen mit Audit schreiben einen Eintrag mit `no_change: true` in `details`. Ein Übergang, den der Zustandsautomat nicht kennt (z. B. `deleted` nach `active`, Hauptverlauf schließen), ergibt `409 invalid_state_transition`. | Das Ausgangsfach wiederholt auch nach `sync.idempotency_key_ttl`; ein Fehler für den gewünschten Zustand sähe wie ein Scheitern aus. |
-| Selbstbezug | `/me/...` für den aufrufenden Menschen; Agenten-Laufzeit unter `/agents/me/...`. | Kein Sonderwert `me` in ID-Parametern; Codegeneratoren typisieren IDs als UUID. |
-| Felder | snake_case, gleich wie Datenbank (03) und Ereignisse (04). | Ein Name je Begriff über alle Schichten. |
-| operationId | lowerCamelCase, Verb plus Nomen (`createMessage`). Lint-Regel `rule/operation-id-camel-case`. | Generatoren bilden Methodennamen daraus; eine Umbenennung bricht SDKs. |
-| Aufzählungen | snake_case-Strings. Wiederholte Wertemengen sind benannte Schemas (z. B. `ThreadState`). | Gleiche Typen in allen Generatoren, keine Namenskollisionen. |
-| IDs | UUIDv7 (RFC 9562) in Kleinschreibung. Der Server akzeptiert Großschreibung beim Lesen. | 03, R-DM-01. |
-| Zeit | RFC 3339 in UTC mit `Z` und Millisekunden. Dauern als Ganzzahl in Millisekunden (`_ms`). Clients lesen jede gültige RFC-3339-Form. | Eindeutig, sortierbar, sprachneutral. |
-| Ganzzahlen | `format: int64`. Sequenzen, Versionen und Beträge bleiben unter 2^53, damit JavaScript sie exakt darstellt; ein Server-Test prüft die Grenze bei der Vergabe. | JSON-Zahlen in JavaScript sind Gleitkomma. |
-| Geld | `amount_micros` (int64) plus `currency` (ISO 4217). | 03, R-DM-04. |
-| Kein `null` | Der Server sendet nie JSON `null`. Fehlt ein Feld, hat es keinen Wert. Clients behandeln ein empfangenes `null` wie ein fehlendes Feld. Werte werden über eigene Felder oder Modi entfernt (z. B. `use_global_order: true`, `OperatorSet.mode = none`), nie durch `null`. | dart-dio kennt den Null-Typ nicht [belegt, Q4]; ein Weg für alle Generatoren (R-API-03, [ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)). |
-| Unbekanntes | Clients ignorieren unbekannte Felder, Enum-Werte, Ereignistypen und Problem-Codes. Der Server lehnt unbekannte Felder in Anfragen und Gateway-Rahmen ab (`400 validation_failed` bzw. Schließ-Code `4002`); schreibende Schemas haben `additionalProperties: false` ([19-sicherheit.md](19-sicherheit.md), SEC-IN-1; PLAN W7). Ob ein Server ein neues Feld kennt, sieht ein Client an `features` der Discovery. | Ein still verworfenes Feld verschluckt bei einem älteren Server eine Absicht; Antworten und Ereignisse bleiben additiv (Abschnitt 13). |
-| Medientypen | JSON als `application/json` (UTF-8); Fehler als `application/problem+json`; Datei-Teile als `application/octet-stream`; Bilder für Avatar und Logo als `multipart/form-data` (Teil `file`); Exporte als `application/x-ndjson`. | Ein Format je Zweck; NDJSON lässt große Exporte streamen. |
-| Größe | JSON-Körper bis `http.max_json_body_bytes`, Schachtelung bis `http.max_json_depth` ([02-architektur.md](02-architektur.md)), sonst `413 payload_too_large` bzw. `400 malformed_request`. `http.max_json_body_bytes` ist echt größer als `message.max_content_bytes`. | Schutz vor Speicherdruck ohne lange Nachrichten zu verhindern. |
-| Caching | Authentifizierte JSON-Antworten tragen `Cache-Control: no-store`. Datei-Inhalte tragen `Cache-Control: private, immutable`, weil sich der Inhalt einer Datei-ID nie ändert. | Kein Inhalt in fremden Caches; der Client löscht bei `access.changed` selbst (04, 8.3). |
-| Korrelation | Jede Antwort trägt `Correlation-Id`: die Trace-ID der Anfrage als UUID geschrieben (Schema `CorrelationId`, keine UUIDv7). Derselbe Wert steht in Problemen, Ereignissen (`correlation_id`) und im Audit. Der Server erzeugt ihn; eine gesendete `Correlation-Id` ignoriert er, und ein eingehender `traceparent` wird nur als Span-Link übernommen, nicht als Eltern-Trace ([17-observability.md](17-observability.md), Abschnitt 3). | Ein fälschbarer Client-Wert würde Audit-Spuren verfälschen. |
-| Client-Kennung | `User-Agent: <app>/<version> (<plattform>)`. | Diagnose und `min_client_versions` in der Discovery. |
-| CORS | Aus. Die Web-Konsole läuft auf demselben Origin. Ausnahmen nur über `api.cors_allowed_origins`. | Kleinste Angriffsfläche für Token im Browser. |
-| Client-IP | Für die Rate-Limit-Klasse `rl.public_auth` und das Audit gilt die Quell-IP; `Forwarded` und `X-Forwarded-For` nur von Absendern aus `server.trusted_proxies` ([16-betrieb.md](16-betrieb.md)). | Hinter einem Reverse-Proxy hätten sonst alle Clients dieselbe IP, oder Angreifer setzen sie selbst. |
-| Sprache | `title` und `detail` in Problemen sind Englisch. Clients übersetzen über `code`. Beschreibungen in den YAML-Dateien sind Englisch, weil sie als Kommentare in generierten Code wandern. | Stabile Texte für Logs; Lokalisierung gehört in den Client. |
+| Paths | Lower case, plural nouns, kebab-case (`/gdpr-requests`). Path parameters are named `{<resource>_id}`. Paths contain only IDs, never handles or names. | Stable URLs; a rename changes no address. |
+| State changes | Changes with a side effect, a reason or an audit entry are `POST /<resource>/{id}/<verb>` (`close`, `reopen`, `move`, `revoke`, `approve`, `archive`, `cancel`, `disable`). | One action per route, auditable with a reason, no hidden field in a PATCH. |
+| No effect | If the target state is already reached (disabling a disabled one, revoking a revoked one, closing a done thread) or a PATCH changes nothing, the server answers as for the change with the current representation, without a new version, without an event and without a permission version; actions with an audit write an entry with `no_change: true` in `details`. A transition the state machine does not know (for example `deleted` after `active`, closing the main thread) gives `409 invalid_state_transition`. | The outbox retries even after `sync.idempotency_key_ttl`; an error for the desired state would look like a failure. |
+| Self reference | `/me/...` for the calling person; agent runtime under `/agents/me/...`. | No special value `me` in ID parameters; code generators type IDs as UUID. |
+| Fields | snake_case, the same as the database (03) and events (04). | One name per term across all layers. |
+| operationId | lowerCamelCase, verb plus noun (`createMessage`). Lint rule `rule/operation-id-camel-case`. | Generators build method names from it; a rename breaks SDKs. |
+| Enumerations | snake_case strings. Repeated value sets are named schemas (for example `ThreadState`). | The same types in all generators, no name collisions. |
+| IDs | UUIDv7 (RFC 9562) in lower case. The server accepts upper case when reading. | 03, R-DM-01. |
+| Time | RFC 3339 in UTC with `Z` and milliseconds. Durations as integers in milliseconds (`_ms`). Clients read every valid RFC 3339 form. | Unambiguous, sortable, language neutral. |
+| Integers | `format: int64`. Sequences, versions and amounts stay below 2^53, so that JavaScript represents them exactly; a server test checks the limit at assignment. | JSON numbers in JavaScript are floating point. |
+| Money | `amount_micros` (int64) plus `currency` (ISO 4217). | 03, R-DM-04. |
+| No `null` | The server never sends JSON `null`. If a field is missing, it has no value. Clients treat a received `null` like a missing field. Values are removed through their own fields or modes (for example `use_global_order: true`, `OperatorSet.mode = none`), never through `null`. | dart-dio does not know the null type [verified, Q4]; one way for all generators (R-API-03, [ADR 0053](../adr/0053-no-json-null-in-api-and-events.md)). |
+| Unknown values | Clients ignore unknown fields, enum values, event types and problem codes. The server rejects unknown fields in requests and gateway frames (`400 validation_failed` or close code `4002`, respectively); writing schemas have `additionalProperties: false` ([19-security.md](19-security.md), SEC-IN-1; PLAN W7). A client sees from `features` in the discovery whether a server knows a new field. | A silently discarded field swallows an intent on an older server; responses and events stay additive (section 13). |
+| Media types | JSON as `application/json` (UTF-8); errors as `application/problem+json`; file parts as `application/octet-stream`; images for avatar and logo as `multipart/form-data` (part `file`); exports as `application/x-ndjson`. | One format per purpose; NDJSON lets large exports stream. |
+| Size | JSON bodies up to `http.max_json_body_bytes`, nesting up to `http.max_json_depth` ([02-architecture.md](02-architecture.md)), otherwise `413 payload_too_large` or `400 malformed_request`, respectively. `http.max_json_body_bytes` is strictly larger than `message.max_content_bytes`. | Protection against memory pressure without preventing long messages. |
+| Caching | Authenticated JSON responses carry `Cache-Control: no-store`. File contents carry `Cache-Control: private, immutable`, because the content of a file ID never changes. | No content in third-party caches; the client deletes on `access.changed` itself (04, 8.3). |
+| Correlation | Every response carries `Correlation-Id`: the trace ID of the request written as a UUID (schema `CorrelationId`, not a UUIDv7). The same value appears in problems, events (`correlation_id`) and in the audit. The server generates it; it ignores a sent `Correlation-Id`, and it takes over an incoming `traceparent` only as a span link, not as the parent trace ([17-observability.md](17-observability.md), section 3). | A forgeable client value would falsify audit trails. |
+| Client identifier | `User-Agent: <app>/<version> (<platform>)`. | Diagnosis and `min_client_versions` in the discovery. |
+| CORS | Off. The web console runs on the same origin. Exceptions only through `api.cors_allowed_origins`. | Smallest attack surface for tokens in the browser. |
+| Client IP | For the rate-limit class `rl.public_auth` and the audit, the source IP applies; `Forwarded` and `X-Forwarded-For` only from senders in `server.trusted_proxies` ([16-operations.md](16-operations.md)). | Behind a reverse proxy all clients would otherwise have the same IP, or attackers would set it themselves. |
+| Language | `title` and `detail` in problems are English. Clients translate through `code`. Descriptions in the YAML files are English, because they travel into generated code as comments. | Stable texts for logs; localization belongs in the client. |
 
-## 3. Authentifizierung je Prinzipal-Art
+## 3. Authentication per principal kind
 
-| Prinzipal | Anmeldung | Kopfzeilen je Anfrage | Bindung | Gültigkeit | Step-up |
+| Principal | Login | Headers per request | Binding | Validity | Step-up |
 |---|---|---|---|---|---|
-| Mensch in einer App | OIDC, Header eines vertrauenswürdigen Reverse-Proxys, lokales Konto mit Passkey oder Passwort plus TOTP; Ergebnis ist ein Token-Paar | `Authorization: DPoP <access_token>` und `DPoP: <Beweis>` | Geräteschlüssel (`cnf.jkt`), RFC 9449 | Zugriffstoken `auth.access_token_ttl` (Kapitel 08), Refresh `auth.refresh_token_ttl` | Passkey oder Geräteschlüssel mit Nutzerbestätigung |
-| Mensch in der Web-Konsole | wie oben; Ergebnis ist eine Cookie-Sitzung nach dem BFF-Muster, keine Tokens im Browser ([08-identitaet.md](08-identitaet.md), Abschnitt 7.5) | Cookie `__Host-...` und eine feste CSRF-Kopfzeile (Name und Wert legt M6-01 in openapi.yaml fest) | Cookie, als HMAC an der Sitzung | `auth.console_session_max_age`, Leerlauf `auth.console_session_idle_timeout` | Passkey, sonst erneute OIDC-Anmeldung bzw. Passwort mit TOTP |
-| Agent | API-Token, vom Owner erzeugt (`token.create`) | `Authorization: Bearer <token>`; bei Token mit `dpop_jkt` `Authorization: DPoP` plus `DPoP` | optional `dpop_jkt` | bis Widerruf oder `expires_at` | nie (R-AZ-03) |
-| App | API-Token mit Scopes (05, 2.6) | wie Agent | optional | wie Agent | nie |
-| Eingangs-Webhook | geheimer Token im Pfad | keine | keine | bis Widerruf | nie |
-| Anonym | keine | keine | keine | | nie |
+| Person in an app | OIDC, header of a trusted reverse proxy, local account with passkey or password plus TOTP; the result is a token pair | `Authorization: DPoP <access_token>` and `DPoP: <proof>` | device key (`cnf.jkt`), RFC 9449 | access token `auth.access_token_ttl` (chapter 08), refresh `auth.refresh_token_ttl` | passkey or device key with user confirmation |
+| Person in the web console | as above; the result is a cookie session following the BFF pattern, no tokens in the browser ([08-identity.md](08-identity.md), section 7.5) | cookie `__Host-...` and a fixed CSRF header (M6-01 sets name and value in openapi.yaml) | cookie, as an HMAC on the session | `auth.console_session_max_age`, idle `auth.console_session_idle_timeout` | passkey, otherwise a new OIDC login or password with TOTP |
+| Agent | API token, created by the owner (`token.create`) | `Authorization: Bearer <token>`; for tokens with `dpop_jkt` `Authorization: DPoP` plus `DPoP` | optional `dpop_jkt` | until revocation or `expires_at` | never (R-AZ-03) |
+| App | API token with scopes (05, 2.6) | like agent | optional | like agent | never |
+| Incoming webhook | secret token in the path | none | none | until revocation | never |
+| Anonymous | none | none | none | | never |
 
-Anonym erreichbar sind nur Operationen mit `security: []`: Discovery, JWKS, Webhook-Schlüssel,
-Logo, Problem-Typen, öffentliche Statusseite, Anmeldeabläufe und Eingangs-Webhooks. Sie
-laufen trotzdem durch `authorize` mit dem Prinzipal `anonymous` (05, 2.1).
+Only operations with `security: []` are reachable anonymously: discovery, JWKS, webhook keys,
+logo, problem types, public status page, login flows and incoming webhooks. They
+still run through `authorize` with the principal `anonymous` (05, 2.1).
 
 ### 3.1 DPoP
 
-1. Der Server stellt Zugriffstokens als JWS mit `sub`, `sid` (Sitzung) und `cnf.jkt` aus
-   (RFC 9449 [belegt, Q3]). Jede Anfrage trägt einen frischen DPoP-Beweis mit `htm`, `htu` (ohne
-   Query), `iat`, `jti` und `ath` (Hash des Zugriffstokens).
-2. Verlangt der Server einen Nonce, antwortet er `401` mit `WWW-Authenticate: DPoP
-   error="use_dpop_nonce"` und `DPoP-Nonce` (Problem `use_dpop_nonce`). Der Client bildet den
-   Beweis mit diesem Nonce neu und wiederholt genau einmal. Jede Antwort darf einen neuen
-   `DPoP-Nonce` tragen; der Client nimmt immer den neuesten. Am Gateway kommt der Nonce aus
-   `hello` und `reauth_required` (04, 6.3).
-3. Anmelde-Endpunkte haben noch kein Zugriffstoken. Sie verlangen die Kopfzeile `DPoP` ohne
-   `ath`; der Server bindet die neuen Tokens an genau diesen Schlüssel.
-4. Refresh (`POST /auth/token/refresh`) verlangt einen Beweis mit dem Schlüssel der Sitzung. Eine
-   Wiederverwendung eines schon rotierten Refresh-Tokens sperrt Familie und Sitzung
-   (`session_revoked`, 03). Ausnahme: dieselbe Wiederholung mit demselben Schlüssel innerhalb von
-   `auth.refresh_reuse_grace`, z. B. nach verlorener Antwort; sie bekommt ein neues Paar
+1. The server issues access tokens as JWS with `sub`, `sid` (session) and `cnf.jkt`
+   (RFC 9449 [verified, Q3]). Every request carries a fresh DPoP proof with `htm`, `htu` (without
+   query), `iat`, `jti` and `ath` (hash of the access token).
+2. If the server requires a nonce, it answers `401` with `WWW-Authenticate: DPoP
+   error="use_dpop_nonce"` and `DPoP-Nonce` (problem `use_dpop_nonce`). The client builds the
+   proof again with this nonce and retries exactly once. Every response may carry a new
+   `DPoP-Nonce`; the client always takes the newest. At the gateway the nonce comes from
+   `hello` and `reauth_required` (04, 6.3).
+3. Login endpoints do not have an access token yet. They require the header `DPoP` without
+   `ath`; the server binds the new tokens to exactly this key.
+4. Refresh (`POST /auth/token/refresh`) requires a proof with the key of the session. Reuse of
+   an already rotated refresh token revokes the family and the session
+   (`session_revoked`, 03). Exception: the same retry with the same key within
+   `auth.refresh_reuse_grace`, for example after a lost response; it gets a new pair
    (03, `refresh_tokens`).
-5. `jti`-Speicher, Zeitfenster für `iat` und Algorithmen legt Kapitel 08 fest.
+5. Chapter 08 sets the `jti` store, the time window for `iat` and the algorithms.
 
-### 3.2 Anmeldeabläufe
+### 3.2 Login flows
 
-Jede Anmeldeart hat eigene Endpunkte statt eines Endpunkts mit Union-Körper; das hält die
-Schemas frei von `oneOf` und die Fehlerbilder getrennt (R-API-12).
+Every login method has its own endpoints instead of one endpoint with a union body; this keeps the
+schemas free of `oneOf` and the error patterns separate (R-API-12).
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant App as App (Alex)
     participant API as Server
-    participant IdP as OIDC-Anbieter
-    App->>App: Geräteschlüssel und client_verifier erzeugen
+    participant IdP as OIDC provider
+    App->>App: Generate device keys and client_verifier
     App->>API: POST /auth/oidc/begin (provider_id, app_redirect_uri, client_challenge)
     API-->>App: authorization_url, login_attempt_id
-    App->>IdP: System-Browser öffnet authorization_url
+    App->>IdP: System browser opens authorization_url
     IdP->>API: GET /auth/oidc/callback (code, state)
-    API->>IdP: Code tauschen (Client-Secret aus dem Secret-Provider)
-    API-->>App: Redirect auf app_redirect_uri mit login_code
+    API->>IdP: Exchange code (client secret from the secret provider)
+    API-->>App: Redirect to app_redirect_uri with login_code
     App->>API: POST /auth/oidc/complete (login_code, client_verifier, device) + DPoP
-    API->>API: Identität zuordnen, Gerät pending oder active, Sitzung anlegen
+    API->>API: Map identity, device pending or active, create session
     API-->>App: 201 TokenResponse (token_type DPoP, device.state)
-    opt Gerät wartet auf Freigabe
+    opt Device waits for approval
         App->>API: GET /devices/{device_id}
-        Note over App,API: Freigabe von einem aktiven eigenen Gerät oder durch einen Owner
+        Note over App,API: Approval from an own active device or by an owner
     end
 ```
 
-1. **OIDC.** Der Server ist der vertrauliche Client beim Anbieter. Die App öffnet den
-   System-Browser; `app_redirect_uri` ist ein eigenes URI-Schema, eine beanspruchte
-   `https`-Adresse oder Loopback (RFC 8252 [belegt, Q12]). Nach dem Rückruf leitet der Server
-   mit einem einmaligen `login_code` (gültig `auth.server_code_ttl`) auf `app_redirect_uri` um.
-   Nur wer den passenden `client_verifier` zur `client_challenge` hat, kann ihn einlösen; ein
-   fremdes Programm, das die Umleitung abfängt, kann es nicht. Der Versuch gilt
-   `auth.login_flow_ttl` ([08-identitaet.md](08-identitaet.md)).
-2. **Proxy-Header.** `POST /auth/trusted-header/login` liest die Identität aus der Kopfzeile des
-   Proxys. Der Endpunkt antwortet `404`, wenn kein Treiber `trusted_header` aktiv ist oder der
-   Server nicht nur auf Loopback lauscht (B9).
-3. **Lokale Konten.** Der Owner legt den Menschen an (`createUser` mit `local_account`) und
-   bekommt einmalig einen Einladungs-Code (gültig `auth.enrollment_code_ttl`). Damit löst der
-   Mensch sein erstes Gerät ein: nur mit den Geräteschlüsseln (`/auth/enroll/redeem`) oder
-   zusammen mit einem Passkey (`/auth/enroll/begin`, `/auth/enroll/complete`). Danach meldet er
-   sich mit Passkey an (`/auth/passkey/...`), koppelt weitere Geräte (`/auth/pairing/...`) oder,
-   solange `auth.local_password_enabled` gilt, nutzt Passwort plus TOTP (`/auth/password/login`).
-   Grund für den Rückfall: native Apple-Apps brauchen für Passkeys eine öffentlich erreichbare
-   Associated Domain (Baseline R-Passkeys).
-4. **Warten auf Freigabe.** Ein neues Gerät bekommt Tokens, ist aber `pending`; dasselbe gilt für
-   einen bereitgestellten Menschen im Zustand `pending` ([08-identitaet.md](08-identitaet.md),
-   Abschnitt 3.1). Alle Aktionen außer `self.read`, `device.list` für das eigene Gerät,
-   `auth.token.refresh` und `auth.logout` antworten `403 device_pending`. Das Gateway lehnt
-   `identify` ab (04, 6.3).
+1. **OIDC.** The server is the confidential client at the provider. The app opens the
+   system browser; `app_redirect_uri` is a custom URI scheme, a claimed
+   `https` address or loopback (RFC 8252 [verified, Q12]). After the callback the server redirects
+   to `app_redirect_uri` with a one-time `login_code` (valid for `auth.server_code_ttl`).
+   Only whoever has the matching `client_verifier` for the `client_challenge` can redeem it; a
+   foreign program that intercepts the redirect cannot. The attempt is valid for
+   `auth.login_flow_ttl` ([08-identity.md](08-identity.md)).
+2. **Proxy header.** `POST /auth/trusted-header/login` reads the identity from the header of the
+   proxy. The endpoint answers `404` if no driver `trusted_header` is active or the
+   server does not listen only on loopback (B9).
+3. **Local accounts.** The owner creates the person (`createUser` with `local_account`) and
+   gets a one-time enrollment code (valid for `auth.enrollment_code_ttl`). With it the
+   person redeems their first device: with the device keys only (`/auth/enroll/redeem`) or
+   together with a passkey (`/auth/enroll/begin`, `/auth/enroll/complete`). After that they log
+   in with a passkey (`/auth/passkey/...`), pair further devices (`/auth/pairing/...`) or,
+   as long as `auth.local_password_enabled` holds, use password plus TOTP (`/auth/password/login`).
+   Reason for the fallback: native Apple apps need a publicly reachable
+   Associated Domain for passkeys (Baseline R-Passkeys).
+4. **Waiting for approval.** A new device gets tokens but is `pending`; the same applies to
+   a provisioned person in the state `pending` ([08-identity.md](08-identity.md),
+   section 3.1). All actions except `self.read`, `device.list` for the own device,
+   `auth.token.refresh` and `auth.logout` answer `403 device_pending`. The gateway rejects
+   `identify` (04, 6.3).
 
 ### 3.3 Step-up
 
-Aktionen mit Step-up (05, Spalte "Step-up") antworten ohne frische Bestätigung `401
-step_up_required`. Der Client holt `POST /auth/step-up/challenge`, lässt den Menschen mit Passkey
-oder Geräteschlüssel bestätigen (`/auth/step-up/passkey` oder `/auth/step-up/device-key`) und
-wiederholt die ursprüngliche Anfrage mit demselben `Idempotency-Key`. Die Bestätigung gilt für die
-Sitzung `auth.step_up_max_age` (03). Agenten- und App-Tokens bekommen bei solchen Aktionen
-`403 forbidden` (R-AZ-03).
+Without a fresh confirmation, actions with step-up (05, column "Step-up") answer `401
+step_up_required`. The client fetches `POST /auth/step-up/challenge`, lets the person confirm with
+a passkey or device key (`/auth/step-up/passkey` or `/auth/step-up/device-key`) and
+repeats the original request with the same `Idempotency-Key`. The confirmation is valid for the
+session for `auth.step_up_max_age` (03). Agent and app tokens get `403 forbidden` for such
+actions (R-AZ-03).
 
-## 4. Autorisierung in der API
+## 4. Authorization in the API
 
-1. Jede Operation trägt `x-authz-action` mit genau einer Aktion aus 05 und `x-rate-limit-class`
-   mit deren Klasse. Lint-Regeln: `rule/authz-action-required`, `rule/authz-action-known`,
+1. Every operation carries `x-authz-action` with exactly one action from 05 and `x-rate-limit-class`
+   with its class. Lint rules: `rule/authz-action-required`, `rule/authz-action-known`,
    `rule/rate-limit-class-required`, `rule/rate-limit-class-known` (docs/api/redocly.yaml).
-2. Listen-Endpunkte prüfen die Aktion gegen den Container (Kanal, Bereich, Instanz) und filtern
-   in der Abfrage (P2). Sie liefern keine Gesamtzahlen.
-3. Kein Leserecht ergibt `404 not_found`, gleich ob es die Ressource gibt (R-AZ-01). Leserecht ohne
-   nötige Stufe oder Zusatzrecht ergibt `403 forbidden`.
-4. Apps: Sichtbarkeit folgt der Freigabe. Hat eine App eine Freigabe auf den Kanal, antwortet die
-   API bei fehlendem Scope (lesend oder schreibend) mit `403 scope_missing`; ohne Freigabe ist der
-   Kanal unsichtbar (`404`). Grund: Die App kennt den Kanal aus ihrer Freigabe; ein `404` würde nur
-   die Fehlersuche erschweren ([07-rechte.md](07-rechte.md), Abschnitt 2.10).
-5. Invarianten: I1-Verletzung ergibt `409 i1_violation` mit `hint`; der letzte Owner ergibt
-   `409 last_owner`; I3 beim Start eines Laufs `409 billing_mode_mismatch`, eine zu hohe
-   Werkzeugklasse (`tool_class_used` im Körper von `startRun` und `resumeRun` über `tool_class`
-   der Marke) `409 tool_class_mismatch`. Ein schreibgeschützter Kanal ergibt
-   `403 channel_read_only`, ein wartendes Gerät `403 device_pending`, der Wartungsmodus
-   `503 maintenance` mit `Retry-After` für Aktionen mit Wirkung `write` außer den Ausnahmen aus
-   [ADR 0065](../adr/0065-wartungsmodus-read-only.md) (05, Regeln 1.8 und 1.9, Abschnitt 2.7).
-6. Agenten-Auslösung: Eine Nachricht wird gespeichert, auch wenn `agent.invoke` ablehnt; dann gilt
-   `trigger_state = failed` mit `trigger_state_reason` (05, Abschnitt 5). Befehle und
-   Interaktionen ohne Auslöserecht antworten `403 agent_invocation_denied` mit `reason`.
-7. Aktionen ohne eigene REST-Route: `agent.invoke` und `run.followup.create` (geprüft in
+2. List endpoints check the action against the container (channel, space, instance) and filter
+   in the query (P2). They return no totals.
+3. No read permission gives `404 not_found`, whether or not the resource exists (R-AZ-01). Read
+   permission without the required level or capability gives `403 forbidden`.
+4. Apps: visibility follows the grant. If an app has a grant on the channel, the API answers a
+   missing scope (reading or writing) with `403 scope_missing`; without a grant the channel is
+   invisible (`404`). Reason: the app knows the channel from its grant; a `404` would only make
+   debugging harder ([07-permissions.md](07-permissions.md), section 2.10).
+5. Invariants: an I1 violation gives `409 i1_violation` with `hint`; the last owner gives
+   `409 last_owner`; I3 at the start of a run gives `409 billing_mode_mismatch`, a tool class that is
+   too high (`tool_class_used` in the body of `startRun` and `resumeRun` above `tool_class`
+   of the invocation token) `409 tool_class_mismatch`. A read-only channel gives
+   `403 channel_read_only`, a waiting device `403 device_pending`, maintenance mode
+   `503 maintenance` with `Retry-After` for actions with effect `write`, except the exceptions from
+   [ADR 0065](../adr/0065-maintenance-mode-read-only.md) (05, rules 1.8 and 1.9, section 2.7).
+6. Agent triggering: a message is stored even if `agent.invoke` denies; then
+   `trigger_state = failed` with `trigger_state_reason` applies (05, section 5). Commands and
+   interactions without trigger permission answer `403 agent_invocation_denied` with `reason`.
+7. Actions without their own REST route: `agent.invoke` and `run.followup.create` (checked in
    `createMessage`, `createInteraction`, `invokeCommand`), `gateway.connect`, `gateway.focus`,
-   `typing.start` (Gateway), `push.deliver` (intern und kurzlebiges `notification.created`),
-   `webhook_out.deliver` (an jedem Eintrag in `webhooks:`), die Systemaktionen
-   `instance.bootstrap` (Befehl `bothy setup bootstrap-owner`), `owner.recover` (Befehl `bothy
+   `typing.start` (gateway), `push.deliver` (internal and ephemeral `notification.created`),
+   `webhook_out.deliver` (on every entry in `webhooks:`), the system actions
+   `instance.bootstrap` (command `bothy setup bootstrap-owner`), `owner.recover` (command `bothy
    setup issue-enrollment-code`), `grant.expire`, `group.member.expire`, `signing_key.transition`
-   und `device.expire` (Jobs), `group.member.sync` (Abgleich bei der OIDC-Anmeldung) sowie
-   `dev_environment.*` (Routen entstehen mit der Etappe Dev-Umgebung, 05 Abschnitt 4.13).
+   and `device.expire` (jobs), `group.member.sync` (reconciliation at OIDC login) as well as
+   `dev_environment.*` (routes come with the dev environment milestone, 05 section 4.13).
 
-## 5. Fehler
+## 5. Errors
 
-1. Jeder Fehler ist `application/problem+json` nach RFC 9457 [belegt, Q2] mit `type`, `title`,
-   `status`, `code`, `correlation_id`, optional `detail` und `instance`. `instance` ist der Pfad
-   der Anfrage ohne Query; Pfad-Parameter, die ein Geheimnis tragen (heute nur `{token}` von
-   `postIncomingWebhook`), erscheinen als Platzhalter, wie in Logs ([19-sicherheit.md](19-sicherheit.md),
+1. Every error is `application/problem+json` per RFC 9457 [verified, Q2] with `type`, `title`,
+   `status`, `code`, `correlation_id`, optionally `detail` and `instance`. `instance` is the path
+   of the request without query; path parameters that carry a secret (today only `{token}` of
+   `postIncomingWebhook`) appear as placeholders, as in logs ([19-security.md](19-security.md),
    SEC-LOG-3).
-2. `type` ist ein relativer URI mit vollem Pfad `/api/v1/problems/{code}`. RFC 9457 empfiehlt
-   absolute URIs "when possible" und erlaubt relative mit vollem Pfad [belegt, Q2]. Eine
-   selbst gehostete Software hat keinen gemeinsamen Host; jede Instanz liefert die Beschreibung
-   unter genau diesem Pfad (`getProblemType`). Clients vergleichen `type` als Zeichenkette oder
-   `code`. Eine spätere Umstellung auf absolute URIs wäre ein Bruch und kommt nur mit `v2`.
-3. Erweiterungen: `errors[]` bei `validation_failed` mit `pointer` (JSON Pointer in den Körper,
-   `#path/<name>`, `#query/<name>` oder `#header/<name>` für Parameter, leer für eine Regel der
-   ganzen Anfrage), `code` (z. B. `required`, `too_long`, `limit_reached` für eine erreichte
-   Mengen-Grenze, `not_enabled` für ein Feld, dessen Funktion diese Server-Version noch nicht baut)
-   und `detail`; `current` bei `version_conflict` und `base_version_conflict`;
-   `reason` und `hint` bei Ablehnungen, Invarianten und Konflikten mit benanntem Grund (z. B.
-   `one_time_secret`, Abschnitt 7). `detail` enthält nie Inhalte, Geheimnisse oder interne Pfade.
-4. `400` steht für Schema- und Regelverstöße. `422` gibt es nur für `idempotency_key_reuse` (04,
-   5.1). `409` für Zustandskonflikte, `412` für `If-Match`.
-5. Eine per Schalter ausgeschaltete Funktion antwortet angemeldeten Prinzipalen mit `403
-   feature_disabled`, damit die Oberfläche den Grund zeigen kann. Öffentliche Endpunkte
-   (Passwort-Anmeldung, Proxy-Header, öffentliche Statusseite) antworten `404`, damit sie die
-   Konfiguration nicht verraten.
-6. Das Gateway nutzt dieselben Codes im Rahmen `error`.
-7. Die Liste der Codes ist geschlossen. Kapitel, Briefs und Plan nennen einen Fehler als Status
-   mit einem Code aus `x-problem-codes` (z. B. `409 conflict`). Einen feineren Grund trägt
-   `reason` (bei Ablehnungen durch `authorize` der Grund-Code aus
-   [07-rechte.md](07-rechte.md), Abschnitt 4.1, sonst der Grund, den das Kapitel nennt) oder
-   `errors[].code` bei `400 validation_failed`. Ein neuer Code entsteht nur in
-   `x-problem-codes` und an den Operationen, die ihn liefern. Der Check
-   `tools/docs/problem_code_refs.py` in `make docs` prüft jedes Paar aus Status und Code in den
-   Markdown-Dateien und den API-Dateien gegen diese Liste. Andere Satzformen (etwa "`409` mit
-   Code ...") sieht er nicht; sie sind in Kapiteln zu vermeiden.
+2. `type` is a relative URI with the full path `/api/v1/problems/{code}`. RFC 9457 recommends
+   absolute URIs "when possible" and allows relative ones with a full path [verified, Q2]. A
+   self-hosted software has no common host; every instance serves the description
+   at exactly this path (`getProblemType`). Clients compare `type` as a string, or
+   `code`. A later switch to absolute URIs would be a breaking change and comes only with `v2`.
+3. Extensions: `errors[]` for `validation_failed` with `pointer` (JSON Pointer into the body,
+   `#path/<name>`, `#query/<name>` or `#header/<name>` for parameters, empty for a rule of the
+   whole request), `code` (for example `required`, `too_long`, `limit_reached` for a reached
+   quantity limit, `not_enabled` for a field whose function this server version does not build yet)
+   and `detail`; `current` for `version_conflict` and `base_version_conflict`;
+   `reason` and `hint` for denials, invariants and conflicts with a named reason (for example
+   `one_time_secret`, section 7). `detail` never contains content, secrets or internal paths.
+4. `400` stands for schema and rule violations. `422` exists only for `idempotency_key_reuse` (04,
+   5.1). `409` for state conflicts, `412` for `If-Match`.
+5. A feature switched off by a switch answers logged-in principals with `403
+   feature_disabled`, so that the interface can show the reason. Public endpoints
+   (password login, proxy header, public status page) answer `404`, so that they do not reveal the
+   configuration.
+6. The gateway uses the same codes in the frame `error`.
+7. The list of codes is closed. Chapters, briefs and the plan name an error as a status
+   with a code from `x-problem-codes` (for example `409 conflict`). A finer reason is carried by
+   `reason` (for denials by `authorize` the reason code from
+   [07-permissions.md](07-permissions.md), section 4.1, otherwise the reason the chapter names) or by
+   `errors[].code` for `400 validation_failed`. A new code comes into being only in
+   `x-problem-codes` and on the operations that return it. The check
+   `tools/docs/problem_code_refs.py` in `make docs` checks every pair of status and code in the
+   Markdown files and the API files against this list. It does not see other sentence forms (such
+   as "`409` with code ..."); chapters are to avoid them.
 
-Bekannte Codes: Quelle ist `x-problem-codes` am Schema `Problem` in openapi.yaml, Englisch wie
-alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Status in `x-status`
-(R-API-23). Die Tabelle wird daraus erzeugt (Abschnitt 15, G3).
+Known codes: the source is `x-problem-codes` on the schema `Problem` in openapi.yaml, in English like
+all texts of the YAML files (R-API-15); every response component names its status in `x-status`
+(R-API-23). The table is generated from it (section 15, G3).
 
 <!-- BEGIN GENERATED: problems -->
-| Code | Status | Bedeutung (aus openapi.yaml) | Client-Reaktion (aus openapi.yaml) |
+| Code | Status | Meaning (from openapi.yaml) | Client reaction (from openapi.yaml) |
 |---|---|---|---|
 | `validation_failed` | 400 | The request violates the schema or a rule; `errors[]` names the fields. | Correct the input; do not retry. |
 | `malformed_request` | 400 | The body is not valid JSON, has a duplicate member name, invalid UTF-8 or nesting deeper than `http.max_json_depth` (SEC-IN-2). | Programming error; do not retry. |
@@ -259,7 +259,7 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `channel_read_only` | 403 | The channel is read-only (05 rule 1.8) or archived (`reason: channel_archived`, 07 section 4.5); applies to owners too. | Lock the input and show a note; do not retry. |
 | `feature_disabled` | 403 | The feature is switched off (for example personal tokens). | Do not retry. |
 | `agent_invocation_denied` | 403 | `agent.invoke` denies; `reason` for example `billing_mode_personal_not_holder`, `project_not_ready`. | Show the reason; do not retry. |
-| `terminal_denied` | 403 | The `terminal` right exists, but a guard rule or limit blocks; `reason` is `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `no_session_user` (no own session user on the host, SR12), `session_limit` or `profile_unknown` (24 section 13). | Show the reason; do not retry. |
+| `terminal_denied` | 403 | The `terminal` capability exists, but a guard rule or limit blocks; `reason` is `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `no_session_user` (no own session user on the host, SR12), `session_limit` or `profile_unknown` (24 section 13). | Show the reason; do not retry. |
 | `invocation_token_invalid` | 403 | The invocation token is not accepted by `startRun`, `resumeRun` or `renewInvocationToken`; `reason` is `expired` (valid and current, only `exp` passed), `superseded` (valid, but no longer current: a newer delivery or renewal replaced its `jti`, or a start consumed it while the run waits for input) or `invalid` (signature, `kid`, `typ`, audience or run wrong). | `expired`: renew the token (`renewInvocationToken`) and start again. `superseded`: start nothing, keep the run; start with the newer token of the redelivery or, for a waiting run, of the answer. `invalid`: start nothing and report the run as `failed` with `invalid_invocation_token`. |
 | `not_found` | 404 | The resource does not exist or is not visible; both answer the same (R-AZ-01). | Mark the outbox entry as failed. |
 | `method_not_allowed` | 405 | The method is not defined on this path. | Programming error. |
@@ -285,7 +285,7 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `gone` | 410 | The object has expired (upload, export package, autocomplete). | Start again. |
 | `version_conflict` | 412 | `If-Match` does not match; `current` holds the current version. | Show both versions; a person decides. |
 | `payload_too_large` | 413 | Body or file above the limit; `detail` names the configuration value. | Do not retry. |
-| `unsupported_media_type` | 415 | The media type is not allowed; `reason` `file_type_denied` when the operator blocks the type (`file.denied_mime_types`, 12 section 6). | Do not retry. |
+| `unsupported_media_type` | 415 | The media type is not allowed; `reason` `file_type_denied` when the instance operator blocks the type (`file.denied_mime_types`, 12 section 6). | Do not retry. |
 | `range_not_satisfiable` | 416 | `Range` lies outside the file. | Load without `Range`. |
 | `idempotency_key_reuse` | 422 | The same client ID or `Idempotency-Key` with different content. | Create a new ID only when the person sends again. |
 | `precondition_required` | 428 | `If-Match` is missing. | Programming error. |
@@ -296,340 +296,340 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `setup_required` | 503 | The instance is not set up yet; only discovery answers (08 section 4). | The owner sets up the instance on the host; there is no `Retry-After`. |
 <!-- END GENERATED: problems -->
 
-## 6. Paginierung
+## 6. Pagination
 
-1. Listen mit offener Menge sind cursor-basiert: Anfrage mit `cursor` und `limit`, Antwort
-   `{items, next_cursor}`. Fehlt `next_cursor`, ist das die letzte Seite.
-2. Der Cursor ist undurchsichtig, an Filter und Sortierung gebunden und stabil gegen neue Zeilen
-   (Keyset über Sortierschlüssel und ID). Ein fremder oder veralteter Cursor ergibt `400
-   cursor_invalid`. Alle Listen nutzen einen Codec in `platform/httpserver` (PLAN M1-18).
-3. `limit` hat den Standard `api.page_size_default`; größere Werte als `api.page_size_max` werden
-   gekappt, nicht abgelehnt.
-4. Keine Gesamtzahlen. Sie kosten eine zweite Abfrage und verraten über Rechtefilter hinweg
-   Mengen.
-5. Sonderfälle mit öffentlichen Nummern: Verlauf eines Threads über `before_seq`, `after_seq`,
-   `around_seq` (Thread-Sequenz, Lücken erkennbar, 04 Abschnitt 4); Ereignisse über `after`
-   (globale Sequenz, 04 Abschnitt 7.4); Agenten-Verbraucher ab `acked_seq + 1`. Im Verlauf gilt
-   mit `L` = Seitengröße: ohne Parameter die `L` neuesten Nachrichten; `before_seq = X` die `L`
-   höchsten unter `X`; `after_seq = X` die `L` niedrigsten über `X`; `around_seq = X` höchstens
-   `(L - 1) / 2` (ganzzahlig) unter `X` und den Rest ab `X`, wobei eine kurze Seite ihren Anteil an
-   die andere abgibt. Einträge stehen immer aufsteigend und lückenlos; `has_more_before` und
-   `has_more_after` sagen, ob es davor bzw. danach weitere gibt, und stammen aus derselben Abfrage
-   wie die Einträge. In Listen kürzt der Server `content_md` über
-   `message.list_content_max_bytes` (`content_truncated: true`); `getMessage` liefert den ganzen
-   Inhalt. Grund: Eine Seite bleibt so unter `api.page_size_max` mal diesem Wert statt mal
+1. Lists with an open-ended set are cursor-based: request with `cursor` and `limit`, response
+   `{items, next_cursor}`. If `next_cursor` is missing, this is the last page.
+2. The cursor is opaque, bound to filters and sorting, and stable against new rows
+   (keyset over the sort key and ID). A foreign or outdated cursor gives `400
+   cursor_invalid`. All lists use one codec in `platform/httpserver` (PLAN M1-18).
+3. `limit` has the default `api.page_size_default`; values larger than `api.page_size_max` are
+   capped, not rejected.
+4. No totals. They cost a second query and reveal quantities across permission
+   filters.
+5. Special cases with public numbers: the history of a thread through `before_seq`, `after_seq`,
+   `around_seq` (thread sequence, gaps detectable, 04 section 4); events through `after`
+   (global sequence, 04 section 7.4); agent consumers from `acked_seq + 1`. In the history, with
+   `L` = page size: without parameters the `L` newest messages; `before_seq = X` the `L`
+   highest below `X`; `after_seq = X` the `L` lowest above `X`; `around_seq = X` at most
+   `(L - 1) / 2` (integer division) below `X` and the rest from `X` on, where a short page hands its
+   share to the other. Entries are always ascending and without gaps; `has_more_before` and
+   `has_more_after` say whether there are more before or after, respectively, and come from the
+   same query as the entries. In lists the server truncates `content_md` at
+   `message.list_content_max_bytes` (`content_truncated: true`); `getMessage` returns the whole
+   content. Reason: a page thus stays below `api.page_size_max` times this value instead of times
    `message.max_content_bytes`.
-6. Ohne Paginierung bleiben nur Listen, deren Menge klein ist (Bereiche, Kanäle eines Bereichs,
-   Tags, Einstellungen, Owner, Gruppenliste einer Person). Wächst eine davon, kommt ein neuer,
-   paginierter Endpunkt; die alte Antwortform bleibt (Abschnitt 13).
+6. Only lists whose set is small stay without pagination (spaces, channels of a space,
+   tags, settings, owners, group list of a person). If one of them grows, a new,
+   paginated endpoint comes; the old response shape stays (section 13).
 
-## 7. Idempotenz
+## 7. Idempotency
 
-| Fall | Mechanismus | Antwort bei Wiederholung |
+| Case | Mechanism | Response on repetition |
 |---|---|---|
-| Nachricht senden | `client_msg_id` im Körper, eindeutig je Autor (04, 5.1) | `200` mit Original und `Idempotent-Replay: true`; anderer Inhalt `422 idempotency_key_reuse` |
-| Interaktion | `client_interaction_id` im Körper | wie oben |
-| Eingangs-Webhook | optional `client_msg_id` im Körper | wie oben |
-| andere POST und PATCH | Kopfzeile `Idempotency-Key` (UUIDv7, 04 5.2) | gespeicherte Antwort mit `Idempotent-Replay: true`; anderer Inhalt `422`; erste Anfrage läuft noch `409 request_in_progress` |
-| PUT und DELETE | idempotent nach HTTP-Semantik | gleiche Wirkung; DELETE einer schon gelöschten Ressource `204`, einer nie sichtbaren `404`; Ressourcen ohne Löschmarke (z. B. Anmelde-Treiber) antworten nach dem Löschen `404`, weil der Server sie von nie vorhandenen nicht unterscheidet |
-| POST mit einmaligem Geheimnis in der Antwort (Einladungs-Code, API-Token, später Webhook-Geheimnisse) | Kopfzeile `Idempotency-Key` | gespeichert wird die Antwort ohne das Geheimnis; die Wiederholung antwortet `409 conflict` mit `reason: one_time_secret`. Der Client legt neu an: Ein neuer Einladungs-Code beendet den alten (08, Abschnitt 3.2), ein API-Token ohne bekanntes Geheimnis widerruft der Owner in der Liste |
+| Send a message | `client_msg_id` in the body, unique per author (04, 5.1) | `200` with the original and `Idempotent-Replay: true`; different content `422 idempotency_key_reuse` |
+| Interaction | `client_interaction_id` in the body | as above |
+| Incoming webhook | optional `client_msg_id` in the body | as above |
+| other POST and PATCH | header `Idempotency-Key` (UUIDv7, 04 5.2) | stored response with `Idempotent-Replay: true`; different content `422`; first request still running `409 request_in_progress` |
+| PUT and DELETE | idempotent by HTTP semantics | same effect; DELETE of an already deleted resource `204`, of a never visible one `404`; resources without a tombstone (for example login drivers) answer `404` after deletion, because the server cannot tell them apart from resources that never existed |
+| POST with a one-time secret in the response (enrollment code, API token, later webhook secrets) | header `Idempotency-Key` | the response is stored without the secret; the repetition answers `409 conflict` with `reason: one_time_secret`. The client creates a new one: a new enrollment code ends the old one (08, section 3.2), an API token without a known secret is revoked by the owner in the list |
 
-1. Der Schlüssel gilt je Prinzipal für `sync.idempotency_key_ttl`. Clients setzen ihn bei jedem
-   Eintrag im Ausgangsfach (04, 13.2). Name und Verhalten folgen dem verbreiteten Muster aus
-   draft-ietf-httpapi-idempotency-key-header; der Entwurf -07 ist abgelaufen, kein RFC
-   [belegt, Q10]. Maßgeblich ist darum 04, Abschnitt 5.2.
-2. Gespeichert werden nur endgültige Antworten: `2xx`, `400`, `403`, `404`, `409` (außer
-   `request_in_progress`), `410`, `412`, `413`, `415`, `422`. Nicht gespeichert werden `401`,
-   `429` und `5xx`. Darum klappt die Wiederholung nach Step-up, nach Token-Erneuerung und nach
-   einer Drosselung mit demselben Schlüssel.
-3. Ohne `Idempotency-Key` bleiben genau die POST- und PATCH-Operationen mit
-   `x-idempotency-exempt` in openapi.yaml; der Grund steht als Code daran (R-API-24): `auth_flow`
-   (Challenges und Codes gelten einmal, Refresh rotiert, `logout` und eine neue Kind-Sitzung
-   wirken wiederholt gleich), `read_only` (`createFileTicket` erzeugt nur ein weiteres kurzlebiges
-   Ticket, 12 Abschnitt 9.2), `agent_runtime` (monoton, Compare-and-swap bzw. `base_version`, die
-   erste Antwort je Anfrage gilt), `client_id` (Tabelle oben), `origin_key` (Herkunftsschlüssel je
-   Objekt) und `telemetry` (ein Doppel ist für Telemetrie unerheblich). Das Gate prüft die Liste
-   (Abschnitt 15, G2):
+1. The key is valid per principal for `sync.idempotency_key_ttl`. Clients set it on every
+   entry in the outbox (04, 13.2). Name and behavior follow the common pattern of
+   draft-ietf-httpapi-idempotency-key-header; draft -07 has expired, there is no RFC
+   [verified, Q10]. 04, section 5.2 is therefore authoritative.
+2. Only final responses are stored: `2xx`, `400`, `403`, `404`, `409` (except
+   `request_in_progress`), `410`, `412`, `413`, `415`, `422`. `401`, `429` and `5xx` are not
+   stored. That is why the repetition with the same key works after step-up, after token renewal
+   and after throttling.
+3. Exactly the POST and PATCH operations with `x-idempotency-exempt` in openapi.yaml stay without
+   `Idempotency-Key`; the reason is attached to them as a code (R-API-24): `auth_flow`
+   (challenges and codes are valid once, refresh rotates, `logout` and a new child session have
+   the same effect when repeated), `read_only` (`createFileTicket` only creates another short-lived
+   ticket, 12 section 9.2), `agent_runtime` (monotonic, compare-and-swap or `base_version`, the
+   first response per request counts), `client_id` (table above), `origin_key` (origin key per
+   object) and `telemetry` (a duplicate does not matter for telemetry). The gate checks the list
+   (section 15, G2):
 
 <!-- BEGIN GENERATED: idempotency_exempt -->
-| operationId | Methode | Pfad | Grund |
+| operationId | Method | Path | Reason |
 |---|---|---|---|
-| `beginOidcLogin` | POST | `/api/v1/auth/oidc/begin` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `completeOidcLogin` | POST | `/api/v1/auth/oidc/complete` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `loginWithTrustedHeader` | POST | `/api/v1/auth/trusted-header/login` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `beginPasskeyLogin` | POST | `/api/v1/auth/passkey/begin` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `completePasskeyLogin` | POST | `/api/v1/auth/passkey/complete` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `beginEnrollment` | POST | `/api/v1/auth/enroll/begin` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `completeEnrollment` | POST | `/api/v1/auth/enroll/complete` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `redeemEnrollmentCode` | POST | `/api/v1/auth/enroll/redeem` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `beginPairing` | POST | `/api/v1/auth/pairing/begin` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `completePairing` | POST | `/api/v1/auth/pairing/complete` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `loginWithPassword` | POST | `/api/v1/auth/password/login` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `refreshToken` | POST | `/api/v1/auth/token/refresh` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `logout` | POST | `/api/v1/auth/logout` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `createStepUpChallenge` | POST | `/api/v1/auth/step-up/challenge` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `completeStepUpWithPasskey` | POST | `/api/v1/auth/step-up/passkey` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `completeStepUpWithDeviceKey` | POST | `/api/v1/auth/step-up/device-key` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `beginIdentityLink` | POST | `/api/v1/me/identities/begin` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `completeIdentityLink` | POST | `/api/v1/me/identities/complete` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `beginPasskeyRegistration` | POST | `/api/v1/me/passkeys/begin` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `completePasskeyRegistration` | POST | `/api/v1/me/passkeys/complete` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `createExtensionSession` | POST | `/api/v1/me/sessions/extensions` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
-| `previewGrant` | POST | `/api/v1/grants/preview` | liest nur, ändert keinen dauerhaften Zustand |
-| `createFileTicket` | POST | `/api/v1/files/{file_id}/tickets` | liest nur, ändert keinen dauerhaften Zustand |
-| `autocompleteCommand` | POST | `/api/v1/channels/{channel_id}/commands/{command_id}/autocomplete` | liest nur, ändert keinen dauerhaften Zustand |
-| `validateManifest` | POST | `/api/v1/app-manifests/validate` | liest nur, ändert keinen dauerhaften Zustand |
-| `verifyAuditChain` | POST | `/api/v1/audit/verify` | liest nur, ändert keinen dauerhaften Zustand |
-| `sendHeartbeat` | POST | `/api/v1/agents/me/heartbeat` | Agenten-Laufzeit: monoton oder Compare-and-swap |
-| `ackAgentEvents` | POST | `/api/v1/agents/me/consumers/{consumer}/ack` | Agenten-Laufzeit: monoton oder Compare-and-swap |
-| `patchRun` | PATCH | `/api/v1/runs/{run_id}` | Agenten-Laufzeit: monoton oder Compare-and-swap |
-| `startRun` | POST | `/api/v1/runs/{run_id}/start` | Agenten-Laufzeit: monoton oder Compare-and-swap |
-| `resumeRun` | POST | `/api/v1/runs/{run_id}/resume` | Agenten-Laufzeit: monoton oder Compare-and-swap |
-| `awaitRunInput` | POST | `/api/v1/runs/{run_id}/await-input` | Agenten-Laufzeit: monoton oder Compare-and-swap |
-| `finishRun` | POST | `/api/v1/runs/{run_id}/finish` | Agenten-Laufzeit: monoton oder Compare-and-swap |
-| `answerAutocomplete` | POST | `/api/v1/command-autocompletions/{request_id}/answer` | Agenten-Laufzeit: monoton oder Compare-and-swap |
-| `postIncomingWebhook` | POST | `/api/v1/hooks/{webhook_id}/{token}` | Client-ID im Körper (Tabelle oben) |
-| `createMessage` | POST | `/api/v1/threads/{thread_id}/messages` | Client-ID im Körper (Tabelle oben) |
-| `createInteraction` | POST | `/api/v1/components/{component_id}/interactions` | Client-ID im Körper (Tabelle oben) |
-| `applyImportBatch` | POST | `/api/v1/imports/{import_id}/batches` | Herkunftsschlüssel des Imports ([22-import-migration.md](22-import-migration.md)) |
-| `createImportFile` | POST | `/api/v1/imports/{import_id}/files` | Herkunftsschlüssel des Imports ([22-import-migration.md](22-import-migration.md)) |
-| `submitClientMetrics` | POST | `/api/v1/client-metrics` | anonyme Messwerte; eine Wiederholung zählt eine Stichprobe doppelt |
+| `beginOidcLogin` | POST | `/api/v1/auth/oidc/begin` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `completeOidcLogin` | POST | `/api/v1/auth/oidc/complete` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `loginWithTrustedHeader` | POST | `/api/v1/auth/trusted-header/login` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `beginPasskeyLogin` | POST | `/api/v1/auth/passkey/begin` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `completePasskeyLogin` | POST | `/api/v1/auth/passkey/complete` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `beginEnrollment` | POST | `/api/v1/auth/enroll/begin` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `completeEnrollment` | POST | `/api/v1/auth/enroll/complete` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `redeemEnrollmentCode` | POST | `/api/v1/auth/enroll/redeem` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `beginPairing` | POST | `/api/v1/auth/pairing/begin` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `completePairing` | POST | `/api/v1/auth/pairing/complete` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `loginWithPassword` | POST | `/api/v1/auth/password/login` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `refreshToken` | POST | `/api/v1/auth/token/refresh` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `logout` | POST | `/api/v1/auth/logout` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `createStepUpChallenge` | POST | `/api/v1/auth/step-up/challenge` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `completeStepUpWithPasskey` | POST | `/api/v1/auth/step-up/passkey` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `completeStepUpWithDeviceKey` | POST | `/api/v1/auth/step-up/device-key` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `beginIdentityLink` | POST | `/api/v1/me/identities/begin` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `completeIdentityLink` | POST | `/api/v1/me/identities/complete` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `beginPasskeyRegistration` | POST | `/api/v1/me/passkeys/begin` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `completePasskeyRegistration` | POST | `/api/v1/me/passkeys/complete` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `createExtensionSession` | POST | `/api/v1/me/sessions/extensions` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `previewGrant` | POST | `/api/v1/grants/preview` | reads only, changes no durable state |
+| `createFileTicket` | POST | `/api/v1/files/{file_id}/tickets` | reads only, changes no durable state |
+| `autocompleteCommand` | POST | `/api/v1/channels/{channel_id}/commands/{command_id}/autocomplete` | reads only, changes no durable state |
+| `validateManifest` | POST | `/api/v1/app-manifests/validate` | reads only, changes no durable state |
+| `verifyAuditChain` | POST | `/api/v1/audit/verify` | reads only, changes no durable state |
+| `sendHeartbeat` | POST | `/api/v1/agents/me/heartbeat` | agent runtime: monotonic or compare-and-swap |
+| `ackAgentEvents` | POST | `/api/v1/agents/me/consumers/{consumer}/ack` | agent runtime: monotonic or compare-and-swap |
+| `patchRun` | PATCH | `/api/v1/runs/{run_id}` | agent runtime: monotonic or compare-and-swap |
+| `startRun` | POST | `/api/v1/runs/{run_id}/start` | agent runtime: monotonic or compare-and-swap |
+| `resumeRun` | POST | `/api/v1/runs/{run_id}/resume` | agent runtime: monotonic or compare-and-swap |
+| `awaitRunInput` | POST | `/api/v1/runs/{run_id}/await-input` | agent runtime: monotonic or compare-and-swap |
+| `finishRun` | POST | `/api/v1/runs/{run_id}/finish` | agent runtime: monotonic or compare-and-swap |
+| `answerAutocomplete` | POST | `/api/v1/command-autocompletions/{request_id}/answer` | agent runtime: monotonic or compare-and-swap |
+| `postIncomingWebhook` | POST | `/api/v1/hooks/{webhook_id}/{token}` | client ID in the body (table above) |
+| `createMessage` | POST | `/api/v1/threads/{thread_id}/messages` | client ID in the body (table above) |
+| `createInteraction` | POST | `/api/v1/components/{component_id}/interactions` | client ID in the body (table above) |
+| `applyImportBatch` | POST | `/api/v1/imports/{import_id}/batches` | origin key of the import ([22-import-migration.md](22-import-migration.md)) |
+| `createImportFile` | POST | `/api/v1/imports/{import_id}/files` | origin key of the import ([22-import-migration.md](22-import-migration.md)) |
+| `submitClientMetrics` | POST | `/api/v1/client-metrics` | anonymous measurements; a retry counts a sample twice |
 <!-- END GENERATED: idempotency_exempt -->
 
-4. Eine Wiederholung liefert die gespeicherte Antwort, ohne den Handler, die Schema-Prüfung oder
-   `authorize` erneut auszuführen; Authentisierung und Drosselung laufen vorher wie immer. Wer
-   gesperrt oder abgemeldet ist, bekommt also `401`; wem nur Rechte entzogen wurden, bekommt
-   innerhalb von `sync.idempotency_key_ttl` seine eigene frühere Antwort, die er schon einmal
-   bekommen durfte. `Correlation-Id` und `RateLimit` stammen von der aktuellen Anfrage; ein
-   gespeichertes Problem behält seine `correlation_id`. Weil `idempotency_keys` keine Kopfzeilen
-   speichert, bildet der Server ein `ETag` der Wiederholung aus `version` im gespeicherten Körper;
-   jede Operation mit Schlüssel und `ETag` hat darum `version` im Antwortkörper (Generator-Check).
-   Gespeichert wird nur ein Körper mit `application/json`; ein Körper über
-   `http.max_json_body_bytes` wird vor dem Fingerabdruck mit `413` abgelehnt und nicht gespeichert.
-5. `startRun` mit derselben Aufruf-Marke nach erfolgreichem Start antwortet `200` mit
-   `Idempotent-Replay: true`; erst eine andere Marke bekommt `409 already_started`. Sonst würde ein
-   Adapter, dessen Antwort verloren ging, einen laufenden Lauf nie bearbeiten (03
-   `runs.started_jti`, 04 Abschnitt 15.3). Das gilt nur, solange der Lauf `running` ist; in
-   `waiting_input` ist die Marke verbraucht (`403 invocation_token_invalid`, `superseded`).
-   `renewInvocationToken` mit der Marke, die die letzte Erneuerung ersetzt hat
-   (`runs.renewed_from_jti`), stellt erneut eine frische Marke aus; sonst hinge ein Lauf, dessen
-   Antwort auf die Erneuerung verloren ging (09 Abschnitt 4.5.1).
+4. A repetition returns the stored response without running the handler, the schema check or
+   `authorize` again; authentication and throttling run before it as always. A person who is
+   disabled or logged out therefore gets `401`; a person who only lost permissions gets, within
+   `sync.idempotency_key_ttl`, their own earlier response, which they were already allowed to
+   receive once. `Correlation-Id` and `RateLimit` come from the current request; a stored problem
+   keeps its `correlation_id`. Because `idempotency_keys` stores no headers, the server forms an
+   `ETag` of the repetition from `version` in the stored body; every operation with a key and
+   `ETag` therefore has `version` in the response body (generator check).
+   Only a body with `application/json` is stored; a body over
+   `http.max_json_body_bytes` is rejected with `413` before the fingerprint and is not stored.
+5. `startRun` with the same invocation token after a successful start answers `200` with
+   `Idempotent-Replay: true`; only a different token gets `409 already_started`. Otherwise an
+   adapter whose response got lost would never process a running run (03
+   `runs.started_jti`, 04 section 15.3). This holds only while the run is `running`; in
+   `waiting_input` the token is used up (`403 invocation_token_invalid`, `superseded`).
+   `renewInvocationToken` with the token that the last renewal replaced
+   (`runs.renewed_from_jti`) issues a fresh token again; otherwise a run whose response to the
+   renewal got lost would hang (09 section 4.5.1).
 
-## 8. Nebenläufigkeit
+## 8. Concurrency
 
-1. Versionierte Ressourcen (Spalte `version` in 03) liefern `ETag: "<version>"` (stark). Beim
-   Kanal-Verhalten ist das ETag `settings_version`; beim Branding, das aus mehreren
-   Einstellungsschlüsseln besteht, ein aus deren Versionen abgeleiteter Wert. Clients behandeln
-   jedes ETag als undurchsichtige Zeichenkette.
-2. Änderungen an gemeinsam genutzten Objekten verlangen `If-Match` (in openapi.yaml als Parameter
-   `IfMatchRequired`): Nachrichten, Thread-Titel, Bereiche, Kanäle, Kanal-Verhalten, Bediener,
-   Agenten, Backend-Richtlinie, Zugangsdaten-Inhaber, Vorlagen, Komponenten, Befehle, Branding und
-   "als ungelesen markieren". Fehlt `If-Match`: `428 precondition_required`. Passt er nicht:
-   `412 version_conflict` mit der aktuellen Fassung in `current`.
-3. Wo "letzte Schreibung gewinnt" gilt (Instanz-Einstellungen, Schalter, Projektbindung,
-   Thread-Tags), ist `If-Match` optional und wird geprüft, wenn er kommt.
-4. Persönliche Sync-Daten folgen 04, Abschnitt 14: Entwürfe mit `base_version` und
-   `overwrote_newer`, Gelesen-Stand monoton. Lauf-Patches nutzen `base_version` und `409
+1. Versioned resources (column `version` in 03) return `ETag: "<version>"` (strong). For
+   channel behavior the ETag is `settings_version`; for branding, which consists of several
+   settings keys, it is a value derived from their versions. Clients treat every ETag as an
+   opaque string.
+2. Changes to shared objects require `If-Match` (in openapi.yaml as the parameter
+   `IfMatchRequired`): messages, thread titles, spaces, channels, channel behavior, operators,
+   agents, backend policy, credential holder, templates, components, commands, branding and
+   "mark as unread". If `If-Match` is missing: `428 precondition_required`. If it does not match:
+   `412 version_conflict` with the current version in `current`.
+3. Where "last write wins" applies (instance settings, switches, project binding,
+   thread tags), `If-Match` is optional and is checked when it is sent.
+4. Personal sync data follow 04, section 14: drafts with `base_version` and
+   `overwrote_newer`, read state monotonic. Run patches use `base_version` and `409
    base_version_conflict` (04, 11.2).
-5. RFC 9110 verbietet bei gescheitertem `If-Match` die Ausführung und sieht dafür `412
-   (Precondition Failed)` vor [belegt, Q9]; HTTP-Bibliotheken kennen genau diesen Status. Darum
-   gilt `412 version_conflict` auch im Kern-Vertrag (03 Grundsatz 10, 04 Abschnitt 13.3). Kommt
-   eine Wiederholung, deren Änderung schon gilt, liefert der `Idempotency-Key` die gespeicherte
-   Antwort statt `412`.
-6. Kein `If-None-Match` und kein `304` in v1, weil JSON-Antworten `no-store` sind. Ein späteres
-   Nachrüsten ist additiv.
+5. RFC 9110 forbids execution on a failed `If-Match` and provides `412
+   (Precondition Failed)` for it [verified, Q9]; HTTP libraries know exactly this status. That is
+   why `412 version_conflict` also applies in the core contract (03 principle 10, 04 section 13.3).
+   If a repetition arrives whose change already applies, the `Idempotency-Key` returns the stored
+   response instead of `412`.
+6. No `If-None-Match` and no `304` in v1, because JSON responses are `no-store`. Adding them later
+   is additive.
 
-## 9. Rate-Limits
+## 9. Rate limits
 
-1. Jede Operation gehört über ihre Aktion zu einer Klasse aus 05, Abschnitt 3 (Token-Bucket mit
-   `ratelimit.<klasse>.per_minute` und `.burst`). Die Prüfung läuft vor `authorize`.
-2. Jede gedrosselte Klasse meldet ihren Stand mit den Kopfzeilen aus
-   draft-ietf-httpapi-ratelimit-headers-11 (Arbeitsstand, kein RFC) [belegt, Q5]:
-   `RateLimit-Policy: "<klasse>";q=<per_minute>;w=60` und `RateLimit: "<klasse>";r=<ganze
-   Token>;t=<Sekunden bis voll>`. Die Abbildung eines Token-Buckets auf `q`, `w`, `r`, `t` ist
-   eigene Festlegung [abgeleitet].
-3. Erschöpft: `429 rate_limited` mit `Retry-After` (RFC 9110). Clients warten mindestens so lange;
-   das Ausgangsfach nutzt danach seinen Backoff (04, 13.2). Am Gateway schließt nur
-   `rl.gateway_connect` bei `identify` und `resume` mit `4008`; jede andere Op antwortet `error`
-   mit `rate_limited`, die Verbindung bleibt (04, 6.2 und 6.4).
-4. Ändern sich die Kopfzeilen, wenn der Entwurf ein RFC wird, sendet der Server die neuen Namen
-   zusätzlich für `api.deprecation_min_notice` (Abschnitt 13).
+1. Every operation belongs, through its action, to a class from 05, section 3 (token bucket with
+   `ratelimit.<class>.per_minute` and `.burst`). The check runs before `authorize`.
+2. Every throttled class reports its state with the headers from
+   draft-ietf-httpapi-ratelimit-headers-11 (work in progress, no RFC) [verified, Q5]:
+   `RateLimit-Policy: "<class>";q=<per_minute>;w=60` and `RateLimit: "<class>";r=<whole
+   tokens>;t=<seconds until full>`. The mapping of a token bucket onto `q`, `w`, `r`, `t` is
+   our own ruling [derived].
+3. Exhausted: `429 rate_limited` with `Retry-After` (RFC 9110). Clients wait at least that long;
+   the outbox then uses its backoff (04, 13.2). At the gateway only `rl.gateway_connect` closes
+   with `4008`, on `identify` and `resume`; every other op answers `error` with `rate_limited`,
+   and the connection stays open (04, 6.2 and 6.4).
+4. If the headers change when the draft becomes an RFC, the server also sends the new names
+   for `api.deprecation_min_notice` (section 13).
 
-## 10. Dateien
+## 10. Files
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant C as Client
     participant API as Server
-    participant OS as Objektspeicher
+    participant OS as Object storage
     C->>API: POST /channels/{id}/uploads (name, size_bytes, sha256)
     API-->>C: 201 UploadSession (file_id, mode, parts)
-    alt mode direct (Dateisystem-Treiber)
-        C->>API: PUT /uploads/{file_id}/parts/{n} (Bytes)
-        API->>OS: Teil speichern
-    else mode presigned (S3-Treiber)
-        C->>OS: PUT presigned URL (Bytes)
+    alt mode direct (file system driver)
+        C->>API: PUT /uploads/{file_id}/parts/{n} (bytes)
+        API->>OS: store part
+    else mode presigned (S3 driver)
+        C->>OS: PUT presigned URL (bytes)
     end
-    C->>API: POST /uploads/{file_id}/complete (parts mit ETag)
+    C->>API: POST /uploads/{file_id}/complete (parts with ETag)
     API-->>C: 200 File (scan_status pending)
-    API-->>C: Ereignis file.updated (scan_status clean)
+    API-->>C: event file.updated (scan_status clean)
     C->>API: POST /threads/{id}/messages (attachment_file_ids)
 ```
 
-1. Upload ist eine Sitzung aus Teilen; beide Treiber (B4, R-Objektspeicher) haben denselben
-   Ablauf, der Client folgt nur den URLs der Antwort. Teile lassen sich parallel und erneut senden.
-   Teilgröße `file.upload_part_bytes`, Gültigkeit der Sitzung `file.upload_session_ttl`,
-   presigned PUT-URLs für Teile (nur Modus `presigned`, S3) `file.s3.presign_ttl`
-   ([12-dateien.md](12-dateien.md), Abschnitt 3).
-2. `complete` prüft Größe und optional SHA-256, erkennt den MIME-Typ selbst und stellt den
-   Virenscan an. Herunterladen geht erst bei `scan_status` `clean` oder `skipped`; vorher
-   `409 file_not_ready`, bei `infected`, `error` oder gescheitertem Upload `409 file_blocked`
-   ([12-dateien.md](12-dateien.md), Abschnitt 9.3); ohne Leserecht immer `404`.
-3. `GET /files/{id}/content` liefert die Bytes immer selbst, mit `Range`-Unterstützung; es gibt
-   keine presigned GET-URLs ([ADR 0048](../adr/0048-datei-abruf-nur-ueber-den-server-mit-kurzlebigen-tickets.md), [12-dateien.md](12-dateien.md), Abschnitt 9). Medien-Player
-   ohne DPoP holen ein kurzlebiges Abruf-Ticket (`POST /files/{id}/tickets`). Der Server prüft
-   `file.read` vor jeder Auslieferung, auch mit Ticket (B7).
-4. Avatar und Logo kommen als `multipart/form-data`; der Server entfernt Metadaten, bei JPEG und
-   PNG verlustfrei, und erzeugt neu kodierte Vorschaubilder ([12-dateien.md](12-dateien.md),
-   Abschnitt 7; Ruling L16; [ADR 0047](../adr/0047-bild-metadaten-verlustfrei-entfernen.md)).
-5. Sprachnachrichten: Audio hochladen, Nachricht mit `kind = voice`. Transkript über
-   `requestTranscription` (Dienst-Port, Schalter `voice.enabled`) oder `submitTranscript` durch
-   den Agenten (Aktion `file.transcript.submit`).
+1. An upload is a session of parts; both drivers (B4, R-Objektspeicher) have the same flow, and
+   the client only follows the URLs of the response. Parts can be sent in parallel and resent.
+   Part size `file.upload_part_bytes`, validity of the session `file.upload_session_ttl`,
+   presigned PUT URLs for parts (only mode `presigned`, S3) `file.s3.presign_ttl`
+   ([12-files.md](12-files.md), section 3).
+2. `complete` checks the size and optionally SHA-256, detects the MIME type itself and queues the
+   virus scan. Download works only once `scan_status` is `clean` or `skipped`; before that
+   `409 file_not_ready`, on `infected`, `error` or a failed upload `409 file_blocked`
+   ([12-files.md](12-files.md), section 9.3); without read permission always `404`.
+3. `GET /files/{id}/content` always delivers the bytes itself, with `Range` support; there are
+   no presigned GET URLs ([ADR 0048](../adr/0048-file-download-only-through-the-server-with-short-lived-tickets.md), [12-files.md](12-files.md), section 9). Media players
+   without DPoP fetch a short-lived file ticket (`POST /files/{id}/tickets`). The server checks
+   `file.read` each time it serves the file, also with a ticket (B7).
+4. Avatar and logo arrive as `multipart/form-data`; the server removes metadata, losslessly for
+   JPEG and PNG, and creates re-encoded thumbnails ([12-files.md](12-files.md),
+   section 7; Ruling L16; [ADR 0047](../adr/0047-remove-image-metadata-losslessly.md)).
+5. Voice messages: upload the audio, message with `kind = voice`. Transcript through
+   `requestTranscription` (service port, switch `voice.enabled`) or `submitTranscript` by
+   the agent (action `file.transcript.submit`).
 
-## 11. Echtzeit-Gateway
+## 11. Real-time gateway
 
-1. Ein Endpunkt `wss://<host>/api/v1/gateway`. Rahmen sind JSON-Textrahmen
-   `{"op": <name>, "d": <körper>}` (04, 2.3). asyncapi.yaml beschreibt jede Op als Nachricht,
-   jedes Ereignis als Nachricht `dispatch` mit `x-receive-action`, und die Schließ-Codes aus 04
+1. One endpoint `wss://<host>/api/v1/gateway`. Frames are JSON text frames
+   `{"op": <name>, "d": <body>}` (04, 2.3). asyncapi.yaml describes every op as a message,
+   every event as a message `dispatch` with `x-receive-action`, and the close codes from 04
    (6.4) in `x-close-codes`.
-2. Alle Körper-Schemas liegen in `components.schemas` von openapi.yaml (`Gateway*`, `*Event`,
-   `*Payload`). So erzeugen alle Generatoren die Typen aus einer Quelle (R-API-06).
-3. Ereignis-Schemas sind `allOf` aus `EventEnvelope` und einem Teil mit `type` und `payload`.
-   `Event` ist die Union aller dauerhaften Typen mit Diskriminator `type`; AsyncAPI referenziert nur
-   die Einzeltypen, weil AsyncAPI-Parser `discriminator` als String erwarten und das
-   OpenAPI-Objekt ablehnen [belegt, eigene Probe 2026-10-10 mit @asyncapi/cli 6.2.0].
-4. Felder nur für die Zustellung: `invocation_token` (frische Aufruf-Marke, 04 15.3) und
-   `redelivered` (04 15.2) stehen im Umschlag, nicht im Rahmen, und nie im Ereignis-Log (04
-   Abschnitt 2.2, [ADR 0052](../adr/0052-ein-ereignis-umschlag-fuer-gateway-rest-und-webhooks.md)).
-5. REST-Alternativen: `GET /events` (04, 7.4) und `GET /agents/me/consumers/{consumer}/events`
-   mit `POST .../ack` für Adapter ohne WebSocket.
-6. Autovervollständigung von Befehlen: `autocompleteCommand` schickt das kurzlebige Ereignis
-   `command.autocomplete_requested` an den Eigentümer des Befehls und wartet bis
-   `command.autocomplete_timeout` auf `answerAutocomplete` oder die Gateway-Op
-   `command.autocomplete_result` (04 Abschnitt 15.7).
-7. Terminal: Die Strom-Verbindung des Geräts und die Steuer- und Datenverbindungen des
-   Host-Dienstes sind eigene Kanäle in asyncapi.yaml (`terminalStream`, `hostControl`, `hostData`)
-   mit eigenen Schließ-Codes `4100` bis `4114`; nach `hello` und `identify` tragen sie nur
-   Binärrahmen mit je einer Noise-Nachricht ([24-terminal.md](24-terminal.md), Abschnitt 5).
+2. All body schemas live in `components.schemas` of openapi.yaml (`Gateway*`, `*Event`,
+   `*Payload`). This way all generators create the types from one source (R-API-06).
+3. Event schemas are `allOf` of `EventEnvelope` and a part with `type` and `payload`.
+   `Event` is the union of all durable types with the discriminator `type`; AsyncAPI references
+   only the single types, because AsyncAPI parsers expect `discriminator` as a string and reject
+   the OpenAPI object [verified, own probe 2026-10-10 with @asyncapi/cli 6.2.0].
+4. Fields only for delivery: `invocation_token` (fresh invocation token, 04 15.3) and
+   `redelivered` (04 15.2) are in the envelope, not in the frame, and never in the event log (04
+   section 2.2, [ADR 0052](../adr/0052-one-event-envelope-for-gateway-rest-and-webhooks.md)).
+5. REST alternatives: `GET /events` (04, 7.4) and `GET /agents/me/consumers/{consumer}/events`
+   with `POST .../ack` for adapters without WebSocket.
+6. Command autocompletion: `autocompleteCommand` sends the ephemeral event
+   `command.autocomplete_requested` to the owner of the command and waits up to
+   `command.autocomplete_timeout` for `answerAutocomplete` or the gateway op
+   `command.autocomplete_result` (04 section 15.7).
+7. Terminal: the stream connection of the device and the control and data connections of the
+   host service are separate channels in asyncapi.yaml (`terminalStream`, `hostControl`, `hostData`)
+   with their own close codes `4100` to `4114`; after `hello` and `identify` they carry only
+   binary frames with one Noise message each ([24-terminal.md](24-terminal.md), section 5).
 
-Ops und Ereignisse stehen in Abschnitt 17.
+Ops and events are listed in section 17.
 
 ## 12. Webhooks
 
-Ausgehende Webhooks folgen Standard Webhooks; Signatur `v1a` (Ed25519) immer, `v1` (HMAC) auf
-Wunsch je Abo. Zustellung, Wiederholung, Prüfung beim Empfänger und Eingangs-Webhooks:
-[docs/api/webhooks.md](../api/webhooks.md), Entscheidung ADR 0016.
+Outgoing webhooks follow Standard Webhooks; signature `v1a` (Ed25519) always, `v1` (HMAC) on
+request per subscription. Delivery, retry, verification at the receiver and incoming webhooks:
+[docs/api/webhooks.md](../api/webhooks.md), decision ADR 0016.
 
-## 13. Versionierung, Deprecation, Kompatibilität
+## 13. Versioning, deprecation, compatibility
 
-1. **Hauptversion im Pfad** (`/api/v1`). Innerhalb von v1 gibt es nur additive Änderungen.
-   `info.version` von openapi.yaml und asyncapi.yaml ist SemVer: MINOR für additive Änderungen,
-   PATCH für reine Doku. Bis zur ersten Veröffentlichung gilt `0.x`. Die Discovery meldet
-   `api_versions`, `spec_version` und `features`.
-2. **Gateway.** Protokollversionen stehen in `hello` und `identify`; nicht unterstützt schließt mit
-   `4007` (04, 6.1). Ereignis-Nutzlasten ändern sich nur additiv; `schema_version` steigt dabei,
-   damit Clients neue Felder erkennen.
+1. **Major version in the path** (`/api/v1`). Within v1 there are only additive changes.
+   `info.version` of openapi.yaml and asyncapi.yaml is SemVer: MINOR for additive changes,
+   PATCH for documentation only. Until the first release, `0.x` applies. The discovery reports
+   `api_versions`, `spec_version` and `features`.
+2. **Gateway.** Protocol versions are in `hello` and `identify`; an unsupported version closes with
+   `4007` (04, 6.1). Event payloads change only additively; `schema_version` increases with each
+   such change, so that clients recognize new fields.
 
-| Additiv, in v1 erlaubt | Bruch, nur in einer neuen Hauptversion |
+| Additive, allowed in v1 | Breaking, only in a new major version |
 |---|---|
-| neuer Endpunkt, neue Op, neuer Ereignistyp, neuer Webhook-Typ | Endpunkt, Feld, Parameter, Op oder Ereignistyp entfernen oder umbenennen |
-| neues optionales Anfragefeld, neuer optionaler Query-Parameter | optionales Anfragefeld wird Pflicht, neues Pflichtfeld in Anfragen |
-| neues Antwortfeld | Typ, Format oder Bedeutung eines Feldes ändern |
-| neuer Enum-Wert in Antworten und Ereignissen | Enum-Wert entfernen |
-| neuer Problem-Code bei bestehendem Status | Status-Code einer bestehenden Situation ändern |
-| neue Kopfzeile, neue Rate-Limit-Klasse | Sortierung, Paginierungsart oder Idempotenz-Regel einer Op ändern |
-| Grenzen lockern (Konfigurationswerte) | `x-authz-action` einer Op auf eine andere Aktion setzen |
+| new endpoint, new op, new event type, new webhook type | remove or rename an endpoint, field, parameter, op or event type |
+| new optional request field, new optional query parameter | an optional request field becomes required, a new required field in requests |
+| new response field | change the type, format or meaning of a field |
+| new enum value in responses and events | remove an enum value |
+| new problem code for an existing status | change the status code of an existing situation |
+| new header, new rate-limit class | change the sort order, pagination kind or idempotency rule of an op |
+| loosen limits (configuration values) | set `x-authz-action` of an op to a different action |
 
-3. Neue Enum-Werte sind nur additiv, weil jeder Client sie toleriert: TypeScript ohne
-   Laufzeitprüfung, Dart mit `enumUnknownDefaultCase=true` [belegt, Q4], Go-Server ohne Bedarf,
-   Python nur mit Handschicht. openapi-python-client 0.29.1 wirft bei unbekannten Werten einen
-   Fehler, auch mit `literal_enums` [belegt, eigene Probe 2026-10-10]. Das Gate hält das mit dem
-   Toleranz-Test G5 (Abschnitt 15).
-4. **Deprecation.** Eine Op oder ein Feld bekommt `deprecated: true`, `x-deprecated-since`
-   (Spec-Version), `x-deprecated-at` (Datum der Ablösung, RFC 3339 `full-date`, Quelle der
-   Kopfzeile `Deprecation`, R-API-25) und `x-sunset` (Datum). Der Server sendet bei jeder Antwort dieser Op
-   `Deprecation: @<unix-zeit>` (RFC 9745 [belegt, Q7]), `Sunset: <HTTP-Datum>` (RFC 8594) und
-   `Link: <...>; rel="deprecation"` auf die Änderungsnotiz. `x-sunset` liegt mindestens
-   `api.deprecation_min_notice` nach `x-deprecated-at`; RFC 9745 verlangt nur "nicht früher"
-   [belegt, Q7]. Entfernt wird erst in der nächsten Hauptversion.
-5. **Hauptversionen überlappen.** Server-Releases, die `v2` anbieten, bedienen `v1` weiter für
-   mindestens `api.major_version_overlap` ab dem ersten Release mit `v2`. Grund: Apps aus den
-   Stores und selbst gehostete Server werden nicht gleichzeitig aktualisiert.
-6. **Ausnahme Sicherheit.** Eine Sicherheitslücke darf Verhalten sofort ändern; das steht im
-   Sicherheitshinweis und im Changelog.
-7. **Prüfung.** Das Gate vergleicht die Spec mit der zuletzt veröffentlichten Fassung (G6). oasdiff
-   (Apache-2.0) erkennt Brüche; seine OpenAPI-3.1-Unterstützung ist nur als Beta-Stand zu sehen
-   [vermutet, Q8]. Ob es mit dieser Spec arbeitet, klärt Ticket B-6; bis dahin prüft das Review die
-   Tabelle oben.
+3. New enum values are additive only because every client tolerates them: TypeScript without a
+   runtime check, Dart with `enumUnknownDefaultCase=true` [verified, Q4], the Go server has no need,
+   Python only with the hand-written layer. openapi-python-client 0.29.1 raises an error on unknown
+   values, also with `literal_enums` [verified, own probe 2026-10-10]. The gate holds this with the
+   tolerance test G5 (section 15).
+4. **Deprecation.** An op or a field gets `deprecated: true`, `x-deprecated-since`
+   (spec version), `x-deprecated-at` (date of the replacement, RFC 3339 `full-date`, source of the
+   `Deprecation` header, R-API-25) and `x-sunset` (date). On every response of this op the server sends
+   `Deprecation: @<unix-time>` (RFC 9745 [verified, Q7]), `Sunset: <HTTP-date>` (RFC 8594) and
+   `Link: <...>; rel="deprecation"` pointing to the change note. `x-sunset` lies at least
+   `api.deprecation_min_notice` after `x-deprecated-at`; RFC 9745 only requires "not earlier"
+   [verified, Q7]. Removal happens only in the next major version.
+5. **Major versions overlap.** Server releases that offer `v2` keep serving `v1` for
+   at least `api.major_version_overlap` from the first release with `v2`. Reason: apps from the
+   stores and self-hosted servers are not updated at the same time.
+6. **Security exception.** A security vulnerability may change behavior immediately; this is
+   stated in the security advisory and in the changelog.
+7. **Check.** The gate compares the spec with the last published version (G6). oasdiff
+   (Apache-2.0) detects breaking changes; its OpenAPI 3.1 support should be seen only as a beta
+   state [assumed, Q8]. Ticket B-6 settles whether it works with this spec; until then the review
+   checks the table above.
 
-## 14. Codegenerierung
+## 14. Code generation
 
-| Ziel | Werkzeug (gepinnt) | Einstellungen | Probe am 2026-10-10 |
+| Target | Tool (pinned) | Settings | Probe on 2026-10-10 |
 |---|---|---|---|
-| Go-Server (Modul `api`) | oapi-codegen v2.8.0, Laufzeit `oapi-codegen/runtime` ab v1.6.0, Go ab 1.25 [belegt, Q1] | `std-http-server`, `strict-server`, `models`, `output-options.skip-prune: true` (Gateway-Typen) | erzeugt, `go vet` ohne Befund, Test der `Event`-Union grün; unbekannter Typ liefert Fehler aus `ValueByDiscriminator`, die Seite dekodiert trotzdem |
-| TypeScript-SDK | openapi-typescript 7.13.0 mit openapi-fetch | Standard | `tsc --strict` ohne Fehler; Union über `type` wird eingeengt |
-| Python-SDK und Hermes-Adapter | openapi-python-client 0.29.1 | Standard | erzeugt, kompiliert, importierbar; ohne typisierte Antwort bleiben `image/*`, `application/zip` und NDJSON (Endpunkte existieren, die Handschicht streamt); strenge Enums und Unions (siehe 13.3) |
-| Dart-Paket der Apps | openapi-generator 7.26.0 `dart-dio` (built_value) | `enumUnknownDefaultCase=true`, `legacyDiscriminatorBehavior=false` | erzeugt, `build_runner` erfolgreich, `dart analyze` ohne Fehler (nur Warnungen im generierten Code); DPoP-Schema und `application/octet-stream`-Körper unterstützt der Generator nicht, beides übernimmt die Handschicht; OpenAPI 3.1 dort nur Beta [belegt, Q6] |
+| Go server (module `api`) | oapi-codegen v2.8.0, runtime `oapi-codegen/runtime` from v1.6.0, Go from 1.25 [verified, Q1] | `std-http-server`, `strict-server`, `models`, `output-options.skip-prune: true` (gateway types) | generated, `go vet` without findings, test of the `Event` union green; an unknown type returns an error from `ValueByDiscriminator`, the page still decodes |
+| TypeScript SDK | openapi-typescript 7.13.0 with openapi-fetch | default | `tsc --strict` without errors; the union is narrowed by `type` |
+| Python SDK and Hermes adapter | openapi-python-client 0.29.1 | default | generated, compiles, importable; `image/*`, `application/zip` and NDJSON stay without a typed response (the endpoints exist, the hand-written layer streams); strict enums and unions (see 13.3) |
+| Dart package of the apps | openapi-generator 7.26.0 `dart-dio` (built_value) | `enumUnknownDefaultCase=true`, `legacyDiscriminatorBehavior=false` | generated, `build_runner` successful, `dart analyze` without errors (only warnings in the generated code); the generator does not support the DPoP scheme and `application/octet-stream` bodies, the hand-written layer takes over both; OpenAPI 3.1 there only beta [verified, Q6] |
 
-1. Generierter Code wird eingecheckt. Das Gate erzeugt ihn neu und bricht bei einem Unterschied
-   ab (G4). Grund: Review sieht die Wirkung einer Spec-Änderung, Builds brauchen keinen Generator.
-2. Jedes SDK hat eine Handschicht über dem generierten Kern (ADR 0026, Team D): DPoP-Beweise und
-   Nonce-Wiederholung, IDs für das Ausgangsfach, Toleranz für Unbekanntes, Paginierungs-Iteratoren,
-   Abbildung der Problem-Codes, Gateway-Rahmen.
-3. Für AsyncAPI gibt es keinen Generator im Gate. Die Typen kommen aus openapi.yaml; den
-   Rahmen-Router schreibt jedes SDK von Hand.
-4. Schemas bleiben konservativ (Lint): kein `null`, keine Typ-Arrays, kein `anyOf`, `oneOf` nur
-   mit Diskriminator, wiederholte Enums als benannte Schemas.
+1. Generated code is checked in. The gate generates it again and fails on a difference
+   (G4). Reason: the review sees the effect of a spec change, and builds need no generator.
+2. Every SDK has a hand-written layer over the generated core (ADR 0026, Team D): DPoP proofs and
+   nonce retry, IDs for the outbox, tolerance for unknown content, pagination iterators,
+   mapping of the problem codes, gateway frames.
+3. There is no generator for AsyncAPI in the gate. The types come from openapi.yaml; every SDK
+   writes the frame router by hand.
+4. Schemas stay conservative (lint): no `null`, no type arrays, no `anyOf`, `oneOf` only
+   with a discriminator, repeated enums as named schemas.
 
-## 15. Vertragstests und Gate
+## 15. Contract tests and gate
 
-| Nr | Prüfung | Werkzeug | Hält |
+| No. | Check | Tool | Holds |
 |---|---|---|---|
-| G1 | Lint beider Dateien ohne Fehler und Warnungen | Redocly CLI 2.62.1 mit docs/api/redocly.yaml | Struktur, Beispiele gegen Schemas, Regeln aus 05 (Aktion, Klasse, Empfangs-Aktion), konservative Schemas |
-| G2 | Katalog-Abgleich `api-catalogue-sync` | `tools/api-checks` (M1-03), `make api-checks` | `x-authz-action` und `x-rate-limit-class` gleich `docs/spec/actions.yaml` ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)); Ops, Ereignisse und Empfangs-Aktionen in asyncapi.yaml gleich actions.yaml; Schließ-Codes gleich 04 (6.4, Code und Name); jede POST- und PATCH-Operation hat `Idempotency-Key` oder `x-idempotency-exempt` mit bekanntem Grund; Deprecation-Daten nach 13.4; `x-problem-codes` und `x-status` vollständig; das Enum `AppScope` gleich den Scopes des Katalogs (05 Abschnitt 2.6). Die Listen in redocly.yaml hält `catalog-check` (M1-02) |
-| G3 | Erzeugte Tabellen dieses Kapitels `api-tables` | `tools/api-checks` (M1-03), `make api-tables` | Blöcke der Abschnitte 5, 7, 16 und 17 und `webhook_events` in webhooks.md entsprechen den YAML-Dateien |
-| G4 | Codegenerierung | vier Generatoren aus Abschnitt 14 | erzeugen, kompilieren, keine Abweichung zum eingecheckten Code |
-| G5 | Toleranz-Test | je SDK ein Test mit Fixture | unbekanntes Feld, unbekannter Enum-Wert, unbekannter Ereignistyp werden ohne Fehler übersprungen |
-| G6 | Bruch-Prüfung gegen die letzte Veröffentlichung | oasdiff, falls Ticket B-6 es belegt | Tabelle in Abschnitt 13 |
-| G7 | Eigenschaftsbasierte Tests gegen den laufenden Server | Schemathesis gegen den Server aus dem Arbeitsbaum mit Wegwerf-PostgreSQL (`make contract-test`); den Compose-Stack prüft der Rauchtest (`make portability`) | Statuscodes, Medientypen, Antwort-Schemas und Kopfzeilen jeder Op; zustandsbehaftete Folgen über die Links, die Schemathesis ableitet (die Spec hat keine `links`; leitet die gepinnte Version keine Übergänge ab, gilt dieser Teil als nicht bewiesen); eigene Prüfungen: Problem-Format, `Correlation-Id`, kein `null`, 404-Gleichheit für fremde und fehlende IDs |
-| G8 | Antwort-Validierung in Integrationstests | Middleware im Test-Build | jede Antwort jedes Integrationstests passt zur Spec |
-| G9 | Gateway-Rahmen | Integrationstests mit Mitschnitt | jeder gesendete Rahmen passt zu seinem Schema; Register von Ops und Ereignistypen gleich 05 (05, Abschnitt 9) |
-| G10 | Webhook-Konformität | Testvektoren und unabhängige Prüfung | `v1` mit der Referenzbibliothek, `v1a` mit Ed25519 aus der Standardbibliothek |
+| G1 | Lint of both files without errors and warnings | Redocly CLI 2.62.1 with docs/api/redocly.yaml | structure, examples against schemas, rules from 05 (action, class, receive action), conservative schemas |
+| G2 | Catalogue sync `api-catalogue-sync` | `tools/api-checks` (M1-03), `make api-checks` | `x-authz-action` and `x-rate-limit-class` equal to `docs/spec/actions.yaml` ([ADR 0049](../adr/0049-machine-readable-action-catalogue-as-the-single-source.md)); ops, events and receive actions in asyncapi.yaml equal to actions.yaml; close codes equal to 04 (6.4, code and name); every POST and PATCH operation has `Idempotency-Key` or `x-idempotency-exempt` with a known reason; deprecation data per 13.4; `x-problem-codes` and `x-status` complete; the enum `AppScope` equal to the scopes of the catalogue (05 section 2.6). `catalog-check` (M1-02) holds the lists in redocly.yaml |
+| G3 | Generated tables of this chapter `api-tables` | `tools/api-checks` (M1-03), `make api-tables` | the blocks of sections 5, 7, 16 and 17 and `webhook_events` in webhooks.md match the YAML files |
+| G4 | Code generation | the four generators from section 14 | generate, compile, no difference from the checked-in code |
+| G5 | Tolerance test | one test with a fixture per SDK | an unknown field, an unknown enum value and an unknown event type are skipped without an error |
+| G6 | Breaking change check against the last release | oasdiff, if ticket B-6 confirms it | table in section 13 |
+| G7 | Property-based tests against the running server | Schemathesis against the server from the working tree with a throwaway PostgreSQL (`make contract-test`); the smoke test (`make portability`) checks the Compose stack | status codes, media types, response schemas and headers of every op; stateful sequences over the links that Schemathesis derives (the spec has no `links`; if the pinned version derives no transitions, this part counts as not proven); own checks: problem format, `Correlation-Id`, no `null`, 404 equality for foreign and missing IDs |
+| G8 | Response validation in integration tests | middleware in the test build | every response of every integration test matches the spec |
+| G9 | Gateway frames | integration tests with a recording | every sent frame matches its schema; the register of ops and event types equals 05 (05, section 9) |
+| G10 | Webhook conformance | test vectors and an independent verification | `v1` with the reference library, `v1a` with Ed25519 from the standard library |
 
-1. Schemathesis (MIT) leitet zustandsbehaftete Folgen aus den Operationen ab und erlaubt eigene
-   Anmelde-Logik [belegt, Q11]. Es lädt diese Spec mit allen Operationen und erzeugt für jede einen
-   Fall [belegt, eigene Probe mit 4.30.1 am 2026-10-10]. Die Anmeldung übernimmt ein Python-Hook,
-   der DPoP-Beweise bildet.
-2. Pact ist nicht nötig. Alle Verbraucher (Apps, SDKs, Adapter) werden im selben Repo aus derselben
-   Spec erzeugt und im Gate kompiliert; G7 und G8 prüfen den Anbieter gegen dieselbe Spec.
-   Verbrauchergetriebene Verträge brächten einen Broker und eine zweite Wahrheit, ohne ein Risiko
-   zu decken, das G4 bis G8 offen lassen. Das ändert sich erst, wenn fremde Teams eigene Clients
-   ohne diese Spec bauen.
-3. G1 bis G6 laufen im einen lokalen Gate-Befehl, der mit CI identisch ist (ADR 0038, Team H).
-   G7 (`make contract-test`) und G8 (in jedem Integrationstest) laufen ebenfalls in `make check`,
-   G9 und G10 mit den Integrationstests. Grund gegen den Compose-Stack für G7: Er braucht das
-   fertige Image und den Rauchtest der Etappe; der Server aus dem Arbeitsbaum prüft jede Änderung
-   vor dem Merge.
+1. Schemathesis (MIT) derives stateful sequences from the operations and allows custom
+   login logic [verified, Q11]. It loads this spec with all operations and creates one case for
+   each [verified, own probe with 4.30.1 on 2026-10-10]. A Python hook that builds the DPoP proofs
+   handles the login.
+2. Pact is not needed. All consumers (apps, SDKs, adapters) are generated in the same repo from the
+   same spec and compiled in the gate; G7 and G8 check the provider against the same spec.
+   Consumer-driven contracts would add a broker and a second source of truth without covering a
+   risk that G4 to G8 leave open. This changes only when outside teams build their own clients
+   without this spec.
+3. G1 to G6 run in the single local gate command, which is identical to CI (ADR 0038, Team H).
+   G7 (`make contract-test`) and G8 (in every integration test) also run in `make check`,
+   G9 and G10 with the integration tests. Reason against the Compose stack for G7: it needs the
+   finished image and the smoke test of the milestone; the server from the working tree checks
+   every change before the merge.
 
-## 16. Endpunkte
+## 16. Endpoints
 
-Erzeugt aus openapi.yaml.
+Generated from openapi.yaml.
 
 <!-- BEGIN GENERATED: endpoints -->
 #### Discovery
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/instance/discovery` | `getDiscovery` | `instance.discovery.read` | Public instance metadata |
 | GET | `/api/v1/instance/jwks` | `getJwks` | `instance.discovery.read` | Public keys for access and invocation tokens |
@@ -639,7 +639,7 @@ Erzeugt aus openapi.yaml.
 
 #### Auth
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | POST | `/api/v1/auth/oidc/begin` | `beginOidcLogin` | `auth.login.begin` | Start an OIDC login |
 | GET | `/api/v1/auth/oidc/callback` | `handleOidcCallback` | `auth.login.begin` | OIDC redirect target of the identity provider |
@@ -661,7 +661,7 @@ Erzeugt aus openapi.yaml.
 
 #### Me
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/me` | `getMe` | `self.read` | Read the calling principal |
 | PATCH | `/api/v1/me/profile` | `updateMyProfile` | `self.profile.update` | Change own profile |
@@ -679,7 +679,7 @@ Erzeugt aus openapi.yaml.
 
 #### Users
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/users` | `listUsers` | `user.read` | List people |
 | POST | `/api/v1/users` | `createUser` | `user.create` | Create a person |
@@ -697,7 +697,7 @@ Erzeugt aus openapi.yaml.
 
 #### Devices
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/users/{user_id}/devices` | `listUserDevices` | `device.list` | List devices of a person |
 | GET | `/api/v1/users/{user_id}/sessions` | `listUserSessions` | `session.list` | List sessions of a person |
@@ -715,7 +715,7 @@ Erzeugt aus openapi.yaml.
 
 #### Tokens
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/principals/{principal_id}/tokens` | `listTokens` | `token.list` | List API tokens of a principal |
 | POST | `/api/v1/principals/{principal_id}/tokens` | `createToken` | `token.create` | Create an API token |
@@ -723,7 +723,7 @@ Erzeugt aus openapi.yaml.
 
 #### Groups
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/groups` | `listGroups` | `group.read` | List groups |
 | POST | `/api/v1/groups` | `createGroup` | `group.create` | Create a group |
@@ -736,7 +736,7 @@ Erzeugt aus openapi.yaml.
 
 #### Access
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/users/{user_id}/view-as` | `viewAsUser` | `access.view_as` | See the instance as a person sees it |
 | GET | `/api/v1/grants` | `listGrants` | `grant.read` | List grants of a target or subject |
@@ -749,7 +749,7 @@ Erzeugt aus openapi.yaml.
 
 #### Admin
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | PUT | `/api/v1/instance/branding/logo` | `uploadBrandingLogo` | `instance.branding.update` | Upload the logo |
 | DELETE | `/api/v1/instance/branding/logo` | `deleteBrandingLogo` | `instance.branding.update` | Remove the logo |
@@ -768,7 +768,7 @@ Erzeugt aus openapi.yaml.
 
 #### Spaces
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/spaces` | `listSpaces` | `space.read` | List visible spaces |
 | POST | `/api/v1/spaces` | `createSpace` | `space.create` | Create a space |
@@ -780,7 +780,7 @@ Erzeugt aus openapi.yaml.
 
 #### Channels
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/spaces/{space_id}/channels` | `listSpaceChannels` | `channel.read` | List visible channels of a space |
 | POST | `/api/v1/spaces/{space_id}/channels` | `createChannel` | `channel.create` | Create a channel |
@@ -791,7 +791,7 @@ Erzeugt aus openapi.yaml.
 | GET | `/api/v1/channels/{channel_id}/behavior` | `getChannelBehavior` | `channel.behavior.read` | Read prompt, skills and mention rules |
 | PUT | `/api/v1/channels/{channel_id}/behavior` | `putChannelBehavior` | `channel.behavior.update` | Change prompt, skills and mention rules |
 | PUT | `/api/v1/channels/{channel_id}/operator` | `setChannelOperator` | `channel.operator.set` | Set or inherit the operator of a channel |
-| PUT | `/api/v1/channels/{channel_id}/read-only` | `setChannelReadOnly` | `channel.read_only.set` | Switch the write protection of a channel |
+| PUT | `/api/v1/channels/{channel_id}/read-only` | `setChannelReadOnly` | `channel.read_only.set` | Switch the read-only state of a channel |
 | PUT | `/api/v1/channels/{channel_id}/project-binding` | `putProjectBinding` | `channel.project.bind` | Bind a forum to a project |
 | DELETE | `/api/v1/channels/{channel_id}/project-binding` | `deleteProjectBinding` | `channel.project.bind` | Remove the project binding |
 | GET | `/api/v1/channels/{channel_id}/tags` | `listForumTags` | `channel.read` | List forum tags |
@@ -809,7 +809,7 @@ Erzeugt aus openapi.yaml.
 
 #### Threads
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/channels/{channel_id}/threads` | `listChannelThreads` | `thread.read` | List threads or forum posts of a channel |
 | POST | `/api/v1/channels/{channel_id}/threads` | `createThread` | `thread.create` | Create a forum post or a thread from a message |
@@ -825,7 +825,7 @@ Erzeugt aus openapi.yaml.
 
 #### Messages
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/threads/{thread_id}/pins` | `listPins` | `thread.read` | List pinned messages |
 | GET | `/api/v1/threads/{thread_id}/messages` | `listThreadMessages` | `thread.read` | Read thread history |
@@ -842,14 +842,14 @@ Erzeugt aus openapi.yaml.
 
 #### Interactions
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | POST | `/api/v1/components/{component_id}/interactions` | `createInteraction` | `interaction.create` | Use a button, select or form |
 | PATCH | `/api/v1/components/{component_id}` | `updateComponent` | `component.update` | Disable or change an own component |
 
 #### Files
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | POST | `/api/v1/channels/{channel_id}/uploads` | `createUpload` | `file.upload` | Start an upload |
 | PUT | `/api/v1/uploads/{file_id}/parts/{part_number}` | `uploadPart` | `file.upload` | Upload one part in direct mode |
@@ -866,21 +866,21 @@ Erzeugt aus openapi.yaml.
 
 #### Search
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/search` | `search` | `search.query` | Full-text search |
 | GET | `/api/v1/search/thread-titles` | `searchThreadTitles` | `search.query` | Prefix search over thread titles |
 
 #### Sync
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/sync/snapshot` | `getSnapshot` | `sync.snapshot.read` | Load a snapshot |
 | GET | `/api/v1/events` | `listEvents` | `events.catch_up` | Catch up on events after a sequence |
 
 #### Preferences
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/me/sidebar` | `getMySidebar` | `settings.read` | Read own sidebar state |
 | PUT | `/api/v1/me/sidebar/spaces/{space_id}` | `putMySidebarSpace` | `sidebar.update` | Collapse or reorder a space for oneself |
@@ -905,7 +905,7 @@ Erzeugt aus openapi.yaml.
 
 #### Agents
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | PUT | `/api/v1/instance/agent-billing-mode` | `setAllAgentsBillingMode` | `agent.billing_mode.set_all` | Switch the backend policy of all agents |
 | GET | `/api/v1/agents` | `listAgents` | `agent.read` | List visible agents |
@@ -920,7 +920,7 @@ Erzeugt aus openapi.yaml.
 
 #### Agent runtime
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | POST | `/api/v1/threads/{thread_id}/agent-sessions/report` | `reportAgentSession` | `agent_session.report` | Report the external session reference and model |
 | POST | `/api/v1/interactions/{interaction_id}/respond` | `respondToInteraction` | `interaction.respond` | Acknowledge or answer an interaction |
@@ -942,7 +942,7 @@ Erzeugt aus openapi.yaml.
 
 #### Runs
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/threads/{thread_id}/runs` | `listThreadRuns` | `run.read` | List runs of a thread |
 | GET | `/api/v1/runs` | `listActiveRuns` | `run.overview.read` | Running now |
@@ -953,7 +953,7 @@ Erzeugt aus openapi.yaml.
 
 #### Commands
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/channels/{channel_id}/commands` | `listChannelCommands` | `command.read` | List commands usable in a channel |
 | POST | `/api/v1/commands` | `registerCommand` | `command.register` | Register a command |
@@ -965,7 +965,7 @@ Erzeugt aus openapi.yaml.
 
 #### Apps
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/apps` | `listApps` | `app.read` | List installed apps |
 | POST | `/api/v1/apps` | `installApp` | `app.install` | Install an app from its manifest |
@@ -979,7 +979,7 @@ Erzeugt aus openapi.yaml.
 
 #### Webhooks
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/channels/{channel_id}/incoming-webhooks` | `listIncomingWebhooks` | `webhook_in.read` | List incoming webhooks of a channel |
 | POST | `/api/v1/channels/{channel_id}/incoming-webhooks` | `createIncomingWebhook` | `webhook_in.create` | Create an incoming webhook |
@@ -996,7 +996,7 @@ Erzeugt aus openapi.yaml.
 
 #### Audit
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/audit/events` | `listAuditEvents` | `audit.read` | Query the audit log |
 | GET | `/api/v1/audit/export` | `exportAuditEvents` | `audit.read` | Export the audit log |
@@ -1004,7 +1004,7 @@ Erzeugt aus openapi.yaml.
 
 #### Stats
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/threads/{thread_id}/costs` | `getThreadCosts` | `cost.read.thread` | Costs of a thread per run |
 | POST | `/api/v1/client-metrics` | `submitClientMetrics` | `client_metrics.submit` | Submit anonymous client measurements |
@@ -1025,7 +1025,7 @@ Erzeugt aus openapi.yaml.
 
 #### Status
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/status` | `getStatus` | `status.read` | Status page |
 | GET | `/api/v1/status/public` | `getPublicStatus` | `status.public.read` | Status page without login |
@@ -1037,7 +1037,7 @@ Erzeugt aus openapi.yaml.
 
 #### Import
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/imports` | `listImports` | `import.read` | List import sources |
 | POST | `/api/v1/imports` | `createImport` | `import.manage` | Add an import source |
@@ -1054,7 +1054,7 @@ Erzeugt aus openapi.yaml.
 
 #### Privacy
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/channels/{channel_id}/export` | `exportChannel` | `export.channel` | Export the history of a channel |
 | GET | `/api/v1/gdpr-requests` | `listGdprRequests` | `gdpr.request.read` | List privacy requests |
@@ -1065,7 +1065,7 @@ Erzeugt aus openapi.yaml.
 
 #### Hosts
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | GET | `/api/v1/hosts` | `listHosts` | `host.read` | List hosts |
 | POST | `/api/v1/hosts` | `createHost` | `host.manage` | Register a host and issue its pairing code |
@@ -1079,7 +1079,7 @@ Erzeugt aus openapi.yaml.
 
 #### Terminal
 
-| Methode | Pfad | operationId | Aktion | Zweck (aus openapi.yaml) |
+| Method | Path | operationId | Action | Purpose (from openapi.yaml) |
 |---|---|---|---|---|
 | POST | `/api/v1/hosts/{host_id}/terminal/sessions` | `openTerminalSession` | `terminal.open` | Open a terminal session |
 | GET | `/api/v1/terminal/sessions` | `listTerminalSessions` | `terminal.read_own` | List terminal sessions |
@@ -1088,214 +1088,214 @@ Erzeugt aus openapi.yaml.
 | POST | `/api/v1/terminal/sessions/{session_id}/close` | `closeTerminalSession` | `terminal.close` | End a terminal session |
 <!-- END GENERATED: endpoints -->
 
-## 17. WebSocket-Ops und Ereignisse
+## 17. WebSocket ops and events
 
-Ops (Aktion nach 05, Abschnitt 7):
+Ops (action per 05, section 7):
 
 <!-- BEGIN GENERATED: ws_ops -->
-| Op | Richtung | Aktion | Körper-Schema | Antwort |
+| Op | Direction | Action | Body schema | Reply |
 |---|---|---|---|---|
-| `identify` | Client an Server | `gateway.connect` | `GatewayIdentify` | `ready` |
-| `resume` | Client an Server | `gateway.connect` | `GatewayResume` | `resumed` |
-| `heartbeat` | Client an Server | `gateway.connect` | `GatewayHeartbeat` | `heartbeat_ack` |
-| `reauth` | Client an Server | `gateway.connect` | `GatewayReauth` |  |
-| `focus` | Client an Server | `gateway.focus` | `GatewayFocus` |  |
-| `typing.start` | Client an Server | `typing.start` | `GatewayTyping` |  |
-| `typing.stop` | Client an Server | `typing.start` | `GatewayTyping` |  |
-| `ack` | Client an Server | `agent.events.consume` | `GatewayAck` |  |
-| `run.update` | Client an Server | `run.update` | `GatewayRunUpdate` |  |
-| `command.autocomplete_result` | Client an Server | `command.autocomplete.respond` | `GatewayAutocompleteResult` |  |
-| `stats.subscribe` | Client an Server | `stats.read` | `GatewayStatsSubscribe` |  |
-| `stats.unsubscribe` | Client an Server | `stats.read` | `GatewayStatsUnsubscribe` |  |
-| `hello` | Server an Client | `gateway.connect` | `GatewayHello` |  |
-| `ready` | Server an Client | `gateway.connect` | `GatewayReady` |  |
-| `resumed` | Server an Client | `gateway.connect` | `GatewayResumed` |  |
-| `cursor` | Server an Client | `gateway.connect` | `GatewayCursor` |  |
-| `catchup.complete` | Server an Client | `gateway.connect` | `GatewayCatchupComplete` |  |
-| `resync_required` | Server an Client | `gateway.connect` | `GatewayResyncRequired` |  |
-| `heartbeat_ack` | Server an Client | `gateway.connect` | `GatewayHeartbeatAck` |  |
-| `reauth_required` | Server an Client | `gateway.connect` | `GatewayReauthRequired` |  |
-| `error` | Server an Client | `gateway.connect` | `GatewayError` |  |
-| `dispatch` | Server an Client | Empfangs-Aktion des Ereignistyps | `<Typ>Event` | |
+| `identify` | Client to server | `gateway.connect` | `GatewayIdentify` | `ready` |
+| `resume` | Client to server | `gateway.connect` | `GatewayResume` | `resumed` |
+| `heartbeat` | Client to server | `gateway.connect` | `GatewayHeartbeat` | `heartbeat_ack` |
+| `reauth` | Client to server | `gateway.connect` | `GatewayReauth` |  |
+| `focus` | Client to server | `gateway.focus` | `GatewayFocus` |  |
+| `typing.start` | Client to server | `typing.start` | `GatewayTyping` |  |
+| `typing.stop` | Client to server | `typing.start` | `GatewayTyping` |  |
+| `ack` | Client to server | `agent.events.consume` | `GatewayAck` |  |
+| `run.update` | Client to server | `run.update` | `GatewayRunUpdate` |  |
+| `command.autocomplete_result` | Client to server | `command.autocomplete.respond` | `GatewayAutocompleteResult` |  |
+| `stats.subscribe` | Client to server | `stats.read` | `GatewayStatsSubscribe` |  |
+| `stats.unsubscribe` | Client to server | `stats.read` | `GatewayStatsUnsubscribe` |  |
+| `hello` | Server to client | `gateway.connect` | `GatewayHello` |  |
+| `ready` | Server to client | `gateway.connect` | `GatewayReady` |  |
+| `resumed` | Server to client | `gateway.connect` | `GatewayResumed` |  |
+| `cursor` | Server to client | `gateway.connect` | `GatewayCursor` |  |
+| `catchup.complete` | Server to client | `gateway.connect` | `GatewayCatchupComplete` |  |
+| `resync_required` | Server to client | `gateway.connect` | `GatewayResyncRequired` |  |
+| `heartbeat_ack` | Server to client | `gateway.connect` | `GatewayHeartbeatAck` |  |
+| `reauth_required` | Server to client | `gateway.connect` | `GatewayReauthRequired` |  |
+| `error` | Server to client | `gateway.connect` | `GatewayError` |  |
+| `dispatch` | Server to client | Receive action of the event type | `<Type>Event` | |
 <!-- END GENERATED: ws_ops -->
 
-Ereignisse (Empfangs-Aktion nach 05, Abschnitt 6; Schema in openapi.yaml):
+Events (receive action per 05, section 6; schema in openapi.yaml):
 
 <!-- BEGIN GENERATED: events -->
-| Ereignistyp | Art | Empfangs-Aktion | Zielgruppe | Schema | Webhook |
+| Event type | Kind | Receive action | Audience | Schema | Webhook |
 |---|---|---|---|---|---|
-| `message.created` | dauerhaft | `message.read` |  | `MessageCreatedEvent` | ja |
-| `message.updated` | dauerhaft | `message.read` |  | `MessageUpdatedEvent` | ja |
-| `message.deleted` | dauerhaft | `message.read` |  | `MessageDeletedEvent` | ja |
-| `reaction.added` | dauerhaft | `message.read` |  | `ReactionAddedEvent` | ja |
-| `reaction.removed` | dauerhaft | `message.read` |  | `ReactionRemovedEvent` | ja |
-| `pin.added` | dauerhaft | `thread.read` |  | `PinAddedEvent` | ja |
-| `pin.removed` | dauerhaft | `thread.read` |  | `PinRemovedEvent` | ja |
-| `thread.created` | dauerhaft | `thread.read` |  | `ThreadCreatedEvent` | ja |
-| `thread.updated` | dauerhaft | `thread.read` |  | `ThreadUpdatedEvent` | ja |
-| `thread.closed` | dauerhaft | `thread.read` |  | `ThreadClosedEvent` | ja |
-| `thread.reopened` | dauerhaft | `thread.read` |  | `ThreadReopenedEvent` | ja |
-| `thread.moved` | dauerhaft | `thread.read` |  | `ThreadMovedEvent` | ja |
-| `thread.moved_out` | dauerhaft | `channel.read` |  | `ThreadMovedOutEvent` | ja |
-| `agent_session.changed` | dauerhaft | `thread.read` |  | `AgentSessionChangedEvent` | ja |
-| `run.state_changed` | dauerhaft | `run.read` |  | `RunStateChangedEvent` | ja |
-| `space.created` | dauerhaft | `space.read` |  | `SpaceCreatedEvent` | ja |
-| `space.updated` | dauerhaft | `space.read` |  | `SpaceUpdatedEvent` | ja |
-| `space.archived` | dauerhaft | `space.read` |  | `SpaceArchivedEvent` | ja |
-| `channel.created` | dauerhaft | `channel.read` |  | `ChannelCreatedEvent` | ja |
-| `channel.updated` | dauerhaft | `channel.read` |  | `ChannelUpdatedEvent` | ja |
-| `channel.settings_changed` | dauerhaft | `channel.read` |  | `ChannelSettingsChangedEvent` | ja |
-| `channel.archived` | dauerhaft | `channel.read` |  | `ChannelArchivedEvent` | ja |
-| `command.changed` | dauerhaft | `command.read` |  | `CommandChangedEvent` | ja |
-| `file.updated` | dauerhaft | `file.read` |  | `FileUpdatedEvent` | ja |
-| `user.updated` | dauerhaft | `user.read` |  | `UserUpdatedEvent` | ja |
-| `agent.updated` | dauerhaft | `agent.read` |  | `AgentUpdatedEvent` | ja |
-| `instance.updated` | dauerhaft | `instance.read` |  | `InstanceUpdatedEvent` | ja |
-| `status.updated` | dauerhaft | `status.read` |  | `StatusUpdatedEvent` | ja |
-| `grant.changed` | dauerhaft | `grant.read` |  | `GrantChangedEvent` |  |
-| `group.changed` | dauerhaft | `group.read` |  | `GroupChangedEvent` |  |
-| `access.changed` | dauerhaft | `self` | self | `AccessChangedEvent` | ja |
-| `access.expiring` | dauerhaft | `self` | self | `AccessExpiringEvent` |  |
-| `session.revoked` | dauerhaft | `self` | self | `SessionRevokedEvent` |  |
-| `read_state.updated` | dauerhaft | `self` | self | `ReadStateUpdatedEvent` |  |
-| `draft.updated` | dauerhaft | `self` | self | `DraftUpdatedEvent` |  |
-| `draft.deleted` | dauerhaft | `self` | self | `DraftDeletedEvent` |  |
-| `settings.updated` | dauerhaft | `self` | self | `SettingsUpdatedEvent` |  |
-| `sidebar.updated` | dauerhaft | `self` | self | `SidebarUpdatedEvent` |  |
-| `notification_pref.updated` | dauerhaft | `self` | self | `NotificationPrefUpdatedEvent` |  |
-| `quiet_hours.updated` | dauerhaft | `self` | self | `QuietHoursUpdatedEvent` |  |
-| `gdpr.request_updated` | dauerhaft | `gdpr.request.read` |  | `GdprRequestUpdatedEvent` |  |
-| `import.progress` | dauerhaft | `import.read` |  | `ImportProgressEvent` |  |
-| `agent.invocation` | dauerhaft | `agent.events.consume` | self | `AgentInvocationEvent` | ja |
-| `agent.followup` | dauerhaft | `agent.events.consume` | self | `AgentFollowupEvent` | ja |
-| `run.cancel_requested` | dauerhaft | `agent.events.consume` | self | `RunCancelRequestedEvent` | ja |
-| `interaction.created` | dauerhaft | `agent.events.consume` | self | `InteractionCreatedEvent` | ja |
-| `command.invoked` | dauerhaft | `agent.events.consume` | self | `CommandInvokedEvent` | ja |
-| `agent.config_changed` | dauerhaft | `agent.config.read` | self | `AgentConfigChangedEvent` | ja |
-| `host.updated` | dauerhaft | `host.read` |  | `HostUpdatedEvent` |  |
-| `terminal_session.changed` | dauerhaft | `self` | self | `TerminalSessionChangedEvent` |  |
-| `typing.started` | kurzlebig | `thread.read` |  | `TypingStartedEvent` |  |
-| `run.updated` | kurzlebig | `run.read` |  | `RunUpdatedEvent` |  |
-| `agent.presence_changed` | kurzlebig | `agent.read` |  | `AgentPresenceChangedEvent` |  |
-| `command.autocomplete_requested` | kurzlebig | `agent.events.consume` | self | `CommandAutocompleteRequestedEvent` |  |
-| `notification.created` | kurzlebig | `push.deliver` | self | `NotificationCreatedEvent` |  |
-| `host.presence_changed` | kurzlebig | `host.read` |  | `HostPresenceChangedEvent` |  |
-| `stats.live` | kurzlebig | `stats.read` |  | `StatsLiveEvent` |  |
+| `message.created` | durable | `message.read` |  | `MessageCreatedEvent` | yes |
+| `message.updated` | durable | `message.read` |  | `MessageUpdatedEvent` | yes |
+| `message.deleted` | durable | `message.read` |  | `MessageDeletedEvent` | yes |
+| `reaction.added` | durable | `message.read` |  | `ReactionAddedEvent` | yes |
+| `reaction.removed` | durable | `message.read` |  | `ReactionRemovedEvent` | yes |
+| `pin.added` | durable | `thread.read` |  | `PinAddedEvent` | yes |
+| `pin.removed` | durable | `thread.read` |  | `PinRemovedEvent` | yes |
+| `thread.created` | durable | `thread.read` |  | `ThreadCreatedEvent` | yes |
+| `thread.updated` | durable | `thread.read` |  | `ThreadUpdatedEvent` | yes |
+| `thread.closed` | durable | `thread.read` |  | `ThreadClosedEvent` | yes |
+| `thread.reopened` | durable | `thread.read` |  | `ThreadReopenedEvent` | yes |
+| `thread.moved` | durable | `thread.read` |  | `ThreadMovedEvent` | yes |
+| `thread.moved_out` | durable | `channel.read` |  | `ThreadMovedOutEvent` | yes |
+| `agent_session.changed` | durable | `thread.read` |  | `AgentSessionChangedEvent` | yes |
+| `run.state_changed` | durable | `run.read` |  | `RunStateChangedEvent` | yes |
+| `space.created` | durable | `space.read` |  | `SpaceCreatedEvent` | yes |
+| `space.updated` | durable | `space.read` |  | `SpaceUpdatedEvent` | yes |
+| `space.archived` | durable | `space.read` |  | `SpaceArchivedEvent` | yes |
+| `channel.created` | durable | `channel.read` |  | `ChannelCreatedEvent` | yes |
+| `channel.updated` | durable | `channel.read` |  | `ChannelUpdatedEvent` | yes |
+| `channel.settings_changed` | durable | `channel.read` |  | `ChannelSettingsChangedEvent` | yes |
+| `channel.archived` | durable | `channel.read` |  | `ChannelArchivedEvent` | yes |
+| `command.changed` | durable | `command.read` |  | `CommandChangedEvent` | yes |
+| `file.updated` | durable | `file.read` |  | `FileUpdatedEvent` | yes |
+| `user.updated` | durable | `user.read` |  | `UserUpdatedEvent` | yes |
+| `agent.updated` | durable | `agent.read` |  | `AgentUpdatedEvent` | yes |
+| `instance.updated` | durable | `instance.read` |  | `InstanceUpdatedEvent` | yes |
+| `status.updated` | durable | `status.read` |  | `StatusUpdatedEvent` | yes |
+| `grant.changed` | durable | `grant.read` |  | `GrantChangedEvent` |  |
+| `group.changed` | durable | `group.read` |  | `GroupChangedEvent` |  |
+| `access.changed` | durable | `self` | self | `AccessChangedEvent` | yes |
+| `access.expiring` | durable | `self` | self | `AccessExpiringEvent` |  |
+| `session.revoked` | durable | `self` | self | `SessionRevokedEvent` |  |
+| `read_state.updated` | durable | `self` | self | `ReadStateUpdatedEvent` |  |
+| `draft.updated` | durable | `self` | self | `DraftUpdatedEvent` |  |
+| `draft.deleted` | durable | `self` | self | `DraftDeletedEvent` |  |
+| `settings.updated` | durable | `self` | self | `SettingsUpdatedEvent` |  |
+| `sidebar.updated` | durable | `self` | self | `SidebarUpdatedEvent` |  |
+| `notification_pref.updated` | durable | `self` | self | `NotificationPrefUpdatedEvent` |  |
+| `quiet_hours.updated` | durable | `self` | self | `QuietHoursUpdatedEvent` |  |
+| `gdpr.request_updated` | durable | `gdpr.request.read` |  | `GdprRequestUpdatedEvent` |  |
+| `import.progress` | durable | `import.read` |  | `ImportProgressEvent` |  |
+| `agent.invocation` | durable | `agent.events.consume` | self | `AgentInvocationEvent` | yes |
+| `agent.followup` | durable | `agent.events.consume` | self | `AgentFollowupEvent` | yes |
+| `run.cancel_requested` | durable | `agent.events.consume` | self | `RunCancelRequestedEvent` | yes |
+| `interaction.created` | durable | `agent.events.consume` | self | `InteractionCreatedEvent` | yes |
+| `command.invoked` | durable | `agent.events.consume` | self | `CommandInvokedEvent` | yes |
+| `agent.config_changed` | durable | `agent.config.read` | self | `AgentConfigChangedEvent` | yes |
+| `host.updated` | durable | `host.read` |  | `HostUpdatedEvent` |  |
+| `terminal_session.changed` | durable | `self` | self | `TerminalSessionChangedEvent` |  |
+| `typing.started` | ephemeral | `thread.read` |  | `TypingStartedEvent` |  |
+| `run.updated` | ephemeral | `run.read` |  | `RunUpdatedEvent` |  |
+| `agent.presence_changed` | ephemeral | `agent.read` |  | `AgentPresenceChangedEvent` |  |
+| `command.autocomplete_requested` | ephemeral | `agent.events.consume` | self | `CommandAutocompleteRequestedEvent` |  |
+| `notification.created` | ephemeral | `push.deliver` | self | `NotificationCreatedEvent` |  |
+| `host.presence_changed` | ephemeral | `host.read` |  | `HostPresenceChangedEvent` |  |
+| `stats.live` | ephemeral | `stats.read` |  | `StatsLiveEvent` |  |
 <!-- END GENERATED: events -->
 
-## 18. Abgleich mit dem Kern-Vertrag
+## 18. Alignment with the core contract
 
-Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026-10-10). Der
-frühere Block "proposed" in docs/api/redocly.yaml ist leer und entfällt.
+The additions requested during drafting are decided (integration of 2026-10-10). The
+former block "proposed" in docs/api/redocly.yaml is empty and is dropped.
 
-### 18.1 Aktionen
+### 18.1 Actions
 
-| ID | Entscheidung, Ort |
+| ID | Decision, location |
 |---|---|
-| `health.read` | nicht übernommen: Health liegt auf dem internen Listener außerhalb der API (Ruling L2, R-API-16) |
-| `instance.settings.read` | übernommen, 05 Abschnitt 4.2 |
-| `identity.read` | übernommen, 05 Abschnitt 4.3 |
-| `self.read` | übernommen, 05 Abschnitt 4.3 |
-| `agent.enable` | übernommen, 05 Abschnitt 4.10 (mit I1-Prüfung) |
-| `file.transcript.submit` | übernommen, 05 Abschnitt 4.8 |
-| `command.autocomplete.respond` | übernommen, 05 Abschnitt 4.10; dazu die Gateway-Op `command.autocomplete_result` |
-| `webhook_in.read` | übernommen, 05 Abschnitt 4.11 |
-| `local_credential.set` | übernommen, 05 Abschnitt 4.3 |
+| `health.read` | not adopted: health lives on the internal listener outside the API (Ruling L2, R-API-16) |
+| `instance.settings.read` | adopted, 05 section 4.2 |
+| `identity.read` | adopted, 05 section 4.3 |
+| `self.read` | adopted, 05 section 4.3 |
+| `agent.enable` | adopted, 05 section 4.10 (with I1 check) |
+| `file.transcript.submit` | adopted, 05 section 4.8 |
+| `command.autocomplete.respond` | adopted, 05 section 4.10; plus the gateway op `command.autocomplete_result` |
+| `webhook_in.read` | adopted, 05 section 4.11 |
+| `local_credential.set` | adopted, 05 section 4.3 |
 
-### 18.2 Weitere Punkte
+### 18.2 Other points
 
-| Nr | Punkt | Entscheidung, Ort |
+| No. | Item | Decision, location |
 |---|---|---|
-| K1 | Pfad-Präfix | `/api/v1` für alle Flächen, 04 |
-| K2 | kein JSON `null` im Umschlag | übernommen, 04 Abschnitt 2.2, [ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md) |
-| K3 | Aufruf-Marke und `redelivered` als Zustellfelder im Umschlag | übernommen, 04 Abschnitt 2.2, [ADR 0052](../adr/0052-ein-ereignis-umschlag-fuer-gateway-rest-und-webhooks.md) |
-| K4 | `412 version_conflict` mit `If-Match` | übernommen, 03 Grundsatz 10, 04 Abschnitt 13.3 |
-| K5 | Wiederholung von `run.start` mit derselben Marke | übernommen, 03 `runs.started_jti`, 04 Abschnitt 15.3 |
-| K6 | `waiting_input -> running` mit der Marke von Interaktion oder Nachtrag | übernommen, 04 Abschnitt 15.3 Schritt 5 (`resumeRun`, Aktion `run.start`) |
-| K7 | Autovervollständigung zum Eigentümer | übernommen, 04 Abschnitt 15.7 |
-| K8 | Grund für `trigger_state = failed` | übernommen als `messages.trigger_state_reason` (gilt auch für `cancelled`) |
-| K9 | lokale Konten mit Passwort und TOTP, Einladungs-Codes | übernommen, 03 `local_credentials`, `enrollment_codes`, `auth_sessions.auth_method` |
-| K10 | Nachsicht bei Refresh-Wiederholung | übernommen, 03 `refresh_tokens`, `auth.refresh_reuse_grace` |
-| K11 | persönliche Ereignisse für Apps; Scopes für Metadaten-Aktionen | übernommen, 05 Abschnitte 2.6 und 6 |
-| K12 | `agent.read` für den Agenten selbst | übernommen, 05 Abschnitt 4.10 |
-| K13 | wartendes Gerät | übernommen: Tokens, aber `403 device_pending` außer Selbstauskunft (05 Abschnitt 2.5, R-AZ-16) |
-| K14 | HMAC-Signatur `v1` je Abo | übernommen, 03 `webhook_subscriptions.hmac_enabled`, `hmac_generation`, `hmac_rotated_at` |
-| K15 | Ressource von `template.manage` | übernommen: `user` für persönliche, `channel` für Kanal-Vorlagen (05) |
-| K16 | Routen für neue Aktionen des Katalogs | angelegt in openapi.yaml: `createFileTicket`, `getUpload`, `getPushPreview`, `searchThreadTitles`, `submitClientMetrics`, `setAgentToolClass`, `listAgentWebhookSubscriptions`, `createAgentWebhookSubscription`, `getAgentTriggerers`, `getRunContext`, `setChannelReadOnly`, `suspendApp`, `resumeApp`, `submitCostReconciliation`, `completeImport`, `setImportLead`, `applyImportBatch`, `createImportFile`, `setImportCursor`, Geräte-Kopplung `beginPairing`, `completePairing`, `approvePairing` (08 Abschnitt 5.3); ohne Route bleiben die Aktionen aus Abschnitt 4, Punkt 7 |
-| K17 | Server-Trockenlauf eines Imports | entfällt (`startImportDryRun`); der Trockenlauf liegt im Werkzeug und liest nur (22, Abschnitte 8 und 10.2) |
-| K18 | Suche | Parameter und Treffer nach 14 Abschnitte 4 und 11: `type`, `sort`, mehrfache Filter, `segments` statt HTML-Markierung, `candidates_capped`; Fehler `400 validation_failed` bzw. `cursor_invalid` |
-| K19 | Sync-Epoche | `sync_epoch` in Momentaufnahme, `EventPage`, `hello`, `ready`, `resumed`, `resync_required` (04 Abschnitt 7.5) |
-| K20 | Problem-Codes | neu `channel_read_only` (`403`), `tool_class_mismatch` (`409`), `maintenance` (`503`); 05 Regeln 1.8 und 1.9, 07 Abschnitt 4.1 |
-| K21 | Webhook als Agenten-Transport | Ereignisse `agent.invocation`, `agent.followup`, `run.cancel_requested`, `agent.config_changed` unter `webhooks:`; Abos an `agent_id` (03 `webhook_subscriptions`, 04 Abschnitt 15.6) |
+| K1 | Path prefix | `/api/v1` for all surfaces, 04 |
+| K2 | no JSON `null` in the envelope | adopted, 04 section 2.2, [ADR 0053](../adr/0053-no-json-null-in-api-and-events.md) |
+| K3 | Invocation token and `redelivered` as delivery fields in the envelope | adopted, 04 section 2.2, [ADR 0052](../adr/0052-one-event-envelope-for-gateway-rest-and-webhooks.md) |
+| K4 | `412 version_conflict` with `If-Match` | adopted, 03 principle 10, 04 section 13.3 |
+| K5 | Repeating `run.start` with the same token | adopted, 03 `runs.started_jti`, 04 section 15.3 |
+| K6 | `waiting_input -> running` with the token of an interaction or follow-up | adopted, 04 section 15.3 step 5 (`resumeRun`, action `run.start`) |
+| K7 | Autocomplete to the command owner | adopted, 04 section 15.7 |
+| K8 | Reason for `trigger_state = failed` | adopted as `messages.trigger_state_reason` (also applies to `cancelled`) |
+| K9 | local accounts with password and TOTP, enrollment codes | adopted, 03 `local_credentials`, `enrollment_codes`, `auth_sessions.auth_method` |
+| K10 | Grace period for a refresh retry | adopted, 03 `refresh_tokens`, `auth.refresh_reuse_grace` |
+| K11 | personal events for apps; scopes for metadata actions | adopted, 05 sections 2.6 and 6 |
+| K12 | `agent.read` for the agent itself | adopted, 05 section 4.10 |
+| K13 | pending device | adopted: tokens, but `403 device_pending` except for the self lookup (05 section 2.5, R-AZ-16) |
+| K14 | HMAC signature `v1` per subscription | adopted, 03 `webhook_subscriptions.hmac_enabled`, `hmac_generation`, `hmac_rotated_at` |
+| K15 | Resource of `template.manage` | adopted: `user` for personal templates, `channel` for channel templates (05) |
+| K16 | Routes for new actions of the catalogue | created in openapi.yaml: `createFileTicket`, `getUpload`, `getPushPreview`, `searchThreadTitles`, `submitClientMetrics`, `setAgentToolClass`, `listAgentWebhookSubscriptions`, `createAgentWebhookSubscription`, `getAgentTriggerers`, `getRunContext`, `setChannelReadOnly`, `suspendApp`, `resumeApp`, `submitCostReconciliation`, `completeImport`, `setImportLead`, `applyImportBatch`, `createImportFile`, `setImportCursor`, device pairing `beginPairing`, `completePairing`, `approvePairing` (08 section 5.3); the actions from section 4, item 7 stay without a route |
+| K17 | Server dry run of an import | dropped (`startImportDryRun`); the dry run lives in the tool and only reads (22, sections 8 and 10.2) |
+| K18 | Search | parameters and hits per 14 sections 4 and 11: `type`, `sort`, multiple filters, `segments` instead of HTML highlighting, `candidates_capped`; errors `400 validation_failed` or `cursor_invalid` |
+| K19 | Sync epoch | `sync_epoch` in snapshot, `EventPage`, `hello`, `ready`, `resumed`, `resync_required` (04 section 7.5) |
+| K20 | Problem codes | new `channel_read_only` (`403`), `tool_class_mismatch` (`409`), `maintenance` (`503`); 05 rules 1.8 and 1.9, 07 section 4.1 |
+| K21 | Webhook as agent transport | events `agent.invocation`, `agent.followup`, `run.cancel_requested`, `agent.config_changed` under `webhooks:`; subscriptions to `agent_id` (03 `webhook_subscriptions`, 04 section 15.6) |
 
-## 19. Entscheidungen dieses Kapitels
+## 19. Decisions of this chapter
 
-| Nr | Entscheidung | Grund |
+| No. | Decision | Reason |
 |---|---|---|
-| R-API-01 | Hauptversion im Pfad `/api/v1`, nur additive Änderungen innerhalb (ADR 0014). | Sichtbar in Logs und Proxys, einfach für generierte Clients. |
-| R-API-02 | Ressourcen-Pfade plus `POST .../<verb>` für Zustandswechsel. | Eine Aktion je Route; Grund und Audit gehören zum Wechsel. |
-| R-API-03 | Kein JSON `null`; fehlend heißt kein Wert; Entfernen über eigene Felder oder Modi ([ADR 0053](../adr/0053-kein-json-null-in-api-und-ereignissen.md)). | dart-dio kennt den Null-Typ nicht; Go `omitempty` passt; PATCH ohne Dreiwertigkeit. |
-| R-API-04 | Clients ignorieren Unbekanntes in Antworten und Ereignissen; der Server lehnt unbekannte Anfragefelder ab (W7, SEC-IN-1). | Unabhängige Updates von Apps und Servern, ohne dass ein älterer Server eine Absicht still verschluckt. |
-| R-API-05 | `oneOf` nur mit Diskriminator, kein `anyOf`, keine Typ-Arrays (Lint). | oapi-codegen macht aus Mehrtyp-Unions `any` (Baseline R-Stack). |
-| R-API-06 | Alle Schemas in openapi.yaml; asyncapi.yaml referenziert sie. | Eine Quelle für alle Generatoren. |
-| R-API-07 | Problem-`type` relativ mit vollem Pfad, plus `code`. | Kein gemeinsamer Host bei selbst gehosteter Software; RFC 9457 erlaubt es. |
-| R-API-08 | `If-Match` mit `412` statt `expected_version` mit `409`. | HTTP-Standardmechanismus (RFC 9110); Standard-Middleware und Bibliotheken nutzbar. |
-| R-API-09 | `Idempotency-Key` auf POST und PATCH außer den Fällen in 7.3; nur endgültige Antworten werden gespeichert. | Wiederholung nach Step-up und Drosselung muss wirken. |
-| R-API-10 | Cursor ohne Gesamtzahl; Verlauf über `thread_seq`. | Keyset ist stabil und billig; Zahlen verraten Mengen. |
-| R-API-11 | RateLimit-Kopfzeilen nach Entwurf -11, als vorläufig markiert. | Clients können vorab drosseln; Wechsel auf den RFC ist additiv. |
-| R-API-12 | Eigene Endpunkte je Anmeldeart; OIDC mit Server als vertraulichem Client, `login_code` plus `client_verifier`. | Keine Unions; abgefangene Umleitungen sind wertlos. |
-| R-API-13 | Uploads als Sitzung aus Teilen mit gleichem Ablauf für beide Treiber. | Ein Client-Pfad; Wiederaufnahme und Parallelität. |
-| R-API-14 | Webhooks: `v1a` immer, `v1` je Abo zuschaltbar (ADR 0016). | Asymmetrisch bevorzugt, HMAC für verbreitete Bibliotheken. |
-| R-API-15 | Beschreibungen in den YAML-Dateien Englisch, Kapitel Deutsch. | Beschreibungen werden Kommentare im generierten Code. |
-| R-API-16 | Keine Health-Endpunkte in der öffentlichen API; Liveness und Readiness liegen auf dem internen Listener (Ruling L2, [16-betrieb.md](16-betrieb.md) 4.2). | Health ist Betriebs-Vertrag; der öffentliche Listener bekommt keinen Weg ohne Anmeldung und Aktion. Ersetzt den Entwurf mit `/api/v1/health/*` und `health.read`. |
-| R-API-17 | Lauf-Ende über `POST /runs/{id}/finish` mit Zielzustand statt der Beispielpfade `/fail`, `/complete`, `/cancelled` aus 04. | Ein Schema, eine Aktion (`run.finish`), kein Verwechseln von `cancel` und `cancelled`. |
-| R-API-18 | Generierter Code wird eingecheckt, Drift-Prüfung im Gate. | Review sieht Wirkungen; Builds ohne Generator. |
-| R-API-19 | Titel der Verträge neutral ("Chat Server API"), kein Produktname. | Name ist Konfiguration (Baseline Abschnitt 1, ADR 0044). |
-| R-API-20 | Unpaginierte Listen nur für kleine Mengen. | Weniger Aufrufe für Struktur; Wachstum über neue Endpunkte. |
-| R-API-21 | App mit Freigabe, aber ohne den Scope der Aktion bekommt `403 scope_missing`; ohne Freigabe `404`. | Sichtbarkeit folgt der Freigabe wie bei Menschen (R-AZ-01, 07 Abschnitt 2.10). |
-| R-API-22 | Jede Operation dokumentiert mindestens eine 4xx-Antwort; ausgenommen sind nur die Webhook-Ereignisse unter `webhooks:` mit Klasse `none`, die der Server sendet. Dafür ersetzt eine eigene Lint-Regel die eingebaute `operation-4xx-response`. | Webhook-Ereignisse beschreiben Anfragen an den Empfänger, keine Antworten des Servers; alles andere muss seine Fehler nennen. |
-| R-API-23 | Problem-Codes haben eine Quelle: `x-problem-codes` am Schema `Problem` (Englisch); jede Antwort-Komponente nennt ihren Status in `x-status`. Die Tabelle in Abschnitt 5 wird daraus erzeugt. | Eine deutsche Tabelle lässt sich nicht aus einem englischen Vertrag erzeugen (L5); `getProblemType` und die Problem-Körper brauchen Titel und Beschreibung aus einer Quelle; `Error` und `ServiceUnavailable` stehen unter keinem Zahlen-Status. |
-| R-API-24 | Ausnahmen vom `Idempotency-Key` stehen maschinenlesbar mit Grund-Code (`x-idempotency-exempt`) an der Operation. | Die Prosaliste deckte nicht alle Operationen ab; G2 braucht eine Quelle. |
-| R-API-25 | `x-deprecated-at` trägt das Datum der Ablösung. | `x-deprecated-since` ist eine Spec-Version; Sunset-Regel und Kopfzeile `Deprecation` brauchen ein Datum. |
-| R-API-26 | Einmalige Geheimnisse liegen nie in `idempotency_keys`; eine Wiederholung antwortet `409 conflict` mit `reason: one_time_secret`. | 03 Grundsatz 9 verbietet Geheimnisse im Klartext; eine Wiederholung darf weder das Geheimnis zeigen noch ein zweites anlegen. |
-| R-API-27 | Ein Zustandswechsel oder PATCH ohne Wirkung ist ein Erfolg ohne Version, Ereignis und Rechte-Version (Abschnitt 2, "Ohne Wirkung"). | Ausgangsfach und Wiederholungen nach Ablauf des Schlüssels brauchen dieselbe Antwort; ein No-op darf keinen Cache ungültig machen. |
-| R-API-28 | Problem-Codes sind eine geschlossene Liste; feinere Gründe stehen in `reason` oder `errors[].code`, nie in einem Code, den nur ein Kapitel nennt (Abschnitt 5 Punkt 7). | Ein Code ohne Eintrag in `x-problem-codes` steht an keiner Operation, kein Client kennt ihn, und der Problem-Typ-Endpunkt kann ihn nicht beschreiben; der Check in `make docs` macht die Regel prüfbar. |
+| R-API-01 | Major version in the path `/api/v1`, only additive changes within it (ADR 0014). | Visible in logs and proxies, simple for generated clients. |
+| R-API-02 | Resource paths plus `POST .../<verb>` for state changes. | One action per route; reason and audit belong to the change. |
+| R-API-03 | No JSON `null`; missing means no value; removal through dedicated fields or modes ([ADR 0053](../adr/0053-no-json-null-in-api-and-events.md)). | dart-dio does not know the null type; Go `omitempty` fits; PATCH without three-valued logic. |
+| R-API-04 | Clients ignore unknown content in responses and events; the server rejects unknown request fields (W7, SEC-IN-1). | Independent updates of apps and servers, without an older server silently swallowing an intent. |
+| R-API-05 | `oneOf` only with a discriminator, no `anyOf`, no type arrays (lint). | oapi-codegen turns multi-type unions into `any` (baseline R-Stack). |
+| R-API-06 | All schemas in openapi.yaml; asyncapi.yaml references them. | One source for all generators. |
+| R-API-07 | Problem `type` relative with the full path, plus `code`. | No shared host for self-hosted software; RFC 9457 allows it. |
+| R-API-08 | `If-Match` with `412` instead of `expected_version` with `409`. | Standard HTTP mechanism (RFC 9110); standard middleware and libraries are usable. |
+| R-API-09 | `Idempotency-Key` on POST and PATCH except the cases in 7.3; only final responses are stored. | A repetition after step-up and throttling must work. |
+| R-API-10 | Cursor without a total count; history through `thread_seq`. | Keyset is stable and cheap; counts reveal volumes. |
+| R-API-11 | RateLimit headers per draft -11, marked as provisional. | Clients can throttle in advance; switching to the RFC is additive. |
+| R-API-12 | Separate endpoints per login method; OIDC with the server as a confidential client, `login_code` plus `client_verifier`. | No unions; intercepted redirects are worthless. |
+| R-API-13 | Uploads as a session of parts with the same flow for both drivers. | One client path; resumption and parallelism. |
+| R-API-14 | Webhooks: `v1a` always, `v1` can be switched on per subscription (ADR 0016). | Asymmetric preferred, HMAC for common libraries. |
+| R-API-15 | Descriptions in the YAML files and the chapters are English (D-W-94, 2026-10-11; before: chapters German). | Descriptions become comments in the generated code. |
+| R-API-16 | No health endpoints in the public API; liveness and readiness live on the internal listener (Ruling L2, [16-operations.md](16-operations.md) 4.2). | Health is an operations contract; the public listener gets no path without login and action. Replaces the draft with `/api/v1/health/*` and `health.read`. |
+| R-API-17 | End of a run through `POST /runs/{id}/finish` with a target state instead of the example paths `/fail`, `/complete`, `/cancelled` from 04. | One schema, one action (`run.finish`), no confusing `cancel` with `cancelled`. |
+| R-API-18 | Generated code is checked in, with a drift check in the gate. | Review sees the effects; builds without a generator. |
+| R-API-19 | Titles of the contracts are neutral ("Chat Server API"), no product name. | The name is configuration (baseline section 1, ADR 0044). |
+| R-API-20 | Unpaginated lists only for small sets. | Fewer calls for structure; growth through new endpoints. |
+| R-API-21 | An app with a grant but without the scope of the action gets `403 scope_missing`; without a grant `404`. | Visibility follows the grant as for people (R-AZ-01, 07 section 2.10). |
+| R-API-22 | Every operation documents at least one 4xx response; the only exceptions are the webhook events under `webhooks:` with class `none` that the server sends. For this, a custom lint rule replaces the built-in `operation-4xx-response`. | Webhook events describe requests to the receiver, not responses of the server; everything else must name its errors. |
+| R-API-23 | Problem codes have one source: `x-problem-codes` on the schema `Problem` (English); every response component names its status in `x-status`. The table in section 5 is generated from it. | A German table cannot be generated from an English contract (L5); `getProblemType` and the problem bodies need title and description from one source; `Error` and `ServiceUnavailable` stand under no numeric status. |
+| R-API-24 | Exceptions from the `Idempotency-Key` are recorded machine-readably with a reason code (`x-idempotency-exempt`) on the operation. | The prose list did not cover all operations; G2 needs one source. |
+| R-API-25 | `x-deprecated-at` carries the date of the replacement. | `x-deprecated-since` is a spec version; the sunset rule and the header `Deprecation` need a date. |
+| R-API-26 | One-time secrets are never stored in `idempotency_keys`; a repetition answers `409 conflict` with `reason: one_time_secret`. | 03 principle 9 forbids secrets in plain text; a repetition must neither show the secret nor create a second one. |
+| R-API-27 | A state change or PATCH without effect is a success without a version, an event and a permission version (section 2, "No effect"). | The outbox and repetitions after the key expires need the same response; a no-op must not invalidate any cache. |
+| R-API-28 | Problem codes are a closed list; finer reasons go in `reason` or `errors[].code`, never in a code that only one chapter names (section 5 item 7). | A code without an entry in `x-problem-codes` stands on no operation, no client knows it, and the problem type endpoint cannot describe it; the check in `make docs` makes the rule checkable. |
 
-## 20. Konfigurationswerte dieses Kapitels
+## 20. Configuration values of this chapter
 
-| Name | Standard | Bedeutung |
+| Name | Default | Meaning |
 |---|---|---|
-| `api.page_size_default` | `50` | Seitengröße ohne `limit` |
-| `api.page_size_max` | `200` | größere `limit` werden gekappt |
-| `api.cors_allowed_origins` | leer | zusätzliche Origins für CORS |
-| `api.deprecation_min_notice` | `180d` | Mindestabstand von `Deprecation` zu `Sunset` |
-| `api.major_version_overlap` | `365d` | so lange bleibt eine alte Hauptversion nach Erscheinen der neuen |
-| `api.stats_max_buckets` | `1000` | Zeit-Buckets je Statistik-Abfrage; mehr ergibt `400` |
-| `message.list_content_max_bytes` | `16384` | größter `content_md` je Nachricht in Listen; darüber gekürzt mit `content_truncated` (Abschnitt 6) |
-| `status.history_window` | `7d` | so lange zeigt die Statusseite gelöste Störungen |
+| `api.page_size_default` | `50` | page size without `limit` |
+| `api.page_size_max` | `200` | larger `limit` values are capped |
+| `api.cors_allowed_origins` | empty | additional origins for CORS |
+| `api.deprecation_min_notice` | `180d` | minimum gap from `Deprecation` to `Sunset` |
+| `api.major_version_overlap` | `365d` | how long an old major version stays after the new one appears |
+| `api.stats_max_buckets` | `1000` | time buckets per statistics query; more yields `400` |
+| `message.list_content_max_bytes` | `16384` | largest `content_md` per message in lists; above that truncated with `content_truncated` (section 6) |
+| `status.history_window` | `7d` | how long the status page shows resolved incidents |
 
-Werte anderer Kapitel, auf die dieses Kapitel verweist: `http.max_json_body_bytes`,
-`http.max_json_depth`, `http.unavailable_retry_after` ([02-architektur.md](02-architektur.md)), `server.trusted_proxies` ([16-betrieb.md](16-betrieb.md)),
-`auth.*` ([08-identitaet.md](08-identitaet.md), `auth.refresh_reuse_grace` in
-[03-datenmodell.md](03-datenmodell.md)), `command.autocomplete_timeout`
-([09-agenten.md](09-agenten.md)), `file.upload_part_bytes`, `file.upload_session_ttl` und
-`file.s3.presign_ttl` ([12-dateien.md](12-dateien.md)).
+Values of other chapters that this chapter refers to: `http.max_json_body_bytes`,
+`http.max_json_depth`, `http.unavailable_retry_after` ([02-architecture.md](02-architecture.md)), `server.trusted_proxies` ([16-operations.md](16-operations.md)),
+`auth.*` ([08-identity.md](08-identity.md), `auth.refresh_reuse_grace` in
+[03-data-model.md](03-data-model.md)), `command.autocomplete_timeout`
+([09-agents.md](09-agents.md)), `file.upload_part_bytes`, `file.upload_session_ttl` and
+`file.s3.presign_ttl` ([12-files.md](12-files.md)).
 
-## Quellen
+## Sources
 
-Alle abgerufen am 2026-10-10.
+All retrieved on 2026-10-10.
 
-| Nr | Quelle | Inhalt | Marker |
+| No. | Source | Content | Marker |
 |---|---|---|---|
-| Q1 | https://github.com/oapi-codegen/oapi-codegen/releases | v2.8.0: erste OpenAPI-3.1-Unterstützung, Go 1.25, Laufzeit ab v1.6.0, `type: [T, "null"]`, Webhooks | [belegt] |
-| Q2 | https://www.rfc-editor.org/rfc/rfc9457.html | Problem Details: `type` als URI-Referenz, absolute URIs empfohlen, relative mit vollem Pfad erlaubt, Erweiterungen | [belegt] |
-| Q3 | https://www.rfc-editor.org/rfc/rfc9449.html | DPoP: Schema `DPoP`, Beweis-Claims, `use_dpop_nonce`, `DPoP-Nonce`, `token_type` `DPoP` | [belegt] |
-| Q4 | https://openapi-generator.tech/docs/generators/dart-dio/ | dart-dio: Null-Typ nicht unterstützt, `enumUnknownDefaultCase`, `oneOf` und Diskriminator unterstützt | [belegt] |
-| Q5 | https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/ | Entwurf -11 (Mai 2026), Felder `RateLimit-Policy` und `RateLimit` | [belegt] |
-| Q6 | https://github.com/OpenAPITools/openapi-generator | Version 7.26.0, Apache-2.0; OpenAPI 3.1 "beta support" (auch als Warnung der Generator-Ausgabe in der eigenen Probe) | [belegt] |
-| Q7 | https://www.rfc-editor.org/rfc/rfc9745.html | `Deprecation` als Structured-Field-Datum, `Sunset` nicht früher, Link-Relation `deprecation` | [belegt] |
-| Q8 | https://github.com/oasdiff/oasdiff | Lizenz Apache-2.0; OpenAPI-3.1-Arbeit nur als Beta-Stände sichtbar | [vermutet] |
-| Q9 | https://www.rfc-editor.org/rfc/rfc9110.html | `If-Match` scheitert: `412`; `Retry-After` | [belegt] |
-| Q10 | https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/ | Entwurf -07 abgelaufen; Kopfzeile `Idempotency-Key` als verbreitetes Muster | [belegt] |
-| Q11 | https://github.com/schemathesis/schemathesis | MIT, zustandsbehaftete Tests über abgeleitete Links, eigene Anmelde-Logik | [belegt] |
-| Q12 | https://www.rfc-editor.org/rfc/rfc8252.html | Native Apps nutzen den externen Browser; Redirect über eigenes Schema, beanspruchtes `https` oder Loopback | [belegt] |
+| Q1 | https://github.com/oapi-codegen/oapi-codegen/releases | v2.8.0: first OpenAPI 3.1 support, Go 1.25, runtime from v1.6.0, `type: [T, "null"]`, webhooks | [verified] |
+| Q2 | https://www.rfc-editor.org/rfc/rfc9457.html | Problem Details: `type` as a URI reference, absolute URIs recommended, relative ones with the full path allowed, extensions | [verified] |
+| Q3 | https://www.rfc-editor.org/rfc/rfc9449.html | DPoP: scheme `DPoP`, proof claims, `use_dpop_nonce`, `DPoP-Nonce`, `token_type` `DPoP` | [verified] |
+| Q4 | https://openapi-generator.tech/docs/generators/dart-dio/ | dart-dio: null type not supported, `enumUnknownDefaultCase`, `oneOf` and discriminator supported | [verified] |
+| Q5 | https://datatracker.ietf.org/doc/draft-ietf-httpapi-ratelimit-headers/ | Draft -11 (May 2026), fields `RateLimit-Policy` and `RateLimit` | [verified] |
+| Q6 | https://github.com/OpenAPITools/openapi-generator | Version 7.26.0, Apache-2.0; OpenAPI 3.1 "beta support" (also as a warning in the generator output in our own probe) | [verified] |
+| Q7 | https://www.rfc-editor.org/rfc/rfc9745.html | `Deprecation` as a structured field date, `Sunset` not earlier, link relation `deprecation` | [verified] |
+| Q8 | https://github.com/oasdiff/oasdiff | License Apache-2.0; OpenAPI 3.1 work visible only as beta releases | [assumed] |
+| Q9 | https://www.rfc-editor.org/rfc/rfc9110.html | `If-Match` fails: `412`; `Retry-After` | [verified] |
+| Q10 | https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/ | Draft -07 expired; header `Idempotency-Key` as a common pattern | [verified] |
+| Q11 | https://github.com/schemathesis/schemathesis | MIT, stateful tests through derived links, custom login logic | [verified] |
+| Q12 | https://www.rfc-editor.org/rfc/rfc8252.html | Native apps use the external browser; redirect through a custom scheme, a claimed `https` or loopback | [verified] |

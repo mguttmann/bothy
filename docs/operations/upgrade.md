@@ -1,90 +1,90 @@
 # Upgrade
 
-Status: Entwurf M0. Leitfaden zu [16-betrieb.md](../spec/16-betrieb.md) 10 und
-[18-release.md](../spec/18-release.md). Gilt für Betreiber (Ablauf) und für Entwickler von
-Migrationen (Regeln in Abschnitt 4).
+Status: draft M0. Guide to [16-operations.md](../spec/16-operations.md) 10 and
+[18-release.md](../spec/18-release.md). Applies to instance operators (procedure) and to developers
+of migrations (rules in section 4).
 
-## 1. Vor dem Upgrade
+## 1. Before the upgrade
 
-1. Release Notes lesen: Abschnitt "Upgrade-Hinweise" sagt, ob Handarbeit nötig ist; Abschnitt
-   "Migrationen" nennt Expand- oder Contract-Schritte und ihre erwartete Dauer auf großen Tabellen.
-2. Nur eine Hauptversion auf einmal. Innerhalb einer Hauptversion darf eine Instanz Versionen
-   überspringen; die Migrationen laufen in Reihenfolge.
-3. Signatur prüfen ([release.md](release.md) 5).
-4. Sicherung: `migrate` verlangt ohnehin eine erfolgreiche Sicherung jünger als
-   `migrate.recent_backup_max_age`. Vor großen Releases zusätzlich von Hand eine Vollsicherung
-   auslösen.
-5. Mindest-App-Versionen prüfen: Hebt das Release `client.min_version.<plattform>` an, vorher die
-   Apps über die Kanäle verteilen.
+1. Read the release notes: the section "Upgrade notes" says whether manual work is needed; the
+   section "Migrations" names expand or contract steps and their expected duration on large tables.
+2. Only one major version at a time. Within a major version, an instance may skip versions; the
+   migrations run in order.
+3. Check the signature ([release.md](release.md) 5).
+4. Backup: `migrate` requires a successful backup younger than
+   `migrate.recent_backup_max_age` anyway. Before large releases, also trigger a full backup
+   by hand.
+5. Check the minimum app versions: if the release raises `client.min_version.<platform>`, distribute
+   the apps via the channels first.
 
-## 2. Ablauf im Compose-Stack
+## 2. Procedure in the Compose stack
 
 ```
-# .env: BOTHY_VERSION auf die neue Version
+# .env: set BOTHY_VERSION to the new version
 docker compose pull
 docker compose up -d
 ```
 
-Compose ersetzt `migrate` zuerst; erst nach Exit 0 starten `api` und `worker` neu. Während des
-Neustarts sind Clients kurz getrennt; sie bekommen `4013 server_restart` und setzen mit `resume`
-fort. Hilfsdienste (Collector, Prometheus usw.) folgen ihren eigenen Versionsvariablen.
+Compose replaces `migrate` first; only after exit 0 do `api` and `worker` restart. During the
+restart, clients are briefly disconnected; they receive `4013 server_restart` and continue with
+`resume`. Auxiliary services (collector, Prometheus and so on) follow their own version variables.
 
-Prüfen: `docker compose ps`, `/readyz`, Statusseite, SLO-Dashboard, Version in der Admin-Konsole.
+Check: `docker compose ps`, `/readyz`, status page, SLO dashboard, version in the admin console.
 
-## 3. Rückweg
+## 3. Rollback
 
-1. Ein Release zurück: `BOTHY_VERSION` auf die vorige Version, `docker compose up -d`. Das Schema
-   bleibt; die Expand/Contract-Regel garantiert, dass der Code von N-1 damit läuft. `migrate`
-   der Version N-1 erkennt das neuere, aber kompatible Schema und beendet sich ohne Änderung.
-2. Mehr als ein Release zurück: nur per Wiederherstellung auf einen Zeitpunkt vor dem Upgrade
-   ([backup-restore.md](backup-restore.md) 5.2). Daten nach diesem Zeitpunkt gehen verloren.
+1. One release back: set `BOTHY_VERSION` to the previous version, `docker compose up -d`. The schema
+   stays; the expand/contract rule guarantees that the code of N-1 runs with it. `migrate`
+   of version N-1 recognizes the newer but compatible schema and exits without a change.
+2. More than one release back: only by a restore to a point in time before the upgrade
+   ([backup-restore.md](backup-restore.md) 5.2). Data after this point in time is lost.
 
-## 4. Regeln für Migrationen (Expand/Contract)
+## 4. Rules for migrations (Expand/Contract)
 
-| Nr | Regel | Grund |
+| No. | Rule | Reason |
 |---|---|---|
-| M1 | Version N darf nur entfernen oder umdeuten, was Version N-1 nicht mehr liest oder schreibt. | Rückweg um eine Version ohne Datenbank-Rückbau. |
-| M2 | Umbenennen nie direkt: neue Spalte (Expand), beide schreiben (N), nur neu lesen (N+1), alte entfernen (N+2). | M1. |
-| M3 | Neue Spalten sind `NULL` erlaubt oder haben einen Standard ohne Neuschreiben der Tabelle. | Kein langer Lock auf großen Tabellen. |
-| M4 | Indexe mit `CREATE INDEX CONCURRENTLY` in einer Migration ohne Transaktion (goose: `-- +goose NO TRANSACTION`). | Schreiben läuft weiter. |
-| M5 | Neue Constraints erst `NOT VALID`, in einer späteren Migration `VALIDATE CONSTRAINT`. | Prüfung ohne Schreibsperre. |
-| M6 | Jeder Schritt setzt `lock_timeout` auf `migrate.lock_timeout` und bricht lieber ab, als zu warten. | Ein wartender Lock blockiert alle folgenden Anfragen. |
-| M7 | Daten nachfüllen (Backfill) nie in der Migration, sondern als Hintergrundjob in Stapeln. | Kurze Transaktionen; Fortschritt sichtbar. |
-| M8 | Aufzählungen sind `text` mit `CHECK`; neue Werte sind additiv (R-DM-02). Code von N-1 muss unbekannte Werte vertragen. | Rückweg. |
-| M9 | Nutzlasten von Ereignissen ändern sich nur additiv (`schema_version`, [04-sync-protokoll.md](../spec/04-sync-protokoll.md) 2.2). | Alte Clients lesen weiter. |
-| M10 | Partitionen des Ereignis-Logs legt ein Job im Voraus an, nie eine Migration im Betrieb. `bothy migrate up` ruft nach den Migrationen dieselbe idempotente Routine, damit eine frische Datenbank Partitionen hat ([16-betrieb.md](../spec/16-betrieb.md) 7.1). | Kein DDL-Lock im heißen Pfad. |
-| M11 | Migrationen von River (Jobs) laufen im selben `migrate`-Lauf, in fester Reihenfolge vor den eigenen. | Ein Startschritt, ein Ergebnis. |
-| M12 | Keine Down-Migrationen in Produktion. Fehler korrigiert eine neue Migration. | Down-Migrationen sind selten getestet und löschen oft Daten. |
+| M1 | Version N may only remove or reinterpret what version N-1 no longer reads or writes. | Rollback by one version without reverting the database. |
+| M2 | Never rename directly: new column (expand), write both (N), read only the new one (N+1), remove the old one (N+2). | M1. |
+| M3 | New columns allow `NULL` or have a default without rewriting the table. | No long lock on large tables. |
+| M4 | Indexes with `CREATE INDEX CONCURRENTLY` in a migration without a transaction (goose: `-- +goose NO TRANSACTION`). | Writes continue. |
+| M5 | New constraints first as `NOT VALID`, `VALIDATE CONSTRAINT` in a later migration. | Check without a write lock. |
+| M6 | Every step sets `lock_timeout` to `migrate.lock_timeout` and would rather abort than wait. | A waiting lock blocks all following requests. |
+| M7 | Never backfill data in the migration, but as a background job in batches. | Short transactions; progress visible. |
+| M8 | Enumerations are `text` with `CHECK`; new values are additive (R-DM-02). Code of N-1 must tolerate unknown values. | Rollback. |
+| M9 | Event payloads change only additively (`schema_version`, [04-sync-protocol.md](../spec/04-sync-protocol.md) 2.2). | Old clients keep reading. |
+| M10 | A job creates the partitions of the event log in advance, never a migration during operation. `bothy migrate up` calls the same idempotent routine after the migrations so that a fresh database has partitions ([16-operations.md](../spec/16-operations.md) 7.1). | No DDL lock in the hot path. |
+| M11 | Migrations of River (jobs) run in the same `migrate` run, in a fixed order before our own. | One start step, one result. |
+| M12 | No down migrations in production. A new migration corrects errors. | Down migrations are rarely tested and often delete data. |
 
-Prüfung im Gate (Ticket): Jede Migration läuft gegen das Schema der vorigen Version mit
-Testdaten; danach läuft die Testsuite der vorigen Version gegen das neue Schema (Kompatibilität
-N-1).
+Check in the gate (ticket): every migration runs against the schema of the previous version with
+test data; then the test suite of the previous version runs against the new schema (N-1
+compatibility).
 
-## 5. Schema-Prüfung beim Start
+## 5. Schema check at startup
 
-1. Jede Binärversion kennt die kleinste Migration, die sie braucht (die höchste eingebettete).
-   Ist die angewandte Migration kleiner, bricht der Start mit Hinweis auf `bothy migrate up` ab
-   (Exitcode `1`, [02-architektur.md](../spec/02-architektur.md) 15.1).
-2. `migrate` schreibt nach jedem Lauf `instance.min_server_version` aus der Konstante
-   `MinServerVersion` neben den eingebetteten Migrationen ([18-release.md](../spec/18-release.md),
-   Abschnitt 2): die älteste Server-Version, die mit dem neuen Schema laufen darf. Nach Regel M1 ist
-   das die vorige Version; ein Release, das bewusst bricht (Hauptversion), setzt die eigene; vor dem
-   ersten Release ist es die aktuelle. Ist die eigene Version kleiner, läuft der Server weiter, wird
-   aber nie bereit: `/readyz` meldet `schema_requires_newer_server` (03,
-   `instance.min_server_version`). Wer das Schema ändert, prüft beim Release, ob die Konstante
-   steigen muss.
-3. Ein neueres Schema ohne diese Sperre ist erlaubt; so funktioniert der Rückweg aus Abschnitt 3.
-4. `instance.schema_version` zeigt den Stand in der Admin-Konsole.
+1. Every binary version knows the smallest migration it needs (the highest embedded one).
+   If the applied migration is smaller, the startup aborts with a reference to `bothy migrate up`
+   (exit code `1`, [02-architecture.md](../spec/02-architecture.md) 15.1).
+2. After every run, `migrate` writes `instance.min_server_version` from the constant
+   `MinServerVersion` next to the embedded migrations ([18-release.md](../spec/18-release.md),
+   section 2): the oldest server version that may run with the new schema. According to rule M1,
+   that is the previous version; a release that breaks deliberately (major version) sets its own;
+   before the first release it is the current one. If its own version is smaller, the server keeps
+   running but never becomes ready: `/readyz` reports `schema_requires_newer_server` (03,
+   `instance.min_server_version`). Whoever changes the schema checks at release time whether the
+   constant must rise.
+3. A newer schema without this lock is allowed; this is how the rollback from section 3 works.
+4. `instance.schema_version` shows the state in the admin console.
 
-## 6. PostgreSQL-Hauptversion
+## 6. PostgreSQL major version
 
-Ein Wechsel der Hauptversion (z. B. 18 auf 19) ist ein eigener Schritt mit Wartungsfenster:
+A change of the major version (for example 18 to 19) is a separate step with a maintenance window:
 
-1. Erst wenn ein Release von `bothy-postgres` die neue Hauptversion unterstützt und der
-   Portabilitätstest damit grün ist.
-2. Standardweg: logischer Abzug und Restore in eine neue Datenbank ([cloud-migration.md](cloud-migration.md)
-   mit gleichem Host). `pg_upgrade` ist schneller, braucht aber beide Hauptversionen im selben
-   Container; das offizielle Image legt Daten ab Version 18 unter `/var/lib/postgresql/<major>/docker`
-   ab, um `pg_upgrade --link` zu erleichtern (https://hub.docker.com/_/postgres, abgerufen
-   2026-10-10) [belegt]. Ein eigenes Upgrade-Image ist ein späteres Ticket.
-3. Danach sofort Vollsicherung; die alte pgBackRest-Stanza gilt nicht mehr für die neue Version.
+1. Only when a release of `bothy-postgres` supports the new major version and the
+   portability test is green with it.
+2. Default path: logical dump and restore into a new database ([cloud-migration.md](cloud-migration.md)
+   with the same host). `pg_upgrade` is faster but needs both major versions in the same
+   container; from version 18 on, the official image stores data under `/var/lib/postgresql/<major>/docker`
+   to make `pg_upgrade --link` easier (https://hub.docker.com/_/postgres, retrieved
+   2026-10-10) [verified]. An own upgrade image is a later ticket.
+3. Immediately afterwards a full backup; the old pgBackRest stanza no longer applies to the new version.

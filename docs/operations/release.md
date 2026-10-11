@@ -1,84 +1,84 @@
-# Ein Release machen
+# Making a release
 
-Status: Entwurf M0. Ablauf zu [18-release.md](../spec/18-release.md). Gates und Runner legen
-ADR 0038 und 0039 fest (Team H); dieser Ablauf nennt nur die Schritte, die zum Release gehören.
+Status: draft M0. Procedure for [18-release.md](../spec/18-release.md). ADR 0038 and 0039 define
+gates and runners (team H); this procedure names only the steps that belong to the release.
 
-![Release-Kette](diagrams/release-pipeline.svg)
+![Release pipeline](diagrams/release-pipeline.svg)
 
-## 1. Voraussetzungen
+## 1. Prerequisites
 
-1. Hauptzweig grün in allen lokalen Gates und in CI.
-2. Portabilitätstest der letzten Produkt-Beta grün; für `server` die Produkt-Beta, deren Bündel
-   diese Server-Version oder ihre letzte Beta pinnt ([18-release.md](../spec/18-release.md) 2.1,
-   [16-betrieb.md](../spec/16-betrieb.md) 11.1).
-3. `CHANGELOG.md` der Komponente hat einen geprüften Abschnitt für die neue Version; Release Notes
-   mit den Pflichtabschnitten ([18-release.md](../spec/18-release.md) 4).
-4. Für `server`: Migrationen erfüllen M1 bis M12 ([upgrade.md](upgrade.md) 4); der
-   N-1-Kompatibilitätstest ist grün.
-5. Mindest-App-Versionen und Deprecation-Daten in den Release Notes stimmen mit ADR 0014.
+1. Main branch green in all local gates and in CI.
+2. Portability test of the last product beta green; for `server`, the product beta whose bundle
+   pins this server version or its last beta ([18-release.md](../spec/18-release.md) 2.1,
+   [16-operations.md](../spec/16-operations.md) 11.1).
+3. `CHANGELOG.md` of the component has a reviewed section for the new version; release notes
+   with the required sections ([18-release.md](../spec/18-release.md) 4).
+4. For `server`: migrations fulfill M1 to M12 ([upgrade.md](upgrade.md) 4); the
+   N-1 compatibility test is green.
+5. Minimum app versions and deprecation dates in the release notes match ADR 0014.
 
-## 2. Server und Produkt
+## 2. Server and product
 
-Neue Installationen mit `install.sh` bekommen die Server-Version, die das Bündel eines
-Produkt-Release pinnt. Darum folgt auf ein Server-Release, das neue Installationen bekommen
-sollen, ein Produkt-Release; bestehende Installationen heben `BOTHY_VERSION` selbst an
+New installations with `install.sh` get the server version that the bundle of a
+product release pins. Therefore a server release that new installations are to get is followed
+by a product release; existing installations raise `BOTHY_VERSION` themselves
 ([upgrade.md](upgrade.md)).
 
 ### 2.1 Server
 
-1. `make release-prep COMPONENT=server [CHANNEL=beta]` setzt `VERSION` und schließt den
-   Changelog-Abschnitt ab ([ADR 0060](../adr/0060-release-automatisierung-im-monorepo.md)); Commit.
-2. Signierten Tag setzen: `server/vX.Y.Z` (Beta: `server/vX.Y.Z-beta.N`).
-3. Die Release-Kette baut je Architektur, erzeugt das Multi-Arch-Manifest, SBOMs, Signaturen,
-   Prüfsummen und (im öffentlichen Repository) die Attestation, und veröffentlicht nach `ghcr.io`.
-4. Prüfen wie ein Betreiber (Abschnitt 5).
-5. Beta: nach `staging`; stable: Release als "latest release" markieren, Betreiber informieren.
+1. `make release-prep COMPONENT=server [CHANNEL=beta]` sets `VERSION` and closes the
+   changelog section ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)); commit.
+2. Set a signed tag: `server/vX.Y.Z` (beta: `server/vX.Y.Z-beta.N`).
+3. The release pipeline builds per architecture, creates the multi-arch manifest, SBOMs, signatures,
+   checksums and (in the public repository) the attestation, and publishes to `ghcr.io`.
+4. Check like an instance operator (section 5).
+5. Beta: to `staging`; stable: mark the release as "latest release", inform the instance operators.
 
-### 2.2 Produkt (Komponente `bothy`)
+### 2.2 Product (component `bothy`)
 
-1. Die Server-Version, die das Bündel installieren soll, ist veröffentlicht (Abschnitt 2.1).
-   Eine Produkt-Beta darf eine Server-Beta pinnen, ein stabiles Produkt nur eine stabile
-   Server-Version ([18-release.md](../spec/18-release.md) 2.1).
-2. `make release-prep COMPONENT=bothy SERVER_VERSION=<version> [CHANNEL=beta]` setzt `VERSION`,
-   schließt den Changelog-Abschnitt ab und schreibt die Server-Version in die Zeile
-   `BOTHY_VERSION=` von `infra/compose/.env.example`; ohne Tag `server/v<version>` bricht es ab.
-   Commit; der Diff zeigt die gepinnte Server-Version.
-3. Signierten Tag setzen: `vA.B.C` (Beta: `vA.B.C-beta.M`). Die Nummern hängen nicht an der
-   Server-Version ([environments-and-flags.md](environments-and-flags.md) 1.3).
-4. Die Release-Kette baut mit `make release-build` das Bündel: `BOTHY_VERSION` aus dem Commit,
-   `BOTHY_REGISTRY` aus dem Owner des Repositorys. Sie bricht ohne Bündel ab bei einem
-   Platzhalter, einer Server-Vorabversion im stabilen Produkt oder einem Image, das in der
-   Registry fehlt ([18-release.md](../spec/18-release.md) 2.1). Dazu `install.sh` mit Version und
-   SHA-256 des Bündels; Signaturen, SBOM und Prüfsummen wie beim Server.
-5. Nach `publish` startet `release.yml` den Portabilitätstest mit dem Tag
-   ([16-betrieb.md](../spec/16-betrieb.md) 11.1); er muss grün sein. Dann prüfen wie ein
-   Betreiber (Abschnitt 5).
+1. The server version that the bundle is to install is published (section 2.1).
+   A product beta may pin a server beta, a stable product only a stable
+   server version ([18-release.md](../spec/18-release.md) 2.1).
+2. `make release-prep COMPONENT=bothy SERVER_VERSION=<version> [CHANNEL=beta]` sets `VERSION`,
+   closes the changelog section and writes the server version into the line
+   `BOTHY_VERSION=` of `infra/compose/.env.example`; without a tag `server/v<version>` it aborts.
+   Commit; the diff shows the pinned server version.
+3. Set a signed tag: `vA.B.C` (beta: `vA.B.C-beta.M`). The numbers do not depend on the
+   server version ([environments-and-flags.md](environments-and-flags.md) 1.3).
+4. The release pipeline builds the bundle with `make release-build`: `BOTHY_VERSION` from the commit,
+   `BOTHY_REGISTRY` from the owner of the repository. It aborts without a bundle on a
+   placeholder, a server pre-release in the stable product or an image that is missing in the
+   registry ([18-release.md](../spec/18-release.md) 2.1). In addition `install.sh` with the version
+   and SHA-256 of the bundle; signatures, SBOM and checksums as for the server.
+5. After `publish`, `release.yml` starts the portability test with the tag
+   ([16-operations.md](../spec/16-operations.md) 11.1); it must be green. Then check like an
+   instance operator (section 5).
 
-## 3. SDKs und Adapter
+## 3. SDKs and adapters
 
-1. `make release-prep COMPONENT=<komponente>`, Commit, Tag `<komponente>/vX.Y.Z` (Namen aus
+1. `make release-prep COMPONENT=<component>`, commit, tag `<component>/vX.Y.Z` (names from
    `tools/ci/components.py`).
-2. Build, SBOM, Signatur der Dateien (`cosign sign-blob`), Veröffentlichung auf PyPI bzw. npm über
-   Trusted Publishing des Registers, wo vorhanden [vermutet: Verfügbarkeit je Register im Ticket
-   prüfen].
-3. Beta: Vorabversion, npm-Tag `beta`.
+2. Build, SBOM, signature of the files (`cosign sign-blob`), publication on PyPI or npm via
+   trusted publishing of the registry, where available [assumed: check the availability per
+   registry in the ticket].
+3. Beta: pre-release, npm tag `beta`.
 
 ## 4. Apps
 
-Apps baut der Herausgeber mit seiner `distribution.yaml` ([18-release.md](../spec/18-release.md) 8).
+The publisher builds the apps with their `distribution.yaml` ([18-release.md](../spec/18-release.md) 8).
 
-| Plattform | Schritte |
+| Platform | Steps |
 |---|---|
-| iOS | Build mit Build-Nummer, Upload nach App Store Connect, TestFlight-Gruppe beta; nach Bewährung Gruppe stable bzw. Einreichung |
-| macOS | Build, Signatur mit Developer ID, `xcrun notarytool submit --wait`, `xcrun stapler staple`, Archiv mit `sign_update` (EdDSA) signieren, Eintrag im Appcast mit `sparkle:channel` beta; nach Bewährung Element entfernen |
-| Windows | MSIX bauen und signieren (Artifact Signing oder OV mit HSM), `beta.appinstaller` auf die neue Version; nach Bewährung `stable.appinstaller` |
-| Android | AAB bauen und signieren, interner Testkanal; nach Bewährung nächster Kanal |
-| Web-Konsole | mit dem Server-Release (Vorschlag, ADR 0028) |
+| iOS | build with a build number, upload to App Store Connect, TestFlight group beta; once proven, group stable or submission |
+| macOS | build, signature with Developer ID, `xcrun notarytool submit --wait`, `xcrun stapler staple`, sign the archive with `sign_update` (EdDSA), entry in the appcast with `sparkle:channel` beta; once proven, remove the element |
+| Windows | build and sign the MSIX (Artifact Signing or OV with HSM), `beta.appinstaller` to the new version; once proven, `stable.appinstaller` |
+| Android | build and sign the AAB, internal test track; once proven, the next track |
+| Web console | with the server release (proposal, ADR 0028) |
 
-Vor dem Wechsel nach stable: Absturzrate des Beta-Builds prüfen (falls ein Ziel für
-Absturzberichte konfiguriert ist) und keine offenen Fehler der Stufe kritisch.
+Before the switch to stable: check the crash rate of the beta build (if a target for
+crash reports is configured) and no open bugs of severity critical.
 
-## 5. Prüfen wie ein Betreiber
+## 5. Check like an instance operator
 
 ```
 cosign verify ghcr.io/<owner>/bothy-server@sha256:<digest> \
@@ -91,15 +91,15 @@ cosign verify-blob SHA256SUMS --bundle SHA256SUMS.sigstore.json \
 sha256sum --check SHA256SUMS
 ```
 
-Diese Befehle gelten im öffentlichen Zustand (keyless). Im privaten Zustand prüft der Betreiber
-mit dem öffentlichen Schlüssel aus dem Repository (`cosign verify --key`, ohne Transparenz-Log;
-der genaue Befehl für die gepinnte cosign-Version steht nach M7-10 hier, [ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md)). Der
-Release-Workflow ist `.github/workflows/release.yml`.
+These commands apply in the public state (keyless). In the private state, the instance operator
+checks with the public key from the repository (`cosign verify --key`, without a transparency log;
+the exact command for the pinned cosign version will be here after M7-10, [ADR 0062](../adr/0062-release-signatures-while-the-repo-is-private.md)). The
+release workflow is `.github/workflows/release.yml`.
 
-## 6. Rückruf
+## 6. Recall
 
-1. Server: Release als zurückgezogen markieren, Hinweis an Betreiber mit Rückweg
-   ([upgrade.md](upgrade.md) 3), korrigierte Patch-Version.
-2. Apps: korrigierten Build mit höherer Nummer; bei Sicherheitsfehlern `client.min_version.<plattform>`
-   auf die korrigierte Version setzen lassen.
-3. SDKs: Version zurückziehen (PyPI yank, npm deprecate), Korrektur veröffentlichen.
+1. Server: mark the release as withdrawn, notice to the instance operators with the rollback
+   ([upgrade.md](upgrade.md) 3), corrected patch version.
+2. Apps: corrected build with a higher number; for security bugs, have `client.min_version.<platform>`
+   set to the corrected version.
+3. SDKs: withdraw the version (PyPI yank, npm deprecate), publish the fix.

@@ -1,160 +1,160 @@
-# Sicherung und Wiederherstellung
+# Backup and restore
 
-Status: Entwurf M0. Anleitung zu [16-betrieb.md](../spec/16-betrieb.md) 8
-([ADR 0058](../adr/0058-sicherung-mit-pgbackrest-objektsicherung-und-restore-test.md)). Gilt für
-den Compose-Stack; mit einem verwalteten PostgreSQL-Dienst entfallen die Schritte zu pgBackRest
-(Abschnitt 6).
+Status: draft M0. Guide to [16-operations.md](../spec/16-operations.md) 8
+([ADR 0058](../adr/0058-backup-with-pgbackrest-object-backup-and-restore-test.md)). Applies to
+the Compose stack; with a managed PostgreSQL service the steps for pgBackRest are dropped
+(section 6).
 
-![Sicherung](diagrams/backup-flow.svg)
+![Backup](diagrams/backup-flow.svg)
 
-## 1. Überblick
+## 1. Overview
 
-| Was | Wie | Wohin | Prüfung |
+| What | How | Where to | Check |
 |---|---|---|---|
-| WAL fortlaufend | pgBackRest `archive-push` aus `postgres` an den Repository-Host `backup` | repo1 lokal, repo2 off-site | `pgbackrest check`, Alarm `BothyWalArchiveStale` |
-| Voll- und Differenzsicherung | `bothy-backupd` startet `pgbackrest backup` nach Plan | repo1, repo2 | Prüfsummen je Datei, `pgbackrest verify` |
-| Logischer Abzug | `pg_dump -Fc` | restic off-site | Wiederherstellungstest |
-| Objekte | restic (Treiber `fs`) oder Spiegel (Treiber `s3`) | off-site | `restic check --read-data-subset`, Stichprobe im Test |
-| Manifest | je Lauf, JSON | neben der Sicherung | Vergleich im Test |
-| Geheimnisse | `bothy secrets export` mit age | offline beim Owner | Probe-Entschlüsselung beim Einrichten |
+| WAL continuously | pgBackRest `archive-push` from `postgres` to the repository host `backup` | repo1 local, repo2 off-site | `pgbackrest check`, alert `BothyWalArchiveStale` |
+| Full and differential backup | `bothy-backupd` starts `pgbackrest backup` on schedule | repo1, repo2 | checksums per file, `pgbackrest verify` |
+| Logical dump | `pg_dump -Fc` | restic off-site | restore test |
+| Objects | restic (driver `fs`) or mirror (driver `s3`) | off-site | `restic check --read-data-subset`, sample in the test |
+| Manifest | per run, JSON | next to the backup | comparison in the test |
+| Secrets | `bothy secrets export` with age | offline with the owner | trial decryption during setup |
 
-Alle Pläne und Fristen sind Konfigurationswerte `backup.*` ([configuration.md](configuration.md)).
+All schedules and retention periods are configuration values `backup.*` ([configuration.md](configuration.md)).
 
-## 2. Einrichten
+## 2. Set up
 
-1. Off-site-Ziel anlegen. S3: Bucket mit Versionierung und Object Lock (Modus Governance oder
-   Compliance, Frist mindestens `backup.logical.retention`), ein Schlüssel nur mit Schreiben und
-   Lesen für `backup`, ein zweiter mit Löschen nur beim Owner. SFTP: Zugang ohne Löschen, Aufräumen
-   durch einen zweiten Zugang.
-2. Zugang in `secrets/offsite/` ablegen, `BOTHY_BACKUP_OFFSITE_TARGET` setzen.
-3. `docker compose up -d backup`; `bothy-backupd` legt beim ersten Start die pgBackRest-Stanza und
-   das restic-Repository an.
-4. Sofort eine Vollsicherung und einen Wiederherstellungstest auslösen
+1. Create the off-site target. S3: bucket with versioning and Object Lock (mode Governance or
+   Compliance, period at least `backup.logical.retention`), one key with only write and
+   read for `backup`, a second one with delete only with the owner. SFTP: access without delete, cleanup
+   through a second access.
+2. Put the access into `secrets/offsite/`, set `BOTHY_BACKUP_OFFSITE_TARGET`.
+3. `docker compose up -d backup`; on its first start `bothy-backupd` creates the pgBackRest stanza and
+   the restic repository.
+4. Trigger a full backup and a restore test immediately
    ([install-compose.md](install-compose.md) 4).
-5. Secrets-Bündel exportieren und die Entschlüsselung einmal auf einem anderen Gerät probieren.
+5. Export the secrets bundle and try the decryption once on another device.
 
 ## 3. Manifest
 
-Jeder Lauf schreibt ein Manifest (JSON, verschlüsselt neben der Sicherung). Felder:
+Every run writes a manifest (JSON, encrypted next to the backup). Fields:
 
-| Feld | Inhalt |
+| Field | Content |
 |---|---|
-| `backup_id`, `kind`, `started_at`, `finished_at` | Lauf |
-| `server_version`, `schema_version` | Stand des Codes und der Migrationen |
-| `instance_id`, `sync_epoch` | Identität und Zeitlinie (03, `instance`) |
-| `event_log.head_seq`, `event_log.min_retained_seq` | Grenzen des Ereignis-Logs |
-| `audit.last_seq`, `audit.last_hash` | Kopf der Audit-Kette |
-| `row_counts` | Zeilen je Tabelle |
-| `files.count`, `files.total_bytes` | Objekte laut Tabelle `files` |
-| `pgbackrest.label`, `restic.snapshot_id` | Bezug auf die Sicherungen |
+| `backup_id`, `kind`, `started_at`, `finished_at` | run |
+| `server_version`, `schema_version` | state of the code and of the migrations |
+| `instance_id`, `sync_epoch` | identity and timeline (03, `instance`) |
+| `event_log.head_seq`, `event_log.min_retained_seq` | bounds of the event log |
+| `audit.last_seq`, `audit.last_hash` | head of the audit chain |
+| `row_counts` | rows per table |
+| `files.count`, `files.total_bytes` | objects according to the table `files` |
+| `pgbackrest.label`, `restic.snapshot_id` | reference to the backups |
 
-Das Manifest enthält keine Inhalte und keine Geheimnisse.
+The manifest contains no contents and no secrets.
 
-## 4. Automatischer Wiederherstellungstest
+## 4. Automatic restore test
 
-Ablauf in `bothy-backupd` nach `backup.restore_test.schedule`:
+Procedure in `bothy-backupd` according to `backup.restore_test.schedule`:
 
-1. Scratch-Verzeichnis leeren.
-2. `pgbackrest restore` der letzten Sicherung nach `backup-scratch`, mit
+1. Empty the scratch directory.
+2. `pgbackrest restore` of the latest backup to `backup-scratch`, with
    `recovery_target = immediate`.
-3. PostgreSQL im Scratch-Verzeichnis starten, nur Unix-Socket, kein TCP.
-4. Prüfungen aus [16-betrieb.md](../spec/16-betrieb.md) 8.3, jede mit eigenem Ergebnis.
-5. Stichprobe der Dateien: Objekte aus der Objektsicherung in das Scratch-Verzeichnis holen und
-   SHA-256 vergleichen.
-6. PostgreSQL stoppen, Scratch-Verzeichnis löschen.
-7. Ergebnis in `backup_runs` (Art `restore_test`, Dauer, Ergebnis je Prüfung) und als Kennzahlen.
+3. Start PostgreSQL in the scratch directory, Unix socket only, no TCP.
+4. Checks from [16-operations.md](../spec/16-operations.md) 8.3, each with its own result.
+5. Sample of the files: fetch objects from the object backup into the scratch directory and
+   compare SHA-256.
+6. Stop PostgreSQL, delete the scratch directory.
+7. Result in `backup_runs` (kind `restore_test`, duration, result per check) and as metrics.
 
-Ein Fehlschlag ist ein Alarm `ticket`; zwei Fehlschläge in Folge oder ein Fehler der
-Audit-Kette sind `page`. Der Test schreibt nie in die produktive Datenbank.
+A failure is a `ticket` alert; two failures in a row or an error of the
+audit chain are `page`. The test never writes to the production database.
 
-## 5. Wiederherstellen
+## 5. Restore
 
-### 5.1 Zeitpunkt wählen
+### 5.1 Choose a point in time
 
-| Lage | Ziel |
+| Situation | Target |
 |---|---|
-| Fehlerhafte Änderung zu bekannter Zeit | `--type=time --target="<Zeit kurz davor>"` |
-| Host verloren | letzter Stand im Off-site-Repository (`--type=default`) |
-| Logischer Fehler, Zeit unklar | zuerst in Scratch probieren (Abschnitt 4 von Hand) und Zeitpunkt suchen |
+| Faulty change at a known time | `--type=time --target="<time shortly before>"` |
+| Host lost | latest state in the off-site repository (`--type=default`) |
+| Logical error, time unclear | try in scratch first (section 4 by hand) and search for the point in time |
 
-### 5.2 Ablauf PITR im Compose-Stack
+### 5.2 PITR procedure in the Compose stack
 
-1. Statusseite: Störung anlegen; Wartungsmodus `server.maintenance_mode = read_only` hilft nicht,
-   weil die Datenbank ersetzt wird. Darum: `docker compose stop api worker`.
+1. Status page: create an incident; maintenance mode `server.maintenance_mode = read_only` does not help,
+   because the database is replaced. Therefore: `docker compose stop api worker`.
 2. `docker compose stop postgres`.
-3. Altes Datenverzeichnis nicht löschen, sondern umbenennen (Volume kopieren), bis die
-   Wiederherstellung geprüft ist.
-4. `docker compose run --rm backup bothy-backupd restore --target-time "<Zeit>"` (ruft
-   `pgbackrest restore` mit `--delta` auf das Volume `pgdata` auf).
-5. `docker compose start postgres`; PostgreSQL spielt WAL bis zum Ziel und beginnt eine neue
-   Zeitlinie.
-6. `docker compose run --rm migrate bothy restore finalize`: neue `sync_epoch`, Cursor der
-   Agenten, Webhooks und Worker-Verbraucher auf `head_seq`, Audit-Eintrag (03 Abschnitt 6.7).
-7. Wiederherstellungstest gegen den neuen Stand von Hand auslösen.
-8. `docker compose start api worker`. Clients bekommen `resync_required` mit Grund
-   `epoch_changed` und laden neu; ihr Ausgangsfach bleibt erhalten.
-9. Störung mit Zeitpunkt und verlorenem Zeitraum beschreiben.
+3. Do not delete the old data directory but rename it (copy the volume) until the
+   restore is verified.
+4. `docker compose run --rm backup bothy-backupd restore --target-time "<time>"` (calls
+   `pgbackrest restore` with `--delta` on the volume `pgdata`).
+5. `docker compose start postgres`; PostgreSQL replays WAL up to the target and begins a new
+   timeline.
+6. `docker compose run --rm migrate bothy restore finalize`: new `sync_epoch`, cursors of the
+   agents, webhooks and worker consumers to `head_seq`, audit entry (03 section 6.7).
+7. Trigger a restore test against the new state by hand.
+8. `docker compose start api worker`. Clients get `resync_required` with reason
+   `epoch_changed` and reload; their outbox is kept.
+9. Describe the incident with the point in time and the lost period.
 
-### 5.3 Logischer Abzug (anderer Host, andere Hauptversion)
+### 5.3 Logical dump (other host, other major version)
 
-1. Leere Instanz mit gleicher `BOTHY_VERSION` und dem Secrets-Bündel starten, `migrate` nicht
-   laufen lassen.
-2. `pg_restore --clean --if-exists --no-owner --role=bothy_owner` aus dem restic-Snapshot.
-3. Objekte aus restic in das Volume `files` (bzw. in den Bucket) zurückspielen.
-4. `bothy restore finalize`, dann Start und Wiederherstellungstest.
+1. Start an empty instance with the same `BOTHY_VERSION` and the secrets bundle, do not let `migrate`
+   run.
+2. `pg_restore --clean --if-exists --no-owner --role=bothy_owner` from the restic snapshot.
+3. Restore the objects from restic into the volume `files` (or into the bucket).
+4. `bothy restore finalize`, then start and restore test.
 
-## 6. Verwalteter PostgreSQL-Dienst
+## 6. Managed PostgreSQL service
 
-1. WAL-Archivierung und PITR übernimmt der Anbieter; die Frist stellt das OpenTofu-Modul ein.
-2. `bothy-backupd` läuft ohne pgBackRest: logischer Abzug, Objektsicherung, Manifest,
-   Wiederherstellungstest (Restore des logischen Abzugs in eine Scratch-Datenbank im Container).
-3. Eine PITR beim Anbieter erzeugt eine neue Datenbank-Instanz; danach gilt 5.2 ab Schritt 6.
+1. The provider takes over WAL archiving and PITR; the OpenTofu module sets the retention period.
+2. `bothy-backupd` runs without pgBackRest: logical dump, object backup, manifest,
+   restore test (restore of the logical dump into a scratch database in the container).
+3. A PITR at the provider creates a new database instance; after that, 5.2 applies from step 6.
 
-## 7. Grenzen
+## 7. Limits
 
-1. Datenverlust bis `dr.rpo_target` ist möglich: Was nach dem letzten archivierten WAL-Segment
-   committet wurde, fehlt nach einem Host-Verlust. Clients, die diese Nachrichten schon bestätigt
-   bekamen, haben sie nicht mehr im Ausgangsfach.
-2. Eine Wiederherstellung einzelner Nachrichten oder Threads gibt es nicht. Gelöschte Inhalte sind
-   gewollt gelöscht (Kapitel 20); eine Wiederherstellung darf Löschungen aus DSGVO-Aufträgen
-   nicht zurückholen. Darum führt `bothy restore finalize` Löschaufträge erneut aus, die nach dem
-   Zielzeitpunkt erledigt wurden. Die Liste dieser Aufträge liegt nicht in der wiederhergestellten
-   Datenbank; `bothy-backupd` schreibt sie darum bei jedem Lauf zusätzlich ins Manifest
-   ([20-datenschutz.md](../spec/20-datenschutz.md), R-DP-04: Lösch-Journal außerhalb der
-   Datenbank).
-3. Gewöhnliche Löschungen nach dem Zielzeitpunkt (eigene Nachricht gelöscht) sind mit der neuen
-   Zeitlinie verloren; die Inhalte erscheinen wieder. Die Störungsmeldung nennt das.
+1. Data loss up to `dr.rpo_target` is possible: what was committed after the last archived WAL
+   segment is missing after a host loss. Clients that already got these messages confirmed
+   no longer have them in their outbox.
+2. A restore of individual messages or threads does not exist. Deleted contents are
+   deleted on purpose (chapter 20); a restore must not bring back deletions from privacy requests.
+   Therefore `bothy restore finalize` runs deletion requests again that were completed after the
+   target point in time. The list of these requests is not in the restored
+   database; `bothy-backupd` therefore also writes it into the manifest on every run
+   ([20-privacy.md](../spec/20-privacy.md), R-DP-04: deletion journal outside the
+   database).
+3. Ordinary deletions after the target point in time (own message deleted) are lost with the new
+   timeline; the contents appear again. The incident report states this.
 
-## 8. Unveränderliche Ablage der Audit-Prüfpunkte
+## 8. Immutable storage of the audit checkpoints
 
-Die signierten Prüfpunkte des Audit-Logs sind der einzige Beleg gegen ein vollständiges Neuschreiben
-der Hash-Kette durch die Datenbank-Verwaltung ([19-sicherheit.md](../spec/19-sicherheit.md),
-SEC-AUD-2; [ADR 0021](../adr/0021-audit-log-hash-verkettet-und-getrennt-von-telemetrie.md)). Sie
-helfen nur, wenn weder die Datenbank-Verwaltung noch die Verwaltung des Server-Hosts sie ändern oder
-löschen kann. Der Server legt sie an `audit.checkpoint_sink` ab; unveränderlich macht sie das Ziel,
-nicht der Server.
+The signed checkpoints of the audit log are the only evidence against a complete rewrite
+of the hash chain by the database administrators ([19-security.md](../spec/19-security.md),
+SEC-AUD-2; [ADR 0021](../adr/0021-hash-chained-audit-log-separate-from-telemetry.md)). They
+only help if neither the database administrators nor the administrators of the server host can change or
+delete them. The server stores them at `audit.checkpoint_sink`; the target makes them immutable,
+not the server.
 
-Empfohlenes Ziel ist ein S3-Bucket mit Object Lock im Modus Compliance. AWS beschreibt den Modus so:
+The recommended target is an S3 bucket with Object Lock in mode Compliance. AWS describes the mode like this:
 "In compliance mode, a protected object version can't be overwritten or deleted by any user,
-including the root user in your AWS account." Object Lock setzt Versionierung voraus
-(https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html, abgerufen 2026-10-10
-[belegt]). Der Modus Governance genügt hier nicht: Wer `s3:BypassGovernanceRetention` hat, kann
-löschen (dieselbe Quelle [belegt]).
+including the root user in your AWS account." Object Lock requires versioning
+(https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html, retrieved 2026-10-10
+[verified]). Mode Governance is not enough here: whoever has `s3:BypassGovernanceRetention` can
+delete (same source [verified]).
 
-Einrichten:
+Set up:
 
-1. Bucket in einem eigenen Konto anlegen, nicht in dem Konto der Off-site-Sicherung (Abschnitt 2)
-   und nicht in dem des Servers. Versionierung und Object Lock einschalten, Standard-Aufbewahrung
-   im Modus Compliance mit einer Frist von mindestens `retention.audit`.
-2. Der Zugang des Servers darf nur Objekte anlegen und lesen; Löschen, Ändern der Aufbewahrung und
-   Bucket-Einstellungen bleiben beim Owner.
-3. Andere S3-kompatible Speicher nur, wenn ihre Doku eine Sperre gleicher Stärke belegt (kein
-   Löschen vor Fristende, auch nicht durch den Verwalter des Speichers). Ohne Beleg gilt das Ziel
-   als nicht unveränderlich.
+1. Create the bucket in a separate account, not in the account of the off-site backup (section 2)
+   and not in that of the server. Turn on versioning and Object Lock, default retention
+   in mode Compliance with a period of at least `retention.audit`.
+2. The access of the server may only create and read objects; deletion, changes to the retention and
+   bucket settings stay with the owner.
+3. Other S3-compatible storage only if its documentation proves a lock of the same strength (no
+   deletion before the end of the period, not even by the administrator of the storage). Without proof the target
+   counts as not immutable.
 
-Stand der Umsetzung: Bis PLAN M7-22 kennt `audit.checkpoint_sink` nur `file://` (19,
-"Konfigurationswerte"). Bis dahin zeigt das Ziel auf einen Pfad außerhalb des Datenbank-Volumes,
-möglichst auf einem anderen Rechner eingebunden, den die Datenbank-Verwaltung nicht erreicht. Ein
-Dateisystem-Ziel ist nicht unveränderlich: Der Owner kopiert die Prüfpunkte darum regelmäßig mit
-eigenem Zugang in den Bucket oben, bis M7-22 das Objektspeicher-Ziel mitbringt. Ab M7-22 lehnt
-`bothy config check` ein Objektspeicher-Ziel ohne wirksame Aufbewahrungssperre ab.
+Implementation status: until PLAN M7-22, `audit.checkpoint_sink` only knows `file://` (19,
+"Configuration values"). Until then the target points to a path outside the database volume,
+preferably mounted from another host that the database administrators cannot reach. A
+file system target is not immutable: the owner therefore regularly copies the checkpoints with
+their own access into the bucket above, until M7-22 brings the object storage target. From M7-22 on,
+`bothy config check` rejects an object storage target without an effective retention lock.

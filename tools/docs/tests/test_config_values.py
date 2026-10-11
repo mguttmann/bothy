@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Number guard: every named value of docs/spec/23-qualitaet.md equals the value that the
+"""Number guard: every named value of docs/spec/23-quality.md equals the value that the
 tool configuration or community file actually uses. A changed threshold must change both."""
 
 from __future__ import annotations
@@ -25,8 +25,8 @@ _DOC_ROW = re.compile(r"\(`(?P<name>[a-z0-9_.]+)`\) \| (?P<value>\d+)\b")
 
 
 def chapter_values() -> dict[str, str]:
-    text = (REPO / "docs" / "spec" / "23-qualitaet.md").read_text(encoding="utf-8")
-    table = text.split("## 11. Konfigurationswerte dieses Kapitels", 1)[1]
+    text = (REPO / "docs" / "spec" / "23-quality.md").read_text(encoding="utf-8")
+    table = text.split("## 11. Configuration values of this chapter", 1)[1]
     return {m.group("name"): m.group("value") for m in _ROW.finditer(table)}
 
 

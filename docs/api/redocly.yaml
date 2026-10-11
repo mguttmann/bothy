@@ -4,7 +4,7 @@
 # Without file arguments both APIs below are linted. A single file:
 #   npx -y @redocly/cli@2.62.1 lint docs/api/openapi.yaml --config docs/api/redocly.yaml
 #
-# The action lists mirror docs/spec/05-aktionen.md section 4 (closed catalogue), the rate-limit
+# The action lists mirror docs/spec/05-actions.md section 4 (closed catalogue), the rate-limit
 # classes section 3. The gate check `api-catalogue-sync` compares these lists with 05
 # (docs/spec/06-api.md); a new action enters 05 first, then this file. From ticket M1-02 the
 # lists are generated from docs/spec/actions.yaml (ADR 0049, machine-readable action catalogue).
@@ -55,14 +55,14 @@ rules:
   no-invalid-media-type-examples: error
   no-invalid-schema-examples: error
 
-  # 05-aktionen.md rule 3: every operation names exactly one known action.
+  # 05-actions.md rule 3: every operation names exactly one known action.
   rule/authz-action-required:
     subject:
       type: Operation
     assertions:
       required:
         - x-authz-action
-    message: Every operation needs x-authz-action from docs/spec/05-aktionen.md.
+    message: Every operation needs x-authz-action from docs/spec/05-actions.md.
   # System actions (05 rule 10: grant.expire, group.member.expire, instance.bootstrap,
   # signing_key.transition) are never on a route or op, so neither list contains them.
   rule/authz-action-known:
@@ -71,7 +71,7 @@ rules:
       property: x-authz-action
     assertions:
       enum:
-        # catalogue (docs/spec/05-aktionen.md section 4)
+        # catalogue (docs/spec/05-actions.md section 4)
         - access.explain
         - access.preview
         - access.view_as
@@ -300,9 +300,9 @@ rules:
         - rl.upload
         - rl.webhook_in
         - rl.write
-    message: x-rate-limit-class is not a class of docs/spec/05-aktionen.md section 3 (or none).
+    message: x-rate-limit-class is not a class of docs/spec/05-actions.md section 3 (or none).
 
-  # 05-aktionen.md rule 4: every event type names its receive action.
+  # 05-actions.md rule 4: every event type names its receive action.
   rule/event-receive-action-required:
     subject:
       type: Message
@@ -316,7 +316,7 @@ rules:
       required:
         - x-receive-action
     message: Every event message needs x-receive-action.
-  # Receive actions: catalogue actions plus `self` (05-aktionen.md section 6).
+  # Receive actions: catalogue actions plus `self` (05-actions.md section 6).
   rule/receive-action-known-message:
     subject:
       type: Message

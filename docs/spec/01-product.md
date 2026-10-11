@@ -1,0 +1,1495 @@
+# 01 Product
+
+Status: draft M0. Terms: [00-glossary.md](00-glossary.md). Data: [03-data-model.md](03-data-model.md).
+Sync and offline: [04-sync-protocol.md](04-sync-protocol.md). Permissions and actions:
+[05-actions.md](05-actions.md), [07-permissions.md](07-permissions.md). Agents: [09-agents.md](09-agents.md),
+[10-backend-policy.md](10-backend-policy.md). Push: [13-push-notifications.md](13-push-notifications.md).
+Apps, technical: [15-client-architecture.md](15-client-architecture.md). Terminal:
+[24-terminal.md](24-terminal.md). Visualization: [25-visualization.md](25-visualization.md).
+Design: [docs/design/](../design/README.md).
+
+This chapter describes what people see and operate. It does not define permissions; every
+operation names the action from the action catalogue that the server checks. The app shows only
+what the server allows and contains no permission logic of its own.
+
+## 1. Vision
+
+Bothy is a **command center for AI agents in chat form**: chat, live view, grants,
+terminal, costs and statistics in one self-hosted, open-source app. Agents are Hermes
+Agent, Claude Code and others that connect through the public API.
+
+1. **Chat like Discord.** Structure and operation like Discord; AI agents are full participants.
+2. **Live view.** Every thread is an agent session: you see the agent working
+   (live box with tool and status lines), answer its questions and approve actions with a
+   button.
+3. **Grants.** Every person sees and controls only what has been granted to them; the server
+   checks this on every access ([07-permissions.md](07-permissions.md)).
+4. **Terminal.** A real shell or an interactive Claude Code session on a connected
+   host, in the desktop app, on the phone and in the web console. Security is built in and cannot
+   be turned off: a separate permission per host, confirmation on every opening, an end-to-end
+   encrypted stream, audit, idle timeout ([24-terminal.md](24-terminal.md)).
+5. **Costs.** Every agent shows what it runs on (personal subscription or organization key),
+   and in organization mode what a run, a thread, a space costs
+   ([10-backend-policy.md](10-backend-policy.md)).
+6. **Statistics.** Own, native visualizations in apps and console: live topology of the runs,
+   backend view, delivery live, executive page, playable timeline, TV mode; for
+   operations the same views as a Grafana panel plugin ([25-visualization.md](25-visualization.md)).
+7. **Own instance.** An instance belongs to one organization and runs on its own hardware or in
+   its own cloud. Hermes Agent is one agent framework among several, not the core.
+8. **Showcase standard.** What people see (apps, console, Grafana plugin, README, docs site,
+   release pages) should be clear to a person within one minute at first sight. Images and video
+   come from a demo instance with invented data (PLAN, milestone M7).
+
+## 2. Personas
+
+Described neutrally; the names are examples. Roles are templates for grants, not a separate
+kind of permission (Baseline section 3).
+
+| Persona | Goal | Typical tasks | Devices | Grants (example) |
+|---|---|---|---|---|
+| **Owner** (Alex) | Work with agents and lead the instance in terms of content | Chats with agents in all spaces, give grants, configure agents and backend policy, keep an eye on costs, read the audit; on the go, open a terminal on their own host from the iPhone; live topology and executive page | Desktop (Mac or Windows), iPhone | Owner: everything except other people's direct messages; terminal on every host, unless I6 blocks it ([24-terminal.md](24-terminal.md), section 7) |
+| **Deputy** (Sam) | Operate granted spaces day to day | Trigger agents in the Support space, answer questions, review drafts; approve actions only if the capability has been given | iPhone, Android, laptop | `trigger` on the Support space, plus `upload`; no `approve_actions`; no terminal |
+| **Developer** (Robin) | Work on code with a runner agent | Posts in dev forums, read tool output, stop runs, watch costs and context, resume sessions; in the terminal on her own host, use `claude` interactively | Desktop with keyboard | `trigger` on a dev forum with project binding; grant `terminal` only on the host assigned to her (SR10); for isolation see [21-dev-isolation.md](21-dev-isolation.md) |
+| **Instance operator** | Install the instance and keep it running | Compose installation, login providers, backup, updates, status page, monitoring; pair hosts and declare the LLM login; Grafana with the panel plugin; TV mode in the office | Web console, command line, Grafana | Owner or a separate person with the owner role; not to be confused with the operator agent (`operator`) |
+| **Bot developer** | Connect an agent or an app | Build an adapter or app with the SDK, write the manifest, request a token from the owner, test webhooks | Own environment, web console of the owner | App or agent principal with scopes; at most `write` (R-DM-08) |
+
+## 3. Feature list
+
+Column "Milestone": **core** = content of a build milestone (the plan defines the order), **later** =
+wanted, but after the core milestones, **never** = deliberately excluded, with a reason. Column
+"Where": D = desktop (macOS, Windows), M = mobile (iOS, Android), W = web console. Where a feature
+of the addendum of 2026-10-10 is built in several milestones, the remark names the build
+milestones from the [plan](../PLAN.md).
+
+### 3.1 Structure and conversations
+
+| Feature | Milestone | Where | Action(s) | Remark |
+|---|---|---|---|---|
+| Spaces collapsible, personal order, across devices | core | D, M | `sidebar.update` | global order only through administration (`space.reorder`) |
+| Text channels with main thread and threads from messages | core | D, M | `thread.create`, `message.create` | |
+| Forum channels with a dense post list, tags, Done section | core | D, M | `thread.create`, `thread.tags.set` | list instead of cards (study B) |
+| Dev forum with project binding and runner agent | core | D, M | `channel.project.bind` | triggering only with `project_bindings.ready` |
+| Button "New post" or "New chat" | core | D, M | `thread.create` | replaces the detour through a helper channel |
+| Fixed thread ID, auto title with source, edit title | core | D, M | `thread.title.update` | a manual title is never overwritten automatically |
+| Set Done, a new message reopens | core | D, M | `thread.close`, `thread.reopen` | section 6.1 |
+| Move a thread (only channels with the same operator) | core | D | `thread.move` | the dialog shows only valid targets |
+| Direct messages between people | later | D, M | `dm.create` | switch `dm.enabled`; without an agent |
+| Threads in threads | never | | | one level is enough; deeper trees fragment agent sessions |
+| Voice and video channels, screen sharing | never | | | not core to the product; large operational effort (Baseline 4) |
+| Multiple servers, server bar, public invite links | never | | | one instance is one organization (B13); outsiders join only when the owner creates them |
+| Role hierarchy like Discord | never | | | grants with levels and capabilities replace roles (ADR 0018) |
+
+### 3.2 Agents
+
+| Feature | Milestone | Where | Action(s) | Remark |
+|---|---|---|---|---|
+| Operator per channel visible in the channel header | core | D, M | `channel.read` | without an operator it says "No agent answers here" |
+| Live box running, pinned, with stop | core | D, M | `run.read`, `run.cancel` | section 6.2 |
+| Live box collapsed after the end, expandable | core | D, M | `run.read` | |
+| Trigger state as icons on the message | core | D, M | | replaces status emoji (section 6.3) |
+| Follow-ups during a run | core | D, M | `run.followup.create` | |
+| Buttons, selects, forms on messages | core | D, M | `interaction.create` | once, only for those authorized |
+| Slash commands with suggestions and options | core | D, M | `command.invoke`, `command.autocomplete` | control commands (`/stop`) never go to the model |
+| One agent session per thread, earlier sessions, start over, resume | core | D, M | `agent_session.reset`, `agent_session.bind` | |
+| Backend policy badge in the thread header and on the agent card | core | D, M, W | `agent.read` | Personal or Organization |
+| Costs per run and thread (organization: estimate until reconciliation) | core | D, M | `cost.read.thread` | with Personal only information |
+| Overview "Running now" | core | D, M | `run.overview.read` | |
+| Typing indicator (people); the agent "types" through the live box | core | D, M | `typing.start` | |
+| Presence of agents (online, degraded, offline) | core | D, M | `agent.read` | people have no presence |
+| Presence of people ("online") | never | | | reveals working hours; privacy and co-determination (study C, R5) |
+
+### 3.3 Messages
+
+| Feature | Milestone | Where | Action(s) | Remark |
+|---|---|---|---|---|
+| Markdown, code blocks, long answers without splitting, collapsed with "Show more" | core | D, M | `message.create` | limit `message.max_content_bytes` |
+| Edit and delete own messages, view versions | core | D, M | `message.update`, `message.delete`, `message.revisions.read` | no editing deadline |
+| Reply with quote | core | D, M | `message.create` | |
+| Reactions with a free Unicode character | core | D, M | `reaction.add` | status is not a reaction |
+| Mentions of people and agents | core | D, M | `message.create` | suggestions only from what is visible |
+| @everyone, @here, role mention | never | | | noise; notification per channel is enough |
+| Pin (moderation) | core | D, M | `pin.create` | needs `manage` |
+| Templates (personal and per channel) | core | D, M | `template.read`, `template.manage` | |
+| Drafts across devices | core | D, M | `draft.write` | notice when a newer version was overwritten |
+| Read receipts of other people | never | | | performance monitoring; the read state stays personal (ruling R-PR-03) |
+| Polls, widgets, to-do lists in text | never | | | agents deliver forms through components |
+| Stickers, GIF search, profile decorations, banners | never | | | distraction, license questions (Baseline 4) |
+| Link preview from the server | never | | | the server loads no foreign URLs (SSRF) |
+| Link preview in the client | later | D, M | | only after opt-in per person, because the app then contacts foreign servers |
+
+### 3.4 Files and voice
+
+| Feature | Milestone | Where | Action(s) | Remark |
+|---|---|---|---|---|
+| Files and images with preview, in and out | core | D, M | `file.upload`, `file.read` | served only after the scan |
+| iPhone: photo, camera, file | core | M | `file.upload` | |
+| Record a voice message, play it, transcript | core | D, M | `file.upload`, `file.transcribe` | switch `voice.enabled`; AAC (15-client-architecture.md) |
+| Share from other apps into a chosen target | core | M, macOS | `message.create`, `file.upload` | Windows see the next row |
+| Share from other apps on Windows | later | D | | needs MSIX identity; after the first Windows release |
+| Export of a channel | core | D, W | `export.channel` | capability `export`, step-up |
+
+### 3.5 Notification, search, navigation
+
+| Feature | Milestone | Where | Action(s) | Remark |
+|---|---|---|---|---|
+| Unread counter, mention counter | core | D, M | | from `read_states` and `mentions` |
+| View "Mentions" | core | D, M | `mention.list` | |
+| Notification per space, channel, thread (all, mentions, mute), quiet hours | core | D, M | `notification_pref.update`, `quiet_hours.update` | section 10 |
+| Push without content; the app fetches the text | core | M, macOS | `push.register` | Windows: notification area with its own connection |
+| Push through the Windows service (WNS) | later | D | | without a running app no notification; Baseline R-Push |
+| Email notifications | never | | | content does not belong in mailboxes (Baseline 4) |
+| Full-text search with permission filter | core | D, M | `search.query` | hits only from what is visible |
+| Quick switcher Cmd/Ctrl+K | core | D | | on mobile as a search field at the top |
+| Keyboard shortcuts | core | D | | section 7 |
+| Multiple windows, thread as its own window | later | D | | multi-window in Flutter still experimental (15-client-architecture.md) |
+| iPad layout with columns | later | M | | until then the scaled iPhone layout |
+
+### 3.6 Offline, sync, devices
+
+| Feature | Milestone | Where | Action(s) | Remark |
+|---|---|---|---|---|
+| Read offline (recently opened threads) | core | D, M | | cache according to [04](04-sync-protocol.md) section 13 |
+| Send offline with a queue, states visible | core | D, M | | section 6.6 |
+| Read state, drafts, settings, sidebar in sync | core | D, M | | |
+| Approve, revoke a device; end sessions | core | D, M, W | `device.approve`, `device.revoke`, `session.revoke` | new devices wait |
+| End-to-end encryption of chat content | never | | | agents must read (Baseline 4); the terminal stream, by contrast, is end-to-end encrypted (3.8) |
+| Chat in the browser | never | | | web only for the console (ADR 0028) |
+
+### 3.7 Administration, operations, integration
+
+| Feature | Milestone | Where | Action(s) | Remark |
+|---|---|---|---|---|
+| Create, disable people; groups | core | D, W | `user.create`, `user.disable`, `group.*` | no self-registration |
+| Grant wizard with plain-language preview and I1 check | core | D, W | `grant.create` | step-up |
+| "Who has access?" with origin | core | D, W | `access.explain` | |
+| "View as person" (read only) | core | D, W | `access.view_as` | logged |
+| Agents: backend switch, costs, tokens, commands | core | D, W | `agent.billing_mode.set`, `cost.read.aggregate`, `token.create` | |
+| Filter the audit, verify the chain | core | D, W | `audit.read`, `audit.verify` | |
+| Statistics | core | D, W | `stats.read` | |
+| Live topology of the agent runs, backend view, delivery and sync live, playable daily timeline | core | D, M, W | `stats.read`, `cost.read.aggregate` | own measurement, no values per person; [25-visualization.md](25-visualization.md); mobile screen M10; build: visualization track after the early M4 tickets against fixtures, server and apps M6 |
+| Executive page with SLO traffic light "own measurement" | core | D, M, W | `stats.read`, `cost.read.aggregate` | traffic light only for owners; build M6 |
+| TV mode (full screen, dark, rotating views) | core | D, W | `stats.read` | costs hidden by default; build M6; screen D13 |
+| Grafana panel plugin "Bothy Live" for operations | core | Grafana | none (permissions of Grafana) | build M7; unsigned locally until V1, signature later |
+| Embed Grafana dashboards in apps | never | | | only optionally in the web console, off by default ([ADR 0069](../adr/0069-visualization-on-two-levels-without-iframes-in-apps.md)) |
+| Status page | core | D, M, W | `status.read` | public only with `status.public_enabled` |
+| Import from Discord | core | W | `import.manage` | [22-import-migration.md](22-import-migration.md) |
+| Install apps, webhooks | core | W | `app.install`, `webhook_out.manage`, `webhook_in.create` | |
+| Emergency actions on the phone: revoke a device, revoke a grant, disable a person, stop a run | core | M | `device.revoke`, `grant.revoke`, `user.disable`, `run.cancel` | large flows (create a grant, audit, statistics) only on desktop and web |
+| Marketplace for bots | never | | | the owner installs apps deliberately; no catalogue of third-party providers |
+
+### 3.8 Terminal
+
+Normative: [24-terminal.md](24-terminal.md). Build: server and host service M2, desktop M4, mobile M5,
+web console M6.
+
+| Feature | Milestone | Where | Action(s) | Remark |
+|---|---|---|---|---|
+| Open a terminal: login shell on a connected host (macOS, Linux, Windows) | core | D, M, W | `terminal.open` | fresh step-up per opening, in the console passkey only ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)); screens D11, M8 |
+| Claude Code session in the terminal (profile `claude`) | core | D, M, W | `terminal.open` | interactive `claude` in a work folder from the allow list of the person's own session user (ruling T13), separate from the runner; only on hosts with a declared LLM login (I6) |
+| Session list per host, detach and reattach, also from another device | core | D, M, W | `terminal.read_own`, `terminal.attach` | the session keeps running for `terminal.detach_grace`; another device with a new step-up |
+| End a session | core | D, M, W | `terminal.close` | owners end any session |
+| Extra keys bar (Esc, Tab, Ctrl, Alt, arrows, `\|`, `~`, `/`, `-`) and hardware keyboard | core | M | | build M5; screen M8 |
+| Host fingerprint and key pinning per device with a hard warning on a change | core | D, M, W | | [24-terminal.md](24-terminal.md), section 5.5 |
+| Create a host, pair it, confirm the fingerprint, declare the LLM login, assign a session user per person, disable, retire | core | D, W | `host.read`, `host.manage` | owner only, step-up, audit; without an own session user no terminal (SR12); screen A8 |
+| Grant `terminal` per host | core | D, W | `grant.create` | owner only; for non-owners it takes effect only on the host assigned to them (SR10); the preview says so |
+| Take over a runner's thread in the terminal | later | D | | only when runner and host service run as the same user in a dev environment ([24-terminal.md](24-terminal.md), section 11.3) |
+| File transfer and clipboard through the terminal channel | later | D, M, W | | blocked in this version (OSC 52, [24-terminal.md](24-terminal.md), section 11.2) |
+| Recording of terminal content | never | | | metadata only; whether evidence obligations require a recording is an owner question (default: no) |
+| Terminal for agents or apps | never | | | an agent that prompt injection controls must not reach a host (T-TM-09) |
+
+## 4. Information architecture
+
+```text
+Instance (branding, status page)
++-- Spaces (sidebar, collapsible, category color, icon, default operator)
+|   +-- Text channel -> Main thread -> threads from messages
+|   +-- Forum        -> Post list   -> one thread per post (tags, Done section)
++-- Direct messages (later)
++-- Cross-cutting: Running now, Mentions, Search, Quick switcher, Settings
++-- Hosts (terminal): profiles and own sessions per host
++-- Live and statistics: live topology, executive page, timeline, TV mode
++-- Administration (desktop and web console; emergency actions on mobile)
+Before login: server address, login, enrollment code, device waiting, pairing (5.6)
+```
+
+A thread is the same object with a fixed ID everywhere: in a forum a post, in a text channel a
+thread from a message. Its agent session, runs and costs are attached to it.
+
+## 5. Screens
+
+Symbols in the wireframes: `v`/`>` expanded/collapsed, `#` text channel, `=` forum, `*`
+unread or run active, `(3)` counter, `[ ]` button or field, `[A]` agent (rounded square),
+`(AL)` person (round), `(o)` running, `[!]` waiting for you, `(@)` mention, `(z)` queue,
+`(v)` done, `(x)` failed, `(-)` cancelled. Trigger state on messages in
+curly braces: `{ok}` done, `{..}` in progress, `{z}` queue, `{x}` failed,
+`{->}` follow-up delivered. Rendered design: [design system](../design/README.md) with the
+images from `docs/design/previews/`.
+
+### 5.1 Desktop (macOS, Windows)
+
+**D1 Main view, forum.** Four columns: spaces and channels (brand surface), post list (forums
+only), history with a pinned live box, right session column (collapsible, instead of a member
+list). No server bar on the left (B13). Column borders can be dragged; widths are stored as the
+setting `layout.column_widths`. Below `ui.desktop_min_width_four_columns` the session column
+collapses, below `ui.desktop_min_width_three_columns` the post list does (navigation stack as on
+the phone).
+
+```text
++----------------------------+--------------------------------+---------------------------------------+------------------------+
+| [^] Bothy                  | = server  [+ New post]         | Gateway: resume after network change  | Session            [x] |
+| [Jump to ...  Cmd+K]       | [Open][Waiting for me]         | [Organization] 1,84 USD estimate      |                        |
+| (o) Running now       (2)  | [Tags v][Last activity v]      |               [Done] [Pin] [Column]   | [A] dev-runner         |
+|                            |                                | +- (o) Running 4:12  62 % 0,62 USD -+ |     online             |
+| v [H] Support              | (o) Gateway: resume af.. 4min  | | Checking if resume restores ...   | | Backend [Organization] |
+|     # general              |     dev-runner  [sync]         | | [ok Read] internal/sync/gw.go     | | Model      model-large |
+|   | = requests     * (3)   | [!] Check migration 0012 12:41 | | [.. Bash] go test ./internal/...  | | Session   0193f2a7-..  |
+|     # alerts  (muted)      |     [Waiting for you] [db]     | | > On resume, the focus is taken.. | | Project   server, main |
+| v [<>] Engineering         | (@) Review: grant wizard 11:58 | | [Stop]  Messages = follow-up      | |                        |
+|   >= server          *     |     Sam mentions you [access]  | +-----------------------------------+ | Context  [######----]  |
+|     = apps                 | (z) Search: hits in tr.. 11:20 | [A] dev-runner AGENT 10:14            | Thread cost   1,84 USD |
+|     # releases             | (v) Costs per space ..  2h     |   Cause: ... [code block]             |         (estimate)     |
+| > [M] Marketing        *   | (x) Upload limit ... yesterday |   [v Ran 12 min, 3 tools  >]          | Runs                5  |
+| > [R] Research             |     failed: project ..         | [A] dev-runner AGENT 10:16            |                        |
+|                            | (-) Old draft: export  Mon     |   Approval needed: go test ...        | Earlier sessions (2)   |
+|                            |                                |   [Allow once][Session][Always]       | Pinned (2)             |
+|                            |                                | |(SA) Sam: @Alex can you ...     (!)  | Files (3)              |
+|                            |                                | (AL) Alex 10:22 {..} @dev-runner ...  |                        |
+|                            |                                | ... Sam is typing                     |                        |
+| (AL) Alex       [Settings] | > Done (14)                    | [+] Follow-up to dev-runner [Mic][>]  |                        |
++----------------------------+--------------------------------+---------------------------------------+------------------------+
+```
+
+**D2 Text channel with an open thread.** No post list. A thread opens to the right of the
+main thread; the session column is then collapsed. The header names the operator.
+
+```text
++--------------------------+------------------------------------------------+------------------------------------------+
+| v [H] Support            | # general   Operator: support-agent    [Topic] | #general > Request summary               |
+|   ># general             |                                                | [Organization]  [Done]  [...]            |
+|     = requests    * (3)  | (SA) Sam 09:12                                 |                                          |
+|     # alerts             |   Customer asks about the export format.       | [v] Ran 2 min, 1 tool, 0,04 USD >        |
+|                          |   [Thread: Export format, 4 replies >]         | [A] support-agent AGENT 09:31            |
+|                          | (AL) Alex 09:30 {ok}                           |   The request concerns ... (truncated)   |
+|                          |   @support-agent summarize the request         |   [Show more]                            |
+|                          |   [Thread: Request summary 4711 >]             | (AL) Alex 09:33 {->}                     |
+|                          | (RO) Robin 09:41                               |   Please also name the deadline.         |
+|                          |   Thanks, I'll take it from here.              |                                          |
+|                          |                                                |                                          |
+|                          | [+] Message to #general              [Mic][>]  | [+] Follow-up to support-agent [Mic][>]  |
++--------------------------+------------------------------------------------+------------------------------------------+
+```
+
+**D3 Thread view: live box in four states.** Running (pinned), collapsed after the end, waiting
+for an answer, failed. Specification: [components.md](../design/components.md) section 2.
+
+```text
++--------------------------------------------------------------------------------+
+| (o) Running 4:12   Context 62 %   48,1k tokens   0,62 USD   [Organization] [v] |
+| Checking if resume restores the focus after the network change.                |
+|   [ok Read ] internal/sync/gateway.go                              0,4 s       |
+|   [ok Grep ] resume_window                                          0,2 s      |
+|   [.. Subagent] Write test cases for 4006                                      |
+|       [.. Bash] go test ./internal/sync/...                     running 38 s   |
+|   2 earlier steps [show]                                                       |
+| > On resume, the focus is taken over from the gateway session; it is still     |
+| > open whether expired threads are dropped silently.                           |
+| [Stop]   New messages in this thread go to the run as a follow-up.             |
++--------------------------------------------------------------------------------+
+```
+
+```text
++--------------------------------------------------------------------------------+
+| (v) Ran 28 min   3 tools   2 subagents   1,20 USD estimate                [>]  |
++--------------------------------------------------------------------------------+
+```
+
+```text
++--------------------------------------------------------------------------------+
+| [!] Waiting for you  2:03  0,18 USD                                [Personal]  |
+| Which database should the test use?                                            |
+|   Database [Local container  v]   Port [55432   ]   [Answer]                   |
++--------------------------------------------------------------------------------+
+```
+
+```text
++--------------------------------------------------------------------------------+
+| (x) Failed   Backend mismatch: reported organization, configured personal      |
+| [Try again]  [Details]                                                         |
++--------------------------------------------------------------------------------+
+```
+
+**D4 Components on messages.** Approval buttons (once, session, always, deny), selection,
+form; after use, a line with the person and the choice.
+
+```text
++--------------------------------------------------------------------------------+
+| [A] dev-runner AGENT 10:16                                                     |
+|   +- [Shield] Approval needed ------------------------------------------+      |
+|   | go test wants to use the network for the test database.              |     |
+|   | [Allow once] [For this session] [Always] [Deny]                      |     |
+|   | [Lock] Only Alex or an owner can approve this.                       |     |
+|   +---------------------------------------------------------------------+      |
+|   +- Choose model ------------------+   +- Question ---------------------+     |
+|   | [model-large            v]      |   | Customer    [Text          ]   |     |
+|   |  > model-large                  |   | Priority    [normal v]         |     |
+|   |    model-fast                   |   | [Submit]                       |     |
+|   +---------------------------------+   +--------------------------------+     |
+|   After use:  {ok} Alex chose 'Allow once', 10:24                              |
++--------------------------------------------------------------------------------+
+```
+
+**D5 Slash autocomplete.** Opens on "/" at the start of a line. Commands of the operator first,
+commands of the same name from other agents with their handle. Options with suggestions from the
+agent.
+
+```text
++--------------------------------------------------------------------------------+
+| +- Commands from dev-runner (operator of this channel) -------------------+    |
+| | > /status   State of the current run                    control command |    |
+| |   /stop     Cancel the run, never goes to the model     control command |    |
+| |   /model    Choose a model for this session             name            |    |
+| |   /stats    Channel metrics                             research-bot    |    |
+| +-------------------------------------------------------------------------+    |
+| [+] /st|                                                          [Mic][>]     |
+|                                                                                |
+| After selection:  /model [name: model-l|]   Suggestions from the agent:        |
+|                   > model-large   model-fast                                   |
++--------------------------------------------------------------------------------+
+```
+
+**D6 Quick switcher (Cmd+K or Ctrl+K).** Jumps to a channel, thread, person, agent or command.
+Results only from what is visible; recently visited targets first. At most
+`ui.quick_switch_max_results` results.
+
+```text
++------------------------------------------------------------------------+
+| [Lens] serv|                                                    [esc]  |
++------------------------------------------------------------------------+
+| > = server                                            Engineering      |
+|   [Thread] Gateway: resume after network change            server      |
+|   [A] dev-runner                                            Agent      |
+|   (SA) Sam                                                 Person      |
++------------------------------------------------------------------------+
+| Tab: Filter  Channels | Threads | People | Agents | Commands           |
++------------------------------------------------------------------------+
+```
+
+**D7 Search.** Full text across messages, thread titles, file names and transcripts; filters on
+the left; results with highlighting and path. The result count counts only what is visible.
+
+```text
++--------------------------+------------------------------------------------------------------------+
+| Filter                   | [Lens] resume_window                                    [Search]       |
++--------------------------+------------------------------------------------------------------------+
+| Space    [all v]         | 14 results, only from channels you may see                             |
+| Channel  [all v]         |                                                                        |
+| From     [all v]         | = server > Gateway: resume after network change                        |
+| Type [x] Messages        |   (A) dev-runner 10:14  ... window **resume_window** is measured       |
+|      [x] Threads         |   from the last heartbeat ...                                          |
+|      [x] Files           | # releases > Version 0.4                                               |
+|      [ ] Transcripts     |   (RO) Robin yesterday  ... new **resume_window** ...                  |
+| Time [any v]             | [File] notes-sync.md  ... **resume_window** ...                        |
+| Status [open+done]       | [load more]                                                            |
++--------------------------+------------------------------------------------------------------------+
+```
+
+**D8 Settings.** Appearance, notifications, language, keyboard, devices and sessions, privacy,
+about (version, licenses). Under "Devices and sessions" the person confirms a waiting device with
+its code (E4) and adds a device with a pairing code (E5), both with step-up.
+
+```text
++--------------------------+------------------------------------------------------------------------+
+| Settings                 | Appearance                                                             |
++--------------------------+------------------------------------------------------------------------+
+| > Appearance             | Theme        ( ) System  ( ) Light  (x) Dark                           |
+|   Notifications          | Density      (x) Normal  ( ) Compact                                   |
+|   Language               | Motion       (x) System  ( ) Full  ( ) Reduced                         |
+|   Keyboard               | Enter sends  [x]   (Shift+Enter: new line)                             |
+|   Devices and sessions   | Column widths [Reset]                                                  |
+|   Privacy                |                                                                        |
+|   About                  | Language     [German v]  Time zone [Europe/Berlin v]                   |
+|                          | Devices: iPhone (active), Laptop (this device), [Revoke device]        |
+|                          | Waiting: Tablet [Enter code]   [Add device]                            |
+|                          | Privacy: [x] Crash reports  [x] Performance data  [Export]             |
++--------------------------+------------------------------------------------------------------------+
+```
+
+**D9 Notification settings.** Default, quiet hours, content in notifications, level per space,
+channel and thread with visible inheritance; time-limited muting.
+
+```text
++------------------------------------------+--------------------------------------------------------+
+| Notifications                            |                                                        |
++------------------------------------------+--------------------------------------------------------+
+| Default for new channels                 | ( ) All  (x) Mentions  ( ) Mute                        |
+| Runs I triggered                         | [x] Notify when done or on a question                  |
+| Show content in notifications            | [x] Load text (otherwise only 'New message')           |
+| Quiet hours                              | Mon-Fri 19:00-07:00, Sat-Sun all day  [Edit]           |
++------------------------------------------+--------------------------------------------------------+
+| Per space, channel and thread            | Level                                                  |
+| v Support                                | [All v]                                                |
+|     # general                            | [inherits: All]                                        |
+|     = requests                           | [Mentions v]                                           |
+| v Engineering                            | [Mentions v]                                           |
+|     = server > Gateway: resume ...       | [All v]  until [today 18:00 v]                         |
+| > Marketing                              | [Mute v]                                               |
++------------------------------------------+--------------------------------------------------------+
+```
+
+**D10 Running now.** All active runs that the person may see; stop only where `run.cancel` is
+allowed (triggering person, `manage`, owner).
+
+```text
++----------------------------------------------------------------------------------------------------+
+| Running now (3)                                          [Filter: Space v] [Agent v] [mine only]   |
++----------------------------------------------------------------------------------------------------+
+| (o) dev-runner     server > Gateway: resume after network change   4:12  62 %  0,62 USD  [Stop]    |
+| [!] dev-runner     server > Check migration 0012         waiting for you  2:03  [Open]             |
+| (z) research-bot   Research > Weekly report                Queued                 [Open]           |
++----------------------------------------------------------------------------------------------------+
+| Organization: sum of active runs 0,80 USD (estimate). Personal runs: information only.             |
++----------------------------------------------------------------------------------------------------+
+```
+
+**D11 Terminal.** Sidebar with the group "Hosts" below the spaces; on the right the terminal view
+with one tab per own session on the host. The header shows the host, the connection, the badge of
+the LLM login, the start of the fingerprint and the time left until
+`terminal.max_session_duration`. "Detach" keeps the session running (it can be reattached), "End"
+closes it. Opening requires confirmation with a passkey or a step-up device key; the dialog
+names the host and the profile. All keys go to the shell, except the shortcuts from section 7.
+
+```text
++----------------------------+-------------------------------------------------------------------------------+
+| [^] Bothy                  | Build host  [online]  [Organization]  Fp 7KQ2 9XTA ..  Left 11:42     [i]     |
+| [Jump to ...  Cmd+K]       | [shell 1 x] [claude: server x] [+ New session v]             [Detach] [End]   |
+| (o) Running now       (2)  +-------------------------------------------------------------------------------+
+|                            | ~/src/server $ go test ./internal/sync/...                                    |
+| > [H] Support              | ok      internal/sync           4.212s                                        |
+| v [<>] Engineering         | ok      internal/sync/gateway   1.874s                                        |
+|     = server         *     | ~/src/server $ git status --short                                             |
+|     # releases             |  M internal/sync/gateway.go                                                   |
+|                            | ~/src/server $ _                                                              |
+| v Hosts                    |                                                                               |
+|   (o) Build host     (2)   |                                                                               |
+|   ( ) Linux VM             |                                                                               |
+|   (-) Test Windows         |                                                                               |
+|       disabled             |                                                                               |
+|                            +-------------------------------------------------------------------------------+
+| (AL) Alex       [Settings] | End-to-end encrypted | Profile shell | Idle timeout active                    |
++----------------------------+-------------------------------------------------------------------------------+
+```
+
+Confirmation on opening and warning on a changed key (24, section 5.5):
+
+```text
++------------------------------------------------------------+  +------------------------------------------------------------+
+| Open terminal                                              |  | [!] The host's key has changed                             |
++------------------------------------------------------------+  +------------------------------------------------------------+
+| Host      Build host                                       |  | Stored:       7KQ2 9XTA M4PB 1C8D ...                      |
+| Profile   (x) shell  ( ) claude [Working folder: server v] |  | Now:          Q0ZJ 55RW 2HNE K7TS ...                      |
+| Login     [Organization]  The organization bears the costs |  | Without re-pairing by an owner, this is a sign of an       |
+|                                                            |  | attack. Connect only after you have checked the new        |
+| Every opening is logged.                                   |  | fingerprint on the host.                                   |
+| [Cancel]                  [Confirm with passkey / device]  |  | [Do not connect]                      [Accept new key]     |
++------------------------------------------------------------+  +------------------------------------------------------------+
+```
+
+**D12 Live topology.** Lanes per space, run cards with state, tool, badge and costs; a click opens
+the thread. The same data as a table via "Table". Normative:
+[25-visualization.md](25-visualization.md), section 6.1.
+
+```text
++----------------------------+-------------------------------------------------------------------------------+
+| [^] Bothy                  | Live  [Topology] [Backend] [Delivery] [Executive] [Timeline]                  |
+| (o) Running now       (3)  | Space [all v]                       12:04:31  live   [Table] [TV mode]        |
+| v Live and statistics      +-------------------------------------------------------------------------------+
+|   > Live                   | Engineering | = server   +- dev-runner ------------------+                    |
+|     Statistics             |             |            | (o) running  4:12             |                    |
+|                            |             |            | [.. Bash] go test             |                    |
+| > [H] Support              |             |            | [Org.] 0,62 USD estimate      |                    |
+| v [<>] Engineering         |             |            +-------------------------------+                    |
+|     = server         *     |             | # releases  (no active runs)                                    |
+| v Hosts                    | Support     | = requests +- support-agent ---------------+                    |
+|   (o) Build host     (2)   |             |            | [!] waiting_input             |                    |
+|                            |             |            | Approval waiting  [Personal]  |                    |
+|                            |             |            +-------------------------------+                    |
+|                            +-------------------------------------------------------------------------------+
+|                            | Last minute: messages 14 | runs 3 | tool calls 41 | errors 0                  |
++----------------------------+-------------------------------------------------------------------------------+
+```
+
+**D13 TV mode.** Full screen, dark theme, larger font, no controls; rotates through the selected
+views every `viz.tv_rotation_interval`. Costs only with `viz.tv_show_costs`. A key press or a click
+ends it. Desktop and web console, not mobile.
+
+```text
++--------------------------------------------------------------------------------------------------------+
+|  BOTHY LIVE                        Live topology  (1 of 3)                           12:04   [=  =  =] |
++--------------------------------------------------------------------------------------------------------+
+|                                                                                                        |
+|   ENGINEERING        server     [ (o) dev-runner    running   Bash      Organization ]                 |
+|                      releases   [ (v) research-bot  completed 2 min                  ]                 |
+|                                                                                                        |
+|   SUPPORT            requests   [ [!] support-agent waiting_input   Approval waiting ]                 |
+|                                                                                                        |
+|   RESEARCH           (no active runs)                                                                  |
+|                                                                                                        |
++--------------------------------------------------------------------------------------------------------+
+|   Active runs 3      Tool calls/min 41      Delivery on target [ok]      own measurement               |
++--------------------------------------------------------------------------------------------------------+
+```
+
+### 5.2 Administration (desktop and web console)
+
+Before it is submitted, every changing administration action with step-up shows the confirmation
+with passkey or device key ([08-identity.md](08-identity.md)).
+
+**A1 People.** List, create (no self-registration, no invitation links), queue of new devices with
+the origin of the login.
+
+```text
++------------------------+----------------------------------------------------------------------------+
+| Administration         | People                                    [+ Add person]                   |
++------------------------+----------------------------------------------------------------------------+
+| > People               | [Lens] Search        Filter: [active v] [Group v]                          |
+|   Groups               | (AL) Alex     Owner          2 devices  last seen today                    |
+|   Grants               | (SA) Sam      Support (trigger) 1 device  last seen today                  |
+|   Devices (1 waiting)  | (RO) Robin    Engineering (trigger) 3 devices yesterday                    |
+|   Agents               | (NE) New      waiting for login                                            |
+|   Apps                 | ---                                                                        |
+|   Audit                | Waiting devices: Sam, 'Pixel', logged in 08:12 via OIDC                    |
+|   Statistics           |   [Approve] [Reject]              Key: hardware, attested                  |
+|   Instance             |                                                                            |
++------------------------+----------------------------------------------------------------------------+
+```
+
+**A2 Create grant with plain-language preview.** Three steps (who, where, level and capabilities).
+The preview states the effect in sentences, names newly visible channels and checks I1 before
+submitting; a violation is explained, not just rejected ("switch to organization first").
+
+```text
++----------------------------------------------------------------------------------------------+
+| Create grant                                                             Step 3 of 3         |
++----------------------------------------------------------------------------------------------+
+| Who          (SA) Sam                     [Person v]                                         |
+| Where        Support space  (applies to all channels in it)                                  |
+| Level        ( ) read  ( ) write  (x) Trigger agents                                         |
+| Capabilities [ ] Approve actions  [x] Upload files  [ ] Export  [ ] Manage                   |
+| Until        [x] 31.12.2026      Reason [Support cover Q4                       ]            |
++----------------------------------------------------------------------------------------------+
+| Plain-language preview:                                                                      |
+|   From now on Sam may read all channels in the Support space, write there and trigger        |
+|   the agent support-agent. Sam may upload files. Sam may not approve                         |
+|   actions (approval buttons stay disabled). Valid until 31.12.2026.                          |
+|   Newly visible for Sam: 3 channels, 214 threads.                                            |
+| [!] Check: support-agent runs in Organization mode. The organization bears the costs.        |
+| [x] Would be rejected: dev-runner (Personal, only Alex may trigger). Switch first.           |
++----------------------------------------------------------------------------------------------+
+| [Back]                                           [Confirm with passkey / device]             |
++----------------------------------------------------------------------------------------------+
+```
+
+**A3 Who has access?** Per space or channel: people, groups, agents with effective level and
+origin (direct, group, inherited, owner).
+
+```text
++--------------------------------+----------------------------------------------------------------+
+| Who has access?                | Space Support > Channel requests                               |
++--------------------------------+----------------------------------------------------------------+
+| Person or group                | Level, capabilities and origin                                 |
++--------------------------------+----------------------------------------------------------------+
+| (AL) Alex                      | trigger, all capabilities      Owner                           |
+| (SA) Sam                       | trigger, files       direct on space Support, until 31.12.     |
+| [G] Support team (4)           | write                 group, inherited from space Support      |
+| (RO) Robin                     | read                  via group Support team and direct        |
+| [A] support-agent              | write (operator)      direct on space Support                  |
++--------------------------------+----------------------------------------------------------------+
+| [View as person v]             | [Create grant]  [Revoke]  [History]                            |
++--------------------------------+----------------------------------------------------------------+
+```
+
+**A4 View as person.** Read-only; clear frame; every use in the audit log.
+
+```text
++----------------------------------------------------------------------------------------------+
+| [Eye] Viewing as Sam (read-only). Nothing is sent. Logged.                     [Exit]        |
++----------------------------------------------------------------------------------------------+
+| Sidebar as Sam sees it:           v Support (# general, = requests, # alerts)                |
+|                                   > Research (# reading-club)                                |
+| Not visible for Sam: Engineering, Marketing                                                  |
+| Clicking a channel shows content as for Sam; input, buttons and reactions are off.           |
++----------------------------------------------------------------------------------------------+
+```
+
+**A5 Agents with backend switch and costs.** Reported mode from the heartbeat next to the
+configured mode; switching with reason and step-up; explanation of why Personal is not possible
+right now (I1).
+
+```text
++--------------------------------+----------------------------------------------------------------+
+| Agents                         | support-agent                                 [online]         |
++--------------------------------+----------------------------------------------------------------+
+| > support-agent  [Org.]        | Adapter      hermes        Reported mode: Organization         |
+|   dev-runner     [Pers.]       | Operates     space Support (default), # alerts                 |
+|   research-bot   [Org.]        | Backend      (x) Organization  ( ) Personal                    |
+|                                |              Switching needs reason and confirmation.          |
+| [Switch all ...]               |              Personal only works if exactly one person         |
+|                                |              may trigger (I1). Today: 5 people.                |
+|                                | Costs 30 days  41,20 USD (estimate)  [by space v]              |
+|                                |   Support 38,10   Marketing 3,10      [Reconcile]              |
+|                                | Tokens [Create token]   Commands (6)   Presence history        |
++--------------------------------+----------------------------------------------------------------+
+```
+
+**A6 Audit.** Filterable by action, person, result, time range; check of the hash chain.
+
+```text
++----------------------------------------------------------------------------------------------------+
+| Audit   Filter: [Action v] [Person v] [Result: all v] [Time range v]       [Check chain]           |
++----------------------------------------------------------------------------------------------------+
+| Time    Who       Action                    Result    Resource          Reason                     |
+| 10:24   Alex      interaction.create        allowed   Card in server    approve_actions            |
+| 10:20   Sam       interaction.create        denied    Card in server    missing capability         |
+| 09:58   Alex      grant.create              allowed   Space Support     Cover Q4                   |
+| 09:57   Alex      auth.step_up              allowed   Session laptop                               |
+| 08:12   Sam       agent.invoke              denied    Run 0193..        Personal: not holder       |
++----------------------------------------------------------------------------------------------------+
+| Chain checked up to no. 18 402: unchanged.          [Export CSV]  (owner only, step-up)            |
++----------------------------------------------------------------------------------------------------+
+```
+
+**A7 Statistics.** Metric tiles, runs per day, costs per agent and space, failure reasons. Values
+from the server; the console shows the same view at full width.
+
+```text
++----------------------------------------------------------------------------------------------------+
+| Statistics  Time range [30 days v]  Space [all v]                         [Export]                 |
++----------------------------------------------------------------------------------------------------+
+| + Runs -----------+ + Costs (Org.) ----+ + Mean duration --+ + Waiting for people --+              |
+| | 1 284           | | 41,20 USD        | | 3 min 10 s       | | 12 open              |             |
+| | +8 % vs prev.   | | Estimate         | | p95 18 min       | | oldest 2 days        |             |
+| +-----------------+ +------------------+ +------------------+ +----------------------+             |
+| Runs per day (stacked by result)             Costs per agent                                       |
+|   ::::::::::::::::::::::::::::::::::::      support-agent  ##########  38,10                       |
+|   done / failed / canceled                  research-bot   #           3,10                        |
+| Failure reasons: project not ready 9, backend mismatch 2, time limit 1                             |
++----------------------------------------------------------------------------------------------------+
+```
+
+**A8 Hosts.** Owner only. Create a host with name, optional assignee and reason; one-time
+pairing code with a command for the host; confirmation by typing the first
+`terminal.fingerprint_confirm_chars` characters of the fingerprint that `bothy-host pair` shows there;
+mandatory questions about the LLM login (I6) and the server host; mapping of each person to their own
+session user on the host, as a choice from the names that the host reports
+(`hosts.reported_session_users`; without a mapping no terminal, SR12); per session user its
+work folders of the profile `claude` (ruling T13); check results of `bothy-host doctor`, for HD6
+and HD11 with each affected session user and the person mapped to it, even when the
+host is disconnected after a refused start ([24](24-terminal.md), section 2.2); disable,
+re-pair, retire. Every change with step-up and reason.
+
+```text
++------------------------+----------------------------------------------------------------------------+
+| Administration         | Hosts > Build host                              [active]  [Disable v]      |
++------------------------+----------------------------------------------------------------------------+
+|   People               | Assignee      (RO) Robin                                   [Change]        |
+|   Groups               | Platform      macOS, host service 1.2.0         connected since 07:58      |
+|   Grants               | Fingerprint   7KQ2 9XTA M4PB 1C8D ...   Key generation 2                   |
+|   Devices              | LLM login     (x) Organization  ( ) Personal of [Person v]  ( ) None       |
+|   Agents               |               Personal: only this person may open a terminal here          |
+| > Hosts (3)            |               (I6), not even other owners.                                 |
+|   Apps                 | Server host   ( ) yes  (x) no    Report of the host service: no            |
+|   Audit                | Checks        HD1 ok  HD2 ok  HD3 ok  HD4 ok  HD5 ok  HD6 ok  HD7 warning  |
+|   Statistics           |               HD8 ok  HD9 ok  HD10 ok  HD11 failed: bothy-s-alex           |
+|   Instance             | Profiles      shell, claude                                                |
+|                        | Grants        (RO) Robin  terminal   effective (assignee)                  |
+|                        |               (SA) Sam    terminal   not effective: not assignee (SR10)    |
+|                        | Session users (RO) Robin: bothy-s-robin   Work folders: server, apps       |
+|                        |               (AX) Alex (Owner): bothy-s-alex   Work folders: none         |
+|                        |               reported, not mapped: bothy-s-sam            [Map]           |
+|                        |               without a session user no terminal (SR12)                    |
+|                        | [Re-pair]  [Sessions (2)]  [Retire]                                        |
++------------------------+----------------------------------------------------------------------------+
+```
+
+Pairing a new host:
+
+```text
++----------------------------------------------------------------------------------------------+
+| Pair host                                                                Step 2 of 3         |
++----------------------------------------------------------------------------------------------+
+| Run on the host as the user of the host service (one-time code, expires soon):               |
+|   bothy-host pair --server https://chat.example.com --code bothy_hpc_EXAMPLE...              |
+| [Copy]                                                           Expires in 14:12            |
++----------------------------------------------------------------------------------------------+
+| Step 3: Type the fingerprint from the host (first characters) [7KQ2 9XTA]                    |
+|            LLM login on this host  ( ) None  ( ) Personal  ( ) Organization                  |
+|            Does the server run on this host?  ( ) yes  ( ) no                                |
+|            Session user per person: [Person v] -> [reported name v]  [+]                     |
+|            (only names that the host reported during pairing)                                |
++----------------------------------------------------------------------------------------------+
+| [Back]                                           [Confirm with passkey / device]             |
++----------------------------------------------------------------------------------------------+
+```
+
+### 5.3 iPhone
+
+Navigation stack: spaces -> channel or post list -> history. Back by swiping from the edge.
+Input at the bottom with spacing to the safe areas. Touch targets `density.target-min` (context
+`touch`). A push opens the thread directly at the message.
+
+**M1 Spaces.**
+
+```text
++--------------------------------------+
+| [^] Bothy                    [Lens]  |
+| (o) Running now               (2)    |
+| v [H] Support                        |
+|      # general                       |
+|    | = requests           * (3)      |
+|      # alerts                        |
+| v [<>] Engineering                   |
+|      = server               *        |
+| > [M] Marketing             *        |
+|                                      |
++--------------------------------------+
+| [Spaces] [Mentions] [Running] [Me]   |
++--------------------------------------+
+```
+
+**M2 Post list.**
+
+```text
++--------------------------------------+
+| < Support      = requests       [+]  |
+| [Open][Waiting for me][Tags]         |
++--------------------------------------+
+| (o) Gateway: resume after netw..     |
+|     dev-runner [sync]      4 min     |
+| [!] Check migration 0012             |
+|     [Waiting for you]      12:41     |
+| (@) Review: grant wizard             |
+| (v) Costs per space         2 h      |
+|                                      |
+| > Done (14)                          |
++--------------------------------------+
+```
+
+**M3 History with compact live box.** Stop is always reachable at the top right of the live box
+row; tapping opens the full live box as a sheet. Approval buttons stacked at full width.
+
+```text
++--------------------------------------+
+| < server   Gateway: resume ...  ...  |
++--------------------------------------+
+| (o) Running 4:12 62 %      [STOP]    |
+|     go test ./internal/sync/...      |
++--------------------------------------+
+| [A] dev-runner 10:16                 |
+|  Approval needed: go test ...        |
+|  [         Allow once         ]      |
+|  [      For this session      ]      |
+|  [           Deny             ]      |
+| (AL) Alex 10:22 {..}                 |
+|  Please include expired threads.     |
++--------------------------------------+
+| [+] Follow-up to dev-runner  [Mic]   |
++--------------------------------------+
+```
+
+**M4 Large components.** Like M3: buttons at full width, forms as a sheet with keyboard; selection
+as the system picker.
+
+**M5 Record voice message.** Press and hold the microphone; swiping left discards, swiping up
+locks the recording; releasing sends. Maximum duration `voice.max_duration` ([12-files.md](12-files.md), delivered by `instance.read`); a
+notice before it runs out.
+
+```text
++--------------------------------------+
+| < server   Gateway: resume ...       |
+|                                      |
+|                                      |
++--------------------------------------+
+|   ( * )  0:17   Recording            |
+|   ||||||||||| ||||| ||||||           |
+|                                      |
+|   <- swipe to discard                |
+|   ^  swipe up to lock                |
+|   [Release = send]                   |
++--------------------------------------+
+| [Press and hold Mic]                 |
++--------------------------------------+
+```
+
+**M6 Share from other apps (choose target).** Separate sheet of the Share Extension: preview,
+comment, target from recently used threads and channels with write permission, search for more.
+Sending goes directly; without network the entry lands in the app's queue.
+
+```text
++--------------------------------------+
+| Cancel      Share to       [Send]    |
++--------------------------------------+
+| [Image] screenshot.png  1,2 MB       |
+| Comment [See error above         ]   |
++--------------------------------------+
+| Target                               |
+| > = server > Gateway: resume ..      |
+|   = requests (new post)              |
+|   # general                          |
+|   [Lens] Search others ...           |
++--------------------------------------+
+| Only targets with write permission.  |
++--------------------------------------+
+```
+
+**M7 Offline.** Banner at the top; waiting messages with "sending"; permanent errors with
+reason and buttons; nothing is discarded silently.
+
+```text
++--------------------------------------+
+| < server   Gateway: resume ...       |
+| [Cloud] Offline. 1 message waiting   |
++--------------------------------------+
+| (AL) Alex 10:22 {..}                 |
+|  Please include expired threads.     |
+| (AL) Alex                            |
+|  And summarize afterwards.           |
+|  {z} sending                         |
+| (AL) Alex                            |
+|  Attachment too large. {x} failed    |
+|  [Retry] [Edit] [Discard]            |
++--------------------------------------+
+| [+] Message (will be sent later)     |
++--------------------------------------+
+```
+
+**M8 Terminal with extra keys bar.** Full-screen view of a session. Above the system keyboard
+sits the extra keys bar: Esc, Tab, Ctrl, Alt, arrows, `|`, `~`, `/`, `-`. Ctrl and Alt
+act once for the next key; tapping twice holds them until the next tap (indicator
+filled). With a hardware keyboard the app hides the bar. Swiping with two fingers scrolls
+the scrollback; a long press selects text for copying. When the app goes to the background, it
+detaches the session (it keeps running on the host) and hides the view in the app switcher; back
+in the app it reattaches within `terminal.quick_reattach_window` without a new confirmation,
+after that with Face ID or fingerprint.
+
+```text
++--------------------------------------+
+| < Hosts     Build host      [Org.]   |
+| shell 1  v   Left 11:42   [Detach]   |
++--------------------------------------+
+| ~/src/server $ git status            |
+| On branch main                       |
+| nothing to commit, working tree clean|
+| ~/src/server $ tail -f run.log       |
+| 12:04:31 sync: resume ok             |
+| 12:04:32 sync: catch-up 14 events    |
+| _                                    |
++--------------------------------------+
+| [Esc][Tab][Ctrl][Alt] [<][^][v][>]   |
+| [ | ] [ ~ ] [ / ] [ - ]     [Keybd.] |
++--------------------------------------+
+|  q  w  e  r  t  z  u  i  o  p        |
+|   a  s  d  f  g  h  j  k  l          |
+|  [^]  y  x  c  v  b  n  m  [<-]      |
+|  [123]   [    Space     ]   [Enter]  |
++--------------------------------------+
+```
+
+**M9 Hosts and sessions.** List of the hosts that the person may see, with connection,
+badge of the LLM login and own sessions; tapping a session attaches.
+
+```text
++--------------------------------------+
+| < Me         Hosts                   |
++--------------------------------------+
+| (o) Build host           [Org.]      |
+|     shell 1     detached  3 min ago  |
+|     claude: server   active          |
+|     [+ New session]                  |
+| ( ) Linux VM             [None]      |
+|     offline since 08:12              |
++--------------------------------------+
+| Fingerprint and login: [i]           |
++--------------------------------------+
+```
+
+**M10 Live.** The same views as D12 from `bothy_viz` in density `touch`, one tab per view:
+topology, backend, delivery, executive, timeline. The topology stacks the lanes vertically;
+tapping a run card opens the thread. Every view has the table view. The live stream
+runs only in the foreground. No TV mode. Normative: [25-visualization.md](25-visualization.md),
+section 6.
+
+```text
++--------------------------------------+
+| < Me    Live      12:04:31   live    |
+| [Topo][Backend][Deliv.][Exec][Time]  |
++--------------------------------------+
+| Engineering                          |
+|  = server                            |
+|   +- dev-runner -------------------+ |
+|   | (o) running 4:12   [.. Bash]   | |
+|   | [Org.] 0,62 USD estimate       | |
+|   +--------------------------------+ |
+| Support                              |
+|  = requests                          |
+|   +- support-agent ----------------+ |
+|   | [!] waiting_input              | |
+|   | Approval waiting  [Personal]   | |
+|   +--------------------------------+ |
++--------------------------------------+
+| Last minute: runs 3 | errors 0       |
+| [Table]                              |
++--------------------------------------+
+```
+
+### 5.4 Android
+
+Same screens as iPhone, with Android controls: system back, top app bar, notification
+channels of the system, sharing via the system share sheet into the same target selection. In
+the terminal (M8), system back detaches the session instead of ending it; the extra keys bar is
+the same.
+
+```text
++--------------------------------------+
+| [<-] Gateway: resume ...   [:]       |
++--------------------------------------+
+| (o) Running 4:12 62 %      [STOP]    |
+| ...                                  |
++--------------------------------------+
+| System back: to the post list        |
+| Notification channels in the         |
+| system settings: Mentions,           |
+| Questions, All messages, Runs        |
+| Share: system sheet -> app ->        |
+|   same target sheet as iOS           |
++--------------------------------------+
+```
+
+### 5.5 Web console (administration, statistics and terminal)
+
+Same administration screens as A1 to A8, the views from D12 and D13 and the terminal from D11,
+navigation on the left. No chat (ADR 0028); links to threads open the app via deep link. The terminal
+opens only after confirmation with a passkey with user verification; other step-up methods of the
+console do not count for it ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)).
+
+```text
++--------------------------+------------------------------------------------------------------------+
+| [^] Bothy console        | Statistics                    Logged in: Alex (passkey)                |
++--------------------------+------------------------------------------------------------------------+
+|   Live                   | (like desktop statistics, full width)                                  |
+| > Statistics             |                                                                        |
+|   Hosts and terminal     | No chat in the browser. Links in threads open the app:                 |
+|   People                 | [Open in the app]  (deep link)                                         |
+|   Groups, grants         |                                                                        |
+|   Devices                | Terminal: opens only with passkey; pinned host keys are kept in        |
+|   Agents, costs          | the storage of this browser and are deleted at logout.                 |
+|   Apps, webhooks         |                                                                        |
+|   Audit                  |                                                                        |
+|   Import                 |                                                                        |
+|   Instance, branding     |                                                                        |
+|   Status                 |                                                                        |
++--------------------------+------------------------------------------------------------------------+
+```
+
+### 5.6 Onboarding and sign-in (all apps)
+
+Screens E1 to E7 apply equally to desktop, iPhone and Android; the flows behind them are in
+[08-identity.md](08-identity.md). On the phone they fill the screen; on the desktop they appear
+as a card in the center of an empty window with the branding of the instance. The wireframes show
+the phone form, E2 also the desktop form. The web console uses only E2 and E7: it has
+no device confirmation, but requires a step-up after the login (08, section 7.5).
+
+Rules for all onboarding screens:
+
+- No content of the instance before the login, only name, logo and accent from
+  `getDiscovery` (`branding`).
+- Every code is set in groups, in a mono font (`font.family.mono`), can be copied and
+  is read character by character by the screen reader. Input fields for codes accept pasting and
+  ignore case, spaces and hyphens (08, section 3.2).
+- Remaining times appear as text, not only as bars; the screen reader announces them at most once
+  per `a11y.live_announce_min_interval`.
+- Error texts name the cause and the next step; the response to a wrong code is
+  always the same (08, section 3.2).
+- Keyboard: Enter triggers the main action, Esc goes back one step; the focus order follows the
+  reading direction.
+
+**E1 Server address (first start).** One field for the address of the instance. "Connect" calls
+`getDiscovery`. Results: on to E2; "No instance at this address" (no
+valid response); "Certificate invalid" (no continue, no exception button); "Instance not set up
+yet" on `setup_required` with a pointer to the setup wizard on the host
+([16-operations.md](16-operations.md), section 3.1); "App too old" below `min_client_versions` with the
+update path ([18-release.md](18-release.md)). The app remembers the address; a second server is
+not planned (B13).
+
+```text
++--------------------------------------+
+|                                      |
+|              [Logo]                  |
+|   Connect to your instance           |
+|                                      |
+|   Server address                     |
+|   [https://chat.example.com      ]   |
+|                                      |
+|   [          Connect            ]    |
+|                                      |
+|   Instance not set up yet:           |
+|   The owner sets it up on the        |
+|   host (install.sh). [More]          |
++--------------------------------------+
+```
+
+**E2 Login.** Name and logo of the instance at the top. Below them, one button per provider from
+`auth_providers` with its `name`: OIDC opens the system browser (08, section 14.1); a proxy provider
+(`trusted_header`) logs in without input (08, section 2.4). If a `local` driver is active: a field
+for the login name, "Log in with passkey" (native apps only with a public domain, 08,
+section 2.5) and, if `local_password_enabled`, "Password and one-time code" with a second step for
+the TOTP code (autofill for the system's one-time codes on). At the bottom always "I have an
+enrollment code" (E3) and "Pair with another device" (E5). If no method exists, it says
+"No login is set up for this instance" with a pointer to the owner.
+
+```text
++--------------------------------------+
+| < Server        chat.example.com     |
++--------------------------------------+
+|              [Logo]                  |
+|        Log in to Team Chat           |
+|                                      |
+|   [   Log in with Company SSO    ]   |
+|   -------------- or --------------   |
+|   Login name  [alex             ]    |
+|   [     Log in with passkey      ]   |
+|   [  Password and one-time code  ]   |
+|                                      |
+|   I have an enrollment code          |
+|   Pair with another device           |
++--------------------------------------+
+```
+
+Desktop: the same card in the center; the sidebar stays empty until the login succeeds.
+
+```text
++------------------------------------------------------------------------------------+
+|                                                                                    |
+|                    +----------------------------------------+                      |
+|                    |                [Logo]                  |                      |
+|                    |        Log in to Team Chat             |                      |
+|                    |   [     Log in with Company SSO      ] |                      |
+|                    |   ---------------- or ---------------- |                      |
+|                    |   Login name [alex                   ] |                      |
+|                    |   [       Log in with passkey        ] |                      |
+|                    |   [    Password and one-time code    ] |                      |
+|                    |   Enrollment code   Pair device        |                      |
+|                    |   Server: chat.example.com  [Change]   |                      |
+|                    +----------------------------------------+                      |
+|                                                                                    |
++------------------------------------------------------------------------------------+
+```
+
+**E3 Redeem enrollment code.** For the first device and for recovery (08, section 3.2).
+First the code, then the method that the instance offers: "Create passkey", "Set up password and
+one-time code" (two steps with a QR code of the one-time code and confirmation, 08, section 2.5) or
+"Link with login service" (OIDC or proxy). A redeemed code makes this device
+`active` immediately; the app goes straight to the main view.
+
+```text
++--------------------------------------+
+| < Login        Enrollment code       |
++--------------------------------------+
+|   Code from the owner                |
+|   [en_ 7K2M-9QXA-...            ]    |
+|                                      |
+|   How do you want to log in?         |
+|   (x) Create passkey                 |
+|   ( ) Password and one-time code     |
+|   ( ) Link with Company SSO          |
+|                                      |
+|   [          Continue           ]    |
+|   The code is valid once.            |
++--------------------------------------+
+```
+
+**E4 Device waiting for confirmation.** After a login on a new device (08, section
+5.2). The confirmation code appears large in the center (`auth.device_verification_code_digits`
+digits), below it the instructions: type in the code on an active device under Settings, Devices,
+or ask an owner. The remaining time until `auth.device_pending_ttl` appears as text.
+"Cancel" logs out and deletes the keys of the device. The app polls the state; after the
+confirmation it goes to the main view, after rejection or expiry to E7.
+
+```text
++--------------------------------------+
+|     Device waiting for confirmation  |
++--------------------------------------+
+|                                      |
+|           4 8 1   2 0 7              |
+|                                      |
+|   Type this code on one of your      |
+|   active devices: Settings,          |
+|   Devices and sessions, Confirm.     |
+|   No active device: ask the owner.   |
+|                                      |
+|   Valid for 23 more minutes          |
+|   [          Cancel             ]    |
++--------------------------------------+
+```
+
+**E5 Pair with another device.** The new device shows a pairing code with
+`auth.pairing_code_chars` characters and the remaining time until `auth.pairing_code_ttl` (08, section
+5.3). On the active device, "Add device" (D8, Devices and sessions) opens a field for the
+code and the step-up. After that the new device is `active`.
+
+```text
++--------------------------------------+
+| < Login        Pair device           |
++--------------------------------------+
+|   On an active device:               |
+|   Settings > Devices >               |
+|   Add device, then enter:            |
+|                                      |
+|           HQ7P - 3MXR                |
+|                                      |
+|   Valid for 4 more minutes           |
+|   [          New code           ]    |
++--------------------------------------+
+```
+
+**E6 App lock.** After `client.app_lock_after` without use and at start, if the person has turned
+it on or `security.app_lock_required` applies (08, section 9). The content is
+hidden, also in the app switcher. A button calls the system's biometrics or device PIN; after
+a failure the lock stays with "Try again". "Log out" leads to E7 and deletes the
+local data. The lock detaches terminal sessions (they keep running on the host, 5.3, M8).
+
+```text
++--------------------------------------+
+|                                      |
+|              [Logo]                  |
+|           Team Chat is locked        |
+|                                      |
+|   [    Unlock with Face ID      ]    |
+|                                      |
+|              Log out                 |
++--------------------------------------+
+```
+
+**E7 Logged out.** After logout, revocation of the device, expiry of the session
+(`auth.session_max_age`), disabling of the person or rejection in E4. The reason appears as text
+(`devices.revoke_reason` or the code of the session, without internal names), together with the
+sentence "The data of this device has been deleted" (04, section 8.5, R-SY-14) and "Log in again"
+(E2). For a disabled person there is no login button, only "Contact the owner".
+
+```text
++--------------------------------------+
+|                                      |
+|   You are logged out.                |
+|   Reason: This device was revoked    |
+|   by another device.                 |
+|                                      |
+|   The data of this device has        |
+|   been deleted.                      |
+|                                      |
+|   [         Log in again        ]    |
++--------------------------------------+
+```
+
+## 6. Interaction rules
+
+### 6.1 Done and reopening
+
+- "Done" (`thread.close`) in the thread header, in the context menu of the post list and via shortcut.
+- Done posts are at the bottom in the section "Done (n)", collapsed by default; the
+  collapse state is personal per forum.
+- A new message in a done thread reopens it (`thread.reopen` implicitly). The
+  history shows a system line "Reopened by message from Sam".
+- The word "done" as a message is not a command; the way is the button or a command that an
+  agent registers.
+
+### 6.2 Live box
+
+- While a run is active, the live box is pinned at the top of the thread; at the end it collapses
+  into one line at its place in the history ("Ran 28 min · 3 agents · USD 1.20 estimate").
+- Expanding loads the run document; during the run, changes arrive only while the
+  thread is visible (focus, [04](04-sync-protocol.md) section 11).
+- Stop asks for no confirmation; it is harmless and must be fast.
+- A stall after `run.stall_after` shows a notice in the live box, no push.
+- Follow-ups: during an active run, the input is labeled "Follow-up to <agent>". The trigger state
+  of the message changes to "Follow-up delivered" as soon as the adapter has handed it over.
+
+### 6.3 Trigger state as icons
+
+Instead of status emoji, the triggering message shows an icon with a label in the tooltip and in
+the screen reader label. Icons and colors: [components.md](../design/components.md) section 5.
+
+| `trigger_state` | Meaning for the person |
+|---|---|
+| `received` | The server has accepted the message. |
+| `queued` | A run has been created and is waiting. |
+| `working` | The agent is working. |
+| `done` | The run is finished. |
+| `failed` | Triggering or the run has failed; the reason is shown with it. |
+| `followup_delivered` | The follow-up has reached the running agent. |
+
+### 6.4 Long replies
+
+Messages over `ui.message_collapse_lines` lines are collapsed with "Show more";
+code blocks scroll horizontally instead of wrapping. Long replies are never split across several
+messages.
+
+### 6.5 Components
+
+Buttons apply once and only for those authorized. Whoever is not authorized sees them disabled
+with a reason ("Only the triggering person or an owner"). After use, the card shows person, choice
+and time. Expired components (`component.default_ttl`) show "Expired". Double clicks do not create
+a second interaction.
+
+### 6.6 Offline and queue
+
+- Banner "Offline" at the top of the content; connecting runs in the background with backoff.
+- Sent messages appear immediately with "sending" at the end of the thread.
+- Permanent errors show the reason with "Send again" (new ID), "Edit", "Discard".
+- If the person loses access, open views close with "No access anymore"; waiting
+  messages remain as text for copying.
+- After reconnecting, the app first catches up and then sends ([04](04-sync-protocol.md)
+  section 13.4).
+
+### 6.7 Other rules
+
+- **Not found instead of forbidden.** A link to something invisible shows "Not found or
+  no access", regardless of whether it exists (B7).
+- **Mention suggestions** show only people and agents that the person may see.
+- **Titles:** automatically set titles carry a small "automatic" mark; editing makes the title
+  manual.
+- **Operator:** The channel header names the operator. Without an operator it says "No agent
+  answers here"; so an agent never answers in the wrong channel unnoticed.
+- **Costs:** in Organization mode with "Estimate" until reconciled; in Personal mode with
+  "Information only".
+- **Destructive actions** (delete a message, revoke a grant, revoke a device) ask for confirmation
+  once; administration actions with step-up ask for the confirmation of the device.
+- **Move:** The dialog shows only channels with the same operator; the thread ID stays.
+
+## 7. Keyboard shortcuts
+
+Shortcuts apply on desktop. They avoid system assignments (Cmd+H, Cmd+M, Cmd+Q, Alt+F4,
+Windows key). There is no shortcut that triggers an approval.
+
+| Action | macOS | Windows |
+|---|---|---|
+| Quick switcher | Cmd+K | Ctrl+K |
+| Search | Cmd+Shift+F | Ctrl+Shift+F |
+| Search in thread | Cmd+F | Ctrl+F |
+| New post or new chat in the current forum | Cmd+N | Ctrl+N |
+| Focus the input | Esc then Tab, or Cmd+L | Esc then Tab, or Ctrl+L |
+| Next or previous channel | Option+Arrow down / up | Alt+Arrow down / up |
+| Next or previous unread channel | Option+Shift+Arrow down / up | Alt+Shift+Arrow down / up |
+| Switch column (sidebar, list, history, session) | F6 / Shift+F6 | F6 / Shift+F6 |
+| Mark thread as read | Esc | Esc |
+| Mark as unread (from a message) | Option+Click | Alt+Click |
+| Mark thread as done or reopen it | Cmd+Shift+E | Ctrl+Shift+E |
+| Stop the run in the current thread | Cmd+. | Ctrl+. |
+| Expand and collapse the live box | Cmd+Shift+L | Ctrl+Shift+L |
+| Show and hide the session column | Cmd+Shift+I | Ctrl+Shift+I |
+| Edit the last own message | Arrow up in the empty field | Arrow up in the empty field |
+| Send / new line | Enter / Shift+Enter (reversible) | Enter / Shift+Enter (reversible) |
+| Running now | Cmd+Shift+R | Ctrl+Shift+R |
+| Mentions | Cmd+Shift+M | Ctrl+Shift+M |
+| Settings | Cmd+, | Ctrl+, |
+| List of shortcuts | Cmd+/ | Ctrl+/ |
+| Open hosts and terminal | Cmd+Shift+T | Ctrl+Shift+T |
+
+**In the terminal** all keys go to the shell, including Ctrl combinations such as Ctrl+C, Ctrl+D
+and Ctrl+K. App shortcuts work there only with the platform modifier: on macOS with Cmd, on
+Windows with Ctrl+Shift. Reason: shells and coding agents use Ctrl and Alt themselves; an app
+shortcut must not swallow any input (R-PR-10).
+
+| Action in the terminal | macOS | Windows |
+|---|---|---|
+| Copy / paste | Cmd+C / Cmd+V | Ctrl+Shift+C / Ctrl+Shift+V |
+| Quick switcher | Cmd+K | Ctrl+Shift+K |
+| New session on this host | Cmd+T | Ctrl+Shift+N |
+| Next or previous session | Cmd+Shift+] / [ | Ctrl+Shift+Arrow right / left |
+| Detach session (keeps running) | Cmd+Shift+D | Ctrl+Shift+D |
+| Search in the scrollback | Cmd+F | Ctrl+Shift+F |
+| Font larger / smaller | Cmd+Plus / Cmd+Minus | Ctrl+Shift+Plus / Ctrl+Shift+Minus |
+
+## 8. Accessibility
+
+Goal: WCAG 2.2 level AA (https://www.w3.org/TR/WCAG22/, retrieved 2026-10-10 [verified]) in apps
+and console, checked by tests, not by intention.
+
+| Topic | Rule | Check |
+|---|---|---|
+| Contrast | Every text and icon pairing reaches AA (text 4.5:1, UI 3:1) in light and dark | Gate `tokens.py check` ([contrast.md](../design/contrast.md)); widget tests with `textContrastGuideline` |
+| Screen reader | VoiceOver, TalkBack, Narrator; in the console NVDA and VoiceOver. Every component has a role and a label; live box as a container with a summary; trigger state as its own label | Widget tests with `labeledTapTargetGuideline`; semantics snapshots per component |
+| Live content | Only state changes and questions are announced, at most once per `a11y.live_announce_min_interval`; patches never | Test with a simulated patch stream |
+| Font size | System scaling up to 200 percent without loss (SC 1.4.4); the layout wraps into the stack | Golden tests with text scaling 1 and 2 |
+| Focus | Order per column (sidebar, list, history, input, session); F6 switches columns; focus ring always visible | Integration test of a keyboard pass |
+| Targets | Touch target at least `density.target-min` (desktop SC 2.5.8, touch platform value) | `androidTapTargetGuideline`, `iOSTapTargetGuideline` |
+| Motion | The system setting "Reduce motion" and the own setting switch to `motion.reduced` | Golden test in the context `reduced` |
+| Color | States never only through color; icons differ in shape | Review list in components.md |
+| Language | Language of the app set in the semantics tree; agent text without a language tag is not switched | |
+| Terminal | The line at the cursor and, on command, the visible screen are readable for screen readers; running output is not read aloud; extra keys bar with labels; the font size follows the system setting and can be set separately in the terminal. How much semantics the renderer `xterm` provides is not verified [assumed: little]; the build ticket checks it and adds its own semantics layer | Widget test of the semantics; checklist with VoiceOver, TalkBack, Narrator |
+| Visualizations | Every view has a table view with the same values; states with icon and text ([25-visualization.md](25-visualization.md), section 7.4) | Golden and widget tests of `bothy_viz` |
+
+Known risk: according to an internal preliminary study, the accessibility of Flutter on macOS was
+being reworked [assumed, not checked ourselves]; it is checked with VoiceOver before the first
+macOS release (ticket in 15-client-architecture.md).
+
+## 9. Languages
+
+- German (default) and English. The language follows `users.locale`; the app starts in the
+  system language as long as the person has not chosen one.
+- Texts in ARB files in `packages/l10n` (`app_de.arb`, `app_en.arb`), generated with
+  `flutter gen-l10n`; plurals and select through ICU messages. A missing translation breaks the
+  build.
+- A test over the ARB files rejects en and em dashes (U+2013, U+2014) and emoji.
+- Errors come from the server as a code (RFC 9457, [06-api.md](06-api.md)); the app translates the
+  code. Unknown codes show a generic text plus the code.
+- Agent content is not translated.
+- Numbers, dates and currencies follow the locale of the app (for example "1,84 USD" (de) or
+  "USD 1.84" (en)).
+- Terms are fixed so that DE and EN mean the same:
+
+<!-- language-check: off -->
+
+| German | English | Code |
+|---|---|---|
+| Bereich | Space | `space` |
+| Kanal | Channel | `channel` |
+| Forum, Beitrag | Forum, Post | `forum`, `thread` |
+| Thread | Thread | `thread` |
+| Erledigt | Done | `closed` |
+| Live-Box | Live box | `run` |
+| Lauf | Run | `run` |
+| Nachtrag | Follow-up | `followup` |
+| Bediener | Operator | `operator` |
+| Freigabe | Access grant | `grant` |
+| Agenten auslösen (Stufe) | Trigger agents | `trigger` |
+| Aktionen freigeben | Approve actions | `approve_actions` |
+| Persönlich, Organisation | Personal, Organization | `personal`, `organization` |
+| Schätzung | Estimate | `cost_is_estimate` |
+| Rechner | Host | `host` |
+| Host-Dienst | Host service | `bothy-host` |
+| Kopplung, Kopplungs-Code | Pairing, pairing code | `host.pair` |
+| Fingerabdruck | Fingerprint | `key_fingerprint` |
+| Terminal-Sitzung | Terminal session | `terminal_session` |
+| Trennen, Wiederanhängen | Detach, reattach | `detached`, `terminal.attach` |
+| Sondertasten-Leiste | Extra keys bar | |
+| LLM-Anmeldung | LLM login | `llm_credentials` |
+| Live-Topologie | Live topology | |
+| TV-Modus | TV mode | |
+| Eigene Messung | Own measurement | `stats_minutes` |
+
+<!-- language-check: on -->
+
+## 10. Notifications
+
+### 10.1 When a notification arrives
+
+Normative for kinds, recipients, effective level and quiet hours is
+[13-push-notifications.md](13-push-notifications.md), sections 2 to 4. For the
+interface, in short:
+
+| Event | Level `all` | Level `mentions` | Level `mute` |
+|---|---|---|---|
+| New message in a visible thread (not your own) | yes | no | no |
+| Mention of me, message in my direct message | yes | yes | no |
+| A run that I triggered is waiting for me (`waiting_input`) | yes | yes | yes |
+| A run that I triggered is finished or has failed | yes | yes | no |
+| Messages from agents without a mention | yes | no | no |
+| Imported or silent messages (`silent`) | no | no | no |
+
+During quiet hours notifications arrive silently (no sound, no waking up); counters and badges
+keep counting. Only a question from one's own run stays loud, and only if the person has turned on
+`notify.input_needed_breaks_quiet_hours`. Every notification passes through `push.deliver`
+beforehand.
+
+### 10.2 Content
+
+The push itself carries only IDs and a neutral placeholder ("New message"). The app fetches the
+text itself ([15](15-client-architecture.md), background behavior) and then shows
+"<Channel> · <Thread title>" as the title and "<Author>: <Text, shortened>" as the text. If fetching
+fails (no network to the server, time expired), the placeholder stays. What the preview may show
+is controlled by `notify.preview_mode` (`full`, `names`, `none`); with `none` the app never fetches
+text, and only the placeholder with the channel name that the app knows locally is shown.
+
+### 10.3 Platform
+
+| Platform | Behavior |
+|---|---|
+| iOS, macOS | Grouping per thread; tapping opens the thread at the message; badge = unread mentions plus questions |
+| Android | Notification channels "Mentions", "Questions", "All messages", "Runs", changeable in the system settings; grouping per thread |
+| Windows | The app in the notification area keeps the connection and shows local notifications; a closed app gets no notifications (Baseline R-Push) |
+| all | If the thread is currently open and the app is in the foreground, there is no notification, only the history |
+
+Reading on one device removes notifications on the others as soon as that app is active the next
+time; a separate push only for cleanup is to be checked later.
+
+## 11. Personal settings
+
+Synchronized via `user_settings` ([04](04-sync-protocol.md) section 14). This table is
+normative for all personal keys except `notify.*` ([03-data-model.md](03-data-model.md),
+`user_settings`); the keys `notify.*` are in
+[13-push-notifications.md](13-push-notifications.md), section 3.3. The server rejects
+unknown keys and values outside the list.
+
+| Key | Values | Default | Meaning |
+|---|---|---|---|
+| `appearance.theme` | `system`, `light`, `dark` | `system` | Theme; `system` follows the device |
+| `appearance.density` | `comfortable`, `compact` | `comfortable` | desktop only; mobile fixed to `touch` |
+| `appearance.reduce_motion` | `system`, `on`, `off` | `system` | Reduce motion |
+| `composer.enter_sends` | `true`, `false` | without a stored value `true` on desktop and `false` on mobile; a stored value applies on all devices | Enter sends |
+| `privacy.crash_reports` | `true`, `false` | `true` if the instance has set up a crash service | Send crash reports |
+| `privacy.client_metrics` | `true`, `false` | `true` | Send performance data without content |
+| `layout.column_widths` | Object: names `^[a-z][a-z0-9_]*$` (column, for example `sidebar`, `post_list`, `session`), values non-negative integers in logical pixels | empty | Column widths on desktop; the client interprets the names |
+
+## 12. Branding per instance
+
+Two layers (ADR 0044):
+
+| Layer | What | Where defined | Effect |
+|---|---|---|---|
+| Runtime | Product name, logo, accent | `instance_settings`: `branding.product_name`, `branding.logo_file_id`, `branding.accent_color` (action `instance.branding.update`) | App and console show name and logo; the accent replaces `color.accent.*` |
+| Build | App name in the system, bundle and package IDs, app icons, URL scheme for deep links and login, push topics (APNs topic = bundle ID, Firebase project), update feeds (Sparkle, `.appinstaller`), signing identities, default server address | File `branding.yaml` of the instance (lives in the instance operator's repo, not in the product), read by the build | Own signed app per instance |
+
+Rules:
+
+- `branding.accent_color` is a key from the category colors (`spruce`, `loch`, `heather`,
+  `rowan`, `amber`, `gorse`, `moss`), not a free color value; only these combinations are in the
+  contrast test (03, `instance_settings`; schema in the configuration reference).
+- Without its own build configuration, the repo builds a neutral version with the working name
+  and placeholder IDs under `example.com`.
+- The logo is uploaded as a file and served only through the server; the app falls back to the
+  product's mark as long as the logo is missing.
+- `branding.product_name` has at most `branding.product_name_max_chars` characters (03) and no
+  control or bidi characters ([19-security.md](19-security.md), SEC-IN-4).
+
+## 13. Decisions of this chapter
+
+| No. | Decision | Reason |
+|---|---|---|
+| R-PR-01 | Four columns on desktop; post list only for forums; the right column shows the session instead of members. | Study B; member lists are of no use in agent work, session data is. |
+| R-PR-02 | Presence only for agents, never for people. | Privacy and co-determination; for agents, presence is operational information. |
+| R-PR-03 | No read receipts for others; the read state stays personal. | Avoid performance monitoring; not in the baseline scope. |
+| R-PR-04 | No keyboard shortcut triggers an approval. | Operating errors on approvals are expensive. |
+| R-PR-05 | Questions from one's own runs notify even at level "mute" (13, kind `input_needed`). | A waiting agent blocks the work of the person who started it. |
+| R-PR-06 | Quiet hours make notifications silent; only a question from one's own run becomes loud, if the person turns this on themselves (13). | Reliability before urgency; the only exception is in the hands of the person. |
+| R-PR-07 | On mobile there are emergency actions of the administration, not the whole administration. | Small screens for complex permissions are error-prone; but disabling and revoking must work on the go. |
+| R-PR-08 | Accent per instance only from the checked palette. | Contrast AA is a test, not a hope. |
+| R-PR-09 | Link preview in the client only later and only with opt-in. | The server loads no foreign URLs; the client would contact foreign servers. |
+| R-PR-10 | In the terminal all keys go to the shell; app shortcuts only with Cmd (macOS) or Ctrl+Shift (Windows). | Shells and coding agents use Ctrl and Alt; a swallowed Ctrl+C would be an operating error with consequences. |
+| R-PR-11 | On mobile, an extra keys bar with one-shot modifiers instead of a custom keyboard. | The system keyboard stays (dictation, languages, accessibility); only the keys that a shell needs are missing. |
+| R-PR-12 | The app detaches the terminal when it moves to the background and hides it in the app switcher. | Mobile systems end connections in the background anyway; the image in the app switcher would show terminal content. |
+| R-PR-13 | Product description "Command center for AI agents in chat form" with six pillars (chat, live view, grants, terminal, costs, statistics). | Requirement of the owner (addendum of 2026-10-10); it determines the home page, docs and showcase. |
+| R-PR-14 | Onboarding screens E1 to E7 shared by all apps; before login only the branding of the instance; with an invalid certificate no continue and no exception button. | One flow for all platforms keeps the security rules from 08 in one place; an exception button would let an attacker in the middle defeat DPoP and device binding. |
+
+## 14. Configuration values of this chapter
+
+| Name | Default | Meaning |
+|---|---|---|
+| `ui.message_group_window` | `5m` | messages of the same author within this time get no header of their own |
+| `ui.message_collapse_lines` | `24` | from this many lines on, a message is collapsed |
+| `ui.livebox_visible_steps` | `6` | visible steps in the running live box |
+| `ui.composer_max_lines` | `12` | the input grows up to this many lines |
+| `ui.autocomplete_debounce` | `150ms` | waiting time before `command.autocomplete` |
+| `ui.quick_switch_max_results` | `20` | hits in the quick switcher |
+| `ui.desktop_min_width_four_columns` | `1280px` | below this width the session column collapses |
+| `ui.desktop_min_width_three_columns` | `960px` | below this width the post list becomes a stack |
+| `a11y.live_announce_min_interval` | `10s` | the live box announces a change at most this often |
+| `client.share.recent_targets` | `8` | recently used targets in the share sheet |

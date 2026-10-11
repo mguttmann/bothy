@@ -1,33 +1,33 @@
 # Webhooks
 
-Status: Entwurf M0. Normativ sind der Abschnitt `webhooks:` in [openapi.yaml](openapi.yaml) (ein
-Eintrag je Ereignistyp mit Schema) und dieses Dokument (Zustellregeln). Entscheidung: ADR 0016.
-Konventionen der API: [docs/spec/06-api.md](../spec/06-api.md). Ereignisse und Empfangs-Aktionen:
-[docs/spec/05-aktionen.md](../spec/05-aktionen.md), Abschnitt 6.
+Status: draft M0. Normative are the section `webhooks:` in [openapi.yaml](openapi.yaml) (one
+entry per event type with a schema) and this document (delivery rules). Decision: ADR 0016.
+Conventions of the API: [docs/spec/06-api.md](../spec/06-api.md). Events and receive actions:
+[docs/spec/05-actions.md](../spec/05-actions.md), section 6.
 
-Es gibt zwei Richtungen:
+There are two directions:
 
-| Richtung | Wer | Zweck |
+| Direction | Who | Purpose |
 |---|---|---|
-| ausgehend | Server an eine installierte App | Ereignisse, die die App abonniert hat, signiert an eine HTTPS-Adresse |
-| eingehend | externes System an den Server | Nachricht als App in einen Kanal schreiben, über eine geheime URL |
+| outgoing | server to an installed app | events that the app has subscribed to, signed, to an HTTPS address |
+| incoming | external system to the server | write a message as an app into a channel, through a secret URL |
 
-Plugins laufen nie im Server-Prozess (B6). Webhooks und das Gateway sind ihre einzigen Wege, von
-Ereignissen zu erfahren.
+Plugins never run in the server process (B6). Webhooks and the gateway are their only ways to
+learn about events.
 
-## 1. Abonnieren
+## 1. Subscribe
 
-1. Die App ist installiert, hat den Scope `events:subscribe` und die gewünschten Typen in
+1. The app is installed, has the scope `events:subscribe` and the desired types in
    `event_subscriptions` (`installApp`, `setAppScopes`).
-2. Ein Owner legt das Abo an (`createWebhookSubscription`, Aktion `webhook_out.manage`, Step-up).
-   Die Adresse muss `https` nutzen und ihr Host in `webhook.allowed_hosts` stehen (R-DM-17);
-   sonst `400 webhook_host_not_allowed`.
-3. Je Abo gilt eine Teilmenge der abonnierten Typen (`event_types`). Ein Abo kann pausiert
-   (`state = paused`) und wieder aktiviert werden.
+2. An owner creates the subscription (`createWebhookSubscription`, action `webhook_out.manage`,
+   step-up). The address must use `https` and its host must be in `webhook.allowed_hosts`
+   (R-DM-17); otherwise `400 webhook_host_not_allowed`.
+3. Each subscription covers a subset of the subscribed types (`event_types`). A subscription can
+   be paused (`state = paused`) and activated again.
 
-## 2. Zustellung
+## 2. Delivery
 
-Jede Zustellung ist ein `POST` mit genau einem Ereignis:
+Every delivery is a `POST` with exactly one event:
 
 ```http
 POST /chat-events HTTP/1.1
@@ -36,108 +36,112 @@ Content-Type: application/json
 User-Agent: chat-server-webhooks/<server-version>
 webhook-id: 0192f4a0-7b1c-7a3e-8c1d-5f0e9a2b4c6d
 webhook-timestamp: 1791624600
-webhook-signature: v1a,<Ed25519-Signatur in Base64> v1,<HMAC-SHA256 in Base64>
+webhook-signature: v1a,<Ed25519 signature in Base64> v1,<HMAC-SHA256 in Base64>
 
 {"id":"0192f4a0-7b1c-7a3e-8c1d-5f0e9a2b4c6d","seq":5301,"type":"message.created", ...}
 ```
 
-| Teil | Regel |
+| Part | Rule |
 |---|---|
-| Körper | Der Ereignis-Umschlag aus openapi.yaml (`MessageCreatedEvent` usw.), dieselbe Form wie im Gateway und in `GET /events`. Standard Webhooks empfiehlt `type`, `timestamp`, `data`; unser Umschlag hat `type` oben und `occurred_at` statt `timestamp`, weil eine Form für alle Kanäle wichtiger ist als die Empfehlung [belegt, W1] ([ADR 0052](../adr/0052-ein-ereignis-umschlag-fuer-gateway-rest-und-webhooks.md)). |
-| `webhook-id` | Ereignis-ID (`id` im Umschlag). Gleich bei jeder Wiederholung und bei einer vom Owner angestoßenen Neuzustellung. |
-| `webhook-timestamp` | Unix-Sekunden dieses Versuchs. |
-| `webhook-signature` | Leerzeichen-getrennte Liste: immer `v1a,<base64>` (Ed25519), zusätzlich `v1,<base64>` (HMAC-SHA256), wenn das Abo HMAC nutzt. Während eines Schlüsselwechsels stehen beide Schlüssel in der Liste. |
-| Signierter Inhalt | `{webhook-id}.{webhook-timestamp}.{Körper}`, der Körper Byte für Byte wie gesendet [belegt, W1]. |
-| Epoche | Jede Zustellung trägt das Zustellfeld `sync_epoch` (04, 2.2 und 7.5; [ADR 0059](../adr/0059-sync-epoche-nach-wiederherstellung.md)). |
-| Inhalt | Nur Felder, die die App mit der Empfangs-Aktion sehen darf (04, 2.2). Kanal-Prompts, Skills und Geheimnisse nie (R-AZ-09). Große Nutzlasten werden gekürzt und tragen `truncated: true`; die App lädt per REST nach. |
+| Body | The event envelope from openapi.yaml (`MessageCreatedEvent` etc.), the same form as in the gateway and in `GET /events`. Standard Webhooks recommends `type`, `timestamp`, `data`; our envelope has `type` at the top level and `occurred_at` instead of `timestamp`, because one form for all delivery channels matters more than the recommendation [verified, W1] ([ADR 0052](../adr/0052-one-event-envelope-for-gateway-rest-and-webhooks.md)). |
+| `webhook-id` | Event ID (`id` in the envelope). The same for every retry and for a redelivery triggered by the owner. |
+| `webhook-timestamp` | Unix seconds of this attempt. |
+| `webhook-signature` | Space-separated list: always `v1a,<base64>` (Ed25519), additionally `v1,<base64>` (HMAC-SHA256) if the subscription uses HMAC. During a key rotation both keys are in the list. |
+| Signed content | `{webhook-id}.{webhook-timestamp}.{body}`, the body byte for byte as sent [verified, W1]. |
+| Epoch | Every delivery carries the delivery field `sync_epoch` (04, 2.2 and 7.5; [ADR 0059](../adr/0059-sync-epoch-after-restore.md)). |
+| Content | Only fields that the app may see with the receive action (04, 2.2). Never channel prompts, skills or secrets (R-AZ-09). Large payloads are truncated and carry `truncated: true`; the app loads the rest via REST. |
 
-### 2.1 Signaturschlüssel
+### 2.1 Signing keys
 
-1. `v1a` nutzt den Server-Schlüssel mit Zweck `webhook_out` (03, `server_signing_keys`). Die
-   öffentlichen Schlüssel stehen unter `GET /api/v1/instance/webhook-keys` im Format `whpk_<base64>`
-   [belegt, W1]. Das Abo nennt seinen `signing_key_kid`.
-2. Schlüsselwechsel (`rotateSigningKey`, Zweck `webhook_out`): Der neue Schlüssel erscheint mit
-   `state = next` in der Liste, bevor er signiert. Danach signiert der Server mit beiden, bis der
-   alte `not_after` erreicht.
-3. `v1` (HMAC) ist je Abo zuschaltbar (`enable_hmac`). Das Geheimnis wird nicht gespeichert,
-   sondern abgeleitet: `HMAC-SHA256(Hauptschlüssel, "webhook-v1:" || subscription_id || ":" ||
-   Generation)`, Hauptschlüssel aus dem Secret-Provider (B12). Der Server zeigt es einmal als
-   `whsec_<base64>` an. `rotate_hmac_secret` erhöht die Generation; für
-   `webhook.secret_rotation_overlap` signiert der Server mit alter und neuer Generation
-   (03 `webhook_subscriptions.hmac_generation` und `hmac_rotated_at`).
-4. Grund für zwei Verfahren: Standard Webhooks empfiehlt asymmetrische Signaturen [belegt, W1];
-   die Referenzbibliotheken nennen in ihren Beschreibungen aber HMAC, `v1a` ist dort nicht belegt
-   [vermutet, W2]. HMAC hält die Hürde für Empfänger niedrig.
+1. `v1a` uses the server key with the purpose `webhook_out` (03, `server_signing_keys`). The
+   public keys are available at `GET /api/v1/instance/webhook-keys` in the format `whpk_<base64>`
+   [verified, W1]. The subscription names its `signing_key_kid`.
+2. Key rotation (`rotateSigningKey`, purpose `webhook_out`): the new key appears in the list with
+   `state = next` before it signs. After that, the server signs with both until the
+   old one reaches `not_after`.
+3. `v1` (HMAC) can be enabled per subscription (`enable_hmac`). The secret is not stored but
+   derived: `HMAC-SHA256(master key, "webhook-v1:" || subscription_id || ":" ||
+   generation)`, with the master key from the secret provider (B12). The server shows it once as
+   `whsec_<base64>`. `rotate_hmac_secret` increases the generation; for
+   `webhook.secret_rotation_overlap` the server signs with the old and the new generation
+   (03 `webhook_subscriptions.hmac_generation` and `hmac_rotated_at`).
+4. Reason for two methods: Standard Webhooks recommends asymmetric signatures [verified, W1];
+   but the reference libraries name HMAC in their descriptions, `v1a` is not documented there
+   [assumed, W2]. HMAC keeps the hurdle for receivers low.
 
-## 3. Prüfung beim Empfänger
+## 3. Verification by the receiver
 
-1. Rohen Körper lesen, nicht erst als JSON parsen und neu serialisieren [belegt, W1].
-2. `webhook-timestamp` prüfen: Abweichung von der eigenen Uhr höchstens `webhook.receiver_tolerance`.
-3. Signaturen prüfen: jede Signatur der Liste gegen die vertrauten Schlüssel versuchen; eine
-   gültige genügt. `v1a`-Schlüssel einmal abrufen und als Vertrauensliste halten, nicht aus der
-   Anfrage übernehmen [belegt, W1]. HMAC zeitkonstant vergleichen.
-4. Doppel erkennen: `webhook-id` merken, mindestens für die Dauer der Wiederholungen
+1. Read the raw body; do not parse it as JSON and serialize it again first [verified, W1].
+2. Check `webhook-timestamp`: the deviation from the own clock is at most
+   `webhook.receiver_tolerance`.
+3. Check the signatures: try every signature of the list against the trusted keys; one valid
+   signature is enough. Fetch the `v1a` keys once and keep them as a trust list; do not take them
+   from the request [verified, W1]. Compare HMAC in constant time.
+4. Detect duplicates: remember `webhook-id`, at least for the duration of the retries
    (`webhook.retry_max_age`).
-5. Schnell mit `2xx` antworten, innerhalb `webhook.delivery_timeout` ([11-erweiterungen.md](../spec/11-erweiterungen.md)); die Arbeit danach erledigen.
-6. Reihenfolge über `seq` herstellen, Objektstand über `resource.version` (04, 9). Ändert sich
-   `sync_epoch`, wurde die Instanz wiederhergestellt: den gemerkten Stand nach `seq` verwerfen und
-   mit der neuen Zeitlinie weitermachen, sonst gälten ihre kleineren Nummern als alt.
+5. Respond quickly with `2xx`, within `webhook.delivery_timeout`
+   ([11-extensions.md](../spec/11-extensions.md)); do the work afterwards.
+6. Establish the order through `seq` and the object state through `resource.version` (04, 9). If
+   `sync_epoch` changes, the instance was restored: discard the state remembered by `seq` and
+   continue with the new timeline, otherwise its smaller numbers would count as old.
 
-## 4. Wiederholungen und Abschalten
+## 4. Retries and disabling
 
-| Antwort | Wirkung |
+| Response | Effect |
 |---|---|
-| `2xx` | Erfolg |
-| `410` | Abo wird abgeschaltet (`state = disabled`) [belegt, W1] |
-| `429`, `502`, `503`, `504` | Drosseln; `Retry-After` wird beachtet [belegt, W1] |
-| `3xx` | Fehler; Umleitungen werden nicht verfolgt [belegt, W1] |
-| andere Status, Zeitüberschreitung, Verbindungsabbruch | Fehler |
+| `2xx` | Success |
+| `410` | The subscription is disabled (`state = disabled`) [verified, W1] |
+| `429`, `502`, `503`, `504` | Throttle; `Retry-After` is respected [verified, W1] |
+| `3xx` | Failure; redirects are not followed [verified, W1] |
+| other status, timeout, dropped connection | Failure |
 
-1. Wiederholung mit exponentiellem Backoff und vollem Jitter zwischen
-   `webhook.retry_backoff_base` und `webhook.retry_backoff_cap` (03), bis
-   `webhook.retry_max_age` erreicht ist. Dann wird die Zustellung `dead`.
-2. Nach `webhook.max_consecutive_failures` (03) Fehlschlägen in Folge wird das Abo `disabled`.
-   Das steht im Audit-Log und in der Admin-Konsole. Das Produkt verschickt keine E-Mails
-   (Baseline Abschnitt 4).
-3. Jeder Versuch prüft vorher `webhook_out.deliver` und die Empfangs-Aktion des Ereignisses für
-   die App (05, R-AZ-11). Hat die App den Zugriff inzwischen verloren, wird die Zustellung `dead`
-   mit `last_error = not_authorized`, ohne Anfrage.
-4. Ein Owner kann jede Zustellung erneut anstoßen (`redeliverWebhook`); sie trägt dieselbe
+1. Retry with exponential backoff and full jitter between
+   `webhook.retry_backoff_base` and `webhook.retry_backoff_cap` (03), until
+   `webhook.retry_max_age` is reached. Then the delivery becomes `dead`.
+2. After `webhook.max_consecutive_failures` (03) consecutive failures, the subscription becomes
+   `disabled`. This is recorded in the audit log and shown in the admin console. The product sends
+   no emails (Baseline section 4).
+3. Every attempt first checks `webhook_out.deliver` and the receive action of the event for
+   the app (05, R-AZ-11). If the app has lost access in the meantime, the delivery becomes `dead`
+   with `last_error = not_authorized`, without a request.
+4. An owner can trigger any delivery again (`redeliverWebhook`); it carries the same
    `webhook-id`.
-5. Antwortkörper werden nicht gespeichert (03, `webhook_deliveries.last_error`).
+5. Response bodies are not stored (03, `webhook_deliveries.last_error`).
 
-## 5. Reihenfolge und Doppel
+## 5. Order and duplicates
 
-1. Zustellung mindestens einmal (at-least-once).
-2. Je Abo streng in `seq`-Reihenfolge, wie auf dem Gateway: Das nächste Ereignis geht erst
-   hinaus, wenn das vorige mit `2xx` angenommen ist ([11-erweiterungen.md](../spec/11-erweiterungen.md),
-   Abschnitt 7). Grund: Empfänger können Ereignisse wie im Gateway der Reihe nach anwenden, und
-   bei Abos von Agenten gilt `2xx` als Bestätigung bis zu dieser `seq`
-   ([04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 15.6).
-3. `webhook_subscriptions.last_delivered_seq` ist die höchste mit `2xx` angenommene `seq`.
-   Scheitert ein Ereignis bis `webhook.retry_max_age`, wird die Zustellung `dead` und das Abo
-   `disabled`; nach dem Wiedereinschalten durch den Owner geht es mit dem Folgeereignis weiter.
+1. Delivery at least once (at-least-once).
+2. Per subscription strictly in `seq` order, as on the gateway: the next event goes out only
+   after the previous one has been accepted with `2xx`
+   ([11-extensions.md](../spec/11-extensions.md), section 7). Reason: receivers can apply
+   events in order as in the gateway, and for subscriptions of agents `2xx` counts as an
+   acknowledgement up to this `seq` ([04-sync-protocol.md](../spec/04-sync-protocol.md),
+   section 15.6).
+3. `webhook_subscriptions.last_delivered_seq` is the highest `seq` accepted with `2xx`.
+   If an event still fails when `webhook.retry_max_age` is reached, the delivery becomes `dead`
+   and the subscription `disabled`; after the owner turns it on again, delivery continues with the
+   next event.
 
-## 6. Sicherheit der Zustellung
+## 6. Delivery security
 
-1. Nur `https`, nur Hosts aus `webhook.allowed_hosts`, keine Umleitungen.
-2. Zustellungen laufen über den Egress-Client des Servers ([19-sicherheit.md](../spec/19-sicherheit.md),
-   SEC-NET-1 bis SEC-NET-5): Er prüft die Adresse nach der DNS-Auflösung beim Verbindungsaufbau
-   und lehnt Loopback-, Link-Local- und private Adressen ab, außer für Einträge in
-   `egress.allowed_hosts` mit `allow_private`. Grund: Schutz vor DNS-Rebinding und SSRF
-   (Baseline Abschnitt 4).
-3. Zeitlimit je Versuch `webhook.delivery_timeout`; Standard Webhooks empfiehlt 15 bis 30 Sekunden
-   [belegt, W1].
+1. Only `https`, only hosts from `webhook.allowed_hosts`, no redirects.
+2. Deliveries go through the egress client of the server
+   ([19-security.md](../spec/19-security.md), SEC-NET-1 to SEC-NET-5): it checks the address
+   after DNS resolution when it opens the connection and rejects loopback, link-local and private
+   addresses, except for entries in `egress.allowed_hosts` with `allow_private`. Reason:
+   protection against DNS rebinding and SSRF (Baseline section 4).
+3. Time limit per attempt `webhook.delivery_timeout`; Standard Webhooks recommends 15 to 30 seconds
+   [verified, W1].
 
-## 7. Ereignistypen für Apps und Agenten
+## 7. Event types for apps and agents
 
-Erzeugt aus openapi.yaml. Ereignisse mit Zielgruppe `self` bekommt nur die App oder der Agent, die
-selbst Empfänger sind (eigene Befehle, eigene Komponenten, eigene Rechte). Ereignisse mit
-"nur Agenten-Abo" gehen nur an Abos eines Agenten (Webhook als Transport,
-[04-sync-protokoll.md](../spec/04-sync-protokoll.md) Abschnitt 15.6).
+Generated from openapi.yaml. Events with the audience `self` go only to the app or the agent that
+is itself the receiver (own commands, own components, own permissions). Events marked
+"agent subscription only" go only to subscriptions of an agent (webhook as transport,
+[04-sync-protocol.md](../spec/04-sync-protocol.md) section 15.6).
 
 <!-- BEGIN GENERATED: webhook_events -->
-| Ereignistyp | Empfangs-Aktion | Empfänger und Scope zusätzlich zu `events:subscribe` | Schema |
+| Event type | Receive action | Receiver and scope in addition to `events:subscribe` | Schema |
 |---|---|---|---|
 | `message.created` | `message.read` | `messages:read` | `MessageCreatedEvent` |
 | `message.updated` | `message.read` | `messages:read` | `MessageUpdatedEvent` |
@@ -161,68 +165,68 @@ selbst Empfänger sind (eigene Befehle, eigene Komponenten, eigene Rechte). Erei
 | `channel.updated` | `channel.read` | `messages:read` | `ChannelUpdatedEvent` |
 | `channel.settings_changed` | `channel.read` | `messages:read` | `ChannelSettingsChangedEvent` |
 | `channel.archived` | `channel.read` | `messages:read` | `ChannelArchivedEvent` |
-| `command.changed` | `command.read` | keiner (Metadaten, 05 Abschnitt 2.6) | `CommandChangedEvent` |
+| `command.changed` | `command.read` | none (metadata, 05 section 2.6) | `CommandChangedEvent` |
 | `file.updated` | `file.read` | `files:read` | `FileUpdatedEvent` |
 | `user.updated` | `user.read` | `users:read` | `UserUpdatedEvent` |
-| `agent.updated` | `agent.read` | keiner (Metadaten, 05 Abschnitt 2.6) | `AgentUpdatedEvent` |
-| `instance.updated` | `instance.read` | keiner (Metadaten, 05 Abschnitt 2.6) | `InstanceUpdatedEvent` |
-| `status.updated` | `status.read` | keiner (Metadaten, 05 Abschnitt 2.6) | `StatusUpdatedEvent` |
-| `access.changed` | `self` | nur eigene (App oder Agent ist Empfänger) | `AccessChangedEvent` |
-| `agent.invocation` | `agent.events.consume` | nur Agenten-Abo (Agent ist Empfänger) | `AgentInvocationEvent` |
-| `agent.followup` | `agent.events.consume` | nur Agenten-Abo (Agent ist Empfänger) | `AgentFollowupEvent` |
-| `run.cancel_requested` | `agent.events.consume` | nur Agenten-Abo (Agent ist Empfänger) | `RunCancelRequestedEvent` |
-| `agent.config_changed` | `agent.config.read` | nur Agenten-Abo (Agent ist Empfänger) | `AgentConfigChangedEvent` |
-| `interaction.created` | `agent.events.consume` | nur eigene (App oder Agent ist Empfänger) | `InteractionCreatedEvent` |
-| `command.invoked` | `agent.events.consume` | nur eigene (App oder Agent ist Empfänger) | `CommandInvokedEvent` |
+| `agent.updated` | `agent.read` | none (metadata, 05 section 2.6) | `AgentUpdatedEvent` |
+| `instance.updated` | `instance.read` | none (metadata, 05 section 2.6) | `InstanceUpdatedEvent` |
+| `status.updated` | `status.read` | none (metadata, 05 section 2.6) | `StatusUpdatedEvent` |
+| `access.changed` | `self` | own only (app or agent is the receiver) | `AccessChangedEvent` |
+| `agent.invocation` | `agent.events.consume` | agent subscription only (agent is the receiver) | `AgentInvocationEvent` |
+| `agent.followup` | `agent.events.consume` | agent subscription only (agent is the receiver) | `AgentFollowupEvent` |
+| `run.cancel_requested` | `agent.events.consume` | agent subscription only (agent is the receiver) | `RunCancelRequestedEvent` |
+| `agent.config_changed` | `agent.config.read` | agent subscription only (agent is the receiver) | `AgentConfigChangedEvent` |
+| `interaction.created` | `agent.events.consume` | own only (app or agent is the receiver) | `InteractionCreatedEvent` |
+| `command.invoked` | `agent.events.consume` | own only (app or agent is the receiver) | `CommandInvokedEvent` |
 <!-- END GENERATED: webhook_events -->
 
-Nicht abonnierbar: Jedes Ereignis des Katalogs, das nicht in der Tabelle steht, gibt es nur über
-das Gateway und `GET /api/v1/events`. Das sind alle kurzlebigen Ereignisse und diese dauerhaften:
+Not subscribable: every event of the catalogue that is not in the table is available only through
+the gateway and `GET /api/v1/events`. These are all ephemeral events and the following durable ones:
 
-| Gruppe | Ereignistypen | Grund |
+| Group | Event types | Reason |
 |---|---|---|
-| persönliche Ereignisse von Menschen | `read_state.updated`, `draft.updated`, `draft.deleted`, `settings.updated`, `sidebar.updated`, `notification_pref.updated`, `quiet_hours.updated`, `session.revoked` | betreffen Geräte und Oberfläche eines Menschen; eine App oder ein Agent ist nie Empfänger |
-| Erinnerung vor Ablauf | `access.expiring` | Hinweis für die Oberfläche; den wirksamen Ablauf erfährt eine App oder ein Agent über `access.changed` |
-| Verwaltung | `grant.changed`, `group.changed`, `gdpr.request_updated`, `import.progress` | Daten der Konsole; Apps haben kein `manage` (11 Abschnitt 5) und sehen eigene Rechte über `access.changed` |
-| Terminal | `host.updated`, `terminal_session.changed` | Terminal-Aktionen nur für Menschen in einer Sitzung (R-AZ-23) |
+| personal events of people | `read_state.updated`, `draft.updated`, `draft.deleted`, `settings.updated`, `sidebar.updated`, `notification_pref.updated`, `quiet_hours.updated`, `session.revoked` | concern the devices and the interface of a person; an app or an agent is never the receiver |
+| expiry reminder | `access.expiring` | a hint for the interface; an app or an agent learns the effective expiry through `access.changed` |
+| administration | `grant.changed`, `group.changed`, `gdpr.request_updated`, `import.progress` | data of the console; apps have no `manage` (11 section 5) and see their own permissions through `access.changed` |
+| terminal | `host.updated`, `terminal_session.changed` | terminal actions only for people in a session (R-AZ-23) |
 
-Agenten-Ereignisse (Aufrufe, Nachträge, Abbruch) gibt es als Webhook nur für Abos eines Agenten
-(Tabelle oben). Ein neuer dauerhafter Ereignistyp steht entweder in `webhooks` von openapi.yaml oder
-in dieser Liste; der Check `api-catalogue-sync` (M1-03, Unterprüfung `webhook-events`) hält das.
+Agent events (invocations, follow-ups, cancellation) exist as webhooks only for subscriptions of an
+agent (table above). A new durable event type is either in `webhooks` of openapi.yaml or
+in this list; the check `api-catalogue-sync` (M1-03, subcheck `webhook-events`) enforces this.
 
-## 8. Eingangs-Webhooks
+## 8. Incoming webhooks
 
-1. Ein Mensch mit `manage` auf dem Kanal legt den Eingangs-Webhook an
-   (`createIncomingWebhook`, Step-up). Er wählt eine installierte App als schreibenden Prinzipal
-   und optional einen festen Thread. Die Antwort enthält die URL mit Token genau einmal.
-2. Externe Systeme senden `POST /api/v1/hooks/{webhook_id}/{token}` mit `content_md`, optional
-   `title` (neuer Thread, wenn kein fester Thread) und `client_msg_id` (Idempotenz für
-   Wiederholungen des Absenders).
-3. Die Nachricht hat `origin = app`, Autor ist die App. Sie löst nie Agenten aus (03,
-   `incoming_webhooks`). Die App braucht `write` auf dem Kanal.
-4. Unbekannte oder widerrufene Webhooks und falsche Tokens ergeben `404`. Rate-Limit-Klasse
-   `rl.webhook_in` je Webhook.
-5. Der Token steht in der URL, weil viele Absender nur eine URL konfigurieren können. Server und
-   Proxys schwärzen den Pfad nach `/hooks/{webhook_id}/` in Logs und Traces. Wechsel: neuen
-   Webhook anlegen, alten widerrufen.
+1. A person with `manage` on the channel creates the incoming webhook
+   (`createIncomingWebhook`, step-up). They choose an installed app as the writing principal
+   and optionally a fixed thread. The response contains the URL with the token exactly once.
+2. External systems send `POST /api/v1/hooks/{webhook_id}/{token}` with `content_md`, optionally
+   `title` (a new thread if there is no fixed thread) and `client_msg_id` (idempotency for
+   retries of the sender).
+3. The message has `origin = app`, and the author is the app. It never triggers agents (03,
+   `incoming_webhooks`). The app needs `write` on the channel.
+4. Unknown or revoked webhooks and wrong tokens result in `404`. Rate-limit class
+   `rl.webhook_in` per webhook.
+5. The token is in the URL because many senders can only configure a URL. Server and
+   proxies redact the path after `/hooks/{webhook_id}/` in logs and traces. Rotation: create a new
+   webhook, revoke the old one.
 
-## 9. Konfigurationswerte
+## 9. Configuration values
 
-Die Werte dieses Dokuments stehen in der Tabelle von
-[11-erweiterungen.md](../spec/11-erweiterungen.md#16-konfigurationswerte-dieses-kapitels), damit
-der Generator sie in die Konfigurationsreferenz übernimmt (Ruling L4): `webhook.retry_max_age`,
-`webhook.secret_rotation_overlap` und `webhook.receiver_tolerance`. Der letzte ist eine Empfehlung
-für Empfänger, kein Wert des Servers. `webhook.allowed_hosts`, `webhook.max_consecutive_failures`,
-`webhook.retry_backoff_base` und `webhook.retry_backoff_cap` stehen in 03, Abschnitt 9;
-`egress.allowed_hosts` in [19-sicherheit.md](../spec/19-sicherheit.md). Der Standard für
-`webhook.retry_max_age` liegt nahe dem Beispielplan von Standard Webhooks (rund 75 Stunden)
-[abgeleitet, W1].
+The values of this document are in the table of
+[11-extensions.md](../spec/11-extensions.md#16-configuration-values-of-this-chapter), so that
+the generator takes them into the configuration reference (ruling L4): `webhook.retry_max_age`,
+`webhook.secret_rotation_overlap` and `webhook.receiver_tolerance`. The last one is a recommendation
+for receivers, not a value of the server. `webhook.allowed_hosts`, `webhook.max_consecutive_failures`,
+`webhook.retry_backoff_base` and `webhook.retry_backoff_cap` are in 03, section 9;
+`egress.allowed_hosts` is in [19-security.md](../spec/19-security.md). The default for
+`webhook.retry_max_age` is close to the example schedule of Standard Webhooks (about 75 hours)
+[derived, W1].
 
-## Quellen
+## Sources
 
-Abgerufen am 2026-10-10.
+Retrieved on 2026-10-10.
 
-| Nr | Quelle | Inhalt | Marker |
+| No. | Source | Content | Marker |
 |---|---|---|---|
-| W1 | https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md | Kopfzeilen, signierter Inhalt, `v1`/`v1a`, Präfixe `whsec_`/`whpk_`, mehrere Signaturen, Statusregeln, Backoff-Beispiel, Zeitlimit 15 bis 30 s, empfohlene Körperform | [belegt] |
-| W2 | https://github.com/standard-webhooks/standard-webhooks | Referenzbibliotheken je Sprache; Unterstützung von `v1a` dort nicht beschrieben | [vermutet] |
+| W1 | https://github.com/standard-webhooks/standard-webhooks/blob/main/spec/standard-webhooks.md | Headers, signed content, `v1`/`v1a`, prefixes `whsec_`/`whpk_`, multiple signatures, status rules, backoff example, time limit 15 to 30 s, recommended body form | [verified] |
+| W2 | https://github.com/standard-webhooks/standard-webhooks | Reference libraries per language; support for `v1a` is not described there | [assumed] |

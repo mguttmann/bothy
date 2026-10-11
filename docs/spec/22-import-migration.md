@@ -1,211 +1,211 @@
-# 22 Import und Migration aus Discord
+# 22 Import and migration from Discord
 
-Status: Entwurf M0. Normativ für das Import-Werkzeug, die Import-Schnittstelle des Servers und den
-Migrationsablauf. Begriffe: [00-glossar.md](00-glossar.md). Tabellen `import_sources` und
-`import_items`: [03-datenmodell.md](03-datenmodell.md), Abschnitt 4.11. Aktionen `import.read`
-und `import.manage`: [05-aktionen.md](05-aktionen.md), Abschnitt 4.12. Entscheidung zur Bauform:
-[ADR 0043](../adr/0043-discord-import-nur-lesen-trockenlauf-herkunftsschluessel.md). Lehren der
-Vorgänger: [REUSE.md](../REUSE.md).
+Status: draft M0. Normative for the import tool, the import interface of the server and the
+migration flow. Terms: [00-glossary.md](00-glossary.md). Tables `import_sources` and
+`import_items`: [03-data-model.md](03-data-model.md), section 4.11. Actions `import.read`
+and `import.manage`: [05-actions.md](05-actions.md), section 4.12. Decision on the design:
+[ADR 0043](../adr/0043-discord-import-read-only-dry-run-origin-key.md). Lessons of the
+predecessors: [REUSE.md](../REUSE.md).
 
-Alle Grenzen, Fenster und Intervalle sind benannte Konfigurationswerte. Ihre Standardwerte stehen
-nur in Abschnitt 19.
+All limits, windows and intervals are named configuration values. Their default values are
+only in section 19.
 
-## 1. Ziel und Abgrenzung
+## 1. Goal and boundaries
 
-Eine Organisation, die heute einen Discord-Server mit Agenten-Bots nutzt, zieht Kanal für Kanal
-nach Bothy um, ohne Verlust und ohne Doppel. Danach steht der alte Verlauf in Bothy, mit
-Original-Zeit und Original-Autor, und jeder Thread kann seine frühere Agenten-Sitzung fortsetzen.
+An organization that uses a Discord server with agent bots today moves to Bothy channel by
+channel, without loss and without duplicates. Afterwards the old history is in Bothy, with the
+original time and the original author, and every thread can continue its earlier agent session.
 
-Im Umfang:
+In scope:
 
-- Einmaliger Import der Historie (Kategorien, Text-Kanäle, Foren, Threads, Forum-Beiträge,
-  Nachrichten, Anhänge, Pins, Forum-Tags).
-- Lese-Spiegel für den Parallelbetrieb: neue Discord-Nachrichten laufen in Bothy nach, nur in
-  diese Richtung.
-- Umschalten je Kanal und Rückweg je Kanal.
-- Bindung importierter Threads an frühere Agenten-Sitzungen.
+- One-time import of the history (categories, text channels, forums, threads, forum posts,
+  messages, attachments, pins, forum tags).
+- Read mirror for parallel operation: new Discord messages are pulled into Bothy, only in
+  this direction.
+- Switching over per channel and reverting per channel.
+- Binding of imported threads to earlier agent sessions.
 
-Nicht im Umfang:
+Out of scope:
 
-- Schreiben nach Discord. Das Werkzeug ruft Discord nur lesend auf (Abschnitt 4).
-- Übernahme von Discord-Rollen und Kanal-Rechten als Freigaben. Rollen gibt es in Bothy nicht
-  (Baseline Abschnitt 4); Freigaben vergibt der Owner bewusst (Abschnitt 5.1).
-- Sprach- und Bühnenkanäle, Reaktionen mit Personen, Nachführen von Bearbeitungen und Löschungen
-  nach dem Kopieren (Abschnitte 6.6 und 12.4).
-- Big Bang. Es gibt keinen Schritt, der alle Kanäle auf einmal umschaltet.
+- Writing to Discord. The tool calls Discord read-only (section 4).
+- Taking over Discord roles and channel permissions as grants. Bothy has no roles
+  (Baseline section 4); the owner assigns grants deliberately (section 5.1).
+- Voice and stage channels, reactions with the people who reacted, keeping edits and deletions
+  in sync after copying (sections 6.6 and 12.4).
+- Big bang. There is no step that switches over all channels at once.
 
-## 2. Bauform
+## 2. Design
 
-Der Import ist ein eigener Prozess außerhalb des Servers: der Befehl `bothy import discord` des
-Kommandozeilen-Werkzeugs `bothy`. Er liest Discord und schreibt über die öffentliche API des
-Servers, wie jeder andere Client. Der Server ruft Discord nie auf.
+The import is a separate process outside the server: the command `bothy import discord` of the
+command-line tool `bothy`. It reads Discord and writes through the public API of the
+server, like any other client. The server never calls Discord.
 
-Gründe (ausführlich in ADR 0043):
+Reasons (in detail in ADR 0043):
 
-1. Der Server lädt nie fremde URLs (Baseline Abschnitt 4, "Bewusst nie": SSRF). Anhänge vom
-   Discord-CDN lädt nur das Werkzeug.
-2. Erweiterungen laufen nie im Server-Prozess (B6). Das Discord-Token liegt nie beim Server.
-3. Der Trockenlauf schreibt nachweisbar nichts, weder in Discord noch in Bothy noch lokal.
-4. Idempotenz und Fortschritt liegen trotzdem im Server (`import_items`, `import_sources.cursor`).
-   Ein abgebrochener Lauf setzt auf jedem Rechner fort.
+1. The server never loads external URLs (Baseline section 4, "Deliberately never": SSRF). Only the
+   tool loads attachments from the Discord CDN.
+2. Extensions never run in the server process (B6). The Discord token is never held by the server.
+3. The dry run provably writes nothing, neither in Discord nor in Bothy nor locally.
+4. Idempotency and progress are nevertheless kept in the server (`import_items`, `import_sources.cursor`).
+   An aborted run resumes on any machine.
 
-Ob `bothy` dasselbe Go-Binary wie der Server ist, entscheidet [02-architektur.md](02-architektur.md);
-wichtig ist nur die Prozess-Trennung.
+Whether `bothy` is the same Go binary as the server is decided by [02-architecture.md](02-architecture.md);
+only the process separation matters.
 
-## 3. Ablauf im Überblick
+## 3. Flow overview
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant O as Owner
     participant T as bothy import discord
-    participant D as Discord API und CDN
-    participant S as Bothy-Server
-    O->>T: Trockenlauf (Standard)
-    T->>D: nur GET: Struktur, Threads, Nachrichten
-    T->>S: nur GET: Personen, Agenten, Bereiche, Kanäle
-    T-->>O: Prüfbericht ohne Inhalte, nichts geschrieben
+    participant D as Discord API and CDN
+    participant S as Bothy server
+    O->>T: Dry run (default)
+    T->>D: GET only: structure, threads, messages
+    T->>S: GET only: people, agents, spaces, channels
+    T-->>O: Check report without content, nothing written
     O->>T: --apply
-    T->>S: Quelle anlegen und starten (import.manage, Step-up)
-    loop je Kanal, je Thread, in Discord-Reihenfolge
-        T->>D: GET Nachrichten-Seite nach Cursor
-        T->>D: GET Anhänge vom CDN (Host-Erlaubnisliste)
-        T->>S: Datei-Objekte mit Herkunftsschlüssel
-        T->>S: Stapel mit Herkunftsschlüsseln (import.apply)
-        S->>S: je Objekt: pending, Ziel anlegen, posted
-        T->>S: Cursor vorrücken
+    T->>S: Create and start source (import.manage, step-up)
+    loop per channel, per thread, in Discord order
+        T->>D: GET message page after cursor
+        T->>D: GET attachments from the CDN (host allow-list)
+        T->>S: File items with origin key
+        T->>S: Batch with origin keys (import.apply)
+        S->>S: per item: pending, create target, posted
+        T->>S: Advance cursor
     end
-    T-->>O: Prüfbericht
-    O->>T: --follow --apply (Lese-Spiegel)
-    O->>S: je Kanal umschalten oder zurück (Abschnitt 13)
+    T-->>O: Check report
+    O->>T: --follow --apply (read mirror)
+    O->>S: Switch over or revert per channel (section 13)
 ```
 
-## 4. Discord-Zugriff: nur lesen
+## 4. Discord access: read only
 
-### 4.1 Endpunkte
+### 4.1 Endpoints
 
-Das Werkzeug kennt nur diese Aufrufe. Der Discord-Client im Code hat keine Methode für ein anderes
-Verb als `GET` (Test in Abschnitt 16).
+The tool knows only these calls. The Discord client in the code has no method for any verb other
+than `GET` (test in section 16).
 
-| Zweck | Aufruf | Quelle |
+| Purpose | Call | Source |
 |---|---|---|
-| Token prüfen, eigene Bot-ID | `GET /users/@me` | [R1] |
-| Server-Name für den Bericht | `GET /guilds/{guild.id}` | [R2] |
-| Kategorien und Kanäle (ohne Threads) | `GET /guilds/{guild.id}/channels` | [R2] |
-| Aktive Threads des Servers | `GET /guilds/{guild.id}/threads/active` | [R2] |
-| Archivierte öffentliche Threads je Kanal, seitenweise mit `before` | `GET /channels/{channel.id}/threads/archived/public` | [R3] |
-| Archivierte private Threads je Kanal; braucht `MANAGE_THREADS`, sonst Hinweis und überspringen | `GET /channels/{channel.id}/threads/archived/private` | [R3] |
-| Ein Kanal oder Thread (Zustand prüfen im Lese-Spiegel) | `GET /channels/{channel.id}` | [R3] |
-| Nachrichten vorwärts ab Cursor | `GET /channels/{channel.id}/messages?after=…&limit=…` | [R4] |
-| Nachrichten vor einer ID (Ruhe-Regel im Lese-Spiegel) | `GET /channels/{channel.id}/messages?before=…&limit=…` | [R4] |
-| Eine Nachricht neu lesen (frische Anhang-URL) | `GET /channels/{channel.id}/messages?around=…&limit=…` | [R4] |
-| Anhänge | `GET` auf Hosts aus `import.discord.cdn_hosts` | [R5] |
+| Check token, own bot ID | `GET /users/@me` | [R1] |
+| Server name for the report | `GET /guilds/{guild.id}` | [R2] |
+| Categories and channels (without threads) | `GET /guilds/{guild.id}/channels` | [R2] |
+| Active threads of the server | `GET /guilds/{guild.id}/threads/active` | [R2] |
+| Archived public threads per channel, page by page with `before` | `GET /channels/{channel.id}/threads/archived/public` | [R3] |
+| Archived private threads per channel; needs `MANAGE_THREADS`, otherwise a note and skip | `GET /channels/{channel.id}/threads/archived/private` | [R3] |
+| One channel or thread (check the state in the read mirror) | `GET /channels/{channel.id}` | [R3] |
+| Messages forward from the cursor | `GET /channels/{channel.id}/messages?after=…&limit=…` | [R4] |
+| Messages before an ID (settle rule in the read mirror) | `GET /channels/{channel.id}/messages?before=…&limit=…` | [R4] |
+| Re-read one message (fresh attachment URL) | `GET /channels/{channel.id}/messages?around=…&limit=…` | [R4] |
+| Attachments | `GET` on hosts from `import.discord.cdn_hosts` | [R5] |
 
-Bewusst nicht benutzt: `GET /guilds/{guild.id}/members`, weil er den privilegierten Intent
-`GUILD_MEMBERS` verlangt [R2, belegt]. Autoren stehen in jedem Nachrichten-Objekt; mehr braucht
-die Zuordnung nicht. Ebenfalls nicht benutzt: der Pin-Endpunkt; das Feld `pinned` am
-Nachrichten-Objekt reicht [R4, belegt].
+Deliberately not used: `GET /guilds/{guild.id}/members`, because it requires the privileged intent
+`GUILD_MEMBERS` [R2, verified]. Authors are in every message object; the mapping needs nothing
+more. Also not used: the pin endpoint; the field `pinned` on the
+message object is enough [R4, verified].
 
-Archivierte Threads kommen neueste zuerst nach `archive_timestamp` [R3, belegt]. Die nächste Seite
-fragt mit `before` gleich dem `archive_timestamp` des letzten Threads; Threads werden über ihre ID
-entdoppelt; eine Seite ohne neue ID beendet die Abfrage, damit nie dieselbe Seite endlos kommt.
+Archived threads come newest first by `archive_timestamp` [R3, verified]. The next page
+asks with `before` equal to the `archive_timestamp` of the last thread; threads are deduplicated
+by their ID; a page without a new ID ends the query, so that the same page never comes endlessly.
 
-Basis-URL ist `import.discord.api_base`. Jede Anfrage trägt einen `User-Agent` im Format, das
-Discord für Bots verlangt [R6, belegt]. Das Bot-Token geht nur an die API-Basis, nie an CDN-Hosts.
+The base URL is `import.discord.api_base`. Every request carries a `User-Agent` in the format that
+Discord requires for bots [R6, verified]. The bot token goes only to the API base, never to CDN hosts.
 
-### 4.2 Bot, Rechte, Intents
+### 4.2 Bot, permissions, intents
 
-Der Import nutzt ein eigenes Discord-Bot-Konto, nicht das Token eines produktiven Agenten-Bots.
-Gründe: Discord zählt Rate-Limits je Bot [R7, belegt], ein Import würde sonst die Antworten der
-laufenden Agenten bremsen; und das Import-Konto braucht nur Leserechte.
+The import uses a separate Discord bot account, not the token of a productive agent bot.
+Reasons: Discord counts rate limits per bot [R7, verified], so an import would otherwise slow down
+the answers of the running agents; and the import account needs only read permissions.
 
-- Kanal-Rechte: `VIEW_CHANNEL` und `READ_MESSAGE_HISTORY` [R4, belegt]; `MANAGE_THREADS` nur,
-  wenn archivierte private Threads übernommen werden sollen [R3, belegt].
-- Intent: `MESSAGE_CONTENT` muss im Entwickler-Portal eingeschaltet sein. Ohne ihn liefert
-  Discord leere Werte in `content`, `embeds`, `attachments`, `components` und `poll`, auch über
-  REST [R8, belegt]. Für Bots unterhalb der Prüfgrenzen reicht der Schalter im Portal [R8, belegt].
-- Das Token liest das Werkzeug aus der Umgebung (`BOTHY_IMPORT_DISCORD_TOKEN`) oder aus einer Datei
-  (`--discord-token-file`). Es erscheint nie in Ausgabe, Bericht, Fehlertext oder Log
-  (Test in Abschnitt 16).
+- Channel permissions: `VIEW_CHANNEL` and `READ_MESSAGE_HISTORY` [R4, verified]; `MANAGE_THREADS`
+  only if archived private threads are to be taken over [R3, verified].
+- Intent: `MESSAGE_CONTENT` must be enabled in the developer portal. Without it, Discord delivers
+  empty values in `content`, `embeds`, `attachments`, `components` and `poll`, also over REST
+  [R8, verified]. For bots below the verification thresholds, the switch in the portal is enough [R8, verified].
+- The tool reads the token from the environment (`BOTHY_IMPORT_DISCORD_TOKEN`) or from a file
+  (`--discord-token-file`). It never appears in output, report, error text or log
+  (test in section 16).
 
-### 4.3 Rate-Limit-Wächter
+### 4.3 Rate-limit guard
 
-Discord meldet Grenzen über Kopfzeilen und `429` mit `retry_after` [R7, belegt]. Das Werkzeug:
+Discord reports limits through headers and `429` with `retry_after` [R7, verified]. The tool:
 
-1. Wartet vor dem nächsten Aufruf `X-RateLimit-Reset-After`, wenn `X-RateLimit-Remaining` gleich
-   `0` ist.
-2. Wartet bei `429` die Zeit aus `retry_after` (Körper) oder `Retry-After` (Kopfzeile) und
-   wiederholt höchstens `import.discord.max_429_retries` Mal.
-3. Bricht ab, wenn eine verlangte Wartezeit größer als `import.discord.max_rate_wait` ist. Der
-   Zustand bleibt; ein neuer Lauf setzt fort.
-4. Wiederholt `401` und `403` nie. Ein `403` auf einem Kanal beendet alle weiteren Aufrufe für
-   diesen Kanal im Lauf. Grund: Discord sperrt eine IP zeitweise nach zu vielen Antworten mit
-   `401`, `403` oder `429` [R7, belegt].
-5. Respektiert ebenso `429` des Bothy-Servers (Kopfzeile `Retry-After`).
+1. Waits `X-RateLimit-Reset-After` before the next call if `X-RateLimit-Remaining` equals
+   `0`.
+2. On `429`, waits the time from `retry_after` (body) or `Retry-After` (header) and
+   retries at most `import.discord.max_429_retries` times.
+3. Aborts if a requested wait time is greater than `import.discord.max_rate_wait`. The
+   state remains; a new run resumes.
+4. Never retries `401` and `403`. A `403` on a channel ends all further calls for
+   this channel in the run. Reason: Discord temporarily blocks an IP after too many responses with
+   `401`, `403` or `429` [R7, verified].
+5. Likewise respects `429` of the Bothy server (header `Retry-After`).
 
-### 4.4 Vorabprüfung
+### 4.4 Preflight check
 
-Vor jedem Lauf, auch im Trockenlauf:
+Before every run, including the dry run:
 
-1. `GET /users/@me` gelingt; das Token ist ein Bot-Token.
-2. Der Server ist lesbar; jede Kategorie und jeder zugeordnete Kanal ist sichtbar.
-3. Intent-Probe: Unter den ersten `import.discord.preflight_sample` Nachrichten fremder Autoren
-   eines lesbaren Kanals hat mindestens eine Inhalt, Anhang oder Embed. Sonst Abbruch mit dem
-   Hinweis, dass `MESSAGE_CONTENT` vermutlich fehlt. Grund: ohne diese Probe entstünde ein
-   vollständiger Import aus leeren Nachrichten.
-4. Die Bothy-Sitzung gehört einem aktiven Owner.
-5. Jede Ziel-Person und jeder Ziel-Agent der Zuordnungsdatei existiert.
+1. `GET /users/@me` succeeds; the token is a bot token.
+2. The server is readable; every category and every mapped channel is visible.
+3. Intent probe: among the first `import.discord.preflight_sample` messages by other authors
+   in a readable channel, at least one has content, an attachment or an embed. Otherwise abort with
+   the note that `MESSAGE_CONTENT` is probably missing. Reason: without this probe, a
+   complete import of empty messages would result.
+4. The Bothy session belongs to an active owner.
+5. Every target person and every target agent of the mapping file exists.
 
-## 5. Zuordnung
+## 5. Mapping
 
-### 5.1 Struktur
+### 5.1 Structure
 
-| Discord (Typ-Nummer [R3, belegt]) | Bothy | Regel |
+| Discord (type number [R3, verified]) | Bothy | Rule |
 |---|---|---|
-| `GUILD_CATEGORY` (4) | Bereich (`space`) | neu anlegen oder vorhandenen Bereich nehmen (Zuordnungsdatei) |
-| `GUILD_TEXT` (0), `GUILD_ANNOUNCEMENT` (5) | Kanal `kind = text` mit Hauptverlauf | Nachrichten außerhalb von Threads in den Hauptverlauf |
-| `GUILD_FORUM` (15), `GUILD_MEDIA` (16) | Kanal `kind = forum` | Tags aus `available_tags` werden `forum_tags` |
-| `PUBLIC_THREAD` (11), `PRIVATE_THREAD` (12), `ANNOUNCEMENT_THREAD` (10) | Thread `kind = thread` | siehe 5.1.1 |
-| `GUILD_VOICE` (2), `GUILD_STAGE_VOICE` (13) | nichts | im Bericht als übersprungen gezählt |
-| Kanal ohne Kategorie | Bereich laut `defaults.uncategorized_space` | sonst übersprungen |
+| `GUILD_CATEGORY` (4) | space (`space`) | create a new space or use an existing one (mapping file) |
+| `GUILD_TEXT` (0), `GUILD_ANNOUNCEMENT` (5) | channel `kind = text` with main thread | messages outside of threads go into the main thread |
+| `GUILD_FORUM` (15), `GUILD_MEDIA` (16) | channel `kind = forum` | tags from `available_tags` become `forum_tags` |
+| `PUBLIC_THREAD` (11), `PRIVATE_THREAD` (12), `ANNOUNCEMENT_THREAD` (10) | thread `kind = thread` | see 5.1.1 |
+| `GUILD_VOICE` (2), `GUILD_STAGE_VOICE` (13) | nothing | counted as skipped in the report |
+| Channel without category | space according to `defaults.uncategorized_space` | otherwise skipped |
 
-Regeln:
+Rules:
 
-1. Das Werkzeug legt nur an. Es löscht, archiviert und benennt nie Objekte in Bothy um. Einen
-   vorhandenen Bereich oder Kanal benutzt es nur, wenn die Zuordnungsdatei ihn ausdrücklich nennt.
-   Trifft ein neuer Name auf einen vorhandenen fremden Namen, bricht der Lauf vor dem ersten
-   Schreiben ab.
-2. Neue Kanäle bekommen keine Freigaben. Sie sind damit nur für Owner sichtbar ("Standard ist
-   nichts"). Kanäle mit `permission_overwrites` in Discord stehen im Bericht markiert, damit der
-   Owner Freigaben bewusst setzt.
-3. Neue Kanäle stehen im Lese-Spiegel schreibgeschützt (Abschnitt 12.1). Bediener setzt erst das
-   Umschalten (Abschnitt 13.3).
-4. Reihenfolge: Bereiche und Kanäle in Discord-Reihenfolge (`position`), als `sort_key`.
+1. The tool only creates. It never deletes, archives or renames items in Bothy. It uses an
+   existing space or channel only if the mapping file names it explicitly.
+   If a new name collides with an existing name that the import did not create, the run aborts
+   before the first write.
+2. New channels get no grants. They are thus visible only to owners ("The default is
+   nothing"). Channels with `permission_overwrites` in Discord are marked in the report so that the
+   owner sets grants deliberately.
+3. New channels are read-only in the read mirror (section 12.1). Only the switch-over sets the
+   operator (section 13.3).
+4. Order: spaces and channels in Discord order (`position`), as `sort_key`.
 
 #### 5.1.1 Threads
 
-- Ein Thread aus einer Nachricht eines Text-Kanals hat dieselbe ID wie seine Ausgangsnachricht
-  [R3, belegt]. In Bothy wird er ein Thread mit `parent_message_id` gleich der importierten
-  Ausgangsnachricht im Hauptverlauf. Fehlt diese, bleibt `parent_message_id` leer.
-- Ein Forum-Beitrag wird ein Thread im Forum-Kanal; seine Startnachricht ist die erste Nachricht.
-- Titel ist der Thread-Name, gekürzt auf `thread.title_max_chars`. Ist der Name ein Platzhalter
-  nach der Auto-Titel-Regel (REUSE.md, Abschnitt 5.1), wird `title_source = auto`, sonst `manual`.
-- `threads.created_at` und `last_activity_at` kommen aus der Quelle (Zeit im Snowflake der
-  Thread-ID bzw. der letzten Nachricht) (03, Abschnitt 4.11).
-- Erledigt: Ein Thread wird `closed`, wenn `thread_metadata.archived` genau `true` ist und er nicht
-  in der Liste aktiver Threads steht, oder wenn er ein Tag aus `import.discord.closed_tags` trägt.
-  `closed_at` ist `archive_timestamp`. Fehlende Metadaten, `false` oder ein Thread in beiden Listen
-  gelten als offen. Grund: ein zu Unrecht offener Thread schadet nicht, ein zu Unrecht
-  geschlossener versteckt Arbeit.
-- `threads.operator_agent_id` kommt aus `planned_operator` des Kanals in der Zuordnungsdatei, nicht
-  aus dem (im Lese-Spiegel leeren) wirksamen Bediener (03, `threads.operator_agent_id`). Grund: R-DM-12 hält den Bediener fest; ohne diese Regel bliebe jeder importierte
-  Thread nach dem Umschalten für immer ohne Agent.
+- A thread created from a message in a text channel has the same ID as its starter message
+  [R3, verified]. In Bothy it becomes a thread with `parent_message_id` equal to the imported
+  starter message in the main thread. If that message is missing, `parent_message_id` stays empty.
+- A forum post becomes a thread in the forum channel; its start message is the first message.
+- The title is the thread name, shortened to `thread.title_max_chars`. If the name is a placeholder
+  according to the auto-title rule (REUSE.md, section 5.1), `title_source = auto`, otherwise `manual`.
+- `threads.created_at` and `last_activity_at` come from the source (time in the snowflake of the
+  thread ID or of the last message, respectively) (03, section 4.11).
+- Done: a thread becomes `closed` if `thread_metadata.archived` is exactly `true` and it is not
+  in the list of active threads, or if it carries a tag from `import.discord.closed_tags`.
+  `closed_at` is `archive_timestamp`. Missing metadata, `false` or a thread in both lists
+  count as open. Reason: a thread wrongly left open does no harm; a thread wrongly
+  closed hides work.
+- `threads.operator_agent_id` comes from `planned_operator` of the channel in the mapping file, not
+  from the effective operator (empty in the read mirror) (03, `threads.operator_agent_id`). Reason: R-DM-12 pins the operator; without this rule every imported
+  thread would stay without an agent forever after the switch-over.
 
-### 5.2 Zuordnungsdatei
+### 5.2 Mapping file
 
-Eine YAML-Datei des Owners, Schema `import_source.discord.v1`. Der Server speichert sie ohne
-Geheimnisse in `import_sources.config`. `bothy import discord init-map` erzeugt ein Gerüst aus der
-Discord-Struktur und den Autoren, die der Trockenlauf gesehen hat; der Owner bearbeitet es.
+A YAML file of the owner, schema `import_source.discord.v1`. The server stores it without
+secrets in `import_sources.config`. `bothy import discord init-map` generates a skeleton from the
+Discord structure and the authors that the dry run has seen; the owner edits it.
 
 ```yaml
 version: 1
@@ -213,15 +213,15 @@ guild_id: "<guild_id>"
 defaults:
   unmapped_human: placeholder      # placeholder | skip
   unmapped_bot: placeholder        # placeholder | skip
-  uncategorized_space: skip        # skip | <Bereichs-Schlüssel aus spaces>
+  uncategorized_space: skip        # skip | <space key from spaces>
 spaces:
   - discord_category: "<category_id>"
-    target: {create: {name: "Support"}}          # oder {existing: "<space_uuid>"} oder skip
+    target: {create: {name: "Support"}}          # or {existing: "<space_uuid>"} or skip
 channels:
   - discord_channel: "<channel_id>"
-    target: {create: {name: "tickets"}}          # Bereich folgt der Kategorie
-    planned_operator: "agent:support-bot"        # oder none
-    lead: discord                                # discord | bothy (Abschnitt 12.1)
+    target: {create: {name: "tickets"}}          # space follows the category
+    planned_operator: "agent:support-bot"        # or none
+    lead: discord                                # discord | bothy (section 12.1)
   - discord_channel: "<channel_id>"
     target: skip
 users:
@@ -231,138 +231,138 @@ users:
     target: "agent:support-bot"
 ```
 
-Nicht genannte Kanäle werden übersprungen und im Bericht gezählt. Ein Fehler in der Datei
-(unbekanntes Feld, unbekannter Handle, doppelte Discord-ID) beendet den Lauf vor jedem Aufruf mit
-Exit-Code `2`.
+Channels that are not named are skipped and counted in the report. An error in the file
+(unknown field, unknown handle, duplicate Discord ID) ends the run before any call with
+exit code `2`.
 
-### 5.3 Personen und Platzhalter
+### 5.3 People and placeholders
 
-Jeder Autor wird ein Prinzipal in Bothy:
+Every author becomes a principal in Bothy:
 
-| Discord-Autor | Ziel | Regel |
+| Discord author | Target | Rule |
 |---|---|---|
-| Mensch mit Eintrag `user:<handle>` | vorhandener Mensch | Original-Autor |
-| Bot mit Eintrag `agent:<handle>` | vorhandener Agent | Original-Autor; die Nachricht hat trotzdem `origin = import` |
-| ohne Eintrag oder `placeholder` | Platzhalter-Mensch | siehe unten |
-| Webhook-Autor | Platzhalter je Webhook-ID | wie ohne Eintrag |
+| Person with entry `user:<handle>` | existing person | original author |
+| Bot with entry `agent:<handle>` | existing agent | original author; the message nevertheless has `origin = import` |
+| Without entry or `placeholder` | placeholder person | see below |
+| Webhook author | placeholder per webhook ID | as without entry |
 
-Platzhalter: ein Prinzipal `kind = user`, `status = disabled`, ohne Identität, ohne Freigaben,
-`display_name` aus `global_name` oder `username`, Handle `imported-<name>` mit Zähler bei
-Kollision. Er kann sich nie anmelden und nie auslösen. Herkunft: `import_items` mit
-`item_kind = user`; die Oberfläche zeigt ihn als "importiert". Platzhalter sind personenbezogene
-Daten der Discord-Nutzer (Abschnitt 14).
+Placeholder: a principal `kind = user`, `status = disabled`, without identity, without grants,
+`display_name` from `global_name` or `username`, handle `imported-<name>` with a counter on
+collision. It can never log in and never trigger. Origin: `import_items` with
+`item_kind = user`; the interface shows it as "imported". Placeholders are personal
+data of the Discord users (section 14).
 
-Erwähnungen von Personen werden Text (`@Name`), keine Zeilen in `mentions`. Grund: eine
-Erwähnung erzeugt Benachrichtigungen und Zähler; ein Import erzeugt keine (Abschnitt 6.4).
+Mentions of people become text (`@Name`), not rows in `mentions`. Reason: a
+mention creates notifications and counters; an import creates none (section 6.4).
 
-### 5.4 Agenten
+### 5.4 Agents
 
-Das Werkzeug legt nie Agenten an und setzt nie Bediener oder Backend-Richtlinien. Das sind
-Owner-Aktionen mit Step-up und I1-Prüfung (`agent.create`, `channel.operator.set`). Die
-Zuordnungsdatei nennt nur vorhandene Agenten.
+The tool never creates agents and never sets operators or backend policies. Those are
+owner actions with step-up and I1 check (`agent.create`, `channel.operator.set`). The
+mapping file names only existing agents.
 
-## 6. Nachrichten
+## 6. Messages
 
-### 6.1 Typen
+### 6.1 Types
 
-Übernommen werden die Discord-Typen `DEFAULT` (0), `REPLY` (19), `CHAT_INPUT_COMMAND` (20),
-`THREAD_STARTER_MESSAGE` (21) und `CONTEXT_MENU_COMMAND` (23) [R4, belegt]. Alle anderen
-(Systemnachrichten wie Pin-Hinweis oder "Thread angelegt") werden gezählt und übersprungen. Typ 21
-entfällt, wenn seine Ausgangsnachricht schon im Hauptverlauf steht. Leere Nachrichten ohne Anhang,
-Embed, Sticker und Umfrage werden gezählt und übersprungen.
+The Discord types `DEFAULT` (0), `REPLY` (19), `CHAT_INPUT_COMMAND` (20),
+`THREAD_STARTER_MESSAGE` (21) and `CONTEXT_MENU_COMMAND` (23) are taken over [R4, verified]. All
+others (system messages such as a pin notice or "thread created") are counted and skipped. Type 21
+is dropped if its starter message is already in the main thread. Empty messages without attachment,
+embed, sticker and poll are counted and skipped.
 
-### 6.2 Felder
+### 6.2 Fields
 
-| Bothy-Feld (`messages`) | Wert |
+| Bothy field (`messages`) | Value |
 |---|---|
-| `author_principal_id` | zugeordneter Prinzipal (5.3) |
-| `origin` | immer `import`; löst nie einen Agenten aus ([05-aktionen.md](05-aktionen.md), Abschnitt 5) |
+| `author_principal_id` | mapped principal (5.3) |
+| `origin` | always `import`; never triggers an agent ([05-actions.md](05-actions.md), section 5) |
 | `kind` | `text` |
-| `created_at` | `timestamp` der Quelle |
-| `edited_at` | `edited_timestamp` der Quelle; keine Revisionen |
+| `created_at` | `timestamp` of the source |
+| `edited_at` | `edited_timestamp` of the source; no revisions |
 | `silent` | `true` |
-| `trigger_state` | leer |
-| `reply_to_message_id` | bei Typ 19, wenn die Bezugsnachricht im selben Thread importiert ist; sonst Zitatzeile im Inhalt, gekürzt auf `import.reply_quote_max_chars` |
-| `import_item_id` | Zeile in `import_items` |
-| `client_msg_id` | vom Server erzeugt; Idempotenz trägt der Herkunftsschlüssel (Abschnitt 7) |
-| `thread_seq` | Anfügen in Discord-Reihenfolge (aufsteigende ID) |
+| `trigger_state` | empty |
+| `reply_to_message_id` | for type 19, if the referenced message is imported in the same thread; otherwise a quote line in the content, shortened to `import.reply_quote_max_chars` |
+| `import_item_id` | row in `import_items` |
+| `client_msg_id` | generated by the server; idempotency is carried by the origin key (section 7) |
+| `thread_seq` | appended in Discord order (ascending ID) |
 
-Die Anzeige-Reihenfolge kommt aus `thread_seq`, nie aus `created_at` ([04-sync-protokoll.md](04-sync-protokoll.md),
-Abschnitt 10). Ein Thread wird darum streng in Discord-Reihenfolge angefügt.
+The display order comes from `thread_seq`, never from `created_at` ([04-sync-protocol.md](04-sync-protocol.md),
+section 10). A thread is therefore appended strictly in Discord order.
 
-### 6.3 Inhalt umwandeln
+### 6.3 Converting content
 
-Ziel ist der Markdown-Dialekt `content_format = 1`. Was sich nicht abbilden lässt, bleibt als
-lesbarer Text.
+The target is the Markdown dialect `content_format = 1`. What cannot be mapped stays as
+readable text.
 
 | Discord | Bothy |
 |---|---|
-| `<@USER_ID>` [R6, belegt] | `@Anzeigename` als Text |
-| `<@&ROLE_ID>` | `@Rollenname` als Text |
-| `<#CHANNEL_ID>` | Verweis auf den importierten Kanal, sonst `#name` |
+| `<@USER_ID>` [R6, verified] | `@DisplayName` as text |
+| `<@&ROLE_ID>` | `@RoleName` as text |
+| `<#CHANNEL_ID>` | link to the imported channel, otherwise `#name` |
 | `<:NAME:ID>`, `<a:NAME:ID>` | `:NAME:` |
-| `<t:TIMESTAMP:STYLE>` (Sekunden) | Zeit als ISO-8601-Text in UTC |
-| Embeds | Zitatblock mit Titel, Link und Beschreibung; Bilder in Embeds werden nicht geladen |
+| `<t:TIMESTAMP:STYLE>` (seconds) | time as ISO 8601 text in UTC |
+| Embeds | quote block with title, link and description; images in embeds are not loaded |
 | Sticker | `[Sticker: name]` |
-| Umfrage | Frage und Antworten als Liste mit Hinweis "Umfrage" |
-| weitergeleitete Nachricht (`message_snapshots`) | Zitatblock mit dem Inhalt des Schnappschusses |
-| Kleintext-Präfix `-# ` am Zeilenanfang | entfernt |
+| Poll | question and answers as a list with the note "Poll" |
+| Forwarded message (`message_snapshots`) | quote block with the content of the snapshot |
+| Small-text prefix `-# ` at the start of a line | removed |
 
-Die Länge einer Discord-Nachricht liegt weit unter `message.max_content_bytes`. Eine Nachricht wird
-nie geteilt; der Herkunftsschlüssel braucht keinen Teil-Index.
+The length of a Discord message is far below `message.max_content_bytes`. A message is
+never split; the origin key needs no part index.
 
-### 6.4 Keine Benachrichtigungen, kein Ungelesen-Berg
+### 6.4 No notifications, no unread backlog
 
-1. `messages.silent = true`, keine `mentions`, kein Push, kein `trigger_state`.
-2. Der Server schreibt je Stapel und Thread ein `thread.updated` statt eines `message.created` je
-   Nachricht (04, Abschnitt 15.8). Clients laden den Thread per REST,
-   wenn sie ihn anzeigen. Grund: ein Import kann ein Vielfaches des normalen Verkehrs schreiben;
-   Clients sollen nicht jede Nachricht einzeln empfangen.
-3. Der Server setzt `threads.unread_floor_seq` auf das Ende des Stapels; Importiertes zählt damit
-   für keinen Menschen mit Leserecht als ungelesen (03, `read_states`). Grund: Importiertes ist
-   alt; es soll nicht als ungelesen leuchten. Eine Zeile je Thread statt einer je Leser hält den
-   Stapel billig.
-4. Agenten-Adapter bekommen kein `agent.invocation` und kein `agent.followup` aus importierten
-   Nachrichten, weil `origin = import` nie auslöst.
+1. `messages.silent = true`, no `mentions`, no push, no `trigger_state`.
+2. The server writes one `thread.updated` per batch and thread instead of one `message.created` per
+   message (04, section 15.8). Clients load the thread through REST
+   when they display it. Reason: an import can write a multiple of the normal traffic;
+   clients should not receive every message individually.
+3. The server sets `threads.unread_floor_seq` to the end of the batch; imported content thus counts
+   as unread for no person with read permission (03, `read_states`). Reason: imported content is
+   old; it should not light up as unread. One row per thread instead of one per reader keeps the
+   batch cheap.
+4. Agent adapters get no `agent.invocation` and no `agent.followup` from imported
+   messages, because `origin = import` never triggers.
 
-### 6.5 Anhänge
+### 6.5 Attachments
 
-Für jeden Anhang:
+For every attachment:
 
-1. Ist `size` größer als `import.attachment_max_bytes`, wird nicht geladen.
-2. Sonst lädt das Werkzeug `url` mit `GET`, nur wenn Schema `https` und Host in
-   `import.discord.cdn_hosts`. Ohne Bot-Token, ohne Weiterleitungen, ohne Proxy aus der Umgebung,
-   mit Lese-Grenze `import.attachment_max_bytes` plus ein Byte, Zeitlimit `import.http_timeout`.
-3. CDN-URLs von Anhängen sind signiert und laufen ab (`ex`, `is`, `hm`) [R5, belegt]. Antwortet
-   der CDN mit `403` oder `404`, liest das Werkzeug die Nachricht einmal neu (frische URL) und
-   versucht es noch einmal.
-4. Fehlertexte zeigen nur Schema, Host und Pfad; Query und Fragment sind maskiert. Der Fehlerkörper
-   des CDN wird nie ausgegeben, weil er die signierte URL enthalten kann.
-5. Erfolg: Upload über die Import-Schnittstelle (Abschnitt 8) in den Ziel-Kanal; die Datei
-   durchläuft den normalen Virenscan ([12-dateien.md](12-dateien.md)); Autor ist der Autor der
-   Nachricht.
-6. Scheitert es oder ist der Anhang zu groß: Die Nachricht bekommt eine Zeile mit Dateiname,
-   Größe, Grund und Sprunglink `https://discord.com/channels/{guild_id}/{channel_id}/{message_id}`.
-   Der Sprunglink läuft nicht ab [abgeleitet: er enthält keine Signatur]. Der Bericht zählt den
-   Fall.
+1. If `size` is greater than `import.attachment_max_bytes`, it is not loaded.
+2. Otherwise the tool loads `url` with `GET`, only if the scheme is `https` and the host is in
+   `import.discord.cdn_hosts`. Without the bot token, without redirects, without a proxy from the
+   environment, with a read limit of `import.attachment_max_bytes` plus one byte, timeout `import.http_timeout`.
+3. CDN URLs of attachments are signed and expire (`ex`, `is`, `hm`) [R5, verified]. If
+   the CDN answers with `403` or `404`, the tool re-reads the message once (fresh URL) and
+   tries once more.
+4. Error texts show only scheme, host and path; query and fragment are masked. The error body
+   of the CDN is never output, because it can contain the signed URL.
+5. Success: upload through the import interface (section 8) into the target channel; the file
+   goes through the normal virus scan ([12-files.md](12-files.md)); the author is the author of
+   the message.
+6. If it fails or the attachment is too large: the message gets a line with file name,
+   size, reason and jump link `https://discord.com/channels/{guild_id}/{channel_id}/{message_id}`.
+   The jump link does not expire [derived: it contains no signature]. The report counts the
+   case.
 
-### 6.6 Pins, Tags, Reaktionen
+### 6.6 Pins, tags, reactions
 
-- Pins: Nachrichten mit `pinned = true` [R4, belegt] werden in Bothy angeheftet; `pinned_by` ist
-  der importierende Owner.
-- Forum-Tags: `available_tags` werden `forum_tags` des Kanals (Abgleich nach Name, ohne Doppel);
-  `applied_tags` werden `thread_tags`.
-- Reaktionen werden nicht übernommen. Discord liefert am Nachrichten-Objekt nur Zähler; wer
-  reagiert hat, kostet einen Aufruf je Emoji und Nachricht. Bothy speichert Reaktionen je Person.
-  Status-Zeichen von Agenten wären ohnehin keine Reaktion (Baseline Abschnitt 4). Der Bericht
-  zählt nicht übernommene Reaktionen.
+- Pins: messages with `pinned = true` [R4, verified] are pinned in Bothy; `pinned_by` is
+  the importing owner.
+- Forum tags: `available_tags` become `forum_tags` of the channel (matched by name, without duplicates);
+  `applied_tags` become `thread_tags`.
+- Reactions are not taken over. Discord delivers only counters on the message object; who
+  reacted costs one call per emoji and message. Bothy stores reactions per person.
+  Status markers of agents would not be a reaction anyway (Baseline section 4). The report
+  counts reactions that were not taken over.
 
-## 7. Idempotenz und Fortsetzen
+## 7. Idempotency and resuming
 
-### 7.1 Herkunftsschlüssel
+### 7.1 Origin key
 
-Eindeutig ist `(source_id, origin_key)` in `import_items`. Der Discord-Server ist durch die Quelle
-festgelegt und steht nicht im Schlüssel.
+`(source_id, origin_key)` in `import_items` is unique. The Discord server is fixed by the source
+and is not part of the key.
 
 | `item_kind` | `origin_key` |
 |---|---|
@@ -371,393 +371,393 @@ festgelegt und steht nicht im Schlüssel.
 | `thread` | `thread:<thread_id>` |
 | `message` | `message:<message_id>` |
 | `file` | `file:<attachment_id>` |
-| `user` | `user:<user_id>` (auch Bots und Webhooks) |
+| `user` | `user:<user_id>` (also bots and webhooks) |
 | `pin` | `pin:<message_id>` |
 
-Discord-IDs sind Snowflakes und in der HTTP-API immer Strings [R6, belegt]; das Werkzeug prüft,
-dass sie nur aus Ziffern bestehen.
+Discord IDs are snowflakes and always strings in the HTTP API [R6, verified]; the tool checks
+that they consist only of digits.
 
-### 7.2 `pending` und `posted`
+### 7.2 `pending` and `posted`
 
-Der Server führt jedes Objekt so aus ([03-datenmodell.md](03-datenmodell.md), `import_items`):
+The server executes every item like this ([03-data-model.md](03-data-model.md), `import_items`):
 
-1. Gibt es `(source_id, origin_key)` mit `posted`, antwortet er mit dem vorhandenen Ziel. Kein
-   Doppel, kein Ereignis.
-2. Sonst schreibt er `pending` und legt in derselben Transaktion das Ziel an und setzt `posted`.
-3. Dateien: `pending` reserviert die Datei-ID vor dem Hochladen der Bytes; ein abgebrochener Upload
-   mit demselben Schlüssel benutzt dieselbe ID erneut. `posted` folgt, wenn die Bytes vollständig
-   sind.
-4. `content_sha256` speichert den Hash des umgewandelten Inhalts. Ein späterer Lauf, der einen
-   anderen Hash sieht, zählt "an der Quelle geändert" im Bericht und ändert nichts.
+1. If `(source_id, origin_key)` exists with `posted`, it answers with the existing target. No
+   duplicate, no event.
+2. Otherwise it writes `pending` and, in the same transaction, creates the target and sets `posted`.
+3. Files: `pending` reserves the file ID before the bytes are uploaded; an aborted upload
+   with the same key reuses the same ID. `posted` follows when the bytes are
+   complete.
+4. `content_sha256` stores the hash of the converted content. A later run that sees a
+   different hash counts "changed at the source" in the report and changes nothing.
 
 ### 7.3 Cursor
 
-`import_sources.cursor` hält je Discord-Kanal und Thread die höchste vollständig übernommene
-Nachrichten-ID. Das Werkzeug rückt ihn erst nach einem erfolgreichen Stapel vor. Ein neuer Lauf
-beginnt hinter dem Cursor; Doppel am Rand verhindert 7.2.
+`import_sources.cursor` holds, per Discord channel and thread, the highest fully taken-over
+message ID. The tool advances it only after a successful batch. A new run
+starts behind the cursor; 7.2 prevents duplicates at the edge.
 
-### 7.4 Zwei Läufe gleichzeitig
+### 7.4 Two runs at the same time
 
-Zwei schreibende Läufe derselben Quelle sind korrekt (jedes Objekt höchstens einmal, je Thread in
-Reihenfolge, weil jeder Lauf einen Thread streng nacheinander abarbeitet und ein konkurrierender
-Schlüssel auf den Commit des anderen wartet), aber verschwenderisch. Das Werkzeug startet darum
-nicht, wenn die Quelle schon `running` ist, außer mit `--takeover`.
+Two writing runs of the same source are correct (every item at most once, in order per thread,
+because each run processes a thread strictly sequentially and a competing
+key waits for the commit of the other), but wasteful. The tool therefore does not start
+if the source is already `running`, except with `--takeover`.
 
-## 8. Import-Schnittstelle des Servers
+## 8. Import interface of the server
 
-Verbindlich ist `docs/api/openapi.yaml` (Tag `Import`); diese Tabelle gibt den Stand der Spec
-wieder. Alle Routen sind nur für Owner.
+Binding is `docs/api/openapi.yaml` (tag `Import`); this table reflects the state of the spec.
+All routes are for owners only.
 
-| Operation | Route | Aktion | Step-up |
+| Operation | Route | Action | Step-up |
 |---|---|---|---|
-| Quelle anlegen (`kind = discord`, Zuordnung) | `POST /api/v1/imports` | `import.manage` | ja |
-| Quelle starten oder fortsetzen, pausieren, abbrechen, abschließen | `POST /api/v1/imports/{import_id}/start`, `/pause`, `/cancel`, `/complete` | `import.manage` | ja |
-| Eigentumsliste je Kanal ändern (`lead`, setzt den Schreibschutz mit) | `PUT /api/v1/imports/{import_id}/leads` | `import.manage` | ja |
-| Quelle, Fortschritt, Objekte nach Zustand lesen | `GET /api/v1/imports`, `/imports/{import_id}`, `/imports/{import_id}/items` | `import.read` | nein |
-| Stapel von Objekten mit Herkunftsschlüsseln schreiben (Abschnitt 7.2) | `POST /api/v1/imports/{import_id}/batches` | `import.apply` | nein |
-| Datei-Objekt mit Herkunftsschlüssel anlegen; die Bytes folgen über die Upload-Session ([12-dateien.md](12-dateien.md)) | `POST /api/v1/imports/{import_id}/files` | `import.apply` | nein |
-| Cursor und Zähler fortschreiben | `PUT /api/v1/imports/{import_id}/cursor` | `import.apply` | nein |
+| Create source (`kind = discord`, mapping) | `POST /api/v1/imports` | `import.manage` | yes |
+| Start or resume, pause, cancel, complete source | `POST /api/v1/imports/{import_id}/start`, `/pause`, `/cancel`, `/complete` | `import.manage` | yes |
+| Change ownership list per channel (`lead`, also sets the read-only flag) | `PUT /api/v1/imports/{import_id}/leads` | `import.manage` | yes |
+| Read source, progress, items by state | `GET /api/v1/imports`, `/imports/{import_id}`, `/imports/{import_id}/items` | `import.read` | no |
+| Write a batch of items with origin keys (section 7.2) | `POST /api/v1/imports/{import_id}/batches` | `import.apply` | no |
+| Create a file item with origin key; the bytes follow through the upload session ([12-files.md](12-files.md)) | `POST /api/v1/imports/{import_id}/files` | `import.apply` | no |
+| Update cursor and counters | `PUT /api/v1/imports/{import_id}/cursor` | `import.apply` | no |
 
-Einen Trockenlauf gibt es auf dem Server nicht: das Werkzeug liest nur (Abschnitt 10.2) und
-legt dabei keine Quelle an.
+There is no dry run on the server: the tool only reads (section 10.2) and
+creates no source while doing so.
 
-`import.apply` verlangt: Prinzipal ist aktiver Owner, Quelle im Zustand `running`, jedes Ziel liegt
-in einem Kanal dieser Quelle. Kein Step-up je Stapel, weil der Start Step-up verlangt und ein
-Lese-Spiegel tagelang läuft. Ein Stapel betrifft genau einen Thread und hat höchstens
-`import.batch_max_items` Objekte; er ist eine Transaktion. Strukturobjekte (Bereiche, Kanäle,
-Forum-Tags, Personen) kommen in eigenen Stapeln ohne Thread. Jeder Stapel schreibt `import.progress`
-und `thread.updated` (Abschnitt 6.4). Start, Abbruch und Abschluss stehen im Audit-Log.
+`import.apply` requires: the principal is an active owner, the source is in state `running`, every
+target lies in a channel of this source. No step-up per batch, because the start requires step-up
+and a read mirror runs for days. A batch concerns exactly one thread and has at most
+`import.batch_max_items` items; it is one transaction. Structure items (spaces, channels,
+forum tags, people) come in separate batches without a thread. Every batch writes `import.progress`
+and `thread.updated` (section 6.4). Start, cancellation and completion are recorded in the audit log.
 
-Wie die Kommandozeile sich als Owner anmeldet und Step-up leistet (Gerät `platform = cli`), legt
-[08-identitaet.md](08-identitaet.md) fest.
+How the command line logs in as owner and performs step-up (device `platform = cli`) is defined in
+[08-identity.md](08-identity.md).
 
-## 9. Bindung an frühere Agenten-Sitzungen
+## 9. Binding to earlier agent sessions
 
-Ein importierter Thread kann die Sitzung fortsetzen, die er in der alten Umgebung hatte
-(Beispiel: Sitzungs-ID von Hermes Agent oder Claude Code). Der Ablauf folgt dem Verhalten eines
-`/resume`: Referenz übernehmen, beim ersten Schreiben binden, genau einmal, mit Compare-and-swap,
-im Fehlerfall ohne Blockade.
+An imported thread can continue the session that it had in the old environment
+(example: session ID of Hermes Agent or Claude Code). The flow follows the behavior of a
+`/resume`: take over the reference, bind on the first write, exactly once, with compare-and-swap,
+without blocking in the error case.
 
-1. **Referenz übernehmen.** `--sessions <datei>` liefert JSON-Zeilen
+1. **Take over the reference.** `--sessions <file>` provides JSON lines
    `{"discord_thread": "<thread_id>", "agent": "<handle>", "external_session_ref": "<ref>"}`.
-   Der Import legt je Zeile eine `agent_sessions`-Zeile an: `is_current = false`,
-   `started = true`, `ended_at` = Importzeit, `end_reason = import`. Weicht `agent` vom
-   `operator_agent_id` des Threads ab, entfällt die Zeile mit Zählung im Bericht.
-2. **Binden beim ersten Auslösen.** Löst ein Mensch im Thread zum ersten Mal einen Agenten aus und
-   hatte der Thread seit dem Import keine aktuelle Sitzung, legt der Server in der Transaktion des
-   Laufs eine aktuelle Zeile mit derselben `external_session_ref` an. Audit `agent_session.bind`,
-   Ereignis `agent_session.changed`.
-3. **Compare-and-swap.** Der Teilindex "eine aktuelle Sitzung je Thread" lässt nur eine von zwei
-   gleichzeitigen Auslösungen binden; die andere sieht die gebundene Zeile. Der Teilindex "eine
-   externe Sitzung gehört höchstens einem Thread" verhindert, dass eine alte Sitzung an zwei
-   Threads hängt; dann gilt Schritt 5.
-4. **Fortsetzen im Adapter.** Die Aufruf-Nachricht trägt die Sitzung mit `started = true`; der
-   Adapter setzt fort statt neu zu beginnen. Er darf die Referenz auflösen (Beispiel: Hermes führt
-   eine Kompressionskette zum lebenden Ende) und meldet die gültige Referenz mit
-   `agent_session.report` unter Versionsprüfung.
-5. **Fail open.** Kennt die Laufzeit die alte Sitzung nicht mehr oder scheitert die Bindung,
-   startet der Adapter eine neue Sitzung und meldet das. Der Server beendet die gebundene Zeile
-   (`end_reason = rebind`), legt die neue an und schreibt genau einmal eine Systemnachricht in den
-   Thread: Die frühere Sitzung gibt es nicht mehr; der Agent beginnt ohne alten Verlauf. Die
-   Nachricht des Menschen geht nie verloren.
-6. **Nie zweimal.** Eine Import-Zeile wird nur gebunden, solange der Thread seit dem Import keine
-   aktuelle Sitzung hatte. Ein späteres Zurücksetzen (`agent_session.reset`) bindet nie erneut.
-7. **Kosten.** Laufzeiten, die kumulierte Sitzungskosten melden, brauchen den Stand vor der
-   Bindung als Sockel, sonst bucht der erste Lauf die alten Kosten noch einmal. Die Datei darf
-   dafür `cost_baseline_micros` und `currency` je Zeile tragen (03, `agent_sessions`).
+   The import creates one `agent_sessions` row per line: `is_current = false`,
+   `started = true`, `ended_at` = import time, `end_reason = import`. If `agent` differs from the
+   `operator_agent_id` of the thread, the row is dropped and counted in the report.
+2. **Bind on the first trigger.** When a person triggers an agent in the thread for the first time
+   and the thread has had no current session since the import, the server creates, in the
+   transaction of the run, a current row with the same `external_session_ref`. Audit
+   `agent_session.bind`, event `agent_session.changed`.
+3. **Compare-and-swap.** The partial index "one current session per thread" lets only one of two
+   simultaneous triggers bind; the other sees the bound row. The partial index "an
+   external session belongs to at most one thread" prevents an old session from hanging on two
+   threads; then step 5 applies.
+4. **Resume in the adapter.** The invocation message carries the session with `started = true`; the
+   adapter resumes instead of starting fresh. It may resolve the reference (example: Hermes follows
+   a compression chain to the live end) and reports the valid reference with
+   `agent_session.report` under a version check.
+5. **Fail open.** If the runtime no longer knows the old session or the binding fails,
+   the adapter starts a new session and reports this. The server ends the bound row
+   (`end_reason = rebind`), creates the new one and writes exactly one system message into the
+   thread: the earlier session no longer exists; the agent starts without the old history. The
+   person's message is never lost.
+6. **Never twice.** An import row is bound only as long as the thread has had no
+   current session since the import. A later reset (`agent_session.reset`) never binds again.
+7. **Cost.** Runtimes that report cumulative session costs need the state before the
+   binding as a baseline, otherwise the first run books the old costs again. For this, the file may
+   carry `cost_baseline_micros` and `currency` per line (03, `agent_sessions`).
 
-Wer binden darf, regelt `agent.invoke`: Die Bindung entsteht nur aus einer erlaubten Auslösung
-(Stufe `trigger`, I2).
+Who may bind is governed by `agent.invoke`: the binding arises only from a permitted trigger
+(level `trigger`, I2).
 
-## 10. Werkzeug
+## 10. Tool
 
-### 10.1 Befehle
+### 10.1 Commands
 
-| Befehl | Wirkung |
+| Command | Effect |
 |---|---|
-| `bothy import discord --guild <id> --map <datei>` | Trockenlauf: nur `GET` gegen Discord und Bothy, schreibt nichts, auch keine lokale Datei; druckt den Prüfbericht |
-| `… --apply` | legt die Quelle an oder setzt sie fort und importiert |
-| `… --apply --follow` | Lese-Spiegel als Schleife (Abschnitt 12); ohne `--apply` eine lesende Runde je Intervall mit "würde kopieren" |
-| `… --apply --once` | genau eine Runde des Lese-Spiegels; für zeitgesteuerte Aufrufe |
-| `bothy import discord init-map --guild <id> --out <datei>` | schreibt ein Gerüst der Zuordnungsdatei (nur diese Datei) |
-| `bothy import discord switch --channel <id>` | Bothy-Seite des Umschaltens (Abschnitt 13.3), druckt die Discord-Schritte |
-| `bothy import discord revert --channel <id>` | Bothy-Seite des Rückwegs (Abschnitt 13.4), druckt die Discord-Schritte |
-| `bothy import discord status` | Quelle, Zustand, Eigentumsliste, Zähler |
+| `bothy import discord --guild <id> --map <file>` | dry run: only `GET` against Discord and Bothy, writes nothing, not even a local file; prints the check report |
+| `… --apply` | creates or resumes the source and imports |
+| `… --apply --follow` | read mirror as a loop (section 12); without `--apply` one reading round per interval with "would copy" |
+| `… --apply --once` | exactly one round of the read mirror; for scheduled calls |
+| `bothy import discord init-map --guild <id> --out <file>` | writes a skeleton of the mapping file (only this file) |
+| `bothy import discord switch --channel <id>` | Bothy side of the switch-over (section 13.3), prints the Discord steps |
+| `bothy import discord revert --channel <id>` | Bothy side of reverting (section 13.4), prints the Discord steps |
+| `bothy import discord status` | source, state, ownership list, counters |
 
-Weitere Optionen: `--channel <id>` (wiederholbar) grenzt ein; `--only-thread <id>` (wiederholbar)
-wählt genau diese Threads; `--sessions <datei>` (Abschnitt 9); `--report text|json`;
-`--takeover` (7.4); `--discord-token-file <pfad>`; `--config <datei>` (Werte aus Abschnitt 19).
+Further options: `--channel <id>` (repeatable) narrows the scope; `--only-thread <id>` (repeatable)
+selects exactly these threads; `--sessions <file>` (section 9); `--report text|json`;
+`--takeover` (7.4); `--discord-token-file <path>`; `--config <file>` (values from section 19).
 
-### 10.2 Regeln
+### 10.2 Rules
 
-1. Trockenlauf ist der Standard. Ein vergessener Schalter liest nur.
-2. Eine unbekannte oder nicht passende ID in `--channel` oder `--only-thread` beendet den Lauf vor
-   jedem Schreiben; auch gültige IDs desselben Aufrufs werden dann nicht verarbeitet.
-3. Widersprüchliche Optionen (`--follow` mit `--once`, `--only-thread` mit `--follow`) enden mit
-   Exit-Code `2` ohne Aufruf an Discord oder Bothy.
-4. Ausgabe enthält nie Nachrichteninhalte, Dateinamen von Anhängen, Tokens oder signierte URLs.
+1. Dry run is the default. A forgotten switch only reads.
+2. An unknown or non-matching ID in `--channel` or `--only-thread` ends the run before
+   any write; valid IDs of the same call are then not processed either.
+3. Contradictory options (`--follow` with `--once`, `--only-thread` with `--follow`) end with
+   exit code `2` without a call to Discord or Bothy.
+4. Output never contains message content, file names of attachments, tokens or signed URLs.
 
-### 10.3 Exit-Codes
+### 10.3 Exit codes
 
-| Code | Bedeutung |
+| Code | Meaning |
 |---|---|
-| `0` | fertig, oder Trockenlauf ohne Fehler |
-| `1` | Lauf abgebrochen (Netz, Rate-Limit über der Grenze, Serverfehler); Zustand bleibt, neuer Lauf setzt fort |
-| `2` | Aufruf, Zuordnungsdatei oder Vorabprüfung fehlerhaft; nichts geschrieben |
-| `3` | Quelle läuft schon (ohne `--takeover`); bei `--once` normaler Fall für zeitgesteuerte Aufrufe |
+| `0` | done, or dry run without errors |
+| `1` | run aborted (network, rate limit above the limit, server error); the state remains, a new run resumes |
+| `2` | invocation, mapping file or preflight check faulty; nothing written |
+| `3` | source already running (without `--takeover`); with `--once` the normal case for scheduled calls |
 
-## 11. Prüfbericht
+## 11. Check report
 
-Je Kanal eine Zeile, am Ende eine Summe. Keine Inhalte, keine Namen von Personen.
+One row per channel, a total at the end. No content, no names of people.
 
-| Spalte | Bedeutung |
+| Column | Meaning |
 |---|---|
-| Kanal | Discord-Name und Ziel in Bothy |
-| Threads | offen, erledigt |
-| Nachrichten | übernommen, schon vorhanden, übersprungen nach Grund (Typ, leer) |
-| Anhänge | übernommen, zu groß, fehlgeschlagen |
-| Personen | zugeordnet, Platzhalter |
-| Sitzungen | Referenzen übernommen, verworfen (Agent passt nicht) |
-| Pins, Tags | übernommen |
-| Reaktionen | nicht übernommen (Zahl) |
-| Hinweise | `403`, Discord-Rechte eingeschränkt, an der Quelle geändert, nach dem Umschalten in Discord geschrieben |
+| Channel | Discord name and target in Bothy |
+| Threads | open, done |
+| Messages | taken over, already present, skipped by reason (type, empty) |
+| Attachments | taken over, too large, failed |
+| People | mapped, placeholders |
+| Sessions | references taken over, discarded (agent does not match) |
+| Pins, tags | taken over |
+| Reactions | not taken over (number) |
+| Notes | `403`, Discord permissions restricted, changed at the source, written in Discord after the switch-over |
 
-Der Bericht steht zusätzlich in `import_sources.stats` und ist mit `import.read` abrufbar.
+The report is also stored in `import_sources.stats` and can be retrieved with `import.read`.
 
-## 12. Lese-Spiegel (Parallelbetrieb)
+## 12. Read mirror (parallel operation)
 
-### 12.1 Eigentumsliste
+### 12.1 Ownership list
 
-Jeder zugeordnete Kanal hat in der Quelle genau einen führenden Ort, `lead`:
+Every mapped channel has exactly one leading place in the source, `lead`:
 
 | `lead` | Discord | Bothy |
 |---|---|---|
-| `discord` | Menschen und Agenten arbeiten dort | Kanal schreibgeschützt; der Spiegel kopiert neue Nachrichten |
-| `bothy` | schreibgeschützt (Schritt des Owners in Discord), Agent dort abgemeldet | Kanal beschreibbar, Bediener gesetzt; kein Spiegel |
+| `discord` | people and agents work there | channel read-only; the mirror copies new messages |
+| `bothy` | read-only (step of the owner in Discord), agent removed there | channel writable, operator set; no mirror |
 
-Schreibgeschützt in Bothy heißt: Kein Prinzipal, auch kein Owner, darf im Kanal Nachrichten,
-Threads, Reaktionen oder Interaktionen anlegen; nur `import.apply` schreibt (`channels.read_only`,
-03; 05 Regel 1.8). Den Schalter setzt `import.manage` mit der Eigentumsliste; von Hand setzt ihn
-`channel.read_only.set`. Damit kann im Spiegel kein Agent ausgelöst werden, und ein
-Kanal hat nie zwei führende Orte.
+Read-only in Bothy means: no principal, not even an owner, may create messages,
+threads, reactions or interactions in the channel; only `import.apply` writes (`channels.read_only`,
+03; 05 rule 1.8). The flag is set by `import.manage` with the ownership list; by hand it is set by
+`channel.read_only.set`. As a result, no agent can be triggered in the mirror, and a
+channel never has two leading places.
 
-### 12.2 Runde
+### 12.2 Round
 
-Je `import.follow.poll_interval`:
+Every `import.follow.poll_interval`:
 
-1. `GET /guilds/{guild.id}/channels` (enthält `last_message_id`) und
+1. `GET /guilds/{guild.id}/channels` (contains `last_message_id`) and
    `GET /guilds/{guild.id}/threads/active`.
-2. Nur Kanäle mit `lead = discord` und neuerer `last_message_id` als der Cursor werden gelesen.
-3. Neue Threads werden Threads; umbenannte Threads ändern den Titel nur bei `title_source = auto`;
-   archivierte werden `closed`, wieder aktive `open` (Regel aus 5.1.1; fehlt ein Thread in der
-   aktiven Liste, bestätigt `GET /channels/{channel.id}` den Zustand).
-4. Kanäle mit `lead = bothy`, in denen Discord trotzdem neue Nachrichten zeigt, erscheinen als
-   Warnung im Bericht. Kopiert wird nichts.
-5. Fehler einer Runde (Netz, `5xx`, Rate-Limit über der Grenze) beenden nicht den Spiegel; die
-   nächste Runde wartet mit Backoff bis `import.follow.max_backoff`. Fehler eines Threads halten
-   andere Threads nicht auf.
+2. Only channels with `lead = discord` and a `last_message_id` newer than the cursor are read.
+3. New threads become threads; renamed threads change the title only with `title_source = auto`;
+   archived ones become `closed`, active-again ones `open` (rule from 5.1.1; if a thread is missing
+   from the active list, `GET /channels/{channel.id}` confirms the state).
+4. Channels with `lead = bothy` in which Discord nevertheless shows new messages appear as a
+   warning in the report. Nothing is copied.
+5. Errors of a round (network, `5xx`, rate limit above the limit) do not end the mirror; the
+   next round waits with backoff up to `import.follow.max_backoff`. Errors of one thread do not hold
+   up other threads.
 
-### 12.3 Ruhe-Regel
+### 12.3 Settle rule
 
-Agenten in Discord bearbeiten ihre Antwort, während sie arbeiten. Eine halbfertige Ausgabe darf
-nicht kopiert werden, weil spätere Bearbeitungen nicht nachgeführt werden (12.4). Je Thread gilt
-streng der Reihe nach:
+Agents in Discord edit their answer while they work. A half-finished output must
+not be copied, because later edits are not kept in sync (12.4). Per thread, the following applies
+strictly in order:
 
-1. Eine Nachricht ist **beschäftigt**, wenn sie (oder bei Typ 21 ihre Ausgangsnachricht) eine
-   Reaktion aus `import.follow.busy_reactions` mit Zähler größer null trägt.
-2. Eine Nachricht ist **unruhig**, wenn die jüngere von `timestamp` und `edited_timestamp` weniger
-   als `import.follow.settle_after` zurückliegt.
-3. Kopiert wird der Anfang der neuen Nachrichten bis vor die erste beschäftigte oder unruhige
-   Nachricht. Nicht kopierte Typen halten nicht an.
-4. Weil Agenten ihre Markierung manchmal erst nach dem Kopieren setzen, prüft die Runde zusätzlich
-   die `import.follow.busy_lookback` Nachrichten vor der ersten neuen. Ist eine davon beschäftigt,
-   wartet der ganze Thread.
+1. A message is **busy** if it (or, for type 21, its starter message) carries a
+   reaction from `import.follow.busy_reactions` with a counter greater than zero.
+2. A message is **unsettled** if the more recent of `timestamp` and `edited_timestamp` lies less
+   than `import.follow.settle_after` in the past.
+3. What is copied is the beginning of the new messages up to before the first busy or unsettled
+   message. Types that are not copied do not stop it.
+4. Because agents sometimes set their marker only after the copy, the round additionally checks
+   the `import.follow.busy_lookback` messages before the first new one. If one of them is busy,
+   the whole thread waits.
 
-### 12.4 Was nicht nachgeführt wird
+### 12.4 What is not kept in sync
 
-Bearbeitungen und Löschungen in Discord nach dem Kopieren. Grund: Das hieße, alte Nachrichten
-regelmäßig neu zu lesen; die Ruhe-Regel macht den Fall selten. Der Bericht eines späteren
-Volllaufs zählt "an der Quelle geändert" (7.2).
+Edits and deletions in Discord after copying. Reason: that would mean re-reading old messages
+regularly; the settle rule makes the case rare. The report of a later
+full run counts "changed at the source" (7.2).
 
-## 13. Migrationsablauf je Kanal
+## 13. Migration flow per channel
 
-### 13.1 Zustände
+### 13.1 States
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Zugeordnet
-    Zugeordnet --> Spiegel: Import angewendet, lead discord
-    Spiegel --> BothyFuehrt: switch
-    BothyFuehrt --> Spiegel: revert
-    BothyFuehrt --> Abgeschlossen: alle Kanäle umgeschaltet, Quelle abgeschlossen
-    Abgeschlossen --> [*]
-    note right of Spiegel
-        Discord führt.
-        Bothy schreibgeschützt, kein Bediener.
+    [*] --> Mapped
+    Mapped --> Mirror: import applied, lead discord
+    Mirror --> BothyLeads: switch
+    BothyLeads --> Mirror: revert
+    BothyLeads --> Completed: all channels switched over, source completed
+    Completed --> [*]
+    note right of Mirror
+        Discord leads.
+        Bothy read-only, no operator.
     end note
-    note right of BothyFuehrt
-        Bothy führt, Bediener gesetzt.
-        Discord schreibgeschützt, Agent dort abgemeldet.
+    note right of BothyLeads
+        Bothy leads, operator set.
+        Discord read-only, agent removed there.
     end note
 ```
 
-### 13.2 Pilot und Parallelbetrieb
+### 13.2 Pilot and parallel operation
 
-1. Trockenlauf über den ganzen Server; Bericht prüfen; Zuordnungsdatei korrigieren, bis es keine
-   Abbrüche gibt.
-2. Pilot: wenige Kanäle mit `--channel`, Import angewendet, Lese-Spiegel an.
-3. Parallelbetrieb: Discord führt in allen Kanälen. Bothy zeigt den Verlauf schreibgeschützt.
-   Prüfen: Zähler im Bericht, Stichproben gegen Discord, Anhänge, Sitzungs-Referenzen.
+1. Dry run over the whole server; check the report; correct the mapping file until there are no
+   aborts.
+2. Pilot: a few channels with `--channel`, import applied, read mirror on.
+3. Parallel operation: Discord leads in all channels. Bothy shows the history read-only.
+   Check: counters in the report, spot checks against Discord, attachments, session references.
 
-### 13.3 Umschalten eines Kanals
+### 13.3 Switching over a channel
 
-Reihenfolge, damit nie zwei Orte gleichzeitig führen:
+Order, so that two places never lead at the same time:
 
-1. Discord, Owner: Kanal schreibgeschützt setzen; Agent in der Discord-Konfiguration seiner
-   Laufzeit von diesem Kanal abmelden.
-2. Werkzeug: eine letzte Spiegel-Runde für den Kanal; warten, bis die Ruhe-Regel nichts mehr
-   zurückhält.
-3. Bothy, Owner: `lead = bothy` (`import.manage`); Schreibschutz aufheben; Bediener setzen
-   (`channel.operator.set`, Step-up, I1). Der Bediener muss `planned_operator` sein, sonst haben
-   die importierten Threads einen anderen Agenten als der Kanal.
-4. Probe: eine Nachricht in einem importierten Thread löst den Agenten aus; die Sitzung bindet
-   (Abschnitt 9); die Antwort erscheint nur in Bothy.
+1. Discord, owner: set the channel read-only; remove the agent from this channel in the Discord
+   configuration of its runtime.
+2. Tool: one last mirror round for the channel; wait until the settle rule holds nothing
+   back any more.
+3. Bothy, owner: `lead = bothy` (`import.manage`); lift read-only; set the operator
+   (`channel.operator.set`, step-up, I1). The operator must be `planned_operator`, otherwise
+   the imported threads have a different agent than the channel.
+4. Probe: a message in an imported thread triggers the agent; the session binds
+   (section 9); the answer appears only in Bothy.
 
-`switch` führt die Schritte 2 und 3 in dieser Reihenfolge aus und bricht vor Schritt 3 ab, wenn
-nach der letzten Runde noch beschäftigte oder unruhige Nachrichten im Kanal stehen.
+`switch` performs steps 2 and 3 in this order and aborts before step 3 if
+busy or unsettled messages are still in the channel after the last round.
 
-### 13.4 Rückweg eines Kanals
+### 13.4 Reverting a channel
 
-1. Bothy, Owner: Kanal schreibgeschützt; Bediener entfernen; `lead = discord`. Laufende Läufe im
-   Kanal werden abgebrochen.
-2. Discord, Owner: Schreibschutz aufheben; Agent dort wieder anmelden.
-3. Der Spiegel setzt am Cursor fort.
+1. Bothy, owner: channel read-only; remove the operator; `lead = discord`. Active runs in the
+   channel are cancelled.
+2. Discord, owner: lift read-only; add the agent there again.
+3. The mirror resumes at the cursor.
 
-Nachrichten, die während `lead = bothy` in Bothy entstanden sind, gehen nicht nach Discord; das
-Werkzeug schreibt Discord nie. `revert` druckt ihre Zahl je Thread, damit der Owner sie bewusst
-überträgt oder verwirft.
+Messages that were created in Bothy while `lead = bothy` do not go to Discord; the
+tool never writes to Discord. `revert` prints their number per thread, so that the owner deliberately
+transfers or discards them.
 
-### 13.5 Abschluss
+### 13.5 Completion
 
-Wenn alle Kanäle `lead = bothy` haben: Spiegel beenden; Quelle `completed` (`import.manage`). Die
-Zuordnung `import_items` bleibt, bis der Owner die Aufbewahrungsklasse `import` löschen lässt
-([20-datenschutz.md](20-datenschutz.md)). Danach ist ein erneuter Import nicht mehr idempotent;
-das Werkzeug warnt vor diesem Schritt.
+When all channels have `lead = bothy`: end the mirror; source `completed` (`import.manage`). The
+mapping `import_items` remains until the owner has the retention class `import` deleted
+([20-privacy.md](20-privacy.md)). After that a repeated import is no longer idempotent;
+the tool warns before this step.
 
-## 14. Sicherheit und Datenschutz
+## 14. Security and privacy
 
-| Thema | Regel |
+| Topic | Rule |
 |---|---|
-| Discord-Token | nur im Werkzeug, aus Umgebung oder Datei; nie an Bothy, nie an CDN-Hosts, nie in Ausgabe oder Log |
-| Server-seitiges Laden | keines; nur das Werkzeug lädt, nur `https`, nur Hosts aus `import.discord.cdn_hosts`, ohne Weiterleitung |
-| Rechte | Import und Spiegel nur durch Owner; Start mit Step-up; neue Kanäle ohne Freigaben |
-| Auslösen | `origin = import` löst nie aus; Kanäle im Spiegel sind schreibgeschützt |
-| Platzhalter | personenbezogene Daten fremder Discord-Nutzer; Klasse `account`; Löschung über DSGVO-Auftrag |
-| Herkunft | `import_items` (Klasse `import`) enthält Discord-IDs; löschbar nach Abschluss |
-| Audit | Start, Pause, Abbruch, Abschluss, Eigentumsliste, Bindungen |
-| Telemetrie | Zähler und Dauern des Werkzeugs, keine Inhalte, keine Discord-IDs |
+| Discord token | only in the tool, from the environment or a file; never to Bothy, never to CDN hosts, never in output or log |
+| Server-side loading | none; only the tool loads, only `https`, only hosts from `import.discord.cdn_hosts`, without redirects |
+| Permissions | import and mirror only by owners; start with step-up; new channels without grants |
+| Triggering | `origin = import` never triggers; channels in the mirror are read-only |
+| Placeholders | personal data of third-party Discord users; class `account`; deletion through a privacy request |
+| Origin | `import_items` (class `import`) contains Discord IDs; deletable after completion |
+| Audit | start, pause, cancellation, completion, ownership list, bindings |
+| Telemetry | counters and durations of the tool, no content, no Discord IDs |
 
-## 15. Später: Zulip-Import
+## 15. Later: Zulip import
 
-Die Import-Schnittstelle ist quellneutral. Ein Zulip-Import wäre ein weiterer Befehl
-`bothy import zulip` mit eigener Zuordnung (Kanal zu Kanal, Topic zu Thread) und braucht
-`import_sources.kind = zulip` (additive Migration). Nicht in diesem Umfang.
+The import interface is source-neutral. A Zulip import would be a further command
+`bothy import zulip` with its own mapping (channel to channel, topic to thread) and needs
+`import_sources.kind = zulip` (additive migration). Not in this scope.
 
-## 16. Tests, die dieses Kapitel halten
+## 16. Tests that hold this chapter
 
-| Test | Beweis |
+| Test | Proof |
 |---|---|
-| Trockenlauf nur `GET` | Fake-Discord und Fake-Bothy zählen Methoden: nur `GET`; keine Datei im Arbeits- und Temp-Ordner |
-| Discord-Client ohne Schreibmethode | statische Prüfung: der Client exportiert keine Methode mit anderem Verb als `GET` |
-| Kein Doppel nach Absturz | Abbruch zwischen Stapel und Cursor; neuer Lauf: jedes Objekt genau einmal, Reihenfolge je Thread gleich Discord |
-| Gespeichert, dann Fehler | Fake-Bothy speichert einen Stapel und antwortet `502`; Wiederholung liefert dasselbe Ziel |
-| Import löst nie aus | importierte Nachricht in einem Kanal mit Bediener erzeugt keinen Lauf, kein `agent.invocation` |
-| Keine Benachrichtigung | kein Push, keine `mentions`, `read_states` auf Stapel-Ende |
-| CDN-Grenzen | fremder Host, `http`, Weiterleitung und zu große Antwort werden abgelehnt; Token nie an CDN |
-| Kein Geheimnis in Ausgabe | Fake-Antworten spiegeln Token und signierte Query; Ausgabe, Bericht und Log enthalten keines davon |
-| Archiv-Regel | nur `archived = true` und nicht aktiv wird `closed`; Zweifel bleibt offen |
-| Ruhe-Regel | beschäftigte oder unruhige Nachricht hält den Thread an; Rückblick-Markierung hält an |
-| Schreibschutz im Spiegel | `message.create` eines Owners im Spiegel-Kanal wird abgelehnt; `import.apply` gelingt |
-| Bindung einmal | zwei gleichzeitige erste Auslösungen binden genau einmal; fehlende alte Sitzung: neue Sitzung, genau eine Systemnachricht |
-| Rate-Limit | `X-RateLimit-Remaining: 0` wartet; Wartezeit über der Grenze bricht mit Exit `1` ab, Zustand bleibt |
-| Intent-Probe | Kanal mit nur leeren fremden Nachrichten bricht mit Exit `2` ab |
-| Ungültige Auswahl | unbekannte ID in `--only-thread` bricht vor jedem Schreiben ab |
+| Dry run only `GET` | fake Discord and fake Bothy count methods: only `GET`; no file in the working and temp folders |
+| Discord client without a write method | static check: the client exports no method with a verb other than `GET` |
+| No duplicate after a crash | abort between batch and cursor; new run: every item exactly once, order per thread equal to Discord |
+| Stored, then error | fake Bothy stores a batch and answers `502`; the retry returns the same target |
+| Import never triggers | an imported message in a channel with an operator creates no run, no `agent.invocation` |
+| No notification | no push, no `mentions`, `read_states` at the batch end |
+| CDN limits | foreign host, `http`, redirect and an oversized response are rejected; token never to the CDN |
+| No secret in output | fake responses echo the token and a signed query; output, report and log contain none of them |
+| Archive rule | only `archived = true` and not active becomes `closed`; doubt stays open |
+| Settle rule | a busy or unsettled message stops the thread; a lookback marker stops it |
+| Read-only in the mirror | `message.create` of an owner in the mirror channel is rejected; `import.apply` succeeds |
+| Binding once | two simultaneous first triggers bind exactly once; missing old session: new session, exactly one system message |
+| Rate limit | `X-RateLimit-Remaining: 0` waits; a wait time above the limit aborts with exit `1`, the state remains |
+| Intent probe | a channel with only empty messages by other authors aborts with exit `2` |
+| Invalid selection | an unknown ID in `--only-thread` aborts before any write |
 
-## 17. Entscheidungen dieses Kapitels
+## 17. Decisions of this chapter
 
-| Nr | Entscheidung | Grund |
+| No. | Decision | Reason |
 |---|---|---|
-| R-IM-01 | Import als eigener Prozess über die öffentliche API, nicht als Server-Job. | Kein server-seitiges Laden fremder URLs, Discord-Token nie im Server, B6 (ADR 0043). |
-| R-IM-02 | Trockenlauf ist Standard und schreibt nirgends. | Ein vergessener Schalter darf nichts anlegen; der Beweis ist ein einfacher Test. |
-| R-IM-03 | Eigenes Discord-Bot-Konto nur mit Leserechten. | Rate-Limits je Bot; produktive Agenten werden nicht gebremst; geringste Rechte. |
-| R-IM-04 | Idempotenz über `import_items (source_id, origin_key)`, nicht über Inhaltsvergleich. | Exakt statt heuristisch; ein Absturz an jeder Stelle hinterlässt kein Doppel. |
-| R-IM-05 | Alle importierten Nachrichten `origin = import`, `silent`, ohne `mentions`. | Nie auslösen, nie benachrichtigen. |
-| R-IM-06 | Unbekannte Autoren werden gesperrte Platzhalter-Menschen. | Jede Nachricht braucht einen Prinzipal; ein Platzhalter kann nichts tun. |
-| R-IM-07 | Kanäle im Spiegel sind schreibgeschützt, auch für Owner. | Ein Kanal hat nie zwei führende Orte; kein Agent wird doppelt ausgelöst. |
-| R-IM-08 | Importierte Threads tragen den geplanten Bediener. | Sonst bleiben sie nach dem Umschalten wegen R-DM-12 ohne Agent. |
-| R-IM-09 | Reaktionen und spätere Bearbeitungen werden nicht übernommen. | Kosten je Emoji und Nachricht; Ruhe-Regel macht späte Bearbeitungen selten. |
-| R-IM-10 | Bindung früherer Sitzungen beim ersten Auslösen, genau einmal, fail open. | Entspricht `/resume`; eine Störung darf den Menschen nie stumm schalten. |
-| R-IM-11 | Archiviert nur bei `archived = true` und nicht in der aktiven Liste. | Ein falsch offener Thread schadet nicht, ein falsch geschlossener versteckt Arbeit. |
-| R-IM-12 | Der Rückweg kopiert nichts nach Discord. | Das Werkzeug schreibt Discord nie; der Owner entscheidet über die wenigen Nachrichten. |
+| R-IM-01 | Import as a separate process through the public API, not as a server job. | No server-side loading of external URLs, Discord token never in the server, B6 (ADR 0043). |
+| R-IM-02 | Dry run is the default and writes nowhere. | A forgotten switch must not create anything; the proof is a simple test. |
+| R-IM-03 | Separate Discord bot account with read permissions only. | Rate limits per bot; productive agents are not slowed down; least privilege. |
+| R-IM-04 | Idempotency through `import_items (source_id, origin_key)`, not through content comparison. | Exact instead of heuristic; a crash at any point leaves no duplicate. |
+| R-IM-05 | All imported messages `origin = import`, `silent`, without `mentions`. | Never trigger, never notify. |
+| R-IM-06 | Unknown authors become disabled placeholder people. | Every message needs a principal; a placeholder can do nothing. |
+| R-IM-07 | Channels in the mirror are read-only, also for owners. | A channel never has two leading places; no agent is triggered twice. |
+| R-IM-08 | Imported threads carry the planned operator. | Otherwise they stay without an agent after the switch-over because of R-DM-12. |
+| R-IM-09 | Reactions and later edits are not taken over. | Cost per emoji and message; the settle rule makes late edits rare. |
+| R-IM-10 | Binding of earlier sessions on the first trigger, exactly once, fail open. | Matches `/resume`; a failure must never silence the person. |
+| R-IM-11 | Archived only with `archived = true` and not in the active list. | A thread wrongly left open does no harm, a thread wrongly closed hides work. |
+| R-IM-12 | Reverting copies nothing to Discord. | The tool never writes to Discord; the owner decides about the few messages. |
 
-## 18. Abgleich mit dem Kern-Vertrag
+## 18. Alignment with the core contract
 
-Die beim Entwurf beantragten Ergänzungen sind entschieden (Integration vom 2026-10-10):
+The additions requested during drafting are decided (integration of 2026-10-10):
 
-| Nr | Ergänzung | Entscheidung, Ort |
+| No. | Addition | Decision, location |
 |---|---|---|
-| K-IM-1 | Aktion `import.apply`, RL-Klasse `rl.import` | übernommen, 05 Abschnitte 3, 4.12 und 10 |
-| K-IM-2 | `channels.read_only` mit Aktion zum Setzen | übernommen, 03 `channels`, 05 Regel 1.8 und `channel.read_only.set` (mit Step-up, weil der Schalter auch Owner sperrt) |
-| K-IM-3 | Bediener und Zeiten importierter Threads aus Zuordnung und Quelle | übernommen, 03 Abschnitt 4.11 |
-| K-IM-4 | `thread.updated` je Stapel; Importiertes nicht ungelesen | übernommen, 04 Abschnitt 15.8; statt Gelesen-Stände je Leser vorzurücken setzt der Import `threads.unread_floor_seq` (eine Zeile je Thread) |
-| K-IM-5 | Bedeutung von `end_reason = import`, Bindungsregel, Meldung "Fortsetzen gescheitert" | übernommen, 03 `agent_sessions`, 05 `agent_session.report` (`bind_failed`) |
-| K-IM-6 | Sockel für kumulierte Sitzungskosten | übernommen, 03 `agent_sessions.cost_baseline_micros` |
-| K-IM-7 | I1-Ziele mit Threads des Agenten, offen oder erledigt | übernommen, 03 Abschnitt 6.4 |
-| K-IM-8 | `forum_tag` als Objektart; Zustand `dry_run` entfällt | übernommen, 03 `import_items`, `import_sources` |
+| K-IM-1 | Action `import.apply`, RL class `rl.import` | adopted, 05 sections 3, 4.12 and 10 |
+| K-IM-2 | `channels.read_only` with an action to set it | adopted, 03 `channels`, 05 rule 1.8 and `channel.read_only.set` (with step-up, because the switch also locks out owners) |
+| K-IM-3 | Operator and times of imported threads from the mapping and the source | adopted, 03 section 4.11 |
+| K-IM-4 | `thread.updated` per batch; imported content not unread | adopted, 04 section 15.8; instead of advancing the read states per reader, the import sets `threads.unread_floor_seq` (one row per thread) |
+| K-IM-5 | Meaning of `end_reason = import`, binding rule, message "resume failed" | adopted, 03 `agent_sessions`, 05 `agent_session.report` (`bind_failed`) |
+| K-IM-6 | Baseline for cumulative session costs | adopted, 03 `agent_sessions.cost_baseline_micros` |
+| K-IM-7 | I1 targets with threads of the agent, open or done | adopted, 03 section 6.4 |
+| K-IM-8 | `forum_tag` as an item kind; state `dry_run` is dropped | adopted, 03 `import_items`, `import_sources` |
 
-## 19. Konfigurationswerte dieses Kapitels
+## 19. Configuration values of this chapter
 
-Werte des Werkzeugs, nicht des Servers. Sie folgen Namensregel und Formaten der
-[Konfigurationsreferenz](../operations/configuration.md) (Abschnitt 2): Umgebung des Werkzeugs
-(`BOTHY_IMPORT__FOLLOW__BUSY_REACTIONS`) oder eine eigene YAML-Datei mit verschachtelten
-Schlüsseln, die `--config` nennt (`import: {follow: {busy_reactions: [...]}}`). Diese Datei ist
-nie die Datei des Servers (`BOTHY_CONFIG_FILE`): Der Server kennt `import.*` nicht und bricht
-bei unbekannten Schlüsseln den Start ab. Die Rate-Limit-Klasse `rl.import` des Servers steht in
-[05-aktionen.md](05-aktionen.md), Abschnitt 10.
+Values of the tool, not of the server. They follow the naming rule and the formats of the
+[configuration reference](../operations/configuration.md) (section 2): the environment of the tool
+(`BOTHY_IMPORT__FOLLOW__BUSY_REACTIONS`) or a separate YAML file with nested keys that `--config`
+names (`import: {follow: {busy_reactions: [...]}}`). This file is never the file of the server
+(`BOTHY_CONFIG_FILE`): the server does not know `import.*` and aborts its start on unknown keys.
+The rate-limit class `rl.import` of the server is in [05-actions.md](05-actions.md),
+section 10.
 
-| Name | Standard | Bedeutung |
+| Name | Default | Meaning |
 |---|---|---|
-| `import.discord.api_base` | `https://discord.com/api/v10` | Discord-API-Basis [R6, belegt: v10 aktuell] |
-| `import.discord.cdn_hosts` | `cdn.discordapp.com`, `media.discordapp.net` | erlaubte Hosts für Anhänge |
-| `import.discord.page_size` | `100` | Nachrichten je Seite; Discord erlaubt höchstens 100 [R4, belegt] |
-| `import.discord.max_429_retries` | `5` | Wiederholungen nach `429` je Aufruf |
-| `import.discord.max_rate_wait` | `60s` | größte Wartezeit, bevor der Lauf abbricht |
-| `import.discord.preflight_sample` | `20` | Nachrichten für die Intent-Probe |
-| `import.discord.closed_tags` | leer | Forum-Tags, die einen Thread zusätzlich als erledigt markieren |
-| `import.attachment_max_bytes` | wie `file.max_upload_bytes` | größter übernommener Anhang |
-| `import.http_timeout` | `60s` | Zeitlimit je Aufruf an Discord und CDN |
-| `import.batch_max_items` | `100` | Objekte je Stapel an den Server |
-| `import.reply_quote_max_chars` | `100` | Länge der Zitatzeile bei Antworten über Threads hinweg |
-| `import.follow.poll_interval` | `30s` | Abstand der Spiegel-Runden |
-| `import.follow.settle_after` | `60s` | Ruhezeit nach letzter Änderung |
-| `import.follow.busy_reactions` | `👀` | Reaktionen, die "Agent arbeitet noch" bedeuten |
-| `import.follow.busy_lookback` | `10` | Nachrichten vor der ersten neuen, die auf Markierung geprüft werden |
-| `import.follow.max_backoff` | `5m` | größter Abstand nach fehlgeschlagenen Runden |
+| `import.discord.api_base` | `https://discord.com/api/v10` | Discord API base [R6, verified: v10 current] |
+| `import.discord.cdn_hosts` | `cdn.discordapp.com`, `media.discordapp.net` | allowed hosts for attachments |
+| `import.discord.page_size` | `100` | messages per page; Discord allows at most 100 [R4, verified] |
+| `import.discord.max_429_retries` | `5` | retries after `429` per call |
+| `import.discord.max_rate_wait` | `60s` | longest wait before the run aborts |
+| `import.discord.preflight_sample` | `20` | messages for the intent probe |
+| `import.discord.closed_tags` | empty | forum tags that additionally mark a thread as done |
+| `import.attachment_max_bytes` | same as `file.max_upload_bytes` | largest imported attachment |
+| `import.http_timeout` | `60s` | time limit per call to Discord and the CDN |
+| `import.batch_max_items` | `100` | items per batch sent to the server |
+| `import.reply_quote_max_chars` | `100` | length of the quote line for replies across threads |
+| `import.follow.poll_interval` | `30s` | interval between mirror rounds |
+| `import.follow.settle_after` | `60s` | quiet time after the last change |
+| `import.follow.busy_reactions` | `👀` | reactions that mean "agent is still working" |
+| `import.follow.busy_lookback` | `10` | messages before the first new one that are checked for the marker |
+| `import.follow.max_backoff` | `5m` | longest interval after failed rounds |
 
-Die Werte für Seitengröße, Wiederholungen, Wartegrenze, Ruhe-Regel und Backoff sind aus dem
-Vorgänger übernommen, dort gegen Fake-Server getestet und nicht gegen das echte Discord gemessen
+The values for page size, retries, wait limit, settle rule and backoff are taken over from the
+predecessor, tested there against fake servers and not measured against the real Discord
 (REUSE.md).
 
-## Quellen
+## Sources
 
-Alle abgerufen 2026-10-10.
+All retrieved on 2026-10-10.
 
-- [R1] Discord, User (`GET /users/@me`, Felder `bot`, `global_name`, `username`):
-  https://docs.discord.com/developers/resources/user [belegt]
-- [R2] Discord, Guild: https://docs.discord.com/developers/resources/guild [belegt]
-- [R3] Discord, Channel: https://docs.discord.com/developers/resources/channel [belegt]
-- [R4] Discord, Message: https://docs.discord.com/developers/resources/message [belegt]
-- [R5] Discord, Reference (CDN, signierte Anhang-URLs): https://docs.discord.com/developers/reference [belegt]
-- [R6] Discord, Reference (API-Basis, Snowflakes, Formatierung, User-Agent): https://docs.discord.com/developers/reference [belegt]
-- [R7] Discord, Rate Limits: https://docs.discord.com/developers/topics/rate-limits [belegt]
-- [R8] Discord, Gateway (Message Content Intent): https://docs.discord.com/developers/events/gateway [belegt]
+- [R1] Discord, User (`GET /users/@me`, fields `bot`, `global_name`, `username`):
+  https://docs.discord.com/developers/resources/user [verified]
+- [R2] Discord, Guild: https://docs.discord.com/developers/resources/guild [verified]
+- [R3] Discord, Channel: https://docs.discord.com/developers/resources/channel [verified]
+- [R4] Discord, Message: https://docs.discord.com/developers/resources/message [verified]
+- [R5] Discord, Reference (CDN, signed attachment URLs): https://docs.discord.com/developers/reference [verified]
+- [R6] Discord, Reference (API base, snowflakes, formatting, User-Agent): https://docs.discord.com/developers/reference [verified]
+- [R7] Discord, Rate Limits: https://docs.discord.com/developers/topics/rate-limits [verified]
+- [R8] Discord, Gateway (Message Content Intent): https://docs.discord.com/developers/events/gateway [verified]

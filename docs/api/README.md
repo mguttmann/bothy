@@ -1,61 +1,63 @@
-# API-Verträge
+# API contracts
 
-Die Dateien in diesem Ordner sind normativ (spec-first, ADR 0013). Server-Stubs, SDKs und das
-Dart-Paket der Apps werden daraus erzeugt. Konventionen: [docs/spec/06-api.md](../spec/06-api.md).
+The files in this folder are normative (spec-first, ADR 0013). Server stubs, SDKs and the
+Dart package of the apps are generated from them. Conventions:
+[docs/spec/06-api.md](../spec/06-api.md).
 
-| Datei | Inhalt |
+| File | Content |
 |---|---|
-| [openapi.yaml](openapi.yaml) | REST-API unter `/api/v1` (OpenAPI 3.1), Webhook-Ereignisse (`webhooks:`), alle Schemas, auch die des Gateways |
-| [asyncapi.yaml](asyncapi.yaml) | Gateway-WebSocket (AsyncAPI 3.0): Ops, Ereignisse, Schließ-Codes; Körper per `$ref` auf openapi.yaml |
-| [webhooks.md](webhooks.md) | Zustellung, Signatur, Wiederholung und Prüfung von Webhooks; Eingangs-Webhooks |
-| [redocly.yaml](redocly.yaml) | Lint-Regeln für beide Dateien, inklusive Pflicht von `x-authz-action` und Abgleich mit dem Aktionskatalog |
+| [openapi.yaml](openapi.yaml) | REST API under `/api/v1` (OpenAPI 3.1), webhook events (`webhooks:`), all schemas, including those of the gateway |
+| [asyncapi.yaml](asyncapi.yaml) | Gateway WebSocket (AsyncAPI 3.0): ops, events, close codes; bodies via `$ref` to openapi.yaml |
+| [webhooks.md](webhooks.md) | Delivery, signature, retry and verification of webhooks; incoming webhooks |
+| [redocly.yaml](redocly.yaml) | Lint rules for both files, including the requirement of `x-authz-action` and the comparison with the action catalogue |
 
-## Prüfen
+## Check
 
-Alle Befehle aus dem Wurzelordner des Repos. Redocly CLI 2 braucht Node ab 22.12
-(https://redocly.com/docs/cli/, abgerufen 2026-10-10 [belegt]).
+Run all commands from the root folder of the repo. Redocly CLI 2 needs Node 22.12 or later
+(https://redocly.com/docs/cli/, retrieved 2026-10-10 [verified]).
 
 ```sh
-# beide APIs aus redocly.yaml (Gate G1, docs/spec/06-api.md Abschnitt 15)
+# both APIs from redocly.yaml (gate G1, docs/spec/06-api.md section 15)
 npx -y @redocly/cli@2.62.1 lint --config docs/api/redocly.yaml
 
-# nur eine Datei, mit denselben Regeln
+# only one file, with the same rules
 npx -y @redocly/cli@2.62.1 lint docs/api/openapi.yaml --config docs/api/redocly.yaml
 
-# zweite Meinung zu AsyncAPI; CI=true schaltet die Nutzungsstatistik der AsyncAPI-CLI ab
+# second opinion on AsyncAPI; CI=true turns off the usage statistics of the AsyncAPI CLI
 CI=true npx -y @asyncapi/cli@6.2.0 validate docs/api/asyncapi.yaml
 ```
 
-Erwartet: Redocly ohne Fehler und Warnungen; AsyncAPI-CLI meldet nur den Hinweis, dass es
-AsyncAPI 3.1.0 gibt. Ohne `--config` nimmt Redocly nur seine Standardregeln; die Regeln aus
-05-aktionen.md greifen dann nicht.
+Expected: Redocly without errors and warnings; the AsyncAPI CLI reports only the note that
+AsyncAPI 3.1.0 exists. Without `--config`, Redocly uses only its default rules; the rules from
+05-actions.md then do not apply.
 
-Die Versionen sind gepinnt; Renovate hebt sie an (ADR 0041). Wer eine Regel in redocly.yaml
-ändert, prüft sie mit einer absichtlich falschen Kopie der Spec, ob sie anschlägt.
+The versions are pinned; Renovate raises them (ADR 0041). Whoever changes a rule in redocly.yaml
+checks with a deliberately wrong copy of the spec whether the rule fires.
 
-## Rendern
+## Render
 
 ```sh
-# REST-Referenz als eine HTML-Datei
+# REST reference as one HTML file
 npx -y @redocly/cli@2.62.1 build-docs docs/api/openapi.yaml -o build/api/rest.html
 
-# Gateway-Referenz als HTML
+# gateway reference as HTML
 CI=true npx -y @asyncapi/cli@6.2.0 generate fromTemplate docs/api/asyncapi.yaml \
   @asyncapi/html-template@3 -o build/api/gateway --force-write --no-interactive
 ```
 
-`build/` ist nicht eingecheckt. Die Doku-Site (ADR 0045) bindet beide Ausgaben ein.
+`build/` is not checked in. The docs site (ADR 0045) includes both outputs.
 
-## Ändern
+## Change
 
-1. Erst die Spec ändern, dann den Code. Additiv oder Bruch entscheidet 06-api.md, Abschnitt 13.
-2. Neue Operation: `operationId` in lowerCamelCase, `tags`, `x-authz-action` aus 05-aktionen.md,
-   `x-rate-limit-class` der Aktion, Problem-Antworten aus `components.responses`, Beispiel im
-   Medientyp. Fehlt eine passende Aktion, wird zuerst 05-aktionen.md ergänzt.
-3. Neues Ereignis: Typ und Empfangs-Aktion in 05-aktionen.md, Nutzlast-Schema `<Name>Payload`,
-   Ereignis-Schema `<Name>Event` als `allOf` aus `EventEnvelope`, Eintrag in `Event` (dauerhaft),
-   Nachricht in asyncapi.yaml, bei Bedarf Eintrag unter `webhooks:`.
-4. Kein `null`, keine Typ-Arrays, kein `anyOf`, `oneOf` nur mit Diskriminator. Wiederholte
-   Enum-Mengen als benanntes Schema.
-5. Lint, Code neu erzeugen, Tests. Die erzeugten Tabellen in 06-api.md und webhooks.md
-   (Markierungen `BEGIN GENERATED`) werden mit erneuert (Gate G3).
+1. Change the spec first, then the code. Whether a change is additive or breaking is decided by
+   06-api.md, section 13.
+2. New operation: `operationId` in lowerCamelCase, `tags`, `x-authz-action` from 05-actions.md,
+   `x-rate-limit-class` of the action, problem responses from `components.responses`, an example in
+   the media type. If no suitable action exists, 05-actions.md is extended first.
+3. New event: type and receive action in 05-actions.md, payload schema `<Name>Payload`,
+   event schema `<Name>Event` as `allOf` from `EventEnvelope`, an entry in `Event` (durable),
+   a message in asyncapi.yaml, if needed an entry under `webhooks:`.
+4. No `null`, no type arrays, no `anyOf`, `oneOf` only with a discriminator. Repeated
+   enum sets as a named schema.
+5. Lint, regenerate the code, run the tests. The generated tables in 06-api.md and webhooks.md
+   (markers `BEGIN GENERATED`) are renewed along with them (gate G3).
