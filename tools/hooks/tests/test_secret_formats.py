@@ -81,6 +81,28 @@ def test_main_returns_one_and_prints_location(
     assert str(good) not in out
 
 
+def test_unreadable_file_is_reported_without_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    locked = tmp_path / "locked.md"
+    locked.write_text("ok\n", encoding="utf-8")
+    good = tmp_path / "good.md"
+    good.write_text("ok\n", encoding="utf-8")
+    real_read_bytes = Path.read_bytes
+
+    def read_bytes(self: Path) -> bytes:
+        if self == locked:
+            raise PermissionError(13, "Permission denied")
+        return real_read_bytes(self)
+
+    monkeypatch.setattr(Path, "read_bytes", read_bytes)
+    rc = secret_formats.main([str(locked), str(good)])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert f"{locked}: cannot be read" in out
+    assert str(good) not in out
+
+
 def test_allowlisted_fixture_is_skipped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fixture = tmp_path / "fixtures" / "secret.txt"
     fixture.parent.mkdir()

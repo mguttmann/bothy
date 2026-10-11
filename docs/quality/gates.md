@@ -157,9 +157,11 @@ Beispiel ein JSON-Bericht), `DENYLIST_FLAGS` (zum Beispiel `--reveal` lokal).
   der Prüfsummen-Datei zugleich von Hand ändert, die neueste Migration samt ihrer Zeile
   entfernt oder `migrations/` samt `migrations.sha256` löscht, besteht das Gate; das muss
   das Review des Diffs sehen.
-* GitHub secret scanning has its own patterns: it knows provider formats that gitleaks does
-  not, and it reported a `whsec_` example shorter than the gitleaks rule
-  `standard-webhooks-secret` accepts. An example in a third-party format can therefore pass
+* GitHub secret scanning has its own patterns ([supported patterns](https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns),
+  retrieved 2026-10-11): it knows provider formats that gitleaks does not. On the first
+  public push of this repository (2026-10-11) it raised two alerts of type
+  `stripe_webhook_signing_secret` for a `whsec_` example shorter than the gitleaks rule
+  `standard-webhooks-secret` accepts (alerts 1 and 2 of the repository, resolved). An example in a third-party format can therefore pass
   the gates and still raise an alert on push; only the `whsec_` format has its own check with
   a wider margin (`tools/hooks/secret_formats.py`). Examples therefore stay short of every
   third-party format (CONTRIBUTING.md).

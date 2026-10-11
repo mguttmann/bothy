@@ -157,6 +157,36 @@ def test_example_marker_does_not_hide_third_party_formats(tmp_path: Path, rule: 
     assert rule in found
 
 
+def test_generic_rule_reports_the_unmarked_example(tmp_path: Path) -> None:
+    """Positive control for the marked generic example in ALLOWED: the same value without the
+    EXAMPLE marker is a generic-api-key finding, so the allowlist case proves the marker."""
+    (tmp_path / "sample.txt").write_text('api_key = "' + _rand(24) + '"\n')
+    report = tmp_path / "report.json"
+    proc = subprocess.run(
+        [
+            str(_gitleaks()),
+            "dir",
+            str(tmp_path / "sample.txt"),
+            "--config",
+            str(REPO / ".gitleaks.toml"),
+            "--no-banner",
+            "--redact",
+            "--report-format",
+            "json",
+            "--report-path",
+            str(report),
+            "--exit-code",
+            "0",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    found = {item["RuleID"] for item in json.loads(report.read_text())}
+    assert "generic-api-key" in found
+
+
 def test_history_allowlist_takes_exact_values_only(tmp_path: Path) -> None:
     """One changed character makes the historical example a finding again."""
     near = HISTORICAL_WEBHOOK_EXAMPLE[:-1] + "x"

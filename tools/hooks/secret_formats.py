@@ -73,7 +73,7 @@ def _allowed(path: Path) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Check the given or all tracked files; returns 1 if a value in the whsec_ format was found."""
+    """Check the given or all tracked files; returns 1 on a whsec_ value or an unreadable file."""
     parser = argparse.ArgumentParser(
         description="Reject the Stripe webhook secret format whsec_ (GitHub secret scanning)."
     )
@@ -81,15 +81,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("files", nargs="*", type=Path)
     args = parser.parse_args(argv)
     files = tracked_files(ROOT) if args.all else args.files
-    findings = [
-        f for path in files if path.is_file() and not _allowed(path) for f in scan_file(path)
-    ]
+    findings: list[Finding] = []
+    unreadable = 0
+    for path in files:
+        if not path.is_file() or _allowed(path):
+            continue
+        try:
+            findings.extend(scan_file(path))
+        except OSError as exc:
+            unreadable += 1
+            print(f"{path}: cannot be read ({exc.strerror or exc}), so it was not checked")
     for f in findings:
         print(
             f"{f.path}:{f.line}:{f.column}: {f.secret_type} format, which GitHub secret "
             "scanning reports; shorten the example (whsec_EXAMPLE) or assemble it at runtime"
         )
-    return 1 if findings else 0
+    return 1 if findings or unreadable else 0
 
 
 if __name__ == "__main__":
