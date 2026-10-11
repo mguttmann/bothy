@@ -1,0 +1,35 @@
+# Overlay "datadog": Datadog exporter (contrib, status beta for traces, metrics, logs).
+# Sources (retrieved 2026-10-10):
+#   https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/datadogexporter
+#     APM statistics only through the Datadog connector; batching in sending_queue instead of the batch processor
+#     against "413 Request Entity Too Large".
+#   https://docs.datadoghq.com/opentelemetry/setup/
+# Secret: secrets/collector/datadog_api_key (file).
+# Limit: the base samples traces before this overlay (tail_sampling). APM statistics are therefore
+# based on the sample, not on all requests (docs/observability/backends.md).
+
+connectors:
+  datadog/connector: {}
+
+exporters:
+  datadog:
+    api:
+      key: ${file:/run/bothy/secrets/datadog_api_key}
+      site: ${env:DD_SITE:-datadoghq.eu}
+    sending_queue:
+      batch:
+        min_size: 10
+        max_size: 100
+        flush_timeout: 10s
+
+service:
+  pipelines:
+    traces/datadog:
+      receivers: [forward/traces]
+      exporters: [datadog/connector, datadog]
+    metrics/datadog:
+      receivers: [forward/metrics, datadog/connector]
+      exporters: [datadog]
+    logs/datadog:
+      receivers: [forward/logs]
+      exporters: [datadog]

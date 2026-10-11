@@ -1,0 +1,44 @@
+# Overlay "azure-monitor": native OTLP ingestion of Azure Monitor with Entra sign-in
+# (extension azure_auth, status beta). No API key header; role "Monitoring Metrics Publisher"
+# on the data collection rule. Endpoints depend on DCE and DCR (one URL per signal).
+# Sources (retrieved 2026-10-10):
+#   https://learn.microsoft.com/en-us/azure/azure-monitor/containers/opentelemetry-protocol-ingestion
+#   https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/extension/azureauthextension
+# Open: GA or preview status of the native OTLP ingestion (sources contradict each other).
+# Application Insights expects delta temporality; hence cumulative_to_delta.
+# Secret: secrets/collector/azure_client_secret (service principal). On Azure VMs use
+# managed_identity instead (see docs/observability/backends.md).
+
+extensions:
+  azure_auth:
+    service_principal:
+      tenant_id: ${env:AZURE_TENANT_ID}
+      client_id: ${env:AZURE_CLIENT_ID}
+      client_secret: ${file:/run/bothy/secrets/azure_client_secret}
+    scopes:
+      - https://monitor.azure.com/.default
+
+processors:
+  cumulative_to_delta/azure: {}
+
+exporters:
+  otlp_http/azure:
+    traces_endpoint: ${env:AZURE_MONITOR_TRACES_ENDPOINT}
+    metrics_endpoint: ${env:AZURE_MONITOR_METRICS_ENDPOINT}
+    logs_endpoint: ${env:AZURE_MONITOR_LOGS_ENDPOINT}
+    auth:
+      authenticator: azure_auth
+
+service:
+  extensions: [health_check, azure_auth]
+  pipelines:
+    traces/azure:
+      receivers: [forward/traces]
+      exporters: [otlp_http/azure]
+    metrics/azure:
+      receivers: [forward/metrics]
+      processors: [cumulative_to_delta/azure]
+      exporters: [otlp_http/azure]
+    logs/azure:
+      receivers: [forward/logs]
+      exporters: [otlp_http/azure]

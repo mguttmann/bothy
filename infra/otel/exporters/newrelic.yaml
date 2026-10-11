@@ -1,0 +1,40 @@
+# Overlay "newrelic": OTLP/HTTP to New Relic, all three signals.
+# Sources (retrieved 2026-10-10): https://docs.newrelic.com/docs/opentelemetry/best-practices/opentelemetry-otlp/
+#   header "api-key" with the license key, http/protobuf recommended, delta temporality recommended,
+#   string attributes up to 4095 characters. EU endpoint https://otlp.eu01.nr-data.net, US https://otlp.nr-data.net.
+# Secret: secrets/collector/newrelic_license_key (file, never an environment variable).
+
+processors:
+  cumulative_to_delta/newrelic: {}
+  transform/newrelic_limits:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - truncate_all(attributes, 4095)
+    log_statements:
+      - context: log
+        statements:
+          - truncate_all(attributes, 4095)
+
+exporters:
+  otlp_http/newrelic:
+    endpoint: ${env:NEW_RELIC_OTLP_ENDPOINT:-https://otlp.eu01.nr-data.net}
+    headers:
+      api-key: ${file:/run/bothy/secrets/newrelic_license_key}
+    compression: gzip
+
+service:
+  pipelines:
+    traces/newrelic:
+      receivers: [forward/traces]
+      processors: [transform/newrelic_limits]
+      exporters: [otlp_http/newrelic]
+    metrics/newrelic:
+      receivers: [forward/metrics]
+      processors: [cumulative_to_delta/newrelic]
+      exporters: [otlp_http/newrelic]
+    logs/newrelic:
+      receivers: [forward/logs]
+      processors: [transform/newrelic_limits]
+      exporters: [otlp_http/newrelic]

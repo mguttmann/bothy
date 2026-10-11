@@ -1,0 +1,19 @@
+{
+  "$description": "Bewegung, Kontext full. Bewegung zeigt Zustandswechsel, schmückt nie.",
+  "motion": {
+    "duration": {
+      "$type": "duration",
+      "move-fast": {"$value": {"value": 120, "unit": "ms"}, "$description": "Einklappen von Bereichen, Chips, Hover."},
+      "move": {"$value": {"value": 180, "unit": "ms"}, "$description": "Live-Box klappt zusammen, Spalte ein- und ausblenden."},
+      "move-slow": {"$value": {"value": 260, "unit": "ms"}, "$description": "Navigationsstapel auf Mobilgeräten (Plattformübergang hat Vorrang)."},
+      "fade": {"$value": {"value": 120, "unit": "ms"}, "$description": "Ein- und Ausblenden ohne Bewegung."},
+      "pulse": {"$value": {"value": 1400, "unit": "ms"}, "$description": "Periode des Lauf-Indikators (running, working). 0 heißt: kein Puls, statisches Icon."}
+    },
+    "easing": {
+      "$type": "cubicBezier",
+      "standard": {"$value": [0.2, 0, 0, 1]},
+      "enter": {"$value": [0, 0, 0.2, 1]},
+      "exit": {"$value": [0.4, 0, 1, 1]}
+    }
+  }
+}

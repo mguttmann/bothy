@@ -1,0 +1,52 @@
+%% Nachricht senden mit Zustellung an verbundene Clients und Push an ein Gerät ohne Verbindung.
+%% Pfade ohne Versions-Präfix; das Präfix legt 06-api.md fest. Aktionen aus 05-aktionen.md.
+sequenceDiagram
+  autonumber
+  participant A as App Alex
+  box api-Knoten
+    participant MW as platform/httpserver
+    participant MSG as messaging
+    participant CH as chat
+    participant RU as runs
+    participant SY as sync
+    participant TL as sync Log-Tail
+    participant HUB as gateway Hub
+  end
+  participant DB as PostgreSQL
+  participant S as App Sam
+  box worker
+    participant NV as notify Verbraucher
+  end
+  participant PD as APNs oder FCM
+  participant R as Gerät Robin, ohne Verbindung
+
+  A->>A: client_msg_id (UUIDv7) erzeugen, Eintrag ins Ausgangsfach
+  A->>MW: POST threads/{id}/messages, Token mit DPoP
+  MW->>MW: Prinzipal prüfen (kernel actor), Rate-Limit rl.message
+  MW->>MSG: Create(Befehl)
+  MSG->>MSG: authorize(Alex, message.create, Thread)
+  MSG->>DB: SELECT nach (author_principal_id, client_msg_id)
+  DB-->>MSG: keine Zeile
+  MSG->>DB: BEGIN (READ COMMITTED)
+  MSG->>CH: AppendToThread: Thread-Zeile sperren, thread_seq vergeben
+  MSG->>DB: INSERT messages, mentions
+  MSG->>SY: Append(message.created), im Transaktions-Kontext gepuffert
+  MSG-)RU: In-Tx-Ereignis MessagePosted
+  RU->>RU: Auslöse-Prüfung: kein Bediener erwähnt, nichts zu tun
+  SY->>DB: Abschluss: event_seq sperren, INSERT event_log, pg_notify
+  MSG->>DB: COMMIT
+  MSG-->>A: 201 Nachricht mit thread_seq und version
+  DB--)TL: NOTIFY event_log (höchste seq)
+  TL->>DB: SELECT event_log WHERE seq > Stand ORDER BY seq
+  TL->>HUB: Ereignisse in seq-Reihenfolge
+  HUB->>HUB: je Verbindung authorize(Empfänger, message.read) aus Rechte-Cache
+  HUB-->>A: dispatch message.created mit client_msg_id
+  A->>A: Eintrag im Ausgangsfach bestätigt
+  HUB-->>S: dispatch message.created
+  DB--)NV: NOTIFY event_log
+  NV->>DB: Verbraucher-Zeile push sperren (SKIP LOCKED), Ereignisse ab Cursor lesen
+  NV->>NV: Empfänger: Erwähnung, Einstellung, Ruhezeiten, Gelesen-Stand
+  NV->>NV: authorize(Robin, push.deliver, Thread)
+  NV->>DB: River-Job notify.push_send je Gerät einfügen und Cursor vorrücken, eine Transaktion
+  NV->>PD: Job notify.push_send: nur IDs und neutraler Platzhalter
+  PD-)R: Push ohne Inhalt

@@ -1,0 +1,11 @@
+line-length = 120
+target-version = "py312"
+
+[lint]
+# "D": docstrings on every public symbol (owner build rule 3, docs/spec/23-qualitaet.md).
+select = ["E", "F", "W", "I", "B", "UP", "D"]
+# Long HTML and CSS templates in the preview renderer are data, not code.
+per-file-ignores = { "tokenkit/emit_preview.py" = ["E501"], "tests/**" = ["D"] }
+
+[lint.pydocstyle]
+convention = "google"

@@ -1,0 +1,67 @@
+%% Agenten-Lauf mit Live-Box und Nachtrag. Invarianten I2 und I3 aus der Planungsgrundlage,
+%% Ablauf nach 04-sync-protokoll.md Abschnitt 11 und 15. Pfade ohne Versions-Präfix.
+sequenceDiagram
+  autonumber
+  participant A as App Alex, Thread im Fokus
+  box api-Knoten
+    participant MSG as messaging
+    participant RU as runs
+    participant GW as gateway (Agent-Verbindung, Hub)
+  end
+  participant DB as PostgreSQL
+  participant AD as Agenten-Adapter
+  participant LZ as Agenten-Laufzeit
+
+  A->>MSG: POST Nachricht mit Erwähnung des Bedieners
+  MSG->>MSG: authorize(Alex, message.create, Thread)
+  MSG->>DB: BEGIN, Thread-Sequenz, INSERT Nachricht (origin human)
+  MSG-)RU: In-Tx-Ereignis MessagePosted
+  RU->>RU: authorize(Alex, agent.invoke, Thread): trigger, Bediener, Erwähnungsregel, I2-Vorprüfung
+  RU->>DB: INSERT runs (queued), Anker-Nachricht kind run, trigger_state queued
+  RU->>DB: Ereignisse message.created, run.state_changed, agent.invocation (an den Agenten, ohne Marke)
+  MSG->>DB: Abschluss event_seq, COMMIT
+  MSG-->>A: 201, trigger_state queued
+  DB--)GW: NOTIFY, Log-Tail liest
+  GW-->>A: dispatch message.created, run.state_changed queued
+  GW->>RU: PrepareDelivery(agent.invocation)
+  RU->>RU: authorize(Alex, agent.invoke) mit aktuellen Rechten, I2 erneut
+  RU->>DB: Aufruf-Marke (JWS, EdDSA) signieren, runs.invocation_jti setzen
+  GW-->>AD: dispatch agent.invocation mit Marke
+  AD->>AD: Signatur über JWKS, aud, Ist-Modus gleich billing_mode (I3), Werkzeugklasse höchstens tool_class
+  AD->>AD: Ereignis und Marke ins Eingangsfach
+  AD->>GW: ack (seq), Bestätigung nach der Annahme
+  opt Marke abgelaufen
+    AD->>RU: POST runs/{id}/invocation-token (alte Marke), Prüfungen wie vor der Zustellung
+    RU-->>AD: frische Marke
+  end
+  AD->>RU: POST runs/{id}/start (Marke, billing_mode_used, tool_class_used, external_session_ref)
+  RU->>DB: jti, Ablauf und Werkzeugklasse prüfen, CAS queued nach running, trigger_state working
+  RU-->>AD: 200 running
+  GW-->>A: dispatch run.state_changed running, message.updated working
+  AD->>LZ: Turn starten
+  loop gedrosselt auf agent.run_update_min_interval
+    LZ-->>AD: Werkzeug, Statuszeile, Text
+    AD->>GW: op run.update (run_id, base_version, ops)
+    GW->>RU: Patch anwenden: CAS auf runs.version, speichern ohne event_log
+    RU-)GW: kurzlebig run.updated
+    GW-->>A: run.updated, gesammelt je sync.run_patch_coalesce_interval
+  end
+  opt Empfänger auf anderem api-Knoten
+    RU-)DB: NOTIFY ephemeral (run_id, version), nur IDs
+    Note over GW: Der andere Knoten lädt das Lauf-Dokument und sendet run.updated mit snapshot
+  end
+  A->>MSG: POST Nachtrag im selben Thread
+  MSG-)RU: In-Tx-Ereignis MessagePosted
+  RU->>DB: aktiver Lauf vorhanden: run_followups queued, agent.followup
+  MSG-->>A: 201
+  GW->>RU: PrepareDelivery(agent.followup): agent.invoke und I2, neue Marke
+  GW-->>AD: dispatch agent.followup mit Marke
+  AD->>LZ: Nachtrag einspeisen (steer oder queue)
+  AD->>GW: run.update followups/{message_id} delivered
+  RU->>DB: trigger_state followup_delivered, Ereignis message.updated
+  AD->>GW: run.update followups/{message_id} absorbed
+  LZ-->>AD: Antwort und Kosten
+  AD->>MSG: POST Antwort-Nachricht (origin agent, löst nichts aus)
+  AD->>RU: run.finish completed, mit Kennzahlen und Kosten
+  RU->>DB: CAS running nach completed, Zusammenfassung, cost_entries (Schätzung), trigger_state done
+  GW-->>A: message.created, run.state_changed completed: Live-Box klappt auf eine Zeile zusammen

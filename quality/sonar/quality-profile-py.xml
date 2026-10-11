@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- Rules activated IN ADDITION to the parent profile (see profiles.json).
+     Empty on purpose: the parent's rules apply unchanged until a rule is added
+     with a reason in the pull request (docs/quality/sonarqube-local.md). -->
+<profile>
+  <name>Bothy way</name>
+  <language>py</language>
+  <rules/>
+</profile>

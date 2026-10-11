@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Post-merge deny-list scan of main with the private list (requirement 22, ADR 0042).
+# Pull requests from forks only see the generic rules, and a squash merge can change the
+# commit message after the pull request checks ran. This workflow scans exactly what
+# reached main: the pushed commits (before..after) with the private list from the
+# protected environment "denylist". A finding fails the run; the owner then follows
+# docs/quality/push-discipline.md, section "Deny-Fund auf main".
+#
+# Runs only for pushes to main (tools/ci/check_runners.py, POST_MERGE_WORKFLOWS). The code
+# that runs is the merged, reviewed commit, on a GitHub-hosted runner like every job (ADR 0039).
+
+name: denylist-main
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: denylist-main
+  cancel-in-progress: false
+
+jobs:
+  denylist:
+    name: denylist (private list, main)
+    environment: denylist
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make denylist (pushed commits)
+        env:
+          LIST: ${{ secrets.BOTHY_DENYLIST }}
+          ALLOW: ${{ secrets.BOTHY_DENYLIST_ALLOW_AUTHORS }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          umask 077
+          dir=$(mktemp -d "$RUNNER_TEMP/denylist.XXXXXX")
+          trap 'rm -rf "$dir"' EXIT
+          printf '%s\n' "$LIST" > "$dir/denylist.txt"
+          printf '%s\n' "$ALLOW" > "$dir/allow-authors.txt"
+          export BOTHY_DENYLIST_FILE="$dir/denylist.txt"
+          # A manual run or the first push of main has no usable "before": scan every
+          # commit reachable from main.
+          if [ -n "$BEFORE" ] && [ "$BEFORE" != 0000000000000000000000000000000000000000 ] \
+             && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            export DENYLIST_RANGE="$BEFORE..$AFTER"
+          else
+            export DENYLIST_RANGE="$AFTER"
+          fi
+          make denylist

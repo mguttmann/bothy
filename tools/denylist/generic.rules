@@ -1,0 +1,36 @@
+# Generic white-label rules (public, versioned with the repository).
+#
+# Applied on every scan in addition to the private deny list, and alone for fork
+# pull requests that cannot read the private list. Same format as the private list:
+# one rule per line, 're:' marks a Python regular expression, matching ignores case.
+# '@exclude-path:' takes a glob of repository paths this file's rules skip.
+# Rules here never inspect commit identities (author, committer, Signed-off-by, Co-authored-by);
+# those belong to contributors and are checked against the private list only.
+
+@exclude-path: tools/denylist/generic.rules
+@exclude-path: tools/denylist/tests/*
+@exclude-path: *uv.lock
+@exclude-path: *package-lock.json
+@exclude-path: *pubspec.lock
+@exclude-path: *go.sum
+
+# macOS home directories. The character class keeps this file from matching itself in
+# other scanners; placeholders with angle brackets stay allowed.
+re:/[U]sers/[A-Za-z0-9._-]+
+
+# Tailscale tailnet host names.
+re:\b[a-z0-9-]+[.]ts[.]net\b
+
+# E-mail addresses outside the documentation domains (RFC 2606: example.*, *.test,
+# *.example, *.invalid, *.localhost) and GitHub's no-reply and SSH host addresses.
+re:\b[A-Za-z0-9._%+-]+@(?!(?:[A-Za-z0-9-]+\.)*(?:example\.(?:com|org|net)|test|example|invalid|localhost|users\.noreply\.github\.com|github\.com)(?![A-Za-z0-9-]|\.[A-Za-z0-9]))[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b
+
+# Private IPv4 ranges (RFC 1918) and carrier-grade NAT (RFC 6598, used by tailnets).
+# A whole range in CIDR notation (network address ending in .0, then /0 to /24) is allowed,
+# because egress and SSRF documentation names the blocked ranges. Host addresses stay
+# findings, also with a prefix length (interface notation) or a URL path behind them.
+re:(?<![\d.])(?:10\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])|192\.168|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7]))\.\d{1,3}\.(?!0/(?:1?\d|2[0-4])\b)\d{1,3}(?![\d.])
+
+# Discord snowflake IDs (17 to 20 digits, not part of a longer token). Digits after a decimal
+# point are a fraction (coordinates in rendered SVG diagrams), not an ID.
+re:(?<![0-9A-Za-z.])[0-9]{17,20}(?![0-9A-Za-z])

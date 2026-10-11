@@ -1,0 +1,30 @@
+flowchart TB
+    pg[("postgres 18")]
+    files[("Objekte: Volume files oder S3-Bucket")]
+    secrets[("Secrets-Bundle (age, offline beim Owner)")]
+
+    subgraph backupd["Dienst backup (bothy-backupd)"]
+        repo1[("pgBackRest repo1 lokal: kurze Aufbewahrung")]
+        dump["pg_dump -Fc täglich"]
+        objs["Objektsicherung (restic bzw. Spiegel)"]
+        manifest["Manifest je Lauf: Zähler, head_seq, Audit-Kopf, Prüfsummen"]
+        drill["Wiederherstellungstest: Restore in backup-scratch, Prüfungen"]
+    end
+
+    repo2[("pgBackRest repo2 off-site: lange Aufbewahrung, verschlüsselt")]
+    restic[("restic-Repository off-site: verschlüsselt, nur anhängend")]
+    status["Metriken und Tabelle backup_runs: Alarm bei Alter oder Fehler"]
+
+    pg -- "archive-push je WAL-Segment (TLS)" --> repo1
+    pg -- "archive-push" --> repo2
+    pg -- "Voll- und Differenzsicherung" --> repo1
+    pg -- "Voll- und Differenzsicherung" --> repo2
+    pg --> dump --> restic
+    files --> objs --> restic
+    dump --> manifest
+    objs --> manifest
+    repo1 --> drill
+    restic --> drill
+    manifest --> drill
+    drill --> status
+    secrets -. "nur bei Disaster Recovery" .-> drill

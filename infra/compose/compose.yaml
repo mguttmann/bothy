@@ -1,0 +1,481 @@
+# Bothy: product stack for Docker Compose.
+#
+# Installation and operation: infra/compose/README.md and docs/operations/install-compose.md.
+# After the preparation (.env and ./secrets) one command starts everything: docker compose up -d
+#
+# Profiles (selected with COMPOSE_PROFILES in .env):
+#   direct         API published on 127.0.0.1; TLS and login through a reverse proxy
+#                  or OIDC. No header trust.
+#   tailscale      API only through a Tailscale sidecar with `tailscale serve`; the server listens
+#                  in the shared network namespace on 127.0.0.1 only (required for header identity).
+#   scan           ClamAV for the virus scan of uploads.
+#   s3             SeaweedFS as S3-compatible object storage (instead of the file system driver).
+#   observability  Prometheus, Loki, Tempo, Grafana, Alertmanager (local default stack).
+# Choose exactly one of `direct` and `tailscale`.
+#
+# Note: the images bothy-server and bothy-postgres are built with the first release
+# (docs/spec/18-release.md). Until then this stack can only be checked as a contract
+# (`docker compose config`), not started.
+#
+# Rules: ports on 127.0.0.1 only. PostgreSQL is attached to the internal network only, never to
+# the host. Secrets never in environment variables; each service sees only its own subdirectory
+# of the volume `secrets` (subpath).
+
+name: bothy
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: ${BOTHY_LOG_MAX_SIZE:-20m}
+    max-file: ${BOTHY_LOG_MAX_FILE:-5}
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: [/tmp]
+
+# Shared process configuration for api, worker and migrate.
+# Naming rule: key `a.b_c` -> BOTHY_A__B_C (docs/operations/configuration.md).
+x-server-env: &server-env
+  BOTHY_INSTANCE__ENVIRONMENT: ${BOTHY_ENVIRONMENT:-prod}
+  BOTHY_SERVER__PUBLIC_URL: ${BOTHY_PUBLIC_URL:?BOTHY_PUBLIC_URL is missing in .env}
+  BOTHY_SERVER__INTERNAL_LISTEN_ADDR: ":8081"
+  BOTHY_SECRETS__DIR: /run/bothy/secrets
+  BOTHY_DATABASE__HOST: postgres
+  BOTHY_DATABASE__NAME: bothy
+  BOTHY_DATABASE__USER: bothy_app
+  BOTHY_DATABASE__SSLMODE: disable            # internal network only; cloud: verify-full
+  BOTHY_FILE__STORAGE__DRIVER: ${BOTHY_STORAGE_DRIVER:-fs}
+  BOTHY_FILE__FS__ROOT: /var/lib/bothy/files
+  BOTHY_FILE__S3__ENDPOINT: ${BOTHY_S3_ENDPOINT:-http://seaweedfs:8333}
+  BOTHY_FILE__S3__BUCKET: ${BOTHY_S3_BUCKET:-bothy-files}
+  BOTHY_FILE__SCAN__CLAMD_ADDRESS: ${BOTHY_CLAMD_ADDRESS:-tcp://clamav:3310}
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+  OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+  OTEL_METRIC_EXPORT_INTERVAL: ${BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS:-15000}
+  OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=${BOTHY_ENVIRONMENT:-prod}
+
+x-server-healthcheck: &server-healthcheck
+  test: ["CMD", "/usr/local/bin/bothy", "healthcheck", "--url", "http://127.0.0.1:8081/readyz"]
+  interval: 15s
+  timeout: 5s
+  retries: 4
+  start_period: 30s
+
+x-api: &api
+  image: ${BOTHY_REGISTRY:?BOTHY_REGISTRY is missing in .env}/bothy-server:${BOTHY_VERSION:?BOTHY_VERSION is missing in .env}
+  command: ["serve", "--role=api"]
+  restart: unless-stopped
+  # Longer than shutdown.total_timeout (02-architektur 15.3); a test keeps it so.
+  stop_grace_period: 75s
+  <<: *hardening
+  logging: *logging
+  healthcheck: *server-healthcheck
+  volumes:
+    - files:/var/lib/bothy/files
+    # Key store of the signing keys, writable by the server (ADR 0066).
+    - signing-keys:/var/lib/bothy/signing-keys
+    - type: volume
+      source: secrets
+      target: /run/bothy/secrets
+      read_only: true
+      volume:
+        subpath: server
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    otel-collector:
+      condition: service_started
+
+services:
+
+  # One-off run: creates missing secrets, takes over files supplied by the owner from
+  # ./secrets and creates one subdirectory per service (read-only for the service).
+  secrets-init:
+    image: ${BOTHY_REGISTRY}/bothy-server:${BOTHY_VERSION}
+    command: ["secrets", "init", "--source", "/input", "--target", "/run/bothy/secrets",
+              "--owner", "server=65532:65532", "--owner", "migrate=65532:65532"]
+    user: "0:0"
+    restart: "no"
+    network_mode: none
+    logging: *logging
+    volumes:
+      - ./secrets:/input:ro
+      - secrets:/run/bothy/secrets
+      # read-only, so that `bothy secrets export` also backs up the key store (16 5.4)
+      - signing-keys:/var/lib/bothy/signing-keys:ro
+
+  postgres:
+    # postgres:18 plus pgBackRest; writes WAL through the repository host `backup` (TLS).
+    image: ${BOTHY_REGISTRY}/bothy-postgres:pg18-${BOTHY_VERSION}
+    restart: unless-stopped
+    shm_size: ${BOTHY_PG_SHM_SIZE:-256m}
+    logging: *logging
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: bothy
+      POSTGRES_PASSWORD_FILE: /run/bothy/secrets/db_superuser_password
+      BOTHY_PG_ARCHIVE_TIMEOUT: ${BOTHY_PG_ARCHIVE_TIMEOUT:-60s}
+      BOTHY_PGBACKREST_REPO_HOST: backup
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - type: volume
+        source: secrets
+        target: /run/bothy/secrets
+        read_only: true
+        volume:
+          subpath: postgres
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "bothy"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+
+  # One-off run before api and worker: create roles (bootstrap), migrations (goose, River).
+  # Refuses to run without a recent backup (migrate.require_recent_backup).
+  migrate:
+    image: ${BOTHY_REGISTRY}/bothy-server:${BOTHY_VERSION}
+    command: ["migrate", "up", "--bootstrap"]
+    restart: "no"
+    <<: *hardening
+    logging: *logging
+    environment:
+      <<: *server-env
+      BOTHY_DATABASE__USER: bothy_owner
+      BOTHY_DATABASE__PASSWORD_REF: file:/run/bothy/secrets/db_owner_password
+    volumes:
+      - type: volume
+        source: secrets
+        target: /run/bothy/secrets
+        read_only: true
+        volume:
+          subpath: migrate
+    networks: [internal, default]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Profile direct: published on 127.0.0.1 of the host only. Header identity is locked here,
+  # because the server listens on all interfaces inside the container.
+  api:
+    <<: *api
+    profiles: [direct]
+    environment:
+      <<: *server-env
+      BOTHY_SERVER__LISTEN_ADDR: ":8080"
+      BOTHY_SERVER__TRUSTED_PROXIES: ${BOTHY_TRUSTED_PROXIES:-127.0.0.1/32,::1/128}
+    ports:
+      - "127.0.0.1:${BOTHY_HTTP_PUBLISH_PORT:-8090}:8080"
+    networks: [internal, default]
+
+  # Profile tailscale: the server shares the network namespace of the sidecar and listens publicly
+  # on 127.0.0.1:8080 only; `tailscale serve` forwards there and sets the identity.
+  api-tailscale:
+    <<: *api
+    profiles: [tailscale]
+    environment:
+      <<: *server-env
+      BOTHY_SERVER__LISTEN_ADDR: "127.0.0.1:8080"
+    network_mode: service:tailscale
+
+  tailscale:
+    image: tailscale/tailscale:${BOTHY_TAILSCALE_VERSION:-v1.102.5}
+    profiles: [tailscale]
+    restart: unless-stopped
+    logging: *logging
+    hostname: ${TS_HOSTNAME:-bothy}
+    environment:
+      TS_HOSTNAME: ${TS_HOSTNAME:-bothy}
+      TS_AUTHKEY: ${TS_AUTHKEY:-}            # first login only, remove from .env afterwards
+      TS_AUTH_ONCE: "true"
+      TS_STATE_DIR: /var/lib/tailscale
+      # Kernel networking instead of userspace: only then is "listens on 127.0.0.1 only" a guarantee
+      # of the kernel. Whether tailscaled in userspace mode passes incoming connections to loopback
+      # ports is not documented (docs/operations/tailscale.md 3).
+      TS_USERSPACE: "false"
+      TS_SERVE_CONFIG: /config/serve.json
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    configs:
+      - source: tailscale-serve
+        target: /config/serve.json
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+    networks:
+      internal: {}
+      default:
+        aliases: [api]                       # internal services reach the server as `api`
+
+  worker:
+    image: ${BOTHY_REGISTRY}/bothy-server:${BOTHY_VERSION}
+    command: ["serve", "--role=worker"]
+    restart: unless-stopped
+    stop_grace_period: 75s
+    <<: *hardening
+    logging: *logging
+    healthcheck: *server-healthcheck
+    environment:
+      <<: *server-env
+    volumes:
+      - files:/var/lib/bothy/files
+      - signing-keys:/var/lib/bothy/signing-keys
+      - type: volume
+        source: secrets
+        target: /run/bothy/secrets
+        read_only: true
+        volume:
+          subpath: server
+    networks: [internal, default]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      otel-collector:
+        condition: service_started
+      clamav:
+        condition: service_healthy
+        required: false
+
+  # Repository host for pgBackRest (TLS to postgres), logical backup, object backup and
+  # automatic restore test in backup-scratch (docs/operations/backup-restore.md).
+  backup:
+    image: ${BOTHY_REGISTRY}/bothy-postgres:pg18-${BOTHY_VERSION}
+    command: ["bothy-backupd"]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      BOTHY_BACKUP__OFFSITE__TARGET: ${BOTHY_BACKUP_OFFSITE_TARGET:-}
+      BOTHY_FILE__STORAGE__DRIVER: ${BOTHY_STORAGE_DRIVER:-fs}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
+      OTEL_RESOURCE_ATTRIBUTES: deployment.environment.name=${BOTHY_ENVIRONMENT:-prod}
+    volumes:
+      - pgbackrest-repo:/var/lib/pgbackrest
+      - backup-scratch:/var/lib/bothy-backup
+      - files:/var/lib/bothy/files:ro
+      - pgdata:/var/lib/postgresql:ro          # only to measure free space
+      - type: volume
+        source: secrets
+        target: /run/bothy/secrets
+        read_only: true
+        volume:
+          subpath: backup
+    networks: [internal, default]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:${BOTHY_OTELCOL_VERSION:-0.162.0}
+    command:
+      - "--config=/etc/otelcol/collector.yaml"
+      - "--config=/etc/otelcol/exporters/${BOTHY_OTEL_EXPORTER:-none}.yaml"
+      - "--config=/etc/otelcol/exporters/${BOTHY_OTEL_EXPORTER_2:-none}.yaml"
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      BOTHY_TRACE_SAMPLE_PERCENT: ${BOTHY_TRACE_SAMPLE_PERCENT:-10}
+      BOTHY_TRACE_SLOW_THRESHOLD_MS: ${BOTHY_TRACE_SLOW_THRESHOLD_MS:-2000}
+      BOTHY_OTEL_MEMORY_LIMIT_PERCENT: ${BOTHY_OTEL_MEMORY_LIMIT_PERCENT:-80}
+      BOTHY_ENVIRONMENT: ${BOTHY_ENVIRONMENT:-prod}
+      # Targets of the overlays (no secrets; keys live in secrets/collector):
+      NEW_RELIC_OTLP_ENDPOINT: ${NEW_RELIC_OTLP_ENDPOINT:-}
+      GRAFANA_OTLP_ENDPOINT: ${GRAFANA_OTLP_ENDPOINT:-}
+      GRAFANA_INSTANCE_ID: ${GRAFANA_INSTANCE_ID:-}
+      DD_SITE: ${DD_SITE:-datadoghq.eu}
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:-}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:-}
+      AZURE_MONITOR_TRACES_ENDPOINT: ${AZURE_MONITOR_TRACES_ENDPOINT:-}
+      AZURE_MONITOR_METRICS_ENDPOINT: ${AZURE_MONITOR_METRICS_ENDPOINT:-}
+      AZURE_MONITOR_LOGS_ENDPOINT: ${AZURE_MONITOR_LOGS_ENDPOINT:-}
+      SENTRY_OTLP_TRACES_ENDPOINT: ${SENTRY_OTLP_TRACES_ENDPOINT:-}
+      SENTRY_OTLP_LOGS_ENDPOINT: ${SENTRY_OTLP_LOGS_ENDPOINT:-}
+    volumes:
+      - ../otel:/etc/otelcol:ro
+      - type: volume
+        source: secrets
+        target: /run/bothy/secrets
+        read_only: true
+        volume:
+          subpath: collector
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${BOTHY_OTLP_PUBLISH_PORT:-4318}:4318"   # only for adapters on the same host
+    networks: [internal, default]
+
+  clamav:
+    image: clamav/clamav-debian:${BOTHY_CLAMAV_VERSION:-1.5.4}
+    profiles: [scan]
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - clamav-db:/var/lib/clamav
+    networks: [default]
+    deploy:
+      resources:
+        limits:
+          memory: ${BOTHY_CLAMAV_MEMORY_LIMIT:-4g}
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:${BOTHY_SEAWEEDFS_VERSION:-4.48}
+    profiles: [s3]
+    restart: unless-stopped
+    logging: *logging
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        export AWS_ACCESS_KEY_ID="$$(cat /run/bothy/secrets/s3_access_key)";
+        export AWS_SECRET_ACCESS_KEY="$$(cat /run/bothy/secrets/s3_secret_key)";
+        exec weed server -dir=/data -s3 -ip.bind=0.0.0.0
+    volumes:
+      - seaweedfs-data:/data
+      - type: volume
+        source: secrets
+        target: /run/bothy/secrets
+        read_only: true
+        volume:
+          subpath: seaweedfs
+    networks: [internal]
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+
+  prometheus:
+    image: prom/prometheus:${BOTHY_PROMETHEUS_VERSION:-v3.15.0}
+    profiles: [observability]
+    restart: unless-stopped
+    logging: *logging
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yaml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=${BOTHY_PROMETHEUS_RETENTION:-30d}"
+      - "--web.enable-otlp-receiver"
+      - "--web.listen-address=:9090"
+    volumes:
+      - ../observability/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${BOTHY_PROMETHEUS_PUBLISH_PORT:-9090}:9090"
+    networks: [internal, default]
+
+  alertmanager:
+    image: prom/alertmanager:${BOTHY_ALERTMANAGER_VERSION:-v0.34.1}
+    profiles: [observability]
+    restart: unless-stopped
+    logging: *logging
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yaml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - ../observability/alertmanager:/etc/alertmanager:ro
+      - alertmanager-data:/alertmanager
+      - type: volume
+        source: secrets
+        target: /run/bothy/secrets
+        read_only: true
+        volume:
+          subpath: alertmanager
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${BOTHY_ALERTMANAGER_PUBLISH_PORT:-9093}:9093"
+    networks: [internal, default]
+
+  loki:
+    image: grafana/loki:${BOTHY_LOKI_VERSION:-3.7.8}
+    profiles: [observability]
+    restart: unless-stopped
+    logging: *logging
+    command: ["-config.file=/etc/loki/loki.yaml", "-config.expand-env=true"]
+    environment:
+      BOTHY_LOKI_RETENTION: ${BOTHY_LOKI_RETENTION:-14d}
+    volumes:
+      - ../observability/loki:/etc/loki:ro
+      - loki-data:/loki
+    networks: [internal]
+
+  tempo:
+    image: grafana/tempo:${BOTHY_TEMPO_VERSION:-3.1.0}
+    profiles: [observability]
+    restart: unless-stopped
+    logging: *logging
+    command: ["-target=all", "-config.file=/etc/tempo/tempo.yaml", "-config.expand-env=true"]
+    environment:
+      BOTHY_TEMPO_RETENTION: ${BOTHY_TEMPO_RETENTION:-168h}
+    volumes:
+      - ../observability/tempo:/etc/tempo:ro
+      - tempo-data:/var/tempo
+    networks: [internal]
+
+  grafana:
+    image: grafana/grafana:${BOTHY_GRAFANA_VERSION:-13.2.3}
+    profiles: [observability]
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      # Grafana variable expansion $__file{} (checked locally with Grafana 13.2.3); $$ escapes $ for Compose.
+      GF_SECURITY_ADMIN_PASSWORD: "$$__file{/run/bothy/secrets/grafana_admin_password}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ../observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+      - type: volume
+        source: secrets
+        target: /run/bothy/secrets
+        read_only: true
+        volume:
+          subpath: grafana
+    depends_on:
+      secrets-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${BOTHY_GRAFANA_PUBLISH_PORT:-3300}:3000"
+    networks: [internal, default]
+
+configs:
+  tailscale-serve:
+    content: |
+      {
+        "TCP": { "443": { "HTTPS": true } },
+        "Web": {
+          "$${TS_CERT_DOMAIN}:443": {
+            "Handlers": { "/": { "Proxy": "http://127.0.0.1:8080" } }
+          }
+        },
+        "AllowFunnel": { "$${TS_CERT_DOMAIN}:443": false }
+      }
+
+networks:
+  internal:
+    internal: true
+  default: {}
+
+volumes:
+  secrets: {}
+  signing-keys: {}
+  pgdata: {}
+  pgbackrest-repo: {}
+  backup-scratch: {}
+  files: {}
+  clamav-db: {}
+  seaweedfs-data: {}
+  tailscale-state: {}
+  prometheus-data: {}
+  alertmanager-data: {}
+  loki-data: {}
+  tempo-data: {}
+  grafana-data: {}

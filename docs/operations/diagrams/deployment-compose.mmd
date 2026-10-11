@@ -1,0 +1,59 @@
+flowchart LR
+    subgraph clients["Clients"]
+        apps["Apps (iOS, Android, macOS, Windows)"]
+        console["Web-Konsole"]
+        adapters["Agenten-Adapter"]
+    end
+
+    subgraph edge["Rand (genau eins)"]
+        proxy["Reverse-Proxy mit TLS auf dem Host (Profil direct)"]
+        ts["tailscale-Sidecar mit tailscale serve (Profil tailscale)"]
+    end
+
+    subgraph host["Docker-Host"]
+        subgraph net_default["Netz default (mit Ausgang)"]
+            api["api: bothy serve --role=api"]
+            worker["worker: bothy serve --role=worker"]
+            backup["backup: bothy-backupd + pgBackRest-Repository"]
+            otel["otel-collector"]
+            clamav["clamav (Profil scan)"]
+            obs["Prometheus, Alertmanager, Grafana (Profil observability)"]
+        end
+        subgraph net_internal["Netz internal (ohne Ausgang)"]
+            pg[("postgres 18 + pgBackRest")]
+            s3[("seaweedfs (Profil s3)")]
+            lt["Loki, Tempo"]
+        end
+        vol_files[("Volume files")]
+        vol_secrets[("Volume secrets, je Dienst ein subpath")]
+    end
+
+    offsite[("Off-site-Ziel der Sicherung")]
+    saas["Telemetrie-Backend (Overlay)"]
+    pushsvc["APNs, FCM"]
+
+    apps --> proxy
+    apps --> ts
+    console --> proxy
+    adapters --> proxy
+    adapters --> ts
+    proxy -- "127.0.0.1:BOTHY_HTTP_PUBLISH_PORT" --> api
+    ts -- "127.0.0.1:8080 im geteilten Namespace" --> api
+    api --> pg
+    worker --> pg
+    api --> vol_files
+    worker --> vol_files
+    worker --> clamav
+    api --> s3
+    worker --> s3
+    worker --> pushsvc
+    pg -- "WAL über pgBackRest-TLS" --> backup
+    backup --> offsite
+    api -- OTLP --> otel
+    worker -- OTLP --> otel
+    backup -- OTLP --> otel
+    otel --> obs
+    otel --> lt
+    otel --> saas
+    vol_secrets -. "nur Lesen" .-> api
+    vol_secrets -. "nur Lesen" .-> pg

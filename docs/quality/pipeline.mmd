@@ -1,0 +1,23 @@
+flowchart TB
+  subgraph lokal["Lokal"]
+    commit["git commit -s"] --> hooks["pre-commit: Text-Regeln, Hygiene, ruff, gitleaks staged<br/>commit-msg: Conventional Commits, DCO"]
+    hooks --> review
+    review["unabhängiges Review über den Diff<br/>.review/&lt;sha&gt;.md mit Urteil: JA"] --> push["git push"]
+    push --> check["pre-push: Review-Nachweis, dann make check<br/>= gates + denylist + sonar"]
+  end
+  subgraph ci["CI: ci.yml je Pull Request auf main"]
+    plan["plan: Komponenten aus geänderten Pfaden"] --> gates["gates: make gates"]
+    plan --> deny["denylist: make denylist<br/>Fork: nur generische Regeln"]
+    plan --> sonar["sonar: make sonar"]
+    gates --> ok["ci-ok: einziger Pflicht-Check"]
+    deny --> ok
+    sonar --> ok
+  end
+  subgraph runner["Runner"]
+    hosted["GitHub-gehostet, festes Label<br/>ubuntu-24.04; Release auch macos-15 und windows-2025"]
+  end
+  check --> plan
+  ci -.-> runner
+  ok --> merge["Squash and merge auf main<br/>signiert, linear"]
+  merge --> denymain["denylist-main.yml: private Liste<br/>über die gepushten Commits"]
+  merge --> tag["Release-Tag: release.yml<br/>Gates, Build, SBOM, Provenance"]

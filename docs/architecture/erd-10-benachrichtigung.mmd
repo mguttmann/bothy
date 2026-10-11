@@ -1,0 +1,43 @@
+%% ERD Teil 10: Modul notify. Quelle: 03-datenmodell.md, 4.10.
+%% Reine Protokoll-Spalten (created_by, updated_by und ähnliche) zeigen auf principals(id) und
+%% sind nicht als Beziehung gezeichnet.
+%% Tabellen anderer Module nur mit Schlüssel.
+erDiagram
+  direction LR
+  notification_preferences {
+    uuid user_id PK, FK
+    text target_kind PK "space, channel, thread"
+    uuid target_id PK "polymorph, ohne FK"
+    text level "all, mentions, mute"
+  }
+  quiet_hours {
+    uuid id PK
+    uuid user_id FK
+    smallint weekdays
+  }
+  push_registrations {
+    uuid id PK
+    uuid user_id FK
+    uuid device_id FK
+    uuid auth_session_id FK
+    text provider "apns, fcm, unifiedpush, wns"
+    text token "UK mit provider"
+    bytea preview_token_hash UK
+    timestamptz disabled_at
+    text disabled_reason
+  }
+  users {
+    uuid principal_id PK
+  }
+  devices {
+    uuid id PK
+  }
+  auth_sessions {
+    uuid id PK
+  }
+
+  users ||--o{ notification_preferences : "hat"
+  users ||--o{ quiet_hours : "hat"
+  users ||--o{ push_registrations : "hat"
+  devices ||--o{ push_registrations : "empfängt"
+  auth_sessions ||--o{ push_registrations : "Sitzung"

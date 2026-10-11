@@ -1,0 +1,55 @@
+# Prometheus for the local default stack (Compose profile observability).
+# Server metrics arrive via OTLP from the collector (flag --web.enable-otlp-receiver in compose.yaml),
+# not by scraping. Only the own metrics of the helper services are scraped.
+# Sources (retrieved 2026-10-10): https://prometheus.io/docs/guides/opentelemetry/
+#   job = "<service.namespace>/<service.name>", instance = service.instance.id;
+#   out_of_order_time_window 30m recommended.
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+otlp:
+  # Promoted to labels; everything else stays in target_info.
+  promote_resource_attributes:
+    - service.instance.id
+    - service.name
+    - service.namespace
+    - service.version
+    - deployment.environment.name
+    - bothy.server.role
+    # The PostgreSQL receiver of the collector delivers one resource per table and index.
+    # Without these labels their series would collapse onto the same identity.
+    - postgresql.database.name
+    - postgresql.schema.name
+    - postgresql.table.name
+    - postgresql.index.name
+
+storage:
+  tsdb:
+    out_of_order_time_window: 30m
+
+rule_files:
+  - /etc/prometheus/rules/*.yaml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: otel-collector
+    static_configs:
+      - targets: ["otel-collector:8888"]
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["alertmanager:9093"]
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
+  - job_name: tempo
+    static_configs:
+      - targets: ["tempo:3200"]

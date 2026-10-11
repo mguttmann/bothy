@@ -1,0 +1,45 @@
+%% Wiederverbinden mit Nachholen, auch wenn der Client auf einem anderen api-Knoten landet.
+%% Regeln aus 04-sync-protokoll.md Abschnitt 6 und 7.
+sequenceDiagram
+  autonumber
+  participant C as App
+  participant LB as Reverse-Proxy
+  participant GA as api-Knoten A (alte Verbindung)
+  participant GB as api-Knoten B
+  participant AZ as authz Rechte-Cache in B
+  participant DB as PostgreSQL
+
+  Note over C,GA: Netzwechsel: Verbindung zu A bricht ab, Sitzungszustand bleibt nur im Speicher von A
+  C->>C: sofortiger Versuch (Netzwechsel), danach Full Jitter bis sync.reconnect_backoff_cap
+  C->>LB: WebSocket-Upgrade
+  LB->>GB: Upgrade
+  GB-->>C: hello (heartbeat_interval_ms, resume_window_ms, dpop_nonce)
+  C->>GB: resume (gateway_session_id, access_token, dpop, cursor 1200)
+  alt Gateway-Sitzung unbekannt auf B
+    GB-->>C: Schließen 4006 session_invalid
+    C->>GB: neue Verbindung, hello, identify (access_token, dpop, device_id, cursor 1200)
+    GB->>GB: Token, DPoP mit Nonce, Gerät active, Sitzung nicht widerrufen
+    GB->>AZ: authorize(Prinzipal, gateway.connect, Instanz), sichtbare Ziele
+    GB-->>C: ready (head_seq 5300, snapshot ohne Thread-Inhalte)
+  else Sitzung bekannt (gleicher Knoten, innerhalb resume_window)
+    GB-->>C: resumed, Fokus wiederhergestellt
+  end
+  alt cursor zu alt, zu weit zurück oder größer als head_seq
+    GB-->>C: resync_required (retention, too_far_behind oder cursor_ahead), Verbindung bleibt live ab head_seq
+    C->>C: Server-Zustand im Cache verwerfen, Ausgangsfach behalten
+    C->>GB: GET sync/snapshot, Cursor auf dessen head_seq, ältere Ereignisse verwerfen
+  else Nachholen möglich
+    loop Seiten zu sync.catchup_page_size
+      GB->>DB: SELECT event_log WHERE seq > cursor AND seq <= head, gefiltert nach sichtbaren Zielen
+      GB->>AZ: authorize je Ereignis mit seiner Empfangs-Aktion
+      GB-->>C: dispatch (nur sichtbare Ereignisse)
+      GB-->>C: cursor (letzte geprüfte seq)
+    end
+    Note over GB: Live-Ereignisse währenddessen je Verbindung gepuffert, höchstens sync.outbound_queue_max
+    GB-->>C: catchup.complete (head_seq)
+    GB-->>C: gepufferte Live-Ereignisse in seq-Reihenfolge
+  end
+  C->>C: Cursor nach jeder Seite dauerhaft speichern
+  C->>GB: Ausgangsfach senden, je Thread streng nacheinander
+  C->>GB: heartbeat (last_seq)
+  GB-->>C: heartbeat_ack

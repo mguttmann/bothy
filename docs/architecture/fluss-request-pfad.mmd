@@ -1,0 +1,26 @@
+---
+config:
+  layout: elk
+---
+%% Request-Pfad einer REST-Anfrage im api-Knoten. Beschreibung: 02-architektur.md, Abschnitt 10.
+flowchart TB
+  classDef step fill:#136f69,stroke:#063b38,color:#fbfeff
+  classDef check fill:#eddc59,stroke:#8d7716,color:#291f02
+  classDef store fill:#12659d,stroke:#0b4d79,color:#fbfeff
+  classDef ext fill:#59696c,stroke:#24363a,color:#fbfeff
+
+  client["Client"]:::ext --> proxy["Reverse-Proxy<br/>TLS"]:::ext
+  proxy --> m1["1 Recover, Request-ID,<br/>Korrelation"]:::step
+  m1 --> m2["2 OTel-Span (otelhttp),<br/>Zugriffslog ohne Inhalte"]:::step
+  m2 --> m3["3 Größen- und Zeitgrenzen<br/>je Routenklasse"]:::check
+  m3 --> m4["4 Authentisierung: Token,<br/>DPoP, Sitzung, Gerät"]:::check
+  m4 --> m5["5 Routen-Metadaten aus Spec:<br/>Aktion, Rate-Limit-Klasse"]:::step
+  m5 --> m6["6 Rate-Limit<br/>(Token-Bucket)"]:::check
+  m6 --> m7["7 Generierter Strict-Handler:<br/>Dekodieren, Schema-Prüfung"]:::step
+  m7 --> h["8 Modul-Adapter httpapi"]:::step
+  h --> app["9 Anwendungsfall (app):<br/>authorize, Unit of Work"]:::check
+  app --> dom["10 domain:<br/>Regeln, Invarianten"]:::step
+  app --> repo["11 Repository (sqlc, pgx)"]:::step
+  repo --> db[("PostgreSQL")]:::store
+  app --> resp["12 Antwort oder<br/>problem+json"]:::step
+  resp --> m8["13 Nachweis-Prüfung:<br/>authorize mit der Aktion<br/>der Route aufgerufen?"]:::check

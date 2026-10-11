@@ -1,0 +1,94 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Development tool chain of the repository (not shipped). One locked
+# environment for the repo checks, the docs build and the Python linters.
+# Versions are pinned through uv.lock; Renovate updates them (pep621 + uv).
+# Usage: `make bootstrap` once, then `make check`. Never install these tools
+# globally for this repo; the Makefile calls them through `uv run --project tools`.
+
+[project]
+name = "bothy-devtools"
+version = "0.0.0"
+description = "Repository checks and documentation tool chain (development only, not distributed)."
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = [
+  "pyyaml==6.0.3",
+]
+
+[dependency-groups]
+dev = [
+  "bandit==1.9.4",
+  "check-jsonschema==0.38.2",
+  "coverage==7.16.2",
+  "mkdocs==1.6.1",
+  "mkdocs-material==9.7.7",
+  "mypy==2.4.0",
+  "pre-commit==4.6.2",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "ruff==0.17.0",
+  "types-Markdown==3.10.2.20260712",
+  "types-PyYAML==6.0.12.20260906",
+  "zizmor==1.30.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+testpaths = ["bin", "ci", "denylist", "docs", "hooks", "sonarqube"]
+pythonpath = ["bin", "ci", "denylist", "docs", "hooks", "sonarqube", "sonarqube/tests"]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["bin", "ci", "denylist", "docs", "hooks", "sonarqube"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# The threshold is the named value `quality.coverage.tools_min` from
+# docs/spec/23-qualitaet.md; hooks/tests/test_config_values.py holds both equal.
+fail_under = 90
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+# "D": every public module, class and function has a docstring (owner build rule 3,
+# docs/spec/23-qualitaet.md "Doku im Code").
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "PL", "PT", "N", "C4", "PTH", "ERA", "D"]
+ignore = [
+  "PLR0911",  # many returns are clearer than nested branches in small checkers
+  "PLR0912",
+  "PLR2004",  # magic values in tests and rule tables are data, not logic
+  "S603",     # subprocess without shell is the intended, safe form
+  "S607",     # the tools call the VCS client from PATH on purpose, as hooks do
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pylint]
+max-args = 7
+
+[tool.ruff.lint.per-file-ignores]
+# Test names state the case; a docstring per test would repeat them.
+"**/tests/**" = ["D", "S101", "S105", "S106", "S108", "PLR0913", "PLC0415"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+# Tool modules only; tests are linted by ruff and executed by pytest.
+files = ["bin", "ci", "denylist", "docs", "hooks", "sonarqube"]
+exclude = ["/tests/"]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B404", "B603", "B607"]

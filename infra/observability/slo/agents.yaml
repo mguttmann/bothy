@@ -1,0 +1,57 @@
+# SLO specification (Sloth, format prometheus/v1) for agent runs.
+# Generated rules: infra/observability/prometheus/rules/slo-agents.yaml (never edit by hand).
+version: "prometheus/v1"
+service: "bothy-agents"
+labels:
+  component: agents
+slos:
+  # Run start: from `queued` to `running` within 7.5 s. Runs that fail without starting
+  # (adapter offline, actual mode does not match) count as errors; cancellations by people do not.
+  - name: "run-start"
+    objective: 99.0
+    description: "Share of runs that leave queued and start running within 7.5 s."
+    sli:
+      events:
+        error_query: >-
+          sum(rate(bothy_run_start_latency_seconds_count{job="bothy/bothy-server",bothy_outcome!="cancelled"}[{{.window}}]))
+          -
+          sum(rate(bothy_run_start_latency_seconds_bucket{job="bothy/bothy-server",bothy_outcome="started",le="7.5"}[{{.window}}]))
+        total_query: sum(rate(bothy_run_start_latency_seconds_count{job="bothy/bothy-server",bothy_outcome!="cancelled"}[{{.window}}]))
+    alerting:
+      name: BothyRunStartBudgetBurn
+      labels:
+        category: latency
+      annotations:
+        summary: "Agent runs wait too long before they start."
+        runbook_url: "docs/observability/alerting.md#bothyrunstartbudgetburn"
+      page_alert:
+        labels:
+          severity: page
+      ticket_alert:
+        labels:
+          severity: ticket
+
+  # Turn duration: completed runs within 600 s. The duration depends on the model and the
+  # task, not only on the platform. Hence a ticket alert only, never a page.
+  - name: "turn-duration"
+    objective: 95.0
+    description: "Share of completed runs that finish within 600 s."
+    sli:
+      events:
+        error_query: >-
+          sum(rate(bothy_run_duration_seconds_count{job="bothy/bothy-server",bothy_run_state="completed"}[{{.window}}]))
+          -
+          sum(rate(bothy_run_duration_seconds_bucket{job="bothy/bothy-server",bothy_run_state="completed",le="600"}[{{.window}}]))
+        total_query: sum(rate(bothy_run_duration_seconds_count{job="bothy/bothy-server",bothy_run_state="completed"}[{{.window}}]))
+    alerting:
+      name: BothyTurnDurationBudgetBurn
+      labels:
+        category: latency
+      annotations:
+        summary: "Agent turns take longer than usual."
+        runbook_url: "docs/observability/alerting.md#bothyturndurationbudgetburn"
+      page_alert:
+        disable: true
+      ticket_alert:
+        labels:
+          severity: ticket

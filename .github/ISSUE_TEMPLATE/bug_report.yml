@@ -1,0 +1,52 @@
+name: Bug report
+description: Something does not work as the documentation says.
+labels: ["type: bug", "status: triage"]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Security vulnerabilities do not belong here: please follow SECURITY.md and report
+        them privately. Remove personal data, tokens and host names from logs before posting.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the stack with ...
+        2. In the client, open ...
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: Server version and, if relevant, app and SDK versions.
+      placeholder: "server 0.4.1, client 0.4.0 (macOS)"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Server or API
+        - Apps or console
+        - Agents, adapters or SDKs
+        - Deployment or operations
+        - Repository tooling
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant log lines, without secrets or personal data.
+      render: text

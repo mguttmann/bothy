@@ -1,0 +1,237 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Merge gate for pull requests to main, and the gate stage of release.yml.
+# Runs exactly the make targets of `make check`: gates, denylist, sonar
+# (docs/quality/gates.md). The only required status check is "ci-ok".
+#
+# Runners (ADR 0039): every job runs on a GitHub-hosted runner with a fixed label;
+# tools/ci/check_runners.py enforces it on every job.
+
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      components:
+        description: Gate components (tools/ci/components.py) or "all"
+        type: string
+        default: all
+    secrets:
+      SONAR_TOKEN:
+        required: false
+      # Provided by the protected environment "denylist", never by the caller.
+      BOTHY_DENYLIST:
+        required: false
+      BOTHY_DENYLIST_ALLOW_AUTHORS:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      components: ${{ steps.plan.outputs.components }}
+      same_repo: ${{ steps.plan.outputs.same_repo }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - id: plan
+        name: Select components from the changed paths
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPO: ${{ github.repository }}
+          INPUT_COMPONENTS: ${{ inputs.components }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            components=$(uv run --no-project --python 3.14 tools/ci/components.py changed --base "$BASE_SHA" --head "$HEAD_SHA")
+            if [ "$HEAD_REPO" = "$REPO" ]; then same_repo=true; else same_repo=false; fi
+          else
+            components="${INPUT_COMPONENTS:-all}"
+            same_repo=true
+          fi
+          echo "components=$components" >> "$GITHUB_OUTPUT"
+          echo "same_repo=$same_repo" >> "$GITHUB_OUTPUT"
+          echo "components: $components (same repository: $same_repo)"
+
+  gates:
+    name: gates
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      - if: hashFiles('services/server/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/server/go.mod
+          cache-dependency-path: services/server/go.sum
+      - if: hashFiles('apps/client/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: apps/client/pubspec.yaml
+          cache: true
+      - name: Restore pinned binaries and hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/tools
+            ~/.cache/pre-commit
+          key: gates-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/bin/tools.lock.json', '.pre-commit-config.yaml') }}
+      - run: make bootstrap-ci
+      - name: make gates
+        env:
+          # Chromium's sandbox can be blocked where user namespaces are restricted; the
+          # renderer only processes this repository's own diagrams.
+          MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
+          COMPONENTS: ${{ needs.plan.outputs.components }}
+          COMMIT_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || '' }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          GH_TOKEN: ${{ github.token }}
+        run: make gates COMPONENTS="$COMPONENTS"
+
+  denylist:
+    name: denylist (private list)
+    needs: plan
+    if: needs.plan.outputs.same_repo == 'true'
+    environment: denylist
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make denylist
+        env:
+          LIST: ${{ secrets.BOTHY_DENYLIST }}
+          ALLOW: ${{ secrets.BOTHY_DENYLIST_ALLOW_AUTHORS }}
+          BOTHY_DENYLIST_NAMES: ${{ github.head_ref }}
+          DENYLIST_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || '' }}
+        run: |
+          umask 077
+          dir=$(mktemp -d "$RUNNER_TEMP/denylist.XXXXXX")
+          trap 'rm -rf "$dir"' EXIT
+          printf '%s\n' "$LIST" > "$dir/denylist.txt"
+          printf '%s\n' "$ALLOW" > "$dir/allow-authors.txt"
+          export BOTHY_DENYLIST_FILE="$dir/denylist.txt"
+          make denylist
+
+  denylist-fork:
+    name: denylist (generic rules, fork)
+    needs: plan
+    if: needs.plan.outputs.same_repo != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make denylist (generic rules only)
+        env:
+          BOTHY_DENYLIST_NAMES: ${{ github.head_ref }}
+          DENYLIST_RANGE: ${{ format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) }}
+        run: make denylist DENYLIST_FLAGS=--allow-missing
+
+  sonar:
+    name: sonar
+    needs: plan
+    if: needs.plan.outputs.same_repo == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: tools/node/package-lock.json
+      - if: hashFiles('services/server/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/server/go.mod
+          cache-dependency-path: services/server/go.sum
+      - if: hashFiles('apps/client/pubspec.yaml') != ''
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: apps/client/pubspec.yaml
+          cache: true
+      - run: make bootstrap-ci
+      - name: make sonar
+        env:
+          COMPONENTS: ${{ needs.plan.outputs.components }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+        run: make sonar COMPONENTS="$COMPONENTS" SONAR_HOST_URL="${SONAR_HOST_URL:-http://127.0.0.1:9000}" SONAR_ORGANIZATION="$SONAR_ORGANIZATION" SONAR_PROJECT_KEY="${SONAR_PROJECT_KEY:-bothy}"
+
+  ci-ok:
+    name: ci-ok
+    needs: [plan, gates, denylist, denylist-fork, sonar]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: All required jobs passed
+        env:
+          PLAN: ${{ needs.plan.result }}
+          GATES: ${{ needs.gates.result }}
+          DENY: ${{ needs.denylist.result }}
+          DENY_FORK: ${{ needs.denylist-fork.result }}
+          SONAR: ${{ needs.sonar.result }}
+        # Explicit checks: a failing test inside an && list would not stop `bash -e`.
+        run: |
+          echo "plan=$PLAN gates=$GATES denylist=$DENY denylist-fork=$DENY_FORK sonar=$SONAR"
+          fail=0
+          if [ "$PLAN" != success ]; then fail=1; fi
+          if [ "$GATES" != success ]; then fail=1; fi
+          if [ "$DENY" != success ] && [ "$DENY_FORK" != success ]; then fail=1; fi
+          case "$SONAR" in success|skipped) ;; *) fail=1 ;; esac
+          exit "$fail"

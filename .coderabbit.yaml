@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# SPDX-License-Identifier: Apache-2.0
+#
+# CodeRabbit pull request reviews, active once the repository is public (free for public
+# repositories). The local CLI is opt-in (`make review` with BOTHY_CODERABBIT=1), because
+# it sends the diff to the CodeRabbit service (docs/quality/push-discipline.md).
+# A finding that only CodeRabbit sees becomes a local rule (Semgrep, a test or a lint).
+
+language: en-US
+early_access: false
+
+reviews:
+  profile: assertive
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  in_progress_fortune: false
+  sequence_diagrams: false
+  suggested_labels: false
+  suggested_reviewers: false
+  review_status: true
+  collapse_walkthrough: true
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!**/uv.lock"
+    - "!**/package-lock.json"
+    - "!**/pubspec.lock"
+    - "!**/go.sum"
+    - "!**/*.svg"
+    - "!design/build/**"
+  path_instructions:
+    - path: "**/*.md"
+      instructions: >-
+        Planning and specification documents are German, community files English.
+        Flag en dashes and em dashes, numbers for limits or thresholds that are not
+        named configuration values, external facts without URL and retrieval date,
+        and anything instance-specific (company or person names, host names, real
+        IP addresses, paths under a user home). Terms must match docs/spec/00-glossar.md.
+    - path: ".github/workflows/**"
+      instructions: >-
+        Every job runs on a fixed GitHub-hosted runner label, never on a runner outside
+        GitHub (tools/ci/check_runners.py, ADR 0039). Actions pinned to full commit
+        SHAs, top-level `permissions: contents: read`, timeout-minutes on every job,
+        no pull_request_target, untrusted values only through environment variables.
+    - path: "services/**/*.go"
+      instructions: >-
+        Every route and event goes through authorize with an action from
+        docs/spec/05-aktionen.md; no read right means 404, never 403. SQL only through
+        sqlc queries. The server never reads model provider credentials.
+    - path: "tools/**/*.py"
+      instructions: >-
+        Repository tools: standard library or PyYAML only, a test for every behaviour,
+        no secret values in output.
+  tools:
+    actionlint:
+      enabled: true
+    gitleaks:
+      enabled: true
+    golangci-lint:
+      enabled: true
+    ruff:
+      enabled: true
+    zizmor:
+      enabled: true
+    languagetool:
+      enabled: false
+
+chat:
+  auto_reply: true
+  art: false
+
+knowledge_base:
+  opt_out: true

@@ -1,0 +1,51 @@
+%% Datei-Upload mit Malware-Scan und Vorschaubild. Fachliche Details: 12-dateien.md.
+sequenceDiagram
+  autonumber
+  participant A as App Alex
+  box api-Knoten
+    participant F as files
+    participant MSG as messaging
+    participant HUB as gateway Hub
+  end
+  participant DB as PostgreSQL
+  participant OBJ as Objektspeicher
+  box worker
+    participant SJ as Job files.scan
+    participant TJ as Job files.thumbnail
+  end
+  participant AV as ClamAV clamd
+  participant S as App Sam
+
+  A->>F: POST Upload-Sitzung (Kanal, Größe, Name, angegebener Typ)
+  F->>F: authorize(Alex, file.upload, Kanal): write und upload, Größe höchstens file.max_upload_bytes
+  F->>DB: INSERT files (upload_state pending, zufälliger object_key)
+  alt Treiber S3 mit presigned URL
+    F-->>A: kurzlebige PUT-URL mit Prüfsummen-Kopfzeile
+    A->>OBJ: PUT Bytes
+  else Treiber Dateisystem oder Upload über den Server
+    F-->>A: Upload-Ziel am Server
+    A->>F: PUT Bytes (gestreamt, Größe begrenzt)
+    F->>OBJ: schreiben, SHA-256 beim Durchleiten
+  end
+  A->>F: POST Upload abschließen
+  F->>OBJ: Größe und Prüfsumme prüfen, Kopf lesen für MIME-Erkennung
+  F->>DB: upload_state complete, scan_status pending, Job files.scan in derselben Transaktion, file.updated
+  F-->>A: 200 Datei (scan pending)
+  A->>MSG: POST Nachricht mit file_id (message.create, zusätzlich upload)
+  MSG->>F: Anhang an Nachricht im selben Kanal binden
+  MSG-->>A: 201, Anzeige "wird geprüft"
+  SJ->>OBJ: Objekt streamen
+  SJ->>AV: INSTREAM in Blöcken, Ende mit Null-Block
+  alt Ergebnis OK
+    AV-->>SJ: OK
+    SJ->>DB: scan_status clean, scanned_at, Job files.thumbnail falls Bild, file.updated
+    TJ->>OBJ: lesen, dekodieren, neu kodieren (Metadaten entfernt), Varianten schreiben
+    TJ->>DB: file_thumbnails, file.updated
+  else Fund
+    AV-->>SJ: FOUND
+    SJ->>DB: scan_status infected, Auslieferung gesperrt, Audit-Eintrag, file.updated
+  else clamd nicht erreichbar
+    SJ->>SJ: Fehler, River wiederholt mit Backoff, Status bleibt pending (fail closed)
+  end
+  HUB-->>S: dispatch file.updated
+  S->>F: GET Vorschaubild (file.read, nur bei clean oder skipped)

@@ -1,0 +1,30 @@
+# SLO specification (Sloth, format prometheus/v1). Source of the numbers in docs/observability/slos.md.
+# Generated rules: infra/observability/prometheus/rules/slo-api.yaml (never edit by hand).
+# Generate: sloth generate -i infra/observability/slo/api.yaml -o infra/observability/prometheus/rules/slo-api.yaml
+version: "prometheus/v1"
+service: "bothy-api"
+labels:
+  component: api
+slos:
+  # Availability of the REST API: share of requests without 5xx. The WebSocket upgrade does not count,
+  # because its duration is the connection duration; the gateway has its own SLO (sync.yaml).
+  - name: "requests-availability"
+    objective: 99.9
+    description: "Share of REST requests answered without a 5xx status."
+    sli:
+      events:
+        error_query: sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway",http_response_status_code=~"5.."}[{{.window}}]))
+        total_query: sum(rate(http_server_request_duration_seconds_count{job="bothy/bothy-server",http_route!="/api/v1/gateway"}[{{.window}}]))
+    alerting:
+      name: BothyApiAvailabilityBudgetBurn
+      labels:
+        category: availability
+      annotations:
+        summary: "REST API is burning its availability error budget."
+        runbook_url: "docs/observability/alerting.md#bothyapiavailabilitybudgetburn"
+      page_alert:
+        labels:
+          severity: page
+      ticket_alert:
+        labels:
+          severity: ticket

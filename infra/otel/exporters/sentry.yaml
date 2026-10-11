@@ -1,0 +1,24 @@
+# Overlay "sentry": traces and logs via OTLP to Sentry. Sentry does not accept OTLP metrics.
+# Source (retrieved 2026-10-10): https://docs.sentry.io/concepts/otlp/
+#   status "open beta"; endpoint per signal
+#   https://o<orgId>.ingest.sentry.io/api/<projectId>/integration/otlp/v1/traces (or /logs),
+#   Header x-sentry-auth: "sentry sentry_key=<public-key>".
+# The contrib exporter "sentry" is only alpha; hence OTLP.
+# Secret: secrets/collector/sentry_key (only the public project key, still as a file).
+# App crashes do not go through the collector but directly from the apps (sentry_flutter).
+
+exporters:
+  otlp_http/sentry:
+    traces_endpoint: ${env:SENTRY_OTLP_TRACES_ENDPOINT}
+    logs_endpoint: ${env:SENTRY_OTLP_LOGS_ENDPOINT}
+    headers:
+      x-sentry-auth: "sentry sentry_key=${file:/run/bothy/secrets/sentry_key}"
+
+service:
+  pipelines:
+    traces/sentry:
+      receivers: [forward/traces]
+      exporters: [otlp_http/sentry]
+    logs/sentry:
+      receivers: [forward/logs]
+      exporters: [otlp_http/sentry]

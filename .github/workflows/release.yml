@@ -1,0 +1,378 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Release of one component per tag: `<component>/v<semver>` or `v<semver>` for the whole
+# product (tools/ci/components.py, docs/spec/18-release.md). Order: resolve the tag,
+# run the full gate (ci.yml), build, SBOM, then publish with provenance; for product tags
+# the portability test (portability.yml) follows publish.
+#
+# Runners (ADR 0039): every job runs on a GitHub-hosted runner with a fixed label, the
+# macOS and iOS build on macos-15 and the Windows build on windows-2025. Signing secrets exist
+# only in the protected environments release, release-apple and release-windows.
+# Sigstore-backed attestations run only while the repository is public: a public
+# transparency log entry would reveal a private repository (ADR 0062).
+# The resolve job has no release environment; every release* job resolves the tag again
+# from tools/ci/components.py, compares, and uses only its own result. publish takes the build
+# artifacts by id from the release jobs, never by name (T-SC-05, D-W-52).
+
+name: release
+
+on:
+  push:
+    tags:
+      - "v[0-9]*"
+      - "*/v[0-9]*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    name: resolve tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      component: ${{ steps.info.outputs.component }}
+      version: ${{ steps.info.outputs.version }}
+      path: ${{ steps.info.outputs.path }}
+      gate_components: ${{ steps.info.outputs.gate_components }}
+      prerelease: ${{ steps.info.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+
+  gates:
+    name: gates
+    needs: resolve
+    # Same-commit reusable workflow. The newer `$/` form is not yet understood by
+    # actionlint 1.7.12; switch when it is (docs/quality/toolchain.md).
+    uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
+    permissions:
+      contents: read
+    with:
+      components: ${{ needs.resolve.outputs.gate_components }}
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  build:
+    name: build (linux, artifacts and images)
+    needs: [resolve, gates]
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write # push the server image to ghcr.io
+    outputs:
+      dist_id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # The resolve job has no release environment. Its outputs may steer control flow
+      # (`if:`), but no value from it reaches a shell or an action here: this job resolves
+      # the tag again from the fixed component list and stops on any difference (T-SC-05,
+      # rule release-untrusted-output in tools/ci/check_runners.py).
+      - name: Resolve the tag again on this runner
+        id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+      - name: Stop if the resolve job reported something else
+        if: >-
+          steps.info.outputs.component != needs.resolve.outputs.component ||
+          steps.info.outputs.version != needs.resolve.outputs.version ||
+          steps.info.outputs.path != needs.resolve.outputs.path ||
+          steps.info.outputs.gate_components != needs.resolve.outputs.gate_components ||
+          steps.info.outputs.prerelease != needs.resolve.outputs.prerelease
+        run: |
+          echo "::error::the resolve job disagrees with this release job; release stopped"
+          exit 1
+      - if: hashFiles('services/server/go.mod') != ''
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/server/go.mod
+          cache: false
+      - name: Build release artifacts (component Makefile, target release-build)
+        env:
+          COMPONENT_PATH: ${{ steps.info.outputs.path }}
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          mkdir -p dist
+          make -C "$COMPONENT_PATH" release-build VERSION="$VERSION" OUT="$GITHUB_WORKSPACE/dist"
+      - name: Image name (registry names are lower case)
+        if: steps.info.outputs.component == 'server'
+        id: name
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "image=ghcr.io/${OWNER,,}/bothy-server" >> "$GITHUB_OUTPUT"
+      - if: steps.info.outputs.component == 'server'
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - if: steps.info.outputs.component == 'server'
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - if: steps.info.outputs.component == 'server'
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Build and push the multi-arch server image by digest only (no tag yet)
+        if: steps.info.outputs.component == 'server'
+        id: image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: services/server/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          provenance: mode=max
+          sbom: true
+          outputs: type=image,name=${{ steps.name.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+      - name: Vulnerability scan, then the version tag
+        if: steps.info.outputs.component == 'server'
+        env:
+          IMAGE: ${{ steps.name.outputs.image }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+          VERSION: ${{ steps.info.outputs.version }}
+        run: |
+          make trivy-image IMAGE="$IMAGE@$DIGEST"
+          docker buildx imagetools create --tag "$IMAGE:$VERSION" "$IMAGE@$DIGEST"
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-linux
+          path: dist
+          if-no-files-found: ignore
+
+  build-apple:
+    name: build (macOS and iOS apps)
+    needs: [resolve, gates]
+    if: needs.resolve.outputs.component == 'client'
+    environment: release-apple
+    runs-on: macos-15
+    timeout-minutes: 90
+    outputs:
+      dist_id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: apps/client/pubspec.yaml
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # The resolve job has no release environment. Its outputs may steer control flow
+      # (`if:`), but no value from it reaches a shell or an action here: this job resolves
+      # the tag again from the fixed component list and stops on any difference (T-SC-05,
+      # rule release-untrusted-output in tools/ci/check_runners.py).
+      - name: Resolve the tag again on this runner
+        id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+      - name: Stop if the resolve job reported something else
+        if: >-
+          steps.info.outputs.component != needs.resolve.outputs.component ||
+          steps.info.outputs.version != needs.resolve.outputs.version ||
+          steps.info.outputs.path != needs.resolve.outputs.path ||
+          steps.info.outputs.gate_components != needs.resolve.outputs.gate_components ||
+          steps.info.outputs.prerelease != needs.resolve.outputs.prerelease
+        run: |
+          echo "::error::the resolve job disagrees with this release job; release stopped"
+          exit 1
+      - name: Build, sign and notarize (apps/client/Makefile, target release-apple)
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+        run: make -C apps/client release-apple VERSION="$VERSION" OUT="$GITHUB_WORKSPACE/dist"
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-apple
+          path: dist
+          if-no-files-found: error
+
+  build-windows:
+    name: build (Windows app)
+    needs: [resolve, gates]
+    if: needs.resolve.outputs.component == 'client'
+    environment: release-windows
+    runs-on: windows-2025
+    timeout-minutes: 90
+    outputs:
+      dist_id: ${{ steps.upload.outputs.artifact-id }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: apps/client/pubspec.yaml
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # The resolve job has no release environment. Its outputs may steer control flow
+      # (`if:`), but no value from it reaches a shell or an action here: this job resolves
+      # the tag again from the fixed component list and stops on any difference (T-SC-05,
+      # rule release-untrusted-output in tools/ci/check_runners.py).
+      - name: Resolve the tag again on this runner
+        id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+      - name: Stop if the resolve job reported something else
+        if: >-
+          steps.info.outputs.component != needs.resolve.outputs.component ||
+          steps.info.outputs.version != needs.resolve.outputs.version ||
+          steps.info.outputs.path != needs.resolve.outputs.path ||
+          steps.info.outputs.gate_components != needs.resolve.outputs.gate_components ||
+          steps.info.outputs.prerelease != needs.resolve.outputs.prerelease
+        run: |
+          echo "::error::the resolve job disagrees with this release job; release stopped"
+          exit 1
+      - name: Build and sign MSIX (apps/client/Makefile, target release-windows)
+        env:
+          VERSION: ${{ steps.info.outputs.version }}
+        run: make -C apps/client release-windows VERSION="$VERSION" OUT="$GITHUB_WORKSPACE/dist"
+      - id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist-windows
+          path: dist
+          if-no-files-found: error
+
+  publish:
+    name: publish
+    needs: [resolve, build, build-apple, build-windows]
+    if: >-
+      always() && needs.build.result == 'success' &&
+      contains(fromJSON('["success","skipped"]'), needs.build-apple.result) &&
+      contains(fromJSON('["success","skipped"]'), needs.build-windows.result)
+    environment: release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write # create the GitHub release
+      id-token: write # Sigstore certificate for the attestations
+      attestations: write # store the attestations
+      artifact-metadata: write # storage record required by actions/attest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      # The resolve job has no release environment. Its outputs may steer control flow
+      # (`if:`), but no value from it reaches a shell or an action here: this job resolves
+      # the tag again from the fixed component list and stops on any difference (T-SC-05,
+      # rule release-untrusted-output in tools/ci/check_runners.py).
+      - name: Resolve the tag again on this runner
+        id: info
+        env:
+          TAG: ${{ github.ref_name }}
+        run: uv run --no-project --python 3.14 tools/ci/components.py release --tag "$TAG" --github-output >> "$GITHUB_OUTPUT"
+      - name: Stop if the resolve job reported something else
+        if: >-
+          steps.info.outputs.component != needs.resolve.outputs.component ||
+          steps.info.outputs.version != needs.resolve.outputs.version ||
+          steps.info.outputs.path != needs.resolve.outputs.path ||
+          steps.info.outputs.gate_components != needs.resolve.outputs.gate_components ||
+          steps.info.outputs.prerelease != needs.resolve.outputs.prerelease
+        run: |
+          echo "::error::the resolve job disagrees with this release job; release stopped"
+          exit 1
+      # By id, not by name or pattern: every job of this run, also the ones without a release
+      # environment, can upload an artifact named dist-something (release-artifact-by-id).
+      - name: Artifacts of the Linux build
+        if: needs.build.outputs.dist_id != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
+      - name: Artifacts of the Apple build
+        if: needs.build-apple.outputs.dist_id != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build-apple.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
+      - name: Artifacts of the Windows build
+        if: needs.build-windows.outputs.dist_id != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build-windows.outputs.dist_id }}
+          path: dist
+          merge-multiple: true
+      - name: SBOM of all release artifacts
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: dist
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Checksums
+        run: |
+          mv sbom.spdx.json dist/
+          (cd dist && find . -type f -print0 | sort -z | xargs -0 shasum -a 256 > "$RUNNER_TEMP/SHA256SUMS")
+          mv "$RUNNER_TEMP/SHA256SUMS" dist/SHA256SUMS
+      - name: Build provenance (public phase only)
+        if: github.event.repository.visibility == 'public'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*
+      - name: SBOM attestation (public phase only)
+        if: github.event.repository.visibility == 'public'
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/*
+          sbom-path: dist/sbom.spdx.json
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          COMPONENT_PATH: ${{ steps.info.outputs.path }}
+          VERSION: ${{ steps.info.outputs.version }}
+          PRERELEASE: ${{ steps.info.outputs.prerelease }}
+        run: |
+          awk -v v="$VERSION" '$0 ~ "^## \\[" v "\\]" {on=1; next} on && /^## \[/ {exit} on {print}' \
+            "$COMPONENT_PATH/CHANGELOG.md" > "$RUNNER_TEMP/notes.md"
+          [ -s "$RUNNER_TEMP/notes.md" ] || { echo "CHANGELOG.md has no section for $VERSION"; exit 1; }
+          flags=(--verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md")
+          [ "$PRERELEASE" = true ] && flags+=(--prerelease)
+          gh release create "$TAG" dist/* "${flags[@]}"
+
+  # Portability test of a product release (docs/spec/16-betrieb.md, 11.1): only after
+  # publish, because install.sh and the bundle exist under the tag only from then on; only
+  # for the component bothy (tag vX.Y.Z), the only one with an install.sh. The tag comes from
+  # github.ref_name, not from the resolve job; its output only steers the condition.
+  portability:
+    name: portability
+    needs: [resolve, publish]
+    if: always() && needs.publish.result == 'success' && needs.resolve.outputs.component == 'bothy'
+    uses: ./.github/workflows/portability.yml # zizmor: ignore[self-repository]
+    permissions:
+      contents: read # check out the tag
+    with:
+      tag: ${{ github.ref_name }}

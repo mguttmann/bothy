@@ -1,0 +1,37 @@
+/* GENERIERT von tools/design-tokens/tokens.py aus design/tokens. Nicht bearbeiten; Quelle ändern und neu erzeugen. */
+
+[data-md-color-scheme="default"] {
+  --md-primary-fg-color: #136f69;
+  --md-primary-fg-color--light: #0c5450;
+  --md-primary-fg-color--dark: #063b38;
+  --md-primary-bg-color: #fbfeff;
+  --md-accent-fg-color: #136f69;
+  --md-accent-fg-color--transparent: #e4fbf8;
+  --md-typeset-a-color: #136f69;
+  --md-mermaid-node-bg-color: #e4fbf8;
+  --md-mermaid-node-fg-color: #136f69;
+  --md-mermaid-edge-color: #3f5154;
+  --md-mermaid-label-bg-color: #fbfeff;
+  --md-mermaid-label-fg-color: #08191c;
+  --md-mermaid-sequence-note-bg-color: #fef5aa;
+  --md-mermaid-sequence-note-border-color: #8d7716;
+  --md-mermaid-sequence-note-fg-color: #08191c;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #49c0b7;
+  --md-primary-fg-color--light: #7cd5cd;
+  --md-primary-fg-color--dark: #a8e8e1;
+  --md-primary-bg-color: #041c1a;
+  --md-accent-fg-color: #7cd5cd;
+  --md-accent-fg-color--transparent: #032624;
+  --md-typeset-a-color: #7cd5cd;
+  --md-mermaid-node-bg-color: #032624;
+  --md-mermaid-node-fg-color: #7cd5cd;
+  --md-mermaid-edge-color: #ccd9db;
+  --md-mermaid-label-bg-color: #15282b;
+  --md-mermaid-label-fg-color: #f5fbfc;
+  --md-mermaid-sequence-note-bg-color: #291f02;
+  --md-mermaid-sequence-note-border-color: #c2ab24;
+  --md-mermaid-sequence-note-fg-color: #f5fbfc;
+}

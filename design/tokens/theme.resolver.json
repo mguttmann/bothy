@@ -1,0 +1,50 @@
+{
+  "$schema": "https://www.designtokens.org/schemas/2025.10/resolver.json",
+  "name": "Design-System",
+  "version": "2025.10",
+  "description": "Einstiegspunkt der Token-Pipeline. Drei Modifikatoren: Theme (hell, dunkel), Dichte (comfortable, compact, touch) und Bewegung (full, reduced). Die Apps wählen den Kontext zur Laufzeit; der Generator erzeugt alle Kontexte.",
+  "sets": {
+    "base": {
+      "sources": [
+        {"$ref": "color.palette.tokens.json"},
+        {"$ref": "typography.tokens.json"},
+        {"$ref": "space.tokens.json"},
+        {"$ref": "elevation.tokens.json"},
+        {"$ref": "icon.tokens.json"}
+      ]
+    }
+  },
+  "modifiers": {
+    "theme": {
+      "description": "Hell oder dunkel. Die Einstellung appearance.theme kennt zusätzlich 'system'; das löst die App auf, nicht der Resolver.",
+      "contexts": {
+        "light": [{"$ref": "color.light.tokens.json"}],
+        "dark": [{"$ref": "color.dark.tokens.json"}]
+      },
+      "default": "dark"
+    },
+    "density": {
+      "description": "comfortable ist Standard auf Desktop und Web, touch fest auf Mobilgeräten, compact wählbar auf Desktop.",
+      "contexts": {
+        "comfortable": [{"$ref": "density.comfortable.tokens.json"}],
+        "compact": [{"$ref": "density.compact.tokens.json"}],
+        "touch": [{"$ref": "density.touch.tokens.json"}]
+      },
+      "default": "comfortable"
+    },
+    "motion": {
+      "description": "reduced folgt der Systemeinstellung 'Bewegung reduzieren' oder der Einstellung appearance.reduce_motion.",
+      "contexts": {
+        "full": [{"$ref": "motion.full.tokens.json"}],
+        "reduced": [{"$ref": "motion.reduced.tokens.json"}]
+      },
+      "default": "full"
+    }
+  },
+  "resolutionOrder": [
+    {"$ref": "#/sets/base"},
+    {"$ref": "#/modifiers/theme"},
+    {"$ref": "#/modifiers/density"},
+    {"$ref": "#/modifiers/motion"}
+  ]
+}

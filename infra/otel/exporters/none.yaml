@@ -1,0 +1,3 @@
+# Overlay "none": no external target. The base drops the data in the nop exporter.
+# Serves as default for BOTHY_OTEL_EXPORTER and BOTHY_OTEL_EXPORTER_2 in Compose.
+{}

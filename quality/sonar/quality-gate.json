@@ -1,0 +1,10 @@
+{
+  "comment": "Quality gate of the project, identical on SonarQube Community Build and SonarQube Cloud. Conditions use metrics that exist in Standard Experience and MQR mode. Thresholds are the named values of docs/spec/23-qualitaet.md (config_key); a test holds both equal.",
+  "name": "Bothy way",
+  "conditions": [
+    {"metric": "new_violations", "op": "GT", "error": "0", "config_key": "quality.sonar.new_issues_max"},
+    {"metric": "new_security_hotspots_reviewed", "op": "LT", "error": "100", "config_key": "quality.sonar.new_hotspots_reviewed_min_percent"},
+    {"metric": "new_coverage", "op": "LT", "error": "80", "config_key": "quality.sonar.new_coverage_min_percent"},
+    {"metric": "new_duplicated_lines_density", "op": "GT", "error": "3", "config_key": "quality.sonar.new_duplication_max_percent"}
+  ]
+}

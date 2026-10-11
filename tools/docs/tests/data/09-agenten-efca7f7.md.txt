@@ -1,0 +1,29 @@
+<!-- Auszug aus docs/spec/09-agenten.md im Stand efca7f7: R-AG-22 stand zweimal in der ersten Spalte (Befund K3-05). Endung .txt, damit Linkcheck und Markdown-Prüfungen die alten relativen Links nicht auswerten. -->
+
+
+| Nr | Entscheidung | Grund |
+|---|---|---|
+| R-AG-01 | Wirksame Fähigkeit = Owner-Erlaubnis und Adapter-Meldung. | Owner kann abschalten, aber nichts erzwingen, was der Adapter nicht kann. |
+| R-AG-02 | Hauptverläufe nutzen den aktuellen Bediener; Threads ihren festen. | Ein eingefrorener Bediener würde Kanäle nach einem Wechsel stumm schalten. |
+| R-AG-03 | Mehr als ein erwähnter Agent ist eine sichtbare Ablehnung. | Höchstens ein aktiver Lauf je Thread; der Server rät nicht. |
+| R-AG-04 | Gast-Läufe haben keine Sitzung. | Eine aktuelle Sitzung je Thread; der Gast verdrängt den Bediener nicht. |
+| R-AG-22 | Persönliche Agenten sind nie Gast-Agenten. | Sonst wären sie auf Kanälen auslösbar, die I1 nicht prüft. |
+| R-AG-05 | Ohne `trigger` gibt es eine Fehlermeldung nur bei ausdrücklicher Erwähnung. | Keine Fehlerflut in freien Kanälen, aber Antwort auf gezielte Ansprache. |
+| R-AG-06 | Kontext baut der Server mit Vertrauensmarke je Nachricht ([ADR 0054](../adr/0054-herkunfts-und-vertrauensmarkierung-im-agenten-kontext.md)). | Nur `authz` kennt die Rechte der Autoren; Schutz gegen Prompt-Injection. |
+| R-AG-07 | Adapter startet die Laufzeit erst nach Zusage durch `run.start`. | Höchstens eine Ausführung je Aufruf. |
+| R-AG-08 | `run.start` deckt auch `waiting_input -> running` ab. | Eine Rückfrage ist eine Auslösung wie jede andere und braucht eine Marke. |
+| R-AG-09 | `trigger_state` trennt `received` (Server) und `queued` (Adapter); neuer Wert `cancelled`. | Mensch sieht, ob der Agent den Auftrag hat; Stopp ist kein Fehler. |
+| R-AG-10 | Nach einem Stopp werden offene Nachträge verworfen, nach einem Fehler nachgeholt. | Stopp heißt "nichts mehr"; Fehler lassen neue Aufträge unbearbeitet. |
+| R-AG-11 | Einmal-Regel gilt je Nachricht für alle `single_use`-Komponenten. | Eine Karte hat genau eine Entscheidung. |
+| R-AG-12 | "Immer erlauben" nur für Owner. | Ändert die dauerhafte Erlaubnis der Laufzeit für alle Auslöser. |
+| R-AG-13 | Eingebaute Steuerbefehle mit reservierten Namen; kein Schlüsselwort im Fließtext. | Eindeutig, übersetzbar, nie an das Modell. |
+| R-AG-14 | Autovervollständigung ruft nie ein Modell und antwortet nach Frist leer. | Tippen kostet nichts und hängt nie. |
+| R-AG-15 | Platzhalter-Erkennung bei der Anlage entscheidet `auto` oder `manual`. | Echte Titel werden nie überschrieben, Platzhalter schon. |
+| R-AG-16 | Spracheingabe: Agent transkribiert, sonst Server-Port, sonst sichtbare Ablehnung. | Kein stiller Verlust einer Sprachnachricht. |
+| R-AG-17 | Keine automatische Wiederholung nach `interrupted`, `stale`; Knopf "Erneut senden". | Nebenwirkungen der Laufzeit dürfen nicht doppelt entstehen. |
+| R-AG-18 | Hermes: Werkzeug-Anzeige als Lauf-Schritte, Entwürfe in die Box, Antworten erst fertig als Nachricht. | Keine Revisionsflut, eine Live-Box statt Fortschritts-Blasen. |
+| R-AG-19 | Hermes: Erlaubnisliste im Adapter aus dem Server; Hermes-eigene Liste nur bei `personal`. | Drei Schichten ohne Neustart bei jeder Freigabe. |
+| R-AG-20 | Runner: Ist-Modus per Vorab-Prüfung mit kontrollierter Umgebung, `apiKeySource` nur als Gegenprobe. | `apiKeySource = none` unterscheidet Abo und andere Wege nicht. |
+| R-AG-21 | Runner: `--permission-prompts none` statt wartender Rückfragen. | Unbeaufsichtigte Turns hängen nicht. |
+| R-AG-22 | Bestätigung nach der Annahme ins Eingangsfach, nicht nach `run.start`; abgelaufene Marke über `run.token.renew` erneuern; ein Fehler der Marke beim Start immer `403 invocation_token_invalid` mit `reason`. | Ein langsamer Start löste sonst eine erneute Zustellung aus, deren Marke die alte ersetzt und die die Doppel-Erkennung verwirft; der Lauf hinge (D-W-15). |
+| R-AG-23 | Werkzeugklasse im Protokoll: Claim `tool_class`, Prüfpunkt im Adapter, `tool_class_used` in `run.start`, Flags je Klasse im Runner. | SR2 braucht eine prüfbare Ist-Klasse beim Start; `full` gab es nicht (D-W-16). |

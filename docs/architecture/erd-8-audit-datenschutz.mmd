@@ -1,0 +1,50 @@
+%% ERD Teil 8: Module audit und privacy. Quelle: 03-datenmodell.md, 4.12. audit_events und
+%% audit_ip_keys haben bewusst keine Fremdschlüssel; audit_events.details.ip_key_id verweist
+%% nur logisch auf audit_ip_keys.id.
+%% Reine Protokoll-Spalten (created_by, updated_by und ähnliche) zeigen auf principals(id) und
+%% sind nicht als Beziehung gezeichnet.
+%% Tabellen anderer Module nur mit Schlüssel.
+erDiagram
+  direction LR
+  audit_events {
+    bigint seq PK
+    uuid id UK
+    text action
+    text decision "allow, deny, error"
+    bytea prev_hash
+    bytea hash UK
+  }
+  audit_checkpoints {
+    bigint seq PK "letzte erfasste audit_events.seq"
+    bytea hash
+    text kid FK
+    timestamptz exported_at
+  }
+  gdpr_requests {
+    uuid id PK
+    uuid subject_user_id FK
+    text kind "export, deletion, rectification"
+    text state
+    uuid result_file_id FK
+  }
+  audit_ip_keys {
+    uuid id PK "ip_key_id in audit_events.details"
+    timestamptz valid_from UK
+    timestamptz valid_until
+    bytea key_ciphertext "NULL nach Vernichtung"
+    text key_ref
+    timestamptz destroyed_at
+  }
+  users {
+    uuid principal_id PK
+  }
+  files {
+    uuid id PK
+  }
+  server_signing_keys {
+    text kid PK
+  }
+
+  server_signing_keys ||--o{ audit_checkpoints : "signiert"
+  users ||--o{ gdpr_requests : "betroffen"
+  files |o--o{ gdpr_requests : "Exportpaket"

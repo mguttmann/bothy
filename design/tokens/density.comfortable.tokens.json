@@ -1,0 +1,16 @@
+{
+  "$description": "Dichte, Kontext comfortable: Standard auf Desktop und in der Konsole. Dicht wie Discord, mit Luft für lange Agenten-Antworten.",
+  "density": {
+    "$type": "dimension",
+    "row-channel": {"$value": {"value": 32, "unit": "px"}, "$description": "Kanalzeile in der Seitenleiste."},
+    "row-post": {"$value": {"value": 52, "unit": "px"}, "$description": "Beitragszeile im Forum (zwei Zeilen: Titel, Metadaten)."},
+    "row-suggestion": {"$value": {"value": 36, "unit": "px"}, "$description": "Zeile in Vorschlagsliste und Schnellwechsel."},
+    "control-height": {"$value": {"value": 32, "unit": "px"}, "$description": "Knöpfe und Auswahlfelder."},
+    "target-min": {"$value": {"value": 24, "unit": "px"}, "$description": "Kleinste Zielgröße für Zeiger (WCAG 2.5.8)."},
+    "message-gap": {"$value": {"value": 16, "unit": "px"}, "$description": "Abstand zwischen Nachrichtengruppen verschiedener Autoren."},
+    "message-pad-y": {"$value": {"value": 4, "unit": "px"}},
+    "message-font-size": {"$value": {"value": 15, "unit": "px"}},
+    "livebox-pad": {"$value": {"value": 12, "unit": "px"}},
+    "composer-min-height": {"$value": {"value": 44, "unit": "px"}}
+  }
+}

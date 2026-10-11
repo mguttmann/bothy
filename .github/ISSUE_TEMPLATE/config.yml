@@ -1,0 +1,4 @@
+# No contact links: a link to SECURITY.md or SUPPORT.md would have to name the account that
+# owns the repository. GitHub is expected to link both files for people who open an issue;
+# docs/quality/public-switch.md, step 9, checks this.
+blank_issues_enabled: false

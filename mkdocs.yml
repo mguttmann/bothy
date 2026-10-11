@@ -1,0 +1,267 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Documentation site (ADR 0045). Build: `make docs` (mkdocs build --strict); versions are
+# pinned in tools/uv.lock. The navigation lists every page under docs/ except the single
+# ADRs: they are reached through the ADR index, which tools/docs/adr_index.py --check keeps
+# complete, and `not_in_nav` names them. Any other page missing from the navigation and
+# any navigation entry without a page fail the strict build (`omitted_files: warn`).
+
+site_name: Bothy
+site_description: Kommandozentrale für KI-Agenten in Chat-Form. Chat, Live-Ansicht, Freigaben, Terminal, Kosten und Statistik, selbst gehostet.
+site_url: https://OWNER.github.io/bothy/
+repo_url: https://github.com/OWNER/bothy
+repo_name: bothy
+edit_uri: edit/main/docs/
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  language: de
+  # System fonts: reading the site sends no request to a font service.
+  font: false
+  features:
+    - content.code.copy
+    - navigation.indexes
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Systemvorgabe
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Dunkel
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Hell
+
+# Colours of the site and of its Mermaid blocks come from the design tokens (generated file,
+# tools/design-tokens/tokens.py).
+extra_css:
+  - design/site-theme.css
+
+plugins:
+  - search:
+      lang: [de, en]
+
+# Links to repository files outside docs/ point to the repository host (the target must
+# exist; tools/docs/mkdocs_repo_links.py).
+hooks:
+  - tools/docs/mkdocs_repo_links.py
+  - tools/docs/mkdocs_markdown_structure.py
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      # GitHub-style anchors, so that links work the same on GitHub and in the site.
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: lower
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+    absolute_links: warn
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: info
+    unrecognized_links: warn
+
+# Deliberately outside the navigation: single ADRs (linked from the ADR index).
+not_in_nav: |
+  /adr/0*.md
+
+nav:
+  - Start: index.md
+  - Überblick:
+      - Spezifikation: SPEC.md
+      - Roadmap: roadmap.md
+      - Plan: PLAN.md
+      - Lehren der Vorgänger: REUSE.md
+  - Spezifikation:
+      - 00 Glossar: spec/00-glossar.md
+      - 01 Produkt: spec/01-produkt.md
+      - 02 Architektur: spec/02-architektur.md
+      - 03 Datenmodell: spec/03-datenmodell.md
+      - 04 Sync-Protokoll: spec/04-sync-protokoll.md
+      - 05 Aktionen: spec/05-aktionen.md
+      - 06 API: spec/06-api.md
+      - 07 Rechte: spec/07-rechte.md
+      - 08 Identität: spec/08-identitaet.md
+      - 09 Agenten: spec/09-agenten.md
+      - 10 Backend-Richtlinie: spec/10-backend-richtlinie.md
+      - 11 Erweiterungen: spec/11-erweiterungen.md
+      - 12 Dateien: spec/12-dateien.md
+      - 13 Push und Benachrichtigungen: spec/13-push-benachrichtigungen.md
+      - 14 Suche: spec/14-suche.md
+      - 15 Client-Architektur: spec/15-client-architektur.md
+      - 16 Betrieb: spec/16-betrieb.md
+      - 17 Observability: spec/17-observability.md
+      - 18 Release: spec/18-release.md
+      - 19 Sicherheit: spec/19-sicherheit.md
+      - 20 Datenschutz: spec/20-datenschutz.md
+      - 21 Dev-Abschottung: spec/21-dev-isolation.md
+      - 22 Import und Migration: spec/22-import-migration.md
+      - 23 Qualität: spec/23-qualitaet.md
+      - 24 Terminal: spec/24-terminal.md
+      - 25 Visualisierung: spec/25-visualisierung.md
+  - Architektur: architecture/README.md
+  - API:
+      - Übersicht: api/README.md
+      - Webhooks: api/webhooks.md
+  - Sicherheit:
+      - Bedrohungsmodell: security/threat-model.md
+  - Compliance:
+      - Verzeichnis der Verarbeitungstätigkeiten: compliance/ropa-template.md
+      - Auftragsverarbeiter: compliance/processors-template.md
+  - Design:
+      - Übersicht: design/README.md
+      - Farbpalette: design/palette.md
+      - Kontraste: design/contrast.md
+      - Typografie: design/typography.md
+      - Abstände, Radien, Erhebung, Bewegung: design/spacing-radii-elevation-motion.md
+      - Token-Referenz: design/tokens.md
+      - Icons: design/icons.md
+      - Komponenten: design/components.md
+      - Name: design/naming.md
+  - Betrieb:
+      - Konfiguration: operations/configuration.md
+      - Installation mit Compose: operations/install-compose.md
+      - Sicherung und Wiederherstellung: operations/backup-restore.md
+      - Notfall: operations/disaster-recovery.md
+      - Umzug in die Cloud: operations/cloud-migration.md
+      - Upgrade: operations/upgrade.md
+      - Tailscale: operations/tailscale.md
+      - Umgebungen und Feature-Flags: operations/environments-and-flags.md
+      - Release: operations/release.md
+  - Observability:
+      - Signale: observability/signals.md
+      - Datenschutz: observability/privacy.md
+      - Collector: observability/collector.md
+      - Dashboards: observability/dashboards.md
+      - SLOs: observability/slos.md
+      - Alarme: observability/alerting.md
+      - Backends: observability/backends.md
+      - Admin-Statistik: observability/admin-statistics.md
+      - Audit und Telemetrie: observability/audit-vs-telemetry.md
+  - Qualität:
+      - Übersicht: quality/README.md
+      - Gates: quality/gates.md
+      - Werkzeugkette: quality/toolchain.md
+      - Push-Disziplin: quality/push-discipline.md
+      - Red-Team-Gate: quality/red-team-gate.md
+      - SonarQube lokal: quality/sonarqube-local.md
+      - Veröffentlichen: quality/public-switch.md
+      - Lizenzen: quality/licenses.md
+  - Entscheidungen:
+      - ADR-Index: adr/README.md
+      - Ruling-Log: DECISIONS.md
+      - Offene Fragen: OPEN-QUESTIONS.md
+      - Risiken: RISKS.md
+  - Bau-Briefs:
+      - briefs/README.md
+      - Etappe M1:
+          - "M1-01: Server gates in the make contract": briefs/M1-01-server-gates.md
+          - "M1-02: Action catalogue as the single data source (ADR 0049)": briefs/M1-02-action-catalogue-source.md
+          - "M1-03: API contract checks in the gate (G2, G3)": briefs/M1-03-api-contract-checks.md
+          - "M1-04: Operations configuration checks in the gate": briefs/M1-04-ops-config-checks.md
+          - "M1-05: Server skeleton, module register and architecture gate": briefs/M1-05-server-skeleton.md
+          - "M1-06: Module register checked against the core contract": briefs/M1-06-module-register-check.md
+          - "M1-07: Configuration schema and loader": briefs/M1-07-config-schema-loader.md
+          - "M1-08: Configuration reference generated from the schema": briefs/M1-08-config-reference.md
+          - "M1-09: Secret provider and `bothy secrets`": briefs/M1-09-secret-provider.md
+          - "M1-10: Logging and telemetry foundation": briefs/M1-10-telemetry-foundation.md
+          - "M1-11: Lifecycle, listeners, health and shutdown": briefs/M1-11-lifecycle-health.md
+          - "M1-12: PostgreSQL access, migrations and schema version": briefs/M1-12-postgres-migrations.md
+          - "M1-13: Unit of work with phase hooks and in-transaction events": briefs/M1-13-unit-of-work.md
+          - "M1-14: Background jobs with River": briefs/M1-14-background-jobs.md
+          - "M1-15: Sequence counters and instance record": briefs/M1-15-instance-counters.md
+          - "M1-16: Event log with commit-ordered sequence": briefs/M1-16-event-log.md
+          - "M1-17: Server interface generated from openapi.yaml and enable list (ADR 0013)": briefs/M1-17-api-server-stubs.md
+          - "M1-18: HTTP middleware chain and problem details (ADR 0015, 0053)": briefs/M1-18-http-chain.md
+          - "M1-19: Rate limits per class": briefs/M1-19-rate-limits.md
+          - "M1-20: Idempotency keys": briefs/M1-20-idempotency-keys.md
+          - "M1-21: Transport protection": briefs/M1-21-transport-protection.md
+          - "M1-22: Egress client and SSRF lint": briefs/M1-22-egress-client.md
+          - "M1-23: Server image (ADR 0012)": briefs/M1-23-server-image.md
+          - "M1-24: Audit: hash chain, recorder and aggregation (ADR 0021)": briefs/M1-24-audit-chain.md
+          - "M1-25: Action catalogue in code and registration duty": briefs/M1-25-authz-catalogue.md
+          - "M1-26: Principal tables and directory": briefs/M1-26-identity-principals.md
+          - "M1-27: Grant model storage": briefs/M1-27-authz-grant-store.md
+          - "M1-28: Rights snapshot, cache and authorize": briefs/M1-28-authz-core.md
+          - "M1-29: Rights changes, access.changed and invariants I1 and SR8": briefs/M1-29-authz-invariants.md
+          - "M1-30: Expiry of grants and memberships": briefs/M1-30-authz-expiry.md
+          - "M1-31: People, owners and own profile": briefs/M1-31-identity-people.md
+          - "M1-32: Signing keys, JWKS and rotation": briefs/M1-32-signing-keys.md
+          - "M1-33: identity: devices, device keys and DPoP verification (ADR 0020)": briefs/M1-33-identity-devices-dpop.md
+          - "M1-34: identity: sessions, access tokens, refresh families and logout": briefs/M1-34-identity-sessions.md
+          - "M1-35: identity: step-up with the device key": briefs/M1-35-identity-step-up.md
+          - "M1-36: identity: identity provider port and provider management (ADR 0019)": briefs/M1-36-identity-providers.md
+          - "M1-37: First setup, enrollment codes and setup lock": briefs/M1-37-identity-bootstrap.md
+          - "M1-38: Device approval and pairing": briefs/M1-38-identity-device-approval.md
+          - "M1-39: Local accounts with password and TOTP": briefs/M1-39-identity-local-accounts.md
+          - "M1-40: Passkeys": briefs/M1-40-identity-passkeys.md
+          - "M1-41: OIDC login with PKCE": briefs/M1-41-identity-oidc.md
+          - "M1-42: Groups from OIDC claims": briefs/M1-42-identity-oidc-groups.md
+          - "M1-43: Trusted proxy header login": briefs/M1-43-identity-trusted-header.md
+          - "M1-44: API tokens with prefix and checksum": briefs/M1-44-identity-api-tokens.md
+          - "M1-45: Disable a person, revoke a device, end a session": briefs/M1-45-identity-revocation.md
+          - "M1-46: Instance settings, branding and discovery": briefs/M1-46-instance-settings.md
+          - "M1-47: Feature flags with registration and cleanup gate": briefs/M1-47-feature-flags.md
+          - "M1-48: Groups and grants over the API": briefs/M1-48-authz-api.md
+          - "M1-49: Who has access, preview and view as": briefs/M1-49-authz-explain.md
+          - "M1-50: Audit verification, checkpoints and queries": briefs/M1-50-audit-verify.md
+          - "M1-51: Agent records, backend policy and credential holder": briefs/M1-51-agents-records.md
+          - "M1-52: Spaces and sidebar": briefs/M1-52-chat-spaces.md
+          - "M1-53: Channels and forum tags": briefs/M1-53-chat-channels.md
+          - "M1-54: Operators with invariant I1": briefs/M1-54-chat-operators.md
+          - "M1-55: Threads": briefs/M1-55-chat-threads.md
+          - "M1-56: Sending messages": briefs/M1-56-messaging-send.md
+          - "M1-57: Reading history": briefs/M1-57-messaging-history.md
+          - "M1-58: Editing, deleting and revisions": briefs/M1-58-messaging-edit-delete.md
+          - "M1-59: Reactions and pins": briefs/M1-59-messaging-reactions-pins.md
+          - "M1-60: Mentions and templates": briefs/M1-60-messaging-mentions-templates.md
+          - "M1-61: Read state, drafts and personal settings": briefs/M1-61-sync-personal-data.md
+          - "M1-62: Moving threads": briefs/M1-62-chat-thread-move.md
+          - "M1-63: Catch-up over REST and snapshot": briefs/M1-63-sync-catch-up.md
+          - "M1-64: Gateway connection and session": briefs/M1-64-gateway-connection.md
+          - "M1-65: Gateway hub, delivery, catch-up and revocation": briefs/M1-65-gateway-delivery.md
+          - "M1-66: Gateway focus and typing": briefs/M1-66-gateway-focus-typing.md
+          - "M1-67: Gateway frame conformance (G9)": briefs/M1-67-gateway-conformance.md
+          - "M1-68: Server core metrics per catalogue": briefs/M1-68-core-metrics.md
+          - "M1-69: Canary test across all outputs (SEC-T10)": briefs/M1-69-canary-test.md
+          - "M1-70: Leak tests and 404 equality": briefs/M1-70-leak-tests.md
+          - "M1-71: Contract tests with Schemathesis (G7, G8)": briefs/M1-71-contract-tests.md
+          - "M1-72: Load tests and performance gate of the server core (ADR 0063)": briefs/M1-72-performance-gate.md
+          - "M1-73: Compose smoke test": briefs/M1-73-compose-smoke.md
+          - "M1-74: CodeQL for Go": briefs/M1-74-codeql-go.md

@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Portability test: the complete stack from the released images on a fresh Linux
+# machine, installed with the documented options of install.sh, then the smoke test
+# (docs/spec/16-betrieb.md, 3.1 and 11.1). release.yml calls it after its publish job for
+# product tags (vX.Y.Z, also beta); before that, install.sh and the bundle do not exist
+# under the tag. Server tags do not start it: no install.sh lives under them; a server
+# version is tested by the product release that installs it (BOTHY_VERSION in the bundle).
+# By hand: workflow_dispatch with a product tag; the job checks out that tag, not the
+# ref it was started from.
+#
+# Source of install.sh (16, 3.1): the documented curl command of the tag, as an operator
+# runs it. The images come from BOTHY_REGISTRY and BOTHY_VERSION in the bundle
+# (docs/spec/18-release.md, 2.1) and are pulled without a login.
+#
+# Runners (ADR 0039): fresh GitHub-hosted Linux runners, because the point is a machine that
+# has never seen the project; the matrix runs it once on amd64 and once on arm64
+# (docs/spec/16-betrieb.md, 11.1).
+
+name: portability
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Product release tag (vX.Y.Z or vX.Y.Z-beta.N)
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Product release tag (vX.Y.Z or vX.Y.Z-beta.N)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Not github.workflow: in a called workflow it is the name of the caller (release).
+concurrency:
+  group: portability-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  stack:
+    name: full stack on a fresh runner (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    permissions:
+      contents: read
+    steps:
+      - name: Accept product tags only
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$' \
+            || { echo "::error::not a product tag: $TAG"; exit 1; }
+      # The tested tag, not the ref the run started from: by hand (workflow_dispatch) that
+      # is a branch, and make portability and smoke.sh must match the release under test.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          persist-credentials: false
+      # Interface of make portability (docs/spec/16-betrieb.md, 11.1); the options after
+      # `sh -s --` live in tests/portability/install-options. The images are pulled without a
+      # login, as an operator does; a package that is still private fails the test
+      # (docs/quality/public-switch.md, step 21).
+      - name: Install with the documented options and run the smoke test
+        env:
+          PORTABILITY_TAG: ${{ inputs.tag }}
+          # url: curl the documented command of the tag
+          PORTABILITY_INSTALL_SOURCE: url
+        run: make portability
+      - name: Container logs on failure
+        if: failure()
+        run: docker compose -f infra/compose/compose.yaml logs --no-color --tail 200 || true

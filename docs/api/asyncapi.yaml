@@ -1,0 +1,2268 @@
+# WebSocket gateway of the chat server, AsyncAPI 3.0. Normative (ADR 0013).
+# Protocol: docs/spec/04-sync-protokoll.md. Body schemas: openapi.yaml (components.schemas).
+# Lint: npx -y @redocly/cli@2.62.1 lint --config docs/api/redocly.yaml
+
+asyncapi: 3.0.0
+
+info:
+  title: Chat Server Gateway
+  version: 0.1.0
+  x-protocol-versions: [1]
+  description: |-
+    WebSocket gateway for people, agents and apps. Frames are JSON text frames `{"op": <name>, "d":
+    <body>}`. Authentication happens in-band with `identify` or `resume` (DPoP proof with the nonce
+    from `hello`), not in the upgrade request. Protocol rules: docs/spec/04-sync-protokoll.md. Body
+    schemas are shared with openapi.yaml.
+  license:
+    name: Apache-2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+defaultContentType: application/json
+
+servers:
+  instance:
+    host: '{host}'
+    pathname: /api/v1
+    protocol: wss
+    description: The instance origin.
+    variables:
+      host:
+        default: chat.example.com
+        description: Host of the instance.
+
+channels:
+  gateway:
+    address: /gateway
+    title: Gateway
+    description: One connection per device (a newer one closes the older with `4017`) or agent consumer (`4015`). Close codes are listed in `x-close-codes`. A failing op answers `error` with a problem code and keeps the connection.
+    messages:
+      op.identify:
+        $ref: '#/components/messages/op.identify'
+      op.resume:
+        $ref: '#/components/messages/op.resume'
+      op.heartbeat:
+        $ref: '#/components/messages/op.heartbeat'
+      op.reauth:
+        $ref: '#/components/messages/op.reauth'
+      op.focus:
+        $ref: '#/components/messages/op.focus'
+      op.typing.start:
+        $ref: '#/components/messages/op.typing.start'
+      op.typing.stop:
+        $ref: '#/components/messages/op.typing.stop'
+      op.ack:
+        $ref: '#/components/messages/op.ack'
+      op.run.update:
+        $ref: '#/components/messages/op.run.update'
+      op.command.autocomplete_result:
+        $ref: '#/components/messages/op.command.autocomplete_result'
+      op.stats.subscribe:
+        $ref: '#/components/messages/op.stats.subscribe'
+      op.stats.unsubscribe:
+        $ref: '#/components/messages/op.stats.unsubscribe'
+      op.hello:
+        $ref: '#/components/messages/op.hello'
+      op.ready:
+        $ref: '#/components/messages/op.ready'
+      op.resumed:
+        $ref: '#/components/messages/op.resumed'
+      op.cursor:
+        $ref: '#/components/messages/op.cursor'
+      op.catchup.complete:
+        $ref: '#/components/messages/op.catchup.complete'
+      op.resync_required:
+        $ref: '#/components/messages/op.resync_required'
+      op.heartbeat_ack:
+        $ref: '#/components/messages/op.heartbeat_ack'
+      op.reauth_required:
+        $ref: '#/components/messages/op.reauth_required'
+      op.error:
+        $ref: '#/components/messages/op.error'
+      event.message.created:
+        $ref: '#/components/messages/event.message.created'
+      event.message.updated:
+        $ref: '#/components/messages/event.message.updated'
+      event.message.deleted:
+        $ref: '#/components/messages/event.message.deleted'
+      event.reaction.added:
+        $ref: '#/components/messages/event.reaction.added'
+      event.reaction.removed:
+        $ref: '#/components/messages/event.reaction.removed'
+      event.pin.added:
+        $ref: '#/components/messages/event.pin.added'
+      event.pin.removed:
+        $ref: '#/components/messages/event.pin.removed'
+      event.thread.created:
+        $ref: '#/components/messages/event.thread.created'
+      event.thread.updated:
+        $ref: '#/components/messages/event.thread.updated'
+      event.thread.closed:
+        $ref: '#/components/messages/event.thread.closed'
+      event.thread.reopened:
+        $ref: '#/components/messages/event.thread.reopened'
+      event.thread.moved:
+        $ref: '#/components/messages/event.thread.moved'
+      event.thread.moved_out:
+        $ref: '#/components/messages/event.thread.moved_out'
+      event.agent_session.changed:
+        $ref: '#/components/messages/event.agent_session.changed'
+      event.run.state_changed:
+        $ref: '#/components/messages/event.run.state_changed'
+      event.space.created:
+        $ref: '#/components/messages/event.space.created'
+      event.space.updated:
+        $ref: '#/components/messages/event.space.updated'
+      event.space.archived:
+        $ref: '#/components/messages/event.space.archived'
+      event.channel.created:
+        $ref: '#/components/messages/event.channel.created'
+      event.channel.updated:
+        $ref: '#/components/messages/event.channel.updated'
+      event.channel.settings_changed:
+        $ref: '#/components/messages/event.channel.settings_changed'
+      event.channel.archived:
+        $ref: '#/components/messages/event.channel.archived'
+      event.command.changed:
+        $ref: '#/components/messages/event.command.changed'
+      event.file.updated:
+        $ref: '#/components/messages/event.file.updated'
+      event.user.updated:
+        $ref: '#/components/messages/event.user.updated'
+      event.agent.updated:
+        $ref: '#/components/messages/event.agent.updated'
+      event.instance.updated:
+        $ref: '#/components/messages/event.instance.updated'
+      event.status.updated:
+        $ref: '#/components/messages/event.status.updated'
+      event.grant.changed:
+        $ref: '#/components/messages/event.grant.changed'
+      event.group.changed:
+        $ref: '#/components/messages/event.group.changed'
+      event.access.changed:
+        $ref: '#/components/messages/event.access.changed'
+      event.access.expiring:
+        $ref: '#/components/messages/event.access.expiring'
+      event.session.revoked:
+        $ref: '#/components/messages/event.session.revoked'
+      event.read_state.updated:
+        $ref: '#/components/messages/event.read_state.updated'
+      event.draft.updated:
+        $ref: '#/components/messages/event.draft.updated'
+      event.draft.deleted:
+        $ref: '#/components/messages/event.draft.deleted'
+      event.settings.updated:
+        $ref: '#/components/messages/event.settings.updated'
+      event.sidebar.updated:
+        $ref: '#/components/messages/event.sidebar.updated'
+      event.notification_pref.updated:
+        $ref: '#/components/messages/event.notification_pref.updated'
+      event.quiet_hours.updated:
+        $ref: '#/components/messages/event.quiet_hours.updated'
+      event.gdpr.request_updated:
+        $ref: '#/components/messages/event.gdpr.request_updated'
+      event.import.progress:
+        $ref: '#/components/messages/event.import.progress'
+      event.agent.invocation:
+        $ref: '#/components/messages/event.agent.invocation'
+      event.agent.followup:
+        $ref: '#/components/messages/event.agent.followup'
+      event.run.cancel_requested:
+        $ref: '#/components/messages/event.run.cancel_requested'
+      event.interaction.created:
+        $ref: '#/components/messages/event.interaction.created'
+      event.command.invoked:
+        $ref: '#/components/messages/event.command.invoked'
+      event.agent.config_changed:
+        $ref: '#/components/messages/event.agent.config_changed'
+      event.typing.started:
+        $ref: '#/components/messages/event.typing.started'
+      event.run.updated:
+        $ref: '#/components/messages/event.run.updated'
+      event.agent.presence_changed:
+        $ref: '#/components/messages/event.agent.presence_changed'
+      event.command.autocomplete_requested:
+        $ref: '#/components/messages/event.command.autocomplete_requested'
+      event.notification.created:
+        $ref: '#/components/messages/event.notification.created'
+      event.host.updated:
+        $ref: '#/components/messages/event.host.updated'
+      event.terminal_session.changed:
+        $ref: '#/components/messages/event.terminal_session.changed'
+      event.host.presence_changed:
+        $ref: '#/components/messages/event.host.presence_changed'
+      event.stats.live:
+        $ref: '#/components/messages/event.stats.live'
+    bindings:
+      ws:
+        method: GET
+        bindingVersion: 0.1.0
+    x-close-codes:
+    - code: 1000
+      name: normal
+      client_action: do not reconnect unless the app is in the foreground
+    - code: 1001
+      name: going_away
+      client_action: reconnect with backoff, try `resume`
+    - code: 4000
+      name: unknown_error
+      client_action: reconnect with backoff
+    - code: 4001
+      name: unknown_op
+      client_action: report the error, reconnect
+    - code: 4002
+      name: decode_error
+      client_action: report the error, reconnect
+    - code: 4003
+      name: not_identified
+      client_action: an op was sent before `identify`; reconnect
+    - code: 4004
+      name: authentication_failed
+      client_action: renew the token; if that fails, log out
+    - code: 4005
+      name: already_identified
+      client_action: report the error, reconnect
+    - code: 4006
+      name: session_invalid
+      client_action: '`identify` instead of `resume`'
+    - code: 4007
+      name: protocol_version_unsupported
+      client_action: show the app update note, do not reconnect
+    - code: 4008
+      name: rate_limited
+      client_action: 'only `rl.gateway_connect` at `identify` and `resume`: wait for the time given in the close reason'
+    - code: 4009
+      name: heartbeat_timeout
+      client_action: reconnect with backoff, try `resume`
+    - code: 4011
+      name: token_expired
+      client_action: renew the token, then `resume`
+    - code: 4012
+      name: revoked
+      client_action: 'session, device or principal revoked: delete local data, log out, do not reconnect'
+    - code: 4013
+      name: server_restart
+      client_action: reconnect at once with a random delay, try `resume`
+    - code: 4014
+      name: slow_consumer
+      client_action: 'outbound queue full or write deadline `gateway.write_timeout` missed: reconnect, catch up from the cursor'
+    - code: 4015
+      name: consumer_replaced
+      client_action: 'agents only: another process took over the same consumer; do not reconnect'
+    - code: 4016
+      name: device_pending
+      client_action: 'device pending approval: do not reconnect until `GET /api/v1/devices/{id}` reports state `active`'
+    - code: 4017
+      name: device_replaced
+      client_action: 'a newer connection of the same device is active: do not reconnect on your own, only when the app returns to the foreground or on user action'
+    - code: 4018
+      name: forbidden
+      client_action: 'credentials are valid, but `gateway.connect` is denied (for example `scope_missing` of an app): show the error, do not renew the token, do not reconnect on your own'
+
+  terminalStream:
+    address: /terminal/sessions/{session_id}/stream
+    title: Terminal stream of a device
+    description: 'End-to-end encrypted terminal stream (Noise_NK_25519_ChaChaPoly_SHA256, docs/spec/24-terminal.md section 5). After `hello` and `identify` only binary frames, each one Noise message; the first is handshake message 1 with the session token. Not part of the gateway; nothing of it enters the event log.'
+    x-protocol-versions: [1]
+    parameters:
+      session_id:
+        description: Terminal session ID (UUIDv7). The proxy routes both stream paths of a session by this segment to the same node (docs/spec/16-betrieb.md, section 4.4).
+    messages:
+      terminal.hello:
+        $ref: '#/components/messages/terminal.hello'
+      terminal.identify:
+        $ref: '#/components/messages/terminal.identify'
+      terminal.error:
+        $ref: '#/components/messages/terminal.error'
+      noise.frame:
+        $ref: '#/components/messages/noise.frame'
+    bindings:
+      ws:
+        method: GET
+        bindingVersion: 0.1.0
+    x-close-codes:
+    - code: 1000
+      name: normal
+      client_action: session ended normally; do not reconnect
+    - code: 1001
+      name: going_away
+      client_action: the node shuts down; attach again with `terminal.attach` within `terminal.detach_grace`
+    - code: 4002
+      name: decode_error
+      client_action: text frame after `identify`, invalid JSON or frame over the Noise limit; report the error
+    - code: 4004
+      name: authentication_failed
+      client_action: renew the token; if that fails, log out
+    - code: 4008
+      name: rate_limited
+      client_action: wait for the time given in the close reason
+    - code: 4012
+      name: revoked
+      client_action: session, device or person revoked; delete local data, log out
+    - code: 4013
+      name: server_restart
+      client_action: attach again with `terminal.attach` within `terminal.detach_grace`
+    - code: 4014
+      name: slow_consumer
+      client_action: relay buffer full; attach again
+    - code: 4100
+      name: terminal_closed
+      client_action: 'the session ended; the close reason holds `close_reason`; do not reconnect'
+    - code: 4101
+      name: terminal_token_stale
+      client_action: 'session token expired (`token_expired`) or already used (`token_replayed`); open or attach again with a fresh step-up'
+    - code: 4102
+      name: terminal_host_unavailable
+      client_action: the other side is missing (host offline or no counterpart on this node); the session is `detached`; attach again later
+    - code: 4103
+      name: terminal_replaced
+      client_action: another device attached; do not reconnect on your own
+    - code: 4104
+      name: terminal_handshake_failed
+      client_action: 'Noise handshake or prologue failed, token signature or binding (`kid`, `typ`, `aud`, `sid`, `cek`) invalid, profile unknown or working directory (`wdi`) not one of the session user, server host without owner, session user (`osu`) unknown or bound to another person, or unknown frame; show a hard warning, do not reconnect'
+  hostControl:
+    address: /hosts/connect
+    title: Control connection of a host service
+    description: 'Outgoing connection of `bothy-host`, one per host. A second connection with the same keys makes the server probe the older one: if the older does not answer it is closed with `4009`; if it answers, both are closed with `4112` and the host is disabled (24, 3.4). Login with the Ed25519 key registered at pairing; `identify` lists the sessions the host service still knows (`live_sessions`), and the server ends every other session of the host in `active` or `detached` with `host_restarted` (24, 6.2). After `ready` the host service sends `report` (profiles, session users, self-checks) before it accepts any `session.open`, and the server sends `session.open` only after that `report` (24, 2.2). When `doctor` refused the start, the host service sends that `report` and closes the connection without accepting `session.open`. The server sends `session.open` per session; the host service answers with a data connection.'
+    x-protocol-versions: [1]
+    messages:
+      host.hello:
+        $ref: '#/components/messages/host.hello'
+      host.identify:
+        $ref: '#/components/messages/host.identify'
+      host.ready:
+        $ref: '#/components/messages/host.ready'
+      host.heartbeat:
+        $ref: '#/components/messages/host.heartbeat'
+      host.heartbeat_ack:
+        $ref: '#/components/messages/host.heartbeat_ack'
+      host.report:
+        $ref: '#/components/messages/host.report'
+      host.session.open:
+        $ref: '#/components/messages/host.session.open'
+      host.session.close:
+        $ref: '#/components/messages/host.session.close'
+      host.session.started:
+        $ref: '#/components/messages/host.session.started'
+      host.session.ended:
+        $ref: '#/components/messages/host.session.ended'
+      host.error:
+        $ref: '#/components/messages/host.error'
+    bindings:
+      ws:
+        method: GET
+        bindingVersion: 0.1.0
+    x-close-codes:
+    - code: 1000
+      name: normal
+      client_action: reconnect with backoff
+    - code: 1001
+      name: going_away
+      client_action: reconnect with backoff
+    - code: 4002
+      name: decode_error
+      client_action: report the error, reconnect
+    - code: 4008
+      name: rate_limited
+      client_action: wait for the time given in the close reason
+    - code: 4009
+      name: heartbeat_timeout
+      client_action: reconnect with backoff
+    - code: 4013
+      name: server_restart
+      client_action: reconnect at once with a random delay; keep PTYs until `terminal.detach_grace`
+    - code: 4014
+      name: slow_consumer
+      client_action: relay buffer full; reconnect the data connection
+    - code: 4100
+      name: terminal_closed
+      client_action: 'data connection only: the session ended; end the PTY'
+    - code: 4110
+      name: host_unpaired
+      client_action: keys unknown or replaced by a re-pairing; stop and run `bothy-host pair` again
+    - code: 4111
+      name: host_disabled
+      client_action: the host is disabled or retired; end all PTYs, reconnect only after a long backoff
+    - code: 4112
+      name: host_duplicate
+      client_action: 'a second live host service with the same keys was found; the host is disabled; stop, do not reconnect, an owner must re-pair (24, 3.4)'
+    - code: 4113
+      name: host_auth_failed
+      client_action: proof invalid or not sent within `terminal.host_auth_timeout`; check clock and keys, reconnect with backoff
+    - code: 4114
+      name: host_version_unsupported
+      client_action: protocol version too old; update the host service, do not reconnect
+  hostData:
+    address: /hosts/sessions/{session_id}/stream
+    title: Data connection of a host service for one session
+    description: 'Opened by the host service after `session.open`. After `hello` and `identify` (with `session_id`) only binary Noise frames, forwarded unchanged to and from the device stream of the same session.'
+    x-protocol-versions: [1]
+    parameters:
+      session_id:
+        description: Terminal session ID (UUIDv7). The proxy routes both stream paths of a session by this segment to the same node (docs/spec/16-betrieb.md, section 4.4).
+    messages:
+      host.hello:
+        $ref: '#/components/messages/host.hello'
+      host.identify:
+        $ref: '#/components/messages/host.identify'
+      host.error:
+        $ref: '#/components/messages/host.error'
+      noise.frame:
+        $ref: '#/components/messages/noise.frame'
+    bindings:
+      ws:
+        method: GET
+        bindingVersion: 0.1.0
+    x-close-codes:
+    - code: 1000
+      name: normal
+      client_action: reconnect with backoff
+    - code: 1001
+      name: going_away
+      client_action: reconnect with backoff
+    - code: 4002
+      name: decode_error
+      client_action: report the error, reconnect
+    - code: 4008
+      name: rate_limited
+      client_action: wait for the time given in the close reason
+    - code: 4009
+      name: heartbeat_timeout
+      client_action: reconnect with backoff
+    - code: 4013
+      name: server_restart
+      client_action: reconnect at once with a random delay; keep PTYs until `terminal.detach_grace`
+    - code: 4014
+      name: slow_consumer
+      client_action: relay buffer full; reconnect the data connection
+    - code: 4100
+      name: terminal_closed
+      client_action: 'data connection only: the session ended; end the PTY'
+    - code: 4110
+      name: host_unpaired
+      client_action: keys unknown or replaced by a re-pairing; stop and run `bothy-host pair` again
+    - code: 4111
+      name: host_disabled
+      client_action: the host is disabled or retired; end all PTYs, reconnect only after a long backoff
+    - code: 4112
+      name: host_duplicate
+      client_action: 'a second live host service with the same keys was found; the host is disabled; stop, do not reconnect, an owner must re-pair (24, 3.4)'
+    - code: 4113
+      name: host_auth_failed
+      client_action: proof invalid or not sent within `terminal.host_auth_timeout`; check clock and keys, reconnect with backoff
+    - code: 4114
+      name: host_version_unsupported
+      client_action: protocol version too old; update the host service, do not reconnect
+
+operations:
+  receive.identify:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Authenticate a new gateway session.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.identify'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+    reply:
+      channel:
+        $ref: '#/channels/gateway'
+      messages:
+      - $ref: '#/channels/gateway/messages/op.ready'
+  receive.resume:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Resume a gateway session after a short disconnect.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.resume'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+    reply:
+      channel:
+        $ref: '#/channels/gateway'
+      messages:
+      - $ref: '#/channels/gateway/messages/op.resumed'
+  receive.heartbeat:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Liveness signal with the last processed `seq`. Agents add their state; then `agent.heartbeat` is checked as well. Does not consume the `rl.gateway_connect` bucket, which counts only `identify` and `resume` (05 section 3).
+    messages:
+    - $ref: '#/channels/gateway/messages/op.heartbeat'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+    reply:
+      channel:
+        $ref: '#/channels/gateway'
+      messages:
+      - $ref: '#/channels/gateway/messages/op.heartbeat_ack'
+  receive.reauth:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Hand over a new access token during the connection. Does not consume the `rl.gateway_connect` bucket (05 section 3).
+    messages:
+    - $ref: '#/channels/gateway/messages/op.reauth'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+  receive.focus:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Set the threads currently on screen (live-box patches, typing). Unreadable threads are ignored silently.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.focus'
+    x-authz-action: gateway.focus
+    x-rate-limit-class: rl.read
+  receive.typing.start:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: The person types in a thread. People only; agents show typing through their run (04 section 12).
+    messages:
+    - $ref: '#/channels/gateway/messages/op.typing.start'
+    x-authz-action: typing.start
+    x-rate-limit-class: rl.typing
+  receive.typing.stop:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: The person stopped typing. No event is sent; the op only resets the throttle of the connection.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.typing.stop'
+    x-authz-action: typing.start
+    x-rate-limit-class: rl.typing
+  receive.ack:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: 'Agents only: acknowledge all events up to `seq`.'
+    messages:
+    - $ref: '#/channels/gateway/messages/op.ack'
+    x-authz-action: agent.events.consume
+    x-rate-limit-class: rl.agent_runtime
+  receive.run.update:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: 'Agents only: live-box patch of an own run, same as `PATCH /runs/{run_id}`.'
+    messages:
+    - $ref: '#/channels/gateway/messages/op.run.update'
+    x-authz-action: run.update
+    x-rate-limit-class: rl.agent_runtime
+  receive.command.autocomplete_result:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: 'Agents and apps: answer a `command.autocomplete_requested`, same as `POST /command-autocompletions/{request_id}/answer`.'
+    messages:
+    - $ref: '#/channels/gateway/messages/op.command.autocomplete_result'
+    x-authz-action: command.autocomplete.respond
+    x-rate-limit-class: rl.agent_runtime
+  receive.stats.subscribe:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Subscribe to the live frames `stats.live` of the instance or of one space (docs/spec/25-visualisierung.md, section 5). One subscription per connection; a new one replaces it.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.stats.subscribe'
+    x-authz-action: stats.read
+    x-rate-limit-class: rl.read
+  receive.stats.unsubscribe:
+    action: receive
+    channel:
+      $ref: '#/channels/gateway'
+    summary: End the `stats.live` subscription of the connection.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.stats.unsubscribe'
+    x-authz-action: stats.read
+    x-rate-limit-class: rl.read
+  send.hello:
+    action: send
+    channel:
+      $ref: '#/channels/gateway'
+    summary: First frame after the upgrade.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.hello'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+  send.ready:
+    action: send
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Session ready, with snapshot. Catch-up follows when a cursor was sent.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.ready'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+  send.resumed:
+    action: send
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Resume accepted; catch-up from the cursor follows.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.resumed'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+  send.cursor:
+    action: send
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Advance the cursor without an event (skipped invisible events).
+    messages:
+    - $ref: '#/channels/gateway/messages/op.cursor'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+  send.catchup.complete:
+    action: send
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Catch-up finished; the connection is live.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.catchup.complete'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+  send.resync_required:
+    action: send
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Catch-up impossible; load `GET /sync/snapshot`. The connection stays open and is live from `head_seq`.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.resync_required'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+  send.heartbeat_ack:
+    action: send
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Answer to `heartbeat`.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.heartbeat_ack'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+  send.reauth_required:
+    action: send
+    channel:
+      $ref: '#/channels/gateway'
+    summary: The access token expires soon; send `reauth`.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.reauth_required'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+  send.error:
+    action: send
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Error for one op; the connection stays open.
+    messages:
+    - $ref: '#/channels/gateway/messages/op.error'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+  send.dispatch:
+    action: send
+    channel:
+      $ref: '#/channels/gateway'
+    summary: Deliver one event. Each message names its receive action in `x-receive-action`.
+    description: The server checks `authorize(recipient, x-receive-action, resource)` for every delivery (docs/spec/04-sync-protokoll.md, section 7 and 8).
+    messages:
+    - $ref: '#/channels/gateway/messages/event.message.created'
+    - $ref: '#/channels/gateway/messages/event.message.updated'
+    - $ref: '#/channels/gateway/messages/event.message.deleted'
+    - $ref: '#/channels/gateway/messages/event.reaction.added'
+    - $ref: '#/channels/gateway/messages/event.reaction.removed'
+    - $ref: '#/channels/gateway/messages/event.pin.added'
+    - $ref: '#/channels/gateway/messages/event.pin.removed'
+    - $ref: '#/channels/gateway/messages/event.thread.created'
+    - $ref: '#/channels/gateway/messages/event.thread.updated'
+    - $ref: '#/channels/gateway/messages/event.thread.closed'
+    - $ref: '#/channels/gateway/messages/event.thread.reopened'
+    - $ref: '#/channels/gateway/messages/event.thread.moved'
+    - $ref: '#/channels/gateway/messages/event.thread.moved_out'
+    - $ref: '#/channels/gateway/messages/event.agent_session.changed'
+    - $ref: '#/channels/gateway/messages/event.run.state_changed'
+    - $ref: '#/channels/gateway/messages/event.space.created'
+    - $ref: '#/channels/gateway/messages/event.space.updated'
+    - $ref: '#/channels/gateway/messages/event.space.archived'
+    - $ref: '#/channels/gateway/messages/event.channel.created'
+    - $ref: '#/channels/gateway/messages/event.channel.updated'
+    - $ref: '#/channels/gateway/messages/event.channel.settings_changed'
+    - $ref: '#/channels/gateway/messages/event.channel.archived'
+    - $ref: '#/channels/gateway/messages/event.command.changed'
+    - $ref: '#/channels/gateway/messages/event.file.updated'
+    - $ref: '#/channels/gateway/messages/event.user.updated'
+    - $ref: '#/channels/gateway/messages/event.agent.updated'
+    - $ref: '#/channels/gateway/messages/event.instance.updated'
+    - $ref: '#/channels/gateway/messages/event.status.updated'
+    - $ref: '#/channels/gateway/messages/event.grant.changed'
+    - $ref: '#/channels/gateway/messages/event.group.changed'
+    - $ref: '#/channels/gateway/messages/event.access.changed'
+    - $ref: '#/channels/gateway/messages/event.access.expiring'
+    - $ref: '#/channels/gateway/messages/event.session.revoked'
+    - $ref: '#/channels/gateway/messages/event.read_state.updated'
+    - $ref: '#/channels/gateway/messages/event.draft.updated'
+    - $ref: '#/channels/gateway/messages/event.draft.deleted'
+    - $ref: '#/channels/gateway/messages/event.settings.updated'
+    - $ref: '#/channels/gateway/messages/event.sidebar.updated'
+    - $ref: '#/channels/gateway/messages/event.notification_pref.updated'
+    - $ref: '#/channels/gateway/messages/event.quiet_hours.updated'
+    - $ref: '#/channels/gateway/messages/event.gdpr.request_updated'
+    - $ref: '#/channels/gateway/messages/event.import.progress'
+    - $ref: '#/channels/gateway/messages/event.agent.invocation'
+    - $ref: '#/channels/gateway/messages/event.agent.followup'
+    - $ref: '#/channels/gateway/messages/event.run.cancel_requested'
+    - $ref: '#/channels/gateway/messages/event.interaction.created'
+    - $ref: '#/channels/gateway/messages/event.command.invoked'
+    - $ref: '#/channels/gateway/messages/event.agent.config_changed'
+    - $ref: '#/channels/gateway/messages/event.typing.started'
+    - $ref: '#/channels/gateway/messages/event.run.updated'
+    - $ref: '#/channels/gateway/messages/event.agent.presence_changed'
+    - $ref: '#/channels/gateway/messages/event.command.autocomplete_requested'
+    - $ref: '#/channels/gateway/messages/event.notification.created'
+    - $ref: '#/channels/gateway/messages/event.host.updated'
+    - $ref: '#/channels/gateway/messages/event.terminal_session.changed'
+    - $ref: '#/channels/gateway/messages/event.host.presence_changed'
+    - $ref: '#/channels/gateway/messages/event.stats.live'
+    x-authz-action: gateway.connect
+    x-rate-limit-class: rl.gateway_connect
+
+  terminal.send.hello:
+    action: send
+    channel:
+      $ref: '#/channels/terminalStream'
+    summary: First frame with the DPoP nonce.
+    messages:
+    - $ref: '#/channels/terminalStream/messages/terminal.hello'
+    x-authz-action: terminal.stream
+    x-rate-limit-class: rl.terminal
+  terminal.receive.identify:
+    action: receive
+    channel:
+      $ref: '#/channels/terminalStream'
+    summary: Authenticate the device; only the device of the current session token passes.
+    messages:
+    - $ref: '#/channels/terminalStream/messages/terminal.identify'
+    x-authz-action: terminal.stream
+    x-rate-limit-class: rl.terminal
+  terminal.send.error:
+    action: send
+    channel:
+      $ref: '#/channels/terminalStream'
+    summary: Error before the handshake; a close code follows.
+    messages:
+    - $ref: '#/channels/terminalStream/messages/terminal.error'
+    x-authz-action: terminal.stream
+    x-rate-limit-class: rl.terminal
+  terminal.receive.frame:
+    action: receive
+    channel:
+      $ref: '#/channels/terminalStream'
+    summary: Noise message from the device, forwarded to the host.
+    messages:
+    - $ref: '#/channels/terminalStream/messages/noise.frame'
+    x-authz-action: terminal.stream
+    x-rate-limit-class: rl.terminal
+  terminal.send.frame:
+    action: send
+    channel:
+      $ref: '#/channels/terminalStream'
+    summary: Noise message from the host, forwarded to the device.
+    messages:
+    - $ref: '#/channels/terminalStream/messages/noise.frame'
+    x-authz-action: terminal.stream
+    x-rate-limit-class: rl.terminal
+  hostControl.send.hello:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: First frame with challenge and JWKS.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.hello'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.identify:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Login of the host service.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.identify'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+    reply:
+      channel:
+        $ref: '#/channels/hostControl'
+      messages:
+      - $ref: '#/channels/hostControl/messages/host.ready'
+  hostControl.send.ready:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Control connection accepted.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.ready'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.heartbeat:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Liveness; missing `terminal.host_heartbeat_miss_limit` heartbeats close with `4009`.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.heartbeat'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+    reply:
+      channel:
+        $ref: '#/channels/hostControl'
+      messages:
+      - $ref: '#/channels/hostControl/messages/host.heartbeat_ack'
+  hostControl.send.heartbeat_ack:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Answer to `heartbeat`.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.heartbeat_ack'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.report:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Profiles, session users and self-checks; a change of the server-host flag, a check result or the reported session users is audited.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.report'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.send.session.open:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Ask for the data connection of a session.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.session.open'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.send.session.close:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: End the PTY of a session (revocation, owner, limits).
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.session.close'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.session.started:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: The PTY runs.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.session.started'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.receive.session.ended:
+    action: receive
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: A session ended on the host.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.session.ended'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostControl.send.error:
+    action: send
+    channel:
+      $ref: '#/channels/hostControl'
+    summary: Error for one op.
+    messages:
+    - $ref: '#/channels/hostControl/messages/host.error'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostData.send.hello:
+    action: send
+    channel:
+      $ref: '#/channels/hostData'
+    summary: First frame with challenge.
+    messages:
+    - $ref: '#/channels/hostData/messages/host.hello'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostData.receive.identify:
+    action: receive
+    channel:
+      $ref: '#/channels/hostData'
+    summary: Login with `session_id`; the session must belong to this host and not be closed.
+    messages:
+    - $ref: '#/channels/hostData/messages/host.identify'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostData.send.error:
+    action: send
+    channel:
+      $ref: '#/channels/hostData'
+    summary: Error before the first Noise frame.
+    messages:
+    - $ref: '#/channels/hostData/messages/host.error'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostData.receive.frame:
+    action: receive
+    channel:
+      $ref: '#/channels/hostData'
+    summary: Noise message from the host, forwarded to the device.
+    messages:
+    - $ref: '#/channels/hostData/messages/noise.frame'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+  hostData.send.frame:
+    action: send
+    channel:
+      $ref: '#/channels/hostData'
+    summary: Noise message from the device, forwarded to the host.
+    messages:
+    - $ref: '#/channels/hostData/messages/noise.frame'
+    x-authz-action: host.connect
+    x-rate-limit-class: rl.host
+
+components:
+  messages:
+    op.identify:
+      name: identify
+      title: identify
+      summary: Authenticate a new gateway session.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [identify]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayIdentify
+    op.resume:
+      name: resume
+      title: resume
+      summary: Resume a gateway session after a short disconnect.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [resume]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayResume
+    op.heartbeat:
+      name: heartbeat
+      title: heartbeat
+      summary: Liveness signal with the last processed `seq`. Agents add their state; then `agent.heartbeat` is checked as well.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [heartbeat]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayHeartbeat
+    op.reauth:
+      name: reauth
+      title: reauth
+      summary: Hand over a new access token during the connection.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [reauth]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayReauth
+    op.focus:
+      name: focus
+      title: focus
+      summary: Set the threads currently on screen (live-box patches, typing). Unreadable threads are ignored silently.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [focus]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayFocus
+    op.typing.start:
+      name: typing.start
+      title: typing.start
+      summary: The person types in a thread. People only.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [typing.start]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayTyping
+    op.typing.stop:
+      name: typing.stop
+      title: typing.stop
+      summary: The person stopped typing. No event is sent; the op only resets the throttle of the connection.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [typing.stop]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayTyping
+    op.ack:
+      name: ack
+      title: ack
+      summary: 'Agents only: acknowledge all events up to `seq`.'
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [ack]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayAck
+    op.run.update:
+      name: run.update
+      title: run.update
+      summary: 'Agents only: live-box patch of an own run, same as `PATCH /runs/{run_id}`.'
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [run.update]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayRunUpdate
+    op.stats.subscribe:
+      name: stats.subscribe
+      title: stats.subscribe
+      summary: Subscribe to `stats.live` for the instance or one space. Needs `stats.read`; a denial answers `error` and keeps the connection.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [stats.subscribe]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayStatsSubscribe
+    op.stats.unsubscribe:
+      name: stats.unsubscribe
+      title: stats.unsubscribe
+      summary: End the `stats.live` subscription of the connection.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [stats.unsubscribe]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayStatsUnsubscribe
+    op.command.autocomplete_result:
+      name: command.autocomplete_result
+      title: command.autocomplete_result
+      summary: 'Agents and apps: suggestions for an autocomplete request (04, 15.7).'
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [command.autocomplete_result]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayAutocompleteResult
+    op.hello:
+      name: hello
+      title: hello
+      summary: First frame after the upgrade.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [hello]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayHello
+    op.ready:
+      name: ready
+      title: ready
+      summary: Session ready, with snapshot. Catch-up follows when a cursor was sent.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [ready]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayReady
+    op.resumed:
+      name: resumed
+      title: resumed
+      summary: Resume accepted; catch-up from the cursor follows.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [resumed]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayResumed
+    op.cursor:
+      name: cursor
+      title: cursor
+      summary: Advance the cursor without an event (skipped invisible events).
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [cursor]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayCursor
+    op.catchup.complete:
+      name: catchup.complete
+      title: catchup.complete
+      summary: Catch-up finished; the connection is live.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [catchup.complete]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayCatchupComplete
+    op.resync_required:
+      name: resync_required
+      title: resync_required
+      summary: Catch-up impossible; load `GET /sync/snapshot`. The connection stays open and is live from `head_seq`.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [resync_required]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayResyncRequired
+    op.heartbeat_ack:
+      name: heartbeat_ack
+      title: heartbeat_ack
+      summary: Answer to `heartbeat`.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [heartbeat_ack]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayHeartbeatAck
+    op.reauth_required:
+      name: reauth_required
+      title: reauth_required
+      summary: The access token expires soon; send `reauth`.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [reauth_required]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayReauthRequired
+    op.error:
+      name: error
+      title: error
+      summary: Error for one op; the connection stays open.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [error]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayError
+    event.message.created:
+      name: message.created
+      title: dispatch message.created
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: message.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/MessageCreatedEvent
+    event.message.updated:
+      name: message.updated
+      title: dispatch message.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: message.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/MessageUpdatedEvent
+    event.message.deleted:
+      name: message.deleted
+      title: dispatch message.deleted
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: message.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/MessageDeletedEvent
+    event.reaction.added:
+      name: reaction.added
+      title: dispatch reaction.added
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: message.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ReactionAddedEvent
+    event.reaction.removed:
+      name: reaction.removed
+      title: dispatch reaction.removed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: message.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ReactionRemovedEvent
+    event.pin.added:
+      name: pin.added
+      title: dispatch pin.added
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: thread.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/PinAddedEvent
+    event.pin.removed:
+      name: pin.removed
+      title: dispatch pin.removed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: thread.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/PinRemovedEvent
+    event.thread.created:
+      name: thread.created
+      title: dispatch thread.created
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: thread.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ThreadCreatedEvent
+    event.thread.updated:
+      name: thread.updated
+      title: dispatch thread.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: thread.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ThreadUpdatedEvent
+    event.thread.closed:
+      name: thread.closed
+      title: dispatch thread.closed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: thread.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ThreadClosedEvent
+    event.thread.reopened:
+      name: thread.reopened
+      title: dispatch thread.reopened
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: thread.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ThreadReopenedEvent
+    event.thread.moved:
+      name: thread.moved
+      title: dispatch thread.moved
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: thread.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ThreadMovedEvent
+    event.thread.moved_out:
+      name: thread.moved_out
+      title: dispatch thread.moved_out
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: channel.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ThreadMovedOutEvent
+    event.agent_session.changed:
+      name: agent_session.changed
+      title: dispatch agent_session.changed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: thread.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/AgentSessionChangedEvent
+    event.run.state_changed:
+      name: run.state_changed
+      title: dispatch run.state_changed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: run.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/RunStateChangedEvent
+    event.space.created:
+      name: space.created
+      title: dispatch space.created
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: space.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/SpaceCreatedEvent
+    event.space.updated:
+      name: space.updated
+      title: dispatch space.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: space.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/SpaceUpdatedEvent
+    event.space.archived:
+      name: space.archived
+      title: dispatch space.archived
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: space.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/SpaceArchivedEvent
+    event.channel.created:
+      name: channel.created
+      title: dispatch channel.created
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: channel.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ChannelCreatedEvent
+    event.channel.updated:
+      name: channel.updated
+      title: dispatch channel.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: channel.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ChannelUpdatedEvent
+    event.channel.settings_changed:
+      name: channel.settings_changed
+      title: dispatch channel.settings_changed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: channel.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ChannelSettingsChangedEvent
+    event.channel.archived:
+      name: channel.archived
+      title: dispatch channel.archived
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: channel.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ChannelArchivedEvent
+    event.command.changed:
+      name: command.changed
+      title: dispatch command.changed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: command.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/CommandChangedEvent
+    event.file.updated:
+      name: file.updated
+      title: dispatch file.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: file.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/FileUpdatedEvent
+    event.user.updated:
+      name: user.updated
+      title: dispatch user.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: user.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/UserUpdatedEvent
+    event.agent.updated:
+      name: agent.updated
+      title: dispatch agent.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: agent.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/AgentUpdatedEvent
+    event.instance.updated:
+      name: instance.updated
+      title: dispatch instance.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: instance.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/InstanceUpdatedEvent
+    event.status.updated:
+      name: status.updated
+      title: dispatch status.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: status.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/StatusUpdatedEvent
+    event.grant.changed:
+      name: grant.changed
+      title: dispatch grant.changed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: grant.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GrantChangedEvent
+    event.group.changed:
+      name: group.changed
+      title: dispatch group.changed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: group.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GroupChangedEvent
+    event.access.changed:
+      name: access.changed
+      title: dispatch access.changed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/AccessChangedEvent
+      x-audience: self
+    event.access.expiring:
+      name: access.expiring
+      title: dispatch access.expiring
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/AccessExpiringEvent
+      x-audience: self
+    event.session.revoked:
+      name: session.revoked
+      title: dispatch session.revoked
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/SessionRevokedEvent
+      x-audience: self
+    event.read_state.updated:
+      name: read_state.updated
+      title: dispatch read_state.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ReadStateUpdatedEvent
+      x-audience: self
+    event.draft.updated:
+      name: draft.updated
+      title: dispatch draft.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/DraftUpdatedEvent
+      x-audience: self
+    event.draft.deleted:
+      name: draft.deleted
+      title: dispatch draft.deleted
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/DraftDeletedEvent
+      x-audience: self
+    event.settings.updated:
+      name: settings.updated
+      title: dispatch settings.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/SettingsUpdatedEvent
+      x-audience: self
+    event.sidebar.updated:
+      name: sidebar.updated
+      title: dispatch sidebar.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/SidebarUpdatedEvent
+      x-audience: self
+    event.notification_pref.updated:
+      name: notification_pref.updated
+      title: dispatch notification_pref.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/NotificationPrefUpdatedEvent
+      x-audience: self
+    event.quiet_hours.updated:
+      name: quiet_hours.updated
+      title: dispatch quiet_hours.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/QuietHoursUpdatedEvent
+      x-audience: self
+    event.gdpr.request_updated:
+      name: gdpr.request_updated
+      title: dispatch gdpr.request_updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: gdpr.request.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GdprRequestUpdatedEvent
+    event.import.progress:
+      name: import.progress
+      title: dispatch import.progress
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: import.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/ImportProgressEvent
+    event.agent.invocation:
+      name: agent.invocation
+      title: dispatch agent.invocation
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: agent.events.consume
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/AgentInvocationEvent
+      x-audience: self
+    event.agent.followup:
+      name: agent.followup
+      title: dispatch agent.followup
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: agent.events.consume
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/AgentFollowupEvent
+      x-audience: self
+    event.run.cancel_requested:
+      name: run.cancel_requested
+      title: dispatch run.cancel_requested
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: agent.events.consume
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/RunCancelRequestedEvent
+      x-audience: self
+    event.interaction.created:
+      name: interaction.created
+      title: dispatch interaction.created
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: agent.events.consume
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/InteractionCreatedEvent
+      x-audience: self
+    event.command.invoked:
+      name: command.invoked
+      title: dispatch command.invoked
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: agent.events.consume
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/CommandInvokedEvent
+      x-audience: self
+    event.agent.config_changed:
+      name: agent.config_changed
+      title: dispatch agent.config_changed
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: agent.config.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/AgentConfigChangedEvent
+      x-audience: self
+    event.typing.started:
+      name: typing.started
+      title: dispatch typing.started
+      summary: Ephemeral event, at most once.
+      x-event-kind: ephemeral
+      x-receive-action: thread.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/TypingStartedEvent
+    event.run.updated:
+      name: run.updated
+      title: dispatch run.updated
+      summary: Ephemeral event, at most once.
+      x-event-kind: ephemeral
+      x-receive-action: run.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/RunUpdatedEvent
+    event.agent.presence_changed:
+      name: agent.presence_changed
+      title: dispatch agent.presence_changed
+      summary: Ephemeral event, at most once.
+      x-event-kind: ephemeral
+      x-receive-action: agent.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/AgentPresenceChangedEvent
+    event.command.autocomplete_requested:
+      name: command.autocomplete_requested
+      title: dispatch command.autocomplete_requested
+      summary: Ephemeral event, at most once.
+      x-event-kind: ephemeral
+      x-receive-action: agent.events.consume
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/CommandAutocompleteRequestedEvent
+      x-audience: self
+      description: Only to one gateway connection of the command owner (docs/spec/04-sync-protokoll.md, section 15.7).
+    event.notification.created:
+      name: notification.created
+      title: dispatch notification.created
+      summary: Ephemeral event, at most once.
+      description: Only to connections of the recipient, instead of a push to this device (docs/spec/13-push-benachrichtigungen.md, section 6.3).
+      x-event-kind: ephemeral
+      x-receive-action: push.deliver
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/NotificationCreatedEvent
+      x-audience: self
+    terminal.hello:
+      name: hello
+      title: hello
+      summary: First frame on the device stream with the DPoP nonce.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [hello]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/TerminalStreamHello
+    terminal.identify:
+      name: identify
+      title: identify
+      summary: Authenticate the device stream with access token and DPoP proof.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [identify]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/TerminalStreamIdentify
+    terminal.error:
+      name: error
+      title: error
+      summary: Error before the Noise handshake; the connection closes afterwards.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [error]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayError
+    noise.frame:
+      name: noise_frame
+      title: noise_frame
+      summary: One Noise message as a binary frame; the relay forwards it unchanged.
+      contentType: application/octet-stream
+      payload:
+        $ref: ./openapi.yaml#/components/schemas/NoiseFrame
+    host.hello:
+      name: hello
+      title: hello
+      summary: First frame on a host connection with the challenge and the JWKS of purpose `terminal`.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [hello]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostChannelHello
+    host.identify:
+      name: identify
+      title: identify
+      summary: Login of the host service with an Ed25519 proof over the challenge.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [identify]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostIdentify
+    host.ready:
+      name: ready
+      title: ready
+      summary: Control connection accepted.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [ready]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostReady
+    host.heartbeat:
+      name: heartbeat
+      title: heartbeat
+      summary: Liveness of the host service.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [heartbeat]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostHeartbeat
+    host.heartbeat_ack:
+      name: heartbeat_ack
+      title: heartbeat_ack
+      summary: Answer to `heartbeat`.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [heartbeat_ack]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostHeartbeatAck
+    host.report:
+      name: report
+      title: report
+      summary: Profiles, session user names, self-checks and server-host flag; codes and names only, never paths.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [report]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostReport
+    host.session.open:
+      name: session.open
+      title: session.open
+      summary: Open the data connection for a session.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [session.open]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostSessionOpen
+    host.session.close:
+      name: session.close
+      title: session.close
+      summary: End the PTY of a session.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [session.close]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostSessionClose
+    host.session.started:
+      name: session.started
+      title: session.started
+      summary: The PTY of a session runs.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [session.started]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostSessionStarted
+    host.session.ended:
+      name: session.ended
+      title: session.ended
+      summary: A session ended on the host (exit, idle, refused handshake).
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [session.ended]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostSessionEnded
+    host.error:
+      name: error
+      title: error
+      summary: Error for one op; the connection stays open unless a close code follows.
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [error]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/GatewayError
+    event.host.updated:
+      name: host.updated
+      title: dispatch host.updated
+      summary: Durable event, at least once, in `seq` order.
+      x-event-kind: durable
+      x-receive-action: host.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostUpdatedEvent
+    event.terminal_session.changed:
+      name: terminal_session.changed
+      title: dispatch terminal_session.changed
+      summary: Durable event, at least once, in `seq` order.
+      description: Only to the person of the session. Never content (docs/spec/24-terminal.md, section 10.2).
+      x-event-kind: durable
+      x-receive-action: self
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/TerminalSessionChangedEvent
+      x-audience: self
+    event.host.presence_changed:
+      name: host.presence_changed
+      title: dispatch host.presence_changed
+      summary: Ephemeral event, at most once.
+      x-event-kind: ephemeral
+      x-receive-action: host.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/HostPresenceChangedEvent
+    event.stats.live:
+      name: stats.live
+      title: dispatch stats.live
+      summary: Ephemeral event, at most once.
+      description: Every `stats.live_interval` to connections with a `stats.subscribe` subscription; filtered to the channels visible to the recipient, cost members only with `cost.read.aggregate`. Loss of `stats.read` ends the subscription with one `error` (`forbidden`). Never in the event log (docs/spec/25-visualisierung.md, section 5).
+      x-event-kind: ephemeral
+      x-receive-action: stats.read
+      payload:
+        type: object
+        required: [op, d]
+        properties:
+          op:
+            type: string
+            enum: [dispatch]
+          d:
+            $ref: ./openapi.yaml#/components/schemas/StatsLiveEvent

@@ -1,0 +1,20 @@
+sequenceDiagram
+    autonumber
+    participant O as Owner
+    participant A as Alte Instanz
+    participant N as Neue Instanz
+    participant D as DNS und Identität
+    participant C as Clients
+    O->>N: Ziel mit OpenTofu bereitstellen, gleiche BOTHY_VERSION
+    O->>N: Secrets-Bundle einspielen (gleiche instance_id, Pepper, Signierschlüssel, Push-Schlüssel)
+    O->>N: Probelauf: letzte Sicherung zurückspielen, Prüfungen grün
+    O->>D: DNS-TTL vorab senken
+    O->>A: Wartungsmodus read_only, ADR 0065 (Statusseite: Wartung)
+    A-->>C: Schreiben ergibt 503 maintenance, Ausgangsfach wartet
+    O->>A: Abschluss-Sicherung (pg_dump, Objekte, Manifest)
+    O->>N: Abschluss-Sicherung zurückspielen, Manifest vergleichen
+    O->>N: Notfall-Widerrufe seit der Abschluss-Sicherung wiederholen
+    O->>D: DNS umstellen, OIDC-Redirect-URIs prüfen
+    C->>N: Wiederverbinden mit gleichem Cursor (gleiche Zeitlinie, kein resync)
+    N-->>C: Nachholen, dann Ausgangsfach senden
+    O->>A: Nach Frist abschalten und Daten sicher löschen

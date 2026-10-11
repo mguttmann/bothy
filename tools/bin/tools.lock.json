@@ -1,0 +1,239 @@
+{
+  "schema": 1,
+  "comment": "Pinned release binaries for the repository gates. sha256 values are the GitHub release asset digests at pin time. Refresh with `make tools-lock TOOL=<name> VERSION=<x.y.z>`; never edit a sha256 by hand.",
+  "tools": {
+    "actionlint": {
+      "version": "1.7.12",
+      "repo": "rhysd/actionlint",
+      "tag": "v{version}",
+      "license": "MIT",
+      "binary": "actionlint",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "actionlint_{version}_darwin_amd64.tar.gz",
+          "member": "actionlint",
+          "sha256": "5b44c3bc2255115c9b69e30efc0fecdf498fdb63c5d58e17084fd5f16324c644"
+        },
+        "darwin-arm64": {
+          "asset": "actionlint_{version}_darwin_arm64.tar.gz",
+          "member": "actionlint",
+          "sha256": "aba9ced2dee8d27fecca3dc7feb1a7f9a52caefa1eb46f3271ea66b6e0e6953f"
+        },
+        "linux-amd64": {
+          "asset": "actionlint_{version}_linux_amd64.tar.gz",
+          "member": "actionlint",
+          "sha256": "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+        },
+        "linux-arm64": {
+          "asset": "actionlint_{version}_linux_arm64.tar.gz",
+          "member": "actionlint",
+          "sha256": "325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6"
+        }
+      }
+    },
+    "gitleaks": {
+      "version": "8.30.1",
+      "repo": "gitleaks/gitleaks",
+      "tag": "v{version}",
+      "license": "MIT",
+      "binary": "gitleaks",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "gitleaks_{version}_darwin_x64.tar.gz",
+          "member": "gitleaks",
+          "sha256": "dfe101a4db2255fc85120ac7f3d25e4342c3c20cf749f2c20a18081af1952709"
+        },
+        "darwin-arm64": {
+          "asset": "gitleaks_{version}_darwin_arm64.tar.gz",
+          "member": "gitleaks",
+          "sha256": "b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5"
+        },
+        "linux-amd64": {
+          "asset": "gitleaks_{version}_linux_x64.tar.gz",
+          "member": "gitleaks",
+          "sha256": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        },
+        "linux-arm64": {
+          "asset": "gitleaks_{version}_linux_arm64.tar.gz",
+          "member": "gitleaks",
+          "sha256": "e4a487ee7ccd7d3a7f7ec08657610aa3606637dab924210b3aee62570fb4b080"
+        }
+      }
+    },
+    "go-arch-lint": {
+      "version": "1.19.0",
+      "repo": "fe3dback/go-arch-lint",
+      "tag": "v{version}",
+      "license": "MIT",
+      "binary": "go-arch-lint",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "go-arch-lint_{version}_darwin_amd64.tar.gz",
+          "member": "go-arch-lint",
+          "sha256": "09b641e03b5314bfee70e98fa9caf91986a650d28b834713871c8d25867a6285"
+        },
+        "darwin-arm64": {
+          "asset": "go-arch-lint_{version}_darwin_arm64.tar.gz",
+          "member": "go-arch-lint",
+          "sha256": "63a64239de9acdbd0ea3f0bf7b94705cc8a441b02b37c01147d3027e8f78611e"
+        },
+        "linux-amd64": {
+          "asset": "go-arch-lint_{version}_linux_amd64.tar.gz",
+          "member": "go-arch-lint",
+          "sha256": "b4454546abf95ab1b32c26af146bc7c73ba3856c534d66890ac0738bada5a03c"
+        },
+        "linux-arm64": {
+          "asset": "go-arch-lint_{version}_linux_arm64.tar.gz",
+          "member": "go-arch-lint",
+          "sha256": "50174a73916c767eda2b27cf18a4db80cd7f102eeb4c514a705239279fd2754b"
+        }
+      }
+    },
+    "golangci-lint": {
+      "version": "2.14.0",
+      "repo": "golangci/golangci-lint",
+      "tag": "v{version}",
+      "license": "GPL-3.0",
+      "binary": "golangci-lint",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "golangci-lint-{version}-darwin-amd64.tar.gz",
+          "member": "golangci-lint-{version}-darwin-amd64/golangci-lint",
+          "sha256": "a5667c1c3536be1740133213e1e822bfb8f0d98ea12903174d6d5f635e4ed68d"
+        },
+        "darwin-arm64": {
+          "asset": "golangci-lint-{version}-darwin-arm64.tar.gz",
+          "member": "golangci-lint-{version}-darwin-arm64/golangci-lint",
+          "sha256": "5ef5f36a7147e91dc58ef9ef4d11bb7bad5ead0c76eb6c01327a73c641d1dcc3"
+        },
+        "linux-amd64": {
+          "asset": "golangci-lint-{version}-linux-amd64.tar.gz",
+          "member": "golangci-lint-{version}-linux-amd64/golangci-lint",
+          "sha256": "ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab"
+        },
+        "linux-arm64": {
+          "asset": "golangci-lint-{version}-linux-arm64.tar.gz",
+          "member": "golangci-lint-{version}-linux-arm64/golangci-lint",
+          "sha256": "ee7ec5f3453d15ddf106fae5a4d6c71737712348a979d1fe9cd52ec7ea299bae"
+        }
+      }
+    },
+    "lychee": {
+      "version": "0.24.2",
+      "repo": "lycheeverse/lychee",
+      "tag": "lychee-v{version}",
+      "license": "Apache-2.0 OR MIT",
+      "binary": "lychee",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "lychee-x86_64-apple-darwin.tar.gz",
+          "member": "lychee-x86_64-apple-darwin/lychee",
+          "sha256": "887503a9cff667d322b8d0892b40bf49976eb9507af8483220a3706cdad55978"
+        },
+        "darwin-arm64": {
+          "asset": "lychee-aarch64-apple-darwin.tar.gz",
+          "member": "lychee-aarch64-apple-darwin/lychee",
+          "sha256": "c9d3740ea2d891854d37116c9fba840f37b6e7c89d330e7db84ac333631c4977"
+        },
+        "linux-amd64": {
+          "asset": "lychee-x86_64-unknown-linux-gnu.tar.gz",
+          "member": "lychee-x86_64-unknown-linux-gnu/lychee",
+          "sha256": "1f4e0ef7f6554a6ed33dd7ac144fb2e1bbed98598e7af973042fc5cd43951c9a"
+        },
+        "linux-arm64": {
+          "asset": "lychee-aarch64-unknown-linux-gnu.tar.gz",
+          "member": "lychee-aarch64-unknown-linux-gnu/lychee",
+          "sha256": "91a7bd65685da41b90ccb9bc867a3d649a7818042dae04ff405e55a25bddee4c"
+        }
+      }
+    },
+    "osv-scanner": {
+      "version": "2.6.0",
+      "repo": "google/osv-scanner",
+      "tag": "v{version}",
+      "license": "Apache-2.0",
+      "binary": "osv-scanner",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "osv-scanner_darwin_amd64",
+          "member": "",
+          "sha256": "60c5296637e977b28eeda5c7f13573e447659a632922737f94d11fa7e30ad6ca"
+        },
+        "darwin-arm64": {
+          "asset": "osv-scanner_darwin_arm64",
+          "member": "",
+          "sha256": "98c460dcd37de25819babd757d04542045b6243113e209edcd4d89fedb0256b4"
+        },
+        "linux-amd64": {
+          "asset": "osv-scanner_linux_amd64",
+          "member": "",
+          "sha256": "ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108"
+        },
+        "linux-arm64": {
+          "asset": "osv-scanner_linux_arm64",
+          "member": "",
+          "sha256": "2c71403eb443d05891c4f268c3ad771cf4f16e5443463fd7851ef8f454d3c7e4"
+        }
+      }
+    },
+    "sqlc": {
+      "version": "1.31.1",
+      "repo": "sqlc-dev/sqlc",
+      "tag": "v{version}",
+      "license": "MIT",
+      "binary": "sqlc",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "sqlc_{version}_darwin_amd64.tar.gz",
+          "member": "sqlc",
+          "sha256": "c5af76772e3785d21663a62697056b383f07629979b1bd25b93872e73dbd519b"
+        },
+        "darwin-arm64": {
+          "asset": "sqlc_{version}_darwin_arm64.tar.gz",
+          "member": "sqlc",
+          "sha256": "21602158c99eb1f2bae197a66abfb1941d1e9e50b23125bb193349c6b1acc71e"
+        },
+        "linux-amd64": {
+          "asset": "sqlc_{version}_linux_amd64.tar.gz",
+          "member": "sqlc",
+          "sha256": "497ae4fcdfa64c5b0c311ffe4c2bd991e43991e82e5367792ed78bc2dca27354"
+        },
+        "linux-arm64": {
+          "asset": "sqlc_{version}_linux_arm64.tar.gz",
+          "member": "sqlc",
+          "sha256": "b7cae247740d0c51a1e657479e5b2d21e6fef428f596682a01bc55bf4ab8a23d"
+        }
+      }
+    },
+    "trivy": {
+      "version": "0.69.3",
+      "repo": "aquasecurity/trivy",
+      "tag": "v{version}",
+      "license": "Apache-2.0",
+      "binary": "trivy",
+      "hold": "Pinned to the last release the vendor advisory GHSA-69fq-xp46-6x23 names as safe (immutable release). Do not bump without the check in docs/quality/toolchain.md.",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "trivy_{version}_macOS-64bit.tar.gz",
+          "member": "trivy",
+          "sha256": "fec4a9f7569b624dd9d044fca019e5da69e032700edbb1d7318972c448ec2f4e"
+        },
+        "darwin-arm64": {
+          "asset": "trivy_{version}_macOS-ARM64.tar.gz",
+          "member": "trivy",
+          "sha256": "a2f2179afd4f8bb265ca3c7aefb56a666bc4a9a411663bc0f22c3549fbc643a5"
+        },
+        "linux-amd64": {
+          "asset": "trivy_{version}_Linux-64bit.tar.gz",
+          "member": "trivy",
+          "sha256": "1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+        },
+        "linux-arm64": {
+          "asset": "trivy_{version}_Linux-ARM64.tar.gz",
+          "member": "trivy",
+          "sha256": "7e3924a974e912e57b4a99f65ece7931f8079584dae12eb7845024f97087bdfd"
+        }
+      }
+    }
+  }
+}

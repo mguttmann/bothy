@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+rules:
+  - id: bothy-go-route-registration
+    languages: [go]
+    severity: ERROR
+    message: >-
+      Register HTTP routes only through the project router, which requires the
+      x-authz-action of every route (docs/spec/05-aktionen.md rule 3, ADR 0017).
+      Direct ServeMux registration bypasses the route-to-action check. The router
+      itself carries one `nosemgrep` comment with this rule id and the reason.
+    pattern-either:
+      - pattern: http.Handle(...)
+      - pattern: http.HandleFunc(...)
+      - patterns:
+          - pattern-either:
+              - pattern: $MUX.Handle($ROUTE, ...)
+              - pattern: $MUX.HandleFunc($ROUTE, ...)
+          - metavariable-regex:
+              metavariable: $ROUTE
+              regex: '^"((GET|HEAD|POST|PUT|PATCH|DELETE|OPTIONS) )?[^"]*/'
