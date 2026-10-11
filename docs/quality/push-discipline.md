@@ -31,8 +31,8 @@ commit per feature, signed and linear.
    Conventional Commit header line, because on merge it becomes the header line of the commit on `main`;
    CI checks it (`PR_TITLE` in `make commitlint`).
 7. **CI.** `ci.yml` runs the same make targets. The only required check: `ci-ok`.
-8. **Merge.** "Squash and merge". GitHub signs the resulting commit; the
-   `Signed-off-by` lines of the individual commits are in the commit message. `main` stays linear.
+8. **Merge.** "Squash and merge". GitHub signs the resulting commit; its message is the
+   pull request body (repository setting below). `main` stays linear.
 
 ## Protection of `main` (ruleset)
 
@@ -44,6 +44,7 @@ commit per feature, signed and linear.
 | Require signed commits | on | provenance of every commit on `main` |
 | Block force pushes | on | history stays immutable |
 | Restrict deletions | on | `main` cannot be deleted |
+| Squash commit message (repository setting, not part of the ruleset) | title: pull request title, message: pull request body | the checked title becomes the commit header on `main` |
 
 Rationale for squash instead of rebase merge: with a rebase merge, GitHub creates new commits
 that it cannot sign; signed commits and rebase merge through the interface

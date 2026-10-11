@@ -25,6 +25,8 @@ operated, and the order of the build.
 
 ### Added
 
+- Rules for AI coding agents (`AGENTS.md`, loaded by `CLAUDE.md`): public-repository
+  hygiene, English only, one pull request per ticket, review findings fixed before merge.
 - Specification entry point (`docs/SPEC.md`) with goals, non-goals, hard invariants,
   system overview, chapter index and reading paths per role.
 - Specification chapters 00 to 25 (`docs/spec/`): core contract (glossary, data model,
