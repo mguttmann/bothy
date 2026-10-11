@@ -205,6 +205,9 @@ jobs:
       - run: make bootstrap-ci
       - name: make sonar
         env:
+          # As for "make gates": `make sonar` runs `make test` first, and its diagram tests
+          # start Chromium.
+          MMDC_PUPPETEER_CONFIG: tools/node/puppeteer-ci.json
           COMPONENTS: ${{ needs.plan.outputs.components }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}

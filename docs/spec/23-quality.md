@@ -35,7 +35,7 @@ The complete list with tool, threshold and where it runs is in
 
 | Group | make targets | Checks |
 |---|---|---|
-| Code | `fmt-check`, `codegen-check`, `lint`, `typecheck`, `arch`, `migrations-lint`, `test`, `coverage` | Format, generated code without drift, linters, types, module boundaries of the Go modules, migration rules, tests with coverage per component |
+| Code | `fmt-check`, `codegen-check`, `lint`, `typecheck`, `arch`, `register-check`, `migrations-lint`, `test`, `coverage` | Format, generated code without drift, linters, types, module boundaries of the Go modules, module register equal to the core contract and docs, migration rules, tests with coverage per component |
 | Commits | `commitlint` | Conventional Commits and DCO sign-off of the new commits |
 | Docs | `docs`, `linkcheck`, `diagrams`, `catalog-check`, `api-lint`, `api-checks`, `api-clients`, `tokens` | Strict site build, links and anchors, diagrams, action catalogue and its generated copies, API contracts, copies of the API contracts equal to their sources, generated clients, design tokens |
 | Operations | `ops-check` | collector, Prometheus, Alertmanager, Loki, Tempo, Sloth, OpenTofu; derived values equal their source |

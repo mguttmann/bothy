@@ -148,6 +148,8 @@ Technology without domain logic; only `adapters/`, `wire` and `cmd` may import i
 - The SQL of a module names only its own tables (02, 7.3).
 - Every operation has an action from 05; otherwise the server does not start.
 - Generated code (`api/`, sqlc, `.go-arch-lint.yml`) matches its source.
+- Register, core contract (03, `actions.yaml`), module tables in 02, component diagram and
+  module READMEs agree (`make register-check`, ADR 0050).
 
 ## Name-bound locations
 

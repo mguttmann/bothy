@@ -147,6 +147,16 @@ def test_mmdc_command_uses_puppeteer_config(
     assert cmd == ["/x/mmdc", "-q", "-i", "in.md", "-o", "out.md", "-p", str(cfg)]
 
 
+def test_mmdc_command_reads_a_relative_puppeteer_config_from_the_repository_root(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # CI gives the path relative to the repository root; pytest under `make test` runs in tools/.
+    monkeypatch.setenv("MMDC_PUPPETEER_CONFIG", "tools/node/puppeteer-ci.json")
+    monkeypatch.chdir(tmp_path)
+    cmd = rd.mmdc_command(Path("/x/mmdc"), Path("in.md"), Path("out.md"))
+    assert cmd[-2:] == ["-p", str(rd.REPO_ROOT / "tools" / "node" / "puppeteer-ci.json")]
+
+
 def test_mmdc_command_without_config(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("MMDC_PUPPETEER_CONFIG", raising=False)
     cmd = rd.mmdc_command(Path("/x/mmdc"), Path("in.md"), Path("out.md"))

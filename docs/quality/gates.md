@@ -19,6 +19,7 @@ Source of the diagram: `docs/quality/pipeline.mmd`.
 | `lint` | pre-commit hooks over all files (text rules, Stripe webhook secret format `whsec_` of GitHub secret scanning, whitespace, YAML/TOML/JSON, merge markers, private keys, file size), ruff (with required docstrings `D`, section "Documentation in code" in chapter 23), bandit, check-jsonschema (issue forms, Renovate, CodeRabbit), actionlint, zizmor, go vet and golangci-lint, flutter analyze and custom_lint, script `lint` | style, sources of errors, workflow security | `repo.max_file_kb` | yes |
 | `typecheck` | mypy (strict), go build, tsc | types | | tools |
 | `arch` | go-arch-lint with `<module>/.go-arch-lint.yml`, generated from `architecture/modules.yaml` | module boundaries and allowed third-party libraries of the Go modules (chapter 02 "go-arch-lint"); no symbolic links below a module, because go-arch-lint does not follow a linked directory and assigns it by the path of the link, while the Go compiler builds the code behind it (go-arch-lint v1.19.0 walks the module with [`filepath.WalkDir`](https://github.com/fe3dback/go-arch-lint/blob/v1.19.0/internal/services/project/scanner/scanner.go#L74), which [does not follow symbolic links](https://pkg.go.dev/path/filepath#WalkDir), retrieved 2026-10-12; M1-05/24) | | from the first Go module |
+| `register-check` | `tools/doccheck/register_check.py` | module register `services/server/architecture/modules.yaml` equal to the core contract (tables and their modules from chapter 03, actions, event types and ops from `docs/spec/actions.yaml`) and equal to the places that repeat it: tables "Module list", "Allowed dependencies", "Cross-cutting ports", "Actions per module" and "Event types and WebSocket ops per module" in chapter 02, component diagram `c4-3-server-components.mmd`, module READMEs; one line per difference with file and item (ADR 0050, rules C1 to C12 in the docstring) | | yes |
 | `migrations-lint` | `tools/ci/migrations_lint.py` | consecutive five-digit numbers without gaps and without timestamp versions, checksums of merged migrations unchanged (`migrations.sha256`), `STORED` with `GENERATED ALWAYS AS`, `-- +goose NO TRANSACTION` with `CONCURRENTLY` (ADR 0007, chapter 14) | | from the first migration |
 | `test` | pytest, go test -race, flutter test, script `test` | tests with coverage data | | tools |
 | `coverage` | coverage, go tool cover, LCOV evaluation | minimum coverage; Go without the packages under `test/` and `perf/` (test code, chapter 23 "Component contract") | `quality.coverage.tools_min_percent`, `quality.coverage.go_min_percent`, `quality.coverage.dart_min_percent` | tools |
@@ -130,11 +131,14 @@ next to `migrations/`, so that neither the embedding pattern `*.sql` nor sqlc re
 ## Individual gates
 
 Every gate also runs alone, for example `make lint` or `make diagrams`. For the
-diagrams, `MMDC_PUPPETEER_CONFIG` can point to a Puppeteer configuration. If it names
-its own Chromium (`executablePath`), `make bootstrap` downloads no browser; otherwise it downloads
-the one that matches Puppeteer. CI uses `tools/node/puppeteer-ci.json` (Chromium without
-sandbox, because runners can restrict user namespaces; only the project's
-own diagrams are rendered).
+diagrams, `MMDC_PUPPETEER_CONFIG` can point to a Puppeteer configuration, which the diagram
+tests of `make test` use too; a relative path counts from the repository root, also when a test
+renders from `tools/`. If it names its own Chromium (`executablePath`), `make bootstrap`
+downloads no browser; otherwise it downloads the one that matches Puppeteer. CI sets
+`tools/node/puppeteer-ci.json` (Chromium without sandbox, because runners can restrict user
+namespaces; only the project's own diagrams are rendered) in every step that reaches
+`make diagrams` or `make test`, that is for `make gates` and `make sonar`; a test in
+`tools/doccheck` holds this.
 
 Further switches: `COMMIT_RANGE` and `DENYLIST_RANGE` (commit range instead of
 `origin/main..HEAD`), `GITLEAKS_LOG_OPTS` (default `HEAD`, all refs with `--all`), `GITLEAKS_FLAGS` (for
@@ -143,6 +147,19 @@ example a JSON report), `DENYLIST_FLAGS` (for example `--reveal` locally).
 ## What the gates do not cover
 
 * Links to the internet: `make linkcheck-external` when needed (R-QA-09).
+* `register-check` compares only names: the machine columns of the tables in 02, nodes and
+  edges of the diagram, lists of the READMEs. Prose ("Responsibility", "Reason per edge", the
+  table "Ports, events and sources per module", purpose, port texts and other paragraphs of the
+  READMEs) stays with review. It reports a name outside a code span only when a source knows
+  it; an unknown word (such as a typo) stays with review. Its static reading approximates
+  Python-Markdown (it does not read Setext headings); a test in `make test` holds that it equals
+  the rendered site on the real files (DECISIONS M1-06/11). GitHub renders the READMEs; what
+  only GitHub shows differently from Python-Markdown is not seen by the test. It reads the
+  diagram through a closed line grammar; a test with the pinned mermaid-cli holds that it equals
+  Mermaid on the real diagram (needs `make bootstrap`).
+  Table ownership in SQL files and the alignment with the tables of the migrations (ADR 0050)
+  are missing as long as there are no migrations and queries; they come with the first schema
+  (PLAN M1-12).
 * Whether the content of an `.svg` matches what mermaid-cli would render today from its `.mmd`:
   the output depends on the browser version, so a byte comparison would differ on every
   host. Instead, `make diagrams` checks the stamp that `render_diagrams.py

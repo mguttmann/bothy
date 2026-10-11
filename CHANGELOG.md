@@ -139,6 +139,12 @@ operated, and the order of the build.
 - Build briefs of the milestones M2 and M3 (`docs/briefs/M2-*.md`, `docs/briefs/M3-*.md`) in the
   brief index with waves and graph, and in the site navigation (D-W-100).
 
+- Gate `register-check` (`tools/doccheck/register_check.py`): the module register
+  `services/server/architecture/modules.yaml` must equal the tables and their modules in
+  chapter 03 and the actions, event types and ops of `docs/spec/actions.yaml`, and the module
+  tables of chapter 02, the server component diagram and the module READMEs must equal the
+  register (ADR 0050); every difference is one finding with file and item.
+
 ### Fixed
 
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code

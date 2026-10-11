@@ -21,7 +21,7 @@ Instance identity, sync epoch, minimum server version, settings and branding, fe
 
 ## Dependencies
 
-Must not use the ports of any other module.
+May use the ports of these modules: none.
 
 Reason: foundation.
 

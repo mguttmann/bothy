@@ -329,21 +329,25 @@ An event type has exactly one producing module. The receive action is in 05 sect
 | Module | Durable events | Ephemeral events | WebSocket ops (client to server) |
 |---|---|---|---|
 | `instance` | `instance.updated` | | |
+| `audit` | | | |
 | `authz` | `grant.changed`, `group.changed`, `access.changed`, `access.expiring` | | |
-| `identity` | `user.updated`, `session.revoked` | | |
+| `identity` | `user.updated`, `session.revoked`, `device.pending` | | |
 | `chat` | `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved`, `thread.moved_out`, `space.created`, `space.updated`, `space.archived`, `channel.created`, `channel.updated`, `channel.settings_changed`, `channel.archived`, `sidebar.updated`, `agent.config_changed` | | |
 | `agents` | `agent_session.changed`, `command.changed`, `agent.updated` | `agent.presence_changed` | `ack` |
 | `files` | `file.updated` | | |
 | `messaging` | `message.created`, `message.updated`, `message.deleted`, `reaction.added`, `reaction.removed`, `pin.added`, `pin.removed` | | |
 | `runs` | `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked` | `run.updated`, `command.autocomplete_requested` | `run.update`, `command.autocomplete_result` |
+| `billing` | | | |
 | `sync` | `read_state.updated`, `draft.updated`, `draft.deleted`, `settings.updated` | | |
 | `notify` | `notification_pref.updated`, `quiet_hours.updated` | `notification.created` | |
+| `apps` | | | |
 | `status` | `status.updated` | | |
 | `privacy` | `gdpr.request_updated` | | |
 | `importer` | `import.progress` | | |
 | `gateway` | | `typing.started` | `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.start`, `typing.stop` |
-| `stats` | | `stats.live` | `stats.subscribe`, `stats.unsubscribe` (through the hub of the gateway) |
-| `terminal` | `host.updated`, `terminal_session.changed` | `host.presence_changed` | none in the gateway; own channels with their own ops (05, section 7) |
+| `search` | | | |
+| `stats` | | `stats.live` | `stats.subscribe`, `stats.unsubscribe` (through the shared WebSocket hub) |
+| `terminal` | `host.updated`, `terminal_session.changed` | `host.presence_changed` | none on the shared WebSocket; separate connections with their own ops (05, section 7) |
 
 `messaging` produces `message.updated` for `trigger_state`, even when `runs` triggers the change
 (through `Messages.SetTriggerState`). Reason: one event type, one producer, one payload definition.
@@ -607,11 +611,11 @@ app uses a subpackage of a foreign app, a kernel port uses another one: exit cod
 | Check | What it holds | Implementation (ticket) |
 |---|---|---|
 | Table ownership | SQL of a module names only its own tables (principle 12 of 03) | Pass over `adapters/postgres/queries/*.sql`, table names against `modules.yaml` |
-| Completeness | every table from 03 and every action from 05 exactly once in the register | Alignment of the register with the core contract |
+| Completeness | every table from 03 and every action from 05 exactly once in the register | `make register-check` (M1-06): alignment of the register with 03 and `actions.yaml`, also event types and ops; the alignment with the migrations comes with the first schema |
 | Routes and ops | every operation has a known action; its handler lives in the module that owns the action | Startup check of the server and a test over the generated route table |
 | In-tx subscriptions | every subscription is an allowed direction (a higher module subscribes to a lower one) | Golden file of the registrations in `internal/wire`; the registration derives publisher and subscriber from the Go packages, not from declarations |
 | Counter access | only the phase hooks of `authz`, `sync`, `audit` use `instance.Counters` | Phase guard in `Counters` (runtime, 8.2) and a static test: only `instance`, `wire` and the packages of the registered hooks reference `Counters` |
-| Docs alignment | tables 4.2, 4.4, 4.6, 4.7 of this chapter match the register | Comparison in the docs gate |
+| Docs alignment | tables 4.2, 4.4, 4.6, 4.7 of this chapter match the register | `make register-check` (M1-06): compares the machine columns, not the prose; also holds 4.5, the component diagram and the module READMEs |
 | Generated files current | `.go-arch-lint.yml`, sqlc code, API code match their source | Regenerate and `git diff --exit-code` |
 
 ## 8. Transactions and Unit of Work

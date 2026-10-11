@@ -15,7 +15,8 @@ Colours written in a `*.mmd` file must be design-token colours. The ERDs must ma
 (erd_check.py). `--write` re-renders every `*.svg` (docs/quality/gates.md).
 
 Environment: MMDC_PUPPETEER_CONFIG may point to a Puppeteer config file, e.g. to use a
-locally installed Chromium instead of the one `make bootstrap` downloads.
+locally installed Chromium instead of the one `make bootstrap` downloads. A relative path is
+relative to the repository root, as CI and `make bootstrap` read it, from any working directory.
 """
 
 from __future__ import annotations
@@ -236,7 +237,8 @@ def mmdc_command(mmdc: Path, source: Path, out: Path, config: Path | None = None
         cmd += ["-c", str(config), "-b", background]
     puppeteer = os.environ.get("MMDC_PUPPETEER_CONFIG")
     if puppeteer:
-        cmd += ["-p", puppeteer]
+        # An absolute path stays as it is (joining it drops REPO_ROOT).
+        cmd += ["-p", str(REPO_ROOT / puppeteer)]
     return cmd
 
 
