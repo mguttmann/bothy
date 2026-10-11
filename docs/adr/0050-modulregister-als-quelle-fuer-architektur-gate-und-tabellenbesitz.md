@@ -80,10 +80,24 @@ einer lesbaren Stelle hält und daraus jede Prüfung im lokalen Gate entsteht. F
 
 - `make arch` (go-arch-lint, Exitcode 0) und `make codegen-check` (erzeugte `.go-arch-lint.yml`
   gleich dem Generator-Ergebnis) im Ziel `gates`.
-- `go test ./tools/archgen/...` mit Fixture-Modulen: Domain importiert einen Treiber, App importiert
-  einen fremden Port, App importiert fremde App, Paket ohne Komponente; alle vier scheitern
-  erwartet ([02-architektur.md](../spec/02-architektur.md), Abschnitt 7.2). Die Form mit
-  Plattform-Komponenten belegt M1-05 mit denselben vier Verstößen.
+- `go test ./tools/archgen/...` mit Fixture-Modulen (PLAN M1-05, Form mit Plattform-Komponenten):
+  `TestArchLintSkeletonClean` (sauberes Gerüst, Exitcode 0), `TestArchLintDomainImportsDriver`
+  (Domain importiert einen Treiber), `TestArchLintAppImportsForeignPort` (App importiert einen
+  fremden Port), `TestArchLintAppImportsForeignApp` (App importiert fremde App),
+  `TestArchLintPackageWithoutComponent` (Paket ohne Komponente); die vier Verstöße scheitern mit
+  Exitcode 1 und dem Paketpfad ([02-architektur.md](../spec/02-architektur.md), Abschnitt 7.2).
+  `TestArchLintTestSupport`: `test/**` darf alles, keine Produktions-Komponente darf es nutzen.
+  `TestArchLintChapter02Layout`: das Layout aus 02 mit mehreren Paketen je Komponente (`sqlcgen`,
+  `pgtest`, Unterpakete, `api/routes` ruft `api/rest`) besteht; `TestArchLintLayersStayClosed`:
+  die Selbst-Einträge öffnen keine andere Kante; `TestArchLintVendorPatternIsLiteral`: ein
+  Vendor-Muster gibt nur die genannten Bibliotheken frei.
+- Generator: `TestGenerateGolden`, `TestGenerateIsDeterministic`, `TestRegisterRejects` (jede
+  Prüfregel des Registers ein Fall), `TestImportPathRule` (Vendor-Muster nur als Go-Importpfad),
+  `TestRunRejectsExcludePrefixOfOtherDirectories` (`exclude` wirkt als Zeichenketten-Präfix),
+  `TestRepositoryRegisterIsValid` und
+  `TestRepositoryConfigIsCurrent` (die eingecheckte `.go-arch-lint.yml` gleicht Byte für Byte dem
+  Generator-Ergebnis aus `architecture/modules.yaml`), `TestChapter02ExamplesMatchGenerator`
+  (Beispielregister und erzeugter Auszug in 02, Abschnitte 7.1 und 7.2, entsprechen dem Generator).
 - Fixture für den Tabellenbesitz: Eine Abfrage in Modul A nennt eine Tabelle von Modul B; der
   Check scheitert mit Datei und Tabelle.
 - Vollständigkeits-Check gegen Migrationen, 03 und `actions.yaml`; Doku-Abgleich mit 02.

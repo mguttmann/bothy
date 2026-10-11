@@ -1,11 +1,16 @@
 # Modul `audit`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: Gerüst (M1-05). Das Port-Paket existiert; Schnittstellen und Anwendungsfälle kommen mit den Tickets der Etappe.
+Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
 
-Audit-Log mit Hash-Kette, signierte Prüfpunkte, Abfrage, Prüfung, Kürzung mit Anker.
+Audit-Log mit Hash-Kette, signierte Prüfpunkte, Schlüssel der IP-Pseudonyme, Abfrage, Prüfung, Kürzung mit Anker.
+
+## Code
+
+- `internal/audit` (`doc.go`): Port als Wurzelpaket, bisher nur mit Paketkommentar. Schnittstellen, DTOs und In-Tx-Ereignisse kommen mit dem Ticket, das sie umsetzt.
+- `domain/`, `app/` und `adapters/<art>/` entstehen mit dem ersten Anwendungsfall. Ihre Komponenten erzeugt `tools/archgen` aus `architecture/modules.yaml`; ein Paket außerhalb dieser Schichten scheitert in `make arch`.
 
 ## Port (Wurzelpaket `internal/audit`)
 
@@ -25,7 +30,7 @@ Geprüft durch go-arch-lint (ADR 0008).
 
 ## Tabellen
 
-`audit_events`, `audit_checkpoints`.
+`audit_events`, `audit_checkpoints`, `audit_ip_keys`.
 
 Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
 

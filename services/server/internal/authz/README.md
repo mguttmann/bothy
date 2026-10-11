@@ -1,18 +1,23 @@
 # Modul `authz`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: Gerüst (M1-05). Das Port-Paket existiert; Schnittstellen und Anwendungsfälle kommen mit den Tickets der Etappe.
+Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
 
 `authorize`, Rechte-Cache, sichtbare Ziele, Gruppen, Freigaben, Rechte-Version, I1-Prüfung, "Wer hat Zugriff", "Als Person ansehen".
 
+## Code
+
+- `internal/authz` (`doc.go`): Port als Wurzelpaket, bisher nur mit Paketkommentar. Schnittstellen, DTOs und In-Tx-Ereignisse kommen mit dem Ticket, das sie umsetzt.
+- `domain/`, `app/` und `adapters/<art>/` entstehen mit dem ersten Anwendungsfall. Ihre Komponenten erzeugt `tools/archgen` aus `architecture/modules.yaml`; ein Paket außerhalb dieser Schichten scheitert in `make arch`.
+
 ## Port (Wurzelpaket `internal/authz`)
 
-- Eingehend: `Admin` (Gruppen, Freigaben, Erklärung, Ansicht als Person); deklariert `PrincipalSource`, `StructureSource`, `AgentPolicySource`.
-- Gibt In-Tx-Ereignisse aus: kernel `authorize.AccessChanged`.
+- Eingehend: `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`.
+- Gibt In-Tx-Ereignisse aus: kernel `authorize.AccessChanged` (mit der auslösenden Aktion; `runs` bricht bei `user.disable` mit Grund `user_disabled` ab, sonst mit `access_revoked`).
 - Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: kernel `authorize.Authorizer`.
+- Implementiert Quellen-Ports und Querschnitts-Ports: kernel `authorize.Authorizer`, `instance.FlagGroupSource`.
 
 ## Abhängigkeiten
 
@@ -31,7 +36,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Aktionen (05-aktionen.md)
 
-`access.explain`, `access.preview`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `group.member.expire`, `grant.read`, `grant.create`, `grant.revoke`, `grant.expire`.
+`access.explain`, `access.preview`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `group.member.expire`, `group.member.sync`, `grant.read`, `grant.create`, `grant.revoke`, `grant.expire`.
 
 ## Ereignisse und WebSocket-Ops
 

@@ -1,0 +1,224 @@
+# SPDX-License-Identifier: Apache-2.0
+# Module register: docs/spec/02-architektur.md "Modulregister als Quelle", ADR 0050.
+# The single source of module boundaries. tools/archgen generates .go-arch-lint.yml from it
+# (go generate ./tools/archgen); later tickets add entries, never fields.
+version: 1
+# exclude: directories go-arch-lint skips (repository tools, not product code). It skips every
+# path that starts with an entry as a string, so archgen rejects an entry that is a prefix of
+# internal, cmd, api or of another directory of the module (docs/DECISIONS.md M1-05/18).
+exclude: [tools]
+kernel:
+  core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys]   # usable by every package
+  ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure]
+platform: {}                # <name>: {depends_on: [<platform names>], vendors: [<vendor groups>]}
+wire: {vendors: []}
+cmd: {vendors: []}
+# api: {vendors: [...]}     # added by M1-17 together with api/
+testsupport: {paths: [test, perf]}   # test code across modules (02 "Code-Layout"); never imported
+modules:
+  instance:
+    tables: [instance, instance_settings, server_signing_keys, feature_flags, sequence_counters]
+    actions: [instance.discovery.read, instance.read, instance.settings.read,
+              instance.settings.update, instance.branding.update, feature_flag.read,
+              feature_flag.update, signing_key.rotate, signing_key.transition]
+    events: [instance.updated]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: []
+    adapter_vendors: []
+  billing:
+    tables: [price_table, cost_entries]
+    actions: [cost.read.thread, cost.read.aggregate, price.read, price.manage, cost.reconcile,
+              cost.reconcile.submit]
+    events: []
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: []
+    adapter_vendors: []
+  audit:
+    tables: [audit_events, audit_checkpoints, audit_ip_keys]
+    actions: [audit.read, audit.verify]
+    events: []
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [instance]
+    adapter_vendors: []
+  authz:
+    tables: [groups, group_memberships, grants]
+    actions: [access.explain, access.preview, access.view_as, group.read, group.create,
+              group.update, group.delete, group.member.add, group.member.remove,
+              group.member.expire, group.member.sync, grant.read, grant.create, grant.revoke,
+              grant.expire]
+    events: [grant.changed, group.changed, access.changed, access.expiring]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [instance]
+    adapter_vendors: []
+  identity:
+    tables: [principals, users, owners, identity_providers, user_identities, local_credentials,
+             enrollment_codes, auth_login_flows, auth_challenges, device_pairings,
+             passkey_credentials, devices, device_keys, auth_sessions, refresh_token_families,
+             refresh_tokens, api_tokens]
+    actions: [instance.bootstrap, auth.login.begin, auth.login.complete, auth.token.refresh,
+              auth.logout, auth.step_up, identity_provider.read, identity_provider.manage,
+              owner.add, owner.remove, owner.recover, self.read, user.read, user.create,
+              user.update, user.disable, user.enable, self.profile.update, identity.read,
+              identity.link, identity.unlink, local_credential.set, passkey.register,
+              passkey.revoke, device.list, device.approve, device.revoke, device.expire,
+              session.list, session.revoke, session.extension.create, token.list, token.create,
+              token.revoke]
+    events: [user.updated, session.revoked]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [instance, authz]
+    adapter_vendors: []
+  chat:
+    tables: [spaces, user_space_states, channels, channel_skill_bindings, project_bindings,
+             dm_participants, forum_tags, threads, thread_tags]
+    actions: [space.read, space.create, space.update, space.reorder, space.archive,
+              space.operator.set, sidebar.update, channel.read, channel.create, channel.update,
+              channel.reorder, channel.behavior.read, channel.behavior.update, channel.operator.set,
+              channel.project.bind, channel.read_only.set, channel.archive, forum_tag.manage,
+              dm.create, dm.leave, thread.read, thread.title.update, thread.close, thread.reopen,
+              thread.move, thread.tags.set, agent.config.read]
+    events: [thread.created, thread.updated, thread.closed, thread.reopened, thread.moved,
+             thread.moved_out, space.created, space.updated, space.archived, channel.created,
+             channel.updated, channel.settings_changed, channel.archived, sidebar.updated,
+             agent.config_changed]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [identity, authz]
+    adapter_vendors: []
+  agents:
+    tables: [agents, agent_consumer_cursors, commands, agent_sessions, dev_environments]
+    actions: [agent.read, agent.create, agent.update, agent.disable, agent.enable,
+              agent.billing_mode.set, agent.billing_mode.set_all, agent.credential_holder.set,
+              agent.tool_class.set, agent.heartbeat, agent.events.consume, agent.triggerers.read,
+              agent_session.read, agent_session.reset, agent_session.bind, agent_session.report,
+              command.read, command.register, command.remove, dev_environment.read,
+              dev_environment.manage, dev_environment.report]
+    events: [agent_session.changed, command.changed, agent.updated]
+    ephemeral_events: [agent.presence_changed]
+    ws_ops: [ack]
+    depends_on: [identity, authz, chat]
+    adapter_vendors: []
+  files:
+    tables: [files, file_upload_sessions, file_upload_parts, file_thumbnails, message_attachments,
+             file_text_extracts]
+    actions: [file.upload, file.read, file.delete, file.transcribe, file.transcript.submit]
+    events: [file.updated]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [identity, chat]
+    adapter_vendors: []
+  messaging:
+    tables: [messages, message_revisions, mentions, reactions, pins, message_templates]
+    actions: [thread.create, message.read, message.create, message.update, message.delete,
+              message.revisions.read, reaction.add, reaction.remove, pin.create, pin.delete,
+              mention.list, template.read, template.manage, export.channel]
+    events: [message.created, message.updated, message.deleted, reaction.added, reaction.removed,
+             pin.added, pin.removed]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [identity, chat, files]
+    adapter_vendors: []
+  status:
+    tables: [status_components, status_incidents, status_incident_updates,
+             status_incident_components, backup_runs]
+    actions: [status.public.read, status.read, status.manage]
+    events: [status.updated]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [agents]
+    adapter_vendors: []
+  terminal:
+    tables: [hosts, terminal_sessions]
+    actions: [host.read, host.manage, host.pair, host.connect, terminal.open, terminal.attach,
+              terminal.stream, terminal.read_own, terminal.close, terminal.terminate]
+    events: [host.updated, terminal_session.changed]
+    ephemeral_events: [host.presence_changed]
+    ws_ops: []
+    depends_on: [instance, identity, authz, agents]
+    adapter_vendors: []
+  runs:
+    tables: [runs, run_steps, run_followups, message_components, interactions]
+    actions: [agent.invoke, run.read, run.overview.read, run.context.read, run.start, run.update,
+              run.finish, run.cancel, run.followup.create, component.update, interaction.create,
+              interaction.respond, command.autocomplete, command.autocomplete.respond,
+              command.invoke]
+    events: [run.state_changed, agent.invocation, agent.followup, run.cancel_requested,
+             interaction.created, command.invoked]
+    ephemeral_events: [run.updated, command.autocomplete_requested]
+    ws_ops: [run.update, command.autocomplete_result]
+    depends_on: [instance, chat, agents, messaging, billing]
+    adapter_vendors: []
+  search:
+    tables: []
+    actions: [search.query]
+    events: []
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [chat, messaging, files]
+    adapter_vendors: []
+  importer:
+    tables: [import_sources, import_items]
+    actions: [import.read, import.manage, import.apply]
+    events: [import.progress]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [identity, chat, agents, messaging, files]
+    adapter_vendors: []
+  privacy:
+    tables: [gdpr_requests]
+    actions: [gdpr.request.create, gdpr.request.read, gdpr.request.decide, gdpr.export.download]
+    events: [gdpr.request_updated]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [identity, files]
+    adapter_vendors: []
+  sync:
+    tables: [event_log, event_consumer_cursors, idempotency_keys, read_states, drafts,
+             user_settings]
+    actions: [read_state.update, read_state.mark_unread, draft.read, draft.write, settings.read,
+              settings.update, sync.snapshot.read, events.catch_up]
+    events: [read_state.updated, draft.updated, draft.deleted, settings.updated]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [instance, identity, chat, agents, messaging, runs]
+    adapter_vendors: []
+  stats:
+    tables: [stats_minutes]
+    actions: [stats.read, client_metrics.submit]
+    events: []
+    ephemeral_events: [stats.live]
+    ws_ops: [stats.subscribe, stats.unsubscribe]
+    depends_on: [chat, agents, messaging, runs, billing]
+    adapter_vendors: []
+  notify:
+    tables: [notification_preferences, quiet_hours, push_registrations]
+    actions: [notification_pref.update, quiet_hours.update, push.register, push.unregister,
+              push.deliver]
+    events: [notification_pref.updated, quiet_hours.updated]
+    ephemeral_events: [notification.created]
+    ws_ops: []
+    depends_on: [identity, chat, messaging, sync]
+    adapter_vendors: []
+  apps:
+    tables: [apps, app_installations, webhook_subscriptions, webhook_deliveries, incoming_webhooks]
+    actions: [app.read, app.install, app.scopes.update, app.suspend, app.resume, app.uninstall,
+              webhook_out.read, webhook_out.manage, webhook_out.redeliver, webhook_out.deliver,
+              webhook_in.read, webhook_in.create, webhook_in.revoke, webhook_in.post]
+    events: []
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [instance, identity, chat, agents, messaging, sync]
+    adapter_vendors: []
+  gateway:
+    tables: []
+    actions: [gateway.connect, gateway.focus, typing.start]
+    events: []
+    ephemeral_events: [typing.started]
+    ws_ops: [identify, resume, heartbeat, reauth, focus, typing.start, typing.stop]
+    depends_on: [chat, agents, runs, sync, stats]
+    adapter_vendors: []
+vendors: {}                 # <group>: [<import path>, <import path>/**]

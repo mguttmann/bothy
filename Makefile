@@ -10,6 +10,13 @@
 
 SHELL := bash
 .SHELLFLAGS := -euo pipefail -c
+# GNU make 3.81 (macOS) ignores .SHELLFLAGS and runs `$(SHELL) -c <line>`, split at blanks,
+# so the flags go into SHELL there. Only make 3.82 and later know .SHELLFLAGS and list the
+# feature `oneshell`. Recipes still end each step with `|| exit 1` (docs/DECISIONS.md M1-01/8,
+# M1-05/22).
+ifeq ($(filter oneshell,$(.FEATURES)),)
+SHELL := bash -euo pipefail
+endif
 .DEFAULT_GOAL := help
 .DELETE_ON_ERROR:
 MAKEFLAGS += --no-builtin-rules --no-print-directory
@@ -31,6 +38,8 @@ GOVULNCHECK_VERSION := v1.8.0
 # renovate: datasource=pypi depName=semgrep
 SEMGREP_VERSION := 1.180.0
 REVIEW_BASE ?= main
+# Licenses allowed for dependencies of shipped components (`make licenses`).
+LICENSE_ALLOWLIST := quality/licenses/allowed.txt
 DENYLIST_FLAGS ?=
 GITLEAKS_FLAGS ?=
 GITLEAKS_LOG_OPTS ?= HEAD
@@ -50,6 +59,10 @@ tool = "$$($(FETCH) path $(1))"
 need_node = [ -x $(NODE_BIN)/$(1) ] || { echo "$(1): $(NODE_BIN)/$(1) not found; run \`make bootstrap\`" >&2; exit 2; }
 skip = printf '  SKIP  %-14s %s\n' '$(1)' '$(2)'
 want = $(if $(filter all $(1),$(COMPONENTS)),yes,)
+# Sets `allowed` to the allowlist joined by commas. An empty list would become `--licenses=`
+# and `--allowed_licenses=`, which no longer limit the licenses, so it fails.
+allowed_licenses = allowed=$$(awk '!/^\#/ && NF' $(LICENSE_ALLOWLIST) | paste -sd, -) || exit 1; \
+  [ -n "$$allowed" ] || { echo "licenses: $(LICENSE_ALLOWLIST) lists no license" >&2; exit 1; }
 
 # ---- component discovery (tracked files only, like CI) --------------------------------
 GO_MODS := $(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'services/*go.mod' 2>/dev/null))))
@@ -121,7 +134,7 @@ fmt: ## Format all code in place
 fmt-check: ## Formatting is clean (no changes)
 	$(UVRUN) ruff format --check tools
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-fmt,no Go module selected under services/); \
-	else for m in $(GO_MODS); do out=$$(cd $$m && gofmt -l .); [ -z "$$out" ] || { echo "$$out"; exit 1; }; done; fi
+	else for m in $(GO_MODS); do out=$$(cd $$m && gofmt -l .) || exit 1; [ -z "$$out" ] || { echo "$$out"; exit 1; }; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-format,no Dart package selected under apps/ or packages/); \
 	else for p in $(DART_PKGS); do (cd $$p && dart format --output=none --set-exit-if-changed .); done; fi
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-format,no Python project selected under sdk/ or plugins/); \
@@ -140,8 +153,10 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, actionlint, zizmor, componen
 	$(call tool,actionlint) -shellcheck= -pyflakes= .github/workflows/*.yml
 	@if [ -n "$${GH_TOKEN:-}" ]; then $(UVRUN) zizmor --min-severity low .github/workflows; \
 	else echo "  zizmor: offline (set GH_TOKEN for the online audits)"; $(UVRUN) zizmor --offline --min-severity low .github/workflows; fi
+	@# Pins are looked up in the repository root: the lookup command uses paths relative to it.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-lint,no Go module selected); \
-	else for m in $(GO_MODS); do (cd $$m && go vet ./... && $(call tool,golangci-lint) run ./...); done; fi
+	else gl=$(call tool,golangci-lint) || exit 1; \
+	  for m in $(GO_MODS); do (cd $$m && go vet ./... && "$$gl" run ./...) || exit 1; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-lint,no Dart package selected); \
 	else for p in $(DART_PKGS); do (cd $$p && flutter analyze --fatal-infos && \
 	  if grep -q '^ *custom_lint:' pubspec.yaml; then dart run custom_lint; fi); done; fi
@@ -154,7 +169,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, actionlint, zizmor, componen
 typecheck: ## Type checks: mypy (strict), go build, flutter analyze, tsc
 	cd tools && uv run --locked --quiet mypy
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-build,no Go module selected); \
-	else for m in $(GO_MODS); do (cd $$m && go build ./...); done; fi
+	else for m in $(GO_MODS); do (cd $$m && go build ./...) || exit 1; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-types,no Dart package selected); \
 	else echo "  dart types: covered by flutter analyze in make lint"; fi
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-types,no Python project selected); \
@@ -166,9 +181,10 @@ test: ## All tests with coverage data
 	@mkdir -p .cache/coverage
 	cd tools && uv run --locked --quiet pytest --cov --cov-report=xml:../.cache/coverage/tools.xml --cov-report=term
 	@# Prerequisites first: without a Docker runtime the integration tests fail clearly (P-09).
+	@# The architecture tests of tools/archgen run the pinned go-arch-lint named by GO_ARCH_LINT.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-test,no Go module selected); \
-	else $(GO_PREREQS) test || exit 1; \
-	  for m in $(GO_MODS); do (cd $$m && go test -race -covermode=atomic -coverprofile=coverage.out ./...) || exit 1; done; fi
+	else $(GO_PREREQS) test || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
+	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -covermode=atomic -coverprofile=coverage.out ./...) || exit 1; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-test,no Dart package selected); \
 	else for p in $(DART_PKGS); do (cd $$p && if [ -d test ]; then flutter test --coverage; fi); done; fi
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-test,no Python project selected); \
@@ -211,8 +227,9 @@ commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the 
 
 # ---- server gates ---------------------------------------------------------------------
 # Each server gate checks its prerequisites first (go, a Docker-compatible runtime, the pins
-# of go-arch-lint and sqlc; tools/ci/go_prereqs.py). Every step ends with `|| exit 1`,
-# because GNU make 3.81 (macOS) ignores .SHELLFLAGS and would run on after a failure.
+# of go-arch-lint and sqlc; tools/ci/go_prereqs.py). Every step ends with `|| exit 1`, so a
+# recipe stops on its own even in a shell without errexit (docs/DECISIONS.md M1-01/8); the
+# flags in SHELL (top of this file, also for GNU make 3.81) are the second line of defence.
 codegen-check: ## Generated code equals a fresh generation (sqlc, go generate)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,codegen-check,no Go module selected under services/); \
 	else $(GO_PREREQS) codegen-check || exit 1; \
@@ -223,10 +240,15 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate)
 	  done; fi
 
 arch: ## Module boundaries of the Go modules (go-arch-lint, config generated from the module register)
+	@# go-arch-lint does not follow a linked directory but attributes it by the path of the link,
+	@# while the compiler builds the code behind it; so no symbolic link may sit below a module
+	@# (docs/DECISIONS.md M1-05/24).
 	@if [ -z "$(GO_ON)" ]; then $(call skip,arch,no Go module selected under services/); \
 	else $(GO_PREREQS) arch || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
 	  for m in $(GO_MODS); do \
 	    [ -f $$m/.go-arch-lint.yml ] || { echo "arch: $$m/.go-arch-lint.yml is missing (generated from $$m/architecture/modules.yaml, docs/spec/02-architektur.md \"Automatische Prüfung der Regeln\")" >&2; exit 1; }; \
+	    links=$$(cd $$m && find . -type l) || exit 1; \
+	    [ -z "$$links" ] || { printf 'arch: %s has symbolic links; go-arch-lint does not follow them, the Go compiler does (docs/quality/gates.md):\n%s\n' "$$m" "$$links" >&2; exit 1; }; \
 	    (cd $$m && "$$gal" check --project-path "$$(pwd -P)" --arch-file .go-arch-lint.yml --output-color=false) || exit 1; \
 	  done; fi
 
@@ -324,7 +346,7 @@ semgrep: ## Project Semgrep rules (.semgrep/) and their rule tests
 	@for rule in .semgrep/*.yaml; do \
 	  fixture=""; for f in "$${rule%.yaml}".*; do case "$$f" in *.yaml) ;; *) fixture=$$f ;; esac; done; \
 	  [ -n "$$fixture" ] || { echo "semgrep: $$rule has no test fixture"; exit 1; }; \
-	  $(SEMGREP) --test --metrics=off --disable-version-check --config "$$rule" "$$fixture"; \
+	  $(SEMGREP) --test --metrics=off --disable-version-check --config "$$rule" "$$fixture" || exit 1; \
 	done
 	$(SEMGREP) scan --config .semgrep --exclude .semgrep --error --metrics=off --disable-version-check --quiet .
 
@@ -347,18 +369,24 @@ osv: ## Known vulnerabilities: every lock file (OSV-Scanner), Go call graphs (go
 	else args=(); for l in $$locks; do args+=(-L "$$l"); done; \
 	  $(call tool,osv-scanner) scan source --format table "$${args[@]}"; fi
 	@if [ -z "$(GO_ON)" ]; then $(call skip,govulncheck,no Go module selected); \
-	else for m in $(GO_MODS); do (cd $$m && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...); done; fi
+	else for m in $(GO_MODS); do (cd $$m && go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...) || exit 1; done; fi
 
 licenses: ## License gate: LICENSE text, SPDX headers, dependency licenses of shipped components
 	$(UVRUN) python tools/ci/license_check.py
-	@allowed=$$(grep -v '^#' quality/licenses/allowed.txt | grep . | paste -sd, -); \
+	@$(allowed_licenses); \
 	dirs="$(if $(GO_ON),$(GO_MODS)) $(if $(DART_ON),$(DART_PKGS)) $(if $(PY_ON),$(PY_PROJECTS)) $(if $(TS_ON),$(TS_PROJECTS))"; \
 	args=(); for d in $$dirs; do for n in $(LOCK_NAMES); do \
 	  for l in $$(git ls-files -- "$$d/*$$n"); do args+=(-L "$$l"); done; done; done; \
 	if [ $${#args[@]} -eq 0 ]; then $(call skip,dep-licenses,no lock file of a shipped component selected); \
 	else $(call tool,osv-scanner) scan source --licenses="$$allowed" "$${args[@]}"; fi
-	@if [ -n "$(GO_ON)" ]; then allowed=$$(grep -v '^#' quality/licenses/allowed.txt | grep . | paste -sd, -); \
-	  for m in $(GO_MODS); do (cd $$m && go run github.com/google/go-licenses/v2@$(GO_LICENSES_VERSION) check ./... --allowed_licenses="$$allowed"); done; fi
+	@# The module's own packages carry the repository license (checked above); go-licenses would
+	@# look for a LICENSE only up to the module root, so it checks the dependencies alone.
+	@if [ -n "$(GO_ON)" ]; then $(allowed_licenses); \
+	  for m in $(GO_MODS); do \
+	    mod=$$(awk '$$1 == "module" { gsub(/"/, "", $$2); print $$2; exit }' $$m/go.mod); \
+	    [ -n "$$mod" ] || { echo "licenses: no module path in $$m/go.mod" >&2; exit 1; }; \
+	    (cd $$m && go run github.com/google/go-licenses/v2@$(GO_LICENSES_VERSION) check ./... --allowed_licenses="$$allowed" --ignore "$$mod") || exit 1; \
+	  done; fi
 
 # ---- SonarQube ------------------------------------------------------------------------
 sonar: test ## SonarQube analysis with the shared gate (local Community Build or SonarQube Cloud)

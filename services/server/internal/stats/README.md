@@ -1,18 +1,23 @@
 # Modul `stats`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: Gerüst (M1-05). Das Port-Paket existiert; Schnittstellen und Anwendungsfälle kommen mit den Tickets der Etappe.
+Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
 
-Statistik für Konsole: Nutzung je Bereich, Läufe, Werkzeugaufrufe, Kosten, Fehlerraten.
+Statistik für Konsole und Apps: Nutzung je Bereich, Läufe, Werkzeugaufrufe, Kosten, Fehlerraten; eigene Messung (Zähler im Speicher, Flush, Aufbewahrung), SLO-Ampel, Live-Rahmen `stats.live`, Timeline.
+
+## Code
+
+- `internal/stats` (`doc.go`): Port als Wurzelpaket, bisher nur mit Paketkommentar. Schnittstellen, DTOs und In-Tx-Ereignisse kommen mit dem Ticket, das sie umsetzt.
+- `domain/`, `app/` und `adapters/<art>/` entstehen mit dem ersten Anwendungsfall. Ihre Komponenten erzeugt `tools/archgen` aus `architecture/modules.yaml`; ein Paket außerhalb dieser Schichten scheitert in `make arch`.
 
 ## Port (Wurzelpaket `internal/stats`)
 
-- Eingehend: `Stats`.
+- Eingehend: `Stats` (Abfragen, Timeline, Ampel, Backend-Ansicht), `Live` (Basis-Rahmen je Intervall, Filter je Empfänger).
 - Gibt In-Tx-Ereignisse aus: keine.
 - Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: keine.
+- Implementiert Quellen-Ports und Querschnitts-Ports: kernel `measure.Recorder`.
 
 ## Abhängigkeiten
 
@@ -25,7 +30,9 @@ Geprüft durch go-arch-lint (ADR 0008).
 
 ## Tabellen
 
-Keine. Das Modul liest über die Ports anderer Module (03-datenmodell.md, Grundsatz 12).
+`stats_minutes`.
+
+Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
 
 ## Aktionen (05-aktionen.md)
 
@@ -34,8 +41,8 @@ Keine. Das Modul liest über die Ports anderer Module (03-datenmodell.md, Grunds
 ## Ereignisse und WebSocket-Ops
 
 - Dauerhaft: keine.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Kurzlebig: `stats.live`.
+- WebSocket-Ops (Client an Server): `stats.subscribe`, `stats.unsubscribe` (über den Hub des Gateways).
 
 ## Hinweise für den Bau
 

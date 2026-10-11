@@ -1,11 +1,16 @@
 # Modul `gateway`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: Gerüst (M1-05). Das Port-Paket existiert; Schnittstellen und Anwendungsfälle kommen mit den Tickets der Etappe.
+Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
 
 WebSocket-Endpunkt, Gateway-Sitzungen, Hub, Fokus, Tippen, Weitergabe kurzlebiger Ereignisse, Agenten-Verbindungen.
+
+## Code
+
+- `internal/gateway` (`doc.go`): Port als Wurzelpaket, bisher nur mit Paketkommentar. Schnittstellen, DTOs und In-Tx-Ereignisse kommen mit dem Ticket, das sie umsetzt.
+- `domain/`, `app/` und `adapters/<art>/` entstehen mit dem ersten Anwendungsfall. Ihre Komponenten erzeugt `tools/archgen` aus `architecture/modules.yaml`; ein Paket außerhalb dieser Schichten scheitert in `make arch`.
 
 ## Port (Wurzelpaket `internal/gateway`)
 
@@ -16,9 +21,9 @@ WebSocket-Endpunkt, Gateway-Sitzungen, Hub, Fokus, Tippen, Weitergabe kurzlebige
 
 ## Abhängigkeiten
 
-Darf die Ports dieser Module nutzen: `chat`, `agents`, `runs`, `sync`.
+Darf die Ports dieser Module nutzen: `chat`, `agents`, `runs`, `sync`, `stats`.
 
-Grund: Thread zu Kanal für Fokus und Tippen; Verbraucher-Cursor und Präsenz; Lauf-Patches und Zustellvorbereitung; Tail, Nachholen, Momentaufnahme.
+Grund: Thread zu Kanal für Fokus und Tippen; Verbraucher-Cursor und Präsenz; Lauf-Patches und Zustellvorbereitung; Tail, Nachholen, Momentaufnahme; Live-Rahmen für `stats.subscribe`.
 
 Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
 Geprüft durch go-arch-lint (ADR 0008).

@@ -480,7 +480,9 @@ modules:
     ws_ops: []
     depends_on: [identity, authz]
     adapter_vendors: [pgx, otel]
+  # identity, authz und die übrigen Module: Einträge wie chat, hier ausgelassen
 vendors:                          # <gruppe>: Importpfade
+  otel: [go.opentelemetry.io/otel, go.opentelemetry.io/otel/**]
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]
   river: [github.com/riverqueue/river, github.com/riverqueue/river/**]
 ```
@@ -488,9 +490,17 @@ vendors:                          # <gruppe>: Importpfade
 Regeln: Module stehen in der Reihenfolge der Ebenen aus 4.4; `tables`, `actions`, `events`,
 `ephemeral_events`, `ws_ops` und `depends_on` folgen den Tabellen 4.2, 4.6, 4.7 und 4.4. Der
 Generator lehnt unbekannte Felder, doppelte Einträge, unbekannte Module oder Vendor-Gruppen und
-Zyklen ab. Ein Ticket, das ein Plattform-Paket oder eine Fremdbibliothek einführt, trägt seinen
-Eintrag und seine Vendor-Gruppe in derselben Änderung ein; ein Paket ohne Eintrag scheitert in
-`make arch` ("not attached to any component").
+Zyklen ab, dazu Schlüssel und Werte, die keine einfachen Zeichenketten sind (getaggt, etwa mit
+`!!binary`), Einträge in `testsupport.paths` unter `internal`, `cmd` oder `api`, Einträge in
+`exclude`, die als Zeichenketten-Präfix `internal`, `cmd`, `api` oder ein anderes Verzeichnis des
+Moduls treffen (go-arch-lint lässt jeden Pfad aus, der mit dem Eintrag beginnt, `in` also ganz
+`internal/`; beides nähme Produktcode aus dem Gate), und Vendor-Muster, die kein Go-Importpfad sind:
+Das erste Element ist eine Domain mit Punkt, die übrigen enthalten nur Buchstaben, Ziffern, `-`,
+`.`, `_` und `~`, und `**` steht nur am Ende nach mindestens zwei festen Elementen. Grund:
+go-arch-lint macht aus jedem Muster einen regulären Ausdruck und maskiert nur `.` und `/`, und
+`github.com/**` gäbe fast jede Bibliothek frei. Ein Ticket, das ein Plattform-Paket oder eine
+Fremdbibliothek einführt, trägt seinen Eintrag und seine Vendor-Gruppe in derselben Änderung ein;
+ein Paket ohne Eintrag scheitert in `make arch` ("not attached to any component").
 
 ### 7.2 go-arch-lint
 
@@ -507,9 +517,11 @@ version: 3
 workdir: .
 allow:
   depOnAnyVendor: false
+  ignoreNotFoundComponents: true
 exclude: [tools]
 excludeFiles: ["^.*_test\\.go$"]
 vendors:
+  v-otel:  { in: [go.opentelemetry.io/otel, go.opentelemetry.io/otel/**] }
   v-pgx:   { in: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**] }
   v-river: { in: [github.com/riverqueue/river, github.com/riverqueue/river/**] }
 components:
@@ -518,9 +530,10 @@ components:
                         internal/kernel/designkeys] }
   kernel-ports:  { in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn,
                         internal/kernel/eventlog, internal/kernel/auditing,
-                        internal/kernel/idempotency, internal/kernel/personaldata] }
-  platform-pg:   { in: [internal/platform/pg, internal/platform/pg/**] }
+                        internal/kernel/idempotency, internal/kernel/personaldata,
+                        internal/kernel/measure] }
   platform-jobs: { in: [internal/platform/jobs, internal/platform/jobs/**] }
+  platform-pg:   { in: [internal/platform/pg, internal/platform/pg/**] }
   wire:          { in: [internal/wire, internal/wire/**] }
   cmd:           { in: cmd/** }
   api:           { in: api/** }
@@ -530,27 +543,55 @@ components:
   chat-adapters: { in: internal/chat/adapters/** }
 commonComponents: [kernel-core]
 deps:
-  platform-pg:   { mayDependOn: [kernel-ports], canUse: [v-pgx] }
-  platform-jobs: { mayDependOn: [kernel-ports, platform-pg], canUse: [v-river] }
-  chat:          { mayDependOn: [kernel-ports] }
-  chat-app:      { mayDependOn: [chat, chat-domain, kernel-ports, identity, authz] }
-  chat-adapters: { mayDependOn: [chat, chat-app, chat-domain, kernel-ports, platform-pg,
-                                 platform-jobs, api, identity, authz],
+  kernel-core:   { mayDependOn: [kernel-core] }
+  platform-jobs: { mayDependOn: [platform-jobs, kernel-ports, platform-pg], canUse: [v-river] }
+  platform-pg:   { mayDependOn: [platform-pg, kernel-ports], canUse: [v-pgx] }
+  chat:          { mayDependOn: [chat, kernel-ports] }
+  chat-domain:   { mayDependOn: [chat-domain] }
+  chat-app:      { mayDependOn: [chat-app, chat, chat-domain, kernel-ports, identity, authz] }
+  chat-adapters: { mayDependOn: [chat-adapters, chat, chat-app, chat-domain, kernel-ports,
+                                 platform-jobs, platform-pg, api, identity, authz],
                    canUse: [v-pgx, v-otel] }
 ```
 
-`wire` darf alle Modul-, Plattform- und Kernel-Komponenten nutzen, `cmd` nur `wire`, Plattform und
-`kernel-ports`. Eine Komponente `<m>-domain` hat keinen Eintrag unter `deps`; sie darf damit nur
-`kernel-core`. Ein leeres `mayDependOn` lehnt go-arch-lint ab; darum fehlt der Eintrag statt leer
-zu sein.
+Der Auszug ist ein Teil dessen, was `tools/archgen` aus dem Beispiel in 7.1 erzeugt; der Test
+`TestChapter02ExamplesMatchGenerator` hält Beispiel und Auszug gegen den Generator.
+
+Jede Komponente nennt sich selbst zuerst in ihrem `mayDependOn`: go-arch-lint erlaubt einer
+Komponente den Import ihrer eigenen Pakete nur dann, und das Layout aus Abschnitt 6 braucht ihn
+(Unterpakete von `domain`, `app` und `adapters`, `adapters/postgres/sqlcgen`, die Testhilfen
+`platform/<p>/<p>test` und `adapters/<modul>test`, `api/routes` ruft `api/rest`). `wire` darf
+dazu alle Modul-, Plattform- und Kernel-Komponenten nutzen, `cmd` nur `wire`, Plattform und
+`kernel-ports`. `<m>-domain` darf nur sich selbst und `kernel-core`. `kernel-ports` hat keinen
+Eintrag unter `deps`, weil go-arch-lint ein leeres `mayDependOn` ablehnt, und darf damit nur
+`kernel-core`: Die Kernel-Ports nutzen einander nicht. Abschnitt 4.5 sagt nur, dass `kernel` von
+nichts im Projekt abhängt; die engere Lesart gilt, bis ein Ticket eine Kante zwischen zwei Ports
+begründet und diese Regel in derselben Änderung anpasst. `ignoreNotFoundComponents: true` lässt
+Komponenten zu, deren Muster noch kein Verzeichnis trifft (`<m>-domain`, `<m>-app` und
+`<m>-adapters` vor dem ersten Anwendungsfall, `testsupport` vor `test/` und `perf/`); ohne die
+Einstellung bricht go-arch-lint v1.19.0 für jedes solche Muster ab.
+Ein Paket ohne Komponente und ein unbekannter Komponentenname in `mayDependOn` scheitern weiterhin
+(geprüft am 2026-10-11 in M1-05).
+
+`make arch` lehnt vor go-arch-lint jeden symbolischen Link unterhalb des Moduls ab: go-arch-lint
+folgt einem verlinkten Verzeichnis nicht und ordnet es nach dem Pfad des Links zu, der
+Go-Compiler baut aber den Code dahinter.
 
 Geprüft am 2026-10-10 an einem Gerüst mit allen Modulen aus Abschnitt 4.2 (Go 1.27.2, go-arch-lint
 v1.19.0): sauberes Gerüst ergibt "No warnings found", Exitcode 0. Vier eingebaute Verstöße wurden
 alle gemeldet, Exitcode 1: `chat/domain` importiert pgx; `chat/app` importiert den Port von
 `messaging`; `messaging/app` importiert `runs/app`; ein neues Paket `chat/util` ohne Komponente
 ("not attached to any component"). Der letzte Punkt ist gewollt: Neue Pakete müssen ins Register.
-Die Form mit Plattform-Komponenten ist an diesem Gerüst noch nicht gelaufen; M1-05 belegt sie mit
-denselben vier Verstößen ([ADR 0050](../adr/0050-modulregister-als-quelle-fuer-architektur-gate-und-tabellenbesitz.md), "Confirmation").
+Die Form mit Plattform-Komponenten belegen seit M1-05 die Tests in `tools/archgen` an einem Gerüst
+mit Plattform-Paket und Treiber-Stub: `TestArchLintSkeletonClean` (Exitcode 0) und die vier
+Verstöße `TestArchLintDomainImportsDriver`, `TestArchLintAppImportsForeignPort`,
+`TestArchLintAppImportsForeignApp` (dort importiert `messaging/app` die App des erlaubten Moduls
+`chat`) und `TestArchLintPackageWithoutComponent` (Exitcode 1 mit dem Paketpfad), dazu
+`TestArchLintTestSupport` für die Komponente `testsupport`, `TestArchLintChapter02Layout` (das
+Layout aus Abschnitt 6 mit mehreren Paketen je Komponente, Exitcode 0) und
+`TestArchLintLayersStayClosed` (Domain nutzt eigene Adapter oder App, Port nutzt eigene Domain, App
+nutzt ein Unterpaket einer fremden App, ein Kernel-Port nutzt einen anderen: Exitcode 1)
+([ADR 0050](../adr/0050-modulregister-als-quelle-fuer-architektur-gate-und-tabellenbesitz.md), "Confirmation").
 
 ### 7.3 Weitere Prüfungen im Gate
 
