@@ -11,5 +11,8 @@
     "@mermaid-js/mermaid-cli": "11.17.0",
     "@redocly/cli": "2.62.1",
     "@sonar/scan": "5.0.1"
+  },
+  "overrides": {
+    "katex": "0.18.10"
   }
 }

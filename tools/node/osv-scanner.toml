@@ -7,9 +7,4 @@
 [[IgnoredVulns]]
 id = "GHSA-86w9-cpqp-85rv"
 ignoreUntil = 2026-11-10
-reason = "node-forge 1.4.0 via @sonar/scan; no fixed release exists yet. The flaw forges RSA PKCS#1 v1.5 signatures made with low-exponent keys; the scanner connects only to the configured SonarQube server (local or SonarQube Cloud). Re-check when node-forge or @sonar/scan publishes a fix."
-
-[[IgnoredVulns]]
-id = "GHSA-238p-pmpm-9mq7"
-ignoreUntil = 2026-11-10
-reason = "katex 0.16.47 via mermaid-cli renders only the repository's own diagrams; the issue needs an already polluted Object.prototype. mermaid pins katex 0.16; the fix is in 0.18.2. Re-check with the next mermaid-cli release."
+reason = "node-forge 1.4.0 via @sonar/scan 5.0.1 (the latest release); no fixed node-forge release exists. Not reachable here: @sonar/scan uses node-forge only to read a PKCS#12 truststore (sonar.scanner.truststorePath or <sonar.userHome>/ssl/truststore.p12; this repository configures neither) and never calls RSA signature verification; TLS is verified by Node. Ruling D-DEPS-2 in docs/DECISIONS.md. Re-check when node-forge or @sonar/scan publishes a fix."
