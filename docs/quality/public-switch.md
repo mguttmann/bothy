@@ -69,7 +69,9 @@ request.
 
 14. **Rulesets** for `main` according to push-discipline.md (pull request, squash only, required check
     `ci-ok`, linear history, signed commits, no force push, no deletion); in addition
-    "Require actions to be pinned to a full-length commit SHA" in the Actions settings.
+    "Require actions to be pinned to a full-length commit SHA" in the Actions settings and,
+    in the general settings, the squash commit message "Pull request title and description"
+    (push-discipline.md).
 15. **Environments** `release`, `release-apple` and `release-windows` with required reviewers and
     tag rule `*/v*` and `v*`; `github-pages` for the docs.
 
