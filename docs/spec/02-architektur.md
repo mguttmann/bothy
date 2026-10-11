@@ -966,21 +966,24 @@ Server lädt.
      die API mit Audit, sofort wirksam, Ereignis `instance.updated`. Grund für die Trennung:
      Infrastruktur gehört dem Betreiber, Fachliches dem Owner, und nur Einstellungen brauchen eine
      Rechteprüfung.
-2. **Quellen, Vorrang von niedrig nach hoch:** eingebaute Standardwerte (aus der
-   Konfigurationsreferenz erzeugt) < Datei (`--config` oder `BOTHY_CONFIG_FILE`, YAML, verschachtelt
-   wie die Namen) < Umgebung (`BOTHY_` plus Name in Großbuchstaben, `.` wird `__`, Beispiel
-   `sync.event_retention` wird `BOTHY_SYNC__EVENT_RETENTION`) < Kommandozeile (nur `--role` und
-   `--config`). Die Abbildung ist umkehrbar (ADR 0011, [16-betrieb.md](16-betrieb.md) 5.1).
+2. **Quellen, Vorrang von niedrig nach hoch:** eingebaute Standardwerte (im Schema,
+   `internal/wire/configkeys_*.go`, gleich der Kapiteltabelle des Schlüssels) < Datei (`--config`
+   oder `BOTHY_CONFIG_FILE`, YAML, verschachtelt wie die Namen) < Umgebung (`BOTHY_` plus Name in
+   Großbuchstaben, `.` wird `__`, Beispiel `sync.event_retention` wird
+   `BOTHY_SYNC__EVENT_RETENTION`) < Kommandozeile (nur `--role` und `--config`). Die Abbildung ist
+   umkehrbar (ADR 0011, [16-betrieb.md](16-betrieb.md) 5.1).
 3. **Geheimnisse** nur als Verweis in Schlüsseln mit Endung `_ref` (z. B. `database.password_ref`). Der
    Secret-Provider löst sie beim Start auf. Werte erscheinen nie in Logs, Fehlertexten oder
-   `bothy config print` (dort `<redacted>`).
+   `bothy config print` (dort steht nur der Verweis; `bothy config` löst nichts auf).
 4. **Prüfung beim Start, fail fast:** unbekannte Schlüssel und unbekannte `BOTHY_`-Variablen
    brechen ab (Tippfehler sind sonst still; Ausnahmen in [16-betrieb.md](16-betrieb.md) 5.1);
    Typen und Bereiche; Querbedingungen. Querbedingungen heute: `http.max_json_body_bytes` echt
    größer als `message.max_content_bytes` (der Umschlag einer Nachricht ist klein gegen den
    Abstand der Standardwerte; ein eigener Wert für ihn wäre ohne Messung geraten);
-   `server.internal_listen_addr` ungleich `server.listen_addr` (Port `0` darf doppelt vorkommen,
-   weil Tests Port 0 binden). Die Regel "Identitäts-Header nur mit Loopback-Listener" ist keine
+   `server.internal_listen_addr` und `server.listen_addr` teilen keinen Port außer `0`, wenn ihre
+   Hosts gleich sind oder einer der Hosts leer, `0.0.0.0` oder `::` ist (auch mit IPv6-Zone; eine
+   IPv4-gemappte IPv6-Adresse zählt als ihre IPv4-Adresse). Port `0` darf doppelt vorkommen, weil
+   Tests Port 0 binden. Die Regel "Identitäts-Header nur mit Loopback-Listener" ist keine
    Konfigurationsprüfung, weil der Treiber eine Einstellung des Owners in der Datenbank ist; sie
    gilt bei der Bereitschaft ([16-betrieb.md](16-betrieb.md) 4.3). Meldungen nennen Schlüssel und
    Quelle, nie den Wert.

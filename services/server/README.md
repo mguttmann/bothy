@@ -1,9 +1,10 @@
 # services/server
 
-Status: Gerüst (M1-05). Das Go-Modul baut; jedes Modul aus 02 existiert als Port-Paket, die
-Kernel-Pakete `ids`, `clock` und `errs` sind fertig, und `make arch` hält die Modulgrenzen aus dem
-Register. Normativ ist [docs/spec/02-architektur.md](../../docs/spec/02-architektur.md); bei
-Abweichung gilt das Kapitel.
+Status: Gerüst (M1-05) mit Konfiguration (M1-07). Das Go-Modul baut; jedes Modul aus 02 existiert
+als Port-Paket, die Kernel-Pakete `ids`, `clock` und `errs` und das Plattform-Paket `config` mit
+`bothy config check|print` sind fertig, und `make arch` hält die Modulgrenzen aus dem Register.
+Normativ ist [docs/spec/02-architektur.md](../../docs/spec/02-architektur.md); bei Abweichung gilt
+das Kapitel.
 
 Modulpfad bis V1: `github.com/OWNER/bothy/services/server` (PLAN P-05). `go.mod` nennt die ältere
 gepflegte Go-Linie als `go`-Direktive und die gebaute Version als `toolchain` (ADR 0005). Version:
@@ -128,7 +129,7 @@ Technik ohne Fachlogik; nur `adapters/`, `wire` und `cmd` dürfen sie importiere
 
 | Paket | Inhalt |
 |---|---|
-| `config` | Laden und Prüfen der Konfiguration (02, Abschnitt 13) |
+| [`config`](internal/platform/config/README.md) | Schema, Laden und Prüfen der Konfiguration, `Bind` an die `Config`-Strukturen (02, Abschnitt 13; gebaut in M1-07) |
 | `secrets` | Secret-Provider (ADR 0011) |
 | `pg` | Pool, Unit of Work mit Sperrreihenfolge, `LISTEN`-Verbindung, Wiederholung bei Deadlock |
 | `httpserver` | Server, Middleware-Kette, `problem+json`, Nachweis-Prüfung von `authorize` (02, Abschnitt 9) |

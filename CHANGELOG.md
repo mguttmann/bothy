@@ -43,3 +43,11 @@ Planning stage (milestone M0). Nothing is installable yet.
   tables of chapter 05 and the lists in `docs/api/redocly.yaml`, and the gate
   `catalog-check` (`tools/catalog/`) fails on drift or on a contradiction with the
   hand-written parts of chapter 05.
+
+### Changed
+
+- Chapter 02 "Konfigurationsladen" and the configuration reference describe the loader as built
+  by the server: built-in defaults live in the schema, `bothy config print` shows secret
+  references instead of `<redacted>`, and `docs/operations/configuration.md` sections 1 to 3 give
+  the exact grammar of every kind (now with `list(cidr)` and `url`), the file rules and the output
+  of `bothy config check` and `bothy config print`.

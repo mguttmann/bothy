@@ -16,7 +16,7 @@ const usageHeader = "Usage: bothy <command> [arguments]\n\nCommands:\n"
 func TestRunWithoutArgumentsPrintsUsageAndExits2(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	code := run(context.Background(), nil, &stdout, &stderr)
+	code := run(context.Background(), nil, nil, &stdout, &stderr)
 
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2", code)
@@ -24,9 +24,19 @@ func TestRunWithoutArgumentsPrintsUsageAndExits2(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Errorf("stdout = %q, want empty", stdout.String())
 	}
-	want := usageHeader + "  (none in this build)\n"
+	want := usageHeader + "  config  Check or print the configuration without starting the server\n"
 	if stderr.String() != want {
 		t.Errorf("stderr = %q, want %q", stderr.String(), want)
+	}
+}
+
+func TestUsageWithoutCommands(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	code := dispatch(context.Background(), nil, []string{"help"}, nil, &stdout, &stderr)
+
+	if code != 0 || stdout.String() != usageHeader+"  (none in this build)\n" {
+		t.Errorf("exit code %d, usage %q", code, stdout.String())
 	}
 }
 
@@ -35,7 +45,7 @@ func TestRunHelpExits0(t *testing.T) {
 		t.Run(spelling, func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
 
-			code := run(context.Background(), []string{spelling}, &stdout, &stderr)
+			code := run(context.Background(), []string{spelling}, nil, &stdout, &stderr)
 
 			if code != 0 {
 				t.Fatalf("exit code = %d, want 0", code)
@@ -53,7 +63,7 @@ func TestRunHelpExits0(t *testing.T) {
 func TestRunUnknownCommandExits2(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
-	code := run(context.Background(), []string{"frobnicate", "--x"}, &stdout, &stderr)
+	code := run(context.Background(), []string{"frobnicate", "--x"}, nil, &stdout, &stderr)
 
 	if code != 2 {
 		t.Fatalf("exit code = %d, want 2", code)
@@ -74,15 +84,15 @@ func TestRunDispatchesRegisteredCommand(t *testing.T) {
 	type ctxKey struct{}
 	ctx := context.WithValue(context.Background(), ctxKey{}, "marker")
 
-	var gotArgs []string
+	var gotArgs, gotEnv []string
 	var gotCtxValue any
 	table := []command{
-		{name: "other", summary: "never called", run: func(context.Context, []string, io.Writer, io.Writer) int {
+		{name: "other", summary: "never called", run: func(context.Context, []string, []string, io.Writer, io.Writer) int {
 			t.Error("command other must not run")
 			return 99
 		}},
-		{name: "probe", summary: "records its call", run: func(c context.Context, args []string, stdout, stderr io.Writer) int {
-			gotArgs = args
+		{name: "probe", summary: "records its call", run: func(c context.Context, args, env []string, stdout, stderr io.Writer) int {
+			gotArgs, gotEnv = args, env
 			gotCtxValue = c.Value(ctxKey{})
 			_, _ = io.WriteString(stdout, "out\n")
 			_, _ = io.WriteString(stderr, "err\n")
@@ -91,13 +101,16 @@ func TestRunDispatchesRegisteredCommand(t *testing.T) {
 	}
 	var stdout, stderr bytes.Buffer
 
-	code := dispatch(ctx, table, []string{"probe", "--flag", "value"}, &stdout, &stderr)
+	code := dispatch(ctx, table, []string{"probe", "--flag", "value"}, []string{"BOTHY_X__Y=1"}, &stdout, &stderr)
 
 	if code != 7 {
 		t.Errorf("exit code = %d, want the command's 7", code)
 	}
 	if want := []string{"--flag", "value"}; !reflect.DeepEqual(gotArgs, want) {
 		t.Errorf("command args = %q, want %q", gotArgs, want)
+	}
+	if want := []string{"BOTHY_X__Y=1"}; !reflect.DeepEqual(gotEnv, want) {
+		t.Errorf("command env = %q, want the caller's %q", gotEnv, want)
 	}
 	if gotCtxValue != "marker" {
 		t.Errorf("command context value = %v, want the caller's context", gotCtxValue)
@@ -108,7 +121,7 @@ func TestRunDispatchesRegisteredCommand(t *testing.T) {
 }
 
 func TestUsageListsCommandsSortedByName(t *testing.T) {
-	noop := func(context.Context, []string, io.Writer, io.Writer) int { return 0 }
+	noop := func(context.Context, []string, []string, io.Writer, io.Writer) int { return 0 }
 	table := []command{
 		{name: "serve", summary: "Start the server", run: noop},
 		{name: "config", summary: "Check configuration", run: noop},
@@ -117,7 +130,7 @@ func TestUsageListsCommandsSortedByName(t *testing.T) {
 	original := append([]command(nil), table...)
 	var stdout, stderr bytes.Buffer
 
-	code := dispatch(context.Background(), table, []string{"help"}, &stdout, &stderr)
+	code := dispatch(context.Background(), table, []string{"help"}, nil, &stdout, &stderr)
 
 	if code != 0 {
 		t.Fatalf("exit code = %d, want 0", code)

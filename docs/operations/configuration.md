@@ -12,7 +12,7 @@ Abschnitt 4 aus dem Schema, und der Check vergleicht es mit den Kapiteltabellen.
 
 | Quelle | Inhalt | Ändern | Wirkung |
 |---|---|---|---|
-| Prozess-Konfiguration | alle Schlüssel aus Abschnitt 4 mit Ort `Server` | Umgebung (`BOTHY_*`) oder YAML-Datei (`BOTHY_CONFIG_FILE`) | beim Start; Geheimnisse nach `secrets.cache_ttl` |
+| Prozess-Konfiguration | alle Schlüssel aus Abschnitt 4 mit Ort `Server` | Umgebung (`BOTHY_*`), YAML-Datei (`--config` oder `BOTHY_CONFIG_FILE`) oder bei `server.role` das Flag `--role` | beim Start; Geheimnisse nach `secrets.cache_ttl` |
 | Instanz-Einstellungen | Abschnitt 6, Tabelle `instance_settings` | Admin-Konsole, `instance.settings.update`, `instance.branding.update` (Owner, Step-up, Audit) | sofort, Ereignis `instance.updated` |
 | Feature-Flags | Abschnitt 7, Tabelle `feature_flags` | Admin-Konsole, `feature_flag.update` (Owner, Step-up, Audit) | sofort, Ereignis `instance.updated` |
 | OpenTelemetry | Abschnitt 8, Variablen `OTEL_*` | Umgebung | beim Start |
@@ -26,16 +26,27 @@ Schlüssel ab dem Ticket, das seinen ersten Nutzer baut ([02-architektur.md](../
 
 ## 2. Namensregel und Formate
 
+Jede Art hat genau einen Parser; Standardwert, Umgebung, Datei und Flag gehen durch denselben.
+Fehlermeldungen nennen nie den geprüften Text.
+
 | Thema | Regel | Beispiel |
 |---|---|---|
+| Schlüssel | mindestens zwei Segmente, durch `.` getrennt, jedes Segment `[a-z][a-z0-9]*(_[a-z0-9]+)*`; die Endung `_ref` haben genau die Schlüssel der Art `secret_ref` | `sync.event_retention` |
 | Umgebungsname | `BOTHY_` plus Schlüssel in Großbuchstaben, Punkt wird `__` | `sync.event_retention` -> `BOTHY_SYNC__EVENT_RETENTION` |
-| Datei | YAML, Schlüssel verschachtelt nach Punkten | `sync: {event_retention: 30d}` |
-| Dauer (`duration`) | Zahl plus Einheit `ms`, `s`, `m`, `h`, `d` (`d` = 24 h) | `250ms`, `30d` |
-| Liste (`list(...)`) | Umgebung: durch Komma getrennt; Datei: YAML-Liste | `BOTHY_SERVER__TRUSTED_PROXIES=192.0.2.10/32,198.51.100.0/24` |
-| `cron` | fünf Felder, Zeitzone UTC | `0 2 * * 0` |
-| `secret_ref` | `<schema>:<pfad>`, Schemata in [16-betrieb.md](../spec/16-betrieb.md) 5.2 | `file:/run/bothy/secrets/db_app_password` |
-| `listen address` | `host:port`; `:port` heißt alle Schnittstellen | `127.0.0.1:8080` |
-| `semver` | SemVer ohne `v` | `1.4.0` |
+| Datei | YAML mit genau einem Dokument, Schlüssel verschachtelt nach Punkten. Skalare gelten als geschriebener Text und gehen an den Parser der Art, so ändert die Typisierung von YAML keinen Wert (`yes` bleibt `yes`, `1.10` bleibt `1.10`, `0x10` ist keine Zahl). Doppelte und gepunktete Schlüssel, Anker, Aliase, Merge-Schlüssel (`<<`) und ausdrückliche Tags (`!!str`) sind Fehler, ebenso eine Liste oder ein Mapping, wo ein Wert steht, und ein Skalar oder `null`, wo ein Abschnitt steht. Ein Schlüssel, dessen Text keine Schlüsselform hat, erscheint in der Meldung nur mit seiner Zeile, weil ein Tippfehler einen Wert zum Teil des Schlüssels machen kann (`{role:wert}` ohne Leerzeichen nach dem Doppelpunkt) | `sync: {event_retention: 30d}` |
+| `string` | beliebiger Text, auch leer | `bothy` |
+| `enum` | genau einer der Werte, die das Kapitel nennt; Groß- und Kleinschreibung zählt | `worker` |
+| `bool` | `true` oder `false` | `true` |
+| `int` | ganze Zahl im Zehnersystem im Bereich von int64, optional mit führendem `-`; kein `+`, kein Trennzeichen, kein Exponent, keine Hexadezimalzahl | `1048576` |
+| `float` | endliche Dezimalzahl: `-` optional, Ziffern mit optionalem Nachkommateil oder nur Nachkommateil (`.5`), optional Exponent `e` oder `E` mit optionalem Vorzeichen; kein `+` vorn, kein `inf`, kein `NaN`, keine Hexadezimalzahl | `0.05` |
+| Dauer (`duration`) | genau `(0\|[1-9][0-9]*)(ms\|s\|m\|h\|d)`: eine Zahl ohne Vorzeichen, Bruch oder führende Null und genau eine Einheit, `d` = 24 h. Keine Zusammensetzung wie `1h30m`; eine Dauer über der größten Dauer von Go (`time.Duration`, int64-Nanosekunden) ist ein Fehler, die größte ganze Zahl hängt darum von der Einheit ab (`106751d`, `2562047h`) | `250ms`, `30d` |
+| Liste (`list(string)`) | Umgebung und Standardwert: ein JSON-Array von Strings, wenn der Text mit `[` beginnt, sonst durch Komma getrennt mit entferntem Leerraum um jedes Element; leerer Text ist die leere Liste; ein leeres Element ist ein Fehler. Datei: YAML-Liste von Skalaren oder ein Skalar in der Form der Umgebung | `a.example.com, b.example.com`, `["x,y"]` |
+| Präfix-Liste (`list(cidr)`) | wie `list(string)`; jedes Element ist ein IPv4- oder IPv6-Präfix in CIDR-Form ohne gesetzte Host-Bits (`192.0.2.10/24` ist ein Fehler) | `BOTHY_SERVER__TRUSTED_PROXIES=192.0.2.10/32,198.51.100.0/24` |
+| `listen address` | `host:port`; Host leer (`:port` heißt alle Schnittstellen) oder IP-Literal, IPv6 in Klammern, kein DNS-Name; Port dezimal von 0 bis 65535 ohne führende Null | `127.0.0.1:8080`, `[::1]:8081`, `:8080` |
+| `cron` | fünf durch Leerraum getrennte Felder in UTC: Minute 0 bis 59, Stunde 0 bis 23, Tag 1 bis 31, Monat 1 bis 12, Wochentag 0 bis 6 (0 = Sonntag). Ein Feld ist eine Komma-Liste aus `*`, `*/n`, `a`, `a-b` und `a-b/n` mit `a <= b` und Schritt `n` von 1 bis zum Höchstwert des Felds; Zahlen ohne führende Null, keine Namen, keine Kürzel wie `@daily` | `0 2 * * 0`, `*/15 0-6 * * 1-5` |
+| `semver` | SemVer 2.0.0 ohne führendes `v`, mit optionaler Vorabversion und Build-Angabe | `1.4.0`, `1.4.0-rc.1` |
+| `secret_ref` | `<schema>:<verweis>` ([16-betrieb.md](../spec/16-betrieb.md) 5.2): `file:` mit absolutem Pfad, `env:` mit einem Variablennamen aus `[A-Z_][A-Z0-9_]*`, der weder `BOTHY_CONFIG_FILE` ist noch die Form einer Schlüssel-Variable hat (`BOTHY_A__B`); üblich ist `BOTHY_SECRET_<NAME>`. `azkv` und `awssm` meldet diese Server-Version als nicht unterstützt; jedes andere Schema, ein fehlendes Schema und leerer Text sind Fehler. Ein Standardwert darf `<schlüssel>` eines String-Schlüssels enthalten; beim Laden steht dort dessen wirksamer Wert. In gesetzten Werten wird nichts ersetzt | `file:/run/bothy/secrets/db_app_password`, `file:<secrets.dir>/db_app_password` |
+| `url` | Schema `http` oder `https`, Host nicht leer, kein Benutzer-Teil, kein Fragment (`#`), Port, falls angegeben, dezimal von 1 bis 65535 ohne führende Null | `https://chat.example.com` |
 | Egress-Ziel (`egress.allowed_hosts`) | `host[:port][;allow_private]`; Host als DNS-Name (klein, ohne Punkt am Ende) oder IP-Literal (IPv6 in Klammern, wenn ein Port folgt); kein Platzhalter, kein Schema, kein Pfad; Port 1 bis 65535; einziger Schalter `allow_private` | `api.example.com:443`, `[2001:db8::10]:8443;allow_private` |
 
 Schlüssel enthalten nie zwei Unterstriche hintereinander; darum ist die Namensregel umkehrbar.
@@ -43,12 +54,39 @@ Schlüssel enthalten nie zwei Unterstriche hintereinander; darum ist die Namensr
 ## 3. Prüfung
 
 1. Unbekannte `BOTHY_*`-Variablen und unbekannte Schlüssel in der Datei brechen den Start ab.
-   Ausgenommen sind `BOTHY_CONFIG_FILE` und Variablen, die ein wirksamer Verweis `env:` nennt
-   ([16-betrieb.md](../spec/16-betrieb.md) 5.1).
-2. Typ- und Bereichsfehler brechen den Start ab; die Meldung nennt Schlüssel und Quelle, nie einen
-   Wert (ein Geheimnis kann im falschen Schlüssel stehen).
-3. `bothy config check` prüft ohne Start. `bothy config print --redacted` zeigt die wirksamen
-   Werte und ihre Quelle, Geheimnisse nur als Verweis.
+   Ausgenommen sind `BOTHY_CONFIG_FILE` und Variablen, die ein gültiger Verweis `env:` im
+   wirksamen Wert eines Schlüssels `*_ref` nennt ([16-betrieb.md](../spec/16-betrieb.md) 5.1).
+   Variablen ohne Präfix `BOTHY_` bleiben unbeachtet. Steht eine Variable zweimal in der
+   Umgebung des Prozesses, sieht der Server nur den ersten Eintrag (so übergibt die Go-Laufzeit die
+   Umgebung); den zweiten prüft er nicht. `BOTHY_CONFIG_FILE` gilt nur, wenn `--config` fehlt;
+   leer heißt keine Datei. `--config` mit leerem Pfad ist ein Aufruffehler.
+2. Typ- und Bereichsfehler brechen den Start ab, auch für einen Wert, den eine höhere Quelle
+   überschreibt. Ein Pflicht-Schlüssel braucht einen nicht leeren Wert aus Datei, Umgebung oder
+   Flag. Danach laufen die Querprüfungen aus [02-architektur.md](../spec/02-architektur.md) 13,
+   Punkt 4, sobald ihre Schlüssel fehlerfrei geladen sind; ein Schlüssel einer verworfenen Datei
+   oder unter einem verworfenen Abschnitt der Datei ist es nicht.
+3. Alle Probleme kommen zusammen, nach Schlüssel sortiert, je Zeile
+   `config: <schlüssel>: <meldung> (source: <quelle>)`, bei unbekannten Namen
+   `config: unknown variable BOTHY_X (source: environment)` bzw.
+   `config: unknown key "a.b" (source: file <pfad>)`; ein Datei-Schlüssel ohne Schlüsselform
+   steht nur mit seiner Zeile da (`config: unknown key at line 3 below "server" (source: file
+   <pfad>)`). Keine Meldung nennt einen Wert (ein Geheimnis kann im falschen Schlüssel stehen).
+   Pfade und Variablennamen mit ungültigem UTF-8, nicht druckbaren Zeichen, Leerraum am Rand oder
+   einem Anführungszeichen am Anfang stehen in Anführungszeichen mit Go-Escapes, damit jedes
+   Problem eine Zeile bleibt.
+4. `bothy config check [--config DATEI] [--role ROLLE]` prüft ohne Start: `configuration ok` und
+   Exitcode 0, sonst jedes Problem auf der Standardfehlerausgabe und Exitcode 1; ein Aufruffehler
+   ergibt Exitcode 2.
+5. `bothy config print [--redacted] [--config DATEI] [--role ROLLE]` zeigt in der ersten Zeile
+   `# configuration file: <pfad>` oder `# configuration file: none`, dann je Schlüssel nach Namen
+   sortiert `<schlüssel> = <wert>  # <quelle>` mit der Quelle `default`, `file <pfad>`,
+   `env BOTHY_X` oder `flag --role`. Geheimnisse erscheinen nur als Verweis; aufgelöst wird
+   nichts. Die Ausgabe ist immer redigiert, `--redacted` sagt das nur aus, `--redacted=false` ist
+   ein Aufruffehler. Werte stehen in kanonischer Form, die sich wieder einlesen lässt: Dauer in
+   der größten ganzen Einheit (`120s` als `2m`), Listen durch `, ` getrennt oder als JSON-Array,
+   wenn ein Element ein Komma oder Leerraum am Rand hat oder das erste mit `[` beginnt,
+   IP-Adressen in Normalform. Text mit ungültigem UTF-8, nicht druckbaren Zeichen, Leerraum am
+   Rand oder einem Anführungszeichen am Anfang steht in Anführungszeichen mit Go-Escapes.
 
 ## 4. Benannte Werte aller Kapitel
 

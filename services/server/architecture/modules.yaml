@@ -10,7 +10,8 @@ exclude: [tools]
 kernel:
   core: [ids, clock, errs, textcheck, reqmeta, jose, designkeys]   # usable by every package
   ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure]
-platform: {}                # <name>: {depends_on: [<platform names>], vendors: [<vendor groups>]}
+platform:                   # <name>: {depends_on: [<platform names>], vendors: [<vendor groups>]}
+  config: {depends_on: [], vendors: [yaml]}
 wire: {vendors: []}
 cmd: {vendors: []}
 # api: {vendors: [...]}     # added by M1-17 together with api/
@@ -221,4 +222,5 @@ modules:
     ws_ops: [identify, resume, heartbeat, reauth, focus, typing.start, typing.stop]
     depends_on: [chat, agents, runs, sync, stats]
     adapter_vendors: []
-vendors: {}                 # <group>: [<import path>, <import path>/**]
+vendors:                    # <group>: [<import path>, <import path>/**]
+  yaml: [go.yaml.in/yaml/v3]

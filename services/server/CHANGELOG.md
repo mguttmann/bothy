@@ -28,3 +28,20 @@ documented in this file. The format is based on
   dependencies. Every component may use its own packages, vendor patterns are Go import paths,
   `exclude` entries may not hit product code or other directories, and `make arch` rejects
   symbolic links below the module.
+- `internal/platform/config`: configuration schema with kind, default, documentation and owning
+  chapter per key; loader with the precedence default < file < environment < `--role`, which
+  rejects unknown `BOTHY_` variables and file keys, type, range and enum errors, missing required
+  keys and failed cross-checks, and reports every problem with key and source but never a value;
+  typed access to the values and `Bind` into the `Config` struct of a consumer.
+- Configuration schema of the server (`internal/wire`): `server.role`, `server.listen_addr`,
+  `server.internal_listen_addr`, `http.max_json_body_bytes` and `message.max_content_bytes`, with
+  the cross-checks `listeners_distinct` and `json_limit_above_message`.
+- `bothy config check` and `bothy config print [--redacted]`: verify the configuration without
+  starting the server (exit codes 0, 1, 2) and show the effective value and source of every key,
+  secret references only as references.
+- Lint rule (forbidigo): outside `cmd/bothy` no product package reads the process environment
+  (`os.Getenv` and its relatives, `exec.Cmd.Environ`, `http.ProxyFromEnvironment`); tests of
+  repository tools under `tools/` are exempt.
+- Lint rules (gocognit, goconst): a function above cognitive complexity 15 or a string literal
+  written three times fails `make lint`, as the rules S3776 and S1192 of the quality gate do; tests
+  and generated code are exempt.
