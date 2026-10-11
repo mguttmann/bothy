@@ -1,6 +1,6 @@
 # M1-73: Compose smoke test
 
-Status: ready | Depends on: M1-37, M1-69 | Etappe: M1
+Status: ready | Depends on: M1-37, M1-69 | Milestone: M1
 
 ## Goal
 
@@ -10,48 +10,48 @@ live delivery over WebSocket: secrets, migrations, first owner, enrollment with 
 DPoP, space, channel, thread and messages, ordered live delivery, reconnect with catch-up, step-up
 and device revocation closing the connection with `4012`. A canary run through the same stack
 proves that no content, token or principal ID leaves the collector or the container logs. This is
-exit criterion 8 of Etappe M1 and the only end-to-end proof that the image, the Compose contract
+exit criterion 8 of milestone M1 and the only end-to-end proof that the image, the Compose contract
 and the server modules work together.
 
 ## Read first
 
 Plan and quality:
 
-- `docs/PLAN.md`: section "M1 Fundament" (ticket row M1-73, "Nicht-Umfang", "Exit-Kriterien" 8,
-  "Red Team" last paragraph "Rauchtest-Stack"), "Arbeitsweise je Ticket", "Teststrategie",
-  "Entscheidungen dieses Plans" P-06, P-09, P-10, P-11; ticket row M7-14 (what stays for M7).
-- `docs/spec/23-qualitaet.md` "Komponenten-Vertrag" (row "Portabilität": executable
+- `docs/PLAN.md`: section "M1 Foundation" (ticket row M1-73, "Out of scope", "Exit criteria" 8,
+  "Red team" last paragraph "smoke test stack"), "Way of working per ticket", "Test strategy",
+  "Decisions of this plan" P-06, P-09, P-10, P-11; ticket row M7-14 (what stays for M7).
+- `docs/spec/23-quality.md` "Component contract" (row "Portability": executable
   `infra/compose/smoke.sh`); `docs/quality/gates.md` (release-only `portability`);
   `docs/quality/red-team-gate.md`.
 - `Makefile` targets `portability`, `release-build`, `trivy`, `image` (M1-23), `ops-check` (M1-04).
 
 Specification:
 
-- `docs/spec/16-betrieb.md`: "Grundregeln" and "Zwei Listener" (4.1, 4.2), "Konfiguration",
-  "Secret-Provider", "Geheimnisse im Compose-Stack" (5.1 to 5.3), "Umgebungen" (6.1, use
-  `staging`), "Rollen" (7.1), "Upgrade" point 1 (an empty database needs no recent backup),
-  "Portabilitätstest in CI" (11.1, the full test is M7-14), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/08-identitaet.md`: "Einladungs-Code" (3.2), "Erstinstallation" (4), "Registrierung"
-  (5.1), "Zwei Schlüssel je nativem Gerät" (6.1), "Step-up-Ablauf" (6.2), "Zugriffstoken" (7.2),
+- `docs/spec/16-operations.md`: "Basic rules" and "Two listeners" (4.1, 4.2), "Configuration",
+  "Secret provider", "Secrets in the Compose stack" (5.1 to 5.3), "Environments" (6.1, use
+  `staging`), "Roles" (7.1), "Upgrade" point 1 (an empty database needs no recent backup),
+  "Portability test in CI" (11.1, the full test is M7-14), "Configuration values of this chapter".
+- `docs/spec/08-identity.md`: "Enrollment code" (3.2), "Initial installation" (4), "Registration"
+  (5.1), "Two keys per native device" (6.1), "Step-up flow" (6.2), "Access token" (7.2),
   "DPoP" (7.3), "Tests" (ID-T06, ID-T07).
-- `docs/spec/04-sync-protokoll.md`: "Umschlag (Envelope)" (2.2), "Rahmen auf dem WebSocket" (2.3),
-  "Nachrichten: `client_msg_id`" (5.1), "Alle anderen Schreibvorgänge: `Idempotency-Key`" (5.2),
-  "Endpunkt und Version", "Ops", "Lebenszyklus", "Schließ-Codes" (6.1 to 6.4), "Nachholen" (7.1 to
-  7.4), "Widerruf von Sitzung, Gerät oder Prinzipal" (8.5), sequence diagrams "Nachricht senden,
-  online" (16.1) and "Wiederverbinden mit Nachholen" (16.3).
-- `docs/spec/05-aktionen.md`: action rows `instance.discovery.read`, `auth.login.begin`,
+- `docs/spec/04-sync-protocol.md`: "Envelope" (2.2), "Frames on the WebSocket" (2.3),
+  "Messages: `client_msg_id`" (5.1), "All other writes: `Idempotency-Key`" (5.2),
+  "Endpoint and version", "Ops", "Lifecycle", "Close codes" (6.1 to 6.4), "Catch-up" (7.1 to
+  7.4), "Revocation of a session, device or principal" (8.5), sequence diagrams "Send a message,
+  online" (16.1) and "Reconnect with catch-up" (16.3).
+- `docs/spec/05-actions.md`: action rows `instance.discovery.read`, `auth.login.begin`,
   `auth.login.complete`, `auth.step_up`, `self.read`, `space.create`, `channel.create`,
   `thread.create`, `message.create`, `device.revoke` (step-up required), `events.catch_up`,
-  `gateway.connect`; section "Dauerhafte Ereignistypen und Empfangs-Aktion" rows
+  `gateway.connect`; section "Durable event types and receive action" rows
   `space.created`, `channel.created`, `thread.created`, `message.created`, `session.revoked`;
-  section "WebSocket-Ops und Aktion".
-- `docs/spec/06-api.md`: "DPoP" (3.1, nonce retry exactly once), "Fehler", "Idempotenz".
-- `docs/spec/02-architektur.md`: "Start" (15.1), "Health" (15.2), "Shutdown" (15.3).
-- `docs/spec/17-observability.md`: "Datenschutz" (4), "Collector und Backends" (5), "Tests, die
-  diese Regeln halten" (10), R-OB-02, R-OB-03.
-- `docs/spec/19-sicherheit.md`: SEC-TLS-1, SEC-TLS-5, SEC-CORS-3, SEC-LOG-1 to SEC-LOG-6, SEC-T10.
-- `docs/spec/20-datenschutz.md`: DP-T09.
-- `docs/observability/privacy.md` section 6 "Kanarien-Test (Gate)";
+  section "WebSocket ops and action".
+- `docs/spec/06-api.md`: "DPoP" (3.1, nonce retry exactly once), "Errors", "Idempotency".
+- `docs/spec/02-architecture.md`: "Start" (15.1), "Health" (15.2), "Shutdown" (15.3).
+- `docs/spec/17-observability.md`: "Privacy" (4), "Collector and backends" (5), "Tests that
+  hold these rules" (10), R-OB-02, R-OB-03.
+- `docs/spec/19-security.md`: SEC-TLS-1, SEC-TLS-5, SEC-CORS-3, SEC-LOG-1 to SEC-LOG-6, SEC-T10.
+- `docs/spec/20-privacy.md`: DP-T09.
+- `docs/observability/privacy.md` section 6 "Canary test (gate)";
   `docs/observability/collector.md`.
 - ADRs 0012 (images, Compose), 0020 (device binding, DPoP, step-up), 0034 (collector),
   0038 (local gates), 0039 (release class), 0053 (no JSON null).
@@ -104,12 +104,12 @@ Owner build rules (verbatim):
 
 Rules for every brief:
 
-6. Test first: every behaviour has a test that was red before the code (record the red output).
+6. Test first: every behavior has a test that was red before the code (record the red output).
 7. No en or em dashes in any text (`uv run --project tools --locked --quiet python tools/hooks/text_rules.py <file>` exits 0). White label:
    people are "Alex", domains `example.com`; no company, host or personal names, no paths of a
    personal machine. SPDX header `Apache-2.0` in every new source, script and YAML file.
 8. Server configuration only through named keys from `docs/operations/configuration.md` (naming
-   rule `a.b_c` to `BOTHY_A__B_C`, 16 "Konfiguration"). Variables of the smoke harness are not
+   rule `a.b_c` to `BOTHY_A__B_C`, 16 "Configuration"). Variables of the smoke harness are not
    server configuration; they start with `SMOKE_` and are documented in
    `infra/compose/test/README.md`.
 
@@ -119,8 +119,8 @@ Product requirements implemented here:
    overlay with the official PostgreSQL 18 image pinned by digest and without the `backup`
    service (P-06).
 10. Missing image, Docker runtime, too old Docker Engine or too old Compose fail with exit code 2
-    and a message that names the fix; nothing is skipped (P-09; plan ticket row "ohne Image klarer
-    Fehler").
+    and a message that names the fix; nothing is skipped (P-09; plan ticket row "without an image
+    a clear error").
 11. No host port is published and nothing binds outside `127.0.0.1` (P-10; 16 4.1).
 12. Plaintext HTTP reaches the server only from loopback (SEC-TLS-1); WebSocket clients send no
     foreign `Origin` (SEC-CORS-3).
@@ -148,7 +148,7 @@ M1-05.
       the `Makefile` variable M1-23 defines), `SMOKE_KEEP` (`1` keeps the stack and the temp dir and
       prints how to remove them), `SMOKE_WAIT_TIMEOUT_S`, `SMOKE_TELEMETRY_SETTLE_S`,
       `SMOKE_LOG_TAIL`. Defaults live only in `smoke.sh`.
-    - **Sanitise.** After reading the inputs, unset every exported variable whose name starts with
+    - **Sanitize.** After reading the inputs, unset every exported variable whose name starts with
       `BOTHY_`, `COMPOSE_` or `OTEL_`, so a developer's shell cannot change the stack; always pass
       `--env-file infra/compose/test/smoke.env`, so `infra/compose/.env` of a real installation is
       never read.
@@ -206,7 +206,7 @@ M1-05.
     - An anchor `x-smoke-env` with the installation's `x-server-env` minus the keys the M1 server
       rejects (expected: every `BOTHY_FILE__*` key; files arrive in M3). Determine the set by
       running `docker run --rm <image> config check` with the installation values; list every
-      dropped key in a comment with the etappe that introduces it.
+      dropped key in a comment with the milestone that introduces it.
     - `secrets-init`, `migrate`, `api`, `worker`: `image: ${SMOKE_SERVER_IMAGE:?set by smoke.sh}`,
       `pull_policy: never`; `environment: !override` built from `x-smoke-env` plus the service's own
       installation overrides (`migrate`: `BOTHY_DATABASE__USER`, `BOTHY_DATABASE__PASSWORD_REF`);
@@ -346,18 +346,18 @@ M1-05.
    `pgtest` image pin (create the group "PostgreSQL test image" if M1-12 did not), so both pins move
    in one pull request; `make lint` validates the file.
 10. Documentation:
-    - `infra/compose/test/README.md` (new, German like `infra/compose/README.md`): purpose and
+    - `infra/compose/test/README.md` (new, English like `infra/compose/README.md`): purpose and
       P-06, prerequisites (Docker Engine 26, Compose 2.26, the image from `make image`), the
       `SMOKE_*` variables, the steps, what is proven and what is not (see "Out of scope"), how to
       debug with `SMOKE_KEEP=1`, why the probe shares the network namespace of `api`.
-    - `infra/compose/README.md`: table "Dateien" gets `test/` and `smoke.sh`; section "Geprüft"
+    - `infra/compose/README.md`: table "Files" gets `test/` and `smoke.sh`; section "Checked"
       states what the smoke test now proves (server part of the stack) and what still waits for M7.
     - `docs/observability/collector.md`: the test overlay `file` under `infra/compose/test/otel/`
       exists only for the smoke test; `docs/observability/privacy.md` section 6: name the
       implementation (`infra/compose/smoke.sh`, overlay `file`) and that the probe's own output is
       not scanned.
-    - `docs/security/threat-model.md` section 5.14 "Betrieb und Sicherungen": one row for the smoke
-      stack (threat: the test overlay or its settings end up in an installation; countermeasures:
+    - `docs/security/threat-model.md` section 5.14 "Operations and backups": one row for the smoke
+      stack (threat: the test overlay or its settings end up in an installation; mitigations:
       overlay only under `infra/compose/test`, excluded from `release-build`, own project name, no
       published ports, `staging` environment), and a register entry in 6.5 with a new ID following
       the register's scheme and the test `test_release_bundle_excludes_smoke_overlay`.
@@ -378,7 +378,7 @@ M1-05.
   already merged in M1 (renamed key, renamed subcommand, secrets layout); then fix it in
   `compose.yaml`, chapter 16 and `infra/compose/README.md` in the same change (specification
   first) instead of masking it in the overlay.
-- Server behaviour. Exception: the scan finds a real leak; fix it at the source with the smallest
+- Server behavior. Exception: the scan finds a real leak; fix it at the source with the smallest
   change, add the case to `test/canary` (M1-69), and name it in the report. If the fix needs a
   specification decision, stop with `BLOCKED`.
 
@@ -406,13 +406,13 @@ M1-05.
   and widening `server.trusted_proxies` for a test would weaken the rule under test. The probe
   shares the namespace (`network_mode: service:api`) and dials `127.0.0.1:8080`, like the
   `tailscale` sidecar pattern. No host port is published (P-10).
-- **D2 Overlay changes are removals or the listed overrides only.** Keys of later etappen are
-  dropped (P-06; the installation file is reconciled with each etappe's schema in M7-14).
+- **D2 Overlay changes are removals or the listed overrides only.** Keys of later milestones are
+  dropped (P-06; the installation file is reconciled with each milestone's schema in M7-14).
   `database.sslmode=disable` on the network `internal` and plaintext OTLP to the collector on the
   Compose network are allowed (19 SEC-TLS-5). Any other value the M1 server rejects is not changed
   in the overlay: stop with `BLOCKED` and quote the `config check` message, because it needs a
   specification decision.
-- **D3 Isolation of each run.** Own project name, explicit `--env-file`, sanitised environment,
+- **D3 Isolation of each run.** Own project name, explicit `--env-file`, sanitized environment,
   empty owner-secrets input directory: the smoke test can neither read nor change a real
   installation on the same host, and parallel worktrees do not collide.
 - **D4 Collector overlay `file`.** It lives under `infra/compose/test/otel/` because it needs the
@@ -443,8 +443,8 @@ M1-05.
   The probe never sends JSON `null` (ADR 0053).
 - **Timeouts.** Every wait in the probe has a context deadline from a named constant; every wait in
   `smoke.sh` uses `SMOKE_WAIT_TIMEOUT_S`; nothing waits unbounded.
-- **Language.** Code, comments, `smoke:` messages and the Go package docs are English;
-  `infra/compose/test/README.md` and the German docs stay German.
+- **Language.** Code, comments, `smoke:` messages, the Go package docs,
+  `infra/compose/test/README.md` and the other docs are English.
 
 ## Tests (write them first)
 

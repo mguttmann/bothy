@@ -1,6 +1,6 @@
 # M1-22: Egress client and SSRF lint
 
-Status: ready | Depends on: M1-07 | Etappe: M1
+Status: ready | Depends on: M1-07 | Milestone: M1
 
 ## Goal
 
@@ -14,24 +14,24 @@ storage and transcription build on this client later.
 
 ## Read first
 
-- `docs/spec/19-sicherheit.md`: "8. SSRF-Verbot und ausgehende Verbindungen" (SEC-NET-1 to
-  SEC-NET-6), "2. Transport" (SEC-TLS-4, SEC-TLS-5), "9. Logs ohne Geheimnisse und ohne Inhalte",
-  "14. Tests" (SEC-T02, SEC-T09), "15. Entscheidungen dieses Kapitels" (R-SE-04), "16.
-  Konfigurationswerte dieses Kapitels" (`egress.allowed_hosts`, `egress.timeout`,
+- `docs/spec/19-security.md`: "8. SSRF ban and outgoing connections" (SEC-NET-1 to
+  SEC-NET-6), "2. Transport" (SEC-TLS-4, SEC-TLS-5), "9. Logs without secrets and without content",
+  "14. Tests" (SEC-T02, SEC-T09), "15. Decisions of this chapter" (R-SE-04),
+  "16. Configuration values of this chapter" (`egress.allowed_hosts`, `egress.timeout`,
   `egress.max_response_bytes`).
-- `docs/spec/02-architektur.md`: "6. Code-Layout", "5. Schichten im Modul" (platform only in
-  adapters), "8.5 Was nie in einer Transaktion passiert", "13. Konfigurationsladen", "14.2 Fristen"
-  (row "Aufrufe nach außen"), "14.4 Ausfall einer Abhängigkeit".
-- `docs/spec/16-betrieb.md`: "4.1 Grundregeln" (rules 3 and 4).
-- `docs/spec/08-identitaet.md`: "2.2 OIDC: Server als Relying Party, App als Client des Servers"
+- `docs/spec/02-architecture.md`: "6. Code layout", "5. Layers within a module" (platform only in
+  adapters), "8.5 What never happens in a transaction", "13. Configuration loading", "14.2 Deadlines"
+  (row "outbound calls"), "14.4 Failure of a dependency".
+- `docs/spec/16-operations.md`: "4.1 Basic rules" (rules 3 and 4).
+- `docs/spec/08-identity.md`: "2.2 OIDC: server as relying party, app as client of the server"
   (the first consumer: discovery and JWKS).
-- `docs/spec/11-erweiterungen.md`: "7. Ausgehende Webhooks" (row "SSRF-Schutz": only `https`, host
+- `docs/spec/11-extensions.md`: "7. Outgoing webhooks" (row "SSRF protection": only `https`, host
   in `webhook.allowed_hosts`, connection bound to the checked address, no redirects).
-- `docs/spec/12-dateien.md`: "8.2 Transkript" (`voice.transcription_url` is instance
+- `docs/spec/12-files.md`: "8.2 Transcript" (`voice.transcription_url` is instance
   configuration).
-- `docs/PLAN.md`: section 7, rows M1-11, M1-22, M1-41; "Bekannte Widersprüche" W9; decisions
+- `docs/PLAN.md`: section 7, rows M1-11, M1-22, M1-41; "Known contradictions" W9; decisions
   P-10, P-11.
-- `docs/security/threat-model.md`: "2. Systemgrenzen" (TB7), register row T-NW-01.
+- `docs/security/threat-model.md`: "2. System boundaries" (TB7), register row T-NW-01.
 - `.semgrep/` (existing rules and their fixtures, especially `bothy-go-route-registration.yaml`
   for the `nosemgrep` precedent), the `semgrep` target in `Makefile`.
 - `docs/operations/configuration.md` sections 2 and 4, the generator merged by M1-08.
@@ -75,12 +75,12 @@ storage and transcription build on this client later.
 
 All Go paths are below `services/server/`.
 
-1. **Specification (already decided):** 19 "8. SSRF-Verbot und ausgehende Verbindungen"
+1. **Specification (already decided):** 19 "8. SSRF ban and outgoing connections"
    (SEC-NET-1 with the loopback client and the OTLP exemption, SEC-NET-2 with `http` only for
    `allow_private` entries and no environment proxies, SEC-NET-3 with the full blocked list,
-   SEC-NET-5 with the metric), R-SE-10, the meaning of `egress.allowed_hosts` in "16.
-   Konfigurationswerte dieses Kapitels"; 02 "6. Code-Layout" (`egress/`, W9);
-   `docs/operations/configuration.md` "2. Namensregel und Formate" (row Egress-Ziel); the metric
+   SEC-NET-5 with the metric), R-SE-10, the meaning of `egress.allowed_hosts` in
+   "16. Configuration values of this chapter"; 02 "6. Code layout" (`egress/`, W9);
+   `docs/operations/configuration.md` "2. Naming rule and formats" (row Egress target); the metric
    `bothy.egress.blocked` in `docs/observability/signals.md`. Change them only if the build proves
    a statement wrong, in the same change.
 2. **Configuration schema** (`internal/platform/config`, typed config in `internal/wire`):
@@ -172,16 +172,16 @@ All Go paths are below `services/server/`.
 6. **Docs and records**: `doc.go` of the package (rules, examples for a consumer);
    `services/server/README.md` platform table gets the row `egress`; if
    `services/server/architecture/modules.yaml` lists platform packages or their vendor
-   permissions, add `egress` there (W9); `docs/security/threat-model.md` "2. Systemgrenzen" row TB7
-   names the egress client among the controls; `services/server/CHANGELOG.md` under `Unreleased`
-   (`Security`).
+   permissions, add `egress` there (W9); `docs/security/threat-model.md` "2. System boundaries"
+   row TB7 names the egress client among the controls; `services/server/CHANGELOG.md` under
+   `Unreleased` (`Security`).
 
 ## Out of scope
 
 - Consumers: OIDC discovery and JWKS with their host policy (M1-41), push (M3), webhooks (M2),
   object storage (M3), transcription (M3). Do not build clients for them here.
 - The OTLP exporters of `internal/platform/otel`: exempt from the egress client by SEC-NET-1
-  (operator-configured collector endpoint); nothing to build here.
+  (collector endpoint configured by the instance operator); nothing to build here.
 - Extra CA bundles for private PKI beyond `Deps.RootCAs`: no configuration key exists.
 - Incoming TLS and HSTS: M1-21.
 
@@ -231,9 +231,9 @@ All Go paths are below `services/server/`.
    `172.16.0.0/12`, `192.168.0.0/16`; shared address space `100.64.0.0/10` (overlay networks);
    unique local `fc00::/7`. Documentation ranges (RFC 5737, RFC 3849) are not blocked; they are not
    routed on the internet and tests use them as public examples (19 SEC-NET-3, R-SE-10).
-4. **`allow_private`** exists only in `egress.allowed_hosts` (operator trust); a consumer policy
-   (`Options.Hosts`) never unlocks a private address. Reason: consumer lists can come from data
-   such as a discovery document; the operator's file cannot.
+4. **`allow_private`** exists only in `egress.allowed_hosts` (instance operator trust); a consumer
+   policy (`Options.Hosts`) never unlocks a private address. Reason: consumer lists can come from
+   data such as a discovery document; the instance operator's file cannot.
 5. **TLS**: `MinVersion: tls.VersionTLS12`, verification always on, `RootCAs` from `Deps`, server
    name from the URL host (the transport does this when the dial returns a TCP connection).
 6. **Proxies**: `Transport.Proxy` is `nil`; `HTTP_PROXY` and `HTTPS_PROXY` are ignored, because a
@@ -247,7 +247,7 @@ All Go paths are below `services/server/`.
    once at `Warn` with purpose, reason and host; never path, query, headers or bodies; and
    increments `bothy.egress.blocked` with `bothy.reason` = the `Reason` value (signals.md).
 9. **Callers** map egress errors to their own error kinds (usually `503 unavailable` with the
-   internal cause `dependency_unavailable`, 02 "14.1 Fehlerarten"); the egress package does not
+   internal cause `dependency_unavailable`, 02 "14.1 Error kinds"); the egress package does not
    know `kernel/errs` kinds of other modules.
 10. **`NewLoopback`** dials only loopback addresses after resolution, plain `http`, no redirects;
     it exists so that `bothy healthcheck` has an allowed client without opening a hole in the
@@ -311,7 +311,7 @@ Commands that must pass: `make test`, `make semgrep`, `make lint`, `make docs`, 
 - [ ] Time and size limits come from `egress.timeout` and `egress.max_response_bytes` or a
       consumer override; oversize bodies fail loudly.
 - [ ] Environment proxies are ignored; TLS is always verified.
-- [ ] 02 "6. Code-Layout", 19 "8." and "16.", `configuration.md` sections 2 and 4 agree with the
+- [ ] 02 "6. Code layout", 19 "8." and "16.", `configuration.md` sections 2 and 4 agree with the
       code; W9 is recorded in `docs/DECISIONS.md`.
 - [ ] `make check` is green.
 

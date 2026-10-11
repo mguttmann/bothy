@@ -1,6 +1,6 @@
 # M1-24: Audit: hash chain, recorder and aggregation (ADR 0021)
 
-Status: ready | Depends on: M1-15, M1-18, M1-26 | Etappe: M1
+Status: ready | Depends on: M1-15, M1-18, M1-26 | Milestone: M1
 
 ## Goal
 
@@ -18,35 +18,35 @@ M1-26 is needed for the shared text validator `internal/kernel/textcheck` that c
 
 ## Read first
 
-- `docs/adr/0021-audit-log-hash-verkettet-und-getrennt-von-telemetrie.md` (all of it).
-- `docs/spec/03-datenmodell.md`: "1. Grundsätze" (1, 2, 8, 9, 11, 13), "3. Aufbewahrungsklassen"
-  (`audit`), "4.1" table `sequence_counters`, "4.12 Audit, Datenschutz, Status" tables
-  `audit_events`, `audit_checkpoints` and `audit_ip_keys`, "6.1 Globale Ereignis-Sequenz", "6.3 Sperrreihenfolge",
-  "6.4 I1-Prüfung" (denial audit in an own transaction), R-DM-28 in the decisions table.
-- `docs/spec/04-sync-protokoll.md`: "3.2 Muster mit Zähler-Zeile", "3.3 Weitere Zähler".
-- `docs/spec/05-aktionen.md`: "1. Verbindliche Regeln" (rules 5 and 10), "2.4 Spalten Owner,
-  Step-up, Audit, Rechte" (aggregation, R-AZ-04), "2.5 Entscheidung", "10. Konfigurationswerte"
-  (`audit.deny_aggregate_window`, `audit.deny_aggregate_max_keys`).
-- `docs/spec/07-rechte.md`: "4.1 Entscheidungen und Gründe" (closed list of reason codes), "11.2
-  Pflicht-Tests" (AZ-P13).
-- `docs/spec/02-architektur.md`: "4.2 Modulliste" (`audit`), "4.3 Ports, Ereignisse und Quellen je
-  Modul", "4.4 Erlaubte Abhängigkeiten" (`audit` may use `instance`), "4.5 Querschnitts-Ports"
-  (`kernel/auditing`), "5. Schichten im Modul", "7.3 Weitere Prüfungen im Gate", "8.1 Ablauf"
-  (phase 3.3), "8.2 Sperrreihenfolge", "8.5 Was nie in einer Transaktion passiert", "14.1
-  Fehlerarten", "15.3 Shutdown".
-- `docs/spec/19-sicherheit.md`: "1. Vertrauensannahmen", "9." (SEC-LOG-4, SEC-LOG-5), "10.
-  Geheimnisse" (SEC-SEC-3), "12. Lieferkette, Sicherungen und Audit-Integrität" (SEC-AUD-1,
+- `docs/adr/0021-hash-chained-audit-log-separate-from-telemetry.md` (all of it).
+- `docs/spec/03-data-model.md`: "1. Principles" (1, 2, 8, 9, 11, 13), "3. Retention classes"
+  (`audit`), "4.1" table `sequence_counters`, "4.12 Audit, privacy, status" tables
+  `audit_events`, `audit_checkpoints` and `audit_ip_keys`, "6.1 Global event sequence", "6.3 Lock order",
+  "6.4 I1 check" (denial audit in an own transaction), R-DM-28 in the decisions table.
+- `docs/spec/04-sync-protocol.md`: "3.2 Pattern with a counter row", "3.3 Other counters".
+- `docs/spec/05-actions.md`: "1. Binding rules" (rules 5 and 10),
+  "2.4 Columns Owner, Step-up, Audit, Permissions" (aggregation, R-AZ-04), "2.5 Decision",
+  "10. Configuration values" (`audit.deny_aggregate_window`, `audit.deny_aggregate_max_keys`).
+- `docs/spec/07-permissions.md`: "4.1 Decisions and reasons" (closed list of reason codes),
+  "11.2 Required tests" (AZ-P13).
+- `docs/spec/02-architecture.md`: "4.2 Module list" (`audit`),
+  "4.3 Ports, events and sources per module", "4.4 Allowed dependencies" (`audit` may use
+  `instance`), "4.5 Cross-cutting ports" (`kernel/auditing`), "5. Layers within a module",
+  "7.3 Other checks in the gate", "8.1 Flow" (phase 3.3), "8.2 Lock order",
+  "8.5 What never happens in a transaction", "14.1 Error kinds", "15.3 Shutdown".
+- `docs/spec/19-security.md`: "1. Trust assumptions", "9." (SEC-LOG-4, SEC-LOG-5),
+  "10. Secrets" (SEC-SEC-3), "12. Supply chain, backups and audit integrity" (SEC-AUD-1,
   SEC-AUD-4 canonical form, SEC-AUD-5 schema `audit_details.v1`, SEC-AUD-6 aggregation),
-  "14. Tests" (SEC-T16), "16. Konfigurationswerte".
-- `docs/spec/20-datenschutz.md`: "4.5 Audit-Log und IP-Adressen", "10. Tests" (DP-T02, DP-T06),
-  "13. Konfigurationswerte" (`privacy.audit_ip_key_period`, `privacy.audit_ip_key_retention`,
+  "14. Tests" (SEC-T16), "16. Configuration values".
+- `docs/spec/20-privacy.md`: "4.5 Audit log and IP addresses", "10. Tests" (DP-T02, DP-T06),
+  "13. Configuration values" (`privacy.audit_ip_key_period`, `privacy.audit_ip_key_retention`,
   `privacy.audit_ip_kek_ref`); `docs/operations/configuration.md` section 5 (`audit_ip_kek`).
-- `docs/spec/16-betrieb.md`: "7.1 Rollen" (`bothy_app`, `bothy_maint`, `bothy_owner`).
+- `docs/spec/16-operations.md`: "7.1 Roles" (`bothy_app`, `bothy_maint`, `bothy_owner`).
 - `docs/spec/17-observability.md` rule 6 and R-OB-07, `docs/observability/audit-vs-telemetry.md`.
 - `docs/api/openapi.yaml` schemas `AuditEvent`, `AuditDecision`, `Timestamp` (the canonical form
   equals this representation without `hash`).
 - `docs/PLAN.md`: section 7, rows M1-13, M1-15, M1-16, M1-18, M1-24, M1-28, M1-29, M1-50, M1-69;
-  "Voraussetzungen aus dem Kern-Vertrag" (rows for M1-24); decisions P-09, P-11, P-14.
+  "Prerequisites from the core contract" (rows for M1-24); decisions P-09, P-11, P-14.
 - `docs/security/threat-model.md` register row T-DB-01.
 - `services/server/internal/audit/README.md`, `services/server/README.md` (kernel table).
 - Code merged by earlier tickets: `internal/kernel/txn` and the unit of work in `internal/platform/pg`
@@ -78,7 +78,7 @@ M1-26 is needed for the shared text validator `internal/kernel/textcheck` that c
 9. ADR 0021 and 03 `audit_events`: `seq` from `sequence_counters('audit_seq')` in the same
    transaction; `prev_hash` is the `hash` of row `seq - 1`, 32 zero bytes for the first row;
    `hash = SHA-256(prev_hash || canonical_json(row without hash))` with JCS (RFC 8785).
-10. 03 "6.3 Sperrreihenfolge": `audit_seq` is locked last, after `event_seq`; 02 "8.1": the audit
+10. 03 "6.3 Lock order": `audit_seq` is locked last, after `event_seq`; 02 "8.1": the audit
     phase hook is phase 3.3.
 11. SEC-AUD-1 and 03: the application role has only `INSERT` and `SELECT` on `audit_events`;
     `UPDATE` and `DELETE` are blocked by `REVOKE` and a trigger.
@@ -98,8 +98,8 @@ M1-26 is needed for the shared text validator `internal/kernel/textcheck` that c
 All Go paths are below `services/server/`.
 
 0. **Core contract and spec.** 03 defines `audit_ip_keys` (module `audit`; `key_ciphertext`
-   AEAD-encrypted, `key_ref`, `destroyed_at`, checks and rights as listed there); 19 defines the
-   canonical form (SEC-AUD-4), the schema `audit_details.v1` (SEC-AUD-5) and the aggregation
+   AEAD-encrypted, `key_ref`, `destroyed_at`, checks and permissions as listed there); 19 defines
+   the canonical form (SEC-AUD-4), the schema `audit_details.v1` (SEC-AUD-5) and the aggregation
    (SEC-AUD-6); 05 holds `audit.deny_aggregate_max_keys`; 20 "4.5" says where the keys live.
    Build exactly that; change a chapter only if the build proves it wrong, in the same change.
 1. **Configuration and secrets.** Schema entries `audit.deny_aggregate_window`,
@@ -111,7 +111,7 @@ All Go paths are below `services/server/`.
 
     ```go
     type Decision string // "allow", "deny", "error" (audit_events.decision)
-    type Reason string   // closed list of 07 "4.1 Entscheidungen und Gründe" (deny_reason)
+    type Reason string   // closed list of 07 "4.1 Decisions and reasons" (deny_reason)
     const ReasonUnauthenticated Reason = "unauthenticated" // ... one constant per row of 07 4.1
     func KnownReasons() []Reason
 
@@ -161,7 +161,7 @@ All Go paths are below `services/server/`.
       read current IP key, insert IP key with `ON CONFLICT (valid_from) DO NOTHING`, read key by
       id), repository, `sqlc.yaml` entry for `audit`.
     - `internal/wire`: construct the recorder, register the hook in the audit slot (phase 3.3) as a
-      method value of the `audit` hook type (never a closure in `internal/wire`, 02 "Ablauf") and
+      method value of the `audit` hook type (never a closure in `internal/wire`, 02 "Flow") and
       update the golden file of registrations, start the aggregator with the role's lifecycle and
       register a shutdown step that flushes it before the pool closes (both roles), fill the typed
       `audit` and `privacy` config.
@@ -180,7 +180,7 @@ All Go paths are below `services/server/`.
    (default `30d`), `privacy.audit_ip_key_retention` (default `90d`); cross check retention `>=`
    period.
 6. **Register and docs**: `architecture/modules.yaml` lists the new table for `audit`;
-   `internal/audit/README.md` (German: status, tables, port, hook, canonical form, details schema,
+   `internal/audit/README.md` (English: status, tables, port, hook, canonical form, details schema,
    aggregation, keyring, limits); package doc of `kernel/auditing` with an example;
    `docs/security/threat-model.md` row T-DB-01 notes the part of SEC-T16 this ticket proves;
    `docs/DECISIONS.md` entries only for the IP canonical form and the location of the reason list
@@ -194,8 +194,8 @@ All Go paths are below `services/server/`.
   changed row and of a rewritten chain): M1-50. Expose `CanonicalRow` and `ChainHash` so M1-50
   reuses them.
 - Calling the recorder from `authorize` according to the "Audit" column of 05 (end-to-end AZ-P13):
-  M1-28 and M1-29 own `authorize` and the rights changes. This ticket proves aggregation at the
-  recorder.
+  M1-28 and M1-29 own `authorize` and the permission changes. This ticket proves aggregation at
+  the recorder.
 - Truncation with anchor, grants for `bothy_maint`, destruction of IP keys after
   `privacy.audit_ip_key_retention` and DP-T06: M7 (P-14).
 - Telemetry about audit entries: none (17 rule 6).
@@ -232,8 +232,8 @@ All Go paths are below `services/server/`.
    (`ZeroHash` when `first == 1`; a missing row is an internal error `audit chain broken` that fails
    the transaction and is logged), computes the rows in order and inserts them in one statement.
    `RecordDenial` buckets and `RecordDetached` run the same hook in an own unit of work that never
-   joins an ambient transaction. If the hook fails, the business transaction fails ("scheitert das
-   Audit, scheitert die Änderung").
+   joins an ambient transaction. If the hook fails, the business transaction fails ("if the audit
+   fails, the change fails").
 2. **Canonical form** of a row (the JSON object `canonical_json` hashes). Members are the column
    names except `hash`. `seq` is a JSON integer (reject values above 2^53 - 1); `id`,
    `actor_principal_id`, `actor_device_id`, `actor_session_id`, `resource_id`, `correlation_id` are
@@ -273,7 +273,7 @@ All Go paths are below `services/server/`.
 5. **Actor and correlation.** `actor_principal_id`, `actor_device_id`, `actor_session_id` come
    from `kernel/actor`; they are absent for system actions and server commands. `correlation_id`
    is the trace ID that M1-18 puts into the request context, rendered as UUID text; it is not a
-   UUIDv7 and must not be validated as one (02 "Querschnitts-Ports"). Read correlation ID and
+   UUIDv7 and must not be validated as one (02 "Cross-cutting ports"). Read correlation ID and
    client IP through `internal/kernel/reqmeta` (M1-18), never from `platform`.
 6. **Aggregation of denials.** Key: actor principal (or, for anonymous requests, `ip_hmac`), action,
    reason. The first denial of a key opens a bucket with `first_at`; later identical denials within
@@ -312,8 +312,8 @@ fake storage); integration tests in `internal/audit/adapters/postgres` and `inte
   `TestCanonicalRow_RejectsOutOfDomain` (float, `null`, non-ASCII key, integer above 2^53 - 1, NUL).
 - `TestChainHash_FirstRowZeroPrevHash`, `TestCanonicalRow_TimeHasMilliseconds`.
 - `TestDetailsV1_ClosedSchema`: reserved member with a wrong shape, attribute key colliding with a reserved member, free-text attribute, float, bad key, bad code rejected; `violations` accepted.
-- `TestReasonsMatchChapter07`: parses the table in `docs/spec/07-rechte.md` section "4.1
-  Entscheidungen und Gründe" (first column) and compares with `KnownReasons()` both ways.
+- `TestReasonsMatchChapter07`: parses the table in `docs/spec/07-permissions.md` section
+  "4.1 Decisions and reasons" (first column) and compares with `KnownReasons()` both ways.
 - `TestIPKey_EncryptedAtRest` (the stored `key_ciphertext` differs from the key and decrypts only with the configured key), `TestIPHMAC_Vectors` (fixed key, `192.0.2.44` and `2001:db8::44`, literal expected hex),
   `TestIPHMAC_MappedEqualsIPv4`, `TestIPHMAC_ZoneIgnored`.
 - `TestAZP13_IdenticalDenialsInWindowYieldOneEntry` (count equals the number of denials),

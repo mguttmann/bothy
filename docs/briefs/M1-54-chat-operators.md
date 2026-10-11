@@ -1,33 +1,33 @@
 # M1-54: Operators with invariant I1
 
-Status: ready | Depends on: M1-49, M1-53 | Etappe: M1
+Status: ready | Depends on: M1-49, M1-53 | Milestone: M1
 
 ## Goal
 
 After this ticket owners set the default operator of a space and the operator of a channel
-(inherit, none, agent) with step-up, and every such change is a rights change that `authz` checks
-against invariant I1 in the same transaction. The real `chat` implementation of the operator part
-of `authz.StructureSource` gives the effective operator its implicit `write` (operator rule) and
-tells `authz` exactly which targets each agent serves. An integration test with all real sources,
-no fakes, proves I1 for every kind of change that M1 can make.
+(inherit, none, agent) with step-up, and every such change is a permission change that `authz`
+checks against invariant I1 in the same transaction. The real `chat` implementation of the
+operator part of `authz.StructureSource` gives the effective operator its implicit `write`
+(operator rule) and tells `authz` exactly which targets each agent serves. An integration test
+with all real sources, no fakes, proves I1 for every kind of change that M1 can make.
 
 ## Read first
 
 - `docs/DECISIONS.md`: B7, invariant I1 and ruling L22 (no owner exception).
-- `docs/spec/03-datenmodell.md`: tables `spaces`, `channels` (effective operator, mention rule),
+- `docs/spec/03-data-model.md`: tables `spaces`, `channels` (effective operator, mention rule),
   `threads` (`operator_agent_id`, index for I1 targets), `agents`, `grants`, `owners`;
-  "Transaktionsregeln" 6.3 lock order and 6.4 I1 check; R-DM-08, R-DM-12, R-DM-21.
-- `docs/spec/05-aktionen.md`: rules 1.6 and 1.7; "Wirksame Stufe" point 4 (operator rule);
+  "Transaction rules" 6.3 lock order and 6.4 I1 check; R-DM-08, R-DM-12, R-DM-21.
+- `docs/spec/05-actions.md`: rules 1.6 and 1.7; "Effective level" point 4 (operator rule);
   rows `space.operator.set`, `channel.operator.set`, `agent.read`; section 6 rows `space.updated`,
   `channel.updated`, `access.changed`; decisions R-AZ-10, R-AZ-13, R-AZ-17.
-- `docs/spec/07-rechte.md`: 2.9 "Agenten als Prinzipale", 4.4 "Invarianten in der Transaktion",
-  SR1, SR5, SR8, "Sofortige Wirkung bei Entzug", "Beispiele" (the world of the tests),
-  "Testmatrix" rows AZ-M21 to AZ-M25 and AZ-M29, "Pflicht-Tests" AZ-P7.
-- `docs/spec/10-backend-richtlinie.md`: "I1 transaktional" 5.1 to 5.4, "Tests" BR-01 to BR-03.
-- `docs/spec/09-agenten.md` 3.1 "Bediener".
-- `docs/spec/04-sync-protokoll.md` 8.2 "Was beim Ändern passiert" (payload of `access.changed`).
-- `docs/spec/02-architektur.md` 4.3 (chat implements `authz.StructureSource`), 4.4, 8.1 phases.
-- `docs/spec/06-api.md` "Autorisierung in der API" point 5, "Nebenläufigkeit".
+- `docs/spec/07-permissions.md`: 2.9 "Agents as principals", 4.4 "Invariants in the transaction",
+  SR1, SR5, SR8, "Immediate effect on revocation", "Examples" (the world of the tests),
+  "Test matrix" rows AZ-M21 to AZ-M25 and AZ-M29, "Required tests" AZ-P7.
+- `docs/spec/10-backend-policy.md`: "I1 transactional" 5.1 to 5.4, "Tests" BR-01 to BR-03.
+- `docs/spec/09-agents.md` 3.1 "Operator".
+- `docs/spec/04-sync-protocol.md` 8.2 "What happens on a change" (payload of `access.changed`).
+- `docs/spec/02-architecture.md` 4.3 (chat implements `authz.StructureSource`), 4.4, 8.1 phases.
+- `docs/spec/06-api.md` "Authorization in the API" point 5, "Concurrency".
 - `docs/api/openapi.yaml`: operationIds `setSpaceOperator`, `setChannelOperator`; schemas
   `OperatorSet`, `OperatorMode`, `ChannelOperator`, `Space`, `Channel`, `Problem`.
 - ADRs 0017, 0018, 0024.
@@ -65,7 +65,7 @@ Rules for every brief:
 
 Product requirements implemented here:
 
-10. Operator setting is owner only, with fresh step-up, audited, and a rights change
+10. Operator setting is owner only, with fresh step-up, audited, and a permission change
     (05 rows `space.operator.set`, `channel.operator.set`; R-AZ-10).
 11. A channel inherits the space default, has no operator, or a fixed agent (03 `channels`;
     `OperatorSet`). A space has a default agent or none.
@@ -102,7 +102,7 @@ Paths relative to `services/server/` unless they start with `docs/`:
 8. `docs/api/openapi.yaml` already has `Problem.conflicts` (M1-29 regenerated the code); change it
    only where the implementation proves it wrong.
 9. `test/integration/` (cross-module tests with all real modules): a world builder for the world
-   of 07 "Beispiele" and "Testmatrix" if none exists yet, and the I1 tests below.
+   of 07 "Examples" and "Test matrix" if none exists yet, and the I1 tests below.
 10. Documentation: `internal/chat/README.md`, `services/server/CHANGELOG.md`, `docs/DECISIONS.md`
     (rulings D2, D5 point 4, D8).
 
@@ -159,8 +159,8 @@ D2. Order of checks: load the target (unknown gives `404`), `authorize` (non-own
 `401 step_up_required`), then `If-Match` (`428` missing, `412 version_conflict` with `current`),
 then validation of D1, then state: an archived space or channel gives `409 conflict`
 (ruling of M1-53: archived targets are frozen). A request that changes nothing returns `200` with
-the current object, no rights change, no version bump, no event; the audit allow entry is written
-as for every audited action.
+the current object, no permission change, no version bump, no event; the audit allow entry is
+written as for every audited action.
 
 D3. The write transaction: unit of work with the `RightsChange` option (02 8.1), so
 `permission_version` is locked first (03 6.3). Affected principals for `access.changed`: every agent
@@ -179,7 +179,7 @@ D4. Events and versions:
   every non-archived channel of the space with `operator_inherit = true`, in ascending `id`:
   `channels.version` plus one and `channel.updated`, because its effective operator changed and
   clients apply a change only with a higher `resource.version` (05 section 6 row `space.updated`;
-  04 "Zustellgarantie" point 3).
+  04 "Delivery guarantee" point 3).
 - No `thread.updated`: thread operators are fixed (R-DM-12); the main thread has no stored operator
   (R-DM-21) and clients read it from `Channel.operator.effective_agent_id`.
 - Audit allow details `{target_kind, target_id, old_mode, old_agent_id, new_mode, new_agent_id,
@@ -231,7 +231,7 @@ Unit (`internal/chat/domain`):
 - `TestEffectiveOperator`: inherit with and without space default, none, agent.
 
 Integration with all real sources (`test/integration/`, PostgreSQL 18, real `identity`, `authz`,
-`agents`, `chat`, `audit`, `sync`; world of 07 "Beispiele": owner, Alex, Sam, Robin; spaces
+`agents`, `chat`, `audit`, `sync`; world of 07 "Examples": owner, Alex, Sam, Robin; spaces
 Support, Marketing, Engineering, Research; agents Lotse (organization, operator of Support), Texter
 (organization, operator of Marketing), Runner (organization), Assistent (personal, credential
 holder = owner, operator of Research); grants G-1 to G-6 created through the `authz` admin port, not

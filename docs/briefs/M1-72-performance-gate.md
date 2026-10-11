@@ -1,35 +1,35 @@
 # M1-72: Load tests and performance gate of the server core (ADR 0063)
 
-Status: ready | Depends on: M1-57, M1-65, M1-71 | Etappe: M1
+Status: ready | Depends on: M1-57, M1-65, M1-71 | Milestone: M1
 
 ## Goal
 
 After this ticket `make perf` measures every performance target of the server core on a recorded
-host profile, compares each value with its named threshold from 02 "Leistungsziele", writes value
-and threshold per target and fails when one is missed. Chaos tests prove that losing the `LISTEN`
-connection, restarting the database during the log tail and killing the server during commits leave
-no gap and no partial change. This closes exit criterion 7 of M1 and turns the capacity start
-values of 16 into measured facts.
+host profile, compares each value with its named threshold from 02 "Performance targets", writes
+value and threshold per target and fails when one is missed. Chaos tests prove that losing the
+`LISTEN` connection, restarting the database during the log tail and killing the server during
+commits leave no gap and no partial change. This closes exit criterion 7 of M1 and turns the
+capacity start values of 16 into measured facts.
 
 ## Read first
 
-- `docs/spec/02-architektur.md`: "Ereignis-Pfad" ("Log-Tail je api-Prozess", "Hub und Zustellung"),
-  "Start und Graceful Shutdown" ("Health"), "Skalierungspfad", "Leistungsziele", "Offen",
-  "Konfigurationswerte dieses Kapitels" (all `perf.*` rows; "Leistungsziele (`perf.*`) sind
-  Schwellen für Tests, keine Laufzeit-Konfiguration").
-- `docs/spec/04-sync-protokoll.md`: "Globale, commit-geordnete Sequenz" ("Muster mit
-  Zähler-Zeile"), "Lebenszyklus", "Nachholen (Catch-up)", "Zustellgarantie", "Reihenfolge".
-- `docs/spec/03-datenmodell.md`: "Transaktionsregeln", tables `event_log`, `sequence_counters`,
+- `docs/spec/02-architecture.md`: "Event path" ("Log tail per api process", "Hub and delivery"),
+  "Start and graceful shutdown" ("Health"), "Scaling path", "Performance targets", "Open",
+  "Configuration values of this chapter" (all `perf.*` rows; "Performance targets (`perf.*`) are
+  thresholds for tests, not runtime configuration").
+- `docs/spec/04-sync-protocol.md`: "Global, commit-ordered sequence" ("Pattern with a
+  counter row"), "Lifecycle", "Catch-up", "Delivery guarantee", "Ordering".
+- `docs/spec/03-data-model.md`: "Transaction rules", tables `event_log`, `sequence_counters`,
   `messages`, `threads`, `idempotency_keys`, `audit_events`.
-- `docs/spec/07-rechte.md`: "Abfrage-Muster" rule 5 (large visible sets).
-- `docs/spec/16-betrieb.md`: "Zwei Listener", "Datenbank" ("Rollen"), "Kapazität und Ressourcen",
-  "Konfigurationswerte dieses Kapitels" (`database.max_conns`, start value until the load test).
+- `docs/spec/07-permissions.md`: "Query pattern" rule 5 (large visible sets).
+- `docs/spec/16-operations.md`: "Two listeners", "Database" ("Roles"), "Capacity and resources",
+  "Configuration values of this chapter" (`database.max_conns`, start value until the load test).
 - `docs/observability/signals.md`: `bothy.delivery.duration`, `bothy.db.event_seq.lock_wait`,
   `bothy.db.pool.connections`.
-- ADRs 0009 (Confirmation), 0004, 0063 "Leistungs-Gate für das Ereignis-Log" (profile modes in its
+- ADRs 0009 (Confirmation), 0004, 0063 "Performance gate for the event log" (profile modes in its
   decision, point 3).
-- `docs/PLAN.md`: "Arbeitsweise je Ticket" item 6, "Abschluss einer Etappe" item 3, M1
-  "Exit-Kriterien" item 7, rows M1-16, M1-28 and M1-72, decisions P-07, P-09, P-10, P-12.
+- `docs/PLAN.md`: "Way of working per ticket" item 6, "Closing a milestone" item 3, M1
+  "Exit criteria" item 7, rows M1-16, M1-28 and M1-72, decisions P-07, P-09, P-10, P-12.
 - Operations: `createMessage`, `listEvents`, `getSnapshot`, `verifyAuditChain`, `createSpace`,
   `createChannel`, `createThread`, `createGrant`, `createUser`, `redeemEnrollmentCode`,
   `refreshToken`; gateway ops `hello`, `identify`, `ready`, `heartbeat`,
@@ -56,15 +56,15 @@ values of 16 into measured facts.
 7. No en dash and no em dash in any file; white label.
 8. Configuration only through named keys from `docs/operations/configuration.md`; thresholds only
    by their `perf.*` names, never as literals in code or docs.
-9. 02 "Leistungsziele": `make perf` measures `perf.message_create_p99` under
+9. 02 "Performance targets": `make perf` measures `perf.message_create_p99` under
    `perf.sustained_messages_per_s`, `perf.fanout_local_p99`, `perf.catchup_page_p99`,
    `perf.authorize_cached_p99`, `perf.ws_connections_per_node`, `perf.ws_idle_conn_mem_max`,
    `perf.idle_rss_max`, `perf.startup_ready_max` and keeps `perf.event_commit_min_per_s` from M1-16.
-10. P-07: `make perf` runs at the etappe close and the release, not in the pre-push gate; values
-    are valid on `perf.reference_profile` (ADR 0063).
-11. 04 "Muster mit Zähler-Zeile" and "Zustellgarantie": no gap in `seq`, no lost or duplicated
-    delivery after deduplication, order equals commit order.
-12. PLAN "Arbeitsweise je Ticket" item 6: no ticket lowers a threshold.
+10. P-07: `make perf` runs at the milestone close and the release, not in the pre-push gate;
+    values are valid on `perf.reference_profile` (ADR 0063).
+11. 04 "Pattern with a counter row" and "Delivery guarantee": no gap in `seq`, no lost or
+    duplicated delivery after deduplication, order equals commit order.
+12. PLAN "Way of working per ticket" item 6: no ticket lowers a threshold.
 
 ## Scope
 
@@ -93,11 +93,11 @@ values of 16 into measured facts.
    `cd services/server && go test -tags perf -count=1 -timeout $(PERF_TIMEOUT) ./perf/... ./test/chaos/...`
    without `-race`; prints the result table; exits non-zero when any target fails or any chaos test
    fails. `make check` compiles and vets the tagged code (`go vet -tags perf ./perf/...
-   ./test/chaos/...` in `lint`, golangci-lint with the tag) so it cannot rot between etappen.
+   ./test/chaos/...` in `lint`, golangci-lint with the tag) so it cannot rot between milestones.
 7. ADR 0063 exists: extend its "Confirmation" and "More Information" with the M1-72 targets, the
    chaos tests, `TestProfileModes` and `TestProfileRejectsNonDurable` without changing the decision; run `make adr-index`.
-8. Documentation: `docs/quality/gates.md` (a section "Nicht in `make check`" with `perf` and
-   `portability`), `docs/spec/16-betrieb.md` "Kapazität und Ressourcen" and the `database.max_conns`
+8. Documentation: `docs/quality/gates.md` (a section "Not in `make check`" with `perf` and
+   `portability`), `docs/spec/16-operations.md` "Capacity and resources" and the `database.max_conns`
    row (Design notes), `sonar-project.properties` (`services/server/perf/**` in
    `sonar.test.inclusions`), `services/server/README.md`, `services/server/CHANGELOG.md` under
    "Unreleased".
@@ -112,9 +112,9 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
   in this process; PostgreSQL 18 from `internal/platform/pg/pgtest`; migrations as
   `bothy migrate up --bootstrap` runs them; secrets created as `bothy secrets init` creates them, in
   `tb.TempDir()`; public and internal listener on `127.0.0.1:0`; the first owner created through the
-  same application service that `bothy setup bootstrap-owner` calls (08 "Erstinstallation"), then
-  enrolled with its enrollment code and fresh ES256 device keys (08 "Einladungs-Code",
-  "Registrierung"); everything stopped in `tb.Cleanup` in reverse order.
+  same application service that `bothy setup bootstrap-owner` calls (08 "Initial installation"),
+  then enrolled with its enrollment code and fresh ES256 device keys (08 "Enrollment code",
+  "Registration"); everything stopped in `tb.Cleanup` in reverse order.
 - `type Options struct { Config map[string]string; LogWriter io.Writer; Telemetry *TelemetrySinks;
   EgressDenyAll bool; Clock clock.Clock }`. `Config` takes dotted keys from
   `docs/operations/configuration.md` and is applied through `platform/config` with flag precedence,
@@ -130,12 +130,12 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
   `completeStepUpWithDeviceKey`.
 - `type Client struct { PrincipalID, DeviceID string; ... }` with `Do(ctx, Request) Response`
   (DPoP proof per RFC 9449 with the latest `DPoP-Nonce`, one retry on `use_dpop_nonce`, refresh on
-  `token_expired`, `Idempotency-Key` UUIDv7 on POST and PATCH except the list in 06 "Idempotenz",
+  `token_expired`, `Idempotency-Key` UUIDv7 on POST and PATCH except the list in 06 "Idempotency",
   optional `Observer func(Request, Response)`), `StepUp(ctx)`, `Gateway(ctx) *GatewayConn`
   (`hello`, `identify`, `ready`, `Next`, `Send`, `Close`, automatic `heartbeat` and `reauth`).
 - `type Response struct { Status int; Header http.Header; Body []byte; Elapsed time.Duration }`.
-- `func BuildMatrixWorld(tb, s *Server) *World`: the M1 subset of 07 "Beispiele" and
-  "Testmatrix": spaces Support, Marketing, Engineering, Research; channels Support/Allgemein,
+- `func BuildMatrixWorld(tb, s *Server) *World`: the M1 subset of 07 "Examples" and
+  "Test matrix": spaces Support, Marketing, Engineering, Research; channels Support/Allgemein,
   Support/Eskalation, Marketing/Kampagnen, Engineering/Projekt-A (forum, no project binding),
   Engineering/Werkzeuge, Research/Notizen; people Alex, Sam, Robin; agents Lotse (organization,
   operator of Support), Texter (organization, operator of Marketing), Runner (organization, operator
@@ -144,7 +144,7 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
   `approve_actions`, space Support), G-2 (Sam, `trigger`, `upload`, space Marketing), G-3 (Robin,
   `trigger`, `upload`, channel Engineering/Projekt-A, with expiry), G-4 (group Leser, `read`,
   Support/Allgemein), G-5 (Lotse, `write`, `upload`, space Support); one thread with messages per
-  text channel and one forum post in Projekt-A. Left out until their etappe: app Tracker and G-6
+  text channel and one forum post in Projekt-A. Left out until their milestone: app Tracker and G-6
   (M2), the DM Alex-Sam (V3), project binding and tool class `host` (M2). Expiry times are relative
   to the harness clock, never calendar dates.
 - `func StartProcess(tb, ProcessOptions) *Process`: builds `./cmd/bothy` once per test binary into
@@ -160,11 +160,11 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
 
 ## Out of scope
 
-- Targets of later etappen: `perf.fanout_cross_node_p99` (M7 multi-node),
+- Targets of later milestones: `perf.fanout_cross_node_p99` (M7 multi-node),
   `perf.invocation_delivery_p99`, `perf.run_patch_fanout_p99` (M2), `perf.push_handoff_p95` (M3).
-- Optimisations beyond what a missed M1 target requires.
+- Optimizations beyond what a missed M1 target requires.
 - Changing any `perf.*` threshold or `perf.reference_profile`.
-- The etappe-close run on the reference host itself (owner operation after merge).
+- The milestone-close run on the reference host itself (owner operation after merge).
 
 ## Boundaries
 
@@ -187,13 +187,13 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
 
 Thresholds and units (`perf/internal/report`):
 
-1. Source: the rows `perf.*` of the table in section "Konfigurationswerte dieses Kapitels" of
-   `docs/spec/02-architektur.md` (Ruling L4: chapter tables are the source; 02 says `perf.*` are not
+1. Source: the rows `perf.*` of the table in section "Configuration values of this chapter" of
+   `docs/spec/02-architecture.md` (Ruling L4: chapter tables are the source; 02 says `perf.*` are not
    runtime configuration, so they are not read from the config schema). Find the section by its
    title, not its number; a missing row or an unparseable value fails the run.
 2. Units: `us`, `ms`, `s` for durations, `KiB`, `MiB`, `GiB` for sizes, plain integers for counts
-   and rates. Comparison by the meaning column: "Ziel (Mindestwert)" means value >= threshold,
-   "Ziel (Höchstwert)" and plain "Ziel" mean value <= threshold.
+   and rates. Comparison by the meaning column: "target (minimum)" means value >= threshold,
+   "target (maximum)" and plain "target" mean value <= threshold.
 3. Percentiles: nearest-rank over all samples of the measured window; warm-up samples excluded.
 4. Results: `.cache/perf/results.json` at the repository root (directory already used for coverage),
    schema `{"profile":{"mode","cpus","memory_bytes","os","postgres_version","gomaxprocs","fsync","synchronous_commit"},
@@ -231,13 +231,13 @@ constants in each package, documented in `perf/README.md`, and copied into `resu
    samples). Every receiver must get every event exactly once in `seq` order.
 4. `catchup` (`perf.catchup_page_p99`): a log with many events across many channels; the principal
    sees a fraction. Measure `listEvents` with `limit` = `sync.catchup_page_size` per full page.
-   Second variant: the principal sees a large number of channels (07 "Abfrage-Muster" rule 5 names
+   Second variant: the principal sees a large number of channels (07 "Query pattern" rule 5 names
    this test); the same threshold holds.
 5. `authorize_cached` (`perf.authorize_cached_p99`): run `BenchmarkAuthorizeCached` with
    `-run '^$' -bench '^BenchmarkAuthorizeCached$'` and read `p99-ns`.
 6. `ws_soak` (`perf.ws_connections_per_node`, `perf.ws_idle_conn_mem_max`): server subprocess; open
    `perf.ws_connections_per_node` connections, each a distinct seeded device (one device holds one
-   connection, 04 "Endpunkt und Version"), each through `identify` to `ready`; keep them idle with
+   connection, 04 "Endpoint and version"), each through `identify` to `ready`; keep them idle with
    heartbeats for at least two `sync.heartbeat_interval`. Pass: all connected, no close frame, every
    heartbeat acknowledged; memory per connection = (RSS with all connections after settling minus RSS
    after ready) divided by the count. Check `RLIMIT_NOFILE` of the test process first and fail with
@@ -247,10 +247,10 @@ constants in each package, documented in `perf/README.md`, and copied into `resu
    repetitions is compared; RSS after an idle settle period, maximum compared.
 8. `event_commit` (`perf.event_commit_min_per_s`): M1-16's test, reported through the shared report.
 9. `database.max_conns`: record pool acquire wait p99 and saturation during `load_messages`. If the
-   default holds the targets without saturation, remove "(Startwert bis zum Lasttest)" from the 16
-   row and point "Kapazität und Ressourcen" to `make perf` and `perf/README.md` (no numbers in the
-   chapter). If another default is needed, change the 16 row and the config schema in this ticket
-   with the measurement in the report.
+   default holds the targets without saturation, remove "(start value until the load test)" from
+   the 16 row and point "Capacity and resources" to `make perf` and `perf/README.md` (no numbers in
+   the chapter). If another default is needed, change the 16 row and the config schema in this
+   ticket with the measurement in the report.
 
 Chaos tests (`test/chaos`, all under load from several writers and with gateway receivers):
 
@@ -272,7 +272,7 @@ Chaos tests (`test/chaos`, all under load from several writers and with gateway 
    in `seq` order.
 
 Architecture register and coverage: `test/**` and `perf/**` under `services/server` form the
-component `testsupport` (M1-05; 02 "Code-Layout"), and the Go coverage total leaves them out
+component `testsupport` (M1-05; 02 "Code layout"), and the Go coverage total leaves them out
 (M1-01). Nothing to add here unless the build proves the component wrong.
 
 ## Tests (write them first)

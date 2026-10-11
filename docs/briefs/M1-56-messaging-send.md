@@ -1,6 +1,6 @@
 # M1-56: Sending messages
 
-Status: ready | Depends on: M1-55 | Etappe: M1
+Status: ready | Depends on: M1-55 | Milestone: M1
 
 ## Goal
 
@@ -13,30 +13,29 @@ channel message can be created together with their first message.
 
 ## Read first
 
-- `docs/spec/03-datenmodell.md`: tables `messages` (with the paragraph "Inhaltsformat" for
-  `content_format = 1` and mention tokens), `mentions`, `threads`; "Grundsätze" points 1, 7, 9, 13;
-  "Transaktionsregeln" 6.1 to 6.3; R-DM-11, R-DM-12, R-DM-18; config table
+- `docs/spec/03-data-model.md`: tables `messages` (with the paragraph "Content format" for
+  `content_format = 1` and mention tokens), `mentions`, `threads`; "Principles" points 1, 7, 9, 13;
+  "Transaction rules" 6.1 to 6.3; R-DM-11, R-DM-12, R-DM-18; config table
   (`message.max_content_bytes`, `message.max_mentions`).
-- `docs/spec/04-sync-protokoll.md`: "Umschlag (Envelope)" with the payload rules,
-  "Globale, commit-geordnete Sequenz" 3.2, "Thread-Sequenz", "Nachrichten: `client_msg_id`"
-  (5.1), "Alle anderen Schreibvorgänge" (5.2), "Ausgangsfach" 13.2, "Bearbeiten und Löschen"
-  row "Thread inzwischen erledigt", "Geräteübergreifende Synchronisation" row "Entwürfe"
-  (`clear_draft`), "Nachricht senden, online" (16.1), "Senden offline, dann Wiederverbinden"
+- `docs/spec/04-sync-protocol.md`: "Envelope" with the payload rules,
+  "Global, commit-ordered sequence" 3.2, "Thread sequence", "Messages: `client_msg_id`"
+  (5.1), "All other writes" (5.2), "Outbox" 13.2, "Editing and deleting"
+  row "Thread marked done in the meantime", "Cross-device synchronization" row "Drafts"
+  (`clear_draft`), "Send a message, online" (16.1), "Send offline, then reconnect"
   (16.2), config `sync.event_payload_max_bytes`.
-- `docs/spec/05-aktionen.md`: rules 1.2, 1.8; "Ziel einer Ressource"; rows `message.create`,
+- `docs/spec/05-actions.md`: rules 1.2, 1.8; "Target of a resource"; rows `message.create`,
   `thread.create`, `thread.reopen`, `user.read`, `agent.read`; section 6 rows `message.created`,
-  `thread.created`, `thread.reopened`; "Scopes für Apps".
-- `docs/spec/09-agenten.md`: 3.2 "Herkunft", 3.4 "Entscheidung je Nachricht" (only to know what
+  `thread.created`, `thread.reopened`; "Scopes for apps".
+- `docs/spec/09-agents.md`: 3.2 "Origin", 3.4 "Decision per message" (only to know what
   M2 needs from `MessagePosted`), 3.7, 12.
-- `docs/spec/01-produkt.md`: 3.3 "Nachrichten", 6.1 "Erledigt und Wiederöffnen", 6.4 "Lange
-  Antworten".
-- `docs/spec/06-api.md`: "Grundregeln", "Autorisierung in der API" points 6 and 7, "Fehler",
-  "Idempotenz", endpoint tables "Threads" and "Messages".
-- `docs/spec/02-architektur.md`: 4.3 (`messaging` publishes `MessagePosted`; `chat.Threads` with
-  `AppendToThread`), 4.4 (`messaging` may use `identity`, `chat`, `files`), 4.6 "Begründungen für
-  Grenzfälle", 8.1 to 8.4, 9.2.
-- `docs/spec/07-rechte.md` 4.3, 4.6 "Erwähnungen auflösen", 7.4; `docs/spec/13-push-benachrichtigungen.md` 2 (what mentions are
-  for, built in M3); `docs/spec/19-sicherheit.md` SEC-IN-2, SEC-IN-4, SEC-OUT-3.
+- `docs/spec/01-product.md`: 3.3 "Messages", 6.1 "Done and reopening", 6.4 "Long replies".
+- `docs/spec/06-api.md`: "Basic rules", "Authorization in the API" points 6 and 7, "Errors",
+  "Idempotency", endpoint tables "Threads" and "Messages".
+- `docs/spec/02-architecture.md`: 4.3 (`messaging` publishes `MessagePosted`; `chat.Threads` with
+  `AppendToThread`), 4.4 (`messaging` may use `identity`, `chat`, `files`), 4.6 "Rationale for
+  borderline cases", 8.1 to 8.4, 9.2.
+- `docs/spec/07-permissions.md` 4.3, 4.6 "Resolving mentions", 7.4; `docs/spec/13-push-notifications.md` 2 (what mentions are
+  for, built in M3); `docs/spec/19-security.md` SEC-IN-2, SEC-IN-4, SEC-OUT-3.
 - `docs/api/openapi.yaml`: operationIds `createMessage`, `createThread`; schemas `MessageCreate`,
   `Message`, `MessageOrigin`, `MessageKind`, `PrincipalRef`, `ThreadCreate`, `ThreadCreated`,
   `MessageCreatedEvent`, `MessagePayload`, `EventEnvelope`; headers `Idempotent-Replay`.
@@ -88,7 +87,7 @@ Product requirements implemented here:
 14. Reply with quote only to a message of the same thread (03 `messages.reply_to_message_id`).
 15. Mentions follow the content format of 03 `messages` and are resolved by the rule of 07 4.6;
     no collective mentions; at most `message.max_mentions` distinct handles.
-16. A new message reopens a done thread and a system line says so (glossary "Erledigt", 01 6.1).
+16. A new message reopens a done thread and a system line says so (glossary "Done", 01 6.1).
 17. `MessagePosted` is published in the transaction for every new message (02 4.3, 8.3).
 18. Forum posts and threads from a channel message through `createThread` (01 3.1).
 
@@ -150,8 +149,8 @@ type MessagePosted struct {
     update the golden file.
 12. `docs/api/openapi.yaml` already has the `200` replay response of `createThread` and
     `Message.system_code` (D6); change them only where the implementation proves them wrong.
-13. `docs/spec/02-architektur.md` 4.6 already assigns `thread.create` to `messaging` (bullet in
-    "Begründungen für Grenzfälle"); `architecture/modules.yaml` lists `thread.create` under
+13. `docs/spec/02-architecture.md` 4.6 already assigns `thread.create` to `messaging` (bullet in
+    "Rationale for borderline cases"); `architecture/modules.yaml` lists `thread.create` under
     `messaging` (M1-06 holds it).
 14. Documentation: `internal/messaging/README.md`, `services/server/CHANGELOG.md`,
     `docs/DECISIONS.md` (only decisions beyond the specification; D2, D5, D6 and D8 link it).
@@ -222,7 +221,7 @@ D2. Body rules (`MessageCreate`):
   else `400` (`/client_msg_id`, `not_uuid_v7`).
 - `kind` absent means `text`. In M1 only `text` is enabled; `voice` and `card` give `400`
   (`/kind`, `not_enabled`). Non-empty `attachment_file_ids`, non-empty `components` or any `run_id`
-  give `400` with the member as pointer and code `not_enabled` (06 "Fehler" item 3); a silently
+  give `400` with the member as pointer and code `not_enabled` (06 "Errors" item 3); a silently
   dropped member would lose an intent (W7). M2-15, M2-19, M3-07 and M3-09 lift the rejection
   (PLAN).
 - `content_md` must contain a non-white-space character, else `400` (`/content_md`, `empty`); at
@@ -234,7 +233,7 @@ D2. Body rules (`MessageCreate`):
 - `silent` is stored; `clear_draft` is not stored and travels in `MessagePosted`.
 - `mention_ids`, when present, must equal the resolved set (D5) as a set, else `400`
   (`/mention_ids`, `mention_mismatch`); more than `message.max_mentions` distinct handles give
-  `400` (`/content_md`, `too_many_mentions`) (03 `messages`, "Inhaltsformat").
+  `400` (`/content_md`, `too_many_mentions`) (03 `messages`, "Content format").
 
 D3. Canonical request hash (`client_payload_sha256`, 04 5.1 point 3): SHA-256 over a versioned,
 length-prefixed encoding, not over JSON text, so key order and white space cannot change it:
@@ -246,7 +245,7 @@ encoding later is a new version prefix, never an edit.
 D4. Origin: `user` gives `human`, `agent` gives `agent`, `app` gives `app` (from `kernel/actor`).
 `trigger_state`, `trigger_state_reason`, `trigger_state_at` stay NULL in M1.
 
-D5. Mentions (03 `messages` "Inhaltsformat" and 07 4.6 are normative; this is the build view):
+D5. Mentions (03 `messages` "Content format" and 07 4.6 are normative; this is the build view):
 
 - The scanner implements the token rule of 03 exactly: `@` plus handle `[a-z0-9][a-z0-9._-]*`
   (case-insensitive), preceded by the start of the text or a character that is not a letter,
@@ -287,7 +286,7 @@ D8. `createThread` (02 4.6): handler and action `thread.create` belong to `messa
 request carries a message and only `messaging` may compose `chat` with messages. The messaging use
 case authorizes `thread.create` on the channel (`write`; read-only or archived channel gives
 `403 channel_read_only`), so the proof of the route action (02 9.3) holds, and then calls
-`chat.Threads.Create` (M1-55), which validates and writes without a rights check of its own.
+`chat.Threads.Create` (M1-55), which validates and writes without a permission check of its own.
 
 - Validation that needs messages: `parent_message_id` must be an undeleted message whose thread is
   the main thread of the target channel; messaging loads it and passes `ParentMessage{MessageID,

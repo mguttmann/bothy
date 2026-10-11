@@ -1,6 +1,6 @@
 # M1-27: Grant model storage
 
-Status: ready | Depends on: M1-26 | Etappe: M1
+Status: ready | Depends on: M1-26 | Milestone: M1
 
 ## Goal
 
@@ -8,22 +8,22 @@ After this ticket the tables `groups`, `group_memberships` and `grants` exist wi
 of the core contract, grants are immutable in the database except for revocation and the expiry
 bookkeeping (`expiry_reminded_at`, `expiry_reported_at`), and the rules of the grant model are
 pure, table-tested domain functions: levels and capabilities, validity at a point in time (07
-section 2.5) and delegation with `manage` (R-AZ-05, 07 section 2.6). M1-28 builds the rights
+section 2.5) and delegation with `manage` (R-AZ-05, 07 section 2.6). M1-28 builds the permission
 snapshot on these functions and this repository; M1-29 and M1-48 write through them.
 
 ## Read first
 
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 rows M1-27 to M1-30, M1-42,
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 rows M1-27 to M1-30, M1-42,
   M1-48, M1-52, M1-53.
-- `docs/spec/03-datenmodell.md`: section 1 "Grundsätze" (1, 2, 3, 7, 12), section 4.3 tables
+- `docs/spec/03-data-model.md`: section 1 "Principles" (1, 2, 3, 7, 12), section 4.3 tables
   `groups`, `group_memberships`, `grants` (including the paragraph after the `grants` table),
-  section 6.3 "Sperrreihenfolge", section 8 R-DM-07, R-DM-08, R-DM-09, R-DM-19, R-DM-20.
-- `docs/spec/07-rechte.md`: section 1 "Grundsätze", section 2.1 to 2.6, section 7.2 (how the
+  section 6.3 "Lock order", section 8 R-DM-07, R-DM-08, R-DM-09, R-DM-19, R-DM-20.
+- `docs/spec/07-permissions.md`: section 1 "Principles", section 2.1 to 2.6, section 7.2 (how the
   snapshot uses grants), section 12 R-RE-03 and R-RE-08, test rows AZ-M31, AZ-M37 to AZ-M39.
-- `docs/spec/05-aktionen.md`: section 2.3 "Wirksame Stufe", section 4.4 "Gruppen und
-  Freigaben", section 8 R-AZ-05.
-- `docs/adr/0018-freigabe-modell-stufen-zusatzrechte-vererbung-kein-verbot.md`.
-- `docs/spec/02-architektur.md`: sections 4.1, 4.2 (`authz` row), 5, 6, 7.3 (table ownership).
+- `docs/spec/05-actions.md`: section 2.3 "Effective level", section 4.4 "Groups and
+  grants", section 8 R-AZ-05.
+- `docs/adr/0018-grant-model-levels-capabilities-inheritance-no-deny.md`.
+- `docs/spec/02-architecture.md`: sections 4.1, 4.2 (`authz` row), 5, 6, 7.3 (table ownership).
 - Code of earlier tickets: `internal/authz` port package and `internal/authz/sources.go`
   (M1-05, M1-26), `internal/identity` (M1-26, for the foreign keys), `internal/platform/pg` and
   `pgtest` (M1-12), unit of work (M1-13), `migrations/` and `sqlc.yaml` conventions.
@@ -80,8 +80,8 @@ Paths are relative to `services/server/`.
 
 ## Out of scope
 
-- The rights snapshot, cache and `authorize`: M1-28.
-- Rights changes with `permission_version`, `access.changed`, I1, SR8, the admin port: M1-29.
+- The permission snapshot, cache and `authorize`: M1-28.
+- Permission changes with `permission_version`, `access.changed`, I1, SR8, the admin port: M1-29.
   The repository writes of this ticket raise no version; they are only called by tests here.
 - Expiry jobs and reminders (`expiry_reminded_at` and `expiry_reported_at` are only columns here):
   M1-30.
@@ -160,7 +160,7 @@ last line against a code path that updates in place.
 **Subject kind versus principal kind.** The database cannot check that `subject_principal_id`
 has the kind named in `subject_kind` without reading an identity table. Do not add such a
 trigger. The use case (M1-48) validates it through `PrincipalSource`, and M1-28 caps level and
-capabilities by the principal's real kind, so a wrong `subject_kind` can never widen rights.
+capabilities by the principal's real kind, so a wrong `subject_kind` can never widen permissions.
 
 **Domain types and functions.**
 
@@ -272,7 +272,7 @@ type Store interface {
 `MembershipWithGroup` pairs a membership with its group row (including `DeletedAt`), read in one
 query. Results are ordered by `id` so tests are deterministic. Reads join the ambient
 transaction when present. Write methods carry doc comments stating that they must run inside a
-unit of work marked as a rights change (M1-29 enforces this).
+unit of work marked as a permission change (M1-29 enforces this).
 
 **Error mapping.** Unique violation on the group name index or the active membership index:
 kind `conflict`, code `conflict`, field `/name` or `/user_id`. Check, trigger and foreign key

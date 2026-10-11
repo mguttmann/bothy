@@ -1,11 +1,11 @@
 # M1-12: PostgreSQL access, migrations and schema version
 
-Status: ready | Depends on: M1-09 | Etappe: M1
+Status: ready | Depends on: M1-09 | Milestone: M1
 
 ## Goal
 
 After this ticket the server reaches PostgreSQL 18 through one pgx v5 pool with the timeouts of
-02 "Fristen", runs embedded goose migrations only through `bothy migrate` (`up`, `status`,
+02 "Deadlines", runs embedded goose migrations only through `bothy migrate` (`up`, `status`,
 `validate`, `up --bootstrap`), creates its four database roles idempotently with least privilege,
 and refuses to start against a schema older than the binary needs. Every later integration test
 uses the test helper `pgtest` with a disposable PostgreSQL 18 container on a random loopback port
@@ -13,26 +13,26 @@ uses the test helper `pgtest` with a disposable PostgreSQL 18 container on a ran
 
 ## Read first
 
-- `docs/spec/02-architektur.md`: "Befehle des Binarys" (row `bothy migrate`), "Code-Layout",
-  "Transaktionen und Unit of Work" ("Ablauf"; this ticket only provides the timeout helper),
-  "Fristen", "Fehlerarten" (`db_pool_exhausted`), "Ausfall einer Abhängigkeit" (row PostgreSQL),
-  "Start" (steps 3 and 4), "Konfigurationswerte dieses Kapitels" (`database.*`,
-  `startup.dependency_wait`), "Modulregister als Quelle", "go-arch-lint".
-- `docs/spec/16-betrieb.md`: "Datenbank" ("Rollen", "Einstellungen"), "Upgrade",
-  "Secret-Provider", "Konfigurationswerte dieses Kapitels" (`database.host` to
+- `docs/spec/02-architecture.md`: "Commands of the binary" (row `bothy migrate`), "Code layout",
+  "Transactions and Unit of Work" ("Flow"; this ticket only provides the timeout helper),
+  "Deadlines", "Error kinds" (`db_pool_exhausted`), "Failure of a dependency" (row PostgreSQL),
+  "Start" (steps 3 and 4), "Configuration values of this chapter" (`database.*`,
+  `startup.dependency_wait`), "Module register as the source", "go-arch-lint".
+- `docs/spec/16-operations.md`: "Database" ("Roles", "Settings"), "Upgrade",
+  "Secret provider", "Configuration values of this chapter" (`database.host` to
   `database.max_conns`, `migrate.*`).
-- `docs/spec/03-datenmodell.md`: "Grundsätze" (items 1, 11, 12), table `instance` (columns
-  `schema_version`, `min_server_version`; created by M1-15), "Technische Tabellen".
-- `docs/spec/19-sicherheit.md`: "Transport" (SEC-TLS-5), "Lieferkette, Sicherungen und
-  Audit-Integrität" (SEC-AUD-1, SEC-SC-4).
-- `docs/operations/upgrade.md`: "Rückweg", "Regeln für Migrationen (Expand/Contract)",
-  "Schema-Prüfung beim Start".
-- `docs/operations/configuration.md`: "Geheimnisse" (`db_*_password` files).
-- `docs/adr/0006-postgresql-ab-tag-1-statt-sqlite.md`,
-  `docs/adr/0007-typisierter-datenbankzugriff-sqlc-und-migrationswerkzeug.md`.
+- `docs/spec/03-data-model.md`: "Principles" (items 1, 11, 12), table `instance` (columns
+  `schema_version`, `min_server_version`; created by M1-15), "Technical tables".
+- `docs/spec/19-security.md`: "Transport" (SEC-TLS-5), "Supply chain, backups and audit
+  integrity" (SEC-AUD-1, SEC-SC-4).
+- `docs/operations/upgrade.md`: "Rollback", "Rules for migrations (Expand/Contract)",
+  "Schema check at startup".
+- `docs/operations/configuration.md`: "Secrets" (`db_*_password` files).
+- `docs/adr/0006-postgresql-from-day-1-instead-of-sqlite.md`,
+  `docs/adr/0007-typed-database-access-sqlc-and-migration-tool.md`.
 - `infra/compose/compose.yaml`: services `postgres` and `migrate`.
 - `tools/sonarqube/compose.yaml`: the already pinned `postgres:18.6-trixie@sha256:...` reference.
-- `docs/PLAN.md`: "Arbeitsweise je Ticket", P-09, P-10, M1 row M1-12, M7 row M7-02.
+- `docs/PLAN.md`: "Way of working per ticket", P-09, P-10, M1 row M1-12, M7 row M7-02.
 - Code you build on: `internal/platform/secrets` (M1-09), `internal/platform/config`, `cmd/bothy`
   (M1-07), `internal/kernel/errs`, `internal/kernel/clock` (M1-05), the `migrations-lint` target
   and `tools/ci/migrations_lint.py` (M1-01).
@@ -61,13 +61,13 @@ uses the test helper `pgtest` with a disposable PostgreSQL 18 container on a ran
 11. 02 "Start" step 4 and the plan row M1-12: the binary knows the smallest schema version it
     needs; against an older database the start aborts with a hint to `bothy migrate up`; a newer
     schema is allowed (expand and contract, rollback by one version).
-12. 16 "Rollen": `bothy_owner` owns the schema and runs DDL; `bothy_app` does DML for `api` and
+12. 16 "Roles": `bothy_owner` owns the schema and runs DDL; `bothy_app` does DML for `api` and
     `worker`; `bothy_maint` trims the audit log; `bothy_monitor` has `pg_monitor`;
     `migrate --bootstrap` creates missing roles idempotently and sets their passwords from the
     secrets.
-13. 02 "Fristen" and 16 "Einstellungen": `database.acquire_timeout` (pool overload becomes
+13. 02 "Deadlines" and 16 "Settings": `database.acquire_timeout` (pool overload becomes
     `503 unavailable`; the internal cause `db_pool_exhausted` appears only in log and metric, 02
-    "Fehlerarten"), `database.statement_timeout` per transaction via `SET LOCAL`,
+    "Error kinds"), `database.statement_timeout` per transaction via `SET LOCAL`,
     `database.lock_timeout`, `database.idle_in_tx_timeout`; isolation `READ COMMITTED`.
 14. upgrade.md rule M6: every migration step runs with `lock_timeout = migrate.lock_timeout`.
 15. SEC-TLS-5: PostgreSQL over a Unix socket, with `sslmode=verify-full`, or with
@@ -139,7 +139,7 @@ All Go paths are relative to `services/server/`.
 
 ### `cmd/bothy`
 
-- `bothy migrate up [--bootstrap]`, `bothy migrate status`, `bothy migrate validate`; behaviour in
+- `bothy migrate up [--bootstrap]`, `bothy migrate status`, `bothy migrate validate`; behavior in
   D5. Use the command framework and logger that `cmd/bothy` already has.
 
 ### Configuration
@@ -189,7 +189,7 @@ D1. Pool.
 
 - pgx v5 `pgxpool`. Connection runtime parameters: `statement_timeout`, `lock_timeout`,
   `idle_in_transaction_session_timeout` from the config, `application_name = bothy-<role>`.
-  `SetLocalTimeouts` uses `SELECT set_config('statement_timeout', $1, true), ...` (parameterised,
+  `SetLocalTimeouts` uses `SELECT set_config('statement_timeout', $1, true), ...` (parameterized,
   equivalent to `SET LOCAL`), so a unit of work can override per transaction.
 - Password: a `BeforeConnect` hook resolves `database.password_ref` through the secrets provider
   for every new connection, so a rotated password works after `secrets.cache_ttl` without restart.
@@ -199,7 +199,7 @@ D1. Pool.
   system roots. Reason: managed services sign with their own CA.
 - Tracing: `otelpgx` tracer on the global tracer provider without query parameters (never enable
   the parameter option); spans carry `db.query.text` with placeholders only. signals.md
-  "Datenbank" asks to check the attribute names of the installed version: if the pinned `otelpgx`
+  "Database" asks to check the attribute names of the installed version: if the pinned `otelpgx`
   emits names other than `db.system.name`, `db.namespace`, `db.operation.name`,
   `db.collection.name`, `db.query.text`, use its option for current semantic conventions if it has
   one; otherwise list the differences in the report (the source-side span allowlist of M1-10 drops
@@ -212,10 +212,10 @@ D2. Schema version check.
 - `CheckSchema` reads the goose version table (`goose_db_version`, default name). Lower than
   required: `*SchemaTooOldError`. Equal or higher: nil.
 - The start aborts on this error (02 "Start" step 4, 16 "Upgrade" item 4, upgrade.md
-  "Schema-Prüfung beim Start" item 1); `schema_requires_newer_server` is the readiness case of
+  "Schema check at startup" item 1); `schema_requires_newer_server` is the readiness case of
   M1-15 (reason in 02 "Start").
 
-D3. Configuration keys (16, table "Konfigurationswerte dieses Kapitels"; already there).
+D3. Configuration keys (16, table "Configuration values of this chapter"; already there).
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -230,7 +230,7 @@ D3. Configuration keys (16, table "Konfigurationswerte dieses Kapitels"; already
 Reason: the spec names the role passwords and the superuser but no keys; the defaults match the
 secret catalog and the `migrate` subpath, so Compose needs no new variables.
 
-D4. Bootstrap and privileges (16 "Rollen" states these rules).
+D4. Bootstrap and privileges (16 "Roles" states these rules).
 
 - Runs as `migrate.bootstrap_user` against `database.name` (the database must exist; Compose
   creates it with `POSTGRES_DB`; a missing database is an error naming it).
@@ -245,15 +245,15 @@ D4. Bootstrap and privileges (16 "Rollen" states these rules).
   `GRANT CONNECT ON DATABASE <name> TO bothy_app, bothy_maint, bothy_monitor`.
 - In the database: `ALTER SCHEMA public OWNER TO bothy_owner`; `REVOKE ALL ON SCHEMA public FROM
   PUBLIC`; `GRANT USAGE ON SCHEMA public TO bothy_app, bothy_maint`.
-- Domain tables live in schema `public`, together with `goose_db_version` (03 "Technische
-  Tabellen").
+- Domain tables live in schema `public`, together with `goose_db_version` (03 "Technical
+  tables").
 - No default privileges. Every migration that creates a table grants exactly what `bothy_app`
   needs (normally `SELECT, INSERT, UPDATE, DELETE`; less where the spec says so, for example
   `audit_events`). Reason: least privilege by default; a forgotten grant fails loudly in
   integration tests, a forgotten revoke would be silent. `00001_base_privileges.sql` grants only
   `SELECT` on `goose_db_version` because the app reads the version at start.
 - Managed services: the OpenTofu module creates roles with the same names and runs the same SQL;
-  `--bootstrap` is then not used (16 "Rollen").
+  `--bootstrap` is then not used (16 "Roles").
 
 D5. Commands.
 
@@ -267,7 +267,7 @@ D5. Commands.
   (`lock.NewPostgresSessionLocker`), so two `migrate up` runs apply each migration once. If the
   database version is higher than the highest embedded version, print
   `schema is newer than this binary; nothing to do` and exit 0 without calling goose (upgrade.md
-  "Rückweg"). Output: one line per applied migration (`applied <version> <name>`) and a summary.
+  "Rollback"). Output: one line per applied migration (`applied <version> <name>`) and a summary.
 - `migrate status`: one line per known migration `<version> <name> <applied|pending> <applied_at>`
   and `database version <n>, binary requires <m>, pending <k>`; exit 0.
 - `migrate validate`: offline; parses every embedded file with goose, checks the name pattern
@@ -351,7 +351,7 @@ make check
       idempotently; passwords never reach the server in plaintext.
 - [ ] A start check against an older schema fails with the hint to `bothy migrate up`; a newer
       schema passes.
-- [ ] Pool timeouts and the acquire timeout behave as in 02 "Fristen".
+- [ ] Pool timeouts and the acquire timeout behave as in 02 "Deadlines".
 - [ ] Without a Docker runtime the integration tests fail with the P-09 message instead of
       skipping; containers bind only `127.0.0.1` on a random port.
 - [ ] The privilege invariant test passes and runs for every future migration.
@@ -364,9 +364,9 @@ make check
 - READMEs: `internal/platform/pg/README.md` (pool, timeouts, roles, bootstrap, migrator steps,
   schema check), `internal/platform/pg/pgtest/README.md` (usage, Docker requirement, cleanup and
   the label for leaked containers), `migrations/README.md`.
-- Spec: 16 "Rollen", "Upgrade" and "Konfigurationswerte dieses Kapitels", upgrade.md and ADR 0007
+- Spec: 16 "Roles", "Upgrade" and "Configuration values of this chapter", upgrade.md and ADR 0007
   already state D2 to D4 and D6; change them only if the build proves a statement wrong. Add
-  `--bootstrap` to 02 "Befehle des Binarys".
+  `--bootstrap` to 02 "Commands of the binary".
 - `docs/DECISIONS.md`: anything decided here that the spec does not state (for example the SCRAM
   iteration count).
 - Configuration reference regenerated without diff.

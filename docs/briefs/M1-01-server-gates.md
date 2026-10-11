@@ -1,6 +1,6 @@
 # M1-01: Server gates in the make contract
 
-Status: ready | Depends on: none | Etappe: M1
+Status: ready | Depends on: none | Milestone: M1
 
 ## Goal
 
@@ -15,19 +15,19 @@ that breaks them.
 
 ## Read first
 
-- `docs/PLAN.md`: section "Arbeitsweise je Ticket"; section "M1 Fundament" (Block A, row M1-01;
-  "Teststrategie"); section "Entscheidungen dieses Plans" (P-07, P-09, P-10, P-12).
-- `docs/spec/23-qualitaet.md`: "Grundsätze", "Gates", "Komponenten-Vertrag", "Rulings" (R-QA-01,
-  R-QA-02), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/02-architektur.md`: "Code-Layout"; "Automatische Prüfung der Regeln" with its
-  subsections "Modulregister als Quelle", "go-arch-lint" and "Weitere Prüfungen im Gate";
-  "Leistungsziele"; R-AR-16, R-AR-19, R-AR-20 in "Entscheidungen dieses Kapitels".
-- `docs/spec/14-suche.md`: subsection "Ausdrücke" (paragraph on `STORED`) and the row
-  "Migrations-Lint" of the test table.
-- ADRs: `docs/adr/0007-typisierter-datenbankzugriff-sqlc-und-migrationswerkzeug.md` (rules 2 to 5
-  and "Confirmation"), `docs/adr/0008-hexagonale-module-und-gepruefte-abhaengigkeitsregeln.md`,
-  `docs/adr/0038-lokale-gates-zuerst-ein-befehl-identisch-zu-ci.md`,
-  `docs/adr/0001-adrs-im-madr-format-decisions-als-ruling-log.md` (small rulings go to
+- `docs/PLAN.md`: section "Way of working per ticket"; section "M1 Foundation" (Block A, row
+  M1-01; "Test strategy"); section "Decisions of this plan" (P-07, P-09, P-10, P-12).
+- `docs/spec/23-quality.md`: "Principles", "Gates", "Component contract", "Rulings" (R-QA-01,
+  R-QA-02), "Configuration values of this chapter".
+- `docs/spec/02-architecture.md`: "Code layout"; "Automatic check of the rules" with its
+  subsections "Module register as the source", "go-arch-lint" and "Other checks in the gate";
+  "Performance targets"; R-AR-16, R-AR-19, R-AR-20 in "Decisions of this chapter".
+- `docs/spec/14-search.md`: subsection "Expressions" (paragraph on `STORED`) and the row
+  "Migration lint" of the test table.
+- ADRs: `docs/adr/0007-typed-database-access-sqlc-and-migration-tool.md` (rules 2 to 5
+  and "Confirmation"), `docs/adr/0008-hexagonal-modules-and-checked-dependency-rules.md`,
+  `docs/adr/0038-local-gates-first-one-command-identical-to-ci.md`,
+  `docs/adr/0001-adrs-in-madr-format-decisions-as-ruling-log.md` (small rulings go to
   `docs/DECISIONS.md`).
 - `docs/quality/gates.md`, `docs/quality/toolchain.md`, `CONTRIBUTING.md` ("Development setup",
   "The gates"), `tools/README.md`, `CHANGELOG.md`, `docs/DECISIONS.md`.
@@ -53,7 +53,7 @@ This ticket touches no API operation, no table of chapter 03 and no action id.
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour gets a test that is red before the change (show the red output in
+6. Test first: every behavior gets a test that is red before the change (show the red output in
    the report), then green.
 7. No en dash (U+2013) and no em dash (U+2014) in any file or commit message. Check every changed
    file with `uv run --project tools --locked --quiet python tools/hooks/text_rules.py <file>` (exit code 0; plain `grep -P` fails on macOS).
@@ -63,23 +63,23 @@ This ticket touches no API operation, no table of chapter 03 and no action id.
 9. Limits, time windows and thresholds are named configuration values; prose and docs use the
    name (for example `quality.perf.timeout`), never a bare number. Runtime values come only from
    keys listed in `docs/operations/configuration.md`; repository tool thresholds live in
-   `docs/spec/23-qualitaet.md` "Konfigurationswerte dieses Kapitels".
+   `docs/spec/23-quality.md` "Configuration values of this chapter".
 10. A gate skips only while its component has no code; a missing tool, list or prerequisite is an
-    error, never a skip (23 "Grundsätze" item 3, R-QA-02).
-11. Every tool is pinned with a checksum (23 "Grundsätze" item 4); release binaries are pinned in
+    error, never a skip (23 "Principles" item 3, R-QA-02).
+11. Every tool is pinned with a checksum (23 "Principles" item 4); release binaries are pinned in
     `tools/bin/tools.lock.json` and fetched by `tools/bin/fetch_tools.py`.
 12. Module boundaries are checked by go-arch-lint with a configuration generated from
     `architecture/modules.yaml`; any violation exits non-zero (02 "go-arch-lint", R-AR-19).
 13. Generated files (`.go-arch-lint.yml`, sqlc code, API code) equal a fresh generation (02
-    "Weitere Prüfungen im Gate", row "Erzeugte Dateien aktuell"; ADR 0007 "Confirmation").
+    "Other checks in the gate", row "Generated files current"; ADR 0007 "Confirmation").
 14. The base branch carries only sequential, gap-free migration numbers, and a merged migration
     never changes; a checksum file in the gate holds this (ADR 0007 rules 4 and 5,
     "Confirmation").
 15. Every `GENERATED ALWAYS AS (...)` column states `STORED`, because PostgreSQL 18 creates
-    virtual generated columns by default (14 "Ausdrücke").
+    virtual generated columns by default (14 "Expressions").
 16. Statements that cannot run inside a transaction stand in their own migration file with
     `-- +goose NO TRANSACTION` (ADR 0007 rule 3).
-17. `make perf` runs at the end of an etappe and in releases, never in `gates` or the pre-push
+17. `make perf` runs at the end of a milestone and in releases, never in `gates` or the pre-push
     hook (P-07). Integration and load tests need a Docker-compatible runtime and fail instead of
     skipping without one (P-09).
 
@@ -187,7 +187,7 @@ lock_path: Path = fetch_tools.DEFAULT_LOCK) -> list[str]`. Import `fetch_tools` 
       directives of later tickets call the pinned versions by name.
     - `arch`: without `GO_ON` print the SKIP line. Else `$(GO_PREREQS) arch`; for each module fail
       with `arch: <m>/.go-arch-lint.yml is missing (generated from <m>/architecture/modules.yaml,
-      docs/spec/02-architektur.md "Automatische Prüfung der Regeln")` if the file is absent, else run
+      docs/spec/02-architecture.md "Automatic check of the rules")` if the file is absent, else run
       `<go-arch-lint path> check --project-path <absolute module path> --arch-file
       .go-arch-lint.yml --output-color=false`.
     - `migrations-lint`: without `GO_ON` print the SKIP line. Else `$(GO_PREREQS) migrations-lint`;
@@ -197,8 +197,8 @@ lock_path: Path = fetch_tools.DEFAULT_LOCK) -> list[str]`. Import `fetch_tools` 
     - `migrations-lock`: runs `migrations_lint.py lock` for each module with a `migrations/`
       directory; not part of `gates`.
     - `perf`: without `GO_ON` print the SKIP line. Else `$(GO_PREREQS) perf`; for each module fail
-      with `perf: <m>/perf does not exist; load tests live there (docs/spec/02-architektur.md
-      "Leistungsziele")` if absent; print `  perf: targets hold only on perf.reference_profile`; run
+      with `perf: <m>/perf does not exist; load tests live there (docs/spec/02-architecture.md
+      "Performance targets")` if absent; print `  perf: targets hold only on perf.reference_profile`; run
       `go test -tags perf -count=1 -timeout $(PERF_TIMEOUT) ./perf/...` in the module. Not part of
       `gates` (P-07).
 - `gates:` gains the three gates in this order:
@@ -209,34 +209,34 @@ lock_path: Path = fetch_tools.DEFAULT_LOCK) -> list[str]`. Import `fetch_tools` 
   fails with a clear message before any integration test starts (P-09).
 - The Go coverage total counts production code only: the `coverage` target removes the lines of
   packages under `<module>/test/` and `<module>/perf/` from `coverage.out` before `go tool cover`
-  (02 "Code-Layout", 23 "Komponenten-Vertrag"; they are test code).
+  (02 "Code layout", 23 "Component contract"; they are test code).
 - Print SKIP lines with the existing `skip` macro. Where the reason contains a shell variable
   (the per-module skip of `migrations-lint`), use `printf '  SKIP  %-14s %s\n' migrations-lint
   "$$m has no migrations/ directory yet"`, because the macro single-quotes its argument.
 
 ### 6. Documentation and named value
 
-- `docs/spec/23-qualitaet.md`: "Gates" table, group "Code": add `codegen-check`, `arch`,
-  `migrations-lint`. "Komponenten-Vertrag", row "Go-Modul": add `.go-arch-lint.yml` (generated
+- `docs/spec/23-quality.md`: "Gates" table, group "Code": add `codegen-check`, `arch`,
+  `migrations-lint`. "Component contract", row "Go module": add `.go-arch-lint.yml` (generated
   from `architecture/modules.yaml`), `migrations/` with `migrations.sha256`, load tests under
-  `perf/` with build tag `perf`. "Konfigurationswerte dieses Kapitels": new row
-  `| \`quality.perf.timeout\` | \`60m\` | Dauer | Zeitlimit von \`make perf\` je Go-Modul | \`Makefile\` (\`PERF_TIMEOUT\`) |`.
+  `perf/` with build tag `perf`. "Configuration values of this chapter": new row
+  `| \`quality.perf.timeout\` | \`60m\` | duration | Time limit of \`make perf\` per Go module | \`Makefile\` (\`PERF_TIMEOUT\`) |`.
 - `tools/docs/tests/test_config_values.py`: add the source
   `"quality.perf.timeout": lambda: _makefile_var("PERF_TIMEOUT")`.
-- `docs/quality/gates.md` (German): rows for `codegen-check`, `arch`, `migrations-lint` in "Liste"
-  (column "Heute aktiv": "ab erstem Go-Modul" or "ab erster Migration"); in "Überspringen und
-  Fehlschlagen" the server prerequisites (`go`, Docker runtime, pins) and that they apply to every
-  server gate and to Go tests; a new section "Leistung (`make perf`)" with P-07,
+- `docs/quality/gates.md` (English): rows for `codegen-check`, `arch`, `migrations-lint` in "List"
+  (column "Active today": "from the first Go module" or "from the first migration"); in
+  "Skipping and failing" the server prerequisites (`go`, Docker runtime, pins) and that they apply
+  to every server gate and to Go tests; a new section "Performance (`make perf`)" with P-07,
   `quality.perf.timeout`, `perf.reference_profile`, build tag `perf` and the package location
-  `<module>/perf/`; a short section "Migrationen" with the workflow from "Design notes".
-- `docs/quality/toolchain.md`, table "Gate-Werkzeuge": rows
-  `| \`go-arch-lint\` | \`1.19.0\` | Modulgrenzen der Go-Module aus dem Modulregister | MIT | in 02 "go-arch-lint" an einem Gerüst aller Module geprüft; prüft Pakete und Fremdbibliotheken |`
-  and `| \`sqlc\` | \`1.31.1\` | typisierter Go-Code aus SQL, Drift-Prüfung | MIT | ADR 0007 |`.
+  `<module>/perf/`; a short section "Migrations" with the workflow from "Design notes".
+- `docs/quality/toolchain.md`, table "Gate tools": rows
+  `| \`go-arch-lint\` | \`1.19.0\` | module boundaries of the Go modules from the module register | MIT | checked in 02 "go-arch-lint" on a skeleton of all modules; checks packages and third-party libraries |`
+  and `| \`sqlc\` | \`1.31.1\` | typed Go code from SQL, drift check | MIT | ADR 0007 |`.
   `tools/docs/tests/test_toolchain_doc.py` must stay green.
 - `CONTRIBUTING.md` (English): "Development setup" says a Docker-compatible runtime is needed for
   the local SonarQube and for server work (integration tests against PostgreSQL in throwaway
   containers, `make perf`); add a short paragraph "Database migrations" with the workflow.
-- `tools/README.md` (German): rows for `ci/migrations_lint.py` (`migrations-lint`,
+- `tools/README.md` (English): rows for `ci/migrations_lint.py` (`migrations-lint`,
   `migrations-lock`), `ci/codegen_check.py` (`codegen-check`), `ci/go_prereqs.py` (server gates);
   add go-arch-lint and sqlc to the list in the `bin/` row.
 - `CHANGELOG.md`, `[Unreleased]`, `### Added`: one bullet for the server gates.
@@ -258,7 +258,7 @@ lock_path: Path = fetch_tools.DEFAULT_LOCK) -> list[str]`. Import `fetch_tools` 
 
 - Work in a dedicated git worktree on the branch `feat/M1-01-server-gates`.
 - Conventional Commits with DCO sign-off (`git commit -s`), scope `gates` or `quality`, for
-  example `build(gates): Server-Gates im Make-Vertrag`.
+  example `build(gates): server gates in the Make contract`.
 - Never push, tag, open pull requests or create remote repositories.
 - Do not modify files outside the scope above, except `docs/DECISIONS.md` and `CHANGELOG.md` as
   named.

@@ -1,46 +1,46 @@
 # M1-51: Agent records, backend policy and credential holder
 
-Status: ready | Depends on: M1-31, M1-44 | Etappe: M1
+Status: ready | Depends on: M1-31, M1-44 | Milestone: M1
 
 ## Goal
 
 After this ticket agents exist as principals with their operating record: adapter kind,
-description, operator configuration, target backend policy (`personal` or `organization`), credential
-holder and target tool class, without any runtime parts (P-02). Owners create, change, disable,
-enable and switch agents over the API with step-up, reason and audit, and every change that could
-break I1 is checked in its own transaction. The module `agents` becomes the real
-`authz.AgentPolicySource`, so the rights core decides with the actual policy instead of a fake.
+description, operator configuration, configured backend policy (`personal` or `organization`),
+credential holder and configured tool class, without any runtime parts (P-02). Owners create,
+change, disable, enable and switch agents over the API with step-up, reason and audit, and every
+change that could break I1 is checked in its own transaction. The module `agents` becomes the real
+`authz.AgentPolicySource`, so the permission core decides with the actual policy instead of a fake.
 This implements ADR 0024 for the data and administration side.
 
 ## Read first
 
-- `docs/PLAN.md`, section 7: row M1-51, "Voraussetzungen aus dem Kern-Vertrag" (rows with
-  `agent.enable` and "`agent.read` für den Agenten selbst"), "Exit-Kriterien" item 3, "Red Team" item
-  3; section 19 P-02; section 3 "Arbeitsweise je Ticket". `docs/briefs/README.md`.
-- `docs/adr/0024-backend-richtlinie-personal-organization-mit-invariante.md`.
-- `docs/spec/10-backend-richtlinie.md`: "3. Invarianten", "5. I1 transaktional" (5.1 to 5.4), "8.
-  Soll und Ist", "9. Umschalten (I4)", "11. Geführter Ablauf" (context only), "13. Anzeige in der
-  App", "14. Audit-Spur", "15. Tests" (BR-01, BR-03, BR-08).
-- `docs/spec/09-agenten.md`: "2. Agenten als Prinzipale" (2.1 to 2.4).
-- `docs/spec/07-rechte.md`: "2.9 Agenten als Prinzipale", "2.11 Werkzeugklasse eines Agenten",
-  "4.3 Sichtbarkeit" (agent visibility), "4.4 Invarianten in der Transaktion", "SR1", "SR5",
-  "SR7", "11.1 Testmatrix" (AZ-M22).
-- `docs/spec/05-aktionen.md`: rules 1.6 and 1.7, "2.4", "4.10" rows `agent.read` to
+- `docs/PLAN.md`, section 7: row M1-51, "Prerequisites from the core contract" (rows with
+  `agent.enable` and "`agent.read` for the agent itself"), "Exit criteria" item 3, "Red team" item
+  3; section 19 P-02; section 3 "Way of working per ticket". `docs/briefs/README.md`.
+- `docs/adr/0024-backend-policy-personal-organization-with-invariant.md`.
+- `docs/spec/10-backend-policy.md`: "3. Invariants", "5. I1 transactional" (5.1 to 5.4),
+  "8. Expected and reported", "9. Switching (I4)", "11. Guided flow" (context only), "13. Display
+  in the app", "14. Audit trail", "15. Tests" (BR-01, BR-03, BR-08).
+- `docs/spec/09-agents.md`: "2. Agents as principals" (2.1 to 2.4).
+- `docs/spec/07-permissions.md`: "2.9 Agents as principals", "2.11 Tool class of an agent",
+  "4.3 Visibility" (agent visibility), "4.4 Invariants in the transaction", "SR1", "SR5",
+  "SR7", "11.1 Test matrix" (AZ-M22).
+- `docs/spec/05-actions.md`: rules 1.6 and 1.7, "2.4", "4.10" rows `agent.read` to
   `agent.credential_holder.set`, "6" row `agent.updated`.
-- `docs/spec/03-datenmodell.md`: tables `agents`, `principals`, `users`, `api_tokens`; "1.
-  Grundsätze" (3, 8, 10, 13), "6.3 Sperrreihenfolge", "6.4 I1-Prüfung".
-- `docs/spec/08-identitaet.md`: "12. API-Tokens für Agenten, Apps und Werkzeuge".
-- `docs/spec/02-architektur.md`: "4.3" (module `agents`: port `Agents`, In-Tx event
+- `docs/spec/03-data-model.md`: tables `agents`, `principals`, `users`, `api_tokens`;
+  "1. Principles" (3, 8, 10, 13), "6.3 Lock order", "6.4 I1 check".
+- `docs/spec/08-identity.md`: "12. API tokens for agents, apps and tools".
+- `docs/spec/02-architecture.md`: "4.3" (module `agents`: port `Agents`, In-Tx event
   `AgentDisabled`, source `authz.AgentPolicySource`), "4.4" (`agents` may use `identity`, `authz`,
-  `chat`), "5. Schichten im Modul", "8.1 Ablauf".
-- `docs/spec/06-api.md`: "7. Idempotenz", "8. Nebenläufigkeit" (If-Match for agents, backend
-  policy, credential holder), "16. Endpunkte" group "Agents".
+  `chat`), "5. Layers within a module", "8.1 Flow".
+- `docs/spec/06-api.md`: "7. Idempotency", "8. Concurrency" (If-Match for agents, backend
+  policy, credential holder), "16. Endpoints" group "Agents".
 - `docs/api/openapi.yaml`: operations `listAgents`, `createAgent`, `getAgent`, `updateAgent`,
   `disableAgent`, `enableAgent`, `setAgentBillingMode`, `setAllAgentsBillingMode`,
   `setCredentialHolder`; schemas `Agent`, `AgentPage`, `AgentCreate`, `AgentUpdate`,
   `AgentRuntimeStatus`, `BillingMode`, `BillingModeSet`, `BillingModeSetAllResult`,
   `CredentialHolderSet`, `ReasonBody`, `ToolClass`, `AgentPayload`, `AgentUpdatedEvent`.
-- `docs/spec/01-produkt.md` wireframe A5.
+- `docs/spec/01-product.md` wireframe A5.
 - Code already merged: `internal/authz` (snapshot, `authorize`, phase hook with I1 and
   `VerifyInvariants`, declared `AgentPolicySource`, fake-source harness), `internal/identity`
   (M1-26 `Directory`, M1-31 people and owners, M1-34 sessions, M1-35 step-up, M1-44 API tokens),
@@ -69,7 +69,7 @@ generated from it (ADR 0013); the route test keeps both identical.
    (green). Keep the red output for the report.
 7. No en dash or em dash characters (U+2013, U+2014) in any file or commit message.
 8. White label: no company, person, host or domain names except Alex, Sam, Robin, the agents of
-   07 "10. Beispiele" and `example.com`; no real model, profile or machine names.
+   07 "10. Examples" and `example.com`; no real model, profile or machine names.
 9. Limits and durations only through named keys from `docs/operations/configuration.md`; no bare
    numbers in production code or documentation.
 10. Specification first: API and chapter changes below land before the code that uses them.
@@ -86,7 +86,7 @@ The specification is in place (planning, spec first): `BillingModeSetAll` as the
 `setAllAgentsBillingMode` and `minLength: 1` on `reason` of `BillingModeSet` and
 `CredentialHolderSet` in `docs/api/openapi.yaml`; 09 "2.2" with the table of
 `agent_operator_config.v1`; 10 "5.1" (I1 over active agents, `agent.enable` checks this agent) and
-"5.2"; 05 row `agent.updated` (also at creation); 06 2 "Ohne Wirkung". Change them only where the
+"5.2"; 05 row `agent.updated` (also at creation); 06 2 "No effect". Change them only where the
 implementation proves them wrong; run `make api-lint`, `make api-checks` and the M1-17 generation
 target; `make codegen-check` shows no diff.
 
@@ -101,7 +101,7 @@ Code (paths under `services/server/`):
 - `internal/agents/domain`: agent entity, backend policy value with transitions, tool class order
   `chat < scoped < host` and effective class, `OperatorConfigV1` validation, presence view.
 - `internal/agents/app`: one use case per operation (authorize, unit of work with the
-  `RightsChange` option where "Rechte" = `ja`, domain, repository, events, audit).
+  `RightsChange` option where "Permissions" = `yes`, domain, repository, events, audit).
 - `internal/agents/adapters/postgres` (sqlc queries and repository),
   `internal/agents/adapters/httpapi` (handlers of the ten operations),
   `internal/agents/adapters/authzsource` (implements `authz.AgentPolicySource`).
@@ -139,9 +139,10 @@ Code (paths under `services/server/`):
 
 ## Design notes
 
-Catalog facts (05 "4.10"): every mutating action is owner only, step-up, audited; "Rechte" = `ja`
-for `agent.create`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`,
-`agent.billing_mode.set_all`, `agent.credential_holder.set`; `agent.update` is not a rights change.
+Catalog facts (05 "4.10"): every mutating action is owner only, step-up, audited;
+"Permissions" = `yes` for `agent.create`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`,
+`agent.billing_mode.set_all`, `agent.credential_holder.set`; `agent.update` is not a permission
+change.
 All use class `rl.admin`; `agent.read` uses `rl.read`.
 
 Visibility and errors:
@@ -149,7 +150,7 @@ Visibility and errors:
 - `agent.read`: owner, the agent itself (`agent-self`), or a principal with `read` on a channel the
   agent serves (07 "4.3"). Not visible gives 404 with the body of an unknown ID; visible but not
   owner gives 403 (`owner_only`); owner without fresh step-up gives 401 `step_up_required`; a
-  personal token of an owner has no owner rights (SR5).
+  personal token of an owner has no owner permissions (SR5).
 - `listAgents`: cursor pagination by principal ID; candidates from the table, each item filtered by
   `authorize(p, agent.read, agent)` (07 "7.4" rule 3); no totals.
 
@@ -165,7 +166,7 @@ Record and representation:
 - `operator_config` schema `agent_operator_config.v1`: JSON object, `additionalProperties: false`,
   optional keys `default_model` (string, pattern `^[A-Za-z0-9._:/@-]+$`), `supports_followups`,
   `supports_components`, `supports_voice`, `supports_title`, `supports_files_out` (booleans; an
-  absent key means allowed, because the owner switches capabilities off, 09 "2.2"). Never secrets.
+  absent key means allowed, because the owner switches features off, 09 "2.2"). Never secrets.
   Invalid config gives `400 validation_failed` with the JSON pointer.
 - `Agent` response: `status` from `principals.status`; `presence` from the `reported_*` columns:
   `state`, `reported_billing_mode`, `runtime_version`, `last_heartbeat_at`,
@@ -205,7 +206,7 @@ Disable and enable:
 - `Disable` (`ReasonBody`, Idempotency-Key): status `disabled` and `disabled_at` through identity,
   revoke every API token of the agent through identity, publish `AgentDisabled`, `agent.updated`,
   `RightsChange` with the agent. Disabling a disabled agent succeeds without change: `200` with
-  the agent, no event, no rights version, audit with `no_change: true` (06 2 "Ohne Wirkung").
+  the agent, no event, no permission version, audit with `no_change: true` (06 2 "No effect").
   Gateway connections close through the existing revocation path (M1-65).
 - `Enable` (`ReasonBody`): back to `active`; I1 is checked for this agent. Enabling an active agent
   succeeds without change in the same way. Tokens are not restored; the owner creates new ones.
@@ -213,7 +214,7 @@ Disable and enable:
   owner, step-up, `If-Match`, body `ToolClassSet` with `tool_class` and `reason`): sets
   `agents.tool_class`, bumps `version`, `agent.updated`, `RightsChange` with the agent (SR2 reads
   the effective class, 07 2.11), audit with old and new class and the reason. The same class
-  succeeds without change (06 2 "Ohne Wirkung").
+  succeeds without change (06 2 "No effect").
 - I1 considers active agents only: `AgentPolicySource` reports personal agents whose principal
   status is `active`. Reason: a disabled agent cannot be triggered, and `agent.enable` exists in
   the I1 list (05 rule 1.6) precisely because enabling can create a violation that arose while the

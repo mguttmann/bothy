@@ -1,346 +1,346 @@
-# Offene Fragen an den Owner
+# Open questions for the owner
 
-Stand: Ende M0 (Planung). Hier stehen nur Fragen, die allein der Owner beantworten kann und die für
-das Produkt gelten: Recht und Anbieterbedingungen, Kosten, externe Konten, öffentliche Zusagen des
-Projekts und echte Produktentscheidungen. Technische Fragen entscheidet die Planung selbst und hält
-sie in den Abschnitten "Entscheidungen dieses Kapitels" der [Kapitel](spec/00-glossar.md) und in den
-[ADRs](adr/README.md) fest.
+As of: end of M0 (planning). This page holds only questions that the owner alone can answer and
+that apply to the product: law and provider terms, costs, external accounts, public commitments of
+the project and real product decisions. The planning decides technical questions itself and records
+them in the sections "Decisions of this chapter" of the [chapters](spec/00-glossary.md) and in the
+[ADRs](adr/README.md).
 
-Jede Frage hat eine Voreinstellung. Der [Plan](PLAN.md) baut mit ihr weiter, bis der Owner anders
-entscheidet; keine Etappe wartet auf eine Antwort, solange die Frist nicht erreicht ist. Die Frist
-nennt das Ticket oder die Etappe, vor deren Beginn die Antwort feststehen muss, weil danach eine
-Änderung teurer wird oder nach außen wirkt.
+Every question has a default. The [plan](PLAN.md) keeps building with it until the owner decides
+otherwise; no milestone waits for an answer as long as the deadline has not been reached. The
+deadline names the ticket or milestone before whose start the answer must be settled, because after
+that a change becomes more expensive or has an external effect.
 
-Fragen, die nur eine einzelne Instanz betreffen (eigene Konten, eigene Rechner, eigener Betrieb),
-stehen im privaten Betriebs-Repository dieser Instanz, nicht hier.
+Questions that concern only a single instance (own accounts, own hosts, own operations) are in the
+private operations repository of that instance, not here.
 
-**Regeln.**
+**Rules.**
 
-1. Eine Antwort des Owners wird in derselben Änderung umgesetzt, die die Frage hier schließt:
-   ADR oder Eintrag im Ruling-Log, betroffene Kapitel, Plan-Tickets.
-2. Eine geschlossene Frage wandert mit Datum und Antwort in den Abschnitt
-   [Entschieden](#entschieden). IDs werden nie neu vergeben.
-3. Eine neue Frage kommt nur hierher, wenn sie die Prüffrage besteht: Kann die Planung sie mit
-   einem Grund selbst entscheiden? Dann ist sie keine Owner-Frage.
+1. An answer of the owner is implemented in the same change that closes the question here:
+   ADR or entry in the ruling log, affected chapters, plan tickets.
+2. A closed question moves with date and answer to the section
+   [Decided](#decided). IDs are never reassigned.
+3. A new question comes here only if it passes the test question: Can the planning decide it itself
+   with a reason? Then it is not an owner question.
 
-## Übersicht
+## Overview
 
-Sortiert nach Frist.
+Sorted by deadline.
 
-| ID | Frage | Voreinstellung | Spätestens bis |
+| ID | Question | Default | Due by |
 |---|---|---|---|
-| OQ-01 | Zweiter Owner, solange persönliche Agenten laufen | strenge I1 ohne Owner-Ausnahme | vor M1-29 |
-| OQ-02 | Sichtbarkeit des Abo-Inhabers auf der Agenten-Karte | sichtbar für alle mit `agent.read` | vor M1-51 |
-| OQ-03 | Eigenes langlebiges Abo-Token des Inhabers im Konto des Sitzungsbenutzers für das Terminal-Profil `claude` | zulässig als eigene Nutzung; das Produkt fasst das Token nicht an; M2-45 prüft die Doku vor dem Bau | vor M2-45 |
-| OQ-04 | Inhaltsaufzeichnung von Terminal-Sitzungen | nein, nur Metadaten | vor M2-46 |
-| OQ-05 | Automatisches Folgen und leise Ruhezeiten | ja, wie in Kapitel 13 | vor M3-19 |
-| OQ-06 | Keine Präsenz und keine Lesebestätigungen für Menschen | so lassen | vor M4 |
-| OQ-07 | Etappe für Mehrknoten-Betrieb | M7 (M7-17); Terminal-Relais schon in M2 | vor M7-17 |
-| OQ-08 | Herausgeber-Konten für Signatur und Verteilung der Apps | Test-Herausgeber bis zur Entscheidung | vor M7-12 und M7-13 |
-| OQ-09 | Live-Tests in fremden Clouds | nur `tofu validate` und lokale VM | vor M7-16 |
-| OQ-10 | Reihenfolge von Migration und Veröffentlichung | Migration zuerst | vor M8-09 |
-| OQ-11 | Externer Penetrationstest | vor der Veröffentlichung beauftragen | vor V1-02 |
-| OQ-12 | Ort des Repositorys und Go-Modulpfad | Platzhalter `OWNER`; Empfehlung Organisation | vor V1-03 |
-| OQ-13 | Externe Prüfdienste vor der Veröffentlichung | aus bis zur Veröffentlichung | vor V1-05 |
-| OQ-14 | Öffentliche Zusagen zu Deprecation und Versions-Überlappung | Standardwerte aus Kapitel 06 | vor V1-05 |
-| OQ-15 | Zusagen in SECURITY.md und GOVERNANCE.md | Standardwerte aus Kapitel 23 | vor V1-05 |
-| OQ-16 | Endgültiger Name und Markenprüfung | Bothy bleibt Arbeitsname | vor V1-06 |
-| OQ-17 | Paketnamen und Konten für SDKs bei PyPI und npm | erst nach der Namenswahl reservieren | vor der ersten SDK-Veröffentlichung, spätestens V1-06 |
-| OQ-18 | Persönliches Abo in Dev-Umgebungen | nein; V2-06 wird nicht gebaut | vor V2-06 |
-| OQ-19 | Direktnachrichten für Owner unsichtbar | ja, Zugriff nur über den Rechtsweg | vor V3-01 |
-| OQ-20 | Grafana-Cloud-Konto für die Signatur des Plugins | unsigniert und lokal bis zur Veröffentlichung | vor V3-17 |
-| OQ-21 | Problem-Typen als absolute URIs | relative URIs in API v1 | vor API v2 |
-| OQ-22 | API-Doku aus dem Code oder aus dem Vertrag | spec-first nach ADR 0013 | vor M1-17 |
+| OQ-01 | Second owner while personal agents run | strict I1 without an owner exception | before M1-29 |
+| OQ-02 | Visibility of the subscription holder on the agent card | visible to everyone with `agent.read` | before M1-51 |
+| OQ-03 | The holder's own long-lived subscription token in the account of the session user for the terminal profile `claude` | allowed as own use; the product does not touch the token; M2-45 checks the documentation before the build | before M2-45 |
+| OQ-04 | Content recording of terminal sessions | no, only metadata | before M2-46 |
+| OQ-05 | Automatic following and silent quiet hours | yes, as in chapter 13 | before M3-19 |
+| OQ-06 | No presence and no read receipts for people | leave it as it is | before M4 |
+| OQ-07 | Milestone for multi-node operation | M7 (M7-17); terminal relay already in M2 | before M7-17 |
+| OQ-08 | Publisher accounts for signing and distributing the apps | test publisher until the decision | before M7-12 and M7-13 |
+| OQ-09 | Live tests in third-party clouds | only `tofu validate` and a local VM | before M7-16 |
+| OQ-10 | Order of migration and publication | migration first | before M8-09 |
+| OQ-11 | External penetration test | commission it before the publication | before V1-02 |
+| OQ-12 | Location of the repository and Go module path | placeholder `OWNER`; recommendation: organization | before V1-03 |
+| OQ-13 | External review services before the publication | off until the publication | before V1-05 |
+| OQ-14 | Public commitments on deprecation and version overlap | default values from chapter 06 | before V1-05 |
+| OQ-15 | Commitments in SECURITY.md and GOVERNANCE.md | default values from chapter 23 | before V1-05 |
+| OQ-16 | Final name and trademark check | Bothy stays the working name | before V1-06 |
+| OQ-17 | Package names and accounts for SDKs at PyPI and npm | reserve only after the choice of name | before the first SDK publication, at the latest V1-06 |
+| OQ-18 | Personal subscription in dev environments | no; V2-06 is not built | before V2-06 |
+| OQ-19 | Direct messages invisible to owners | yes, access only through the legal route | before V3-01 |
+| OQ-20 | Grafana Cloud account for signing the plugin | unsigned and local until the publication | before V3-17 |
+| OQ-21 | Problem types as absolute URIs | relative URIs in API v1 | before API v2 |
+| OQ-22 | API documentation from the code or from the contract | spec-first according to ADR 0013 | before M1-17 |
 
-## Fragen
+## Questions
 
-### OQ-01: Zweiter Owner bei persönlichen Agenten
+### OQ-01: Second owner with personal agents
 
-- **Frage:** Soll ein zweiter Owner möglich sein, ohne vorher alle Agenten mit
-  `billing_mode = personal` auf `organization` umzustellen? Das ginge nur mit einer Owner-Ausnahme
-  in I1: andere Owner zählten nicht zur Auslöser-Menge und würden von I2 abgewiesen.
-- **Warum nur der Owner:** I1 ist eine Vorgabe des Owners und hängt an den Anbieterbedingungen
-  (persönliches Abo nur für eigene Nutzung). Eine Ausnahme ändert "Owner darf alles".
-- **Voreinstellung:** Nein. I1 bleibt streng: `personal` nur, solange der `credential_holder` der
-  einzige Owner ist. `owner.add` wird sonst abgelehnt; der geführte Ablauf `resolve_i1` stellt
-  vorher um.
-- **Was der Plan damit tut:** M1-29 baut I1 ohne Ausnahme, M2-21 den geführten Ablauf.
-  [Kapitel 10](spec/10-backend-richtlinie.md), [ADR 0024](adr/0024-backend-richtlinie-personal-organization-mit-invariante.md).
-  Das Terminal hat eine eigene, engere Regel mit Owner-Ausnahme (I6,
-  [Kapitel 24](spec/24-terminal.md) Abschnitt 7.3); sie schränkt Owner ein und ändert I1 nicht.
-- **Bis wann:** vor M1-29. Eine spätere Ausnahme wäre eine neue ADR mit Migration der Prüfungen.
+- **Question:** Should a second owner be possible without first switching all agents with
+  `billing_mode = personal` to `organization`? That would only work with an owner exception
+  in I1: other owners would not count toward the set of triggering people and would be rejected by I2.
+- **Why only the owner:** I1 is a requirement of the owner and depends on the provider terms
+  (personal subscription only for own use). An exception changes "the owner may do everything".
+- **Default:** No. I1 stays strict: `personal` only as long as the `credential_holder` is the
+  only owner. Otherwise `owner.add` is rejected; the guided flow `resolve_i1` switches over
+  beforehand.
+- **What the plan does with it:** M1-29 builds I1 without an exception, M2-21 the guided flow.
+  [Chapter 10](spec/10-backend-policy.md), [ADR 0024](adr/0024-backend-policy-personal-organization-with-invariant.md).
+  The terminal has its own, narrower rule with an owner exception (I6,
+  [chapter 24](spec/24-terminal.md) section 7.3); it restricts owners and does not change I1.
+- **Due by:** before M1-29. A later exception would be a new ADR with a migration of the checks.
 
-### OQ-02: Sichtbarkeit des Abo-Inhabers
+### OQ-02: Visibility of the subscription holder
 
-- **Frage:** Darf die Agenten-Karte allen, die den Agenten sehen, zeigen, wessen persönliches Abo er
-  nutzt (`credential_holder_id`)?
-- **Warum nur der Owner:** Abwägung zwischen Transparenz und Datenschutz gegenüber den Menschen der
-  Organisation; keine technische Frage.
-- **Voreinstellung:** Ja, sichtbar für alle mit `agent.read`. Grund: Das Abzeichen "Persönlich" ist
-  ohnehin sichtbar, und die Angabe erklärt, warum nur eine Person auslösen darf.
-- **Was der Plan damit tut:** Das Schema `Agent` in [openapi.yaml](api/openapi.yaml) enthält das
-  Feld; M1-51 liefert es mit `getAgent` und `listAgents` aus. Bei "nein" sieht es nur, wer `agent.update` darf.
-- **Bis wann:** vor M1-51.
+- **Question:** May the agent card show everyone who sees the agent whose personal subscription it
+  uses (`credential_holder_id`)?
+- **Why only the owner:** A trade-off between transparency and privacy toward the people of the
+  organization; not a technical question.
+- **Default:** Yes, visible to everyone with `agent.read`. Reason: The badge "Personal" is
+  visible anyway, and the information explains why only one person may trigger.
+- **What the plan does with it:** The schema `Agent` in [openapi.yaml](api/openapi.yaml) contains the
+  field; M1-51 delivers it with `getAgent` and `listAgents`. With "no", only those who may use `agent.update` see it.
+- **Due by:** before M1-51.
 
-### OQ-03: Langlebiges Abo-Token im Terminal
+### OQ-03: Long-lived subscription token in the terminal
 
-- **Frage:** Ist es zulässig, dass der Inhaber einer Abo-Anmeldung (`llm_credentials = personal`)
-  sich im Konto des Sitzungsbenutzers mit einem eigenen langlebigen Token aus `claude setup-token`
-  (Variable `CLAUDE_CODE_OAUTH_TOKEN`) für seine interaktiven Sitzungen des Profils `claude`
-  anmeldet? Das Produkt speichert, liest und übergibt das Token dabei nicht (D-W-17).
-- **Warum nur der Owner:** Auslegung der Anbieterbedingungen; das Risiko trägt der Owner. Die Doku
-  beschreibt das Token für Umgebungen ohne Browser, sagt aber nicht, ob eine interaktive Sitzung
-  derselben Person gemeint ist ([Kapitel 24](spec/24-terminal.md) Abschnitt 7.4, [vermutet]).
-- **Voreinstellung:** Ja, als eigene Nutzung des Inhabers im unveränderten Coding-Agenten.
-- **Was der Plan damit tut:** M2-45 prüft die aktuelle Anbieter-Doku vor dem Bau (Ruling T10). Ist
-  der Weg dort ausgeschlossen, bleibt bei `personal` nur `/login` in einer Sitzung; geht auch das
-  für einen Benutzer ohne Anmeldesitzung nicht, bietet der Rechner das Profil `claude` nur mit
-  `organization` an.
-- **Bis wann:** vor M2-45.
+- **Question:** Is it allowed that the holder of a subscription login (`llm_credentials = personal`)
+  logs in, in the account of the session user, with their own long-lived token from `claude setup-token`
+  (variable `CLAUDE_CODE_OAUTH_TOKEN`) for their interactive sessions of the profile `claude`?
+  The product does not store, read or pass on the token (D-W-17).
+- **Why only the owner:** Interpretation of the provider terms; the owner bears the risk. The
+  documentation describes the token for environments without a browser, but does not say whether an
+  interactive session of the same person is meant ([chapter 24](spec/24-terminal.md) section 7.4, [assumed]).
+- **Default:** Yes, as the holder's own use in the unmodified coding agent.
+- **What the plan does with it:** M2-45 checks the current provider documentation before the build (ruling T10). If
+  that route is excluded there, with `personal` only `/login` in a session remains; if that does not
+  work either for a user without a login session, the host offers the profile `claude` only with
+  `organization`.
+- **Due by:** before M2-45.
 
-### OQ-04: Inhaltsaufzeichnung von Terminal-Sitzungen
+### OQ-04: Content recording of terminal sessions
 
-- **Frage:** Sollen Terminal-Sitzungen inhaltlich aufgezeichnet werden können, etwa für
-  Nachweispflichten?
-- **Warum nur der Owner:** Rechts- und Nachweisfrage, Datenschutz und Mitbestimmung.
-- **Voreinstellung:** Nein. Es gibt nur Metadaten (`terminal_sessions`, Audit) mit der
-  Aufbewahrungsklasse `security`.
-- **Was der Plan damit tut:** M2-46 baut Audit und Kennzahlen ohne Inhalt; 01 führt die Aufzeichnung
-  als "nie". [Kapitel 24](spec/24-terminal.md) Abschnitt 10.4, [Kapitel 20](spec/20-datenschutz.md)
-  (R-DP-07), [Kapitel 01](spec/01-produkt.md). Bei "ja" braucht es eine eigene ADR: Der Server darf
-  den Inhalt nach [ADR 0068](adr/0068-terminal-ueber-host-dienst-mit-noise-strom-und-invariante-i6.md)
-  nicht lesen, eine Aufzeichnung müsste also im Host-Dienst entstehen.
-- **Bis wann:** vor M2-46.
+- **Question:** Should it be possible to record the content of terminal sessions, for example for
+  record-keeping obligations?
+- **Why only the owner:** A question of law and of record-keeping, privacy and codetermination.
+- **Default:** No. There is only metadata (`terminal_sessions`, audit) with the
+  retention class `security`.
+- **What the plan does with it:** M2-46 builds audit and metrics without content; 01 lists recording
+  as "never". [Chapter 24](spec/24-terminal.md) section 10.4, [chapter 20](spec/20-privacy.md)
+  (R-DP-07), [chapter 01](spec/01-product.md). With "yes" it needs its own ADR: Under
+  [ADR 0068](adr/0068-terminal-through-a-host-service-with-noise-stream-and-invariant-i6.md) the server must
+  not read the content, so a recording would have to be created in the host service.
+- **Due by:** before M2-46.
 
-### OQ-05: Automatisches Folgen und Ruhezeiten
+### OQ-05: Automatic following and quiet hours
 
-- **Frage:** Soll es wie bei Discord sein: Wer in einem Thread schreibt, folgt ihm automatisch, und
-  Ruhezeiten machen Hinweise leise statt stumm?
-- **Warum nur der Owner:** Produktentscheidung über das Benachrichtigungsverhalten.
-- **Voreinstellung:** Ja, wie geplant.
-- **Was der Plan damit tut:** M3-19 baut automatisches Folgen und Bündeln nach
-  [Kapitel 13](spec/13-push-benachrichtigungen.md) Abschnitt 3.2; die Person kann "Folgen" ändern.
-- **Bis wann:** vor M3-19.
+- **Question:** Should it be like Discord: whoever writes in a thread follows it automatically, and
+  quiet hours make notifications silent instead of muted?
+- **Why only the owner:** Product decision about the notification behavior.
+- **Default:** Yes, as planned.
+- **What the plan does with it:** M3-19 builds automatic following and bundling according to
+  [chapter 13](spec/13-push-notifications.md) section 3.2; the person can change "Follow".
+- **Due by:** before M3-19.
 
-### OQ-06: Präsenz und Lesebestätigungen
+### OQ-06: Presence and read receipts
 
-- **Frage:** Menschen haben nie eine Präsenz ("online") und nie Lesebestätigungen für andere; die
-  Tipp-Anzeige gibt es. Ist das so gewollt?
-- **Warum nur der Owner:** Datenschutz und Mitbestimmung (Leistungskontrolle) betreffen die
-  Organisation.
-- **Voreinstellung:** Ja, so lassen.
-- **Was der Plan damit tut:** Die Clients ab M4 bauen ohne Präsenz von Menschen und ohne
-  Lesebestätigungen. [Kapitel 01](spec/01-produkt.md) (R-PR-02, R-PR-03).
-- **Bis wann:** vor M4.
+- **Question:** People never have a presence ("online") and never read receipts for others; the
+  typing indicator exists. Is this intended?
+- **Why only the owner:** Privacy and codetermination (performance monitoring) concern the
+  organization.
+- **Default:** Yes, leave it as it is.
+- **What the plan does with it:** The clients from M4 on are built without presence of people and
+  without read receipts. [Chapter 01](spec/01-product.md) (R-PR-02, R-PR-03).
+- **Due by:** before M4.
 
-### OQ-07: Etappe für Mehrknoten-Betrieb
+### OQ-07: Milestone for multi-node operation
 
-- **Frage:** In welcher Etappe soll der Betrieb mit mehreren api-Knoten produktionsreif sein?
-- **Warum nur der Owner:** Umfang und Zeit: Cloud-Betrieb mit Ausfallsicherheit gegen Betrieb auf
-  einem Rechner.
-- **Voreinstellung:** In M7. Der Code bleibt ab M1 knotenneutral.
-- **Was der Plan damit tut:** M7-17 baut Stufe 2 aus [Kapitel 02](spec/02-architektur.md)
-  Abschnitt 16; das Terminal-Relais über mehrere Knoten kommt schon mit M2-47 (P-25,
-  [Kapitel 24](spec/24-terminal.md) Abschnitt 9).
-- **Bis wann:** vor M7-17.
+- **Question:** In which milestone should operation with several api nodes be production-ready?
+- **Why only the owner:** Scope and time: cloud operation with failover versus operation on
+  a single host.
+- **Default:** In M7. The code stays node-neutral from M1 on.
+- **What the plan does with it:** M7-17 builds stage 2 from [chapter 02](spec/02-architecture.md)
+  section 16; the terminal relay across several nodes already comes with M2-47 (P-25,
+  [chapter 24](spec/24-terminal.md) section 9).
+- **Due by:** before M7-17.
 
-### OQ-08: Herausgeber-Konten für die Apps
+### OQ-08: Publisher accounts for the apps
 
-- **Frage:** Mit welchen Konten signiert und verteilt das Projekt seine Apps (Apple Developer
-  Program, Signatur für Windows, Weg für Android)?
-- **Warum nur der Owner:** externe Konten, laufende Kosten, Name des Herausgebers. Die Konten einer
-  einzelnen Instanz sind Sache ihres Betreibers.
-- **Voreinstellung:** Herausgeber-Modell aus
-  [ADR 0037](adr/0037-app-verteilung-und-auto-update-kanaele.md) (Status `proposed`): jede
-  Organisation signiert selbst. Bis zur Entscheidung bauen und prüfen die Tickets nur mit einem
-  Test-Herausgeber.
-- **Was der Plan damit tut:** M7-12 und M7-13 liefern Release-Kette, `distribution.yaml`-Vorlage
-  und Runbook; echte Signaturen entstehen erst nach der Antwort. [Kapitel 18](spec/18-release.md).
-- **Bis wann:** vor M7-12 und M7-13.
+- **Question:** With which accounts does the project sign and distribute its apps (Apple Developer
+  Program, signing for Windows, route for Android)?
+- **Why only the owner:** external accounts, running costs, name of the publisher. The accounts of a
+  single instance are the business of its instance operator.
+- **Default:** Publisher model from
+  [ADR 0037](adr/0037-app-distribution-and-auto-update-channels.md) (status `proposed`): each
+  organization signs itself. Until the decision, the tickets build and check only with a
+  test publisher.
+- **What the plan does with it:** M7-12 and M7-13 deliver the release chain, the `distribution.yaml`
+  template and the runbook; real signatures are only created after the answer. [Chapter 18](spec/18-release.md).
+- **Due by:** before M7-12 and M7-13.
 
-### OQ-09: Live-Tests in fremden Clouds
+### OQ-09: Live tests in third-party clouds
 
-- **Frage:** Sollen die OpenTofu-Module gegen echte Konten bei Cloud-Anbietern getestet werden?
-- **Warum nur der Owner:** Kosten und externe Konten.
-- **Voreinstellung:** Nein. Nur `tofu validate` und der Portabilitätstest auf einer lokalen VM.
-- **Was der Plan damit tut:** M7-16 liefert die Module mit diesen Prüfungen; ein Live-Test wäre ein
-  eigenes Ticket mit Kostenrahmen. [Kapitel 16](spec/16-betrieb.md),
-  [Cloud-Migration](operations/cloud-migration.md).
-- **Bis wann:** vor M7-16.
+- **Question:** Should the OpenTofu modules be tested against real accounts at cloud providers?
+- **Why only the owner:** Costs and external accounts.
+- **Default:** No. Only `tofu validate` and the portability test on a local VM.
+- **What the plan does with it:** M7-16 delivers the modules with these checks; a live test would be
+  a separate ticket with a cost budget. [Chapter 16](spec/16-operations.md),
+  [cloud migration](operations/cloud-migration.md).
+- **Due by:** before M7-16.
 
-### OQ-10: Reihenfolge von Migration und Veröffentlichung
+### OQ-10: Order of migration and publication
 
-- **Frage:** Läuft die erste Migration einer bestehenden Installation (M8-09) vor der
-  Veröffentlichung des Repositorys (V1) oder danach? Und wann genau wird es öffentlich?
-- **Warum nur der Owner:** Die Veröffentlichung wirkt nach außen und ist nicht umkehrbar.
-- **Voreinstellung:** Migration zuerst (P-15). Eine Migration mit echten Daten vor der
-  Veröffentlichung liefert Belege.
-  Bis zur Veröffentlichung gelten die Release-Signaturen aus
-  [ADR 0062](adr/0062-release-signaturen-solange-das-repo-privat-ist.md) ohne Kosten; Artifact
-  Attestations kommen mit der Veröffentlichung, weil GitHub sie in den Plänen Free, Pro und Team
-  nur für öffentliche Repositorys anbietet ([Kapitel 18](spec/18-release.md) Abschnitt 6).
-- **Was der Plan damit tut:** V1 hängt an den Bau-Tickets von M8, nicht an der Durchführung M8-09;
-  der Owner kann V1 vorziehen. [Plan](PLAN.md) Abschnitte 15 und 19,
-  [Checkliste Öffentlich-Schalten](quality/public-switch.md).
-- **Bis wann:** vor M8-09.
+- **Question:** Does the first migration of an existing installation (M8-09) run before the
+  publication of the repository (V1) or after it? And when exactly does it become public?
+- **Why only the owner:** The publication has an external effect and cannot be undone.
+- **Default:** Migration first (P-15). A migration with real data before the
+  publication provides evidence.
+  Until the publication, the release signatures from
+  [ADR 0062](adr/0062-release-signatures-while-the-repo-is-private.md) apply at no cost; Artifact
+  Attestations come with the publication, because GitHub offers them in the Free, Pro and Team plans
+  only for public repositories ([chapter 18](spec/18-release.md) section 6).
+- **What the plan does with it:** V1 depends on the build tickets of M8, not on carrying out M8-09;
+  the owner can bring V1 forward. [Plan](PLAN.md) sections 15 and 19,
+  [Checklist: publishing](quality/public-switch.md).
+- **Due by:** before M8-09.
 
-### OQ-11: Externer Penetrationstest
+### OQ-11: External penetration test
 
-- **Frage:** Wird vor der Veröffentlichung ein externer Penetrationstest beauftragt?
-- **Warum nur der Owner:** Kosten und Auswahl eines Dienstleisters.
-- **Voreinstellung:** Ja, Stufe P2 aus [Kapitel 19](spec/19-sicherheit.md) "Penetrationstest-Plan",
-  auf einer Test-Instanz mit synthetischen Daten.
-- **Was der Plan damit tut:** V1-02 ist Voraussetzung für V1-04; ohne Test gibt es keine
-  Veröffentlichung.
-- **Bis wann:** vor V1-02.
+- **Question:** Is an external penetration test commissioned before the publication?
+- **Why only the owner:** Costs and choice of a service provider.
+- **Default:** Yes, stage P2 from [chapter 19](spec/19-security.md) "Penetration test plan",
+  on a test instance with synthetic data.
+- **What the plan does with it:** V1-02 is a prerequisite for V1-04; without a test there is no
+  publication.
+- **Due by:** before V1-02.
 
-### OQ-12: Ort des Repositorys und Go-Modulpfad
+### OQ-12: Location of the repository and Go module path
 
-- **Frage:** Unter welchem Konto oder welcher Organisation erscheint das öffentliche Repository, und
-  welcher Go-Modulpfad folgt daraus?
-- **Warum nur der Owner:** externes Konto und Außenwirkung; nur der Owner kann eine Organisation
-  anlegen und benennen.
-- **Voreinstellung:** Es gilt die frühere Vorgabe des Owners (persönliches Konto). Alle Dateien
-  nutzen bis dahin den Platzhalter `OWNER` (P-05). Empfehlung: vor dem ersten öffentlichen Commit
-  eine neutrale Organisation anlegen, weil ein späterer Umzug den Go-Modulpfad aller Importe bricht
-  und ein persönlicher Name sonst im Modulpfad steht.
-- **Was der Plan damit tut:** V1-03 ersetzt `OWNER` und den vorläufigen Modulpfad; ein Test prüft,
-  dass kein Platzhalter bleibt. [ADR 0044](adr/0044-arbeitsname-und-branding-als-konfiguration.md).
-- **Bis wann:** vor V1-03.
+- **Question:** Under which account or which organization does the public repository appear, and
+  which Go module path follows from that?
+- **Why only the owner:** external account and public effect; only the owner can create and name an
+  organization.
+- **Default:** The earlier requirement of the owner applies (personal account). Until then all files
+  use the placeholder `OWNER` (P-05). Recommendation: create a neutral organization before the first
+  public commit, because a later move breaks the Go module path of all imports and a personal name
+  would otherwise be in the module path.
+- **What the plan does with it:** V1-03 replaces `OWNER` and the provisional module path; a test checks
+  that no placeholder remains. [ADR 0044](adr/0044-working-name-and-branding-as-configuration.md).
+- **Due by:** before V1-03.
 
-### OQ-13: Externe Prüfdienste vor der Veröffentlichung
+### OQ-13: External review services before publication
 
-- **Frage:** Dürfen Diffs des noch privaten Repositorys an externe Dienste gehen: die CodeRabbit CLI
-  und die gehostete Renovate-App?
-- **Warum nur der Owner:** Abfluss von privatem Code an Dritte.
-- **Voreinstellung:** Nein. Die CodeRabbit CLI ist aus, bis `BOTHY_CODERABBIT=1` gesetzt ist;
-  Renovate wird beim Öffentlich-Schalten aktiviert.
-- **Was der Plan damit tut:** [Push-Disziplin](quality/push-discipline.md),
-  [ADR 0041](adr/0041-abhaengigkeits-updates-mit-renovate.md),
-  [Checkliste Öffentlich-Schalten](quality/public-switch.md) Schritt 16. Bis dahin prüfen die
-  lokalen Gates allein.
-- **Bis wann:** vor V1-05. Die Voreinstellung kostet nichts; eine frühere Freigabe ist jederzeit
-  möglich.
+- **Question:** May diffs of the still private repository go to external services: the CodeRabbit CLI
+  and the hosted Renovate app?
+- **Why only the owner:** Outflow of private code to third parties.
+- **Default:** No. The CodeRabbit CLI is off until `BOTHY_CODERABBIT=1` is set;
+  Renovate is activated when the repository goes public.
+- **What the plan does with it:** [Push discipline](quality/push-discipline.md),
+  [ADR 0041](adr/0041-dependency-updates-with-renovate.md),
+  [Checklist: publishing](quality/public-switch.md) step 16. Until then the
+  local gates check alone.
+- **Due by:** before V1-05. The default costs nothing; allowing it earlier is possible at any
+  time.
 
-### OQ-14: Zusagen zu Deprecation und Versions-Überlappung
+### OQ-14: Commitments on deprecation and version overlap
 
-- **Frage:** Welche Fristen sagt das Projekt Integratoren zu: Mindestvorlauf vor dem Abschalten
-  einer veralteten Operation und Mindestdauer, die eine alte Hauptversion neben der neuen läuft?
-- **Warum nur der Owner:** öffentliche Zusage an Dritte mit Pflegeaufwand.
-- **Voreinstellung:** die Standardwerte von `api.deprecation_min_notice` und
-  `api.major_version_overlap` aus [Kapitel 06](spec/06-api.md).
-- **Was der Plan damit tut:** [ADR 0014](adr/0014-api-versionierung-und-deprecation-policy.md) und
-  die Bruch-Prüfung M7-11 arbeiten mit diesen Werten.
-- **Bis wann:** vor V1-05.
+- **Question:** Which deadlines does the project commit to for integrators: minimum notice before
+  shutting down a deprecated operation, and minimum duration that an old major version runs next to the new one?
+- **Why only the owner:** public commitment to third parties with maintenance effort.
+- **Default:** the default values of `api.deprecation_min_notice` and
+  `api.major_version_overlap` from [chapter 06](spec/06-api.md).
+- **What the plan does with it:** [ADR 0014](adr/0014-api-versioning-and-deprecation-policy.md) and
+  the breaking-change check M7-11 work with these values.
+- **Due by:** before V1-05.
 
-### OQ-15: Zusagen in SECURITY.md und GOVERNANCE.md
+### OQ-15: Commitments in SECURITY.md and GOVERNANCE.md
 
-- **Frage:** Sind die Fristen für Meldungen von Schwachstellen (Eingang, Bewertung, Korrektur,
-  Offenlegung) und für Issues (Erstantwort, Schließen bei fehlender Rückmeldung) zusagbar?
-- **Warum nur der Owner:** öffentliche Zusage des Projekts.
-- **Voreinstellung:** die Standardwerte von `security.*` und `triage.*` aus
-  [Kapitel 23](spec/23-qualitaet.md); ein Test hält die Dateien gleich.
-- **Was der Plan damit tut:** Die Community-Dateien nennen diese Werte; V1-05 macht sie öffentlich.
-- **Bis wann:** vor V1-05.
+- **Question:** Can the project commit to the deadlines for vulnerability reports (receipt,
+  assessment, fix, disclosure) and for issues (first response, closing when feedback is missing)?
+- **Why only the owner:** public commitment of the project.
+- **Default:** the default values of `security.*` and `triage.*` from
+  [chapter 23](spec/23-quality.md); a test keeps the files in line.
+- **What the plan does with it:** The community files name these values; V1-05 makes them public.
+- **Due by:** before V1-05.
 
-### OQ-16: Endgültiger Name und Markenprüfung
+### OQ-16: Final name and trademark check
 
-- **Frage:** Bleibt es bei Bothy oder wird es einer der anderen Kandidaten? Wird eine
-  Markenrecherche durch eine Fachperson in den Klassen 9 und 42 beauftragt?
-- **Warum nur der Owner:** Marken- und Rechtsfrage, Kosten der Recherche, Produktentscheidung.
-- **Voreinstellung:** Bothy bleibt Arbeitsname; Recherche vor der Veröffentlichung beauftragen.
-- **Was der Plan damit tut:** Der angezeigte Name ist Konfiguration (`branding.product_name`); im
-  Code steht er nur an den Stellen, die
-  [ADR 0044](adr/0044-arbeitsname-und-branding-als-konfiguration.md) listet, und ein Test hält die
-  Liste. V1-06 setzt den endgültigen Namen.
-- **Bis wann:** vor V1-06. Davon hängen OQ-17 und OQ-20 ab.
+- **Question:** Does it stay Bothy, or does it become one of the other candidates? Is a
+  trademark search by a professional in classes 9 and 42 commissioned?
+- **Why only the owner:** Trademark and legal question, cost of the search, product decision.
+- **Default:** Bothy stays the working name; commission the search before the publication.
+- **What the plan does with it:** The displayed name is configuration (`branding.product_name`); in
+  the code it appears only in the places that
+  [ADR 0044](adr/0044-working-name-and-branding-as-configuration.md) lists, and a test holds the
+  list. V1-06 sets the final name.
+- **Due by:** before V1-06. OQ-17 and OQ-20 depend on it.
 
-### OQ-17: Paketnamen und Konten für die SDKs
+### OQ-17: Package names and accounts for the SDKs
 
-- **Frage:** Unter welchen Namen werden die SDKs bei PyPI und npm registriert, und wer hält die
-  Konten (npm-Scope oder Organisation)?
-- **Warum nur der Owner:** externe Konten; hängt am Namen (OQ-16).
-- **Voreinstellung:** erst nach der endgültigen Namenswahl reservieren.
-- **Was der Plan damit tut:** Die SDKs entstehen in M2-29 und M2-30 ohne Veröffentlichung; die
-  Release-Kette veröffentlicht erst mit festem Namen.
-  [ADR 0026](adr/0026-sdks-generierter-kern-plus-handschicht.md), [Kapitel 18](spec/18-release.md).
-- **Bis wann:** vor der ersten Veröffentlichung eines SDK, spätestens V1-06.
+- **Question:** Under which names are the SDKs registered at PyPI and npm, and who holds the
+  accounts (npm scope or organization)?
+- **Why only the owner:** external accounts; depends on the name (OQ-16).
+- **Default:** reserve only after the final choice of name.
+- **What the plan does with it:** The SDKs are created in M2-29 and M2-30 without publication; the
+  release chain publishes only once the name is fixed.
+  [ADR 0026](adr/0026-sdks-generated-core-plus-hand-written-layer.md), [chapter 18](spec/18-release.md).
+- **Due by:** before the first publication of an SDK, at the latest V1-06.
 
-### OQ-18: Persönliches Abo in Dev-Umgebungen
+### OQ-18: Personal subscription in dev environments
 
-- **Frage:** Darf eine Person in ihrer eigenen, abgeschotteten Dev-Umgebung ihr persönliches Abo
-  nutzen? Das verlangt I1 je Umgebung statt je Agent.
-- **Warum nur der Owner:** ändert die Vorgabe I1 und berührt Anbieterbedingungen.
-- **Voreinstellung:** Nein. Dev-Umgebungen haben `organization` (eigener Schlüssel mit
-  Ausgabengrenze je Person) oder keine LLM-Anmeldung.
-- **Was der Plan damit tut:** V2-06 wird ohne Entscheidung nicht gebaut.
-  [Kapitel 21](spec/21-dev-isolation.md) (K-DV-2),
-  [ADR 0046](adr/0046-mehrbenutzer-dev-umgebung-nur-mit-abschottung.md).
-- **Bis wann:** vor V2-06.
+- **Question:** May a person use their personal subscription in their own isolated dev environment?
+  That requires I1 per environment instead of per agent.
+- **Why only the owner:** changes the requirement I1 and touches provider terms.
+- **Default:** No. Dev environments have `organization` (own key with a
+  spending limit per person) or no LLM login.
+- **What the plan does with it:** V2-06 is not built without a decision.
+  [Chapter 21](spec/21-dev-isolation.md) (K-DV-2),
+  [ADR 0046](adr/0046-multi-user-dev-environment-only-with-isolation.md).
+- **Due by:** before V2-06.
 
-### OQ-19: Direktnachrichten für Owner unsichtbar
+### OQ-19: Direct messages invisible to owners
 
-- **Frage:** Bleiben Direktnachrichten zwischen Menschen auch für Owner unsichtbar? Das weicht von
-  "Owner darf alles" ab.
-- **Warum nur der Owner:** Vertraulichkeit zwischen Menschen gegen Kontrolle durch die
-  Organisation; Rechtsfrage.
-- **Voreinstellung:** Ja, unsichtbar. Zugriff nur über einen Auskunfts- oder Rechtsweg mit Step-up
-  und Audit (Ruling L21).
-- **Was der Plan damit tut:** V3-01 baut Direktnachrichten mit Schutzregel SR6.
-  [Kapitel 07](spec/07-rechte.md), [Kapitel 05](spec/05-aktionen.md) (R-AZ-02).
-- **Bis wann:** vor V3-01.
+- **Question:** Do direct messages between people stay invisible to owners as well? That deviates from
+  "the owner may do everything".
+- **Why only the owner:** Confidentiality between people versus control by the
+  organization; a legal question.
+- **Default:** Yes, invisible. Access only through a data subject access route or a legal route with
+  step-up and audit (ruling L21).
+- **What the plan does with it:** V3-01 builds direct messages with guard rule SR6.
+  [Chapter 07](spec/07-permissions.md), [chapter 05](spec/05-actions.md) (R-AZ-02).
+- **Due by:** before V3-01.
 
-### OQ-20: Grafana-Cloud-Konto für die Plugin-Signatur
+### OQ-20: Grafana Cloud account for the plugin signature
 
-- **Frage:** Wann und unter welchem Organisationsnamen wird das Konto bei Grafana Cloud angelegt,
-  das die Signatur des Panel-Plugins braucht? Der erste Teil der Plugin-ID muss zum Konto passen.
-- **Warum nur der Owner:** externes Konto und Name beim Anbieter; hängt an OQ-16.
-- **Voreinstellung:** Bis zur Veröffentlichung unsigniert und lokal provisioniert; freigegeben ist
-  nur genau diese Plugin-ID (Ruling T11). Konto und Antrag als Community-Plugin nach der
-  endgültigen Namenswahl.
-- **Was der Plan damit tut:** M7-25 und M7-26 liefern das Plugin unsigniert; V3-17 signiert es.
-  [Kapitel 25](spec/25-visualisierung.md) Abschnitt 8,
-  [ADR 0069](adr/0069-visualisierung-auf-zwei-ebenen-ohne-iframes-in-apps.md).
-- **Bis wann:** vor V3-17; früher nur, wenn das Plugin in Grafana Cloud laufen soll.
+- **Question:** When and under which organization name is the account at Grafana Cloud created
+  that signing the panel plugin needs? The first part of the plugin ID must match the account.
+- **Why only the owner:** external account and name at the provider; depends on OQ-16.
+- **Default:** Until the publication unsigned and provisioned locally; only exactly this plugin ID
+  is allowed (ruling T11). Account and application as a community plugin after the
+  final choice of name.
+- **What the plan does with it:** M7-25 and M7-26 deliver the plugin unsigned; V3-17 signs it.
+  [Chapter 25](spec/25-visualization.md) section 8,
+  [ADR 0069](adr/0069-visualization-on-two-levels-without-iframes-in-apps.md).
+- **Due by:** before V3-17; earlier only if the plugin is to run in Grafana Cloud.
 
-### OQ-21: Problem-Typen als absolute URIs
+### OQ-21: Problem types as absolute URIs
 
-- **Frage:** Sollen die Fehler-Typen der API später absolute URIs unter einer öffentlichen
-  Projekt-Domain bekommen?
-- **Warum nur der Owner:** setzt eine öffentliche Domain des Produkts voraus und hängt an OQ-16.
-- **Voreinstellung:** Relativer URI `/api/v1/problems/{code}` bleibt für API v1.
-- **Was der Plan damit tut:** nichts bis v2; eine Umstellung wäre ein Bruch.
-  [Kapitel 06](spec/06-api.md) Abschnitt 5,
-  [ADR 0015](adr/0015-fehlerformat-rfc-9457-idempotenz-paginierung.md).
-- **Bis wann:** vor der Planung von API v2.
+- **Question:** Should the error types of the API later get absolute URIs under a public
+  project domain?
+- **Why only the owner:** requires a public domain of the product and depends on OQ-16.
+- **Default:** The relative URI `/api/v1/problems/{code}` stays for API v1.
+- **What the plan does with it:** nothing until v2; a switch would be a breaking change.
+  [Chapter 06](spec/06-api.md) section 5,
+  [ADR 0015](adr/0015-error-format-rfc-9457-idempotency-pagination.md).
+- **Due by:** before the planning of API v2.
 
-### OQ-22: API-Doku aus dem Code oder aus dem Vertrag
+### OQ-22: API documentation from the code or from the contract
 
-- **Frage:** Bau-Vorgabe 3 verlangt "API documentation is generated from code (OpenAPI from the
-  routes)". ADR 0013 macht `openapi.yaml` normativ und erzeugt den Code daraus. Gilt für den
-  Server die Lesart "eine Quelle, spec-first" (D-W-43)?
-- **Warum nur der Owner:** Die Bau-Vorgabe ist eine Owner-Vorgabe; nur er kann sie auslegen oder
-  ändern.
-- **Voreinstellung:** Ja, spec-first. Server-Stubs, Clients und die API-Referenz entstehen aus
-  dem Vertrag; ein Test (`make codegen-check`) hält Code und Vertrag gleich. Für SDKs und
-  Dart-Pakete gilt die Vorgabe wörtlich.
-- **Was der Plan damit tut:** M1-17 und alle API-Tickets arbeiten spec-first. Antwortet der
-  Owner "aus den Routen", braucht es eine neue ADR, die ADR 0013 ersetzt, und M1-17 ändert die
-  Codegenerierung um.
-- **Bis wann:** vor M1-17.
+- **Question:** Fixed build rule 3 requires "API documentation is generated from code (OpenAPI from the
+  routes)". ADR 0013 makes `openapi.yaml` normative and generates the code from it. Does the reading
+  "one source, spec-first" (D-W-43) apply to the server?
+- **Why only the owner:** The build rule is an owner requirement; only the owner can interpret or
+  change it.
+- **Default:** Yes, spec-first. Server stubs, clients and the API reference are generated from
+  the contract; a test (`make codegen-check`) keeps code and contract in line. For SDKs and
+  Dart packages the rule applies literally.
+- **What the plan does with it:** M1-17 and all API tickets work spec-first. If the
+  owner answers "from the routes", a new ADR is needed that supersedes ADR 0013, and M1-17 changes
+  the code generation.
+- **Due by:** before M1-17.
 
-## Entschieden
+## Decided
 
-Fragen aus den Team-Berichten und Fragen dieser Seite, die inzwischen entschieden sind. Sie stehen
-hier, damit niemand sie erneut stellt. Eine geschlossene Frage dieser Seite behält ihre ID in der
-Spalte "Frage"; die ID wird nicht neu vergeben.
+Questions from the team reports and questions of this page that have since been decided. They are
+here so that nobody asks them again. A closed question of this page keeps its ID in the
+column "Question"; the ID is not reassigned.
 
-| Frage | Entscheidung | Wer, wann | Wirkung |
+| Question | Decision | Who, when | Effect |
 |---|---|---|---|
-| Markenfarbe und Gestaltung (Petrol dunkel, gelber Akzent) | abgenommen | Owner, 2026-10-10, auf den Vorschauen in [design](design/README.md) | Palette und Tokens bleiben; Akzent-Varianten je Instanz kommen mit M4-03. |
-| Gilt die Abnahme für die sieben danach neu erzeugten Vorschaubilder (D-W-46)? | ja, ohne Nachabnahme: Die Abnahme gilt für die Bilder in `docs/design/previews`, und die sieben sind inhaltliche Korrekturen innerhalb des abgenommenen Designs (Lauf-Zustände als Wörter, `amber.100` im Warn-Banner, keine abgeschnittene Nachricht). | Owner-Entscheidung "Design auf `docs/design/previews` abgenommen", der Planung in dieser Fassung am 2026-10-11 übermittelt, nachdem die sieben Bilder am selben Tag neu erzeugt waren (D-W-46, D-W-77) | Die Tickets bauen mit diesen Ständen. |
-| OQ-23: Gelten die Vorschaubilder Terminal und Statistik (`terminal-*`, `viz-*`) als abgenommen? | ja, ohne offene Owner-Frage: Sie liegen in `docs/design/previews` und wenden das abgenommene Design-System an (gleiche Tokens, gleiche Regeln). Sie entstanden nach der Abnahme vom 2026-10-10: beide Paare am selben Tag (D-W-13), `viz-*` am 2026-10-11 neu erzeugt, zuletzt mit D-W-55. | Owner-Entscheidung wie in der Zeile davor; Ruling T14 der Leitung, 2026-10-11 (D-W-77) | Die Tickets bauen mit diesen Ständen; die frühere Frist vor M4-03 entfällt. |
-| Commit-Identität im öffentlichen Repository | Die Commits tragen die vom Owner gewählte Identität; das Produkt-Repository nennt sie nicht. | Owner, 2026-10-10 | Kein Umschreiben der Autoren nötig. Veröffentlicht wird ein Commit ohne Eltern; die Planungshistorie bleibt privat (D-W-93, Schritt 2 der [Checkliste Veröffentlichen](quality/public-switch.md)). |
-| Android, Sprachnachrichten, Teilen aus anderen Apps, Anmeldung über OIDC | Teil des Kerns | Owner, Planungsgrundlage | [Kapitel 01](spec/01-produkt.md), [Kapitel 08](spec/08-identitaet.md); Tickets in M3 bis M5. |
-| Revisionen bearbeiteter Nachrichten und Standardwerte des Kern-Vertrags (Aufbewahrung des Ereignis-Logs, Sitzungsdauer, Größen) | keine Owner-Frage | Planung | Revisionen folgen der Klasse `content` in [Kapitel 20](spec/20-datenschutz.md); die Werte sind benannte Konfigurationswerte, die jede Instanz ändern kann ([Konfigurationsreferenz](operations/configuration.md)). |
-| Ansicht mit Daten über einzelne Abo-Sitze oder Zugangsdaten | nicht im Produkt | Planung, Ruling T8 | Das Produkt zeigt nur die Backend-Ansicht ([Kapitel 25](spec/25-visualisierung.md) Abschnitt 6.2) und kennt keine Zugangsdaten (I5). |
+| Brand color and design (dark petrol, yellow accent) | accepted | Owner, 2026-10-10, on the previews in [design](design/README.md) | Palette and tokens stay; accent variants per instance come with M4-03. |
+| Does the acceptance apply to the seven preview images generated again afterwards (D-W-46)? | yes, without a new acceptance: The acceptance applies to the images in `docs/design/previews`, and the seven are content corrections within the accepted design (run states as words, `amber.100` in the warning banner, no truncated message). | Owner decision "Design on `docs/design/previews` accepted", passed to the planning in this wording on 2026-10-11, after the seven images had been generated again on the same day (D-W-46, D-W-77) | The tickets build with these versions. |
+| OQ-23: Are the preview images terminal and statistics (`terminal-*`, `viz-*`) considered accepted? | yes, without an open owner question: They are in `docs/design/previews` and apply the accepted design system (same tokens, same rules). They were created after the acceptance of 2026-10-10: both pairs on the same day (D-W-13), `viz-*` generated again on 2026-10-11, last with D-W-55. | Owner decision as in the row above; ruling T14 of the lead, 2026-10-11 (D-W-77) | The tickets build with these versions; the earlier deadline before M4-03 no longer applies. |
+| Commit identity in the public repository | The commits carry the identity chosen by the owner; the product repository does not name it. | Owner, 2026-10-10 | No rewriting of the authors needed. What is published is a commit without parents; the planning history stays private (D-W-93, step 2 of the [Checklist: publishing](quality/public-switch.md)). |
+| Android, voice messages, sharing from other apps, login through OIDC | Part of the core | Owner, planning basis | [Chapter 01](spec/01-product.md), [chapter 08](spec/08-identity.md); tickets in M3 to M5. |
+| Revisions of edited messages and default values of the core contract (retention of the event log, session duration, sizes) | not an owner question | Planning | Revisions follow the class `content` in [chapter 20](spec/20-privacy.md); the values are named configuration values that every instance can change ([configuration reference](operations/configuration.md)). |
+| View with data about individual subscription seats or credentials | not in the product | Planning, ruling T8 | The product shows only the backend view ([chapter 25](spec/25-visualization.md) section 6.2) and knows no credentials (I5). |

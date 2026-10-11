@@ -1,27 +1,27 @@
 # M1-32: Signing keys, JWKS and rotation
 
-Status: ready | Depends on: M1-20, M1-23, M1-28 | Etappe: M1
+Status: ready | Depends on: M1-20, M1-23, M1-28 | Milestone: M1
 
 ## Goal
 
-After this ticket the server owns one Ed25519 signing key per purpose (`access_token`, `invocation`, `webhook_out`, `audit_checkpoint`) with the states `next`, `active`, `retiring` and `retired`. The private part lives only in the Secret-Provider; the database holds the public JWK, the state and a reference. Keys rotate on schedule without invalidating any signature that is still valid, an owner with step-up can rotate on demand or in an emergency that withdraws the old key at once, and the public JWKS is served for clients and agent adapters. Access tokens (M1-34), invocation tokens (M2), outgoing webhooks (M2) and audit checkpoints (M1-50) sign through this ticket's port.
+After this ticket the server owns one Ed25519 signing key per purpose (`access_token`, `invocation`, `webhook_out`, `audit_checkpoint`) with the states `next`, `active`, `retiring` and `retired`. The private part lives only in the secret provider; the database holds the public JWK, the state and a reference. Keys rotate on schedule without invalidating any signature that is still valid, an owner with step-up can rotate on demand or in an emergency that withdraws the old key at once, and the public JWKS is served for clients and agent adapters. Access tokens (M1-34), invocation tokens (M2), outgoing webhooks (M2) and audit checkpoints (M1-50) sign through this ticket's port.
 
 M1-20 (`Idempotency-Key` on `rotateSigningKey`) and M1-28 are the direct dependencies; M1-14 (jobs), M1-15 (instance) and M1-24 (audit of `signing_key.rotate` and `signing_key.transition`) come with them.
 
 ## Read first
 
 - `docs/PLAN.md`: section 3, section 7 (M1), rows M1-09, M1-23, M1-32, M1-34, M1-37, M1-50, M1-73.
-- `docs/spec/03-datenmodell.md`: 1 (principle 9), 4.1 `instance` and `server_signing_keys`, 4.12 `audit_checkpoints` (column `kid`), 6.3.
-- `docs/spec/05-aktionen.md`: table 4.1 (`instance.discovery.read`), table 4.2 (`signing_key.rotate` with `mode`, system action `signing_key.transition`), 5 (invocation token header and claims), R-AZ-15.
-- `docs/spec/08-identitaet.md`: 4 (bootstrap step 3), 7.1 and 7.2 (access tokens, verification with `active` and `retiring`).
-- `docs/spec/09-agenten.md`: 4.5 (Aufruf-Marke, Schluessel und Rotation).
-- `docs/spec/11-erweiterungen.md`: 7 (Ausgehende Webhooks, key purpose `webhook_out`).
-- `docs/spec/16-betrieb.md`: 5.1 to 5.4 (Secret-Provider, compose secrets, escrow), 4.2 (health), 14.
-- `docs/spec/19-sicherheit.md`: SEC-CORS-2, 9 (SEC-LOG-1 to SEC-LOG-4), 10 (Geheimnisse, SEC-SEC-1 to SEC-SEC-5), 12 (SEC-AUD-2), 16.
-- `docs/spec/02-architektur.md`: 4.2 and 4.3 (row `instance`), 5, 12 (jobs), 13, 15.1 and 15.2.
-- `docs/spec/20-datenschutz.md`: row `server_signing_keys`.
+- `docs/spec/03-data-model.md`: 1 (principle 9), 4.1 `instance` and `server_signing_keys`, 4.12 `audit_checkpoints` (column `kid`), 6.3.
+- `docs/spec/05-actions.md`: table 4.1 (`instance.discovery.read`), table 4.2 (`signing_key.rotate` with `mode`, system action `signing_key.transition`), 5 (invocation token header and claims), R-AZ-15.
+- `docs/spec/08-identity.md`: 4 (bootstrap step 3), 7.1 and 7.2 (access tokens, verification with `active` and `retiring`).
+- `docs/spec/09-agents.md`: 4.5 (Invocation token, keys and rotation).
+- `docs/spec/11-extensions.md`: 7 (Outgoing webhooks, key purpose `webhook_out`).
+- `docs/spec/16-operations.md`: 5.1 to 5.4 (secret provider, compose secrets, escrow), 4.2 (health), 14.
+- `docs/spec/19-security.md`: SEC-CORS-2, 9 (SEC-LOG-1 to SEC-LOG-4), 10 (Secrets, SEC-SEC-1 to SEC-SEC-5), 12 (SEC-AUD-2), 16.
+- `docs/spec/02-architecture.md`: 4.2 and 4.3 (row `instance`), 5, 12 (jobs), 13, 15.1 and 15.2.
+- `docs/spec/20-privacy.md`: row `server_signing_keys`.
 - `docs/api/openapi.yaml`: operations `getJwks`, `rotateSigningKey`; schemas `Jwks`, `SigningKeyRotate`, `SigningKeyRotation`, `SigningKeyPurpose`.
-- `docs/operations/configuration.md` section 5 (Geheimnisse), `docs/operations/disaster-recovery.md` (Fall D), `docs/security/threat-model.md` (T-TK-04), `infra/compose/compose.yaml` (service `server`, volume `secrets`), `services/server/Dockerfile` (M1-23).
+- `docs/operations/configuration.md` section 5 (Secrets), `docs/operations/disaster-recovery.md` (Case D), `docs/security/threat-model.md` (T-TK-04), `infra/compose/compose.yaml` (service `server`, volume `secrets`), `services/server/Dockerfile` (M1-23).
 - ADRs: 0066 (writable key store), 0011, 0012, 0020, 0021, 0023, 0016.
 - Merged code: `internal/platform/secrets` and `bothy secrets` (M1-09), `internal/platform/jobs` (M1-14), `internal/instance` with `instance` and `sequence_counters` (M1-15), the HTTP chain and problem writer (M1-18), idempotency (M1-20), `auditing.Recorder` (M1-24), `authorize` (M1-28), lifecycle and health (M1-11), config loader (M1-07) and generator (M1-08). Their names win where they differ from this brief only in naming.
 - RFC 7517 (JWK), RFC 7638 (JWK thumbprint), RFC 8037 (OKP keys, `EdDSA`).
@@ -43,7 +43,7 @@ M1-20 (`Idempotency-Key` on `rotateSigningKey`) and M1-28 are the direct depende
 6. Test first: red before green, red output kept for the report.
 7. No en dash or em dash in any file; White Label.
 8. Configuration values only through named keys listed in `docs/operations/configuration.md`; the new keys of this ticket are added to their chapter tables first and the reference is regenerated.
-9. The private part of a signing key exists only in the key store `secrets.signing_key_dir` of the Secret-Provider (ADR 0066, 16 section 5.2); `server_signing_keys` holds the public JWK, the state and `private_key_ref` (03; 19 section 10; SEC-SEC-3). A private key never appears in the database, a log, telemetry, an audit entry, an error or a response.
+9. The private part of a signing key exists only in the key store `secrets.signing_key_dir` of the secret provider (ADR 0066, 16 section 5.2); `server_signing_keys` holds the public JWK, the state and `private_key_ref` (03; 19 section 10; SEC-SEC-3). A private key never appears in the database, a log, telemetry, an audit entry, an error or a response.
 10. States `next`, `active`, `retiring`, `retired`; exactly one `active` key per purpose (partial unique index of 03); a key stays `retiring` until the longest validity of anything signed with it has passed (19 section 10); the JWKS publishes `next`, `active` and `retiring` keys (09 section 4.5).
 11. `invocation` and `webhook_out` keys use only `EdDSA` (03 check). This ticket generates Ed25519 keys for every purpose (08 section 7.1 names `EdDSA` for access tokens).
 12. Scheduled rotation of `invocation` keys after `signing_key.invocation_rotation_interval` and of `access_token` keys after `signing_key.access_token_rotation_interval`, with the new key published for at least `agent.jwks_max_age` before it signs (09 section 4.5, 19 section 10). `webhook_out` and `audit_checkpoint` rotate on owner request only.
@@ -59,12 +59,12 @@ ADR 0066 and the chapters already describe this ticket: 16 sections 5.2 to 5.4 a
 states, windows, `signing_key.cache_ttl`, `signing_key.rotation_check_interval`,
 `signing_key.access_token_rotation_interval`), 02 15.1 step 6 and 15.2 (`signing_keys`), 09 4.5
 (modes, `auth.clock_leeway` as the retiring margin), 05 (`signing_key.transition`), `openapi.yaml`
-(`SigningKeyRotate.mode`), `configuration.md` section 5, `disaster-recovery.md` Fall D, the threat
+(`SigningKeyRotate.mode`), `configuration.md` section 5, `disaster-recovery.md` Case D, the threat
 model row T-TK-04 and the compose volume `signing-keys`. Change them only if the build proves a
 statement wrong, in the same change; add this ticket's tests to the "Confirmation" of ADR 0066 if
 their names differ.
 
-### 2. Secret-Provider (`internal/platform/secrets`)
+### 2. Secret provider (`internal/platform/secrets`)
 
 - Add `Put(ctx, ref string, value Secret) error` and `Delete(ctx, ref string) error`. Only the `file` driver supports them, and only for references below `secrets.signing_key_dir`; every other reference returns `ErrReadOnly`; `env` never writes.
 - `Put` creates the file with mode 0600 in the same directory under a temporary name, writes, fsyncs, links it to the final name without overwriting (an existing name is an error), removes the temporary name, and fsyncs the directory.
@@ -158,7 +158,7 @@ Migration `services/server/migrations/<next number>_server_signing_keys.sql` (go
 ## Out of scope
 
 - Issuing and verifying access tokens: M1-34. Invocation tokens: M2-06. Webhook signatures and `getWebhookKeys`: M2. Audit checkpoints: M1-50. Bootstrap command: M1-37 (it calls `EnsureActive`).
-- Revoking all sessions after an emergency rotation of `access_token` keys: an owner step in the runbook (Fall D), not automatic.
+- Revoking all sessions after an emergency rotation of `access_token` keys: an owner step in the runbook (Case D), not automatic.
 - Writable drivers `azkv` and `awssm`: V3-12. Multi-node key store: M7-17.
 - Startable installation compose and the smoke overlay: M7 and M1-73 (the overlay mounts `signing-keys`).
 

@@ -1,6 +1,6 @@
 # M1-65: Gateway hub, delivery, catch-up and revocation
 
-Status: ready | Depends on: M1-45, M1-64 | Etappe: M1
+Status: ready | Depends on: M1-45, M1-64 | Milestone: M1
 
 ## Goal
 
@@ -10,44 +10,43 @@ without ever blocking on a slow reader. A connection that identifies or resumes 
 catches up page by page over the WebSocket and then switches to live delivery without gap,
 duplicate or interleaving. Revoking a grant, session, device, principal or token takes effect on
 open connections immediately, also across processes, and shutdown closes every connection with
-`4013`. This is the delivery half of B8 and the guarantee "rights apply at every delivery" (04
-"Ziele", items 1, 3 and 4).
+`4013`. This is the delivery half of B8 and the guarantee "permissions apply at every delivery"
+(04 "Goals", items 1, 3 and 4).
 
 ## Read first
 
-- `docs/PLAN.md`: section "Arbeitsweise je Ticket"; section "M1 Fundament" with the rows M1-63,
-  M1-64, M1-65, M1-66, M1-67, M1-68, M1-70, M1-72 and the list "Bekannte Widersprüche, die M1
-  auflöst".
-- `docs/spec/04-sync-protokoll.md`: "Zwei Arten", "Umschlag (Envelope)", "Rahmen auf dem
-  WebSocket", "Lebenszyklus", "Schließ-Codes", "Nachholen (Catch-up)" with "Cursor", "Ablauf",
-  "`resync_required`" and "REST-Variante", "Sichtbarkeit bei Rechte-Änderungen" (all subsections),
-  "Zustellgarantie", "Reihenfolge", the sequence diagrams "Nachricht senden, online",
-  "Wiederverbinden mit Nachholen" and "Entzug während offener Verbindung", "Entscheidungen dieses
-  Kapitels" (R-SY-02, R-SY-03, R-SY-04, R-SY-14, R-SY-15, R-SY-16), "Konfigurationswerte dieses
-  Kapitels".
-- `docs/spec/02-architektur.md`: "Querschnitts-Ports (`internal/kernel`)", "Erlaubte
-  Abhängigkeiten", "Ereignistypen und WebSocket-Ops je Modul", "Schichten im Modul", "Gateway",
-  "Ereignis-Pfad" ("Log-Tail je api-Prozess", "Rechte-Cache", "Hub und Zustellung"), "Ausfall
-  einer Abhängigkeit", "Panics", "Health", "Shutdown", "Konfigurationswerte dieses Kapitels".
-- `docs/spec/05-aktionen.md`: "Verbindliche Regeln" (rules 1, 2, 4, 7), "Entscheidung",
-  "Dauerhafte Ereignistypen und Empfangs-Aktion", "WebSocket-Ops und Aktion". Action ids:
+- `docs/PLAN.md`: section "Way of working per ticket"; section "M1 Foundation" with the rows
+  M1-63, M1-64, M1-65, M1-66, M1-67, M1-68, M1-70, M1-72 and the list
+  "Known contradictions that M1 resolves".
+- `docs/spec/04-sync-protocol.md`: "Two kinds", "Envelope", "Frames on the WebSocket",
+  "Lifecycle", "Close codes", "Catch-up" with "Cursor", "Flow", "`resync_required`" and
+  "REST variant", "Visibility on permission changes" (all subsections), "Delivery guarantee",
+  "Ordering", the sequence diagrams "Send a message, online", "Reconnect with catch-up" and
+  "Access removal during an open connection", "Decisions of this chapter" (R-SY-02, R-SY-03,
+  R-SY-04, R-SY-14, R-SY-15, R-SY-16), "Configuration values of this chapter".
+- `docs/spec/02-architecture.md`: "Cross-cutting ports (`internal/kernel`)", "Allowed dependencies",
+  "Event types and WebSocket ops per module", "Layers within a module", "Gateway", "Event path"
+  ("Log tail per api process", "Permission cache", "Hub and delivery"), "Failure of a dependency",
+  "Panics", "Health", "Shutdown", "Configuration values of this chapter".
+- `docs/spec/05-actions.md`: "Binding rules" (rules 1, 2, 4, 7), "Decision",
+  "Durable event types and receive action", "WebSocket ops and action". Action ids:
   `gateway.connect`, `events.catch_up`, `grant.revoke`, `session.revoke`, `device.revoke`,
   `user.disable`, `token.revoke`, `agent.disable`.
-- `docs/spec/07-rechte.md`: "Ablauf" (pseudo-code of `authorize`), "Rechte-Stand (Snapshot)",
-  "Gültigkeit des Caches", "Zustellfilter je Empfänger und sofortige Wirkung" (both
-  subsections), "Pflicht-Tests" (AZ-P9), test matrix rows AZ-M40 and AZ-M41.
-- `docs/spec/08-identitaet.md`: "Refresh-Tokens: Rotation, Familien, Wiederverwendung", "Verlorenes
-  Gerät", "Person sperren".
-- `docs/spec/03-datenmodell.md`: table `event_log`; "Transaktionsregeln" ("Benachrichtigung der
-  Gateway-Prozesse", "Sync-Epoche und Wiederherstellung").
+- `docs/spec/07-permissions.md`: "Flow" (pseudo-code of `authorize`), "Permission state (snapshot)",
+  "Validity of the cache", "Delivery filter per recipient and immediate effect" (both
+  subsections), "Required tests" (AZ-P9), test matrix rows AZ-M40 and AZ-M41.
+- `docs/spec/08-identity.md`: "Refresh tokens: rotation, families, reuse", "Lost device",
+  "Disabling a person".
+- `docs/spec/03-data-model.md`: table `event_log`; "Transaction rules"
+  ("Notifying the gateway processes", "Sync epoch and restore").
 - `docs/api/asyncapi.yaml`: operations `send.dispatch`, `send.cursor`, `send.catchup.complete`,
   `send.resync_required`; `x-close-codes`. `docs/api/openapi.yaml` schemas `EventEnvelope`,
   `GatewayCursor`, `GatewayCatchupComplete`, `GatewayResyncRequired`, `AccessChangedPayload`,
   `AccessTarget`, `SessionRevokedPayload`.
 - ADRs: `docs/adr/0008-*`, `0009-*`, `0017-*`, and 0052 (one event envelope) and 0053 (no JSON
   null), written by M1-16.
-- Diagrams: `docs/architecture/fluss-ereignis-pfad.svg`, `seq-3-wiederverbinden.svg`,
-  `seq-4-freigabe-entziehen.svg`.
+- Diagrams: `docs/architecture/flow-event-path.svg`, `seq-3-reconnect.svg`,
+  `seq-4-revoke-grant.svg`.
 - `docs/security/threat-model.md`: "Gateway (WebSocket)", register rows T-AZ-03 and T-DS-01.
 - Code you build on: `internal/gateway` (M1-64: endpoint, sessions, handshake, test client),
   `internal/sync` (M1-16: appender, `Tail`; M1-63: `CatchUp`, `Snapshot`, `listEvents`),
@@ -76,40 +75,40 @@ open connections immediately, also across processes, and shutdown closes every c
 7. No en dash or em dash (U+2013, U+2014) in any file you write; the `text-rules` hook rejects
    them.
 8. White label: no company, person, host or domain names except the examples Alex, Sam, Robin,
-   `example.com` and the areas Support, Marketing, Engineering, Research; no paths under `/Users`.
+   `example.com` and the spaces Support, Marketing, Engineering, Research; no paths under `/Users`.
 9. Limits, windows and intervals only through named keys from `docs/operations/configuration.md`;
    no literal numbers in code or docs that a test does not hold.
-10. Rights apply at delivery time. A gateway process updates the rights cache of a principal when
-    its `access.changed` arrives in log order and checks every later event with the new state
-    (04 "Grundregel", R-SY-02; 02 "Rechte-Cache").
+10. Permissions apply at delivery time. A gateway process updates the permission cache of a
+    principal when its `access.changed` arrives in log order and checks every later event with the
+    new state (04 "Basic rule", R-SY-02; 02 "Permission cache").
 11. Every `dispatch` passes `authorize(recipient, receive_action, resource)` first; personal events
-    (`audience = self`) go only to the audience principal (05 "Dauerhafte Ereignistypen und
-    Empfangs-Aktion"; 07 "Zustellfilter").
+    (`audience = self`) go only to the audience principal
+    (05 "Durable event types and receive action"; 07 "Delivery filter").
 12. The hub never blocks on a connection; a connection whose queue exceeds
-    `sync.outbound_queue_max` is closed with `4014` without delaying others (02 "Gateway", "Hub und
-    Zustellung"; 04 "Ablauf" step 5).
+    `sync.outbound_queue_max` is closed with `4014` without delaying others
+    (02 "Gateway", "Hub and delivery"; 04 "Flow" step 5).
 13. Catch-up in pages of `sync.catchup_page_size`; `cursor` frames for skipped events at the latest
     after `sync.cursor_advance_every` and at the end of every page; live events buffered and sent
-    after `catchup.complete {head_seq}` in `seq` order, never mixed (04 "Cursor", "Ablauf").
+    after `catchup.complete {head_seq}` in `seq` order, never mixed (04 "Cursor", "Flow").
 14. `resync_required {reason, head_seq, sync_epoch}` instead of events for the reasons `retention`,
     `too_far_behind` and `cursor_ahead` (04 "`resync_required`"). The epoch check (`epoch_changed`)
     runs once at `identify` and `resume` in M1-64 through `sync.CatchUp.Check` (M1-63), not here.
 15. After `access.changed` nothing more from removed targets: buffered and queued frames of those
-    targets are discarded (04 "Was der Client bei Entzug bekommt und tut", items 1 and 2).
+    targets are discarded (04 "What the client receives and does on access removal", items 1 and 2).
 16. Revocation of a session, device, principal or token closes the affected connections with
-    `4012` (04 "Widerruf von Sitzung, Gerät oder Prinzipal"; 08 "Verlorenes Gerät", "Person
-    sperren").
+    `4012` (04 "Revocation of a session, device or principal"; 08 "Lost device",
+    "Disabling a person").
 17. Shutdown of role `api` closes all connections with `4013 server_restart` (02 "Shutdown",
     step 3; R-AR-17).
-18. AZ-P9: after the commit of a revocation in process A, nothing that depends on the revoked right
-    is allowed or delivered by process B (07 "Pflicht-Tests").
+18. AZ-P9: after the commit of a revocation in process A, nothing that depends on the revoked
+    permission is allowed or delivered by process B (07 "Required tests").
 19. A panic in the log tail or the hub ends the process with an error code; a panic on one
     connection closes it with `4000` (02 "Panics").
 
 ## Scope
 
 Follow the package layout that M1-64 established in `internal/gateway`. Where M1-64 left no
-place, use this layout (it satisfies 02 "Schichten im Modul"):
+place, use this layout (it satisfies 02 "Layers within a module"):
 
 - `internal/gateway/domain/`: pure types and functions: connection phase (`catching_up`, `live`,
   `closing`), the bounded outbound queue with scope metadata and purge, the candidate rule of the
@@ -117,7 +116,7 @@ place, use this layout (it satisfies 02 "Schichten im Modul"):
 - `internal/gateway/app/`: `Hub` (indices, `Dispatch`), the per-connection catch-up runner
   (`catchup.go`), revocation handling (`revocation.go`), shutdown (`shutdown.go`). Imports only
   its own port and domain, `internal/kernel/*` and the port of `sync` (allowed edge in 02
-  "Erlaubte Abhängigkeiten").
+  "Allowed dependencies").
 - `internal/gateway/adapters/ws/` (from M1-64): the writer goroutine drains the queue with
   deadline `gateway.write_timeout`; the handshake registers the connection in the hub before it
   reads `head_seq` (see "Connection phases").
@@ -126,7 +125,7 @@ place, use this layout (it satisfies 02 "Schichten im Modul"):
   `Filter(ctx)` of M1-28 (no denial audit, not counted).
 - `internal/authz/`: implement `Observe` and the delivery mode of `Authorize` (`observe.go`,
   tests), including `thread.moved` (this ticket owns the cache side of moves; M1-62 builds the move
-  itself, 04 "Grundregel").
+  itself, 04 "Basic rule").
 - `internal/kernel/actor/` and `internal/identity/`: `Revalidate` (see "Revocation") if the
   `Authenticator` has no equivalent yet.
 - `internal/sync/` port: expose what M1-63 built so the gateway can reuse it without copying:
@@ -135,7 +134,7 @@ place, use this layout (it satisfies 02 "Schichten im Modul"):
 - `internal/wire/`: wire `Tail` -> `Authorizer.Observe` -> `Hub.Dispatch` in one goroutine per
   process, register the shutdown step and the liveness check.
 - Docs: `services/server/internal/gateway/README.md` and `services/server/internal/authz/README.md`
-  (German, like the existing files), `docs/spec/02-architektur.md` table "Querschnitts-Ports"
+  (English, like the existing files), `docs/spec/02-architecture.md` table "Cross-cutting ports"
   (already names `Delivery` and `Revalidate`; change it only where the build proves it wrong),
   `docs/security/threat-model.md` row T-AZ-03 (add the new test names), `services/server/CHANGELOG.md`
   under "Unreleased", `docs/DECISIONS.md` (rulings listed below).
@@ -155,7 +154,7 @@ type LogEvent struct {
 }
 type Authorizer interface {
     // existing: Authorize, Scope
-    // Observe applies one durable event to the process-local rights cache. The log tail calls
+    // Observe applies one durable event to the process-local permission cache. The log tail calls
     // it in seq order, before the hub sees the event.
     Observe(ctx context.Context, ev LogEvent)
 }
@@ -208,7 +207,7 @@ func (h *Hub) CloseAll(code int, reason string)         // shutdown
 
 ## Design notes
 
-Event path (one goroutine per process, 02 "Log-Tail je api-Prozess")
+Event path (one goroutine per process, 02 "Log tail per api process")
 
 1. `sync.Tail` reads `event_log` in `seq` order. For each event: first
    `Authorizer.Observe(ev)`, then `Hub.Dispatch(ev)`. Nothing else consumes the tail in M1.
@@ -218,26 +217,26 @@ Event path (one goroutine per process, 02 "Log-Tail je api-Prozess")
    "Panics"). Register a liveness check with `internal/platform/health` that fails once the tail
    or hub goroutine has exited, so `/healthz` reflects 02 "Health".
 
-Rights cache in delivery mode (`internal/authz`)
+Permission cache in delivery mode (`internal/authz`)
 
 - `Observe` on `access.changed` with audience P: set `floor[P] = ev.PermissionVersion` and drop the
   cached snapshot and revocation state of P.
 - `Observe` on `channel.created`, `channel.updated` (carries `read_only`), `channel.archived`,
-  `space.archived`, `thread.moved` (04 "Grundregel"): advance a process-wide structure generation;
+  `space.archived`, `thread.moved` (04 "Basic rule"): advance a process-wide structure generation;
   cached snapshots and resolved resource paths from an older generation are recomputed on next
   use. Reason: these events are rare, and a global generation is correct without knowing every
   affected principal. All other types: no-op.
 - In `Delivery(ctx)` a cached snapshot of P is valid if its version is at least `floor[P]`, its
-  generation is current and the clock is before `valid_until` (07 "Gültigkeit des Caches"). A
+  generation is current and the clock is before `valid_until` (07 "Validity of the cache"). A
   recomputed snapshot reads current database state, which can only be newer than the log
-  position; that is allowed (rights at delivery time).
+  position; that is allowed (permissions at delivery time).
 - REST mode is unchanged: it keeps reading `permission_version` per request (R-RE-02).
 - Delivery checks write no audit entry for denials (they are filters, 07 4.2; `Delivery(ctx)`
   implies `Filter(ctx)` of M1-28, which `listEvents` in M1-63 uses). Requests and ops keep R-AZ-04.
 - A delivery decision `unauthenticated` for a connection means its credential was revoked: close
   that connection with `4012`.
 
-Hub indices and candidates (02 "Hub und Zustellung")
+Hub indices and candidates (02 "Hub and delivery")
 
 - Indices: principal -> connections; space -> connections whose principal sees the space
   (`visible_space_ids` from `Authorizer.Scope`); channel -> connections (`visible_channel_ids`);
@@ -247,8 +246,8 @@ Hub indices and candidates (02 "Hub und Zustellung")
   level, for example `instance.updated`, `user.updated`, `agent.updated`) -> all connections.
 - The candidate set is only a performance filter and must be a superset of the allowed set; the
   truth is `sync.Admit` in `Delivery(ctx)` for each candidate. A new channel in a visible space is
-  reached through the space index without a new rights version (02 "Ergänzungen am Kern-Vertrag"
-  point 4).
+  reached through the space index without a new permission version
+  (02 "Additions to the core contract" point 4).
 - Recompute the index entries of P's connections from `Authorizer.Scope` (delivery mode) when
   P's `access.changed` is processed.
 - Encode each event once (`{"op":"dispatch","d":<envelope>}` with the no-null encoder of M1-18)
@@ -263,16 +262,16 @@ Per-connection queue
   `heartbeat_ack`) are never purged.
 - Overflow: mark the connection `closing`, drop its queue and close it with `4014` from the
   writer side. The writer writes each frame with deadline `gateway.write_timeout`; a write that
-  misses the deadline also closes with `4014` (04 'Schließ-Codes', 02 'Gateway').
+  misses the deadline also closes with `4014` (04 'Close codes', 02 'Gateway').
 
-Connection phases and catch-up (04 "Ablauf")
+Connection phases and catch-up (04 "Flow")
 
 1. Registration: the handshake calls `Delivery.Register` (M1-64) before it reads `head_seq` for
-   `ready` or `resumed` (04 'Lebenszyklus' step 4); this ticket's implementation puts the
+   `ready` or `resumed` (04 'Lifecycle' step 4); this ticket's implementation puts the
    connection into the hub in phase `catching_up`. Call the value H. Every event with `seq > H` the tail delivers from now on is either
    buffered or sent; every event with `seq <= H` is covered by the snapshot or the catch-up.
 2. No cursor in `identify`: no catch-up frames; switch to `live` with base H immediately after
-   `ready` (04 "Lebenszyklus" step 4: catch-up only when a cursor was sent).
+   `ready` (04 "Lifecycle" step 4: catch-up only when a cursor was sent).
 3. Cursor c (from `identify` or `resume`): `sync.Check(c)`. On a resync reason send
    `resync_required {reason, head_seq: H, sync_epoch}` and switch to `live` with base H (the
    connection stays open, 04 '`resync_required`'). Otherwise read pages `after = c`, `upTo = H`,
@@ -282,14 +281,14 @@ Connection phases and catch-up (04 "Ablauf")
    the last frame that carried a `seq` reaches `sync.cursor_advance_every`.
 5. End: `catchup.complete {head_seq: H}`; then, atomically with respect to `Dispatch`, run the
    live buffer through `Admit` in `seq` order (only `seq > H`), enqueue the admitted ones and
-   switch to `live`. Admission at flush time applies the newest rights, so events of a target
+   switch to `live`. Admission at flush time applies the newest permissions, so events of a target
    removed during the catch-up never go out.
 6. The live buffer during catch-up is bounded by `sync.outbound_queue_max`; overflow closes with
    `4014`. The catch-up runner itself waits for queue space (it blocks only its own goroutine and
    stops when the connection closes).
 7. A failing page read (database unavailable) is retried with backoff capped at
    `database.listen_reconnect_backoff_cap` while the connection is open; the gateway keeps
-   connections and delivers nothing meanwhile (02 "Ausfall einer Abhängigkeit").
+   connections and delivers nothing meanwhile (02 "Failure of a dependency").
 
 Live cursor frames (04 "Cursor", R-SY-03)
 
@@ -303,13 +302,13 @@ Revocation
 - On P's `access.changed`, before it is dispatched: (a) `Revalidate` every connection of P and
   close failures with `4012`; (b) recompute P's index entries; (c) purge the queues and live
   buffers of P's connections for the `removed` targets; (d) dispatch `access.changed` through the
-  normal path, in `seq` order (it must not overtake earlier frames, 04 "Zustellgarantie" item 2).
+  normal path, in `seq` order (it must not overtake earlier frames, 04 "Delivery guarantee" item 2).
 - On `session.revoked` (audience P, payload `session_id`): close every connection whose actor
   carries that session id with `4012`; it is delivered to P's other connections whose
   credentials are still valid.
 - `user.disable`, `device.revoke`, `session.revoke`, `token.revoke` and `agent.disable` all raise
-  the rights version and write `access.changed` (05 column "Rechte"), so the recheck in (a) covers
-  every revocation even without a `session.revoked`.
+  the permission version and write `access.changed` (05 column "Permissions"), so the recheck in
+  (a) covers every revocation even without a `session.revoked`.
 
 Agents and apps in M1
 
@@ -333,7 +332,7 @@ Ruling to record in `docs/DECISIONS.md` (with its reason): structure events inva
 cached snapshots through a generation counter. The other decisions of this ticket are in the
 specification: the connection stays open after `resync_required` (04 7.3), a missed write
 deadline closes with `4014` (04 6.4), delivery checks write no denial audit (07 4.2, R-AZ-04), and
-AZ-P9 runs with two independent server instances in one test binary (07 "Pflicht-Tests").
+AZ-P9 runs with two independent server instances in one test binary (07 "Required tests").
 
 If a change to 04 or 05 (core contract) turns out to be necessary, stop with
 `Verdict: BLOCKED` (P-11). Changes to 02 named above are allowed.
@@ -367,12 +366,12 @@ the `kernel/clock` test clock):
 Integration tests against PostgreSQL 18 with all real modules, using the in-process server and
 WebSocket test client from M1-64 and the step-up test authenticator of the identity tickets:
 
-- `TestGateway_ReconnectWithCatchUp`: sequence diagram 04 "Wiederverbinden mit Nachholen".
-- `TestGateway_RevocationDuringOpenConnection`: sequence diagram 04 "Entzug während offener
-  Verbindung" without the agent part (M2): the Owner revokes Sam's grant on channel Support via
-  `revokeGrant`; Sam receives `access.changed` with Support in `removed`; frames for Support queued
-  before it (writer held) are not written; a message posted to Support afterwards does not reach
-  Sam; Sam still receives events of Marketing.
+- `TestGateway_ReconnectWithCatchUp`: sequence diagram 04 "Reconnect with catch-up".
+- `TestGateway_RevocationDuringOpenConnection`: sequence diagram
+  04 "Access removal during an open connection" without the agent part (M2): the Owner revokes
+  Sam's grant on channel Support via `revokeGrant`; Sam receives `access.changed` with Support in
+  `removed`; frames for Support queued before it (writer held) are not written; a message posted
+  to Support afterwards does not reach Sam; Sam still receives events of Marketing.
 - `TestGateway_RevocationCloses4012`: table over `revokeSession`, `revokeDevice`, `disableUser`,
   `revokeToken` (agent API token) and `disableAgent`; the affected connections close with `4012`;
   in the session case a second session of the same person stays open and receives
@@ -410,8 +409,8 @@ make check
 - [ ] Revoking a session, device, person, API token or agent closes exactly the affected
       connections with `4012`.
 - [ ] AZ-P9 with two instances is green.
-- [ ] Sequence diagrams 04 "Wiederverbinden mit Nachholen" and "Entzug während offener
-      Verbindung" run as integration tests.
+- [ ] Sequence diagrams 04 "Reconnect with catch-up" and
+      "Access removal during an open connection" run as integration tests.
 - [ ] Shutdown closes every connection with `4013` within `shutdown.total_timeout`; `/healthz`
       fails when tail or hub stop.
 - [ ] Delivery denials write no audit entries; request denials still do.
@@ -422,7 +421,7 @@ make check
 - Code and tests as above; doc comment on every public symbol (purpose, parameters, return value,
   errors); comments explain why.
 - Module READMEs of `gateway` and `authz` updated (status, ports, actions, config keys, behaviour
-  on revocation and shutdown); 02 table "Querschnitts-Ports" updated; threat model row T-AZ-03
+  on revocation and shutdown); 02 table "Cross-cutting ports" updated; threat model row T-AZ-03
   lists the new tests; rulings in `docs/DECISIONS.md`; `services/server/CHANGELOG.md` entry under
   "Unreleased". No new ADR is expected; write one if you take an architecture decision beyond
   this brief.

@@ -1,23 +1,23 @@
 # M1-30: Expiry of grants and memberships
 
-Status: ready | Depends on: M1-29 | Etappe: M1
+Status: ready | Depends on: M1-29 | Milestone: M1
 
 ## Goal
 
-After this ticket two periodic jobs in `authz` make expiry visible: `authz.expiry_sweep` reports every expired grant and group membership exactly once with a raised rights version, `access.changed` for each affected principal, the management events and an audit entry with the system actions `grant.expire` and `group.member.expire`; `authz.expiry_reminder` sends the personal event `access.expiring` exactly once before an expiry. The access decision itself never depends on either job: `authorize` already treats a row as invalid from the second of its expiry (07 section 2.5), and this ticket proves that again with the jobs switched off. Clients need the events to clear their caches and, from M2 on, runs of people who lost `trigger` end through the same in-transaction event.
+After this ticket two periodic jobs in `authz` make expiry visible: `authz.expiry_sweep` reports every expired grant and group membership exactly once with a raised permission version, `access.changed` for each affected principal, the management events and an audit entry with the system actions `grant.expire` and `group.member.expire`; `authz.expiry_reminder` sends the personal event `access.expiring` exactly once before an expiry. The access decision itself never depends on either job: `authorize` already treats a row as invalid from the second of its expiry (07 section 2.5), and this ticket proves that again with the jobs switched off. Clients need the events to clear their caches and, from M2 on, runs of people who lost `trigger` end through the same in-transaction event.
 
 ## Read first
 
 - `docs/PLAN.md`: section 3, section 7 (M1), rows M1-27 to M1-31.
-- `docs/spec/07-rechte.md`: 2.5 (Gueltigkeit einer Freigabe), 4.4, 8.2, 8.3 (Ablauf durch Zeit), 9.4 (Erinnerung vor Ablauf), 11.2 (AZ-P10), 12 (R-RE-09), 14 (configuration values).
-- `docs/spec/03-datenmodell.md`: 4.3 `groups`, `group_memberships`, `grants` (including `expiry_reminded_at` and the expiry index), 6.3, 6.4.
-- `docs/spec/04-sync-protokoll.md`: 2.2, 8.2.
-- `docs/spec/05-aktionen.md`: rule 1.10 (system actions), table 4.4 (`grant.expire`, `group.member.expire` and the note below the table), 6 (`access.changed`, `access.expiring`, `grant.changed`, `group.changed`), 8 (R-AZ-15).
-- `docs/spec/02-architektur.md`: 4.7, 8.1 to 8.3, 12.1 to 12.4 (jobs, queues, job catalogue, job rules).
+- `docs/spec/07-permissions.md`: 2.5 (Validity of a grant), 4.4, 8.2, 8.3 (Expiry by time), 9.4 (Expiry reminder), 11.2 (AZ-P10), 12 (R-RE-09), 14 (configuration values).
+- `docs/spec/03-data-model.md`: 4.3 `groups`, `group_memberships`, `grants` (including `expiry_reminded_at` and the expiry index), 6.3, 6.4.
+- `docs/spec/04-sync-protocol.md`: 2.2, 8.2.
+- `docs/spec/05-actions.md`: rule 1.10 (system actions), table 4.4 (`grant.expire`, `group.member.expire` and the note below the table), 6 (`access.changed`, `access.expiring`, `grant.changed`, `group.changed`), 8 (R-AZ-15).
+- `docs/spec/02-architecture.md`: 4.7, 8.1 to 8.3, 12.1 to 12.4 (jobs, queues, job catalogue, job rules).
 - `docs/api/openapi.yaml`: schemas `AccessExpiringPayload`, `AccessTarget`, `AccessTargetKind`, `GrantChangedPayload`, `GroupChangedPayload`, `Grant`, `Group`, `EventEnvelope`.
 - ADRs: 0018, 0021, 0009, 0052, 0053.
 - `docs/security/threat-model.md`: T-AZ-03, T-AZ-04.
-- Merged code: `internal/platform/jobs` (M1-14, periodic jobs and handler interface), the rights-change hook, `VerifyInvariants` and the Admin port (M1-29), the grant store (M1-27), the snapshot builder (M1-28), `auditing.Recorder` (M1-24), `kernel/eventlog.Appender` (M1-16). Their names win where they differ from this brief only in naming.
+- Merged code: `internal/platform/jobs` (M1-14, periodic jobs and handler interface), the permission-change hook, `VerifyInvariants` and the Admin port (M1-29), the grant store (M1-27), the snapshot builder (M1-28), `auditing.Recorder` (M1-24), `kernel/eventlog.Appender` (M1-16). Their names win where they differ from this brief only in naming.
 - `docs/quality/gates.md`, `CONTRIBUTING.md`.
 
 ## Fixed requirements that apply
@@ -38,7 +38,7 @@ After this ticket two periodic jobs in `authz` make expiry visible: `authz.expir
 7. No en dash or em dash in any file; White Label.
 8. Configuration values only through named keys listed in `docs/operations/configuration.md`; the one new key of this ticket is added there through its chapter table (Scope 6).
 9. Expiry is checked at every `authorize` call; the jobs only report (07 principle 3, section 8.3, R-RE-09). With `authz.expiry_sweep` switched off an expired grant still has no effect (AZ-P10).
-10. The sweep writes, in one transaction per batch: raised rights version, `access.changed`, audit entries with the system actions `grant.expire` and `group.member.expire` (07 section 8.3, R-AZ-15); invariants are verified as for every rights change (05 rule 1.6).
+10. The sweep writes, in one transaction per batch: raised permission version, `access.changed`, audit entries with the system actions `grant.expire` and `group.member.expire` (07 section 8.3, R-AZ-15); invariants are verified as for every permission change (05 rule 1.6).
 11. The reminder runs with the period `authz.expiry_sweep_interval`, finds rows expiring within `authz.expiry_reminder_lead` and not yet reminded, and writes `access.expiring` exactly once (07 section 9.4); no e-mail (Baseline section 4).
 12. Job arguments contain only IDs, never content or secrets (02 section 12.1); these jobs need no arguments.
 13. Lock order of 03 section 6.3.
@@ -61,7 +61,7 @@ In `internal/authz/app/rightschange.go` (M1-29) add `AddAffectedAssumingValid(ct
 
 Handler in `internal/authz/app/expiry.go`, registered through `internal/platform/jobs` in `internal/wire` for the roles `worker` and `all`, queue `maintenance`, period `authz.expiry_sweep_interval`. Algorithm per run, with `t` read once per batch from `kernel/clock`:
 
-1. Grants. Open a unit of work with `RightsChange{Action: grant.expire}` (phase 1 locks `permission_version`). Select `grants WHERE revoked_at IS NULL AND expires_at IS NOT NULL AND expires_at <= t AND expiry_reported_at IS NULL ORDER BY id LIMIT authz.expiry_sweep_batch_max FOR UPDATE`. If none: return a sentinel error so the transaction rolls back and the rights version does not move; treat the sentinel as success. Otherwise:
+1. Grants. Open a unit of work with `RightsChange{Action: grant.expire}` (phase 1 locks `permission_version`). Select `grants WHERE revoked_at IS NULL AND expires_at IS NOT NULL AND expires_at <= t AND expiry_reported_at IS NULL ORDER BY id LIMIT authz.expiry_sweep_batch_max FOR UPDATE`. If none: return a sentinel error so the transaction rolls back and the permission version does not move; treat the sentinel as success. Otherwise:
     - affected principals: the subject principal for subjects `user`, `agent`, `app`; for a group subject all members with `removed_at IS NULL` of a non-deleted group; register them with `AddAffectedAssumingValid` before any write;
     - set `expiry_reported_at = t` on the selected rows;
     - append `grant.changed` per row (envelope `resource = {kind: grant, id}`, `scope` with `space_id` and, for channel targets, `channel_id` resolved through `StructureSource`; payload `GrantChangedPayload{grant: Grant, change: expired}`);
@@ -73,14 +73,14 @@ Handler in `internal/authz/app/expiry.go`, registered through `internal/platform
 
 ### 4. Job `authz.expiry_reminder`
 
-Handler in the same file, same roles, queue `maintenance`, period `authz.expiry_sweep_interval` (07 section 9.4). Per batch, in one unit of work without rights change, `t` read once:
+Handler in the same file, same roles, queue `maintenance`, period `authz.expiry_sweep_interval` (07 section 9.4). Per batch, in one unit of work without permission change, `t` read once:
 
 1. Select `grants WHERE revoked_at IS NULL AND expires_at > t AND expires_at <= t + authz.expiry_reminder_lead AND expiry_reminded_at IS NULL ORDER BY id LIMIT authz.expiry_sweep_batch_max FOR UPDATE`; skip grants of deleted groups.
 2. Recipients per row (Ruling, see Design notes), deduplicated, only active principals: grants to `user`, `agent` or `app`: the subject and `granted_by`; grants to a group: all active owners and `granted_by`; memberships: the member and `added_by`.
 3. Append one `access.expiring` per recipient: `audience = self`, `resource = {kind: principal, id: <recipient>}`, empty scope, no actor, payload `AccessExpiringPayload`: `kind` (`grant` or `group_membership`), `grant_id` for grants, `group_id` for group grants and memberships, `subject_id` (subject principal, group id for a group grant, member for a membership), `target` (`kind`, `id`, `level`, `capabilities`) only for space and channel targets, `expires_at`.
 4. Set `expiry_reminded_at = t`.
 5. Same for `group_memberships WHERE removed_at IS NULL AND expires_at > t AND expires_at <= t + lead AND expiry_reminded_at IS NULL` of non-deleted groups.
-6. Repeat while a full batch was found. Reminders write no audit entry: they change no right and the catalogue has no action for them.
+6. Repeat while a full batch was found. Reminders write no audit entry: they change no permission and the catalogue has no action for them.
 
 ### 5. Specification (already decided)
 
@@ -97,7 +97,7 @@ Add `authz.expiry_sweep_batch_max` (integer, at least 1, default from 07 section
 ## Out of scope
 
 - Cancelling runs of people who lost `trigger` (`run.cancel_requested`): `runs` subscribes to `AccessChanged` in M2. This ticket only guarantees that the in-transaction event is published.
-- HTTP routes for grants and groups, the console list Laeuft bald ab: M1-48 and M4.
+- HTTP routes for grants and groups, the console list "Expiring soon": M1-48 and M4.
 - Groups from OIDC claims and their expiry at login: M1-42 (its memberships expire through this sweep).
 - Any change to how `authorize` treats expiry: done in M1-27 and M1-28.
 
@@ -117,7 +117,7 @@ Add `authz.expiry_sweep_batch_max` (integer, at least 1, default from 07 section
 ## Design notes
 
 - Exactly once: marking (`expiry_reported_at`, `expiry_reminded_at`), events and audit commit in one transaction. A crash or error rolls back everything, and the next run selects the same rows again. Rows expired while the worker was down are found on the next run because the selection is not bounded by the last run time.
-- No empty rights change: a sweep run that finds nothing rolls back its unit of work, so `permission_version` only moves when something expired. Otherwise every run would invalidate every rights cache once per `authz.expiry_sweep_interval`.
+- No empty permission change: a sweep run that finds nothing rolls back its unit of work, so `permission_version` only moves when something expired. Otherwise every run would invalidate every permission cache once per `authz.expiry_sweep_interval`.
 - Lock order: phase 1 locks `permission_version` before the sweep selects rows `FOR UPDATE` in ascending `id` (03 section 6.3). The reminder takes no `permission_version` lock.
 - The difference uses `AssumeValid`: before = snapshot at `t` with the batch rows treated as valid, after = snapshot at `t`. This isolates the effect of exactly these expiries against the current state of all other rows.
 - A grant revoked or a membership removed before the sweep is not reported as expired; the revocation already produced its own `access.changed`.
@@ -131,7 +131,7 @@ Add `authz.expiry_sweep_batch_max` (integer, at least 1, default from 07 section
 
 Controllable clock, PostgreSQL 18 through `pgtest`, the world of 07 section 11.1 with real grants and memberships, the fake `StructureSource` and `AgentPolicySource` from M1-28 and M1-29. Call the handlers directly; River is not needed except for the registration test.
 
-1. `TestAZ_P10_ExpiryWithoutJob`: no job registered or run; `authorize` at exactly `expires_at` of G-3 (Robin) and of the Leser membership (Sam) answers `not_found`, one microsecond earlier `allow`; the cached snapshot honours `valid_until`.
+1. `TestAZ_P10_ExpiryWithoutJob`: no job registered or run; `authorize` at exactly `expires_at` of G-3 (Robin) and of the Leser membership (Sam) answers `not_found`, one microsecond earlier `allow`; the cached snapshot honors `valid_until`.
 2. `TestExpirySweep_Grant`: G-3 expires at T; the sweep at T plus `authz.expiry_sweep_interval` writes exactly one `access.changed` for Robin with `removed` containing the channel, one `grant.changed` with `change = expired`, one audit row `grant.expire` without actor, sets `expiry_reported_at`, and raises `permission_version` by one.
 3. `TestExpirySweep_GroupGrant`: a group grant expires; every member whose visible targets change gets `access.changed`; members with an independent grant on the same target get none.
 4. `TestExpirySweep_Membership`: the Leser membership expires; Sam gets `access.changed`; `group.changed` with `member_expired`; audit `group.member.expire`.

@@ -1,6 +1,6 @@
 # M1-68: Server core metrics per catalogue
 
-Status: ready | Depends on: M1-04, M1-50, M1-66 | Etappe: M1
+Status: ready | Depends on: M1-04, M1-50, M1-66 | Milestone: M1
 
 ## Goal
 
@@ -14,20 +14,21 @@ Without this the dashboards, alerts and SLOs shipped in `infra/observability/` m
 
 ## Read first
 
-- `docs/PLAN.md`: section "Arbeitsweise je Ticket"; section "M1 Fundament", rows M1-04, M1-10,
+- `docs/PLAN.md`: section "Way of working per ticket"; section "M1 Foundation", rows M1-04, M1-10,
   M1-14, M1-16, M1-18, M1-19, M1-50, M1-65, M1-66, M1-68, M1-69, M7-09.
-- `docs/spec/17-observability.md` (all sections, especially "Grundregeln" 3, 4, 8, 9, "Tests, die
-  diese Regeln halten" items 2 to 4, R-OB-06).
+- `docs/spec/17-observability.md` (all sections, especially "Basic rules" 3, 4, 8, 9,
+  "Tests that hold these rules" items 2 to 4, R-OB-06).
 - `docs/observability/signals.md` (all sections; tables 4.1, 4.2, 4.4, 4.5, 4.6, 4.7).
 - `docs/observability/slos.md`, `docs/observability/alerting.md`, `docs/observability/dashboards.md`,
-  `docs/observability/privacy.md` "Keine Überwachung einzelner Menschen".
+  `docs/observability/privacy.md` "No monitoring of individual people".
 - `infra/observability/slo/*.yaml`, `infra/observability/prometheus/rules/*.yaml`,
   `infra/observability/grafana/dashboards/*.json`, `infra/otel/collector.yaml`
   (`transform/scrub_metrics`).
-- `docs/spec/02-architektur.md`: "Schichten im Modul" (app layer imports no third-party library
-  and no `platform`), "Gateway", "Ereignis-Pfad", "Hintergrundjobs (River)", "Fristen", "Code-Layout".
-- `docs/spec/04-sync-protokoll.md`: "Schließ-Codes", "`resync_required`"; `docs/spec/05-aktionen.md`:
-  "Rate-Limit-Klassen", "Entscheidung"; `docs/spec/03-datenmodell.md` table `messages` (`origin`,
+- `docs/spec/02-architecture.md`: "Layers within a module" (app layer imports no third-party
+  library and no `platform`), "Gateway", "Event path", "Background jobs (River)", "Deadlines",
+  "Code layout".
+- `docs/spec/04-sync-protocol.md`: "Close codes", "`resync_required`"; `docs/spec/05-actions.md`:
+  "Rate-limit classes", "Decision"; `docs/spec/03-data-model.md` table `messages` (`origin`,
   `kind` checks).
 - ADRs: `docs/adr/0034-*`, `0035-*`, `0008-*`.
 - Code you build on: `internal/platform/otel` (M1-10, meter provider, `bothy.telemetry.dropped`),
@@ -55,19 +56,19 @@ Without this the dashboards, alerts and SLOs shipped in `infra/observability/` m
 6. Test first: every behaviour change has a test that was red before the change (record the red
    run in the report), then green, then clean up.
 7. No en dash or em dash (U+2013, U+2014) in any file you write.
-8. White label: only the examples Alex, Sam, Robin, `example.com` and the areas Support, Marketing,
+8. White label: only the examples Alex, Sam, Robin, `example.com` and the spaces Support, Marketing,
    Engineering, Research; no paths under `/Users`.
 9. Limits only through named keys from `docs/operations/configuration.md`.
 10. The catalogue is the only list of names, units and attributes; what is not in it is not sent
-    (signals.md, header; 17 "Signale").
+    (signals.md, header; 17 "Signals").
 11. Metric attributes come only from closed sets; never IDs, user input, error texts or raw paths;
-    `http.route` is the template or `unmatched` (signals.md "Kardinalität"; 17 rule 9).
-12. Metrics never carry attributes that identify a person (17 rule 8; privacy.md "Keine
-    Überwachung einzelner Menschen").
+    `http.route` is the template or `unmatched` (signals.md "Cardinality"; 17 rule 9).
+12. Metrics never carry attributes that identify a person
+    (17 rule 8; privacy.md "No monitoring of individual people").
 13. Histograms use the fixed bounds of signals.md 4.7, and every SLO threshold is one of these
     bounds (R-OB-06).
 14. Telemetry never blocks or changes the result of a request (17 rule 4).
-15. Tests named in 17 "Tests, die diese Regeln halten" items 3 and 4 (cardinality, names).
+15. Tests named in 17 "Tests that hold these rules" items 3 and 4 (cardinality, names).
 
 ## Scope
 
@@ -79,7 +80,7 @@ Go (module `services/server`):
   histogram, attribute allow-filters per instrument, including the ones created by otelhttp and
   otelpgx), and typed recording wrappers. Unknown attribute values map to `other` in production
   and fail the test in test builds (a strict switch the test helpers turn on).
-- Recording, in the layer where the fact is known (02 "Schichten im Modul", rule 5): app-layer code records
+- Recording, in the layer where the fact is known (02 "Layers within a module", rule 5): app-layer code records
   through a small outbound port in `internal/<module>/app/metrics.go` with a no-op default for
   unit tests; the implementation lives in `internal/<module>/adapters/otelmetrics/metrics.go`;
   platform packages record in `internal/platform/<pkg>/metrics.go`. Wire everything in
@@ -96,7 +97,7 @@ Go (module `services/server`):
 | `bothy.gateway.connect.duration` | `gateway` | upgrade to `ready`/`resumed`, or to the close before it; `client_error` and `server_error` exactly as signals.md 4.1 defines them; kind `anonymous` before identification |
 | `bothy.gateway.catchup.duration` | `gateway` | `ready`/`resumed` to `catchup.complete` (`complete`) or `resync_required` |
 | `bothy.gateway.resync` | `gateway` | reasons of 04 "`resync_required`" |
-| `bothy.gateway.close` | `gateway` | every close in both directions; codes of 04 "Schließ-Codes" as strings, any other code `other` |
+| `bothy.gateway.close` | `gateway` | every close in both directions; codes of 04 "Close codes" as strings, any other code `other` |
 | `bothy.gateway.outbound.dropped` | `gateway` | `slow_consumer`: number of frames discarded at a `4014` close, live buffer included |
 | `bothy.message.created` | `messaging` | after commit only; `origin` and `kind` from the `messages` checks in 03 |
 | `bothy.event.appended` | `sync` phase hook | after commit, per durable type |
@@ -126,11 +127,11 @@ Docs:
 - `docs/observability/signals.md` already carries the definition of `bothy.event.fanout.lag`, the
   `client_error` list, `bothy.authz.decisions` without filters, the view rule for library
   instruments (2, item 5), the outcome values of `bothy.job.duration` and the GenAI package path.
-  Change only the Quelle column of `db.client.operation.duration` (verified otelpgx version) and
+  Change only the Source column of `db.client.operation.duration` (verified otelpgx version) and
   what the build proves wrong. Move the declarations of
   `bothy.authz.errors` (M1-18, M1-25), `bothy.egress.blocked` (M1-22) and
   `bothy.secrets.refresh.failures` (M1-09) into the registry like `bothy.telemetry.dropped`.
-- Module READMEs of every module that records metrics (German, like the existing files),
+- Module READMEs of every module that records metrics (English, like the existing files),
   `services/server/CHANGELOG.md` under "Unreleased", `docs/DECISIONS.md` (only decisions beyond the specification).
 
 ## Out of scope
@@ -174,13 +175,13 @@ Go registry and checks
   query in `platform/jobs` (the owner of the River tables) with `database.statement_timeout`.
 - Catalogue test: the Go test reads `docs/observability/signals.md` (found by walking up to the
   directory that contains it), parses tables 4.1 to 4.7 and compares every registered `Spec`:
-  name present, kind (Histogramm, Zähler, UpDownCounter, Gauge), unit, attribute keys, listed
+  name present, kind (Histogram, Counter, UpDownCounter, Gauge), unit, attribute keys, listed
   values where the catalogue lists them, and bucket bounds.
 
 `signalcheck` (Python)
 
 1. Catalogue integrity: every row of 4.1 to 4.6 parses; the Prometheus column equals the
-   translation rule of signals.md "Namen und Einheiten" item 4 (dots to `_`, unit suffix `s` ->
+   translation rule of signals.md "Names and units" item 4 (dots to `_`, unit suffix `s` ->
    `_seconds`, `By` -> `_bytes`, counters `_total`, units in braces dropped); each histogram has
    exactly one row in 4.7 and 4.7 names only histograms; no attribute column names a person or ID
    attribute (deny list as in Go).
@@ -189,7 +190,7 @@ Go registry and checks
    Prometheus name (histograms also with `_bucket`, `_count`, `_sum`), a recording rule defined
    by `record:` in the rule files, or `up`, `ALERTS`, `ALERTS_FOR_STATE`.
 3. Labels: inside the selector braces of a catalogue metric, every label name is an attribute of
-   that metric (translated), a resource attribute of signals.md "Resource-Attribute"
+   that metric (translated), a resource attribute of signals.md "Resource attributes"
    (translated), `job`, `instance`, or `le` on `_bucket` series.
 4. Thresholds: every `le` matcher on a `_bucket` series in the Sloth files, rule files and
    dashboards is a bound of that histogram's 4.7 row (numeric comparison) or `+Inf`.
@@ -209,7 +210,7 @@ Go registry and checks
 Fixes to existing files: if the real dashboards, rules or Sloth files fail a rule, fix the file
 or, when the file is right, the catalogue, in this change, each with a line in the report.
 
-No rulings of its own: metric ports (02 "Schichten im Modul" rule 5), the fan-out lag, the
+No rulings of its own: metric ports (02 "Layers within a module" rule 5), the fan-out lag, the
 `client_error` set, the scope of `bothy.authz.decisions`, the views for library instruments and the
 job outcomes are in the specification. Record in `docs/DECISIONS.md` only what the build had to
 decide beyond them.

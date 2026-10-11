@@ -17,7 +17,7 @@ INDEX_ROWS = {
     "M1-04": (1, "none (M0 closed)"),
 }
 
-BRIEF = "# T\n\nStatus: ready | Depends on: {deps} | Etappe: M1\n\n{body}\n"
+BRIEF = "# T\n\nStatus: ready | Depends on: {deps} | Milestone: M1\n\n{body}\n"
 
 
 def _readme(rows: dict[str, tuple[int, str]], waves: str, edges: str) -> str:
@@ -54,10 +54,10 @@ def _repo(
     plan_deps = plan_deps or {}
     (tmp_path / "docs/briefs").mkdir(parents=True)
     (tmp_path / "docs/briefs/README.md").write_text(_readme(rows, waves, edges), encoding="utf-8")
-    plan = ["| ID | Titel | Abhängig von |", "|---|---|---|"]
+    plan = ["| ID | Title | Depends on |", "|---|---|---|"]
     for tid, (_, deps) in rows.items():
-        plan_cell = plan_deps.get(tid, deps.replace("none (M0 closed)", "keine"))
-        plan.append(f"| {tid} | Titel | {plan_cell} |")
+        plan_cell = plan_deps.get(tid, deps.replace("none (M0 closed)", "none"))
+        plan.append(f"| {tid} | Title | {plan_cell} |")
         (tmp_path / f"docs/briefs/{tid}-x.md").write_text(
             BRIEF.format(deps=deps, body=bodies.get(tid, "Run `make check`.")), encoding="utf-8"
         )
@@ -142,7 +142,7 @@ def test_brief_header_mismatch_fails(tmp_path: Path) -> None:
 def test_missing_brief_and_plan_row_fail(tmp_path: Path) -> None:
     root = _repo(tmp_path)
     (root / "docs/briefs/M1-04-x.md").unlink()
-    (root / "docs/PLAN.md").write_text("| M1-01 | T | keine |\n", encoding="utf-8")
+    (root / "docs/PLAN.md").write_text("| M1-01 | T | none |\n", encoding="utf-8")
     problems = brief_deps.check(root)
     assert "docs/briefs/README.md: M1-04: brief file M1-04-x.md missing" in problems
     assert "docs/PLAN.md: no ticket row for M1-02" in problems

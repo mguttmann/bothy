@@ -1,49 +1,48 @@
 # M1-48: Groups and grants over the API
 
-Status: ready | Depends on: M1-31, M1-44 | Etappe: M1
+Status: ready | Depends on: M1-31, M1-44 | Milestone: M1
 
 ## Goal
 
 After this ticket owners manage groups and memberships, and owners and holders of `manage`
 manage grants, through the twelve REST operations of 06 "Groups" and "Access". Every change runs
 through `authorize` with step-up, respects the delegation limits of `manage` (R-AZ-05), is a
-rights change with I1 and SR8 in the same transaction where 05 says so, writes `grant.changed` or
-`group.changed` for administrators, `access.changed` for every affected person and an audit
-entry. Reads show nothing a caller may not see: no grant outside the caller's `manage` scope, no
-group the caller is not in, unless the caller is an owner.
+permission change with I1 and SR8 in the same transaction where 05 says so, writes
+`grant.changed` or `group.changed` for administrators, `access.changed` for every affected person
+and an audit entry. Reads show nothing a caller may not see: no grant outside the caller's
+`manage` scope, no group the caller is not in, unless the caller is an owner.
 
 ## Read first
 
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 rows M1-27 to M1-31, M1-42,
-  M1-44, M1-48, M1-49, M1-54, M2-21; "Voraussetzungen aus dem Kern-Vertrag" (row with K-RE-6).
-- `docs/spec/07-rechte.md`: "Freigabe-Modell" (2.1 to 2.7, especially "Gültigkeit einer
-  Freigabe" and "Delegation mit `manage`"), "Prinzipal-Kontext" (3), "Entscheidungen und
-  Gründe" (4.1), "Ablauf" (4.2: requirement before step-up), "Sichtbarkeit" (4.3),
-  "Invarianten in der Transaktion" (4.4), SR1, SR5, SR8, "Sofortige Wirkung bei Entzug" (8.2),
-  "Weitere Pflichten" (9.5: every grant needs a reason), "Beispiele" (10), "Testmatrix" (11.1)
-  rows AZ-M21, AZ-M25, AZ-M31, AZ-M35 to AZ-M39, "Pflicht-Tests" (11.2) AZ-P4, AZ-P13.
-- `docs/spec/05-aktionen.md`: "Verbindliche Regeln" items 2, 6 and 7; 2.1 to 2.5; 4.4 "Gruppen
-  und Freigaben"; 6 rows `grant.changed`, `group.changed`, `access.changed`; 8 R-AZ-05, R-AZ-14.
-- `docs/spec/03-datenmodell.md`: 4.3 tables `groups`, `group_memberships`, `grants` (paragraph
-  after `grants`); "Sperrreihenfolge" (6.3); "I1-Prüfung" (6.4).
-- `docs/spec/04-sync-protokoll.md`: "Umschlag (Envelope)" (2.2), "Was beim Ändern passiert"
-  (8.2).
-- `docs/spec/06-api.md`: "Grundregeln" (2), "Autorisierung in der API" (4), "Fehler" (5),
-  "Paginierung" (6), "Idempotenz" (7), 16 "Endpunkte" groups "Groups" and "Access".
-- `docs/spec/08-identitaet.md`: "Gruppen aus Claims" (3.4).
-- `docs/spec/19-sicherheit.md`: SEC-IN-4.
-- `docs/spec/02-architektur.md`: 4.3 (row `authz`: `Admin`, `PrincipalSource`,
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 rows M1-27 to M1-31, M1-42,
+  M1-44, M1-48, M1-49, M1-54, M2-21; "Prerequisites from the core contract" (row with K-RE-6).
+- `docs/spec/07-permissions.md`: "Grant model" (2.1 to 2.7, especially "Validity of a grant" and
+  "Delegation with `manage`"), "Principal context" (3), "Decisions and reasons" (4.1), "Flow"
+  (4.2: requirement before step-up), "Visibility" (4.3), "Invariants in the transaction" (4.4),
+  SR1, SR5, SR8, "Immediate effect on revocation" (8.2), "Further obligations" (9.5: every grant
+  needs a reason), "Examples" (10), "Test matrix" (11.1) rows AZ-M21, AZ-M25, AZ-M31, AZ-M35 to
+  AZ-M39, "Required tests" (11.2) AZ-P4, AZ-P13.
+- `docs/spec/05-actions.md`: "Binding rules" items 2, 6 and 7; 2.1 to 2.5; 4.4 "Groups and
+  grants"; 6 rows `grant.changed`, `group.changed`, `access.changed`; 8 R-AZ-05, R-AZ-14.
+- `docs/spec/03-data-model.md`: 4.3 tables `groups`, `group_memberships`, `grants` (paragraph
+  after `grants`); "Lock order" (6.3); "I1 check" (6.4).
+- `docs/spec/04-sync-protocol.md`: "Envelope" (2.2), "What happens on a change" (8.2).
+- `docs/spec/06-api.md`: "Basic rules" (2), "Authorization in the API" (4), "Errors" (5),
+  "Pagination" (6), "Idempotency" (7), 16 "Endpoints" groups "Groups" and "Access".
+- `docs/spec/08-identity.md`: "Groups from claims" (3.4).
+- `docs/spec/19-security.md`: SEC-IN-4.
+- `docs/spec/02-architecture.md`: 4.3 (row `authz`: `Admin`, `PrincipalSource`,
   `StructureSource`, `AgentPolicySource`), 4.4, 5, 8.1 to 8.3, 9.2, 9.3.
-- ADRs: `docs/adr/0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`,
-  `docs/adr/0018-freigabe-modell-stufen-zusatzrechte-vererbung-kein-verbot.md`,
-  `docs/adr/0021-audit-log-hash-verkettet-und-getrennt-von-telemetrie.md`.
+- ADRs: `docs/adr/0017-one-authorization-function-404-instead-of-403-mandatory-registration.md`,
+  `docs/adr/0018-grant-model-levels-capabilities-inheritance-no-deny.md`,
+  `docs/adr/0021-hash-chained-audit-log-separate-from-telemetry.md`.
 - `docs/api/openapi.yaml`: operations `listGroups`, `createGroup`, `getGroup`, `updateGroup`,
   `deleteGroup`, `listGroupMembers`, `addGroupMember`, `removeGroupMember`, `listGrants`,
   `createGrant`, `getGrant`, `revokeGrant`; schemas `Group`, `GroupCreate`, `GroupUpdate`,
   `GroupMember`, `GroupMemberAdd`, `GroupPage`, `GroupMemberPage`, `Grant`, `GrantCreate`,
   `GrantPage`, `ReasonBody`, `PrincipalRef`, `GrantChangedPayload`, `GroupChangedPayload`.
 - Code of earlier tickets: `internal/authz` (M1-27 domain and store, M1-28 `authorize`, snapshot
-  and `Scope`, M1-29 `Admin` port, rights-change hook and `VerifyInvariants`, M1-30 expiry),
+  and `Scope`, M1-29 `Admin` port, permission-change hook and `VerifyInvariants`, M1-30 expiry),
   `internal/identity` (M1-26 `PrincipalSource` implementation, M1-31 cursor helper and response
   validation, M1-34 and M1-35 authentication and step-up, M1-44 personal tokens),
   `internal/platform/httpserver`, `services/server/api/operations.yaml`.
@@ -71,14 +70,14 @@ group the caller is not in, unless the caller is an owner.
    named keys from `docs/operations/configuration.md`.
 8. 05 4.4: group writes are owner only with step-up and audit; `grant.read` needs owner or
    `manage`; `grant.create` and `grant.revoke` need owner or `manage`, step-up and audit;
-   `group.read` is owner or member ("eigene Gruppen auch ohne Owner").
+   `group.read` is owner or member ("own groups even without owner").
 9. 07 2.6 and R-AZ-05: with `manage`, a new grant is at most the own effective level and
    capabilities on its target, only for people and groups, never on the instance; revocation
    only of grants one could have created. Grants to agents and apps only by an owner; agents and
    apps never `trigger` and only `upload` (AZ-M31).
-10. 07 4.2: decision order; a missing right is reported before a missing step-up; a personal
-    token can never provide step-up (`step_up_not_possible`, AZ-M35); owner rights only in a
-    session (SR5, R-AZ-14).
+10. 07 4.2: decision order; a missing permission is reported before a missing step-up; a
+    personal token can never provide step-up (`step_up_not_possible`, AZ-M35); owner permissions
+    only in a session (SR5, R-AZ-14).
 11. 05 rule 1.6 and 07 4.4: `grant.create`, `grant.revoke`, `group.member.add`,
     `group.member.remove`, `group.delete` check I1 and SR8 in the same transaction; a violation
     rolls back completely and answers `409 i1_violation` with `hint` (AZ-M21, AZ-M25).
@@ -86,8 +85,8 @@ group the caller is not in, unless the caller is an owner.
     `access.changed` for every affected principal.
 13. 03 R-DM-09 and 07 9.5: grants are never changed, only revoked; every grant and every
     revocation has a reason.
-14. 05 rule 2 and 06 4: no read right gives `404`, the same as a missing resource; lists filter
-    in the query and carry no totals.
+14. 05 rule 2 and 06 4: no read permission gives `404`, the same as a missing resource; lists
+    filter in the query and carry no totals.
 15. 05 6: `grant.changed` (receive action `grant.read`) and `group.changed` (receive action
     `group.read`) on every write.
 16. 19 SEC-IN-4: group names and descriptions with control or bidi control characters are
@@ -100,7 +99,7 @@ Paths are relative to `services/server/` unless they start with `docs/`.
 1. **Specification** (in place from planning): 07 2.6 item 6 (visibility of grants to `manage`
    holders) and the paragraph on `oidc_claim` groups (`409 conflict`, `reason:
    claim_managed_group`); 05 `group.member.add`, `group.member.remove`, `grant.read`; 03 `groups`
-   (`provider_id`, checks, unique `(provider_id, external_ref)`, length keys); 06 2 "Ohne Wirkung".
+   (`provider_id`, checks, unique `(provider_id, external_ref)`, length keys); 06 2 "No effect".
    Change them only where the implementation proves them wrong. `docs/DECISIONS.md`: the rulings
    under Design notes, in the file's existing format.
 2. **Application** `internal/authz/app`: use cases `ListGroups`, `GetGroup`, `ListGroupMembers`,
@@ -123,7 +122,7 @@ Paths are relative to `services/server/` unless they start with `docs/`.
    (keyset pagination by `id`), `member_count`, membership history for `removeGroupMember`;
    sqlc regenerated.
 6. **Adapter httpapi** `internal/authz/adapters/httpapi`: the twelve strict-server methods.
-7. **Freischalt-Liste** `api/operations.yaml`: the twelve operations.
+7. **Enable list** `api/operations.yaml`: the twelve operations.
 8. **Documentation**: `internal/authz/README.md` (API use cases, visibility rules, events),
    `services/server/CHANGELOG.md` under `Unreleased`.
 
@@ -173,10 +172,10 @@ step-up: `401 step_up_required`; with a token without session (agent, app, perso
 
 **`manage` scope for grant reads.** Non-owners see grants whose target is a space on which they
 have `manage`, or a channel on which they have `manage` directly or through its space. Compute
-the set from the caller's rights snapshot (M1-28; owners: everything). Instance grants are owner
-only. Reason: 05 lists `grant.read` as "owner oder manage" on `space`, `channel`, `principal`; a
-`principal` filter alone gives no target, so for non-owners it narrows within the `manage` scope
-instead of widening it.
+the set from the caller's permission snapshot (M1-28; owners: everything). Instance grants are
+owner only. Reason: 05 lists `grant.read` as "owner or manage" on `space`, `channel`,
+`principal`; a `principal` filter alone gives no target, so for non-owners it narrows within the
+`manage` scope instead of widening it.
 
 **`listGrants` filters.** `target_kind` with `target_id` (except `instance`, which has no id),
 `subject_kind` with `subject_id`; a half pair is `400 validation_failed` with pointer
@@ -198,7 +197,7 @@ cursor_invalid` otherwise), `limit` default `api.page_size_default`, capped at
 3. Subject exists: `user`, `agent`, `app` through `PrincipalSource` (kind must match, status not
    `deleted`); `group` through the store (not deleted). Otherwise `400 validation_failed`,
    pointer `/subject_id`, code `unknown_subject`. This comes after `authorize`, so a caller
-   without rights learns nothing about principal ids.
+   without permissions learns nothing about principal ids.
 4. Unit of work with `RightsChange`; affected principals: the subject principal, or all
    people with an in-effect membership of the subject group at `t`. Insert through `Admin`;
    append `grant.changed {grant, change: created}`; audit allow with `details = {subject_kind,
@@ -212,7 +211,7 @@ the stored grant, no write, no event, audit allow with `details.no_change = true
 a read before opening the RightsChange unit of work, because phase 1 raises
 `permission_version` unconditionally). Otherwise set `revoked_at`, `revoked_by`,
 `revoke_reason = reason`; affected principals as for create; `grant.changed {change: revoked}`;
-audit. An expired grant may be revoked; it changes no rights but closes the record.
+audit. An expired grant may be revoked; it changes no permissions but closes the record.
 
 **Groups.**
 
@@ -223,7 +222,7 @@ audit. An expired grant may be revoked; it changes no rights but closes the reco
   `provider_id` of an existing OIDC provider (else `400`, pointer `/external_ref` or
   `/provider_id`), `local` forbids both. Name taken by a live group (case-insensitive) or
   `(provider_id, external_ref)` taken by a live group: `409 conflict` with `errors` pointer
-  `/name` or `/external_ref`. Not a rights change (05 "Rechte" `nein`).
+  `/name` or `/external_ref`. Not a permission change (05 "Permissions" `no`).
   `group.changed {change: created}`; audit; `201`.
 - `updateGroup` (PATCH): at least one of `name`, `description`; same checks and conflicts;
   `group.changed {change: updated}`; audit; `200`.
@@ -256,7 +255,7 @@ and `channel_id` (from `StructureSource`; empty for instance grants), payload
 1. Non-owners see grants only inside their `manage` scope; filters narrow, never widen it.
 2. A grant or group the caller may not read is `404` for every operation on it.
 3. Revoking an already revoked grant succeeds without change and is audited with `no_change`
-   (06 2 "Ohne Wirkung").
+   (06 2 "No effect").
 4. Deleting a group revokes its grants with reason `group_deleted` and keeps memberships as
    history.
 5. `member_count` and member lists show memberships in effect at request time.
@@ -284,7 +283,7 @@ A controllable clock. Test names carry the spec IDs.
       after is equal; a deny audit entry exists after the rollback.
     - `TestManageCannotGrantToAgentOrOnInstance`, `TestRequirementBeforeStepUp` (a non-manager
       without step-up gets `403`, not `401`).
-2. HTTP integration, behaviour:
+2. HTTP integration, behavior:
     - groups: create, duplicate name `409`, bidi name `400`, `oidc_claim` without
       `external_ref` `400`, update, delete revokes grants and writes `access.changed` for every
       member, add and remove member with events, add to and remove from an `oidc_claim` group

@@ -1,45 +1,45 @@
 # M1-52: Spaces and sidebar
 
-Status: ready | Depends on: M1-46, M1-51 | Etappe: M1
+Status: ready | Depends on: M1-46, M1-51 | Milestone: M1
 
 ## Goal
 
 After this ticket the module `chat` owns spaces: the top level of the sidebar with a global order
-kept as a fractional index (moving changes exactly one row), a colour and an icon from the design
-system palette, archiving, and each person's collapsed state and own order, synchronised across
+kept as a fractional index (moving changes exactly one row), a color and an icon from the design
+system palette, archiving, and each person's collapsed state and own order, synchronized across
 devices through personal events. `chat` becomes the space part of `authz.StructureSource`, so
 `authorize` resolves spaces from real data. Channels, threads and operators build on this in
 M1-53 to M1-55.
 
 ## Read first
 
-- `docs/PLAN.md`, section 7: row M1-52, "Bekannte Widersprüche" (none for this ticket), "Red Team";
-  section 3 "Arbeitsweise je Ticket". `docs/briefs/README.md`.
-- `docs/spec/03-datenmodell.md`: "1. Grundsätze" (1, 5 sort keys, 6, 7, 10, 12, 13), tables
-  `spaces`, `user_space_states`, `grants` (FK `target_space_id`), `agents`; "6.3 Sperrreihenfolge".
-- `docs/spec/05-aktionen.md`: "2.2 Ziel einer Ressource", "2.3 Wirksame Stufe", "2.6 Scopes für
-  Apps" (`space.read`), "4.5 Bereiche, Kanäle, Seitenleiste" rows `space.read`, `space.create`,
+- `docs/PLAN.md`, section 7: row M1-52, "Known contradictions" (none for this ticket), "Red team";
+  section 3 "Way of working per ticket". `docs/briefs/README.md`.
+- `docs/spec/03-data-model.md`: "1. Principles" (1, 5 sort keys, 6, 7, 10, 12, 13), tables
+  `spaces`, `user_space_states`, `grants` (FK `target_space_id`), `agents`; "6.3 Lock order".
+- `docs/spec/05-actions.md`: "2.2 Target of a resource", "2.3 Effective level", "2.6 Scopes for
+  apps" (`space.read`), "4.5 Spaces, channels, sidebar" rows `space.read`, `space.create`,
   `space.update`, `space.reorder`, `space.archive`, `sidebar.update`; "6" rows `space.created`,
   `space.updated`, `space.archived`, `sidebar.updated`; R-AZ-06.
-- `docs/spec/07-rechte.md`: "4.3 Sichtbarkeit", "7.3 Gültigkeit des Caches", "7.4 Abfrage-Muster",
-  "8.2 Sofortige Wirkung bei Entzug".
-- `docs/spec/04-sync-protokoll.md`: "2.2 Umschlag", "8.1 Grundregel", "8.2 Was beim Ändern
-  passiert", "14. Geräteübergreifende Synchronisation" (row Seitenleiste).
-- `docs/spec/02-architektur.md`: "4.3" (module `chat`: port `Structure`, In-Tx event
+- `docs/spec/07-permissions.md`: "4.3 Visibility", "7.3 Validity of the cache", "7.4 Query pattern",
+  "8.2 Immediate effect on revocation".
+- `docs/spec/04-sync-protocol.md`: "2.2 Envelope", "8.1 Basic rule", "8.2 What happens on a
+  change", "14. Cross-device synchronization" (row Sidebar).
+- `docs/spec/02-architecture.md`: "4.3" (module `chat`: port `Structure`, In-Tx event
   `SpaceArchived`, source `authz.StructureSource`), "4.4" (`chat` may use `identity`, `authz`),
-  "4.5 Querschnitts-Ports", "5. Schichten im Modul", "7.1 Modulregister als Quelle", "8.1" and
-  "8.2", "11.3 Rechte-Cache".
-- `docs/spec/01-produkt.md`: "3.1 Struktur und Gespräche" (first row), "9. Sprachen", "14.
-  Konfigurationswerte".
-- `docs/spec/19-sicherheit.md`: SEC-IN-1, SEC-IN-4, SEC-T07.
-- `docs/spec/06-api.md`: "6. Paginierung" (rule 6), "7. Idempotenz", "8. Nebenläufigkeit", "16.
-  Endpunkte" groups "Spaces" and "Preferences".
+  "4.5 Cross-cutting ports", "5. Layers within a module", "7.1 Module register as the source",
+  "8.1" and "8.2", "11.3 Permission cache".
+- `docs/spec/01-product.md`: "3.1 Structure and conversations" (first row), "9. Languages",
+  "14. Configuration values".
+- `docs/spec/19-security.md`: SEC-IN-1, SEC-IN-4, SEC-T07.
+- `docs/spec/06-api.md`: "6. Pagination" (rule 6), "7. Idempotency", "8. Concurrency",
+  "16. Endpoints" groups "Spaces" and "Preferences".
 - `docs/api/openapi.yaml`: operations `listSpaces`, `createSpace`, `getSpace`, `updateSpace`,
   `moveSpace`, `archiveSpace`, `putMySidebarSpace`; schemas `Space`, `SpaceCreate`, `SpaceUpdate`,
   `MovePosition`, `SpaceView`, `SpaceViewList`, `SidebarState`, `SidebarStatePut`, `ReasonBody`,
   `SpacePayload`, `SidebarPayload`, `SpaceCreatedEvent`, `SpaceUpdatedEvent`, `SpaceArchivedEvent`,
   `SidebarUpdatedEvent`.
-- `design/build/tokens.resolved.json` (category colours `amber`, `gorse`, `granite`, `heather`,
+- `design/build/tokens.resolved.json` (category colors `amber`, `gorse`, `granite`, `heather`,
   `loch`, `moss`, `rowan`, `spruce`) and the generated palette and icon key list of M1-46 with its
   gate check.
 - Code already merged: `internal/authz` (snapshot, `authorize`, `Scope`, phase hook,
@@ -75,16 +75,16 @@ generated from it (ADR 0013); the route test keeps both identical.
    numbers in production code or documentation.
 10. Specification first: the chapter and API changes below land before the code that uses them.
 11. Product requirements implemented here: spaces collapsible and sortable, global order only by
-    owners (`space.reorder`), own collapse and order per person, synchronised across devices (01
-    "3.1", 04 "14"); colour and icon only as keys of the design system, never hex or emoji (03
-    `spaces`); archiving as a rights change (05 `space.archive`, "Rechte" = `ja`); display texts
-    without control or bidi characters (SEC-IN-4).
+    owners (`space.reorder`), own collapse and order per person, synchronized across devices (01
+    "3.1", 04 "14"); color and icon only as keys of the design system, never hex or emoji (03
+    `spaces`); archiving as a permission change (05 `space.archive`, "Permissions" = `yes`);
+    display texts without control or bidi characters (SEC-IN-4).
 
 ## Scope
 
 The specification is in place (planning, spec first): 03 `spaces` (name limit
 `space.name_max_chars` in 03 9, icon from `space-icons`), 07 "4.5" and "7.2"/"7.4" (archive rule;
-`Scope` builds lists per request, so new spaces need no new rights version), and in
+`Scope` builds lists per request, so new spaces need no new permission version), and in
 `docs/api/openapi.yaml` the descriptions of `SpaceView.level`, `SpaceCreate`, `SpaceUpdate` and
 `archiveSpace`. Change them only where the implementation proves them wrong; run `make api-lint`,
 `make api-checks` and the M1-17 generation target; `make codegen-check` shows no diff.
@@ -111,7 +111,7 @@ Code (paths under `services/server/`):
 - `internal/authz`: only if the base lacks it (each with a test): in an archived space every
   effective level is capped at `read` (07 "4.5"; M1-53 builds the same cap for channels, share
   one implementation); `Scope` for spaces can express "all spaces" for owners and principals with
-  instance-level `read`, so new spaces are listed without a new rights version; an
+  instance-level `read`, so new spaces are listed without a new permission version; an
   effective level and capabilities query for one target (used for `SpaceView`), built on the same
   snapshot as `authorize`.
 - `internal/wire`: register handlers and the space part of the structure source; keep the channel
@@ -148,7 +148,7 @@ Code (paths under `services/server/`):
 Catalog facts (05 "4.5"): `space.read` = `read` on the space or on at least one of its channels
 (`rl.read`); `space.create` owner, no step-up, audit (`rl.admin`); `space.update` `manage`, no
 step-up, audit (`rl.admin`); `space.reorder` owner, no step-up, audit (`rl.admin`); `space.archive`
-owner, step-up, audit, "Rechte" = `ja` (`rl.admin`); `sidebar.update` self and read, no audit
+owner, step-up, audit, "Permissions" = `yes` (`rl.admin`); `sidebar.update` self and read, no audit
 (`rl.write`). Apps need scope `messages:read` for `space.read`.
 
 Fractional index (`fracindex`, compatible with the widely used base-62 scheme with integer part):
@@ -182,7 +182,7 @@ Validation:
 
 - Name: trimmed, non-empty, at most `space.name_max_chars` characters, no control or bidi
   characters (SEC-IN-4); unique case-insensitive among non-archived spaces, else `409 conflict`.
-- `color`: a category colour key from the generated palette list; `icon`: an icon key from the
+- `color`: a category color key from the generated palette list; `icon`: an icon key from the
   generated list. Hex values, emoji and unknown keys give `400 validation_failed` (pointer
   `/color` or `/icon`). `SpaceUpdate` cannot clear `icon` or `color` (no `null`, no clear field;
   its description says so).
@@ -197,7 +197,7 @@ Visibility and archive:
   only through a channel reports `read` and no capabilities. No pagination (06 "6" rule 6).
 - `getSpace`: `SpaceView` with `ETag`; not visible or unknown gives the same `404`; an archived
   space stays readable for those who could read it (with `archived_at`).
-- Archive rule (07 "4.5 Archivierte Bereiche und Kanäle"): archiving is final; in an archived space
+- Archive rule (07 "4.5 Archived spaces and channels"): archiving is final; in an archived space
   every principal, owners included, has at most `read`; writing and triggering actions there end
   with `403 channel_read_only` and `reason: channel_archived`; management changes of an archived
   space (`updateSpace`, `moveSpace`, operator) give `409 conflict`; archiving it again returns `200`
@@ -208,8 +208,8 @@ Visibility and archive:
   whose effective level in the space was above `read`, `access.changed` with a `changed` entry per
   affected target at level `read`), publishes `SpaceArchived`, appends `space.archived`, audit with
   the reason. The gateway cache applies `space.archived` in log order (02 "11.3", 04 "8.1").
-- New spaces are visible to owners and instance-level readers without a new rights version: the
-  REST path must not depend on a cached list of spaces (see `Scope` above).
+- New spaces are visible to owners and instance-level readers without a new permission version:
+  the REST path must not depend on a cached list of spaces (see `Scope` above).
 
 Sidebar (`putMySidebarSpace`, PUT, no If-Match, last write wins per space, 04 "14"):
 
@@ -290,13 +290,14 @@ make check
 
 - [ ] Moving a space changes exactly one row; order is stable and total under concurrency.
 - [ ] `updateSpace` requires `If-Match`.
-- [ ] Hex values and emoji as colour or icon are rejected; palette keys are accepted.
+- [ ] Hex values and emoji as color or icon are rejected; palette keys are accepted.
 - [ ] `space.read` holds with `read` on only one channel.
-- [ ] `space.archive` is a rights change with `access.changed`; archived spaces are read-only for everyone and missing from `listSpaces` (07 "4.5").
+- [ ] `space.archive` is a permission change with `access.changed`; archived spaces are read-only for everyone and missing from `listSpaces` (07 "4.5").
 - [ ] Events `space.created`, `space.updated`, `space.archived`, `sidebar.updated` are written as
       specified.
 - [ ] Names with control or bidi characters are rejected.
-- [ ] New spaces are visible to owners and instance-level readers without a new rights version.
+- [ ] New spaces are visible to owners and instance-level readers without a new permission
+      version.
 - [ ] Spec changes are in the same change; `make api-lint`, `make api-checks`,
       `make codegen-check`, `make migrations-lint`, `make arch`, `make config-doc-check` are green;
       the seven operations are enabled.

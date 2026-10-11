@@ -1,6 +1,6 @@
 # M1-40: Passkeys
 
-Status: ready | Depends on: M1-37 | Etappe: M1
+Status: ready | Depends on: M1-37 | Milestone: M1
 
 ## Goal
 
@@ -13,22 +13,24 @@ configuration, and a falling signature counter is reported in the audit log. A v
 
 ## Read first
 
-- `docs/spec/08-identitaet.md`: "Lokale Konten" (WebAuthn paragraph), "Einladungs-Code",
-  "Bestätigung", "Step-up-Ablauf", "DPoP", "Schutz der Anmeldung", "Web-Konsole: Sitzung nach dem
-  Backend-for-Frontend-Muster" (context only), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/03-datenmodell.md`: tables `passkey_credentials`, `auth_challenges` (R-DM-31),
+- `docs/spec/08-identity.md`: "Local accounts" (WebAuthn paragraph), "Enrollment code",
+  "Approval", "Step-up flow", "DPoP", "Login protection",
+  "Web console: session following the backend-for-frontend pattern" (context only),
+  "Configuration values of this chapter".
+- `docs/spec/03-data-model.md`: tables `passkey_credentials`, `auth_challenges` (R-DM-31),
   `enrollment_codes`,
   `user_identities`, `identity_providers`, `auth_sessions` (`step_up_at`, `step_up_method`),
-  `audit_events`; Grundsatz 1 (UUIDv7).
-- `docs/spec/05-aktionen.md`: actions `auth.login.begin`, `auth.login.complete`, `auth.step_up`,
-  `passkey.register`, `passkey.revoke`, `identity.read`; "Spalten Owner, Step-up, Audit, Rechte".
-- `docs/spec/07-rechte.md`: "Ablauf" step 8, SR5.
-- `docs/spec/06-api.md`: "Anmeldeabläufe" point 3, "Step-up", "Endpunkte" (Auth, Me, Users).
-- `docs/spec/02-architektur.md`: "Schichten im Modul" (foreign libraries only in adapters),
-  "Modulregister als Quelle", "Konfigurationsladen".
-- `docs/spec/16-betrieb.md`: "Umzug und Cloud-Portabilität" (RP ID keeps passkeys on the same
+  `audit_events`; principle 1 (UUIDv7).
+- `docs/spec/05-actions.md`: actions `auth.login.begin`, `auth.login.complete`, `auth.step_up`,
+  `passkey.register`, `passkey.revoke`, `identity.read`;
+  "Columns Owner, Step-up, Audit, Permissions".
+- `docs/spec/07-permissions.md`: "Flow" step 8, SR5.
+- `docs/spec/06-api.md`: "Login flows" point 3, "Step-up", "Endpoints" (Auth, Me, Users).
+- `docs/spec/02-architecture.md`: "Layers within a module" (foreign libraries only in adapters),
+  "Module register as the source", "Configuration loading".
+- `docs/spec/16-operations.md`: "Relocation and cloud portability" (RP ID keeps passkeys on the same
   domain).
-- `docs/PLAN.md`: P-03, P-11, row M1-40 (updated by M1-37), section 5 "Teststrategie" (virtual
+- `docs/PLAN.md`: P-03, P-11, row M1-40 (updated by M1-37), section 5 "Test strategy" (virtual
   WebAuthn authenticator).
 - ADR 0019, ADR 0020.
 - `docs/api/openapi.yaml`: `beginPasskeyLogin`, `completePasskeyLogin`, `beginEnrollment`,
@@ -57,27 +59,27 @@ configuration, and a falling signature counter is reported in the audit log. A v
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour change starts with a failing test (red), then code (green), then
+6. Test first: every behavior change starts with a failing test (red), then code (green), then
    cleanup. No en dash or em dash in any text. White label: examples use Alex, Sam, Robin and
    `example.com`. Configuration values only through named keys listed in
    `docs/operations/configuration.md`.
 7. WebAuthn with go-webauthn (pinned): RP ID is the domain of the instance, allowed origins as a
    list, `userVerification = required`, `residentKey = preferred`, `attestation = none`
-   (08 "Lokale Konten").
+   (08 "Local accounts").
 8. A decrease of `sign_count` is reported in the audit log (03 `passkey_credentials`).
-9. `passkey.register` has Step-up `bedingt` (05 "Spalten Owner, Step-up, Audit, Rechte"): step-up
-   once an active passkey exists; the first passkey needs only a human session.
-10. Passkeys serve login of local accounts and step-up (03 `passkey_credentials`, 08 "Step-up-
-    Ablauf"); the enrollment code confirms the first device (08 "Einladungs-Code").
-11. Code stays node neutral (PLAN section 20, "Mehrknoten-Betrieb"): no ceremony state in process
-    memory; it lives in `auth_challenges` (08 "2.5").
+9. `passkey.register` has Step-up `conditional` (05 "Columns Owner, Step-up, Audit, Permissions"):
+   step-up once an active passkey exists; the first passkey needs only a human session.
+10. Passkeys serve login of local accounts and step-up (03 `passkey_credentials`,
+    08 "Step-up flow"); the enrollment code confirms the first device (08 "Enrollment code").
+11. Code stays node neutral (PLAN section 20, "Multi-node operation"): no ceremony state in
+    process memory; it lives in `auth_challenges` (08 "2.5").
 
 ## Scope
 
 The specification is in place (planning, spec first): 08 "2.5" (configuration keys, ceremony
 state in `auth_challenges`, single use, algorithms, passkey login only with a local identity, decoy,
 sign counter), 08 "18" (`auth.webauthn_rp_id`, `auth.webauthn_origins`), 07 "4.2" step 8 with
-`hat_anmeldedaten` for the conditional step-up, and the descriptions of the passkey operations and
+`has_credentials` for the conditional step-up, and the descriptions of the passkey operations and
 of `WebAuthnChallenge` in `openapi.yaml`. Change them only where the implementation proves them
 wrong (spec first, `make api-lint api-checks` green), and regenerate `docs/operations/configuration.md`
 if a key changes. `docs/DECISIONS.md`: rulings listed in Design notes.
@@ -239,12 +241,12 @@ Conditional step-up (identical shape in M1-39; keep names exactly so the merge i
 - Add to `authz.PrincipalSource`: `HasActivePasskey(ctx context.Context, userID <UUID type of
   PrincipalSource>) (bool, error)` (true if a `passkey_credentials` row with `revoked_at IS NULL`
   exists); implement it in the identity adapter; update the authz fakes.
-- In the authz file that implements step 8 of 07 "Ablauf", add (or extend, if M1-39 already
+- In the authz file that implements step 8 of 07 "Flow", add (or extend, if M1-39 already
   created it) `var stepUpOnlyWithExistingCredential = map[authorize.Action]func(ctx
   context.Context, src PrincipalSource, userID <UUID type>) (bool, error){...}` with the entry for
   `passkey.register`. In step 8: if the action is in the map and the function returns `false`, no
   step-up is required; "human with a session" stays required (else `forbidden`,
-  `step_up_not_possible`). Rights logic stays in `authz` (B7).
+  `step_up_not_possible`). Permission logic stays in `authz` (B7).
 
 Virtual authenticator (`virtualauthn`): holds ES256 keys in memory; produces creation responses
 (attestation format `none`) and assertion responses as JSON exactly like a browser
@@ -320,7 +322,7 @@ make check
 - [ ] `passkey.register` needs step-up once a passkey exists, decided in `authz`.
 - [ ] Passkey login creates `pending` devices for unknown devices and only for people with a local
       identity.
-- [ ] go-webauthn pinned in `go.mod`, licence allowed (`make licenses`).
+- [ ] go-webauthn pinned in `go.mod`, license allowed (`make licenses`).
 - [ ] `make check` green, coverage at or above `quality.coverage.go_min_percent`.
 
 ## Definition of done

@@ -1,6 +1,6 @@
 # M1-59: Reactions and pins
 
-Status: ready | Depends on: M1-58 | Etappe: M1
+Status: ready | Depends on: M1-58 | Milestone: M1
 
 ## Goal
 
@@ -13,35 +13,34 @@ reacted" list and the pinned list of a thread from this.
 
 ## Read first
 
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 "M1 Fundament" (row M1-59,
-  "Red Team").
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 "M1 Foundation" (row M1-59,
+  "Red team").
 - `docs/briefs/README.md`.
-- `docs/spec/00-glossar.md`: Reaktion, Anheften, Auslöser-Status.
-- `docs/spec/01-produkt.md`: "Funktionsliste" 3.3 Nachrichten (reactions, pins).
-- `docs/spec/02-architektur.md`: 4.1, 4.3 row `messaging` (ports `Reactions`, `Pins`), 4.4, 4.7,
-  "Schichten im Modul" (no third-party libraries in `domain` and `app`), "Transaktionen und Unit of
-  Work", "Request-Pfad".
-- `docs/spec/03-datenmodell.md`: "Grundsätze" (items 10, 12, 13), tables `messages`, `reactions`,
-  `pins`; "Transaktionsregeln" 6.3.
-- `docs/spec/04-sync-protokoll.md`: "Umschlag (Envelope)", "Zustellgarantie" (item 3),
-  "Reihenfolge".
-- `docs/spec/05-aktionen.md`: rules 1.1, 1.2, 1.8; "Ziel einer Ressource" (resources `reaction`,
-  `pin`); "Entscheidung"; table 4.7 (`reaction.add`, `reaction.remove`, `pin.create`, `pin.delete`,
+- `docs/spec/00-glossary.md`: reaction, pin, trigger state.
+- `docs/spec/01-product.md`: "Feature list" 3.3 Messages (reactions, pins).
+- `docs/spec/02-architecture.md`: 4.1, 4.3 row `messaging` (ports `Reactions`, `Pins`), 4.4, 4.7,
+  "Layers within a module" (no third-party libraries in `domain` and `app`), "Transactions and
+  Unit of Work", "Request path".
+- `docs/spec/03-data-model.md`: "Principles" (items 10, 12, 13), tables `messages`, `reactions`,
+  `pins`; "Transaction rules" 6.3.
+- `docs/spec/04-sync-protocol.md`: "Envelope", "Delivery guarantee" (item 3), "Ordering".
+- `docs/spec/05-actions.md`: rules 1.1, 1.2, 1.8; "Target of a resource" (resources `reaction`,
+  `pin`); "Decision"; table 4.7 (`reaction.add`, `reaction.remove`, `pin.create`, `pin.delete`,
   `message.read`), table 4.6 (`thread.read`); section 6 rows `reaction.*`, `pin.*`; R-AZ-08.
-- `docs/spec/06-api.md`: "Grundregeln", "Autorisierung in der API", "Fehler", "Paginierung",
-  "Idempotenz" (PUT and DELETE), "Endpunkte" > "Messages", "Konfigurationswerte dieses Kapitels".
-- `docs/spec/07-rechte.md`: 4.1, 4.2, 4.3, 7.4.
-- `docs/spec/15-client-architektur.md`: section 5 (event application by `resource.version`) and
+- `docs/spec/06-api.md`: "Basic rules", "Authorization in the API", "Errors", "Pagination",
+  "Idempotency" (PUT and DELETE), "Endpoints" > "Messages", "Configuration values of this chapter".
+- `docs/spec/07-permissions.md`: 4.1, 4.2, 4.3, 7.4.
+- `docs/spec/15-client-architecture.md`: section 5 (event application by `resource.version`) and
   6.1 (`reactions_summary`).
-- `docs/spec/19-sicherheit.md`: "Eingabevalidierung im Server" (SEC-IN-1, SEC-IN-2), SEC-LOG-4.
+- `docs/spec/19-security.md`: "Input validation in the server" (SEC-IN-1, SEC-IN-2), SEC-LOG-4.
 - `docs/api/openapi.yaml`: operations `addReaction`, `removeReaction`, `listReactions`,
   `pinMessage`, `unpinMessage`, `listPins`; schemas `Message` (`reactions`, `my_reactions`,
   `pinned`), `ReactionSummary`, `Reaction`, `ReactionPage`, `Pin`, `PinList`, `ReactionPayload`,
   `PinPayload`, `ReactionAddedEvent`, `ReactionRemovedEvent`, `PinAddedEvent`, `PinRemovedEvent`;
   parameters `EmojiPath`, `Cursor`, `Limit`; response `Gone`.
-- ADRs: `docs/adr/0008-hexagonale-module-und-gepruefte-abhaengigkeitsregeln.md`,
-  `0015-fehlerformat-rfc-9457-idempotenz-paginierung.md`,
-  `0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`.
+- ADRs: `docs/adr/0008-hexagonal-modules-and-checked-dependency-rules.md`,
+  `0015-error-format-rfc-9457-idempotency-pagination.md`,
+  `0017-one-authorization-function-404-instead-of-403-mandatory-registration.md`.
 - Code of earlier tickets: `internal/messaging` (M1-56: tables, representation function, resource
   descriptor), `internal/identity` port `Directory` (PrincipalRef data; M1-26), `kernel/authorize`
   (`Scope`; M1-28), the cursor codec of earlier list operations (search for `next_cursor` in
@@ -74,9 +73,9 @@ reacted" list and the pinned list of a thread from this.
 9. Limits only through named configuration keys from `docs/operations/configuration.md`.
 10. A reaction is exactly one Unicode grapheme cluster, checked in the application
     (03 `reactions`); a reaction is never a status and never changes `trigger_state`
-    (00 "Reaktion"; 01 3.3; 03 `reactions`).
+    (00 "Reaction"; 01 3.3; 03 `reactions`).
 11. A repeated reaction of the same principal with the same symbol is idempotent (PK of
-    `reactions`; 06 "Idempotenz": PUT and DELETE).
+    `reactions`; 06 "Idempotency": PUT and DELETE).
 12. `reaction.add` needs `write`; `reaction.remove` removes only the caller's own reaction
     (05 table 4.7). Read-only channels refuse both with `403 channel_read_only` (05 rule 1.8).
 13. Pinning and unpinning need `manage` (05 `pin.create`, `pin.delete`; R-AZ-08); a principal who
@@ -86,7 +85,7 @@ reacted" list and the pinned list of a thread from this.
 15. `my_reactions` appears only in REST responses, never in events (openapi `Message`).
 16. Lists filter in SQL with the visible channels and check each element with `authorize`
     (07 7.4).
-17. Third-party libraries only in adapters (02 "Schichten im Modul"), pinned and with an allowed
+17. Third-party libraries only in adapters (02 "Layers within a module"), pinned and with an allowed
     license (`quality/licenses/allowed.txt`).
 
 ## Scope
@@ -126,7 +125,7 @@ All paths below `services/server/` unless stated.
 9. Configuration: add the three keys to the configuration schema (M1-07) and keep
    `docs/operations/configuration.md` current (`make config-doc-check`).
 10. `api/operations.yaml`: enable the six operations; regenerate.
-11. Docs: `internal/messaging/README.md` (German, existing structure), `services/server/CHANGELOG.md`,
+11. Docs: `internal/messaging/README.md` (English, existing structure), `services/server/CHANGELOG.md`,
     `docs/DECISIONS.md` entry for note 3 (notes 6 and 9 are in the specification).
 
 ## Out of scope
@@ -205,8 +204,8 @@ All paths below `services/server/` unless stated.
    apply them in `seq` order.
    Limits: adding a new symbol to a message that already has `reaction.max_distinct_per_message`
    distinct symbols, and pinning in a thread with `pin.max_per_thread` pins, give `400
-   validation_failed` with code `limit_reached` (pointer `#path/emoji` resp. empty); checked under
-   the message row lock so the bound is exact.
+   validation_failed` with code `limit_reached` (pointer `#path/emoji` or empty, respectively);
+   checked under the message row lock so the bound is exact.
 7. Representation (one function for REST and events): `reactions` is a list of `{emoji, count}`
    for the message, ordered by the earliest `created_at` of each symbol, then by symbol;
    `my_reactions` lists the caller's symbols in the same order and appears only in REST responses
@@ -256,7 +255,7 @@ Unit:
   allows, invalid UTF-8.
 - `TestReactionSummaryOrder` (domain).
 
-Integration against PostgreSQL 18 (`pgtest`, world of 07 "Beispiele", HTTP through the real chain):
+Integration against PostgreSQL 18 (`pgtest`, world of 07 "Examples", HTTP through the real chain):
 
 - `TestAddReaction_IdempotentSingleEvent`: two identical calls give `204` twice, one row, one
   `reaction.added` with `count = 1`.

@@ -1,6 +1,6 @@
 # M1-60: Mentions and templates
 
-Status: ready | Depends on: M1-56 | Etappe: M1
+Status: ready | Depends on: M1-56 | Milestone: M1
 
 ## Goal
 
@@ -12,34 +12,34 @@ stored but never show up in a list or a count.
 
 ## Read first
 
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 "M1 Fundament" (rows M1-60, M1-61,
-  M1-63; "Voraussetzungen aus dem Kern-Vertrag": K15).
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 "M1 Foundation" (rows M1-60, M1-61,
+  M1-63; "Prerequisites from the core contract": K15).
 - `docs/briefs/README.md`.
-- `docs/spec/00-glossar.md`: Erwähnung, Vorlage, Gelesen-Stand.
-- `docs/spec/01-produkt.md`: "Funktionsliste" 3.3 (templates) and 3.5 (mention counter, view
-  "Erwähnungen").
-- `docs/spec/02-architektur.md`: 4.1, 4.3 rows `messaging` (ports `Mentions`, `Templates`) and
-  `sync` (reads unread mentions through `Mentions.CountUnread`; no stored counter, R-DM-32), 4.4, "Schichten im Modul",
-  "Transaktionen und Unit of Work", "Request-Pfad".
-- `docs/spec/03-datenmodell.md`: "Grundsätze" (items 7, 10, 12, 13), tables `mentions`,
+- `docs/spec/00-glossary.md`: mention, template, read state.
+- `docs/spec/01-product.md`: "Feature list" 3.3 (templates) and 3.5 (mention counter, view
+  "Mentions").
+- `docs/spec/02-architecture.md`: 4.1, 4.3 rows `messaging` (ports `Mentions`, `Templates`) and
+  `sync` (reads unread mentions through `Mentions.CountUnread`; no stored counter, R-DM-32), 4.4, "Layers within a module",
+  "Transactions and Unit of Work", "Request path".
+- `docs/spec/03-data-model.md`: "Principles" (items 7, 10, 12, 13), tables `mentions`,
   `message_templates`, `messages`, `read_states` (computed counters, R-DM-32), 9
   (`template.name_max_chars`, `template.max_per_scope`).
-- `docs/spec/05-aktionen.md`: rules 1.1, 1.2, 1.8; "Spalte Recht" (`self`, `manage`); "Entscheidung";
-  table 4.7 (`mention.list`, `template.read`, `template.manage`, `message.read`).
-- `docs/spec/06-api.md`: "Grundregeln", "Autorisierung in der API", "Fehler", "Paginierung",
-  "Idempotenz", "Nebenläufigkeit" (item 2: templates need `If-Match`), "Endpunkte" > "Me" and
-  "Channels", "Weitere Punkte" K15, "Konfigurationswerte dieses Kapitels".
-- `docs/spec/07-rechte.md`: 4.1 (`not_self`, `subject_kind_not_allowed`), 4.2, 4.3, 7.4,
-  "Pflicht-Tests" (AZ-P5), "Testmatrix" (AZ-M48).
-- `docs/spec/13-push-benachrichtigungen.md`: "Badge und Abgleich" (consumer of mention counts).
-- `docs/spec/19-sicherheit.md`: SEC-IN-1, SEC-IN-4, SEC-LOG-4.
+- `docs/spec/05-actions.md`: rules 1.1, 1.2, 1.8; 'Column "Permission"' (`self`, `manage`);
+  "Decision"; table 4.7 (`mention.list`, `template.read`, `template.manage`, `message.read`).
+- `docs/spec/06-api.md`: "Basic rules", "Authorization in the API", "Errors", "Pagination",
+  "Idempotency", "Concurrency" (item 2: templates need `If-Match`), "Endpoints" > "Me" and
+  "Channels", "Other points" K15, "Configuration values of this chapter".
+- `docs/spec/07-permissions.md`: 4.1 (`not_self`, `subject_kind_not_allowed`), 4.2, 4.3, 7.4,
+  "Required tests" (AZ-P5), "Test matrix" (AZ-M48).
+- `docs/spec/13-push-notifications.md`: "Badge and sync" (consumer of mention counts).
+- `docs/spec/19-security.md`: SEC-IN-1, SEC-IN-4, SEC-LOG-4.
 - `docs/spec/22-import-migration.md`: 6.4 (imports write no mentions).
 - `docs/api/openapi.yaml`: operations `listMyMentions`, `listTemplates`, `createPersonalTemplate`,
   `createChannelTemplate`, `updateTemplate`, `deleteTemplate`; schemas `MentionItem`,
   `MentionItemPage`, `Template`, `TemplateCreate`, `TemplateUpdate`, `TemplateList`, `Problem`;
   parameters `Cursor`, `Limit`, `IdempotencyKey`, `IfMatchRequired`, `TemplateIdPath`.
-- ADRs: `docs/adr/0015-fehlerformat-rfc-9457-idempotenz-paginierung.md`,
-  `0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`.
+- ADRs: `docs/adr/0015-error-format-rfc-9457-idempotency-pagination.md`,
+  `0017-one-authorization-function-404-instead-of-403-mandatory-registration.md`.
 - Code of earlier tickets: `internal/messaging` (M1-56: tables `messages` and `mentions`,
   representation function), `kernel/authorize` (`Scope`; M1-28), the cursor codec of earlier list
   operations (search for `next_cursor` in `services/server/internal`), the shared display-text
@@ -72,17 +72,17 @@ stored but never show up in a list or a count.
 9. Limits only through named configuration keys from `docs/operations/configuration.md`.
 10. The own mention list is filtered by `message.read`: SQL predicate on visible channels plus
     `authorize` per item (05 `mention.list`; 07 7.4).
-11. A mention of a principal without read right is stored but never listed, counted or notified
-    (03 `mentions`; AZ-M48).
-12. Mention counters include no channel without read right (PLAN M1-60; AZ-P5).
+11. A mention of a principal without read permission is stored but never listed, counted or
+    notified (03 `mentions`; AZ-M48).
+12. Mention counters include no channel without read permission (PLAN M1-60; AZ-P5).
 13. Personal templates have no channel (`owner_user_id` set, `channel_id` empty) and are checked
     against the resource `user` with `self`; channel templates are checked against the resource
     `channel`, reading with `read`, changing with `manage` (03 `message_templates`; 05
     `template.read`, `template.manage`; 06 K15).
-14. Template changes need `If-Match` (06 "Nebenläufigkeit" item 2); POST and PATCH accept
-    `Idempotency-Key` (06 "Idempotenz").
+14. Template changes need `If-Match` (06 "Concurrency" item 2); POST and PATCH accept
+    `Idempotency-Key` (06 "Idempotency").
 15. Template names are display texts: control and Bidi control characters are rejected (SEC-IN-4).
-16. Lists without pagination stay small (06 "Paginierung" item 6): template counts are bounded by a
+16. Lists without pagination stay small (06 "Pagination" item 6): template counts are bounded by a
     named key (note 9).
 17. No content, template names or display names in logs or telemetry (SEC-LOG-4).
 
@@ -91,7 +91,7 @@ stored but never show up in a list or a count.
 All paths below `services/server/` unless stated.
 
 1. Migration `migrations/<next number>_message_templates.sql`: table `message_templates` exactly as
-   03 (columns, check "genau eines von `owner_user_id` und `channel_id`", FKs with ON DELETE
+   03 (columns, check "exactly one of `owner_user_id` and `channel_id`", FKs with ON DELETE
    CASCADE, partial indexes on `owner_user_id` and `channel_id` `WHERE deleted_at IS NULL`). Use
    the next free goose number at your local merge; renumber before merging if a parallel ticket
    took it.
@@ -117,7 +117,7 @@ All paths below `services/server/` unless stated.
    both to the configuration schema (M1-07) and keep `docs/operations/configuration.md` current
    (`make config-doc-check`).
 8. `api/operations.yaml`: enable the seven operations; regenerate.
-9. Docs: `internal/messaging/README.md` (German, existing structure, including who consumes
+9. Docs: `internal/messaging/README.md` (English, existing structure, including who consumes
    `CountUnread`), `services/server/CHANGELOG.md`, `docs/DECISIONS.md` entries for notes 6, 8, 9
    and 12.
 
@@ -167,7 +167,7 @@ All paths below `services/server/` unless stated.
 
     Agents and apps are not users: `mention.list` and personal templates are decided by
     `authorize` for them; the expected decision is `403 forbidden` with reason
-    `subject_kind_not_allowed` (07 4.1). Do not add a rights check outside `authz`.
+    `subject_kind_not_allowed` (07 4.1). Do not add a permission check outside `authz`.
 
 2. `listMyMentions`: `authorize(mention.list, user = caller)`; visible channel IDs for
    `message.read` from `Authorizer.Scope`; query `mentions mn JOIN messages m ON m.id =
@@ -178,7 +178,7 @@ All paths below `services/server/` unless stated.
    resource kind and counted in `bothy.authz.errors` with `bothy.reason = filter_mismatch` (07 7.4
    rule 3). Items `MentionItem{message,
    created_at}` with the REST representation of M1-56. `next_cursor` only when more exist.
-3. Cursor: the codec of `internal/platform/httpserver` (M1-18, 06 "Paginierung"), bound to the
+3. Cursor: the codec of `internal/platform/httpserver` (M1-18, 06 "Pagination"), bound to the
    list name and the caller. A cursor of another list, of another principal, or a tampered one
    gives `400 cursor_invalid`.
 4. `CountUnread`: for one principal, the number of mentions per thread with `m.thread_seq >
@@ -226,8 +226,8 @@ All paths below `services/server/` unless stated.
     template and no write; otherwise update and raise `version`. `200` with `ETag: "<version>"`.
 11. `deleteTemplate`: load like note 10 but including rows with `deleted_at` set; a template that
     was never visible gives `404`; `authorize(template.manage, ...)`; an already deleted one gives
-    `204` without write; otherwise set `deleted_at` and raise `version`. `204`. Owners have no right
-    on other people's personal templates (the action has no `owner` right).
+    `204` without write; otherwise set `deleted_at` and raise `version`. `204`. Owners have no
+    permission on other people's personal templates (the action has no `owner` permission).
 12. Templates have no event type in 05 section 6: no durable event is appended. Clients reload
     templates by REST. Record this in DECISIONS.md.
 13. Read-only channels: `template.read` and `template.manage` with `manage` stay allowed (05 rule
@@ -246,7 +246,7 @@ Unit:
 - `TestListMyTemplates`: only the caller's personal templates, also without any readable channel;
   an agent gets `403`.
 
-Integration against PostgreSQL 18 (`pgtest`, world of 07 "Beispiele", HTTP through the real chain):
+Integration against PostgreSQL 18 (`pgtest`, world of 07 "Examples", HTTP through the real chain):
 
 - `TestListMyMentions_NewestFirstAndPaging`: 7 mentions of Alex, `limit=3`, three pages, newest
   first, no duplicates, last page without `next_cursor`.

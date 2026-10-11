@@ -1,48 +1,49 @@
 # M1-46: Instance settings, branding and discovery
 
-Status: ready | Depends on: M1-36 | Etappe: M1
+Status: ready | Depends on: M1-36 | Milestone: M1
 
 ## Goal
 
 After this ticket the `instance` module serves the public discovery document, the instance view
 for every signed-in principal, the documentation of every problem type, and lets owners change
 instance settings and branding with step-up and audit. Settings are typed and validated in one
-code registry; the accent colour is checked against keys generated from the design tokens, so no
-free colour value or emoji can enter the product (ADR 0044, R-PR-08), and the same generated keys
-serve space colours, space icons and forum tag colours in later tickets. Every change writes
+code registry; the accent color is checked against keys generated from the design tokens, so no
+free color value or emoji can enter the product (ADR 0044, R-PR-08), and the same generated keys
+serve space colors, space icons and forum tag colors in later tickets. Every change writes
 `instance.updated` with exactly the changed keys.
 
 ## Read first
 
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 rows M1-15, M1-17, M1-36, M1-37,
-  M1-46, M1-47, M1-52, M3-10; "Voraussetzungen aus dem Kern-Vertrag" (row `instance.settings.read`).
-- `docs/spec/01-produkt.md`: "Sprachen" (9), "Branding je Instanz" (12).
-- `docs/spec/03-datenmodell.md`: 4.1 tables `instance`, `instance_settings`; "Grundsätze" items
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 rows M1-15, M1-17, M1-36,
+  M1-37, M1-46, M1-47, M1-52, M3-10; "Prerequisites from the core contract" (row
+  `instance.settings.read`).
+- `docs/spec/01-product.md`: "Languages" (9), "Branding per instance" (12).
+- `docs/spec/03-data-model.md`: 4.1 tables `instance`, `instance_settings`; "Principles" items
   10 (optimistic lock) and 13 (no `null`).
-- `docs/spec/05-aktionen.md`: 4.1 row `instance.discovery.read`; 4.2 rows `instance.read`,
+- `docs/spec/05-actions.md`: 4.1 row `instance.discovery.read`; 4.2 rows `instance.read`,
   `instance.settings.read`, `instance.settings.update`, `instance.branding.update`; 2.6 (no scope
   for `instance.read`); 6 row `instance.updated`.
-- `docs/spec/06-api.md`: "Grundregeln" (2), "Authentifizierung je Prinzipal-Art" (3, anonymous
-  operations), "Fehler" (5), "Nebenläufigkeit" (8, items 1 to 3: branding ETag derived from
-  several setting versions; settings with optional `If-Match`), "Versionierung, Deprecation,
-  Kompatibilität" (13, item 1: discovery reports `api_versions`, `spec_version`, `features`),
-  16 "Endpunkte" groups Discovery and Admin.
-- `docs/spec/08-identitaet.md`: "Erstinstallation" (4: discovery answers with `setup_required`
-  before setup).
-- `docs/spec/16-betrieb.md`: "Konfiguration" (5.1 item 6: settings are not process
+- `docs/spec/06-api.md`: "Basic rules" (2), "Authentication per principal kind" (3, anonymous
+  operations), "Errors" (5), "Concurrency" (8, items 1 to 3: branding ETag derived from
+  several setting versions; settings with optional `If-Match`), "Versioning, deprecation,
+  compatibility" (13, item 1: discovery reports `api_versions`, `spec_version`, `features`),
+  16 "Endpoints" groups Discovery and Admin.
+- `docs/spec/08-identity.md`: "Initial installation" (4: discovery answers with
+  `setup_required` before setup).
+- `docs/spec/16-operations.md`: "Configuration" (5.1 item 6: settings are not process
   configuration).
-- `docs/spec/18-release.md`: "Kompatibilität zwischen App und Server" (9, item 2: discovery
+- `docs/spec/18-release.md`: "Compatibility between app and server" (9, item 2: discovery
   delivers `client.min_version.<platform>` and `client.recommended_version.<platform>`).
-- `docs/spec/19-sicherheit.md`: SEC-IN-4 (control and bidi characters in display texts).
-- `docs/operations/configuration.md`: 6 "Instanz-Einstellungen"; sections "03 Datenmodell",
-  "12 Dateien", "18 Release" of section 4 for the limit and version keys.
-- `docs/spec/02-architektur.md`: 4.2, 4.3 (row `instance`), 4.4 (`instance` depends on nothing),
-  4.5 "Querschnitts-Ports", 5 "Schichten im Modul", 6 "Code-Layout" (paragraph on name-bound
+- `docs/spec/19-security.md`: SEC-IN-4 (control and bidi characters in display texts).
+- `docs/operations/configuration.md`: 6 "Instance settings"; sections "03 Data model",
+  "12 Files", "18 Release" of section 4 for the limit and version keys.
+- `docs/spec/02-architecture.md`: 4.2, 4.3 (row `instance`), 4.4 (`instance` depends on nothing),
+  4.5 "Cross-cutting ports", 5 "Layers within a module", 6 "Code layout" (paragraph on name-bound
   places), 7.2 "go-arch-lint", 7.3.
-- ADRs: `docs/adr/0044-arbeitsname-und-branding-als-konfiguration.md`,
-  `docs/adr/0030-design-tokens-als-eine-quelle-mit-generator.md`,
-  `docs/adr/0013-spec-first-openapi-31-und-asyncapi-30-normativ.md`,
-  `docs/adr/0015-fehlerformat-rfc-9457-idempotenz-paginierung.md`.
+- ADRs: `docs/adr/0044-working-name-and-branding-as-configuration.md`,
+  `docs/adr/0030-design-tokens-as-one-source-with-a-generator.md`,
+  `docs/adr/0013-spec-first-openapi-31-and-asyncapi-30-normative.md`,
+  `docs/adr/0015-error-format-rfc-9457-idempotency-pagination.md`.
 - `design/build/tokens.resolved.json` (`contexts.theme.light` and `.dark` keys
   `color.category.<key>.*`; `icons.space-icons`), `design/build/README.md`.
 - `docs/api/openapi.yaml`: operations `getDiscovery`, `getInstance`, `listInstanceSettings`,
@@ -74,12 +75,12 @@ serve space colours, space icons and forum tag colours in later tickets. Every c
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour gets a test that is red before the code exists (plan section 3).
+6. Test first: every behavior gets a test that is red before the code exists (plan section 3).
 7. No en dash or em dash in any text you write; white label (people Alex, Sam, Robin, domains
    under example.com); configuration only through named keys from
    `docs/operations/configuration.md`.
-8. 01 12 and ADR 0044: `branding.accent_color` is a key of the category colours `spruce`,
-   `loch`, `heather`, `rowan`, `amber`, `gorse`, `moss`; a hex value, a CSS colour or an emoji
+8. 01 12 and ADR 0044: `branding.accent_color` is a key of the category colors `spruce`,
+   `loch`, `heather`, `rowan`, `amber`, `gorse`, `moss`; a hex value, a CSS color or an emoji
    is rejected. The server checks against keys from `design/build/tokens.resolved.json`.
 9. 03 `instance_settings`: typed key-value pairs, value checked against the key's schema,
    `version` as optimistic lock; keys and defaults as in configuration.md section 6.
@@ -153,17 +154,17 @@ Paths are relative to `services/server/` unless they start with `docs/`, `design
     `client.recommended_version.macos`, `client.recommended_version.windows`. Validate the
     version keys as SemVer without `v` when set. Regenerate `docs/operations/configuration.md`
     (`make config-reference`).
-12. **Freischalt-Liste** `api/operations.yaml` (P-04): the six operations.
+12. **Enable list** `api/operations.yaml` (P-04): the six operations.
 12a. **Language of new people** (PLAN row M1-46): `createUser` (M1-31) stores `locale.default` as
     `users.locale` when the request has no `locale`; M1-31 used the 03 column default until now.
-    Read the setting through the `Settings` port (identity may use `instance`, 02 "Erlaubte
-    Abhängigkeiten"); test `TestCreateUser_UsesLocaleDefault` (setting `en`, request without
+    Read the setting through the `Settings` port (identity may use `instance`, 02 "Allowed
+    dependencies"); test `TestCreateUser_UsesLocaleDefault` (setting `en`, request without
     `locale`, stored `en`).
 13. **Documentation**: `internal/instance/README.md` (settings registry, branding version,
     discovery sources, source port), `internal/kernel` README or package docs,
-    `services/server/README.md` ("Namensgebundene Stellen": the default product name constant),
+    `services/server/README.md` ("Name-bound locations": the default product name constant),
     `services/server/CHANGELOG.md` under `Unreleased`.
-14. **Places with the product name** (02 "6. Code-Layout", ADR 0044 Confirmation): a test
+14. **Places with the product name** (02 "6. Code layout", ADR 0044 Confirmation): a test
     `tools/ci/tests/test_product_name_places.py` searches tracked code and configuration (not
     `docs/`) for the working name, case-insensitively, and allows it only at the kinds 02 6 lists
     (module path, binary and `cmd/bothy`, `BOTHY_` variables, image names and container paths,
@@ -179,7 +180,7 @@ Paths are relative to `services/server/` unless they start with `docs/`, `design
   `deleteBrandingLogo`): M3-10. This ticket never writes `branding.logo_file_id`.
 - JWKS and webhook keys (`getJwks` M1-32, `getWebhookKeys` M2).
 - The setup lock (`503 setup_required` for every other route): M1-37.
-- Space colours and icons (M1-52) and forum tag colours (M1-53) use the generated keys but are
+- Space colors and icons (M1-52) and forum tag colors (M1-53) use the generated keys but are
   not built here.
 - The setup lock itself and `bothy setup`: M1-37 (the problem code `setup_required` is in the
   specification already).
@@ -218,8 +219,8 @@ func IsAccentColor(key string) bool
 
 `accent.go` holds the accent list as an explicit constant of the seven keys of ADR 0044 and 01
 12 (`spruce`, `loch`, `heather`, `rowan`, `amber`, `gorse`, `moss`), not derived from the tokens:
-`granite` is the neutral palette of all surfaces, and a new category colour becomes an accent only
-after the contrast gate (ADR 0044). Tests assert that every accent is a generated category colour
+`granite` is the neutral palette of all surfaces, and a new category color becomes an accent only
+after the contrast gate (ADR 0044). Tests assert that every accent is a generated category color
 and that the constant equals the list in 01 12. Keys are case sensitive;
 `Spruce`, ` spruce` and `#5865f2` are not keys.
 
@@ -370,7 +371,7 @@ make check
 
 ## Acceptance criteria
 
-- [ ] Hex values, CSS colours and emoji are rejected as accent; the seven palette keys are
+- [ ] Hex values, CSS colors and emoji are rejected as accent; the seven palette keys are
       accepted; the generated key list is current (`make codegen-check`).
 - [ ] Discovery reports `setup_required`, `api_versions`, `spec_version`, `features`, gateway
       protocol versions and minimum and recommended versions per platform; it works without

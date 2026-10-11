@@ -2,20 +2,20 @@
 r"""The ranking of the largest risks in docs/RISKS.md follows the ratings of its register.
 
 docs/RISKS.md ranks its largest risks by three criteria in order; the first is the rating of
-the register, likelihood times impact (`niedrig` 1, `mittel` 2, `hoch` 3). This check holds the
+the register, likelihood times impact (`low` 1, `medium` 2, `high` 3). This check holds the
 part a program can decide: every ranked risk stands in the register with the same likelihood
 and impact, ranks count from 1 without gaps or repeats, the rating never rises down the ranking,
 no risk of the register outside the ranking is rated higher than the last ranked one, and the
 list behind the last rank names exactly the risks outside the ranking rated like it (D-W-79).
 A risk raised in the register without a new ranking fails here (RK-77 before D-W-78), and so
 does one raised to the rating of the last rank without joining that list. Which criterion
-decides between risks of the same rating is a judgement; the stage gate reviews it
+decides between risks of the same rating is a judgement; the milestone gate reviews it
 (docs/PLAN.md section 4 item 6).
 
-The ranking table is the one table whose header starts with `Rang | ID`; register tables start
-with `ID` and have the columns `Wahrscheinlichkeit` and `Auswirkung`. Cells split like
+The ranking table is the one table whose header starts with `Rank | ID`; register tables start
+with `ID` and have the columns `Likelihood` and `Impact`. Cells split like
 Python-Markdown splits them (an escaped `\|` and a pipe in a code span do not split); code
-blocks are ignored. The list behind the last rank starts with a line `**Hinter Rang <n>**` and
+blocks are ignored. The list behind the last rank starts with a line `**Behind rank <n>**` and
 ends at the next heading; it names a risk by its ID in the bold span that starts a list item, so
 a comparison in the running text names nothing.
 Usage: python tools/docs/risk_ranking.py [--root DIR]  (exit 1 on a finding)
@@ -31,14 +31,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 RISKS = Path("docs/RISKS.md")
-LEVELS = {"niedrig": 1, "mittel": 2, "hoch": 3}
-LIKELIHOOD = "Wahrscheinlichkeit"
-IMPACT = "Auswirkung"
+LEVELS = {"low": 1, "medium": 2, "high": 3}
+LIKELIHOOD = "Likelihood"
+IMPACT = "Impact"
 
 _FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
 _DELIMITER_ROW = re.compile(r"^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?$")
 _CODE_SPAN = re.compile(r"(`+)(?!`).*?(?<!`)\1(?!`)")
-_BEHIND = re.compile(r"^\*\*Hinter Rang (\d+)\*\*")
+_BEHIND = re.compile(r"^\*\*Behind rank (\d+)\*\*")
 _HEADING = re.compile(r"^#{1,6}\s")
 _LIST_ITEM = re.compile(r"^\s*[-*+]\s+\*\*(.+?)\*\*")
 _RISK_ID = re.compile(r"\bRK-\d+\b")
@@ -60,7 +60,7 @@ class Rated:
         return None
 
     def rating(self) -> str:
-        """Return the rating as written, e.g. `mittel x hoch`."""
+        """Return the rating as written, e.g. `medium x high`."""
         return f"{self.likelihood} x {self.impact}"
 
 
@@ -149,7 +149,7 @@ def _rated(header: list[str], body: list[tuple[int, list[str]]]) -> list[tuple[s
 
 
 def _behind(path: Path) -> list[Behind]:
-    """Return every list that starts with `**Hinter Rang <n>**`, up to the next heading."""
+    """Return every list that starts with `**Behind rank <n>**`, up to the next heading."""
     lists: list[Behind] = []
     current: tuple[int, str, list[tuple[int, str]]] | None = None
     for number, line in _lines(path):
@@ -179,7 +179,7 @@ def check(root: Path) -> list[str]:
     ranking_line = 0
     register: dict[str, Rated] = {}
     for line, header, body in _tables(root / RISKS):
-        if header[:2] == ["Rang", "ID"] and LIKELIHOOD in header and IMPACT in header:
+        if header[:2] == ["Rank", "ID"] and LIKELIHOOD in header and IMPACT in header:
             if ranking_line:
                 problems.append(
                     f"{RISKS}:{line}: a second ranking table, the first starts in line "
@@ -198,7 +198,7 @@ def check(root: Path) -> list[str]:
                             f"allowed are {', '.join(LEVELS)}"
                         )
     if not ranking_line:
-        return [f"{RISKS}: no ranking table (header 'Rang | ID | ...')", *problems]
+        return [f"{RISKS}: no ranking table (header 'Rank | ID | ...')", *problems]
 
     seen: dict[str, str] = {}
     previous: tuple[str, Rated] | None = None
@@ -251,7 +251,7 @@ def _check_behind(
     lists = _behind(root / RISKS)
     for extra in lists[1:]:
         problems.append(
-            f"{RISKS}:{extra.line}: a second list '**Hinter Rang {extra.rank}**', the first "
+            f"{RISKS}:{extra.line}: a second list '**Behind rank {extra.rank}**', the first "
             f"starts in line {lists[0].line}"
         )
     named: dict[str, int] = {}
@@ -259,7 +259,7 @@ def _check_behind(
         behind = lists[0]
         if behind.rank != last_rank:
             problems.append(
-                f"{RISKS}:{behind.line}: the list '**Hinter Rang {behind.rank}**' names rank "
+                f"{RISKS}:{behind.line}: the list '**Behind rank {behind.rank}**' names rank "
                 f"{behind.rank}, the last rank is {last_rank}"
             )
         for line, ident in behind.named:

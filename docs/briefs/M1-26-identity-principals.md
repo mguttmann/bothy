@@ -1,6 +1,6 @@
 # M1-26: Principal tables and directory
 
-Status: ready | Depends on: M1-13 | Etappe: M1
+Status: ready | Depends on: M1-13 | Milestone: M1
 
 ## Goal
 
@@ -13,16 +13,16 @@ people), through a shared validator that later tickets reuse for space, channel 
 
 ## Read first
 
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 rows M1-12, M1-13, M1-26 to
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 rows M1-12, M1-13, M1-26 to
   M1-31, M1-37, M1-51, M1-52; section 9 row M3-03.
-- `docs/spec/03-datenmodell.md`: section 1 "Grundsätze" (1 IDs, 3 enumerations, 6 case, 7
+- `docs/spec/03-data-model.md`: section 1 "Principles" (1 IDs, 3 enumerations, 6 case, 7
   deletion, 12 access, 13 no null), section 4.2 tables `principals`, `users`, `owners`, section
-  6.3 "Sperrreihenfolge", section 8 R-DM-01 to R-DM-03, section 9 (`principal.handle_max_chars`).
-- `docs/spec/07-rechte.md`: section 2.7 "Owner", section 3 "Prinzipal-Kontext", SR5, SR7, SR8.
-- `docs/spec/08-identitaet.md`: section 4 "Erstinstallation", section 11 "Person sperren",
-  section 12 "API-Tokens" (last bullet: personal token has no owner rights).
-- `docs/spec/19-sicherheit.md`: section 6.1 SEC-IN-4 and SEC-IN-6; test SEC-T07.
-- `docs/spec/02-architektur.md`: sections 4.1 to 4.5, 5, 6, 7.1 to 7.3, 8.1.
+  6.3 "Lock order", section 8 R-DM-01 to R-DM-03, section 9 (`principal.handle_max_chars`).
+- `docs/spec/07-permissions.md`: section 2.7 "Owner", section 3 "Principal context", SR5, SR7, SR8.
+- `docs/spec/08-identity.md`: section 4 "Initial installation", section 11 "Disabling a person",
+  section 12 "API tokens" (last bullet: personal token has no owner permissions).
+- `docs/spec/19-security.md`: section 6.1 SEC-IN-4 and SEC-IN-6; test SEC-T07.
+- `docs/spec/02-architecture.md`: sections 4.1 to 4.5, 5, 6, 7.1 to 7.3, 8.1.
 - ADRs 0006, 0007, 0008.
 - `docs/operations/configuration.md`: key `principal.handle_max_chars`.
 - `docs/api/openapi.yaml` schemas `User`, `PrincipalRef`, `PrincipalKind`, `UserStatus`,
@@ -54,11 +54,11 @@ people), through a shared validator that later tickets reuse for space, channel 
    example.com); configuration only through named keys from `docs/operations/configuration.md`.
 8. 03 `principals`, `users`, `owners`: columns, types, defaults, checks, unique indexes, indexes
    and foreign keys exactly as specified (exception: the avatar foreign key, see Design notes).
-9. 03 Grundsatz 6: handles unique without regard to case (`lower(handle)`), email unique without
+9. 03 principle 6: handles unique without regard to case (`lower(handle)`), email unique without
    regard to case where present.
 10. 19 SEC-IN-4 and SEC-T07 (people): display names with control or bidi control characters are
     rejected.
-11. 03 Grundsatz 12 and 02 section 4.1: only identity reads and writes its tables; `authz` gets
+11. 03 principle 12 and 02 section 4.1: only identity reads and writes its tables; `authz` gets
     facts through `authz.PrincipalSource`.
 
 ## Scope
@@ -100,7 +100,7 @@ Paths are relative to `services/server/` unless noted.
   email, locale (BCP 47) and time zone (IANA) belongs to those use cases.
 - `internal/wire` wiring of the Directory and the PrincipalSource into `authz`: M1-28.
 - Sessions, devices, tokens, identities: M1-33 and later.
-- Pseudonymisation of deleted principals: M7 (DSGVO flows).
+- Pseudonymization of deleted principals: M7 (GDPR flows).
 - The foreign key `principals.avatar_file_id -> files(id)`: added by the migration that creates
   `files` (M3-03).
 - I1 and SR8 checks: M1-29.
@@ -139,9 +139,9 @@ NULL`.
 **Triggers** (SQLSTATE `23514` so the adapter maps them like a check violation):
 
 - `identity_users_kind_check` (BEFORE INSERT OR UPDATE OF principal_id ON users): the referenced
-  principal has `kind = 'user'` (03 `users`: "per Trigger geprüft").
+  principal has `kind = 'user'` (03 `users`: "checked by trigger").
 - `identity_principals_kind_immutable` (BEFORE UPDATE OF kind ON principals): rejects any change
-  of `kind` (03: "nie änderbar").
+  of `kind` (03: "never changeable").
 
 **Validation.**
 
@@ -157,7 +157,7 @@ NULL`.
 - `domain.NewDisplayName(s string, maxChars int)`: `textcheck.DisplayText`, at least one rune that
   is not Unicode white space, and at most `maxChars` runes (`principal.display_name_max_chars`;
   03 `principals.display_name`).
-- `domain.NewOwner(...)` requires a non-blank `reason` (03: "Pflicht, steht im Audit").
+- `domain.NewOwner(...)` requires a non-blank `reason` (03: "required, recorded in the audit").
 - Validation errors are `kernel/errs` errors of kind `bad_request` with code
   `validation_failed` and a field error (`/handle`, `/display_name`, `/reason`) in the form
   M1-18 renders as `errors[]`.
@@ -229,7 +229,7 @@ type PrincipalSource interface {
 **Transactions.** Reads join the ambient transaction of `kernel/txn` when one exists, otherwise
 use the pool (M1-13 convention). Repository writes (insert principal and user, insert owner) are
 only used by tests in this ticket and by later use cases; their doc comments state that callers
-run them inside a unit of work and, for owners, as a rights change (M1-29).
+run them inside a unit of work and, for owners, as a permission change (M1-29).
 
 **Error mapping in the adapter.** Unique violation on the handle index: kind `conflict`, code
 `conflict`, field `/handle`, without echoing the value. Unique violation on the email index:

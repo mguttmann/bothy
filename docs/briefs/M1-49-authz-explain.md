@@ -1,45 +1,45 @@
 # M1-49: Who has access, preview and view as
 
-Status: ready | Depends on: M1-48 | Etappe: M1
+Status: ready | Depends on: M1-48 | Milestone: M1
 
 ## Goal
 
 After this ticket the module `authz` answers the three questions an owner or a person with `manage`
-asks around a rights change: who can access a space or channel and why (`access.explain`), what a
-grant would change before it exists (`access.preview`, a dry run in the real transaction with a
-plain-text explanation from fixed templates in German and English), and what one person sees
-(`access.view_as`, read only, time limited, audited). All three are computed by the same snapshot
-code that `authorize` uses, so they cannot disagree with a real decision. They feed the console
-screens A2 to A4 (M6) and carry hint H1 ("Lesehorizont") wherever the specification asks for it.
+asks around a permission change: who can access a space or channel and why (`access.explain`),
+what a grant would change before it exists (`access.preview`, a dry run in the real transaction
+with a plain-text explanation from fixed templates in German and English), and what one person
+sees (`access.view_as`, read only, time limited, audited). All three are computed by the same
+snapshot code that `authorize` uses, so they cannot disagree with a real decision. They feed the
+console screens A2 to A4 (M6) and carry hint H1 ("read horizon") wherever the specification asks
+for it.
 
 ## Read first
 
-- `docs/PLAN.md`, section 7 "M1 Fundament": row M1-49, "Voraussetzungen aus dem Kern-Vertrag"
-  (row `access.preview` ... K-RE-7 to K-RE-9), "Teststrategie", "Red Team"; section 3
-  "Arbeitsweise je Ticket". `docs/briefs/README.md`.
-- `docs/spec/07-rechte.md`: "3. Prinzipal-Kontext" (field `view_as`), "4.1 Entscheidungen und
-  Gründe", "4.2 Ablauf" (steps 4 and 7), "4.3 Sichtbarkeit", "4.4 Invarianten in der
-  Transaktion", "SR2 Werkzeugklasse", "SR6 Direktnachrichten nur für Teilnehmer", "6. Lesehorizont
-  von Agenten" (H(A), T(A), H1), "7.2 Rechte-Stand (Snapshot)" (provenance), "9.1 Wer hat
-  Zugriff?", "9.2 Als Person ansehen", "9.3 Vorschau in Klartext", "10. Beispiele", "11.1
-  Testmatrix" (world, AZ-M21, AZ-M31, AZ-M37, AZ-M38, AZ-M46, AZ-M47), "11.2 Pflicht-Tests" (AZ-P8),
-  "12. Entscheidungen" (R-RE-07, R-RE-10), "14. Konfigurationswerte".
-- `docs/spec/05-aktionen.md`: "1. Verbindliche Regeln" (rules 1.6, 1.7), "2.3 Wirksame Stufe",
-  "2.4" (columns), "4.2 Instanz und Verwaltung" (rows `access.explain`, `access.preview`,
-  `access.view_as`), "4.4 Gruppen und Freigaben" (`grant.create`), "8" (R-AZ-05, R-AZ-13).
-- `docs/spec/03-datenmodell.md`: tables `grants`, `groups`, `group_memberships`, `owners`,
+- `docs/PLAN.md`, section 7 "M1 Foundation": row M1-49, "Prerequisites from the core contract"
+  (row `access.preview` ... K-RE-7 to K-RE-9), "Test strategy", "Red team"; section 3
+  "Way of working per ticket". `docs/briefs/README.md`.
+- `docs/spec/07-permissions.md`: "3. Principal context" (field `view_as`), "4.1 Decisions and reasons",
+  "4.2 Flow" (steps 4 and 7), "4.3 Visibility", "4.4 Invariants in the transaction",
+  "SR2 Tool class", "SR6 Direct messages only for participants", "6. Read horizon of agents"
+  (H(A), T(A), H1), "7.2 Permission state (snapshot)" (provenance), "9.1 Who has access?",
+  "9.2 View as person", "9.3 Plain-text preview", "10. Examples", "11.1 Test matrix" (world,
+  AZ-M21, AZ-M31, AZ-M37, AZ-M38, AZ-M46, AZ-M47), "11.2 Required tests" (AZ-P8),
+  "12. Decisions" (R-RE-07, R-RE-10), "14. Configuration values".
+- `docs/spec/05-actions.md`: "1. Binding rules" (rules 1.6, 1.7), "2.3 Effective level",
+  "2.4" (columns), "4.2 Instance and administration" (rows `access.explain`, `access.preview`,
+  `access.view_as`), "4.4 Groups and grants" (`grant.create`), "8" (R-AZ-05, R-AZ-13).
+- `docs/spec/03-data-model.md`: tables `grants`, `groups`, `group_memberships`, `owners`,
   `principals`, `users` (`locale`, `time_zone`), `agents` (`billing_mode`, `credential_holder_id`,
-  `tool_class`, `reported_tool_class`, `reported_details`); "6.3 Sperrreihenfolge", "6.4
-  I1-Prüfung".
-- `docs/spec/10-backend-richtlinie.md`: "5.3 Abfrage" (triggerer query), "11. Geführter Ablauf"
+  `tool_class`, `reported_tool_class`, `reported_details`); "6.3 Lock order", "6.4 I1 check".
+- `docs/spec/10-backend-policy.md`: "5.3 Query" (triggerer query), "11. Guided flow"
   (`i1_conflicts`, `organization_ready`).
-- `docs/spec/04-sync-protokoll.md`: "8.2 Was beim Ändern passiert" (diff format).
-- `docs/spec/02-architektur.md`: "4.1 Regeln" (source ports), "4.3 Ports, Ereignisse und Quellen je
-  Modul", "4.4 Erlaubte Abhängigkeiten", "5. Schichten im Modul", "8.1 Ablauf" (unit of work and
-  phase hooks), "9.3 Nachweis der Prüfung".
-- `docs/spec/01-produkt.md`: A2, A3, A4 wireframes; "9. Sprachen" (language follows `users.locale`).
-- `docs/spec/06-api.md`: "5. Fehler", "7. Idempotenz" (`previewGrant` has no `Idempotency-Key`),
-  "16. Endpunkte" group "Access", "13. Versionierung" (additive changes).
+- `docs/spec/04-sync-protocol.md`: "8.2 What happens on a change" (diff format).
+- `docs/spec/02-architecture.md`: "4.1 Rules" (source ports), "4.3 Ports, events and sources per
+  module", "4.4 Allowed dependencies", "5. Layers within a module", "8.1 Flow" (unit of work and
+  phase hooks), "9.3 Proof of the check".
+- `docs/spec/01-product.md`: A2, A3, A4 wireframes; "9. Languages" (language follows `users.locale`).
+- `docs/spec/06-api.md`: "5. Errors", "7. Idempotency" (`previewGrant` has no `Idempotency-Key`),
+  "16. Endpoints" group "Access", "13. Versioning" (additive changes).
 - `docs/api/openapi.yaml`: operations `explainSpaceAccess`, `explainChannelAccess`, `previewGrant`,
   `viewAsUser`, `createGrant`; schemas `AccessExplanation`, `AccessEntry`, `AccessSource`,
   `AccessTargetKind`, `GrantCreate`, `GrantPreview`, `AccessEffect`, `InvariantViolation`,
@@ -76,17 +76,17 @@ generated from it (ADR 0013); the route test keeps both identical.
    (green). Keep the red output for the report.
 7. No en dash or em dash characters (U+2013, U+2014) in any file or commit message.
 8. White label: no company, person, host or domain names except the examples Alex, Sam, Robin,
-   the agents from 07 "10. Beispiele" and `example.com`; no paths of a real machine.
+   the agents from 07 "10. Examples" and `example.com`; no paths of a real machine.
 9. Limits and durations only through named keys from `docs/operations/configuration.md`; no bare
    numbers in production code or documentation.
 10. Specification first: every API change below lands in `docs/api/openapi.yaml` and the chapter in
     the same change, before the code that implements it (PLAN principle 3).
-11. Product requirements implemented here: "Wer hat Zugriff?" with provenance per principal
-    (07 "9.1"); preview of every rights change as a dry run in the real transaction with rollback,
-    I1 and SR8 results and hints in plain text from templates (07 "9.3", R-RE-10); "Als Person
-    ansehen" only for owners with step-up, intersection of rights, DM channels hidden, every write
-    `view_as_read_only`, ends after `authz.view_as_max_duration`, audited (07 "9.2", SR6, AZ-M46,
-    AZ-M47); hint H1 in preview and explanation (07 "6").
+11. Product requirements implemented here: "Who has access?" with provenance per principal
+    (07 "9.1"); preview of every permission change as a dry run in the real transaction with
+    rollback, I1 and SR8 results and hints in plain text from templates (07 "9.3", R-RE-10);
+    "View as person" only for owners with step-up, intersection of permissions, DM channels
+    hidden, every write `view_as_read_only`, ends after `authz.view_as_max_duration`, audited
+    (07 "9.2", SR6, AZ-M46, AZ-M47); hint H1 in preview and explanation (07 "6").
 
 ## Scope
 
@@ -97,8 +97,8 @@ with `hints`, `text`, `text_locale`, `denial_reason`; `PreviewHint`; `InvariantV
 `expires_at`, `membership_expires_at`, `reason`; `ViewAsSnapshot.expires_at`; descriptions of the
 four operations) and 07 "9.1" (API source kinds), "9.2" (view-as in M1 as a snapshot), "9.3"
 (language rule `users.locale` with fallback `de`, time zone, catalog in `authz`, the split between
-missing base right and `allowed = false`, the example with line 4 unwrapped). Change them only
-where the implementation proves them wrong; run `make api-lint` and `make api-checks` and
+missing base permission and `allowed = false`, the example with line 4 unwrapped). Change them
+only where the implementation proves them wrong; run `make api-lint` and `make api-checks` and
 regenerate the server code with the target of M1-17 so that `make codegen-check` shows no diff.
 
 Code (paths under `services/server/`):
@@ -127,11 +127,11 @@ Code (paths under `services/server/`):
   diff to `AccessEffect` (`preview.go`), plain-text renderer `internal/authz/domain/previewtext`
   with the catalog files `catalog_de.go` and `catalog_en.go` (stdlib `text/template` or plain
   formatting; no third-party library in domain).
-- `internal/authz/app`: use cases `explain.go`, `preview.go`, `viewas.go`; `authorize` honours
+- `internal/authz/app`: use cases `explain.go`, `preview.go`, `viewas.go`; `authorize` honors
   `ViewAs` (07 "4.2" step 4 intersection, step 7 `view_as_read_only`, expiry rule below) if the
   base does not already.
 - `internal/authz/adapters/postgres`: queries for explanation candidates (grants by target on the
-  path, valid group members, owners) and for the trigger set of any agent (generalise the I1
+  path, valid group members, owners) and for the trigger set of any agent (generalize the I1
   triggerer query of 10 "5.3"; no copy).
 - `internal/authz/adapters/httpapi`: handlers `explainSpaceAccess`, `explainChannelAccess`,
   `previewGrant`, `viewAsUser`.
@@ -144,10 +144,10 @@ Code (paths under `services/server/`):
 
 ## Out of scope
 
-- Gruppen and grants API itself (M1-48, merged), expiry jobs (M1-30), `resolve_i1` (not in the
+- Groups and grants API itself (M1-48, merged), expiry jobs (M1-30), `resolve_i1` (not in the
   `GrantCreate` schema; preview of it waits for the ticket that adds it).
-- Previews of other actions with "Rechte" = `ja` (07 "9.3": they come with their routes).
-- The console screens, the "Rechte-Hinweise" list and console browsing of content as another
+- Previews of other actions with "Permissions" = `yes` (07 "9.3": they come with their routes).
+- The console screens, the "Permission hints" list and console browsing of content as another
   person (M6-01 adds the view-as state of the console session with start and end operations to
   the core contract first, 07 "9.2"); in M1 only `authz` sets `actor.ViewAs`, inside `viewAsUser`
   and in tests.
@@ -235,7 +235,7 @@ Same code as `authorize`:
 
 Plain-text rendering (`text`):
 
-- Language: primary subtag of the caller's `users.locale` (01 "9. Sprachen"); `de` or `en`,
+- Language: primary subtag of the caller's `users.locale` (01 "9. Languages"); `de` or `en`,
   anything else falls back to `de` (product default). `text_locale` names the language used.
 - Dates: the instant `expires_at` formatted in the caller's `users.time_zone` (invalid zone: UTC);
   `de` uses `02.01.2006`, `en` uses `2006-01-02` (Go layouts).
@@ -251,6 +251,8 @@ Plain-text rendering (`text`):
 - Capabilities line: always upload and approve lines; ` ` plus caps.export and ` ` plus caps.manage
   appended only when granted.
 - Catalog (placeholders in braces; quotes are ASCII):
+
+<!-- language-check: off -->
 
 | Key | de | en |
 |---|---|---|
@@ -270,7 +272,7 @@ Plain-text rendering (`text`):
 | `caps.export` / `caps.manage` | `Exportieren: ja.` / `Verwalten: ja.` | `Export: yes.` / `Manage: yes.` |
 | `yes` / `no` | `ja` / `nein` | `yes` / `no` |
 | `denial.delegation_exceeds_own_level` | `Abgelehnt: Du kannst höchstens deine eigene Stufe weitergeben.` | `Rejected: you can grant at most your own level.` |
-| `denial.delegation_exceeds_own_capabilities` | `Abgelehnt: Du kannst nur eigene Zusatzrechte weitergeben.` | `Rejected: you can only grant additional rights you have yourself.` |
+| `denial.delegation_exceeds_own_capabilities` | `Abgelehnt: Du kannst nur eigene Zusatzrechte weitergeben.` | `Rejected: you can only grant capabilities you have yourself.` |
 | `denial.subject_kind_not_allowed` | `Abgelehnt: Agenten und Apps bekommen Freigaben nur vom Owner, höchstens Schreiben und nur Dateien hochladen.` | `Rejected: agents and apps get grants only from an owner, at most Write and only Upload files.` |
 | `denial.owner_only` | `Abgelehnt: Freigaben auf der ganzen Instanz legt nur ein Owner an.` | `Rejected: only an owner grants on the whole instance.` |
 | `hint.i1` | `Abgelehnt: {agent} läuft auf dem persönlichen Abo von {holder}. Zuerst auf Organisation umstellen.` | `Rejected: {agent} runs on the personal subscription of {holder}. Switch it to organization first.` |
@@ -281,7 +283,11 @@ Plain-text rendering (`text`):
 | `hint.group_reach` / `.one` | `Hinweis: Die Gruppe {group} erreicht {count} Menschen.` / `Hinweis: Die Gruppe {group} erreicht einen Menschen.` | `Note: the group {group} reaches {count} people.` / `Note: the group {group} reaches one person.` |
 | `hint.expiry_missing` | `Hinweis: Die Freigabe für {subject} hat kein Ablaufdatum.` | `Note: the grant for {subject} has no expiry date.` |
 
+<!-- language-check: on -->
+
 - Golden file `internal/authz/domain/previewtext/testdata/example_07_de.golden` (exactly 4 lines):
+
+<!-- language-check: off -->
 
 ```text
 Sam erhält bis 31.12.2026 die Stufe "Auslösen" im Kanal Marketing/Kampagnen.
@@ -289,6 +295,8 @@ Sam kann damit: Nachrichten lesen und schreiben, Threads anlegen, Agent Texter a
 Dateien hochladen: nein. Freigabe-Karten bestätigen: nein.
 Hinweis: Texter liest auch Marketing/Intern. Sam darf Marketing/Intern nicht lesen, kann aber über Texter Inhalte daraus erfahren.
 ```
+
+<!-- language-check: on -->
 
 - Golden file `example_07_en.golden`:
 
@@ -299,24 +307,25 @@ Upload files: no. Confirm approval cards: no.
 Note: Texter also reads Marketing/Intern. Sam may not read Marketing/Intern but can learn its contents through Texter.
 ```
 
-- World of both golden tests: owner (locale `de` resp. `en`, time zone `UTC`); Sam without grants;
-  space Marketing with channels Kampagnen and Intern; agent Texter, `organization`, tool class
-  `chat`, default operator of Marketing; grant: Sam, channel Marketing/Kampagnen, `trigger`, no
-  capabilities, `expires_at = 2026-12-31T12:00:00Z`, reason `Kampagne`.
+- World of both golden tests: owner (locale `de` or `en` respectively, time zone `UTC`); Sam
+  without grants; space Marketing with channels Kampagnen and Intern; agent Texter,
+  `organization`, tool class `chat`, default operator of Marketing; grant: Sam, channel
+  Marketing/Kampagnen, `trigger`, no capabilities, `expires_at = 2026-12-31T12:00:00Z`, reason
+  `Campaign`.
 
 `access.view_as` (`viewAsUser`):
 
 - `authorize(p, access.view_as, user)`: owner in a session, step-up, audit of allow and deny, class
   `rl.admin`. Unknown user or a principal that is not a human gives 404.
 - The handler sets `actor.ViewAs{UserID, StartedAt: request_time}` and computes the visible spaces
-  and channels through `Scope`/`authorize` with that context: effective rights are the
+  and channels through `Scope`/`authorize` with that context: effective permissions are the
   intersection of owner and person (07 "4.2" step 4); DM channels never appear (SR6); archived
   structure never appears. Each item carries the intersected `level` and `capabilities`. A disabled
   person yields empty lists. `expires_at = request_time + authz.view_as_max_duration`.
 - Audit entry: action `access.view_as`, resource `user`, details
   `{"target_user_id": ..., "expires_at": ...}`; no names.
-- `authorize` with `ViewAs` set: every action whose catalog right writes ends with `forbidden`,
-  reason `view_as_read_only` (07 "4.2" step 7); once
+- `authorize` with `ViewAs` set: every action whose catalog permission writes ends with
+  `forbidden`, reason `view_as_read_only` (07 "4.2" step 7); once
   `request_time >= StartedAt + authz.view_as_max_duration` every decision is `step_up_required`
   (the view ended; a new one needs a fresh step-up). No new reason code.
 

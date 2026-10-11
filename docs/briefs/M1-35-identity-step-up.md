@@ -1,6 +1,6 @@
 # M1-35: identity: step-up with the device key
 
-Status: ready | Depends on: M1-34 | Etappe: M1
+Status: ready | Depends on: M1-34 | Milestone: M1
 
 ## Goal
 
@@ -8,31 +8,31 @@ After this ticket a person confirms administrative actions with the device's `st
 app fetches a single-use challenge, the operating system asks for biometrics or the device PIN,
 the `step_up` key signs the challenge, and the server sets `auth_sessions.step_up_at`, which
 counts as fresh for `auth.step_up_max_age`. Too many failed attempts end the session. Every
-action with "Step-up = ja" in 05 (owners, grants, providers, keys, agent policy) depends on this
-(08 "Ziele" item 4, ADR 0020, SR5).
+action with "Step-up = yes" in 05 (owners, grants, providers, keys, agent policy) depends on this
+(08 "Goals" item 4, ADR 0020, SR5).
 
 ## Read first
 
-- `docs/spec/03-datenmodell.md` `auth_challenges` (R-DM-31): single-use challenges for step-up and
+- `docs/spec/03-data-model.md` `auth_challenges` (R-DM-31): single-use challenges for step-up and
   the WebAuthn ceremonies in one table (`purpose` `step_up`, `passkey_login`, `passkey_enroll`,
   `passkey_register`), stored as HMAC, with `status`, `finished_at` and the failure index; and
   `step_up_failed` in `auth_sessions.revoke_reason` and `SessionRevokedPayload.reason`. Reason for a
   table: a single-use challenge and a failure limit need state that every process sees (the code
   stays node-neutral from M1 on, plan section 20). This ticket creates the whole table (all
   purposes in the CHECK) and uses `step_up`; M1-40 uses the passkey purposes.
-- `docs/spec/08-identitaet.md`: "6.1 Zwei Schlüssel je nativem Gerät", "6.2 Step-up-Ablauf",
-  "7.4" (revocation helpers), "8. Sitzungsdauer", "13. Schutz der Anmeldung" (row Step-up),
-  "14.3 Step-up" (sequence diagram), "15. Tests" (ID-T18, ID-T27), "18. Konfigurationswerte".
-- `docs/spec/03-datenmodell.md`: "4.2" tables `auth_sessions` (`step_up_at`, `step_up_method`,
-  checks), `device_keys`, the challenge table above; "6.3 Sperrreihenfolge";
-  "9. Konfigurationswerte" (`auth.step_up_max_age`).
-- `docs/spec/05-aktionen.md`: "2.4 Spalten Owner, Step-up, Audit, Rechte", "2.5 Entscheidung",
+- `docs/spec/08-identity.md`: "6.1 Two keys per native device", "6.2 Step-up flow",
+  "7.4" (revocation helpers), "8. Session duration", "13. Login protection" (row Step-up),
+  "14.3 Step-up" (sequence diagram), "15. Tests" (ID-T18, ID-T27), "18. Configuration values".
+- `docs/spec/03-data-model.md`: "4.2" tables `auth_sessions` (`step_up_at`, `step_up_method`,
+  checks), `device_keys`, the challenge table above; "6.3 Lock order";
+  "9. Configuration values" (`auth.step_up_max_age`).
+- `docs/spec/05-actions.md`: "2.4 Columns Owner, Step-up, Audit, Permissions", "2.5 Decision",
   "4.1" (`auth.step_up`).
-- `docs/spec/07-rechte.md`: "3. Prinzipal-Kontext", "4.1" (`step_up_required`,
-  `step_up_not_possible`), "4.2 Ablauf" step 8, "SR5", "11.1 Testmatrix" (AZ-M36).
-- `docs/spec/06-api.md`: "3.3 Step-up", "5. Fehler", "7. Idempotenz" item 3.
-- `docs/spec/02-architektur.md`: "4.3" (`identity` port `Auth`: step-up), "8. Transaktionen und
-  Unit of Work", "9. Request-Pfad".
+- `docs/spec/07-permissions.md`: "3. Principal context", "4.1" (`step_up_required`,
+  `step_up_not_possible`), "4.2 Flow" step 8, "SR5", "11.1 Test matrix" (AZ-M36).
+- `docs/spec/06-api.md`: "3.3 Step-up", "5. Errors", "7. Idempotency" item 3.
+- `docs/spec/02-architecture.md`: "4.3" (`identity` port `Auth`: step-up), "8. Transactions and
+  Unit of Work", "9. Request path".
 - ADR 0020, ADR 0017, ADR 0021.
 - `docs/api/openapi.yaml`: operations `createStepUpChallenge`, `completeStepUpWithDeviceKey`
   (and `completeStepUpWithPasskey`, which M1-40 builds); schemas `StepUpChallenge`,
@@ -42,7 +42,7 @@ action with "Step-up = ja" in 05 (owners, grants, providers, keys, agent policy)
   (`identity.Auth.RevokeSession`, Authenticator, actor fields `StepUpAt`, `StepUpMethod`), M1-28
   (`authorize` step 8 and its matrix test world), M1-24 (audit recorder), M1-16 (event appender).
 - `services/server/internal/identity/README.md`, `docs/quality/gates.md`, `CONTRIBUTING.md`,
-  `docs/PLAN.md` "3. Arbeitsweise je Ticket".
+  `docs/PLAN.md` "3. Way of working per ticket".
 
 ## Fixed requirements that apply
 
@@ -58,7 +58,7 @@ action with "Step-up = ja" in 05 (owners, grants, providers, keys, agent policy)
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour starts with a failing test (red output goes into the report).
+6. Test first: every behavior starts with a failing test (red output goes into the report).
 7. No en dash and no em dash in any text you write.
 8. White label: only example.com, example.org and the names Alex, Sam, Robin in examples.
 9. Configuration values only through named keys from `docs/operations/configuration.md`.
@@ -73,7 +73,7 @@ action with "Step-up = ja" in 05 (owners, grants, providers, keys, agent policy)
 13. `auth.step_up_fail_limit` failures per `auth.login_fail_window` revoke the session
     (08 "13").
 14. `createStepUpChallenge` and `completeStepUpWithDeviceKey` have no `Idempotency-Key`
-    (06 "7" item 3); action `auth.step_up`, class `rl.public_auth`, audit `ja` (05 "4.1").
+    (06 "7" item 3); action `auth.step_up`, class `rl.public_auth`, audit `yes` (05 "4.1").
 
 ## Scope
 
@@ -98,7 +98,7 @@ action with "Step-up = ja" in 05 (owners, grants, providers, keys, agent policy)
    role `worker`): deletes rows of `auth_challenges` past `expires_at`; M1-38 adds pairings and
    device expiry, M1-41 adds `auth_login_flows`. Register `auth.cleanup_interval` in the identity
    `Config`. Request handling never depends on the job (expiry is checked per request).
-9. Docs: `docs/spec/08-identitaet.md` "6.2" and "13" already state the JWS profile, the failure
+9. Docs: `docs/spec/08-identity.md` "6.2" and "13" already state the JWS profile, the failure
    counting and the answers, and `StepUpDeviceKeyRequest` in `openapi.yaml` describes the signed
    payload; change them only where the implementation proves them wrong (spec first). Rulings in
    `docs/DECISIONS.md`; identity README; `services/server/CHANGELOG.md`.
@@ -138,7 +138,7 @@ Create challenge (`createStepUpChallenge`):
 1. The actor must be a person with a session (`kind = user`, `SessionID` set) whose device is not
    `platform = 'cli'` (08 "6.4"); otherwise `403 forbidden`, audit deny with reason
    `step_up_not_possible`.
-2. `authorize(actor, auth.step_up, auth_session = actor.SessionID)`: right `self`; a pending
+2. `authorize(actor, auth.step_up, auth_session = actor.SessionID)`: permission `self`; a pending
    device gets `403 device_pending`; a revoked session `401 session_revoked`.
 3. Value: 32 bytes from `crypto/rand`, base64url without padding. Store `challenge_hash` =
    HMAC-SHA-256(token pepper, value), `status = issued`, `expires_at = now +
@@ -162,7 +162,7 @@ Complete with the device key (`completeStepUpWithDeviceKey`):
     - Parse with `kernel/jose`, allowlist exactly the key's `alg`; reject `crit`, `jwk`, `jku`,
       `x5u`, `x5c` in the header (the key comes only from `device_keys`).
     - Verify with the active `step_up` key; a signature by the `dpop` key or any other key fails
-      (ID-T18 "falscher Schlüssel").
+      (ID-T18 "wrong key").
     - Payload: `challenge` string whose HMAC equals `challenge_hash` (`hmac.Equal`); `sid` equals
       `actor.SessionID`; `iat` integer NumericDate, not before `created_at - auth.clock_leeway` and
       not after now + `auth.clock_leeway`. Unknown members are ignored.

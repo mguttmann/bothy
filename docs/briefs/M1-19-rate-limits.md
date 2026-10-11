@@ -1,6 +1,6 @@
 # M1-19: Rate limits per class
 
-Status: ready | Depends on: M1-18 | Etappe: M1
+Status: ready | Depends on: M1-18 | Milestone: M1
 
 ## Goal
 
@@ -8,12 +8,12 @@ After this ticket token buckets per rate-limit class and key run in the chain st
 
 ## Read first
 
-- `docs/PLAN.md`: section "M1 Fundament" (rows M1-17 to M1-20, M1-37, M1-38, M1-64, M1-66, M1-68; exit criteria), "Entscheidungen dieses Plans" (P-07 to P-12).
-- `docs/spec/05-aktionen.md`: "Rate-Limit-Klassen", "Entscheidung" (rate limits run in their own layer before `authorize`), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/06-api.md`: "Rate-Limits", "Grundregeln" (row Client-IP), "Fehler" (`rate_limited`), "Entscheidungen dieses Kapitels" (R-API-11), "Quellen" (Q5).
-- `docs/spec/02-architektur.md`: "Request-Pfad", "Skalierungspfad" (limits per node), "Entscheidungen dieses Kapitels" (R-AR-12), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/08-identitaet.md`: "Schutz der Anmeldung", test ID-T25. `docs/spec/16-betrieb.md`: "Rand und Identität".
-- `docs/spec/19-sicherheit.md`: SEC-AI-7, "Tests" (SEC-T03). `docs/security/threat-model.md`: row T-DS-01.
+- `docs/PLAN.md`: section "M1 Foundation" (rows M1-17 to M1-20, M1-37, M1-38, M1-64, M1-66, M1-68; exit criteria), "Decisions of this plan" (P-07 to P-12).
+- `docs/spec/05-actions.md`: "Rate-limit classes", "Decision" (rate limits run in their own layer before `authorize`), "Configuration values of this chapter".
+- `docs/spec/06-api.md`: "Rate limits", "Basic rules" (row Client IP), "Errors" (`rate_limited`), "Decisions of this chapter" (R-API-11), "Sources" (Q5).
+- `docs/spec/02-architecture.md`: "Request path", "Scaling path" (limits per node), "Decisions of this chapter" (R-AR-12), "Configuration values of this chapter".
+- `docs/spec/08-identity.md`: "Login protection", test ID-T25. `docs/spec/16-operations.md`: "Edge and identity".
+- `docs/spec/19-security.md`: SEC-AI-7, "Tests" (SEC-T03). `docs/security/threat-model.md`: row T-DS-01.
 - `docs/observability/signals.md`: `bothy.ratelimit.rejected` and attribute `bothy.ratelimit.class`.
 - `docs/spec/actions.yaml` (classes per action, M1-02).
 - Code: `internal/platform/httpserver` and `httpservertest` (M1-18), `api/routes` (M1-17), `internal/kernel/{actor,reqmeta,clock,errs}`, `internal/platform/{config,otel,lifecycle}`, `internal/wire`.
@@ -34,11 +34,11 @@ After this ticket token buckets per rate-limit class and key run in the chain st
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
 6. Test first: write the failing test, show it red, then make it green. No en or em dashes in any text. White label everywhere. Configuration values only through named keys from `docs/operations/configuration.md`.
-7. 05 "Rate-Limit-Klassen" and 06 "Rate-Limits" point 1: one token bucket per class and key with `ratelimit.<class>.per_minute` and `ratelimit.<class>.burst` (for example `ratelimit.rl.read.per_minute`); the check runs before `authorize`.
-8. 06 "Rate-Limits" point 2 (draft-ietf-httpapi-ratelimit-headers-11, provisional): `RateLimit-Policy: "<class>";q=<per_minute>;w=60` and `RateLimit: "<class>";r=<whole tokens>;t=<seconds until full>`.
-9. 06 "Rate-Limits" point 3: an exhausted bucket gives `429 rate_limited` with `Retry-After` (RFC 9110).
-10. Keys per class as in the 05 table column "Schlüssel": Client-IP, Prinzipal, Gerät bzw. Token, Verbindung, Agent, Eingangs-Webhook.
-11. The client IP comes only from forwarding headers of peers in `server.trusted_proxies` (08 "Schutz der Anmeldung", ID-T25), resolved by M1-18 into `kernel/reqmeta`.
+7. 05 "Rate-limit classes" and 06 "Rate limits" point 1: one token bucket per class and key with `ratelimit.<class>.per_minute` and `ratelimit.<class>.burst` (for example `ratelimit.rl.read.per_minute`); the check runs before `authorize`.
+8. 06 "Rate limits" point 2 (draft-ietf-httpapi-ratelimit-headers-11, provisional): `RateLimit-Policy: "<class>";q=<per_minute>;w=60` and `RateLimit: "<class>";r=<whole tokens>;t=<seconds until full>`.
+9. 06 "Rate limits" point 3: an exhausted bucket gives `429 rate_limited` with `Retry-After` (RFC 9110).
+10. Keys per class as in the 05 table column "Key": client IP, principal, device or token, connection, agent, incoming webhook.
+11. The client IP comes only from forwarding headers of peers in `server.trusted_proxies` (08 "Login protection", ID-T25), resolved by M1-18 into `kernel/reqmeta`.
 12. R-AR-12: limits live in the process; with several api nodes they apply per node.
 
 ## Scope
@@ -47,16 +47,16 @@ Paths are relative to `services/server/` unless they start with `docs/`.
 
 1. `internal/platform/ratelimit` (new): limiter, buckets, shards, sweeper, key derivation, header formatting, HTTP middleware constructor; `doc.go` and `README.md`.
 2. `internal/wire`: build the limiter from configuration, register it with `Chain.Use(httpserver.StageRateLimit, ...)` for roles `api` and `all`, start the sweeper under the lifecycle of M1-11 and stop it on shutdown, run the start check below.
-3. Configuration schema (M1-07): the keys `ratelimit.rl.<name>.per_minute` and `.burst` for every class of the 05 table "Rate-Limit-Klassen" (two per row; `rl.terminal` and `rl.host` included, although no operation uses them before M2, P-24) of 05 "Konfigurationswerte dieses Kapitels" (if not yet present) and `ratelimit.max_tracked_keys` and `ratelimit.sweep_interval` (02 "Konfigurationswerte dieses Kapitels").
-4. Failed credentials (02 "Kette im api-Knoten", 05 "Rate-Limit-Klassen"): fill the hook M1-18 gives `StageAuthenticate`. A request whose presented credentials fail with `401` other than `token_expired` and `use_dpop_nonce` takes one token from the `rl.public_auth` bucket of its client IP; while that bucket is empty, the stage answers `429` for requests with credentials from that client IP without verifying them.
-5. Docs: in `docs/spec/06-api.md` "Rate-Limits" the rounding of `r`, `t` and `Retry-After`, the anonymous fallback to the client IP, and the per-node note; `docs/DECISIONS.md` entries; `docs/operations/configuration.md` regenerated; `services/server/CHANGELOG.md`.
+3. Configuration schema (M1-07): the keys `ratelimit.rl.<name>.per_minute` and `.burst` for every class of the 05 table "Rate-limit classes" (two per row; `rl.terminal` and `rl.host` included, although no operation uses them before M2, P-24) of 05 "Configuration values of this chapter" (if not yet present) and `ratelimit.max_tracked_keys` and `ratelimit.sweep_interval` (02 "Configuration values of this chapter").
+4. Failed credentials (02 "Chain in the api node", 05 "Rate-limit classes"): fill the hook M1-18 gives `StageAuthenticate`. A request whose presented credentials fail with `401` other than `token_expired` and `use_dpop_nonce` takes one token from the `rl.public_auth` bucket of its client IP; while that bucket is empty, the stage answers `429` for requests with credentials from that client IP without verifying them.
+5. Docs: in `docs/spec/06-api.md` "Rate limits" the rounding of `r`, `t` and `Retry-After`, the anonymous fallback to the client IP, and the per-node note; `docs/DECISIONS.md` entries; `docs/operations/configuration.md` regenerated; `services/server/CHANGELOG.md`.
 
 ## Out of scope
 
 - Using the limiter in the gateway (`rl.gateway_connect` at connection setup in M1-64, `rl.typing` in M1-66). This ticket provides the API and the key rules.
-- The per-code and per-account login protections of 08 "Schutz der Anmeldung" other than `rl.public_auth` (`auth.login_fail_limit` and similar): identity tickets M1-37 to M1-39.
+- The per-code and per-account login protections of 08 "Login protection" other than `rl.public_auth` (`auth.login_fail_limit` and similar): identity tickets M1-37 to M1-39.
 - Upload session limits of 12 (M3), maintenance mode (M7-08), idempotency (M1-20).
-- A shared limiter across nodes (02 "Skalierungspfad" keeps it per node).
+- A shared limiter across nodes (02 "Scaling path" keeps it per node).
 - Metrics other than `bothy.ratelimit.rejected` (M1-68).
 
 ## Boundaries
@@ -112,14 +112,14 @@ Use the metric API of M1-10 for `bothy.ratelimit.rejected` (counter, attribute `
 
 | Class | Kind | Key value |
 |---|---|---|
-| `rl.public_auth` | Client-IP | `reqmeta.ClientIP`; IPv6 addresses by their /64 prefix, IPv4-mapped IPv6 unmapped first (05) |
-| `rl.gateway_connect` | Gerät bzw. Token | device ID of the verified actor, else its API token ID; the gateway calls the limiter at `identify` and `resume` after the credentials are verified (04 "Lebenszyklus", 05), never at the upgrade |
-| `rl.read`, `rl.write`, `rl.message`, `rl.trigger`, `rl.interaction`, `rl.upload`, `rl.search`, `rl.admin`, `rl.export`, `rl.import` | Prinzipal | actor ID |
-| `rl.agent_runtime` | Agent | actor ID (the agent) |
-| `rl.typing` | Verbindung | gateway connection ID passed by the caller |
-| `rl.webhook_in` | Eingangs-Webhook | path value `webhook_id` (`r.PathValue`) |
+| `rl.public_auth` | client IP | `reqmeta.ClientIP`; IPv6 addresses by their /64 prefix, IPv4-mapped IPv6 unmapped first (05) |
+| `rl.gateway_connect` | device or token | device ID of the verified actor, else its API token ID; the gateway calls the limiter at `identify` and `resume` after the credentials are verified (04 "Lifecycle", 05), never at the upgrade |
+| `rl.read`, `rl.write`, `rl.message`, `rl.trigger`, `rl.interaction`, `rl.upload`, `rl.search`, `rl.admin`, `rl.export`, `rl.import` | principal | actor ID |
+| `rl.agent_runtime` | agent | actor ID (the agent) |
+| `rl.typing` | connection | gateway connection ID passed by the caller |
+| `rl.webhook_in` | incoming webhook | path value `webhook_id` (`r.PathValue`) |
 
-Principal-keyed classes with the anonymous actor use the client IP (IPv6 by /64), so unauthenticated calls never share one bucket and never borrow a principal's bucket. Internal map key: `<class>` + `|` + `<kind prefix>:<value>`, so classes never share buckets. If `docs/spec/actions.yaml` (M1-02) carries the key kind per class, take the kind table from it (generated); otherwise keep a hand-written table and add `TestKeyKinds_MatchChapter05`, which parses the 05 table "Rate-Limit-Klassen" and compares class and key column.
+Principal-keyed classes with the anonymous actor use the client IP (IPv6 by /64), so unauthenticated calls never share one bucket and never borrow a principal's bucket. Internal map key: `<class>` + `|` + `<kind prefix>:<value>`, so classes never share buckets. If `docs/spec/actions.yaml` (M1-02) carries the key kind per class, take the kind table from it (generated); otherwise keep a hand-written table and add `TestKeyKinds_MatchChapter05`, which parses the 05 table "Rate-limit classes" and compares class and key column.
 
 Start check in `internal/wire`: every class used by an enabled operation (`routes.Enabled()`) and every class of the catalogue has limits in the configuration; an enabled REST operation with class `rl.typing` or `rl.gateway_connect` fails the start, because those classes belong to the gateway.
 
@@ -131,11 +131,11 @@ Reads the `routes.Operation` that M1-18 puts into the context in `StageRoute`, d
 
 Buckets live in a fixed number of shards (map plus mutex each; shard chosen by FNV-1a of the internal key). A full bucket decides exactly like a missing bucket, so removing it changes no decision: `Sweep` removes every bucket that is full at sweep time, and `Run` calls it every `ratelimit.sweep_interval`. Hard cap: at most `ratelimit.max_tracked_keys` buckets in total, spread evenly over the shards (at least one per shard). Inserting into a full shard first removes full buckets found in a small sample of that shard (Go map iteration gives a random sample; the sample size is a code constant with a comment), and only if none is full evicts the sampled bucket with the oldest last use. An evicted key gets a fresh bucket on its next request; this happens only when more distinct keys are active within one refill window than the cap allows (a distributed flood). The limiter never blocks or denies because the table is full. Record this policy in `docs/DECISIONS.md`.
 
-Configuration values in 02 "Konfigurationswerte dieses Kapitels": `ratelimit.max_tracked_keys` and `ratelimit.sweep_interval`. The README explains how to estimate memory from `BenchmarkLimiter_BytesPerKey` and `ratelimit.max_tracked_keys`.
+Configuration values in 02 "Configuration values of this chapter": `ratelimit.max_tracked_keys` and `ratelimit.sweep_interval`. The README explains how to estimate memory from `BenchmarkLimiter_BytesPerKey` and `ratelimit.max_tracked_keys`.
 
 ### Several nodes
 
-Limits are per process. The README and 06 "Rate-Limits" note that with n api nodes the effective limit is up to n times the configured value (02 "Skalierungspfad").
+Limits are per process. The README and 06 "Rate limits" note that with n api nodes the effective limit is up to n times the configured value (02 "Scaling path").
 
 ### Decisions to record in `docs/DECISIONS.md`
 
@@ -147,7 +147,7 @@ Unit tests with a fake clock, `internal/platform/ratelimit`:
 
 - `TestBucket_StartsFull`, `TestBucket_BurstThenDeny` (exactly `burst` requests allowed at a frozen clock, then deny with `Retry-After` = ceil(60 / per_minute)), `TestBucket_Refill`, `TestBucket_NeverAboveBurst`.
 - `TestHeaders_Format`: exact strings, for example policy `"rl.write";q=120;w=60` and state `"rl.write";r=29;t=1` after one request with defaults; `TestHeaders_RoundingFloorAndCeil`.
-- `TestKeys_PerClass` (table over every class of the 05 table "Rate-Limit-Klassen", read from the chapter, no hard-coded count), `TestKeys_AnonymousUsesClientIP`, `TestKeys_ClassesIndependent` (draining `rl.write` leaves `rl.read` untouched), `TestKeys_WebhookPathValue`, `TestKeyKinds_MatchChapter05` (only with a hand-written table).
+- `TestKeys_PerClass` (table over every class of the 05 table "Rate-limit classes", read from the chapter, no hard-coded count), `TestKeys_AnonymousUsesClientIP`, `TestKeys_ClassesIndependent` (draining `rl.write` leaves `rl.read` untouched), `TestKeys_WebhookPathValue`, `TestKeyKinds_MatchChapter05` (only with a hand-written table).
 - `TestConfig_RejectsZeroValues`, `TestConfig_EveryCatalogueClassConfigured`, `TestAllow_UnknownClassErrors`.
 - `TestMemory_BoundedUnderManyKeys` (three times `max_tracked_keys` distinct keys: `Len()` never exceeds the cap), `TestSweep_RemovesOnlyFullBuckets`, `TestEvict_PrefersFullThenOldest`, `TestRun_StopsOnCancel`.
 - `TestConcurrent_NoOverAdmission` (`-race`; many goroutines on one key at a frozen clock: allowed equals `burst`).
@@ -169,8 +169,8 @@ Commands that must pass: `cd services/server && go test -race ./internal/platfor
 ## Acceptance criteria
 
 - [ ] After `burst` requests the next one gets `429 rate_limited` with `Retry-After` as a problem.
-- [ ] `RateLimit-Policy` and `RateLimit` match 06 "Rate-Limits" exactly on success and error responses of limited operations.
-- [ ] Keys follow 05 "Rate-Limit-Klassen" (client IP with IPv6 by /64, principal, device or token, connection, agent, incoming webhook, human for `rl.terminal`, host for `rl.host`); anonymous requests fall back to the client IP; failed credentials count against `rl.public_auth`.
+- [ ] `RateLimit-Policy` and `RateLimit` match 06 "Rate limits" exactly on success and error responses of limited operations.
+- [ ] Keys follow 05 "Rate-limit classes" (client IP with IPv6 by /64, principal, device or token, connection, agent, incoming webhook, human for `rl.terminal`, host for `rl.host`); anonymous requests fall back to the client IP; failed credentials count against `rl.public_auth`.
 - [ ] Values come from `ratelimit.<class>.per_minute` and `.burst`; invalid values stop the start.
 - [ ] A spoofed `X-Forwarded-For` from an untrusted peer counts against the peer (ID-T25).
 - [ ] Memory stays bounded under many keys; full buckets disappear with the sweep.

@@ -1,28 +1,28 @@
 # M1-08: Configuration reference generated from the schema
 
-Status: ready | Depends on: M1-07 | Etappe: M1
+Status: ready | Depends on: M1-07 | Milestone: M1
 
 ## Goal
 
 Ruling L4 takes effect: the configuration schema in the server code is the source, and section 4 of
 `docs/operations/configuration.md` is generated from the schema plus the chapter tables. A new gate
 `make config-doc-check` fails when a name appears twice, when schema and chapter disagree on a
-default, when a schema key has no chapter row, when a planned chapter key has no etappe, or when a
-retired synonym from W1 reappears anywhere. After this ticket an operator reads one reference that
-says, for every key, whether this server version accepts it.
+default, when a schema key has no chapter row, when a planned chapter key has no milestone, or when
+a retired synonym from W1 reappears anywhere. After this ticket an instance operator reads one
+reference that says, for every key, whether this server version accepts it.
 
 ## Read first
 
-- `docs/PLAN.md`: section "Arbeitsweise je Ticket", section "M1 Fundament" (row M1-08, "Bekannte
-  Widersprüche, die M1 auflöst" with W1 and the table "Konfigurationsnamen (W1)", "Voraussetzungen
-  aus dem Kern-Vertrag" row with `auth.dpop_nonce_ttl`), P-08, P-11, and the etappe tables of all
-  sections (needed for planned keys).
+- `docs/PLAN.md`: section "Way of working per ticket", section "M1 Foundation" (row M1-08, "Known
+  contradictions that M1 resolves" with W1 and the table "Configuration names (W1)", "Prerequisites
+  from the core contract" row with `auth.dpop_nonce_ttl`), P-08, P-11, and the milestone tables of
+  all sections (needed for planned keys).
 - `docs/leitung` rulings as recorded in `docs/DECISIONS.md` (L4).
 - `docs/operations/configuration.md` (whole file) and `tools/docs/config_reference.py` with
   `tools/docs/tests/test_config_reference.py` (current generator; its parsing rules stay).
-- Chapter tables "Konfigurationswerte dieses Kapitels" in `docs/spec/02-architektur.md`,
-  `06-api.md`, `08-identitaet.md`, `09-agenten.md`, `12-dateien.md`, `16-betrieb.md`,
-  `19-sicherheit.md`, and the prose of 02 "Leistungsziele" and "Shutdown".
+- Chapter tables "Configuration values of this chapter" in `docs/spec/02-architecture.md`,
+  `06-api.md`, `08-identity.md`, `09-agents.md`, `12-files.md`, `16-operations.md`,
+  `19-security.md`, and the prose of 02 "Performance targets" and "Shutdown".
 - `services/server/internal/platform/config` and `services/server/internal/wire/config*.go` (schema
   from M1-07), `services/server/architecture/` (register from M1-05).
 - `infra/compose/compose.yaml` (anchors `x-api`, services `api`, `api-tailscale`, `worker`).
@@ -57,10 +57,10 @@ says, for every key, whether this server version accepts it.
     their chapter; with different defaults the stricter one applies until the leading chapter
     decides. When a chapter and `docs/PLAN.md` disagree, the chapter wins and the plan is corrected
     in the same change (PLAN introduction).
-12. Leistungsziele (`perf.*`) are thresholds of load tests, not runtime configuration
-    (02 "Konfigurationswerte dieses Kapitels").
+12. Performance targets (`perf.*`) are thresholds of load tests, not runtime configuration
+    (02 "Configuration values of this chapter").
 13. The orchestrator must wait longer than `shutdown.total_timeout` (02 "Shutdown", W1 row
-    "Herunterfahren").
+    "shutdown").
 14. New repository tools: Python with the standard library or PyYAML, one test file per tool, SPDX
     line in every file, one make target, a row in `tools/README.md`.
 15. The core contract (00, 03, 04, 05) is not edited here; a duplicate or synonym that can only be
@@ -88,9 +88,9 @@ Change:
 - `tools/pyproject.toml`: `configdoc` in pytest `testpaths` and `pythonpath`, coverage `source`, mypy
   `files`.
 - `docs/operations/configuration.md`: introduction, section 1, section 4 (generated), section 10
-  "Pflege".
+  "Maintenance".
 - Chapter tables of 02, 06, 08, 09, 12, 16 and 19: only rows the check finds wrong (W1 residue).
-  02 already has the column `Ort` (`Server`, `Lasttest` for `perf.*`); Compose already sets
+  02 already has the column `Place` (`Server`, `Load test` for `perf.*`); Compose already sets
   `stop_grace_period`; the PLAN W1 table already names `http.max_json_body_bytes`.
 - `tools/README.md`, `docs/quality/gates.md` (rows `docs` and `config-doc-check`),
   `docs/DECISIONS.md`, root `CHANGELOG.md`, `services/server/CHANGELOG.md`.
@@ -101,7 +101,7 @@ Change:
 - Secret catalogue (section 5), instance settings (6), feature flags (7), OpenTelemetry (8) and
   Compose variables (9) of `configuration.md` stay hand-written.
 - Any other Compose change; making the installation Compose startable (M7).
-- Defaults of `*_ref` keys that chapters list as `leer` although 16 "Secret-Provider" defines
+- Defaults of `*_ref` keys that chapters list as `empty` although 16 "Secret provider" defines
   `file:<secrets.dir>/<name>`: they are planned keys; the ticket that adds them to the schema settles
   the default.
 
@@ -132,11 +132,11 @@ Change:
 
 ### Chapter tables (rules kept from `config_reference.py`)
 
-Section titled "Konfigurationswerte dieses Kapitels" of every `docs/spec/NN-*.md` except
-`23-qualitaet.md` (quality thresholds, held by `tools/docs/tests/test_config_values.py`). First cell:
+Section titled "Configuration values of this chapter" of every `docs/spec/NN-*.md` except
+`23-quality.md` (quality thresholds, held by `tools/docs/tests/test_config_values.py`). First cell:
 one name, a list (`` `a.x`, `a.y` ``) or the shorthand (`` `a.b.per_minute` / `.burst` `` with defaults
-`30` / `10`). A table with an `Ort` column names the program; otherwise the chapter default place
-applies (`01` and `15`: App; `22`: Werkzeug `bothy import`; all others: Server). Local links are
+`30` / `10`). A table with a `Place` column names the program; otherwise the chapter default place
+applies (`01` and `15`: App; `22`: Tool `bothy import`; all others: Server). Local links are
 rewritten to `../spec/`.
 
 ### Checks of `configdoc.py --check` (each finding `config-doc: <path>[:<line>]: <id>: <message>`)
@@ -146,9 +146,9 @@ rewritten to `../spec/`.
 | D1 | A name appears in more than one chapter table. |
 | D2 | A schema key has no chapter row. |
 | D3 | A schema key is found in a chapter other than its `chapter` field. |
-| D4 | A schema key's chapter row has an `Ort` other than `Server`. |
-| D5 | Default mismatch: chapter cell with backticks removed equals the schema `default`; the cell `leer` equals `""`; the cell `keiner, Pflicht` equals `required: true` with `""`. |
-| D6 | A chapter key with `Ort` Server that is not in the schema matches no rule of `planned.yaml`, or a rule matches no such key (stale rule). |
+| D4 | A schema key's chapter row has a `Place` other than `Server`. |
+| D5 | Default mismatch: chapter cell with backticks removed equals the schema `default`; the cell `empty` equals `""`; the cell `none, required` equals `required: true` with `""`. |
+| D6 | A chapter key with `Place` Server that is not in the schema matches no rule of `planned.yaml`, or a rule matches no such key (stale rule). |
 | D7 | A retired name of `retired.yaml` occurs in backticks, or its `BOTHY_` form occurs anywhere, in a tracked text file (`git ls-files`) outside the allowlist `docs/PLAN.md`, `docs/DECISIONS.md`, `tools/configdoc/retired.yaml`, `tools/configdoc/tests/`. |
 | D8 | A Compose service whose `command` (after YAML merge keys) starts with `serve` has no `stop_grace_period`, or one not strictly greater than `shutdown.total_timeout` (schema default if the key is in the schema, else the chapter 02 default). |
 | D9 | Two names map to the same environment variable. |
@@ -160,26 +160,27 @@ file or marker exits 2.
 ### Rendering of section 4
 
 One subsection per chapter as today, table columns
-`Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand`:
-`Umgebung` only for place Server; `Typ` from the schema (`enum(api, worker, all)` for enums), empty
-for planned keys; `Standard` and `Bedeutung` from the chapter; `Stand` is `aktiv` for schema keys,
-`geplant (<etappe>)` for planned Server keys, empty for other places. Output is deterministic.
+`Key | Environment | Place | Type | Default | Meaning | Status`:
+`Environment` only for place Server; `Type` from the schema (`enum(api, worker, all)` for enums),
+empty for planned keys; `Default` and `Meaning` from the chapter; `Status` is `active` for schema
+keys, `planned (<milestone>)` for planned Server keys, empty for other places. Output is
+deterministic.
 
 ### `planned.yaml` and `retired.yaml`
 
 ```yaml
 # SPDX-License-Identifier: Apache-2.0
-# Etappe of chapter keys with place Server that are not in the schema yet (config-doc rule D6).
+# Milestone of chapter keys with place Server that are not in the schema yet (config-doc rule D6).
 rules:
   - match: "file."     # ends with ".": prefix rule; otherwise an exact key name
-    etappe: M3
+    milestone: M3
 ```
 
-Exact names win over prefixes, a longer prefix over a shorter one. Etappe of a key: the etappe of
-the first ticket in `docs/PLAN.md` whose row names the key, its prefix or the feature that reads it;
-where only the chapter is known, the etappe that builds that chapter's module (PLAN "Schnitt der
-Etappen"). Keys whose consumer is an M1 ticket not built yet get `M1`. List uncertain assignments in
-the report; the column is information, not a contract.
+Exact names win over prefixes, a longer prefix over a shorter one. Milestone of a key: the
+milestone of the first ticket in `docs/PLAN.md` whose row names the key, its prefix or the feature
+that reads it; where only the chapter is known, the milestone that builds that chapter's module
+(PLAN "Milestone breakdown"). Keys whose consumer is an M1 ticket not built yet get `M1`. List
+uncertain assignments in the report; the column is information, not a contract.
 
 ```yaml
 # SPDX-License-Identifier: Apache-2.0
@@ -193,7 +194,7 @@ retired:
   - {name: http.max_body_bytes, replaced_by: http.max_json_body_bytes}
   - {name: server.shutdown_grace, replaced_by: shutdown.total_timeout}
   - {name: upload.image_max_pixels, replaced_by: file.image.max_pixels}
-  - {name: upload.strip_image_metadata, replaced_by: "file.image.* (12-dateien.md)"}
+  - {name: upload.strip_image_metadata, replaced_by: "file.image.* (12-files.md)"}
   - {name: db.acquire_timeout, replaced_by: database.acquire_timeout}
   - {name: db.statement_timeout, replaced_by: database.statement_timeout}
   - {name: db.lock_timeout, replaced_by: database.lock_timeout}
@@ -214,17 +215,17 @@ limit is `http.max_json_body_bytes` in 02, 06 and 19 (enforced by `platform/http
 route class), and `api.max_json_body_bytes` is retired. Re-verify every row when you build; fix
 residue in the chapter that P-08 names as leading.
 
-Still open and done here: the guard (D1, D7), the rendering of `Ort` (D-rendering: no environment
+Still open and done here: the guard (D1, D7), the rendering of `Place` (D-rendering: no environment
 name for load test thresholds), and the check D8 that holds Compose `stop_grace_period` (`75s`)
 above `shutdown.total_timeout` (`60s` in 02). Verify `auth.dpop_nonce_ttl` occurs only
 in the table of 08 (K-ID-8); if 04 still had a row, that is a core contract change: BLOCKED.
 
 ### Documentation
 
-- `configuration.md` introduction and section 1: present tense ("Quelle ist das Schema im Code");
-  `Stand` explains that planned keys are rejected by this server version as unknown.
-- Section 10 "Pflege": a new server key enters the schema (`internal/wire/configkeys_*.go`) and its
-  chapter table in the same change; then `go generate ./tools/configschema` and
+- `configuration.md` introduction and section 1: present tense ("The source is the schema in
+  code"); `Status` explains that planned keys are rejected by this server version as unknown.
+- Section 10 "Maintenance": a new server key enters the schema (`internal/wire/configkeys_*.go`)
+  and its chapter table in the same change; then `go generate ./tools/configschema` and
   `make config-reference`; `make config-doc-check` and `make codegen-check` enforce it.
 - DECISIONS.md: one entry per W1 row with its resolution and evidence (D1, D7 green); P-08 applied;
   generator moved from `tools/docs` to `tools/configdoc`.
@@ -233,14 +234,14 @@ in the table of 08 (K-ID-8); if 04 still had a row, that is a core contract chan
 
 `tools/configdoc/tests/test_configdoc.py` (fixtures built in `tmp_path`):
 
-- Moved from `test_config_reference.py`: shorthand `/ .burst`, lists in the first cell, `Ort`
+- Moved from `test_config_reference.py`: shorthand `/ .burst`, lists in the first cell, `Place`
   column, link rewrite, missing markers, wrong default count.
 - `test_name_in_two_chapters_fails` (D1)
 - `test_schema_key_without_chapter_row_fails` (D2)
 - `test_schema_key_in_other_chapter_fails` (D3)
 - `test_schema_key_with_non_server_place_fails` (D4)
 - `test_schema_default_differs_from_chapter_fails` and `test_required_and_empty_defaults_match` (D5)
-- `test_planned_key_rendered_with_etappe`, `test_planned_key_without_rule_fails`,
+- `test_planned_key_rendered_with_milestone`, `test_planned_key_without_rule_fails`,
   `test_stale_planned_rule_fails`, `test_exact_rule_beats_prefix` (D6)
 - `test_retired_name_in_backticks_fails`, `test_retired_env_form_fails`,
   `test_retired_name_in_allowlisted_file_passes`, `test_otel_attribute_db_system_name_passes` (D7)
@@ -272,7 +273,7 @@ make check
       section 4 without diff.
 - [ ] Rules D1 to D10 each have a failing fixture test; all tests pass.
 - [ ] The real repository has zero duplicate names and zero retired names (test above).
-- [ ] Schema keys show `aktiv` with their type; planned Server keys show `geplant (<etappe>)`;
+- [ ] Schema keys show `active` with their type; planned Server keys show `planned (<milestone>)`;
       `perf.*` rows have no environment name.
 - [ ] `infra/compose/compose.yaml` sets `stop_grace_period` above `shutdown.total_timeout` for every
       service that runs `bothy serve`.
@@ -299,6 +300,6 @@ make check
 
 Write to `{{REPORT_PATH}}`: first line `Verdict: DONE` or `Verdict: BLOCKED <reason>`; then commits
 (SHA and subject), files with line counts, test results with counts (including the red output of
-the first test run), the W1 rows with their final state, uncertain etappe assignments in
+the first test run), the W1 rows with their final state, uncertain milestone assignments in
 `planned.yaml`, what is not proven, and follow-ups that could not be done in scope with the reason.
 Then write `{{DONE_PATH}}` with `exit=0 sha=<merge sha>` or `exit=1 <reason>`.

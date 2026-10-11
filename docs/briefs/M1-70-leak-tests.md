@@ -1,6 +1,6 @@
 # M1-70: Leak tests and 404 equality
 
-Status: ready | Depends on: M1-65, M1-71 | Etappe: M1
+Status: ready | Depends on: M1-65, M1-71 | Milestone: M1
 
 ## Goal
 
@@ -13,22 +13,22 @@ unless it is on a reviewed exception list (AZ-P12). These are the tests behind t
 
 ## Read first
 
-- `docs/spec/07-rechte.md`: "Grundsätze", "Die Funktion `authorize`" ("Entscheidungen und
-  Gründe", "Ablauf", "Sichtbarkeit"), "Filterung in SQL: Rechte-Cache mit Versionszähler"
-  ("Abfrage-Muster", rules 1 to 5), "Zustellfilter je Empfänger und sofortige Wirkung",
-  "Beispiele", "Tests" (AZ-M52, AZ-P4, AZ-P5, AZ-P12), "Konfigurationswerte dieses Kapitels"
+- `docs/spec/07-permissions.md`: "Principles", "The `authorize` function" ("Decisions and reasons",
+  "Flow", "Visibility"), "Filtering in SQL: permission cache with version counter"
+  ("Query pattern", rules 1 to 5), "Delivery filter per recipient and immediate effect",
+  "Examples", "Tests" (AZ-M52, AZ-P4, AZ-P5, AZ-P12), "Configuration values of this chapter"
   (`authz.not_found_timing_tolerance`).
-- `docs/spec/05-aktionen.md`: "Begriffe der Tabellen" ("Spalte Recht", "Ziel einer Ressource",
-  "Entscheidung"), "Aktionen" (rows `space.read`, `channel.read`, `thread.read`, `message.read`,
+- `docs/spec/05-actions.md`: "Terms of the tables" ("Column Permission", "Target of a resource",
+  "Decision"), "Actions" (rows `space.read`, `channel.read`, `thread.read`, `message.read`,
   `agent.read`, `user.read`, `device.list`, `group.read`, `grant.read`, `mention.list`,
   `settings.read`, `draft.read`, `sync.snapshot.read`, `events.catch_up`).
-- `docs/spec/04-sync-protokoll.md`: "Lebenszyklus" (`ready` snapshot), "Nachholen (Catch-up)"
-  ("Cursor", "Ablauf", "REST-Variante").
-- `docs/spec/06-api.md`: "Autorisierung in der API", "Fehler", "Paginierung" (no totals).
-- `docs/spec/03-datenmodell.md`: "Grundsätze" item 12, tables `spaces`, `channels`, `threads`,
+- `docs/spec/04-sync-protocol.md`: "Lifecycle" (`ready` snapshot), "Catch-up"
+  ("Cursor", "Flow", "REST variant").
+- `docs/spec/06-api.md`: "Authorization in the API", "Errors", "Pagination" (no totals).
+- `docs/spec/03-data-model.md`: "Principles" item 12, tables `spaces`, `channels`, `threads`,
   `thread_tags`, `forum_tags`, `messages`, `message_revisions`, `mentions`, `reactions`, `pins`,
   `message_templates`, `read_states`, `drafts`, `event_log`, `agents`.
-- `docs/spec/02-architektur.md`: "Code-Layout", "Automatische Prüfung der Regeln".
+- `docs/spec/02-architecture.md`: "Code layout", "Automatic check of the rules".
 - ADR 0017 (Confirmation), ADR 0018.
 - `docs/security/threat-model.md`: T-AZ-02.
 - Operations (by operationId): every enabled GET operation in `services/server/api/operations.yaml`;
@@ -59,13 +59,14 @@ unless it is on a reviewed exception list (AZ-P12). These are the tests behind t
 6. Test first: every test is written and seen failing before the code that makes it pass.
 7. No en dash and no em dash in any file; white label.
 8. Configuration only through named keys from `docs/operations/configuration.md`.
-9. R-AZ-01 and 06 "Autorisierung in der API" item 3: no read right gives `404 not_found`, whether
-   the resource exists or not.
+9. R-AZ-01 and 06 "Authorization in the API" item 3: no read permission gives `404 not_found`,
+   whether the resource exists or not.
 10. AZ-P4: answers for a foreign ID and an unknown ID do not differ in status, body or headers, and
     their medians differ by at most `authz.not_found_timing_tolerance`.
-11. AZ-P5: in random worlds, unread counters, mention counters, lists and the snapshot never count a
-    channel without read right (search, facets and "Läuft gerade" join this test with M2 and M3).
-12. AZ-P12 and 07 "Abfrage-Muster" rule 1: every query over content tables carries
+11. AZ-P5: in random worlds, unread counters, mention counters, lists and the snapshot never count
+    a channel without read permission (search, facets and "Running now" join this test with M2
+    and M3).
+12. AZ-P12 and 07 "Query pattern" rule 1: every query over content tables carries
     `channel_id = ANY($visible)` or `space_id = ANY($visible_spaces)` unless it is on the reviewed
     exception list.
 13. AZ-M52: Alex reading a message in Marketing/Kampagnen by ID gets the same answer as for a random
@@ -83,7 +84,7 @@ unless it is on a reviewed exception list (AZ-P12). These are the tests behind t
       `thread_id`, `message_id`, `agent_id`, `user_id`, `device_id`, `group_id`, `grant_id`,
       `provider_id`, `principal_id`). `ok=false` requires a reason citing 05 (for example `user_id`
       for human requesters: the directory is readable for every human, 05 `user.read`).
-    - `normalize.go`: response normalisation (Design notes).
+    - `normalize.go`: response normalization (Design notes).
     - `world.go`: random world generator for AZ-P5.
     - `notfound_test.go`, `counters_test.go`, `README.md`.
 2. Shared test harness `services/server/test/harness` (extend, text below).
@@ -96,9 +97,9 @@ unless it is on a reviewed exception list (AZ-P12). These are the tests behind t
 5. `tools/pyproject.toml`: add `lint` to pytest `testpaths` and `pythonpath`, coverage `source`
    and mypy `files`.
 6. Fixes in owning modules for every leak or lint violation found (see Boundaries).
-7. Documentation: `docs/quality/gates.md` (row `sql-visibility`), `docs/spec/07-rechte.md`
-   "Abfrage-Muster" rule 1 (one sentence naming the lint and `tools/lint/sql_visibility.yaml`),
-   `services/server/README.md` ("Regeln, die das Gate hält" and test packages),
+7. Documentation: `docs/quality/gates.md` (row `sql-visibility`), `docs/spec/07-permissions.md`
+   "Query pattern" rule 1 (one sentence naming the lint and `tools/lint/sql_visibility.yaml`),
+   `services/server/README.md` ("Rules that the gate enforces" and test packages),
    `services/server/CHANGELOG.md` and root `CHANGELOG.md` (tool) under "Unreleased".
 
 ### Shared test harness (the same interface in the briefs M1-69 to M1-72)
@@ -111,9 +112,9 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
   in this process; PostgreSQL 18 from `internal/platform/pg/pgtest`; migrations as
   `bothy migrate up --bootstrap` runs them; secrets created as `bothy secrets init` creates them, in
   `tb.TempDir()`; public and internal listener on `127.0.0.1:0`; the first owner created through the
-  same application service that `bothy setup bootstrap-owner` calls (08 "Erstinstallation"), then
-  enrolled with its enrollment code and fresh ES256 device keys (08 "Einladungs-Code",
-  "Registrierung"); everything stopped in `tb.Cleanup` in reverse order.
+  same application service that `bothy setup bootstrap-owner` calls (08 "Initial installation"),
+  then enrolled with its enrollment code and fresh ES256 device keys (08 "Enrollment code",
+  "Registration"); everything stopped in `tb.Cleanup` in reverse order.
 - `type Options struct { Config map[string]string; LogWriter io.Writer; Telemetry *TelemetrySinks;
   EgressDenyAll bool; Clock clock.Clock }`. `Config` takes dotted keys from
   `docs/operations/configuration.md` and is applied through `platform/config` with flag precedence,
@@ -129,12 +130,12 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
   `completeStepUpWithDeviceKey`.
 - `type Client struct { PrincipalID, DeviceID string; ... }` with `Do(ctx, Request) Response`
   (DPoP proof per RFC 9449 with the latest `DPoP-Nonce`, one retry on `use_dpop_nonce`, refresh on
-  `token_expired`, `Idempotency-Key` UUIDv7 on POST and PATCH except the list in 06 "Idempotenz",
+  `token_expired`, `Idempotency-Key` UUIDv7 on POST and PATCH except the list in 06 "Idempotency",
   optional `Observer func(Request, Response)`), `StepUp(ctx)`, `Gateway(ctx) *GatewayConn`
   (`hello`, `identify`, `ready`, `Next`, `Send`, `Close`, automatic `heartbeat` and `reauth`).
 - `type Response struct { Status int; Header http.Header; Body []byte; Elapsed time.Duration }`.
-- `func BuildMatrixWorld(tb, s *Server) *World`: the M1 subset of 07 "Beispiele" and
-  "Testmatrix": spaces Support, Marketing, Engineering, Research; channels Support/Allgemein,
+- `func BuildMatrixWorld(tb, s *Server) *World`: the M1 subset of 07 "Examples" and
+  "Test matrix": spaces Support, Marketing, Engineering, Research; channels Support/Allgemein,
   Support/Eskalation, Marketing/Kampagnen, Engineering/Projekt-A (forum, no project binding),
   Engineering/Werkzeuge, Research/Notizen; people Alex, Sam, Robin; agents Lotse (organization,
   operator of Support), Texter (organization, operator of Marketing), Runner (organization, operator
@@ -143,7 +144,7 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
   `approve_actions`, space Support), G-2 (Sam, `trigger`, `upload`, space Marketing), G-3 (Robin,
   `trigger`, `upload`, channel Engineering/Projekt-A, with expiry), G-4 (group Leser, `read`,
   Support/Allgemein), G-5 (Lotse, `write`, `upload`, space Support); one thread with messages per
-  text channel and one forum post in Projekt-A. Left out until their etappe: app Tracker and G-6
+  text channel and one forum post in Projekt-A. Left out until their milestone: app Tracker and G-6
   (M2), the DM Alex-Sam (V3), project binding and tool class `host` (M2). Expiry times are relative
   to the harness clock, never calendar dates.
 - `func StartProcess(tb, ProcessOptions) *Process` (subprocess server for M1-72): not needed in
@@ -152,9 +153,9 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
 
 ## Out of scope
 
-- Search, facets, suggestions and "Läuft gerade" in AZ-P5 (M2, M3 extend the property test).
+- Search, facets, suggestions and "Running now" in AZ-P5 (M2, M3 extend the property test).
 - Gateway `focus` on foreign threads (M1-66 tests it).
-- Rate-limit behaviour (M1-19) and authorize matrix rows other than AZ-M52 (M1-28, M1-54).
+- Rate-limit behavior (M1-19) and authorize matrix rows other than AZ-M52 (M1-28, M1-54).
 - Changes to `authorize` semantics; if a leak needs a change in the core contract (00, 03, 04, 05),
   stop with `BLOCKED`.
 
@@ -184,11 +185,11 @@ AZ-P4 (route-driven, `notfound_test.go`):
 2. Requesters: Alex (human, DPoP) and Lotse (agent token). For each selected route, requester and
    path parameter set: build request A with the foreign IDs from the fixtures and request B with
    fresh random UUIDv7 values in the same parameters. A foreign ID is an existing resource for which
-   the requester has no read path under 07 "Sichtbarkeit".
-3. Assert after normalisation: same status; same header names and values; same body; same
+   the requester has no read path under 07 "Visibility".
+3. Assert after normalization: same status; same header names and values; same body; same
    `Content-Length`. When the requester lacks read on a content resource (space, channel, thread,
    message, agent), the status must be `404` with code `not_found`.
-4. Normalisation: drop `Correlation-Id`, `Date`, `DPoP-Nonce`; for `RateLimit` keep the policy name
+4. Normalization: drop `Correlation-Id`, `Date`, `DPoP-Nonce`; for `RateLimit` keep the policy name
    and drop `r` and `t`; in problem bodies drop `correlation_id` and replace the requested IDs in
    `instance` with a placeholder; compare JSON structurally and the raw byte length after the same
    replacement.
@@ -205,15 +206,15 @@ AZ-P5 (property test, `counters_test.go`, `world.go`):
 1. Generator: seeded by the environment variable `LEAK_SEED` or the current time; the seed is
    printed so a failure can be replayed. World sizes and the number of worlds are named constants
    in `world.go`. A world has spaces, text and forum channels, the observed principal P (a human
-   who is not owner, and in a second run an agent with the operator rule of 07 "Agenten als
-   Prinzipale"), grants of P on instance, space and channel with random levels and expiry (some
+   who is not owner, and in a second run an agent with the operator rule of 07 "Agents as
+   principals"), grants of P on instance, space and channel with random levels and expiry (some
    already expired by the harness clock), group memberships of P with expiry and group grants,
    threads and messages by others with mentions of P in visible and invisible channels, read
    states and drafts of P, including drafts and read states in channels whose access P loses
    during the world build.
 2. Truth: per-item reads by P (`getSpace`, `getChannel`, `getThread`, `getAgent`): `200` means
    visible, `404` means not visible. The SQL filter is performance, `authorize` is truth (07
-   "Abfrage-Muster" rule 3).
+   "Query pattern" rule 3).
 3. Surfaces checked: `getSnapshot` and the gateway `ready` snapshot, `listSpaces`,
    `listSpaceChannels` per visible space, `listChannelThreads` per visible channel, `listAgents`,
    `getMySidebar`, `listMyMentions`, `listMyReadStates`, `listMyDrafts`, and `listEvents` from cursor
@@ -225,7 +226,7 @@ AZ-P5 (property test, `counters_test.go`, `world.go`):
 5. Property 2 (noise invariance): add noise only in channels P cannot read (threads, messages,
    mentions of P, reactions, pins), then query again: all surfaces equal after dropping `head_seq`,
    `next_cursor` and `cursor` frames (the checked cursor advances by design, 04 "Cursor").
-6. No totals anywhere (06 "Paginierung").
+6. No totals anywhere (06 "Pagination").
 
 AZ-M52: `TestAZ_M52_ForeignMessageEqualsUnknown` uses `BuildMatrixWorld`: Alex `GET
 /api/v1/messages/{message_id}` with a message of Marketing/Kampagnen versus a random UUIDv7, same
@@ -239,7 +240,7 @@ SQL lint (`tools/lint/sql_visibility.py`, AZ-P12):
 2. Only reads are checked: the first keyword after comments is `SELECT` or `WITH` and the
    statement contains no `INSERT`, `UPDATE` or `DELETE` at top level.
 3. Content tables are listed in `sql_visibility.yaml` under `content_tables` (final state, also
-   tables of later etappen so new queries are covered from their first commit): `spaces`,
+   tables of later milestones so new queries are covered from their first commit): `spaces`,
    `channels`, `channel_skill_bindings`, `project_bindings`, `dm_participants`, `forum_tags`,
    `threads`, `thread_tags`, `agent_sessions`, `messages`, `message_revisions`, `mentions`,
    `reactions`, `pins`, `message_templates`, `files`, `file_thumbnails`, `message_attachments`,
@@ -248,7 +249,7 @@ SQL lint (`tools/lint/sql_visibility.py`, AZ-P12):
 4. A read that references a content table (in `FROM` or `JOIN`, with or without alias) passes when
    it contains a predicate matching `(alias.)?(channel_id|space_id) = ANY(<param>)` where `<param>`
    is a sqlc parameter (`$n`, `@name`, `sqlc.arg(name)`, `sqlc.narg(name)`) with an optional cast.
-   A subquery inside `ANY(...)` does not count (03 "Grundsätze" item 12).
+   A subquery inside `ANY(...)` does not count (03 "Principles" item 12).
 5. Otherwise the query must be listed under `exceptions` with `query: <module>.<Name>`,
    `category` from the closed set `authorize_resolution` (resolves a resource path for
    `authorize`), `after_authorize` (loads a single resource after `authorize` allowed it),
@@ -256,12 +257,12 @@ SQL lint (`tools/lint/sql_visibility.py`, AZ-P12):
    checks `authorize` per receiver), and a non-empty `reason`.
 6. Fails also on: an exception whose query no longer exists (stale), an unknown category, a
    duplicate entry, a content table missing from 03 (cross-check table names against the table
-   headings of `docs/spec/03-datenmodell.md`).
+   headings of `docs/spec/03-data-model.md`).
 7. Output: one line per finding `file:line: <module>.<Name>: <rule>`; exit code 1 on findings, 0
    otherwise, 2 on usage errors. Usage: `python tools/lint/sql_visibility.py [--repo DIR]`.
 
 Architecture register and coverage: `test/**` and `perf/**` under `services/server` form the
-component `testsupport` (M1-05; 02 "Code-Layout"), and the Go coverage total leaves them out
+component `testsupport` (M1-05; 02 "Code layout"), and the Go coverage total leaves them out
 (M1-01). Nothing to add here unless the build proves the component wrong.
 
 ## Tests (write them first)
@@ -298,7 +299,7 @@ make check
 
 - [ ] AZ-P4 runs for every enabled GET route with a UUID path parameter and both requesters; every
       route without a foreign instance has a reason from 05 in the printed table.
-- [ ] Foreign and unknown IDs give identical normalised status, headers, body and length; medians
+- [ ] Foreign and unknown IDs give identical normalized status, headers, body and length; medians
       within `authz.not_found_timing_tolerance`.
 - [ ] AZ-M52 passes.
 - [ ] AZ-P5 property 1 and property 2 pass for the printed seeds; a failing seed is replayable with
@@ -314,7 +315,7 @@ make check
   (updated for what this ticket adds); doc comment on every exported symbol and docstrings on
   every public Python function.
 - No new ADR (the decision is ADR 0017). The `testsupport` component exists (M1-05); describe any
-  change to it in `services/server/README.md` and in 02 "Code-Layout".
+  change to it in `services/server/README.md` and in 02 "Code layout".
 - CHANGELOG entries under "Unreleased" in `services/server/CHANGELOG.md` and root `CHANGELOG.md`.
 - `make check` green.
 - Independent review and red team over the diff (`docs/quality/red-team-gate.md`) with verdict
@@ -327,5 +328,5 @@ Write to `{{REPORT_PATH}}`: first line `Verdict: DONE` or `Verdict: BLOCKED <rea
 files with line counts, test results with counts (including red runs and the seeds used), the
 AZ-P4 coverage table, the exception list with categories, leaks and violations found and fixed,
 what is not proven (at least: timing on hosts other than the build host; search, suggestions and
-"Läuft gerade" until M2 and M3), follow-ups that could not be done in scope with reason. Then write
+"Running now" until M2 and M3), follow-ups that could not be done in scope with reason. Then write
 `{{DONE_PATH}}` with `exit=0 sha=<sha>` or `exit=1 <reason>`.

@@ -1,6 +1,6 @@
 # M1-09: Secret provider and `bothy secrets`
 
-Status: ready | Depends on: M1-07 | Etappe: M1
+Status: ready | Depends on: M1-07 | Milestone: M1
 
 ## Goal
 
@@ -14,24 +14,24 @@ SEC-T11 and SEC-T12 become tests.
 
 ## Read first
 
-- `docs/spec/16-betrieb.md`: "Konfiguration und Geheimnisse" with all four subsections
-  ("Konfiguration (ADR 0011)", "Secret-Provider (ADR 0011)", "Geheimnisse im Compose-Stack",
-  "Hinterlegung (Escrow)"), "Rollen" under "Datenbank", "Konfigurationswerte dieses Kapitels"
+- `docs/spec/16-operations.md`: "Configuration and secrets" with all four subsections
+  ("Configuration (ADR 0011)", "Secret provider (ADR 0011)", "Secrets in the Compose stack",
+  "Escrow"), "Roles" under "Database", "Configuration values of this chapter"
   (`secrets.dir`, `secrets.cache_ttl`).
-- `docs/spec/19-sicherheit.md`: "Logs ohne Geheimnisse und ohne Inhalte" (SEC-LOG-1),
-  "Geheimnisse" (SEC-SEC-1 to SEC-SEC-5), "Tests" (SEC-T11, SEC-T12).
-- `docs/spec/02-architektur.md`: "Befehle des Binarys", "Code-Layout", "Konfigurationsladen",
-  "Ausfall einer Abhängigkeit" (row Secret-Provider), "Modulregister als Quelle", "go-arch-lint".
-- `docs/spec/03-datenmodell.md`: "Grundsätze", item 9 (secrets only as hash or `secret_ref`).
-- `docs/operations/configuration.md`: "Namensregel und Formate" (`secret_ref`), "Geheimnisse"
+- `docs/spec/19-security.md`: "Logs without secrets and without content" (SEC-LOG-1),
+  "Secrets" (SEC-SEC-1 to SEC-SEC-5), "Tests" (SEC-T11, SEC-T12).
+- `docs/spec/02-architecture.md`: "Commands of the binary", "Code layout", "Configuration loading",
+  "Failure of a dependency" (row secret provider), "Module register as the source", "go-arch-lint".
+- `docs/spec/03-data-model.md`: "Principles", item 9 (secrets only as hash or `secret_ref`).
+- `docs/operations/configuration.md`: "Naming rule and formats" (`secret_ref`), "Secrets"
   (the catalog table you implement and keep equal).
-- `docs/operations/disaster-recovery.md` "Fall B: Host verloren" (bundle files are adopted by
+- `docs/operations/disaster-recovery.md` "Case B: host lost" (bundle files are adopted by
   `secrets-init`), `docs/operations/backup-restore.md` (escrow rows).
-- `docs/adr/0011-12-factor-konfiguration-und-secret-provider.md`.
-- `docs/spec/18-release.md` "Server-Images" (you fix the image user there).
-- `docs/observability/signals.md` "Sicherung, Audit, Telemetrie" (you add one metric row).
+- `docs/adr/0011-12-factor-configuration-and-secret-provider.md`.
+- `docs/spec/18-release.md` "Server images" (you fix the image user there).
+- `docs/observability/signals.md` "Backup, audit, telemetry" (you add one metric row).
 - `infra/compose/compose.yaml`: service `secrets-init` and every `subpath` mount.
-- `docs/PLAN.md`: "Arbeitsweise je Ticket", the M1 row M1-09 and the contradiction W3.
+- `docs/PLAN.md`: "Way of working per ticket", the M1 row M1-09 and the contradiction W3.
 - Code you build on: `services/server/internal/platform/config` and `cmd/bothy` (M1-07, read
   their READMEs first), `internal/kernel/clock` and `internal/kernel/errs` (M1-05),
   `services/server/architecture/modules.yaml` and its generator (M1-05).
@@ -62,12 +62,12 @@ SEC-T11 and SEC-T12 become tests.
 11. SEC-SEC-2 and SEC-T12: `config print` and diagnostics never show a secret, not even truncated.
 12. SEC-SEC-3 and SEC-LOG-1: secrets never appear in logs, errors, events or telemetry; in code
     they have their own type that always renders as `[redacted]`.
-13. 16 "Secret-Provider": references `<scheme>:<path>`; schemes `file` and `env` in M1; driver
+13. 16 "Secret provider": references `<scheme>:<path>`; schemes `file` and `env` in M1; driver
     interface `Get(ref) -> (value, version)`, optional `Put`; values cached at most
     `secrets.cache_ttl`; a missing `*_ref` value means `file:<secrets.dir>/<name>`.
-14. 02 "Ausfall einer Abhängigkeit": the start aborts when a secret cannot be read; a failed
+14. 02 "Failure of a dependency": the start aborts when a secret cannot be read; a failed
     rotation keeps the old value and raises an alarm signal.
-15. 16 "Geheimnisse im Compose-Stack" and "Hinterlegung (Escrow)": `secrets init` creates missing
+15. 16 "Secrets in the Compose stack" and "Escrow": `secrets init` creates missing
     secrets, one subdirectory per service, never overwrites an existing generated secret, prints
     fingerprints and never values; `secrets export --age-recipient <public key>` writes an
     age-encrypted bundle.
@@ -104,7 +104,7 @@ Public interface (names fixed; signatures may add an `error` where Go needs one,
 
 ### `internal/platform/secrets/stack` (Compose stack preparation)
 
-- `Catalog`: the Go form of the table in `docs/operations/configuration.md` "Geheimnisse"; one
+- `Catalog`: the Go form of the table in `docs/operations/configuration.md` "Secrets"; one
   entry per row: name or name pattern, origin (`generated`, `supplied`), generator, services.
 - `func Init(ctx context.Context, opts InitOptions) (Report, error)` and
   `func Export(ctx context.Context, opts ExportOptions) error`, used by the commands below.
@@ -133,7 +133,7 @@ Public interface (names fixed; signatures may add an `error` where Go needs one,
   `singleflight`) as vendors allowed for the platform component; regenerate `.go-arch-lint.yml`
   with the M1-05 generator.
 - `infra/compose/compose.yaml` already passes `--owner server=65532:65532 --owner
-  migrate=65532:65532` to `secrets-init` (16 "Geheimnisse im Compose-Stack" item 4); keep it.
+  migrate=65532:65532` to `secrets-init` (16 "Secrets in the Compose stack" item 4); keep it.
 - Docs listed under "Definition of done".
 
 ## Out of scope
@@ -143,8 +143,8 @@ Public interface (names fixed; signatures may add an `error` where Go needs one,
 - Signing keys: the server creates them in `secrets.signing_key_dir` (ADR 0066, M1-32); they are
   no catalogue entry. Generators for `pgbackrest_tls/` (M7-01) and the generated `s3_*` keys of the
   `s3` profile (M3) stay `pending` in the catalog (D6, configuration.md section 5).
-- Drivers `azkv` and `awssm` (later etappe).
-- The server image itself (M1-23; uid and gid `65532` are in 18 "Server-Images").
+- Drivers `azkv` and `awssm` (later milestone).
+- The server image itself (M1-23; uid and gid `65532` are in 18 "Server images").
 - A `promtool` test for the alarm `BothySecretRefreshFailing` (it exists in
   `infra/observability/prometheus/rules/bothy-alerts.yaml`; rule tests come with M1-04).
 
@@ -184,7 +184,7 @@ D2. Env driver (`env:`).
 - 16 shows `env:BOTHY_SECRET_DB_APP_PASSWORD`, but M1-07 aborts on unknown `BOTHY_` variables.
   Rule: after loading file and environment, the loader collects the variable names of all
   effective `env:` references and excludes exactly those from the unknown-variable check. Any
-  other unknown `BOTHY_` variable still aborts (16 "Konfiguration (ADR 0011)" item 3).
+  other unknown `BOTHY_` variable still aborts (16 "Configuration (ADR 0011)" item 3).
 - `env:` stays allowed but not recommended (16); `config check` prints a warning line per key
   that uses it.
 
@@ -198,7 +198,7 @@ D3. Cache and rotation.
   (error code only), increment counter `bothy.secrets.refresh.failures` (unit `{refresh}`, no
   attributes) through the global OpenTelemetry meter (`go.opentelemetry.io/otel` API only; M1-10
   installs the provider later, the global delegate forwards). Add this metric as a row to
-  `docs/observability/signals.md` "Sicherung, Audit, Telemetrie" (Prometheus name
+  `docs/observability/signals.md` "Backup, audit, telemetry" (Prometheus name
   `bothy_secrets_refresh_failures_total`).
 - Re-read fails without cached value: return the error (the start aborts, fail fast).
 
@@ -209,7 +209,7 @@ D4. `secrets init` layout and rules.
   service mounts with `subpath`. No service may be named `_store`. Relative names inside both are
   the catalog names (`db_app_password`, `oidc/<provider>_client_secret`, `offsite/...`), which is
   also the layout of `--source` and of the export bundle, so a decrypted bundle placed in the
-  source directory is adopted (disaster recovery "Fall B").
+  source directory is adopted (disaster recovery "Case B").
 - Per catalog entry, reconcile `_store` with `--source`:
 
 | store | source | generated entry | supplied entry |
@@ -247,7 +247,7 @@ D5. Generators (crypto/rand only).
 
 D6. Catalog.
 
-- Every row of `docs/operations/configuration.md` "Geheimnisse" is a catalog entry with the same
+- Every row of `docs/operations/configuration.md` "Secrets" is a catalog entry with the same
   name, origin and services. Supplied directory entries: `oidc/` (files matching
   `^[a-z0-9_-]+_client_secret$`) and `offsite/` (any regular files, recursive).
 - Entries whose generator belongs to another ticket get generator `pending` with a code comment
@@ -267,7 +267,7 @@ D7. Owners and modes of service copies.
   directory), and the volume root is `0700`.
 - `server` and `migrate` must have an `--owner` (exit 2 otherwise), because the file driver
   enforces SEC-SEC-1 for them.
-- The `bothy-server` image runs as uid and gid `65532` (18 "Server-Images" item 3); M1-23 builds
+- The `bothy-server` image runs as uid and gid `65532` (18 "Server images" item 3); M1-23 builds
   the image with exactly this user.
 - Running `init` as a non-root user is allowed when every `--owner` equals the current uid:gid
   (tests do this); copies for services without `--owner` are then owned by the running user
@@ -292,7 +292,7 @@ not there yet: Ruling L1 is extended by `secrets`, `healthcheck`, `restore`; `bo
 
 D10. Process wiring. `Provider` instances are created only in `internal/wire` and `cmd/bothy`;
 modules receive values through their typed `Config` or a narrow interface, never read files or
-environment themselves (02 "Konfigurationsladen" item 5).
+environment themselves (02 "Configuration loading" item 5).
 
 ## Tests (write them first)
 
@@ -318,7 +318,7 @@ Unit tests in `internal/platform/secrets` (fake clock from `kernel/clock`, files
 
 Unit tests in `internal/platform/secrets/stack`:
 
-- `TestCatalogMatchesConfigurationDoc`: parses `docs/operations/configuration.md` "Geheimnisse".
+- `TestCatalogMatchesConfigurationDoc`: parses `docs/operations/configuration.md` "Secrets".
 - `TestInitFreshTarget`: every generated entry present in `_store` and in each listed service
   directory with the mode and owner of D7 (owners = current uid:gid); `token` values decode to 32
   bytes; `TestPseudonymKeyAtLeast32Bytes`.
@@ -362,7 +362,7 @@ make check
 - [ ] A second `secrets init` run changes nothing (byte, mode, owner and mtime snapshot).
 - [ ] The generated telemetry pseudonym key has at least 32 bytes.
 - [ ] The export bundle decrypts with a test identity and equals `_store`.
-- [ ] The Go catalog equals the table in `docs/operations/configuration.md` "Geheimnisse".
+- [ ] The Go catalog equals the table in `docs/operations/configuration.md` "Secrets".
 - [ ] `env:` references do not trip the unknown-variable check; other unknown `BOTHY_` variables do.
 - [ ] `make arch` and `make check` are green; Go coverage of the module stays at or above the
       threshold `quality.coverage.go_min_percent`.
@@ -373,10 +373,10 @@ make check
 - `internal/platform/secrets/README.md` and `internal/platform/secrets/stack/README.md`: purpose,
   interfaces, reference grammar, file rules, cache, init table, owners, export, what is pending.
 - The spec already states D2 (16 5.1 item 3), D4 and D7 (16 5.3), the uid (18), the metric
-  (signals.md) and the alarm. Still to write in the same change: 16 "Secret-Provider" (D1 newline
-  rule, D3 cache), "Hinterlegung (Escrow)" (D8 usage line); `docs/spec/02-architektur.md` "Befehle
-  des Binarys" (flags of `secrets init|export`, `config check --secrets`);
-  `docs/operations/disaster-recovery.md` "Fall B" step 2 (`--adopt-source` when the volume
+  (signals.md) and the alarm. Still to write in the same change: 16 "Secret provider" (D1 newline
+  rule, D3 cache), "Escrow" (D8 usage line); `docs/spec/02-architecture.md` "Commands of the
+  binary" (flags of `secrets init|export`, `config check --secrets`);
+  `docs/operations/disaster-recovery.md` "Case B" step 2 (`--adopt-source` when the volume
   already exists).
 - `docs/DECISIONS.md`: one entry each for D1 (newline rule), D8 and D9.
 - Configuration reference regenerated (`make config-reference`, or the M1-08 target

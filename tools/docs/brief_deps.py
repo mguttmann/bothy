@@ -3,7 +3,7 @@
 
 docs/briefs/README.md lists every brief with its dependencies ("Index"), the waves derived from
 them ("Waves") and the dependency graph ("Dependency graph"). docs/PLAN.md repeats the
-dependencies in the column "Abhängig von" of each ticket row. A launcher starts a brief as soon
+dependencies in the column "Depends on" of each ticket row. A launcher starts a brief as soon
 as its own dependencies are merged, so a brief must not call a `make` target that only a ticket
 outside its dependency closure creates (the target would be missing when it runs).
 
@@ -14,7 +14,7 @@ This check reads all of them and fails on:
 - a wave that is not 1 + the largest wave of the dependencies (1 without dependencies), a
   "Waves" table that does not group the index by wave, a graph whose edges are not the index
   dependencies;
-- a plan row whose "Abhängig von" or a brief whose header line "Depends on" differs from the
+- a plan row whose "Depends on" or a brief whose header line "Depends on" differs from the
   index;
 - a `make <target>` inside code of a brief whose target is neither in the Makefile nor in the
   table "Make targets created by tickets", or whose creating ticket is not the brief itself or

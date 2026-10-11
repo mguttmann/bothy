@@ -1,6 +1,6 @@
 # M1-67: Gateway frame conformance (G9)
 
-Status: ready | Depends on: M1-62, M1-66 | Etappe: M1
+Status: ready | Depends on: M1-62, M1-66 | Milestone: M1
 
 ## Goal
 
@@ -9,21 +9,20 @@ against its message in `docs/api/asyncapi.yaml` and the body schemas in `docs/ap
 and the runtime register of gateway ops and event types is checked against
 `docs/spec/actions.yaml` and `asyncapi.yaml`. A frame that drifts from the contract, or an event
 type or op registered without a catalogue and AsyncAPI entry, fails `make check`. This is gate G9
-from 06 "Vertragstests und Gate" and exit criterion 6 of M1.
+from 06 "Contract tests and gate" and exit criterion 6 of M1.
 
 ## Read first
 
-- `docs/PLAN.md`: section "Arbeitsweise je Ticket"; section "M1 Fundament", row M1-67, rows M1-17,
-  M1-25, M1-64 to M1-66 and M1-71; "Teststrategie" of M1; decision P-04 (enable list).
-- `docs/spec/06-api.md`: "Grundregeln" (no `null`, integers below 2^53, unknown fields),
-  "Echtzeit-Gateway", "Codegenerierung" item 3 (no AsyncAPI generator), "Vertragstests und Gate"
-  (G9, G2, G8), "WebSocket-Ops und Ereignisse".
-- `docs/spec/04-sync-protokoll.md`: "Umschlag (Envelope)", "Rahmen auf dem WebSocket", "Ops",
-  "Schließ-Codes", "Zustellgarantie", "Reihenfolge".
-- `docs/spec/05-aktionen.md`: "Verbindliche Regeln" rule 4, "Dauerhafte Ereignistypen und
-  Empfangs-Aktion", "Kurzlebige Ereignisse", "WebSocket-Ops und Aktion", "Tests, die diesen
-  Katalog halten" item 2.
-- `docs/spec/07-rechte.md`: "Pflicht-Tests" AZ-P2.
+- `docs/PLAN.md`: section "Way of working per ticket"; section "M1 Foundation", row M1-67, rows
+  M1-17, M1-25, M1-64 to M1-66 and M1-71; "Test strategy" of M1; decision P-04 (enable list).
+- `docs/spec/06-api.md`: "Basic rules" (no `null`, integers below 2^53, unknown fields),
+  "Real-time gateway", "Code generation" item 3 (no AsyncAPI generator), "Contract tests and gate"
+  (G9, G2, G8), "WebSocket ops and events".
+- `docs/spec/04-sync-protocol.md`: "Envelope", "Frames on the WebSocket", "Ops",
+  "Close codes", "Delivery guarantee", "Ordering".
+- `docs/spec/05-actions.md`: "Binding rules" rule 4, "Durable event types and receive action",
+  "Ephemeral events", "WebSocket ops and action", "Tests that hold this catalogue" item 2.
+- `docs/spec/07-permissions.md`: "Required tests" AZ-P2.
 - `docs/api/asyncapi.yaml` (channel `gateway`, `operations`, `components.messages`,
   `x-close-codes`, `x-receive-action`, `x-event-kind`), `docs/api/openapi.yaml`
   (`components.schemas`: `Gateway*`, `*Event`, `*Payload`, `EventEnvelope`), `docs/spec/actions.yaml`
@@ -50,21 +49,21 @@ from 06 "Vertragstests und Gate" and exit criterion 6 of M1.
 6. Test first: every behaviour change has a test that was red before the change (record the red
    run in the report), then green, then clean up.
 7. No en dash or em dash (U+2013, U+2014) in any file you write.
-8. White label: only the examples Alex, Sam, Robin, `example.com` and the areas Support, Marketing,
+8. White label: only the examples Alex, Sam, Robin, `example.com` and the spaces Support, Marketing,
    Engineering, Research; no paths under `/Users`.
 9. Limits only through named keys from `docs/operations/configuration.md`.
 10. G9: every frame sent by the server matches its schema; the register of ops and event types
-    equals the catalogue (06 "Vertragstests und Gate"; 05 "Tests, die diesen Katalog halten"
+    equals the catalogue (06 "Contract tests and gate"; 05 "Tests that hold this catalogue"
     item 2; AZ-P2).
 11. Frames are `{"op": <name>, "d": <body>}` text frames of at most `sync.ws_max_frame_bytes`;
-    events travel as `dispatch` (04 "Rahmen auf dem WebSocket").
-12. No JSON `null` anywhere; integers stay below 2^53 (06 "Grundregeln"; ADR 0053).
-13. Durable events carry `seq` and `permission_version`, ephemeral ones carry neither (04
-    "Umschlag"); a connection delivers durable events in strictly increasing `seq` (04
-    "Zustellgarantie" item 2).
-14. Every close code the server sends is one of 04 "Schließ-Codes" and of `x-close-codes`.
-15. `resource.version` is present exactly for event types whose catalogue entry says so (04
-    "Zustellgarantie" item 3; `EventSpec.ResourceVersion` from M1-25).
+    events travel as `dispatch` (04 "Frames on the WebSocket").
+12. No JSON `null` anywhere; integers stay below 2^53 (06 "Basic rules"; ADR 0053).
+13. Durable events carry `seq` and `permission_version`, ephemeral ones carry neither
+    (04 "Envelope"); a connection delivers durable events in strictly increasing `seq`
+    (04 "Delivery guarantee" item 2).
+14. Every close code the server sends is one of 04 "Close codes" and of `x-close-codes`.
+15. `resource.version` is present exactly for event types whose catalogue entry says so
+    (04 "Delivery guarantee" item 3; `EventSpec.ResourceVersion` from M1-25).
 
 ## Scope
 
@@ -121,7 +120,7 @@ func (c *Contract) CloseCodes() map[int]string
   `unevaluatedProperties`. Reuse one if the module already has it; otherwise add
   `github.com/santhosh-tekuri/jsonschema/v6` (Apache-2.0) pinned in `go.mod`; `make licenses` must
   stay green. Use the YAML library already in `go.mod`.
-- Docs: `docs/spec/06-api.md` "Vertragstests und Gate" row G9 (name the harness and the
+- Docs: `docs/spec/06-api.md` "Contract tests and gate" row G9 (name the harness and the
   commands), `docs/quality/gates.md` if it lists contract tests, `services/server/internal/gateway/README.md`,
   `services/server/CHANGELOG.md` under "Unreleased", `docs/DECISIONS.md` (rulings below).
 
@@ -162,7 +161,7 @@ Building the schema bundle (deterministic and independent of library quirks)
    `$ref` that is itself an `allOf` member (base schemas such as `EventEnvelope`). Reason: in
    2020-12, `unevaluatedProperties` on the composing schema sees the properties of all `allOf`
    members, while the same keyword on a base schema would reject its siblings' fields. Clients
-   ignore unknown fields (06 "Grundregeln"), but the server must not send undeclared ones: an
+   ignore unknown fields (06 "Basic rules"), but the server must not send undeclared ones: an
    undeclared field is contract drift.
 6. Root `$schema: https://json-schema.org/draft/2020-12/schema`; enable format assertion so `uuid`
    and `date-time` are checked.
@@ -184,7 +183,7 @@ Register comparison (`Compare`)
   asyncapi.yaml as message `event.<type>` with the same `x-receive-action` and `x-event-kind`,
   and as schema `<PascalCase>Event` in openapi.yaml.
 - Each client-to-server op of asyncapi.yaml is either registered (and in `gateway_ops.enabled`)
-  or listed in `gateway_ops.later` with an etappe.
+  or listed in `gateway_ops.later` with a milestone.
 - Fixture tests: a register with an extra event type `test.unlisted` yields exactly two problems
   (missing in actions.yaml, missing in asyncapi.yaml); an op registered with a different action
   yields one problem.

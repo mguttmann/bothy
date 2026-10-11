@@ -1,6 +1,6 @@
 # M1-58: Editing, deleting and revisions
 
-Status: ready | Depends on: M1-56 | Etappe: M1
+Status: ready | Depends on: M1-56 | Milestone: M1
 
 ## Goal
 
@@ -9,43 +9,42 @@ message can read its earlier versions. Deleting leaves a tombstone that keeps it
 removes content, revisions and mentions, and redacts the payloads of all stored events about the
 message in the same transaction, while their envelopes stay intact. Moderators with `manage` delete
 other people's messages, audited. This is the content-removal guarantee that data protection
-(DP-T01) and the offline outbox (04 "Bearbeiten und Löschen") rely on.
+(DP-T01) and the offline outbox (04 "Editing and deleting") rely on.
 
 ## Read first
 
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 "M1 Fundament" (row M1-58,
-  "Voraussetzungen aus dem Kern-Vertrag": K2 and K4, "Red Team").
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 "M1 Foundation" (row M1-58,
+  "Prerequisites from the core contract": K2 and K4, "Red team").
 - `docs/briefs/README.md`.
-- `docs/spec/00-glossar.md`: Löschmarke, Schwärzen, Nachrichten-Revision, Ereignis-Umschlag.
-- `docs/spec/02-architektur.md`: "Module des Monolithen" (4.1; 4.3 rows `messaging`, `chat`,
-  `sync`, `runs`; 4.4; 4.5 row `kernel/eventlog`), "Schichten im Modul", "Transaktionen und Unit
-  of Work" (8.1 to 8.5), "Request-Pfad".
-- `docs/spec/03-datenmodell.md`: "Grundsätze" (items 7, 10, 12, 13), tables `messages`,
-  `message_revisions`, `mentions`, `threads`, `event_log`; "Transaktionsregeln" 6.2, 6.3, 6.5;
+- `docs/spec/00-glossary.md`: tombstone, redaction, message revision, event envelope.
+- `docs/spec/02-architecture.md`: "Modules of the monolith" (4.1; 4.3 rows `messaging`, `chat`,
+  `sync`, `runs`; 4.4; 4.5 row `kernel/eventlog`), "Layers within a module", "Transactions and
+  Unit of Work" (8.1 to 8.5), "Request path".
+- `docs/spec/03-data-model.md`: "Principles" (items 7, 10, 12, 13), tables `messages`,
+  `message_revisions`, `mentions`, `threads`, `event_log`; "Transaction rules" 6.2, 6.3, 6.5;
   R-DM-18.
-- `docs/spec/04-sync-protokoll.md`: "Umschlag (Envelope)" (`redacted`, `truncated`), "Globale,
-  commit-geordnete Sequenz", "Idempotente Schreibvorgänge" (5.2), "Bearbeiten und Löschen" (13.3),
-  "Zustellgarantie".
-- `docs/spec/05-aktionen.md`: rules 1.1, 1.2, 1.7, 1.8; "Spalten Owner, Step-up, Audit, Rechte";
-  table 4.7 (`message.update`, `message.delete`, `message.revisions.read`); section 6 rows
-  `message.updated`, `message.deleted`.
-- `docs/spec/06-api.md`: "Fehler" (codes `version_conflict`, `precondition_required`,
-  `message_deleted`, `payload_too_large`, `validation_failed`), "Idempotenz", "Nebenläufigkeit",
-  "Endpunkte" > "Messages".
-- `docs/spec/07-rechte.md`: 4.1, 4.2, 4.3, 7.4; "Testmatrix".
-- `docs/spec/09-agenten.md`: section 6 "Auslöser-Status (`trigger_state`)" (owned by `runs`;
+- `docs/spec/04-sync-protocol.md`: "Envelope" (`redacted`, `truncated`), "Global, commit-ordered
+  sequence", "Idempotent writes" (5.2), "Editing and deleting" (13.3), "Delivery guarantee".
+- `docs/spec/05-actions.md`: rules 1.1, 1.2, 1.7, 1.8; 'Columns "Owner", "Step-up", "Audit",
+  "Permissions"'; table 4.7 (`message.update`, `message.delete`, `message.revisions.read`);
+  section 6 rows `message.updated`, `message.deleted`.
+- `docs/spec/06-api.md`: "Errors" (codes `version_conflict`, `precondition_required`,
+  `message_deleted`, `payload_too_large`, `validation_failed`), "Idempotency", "Concurrency",
+  "Endpoints" > "Messages".
+- `docs/spec/07-permissions.md`: 4.1, 4.2, 4.3, 7.4; "Test matrix".
+- `docs/spec/09-agents.md`: section 6 "Trigger state (`trigger_state`)" (owned by `runs`;
   editing never triggers).
-- `docs/spec/19-sicherheit.md`: SEC-LOG-4.
-- `docs/spec/20-datenschutz.md`: "Nachricht löschen" (4.2), "Audit-Log und IP-Adressen" (4.5),
+- `docs/spec/19-security.md`: SEC-LOG-4.
+- `docs/spec/20-privacy.md`: "Deleting a message" (4.2), "Audit log and IP addresses" (4.5),
   "Tests" (DP-T01).
 - `docs/api/openapi.yaml`: operations `updateMessage`, `deleteMessage`, `listMessageRevisions`;
   schemas `Message`, `MessageUpdate`, `MessageRevision`, `MessageRevisionList`, `Problem`
   (`current`), `MessagePayload`, `MessageDeletedPayload`, `ReactionPayload`, `PinPayload`,
   `EventEnvelope`; parameters `IfMatchRequired`, `IdempotencyKey`.
-- ADRs: `docs/adr/0009-commit-geordnetes-ereignis-log-mit-globaler-sequenz.md`,
-  `0015-fehlerformat-rfc-9457-idempotenz-paginierung.md`,
-  `0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`,
-  `0021-audit-log-hash-verkettet-und-getrennt-von-telemetrie.md`; ADR 0052 and 0053 once M1-16 has
+- ADRs: `docs/adr/0009-commit-ordered-event-log-with-a-global-sequence.md`,
+  `0015-error-format-rfc-9457-idempotency-pagination.md`,
+  `0017-one-authorization-function-404-instead-of-403-mandatory-registration.md`,
+  `0021-hash-chained-audit-log-separate-from-telemetry.md`; ADR 0052 and 0053 once M1-16 has
   written them.
 - Code of earlier tickets: `internal/messaging` (M1-56), `internal/chat` port `Threads` (M1-55),
   `internal/kernel/eventlog` and `internal/sync` (Appender, envelope; M1-16),
@@ -78,20 +77,20 @@ other people's messages, audited. This is the content-removal guarantee that dat
 9. Limits only through named configuration keys from `docs/operations/configuration.md`.
 10. Only the author edits, with `If-Match`; no edit deadline (05 `message.update`; 01 3.3).
     Missing `If-Match` gives `428 precondition_required`, a stale one `412 version_conflict` with
-    the current representation in `current` (06 "Nebenläufigkeit" item 2; 04 13.3; K4).
+    the current representation in `current` (06 "Concurrency" item 2; 04 13.3; K4).
 11. Editing a deleted message gives `410 message_deleted` (04 13.3; openapi `updateMessage`).
 12. Each edit stores the previous content as a revision; revision 1 is the original
     (03 `message_revisions`); run anchors (`kind = 'run'`) store no revisions.
-13. Deleting is idempotent: an already deleted message gives `204` (04 13.3; 06 "Idempotenz").
+13. Deleting is idempotent: an already deleted message gives `204` (04 13.3; 06 "Idempotency").
     Own messages need `write`; other people's need `manage` and are audited
-    (05 `message.delete`, column Audit "ja bei fremder").
+    (05 `message.delete`, column Audit "yes for other people's").
 14. Deleting clears `content_md`, removes revisions and mentions, keeps the row and `thread_seq`,
     redacts event payloads with resource `message` and this ID, sets `redacted_at`, keeps every
     envelope column, and appends `message.deleted`, all in one transaction (03 6.5; R-DM-18;
     20 4.2; DP-T01 part messages).
 15. `message_count` of the thread counts messages without deleted ones (03 `threads`).
 16. Every edit and deletion raises `messages.version` (03 `messages`) and appends a durable event
-    with `resource.version` after the change (04 "Umschlag").
+    with `resource.version` after the change (04 "Envelope").
 17. Editing never triggers an agent and never changes `trigger_state` (09 section 6; only new human
     messages trigger).
 18. No content, emoji or display names in logs, telemetry or audit details (SEC-LOG-4; 20 4.5).
@@ -144,12 +143,12 @@ built instead of adding a second version.
    no row or the count would go below zero).
 10. `api/operations.yaml`: enable `updateMessage`, `deleteMessage`, `listMessageRevisions`;
     regenerate.
-11. The specification is in place: `docs/spec/02-architektur.md` 4.3 (`chat.Threads` with the
+11. The specification is in place: `docs/spec/02-architecture.md` 4.3 (`chat.Threads` with the
     message count, `sync` implements `eventlog.Redactor`) and 4.5 (row `kernel/eventlog` with
     `Redactor`); 04 2.2 rules 4 and 5 (redacted shapes); 03 `messages` (deletion removes reactions
     and the pin). Change them only where the implementation proves them wrong;
     `architecture/modules.yaml` only if it lists kernel ports or their implementers.
-12. Docs: READMEs of `messaging`, `chat`, `sync` (keep their German text and structure; add the
+12. Docs: READMEs of `messaging`, `chat`, `sync` (keep their English text and structure; add the
     lock order of note 4), `services/server/CHANGELOG.md`, `docs/DECISIONS.md` entries for the
     no-op rule and error precedence of note 2 and for notes 4, 6 and 8.
 
@@ -161,7 +160,7 @@ built instead of adding a second version.
   (M1-62).
 - Deleting attachments (M3, through the `files` port) and components (M2, `runs` subscribes
   `MessageDeleted`); cancelling a run of a deleted trigger message (M2).
-- Deletion journal entry of 20 4.6 (M7-07); DSGVO jobs (M7).
+- Deletion journal entry of 20 4.6 (M7-07); GDPR jobs (M7).
 - Gateway delivery of the events (M1-65); search index (M3).
 
 ## Boundaries
@@ -196,7 +195,7 @@ built instead of adding a second version.
     | `listMessageRevisions` | `GET /api/v1/messages/{message_id}/revisions` | `message.revisions.read` | message | `rl.read` | none |
 
     Build the message resource descriptor the same way M1-56 does (thread, channel, author), so
-    `authorize` can evaluate "write und Autor" and "(write und Autor) oder manage".
+    `authorize` can evaluate "write and author" and "(write and author) or manage".
 
 2. `updateMessage`, precedence: `428` (no lookup) > `404` > `403` (including
    `channel_read_only`) > `410` > `412` > `413` > `400`.
@@ -208,7 +207,7 @@ built instead of adding a second version.
        predicate); `deleted_at` set gives `410 message_deleted`; version different from `If-Match`
        gives `412 version_conflict` with `current` = REST representation.
     4. Resulting state: `content_md` = given or current; mentions = resolved again from the
-       resulting content with M1-56's scanner and resolution (03 `messages` "Inhaltsformat", 07
+       resulting content with M1-56's scanner and resolution (03 `messages` "Content format", 07
        4.6); a given `mention_ids` must equal that set (same function, same errors,
        `400 validation_failed`). Content above `message.max_content_bytes` gives
        `413 payload_too_large` (detail names the key).
@@ -286,7 +285,7 @@ Unit:
 - `TestEditRules`: no-op detection (same content and mentions, empty body), `kind = 'run'` stores no
   revision.
 
-Integration against PostgreSQL 18 (`pgtest`, world of 07 "Beispiele", HTTP through the real chain):
+Integration against PostgreSQL 18 (`pgtest`, world of 07 "Examples", HTTP through the real chain):
 
 - `TestUpdateMessage_MissingIfMatch428`, `TestUpdateMessage_StaleIfMatch412WithCurrent`
   (`current.version` equals the stored version).

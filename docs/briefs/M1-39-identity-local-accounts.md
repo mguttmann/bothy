@@ -1,10 +1,10 @@
 # M1-39: Local accounts with password and TOTP
 
-Status: ready | Depends on: M1-37 | Etappe: M1
+Status: ready | Depends on: M1-37 | Milestone: M1
 
 ## Goal
 
-After this ticket a person with a local account can set a password and enrol TOTP, and can log in
+After this ticket a person with a local account can set a password and enroll TOTP, and can log in
 with login name, password and a TOTP code as a switchable fallback for instances without an
 identity provider and for native apps without passkeys. Passwords are stored as Argon2id, the TOTP
 secret only encrypted with a key from the secret provider, every TOTP code works once, failed
@@ -13,21 +13,21 @@ passwords in answer and timing.
 
 ## Read first
 
-- `docs/spec/08-identitaet.md`: "Lokale Konten", "Zuordnung einer externen Identität",
-  "Step-up-Ablauf", "DPoP", "Schutz der Anmeldung", "Tests" (ID-T20, ID-T21, ID-T24, ID-T27),
-  "Entscheidungen dieses Kapitels" (R-ID-09, R-ID-10), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/03-datenmodell.md`: Grundsatz 9; tables `local_credentials`, `user_identities`,
+- `docs/spec/08-identity.md`: "Local accounts", "Mapping an external identity",
+  "Step-up flow", "DPoP", "Login protection", "Tests" (ID-T20, ID-T21, ID-T24, ID-T27),
+  "Decisions of this chapter" (R-ID-09, R-ID-10), "Configuration values of this chapter".
+- `docs/spec/03-data-model.md`: principle 9; tables `local_credentials`, `user_identities`,
   `identity_providers`, `auth_sessions`.
-- `docs/spec/05-aktionen.md`: "Spalten Owner, Step-up, Audit, Rechte"; actions
+- `docs/spec/05-actions.md`: "Columns Owner, Step-up, Audit, Permissions"; actions
   `auth.login.complete`, `local_credential.set`, `identity.read`.
-- `docs/spec/07-rechte.md`: "Prinzipal-Kontext", "Ablauf" step 8.
-- `docs/spec/06-api.md`: "Anmeldeabläufe" point 3, "Fehler" point 5 (`404` versus `403
-  feature_disabled`), "Endpunkte" (Auth, Me).
-- `docs/spec/16-betrieb.md`: "Secret-Provider", "Geheimnisse im Compose-Stack".
-- `docs/spec/19-sicherheit.md`: the secrets table (row "Schlüssel für TOTP-Geheimnisse").
-- `docs/operations/configuration.md`: section "Geheimnisse".
-- `docs/spec/02-architektur.md`: "Schichten im Modul", "Modulregister als Quelle",
-  "Konfigurationsladen".
+- `docs/spec/07-permissions.md`: "Principal context", "Flow" step 8.
+- `docs/spec/06-api.md`: "Login flows" point 3, "Errors" point 5 (`404` versus `403
+  feature_disabled`), "Endpoints" (Auth, Me).
+- `docs/spec/16-operations.md`: "Secret provider", "Secrets in the Compose stack".
+- `docs/spec/19-security.md`: the secrets table (row "Key for TOTP secrets").
+- `docs/operations/configuration.md`: section "Secrets".
+- `docs/spec/02-architecture.md`: "Layers within a module", "Module register as the source",
+  "Configuration loading".
 - ADR 0011, ADR 0019.
 - `docs/api/openapi.yaml`: `loginWithPassword`, `setMyLocalCredential`, `getMyCredentials`;
   schemas `PasswordLoginRequest`, `LocalCredentialSet`, `LocalCredentialResult`,
@@ -52,12 +52,12 @@ passwords in answer and timing.
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour change starts with a failing test (red), then code (green), then
+6. Test first: every behavior change starts with a failing test (red), then code (green), then
    cleanup. No en dash or em dash in any text. White label: examples use Alex, Sam, Robin and
    `example.com`; example passwords contain `EXAMPLE`. Configuration values only through named keys
    listed in `docs/operations/configuration.md`.
 7. Password hash Argon2id in PHC format with parameters `auth.argon2id_*`; values below the OWASP
-   floor (19456 KiB, 2 iterations, parallelism 1) stop the start (08 "Lokale Konten", ID-T24).
+   floor (19456 KiB, 2 iterations, parallelism 1) stop the start (08 "Local accounts", ID-T24).
 8. Minimum length `auth.password_min_length`, check against a local list of common passwords, no
    composition rules.
 9. TOTP per RFC 6238 with 30-second step, at most one step tolerance, every code accepted only
@@ -65,7 +65,7 @@ passwords in answer and timing.
 10. The TOTP secret is stored only AEAD-encrypted; the key lives only in the secret provider and
     the row keeps `totp_key_ref` (03 `local_credentials`, 19).
 11. No recovery codes (R-ID-09).
-12. `auth.local_password_enabled = false` makes the password login answer `404` (06 "Fehler").
+12. `auth.local_password_enabled = false` makes the password login answer `404` (06 "Errors").
 13. Failed attempts per local login name: `auth.login_fail_limit` per `auth.login_fail_window`,
     then the password path only is locked for `auth.login_lock_duration`; passkey, pairing and
     OIDC stay open (R-ID-10). Unknown login name and wrong password give the same answer in the
@@ -78,10 +78,10 @@ The specification is in place (planning, spec first): 03 `local_credentials` wit
 `fail_window_started_at` and its check; `docs/api/openapi.yaml` (`LocalCredentialSet` with
 optional `password`, `totp_enroll`, `totp_code`; `LocalCredentialResult.totp_enabled`; responses
 and descriptions of `setMyLocalCredential` and `loginWithPassword`); 08 "2.5" (login name, TOTP
-enrolment with confirmation, AES-256-GCM and `auth.totp_key_ref`, otpauth issuer, when the password
-path counts as established, rehash, common-password list with source in the adapter README), "13"
-(failure window) and "18" (`auth.totp_key_ref`); 07 "4.2" step 8 (`bedingt` with
-`hat_anmeldedaten`); `docs/operations/configuration.md` section "Geheimnisse" (row `totp_key`).
+enrollment with confirmation, AES-256-GCM and `auth.totp_key_ref`, otpauth issuer, when the
+password path counts as established, rehash, common-password list with source in the adapter
+README), "13" (failure window) and "18" (`auth.totp_key_ref`); 07 "4.2" step 8 (`conditional`
+with `has_credentials`); `docs/operations/configuration.md` section "Secrets" (row `totp_key`).
 Change them only where the implementation proves them wrong (spec first, `make api-lint
 api-checks` green). `docs/DECISIONS.md`: rulings listed in Design notes.
 
@@ -94,14 +94,14 @@ Production code under `services/server/`:
   `TOTPStep(t time.Time) int64`, `VerifyTOTP(secret []byte, code string, now time.Time,
   lastStep *int64) (step int64, ok bool)`.
 - `internal/identity/domain/lockout.go`: pure function for the failure window and lock.
-- `internal/identity/domain/password_rules.go`: length rule on the NFC-normalised password
+- `internal/identity/domain/password_rules.go`: length rule on the NFC-normalized password
   counted in Unicode code points.
 - `internal/identity/app/local.go`: use cases `SetLocalCredential` and `LoginWithPassword`;
   outbound ports `PasswordHasher`, `SecretSealer`, `CommonPasswords`.
 - `internal/identity/adapters/passwordhash`: Argon2id with `golang.org/x/crypto/argon2`.
 - `internal/identity/adapters/secretbox`: AES-256-GCM sealer using the secret provider.
 - `internal/identity/adapters/passwordpolicy`: embedded list `common_passwords.txt` (truncated
-  hashes, Design notes) and its `README.md` with source, commit, licence and checksum.
+  hashes, Design notes) and its `README.md` with source, commit, license and checksum.
 - `internal/identity/adapters/httpapi`: handlers `LoginWithPassword`, `SetMyLocalCredential`;
   the credential overview from M1-36 fills `local_password_set` and `totp_enrolled`.
 - `internal/authz`: conditional step-up for `local_credential.set` (Design notes).
@@ -196,7 +196,7 @@ TOTP:
 
 Common passwords (`passwordpolicy`): source is the SecLists file
 `Passwords/Common-Credentials/10k-most-common.txt` (github.com/danielmiessler/SecLists, MIT
-licence) at a commit you pin; download it once with `curl` into a `mktemp -d` folder, verify that
+license) at a commit you pin; download it once with `curl` into a `mktemp -d` folder, verify that
 the repository's `LICENSE` at that commit is MIT (if not, stop with `BLOCKED`), and generate
 `common_passwords.txt` with one line per entry: the first 16 hex characters of
 `SHA-256(lowercase(NFC(password)))`, sorted, unique. Commit only the generated file, not the
@@ -215,11 +215,11 @@ hashes the candidate the same way.
 - `password`: shorter than `auth.password_min_length` gives code `too_short`; listed gives
   `common_password`; else new hash, `password_changed_at = now`.
 - `totp_enroll: true`: new secret, sealed; `totp_enabled_at` and `totp_last_step` NULL (the
-  enrolment is pending until confirmed); response `totp_secret_uri` once.
+  enrollment is pending until confirmed); response `totp_secret_uri` once.
 - `totp_code`: verified against the current secret; success sets `totp_enabled_at = now` and
   `totp_last_step`; failure gives `400 validation_failed` code `totp_invalid`.
 - Response `200` `LocalCredentialResult` with `password_set`, `totp_enabled`, optional
-  `totp_secret_uri`. Audit per catalogue (`ja`), details without any secret.
+  `totp_secret_uri`. Audit per catalogue (`yes`), details without any secret.
 - The response with `totp_secret_uri` is a one-time secret: mark it with the mechanism from M1-37
   (`idempotency.MarkOneTimeSecret`) in case a client sends `Idempotency-Key`.
 
@@ -232,12 +232,12 @@ Conditional step-up (identical shape in M1-40; keep names exactly so the merge i
 - Add to `authz.PrincipalSource`: `HasEstablishedLocalCredential(ctx context.Context, userID
   <UUID type of PrincipalSource>) (bool, error)`; implement it in the identity adapter; update the
   authz fakes.
-- In the authz file that implements step 8 of 07 "Ablauf", add (or extend, if M1-40 already
+- In the authz file that implements step 8 of 07 "Flow", add (or extend, if M1-40 already
   created it) `var stepUpOnlyWithExistingCredential = map[authorize.Action]func(ctx
   context.Context, src PrincipalSource, userID <UUID type>) (bool, error){...}` with the entry for
   `local_credential.set`. In step 8: if the action is in the map and the function returns `false`
   for the resource's person, step-up is not required; the check "human with a session" (else
-  `forbidden`, `step_up_not_possible`) stays. Rights logic stays inside `authz` (B7).
+  `forbidden`, `step_up_not_possible`) stays. Permission logic stays inside `authz` (B7).
 
 `LoginWithPassword` (`loginWithPassword`, action `auth.login.complete`, `rl.public_auth`):
 
@@ -266,9 +266,9 @@ Configuration: new `auth.totp_key_ref`; used `auth.local_password_enabled`,
 `auth.login_lock_duration`, `server.public_url`, `authz.not_found_timing_tolerance` (tests).
 
 Rulings to record in `docs/DECISIONS.md`: TOTP confirmation step and the API change; how authz
-learns "credentials exist" (`PrincipalSource`; the rule itself is Step-up `bedingt` in 05 2.4); issuer from
-`server.public_url`; AEAD scheme and AAD; password list source and hashed storage; failure window
-column; one Argon2id computation per request.
+learns "credentials exist" (`PrincipalSource`; the rule itself is Step-up `conditional` in
+05 2.4); issuer from `server.public_url`; AEAD scheme and AAD; password list source and hashed
+storage; failure window column; one Argon2id computation per request.
 
 ## Tests (write them first)
 
@@ -285,7 +285,7 @@ Unit:
   previous step after a newer step was used, rejected.
 - `TestTOTPWindowEdges`: steps -2 and +2 rejected, -1 and +1 accepted.
 - `TestLockoutWindow`: table over window start, expiry, limit reached, lock expiry.
-- `TestPasswordRules`: NFC normalisation, code-point length, list hit.
+- `TestPasswordRules`: NFC normalization, code-point length, list hit.
 - `TestPHCFormatAndRehash`: parse, parameter mismatch gives `needsRehash`.
 - `TestSecretBoxBindsIdentity`: a ciphertext opened with another identity ID fails; a wrong
   version byte fails; tampering fails.
@@ -296,7 +296,7 @@ Unit:
 
 Integration (`pgtest`, controllable clock):
 
-- `TestPasswordLoginHappyPath`: set password, enrol and confirm TOTP, log in; `201`,
+- `TestPasswordLoginHappyPath`: set password, enroll and confirm TOTP, log in; `201`,
   `auth_method: password_totp`, new device `pending`.
 - `TestPasswordLoginKnownDeviceStaysActive`.
 - `TestIDT21_UnknownNameTimingEqualsWrongPassword`: interleaved samples (at least 31 each) of
@@ -341,7 +341,7 @@ make check
       `totp_key`.
 - [ ] Step-up for `local_credential.set` only once a local credential is established, decided in
       `authz`.
-- [ ] New dependency `golang.org/x/crypto` pinned in `go.mod`, licence allowed (`make licenses`).
+- [ ] New dependency `golang.org/x/crypto` pinned in `go.mod`, license allowed (`make licenses`).
 - [ ] `make check` green, coverage at or above `quality.coverage.go_min_percent`.
 
 ## Definition of done

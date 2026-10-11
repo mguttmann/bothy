@@ -1,6 +1,6 @@
 # M1-38: Device approval and pairing
 
-Status: ready | Depends on: M1-37 | Etappe: M1
+Status: ready | Depends on: M1-37 | Milestone: M1
 
 ## Goal
 
@@ -14,21 +14,21 @@ accounts without passkeys a way to add devices.
 
 ## Read first
 
-- `docs/spec/08-identitaet.md`: "Lokale Konten", "Registrierung", "Bestätigung",
-  "Geräte-Kopplung", "Verwaltung" (section 5), "Zwei Schlüssel je nativem Gerät", "DPoP",
-  "Schutz der Anmeldung", "Bestätigung eines neuen Geräts" (flow 14.2), "Tests" (ID-T12, ID-T13),
-  "Entscheidungen dieses Kapitels" (R-ID-08), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/03-datenmodell.md`: tables `devices`, `device_keys`, `device_pairings`,
-  `auth_sessions`, `refresh_token_families`, `audit_events`; Grundsätze 9 and 13.
-- `docs/spec/05-aktionen.md`: "Entscheidung" (pending device rule), actions `auth.login.begin`,
+- `docs/spec/08-identity.md`: "Local accounts", "Registration", "Approval",
+  "Device pairing", "Management" (section 5), "Two keys per native device", "DPoP",
+  "Login protection", "Approval of a new device" (flow 14.2), "Tests" (ID-T12, ID-T13),
+  "Decisions of this chapter" (R-ID-08), "Configuration values of this chapter".
+- `docs/spec/03-data-model.md`: tables `devices`, `device_keys`, `device_pairings`,
+  `auth_sessions`, `refresh_token_families`, `audit_events`; principles 9 and 13.
+- `docs/spec/05-actions.md`: "Decision" (pending device rule), actions `auth.login.begin`,
   `auth.login.complete`, `device.list`, `device.approve`, `self.read`, `auth.token.refresh`,
   `auth.logout`; R-AZ-16.
-- `docs/spec/07-rechte.md`: "Entscheidungen und Gründe" (`device_pending`, `device_inactive`,
-  `not_self`), "Ablauf".
-- `docs/spec/06-api.md`: "Anmeldeabläufe" point 4, "Fehler", "Idempotenz", "Endpunkte" (Auth,
-  Devices), "Weitere Punkte" K13 and K16.
-- `docs/spec/02-architektur.md`: "Schichten im Modul", "Transaktionen und Unit of Work",
-  "Hintergrundjobs (River)" (job catalogue, rules for jobs).
+- `docs/spec/07-permissions.md`: "Decisions and reasons" (`device_pending`, `device_inactive`,
+  `not_self`), "Flow".
+- `docs/spec/06-api.md`: "Login flows" point 4, "Errors", "Idempotency", "Endpoints" (Auth,
+  Devices), "Other points" K13 and K16.
+- `docs/spec/02-architecture.md`: "Layers within a module", "Transactions and Unit of Work",
+  "Background jobs (River)" (job catalogue, rules for jobs).
 - `docs/PLAN.md`: section 7 W5 and row M1-38.
 - ADR 0019, ADR 0020.
 - `docs/api/openapi.yaml`: `approveDevice`, `getDevice`, `listMyDevices`, `listUserDevices`,
@@ -54,24 +54,24 @@ accounts without passkeys a way to add devices.
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour change starts with a failing test (red), then code (green), then
+6. Test first: every behavior change starts with a failing test (red), then code (green), then
    cleanup. No en dash or em dash in any text. White label: examples use Alex, Sam, Robin and
    `example.com`. Configuration values only through named keys listed in
    `docs/operations/configuration.md`.
 7. A new device is `pending` unless it redeems an enrollment code or is confirmed by pairing. A
    pending device has tokens but every action except `self.read`, `device.list` for itself,
-   `auth.token.refresh` and `auth.logout` ends with `403 device_pending` (08 "Bestätigung", 05
-   "Entscheidung", R-AZ-16). After `auth.device_pending_ttl` without approval the device is
+   `auth.token.refresh` and `auth.logout` ends with `403 device_pending` (08 "Approval", 05
+   "Decision", R-AZ-16). After `auth.device_pending_ttl` without approval the device is
    revoked.
 8. Approval (`device.approve`, step-up) by the person from one of their active devices or by an
    owner, by typing the verification code of `auth.device_verification_code_digits` digits that the
-   pending device shows; a wrong code rejects (revokes) the pending device (08 "Bestätigung",
+   pending device shows; a wrong code rejects (revokes) the pending device (08 "Approval",
    R-ID-08, ID-T13).
 9. Pairing: the new device registers its public keys without login and with a DPoP proof, shows a
    pairing code of `auth.pairing_code_chars` Crockford characters valid `auth.pairing_code_ttl`;
    an active device of the same person enters it with step-up; the new device collects its tokens
    with a DPoP proof of the registered key; one failed attempt invalidates the request; rate limits
-   per code and per IP (08 "Geräte-Kopplung", "Schutz der Anmeldung").
+   per code and per IP (08 "Device pairing", "Login protection").
 
 ## Scope
 
@@ -92,7 +92,7 @@ Production code under `services/server/`:
 - `internal/identity/adapters/postgres/queries/device_pairings.sql`, queries for approval and
   expiry; regenerated sqlc code.
 - `internal/identity/domain/verification.go`: `DeriveVerificationCode`, `VerificationCodeEqual`.
-- `internal/identity/domain/pairing.go`: pairing code generation and normalisation, state machine
+- `internal/identity/domain/pairing.go`: pairing code generation and normalization, state machine
   `requested -> approved -> completed`, `requested -> rejected | expired`, `approved -> expired`
   (all other transitions are errors), JSON type `DeviceRegistrationV1` for `device_registration`.
 - `internal/identity/app/approval.go`: use case `ApproveDevice`; internal function
@@ -116,7 +116,7 @@ Public interfaces (Go, names fixed):
 
 ```go
 // internal/identity/domain
-// DeriveVerificationCode returns the decimal code the pending device shows (08 "Bestätigung").
+// DeriveVerificationCode returns the decimal code the pending device shows (08 "Approval").
 func DeriveVerificationCode(pepper []byte, deviceID ids.ID, dpopJKT string, digits int) string
 func VerificationCodeEqual(expected, typed string) bool // constant time, ignores spaces
 
@@ -134,7 +134,7 @@ func (s *Service) CompletePairing(ctx context.Context, pairingID ids.ID, proofJK
   `TrustUnconfirmed` (M1-37).
 - Revoking active devices with the full ordered sequence and push registrations (`device.revoke`,
   M1-45); the gateway close code `4016` for pending devices (M1-64, M1-65).
-- Notifying the person that a device waits (push, M3), key rotation of a device (08 "Verwaltung",
+- Notifying the person that a device waits (push, M3), key rotation of a device (08 "Management",
   none: 08 "5.4" has no key change at an existing device), the console approval queue (M6),
   automatic revocation of active devices after `auth.device_inactive_revoke_after` (M1-45, which
   owns the full revocation sequence).
@@ -162,7 +162,7 @@ Pending devices and the verification code:
 
 - The rule "tokens, but `403 device_pending`" is normative in 05 and 07 and already enforced by
   `authorize` (M1-28); ID-T12, the threat model and the plan row say the same. Test the 05
-  behaviour.
+  behavior.
 - The code is derived, not stored, so no column is needed: `HMAC-SHA-256(key = pepper, msg =
   "device-verification/v1" || 0x00 || device_id (16 bytes) || 0x00 || dpop_jkt (ASCII))`; take
   the first 8 bytes as big-endian `uint64`, reduce modulo `10^digits`, left-pad with zeros to
@@ -173,12 +173,12 @@ Pending devices and the verification code:
   device is that device and it is still pending. Owners and other devices never see it.
 - `ApproveDevice` order: load the device (invisible: `404`), `authorize(actor, device.approve,
   device)` (owner or self; a pending caller gets `403 device_pending`; step-up required); state
-  `active`: `200` with the device and no change (06 2 "Ohne Wirkung"); state `revoked`: `409
+  `active`: `200` with the device and no change (06 2 "No effect"); state `revoked`: `409
   invalid_state_transition`; pending older than `auth.device_pending_ttl`: revoke it with reason
   `pending_expired` and answer `409 invalid_state_transition`.
-- Correct code: one unit of work with the rights-change option for the device's person: `state =
-  'active'`, `approved_by` = actor, `approved_at`; audit `device.approve` allow with details
-  `{device_id, result: "approved"}`; `200` with the device.
+- Correct code: one unit of work with the permission-change option for the device's person:
+  `state = 'active'`, `approved_by` = actor, `approved_at`; audit `device.approve` allow with
+  details `{device_id, result: "approved"}`; `200` with the device.
 - Wrong code: same unit of work shape: `revokeUnconfirmedDevice(deviceID, "verification_failed")`;
   audit `device.approve` allow with details `{device_id, result: "rejected_wrong_code"}`; `200`
   with `state: revoked`. Reason for `200`: the request had a committed effect; an error status
@@ -197,7 +197,7 @@ Pending devices and the verification code:
 Pairing:
 
 - Code: `auth.pairing_code_chars` Crockford Base32 characters from `crypto/rand` (default 8
-  characters, 40 bits); display in two groups joined by `-`; normalisation as for enrollment codes
+  characters, 40 bits); display in two groups joined by `-`; normalization as for enrollment codes
   (M1-37) without prefix. Stored as `HMAC-SHA-256(pepper, "pairing-code/v1" || 0x00 ||
   canonical)`. On a unique-index collision with another open pairing, generate a new code (bounded
   retry, named constant).
@@ -219,8 +219,8 @@ Pairing:
   Reason: 08 asks that one failed attempt invalidates the request; the approving request is
   bound to the step-up, so every guess costs a fresh biometric confirmation, and 40 bits within
   `auth.pairing_code_ttl` cannot be searched that way.
-- Match: in one unit of work with the rights-change option for the caller: create the device for
-  the caller (`state = 'active'`, `approved_by` = caller, `approved_at`) and its keys from the
+- Match: in one unit of work with the permission-change option for the caller: create the device
+  for the caller (`state = 'active'`, `approved_by` = caller, `approved_at`) and its keys from the
   registration; set pairing `status = 'approved'`, `user_id`, `approved_by_device_id` (the
   caller's device), `device_id`, and `expires_at = now + auth.pairing_code_ttl` (a fresh window to
   collect); audit allow with details `{pairing_id, device_id}`; `201` with the device.

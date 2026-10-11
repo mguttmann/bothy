@@ -1,6 +1,6 @@
 # M1-50: Audit verification, checkpoints and queries
 
-Status: ready | Depends on: M1-35 | Etappe: M1
+Status: ready | Depends on: M1-35 | Milestone: M1
 
 ## Goal
 
@@ -13,31 +13,31 @@ permanent warning instead of pretending to be protected.
 
 ## Read first
 
-- `docs/PLAN.md`, section 7: row M1-50, "Voraussetzungen aus dem Kern-Vertrag" (row "Zweck
-  `audit_checkpoint` und Prüfpunkte"), "Exit-Kriterien" item 5 (SEC-T16), "Red Team" item 7; section
-  3 "Arbeitsweise je Ticket". `docs/briefs/README.md`.
-- `docs/adr/0021-audit-log-hash-verkettet-und-getrennt-von-telemetrie.md` (whole).
-- `docs/spec/19-sicherheit.md`: "12. Lieferkette, Sicherungen und Audit-Integrität" (SEC-AUD-1 to
-  SEC-AUD-3), "14. Tests" (SEC-T10, SEC-T16), "16. Konfigurationswerte" (`audit.checkpoint_interval`,
-  `audit.checkpoint_sink`).
-- `docs/spec/03-datenmodell.md`: tables `audit_events`, `audit_checkpoints`, `server_signing_keys`,
-  `instance`, `sequence_counters`; "6.3 Sperrreihenfolge"; R-DM-28.
-- `docs/spec/05-aktionen.md`: "4.2 Instanz und Verwaltung" rows `audit.read`, `audit.verify`;
+- `docs/PLAN.md`, section 7: row M1-50, "Prerequisites from the core contract" (row "Purpose
+  `audit_checkpoint` and checkpoints"), "Exit criteria" item 5 (SEC-T16), "Red team" item 7;
+  section 3 "Way of working per ticket". `docs/briefs/README.md`.
+- `docs/adr/0021-hash-chained-audit-log-separate-from-telemetry.md` (whole).
+- `docs/spec/19-security.md`: "12. Supply chain, backups and audit integrity" (SEC-AUD-1 to
+  SEC-AUD-3), "14. Tests" (SEC-T10, SEC-T16), "16. Configuration values"
+  (`audit.checkpoint_interval`, `audit.checkpoint_sink`).
+- `docs/spec/03-data-model.md`: tables `audit_events`, `audit_checkpoints`, `server_signing_keys`,
+  `instance`, `sequence_counters`; "6.3 Lock order"; R-DM-28.
+- `docs/spec/05-actions.md`: "4.2 Instance and administration" rows `audit.read`, `audit.verify`;
   "2.4" (columns Owner, Step-up, Audit).
-- `docs/spec/20-datenschutz.md`: "4.5 Audit-Log und IP-Adressen", table of controls ("jeder
-  Lesezugriff steht selbst im Audit-Log").
-- `docs/spec/02-architektur.md`: "8.5 Was nie in einer Transaktion passiert", "12.1" to "12.4"
-  (River, queue `maintenance`, job `audit.chain_verify`), "13. Konfigurationsladen", "14.1
-  Fehlerarten", "14.2 Fristen" (`http.transfer_timeout`).
-- `docs/spec/06-api.md`: "6. Paginierung", "7. Idempotenz" (`verifyAuditChain` is a reading POST
-  without `Idempotency-Key`), "16. Endpunkte" group "Audit".
+- `docs/spec/20-privacy.md`: "4.5 Audit log and IP addresses", table of controls ("every read
+  access is itself recorded in the audit log").
+- `docs/spec/02-architecture.md`: "8.5 What never happens in a transaction", "12.1" to "12.4"
+  (River, queue `maintenance`, job `audit.chain_verify`), "13. Configuration loading", "14.1
+  Error kinds", "14.2 Deadlines" (`http.transfer_timeout`).
+- `docs/spec/06-api.md`: "6. Pagination", "7. Idempotency" (`verifyAuditChain` is a reading POST
+  without `Idempotency-Key`), "16. Endpoints" group "Audit".
 - `docs/api/openapi.yaml`: operations `listAuditEvents`, `exportAuditEvents`, `verifyAuditChain`;
   schemas `AuditEvent`, `AuditEventPage`, `AuditVerifyRequest`, `AuditVerifyResult`,
   `AuditDecision`, `Cursor`.
 - `docs/observability/signals.md` "4.6" (`bothy.audit.verify.failures`,
   `bothy.audit.verify.last_success.timestamp`), `docs/observability/alerting.md`
   (`BothyAuditChainBroken`), `docs/observability/audit-vs-telemetry.md`.
-- `docs/security/threat-model.md` row T-DB-01; `docs/spec/01-produkt.md` wireframe A6.
+- `docs/security/threat-model.md` row T-DB-01; `docs/spec/01-product.md` wireframe A6.
 - Code already merged: `services/server/internal/audit` (M1-24: canonical form after RFC 8785,
   chain, recorder, migration with `REVOKE`), `internal/instance` (M1-32: `Keys` with a signer per
   purpose including `audit_checkpoint`, JWKS), `internal/platform/jobs` (M1-14),
@@ -81,10 +81,10 @@ generated from it (ADR 0013); the route test keeps both identical.
 
 The specification is in place (planning, spec first): `AuditVerifyResult` with `failure_reason`,
 `checkpoints_compared`, `last_checkpoint_seq`, `warnings` and the description of
-`exportAuditEvents` in `docs/api/openapi.yaml`; 19 SEC-AUD-2, SEC-AUD-7 with the table "Format der
-Prüfpunkte" and the value format of `audit.checkpoint_sink` in 19 16; 03 `audit_checkpoints`; 02
-12.3 row `audit.chain_verify` (verify, then sign). Change them only where the implementation proves
-them wrong; run `make api-lint`, `make api-checks` and regenerate the server code (M1-17
+`exportAuditEvents` in `docs/api/openapi.yaml`; 19 SEC-AUD-2, SEC-AUD-7 with the table "Format of
+the checkpoints" and the value format of `audit.checkpoint_sink` in 19 16; 03 `audit_checkpoints`;
+02 12.3 row `audit.chain_verify` (verify, then sign). Change them only where the implementation
+proves them wrong; run `make api-lint`, `make api-checks` and regenerate the server code (M1-17
 generation target) so that `make codegen-check` shows no diff.
 
 Code (paths under `services/server/`):

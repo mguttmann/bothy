@@ -1,24 +1,24 @@
 # M1-31: People, owners and own profile
 
-Status: ready | Depends on: M1-20, M1-29 | Etappe: M1
+Status: ready | Depends on: M1-20, M1-29 | Milestone: M1
 
 ## Goal
 
-After this ticket an owner can create people, change their profile, activate pending or disabled people, list and read the directory, appoint further owners and remove owners, and every person can read their own principal and maintain their own profile. There is no self registration. Owner and status changes are rights changes: they run through the hook of M1-29, so I1 and SR8 hold for every sequence of these actions, and a second owner is impossible while an agent runs on a personal subscription. Ten REST operations become reachable.
+After this ticket an owner can create people, change their profile, activate pending or disabled people, list and read the directory, appoint further owners and remove owners, and every person can read their own principal and maintain their own profile. There is no self registration. Owner and status changes are permission changes: they run through the hook of M1-29, so I1 and SR8 hold for every sequence of these actions, and a second owner is impossible while an agent runs on a personal subscription. Ten REST operations become reachable.
 
 ## Read first
 
 - `docs/PLAN.md`: section 3, section 7 (M1), rows M1-26, M1-29, M1-31, M1-37, M1-45, M1-46.
-- `docs/spec/05-aktionen.md`: 2.3 (owner only in a session), 2.4, 2.5, table 4.2 (`owner.add`, `owner.remove`), table 4.3 (`self.read`, `user.read`, `user.create`, `user.update`, `user.enable`, `self.profile.update`), 6 (`user.updated`), 8 (R-AZ-03, R-AZ-14).
-- `docs/spec/07-rechte.md`: 2.7 (Owner), 3 (Prinzipal-Kontext), 4.1, 4.2 step 8 (step-up), 5 (SR1, SR5, SR7, SR8), 11.1 (AZ-M23, AZ-M26, AZ-M35, AZ-M36).
-- `docs/spec/08-identitaet.md`: 3.1 (provisioning as `pending`), 3.2 (Einladungs-Code), 4 (Erstinstallation), 11 (Person sperren, for contrast), 18.
-- `docs/spec/03-datenmodell.md`: 1 (principles 6, 7, 13), 4.2 `principals`, `users`, `owners`, 9 (`principal.handle_max_chars`).
-- `docs/spec/10-backend-richtlinie.md`: 3 (consequence of I1 for owners), 5.1 (row `owner.add`, `owner.remove`, `user.enable`), 5.4.
-- `docs/spec/06-api.md`: 2 (Grundregeln), 3.3 (Step-up), 4, 5 (Fehler), 6 (Paginierung), 7 (Idempotenz), 16 (Me, Users).
-- `docs/spec/19-sicherheit.md`: SEC-IN-1, SEC-IN-2, SEC-IN-4, SEC-LOG-4, SEC-T07.
+- `docs/spec/05-actions.md`: 2.3 (owner only in a session), 2.4, 2.5, table 4.2 (`owner.add`, `owner.remove`), table 4.3 (`self.read`, `user.read`, `user.create`, `user.update`, `user.enable`, `self.profile.update`), 6 (`user.updated`), 8 (R-AZ-03, R-AZ-14).
+- `docs/spec/07-permissions.md`: 2.7 (Owner), 3 (Principal context), 4.1, 4.2 step 8 (step-up), 5 (SR1, SR5, SR7, SR8), 11.1 (AZ-M23, AZ-M26, AZ-M35, AZ-M36).
+- `docs/spec/08-identity.md`: 3.1 (provisioning as `pending`), 3.2 (Enrollment code), 4 (Initial installation), 11 (Disabling a person, for contrast), 18.
+- `docs/spec/03-data-model.md`: 1 (principles 6, 7, 13), 4.2 `principals`, `users`, `owners`, 9 (`principal.handle_max_chars`).
+- `docs/spec/10-backend-policy.md`: 3 (consequence of I1 for owners), 5.1 (row `owner.add`, `owner.remove`, `user.enable`), 5.4.
+- `docs/spec/06-api.md`: 2 (Basic rules), 3.3 (Step-up), 4, 5 (Errors), 6 (Pagination), 7 (Idempotency), 16 (Me, Users).
+- `docs/spec/19-security.md`: SEC-IN-1, SEC-IN-2, SEC-IN-4, SEC-LOG-4, SEC-T07.
 - `docs/api/openapi.yaml`: operations `listUsers`, `createUser`, `getUser`, `updateUser`, `enableUser`, `listOwners`, `addOwner`, `revokeOwner`, `getMe`, `updateMyProfile`; schemas `User`, `UserCreate`, `UserCreated`, `UserUpdate`, `UserPage`, `UserStatus`, `ProfileUpdate`, `Me`, `PrincipalRef`, `Owner`, `OwnerAdd`, `OwnerList`, `ReasonBody`, `Problem`, `InvariantViolation`, `UserUpdatedEvent`, `UserPayload`.
 - ADRs: 0015, 0017, 0019, 0020, 0021, 0053.
-- Merged code: `internal/identity` with `principals`, `users`, `owners`, `Directory` and `PrincipalSource` (M1-26); the rights-change hook, `InvariantError` with `conflicts` and the problem extension (M1-29); `authorize` and the source ports (M1-28); the HTTP chain, problem writer, test authenticator if any (M1-18); idempotency middleware (M1-20); the generated strict server and `services/server/api/operations.yaml` (M1-17). Their names win where they differ from this brief only in naming.
+- Merged code: `internal/identity` with `principals`, `users`, `owners`, `Directory` and `PrincipalSource` (M1-26); the permission-change hook, `InvariantError` with `conflicts` and the problem extension (M1-29); `authorize` and the source ports (M1-28); the HTTP chain, problem writer, test authenticator if any (M1-18); idempotency middleware (M1-20); the generated strict server and `services/server/api/operations.yaml` (M1-17). Their names win where they differ from this brief only in naming.
 - `docs/quality/gates.md`, `CONTRIBUTING.md`.
 
 ## Fixed requirements that apply
@@ -39,8 +39,8 @@ After this ticket an owner can create people, change their profile, activate pen
 7. No en dash or em dash in any file; White Label (Alex, Sam, Robin, `example.com`).
 8. Configuration values only through named keys listed in `docs/operations/configuration.md`; this ticket adds none.
 9. No self registration: people are created only by an owner (`user.create`) or, later, by provisioning and bootstrap (08 sections 3.1 and 4).
-10. `user.create`, `user.update`, `user.enable`, `owner.add`, `owner.remove` are owner actions with step-up and audit (05 tables 4.2 and 4.3); owner rights only in a session, never through a personal token (SR5, R-AZ-14).
-11. `owner.add`, `owner.remove`, `user.enable` are rights changes (column Rechte = ja): `permission_version`, `access.changed`, I1 and SR8 in the same transaction (05 rules 1.6 and 1.7). `owner.add` while an agent has `billing_mode = 'personal'` fails with `409 i1_violation` (07 SR1 consequence, AZ-M23); the last active owner stays (`409 last_owner`, SR8).
+10. `user.create`, `user.update`, `user.enable`, `owner.add`, `owner.remove` are owner actions with step-up and audit (05 tables 4.2 and 4.3); owner permissions only in a session, never through a personal token (SR5, R-AZ-14).
+11. `owner.add`, `owner.remove`, `user.enable` are permission changes (column Permissions = yes): `permission_version`, `access.changed`, I1 and SR8 in the same transaction (05 rules 1.6 and 1.7). `owner.add` while an agent has `billing_mode = 'personal'` fails with `409 i1_violation` (07 SR1 consequence, AZ-M23); the last active owner stays (`409 last_owner`, SR8).
 12. `user.enable` covers `pending` to `active` and `disabled` to `active` (05 table 4.3; 08 section 3.1).
 13. Display texts with control or bidi characters are rejected (SEC-IN-4, SEC-T07); handles follow 03 `principals`.
 14. No JSON `null` in responses and events (ADR 0053); every response matches its schema.
@@ -56,9 +56,9 @@ Extend the ports from M1-26 with DTOs (no domain types in the port):
 
 ### 2. Use cases (`internal/identity/app`, files `people.go`, `owners.go`, `me.go`)
 
-Each use case loads the resource, calls `authorize`, runs in one unit of work for writes, writes the audit entry through `auditing.Recorder` where column Audit = ja, and appends `user.updated` where listed.
+Each use case loads the resource, calls `authorize`, runs in one unit of work for writes, writes the audit entry through `auditing.Recorder` where column Audit = yes, and appends `user.updated` where listed.
 
-| Operation | Use case | Action and resource | Rights change | Event |
+| Operation | Use case | Action and resource | Permission change | Event |
 |---|---|---|---|---|
 | `listUsers` | `ListUsers` | `user.read` on instance | no | none |
 | `createUser` | `CreateUser` | `user.create` on instance | no | `user.updated` |
@@ -75,9 +75,9 @@ Rules per use case:
 
 - `CreateUser`: new principal (UUIDv7, `kind = 'user'`, `status = 'active'`) and `users` row. `handle` matches `^[a-z0-9][a-z0-9._-]*$`, at most `principal.handle_max_chars`, unique ignoring case (`409 conflict` on collision). `display_name` not blank, at most `principal.display_name_max_chars` runes and free of control and bidi characters (reuse the validation of M1-26; 03 `principals.display_name`). `email` optional, unique ignoring case (`409 conflict`). `locale` optional, a well-formed BCP 47 tag parsed with `golang.org/x/text/language` and stored in canonical form; when absent the column default of 03 applies. `time_zone` optional, an IANA name accepted by `time.LoadLocation`, never `Local` or empty; the identity domain imports `time/tzdata` because the server image has no zoneinfo. `local_account: true` is answered with `400 validation_failed`, pointer `/local_account`, until M1-37 adds enrollment codes (record this interim rule in `docs/DECISIONS.md` with the note that M1-37 replaces it). Response `201 UserCreated` without `enrollment`.
 - `UpdateUser`: fields of `UserUpdate`, same validation; absent fields stay; the handle never changes.
-- `EnableUser`: `pending` or `disabled` to `active`, `disabled_at` cleared; `deleted` is `409 invalid_state_transition`; an already active person returns `200` with the unchanged user and an allow audit entry, but no rights change and no event. Enabling never restores devices or sessions revoked by `user.disable` (08 section 11).
-- `AddOwner`: the user must be an active principal of kind `user` (`404` if no such user, `409 conflict` if not active or already an owner); insert into `owners` (`granted_by` = caller, `reason`); declare the rights change; I1 and SR8 are verified by the hook, which answers `409 i1_violation` with `conflicts`. Response `201 Owner`.
-- `RevokeOwner`: `404` if the user has no active owner row; set `revoked_at`, `revoked_by`; declare the rights change; `409 last_owner` from the hook if no active owner remains, also when owners remove themselves. Response `204`.
+- `EnableUser`: `pending` or `disabled` to `active`, `disabled_at` cleared; `deleted` is `409 invalid_state_transition`; an already active person returns `200` with the unchanged user and an allow audit entry, but no permission change and no event. Enabling never restores devices or sessions revoked by `user.disable` (08 section 11).
+- `AddOwner`: the user must be an active principal of kind `user` (`404` if no such user, `409 conflict` if not active or already an owner); insert into `owners` (`granted_by` = caller, `reason`); declare the permission change; I1 and SR8 are verified by the hook, which answers `409 i1_violation` with `conflicts`. Response `201 Owner`.
+- `RevokeOwner`: `404` if the user has no active owner row; set `revoked_at`, `revoked_by`; declare the permission change; `409 last_owner` from the hook if no active owner remains, also when owners remove themselves. Response `204`.
 - `GetMe`: for humans, agents and apps (an agent and an app read themselves). `principal` from `principals`; `is_owner` true only for a principal with an active owner row; `email`, `locale`, `time_zone` only for humans; `permission_version` = the version the request was authorized with; `session_id` and `device_id` from the actor when present; `step_up_valid_until` = `step_up_at` plus `auth.step_up_max_age` only when that lies in the future. Allowed for a pending device (05 section 2.5).
 - `UpdateMyProfile`: `display_name`, `locale`, `time_zone` of the calling human, same validation; no step-up, no audit (05 table 4.3).
 - `ListUsers`: every status unless `status` is given; `q` is a case-insensitive prefix match on handle or display name (escape `%` and `_`); keyset order `(lower(handle), id)` ascending; `limit` defaults to `api.page_size_default`, larger values are capped at `api.page_size_max`; opaque cursor bound to the filters, a foreign or stale cursor is `400 cursor_invalid`; no totals (06 section 6). Use the cursor helper of the merged tree if one exists.
@@ -135,7 +135,7 @@ IDs and field names only, never values of names, e-mail addresses or locales (SE
 - Ruling: `revokeOwner` for a person without an active owner row is `404`, because the owner role is the resource.
 - Problem codes: `400 validation_failed` with `errors[]`, `400 cursor_invalid`, `401 unauthenticated`, `401 step_up_required`, `403 forbidden` (`owner_only`, `step_up_not_possible`, `subject_kind_not_allowed`), `404 not_found`, `409 conflict`, `409 invalid_state_transition`, `409 i1_violation`, `409 last_owner`, `422 idempotency_key_reuse` (M1-20).
 - Response validation: use the response validator of the merged tree if one exists; otherwise add a test-only helper in `services/server/test/apitest` that validates each response body against its component schema in `docs/api/openapi.yaml` with `github.com/santhosh-tekuri/jsonschema/v6` (Apache-2.0, JSON Schema 2020-12 as used by OpenAPI 3.1), pinned in `go.mod`, checked by `make licenses`.
-- Test authentication: use the fake authenticator of `internal/platform/httpserver/httpservertest` (M1-18); add the builders it lacks there (owner in a session with fresh or old step-up, owner with a personal API token, human without owner role, human on a pending device, agent, anonymous). Test helpers live in the tree of a component (02 "6. Code-Layout"); no package under `internal/kernel/actor`.
+- Test authentication: use the fake authenticator of `internal/platform/httpserver/httpservertest` (M1-18); add the builders it lacks there (owner in a session with fresh or old step-up, owner with a personal API token, human without owner role, human on a pending device, agent, anonymous). Test helpers live in the tree of a component (02 "6. Code layout"); no package under `internal/kernel/actor`.
 
 ## Tests (write them first)
 

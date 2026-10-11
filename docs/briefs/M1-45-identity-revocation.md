@@ -1,53 +1,53 @@
 # M1-45: Disable a person, revoke a device, end a session
 
-Status: ready | Depends on: M1-44 | Etappe: M1
+Status: ready | Depends on: M1-44 | Milestone: M1
 
 ## Goal
 
 After this ticket an owner can disable a person, a person or an owner can revoke a device, and a
-person or an owner can end a session. Each runs in one rights-change transaction in the fixed order
-of 08 "Person sperren" and "Verlorenes Gerät": every step is visible in the database, the rights
-version rises, `access.changed` and one `session.revoked` per ended session land in the event log
-(M1-65 closes gateway connections with `4012` from them), and an audit entry is written. From the
-commit on, every request that carries a token of the disabled person, the revoked device or the
-ended session fails with `401`, without waiting for the token to expire (07 SR7, AZ-M40, AZ-M41).
+person or an owner can end a session. Each runs in one permission-change transaction in the fixed
+order of 08 "Disabling a person" and "Lost device": every step is visible in the database, the
+permission version rises, `access.changed` and one `session.revoked` per ended session land in
+the event log (M1-65 closes gateway connections with `4012` from them), and an audit entry is
+written. From the commit on, every request that carries a token of the disabled person, the
+revoked device or the ended session fails with `401`, without waiting for the token to expire
+(07 SR7, AZ-M40, AZ-M41).
 
 ## Read first
 
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 rows M1-29, M1-34, M1-35, M1-44,
-  M1-45, M1-65 and M3-22; "Voraussetzungen aus dem Kern-Vertrag" (row with K-RE-5).
-- `docs/spec/08-identitaet.md`: "Verwaltung" (5.4), "Refresh-Tokens: Rotation, Familien,
-  Wiederverwendung" (7.4, paragraph "Erweiterungs-Sitzungen"), "Verlorenes Gerät" (10), "Person
-  sperren" (11), "API-Tokens für Agenten, Apps und Werkzeuge" (12, item "Grenzen"), "Tests" (15)
-  rows ID-T22 and ID-T26.
-- `docs/spec/07-rechte.md`: "Prinzipal-Kontext" (3), "Entscheidungen und Gründe" (4.1), "Ablauf"
-  (4.2), "Invarianten in der Transaktion" (4.4), SR5, SR7, SR8, "Sofortige Wirkung bei Entzug"
-  (8.2), "Testmatrix" (11.1) rows AZ-M26, AZ-M40, AZ-M41.
-- `docs/spec/05-aktionen.md`: "Verbindliche Regeln" items 6 and 7; "Spalten Owner, Step-up,
-  Audit, Rechte" (2.4); "Entscheidung" (2.5); 4.3 rows `user.disable`, `device.revoke`,
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 rows M1-29, M1-34, M1-35,
+  M1-44, M1-45, M1-65 and M3-22; "Prerequisites from the core contract" (row with K-RE-5).
+- `docs/spec/08-identity.md`: "Management" (5.4), "Refresh tokens: rotation, families, reuse"
+  (7.4, paragraph "Extension sessions"), "Lost device" (10), "Disabling a person" (11), "API
+  tokens for agents, apps and tools" (12, item "Limits"), "Tests" (15) rows ID-T22 and ID-T26.
+- `docs/spec/07-permissions.md`: "Principal context" (3), "Decisions and reasons" (4.1), "Flow" (4.2),
+  "Invariants in the transaction" (4.4), SR5, SR7, SR8, "Immediate effect on revocation" (8.2),
+  "Test matrix" (11.1) rows AZ-M26, AZ-M40, AZ-M41.
+- `docs/spec/05-actions.md`: "Binding rules" items 6 and 7; "Columns Owner, Step-up, Audit,
+  Permissions" (2.4); "Decision" (2.5); 4.3 rows `user.disable`, `device.revoke`,
   `session.revoke`, `device.list`; 6 rows `session.revoked`, `user.updated`, `access.changed`.
-- `docs/spec/03-datenmodell.md`: 4.2 tables `principals`, `users`, `owners` (SR8 invariant
+- `docs/spec/03-data-model.md`: 4.2 tables `principals`, `users`, `owners` (SR8 invariant
   paragraph), `devices`, `device_keys`, `auth_sessions`, `refresh_token_families`,
-  `refresh_tokens`, `api_tokens`; "Sperrreihenfolge" (6.3); "I1-Prüfung" (6.4).
-- `docs/spec/04-sync-protokoll.md`: "Umschlag (Envelope)" (2.2), "Schließ-Codes" (6.4, `4012`),
-  "Was beim Ändern passiert" (8.2), "Widerruf von Sitzung, Gerät oder Prinzipal" (8.5).
-- `docs/spec/02-architektur.md`: "Ports, Ereignisse und Quellen je Modul" (4.3, row `identity`:
-  `DeviceRevoked`, `SessionEnded`), "Schichten im Modul" (5), "Transaktionen und Unit of Work"
-  (8.1 to 8.3), "404 statt 403" (9.2), "Nachweis der Prüfung" (9.3).
-- `docs/spec/06-api.md`: "Step-up" (3.3), "Autorisierung in der API" (4), "Fehler" (5: codes
-  `session_revoked`, `last_owner`, `step_up_required`, `invalid_state_transition`), "Idempotenz"
+  `refresh_tokens`, `api_tokens`; "Lock order" (6.3); "I1 check" (6.4).
+- `docs/spec/04-sync-protocol.md`: "Envelope" (2.2), "Close codes" (6.4, `4012`), "What happens
+  on a change" (8.2), "Revocation of a session, device or principal" (8.5).
+- `docs/spec/02-architecture.md`: "Ports, events and sources per module" (4.3, row `identity`:
+  `DeviceRevoked`, `SessionEnded`), "Layers within a module" (5), "Transactions and Unit of Work"
+  (8.1 to 8.3), "404 instead of 403" (9.2), "Proof of the check" (9.3).
+- `docs/spec/06-api.md`: "Step-up" (3.3), "Authorization in the API" (4), "Errors" (5: codes
+  `session_revoked`, `last_owner`, `step_up_required`, `invalid_state_transition`), "Idempotency"
   (7).
-- ADRs: `docs/adr/0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`,
-  `docs/adr/0020-geraetebindung-dpop-step-up-fuer-admin-aktionen.md`,
-  `docs/adr/0021-audit-log-hash-verkettet-und-getrennt-von-telemetrie.md`.
+- ADRs: `docs/adr/0017-one-authorization-function-404-instead-of-403-mandatory-registration.md`,
+  `docs/adr/0020-device-binding-dpop-step-up-for-admin-actions.md`,
+  `docs/adr/0021-hash-chained-audit-log-separate-from-telemetry.md`.
 - `docs/api/openapi.yaml`: operations `disableUser` (`POST /users/{user_id}/disable`),
   `revokeDevice` (`POST /devices/{device_id}/revoke`), `revokeSession`
   (`POST /sessions/{session_id}/revoke`); schemas `ReasonBody`, `User`, `Device`,
   `SessionRevokedPayload`, `SessionRevokedEvent`, `UserPayload`, `UserUpdatedEvent`.
 - Code of earlier tickets (read before writing anything): `internal/identity` (M1-26 principals
   and owners, M1-31 people and owners, M1-33 devices, M1-34 sessions and refresh families,
-  M1-35 step-up, M1-44 API tokens), `internal/authz` (M1-28 `authorize`, M1-29 rights-change
-  hook and `VerifyInvariants`), `internal/kernel/txn`, `internal/kernel/eventlog`,
+  M1-35 step-up, M1-44 API tokens), `internal/authz` (M1-28 `authorize`, M1-29
+  permission-change hook and `VerifyInvariants`), `internal/kernel/txn`, `internal/kernel/eventlog`,
   `internal/kernel/auditing`, `internal/platform/httpserver`, `services/server/api/operations.yaml`.
 - Tables: `principals`, `users`, `owners`, `devices`, `device_keys`, `auth_sessions`,
   `refresh_token_families`, `api_tokens`. Action ids: `user.disable`, `device.revoke`,
@@ -67,31 +67,32 @@ ended session fails with `401`, without waiting for the token to expire (07 SR7,
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour gets a test that is red before the code exists (plan section 3).
+6. Test first: every behavior gets a test that is red before the code exists (plan section 3).
 7. No en dash or em dash in any text you write; white label (people Alex, Sam, Robin, domains
    under example.com); configuration only through named keys from
    `docs/operations/configuration.md`.
-8. 08 "Person sperren": `user.disable` (owner, step-up) does in one transaction, in this order:
-   last-owner check (SR8); `principals.status = 'disabled'` and `disabled_at`; all sessions
-   revoked with reason `user_disabled` and all their refresh families revoked; all devices
-   revoked; personal API tokens revoked; rights version raised, I1 checked, `access.changed`
-   and `session.revoked` written; audit entry. Grants and group memberships stay untouched.
-9. 08 "Verlorenes Gerät": `device.revoke` (self or owner, step-up) revokes in one transaction
+8. 08 "Disabling a person": `user.disable` (owner, step-up) does in one transaction, in this
+   order: last-owner check (SR8); `principals.status = 'disabled'` and `disabled_at`; all
+   sessions revoked with reason `user_disabled` and all their refresh families revoked; all
+   devices revoked; personal API tokens revoked; permission version raised, I1 checked,
+   `access.changed` and `session.revoked` written; audit entry. Grants and group memberships
+   stay untouched.
+9. 08 "Lost device": `device.revoke` (self or owner, step-up) revokes in one transaction
    the device, its keys, all its sessions with reason `device_revoked`, their families, raises
-   the rights version and writes audit.
+   the permission version and writes audit.
 10. 05 `session.revoke` (self or owner, no step-up): the session and all its child sessions end
     with the same reason (03 `auth_sessions.parent_session_id`, 08 7.4).
 11. 07 SR8 and 03 `owners`: no transaction leaves zero active owners; `user.disable` on the last
     active owner fails with `409 last_owner` and changes nothing (AZ-M26).
 12. 07 SR7 and 04 8.5: a disabled principal, a revoked device and a revoked session yield
     `unauthenticated` before any grant is read; the HTTP answer is `401` with problem code
-    `session_revoked` (06 "Fehler"), the audit `deny_reason` is `principal_inactive`,
+    `session_revoked` (06 "Errors"), the audit `deny_reason` is `principal_inactive`,
     `device_inactive` or `session_revoked` (07 4.1) (AZ-M40, AZ-M41).
-13. 05 rule 1.7: all three actions have "Rechte" = `ja`: they raise `permission_version` and
-    write `access.changed` for every affected principal through the M1-29 hook.
+13. 05 rule 1.7: all three actions have "Permissions" = `yes`: they raise `permission_version`
+    and write `access.changed` for every affected principal through the M1-29 hook.
 14. 04 8.5: every ended session produces one durable `session.revoked` event (audience self,
     the session's user), so that the gateway closes its connections with `4012`.
-15. 08 12 "Grenzen": a disabled person's personal API tokens stop working at once.
+15. 08 12 "Limits": a disabled person's personal API tokens stop working at once.
 16. 05 2.4: `user.disable` and `device.revoke` need step-up; all three are audited on allow and
     on deny.
 
@@ -99,14 +100,14 @@ ended session fails with `401`, without waiting for the token to expire (07 SR7,
 
 Paths are relative to `services/server/` unless they start with `docs/`.
 
-1. **Specification first** (German, like the chapter):
-    - `docs/spec/08-identitaet.md` "Verlorenes Gerät" and "Person sperren": name the stored reason
+1. **Specification first** (English, like the chapter):
+    - `docs/spec/08-identity.md` "Lost device" and "Disabling a person": name the stored reason
       codes (`devices.revoke_reason` = `revoked_by_self`, `revoked_by_owner` or `user_disabled`;
       `auth_sessions.revoke_reason` = `device_revoked`, `user_disabled`, `logout` or `admin`;
       `refresh_token_families.revoke_reason` = `session_revoked`) and the rule for
       `session.revoke` (Design notes). State that steps 5 (push registrations) and 7 (runs, dev
-      environments) of "Person sperren" are carried out by subscribers of the in-transaction
-      events in later etappen (M3-22, M2, V2).
+      environments) of "Disabling a person" are carried out by subscribers of the in-transaction
+      events in later milestones (M3-22, M2, V2).
     - `docs/DECISIONS.md`: the rulings listed under Design notes, in the file's existing format.
 2. **Domain** `internal/identity/domain/lifecycle.go` (pure, imports only `kernel/ids`,
    `kernel/clock`, `kernel/errs`):
@@ -151,10 +152,10 @@ Paths are relative to `services/server/` unless they start with `docs/`.
 6. **Adapter httpapi** `internal/identity/adapters/httpapi`: strict-server methods
    `DisableUser`, `RevokeDevice`, `RevokeSession` mapping the generated request objects to the
    commands and the results to `User`, `Device` and `204`.
-7. **Freischalt-Liste** `api/operations.yaml` (P-04): `disableUser`, `revokeDevice`,
+7. **Enable list** `api/operations.yaml` (P-04): `disableUser`, `revokeDevice`,
    `revokeSession` move from `later` (or are added) to the built list; `make codegen-check`.
 8. **Documentation**: `internal/identity/README.md` (lifecycle use cases, reason codes, events,
-   what later etappen subscribe), `services/server/CHANGELOG.md` under `Unreleased`.
+   what later milestones subscribe), `services/server/CHANGELOG.md` under `Unreleased`.
 
 ## Out of scope
 
@@ -195,7 +196,7 @@ Paths are relative to `services/server/` unless they start with `docs/`.
    row) with `SELECT ... FOR UPDATE`. Missing, or a principal whose `kind` is not `user`: the
    same `not_found` as an invisible resource (02 9.2).
 2. `Authorize(ctx, actor, action, resource)` (M1-28) inside the unit of work, after phase 1 has
-   locked `permission_version`, so that decision and change see the same rights version. A
+   locked `permission_version`, so that decision and change see the same permission version. A
    denial returns the decision's error; the unit of work rolls back; the deny audit entry is
    written by `auditing.Recorder` in its own transaction (02 8.1, AZ-P13).
 3. Domain transition. Already disabled or already revoked is a no-change case. Detect it
@@ -203,7 +204,7 @@ Paths are relative to `services/server/` unless they start with `docs/`.
    `Authorize` and writes the allow audit entry with `details.no_change = true`, then return
    `200` with the current object (`204` for sessions). Reason: phase 1 of a RightsChange unit
    of work raises `permission_version` unconditionally, and a no-op must not invalidate every
-   rights cache. Inside the RightsChange unit of work the transition is checked again; if a
+   permission cache. Inside the RightsChange unit of work the transition is checked again; if a
    concurrent request got there first, finish as no-change (the one extra version step is
    harmless and rare).
 4. Writes in the lock order of 03 6.3: domain rows of one table in ascending `id`.
@@ -226,7 +227,7 @@ partial change survives.
 | 3 | every `auth_sessions` row of the person with `revoked_at IS NULL`: `revoked_at = t`, `revoke_reason = 'user_disabled'`; every live family of these sessions: `revoked_at = t`, `revoke_reason = 'session_revoked'` |
 | 4 | every device with `state <> 'revoked'` (including `pending`): `state = 'revoked'`, `revoked_at = t`, `revoked_by = actor`, `revoke_reason = 'user_disabled'`; every key of these devices with `revoked_at IS NULL`: `revoked_at = t` |
 | 5 | every `api_tokens` row with `principal_id = person` and `revoked_at IS NULL`: `revoked_at = t`, `revoked_by = actor` |
-| 6 | rights version and `access.changed` (hook); one `session.revoked` per session from step 3; one `user.updated` with the new `User` |
+| 6 | permission version and `access.changed` (hook); one `session.revoked` per session from step 3; one `user.updated` with the new `User` |
 | 8 | audit `user.disable`, `decision = allow`, `resource_kind = user`, `details = {reason, sessions_revoked, devices_revoked, tokens_revoked}` (counts, never token values) |
 
 The owner row in `owners` stays (08 11: grants and memberships stay as well). Response `200`
@@ -238,8 +239,8 @@ its live keys `revoked_at`; all its live sessions `revoke_reason = 'device_revok
 child sessions with the same reason, their families `session_revoked`; one `session.revoked` per
 ended session; audit with `details = {reason, sessions_revoked}`. Response `200` with `Device`.
 A person may revoke the device they are using; the response is still sent, later requests fail.
-A device of another person is invisible to a non-owner: `404` (07 4.3, "Ressource gehört p
-selbst").
+A device of another person is invisible to a non-owner: `404` (07 4.3, "The resource belongs to p
+itself").
 
 **`session.revoke`** (resource `auth_session`, self or owner, no step-up): the session and every
 live child session (`parent_session_id = id`) get `revoke_reason = SessionRevokeReasonFor(actor,
@@ -252,13 +253,13 @@ the actor anyway.
 auth_session, id}`, payload `{session_id, reason}` (`SessionRevokedPayload`). `user.updated`:
 `resource = {kind: user, id}`, payload `UserPayload`. No `null` anywhere (ADR 0053).
 
-**Authentication after the commit.** Nothing in this ticket caches state beyond the rights
+**Authentication after the commit.** Nothing in this ticket caches state beyond the permission
 version: `authorize` step 1 (M1-28) reads principal status, session and device state through the
-rights-version-bound cache, so the version raised here invalidates it in every process (07 7.3,
-04 8.5). If a test shows a revoked session still passing, the defect is in the cache key of
+permission-version-bound cache, so the version raised here invalidates it in every process (07
+7.3, 04 8.5). If a test shows a revoked session still passing, the defect is in the cache key of
 M1-28 or M1-34; fix it there in this ticket with a test, because the requirement belongs to this
-ticket's acceptance. The problem code for all three cases is `session_revoked` (06 "Fehler":
-"Sitzung, Gerät oder Prinzipal widerrufen"); if the HTTP chain maps `principal_inactive` or
+ticket's acceptance. The problem code for all three cases is `session_revoked` (06 "Errors":
+"Session, device or principal revoked"); if the HTTP chain maps `principal_inactive` or
 `device_inactive` to another code today, correct the mapping.
 
 **Refresh after revocation.** A refresh with a token of a revoked family fails with `401
@@ -283,7 +284,7 @@ device as inactive already (08 "5.4").
 2. `session.revoke` stores `logout` when the session's own person ends it and `admin` otherwise
    (03 `auth_sessions.revoke_reason`).
 3. Revoking or disabling something that is already revoked or disabled succeeds without change
-   and is audited with `no_change: true` (06 "2", row "Ohne Wirkung", R-API-27).
+   and is audited with `no_change: true` (06 "2", row "No effect", R-API-27).
 
 ## Tests (write them first)
 
@@ -347,7 +348,7 @@ make check
 
 ## Acceptance criteria
 
-- [ ] ID-T22 and ID-T26 are green; every step of 08 "Person sperren" that belongs to M1 is
+- [ ] ID-T22 and ID-T26 are green; every step of 08 "Disabling a person" that belongs to M1 is
       asserted in the database state, and steps 5 and 7 are documented as later subscribers.
 - [ ] AZ-M26, AZ-M40 and AZ-M41 are green with real authentication.
 - [ ] A failed disable leaves no partial change and a deny audit entry.

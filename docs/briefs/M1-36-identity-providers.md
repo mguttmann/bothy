@@ -1,6 +1,6 @@
 # M1-36: identity: identity provider port and provider management (ADR 0019)
 
-Status: ready | Depends on: M1-31, M1-35 | Etappe: M1
+Status: ready | Depends on: M1-31, M1-35 | Milestone: M1
 
 ## Goal
 
@@ -14,24 +14,24 @@ inventing their own account mapping, which closes the account takeover through e
 
 ## Read first
 
-- `docs/spec/08-identitaet.md`: "2.1 Port", "2.2 OIDC" (what the OIDC driver will need from the
-  config), "2.3 Beispiel Microsoft Entra ID" (`tid` allow list, `sub` as subject), "2.4
-  Vertrauenswürdiger Proxy-Header" (login header), "2.5 Lokale Konten", "3.1 Zuordnung einer
-  externen Identität", "3.3 Weitere Identität verknüpfen und lösen", "3.4 Gruppen aus Claims",
-  "15. Tests" (ID-T04), "16. Entscheidungen dieses Kapitels" (R-ID-02).
-- `docs/spec/03-datenmodell.md`: "1. Grundsätze" (items 1, 3, 6, 8, 9, 12, 13), "4.2" tables
+- `docs/spec/08-identity.md`: "2.1 Port", "2.2 OIDC" (what the OIDC driver will need from the
+  config), "2.3 Example: Microsoft Entra ID" (`tid` allow list, `sub` as subject),
+  "2.4 Trusted proxy header" (login header), "2.5 Local accounts",
+  "3.1 Mapping an external identity", "3.3 Linking and unlinking another identity",
+  "3.4 Groups from claims", "15. Tests" (ID-T04), "16. Decisions of this chapter" (R-ID-02).
+- `docs/spec/03-data-model.md`: "1. Principles" (items 1, 3, 6, 8, 9, 12, 13), "4.2" tables
   `identity_providers`, `user_identities`, `auth_sessions` (`identity_id`), `auth_login_flows`
   (FK to providers), `users`, `devices`.
-- `docs/spec/05-aktionen.md`: "4.2" (`identity_provider.read`, `identity_provider.manage`),
+- `docs/spec/05-actions.md`: "4.2" (`identity_provider.read`, `identity_provider.manage`),
   "4.3" (`identity.read`, `identity.link`, `identity.unlink`), "2.4", "2.5".
-- `docs/spec/07-rechte.md`: "4.1", "4.2", "4.3 Sichtbarkeit", "SR5".
-- `docs/spec/06-api.md`: "3.2 Anmeldeabläufe", "5. Fehler", "7. Idempotenz" (DELETE rules),
-  "16. Endpunkte" (Admin, Me, Users).
-- `docs/spec/02-architektur.md`: "4.1 Regeln", "5. Schichten im Modul", "8. Transaktionen und
-  Unit of Work", "9.2 404 statt 403".
-- `docs/spec/19-sicherheit.md`: "6.1" (SEC-IN-1, SEC-IN-2, SEC-IN-4), "10. Geheimnisse" (OIDC
+- `docs/spec/07-permissions.md`: "4.1", "4.2", "4.3 Visibility", "SR5".
+- `docs/spec/06-api.md`: "3.2 Login flows", "5. Errors", "7. Idempotency" (DELETE rules),
+  "16. Endpoints" (Admin, Me, Users).
+- `docs/spec/02-architecture.md`: "4.1 Rules", "5. Layers within a module",
+  "8. Transactions and Unit of Work", "9.2 404 instead of 403".
+- `docs/spec/19-security.md`: "6.1" (SEC-IN-1, SEC-IN-2, SEC-IN-4), "10. Secrets" (OIDC
   client access only as `secret_ref`).
-- ADR 0019 (`docs/adr/0019-identitaetsanbieter-oidc-proxy-header-lokale-passkey-konten.md`),
+- ADR 0019 (`docs/adr/0019-identity-providers-oidc-proxy-header-local-passkey-accounts.md`),
   ADR 0011, ADR 0017.
 - `docs/api/openapi.yaml`: operations `listIdentityProviders`, `createIdentityProvider`,
   `getIdentityProvider`, `updateIdentityProvider`, `deleteIdentityProvider`, `getMyCredentials`,
@@ -44,7 +44,7 @@ inventing their own account mapping, which closes the account takeover through e
   owners, `identity` HTTP adapter), M1-33 (devices), M1-34 (`auth_sessions`), M1-35 (step-up),
   M1-24 (audit), M1-28 (`authorize`).
 - `services/server/internal/identity/README.md`, `docs/quality/gates.md`, `CONTRIBUTING.md`,
-  `docs/PLAN.md` "3. Arbeitsweise je Ticket".
+  `docs/PLAN.md` "3. Way of working per ticket".
 
 ## Fixed requirements that apply
 
@@ -60,7 +60,7 @@ inventing their own account mapping, which closes the account takeover through e
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour starts with a failing test (red output goes into the report).
+6. Test first: every behavior starts with a failing test (red output goes into the report).
 7. No en dash and no em dash in any text you write.
 8. White label: only example.com, example.org and the names Alex, Sam, Robin in examples; provider
    names in tests like "Company SSO".

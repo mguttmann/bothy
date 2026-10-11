@@ -1,32 +1,32 @@
 # M1-44: API tokens with prefix and checksum
 
-Status: ready | Depends on: M1-29, M1-35 | Etappe: M1
+Status: ready | Depends on: M1-29, M1-35 | Milestone: M1
 
 ## Goal
 
 After this ticket agents, apps and (behind the switch `tokens.personal_enabled`) people
 authenticate with long-lived API tokens of the form `bothy_<kind>_<random>_<checksum>`: stored only
 as HMAC, shown exactly once, with a mandatory expiry, DPoP-bound for agents by default, revocable
-with immediate effect, and recognisable by the secret scanner. ADR 0061 records the format. A
-personal token acts with the person's grants but never with owner rights and never provides
-step-up (SR5).
+with immediate effect, and recognizable by the secret scanner. ADR 0061 records the format. A
+personal token acts with the person's grants but never with owner permissions and never
+provides step-up (SR5).
 
 ## Read first
 
-- `docs/spec/08-identitaet.md`: 7.1 "Übersicht", 7.3 "DPoP", 12 "API-Tokens für Agenten, Apps
-  und Werkzeuge", 15 (ID-T23, ID-T27), 18 (`auth.dpop_required_for`, `auth.api_token_max_ttl`,
+- `docs/spec/08-identity.md`: 7.1 "Overview", 7.3 "DPoP", 12 "API tokens for agents, apps
+  and tools", 15 (ID-T23, ID-T27), 18 (`auth.dpop_required_for`, `auth.api_token_max_ttl`,
   `auth.personal_token_max_ttl`, `auth.token_pepper_ref`).
-- `docs/spec/03-datenmodell.md`: 1 "Grundsätze" (point 9), 4.2 `api_tokens`, `principals`,
-  4.10 `idempotency_keys`, 4.12 `audit_events`, 6.3 "Sperrreihenfolge".
-- `docs/spec/05-aktionen.md` and `docs/spec/actions.yaml`: `token.list`, `token.create`,
+- `docs/spec/03-data-model.md`: 1 "Principles" (point 9), 4.2 `api_tokens`, `principals`,
+  4.10 `idempotency_keys`, 4.12 `audit_events`, 6.3 "Lock order".
+- `docs/spec/05-actions.md` and `docs/spec/actions.yaml`: `token.list`, `token.create`,
   `token.revoke`; 2.1, 2.3 point 1, 2.4, 2.5, 2.6.
-- `docs/spec/07-rechte.md`: 3 "Prinzipal-Kontext", 4.1 (`token_revoked`, `step_up_not_possible`,
+- `docs/spec/07-permissions.md`: 3 "Principal context", 4.1 (`token_revoked`, `step_up_not_possible`,
   `owner_only`, `not_self`), 4.2, SR5, SR7, 11.1 AZ-M35.
-- `docs/spec/06-api.md`: 3 "Authentifizierung je Prinzipal-Art", 3.1 "DPoP", 5 "Fehler"
-  (`feature_disabled`), 6 "Paginierung", 7 "Idempotenz".
-- `docs/spec/16-betrieb.md`: 6.2 "Feature-Flags".
-- `docs/spec/19-sicherheit.md`: 9, 10 (SEC-SEC-3, SEC-SEC-4).
-- `docs/spec/02-architektur.md`: 4.3 (`identity` port `Tokens`), 4.4, 4.5 (`kernel/actor`,
+- `docs/spec/06-api.md`: 3 "Authentication per principal kind", 3.1 "DPoP", 5 "Errors"
+  (`feature_disabled`), 6 "Pagination", 7 "Idempotency".
+- `docs/spec/16-operations.md`: 6.2 "Feature flags".
+- `docs/spec/19-security.md`: 9, 10 (SEC-SEC-3, SEC-SEC-4).
+- `docs/spec/02-architecture.md`: 4.3 (`identity` port `Tokens`), 4.4, 4.5 (`kernel/actor`,
   `kernel/idempotency`), 5, 9.
 - ADRs 0000 (template), 0001, 0015, 0017, 0020, 0042, 0044.
 - `docs/api/openapi.yaml`: operations `listTokens`, `createToken`, `revokeToken`; schemas
@@ -34,7 +34,7 @@ step-up (SR5).
 - `.gitleaks.toml` rule `bothy-api-token`; `tools/ci/tests/test_gitleaks_rules.py`.
 - `docs/security/threat-model.md`: T-TK-02.
 - Merged READMEs and code: `internal/identity` (authenticator, HMAC hasher with the pepper, DPoP
-  verifier of M1-33 and M1-34), `internal/authz` (guards, rights-change path of M1-29),
+  verifier of M1-33 and M1-34), `internal/authz` (guards, permission-change path of M1-29),
   `internal/kernel/idempotency` and its middleware (M1-20), `internal/instance` (port `Flags`, if
   M1-47 is merged), `services/server/api/operations.yaml`.
 - `docs/PLAN.md` section 3, section 7 rows M1-34, M1-44, M1-45, M1-47, M1-51;
@@ -54,7 +54,7 @@ step-up (SR5).
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour change has a test that was red before the change (the red run is
+6. Test first: every behavior change has a test that was red before the change (the red run is
    quoted in the report), then green, then refactor.
 7. No en dash or em dash characters in any file you write; use a hyphen or rephrase.
 8. White label; every committed token-shaped value carries the marker `EXAMPLE` in its random part
@@ -69,8 +69,8 @@ step-up (SR5).
     `auth.personal_token_max_ttl` (08 12).
 13. Agent tokens are DPoP-bound when `agent` is in `auth.dpop_required_for`; a DPoP-bound token as
     `Bearer` is rejected (08 12, 7.3, RFC 9449 7.2).
-14. API tokens never provide step-up; a personal token of an owner has no owner rights (SR5,
-    05 2.3 point 1, AZ-M35).
+14. API tokens never provide step-up; a personal token of an owner has no owner permissions
+    (SR5, 05 2.3 point 1, AZ-M35).
 15. Personal tokens only with `tokens.personal_enabled`; switched off gives `403
     feature_disabled` (05 `token.create`, 06 5 point 5).
 16. The secret scanner has a rule for the prefix (SEC-SEC-4).
@@ -108,13 +108,13 @@ step-up (SR5).
   personal tokens only for oneself, `app_not_installed`, one-time secret), 03 `api_tokens`
   (`expires_at` NOT NULL), 06 7 (R-API-26), `openapi.yaml` (`ApiTokenCreate.expires_at` required,
   description of `createToken`). Change them only where the implementation proves them wrong
-  (`docs/spec/02-architektur.md` 4.3 if the port names differ). `services/server/api/operations.yaml`:
+  (`docs/spec/02-architecture.md` 4.3 if the port names differ). `services/server/api/operations.yaml`:
   the three operations move to the built list; regenerated server code.
 - `services/server/internal/identity/README.md`, CHANGELOG entry under "Unreleased" of
   `services/server/CHANGELOG.md`, `docs/DECISIONS.md` entries for the rulings below,
   `docs/security/threat-model.md` T-TK-02 test column with the test names.
-- **`authz.CredentialSource`, API tokens part** (02 "Ports, Ereignisse und Quellen je Modul", 07
-  "Ablauf" `check_active`, PLAN row M1-44): implement `TokenActive` and `TokenExpiresAt` of the
+- **`authz.CredentialSource`, API tokens part** (02 "Ports, events and sources per module", 07
+  "Flow" `check_active`, PLAN row M1-44): implement `TokenActive` and `TokenExpiresAt` of the
   request's API token in the identity adapter of the source port that M1-28 declared, and replace
   the corresponding empty source in `internal/wire` (fail closed until then). Test:
   `TestCredentialSource_Tokens` against PostgreSQL 18 (active, revoked, expired, foreign
@@ -125,7 +125,7 @@ step-up (SR5).
 - Incoming webhook tokens (`whi`): format support only; issuance, path handling and verification
   belong to M2-27.
 - App tokens issued at installation with installation scopes: M2-24 (see Design notes for the
-  behaviour until then).
+  behavior until then).
 - Revoking personal tokens on `user.disable`: M1-45 (uses `RevokeAllForPrincipal`). Revoking agent
   tokens on `agent.disable`: M1-51.
 - Closing open gateway connections on revocation (`4012`): M1-65.
@@ -157,7 +157,7 @@ step-up (SR5).
 
 **Preconditions (check before writing code; any failure: `Verdict: BLOCKED <which>`).**
 
-1. M1-29 (rights-change path: `permission_version` first, `access.changed`; with M1-24 audit)
+1. M1-29 (permission-change path: `permission_version` first, `access.changed`; with M1-24 audit)
    and M1-35 (step-up for `token.create`) are merged: both are dependencies of this ticket.
 2. The DPoP verifier (M1-33) and the HMAC hasher with `auth.token_pepper_ref` (M1-34) exist.
 
@@ -174,7 +174,7 @@ Tests obtain step-up through the M1-35 flow (or its test helper), not by writing
   written in the same Base62 alphabet, left-padded to 6 characters. Public precedent: CRC32,
   Base62 with leading-zero padding, last 6 characters
   (https://github.blog/engineering/platform-security/behind-githubs-new-authentication-token-formats/,
-  retrieved 2026-10-10) [belegt]. The checksum rejects typos and random matches without a database
+  retrieved 2026-10-10) [verified]. The checksum rejects typos and random matches without a database
   call; it is not a security control.
 - Parse: exactly `^bothy_(agt|app|pat|whi)_[0-9A-Za-z]{43}_[0-9A-Za-z]{6}$`, checksum equal, the
   random part decodes to a value below 2^256.
@@ -208,7 +208,7 @@ only for `user`; `whi` is never issued by `createToken` and never accepted by th
    the configuration schema if missing), else `400` with pointer `/dpop_jkt`.
 6. Generate, insert (`created_by` = actor), audit allow with details `{token_id, kind,
    principal_id, dpop_bound, expires_at}` (never secret, never hash). `token.create` changes no
-   rights.
+   permissions.
 7. `201 ApiTokenCreated` with `secret`; header `Cache-Control: no-store`.
 
 **Idempotency with a one-time secret.** 03 point 9 forbids storing the token. The handler calls
@@ -223,12 +223,13 @@ replay with the same key and body answers `409 conflict` with `reason: one_time_
 
 **`revokeToken`** (`DELETE /api/v1/tokens/{token_id}`, `token.revoke`, `rl.admin`): load the
 token (missing: `404`); resource kind `api_token` with owner = `principal_id`; `authorize`; already
-revoked: `204` without a new audit entry; otherwise in a rights-change Unit of Work (M1-29 path):
-`revoked_at = now`, `revoked_by` = actor, audit allow, `access.changed` for the token's principal
-as the path computes it. `204`.
+revoked: `204` without a new audit entry; otherwise in a permission-change Unit of Work (M1-29
+path): `revoked_at = now`, `revoked_by` = actor, audit allow, `access.changed` for the token's
+principal as the path computes it. `204`.
 
 **`RevokeAllForPrincipal`** revokes every active token of a principal in the caller's Unit of
-Work and returns the count; the caller owns the rights change and the audit (M1-45, M1-51).
+Work and returns the count; the caller owns the permission change and the audit (M1-45,
+M1-51).
 
 **Authentication** (shared authenticator, 02 9 step 4):
 
@@ -294,7 +295,7 @@ Integration tests (PostgreSQL 18, real HTTP chain on `127.0.0.1:0`, steerable cl
 - `TestPersonalTokenOfOwnerHasNoOwnerRights`: the owner's personal token calling `createToken` for
   an agent gives `403` with reason `owner_only`.
 - `TestRevokeToken_Immediate`: the next request with the token gives `401`; a second `DELETE`
-  gives `204`; a token of another principal without rights gives `404`;
+  gives `204`; a token of another principal without permissions gives `404`;
   `permission_version` raised and audit entry written.
 - `TestRevokeAllForPrincipal` and `TestLastUsedGranularity`.
 - `TestAPITokenNeverLogged`: log and audit capture contain no secret.
@@ -331,7 +332,7 @@ make check
 - [ ] Expiry mandatory and bounded; agent tokens DPoP-bound by default; `Bearer` with a bound token
       rejected.
 - [ ] Personal tokens: switch respected (`403 feature_disabled`), only for oneself, no owner
-      rights, no step-up (AZ-M35).
+      permissions, no step-up (AZ-M35).
 - [ ] Revocation effective on the next request; `RevokeAllForPrincipal` available for M1-45 and
       M1-51.
 - [ ] The implementation matches ADR 0061, 03, 06, 08 and `openapi.yaml` (changed only where proven
@@ -346,7 +347,7 @@ make check
 - `make check` green.
 - Independent review (`make review` and a code review over the diff) and the red team gate over
   the diff, verdict recorded in the report; red team item 4 of the M1 section (personal token with
-  owner rights, step-up with a token without session) applies directly.
+  owner permissions, step-up with a token without session) applies directly.
 - Merge locally into the base branch only if review and red team are green and `make check` is
   green; then `git worktree remove`.
 
