@@ -10,9 +10,10 @@ shares with Standard Webhooks. Example values therefore stay short of the format
 third-party formats are left to gitleaks, whose EXAMPLE marker exempts only this product's
 own token formats and generic key-like values (.gitleaks.toml).
 
-GitHub does not publish its patterns. The check reports `whsec_` followed by 16 or more
-base64 characters: a real secret has at least 32, GitHub reported 31, and the margin covers a
-shorter pattern. Binary files (NUL byte in the first block) are skipped.
+GitHub publishes the secret types it scans for, not their regular expressions. The check
+reports `whsec_` followed by 16 or more base64 characters: a real secret has at least 32,
+GitHub reported 31, and the margin covers a shorter pattern. Binary files (NUL byte in the
+first block) are skipped.
 
 Usage:
   secret_formats.py FILE...   check the given files (pre-commit passes staged files)
