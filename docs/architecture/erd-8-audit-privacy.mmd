@@ -1,0 +1,50 @@
+%% ERD part 8: modules audit and privacy. Source: 03-data-model.md, 4.12. audit_events and
+%% audit_ip_keys deliberately have no foreign keys; audit_events.details.ip_key_id refers
+%% only logically to audit_ip_keys.id.
+%% Pure log columns (created_by, updated_by and similar) point to principals(id) and
+%% are not drawn as a relationship.
+%% Tables of other modules only with their key.
+erDiagram
+  direction LR
+  audit_events {
+    bigint seq PK
+    uuid id UK
+    text action
+    text decision "allow, deny, error"
+    bytea prev_hash
+    bytea hash UK
+  }
+  audit_checkpoints {
+    bigint seq PK "last covered audit_events.seq"
+    bytea hash
+    text kid FK
+    timestamptz exported_at
+  }
+  gdpr_requests {
+    uuid id PK
+    uuid subject_user_id FK
+    text kind "export, deletion, rectification"
+    text state
+    uuid result_file_id FK
+  }
+  audit_ip_keys {
+    uuid id PK "ip_key_id in audit_events.details"
+    timestamptz valid_from UK
+    timestamptz valid_until
+    bytea key_ciphertext "NULL after destruction"
+    text key_ref
+    timestamptz destroyed_at
+  }
+  users {
+    uuid principal_id PK
+  }
+  files {
+    uuid id PK
+  }
+  server_signing_keys {
+    text kid PK
+  }
+
+  server_signing_keys ||--o{ audit_checkpoints : "signs"
+  users ||--o{ gdpr_requests : "affected"
+  files |o--o{ gdpr_requests : "export package"

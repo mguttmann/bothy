@@ -1,0 +1,140 @@
+%% ERD part 2: modules authz and chat. Source: 03-data-model.md, 4.3 and 4.5.
+%% Pure log columns (created_by, updated_by, granted_by, revoked_by and similar) point to
+%% principals(id) and are not drawn as a relationship.
+%% Tables of other modules only with their key.
+erDiagram
+  direction LR
+  groups {
+    uuid id PK
+    text name
+    text source "local, oidc_claim"
+    uuid provider_id FK "only oidc_claim"
+    text external_ref "only oidc_claim"
+    timestamptz deleted_at
+  }
+  group_memberships {
+    uuid id PK
+    uuid group_id FK
+    uuid user_id FK
+    timestamptz expires_at
+    timestamptz expiry_reminded_at
+    timestamptz removed_at
+  }
+  grants {
+    uuid id PK
+    text subject_kind "user, group, agent, app"
+    uuid subject_principal_id FK
+    uuid subject_group_id FK
+    text target_kind "instance, space, channel, host"
+    uuid target_space_id FK
+    uuid target_channel_id FK
+    uuid target_host_id FK
+    text level "read, write, trigger; NULL for host"
+    text[] capabilities
+    timestamptz expires_at
+    timestamptz expiry_reminded_at
+    timestamptz revoked_at
+  }
+  spaces {
+    uuid id PK
+    text sort_key
+    uuid default_operator_agent_id FK
+    timestamptz archived_at
+  }
+  user_space_states {
+    uuid user_id PK, FK
+    uuid space_id PK, FK
+    boolean collapsed
+    uuid updated_by_device_id FK
+  }
+  channels {
+    uuid id PK
+    uuid space_id FK "NULL exactly for dm"
+    text kind "text, forum, dm"
+    boolean operator_inherit
+    uuid operator_agent_id FK
+    boolean read_only "read-only, also for owners"
+    text default_notification_level
+    bigint settings_version
+  }
+  channel_skill_bindings {
+    uuid channel_id PK, FK
+    integer position PK
+    text skill_ref
+  }
+  project_bindings {
+    uuid channel_id PK, FK
+    text workspace_ref UK
+    boolean ready
+  }
+  dm_participants {
+    uuid channel_id PK, FK
+    uuid user_id PK, FK
+    timestamptz left_at
+  }
+  forum_tags {
+    uuid id PK
+    uuid channel_id FK
+    boolean restricted
+  }
+  threads {
+    uuid id PK
+    uuid channel_id FK
+    text kind "main, thread"
+    uuid parent_message_id FK
+    text title_source "auto, manual"
+    text state "open, closed"
+    uuid operator_agent_id FK "NULL for the main thread"
+    bigint last_message_seq
+    bigint unread_floor_seq
+  }
+  thread_tags {
+    uuid thread_id PK, FK
+    uuid tag_id PK, FK
+  }
+  principals {
+    uuid id PK
+  }
+  users {
+    uuid principal_id PK
+  }
+  identity_providers {
+    uuid id PK
+  }
+  agents {
+    uuid principal_id PK
+  }
+  devices {
+    uuid id PK
+  }
+  messages {
+    uuid id PK
+  }
+  hosts {
+    uuid id PK
+  }
+
+  identity_providers |o--o{ groups : "claim groups"
+  groups ||--o{ group_memberships : "has"
+  users ||--o{ group_memberships : "is member"
+  principals |o--o{ grants : "subject"
+  groups |o--o{ grants : "subject"
+  spaces |o--o{ grants : "target"
+  channels |o--o{ grants : "target"
+  hosts |o--o{ grants : "target"
+  agents |o--o{ spaces : "default operator"
+  users ||--o{ user_space_states : "has"
+  spaces ||--o{ user_space_states : "state"
+  devices |o--o{ user_space_states : "last by"
+  spaces |o--o{ channels : "contains"
+  agents |o--o{ channels : "operates"
+  channels ||--o{ channel_skill_bindings : "loads"
+  channels ||--o| project_bindings : "bound to"
+  channels ||--o{ dm_participants : "participants"
+  users ||--o{ dm_participants : "takes part"
+  channels ||--o{ forum_tags : "has"
+  channels ||--o{ threads : "contains"
+  messages |o--o| threads : "starts"
+  agents |o--o{ threads : "operator at creation"
+  threads ||--o{ thread_tags : "carries"
+  forum_tags ||--o{ thread_tags : "on"

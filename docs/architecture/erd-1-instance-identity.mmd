@@ -1,0 +1,183 @@
+%% ERD part 1: modules instance and identity. Source: 03-data-model.md, 4.1 and 4.2.
+%% Shown: keys, foreign keys and columns with state. Pure log columns (created_by,
+%% updated_by, granted_by, revoked_by and similar) point to principals(id) and are not drawn as a
+%% relationship. Tables of other modules only with their key.
+erDiagram
+  instance {
+    smallint id PK "CHECK id = 1"
+    uuid instance_id UK
+    timestamptz setup_completed_at
+    text min_server_version
+    uuid sync_epoch "timeline of the event log"
+  }
+  instance_settings {
+    text key PK
+    jsonb value
+    bigint version
+  }
+  server_signing_keys {
+    text kid PK
+    text purpose "access_token, invocation, terminal, webhook_out, audit_checkpoint"
+    text state "next, active, retiring, retired"
+  }
+  feature_flags {
+    text key PK
+    boolean enabled
+    jsonb rollout
+  }
+  sequence_counters {
+    text name PK "event_seq, audit_seq, permission_version"
+    bigint value
+  }
+  principals {
+    uuid id PK
+    text kind "user, agent, app"
+    text status "pending, active, disabled, deleted"
+    text handle UK
+    uuid avatar_file_id FK
+  }
+  users {
+    uuid principal_id PK, FK
+    text email UK
+    text time_zone
+  }
+  owners {
+    uuid id PK
+    uuid user_id FK
+    timestamptz revoked_at
+  }
+  identity_providers {
+    uuid id PK
+    text kind "oidc, trusted_header, local"
+    boolean allow_provisioning
+  }
+  user_identities {
+    uuid id PK
+    uuid user_id FK
+    uuid provider_id FK
+    text subject
+  }
+  passkey_credentials {
+    uuid id PK
+    uuid user_id FK
+    bytea credential_id UK
+  }
+  devices {
+    uuid id PK
+    uuid user_id FK
+    text state "pending, active, revoked"
+  }
+  device_keys {
+    uuid id PK
+    uuid device_id FK
+    text purpose "dpop, step_up"
+    text jkt UK
+    timestamptz revoked_at
+  }
+  auth_sessions {
+    uuid id PK
+    uuid user_id FK
+    uuid device_id FK
+    uuid identity_id FK
+    uuid parent_session_id FK "extensions"
+    text client_component "app, share_ext, console"
+    text auth_method
+    timestamptz step_up_at
+    text step_up_method
+    timestamptz step_up_consumed_at
+    timestamptz revoked_at
+  }
+  refresh_token_families {
+    uuid id PK
+    uuid session_id FK
+    text dpop_jkt
+    integer current_generation
+    timestamptz rotated_at
+  }
+  refresh_tokens {
+    uuid id PK
+    uuid family_id FK
+    integer generation
+    bytea token_hash UK
+  }
+  api_tokens {
+    uuid id PK
+    uuid principal_id FK
+    bytea token_hash UK
+    text[] scopes
+  }
+  local_credentials {
+    uuid identity_id PK, FK
+    text password_hash
+    bytea totp_secret_ciphertext
+    timestamptz fail_window_started_at
+    timestamptz locked_until
+  }
+  enrollment_codes {
+    uuid id PK
+    uuid user_id FK
+    text purpose "first_login, identity_link, recovery"
+    bytea code_hash UK
+    uuid used_by_device_id FK
+    timestamptz expires_at
+  }
+  auth_login_flows {
+    uuid id PK
+    uuid provider_id FK
+    text mode "login, link"
+    uuid user_id FK
+    uuid enrollment_code_id FK
+    bytea oidc_state_hash UK
+    bytea login_code_hash UK
+    jsonb external_identity "checked on callback, until completion"
+    text status "started, code_issued, completed, failed"
+    timestamptz expires_at
+  }
+  auth_challenges {
+    uuid id PK
+    text purpose "step_up, passkey_login, passkey_enroll, passkey_register"
+    uuid session_id FK
+    uuid enrollment_code_id FK
+    bytea challenge_hash UK
+    text status "issued, used, failed"
+    timestamptz expires_at
+  }
+  device_pairings {
+    uuid id PK
+    bytea pairing_code_hash UK
+    text status "requested, approved, completed, rejected, expired"
+    uuid user_id FK
+    uuid approved_by_device_id FK
+    uuid device_id FK
+    timestamptz expires_at
+  }
+  files {
+    uuid id PK
+  }
+
+  principals ||--o| users : "is a person"
+  files |o--o{ principals : "avatar"
+  users ||--o{ owners : "is owner"
+  users ||--o{ user_identities : "has"
+  identity_providers ||--o{ user_identities : "provides"
+  users ||--o{ passkey_credentials : "has"
+  users ||--o{ devices : "has"
+  devices ||--o{ device_keys : "has"
+  users ||--o{ auth_sessions : "has"
+  devices ||--o{ auth_sessions : "carries"
+  user_identities |o--o{ auth_sessions : "logs in"
+  auth_sessions |o--o{ auth_sessions : "child session"
+  user_identities ||--o| local_credentials : "password, TOTP"
+  users ||--o{ enrollment_codes : "code for"
+  devices |o--o{ enrollment_codes : "redeemed by"
+  identity_providers ||--o{ auth_login_flows : "provider"
+  users |o--o{ auth_login_flows : "links"
+  enrollment_codes |o--o{ auth_login_flows : "presented"
+  auth_sessions |o--o{ auth_challenges : "step-up, passkey"
+  enrollment_codes |o--o{ auth_challenges : "setup with passkey"
+  users |o--o{ device_pairings : "pairs"
+  devices |o--o{ device_pairings : "confirms"
+  devices |o--o{ device_pairings : "is created"
+  auth_sessions ||--o{ refresh_token_families : "has"
+  refresh_token_families ||--o{ refresh_tokens : "rotates"
+  principals ||--o{ api_tokens : "owns"

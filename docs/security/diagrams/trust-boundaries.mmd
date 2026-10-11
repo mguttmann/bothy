@@ -1,74 +1,74 @@
-%% Systemgrenzen-Diagramm zum Bedrohungsmodell (docs/security/threat-model.md)
-%% Rendern: mermaid-cli 11 (siehe docs/security/threat-model.md, Abschnitt 2)
+%% System boundary diagram for the threat model (docs/security/threat-model.md)
+%% Render: mermaid-cli 11 (see docs/security/threat-model.md, section 2)
 flowchart LR
-    subgraph Z1["Zone 1: Endgeräte (nicht vertrauenswürdig)"]
-        APP["Native Apps<br/>iOS, Android, macOS, Windows<br/>Geräteschlüssel, lokaler Cache"]
-        CON["Admin-Konsole<br/>Browser, Flutter Web"]
+    subgraph Z1["Zone 1: End devices (untrusted)"]
+        APP["Native apps<br/>iOS, Android, macOS, Windows<br/>device key, local cache"]
+        CON["Admin console<br/>browser, Flutter Web"]
     end
 
-    subgraph Z2["Zone 2: Netzrand"]
-        PRX["Reverse-Proxy mit TLS<br/>z. B. Caddy oder tailscale serve"]
+    subgraph Z2["Zone 2: Network edge"]
+        PRX["Reverse proxy with TLS<br/>for example Caddy or tailscale serve"]
     end
 
-    subgraph Z3["Zone 3: Server-Host (vertrauenswürdig)"]
-        SRV["Server<br/>Rollen api und worker<br/>authz, identity, Gateway"]
-        DB[("PostgreSQL<br/>Inhalte, Ereignis-Log,<br/>Audit-Log")]
-        OBJ[("Objektspeicher<br/>Dateien")]
-        AV["Virenscanner<br/>Unix-Socket"]
+    subgraph Z3["Zone 3: Server host (trusted)"]
+        SRV["Server<br/>roles api and worker<br/>authz, identity, gateway"]
+        DB[("PostgreSQL<br/>contents, event log,<br/>audit log")]
+        OBJ[("Object storage<br/>files")]
+        AV["Virus scanner<br/>Unix socket"]
         OTC["OTel Collector"]
-        SP["Secret-Provider<br/>Signierschlüssel, Pepper"]
+        SP["Secret provider<br/>signing keys, pepper"]
     end
 
-    subgraph Z4["Zone 4: Agenten (halb vertrauenswürdig)"]
-        ADP["Agenten-Adapter<br/>z. B. Hermes Agent, Dev-Runner"]
-        RT["Laufzeit mit Werkzeugen<br/>Werkzeugklasse chat, scoped, host"]
-        DEV["Dev-Umgebung je Person<br/>VM"]
+    subgraph Z4["Zone 4: Agents (semi-trusted)"]
+        ADP["Agent adapters<br/>for example Hermes Agent, dev runner"]
+        RT["Runtime with tools<br/>tool class chat, scoped, host"]
+        DEV["Dev environment per person<br/>VM"]
     end
 
-    subgraph Z8["Zone 8: Angebundene Rechner (halb vertrauenswürdig)"]
-        HOSTD["Host-Dienst bothy-host<br/>eigener Benutzer ohne Admin"]
-        PTY["PTY: Shell oder Coding-Agent"]
+    subgraph Z8["Zone 8: Connected hosts (semi-trusted)"]
+        HOSTD["Host service bothy-host<br/>own user without admin"]
+        PTY["PTY: shell or coding agent"]
     end
 
-    subgraph Z5["Zone 5: Integrationen (nicht vertrauenswürdig)"]
-        APPS["Apps und Plugins"]
-        EXT["Externe Systeme<br/>Eingangs-Webhooks"]
+    subgraph Z5["Zone 5: Integrations (untrusted)"]
+        APPS["Apps and plugins"]
+        EXT["External systems<br/>incoming webhooks"]
     end
 
-    subgraph Z6["Zone 6: Externe Dienste"]
-        IDP["Identitätsanbieter OIDC"]
+    subgraph Z6["Zone 6: External services"]
+        IDP["Identity provider OIDC"]
         PUSH["APNs, FCM, WNS"]
-        LLM["LLM-Anbieter"]
-        TEL["Telemetrie-Backends"]
+        LLM["LLM providers"]
+        TEL["Telemetry backends"]
     end
 
-    subgraph Z7["Zone 7: Betrieb und Lieferkette"]
-        OPS["Owner am Host<br/>CLI, Sicherungen"]
-        CI["Repository, CI, Registry"]
+    subgraph Z7["Zone 7: Operations and supply chain"]
+        OPS["Owner on the host<br/>CLI, backups"]
+        CI["Repository, CI, registry"]
     end
 
-    APP -- "TB1: HTTPS mit DPoP, WSS" --> PRX
-    CON -- "TB1: HTTPS, Cookie (BFF)" --> PRX
-    PRX -- "TB2: HTTP über Loopback" --> SRV
+    APP -- "TB1: HTTPS with DPoP, WSS" --> PRX
+    CON -- "TB1: HTTPS, cookie (BFF)" --> PRX
+    PRX -- "TB2: HTTP over loopback" --> SRV
     SRV -- "TB3: SQL" --> DB
-    SRV -- "TB3: S3-API oder Dateisystem" --> OBJ
+    SRV -- "TB3: S3 API or file system" --> OBJ
     SRV -- "TB3: INSTREAM" --> AV
-    SRV -. "liest beim Start" .-> SP
-    SRV -- "OTLP ohne Inhalte" --> OTC
+    SRV -. "reads at startup" .-> SP
+    SRV -- "OTLP without contents" --> OTC
     OTC -- "TB7" --> TEL
-    ADP -- "TB4: API-Token, WSS, Aufruf-Marke" --> PRX
+    ADP -- "TB4: API token, WSS, invocation token" --> PRX
     ADP --> RT
-    RT -- "TB5: Prompts und Inhalte" --> LLM
-    RT -- "TB9: Lauf in Umgebung der Person" --> DEV
-    APPS -- "TB6: API-Token, WSS" --> PRX
-    SRV -- "TB6: signierte Webhooks an erlaubte Ziele" --> APPS
-    EXT -- "TB6: geheime URL" --> PRX
-    APP -- "TB1: Systembrowser" --> IDP
-    SRV -- "TB7: Code-Tausch, JWKS" --> IDP
-    SRV -- "TB7: nur IDs" --> PUSH
+    RT -- "TB5: prompts and contents" --> LLM
+    RT -- "TB9: run in the environment of the person" --> DEV
+    APPS -- "TB6: API token, WSS" --> PRX
+    SRV -- "TB6: signed webhooks to allowed targets" --> APPS
+    EXT -- "TB6: secret URL" --> PRX
+    APP -- "TB1: system browser" --> IDP
+    SRV -- "TB7: code exchange, JWKS" --> IDP
+    SRV -- "TB7: IDs only" --> PUSH
     PUSH -- "TB7" --> APP
-    OPS -- "TB8: Verwaltungsrolle" --> DB
-    CI -- "TB8: signierte Artefakte" --> OPS
-    APP -- "TB10: Noise-Strom Ende-zu-Ende" --> PRX
-    HOSTD -- "TB10: WSS ausgehend, Anmeldeschlüssel" --> PRX
+    OPS -- "TB8: admin role" --> DB
+    CI -- "TB8: signed artifacts" --> OPS
+    APP -- "TB10: Noise stream end-to-end" --> PRX
+    HOSTD -- "TB10: WSS outbound, login key" --> PRX
     HOSTD --> PTY

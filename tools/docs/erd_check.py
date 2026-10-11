@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-"""ERD gate: the ERDs in docs/architecture match the data model in docs/spec/03-datenmodell.md.
+"""ERD gate: the ERDs in docs/architecture match the data model in docs/spec/03-data-model.md.
 
-Rules (docs/architecture/README.md, section "Konventionen"):
+Rules (docs/architecture/README.md, section "Conventions"):
 
 - Every table of section 4 of 03 has exactly one full entity (a foreign key or an attribute
   that is no primary key) in the `erd-*.mmd` files. Other entities only show their key.
@@ -19,12 +19,12 @@ from collections import Counter
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DATA_MODEL = Path("docs") / "spec" / "03-datenmodell.md"
+DATA_MODEL = Path("docs") / "spec" / "03-data-model.md"
 ERD_GLOB = "docs/architecture/erd-*.mmd"
 
 _TABLE_HEADING = re.compile(r"^#### `([a-z_][a-z0-9_]*)`\s*$")
 _FK_END = re.compile(
-    r"(?:^|\s)(?:PK|Unique|Indexe|Checks|Aufbewahrung|Rechte|Partitionierung|Trigger|Hinweis):",
+    r"(?:^|\s)(?:PK|Unique|Indexes|Checks|Retention|Permissions|Partitioning|Trigger|Note):",
 )
 _PARENT = re.compile(r"->\s*`([a-z_][a-z0-9_]*)\([^)`]*\)`")
 _COLUMN = re.compile(r"`([a-z_][a-z0-9_]*)`")
@@ -53,7 +53,7 @@ def model_tables(text: str) -> dict[str, str]:
 
 
 def _fk_text(section: str) -> str:
-    """Return the text after `FK:` up to the next clause (PK, Unique, Indexe, ...)."""
+    """Return the text after `FK:` up to the next clause (PK, Unique, Indexes, ...)."""
     i = section.find("FK:")
     if i < 0:
         return ""

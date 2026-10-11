@@ -1,0 +1,51 @@
+%% File upload with malware scan and thumbnail. Domain details: 12-files.md.
+sequenceDiagram
+  autonumber
+  participant A as App Alex
+  box api node
+    participant F as files
+    participant MSG as messaging
+    participant HUB as gateway hub
+  end
+  participant DB as PostgreSQL
+  participant OBJ as Object storage
+  box worker
+    participant SJ as Job files.scan
+    participant TJ as Job files.thumbnail
+  end
+  participant AV as ClamAV clamd
+  participant S as App Sam
+
+  A->>F: POST upload session (channel, size, name, declared type)
+  F->>F: authorize(Alex, file.upload, channel): write and upload, size at most file.max_upload_bytes
+  F->>DB: INSERT files (upload_state pending, random object_key)
+  alt driver S3 with presigned URL
+    F-->>A: short-lived PUT URL with checksum header
+    A->>OBJ: PUT bytes
+  else driver file system or upload through the server
+    F-->>A: upload target on the server
+    A->>F: PUT bytes (streamed, size limited)
+    F->>OBJ: write, SHA-256 while passing through
+  end
+  A->>F: POST complete upload
+  F->>OBJ: check size and checksum, read head for MIME detection
+  F->>DB: upload_state complete, scan_status pending, job files.scan in the same transaction, file.updated
+  F-->>A: 200 file (scan pending)
+  A->>MSG: POST message with file_id (message.create, plus upload)
+  MSG->>F: bind attachment to the message in the same channel
+  MSG-->>A: 201, display "being checked"
+  SJ->>OBJ: stream object
+  SJ->>AV: INSTREAM in chunks, end with zero-length chunk
+  alt result OK
+    AV-->>SJ: OK
+    SJ->>DB: scan_status clean, scanned_at, job files.thumbnail if image, file.updated
+    TJ->>OBJ: read, decode, re-encode (metadata removed), write variants
+    TJ->>DB: file_thumbnails, file.updated
+  else detection
+    AV-->>SJ: FOUND
+    SJ->>DB: scan_status infected, serving blocked, audit entry, file.updated
+  else clamd not reachable
+    SJ->>SJ: error, River retries with backoff, status stays pending (fail closed)
+  end
+  HUB-->>S: dispatch file.updated
+  S->>F: GET thumbnail (file.read, only when clean or skipped)

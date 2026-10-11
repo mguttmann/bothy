@@ -1,0 +1,38 @@
+%% C4 level 1: system context. C4 notation as a Mermaid flowchart (see README).
+flowchart TB
+  classDef person fill:#063b38,stroke:#08191c,color:#fbfeff
+  classDef system fill:#136f69,stroke:#063b38,color:#fbfeff
+  classDef ext fill:#59696c,stroke:#24363a,color:#fbfeff
+
+  member["<b>Member</b><br/>[Person]<br/>Person with grants on<br/>spaces or channels"]:::person
+  owner["<b>Owner</b><br/>[Person]<br/>manages permissions, agents,<br/>backend policy"]:::person
+  operator["<b>Instance operator</b><br/>[Person]<br/>installs, configures,<br/>backs up the instance"]:::person
+  dev["<b>Bot developer</b><br/>[Person]<br/>builds adapters and apps<br/>against the public API"]:::person
+
+  bothy["<b>Bothy instance</b><br/>[Software system]<br/>Server, apps for iOS, Android,<br/>macOS, Windows, web console"]:::system
+
+  proxy["<b>Reverse proxy</b><br/>[external]<br/>TLS, optional identity header"]:::ext
+  idp["<b>Identity provider</b><br/>[external]<br/>OIDC, for example Microsoft Entra ID"]:::ext
+  push["<b>Push services</b><br/>[external]<br/>APNs, FCM"]:::ext
+  agents["<b>Agents</b><br/>[external to the server]<br/>Adapter plus runtime,<br/>for example Hermes Agent, Claude Code"]:::ext
+  llm["<b>AI providers</b><br/>[external]<br/>Model API or personal subscription<br/>in the runtime"]:::ext
+  integr["<b>Integrations</b><br/>[external]<br/>Apps with manifest,<br/>systems with webhooks"]:::ext
+  telemetry["<b>Telemetry backends</b><br/>[external]<br/>via OpenTelemetry Collector"]:::ext
+  discord["<b>Discord</b><br/>[external]<br/>Import source, read-only"]:::ext
+  stt["<b>Transcription service</b><br/>[external, optional]<br/>behind a port"]:::ext
+  hosts["<b>Connected hosts</b><br/>[external to the server]<br/>Host service bothy-host,<br/>terminal sessions"]:::ext
+
+  member -->|"chats, triggers agents"| bothy
+  owner -->|"manages with step-up"| bothy
+  operator -->|"installs, configures"| bothy
+  dev -->|"develops against API and SDK"| integr
+  proxy -->|"HTTPS, WebSocket"| bothy
+  bothy -->|"OIDC auth code with PKCE"| idp
+  bothy -->|"Push without content"| push
+  agents -->|"WebSocket, REST,<br/>invocation token"| bothy
+  agents -->|"Model calls with<br/>own credentials"| llm
+  integr -->|"REST, webhooks"| bothy
+  bothy -->|"OTLP"| telemetry
+  bothy -->|"reads during import"| discord
+  bothy -->|"Audio for transcription"| stt
+  hosts -->|"Outbound WebSocket,<br/>end-to-end Noise stream"| bothy

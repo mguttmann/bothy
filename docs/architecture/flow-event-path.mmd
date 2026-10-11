@@ -1,0 +1,52 @@
+---
+config:
+  layout: elk
+---
+%% Event path: write transaction -> event_log -> fan-out -> connections, agent consumers,
+%% worker consumers -> push and webhooks. Description: 02-architecture.md, section 11.
+flowchart TB
+  classDef step fill:#136f69,stroke:#063b38,color:#fbfeff
+  classDef store fill:#12659d,stroke:#0b4d79,color:#fbfeff
+  classDef check fill:#eddc59,stroke:#8d7716,color:#291f02
+  classDef ext fill:#59696c,stroke:#24363a,color:#fbfeff
+
+  subgraph tx["Write transaction (Unit of Work, READ COMMITTED)"]
+    t1["1 Lock permission_version<br/>(only on permission change)"]:::step
+    t2["2 Write domain rows<br/>(only the owning module)"]:::step
+    t3["3 In-tx subscribers<br/>(for example runs on MessagePosted)"]:::step
+    t4["4 Pre-commit, only on permission change:<br/>authz checks I1, computes access.changed"]:::check
+    t5["5 sync: lock event_seq,<br/>write event_log, pg_notify"]:::step
+    t6["6 audit: lock audit_seq,<br/>hash chain, COMMIT"]:::step
+    t1 --> t2 --> t3 --> t4 --> t5 --> t6
+  end
+
+  log[("event_log<br/>commit-ordered seq")]:::store
+  t5 --> log
+
+  subgraph apinode["every api node"]
+    tail["Log tail (sync)<br/>one reader per process,<br/>wake-up signal NOTIFY or poll"]:::step
+    rc["Permission cache (authz)<br/>follows access.changed in log order"]:::check
+    hub["Hub (gateway)<br/>index of channel and principal<br/>to connections"]:::step
+    conn["Client connection<br/>authorize per recipient,<br/>bounded outbound queue"]:::check
+    agentc["Agent consumer<br/>cursor acked_seq, in-flight window,<br/>before invocation: agent.invoke, I2, token"]:::check
+    tail --> rc --> hub
+    hub --> conn
+    hub --> agentc
+  end
+
+  subgraph workernode["worker"]
+    cons["Event consumer with cursor<br/>(push, webhooks), SKIP LOCKED"]:::step
+    jobs["River jobs per recipient<br/>or per delivery"]:::step
+    pushj["notify.push_send<br/>authorize push.deliver"]:::check
+    hookj["webhook_out.deliver<br/>signature, backoff"]:::check
+    cons --> jobs
+    jobs --> pushj
+    jobs --> hookj
+  end
+
+  log -->|"NOTIFY seq only"| tail
+  log -->|"NOTIFY seq only"| cons
+  conn --> apps["Apps and console"]:::ext
+  agentc --> adapter["Agent adapter"]:::ext
+  pushj --> pushsvc["APNs, FCM"]:::ext
+  hookj --> integr["Integrations"]:::ext

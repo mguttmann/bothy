@@ -1,0 +1,42 @@
+%% Revoke a grant while Sam is connected and a run triggered by Sam is running.
+%% Lock order from 03-data-model.md 6.3, flow from 04-sync-protocol.md section 8.
+sequenceDiagram
+  autonumber
+  participant O as Owner (console)
+  box api node A
+    participant AZA as authz
+    participant RUA as runs
+  end
+  participant DB as PostgreSQL
+  box api node B
+    participant TL as sync log tail
+    participant HUB as gateway hub with permission cache
+  end
+  participant S as App Sam
+  participant AD as Agent adapter
+  participant W as worker
+
+  O->>AZA: POST grants/{id}/revoke with reason, fresh step-up
+  AZA->>AZA: authorize(Owner, grant.revoke, grant), step-up valid
+  AZA->>DB: BEGIN, first lock and increment permission_version
+  AZA->>DB: read the visible targets of Sam beforehand, set grants.revoked_at
+  AZA->>AZA: before the commit: I1 for affected agents with personal, difference before and after
+  AZA-)RUA: in-tx event AccessReduced (Sam loses channel Support)
+  RUA->>DB: active run of Sam in the channel: event run.cancel_requested (access_revoked) to the agent
+  AZA->>DB: event_seq: grant.changed, access.changed (audience Sam), pg_notify
+  AZA->>DB: audit_seq: audit entry with hash chain, COMMIT
+  AZA-->>O: 200
+  DB--)TL: NOTIFY event_log
+  TL->>HUB: events in seq order
+  HUB->>HUB: on access.changed: permission cache of Sam to the new permission version
+  HUB-->>S: dispatch access.changed (removed channel Support), immediately
+  HUB->>HUB: end focus on Support, discard buffered events from Support
+  S->>S: delete local contents of Support, close the view with a notice
+  HUB-->>AD: dispatch run.cancel_requested (access_revoked)
+  AD->>AD: stop the runtime
+  AD->>RUA: run.finish cancelled
+  alt adapter reports nothing within agent.cancel_grace
+    W->>DB: job runs.cancel_timeout: run cancelled with reason cancel_timeout
+  end
+  Note over HUB,S: Later events from Support: authorize(Sam, message.read) yields not_found, no delivery
+  Note over W: Push checks push.deliver before every send, Sam gets no push from Support

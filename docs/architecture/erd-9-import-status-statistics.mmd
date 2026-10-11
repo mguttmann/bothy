@@ -1,0 +1,62 @@
+%% ERD part 9: modules importer, status and stats. Source: 03-data-model.md, 4.11 (import),
+%% 4.12 (status) and 4.15. backup_runs and stats_minutes deliberately have no foreign keys.
+%% Pure log columns (created_by, updated_by and similar) point to principals(id) and
+%% are not drawn as a relationship.
+%% Tables of other modules only with their key.
+erDiagram
+  direction LR
+  import_sources {
+    uuid id PK
+    text kind "discord, archive"
+    text state "draft, running, paused, completed, failed"
+  }
+  import_items {
+    uuid id PK
+    uuid source_id FK
+    text origin_key "UK with source_id"
+    text item_kind
+    text state "pending, posted, skipped, failed"
+  }
+  status_components {
+    uuid id PK
+    text state
+    uuid agent_id FK
+  }
+  status_incidents {
+    uuid id PK
+    text state
+  }
+  status_incident_updates {
+    uuid id PK
+    uuid incident_id FK
+  }
+  status_incident_components {
+    uuid incident_id PK, FK
+    uuid component_id PK, FK
+  }
+  backup_runs {
+    uuid id PK
+    text kind "pg_full, pg_diff, logical, objects, restore_test"
+    text state "running, succeeded, failed"
+    timestamptz finished_at
+  }
+  stats_minutes {
+    timestamptz bucket_start "UK with all dimensions, partition per day"
+    text metric
+    uuid channel_id "no FK"
+    uuid agent_id "no FK"
+    text dimension
+    text currency "only for cost"
+    bigint count
+    bigint sum
+    bigint good
+  }
+  agents {
+    uuid principal_id PK
+  }
+
+  import_sources ||--o{ import_items : "contains"
+  agents |o--o{ status_components : "monitors"
+  status_incidents ||--o{ status_incident_updates : "history"
+  status_incidents ||--o{ status_incident_components : "affects"
+  status_components ||--o{ status_incident_components : "affected"

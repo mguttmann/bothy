@@ -1,0 +1,45 @@
+%% Reconnect with catch-up, also when the client lands on another api node.
+%% Rules from 04-sync-protocol.md sections 6 and 7.
+sequenceDiagram
+  autonumber
+  participant C as App
+  participant LB as Reverse proxy
+  participant GA as api node A (old connection)
+  participant GB as api node B
+  participant AZ as authz permission cache in B
+  participant DB as PostgreSQL
+
+  Note over C,GA: Network change: connection to A drops, session state stays only in the memory of A
+  C->>C: immediate attempt (network change), then full jitter up to sync.reconnect_backoff_cap
+  C->>LB: WebSocket upgrade
+  LB->>GB: upgrade
+  GB-->>C: hello (heartbeat_interval_ms, resume_window_ms, dpop_nonce)
+  C->>GB: resume (gateway_session_id, access_token, dpop, cursor 1200)
+  alt gateway session unknown on B
+    GB-->>C: close 4006 session_invalid
+    C->>GB: new connection, hello, identify (access_token, dpop, device_id, cursor 1200)
+    GB->>GB: token, DPoP with nonce, device active, session not revoked
+    GB->>AZ: authorize(principal, gateway.connect, instance), visible targets
+    GB-->>C: ready (head_seq 5300, snapshot without thread contents)
+  else session known (same node, within resume_window)
+    GB-->>C: resumed, focus restored
+  end
+  alt cursor too old, too far behind or greater than head_seq
+    GB-->>C: resync_required (retention, too_far_behind or cursor_ahead), connection stays live from head_seq
+    C->>C: discard server state in the cache, keep the outbox
+    C->>GB: GET sync/snapshot, cursor to its head_seq, discard older events
+  else catch-up possible
+    loop pages of sync.catchup_page_size
+      GB->>DB: SELECT event_log WHERE seq > cursor AND seq <= head, filtered by visible targets
+      GB->>AZ: authorize per event with its receive action
+      GB-->>C: dispatch (only visible events)
+      GB-->>C: cursor (last checked seq)
+    end
+    Note over GB: Live events meanwhile buffered per connection, at most sync.outbound_queue_max
+    GB-->>C: catchup.complete (head_seq)
+    GB-->>C: buffered live events in seq order
+  end
+  C->>C: persist the cursor after every page
+  C->>GB: send outbox, strictly one after another per thread
+  C->>GB: heartbeat (last_seq)
+  GB-->>C: heartbeat_ack

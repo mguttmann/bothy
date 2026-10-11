@@ -1,0 +1,126 @@
+%% ERD part 4: modules messaging and files. Source: 03-data-model.md, 4.6 and 4.7.
+%% Pure log columns (created_by, updated_by, granted_by, revoked_by and similar) point to
+%% principals(id) and are not drawn as a relationship.
+%% Tables of other modules only with their key.
+erDiagram
+  direction LR
+  messages {
+    uuid id PK
+    uuid thread_id FK
+    uuid channel_id FK "copy for permission filter"
+    bigint thread_seq "UK with thread_id"
+    uuid author_principal_id FK
+    uuid client_msg_id "UK with author_principal_id"
+    text origin "human, agent, app, import, system"
+    text kind "text, voice, run, card, system"
+    uuid reply_to_message_id FK
+    uuid run_id FK
+    text trigger_state "received, queued, working, done, failed, cancelled, followup_delivered"
+    text trigger_state_reason
+    uuid import_item_id FK
+    bigint version
+    timestamptz deleted_at
+  }
+  message_revisions {
+    uuid id PK
+    uuid message_id FK
+    integer revision
+  }
+  mentions {
+    uuid message_id PK, FK
+    uuid principal_id PK, FK
+    uuid thread_id FK
+  }
+  reactions {
+    uuid message_id PK, FK
+    uuid principal_id PK, FK
+    text emoji PK
+  }
+  pins {
+    uuid message_id PK, FK
+    uuid thread_id FK
+  }
+  message_templates {
+    uuid id PK
+    uuid owner_user_id FK
+    uuid channel_id FK
+  }
+  files {
+    uuid id PK
+    text object_key UK
+    bytea sha256
+    text purpose "attachment, avatar, branding, gdpr_export"
+    uuid scope_channel_id FK "exactly for attachment"
+    text upload_state "pending, complete, failed"
+    text scan_status "pending, clean, infected, error, skipped"
+    text transcript_status
+  }
+  file_upload_sessions {
+    uuid file_id PK, FK
+    text mode "direct, presigned"
+    text state "open, completed, aborted, expired"
+    timestamptz expires_at
+  }
+  file_upload_parts {
+    uuid file_id PK, FK
+    integer part_number PK
+    bytea sha256
+  }
+  file_text_extracts {
+    uuid file_id PK, FK
+    text state "pending, done, failed, unsupported"
+    tsvector search_vector
+  }
+  file_thumbnails {
+    uuid file_id PK, FK
+    text variant PK "small, medium, large, poster"
+    text object_key UK
+  }
+  message_attachments {
+    uuid message_id PK, FK
+    smallint position PK
+    uuid file_id FK, UK
+  }
+  principals {
+    uuid id PK
+  }
+  users {
+    uuid principal_id PK
+  }
+  threads {
+    uuid id PK
+  }
+  channels {
+    uuid id PK
+  }
+  runs {
+    uuid id PK
+  }
+  import_items {
+    uuid id PK
+  }
+
+  threads ||--o{ messages : "contains"
+  channels ||--o{ messages : "filter"
+  principals ||--o{ messages : "author"
+  messages |o--o{ messages : "reply to"
+  runs |o--o| messages : "live box anchor"
+  import_items |o--o{ messages : "origin"
+  messages ||--o{ message_revisions : "revisions"
+  messages ||--o{ mentions : "mentions"
+  principals ||--o{ mentions : "is mentioned"
+  threads ||--o{ mentions : "copy"
+  messages ||--o{ reactions : "has"
+  principals ||--o{ reactions : "reacts"
+  messages ||--o| pins : "pinned"
+  threads ||--o{ pins : "list"
+  users |o--o{ message_templates : "personal"
+  channels |o--o{ message_templates : "channel"
+  principals ||--o{ files : "uploads"
+  channels |o--o{ files : "upload target"
+  files ||--o{ file_thumbnails : "preview"
+  files ||--o| file_upload_sessions : "upload"
+  file_upload_sessions ||--o{ file_upload_parts : "parts"
+  files ||--o| file_text_extracts : "file text"
+  messages ||--o{ message_attachments : "attachments"
+  files ||--o| message_attachments : "attached to"

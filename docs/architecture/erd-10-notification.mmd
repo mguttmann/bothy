@@ -1,0 +1,43 @@
+%% ERD part 10: module notify. Source: 03-data-model.md, 4.10.
+%% Pure log columns (created_by, updated_by and similar) point to principals(id) and
+%% are not drawn as a relationship.
+%% Tables of other modules only with their key.
+erDiagram
+  direction LR
+  notification_preferences {
+    uuid user_id PK, FK
+    text target_kind PK "space, channel, thread"
+    uuid target_id PK "polymorphic, no FK"
+    text level "all, mentions, mute"
+  }
+  quiet_hours {
+    uuid id PK
+    uuid user_id FK
+    smallint weekdays
+  }
+  push_registrations {
+    uuid id PK
+    uuid user_id FK
+    uuid device_id FK
+    uuid auth_session_id FK
+    text provider "apns, fcm, unifiedpush, wns"
+    text token "UK with provider"
+    bytea preview_token_hash UK
+    timestamptz disabled_at
+    text disabled_reason
+  }
+  users {
+    uuid principal_id PK
+  }
+  devices {
+    uuid id PK
+  }
+  auth_sessions {
+    uuid id PK
+  }
+
+  users ||--o{ notification_preferences : "has"
+  users ||--o{ quiet_hours : "has"
+  users ||--o{ push_registrations : "has"
+  devices ||--o{ push_registrations : "receives"
+  auth_sessions ||--o{ push_registrations : "session"

@@ -163,15 +163,15 @@ def test_mmdc_command_with_mermaid_config(monkeypatch: pytest.MonkeyPatch, tmp_p
 
 DATA_MODEL = """# 03
 
-## 4. Tabellen
+## 4. Tables
 
-### 4.1 Teil
+### 4.1 Part
 
 #### `a`
 
-PK: `id`. FK: keine.
+PK: `id`. FK: none.
 
-## 5. Weiter
+## 5. Next
 """
 
 ERD = "erDiagram\n  a {\n    uuid id PK\n    text name\n  }\n"
@@ -189,7 +189,7 @@ def _repo_with_diagrams(tmp_path: Path) -> Path:
         '{"theme": "base", "themeVariables": {"background": "#fbfeff"}}'
     )
     (repo / "design" / "build" / "tokens.resolved.json").write_text('{"base": {}, "contexts": {}}')
-    (repo / "docs" / "spec" / "03-datenmodell.md").write_text(DATA_MODEL)
+    (repo / "docs" / "spec" / "03-data-model.md").write_text(DATA_MODEL)
     (repo / "docs" / "architecture" / "erd-1.mmd").write_text(ERD)
     (repo / "docs" / "architecture" / "erd-1.svg").write_text(
         stamped(repo, "docs/architecture/erd-1.mmd")

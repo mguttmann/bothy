@@ -1,0 +1,40 @@
+%% Switch the backend policy of an agent from organization to personal (I1, I3, I4).
+%% Domain details and guided flow: 10-backend-policy.md.
+sequenceDiagram
+  autonumber
+  participant O as Owner (console)
+  box api node
+    participant AG as agents
+    participant AZ as authz
+    participant HUB as gateway hub
+  end
+  participant DB as PostgreSQL
+  participant AD as Agent adapter
+  participant B as Whoever runs the runtime
+  participant APP as Apps of the readers
+
+  O->>AG: step-up with passkey or device key
+  O->>AG: POST agents/{id}/billing-mode (personal, credential_holder_id, reason)
+  AG->>AZ: authorize(Owner, agent.billing_mode.set, agent): Owner and step-up
+  AG->>DB: BEGIN, lock permission_version first
+  AG->>DB: UPDATE agents billing_mode, credential_holder_id, billing_mode_changed_at and _by
+  AG->>AZ: before the commit: I1 check
+  AZ->>AZ: compute the set with effective level trigger on all targets of the agent
+  alt set is not exactly the credential_holder
+    AZ-->>AG: invariant_violation, code i1_violation
+    AG->>DB: ROLLBACK
+    AG->>DB: own transaction: audit entry decision deny
+    AG-->>O: 409 with hint "switch to organization first" or adjust grants
+  else I1 holds
+    AG->>DB: events agent.updated, access.changed for those affected, audit allow, COMMIT
+    AG-->>O: 200
+    HUB-->>APP: agent.updated: badge Personal
+    HUB-->>AD: agent.updated with new configured mode (received via agent.read as agent-self)
+  end
+  AD->>AG: heartbeat: reported_billing_mode organization
+  AG->>AG: configured and reported mode differ: state degraded, warning in console and agent card
+  Note over AD: Every token now carries billing_mode personal. The adapter starts nothing while its reported mode differs, and reports billing_mode_mismatch (I3)
+  B->>AD: switch the runtime outside the product (profile environment, restart)
+  AD->>AG: heartbeat: reported_billing_mode personal
+  AG->>AG: configured equals reported mode, warning goes away
+  Note over O,APP: Switching all agents (agent.billing_mode.set_all) works the same way, in one transaction

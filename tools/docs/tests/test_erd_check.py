@@ -7,30 +7,30 @@ from pathlib import Path
 
 import erd_check as ec
 
-MODEL = """# 03 Datenmodell
+MODEL = """# 03 Data model
 
-## 4. Tabellen
+## 4. Tables
 
-### 4.1 Teil
+### 4.1 Part
 
 #### `users`
 
-Zweck: Menschen.
+Purpose: people.
 
 PK: `id`. FK: `created_by` -> `principals(id)` ON DELETE RESTRICT.
 
 #### `principals`
 
-PK: `id`. FK: keine.
+PK: `id`. FK: none.
 
 #### `devices`
 
 PK: `id`. FK: `user_id` -> `users(id)` ON DELETE CASCADE; `approved_by_device_id`,
-`paired_device_id` -> `devices(id)` ON DELETE SET NULL. Checks: `user_id` ist gesetzt.
+`paired_device_id` -> `devices(id)` ON DELETE SET NULL. Checks: `user_id` is set.
 
-### 4.2 Nichts
+### 4.2 Nothing
 
-## 5. Suchvektoren
+## 5. Search vectors
 
 #### `not_a_table`
 """
@@ -48,9 +48,9 @@ GOOD = """erDiagram
     uuid id PK
     uuid user_id FK
   }
-  users ||--o{ devices : "hat"
-  devices |o--o{ devices : "bestätigt"
-  devices |o--o{ devices : "gekoppelt"
+  users ||--o{ devices : "has"
+  devices |o--o{ devices : "approved"
+  devices |o--o{ devices : "paired"
 """
 
 
@@ -78,11 +78,11 @@ def test_matching_erd_has_no_problems() -> None:
 
 
 def test_missing_table_and_relationship_are_reported() -> None:
-    erd = GOOD.replace('  devices |o--o{ devices : "gekoppelt"\n', "").replace(
+    erd = GOOD.replace('  devices |o--o{ devices : "paired"\n', "").replace(
         "  principals {\n    uuid id PK\n    text kind\n  }\n", ""
     )
     assert ec.check(MODEL, {"erd-1.mmd": erd}) == [
-        "docs/spec/03-datenmodell.md: table principals has no full entity in any ERD",
+        "docs/spec/03-data-model.md: table principals has no full entity in any ERD",
         "ERD: 1 of 2 relationship(s) missing for devices.approved_by_device_id -> devices; "
         "devices.paired_device_id -> devices",
     ]
@@ -93,7 +93,7 @@ def test_stub_is_not_full_but_a_second_full_entity_is_reported() -> None:
     assert ec.check(MODEL, {"erd-1.mmd": GOOD, "erd-2.mmd": stub}) == []
     twice = "erDiagram\n  users {\n    uuid id PK\n    text name\n  }\n"
     assert ec.check(MODEL, {"erd-1.mmd": GOOD, "erd-2.mmd": twice}) == [
-        "docs/spec/03-datenmodell.md: table users has a full entity in erd-1.mmd, erd-2.mmd"
+        "docs/spec/03-data-model.md: table users has a full entity in erd-1.mmd, erd-2.mmd"
     ]
 
 
@@ -105,7 +105,7 @@ def test_all_pk_table_with_foreign_keys_counts_as_full() -> None:
 def test_unknown_entity_is_reported() -> None:
     erd = GOOD + "  ghosts {\n    uuid id PK\n  }\n"
     assert ec.check(MODEL, {"erd-1.mmd": erd}) == [
-        "erd-1.mmd: entity ghosts is no table of docs/spec/03-datenmodell.md"
+        "erd-1.mmd: entity ghosts is no table of docs/spec/03-data-model.md"
     ]
 
 

@@ -1,0 +1,50 @@
+%% Open a terminal: step-up, authorize with SR10, I6 and SR12, terminal session token, Noise NK via the relay.
+%% Domain details: 24-terminal.md, sections 5 and 6. Paths without prefix /api/v1.
+sequenceDiagram
+  autonumber
+  participant G as Device (terminal view)
+  box api node (hash routing by session_id)
+    participant T as terminal
+    participant AZ as authz
+    participant ID as identity
+    participant R as Relay
+  end
+  participant DB as PostgreSQL
+  participant H as Host service bothy-host
+  participant P as PTY
+
+  Note over H,T: Control connection /hosts/connect is up, authenticated with Ed25519
+  G->>ID: step-up with passkey or step-up device key
+  G->>G: create ephemeral X25519 pair e
+  G->>T: POST hosts/{id}/terminal/sessions (profile, size, hash of e, for claude workdir_index)
+  T->>AZ: authorize(person, terminal.open, host)
+  AZ->>AZ: terminal capability, SR10, SR11 (I6), SR12 (own reported session user), own working directory, step-up fresh and unused, limits
+  alt denied
+    AZ-->>T: decision with reason
+    T->>DB: own transaction: audit deny
+    T-->>G: 401, 403 or 404
+  else allowed
+    T->>DB: BEGIN, consume step-up, terminal_sessions opening, audit, terminal_session.changed, COMMIT
+    T->>T: sign terminal session token (purpose terminal, jti, cek, osu, wdi)
+    T-->>G: 201: session_id, token, noise_public_key, fingerprint
+    G->>G: check key against pin, otherwise hard warning
+    T->>H: session.open (session_id, data path)
+    H->>R: WSS /hosts/sessions/{id}/stream, identify with Ed25519
+    G->>R: WSS /terminal/sessions/{id}/stream, identify with DPoP
+    G->>R: Noise message 1: e, es, payload token
+    R->>H: forward unchanged
+    H->>H: prologue, signature, aud, sid, exp, jti single use, cek, profile, osu bound, wdi in the list of osu, own
+    H-->>R: Noise message 2: e, ee
+    R-->>G: forward unchanged
+    G->>R: first transport message: start (columns, rows)
+    R->>H: forward
+    H->>P: start PTY in the helper of osu (profile)
+    H->>T: session.started
+    T->>DB: state active, terminal_session.changed
+    loop session
+      G->>R: data, resize (encrypted)
+      R->>H: forward, count length only
+      H-->>R: data (encrypted)
+      R-->>G: forward
+    end
+  end
