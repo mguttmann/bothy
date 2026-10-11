@@ -43,6 +43,11 @@ Planning stage (milestone M0). Nothing is installable yet.
   tables of chapter 05 and the lists in `docs/api/redocly.yaml`, and the gate
   `catalog-check` (`tools/catalog/`) fails on drift or on a contradiction with the
   hand-written parts of chapter 05.
+- Gate `register-check` (`tools/doccheck/register_check.py`): the module register
+  `services/server/architecture/modules.yaml` must equal the tables and their modules in
+  chapter 03 and the actions, event types and ops of `docs/spec/actions.yaml`, and the module
+  tables of chapter 02, the server component diagram and the module READMEs must equal the
+  register (ADR 0050); every difference is one finding with file and item.
 
 ### Changed
 

@@ -147,6 +147,8 @@ Technik ohne Fachlogik; nur `adapters/`, `wire` und `cmd` dürfen sie importiere
   (go-arch-lint, ADR 0008).
 - SQL eines Moduls nennt nur eigene Tabellen (02, 7.3).
 - Jede Operation hat eine Aktion aus 05; der Server startet sonst nicht.
+- Register, Kern-Vertrag (03, `actions.yaml`), Modultabellen in 02, Komponenten-Diagramm und
+  Modul-READMEs stimmen überein (`make register-check`, ADR 0050).
 - Erzeugter Code (`api/`, sqlc, `.go-arch-lint.yml`) entspricht seiner Quelle.
 
 ## Namensgebundene Stellen

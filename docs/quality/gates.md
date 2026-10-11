@@ -19,6 +19,7 @@ Quelle des Diagramms: `docs/quality/pipeline.mmd`.
 | `lint` | pre-commit-Hooks über alle Dateien (Text-Regeln, Leerzeichen, YAML/TOML/JSON, Merge-Marker, private Schlüssel, Dateigröße), ruff, bandit, check-jsonschema (Issue-Formulare, Renovate, CodeRabbit), actionlint, zizmor, go vet und golangci-lint, flutter analyze und custom_lint, Skript `lint` | Stil, Fehlerquellen, Workflow-Sicherheit | `repo.max_file_kb` | ja |
 | `typecheck` | mypy (strict), go build, tsc | Typen | | Werkzeuge |
 | `arch` | go-arch-lint mit `<modul>/.go-arch-lint.yml`, erzeugt aus `architecture/modules.yaml` | Modulgrenzen und erlaubte Fremdbibliotheken der Go-Module (Kapitel 02 "go-arch-lint"); keine symbolischen Links unterhalb eines Moduls, weil go-arch-lint einem verlinkten Verzeichnis nicht folgt und es nach dem Pfad des Links zuordnet, der Go-Compiler den Code dahinter aber baut | | ab erstem Go-Modul |
+| `register-check` | `tools/doccheck/register_check.py` | Modulregister `services/server/architecture/modules.yaml` gleich dem Kern-Vertrag (Tabellen und ihre Module aus Kapitel 03, Aktionen, Ereignistypen und Ops aus `docs/spec/actions.yaml`) und gleich den Stellen, die es wiederholen: Tabellen "Modulliste", "Erlaubte Abhängigkeiten", "Querschnitts-Ports", "Aktionen je Modul" und "Ereignistypen und WebSocket-Ops je Modul" in Kapitel 02, Komponenten-Diagramm `c4-3-komponenten-server.mmd`, Modul-READMEs; eine Zeile je Abweichung mit Datei und Element (ADR 0050, Regeln C1 bis C12 im Docstring) | | ja |
 | `migrations-lint` | `tools/ci/migrations_lint.py` | fortlaufende, lückenlose fünfstellige Nummern ohne Zeitstempel-Versionen, Prüfsummen gemergter Migrationen unverändert (`migrations.sha256`), `STORED` bei `GENERATED ALWAYS AS`, `-- +goose NO TRANSACTION` bei `CONCURRENTLY` (ADR 0007, Kapitel 14) | | ab erster Migration |
 | `test` | pytest, go test -race, flutter test, Skript `test` | Tests mit Abdeckungsdaten | | Werkzeuge |
 | `coverage` | coverage, go tool cover, LCOV-Auswertung | Mindestabdeckung; Go ohne die Pakete unter `test/` und `perf/` (Testcode, Kapitel 23 "Komponenten-Vertrag") | `quality.coverage.tools_min_percent`, `quality.coverage.go_min_percent`, `quality.coverage.dart_min_percent` | Werkzeuge |
@@ -124,11 +125,13 @@ neben `migrations/`, damit weder das Einbettungsmuster `*.sql` noch sqlc sie lie
 ## Einzelne Gates
 
 Jedes Gate läuft auch allein, zum Beispiel `make lint` oder `make diagrams`. Für die
-Diagramme kann `MMDC_PUPPETEER_CONFIG` auf eine Puppeteer-Konfiguration zeigen. Nennt sie
-ein eigenes Chromium (`executablePath`), lädt `make bootstrap` keinen Browser; sonst lädt
-es den zu Puppeteer passenden. CI nutzt `tools/node/puppeteer-ci.json` (Chromium ohne
-Sandbox, weil Runner Benutzer-Namensräume einschränken können; gerendert werden nur die
-eigenen Diagramme).
+Diagramme kann `MMDC_PUPPETEER_CONFIG` auf eine Puppeteer-Konfiguration zeigen, die auch die
+Diagrammtests von `make test` nutzen; ein relativer Pfad gilt ab dem Repository-Stamm, auch
+wenn ein Test aus `tools/` rendert. Nennt sie ein eigenes Chromium (`executablePath`), lädt
+`make bootstrap` keinen Browser; sonst lädt es den zu Puppeteer passenden. CI setzt `tools/node/puppeteer-ci.json` (Chromium ohne Sandbox, weil Runner
+Benutzer-Namensräume einschränken können; gerendert werden nur die eigenen Diagramme) in jedem
+Schritt, der `make diagrams` oder `make test` erreicht, also für `make gates` und `make sonar`;
+ein Test in `tools/doccheck` hält das.
 
 Weitere Schalter: `COMMIT_RANGE` und `DENYLIST_RANGE` (Commit-Bereich statt
 `origin/main..HEAD`), `GITLEAKS_LOG_OPTS` (Standard `HEAD`, alle Refs mit `--all`), `GITLEAKS_FLAGS` (zum
@@ -149,6 +152,20 @@ Beispiel ein JSON-Bericht), `DENYLIST_FLAGS` (zum Beispiel `--reveal` lokal).
   Integrationstest mit allen Migrationen auf leerem PostgreSQL 18 (ADR 0007,
   "Confirmation"). `goose validate` prüft die Dateien ohne Datenbank; es kommt mit
   `bothy migrate validate` (PLAN M1-12) und ist noch kein Teil von `migrations-lint`.
+* `register-check` vergleicht nur Namen: die Maschinenspalten der Tabellen in 02, Knoten und
+  Kanten des Diagramms, Listen der READMEs. Prosa ("Verantwortung", "Grund je Kante", die
+  Tabelle "Ports, Ereignisse und Quellen je Modul", Zweck, Port-Texte und weitere Absätze der
+  READMEs) bleibt Review. Einen Namen außerhalb eines Code-Spans meldet es nur, wenn eine
+  Quelle ihn kennt; ein unbekanntes Wort (etwa ein Tippfehler) bleibt Review. Seine statische
+  Lesart nähert Python-Markdown an (Setext-Überschriften liest es nicht); dass sie auf den
+  echten Dateien der gerenderten Site gleicht, hält ein Test in `make test` (DECISIONS M1-06/11).
+  Die READMEs rendert GitHub; was nur GitHub anders zeigt als Python-Markdown, sieht der Test
+  nicht. Das Diagramm liest es über eine geschlossene Zeilengrammatik; dass sie Mermaid auf
+  dem echten Diagramm gleicht, hält ein Test mit dem gepinnten mermaid-cli (braucht
+  `make bootstrap`).
+  Tabellenbesitz in SQL-Dateien und der Abgleich mit den Tabellen der Migrationen (ADR 0050)
+  fehlen, solange es keine Migrationen und Abfragen gibt; sie kommen mit dem ersten Schema
+  (PLAN M1-12).
 * `migrations-lint` vergleicht gemergte Migrationen nur mit `migrations.sha256` im
   Arbeitsbaum, nicht mit dem Stand des Ausgangsbranchs. Wer eine Migration und ihre Zeile in
   der Prüfsummen-Datei zugleich von Hand ändert, die neueste Migration samt ihrer Zeile

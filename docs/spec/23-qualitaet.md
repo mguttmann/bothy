@@ -36,7 +36,7 @@ Die vollständige Liste mit Werkzeug, Schwelle und Lauf-Ort steht in
 
 | Gruppe | make-Ziele | Prüft |
 |---|---|---|
-| Code | `fmt-check`, `codegen-check`, `lint`, `typecheck`, `arch`, `migrations-lint`, `test`, `coverage` | Format, erzeugter Code ohne Drift, Linter, Typen, Modulgrenzen der Go-Module, Migrationsregeln, Tests mit Abdeckung je Komponente |
+| Code | `fmt-check`, `codegen-check`, `lint`, `typecheck`, `arch`, `register-check`, `migrations-lint`, `test`, `coverage` | Format, erzeugter Code ohne Drift, Linter, Typen, Modulgrenzen der Go-Module, Modulregister gleich Kern-Vertrag und Doku, Migrationsregeln, Tests mit Abdeckung je Komponente |
 | Commits | `commitlint` | Conventional Commits und DCO-Sign-off der neuen Commits |
 | Doku | `docs`, `linkcheck`, `diagrams`, `catalog-check`, `api-lint`, `api-clients`, `tokens` | Site-Build strikt, Links und Anker, Diagramme, Aktionskatalog und seine erzeugten Kopien, API-Verträge, generierte Clients, Design-Tokens |
 | CI-Regeln | `runners-check`, `labels-check` | Runner-Weiche, Trigger, SHA-Pinning, Timeouts, Rechte; Labels |

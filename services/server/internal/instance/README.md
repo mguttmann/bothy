@@ -21,7 +21,7 @@ Instanz-Identität, Sync-Epoche, Mindest-Server-Version, Einstellungen und Brand
 
 ## Abhängigkeiten
 
-Darf die Ports keines anderen Moduls nutzen.
+Darf die Ports dieser Module nutzen: keine.
 
 Grund: Fundament.
 

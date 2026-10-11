@@ -21,7 +21,7 @@ Preistabelle, Kostenbuchungen, Summen je Lauf, Thread, Bereich, Agent, Abgleich.
 
 ## Abhängigkeiten
 
-Darf die Ports keines anderen Moduls nutzen.
+Darf die Ports dieser Module nutzen: keine.
 
 Grund: Kostenzeilen tragen Kopien von Thread, Kanal, Bereich und Agent (03); keine Rückfrage nötig.
 

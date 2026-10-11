@@ -7,7 +7,8 @@ on failure each diagram is rendered alone to name the broken ones. A `*.mmd` fil
 also needs its rendered `*.svg` next to it (docs/quality/gates.md).
 
 Environment: MMDC_PUPPETEER_CONFIG may point to a Puppeteer config file, e.g. to use a
-locally installed Chromium instead of the one `make bootstrap` downloads.
+locally installed Chromium instead of the one `make bootstrap` downloads. A relative path is
+relative to the repository root, as CI and `make bootstrap` read it, from any working directory.
 """
 
 from __future__ import annotations
@@ -116,7 +117,8 @@ def mmdc_command(mmdc: Path, source: Path, out: Path) -> list[str]:
     cmd = [str(mmdc), "-q", "-i", str(source), "-o", str(out)]
     config = os.environ.get("MMDC_PUPPETEER_CONFIG")
     if config:
-        cmd += ["-p", config]
+        # An absolute path stays as it is (joining it drops REPO_ROOT).
+        cmd += ["-p", str(REPO_ROOT / config)]
     return cmd
 
 

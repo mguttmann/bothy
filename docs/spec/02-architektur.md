@@ -329,6 +329,7 @@ Ein Ereignistyp hat genau ein erzeugendes Modul. Die Empfangs-Aktion steht in 05
 | Modul | Dauerhafte Ereignisse | Kurzlebige Ereignisse | WebSocket-Ops (Client an Server) |
 |---|---|---|---|
 | `instance` | `instance.updated` | | |
+| `audit` | | | |
 | `authz` | `grant.changed`, `group.changed`, `access.changed`, `access.expiring` | | |
 | `identity` | `user.updated`, `session.revoked` | | |
 | `chat` | `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved`, `thread.moved_out`, `space.created`, `space.updated`, `space.archived`, `channel.created`, `channel.updated`, `channel.settings_changed`, `channel.archived`, `sidebar.updated`, `agent.config_changed` | | |
@@ -336,12 +337,15 @@ Ein Ereignistyp hat genau ein erzeugendes Modul. Die Empfangs-Aktion steht in 05
 | `files` | `file.updated` | | |
 | `messaging` | `message.created`, `message.updated`, `message.deleted`, `reaction.added`, `reaction.removed`, `pin.added`, `pin.removed` | | |
 | `runs` | `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked` | `run.updated`, `command.autocomplete_requested` | `run.update`, `command.autocomplete_result` |
+| `billing` | | | |
 | `sync` | `read_state.updated`, `draft.updated`, `draft.deleted`, `settings.updated` | | |
 | `notify` | `notification_pref.updated`, `quiet_hours.updated` | `notification.created` | |
+| `apps` | | | |
 | `status` | `status.updated` | | |
 | `privacy` | `gdpr.request_updated` | | |
 | `importer` | `import.progress` | | |
 | `gateway` | | `typing.started` | `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.start`, `typing.stop` |
+| `search` | | | |
 | `stats` | | `stats.live` | `stats.subscribe`, `stats.unsubscribe` (über den Hub des Gateways) |
 | `terminal` | `host.updated`, `terminal_session.changed` | `host.presence_changed` | keine im Gateway; eigene Kanäle mit eigenen Ops (05, Abschnitt 7) |
 
@@ -598,11 +602,11 @@ nutzt ein Unterpaket einer fremden App, ein Kernel-Port nutzt einen anderen: Exi
 | Prüfung | Was sie hält | Umsetzung (Ticket) |
 |---|---|---|
 | Tabellenbesitz | SQL eines Moduls nennt nur eigene Tabellen (Grundsatz 12 aus 03) | Durchlauf über `adapters/postgres/queries/*.sql`, Tabellennamen gegen `modules.yaml` |
-| Vollständigkeit | jede Tabelle aus 03 und jede Aktion aus 05 genau einmal im Register | Abgleich Register mit Kern-Vertrag |
+| Vollständigkeit | jede Tabelle aus 03 und jede Aktion aus 05 genau einmal im Register | `make register-check` (M1-06): Abgleich des Registers mit 03 und `actions.yaml`, auch Ereignistypen und Ops; der Abgleich mit den Migrationen kommt mit dem ersten Schema |
 | Routen und Ops | jede Operation hat eine bekannte Aktion; ihr Handler liegt im Modul, dem die Aktion gehört | Start-Prüfung des Servers und Test über die generierte Routen-Tabelle |
 | In-Tx-Abonnements | jedes Abonnement ist eine erlaubte Richtung (höheres Modul abonniert tieferes) | Golden-Datei der Registrierungen in `internal/wire`; Veröffentlicher und Abonnent leitet die Registrierung aus den Go-Paketen ab, nicht aus Angaben |
 | Zähler-Zugriff | nur die Phasen-Hooks von `authz`, `sync`, `audit` nutzen `instance.Counters` | Phasen-Wächter in `Counters` (Laufzeit, 8.2) und statischer Test: nur `instance`, `wire` und die Pakete der registrierten Hooks referenzieren `Counters` |
-| Doku-Abgleich | Tabellen 4.2, 4.4, 4.6, 4.7 dieses Kapitels stimmen mit dem Register überein | Vergleich im Doku-Gate |
+| Doku-Abgleich | Tabellen 4.2, 4.4, 4.6, 4.7 dieses Kapitels stimmen mit dem Register überein | `make register-check` (M1-06): vergleicht die Maschinenspalten, nicht die Prosa; hält dazu 4.5, das Komponenten-Diagramm und die Modul-READMEs |
 | Erzeugte Dateien aktuell | `.go-arch-lint.yml`, sqlc-Code, API-Code entsprechen ihrer Quelle | Neu erzeugen und `git diff --exit-code` |
 
 ## 8. Transaktionen und Unit of Work

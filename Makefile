@@ -83,7 +83,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-clients runners-check commitlint \
         review labels-check labels-sync tools-lock release-build clean \
-        codegen-check arch migrations-lint migrations-lock perf
+        codegen-check arch register-check migrations-lint migrations-lock perf
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -118,7 +118,7 @@ check: gates denylist sonar ## Every gate, identical to CI (before every push)
 gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
-gates: fmt-check codegen-check lint typecheck arch migrations-lint test coverage commitlint \
+gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint test coverage commitlint \
        docs linkcheck diagrams catalog-check api-lint \
        api-clients tokens runners-check labels-check gitleaks semgrep trivy osv licenses
 
@@ -145,7 +145,7 @@ fmt-check: ## Formatting is clean (no changes)
 lint: ## Linters: file hygiene hooks, ruff, bandit, actionlint, zizmor, component linters
 	SKIP=ruff-format,ruff-check,gitleaks-staged $(UVRUN) pre-commit run --all-files --hook-stage pre-commit
 	$(UVRUN) ruff check tools
-	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/bin tools/catalog tools/ci tools/denylist tools/design-tokens tools/docs tools/hooks tools/sonarqube
+	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/bin tools/catalog tools/ci tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/sonarqube
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -251,6 +251,10 @@ arch: ## Module boundaries of the Go modules (go-arch-lint, config generated fro
 	    [ -z "$$links" ] || { printf 'arch: %s has symbolic links; go-arch-lint does not follow them, the Go compiler does (docs/quality/gates.md):\n%s\n' "$$m" "$$links" >&2; exit 1; }; \
 	    (cd $$m && "$$gal" check --project-path "$$(pwd -P)" --arch-file .go-arch-lint.yml --output-color=false) || exit 1; \
 	  done; fi
+
+# Repository-wide like catalog-check: no SKIP, a missing source fails (exit 2).
+register-check: ## Module register equals 03, actions.yaml, the tables of 02, the component diagram and the module READMEs (ADR 0050)
+	$(UVRUN) python tools/doccheck/register_check.py
 
 migrations-lint: ## Migration rules: sequential numbers, locked checksums, STORED, NO TRANSACTION (ADR 0007)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,migrations-lint,no Go module selected under services/); \
