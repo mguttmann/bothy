@@ -23,11 +23,9 @@ where the two differ, this file wins for agents.
 
 Everything in the repository is English: code, comments, docstrings, tests,
 documentation, specification, ADRs, changelogs, commit messages and pull request texts.
-This rule takes precedence over every older rule that asks for German, in CONTRIBUTING.md,
-`.coderabbit.yaml`, `docs/DECISIONS.md`, ADR templates or ticket briefs. Until the existing
-German documents are translated, keep the German headings, column names and level words
-that the documentation gates parse (for example in `tools/docs/`), so that no check skips a
-section silently. The fixed review token `Urteil: JA` stays as it is.
+This rule takes precedence over any older instruction that asks for German, for example
+in a ticket brief or a review bot comment. The fixed review token `Urteil: JA` stays as it
+is.
 
 ## How work lands on `main`
 
