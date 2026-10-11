@@ -9,9 +9,10 @@ git at another repository for every test; the first test runs a git fixture unde
 environment and checks that the outer repository stays untouched.
 
 A fresh CI runner has no git identity, and a fixture that relied on the identity of a
-workstation failed there (`git tag -a`, exit 128). tools/conftest.py runs every test without
-one; the next tests check that no identity of the machine reaches a test and that the
-repositories of testing/git_fixtures.py commit and tag with their own.
+workstation failed there (`git tag -a`, exit 128). tools/conftest.py runs the whole test run
+without one; the next tests check that no identity of the machine reaches a test or a
+session-scoped fixture and that the repositories of testing/git_fixtures.py commit and tag
+with their own.
 """
 
 from __future__ import annotations
@@ -21,6 +22,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from git_fixtures import commit, git, init_repo
 
 TOOLS = Path(__file__).resolve().parents[2]
@@ -65,6 +67,30 @@ def test_tests_run_without_a_git_identity(tmp_path: Path) -> None:
         assert run.returncode != 0, f"{ident} is known to the tests: {run.stdout}"
 
 
+@pytest.fixture(scope="session")
+def session_fixture_identity(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> subprocess.CompletedProcess[str]:
+    """`git var` in a fixture that pytest sets up before every function-scoped one."""
+    repo = tmp_path_factory.mktemp("session-repo")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True, timeout=60)
+    return subprocess.run(
+        ["git", "-C", str(repo), "var", "GIT_AUTHOR_IDENT"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+
+
+def test_wider_scoped_fixtures_run_without_a_git_identity(
+    session_fixture_identity: subprocess.CompletedProcess[str],
+) -> None:
+    """A module or session fixture that commits without an identity fails locally too."""
+    run = session_fixture_identity
+    assert run.returncode != 0, f"a session fixture knows the identity {run.stdout}"
+
+
 def test_no_identity_of_the_machine_reaches_a_test(tmp_path: Path) -> None:
     """Every place a workstation or a calling git keeps an identity is offered to a test run."""
     sam = "[user]\n\tname = Sam Example\n\temail = sam@example.com\n"
@@ -90,9 +116,12 @@ def test_no_identity_of_the_machine_reaches_a_test(tmp_path: Path) -> None:
         GIT_COMMITTER_EMAIL="sam@example.com",
         EMAIL="sam@example.com",
     )
-    probe = "ci/tests/test_git_env_isolation.py::test_tests_run_without_a_git_identity"
+    probes = [
+        "ci/tests/test_git_env_isolation.py::test_tests_run_without_a_git_identity",
+        "ci/tests/test_git_env_isolation.py::test_wider_scoped_fixtures_run_without_a_git_identity",
+    ]
     run = subprocess.run(
-        [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", probe],
+        [sys.executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", *probes],
         cwd=TOOLS,
         env=env,
         capture_output=True,
