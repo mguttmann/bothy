@@ -242,14 +242,26 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate)
 arch: ## Module boundaries of the Go modules (go-arch-lint, config generated from the module register)
 	@# go-arch-lint does not follow a linked directory but attributes it by the path of the link,
 	@# while the compiler builds the code behind it; so no symbolic link may sit below a module
-	@# (docs/DECISIONS.md M1-05/24).
+	@# (docs/DECISIONS.md M1-05/24). Only editor lock files pass: dangling links named .#*, behind
+	@# which nothing can be built. go-arch-lint stops at any dangling link below a ** component,
+	@# so with lock files it checks a copy without them and names the files of the module (M1-05/25).
 	@if [ -z "$(GO_ON)" ]; then $(call skip,arch,no Go module selected under services/); \
 	else $(GO_PREREQS) arch || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
 	  for m in $(GO_MODS); do \
 	    [ -f $$m/.go-arch-lint.yml ] || { echo "arch: $$m/.go-arch-lint.yml is missing (generated from $$m/architecture/modules.yaml, docs/spec/02-architektur.md \"Automatische Prüfung der Regeln\")" >&2; exit 1; }; \
-	    links=$$(cd $$m && find . -type l) || exit 1; \
+	    links=$$(cd $$m && find . -type l \( ! -name '.#*' -o -exec test -e {} \; \) -print) || exit 1; \
 	    [ -z "$$links" ] || { printf 'arch: %s has symbolic links; go-arch-lint does not follow them, the Go compiler does (docs/quality/gates.md):\n%s\n' "$$m" "$$links" >&2; exit 1; }; \
-	    (cd $$m && "$$gal" check --project-path "$$(pwd -P)" --arch-file .go-arch-lint.yml --output-color=false) || exit 1; \
+	    locks=$$(cd $$m && find . -type l -name '.#*' -print) || exit 1; \
+	    if [ -z "$$locks" ]; then \
+	      (cd $$m && "$$gal" check --project-path "$$(pwd -P)" --arch-file .go-arch-lint.yml --output-color=false) || exit 1; \
+	    else \
+	      printf 'arch: %s: checking a copy without the editor lock files:\n%s\n' "$$m" "$$locks" >&2; \
+	      dir=$$(cd $$m && pwd -P) || exit 1; copy=$$(mktemp -d) || exit 1; \
+	      { tar -cf "$$copy/m.tar" --exclude='.#*' -C "$$dir" . && mkdir "$$copy/m" && tar -xf "$$copy/m.tar" -C "$$copy/m" \
+	        && view=$$(cd "$$copy/m" && pwd -P); } || { rm -rf "$$copy"; exit 1; }; \
+	      out=$$(cd "$$view" && "$$gal" check --project-path "$$view" --arch-file .go-arch-lint.yml --output-color=false 2>&1) && rc=0 || rc=$$?; \
+	      rm -rf "$$copy"; printf '%s\n' "$${out//"$$view"/$$dir}"; [ "$$rc" -eq 0 ] || exit 1; \
+	    fi; \
 	  done; fi
 
 # Repository-wide like catalog-check: no SKIP, a missing source fails (exit 2).

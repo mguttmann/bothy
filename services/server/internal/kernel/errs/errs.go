@@ -15,6 +15,7 @@
 package errs
 
 import (
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strconv"
@@ -275,6 +276,17 @@ func (e *Error) Error() string {
 		return code
 	}
 	return code + ": " + e.Detail
+}
+
+// MarshalJSON writes the exported fields under their own names, with the code of PublicCode as
+// Error() does, so an encoder that meets an Error directly never writes a code outside the closed
+// list; Cause and the wrapped error stay out. The value receiver also covers an Error value behind
+// an interface; encoding/json writes null for a nil *Error without calling it.
+func (e Error) MarshalJSON() ([]byte, error) {
+	type fields Error // same fields and tags without this method, so Marshal does not recurse
+	f := fields(e)
+	f.Code = e.PublicCode()
+	return json.Marshal(f)
 }
 
 // LogValue renders the error for log/slog as a group with code, kind (always present), detail,

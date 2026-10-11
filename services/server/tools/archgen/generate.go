@@ -187,10 +187,12 @@ type dep struct {
 }
 
 // deps lists the rules. go-arch-lint lets a component import its own packages only if the
-// component names itself in mayDependOn, so every rule starts with its own component: a module
-// has sub-packages in domain, app and adapters (sqlcgen, test helpers such as chattest), a
-// platform package its test helper (pgtest), api/routes uses api/rest (docs/DECISIONS.md M1-05/14).
-// kernel-ports has no rule: the kernel ports use no other port, only kernel-core (M1-05/15).
+// component names itself in mayDependOn or is a common component, so every rule starts with its
+// own component: a module has sub-packages in domain, app and adapters (sqlcgen, test helpers
+// such as chattest), a platform package its test helper (pgtest), api/routes uses api/rest
+// (docs/DECISIONS.md M1-05/14). kernel-core, the common component, would not need its rule and
+// keeps it for the uniform rule (M1-05/26). kernel-ports has no rule: the kernel ports use no
+// other port, only kernel-core (M1-05/15).
 func deps(r *register) []dep {
 	platforms := platformComponents(r)
 	var api []string

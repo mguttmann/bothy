@@ -495,10 +495,13 @@ Regeln: Module stehen in der Reihenfolge der Ebenen aus 4.4; `tables`, `actions`
 `ephemeral_events`, `ws_ops` und `depends_on` folgen den Tabellen 4.2, 4.6, 4.7 und 4.4. Der
 Generator lehnt unbekannte Felder, doppelte Einträge, unbekannte Module oder Vendor-Gruppen und
 Zyklen ab, dazu Schlüssel und Werte, die keine einfachen Zeichenketten sind (getaggt, etwa mit
-`!!binary`), Einträge in `testsupport.paths` unter `internal`, `cmd` oder `api`, Einträge in
-`exclude`, die als Zeichenketten-Präfix `internal`, `cmd`, `api` oder ein anderes Verzeichnis des
-Moduls treffen (go-arch-lint lässt jeden Pfad aus, der mit dem Eintrag beginnt, `in` also ganz
-`internal/`; beides nähme Produktcode aus dem Gate), und Vendor-Muster, die kein Go-Importpfad sind:
+`!!binary`, oder ohne Anführungszeichen so geschrieben, dass ein YAML-1.1-Leser wie PyYAML sie
+nicht als Zeichenkette liest, etwa `no`, `on` oder `1:20`, dazu `y`, `n`, `yes`, `no`, `on` und
+`off` in jeder Schreibweise), eine `version` außerhalb des Zehnersystems, Einträge in
+`testsupport.paths` unter `internal`, `cmd` oder `api`, Einträge in `exclude`, die als
+Zeichenketten-Präfix `internal`, `cmd`, `api` oder ein anderes Verzeichnis des Moduls treffen
+(go-arch-lint lässt jeden Pfad aus, der mit dem Eintrag beginnt, `in` also ganz `internal/`;
+beides nähme Produktcode aus dem Gate), und Vendor-Muster, die kein Go-Importpfad sind:
 Das erste Element ist eine Domain mit Punkt, die übrigen enthalten nur Buchstaben, Ziffern, `-`,
 `.`, `_` und `~`, und `**` steht nur am Ende nach mindestens zwei festen Elementen. Grund:
 go-arch-lint macht aus jedem Muster einen regulären Ausdruck und maskiert nur `.` und `/`, und
@@ -562,13 +565,15 @@ Der Auszug ist ein Teil dessen, was `tools/archgen` aus dem Beispiel in 7.1 erze
 `TestChapter02ExamplesMatchGenerator` hält Beispiel und Auszug gegen den Generator.
 
 Jede Komponente nennt sich selbst zuerst in ihrem `mayDependOn`: go-arch-lint erlaubt einer
-Komponente den Import ihrer eigenen Pakete nur dann, und das Layout aus Abschnitt 6 braucht ihn
-(Unterpakete von `domain`, `app` und `adapters`, `adapters/postgres/sqlcgen`, die Testhilfen
-`platform/<p>/<p>test` und `adapters/<modul>test`, `api/routes` ruft `api/rest`). `wire` darf
-dazu alle Modul-, Plattform- und Kernel-Komponenten nutzen, `cmd` nur `wire`, Plattform und
-`kernel-ports`. `<m>-domain` darf nur sich selbst und `kernel-core`. `kernel-ports` hat keinen
-Eintrag unter `deps`, weil go-arch-lint ein leeres `mayDependOn` ablehnt, und darf damit nur
-`kernel-core`: Die Kernel-Ports nutzen einander nicht. Abschnitt 4.5 sagt nur, dass `kernel` von
+Komponente den Import ihrer eigenen Pakete nur dann oder wenn sie unter `commonComponents` steht,
+und das Layout aus Abschnitt 6 braucht ihn (Unterpakete von `domain`, `app` und `adapters`,
+`adapters/postgres/sqlcgen`, die Testhilfen `platform/<p>/<p>test` und `adapters/<modul>test`,
+`api/routes` ruft `api/rest`). `kernel-core` steht unter `commonComponents` und bräuchte den
+Eintrag darum nicht; er bleibt der einheitlichen Regel wegen. `wire` darf dazu alle Modul-,
+Plattform- und Kernel-Komponenten nutzen, `cmd` nur `wire`, Plattform und `kernel-ports`.
+`<m>-domain` darf nur sich selbst und `kernel-core`. `kernel-ports` hat keinen Eintrag unter
+`deps`, weil go-arch-lint ein leeres `mayDependOn` ablehnt, und darf damit nur `kernel-core`: Die
+Kernel-Ports nutzen einander nicht. Abschnitt 4.5 sagt nur, dass `kernel` von
 nichts im Projekt abhängt; die engere Lesart gilt, bis ein Ticket eine Kante zwischen zwei Ports
 begründet und diese Regel in derselben Änderung anpasst. `ignoreNotFoundComponents: true` lässt
 Komponenten zu, deren Muster noch kein Verzeichnis trifft (`<m>-domain`, `<m>-app` und
@@ -579,7 +584,11 @@ Ein Paket ohne Komponente und ein unbekannter Komponentenname in `mayDependOn` s
 
 `make arch` lehnt vor go-arch-lint jeden symbolischen Link unterhalb des Moduls ab: go-arch-lint
 folgt einem verlinkten Verzeichnis nicht und ordnet es nach dem Pfad des Links zu, der
-Go-Compiler baut aber den Code dahinter.
+Go-Compiler baut aber den Code dahinter. Ausgenommen sind nur Sperrdateien von Editoren, also
+Links mit Namen `.#*`, deren Ziel nicht existiert; hinter ihnen lässt sich nichts bauen. Weil
+go-arch-lint v1.19.0 an jedem toten Link unterhalb einer Komponente mit `**` abbricht, prüft
+`make arch` dann eine Kopie des Moduls ohne diese Namen und nennt in Meldungen die Dateien des
+Moduls; der Go-Compiler übergeht Dateien mit Punkt am Anfang ohnehin.
 
 Geprüft am 2026-10-10 an einem Gerüst mit allen Modulen aus Abschnitt 4.2 (Go 1.27.2, go-arch-lint
 v1.19.0): sauberes Gerüst ergibt "No warnings found", Exitcode 0. Vier eingebaute Verstöße wurden

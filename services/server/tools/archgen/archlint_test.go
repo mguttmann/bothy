@@ -61,6 +61,12 @@ func skeleton(t *testing.T, overlay string) string {
 // go-arch-lint on it.
 func lint(t *testing.T, dir string) (code int, output string) {
 	t.Helper()
+	return lintEdited(t, dir, func(config string) string { return config })
+}
+
+// lintEdited is lint with a change to the generated config before go-arch-lint reads it.
+func lintEdited(t *testing.T, dir string, edit func(config string) string) (code int, output string) {
+	t.Helper()
 	bin := os.Getenv("GO_ARCH_LINT")
 	if bin == "" {
 		t.Fatal("set GO_ARCH_LINT to the pinned go-arch-lint (make test does this)")
@@ -69,7 +75,7 @@ func lint(t *testing.T, dir string) (code int, output string) {
 	if problems, err := checkDirectories(r, dir); err != nil || len(problems) > 0 {
 		t.Fatalf("exclude entries of the fixture hit other directories (%v):\n%s", err, formatProblems(problems))
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".go-arch-lint.yml"), mustGenerate(t, r), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".go-arch-lint.yml"), []byte(edit(string(mustGenerate(t, r)))), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -167,10 +173,42 @@ func TestArchLintTestSupport(t *testing.T) {
 // prescribes, with two or more packages in one component: adapters/postgres with sqlcgen, the
 // test helpers platform/pg/pgtest and adapters/chattest, sub-packages of domain, app and wire, a
 // package below cmd, api/routes calling api/rest and two kernel-core packages. go-arch-lint lets
-// a component import its own packages only if it names itself in mayDependOn.
+// a component import its own packages only if it names itself in mayDependOn or is a common
+// component (kernel-core, see TestArchLintSelfEntry).
 func TestArchLintChapter02Layout(t *testing.T) {
 	t.Parallel()
 	assertPasses(t, "layout")
+}
+
+// TestArchLintSelfEntry holds the reason for the self entries. Without its entry chat-domain may
+// no longer import its own sub-package; kernel-core keeps importing its other package, because
+// commonComponents already allows it to every component, itself included. Its entry stays for
+// the uniform rule (docs/DECISIONS.md M1-05/26).
+func TestArchLintSelfEntry(t *testing.T) {
+	t.Parallel()
+	drop := func(t *testing.T, entry string) func(string) string {
+		return func(config string) string {
+			if strings.Count(config, entry) != 1 {
+				t.Fatalf("generated config lacks the entry %q", entry)
+			}
+			return strings.Replace(config, entry, "", 1)
+		}
+	}
+	t.Run("kernel-core without its entry", func(t *testing.T) {
+		t.Parallel()
+		code, out := lintEdited(t, skeleton(t, "layout"), drop(t, "  kernel-core:\n    mayDependOn: [kernel-core]\n"))
+		if code != 0 || !strings.Contains(out, "No warnings found") {
+			t.Fatalf("go-arch-lint exit code %d, want 0 and \"No warnings found\":\n%s", code, out)
+		}
+	})
+	t.Run("domain without its entry", func(t *testing.T) {
+		t.Parallel()
+		code, out := lintEdited(t, skeleton(t, "layout"), drop(t, "  chat-domain:\n    mayDependOn: [chat-domain]\n"))
+		const rule = "chat-domain shouldn't depend on example.com/skeleton/internal/chat/domain/policy"
+		if code != 1 || !strings.Contains(out, rule) {
+			t.Fatalf("go-arch-lint exit code %d, want 1 and %q:\n%s", code, rule, out)
+		}
+	})
 }
 
 // The rules stay as narrow as before: naming the own component opens no other edge.

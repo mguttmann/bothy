@@ -20,14 +20,16 @@ documented in this file. The format is based on
 - `internal/kernel/clock`: system clock in UTC and a fake clock for tests.
 - `internal/kernel/errs`: error kinds with a fixed HTTP status, the closed set of public problem
   codes of `docs/spec/06-api.md` and internal causes that never reach a response; `PublicCode`
-  gives the code a response may carry.
+  gives the code a response may carry, and the error text and JSON encoding of an error carry the
+  same code.
 - Port packages of all modules of `docs/spec/02-architektur.md`, the remaining kernel packages and
   `internal/wire`, each with its package documentation.
 - Module register `architecture/modules.yaml` and the generator `tools/archgen`, which writes
   `.go-arch-lint.yml` from it; `make arch` enforces the layers and the allowed module
   dependencies. Every component may use its own packages, vendor patterns are Go import paths,
-  `exclude` entries may not hit product code or other directories, and `make arch` rejects
-  symbolic links below the module.
+  `exclude` entries may not hit product code or other directories, the register rejects plain
+  words and numbers that YAML 1.1 readers such as PyYAML read differently from yaml.v3, and
+  `make arch` rejects symbolic links below the module except editor lock files.
 - `internal/platform/config`: configuration schema with kind, default, documentation and owning
   chapter per key; loader with the precedence default < file < environment < `--role`, which
   rejects unknown `BOTHY_` variables and file keys, type, range and enum errors, missing required
@@ -42,9 +44,11 @@ documented in this file. The format is based on
 - Lint rule (forbidigo): outside `cmd/bothy` no product package reads the process environment
   (`os.Getenv` and its relatives, `exec.Cmd.Environ`, `http.ProxyFromEnvironment`); tests of
   repository tools under `tools/` are exempt.
-- Lint rules (gocognit, goconst): a function above cognitive complexity 15 or a string literal
-  written three times fails `make lint`, as the rules S3776 and S1192 of the quality gate do; tests
-  and generated code are exempt.
+- Lint rules (gocognit, goconst): `make lint` fails on a function above cognitive complexity 15,
+  as rule S3776 of the quality gate does, and on most string literals written three times in a
+  package; goconst skips some that rule S1192 counts, such as literals in call arguments, so only
+  the analysis finds those. `_test.go` files and the generated code that `sonar.exclusions` leaves
+  out are exempt.
 
 ### Security
 

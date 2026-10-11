@@ -251,9 +251,17 @@ func (w *walker) walk(n *yaml.Node, t reflect.Type, path string) {
 	case reflect.Int:
 		w.walkInt(n, path)
 	default: // string, the only other kind the register types use
-		if w.expect(n, yaml.ScalarNode, path) && n.ShortTag() != strTag {
-			w.add(n, path, "expected a string, found "+n.ShortTag())
-		}
+		w.walkString(n, path)
+	}
+}
+
+func (w *walker) walkString(n *yaml.Node, path string) {
+	switch {
+	case !w.expect(n, yaml.ScalarNode, path):
+	case n.ShortTag() != strTag:
+		w.add(n, path, "expected a string, found "+n.ShortTag())
+	case notYAML11String(n):
+		w.add(n, path, fmt.Sprintf("expected a string, found plain %q%s", n.Value, yaml11Hint))
 	}
 }
 
@@ -262,9 +270,46 @@ func (w *walker) walk(n *yaml.Node, t reflect.Type, path string) {
 // readers of the register (the checks of M1-06) would then see other names than this generator.
 const strTag = "!!str"
 
+// yaml11Typed matches the plain scalars that a YAML 1.1 reader resolves to another type than a
+// string. yaml.v3 reads the register as YAML 1.2 and keeps "no", "1:20" or "190:20:30.15" as
+// strings, PyYAML (the checks of M1-06) reads them as False, 80 and 685230.15. The alternatives
+// are the implicit resolvers of PyYAML 6.0.3 (bool, float, int, merge, null, timestamp, value);
+// the boolean words also match with y and n, which the YAML 1.1 type repository lists, and in any
+// case, as the red-team finding asked.
+var yaml11Typed = regexp.MustCompile(`^(?:` + strings.Join([]string{
+	`(?i:y|yes|n|no|on|off)|true|True|TRUE|false|False|FALSE`,
+	`[-+]?[0-9][0-9_]*\.[0-9_]*(?:[eE][-+][0-9]+)?|\.[0-9][0-9_]*(?:[eE][-+][0-9]+)?`,
+	`[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN)`,
+	`[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(?:0|[1-9][0-9_]*)|[-+]?0x[0-9a-fA-F_]+|[-+]?[1-9][0-9_]*(?::[0-5]?[0-9])+`,
+	`<<|~|null|Null|NULL|=|`,
+	`[0-9]{4}-[0-9]{2}-[0-9]{2}`,
+	`[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:[Tt]|[ \t]+)[0-9]{1,2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]*)?(?:[ \t]*(?:Z|[-+][0-9]{1,2}(?::[0-9]{2})?))?`,
+}, "|") + `)$`)
+
+// yaml11Hint ends the problem of a scalar that yaml11Typed matches.
+const yaml11Hint = ", which YAML 1.1 readers may take for another type" +
+	" (PyYAML reads the register in M1-06); quote it"
+
+// notYAML11String reports a plain, untagged scalar that a YAML 1.1 reader may not read as a
+// string. Quotes or an explicit !!str tag make it a string for every reader, except quotes behind
+// the non-specific tag ! ("! 'no'"): PyYAML resolves that like a plain scalar, and yaml.v3 keeps
+// no trace of the tag, so this check cannot see it.
+func notYAML11String(n *yaml.Node) bool {
+	return n.Style == 0 && yaml11Typed.MatchString(n.Value)
+}
+
+// decimalInt is an integer in decimal form, which YAML 1.2 and YAML 1.1 readers read alike. Some
+// other forms differ (yaml.v3 reads 0o1 as 1, PyYAML of M1-06 the string "0o1"), so only this
+// one passes.
+var decimalInt = regexp.MustCompile(`^[-+]?(0|[1-9][0-9]*)$`)
+
 func (w *walker) walkInt(n *yaml.Node, path string) {
 	if n.Kind != yaml.ScalarNode || n.ShortTag() != "!!int" {
 		w.add(n, path, "expected an integer, found "+describe(n))
+		return
+	}
+	if !decimalInt.MatchString(n.Value) {
+		w.add(n, path, fmt.Sprintf("expected a decimal integer, found %q", n.Value))
 		return
 	}
 	var v int
@@ -360,6 +405,10 @@ func (w *walker) entries(n *yaml.Node, path string, yield func(k, v *yaml.Node, 
 				found = "null"
 			}
 			w.add(k, path, "key must be a string, found "+found)
+			continue
+		}
+		if notYAML11String(k) {
+			w.add(k, path, fmt.Sprintf("key must be a string, found plain %q%s", k.Value, yaml11Hint))
 			continue
 		}
 		child := join(path, k.Value)
