@@ -6,7 +6,7 @@ asyncapi: 3.0.0
 
 info:
   title: Chat Server Gateway
-  version: 0.1.0
+  version: 0.1.1
   x-protocol-versions: [1]
   description: |-
     WebSocket gateway for people, agents and apps. Frames are JSON text frames `{"op": <name>, "d":
@@ -712,15 +712,15 @@ operations:
     - $ref: '#/channels/gateway/messages/event.interaction.created'
     - $ref: '#/channels/gateway/messages/event.command.invoked'
     - $ref: '#/channels/gateway/messages/event.agent.config_changed'
+    - $ref: '#/channels/gateway/messages/event.host.updated'
+    - $ref: '#/channels/gateway/messages/event.terminal_session.changed'
     - $ref: '#/channels/gateway/messages/event.typing.started'
     - $ref: '#/channels/gateway/messages/event.run.updated'
     - $ref: '#/channels/gateway/messages/event.agent.presence_changed'
-    - $ref: '#/channels/gateway/messages/event.command.autocomplete_requested'
-    - $ref: '#/channels/gateway/messages/event.notification.created'
-    - $ref: '#/channels/gateway/messages/event.host.updated'
-    - $ref: '#/channels/gateway/messages/event.terminal_session.changed'
     - $ref: '#/channels/gateway/messages/event.host.presence_changed'
     - $ref: '#/channels/gateway/messages/event.stats.live'
+    - $ref: '#/channels/gateway/messages/event.notification.created'
+    - $ref: '#/channels/gateway/messages/event.command.autocomplete_requested'
     x-authz-action: gateway.connect
     x-rate-limit-class: rl.gateway_connect
 

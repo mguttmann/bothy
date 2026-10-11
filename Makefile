@@ -68,7 +68,8 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference catalog catalog-check linkcheck \
-        trivy-image portability linkcheck-external diagrams tokens api-lint api-clients runners-check commitlint \
+        trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-tables api-clients \
+        runners-check commitlint \
         review labels-check labels-sync tools-lock release-build clean \
         codegen-check arch migrations-lint migrations-lock perf
 
@@ -106,7 +107,7 @@ gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
 gates: fmt-check codegen-check lint typecheck arch migrations-lint test coverage commitlint \
-       docs linkcheck diagrams catalog-check api-lint \
+       docs linkcheck diagrams catalog-check api-lint api-checks \
        api-clients tokens runners-check labels-check gitleaks semgrep trivy osv licenses
 
 # ---- code quality ---------------------------------------------------------------------
@@ -132,7 +133,7 @@ fmt-check: ## Formatting is clean (no changes)
 lint: ## Linters: file hygiene hooks, ruff, bandit, actionlint, zizmor, component linters
 	SKIP=ruff-format,ruff-check,gitleaks-staged $(UVRUN) pre-commit run --all-files --hook-stage pre-commit
 	$(UVRUN) ruff check tools
-	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/bin tools/catalog tools/ci tools/denylist tools/design-tokens tools/docs tools/hooks tools/sonarqube
+	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/bin tools/catalog tools/ci tools/denylist tools/design-tokens tools/docs tools/hooks tools/sonarqube
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -298,6 +299,12 @@ api-lint: ## Redocly lint of the OpenAPI and AsyncAPI documents
 	else cfg=""; [ -f docs/api/redocly.yaml ] && cfg="--config docs/api/redocly.yaml"; \
 	  files="docs/api/openapi.yaml"; [ -f docs/api/asyncapi.yaml ] && files="$$files docs/api/asyncapi.yaml"; \
 	  $(call need_node,redocly); REDOCLY_TELEMETRY=off $(NODE_BIN)/redocly lint $$cfg $$files; fi
+
+api-checks: ## API contract copies equal their sources (06 G2, G3)
+	$(UVRUN) python tools/api-checks/api_checks.py check
+
+api-tables: ## Regenerate the generated tables of chapter 06 and webhooks.md
+	$(UVRUN) python tools/api-checks/api_checks.py generate
 
 api-clients: ## Generated API clients compile (contract: each SDK/app provides `make -C <dir> generate-check`)
 	@found=""; for d in sdk/python sdk/typescript packages/api_client; do \

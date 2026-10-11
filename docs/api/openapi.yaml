@@ -6,7 +6,7 @@ openapi: 3.1.0
 
 info:
   title: Chat Server API
-  version: 0.1.0
+  version: 0.2.0
   summary: REST API of the team chat with agents that its instance operator hosts.
   description: |
     Normative REST contract of the chat server (spec-first, ADR 0013).
@@ -16980,10 +16980,11 @@ paths:
       summary: Register a host and issue its pairing code
       tags: [Hosts]
       description: |-
-        Creates a host in state `pairing` and returns the pairing code `bothy_hpc_...` exactly once; it is valid for `terminal.pairing_code_ttl` (24, 3.2). Needs step-up.
+        Creates a host in state `pairing` and returns the pairing code `bothy_hpc_...` exactly once; it is valid for `terminal.pairing_code_ttl` (24, 3.2). Needs step-up. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` instead of repeating it (06, 7).
       x-authz-action: host.manage
       x-rate-limit-class: rl.admin
-      x-idempotency-exempt: auth_flow
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -17275,12 +17276,12 @@ paths:
       summary: Issue a new pairing code (re-pairing)
       tags: [Hosts]
       description: |-
-        Sets the host to `pairing`, drops its keys at once, closes its connections and ends its sessions (`host_rekeyed`). Every owner gets `host.updated` with `key_changed` (24, 3.3). Needs step-up.
+        Sets the host to `pairing`, drops its keys at once, closes its connections and ends its sessions (`host_rekeyed`). Every owner gets `host.updated` with `key_changed` (24, 3.3). Needs step-up. The code is a one-time secret: a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` instead of repeating it (06, 7).
       x-authz-action: host.manage
       x-rate-limit-class: rl.admin
-      x-idempotency-exempt: auth_flow
       parameters:
       - $ref: '#/components/parameters/HostIdPath'
+      - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -17323,6 +17324,8 @@ paths:
           $ref: '#/components/responses/NotFound'
         '409':
           $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         default:
@@ -20385,7 +20388,7 @@ components:
           $ref: '#/components/headers/Correlation-Id'
     Conflict:
       x-status: 409
-      description: 'Problem codes: `conflict`, `request_in_progress`, `i1_violation`, `i6_violation`, `last_owner`, `already_started`, `billing_mode_mismatch`, `tool_class_mismatch`, `invalid_state_transition`, `base_version_conflict`, `component_used`, `operator_mismatch`, `file_not_ready`, `title_manual`, `host_unavailable`, `fingerprint_mismatch`, `file_blocked`.'
+      description: 'Problem codes: `conflict`, `request_in_progress`, `i1_violation`, `i6_violation`, `last_owner`, `already_started`, `billing_mode_mismatch`, `tool_class_mismatch`, `invalid_state_transition`, `base_version_conflict`, `component_used`, `operator_mismatch`, `file_not_ready`, `file_blocked`, `title_manual`, `host_unavailable`, `fingerprint_mismatch`.'
       content:
         application/problem+json:
           schema:
