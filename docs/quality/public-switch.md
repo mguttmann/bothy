@@ -71,7 +71,9 @@ request.
     `ci-ok`, linear history, signed commits, no force push, no deletion); in addition
     "Require actions to be pinned to a full-length commit SHA" in the Actions settings and,
     in the general settings, the squash commit message "Pull request title and description"
-    (push-discipline.md).
+    (push-discipline.md;
+    [configuring commit squashing](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/configuring-commit-squashing-for-pull-requests),
+    retrieved 2026-10-11).
 15. **Environments** `release`, `release-apple` and `release-windows` with required reviewers and
     tag rule `*/v*` and `v*`; `github-pages` for the docs.
 
