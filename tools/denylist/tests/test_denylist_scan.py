@@ -7,11 +7,11 @@ tools/denylist/testdata/example-denylist.txt (invented, neutral words).
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import denylist_scan as ds
 import pytest
+from git_fixtures import commit, git, init_repo
 
 TESTDATA = Path(__file__).resolve().parents[1] / "testdata"
 EXAMPLE_LIST = TESTDATA / "example-denylist.txt"
@@ -26,35 +26,9 @@ def _isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(name, raising=False)
 
 
-def git(repo: Path, *args: str, env: dict[str, str] | None = None) -> str:
-    import os
-
-    full_env = {**os.environ, **(env or {})}
-    return subprocess.run(
-        ["git", "-C", str(repo), *args], check=True, capture_output=True, text=True, env=full_env
-    ).stdout
-
-
-def commit(repo: Path, message: str, *, author: str = "Alex Example <alex@example.com>") -> None:
-    name, email = author[:-1].split(" <")
-    env = {
-        "GIT_AUTHOR_NAME": name,
-        "GIT_AUTHOR_EMAIL": email,
-        "GIT_COMMITTER_NAME": name,
-        "GIT_COMMITTER_EMAIL": email,
-    }
-    git(repo, "add", "-A")
-    git(repo, "commit", "-q", "--allow-empty", "-m", message, env=env)
-
-
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
-    r = tmp_path / "repo"
-    r.mkdir()
-    git(r, "init", "-q", "-b", "main")
-    git(r, "config", "commit.gpgsign", "false")
-    git(r, "config", "tag.gpgsign", "false")
-    git(r, "config", "core.hooksPath", "/dev/null")
+    r = init_repo(tmp_path / "repo")
     (r / "README.md").write_text("# Demo\n\nNothing to see.\n")
     commit(r, "docs: start")
     return r

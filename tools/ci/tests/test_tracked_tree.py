@@ -3,30 +3,22 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import pytest
 import tracked_tree as tt
-
-
-def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+from git_fixtures import commit, init_repo
 
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
-    root = tmp_path / "repo"
-    root.mkdir()
-    _git(root, "init", "-q", "-b", "main")
-    _git(root, "config", "commit.gpgsign", "false")
+    root = init_repo(tmp_path / "repo")
     (root / ".gitignore").write_text("cache/\n.claude/worktrees/\n")
     (root / "tracked.txt").write_text("committed\n")
     (root / "deleted.txt").write_text("gone\n")
     (root / "sub").mkdir()
     (root / "sub" / "nested.tf").write_text("resource {}\n")
-    _git(root, "add", ".")
-    _git(root, "-c", "user.name=Alex", "-c", "user.email=alex@example.com", "commit", "-qm", "x")
+    commit(root, "x")
     (root / "tracked.txt").write_text("changed in the working tree\n")
     (root / "deleted.txt").unlink()
     (root / "new.txt").write_text("not yet added\n")

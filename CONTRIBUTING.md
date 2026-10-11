@@ -108,9 +108,17 @@ file name and, with `BOTHY_CODERABBIT=1`, also runs the CodeRabbit CLI.
   language enforce it (ruff `D` for Python, see chapter 23 "Doku im Code").
 - No en dashes or em dashes anywhere (the `text-rules` hook rejects them); use a hyphen
   or rephrase.
-- Example credentials in documentation and tests contain the word `EXAMPLE` (for example
-  `whsec_EXAMPLE...`), so that the secret scan can tell them from real ones. Identifiers
-  in examples are UUIDs, people are Alex, Sam and Robin, domains are `example.com`.
+- Example credentials in documentation and tests contain the word `EXAMPLE`, so that the
+  secret scan can tell them from real ones. The marker exempts only formats that GitHub
+  secret scanning does not know (Bothy's own tokens, generic key-like values): GitHub
+  ignores the word, so an example for a third-party provider's credential stays shorter than
+  that provider's format (for example `whsec_EXAMPLE`), and a test that needs a full-length
+  sample assembles it at runtime. gitleaks (for the formats its rules know) and the
+  `secret-formats` hook (`whsec_`) reject such values; not every GitHub pattern is covered
+  ([what the gates do not cover](docs/quality/gates.md#was-die-gates-nicht-abdecken), with
+  GitHub's [supported patterns](https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns), retrieved 2026-10-11).
+  Identifiers in examples are UUIDs, people are Alex, Sam and Robin, domains are
+  `example.com`.
 - Diagrams are Mermaid sources (`.mmd`) with the rendered `.svg` next to them, or
   ```` ```mermaid ```` blocks in Markdown; `make diagrams` renders all of them.
 - Every component has a `CHANGELOG.md` in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)

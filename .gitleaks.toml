@@ -74,14 +74,22 @@ keywords = ["squ_", "sqp_", "sqa_"]
 
 [[allowlists]]
 description = "Example credentials in documentation and tests carry the marker EXAMPLE (CONTRIBUTING.md); real credentials never do"
+# Only for formats that GitHub secret scanning does not know: this product's own tokens and
+# generic key-like values. GitHub ignores the marker, so an example in a third-party format
+# stays short of that format instead (CONTRIBUTING.md, tools/hooks/secret_formats.py). The
+# default generic rule ignores the word on its own; naming it keeps that if the default changes.
+targetRules = ["bothy-api-token", "generic-api-key"]
 stopwords = ["example"]
 
 [[allowlists]]
 description = "Fake example values in the history of docs/api/openapi.yaml, committed before the EXAMPLE marker rule. Exact values only; they occur only in the private planning history, the published commit without parents carries them only in this entry (docs/quality/public-switch.md, step 2)"
+# The webhook value is written with the character class [_], so that this file holds no
+# value in a provider format: GitHub secret scanning reads it as text
+# (tools/hooks/secret_formats.py).
 targetRules = ["standard-webhooks-secret", "generic-api-key"]
 regexTarget = "secret"
 regexes = [
-  '''^whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw$''',
+  '''^whsec[_]MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw$''',
   '''^agt_7Hq2\.kJ8sV2pQ0wX5yZ1aB3cD4eF6gH$''',
   '''^a1b2c3d4e5f6$''',
   '''^eyJhbGciOiJFZERTQSIsImtpZCI6Imludi0yMDI2LTEwIn0\.e30\.sig2$''',

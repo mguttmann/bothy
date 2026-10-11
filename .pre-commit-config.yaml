@@ -43,6 +43,11 @@ repos:
         entry: uv run --project tools --locked --quiet python tools/hooks/text_rules.py
         language: system
         types: [text]
+      - id: secret-formats
+        name: no Stripe webhook secret format (whsec_, GitHub secret scanning)
+        entry: uv run --project tools --locked --quiet python tools/hooks/secret_formats.py
+        language: system
+        types: [text]
       - id: ruff-format
         name: ruff format (tools)
         entry: uv run --project tools --locked --quiet ruff format --check

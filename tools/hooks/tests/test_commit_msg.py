@@ -3,13 +3,18 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from pathlib import Path
 
 import commit_msg
 import pytest
+from git_fixtures import commit, git, init_repo
 
 ALEX = "Alex Example <alex@example.com>"
+REPO = Path(__file__).resolve().parents[3]
+# The test may run under `make test`; its make flags must not reach the make run below.
+_MAKE_VARIABLES = {"MAKEFLAGS", "MAKELEVEL", "MFLAGS"}
 
 
 def _check(
@@ -95,33 +100,20 @@ def test_merge_commit_message_is_accepted() -> None:
     assert _check("Merge branch 'main' into feat/x\n") == []
 
 
-def _git(repo: Path, *args: str) -> str:
-    return subprocess.run(
-        ["git", "-C", str(repo), *args], check=True, capture_output=True, text=True
-    ).stdout
-
-
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
-    _git(tmp_path, "init", "-q", "-b", "main")
-    _git(tmp_path, "config", "user.name", "Alex Example")
-    _git(tmp_path, "config", "user.email", "alex@example.com")
-    _git(tmp_path, "config", "commit.gpgsign", "false")
-    _git(tmp_path, "config", "core.hooksPath", "/dev/null")
+    init_repo(tmp_path)
     (tmp_path / "a").write_text("a\n")
-    _git(tmp_path, "add", "a")
-    _git(tmp_path, "commit", "-q", "-m", "chore: start")
+    commit(tmp_path, "chore: start")
     return tmp_path
 
 
 def test_range_mode_checks_every_commit(repo: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    base = _git(repo, "rev-parse", "HEAD").strip()
+    base = git(repo, "rev-parse", "HEAD").strip()
     (repo / "b").write_text("b\n")
-    _git(repo, "add", "b")
-    _git(repo, "commit", "-q", "-s", "-m", "feat: add b")
+    commit(repo, "feat: add b", signoff=True)
     (repo / "c").write_text("c\n")
-    _git(repo, "add", "c")
-    _git(repo, "commit", "-q", "-m", "fix CI")
+    commit(repo, "fix CI")
     rc = commit_msg.main(["--repo", str(repo), "--range", f"{base}..HEAD", "--require-signoff"])
     out = capsys.readouterr().out
     assert rc == 1
@@ -130,10 +122,9 @@ def test_range_mode_checks_every_commit(repo: Path, capsys: pytest.CaptureFixtur
 
 
 def test_range_mode_passes_for_clean_range(repo: Path) -> None:
-    base = _git(repo, "rev-parse", "HEAD").strip()
+    base = git(repo, "rev-parse", "HEAD").strip()
     (repo / "b").write_text("b\n")
-    _git(repo, "add", "b")
-    _git(repo, "commit", "-q", "-s", "-m", "feat: add b")
+    commit(repo, "feat: add b", signoff=True)
     assert (
         commit_msg.main(["--repo", str(repo), "--range", f"{base}..HEAD", "--require-signoff"]) == 0
     )
@@ -143,3 +134,35 @@ def test_file_mode_reads_message_file(repo: Path, tmp_path: Path) -> None:
     msg = tmp_path / "MSG"
     msg.write_text("feat: x\n\nSigned-off-by: Alex Example <alex@example.com>\n")
     assert commit_msg.main(["--repo", str(repo), "--require-signoff", str(msg)]) == 0
+
+
+def test_file_mode_without_signoff_needs_no_identity(tmp_path: Path) -> None:
+    """Without --require-signoff the message alone counts; tests have no git identity."""
+    repo = tmp_path / "plain"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True, timeout=60)
+    msg = tmp_path / "MSG"
+    msg.write_text("fix: keep the gates green\n")
+    assert commit_msg.main(["--repo", str(repo), str(msg)]) == 0
+
+
+@pytest.mark.parametrize(
+    ("title", "passes"),
+    [("fix: keep the gates green", True), ("Keep the gates green", False)],
+    ids=["conventional title", "plain title"],
+)
+def test_commitlint_recipe_checks_the_pull_request_title(title: str, *, passes: bool) -> None:
+    """The CI job gates sets PR_TITLE on every pull request, on a runner without git identity."""
+    env = {k: v for k, v in os.environ.items() if k not in _MAKE_VARIABLES}
+    env.update(COMMIT_RANGE="HEAD..HEAD", PR_TITLE=title)
+    run = subprocess.run(
+        ["make", "-s", "-C", str(REPO), "commitlint"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+    output = run.stdout + run.stderr
+    assert "CalledProcessError" not in output, output
+    assert (run.returncode == 0) is passes, output
+    assert ("commit message: " in run.stdout) is not passes, output
