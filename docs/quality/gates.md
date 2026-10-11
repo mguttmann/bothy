@@ -29,6 +29,7 @@ Source of the diagram: `docs/quality/pipeline.mmd`.
 | `catalog-check` | `tools/catalog/action_catalog.py` | `docs/spec/actions.yaml` valid (schema, unique IDs, rate-limit classes, receive actions, ops without a system action), equal to the hand-maintained parts of chapter 05 (scopes for apps, effect, configuration values of the classes); the generated tables in 05 and lists in `docs/api/redocly.yaml` are current ([ADR 0049](../adr/0049-machine-readable-action-catalogue-as-the-single-source.md)) | | yes |
 | `api-lint` | Redocly CLI with `docs/api/redocly.yaml` | OpenAPI and AsyncAPI, requirement of `x-authz-action` | | once `docs/api/openapi.yaml` exists |
 | `api-checks` | `tools/api-checks/api_checks.py` | copies of the API contracts equal their sources (chapter 06, G2 and G3): `x-authz-action`, `x-rate-limit-class`, ops, events, receive actions, scopes (`AppScope`) and the union `Event` in `openapi.yaml` and `asyncapi.yaml` equal `docs/spec/actions.yaml`, close codes equal 04, `Idempotency-Key` or `x-idempotency-exempt` with a known reason on every POST and PATCH, deprecation dates against `api.deprecation_min_notice`, `x-problem-codes` and `x-status` complete; the generated tables in 06 and `docs/api/webhooks.md` are current ([README](../../tools/api-checks/README.md)) | | yes |
+| `ops-check` | `tools/opscheck/opscheck.py` with the pinned validators otelcol-contrib, promtool, amtool, loki, tempo, sloth and tofu ([README](../../tools/opscheck/README.md)) | collector base alone, with each overlay and with every ordered pair of two overlays; Prometheus configuration, rules and rule unit tests (every hand-written alert has one); Alertmanager configuration and routing; Loki; Tempo; OpenTofu modules; generated SLO rules equal to a fresh Sloth generation; SLO table equal to the Sloth files; collector allowlist equal to the signal catalogue; alert thresholds equal to their configuration values; validator versions equal to the image versions of the Compose stack | | yes |
 | `api-clients` | target `generate-check` of the client packages | generated clients are up to date and compile | | from the first client package |
 | `tokens` | target `check` in `tools/design-tokens/` | tests of the generator; design tokens build, contrast and palette guard checks pass, generated files up to date, embedded files match `vendor/MANIFEST.json` | | yes |
 | `runners-check` | `tools/ci/check_runners.py` | Only fixed GitHub-hosted runner labels (ADR 0039), triggers, SHA pinning, timeouts, permissions; in jobs with environment `release*`, outputs of jobs without this environment only in the `if:` of the job or of a step (allow-list D-W-61, D-W-72), artifacts only via `artifact-ids` (D-W-52); matrix values in `runs-on` checked per combination, no runtime matrix behind `runs-on` (D-W-53); release workflows are called only by a job of `release.yml` without a matrix (D-W-73); `push` only on tags, except `denylist-main.yml` on `main` | | yes |
@@ -167,3 +168,18 @@ example a JSON report), `DENYLIST_FLAGS` (for example `--reveal` locally).
   can therefore pass the gates and still raise an alert on push; only the `whsec_` format has
   its own check with a wider margin (`tools/hooks/secret_formats.py`). Examples therefore
   stay short of every third-party format (CONTRIBUTING.md).
+* `ops-check` checks the files with the same tools and versions as the running components, but
+  does not start them. What fails only in operation (a target is unreachable, a secret is wrong, a
+  component rejects a value only at start) shows in the portability test. `ops-check` does not
+  check Grafana dashboards and their provisioning: `signal-check` (PLAN M1-68) checks the metric
+  names and the PromQL of the dashboards, the portability test the provisioning.
+* An OpenTofu module with providers or remote module sources must pass `tofu init` offline.
+  `ops-check` gives `tofu` an empty local mirror as its only provider source and every validator
+  a closed proxy, so that the gate downloads nothing from the network; such a module fails until
+  the ticket with the first provider defines a pinned way without network.
+* That no validator reaches the network is proven by a test only on macOS
+  (`test_no_validator_reaches_the_network` in `tools/opscheck/tests/`, with `sandbox-exec`). On
+  Linux, so in CI, there is no equivalent lock in the test; there the closed proxy and
+  `GCE_METADATA_HOST` work without a proof of their own.
+* `otelcol-contrib validate` accepts unknown keys under some exporters (seen on 2026-10-11 with
+  0.162.0: `otlp_http`); a typo in an optional key of such an exporter shows only in operation.

@@ -158,10 +158,15 @@ of this chapter; the views of the apps read only the project's own statistics AP
    collector allowlist is in the catalogue.
 3. Cardinality test: metric attributes only from finite sets; no IDs on metrics.
 4. Name test: every metric used in dashboards, rules and SLOs is in the catalogue.
-5. `promtool check rules`, `amtool check-config`, `otelcol-contrib validate`, Grafana provisioning
-   in the portability test.
-6. SLO docs check: targets and thresholds in [slos.md](../observability/slos.md) equal to the
-   Sloth files; generated rules equal to a fresh generation.
+5. `make ops-check`: `otelcol-contrib validate` for base, overlays and pairs (check `collector`),
+   `promtool check config`, `check rules` and `test rules` (checks `prometheus-config`,
+   `prometheus-rules`, `prometheus-rule-tests`), `amtool check-config` with routing (check
+   `alertmanager`), Loki, Tempo and OpenTofu (checks `loki`, `tempo`, `tofu`); alert thresholds
+   equal to their configuration values (check `alert-thresholds`). Grafana provisioning in the
+   portability test.
+6. `make ops-check`, checks `slo-docs` and `sloth`: targets and thresholds in
+   [slos.md](../observability/slos.md) equal to the Sloth files; generated rules equal to a
+   fresh generation.
 7. SLI boundary check: the generated boundaries of the own measurement equal to a fresh generation
    from the Sloth files; every SLO has a `sli.*` metric in `stats_minutes` (25, VZ-T02, VZ-T03).
 

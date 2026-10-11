@@ -8,6 +8,7 @@ import io
 import json
 import stat
 import tarfile
+import zipfile
 from pathlib import Path
 
 import fetch_tools
@@ -24,6 +25,17 @@ def _tar_gz(members: dict[str, bytes]) -> bytes:
             info.size = len(data)
             info.mode = 0o755
             tf.addfile(info, io.BytesIO(data))
+    return buf.getvalue()
+
+
+def _zip(members: dict[str, tuple[bytes, int]]) -> bytes:
+    """Zip archive whose entries carry the given Unix mode (file type bits included)."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for name, (data, mode) in members.items():
+            info = zipfile.ZipInfo(name)
+            info.external_attr = mode << 16
+            zf.writestr(info, data)
     return buf.getvalue()
 
 
@@ -74,8 +86,26 @@ def downloads(monkeypatch: pytest.MonkeyPatch) -> FakeNet:
 def test_repository_lock_is_valid() -> None:
     lock = fetch_tools.load_lock(REPO_LOCK)
     assert set(lock["tools"]) >= {"actionlint", "gitleaks", "lychee", "osv-scanner", "trivy"}
+    # Validators of `make ops-check` (tools/opscheck).
+    assert set(lock["tools"]) >= {
+        "otelcol-contrib",
+        "promtool",
+        "amtool",
+        "loki",
+        "tempo",
+        "sloth",
+        "tofu",
+    }
     for tool in lock["tools"].values():
         assert set(tool["assets"]) == set(fetch_tools.PLATFORMS)
+
+
+def test_repository_lock_entries_keep_the_renovate_key_order() -> None:
+    """The Renovate regex manager reads `"<name>": {"version": ..., "repo": ...}` in this order."""
+    lock = json.loads(REPO_LOCK.read_text(encoding="utf-8"))
+    for name, tool in lock["tools"].items():
+        keys = [k for k in tool if k != "hold"]
+        assert keys == ["version", "repo", "tag", "license", "binary", "assets"], name
 
 
 def test_repository_lock_has_the_refresh_layout() -> None:
@@ -156,6 +186,78 @@ def test_ensure_rejects_missing_member(tmp_path: Path, downloads: FakeNet) -> No
     lock = _lock("demo.tar.gz", "demo", payload)
     downloads["https://github.com/example/demo/releases/download/v1.2.3/demo.tar.gz"] = payload
     with pytest.raises(fetch_tools.FetchError, match="not in archive"):
+        fetch_tools.ensure(lock, "demo", "linux-amd64", tmp_path)
+
+
+ZIP_URL = "https://github.com/example/demo/releases/download/v1.2.3/demo-linux-amd64.zip"
+
+
+def test_ensure_extracts_zip_member(tmp_path: Path, downloads: FakeNet) -> None:
+    """Loki publishes only zip assets; the member is read like a tar member."""
+    payload = _zip(
+        {
+            "demo-linux-amd64": (b"#!/bin/sh\necho zip\n", stat.S_IFREG | 0o755),
+            "README": (b"r", stat.S_IFREG | 0o644),
+        }
+    )
+    lock = _lock("demo-linux-amd64.zip", "demo-linux-amd64", payload)
+    downloads[ZIP_URL] = payload
+
+    path = fetch_tools.ensure(lock, "demo", "linux-amd64", tmp_path)
+
+    assert path.read_bytes() == b"#!/bin/sh\necho zip\n"
+    assert path.stat().st_mode & stat.S_IXUSR
+
+
+@pytest.mark.parametrize("mode", [0, 0o644])
+def test_ensure_extracts_zip_member_without_file_type(
+    tmp_path: Path, downloads: FakeNet, mode: int
+) -> None:
+    """Zip tools on other systems leave the file type bits empty; such an entry still counts."""
+    payload = _zip({"demo-linux-amd64": (b"bin", mode)})
+    lock = _lock("demo-linux-amd64.zip", "demo-linux-amd64", payload)
+    downloads[ZIP_URL] = payload
+    assert fetch_tools.ensure(lock, "demo", "linux-amd64", tmp_path).read_bytes() == b"bin"
+
+
+def test_ensure_rejects_missing_zip_member(tmp_path: Path, downloads: FakeNet) -> None:
+    payload = _zip({"other": (b"x", stat.S_IFREG | 0o755)})
+    lock = _lock("demo-linux-amd64.zip", "demo-linux-amd64", payload)
+    downloads[ZIP_URL] = payload
+    with pytest.raises(fetch_tools.FetchError, match="not in archive"):
+        fetch_tools.ensure(lock, "demo", "linux-amd64", tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("member", "mode"),
+    [
+        ("demo-linux-amd64/", stat.S_IFDIR | 0o755),  # directory entry as zip writes it
+        ("demo-linux-amd64", stat.S_IFDIR | 0o755),  # directory by its mode only
+        ("demo-linux-amd64", stat.S_IFLNK | 0o777),  # symbolic link
+    ],
+)
+def test_ensure_rejects_zip_member_that_is_not_a_regular_file(
+    tmp_path: Path, downloads: FakeNet, member: str, mode: int
+) -> None:
+    payload = _zip({member: (b"", mode)})
+    lock = _lock("demo-linux-amd64.zip", member, payload)
+    downloads[ZIP_URL] = payload
+    with pytest.raises(fetch_tools.FetchError, match="not a regular file"):
+        fetch_tools.ensure(lock, "demo", "linux-amd64", tmp_path)
+    assert not (tmp_path / "demo" / "1.2.3" / "demo").exists()
+
+
+def test_ensure_rejects_tar_member_that_is_a_directory(tmp_path: Path, downloads: FakeNet) -> None:
+    """Tar behaviour is unchanged by the zip support: a directory member still fails."""
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+        info = tarfile.TarInfo("demo")
+        info.type = tarfile.DIRTYPE
+        tf.addfile(info)
+    payload = buf.getvalue()
+    lock = _lock("demo.tar.gz", "demo", payload)
+    downloads["https://github.com/example/demo/releases/download/v1.2.3/demo.tar.gz"] = payload
+    with pytest.raises(fetch_tools.FetchError, match="not a regular file"):
         fetch_tools.ensure(lock, "demo", "linux-amd64", tmp_path)
 
 

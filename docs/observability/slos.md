@@ -2,7 +2,7 @@
 
 Status: draft M0. Decision: ADR 0035. The source of all numbers is the Sloth files under
 [infra/observability/slo/](../../infra/observability/slo/); the table below reproduces them.
-A check compares table and files (build ticket "SLO docs check").
+`make ops-check` compares table and files (check `slo-docs`).
 
 ## 1. Principles
 
@@ -62,14 +62,22 @@ An alert fires only when both windows are above the threshold.
 
 ## 4. Generate and check
 
+After a change to a Sloth file, regenerate the rules with the pinned Sloth and run the gate:
+
 ```
-sloth generate -i infra/observability/slo/api.yaml -o infra/observability/prometheus/rules/slo-api.yaml
-promtool check rules infra/observability/prometheus/rules/*.yaml
+sloth=$(uv run --project tools --locked --quiet python tools/bin/fetch_tools.py path sloth)
+"$sloth" generate --no-log -i infra/observability/slo/api.yaml -o infra/observability/prometheus/rules/slo-api.yaml
+make ops-check
 ```
 
-The generated files are checked in and carry the header "DO NOT EDIT". A check regenerates them
-and compares (no difference allowed). Generated locally on 2026-10-10 with Sloth v0.16.0 and
-checked with `promtool` from Prometheus v3.15.0: valid [verified].
+The generated files are checked in and carry the header "DO NOT EDIT". `make ops-check`
+regenerates them and compares byte for byte (check `sloth`; no difference allowed, and every
+generated file needs its Sloth file), checks all rules with `promtool check rules` (check
+`prometheus-rules`) and the table in section 2 against the Sloth files (check `slo-docs`: rows,
+target with one decimal, with more only where one would round the target, threshold from the
+`le` selector of the error query, alert according to `page_alert.disable`). Generated locally
+on 2026-10-10 with Sloth v0.16.0 and checked with `promtool` from Prometheus v3.15.0: valid
+[verified].
 
 ## 5. Visibility
 

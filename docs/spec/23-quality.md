@@ -38,6 +38,7 @@ The complete list with tool, threshold and where it runs is in
 | Code | `fmt-check`, `codegen-check`, `lint`, `typecheck`, `arch`, `migrations-lint`, `test`, `coverage` | Format, generated code without drift, linters, types, module boundaries of the Go modules, migration rules, tests with coverage per component |
 | Commits | `commitlint` | Conventional Commits and DCO sign-off of the new commits |
 | Docs | `docs`, `linkcheck`, `diagrams`, `catalog-check`, `api-lint`, `api-checks`, `api-clients`, `tokens` | Strict site build, links and anchors, diagrams, action catalogue and its generated copies, API contracts, copies of the API contracts equal to their sources, generated clients, design tokens |
+| Operations | `ops-check` | collector, Prometheus, Alertmanager, Loki, Tempo, Sloth, OpenTofu; derived values equal their source |
 | CI rules | `runners-check`, `labels-check` | GitHub-hosted runners, triggers, SHA pinning, timeouts, permissions; labels |
 | Security | `gitleaks`, `denylist`, `semgrep`, `trivy`, `osv` | Secrets, white label, project rules, misconfiguration, known vulnerabilities |
 | Legal | `licenses` | License text, SPDX header lines, licenses of the dependencies |
