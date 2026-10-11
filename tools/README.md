@@ -22,9 +22,9 @@ Versionen laufen wie in CI. Einrichtung einmal je Klon: `make bootstrap`.
 | `opscheck/` | Betriebs-Konfiguration (Collector, Prometheus, Alertmanager, Loki, Tempo, Sloth, OpenTofu) mit den gepinnten Validatoren prüfen; abgeleitete Werte gleich ihrer Quelle ([README](opscheck/README.md)) | `ops-check` | `opscheck/tests/` |
 | `hooks/text_rules.py` | keine Gedankenstriche (U+2013, U+2014) in Textdateien | pre-commit, `lint` | `hooks/tests/` |
 | `hooks/commit_msg.py` | Conventional Commits und DCO-Sign-off | commit-msg, `commitlint` | `hooks/tests/` |
+| `configdoc/configdoc.py`, `configdoc/planned.yaml`, `configdoc/retired.yaml` | Abschnitt 4 der Konfigurationsreferenz aus dem Schema des Servers (`services/server/architecture/config-schema.json`) und den Kapiteltabellen erzeugen und prüfen (Regeln D1 bis D10: doppelte Namen, Schema gegen Kapitel, Etappen geplanter Schlüssel, abgelöste Namen aus W1, Compose-Frist, Umgebungsnamen, Aktualität); die Tests halten die Erkennung von Code gegen den CommonMark-Parser `markdown-it-py` | `config-reference`, `config-doc-check` | `configdoc/tests/` |
 | `denylist/` | White-Label-Scanner mit privater Liste und öffentlichen Regeln ([README](denylist/README.md)) | `denylist`, `denylist-history` | `denylist/tests/` |
 | `docs/adr_index.py` | ADR-Index erzeugen und prüfen | `adr-index`, `docs` | `docs/tests/` |
-| `docs/config_reference.py` | Abschnitt 4 der Konfigurationsreferenz aus den Kapiteltabellen erzeugen und prüfen, doppelte Namen ablehnen | `config-reference`, `docs` | `docs/tests/` |
 | `docs/render_diagrams.py` | jedes Mermaid-Diagramm rendert | `diagrams` | `docs/tests/` |
 | `docs/mkdocs_repo_links.py` | MkDocs-Hook: Links auf vorhandene Dateien außerhalb von `docs/` zeigen in der Site auf das Repository | `docs` | `docs/tests/` |
 | `catalog/` | Aktionskatalog `docs/spec/actions.yaml` laden und prüfen, Tabellen von Kapitel 05 und Listen in `docs/api/redocly.yaml` daraus erzeugen ([README](catalog/README.md)) | `catalog`, `catalog-check` | `catalog/tests/` |

@@ -21,6 +21,7 @@ selben make-Ziel in GitHub Actions. Alle Gate-Werkzeuge laufen an beiden Orten.
 | `pytest` | `9.1.1` | Tests der Werkzeuge | MIT | Standard |
 | `pytest-cov` | `7.1.0` | Abdeckung in pytest | MIT | Standard |
 | `coverage` | `7.16.2` | Abdeckungsschwelle | Apache-2.0 | Grundlage von pytest-cov |
+| `markdown-it-py` | `4.2.0` | CommonMark-Parser als Orakel in den Tests von `tools/configdoc` (Code-Spans und Code-Blöcke für Regel D7) | MIT | Referenz-Implementierung von CommonMark mit GFM-Tabellen; nur in Tests, das Werkzeug selbst bleibt bei Standardbibliothek und PyYAML |
 | `pre-commit` | `4.6.2` | Hooks für commit, commit-msg, pre-push | MIT | verbreitet, Hooks als Datei im Repository |
 | `pre-commit-hooks` | `v6.0.0` | Datei-Hygiene-Hooks | MIT | gepflegte Standard-Hooks, per Commit-SHA gepinnt |
 | `check-jsonschema` | `0.38.2` | Schema-Prüfung von Issue-Formularen, Renovate- und CodeRabbit-Konfiguration | Apache-2.0 | bringt die Schemas der Formate mit |

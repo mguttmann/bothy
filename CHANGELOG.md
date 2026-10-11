@@ -66,6 +66,10 @@ Planning stage (milestone M0). Nothing is installable yet.
   `tofu`); `tools/bin/fetch_tools.py` reads zip release assets. Every hand-written alert has
   `promtool` unit tests. Renovate updates the helper images of the Compose stack in one group
   "Compose-Images" and leaves their validators to `make tools-lock`.
+- `make config-doc-check` in `make gates` (`tools/configdoc/configdoc.py`): the configuration
+  reference against the server schema, the chapter tables, the etappe of planned keys
+  (`tools/configdoc/planned.yaml`), the names retired by W1 (`tools/configdoc/retired.yaml`) and
+  the Compose `stop_grace_period` of every service that runs `serve` (rules D1 to D10).
 
 ### Changed
 
@@ -82,6 +86,13 @@ Planning stage (milestone M0). Nothing is installable yet.
   rules gocognit and goconst of the server module.
 - The CI path filter selects the server component for a change to `docs/spec/actions.yaml`,
   from which the server generates its route table and action catalogue.
+- Configuration reference: section 4 of `docs/operations/configuration.md` is generated from the
+  configuration schema of the server plus the chapter tables, with the new columns type and state
+  (`aktiv` for keys this server version reads, `geplant (<etappe>)` for keys of a later ticket);
+  the generator moved from `tools/docs/config_reference.py` to `tools/configdoc/`, and `make docs`
+  no longer checks the reference.
+- `docs/PLAN.md`: the W1 rows for trusted proxies and database timeouts and the acceptance test of
+  M3-06 follow the chapters.
 
 ### Fixed
 

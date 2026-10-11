@@ -62,6 +62,9 @@ documented in this file. The format is based on
 - `internal/wire`: `MountRoutes`, start step 7 of the roles `api` and `all`, which builds the
   routes from the composite of module handlers; a failed route check logs `route check failed`,
   mounts nothing and returns the error, on which `bothy serve` (M1-11) is to exit before ready.
+- `tools/configschema`: exports the configuration schema to `architecture/config-schema.json`
+  (`go generate ./tools/configschema`, held current by `make codegen-check`), the input of the
+  configuration reference.
 
 ### Changed
 

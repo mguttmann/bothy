@@ -1,0 +1,185 @@
+# SPDX-License-Identifier: Apache-2.0
+# Etappe of chapter keys with place Server that are not in the schema yet (config-doc rule D6).
+# The etappe is that of the first ticket in docs/PLAN.md (or its M1 brief) whose row names the
+# key, its prefix or the feature that reads it; without such a row, the etappe that builds the
+# chapter's module. The comment names the deciding tickets. A rule whose keys all entered the
+# schema is stale and goes (docs/operations/configuration.md section 10).
+rules:
+  - match: "agent."  # M2-07 to M2-20
+    etappe: M2
+  - match: agent.invocation_token_ttl  # M1-32
+    etappe: M1
+  - match: agent.jwks_max_age  # M1-32
+    etappe: M1
+  - match: "api."  # M1-03, M1-18, M1-31
+    etappe: M1
+  - match: api.major_version_overlap  # M7-11
+    etappe: M7
+  - match: api.stats_max_buckets  # M6-05
+    etappe: M6
+  - match: "app."  # M2-24, M2-25
+    etappe: M2
+  - match: "audit."  # M1-24, M1-50
+    etappe: M1
+  - match: "auth."  # M1-28 to M1-45
+    etappe: M1
+  - match: auth.console_session_idle_timeout  # M6-01
+    etappe: M6
+  - match: auth.console_session_max_age  # M6-01
+    etappe: M6
+  - match: auth.require_key_attestation  # V3-09
+    etappe: V3
+  - match: "authz."  # M1-28 to M1-49
+    etappe: M1
+  - match: "backup."  # M7-01, M7-02
+    etappe: M7
+  - match: "billing."  # M2-20, M2-22
+    etappe: M2
+  - match: "branding."  # M1-46
+    etappe: M1
+  - match: "channel."  # M1-53
+    etappe: M1
+  - match: channel.prompt_max_bytes  # M2-02
+    etappe: M2
+  - match: "client."  # M1-46
+    etappe: M1
+  - match: client.app_lock_after  # M5-08
+    etappe: M5
+  - match: client.cache_max_age  # M3-05
+    etappe: M3
+  - match: client.outbox_retry_base  # M4-15
+    etappe: M4
+  - match: client.outbox_retry_cap  # M4-15
+    etappe: M4
+  - match: "cluster."  # M2-47
+    etappe: M2
+  - match: "command."  # M2-16, M2-17
+    etappe: M2
+  - match: "component."  # M2-15
+    etappe: M2
+  - match: "console."  # M6-17
+    etappe: M6
+  - match: "consumer."  # M2-01
+    etappe: M2
+  - match: "database."  # M1-12, M1-13, M1-16
+    etappe: M1
+  - match: "dev."  # V2-01, V2-04
+    etappe: V2
+  - match: "dr."  # M7-03
+    etappe: M7
+  - match: "file."  # M3-01 to M3-08
+    etappe: M3
+  - match: file.max_upload_bytes  # M1-18
+    etappe: M1
+  - match: "forum_tag."  # M1-53
+    etappe: M1
+  - match: "gateway."  # M1-64
+    etappe: M1
+  - match: "group."  # M1-48
+    etappe: M1
+  - match: "host."  # M2-39
+    etappe: M2
+  - match: "http."  # M1-11, M1-18, M1-21
+    etappe: M1
+  - match: "identity."  # M1-34
+    etappe: M1
+  - match: "instance."  # M1-10
+    etappe: M1
+  - match: "interaction."  # M2-15
+    etappe: M2
+  - match: "jobs."  # M1-14
+    etappe: M1
+  - match: "message."  # M1-46, M1-56, M1-57
+    etappe: M1
+  - match: "migrate."  # M1-12
+    etappe: M1
+  - match: migrate.recent_backup_max_age  # M7-02
+    etappe: M7
+  - match: migrate.require_recent_backup  # M7-02
+    etappe: M7
+  - match: "notify."  # M3-17, M3-22, M3-23; etappe of the chapter for badge_sync_min_interval (no ticket names it)
+    etappe: M3
+  - match: "pin."  # M1-59
+    etappe: M1
+  - match: "principal."  # M1-26
+    etappe: M1
+  - match: "privacy."  # M7-06, M7-07; etappe of the chapter for ai_notice_enabled, notice_url (no ticket names it)
+    etappe: M7
+  - match: privacy.audit_ip_kek_ref  # M1-24
+    etappe: M1
+  - match: privacy.audit_ip_key_period  # M1-24
+    etappe: M1
+  - match: privacy.audit_ip_key_retention  # M1-24
+    etappe: M1
+  - match: privacy.object_delete_delay  # M3-08
+    etappe: M3
+  - match: privacy.per_person_stats_enabled  # M6-05
+    etappe: M6
+  - match: privacy.stats_min_group_size  # M6-05
+    etappe: M6
+  - match: privacy.telemetry_pseudonym_rotation  # M1-10
+    etappe: M1
+  - match: "push."  # M3-20, M3-21
+    etappe: M3
+  - match: "ratelimit."  # M1-19
+    etappe: M1
+  - match: "reaction."  # M1-59
+    etappe: M1
+  - match: "retention."  # M7-05
+    etappe: M7
+  - match: retention.stats_minutes  # M6-13
+    etappe: M6
+  - match: "run."  # M2-08, M2-09, M2-10
+    etappe: M2
+  - match: "search."  # M3-13 to M3-16
+    etappe: M3
+  - match: search.extract.tika_url  # M3 Nicht-Umfang defers Tika to V3; no ticket yet
+    etappe: V3
+  - match: "secrets."  # M1-09, M1-32
+    etappe: M1
+  - match: "security."  # M5-08
+    etappe: M5
+  - match: "server."  # M1-18, M1-21
+    etappe: M1
+  - match: server.maintenance_mode  # M7-08
+    etappe: M7
+  - match: "shutdown."  # M1-11, M1-14
+    etappe: M1
+  - match: "signing_key."  # M1-32
+    etappe: M1
+  - match: "space."  # M1-52
+    etappe: M1
+  - match: "startup."  # M1-11
+    etappe: M1
+  - match: "stats."  # M6-05 to M6-15
+    etappe: M6
+  - match: "status."  # M7-09
+    etappe: M7
+  - match: "sync."  # M1-16 to M1-66
+    etappe: M1
+  - match: sync.reconnect_backoff_base  # M2-29
+    etappe: M2
+  - match: sync.reconnect_backoff_cap  # M2-29
+    etappe: M2
+  - match: sync.run_patch_coalesce_interval  # M2-10
+    etappe: M2
+  - match: "telemetry."  # M1-10
+    etappe: M1
+  - match: telemetry.dashboard_url  # M6-06
+    etappe: M6
+  - match: "template."  # M1-60
+    etappe: M1
+  - match: "terminal."  # M2-40 to M2-46
+    etappe: M2
+  - match: "thread."  # M1-46, M1-55
+    etappe: M1
+  - match: "voice."  # M3-09
+    etappe: M3
+  - match: voice.max_duration  # M1-46
+    etappe: M1
+  - match: "webhook."  # M2-24, M2-26
+    etappe: M2
+  - match: webhook.delivery_timeout  # M1-32
+    etappe: M1
+  - match: "webhook_in."  # M2-27
+    etappe: M2

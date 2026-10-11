@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+# Names retired by W1 (docs/PLAN.md); config-doc rule D7 keeps them out of the repository.
+retired:
+  - {name: http.listen_addr, replaced_by: server.listen_addr}
+  - {name: http.ops_listen_addr, replaced_by: server.internal_listen_addr}
+  - {name: api.trusted_proxy_cidrs, replaced_by: server.trusted_proxies}
+  - {name: net.trusted_proxies, replaced_by: server.trusted_proxies}
+  - {name: api.max_json_body_bytes, replaced_by: http.max_json_body_bytes}
+  - {name: http.max_body_bytes, replaced_by: http.max_json_body_bytes}
+  - {name: server.shutdown_grace, replaced_by: shutdown.total_timeout}
+  - {name: upload.image_max_pixels, replaced_by: file.image.max_pixels}
+  - {name: upload.strip_image_metadata, replaced_by: "file.image.* (12-dateien.md)"}
+  - {name: db.acquire_timeout, replaced_by: database.acquire_timeout}
+  - {name: db.statement_timeout, replaced_by: database.statement_timeout}
+  - {name: db.lock_timeout, replaced_by: database.lock_timeout}
+  - {name: db.idle_in_tx_timeout, replaced_by: database.idle_in_tx_timeout}
+  - {name: db.tx_retry_max, replaced_by: database.tx_retry_max}
+  - {name: db.listen_reconnect_backoff_cap, replaced_by: database.listen_reconnect_backoff_cap}

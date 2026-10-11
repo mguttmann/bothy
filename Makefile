@@ -80,7 +80,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
 
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
-        gitleaks-staged denylist denylist-history licenses docs adr-index config-reference catalog catalog-check linkcheck \
+        gitleaks-staged denylist denylist-history licenses docs adr-index config-reference config-doc-check catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-tables api-clients \
         runners-check commitlint \
         review labels-check labels-sync tools-lock release-build clean \
@@ -120,7 +120,7 @@ gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
 gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint test coverage commitlint \
-       docs linkcheck diagrams catalog-check api-lint api-checks ops-check \
+       docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks ops-check \
        api-clients tokens runners-check labels-check gitleaks semgrep trivy osv licenses
 
 # ---- code quality ---------------------------------------------------------------------
@@ -146,7 +146,7 @@ fmt-check: ## Formatting is clean (no changes)
 lint: ## Linters: file hygiene hooks, ruff, bandit, actionlint, zizmor, component linters
 	SKIP=ruff-format,ruff-check,gitleaks-staged $(UVRUN) pre-commit run --all-files --hook-stage pre-commit
 	$(UVRUN) ruff check tools
-	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/bin tools/catalog tools/ci tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/opscheck tools/sonarqube
+	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/bin tools/catalog tools/ci tools/configdoc tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/opscheck tools/sonarqube
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -295,17 +295,21 @@ perf: ## Load tests against the performance targets (end of an etappe and releas
 	  done; fi
 
 # ---- documentation --------------------------------------------------------------------
-docs: ## Documentation site builds strictly; ADR index and configuration reference are current
+docs: ## Documentation site builds strictly; ADR index is current
 	$(UVRUN) python tools/docs/adr_index.py --check
-	$(UVRUN) python tools/docs/config_reference.py --check
 	@# No --quiet: it hides the warnings that --strict turns into a failure.
 	$(UVRUN) mkdocs build --strict --site-dir site
 
 adr-index: ## Regenerate the ADR index in docs/adr/README.md
 	$(UVRUN) python tools/docs/adr_index.py
 
-config-reference: ## Regenerate section 4 of docs/operations/configuration.md from the chapter tables
-	$(UVRUN) python tools/docs/config_reference.py
+config-reference: ## Regenerate section 4 of docs/operations/configuration.md from the schema and the chapter tables
+	$(UVRUN) python tools/configdoc/configdoc.py
+
+config-doc-check: ## Configuration reference matches schema, chapter tables, planned.yaml, retired.yaml and Compose (D1 to D10)
+	@# Reads the committed services/server/architecture/config-schema.json, so no Go toolchain is
+	@# needed; make codegen-check keeps that file equal to the schema in the code.
+	$(UVRUN) python tools/configdoc/configdoc.py --check
 
 catalog: ## Regenerate the tables of chapter 05 and the lists in docs/api/redocly.yaml from docs/spec/actions.yaml
 	$(UVRUN) python tools/catalog/action_catalog.py generate

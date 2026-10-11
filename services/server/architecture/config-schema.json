@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "keys": [
+    {
+      "name": "egress.allowed_hosts",
+      "env": "BOTHY_EGRESS__ALLOWED_HOSTS",
+      "kind": "list(string)",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "19-sicherheit.md",
+      "doc": "Additional allowed targets of outgoing connections, each host[:port][;allow_private]; allow_private also opens private addresses and plain http."
+    },
+    {
+      "name": "egress.max_response_bytes",
+      "env": "BOTHY_EGRESS__MAX_RESPONSE_BYTES",
+      "kind": "int",
+      "default": "1048576",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "19-sicherheit.md",
+      "doc": "Largest response body and header of one outgoing request in bytes; a larger body is an error."
+    },
+    {
+      "name": "egress.timeout",
+      "env": "BOTHY_EGRESS__TIMEOUT",
+      "kind": "duration",
+      "default": "15s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "19-sicherheit.md",
+      "doc": "Time limit of one outgoing request, from name resolution to the end of the body."
+    },
+    {
+      "name": "http.max_json_body_bytes",
+      "env": "BOTHY_HTTP__MAX_JSON_BODY_BYTES",
+      "kind": "int",
+      "default": "1048576",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "02-architektur.md",
+      "doc": "Largest JSON request body in bytes; it must be greater than message.max_content_bytes."
+    },
+    {
+      "name": "message.max_content_bytes",
+      "env": "BOTHY_MESSAGE__MAX_CONTENT_BYTES",
+      "kind": "int",
+      "default": "262144",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Largest content of one message in bytes."
+    },
+    {
+      "name": "server.internal_listen_addr",
+      "env": "BOTHY_SERVER__INTERNAL_LISTEN_ADDR",
+      "kind": "listen address",
+      "default": "127.0.0.1:8081",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Address of the internal listener for health, readiness and incoming webhooks from services in the stack."
+    },
+    {
+      "name": "server.listen_addr",
+      "env": "BOTHY_SERVER__LISTEN_ADDR",
+      "kind": "listen address",
+      "default": "127.0.0.1:8080",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Address of the public listener that serves REST and the gateway."
+    },
+    {
+      "name": "server.role",
+      "env": "BOTHY_SERVER__ROLE",
+      "kind": "enum",
+      "default": "all",
+      "required": false,
+      "enum": [
+        "api",
+        "worker",
+        "all"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Role of the process: api serves REST and the gateway, worker runs jobs and consumers, all does both."
+    }
+  ]
+}
