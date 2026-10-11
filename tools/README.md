@@ -33,6 +33,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `docs/render_diagrams.py` | every Mermaid diagram renders with the design theme, aspect ratio and token colors; `--write` re-renders the `.svg` | `diagrams` | `docs/tests/` |
 | `docs/erd_check.py` | ERDs in `docs/architecture/` against 03: every table exactly once in full, every foreign key drawn | `diagrams` | `docs/tests/` |
 | `docs/mkdocs_repo_links.py` | MkDocs hook: links to existing files outside `docs/` point to the repository in the site | `docs` | `docs/tests/` |
+| `catalog/` | load and check the action catalogue `docs/spec/actions.yaml`, generate the tables of chapter 05 and the lists in `docs/api/redocly.yaml` from it ([README](catalog/README.md)) | `catalog`, `catalog-check` | `catalog/tests/` |
 | `docs/tests/test_config_values.py`, `docs/tests/test_toolchain_doc.py` | number and version guards for the docs | `test` | |
 | `sonarqube/` | local SonarQube and syncing of profile and gate ([README](sonarqube/README.md)) | `sonar-up`, `sonar-config`, `sonar-config-check` | `sonarqube/tests/` |
 | `design-tokens/` | translate design tokens into CSS, Dart, contrast table and preview (chapter 15, design system) | `tokens` (`design-tokens/Makefile`, target `check`) | `design-tokens/tests/` (unittest, via `make tokens`) |

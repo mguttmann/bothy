@@ -1255,7 +1255,7 @@ core contract (integration of 2026-10-10):
 | expiry produces `access.changed` via `authz.expiry_sweep` | 04, section 8.2; 05 `grant.expire`, `group.member.expire` |
 | moving a thread: copies of `channel_id`, files follow the message | 03 `threads`; 05, section 2.2 |
 | path prefix `/api/v1` | 04, header and section 6.1 |
-| machine-readable action catalogue | decided ([ADR 0049](../adr/0049-machine-readable-action-catalogue-as-the-single-source.md)); until then reconciliation in the docs gate (05, rule 3) |
+| machine-readable action catalogue | [`docs/spec/actions.yaml`](actions.yaml) ([ADR 0049](../adr/0049-machine-readable-action-catalogue-as-the-single-source.md)), checked by `make catalog-check` (05, rule 3) |
 | health without an action, on the internal listener | 05, R-AZ-22; section 15.2 |
 | modules `gateway`, `search` without tables; `stats` with `stats_minutes` | 03, sections 2 and 4.15 |
 | `agent.read` for the agent itself | 05, section 4.10 |

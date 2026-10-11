@@ -60,7 +60,7 @@ if it is out of date. Do not edit it by hand.
 | [0046](0046-multi-user-dev-environment-only-with-isolation.md) | Multi-user dev environment only with isolation | accepted | 2026-10-10 |
 | [0047](0047-remove-image-metadata-losslessly.md) | Remove image metadata losslessly | accepted | 2026-10-10 |
 | [0048](0048-file-download-only-through-the-server-with-short-lived-tickets.md) | File download only through the server with short-lived tickets instead of presigned GET | accepted | 2026-10-10 |
-| [0049](0049-machine-readable-action-catalogue-as-the-single-source.md) | Machine-readable action catalogue as the single source for docs, lint and code | accepted | 2026-10-10 |
+| [0049](0049-machine-readable-action-catalogue-as-the-single-source.md) | Machine-readable action catalogue as the single source for docs, lint and code | accepted | 2026-10-11 |
 | [0050](0050-module-register-as-the-source-for-architecture-gate-and-table-ownership.md) | Module register as the source for the architecture gate and table ownership | accepted | 2026-10-10 |
 | [0051](0051-worker-consumers-of-the-event-log-with-a-cursor.md) | Worker consumers of the event log with a cursor instead of job inserts in the write path | accepted | 2026-10-10 |
 | [0052](0052-one-event-envelope-for-gateway-rest-and-webhooks.md) | One event envelope for gateway, REST catch-up and webhooks | accepted | 2026-10-10 |

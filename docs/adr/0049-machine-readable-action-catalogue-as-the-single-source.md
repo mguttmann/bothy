@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-10
+date: 2026-10-11
 decision-makers: Planning lead
 consulted: Team A (architecture), Team B (API), Team C (permissions)
 informed: all planning teams
@@ -46,14 +46,16 @@ Python and Go load it without parser tricks, and every copy is created mechanica
    section 2.6, the rate-limit classes with key and purpose, the durable and ephemeral event types
    with their receive action (05, section 6) and the WebSocket ops with their action (section 7).
    Further attributes are added only through an ADR (for example the effect for the maintenance
-   mode, ADR 0065).
+   mode, ADR 0065) or through the core contract (per event type, whether the envelope carries
+   `resource.version`, [04-sync-protocol.md](../spec/04-sync-protocol.md), "Delivery guarantee").
 2. Generated are: the tables of sections 3, 4, 6 and 7 in 05 between markers, the action lists in
    `docs/api/redocly.yaml` (without system actions, because no route may name them), the
    constants and attributes in `kernel/authorize` and the mapping of `operationId` to action in
    `api/routes` ([02-architecture.md](../spec/02-architecture.md), sections 4.5 and 6).
    Kept by hand are the table "Scopes for apps" (05, section 2.6; its rows contain prose) and the
    configuration values of 05 (source of the configuration reference); the check compares them
-   with the file. Cells of the receive action that name several cases in words
+   with the file. The list "Effect" (05, section 2.7; a closed rule in words) also stays
+   maintained by hand and is compared the same way. Cells of the receive action that name several cases in words
    (for example "self (agent) and `agent.events.consume`") keep their text; the machine value
    stands next to it and matches `x-receive-action` in asyncapi.yaml.
 3. The mapping of action to module is not here but in the module register (ADR 0050). A check
@@ -79,8 +81,11 @@ Python and Go load it without parser tricks, and every copy is created mechanica
 - `pytest tools/catalog/tests`: a duplicate action ID, an unknown rate-limit class, an event type
   without a receive action, an op without an action and a diverging table block in 05 make the
   check fail; a test proves that the tables in 05 have the same rows before and after the rework.
-- `make catalog-check` in the target `gates` (ADR 0038): generating again yields no diff in 05,
-  `redocly.yaml`, `kernel/authorize` and `api/routes`.
+- `make catalog-check` in the target `gates` (ADR 0038): reads `docs/spec/actions.yaml`, chapter 05,
+  `docs/api/redocly.yaml` and, if present, `docs/api/.redocly.lint-ignore.yaml`; generating
+  again would produce no diff in 05 and `redocly.yaml`. The generated constants in
+  `kernel/authorize` (M1-25) and the route table in `api/routes` (M1-17) are kept current by
+  `make codegen-check`.
 - `make api-lint`: rules `authz-action-required` and `authz-action-known` with the generated list.
 - Server startup check and route test from 05, section 9 (tests 1 and 2), against the generated
   constants.
@@ -122,6 +127,6 @@ Python and Go load it without parser tricks, and every copy is created mechanica
 ## More Information
 
 - Resolution in the core contract: 05, rule 1.3; [02-architecture.md](../spec/02-architecture.md),
-  section 20 ("decided, until then reconciliation in the docs gate").
+  section 20 (row "machine-readable action catalogue").
 - Related: ADR 0013 (spec-first), ADR 0017 (one authorization function), ADR 0050
   (module register), ADR 0065 (maintenance mode).
