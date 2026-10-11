@@ -3,11 +3,13 @@
 
 from __future__ import annotations
 
+import datetime
 import functools
 import itertools
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -2599,9 +2601,32 @@ _LINEAR_SCAN_CPU_SECONDS = 1.0
 
 
 def _cpu_seconds(work: Callable[[], object]) -> float:
-    start = time.process_time()
-    work()
-    return time.process_time() - start
+    """Process time of `work`. A profiling timer, which counts process time like
+    `time.process_time` and never waiting, stops `work` at the bound with a test failure, so
+    that a regression to exponential or quadratic work fails within the bound instead of
+    hanging the run."""
+
+    def stop(signum: int, frame: object) -> None:
+        pytest.fail(f"more than {_LINEAR_SCAN_CPU_SECONDS} s of process time")
+
+    previous = signal.signal(signal.SIGPROF, stop)
+    signal.setitimer(signal.ITIMER_PROF, _LINEAR_SCAN_CPU_SECONDS)
+    try:
+        start = time.process_time()
+        work()
+        return time.process_time() - start
+    finally:
+        signal.setitimer(signal.ITIMER_PROF, 0)
+        signal.signal(signal.SIGPROF, previous)
+
+
+def test_the_process_time_bound_stops_runaway_work() -> None:
+    def spin() -> None:
+        while True:
+            pass
+
+    with pytest.raises(pytest.fail.Exception, match="s of process time"):
+        _cpu_seconds(spin)
 
 
 def test_static_code_spans_scan_long_lines_in_linear_time() -> None:
@@ -2682,6 +2707,26 @@ MISPLACED = [
         ),
         {"actions.public"},
         id="level-4-heading-above-a-table",
+    ),
+    # The level-4 rule holds for every generated table, not only for action tables; the heading
+    # stays above every table up to the next heading of level 2 or 3.
+    *(
+        pytest.param(
+            lambda t, name=name: t.replace(
+                f"<!-- BEGIN GENERATED: {name} -->\n",
+                f"#### Hinweis\n\n<!-- BEGIN GENERATED: {name} -->\n",
+                1,
+            ),
+            names,
+            id=f"level-4-heading-above-{name}",
+        )
+        for name, names in (
+            ("rate_limit_classes", {"rate_limit_classes"}),
+            ("events.durable", {"events.durable", "events.ephemeral"}),
+            ("events.ephemeral", {"events.ephemeral"}),
+            ("ws_ops", {"ws_ops", "channel_ops"}),
+            ("channel_ops", {"channel_ops"}),
+        )
     ),
 ]
 
@@ -3160,25 +3205,25 @@ SECTION_EDGES = [
     ),
     pytest.param(
         _copy_before_27("### 2.7 Wirkung  (`effect`)"),
-        "appears 2 times",
+        "look the same",
         "title rendered 2 times",
         id="copy-of-2.7-with-two-spaces",
     ),
     pytest.param(
         _copy_before_27("### 2.7 Wirkung\u00a0(`effect`)"),
-        "appears 2 times",
+        "look the same",
         "title rendered 2 times",
         id="copy-of-2.7-with-no-break-space",
     ),
     pytest.param(
         _copy_before_27("### 2.7 Wirkung (`effect`)\u200b"),
-        "appears 2 times",
+        "look the same",
         "title rendered 2 times",
         id="copy-of-2.7-with-zero-width-space",
     ),
     pytest.param(
         _copy_before_27("### 2.7 Wir\u00adkung (`effect`)"),
-        "appears 2 times",
+        "look the same",
         "title rendered 2 times",
         id="copy-of-2.7-with-soft-hyphen",
     ),
@@ -3197,7 +3242,7 @@ SECTION_EDGES = [
     *(
         pytest.param(
             _copy_before_27(f"### {number} Wirkung (`effect`)"),
-            "appears 2 times",
+            "look the same",
             "title rendered 2 times",
             id=f"copy-of-2.7-numbered-{number}",
         )
@@ -3211,7 +3256,7 @@ SECTION_EDGES = [
             "\n## 9. Tests,",
             1,
         ),
-        "appears 2 times",
+        "look the same",
         "title rendered 2 times",
         id="copy-of-the-configuration-title-with-capital-i",
     ),
@@ -3224,7 +3269,7 @@ SECTION_EDGES = [
                 "\n## 9. Tests,",
                 1,
             ),
-            "appears 2 times",
+            "look the same",
             "title rendered 2 times",
             id=f"copy-of-the-configuration-title-with-digits-{title}",
         )
@@ -3285,6 +3330,21 @@ def test_a_level_4_heading_does_not_end_2_7(tmp_path: Path) -> None:
     )
     findings = _findings_for(root, "effect")
     assert any("message.create: effect write differs" in f for f in findings), findings
+
+
+def test_look_alike_headings_are_named_in_the_finding(tmp_path: Path) -> None:
+    # Titles that differ only in digits look the same to the checks; the finding names both
+    # headings instead of saying that one title appears twice.
+    root = _copy_repo(tmp_path)
+    _edit(root, CHAPTER, "\n## 10. ", "\n### 9.1 Scopes für Apps 2\n\nText.\n\n## 10. ")
+    lines = (root / CHAPTER).read_text(encoding="utf-8").splitlines()
+    real = lines.index("### 2.6 Scopes für Apps") + 1
+    copy = lines.index("### 9.1 Scopes für Apps 2") + 1
+    assert _findings_for(root, "app-scope") == [
+        f"actions.yaml: app-scope: section 'Scopes für Apps': headings 'Scopes für Apps' (line"
+        f" {real}), 'Scopes für Apps 2' (line {copy}) in chapter 05 look the same (only the"
+        " letters of a title count, without case, with I as l, 1 as l and 0 as o)"
+    ]
 
 
 def test_a_heading_with_a_tab_ends_a_read_section_like_on_the_site(tmp_path: Path) -> None:
@@ -3435,8 +3495,56 @@ def test_cell_that_the_site_would_split_fails_with_one_line(
     assert "\n" not in finding
 
 
+# Markup the site does not show as text of the cell: raw HTML can swallow the table or end the
+# cell early, and a brace pair is an attribute list that takes text out of the cell or hides it.
+MARKUP_CELLS = (
+    "Nachricht lesen {Entwurf}",
+    "{Kanal}",
+    "Nachricht lesen {: hidden }",
+    "a {x}`y`",
+    "Nachricht lesen <script>",
+    "Nachricht lesen <!-- x",
+    "x </p> y",
+    "a\\<b>c</b>",
+)
+
+
+@pytest.mark.parametrize("description", MARKUP_CELLS)
+def test_cell_with_html_or_an_attribute_list_fails_with_one_line(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], description: str
+) -> None:
+    root = _copy_repo(tmp_path)
+    _mutate(
+        root, lambda d: _entry(d, "actions", "id", "message.read").update(description=description)
+    )
+    before = _contents(root)
+    assert action_catalog.main(["check", "--root", str(root)]) == 1
+    [finding] = capsys.readouterr().err.splitlines()
+    assert finding.startswith(
+        "actions.yaml: schema: message.read: description (column Beschreibung): holds "
+    )
+    needle = "HTML outside a code span" if "<" in description else "a brace pair outside"
+    assert needle in finding
+    with pytest.raises(CatalogError):
+        action_catalog.generate(root)
+    assert _contents(root) == before
+
+
 @pytest.mark.parametrize(
-    "description", ["a \\| b", "a \\\\\\| b", "`a|b` c", "``a`|`b``", "a\\` b"]
+    "description",
+    [
+        "a \\| b",
+        "a \\\\\\| b",
+        "`a|b` c",
+        "``a`|`b``",
+        "a\\` b",
+        "a < b",
+        "a <3",
+        "`{id}` lesen",
+        "`<b>` code",
+        "a \\{x\\} b",
+        "a {x b",
+    ],
 )
 def test_cell_that_stays_one_cell_on_the_site_passes(tmp_path: Path, description: str) -> None:
     root = _copy_repo(tmp_path)
@@ -3536,16 +3644,25 @@ def test_nested_aliases_in_the_redocly_configuration_are_read_in_linear_time(
     )
 
 
+def _value_error(build: Callable[[], object]) -> str:
+    """The message of the ValueError `build` raises; its wording differs between Pythons."""
+    try:
+        build()
+    except ValueError as exc:
+        return " ".join(str(exc).split())
+    pytest.fail("no ValueError")
+
+
 @pytest.mark.parametrize(
-    ("value", "needle"),
+    ("value", "build"),
     [
-        pytest.param("2026-02-30", "day 30 must be in range", id="invalid-date"),
-        pytest.param("9" * 5000, "integer string conversion", id="huge-integer"),
+        pytest.param("2026-02-30", lambda: datetime.date(2026, 2, 30), id="invalid-date"),
+        pytest.param("9" * 5000, lambda: int("9" * 5000), id="huge-integer"),
     ],
 )
 @pytest.mark.parametrize("rel", [CATALOG, REDOCLY, LINT_IGNORE])
 def test_values_python_cannot_build_are_findings(
-    tmp_path: Path, rel: Path, value: str, needle: str
+    tmp_path: Path, rel: Path, value: str, build: Callable[[], object]
 ) -> None:
     root = _copy_repo(tmp_path)
     path = root / rel
@@ -3554,7 +3671,7 @@ def test_values_python_cannot_build_are_findings(
     )
     findings = action_catalog.check(root)
     label = "actions.yaml: schema" if rel == CATALOG else f"{rel.as_posix()}: generated-block"
-    assert any(f.startswith(f"{label}: cannot parse: ") and needle in f for f in findings), findings
+    assert findings == [f"{label}: cannot parse: {_value_error(build)}"]
     with pytest.raises(CatalogError):
         action_catalog.generate(root)
 
@@ -3675,6 +3792,97 @@ def test_generate_restores_a_replaced_file_when_the_next_fails(
     leftovers = [p for p in (root / "docs").rglob("*") if p.is_file() and p.name.startswith(".")]
     assert leftovers == []
     assert action_catalog.generate(root) == [CHAPTER.as_posix(), REDOCLY.as_posix()]
+
+
+def _replace_failing_at(
+    monkeypatch: pytest.MonkeyPatch, call: int, error: BaseException
+) -> list[str]:
+    """Make the `call`-th `os.replace` raise `error`; the others replace as usual."""
+    replace = os.replace
+    calls: list[str] = []
+
+    def failing(src: str, dst: str) -> None:
+        calls.append(str(dst))
+        if len(calls) == call:
+            raise error
+        replace(src, dst)
+
+    monkeypatch.setattr(os, "replace", failing)
+    return calls
+
+
+def _temporary_files(root: Path) -> list[Path]:
+    return [p for p in (root / "docs").rglob("*") if p.is_file() and p.name.startswith(".")]
+
+
+@pytest.mark.parametrize("call", [1, 2])
+def test_generate_cleans_up_after_an_interrupt_and_raises_it_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, call: int
+) -> None:
+    # Interrupted before the first or the second replacement: no temporary file stays, the
+    # files keep their old text, and the interrupt itself reaches the caller.
+    root = _stale_copy(tmp_path)
+    before = _contents(root)
+    _replace_failing_at(monkeypatch, call, KeyboardInterrupt())
+    with pytest.raises(KeyboardInterrupt):
+        action_catalog.generate(root)
+    monkeypatch.undo()
+    assert _temporary_files(root) == []
+    assert _contents(root) == before
+
+
+def test_an_interrupt_notes_a_file_whose_old_text_could_not_be_restored(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _stale_copy(tmp_path)
+    _replace_failing_at(monkeypatch, 2, KeyboardInterrupt())
+
+    def no_space(self: Path, *args: object, **kwargs: object) -> int:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "write_text", no_space)
+    with pytest.raises(KeyboardInterrupt) as err:
+        action_catalog.generate(root)
+    monkeypatch.undo()
+    assert err.value.__notes__ == [
+        "docs/spec/05-aktionen.md: generated-block: old text not restored: disk full"
+    ]
+    assert _temporary_files(root) == []
+
+
+def test_cli_reports_a_write_error_as_one_and_says_nothing_was_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = _stale_copy(tmp_path)
+    before = _contents(root)
+    _replace_failing_at(monkeypatch, 2, OSError("disk full"))
+    assert action_catalog.main(["generate", "--root", str(root)]) == 1
+    monkeypatch.undo()
+    assert capsys.readouterr().err.splitlines() == [
+        "docs/api/redocly.yaml: generated-block: cannot write: disk full",
+        "action_catalog: cannot write the generated blocks; nothing written",
+    ]
+    assert _contents(root) == before
+
+
+def test_cli_names_a_file_left_with_its_new_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = _stale_copy(tmp_path)
+    _replace_failing_at(monkeypatch, 2, OSError("disk full"))
+
+    def read_only(self: Path, *args: object, **kwargs: object) -> int:
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr(Path, "write_text", read_only)
+    assert action_catalog.main(["generate", "--root", str(root)]) == 1
+    monkeypatch.undo()
+    assert capsys.readouterr().err.splitlines() == [
+        "docs/api/redocly.yaml: generated-block: cannot write: disk full",
+        "docs/spec/05-aktionen.md: generated-block: old text not restored: read-only file system",
+        "action_catalog: cannot write the generated blocks; the files above whose old text was"
+        " not restored hold the new text",
+    ]
 
 
 def test_generate_refuses_a_catalogue_with_broken_relations(tmp_path: Path) -> None:

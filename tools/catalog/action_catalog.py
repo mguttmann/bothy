@@ -88,6 +88,23 @@ class CatalogError(Exception):
         super().__init__("\n".join(self.findings))
 
 
+class CatalogWriteError(CatalogError):
+    """`generate` could not write a file; the catalogue and the blocks were valid.
+
+    Args:
+        findings: The write error, then one line `old text not restored` for each file that
+            kept its new text.
+        restored: Whether every file has its old text again.
+
+    Attributes:
+        restored: As above.
+    """
+
+    def __init__(self, findings: Sequence[str], *, restored: bool) -> None:
+        super().__init__(findings)
+        self.restored = restored
+
+
 # ---- generated-block markers -------------------------------------------------------------
 
 
@@ -467,6 +484,9 @@ def _cell_problem(text: str) -> str | None:
     pair, because the row then pairs and splits it as it does the cell alone. A test compares
     this model with the renderer, and one compares every generated table cell by cell with the
     catalogue. Runs are looked up by length, not searched again, so the check stays linear.
+    A cell that stays one cell also holds no markup the site does not show as its text: no
+    HTML and no brace pair outside a code span (an attribute list), read like the chapter
+    outside the blocks (`_without_code`, `_HTML_START`, `_ATTRIBUTE_LIST`).
     """
     if text.splitlines() != [text]:
         return "holds a line break, but a table cell has one line"
@@ -516,7 +536,26 @@ def _cell_problem(text: str) -> str | None:
                 )
             )
             break
-    return "; ".join(message for _, message in sorted(problems)) or None
+    if problems:
+        return "; ".join(message for _, message in sorted(problems))
+    bare = _without_code(text)
+    markup = [
+        message
+        for pattern, message in (
+            (
+                _HTML_START,
+                "holds HTML outside a code span (a < before a letter, !, ? or /), which the"
+                " site does not show as text of the cell",
+            ),
+            (
+                _ATTRIBUTE_LIST,
+                "holds a brace pair outside a code span, which the site reads as an attribute"
+                " list of the cell",
+            ),
+        )
+        if pattern.search(bare)
+    ]
+    return "; ".join(markup) or None
 
 
 class _Entry:
@@ -1092,11 +1131,22 @@ def _section(chapter: str, title: str) -> str:
     if m is None:
         raise CatalogError([f"section {title!r} not found in chapter 05"])
     keys = _title_keys(title)
-    count = sum(
-        1 for h in _headings(chapter.splitlines()) if h is not None and _title_keys(h[1]) & keys
-    )
-    if count > 1:
-        raise CatalogError([f"section {title!r} appears {count} times in chapter 05"])
+    alike = [
+        (n + 1, h[1])
+        for n, h in enumerate(_headings(chapter.splitlines()))
+        if h is not None and _title_keys(h[1]) & keys
+    ]
+    if len(alike) > 1 and all(found == title for _, found in alike):
+        raise CatalogError([f"section {title!r} appears {len(alike)} times in chapter 05"])
+    if len(alike) > 1:
+        # Titles that differ only in what does not count would read as one title twice.
+        shown = ", ".join(f"{found!r} (line {line})" for line, found in alike)
+        raise CatalogError(
+            [
+                f"section {title!r}: headings {shown} in chapter 05 look the same (only the"
+                " letters of a title count, without case, with I as l, 1 as l and 0 as o)"
+            ]
+        )
     body = chapter[m.end() :]
     nxt = re.search(rf"^#{{1,{len(m.group('hashes'))}}}(?!#)", body, re.MULTILINE)
     return body[: nxt.start()] if nxt else body
@@ -2325,8 +2375,8 @@ def _write_all(root: Path, changes: Sequence[tuple[Path, str, str]]) -> list[str
 
     Each new text goes into a temporary file next to its target first (mode copied); only when
     all are written do they replace their targets. A target that is not writable stops
-    everything before the first write, and if a replacement fails, the files replaced before it
-    get their old text back.
+    everything before the first write. If anything fails after that, also an interrupt, the
+    files replaced before get their old text back and no temporary file stays.
 
     Args:
         root: Repository root.
@@ -2337,7 +2387,10 @@ def _write_all(root: Path, changes: Sequence[tuple[Path, str, str]]) -> list[str
         The relative paths written, in POSIX form.
 
     Raises:
-        CatalogError: A file could not be written; nothing has changed then.
+        CatalogWriteError: A file could not be written; every file has its old text again
+            unless a finding says otherwise (`restored`).
+        BaseException: Any other error, such as an interrupt, after the same clean-up; a file
+            that kept its new text is named in a note of the error.
     """
     targets = [(rel, Path(os.path.realpath(root / rel)), old, new) for rel, old, new in changes]
     targets = [t for t in targets if t[3] != t[2]]
@@ -2347,7 +2400,7 @@ def _write_all(root: Path, changes: Sequence[tuple[Path, str, str]]) -> list[str
         if not os.access(path, os.W_OK)
     ]
     if findings:
-        raise CatalogError(findings)
+        raise CatalogWriteError(findings, restored=True)
     temporary: list[Path] = []
     replaced: list[tuple[Path, Path, str]] = []
     current = CHAPTER_PATH
@@ -2361,16 +2414,23 @@ def _write_all(root: Path, changes: Sequence[tuple[Path, str, str]]) -> list[str
         for (current, path, old, _), temp in zip(targets, temporary, strict=True):
             temp.replace(path)
             replaced.append((current, path, old))
-    except OSError as exc:
-        findings = [f"{current.as_posix()}: {RULE_BLOCK}: cannot write: {exc}"]
+    except BaseException as exc:
+        unrestored: list[str] = []
         for rel, path, old in reversed(replaced):
             try:
                 path.write_text(old, encoding="utf-8")
             except OSError as undo:
-                findings.append(f"{rel.as_posix()}: {RULE_BLOCK}: old text not restored: {undo}")
+                unrestored.append(f"{rel.as_posix()}: {RULE_BLOCK}: old text not restored: {undo}")
         for temp in temporary:
             temp.unlink(missing_ok=True)
-        raise CatalogError(findings) from exc
+        if not isinstance(exc, OSError):
+            for line in unrestored:
+                exc.add_note(line)
+            raise
+        raise CatalogWriteError(
+            [f"{current.as_posix()}: {RULE_BLOCK}: cannot write: {exc}", *unrestored],
+            restored=not unrestored,
+        ) from exc
     return [rel.as_posix() for rel, _, _, _ in targets]
 
 
@@ -2406,6 +2466,8 @@ def generate(root: Path) -> list[str]:
             `REDOCLY_API_KEYS` or starting with `$` anywhere, an `extends` other than
             `REDOCLY_EXTENDS`, a missing, absolute or repeated `root`, duplicate keys, a
             lint-ignore entry for a catalogue rule).
+        CatalogWriteError: All of that was valid, but a file could not be written (see
+            `_write_all`).
     """
     catalog = load_catalog(root / CATALOG_PATH)
     chapter = _read(root, CHAPTER_PATH)
@@ -2456,7 +2518,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     except CatalogError as err:
         for finding in err.findings:
             print(finding, file=sys.stderr)
-        print("action_catalog: catalogue or blocks invalid; nothing written", file=sys.stderr)
+        if not isinstance(err, CatalogWriteError):
+            summary = "catalogue or blocks invalid; nothing written"
+        elif err.restored:
+            summary = "cannot write the generated blocks; nothing written"
+        else:
+            summary = (
+                "cannot write the generated blocks; the files above whose old text was not"
+                " restored hold the new text"
+            )
+        print(f"action_catalog: {summary}", file=sys.stderr)
         return 1
     for rel in written:
         print(f"  rewrote {rel}")
