@@ -777,15 +777,29 @@ def test_example_data_is_not_a_deprecation(tmp_path: Path) -> None:
     ]
 
 
-CONFIG_ROW = (
-    "| `api.deprecation_min_notice` | `BOTHY_API__DEPRECATION_MIN_NOTICE` | Server | `180d` | "
-    "Mindestabstand von `Deprecation` zu `Sunset` |\n"
-)
+CONFIG_KEY_CELL = "| `api.deprecation_min_notice` |"
+
+
+def _config_table(root: Path) -> list[str]:
+    """Lines of the generated table that holds api.deprecation_min_notice, header to its row.
+
+    Read from the copied reference, not written out here: section 4 is generated (M1-08), and
+    its columns and the state cell change when tickets add keys to the schema.
+    """
+    lines = (root / CONFIG).read_text(encoding="utf-8").splitlines(keepends=True)
+    row = next(i for i, line in enumerate(lines) if line.startswith(CONFIG_KEY_CELL))
+    header = max(i for i in range(row) if lines[i].startswith("| Schlüssel |"))
+    return lines[header : row + 1]
+
+
+def _config_row(root: Path) -> str:
+    """The row of api.deprecation_min_notice in the copied reference, with its line end."""
+    return _config_table(root)[-1]
 
 
 def test_missing_config_value_fails(tmp_path: Path) -> None:
     root = _copy_inputs(tmp_path)
-    _edit(root, CONFIG, CONFIG_ROW, "")
+    _edit(root, CONFIG, _config_row(root), "")
     assert _sync(root, "deprecation") == [
         f"{SYNC_RULE}: deprecation: api.deprecation_min_notice: no row in "
         'docs/operations/configuration.md "Benannte Werte aller Kapitel"'
@@ -794,7 +808,8 @@ def test_missing_config_value_fails(tmp_path: Path) -> None:
 
 def test_duplicate_config_value_fails(tmp_path: Path) -> None:
     root = _copy_inputs(tmp_path)
-    _edit(root, CONFIG, CONFIG_ROW, CONFIG_ROW + CONFIG_ROW)
+    row = _config_row(root)
+    _edit(root, CONFIG, row, row + row)
     assert _sync(root, "deprecation") == [
         f"{SYNC_RULE}: deprecation: api.deprecation_min_notice: 2 rows in "
         'docs/operations/configuration.md "Benannte Werte aller Kapitel"'
@@ -803,7 +818,8 @@ def test_duplicate_config_value_fails(tmp_path: Path) -> None:
 
 def test_config_value_must_be_a_duration(tmp_path: Path) -> None:
     root = _copy_inputs(tmp_path)
-    _edit(root, CONFIG, CONFIG_ROW, CONFIG_ROW.replace("`180d`", "halbes Jahr"))
+    row = _config_row(root)
+    _edit(root, CONFIG, row, row.replace("`180d`", "halbes Jahr"))
     assert _sync(root, "deprecation") == [
         f"{SYNC_RULE}: deprecation: api.deprecation_min_notice: standard value 'halbes Jahr' is "
         "not a duration (number with unit ms, s, m, h or d)"
@@ -813,21 +829,18 @@ def test_config_value_must_be_a_duration(tmp_path: Path) -> None:
 def test_config_value_is_read_by_column_name(tmp_path: Path) -> None:
     # Another column before "Standard" (M1-08 may add one) must not shift the value read.
     root = _copy_inputs(tmp_path)
+    table = _config_table(root)
+    head, sep, middle, row = table[0], table[1], table[2:-1], table[-1]
     _edit(
         root,
         CONFIG,
-        "### 06 Öffentliche API\n\nQuelle: [06-api.md](../spec/06-api.md), Abschnitt 20.\n\n"
-        "| Schlüssel | Umgebung | Ort | Standard | Bedeutung |\n|---|---|---|---|---|\n",
-        "### 06 Öffentliche API\n\nQuelle: [06-api.md](../spec/06-api.md), Abschnitt 20.\n\n"
-        "| Schlüssel | Typ | Umgebung | Ort | Standard | Bedeutung |\n|---|---|---|---|---|---|\n",
-    )
-    _edit(
-        root,
-        CONFIG,
-        CONFIG_ROW,
-        CONFIG_ROW.replace("`180d`", "`4320h`").replace(
-            "| `BOTHY_API__DEPRECATION_MIN_NOTICE`",
-            "| duration | `BOTHY_API__DEPRECATION_MIN_NOTICE`",
+        "".join(table),
+        head.replace("| Schlüssel |", "| Schlüssel | Extra |", 1)
+        + "|---"
+        + sep
+        + "".join(middle)
+        + row.replace("`180d`", "`4320h`").replace(
+            CONFIG_KEY_CELL, CONFIG_KEY_CELL + " extra |", 1
         ),
     )
     fields = {"x-deprecated-since": "0.2.0", "x-deprecated-at": "2026-11-01"}
@@ -1473,7 +1486,8 @@ def test_recursive_alias_does_not_crash(tmp_path: Path) -> None:
 
 def test_huge_numbers_are_findings(tmp_path: Path) -> None:
     root = _copy_inputs(tmp_path)
-    _edit(root, CONFIG, CONFIG_ROW, CONFIG_ROW.replace("`180d`", f"`{'9' * 30}d`"))
+    row = _config_row(root)
+    _edit(root, CONFIG, row, row.replace("`180d`", f"`{'9' * 30}d`"))
     _edit(root, SYNC, "| `4015` | consumer_replaced |", f"| `{'4' * 30}` | consumer_replaced |")
     findings = api_checks.check_catalogue_sync(root)
     assert (
@@ -1581,15 +1595,20 @@ def test_min_notice_is_read_from_the_configuration(tmp_path: Path) -> None:
     # A different value and a column in front of "Schlüssel": neither a fixed 180 days nor a
     # positional read passes.
     root = _copy_inputs(tmp_path)
+    table = _config_table(root)
+    head, sep, middle, row = table[0], table[1], table[2:-1], table[-1]
     _edit(
         root,
         CONFIG,
-        "| Schlüssel | Umgebung | Ort | Standard | Bedeutung |\n|---|---|---|---|---|\n"
-        "| `api.page_size_default` |",
-        "| Nr | Schlüssel | Umgebung | Ort | Standard | Bedeutung |\n|---|---|---|---|---|---|\n"
-        "| 1 | `api.page_size_default` |",
+        "".join(table),
+        "| Nr "
+        + head
+        + "|---"
+        + sep
+        + "".join(f"| {n} {line}" for n, line in enumerate(middle, start=1))
+        + f"| {len(middle) + 1} "
+        + row.replace("`180d`", "`10d`"),
     )
-    _edit(root, CONFIG, CONFIG_ROW, "| 4 " + CONFIG_ROW.replace("`180d`", "`10d`"))
     since = {"x-deprecated-since": "0.2.0", "x-deprecated-at": "2026-11-01"}
     _mutate(root, OPENAPI, _deprecate(deprecated=True, **since, **{"x-sunset": "2026-11-10"}))
     assert _sync(root, "deprecation") == [
