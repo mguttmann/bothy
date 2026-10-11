@@ -11,4 +11,6 @@ const (
 	chapter02 = "02-architektur.md"
 	chapter03 = "03-datenmodell.md"
 	chapter16 = "16-betrieb.md"
+	chapter17 = "17-observability.md"
+	chapter20 = "20-datenschutz.md"
 )

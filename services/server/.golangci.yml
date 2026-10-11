@@ -21,6 +21,7 @@ linters:
     - noctx
     - nolintlint
     - revive
+    - sloglint
     - unparam
   settings:
     forbidigo:
@@ -60,6 +61,15 @@ linters:
       # Every suppression names its linter and says why.
       require-explanation: true
       require-specific: true
+    sloglint:
+      # docs/observability/signals.md "Logs": the message is constant English text, never built
+      # from input; attributes are slog.Attr values with constant keys (the catalog keys live in
+      # internal/platform/otel/attr); a function that has a context passes it on, so the
+      # record carries trace_id, span_id and bothy.correlation_id (brief M1-10).
+      static-msg: true
+      attr-only: true
+      no-raw-keys: true
+      context: scope
     revive:
       rules:
         # A doc comment on every exported symbol and on every package
@@ -86,6 +96,10 @@ linters:
       # table rows of tests repeat literals on purpose.
       - path: _test\.go$
         linters: [gocognit, goconst]
+      # Tests log arbitrary keys on purpose: they prove that the handlers of platform/otel drop
+      # them and that secret values stay redacted (docs/DECISIONS.md M1-10).
+      - path: _test\.go$
+        linters: [sloglint]
       # Generated code, which sonar.exclusions leaves out of the analysis as well (M1-05/7);
       # tools/ci/tests/test_server_lint_config.py holds both lists together. A directory named
       # gen is not generated: the route generator in api/routes/gen is hand-written and checked

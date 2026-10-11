@@ -617,7 +617,7 @@ Quelle: [16-betrieb.md](../spec/16-betrieb.md), Abschnitt 14.
 
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
-| `instance.environment` | `BOTHY_INSTANCE__ENVIRONMENT` | Server |  | `prod` | `dev`, `staging` oder `prod` (6.1) | geplant (M1) |
+| `instance.environment` | `BOTHY_INSTANCE__ENVIRONMENT` | Server | enum(dev, staging, prod) | `prod` | `dev`, `staging` oder `prod` (6.1) | aktiv |
 | `server.role` | `BOTHY_SERVER__ROLE` | Server | enum(api, worker, all) | `all` | `api`, `worker` oder `all` | aktiv |
 | `server.listen_addr` | `BOTHY_SERVER__LISTEN_ADDR` | Server | listen address | `127.0.0.1:8080` | öffentlicher Listener (REST, Gateway) | aktiv |
 | `server.internal_listen_addr` | `BOTHY_SERVER__INTERNAL_LISTEN_ADDR` | Server | listen address | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack | aktiv |
@@ -677,12 +677,12 @@ Quelle: [17-observability.md](../spec/17-observability.md), Abschnitt 11.
 
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
-| `telemetry.enabled` | `BOTHY_TELEMETRY__ENABLED` | Server |  | `true` | Telemetrie an oder aus | geplant (M1) |
-| `telemetry.traces.sampler_ratio` | `BOTHY_TELEMETRY__TRACES__SAMPLER_RATIO` | Server |  | `1.0` | Anteil der Traces, die das SDK aufzeichnet; der Collector sampelt danach nach | geplant (M1) |
-| `telemetry.traces.trust_remote_parent` | `BOTHY_TELEMETRY__TRACES__TRUST_REMOTE_PARENT` | Server |  | `false` | `true`: ein eingehender `traceparent` wird Eltern-Kontext (seine Trace-ID wird `correlation_id`, sein Sampling-Flag gilt); `false`: nur Span-Link, eigener Trace | geplant (M1) |
-| `telemetry.logs.exporter` | `BOTHY_TELEMETRY__LOGS__EXPORTER` | Server |  | `both` | `otlp`, `stdout` oder `both` | geplant (M1) |
-| `telemetry.logs.level` | `BOTHY_TELEMETRY__LOGS__LEVEL` | Server |  | `info` | kleinste Stufe, die geschrieben wird | geplant (M1) |
-| `telemetry.pseudonym_key_ref` | `BOTHY_TELEMETRY__PSEUDONYM_KEY_REF` | Server |  | `file:<secrets.dir>/telemetry_pseudonym_key` | Schlüssel für HMAC-Pseudonyme; mindestens 32 Byte | geplant (M1) |
+| `telemetry.enabled` | `BOTHY_TELEMETRY__ENABLED` | Server | bool | `true` | Telemetrie an oder aus | aktiv |
+| `telemetry.traces.sampler_ratio` | `BOTHY_TELEMETRY__TRACES__SAMPLER_RATIO` | Server | float | `1.0` | Anteil der Traces, die das SDK aufzeichnet; der Collector sampelt danach nach | aktiv |
+| `telemetry.traces.trust_remote_parent` | `BOTHY_TELEMETRY__TRACES__TRUST_REMOTE_PARENT` | Server | bool | `false` | `true`: ein eingehender `traceparent` wird Eltern-Kontext (seine Trace-ID wird `correlation_id`, sein Sampling-Flag gilt); `false`: nur Span-Link, eigener Trace | aktiv |
+| `telemetry.logs.exporter` | `BOTHY_TELEMETRY__LOGS__EXPORTER` | Server | enum(otlp, stdout, both) | `both` | `otlp`, `stdout` oder `both` | aktiv |
+| `telemetry.logs.level` | `BOTHY_TELEMETRY__LOGS__LEVEL` | Server | enum(debug, info, warn, error) | `info` | kleinste Stufe, die geschrieben wird | aktiv |
+| `telemetry.pseudonym_key_ref` | `BOTHY_TELEMETRY__PSEUDONYM_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/telemetry_pseudonym_key` | Schlüssel für HMAC-Pseudonyme; mindestens 32 Byte | aktiv |
 | `telemetry.dashboard_url` | `BOTHY_TELEMETRY__DASHBOARD_URL` | Server |  | leer | Link aus der Admin-Konsole zum Telemetrie-Backend | geplant (M6) |
 | `stats.cache_ttl` | `BOTHY_STATS__CACHE_TTL` | Server |  | `5m` | so lange gilt ein berechnetes Statistik-Ergebnis | geplant (M6) |
 | `stats.max_range` | `BOTHY_STATS__MAX_RANGE` | Server |  | `400d` | größter abfragbarer Zeitraum | geplant (M6) |
@@ -742,7 +742,7 @@ Quelle: [20-datenschutz.md](../spec/20-datenschutz.md), Abschnitt 13.
 | `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server |  | `30d` | Zeitraum je Schlüssel für IP-Pseudonyme | geplant (M1) |
 | `privacy.audit_ip_key_retention` | `BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION` | Server |  | `90d` | danach werden Schlüssel vernichtet | geplant (M1) |
 | `privacy.audit_ip_kek_ref` | `BOTHY_PRIVACY__AUDIT_IP_KEK_REF` | Server |  | `file:<secrets.dir>/audit_ip_kek` | Verweis auf den Schlüssel, mit dem die IP-Schlüssel in `audit_ip_keys` verschlüsselt sind | geplant (M1) |
-| `privacy.telemetry_pseudonym_rotation` | `BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION` | Server |  | `30d` | Wechsel des Schlüssels für pseudonyme IDs in Telemetrie | geplant (M1) |
+| `privacy.telemetry_pseudonym_rotation` | `BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION` | Server | duration | `30d` | Wechsel des Schlüssels für pseudonyme IDs in Telemetrie | aktiv |
 | `privacy.per_person_stats_enabled` | `BOTHY_PRIVACY__PER_PERSON_STATS_ENABLED` | Server |  | `false` | Statistik je Person | geplant (M6) |
 | `privacy.stats_min_group_size` | `BOTHY_PRIVACY__STATS_MIN_GROUP_SIZE` | Server |  | `5` | kleinste Gruppe für Auswertungen nach Personen | geplant (M6) |
 | `privacy.ai_notice_enabled` | `BOTHY_PRIVACY__AI_NOTICE_ENABLED` | Server |  | `true` | einmaliger KI-Hinweis je Kanal mit Agent | geplant (M7) |

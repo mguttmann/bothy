@@ -99,7 +99,7 @@ nennen nur Befehle von hier.
 | `bothy secrets init\|export` | Geheimnisse anlegen und sichern: `init --target DIR [--source DIR] [--owner DIENST=UID:GID ...] [--adopt-source]` gleicht die Ablage `_store/` mit der Quelle ab und kopiert je Dienst; `export --from DIR --age-recipient SCHLÜSSEL [--age-recipient ...] [--output DATEI\|-] [--armor]` schreibt das age-verschlüsselte Bündel; beide lesen nur ihre Flags, ohne Konfigurationsdatei und Datenbank | [16-betrieb.md](16-betrieb.md) 5.3, 5.4 |
 | `bothy healthcheck --url` | Gesundheitsprüfung für Container ohne Shell gegen den internen Listener | [16-betrieb.md](16-betrieb.md) |
 | `bothy files rescan` | Wartung: Dateien erneut prüfen lassen | [12-dateien.md](12-dateien.md) |
-| `bothy telemetry pseudonym` | Pseudonym eines Prinzipals für die Fehlersuche des Owners | [../observability/privacy.md](../observability/privacy.md) |
+| `bothy telemetry pseudonym <principal_id> [--at TIME] [--config FILE]` | Pseudonym of a principal for the owner's troubleshooting: prints `bothy.principal.pseudo_id` for the period that contains `--at` (RFC 3339, default now) and the start of that period in UTC; reads `telemetry.pseudonym_key_ref` through the secret provider, no database | [../observability/privacy.md](../observability/privacy.md) |
 | `bothy dev seed` | Testdaten, nur in `instance.environment = dev` | [../operations/environments-and-flags.md](../operations/environments-and-flags.md) |
 
 Exitcodes aller Befehle: `0` Erfolg bzw. geordnetes Ende; `1` Fehler (Start gescheitert, fataler

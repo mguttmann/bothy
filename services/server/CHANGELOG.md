@@ -111,6 +111,31 @@ documented in this file. The format is based on
   binary on `127.0.0.1` with a random port and a fresh database per test cloned from a migrated
   template; without a Docker-compatible runtime the test binary fails instead of skipping. The
   test `TestPrivilegesAfterAllMigrations` holds the grant rule for every migration.
+- `internal/platform/otel`: the one telemetry setup of the server. `Setup` installs tracer, meter
+  and logger providers that export over OTLP (gRPC or HTTP per `OTEL_EXPORTER_OTLP_*PROTOCOL`)
+  asynchronously behind one bounded in-flight budget per signal; a full queue or a failed export
+  never delays a request and is counted in `bothy.telemetry.dropped{bothy.signal}`. Logs go
+  through a level filter and a catalog allowlist to JSON on stdout and/or OTLP
+  (`telemetry.logs.exporter`); with `telemetry.enabled = false` logs stay on stdout and every
+  request still gets a trace id. `Middleware` and `RecordRoute` give each request a server span
+  named after its route pattern, the `http.server.request.duration` metric with catalog
+  attributes and one access log record; an incoming `traceparent` is only a span link unless
+  `telemetry.traces.trust_remote_parent`. `CorrelationID`, `NewCommandLogger`, `ServerErrorLog`
+  and `Pseudonymizer` (HMAC pseudonyms `bothy.principal.pseudo_id` per
+  `privacy.telemetry_pseudonym_rotation` period) complete it.
+- `internal/platform/otel/attr` (catalog attribute keys and `Allowed`) and
+  `internal/platform/otel/genai` (the `gen_ai.*` keys, the forbidden content keys and the
+  convention reference, held by a snapshot); tests keep both equal to the collector allowlist.
+- `internal/platform/buildinfo`: `Version()`, a constant held equal to `VERSION`.
+- Configuration keys `telemetry.enabled`, `telemetry.traces.sampler_ratio`,
+  `telemetry.traces.trust_remote_parent`, `telemetry.logs.exporter`, `telemetry.logs.level`,
+  `telemetry.pseudonym_key_ref`, `privacy.telemetry_pseudonym_rotation` and
+  `instance.environment`.
+- `bothy telemetry pseudonym <principal_id> [--at TIME] [--config FILE]`: prints the pseudonym of
+  a principal and the start of its period for the owner, without a database. Commands log JSON
+  through the same allowlist on stderr.
+- Lint rule (sloglint): log messages are constants, attributes are `slog.Attr` values with
+  constant keys, and functions with a context log with it; tests are exempt.
 
 ### Changed
 

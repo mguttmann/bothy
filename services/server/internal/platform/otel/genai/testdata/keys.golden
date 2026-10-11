@@ -1,0 +1,21 @@
+# gen_ai keys of internal/platform/otel/genai; regenerate with go test -update
+convention open-telemetry/semantic-conventions-genai, status Development, read 2026-10-10, commit not recorded
+key gen_ai.agent.id
+key gen_ai.agent.name
+key gen_ai.conversation.id
+key gen_ai.operation.name
+key gen_ai.provider.name
+key gen_ai.request.model
+key gen_ai.response.finish_reasons
+key gen_ai.response.model
+key gen_ai.tool.name
+key gen_ai.usage.cache_read.input_tokens
+key gen_ai.usage.cache_write.input_tokens
+key gen_ai.usage.input_tokens
+key gen_ai.usage.output_tokens
+forbidden gen_ai.input.messages
+forbidden gen_ai.output.messages
+forbidden gen_ai.system_instructions
+forbidden gen_ai.tool.call.arguments
+forbidden gen_ai.tool.call.result
+forbidden gen_ai.tool.definitions

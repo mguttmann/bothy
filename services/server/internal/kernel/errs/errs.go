@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"slices"
 	"strconv"
 	"time"
 )
@@ -297,23 +298,35 @@ func (e *Error) LogValue() slog.Value {
 	if e == nil {
 		return slog.GroupValue()
 	}
-	attrs := make([]slog.Attr, 0, 7)
-	add := func(key, value string) {
-		if value != "" {
-			attrs = append(attrs, slog.String(key, value))
-		}
+	attrs := []slog.Attr{
+		slog.String(logKeyCode, string(e.Code)),
+		slog.String(logKeyKind, e.Kind().String()),
+		slog.String(logKeyDetail, e.Detail),
+		slog.String(logKeyReason, e.Reason),
+		slog.String(logKeyHint, e.Hint),
+		slog.String(logKeyCause, e.Cause),
 	}
-	add("code", string(e.Code))
-	attrs = append(attrs, slog.String("kind", e.Kind().String()))
-	add("detail", e.Detail)
-	add("reason", e.Reason)
-	add("hint", e.Hint)
-	add("cause", e.Cause)
 	if e.err != nil {
-		attrs = append(attrs, slog.String("error", e.err.Error()))
+		attrs = append(attrs, slog.String(logKeyError, e.err.Error()))
 	}
+	// Unset fields stay out; kind and the wrapped error are always written as they are.
+	attrs = slices.DeleteFunc(attrs, func(a slog.Attr) bool {
+		return a.Key != logKeyKind && a.Key != logKeyError && a.Value.String() == ""
+	})
 	return slog.GroupValue(attrs...)
 }
+
+// The keys of the group LogValue writes. They are constants because the linter sloglint
+// (no-raw-keys, docs/observability/signals.md "Logs") accepts no other keys.
+const (
+	logKeyCode   = "code"
+	logKeyKind   = "kind"
+	logKeyDetail = "detail"
+	logKeyReason = "reason"
+	logKeyHint   = "hint"
+	logKeyCause  = "cause"
+	logKeyError  = "error"
+)
 
 // As finds the first *Error in the chain of err (through fmt.Errorf %w and errors.Join). It
 // reports false for nil, for chains without an *Error and for a typed nil *Error, so a true
