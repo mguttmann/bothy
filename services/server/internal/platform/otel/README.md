@@ -25,6 +25,7 @@ collector is counted.
 | `resource.go` | resource of the process |
 | `queue.go` | in-flight budget and front queue of one signal |
 | `spans.go` | span processor, attribute filter and counting span exporter |
+| `txnspan.go` | `SubscriberSpan`, the span `txn.subscribe <module>` of an in-transaction subscriber (kernel/txn tracer, M1-13) |
 | `logexport.go` | log processor and counting log exporter |
 | `metrics.go` | `bothy.telemetry.dropped`, the view of `http.server.request.duration`, counting metric exporter |
 | `logs.go` | slog handler chain, `NewCommandLogger`, `ParseLevel`, `CorrelationID`, `ServerErrorLog` |

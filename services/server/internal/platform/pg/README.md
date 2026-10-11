@@ -1,6 +1,6 @@
 # Package `platform/pg`
 
-Status: built (M1-12). Normative are [02-architektur.md](../../../../../docs/spec/02-architektur.md)
+Status: built (M1-12; unit of work M1-13). Normative are [02-architektur.md](../../../../../docs/spec/02-architektur.md)
 "Fristen", "Fehlerarten", "Start" and "Befehle des Binarys",
 [16-betrieb.md](../../../../../docs/spec/16-betrieb.md) "Datenbank" ("Rollen", "Einstellungen")
 and "Upgrade", [upgrade.md](../../../../../docs/operations/upgrade.md) and ADR 0006 and 0007; where
@@ -18,6 +18,8 @@ migrator behind `bothy migrate`. Migrations never run at `bothy serve` (R-AR-16)
 |---|---|
 | `config.go` | `Config`, `Validate`, `WithAppName`, `ForMigrate`, the connection string and session parameters |
 | `pool.go` | `Open`, `Pool` (`WaitReady`, `Ping`, `Acquire`, `Begin`, `Stat`, `Close`, `OpenSQL`), `Connect` |
+| `unit.go` | `UnitConfig`, `UnitOfWork` (`NewUnitOfWork`, `Do`), `Tx`, `Querier` |
+| `querier.go` | `DBTX`, `Pool.Exec`, `Pool.Query`, `Pool.QueryRow` |
 | `timeouts.go` | `Timeouts`, `SetLocalTimeouts` |
 | `tracer.go` | otelpgx tracer without query parameters, statement errors redacted |
 | `schema.go` | `CheckSchema`, `SchemaTooOldError`, `RequiredSchemaVersion` |
@@ -53,8 +55,65 @@ migrator behind `bothy migrate`. Migrations never run at `bothy serve` (R-AR-16)
 
 `SetLocalTimeouts(ctx, tx, Timeouts{Statement, Lock, IdleInTx})` overrides the deadlines for one
 transaction with `set_config(..., true)`, the function form of `SET LOCAL`, so values travel as
-parameters. A zero field keeps the session value; a negative one is an error. The unit of work of
-M1-13 builds on it.
+parameters. A zero field keeps the session value; a negative one is an error. The unit of work
+applies it to every transaction.
+
+## Unit of work
+
+`NewUnitOfWork(pool, cfg, reg)` implements `kernel/txn.UnitOfWork`, and `platform/pg` is the only
+package that begins, commits or rolls back a transaction (02 "Ablauf", R-AR-06; the Semgrep rule
+`bothy-go-tx-only-in-platform-pg` flags `Begin`, `BeginTx`, `pgx.BeginFunc` and
+`pgx.BeginTxFunc` elsewhere). `cfg` comes from `wire.UnitConfig`: `database.tx_retry_max`,
+`database.statement_timeout`, `database.lock_timeout`, `database.idle_in_tx_timeout`; `reg` from
+`wire.NewTxnRegistry`, sealed. `Do` before `Seal` is an internal error.
+
+One attempt of an outermost `Do`:
+
+1. `BEGIN` with `READ COMMITTED` set explicitly, never the database default (ADR 0009).
+2. `SET LOCAL` of the three deadlines (`SetLocalTimeouts`).
+3. Phase `rights_begin`: the authz hook, only with `txn.RightsChange`.
+4. Phase `work`: the function of the use case. Events published here reach their subscribers
+   synchronously, in registration order, each in a span `txn.subscribe <module>`.
+5. Phase `rights_check`: the authz hook, only with `txn.RightsChange`.
+6. Phase `sync`, then phase `audit`: their hooks.
+7. `COMMIT`.
+
+A phase without a hook is skipped. Any error rolls back and comes back unchanged (a veto stays
+the caller's error); a panic rolls back and is raised again, so the HTTP chain answers `500`. The
+rollback runs even when the request context is gone, bounded by `database.statement_timeout`.
+
+Retry: only the outermost unit retries, and only when the error carries SQLSTATE `40P01`
+(deadlock) or `55P03` (lock not available) and the context is still live; at most
+`database.tx_retry_max` times, so there are `1 + database.tx_retry_max` attempts. Every attempt
+re-runs the function with a fresh per-unit state (`txn.Load`, `txn.Store`) and publishes its
+events again. When the last attempt fails, `Do` returns the `kernel/errs` error of code
+`unavailable` (503) that wraps the database error; the SQLSTATE stays in the log. Other errors are
+never retried. The wait at an idempotency key (02 "Idempotenz im Unit of Work") must not surface
+as a retryable `55P03`; M1-20 maps it to `request_in_progress`.
+
+Nesting: `Do` inside a unit joins the ambient transaction and runs its function in the current
+phase; it never commits, rolls back or retries, and its error goes to the outer `Do`. A nested
+`txn.RightsChange` is an internal error unless the outermost unit declared `RightsChange` with
+all its principals, because the rights begin hook must lock `permission_version` before any
+domain row (03 "Sperrreihenfolge" item 1).
+
+Repositories write through `Tx(ctx)` (internal error outside a unit) or run statements on
+`Querier(ctx, pool)`: the ambient transaction inside a unit, the pool outside. The pool methods
+`Exec`, `Query` and `QueryRow` wait at most `database.acquire_timeout` for a connection.
+
+```go
+uow := pg.NewUnitOfWork(pool, unitCfg, reg)
+err := uow.Do(ctx, func(ctx context.Context) error {
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "UPDATE grants SET revoked_at = now() WHERE id = $1", id); err != nil {
+		return err
+	}
+	return txn.Publish(ctx, authz.GrantChanged{ID: id})
+}, txn.RightsChange(subject))
+```
 
 ## Roles and bootstrap
 
@@ -109,9 +168,12 @@ error text.
 ## Tests
 
 Integration tests use [`pgtest`](pgtest/README.md) and need a Docker-compatible runtime; without
-one the test binary fails (plan P-09). `go test -race ./internal/platform/pg/...`.
+one the test binary fails (plan P-09). `go test -race ./internal/platform/pg/...`. The tests of the unit of work register their hooks
+and subscribers through the stand-in module `internal/fakemodule`, because the registry rejects
+handlers of a platform package.
 
 ## Not covered here
 
-Unit of work and retries (M1-13), the `LISTEN` connection (M1-16), River migrations (M1-14), the
+The phase hooks of authz, sync and audit (M1-29, M1-16, M1-24), idempotency keys in the unit
+of work (M1-20), the `LISTEN` connection (M1-16), River migrations (M1-14), the
 instance row (M1-15), the backup requirement of `migrate` (M7-02), pool metrics (M1-68).

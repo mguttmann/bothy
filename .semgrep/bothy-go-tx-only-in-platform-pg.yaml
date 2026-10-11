@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: Apache-2.0
+rules:
+  - id: bothy-go-tx-only-in-platform-pg
+    languages: [go]
+    severity: ERROR
+    message: >-
+      Only internal/platform/pg opens and ends transactions and creates units of work
+      (docs/spec/02-architektur.md "Ablauf", R-AR-06): a write use case runs in the unit of work
+      (txn.UnitOfWork.Do) and writes through the ambient transaction (pg.Tx, pg.Querier). A
+      transaction opened or committed elsewhere skips the phase hooks of authz, sync and audit,
+      the lock order, the retry and the deadlines; a unit built elsewhere fakes the phase.
+    paths:
+      # Test code (Go tests, services/*/test, the load tests of services/*/perf) and the one
+      # package that owns transactions.
+      exclude: ["*_test.go", "test/", "tests/", "testsuite/", "/services/*/perf/",
+                "/services/server/internal/platform/pg/"]
+    pattern-either:
+      - pattern: $X.Begin(...)
+      - pattern: $X.BeginTx(...)
+      - pattern: pgx.BeginFunc(...)
+      - pattern: pgx.BeginTxFunc(...)
+      - pattern: $X.Commit(...)
+      - pattern: $X.Rollback(...)
+      - pattern: txn.NewUnit(...)
+      - pattern: txn.WithUnit(...)
