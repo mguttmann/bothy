@@ -1,94 +1,94 @@
-# Umgebungen und Feature-Flags
+# Environments and feature flags
 
-Status: Entwurf M0. Anleitung zu [16-betrieb.md](../spec/16-betrieb.md) 6.
+Status: draft M0. Guide to [16-operations.md](../spec/16-operations.md) 6.
 
-## 1. Umgebungen
+## 1. Environments
 
-| Umgebung | Wer | Wo | Daten | Images |
+| Environment | Who | Where | Data | Images |
 |---|---|---|---|---|
-| `dev` | Entwicklung | Arbeitsrechner, Compose | synthetisch (Seed-Daten der Tests) | lokal gebaut oder beliebige Version |
-| `staging` | Abnahme vor stable | eigener Host oder Cloud, Compose | synthetisch oder Import aus einer Test-Quelle | Release-Kandidat per Digest |
-| `prod` | Betrieb | Zielsystem | echt | Release per Digest |
+| `dev` | development | workstation, Compose | synthetic (seed data of the tests) | built locally or any version |
+| `staging` | acceptance before stable | own host or cloud, Compose | synthetic or imported from a test source | release candidate by digest |
+| `prod` | operations | target system | real | release by digest |
 
-### 1.1 Was sich unterscheiden darf
+### 1.1 What may differ
 
-Nur Konfiguration: `instance.environment`, `server.public_url`, Geheimnisse, Push-Umgebung
-(APNs-Sandbox in `dev`), Telemetrie-Overlay, Pläne der Sicherung. Code, Images und Migrationen
-sind gleich.
+Only configuration: `instance.environment`, `server.public_url`, secrets, push environment
+(APNs sandbox in `dev`), telemetry overlay, backup schedules. Code, images and migrations
+are the same.
 
-### 1.2 Was `instance.environment` bewirkt
+### 1.2 What `instance.environment` does
 
-| Wirkung | `dev` | `staging` | `prod` |
+| Effect | `dev` | `staging` | `prod` |
 |---|---|---|---|
-| HTTP ohne TLS auf Loopback für Clients | erlaubt | nein | nein |
-| Banner in den Apps | "Dev" | "Staging" | keins |
-| `deployment.environment.name` in Telemetrie | `dev` | `staging` | `prod` |
-| Warnung ohne Off-site-Ziel | Hinweis | Warnung in der Admin-Konsole | Warnung in der Admin-Konsole bei jeder Anmeldung des Owners |
-| Seed-Befehle (`bothy dev seed`) | erlaubt | nein | nein |
+| HTTP without TLS on loopback for clients | allowed | no | no |
+| Banner in the apps | "Dev" | "Staging" | none |
+| `deployment.environment.name` in telemetry | `dev` | `staging` | `prod` |
+| Warning without an off-site target | notice | warning in the admin console | warning in the admin console at every login of the owner |
+| Seed commands (`bothy dev seed`) | allowed | no | no |
 
-### 1.3 Beförderung
+### 1.3 Promotion
 
-1. Beta (`server/vX.Y.Z-beta.N`) nach `staging`; Portabilitätstest über eine Produkt-Beta
-   (`vA.B.C-beta.M`), deren Bündel `BOTHY_VERSION` auf diese Server-Beta setzt
+1. Beta (`server/vX.Y.Z-beta.N`) to `staging`; portability test via a product beta
+   (`vA.B.C-beta.M`) whose bundle sets `BOTHY_VERSION` to this server beta
    (`make release-prep COMPONENT=bothy SERVER_VERSION=X.Y.Z-beta.N`,
-   [18-release.md](../spec/18-release.md) 2.1; [16-betrieb.md](../spec/16-betrieb.md) 11.1), und
-   Abnahme. Die Nummern beider Tags hängen nicht zusammen: Jede Komponente hat ihre eigene
-   Version ([18-release.md](../spec/18-release.md) 1).
-2. Bewährt: stable (`X.Y.Z`) aus demselben Commit nach `staging`, kurze Prüfung, dann derselbe
-   Digest nach `prod` ([18-release.md](../spec/18-release.md) 5). Neue Installationen bekommen
-   die stabile Server-Version erst mit einem stabilen Produkt-Release, dessen Bündel sie pinnt;
-   eine Server-Beta im Bündel eines stabilen Produkts lehnt `make release-build` ab
+   [18-release.md](../spec/18-release.md) 2.1; [16-operations.md](../spec/16-operations.md) 11.1), and
+   acceptance. The numbers of the two tags are not related: every component has its own
+   version ([18-release.md](../spec/18-release.md) 1).
+2. Proven: stable (`X.Y.Z`) from the same commit to `staging`, a short check, then the same
+   digest to `prod` ([18-release.md](../spec/18-release.md) 5). New installations only get the
+   stable server version with a stable product release whose bundle pins it; `make release-build`
+   rejects a server beta in the bundle of a stable product
    ([18-release.md](../spec/18-release.md) 2.1).
-3. Jede Umgebung hat eigene Geheimnisse, eigene `instance_id`, eigene Push-Schlüssel.
-4. Produktionsdaten verlassen `prod` nie. Fehler, die nur mit echten Daten auftreten, untersucht
-   der Owner in `prod` mit `access.view_as` und Traces, nicht mit einer Kopie.
+3. Every environment has its own secrets, its own `instance_id`, its own push keys.
+4. Production data never leaves `prod`. The owner investigates errors that only occur with real
+   data in `prod` with `access.view_as` and traces, not with a copy.
 
-## 2. Feature-Flags
+## 2. Feature flags
 
-Registrierung und Aufräum-Gate: [ADR 0064](../adr/0064-feature-flag-registrierung-mit-aufraeum-gate.md).
+Registration and cleanup gate: [ADR 0064](../adr/0064-feature-flag-registration-with-a-cleanup-gate.md).
 
-### 2.1 Arten
+### 2.1 Kinds
 
-| Art | Zweck | Lebensdauer | Beispiel |
+| Kind | Purpose | Lifetime | Example |
 |---|---|---|---|
-| `release` | neue Funktion schrittweise freischalten | bis `remove_by` (eine Version im Code) | neue Live-Box-Darstellung |
-| `option` | dauerhafter Produktschalter des Owners | dauerhaft, dokumentiert in [configuration.md](configuration.md) 7 | `dm.enabled` |
+| `release` | roll out a new feature step by step | until `remove_by` (a version in the code) | new live box display |
+| `option` | permanent product switch of the owner | permanent, documented in [configuration.md](configuration.md) 7 | `dm.enabled` |
 
-Flags sind keine Konfiguration: keine Zahlen, keine Grenzen, keine Sicherheitsgrenzen, keine
-Geheimnisse. Ein Flag darf eine Funktion nur ein- oder ausschalten.
+Flags are not configuration: no numbers, no limits, no security boundaries, no
+secrets. A flag may only switch a feature on or off.
 
-### 2.2 Registrierung im Code
+### 2.2 Registration in code
 
-Jedes Flag ist an einer Stelle im Server registriert mit: Schlüssel, Art, Beschreibung (Englisch,
-für die Konsole), Standard, bei `release` die Version `remove_by` und das zuständige Modul.
-Unbekannte Schlüssel in der Tabelle `feature_flags` wertet der Server als aus und zeigt sie in
-der Konsole als "verwaist".
+Every flag is registered in one place in the server with: key, kind, description (English,
+for the console), default, for `release` the version `remove_by`, and the responsible module.
+The server evaluates unknown keys in the table `feature_flags` as off and shows them in
+the console as "orphaned".
 
-### 2.3 Auswertung
+### 2.3 Evaluation
 
 ```
-wert = flag.enabled
-wenn principal oder eine seiner gültigen Gruppen in flag.rollout steht:
-    wert = nicht flag.enabled
+value = flag.enabled
+if principal or one of its valid groups is in flag.rollout:
+    value = not flag.enabled
 ```
 
-Der Server wertet aus, nie der Client. Clients bekommen die für sie gültigen Werte per REST
-(`instance.read`) und laden neu, wenn `instance.updated` einen geänderten Schlüssel nennt.
-Auf Agenten und Apps wirken Flags wie auf Menschen; `rollout` kennt aber nur Menschen und Gruppen.
+The server evaluates, never the client. Clients receive the values valid for them via REST
+(`instance.read`) and reload when `instance.updated` names a changed key.
+Flags act on agents and apps as on people; `rollout`, however, only knows people and groups.
 
-### 2.4 Admin-Konsole
+### 2.4 Admin console
 
-| Ansicht | Inhalt |
+| View | Content |
 |---|---|
-| Liste | Schlüssel, Art, Beschreibung, globaler Wert, Zahl der Ausnahmen, letzte Änderung |
-| Detail | Ausnahmen (Personen, Gruppen), Verlauf aus dem Audit-Log |
-| Ändern | `feature_flag.update`: Owner, Step-up, Grund, Audit |
+| List | key, kind, description, global value, number of exceptions, last change |
+| Detail | exceptions (people, groups), history from the audit log |
+| Change | `feature_flag.update`: owner, step-up, reason, audit |
 
-### 2.5 Aufräumregel
+### 2.5 Cleanup rule
 
-1. Ein `release`-Flag nennt `remove_by`. Ein Gate-Check schlägt fehl, wenn die Version in
-   `VERSION` des Servers `remove_by` erreicht und das Flag noch registriert ist.
-2. Wer das Flag entfernt, entfernt Code und Registrierung und löscht die Zeile in derselben
-   Änderung per Migration.
-3. Ein `release`-Flag wird nie zu `option` umgedeutet; wenn ein Schalter dauerhaft bleiben soll,
-   entsteht ein neues `option`-Flag mit eigenem Schlüssel.
+1. A `release` flag names `remove_by`. A gate check fails when the version in
+   `VERSION` of the server reaches `remove_by` and the flag is still registered.
+2. Whoever removes the flag removes code and registration and deletes the row in the same
+   change via a migration.
+3. A `release` flag is never reinterpreted as `option`; if a switch is to stay permanently,
+   a new `option` flag with its own key is created.

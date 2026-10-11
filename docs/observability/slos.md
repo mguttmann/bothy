@@ -1,86 +1,86 @@
 # Service Level Objectives
 
-Status: Entwurf M0. Entscheidung: ADR 0035. Quelle aller Zahlen sind die Sloth-Dateien unter
-[infra/observability/slo/](../../infra/observability/slo/); die Tabelle unten gibt sie wieder.
-Ein Check vergleicht Tabelle und Dateien (Bau-Ticket "SLO-Docs-Check").
+Status: draft M0. Decision: ADR 0035. The source of all numbers is the Sloth files under
+[infra/observability/slo/](../../infra/observability/slo/); the table below reproduces them.
+A check compares table and files (build ticket "SLO docs check").
 
-## 1. Grundsätze
+## 1. Principles
 
-1. Ein SLO misst, was Menschen spüren: Antworten der API, Ankunft von Nachrichten, Wiederverbinden,
-   Push, Start und Dauer von Agenten-Läufen.
-2. Ein SLI ist ein Verhältnis guter zu allen Ereignissen aus Histogrammen und Zählern
-   ([signals.md](signals.md)). Schwellen sind Bucket-Grenzen.
-3. Zeitraum: 30 Tage, rollierend (Standard von Sloth).
-4. Fehlerbudget = 1 minus Ziel. Ein verbrauchtes Budget heißt: Zuverlässigkeit vor neuen Funktionen,
-   bis das Budget sich erholt (Regel für die Etappenplanung).
-5. Alle Ziele sind Startwerte. Nach 30 Tagen Messung im Betrieb prüft der Owner sie; eine Änderung
-   ist eine Änderung der Sloth-Datei mit Begründung im Commit.
+1. An SLO measures what people feel: API responses, arrival of messages, reconnecting,
+   push, start and duration of agent runs.
+2. An SLI is a ratio of good events to all events, taken from histograms and counters
+   ([signals.md](signals.md)). Thresholds are bucket boundaries.
+3. Period: 30 days, rolling (Sloth default).
+4. Error budget = 1 minus target. A spent budget means: reliability before new features,
+   until the budget recovers (rule for milestone planning).
+5. All targets are starting values. After 30 days of measurement in operation the owner checks them; a change
+   is a change of the Sloth file with the reason in the commit.
 
 ## 2. SLOs
 
-| SLO (`service/name`) | SLI: gut | SLI: alle | Schwelle | Ziel | Alarm | Metrik der eigenen Messung |
+| SLO (`service/name`) | SLI: good | SLI: all | Threshold | Target | Alert | Metric of the own measurement |
 |---|---|---|---|---|---|---|
-| `bothy-api/requests-availability` | REST-Anfragen ohne 5xx | REST-Anfragen ohne `/api/v1/gateway` | keine | 99.9 % | Page, Ticket | `sli.api_availability` |
-| `bothy-sync/delivery-latency` | Live-Zustellungen dauerhafter Ereignisse bis Schwelle | alle Live-Zustellungen dauerhafter Ereignisse | 0.5 s | 99.5 % | Page, Ticket | `sli.delivery_latency` |
-| `bothy-sync/reconnect` | Verbindungen mit `ok` bis Schwelle | Verbindungen ohne `client_error` | 2.5 s | 99.0 % | Page, Ticket | `sli.reconnect` |
-| `bothy-push/provider-acceptance` | Sendungen `accepted` | Sendungen ohne `rejected_token` | keine | 99.5 % | Page, Ticket | `sli.push_acceptance` |
-| `bothy-agents/run-start` | Läufe `started` bis Schwelle | Läufe ohne `cancelled` | 7.5 s | 99.0 % | Page, Ticket | `sli.run_start` |
-| `bothy-agents/turn-duration` | abgeschlossene Läufe bis Schwelle | abgeschlossene Läufe | 600 s | 95.0 % | nur Ticket | `sli.turn_duration` |
+| `bothy-api/requests-availability` | REST requests without 5xx | REST requests without `/api/v1/gateway` | none | 99.9 % | Page, Ticket | `sli.api_availability` |
+| `bothy-sync/delivery-latency` | live deliveries of durable events up to the threshold | all live deliveries of durable events | 0.5 s | 99.5 % | Page, Ticket | `sli.delivery_latency` |
+| `bothy-sync/reconnect` | connections with `ok` up to the threshold | connections without `client_error` | 2.5 s | 99.0 % | Page, Ticket | `sli.reconnect` |
+| `bothy-push/provider-acceptance` | sends `accepted` | sends without `rejected_token` | none | 99.5 % | Page, Ticket | `sli.push_acceptance` |
+| `bothy-agents/run-start` | runs `started` up to the threshold | runs without `cancelled` | 7.5 s | 99.0 % | Page, Ticket | `sli.run_start` |
+| `bothy-agents/turn-duration` | completed runs up to the threshold | completed runs | 600 s | 95.0 % | Ticket only | `sli.turn_duration` |
 
-Die Spalte "Metrik der eigenen Messung" gibt das Label `bothy_sli_metric` des SLO in der
-Sloth-Datei wieder; es ordnet das SLO seiner Metrik in `stats_minutes` zu
-([25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 3.3). Die Labels setzt das
-Bau-Ticket PLAN M6-11; bis dahin ist diese Spalte die Vorgabe dafür.
+The column "Metric of the own measurement" reproduces the label `bothy_sli_metric` of the SLO in the
+Sloth file; it maps the SLO to its metric in `stats_minutes`
+([25-visualization.md](../spec/25-visualization.md), section 3.3). The build ticket PLAN M6-11
+sets the labels; until then this column is the requirement for them.
 
-Begründungen:
+Rationale:
 
-1. Verfügbarkeit ohne Gateway-Upgrade: Die Dauer eines Upgrades ist die Verbindungsdauer, kein
-   Antwortverhalten. Das Gateway misst `reconnect`.
-2. Zustellung nur live: Nachholen nach einer Pause misst `bothy.gateway.catchup.duration`; dessen
-   Dauer hängt am Rückstand des Clients, nicht am Server.
-3. Push misst die Annahme beim Anbieter. Ob ein Gerät die Meldung zeigt, sieht der Server nicht;
-   die Abruf-Quote (`bothy.push.fetch`) ist ein Hinweis, kein SLI.
-4. `run-start` schließt Adapter und Netz ein: Ist ein Adapter offline, verbrennt das Budget. Das
-   ist gewollt; der Betreiber betreibt auch den Adapter.
-5. `turn-duration` hängt an Modell und Aufgabe. Ein Page-Alarm wäre meist nicht vom Betreiber
-   behebbar; darum nur Ticket.
+1. Availability without the gateway upgrade: the duration of an upgrade is the connection duration, not
+   response behavior. The gateway measures `reconnect`.
+2. Delivery only live: catch-up after a pause is measured by `bothy.gateway.catchup.duration`; its
+   duration depends on the backlog of the client, not on the server.
+3. Push measures the acceptance by the provider. Whether a device shows the notification, the server does not see;
+   the fetch rate (`bothy.push.fetch`) is a hint, not an SLI.
+4. `run-start` includes adapter and network: if an adapter is offline, the budget burns. That
+   is intended; the instance operator also operates the adapter.
+5. `turn-duration` depends on model and task. A page alert would usually not be fixable by the
+   instance operator; therefore ticket only.
 
-## 3. Burn-Rate-Alarme
+## 3. Burn rate alerts
 
-Sloth erzeugt Mehrfenster-Alarme (https://github.com/slok/sloth, abgerufen 2026-10-10) [belegt],
-nach dem Verfahren des Google SRE Workbook (https://sre.google/workbook/alerting-on-slos/,
-abgerufen 2026-10-10) [belegt]. In den erzeugten Regeln (Sloth v0.16.0) stehen:
+Sloth generates multi-window alerts (https://github.com/slok/sloth, retrieved 2026-10-10) [verified],
+following the method of the Google SRE Workbook (https://sre.google/workbook/alerting-on-slos/,
+retrieved 2026-10-10) [verified]. The generated rules (Sloth v0.16.0) contain:
 
-| Stufe | Kurzes Fenster | Langes Fenster | Burn-Rate |
+| Level | Short window | Long window | Burn rate |
 |---|---|---|---|
 | page | 5m | 1h | 14.4 |
 | page | 30m | 6h | 6 |
 | ticket | 2h | 1d | 3 |
 | ticket | 6h | 3d | 1 |
 
-Ein Alarm feuert nur, wenn beide Fenster über der Schwelle liegen.
+An alert fires only when both windows are above the threshold.
 
-## 4. Erzeugen und prüfen
+## 4. Generate and check
 
 ```
 sloth generate -i infra/observability/slo/api.yaml -o infra/observability/prometheus/rules/slo-api.yaml
 promtool check rules infra/observability/prometheus/rules/*.yaml
 ```
 
-Die erzeugten Dateien sind eingecheckt und tragen den Kopf "DO NOT EDIT". Ein Check erzeugt sie
-neu und vergleicht (kein Unterschied erlaubt). Am 2026-10-10 lokal mit Sloth v0.16.0 erzeugt und
-mit `promtool` aus Prometheus v3.15.0 geprüft: gültig [belegt].
+The generated files are checked in and carry the header "DO NOT EDIT". A check regenerates them
+and compares (no difference allowed). Generated locally on 2026-10-10 with Sloth v0.16.0 and
+checked with `promtool` from Prometheus v3.15.0: valid [verified].
 
-## 5. Sichtbarkeit
+## 5. Visibility
 
-Das Dashboard `bothy-slo-overview` zeigt Ziel, Erfüllung, Restbudget und Burn-Rate aus den
-Recording-Regeln `slo:objective:ratio`, `slo:sli_error:ratio_rate30d`,
-`slo:period_error_budget_remaining:ratio` und `slo:current_burn_rate:ratio`.
+The dashboard `bothy-slo-overview` shows target, attainment, remaining budget and burn rate from the
+recording rules `slo:objective:ratio`, `slo:sli_error:ratio_rate30d`,
+`slo:period_error_budget_remaining:ratio` and `slo:current_burn_rate:ratio`.
 
-## 6. Eigene Messung in den Apps
+## 6. Own measurement in the apps
 
-Die SLO-Ampel der Apps und der Konsole rechnet nicht mit Prometheus, sondern mit der eigenen
-Messung des Servers (`stats_minutes`, [25-visualisierung.md](../spec/25-visualisierung.md),
-Abschnitt 3 und 6.4). Ziele, Schwellen und Zeitraum erzeugt ein Generator aus denselben
-Sloth-Dateien; ein Check hält sie gleich. Die Ampel trägt das Etikett "eigene Messung" und
-alarmiert nicht; Alarme bleiben bei den Burn-Rate-Regeln aus Abschnitt 3.
+The SLO traffic light of the apps and the console does not compute with Prometheus but with the
+server's own measurement (`stats_minutes`, [25-visualization.md](../spec/25-visualization.md),
+section 3 and 6.4). A generator produces targets, thresholds and period from the same
+Sloth files; a check keeps them equal. The traffic light carries the label "own measurement" and
+does not alert; alerts stay with the burn rate rules from section 3.

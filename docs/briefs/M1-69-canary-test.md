@@ -1,6 +1,6 @@
 # M1-69: Canary test across all outputs (SEC-T10)
 
-Status: ready | Depends on: M1-68, M1-71 | Etappe: M1
+Status: ready | Depends on: M1-68, M1-71 | Milestone: M1
 
 ## Goal
 
@@ -8,32 +8,32 @@ After this ticket a Go test package `services/server/test/canary` runs a scenari
 enabled operation and every client gateway op of the server core with run-unique canary values
 (content, names, e-mail addresses, IP addresses, tokens and server secrets). It proves that none of
 them appears in logs, traces, metrics, audit rows, error responses or events delivered to
-principals without read rights, and that human principal IDs appear in telemetry only as
+principals without read permissions, and that human principal IDs appear in telemetry only as
 pseudonyms and device IDs never (DP-T09). This is the test behind threat T-LG-01 and the regression guard for every
 later ticket: a new operation that is not in the scenario makes the test fail.
 
 ## Read first
 
-- `docs/spec/19-sicherheit.md`: sections "Logs ohne Geheimnisse und ohne Inhalte" (SEC-LOG-1 to
-  SEC-LOG-7), "Geheimnisse" (SEC-SEC-2, SEC-SEC-3), "Eingaben und Ausgaben" (SEC-IN-2, SEC-IN-4,
+- `docs/spec/19-security.md`: sections "Logs without secrets and without content" (SEC-LOG-1 to
+  SEC-LOG-7), "Secrets" (SEC-SEC-2, SEC-SEC-3), "Inputs and outputs" (SEC-IN-2, SEC-IN-4,
   SEC-OUT-5), "Tests" (SEC-T10).
-- `docs/spec/20-datenschutz.md`: "Audit-Log und IP-Adressen", "Telemetrie", "Tests" (DP-T09).
-- `docs/spec/17-observability.md`: "Grundregeln", "Datenschutz", "Tests, die diese Regeln halten".
-- `docs/observability/privacy.md` (all sections, especially "Was nie in Telemetrie steht",
-  "Pseudonyme", "Kanarien-Test (Gate)"), `docs/observability/signals.md` ("Kardinalität",
-  "Attribute in Spans und Logs", "Logs"), `docs/observability/audit-vs-telemetry.md`.
-- `docs/spec/03-datenmodell.md`: tables `audit_events`, `event_log`, `auth_sessions` (`last_ip`),
+- `docs/spec/20-privacy.md`: "Audit log and IP addresses", "Telemetry", "Tests" (DP-T09).
+- `docs/spec/17-observability.md`: "Basic rules", "Privacy", "Tests that hold these rules".
+- `docs/observability/privacy.md` (all sections, especially "What never goes into telemetry",
+  "Pseudonyms", "Canary test (gate)"), `docs/observability/signals.md` ("Cardinality",
+  "Attributes in spans and logs", "Logs"), `docs/observability/audit-vs-telemetry.md`.
+- `docs/spec/03-data-model.md`: tables `audit_events`, `event_log`, `auth_sessions` (`last_ip`),
   `owners` (`reason`), `grants` (`reason`), `messages`, `message_revisions`.
-- `docs/spec/04-sync-protokoll.md`: "Umschlag (Envelope)" (payload rules 1 to 3), "Nachholen
-  (Catch-up)", "Sichtbarkeit bei Rechte-Änderungen".
-- `docs/spec/06-api.md`: "Grundregeln" (row Korrelation), "Fehler", "Idempotenz",
-  "Authentifizierung je Prinzipal-Art".
-- `docs/spec/08-identitaet.md`: "Lokale Konten", "Einladungs-Code", "Erstinstallation",
-  "Geräte", "Token-Modell", "API-Tokens für Agenten, Apps und Werkzeuge".
+- `docs/spec/04-sync-protocol.md`: "Envelope" (payload rules 1 to 3), "Catch-up",
+  "Visibility on permission changes".
+- `docs/spec/06-api.md`: "Basic rules" (row Correlation), "Errors", "Idempotency",
+  "Authentication per principal kind".
+- `docs/spec/08-identity.md`: "Local accounts", "Enrollment code", "Initial installation",
+  "Devices", "Token model", "API tokens for agents, apps and tools".
 - ADRs: 0011 (secret provider), 0021 (audit separate from telemetry), 0034 (OpenTelemetry via
   collector), 0061 (token format, if present).
 - `docs/security/threat-model.md`: T-LG-01.
-- `docs/PLAN.md`: section "M1 Fundament", rows M1-69 and M1-73 (the collector part of the canary
+- `docs/PLAN.md`: section "M1 Foundation", rows M1-69 and M1-73 (the collector part of the canary
   belongs to M1-73).
 - `services/server/api/operations.yaml` (enabled operations, P-04), `docs/api/openapi.yaml`,
   `docs/api/asyncapi.yaml` (client ops `identify`, `resume`, `heartbeat`, `reauth`, `focus`,
@@ -65,13 +65,13 @@ later ticket: a new operation that is not in the scenario makes the test fail.
 9. SEC-T10: canary values through all ways of the server core; none appears in logs, traces,
    metrics, audit details, error responses or foreign events (19 "Tests").
 10. DP-T09: no content and no clear IDs in telemetry (20 "Tests"); human principal IDs only
-    as `bothy.principal.pseudo_id`; device IDs never (19 SEC-LOG-4, 20 "Telemetrie", privacy.md
-    "Pseudonyme").
+    as `bothy.principal.pseudo_id`; device IDs never (19 SEC-LOG-4, 20 "Telemetry", privacy.md
+    "Pseudonyms").
 11. SEC-LOG-2, SEC-LOG-3, SEC-LOG-4, SEC-LOG-5, SEC-LOG-6: header allow list, route patterns,
     no content, IP addresses only pseudonymised in the audit log, telemetry attributes only from
     the catalogue.
 12. SEC-SEC-3: secrets never in events, audit details, telemetry or error messages.
-13. SEC-OUT-5 and 06 "Fehler": problem bodies never contain content, secrets or internal paths.
+13. SEC-OUT-5 and 06 "Errors": problem bodies never contain content, secrets or internal paths.
 
 ## Scope
 
@@ -100,7 +100,7 @@ later ticket: a new operation that is not in the scenario makes the test fail.
 4. Fixes of leaks the test finds, in the owning module, each with its own regression unit test in
    that module (see Boundaries).
 5. Documentation: `services/server/README.md` (list of test packages), `services/server/CHANGELOG.md`
-   under "Unreleased" (Added), `docs/observability/privacy.md` section "Kanarien-Test (Gate)": one
+   under "Unreleased" (Added), `docs/observability/privacy.md` section "Canary test (gate)": one
    sentence naming `services/server/test/canary` as the in-process part and M1-73 as the collector
    part.
 
@@ -114,9 +114,9 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
   in this process; PostgreSQL 18 from `internal/platform/pg/pgtest`; migrations as
   `bothy migrate up --bootstrap` runs them; secrets created as `bothy secrets init` creates them, in
   `tb.TempDir()`; public and internal listener on `127.0.0.1:0`; the first owner created through the
-  same application service that `bothy setup bootstrap-owner` calls (08 "Erstinstallation"), then
-  enrolled with its enrollment code and fresh ES256 device keys (08 "Einladungs-Code",
-  "Registrierung"); everything stopped in `tb.Cleanup` in reverse order.
+  same application service that `bothy setup bootstrap-owner` calls (08 "Initial installation"), then
+  enrolled with its enrollment code and fresh ES256 device keys (08 "Enrollment code",
+  "Registration"); everything stopped in `tb.Cleanup` in reverse order.
 - `type Options struct { Config map[string]string; LogWriter io.Writer; Telemetry *TelemetrySinks;
   EgressDenyAll bool; Clock clock.Clock }`. `Config` takes dotted keys from
   `docs/operations/configuration.md` and is applied through `platform/config` with flag precedence,
@@ -132,23 +132,23 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
   `completeStepUpWithDeviceKey`.
 - `type Client struct { PrincipalID, DeviceID string; ... }` with `Do(ctx, Request) Response`
   (DPoP proof per RFC 9449 with the latest `DPoP-Nonce`, one retry on `use_dpop_nonce`, refresh on
-  `token_expired`, `Idempotency-Key` UUIDv7 on POST and PATCH except the list in 06 "Idempotenz",
+  `token_expired`, `Idempotency-Key` UUIDv7 on POST and PATCH except the list in 06 "Idempotency",
   optional `Observer func(Request, Response)`), `StepUp(ctx)`, `Gateway(ctx) *GatewayConn`
   (`hello`, `identify`, `ready`, `Next`, `Send`, `Close`, automatic `heartbeat` and `reauth`).
 - `type Response struct { Status int; Header http.Header; Body []byte; Elapsed time.Duration }`.
-- `func BuildMatrixWorld(tb, s *Server) *World`: the M1 subset of 07 "Beispiele" and
-  "Testmatrix": spaces Support, Marketing, Engineering, Research; channels Support/Allgemein,
+- `func BuildMatrixWorld(tb, s *Server) *World`: the M1 subset of 07 "Examples" and
+  "Test matrix": spaces Support, Marketing, Engineering, Research; channels Support/Allgemein,
   Support/Eskalation, Marketing/Kampagnen, Engineering/Projekt-A (forum, no project binding),
   Engineering/Werkzeuge, Research/Notizen; people Alex, Sam, Robin; agents Lotse (organization,
-  operator of Support), Texter (organization, operator of Marketing), Runner (organization, operator
-  of Engineering/Werkzeuge), Assistent (personal, credential holder the owner, operator of Research);
-  group Leser with member Sam (membership with expiry); grants G-1 (Alex, `trigger`, `upload` and
-  `approve_actions`, space Support), G-2 (Sam, `trigger`, `upload`, space Marketing), G-3 (Robin,
-  `trigger`, `upload`, channel Engineering/Projekt-A, with expiry), G-4 (group Leser, `read`,
-  Support/Allgemein), G-5 (Lotse, `write`, `upload`, space Support); one thread with messages per
-  text channel and one forum post in Projekt-A. Left out until their etappe: app Tracker and G-6
-  (M2), the DM Alex-Sam (V3), project binding and tool class `host` (M2). Expiry times are relative
-  to the harness clock, never calendar dates.
+  operator of Support), Texter (organization, operator of Marketing), Runner (organization,
+  operator of Engineering/Werkzeuge), Assistent (personal, credential holder the owner, operator of
+  Research); group Leser with member Sam (membership with expiry); grants G-1 (Alex, `trigger`,
+  `upload` and `approve_actions`, space Support), G-2 (Sam, `trigger`, `upload`, space Marketing),
+  G-3 (Robin, `trigger`, `upload`, channel Engineering/Projekt-A, with expiry), G-4 (group Leser,
+  `read`, Support/Allgemein), G-5 (Lotse, `write`, `upload`, space Support); one thread with messages
+  per text channel and one forum post in Projekt-A. Left out until their milestone: app Tracker and
+  G-6 (M2), the DM Alex-Sam (V3), project binding and tool class `host` (M2). Expiry times are
+  relative to the harness clock, never calendar dates.
 - `func StartProcess(tb, ProcessOptions) *Process` (subprocess server for M1-72): built once per
   test binary from `./cmd/bothy`; not needed in this ticket, do not create it here if absent.
 - Unit tests for every part you add (at least: DPoP proof claims and the nonce retry).
@@ -161,7 +161,7 @@ Use it and extend it only additively; the parts this ticket adds are named in "S
   SEC-T10 and PLAN).
 - App crash reports (M4, M5), console cookies (M6).
 - Output of the CLI commands `bothy setup` and `bothy secrets` (M1-37, M1-09, M1-73).
-- Logs of the PostgreSQL server itself (operator configuration).
+- Logs of the PostgreSQL server itself (instance operator configuration).
 - New metrics or spans (M1-68, M1-10); this ticket only checks them.
 
 ## Boundaries
@@ -195,22 +195,22 @@ Sinks (all captured during the scenario, scanned afterwards):
 4. Audit: every row of `audit_events` read through `AdminDB()`, all columns, `details` as text.
 5. Error responses: every response with status 400 or higher seen by any harness client (body and
    all headers), recorded through `Client.Observer`.
-6. Foreign events: observer connections that must not see a scope: Sam (no right on Support,
-   Research, Engineering) and Robin (only Engineering/Projekt-A) keep a gateway connection open for
-   the whole scenario and also page `GET /api/v1/events` (`listEvents`) from cursor 0 and load
-   `getSnapshot` at the end. Scan frames, pages and snapshots.
+6. Foreign events: observer connections that must not see a scope: Sam (no permission on
+   Support, Research, Engineering) and Robin (only Engineering/Projekt-A) keep a gateway connection
+   open for the whole scenario and also page `GET /api/v1/events` (`listEvents`) from cursor 0 and
+   load `getSnapshot` at the end. Scan frames, pages and snapshots.
 
 Allow matrix (a value found in a sink not allowed for its class is a finding):
 
 | Class | Examples | Allowed only in |
 |---|---|---|
-| `content` | message text and edits, thread titles, space and channel names, forum tag names, template names and content, draft content, group names and descriptions, human display names, human handles, e-mail addresses, OIDC claim values from the Fake-IdP, agent display names | success responses and events to principals with read rights on its scope; never in sinks 1 to 4, never in 5, never in 6 for a scoped value |
+| `content` | message text and edits, thread titles, space and channel names, forum tag names, template names and content, draft content, group names and descriptions, human display names, human handles, e-mail addresses, OIDC claim values from the Fake-IdP, agent display names | success responses and events to principals with read permissions on its scope; never in sinks 1 to 4, never in 5, never in 6 for a scoped value |
 | `admin_reason` | `reason` of grants, owners, user disable, revocations | additionally `audit_events.details` as the reserved field `reason` (19 SEC-AUD-5, 03 `audit_events.details`, I4) |
 | `secret` | access and refresh tokens, API tokens, enrollment and pairing codes, `login_code`, step-up challenges, DPoP proofs (signature segment), passwords, TOTP codes and secrets, Fake-IdP codes and ID tokens, every file in the secrets directory (token pepper, private signing keys, telemetry pseudonym key, database passwords) | only the one response that issues it and the request that carries it; never in any sink |
 | `network` | one IPv4 from 198.51.100.0/24 and one IPv6 from 2001:db8::/32 per run, random host part, sent as `X-Forwarded-For` from the loopback trusted proxy | `auth_sessions.last_ip` and API fields the schema documents for it (session lists); never in sinks 1 to 4 (audit holds only `ip_hmac` with `ip_key_id`), never in 5 or 6 |
 | `identity` | every principal ID and device ID created in the run | anywhere except sinks 1 to 3 (logs, traces, metrics), where only `bothy.principal.pseudo_id` may appear |
 
-Agent handles are allowed in clear in telemetry (privacy.md "Pseudonyme" item 4); they are not
+Agent handles are allowed in clear in telemetry (privacy.md "Pseudonyms" item 4); they are not
 canaries. Object IDs of threads, channels, messages are allowed in spans and logs (same section).
 
 Matching rules in `scan.go`:
@@ -312,7 +312,7 @@ make check
   `services/server/test/harness/` (updated for what this ticket adds); doc comment on every exported symbol (purpose,
   parameters, return value, errors).
 - No ADR needed unless you change a production interface beyond the otel seam; if you do, write
-  the ADR (MADR 4, `docs/adr/0000-vorlage-madr-4.md`).
+  the ADR (MADR 4, `docs/adr/0000-template-madr-4.md`).
 - CHANGELOG entry under "Unreleased" in `services/server/CHANGELOG.md`.
 - `make check` green.
 - Independent review and red team over the diff (`docs/quality/red-team-gate.md`) with verdict

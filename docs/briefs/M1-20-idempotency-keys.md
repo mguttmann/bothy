@@ -1,21 +1,21 @@
 # M1-20: Idempotency keys
 
-Status: ready | Depends on: M1-16, M1-18, M1-26 | Etappe: M1
+Status: ready | Depends on: M1-16, M1-18, M1-26 | Milestone: M1
 
 Note on dependencies: M1-26 is needed because `idempotency_keys.principal_id` references `principals(id)` (03), and that table comes from M1-26. Do not start before all three are merged.
 
 ## Goal
 
-After this ticket the `Idempotency-Key` header works inside the same unit of work as the operation: the key row and the effect commit together, only final responses are stored, a repeat gets the stored response with `Idempotent-Replay: true`, a different request under the same key gets `422 idempotency_key_reuse`, a repeat while the first runs gets `409 request_in_progress`, and the job `sync.idempotency_cleanup` removes keys after `sync.idempotency_key_ttl`. With this, the client outbox (04 "Ausgangsfach (Outbox)") can repeat any keyed write blindly, and every later write ticket gets idempotency without code of its own.
+After this ticket the `Idempotency-Key` header works inside the same unit of work as the operation: the key row and the effect commit together, only final responses are stored, a repeat gets the stored response with `Idempotent-Replay: true`, a different request under the same key gets `422 idempotency_key_reuse`, a repeat while the first runs gets `409 request_in_progress`, and the job `sync.idempotency_cleanup` removes keys after `sync.idempotency_key_ttl`. With this, the client outbox (04 "Outbox") can repeat any keyed write blindly, and every later write ticket gets idempotency without code of its own.
 
 ## Read first
 
-- `docs/PLAN.md`: section "M1 Fundament" (rows M1-12 to M1-20, M1-26, M1-31, M1-56), "Arbeitsweise je Ticket", "Entscheidungen dieses Plans" (P-09 to P-12).
-- `docs/spec/04-sync-protokoll.md`: "Idempotente Schreibvorgänge" (both subsections), "Ausgangsfach (Outbox)".
-- `docs/spec/03-datenmodell.md`: "Grundsätze" (2, 9, 11, 12, 13), tables `idempotency_keys` and `principals`, "Sperrreihenfolge", "Aufbewahrungsklassen".
-- `docs/spec/02-architektur.md`: "Ports, Ereignisse und Quellen je Modul" (`sync` implements kernel `idempotency.Store`), "Querschnitts-Ports (`internal/kernel`)", "Transaktionen und Unit of Work" ("Ablauf", "Sperrreihenfolge", "Idempotenz im Unit of Work"), "Fristen" (`database.lock_timeout`), "Wiederholungen", "Hintergrundjobs (River)" ("Warteschlangen", "Job-Katalog", "Regeln für Jobs"), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/06-api.md`: "Idempotenz" (all points), "Nebenläufigkeit" (points 1 and 5), "Authentifizierung je Prinzipal-Art" ("Step-up": repeat with the same key), "Fehler".
-- `docs/adr/0015-fehlerformat-rfc-9457-idempotenz-paginierung.md`, `docs/adr/0009-commit-geordnetes-ereignis-log-mit-globaler-sequenz.md`.
+- `docs/PLAN.md`: section "M1 Foundation" (rows M1-12 to M1-20, M1-26, M1-31, M1-56), "Way of working per ticket", "Decisions of this plan" (P-09 to P-12).
+- `docs/spec/04-sync-protocol.md`: "Idempotent writes" (both subsections), "Outbox".
+- `docs/spec/03-data-model.md`: "Principles" (2, 9, 11, 12, 13), tables `idempotency_keys` and `principals`, "Lock order", "Retention classes".
+- `docs/spec/02-architecture.md`: "Ports, events and sources per module" (`sync` implements kernel `idempotency.Store`), "Cross-cutting ports (`internal/kernel`)", "Transactions and Unit of Work" ("Flow", "Lock order", "Idempotency in the Unit of Work"), "Deadlines" (`database.lock_timeout`), "Retries", "Background jobs (River)" ("Queues", "Job catalogue", "Rules for jobs"), "Configuration values of this chapter".
+- `docs/spec/06-api.md`: "Idempotency" (all points), "Concurrency" (points 1 and 5), "Authentication per principal kind" ("Step-up": repeat with the same key), "Errors".
+- `docs/adr/0015-error-format-rfc-9457-idempotency-pagination.md`, `docs/adr/0009-commit-ordered-event-log-with-a-global-sequence.md`.
 - `docs/api/openapi.yaml`: parameter `IdempotencyKey`, header `Idempotent-Replay`, header `ETag`.
 - Code: `internal/kernel/{txn,ids,clock,errs,actor}`, `internal/platform/{pg,pg/pgtest,jobs,httpserver,httpserver/httpservertest}`, `internal/sync` (M1-16), `internal/identity` port `Directory` (M1-26), `api/routes` and `api/routes/gen` (M1-17, M1-18), `migrations/`, `sqlc.yaml`.
 - `docs/quality/gates.md`, `CONTRIBUTING.md`.
@@ -35,12 +35,12 @@ After this ticket the `Idempotency-Key` header works inside the same unit of wor
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
 6. Test first: write the failing test, show it red, then make it green. No en or em dashes in any text. White label everywhere. Configuration values only through named keys from `docs/operations/configuration.md`.
-7. 04 "Alle anderen Schreibvorgänge: `Idempotency-Key`" and 06 "Idempotenz": a repeat with the same fingerprint gets the stored response with `Idempotent-Replay: true`; another fingerprint gets `422 idempotency_key_reuse`; a repeat while the first request runs gets `409 request_in_progress`.
-8. 06 "Idempotenz" point 2: stored are only final responses: `2xx`, `400`, `403`, `404`, `409` except `request_in_progress`, `410`, `412`, `413`, `415`, `422`. Not stored: `401`, `429`, `5xx`. So a repeat after step-up, token refresh or throttling works with the same key.
-9. 06 "Idempotenz" point 1 and 03: the key is valid per principal for `sync.idempotency_key_ttl`; primary key `(principal_id, key)`.
-10. 02 "Idempotenz im Unit of Work": key row and effect commit in one transaction; a concurrent repeat waits at the primary key until the first transaction ends and then reads the stored response; if the wait ends with `database.lock_timeout`, the answer is `409 request_in_progress`.
+7. 04 "All other writes: `Idempotency-Key`" and 06 "Idempotency": a repeat with the same fingerprint gets the stored response with `Idempotent-Replay: true`; another fingerprint gets `422 idempotency_key_reuse`; a repeat while the first request runs gets `409 request_in_progress`.
+8. 06 "Idempotency" point 2: stored are only final responses: `2xx`, `400`, `403`, `404`, `409` except `request_in_progress`, `410`, `412`, `413`, `415`, `422`. Not stored: `401`, `429`, `5xx`. So a repeat after step-up, token refresh or throttling works with the same key.
+9. 06 "Idempotency" point 1 and 03: the key is valid per principal for `sync.idempotency_key_ttl`; primary key `(principal_id, key)`.
+10. 02 "Idempotency in the Unit of Work": key row and effect commit in one transaction; a concurrent repeat waits at the primary key until the first transaction ends and then reads the stored response; if the wait ends with `database.lock_timeout`, the answer is `409 request_in_progress`.
 11. 03 table `idempotency_keys` exactly as specified (columns, types, defaults, CHECK, PK, FK, index, retention class `transient`).
-12. 02 "Job-Katalog": job `sync.idempotency_cleanup`, module `sync`, periodic, queue `maintenance`; 02 "Regeln für Jobs" apply.
+12. 02 "Job catalogue": job `sync.idempotency_cleanup`, module `sync`, periodic, queue `maintenance`; 02 "Rules for jobs" apply.
 
 ## Scope
 
@@ -53,12 +53,12 @@ Paths are relative to `services/server/` unless they start with `docs/`.
 5. Canonical JSON (RFC 8785): reuse an implementation already in the tree (M1-24 may have added one). Otherwise add `internal/platform/jsoncanon` as a thin wrapper over `github.com/gowebpki/jcs` (Apache-2.0) with the RFC 8785 test vectors.
 6. `api/routes/gen` (M1-17): checks for keyed operations (Design notes "Generator checks") with negative fixtures.
 7. `internal/wire`: register the stage for roles `api` and `all`; bind the `sync` store to the kernel port; register the periodic job for roles `worker` and `all` through `platform/jobs`.
-8. Configuration schema: `sync.idempotency_key_ttl` (04) if not present; `sync.idempotency_cleanup_interval` and `sync.idempotency_cleanup_batch_size` (02 "Konfigurationswerte dieses Kapitels", job row in 02 "Job-Katalog").
-9. Docs: 02 "Idempotenz im Unit of Work" and "Job-Katalog" and 06 "Idempotenz" already state the rules above; add to 06 "Idempotenz" when the header is ignored (anonymous actors, operations without the parameter). `docs/DECISIONS.md`, `docs/operations/configuration.md` regenerated, `services/server/CHANGELOG.md`.
+8. Configuration schema: `sync.idempotency_key_ttl` (04) if not present; `sync.idempotency_cleanup_interval` and `sync.idempotency_cleanup_batch_size` (02 "Configuration values of this chapter", job row in 02 "Job catalogue").
+9. Docs: 02 "Idempotency in the Unit of Work" and "Job catalogue" and 06 "Idempotency" already state the rules above; add to 06 "Idempotency" when the header is ignored (anonymous actors, operations without the parameter). `docs/DECISIONS.md`, `docs/operations/configuration.md` regenerated, `services/server/CHANGELOG.md`.
 
 ## Out of scope
 
-- `client_msg_id` and `client_interaction_id` (04 "Nachrichten: `client_msg_id`"): M1-56 and M2.
+- `client_msg_id` and `client_interaction_id` (04 "Messages: `client_msg_id`"): M1-56 and M2.
 - Repeat of `startRun` with the same invocation token: M2.
 - `If-Match` semantics of each resource: the handler tickets.
 - Rate limiting (M1-19), the chain itself (M1-18).
@@ -106,7 +106,7 @@ SHA-256 over the upper-case method, a line feed, the escaped request path (`r.UR
 
 ### One-time secrets
 
-06 "Idempotenz" (row "POST mit einmaligem Geheimnis", R-API-26) and 03 Grundsatz 9: a response
+06 "Idempotency" (row "POST with a one-time secret", R-API-26) and 03 principle 9: a response
 that carries a one-time secret (enrollment code, API token, later webhook secrets) is never stored.
 A handler that returns such a secret calls `idempotency.MarkOneTimeSecret(ctx)`. For a marked `2xx`
 the stage stores `response_status` and the body `{"one_time_secret": true}` instead of the response
@@ -117,7 +117,7 @@ marker.
 
 ### Replay
 
-Status and body from the row; `Content-Type: application/json` for a `2xx` with body, `application/problem+json` for a stored problem; `Idempotent-Replay: true`; `ETag` with the value of `version` from the body in double quotes when the operation declares `ETag` for that status (`routes.Operation.ETagStatuses`; 06 "Nebenläufigkeit" point 1). `Correlation-Id` and the `RateLimit` headers are those of the current request; a stored problem body keeps its original `correlation_id`. The replay does not run the handler, the validator or the proof stage; authentication and rate limiting have run before. 06 "Idempotenz" point 4 states the replay rules (no re-run of `authorize`, current `Correlation-Id` and `RateLimit`, `ETag` from `version`).
+Status and body from the row; `Content-Type: application/json` for a `2xx` with body, `application/problem+json` for a stored problem; `Idempotent-Replay: true`; `ETag` with the value of `version` from the body in double quotes when the operation declares `ETag` for that status (`routes.Operation.ETagStatuses`; 06 "Concurrency" point 1). `Correlation-Id` and the `RateLimit` headers are those of the current request; a stored problem body keeps its original `correlation_id`. The replay does not run the handler, the validator or the proof stage; authentication and rate limiting have run before. 06 "Idempotency" point 4 states the replay rules (no re-run of `authorize`, current `Correlation-Id` and `RateLimit`, `ETag` from `version`).
 
 ### Port `kernel/idempotency`
 
@@ -157,11 +157,11 @@ type Store interface {
 
 ### Table and migration
 
-Exactly the 03 table `idempotency_keys`: `principal_id uuid not null`, `key uuid not null`, `action text not null`, `request_sha256 bytea not null`, `state text not null default 'in_progress'` with `CHECK (state IN ('in_progress','completed'))`, `response_status smallint`, `response_body jsonb`, `resource_id uuid`, `created_at timestamptz not null default now()`, `expires_at timestamptz not null`; primary key `(principal_id, key)`; foreign key `principal_id` to `principals(id) ON DELETE CASCADE`; index `(expires_at)`. The application sets `created_at` and `expires_at = created_at + sync.idempotency_key_ttl` from `kernel/clock` (03 Grundsatz 2). Grants for the application role follow the convention of M1-12 (`bothy_app` needs SELECT, INSERT, UPDATE, DELETE). SQL only through sqlc queries of the `sync` module (03 Grundsatz 12, SEC-IN-5).
+Exactly the 03 table `idempotency_keys`: `principal_id uuid not null`, `key uuid not null`, `action text not null`, `request_sha256 bytea not null`, `state text not null default 'in_progress'` with `CHECK (state IN ('in_progress','completed'))`, `response_status smallint`, `response_body jsonb`, `resource_id uuid`, `created_at timestamptz not null default now()`, `expires_at timestamptz not null`; primary key `(principal_id, key)`; foreign key `principal_id` to `principals(id) ON DELETE CASCADE`; index `(expires_at)`. The application sets `created_at` and `expires_at = created_at + sync.idempotency_key_ttl` from `kernel/clock` (03 principle 2). Grants for the application role follow the convention of M1-12 (`bothy_app` needs SELECT, INSERT, UPDATE, DELETE). SQL only through sqlc queries of the `sync` module (03 principle 12, SEC-IN-5).
 
 ### Cleanup job
 
-`sync.idempotency_cleanup`: periodic every `sync.idempotency_cleanup_interval`, queue `maintenance`, executed only in roles `worker` and `all`, no arguments (02 "Regeln für Jobs": arguments carry IDs only). It deletes rows with `expires_at <= now` in batches of `sync.idempotency_cleanup_batch_size`, ordered by `expires_at`, and repeats until a batch is smaller than the batch size or the context ends; on cancellation it returns `ctx.Err()`. A repeated run is harmless.
+`sync.idempotency_cleanup`: periodic every `sync.idempotency_cleanup_interval`, queue `maintenance`, executed only in roles `worker` and `all`, no arguments (02 "Rules for jobs": arguments carry IDs only). It deletes rows with `expires_at <= now` in batches of `sync.idempotency_cleanup_batch_size`, ordered by `expires_at`, and repeats until a batch is smaller than the batch size or the context ends; on cancellation it returns `ctx.Err()`. A repeated run is harmless.
 
 ### Generator checks (extend `api/routes/gen`)
 
@@ -169,7 +169,7 @@ For every operation that declares `IdempotencyKey`: no query parameters (the fin
 
 ### Decisions to record in `docs/DECISIONS.md`
 
-Fingerprint definition; header ignored for anonymous actors and for operations without the parameter. (Final errors in a second transaction, `413` before the fingerprint, `ETag` from `version`, no re-run of `authorize` and the two configuration values are in 02 "Idempotenz im Unit of Work" and 06 "Idempotenz".)
+Fingerprint definition; header ignored for anonymous actors and for operations without the parameter. (Final errors in a second transaction, `413` before the fingerprint, `ETag` from `version`, no re-run of `authorize` and the two configuration values are in 02 "Idempotency in the Unit of Work" and 06 "Idempotency".)
 
 ## Tests (write them first)
 
@@ -214,7 +214,7 @@ Commands that must pass: `cd services/server && go test -race ./internal/sync/..
 ## Definition of done
 
 - Code and tests as above; `make check` green.
-- Documentation: `internal/sync/README.md` (table, port, job, configuration) and the doc comments of `kernel/idempotency` and the stage (purpose, parameters, return value, errors, example where useful), comments explain why; the 02 and 06 edits; `docs/DECISIONS.md` entries; regenerated configuration reference; a `services/server/CHANGELOG.md` entry under Unreleased. An ADR only if you take an architecture decision beyond 02 "Idempotenz im Unit of Work" and ADR 0015.
+- Documentation: `internal/sync/README.md` (table, port, job, configuration) and the doc comments of `kernel/idempotency` and the stage (purpose, parameters, return value, errors, example where useful), comments explain why; the 02 and 06 edits; `docs/DECISIONS.md` entries; regenerated configuration reference; a `services/server/CHANGELOG.md` entry under Unreleased. An ADR only if you take an architecture decision beyond 02 "Idempotency in the Unit of Work" and ADR 0015.
 - Independent review over the diff (`make review` plus a code review) and the red team gate (`docs/quality/red-team-gate.md`) over the diff, with the verdict `JA` or `NEIN` recorded in the report. On `NEIN`: fix, one test per finding, recheck the delta.
 - Merge locally into the base branch only if review and red team are green and `make check` passes; then `git worktree remove`.
 

@@ -1,95 +1,96 @@
-# Architektur-Diagramme
+# Architecture diagrams
 
-Alle Diagramme sind Mermaid-Quellen (`.mmd`) mit dem gerenderten SVG daneben. Die Quelle ist
-maßgeblich; das SVG wird bei jeder Änderung neu erzeugt. Text und Regeln dazu stehen in
-[../spec/02-architektur.md](../spec/02-architektur.md). Namen von Tabellen, Ereignissen und Aktionen
-stammen aus dem Kern-Vertrag ([00](../spec/00-glossar.md), [03](../spec/03-datenmodell.md),
-[04](../spec/04-sync-protokoll.md), [05](../spec/05-aktionen.md)).
+All diagrams are Mermaid sources (`.mmd`) with the rendered SVG next to them. The source is
+authoritative; the SVG is regenerated on every change. Text and rules for them are in
+[../spec/02-architecture.md](../spec/02-architecture.md). Names of tables, events and actions
+come from the core contract ([00](../spec/00-glossary.md), [03](../spec/03-data-model.md),
+[04](../spec/04-sync-protocol.md), [05](../spec/05-actions.md)).
 
 ## Index
 
 ### C4
 
-| Diagramm | Inhalt | Quelle | Bild |
+| Diagram | Content | Source | Image |
 |---|---|---|---|
-| Kontext | Eine Instanz mit Menschen und Fremdsystemen, je Beziehung das Protokoll. | [c4-1-kontext.mmd](c4-1-kontext.mmd) | [c4-1-kontext.svg](c4-1-kontext.svg) |
-| Container | Rollen `api` und `worker` des Binarys, PostgreSQL, Objektspeicher, clamd, Collector, Apps, Adapter, Host-Dienst. | [c4-2-container.mmd](c4-2-container.mmd) | [c4-2-container.svg](c4-2-container.svg) |
-| Komponenten des Servers | Module des Monolithen mit allen erlaubten Abhängigkeiten nach 02-architektur.md, 4.4. | [c4-3-komponenten-server.mmd](c4-3-komponenten-server.mmd) | [c4-3-komponenten-server.svg](c4-3-komponenten-server.svg) |
+| Context | An instance with people and external systems, the protocol for each relationship. | [c4-1-context.mmd](c4-1-context.mmd) | [c4-1-context.svg](c4-1-context.svg) |
+| Container | Roles `api` and `worker` of the binary, PostgreSQL, object storage, clamd, Collector, apps, adapters, host service. | [c4-2-container.mmd](c4-2-container.mmd) | [c4-2-container.svg](c4-2-container.svg) |
+| Server components | Modules of the monolith with all allowed dependencies according to 02-architecture.md, 4.4. | [c4-3-server-components.mmd](c4-3-server-components.mmd) | [c4-3-server-components.svg](c4-3-server-components.svg) |
 
-### Abläufe im Server
+### Flows in the server
 
-| Diagramm | Inhalt | Quelle | Bild |
+| Diagram | Content | Source | Image |
 |---|---|---|---|
-| Request-Pfad | Middleware-Kette einer REST-Anfrage bis zur Nachweis-Prüfung von `authorize`. | [fluss-request-pfad.mmd](fluss-request-pfad.mmd) | [fluss-request-pfad.svg](fluss-request-pfad.svg) |
-| Ereignis-Pfad | Unit of Work mit Phasen, `event_log`, Log-Tail, Hub, Agenten- und Worker-Verbraucher. | [fluss-ereignis-pfad.mmd](fluss-ereignis-pfad.mmd) | [fluss-ereignis-pfad.svg](fluss-ereignis-pfad.svg) |
+| Request path | Middleware chain of a REST request up to the proof check of `authorize`. | [flow-request-path.mmd](flow-request-path.mmd) | [flow-request-path.svg](flow-request-path.svg) |
+| Event path | Unit of work with phases, `event_log`, log tail, hub, agent and worker consumers. | [flow-event-path.mmd](flow-event-path.mmd) | [flow-event-path.svg](flow-event-path.svg) |
 
-### Sequenzen
+### Sequences
 
-| Diagramm | Inhalt | Quelle | Bild |
+| Diagram | Content | Source | Image |
 |---|---|---|---|
-| Nachricht senden | Senden mit `client_msg_id`, Zustellung an verbundene Clients, Push an ein Gerät ohne Verbindung. | [seq-1-nachricht-senden.mmd](seq-1-nachricht-senden.mmd) | [seq-1-nachricht-senden.svg](seq-1-nachricht-senden.svg) |
-| Agenten-Lauf | Auslösung, I2 und Aufruf-Marke bei Zustellung, Lauf-Start per Compare-and-swap, Live-Box-Patches, Nachtrag, Abschluss. | [seq-2-agenten-lauf.mmd](seq-2-agenten-lauf.mmd) | [seq-2-agenten-lauf.svg](seq-2-agenten-lauf.svg) |
-| Wiederverbinden | `resume` oder `identify` auf einem anderen Knoten, Nachholen mit Puffer, `resync_required`. | [seq-3-wiederverbinden.mmd](seq-3-wiederverbinden.mmd) | [seq-3-wiederverbinden.svg](seq-3-wiederverbinden.svg) |
-| Freigabe entziehen | Entzug bei offener Verbindung über zwei Knoten, Abbruch des laufenden Laufs. | [seq-4-freigabe-entziehen.mmd](seq-4-freigabe-entziehen.mmd) | [seq-4-freigabe-entziehen.svg](seq-4-freigabe-entziehen.svg) |
-| Backend-Modus umschalten | Umschalten auf `personal` mit Step-up, I1-Prüfung, Soll und Ist am Adapter. | [seq-5-backend-modus.mmd](seq-5-backend-modus.mmd) | [seq-5-backend-modus.svg](seq-5-backend-modus.svg) |
-| Push mit Extension | Push ohne Inhalt, Notification Service Extension holt die Nachricht über die API. | [seq-6-push-nse.mmd](seq-6-push-nse.mmd) | [seq-6-push-nse.svg](seq-6-push-nse.svg) |
-| Datei-Upload | Upload-Sitzung, Upload direkt oder über presigned URL, Scan mit clamd, Vorschaubild. | [seq-7-datei-upload.mmd](seq-7-datei-upload.mmd) | [seq-7-datei-upload.svg](seq-7-datei-upload.svg) |
-| Terminal öffnen | Step-up, `terminal.open` mit SR10, I6 und SR12, Sitzungs-Marke, Noise `NK` über das Relais, PTY erst nach `start`. | [seq-8-terminal-oeffnen.mmd](seq-8-terminal-oeffnen.mmd) | [seq-8-terminal-oeffnen.svg](seq-8-terminal-oeffnen.svg) |
+| Send a message | Sending with `client_msg_id`, delivery to connected clients, push to a device without a connection. | [seq-1-send-message.mmd](seq-1-send-message.mmd) | [seq-1-send-message.svg](seq-1-send-message.svg) |
+| Agent run | Triggering, I2 and invocation token on delivery, run start via compare-and-swap, live box patches, follow-up, completion. | [seq-2-agent-run.mmd](seq-2-agent-run.mmd) | [seq-2-agent-run.svg](seq-2-agent-run.svg) |
+| Reconnect | `resume` or `identify` on another node, catch-up with a buffer, `resync_required`. | [seq-3-reconnect.mmd](seq-3-reconnect.mmd) | [seq-3-reconnect.svg](seq-3-reconnect.svg) |
+| Revoke a grant | Revocation with an open connection across two nodes, cancellation of the active run. | [seq-4-revoke-grant.mmd](seq-4-revoke-grant.mmd) | [seq-4-revoke-grant.svg](seq-4-revoke-grant.svg) |
+| Switch the backend mode | Switching to `personal` with step-up, I1 check, configured and reported mode at the adapter. | [seq-5-backend-mode.mmd](seq-5-backend-mode.mmd) | [seq-5-backend-mode.svg](seq-5-backend-mode.svg) |
+| Push with extension | Push without content, the Notification Service Extension fetches the message through the API. | [seq-6-push-nse.mmd](seq-6-push-nse.mmd) | [seq-6-push-nse.svg](seq-6-push-nse.svg) |
+| File upload | Upload session, upload directly or through a presigned URL, scan with clamd, thumbnail. | [seq-7-file-upload.mmd](seq-7-file-upload.mmd) | [seq-7-file-upload.svg](seq-7-file-upload.svg) |
+| Open a terminal | Step-up, `terminal.open` with SR10, I6 and SR12, terminal session token, Noise `NK` through the relay, PTY only after `start`. | [seq-8-open-terminal.mmd](seq-8-open-terminal.mmd) | [seq-8-open-terminal.svg](seq-8-open-terminal.svg) |
 
-### Datenmodell (ERD, aus 03-datenmodell.md, nach Modulen geteilt)
+### Data model (ERD, from 03-data-model.md, split by module)
 
-| Diagramm | Inhalt | Quelle | Bild |
+| Diagram | Content | Source | Image |
 |---|---|---|---|
-| Instanz und Identität | Module `instance` und `identity`. | [erd-1-instanz-identitaet.mmd](erd-1-instanz-identitaet.mmd) | [erd-1-instanz-identitaet.svg](erd-1-instanz-identitaet.svg) |
-| Rechte und Struktur | Module `authz` und `chat`. | [erd-2-rechte-struktur.mmd](erd-2-rechte-struktur.mmd) | [erd-2-rechte-struktur.svg](erd-2-rechte-struktur.svg) |
-| Agenten und Apps | Module `agents` und `apps`. | [erd-3-agenten-apps.mmd](erd-3-agenten-apps.mmd) | [erd-3-agenten-apps.svg](erd-3-agenten-apps.svg) |
-| Nachrichten und Dateien | Module `messaging` und `files`. | [erd-4-nachrichten-dateien.mmd](erd-4-nachrichten-dateien.mmd) | [erd-4-nachrichten-dateien.svg](erd-4-nachrichten-dateien.svg) |
-| Läufe und Kosten | Module `runs` und `billing`. | [erd-5-laeufe-kosten.mmd](erd-5-laeufe-kosten.mmd) | [erd-5-laeufe-kosten.svg](erd-5-laeufe-kosten.svg) |
-| Sync | Modul `sync`: Ereignis-Log, Idempotenz, Gelesen-Stand, Entwürfe, Einstellungen. | [erd-6-sync.mmd](erd-6-sync.mmd) | [erd-6-sync.svg](erd-6-sync.svg) |
-| Terminal | Modul `terminal`: Rechner und Terminal-Sitzungen. | [erd-7-terminal.mmd](erd-7-terminal.mmd) | [erd-7-terminal.svg](erd-7-terminal.svg) |
-| Audit und Datenschutz | Module `audit` und `privacy`. | [erd-8-audit-datenschutz.mmd](erd-8-audit-datenschutz.mmd) | [erd-8-audit-datenschutz.svg](erd-8-audit-datenschutz.svg) |
-| Import, Status, Statistik | Module `importer`, `status` und `stats`. | [erd-9-import-status-statistik.mmd](erd-9-import-status-statistik.mmd) | [erd-9-import-status-statistik.svg](erd-9-import-status-statistik.svg) |
-| Benachrichtigung | Modul `notify`. | [erd-10-benachrichtigung.mmd](erd-10-benachrichtigung.mmd) | [erd-10-benachrichtigung.svg](erd-10-benachrichtigung.svg) |
+| Instance and identity | Modules `instance` and `identity`. | [erd-1-instance-identity.mmd](erd-1-instance-identity.mmd) | [erd-1-instance-identity.svg](erd-1-instance-identity.svg) |
+| Permissions and structure | Modules `authz` and `chat`. | [erd-2-permissions-structure.mmd](erd-2-permissions-structure.mmd) | [erd-2-permissions-structure.svg](erd-2-permissions-structure.svg) |
+| Agents and apps | Modules `agents` and `apps`. | [erd-3-agents-apps.mmd](erd-3-agents-apps.mmd) | [erd-3-agents-apps.svg](erd-3-agents-apps.svg) |
+| Messages and files | Modules `messaging` and `files`. | [erd-4-messages-files.mmd](erd-4-messages-files.mmd) | [erd-4-messages-files.svg](erd-4-messages-files.svg) |
+| Runs and costs | Modules `runs` and `billing`. | [erd-5-runs-costs.mmd](erd-5-runs-costs.mmd) | [erd-5-runs-costs.svg](erd-5-runs-costs.svg) |
+| Sync | Module `sync`: event log, idempotency, read state, drafts, settings. | [erd-6-sync.mmd](erd-6-sync.mmd) | [erd-6-sync.svg](erd-6-sync.svg) |
+| Terminal | Module `terminal`: hosts and terminal sessions. | [erd-7-terminal.mmd](erd-7-terminal.mmd) | [erd-7-terminal.svg](erd-7-terminal.svg) |
+| Audit and privacy | Modules `audit` and `privacy`. | [erd-8-audit-privacy.mmd](erd-8-audit-privacy.mmd) | [erd-8-audit-privacy.svg](erd-8-audit-privacy.svg) |
+| Import, status, statistics | Modules `importer`, `status` and `stats`. | [erd-9-import-status-statistics.mmd](erd-9-import-status-statistics.mmd) | [erd-9-import-status-statistics.svg](erd-9-import-status-statistics.svg) |
+| Notification | Module `notify`. | [erd-10-notification.mmd](erd-10-notification.mmd) | [erd-10-notification.svg](erd-10-notification.svg) |
 
-## Konventionen
+## Conventions
 
-- **C4 als Flowchart.** Kontext, Container und Komponenten nutzen die C4-Notation (Person,
-  System, Container, extern) als Mermaid-Flowchart. Grund: Der C4-Modus von Mermaid ordnet die Kästen
-  in festem Raster an, und bei mehr als einer Handvoll Beziehungen überlappen die Beschriftungen.
-  Container- und Komponenten-Diagramm nutzen das ELK-Layout (`config.layout: elk`).
-- **Pfade ohne Präfix.** REST-Pfade stehen ohne Versions-Präfix; das Präfix legt
-  [../spec/06-api.md](../spec/06-api.md) fest. Wo es klarer ist, steht die Aktion statt des Pfads
-  (z. B. `run.finish`).
-- **ERDs.** Die Dateien `erd-*.mmd` sind die einzigen ERDs des Projekts; 03 verweist nur auf sie.
-  Jede Tabelle aus 03, Abschnitt 4 (außer den technischen Tabellen aus 4.13) steht genau einmal mit
-  Spalten (Schlüssel, Fremdschlüssel, Zustandsspalten), in dem Diagramm ihres Moduls. Tabellen
-  anderer Module erscheinen dort nur mit Schlüssel. Jede Fremdschlüssel-Beziehung aus 03 ist
-  gezeichnet, so oft wie es Fremdschlüssel zwischen den beiden Tabellen gibt; ausgenommen sind reine
-  Protokoll-Spalten (Name endet auf `_by`, Ziel `principals(id)`). Vollständige Spalten, Typen und
-  Indexe stehen nur in 03. ERDs mit vielen Kind-Tabellen nutzen `direction LR`, damit sie nicht in
-  die Breite wachsen.
-- **Lesbarkeit.** Kein Diagramm ist breiter oder höher als das Seitenverhältnis `MAX_ASPECT` in
-  `tools/docs/render_diagrams.py`. Wird eines zu breit, wird es nach Modulen geteilt oder gedreht.
-- **Farben und Schrift aus dem Design-System.** Alle Diagramme rendern mit
-  `design/build/mermaid.config.json` (Mermaid-Thema `base`), das `tools/design-tokens/tokens.py`
-  aus den Tokens des Themes light erzeugt. Knotenklassen (`classDef`) nutzen nur Token-Farben:
-  Akzent (Fichte) für eigene Container und Schritte, See für Datenspeicher, Moos für Rand-Module,
-  Ginster für Prüfungen, Granit für Fremdsysteme. Die Doku-Site färbt ihre eingebetteten
-  Mermaid-Blöcke über `docs/design/site-theme.css` (ebenfalls erzeugt) passend zum Farbschema.
-- **Modulkanten.** Ein Pfeil im Komponenten-Diagramm heißt "darf den Port aufrufen". Kanten zu
-  `internal/kernel` sind nicht gezeichnet, weil jedes Modul sie hat.
+- **C4 as a flowchart.** Context, container and component diagrams use the C4 notation (person,
+  system, container, external) as a Mermaid flowchart. Reason: the C4 mode of Mermaid arranges the
+  boxes in a fixed grid, and with more than a handful of relationships the labels overlap.
+  The container and component diagrams use the ELK layout (`config.layout: elk`).
+- **Paths without prefix.** REST paths are written without the version prefix; the prefix is set by
+  [../spec/06-api.md](../spec/06-api.md). Where it is clearer, the action is shown instead of the path
+  (for example `run.finish`).
+- **ERDs.** The files `erd-*.mmd` are the only ERDs of the project; 03 only refers to them.
+  Every table from 03, section 4 (except the technical tables from 4.13) appears exactly once with
+  columns (keys, foreign keys, state columns), in the diagram of its module. Tables of
+  other modules appear there only with their key. Every foreign key relationship from 03 is
+  drawn, as often as there are foreign keys between the two tables; excepted are pure
+  log columns (name ends in `_by`, target `principals(id)`). Complete columns, types and
+  indexes are only in 03. ERDs with many child tables use `direction LR` so that they do not grow
+  too wide.
+- **Readability.** No diagram is wider or taller than the aspect ratio `MAX_ASPECT` in
+  `tools/docs/render_diagrams.py`. If one becomes too wide, it is split by module or rotated.
+- **Colors and font from the design system.** All diagrams render with
+  `design/build/mermaid.config.json` (Mermaid theme `base`), which `tools/design-tokens/tokens.py`
+  generates from the tokens of the light theme. Node classes (`classDef`) use only token colors:
+  accent (spruce) for own containers and steps, loch for data stores, moss for edge modules,
+  gorse for checks, granite for external systems. The docs site colors its embedded
+  Mermaid blocks through `docs/design/site-theme.css` (also generated) to match the color scheme.
+- **Module edges.** An arrow in the component diagram means "may call the port". Edges to
+  `internal/kernel` are not drawn because every module has them.
 
-## Rendern und prüfen
+## Render and check
 
-Neu rendern (alle `.svg` oder nur die genannten), danach laufen alle Prüfungen:
+Re-render (all `.svg` files or only the named ones); afterwards all checks run:
 
 ```sh
 uv run --project tools --locked --quiet python tools/docs/render_diagrams.py --write [docs/architecture/<name>.mmd ...]
 ```
 
-Prüfen: `make diagrams`. Das Gate prüft, dass jedes Diagramm rendert, jedes `.mmd` ein `.svg` mit
-dem Design-Thema hat, das Seitenverhältnis `MAX_ASPECT` nicht überschreitet, `.mmd`-Dateien nur
-Token-Farben nennen und die ERDs zu 03 passen (`tools/docs/erd_check.py`: jede Tabelle genau
-einmal vollständig, jede Fremdschlüssel-Beziehung gezeichnet). Für Chromium ohne Sandbox braucht
-mermaid-cli eine Puppeteer-Konfiguration außerhalb des Repos (`MMDC_PUPPETEER_CONFIG`). Den Abgleich
-der Modulkanten beschreibt [../spec/02-architektur.md](../spec/02-architektur.md), Abschnitt 7.3.
+Check: `make diagrams`. The gate checks that every diagram renders, that every `.mmd` has an `.svg`
+with the design theme, that no diagram exceeds the aspect ratio `MAX_ASPECT`, that `.mmd` files name
+only token colors and that the ERDs match 03 (`tools/docs/erd_check.py`: every table exactly
+once in full, every foreign key relationship drawn). For Chromium without a sandbox,
+mermaid-cli needs a Puppeteer configuration outside the repo (`MMDC_PUPPETEER_CONFIG`). The
+comparison of the module edges is described in [../spec/02-architecture.md](../spec/02-architecture.md),
+section 7.3.

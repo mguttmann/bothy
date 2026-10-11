@@ -2,7 +2,7 @@
 """Run a code generator and fail if it changed what git would see (gate `codegen-check`).
 
 Generated files (sqlc code, `.go-arch-lint.yml`, API code) must equal a fresh generation
-(docs/spec/02-architektur.md "Weitere Prüfungen im Gate", ADR 0007 "Confirmation"). The
+(docs/spec/02-architecture.md "Other checks in the gate", ADR 0007 "Confirmation"). The
 tool hashes every file git would see under the directory (tracked plus untracked, not
 ignored), runs the generator there, hashes again and compares.
 

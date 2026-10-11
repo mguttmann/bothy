@@ -1,6 +1,6 @@
 # M1-43: Trusted proxy header login
 
-Status: ready | Depends on: M1-21, M1-37 | Etappe: M1
+Status: ready | Depends on: M1-21, M1-37 | Milestone: M1
 
 ## Goal
 
@@ -13,24 +13,24 @@ misconfiguration fails closed: the driver stays off and readiness reports it (W4
 
 ## Read first
 
-- `docs/spec/08-identitaet.md`: 2.1 "Port", 2.4 "Vertrauenswürdiger Proxy-Header", 3.1
-  "Zuordnung einer externen Identität", 3.2 "Einladungs-Code", 5.1, 5.2, 7.3 "DPoP", 13 "Schutz
-  der Anmeldung", 15 (ID-T08, ID-T09, ID-T10, ID-T25), 16 (R-ID-03), 18
+- `docs/spec/08-identity.md`: 2.1 "Port", 2.4 "Trusted proxy header", 3.1
+  "Mapping an external identity", 3.2 "Enrollment code", 5.1, 5.2, 7.3 "DPoP", 13 "Login
+  protection", 15 (ID-T08, ID-T09, ID-T10, ID-T25), 16 (R-ID-03), 18
   (`auth.trusted_header_bind_requests`).
-- `docs/spec/16-betrieb.md`: 4.2 "Zwei Listener", 4.3 "Rand und Identität", 14
+- `docs/spec/16-operations.md`: 4.2 "Two listeners", 4.3 "Edge and identity", 14
   (`server.listen_addr`, `server.trusted_proxies`), R-OP-02.
-- `docs/spec/19-sicherheit.md`: 2 "Transport" (SEC-TLS-1), 9 (SEC-LOG-2: identity headers never
+- `docs/spec/19-security.md`: 2 "Transport" (SEC-TLS-1), 9 (SEC-LOG-2: identity headers never
   logged), 14 SEC-T01.
-- `docs/spec/02-architektur.md`: 9 "Request-Pfad" (step 4), 13 "Konfigurationsladen" point 4,
+- `docs/spec/02-architecture.md`: 9 "Request path" (step 4), 13 "Configuration loading" point 4,
   15.2 "Health".
-- `docs/spec/03-datenmodell.md`: 4.2 `identity_providers`, `user_identities`, `auth_sessions`
+- `docs/spec/03-data-model.md`: 4.2 `identity_providers`, `user_identities`, `auth_sessions`
   (`auth_method`, `revoke_reason`), `enrollment_codes`, `devices`.
-- `docs/spec/05-aktionen.md` and `docs/spec/actions.yaml`: `auth.login.complete`,
+- `docs/spec/05-actions.md` and `docs/spec/actions.yaml`: `auth.login.complete`,
   `identity_provider.manage`, 2.5.
-- `docs/spec/06-api.md`: 3.2 "Anmeldeabläufe" point 2, 5 "Fehler" point 5 (public endpoints
+- `docs/spec/06-api.md`: 3.2 "Login flows" point 2, 5 "Errors" point 5 (public endpoints
   answer `404` when switched off).
-- `docs/spec/07-rechte.md`: 4.1 (`session_revoked`), SR7.
-- `docs/PLAN.md` section 7 "Bekannte Widersprüche, die M1 auflöst" W4, rows M1-11, M1-21, M1-34,
+- `docs/spec/07-permissions.md`: 4.1 (`session_revoked`), SR7.
+- `docs/PLAN.md` section 7 "Known contradictions that M1 resolves" W4, rows M1-11, M1-21, M1-34,
   M1-36, M1-37, M1-43, M1-64; section 3.
 - `docs/operations/tailscale.md` sections 2 to 4.
 - ADRs 0019, 0020.
@@ -58,7 +58,7 @@ misconfiguration fails closed: the driver stays off and readiness reports it (W4
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour change has a test that was red before the change (the red run is
+6. Test first: every behavior change has a test that was red before the change (the red run is
    quoted in the report), then green, then refactor.
 7. No en dash or em dash characters in any file you write; use a hyphen or rephrase.
 8. White label: logins in tests are `alex@example.com`, `sam@example.com`; no real tailnet,
@@ -98,7 +98,7 @@ misconfiguration fails closed: the driver stays off and readiness reports it (W4
 - `internal/wire`: computes the loopback flag from the bound public listener address and passes it
   into the `identity` config.
 - If `internal/platform/config` contains a start-time cross-check "header driver only with a
-  loopback listener" (02 13 point 4), remove it in favour of the readiness check and adapt its
+  loopback listener" (02 13 point 4), remove it in favor of the readiness check and adapt its
   test; no other change in `platform/config`.
 - The specification is in place (planning, spec first; W4 resolved there): 08 2.4 (rules 1 to 7
   with W4, binding, RFC 2047), 2.6 (`identity_provider.trusted_header.v1`), 3.1 (enrollment code
@@ -148,7 +148,7 @@ misconfiguration fails closed: the driver stays off and readiness reports it (W4
 
 **Preconditions (check before writing code; any failure: `Verdict: BLOCKED <which>`).**
 
-1. `docs/spec/03-datenmodell.md` `auth_sessions.revoke_reason` contains `trusted_header_mismatch`
+1. `docs/spec/03-data-model.md` `auth_sessions.revoke_reason` contains `trusted_header_mismatch`
    (also in `SessionRevokedPayload.reason`); ID-T10 requires a revocation with a stated reason.
 2. The authenticator and the session revocation of M1-34 exist (revocation also revokes the family
    and writes `session.revoked`), and M1-37 provides enrollment-code verification and consumption
@@ -234,8 +234,9 @@ Unit tests (`domain/trustedheader`):
 
 - `TestIsLoopbackListener`: `127.0.0.1`, `127.5.5.5`, `::1` true; `0.0.0.0`, `::`,
   `192.0.2.10`, `2001:db8::1` false (constructed `net.TCPAddr` values).
-- `TestDecodeHeaderValue`: plain ASCII; `=?utf-8?q?R=C3=B6bin?=` decodes to `Röbin`; base64
-  encoded word; unsupported charset absent; control and bidi characters absent; empty absent.
+- `TestDecodeHeaderValue`: plain ASCII; `=?utf-8?q?R=C3=B6bin?=` decodes to "Robin" with U+00F6
+  (o with diaeresis) as the second letter; base64 encoded word; unsupported charset absent; control
+  and bidi characters absent; empty absent.
 - `TestTrustedHeaderConfigValidation`: valid names; invalid token characters; unknown field.
 
 Integration tests (PostgreSQL 18, real HTTP chain on `127.0.0.1:0`; the peer is `127.0.0.1`, so
@@ -305,6 +306,6 @@ make check
 
 Write to `{{REPORT_PATH}}`: first line `Verdict: DONE` or `Verdict: BLOCKED <reason>`; then the
 commits, the files with line counts, the test results with counts (including the red runs), what
-is not proven (at least: behaviour behind a real `tailscale serve`, WebSocket upgrade binding),
+is not proven (at least: behavior behind a real `tailscale serve`, WebSocket upgrade binding),
 and follow-ups that could not be done in scope with the reason (at least the gateway binding test
 for M1-64). Then write `{{DONE_PATH}}` with `exit=0 sha=<sha>` or `exit=1 <reason>`.

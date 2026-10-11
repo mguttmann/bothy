@@ -1,5 +1,5 @@
 {
-  "comment": "Quality gate of the project, identical on SonarQube Community Build and SonarQube Cloud. Conditions use metrics that exist in Standard Experience and MQR mode. Thresholds are the named values of docs/spec/23-qualitaet.md (config_key); a test holds both equal.",
+  "comment": "Quality gate of the project, identical on SonarQube Community Build and SonarQube Cloud. Conditions use metrics that exist in Standard Experience and MQR mode. Thresholds are the named values of docs/spec/23-quality.md (config_key); a test holds both equal.",
   "name": "Bothy way",
   "conditions": [
     {"metric": "new_violations", "op": "GT", "error": "0", "config_key": "quality.sonar.new_issues_max"},

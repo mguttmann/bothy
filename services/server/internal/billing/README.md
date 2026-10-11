@@ -1,55 +1,55 @@
-# Modul `billing`
+# Module `billing`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-## Zweck
+## Purpose
 
-Preistabelle, Kostenbuchungen, Summen je Lauf, Thread, Bereich, Agent, Abgleich.
+Price table, cost postings, totals per run, thread, space, agent, reconciliation.
 
-## Port (Wurzelpaket `internal/billing`)
+## Port (root package `internal/billing`)
 
-- Eingehend: `Costs` (Buchen, Korrektur, Summen), `Prices`.
-- Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: keine.
+- Inbound: `Costs` (posting, correction, totals), `Prices`.
+- Emits in-tx events: none.
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: none.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports keines anderen Moduls nutzen.
+Must not use the ports of any other module.
 
-Grund: Kostenzeilen tragen Kopien von Thread, Kanal, Bereich und Agent (03); keine Rückfrage nötig.
+Reason: cost rows carry copies of thread, channel, space and agent (03); no lookup needed.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `price_table`, `cost_entries`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `cost.reconcile`, `cost.reconcile.submit`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: keine.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: none.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hintergrundjobs
+## Background jobs
 
-| Job | Auslöser | Warteschlange |
+| Job | Trigger | Queue |
 |---|---|---|
-| `billing.reconcile` | `cost.reconcile` oder periodisch, falls eingeschaltet | `default` |
+| `billing.reconcile` | `cost.reconcile` or periodic, if enabled | `default` |
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Beträge in Mikro-Einheiten mit Währung; Korrekturen nur als neue Zeile mit `supersedes_id` (03, 4.9).
-- Bei `billing_mode = personal` sind Beträge nur Information.
+- Amounts in micro-units with a currency; corrections only as a new row with `supersedes_id` (03, 4.9).
+- With `billing_mode = personal`, amounts are for information only.
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [10-backend-richtlinie.md](../../../../docs/spec/10-backend-richtlinie.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [10-backend-policy.md](../../../../docs/spec/10-backend-policy.md)

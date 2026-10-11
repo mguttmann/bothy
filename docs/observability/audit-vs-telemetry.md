@@ -1,45 +1,45 @@
-# Audit-Log und Telemetrie
+# Audit log and telemetry
 
-Status: Entwurf M0. Abgrenzung nach B11. Audit-Log: [03-datenmodell.md](../spec/03-datenmodell.md)
-4.12, Aktionen mit Audit: [05-aktionen.md](../spec/05-aktionen.md). Sicherheitskapitel 19 und
-ADR 0021 legen Inhalt und Prüfung des Audit-Logs fest.
+Status: draft M0. Distinction according to B11. Audit log: [03-data-model.md](../spec/03-data-model.md)
+4.12, actions with audit: [05-actions.md](../spec/05-actions.md). Security chapter 19 and
+ADR 0021 define the content and the checking of the audit log.
 
-## 1. Gegenüberstellung
+## 1. Comparison
 
-| Merkmal | Audit-Log (`audit_events`) | Telemetrie (Traces, Metriken, Logs) |
+| Attribute | Audit log (`audit_events`) | Telemetry (traces, metrics, logs) |
 |---|---|---|
-| Zweck | Nachweis: wer hat was entschieden oder verändert | Betrieb: läuft es, wo hakt es |
-| Inhalt | Aktion, Entscheidung, Grund, Ressource, Akteur (Klar-ID), Gerät, Sitzung | Dauern, Zähler, Fehlerarten, IDs von Objekten, Pseudonyme von Menschen |
-| Vollständigkeit | jedes Ereignis der Pflichtliste; Ablehnungen je Fenster zusammengefasst | gesampelt, darf bei Rückstau verworfen werden |
-| Schreiben | in derselben Transaktion wie die Änderung; scheitert das Audit, scheitert die Änderung | asynchron, fail-open |
-| Integrität | Hash-Kette, nur `INSERT` und `SELECT` für die Anwendung | keine |
-| Ort | PostgreSQL der Instanz | Collector, dann Backend nach Wahl |
-| Zugriff | Owner mit Step-up (`audit.read`, `audit.verify`) | Betreiber des Backends |
-| Frist | eigene Klasse `audit` (Kapitel 20) | kurz, je Backend ([privacy.md](privacy.md) 5) |
-| Sicherung | mit der Datenbank, Kette im Wiederherstellungstest geprüft | keine |
-| Export | nur durch den Owner über `exportAuditEvents`; geprüft wird die Kette mit `verifyAuditChain` (M1-50) | per Overlay |
+| Purpose | Evidence: who decided or changed what | Operations: is it running, where does it get stuck |
+| Content | Action, decision, reason, resource, actor (plain ID), device, session | Durations, counters, error types, IDs of objects, pseudonyms of people |
+| Completeness | Every event of the mandatory list; denials aggregated per window | Sampled, may be discarded under backpressure |
+| Writing | In the same transaction as the change; if the audit fails, the change fails | Asynchronous, fail-open |
+| Integrity | Hash chain, only `INSERT` and `SELECT` for the application | None |
+| Location | PostgreSQL of the instance | Collector, then a backend of choice |
+| Access | Owner with step-up (`audit.read`, `audit.verify`) | Whoever runs the backend |
+| Retention | Own class `audit` (chapter 20) | Short, per backend ([privacy.md](privacy.md) 5) |
+| Backup | With the database, chain checked in the restore test | None |
+| Export | Only by the owner via `exportAuditEvents`; the chain is checked with `verifyAuditChain` (M1-50) | Per overlay |
 
-## 2. Regeln
+## 2. Rules
 
-1. Kein Audit-Eintrag entsteht aus Telemetrie, keine Telemetrie aus dem Audit-Log. Beide schreibt
-   der Code an derselben Stelle getrennt.
-2. Verbindung nur über `correlation_id`: Sie ist die Trace-ID der Anfrage
-   ([signals.md](signals.md) 5.1). Ein Prüfer kann vom Audit-Eintrag zum Trace springen, solange
-   der Trace noch aufbewahrt und aufgezeichnet ist.
-3. Ablehnungen von `authorize` stehen in beiden: im Audit-Log als Nachweis (zusammengefasst nach
-   `audit.deny_aggregate_window`), in der Telemetrie als Zähler `bothy.authz.decisions` ohne
-   Akteur.
-4. Der Collector bekommt nie den Inhalt von `audit_events.details`.
-5. Das Audit-Log enthält Klar-IDs von Menschen, die Telemetrie nur Pseudonyme. Wer Telemetrie
-   betreibt, kann damit nicht nachvollziehen, wer etwas getan hat; dafür ist das Audit-Log da.
-6. Die Prüfung der Hash-Kette läuft periodisch im `worker` (`bothy.audit.verify.*`) und in jedem
-   Wiederherstellungstest; ein Fehler ist ein Alarm `page`.
+1. No audit entry is created from telemetry, no telemetry from the audit log. The code writes
+   both at the same place, separately.
+2. Link only through `correlation_id`: it is the trace ID of the request
+   ([signals.md](signals.md) 5.1). An auditor can jump from the audit entry to the trace as long as
+   the trace is still retained and recorded.
+3. Denials by `authorize` appear in both: in the audit log as evidence (aggregated by
+   `audit.deny_aggregate_window`), in telemetry as the counter `bothy.authz.decisions` without an
+   actor.
+4. The collector never receives the content of `audit_events.details`.
+5. The audit log contains plain IDs of people, telemetry only pseudonyms. Whoever runs telemetry
+   therefore cannot trace who did something; that is what the audit log is for.
+6. The check of the hash chain runs periodically in the `worker` (`bothy.audit.verify.*`) and in
+   every restore test; a failure is an alert `page`.
 
-## 3. Beispiel: Freigabe widerrufen
+## 3. Example: revoke a grant
 
-| Ort | Was entsteht |
+| Location | What is created |
 |---|---|
-| `audit_events` | `action = grant.revoke`, `decision = allow`, Akteur, Gerät, Sitzung, `resource_id` der Freigabe, `correlation_id` |
-| `event_log` | `access.changed` an Betroffene, ggf. `run.cancel_requested`, gleiche `correlation_id` |
-| Trace | Span `POST /api/v1/grants/{id}/revoke` mit `bothy.action = grant.revoke`, `bothy.decision = allow`, Pseudonym des Akteurs |
-| Metrik | `bothy.authz.decisions{bothy.action="grant.revoke", bothy.decision="allow"}` plus eins |
+| `audit_events` | `action = grant.revoke`, `decision = allow`, actor, device, session, `resource_id` of the grant, `correlation_id` |
+| `event_log` | `access.changed` to the affected people, if needed `run.cancel_requested`, same `correlation_id` |
+| Trace | Span `POST /api/v1/grants/{id}/revoke` with `bothy.action = grant.revoke`, `bothy.decision = allow`, pseudonym of the actor |
+| Metric | `bothy.authz.decisions{bothy.action="grant.revoke", bothy.decision="allow"}` plus one |

@@ -1,59 +1,59 @@
-# Modul `runs`
+# Module `runs`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
-## Zweck
+## Purpose
 
-Auslöse-Entscheidung, Läufe und Lauf-Dokument, Schritte, Nachträge, Komponenten, Interaktionen, Befehlsausführung, Aufruf-Marken.
+Trigger decision, runs and run document, steps, follow-ups, components, interactions, command execution, invocation tokens.
 
-## Port (Wurzelpaket `internal/runs`)
+## Port (root package `internal/runs`)
 
-- Eingehend: `Runs` (Lesen, Kontext, Start, Wiederaufnahme, Patch, Ende, Abbruch, Übersicht), `Delivery` (Zustellvorbereitung mit I2, Schutzregeln und Marke), `Interactions`, `CommandExec` (inklusive Autovervollständigung).
-- Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (zurückgehaltenen Aufruf schreiben), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged`.
-- Implementiert Quellen-Ports und Querschnitts-Ports: `messaging.ComponentReader`, kernel `personaldata.Participant`.
+- Inbound: `Runs` (read, context, start, resume, patch, end, cancel, overview), `Delivery` (delivery preparation with I2, guard rules and token), `Interactions`, `CommandExec` (including autocompletion).
+- Emits in-tx events: none.
+- Subscribes to in-tx events: `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (write the held-back invocation), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged`.
+- Implements source ports and cross-cutting ports: `messaging.ComponentReader`, kernel `personaldata.Participant`.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `instance`, `chat`, `agents`, `messaging`, `billing`.
+May use the ports of these modules: `instance`, `chat`, `agents`, `messaging`, `billing`.
 
-Grund: Marke signieren; Bediener, Erwähnungsregel, Projektbindung; Richtlinie und Sitzung; Anker und `trigger_state`; Kosten buchen.
+Reason: sign the token; operator, mention rule, project binding; policy and session; anchor and `trigger_state`; post costs.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `runs`, `run_steps`, `run_followups`, `message_components`, `interactions`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables via SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.token.renew`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`.
-- Kurzlebig: `run.updated`, `command.autocomplete_requested`.
-- WebSocket-Ops (Client an Server): `run.update`, `command.autocomplete_result`.
+- Durable: `run.state_changed`, `agent.invocation`, `agent.followup`, `run.cancel_requested`, `interaction.created`, `command.invoked`.
+- Ephemeral: `run.updated`, `command.autocomplete_requested`.
+- WebSocket ops (client to server): `run.update`, `command.autocomplete_result`.
 
-## Hintergrundjobs
+## Background jobs
 
-| Job | Auslöser | Warteschlange |
+| Job | Trigger | Queue |
 |---|---|---|
-| `runs.cancel_timeout` | periodisch, `agent.cancel_grace` | `maintenance` |
-| `runs.stall_check` | periodisch, `run.stall_after` | `maintenance` |
-| `runs.component_expiry` | periodisch, `component.default_ttl` | `maintenance` |
-| `runs.invocation_hold_timeout` | terminiert, `file.invocation_hold_max` bzw. `voice.transcript_hold_max` | `default` |
+| `runs.cancel_timeout` | periodic, `agent.cancel_grace` | `maintenance` |
+| `runs.stall_check` | periodic, `run.stall_after` | `maintenance` |
+| `runs.component_expiry` | periodic, `component.default_ttl` | `maintenance` |
+| `runs.invocation_hold_timeout` | scheduled, `file.invocation_hold_max` or `voice.transcript_hold_max` | `default` |
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Zustandsübergänge sind Compare-and-swap auf `state` und `version` (03, `runs`).
-- Live-Box-Patches speichern ohne `event_log` und gehen kurzlebig als `run.updated` an fokussierte Verbindungen (04, 11).
-- Die Aufruf-Marke entsteht bei jeder Zustellung neu, nach `agent.invoke` und I2 mit aktuellen Rechten; scheitert die Prüfung, wird der Lauf `failed` (fail closed, 04, 15.3).
+- State transitions are compare-and-swap on `state` and `version` (03, `runs`).
+- Live box patches are stored without `event_log` and go out as ephemeral `run.updated` to focused connections (04, 11).
+- The invocation token is created anew at every delivery, after `agent.invoke` and I2 with current permissions; if the check fails, the run becomes `failed` (fail closed, 04, 15.3).
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [09-agenten.md](../../../../docs/spec/09-agenten.md), [10-backend-richtlinie.md](../../../../docs/spec/10-backend-richtlinie.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [09-agents.md](../../../../docs/spec/09-agents.md), [10-backend-policy.md](../../../../docs/spec/10-backend-policy.md)

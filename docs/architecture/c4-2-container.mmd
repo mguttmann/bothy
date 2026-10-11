@@ -2,79 +2,79 @@
 config:
   layout: elk
 ---
-%% C4 Ebene 2: Container. C4-Notation als Mermaid-Flowchart (siehe README).
-%% Secret-Quelle (Datei, Env, später Key Vault) ist nicht gezeichnet: api und worker lesen sie beim
-%% Start und bei Rotation (02-architektur.md, Abschnitt Konfigurationsladen).
+%% C4 level 2: containers. C4 notation as a Mermaid flowchart (see README).
+%% The secret source (file, env, later Key Vault) is not drawn: api and worker read it at
+%% start and on rotation (02-architecture.md, section Configuration loading).
 flowchart TB
   classDef person fill:#063b38,stroke:#08191c,color:#fbfeff
   classDef container fill:#136f69,stroke:#063b38,color:#fbfeff
   classDef store fill:#12659d,stroke:#0b4d79,color:#fbfeff
   classDef ext fill:#59696c,stroke:#24363a,color:#fbfeff
 
-  member["<b>Mitglied, Owner</b><br/>[Person]"]:::person
+  member["<b>Member, owner</b><br/>[Person]"]:::person
 
-  subgraph devices["Geräte der Menschen"]
+  subgraph devices["People's devices"]
     direction LR
-    apps["<b>Apps</b><br/>[Flutter: iOS, Android, macOS, Windows]<br/>Chat, Offline-Ausgangsfach,<br/>Notification Service Extension"]:::container
-    console["<b>Web-Konsole</b><br/>[Flutter Web]<br/>Verwaltung, Statistik, Terminal"]:::container
+    apps["<b>Apps</b><br/>[Flutter: iOS, Android, macOS, Windows]<br/>Chat, offline outbox,<br/>Notification Service Extension"]:::container
+    console["<b>Web console</b><br/>[Flutter Web]<br/>Administration, statistics, terminal"]:::container
   end
 
-  subgraph agenthost["Agenten-Host (außerhalb des Servers)"]
+  subgraph agenthost["Agent host (outside the server)"]
     direction LR
-    adapter["<b>Agenten-Adapter</b><br/>[Hermes-Agent-Plugin, Claude-Code-Runner,<br/>eigene mit SDK]<br/>Verbraucher mit Cursor, prüft Marke"]:::container
-    runtime["<b>Agenten-Laufzeit</b><br/>[Hermes Agent, Claude Code, ...]"]:::ext
+    adapter["<b>Agent adapter</b><br/>[Hermes agent plugin, Claude Code runner,<br/>custom ones with SDK]<br/>Consumer with cursor, checks token"]:::container
+    runtime["<b>Agent runtime</b><br/>[Hermes Agent, Claude Code, ...]"]:::ext
   end
 
-  subgraph termhost["Angebundener Rechner"]
+  subgraph termhost["Connected host"]
     direction LR
-    hostd["<b>Host-Dienst bothy-host</b><br/>[Go, eigener Benutzer ohne Admin]<br/>PTY, Noise-Gegenstelle, Profile"]:::container
+    hostd["<b>Host service bothy-host</b><br/>[Go, own user without admin]<br/>PTY, Noise peer, profiles"]:::container
   end
 
-  subgraph inst["Bothy-Instanz (Betreiber)"]
-    proxy["<b>Reverse-Proxy</b><br/>[vom Betreiber gewählt]<br/>TLS, optional Identitäts-Header"]:::ext
-    subgraph bin["Ein Image, ein Binary bothy"]
+  subgraph inst["Bothy instance (instance operator)"]
+    proxy["<b>Reverse proxy</b><br/>[chosen by the instance operator]<br/>TLS, optional identity header"]:::ext
+    subgraph bin["One image, one binary bothy"]
       direction LR
-      api["<b>bothy serve --role=api</b><br/>[Go]<br/>REST, Gateway-WebSocket,<br/>Log-Tail und Fan-out im Prozess"]:::container
-      worker["<b>bothy serve --role=worker</b><br/>[Go]<br/>River-Jobs, Ereignis-Verbraucher,<br/>Dateiverarbeitung, Wartung"]:::container
+      api["<b>bothy serve --role=api</b><br/>[Go]<br/>REST, gateway WebSocket,<br/>log tail and fan-out in process"]:::container
+      worker["<b>bothy serve --role=worker</b><br/>[Go]<br/>River jobs, event consumers,<br/>file processing, maintenance"]:::container
     end
-    subgraph data["Zustand"]
+    subgraph data["State"]
       direction LR
-      pg[("<b>PostgreSQL 18</b><br/>[Datenbank]<br/>Domänendaten, event_log,<br/>River-Tabellen")]:::store
-      objects[("<b>Objektspeicher</b><br/>[Dateisystem oder S3-kompatibel]<br/>Dateien, Vorschaubilder")]:::store
+      pg[("<b>PostgreSQL 18</b><br/>[Database]<br/>Domain data, event_log,<br/>River tables")]:::store
+      objects[("<b>Object storage</b><br/>[File system or S3-compatible]<br/>Files, thumbnails")]:::store
     end
-    clamd["<b>ClamAV clamd</b><br/>[eigener Prozess, optional]"]:::container
-    otelcol["<b>OTel Collector</b><br/>[eigener Prozess]"]:::container
+    clamd["<b>ClamAV clamd</b><br/>[separate process, optional]"]:::container
+    otelcol["<b>OTel Collector</b><br/>[separate process]"]:::container
   end
 
-  idp["<b>Identitätsanbieter</b><br/>[OIDC]"]:::ext
-  pushsvc["<b>Push-Dienste</b><br/>[APNs, FCM]"]:::ext
-  llm["<b>KI-Anbieter</b>"]:::ext
-  integr["<b>Integrationen</b><br/>[Apps, externe Systeme]"]:::ext
-  backends["<b>Telemetrie-Backends</b>"]:::ext
-  stt["<b>Transkriptions-Dienst</b><br/>[optional]"]:::ext
+  idp["<b>Identity provider</b><br/>[OIDC]"]:::ext
+  pushsvc["<b>Push services</b><br/>[APNs, FCM]"]:::ext
+  llm["<b>AI providers</b>"]:::ext
+  integr["<b>Integrations</b><br/>[Apps, external systems]"]:::ext
+  backends["<b>Telemetry backends</b>"]:::ext
+  stt["<b>Transcription service</b><br/>[optional]"]:::ext
 
   member --> apps
   member --> console
-  apps -->|"HTTPS REST mit DPoP, WSS Gateway"| proxy
-  console -->|"HTTPS REST, WSS Gateway, WSS Terminal-Strom"| proxy
-  adapter -->|"WSS Gateway als Agent, REST"| proxy
-  integr -->|"REST, Eingangs-Webhooks"| proxy
-  hostd -->|"WSS ausgehend: Steuerung und Daten je Sitzung"| proxy
-  apps -->|"WSS Terminal-Strom, Ende-zu-Ende verschlüsselt"| proxy
-  apps -.->|"Anmeldung im Systembrowser"| idp
-  adapter -->|"Plugin oder Kindprozess"| runtime
-  runtime -->|"Modellaufrufe"| llm
-  proxy -->|"HTTP, intern"| api
+  apps -->|"HTTPS REST with DPoP, WSS gateway"| proxy
+  console -->|"HTTPS REST, WSS gateway, WSS terminal stream"| proxy
+  adapter -->|"WSS gateway as agent, REST"| proxy
+  integr -->|"REST, incoming webhooks"| proxy
+  hostd -->|"Outbound WSS: control and data per session"| proxy
+  apps -->|"WSS terminal stream, end-to-end encrypted"| proxy
+  apps -.->|"Login in the system browser"| idp
+  adapter -->|"Plugin or child process"| runtime
+  runtime -->|"Model calls"| llm
+  proxy -->|"HTTP, internal"| api
   api -->|"SQL, LISTEN"| pg
   worker -->|"SQL, River, LISTEN"| pg
-  api -->|"Upload, Download"| objects
-  worker -->|"Scan, Vorschau"| objects
+  api -->|"Upload, download"| objects
+  worker -->|"Scan, preview"| objects
   worker -->|"INSTREAM"| clamd
-  api -->|"Code-Austausch, JWKS"| idp
-  worker -->|"HTTPS, nur IDs"| pushsvc
-  pushsvc -.->|"Push ohne Inhalt"| apps
-  worker -->|"signierte Webhooks"| integr
+  api -->|"Code exchange, JWKS"| idp
+  worker -->|"HTTPS, IDs only"| pushsvc
+  pushsvc -.->|"Push without content"| apps
+  worker -->|"signed webhooks"| integr
   worker -.->|"Audio, optional"| stt
   api -->|"OTLP"| otelcol
   worker -->|"OTLP"| otelcol
-  otelcol -->|"Exporter je Backend"| backends
+  otelcol -->|"Exporter per backend"| backends

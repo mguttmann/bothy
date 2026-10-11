@@ -1,5 +1,5 @@
 {
-  "$description": "Dichte, Kontext compact: wählbar auf Desktop (appearance.density = compact). Mehr Zeilen je Bildschirm, gleiche Schriftgröße.",
+  "$description": "Density, context compact: selectable on desktop (appearance.density = compact). More rows per screen, same font size.",
   "density": {
     "$type": "dimension",
     "row-channel": {"$value": {"value": 28, "unit": "px"}},

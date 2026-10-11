@@ -16,12 +16,12 @@ CODES = {"conflict": 409, "payload_too_large": 413, "validation_failed": 400}
 @pytest.mark.parametrize(
     "text",
     [
-        "Sonst `409 quota_exceeded`.\n",
-        "Sonst `409` `quota_exceeded`.\n",
-        "Sonst 409 `quota_exceeded`.\n",
-        "| Fall | `507 storage_full` |\n",
-        "sonst `422\n  voice_too_long`.\n",
-        "Größe: `413 conflict`.\n",
+        "Otherwise `409 quota_exceeded`.\n",
+        "Otherwise `409` `quota_exceeded`.\n",
+        "Otherwise 409 `quota_exceeded`.\n",
+        "| Case | `507 storage_full` |\n",
+        "otherwise `422\n  voice_too_long`.\n",
+        "Size: `413 conflict`.\n",
     ],
 )
 def test_unregistered_pair_fails(text: str) -> None:
@@ -38,14 +38,14 @@ def test_status_mismatch_names_registered_status() -> None:
 @pytest.mark.parametrize(
     "text",
     [
-        "Sonst `409 conflict` mit `reason: quota_exceeded`.\n",
-        "Sonst `409` `conflict`; 413 `payload_too_large`.\n",
-        "`400 validation_failed` mit `errors[].code` `part_digest_mismatch`.\n",
-        "`403` bzw. `404`; `429` mit `Retry-After`.\n",
-        "Schließ-Code `4004` `forbidden`; Port 4317 `otlp`.\n",
-        "Grenze `413` für `message.max_content_bytes`.\n",
-        "`409` mit Code `quota_exceeded`.\n",
-        "Stufe `422`, dann `conflict` getrennt.\n",
+        "Otherwise `409 conflict` with `reason: quota_exceeded`.\n",
+        "Otherwise `409` `conflict`; 413 `payload_too_large`.\n",
+        "`400 validation_failed` with `errors[].code` `part_digest_mismatch`.\n",
+        "`403` or `404`; `429` with `Retry-After`.\n",
+        "Close code `4004` `forbidden`; port 4317 `otlp`.\n",
+        "Limit `413` for `message.max_content_bytes`.\n",
+        "`409` with code `quota_exceeded`.\n",
+        "Level `422`, then `conflict` apart.\n",
     ],
 )
 def test_registered_or_unrelated_text_passes(text: str) -> None:

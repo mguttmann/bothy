@@ -1,10 +1,10 @@
 # M1-74: CodeQL for Go
 
-Status: ready | Depends on: M1-05 | Etappe: M1
+Status: ready | Depends on: M1-05 | Milestone: M1
 
 ## Goal
 
-After this ticket the CodeQL workflow analyses the Go server module `services/server` next to the
+After this ticket the CodeQL workflow analyzes the Go server module `services/server` next to the
 workflow files and the Python tools, in the public phase only, exactly as ADR 0039 rule 1 allows.
 The Go entry builds the shipped module manually, because CodeQL offers no build-free mode for Go
 and its autobuilder would first run the repository root `Makefile`. A test against the real
@@ -13,21 +13,21 @@ supported language cannot be forgotten silently.
 
 ## Read first
 
-- `docs/PLAN.md`: section "M1 Fundament", ticket row M1-74 (Block H), "Arbeitsweise je Ticket",
-  "Entscheidungen dieses Plans" (P-09, P-12).
+- `docs/PLAN.md`: section "M1 Foundation", ticket row M1-74 (Block H), "Way of working per ticket",
+  "Decisions of this plan" (P-09, P-12).
 - `.github/workflows/codeql.yml` (current state: matrix `[actions, python]`, every entry with
   `build-mode: none`; the job condition is the public guard).
-- `docs/adr/0039-nur-github-gehostete-runner-oeffentlich-ab-dem-ersten-push.md`, "Decision
-  Outcome", rule 1 "Öffentlich-Jobs".
+- `docs/adr/0039-only-github-hosted-runners-public-from-the-first-push.md`, "Decision
+  Outcome", rule 1 "Public jobs".
 - `tools/ci/check_runners.py` (`PUBLIC_GUARD`, `has_public_guard`, `load_yaml`, the rule list in
   the module docstring) and `tools/ci/tests/test_check_runners.py` (test style, `REPO` constant).
 - `docs/quality/toolchain.md`, section "GitHub Actions" (pins of `actions/checkout`,
   `actions/setup-go`, `github/codeql-action`) and `tools/docs/tests/test_toolchain_doc.py`
   (`test_actions_table_matches_workflows`: one version per action across all workflows).
-- `docs/quality/gates.md`: "Liste" (rows `lint`, `runners-check`) and "Was die Gates nicht
-  abdecken" (no shellcheck; workflows only run short commands).
-- `docs/quality/public-switch.md`, step 18 "Probelauf".
-- `docs/spec/23-qualitaet.md`: "Komponenten-Vertrag" (components are discovered from tracked
+- `docs/quality/gates.md`: "List" (rows `lint`, `runners-check`) and "What the gates do not
+  cover" (no shellcheck; workflows only run short commands).
+- `docs/quality/public-switch.md`, step 18 "Trial run".
+- `docs/spec/23-quality.md`: "Component contract" (components are discovered from tracked
   manifests) and R-QA-05 (CodeQL is part of the general static analysis).
 - `Makefile`: component discovery (`GO_MODS`, `PY_PROJECTS`, `TS_PROJECTS`), targets `lint`
   (actionlint, zizmor), `runners-check`, `typecheck` (`go build ./...` per Go module).
@@ -36,14 +36,14 @@ supported language cannot be forgotten silently.
 - External facts (checked 2026-10-10):
     - "CodeQL supports build modes `autobuild` or `manual` for Go code"; Go has no `none` mode;
       the Go autobuilder first invokes `make`, `ninja`, `./build` or `./build.sh` and then needs
-      `go list ./...` to succeed; test files (`_test.go`) are not analysed by default.
+      `go list ./...` to succeed; test files (`_test.go`) are not analyzed by default.
       https://docs.github.com/en/code-security/reference/code-scanning/codeql/build-options-for-compiled-languages
-      [belegt]
+      [verified]
     - CodeQL CLI terms: analysis is permitted only on an "Open Source Codebase" (released under an
       OSI-approved license); use "in connection with any codebase that is not an Open Source
       Codebase (e.g., code in a private repo in GitHub)" is excluded without a paid GitHub Advanced
       Security license. https://raw.githubusercontent.com/github/codeql-cli-binaries/main/LICENSE.md
-      [belegt]
+      [verified]
 - This ticket touches no specification chapter, API operation, data table or action id.
 
 ## Fixed requirements that apply
@@ -195,11 +195,11 @@ Product requirements of this ticket:
           .github/workflows/codeql.yml>, tracked_files()) == []`; it first asserts that at least one
           `services/*/go.mod` is tracked, so it cannot pass vacuously.
     - Each negative test asserts on the text of the expected finding, not only on a non-empty list.
-3. `docs/quality/public-switch.md`, step 18 "Probelauf": name the checks to look at after the
+3. `docs/quality/public-switch.md`, step 18 "Trial run": name the checks to look at after the
    first public pull request: jobs `analyze (actions)`, `analyze (go)`, `analyze (python)` green,
-   and code scanning shows results for the category `/language:go`. German, like the file.
+   and code scanning shows results for the category `/language:go`. English, like the file.
 4. `CHANGELOG.md` (root, section `[Unreleased]`, subsection `### Changed`): one line, for example
-   "CodeQL analyses the Go server module (manual build of `services/server`) in the public phase;
+   "CodeQL analyzes the Go server module (manual build of `services/server`) in the public phase;
    a test keeps the CodeQL languages in step with the tracked components."
 
 No other file changes. No ADR: ADR 0039 holds the decision, and the reasons live in the workflow
@@ -208,7 +208,7 @@ comment.
 ## Out of scope
 
 - `javascript-typescript` in the matrix: added by the ticket that adds the first TypeScript project
-  (`sdk/typescript`, Etappe M2); the new test will force it.
+  (`sdk/typescript`, milestone M2); the new test will force it.
 - Dart (not supported by CodeQL), custom CodeQL queries, a CodeQL config file, path filters.
 - Enabling code scanning, rulesets or `BOTHY_VISIBILITY` on GitHub (public-switch runbook, V1).
 - Any change to `tools/ci/check_runners.py`, `ci.yml`, `scorecard.yml` or the `Makefile`.
@@ -218,7 +218,7 @@ comment.
 
 - Work in a dedicated git worktree on the branch `feat/M1-74-codeql-go`.
 - Conventional Commits with DCO sign-off (`git commit -s`), scope `ci`, for example
-  `ci(codeql): analyse Go with a manual build of the server module`.
+  `ci(codeql): analyze Go with a manual build of the server module`.
 - Never push, tag, open pull requests, create remote repositories or trigger workflows on GitHub.
 - Do not run the CodeQL CLI, a CodeQL bundle or `codeql-action` locally: the CodeQL terms exclude
   analysis of a codebase that is not released open source, and this repository is private until
@@ -236,7 +236,7 @@ comment.
   and the following `go list ./...` runs at a root without `go.mod`. The outcome would depend on
   fallback heuristics. A manual `go build ./...` in `services/server` is deterministic and is the
   same command `make typecheck` runs.
-- Test files stay unanalysed: CodeQL skips `_test.go` by default and test code is not shipped. Do
+- Test files stay unanalyzed: CodeQL skips `_test.go` by default and test code is not shipped. Do
   not set `CODEQL_EXTRACTOR_GO_OPTION_EXTRACT_TESTS`.
 - `matrix.build-mode` is a valid expression (property names may contain `-`); actionlint accepts
   it. Keep every `run` step a single short command (gates.md: shellcheck is not pinned).

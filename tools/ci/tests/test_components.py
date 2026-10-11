@@ -20,7 +20,7 @@ import pytest
         (["sdk/typescript/src/x.ts"], ["sdk-typescript"]),
         (["plugins/hermes-adapter/x.py"], ["plugins"]),
         (["docs/api/openapi.yaml"], ["apps", "plugins", "sdk-python", "sdk-typescript", "server"]),
-        (["docs/spec/07-rechte.md", "infra/compose/compose.yaml", "README.md"], []),
+        (["docs/spec/07-permissions.md", "infra/compose/compose.yaml", "README.md"], []),
         (["Makefile"], ["all"]),
         (["tools/ci/check_runners.py"], ["all"]),
         ([".github/workflows/ci.yml"], ["all"]),

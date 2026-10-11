@@ -1,72 +1,72 @@
-# Deny-List-Scanner
+# Deny-list scanner
 
-Findet instanzspezifische Begriffe, bevor sie ein öffentliches Repository erreichen
-(ADR 0042). Aufruf über `make denylist` (Teil von `make check`) oder
-`make denylist-history` (ganze Historie, vor dem Öffentlich-Schalten).
+Finds instance-specific terms before they reach a public repository
+(ADR 0042). Run it through `make denylist` (part of `make check`) or
+`make denylist-history` (whole history, before switching the repository to public).
 
-## Liste einrichten (Maintainer)
+## Set up the list (maintainer)
 
-Die private Liste liegt außerhalb dieses Repositorys. Eine der beiden Möglichkeiten:
+The private list lives outside this repository. One of the two options:
 
 ```sh
-export BOTHY_DENYLIST_FILE=/pfad/zur/denylist.txt
-# oder dauerhaft für diesen Klon (die Datei ist git-ignoriert):
-echo /pfad/zur/denylist.txt > .denylist-path
+export BOTHY_DENYLIST_FILE=/path/to/denylist.txt
+# or permanently for this clone (the file is git-ignored):
+echo /path/to/denylist.txt > .denylist-path
 ```
 
-Ein relativer Pfad in `.denylist-path` gilt relativ zum Repository. Ohne Liste schlägt
-der Scan fehl. Erlaubte Commit-Identitäten stehen in `allow-authors.txt` neben der Liste
-(oder `BOTHY_DENYLIST_ALLOW_AUTHORS`).
+A relative path in `.denylist-path` is relative to the repository. Without a list, the
+scan fails. Allowed commit identities are in `allow-authors.txt` next to the list
+(or `BOTHY_DENYLIST_ALLOW_AUTHORS`).
 
 ## Format
 
 ```text
-# Kommentar
-ein-wörtlicher-begriff
-re:\bregulärer[- ]ausdruck\b
-@exclude-path: pfad/mit/*glob
+# comment
+a-literal-term
+re:\bregular[- ]expression\b
+@exclude-path: path/with/*glob
 ```
 
-Eine Regel je Zeile, Groß- und Kleinschreibung egal. `re:` leitet einen regulären Ausdruck
-nach Python-Syntax ein. Kurze Begriffe besser als Ausdruck mit Wortgrenzen `\b`, sonst
-treffen sie Teile anderer Wörter. `allow-authors.txt`: eine Identität je Zeile als
-`Name <email>` oder nur `<email>`.
+One rule per line, case-insensitive. `re:` starts a regular expression
+in Python syntax. Short terms are better written as an expression with word boundaries `\b`,
+otherwise they match parts of other words. `allow-authors.txt`: one identity per line as
+`Name <email>` or just `<email>`.
 
-## Was geprüft wird
+## What is checked
 
-| Ort | Standard | `--history` |
+| Location | Default | `--history` |
 |---|---|---|
-| Inhalt und Name jeder getrackten Datei (auch Binärdateien; bei PNG alles außer den Pixeldaten (`IDAT`), weil komprimierte Pixel zufällige Treffer liefern; `zTXt`, `iTXt` und `iCCP` zusätzlich entpackt; ein beschädigtes PNG wird roh geprüft) | ja | ja, plus jedes frühere Objekt und jeder frühere Pfad |
-| Commit-Nachrichten | Commits in `--range` (Standard: noch nicht auf `origin/main`, ohne Remote alle) | alle Commits aller Refs |
-| Autor, Committer und die Identitätszeilen `Signed-off-by` und `Co-authored-by` | wie Nachrichten, nur gegen die private Liste | ja |
-| Branch-, Remote- und Tag-Namen, Tag-Nachrichten | ja | ja |
-| Zusätzliche Namen (`--name`, `BOTHY_DENYLIST_NAMES`) | ja | ja |
+| Content and name of every tracked file (binary files too; for PNG everything except the pixel data (`IDAT`), because compressed pixels produce random matches; `zTXt`, `iTXt` and `iCCP` are also decompressed; a damaged PNG is checked raw) | yes | yes, plus every earlier object and every earlier path |
+| Commit messages | commits in `--range` (default: not yet on `origin/main`, without a remote all of them) | all commits of all refs |
+| Author, committer and the identity lines `Signed-off-by` and `Co-authored-by` | like messages, only against the private list | yes |
+| Branch, remote and tag names, tag messages | yes | yes |
+| Additional names (`--name`, `BOTHY_DENYLIST_NAMES`) | yes | yes |
 
-Die öffentlichen Regeln in `generic.rules` laufen immer, prüfen aber keine
-Commit-Identitäten: Beitragende zeichnen mit ihrer eigenen Adresse ab (DCO). Mit
-`--allow-missing` (nur Fork-Pull-Requests in CI) laufen nur sie. Andere Zeilen wie
-`Reviewed-by` sind normaler Nachrichtentext und bekommen alle Regeln.
+The public rules in `generic.rules` always run, but do not check
+commit identities: contributors sign off with their own address (DCO). With
+`--allow-missing` (only fork pull requests in CI), only they run. Other lines such as
+`Reviewed-by` are normal message text and get all rules.
 
-Die erlaubten Identitäten aus `allow-authors.txt` gelten nur als Autor und Committer und in
-einer `Signed-off-by`-Zeile, die genau den Autor oder Committer desselben Commits wiederholt
-(`git commit -s`). In `Co-authored-by`, in einer fremden Abzeichnung und im Text meldet die
-private Liste sie wie jede andere Fundstelle (Anforderung 22, D-W-06, D-W-37).
+The allowed identities from `allow-authors.txt` apply only as author and committer and in
+a `Signed-off-by` line that repeats exactly the author or committer of the same commit
+(`git commit -s`). In `Co-authored-by`, in a sign-off by someone else and in the text, the
+private list reports them like any other match (requirement 22, D-W-06, D-W-37).
 
-## Ausgabe
+## Output
 
 ```text
 docs/x.md:2:7: content matches private rule line 7
 path ************-notes.md: path matches private rule line 5
 ```
 
-Nur Fundort und Zeile der Regel, nie der Treffer; Treffer in Pfaden sind maskiert.
-`--reveal` zeigt den Treffer (nur lokal, nie in CI). Rückgabewerte: 0 sauber, 1 Funde,
-2 Konfigurationsfehler (fehlende Liste, kaputter Ausdruck).
+Only the location and the line of the rule, never the match; matches in paths are masked.
+`--reveal` shows the match (only locally, never in CI). Exit codes: 0 clean, 1 findings,
+2 configuration error (missing list, broken expression).
 
-## Beheben
+## Fixing
 
-* Treffer im aktuellen Stand: Begriff ersetzen (Beispiel-Domains example.com, Personen
+* Match in the current state: replace the term (example domains example.com, people
   Alex, Sam, Robin).
-* Treffer in Commit-Nachrichten oder -Identitäten noch nicht gepushter Commits:
-  `git commit --amend` beziehungsweise Rebase mit neuer Nachricht oder Identität.
-* Treffer in alter Historie: Umschreiben nach docs/quality/public-switch.md.
+* Match in commit messages or commit identities of commits not yet pushed:
+  `git commit --amend` or a rebase with a new message or identity.
+* Match in old history: rewrite it as described in docs/quality/public-switch.md.

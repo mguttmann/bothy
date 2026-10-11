@@ -30,7 +30,7 @@ repos:
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: check-added-large-files
-        # Named value repo.max_file_kb (docs/spec/23-qualitaet.md).
+        # Named value repo.max_file_kb (docs/spec/23-quality.md).
         args: [--maxkb=1024, --enforce-all]
       - id: detect-private-key
       - id: check-executables-have-shebangs

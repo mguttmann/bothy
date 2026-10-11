@@ -182,7 +182,7 @@ def render(model: Model, header: str) -> str:
     ]
     parts.append(
         _static_class(
-            "DsPalette", "Primitive Tonleitern. Komponenten nutzen DsColors, nie diese Werte direkt.", palette
+            "DsPalette", "Primitive tonal scales. Components use DsColors, never these values directly.", palette
         )
     )
 
@@ -197,7 +197,7 @@ def render(model: Model, header: str) -> str:
         parts.append("")
         parts.append(
             _extension_class(
-                "DsColors", fields, instances, {f: "color" for f, _ in fields}, "Semantische Farbrollen je Theme."
+                "DsColors", fields, instances, {f: "color" for f, _ in fields}, "Semantic color roles per theme."
             )
         )
         shadow_paths = [p for p, t in any_ctx.items() if t.type == "shadow"]
@@ -214,7 +214,7 @@ def render(model: Model, header: str) -> str:
                     sfields,
                     sinst,
                     {f: "shadows" for f, _ in sfields},
-                    "Schatten für Ebenen über dem Inhalt, je Theme.",
+                    "Shadows for layers above the content, per theme.",
                 )
             )
 
@@ -231,7 +231,7 @@ def render(model: Model, header: str) -> str:
                 fields,
                 inst,
                 {f: "double" for f, _ in fields},
-                "Dichte: comfortable (Desktop), compact (wählbar), touch (Mobil).",
+                "Density: comfortable (desktop), compact (selectable), touch (mobile).",
             )
         )
 
@@ -260,16 +260,16 @@ def render(model: Model, header: str) -> str:
                 fields,
                 inst,
                 lerp,
-                "Bewegung: full oder reduced (Systemeinstellung bzw. appearance.reduce_motion).",
+                "Motion: full or reduced (system setting or appearance.reduce_motion).",
             )
         )
 
     for group, cls, doc in (
-        ("space", "DsSpace", "Abstände (Raster 4 px)."),
-        ("radius", "DsRadius", "Eckenradien."),
-        ("border-width", "DsBorderWidth", "Linienstärken."),
-        ("layout", "DsLayout", "Startbreiten der Desktop-Spalten."),
-        ("size", "DsSize", "Feste Maße."),
+        ("space", "DsSpace", "Spacing (4 px grid)."),
+        ("radius", "DsRadius", "Corner radii."),
+        ("border-width", "DsBorderWidth", "Line widths."),
+        ("layout", "DsLayout", "Initial widths of the desktop columns."),
+        ("size", "DsSize", "Fixed sizes."),
     ):
         members = [
             (identifier(p, group), "double", _px(t.value))
@@ -285,7 +285,7 @@ def render(model: Model, header: str) -> str:
     ]
     if icon_sizes:
         parts.append("")
-        parts.append(_static_class("DsIconSize", "Icon-Größen.", icon_sizes))
+        parts.append(_static_class("DsIconSize", "Icon sizes.", icon_sizes))
 
     families = [
         (identifier(p, "font"), "List<String>", _string_list(t.value if isinstance(t.value, list) else [t.value]))
@@ -298,12 +298,10 @@ def render(model: Model, header: str) -> str:
         if t.type == "typography"
     ]
     parts.append("")
-    parts.append(_static_class("DsFonts", "Schriftfamilien mit Rückfall-Liste.", families))
+    parts.append(_static_class("DsFonts", "Font families with a fallback list.", families))
     parts.append("")
     parts.append(
-        _static_class(
-            "DsType", "Typo-Rollen. Farbe kommt aus DsColors, Größe skaliert mit MediaQuery.textScaler.", types
-        )
+        _static_class("DsType", "Type roles. Color comes from DsColors, size scales with MediaQuery.textScaler.", types)
     )
 
     icons = icon_extension(model)
@@ -311,7 +309,7 @@ def render(model: Model, header: str) -> str:
         parts.append("")
         parts.append("enum DsIconWeight { thin, light, regular, bold, fill, duotone }")
         parts.append("")
-        parts.append("/// Semantisches Icon: Name im Phosphor-Set und Strichstärke.")
+        parts.append("/// Semantic icon: name in the Phosphor set and stroke weight.")
         parts.append("@immutable")
         parts.append("final class DsGlyph {")
         parts.append("  const DsGlyph(this.name, this.weight, {this.spins = false});")
@@ -332,7 +330,7 @@ def render(model: Model, header: str) -> str:
         members.append(("spaceIcons", "List<String>", _string_list(icons["space-icons"])))
         parts.append("")
         parts.append(
-            _static_class("DsIcons", f"Icons aus {icons['source']} {icons['version']} ({icons['license']}).", members)
+            _static_class("DsIcons", f"Icons from {icons['source']} {icons['version']} ({icons['license']}).", members)
         )
 
     return "\n".join(parts) + "\n"

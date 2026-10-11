@@ -1,0 +1,26 @@
+---
+config:
+  layout: elk
+---
+%% Request path of a REST request in the api node. Description: 02-architecture.md, section 10.
+flowchart TB
+  classDef step fill:#136f69,stroke:#063b38,color:#fbfeff
+  classDef check fill:#eddc59,stroke:#8d7716,color:#291f02
+  classDef store fill:#12659d,stroke:#0b4d79,color:#fbfeff
+  classDef ext fill:#59696c,stroke:#24363a,color:#fbfeff
+
+  client["Client"]:::ext --> proxy["Reverse proxy<br/>TLS"]:::ext
+  proxy --> m1["1 Recover, request ID,<br/>correlation"]:::step
+  m1 --> m2["2 OTel span (otelhttp),<br/>access log without content"]:::step
+  m2 --> m3["3 Size and time limits<br/>per route class"]:::check
+  m3 --> m4["4 Authentication: token,<br/>DPoP, session, device"]:::check
+  m4 --> m5["5 Route metadata from spec:<br/>action, rate-limit class"]:::step
+  m5 --> m6["6 Rate limit<br/>(token bucket)"]:::check
+  m6 --> m7["7 Generated strict handler:<br/>decoding, schema check"]:::step
+  m7 --> h["8 Module adapter httpapi"]:::step
+  h --> app["9 Use case (app):<br/>authorize, Unit of Work"]:::check
+  app --> dom["10 domain:<br/>rules, invariants"]:::step
+  app --> repo["11 Repository (sqlc, pgx)"]:::step
+  repo --> db[("PostgreSQL")]:::store
+  app --> resp["12 Response or<br/>problem+json"]:::step
+  resp --> m8["13 Proof check:<br/>authorize called with the<br/>action of the route?"]:::check

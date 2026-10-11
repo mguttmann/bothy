@@ -1,40 +1,40 @@
 # M1-37: First setup, enrollment codes and setup lock
 
-Status: ready | Depends on: M1-19, M1-36 | Etappe: M1
+Status: ready | Depends on: M1-19, M1-36 | Milestone: M1
 
 ## Goal
 
 After this ticket a fresh instance answers every public request except the discovery-class reads
-with `503 setup_required` until the operator runs `bothy setup bootstrap-owner` on the host. That
-command creates the first owner in one transaction and prints a one-time enrollment code. The owner
-redeems the code on a device that registers only its device keys (no passkey needed, contradiction
-W5) and gets an active device with a DPoP-bound session. Owners issue enrollment codes for local
-accounts over the API, and lost access is recovered on the host with
+with `503 setup_required` until the instance operator runs `bothy setup bootstrap-owner` on the
+host. That command creates the first owner in one transaction and prints a one-time enrollment
+code. The owner redeems the code on a device that registers only its device keys (no passkey
+needed, contradiction W5) and gets an active device with a DPoP-bound session. Owners issue
+enrollment codes for local accounts over the API, and lost access is recovered on the host with
 `bothy setup issue-enrollment-code`. The ticket also builds the shared login-completion use case
 that every later login flow (M1-38 to M1-43) reuses, so device, session and token creation exist
 exactly once.
 
 ## Read first
 
-- `docs/spec/08-identitaet.md`: "Lokale Konten", "Zuordnung einer externen Identität",
-  "Einladungs-Code", "Erstinstallation", "Registrierung" and "Bestätigung" (section 5), "DPoP",
-  "Schutz der Anmeldung", "Tests" (ID-T06, ID-T07, ID-T11, ID-T27), "Entscheidungen dieses
-  Kapitels" (R-ID-07, R-ID-09), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/03-datenmodell.md`: "Grundsätze" 1, 9, 12, 13; tables `instance`, `principals`,
+- `docs/spec/08-identity.md`: "Local accounts", "Mapping an external identity",
+  "Enrollment code", "Initial installation", "Registration" and "Approval" (section 5), "DPoP",
+  "Login protection", "Tests" (ID-T06, ID-T07, ID-T11, ID-T27), "Decisions of this chapter"
+  (R-ID-07, R-ID-09), "Configuration values of this chapter".
+- `docs/spec/03-data-model.md`: "Principles" 1, 9, 12, 13; tables `instance`, `principals`,
   `users`, `owners`, `identity_providers`, `user_identities`, `enrollment_codes`, `devices`,
   `device_keys`, `auth_sessions`, `refresh_token_families`, `idempotency_keys`, `audit_events`.
-- `docs/spec/05-aktionen.md`: rules 1.5 and 1.10, "Spalten Owner, Step-up, Audit, Rechte",
-  "Entscheidung"; actions `instance.discovery.read`, `instance.bootstrap`, `owner.recover`,
+- `docs/spec/05-actions.md`: rules 1.5 and 1.10, "Columns Owner, Step-up, Audit, Permissions",
+  "Decision"; actions `instance.discovery.read`, `instance.bootstrap`, `owner.recover`,
   `auth.login.complete`, `user.create`, `user.update`.
-- `docs/spec/02-architektur.md`: "Befehle des Binarys", "Modulliste", "Erlaubte Abhängigkeiten",
-  "Querschnitts-Ports", "Schichten im Modul", "Transaktionen und Unit of Work", "Request-Pfad",
-  "Fehlerarten", "Start".
-- `docs/spec/06-api.md`: "DPoP", "Anmeldeabläufe", "Fehler", "Idempotenz", "Endpunkte" (Auth,
-  Users), "Vertragstests und Gate".
-- `docs/spec/07-rechte.md`: "Prinzipal-Kontext", "Ablauf".
-- `docs/spec/16-betrieb.md`: "Zwei Listener", "Rollen" (database roles).
+- `docs/spec/02-architecture.md`: "Commands of the binary", "Module list", "Allowed dependencies",
+  "Cross-cutting ports", "Layers within a module", "Transactions and Unit of Work", "Request path",
+  "Error kinds", "Start".
+- `docs/spec/06-api.md`: "DPoP", "Login flows", "Errors", "Idempotency", "Endpoints" (Auth,
+  Users), "Contract tests and gate".
+- `docs/spec/07-permissions.md`: "Principal context", "Flow".
+- `docs/spec/16-operations.md`: "Two listeners", "Roles" (database roles).
 - `docs/operations/install-compose.md`: section "Start".
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 "Bekannte Widersprüche" W3, W5.
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 "Known contradictions" W3, W5.
 - ADR 0013, ADR 0015, ADR 0019, ADR 0020, ADR 0021.
 - `docs/api/openapi.yaml`: operations `createEnrollmentCode`, `createUser`,
   `redeemEnrollmentCode`, `getJwks`, `getDiscovery` (`beginEnrollment` and `completeEnrollment`
@@ -60,27 +60,27 @@ exactly once.
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour change starts with a failing test (red), then code (green), then
+6. Test first: every behavior change starts with a failing test (red), then code (green), then
    cleanup. No en dash or em dash in any text. White label: examples use Alex, Sam, Robin and
    `example.com`; example secrets contain `EXAMPLE`. Configuration values only through named keys
    listed in `docs/operations/configuration.md`.
 7. Until `instance.setup_completed_at` is set, the server answers only health checks and
    `instance.discovery.read`; every other request ends with `503 setup_required`. There is no
-   "first visitor becomes owner" (08 "Erstinstallation", R-ID-07, T-ID-04).
+   "first visitor becomes owner" (08 "Initial installation", R-ID-07, T-ID-04).
 8. The first owner is created only by a host command, directly against the database, in one
-   transaction with the six steps of 08 "Erstinstallation" (check, principal and owner, signing
-   keys, enrollment code, audit with system action `instance.bootstrap` and no actor, mark setup
-   complete).
+   transaction with the six steps of 08 "Initial installation" (check, principal and owner,
+   signing keys, enrollment code, audit with system action `instance.bootstrap` and no actor, mark
+   setup complete).
 9. Enrollment codes: at least 128 random bits from the cryptographic generator, shown exactly once,
    stored only as HMAC-SHA-256 with the server pepper (`auth.token_pepper_ref`), valid
    `auth.enrollment_code_ttl`, single use, invalid after `auth.enrollment_code_max_attempts` failed
-   attempts, never sent by e-mail (08 "Einladungs-Code", 03 Grundsatz 9, ID-T11, ID-T27).
+   attempts, never sent by e-mail (08 "Enrollment code", 03 principle 9, ID-T11, ID-T27).
 10. Redeeming a code confirms the first device: the device that redeems it becomes `active`
-    (08 "Einladungs-Code", "Bestätigung").
-11. Recovery on the host only for active owners, with an audit entry (08 "Erstinstallation",
-    R-ID-09).
+    (08 "Enrollment code", "Approval").
+11. Recovery on the host only for active owners, with an audit entry
+    (08 "Initial installation", R-ID-09).
 12. No information about accounts or codes: every rejected code yields the same answer
-    (08 "Schutz der Anmeldung").
+    (08 "Login protection").
 13. Every route goes through `authorize` with its catalogue action; the system action
     `instance.bootstrap` is not reachable over API or gateway (05 rules 1.1 and 1.10).
 
@@ -90,8 +90,8 @@ The specification is in place (planning, spec first; W3 and W5 resolved there): 
 `redeemEnrollmentCode` (`POST /auth/enroll/redeem`, `auth.login.complete`, `rl.public_auth`,
 `x-idempotency-exempt: auth_flow`, schema `EnrollRedeemRequest`), `EnrollmentCode.purpose`, the
 problem code `setup_required` in `x-problem-codes` (503) and the descriptions of
-`createEnrollmentCode` and `createUser` (one-time secret) in `openapi.yaml`; 06 "Idempotenz" row
-"Antwort mit einmaligem Geheimnis" and R-API-26; 08 "3.2" (format, purposes table, one valid code
+`createEnrollmentCode` and `createUser` (one-time secret) in `openapi.yaml`; 06 "Idempotency" row
+"Response with a one-time secret" and R-API-26; 08 "3.2" (format, purposes table, one valid code
 per person, definition of a failed attempt, redemption paths) and "4" (local provider and local
 identity created by `bootstrap-owner`, application role, recovery with the system action
 `owner.recover`); 05 `owner.recover`; 16 "4.3" (host access is the root of trust) and "7.1"
@@ -107,7 +107,7 @@ Production code under `services/server/`:
   IS NULL`, index `(expires_at)`). Use the next free goose sequence number; `make migrations-lint`
   must pass.
 - `internal/identity/adapters/postgres/queries/enrollment_codes.sql` plus regenerated sqlc code.
-- `internal/identity/domain/enrollment.go`: code generation, normalisation, display format,
+- `internal/identity/domain/enrollment.go`: code generation, normalization, display format,
   purpose rules, attempt rules (pure functions).
 - `internal/identity/app/enrollment.go`: service `EnrollmentCodes` with `Issue`, `Match`,
   `RecordFailedAttempt`, `MarkUsed` (used by M1-40 and M1-41, so keep them exported within the
@@ -201,7 +201,7 @@ Enrollment code format and storage:
   Base32 characters (alphabet `0123456789ABCDEFGHJKMNPQRSTVWXYZ`). Display form: `en_` plus eight
   groups of four characters joined by `-`, for example `en_EXAM-PLE0-...` in docs only with the word
   `EXAMPLE` in the value.
-- Normalisation of input: trim, drop an optional `en_` prefix (any case), remove `-` and spaces,
+- Normalization of input: trim, drop an optional `en_` prefix (any case), remove `-` and spaces,
   uppercase, map `O` to `0` and `I`, `L` to `1`; anything that is not 32 alphabet characters is not
   a code.
 - Stored value: `code_hash = HMAC-SHA-256(key = pepper, msg = "enrollment-code/v1" || 0x00 ||
@@ -238,7 +238,7 @@ Redemption `redeemEnrollmentCode`, in this order:
 2. Verify the DPoP proof as a login proof without `ath` (06 "DPoP" point 3) with the verifier
    from M1-33, including the nonce rules. Failure: `401 invalid_dpop_proof` or `use_dpop_nonce`;
    the code is not looked up.
-3. Normalise the code. Malformed, unknown, used, expired (`now >= expires_at`), exhausted, wrong
+3. Normalize the code. Malformed, unknown, used, expired (`now >= expires_at`), exhausted, wrong
    purpose, or the person is not `principals.status = 'active'`: `401 unauthenticated` with the
    same body (only `correlation_id` differs) and an audit denial. Lookup uses `Match`, which locks
    the row with `SELECT ... FOR UPDATE` inside the unit of work.
@@ -248,7 +248,7 @@ Redemption `redeemEnrollmentCode`, in this order:
 5. `MarkUsed` sets `used_at` and `used_by_device_id` in the same unit of work. Respond `201` with
    `TokenResponse`.
 
-Two parallel redemptions of the same code: the row lock serialises them; the second sees `used_at`
+Two parallel redemptions of the same code: the row lock serializes them; the second sees `used_at`
 and gets the generic `401`.
 
 `CompleteLogin` (shared by all login flows):
@@ -300,8 +300,8 @@ Setup gate:
   if that function opens its own transaction, call it before the bootstrap transaction). The
   command therefore needs the writable key store like `serve` (Compose: run it in the `api`
   service).
-- One unit of work with the rights-change option for the new principal (`instance.bootstrap` has
-  "Rechte" `ja`), system actor:
+- One unit of work with the permission-change option for the new principal (`instance.bootstrap`
+  has "Permissions" `yes`), system actor:
     1. Lock the instance record (`SELECT ... FOR UPDATE` through the instance port; if M1-15 creates
        the record lazily, call its ensure function first). `setup_completed_at` set: abort.
     2. Ensure a `local` identity provider: reuse the existing one, else create `kind = 'local'`,
@@ -345,8 +345,8 @@ handle) and a `first_login` code in the same unit of work and returns it as `enr
 One-time secrets and idempotency: a response that carries a one-time secret is marked by the
 handler with `idempotency.MarkOneTimeSecret(ctx)` (M1-20). The idempotency layer then stores status
 and `{"one_time_secret": true}` as body instead of the response; a replay with the same key answers
-`409 conflict` with `reason: one_time_secret` (06 "Idempotenz", R-API-26). Reason:
-`idempotency_keys.response_body` must not hold a secret in plain text (03 Grundsatz 9).
+`409 conflict` with `reason: one_time_secret` (06 "Idempotency", R-API-26). Reason:
+`idempotency_keys.response_body` must not hold a secret in plain text (03 principle 9).
 
 Configuration used (all existing; add none): `auth.enrollment_code_ttl`,
 `auth.enrollment_code_max_attempts`, `auth.token_pepper_ref`, `auth.session_max_age`,
@@ -356,7 +356,7 @@ Error codes: `setup_required` (503, in `x-problem-codes`), `unauthenticated`, `i
 `use_dpop_nonce` (401), `validation_failed` (400), `conflict` (409), `rate_limited` (429).
 
 Rulings to record in `docs/DECISIONS.md` (link the spec places named in Scope): W3 and W5
-resolution; setup gate placement and caching; code display format and normalisation.
+resolution; setup gate placement and caching; code display format and normalization.
 
 ## Tests (write them first)
 

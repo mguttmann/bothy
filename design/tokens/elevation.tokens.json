@@ -1,5 +1,5 @@
 {
-  "$description": "Erhebung. Flächen liegen flach und trennen sich durch Farbe und Linien; Schatten nur für Ebenen über dem Inhalt. Kein Glühen, kein Glas.",
+  "$description": "Elevation. Surfaces lie flat and are separated by color and lines; shadows only for layers above the content. No glow, no glass.",
   "elevation": {
     "$type": "shadow",
     "menu": {
@@ -7,14 +7,14 @@
         {"color": "{color.shadow}", "offsetX": {"value": 0, "unit": "px"}, "offsetY": {"value": 2, "unit": "px"}, "blur": {"value": 6, "unit": "px"}, "spread": {"value": 0, "unit": "px"}},
         {"color": "{color.shadow}", "offsetX": {"value": 0, "unit": "px"}, "offsetY": {"value": 8, "unit": "px"}, "blur": {"value": 20, "unit": "px"}, "spread": {"value": -4, "unit": "px"}}
       ],
-      "$description": "Kontextmenü, Vorschlagsliste, Tooltip."
+      "$description": "Context menu, suggestion list, tooltip."
     },
     "dialog": {
       "$value": [
         {"color": "{color.shadow}", "offsetX": {"value": 0, "unit": "px"}, "offsetY": {"value": 4, "unit": "px"}, "blur": {"value": 12, "unit": "px"}, "spread": {"value": 0, "unit": "px"}},
         {"color": "{color.shadow}", "offsetX": {"value": 0, "unit": "px"}, "offsetY": {"value": 24, "unit": "px"}, "blur": {"value": 48, "unit": "px"}, "spread": {"value": -8, "unit": "px"}}
       ],
-      "$description": "Dialog, Schnellwechsel, Freigabe-Assistent."
+      "$description": "Dialog, quick switcher, grant wizard."
     }
   }
 }

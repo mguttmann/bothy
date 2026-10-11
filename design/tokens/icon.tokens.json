@@ -1,11 +1,11 @@
 {
-  "$description": "Icons: Größen als Tokens, die Zuordnung semantischer Namen zu Phosphor-Glyphen als Erweiterung (DTCG kennt keinen Icon-Typ). Namensraum 'ds' bis Produktname und Domain feststehen (ADR 0044).",
+  "$description": "Icons: sizes as tokens, the mapping of semantic names to Phosphor glyphs as an extension (DTCG has no icon type). Namespace 'ds' until the product name and domain are settled (ADR 0044).",
   "icon": {
     "size": {
       "$type": "dimension",
-      "sm": {"$value": {"value": 16, "unit": "px"}, "$description": "In Listenzeilen, Chips, Auslöser-Status."},
-      "md": {"$value": {"value": 20, "unit": "px"}, "$description": "Standard in Knöpfen und Kopfzeilen."},
-      "lg": {"$value": {"value": 24, "unit": "px"}, "$description": "Mobile Navigation, leere Zustände."}
+      "sm": {"$value": {"value": 16, "unit": "px"}, "$description": "In list rows, chips, trigger state."},
+      "md": {"$value": {"value": 20, "unit": "px"}, "$description": "Default in buttons and headers."},
+      "lg": {"$value": {"value": 24, "unit": "px"}, "$description": "Mobile navigation, empty states."}
     },
     "$extensions": {
       "ds.icons": {

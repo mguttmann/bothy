@@ -1,0 +1,662 @@
+# 13 Push and notifications
+
+Status: draft M0. Normative for the module `notify`, the push adapters and the
+notification rules of all clients. Terms: [00-glossary.md](00-glossary.md). Tables:
+[03-data-model.md](03-data-model.md) (`notification_preferences`, `quiet_hours`,
+`push_registrations`, `read_states`). Actions: [05-actions.md](05-actions.md) (4.9).
+Events: [04-sync-protocol.md](04-sync-protocol.md). Client side:
+[15-client-architecture.md](15-client-architecture.md). Decision: ADR 0031 (push without content).
+
+All deadlines, windows and limits are named configuration values with a default in section 17.
+External facts refer to the source list (section 18).
+
+## 1. Goals
+
+1. **No content at Apple or Google.** Push carries only IDs and a neutral placeholder.
+   The app fetches the text itself from its own server (Baseline R-Push, ADR 0031).
+2. **Permissions at display time.** Before every push the server checks `push.deliver`; when the
+   content is fetched, it checks `message.read` once more. Whoever no longer has access sees nothing.
+3. **Little noise.** One notification per thread and window; none if the person is in the thread
+   right now; silent during quiet hours.
+4. **One place for rules.** Only the server decides whether, how and where to notify.
+   Clients display, they do not decide. This also applies to desktop notifications.
+5. **Measurable.** Every push has an ID; delivery and fetching are measurable (section 9).
+
+Not a goal: email notifications (Baseline "deliberately never"), push to agents or apps
+(they use the gateway or webhooks), background push for data synchronization.
+
+## 2. Kinds of notifications and recipients
+
+A notification has a kind (`kind`). The kind determines the recipients and the minimum level required.
+
+| `kind` | Trigger | Recipient | Applies from level | Note |
+|---|---|---|---|---|
+| `message` | new message from a person, an app or an agent without an active run; first post of a forum thread | all people with read permission and effective level `all`, except the author | `all` | report channels, section 2.2 |
+| `mention` | message mentions the person r | r | `mentions` | also mentions by agents, always immediately |
+| `dm` | message in a DM channel | participants except the author | `mentions` | a DM counts as addressed directly to the person |
+| `run_done` | run `completed` | the run's triggering person (`runs.triggered_by`) | `mentions` | points to the last agent message of the run; others with `all` get `message` for it |
+| `run_failed` | run `failed` | the run's triggering person | `mentions` | not for `cancelled` |
+| `input_needed` | run changes to `waiting_input` (question, approval) | the run's triggering person | always, even with `mute` | rationale in 2.1 |
+| `security` | a new device of the person waits for device approval | all other active devices of this person | always | account protection: a foreign device is noticed immediately |
+| `admin` | reminders from the administration (grant expires, GDPR deadline) | owner or administrators according to [07-permissions.md](07-permissions.md) and [20-privacy.md](20-privacy.md) | switch `notify.admin_enabled` | content only kind and target ID |
+
+No notification is created for: edits, deletions, reactions, pins, typing, live box patches,
+messages with `silent = true` and messages with `origin IN ('import','system')`. An edit
+creates no notification even when it adds a mention (one rule less,
+no abuse through mentioning after the fact).
+
+### 2.1 Agent messages during a run
+
+Messages that the agent of an active run writes in the thread do not create their own
+`message` notification. At the end of the run exactly one notification is created: `run_done` to the
+triggering person, `message` to all others with level `all`; both point to the last agent message of the run.
+If the agent mentions a person, `mention` goes out immediately. Reason: a run can write several
+intermediate messages; the person wants to know when it is finished.
+
+`input_needed` ignores `mute`, but not quiet hours: the run waits until exactly this person
+answers, and that person started it. Muting should not leave a person's own runs stuck. Other
+authorized people (for example with `approve_actions`) see the question in the thread, but get
+no push; otherwise whole groups would be woken for every approval.
+
+### 2.2 Report channels
+
+A report channel is a normal channel that agents without a triggering person (cron, background) or
+integrations write to through incoming webhooks (for example Alertmanager). These messages are
+`message` notifications. So that members without their own setting are notified, this
+chapter plans the channel default `channels.default_notification_level` (`all`, `mentions`,
+`mute`, nullable; 03). It is set by whoever may perform `channel.update`.
+
+## 3. Settings
+
+### 3.1 Effective level
+
+Levels from [03-data-model.md](03-data-model.md): `all`, `mentions`, `mute`. The effective
+level of a person for a thread is the first existing value in this order:
+
+1. own setting for the thread,
+2. own setting for the channel,
+3. own setting for the space,
+4. channel default `channels.default_notification_level`,
+5. for DM channels `all`,
+6. personal default `user_settings['notify.default_level']`,
+7. instance default `notify.user_default_level`.
+
+If `muted_until` of the selected row lies in the future, `mute` applies. The same order is
+in [03-data-model.md](03-data-model.md) (`notification_preferences`).
+
+### 3.2 Automatic following
+
+If a person writes in a thread with `kind = 'thread'` (not in the main thread) or creates
+it, and has no own setting for this thread yet, the server creates in the same
+transaction `notification_preferences(user, 'thread', id, level = 'all')` and writes
+`notification_pref.updated`. The app shows this as "Following"; the person can change it. Reason:
+whoever writes in a thread or triggers an agent wants to see the answers. In the
+main thread this does not apply; otherwise one message would make a person follow the whole channel.
+
+### 3.3 Personal switches
+
+Keys in `user_settings` (03). This table is normative for all keys `notify.*`; the
+other personal keys are in [01-product.md](01-product.md), section 11. Default
+without an own setting: section 17.
+
+| Key | Values | Effect |
+|---|---|---|
+| `notify.default_level` | `all`, `mentions`, `mute` | step 6 in 3.1 |
+| `notify.preview_mode` | `full`, `names`, `none` | what the preview endpoint returns (6.4): text and names, only names, only kind |
+| `notify.input_needed_breaks_quiet_hours` | bool | `input_needed` is audible even during quiet hours |
+| `notify.admin_enabled` | bool | `admin` notifications to owners and administrators |
+
+### 3.4 Quiet hours with time zone
+
+Rows in `quiet_hours`: weekdays as a bit mask (bit 0 = Monday), `start_local`, `end_local`,
+`time_zone` (NULL = `users.time_zone`), `enabled`. Check at send time:
+
+1. Convert now into the time zone of the row. This gives an unambiguous weekday and time, even
+   on days with a clock change. The server never computes the boundaries as points in time; so there
+   are no special cases for skipped or repeated hours.
+2. If `start_local < end_local`: quiet if the bit of the weekday is set and
+   `start_local <= time < end_local`.
+3. If `end_local <= start_local` (across midnight): quiet if the bit of the weekday is set
+   and `time >= start_local`, or if the bit of the previous day is set and
+   `time < end_local`. A window therefore belongs to the day on which it starts.
+4. A person is in quiet hours if an enabled row matches.
+
+Effect of quiet hours: the notification is delivered silently (iOS `interruption-level: passive` and
+priority 5, Android without sound with low priority, desktop without sound). It appears in the
+notification center but does not wake anyone. Exception: `input_needed` with
+`notify.input_needed_breaks_quiet_hours = true`.
+
+## 4. Decision per recipient
+
+### 4.1 Flow
+
+```mermaid
+flowchart TD
+    A["Event and recipient r"] --> B{"authorize(r, push.deliver, thread)"}
+    B -- no --> X["no notification"]
+    B -- yes --> C{"Kind and effective level match?"}
+    C -- no --> X
+    C -- yes --> D{"r active in the thread?"}
+    D -- yes --> X
+    D -- no --> F{"Quiet hours?"}
+    F -- yes --> G["silent"]
+    F -- no --> H["normal"]
+    G --> I{"Coalescing window for r and thread open?"}
+    H --> I
+    I -- "yes, kind message" --> J["collect, one notification at the end of the window"]
+    I -- "no, or urgent kind" --> K["immediately"]
+    J --> L{"per device: live connection?"}
+    K --> L
+    L -- yes --> M["Gateway: notification.created"]
+    L -- no --> N{"Desktop of r active and device mobile?"}
+    N -- yes --> O["delay, read: discard"]
+    N -- no --> P["APNs or FCM"]
+    O --> P
+```
+
+### 4.2 Permissions
+
+`authorize(r, push.deliver, thread)` with the permissions at decision time (P3). A
+mention of a person without read permission creates nothing and reveals nothing
+([03-data-model.md](03-data-model.md), `mentions`). Only active people are recipients.
+
+### 4.3 Level and kind
+
+| Effective level | Allowed kinds |
+|---|---|
+| `all` | all |
+| `mentions` | all except `message` |
+| `mute` | only `input_needed` (own run), `security`, `admin` |
+
+### 4.4 Active on a device
+
+- **Active in the thread:** a device of r has a gateway connection whose `focus` contains the
+  thread, and does not report `idle`. Then r gets no notification for this thread, on no
+  device. The field `idle` in the op `focus` ([04-sync-protocol.md](04-sync-protocol.md), 6.2): a
+  desktop window that is open but unused should keep receiving live box patches, but
+  not count as "person is watching". When a client reports `idle` is defined by
+  [15-client-architecture.md](15-client-architecture.md).
+- **Desktop active:** a device with `platform IN ('macos','windows')` is connected and not
+  `idle`. Then pushes to mobile devices go out only after `notify.mobile_delay_when_desktop_active`.
+  If the notification has been read by then (`read_states.last_read_seq` at least the thread sequence of the
+  message), it is dropped. Reason: whoever sits at the computer does not want the phone to buzz
+  at the same time.
+
+### 4.5 Coalescing
+
+Per recipient and thread, a window `notify.coalesce_window` applies:
+
+1. The first notification goes out immediately. This opens the window.
+2. Further `message` notifications within the window are collected. At the end of the window one notification
+   goes out with the number of unread messages (`threads.last_message_seq - read_states.last_read_seq`),
+   which replaces the previous one on the device (6.1 `apns-collapse-id`, 5.2 notification tag).
+3. `mention`, `dm`, `input_needed`, `run_done`, `run_failed` and `security` always go out immediately,
+   but replace the same slot.
+
+Implementation: one unique, scheduled job per (recipient, thread) in River; River can make jobs
+unique by their arguments and run them at a point in time [Q1, verified].
+
+### 4.6 Delivery path per device
+
+For every active device of r (`devices.state = 'active'`):
+
+1. If the device currently has a gateway connection, the ephemeral event
+   `notification.created` goes over this connection (6.3; 05 section 6). The
+   app shows its own notification or an in-app banner. No push for this device.
+2. Otherwise a push goes to every active push registration of the device (`disabled_at IS NULL`).
+3. If the device has neither a connection nor a registration (for example the Windows app is closed),
+   nothing is created. Unread counters show it on the next opening.
+
+## 5. Delivery paths per platform
+
+### 5.1 iOS and macOS: APNs with Notification Service Extension
+
+- **Connection.** HTTP/2 to `api.push.apple.com` or `api.sandbox.push.apple.com`, depending on
+  `push_registrations.environment` [Q2, verified]. Request `POST /3/device/<token>` [Q2, verified].
+- **Authentication at APNs.** Token method with a `.p8` key: JWT with `ES256`, header `alg` and
+  `kid`, claims `iss` (team ID) and `iat` [Q3, verified]. Renew no more often than every 20 and no
+  less often than every 60 minutes [Q3, verified]; the server renews every
+  `push.apns.jwt_refresh_interval` and does not start if the value lies outside this
+  range.
+- **Headers.** `apns-push-type: alert`; `apns-id` = `nid` (a UUID in canonical form is
+  allowed and appears in error responses [Q2, verified]); `apns-topic` = `push_registrations.app_id`
+  (must be in `push.apns.topics`); `apns-priority` 10, for silent notifications 5 [Q2, verified];
+  `apns-expiration` = now plus `push.ttl`; `apns-collapse-id` = thread ID (at most 64 bytes
+  allowed [Q2, verified]).
+- **Notification Service Extension (NSE).** It runs only with `mutable-content: 1` and a
+  visible `alert` [Q4, verified] and has about 30 seconds [Q4, verified]. It fetches the content through
+  the preview endpoint (6.4) and replaces title and text ([ADR 0056](../adr/0056-native-extensions-without-the-flutter-engine.md)). If the fetch fails (server not
+  reachable, for example because the device cannot reach the private network right now), the placeholder
+  stays [Q4, verified]. The NSE also exists on macOS [Q5, verified]; the same pattern applies there
+  [derived].
+- **No token renewal in the NSE.** The NSE never uses refresh tokens. Two processes that
+  rotate the same refresh family would trigger the reuse detection and revoke the
+  session ([03-data-model.md](03-data-model.md), `refresh_tokens`). That is why the
+  preview token (6.4) exists.
+- **Device key.** The NSE signs the DPoP proof with the device key, without
+  user confirmation. This requires that the DPoP key is usable without biometrics and that
+  step-up has a separate path ([08-identity.md](08-identity.md)). This requirement is
+  reported in the return report to Team C.
+- **Suppressing.** Without a special permission the NSE must show every notification. With the entitlement
+  `com.apple.developer.usernotifications.filtering` it can silently discard a notification,
+  for example when the message has been deleted in the meantime or access has been revoked; Apple must approve it on
+  request [Q6, verified]. Without the entitlement the NSE then shows "Message not
+  available". Applying for it is a decision of the instance operator.
+- **No background push.** Apple throttles background pushes heavily and advises against more than two
+  to three per hour [Q7, verified]. They are not suitable for chat.
+
+### 5.2 Android: FCM data message
+
+- **Sending.** `POST https://fcm.googleapis.com/v1/projects/{project_id}/messages:send` with an
+  OAuth 2.0 access token from the service account, scope
+  `https://www.googleapis.com/auth/firebase.messaging` [Q8, verified].
+- **Only data messages** with own keys, without a `notification` block [Q9, verified]. The
+  connection to FCM is encrypted, but not end-to-end [Q9, verified]; therefore only IDs.
+- **Priority** `high`, for silent notifications `normal`. FCM can deprioritize a high-priority message without a visible
+  notification [Q10, verified]; the app therefore shows a notification for every message of the kinds
+  from section 2, with a placeholder if necessary.
+- **Lifetime** `android.ttl` = `push.ttl` in the format `"<seconds>s"`; FCM allows at most 28
+  days [Q11, verified].
+- **No `collapse_key`.** FCM keeps only four different collapse keys per device and chooses
+  arbitrarily which ones remain [Q12, verified]; using one key per thread would lose
+  notifications. The app replaces notifications itself through a tag equal to the thread ID.
+- **Overflow.** Without collapse, FCM stores at most 100 messages for a device; beyond that
+  it discards all of them and sends a special message [Q12, verified]. The app then reloads the state
+  (unread counters through the normal sync).
+- **Time budget.** `onMessageReceived` has only a few seconds; longer work runs as an
+  expedited WorkManager job [Q10, verified]. The app fetches the preview (6.4) within this budget.
+
+### 5.3 Windows and desktop through the gateway
+
+- The Windows app keeps running in the notification area, keeps its gateway connection and shows local
+  notifications from `notification.created` (Baseline R-Push). macOS uses the same path as long as
+  the app is connected, otherwise APNs.
+- WNS is "later": it needs package identity for delivery in the background, an
+  Entra app registration and a mapping of the package family to the app by email to Microsoft
+  [Q13, verified]. If the Windows app is closed, there are no notifications; the user
+  documentation says so.
+
+### 5.4 Later
+
+`unifiedpush` (Android without Google services) and `wns` are provided for as values in
+`push_registrations.provider`, but without an adapter in the core. The port `PushProvider`
+(`Send(ctx, registration, notification) -> Result`) takes them in without a change to the
+decision logic.
+
+## 6. Payload and preview
+
+### 6.1 APNs
+
+```json
+{
+  "aps": {
+    "alert": { "title-loc-key": "PUSH_TITLE", "loc-key": "PUSH_BODY_MESSAGE" },
+    "mutable-content": 1,
+    "thread-id": "0192f1d2-7c4e-7a10-9a3b-2f6c1e0d4a11",
+    "category": "MESSAGE",
+    "sound": "default",
+    "badge": 3,
+    "interruption-level": "active"
+  },
+  "b": {
+    "v": 1,
+    "nid": "0192f1d3-0a55-7b21-8c4d-5e6f7a8b9c0d",
+    "k": "message",
+    "i": "0192a000-0000-7000-8000-00000000c0de",
+    "t": "0192f1d2-7c4e-7a10-9a3b-2f6c1e0d4a11",
+    "m": "0192f1d3-0a44-7f00-b1c2-d3e4f5a6b7c8"
+  }
+}
+```
+
+- Own keys are next to `aps`, never inside it [Q14, verified]. An object `b` holds them
+  together.
+- Title and text are keys in the app's language files (`title-loc-key`, `loc-key`) [Q14,
+  verified]. This way the server knows neither the language of the device nor any text; the app shows the
+  placeholder in its language and its branding.
+- `loc-key` per kind: `PUSH_BODY_MESSAGE`, `PUSH_BODY_MENTION`, `PUSH_BODY_DM`,
+  `PUSH_BODY_RUN_DONE`, `PUSH_BODY_RUN_FAILED`, `PUSH_BODY_INPUT_NEEDED`, `PUSH_BODY_SECURITY`,
+  `PUSH_BODY_ADMIN`. `category` correspondingly in upper case (the actions of the notification are defined in
+  [15-client-architecture.md](15-client-architecture.md)).
+- `interruption-level`: `active`; `passive` during quiet hours; `time-sensitive` only for
+  `input_needed` and only if `push.apns.time_sensitive_enabled` is set (the app needs
+  the matching Apple capability for this). Allowed values according to Apple: `passive`, `active`,
+  `time-sensitive`, `critical` [Q14, verified]; the product never uses `critical`.
+- `sound` is missing for silent notifications. `badge`: see section 8.
+- `i` is the `instance_id`. It allows an app with several accounts to assign the notification.
+- Size: Apple rejects payloads over 4096 bytes [Q14, verified]. The payload here has a fixed
+  structure and is far below that; a test holds the limit.
+
+### 6.2 FCM
+
+```json
+{
+  "message": {
+    "token": "<registration token>",
+    "android": { "priority": "high", "ttl": "86400s" },
+    "data": {
+      "v": "1",
+      "nid": "0192f1d3-0a55-7b21-8c4d-5e6f7a8b9c0d",
+      "k": "message",
+      "i": "0192a000-0000-7000-8000-00000000c0de",
+      "t": "0192f1d2-7c4e-7a10-9a3b-2f6c1e0d4a11",
+      "m": "0192f1d3-0a44-7f00-b1c2-d3e4f5a6b7c8",
+      "badge": "3",
+      "quiet": "0"
+    }
+  }
+}
+```
+
+Values in `data` are strings. In addition there is `k = "sync"` with `badge` and
+`cleared` (thread IDs, comma-separated) for section 8.
+
+### 6.3 Gateway event `notification.created`
+
+Ephemeral, only to connections of the recipient (`audience = self`), receive action `push.deliver`
+([05-actions.md](05-actions.md) section 6, ephemeral events). Payload: `nid`, `kind`, `thread_id`, `message_id`, `quiet`, `count` and the
+preview fields from 6.4. The preview may come along here because the connection is authenticated and
+`message.read` has already been checked; there is no third party on the way.
+
+### 6.4 Preview endpoint and preview token
+
+`GET /api/v1/push/preview?nid=<nid>&message_id=<id>`
+
+- **Authentication:** preview token in the header `Authorization: DPoP <token>` plus a DPoP proof with the
+  device key. The token is created at `push.register`, is issued exactly once, is stored only as an
+  HMAC (`push_registrations.preview_token_hash`, 03)
+  and is rotated with every new registration. It is valid only for this endpoint.
+- **Valid only as long as** the registration is active, the device is `active`, the session of the
+  registration (`push_registrations.auth_session_id`, 03) is not revoked and the
+  person is active. Logging out (`auth.logout`) disables the registrations of this session with
+  `disabled_reason = 'logout'`; after that no more pushes reach this device.
+- **Check:** `authorize(r, message.read, message)` with current permissions. No permission, message
+  deleted or unknown: `404`. The app then shows "Message not available".
+- **Response** depending on `notify.preview_mode`:
+
+| Field | `full` | `names` | `none` |
+|---|---|---|---|
+| `kind`, `thread_id`, `message_id`, `badge` | yes | yes | yes |
+| `space_name`, `channel_name`, `thread_title`, `sender_display_name` | yes | yes | no |
+| `excerpt` (text without Markdown, mentions as names, at most `notify.preview_max_chars`) | yes | no | no |
+| `attachment_count`, `image_url` (file ticket for `small` of the first image, [12-files.md](12-files.md) 9.2) | yes | no | no |
+
+For `run_done` the endpoint returns the excerpt of the last agent message of the run, for
+`input_needed` the text of the question.
+
+The fetch is at the same time the receipt confirmation for the measurement (section 9).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant J as notify job
+    participant P as APNs
+    participant E as NSE (Sam's iPhone)
+    participant API as API process
+    J->>J: Recipient, level, quiet hours, coalescing
+    J->>P: POST /3/device/token (alert, mutable-content, only IDs, apns-id = nid)
+    P-->>J: 200
+    P-->>E: Notification with placeholder
+    E->>API: GET /api/v1/push/preview (preview token, DPoP)
+    API->>API: Token and session valid, authorize(Sam, message.read)
+    alt allowed
+        API-->>E: Names and excerpt according to notify.preview_mode
+        E->>E: Replace title and text
+    else no access or deleted
+        API-->>E: 404
+        E->>E: "Message not available"
+    end
+    Note over E,API: Server not reachable: placeholder stays
+```
+
+## 7. Error handling
+
+### 7.1 APNs
+
+Apple names which errors must not be retried: `BadDeviceToken`,
+`DeviceTokenNotForTopic`, `Forbidden`, `ExpiredToken`, `Unregistered`, `PayloadTooLarge`; 5xx
+may be retried after 15 minutes, `TooManyRequests` with a delay [Q15, verified].
+
+| Response | Consequence |
+|---|---|
+| `200` | `last_success_at`, `failure_count = 0` |
+| `410 Unregistered`, `410 ExpiredToken` | disable the registration (`token_invalid`). The response carries `timestamp`, from which on the token was invalid [Q15, verified]; if the same token was registered again after that, the new registration stays active [derived] |
+| `400 BadDeviceToken` | disable (`token_invalid`); if the environment does not match the registration, also a configuration alert |
+| `400 DeviceTokenNotForTopic` | disable (`topic_mismatch`) |
+| `403 ExpiredProviderToken` | create a new JWT, retry once |
+| `403 InvalidProviderToken`, `MissingProviderToken`, `BadEnvironmentKeyIdInToken`, `UnrelatedKeyIdInToken`, `Forbidden` | configuration error: alert, APNs sending paused, status page "Push disrupted" |
+| `429 TooManyProviderTokenUpdates` | bug in the JWT cache: alert |
+| `429 TooManyRequests` | retry later (backoff), same device |
+| `413 PayloadTooLarge`, other `400` | bug: alert, no retry |
+| `500`, `503` | retry after `push.apns.retry_5xx_delay` |
+
+### 7.2 FCM
+
+| Response | Consequence |
+|---|---|
+| `404 UNREGISTERED` | disable (`token_invalid`) [Q16, verified] |
+| `400 INVALID_ARGUMENT` because of an invalid token | disable (`token_invalid`) [Q16, verified]; otherwise a bug, alert |
+| `403 SENDER_ID_MISMATCH` | disable (`sender_mismatch`), configuration alert [Q16, verified] |
+| `401 THIRD_PARTY_AUTH_ERROR` | configuration alert [Q16, verified] |
+| `429 QUOTA_EXCEEDED` | backoff, first wait at least one minute [Q16, verified] |
+| `503 UNAVAILABLE` | respect `Retry-After`, then exponential backoff with jitter [Q16, verified] |
+| `500 INTERNAL` | backoff between `push.retry_base` and `push.retry_cap` [Q16, verified] |
+
+### 7.3 Common
+
+- Transient errors increase `failure_count`. From `push.max_consecutive_failures`
+  ([03-data-model.md](03-data-model.md)) on, the registration is disabled with
+  `repeated_failures`.
+- A notification that has not reached the provider after `push.max_age` is discarded.
+  An old notification disturbs more than it helps; the unread counter carries the state.
+- Device revoked (`device.revoke`): all registrations `device_revoked`, immediately.
+- Device tokens never appear in logs, only a short hash prefix.
+
+## 8. Badge and sync
+
+Badge number for r = number of threads visible to r with at least one unread mention
+(computed from `mentions` and `read_states.last_read_seq`, [03-data-model.md](03-data-model.md),
+`read_states`) or (unread and effective level `all`) or (unread DM thread). The server computes it when sending and writes it into `aps.badge` or `data.badge`.
+
+If r reads on another device and the number drops, the server sends a sync to mobile devices at most
+once per `notify.badge_sync_min_interval`: iOS a push with only `badge` (without
+text; the NSE then does not run [Q4, derived]; push type `alert` [assumed, to be confirmed in a
+device test]), Android `k = "sync"` with priority
+`normal`, which removes read threads from the notification drawer. On iOS, displayed
+notifications stay until the next opening of the app; this is a known limitation.
+
+## 9. Delivery measurement
+
+Every notification has an `nid` (UUIDv7). Measurement points:
+
+| Point | Moment |
+|---|---|
+| t0 | planned send time: commit of the triggering event, with coalescing or desktop delay the end of the waiting time |
+| t1 | the provider has accepted (`200`) or the gateway has written the frame |
+| t2 | the preview fetch with this `nid` arrives at the server |
+
+SLIs (targets, windows and thresholds in `docs/observability/slos.md`, Team F):
+
+- **Push sending:** share of notifications with t1 minus t0 below the threshold. Errors at the
+  provider count as not met, disabled tokens do not.
+- **Push end-to-end (sample):** share of notifications with a preview fetch where t2 minus
+  t0 is below the threshold.
+- **Confirmation rate:** preview fetches per sent push, per platform. Not a target, but a
+  diagnosis: a drop shows that devices do not reach the server (placeholders stay).
+
+Signal names: `docs/observability/signals.md`. Attributes only provider, kind, result, platform;
+no person, device or thread IDs.
+
+## 10. Privacy
+
+- Apple and Google see: device token, app identifier, time, size, the IDs in the payload
+  and, through `thread-id`, which notifications belong together. UUIDv7 contains a timestamp; that
+  reveals no more than the send time itself. They see no names and no text.
+- Apple and Google are processors of the instance operator; the template is in
+  `docs/compliance/processors-template.md` ([20-privacy.md](20-privacy.md)).
+- The content flows only between the own server and the device, after `message.read`.
+- `notify.preview_mode` controls what can appear on the lock screen; the
+  operating system setting for previews applies in addition.
+- Telemetry contains no content and no device tokens ([17-observability.md](17-observability.md)).
+
+## 11. Push keys and white label
+
+- Push credentials are instance configuration of the instance operator: APNs team ID, key ID and `.p8` key
+  (reference to the secret provider), allowed topics; FCM project ID and service account key
+  (reference). APNs keys can be separate per environment [Q3, verified]; the configuration
+  keeps sandbox and production separate.
+- Outbound connections: `api.push.apple.com`, `api.sandbox.push.apple.com`,
+  `fcm.googleapis.com` and the token endpoint from the service account
+  ([16-operations.md](16-operations.md), network rules).
+- **White label apps.** An APNs key is valid for the apps of the Apple team that owns it
+  [Q3, verified]; an FCM token is valid only for the sender of its Firebase project [Q16, verified].
+  An instance can therefore only push to apps whose keys it has. Every instance with its own
+  app IDs needs its own push keys and its own builds ([18-release.md](18-release.md)).
+- **Central push relay for third-party instances: later.** Reasons: (1) Whoever runs a relay
+  would see metadata (times, tokens, IDs) of all connected instances and would become another
+  processor for each of them. (2) A relay is a service that someone has to run, with registration
+  of the instances, abuse protection and an availability commitment; that contradicts the
+  self-hosting approach of the first milestones. (3) A shared app would have to manage several
+  instances ([01-product.md](01-product.md)). If it comes: only ID payloads, signed by the
+  instance, without content; the port `PushProvider` gets an adapter `relay` for it.
+
+## 12. Execution in the server
+
+1. Notifications are created in the `worker` from the event log, not in the write path: the consumer
+   `push` reads, from its cursor in `event_consumer_cursors`, the events that can trigger a
+   notification (new message, run state change, waiting device, personal administration events
+   such as `access.expiring`). One round creates the jobs with `InsertTx` and advances the
+   cursor in the same transaction; so every notification is created exactly once, and none is
+   lost ([02-architecture.md](02-architecture.md), section 11.5,
+   [ADR 0051](../adr/0051-worker-consumers-of-the-event-log-with-a-cursor.md)). Producers do not know
+   `notify`.
+2. The consumer `push` determines the candidates per event: people with read permission on the
+   channel (from `authz`), mentioned people, the run's triggering person. A batched query on
+   `notification_preferences` fetches the levels for all candidates and the three targets (thread, channel, space).
+3. The decision per recipient (section 4) is a pure function in the domain part of
+   `notify`. It gets facts (level, quiet hours, activity, window state) and returns a
+   decision. Tests check it as a table.
+4. `notify` queries activity and live connections from the gateway through the port `PresenceView`.
+   With one `api` process this is memory in the process. With several `api` nodes the
+   gateway needs a shared presence state; this belongs to the scaling path in
+   [02-architecture.md](02-architecture.md), like the distribution of other ephemeral events.
+5. Per registration one job `notify.push_send` (job catalogue in 02, section 12.3) with
+   retries according to section 7. HTTP/2 connections to APNs stay open and are shared; at most `push.max_concurrent_requests` at the same time.
+
+## 13. Endpoints and actions
+
+`docs/api/openapi.yaml` is binding; this table reflects the state of the spec.
+
+| Method and path | Action | RL class |
+|---|---|---|
+| `POST /api/v1/me/devices/current/push-registrations` | `push.register` | `rl.write` |
+| `DELETE /api/v1/push-registrations/{registration_id}` | `push.unregister` | `rl.write` |
+| `GET /api/v1/push/preview` | `message.read` (with preview token) | `rl.read` |
+| `GET /api/v1/me/notification-preferences` | `settings.read` | `rl.read` |
+| `PUT`, `DELETE /api/v1/me/notification-preferences/{target_kind}/{target_id}` | `notification_pref.update` | `rl.write` |
+| `GET /api/v1/me/quiet-hours` | `settings.read` | `rl.read` |
+| `POST /api/v1/me/quiet-hours`, `PUT` and `DELETE /api/v1/me/quiet-hours/{rule_id}` | `quiet_hours.update` | `rl.write` |
+| `PATCH /api/v1/channels/{id}` with `default_notification_level` | `channel.update` | `rl.admin` |
+
+`push.register` takes `provider`, `token`, `environment`, `app_id` and returns `id` and the
+preview token. An already known `(provider, token)` is taken over (the old row is
+disabled), because tokens can move between installations.
+
+## 14. Tests
+
+| Test | Holds |
+|---|---|
+| Decision table: kind x effective level x `muted_until` x quiet hours x active x desktop active x window | sections 2 to 4 |
+| Payload allow-list: serialized APNs and FCM payloads contain only the keys from 6.1 and 6.2, all values are IDs, numbers or fixed keys; size below the Apple limit | no content at the provider |
+| Revocation between event and sending | no push; preview `404` |
+| Mention of a person without read permission | no push, no trace in the result |
+| `auth.logout`, `device.revoke`, `user.disable` | registrations disabled, preview token worthless, no push |
+| Fake APNs (HTTP/2) with every response from 7.1 | disabling, retrying, alert as in the table |
+| Fake FCM with every response from 7.2 | as in the table, `Retry-After` respected |
+| JWT cache | at most one new JWT per `push.apns.jwt_refresh_interval`; start error outside 20 to 60 minutes |
+| Quiet hours in `Europe/Berlin` on both clock change days, across midnight, weekday bits | section 3.4 |
+| Ten messages in one thread within one window | at most two pushes, the second with a count |
+| Thread in focus on the desktop | no push to the phone |
+| Desktop active, message read there before the delay expires | no push to the phone |
+| Run with three agent messages | exactly one `run_done` to the triggering person |
+| `input_needed` with `mute` | push arrives, silent during quiet hours |
+| Automatic following | the first answer in a thread sets `all`; not in the main thread |
+
+## 15. Decisions of this chapter
+
+| No. | Decision | Reason |
+|---|---|---|
+| R-PN-01 | Only the server decides on notifications; desktop notifications come as `notification.created` through the gateway. | One place for rules, no diverging logic in four clients. |
+| R-PN-02 | Agent messages during a run are coalesced into one notification at the end of the run. | Runs write intermediate states; what matters is "finished". |
+| R-PN-03 | `input_needed` ignores `mute`, not quiet hours. | A person's own runs should not get stuck; the night's rest stays. |
+| R-PN-04 | Automatic following in threads when writing. | Answers to a person's own questions and tasks arrive. |
+| R-PN-05 | Quiet hours make notifications silent, not muted. | The notification center stays complete; nobody is woken. |
+| R-PN-06 | Coalescing: first notification immediately, the rest at the end of the window, one slot per thread. | Low latency for the first notification, little noise after it. |
+| R-PN-07 | Own preview token per registration, DPoP-bound, without refresh. | Otherwise the NSE and the app would get each other's refresh family revoked. |
+| R-PN-08 | No FCM `collapse_key`; the app replaces by tag. | FCM keeps only four collapse keys per device. |
+| R-PN-09 | Notifications are created in the worker consumer `push` with a cursor from the event log, not as a job in the triggering transaction. | Producers do not know their consumers; cursor and jobs commit together, so exactly one notification per event ([ADR 0051](../adr/0051-worker-consumers-of-the-event-log-with-a-cursor.md)). |
+| R-PN-10 | Central push relay later; every instance uses its own keys. | No collection point for metadata, no service to run in the first milestones. |
+| R-PN-11 | No notification through editing. | Simple, no abuse through mentioning after the fact. |
+
+## 16. Alignment with the core contract
+
+The additions requested during drafting have been decided (integration of 2026-10-10):
+
+| No. | Addition | Decision, location |
+|---|---|---|
+| 1 | `channels.default_notification_level` and the order of the effective level | adopted, 03 `channels` and `notification_preferences` |
+| 2 | `push_registrations.auth_session_id`, `preview_token_hash`, fixed values of `disabled_reason` | adopted, 03 `push_registrations` |
+| 3 | ephemeral event `notification.created` | adopted, 05 section 6 |
+| 4 | field `idle` in the op `focus` | adopted, 04 section 6.2 |
+| 5 | own read action for notification preferences | not adopted: `settings.read` covers all of a person's own personal data (05, R-AZ-21) |
+
+## 17. Configuration values of this chapter
+
+Values from other chapters (reference only): `push.max_consecutive_failures`
+([03-data-model.md](03-data-model.md)).
+
+| Name | Default | Meaning |
+|---|---|---|
+| `push.ttl` | `24h` | lifetime at the provider (`apns-expiration`, `android.ttl`) |
+| `push.max_age` | `1h` | a notification not yet sent that is older than this is discarded |
+| `push.retry_base` | `2s` | base of the backoff |
+| `push.retry_cap` | `5m` | largest backoff interval |
+| `push.max_concurrent_requests` | `32` | concurrent requests to providers per process |
+| `push.apns.team_id` | empty | Apple team ID |
+| `push.apns.key_id` | empty | key ID of the `.p8` key |
+| `push.apns.private_key_ref` | empty | reference to the key in the secret provider |
+| `push.apns.topics` | empty | allowed bundle IDs |
+| `push.apns.jwt_refresh_interval` | `40m` | renewal of the provider JWT, must be between 20 and 60 minutes |
+| `push.apns.retry_5xx_delay` | `15m` | waiting time after `500` or `503` |
+| `push.apns.time_sensitive_enabled` | `false` | `time-sensitive` for `input_needed` |
+| `push.fcm.project_id` | empty | Firebase project |
+| `push.fcm.service_account_ref` | empty | reference to the service account key |
+| `notify.user_default_level` | `mentions` | level without any setting |
+| `notify.default_preview_mode` | `full` | default for `notify.preview_mode` |
+| `notify.default_input_needed_breaks_quiet_hours` | `false` | default for the switch of the same name |
+| `notify.default_admin_enabled` | `true` | default for `notify.admin_enabled` |
+| `notify.coalesce_window` | `60s` | coalescing window per recipient and thread |
+| `notify.mobile_delay_when_desktop_active` | `60s` | delay of mobile pushes while the desktop is active |
+| `notify.preview_max_chars` | `240` | length of the excerpt in the preview |
+| `notify.badge_sync_min_interval` | `60s` | smallest interval between badge syncs per person |
+
+## 18. Sources
+
+All retrieved on 2026-10-10.
+
+- Q1 River README (InsertTx, unique and scheduled jobs): https://github.com/riverqueue/river [verified]
+- Q2 Apple, Sending notification requests to APNs: https://developer.apple.com/documentation/usernotifications/sending-notification-requests-to-apns [verified]
+- Q3 Apple, Establishing a token-based connection to APNs: https://developer.apple.com/documentation/usernotifications/establishing-a-token-based-connection-to-apns [verified]
+- Q4 Apple, Modifying content in newly delivered notifications: https://developer.apple.com/documentation/usernotifications/modifying-content-in-newly-delivered-notifications [verified]
+- Q5 Apple, UNNotificationServiceExtension (platforms): https://developer.apple.com/documentation/usernotifications/unnotificationserviceextension [verified]
+- Q6 Apple, Entitlement `com.apple.developer.usernotifications.filtering`: https://developer.apple.com/documentation/bundleresources/entitlements/com.apple.developer.usernotifications.filtering [verified]
+- Q7 Apple, Pushing background updates to your App: https://developer.apple.com/documentation/usernotifications/pushing-background-updates-to-your-app [verified]
+- Q8 Firebase, Send messages with the HTTP v1 API: https://firebase.google.com/docs/cloud-messaging/send/v1-api [verified]
+- Q9 Firebase, Message types: https://firebase.google.com/docs/cloud-messaging/customize-messages/set-message-type [verified]
+- Q10 Firebase, Message priority on Android: https://firebase.google.com/docs/cloud-messaging/android/message-priority [verified]
+- Q11 Firebase, Setting the lifespan of a message: https://firebase.google.com/docs/cloud-messaging/customize-messages/setting-message-lifespan [verified]
+- Q12 Firebase, Non-collapsible and collapsible message types: https://firebase.google.com/docs/cloud-messaging/customize-messages/collapsible-message-types [verified]
+- Q13 Microsoft, Push notifications quickstart (Windows App SDK): https://learn.microsoft.com/en-us/windows/apps/develop/notifications/push-notifications/push-quickstart [verified]
+- Q14 Apple, Generating a remote notification: https://developer.apple.com/documentation/usernotifications/generating-a-remote-notification [verified]
+- Q15 Apple, Handling notification responses from APNs: https://developer.apple.com/documentation/usernotifications/handling-notification-responses-from-apns [verified]
+- Q16 Firebase, FCM error codes: https://firebase.google.com/docs/cloud-messaging/error-codes [verified]

@@ -25,7 +25,7 @@
 
 Every new issue gets `status: triage` from its template. A maintainer then:
 
-1. Checks scope and duplicates. Out of scope or never-list items (docs/spec/01-produkt.md)
+1. Checks scope and duplicates. Out of scope or never-list items (docs/spec/01-product.md)
    get `status: declined` with the reason; duplicates get `status: duplicate` and a link.
 2. Sets one `type: ...` label, one `area: ...` label and, for accepted work, one
    `priority: ...` label (`priority: high`, `priority: medium` or `priority: low`).
@@ -34,7 +34,7 @@ Every new issue gets `status: triage` from its template. A maintainer then:
    `help wanted`.
 4. Moves anything that looks like a vulnerability out of public view (SECURITY.md).
 
-The targets below are named values in docs/spec/23-qualitaet.md; a test keeps this table
+The targets below are named values in docs/spec/23-quality.md; a test keeps this table
 and that chapter equal.
 
 | Step | Target |

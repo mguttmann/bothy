@@ -1,6 +1,6 @@
 # M1-53: Channels and forum tags
 
-Status: ready | Depends on: M1-52 | Etappe: M1
+Status: ready | Depends on: M1-52 | Milestone: M1
 
 ## Goal
 
@@ -13,30 +13,31 @@ build directly on this.
 
 ## Read first
 
-- `docs/spec/03-datenmodell.md`: "Grundsätze" (all 13 points), "Module", section "Struktur (`chat`)"
-  tables `channels`, `channel_skill_bindings`, `forum_tags`, `threads`; "Transaktionsregeln"
+- `docs/spec/03-data-model.md`: "Principles" (all 13 points), "Modules", section "Structure (`chat`)"
+  tables `channels`, `channel_skill_bindings`, `forum_tags`, `threads`; "Transaction rules"
   (6.1 global sequence, 6.3 lock order, 6.4 I1); decisions R-DM-10, R-DM-11, R-DM-12, R-DM-21,
-  R-DM-25; "Konfigurationswerte dieses Kapitels".
-- `docs/spec/04-sync-protokoll.md`: "Umschlag (Envelope)", "Globale, commit-geordnete Sequenz",
-  "Idempotente Schreibvorgänge" (5.2), "Nachholen (Catch-up)" 7.2 (fully visible spaces),
-  "Sichtbarkeit bei Rechte-Änderungen" 8.1 and 8.2, "Zustellgarantie".
-- `docs/spec/05-aktionen.md`: rules 1.1, 1.2, 1.3, 1.5, 1.7, 1.8; "Ziel einer Ressource";
-  "Wirksame Stufe"; "Spalten Owner, Step-up, Audit, Rechte"; "Entscheidung"; table
-  "Bereiche, Kanäle, Seitenleiste" rows `space.read`, `channel.read`, `channel.create`,
+  R-DM-25; "Configuration values of this chapter".
+- `docs/spec/04-sync-protocol.md`: "Envelope", "Global, commit-ordered sequence",
+  "Idempotent writes" (5.2), "Catch-up" 7.2 (fully visible spaces),
+  "Visibility on permission changes" 8.1 and 8.2, "Delivery guarantee".
+- `docs/spec/05-actions.md`: rules 1.1, 1.2, 1.3, 1.5, 1.7, 1.8; "Target of a resource";
+  "Effective level"; 'Columns "Owner", "Step-up", "Audit", "Permissions"'; "Decision"; table
+  "Spaces, channels, sidebar" rows `space.read`, `channel.read`, `channel.create`,
   `channel.update`, `channel.reorder`, `channel.archive`, `forum_tag.manage`; section 6 rows
   `channel.created`, `channel.updated`, `channel.archived`, `thread.created`; decisions R-AZ-01,
   R-AZ-06, R-AZ-12.
-- `docs/spec/07-rechte.md`: "Ziele und Vererbung", "Die Funktion `authorize`" (4.1 reasons,
-  4.2 flow, 4.3 visibility, 4.4 invariants), "Filterung in SQL" (7.2 snapshot, 7.3 cache
-  validity, 7.4 query pattern), "Sofortige Wirkung bei Entzug", "Pflicht-Tests" AZ-P1, AZ-P4, AZ-P8.
-- `docs/spec/02-architektur.md`: "Module des Monolithen" 4.1 to 4.6, "Schichten im Modul",
-  "Code-Layout", "Transaktionen und Unit of Work", "Request-Pfad", "Rechte-Cache" (11.3),
-  "Abgleich mit dem Kern-Vertrag" row "Nachholen mit vollständig sichtbaren Bereichen; Cache folgt
-  Strukturereignissen".
-- `docs/spec/06-api.md`: "Grundregeln", "Autorisierung in der API", "Fehler", "Paginierung"
-  point 6, "Idempotenz", "Nebenläufigkeit", endpoint table "Channels".
-- `docs/spec/19-sicherheit.md`: SEC-IN-1, SEC-IN-4, SEC-T07. `docs/spec/01-produkt.md` 3.1 and
-  3.2 row "Bediener je Kanal sichtbar im Kanal-Kopf".
+- `docs/spec/07-permissions.md`: "Targets and inheritance", "The `authorize` function" (4.1 reasons,
+  4.2 flow, 4.3 visibility, 4.4 invariants), "Filtering in SQL" (7.2 snapshot, 7.3 cache
+  validity, 7.4 query pattern), "Immediate effect on revocation", "Required tests" AZ-P1, AZ-P4,
+  AZ-P8.
+- `docs/spec/02-architecture.md`: "Modules of the monolith" 4.1 to 4.6, "Layers within a module",
+  "Code layout", "Transactions and Unit of Work", "Request path", "Permission cache" (11.3),
+  "Alignment with the core contract" row "catch-up with fully visible spaces; the cache follows
+  structure events".
+- `docs/spec/06-api.md`: "Basic rules", "Authorization in the API", "Errors", "Pagination"
+  point 6, "Idempotency", "Concurrency", endpoint table "Channels".
+- `docs/spec/19-security.md`: SEC-IN-1, SEC-IN-4, SEC-T07. `docs/spec/01-product.md` 3.1 and
+  3.2 row "Operator per channel visible in the channel header".
 - `docs/api/openapi.yaml`, operationIds: `listSpaceChannels`, `createChannel`, `getChannel`,
   `updateChannel`, `moveChannel`, `archiveChannel`, `listForumTags`, `createForumTag`,
   `updateForumTag`, `moveForumTag`, `deleteForumTag`. Schemas: `Channel`, `ChannelView`, `ChannelViewList`,
@@ -52,8 +53,8 @@ build directly on this.
   hook), `internal/kernel/{txn,eventlog,auditing,authorize,actor,ids,errs}`,
   `internal/platform/httpserver`, `services/server/api/operations.yaml`, the display-name validator
   of SEC-T07 (M1-26), the response validator used in integration tests.
-- `docs/quality/gates.md`, `CONTRIBUTING.md`, `docs/PLAN.md` sections "Arbeitsweise je Ticket" and
-  "M1 Fundament".
+- `docs/quality/gates.md`, `CONTRIBUTING.md`, `docs/PLAN.md` sections "Way of working per ticket" and
+  "M1 Foundation".
 
 ## Fixed requirements that apply
 
@@ -82,7 +83,7 @@ Rules for every brief:
    cleanup. Keep the red output for the report.
 7. No dashes U+2013 or U+2014 in any file you write; use a hyphen or rephrase.
 8. White label: no company, person, host or domain names except the examples of the
-   specification (example.com, Alex, Sam, Robin, the example spaces and agents of 07 "Beispiele").
+   specification (example.com, Alex, Sam, Robin, the example spaces and agents of 07 "Examples").
 9. Limits and windows only through named configuration keys from
    `docs/operations/configuration.md`; never a literal number in code or docs that a key covers.
 
@@ -92,19 +93,19 @@ Product requirements implemented here:
     these operations (03 `channels`, R-DM-10).
 11. Every text channel has exactly one thread with `kind = 'main'`, created in the same
     transaction; forum channels have none (R-DM-11).
-12. Channel and tag order is a fractional index; moving changes exactly one row (03 "Grundsätze"
+12. Channel and tag order is a fractional index; moving changes exactly one row (03 "Principles"
     point 5).
 13. Channel names are unique per space, case-insensitive, among non-archived channels; tag names
     unique per channel among non-deleted tags (03 unique indexes). Channel names at most
     `channel.name_max_chars`, topics at most `channel.topic_max_chars`, tag names at most
     `forum_tag.name_max_chars` (03 9). Display texts
     with control or bidi control characters are rejected (SEC-IN-4, SEC-T07).
-14. No read right gives `404`, identical to an unknown ID; lists filter in SQL and then run
+14. No read permission gives `404`, identical to an unknown ID; lists filter in SQL and then run
     `authorize` per item (05 rule 1.2, 07 7.4).
-15. `channel.archive`: right `manage`, step-up, audit, and a rights change with `access.changed`
-    (05 table, rule 1.7).
+15. `channel.archive`: permission `manage`, step-up, audit, and a permission change with
+    `access.changed` (05 table, rule 1.7).
 16. A new channel in a visible space is visible and catch-up relevant without a new permission
-    version (02 "Abgleich mit dem Kern-Vertrag", 04 7.2 and 8.1).
+    version (02 "Alignment with the core contract", 04 7.2 and 8.1).
 17. Forum tags are managed with `manage`; tags may be `restricted` (03 `forum_tags`, 05
     `forum_tag.manage`).
 18. Every durable event uses the common envelope without JSON `null` (04 2.2, ADR 0053).
@@ -143,7 +144,7 @@ Create or change exactly these (paths relative to `services/server/` unless they
 7. The chat adapter that implements `authz.StructureSource` (find it with
    `grep -rn "StructureSource" internal/chat`): the channel part, see "Design notes" D7.
 8. `internal/authz` and `internal/kernel/authorize`, only as far as "Design notes" D8 and D9
-   require (archived cap, effective rights for `ChannelView`), each with tests. Rights of
+   require (archived cap, effective permissions for `ChannelView`), each with tests. Permissions of
    channels created after a snapshot and the list scope fields are built by M1-28 (07 7.2,
    ruling D5 there); this ticket only adds the integration test against real channels. The
    target-based `RightsChange` comes from M1-29.
@@ -234,7 +235,7 @@ stop with `Verdict: BLOCKED base branch red` and the failing gate. Confirm that 
 
 D1. Channels.
 
-- `createChannel`: action `channel.create` on the space (right `manage`, audit). Body
+- `createChannel`: action `channel.create` on the space (permission `manage`, audit). Body
   `ChannelCreate`. `kind` is `text` or `forum`. `name`: trim leading and trailing Unicode white
   space, then at least one character; reject C0 and C1 control characters and bidi controls
   (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069) with `400 validation_failed`,
@@ -265,7 +266,7 @@ D1. Channels.
   `Scope(channel.read)`; SQL filter `space_id = $space AND archived_at IS NULL AND (id = ANY($visible)
   OR space_id = ANY($fully_visible_spaces) OR $instance_wide)`, ordered by `sort_key`; then
   `authorize(channel.read)` per item in filter mode `authorize.Filter(ctx)` (M1-28; no denial audit, 07 4.2), an item that fails is dropped and counted as an
-  alarm (07 7.4 rule 3). Unpaginated (06 "Paginierung" point 6). Archived channels are not listed.
+  alarm (07 7.4 rule 3). Unpaginated (06 "Pagination" point 6). Archived channels are not listed.
 - `updateChannel`: action `channel.update` (`manage`, audit), `If-Match` required (`428`
   without, `412 version_conflict` with `current` on mismatch, through the helpers of M1-18). At
   least one field, else `400`. `default_notification_level` and
@@ -277,29 +278,29 @@ D1. Channels.
   space gives `400`; none moves to the start. Compute the key with the fractional index helper of
   M1-52; exactly one row changes. Bumps `version`, emits `channel.updated`.
 
-D2. Archived channels (07 "4.5 Archivierte Bereiche und Kanäle", reason `channel_archived` in 07
+D2. Archived channels (07 "4.5 Archived spaces and channels", reason `channel_archived` in 07
 "4.1"):
 
-1. `archiveChannel` (action `channel.archive`: `manage`, step-up, audit, rights) needs
+1. `archiveChannel` (action `channel.archive`: `manage`, step-up, audit, permissions) needs
    `ReasonBody`; it sets `archived_at`, bumps `version`, emits `channel.archived` (payload
    `{channel}`) and publishes `ChannelArchived` in the transaction. It is irreversible; 05 has no
    unarchive action. Archiving an archived channel returns `200` with the current channel and
    writes nothing.
 2. On an archived channel, and on every channel of an archived space, the effective level of
    every principal, owners included, is at most `read`. `authorize` denies every action whose
-   "Recht" column needs `write` or `trigger` on a target in that channel with decision
+   "Permission" column needs `write` or `trigger` on a target in that channel with decision
    `forbidden`, reason `channel_archived`. The HTTP answer is `403` with problem code
    `channel_read_only` and `reason: channel_archived` (same client reaction as rule 1.8, no new
    problem code). Reading stays allowed for everyone who could read before.
-3. Actions with right `manage` or `owner` pass `authorize`, but chat rejects every state change of
-   an archived channel or its tags (`updateChannel`, `moveChannel`, forum tag create, update,
-   move, delete) with `409 conflict`.
-4. Rights change: the unit of work runs with the `RightsChange` option. Affected principals are
-   all principals whose effective level on the channel was above `read` before the change
+3. Actions with permission `manage` or `owner` pass `authorize`, but chat rejects every state
+   change of an archived channel or its tags (`updateChannel`, `moveChannel`, forum tag create,
+   update, move, delete) with `409 conflict`.
+4. Permission change: the unit of work runs with the `RightsChange` option. Affected principals
+   are all principals whose effective level on the channel was above `read` before the change
    (direct grants, group members, owners, the operator rule). `authz` writes `access.changed`
    for each with a `changed` entry `{kind: channel, id, level: read, previous_level}` and bumps
-   `permission_version` (04 "8.1" and 02 "11.3": archiving is a structure change and a rights
-   change).
+   `permission_version` (04 "8.1" and 02 "11.3": archiving is a structure change and a
+   permission change).
 5. `listSpaceChannels` omits archived channels; `getChannel` still returns them.
 
 D3. Forum tags.
@@ -341,7 +342,7 @@ resolve a channel ID to `{space_id, kind, archived (own or space), read_only}`; 
 non-archived channel IDs of a space and of the instance where `authz` needs them. Lookups run in
 the ambient transaction when one exists, so rows written earlier in the same unit of work are seen.
 
-D8. Rights of channels created after a snapshot (requirement 16). M1-28 builds this (07 7.2,
+D8. Permissions of channels created after a snapshot (requirement 16). M1-28 builds this (07 7.2,
 ruling D5 of M1-28): `authorize` derives a channel's level at decision time from the freshly
 resolved path, the snapshot caches grant data per target only, and `Scope` returns
 `visible_channel_ids`, `fully_visible_space_ids` and `instance_wide`, as 04 7.2 needs; AZ-P8 in
@@ -359,7 +360,7 @@ archived: `read`). If `kernel/authorize` has none, add `EffectiveRights(ctx, pri
 channelRef) (Level, []Capability, error)` with a table test.
 
 D10. Problem mapping: unknown or invisible space or channel gives `404 not_found`; visible without
-the right gives `403 forbidden` (`level_insufficient`, `capability_missing`, `owner_only`);
+the permission gives `403 forbidden` (`level_insufficient`, `capability_missing`, `owner_only`);
 missing fresh step-up gives `401 step_up_required` (agent, app and personal tokens get `403`,
 `step_up_not_possible`). The problem catalogue is generated; change its source (find it with
 `grep -rn "operator_mismatch" tools docs/api services/server`), regenerate with
@@ -417,7 +418,7 @@ validator):
   owner and for Alex gives `forbidden` with reason `channel_archived`; `channel.read` still allowed;
   the audit deny entry carries `channel_archived`.
 - `TestArchiveChannel_Idempotent` and `TestArchivedChannel_Mutations409` (update, move, tag create).
-- `TestForumTags_CRUD`: rights (`manage` needed, read-only member gets `403`, outsider `404`),
+- `TestForumTags_CRUD`: permissions (`manage` needed, read-only member gets `403`, outsider `404`),
   `restricted`, palette colour accepted, hex colour `400`, duplicate name `409`, text channel
   `400 validation_failed` with `errors[].code` `not_a_forum`, delete twice `204`, `clear_color` removes the colour, `moveForumTag` changes
   the order, each change emits `channel.updated` with a higher channel version.
@@ -453,8 +454,9 @@ make check
       (`403 channel_read_only`, reason `channel_archived`), while reading stays possible.
 - [ ] Forum tags follow D3, including the `channel.updated` ruling.
 - [ ] Names with control or bidi characters are rejected (SEC-T07 part channels and tags).
-- [ ] 07 has the subsection "Archivierte Kanäle" and the reason row; 06 and openapi.yaml describe
-      the archived case; `docs/DECISIONS.md` has rulings D1 (validation), D2, D3 (tag event), D6, D8.
+- [ ] 07 has the subsection "Archived spaces and channels" and the reason row; 06 and openapi.yaml
+      describe the archived case; `docs/DECISIONS.md` has rulings D1 (validation), D2, D3 (tag
+      event), D6, D8.
 - [ ] `make check` is green.
 
 ## Definition of done
@@ -463,13 +465,13 @@ make check
   ports, tables, actions, events, in-transaction events), a doc comment on every public symbol
   (purpose, parameters, return value, errors, example where useful), comments explain why.
 - No new architecture decision beyond the rulings above; if you take one, write an ADR (MADR 4,
-  next free number, German text, English headings) and list it in the report.
+  next free number, headings and text in English) and list it in the report.
 - `services/server/CHANGELOG.md` has an entry under "Unreleased".
 - `make check` green on the final commit.
 - Local review: `make review` and a code review over the whole diff; every finding fixed with a
   test.
 - Red team: a fresh, read-only reviewer runs `docs/quality/red-team-gate.md` over
-  `git diff <base>...HEAD`; record its last line (`Urteil: JA` or `Urteil: NEIN <Grund>`). On
+  `git diff <base>...HEAD`; record its last line (`Urteil: JA` or `Urteil: NEIN <reason>`). On
   `NEIN` fix, add a test per finding and have the delta checked again.
 - Merge locally into the base branch only if review and red team are green and `make check` is
   green; then `git worktree remove` the worktree.

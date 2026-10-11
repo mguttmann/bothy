@@ -1,107 +1,107 @@
-# Checkliste: Veröffentlichen
+# Checklist: publishing
 
-Das Produkt-Repository ist ab dem ersten Push öffentlich
-([ADR 0039](../adr/0039-nur-github-gehostete-runner-oeffentlich-ab-dem-ersten-push.md)); jeder
-Workflow läuft auf GitHub-gehosteten Runnern. Diese Liste wird vollständig und in dieser
-Reihenfolge abgearbeitet, jeder Punkt mit Beleg (Befehlsausgabe oder Bildschirmfoto im
-Ops-Repository): erst lokal prüfen, dann pushen und sofort öffentlich schalten, dann SonarQube
-Cloud und CodeRabbit anbinden, dann `main` schützen. Danach kommt jedes Ticket als eigener Pull
-Request.
+The product repository is public from the first push
+([ADR 0039](../adr/0039-only-github-hosted-runners-public-from-the-first-push.md)); every
+workflow runs on GitHub-hosted runners. This list is worked through completely and in this
+order, every item with evidence (command output or screenshot in the
+ops repository): first check locally, then push and make public right away, then connect SonarQube
+Cloud and CodeRabbit, then protect `main`. After that, each ticket comes as its own pull
+request.
 
-## A. Vor dem Push
+## A. Before the push
 
-1. **Red-Team-Gate** über den ganzen Stand mit Urteil `JA` (red-team-gate.md).
-2. **Ein Wurzel-Commit mit der gewählten Identität.** Veröffentlicht wird ein einzelner Commit
-   ohne Eltern mit dem geprüften Stand; die Planungshistorie bleibt privat (D-W-93). Ein Umschreiben der
-   Historie mit `git filter-repo` (PLAN M0-08, D-W-48) ist nur nötig, wenn doch eine Historie
-   veröffentlicht werden soll. Die Commit-Identität hat der Owner gewählt; sie ist in
-   `allow-authors.txt` der privaten Liste eingetragen und dort nur in den Feldern Autor und
-   Committer erlaubt (und in einer `Signed-off-by`-Zeile, die genau diese wiederholt, D-W-37).
-   Jede Identität in `allow-authors.txt`, die nicht die gewählte ist, wird entfernt, bevor
-   Schritt 3 läuft; nur dann belegt ein Scan ohne Fund, dass keine andere Identität im Commit
-   steht.
-3. **Scans** in einem frischen Klon nur dieses Commits, mit der privaten Liste: `make denylist`,
-   `make denylist-history` und `make gitleaks GITLEAKS_LOG_OPTS=--all` sind grün. Jeder Treffer
-   wird im Stand entfernt, danach wird der Commit neu gebaut und beide Scans laufen erneut.
-4. **Secrets rotieren**, die je im Repository oder in CI-Logs standen.
-5. **Lizenz-Gate** grün, `NOTICE` vollständig, ScanCode-Lauf über den ganzen Baum ohne
-   unerwartete Lizenz (licenses.md).
-6. **Umgebung `denylist`** im noch leeren Repository anlegen: Secrets `BOTHY_DENYLIST` und
-   `BOTHY_DENYLIST_ALLOW_AUTHORS`, erreichbar für Pull Requests aus dem Repository und für
-   `main`. `denylist-main.yml` läuft schon beim Push (Schritt 7); fehlt die Erlaubnisliste der
-   Autoren, kann sein Log zeigen, dass die Autor-Identität eine Regel der privaten Liste trifft,
-   und dieses Log ist danach öffentlich.
+1. **Red-team gate** over the whole state with the verdict `JA` (red-team-gate.md).
+2. **One root commit with the chosen identity.** What is published is a single commit
+   without parents with the checked state; the planning history stays private (D-W-93). Rewriting the
+   history with `git filter-repo` (PLAN M0-08, D-W-48) is only needed if a history
+   is to be published after all. The owner chose the commit identity; it is entered in
+   `allow-authors.txt` of the private list and allowed there only in the author and
+   committer fields (and in a `Signed-off-by` line that repeats exactly this identity, D-W-37).
+   Every identity in `allow-authors.txt` that is not the chosen one is removed before
+   step 3 runs; only then does a scan without a hit prove that no other identity is in the
+   commit.
+3. **Scans** in a fresh clone of only this commit, with the private list: `make denylist`,
+   `make denylist-history` and `make gitleaks GITLEAKS_LOG_OPTS=--all` are green. Every hit
+   is removed from the state, then the commit is rebuilt and both scans run again.
+4. **Rotate secrets** that were ever in the repository or in CI logs.
+5. **License gate** green, `NOTICE` complete, ScanCode run over the whole tree without an
+   unexpected license (licenses.md).
+6. **Create the environment `denylist`** in the still empty repository: secrets `BOTHY_DENYLIST` and
+   `BOTHY_DENYLIST_ALLOW_AUTHORS`, reachable for pull requests from the repository and for
+   `main`. `denylist-main.yml` already runs on the push (step 7); if the allow-list of
+   authors is missing, its log can show that the author identity matches a rule of the private list,
+   and this log is public afterwards.
 
-## B. Push und sofort öffentlich
+## B. Push and public right away
 
-7. **Push** des Commits als `main` in das leere Repository. Es darf noch kein `main` geben:
-   Einen Commit ohne Eltern nimmt ein bestehendes `main` nur per Force-Push an.
-8. **Sofort öffentlich:** Repository, Settings, General, Danger Zone: Sichtbarkeit "Public". Im
-   selben Zug die Repository-Variable `BOTHY_VISIBILITY` auf `public` setzen (geplante Läufe von
-   CodeQL, Scorecard und Pages, ADR 0039 Regel 1).
-9. **Private vulnerability reporting** einschalten (Settings, Advanced Security), im selben
-   Zug wie Schritt 8: `SECURITY.md` und `CODE_OF_CONDUCT.md` nennen nur diesen Meldeweg, er
-   muss ab dem Umschalten funktionieren. Gegenprobe: ein neues Issue beginnen; die Auswahl
-   verlinkt `SECURITY.md` und `SUPPORT.md` aus dem Repository [vermutet, offline nicht
-   geprüft]. Fehlt einer der beiden Links, bekommt `.github/ISSUE_TEMPLATE/config.yml` per
-   Pull Request einen Eintrag unter `contact_links` mit `name`, `about` und der absoluten URL der
-   Datei; der Eintrag muss `make denylist` bestehen, und der Kopfkommentar der Datei wird
-   angepasst.
-10. **Secret Scanning und Push Protection** einschalten (Settings, Advanced Security);
-    für öffentliche Repositories kostenlos
+7. **Push** the commit as `main` into the empty repository. There must be no `main` yet:
+   an existing `main` accepts a commit without parents only by force push.
+8. **Public right away:** Repository, Settings, General, Danger Zone: visibility "Public". In
+   the same move, set the repository variable `BOTHY_VISIBILITY` to `public` (scheduled runs of
+   CodeQL, Scorecard and Pages, ADR 0039 rule 1).
+9. **Enable private vulnerability reporting** (Settings, Advanced Security), in the same
+   move as step 8: `SECURITY.md` and `CODE_OF_CONDUCT.md` name only this reporting channel, it
+   must work from the switch on. Cross-check: start a new issue; the chooser
+   links `SECURITY.md` and `SUPPORT.md` from the repository [assumed, not checked
+   offline]. If one of the two links is missing, `.github/ISSUE_TEMPLATE/config.yml` gets, by
+   pull request, an entry under `contact_links` with `name`, `about` and the absolute URL of the
+   file; the entry must pass `make denylist`, and the header comment of the file is
+   adjusted.
+10. **Enable secret scanning and push protection** (Settings, Advanced Security);
+    free for public repositories
     (https://docs.github.com/en/code-security/secret-scanning/introduction/about-push-protection,
-    abgerufen 2026-10-10) [belegt für Secret Scanning; Push Protection auf
-    Repository-Ebene laut Changelog 2023 kostenlos, nicht erneut geprüft].
-11. **Deny-Scan des Pushs:** `denylist-main.yml` ist für den Push aus Schritt 7 grün gelaufen.
-    Ist er nicht grün, Ursache klären und ihn per `workflow_dispatch` erneut starten.
+    retrieved 2026-10-10) [verified for secret scanning; push protection at
+    repository level free according to the 2023 changelog, not checked again].
+11. **Deny scan of the push:** `denylist-main.yml` ran green for the push from step 7.
+    If it is not green, find the cause and start it again via `workflow_dispatch`.
 
-## C. SonarQube Cloud und CodeRabbit
+## C. SonarQube Cloud and CodeRabbit
 
-12. **SonarQube Cloud**: Organisation des Kontos, dem das Repository gehört (Name im
-    Ops-Repository), mit OSS-Plan, Projekt anlegen, automatische Analyse aus (R-QA-10),
-    `make sonar-config` und `make sonar-config-check` gegen die Cloud (sonarqube-local.md,
-    Abschnitt 6). Repository-Variablen `SONAR_HOST_URL` (`https://sonarcloud.io`),
-    `SONAR_ORGANIZATION`, `SONAR_PROJECT_KEY`, Secret `SONAR_TOKEN`. Ohne diese Werte scheitert
-    der Job `sonar` jedes Pull Requests aus dem Repository.
-13. **CodeRabbit** als GitHub-App für das Repository installieren; `.coderabbit.yaml` gilt.
+12. **SonarQube Cloud**: organization of the account that owns the repository (name in the
+    ops repository), with the OSS plan, create the project, automatic analysis off (R-QA-10),
+    `make sonar-config` and `make sonar-config-check` against the cloud (sonarqube-local.md,
+    section 6). Repository variables `SONAR_HOST_URL` (`https://sonarcloud.io`),
+    `SONAR_ORGANIZATION`, `SONAR_PROJECT_KEY`, secret `SONAR_TOKEN`. Without these values, the
+    job `sonar` of every pull request from the repository fails.
+13. **CodeRabbit**: install it as a GitHub app for the repository; `.coderabbit.yaml` applies.
 
-## D. Branch-Schutz
+## D. Branch protection
 
-14. **Rulesets** für `main` nach push-discipline.md (Pull Request, nur Squash, Pflicht-Check
-    `ci-ok`, lineare Historie, signierte Commits, kein Force-Push, kein Löschen); zusätzlich
-    "Require actions to be pinned to a full-length commit SHA" in den Actions-Einstellungen.
-15. **Environments** `release`, `release-apple` und `release-windows` mit Required Reviewers und
-    Tag-Regel `*/v*` und `v*`; `github-pages` für die Doku.
+14. **Rulesets** for `main` according to push-discipline.md (pull request, squash only, required check
+    `ci-ok`, linear history, signed commits, no force push, no deletion); in addition
+    "Require actions to be pinned to a full-length commit SHA" in the Actions settings.
+15. **Environments** `release`, `release-apple` and `release-windows` with required reviewers and
+    tag rule `*/v*` and `v*`; `github-pages` for the docs.
 
-## E. Danach: jedes Ticket als eigener Pull Request
+## E. Afterwards: each ticket as its own pull request
 
-Jedes Ticket kommt der Reihe nach als eigener Pull Request nach push-discipline.md auf `main`.
+Each ticket comes in order as its own pull request according to push-discipline.md onto `main`.
 
-16. **Renovate** aktivieren (ADR 0041) und das Dependency Dashboard prüfen.
-17. **Pages** auf "GitHub Actions" als Quelle stellen; `docs.yml` manuell starten.
-18. **Probelauf** mit dem ersten Pull Request: Alle Jobs liefen auf GitHub-gehosteten Runnern,
-    `ci-ok` ist grün, SonarQube Cloud, CodeQL und CodeRabbit melden sich, Scorecard startet.
-    Dazu ein Pull Request aus einem Fork (generische Deny-Regeln, kein Secret).
-19. **DCO** prüfen: ein Pull Request ohne Sign-off muss an `ci-ok` scheitern.
-20. **Release-Signaturen** vor dem ersten Release-Tag (Bau-Ticket M7-10): Die Release-Kette
-    signiert keyless und mit Attestations (ADR 0036). Das Schlüsselpaar aus
-    [ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md) gilt nur für
-    Releases aus einem privaten Repository und entsteht nicht.
-21. **Portabilitätstest auf dem öffentlichen Weg** mit dem ersten Produkt-Release: Zuerst die
-    Pakete `bothy-server` und `bothy-postgres` in der Container-Registry öffentlich stellen
-    (Paket-Einstellungen, Danger Zone, "Change visibility"). Ein neues Paket ist privat, und ein
-    mit dem Repository verknüpftes Paket erbt "the access permissions (but not the visibility)"
-    des Repositorys
+16. **Enable Renovate** (ADR 0041) and check the Dependency Dashboard.
+17. **Pages**: set the source to "GitHub Actions"; start `docs.yml` manually.
+18. **Trial run** with the first pull request: all jobs ran on GitHub-hosted runners,
+    `ci-ok` is green, SonarQube Cloud, CodeQL and CodeRabbit report, Scorecard starts.
+    In addition, a pull request from a fork (generic deny rules, no secret).
+19. **Check DCO**: a pull request without sign-off must fail at `ci-ok`.
+20. **Release signatures** before the first release tag (build ticket M7-10): the release chain
+    signs keyless and with attestations (ADR 0036). The key pair from
+    [ADR 0062](../adr/0062-release-signatures-while-the-repo-is-private.md) applies only to
+    releases from a private repository and is not created.
+21. **Portability test on the public path** with the first product release: first make the
+    packages `bothy-server` and `bothy-postgres` in the container registry public
+    (package settings, Danger Zone, "Change visibility"). A new package is private, and a
+    package linked to the repository inherits "the access permissions (but not the visibility)"
+    of the repository
     (https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility,
-    abgerufen 2026-10-11) [belegt]. Der Schritt lässt sich nicht zurücknehmen ("Once you make a
-    package public, you cannot make it private again", gleiche Quelle) [belegt]. Dann
-    `portability.yml` per `workflow_dispatch` mit dem letzten Produkt-Tag starten. Er checkt diesen
-    Tag aus (Test-Code passend zum Release, [16-betrieb.md](../spec/16-betrieb.md) 11.1), holt
-    `install.sh` ohne Anmeldung mit dem dokumentierten `curl`-Befehl (Quelle `url`,
-    [16-betrieb.md](../spec/16-betrieb.md) 3.1) und zieht die Images, die das Bündel pinnt
-    ([18-release.md](../spec/18-release.md) 2.1), ebenfalls ohne Anmeldung; ein noch privates
-    Paket lässt ihn scheitern. Er muss grün sein.
-22. **Platzhalter `OWNER` ersetzen** (PLAN V1-03): `@OWNER` in `.github/CODEOWNERS`, `OWNER` in
-    `mkdocs.yml`, `docs/index.md`, `README.md` und `CONTRIBUTING.md` (`grep -rn OWNER` als
-    Gegenprobe). `make denylist` muss danach grün sein; trifft die private Liste den neuen Pfad,
-    bekommt sie im Ops-Repository eine enge Ausnahme für genau diesen Pfad.
+    retrieved 2026-10-11) [verified]. The step cannot be undone ("Once you make a
+    package public, you cannot make it private again", same source) [verified]. Then start
+    `portability.yml` via `workflow_dispatch` with the latest product tag. It checks out this
+    tag (test code matching the release, [16-operations.md](../spec/16-operations.md) 11.1), fetches
+    `install.sh` without login with the documented `curl` command (source `url`,
+    [16-operations.md](../spec/16-operations.md) 3.1) and pulls the images that the bundle pins
+    ([18-release.md](../spec/18-release.md) 2.1), also without login; a still private
+    package makes it fail. It must be green.
+22. **Replace the placeholder `OWNER`** (PLAN V1-03): `@OWNER` in `.github/CODEOWNERS`, `OWNER` in
+    `mkdocs.yml`, `docs/index.md`, `README.md` and `CONTRIBUTING.md` (`grep -rn OWNER` as a
+    cross-check). `make denylist` must be green afterwards; if the private list matches the new path,
+    it gets a narrow exception for exactly this path in the ops repository.

@@ -1,0 +1,52 @@
+%% Send a message with delivery to connected clients and push to a device without a connection.
+%% Paths without version prefix; 06-api.md sets the prefix. Actions from 05-actions.md.
+sequenceDiagram
+  autonumber
+  participant A as App Alex
+  box api node
+    participant MW as platform/httpserver
+    participant MSG as messaging
+    participant CH as chat
+    participant RU as runs
+    participant SY as sync
+    participant TL as sync log tail
+    participant HUB as gateway hub
+  end
+  participant DB as PostgreSQL
+  participant S as App Sam
+  box worker
+    participant NV as notify consumer
+  end
+  participant PD as APNs or FCM
+  participant R as Device Robin, not connected
+
+  A->>A: create client_msg_id (UUIDv7), entry in the outbox
+  A->>MW: POST threads/{id}/messages, token with DPoP
+  MW->>MW: check principal (kernel actor), rate limit rl.message
+  MW->>MSG: Create(command)
+  MSG->>MSG: authorize(Alex, message.create, thread)
+  MSG->>DB: SELECT by (author_principal_id, client_msg_id)
+  DB-->>MSG: no row
+  MSG->>DB: BEGIN (READ COMMITTED)
+  MSG->>CH: AppendToThread: lock thread row, assign thread_seq
+  MSG->>DB: INSERT messages, mentions
+  MSG->>SY: Append(message.created), buffered in the transaction context
+  MSG-)RU: in-tx event MessagePosted
+  RU->>RU: trigger check: no operator mentioned, nothing to do
+  SY->>DB: finalize: lock event_seq, INSERT event_log, pg_notify
+  MSG->>DB: COMMIT
+  MSG-->>A: 201 message with thread_seq and version
+  DB--)TL: NOTIFY event_log (highest seq)
+  TL->>DB: SELECT event_log WHERE seq > position ORDER BY seq
+  TL->>HUB: events in seq order
+  HUB->>HUB: per connection authorize(recipient, message.read) from permission cache
+  HUB-->>A: dispatch message.created with client_msg_id
+  A->>A: outbox entry confirmed
+  HUB-->>S: dispatch message.created
+  DB--)NV: NOTIFY event_log
+  NV->>DB: lock consumer row push (SKIP LOCKED), read events from cursor
+  NV->>NV: recipients: mention, preference, quiet hours, read state
+  NV->>NV: authorize(Robin, push.deliver, thread)
+  NV->>DB: insert River job notify.push_send per device and advance cursor, one transaction
+  NV->>PD: job notify.push_send: only IDs and neutral placeholder
+  PD-)R: push without content

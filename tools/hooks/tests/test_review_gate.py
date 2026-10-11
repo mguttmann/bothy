@@ -54,14 +54,14 @@ def test_report_with_yes_passes(repo: Path) -> None:
     assert review_gate.main(["--repo", str(repo)]) == 0
 
 
-@pytest.mark.parametrize("verdict", ["Urteil: NEIN offene Rechte-Lücke", "Urteil: ja", "JA"])
+@pytest.mark.parametrize("verdict", ["Urteil: NEIN open permission gap", "Urteil: ja", "JA"])
 def test_report_without_final_yes_fails(repo: Path, verdict: str) -> None:
     write_report(repo, head(repo), verdict)
     assert review_gate.main(["--repo", str(repo)]) == 1
 
 
 def test_yes_must_be_the_last_line(repo: Path) -> None:
-    write_report(repo, head(repo), "Urteil: JA\n\nNachtrag: Urteil: NEIN")
+    write_report(repo, head(repo), "Urteil: JA\n\nAddendum: Urteil: NEIN")
     assert review_gate.main(["--repo", str(repo)]) == 1
 
 

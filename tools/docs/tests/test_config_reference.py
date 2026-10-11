@@ -12,30 +12,30 @@ REPO = Path(__file__).resolve().parents[3]
 
 CHAPTER_A = """# 04 Sync
 
-## 18. Konfigurationswerte dieses Kapitels
+## 18. Configuration values of this chapter
 
-| Name | Standard | Bedeutung |
+| Name | Default | Meaning |
 |---|---|---|
-| `sync.event_retention` | `30d` | so lange bleiben Ereignisse nachholbar |
-| `ratelimit.rl.read.per_minute` / `.burst` | `600` / `100` | je Prinzipal |
-| `file.s3.access_key_ref`, `file.s3.secret_key_ref` | leer | Verweise |
+| `sync.event_retention` | `30d` | events stay available for catch-up this long |
+| `ratelimit.rl.read.per_minute` / `.burst` | `600` / `100` | per principal |
+| `file.s3.access_key_ref`, `file.s3.secret_key_ref` | empty | references |
 
-## 19. Danach
+## 19. After
 
-| `not.a_value` | `1` | gehört nicht zur Tabelle |
+| `not.a_value` | `1` | not part of the table |
 """
 
-CHAPTER_B = """# 09 Agenten
+CHAPTER_B = """# 09 Agents
 
-## 21. Konfigurationswerte dieses Kapitels
+## 21. Configuration values of this chapter
 
-| Name | Ort | Standard | Bedeutung |
+| Name | Place | Default | Meaning |
 |---|---|---|---|
-| `agent.context_max_bytes` | Server | `262144` | Summe |
-| `adapter.invocation_token_leeway` | Adapter | `10s` | Uhren-Toleranz |
+| `agent.context_max_bytes` | Server | `262144` | sum |
+| `adapter.invocation_token_leeway` | Adapter | `10s` | clock tolerance |
 """
 
-REFERENCE = """# Konfigurationsreferenz
+REFERENCE = """# Configuration reference
 
 Intro stays.
 
@@ -56,22 +56,22 @@ def _spec(tmp_path: Path, **chapters: str) -> Path:
 
 
 def test_parse_expands_shorthand_and_lists(tmp_path: Path) -> None:
-    spec = _spec(tmp_path, **{"04-sync-protokoll": CHAPTER_A})
+    spec = _spec(tmp_path, **{"04-sync-protocol": CHAPTER_A})
     [chapter] = config_reference.collect(spec)
     names = [(v.name, v.default) for v in chapter.values]
     assert names == [
         ("sync.event_retention", "`30d`"),
         ("ratelimit.rl.read.per_minute", "`600`"),
         ("ratelimit.rl.read.burst", "`100`"),
-        ("file.s3.access_key_ref", "leer"),
-        ("file.s3.secret_key_ref", "leer"),
+        ("file.s3.access_key_ref", "empty"),
+        ("file.s3.secret_key_ref", "empty"),
     ]
     assert chapter.section == "18"
     assert all(v.place == "Server" for v in chapter.values)
 
 
 def test_place_column_and_environment_name(tmp_path: Path) -> None:
-    spec = _spec(tmp_path, **{"09-agenten": CHAPTER_B})
+    spec = _spec(tmp_path, **{"09-agents": CHAPTER_B})
     [chapter] = config_reference.collect(spec)
     server, adapter = chapter.values
     assert (server.place, server.env) == ("Server", "BOTHY_AGENT__CONTEXT_MAX_BYTES")
@@ -82,57 +82,58 @@ def test_default_place_per_chapter(tmp_path: Path) -> None:
     text = CHAPTER_A.replace("# 04 Sync", "# 22 Import")
     spec = _spec(tmp_path, **{"22-import-migration": text})
     [chapter] = config_reference.collect(spec)
-    assert {v.place for v in chapter.values} == {"Werkzeug `bothy import`"}
+    assert {v.place for v in chapter.values} == {"Tool `bothy import`"}
     assert {v.env for v in chapter.values} == {""}
 
 
 def test_excluded_chapter_is_skipped(tmp_path: Path) -> None:
-    spec = _spec(tmp_path, **{"23-qualitaet": CHAPTER_A})
+    spec = _spec(tmp_path, **{"23-quality": CHAPTER_A})
     assert config_reference.collect(spec) == []
 
 
 def test_duplicate_name_fails(tmp_path: Path) -> None:
-    spec = _spec(tmp_path, **{"04-sync-protokoll": CHAPTER_A, "05-aktionen": CHAPTER_A})
+    spec = _spec(tmp_path, **{"04-sync-protocol": CHAPTER_A, "05-actions": CHAPTER_A})
     with pytest.raises(config_reference.ConfigError, match=r"sync\.event_retention"):
         config_reference.collect(spec)
 
 
 def test_bad_name_fails(tmp_path: Path) -> None:
     bad = CHAPTER_A.replace("`sync.event_retention`", "`Sync.Event`")
-    spec = _spec(tmp_path, **{"04-sync-protokoll": bad})
+    spec = _spec(tmp_path, **{"04-sync-protocol": bad})
     with pytest.raises(config_reference.ConfigError, match="no value name"):
         config_reference.collect(spec)
 
 
 def test_split_default_count_must_match(tmp_path: Path) -> None:
     bad = CHAPTER_A.replace("`600` / `100`", "`600` / `100` / `7`")
-    spec = _spec(tmp_path, **{"04-sync-protokoll": bad})
+    spec = _spec(tmp_path, **{"04-sync-protocol": bad})
     with pytest.raises(config_reference.ConfigError, match="defaults"):
         config_reference.collect(spec)
 
 
 def test_render_replaces_only_the_marked_block(tmp_path: Path) -> None:
-    spec = _spec(tmp_path, **{"04-sync-protokoll": CHAPTER_A, "09-agenten": CHAPTER_B})
+    spec = _spec(tmp_path, **{"04-sync-protocol": CHAPTER_A, "09-agents": CHAPTER_B})
     out = config_reference.render(REFERENCE, config_reference.collect(spec))
-    assert out.startswith("# Konfigurationsreferenz\n\nIntro stays.\n")
+    assert out.startswith("# Configuration reference\n\nIntro stays.\n")
     assert out.endswith("Footer stays.\n")
     assert "old" not in out
     assert "### 04 Sync\n" in out
-    assert "[04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18" in out
+    assert "Source: [04-sync-protocol.md](../spec/04-sync-protocol.md), section 18." in out
+    assert "| Key | Environment | Place | Default | Meaning |\n|---|---|---|---|---|\n" in out
     assert (
         "| `ratelimit.rl.read.burst` | `BOTHY_RATELIMIT__RL__READ__BURST` | Server | `100` |" in out
     )
-    assert "| `adapter.invocation_token_leeway` |  | Adapter | `10s` | Uhren-Toleranz |" in out
+    assert "| `adapter.invocation_token_leeway` |  | Adapter | `10s` | clock tolerance |" in out
 
 
 def test_render_rewrites_chapter_relative_links(tmp_path: Path) -> None:
     linked = CHAPTER_A.replace(
-        "| so lange bleiben Ereignisse nachholbar |",
-        "| siehe [19](19-sicherheit.md#x), [ADR](../adr/README.md), [W](https://example.com) |",
+        "| events stay available for catch-up this long |",
+        "| see [19](19-security.md#x), [ADR](../adr/README.md), [W](https://example.com) |",
     )
-    spec = _spec(tmp_path, **{"04-sync-protokoll": linked})
+    spec = _spec(tmp_path, **{"04-sync-protocol": linked})
     out = config_reference.render(REFERENCE, config_reference.collect(spec))
-    assert "[19](../spec/19-sicherheit.md#x)" in out
+    assert "[19](../spec/19-security.md#x)" in out
     assert "[ADR](../adr/README.md)" in out
     assert "[W](https://example.com)" in out
 
@@ -143,7 +144,7 @@ def test_render_needs_markers() -> None:
 
 
 def test_main_writes_then_check_passes(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    spec = _spec(tmp_path, **{"04-sync-protokoll": CHAPTER_A})
+    spec = _spec(tmp_path, **{"04-sync-protocol": CHAPTER_A})
     ref = tmp_path / "configuration.md"
     ref.write_text(REFERENCE, encoding="utf-8")
     args = ["--spec", str(spec), "--reference", str(ref)]
@@ -154,7 +155,7 @@ def test_main_writes_then_check_passes(tmp_path: Path, capsys: pytest.CaptureFix
 
 
 def test_main_reports_errors(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    spec = _spec(tmp_path, **{"04-sync-protokoll": CHAPTER_A, "05-aktionen": CHAPTER_A})
+    spec = _spec(tmp_path, **{"04-sync-protocol": CHAPTER_A, "05-actions": CHAPTER_A})
     ref = tmp_path / "configuration.md"
     ref.write_text(REFERENCE, encoding="utf-8")
     assert config_reference.main(["--spec", str(spec), "--reference", str(ref)]) == 1
@@ -167,17 +168,17 @@ def test_repository_reference_is_current() -> None:
 
 
 def _value_rows_outside_chapters(name: str, text: str) -> list[str]:
-    """Rows `| `a.b` | ...` under a heading "Konfigurationswerte" (until the next heading)."""
+    """Rows `| `a.b` | ...` under a heading "Configuration values" (until the next heading)."""
     import re
 
-    section = re.compile(r"^#+ [^\n]*Konfigurationswerte.*?(?=^#|\Z)", re.MULTILINE | re.DOTALL)
+    section = re.compile(r"^#+ [^\n]*Configuration values.*?(?=^#|\Z)", re.MULTILINE | re.DOTALL)
     row = re.compile(r"^\| `[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+`", re.MULTILINE)
     return [name for block in section.findall(text) if row.search(block)]
 
 
 def test_value_table_outside_chapters_is_found() -> None:
-    table = "## 9. Konfigurationswerte\n\n| Name | Standard |\n|---|---|\n| `webhook.x` | `1` |\n"
-    pointer = "## 9. Konfigurationswerte\n\nSiehe 11.\n\n## 10. Rest\n\n| `a.b` | 1 |\n"
+    table = "## 9. Configuration values\n\n| Name | Default |\n|---|---|\n| `webhook.x` | `1` |\n"
+    pointer = "## 9. Configuration values\n\nSee 11.\n\n## 10. Rest\n\n| `a.b` | 1 |\n"
     assert _value_rows_outside_chapters("x.md", table) == ["x.md"]
     assert _value_rows_outside_chapters("x.md", pointer) == []
 

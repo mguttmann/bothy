@@ -53,7 +53,7 @@ import yaml
 
 # Release workflows: triggers limited. release.yml calls portability.yml after its publish
 # job, because install.sh and the bundle exist under the tag only from then on
-# (docs/spec/16-betrieb.md, 11.1).
+# (docs/spec/16-operations.md, 11.1).
 RELEASE_WORKFLOWS: dict[str, frozenset[str]] = {
     "release.yml": frozenset({"push"}),
     "portability.yml": frozenset({"workflow_call", "workflow_dispatch"}),

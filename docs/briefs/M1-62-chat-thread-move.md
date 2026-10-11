@@ -1,23 +1,23 @@
 # M1-62: Moving threads
 
-Status: ready | Depends on: M1-54, M1-61 | Etappe: M1
+Status: ready | Depends on: M1-54, M1-61 | Milestone: M1
 
 ## Goal
 
-A person with `manage` on the source and on the target channel moves a thread into another channel whose effective operator equals the thread's fixed operator. The thread keeps its id; its messages, read states and drafts follow in the same transaction; readers of the target get `thread.moved`, readers of the source get `thread.moved_out`; and no authorization decision after the commit evaluates the thread at its old place. This is the function 'Thread verschieben' of 01 and the baseline rule that a thread moves only within the same operator agent.
+A person with `manage` on the source and on the target channel moves a thread into another channel whose effective operator equals the thread's fixed operator. The thread keeps its id; its messages, read states and drafts follow in the same transaction; readers of the target get `thread.moved`, readers of the source get `thread.moved_out`; and no authorization decision after the commit evaluates the thread at its old place. This is the function 'Move thread' of 01 and the baseline rule that a thread moves only within the same operator agent.
 
 ## Read first
 
-- `docs/spec/03-datenmodell.md`: `threads` (the paragraph 'Verschieben ändert channel_id' after the indexes, `operator_agent_id`, `moved_at`, the unique index on `kind = main`), `thread_tags` (the rule that a tag belongs to the thread's channel and the last sentence), `messages.channel_id`, `read_states.channel_id`, `drafts.channel_id`, `channels` (formula of the effective operator), `spaces.default_operator_agent_id`, 'I1-Prüfung', 'Sperrreihenfolge', R-DM-11, R-DM-12, R-DM-21.
-- `docs/spec/05-aktionen.md`: `thread.move` in 'Threads und Agenten-Sitzungen'; 'Ziel einer Ressource' (files follow their message); 'Wirksame Stufe' (operator rule); rule 8; 'Entscheidung'; rows `thread.moved` and `thread.moved_out` in 'Dauerhafte Ereignistypen und Empfangs-Aktion'.
-- `docs/spec/04-sync-protokoll.md`: 'Sichtbarkeit bei Rechte-Änderungen' with 'Grundregel' (structure changes such as `thread.moved` are applied in log order), 'Bearbeiten und Löschen' (row 'Thread verschoben'), 'Zustellgarantie'.
-- `docs/spec/02-architektur.md`: 'Ports, Ereignisse und Quellen je Modul' (`chat` emits `ThreadMoved`; `messaging` and `sync` subscribe), 'Rechte-Cache', 'Transaktionen und Unit of Work', 'In-Tx-Ereignisse', 'Abgleich mit dem Kern-Vertrag' (row on moving threads).
-- `docs/spec/07-rechte.md`: 'Zusatzrechte' (`manage` covers moving threads), 'Die Funktion authorize' (visibility before requirement), 'Gültigkeit des Caches'.
-- `docs/spec/01-produkt.md`: 'Struktur und Gespräche' (row 'Thread verschieben'), 'Weitere Regeln' (Verschieben).
-- `docs/spec/06-api.md`: 'Fehler' (`operator_mismatch`, `conflict`), 'Idempotenz'.
+- `docs/spec/03-data-model.md`: `threads` (the paragraph 'Moving changes channel_id' after the indexes, `operator_agent_id`, `moved_at`, the unique index on `kind = main`), `thread_tags` (the rule that a tag belongs to the thread's channel and the last sentence), `messages.channel_id`, `read_states.channel_id`, `drafts.channel_id`, `channels` (formula of the effective operator), `spaces.default_operator_agent_id`, 'I1 check', 'Lock order', R-DM-11, R-DM-12, R-DM-21.
+- `docs/spec/05-actions.md`: `thread.move` in 'Threads and agent sessions'; 'Target of a resource' (files follow their message); 'Effective level' (operator rule); rule 8; 'Decision'; rows `thread.moved` and `thread.moved_out` in 'Durable event types and receive action'.
+- `docs/spec/04-sync-protocol.md`: 'Visibility on permission changes' with 'Basic rule' (structure changes such as `thread.moved` are applied in log order), 'Editing and deleting' (row 'Thread moved'), 'Delivery guarantee'.
+- `docs/spec/02-architecture.md`: 'Ports, events and sources per module' (`chat` emits `ThreadMoved`; `messaging` and `sync` subscribe), 'Permission cache', 'Transactions and Unit of Work', 'In-Tx events', 'Alignment with the core contract' (row on moving threads).
+- `docs/spec/07-permissions.md`: 'Capabilities' (`manage` covers moving threads), 'The `authorize` function' (visibility before requirement), 'Validity of the cache'.
+- `docs/spec/01-product.md`: 'Structure and conversations' (row 'Move thread'), 'Other rules' (Moving).
+- `docs/spec/06-api.md`: 'Errors' (`operator_mismatch`, `conflict`), 'Idempotency'.
 - `docs/api/openapi.yaml`: `moveThread`, schemas `ThreadMove`, `Thread`, `ThreadMovedEvent`, `ThreadMovedPayload`, `ThreadMovedOutEvent`, `ThreadMovedOutPayload`, response `Conflict`.
 - ADRs 0017, 0018, 0021.
-- `docs/PLAN.md`: 'Arbeitsweise je Ticket', M1 rows M1-53 to M1-55, M1-61, M1-65 and M1-70; 'Voreinstellungen aus dem Kern-Vertrag' row on 02 point 6.
+- `docs/PLAN.md`: 'Way of working per ticket', M1 rows M1-53 to M1-55, M1-61, M1-65 and M1-70; 'Prerequisites from the core contract' row on 02 point 6.
 - Code: `internal/chat` (threads M1-55, operators M1-54, channels M1-53), `internal/messaging`, `internal/sync` (M1-61), `internal/authz` (M1-28), `internal/kernel/authorize`, `internal/kernel/auditing`, `internal/wire`.
 
 ## Fixed requirements that apply
@@ -43,16 +43,16 @@ Rules for every brief:
 7. No en dash and no em dash in any file you write; the `text-rules` pre-commit hook rejects them. Use a hyphen or rephrase.
 8. White label: examples and test data use `example.com` and the people Alex, Sam and Robin; no company, host or personal names, no paths under a home directory.
 9. Limits, windows and thresholds only through named configuration keys listed in `docs/operations/configuration.md`; code comments and docs name the key, never the number.
-10. Specification first: a change to behaviour, API, event, right or configuration updates `docs/spec/` or `docs/api/` in the same change. The core contract (`docs/spec/00-glossar.md`, `03-datenmodell.md`, `04-sync-protokoll.md`, `05-aktionen.md`) is not edited by this ticket.
+10. Specification first: a change to behaviour, API, event, permission or configuration updates `docs/spec/` or `docs/api/` in the same change. The core contract (`docs/spec/00-glossary.md`, `03-data-model.md`, `04-sync-protocol.md`, `05-actions.md`) is not edited by this ticket.
 
 Product requirements implemented here:
 
-11. A thread moves only to a channel whose effective operator equals `threads.operator_agent_id`; otherwise `409 operator_mismatch` (03 `threads`, 01, 06 'Fehler').
-12. `thread.move` needs `manage` on source and target, is audited (Audit `ja`), uses rate-limit class `rl.admin` and accepts `Idempotency-Key` (05, openapi).
-13. The thread id never changes (03 `threads.id`). The same transaction changes `messages.channel_id`, `read_states.channel_id` and `drafts.channel_id`; `cost_entries` and `event_log` keep the old channel; attached files follow their message and `files.scope_channel_id` stays (03 `threads`, 05 'Ziel einer Ressource').
+11. A thread moves only to a channel whose effective operator equals `threads.operator_agent_id`; otherwise `409 operator_mismatch` (03 `threads`, 01, 06 'Errors').
+12. `thread.move` needs `manage` on source and target, is audited (Audit `yes`), uses rate-limit class `rl.admin` and accepts `Idempotency-Key` (05, openapi).
+13. The thread id never changes (03 `threads.id`). The same transaction changes `messages.channel_id`, `read_states.channel_id` and `drafts.channel_id`; `cost_entries` and `event_log` keep the old channel; attached files follow their message and `files.scope_channel_id` stays (03 `threads`, 05 'Target of a resource').
 14. Events `thread.moved` (place: target channel, receive action `thread.read`) and `thread.moved_out` (place: source channel, resource `channel`, receive action `channel.read`; it never names the target) (05, openapi).
-15. After the commit no REST decision uses the old location: `authorize` resolves the thread's path at decision time (07 4.2). The gateway's rights cache applies `thread.moved` in log order; that side is M1-65 (04 'Grundregel', 02 'Rechte-Cache').
-16. No read right gives `404`; `403` only with read right but missing `manage` (05 rules 1 and 2, R-AZ-01).
+15. After the commit no REST decision uses the old location: `authorize` resolves the thread's path at decision time (07 4.2). The gateway's permission cache applies `thread.moved` in log order; that side is M1-65 (04 'Basic rule', 02 'Permission cache').
+16. No read permission gives `404`; `403` only with read permission but missing `manage` (05 rules 1 and 2, R-AZ-01).
 
 ## Scope
 
@@ -70,14 +70,14 @@ Change:
 
 - `internal/chat` port: `Threads.Move(ctx, MoveThread{ThreadID, TargetChannelID uuid; Reason string}) (Thread, error)`; in-transaction event type `ThreadMoved{ThreadID, FromChannelID, FromSpaceID, ToChannelID, ToSpaceID uuid; ThreadVersion int64}`.
 - `internal/chat/adapters/httpapi`: the strict-server method for `moveThread`.
-- `internal/authz` and `internal/kernel/authorize`: the requirement for `thread.move` checks `manage` on the thread's path and on the target channel's path, with the second target in the resource descriptor (07 4.2 "Aktionen mit zwei Zielen"; 02 4.5). M1-28 already provides the descriptor field `TargetChannelID` (`thread.move`: destination channel) and the requirement `All(Cap(manage), TargetCap(manage))` for "manage auf Quelle und Ziel"; set `TargetChannelID` in the descriptor and add no second field.
+- `internal/authz` and `internal/kernel/authorize`: the requirement for `thread.move` checks `manage` on the thread's path and on the target channel's path, with the second target in the resource descriptor (07 4.2 "Actions with two targets"; 02 4.5). M1-28 already provides the descriptor field `TargetChannelID` (`thread.move`: destination channel) and the requirement `All(Cap(manage), TargetCap(manage))` for "manage on source and target"; set `TargetChannelID` in the descriptor and add no second field.
 - `internal/wire`: register `chat.ThreadMoved -> messaging.OnThreadMoved` and `chat.ThreadMoved -> sync.OnThreadMoved` (in this order) and the handler; update the golden file of subscriptions.
 - `api/operations.yaml`: enable `moveThread`; rerun the route generator.
 - READMEs of `chat`, `messaging`, `sync`, `authz`; `services/server/CHANGELOG.md`; `docs/DECISIONS.md`.
 
 ## Out of scope
 
-- Delivery of `thread.moved` and `thread.moved_out` over the gateway, the hub indices and the gateway's rights cache (M1-65); this ticket writes the events and makes REST decisions follow the move.
+- Delivery of `thread.moved` and `thread.moved_out` over the gateway, the hub indices and the gateway's permission cache (M1-65); this ticket writes the events and makes REST decisions follow the move.
 - The lint for the visible-channel predicate (AZ-P12, M1-70) and the full leak tests (M1-70).
 - Moving a channel between spaces (`moveChannel`, M1-53) and space reordering (M1-52).
 - Runs, agent sessions and costs of a moved thread (M2); none reference the channel (03 `runs`, `agent_sessions`; `cost_entries` keeps the booking channel by design).
@@ -101,20 +101,20 @@ Change:
 ## Design notes
 
 1. Use case `Threads.Move`, one unit of work:
-   a. Load the thread (unknown id gives `404`). Build the descriptor `{kind: thread, id, TargetChannelID: target_channel_id}` and call `authorize(actor, thread.move, descriptor)`. `authz` decides in this order: no read right on the thread gives `not_found`; no read right on the target or an unknown target gives `not_found` with exactly the body and headers of an unknown thread id; missing `manage` on the source or the target gives `forbidden` (`capability_missing`). Owners have `manage` everywhere except DM channels (05 'Wirksame Stufe').
+   a. Load the thread (unknown id gives `404`). Build the descriptor `{kind: thread, id, TargetChannelID: target_channel_id}` and call `authorize(actor, thread.move, descriptor)`. `authz` decides in this order: no read permission on the thread gives `not_found`; no read permission on the target or an unknown target gives `not_found` with exactly the body and headers of an unknown thread id; missing `manage` on the source or the target gives `forbidden` (`capability_missing`). Owners have `manage` everywhere except DM channels (05 'Effective level').
    b. Domain checks after `authorize`, in this order: thread `kind = main` gives `409 conflict` (each text channel keeps exactly one main thread, R-DM-11 and the unique index); target equal to the source gives `400 validation_failed` with pointer `/target_channel_id`; archived target gives `409 conflict`; a DM channel as source or target gives `409 conflict` (not reachable after `authorize`, kept as defence in depth); effective operator of the target differs from `threads.operator_agent_id` gives `409 operator_mismatch`. Operators compare with `IS NOT DISTINCT FROM` semantics: a thread without operator moves only into a channel without effective operator.
    c. `reason` (required by `ThreadMove`): non-empty after trimming, no control or bidi characters (reuse the shared validator `kernel/textcheck` of M1-26, SEC-IN-4), otherwise `400 validation_failed` with pointer `/reason`.
-   d. Locks, in this order: `threads` row `FOR UPDATE`; target `channels` row `FOR SHARE`; when the target inherits its operator, the target's `spaces` row `FOR SHARE`. Compute the effective operator only after these locks. Reason: `channel.operator.set` and `space.operator.set` update these rows, so the share lock serializes the operator check against a concurrent operator change and the move cannot break I1 (03 'I1-Prüfung', target kind 2). Deadlocks are retried by the unit of work (`database.tx_retry_max`).
+   d. Locks, in this order: `threads` row `FOR UPDATE`; target `channels` row `FOR SHARE`; when the target inherits its operator, the target's `spaces` row `FOR SHARE`. Compute the effective operator only after these locks. Reason: `channel.operator.set` and `space.operator.set` update these rows, so the share lock serializes the operator check against a concurrent operator change and the move cannot break I1 (03 'I1 check', target kind 2). Deadlocks are retried by the unit of work (`database.tx_retry_max`).
    e. Update the thread: `channel_id = target`, `moved_at = now()`, `version = version + 1`. Delete all `thread_tags` of the thread: a tag must belong to the thread's channel (03 `thread_tags`), so tags never survive a move.
    f. Publish `chat.ThreadMoved`. `messaging.OnThreadMoved` runs `UPDATE messages SET channel_id = $to WHERE thread_id = $thread`; `sync.OnThreadMoved` runs the same for `read_states` and `drafts`. These are copies: no version change, no events from the subscribers; clients learn the new channel from `thread.moved`.
    g. Append, in this order, `thread.moved_out` then `thread.moved`, so a client that receives both ends with the thread in the target:
-    - `thread.moved_out`: `scope {space_id: source space, channel_id: source}`, `resource {kind: channel, id: source}` without `version` (the channel object did not change, so a version would make clients drop the event, 04 'Zustellgarantie' point 3), payload `ThreadMovedOutPayload {thread_id, channel_id: source}`, receive action `channel.read`.
+    - `thread.moved_out`: `scope {space_id: source space, channel_id: source}`, `resource {kind: channel, id: source}` without `version` (the channel object did not change, so a version would make clients drop the event, 04 'Delivery guarantee' point 3), payload `ThreadMovedOutPayload {thread_id, channel_id: source}`, receive action `channel.read`.
     - `thread.moved`: `scope {space_id: target space, channel_id: target, thread_id}`, `resource {kind: thread, id, version: new version}`, payload `ThreadMovedPayload {thread: the full Thread after the move, from_channel_id}`, receive action `thread.read`.
-    h. Audit in the same transaction through `auditing.Recorder`: action `thread.move`, resource the thread, details `from_channel_id`, `to_channel_id` and `reason`, nothing else. Denials are audited by the authz layer like every action with Audit `ja` (R-AZ-04).
+    h. Audit in the same transaction through `auditing.Recorder`: action `thread.move`, resource the thread, details `from_channel_id`, `to_channel_id` and `reason`, nothing else. Denials are audited by the authz layer like every action with Audit `yes` (R-AZ-04).
     i. Answer `200` with the `Thread` after the move. `Idempotency-Key` is handled by the middleware of M1-20.
-2. The rights version is not raised and no `access.changed` is written (05: Rechte `nein`). I1 needs no extra check: the target's effective operator is the thread's operator, so the target already is one of that agent's targets, and the source can only drop out (03 'I1-Prüfung'); note 1d keeps this true under concurrency.
-3. A thread created from a main-thread message keeps `parent_message_id`, which now points into the source channel; readers of the target without read right on the source get `404` for that message (03 `threads.parent_message_id`).
-4. Rights: REST decisions resolve the thread's channel at decision time (07 4.2) and cache no thread-to-channel resolution across requests; state that in the authz README. The gateway's cache side of `thread.moved` is M1-65.
+2. The permission version is not raised and no `access.changed` is written (05: Permissions `no`). I1 needs no extra check: the target's effective operator is the thread's operator, so the target already is one of that agent's targets, and the source can only drop out (03 'I1 check'); note 1d keeps this true under concurrency.
+3. A thread created from a main-thread message keeps `parent_message_id`, which now points into the source channel; readers of the target without read permission on the source get `404` for that message (03 `threads.parent_message_id`).
+4. Permissions: REST decisions resolve the thread's channel at decision time (07 4.2) and cache no thread-to-channel resolution across requests; state that in the authz README. The gateway's cache side of `thread.moved` is M1-65.
 5. `MoveThreadMessages` has no visible-channel predicate by design: it writes the rows of a thread that `authorize` checked in the same transaction (07 7.4 rule 1: writes are outside the lint). Name it in the messaging README with this reason.
 6. Rulings for `docs/DECISIONS.md`: event order `thread.moved_out` before `thread.moved`; threads without operator move only to channels without effective operator; status codes for same channel (`400`) and archived target (`409 conflict`). Main threads never move, tags fall away on every move, `thread.moved_out` has no `resource.version` and `parent_message_id` stays: these are in 03 and 04.
 
@@ -138,7 +138,7 @@ Integration (PostgreSQL 18 via `pgtest`, real modules through `internal/wire`, H
 - `TestMoveThreadConcurrentReadState`: parallel `putReadState` of Alex and the move: afterwards `read_states.channel_id` equals `threads.channel_id`.
 - `TestMoveThreadConcurrentOperatorChange`: parallel `setChannelOperator` on the target to another agent and the move: both requests end with a defined status (no deadlock reaches the client) and `VerifyInvariants` of `authz` passes afterwards.
 - `TestMoveThreadIdempotencyKey`: a replay returns the stored response with `Idempotent-Replay: true` and writes no second set of events.
-- `TestSendAfterMove`: `createMessage` to the moved thread id succeeds and the new message has the target `channel_id` (04 'Bearbeiten und Löschen').
+- `TestSendAfterMove`: `createMessage` to the moved thread id succeeds and the new message has the target `channel_id` (04 'Editing and deleting').
 
 Commands that must pass, from the repository root:
 
@@ -163,7 +163,7 @@ Commands that must pass, from the repository root:
 - READMEs of `chat`, `messaging`, `sync` and `authz` updated (ports, events, subscriptions, the query exception of note 5, cache behaviour of note 4).
 - Rulings of note 6 recorded in `docs/DECISIONS.md` (one row each with reason).
 - `services/server/CHANGELOG.md` entry under 'Unreleased'.
-- An ADR only if you take an architecture decision beyond this brief (MADR 4 as in `docs/adr/0000-vorlage-madr-4.md`, headings English, text German, next free number, `make adr-index`).
+- An ADR only if you take an architecture decision beyond this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, headings and text in English, next free number, `make adr-index`).
 - `make check` green.
 - An independent code review over the diff, then the red team gate (`docs/quality/red-team-gate.md`, verdict `JA` or `NEIN`); on `NEIN` fix with a test per finding and have the delta checked again. Record both verdicts.
 - Merge locally into the base branch only if review, red team and `make check` are green; then `git worktree remove`.

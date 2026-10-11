@@ -1,5 +1,5 @@
 # REST API of the chat server, OpenAPI 3.1. Normative (ADR 0013).
-# Conventions: docs/spec/06-api.md. Authorization actions: docs/spec/05-aktionen.md.
+# Conventions: docs/spec/06-api.md. Authorization actions: docs/spec/05-actions.md.
 # Lint: npx -y @redocly/cli@2.62.1 lint --config docs/api/redocly.yaml
 
 openapi: 3.1.0
@@ -7,13 +7,13 @@ openapi: 3.1.0
 info:
   title: Chat Server API
   version: 0.1.0
-  summary: REST API of the team chat with agents that its operator hosts.
+  summary: REST API of the team chat with agents that its instance operator hosts.
   description: |
     Normative REST contract of the chat server (spec-first, ADR 0013).
 
     Conventions (names, time, IDs, errors, pagination, idempotency, concurrency, rate limits,
     versioning) are in docs/spec/06-api.md. Every operation names its authorization action in
-    `x-authz-action` (catalogue docs/spec/05-aktionen.md) and its rate-limit class in
+    `x-authz-action` (catalogue docs/spec/05-actions.md) and its rate-limit class in
     `x-rate-limit-class`. The WebSocket gateway is described in asyncapi.yaml; its frame and event
     schemas live in `components.schemas` of this file.
 
@@ -63,7 +63,7 @@ tags:
 - name: Files
   description: Upload sessions, downloads, thumbnails, transcripts.
 - name: Search
-  description: Full-text search filtered by rights.
+  description: Full-text search filtered by permissions.
 - name: Sync
   description: Snapshot and catch-up over REST.
 - name: Preferences
@@ -5493,7 +5493,7 @@ paths:
       operationId: archiveSpace
       summary: Archive a space
       tags: [Spaces]
-      description: 'Final; there is no unarchive. Every channel of the space becomes read-only for everyone, owners included; reading stays for those who could read before. Archiving is a rights change with `access.changed`; archived spaces leave `listSpaces` (07, 4.5).'
+      description: 'Final; there is no unarchive. Every channel of the space becomes read-only for everyone, owners included; reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived spaces leave `listSpaces` (07, 4.5).'
       x-authz-action: space.archive
       x-rate-limit-class: rl.admin
       parameters:
@@ -6030,7 +6030,7 @@ paths:
       operationId: archiveChannel
       summary: Archive a channel
       tags: [Channels]
-      description: 'Final; there is no unarchive. The channel becomes read-only for everyone, owners included (`403 channel_read_only` with `reason: channel_archived`); reading stays for those who could read before. Archiving is a rights change with `access.changed`; archived channels leave `listSpaceChannels` (07, 4.5).'
+      description: 'Final; there is no unarchive. The channel becomes read-only for everyone, owners included (`403 channel_read_only` with `reason: channel_archived`); reading stays for those who could read before. Archiving is a permission change with `access.changed`; archived channels leave `listSpaceChannels` (07, 4.5).'
       x-authz-action: channel.archive
       x-rate-limit-class: rl.admin
       parameters:
@@ -6290,7 +6290,7 @@ paths:
   /channels/{channel_id}/read-only:
     put:
       operationId: setChannelReadOnly
-      summary: Switch the write protection of a channel
+      summary: Switch the read-only state of a channel
       tags: [Channels]
       description: |-
         Write-protected for every principal including owners; only a running import writes (05, rule 1.8). Switching on cancels active runs in the channel.
@@ -12879,7 +12879,7 @@ paths:
         it is not consumed by a start (`runs.started_jti` is NULL or differs, SQL `started_jti IS
         DISTINCT FROM jti`). A retry with the replaced token issues a
         fresh token again; the run still starts at most once. The server repeats every check it runs
-        before a delivery (`agent.invoke` for the triggering person with current rights, I2, SR2,
+        before a delivery (`agent.invoke` for the triggering person with current permissions, I2, SR2,
         SR3); on failure the run becomes `failed` and the answer is 403 `agent_invocation_denied`. A
         replaced or consumed token gets 403 `invocation_token_invalid` with `reason: superseded`; a
         run that already started gets 409 `already_started`.
@@ -14997,7 +14997,7 @@ paths:
       summary: Current live frame
       tags: [Stats]
       description: |-
-        The latest live frame (`StatsLiveFrame`) of the instance or of one space, the same frame the gateway sends as `stats.live` (docs/spec/25-visualisierung.md, section 5). The server returns the base frame built for the current `stats.live_interval`; polling does not rebuild it. Filtered to the channels visible to the caller; cost members only with `cost.read.aggregate`. `403 feature_disabled` when `stats.live_enabled` is off.
+        The latest live frame (`StatsLiveFrame`) of the instance or of one space, the same frame the gateway sends as `stats.live` (docs/spec/25-visualization.md, section 5). The server returns the base frame built for the current `stats.live_interval`; polling does not rebuild it. Filtered to the channels visible to the caller; cost members only with `cost.read.aggregate`. `403 feature_disabled` when `stats.live_enabled` is off.
       x-authz-action: stats.read
       x-rate-limit-class: rl.read
       parameters:
@@ -15081,7 +15081,7 @@ paths:
       summary: Minute buckets and runs for playback
       tags: [Stats]
       description: |-
-        Minute aggregates from `stats_minutes` and run intervals for a range of at most `stats.timeline_max_range` inside `retention.stats_minutes` (docs/spec/25-visualisierung.md, section 6.5). Filtered to the channels visible to the caller. Rows without a channel (`sli.*`, gateway metrics) only with `stats.read` on the instance; `cost` only with `cost.read.aggregate`.
+        Minute aggregates from `stats_minutes` and run intervals for a range of at most `stats.timeline_max_range` inside `retention.stats_minutes` (docs/spec/25-visualization.md, section 6.5). Filtered to the channels visible to the caller. Rows without a channel (`sli.*`, gateway metrics) only with `stats.read` on the instance; `cost` only with `cost.read.aggregate`.
       x-authz-action: stats.read
       x-rate-limit-class: rl.read
       parameters:
@@ -15168,7 +15168,7 @@ paths:
       summary: SLO traffic light from own measurement
       tags: [Stats]
       description: |-
-        One entry per SLO of the Sloth files, computed from `stats_minutes` over the SLO period (docs/spec/25-visualisierung.md, section 6.4). Label "own measurement": values may differ from Prometheus. Requires `stats.read` on the instance (owner); a space manager gets `403 forbidden`.
+        One entry per SLO of the Sloth files, computed from `stats_minutes` over the SLO period (docs/spec/25-visualization.md, section 6.4). Label "own measurement": values may differ from Prometheus. Requires `stats.read` on the instance (owner); a space manager gets `403 forbidden`.
       x-authz-action: stats.read
       x-rate-limit-class: rl.read
       responses:
@@ -15217,7 +15217,7 @@ paths:
       summary: Backend policy view per agent
       tags: [Stats]
       description: |-
-        Per agent: configured and reported billing mode, supported modes, switches, denied invocations (I2, I3), cost per mode and the rate-limit state reported by the adapter (docs/spec/25-visualisierung.md, section 6.2). Agents of channels visible to the caller; cost members only with `cost.read.aggregate`. Never credentials, subscriptions or runtime names of an instance.
+        Per agent: configured and reported billing mode, supported modes, switches, denied invocations (I2, I3), cost per mode and the rate-limit state reported by the adapter (docs/spec/25-visualization.md, section 6.2). Agents of channels visible to the caller; cost members only with `cost.read.aggregate`. Never credentials, subscriptions or runtime names of an instance.
       x-authz-action: stats.read
       x-rate-limit-class: rl.read
       parameters:
@@ -16380,7 +16380,7 @@ paths:
       summary: Set the leading side of a channel
       tags: [Import]
       description: |-
-        Switches `lead` of one mapped channel and the write protection of its target channel in one transaction (22, 12.1 and 13).
+        Switches `lead` of one mapped channel and the read-only state of its target channel in one transaction (22, 12.1 and 13).
       x-authz-action: import.manage
       x-rate-limit-class: rl.admin
       parameters:
@@ -17621,7 +17621,7 @@ paths:
       summary: Open a terminal session
       tags: [Terminal]
       description: |-
-        Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` right, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
+        Needs a fresh, unused step-up (passkey or step-up device key; in the console only a passkey with `userVerification = required`), the `terminal` capability, SR10, SR11 (I6) and SR12 (an own session user on the host whose name the host reports, otherwise 403 `terminal_denied` with `reason: no_session_user`). With a `claude` profile `workdir_index` must point into the caller's own working directories (ruling T13). Consumes the step-up and returns a one-time session token for the Noise handshake (24, 5 and 6.1). The device then connects to `stream_path`.
       x-authz-action: terminal.open
       x-rate-limit-class: rl.terminal
       x-idempotency-exempt: auth_flow
@@ -19671,7 +19671,7 @@ webhooks:
           description: The server slows down and honors `Retry-After`; same for 502, 503 and 504.
         default:
           description: Failure; the server retries this event with backoff and sends nothing newer before it succeeds.
-      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protokoll.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
+      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protocol.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
   agent.followup:
     post:
       operationId: onAgentFollowupEvent
@@ -19700,7 +19700,7 @@ webhooks:
           description: The server slows down and honors `Retry-After`; same for 502, 503 and 504.
         default:
           description: Failure; the server retries this event with backoff and sends nothing newer before it succeeds.
-      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protokoll.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
+      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protocol.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
   run.cancel_requested:
     post:
       operationId: onRunCancelRequestedEvent
@@ -19729,7 +19729,7 @@ webhooks:
           description: The server slows down and honors `Retry-After`; same for 502, 503 and 504.
         default:
           description: Failure; the server retries this event with backoff and sends nothing newer before it succeeds.
-      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protokoll.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
+      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protocol.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
   agent.config_changed:
     post:
       operationId: onAgentConfigChangedEvent
@@ -19758,7 +19758,7 @@ webhooks:
           description: The server slows down and honors `Retry-After`; same for 502, 503 and 504.
         default:
           description: Failure; the server retries this event with backoff and sends nothing newer before it succeeds.
-      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protokoll.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
+      description: Only for webhook subscriptions of the agent itself (webhook as agent transport, docs/spec/04-sync-protocol.md section 15.6). Carries a freshly issued invocation token in the delivery fields.
   interaction.created:
     post:
       operationId: onInteractionCreatedEvent
@@ -20638,7 +20638,7 @@ components:
       enum: [read, write, trigger]
     Capability:
       type: string
-      description: Additional right next to the level. `terminal` exists only on the target `host`.
+      description: Capability next to the level. `terminal` exists only on the target `host`.
       enum: [approve_actions, upload, export, manage, terminal]
     PrincipalKind:
       type: string
@@ -20820,7 +20820,7 @@ components:
       - code: terminal_denied
         status: 403
         title: 'Terminal denied'
-        description: 'The `terminal` right exists, but a guard rule or limit blocks; `reason` is `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `no_session_user` (no own session user on the host, SR12), `session_limit` or `profile_unknown` (24 section 13).'
+        description: 'The `terminal` capability exists, but a guard rule or limit blocks; `reason` is `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `no_session_user` (no own session user on the host, SR12), `session_limit` or `profile_unknown` (24 section 13).'
         client_action: 'Show the reason; do not retry.'
       - code: invocation_token_invalid
         status: 403
@@ -20951,7 +20951,7 @@ components:
       - code: unsupported_media_type
         status: 415
         title: 'Unsupported media type'
-        description: 'The media type is not allowed; `reason` `file_type_denied` when the operator blocks the type (`file.denied_mime_types`, 12 section 6).'
+        description: 'The media type is not allowed; `reason` `file_type_denied` when the instance operator blocks the type (`file.denied_mime_types`, 12 section 6).'
         client_action: 'Do not retry.'
       - code: range_not_satisfiable
         status: 416
@@ -21024,7 +21024,7 @@ components:
           description: 'Machine-readable cause that refines `code` (06 section 5): the deny reason of 07 section 4.1 for denials where it reveals nothing, or a cause named by the chapter of the operation, e.g. `billing_mode_personal_not_holder`, `quota_exceeded`. A new cause is a new `reason`, never a new `code` outside `x-problem-codes`. Clients treat unknown values by `code`.'
         hint:
           type: string
-          description: Short instruction for the operator, e.g. switch the agent to `organization` first.
+          description: Short instruction for the person making the change, e.g. switch the agent to `organization` first.
         errors:
           type: array
           description: Field errors for `validation_failed`.
@@ -21035,7 +21035,7 @@ components:
           description: Current representation of the resource for `version_conflict` and `base_version_conflict`.
         conflicts:
           type: array
-          description: One entry per affected agent; present with `i1_violation` (10-backend-richtlinie, 5.4).
+          description: One entry per affected agent; present with `i1_violation` (10-backend-policy, 5.4).
           items:
             $ref: '#/components/schemas/InvariantViolation'
     FieldError:
@@ -22528,7 +22528,7 @@ components:
         rule:
           type: string
           enum: [sr2, sr3]
-          description: Protection rule of a `guard_blocked` source.
+          description: Guard rule of a `guard_blocked` source.
         expires_at:
           $ref: '#/components/schemas/Timestamp'
           description: Expiry of the grant.
@@ -27008,7 +27008,7 @@ components:
           $ref: '#/components/schemas/Uuid'
     StatsMetric:
       type: string
-      description: Metric of the own measurement in `stats_minutes` (docs/spec/25-visualisierung.md, section 3.2).
+      description: Metric of the own measurement in `stats_minutes` (docs/spec/25-visualization.md, section 3.2).
       enum:
       - messages_created
       - threads_created
@@ -27163,7 +27163,7 @@ components:
           type: integer
     StatsLiveFrame:
       type: object
-      description: Live frame (docs/spec/25-visualisierung.md, section 5.2). No person values, no content.
+      description: Live frame (docs/spec/25-visualization.md, section 5.2). No person values, no content.
       required: [at, interval_ms, scope, runs, runs_truncated, agents, rates]
       properties:
         at:
@@ -27260,7 +27260,7 @@ components:
     StatsSloState:
       type: string
       enum: [green, amber, red, insufficient_data]
-      description: Traffic light of one SLO (docs/spec/25-visualisierung.md, section 6.4).
+      description: Traffic light of one SLO (docs/spec/25-visualization.md, section 6.4).
     StatsSloEntry:
       type: object
       required: [slo, metric, objective, period_days, total, good, state]
@@ -27420,7 +27420,7 @@ components:
       description: Level including `none` for no access.
     AccessTargetKind:
       type: string
-      description: '`host` appears only in `access.changed` and `access.expiring` (terminal right, no level).'
+      description: '`host` appears only in `access.changed` and `access.expiring` (terminal capability, no level).'
       enum: [space, channel, host]
     OperatorMode:
       type: string
@@ -28703,7 +28703,7 @@ components:
           examples: [subscription_login_detected]
         session_user:
           type: string
-          description: 'Only with `hd6_llm_login` and `hd11_shared_locations` when not passed: the session user whose account the finding is in, so the operator knows where to look (24, 2.2 and 7.4). One entry per affected session user. A name, never a path.'
+          description: 'Only with `hd6_llm_login` and `hd11_shared_locations` when not passed: the session user whose account the finding is in, so the instance operator knows where to look (24, 2.2 and 7.4). One entry per affected session user. A name, never a path.'
           pattern: ^[A-Za-z0-9_][A-Za-z0-9_.-]*$
           examples: [bothy-s-robin]
     HostSessionUserAssign:
@@ -29051,7 +29051,7 @@ components:
         pin_changed:
           type: boolean
           default: false
-          description: '`true` when the person confirmed a host key that differs from the key this device pinned earlier (docs/spec/24-terminal.md section 5.5, docs/spec/15-client-architektur.md section 23.3); recorded in the audit entry of `terminal.open`.'
+          description: '`true` when the person confirmed a host key that differs from the key this device pinned earlier (docs/spec/24-terminal.md section 5.5, docs/spec/15-client-architecture.md section 23.3); recorded in the audit entry of `terminal.open`.'
     TerminalSessionAttach:
       type: object
       required: [cols, rows, client_ephemeral_key_hash]
@@ -29166,7 +29166,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     TerminalStreamIdentify:
       type: object
-      description: 'Native apps send an access token with DPoP proof (`htm = GET`, `htu` = HTTPS form of the stream URL, `nonce` from `hello`, `ath`). The web console sends neither: its stream authenticates with the console session cookie of the upgrade request and the same-origin check of the upgrade (docs/spec/08-identitaet.md section 7.5, docs/spec/15-client-architektur.md section 23.2); the server rejects an identify without token from any other session. Only the device of the current session token passes (`terminal.stream`).'
+      description: 'Native apps send an access token with DPoP proof (`htm = GET`, `htu` = HTTPS form of the stream URL, `nonce` from `hello`, `ath`). The web console sends neither: its stream authenticates with the console session cookie of the upgrade request and the same-origin check of the upgrade (docs/spec/08-identity.md section 7.5, docs/spec/15-client-architecture.md section 23.2); the server rejects an identify without token from any other session. Only the device of the current session token passes (`terminal.stream`).'
       required: [protocol_version, device_id]
       properties:
         protocol_version:

@@ -1,22 +1,22 @@
 # M1-63: Catch-up over REST and snapshot
 
-Status: ready | Depends on: M1-61 | Etappe: M1
+Status: ready | Depends on: M1-61 | Milestone: M1
 
 ## Goal
 
-`GET /api/v1/events` delivers every durable event after a cursor that the caller may see at delivery time, with `authorize` per event and a cursor that means 'last checked', or `410 resync_required` with a reason. `GET /api/v1/sync/snapshot` delivers structure, counters and versions without thread contents. Both are built as the `sync` ports `CatchUp` and `Snapshot`, which the gateway reuses for `ready`, `resume` and streaming catch-up (M1-64, M1-65), so REST and WebSocket follow exactly the same rules (04 'REST-Variante').
+`GET /api/v1/events` delivers every durable event after a cursor that the caller may see at delivery time, with `authorize` per event and a cursor that means 'last checked', or `410 resync_required` with a reason. `GET /api/v1/sync/snapshot` delivers structure, counters and versions without thread contents. Both are built as the `sync` ports `CatchUp` and `Snapshot`, which the gateway reuses for `ready`, `resume` and streaming catch-up (M1-64, M1-65), so REST and WebSocket follow exactly the same rules (04 'REST variant').
 
 ## Read first
 
-- `docs/spec/04-sync-protokoll.md`: 'Umschlag (Envelope)', 'Globale, commit-geordnete Sequenz', 'Nachholen (Catch-up)' with 'Cursor', 'Ablauf', 'resync_required', 'REST-Variante', 'Sync-Epoche'; 'Lebenszyklus' step 4 (content of the snapshot); 'Sichtbarkeit bei Rechte-Änderungen'; 'Zustellgarantie'; sequence diagram 'Wiederverbinden mit Nachholen'; decisions R-SY-03, R-SY-04, R-SY-16, R-SY-18.
-- `docs/spec/03-datenmodell.md`: `event_log`, `sequence_counters`, `instance.sync_epoch`, 'Sync-Epoche und Wiederherstellung', `read_states`, `threads` (`last_message_seq`, `unread_floor_seq`), `drafts`, `user_settings`, 'Grundsätze' point 12, R-DM-26.
-- `docs/spec/05-aktionen.md`: `sync.snapshot.read`, `events.catch_up` ('Persönliche Daten, Benachrichtigung, Sync'); 'Scopes für Apps' (`events:subscribe`); 'Dauerhafte Ereignistypen und Empfangs-Aktion'.
-- `docs/spec/07-rechte.md`: 'Rechte-Stand (Snapshot)', 'Gültigkeit des Caches', 'Abfrage-Muster', 'Zustellfilter', AZ-P5 in 'Pflicht-Tests'.
-- `docs/spec/02-architektur.md`: 'Regeln' of the module list (point 1: only the owning module reads its tables), 'Ports, Ereignisse und Quellen je Modul' (`sync`: `CatchUp`, `Snapshot`), 'Erlaubte Abhängigkeiten', 'Querschnitts-Ports' (`Authorizer.Scope`), 'Log-Tail je api-Prozess', 'Rechte-Cache', 'Leistungsziele' (`perf.catchup_page_p99`, measured by M1-72).
-- `docs/spec/06-api.md`: 'Fehler' (`resync_required`), 'Paginierung' points 3 and 5, 'Weitere Punkte' K19.
+- `docs/spec/04-sync-protocol.md`: 'Envelope', 'Global, commit-ordered sequence', 'Catch-up' with 'Cursor', 'Flow', 'resync_required', 'REST variant', 'Sync epoch'; 'Lifecycle' step 4 (content of the snapshot); 'Visibility on permission changes'; 'Delivery guarantee'; sequence diagram 'Reconnect with catch-up'; decisions R-SY-03, R-SY-04, R-SY-16, R-SY-18.
+- `docs/spec/03-data-model.md`: `event_log`, `sequence_counters`, `instance.sync_epoch`, 'Sync epoch and restore', `read_states`, `threads` (`last_message_seq`, `unread_floor_seq`), `drafts`, `user_settings`, 'Principles' point 12, R-DM-26.
+- `docs/spec/05-actions.md`: `sync.snapshot.read`, `events.catch_up` ('Personal data, notifications, sync'); 'Scopes for apps' (`events:subscribe`); 'Durable event types and receive action'.
+- `docs/spec/07-permissions.md`: 'Permission state (snapshot)', 'Validity of the cache', 'Query pattern', 'Delivery filter', AZ-P5 in 'Required tests'.
+- `docs/spec/02-architecture.md`: 'Rules' of the module list (point 1: only the owning module reads its tables), 'Ports, events and sources per module' (`sync`: `CatchUp`, `Snapshot`), 'Allowed dependencies', 'Cross-cutting ports' (`Authorizer.Scope`), 'Log tail per api process', 'Permission cache', 'Performance targets' (`perf.catchup_page_p99`, measured by M1-72).
+- `docs/spec/06-api.md`: 'Errors' (`resync_required`), 'Pagination' points 3 and 5, 'Other points' K19.
 - `docs/api/openapi.yaml`: `listEvents`, `getSnapshot`; schemas `EventPage`, `Event`, `EventEnvelope`, `Snapshot`, `SpaceView`, `ChannelView`, `SidebarState`, `UnreadThread`, `RunSummary`, `AgentPresence`, `AgentRuntimeState`, `UserSetting`, `DraftRef`, `PrincipalRef`, `EvaluatedFlag`, `InstanceInfo`, `Problem`, response `Gone`.
 - ADRs 0009, 0013, 0017, 0052, 0053, 0059.
-- `docs/PLAN.md`: 'Arbeitsweise je Ticket', M1 rows M1-16, M1-28, M1-47, M1-51 to M1-53, M1-61, M1-64, M1-65, M1-70, M1-72; P-12.
+- `docs/PLAN.md`: 'Way of working per ticket', M1 rows M1-16, M1-28, M1-47, M1-51 to M1-53, M1-61, M1-64, M1-65, M1-70, M1-72; P-12.
 - Code: `internal/sync` (appender, tail, envelope encoder of M1-16, personal data of M1-61), `internal/instance` (`Versions`, sync epoch, `Flags`), `internal/authz` (`Scope`), `internal/chat` (space and channel views of `listSpaces` and `listSpaceChannels`), `internal/agents` (listing behind `listAgents`), `internal/identity` (`Directory`).
 
 ## Fixed requirements that apply
@@ -42,16 +42,16 @@ Rules for every brief:
 7. No en dash and no em dash in any file you write; the `text-rules` pre-commit hook rejects them. Use a hyphen or rephrase.
 8. White label: examples and test data use `example.com` and the people Alex, Sam and Robin; no company, host or personal names, no paths under a home directory.
 9. Limits, windows and thresholds only through named configuration keys listed in `docs/operations/configuration.md`; code comments and docs name the key, never the number.
-10. Specification first: a change to behaviour, API, event, right or configuration updates `docs/spec/` or `docs/api/` in the same change. The core contract (`docs/spec/00-glossar.md`, `03-datenmodell.md`, `04-sync-protokoll.md`, `05-aktionen.md`) is not edited by this ticket.
+10. Specification first: a change to behaviour, API, event, permission or configuration updates `docs/spec/` or `docs/api/` in the same change. The core contract (`docs/spec/00-glossary.md`, `03-data-model.md`, `04-sync-protocol.md`, `05-actions.md`) is not edited by this ticket.
 
 Product requirements implemented here:
 
 11. The cursor is the highest `seq` checked for the principal, not the highest delivered; invisible events advance it (04 'Cursor', R-SY-03).
-12. Filter: the SQL predicate of 04 'Ablauf' point 1 for performance and `authorize(principal, receive_action, resource)` per event as the truth; rights at delivery time apply (04 'Ablauf' point 2, 'Grundregel').
-13. `410 resync_required` with the reasons `epoch_changed`, `retention`, `too_far_behind`, `cursor_ahead` (04 'resync_required', 'Sync-Epoche').
-14. Events with a personal audience go only to that principal (05 'Dauerhafte Ereignistypen und Empfangs-Aktion', 07 'Zustellfilter').
-15. The snapshot holds visible spaces and channels with versions, the sidebar state, unread and mention counters, running runs, agent presence, versions of settings and drafts and the evaluated feature flags, and no thread contents (04 'Lebenszyklus' step 4).
-16. Counters and snapshot never consider a channel without read right (AZ-P5, snapshot part).
+12. Filter: the SQL predicate of 04 'Flow' point 1 for performance and `authorize(principal, receive_action, resource)` per event as the truth; permissions at delivery time apply (04 'Flow' point 2, 'Basic rule').
+13. `410 resync_required` with the reasons `epoch_changed`, `retention`, `too_far_behind`, `cursor_ahead` (04 'resync_required', 'Sync epoch').
+14. Events with a personal audience go only to that principal (05 'Durable event types and receive action', 07 'Delivery filter').
+15. The snapshot holds visible spaces and channels with versions, the sidebar state, unread and mention counters, running runs, agent presence, versions of settings and drafts and the evaluated feature flags, and no thread contents (04 'Lifecycle' step 4).
+16. Counters and snapshot never consider a channel without read permission (AZ-P5, snapshot part).
 17. No JSON `null` (ADR 0053).
 
 ## Scope
@@ -72,7 +72,7 @@ Create:
 
 Change:
 
-- The specification is in place: `docs/api/openapi.yaml` has the optional query parameter `epoch` on `listEvents` and the required property `features` on `Snapshot` (with example), and 02 'Erlaubte Abhängigkeiten' lets `sync` use `identity`. Change them only where the implementation proves them wrong. Regenerate code (`make codegen-check`).
+- The specification is in place: `docs/api/openapi.yaml` has the optional query parameter `epoch` on `listEvents` and the required property `features` on `Snapshot` (with example), and 02 'Allowed dependencies' lets `sync` use `identity`. Change them only where the implementation proves them wrong. Regenerate code (`make codegen-check`).
 - `architecture/modules.yaml`: add `identity` to `depends_on` of `sync` as in 02; regenerate `.go-arch-lint.yml`; `make register-check` green.
 - Port additions in `internal/chat`, additive and only if absent: `Threads.Counters(ctx, channelIDs []uuid) ([]ThreadCounter{ThreadID, ChannelID uuid; LastMessageSeq, UnreadFloorSeq int64}, error)` returning only threads with `last_message_seq > unread_floor_seq`, query with `channel_id = ANY($1)`.
 - If `kernel/authorize` has no constructor for a resource descriptor from an event row, add `authorize.ResourceFromEvent(kind string, id, spaceID, channelID, threadID uuid) Resource` with tests in `internal/authz`; the gateway hub (M1-65) uses the same constructor.
@@ -106,24 +106,24 @@ Change:
 
 Catch-up
 
-1. `HeadSeq` is the current value of `sequence_counters('event_seq')`, read without a lock through `instance.Versions` (02 "Ports, Ereignisse und Quellen je Modul"; add `EventSeq(ctx) (int64, error)` next to `PermissionVersion` of M1-28). Never through `instance.Counters`: its phase guard (M1-15) rejects calls outside the phase hooks. Reason: after retention the log can be empty while the counter is not, and `max(seq)` would then report `cursor_ahead` wrongly. `MinRetainedSeq` is `min(seq)` of `event_log`, or `HeadSeq + 1` when the log is empty. `SyncEpoch` is `instance.sync_epoch` from the instance port. Because a commit is visible before its counter lock is released, every `seq <= HeadSeq` is visible when `HeadSeq` is read (04 'Muster mit Zähler-Zeile').
+1. `HeadSeq` is the current value of `sequence_counters('event_seq')`, read without a lock through `instance.Versions` (02 "Ports, events and sources per module"; add `EventSeq(ctx) (int64, error)` next to `PermissionVersion` of M1-28). Never through `instance.Counters`: its phase guard (M1-15) rejects calls outside the phase hooks. Reason: after retention the log can be empty while the counter is not, and `max(seq)` would then report `cursor_ahead` wrongly. `MinRetainedSeq` is `min(seq)` of `event_log`, or `HeadSeq + 1` when the log is empty. `SyncEpoch` is `instance.sync_epoch` from the instance port. Because a commit is visible before its counter lock is released, every `seq <= HeadSeq` is visible when `HeadSeq` is read (04 'Pattern with a counter row').
 2. Check order (first match wins): `epoch` given and different from `SyncEpoch` gives `epoch_changed`; `After > HeadSeq` gives `cursor_ahead`; `After < MinRetainedSeq - 1` gives `retention`; `HeadSeq - After > sync.catchup_max_events` gives `too_far_behind`. Without `epoch` there is no epoch check; `cursor_ahead` stays the second net (R-SY-04).
-3. `Page`: get the visible sets from `Authorizer.Scope(ctx, actor)`: visible channel ids, visible space ids (at least one visible channel), fully visible space ids (grant on the space) and the instance-wide flag (Owner or grant on the instance). Run exactly the predicate of 04 'Ablauf' point 1 with `seq > $after AND seq <= $head ORDER BY seq LIMIT $limit`. Then per row: if `audience_principal_id` is set, deliver only when it equals the actor; otherwise call `authorize(actor, receive_action, authorize.ResourceFromEvent(...))` in filter mode `authorize.Filter(ctx)` (M1-28; no denial audit, 07 4.2) and deliver only on `allow`. Never query content tables per event.
+3. `Page`: get the visible sets from `Authorizer.Scope(ctx, actor)`: visible channel ids, visible space ids (at least one visible channel), fully visible space ids (grant on the space) and the instance-wide flag (Owner or grant on the instance). Run exactly the predicate of 04 'Flow' point 1 with `seq > $after AND seq <= $head ORDER BY seq LIMIT $limit`. Then per row: if `audience_principal_id` is set, deliver only when it equals the actor; otherwise call `authorize(actor, receive_action, authorize.ResourceFromEvent(...))` in filter mode `authorize.Filter(ctx)` (M1-28; no denial audit, 07 4.2) and deliver only on `allow`. Never query content tables per event.
 4. `NextCursor`: if the query returned `limit` rows, the `seq` of the last row; otherwise `Head`. Rows dropped by `authorize` or the audience rule still count as checked.
-5. Envelope: use the M1-16 encoder (no `null`, `redacted: true` when `redacted_at` is set, `correlation_id`). `trace_context` only when the actor is an agent (04 'Umschlag'). No delivery-only fields in M1.
-6. `listEvents`: `authorize(actor, events.catch_up, instance)` (apps need `events:subscribe`, 05 'Scopes für Apps'). Parameters: `after` required and at least 0; `epoch` optional; `limit` defaults to `sync.catchup_page_size` and larger values are capped to it (06 'Paginierung' point 3). A resync reason gives `410` with problem code `resync_required` and `reason` set to the reason. Otherwise `200 EventPage {events, next_cursor, head_seq, sync_epoch}`; `next_cursor` is present even when `events` is empty.
+5. Envelope: use the M1-16 encoder (no `null`, `redacted: true` when `redacted_at` is set, `correlation_id`). `trace_context` only when the actor is an agent (04 'Envelope'). No delivery-only fields in M1.
+6. `listEvents`: `authorize(actor, events.catch_up, instance)` (apps need `events:subscribe`, 05 'Scopes for apps'). Parameters: `after` required and at least 0; `epoch` optional; `limit` defaults to `sync.catchup_page_size` and larger values are capped to it (06 'Pagination' point 3). A resync reason gives `410` with problem code `resync_required` and `reason` set to the reason. Otherwise `200 EventPage {events, next_cursor, head_seq, sync_epoch}`; `next_cursor` is present even when `events` is empty.
 
 Snapshot
 
 7. `getSnapshot`: `authorize(actor, sync.snapshot.read, instance)`; a pending device gets `403 device_pending` from `authorize`.
-8. Consistency: read `head_seq` and `sync_epoch` first, then all other parts (READ COMMITTED). Every change with `seq <= head_seq` is then contained; later changes either are contained too or arrive by catch-up after `head_seq`, and duplicates are harmless (04 'Zustellgarantie').
+8. Consistency: read `head_seq` and `sync_epoch` first, then all other parts (READ COMMITTED). Every change with `seq <= head_seq` is then contained; later changes either are contained too or arrive by catch-up after `head_seq`, and duplicates are harmless (04 'Delivery guarantee').
 9. Parts and their sources:
     - `head_seq`, `sync_epoch`: note 1.
     - `permission_version`, `is_owner`: from `Authorizer.Scope`.
     - `principal`: `PrincipalRef` of the actor from `identity.Directory` (new allowed edge `sync -> identity`).
     - `spaces`, `channels`: `SpaceView` and `ChannelView` of the visible, not archived spaces and channels with level and capabilities, through the chat port listing that serves `listSpaces` and `listSpaceChannels`; DM channels of participation are included.
     - `sidebar`: `Settings.ListSidebar` of M1-61.
-    - `unread_threads`: `Threads.Counters` for the visible channel ids, combined in Go with the actor's `read_states` of those channels: unread = `last_message_seq - GREATEST(last_read_seq, unread_floor_seq)` (never below 0), and the unread mentions per thread from `messaging.Mentions.CountUnread` (M1-60) with the same read positions (computed, never stored, 03 R-DM-32); a thread is listed when unread is above 0 or its mention count is above 0; each listed thread is checked with `authorize(actor, thread.read, thread)` in filter mode `authorize.Filter(ctx)` and dropped on deny (07 'Abfrage-Muster' rule 3). No SQL join across module tables (02 'Regeln' point 1); the join in 07 'Abfrage-Muster' illustrates the result, not the place of the query.
+    - `unread_threads`: `Threads.Counters` for the visible channel ids, combined in Go with the actor's `read_states` of those channels: unread = `last_message_seq - GREATEST(last_read_seq, unread_floor_seq)` (never below 0), and the unread mentions per thread from `messaging.Mentions.CountUnread` (M1-60) with the same read positions (computed, never stored, 03 R-DM-32); a thread is listed when unread is above 0 or its mention count is above 0; each listed thread is checked with `authorize(actor, thread.read, thread)` in filter mode `authorize.Filter(ctx)` and dropped on deny (07 'Query pattern' rule 3). No SQL join across module tables (02 'Rules' point 1); the join in 07 'Query pattern' illustrates the result, not the place of the query.
     - `active_runs`: from `RunSummarySource`. In M1 `internal/wire` binds `internal/sync/adapters/noruns`, which returns an empty list, because the table `runs` exists only from M2-05; its doc comment says so and names M2-05 as the ticket that binds the `runs` port.
     - `agents`: agents the actor may read (`agent.read`) from the agents port listing behind `listAgents`, each with `state: unknown` and without `reported_billing_mode`, because no heartbeat exists before M2-20 (`AgentRuntimeState` documents `unknown`).
     - `settings`: all stored rows of the person (M1-61).
@@ -149,14 +149,14 @@ Integration (PostgreSQL 18 via `pgtest`, real modules through `internal/wire`, H
 - `TestListEventsCursorIsLastChecked`: a full page ends at the `seq` of its last row.
 - `TestListEventsPersonalAudience`: Sam's `read_state.updated` in Support is not delivered to Alex; Sam receives it.
 - `TestListEventsResync`: cases `retention` (partition removed through M1-16's maintenance with a controlled clock), `too_far_behind` (test configuration with a small `sync.catchup_max_events`), `cursor_ahead`, `epoch_changed`; each gives `410` with the right `reason`.
-- `TestListEventsNewChannelInVisibleSpace`: a channel created in a space where Alex has a space grant after Alex's rights snapshot was cached: its events are delivered.
-- `TestListEventsAfterRevoke`: after Alex's grant on Support is revoked, no Support event is delivered to Alex, also none before the revoke that Alex had not fetched yet (rights at delivery time).
+- `TestListEventsNewChannelInVisibleSpace`: a channel created in a space where Alex has a space grant after Alex's permission snapshot was cached: its events are delivered.
+- `TestListEventsAfterRevoke`: after Alex's grant on Support is revoked, no Support event is delivered to Alex, also none before the revoke that Alex had not fetched yet (permissions at delivery time).
 - `TestListEventsRedacted`: a deleted message's event comes with `redacted: true` and the redacted payload.
 - `TestListEventsLimitCapped`: `limit` above `sync.catchup_page_size` returns at most that many events.
-- `TestListEventsAppNeedsScope`: an app without `events:subscribe` gets the same response as without read right on the instance resource per `authorize`.
+- `TestListEventsAppNeedsScope`: an app without `events:subscribe` gets the same response as without read permission on the instance resource per `authorize`.
 - `TestSnapshotContents`: a world with spaces, channels, threads, read states, mentions, drafts and settings: every part as in note 9; responses validate against `Snapshot`, `features` present.
 - `TestSnapshotHeadReadFirst`: with a concurrent writer, every change with `seq <= head_seq` is contained in the snapshot.
-- `TestAZP5SnapshotNoForeignChannel`: property test over random worlds (reuse the world generator of AZ-P8 from `internal/authz` tests if it is exported; otherwise build worlds through the public ports): no entry of `spaces`, `channels`, `unread_threads`, `drafts` or `sidebar` and no counter refers to a channel without read right. Run a fixed number of worlds with a logged seed in `make test`.
+- `TestAZP5SnapshotNoForeignChannel`: property test over random worlds (reuse the world generator of AZ-P8 from `internal/authz` tests if it is exported; otherwise build worlds through the public ports): no entry of `spaces`, `channels`, `unread_threads`, `drafts` or `sidebar` and no counter refers to a channel without read permission. Run a fixed number of worlds with a logged seed in `make test`.
 - `TestSnapshotAgentHasEmptyPersonalParts`.
 - `TestSnapshotHasNoContent`: no `content_md` member anywhere in the response.
 

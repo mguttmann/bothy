@@ -1,44 +1,44 @@
-# M1-28: Rights snapshot, cache and authorize
+# M1-28: Permission snapshot, cache and authorize
 
-Status: ready | Depends on: M1-24, M1-25, M1-27 | Etappe: M1
+Status: ready | Depends on: M1-24, M1-25, M1-27 | Milestone: M1
 
 ## Goal
 
 After this ticket `authz` implements the one authorization function of B7:
 `Authorize(ctx, principal, action, resource)` decides exactly as 07 section 4.2 describes, from a
-rights snapshot per principal that is cached per rights version and valid until the earliest
-expiry, and `Scope` gives list queries the sorted sets of visible channels and spaces. Owner
-rule, DM rule, operator rule, limits for agents and apps, app scopes, read-only channels, "view
-as" and step-up are enforced; facts owned by other modules come only through source ports, which
-the tests replace with fakes. Every denial is audited. Everything later in M1 (identity, rights
-changes, structure, messaging, sync, gateway) calls this function.
+permission snapshot per principal that is cached per permission version and valid until the
+earliest expiry, and `Scope` gives list queries the sorted sets of visible channels and spaces.
+Owner rule, DM rule, operator rule, limits for agents and apps, app scopes, read-only channels,
+"view as" and step-up are enforced; facts owned by other modules come only through source ports,
+which the tests replace with fakes. Every denial is audited. Everything later in M1 (identity,
+permission changes, structure, messaging, sync, gateway) calls this function.
 
 ## Read first
 
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 (M1) "Teststrategie", "Red
-  Team", exit criterion 2, and the rows M1-18, M1-24, M1-25 to M1-30, M1-33, M1-34, M1-44,
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 (M1) "Test strategy", "Red
+  team", exit criterion 2, and the rows M1-18, M1-24, M1-25 to M1-30, M1-33, M1-34, M1-44,
   M1-48, M1-49, M1-51 to M1-55, M1-63, M1-65, M1-70, M1-72.
-- `docs/spec/07-rechte.md`: sections 1 to 8 completely, section 10 "Beispiele", section 11.1
-  "Testmatrix", section 11.2 "Pflicht-Tests", section 12, section 14. Section 9 only to know
+- `docs/spec/07-permissions.md`: sections 1 to 8 completely, section 10 "Examples", section 11.1
+  "Test matrix", section 11.2 "Required tests", section 12, section 14. Section 9 only to know
   what M1-49 builds on top.
-- `docs/spec/05-aktionen.md`: completely; in particular section 1 rules 1, 2, 5, 7, 8 and 10,
-  section 2 (2.1 to 2.6), section 4 (every "Recht" cell), section 5 "Agenten-Aufruf".
-- `docs/spec/04-sync-protokoll.md`: section 2.2 (`permission_version`), section 8 (8.1, 8.2,
+- `docs/spec/05-actions.md`: completely; in particular section 1 rules 1, 2, 5, 7, 8 and 10,
+  section 2 (2.1 to 2.6), section 4 (every "Permission" cell), section 5 "Agent invocation".
+- `docs/spec/04-sync-protocol.md`: section 2.2 (`permission_version`), section 8 (8.1, 8.2,
   8.5).
-- `docs/spec/03-datenmodell.md`: section 4.3; from section 4.5 the fields of `channels`
+- `docs/spec/03-data-model.md`: section 4.3; from section 4.5 the fields of `channels`
   (`kind`, `space_id`, `read_only`, `operator_inherit`, `operator_agent_id`,
   `require_mention`, `thread_require_mention`, `free_response`, `allow_mentioned_agents`),
   `threads` (`kind`, `operator_agent_id`, `created_by`), `dm_participants`, `project_bindings`
   (`ready`); `agents` (`billing_mode`, `credential_holder_id`, `tool_class`,
   `reported_tool_class`); section 6.3; `audit_events` (`decision`, `deny_reason`).
-- `docs/spec/02-architektur.md`: sections 4.3 to 4.5, 5, 8.1, 9 (9.1 to 9.3), 11.3, 14.1, 17
+- `docs/spec/02-architecture.md`: sections 4.3 to 4.5, 5, 8.1, 9 (9.1 to 9.3), 11.3, 14.1, 17
   (`perf.authorize_cached_p99`).
 - `docs/spec/06-api.md`: section 3.2 point 4, section 3.3, section 4, section 5 (problem codes
   and the extensions `reason` and `hint`), decision R-API-21.
-- `docs/spec/08-identitaet.md`: section 6 (step-up), section 12 (personal tokens).
-- ADRs `0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`,
-  `0018-freigabe-modell-stufen-zusatzrechte-vererbung-kein-verbot.md`,
-  `0021-audit-log-hash-verkettet-und-getrennt-von-telemetrie.md`.
+- `docs/spec/08-identity.md`: section 6 (step-up), section 12 (personal tokens).
+- ADRs `0017-one-authorization-function-404-instead-of-403-mandatory-registration.md`,
+  `0018-grant-model-levels-capabilities-inheritance-no-deny.md`,
+  `0021-hash-chained-audit-log-separate-from-telemetry.md`.
 - `docs/observability/audit-vs-telemetry.md`, `docs/security/threat-model.md` (T-AZ-01 to
   T-AZ-04).
 - Code of earlier tickets: `internal/kernel/authorize` (M1-05, M1-18 check log, M1-25 generated
@@ -72,14 +72,14 @@ changes, structure, messaging, sync, gateway) calls this function.
 7. No en dash or em dash in any text you write; white label (examples and test worlds use Alex,
    Sam, Robin, example.com, spaces Support, Marketing, Engineering, Research); configuration only
    through named keys from `docs/operations/configuration.md`.
-8. B7, ADR 0017: one function decides; no visible read right gives `not_found`, never
+8. B7, ADR 0017: one function decides; no visible read permission gives `not_found`, never
    `forbidden` (R-AZ-01).
 9. 07 section 1: default is nothing; time is read once per call and checked on every call;
    fail closed on every error (no allow on a source error, an unknown action or an unknown
    resource kind).
 10. 07 section 4.2: the order of the steps and the reasons of section 4.1.
-11. 07 section 7 and R-RE-01, R-RE-02: cache per principal and rights version, valid until the
-    earliest expiry; every REST request reads the current rights version.
+11. 07 section 7 and R-RE-01, R-RE-02: cache per principal and permission version, valid until
+    the earliest expiry; every REST request reads the current permission version.
 12. 07 sections 2.7 to 2.10, 05 section 2.3: owner only in a session (SR5, R-AZ-14), owners
     never see DMs (SR6), operator rule (R-AZ-13), agents and apps at most `write` and `upload`
     (R-DM-08, R-DM-20), apps need a scope (05 section 2.6).
@@ -115,7 +115,7 @@ Paths are relative to `services/server/` unless they start with `docs/`.
    ops that name a deferred action fail the start.
 6. **`internal/authz/adapters/fake`**: in-memory fakes of the four sources, exported for the
    tests of this and later modules (test files only).
-7. **`internal/instance`**: the read-only port `instance.Versions` with the current rights
+7. **`internal/instance`**: the read-only port `instance.Versions` with the current permission
    version (see Design notes); implementation in instance's adapter.
 8. **`internal/platform/httpserver`**: call `authorize.WithRequestScope` once per request at the
    start of the chain (02 section 9.1 step 1), unless M1-18's request-scoped check-log value can
@@ -139,7 +139,7 @@ Paths are relative to `services/server/` unless they start with `docs/`.
 
 ## Out of scope
 
-- Rights changes, the phase hook, `permission_version` increments, `access.changed`, I1, SR8 and
+- Permission changes, the phase hook, `permission_version` increments, `access.changed`, I1, SR8 and
   `VerifyInvariants`: M1-29. `invariant_violation` exists as an outcome here but `Authorize`
   never returns it.
 - Expiry jobs and reminders: M1-30.
@@ -147,7 +147,7 @@ Paths are relative to `services/server/` unless they start with `docs/`.
   `Authorize` is in scope).
 - `Authorizer.Observe` and the gateway's version handling: M1-65. If `kernel/authorize` already
   declares `Observe`, remove the declaration; M1-65 adds it with its implementation.
-- Following structure changes without a new rights version in the gateway's per-process state
+- Following structure changes without a new permission version in the gateway's per-process state
   (`channel.created` and friends, 02 section 11.3): M1-53, M1-62, M1-65. REST needs nothing for
   this: the snapshot holds grants per target and `Scope` builds its lists per request (07 7.2,
   7.4).
@@ -327,7 +327,7 @@ principal, credential, group and grant facts are cached with the snapshot.
 ### Requirement table (`domain/requirements.go`)
 
 Every catalogue action has exactly one entry `{Source string, Expr Expr}`. `Source` repeats the
-05 "Recht" text that the expression was written against; a test compares it with
+05 "Permission" text that the expression was written against; a test compares it with
 `domain.LookupAction(id).Right`, so any change of 05 fails until the entry is reviewed. Atoms:
 
 | Atom | True when | Reason when it decides a failure |
@@ -348,7 +348,7 @@ Every catalogue action has exactly one entry `{Source string, Expr Expr}`. `Sour
 | `ChannelOperator` | kind `agent` and the principal is the channel's effective operator | `subject_kind_not_allowed` |
 | `ReadOnOperatedChannel` | `r` is agent A and the principal has at least `read` on a channel that A operates | `no_grant` |
 | `GroupMember` | `r` is group G and the principal has a membership in effect in G | `not_self` |
-| `Preview` | the requirement of `r.PreviewOf` holds on the same resource (no step-up); `PreviewOf` must be an action with Rights = `ja`, otherwise an internal error | reason of the inner failure |
+| `Preview` | the requirement of `r.PreviewOf` holds on the same resource (no step-up); `PreviewOf` must be an action with Permissions = `yes`, otherwise an internal error | reason of the inner failure |
 | `All(...)`, `Any(...)` | conjunction, disjunction | `All`: first failing part; `Any`: reason of its first alternative |
 | `ByKind{kind: expr}` | expression chosen by `r.Kind`; a kind not listed is an internal error | |
 
@@ -357,39 +357,39 @@ separately for apps). The texts are shown without their inner backticks; copy th
 from `docs/spec/actions.yaml` into `Source`. Overrides and deferred entries below win over this
 table.
 
-| 05 "Recht" text | Expression |
+| 05 "Permission" text | Expression |
 |---|---|
 | `owner` | `Owner` |
 | `manage` | `Cap(manage)` |
 | `self` | `Self` |
 | `read` / `write` / `trigger` | `Level(read)` / `Level(write)` / `Level(trigger)` |
-| `self oder owner`, `owner oder self`, `owner; self bei eigenem`, `owner; self bei eigenen`, `self (Betroffene Person) oder owner` | `Any(Self, Owner)` |
-| `agent-self`, `agent-self (Runner der Umgebung)` | `AgentSelf` |
-| `auth`, `auth (Mensch mit aktivem Gerät, Agent, App mit events:subscribe)` | `Auth` |
-| `owner oder manage`, `owner oder manage (auf host nur owner)` | `Any(Owner, Cap(manage))`; a grant on a host target has no path in the tree, so only `Owner` passes there (see Resolution) |
-| `self und read` | `All(Self, Level(read))` |
-| `public`, `public (gültiges Refresh-Token und DPoP-Beweis der Familie)` | `Public` |
-| `self oder manage` | `Any(Self, Cap(manage))` |
+| `self or owner`, `owner or self`, `owner; self for own token`, `owner; self for own tokens`, `self (data subject) or owner` | `Any(Self, Owner)` |
+| `agent-self`, `agent-self (runner of the environment)` | `AgentSelf` |
+| `auth`, `auth (person with an active device, agent, app with events:subscribe)` | `Auth` |
+| `owner or manage`, `owner or manage (on host only owner)` | `Any(Owner, Cap(manage))`; a grant on a host target has no path in the tree, so only `Owner` passes there (see Resolution) |
+| `self and read` | `All(Self, Level(read))` |
+| `public`, `public (valid refresh token and DPoP proof of the family)` | `Public` |
+| `self or manage` | `Any(Self, Cap(manage))` |
 | `human` | `Human` |
-| `agent-self bzw. app-self mit Scope`, `agent-self bzw. app-self`, `agent-self bzw. app-self, Eigentümer des Befehls`, `Autor der Nachricht (agent-self bzw. app-self)` | `Any(AgentSelf, AppSelf)` |
-| `write und self`, `write und Autor` | `All(Level(write), Self)` |
-| `self und write` | `All(Self, Level(write))` |
-| `write und +upload` | `All(Level(write), Cap(upload))` |
-| `write und (Ersteller oder manage oder Bediener-Agent)` | `All(Level(write), Any(Self, Cap(manage), ThreadOperator))` |
-| `trigger und Regeln aus 5` | `Level(trigger)` plus the `agent.invoke` guard |
-| `trigger und (Auslöser des Laufs oder manage)` | `All(Level(trigger), Any(Self, Cap(manage)))` |
-| `read und +export` | `All(Level(read), Cap(export))` |
-| `read bzw. self` | `ByKind{channel: Level(read), user: Self}` |
+| `agent-self or app-self with scope`, `agent-self or app-self`, `agent-self or app-self, owner of the command`, `author of the message (agent-self or app-self)` | `Any(AgentSelf, AppSelf)` |
+| `write and self`, `write and author` | `All(Level(write), Self)` |
+| `self and write` | `All(Self, Level(write))` |
+| `write and +upload` | `All(Level(write), Cap(upload))` |
+| `write and (creator or manage or operator agent)` | `All(Level(write), Any(Self, Cap(manage), ThreadOperator))` |
+| `trigger and rules from 5` | `Level(trigger)` plus the `agent.invoke` guard |
+| `trigger and (triggering person of the run or manage)` | `All(Level(trigger), Any(Self, Cap(manage)))` |
+| `read and +export` | `All(Level(read), Cap(export))` |
+| `read or self` | `ByKind{channel: Level(read), user: Self}` |
 | `participant` | `Participant` |
-| `owner; Bereich mit manage` | `ByKind{instance: Owner, agent: Owner, space: Any(Owner, Cap(manage))}` |
-| `owner oder agent-self oder read auf einem Kanal, den der Agent bedient` | `Any(Owner, AgentSelf, ReadOnOperatedChannel)` |
-| `manage auf Quelle und Ziel` | `All(Cap(manage), TargetCap(manage))` |
-| `human; Apps mit Scope` | `Any(Human, AppKind)` |
-| `auth und self` | `All(Auth, Self)` |
-| `agent-self und wirksamer Bediener` | `ChannelOperator` |
-| `App mit Scope costs:reconcile` | `AppKind` |
-| `(write und Autor) oder manage` | `Any(All(Level(write), Self), Cap(manage))` |
-| `Recht der Zielaktion` | `Preview` |
+| `owner; space with manage` | `ByKind{instance: Owner, agent: Owner, space: Any(Owner, Cap(manage))}` |
+| `owner or agent-self or read on a channel that the agent operates` | `Any(Owner, AgentSelf, ReadOnOperatedChannel)` |
+| `manage on source and target` | `All(Cap(manage), TargetCap(manage))` |
+| `human; apps with scope` | `Any(Human, AppKind)` |
+| `auth and self` | `All(Auth, Self)` |
+| `agent-self and effective operator` | `ChannelOperator` |
+| `app with scope costs:reconcile` | `AppKind` |
+| `(write and author) or manage` | `Any(All(Level(write), Self), Cap(manage))` |
+| `permission of the target action` | `Preview` |
 | `system` | not evaluable: `Authorize` returns an internal error (code `internal`) |
 
 Overrides by action id (they win over the text rule): `message.create`:
@@ -399,9 +399,9 @@ Overrides by action id (they win over the text rule): `message.create`:
 `ByKind{space: Any(Owner, Cap(manage)), channel: Any(Owner, Cap(manage)), host: Owner, principal: Owner}`.
 
 **Deferred entries** (07 section 4.2): the requirement of these actions depends on facts that only
-a later etappe defines. Their entry is `Deferred("<etappe>")`; `Authorize` and `Scope` answer an
-internal error with cause `unknown_action` (as for an unknown action, because no build of this
-etappe may reach them), and `VerifyRegistrations` rejects any route or op that names one:
+a later milestone defines. Their entry is `Deferred("<milestone>")`; `Authorize` and `Scope` answer
+an internal error with cause `unknown_action` (as for an unknown action, because no build of this
+milestone may reach them), and `VerifyRegistrations` rejects any route or op that names one:
 `agent_session.reset`, `agent_session.bind`, `run.followup.create`, `command.autocomplete`,
 `command.invoke`, `interaction.create`, `run.start`, `run.token.renew`, `webhook_out.deliver`,
 `webhook_in.post`, and the terminal actions of 05 section 4.14 `host.read`, `host.manage`,
@@ -456,18 +456,18 @@ thread's channel) is an internal error. A missing thread, channel or space gives
 host (`TargetKind = host`) has no path in the tree (07 section 2.12, 05 R-AZ-24): `Level` and
 `Cap` are false there, so only `Owner` passes.
 
-### Snapshot and effective rights (`domain/snapshot.go`, `domain/effective.go`)
+### Snapshot and effective permissions (`domain/snapshot.go`, `domain/effective.go`)
 
-The snapshot holds the result of 07 section 7.2 "Aufbau" steps 1, 2 and 4 (grants per target,
-owner, `valid_until`) for one principal at one rights version. Following the paragraph "Der Stand
-speichert Stufen je Ziel" of 07 7.2, everything that depends on the structure is applied when a
-path is evaluated: propagation along instance, space and channel, the operator rule (07 2.9), the
-limits for agents and apps (07 2.1) and the archive cap (07 4.5, built in M1-53). DM participation
-(07 7.2 step 3) is read from the resolved channel (path evaluation step 1 below) and, for lists,
-from `StructureSource.DMChannelsOf` per request; this gives the same decisions as storing it and
-also covers a DM created after the snapshot. So a channel created after the snapshot is judged
-correctly by `Authorize` (ruling D5; AZ-P8 proves equivalence with the 07 definition). This ticket
-owns that behaviour; M1-53 only adds an integration test against real channels:
+The snapshot holds the result of 07 section 7.2 "Construction" steps 1, 2 and 4 (grants per target,
+owner, `valid_until`) for one principal at one permission version. Following the paragraph "The
+snapshot stores levels per target" of 07 7.2, everything that depends on the structure is applied
+when a path is evaluated: propagation along instance, space and channel, the operator rule (07 2.9),
+the limits for agents and apps (07 2.1) and the archive cap (07 4.5, built in M1-53). DM
+participation (07 7.2 step 3) is read from the resolved channel (path evaluation step 1 below) and,
+for lists, from `StructureSource.DMChannelsOf` per request; this gives the same decisions as storing
+it and also covers a DM created after the snapshot. So a channel created after the snapshot is
+judged correctly by `Authorize` (ruling D5; AZ-P8 proves equivalence with the 07 definition). This
+ticket owns that behavior; M1-53 only adds an integration test against real channels:
 
 ```text
 Snapshot {
@@ -490,7 +490,7 @@ target never enter `Instance`, `Spaces` or `Channels`: the host is outside the t
 capability `terminal` gives nothing in it (07 section 2.12, AZ-M60). M2-39 adds a `Hosts` map for
 them; until then the snapshot skips them (test with a host grant row next to an instance grant).
 
-Effective rights on a path (instance, space S, channel C, optional thread T):
+Effective permissions on a path (instance, space S, channel C, optional thread T):
 
 1. dm channel: participant gives `write` and `{upload}`; anyone else nothing (owners too, SR6).
 2. owner: `trigger` and all capabilities.
@@ -498,11 +498,11 @@ Effective rights on a path (instance, space S, channel C, optional thread T):
 4. agents: at least `write` when the principal is `C.EffectiveOperatorID`, or when T is a
    non-main thread with `OperatorAgentID` equal to the principal (07 section 2.9 point 2).
 5. agents and apps: level capped at `write`, caps intersected with `{upload}` (07 section 2.1;
-   this also neutralises a grant whose `subject_kind` does not match the real kind).
-6. `p.ViewAs` set: intersect with the effective rights of that person (snapshot without session,
-   so never owner); `p.ActingFor` set: intersect with the effective rights of the triggering
-   person (no SR9 exceptions yet: stricter until M2). Intersection: lower level, intersection of
-   capabilities, owner only if both are owner.
+   this also neutralizes a grant whose `subject_kind` does not match the real kind).
+6. `p.ViewAs` set: intersect with the effective permissions of that person (snapshot without
+   session, so never owner); `p.ActingFor` set: intersect with the effective permissions of the
+   triggering person (no SR9 exceptions yet: stricter until M2). Intersection: lower level,
+   intersection of capabilities, owner only if both are owner.
 
 ### Cache (`app/cache.go`)
 
@@ -514,14 +514,14 @@ Effective rights on a path (instance, space S, channel C, optional thread T):
   standard library; no new dependency.
 - The visible lists for `Scope` are never stored in the cache entry: they are built per request
   from the snapshot and the current structure (`StructureSource.Channels`, `ChannelsOperatedBy`,
-  `DMChannelsOf`) and memoised only in the request scope (`WithRequestScope`), so a channel or
-  space created without a new rights version appears at once (07 7.2 and 7.4 rule 1).
+  `DMChannelsOf`) and memoized only in the request scope (`WithRequestScope`), so a channel or
+  space created without a new permission version appears at once (07 7.2 and 7.4 rule 1).
 
-### Rights version (`app/version.go`)
+### Permission version (`app/version.go`)
 
 Order of sources: a version pinned with `WithPermissionVersion`; else the memo of the request
 scope (filled by the first read in the request); else a fresh read. The read goes through the
-instance port `instance.Versions` (02 "Ports, Ereignisse und Quellen je Modul"): create it with
+instance port `instance.Versions` (02 "Ports, events and sources per module"): create it with
 `PermissionVersion(ctx) (int64, error)`, implemented with `SELECT value FROM sequence_counters
 WHERE name = 'permission_version'` in the ambient transaction when present. Do not use the
 `Counters` port: its phase guard (M1-15) rejects calls outside the phase hooks. A read failure is
@@ -599,8 +599,8 @@ Point 6 of 05 (interactions) and SR3 rule 2 (foreign thread) come with M2 and V2
 
 `grant.create` (`r.Grant` required; its target must equal the resource, else internal error):
 `domain.CheckCreate(Delegator{IsOwner: snapshot owner after intersections, Level, Caps:
-effective rights on the resource path}, shape)`. `grant.revoke` (`r.Kind == grant`):
-`domain.CheckRevoke` with the existing grant's shape and the effective rights on its target
+effective permissions on the resource path}, shape)`. `grant.revoke` (`r.Kind == grant`):
+`domain.CheckRevoke` with the existing grant's shape and the effective permissions on its target
 path. A non-empty reason gives `forbidden` with that reason.
 
 ### `Scope(ctx, p, a)`
@@ -629,7 +629,7 @@ is correct because no credential can exist before it.
 
 - D1: `authz.CredentialSource` is a fourth source port; identity implements it. Reason: 07
   section 4.2 checks session, device and token on every call and 04 section 8.5 caches that
-  state per rights version; these facts live in identity tables and `PrincipalSource` (M1-26)
+  state per permission version; these facts live in identity tables and `PrincipalSource` (M1-26)
   covers only the principal row.
 - D2: empty sources in `internal/wire` until the owning modules exist (text above).
 - D3: deferred requirement entries (list above) behave like unknown actions and cannot be
@@ -655,7 +655,7 @@ Pure tests run without a database; the test world and fakes live in
     - `TestDeferredActionsGolden` (exactly the ids of the "Deferred entries" list above, compared as a
       set; the golden file copies that list, no count is hard-coded);
     - `TestScopeTableActionsExist`, `TestWritesSetGolden`;
-    - `TestReasonsMatchChapter07`: reads `docs/spec/07-rechte.md`, extracts the first-column
+    - `TestReasonsMatchChapter07`: reads `docs/spec/07-permissions.md`, extracts the first-column
       codes of the table in section 4.1 (between the headings "### 4.1" and "### 4.2"), and
       compares with the `kernel/auditing.Reason` constants that `authz` uses (R-DM-28 keeps the list
       closed by this test; M1-24 has the same test on its side).
@@ -687,13 +687,13 @@ Pure tests run without a database; the test world and fakes live in
       fake `StructureSource` without raising the version;
     - `TestChannelCreatedAfterSnapshotVisibleWithoutNewVersion`: Alex has `read` on space Support;
       warm the cache; add a channel to Support in the fake `StructureSource` without changing the
-      rights version; `Authorize(channel.read)` on it allows, `Scope` lists it in
+      permission version; `Authorize(channel.read)` on it allows, `Scope` lists it in
       `visible_channel_ids` and Support in `fully_visible_space_ids`, and the snapshot was not
       rebuilt (the fake grant store sees no second read);
     - `TestAZP10_ExpiryWithoutJob`: warm cache, advance the clock to exactly `expires_at` of a
       grant and of a membership, no version change: `not_found`.
 6. **Rules** (`internal/authz/app` and `domain`):
-    - owner: `TestSR5_OwnerOnlyInSession` (same owner with a personal token: no owner rights,
+    - owner: `TestSR5_OwnerOnlyInSession` (same owner with a personal token: no owner permissions,
       `user.create` gives `forbidden owner_only`, `identity.link` on the own user gives
       `step_up_not_possible`);
       `TestSR6_OwnerNeverSeesDM`;
@@ -720,7 +720,7 @@ Pure tests run without a database; the test world and fakes live in
       `messages:read` gets empty lists; view as intersects; an agent with `ActingFor` set (built
       directly in the test) gets only channels the triggering person can read too; ascending order; a channel added to
       the fake structure of a space with a space grant appears in the next request's `Scope`
-      without a new rights version (cached snapshot unchanged).
+      without a new permission version (cached snapshot unchanged).
 7. **Cache and version**: version change invalidates; `ValidUntil` boundary; LRU never exceeds
    `authz.snapshot_cache_max_entries` (run with a small value); one version read per request
    scope however many `Authorize` calls (count reads on a fake); pinned version wins.
@@ -777,7 +777,7 @@ make check
 Code, tests and documentation are complete: module README updated, doc comments on every public
 symbol, an ADR if you took an architecture decision beyond this brief and rulings D1 to D6,
 CHANGELOG entry under `Unreleased` in `services/server/CHANGELOG.md`. `make check` is green. An
-independent review and the red team (`docs/quality/red-team-gate.md`, with the M1 "Red Team"
+independent review and the red team (`docs/quality/red-team-gate.md`, with the M1 "Red team"
 points 1, 2 and 5 of `docs/PLAN.md` in mind) have run over the diff with their verdicts recorded
 in the report. Merge locally into the base branch only if both are green; then remove the
 worktree with `git worktree remove`.

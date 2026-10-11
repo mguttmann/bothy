@@ -1,14 +1,14 @@
 # services
 
-Server-Code. Heute nur Planung, kein Code.
+Server code. Today only planning, no code.
 
-| Ordner | Inhalt | Kapitel |
+| Folder | Content | Chapter |
 |---|---|---|
-| `server/` | Der Go-Server als modularer Monolith: ein Binary mit den Rollen `api` und `worker` | [02 Architektur](../docs/spec/02-architektur.md) |
-| `host/` | Host-Dienst `bothy-host` für das Terminal auf angebundenen Rechnern | [24 Terminal](../docs/spec/24-terminal.md) |
+| `server/` | The Go server as a modular monolith: one binary with the roles `api` and `worker` | [02 Architecture](../docs/spec/02-architecture.md) |
+| `host/` | Host service `bothy-host` for the terminal on connected hosts | [24 Terminal](../docs/spec/24-terminal.md) |
 
-Für die Gates ist jedes getrackte `go.mod` unter `services/` ein Go-Modul (Format, Lint,
-Build, Tests mit Abdeckung, Schwachstellen, Lizenzen); Einzelheiten in
-[docs/quality/gates.md](../docs/quality/gates.md). Releases des Servers tragen Tags
-`server/v<version>` und brauchen `server/VERSION`, `server/CHANGELOG.md` und das Ziel
-`release-build` in `server/Makefile` (Kapitel 23, Abschnitt 3).
+For the gates, every tracked `go.mod` under `services/` is a Go module (format, lint,
+build, tests with coverage, vulnerabilities, licenses); details in
+[docs/quality/gates.md](../docs/quality/gates.md). Releases of the server carry tags
+`server/v<version>` and need `server/VERSION`, `server/CHANGELOG.md` and the target
+`release-build` in `server/Makefile` (chapter 23, section 3).

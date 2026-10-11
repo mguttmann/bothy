@@ -1,6 +1,6 @@
 # M1-57: Reading history
 
-Status: ready | Depends on: M1-56 | Etappe: M1
+Status: ready | Depends on: M1-56 | Milestone: M1
 
 ## Goal
 
@@ -14,37 +14,37 @@ search build on this read path.
 
 ## Read first
 
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 "M1 Fundament" (row M1-57,
-  "Teststrategie", "Red Team").
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 "M1 Foundation" (row M1-57,
+  "Test strategy", "Red team").
 - `docs/briefs/README.md` ("How a brief runs").
-- `docs/spec/00-glossar.md`: Löschmarke, Sequenz je Thread, Nachricht.
-- `docs/spec/02-architektur.md`: "Module des Monolithen" (4.1 Regeln, 4.3 Ports, 4.4 Erlaubte
-  Abhängigkeiten, 4.5 Querschnitts-Ports), "Schichten im Modul", "Code-Layout", "Request-Pfad"
-  (9.1 to 9.3), "Fehler- und Timeout-Strategie" (14.1).
-- `docs/spec/03-datenmodell.md`: "Grundsätze" (items 7, 12, 13), tables `messages` and `threads`
-  (sections 4.5 and 4.6), "Transaktionsregeln" 6.2.
-- `docs/spec/04-sync-protokoll.md`: "Umschlag (Envelope)" (payload rule 2, `truncated`),
-  "Thread-Sequenz", "Zustellgarantie", "Reihenfolge".
-- `docs/spec/05-aktionen.md`: section 1 rules 1 to 3; "Ziel einer Ressource"; "Entscheidung";
+- `docs/spec/00-glossary.md`: Tombstone, Thread sequence, Message.
+- `docs/spec/02-architecture.md`: "Modules of the monolith" (4.1 Rules, 4.3 Ports, 4.4 Allowed
+  dependencies, 4.5 Cross-cutting ports), "Layers within a module", "Code layout", "Request path"
+  (9.1 to 9.3), "Error and timeout strategy" (14.1).
+- `docs/spec/03-data-model.md`: "Principles" (items 7, 12, 13), tables `messages` and `threads`
+  (sections 4.5 and 4.6), "Transaction rules" 6.2.
+- `docs/spec/04-sync-protocol.md`: "Envelope" (payload rule 2, `truncated`),
+  "Thread sequence", "Delivery guarantee", "Ordering".
+- `docs/spec/05-actions.md`: section 1 rules 1 to 3; "Target of a resource"; "Decision";
   table 4.6 (`thread.read`) and table 4.7 (`message.read`); section 9 item 4.
-- `docs/spec/06-api.md`: "Grundregeln", "Autorisierung in der API", "Fehler", "Paginierung"
-  (items 2, 3, 5), "Nebenläufigkeit" (item 1), "Endpunkte" > "Messages", "Konfigurationswerte
-  dieses Kapitels".
-- `docs/spec/07-rechte.md`: "Die Funktion `authorize`" (4.1, 4.2, 4.3), "Abfrage-Muster" (7.4,
-  rules 1 and 3), "Testmatrix" (AZ-M52) and "Pflicht-Tests" (AZ-P4, AZ-P12).
-- `docs/spec/19-sicherheit.md`: "Logs ohne Geheimnisse und ohne Inhalte" (SEC-LOG-3, SEC-LOG-4).
+- `docs/spec/06-api.md`: "Basic rules", "Authorization in the API", "Errors", "Pagination"
+  (items 2, 3, 5), "Concurrency" (item 1), "Endpoints" > "Messages", "Configuration values of
+  this chapter".
+- `docs/spec/07-permissions.md`: "The `authorize` function" (4.1, 4.2, 4.3), "Query pattern" (7.4,
+  rules 1 and 3), "Test matrix" (AZ-M52) and "Required tests" (AZ-P4, AZ-P12).
+- `docs/spec/19-security.md`: "Logs without secrets and without content" (SEC-LOG-3, SEC-LOG-4).
 - `docs/api/openapi.yaml`: operations `listThreadMessages`, `getMessage`; schemas `Message`,
   `MessagePage`, `PageLimit`, `Problem`; parameters `ThreadIdPath`, `MessageIdPath`.
-- ADRs in `docs/adr/`: `0008-hexagonale-module-und-gepruefte-abhaengigkeitsregeln.md`,
-  `0013-spec-first-openapi-31-und-asyncapi-30-normativ.md`,
-  `0015-fehlerformat-rfc-9457-idempotenz-paginierung.md`,
-  `0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`; ADR 0053 (no JSON
+- ADRs in `docs/adr/`: `0008-hexagonal-modules-and-checked-dependency-rules.md`,
+  `0013-spec-first-openapi-31-and-asyncapi-30-normative.md`,
+  `0015-error-format-rfc-9457-idempotency-pagination.md`,
+  `0017-one-authorization-function-404-instead-of-403-mandatory-registration.md`; ADR 0053 (no JSON
   `null`) once M1-16 has written it.
 - Code of earlier tickets: `services/server/internal/messaging` (M1-56: tables, the `Message`
   representation, `createMessage`), the `chat` port `Threads` (M1-55), `internal/kernel/authorize`
   (`Authorizer`, `Scope`; M1-28), `internal/platform/httpserver` (problem format, ETag helper;
   M1-18), `internal/platform/pg/pgtest` (M1-12), `services/server/api/operations.yaml` (M1-17),
-  and the integration test world of 07 "Beispiele" used by M1-54 and M1-56.
+  and the integration test world of 07 "Examples" used by M1-54 and M1-56.
 - `docs/quality/gates.md`, `CONTRIBUTING.md`, `docs/quality/red-team-gate.md`,
   `services/server/internal/messaging/README.md`.
 - Tables: `messages` (read). Actions: `thread.read`, `message.read`.
@@ -65,32 +65,32 @@ search build on this read path.
    merge.
 6. Test first: write the failing test, record it red, then make it green (PLAN section 3 item 3).
 7. No en dash or em dash characters in anything you write; use a hyphen or rephrase.
-8. White label: no company, person, host or domain names; examples use Alex, Sam, Robin, the areas
+8. White label: no company, person, host or domain names; examples use Alex, Sam, Robin, the spaces
    Support, Marketing, Engineering, Research and `example.com`.
 9. Limits and windows only through named configuration keys from
    `docs/operations/configuration.md`; prose and comments name the key, never the number.
 10. History of one thread over `thread_seq`: at most one of `before_seq`, `after_seq`,
     `around_seq`; without any, the newest page; items ascending; tombstones included; the window
-    rules of `around_seq` and the flags as in 06 "Paginierung" item 5 (openapi
-    `listThreadMessages`; 04 "Thread-Sequenz").
-11. Keyset pages over `thread_seq`: a new message never changes an existing page (06 "Paginierung"
+    rules of `around_seq` and the flags as in 06 "Pagination" item 5 (openapi
+    `listThreadMessages`; 04 "Thread sequence").
+11. Keyset pages over `thread_seq`: a new message never changes an existing page (06 "Pagination"
     items 2 and 5; ADR 0015).
 12. A deleted message keeps its row and `thread_seq` and is returned as a tombstone without content
-    (03 "Grundsätze" item 7; 03 `messages`).
-13. No read right gives `404 not_found`, identical for foreign and unknown IDs in status, body and
-    headers (05 rule 2; 07 4.2; 02 "404 statt 403"; AZ-M52; AZ-P4).
+    (03 "Principles" item 7; 03 `messages`).
+13. No read permission gives `404 not_found`, identical for foreign and unknown IDs in status, body
+    and headers (05 rule 2; 07 4.2; 02 "404 instead of 403"; AZ-M52; AZ-P4).
 14. Every SQL statement on messaging tables carries `channel_id = ANY($visible)` (directly or via a
     join to `messages`), and every returned element is checked again with `authorize` (07 7.4 rules
     1 and 3; preparation for AZ-P12).
 15. Lists cut `content_md` above `message.list_content_max_bytes` at a UTF-8 character boundary and
     set `content_truncated: true`; `getMessage` always returns the full content and is the reload
-    path for content cut in lists and events (06 "Paginierung" item 5, 04 "Umschlag" rule 2,
+    path for content cut in lists and events (06 "Pagination" item 5, 04 "Envelope" rule 2,
     `Message.content_truncated`). Reason: one page stays below `api.page_size_max` times that
     value.
 16. `limit` defaults to `api.page_size_default`; larger values are capped at `api.page_size_max`,
-    not rejected (06 "Paginierung" item 3).
-17. `getMessage` returns `ETag: "<version>"` (06 "Nebenläufigkeit" item 1); no JSON `null` in any
-    response (06 "Grundregeln").
+    not rejected (06 "Pagination" item 3).
+17. `getMessage` returns `ETag: "<version>"` (06 "Concurrency" item 1); no JSON `null` in any
+    response (06 "Basic rules").
 18. No message content, query strings or display names in logs or telemetry (SEC-LOG-3,
     SEC-LOG-4).
 
@@ -123,7 +123,7 @@ established inside `internal/messaging`; the names below are the required public
    `TestQueriesCarryVisibleChannelPredicate` (Design note 7).
 7. `api/operations.yaml`: move `listThreadMessages` and `getMessage` from `later` into the built
    list (format from M1-17); regenerate with the generator `make codegen-check` verifies.
-8. Docs: `internal/messaging/README.md` (keep its German text and section structure; status,
+8. Docs: `internal/messaging/README.md` (keep its English text and section structure; status,
    operations, queries), `services/server/CHANGELOG.md` (entry under `Unreleased`).
 
 ## Out of scope
@@ -234,7 +234,7 @@ Unit (`internal/messaging/domain`, table-driven):
   from below), anchor beyond the last message, `L = 1`, `L = 2`, empty thread.
 - `TestPageFlags`: every mode with full, partial and empty results.
 
-Integration against PostgreSQL 18 (`pgtest`, real `authz` sources, world of 07 "Beispiele"; HTTP
+Integration against PostgreSQL 18 (`pgtest`, real `authz` sources, world of 07 "Examples"; HTTP
 through the real chain on `127.0.0.1:0` with real authentication as in M1-48 and M1-56):
 
 - `TestListThreadMessages_NewestPage`: 30 messages, `limit=10` gives 21 to 30,

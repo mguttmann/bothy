@@ -1,6 +1,6 @@
 # M1-64: Gateway connection and session
 
-Status: ready | Depends on: M1-19, M1-21, M1-63 | Etappe: M1
+Status: ready | Depends on: M1-19, M1-21, M1-63 | Milestone: M1
 
 ## Goal
 
@@ -8,18 +8,18 @@ The WebSocket endpoint `/api/v1/gateway` accepts connections, checks the `Origin
 
 ## Read first
 
-- `docs/spec/04-sync-protokoll.md`: 'Rahmen auf dem WebSocket'; 'WebSocket-Gateway' with 'Endpunkt und Version', 'Ops', 'Lebenszyklus', 'Schließ-Codes', 'Neu verbinden'; 'resync_required'; 'Sync-Epoche'; 'Widerruf von Sitzung, Gerät oder Prinzipal'; sequence diagram 'Wiederverbinden mit Nachholen'; decisions R-SY-01, R-SY-14; configuration table.
-- `docs/spec/05-aktionen.md`: `gateway.connect` ('Persönliche Daten, Benachrichtigung, Sync'), 'WebSocket-Ops und Aktion', 'Rate-Limit-Klassen' (`rl.gateway_connect`), 'Entscheidung' (pending devices, `4016`), 'Scopes für Apps'.
-- `docs/spec/02-architektur.md`: 'Gateway', 'Schichten im Modul' rule 4 (only `gateway/adapters` imports `github.com/coder/websocket`), 'Erlaubte Abhängigkeiten' (`gateway`), 'Querschnitts-Ports' (`actor.Authenticator`, `Authorizer`), 'Kette im api-Knoten', 'Nachweis der Prüfung', 'Fristen' (`gateway.write_timeout`), 'Panics', R-AR-11.
-- `docs/spec/06-api.md`: 'Echtzeit-Gateway', 'WebSocket-Ops und Ereignisse', 'DPoP', 'Rate-Limits' point 3, 'Fehler' point 6.
-- `docs/spec/08-identitaet.md`: 'Zugriffstoken', 'DPoP', 'API-Tokens für Agenten, Apps und Werkzeuge', 'Bestätigung' (pending devices); configuration `auth.dpop_nonce_ttl`, `auth.clock_leeway`, `auth.dpop_proof_max_age`.
-- `docs/spec/07-rechte.md`: 'Prinzipal-Kontext', 'Entscheidungen und Gründe'.
-- `docs/spec/19-sicherheit.md`: 'CORS und WebSocket-Herkunft' (SEC-CORS-3), input rules SEC-IN-1 to SEC-IN-3, tests SEC-T04 and SEC-T10.
-- `docs/spec/16-betrieb.md`: `server.public_url`.
+- `docs/spec/04-sync-protocol.md`: 'Frames on the WebSocket'; 'WebSocket gateway' with 'Endpoint and version', 'Ops', 'Lifecycle', 'Close codes', 'Reconnecting'; 'resync_required'; 'Sync epoch'; 'Revocation of a session, device or principal'; sequence diagram 'Reconnect with catch-up'; decisions R-SY-01, R-SY-14; configuration table.
+- `docs/spec/05-actions.md`: `gateway.connect` ('Personal data, notifications, sync'), 'WebSocket ops and action', 'Rate-limit classes' (`rl.gateway_connect`), 'Decision' (pending devices, `4016`), 'Scopes for apps'.
+- `docs/spec/02-architecture.md`: 'Gateway', 'Layers within a module' rule 4 (only `gateway/adapters` imports `github.com/coder/websocket`), 'Allowed dependencies' (`gateway`), 'Cross-cutting ports' (`actor.Authenticator`, `Authorizer`), 'Chain in the api node', 'Proof of the check', 'Deadlines' (`gateway.write_timeout`), 'Panics', R-AR-11.
+- `docs/spec/06-api.md`: 'Real-time gateway', 'WebSocket ops and events', 'DPoP', 'Rate limits' point 3, 'Errors' point 6.
+- `docs/spec/08-identity.md`: 'Access token', 'DPoP', 'API tokens for agents, apps and tools', 'Approval' (pending devices); configuration `auth.dpop_nonce_ttl`, `auth.clock_leeway`, `auth.dpop_proof_max_age`.
+- `docs/spec/07-permissions.md`: 'Principal context', 'Decisions and reasons'.
+- `docs/spec/19-security.md`: 'CORS and WebSocket origin' (SEC-CORS-3), input rules SEC-IN-1 to SEC-IN-3, tests SEC-T04 and SEC-T10.
+- `docs/spec/16-operations.md`: `server.public_url`.
 - `docs/api/asyncapi.yaml`: channel `gateway`, `x-close-codes`, messages `op.*`. `docs/api/openapi.yaml`: schemas `GatewayHello`, `GatewayIdentify`, `GatewayClientInfo`, `GatewayReady`, `GatewayResume`, `GatewayResumed`, `GatewayHeartbeat`, `GatewayHeartbeatAck`, `GatewayReauth`, `GatewayReauthRequired`, `GatewayResyncRequired`, `GatewayError`, `Snapshot`.
 - `docs/observability/signals.md` (gateway rows, span `gateway.connect`); `docs/security/threat-model.md` 'Gateway (WebSocket)'.
 - ADRs 0013, 0017, 0020 and, if present, 0052, 0053, 0061.
-- `docs/PLAN.md`: 'Arbeitsweise je Ticket', M1 rows M1-33, M1-34, M1-44, M1-63, M1-65 to M1-67, M2-07, M2-20.
+- `docs/PLAN.md`: 'Way of working per ticket', M1 rows M1-33, M1-34, M1-44, M1-63, M1-65 to M1-67, M2-07, M2-20.
 - Code: `internal/kernel/actor`, `internal/kernel/authorize`, `internal/identity` (DPoP verifier and nonce source of M1-33, authenticator of M1-34, API tokens of M1-44, test helpers), `internal/platform/ratelimit` (M1-19), `internal/platform/httpserver` (M1-18, M1-21), `internal/sync` ports `Snapshot` and `CatchUp` (M1-63), `api/rest` (generated `Gateway*` types), `api/routes`, `architecture/modules.yaml`.
 
 ## Fixed requirements that apply
@@ -45,22 +45,22 @@ Rules for every brief:
 7. No en dash and no em dash in any file you write; the `text-rules` pre-commit hook rejects them. Use a hyphen or rephrase.
 8. White label: examples and test data use `example.com` and the people Alex, Sam and Robin; no company, host or personal names, no paths under a home directory.
 9. Limits, windows and thresholds only through named configuration keys listed in `docs/operations/configuration.md`; code comments and docs name the key, never the number.
-10. Specification first: a change to behaviour, API, event, right or configuration updates `docs/spec/` or `docs/api/` in the same change. The core contract (`docs/spec/00-glossar.md`, `03-datenmodell.md`, `04-sync-protokoll.md`, `05-aktionen.md`) is not edited by this ticket.
+10. Specification first: a change to behaviour, API, event, permission or configuration updates `docs/spec/` or `docs/api/` in the same change. The core contract (`docs/spec/00-glossary.md`, `03-data-model.md`, `04-sync-protocol.md`, `05-actions.md`) is not edited by this ticket.
 
 Product requirements implemented here:
 
-11. One endpoint `wss://<host>/api/v1/gateway`; JSON text frames `{op, d}` of at most `sync.ws_max_frame_bytes` (04 'Endpunkt und Version', 'Rahmen auf dem WebSocket').
-12. The upgrade checks only the origin; a foreign `Origin` gives `403` before the upgrade (19 SEC-CORS-3, 04 'Lebenszyklus' step 1).
+11. One endpoint `wss://<host>/api/v1/gateway`; JSON text frames `{op, d}` of at most `sync.ws_max_frame_bytes` (04 'Endpoint and version', 'Frames on the WebSocket').
+12. The upgrade checks only the origin; a foreign `Origin` gives `403` before the upgrade (19 SEC-CORS-3, 04 'Lifecycle' step 1).
 13. `hello` immediately with `heartbeat_interval_ms`, `resume_window_ms`, `protocol_versions`, `dpop_nonce`, `server_time`, `sync_epoch` (04, schema `GatewayHello`).
 14. Authentication only in `identify`, `resume` and `reauth`, with the DPoP proof bound to the nonce from `hello` (R-SY-01, 08 'DPoP'); then `authorize(principal, gateway.connect, instance)`; a pending device gets `4016`.
-15. `ready` with session id, principal, device, rights version, head and snapshot; `resume` within `sync.resume_window`, otherwise `4006`; heartbeats with `4009` after `sync.heartbeat_miss_limit` missed; `reauth_required` `sync.reauth_lead_time` before token expiry and `4011` without a valid `reauth` (04 'Lebenszyklus').
-16. All close codes of 04 'Schließ-Codes'; this ticket owns `4001` to `4009`, `4011` and `4016` to `4018`, and uses `4000`, `4012` and `4014` where named below. The causes at connection setup map to codes as the table in 04 'Schließ-Codes' says.
-17. Rate-limit class `rl.gateway_connect`; when exhausted the gateway closes with `4008` (06 'Rate-Limits' point 3).
+15. `ready` with session id, principal, device, permission version, head and snapshot; `resume` within `sync.resume_window`, otherwise `4006`; heartbeats with `4009` after `sync.heartbeat_miss_limit` missed; `reauth_required` `sync.reauth_lead_time` before token expiry and `4011` without a valid `reauth` (04 'Lifecycle').
+16. All close codes of 04 'Close codes'; this ticket owns `4001` to `4009`, `4011` and `4016` to `4018`, and uses `4000`, `4012` and `4014` where named below. The causes at connection setup map to codes as the table in 04 'Close codes' says.
+17. Rate-limit class `rl.gateway_connect`; when exhausted the gateway closes with `4008` (06 'Rate limits' point 3).
 18. Gateway sessions live only in process memory; a resume on another node gives `4006` (R-AR-11).
-19. Every op goes through `authorize` with its action from 05 'WebSocket-Ops und Aktion' (B7).
-20. One connection per device: a new `identify` or `resume` of the same device closes the older open connection with `4017` (04 'Endpunkt und Version').
-21. Agents and apps get no `reauth_required`; at the `expires_at` of their API token the server closes with `4011` (04 'Lebenszyklus' step 6).
-22. The connection registers with delivery before `head_seq` is read (04 'Lebenszyklus' step 4).
+19. Every op goes through `authorize` with its action from 05 'WebSocket ops and action' (B7).
+20. One connection per device: a new `identify` or `resume` of the same device closes the older open connection with `4017` (04 'Endpoint and version').
+21. Agents and apps get no `reauth_required`; at the `expires_at` of their API token the server closes with `4011` (04 'Lifecycle' step 6).
+22. The connection registers with delivery before `head_seq` is read (04 'Lifecycle' step 4).
 
 ## Scope
 
@@ -68,10 +68,10 @@ All paths under `services/server/` unless noted.
 
 Create:
 
-- `internal/gateway/domain/closecodes.go`: one constant per code of 04 'Schließ-Codes' with the name from `x-close-codes` and a doc comment with the client reaction; `internal/gateway/domain/session.go`: session states `awaiting_identify`, `ready`, `detached` (disconnected, resumable) and `closed` with the allowed transitions.
+- `internal/gateway/domain/closecodes.go`: one constant per code of 04 'Close codes' with the name from `x-close-codes` and a doc comment with the client reaction; `internal/gateway/domain/session.go`: session states `awaiting_identify`, `ready`, `detached` (disconnected, resumable) and `closed` with the allowed transitions.
 - `internal/gateway/app/`: `sessions.go` (in-memory store per process with resume window and sweeper), `dispatcher.go` (op registry `Register(op string, action authorize.Action, handler OpHandler)`, unknown op handling, proof that each handler called `authorize` with its declared action), `identify.go`, `resume.go`, `heartbeat.go`, `reauth.go`, `delivery.go` (interface `Delivery { Register(*Session); Attach(ctx, *Session, fromSeq int64) error; Detach(*Session) }`; `Register` comes before the head is read, note 11), and the outgoing ports the use cases need (authenticator, authorizer, nonce source, rate limiter, `sync.Snapshot`, `sync.CatchUp`, instance epoch, clock).
 - `internal/gateway/adapters/ws/`: the HTTP handler for `GET /api/v1/gateway` with `github.com/coder/websocket`, the reader and writer goroutines, the frame codec on the generated `Gateway*` types of `api/rest` with the strict JSON decoder of M1-18.
-- `internal/gateway/adapters/wstest/`: a Go test client for this and later tickets: `Dial(ctx, baseURL string, opts ...Option) (*Client, error)`, `Hello() GatewayHello`, `Identify(ctx, IdentifyParams) (GatewayReady, error)`, `Resume(...)`, `Send(op string, d any) error`, `Next(ctx) (op string, d json.RawMessage, err error)`, `ExpectClose(ctx) (code int, reason string, err error)`, and an automatic heartbeat loop whose first heartbeat waits a uniformly random share of `heartbeat_interval_ms` (04 'Lebenszyklus' step 5).
+- `internal/gateway/adapters/wstest/`: a Go test client for this and later tickets: `Dial(ctx, baseURL string, opts ...Option) (*Client, error)`, `Hello() GatewayHello`, `Identify(ctx, IdentifyParams) (GatewayReady, error)`, `Resume(...)`, `Send(op string, d any) error`, `Next(ctx) (op string, d json.RawMessage, err error)`, `ExpectClose(ctx) (code int, reason string, err error)`, and an automatic heartbeat loop whose first heartbeat waits a uniformly random share of `heartbeat_interval_ms` (04 'Lifecycle' step 5).
 - `internal/gateway/README.md` (status, ops, close codes owned, sessions, configuration, dependencies).
 
 Change:
@@ -79,9 +79,9 @@ Change:
 - `architecture/modules.yaml`: allow `github.com/coder/websocket` for `gateway/adapters` only; regenerate `.go-arch-lint.yml`; `go.mod` and `go.sum` with the module pinned to a full release version (MIT-compatible ISC license, allowed in `quality/licenses/allowed.txt`).
 - `internal/wire`: the gateway route on the public listener for roles `api` and `all`, the registration of the ops `identify`, `resume`, `heartbeat`, `reauth`, the sweeper in the lifecycle, and a `Delivery` binding that does nothing until M1-65 replaces it (doc comment names M1-65).
 - `services/server/api/operations.yaml`: new section `gateway_ops` with `enabled` (`identify`, `resume`, `heartbeat`, `reauth`) and `later` (`focus`, `typing.start`, `typing.stop`: M1-66; `ack`, `run.update`, `command.autocomplete_result`: M2; `stats.subscribe`, `stats.unsubscribe`: M6, ticket M6-15), P-04. The dispatcher registers exactly the enabled ops; a gate check (the one M1-17 built for operations) also verifies that every op of the section is a client-to-server op of the channel `gateway` in `asyncapi.yaml` and that none is missing. The terminal channels (`terminalStream`, `hostControl`, `hostData`) are not gateway ops and stay out of this list; their handlers come with M2 (M2-43, M2-44).
-- Route registry (`internal/platform/httpserver` and the registration test of M1-25): register `GET /api/v1/gateway` with action `gateway.connect` and class `rl.gateway_connect`, marked as authorized in-band, so AZ-P1 counts it and the proof check of 02 'Nachweis der Prüfung' does not require a route-level `authorize` for the `101` response. Add that marker if the registry has none, with a test that only this route uses it.
+- Route registry (`internal/platform/httpserver` and the registration test of M1-25): register `GET /api/v1/gateway` with action `gateway.connect` and class `rl.gateway_connect`, marked as authorized in-band, so AZ-P1 counts it and the proof check of 02 'Proof of the check' does not require a route-level `authorize` for the `101` response. Add that marker if the registry has none, with a test that only this route uses it.
 - `internal/kernel/actor` and `internal/identity`, only if needed: if `actor.Authenticator` accepts only an `*http.Request`, add a transport-neutral method `AuthenticateCredentials(ctx, actor.Credentials{Scheme, Token, DPoPProof, Method, URL string; ExpectNonce bool}) (actor.Actor, error)` and implement the HTTP path on top of it, with tests in identity. Expose the current server DPoP nonce through the identity port (M1-33 source) if it is not exposed.
-- `docs/api/openapi.yaml` (W7, SEC-IN-1; 06 "Grundregeln" row Unbekanntes): `additionalProperties: false` on every schema of a client-to-server frame (`GatewayIdentify` with `GatewayClientInfo`, `GatewayResume`, `GatewayHeartbeat`, `GatewayReauth`, `GatewayFocus`, `GatewayTyping`, `GatewayAck`, `GatewayRunUpdate`, `GatewayAutocompleteResult`), closed the same way M1-18 closes request schemas; extend the M1-18 generator check "request schemas closed" to these schemas; `make api-lint` green.
+- `docs/api/openapi.yaml` (W7, SEC-IN-1; 06 "Basic rules" row Unknown): `additionalProperties: false` on every schema of a client-to-server frame (`GatewayIdentify` with `GatewayClientInfo`, `GatewayResume`, `GatewayHeartbeat`, `GatewayReauth`, `GatewayFocus`, `GatewayTyping`, `GatewayAck`, `GatewayRunUpdate`, `GatewayAutocompleteResult`), closed the same way M1-18 closes request schemas; extend the M1-18 generator check "request schemas closed" to these schemas; `make api-lint` green.
 - `services/server/CHANGELOG.md`; `docs/DECISIONS.md`.
 
 ## Out of scope
@@ -110,19 +110,19 @@ Change:
 
 Upgrade and frames
 
-1. `GET /api/v1/gateway` exists only on the public listener. It passes the chain steps panic, correlation, span and header limits (02 'Kette im api-Knoten' steps 1 to 3). If an `Origin` header is present and its scheme, host and port differ from the origin of `server.public_url`, answer `403` with problem code `forbidden` before the upgrade (SEC-CORS-3). Nothing else is checked at the upgrade. Accept with compression disabled (memory per idle connection, `perf.ws_idle_conn_mem_max`) and with `OriginPatterns` set to the host of `server.public_url`; never use the option that turns origin verification off.
+1. `GET /api/v1/gateway` exists only on the public listener. It passes the chain steps panic, correlation, span and header limits (02 'Chain in the api node' steps 1 to 3). If an `Origin` header is present and its scheme, host and port differ from the origin of `server.public_url`, answer `403` with problem code `forbidden` before the upgrade (SEC-CORS-3). Nothing else is checked at the upgrade. Accept with compression disabled (memory per idle connection, `perf.ws_idle_conn_mem_max`) and with `OriginPatterns` set to the host of `server.public_url`; never use the option that turns origin verification off.
 2. Send `hello` right after the upgrade: `heartbeat_interval_ms` from `sync.heartbeat_interval`, `resume_window_ms` from `sync.resume_window`, `protocol_versions: [1]`, `dpop_nonce` = the current server nonce from identity (valid `auth.dpop_nonce_ttl`; the current and the previous nonce are accepted, 08 'DPoP'), `server_time`, `sync_epoch`.
 3. Frames: text only. Read each message through a streaming reader limited to `sync.ws_max_frame_bytes` plus one byte; a larger frame closes with `4002` and reason `frame_too_large`. Binary frames, invalid JSON, duplicate keys, invalid UTF-8, a missing `op`, a `d` that does not match its schema and unknown members in `d` (Ruling W7) close with `4002`.
-4. Before a successful `identify` or `resume`, any other known op closes with `4003`; an unknown op closes with `4001` at any time. Without `identify` or `resume` within `sync.identify_timeout` the server closes with `4003` (04 'Schließ-Codes').
+4. Before a successful `identify` or `resume`, any other known op closes with `4003`; an unknown op closes with `4001` at any time. Without `identify` or `resume` within `sync.identify_timeout` the server closes with `4003` (04 'Close codes').
 5. Ops in `gateway_ops.later` (`focus`, `typing.start`, `typing.stop` until M1-66; `ack`, `run.update`, `command.autocomplete_result` until M2; `stats.subscribe`, `stats.unsubscribe` until M6) are treated as unknown (`4001`). The dispatcher takes each op's action from the generated mapping in `api/routes`; after a handler returns, it checks that `authorize` was called with that action, otherwise it closes with `4000` and raises the alarm counter used by the HTTP proof check.
 
 identify
 
 6. Exactly one of `access_token` and `api_token`, otherwise `4002`. `protocol_version` not in `[1]` gives `4007`.
-7. Authenticate with `actor.Authenticator`: token, DPoP proof, method `GET`, HTU `https://<host and port of server.public_url>/api/v1/gateway` (the HTTPS form even behind TLS termination, 04 'Lebenszyklus' step 3), nonce required. People must send `device_id` equal to the token's device claim. API tokens need a proof when the token has `dpop_jkt`.
+7. Authenticate with `actor.Authenticator`: token, DPoP proof, method `GET`, HTU `https://<host and port of server.public_url>/api/v1/gateway` (the HTTPS form even behind TLS termination, 04 'Lifecycle' step 3), nonce required. People must send `device_id` equal to the token's device claim. API tokens need a proof when the token has `dpop_jkt`.
 8. Rate limit `rl.gateway_connect` through `platform/ratelimit`, keyed by the verified device id (people) or token id (agents and apps), checked after the credentials are verified so that nobody can drain another device's bucket. Exhausted: close `4008` with reason `retry_after=<seconds>`.
 9. Then `authorize(actor, gateway.connect, instance)`.
-10. Outcome to close code (04 'Schließ-Codes', table of causes at connection setup):
+10. Outcome to close code (04 'Close codes', table of causes at connection setup):
 
 | Outcome | Close |
 |---|---|
@@ -141,7 +141,7 @@ identify
 heartbeat, reauth, resume
 
 14. `heartbeat {last_seq}` (at least 0): answer `heartbeat_ack {server_time}` and check `authorize(actor, gateway.connect, instance)` from the cache; a revoked session, device, token or principal closes with `4012`. The server closes with `4009` when no heartbeat arrived for `sync.heartbeat_interval` times (`sync.heartbeat_miss_limit` + 1) since `ready`, `resumed` or the last heartbeat; the extra interval absorbs the client's random delay of the first heartbeat. The member `agent` is accepted and ignored until M2-20.
-15. One connection per device (04 'Endpunkt und Version'): the session store keeps an index device id to open connection. A new `identify` or `resume` of a device closes the older connection with `4017` before the new one gets `ready` or `resumed`. Connections of agents and apps have no device and are not affected (their consumer rule is M2-07). Across api nodes the rule needs `cluster.mode = multi` (M7-17).
+15. One connection per device (04 'Endpoint and version'): the session store keeps an index device id to open connection. A new `identify` or `resume` of a device closes the older connection with `4017` before the new one gets `ready` or `resumed`. Connections of agents and apps have no device and are not affected (their consumer rule is M2-07). Across api nodes the rule needs `cluster.mode = multi` (M7-17).
 16. People: send `reauth_required {expires_at, dpop_nonce}` `sync.reauth_lead_time` before the access token expires. `reauth {access_token, dpop}` is authenticated like `identify`; the new token must belong to the same principal, device and auth session, otherwise close `4004`. An invalid token or proof answers `error {op: reauth, code}` with the problem code and the connection stays. When the current token expires without a successful `reauth`, close `4011`. Agents and apps get no `reauth_required`; at the API token's `expires_at` the server closes with `4011`.
 17. `resume {gateway_session_id, access_token or api_token, dpop, cursor, sync_epoch}` on a new connection after `hello`: an unknown session, a session detached longer than `sync.resume_window` and a session of another principal or device all close with `4006`, identically. Authenticate, rate limit and authorize as in notes 7 to 10. If the session's old connection is still open, close it with `4017` first (same device, note 15; `4006` would make the old client reconnect and push out the new one). Send `resumed {gateway_session_id, head_seq, sync_epoch}` and continue as in note 12.
 18. Sessions: a per-process map; a detached session keeps its id and data for `sync.resume_window`; a sweeper started and stopped by the lifecycle removes expired ones.
@@ -202,9 +202,9 @@ Commands that must pass, from the repository root:
 
 - Code and tests as specified; doc comment on every public symbol (purpose, parameters, return value, errors, example where useful); comments explain why.
 - `internal/gateway/README.md` written; READMEs of `identity` and `platform/httpserver` updated if they changed.
-- Rulings of note 24 recorded in `docs/DECISIONS.md` (one row each with reason). If the implementation adds a threat that `docs/security/threat-model.md` section 'Gateway (WebSocket)' does not list (for example connections held unauthenticated until `sync.identify_timeout`), add the row with its countermeasure.
+- Rulings of note 24 recorded in `docs/DECISIONS.md` (one row each with reason). If the implementation adds a threat that `docs/security/threat-model.md` section 'Gateway (WebSocket)' does not list (for example connections held unauthenticated until `sync.identify_timeout`), add the row with its mitigation.
 - `services/server/CHANGELOG.md` entry under 'Unreleased'.
-- An ADR only if you take an architecture decision beyond this brief (MADR 4 as in `docs/adr/0000-vorlage-madr-4.md`, headings English, text German, next free number, `make adr-index`).
+- An ADR only if you take an architecture decision beyond this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, headings and text in English, next free number, `make adr-index`).
 - `make check` green.
 - An independent code review over the diff, then the red team gate (`docs/quality/red-team-gate.md`, verdict `JA` or `NEIN`); on `NEIN` fix with a test per finding and have the delta checked again. Record both verdicts.
 - Merge locally into the base branch only if review, red team and `make check` are green; then `git worktree remove`.

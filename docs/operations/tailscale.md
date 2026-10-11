@@ -1,58 +1,58 @@
-# Betrieb mit Tailscale
+# Operations with Tailscale
 
-Status: Entwurf M0. Tailscale ist eine dokumentierte Option, kein Zwang (B9). Regeln:
-[16-betrieb.md](../spec/16-betrieb.md) 4.3. Identitätsanbieter `trusted_header`: Kapitel 08.
+Status: draft M0. Tailscale is a documented option, not a requirement (B9). Rules:
+[16-operations.md](../spec/16-operations.md) 4.3. Identity provider `trusted_header`: chapter 08.
 
-## 1. Wann diese Option
+## 1. When to use this option
 
-Die Instanz ist nur im Tailnet erreichbar; Tailscale liefert TLS und die Identität der Menschen.
-Es gibt keinen öffentlichen Hostnamen und keinen eigenen Reverse-Proxy.
+The instance is reachable only in the tailnet; Tailscale provides TLS and the identity of the people.
+There is no public hostname and no own reverse proxy.
 
-Folgen, die vorher klar sein müssen:
+Consequences that must be clear beforehand:
 
-1. Passkeys in nativen Apple-Apps brauchen eine öffentlich erreichbare Associated Domain; eine
-   reine Tailnet-Domain reicht im Normalbetrieb nicht (Baseline R-Passkeys, Beleg
-   https://developer.apple.com/documentation/xcode/supporting-associated-domains, abgerufen
-   2026-10-10) [belegt]. Step-up und Gerätebindung laufen darum über den Geräteschlüssel.
-2. Die Notification Service Extension holt den Inhalt eines Push über die normale API. Ist das VPN
-   auf dem Gerät gerade nicht verbunden, bleibt der neutrale Platzhalter stehen (R-Push).
-3. Getaggte Geräte und Funnel liefern keine Identitäts-Kopfzeilen
-   (https://tailscale.com/kb/1312/serve, abgerufen 2026-10-10) [belegt]. Agenten-Adapter melden
-   sich darum mit ihrem API-Token an, nicht über Kopfzeilen.
-4. Gerätenamen mit HTTPS-Zertifikat erscheinen im öffentlichen Certificate-Transparency-Log
-   (https://tailscale.com/kb/1153/enabling-https, abgerufen 2026-10-10) [belegt]. `TS_HOSTNAME`
-   neutral wählen.
-5. Der Tarif des Tailnets (Zahl der Menschen, gewerbliche Nutzung) ist eine Entscheidung des
-   Owners (https://tailscale.com/pricing, abgerufen 2026-10-10) [belegt].
+1. Passkeys in native Apple apps need a publicly reachable Associated Domain; a
+   pure tailnet domain is not enough in normal operation (Baseline R-Passkeys, source
+   https://developer.apple.com/documentation/xcode/supporting-associated-domains, retrieved
+   2026-10-10) [verified]. Step-up and device binding therefore run via the device key.
+2. The Notification Service Extension fetches the content of a push via the normal API. If the VPN
+   on the device is not connected at that moment, the neutral placeholder stays (R-Push).
+3. Tagged devices and Funnel deliver no identity headers
+   (https://tailscale.com/kb/1312/serve, retrieved 2026-10-10) [verified]. Agent adapters therefore
+   log in with their API token, not via headers.
+4. Device names with an HTTPS certificate appear in the public Certificate Transparency log
+   (https://tailscale.com/kb/1153/enabling-https, retrieved 2026-10-10) [verified]. Choose a
+   neutral `TS_HOSTNAME`.
+5. The plan of the tailnet (number of people, commercial use) is a decision of the
+   owner (https://tailscale.com/pricing, retrieved 2026-10-10) [verified].
 
-## 2. Aufbau im Compose-Stack
+## 2. Setup in the Compose stack
 
-Profil `tailscale` statt `direct`:
+Profile `tailscale` instead of `direct`:
 
-1. Der Dienst `tailscale` (Image `tailscale/tailscale`) meldet sich mit `TS_AUTHKEY` einmal an und
-   hält seinen Zustand im Volume `tailscale-state` (`TS_AUTH_ONCE=true`).
-2. `TS_SERVE_CONFIG` (in `compose.yaml` als `configs`-Eintrag) leitet HTTPS 443 an
-   `http://127.0.0.1:8080` weiter und verbietet Funnel.
-3. `api-tailscale` teilt den Netz-Namespace des Sidecars (`network_mode: service:tailscale`) und
-   lauscht öffentlich nur auf `127.0.0.1:8080`. Kein anderer Container und kein anderer Host
-   erreicht diesen Listener.
-4. Der Sidecar läuft mit Kernel-Netz (`TS_USERSPACE=false`, Gerät `/dev/net/tun`, Capability
-   `NET_ADMIN`), wie im Beispiel von Tailscale. Dann ist Punkt 3 eine Eigenschaft des Kernels:
-   Pakete, die über `tailscale0` ankommen, erreichen keinen Socket, der nur an `127.0.0.1`
-   gebunden ist. Ob der Userspace-Modus eingehende Verbindungen an Loopback-Ports weiterreicht,
-   ist nicht dokumentiert (https://tailscale.com/kb/1112/userspace-networking, abgerufen
-   2026-10-10, beschreibt nur ausgehenden Verkehr) [belegt]; darum kein Userspace-Modus.
-   Ob die Docker-VM auf dem Mac `/dev/net/tun` bereitstellt, prüft der Portabilitätstest
-   [vermutet].
-5. Der interne Listener (`:8081`) ist für Dienste im Stack unter dem Namen `api` erreichbar (Alias
-   am Sidecar). Er vertraut keinen Kopfzeilen (R-OP-01); über das Tailnet sperrt ihn die
-   Richtlinie aus Abschnitt 3.
+1. The service `tailscale` (image `tailscale/tailscale`) logs in once with `TS_AUTHKEY` and
+   keeps its state in the volume `tailscale-state` (`TS_AUTH_ONCE=true`).
+2. `TS_SERVE_CONFIG` (in `compose.yaml` as a `configs` entry) forwards HTTPS 443 to
+   `http://127.0.0.1:8080` and forbids Funnel.
+3. `api-tailscale` shares the network namespace of the sidecar (`network_mode: service:tailscale`)
+   and its public listener listens only on `127.0.0.1:8080`. No other container and no other host
+   reaches this listener.
+4. The sidecar runs with kernel networking (`TS_USERSPACE=false`, device `/dev/net/tun`, capability
+   `NET_ADMIN`), as in the example from Tailscale. Then item 3 is a property of the kernel:
+   packets that arrive via `tailscale0` reach no socket that is bound only to `127.0.0.1`.
+   Whether userspace mode forwards incoming connections to loopback ports
+   is not documented (https://tailscale.com/kb/1112/userspace-networking, retrieved
+   2026-10-10, describes only outgoing traffic) [verified]; therefore no userspace mode.
+   Whether the Docker VM on the Mac provides `/dev/net/tun` is checked by the portability test
+   [assumed].
+5. The internal listener (`:8081`) is reachable for services in the stack under the name `api` (alias
+   on the sidecar). It trusts no headers (R-OP-01); over the tailnet, the
+   policy from section 3 blocks it.
 
-Belege für die Variablen und das Muster (abgerufen 2026-10-10):
-https://tailscale.com/docs/features/containers/docker/docker-params und das Beispiel
-https://github.com/tailscale-dev/docker-guide-code-examples (`07-ts-actual-server`) [belegt].
+Sources for the variables and the pattern (retrieved 2026-10-10):
+https://tailscale.com/docs/features/containers/docker/docker-params and the example
+https://github.com/tailscale-dev/docker-guide-code-examples (`07-ts-actual-server`) [verified].
 
-Kommandozeile ohne Container (z. B. Host-Installation ohne Compose):
+Command line without containers (for example a host installation without Compose):
 
 ```
 tailscale serve --bg --https=443 127.0.0.1:8080
@@ -60,41 +60,41 @@ tailscale serve status
 tailscale serve --https=443 off
 ```
 
-Flags laut https://tailscale.com/docs/reference/tailscale-cli/serve (abgerufen 2026-10-10)
-[belegt]; die Kombination in der ersten Zeile ist zusammengesetzt, nicht wörtlich belegt
-[abgeleitet]. Ohne Container muss der Server selbst nur auf `127.0.0.1` lauschen, und kein anderer
-Prozess des Hosts darf Kopfzeilen an diesen Port schicken können.
+Flags according to https://tailscale.com/docs/reference/tailscale-cli/serve (retrieved 2026-10-10)
+[verified]; the combination in the first line is composed, not literally sourced
+[derived]. Without containers, the server itself must listen only on `127.0.0.1`, and no other
+process of the host may be able to send headers to this port.
 
-## 3. Tailnet-Richtlinie (Pflicht)
+## 3. Tailnet policy (required)
 
-1. Das Bothy-Gerät bekommt einen Tag (z. B. `tag:bothy`), damit es nicht an einem Menschen hängt.
-2. Grants erlauben auf `tag:bothy` nur `tcp:443` für die Gruppen, die Bothy nutzen. Alle anderen
-   Ports sind verboten.
-3. Grund: Zweite Sperre neben dem Kernel-Netz. Erreicht ein Tailnet-Gerät nur 443, landet jede
-   Anfrage bei `tailscale serve`, das eingehende Identitäts-Kopfzeilen entfernt und selbst setzt.
-   Der Portabilitätstest prüft, dass außer 443 nichts antwortet.
-4. Funnel bleibt aus (`AllowFunnel: false`).
+1. The Bothy device gets a tag (for example `tag:bothy`) so that it is not tied to a person.
+2. Grants allow only `tcp:443` on `tag:bothy` for the groups that use Bothy. All other
+   ports are forbidden.
+3. Reason: a second barrier next to kernel networking. If a tailnet device reaches only 443, every
+   request lands at `tailscale serve`, which removes incoming identity headers and sets them itself.
+   The portability test checks that nothing except 443 answers.
+4. Funnel stays off (`AllowFunnel: false`).
 
-## 4. Identität
+## 4. Identity
 
-| Kopfzeile | Verwendung |
+| Header | Use |
 |---|---|
-| `Tailscale-User-Login` | Subjekt in `user_identities` des Anbieters `trusted_header` |
-| `Tailscale-User-Name` | Anzeigename bei der Anlage, nur wenn `allow_provisioning` |
-| `Tailscale-User-Profile-Pic` | ignoriert (der Server lädt keine fremden URLs) |
-| `Tailscale-App-Capabilities` | nicht ausgewertet; Rechte vergibt nur `authorize` (B7) |
+| `Tailscale-User-Login` | subject in `user_identities` of the provider `trusted_header` |
+| `Tailscale-User-Name` | display name on creation, only if `allow_provisioning` |
+| `Tailscale-User-Profile-Pic` | ignored (the server loads no foreign URLs) |
+| `Tailscale-App-Capabilities` | not evaluated; only `authorize` grants permissions (B7) |
 
-Ohne `Tailscale-User-Login` (getaggtes Gerät, Funnel) ist die Anfrage unangemeldet. Nicht-ASCII
-kann RFC-2047-kodiert sein; der Server dekodiert vor dem Vergleich.
+Without `Tailscale-User-Login` (tagged device, Funnel), the request is unauthenticated. Non-ASCII
+can be RFC-2047-encoded; the server decodes it before the comparison.
 
-WebSocket über `tailscale serve`: nicht in der Dokumentation belegt [vermutet]. Der
-Portabilitätstest mit Profil `tailscale` prüft das Gateway ausdrücklich.
+WebSocket via `tailscale serve`: not confirmed in the documentation [assumed]. The
+portability test with profile `tailscale` checks the gateway explicitly.
 
-## 5. Betrieb
+## 5. Operations
 
-| Aufgabe | Weg |
+| Task | Way |
 |---|---|
-| Zertifikat | `tailscaled` erneuert es bei `serve` selbst; ein Fehler zeigt sich als Einbruch im SLO `bothy-sync/reconnect` |
-| Gerät verloren, neu anmelden | Volume `tailscale-state` löschen, neuen `TS_AUTHKEY` setzen, altes Gerät im Tailnet entfernen |
-| Update | `BOTHY_TAILSCALE_VERSION` anheben, `docker compose up -d tailscale` |
-| Fehlersuche | `docker compose exec tailscale tailscale status`, `tailscale serve status` |
+| Certificate | `tailscaled` renews it itself with `serve`; a failure shows as a drop in the SLO `bothy-sync/reconnect` |
+| Device lost, log in again | delete the volume `tailscale-state`, set a new `TS_AUTHKEY`, remove the old device in the tailnet |
+| Update | raise `BOTHY_TAILSCALE_VERSION`, `docker compose up -d tailscale` |
+| Troubleshooting | `docker compose exec tailscale tailscale status`, `tailscale serve status` |

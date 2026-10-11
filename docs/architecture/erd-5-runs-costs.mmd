@@ -1,0 +1,126 @@
+%% ERD part 5: modules runs and billing. Source: 03-data-model.md, 4.8 and 4.9.
+%% Pure log columns (created_by, updated_by, granted_by, revoked_by and similar) point to
+%% principals(id) and are not drawn as a relationship.
+%% Tables of other modules only with their key.
+erDiagram
+  direction LR
+  runs {
+    uuid id PK
+    uuid thread_id FK
+    uuid agent_id FK
+    uuid agent_session_id FK
+    text trigger_kind "message, command, interaction"
+    uuid triggering_message_id FK
+    uuid triggering_command_id FK
+    uuid triggering_interaction_id FK
+    uuid triggered_by FK "person who triggered"
+    text state "queued, running, waiting_input, completed, failed, cancelled"
+    bigint version
+    text billing_mode_expected
+    text billing_mode_used
+    uuid invocation_jti UK
+    uuid started_jti
+    uuid renewed_from_jti
+    uuid dev_environment_id FK
+  }
+  run_steps {
+    uuid id PK
+    uuid run_id FK
+    integer ordinal "UK with run_id"
+    uuid parent_step_id FK
+    text kind "tool_call, status, subagent, workflow, background_job"
+  }
+  run_followups {
+    uuid run_id PK, FK
+    uuid message_id PK, FK "UK"
+    text state "queued, delivered, absorbed, deferred, discarded"
+  }
+  message_components {
+    uuid id PK
+    uuid message_id FK
+    text custom_id "UK with message_id"
+    text type "button, select, form"
+    uuid run_id FK
+    text state "active, used, expired, disabled"
+  }
+  interactions {
+    uuid id PK
+    uuid component_id FK
+    uuid message_id FK
+    uuid principal_id FK
+    uuid client_interaction_id "UK with principal_id"
+    text state
+  }
+  price_table {
+    uuid id PK
+    text provider
+    text model
+    text unit
+    timestamptz valid_from
+  }
+  cost_entries {
+    uuid id PK
+    uuid run_id FK
+    uuid agent_id FK
+    uuid thread_id FK
+    uuid channel_id FK
+    uuid space_id FK
+    uuid agent_session_id FK
+    text billing_mode
+    bigint amount_micros
+    text source "adapter_reported, computed, unpriced, reconciled"
+    boolean is_estimate
+    uuid supersedes_id FK
+  }
+  threads {
+    uuid id PK
+  }
+  channels {
+    uuid id PK
+  }
+  spaces {
+    uuid id PK
+  }
+  agents {
+    uuid principal_id PK
+  }
+  agent_sessions {
+    uuid id PK
+  }
+  messages {
+    uuid id PK
+  }
+  principals {
+    uuid id PK
+  }
+  commands {
+    uuid id PK
+  }
+  dev_environments {
+    uuid id PK
+  }
+
+  threads ||--o{ runs : "runs"
+  agents ||--o{ runs : "executes"
+  agent_sessions |o--o{ runs : "in session"
+  messages |o--o{ runs : "triggers"
+  interactions |o--o{ runs : "triggers"
+  commands |o--o{ runs : "triggers"
+  dev_environments |o--o{ runs : "runs in"
+  principals ||--o{ runs : "triggering person"
+  runs ||--o{ run_steps : "steps"
+  run_steps |o--o{ run_steps : "substep"
+  runs ||--o{ run_followups : "follow-ups"
+  messages ||--o| run_followups : "is follow-up"
+  messages ||--o{ message_components : "components"
+  runs |o--o{ message_components : "question"
+  message_components ||--o{ interactions : "operation"
+  messages ||--o{ interactions : "on"
+  principals ||--o{ interactions : "operates"
+  runs ||--o{ cost_entries : "costs"
+  agents ||--o{ cost_entries : "copy"
+  threads ||--o{ cost_entries : "copy"
+  channels ||--o{ cost_entries : "copy"
+  spaces |o--o{ cost_entries : "copy"
+  agent_sessions |o--o{ cost_entries : "session"
+  cost_entries |o--o| cost_entries : "supersedes"

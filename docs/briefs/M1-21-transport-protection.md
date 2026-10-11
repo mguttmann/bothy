@@ -1,43 +1,44 @@
 # M1-21: Transport protection
 
-Status: ready | Depends on: M1-18 | Etappe: M1
+Status: ready | Depends on: M1-18 | Milestone: M1
 
 ## Goal
 
 After this ticket the public listener of `bothy serve` accepts plaintext HTTP only from loopback
 peers and from peers listed in `server.trusted_proxies`, and closes every other plaintext
-connection at accept time, before a byte is read. An operator who configures a certificate gets
-server-side TLS with TLS 1.2 as the floor and the Go standard cipher selection. Every response of
-both listeners carries the headers of SEC-HDR-1 and SEC-HDR-2, including HSTS with
-`http.hsts_max_age` whenever the instance is served over HTTPS. One list, `server.trusted_proxies`,
-then decides both who may send plaintext and whose forwarded headers count; this closes the server
-side of threat T-NW-02.
+connection at accept time, before a byte is read. An instance operator who configures a
+certificate gets server-side TLS with TLS 1.2 as the floor and the Go standard cipher selection.
+Every response of both listeners carries the headers of SEC-HDR-1 and SEC-HDR-2, including HSTS
+with `http.hsts_max_age` whenever the instance is served over HTTPS. One list,
+`server.trusted_proxies`, then decides both who may send plaintext and whose forwarded headers
+count; this closes the server side of threat T-NW-02.
 
 ## Read first
 
-- `docs/spec/19-sicherheit.md`: "2. Transport" (SEC-TLS-1 to SEC-TLS-3), "3. HTTP-Sicherheitskopfzeilen"
-  (SEC-HDR-1, SEC-HDR-2), "9. Logs ohne Geheimnisse und ohne Inhalte" (SEC-LOG-5), "14. Tests"
-  (SEC-T01, SEC-T03, SEC-T17), "15. Entscheidungen dieses Kapitels" (R-SE-01), "16. Konfigurationswerte
-  dieses Kapitels" (`http.hsts_max_age`).
-- `docs/spec/16-betrieb.md`: "4. Netz" ("4.1 Grundregeln", "4.2 Zwei Listener", "4.3 Rand und Identität"),
-  "5.1 Konfiguration", "5.2 Secret-Provider", "6.1 Umgebungen", "14. Konfigurationswerte dieses Kapitels"
+- `docs/spec/19-security.md`: "2. Transport" (SEC-TLS-1 to SEC-TLS-3), "3. HTTP security headers"
+  (SEC-HDR-1, SEC-HDR-2), "9. Logs without secrets and without content" (SEC-LOG-5), "14. Tests"
+  (SEC-T01, SEC-T03, SEC-T17), "15. Decisions of this chapter" (R-SE-01),
+  "16. Configuration values of this chapter" (`http.hsts_max_age`).
+- `docs/spec/16-operations.md`: "4. Network" ("4.1 Basic rules", "4.2 Two listeners", "4.3 Edge and identity"),
+  "5.1 Configuration", "5.2 Secret provider", "6.1 Environments", "14. Configuration values of this chapter"
   (`server.listen_addr`, `server.internal_listen_addr`, `server.public_url`, `server.trusted_proxies`,
-  `secrets.cache_ttl`), "15. Entscheidungen" (R-OP-01, R-OP-02).
-- `docs/spec/02-architektur.md`: "9. Request-Pfad" ("9.1 Kette im api-Knoten"), "13. Konfigurationsladen",
-  "14.1 Fehlerarten", "14.4 Ausfall einer Abhängigkeit" (row Secret-Provider), "15. Start und Graceful
-  Shutdown" ("15.1 Start", "15.2 Health").
-- `docs/spec/08-identitaet.md`: "2.4 Vertrauenswürdiger Proxy-Header" (rules 1 and 2), "13. Schutz der
-  Anmeldung" (client IP rule), "15. Tests" (ID-T08, ID-T25).
-- `docs/spec/06-api.md`: "2. Grundregeln" (row "Client-IP"), "5. Fehler".
-- `docs/PLAN.md`: section 7, rows M1-18, M1-21, M1-43, M1-64, M1-73; "Bekannte Widersprüche, die M1
-  auflöst" (W1 row "vertraute Proxys", W4); section 19 decisions P-08, P-09, P-10, P-11.
-- ADR 0011 (`docs/adr/0011-12-factor-konfiguration-und-secret-provider.md`).
-- `docs/security/threat-model.md`: "2. Systemgrenzen" (TB1, TB2), "5.3 Netzrand und Proxy", register
+  `secrets.cache_ttl`), "15. Decisions" (R-OP-01, R-OP-02).
+- `docs/spec/02-architecture.md`: "9. Request path" ("9.1 Chain in the api node"), "13. Configuration loading",
+  "14.1 Error kinds", "14.4 Failure of a dependency" (row secret provider),
+  "15. Start and graceful shutdown" ("15.1 Start", "15.2 Health").
+- `docs/spec/08-identity.md`: "2.4 Trusted proxy header" (rules 1 and 2), "13. Login protection"
+  (client IP rule), "15. Tests" (ID-T08, ID-T25).
+- `docs/spec/06-api.md`: "2. Basic rules" (row "Client IP"), "5. Errors".
+- `docs/PLAN.md`: section 7, rows M1-18, M1-21, M1-43, M1-64, M1-73;
+  "Known contradictions that M1 resolves" (W1 row "trusted proxies", W4); section 19 decisions P-08,
+  P-09, P-10, P-11.
+- ADR 0011 (`docs/adr/0011-12-factor-configuration-and-secret-provider.md`).
+- `docs/security/threat-model.md`: "2. System boundaries" (TB1, TB2), "5.3 Network edge and proxy", register
   rows T-NW-02 and T-ID-03.
 - `infra/compose/compose.yaml` (anchor `x-server-env`, services `api` and `api-tailscale`),
-  `infra/compose/.env.example`, `docs/operations/install-compose.md` "5.1 Profil direct",
+  `infra/compose/.env.example`, `docs/operations/install-compose.md` "5.1 Profile direct",
   `docs/operations/tailscale.md`, `docs/operations/configuration.md` sections 2, 4 (generated) and
-  9 ("Compose-Variablen").
+  9 ("Compose variables").
 - Code merged by earlier tickets: `services/server/internal/platform/config` (M1-07),
   `internal/platform/secrets` (M1-09), `internal/platform/lifecycle` and `internal/platform/health`
   (M1-11), `internal/platform/httpserver` (M1-18: middleware chain, security headers, client IP
@@ -84,8 +85,8 @@ side of threat T-NW-02.
 
 All Go paths are below `services/server/`.
 
-1. **Specification (already decided):** 16 "4.1 Grundregeln" rule 1, "4.3 Rand und Identität",
-   "5.2 Secret-Provider" and "14" (`server.tls_cert_ref`, `server.tls_key_ref`); 19 SEC-TLS-1 to
+1. **Specification (already decided):** 16 "4.1 Basic rules" rule 1, "4.3 Edge and identity",
+   "5.2 Secret provider" and "14" (`server.tls_cert_ref`, `server.tls_key_ref`); 19 SEC-TLS-1 to
    SEC-TLS-3, R-SE-08 and R-SE-09; `docs/operations/configuration.md` sections 4 and 9
    (`BOTHY_TRUSTED_PROXIES`); `install-compose.md` "5.1"; `infra/compose/.env.example` and the
    passthrough `BOTHY_SERVER__TRUSTED_PROXIES` in service `api` of `infra/compose/compose.yaml`.
@@ -93,7 +94,7 @@ All Go paths are below `services/server/`.
 2. **Configuration schema** (`internal/platform/config`, typed config in `internal/wire`): add
    `server.tls_cert_ref` and `server.tls_key_ref` (type `secret_ref`, default empty) and, if not
    yet present, `http.hsts_max_age` (type duration, default `31536000s`, whole seconds, `>= 0`).
-   Cross checks at load time (02 "13. Konfigurationsladen" step 4): both TLS keys set or both
+   Cross checks at load time (02 "13. Configuration loading" step 4): both TLS keys set or both
    empty; with TLS set, `server.public_url` must use `https`. Error messages name key and source,
    never a value.
 3. **Transport** in `internal/platform/httpserver` (new files `transport.go`, `tlscert.go`, tests):
@@ -114,7 +115,7 @@ All Go paths are below `services/server/`.
    never keep two. Fix every response kind of design note 7 that lacks SEC-HDR-1, SEC-HDR-2 or a
    problem body.
 5. **Lifecycle** (`internal/platform/lifecycle`): open the public listener through `ListenPublic`;
-   load and validate TLS material at start step 2 ("Geheimnisse auflösen", 02 "15.1 Start") so that
+   load and validate TLS material at start step 2 ("Resolve secrets", 02 "15.1 Start") so that
    bad material aborts before the database wait. The internal listener keeps its plain
    `net.Listen`.
 6. **Compose contract**: already in place (Scope 1). Add a test that reads
@@ -129,8 +130,8 @@ All Go paths are below `services/server/`.
 
 ## Out of scope
 
-- The `trusted_header` loopback rule, ID-T08 and the second half of SEC-T01 ("Start mit
-  Proxy-Header-Treiber und Nicht-Loopback-Listener"): M1-43 with ruling W4.
+- The `trusted_header` loopback rule, ID-T08 and the second half of SEC-T01 ("start with
+  the proxy header driver and a non-loopback listener"): M1-43 with ruling W4.
 - Client IP from `Forwarded` and `X-Forwarded-For` and ID-T25: M1-18. Reuse its parsed
   `server.trusted_proxies`; do not parse the list a second time.
 - Rate limits and the `429` response: M1-19. If `internal/platform/ratelimit` is merged when you
@@ -151,8 +152,8 @@ All Go paths are below `services/server/`.
 - Never push, tag, open pull requests or create remote repositories.
 - Do not modify files outside the scope above, except `docs/DECISIONS.md`,
   `services/server/CHANGELOG.md` and generated references named above.
-- The core contract (`docs/spec/00-glossar.md`, `03-datenmodell.md`, `04-sync-protokoll.md`,
-  `05-aktionen.md`) is read-only. If this ticket needs something it lacks, stop with
+- The core contract (`docs/spec/00-glossary.md`, `03-data-model.md`, `04-sync-protocol.md`,
+  `05-actions.md`) is read-only. If this ticket needs something it lacks, stop with
   `Verdict: BLOCKED` (P-11).
 - Follow the host rules supplied by the launcher. Tests bind only `127.0.0.1` and port 0.
 - Stop only processes you started, by PID. Temporary directories only via `mktemp -d` (in Go
@@ -167,10 +168,10 @@ All Go paths are below `services/server/`.
 1. **Which listener.** Transport protection applies to the public listener
    (`server.listen_addr`). The internal listener (`server.internal_listen_addr`) stays plaintext
    without a peer filter: it serves only `/healthz`, `/readyz` and in-stack webhooks, evaluates no
-   identity or forwarded headers, and is never published on the host (16 "4.1 Grundregeln" rule 1,
-   "4.2 Zwei Listener"). Filtering it would force operators to add the whole Compose network to
-   `server.trusted_proxies`, which would also make forwarded headers from any container count on
-   the public listener (R-SE-09).
+   identity or forwarded headers, and is never published on the host (16 "4.1 Basic rules" rule 1,
+   "4.2 Two listeners"). Filtering it would force instance operators to add the whole Compose
+   network to `server.trusted_proxies`, which would also make forwarded headers from any container
+   count on the public listener (R-SE-09).
 2. **Plaintext mode** (both TLS refs empty). On every accepted connection take
    `conn.RemoteAddr()`, parse it as `netip.AddrPort`, apply `Addr().Unmap()`. Allowed if the
    address is loopback (`127.0.0.0/8`, `::1`) or contained in a prefix of
@@ -195,9 +196,10 @@ All Go paths are below `services/server/`.
    `Error` per failed version (02 "14.4": rotation failure keeps the old value).
 6. **HSTS.** On every response of both listeners, when the scheme of `server.public_url` is
    `https` (which TLS mode enforces): `Strict-Transport-Security: max-age=<http.hsts_max_age in
-   whole seconds>`. No `includeSubDomains` (other subdomains belong to the operator) and no
-   `preload` (not reversible). With an `http` public URL (loopback development, 16 "6.1
-   Umgebungen") the header is absent. `max-age=0` is valid and tells browsers to forget the rule.
+   whole seconds>`. No `includeSubDomains` (other subdomains belong to the instance operator) and
+   no `preload` (not reversible). With an `http` public URL (loopback development, 16
+   "6.1 Environments") the header is absent. `max-age=0` is valid and tells browsers to forget the
+   rule.
 7. **Response kinds that SEC-T03 covers in M1.** Set the SEC-HDR-1 headers in the outermost
    middleware before calling the next handler, so that responses written by inner components
    inherit them. Never set a `Server` header. Kinds: `2xx` JSON of an operation; problem bodies
@@ -207,7 +209,7 @@ All Go paths are below `services/server/`.
    shutting down; `/healthz` and `/readyz` on the internal listener in both states and an unknown
    path there. Where an inner component writes a body that is not `application/problem+json`
    (for example the default `ServeMux` 404 or 405 text, or `http.TimeoutHandler` HTML), replace it
-   with the problem body of 06 "5. Fehler".
+   with the problem body of 06 "5. Errors".
 8. **One source for trusted proxies.** `TransportConfig.TrustedProxies` is the same parsed slice
    that M1-18 uses for the client IP. Bare addresses in the configuration count as `/32` or
    `/128`, following the type M1-07 defines.
@@ -284,7 +286,7 @@ config --quiet` once with `COMPOSE_PROFILES=direct` and once with `COMPOSE_PROFI
   (purpose, parameters, return value, errors), package doc for `httpserver`, README and spec
   updates, `docs/DECISIONS.md` entries, CHANGELOG entry under `Unreleased` in
   `services/server/CHANGELOG.md`. No ADR is needed unless you take an architecture decision beyond
-  the rulings listed here; then write one (MADR 4, `docs/adr/0000-vorlage-madr-4.md`).
+  the rulings listed here; then write one (MADR 4, `docs/adr/0000-template-madr-4.md`).
 - `make check` is green.
 - Independent review: `make review` plus a code review over the diff; then the red team of
   `docs/quality/red-team-gate.md` over the diff with verdict `JA` or `NEIN`, recorded in the

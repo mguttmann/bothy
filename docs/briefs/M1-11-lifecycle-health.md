@@ -1,6 +1,6 @@
 # M1-11: Lifecycle, listeners, health and shutdown
 
-Status: ready | Depends on: M1-10, M1-12, M1-22 | Etappe: M1
+Status: ready | Depends on: M1-10, M1-12, M1-22 | Milestone: M1
 
 Note on dependencies: M1-12 is needed because start steps 3 and 4 of 02 "Start" (database, schema
 version) and the readiness check `database` are part of the ticket; M1-22 because `bothy
@@ -19,21 +19,21 @@ R-AR-13, R-AR-16, R-AR-17).
 
 ## Read first
 
-- `docs/spec/02-architektur.md`: "Rollen eines Prozesses", "Befehle des Binarys", "Code-Layout",
-  "Ausfall einer Abhängigkeit", "Panics", "Start", "Health", "Shutdown", "Leistungsziele"
-  (`perf.startup_ready_max`, `perf.idle_rss_max`), "Entscheidungen dieses Kapitels" (R-AR-13,
-  R-AR-16, R-AR-17), "Konfigurationswerte dieses Kapitels" (`http.*`, `startup.*`,
+- `docs/spec/02-architecture.md`: "Roles of a process", "Commands of the binary", "Code layout",
+  "Failure of a dependency", "Panics", "Start", "Health", "Shutdown", "Performance targets"
+  (`perf.startup_ready_max`, `perf.idle_rss_max`), "Decisions of this chapter" (R-AR-13,
+  R-AR-16, R-AR-17), "Configuration values of this chapter" (`http.*`, `startup.*`,
   `shutdown.*`).
-- `docs/spec/16-betrieb.md`: "Bausteine einer Instanz", "Zwei Listener", "Rand und Identität"
+- `docs/spec/16-operations.md`: "Building blocks of an instance", "Two listeners", "Edge and identity"
   (readiness error `trusted_header_requires_loopback`, implemented later by M1-43), "Upgrade",
-  "Konfigurationswerte dieses Kapitels" (`server.role`, `server.listen_addr`,
+  "Configuration values of this chapter" (`server.role`, `server.listen_addr`,
   `server.internal_listen_addr`).
-- `docs/spec/05-aktionen.md`: R-AZ-22 (health has no action).
-- `docs/spec/18-release.md` "Server-Images" (`bothy healthcheck` in a shell-less image).
-- `docs/spec/19-sicherheit.md` "Logs ohne Geheimnisse und ohne Inhalte" (SEC-LOG-5).
+- `docs/spec/05-actions.md`: R-AZ-22 (health has no action).
+- `docs/spec/18-release.md` "Server images" (`bothy healthcheck` in a shell-less image).
+- `docs/spec/19-security.md` "Logs without secrets and without content" (SEC-LOG-5).
 - `infra/compose/compose.yaml` (`x-server-healthcheck`, `x-api`, `worker`),
-  `docs/operations/install-compose.md` "Prüfung nach dem Start", `infra/helm/README.md`.
-- `docs/PLAN.md`: "Arbeitsweise je Ticket", M1 row M1-11, contradictions W2 and W3.
+  `docs/operations/install-compose.md` "Check after the start", `infra/helm/README.md`.
+- `docs/PLAN.md`: "Way of working per ticket", M1 row M1-11, contradictions W2 and W3.
 - Code you build on: `internal/platform/otel` (M1-10: `Setup`, `Shutdown`, `NewCommandLogger`,
   `ServerErrorLog`), `internal/platform/pg` (M1-12: `Open`, `WaitReady`, `Ping`, `CheckSchema`,
   `RequiredSchemaVersion`, `migrations.FS`), `internal/platform/secrets` (M1-09),
@@ -59,7 +59,7 @@ R-AR-13, R-AR-16, R-AR-17).
 8. White label: no company, person, host or domain names except `example.com`, people Alex, Sam,
    Robin; no paths under a user home directory.
 9. Configuration only through named keys listed in `docs/operations/configuration.md`.
-10. L2 and 16 "Zwei Listener": `/healthz` and `/readyz` only on `server.internal_listen_addr`,
+10. L2 and 16 "Two listeners": `/healthz` and `/readyz` only on `server.internal_listen_addr`,
     never on the public listener; answers carry no detail except the names of failed checks.
 11. 02 "Start": order config and telemetry, secrets, database within `startup.dependency_wait`,
     schema version (abort with hint on an older schema), instance (later), routes (later), role
@@ -67,7 +67,7 @@ R-AR-13, R-AR-16, R-AR-17).
 12. 02 "Health": `/healthz` means the process answers (a failing log tail, hub or River client
     ends the process with exit `1` instead, 02 "Panics"); `/readyz` means start complete, database
     reachable, version fits the schema, signing keys present (M1-32), no shutdown begun. Answer
-    format and status codes: 16 "Zwei Listener".
+    format and status codes: 16 "Two listeners".
 13. 02 "Shutdown": `SIGTERM` and `SIGINT` start it, a second signal ends at once; total budget
     `shutdown.total_timeout`; `api`: ready false, wait `shutdown.drain_delay`, HTTP shutdown with
     `shutdown.http_grace`, close connections (later), stop log tail (later), flush telemetry within
@@ -75,7 +75,7 @@ R-AR-13, R-AR-16, R-AR-17).
     River soft stop (later), telemetry, pool; `all`: api steps, then worker steps, then telemetry
     and pool. The orchestrator waits longer than the total budget (Compose `stop_grace_period`).
 14. R-AR-16: `serve` never runs migrations.
-15. 18 "Server-Images": `bothy healthcheck` replaces shell and curl in the image.
+15. 18 "Server images": `bothy healthcheck` replaces shell and curl in the image.
 16. SEC-LOG-5: no client IP addresses in general logs (also not from `http.Server` error logs).
 
 ## Scope
@@ -118,7 +118,7 @@ All Go paths are relative to `services/server/`.
   `MaxHeaderBytes = http.max_header_bytes`, `ErrorLog = otel.ServerErrorLog(log)`; no
   `ReadTimeout` or `WriteTimeout` (per-route deadlines come with M1-18).
 - `func Internal(reg *health.Registry) *http.ServeMux`: the internal mux; later tickets may add
-  stack-internal webhook routes to it before start (16 "Zwei Listener").
+  stack-internal webhook routes to it before start (16 "Two listeners").
 - Until M1-17 and M1-18 exist, the public listener serves a handler that answers every request
   with `404` and an empty body; M1-18 replaces it.
 
@@ -194,10 +194,10 @@ D1. Start sequence and listeners.
   from these lines), then `server ready` with `bothy.server.role`.
 - Database down at start: `WaitReady` retries until `startup.dependency_wait`, then exit `1`.
   Database lost later: readiness check `database` fails (`503`), the process keeps running and
-  recovers without intervention (02 "Ausfall einer Abhängigkeit").
+  recovers without intervention (02 "Failure of a dependency").
 - Older schema: exit `1` with the hint text from M1-12, no listener left open.
 
-D2. Health answers (16 "Zwei Listener").
+D2. Health answers (16 "Two listeners").
 
 - `Content-Type: application/json`, `Cache-Control: no-store`.
 - Success: `200` with `{"status":"ok"}`.
@@ -238,7 +238,7 @@ D5. `bothy healthcheck`.
 
 D6. W2 and W3.
 
-- W2 is resolved in 02 ("Rollen eines Prozesses", R-AR-13: health on the internal listener, metrics
+- W2 is resolved in 02 ("Roles of a process", R-AR-13: health on the internal listener, metrics
   only over OTLP). In `services/server/README.md` describe `health` as `/healthz` and `/readyz` on
   the internal listener.
 - W3: if the W3 entry from M1-09 is missing in DECISIONS.md, add it (L1 extended by `secrets`,
@@ -321,10 +321,10 @@ make check
   tickets add components and stop steps), `internal/platform/health/README.md` (check names,
   answer format, how to add checks), `internal/platform/httpserver/README.md` (listener part;
   M1-18 extends it), `internal/wire/README.md` (serve assembly and extension points).
-- Spec: 02 "Rollen eines Prozesses", "Befehle des Binarys" (exit codes), "Start", "Health",
-  "Shutdown", R-AR-13 and `shutdown.total_timeout`, 16 "Zwei Listener" (answer format) and the
+- Spec: 02 "Roles of a process", "Commands of the binary" (exit codes), "Start", "Health",
+  "Shutdown", R-AR-13 and `shutdown.total_timeout`, 16 "Two listeners" (answer format) and the
   Compose `stop_grace_period` already say what this ticket builds; change them only if the build
-  proves a statement wrong. Add the `healthcheck` flags to 02 "Befehle des Binarys";
+  proves a statement wrong. Add the `healthcheck` flags to 02 "Commands of the binary";
   `services/server/README.md`.
 - `docs/DECISIONS.md`: W3 (if missing), D4.
 - Configuration reference regenerated without diff.
@@ -338,6 +338,6 @@ make check
 
 Write to `{{REPORT_PATH}}`: first line `Verdict: DONE` or `Verdict: BLOCKED <reason>`; then
 commits, files with line counts, test results with counts (including the red runs), what is not
-proven (for example behaviour under a real orchestrator), follow-ups that could not be done in
+proven (for example behavior under a real orchestrator), follow-ups that could not be done in
 scope with the reason. Then write `{{DONE_PATH}}` with `exit=0 sha=<merge sha>` or
 `exit=1 <reason>`.

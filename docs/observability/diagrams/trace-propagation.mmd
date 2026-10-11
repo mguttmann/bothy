@@ -1,19 +1,19 @@
 sequenceDiagram
     autonumber
     participant App as App (Alex)
-    participant API as api: HTTP-Span
+    participant API as api: HTTP span
     participant DB as PostgreSQL:<br/>event_log
-    participant GW as api: Fan-out-Span
-    participant AD as Adapter:<br/>invoke_agent-Span
-    participant RT as Laufzeit<br/>(TRACEPARENT)
-    App->>API: POST message, traceparent<br/>(Trace-ID T, Sampling entscheidet der Server)
-    API->>DB: Commit, correlation_id = T,<br/>trace_context gespeichert
+    participant GW as api: fan-out span
+    participant AD as Adapter:<br/>invoke_agent span
+    participant RT as Runtime<br/>(TRACEPARENT)
+    App->>API: POST message, traceparent<br/>(trace ID T, the server decides sampling)
+    API->>DB: Commit, correlation_id = T,<br/>trace_context stored
     DB-->>GW: NOTIFY
-    GW->>GW: Span event.fanout mit Link auf T
-    GW-->>AD: dispatch agent.invocation<br/>mit trace_context
-    AD->>AD: Span invoke_agent,<br/>Eltern-Kontext aus trace_context
-    AD->>RT: Lauf starten,<br/>TRACEPARENT in der Umgebung
-    RT-->>AD: Werkzeuge, Text<br/>(eigene Spans unter T)
-    AD->>API: POST /runs/{id}/start und PATCH,<br/>traceparent unter T
-    AD->>API: POST message (origin agent),<br/>traceparent unter T
-    API-->>App: dispatch message.created<br/>(Span event.fanout mit Link auf T)
+    GW->>GW: Span event.fanout with link to T
+    GW-->>AD: dispatch agent.invocation<br/>with trace_context
+    AD->>AD: Span invoke_agent,<br/>parent context from trace_context
+    AD->>RT: Start run,<br/>TRACEPARENT in the environment
+    RT-->>AD: Tools, text<br/>(own spans under T)
+    AD->>API: POST /runs/{id}/start and PATCH,<br/>traceparent under T
+    AD->>API: POST message (origin agent),<br/>traceparent under T
+    API-->>App: dispatch message.created<br/>(span event.fanout with link to T)

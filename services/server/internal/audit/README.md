@@ -1,57 +1,57 @@
-# Modul `audit`
+# Module `audit`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-## Zweck
+## Purpose
 
-Audit-Log mit Hash-Kette, signierte Prüfpunkte, Abfrage, Prüfung, Kürzung mit Anker.
+Audit log with hash chain, signed checkpoints, query, verification, truncation with anchor.
 
-## Port (Wurzelpaket `internal/audit`)
+## Port (root package `internal/audit`)
 
-- Eingehend: `Log` (Abfrage, Prüfung).
-- Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: kernel `auditing.Recorder`.
+- Inbound: `Log` (query, verification).
+- Emits in-tx events: none.
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: kernel `auditing.Recorder`.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `instance`.
+May use the ports of these modules: `instance`.
 
-Grund: Zähler `audit_seq`.
+Reason: counter `audit_seq`.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `audit_events`, `audit_checkpoints`, `audit_ip_keys`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `audit.read`, `audit.verify`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: keine.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: none.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hintergrundjobs
+## Background jobs
 
-| Job | Auslöser | Warteschlange |
+| Job | Trigger | Queue |
 |---|---|---|
-| `audit.chain_verify` | periodisch | `maintenance` |
-| `audit.retention_trim` | periodisch, eigene Wartungsrolle der Datenbank | `maintenance` |
+| `audit.chain_verify` | periodic | `maintenance` |
+| `audit.retention_trim` | periodic, separate maintenance role of the database | `maintenance` |
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Die Anwendungsrolle der Datenbank darf nur `INSERT` und `SELECT`; Kürzung läuft über eine eigene Wartungsrolle und schreibt einen Anker (03, 4.12).
-- `Recorder` schreibt in der laufenden Transaktion (Phase 3.3 der Unit of Work) oder getrennt, wenn eine Ablehnung nach einem Rollback ins Audit muss.
-- Gleiche Ablehnungen werden je `audit.deny_aggregate_window` zusammengefasst (05, R-AZ-04).
+- The application role of the database may only `INSERT` and `SELECT`; truncation runs through a separate maintenance role and writes an anchor (03, 4.12).
+- `Recorder` writes in the running transaction (phase 3.3 of the Unit of Work) or separately when a denial must go into the audit after a rollback.
+- Identical denials are aggregated per `audit.deny_aggregate_window` (05, R-AZ-04).
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [19-sicherheit.md](../../../../docs/spec/19-sicherheit.md), [20-datenschutz.md](../../../../docs/spec/20-datenschutz.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [19-security.md](../../../../docs/spec/19-security.md), [20-privacy.md](../../../../docs/spec/20-privacy.md)

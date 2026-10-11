@@ -1,5 +1,5 @@
 # WebSocket gateway of the chat server, AsyncAPI 3.0. Normative (ADR 0013).
-# Protocol: docs/spec/04-sync-protokoll.md. Body schemas: openapi.yaml (components.schemas).
+# Protocol: docs/spec/04-sync-protocol.md. Body schemas: openapi.yaml (components.schemas).
 # Lint: npx -y @redocly/cli@2.62.1 lint --config docs/api/redocly.yaml
 
 asyncapi: 3.0.0
@@ -11,7 +11,7 @@ info:
   description: |-
     WebSocket gateway for people, agents and apps. Frames are JSON text frames `{"op": <name>, "d":
     <body>}`. Authentication happens in-band with `identify` or `resume` (DPoP proof with the nonce
-    from `hello`), not in the upgrade request. Protocol rules: docs/spec/04-sync-protokoll.md. Body
+    from `hello`), not in the upgrade request. Protocol rules: docs/spec/04-sync-protocol.md. Body
     schemas are shared with openapi.yaml.
   license:
     name: Apache-2.0
@@ -264,7 +264,7 @@ channels:
     x-protocol-versions: [1]
     parameters:
       session_id:
-        description: Terminal session ID (UUIDv7). The proxy routes both stream paths of a session by this segment to the same node (docs/spec/16-betrieb.md, section 4.4).
+        description: Terminal session ID (UUIDv7). The proxy routes both stream paths of a session by this segment to the same node (docs/spec/16-operations.md, section 4.4).
     messages:
       terminal.hello:
         $ref: '#/components/messages/terminal.hello'
@@ -397,7 +397,7 @@ channels:
     x-protocol-versions: [1]
     parameters:
       session_id:
-        description: Terminal session ID (UUIDv7). The proxy routes both stream paths of a session by this segment to the same node (docs/spec/16-betrieb.md, section 4.4).
+        description: Terminal session ID (UUIDv7). The proxy routes both stream paths of a session by this segment to the same node (docs/spec/16-operations.md, section 4.4).
     messages:
       host.hello:
         $ref: '#/components/messages/host.hello'
@@ -562,7 +562,7 @@ operations:
     action: receive
     channel:
       $ref: '#/channels/gateway'
-    summary: Subscribe to the live frames `stats.live` of the instance or of one space (docs/spec/25-visualisierung.md, section 5). One subscription per connection; a new one replaces it.
+    summary: Subscribe to the live frames `stats.live` of the instance or of one space (docs/spec/25-visualization.md, section 5). One subscription per connection; a new one replaces it.
     messages:
     - $ref: '#/channels/gateway/messages/op.stats.subscribe'
     x-authz-action: stats.read
@@ -662,7 +662,7 @@ operations:
     channel:
       $ref: '#/channels/gateway'
     summary: Deliver one event. Each message names its receive action in `x-receive-action`.
-    description: The server checks `authorize(recipient, x-receive-action, resource)` for every delivery (docs/spec/04-sync-protokoll.md, section 7 and 8).
+    description: The server checks `authorize(recipient, x-receive-action, resource)` for every delivery (docs/spec/04-sync-protocol.md, section 7 and 8).
     messages:
     - $ref: '#/channels/gateway/messages/event.message.created'
     - $ref: '#/channels/gateway/messages/event.message.updated'
@@ -1996,12 +1996,12 @@ components:
           d:
             $ref: ./openapi.yaml#/components/schemas/CommandAutocompleteRequestedEvent
       x-audience: self
-      description: Only to one gateway connection of the command owner (docs/spec/04-sync-protokoll.md, section 15.7).
+      description: Only to one gateway connection of the command owner (docs/spec/04-sync-protocol.md, section 15.7).
     event.notification.created:
       name: notification.created
       title: dispatch notification.created
       summary: Ephemeral event, at most once.
-      description: Only to connections of the recipient, instead of a push to this device (docs/spec/13-push-benachrichtigungen.md, section 6.3).
+      description: Only to connections of the recipient, instead of a push to this device (docs/spec/13-push-notifications.md, section 6.3).
       x-event-kind: ephemeral
       x-receive-action: push.deliver
       payload:
@@ -2254,7 +2254,7 @@ components:
       name: stats.live
       title: dispatch stats.live
       summary: Ephemeral event, at most once.
-      description: Every `stats.live_interval` to connections with a `stats.subscribe` subscription; filtered to the channels visible to the recipient, cost members only with `cost.read.aggregate`. Loss of `stats.read` ends the subscription with one `error` (`forbidden`). Never in the event log (docs/spec/25-visualisierung.md, section 5).
+      description: Every `stats.live_interval` to connections with a `stats.subscribe` subscription; filtered to the channels visible to the recipient, cost members only with `cost.read.aggregate`. Loss of `stats.read` ends the subscription with one `error` (`forbidden`). Never in the event log (docs/spec/25-visualization.md, section 5).
       x-event-kind: ephemeral
       x-receive-action: stats.read
       payload:

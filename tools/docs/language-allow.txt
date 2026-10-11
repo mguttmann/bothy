@@ -1,0 +1,30 @@
+# Exceptions of the language gate (tools/docs/language_check.py, D-W-94, docs/glossary.md
+# section 4). A line `path: <glob>` excludes the matching tracked files; any other line is a
+# word that may appear verbatim (a proper name). German product strings of the `de` locale
+# stand in the documents between `language-check: off` and `language-check: on` instead.
+
+# The German-English term list.
+path: docs/glossary.md
+# The gate's German word list and the German samples of its tests.
+path: tools/docs/language_check.py
+path: tools/docs/tests/data/language/*
+# Third-party files, kept byte for byte as published.
+path: tools/design-tokens/vendor/fonts/*
+path: tools/design-tokens/vendor/phosphor/*
+
+# Proper names of the fictional example world (07 section 10, the preview text goldens in 07 and
+# brief M1-49, the shared test world of the briefs): channels, agents and a group.
+Allgemein
+Eskalation
+Kampagnen
+Intern
+Projekt-A
+Werkzeuge
+Notizen
+Lotse
+Texter
+Assistent
+Leser
+
+# IDs of rulings in the private planning baseline, cited verbatim like every other ID.
+R-Qualität

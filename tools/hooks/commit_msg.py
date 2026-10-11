@@ -34,7 +34,7 @@ TYPES = (
     "style",
     "test",
 )
-# Named value `commit.header_max_length` (docs/spec/23-qualitaet.md).
+# Named value `commit.header_max_length` (docs/spec/23-quality.md).
 HEADER_MAX_LENGTH = 100
 _HEADER = re.compile(
     r"^(?P<type>[a-z]+)(?:\((?P<scope>[a-z0-9][a-z0-9._/-]*)\))?(?P<bang>!)?: (?P<desc>\S.*)$"

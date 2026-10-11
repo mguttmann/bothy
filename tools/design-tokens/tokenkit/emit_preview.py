@@ -4,7 +4,7 @@
 Fonts and icons are embedded (base64 and an SVG sprite) so the file renders the same everywhere,
 offline, and in screenshots. `?view=palette|layout|components|mobile|terminal|viz` shows one section only,
 `?theme=light|dark` forces a theme, `?density=compact|comfortable|touch` forces a density.
-All example data is fictitious (people Alex, Sam, Robin; areas Support, Marketing, Engineering,
+All example data is fictitious (people Alex, Sam, Robin; spaces Support, Marketing, Engineering,
 Research).
 """
 
@@ -476,27 +476,27 @@ def _palette_section(model: Model) -> str:
         )
     roles = []
     for name, bg, label in (
-        ("surface.sidebar", "var(--ds-color-surface-sidebar)", "Markenfläche"),
-        ("surface.list", "var(--ds-color-surface-list)", "Liste"),
-        ("surface.canvas", "var(--ds-color-surface-canvas)", "Verlauf"),
-        ("surface.raised", "var(--ds-color-surface-raised)", "Live-Box, Karte"),
+        ("surface.sidebar", "var(--ds-color-surface-sidebar)", "Brand surface"),
+        ("surface.list", "var(--ds-color-surface-list)", "List"),
+        ("surface.canvas", "var(--ds-color-surface-canvas)", "History"),
+        ("surface.raised", "var(--ds-color-surface-raised)", "Live box, card"),
     ):
         fg = "var(--ds-color-text-on-sidebar)" if "sidebar" in name else "var(--ds-color-text-primary)"
         fg2 = "var(--ds-color-text-on-sidebar-secondary)" if "sidebar" in name else "var(--ds-color-text-secondary)"
         fg3 = "var(--ds-color-text-on-sidebar-muted)" if "sidebar" in name else "var(--ds-color-text-muted)"
         roles.append(
             f'<div class="role" style="background:{bg}"><h4 style="color:{fg}">{name}</h4>'
-            f'<div style="color:{fg}">Primärtext {label}</div><div style="color:{fg2}">Sekundärtext</div>'
-            f'<div style="color:{fg3}">Stummer Text</div></div>'
+            f'<div style="color:{fg}">Primary text {label}</div><div style="color:{fg2}">Secondary text</div>'
+            f'<div style="color:{fg3}">Muted text</div></div>'
         )
     status = []
     for label, var in (
-        ("Wartet auf dich", "attention"),
-        ("Erledigt", "success"),
-        ("Stillstand", "warning"),
-        ("Fehlgeschlagen", "danger"),
-        ("Nachtrag zugestellt", "info"),
-        ("Läuft", "accent"),
+        ("Waiting for you", "attention"),
+        ("Done", "success"),
+        ("Stalled", "warning"),
+        ("Failed", "danger"),
+        ("Follow-up delivered", "info"),
+        ("Running", "accent"),
     ):
         bg = f"var(--ds-color-{var}-subtle)"
         fg = f"var(--ds-color-{var}-fg)"
@@ -507,7 +507,7 @@ def _palette_section(model: Model) -> str:
     )
     return (
         '<section class="pv" id="palette"><h2 class="t-title">Palette</h2>'
-        '<p class="pv-note">Tonleitern in OKLCH (Werte in docs/design/palette.md). Darunter die semantischen Rollen im aktuellen Theme.</p>'
+        '<p class="pv-note">Tonal scales in OKLCH (values in docs/design/palette.md). Below them, the semantic roles in the current theme.</p>'
         + "".join(rows)
         + '<div class="roles">'
         + "".join(roles)
@@ -521,15 +521,15 @@ def _palette_section(model: Model) -> str:
 
 def _sidebar(c: _Ctx) -> str:
     return f"""
-<aside class="side" aria-label="Bereiche und Kanäle">
+<aside class="side" aria-label="Spaces and channels">
   <div class="brand"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 13.5 12 5l9 8.5" fill="none" stroke="var(--ds-color-surface-sidebar)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 12v7h9v-7" fill="none" stroke="var(--ds-color-surface-sidebar)" stroke-width="2.6" stroke-linejoin="round"/></svg></span><span class="name">Bothy</span></div>
-  <div class="jump">{c.ic("action.search", "sm")}Springen zu<kbd>⌘K</kbd></div>
-  <div class="running">{c.ic("run.running", "sm")}Läuft gerade<span class="count cnt">2</span></div>
+  <div class="jump">{c.ic("action.search", "sm")}Jump to<kbd>⌘K</kbd></div>
+  <div class="running">{c.ic("run.running", "sm")}Running now<span class="count cnt">2</span></div>
   <nav class="tree">
     <div class="space">{c.ic("action.expand", "caret")}<span class="sico" style="background:color-mix(in oklab,var(--ds-color-category-heather-on-sidebar) 22%,transparent);color:var(--ds-color-category-heather-on-sidebar)">{c.ic("headset")}</span><span class="t-section">Support</span></div>
-    <div class="ch">{c.ic("channel.text")}allgemein</div>
-    <div class="ch unread">{c.ic("channel.forum")}anfragen<span class="end"><span class="livedot" title="Lauf aktiv"></span><span class="cnt">3</span></span></div>
-    <div class="ch mute">{c.ic("channel.text")}meldungen<span class="end">{c.ic("action.mute", "sm")}</span></div>
+    <div class="ch">{c.ic("channel.text")}general</div>
+    <div class="ch unread">{c.ic("channel.forum")}requests<span class="end"><span class="livedot" title="Run active"></span><span class="cnt">3</span></span></div>
+    <div class="ch mute">{c.ic("channel.text")}reports<span class="end">{c.ic("action.mute", "sm")}</span></div>
     <div class="space">{c.ic("action.expand", "caret")}<span class="sico" style="background:color-mix(in oklab,var(--ds-color-category-loch-on-sidebar) 22%,transparent);color:var(--ds-color-category-loch-on-sidebar)">{c.ic("code")}</span><span class="t-section">Engineering</span></div>
     <div class="ch sel">{c.ic("channel.forum")}server<span class="end"><span class="livedot"></span></span></div>
     <div class="ch hover">{c.ic("channel.forum")}apps</div>
@@ -555,133 +555,133 @@ def _list(c: _Ctx) -> str:
             c,
             "running",
             "run.running",
-            "Gateway: resume nach Netzwechsel",
+            "Gateway: resume after network change",
             f'{c.ic("agent", "sm")}dev-runner <span class="chip tag-loch">sync</span>',
-            "läuft 4 min",
+            "running 4 min",
             "sel unread",
-            "Läuft",
+            "Running",
         ),
         _post(
             c,
             "waiting",
             "run.waiting",
-            "Migration 0012 vor dem Merge prüfen",
-            '<span class="badge b-attn">Wartet auf dich</span><span class="chip tag-rowan">datenbank</span>',
+            "Check migration 0012 before the merge",
+            '<span class="badge b-attn">Waiting for you</span><span class="chip tag-rowan">database</span>',
             "12:41",
             "unread",
-            "Wartet auf dich",
+            "Waiting for you",
         ),
         _post(
             c,
             "attn",
             "state.info",
-            "Review: Freigabe-Assistent, Klartext",
-            'Sam erwähnt dich <span class="chip tag-heather">rechte</span>',
+            "Review: grant wizard, plain text",
+            'Sam mentions you <span class="chip tag-heather">permissions</span>',
             "11:58",
             "unread hover",
-            "Erwähnung",
+            "Mention",
         ),
         _post(
             c,
             "queued",
             "run.queued",
-            "Suche: Treffer im Transkript markieren",
-            '<span class="chip tag-moss">suche</span>',
+            "Search: highlight hits in the transcript",
+            '<span class="chip tag-moss">search</span>',
             "11:20",
             "",
-            "In Warteschlange",
+            "Queued",
         ),
         _post(
             c,
             "completed",
             "run.completed",
-            "Kosten je Bereich in der Statistik",
-            'Robin <span class="chip tag-amber">statistik</span>',
-            "vor 2 h",
+            "Costs per space in the statistics",
+            'Robin <span class="chip tag-amber">statistics</span>',
+            "2 h ago",
             "",
-            "Erledigt",
+            "Done",
         ),
         _post(
             c,
             "failed",
             "run.failed",
-            "Upload-Grenze für Sprachnachrichten",
-            '<span style="color:var(--ds-color-danger-fg)">fehlgeschlagen: Projekt nicht bereit</span>',
-            "gestern",
+            "Upload limit for voice messages",
+            '<span style="color:var(--ds-color-danger-fg)">failed: project not ready</span>',
+            "yesterday",
             "",
-            "Fehlgeschlagen",
+            "Failed",
         ),
         _post(
             c,
             "cancelled",
             "run.cancelled",
-            "Alter Entwurf: Exportformat",
+            "Old draft: export format",
             '<span class="chip tag-granite">export</span>',
-            "Mo",
+            "Mon",
             "",
-            "Abgebrochen",
+            "Canceled",
         ),
     ]
     return f"""
-<section class="list" aria-label="Beiträge im Forum server">
-  <div class="colhead">{c.ic("channel.forum", "c-accent")}<span class="t-heading">server</span><span class="grow"></span><span class="btn primary">{c.ic("action.new")}Neuer Beitrag</span></div>
-  <div class="filters"><span class="chip f on">Offen</span><span class="chip f">Wartet auf mich</span><span class="chip f">{c.ic("action.filter", "sm")}Tags</span><span class="chip f">Letzte Aktivität</span></div>
+<section class="list" aria-label="Posts in the forum server">
+  <div class="colhead">{c.ic("channel.forum", "c-accent")}<span class="t-heading">server</span><span class="grow"></span><span class="btn primary">{c.ic("action.new")}New post</span></div>
+  <div class="filters"><span class="chip f on">Open</span><span class="chip f">Waiting for me</span><span class="chip f">{c.ic("action.filter", "sm")}Tags</span><span class="chip f">Last activity</span></div>
   <div class="posts">{"".join(posts)}</div>
-  <div class="done-sec">{c.ic("action.collapse", "sm")}Erledigt (14)</div>
+  <div class="done-sec">{c.ic("action.collapse", "sm")}Done (14)</div>
 </section>"""
 
 
 def _livebox_running(c: _Ctx, actions: bool = True) -> str:
     foot = (
-        f'<div class="lb-foot"><span class="btn danger-out">{c.ic("action.stop")}Stopp</span>'
-        f'<span class="t-caption muted">Neue Nachrichten in diesem Thread gehen als Nachtrag an den Lauf.</span></div>'
+        f'<div class="lb-foot"><span class="btn danger-out">{c.ic("action.stop")}Stop</span>'
+        f'<span class="t-caption muted">New messages in this thread go to the run as a follow-up.</span></div>'
         if actions
         else ""
     )
     return f"""
-<div class="lb s-running" role="status" aria-label="Lauf von dev-runner: läuft seit 4 Minuten 12 Sekunden, Kontext 62 Prozent">
-  <div class="lb-head"><span class="lb-state c-running">{c.ic("run.running", "sm")}Läuft</span>
-    <span class="metrics t-code-sm"><span>4:12</span><span>{c.ic("context", "sm")}62 %</span><span>48,1k Token</span><span>{c.ic("cost", "sm")}0,62 USD</span></span>
-    <span class="grow"></span><span class="badge b-org">{c.ic("billing.organization")}Organisation</span>{c.ic("action.expand", "sm muted")}</div>
-  <div class="statusline">Prüfe, ob <code class="inl">resume</code> den Fokus nach dem Netzwechsel wiederherstellt.</div>
+<div class="lb s-running" role="status" aria-label="Run of dev-runner: running, for 4 minutes 12 seconds, context 62 percent">
+  <div class="lb-head"><span class="lb-state c-running">{c.ic("run.running", "sm")}Running</span>
+    <span class="metrics t-code-sm"><span>4:12</span><span>{c.ic("context", "sm")}62%</span><span>48.1k tokens</span><span>{c.ic("cost", "sm")}USD 0.62</span></span>
+    <span class="grow"></span><span class="badge b-org">{c.ic("billing.organization")}Organization</span>{c.ic("action.expand", "sm muted")}</div>
+  <div class="statusline">Checking if <code class="inl">resume</code> restores the focus after the network change.</div>
   <div class="steps">
-    <div class="step"><span class="tool">{c.ic("step.tool_call", "c-completed")}<span class="t-code-sm">Read</span></span><span class="t-code-sm secondary">internal/sync/gateway.go</span><span class="muted">0,4 s</span></div>
-    <div class="step"><span class="tool">{c.ic("step.tool_call", "c-completed")}<span class="t-code-sm">Grep</span></span><span class="t-code-sm secondary">resume_window</span><span class="muted">0,2 s</span></div>
-    <div class="step"><span class="tool">{c.ic("step.subagent", "c-running")}<span class="t-code-sm">Unteragent</span></span><span class="secondary" style="font-size:13px">Testfälle für 4006 schreiben</span></div>
-    <div class="step child"><span class="tool">{c.ic("run.running", "c-running")}<span class="t-code-sm">Bash</span></span><span class="t-code-sm secondary">go test ./internal/sync/...</span><span class="muted">läuft 38 s</span></div>
+    <div class="step"><span class="tool">{c.ic("step.tool_call", "c-completed")}<span class="t-code-sm">Read</span></span><span class="t-code-sm secondary">internal/sync/gateway.go</span><span class="muted">0.4 s</span></div>
+    <div class="step"><span class="tool">{c.ic("step.tool_call", "c-completed")}<span class="t-code-sm">Grep</span></span><span class="t-code-sm secondary">resume_window</span><span class="muted">0.2 s</span></div>
+    <div class="step"><span class="tool">{c.ic("step.subagent", "c-running")}<span class="t-code-sm">Subagent</span></span><span class="secondary" style="font-size:13px">Write test cases for 4006</span></div>
+    <div class="step child"><span class="tool">{c.ic("run.running", "c-running")}<span class="t-code-sm">Bash</span></span><span class="t-code-sm secondary">go test ./internal/sync/...</span><span class="muted">running 38 s</span></div>
   </div>
-  <div class="excerpt">Der Fokus wird beim Fortsetzen aus der Gateway-Sitzung übernommen; offen ist, ob abgelaufene Threads still entfallen.</div>
+  <div class="excerpt">On resume, the focus is taken over from the gateway session; it is still open whether expired threads are dropped silently.</div>
   {foot}
 </div>"""
 
 
 def _conv(c: _Ctx) -> str:
     return f"""
-<main class="conv" aria-label="Thread Gateway: resume nach Netzwechsel">
-  <div class="thead">{c.ic("thread", "c-accent")}<span class="t-heading">Gateway: resume nach Netzwechsel</span>
-    <span class="badge b-org">{c.ic("billing.organization")}Organisation</span><span class="t-caption muted">1,84 USD Schätzung</span>
-    <span style="flex:1"></span><span class="btn secondary">{c.ic("action.close-thread")}Erledigt</span><span class="iconbtn">{c.ic("action.pin")}</span><span class="iconbtn on">{c.ic("action.toggle-panel")}</span></div>
+<main class="conv" aria-label="Thread Gateway: resume after network change">
+  <div class="thead">{c.ic("thread", "c-accent")}<span class="t-heading">Gateway: resume after network change</span>
+    <span class="badge b-org">{c.ic("billing.organization")}Organization</span><span class="t-caption muted">USD 1.84 estimate</span>
+    <span style="flex:1"></span><span class="btn secondary">{c.ic("action.close-thread")}Done</span><span class="iconbtn">{c.ic("action.pin")}</span><span class="iconbtn on">{c.ic("action.toggle-panel")}</span></div>
   <div class="scroll">
     <div class="pinned">{_livebox_running(c)}</div>
     <div class="msgs">
       <div class="msg agent"><span class="av agent c-spruce">{c.ic("agent")}</span><div><div class="who"><b>dev-runner</b><span class="badge b-agent">AGENT</span><span class="ts">10:14</span></div>
-        <div class="body"><p>Ursache: Das Fenster <code class="inl">sync.resume_window</code> wird ab dem letzten Heartbeat gemessen, nicht ab der Trennung.</p>
-<span class="more">Mehr anzeigen</span>
-        <div class="lb-line" style="margin-top:8px">{c.ic("run.completed", "sm c-completed")}<b>Lief 12 min</b><span>3 Werkzeuge</span><span>2 Unteragenten</span><span class="t-code-sm">0,74 USD Schätzung</span><span class="grow"></span>{c.ic("action.collapse", "sm")}</div>
+        <div class="body"><p>Cause: The window <code class="inl">sync.resume_window</code> is measured from the last heartbeat, not from the disconnect.</p>
+<span class="more">Show more</span>
+        <div class="lb-line" style="margin-top:8px">{c.ic("run.completed", "sm c-completed")}<b>Ran 12 min</b><span>3 tools</span><span>2 subagents</span><span class="t-code-sm">USD 0.74 estimate</span><span class="grow"></span>{c.ic("action.collapse", "sm")}</div>
         <div class="reacts"><span class="react mine">👍 2</span><span class="react">🎯 1</span></div></div></div></div>
       <div class="msg agent"><span class="av agent c-spruce">{c.ic("agent")}</span><div><div class="who"><b>dev-runner</b><span class="badge b-agent">AGENT</span><span class="ts">10:16</span></div>
-        <div class="card"><div class="hd">{c.ic("security.step-up", "c-attn")}Freigabe nötig</div>
-          <div class="t-body-sm"><code class="inl">go test</code> möchte das Netzwerk für die Testdatenbank nutzen.</div>
-          <div class="row"><span class="btn primary">Einmal erlauben</span><span class="btn secondary">Für diese Sitzung</span><span class="btn secondary">Immer</span><span class="btn ghost">Ablehnen</span></div>
-          <div class="note">{c.ic("security.lock", "sm")}Nur Alex oder ein Owner kann das freigeben.</div></div></div></div>
+        <div class="card"><div class="hd">{c.ic("security.step-up", "c-attn")}Approval needed</div>
+          <div class="t-body-sm"><code class="inl">go test</code> wants to use the network for the test database.</div>
+          <div class="row"><span class="btn primary">Allow once</span><span class="btn secondary">For this session</span><span class="btn secondary">Always</span><span class="btn ghost">Deny</span></div>
+          <div class="note">{c.ic("security.lock", "sm")}Only Alex or an owner can approve this.</div></div></div></div>
       <div class="msg mention"><span class="av c-loch">SA</span><div><div class="who"><b>Sam</b><span class="ts">10:21</span></div>
-        <div class="body"><p><span class="pill">@Alex</span> kannst du die Freigabe übernehmen? Ich habe auf dem Kanal nur Schreibrecht.</p></div></div></div>
-      <div class="msg"><span class="av c-heather">AL</span><div><div class="who"><b>Alex</b><span class="ts">10:22</span>{c.ic("trigger.working", "tr-working", "Wird bearbeitet")}</div>
-        <div class="body"><p><span class="pill">@dev-runner</span> Bitte prüfe auch, ob abgelaufene Threads beim Fortsetzen still aus dem Fokus fallen.</p></div></div></div>
+        <div class="body"><p><span class="pill">@Alex</span> can you take over the approval? I only have write permission on the channel.</p></div></div></div>
+      <div class="msg"><span class="av c-heather">AL</span><div><div class="who"><b>Alex</b><span class="ts">10:22</span>{c.ic("trigger.working", "tr-working", "Working")}</div>
+        <div class="body"><p><span class="pill">@dev-runner</span> Please also check whether expired threads silently drop out of the focus on resume.</p></div></div></div>
     </div>
     <div class="composer-wrap">
-      <div class="typing">{c.ic("action.more", "sm")}Sam schreibt gerade</div>
-      <div class="composer">{c.ic("action.attach")}<span class="txt ph">Nachtrag an dev-runner, / für Befehle</span>{c.ic("action.voice")}{c.ic("action.send", "c-accent")}</div>
+      <div class="typing">{c.ic("action.more", "sm")}Sam is typing</div>
+      <div class="composer">{c.ic("action.attach")}<span class="txt ph">Follow-up to dev-runner, / for commands</span>{c.ic("action.voice")}{c.ic("action.send", "c-accent")}</div>
     </div>
   </div>
 </main>"""
@@ -689,14 +689,14 @@ def _conv(c: _Ctx) -> str:
 
 def _session(c: _Ctx) -> str:
     return f"""
-<aside class="sess" aria-label="Sitzung">
-  <div class="colhead"><span class="t-heading">Sitzung</span><span class="grow"></span>{c.ic("action.dismiss", "sm secondary")}</div>
+<aside class="sess" aria-label="Session">
+  <div class="colhead"><span class="t-heading">Session</span><span class="grow"></span>{c.ic("action.dismiss", "sm secondary")}</div>
   <div class="blk"><div class="agentcard"><span class="av agent c-spruce">{c.ic("agent")}</span><div><div class="name">dev-runner</div><span class="presence"><i></i>online</span></div></div>
-    <dl class="kv"><dt>Backend</dt><dd><span class="badge b-org">Organisation</span></dd><dt>Modell</dt><dd class="t-code-sm">model-large</dd><dt>Sitzung</dt><dd class="t-code-sm">0193f2a7-8c41</dd><dt>Projekt</dt><dd>server, Branch main</dd></dl></div>
-  <div class="blk"><h5>KONTEXT</h5><div class="gauge" role="meter" aria-valuenow="62" aria-valuemin="0" aria-valuemax="100" aria-label="Kontext 62 Prozent"><i style="width:62%"></i></div>
-    <dl class="kv"><dt>Kontext</dt><dd>62 %</dd><dt>Kosten Thread</dt><dd>1,84 USD <span class="muted">Schätzung</span></dd><dt>Läufe</dt><dd>5</dd></dl></div>
-  <div class="blk"><h5>FRÜHERE SITZUNGEN</h5><div class="prev">{c.ic("thread", "sm")}<span class="t-code-sm">0193e01c-55d2</span><span class="muted">neu begonnen</span></div><div class="prev">{c.ic("thread", "sm")}<span class="t-code-sm">0193d8b4-01aa</span><span class="muted">Import</span></div></div>
-  <div class="blk"><h5>ANGEHEFTET (2)</h5><div class="prev">{c.ic("action.pin", "sm")}Ablauf Fortsetzen, Skizze</div><div class="prev">{c.ic("action.pin", "sm")}Testplan 4006</div></div>
+    <dl class="kv"><dt>Backend</dt><dd><span class="badge b-org">Organization</span></dd><dt>Model</dt><dd class="t-code-sm">model-large</dd><dt>Session</dt><dd class="t-code-sm">0193f2a7-8c41</dd><dt>Project</dt><dd>server, branch main</dd></dl></div>
+  <div class="blk"><h5>CONTEXT</h5><div class="gauge" role="meter" aria-valuenow="62" aria-valuemin="0" aria-valuemax="100" aria-label="Context 62 percent"><i style="width:62%"></i></div>
+    <dl class="kv"><dt>Context</dt><dd>62%</dd><dt>Thread cost</dt><dd>USD 1.84 <span class="muted">estimate</span></dd><dt>Runs</dt><dd>5</dd></dl></div>
+  <div class="blk"><h5>EARLIER SESSIONS</h5><div class="prev">{c.ic("thread", "sm")}<span class="t-code-sm">0193e01c-55d2</span><span class="muted">started over</span></div><div class="prev">{c.ic("thread", "sm")}<span class="t-code-sm">0193d8b4-01aa</span><span class="muted">import</span></div></div>
+  <div class="blk"><h5>PINNED (2)</h5><div class="prev">{c.ic("action.pin", "sm")}Resume flow, sketch</div><div class="prev">{c.ic("action.pin", "sm")}Test plan 4006</div></div>
 </aside>"""
 
 
@@ -715,92 +715,92 @@ def _components_section(c: _Ctx) -> str:
     trig = "".join(
         f'<span class="trig">{c.ic(k, cls, lab)}{lab}</span>'
         for k, cls, lab in (
-            ("trigger.received", "tr-received", "Empfangen"),
-            ("trigger.queued", "tr-queued", "In Warteschlange"),
-            ("trigger.working", "tr-working", "Wird bearbeitet"),
-            ("trigger.done", "tr-done", "Erledigt"),
-            ("trigger.failed", "tr-failed", "Fehlgeschlagen"),
-            ("trigger.followup", "tr-followup", "Nachtrag zugestellt"),
+            ("trigger.received", "tr-received", "Received"),
+            ("trigger.queued", "tr-queued", "Queued"),
+            ("trigger.working", "tr-working", "Working"),
+            ("trigger.done", "tr-done", "Done"),
+            ("trigger.failed", "tr-failed", "Failed"),
+            ("trigger.followup", "tr-followup", "Follow-up delivered"),
         )
     )
     runs = "".join(
         f'<span class="trig">{c.ic(k, cls, lab)}{lab}</span>'
         for k, cls, lab in (
             # Words from docs/design/components.md, section 2.1 (never the raw enum value).
-            ("run.queued", "c-queued", "In Warteschlange"),
-            ("run.running", "c-running", "Läuft"),
-            ("run.waiting", "c-waiting", "Wartet auf dich"),
-            ("run.completed", "c-completed", "Erledigt"),
-            ("run.failed", "c-failed", "Fehlgeschlagen"),
-            ("run.cancelled", "c-cancelled", "Abgebrochen"),
+            ("run.queued", "c-queued", "Queued"),
+            ("run.running", "c-running", "Running"),
+            ("run.waiting", "c-waiting", "Waiting for you"),
+            ("run.completed", "c-completed", "Done"),
+            ("run.failed", "c-failed", "Failed"),
+            ("run.cancelled", "c-cancelled", "Canceled"),
         )
     )
     waiting = f"""
-<div class="lb s-waiting" role="status" aria-label="Lauf wartet auf deine Antwort">
-  <div class="lb-head"><span class="lb-state c-waiting">{c.ic("run.waiting", "sm")}Wartet auf dich</span><span class="metrics t-code-sm"><span>2:03</span><span>0,18 USD</span></span><span class="grow"></span><span class="badge b-pers">{c.ic("billing.personal")}Persönlich</span></div>
-  <div class="statusline">Welche Datenbank soll der Test nutzen?</div>
+<div class="lb s-waiting" role="status" aria-label="Run is waiting for your answer">
+  <div class="lb-head"><span class="lb-state c-waiting">{c.ic("run.waiting", "sm")}Waiting for you</span><span class="metrics t-code-sm"><span>2:03</span><span>USD 0.18</span></span><span class="grow"></span><span class="badge b-pers">{c.ic("billing.personal")}Personal</span></div>
+  <div class="statusline">Which database should the test use?</div>
   <div class="row" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-    <div class="field"><label>Datenbank</label><div class="input select" style="width:220px">Lokaler Container{c.ic("action.expand")}</div></div>
+    <div class="field"><label>Database</label><div class="input select" style="width:220px">Local container{c.ic("action.expand")}</div></div>
     <div class="field"><label>Port</label><div class="input" style="width:110px"><span class="ph">55432</span></div></div>
-    <span class="btn primary">Antworten</span></div>
+    <span class="btn primary">Answer</span></div>
 </div>"""
     failed = f"""
-<div class="lb s-failed" role="status"><div class="lb-head"><span class="lb-state c-failed">{c.ic("run.failed", "sm")}Fehlgeschlagen</span><span class="t-caption secondary">Backend passt nicht: Adapter meldet organization, Soll ist personal.</span></div>
-<div class="lb-foot"><span class="btn secondary">{c.ic("action.reopen")}Erneut versuchen</span><span class="btn ghost">Details</span></div></div>"""
+<div class="lb s-failed" role="status"><div class="lb-head"><span class="lb-state c-failed">{c.ic("run.failed", "sm")}Failed</span><span class="t-caption secondary">Backend does not match: the adapter reports organization, the configured mode is personal.</span></div>
+<div class="lb-foot"><span class="btn secondary">{c.ic("action.reopen")}Try again</span><span class="btn ghost">Details</span></div></div>"""
     return f"""
-<section class="pv" id="components"><h2 class="t-title">Komponenten</h2>
+<section class="pv" id="components"><h2 class="t-title">Components</h2>
 <div class="sheet">
-  <div class="grp"><h3>KNÖPFE</h3>
-    <div class="row"><span class="btn primary">Primär</span><span class="btn primary hover">Primär Hover</span><span class="btn secondary">Sekundär</span><span class="btn ghost">Ruhig</span></div>
-    <div class="row"><span class="btn success">Freigeben</span><span class="btn danger">Löschen</span><span class="btn danger-out">{c.ic("action.stop")}Stopp</span><span class="btn primary disabled">Deaktiviert</span><span class="btn secondary focus">Mit Fokus</span></div>
-    <h3 style="margin-top:14px">ABZEICHEN</h3>
-    <div class="row"><span class="badge b-pers">{c.ic("billing.personal")}Persönlich</span><span class="badge b-org">{c.ic("billing.organization")}Organisation</span><span class="badge b-attn">Wartet auf dich</span><span class="badge b-agent">AGENT</span><span class="cnt">3</span><span class="t-caption muted">0,62 USD Schätzung</span></div>
+  <div class="grp"><h3>BUTTONS</h3>
+    <div class="row"><span class="btn primary">Primary</span><span class="btn primary hover">Primary hover</span><span class="btn secondary">Secondary</span><span class="btn ghost">Quiet</span></div>
+    <div class="row"><span class="btn success">Approve</span><span class="btn danger">Delete</span><span class="btn danger-out">{c.ic("action.stop")}Stop</span><span class="btn primary disabled">Disabled</span><span class="btn secondary focus">With focus</span></div>
+    <h3 style="margin-top:14px">BADGES</h3>
+    <div class="row"><span class="badge b-pers">{c.ic("billing.personal")}Personal</span><span class="badge b-org">{c.ic("billing.organization")}Organization</span><span class="badge b-attn">Waiting for you</span><span class="badge b-agent">AGENT</span><span class="cnt">3</span><span class="t-caption muted">USD 0.62 estimate</span></div>
     <h3 style="margin-top:14px">TAGS</h3>
-    <div class="chips"><span class="chip tag-spruce">sync</span><span class="chip tag-loch">server</span><span class="chip tag-heather">rechte</span><span class="chip tag-rowan">datenbank</span><span class="chip tag-amber">statistik</span><span class="chip tag-gorse">frage</span><span class="chip tag-moss">suche</span><span class="chip tag-granite">export</span></div>
+    <div class="chips"><span class="chip tag-spruce">sync</span><span class="chip tag-loch">server</span><span class="chip tag-heather">permissions</span><span class="chip tag-rowan">database</span><span class="chip tag-amber">statistics</span><span class="chip tag-gorse">question</span><span class="chip tag-moss">search</span><span class="chip tag-granite">export</span></div>
   </div>
-  <div class="grp"><h3>AUSLÖSER-STATUS (AN DER NACHRICHT)</h3><div class="row">{trig}</div>
-    <h3 style="margin-top:6px">LAUF-ZUSTAND</h3><div class="row">{runs}</div>
-    <h3 style="margin-top:6px">BANNER</h3>
+  <div class="grp"><h3>TRIGGER STATE (ON THE MESSAGE)</h3><div class="row">{trig}</div>
+    <h3 style="margin-top:6px">RUN STATE</h3><div class="row">{runs}</div>
+    <h3 style="margin-top:6px">BANNERS</h3>
     <div class="stack">
-      <div class="banner warn">{c.ic("state.offline")}<span class="grow">Offline. 3 Nachrichten warten auf Versand.</span><span class="btn ghost">Details</span></div>
-      <div class="banner info">{c.ic("state.reconnecting")}<span class="grow">Verbinde neu, hole verpasste Ereignisse nach.</span></div>
-      <div class="banner err">{c.ic("state.error")}<span class="grow">Kein Zugriff mehr auf diesen Kanal.</span></div>
-      <div class="banner attn">{c.ic("security.step-up")}<span class="grow">Diese Änderung braucht eine frische Bestätigung.</span><span class="btn primary">Bestätigen</span></div>
+      <div class="banner warn">{c.ic("state.offline")}<span class="grow">Offline. 3 messages waiting to be sent.</span><span class="btn ghost">Details</span></div>
+      <div class="banner info">{c.ic("state.reconnecting")}<span class="grow">Reconnecting, catching up on missed events.</span></div>
+      <div class="banner err">{c.ic("state.error")}<span class="grow">No access to this channel anymore.</span></div>
+      <div class="banner attn">{c.ic("security.step-up")}<span class="grow">This change needs a fresh confirmation.</span><span class="btn primary">Confirm</span></div>
     </div>
   </div>
-  <div class="grp"><h3>LIVE-BOX</h3><div class="stack">{_livebox_running(c)}{waiting}{failed}
-    <div class="lb-line">{c.ic("run.completed", "sm c-completed")}<b>Lief 28 min</b><span>3 Agenten</span><span class="t-code-sm">1,20 USD Schätzung</span><span class="grow"></span>{c.ic("action.collapse", "sm")}</div>
-    <div class="lb-line">{c.ic("run.cancelled", "sm c-cancelled")}<b>Abgebrochen nach 1 min</b><span>von Alex</span><span class="grow"></span>{c.ic("action.collapse", "sm")}</div>
+  <div class="grp"><h3>LIVE BOX</h3><div class="stack">{_livebox_running(c)}{waiting}{failed}
+    <div class="lb-line">{c.ic("run.completed", "sm c-completed")}<b>Ran 28 min</b><span>3 agents</span><span class="t-code-sm">USD 1.20 estimate</span><span class="grow"></span>{c.ic("action.collapse", "sm")}</div>
+    <div class="lb-line">{c.ic("run.cancelled", "sm c-cancelled")}<b>Canceled after 1 min</b><span>by Alex</span><span class="grow"></span>{c.ic("action.collapse", "sm")}</div>
   </div></div>
-  <div class="grp"><h3>KOMPONENTEN AN NACHRICHTEN</h3><div class="stack">
-    <div class="card" style="margin:0"><div class="hd">{c.ic("security.step-up", "c-attn")}Entwurf freigeben</div><div class="t-body-sm">Beitrag für den Kanal Ankündigungen, 3 Absätze.</div>
-      <div class="row"><span class="btn success">Freigeben</span><span class="btn secondary">Ändern</span><span class="btn ghost">Verwerfen</span></div></div>
-    <div class="card" style="margin:0"><div class="hd">{c.ic("context", "c-accent")}Modell wählen</div>
+  <div class="grp"><h3>COMPONENTS ON MESSAGES</h3><div class="stack">
+    <div class="card" style="margin:0"><div class="hd">{c.ic("security.step-up", "c-attn")}Approve draft</div><div class="t-body-sm">Post for the announcements channel, 3 paragraphs.</div>
+      <div class="row"><span class="btn success">Approve</span><span class="btn secondary">Edit</span><span class="btn ghost">Discard</span></div></div>
+    <div class="card" style="margin:0"><div class="hd">{c.ic("context", "c-accent")}Choose model</div>
       <div class="input select" style="width:260px">model-large{c.ic("action.expand")}</div>
       <div class="menu" style="margin-top:6px"><div class="it sel">{c.ic("trigger.received", "sm c-accent")}model-large</div><div class="it">model-fast</div><div class="it">model-small</div></div></div>
     <pre class="code" style="margin:0">if now.Sub(s.lastHeartbeat) &gt; cfg.ResumeWindow {{
     return closeWith(4006)
 }}</pre>
-    <div class="card" style="margin:0"><div class="hd">{c.ic("trigger.done", "sm tr-done")}Freigegeben</div><div class="used-line">{c.ic("person", "sm")}Alex hat um 10:24 "Einmal erlauben" gewählt. Die Knöpfe sind verbraucht.</div></div>
+    <div class="card" style="margin:0"><div class="hd">{c.ic("trigger.done", "sm tr-done")}Approved</div><div class="used-line">{c.ic("person", "sm")}Alex chose "Allow once" at 10:24. The buttons are used up.</div></div>
   </div></div>
-  <div class="grp"><h3>BEREICHS- UND KANALBAUM</h3><div class="sidedemo">
+  <div class="grp"><h3>SPACE AND CHANNEL TREE</h3><div class="sidedemo">
     <div class="space">{c.ic("action.expand", "caret")}<span class="sico" style="background:color-mix(in oklab,var(--ds-color-category-heather-on-sidebar) 22%,transparent);color:var(--ds-color-category-heather-on-sidebar)">{c.ic("headset")}</span><span class="t-section">Support</span></div>
-    <div class="ch unread">{c.ic("channel.forum")}anfragen<span class="end"><span class="livedot"></span><span class="cnt">3</span></span></div>
-    <div class="ch sel">{c.ic("channel.text")}allgemein</div>
-    <div class="ch mute">{c.ic("channel.text")}meldungen<span class="end">{c.ic("action.mute", "sm")}</span></div>
+    <div class="ch unread">{c.ic("channel.forum")}requests<span class="end"><span class="livedot"></span><span class="cnt">3</span></span></div>
+    <div class="ch sel">{c.ic("channel.text")}general</div>
+    <div class="ch mute">{c.ic("channel.text")}reports<span class="end">{c.ic("action.mute", "sm")}</span></div>
     <div class="space">{c.ic("action.collapse", "caret")}<span class="sico" style="background:color-mix(in oklab,var(--ds-color-category-moss-on-sidebar) 22%,transparent);color:var(--ds-color-category-moss-on-sidebar)">{c.ic("flask")}</span><span class="t-section">Research</span><span class="dot"></span></div>
   </div></div>
-  <div class="grp"><h3>SCHNELLWECHSEL (⌘K / STRG+K)</h3>
+  <div class="grp"><h3>QUICK SWITCHER (⌘K / CTRL+K)</h3>
     <div class="qs"><div class="q">{c.ic("action.search")}<span>serv<span class="textcaret"></span></span><span style="margin-left:auto"><kbd>esc</kbd></span></div>
-      <div class="res"><div class="r sel">{c.ic("channel.forum", "c-accent")}server<span class="path">Engineering</span></div><div class="r">{c.ic("thread")}Gateway: resume nach Netzwechsel<span class="path">server</span></div><div class="r">{c.ic("agent")}dev-runner<span class="path">Agent</span></div></div></div>
+      <div class="res"><div class="r sel">{c.ic("channel.forum", "c-accent")}server<span class="path">Engineering</span></div><div class="r">{c.ic("thread")}Gateway: resume after network change<span class="path">server</span></div><div class="r">{c.ic("agent")}dev-runner<span class="path">Agent</span></div></div></div>
   </div>
-  <div class="grp" style="grid-column:1/3"><h3>EINGABE MIT SLASH-VORSCHLÄGEN</h3>
+  <div class="grp" style="grid-column:1/3"><h3>INPUT WITH SLASH SUGGESTIONS</h3>
     <div class="composer-wrap" style="padding:150px 0 0">
-      <div class="suggest" role="listbox" aria-label="Befehle" style="left:0;right:0;bottom:56px">
-        <div class="hd">Befehle von dev-runner, Bediener dieses Kanals</div>
-        <div class="sug sel"><span class="cmd">/status</span><span class="desc">Zustand des laufenden Laufs</span><span class="src">Steuerbefehl</span></div>
-        <div class="sug"><span class="cmd">/stop</span><span class="desc">Lauf abbrechen, geht nie an das Modell</span><span class="src">Steuerbefehl</span></div>
-        <div class="sug"><span class="cmd">/stats</span><span class="desc">Kennzahlen des Kanals</span><span class="src">research-bot</span></div>
+      <div class="suggest" role="listbox" aria-label="Commands" style="left:0;right:0;bottom:56px">
+        <div class="hd">Commands from dev-runner, operator of this channel</div>
+        <div class="sug sel"><span class="cmd">/status</span><span class="desc">State of the current run</span><span class="src">Control command</span></div>
+        <div class="sug"><span class="cmd">/stop</span><span class="desc">Cancel the run, never goes to the model</span><span class="src">Control command</span></div>
+        <div class="sug"><span class="cmd">/stats</span><span class="desc">Channel metrics</span><span class="src">research-bot</span></div>
       </div>
       <div class="composer">{c.ic("action.attach")}<span class="txt">/st<span class="textcaret"></span></span>{c.ic("action.voice")}{c.ic("action.send", "c-accent")}</div>
     </div>
@@ -812,34 +812,34 @@ def _mobile_section(c: _Ctx) -> str:
     left = f"""
 <div class="phone" data-density="touch"><div class="m-side"><div class="sb"></div>
   <div class="brand" style="padding:6px 4px 10px"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 13.5 12 5l9 8.5" fill="none" stroke="var(--ds-color-surface-sidebar)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 12v7h9v-7" fill="none" stroke="var(--ds-color-surface-sidebar)" stroke-width="2.6" stroke-linejoin="round"/></svg></span><span class="name">Bothy</span><span style="margin-left:auto">{c.ic("action.search")}</span></div>
-  <div class="running" style="margin:0">{c.ic("run.running", "sm")}Läuft gerade<span class="count cnt">2</span></div>
+  <div class="running" style="margin:0">{c.ic("run.running", "sm")}Running now<span class="count cnt">2</span></div>
   <div class="space">{c.ic("action.expand", "caret")}<span class="sico" style="background:color-mix(in oklab,var(--ds-color-category-heather-on-sidebar) 22%,transparent);color:var(--ds-color-category-heather-on-sidebar)">{c.ic("headset")}</span><span class="t-section">Support</span></div>
-  <div class="ch">{c.ic("channel.text")}allgemein</div>
-  <div class="ch unread">{c.ic("channel.forum")}anfragen<span class="end"><span class="livedot"></span><span class="cnt">3</span></span></div>
-  <div class="ch mute">{c.ic("channel.text")}meldungen</div>
+  <div class="ch">{c.ic("channel.text")}general</div>
+  <div class="ch unread">{c.ic("channel.forum")}requests<span class="end"><span class="livedot"></span><span class="cnt">3</span></span></div>
+  <div class="ch mute">{c.ic("channel.text")}reports</div>
   <div class="space">{c.ic("action.expand", "caret")}<span class="sico" style="background:color-mix(in oklab,var(--ds-color-category-loch-on-sidebar) 22%,transparent);color:var(--ds-color-category-loch-on-sidebar)">{c.ic("code")}</span><span class="t-section">Engineering</span></div>
   <div class="ch">{c.ic("channel.forum")}server<span class="end"><span class="livedot"></span></span></div>
   <div class="ch">{c.ic("channel.forum")}apps</div>
   <div class="space">{c.ic("action.collapse", "caret")}<span class="sico" style="background:color-mix(in oklab,var(--ds-color-category-amber-on-sidebar) 22%,transparent);color:var(--ds-color-category-amber-on-sidebar)">{c.ic("megaphone")}</span><span class="t-section">Marketing</span><span class="dot"></span></div>
   </div>
-  <div class="m-tabbar"><div class="on">{c.ic("channel.forum")}Bereiche</div><div>{c.ic("action.notifications")}Erwähnt</div><div>{c.ic("run.running")}Läuft</div><div>{c.ic("person")}Ich</div></div>
+  <div class="m-tabbar"><div class="on">{c.ic("channel.forum")}Spaces</div><div>{c.ic("action.notifications")}Mentions</div><div>{c.ic("run.running")}Running</div><div>{c.ic("person")}Me</div></div>
 </div>"""
     right = f"""
 <div class="phone" data-density="touch"><div class="sb"></div>
-  <div class="nav"><span class="back">{c.ic("action.back", "lg", "Zurück")}</span><span class="t-heading">Gateway: resume nach Netzwechsel</span>{c.ic("action.more", "lg")}</div>
-  <div class="offline">{c.ic("state.offline", "sm")}Offline. 1 Nachricht wartet.</div>
-  <div class="m-lb" role="status" aria-label="Läuft seit 4 Minuten, Stopp möglich">{c.ic("run.running", "c-running")}<div class="grow"><div class="t-label">Läuft 4:12 · 62 %</div><div class="stl">go test ./internal/sync/...</div></div><span class="m-stop" role="button" aria-label="Lauf stoppen">{c.ic("action.stop")}</span></div>
+  <div class="nav"><span class="back">{c.ic("action.back", "lg", "Back")}</span><span class="t-heading">Gateway: resume after network change</span>{c.ic("action.more", "lg")}</div>
+  <div class="offline">{c.ic("state.offline", "sm")}Offline. 1 message waiting.</div>
+  <div class="m-lb" role="status" aria-label="Running for 4 minutes, stop possible">{c.ic("run.running", "c-running")}<div class="grow"><div class="t-label">Running 4:12 · 62%</div><div class="stl">go test ./internal/sync/...</div></div><span class="m-stop" role="button" aria-label="Stop run">{c.ic("action.stop")}</span></div>
   <div class="msgs" style="flex:1;justify-content:flex-end">
     <div class="msg agent"><span class="av agent c-spruce">{c.ic("agent")}</span><div><div class="who"><b>dev-runner</b><span class="ts">10:16</span></div>
-      <div class="card"><div class="hd">{c.ic("security.step-up", "c-attn")}Freigabe nötig</div><div class="t-body-sm"><code class="inl">go test</code> möchte das Netzwerk nutzen.</div>
-      <div class="row" style="flex-direction:column;align-items:stretch"><span class="btn primary" style="justify-content:center">Einmal erlauben</span><span class="btn secondary" style="justify-content:center">Für diese Sitzung</span><span class="btn ghost" style="justify-content:center">Ablehnen</span></div></div></div></div>
-    <div class="msg"><span class="av c-heather">AL</span><div><div class="who"><b>Alex</b><span class="ts">10:22</span>{c.ic("trigger.working", "tr-working", "Wird bearbeitet")}</div><div class="body"><p>Bitte auch abgelaufene Threads prüfen.</p></div></div></div>
-    <div class="msg cont pending"><span class="av c-heather">AL</span><div><div class="body"><p>Und danach bitte zusammenfassen.</p></div><div class="who"><span class="ts">{c.ic("trigger.queued", "sm tr-queued")}wird gesendet</span></div></div></div>
+      <div class="card"><div class="hd">{c.ic("security.step-up", "c-attn")}Approval needed</div><div class="t-body-sm"><code class="inl">go test</code> wants to use the network.</div>
+      <div class="row" style="flex-direction:column;align-items:stretch"><span class="btn primary" style="justify-content:center">Allow once</span><span class="btn secondary" style="justify-content:center">For this session</span><span class="btn ghost" style="justify-content:center">Deny</span></div></div></div></div>
+    <div class="msg"><span class="av c-heather">AL</span><div><div class="who"><b>Alex</b><span class="ts">10:22</span>{c.ic("trigger.working", "tr-working", "Working")}</div><div class="body"><p>Please also check expired threads.</p></div></div></div>
+    <div class="msg cont pending"><span class="av c-heather">AL</span><div><div class="body"><p>And then please summarize.</p></div><div class="who"><span class="ts">{c.ic("trigger.queued", "sm tr-queued")}sending</span></div></div></div>
   </div>
-  <div class="composer">{c.ic("action.attach", "lg")}<span class="txt ph">Nachtrag an dev-runner</span>{c.ic("action.voice", "lg")}</div>
+  <div class="composer">{c.ic("action.attach", "lg")}<span class="txt ph">Follow-up to dev-runner</span>{c.ic("action.voice", "lg")}</div>
 </div>"""
     return (
-        '<section class="pv" id="mobile"><h2 class="t-title">iPhone und Android</h2><div class="phones">'
+        '<section class="pv" id="mobile"><h2 class="t-title">iPhone and Android</h2><div class="phones">'
         + left
         + right
         + "</div></section>"
@@ -865,21 +865,21 @@ def _terminal_section(c: _Ctx) -> str:
     )
     desktop = f"""
 <div class="term">
-  <div class="term-head">{c.ic("terminal-window")}<span class="t-heading">Build-Rechner</span><span class="presence"><i></i>online</span><span class="badge b-org">{c.ic("billing.organization")}Organisation</span><span class="fp">Fp 7KQ2 9XTA</span><span class="grow"></span><span class="t-caption secondary">Rest 11:42</span></div>
-  <div class="term-tabs"><span class="term-tab on">shell 1</span><span class="term-tab">claude: server</span><span class="term-tab">{c.ic("action.new", "sm")}Neue Sitzung</span><span class="grow"></span><span class="btn secondary">Trennen</span><span class="btn danger-out">Beenden</span></div>
-  <div class="screen" role="log" aria-label="Terminal shell 1 auf Build-Rechner">{screen}</div>
-  <div class="term-foot"><span>{c.ic("security.lock", "sm")}Ende-zu-Ende verschlüsselt</span><span>Profil shell</span><span>Leerlauf-Abbruch aktiv</span></div>
+  <div class="term-head">{c.ic("terminal-window")}<span class="t-heading">Build host</span><span class="presence"><i></i>online</span><span class="badge b-org">{c.ic("billing.organization")}Organization</span><span class="fp">Fp 7KQ2 9XTA</span><span class="grow"></span><span class="t-caption secondary">Left 11:42</span></div>
+  <div class="term-tabs"><span class="term-tab on">shell 1</span><span class="term-tab">claude: server</span><span class="term-tab">{c.ic("action.new", "sm")}New session</span><span class="grow"></span><span class="btn secondary">Detach</span><span class="btn danger-out">End</span></div>
+  <div class="screen" role="log" aria-label="Terminal shell 1 on Build host">{screen}</div>
+  <div class="term-foot"><span>{c.ic("security.lock", "sm")}End-to-end encrypted</span><span>Profile shell</span><span>Idle timeout active</span></div>
 </div>
-<div class="ansi" aria-label="ANSI-Farben 0 bis 15">{swatches}</div>
+<div class="ansi" aria-label="ANSI colors 0 to 15">{swatches}</div>
 <div class="dlgs">
-  <div class="dlg"><div class="hd">{c.ic("security.step-up", "c-attn")}Terminal öffnen</div>
-    <dl class="kv"><dt>Rechner</dt><dd>Build-Rechner</dd><dt>Profil</dt><dd>shell</dd><dt>Anmeldung</dt><dd><span class="badge b-org">{c.ic("billing.organization")}Organisation</span></dd></dl>
-    <div class="t-caption muted" style="margin-top:8px">Jede Öffnung wird protokolliert.</div>
-    <div class="row"><span class="btn ghost">Abbrechen</span><span class="btn primary">{c.ic("security.key")}Mit Passkey bestätigen</span></div></div>
-  <div class="dlg warn"><div class="hd">{c.ic("state.warning", "c-failed")}Schlüssel des Rechners hat sich geändert</div>
-    <dl class="kv"><dt>Gespeichert</dt><dd class="mono">7KQ2 9XTA M4PB 1C8D</dd><dt>Jetzt</dt><dd class="mono">Q0ZJ 55RW 2HNE K7TS</dd></dl>
-    <div class="t-caption secondary" style="margin-top:8px">Ohne Neukopplung durch einen Owner ist das ein Hinweis auf einen Angriff.</div>
-    <div class="row"><span class="btn secondary">Neuen Schlüssel annehmen</span><span class="btn danger">Nicht verbinden</span></div></div>
+  <div class="dlg"><div class="hd">{c.ic("security.step-up", "c-attn")}Open terminal</div>
+    <dl class="kv"><dt>Host</dt><dd>Build host</dd><dt>Profile</dt><dd>shell</dd><dt>Login</dt><dd><span class="badge b-org">{c.ic("billing.organization")}Organization</span></dd></dl>
+    <div class="t-caption muted" style="margin-top:8px">Every opening is logged.</div>
+    <div class="row"><span class="btn ghost">Cancel</span><span class="btn primary">{c.ic("security.key")}Confirm with passkey</span></div></div>
+  <div class="dlg warn"><div class="hd">{c.ic("state.warning", "c-failed")}The host's key has changed</div>
+    <dl class="kv"><dt>Stored</dt><dd class="mono">7KQ2 9XTA M4PB 1C8D</dd><dt>Now</dt><dd class="mono">Q0ZJ 55RW 2HNE K7TS</dd></dl>
+    <div class="t-caption secondary" style="margin-top:8px">Without re-pairing by an owner, this is a sign of an attack.</div>
+    <div class="row"><span class="btn secondary">Accept new key</span><span class="btn danger">Do not connect</span></div></div>
 </div>"""
     keys = "".join(
         f'<span class="key{on}">{k}</span>'
@@ -900,10 +900,10 @@ def _terminal_section(c: _Ctx) -> str:
     )
     phone = f"""
 <div class="phone" data-density="touch"><div class="sb"></div>
-  <div class="nav"><span class="back">{c.ic("action.back", "lg", "Zurück")}</span><span class="t-heading">Build-Rechner</span><span class="badge b-org">Org.</span></div>
-  <div class="term-tabs"><span class="term-tab on">shell 1</span><span class="grow"></span><span class="t-caption secondary">Rest 11:42</span><span class="btn secondary">Trennen</span></div>
+  <div class="nav"><span class="back">{c.ic("action.back", "lg", "Back")}</span><span class="t-heading">Build host</span><span class="badge b-org">Org.</span></div>
+  <div class="term-tabs"><span class="term-tab on">shell 1</span><span class="grow"></span><span class="t-caption secondary">Left 11:42</span><span class="btn secondary">Detach</span></div>
   <div class="screen" role="log" aria-label="Terminal shell 1">{screen.replace("internal/sync/", "").replace("resume_test.go:88: expected seq 41, got 40", "resume_test.go:88: seq 41 != 40")}</div>
-  <div class="keys" role="toolbar" aria-label="Sondertasten">{keys}</div>
+  <div class="keys" role="toolbar" aria-label="Extra keys">{keys}</div>
 </div>"""
     return (
         '<section class="pv" id="terminal"><h2 class="t-title">Terminal</h2><div class="tw"><div>'
@@ -936,9 +936,9 @@ def delivery_slo(path: Path = SLO_FILE) -> tuple[float, float]:
     return float(objective.group(1)), float(threshold.group(1))
 
 
-def _de(value: float) -> str:
-    """Format a number the German way, without trailing zeros (99.5 -> '99,5', 500.0 -> '500')."""
-    return f"{value:.10g}".replace(".", ",")
+def _num(value: float) -> str:
+    """Format a number the English way, without trailing zeros (99.5 -> '99.5', 500.0 -> '500', 2941.0 -> '2,941')."""
+    return f"{value:,.10g}"
 
 
 def _viz_section(c: _Ctx) -> str:
@@ -957,7 +957,8 @@ def _viz_section(c: _Ctx) -> str:
     )
     axis = '<line x1="36" x2="480" y1="150" y2="150" stroke="var(--ds-color-viz-axis)"/><line x1="36" x2="36" y1="20" y2="150" stroke="var(--ds-color-viz-axis)"/>'
     labels = "".join(
-        f'<text x="{56 + d * 62}" y="166">{t}</text>' for d, t in enumerate(("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"))
+        f'<text x="{56 + d * 62}" y="166">{t}</text>'
+        for d, t in enumerate(("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"))
     )
     names = (
         "dev-runner",
@@ -967,13 +968,13 @@ def _viz_section(c: _Ctx) -> str:
         "release-bot",
         "docs-bot",
         "import-bot",
-        "weitere",
+        "others",
     )
     legend = "".join(
         f'<span><i style="background:var(--ds-color-viz-series-{k})"></i>{n}</span>' for k, n in enumerate(names, 1)
     )
     # Share of live deliveries within the threshold of the SLO, per hour. Target and threshold
-    # come from the SLO file (25 "Zustellung und Sync live"); the sample values are invented.
+    # come from the SLO file (25 "Delivery and sync live"); the sample values are invented.
     objective, threshold_s = delivery_slo()
     low = objective - (100 - objective)
 
@@ -986,13 +987,13 @@ def _viz_section(c: _Ctx) -> str:
     area = f"M56,150 L{line.replace(' ', ' L')} L476,150 Z"
     y_axis = "".join(
         f'<line x1="56" x2="480" y1="{y_of(v)}" y2="{y_of(v)}" stroke="var(--ds-color-viz-grid)"/>'
-        f'<text x="50" y="{y_of(v) + 4}" text-anchor="end">{_de(v)}</text>'
+        f'<text x="50" y="{y_of(v) + 4}" text-anchor="end">{_num(v)}</text>'
         for v in (low, 100)
     )
     target = (
         f'<line x1="56" x2="480" y1="{y_of(objective)}" y2="{y_of(objective)}" '
         'stroke="var(--ds-color-viz-axis)" stroke-dasharray="6 4"/>'
-        f'<text x="50" y="{y_of(objective) + 4}" text-anchor="end">{_de(objective)}</text>'
+        f'<text x="50" y="{y_of(objective) + 4}" text-anchor="end">{_num(objective)}</text>'
     )
     share_axis = (
         '<line x1="56" x2="480" y1="150" y2="150" stroke="var(--ds-color-viz-axis)"/>'
@@ -1001,29 +1002,29 @@ def _viz_section(c: _Ctx) -> str:
     tiles = "".join(
         f'<div class="tile"><div class="lab">{lab}</div><div class="num">{num}</div><div class="cmp">{c.ic(ic, "sm")}{cmp}</div></div>'
         for lab, num, ic, cmp in (
-            ("Läufe heute", "128", "trigger.followup", "12 mehr als gestern"),
-            ("Werkzeugaufrufe", "2 941", "trigger.followup", "8 % mehr als gestern"),
-            ("Kosten heute", "14,20 USD", "cost", "Schätzung, nur API-Modus"),
-            ("Zustellung im Ziel", "99,9 %", "run.completed", f"Ziel {_de(objective)} %"),
+            ("Runs today", "128", "trigger.followup", "12 more than yesterday"),
+            ("Tool calls", "2,941", "trigger.followup", "8% more than yesterday"),
+            ("Costs today", "USD 14.20", "cost", "Estimate, API mode only"),
+            ("Delivery on target", "99.9%", "run.completed", f"Target {_num(objective)}%"),
         )
     )
     lanes = f"""
-<div class="lanes" role="table" aria-label="Live-Topologie">
+<div class="lanes" role="table" aria-label="Live topology">
   <div class="lane"><div class="lh"><span class="sico" style="color:var(--ds-color-category-loch-fg)">{c.ic("code")}</span>Engineering</div><div class="cards">
-    <div class="rc s-running"><div class="top">{c.ic("run.running", "sm c-running")}dev-runner<span class="t-caption muted">4:12</span></div><div class="bot"><span class="tool">{c.ic("step.tool_call")}Bash</span><span class="t-code-sm">go test</span></div><div class="bot"><span class="badge b-org">Org.</span><span class="t-code-sm">0,62 USD</span></div></div>
-    <div class="rc s-completed"><div class="top">{c.ic("run.completed", "sm c-completed")}review-bot<span class="t-caption muted">vor 2 min</span></div><div class="bot"><span class="tool">{c.ic("step.tool_call")}Read</span><span class="t-code-sm">3 Dateien</span></div><div class="bot"><span class="badge b-org">Org.</span><span class="t-code-sm">0,08 USD</span></div></div>
+    <div class="rc s-running"><div class="top">{c.ic("run.running", "sm c-running")}dev-runner<span class="t-caption muted">4:12</span></div><div class="bot"><span class="tool">{c.ic("step.tool_call")}Bash</span><span class="t-code-sm">go test</span></div><div class="bot"><span class="badge b-org">Org.</span><span class="t-code-sm">USD 0.62</span></div></div>
+    <div class="rc s-completed"><div class="top">{c.ic("run.completed", "sm c-completed")}review-bot<span class="t-caption muted">2 min ago</span></div><div class="bot"><span class="tool">{c.ic("step.tool_call")}Read</span><span class="t-code-sm">3 files</span></div><div class="bot"><span class="badge b-org">Org.</span><span class="t-code-sm">USD 0.08</span></div></div>
   </div></div>
   <div class="lane"><div class="lh"><span class="sico" style="color:var(--ds-color-category-heather-fg)">{c.ic("headset")}</span>Support</div><div class="cards">
-    <div class="rc s-waiting"><div class="top">{c.ic("run.waiting", "sm c-waiting")}support-agent<span class="t-caption muted">wartet</span></div><div class="bot">Freigabe wartet</div><div class="bot"><span class="badge b-pers">Persönlich</span><span class="t-caption muted">nur Information</span></div></div>
+    <div class="rc s-waiting"><div class="top">{c.ic("run.waiting", "sm c-waiting")}support-agent<span class="t-caption muted">waiting</span></div><div class="bot">Approval waiting</div><div class="bot"><span class="badge b-pers">Personal</span><span class="t-caption muted">information only</span></div></div>
   </div></div>
 </div>"""
     charts = f"""
-<div class="chart"><h4>Läufe je Agent, letzte 7 Tage</h4><svg viewBox="0 0 490 172" role="img" aria-label="Gestapelte Balken der Läufe je Agent">{grid}{"".join(bars)}{axis}{labels}</svg><div class="legend">{legend}</div></div>
-<div class="chart"><h4>Zustellung heute: Anteil innerhalb {_de(threshold_s * 1000)} ms</h4><svg viewBox="0 0 490 172" role="img" aria-label="Fläche des Anteils der Zustellungen innerhalb der Schwelle, mit Ziellinie">{y_axis}<path d="{area}" fill="var(--ds-color-viz-area-fill)"/><polyline points="{line}" fill="none" stroke="var(--ds-color-viz-series-1)" stroke-width="2"/>{target}{share_axis}</svg><div class="legend"><span><i style="background:var(--ds-color-viz-series-1)"></i>Anteil in %, je Stunde</span><span>gestrichelt: Ziel {_de(objective)} % (SLO {SLO_NAME})</span></div></div>"""
+<div class="chart"><h4>Runs per agent, last 7 days</h4><svg viewBox="0 0 490 172" role="img" aria-label="Stacked bars of the runs per agent">{grid}{"".join(bars)}{axis}{labels}</svg><div class="legend">{legend}</div></div>
+<div class="chart"><h4>Delivery today: share within {_num(threshold_s * 1000)} ms</h4><svg viewBox="0 0 490 172" role="img" aria-label="Area of the share of deliveries within the threshold, with a target line">{y_axis}<path d="{area}" fill="var(--ds-color-viz-area-fill)"/><polyline points="{line}" fill="none" stroke="var(--ds-color-viz-series-1)" stroke-width="2"/>{target}{share_axis}</svg><div class="legend"><span><i style="background:var(--ds-color-viz-series-1)"></i>Share in %, per hour</span><span>dashed: target {_num(objective)}% (SLO {SLO_NAME})</span></div></div>"""
     slo = f"""
-<div class="slo"><span class="badge b-ok">{c.ic("run.completed", "sm")}Zustellung: im Ziel</span><span class="badge b-warn">{c.ic("state.warning", "sm")}Reconnect: Budget knapp</span><span class="badge b-bad">{c.ic("state.error", "sm")}Push: Ziel verfehlt</span><span class="badge b-none">{c.ic("state.info", "sm")}Agenten-Läufe: zu wenig Daten</span><span class="t-caption muted" style="align-self:center">eigene Messung</span></div>"""
+<div class="slo"><span class="badge b-ok">{c.ic("run.completed", "sm")}Delivery: on target</span><span class="badge b-warn">{c.ic("state.warning", "sm")}Reconnect: budget tight</span><span class="badge b-bad">{c.ic("state.error", "sm")}Push: target missed</span><span class="badge b-none">{c.ic("state.info", "sm")}Agent runs: not enough data</span><span class="t-caption muted" style="align-self:center">own measurement</span></div>"""
     return (
-        '<section class="pv" id="viz"><h2 class="t-title">Statistik und Live-Ansichten</h2><div class="vz">'
+        '<section class="pv" id="viz"><h2 class="t-title">Statistics and live views</h2><div class="vz">'
         + tiles
         + lanes
         + charts
@@ -1039,19 +1040,19 @@ def render(model: Model, vendor: Path, header: str) -> str:
     return (
         "<!doctype html>\n"
         f"<!-- {header} -->\n"
-        "<!-- Schriften: Atkinson Hyperlegible Next und Mono, SIL Open Font License 1.1 (siehe tools/design-tokens/vendor/fonts). Icons: Phosphor, MIT (siehe tools/design-tokens/vendor/phosphor/LICENSE). -->\n"
-        '<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<title>Design-System: Vorschau</title>\n<style>\n"
+        "<!-- Fonts: Atkinson Hyperlegible Next and Mono, SIL Open Font License 1.1 (see tools/design-tokens/vendor/fonts). Icons: Phosphor, MIT (see tools/design-tokens/vendor/phosphor/LICENSE). -->\n"
+        '<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        "<title>Design system: preview</title>\n<style>\n"
         + _font_faces(vendor)
         + "\n"
         + tokens_css
         + CSS
         + "</style></head><body>\n"
         + _sprite(model, vendor)
-        + '\n<div class="pv-bar"><b>Design-System</b><span class="grow"></span>'
-        '<label>Theme <select id="pv-theme"><option value="system">System</option><option value="light">Hell</option><option value="dark">Dunkel</option></select></label>'
-        '<label>Dichte <select id="pv-density"><option value="comfortable">comfortable</option><option value="compact">compact</option><option value="touch">touch</option></select></label>'
-        '<label>Bewegung <select id="pv-motion"><option value="system">System</option><option value="full">voll</option><option value="reduced">reduziert</option></select></label></div>\n'
+        + '\n<div class="pv-bar"><b>Design system</b><span class="grow"></span>'
+        '<label>Theme <select id="pv-theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>'
+        '<label>Density <select id="pv-density"><option value="comfortable">comfortable</option><option value="compact">compact</option><option value="touch">touch</option></select></label>'
+        '<label>Motion <select id="pv-motion"><option value="system">System</option><option value="full">full</option><option value="reduced">reduced</option></select></label></div>\n'
         + _layout_section(c)
         + _components_section(c)
         + _mobile_section(c)

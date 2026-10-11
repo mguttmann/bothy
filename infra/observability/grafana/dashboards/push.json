@@ -1,7 +1,7 @@
 {
   "uid": "bothy-push",
   "title": "Bothy / Push",
-  "description": "Push without content (docs/spec/13-push-benachrichtigungen.md): sends, provider acceptance, skips and fetches by the app.",
+  "description": "Push without content (docs/spec/13-push-notifications.md): sends, provider acceptance, skips and fetches by the app.",
   "tags": [
     "bothy"
   ],

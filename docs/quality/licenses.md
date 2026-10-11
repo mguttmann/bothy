@@ -1,69 +1,69 @@
-# Lizenzen
+# Licenses
 
-Das Projekt steht unter Apache-2.0 mit DCO (ADR 0003). Ausgelieferte Teile (Server,
-Images, Apps, SDKs, Adapter) dürfen nur Abhängigkeiten mit vereinbarer Lizenz enthalten.
-Entwicklungswerkzeuge unter `tools/` werden nicht ausgeliefert; für sie gilt die Liste
-nicht (ihre Lizenzen stehen in toolchain.md).
+The project is licensed under Apache-2.0 with DCO (ADR 0003). Shipped parts (server,
+images, apps, SDKs, adapters) may only contain dependencies with a compatible license.
+Development tools under `tools/` are not shipped; the list does not apply to them
+(their licenses are listed in toolchain.md).
 
-## Erlaubte Lizenzen
+## Allowed licenses
 
-Quelle der Wahrheit ist `quality/licenses/allowed.txt`; ein Test hält diese Tabelle
-gleich.
+The source of truth is `quality/licenses/allowed.txt`; a test keeps this table
+equal to it.
 
-| SPDX | Art |
+| SPDX | Kind |
 |---|---|
-| `0BSD` | erlaubend |
-| `Apache-2.0` | erlaubend, mit Patentlizenz |
-| `BSD-2-Clause` | erlaubend |
-| `BSD-3-Clause` | erlaubend |
-| `BSL-1.0` | erlaubend |
-| `CC0-1.0` | gemeinfrei-ähnlich |
-| `ISC` | erlaubend |
-| `MIT` | erlaubend |
-| `MIT-0` | erlaubend |
-| `MPL-2.0` | schwaches Copyleft je Datei; nur unverändert nutzen |
-| `PSF-2.0` | erlaubend |
-| `Python-2.0` | erlaubend |
-| `Unicode-3.0` | erlaubend (Unicode-Daten) |
-| `Unicode-DFS-2016` | erlaubend (Unicode-Daten) |
-| `Zlib` | erlaubend |
+| `0BSD` | permissive |
+| `Apache-2.0` | permissive, with patent license |
+| `BSD-2-Clause` | permissive |
+| `BSD-3-Clause` | permissive |
+| `BSL-1.0` | permissive |
+| `CC0-1.0` | public-domain-like |
+| `ISC` | permissive |
+| `MIT` | permissive |
+| `MIT-0` | permissive |
+| `MPL-2.0` | weak copyleft per file; use only unmodified |
+| `PSF-2.0` | permissive |
+| `Python-2.0` | permissive |
+| `Unicode-3.0` | permissive (Unicode data) |
+| `Unicode-DFS-2016` | permissive (Unicode data) |
+| `Zlib` | permissive |
 
-Nicht erlaubt ohne ADR: GPL, AGPL, LGPL in statisch gelinkten Teilen (Go-Server, Apps),
-SSPL, BUSL, Lizenzen mit Nutzungsbeschränkung (zum Beispiel Commons Clause), proprietäre
-und unbekannte Lizenzen. Ein Dienst unter einer solchen Lizenz darf als getrennter Prozess
-angebunden werden, wenn das Kapitel des Dienstes das begründet (zum Beispiel der
-Virenscanner in Kapitel 12).
+Not allowed without an ADR: GPL, AGPL, LGPL in statically linked parts (Go server, apps),
+SSPL, BUSL, licenses with usage restrictions (for example Commons Clause), proprietary
+and unknown licenses. A service under such a license may be connected as a separate process
+if the chapter of the service justifies it (for example the
+virus scanner in chapter 12).
 
-MPL-2.0 ist erlaubt, weil Pflichten nur geänderte Dateien der Bibliothek betreffen; die
-Planungsgrundlage nennt River (MPL-2.0) für Hintergrundjobs.
+MPL-2.0 is allowed because its obligations only affect modified files of the library; the
+planning basis names River (MPL-2.0) for background jobs.
 
-## Lizenz-Gate (`make licenses`)
+## License gate (`make licenses`)
 
-1. `LICENSE` ist der unveränderte Apache-2.0-Text (sha256 gegen
-   https://www.apache.org/licenses/LICENSE-2.0.txt, abgerufen 2026-10-10) [belegt].
-2. Jede handgeschriebene Quelldatei trägt `SPDX-License-Identifier: Apache-2.0` in den
-   ersten `license.spdx_header_lines` Zeilen; generierter Code ist ausgenommen
+1. `LICENSE` is the unmodified Apache-2.0 text (sha256 against
+   https://www.apache.org/licenses/LICENSE-2.0.txt, retrieved 2026-10-10) [verified].
+2. Every handwritten source file carries `SPDX-License-Identifier: Apache-2.0` in the
+   first `license.spdx_header_lines` lines; generated code is exempt
    (`tools/ci/license_check.py`).
-3. Abhängigkeiten ausgelieferter Komponenten: OSV-Scanner mit `--licenses` und der Liste
-   oben über alle Lock-Dateien der Komponente (Go, Dart, Python, npm); OSV-Scanner bezieht
-   Lizenzdaten über deps.dev (https://github.com/google/osv-scanner, abgerufen 2026-10-10)
-   [belegt]. Für Go zusätzlich `go-licenses check` über die tatsächlich gelinkten Pakete.
-   Meldet OSV-Scanner eine Lizenz als `UNKNOWN` oder `non-standard` (deps.dev kennt den
-   Lizenztext nicht als SPDX-Ausdruck), wird die Lizenz in der LICENSE-Datei des Pakets
-   geprüft und in einer `osv-scanner.toml` der Komponente als `PackageOverrides` mit Grund
-   festgehalten; nie pauschal für alle Pakete.
-4. Vor jedem Release und vor dem Öffentlich-Schalten: ScanCode über den ganzen Baum
-   (Lizenztexte und Copyright-Angaben in Dateien), Ergebnis im Release-Protokoll. ScanCode
-   ist kein Pull-Request-Gate, weil ein Lauf über den ganzen Baum lange dauert; der
-   Ablauf ist ein Ticket der Release-Etappe.
+3. Dependencies of shipped components: OSV-Scanner with `--licenses` and the list
+   above over all lock files of the component (Go, Dart, Python, npm); OSV-Scanner obtains
+   license data via deps.dev (https://github.com/google/osv-scanner, retrieved 2026-10-10)
+   [verified]. For Go, additionally `go-licenses check` over the packages actually linked.
+   If OSV-Scanner reports a license as `UNKNOWN` or `non-standard` (deps.dev does not know the
+   license text as an SPDX expression), the license is checked in the LICENSE file of the package
+   and recorded with a reason in an `osv-scanner.toml` of the component as `PackageOverrides`;
+   never as a blanket rule for all packages.
+4. Before every release and before going public: ScanCode over the whole tree
+   (license texts and copyright notices in files), result in the release record. ScanCode
+   is not a pull request gate, because a run over the whole tree takes a long time; the
+   procedure is a ticket of the release milestone.
 
-## SBOM und Prüfung von Releases
+## SBOM and checking releases
 
-* Jedes Release enthält `sbom.spdx.json` (SPDX, erzeugt mit Syft über
-  `anchore/sbom-action`) und `SHA256SUMS`.
-* Server-Images tragen Provenance und SBOM als Attestation im Registry-Eintrag
+* Every release contains `sbom.spdx.json` (SPDX, generated with Syft via
+  `anchore/sbom-action`) and `SHA256SUMS`.
+* Server images carry provenance and SBOM as an attestation in the registry entry
   (Buildx, `provenance: mode=max`, `sbom: true`).
-* Zusätzlich signierte Build-Provenance und SBOM-Attestation über GitHub Artifact
-  Attestations, solange das Repository öffentlich ist (ADR 0039); Prüfung mit
-  `gh attestation verify <datei> --repo <owner>/<repo>`
-  (https://github.com/actions/attest-build-provenance, abgerufen 2026-10-10) [belegt].
+* In addition, signed build provenance and SBOM attestation via GitHub Artifact
+  Attestations, as long as the repository is public (ADR 0039); check with
+  `gh attestation verify <file> --repo <owner>/<repo>`
+  (https://github.com/actions/attest-build-provenance, retrieved 2026-10-10) [verified].

@@ -54,9 +54,9 @@ class PreviewSectionsTest(unittest.TestCase):
         threshold = re.search(r'le="([0-9.]+)"', slo["sli"]["events"]["error_query"]).group(1)
         self.assertEqual(emit_preview.delivery_slo(), (float(slo["objective"]), float(threshold)))
         section = self.html.split('<section class="pv" id="viz"', 1)[1].split("</section>", 1)[0]
-        objective = f"{float(slo['objective']):.10g}".replace(".", ",")
-        self.assertIn(f"Ziel {objective} %", section)
-        self.assertIn(f"Anteil innerhalb {float(threshold) * 1000:.10g} ms", section)
+        objective = f"{float(slo['objective']):.10g}"
+        self.assertIn(f"Target {objective}%", section)
+        self.assertIn(f"share within {float(threshold) * 1000:.10g} ms", section)
         self.assertIn('stroke-dasharray="6 4"', section)
         self.assertNotIn("250 ms", section)
 

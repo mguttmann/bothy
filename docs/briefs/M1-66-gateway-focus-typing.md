@@ -1,6 +1,6 @@
 # M1-66: Gateway focus and typing
 
-Status: ready | Depends on: M1-65 | Etappe: M1
+Status: ready | Depends on: M1-65 | Milestone: M1
 
 ## Goal
 
@@ -13,28 +13,29 @@ single path for ephemeral events that `runs`, `agents` and `notify` use from M2 
 
 ## Read first
 
-- `docs/PLAN.md`: section "Arbeitsweise je Ticket"; section "M1 Fundament", rows M1-64 to M1-68;
+- `docs/PLAN.md`: section "Way of working per ticket"; section "M1 Foundation", rows M1-64 to M1-68;
   rows M2-10 and M3-23 (later users of focus and of the publisher).
-- `docs/spec/04-sync-protokoll.md`: "Zwei Arten", "Umschlag (Envelope)", "Ops" (row `focus` with
-  `idle`, rows `typing.start` / `typing.stop`), "Lebenszyklus" step 7 (`resume` restores focus),
-  "Was der Client bei Entzug bekommt und tut" item 2 (focus ends), "Zustellgarantie" item 4,
-  "Reihenfolge", "Vom Server zu den Clients" item 2 (`sync.max_focused_threads`), "Tippen und
-  Agenten-Präsenz" item 1 and item 3, "Konfigurationswerte dieses Kapitels".
-- `docs/spec/05-aktionen.md`: "Rate-Limit-Klassen" (`rl.read` keyed by principal, `rl.typing`
-  keyed by connection), action rows `gateway.focus` and `typing.start`, "Verbindliche Regeln"
-  rule 8 (read-only channels block typing), "Kurzlebige Ereignisse" (Zusatzbedingung "Thread im
-  Fokus"), "WebSocket-Ops und Aktion".
-- `docs/spec/02-architektur.md`: "Querschnitts-Ports" (`kernel/eventlog.EphemeralPublisher`),
-  "Ports, Ereignisse und Quellen je Modul" (row `gateway`), "Erlaubte Abhängigkeiten" (`gateway`
-  may use `chat`), "Kurzlebige Ereignisse".
-- `docs/spec/13-push-benachrichtigungen.md`: "Aktiv am Gerät" (meaning of `idle`).
-- `docs/spec/01-produkt.md`: feature row "Tippen-Anzeige (Menschen)".
+- `docs/spec/04-sync-protocol.md`: "Two kinds", "Envelope", "Ops" (row `focus` with `idle`, rows
+  `typing.start` / `typing.stop`), "Lifecycle" step 7 (`resume` restores focus),
+  "What the client receives and does on access removal" item 2 (focus ends),
+  "Delivery guarantee" item 4, "Ordering", "From the server to the clients" item 2
+  (`sync.max_focused_threads`), "Typing and agent presence" item 1 and item 3,
+  "Configuration values of this chapter".
+- `docs/spec/05-actions.md`: "Rate-limit classes" (`rl.read` keyed by principal, `rl.typing`
+  keyed by connection), action rows `gateway.focus` and `typing.start`, "Binding rules" rule 8
+  (read-only channels block typing), "Ephemeral events" (additional condition
+  "thread in focus"), "WebSocket ops and action".
+- `docs/spec/02-architecture.md`: "Cross-cutting ports" (`kernel/eventlog.EphemeralPublisher`),
+  "Ports, events and sources per module" (row `gateway`), "Allowed dependencies" (`gateway`
+  may use `chat`), "Ephemeral events".
+- `docs/spec/13-push-notifications.md`: "Active on a device" (meaning of `idle`).
+- `docs/spec/01-product.md`: feature row "Typing indicator (people)".
 - `docs/api/asyncapi.yaml`: `receive.focus` (`x-rate-limit-class: rl.read`), `receive.typing.start`,
   `receive.typing.stop`, message `event.typing.started`. `docs/api/openapi.yaml` schemas
   `GatewayFocus`, `GatewayTyping`, `TypingStartedEvent`, `TypingStartedPayload`, `EventEnvelope`,
   `GatewayError`.
 - ADR `docs/adr/0017-*` and 0053 (no JSON null).
-- `docs/security/threat-model.md` "Gateway (WebSocket)" (row "Fokus auf fremde Threads").
+- `docs/security/threat-model.md` "Gateway (WebSocket)" (row "Focus on foreign threads").
 - Code you build on: `internal/gateway` (M1-64, M1-65: hub, queue, phases, test client),
   `internal/kernel/eventlog`, `internal/kernel/authorize` (`Delivery(ctx)` from M1-65),
   `internal/platform/ratelimit` (M1-19), the `chat` port (`Threads` info, M1-55).
@@ -57,29 +58,29 @@ single path for ephemeral events that `runs`, `agents` and `notify` use from M2 
 6. Test first: every behaviour change has a test that was red before the change (record the red
    run in the report), then green, then clean up.
 7. No en dash or em dash (U+2013, U+2014) in any file you write.
-8. White label: only the examples Alex, Sam, Robin, `example.com` and the areas Support, Marketing,
+8. White label: only the examples Alex, Sam, Robin, `example.com` and the spaces Support, Marketing,
    Engineering, Research; no paths under `/Users`.
 9. Limits and intervals only through named keys from `docs/operations/configuration.md`.
 10. `focus {thread_ids, idle}` replaces the previous set; each thread is checked with
     `authorize(principal, gateway.focus, thread)`; unreadable threads are ignored silently; at
-    most `sync.max_focused_threads` threads (04 "Ops", "Vom Server zu den Clients"; 05 row
+    most `sync.max_focused_threads` threads (04 "Ops", "From the server to the clients"; 05 row
     `gateway.focus`).
 11. `typing.start {thread_id}` is checked with action `typing.start` and rate class `rl.typing`;
-    `typing.stop` uses the same action and class (05 "WebSocket-Ops und Aktion").
+    `typing.stop` uses the same action and class (05 "WebSocket ops and action").
 12. The server fans out `typing.start` at most once per `sync.typing_min_interval` and sends
     `typing.started {thread_id, principal_id, expires_at}` only to connections that focus the
-    thread and may read it; without renewal the display ends after `sync.typing_ttl` (04 "Tippen
-    und Agenten-Präsenz" item 1).
-13. Agents send no typing of their own; a running run shows the agent's typing (04 "Tippen und
-    Agenten-Präsenz" item 1; ruling L9; 01 "Tippen-Anzeige (Menschen)"). 05 gives `typing.start`
-    the right "human und write", so `authorize` denies agents and apps.
+    thread and may read it; without renewal the display ends after `sync.typing_ttl`
+    (04 "Typing and agent presence" item 1).
+13. Agents send no typing of their own; a running run shows the agent's typing
+    (04 "Typing and agent presence" item 1; ruling L9; 01 "Typing indicator (people)"). 05 gives
+    `typing.start` the permission "human and write", so `authorize` denies agents and apps.
 14. Ephemeral events have no `seq` and no `permission_version`, are delivered at most once and are
-    lost during a pause (04 "Zwei Arten", "Zustellgarantie" item 4, "Lebenszyklus" step 7).
-15. When `access.changed` removes a target, the focus on threads of that target ends (04 "Was der
-    Client bei Entzug bekommt und tut" item 2).
-16. `resume` restores the focus (04 "Lebenszyklus" step 7).
+    lost during a pause (04 "Two kinds", "Delivery guarantee" item 4, "Lifecycle" step 7).
+15. When `access.changed` removes a target, the focus on threads of that target ends
+    (04 "What the client receives and does on access removal" item 2).
+16. `resume` restores the focus (04 "Lifecycle" step 7).
 17. A failing op answers `error` with a problem code and keeps the connection; `4008` is only for
-    `rl.gateway_connect` (04 "Ops", "Schließ-Codes"). `focus` over `sync.max_focused_threads`
+    `rl.gateway_connect` (04 "Ops", "Close codes"). `focus` over `sync.max_focused_threads`
     answers `validation_failed` and keeps the previous set (04 11.3 item 2). `typing.stop` sends
     nothing and resets the throttle; `typing.started` never reaches the typist's own connections
     (04 12 item 1). Ephemeral frames are dropped when the queue is full (never `4014`) and never
@@ -91,7 +92,7 @@ single path for ephemeral events that `runs`, `agents` and `notify` use from M2 
   (if M1-05 or M1-16 declared them, keep their shape and extend only what is missing):
 
 ```go
-// EphemeralEvent is a short-lived event (04 "Zwei Arten"): no seq, never stored, at most once.
+// EphemeralEvent is a short-lived event (04 "Two kinds"): no seq, never stored, at most once.
 type EphemeralEvent struct {
     Type          string      // ephemeral type from docs/spec/actions.yaml
     SchemaVersion int
@@ -111,7 +112,7 @@ type EphemeralPublisher interface {
 
 - `internal/gateway/domain/`: `FocusSet` (dedupe, limit check, `idle` flag), `TypingThrottle`
   (last fan-out per connection and thread, clock-driven), the set of focus-bound ephemeral types
-  `typing.started` and `run.updated` with a doc comment citing 05 "Kurzlebige Ereignisse".
+  `typing.started` and `run.updated` with a doc comment citing 05 "Ephemeral events".
 - `internal/gateway/app/`: op handlers `focus.go` and `typing.go`; `ephemeral.go` implementing
   `EphemeralPublisher` on top of the hub; the hub gains the index thread -> focused connections
   and focus pruning.
@@ -121,7 +122,7 @@ type EphemeralPublisher interface {
   (P-04).
 - `internal/wire/`: provide the gateway publisher as the process's
   `kernel/eventlog.EphemeralPublisher`.
-- Docs: `services/server/internal/gateway/README.md` (German, like the existing file),
+- Docs: `services/server/internal/gateway/README.md` (English, like the existing file),
   `services/server/CHANGELOG.md` under "Unreleased", `docs/DECISIONS.md` (only decisions beyond the specification).
 
 ## Out of scope
@@ -147,7 +148,7 @@ type EphemeralPublisher interface {
 
 ## Design notes
 
-Op `focus` (order of steps as in 05 "Entscheidung": rate limit before `authorize`)
+Op `focus` (order of steps as in 05 "Decision": rate limit before `authorize`)
 
 1. Rate limit `rl.read` keyed by principal (class from asyncapi `receive.focus`). Over the limit:
    frame `error {op: "focus", code: "rate_limited"}`, connection stays.
@@ -158,7 +159,7 @@ Op `focus` (order of steps as in 05 "Entscheidung": rate limit before `authorize
 4. For each id: load the thread through the `chat` port, then
    `authorize(principal, gateway.focus, thread)` in the normal request context (denials are
    audited per R-AZ-04 by authz; no error frame). Unknown and unreadable ids are both dropped
-   silently, with the same code path (02 "404 statt 403").
+   silently, with the same code path (02 "404 instead of 403").
 5. Replace the connection's set atomically in the hub index; store `idle`. No other code reads
    `idle` in M1 (M3-23 does); do not add an accessor without a user (P-13).
 6. `focus` is accepted in phase `catching_up` too; ephemeral frames still wait for `live`.
@@ -166,10 +167,10 @@ Op `focus` (order of steps as in 05 "Entscheidung": rate limit before `authorize
 Ops `typing.start` and `typing.stop`
 
 1. Only people may send them: `authorize` denies agents and apps with `forbidden`
-   (`subject_kind_not_allowed`, 05 right "human und write"); they get `error {op, code:
+   (`subject_kind_not_allowed`, 05 permission "human and write"); they get `error {op, code:
    "forbidden"}` and the frame has no effect (requirement 13). If the requirement step of M1-28
-   lacks the `human` part of a combined right, add it there with a test (no rights logic in the
-   gateway).
+   lacks the `human` part of a combined permission, add it there with a test (no permission logic
+   in the gateway).
 2. Rate limit `rl.typing` keyed by connection (`ratelimit.rl.typing.*`); over the limit:
    `error {op, code: "rate_limited"}`.
 3. Decode `GatewayTyping`; load the thread; `authorize(principal, typing.start, thread)`. A denial
@@ -188,7 +189,7 @@ Ops `typing.start` and `typing.stop`
    person.
 6. Recipients of `typing.started`: connections in phase `live` that focus the thread, minus every
    connection of the typing principal (04 12 item 1), each admitted with `thread.read` in
-   `authorize.Delivery(ctx)` (05 "Kurzlebige Ereignisse").
+   `authorize.Delivery(ctx)` (05 "Ephemeral events").
 
 Publisher and hub
 
@@ -197,7 +198,7 @@ Publisher and hub
   the same `Admit` path as durable events, receive action from the event register.
 - Encode once per event; frame `{"op":"dispatch","d":<envelope>}`.
 - Ephemeral frames are never delivered to a connection before its `catchup.complete` and are
-  never buffered (at most once; 04 "Ablauf" item 3 forbids mixing).
+  never buffered (at most once; 04 "Flow" item 3 forbids mixing).
 - If enqueuing an ephemeral frame would exceed `sync.outbound_queue_max`, drop that frame; never
   close with `4014` for an ephemeral frame (04 7.2 item 6). Durable frames keep M1-65's rule.
 - `PublishEphemeral` never blocks; it validates the type against the register and the payload
@@ -217,8 +218,8 @@ Configuration keys used: `sync.max_focused_threads`, `sync.typing_min_interval`,
 `ratelimit.rl.typing.per_minute`, `ratelimit.rl.typing.burst`, `ratelimit.rl.read.per_minute`,
 `ratelimit.rl.read.burst`.
 
-No rulings of its own: the behaviour of requirements 10 to 17 is in 04 ("Ops", "Ablauf",
-"Vom Server zu den Clients", "Tippen und Agenten-Präsenz") and 05 (`typing.start`). Record in
+No rulings of its own: the behaviour of requirements 10 to 17 is in 04 ("Ops", "Flow",
+"From the server to the clients", "Typing and agent presence") and 05 (`typing.start`). Record in
 `docs/DECISIONS.md` only what the build had to decide beyond them.
 
 ## Tests (write them first)
@@ -235,7 +236,7 @@ Unit tests (fake `Authorizer`, fake `chat` port, test clock, fake rate limiter):
 - `TestTyping_DeniedCodes`: table unreadable thread -> `not_found`, `read` grant -> `forbidden`,
   read-only channel -> `channel_read_only`.
 - `TestTypingStarted_OnlyFocusedReaders`: focused reader receives; reader without focus does not;
-  focused connection without read right does not; the typist's own second connection does not.
+  focused connection without read permission does not; the typist's own second connection does not.
 - `TestTypingStarted_EnvelopeAndExpiry`: no `seq`, no `permission_version`, `expires_at =
   occurred_at + sync.typing_ttl`.
 - `TestEphemeral_NotDeliveredDuringCatchUp`, `TestEphemeral_DroppedWhenQueueFullNoClose`,
@@ -264,9 +265,9 @@ make check
       silently, replaces the previous set and stores `idle`.
 - [ ] `typing.start` fans out at most once per `sync.typing_min_interval` per connection and
       thread and is limited by `rl.typing`.
-- [ ] `typing.started` reaches only live connections with focus on the thread and read right,
-      never the typist's own connections, and carries `expires_at = occurred_at +
-      sync.typing_ttl`.
+- [ ] `typing.started` reaches only live connections with focus on the thread and read
+      permission, never the typist's own connections, and carries
+      `expires_at = occurred_at + sync.typing_ttl`.
 - [ ] Agents and apps cannot produce typing.
 - [ ] Focus ends for targets removed by `access.changed` and survives `resume` where still
       readable.

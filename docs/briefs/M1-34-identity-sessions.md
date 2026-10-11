@@ -1,46 +1,46 @@
 # M1-34: identity: sessions, access tokens, refresh families and logout
 
-Status: ready | Depends on: M1-32, M1-33 | Etappe: M1
+Status: ready | Depends on: M1-32, M1-33 | Milestone: M1
 
 ## Goal
 
 After this ticket a person's app holds a session with a short-lived access token (JWS with
-`cnf.jkt` and `sid`, no rights inside) and a rotating refresh token in a family bound to the
+`cnf.jkt` and `sid`, no permissions inside) and a rotating refresh token in a family bound to the
 device's DPoP key. Reuse of a rotated refresh token revokes family and session; extensions get
 child sessions with their own family; logout ends a session and its children. The `identity`
 module implements `kernel/actor.Authenticator`, so every REST request of a person is
 authenticated with token, DPoP proof, session and device state before `authorize` runs. This is
-the token model of 08 "7. Token-Modell" that all login tickets (M1-37 to M1-43), the gateway
+the token model of 08 "7. Token model" that all login tickets (M1-37 to M1-43), the gateway
 (M1-64) and step-up (M1-35) build on.
 
 ## Read first
 
-- `docs/spec/08-identitaet.md`: "1. Ziele", "5.2 Bestätigung", "7.1 Übersicht",
-  "7.2 Zugriffstoken", "7.3 DPoP", "7.4 Refresh-Tokens: Rotation, Familien, Wiederverwendung",
-  "8. Sitzungsdauer", "13. Schutz der Anmeldung", "15. Tests" (ID-T14 Bearer case, ID-T15,
-  ID-T16, ID-T17, ID-T27), "16. Entscheidungen dieses Kapitels" (R-ID-05),
-  "18. Konfigurationswerte dieses Kapitels".
-- `docs/spec/03-datenmodell.md`: "1. Grundsätze" (items 1, 2, 9, 11, 13), "4.2 Identität" tables
+- `docs/spec/08-identity.md`: "1. Goals", "5.2 Approval", "7.1 Overview",
+  "7.2 Access token", "7.3 DPoP", "7.4 Refresh tokens: rotation, families, reuse",
+  "8. Session duration", "13. Login protection", "15. Tests" (ID-T14 Bearer case, ID-T15,
+  ID-T16, ID-T17, ID-T27), "16. Decisions of this chapter" (R-ID-05),
+  "18. Configuration values of this chapter".
+- `docs/spec/03-data-model.md`: "1. Principles" (items 1, 2, 9, 11, 13), "4.2 Identity" tables
   `auth_sessions`, `refresh_token_families`, `refresh_tokens` (including the rotation rules under
-  `refresh_tokens`), `devices`, `device_keys`; "4.1 Instanz" table `server_signing_keys`;
-  "4.10" table `event_log`; "4.12" table `audit_events`; "6.3 Sperrreihenfolge";
-  "9. Konfigurationswerte dieses Kapitels" (`auth.session_max_age`, `auth.refresh_token_ttl`,
+  `refresh_tokens`), `devices`, `device_keys`; "4.1 Instance" table `server_signing_keys`;
+  "4.10" table `event_log`; "4.12" table `audit_events`; "6.3 Lock order";
+  "9. Configuration values of this chapter" (`auth.session_max_age`, `auth.refresh_token_ttl`,
   `auth.refresh_reuse_grace`, `identity.last_active_granularity`).
-- `docs/spec/04-sync-protokoll.md`: "2.2 Umschlag (Envelope)", "8.5 Widerruf von Sitzung, Gerät
-  oder Prinzipal".
-- `docs/spec/05-aktionen.md`: "2.1 Spalte Recht", "2.4 Spalten Owner, Step-up, Audit, Rechte",
-  "2.5 Entscheidung", "4.1 Öffentlich und Anmeldung" (`auth.token.refresh`, `auth.logout`),
-  "4.3" (`session.list`), "6. Dauerhafte Ereignistypen und Empfangs-Aktion" (`session.revoked`).
-- `docs/spec/07-rechte.md`: "3. Prinzipal-Kontext", "4.1 Entscheidungen und Gründe",
-  "4.2 Ablauf" (`check_active`), "SR5", "SR7".
-- `docs/spec/06-api.md`: "3. Authentifizierung je Prinzipal-Art", "3.1 DPoP", "5. Fehler",
-  "6. Paginierung", "7. Idempotenz" item 3 (no `Idempotency-Key` on refresh).
-- `docs/spec/02-architektur.md`: "4.3 Ports, Ereignisse und Quellen je Modul" (`identity`:
-  `Auth`, `SessionEnded`), "4.4 Erlaubte Abhängigkeiten" (`identity` uses `instance`, `authz`),
-  "4.5 Querschnitts-Ports" (`kernel/actor`), "8. Transaktionen und Unit of Work",
-  "9. Request-Pfad".
-- `docs/spec/19-sicherheit.md`: "9. Logs ohne Geheimnisse und ohne Inhalte", "10. Geheimnisse".
-- `docs/spec/15-client-architektur.md`: "8. Netzwerk und Anmeldung" (single-flight refresh per
+- `docs/spec/04-sync-protocol.md`: "2.2 Envelope", "8.5 Revocation of a session, device or
+  principal".
+- `docs/spec/05-actions.md`: "2.1 Column Permission", "2.4 Columns Owner, Step-up, Audit, Permissions",
+  "2.5 Decision", "4.1 Public and login" (`auth.token.refresh`, `auth.logout`),
+  "4.3" (`session.list`), "6. Durable event types and receive action" (`session.revoked`).
+- `docs/spec/07-permissions.md`: "3. Principal context", "4.1 Decisions and reasons",
+  "4.2 Flow" (`check_active`), "SR5", "SR7".
+- `docs/spec/06-api.md`: "3. Authentication per principal kind", "3.1 DPoP", "5. Errors",
+  "6. Pagination", "7. Idempotency" item 3 (no `Idempotency-Key` on refresh).
+- `docs/spec/02-architecture.md`: "4.3 Ports, events and sources per module" (`identity`:
+  `Auth`, `SessionEnded`), "4.4 Allowed dependencies" (`identity` uses `instance`, `authz`),
+  "4.5 Cross-cutting ports" (`kernel/actor`), "8. Transactions and Unit of Work",
+  "9. Request path".
+- `docs/spec/19-security.md`: "9. Logs without secrets and without content", "10. Secrets".
+- `docs/spec/15-client-architecture.md`: "8. Network and login" (single-flight refresh per
   family; extensions refresh only their own child session).
 - ADR 0020, ADR 0021, ADR 0017.
 - `docs/api/openapi.yaml`: operations `refreshToken`, `logout`, `listMySessions`,
@@ -55,7 +55,7 @@ the token model of 08 "7. Token-Modell" that all login tickets (M1-37 to M1-43),
   `ExpectedHTU`), M1-18 (`platform/httpserver`, `kernel/actor`, problem mapping) and M1-15
   (instance record with `instance_id`).
 - `services/server/internal/identity/README.md`, `docs/quality/gates.md`, `CONTRIBUTING.md`,
-  `docs/PLAN.md` "3. Arbeitsweise je Ticket".
+  `docs/PLAN.md` "3. Way of working per ticket".
 
 This ticket also writes `session.revoked` (M1-16) and audit entries (M1-24); both are merged
 through the dependencies (M1-32 needs M1-20, which needs M1-16; M1-28 needs M1-24).
@@ -74,13 +74,13 @@ through the dependencies (M1-32 needs M1-20, which needs M1-16; M1-28 needs M1-2
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour starts with a failing test (red output goes into the report).
+6. Test first: every behavior starts with a failing test (red output goes into the report).
 7. No en dash and no em dash in any text you write.
 8. White label: only example.com, example.org and the names Alex, Sam, Robin in examples.
 9. Configuration values only through named keys from `docs/operations/configuration.md`.
 10. Access token: JWS signed with a server key of purpose `access_token`; claims `iss`
     (`instance_id`), `aud`, `sub`, `sid`, `did`, `jti`, `iat`, `nbf`, `exp`, `cnf.jkt`, `amr`; no
-    rights in the token (08 "7.2"). Verification with `kid` among keys in state `active` or
+    permissions in the token (08 "7.2"). Verification with `kid` among keys in state `active` or
     `retiring`, `iss`, `aud`, `exp` and `nbf` with `auth.clock_leeway`, then DPoP, then session and
     device (08 "7.2").
 11. A DPoP-bound token used as `Bearer` is rejected (08 "7.3", RFC 9449 section 7.2).
@@ -166,13 +166,13 @@ through the dependencies (M1-32 needs M1-20, which needs M1-16; M1-28 needs M1-2
 11. Lint: a depguard rule in `services/server/.golangci.yml` forbids `math/rand` and
     `math/rand/v2` in `internal/identity/...` (part of ID-T27), unless a repo-wide rule already
     does.
-12. Docs: `docs/spec/08-identitaet.md` "7.2" already states `aud`, header `typ`, `amr` and the
+12. Docs: `docs/spec/08-identity.md` "7.2" already states `aud`, header `typ`, `amr` and the
     cap of `exp` at the session end, "7.4" the child sessions and "13" the refresh answers
-    ("Antworten, die das Kapitel festlegt"); change them only where the implementation proves
+    ("Responses that this chapter defines"); change them only where the implementation proves
     them wrong (spec first). Rulings in `docs/DECISIONS.md`; identity README;
     `services/server/CHANGELOG.md`.
-13. **`authz.CredentialSource`, sessions part** (02 "Ports, Ereignisse und Quellen je Modul", 07
-    "Ablauf" `check_active`, PLAN row M1-34): implement `SessionActive` and `SessionExpiresAt` of
+13. **`authz.CredentialSource`, sessions part** (02 "Ports, events and sources per module", 07
+    "Flow" `check_active`, PLAN row M1-34): implement `SessionActive` and `SessionExpiresAt` of
     the request's session in the identity adapter of the source port that M1-28 declared, and
     replace the corresponding empty source in `internal/wire` (fail closed until then). Test:
     `TestCredentialSource_Sessions` against PostgreSQL 18 (active, revoked, expired, foreign
@@ -252,8 +252,8 @@ Authenticator (`Authenticate(r) (actor.Actor, error)`), in this order:
    only if the active `dpop` key's `jkt` equals `cnf.jkt`. The Authenticator does not reject on
    these flags: `authorize` (`check_active`) does, so the denial is audited with its reason
    (07 "4.2", "4.1"). The HTTP chain maps `principal_inactive`, `session_revoked` and
-   `device_inactive` to `401` problem code `session_revoked` (06 "5": "Sitzung, Gerät oder
-   Prinzipal widerrufen"), `unauthenticated` to `401 unauthenticated`.
+   `device_inactive` to `401` problem code `session_revoked` (06 "5": "Session, device or
+   principal revoked"), `unauthenticated` to `401 unauthenticated`.
 7. If the proof used the previous nonce (`NonceStale`), the response carries `DPoP-Nonce` with the
    current nonce (06 "3.1" item 2).
 8. Activity: when `auth_sessions.last_seen_at` or `devices.last_seen_at` is older than
@@ -280,7 +280,7 @@ the parent family's `dpop_jkt` (extensions share the device key through the keyc
 `400 validation_failed` or `not_found`.
 
 `createExtensionSession` (`POST /api/v1/me/sessions/extensions`, action
-`session.extension.create`, right `self`, class `rl.write`, audit, `x-idempotency-exempt:
+`session.extension.create`, permission `self`, class `rl.write`, audit, `x-idempotency-exempt:
 auth_flow`): body `ExtensionSessionCreate` (`client_component`), caller's session is the parent,
 answer `201 TokenResponse` of the child. A repeated call replaces the child again; that is the
 reason for the exemption.
@@ -310,10 +310,10 @@ Refresh (`refreshToken`, action `auth.token.refresh`, no `Idempotency-Key`), one
 8. Success: `200 TokenResponse` with the new pair, `session` and `device`.
 
 The `authorize` call of the handler uses the anonymous principal, action `auth.token.refresh` and
-resource `auth_session` (right `public`), so the proof of check of 02 "9.3" holds. A pending device
+resource `auth_session` (permission `public`), so the proof of check of 02 "9.3" holds. A pending device
 refreshes like an active one.
 
-Logout (`logout`, action `auth.logout`, resource `auth_session` = the actor's session, right
+Logout (`logout`, action `auth.logout`, resource `auth_session` = the actor's session, permission
 `self`): revoke the session (`logout`), its children (`logout`), all their families (`logout`);
 one `session.revoked` per session; `SessionEnded`; audit allow; `204`. An actor without a session
 gets what `authorize` decides for a missing resource (`404`).
@@ -344,7 +344,7 @@ Unit tests:
 
 - `TestSessionDecide` table: every outcome of the rotation decision, grace boundary exactly at
   `auth.refresh_reuse_grace`, generation `current - 2` is reuse.
-- `TestAccessToken_Claims`: exactly the claim set of "Design notes"; no rights claims; `exp`
+- `TestAccessToken_Claims`: exactly the claim set of "Design notes"; no permission claims; `exp`
   capped at the session end; header `typ` `at+jwt`.
 - `TestRefreshToken_IDT27`: 32 bytes, 43 characters, distinct across many draws; plus the depguard
   rule (golangci fixture or `make lint` failing on a probe file in a temporary copy).
@@ -407,7 +407,7 @@ make check
 
 - [ ] Migration creates the three tables exactly as 03 (FK on `identity_id` deferred to M1-36,
       documented in the migration).
-- [ ] Access tokens carry exactly the claims of 08 "7.2" plus header `typ` `at+jwt`, no rights,
+- [ ] Access tokens carry exactly the claims of 08 "7.2" plus header `typ` `at+jwt`, no permissions,
       `exp` capped at the session end.
 - [ ] Authenticator follows the order of "Design notes"; Bearer use of an access token is
       rejected; revoked sessions are rejected by `authorize` with an audited reason.

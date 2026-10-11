@@ -1,6 +1,6 @@
 # M1-33: identity: devices, device keys and DPoP verification (ADR 0020)
 
-Status: ready | Depends on: M1-28 | Etappe: M1
+Status: ready | Depends on: M1-28 | Milestone: M1
 
 ## Goal
 
@@ -9,32 +9,32 @@ and `step_up`), validates and fingerprints those keys (RFC 7638) and verifies DP
 with server nonces and a per-process `jti` replay store. People and owners can list and read
 devices over the API. Every later authentication path (sessions M1-34, step-up M1-35, logins M1-37
 to M1-43, API tokens M1-44, gateway M1-64) uses this one verifier, so a stolen token without the
-non-exportable device key is worthless (08 "Ziele" item 3, threat T-TK-01).
+non-exportable device key is worthless (08 "Goals" item 3, threat T-TK-01).
 
 ## Read first
 
-- `docs/spec/08-identitaet.md`: "5.1 Registrierung", "5.2 Bestätigung", "5.4 Verwaltung",
-  "6.1 Zwei Schlüssel je nativem Gerät", "7.1 Übersicht", "7.3 DPoP", "13. Schutz der Anmeldung",
-  "15. Tests" (ID-T14, ID-T27), "16. Entscheidungen dieses Kapitels" (R-ID-04),
-  "18. Konfigurationswerte dieses Kapitels".
-- `docs/spec/03-datenmodell.md`: "1. Grundsätze" (items 1, 2, 3, 9, 12, 13), "4.2 Identität"
-  tables `devices` and `device_keys`, "3. Aufbewahrungsklassen".
-- `docs/spec/05-aktionen.md`: "2.1 Spalte Recht", "2.5 Entscheidung" (pending devices),
-  "4.3 Menschen, Identität, Geräte, Tokens" (`device.list`).
-- `docs/spec/07-rechte.md`: "3. Prinzipal-Kontext", "4.1 Entscheidungen und Gründe",
-  "4.2 Ablauf", "4.3 Sichtbarkeit".
-- `docs/spec/06-api.md`: "3.1 DPoP", "5. Fehler" (codes `invalid_dpop_proof`, `use_dpop_nonce`,
-  `device_pending`, `not_found`, `cursor_invalid`), "6. Paginierung".
-- `docs/spec/02-architektur.md`: "4.1 Regeln", "4.5 Querschnitts-Ports", "5. Schichten im Modul",
-  "6. Code-Layout", "9. Request-Pfad", "14.1 Fehlerarten".
-- `docs/spec/19-sicherheit.md`: "6.1 Eingabevalidierung im Server" (SEC-IN-1, SEC-IN-2, SEC-IN-4),
-  "9. Logs ohne Geheimnisse und ohne Inhalte", "10. Geheimnisse".
-- `docs/spec/15-client-architektur.md`: "9. Sichere Speicherung und Geräteschlüssel" (clients use
+- `docs/spec/08-identity.md`: "5.1 Registration", "5.2 Approval", "5.4 Management",
+  "6.1 Two keys per native device", "7.1 Overview", "7.3 DPoP", "13. Login protection",
+  "15. Tests" (ID-T14, ID-T27), "16. Decisions of this chapter" (R-ID-04),
+  "18. Configuration values of this chapter".
+- `docs/spec/03-data-model.md`: "1. Principles" (items 1, 2, 3, 9, 12, 13), "4.2 Identity"
+  tables `devices` and `device_keys`, "3. Retention classes".
+- `docs/spec/05-actions.md`: "2.1 Column Permission", "2.5 Decision" (pending devices),
+  "4.3 People, identity, devices, tokens" (`device.list`).
+- `docs/spec/07-permissions.md`: "3. Principal context", "4.1 Decisions and reasons",
+  "4.2 Flow", "4.3 Visibility".
+- `docs/spec/06-api.md`: "3.1 DPoP", "5. Errors" (codes `invalid_dpop_proof`, `use_dpop_nonce`,
+  `device_pending`, `not_found`, `cursor_invalid`), "6. Pagination".
+- `docs/spec/02-architecture.md`: "4.1 Rules", "4.5 Cross-cutting ports", "5. Layers within a module",
+  "6. Code layout", "9. Request path", "14.1 Error kinds".
+- `docs/spec/19-security.md`: "6.1 Input validation in the server" (SEC-IN-1, SEC-IN-2, SEC-IN-4),
+  "9. Logs without secrets and without content", "10. Secrets".
+- `docs/spec/15-client-architecture.md`: "9. Secure storage and device key" (clients use
   ES256; EdDSA stays allowed by the data model).
-- `docs/spec/04-sync-protokoll.md`: "6.3 Lebenszyklus" (the gateway reuses this verifier with
+- `docs/spec/04-sync-protocol.md`: "6.3 Lifecycle" (the gateway reuses this verifier with
   `htm = GET` and the nonce from `hello`; not built here).
-- ADR 0020 (`docs/adr/0020-geraetebindung-dpop-step-up-fuer-admin-aktionen.md`), ADR 0067
-  (`docs/adr/0067-jose-profil-mit-der-standardbibliothek.md`), ADR 0008, ADR 0017.
+- ADR 0020 (`docs/adr/0020-device-binding-dpop-step-up-for-admin-actions.md`), ADR 0067
+  (`docs/adr/0067-jose-profile-with-the-standard-library.md`), ADR 0008, ADR 0017.
 - `docs/api/openapi.yaml`: operations `listMyDevices`, `listUserDevices`, `getDevice`; schemas
   `Device`, `DevicePage`, `DevicePlatform`, `DeviceRegistration`, `DeviceKeyRegistration`,
   `Problem`; responses `Unauthorized`, `Forbidden`, `NotFound`; headers `WWW-Authenticate`,
@@ -43,7 +43,7 @@ non-exportable device key is worthless (08 "Ziele" item 3, threat T-TK-01).
 - `docs/security/threat-model.md`: T-TK-01, T-ID-05.
 - `services/server/internal/identity/README.md`, `services/server/README.md`,
   `services/server/architecture/modules.yaml`, `docs/quality/gates.md`, `CONTRIBUTING.md`,
-  `docs/PLAN.md` section "3. Arbeitsweise je Ticket" and the M1 row of this ticket.
+  `docs/PLAN.md` section "3. Way of working per ticket" and the M1 row of this ticket.
 - The merged code of M1-07 (`internal/platform/config`), M1-09 (`internal/platform/secrets`),
   M1-12 (`internal/platform/pg`, `pgtest`), M1-13 (`internal/kernel/txn`), M1-17
   (`services/server/api/operations.yaml`, generator), M1-18 (`internal/platform/httpserver`,
@@ -65,7 +65,7 @@ non-exportable device key is worthless (08 "Ziele" item 3, threat T-TK-01).
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour starts with a failing test (red output goes into the report), then
+6. Test first: every behavior starts with a failing test (red output goes into the report), then
    code until green, then clean up.
 7. No en dash and no em dash in any text you write (code comments, docs, commit messages).
 8. White label: no company, person, host or domain names except example.com, example.org and the
@@ -85,7 +85,7 @@ non-exportable device key is worthless (08 "Ziele" item 3, threat T-TK-01).
     `error="use_dpop_nonce"` and a fresh `DPoP-Nonce` (08 "7.3", 06 "3.1").
 13. A pending device has tokens but every action except `self.read`, `device.list` for its own
     device, `auth.token.refresh` and `auth.logout` ends with `403 device_pending` (05 "2.5").
-14. No view right gives `404`, never `403` (05 rule 2, ADR 0017); `device.list` is `self` or
+14. No view permission gives `404`, never `403` (05 rule 2, ADR 0017); `device.list` is `self` or
     `owner` (05 "4.3").
 15. Display texts (device names) with control or bidi control characters are rejected (SEC-IN-4).
 
@@ -150,7 +150,7 @@ Work only in `services/server` and the docs named here.
    operations) and `internal/identity/adapters/httpapi/dpop.go` with
    `ExpectedHTU(publicURL *url.URL, r *http.Request) string` (origin of `server.public_url` plus
    the escaped request path) for M1-34 and later login handlers.
-7. Test helpers `internal/identity/adapters/identitytest` (02 "6. Code-Layout"): `NewDeviceKey(alg) (signer, PublicKey)`,
+7. Test helpers `internal/identity/adapters/identitytest` (02 "6. Code layout"): `NewDeviceKey(alg) (signer, PublicKey)`,
    `SignDPoPProof(signer, ProofClaims) string`, `SignJWS(signer, header, payload) string`. Later
    tickets (M1-34, M1-35, M1-64, M1-73) reuse them. Only `_test.go` files import this package; a
    test runs `go list -deps ./cmd/bothy` and fails if it appears.
@@ -169,14 +169,14 @@ Work only in `services/server` and the docs named here.
     its error type and render it in `platform/httpserver` (the only change outside `identity`
     besides wiring, config schema, secrets init and pagination below), with a unit test.
 11. Pagination uses the cursor codec of `internal/platform/httpserver` (M1-18, 06 "6.
-    Paginierung": opaque, bound to filter and sort, `400 cursor_invalid` on mismatch); no second
+    Pagination": opaque, bound to filter and sort, `400 cursor_invalid` on mismatch); no second
     codec.
-12. Docs: `docs/spec/08-identitaet.md` "7.3 DPoP" already states the nonce construction, the
+12. Docs: `docs/spec/08-identity.md` "7.3 DPoP" already states the nonce construction, the
     `htu` rule and the replay store; ADR 0067 states the JWS profile. Change them only where the
     implementation proves them wrong (spec first). `docs/DECISIONS.md` gets the rulings listed in
     "Design notes"; module README and `services/server/CHANGELOG.md` (Unreleased).
-13. **`authz.CredentialSource`, devices part** (02 "Ports, Ereignisse und Quellen je Modul", 07
-    "Ablauf" `check_active`, PLAN row M1-33): implement `DeviceState` (`pending`, `active`,
+13. **`authz.CredentialSource`, devices part** (02 "Ports, events and sources per module", 07
+    "Flow" `check_active`, PLAN row M1-33): implement `DeviceState` (`pending`, `active`,
     `revoked`) of the request's device in the identity adapter of the source port that M1-28
     declared, and replace the corresponding empty source in `internal/wire` (fail closed until
     then). Test: `TestCredentialSource_Devices` against PostgreSQL 18 (active, revoked, expired,
@@ -261,7 +261,7 @@ audit checkpoints in M1-50):
    `crypto/ecdsa` over SHA-256 of the signing input; DER or other lengths are rejected. `EdDSA`
    uses `crypto/ed25519` with a 64-byte signature.
 5. No JOSE library (ADR 0067): the profile is a few algorithms and one serialization, and domain
-   layers may not import third-party code (02 "5. Schichten im Modul").
+   layers may not import third-party code (02 "5. Layers within a module").
 
 DPoP proof checks (`Verify`), in this order; a failure stops and nothing is remembered:
 
@@ -287,12 +287,12 @@ DPoP proof checks (`Verify`), in this order; a failure stops and nothing is reme
    now plus `auth.dpop_proof_max_age` plus `auth.clock_leeway`. A second use inside that window
    gives `invalid_dpop_proof`. Check and insert are one atomic step.
 
-Nonce construction (stateless, so every process and every restart agrees; 08 says "über Prozesse
-hinweg schützt der Nonce"):
+Nonce construction (stateless, so every process and every restart agrees; 08 says "across
+processes the nonce protects"):
 
 - Key: HKDF-SHA256 (`crypto/hkdf`) over the token pepper loaded from `auth.token_pepper_ref`, empty
   salt, info `dpop-nonce/v1`, 32 bytes. Do not put the product name into the info string (02
-  "6. Code-Layout" lists the only places with the product name).
+  "6. Code layout" lists the only places with the product name).
 - Window `w = floor(unix seconds / seconds of auth.dpop_nonce_ttl)`.
 - Nonce = base64url without padding of `uint64 big-endian(w) || first 16 bytes of
   HMAC-SHA256(key, uint64 big-endian(w))`.

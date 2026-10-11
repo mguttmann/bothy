@@ -1,0 +1,67 @@
+%% Agent run with live box and follow-up. Invariants I2 and I3 from the planning basis,
+%% flow per 04-sync-protocol.md sections 11 and 15. Paths without version prefix.
+sequenceDiagram
+  autonumber
+  participant A as App Alex, thread in focus
+  box api node
+    participant MSG as messaging
+    participant RU as runs
+    participant GW as gateway (agent connection, hub)
+  end
+  participant DB as PostgreSQL
+  participant AD as Agent adapter
+  participant LZ as Agent runtime
+
+  A->>MSG: POST message with a mention of the operator
+  MSG->>MSG: authorize(Alex, message.create, thread)
+  MSG->>DB: BEGIN, thread sequence, INSERT message (origin human)
+  MSG-)RU: in-tx event MessagePosted
+  RU->>RU: authorize(Alex, agent.invoke, thread): trigger, operator, mention rule, I2 pre-check
+  RU->>DB: INSERT runs (queued), anchor message kind run, trigger_state queued
+  RU->>DB: events message.created, run.state_changed, agent.invocation (to the agent, without token)
+  MSG->>DB: finalize event_seq, COMMIT
+  MSG-->>A: 201, trigger_state queued
+  DB--)GW: NOTIFY, log tail reads
+  GW-->>A: dispatch message.created, run.state_changed queued
+  GW->>RU: PrepareDelivery(agent.invocation)
+  RU->>RU: authorize(Alex, agent.invoke) with current permissions, I2 again
+  RU->>DB: sign invocation token (JWS, EdDSA), set runs.invocation_jti
+  GW-->>AD: dispatch agent.invocation with token
+  AD->>AD: signature via JWKS, aud, reported mode equals billing_mode (I3), tool class at most tool_class
+  AD->>AD: event and token into the inbox
+  AD->>GW: ack (seq), acknowledged after acceptance
+  opt token expired
+    AD->>RU: POST runs/{id}/invocation-token (old token), checks as before the delivery
+    RU-->>AD: fresh token
+  end
+  AD->>RU: POST runs/{id}/start (token, billing_mode_used, tool_class_used, external_session_ref)
+  RU->>DB: check jti, expiry and tool class, CAS queued to running, trigger_state working
+  RU-->>AD: 200 running
+  GW-->>A: dispatch run.state_changed running, message.updated working
+  AD->>LZ: start turn
+  loop throttled to agent.run_update_min_interval
+    LZ-->>AD: tool, status line, text
+    AD->>GW: op run.update (run_id, base_version, ops)
+    GW->>RU: apply patch: CAS on runs.version, store without event_log
+    RU-)GW: ephemeral run.updated
+    GW-->>A: run.updated, coalesced per sync.run_patch_coalesce_interval
+  end
+  opt recipient on another api node
+    RU-)DB: NOTIFY ephemeral (run_id, version), only IDs
+    Note over GW: The other node loads the run document and sends run.updated with snapshot
+  end
+  A->>MSG: POST follow-up in the same thread
+  MSG-)RU: in-tx event MessagePosted
+  RU->>DB: active run exists: run_followups queued, agent.followup
+  MSG-->>A: 201
+  GW->>RU: PrepareDelivery(agent.followup): agent.invoke and I2, new token
+  GW-->>AD: dispatch agent.followup with token
+  AD->>LZ: feed in follow-up (steer or queue)
+  AD->>GW: run.update followups/{message_id} delivered
+  RU->>DB: trigger_state followup_delivered, event message.updated
+  AD->>GW: run.update followups/{message_id} absorbed
+  LZ-->>AD: answer and costs
+  AD->>MSG: POST reply message (origin agent, triggers nothing)
+  AD->>RU: run.finish completed, with metrics and costs
+  RU->>DB: CAS running to completed, summary, cost_entries (estimate), trigger_state done
+  GW-->>A: message.created, run.state_changed completed: live box collapses to one line

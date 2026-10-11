@@ -95,7 +95,7 @@ groups:
         labels:
           severity: page
         annotations:
-          summary: "Rights check programming error ({{ $labels.bothy_reason }}): a route answered without its authorize check or an unknown action was checked."
+          summary: "Permission check programming error ({{ $labels.bothy_reason }}): a route answered without its authorize check or an unknown action was checked."
           runbook_url: "docs/observability/alerting.md#bothyauthzerror"
 
       - alert: BothySecretRefreshFailing
@@ -175,5 +175,5 @@ groups:
         labels:
           severity: ticket
         annotations:
-          summary: "PostgreSQL reported deadlocks; check the lock order rule (03-datenmodell 6.3)."
+          summary: "PostgreSQL reported deadlocks; check the lock order rule (03-data-model 6.3)."
           runbook_url: "docs/observability/alerting.md#bothydatabasedeadlocks"

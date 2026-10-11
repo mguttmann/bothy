@@ -1,6 +1,6 @@
 # M1-41: OIDC login with PKCE
 
-Status: ready | Depends on: M1-37 | Etappe: M1
+Status: ready | Depends on: M1-37 | Milestone: M1
 
 ## Goal
 
@@ -14,27 +14,27 @@ provider tokens never reach a device and are never stored.
 
 ## Read first
 
-- `docs/spec/08-identitaet.md`: 2.1 "Port", 2.2 "OIDC: Server als Relying Party, App als Client
-  des Servers", 2.3 "Beispiel Microsoft Entra ID", 3.1 "Zuordnung einer externen Identität",
-  3.2 "Einladungs-Code", 3.3 "Weitere Identität verknüpfen und lösen", 3.5 "Verzögerung bei
-  Sperre im Anbieter", 5.1 "Registrierung", 5.2 "Bestätigung", 7.3 "DPoP", 13 "Schutz der
-  Anmeldung", 14.1 "Anmeldung mit OIDC (native App)", 15 "Tests" (ID-T01 to ID-T05, ID-T27),
-  16 (R-ID-01, R-ID-02), 18 "Konfigurationswerte dieses Kapitels".
-- `docs/spec/03-datenmodell.md`: 1 "Grundsätze" (points 1, 9, 12, 13); 4.2 tables `principals`,
+- `docs/spec/08-identity.md`: 2.1 "Port", 2.2 "OIDC: server as relying party, app as client of
+  the server", 2.3 "Example: Microsoft Entra ID", 3.1 "Mapping an external identity", 3.2
+  "Enrollment code", 3.3 "Linking and unlinking another identity", 3.5 "Delay when disabled at
+  the provider", 5.1 "Registration", 5.2 "Approval", 7.3 "DPoP", 13 "Login protection", 14.1
+  "Login with OIDC (native app)", 15 "Tests" (ID-T01 to ID-T05, ID-T27), 16 (R-ID-01, R-ID-02),
+  18 "Configuration values of this chapter".
+- `docs/spec/03-data-model.md`: 1 "Principles" (points 1, 9, 12, 13); 4.2 tables `principals`,
   `users`, `identity_providers`, `user_identities`, `enrollment_codes`, `auth_login_flows`,
   `devices`, `device_keys`, `auth_sessions`.
-- `docs/spec/05-aktionen.md` and `docs/spec/actions.yaml`: `auth.login.begin`,
-  `auth.login.complete`, `auth.token.refresh`, `identity.link`; 2.4 and 2.5; 3 "Rate-Limit-Klassen"
+- `docs/spec/05-actions.md` and `docs/spec/actions.yaml`: `auth.login.begin`,
+  `auth.login.complete`, `auth.token.refresh`, `identity.link`; 2.4 and 2.5; 3 "Rate-limit classes"
   (`rl.public_auth`, `rl.admin`).
-- `docs/spec/06-api.md`: 3 "Authentifizierung je Prinzipal-Art", 3.1 "DPoP", 3.2
-  "Anmeldeabläufe", 5 "Fehler", 7 "Idempotenz" (point 3: login flows carry no `Idempotency-Key`).
-- `docs/spec/07-rechte.md`: 4.1 "Entscheidungen und Gründe", 4.2 "Ablauf".
-- `docs/spec/19-sicherheit.md`: 8 "SSRF-Verbot und ausgehende Verbindungen" (SEC-NET-1 to
-  SEC-NET-5), 9 "Logs ohne Geheimnisse und ohne Inhalte", 10 "Geheimnisse".
-- `docs/spec/02-architektur.md`: 4.1 "Regeln", 4.4 "Erlaubte Abhängigkeiten", 5 "Schichten im
-  Modul", 9 "Request-Pfad", 12.3 "Job-Katalog" (`identity.auth_cleanup`), 13
-  "Konfigurationsladen".
-- `docs/spec/16-betrieb.md`: 4.3 "Rand und Identität".
+- `docs/spec/06-api.md`: 3 "Authentication per principal kind", 3.1 "DPoP", 3.2 "Login flows",
+  5 "Errors", 7 "Idempotency" (point 3: login flows carry no `Idempotency-Key`).
+- `docs/spec/07-permissions.md`: 4.1 "Decisions and reasons", 4.2 "Flow".
+- `docs/spec/19-security.md`: 8 "SSRF ban and outgoing connections" (SEC-NET-1 to
+  SEC-NET-5), 9 "Logs without secrets and without content", 10 "Secrets".
+- `docs/spec/02-architecture.md`: 4.1 "Rules", 4.4 "Allowed dependencies", 5 "Layers within a
+  module", 9 "Request path", 12.3 "Job catalogue" (`identity.auth_cleanup`), 13
+  "Configuration loading".
+- `docs/spec/16-operations.md`: 4.3 "Edge and identity".
 - ADRs 0011, 0013, 0015, 0019, 0020.
 - `docs/api/openapi.yaml`: operations `beginOidcLogin`, `handleOidcCallback`,
   `completeOidcLogin`, `beginIdentityLink`, `completeIdentityLink`; schemas `OidcBeginRequest`,
@@ -44,7 +44,7 @@ provider tokens never reach a device and are never stored.
 - The merged READMEs and package docs of `services/server/internal/identity`,
   `internal/authz`, `internal/platform/egress`, `internal/platform/secrets`, `internal/kernel/*`,
   and the allow-list `services/server/api/operations.yaml`.
-- `docs/PLAN.md` section 3 "Arbeitsweise je Ticket" and section 7 rows M1-33 to M1-42;
+- `docs/PLAN.md` section 3 "Way of working per ticket" and section 7 rows M1-33 to M1-42;
   `docs/quality/gates.md`; `CONTRIBUTING.md`.
 
 ## Fixed requirements that apply
@@ -61,7 +61,7 @@ provider tokens never reach a device and are never stored.
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour change has a test that was red before the change (the red run is
+6. Test first: every behavior change has a test that was red before the change (the red run is
    quoted in the report), then green, then refactor.
 7. No en dash or em dash characters in any file you write; use a hyphen or rephrase.
 8. White label: no company, person, host or tenant names; domains only `example.com` and
@@ -90,8 +90,8 @@ provider tokens never reach a device and are never stored.
 
 ## Scope
 
-Layering (02 "6. Code-Layout", PLAN row M1-41): a package outside the layers would fail the
-architecture gate (02 7.2, "Paket ohne Komponente"), so the work lands in the layers of the
+Layering (02 "6. Code layout", PLAN row M1-41): a package outside the layers would fail the
+architecture gate (02 7.2, "package without a component"), so the work lands in the layers of the
 module:
 
 - `services/server/internal/identity/domain/oidcflow/`: pure code without I/O and without
@@ -139,7 +139,7 @@ module:
   `handleOidcCallback` with `iss` and the redirect description). Change them only where the
   implementation proves them wrong. `services/server/api/operations.yaml`: the five operations move
   from `later` to the built list; regenerated server code (`make codegen-check` without diff).
-- Docs: `docs/operations/oidc-entra.md` (new, German like the other operations pages): app
+- Docs: `docs/operations/oidc-entra.md` (new, English like the other operations pages): app
   registration as web application, the single redirect URI `https://<host>/api/v1/auth/oidc/callback`,
   certificate credential for `private_key_jwt`, optional `groups` claim (pointer to M1-42),
   tenant allow-list, a complete `identity_provider.oidc.v1` example with `EXAMPLE` values and
@@ -187,7 +187,7 @@ module:
 
 **Preconditions (check before writing code; any failure: `Verdict: BLOCKED <which>`).**
 
-1. `docs/spec/03-datenmodell.md` table `auth_login_flows` has `external_identity jsonb` (schema
+1. `docs/spec/03-data-model.md` table `auth_login_flows` has `external_identity jsonb` (schema
    `external_identity.v1`) and `enrollment_code_id` (FK `enrollment_codes(id)` ON DELETE SET NULL)
    with their checks (R-DM-30). Reason: see "Ruling: account effects only at complete".
 2. M1-36 provides the provider registry with per-kind config validation and the `(issuer,
@@ -226,7 +226,7 @@ with `400 validation_failed`; normative table in 08 2.6):
 Entra facts for the docs page, retrieved 2026-10-10: certificate assertions use `alg` `PS256`,
 `typ` `JWT`, header `x5t#S256`, claims `aud` (token endpoint), `iss` and `sub` (client ID),
 `jti`, `nbf`, `exp`, `iat`
-(https://learn.microsoft.com/en-us/entra/identity-platform/certificate-credentials) [belegt].
+(https://learn.microsoft.com/en-us/entra/identity-platform/certificate-credentials) [verified].
 
 **Redirect URI rules** (`app_redirect_uri` at begin): allowed are (a) an exact string match with an
 entry of `app_redirect_uris`, (b) `http://127.0.0.1:<port>/callback` or `http://[::1]:<port>/callback`
@@ -329,7 +329,7 @@ header `DPoP` without `ath`):
     5. Principal `disabled` or `deleted`: `401 unauthenticated`, nothing written.
     6. Device registration, session (`auth_method = 'oidc'`, `identity_id`) and token pair through
        the shared functions; `user_identities.last_login_at = now`; flow `status = 'completed'` and
-       the external identity set to NULL (data minimisation); audit allow `auth.login.complete`.
+       the external identity set to NULL (data minimization); audit allow `auth.login.complete`.
 4. `201 TokenResponse`, `Cache-Control: no-store`.
 
 **Provisioned handle and display name.** Handle from the local part of `preferred_username`, else
@@ -459,7 +459,7 @@ make check
       `pending` without grants.
 - [ ] Discovery, JWKS and token calls go only through `platform/egress`; private targets are
       rejected.
-- [ ] JWKS and metadata cache honour `auth.oidc_jwks_cache_ttl` and reload once for an unknown
+- [ ] JWKS and metadata cache honor `auth.oidc_jwks_cache_ttl` and reload once for an unknown
       `kid`.
 - [ ] Refresh of an OIDC session older than `auth.idp_recheck_interval` is refused.
 - [ ] No secret or token in logs, audit details or problem bodies.
@@ -474,7 +474,7 @@ make check
   value, errors, example where useful); comments explain why.
 - `internal/identity/README.md` current (OIDC flow, ports, job, tables); module CHANGELOG entry
   under "Unreleased"; `docs/DECISIONS.md` entries; no new ADR unless a decision beyond ADR 0019
-  was taken (then a MADR 4 ADR, headings English, text German, and `make adr-index`).
+  was taken (then a MADR 4 ADR, headings and text in English, and `make adr-index`).
 - `make check` green.
 - Independent review (`make review` and a code review over the diff) and the red team gate
   (`docs/quality/red-team-gate.md`) over the diff, verdict recorded in the report; on `NEIN` fix,

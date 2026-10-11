@@ -1,0 +1,2 @@
+Ein abgebrochener Lauf wird nie still wiederholt, und die Nebenwirkungen einer Laufzeit
+sollen nicht doppelt entstehen. Der Mensch sieht den Grund, wenn ein Beleg fehlt.

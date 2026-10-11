@@ -1,45 +1,45 @@
 # sdk
 
-Status: geplant. Dieser Ordner enthält noch keinen Code.
+Status: planned. This folder contains no code yet.
 
-## Zweck
+## Purpose
 
-SDKs für Agenten-Adapter, Apps und Werkzeuge, die die öffentliche API nutzen. Je Sprache ein
-generierter Kern aus der Spezifikation plus eine Handschicht für Gateway, Aufruf-Marke, Läufe,
-Komponenten, Befehle, Idempotenz, Wiederholungen, Webhook-Signaturen und Testdoppel (ADR 0026).
+SDKs for agent adapters, apps and tools that use the public API. Per language a core generated
+from the specification plus a hand-written layer for gateway, invocation token, runs,
+components, commands, idempotency, retries, webhook signatures and test doubles (ADR 0026).
 
-| Ordner | Sprache | Stand |
+| Folder | Language | State |
 |---|---|---|
-| `python/` | Python | geplant |
-| `typescript/` | TypeScript | geplant |
+| `python/` | Python | planned |
+| `typescript/` | TypeScript | planned |
 
-Clients der Apps (Dart) entstehen ebenfalls aus der Spezifikation, gehören aber zu den Apps
-(docs/spec/15-client-architektur.md).
+The clients of the apps (Dart) are also generated from the specification, but they belong to the
+apps (docs/spec/15-client-architecture.md).
 
-## Vertrag
+## Contract
 
-- Design: docs/spec/11-erweiterungen.md Abschnitt 11.
-- Agenten-Vertrag, den die Handschicht umsetzt: docs/spec/09-agenten.md.
-- Quelle der Wahrheit: `docs/api/openapi.yaml` und `docs/api/asyncapi.yaml`.
+- Design: docs/spec/11-extensions.md section 11.
+- Agent contract that the hand-written layer implements: docs/spec/09-agents.md.
+- Source of truth: `docs/api/openapi.yaml` and `docs/api/asyncapi.yaml`.
 
-## Versionierung
+## Versioning
 
-SemVer je Sprache, eigenes Changelog je Ordner. Regeln: docs/spec/11-erweiterungen.md
-Abschnitt 12; Deprecation nach docs/spec/06-api.md.
+SemVer per language, own changelog per folder. Rules: docs/spec/11-extensions.md
+section 12; deprecation according to docs/spec/06-api.md.
 
-## Kompatibilitätsmatrix
+## Compatibility matrix
 
-Noch keine veröffentlichte Version. Jede Zeile bekommt einen Test im Gate, der die Vertragstests
-der SDK-Version gegen die genannte Server-Version laufen lässt.
+No published version yet. Every row gets a test in the gate that runs the contract tests
+of the SDK version against the named server version.
 
-| SDK | Version | API | Gateway-Protokoll | Server mindestens | Status |
+| SDK | Version | API | Gateway protocol | Minimum server | Status |
 |---|---|---|---|---|---|
-| Python | noch keine | | | | |
-| TypeScript | noch keine | | | | |
+| Python | none yet | | | | |
+| TypeScript | none yet | | | | |
 
-Status-Werte: `supported`, `deprecated`, `end-of-life`.
+Status values: `supported`, `deprecated`, `end-of-life`.
 
-## Paketnamen
+## Package names
 
-Die Namen bei PyPI und npm hängen am endgültigen Produktnamen und sind noch nicht reserviert
-(Frage an den Owner).
+The names on PyPI and npm depend on the final product name and are not reserved yet
+(question to the owner).

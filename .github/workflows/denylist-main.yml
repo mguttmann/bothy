@@ -5,7 +5,7 @@
 # commit message after the pull request checks ran. This workflow scans exactly what
 # reached main: the pushed commits (before..after) with the private list from the
 # protected environment "denylist". A finding fails the run; the owner then follows
-# docs/quality/push-discipline.md, section "Deny-Fund auf main".
+# docs/quality/push-discipline.md, section "Deny-list hit on `main`".
 #
 # Runs only for pushes to main (tools/ci/check_runners.py, POST_MERGE_WORKFLOWS). The code
 # that runs is the merged, reviewed commit, on a GitHub-hosted runner like every job (ADR 0039).

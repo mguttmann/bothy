@@ -33,11 +33,11 @@ reviews:
   path_instructions:
     - path: "**/*.md"
       instructions: >-
-        Planning and specification documents are German, community files English.
+        All repository content is English (docs/glossary.md, D-W-94).
         Flag en dashes and em dashes, numbers for limits or thresholds that are not
         named configuration values, external facts without URL and retrieval date,
         and anything instance-specific (company or person names, host names, real
-        IP addresses, paths under a user home). Terms must match docs/spec/00-glossar.md.
+        IP addresses, paths under a user home). Terms must match docs/spec/00-glossary.md.
     - path: ".github/workflows/**"
       instructions: >-
         Every job runs on a fixed GitHub-hosted runner label, never on a runner outside
@@ -47,11 +47,11 @@ reviews:
     - path: "services/**/*.go"
       instructions: >-
         Every route and event goes through authorize with an action from
-        docs/spec/05-aktionen.md; no read right means 404, never 403. SQL only through
+        docs/spec/05-actions.md; no read permission means 404, never 403. SQL only through
         sqlc queries. The server never reads model provider credentials.
     - path: "tools/**/*.py"
       instructions: >-
-        Repository tools: standard library or PyYAML only, a test for every behaviour,
+        Repository tools: standard library or PyYAML only, a test for every behavior,
         no secret values in output.
   tools:
     actionlint:

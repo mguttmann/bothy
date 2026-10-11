@@ -1,5 +1,5 @@
 {
-  "$description": "Abstände, Radien und feste Maße. Raster 4 px, mit 2 px und 6 px für dichte Listen.",
+  "$description": "Spacing, radii and fixed sizes. Grid 4 px, with 2 px and 6 px for dense lists.",
   "space": {
     "$type": "dimension",
     "0": {"$value": {"value": 0, "unit": "px"}},
@@ -18,7 +18,7 @@
   },
   "radius": {
     "$type": "dimension",
-    "$description": "Knappe Radien: Werkzeug, kein Spielzeug. pill nur für Zähler und Abzeichen.",
+    "$description": "Tight radii: a tool, not a toy. pill only for counters and badges.",
     "none": {"$value": {"value": 0, "unit": "px"}},
     "xs": {"$value": {"value": 2, "unit": "px"}},
     "sm": {"$value": {"value": 4, "unit": "px"}},
@@ -30,18 +30,18 @@
   "border-width": {
     "$type": "dimension",
     "hairline": {"$value": {"value": 1, "unit": "px"}},
-    "focus": {"$value": {"value": 2, "unit": "px"}, "$description": "Fokusring, immer mindestens 2 px (WCAG 2.4.13 als Ziel)."},
-    "spine": {"$value": {"value": 3, "unit": "px"}, "$description": "Rückgrat links an Live-Box und Erwähnungen; Farbe aus color.run.* bzw. color.attention.border."}
+    "focus": {"$value": {"value": 2, "unit": "px"}, "$description": "Focus ring, always at least 2 px (WCAG 2.4.13 as the target)."},
+    "spine": {"$value": {"value": 3, "unit": "px"}, "$description": "Spine on the left of the live box and mentions; color from color.run.* or color.attention.border, respectively."}
   },
   "layout": {
     "$type": "dimension",
-    "$description": "Spaltenbreiten Desktop (Startwerte; Personen ziehen die Grenzen, der Wert wird als Einstellung gespeichert).",
+    "$description": "Desktop column widths (initial values; people drag the borders, and the value is stored as a setting).",
     "sidebar-width": {"$value": {"value": 248, "unit": "px"}},
     "list-width": {"$value": {"value": 340, "unit": "px"}},
     "session-width": {"$value": {"value": 296, "unit": "px"}},
     "column-min": {"$value": {"value": 200, "unit": "px"}},
-    "message-max-width": {"$value": {"value": 880, "unit": "px"}, "$description": "Lesbare Zeilenlänge im Verlauf auf sehr breiten Fenstern."},
-    "overlay-width": {"$value": {"value": 560, "unit": "px"}, "$description": "Schnellwechsel und Dialoge."}
+    "message-max-width": {"$value": {"value": 880, "unit": "px"}, "$description": "Readable line length in the history on very wide windows."},
+    "overlay-width": {"$value": {"value": 560, "unit": "px"}, "$description": "Quick switcher and dialogs."}
   },
   "size": {
     "$type": "dimension",

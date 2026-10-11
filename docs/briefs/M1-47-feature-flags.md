@@ -1,6 +1,6 @@
 # M1-47: Feature flags with registration and cleanup gate
 
-Status: ready | Depends on: M1-44, M1-46 | Etappe: M1
+Status: ready | Depends on: M1-44, M1-46 | Milestone: M1
 
 ## Goal
 
@@ -10,30 +10,30 @@ version `remove_by`. The server evaluates flags per principal with the rollout l
 and groups, unknown keys are off, owners change flags over the API with step-up, reason and
 audit, and clients get their evaluated flags from `getInstance`. A gate `make flag-check` fails
 as soon as the server version reaches the `remove_by` of a registered `release` flag, so no
-release flag outlives its date (16 "Feature-Flags", ADR 0064). The existing gate on personal API
+release flag outlives its date (16 "Feature flags", ADR 0064). The existing gate on personal API
 tokens (`tokens.personal_enabled`, M1-44) runs through this evaluation.
 
 ## Read first
 
-- `docs/PLAN.md`: section 3 "Arbeitsweise je Ticket"; section 7 rows M1-27, M1-30, M1-44, M1-46,
+- `docs/PLAN.md`: section 3 "Way of working per ticket"; section 7 rows M1-27, M1-30, M1-44, M1-46,
   M1-47; exit criterion 9 (ADR 0064, accepted:
-  `docs/adr/0064-feature-flag-registrierung-mit-aufraeum-gate.md`).
-- `docs/spec/16-betrieb.md`: "Umgebungen und Feature-Flags" (6), especially "Feature-Flags"
+  `docs/adr/0064-feature-flag-registration-with-a-cleanup-gate.md`).
+- `docs/spec/16-operations.md`: "Environments and feature flags" (6), especially "Feature flags"
   (6.2), and decision R-OP-14.
-- `docs/operations/environments-and-flags.md`: section 2 "Feature-Flags" (2.1 to 2.5).
-- `docs/operations/configuration.md`: 1 "Quellen" (row Feature-Flags), 7 "Feature-Flags".
-- `docs/spec/03-datenmodell.md`: 4.1 table `feature_flags` (rollout schema
+- `docs/operations/environments-and-flags.md`: section 2 "Feature flags" (2.1 to 2.5).
+- `docs/operations/configuration.md`: 1 "Sources" (row Feature flags), 7 "Feature flags".
+- `docs/spec/03-data-model.md`: 4.1 table `feature_flags` (rollout schema
   `feature_flag_rollout.v1`); 4.3 `groups`, `group_memberships` (validity of memberships).
-- `docs/spec/07-rechte.md`: "Gültigkeit einer Freigabe" (2.5: a membership with `expires_at = t`
-  is already invalid), "Prinzipal-Kontext" (3, personal tokens and `tokens.personal_enabled`).
-- `docs/spec/05-aktionen.md`: 4.2 rows `instance.read`, `feature_flag.read`,
+- `docs/spec/07-permissions.md`: "Validity of a grant" (2.5: a membership with `expires_at = t`
+  is already invalid), "Principal context" (3, personal tokens and `tokens.personal_enabled`).
+- `docs/spec/05-actions.md`: 4.2 rows `instance.read`, `feature_flag.read`,
   `feature_flag.update`; 4.3 row `token.create`; 6 row `instance.updated`.
 - `docs/spec/06-api.md`: 5 item 5 (`403 feature_disabled`, public endpoints answer `404`), 8
   item 3 (flags take an optional `If-Match`).
-- `docs/spec/18-release.md`: 2 "Komponenten", rules 1 and 4 (file `VERSION`, SemVer without `v`, equal to the tag).
-- `docs/spec/02-architektur.md`: 4.1 item 4 (source ports), 4.3, 4.4, 5, 7.1 to 7.3.
-- `docs/adr/0000-vorlage-madr-4.md`, `docs/adr/0001-adrs-im-madr-format-decisions-als-ruling-log.md`
-  (form of the new ADR), `docs/adr/0011-12-factor-konfiguration-und-secret-provider.md`.
+- `docs/spec/18-release.md`: 2 "Components", rules 1 and 4 (file `VERSION`, SemVer without `v`, equal to the tag).
+- `docs/spec/02-architecture.md`: 4.1 item 4 (source ports), 4.3, 4.4, 5, 7.1 to 7.3.
+- `docs/adr/0000-template-madr-4.md`, `docs/adr/0001-adrs-in-madr-format-decisions-as-ruling-log.md`
+  (form of the new ADR), `docs/adr/0011-12-factor-configuration-and-secret-provider.md`.
 - `docs/api/openapi.yaml`: operations `listFeatureFlags` (`GET /feature-flags`),
   `putFeatureFlag` (`PUT /feature-flags/{key}`), `getInstance`; schemas `FeatureFlag`,
   `FlagRollout`, `FeatureFlagPut`, `FeatureFlagList`, `EvaluatedFlag`, `InstanceInfo`.
@@ -63,19 +63,19 @@ tokens (`tokens.personal_enabled`, M1-44) runs through this evaluation.
 7. No en dash or em dash in any text you write; white label (people Alex, Sam, Robin, groups
    Support, Marketing, Engineering, Research); configuration only through named keys from
    `docs/operations/configuration.md`.
-8. 16 6.2 "Registrierung": every flag is registered in code with key, kind `release` or
+8. 16 6.2 "Registration": every flag is registered in code with key, kind `release` or
    `option`, description, default, and for `release` the version `remove_by`; environments doc
    2.2 adds the owning module and says unknown keys in the table are off and shown as orphaned.
-9. 16 6.2 "Auswertung" and environments doc 2.3: value = global value, inverted when the
+9. 16 6.2 "Evaluation" and environments doc 2.3: value = global value, inverted when the
    principal or one of its valid groups is in `rollout`; unknown keys are off; the server
    evaluates, never the client; agents and apps get the global value (rollout holds only people
    and groups).
-10. 16 6.2 "Aufräumregel": a gate fails when the server's `VERSION` reaches `remove_by` of a
+10. 16 6.2 "Cleanup rule": a gate fails when the server's `VERSION` reaches `remove_by` of a
     registered `release` flag.
 11. 05 4.2: `feature_flag.read` and `feature_flag.update` are owner only; update needs step-up
     and is audited on allow and deny; environments doc 2.4 requires a reason.
 12. 05 6 and 16 6.2: `instance.updated` names only the changed flag keys.
-13. 16 6.2 "Grenze": flags switch functions only, never security limits, thresholds or secrets.
+13. 16 6.2 "Limit": flags switch functions only, never security limits, thresholds or secrets.
 14. configuration.md 7: the option flags `dm.enabled`, `voice.enabled`,
     `tokens.personal_enabled`, all off by default.
 15. 06 5 item 5 and 05 `token.create`: with `tokens.personal_enabled` off for the caller,
@@ -91,7 +91,7 @@ Paths are relative to `services/server/` unless they start with `docs/` or `Make
    `updated_at` and `FeatureFlagPut` with required `enabled` and `reason` and without
    `description`; ADR 0064; 03 `feature_flags` (no `description` column, version `0` for a
    registered key without a row); 02 4.3 (`instance` declares `FlagGroupSource` and
-   `FlagUserSource`, implemented by `authz` and `identity`); 02 "6. Code-Layout"
+   `FlagUserSource`, implemented by `authz` and `identity`); 02 "6. Code layout"
    (`tools/flagcheck`). To do here: `docs/quality/gates.md` row `flag-check`; `docs/DECISIONS.md`
    the rulings under Design notes, in the file's existing format.
 2. **Port** `internal/instance/flags.go` (port package, imports only `kernel`):
@@ -149,8 +149,8 @@ Paths are relative to `services/server/` unless they start with `docs/` or `Make
 9. **Gate tool** `tools/flagcheck` (Go `main` in the server module, beside `tools/archgen`;
    follow its location convention): flags `-version-file`, `-config-doc`, `-modules`; checks in
    Design notes. `Makefile`: target `flag-check`, part of `gates`; it prints `SKIP flag-check no
-   server module` when `services/server/go.mod` is not tracked (gates.md "Überspringen").
-10. **Freischalt-Liste** `api/operations.yaml`: `listFeatureFlags`, `putFeatureFlag`.
+   server module` when `services/server/go.mod` is not tracked (gates.md "Skipping").
+10. **Enable list** `api/operations.yaml`: `listFeatureFlags`, `putFeatureFlag`.
 11. **Documentation**: `internal/instance/README.md` (registry, evaluation, source ports, how to
     add and remove a flag), `docs/operations/environments-and-flags.md` 2.2 (where the registry
     lives, the `flag-check` command), `services/server/CHANGELOG.md` under `Unreleased`.
@@ -194,7 +194,7 @@ Registry rules (checked by `CheckRegistry`, used by `flag-check` and a unit test
 `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$` (fits the `KeyPath` pattern), keys unique, kind is
 `release` or `option`, description not blank, module is a key under `modules:` in
 `architecture/modules.yaml`, `release` has a valid `remove_by` (SemVer without `v`), `option`
-has none. A flag never encodes a number, limit or secret (16 6.2 "Grenze"); the README says so
+has none. A flag never encodes a number, limit or secret (16 6.2 "Limit"); the README says so
 next to the registry, because a check cannot see intent.
 
 **Evaluation.**
@@ -253,8 +253,8 @@ Fails with one line per finding, prefixed `flag-check:`, exit code 1:
 2. a `release` flag with `CompareSemVer(VERSION, remove_by) >= 0` (a pre-release such as
    `1.4.0-beta.1` has not reached `1.4.0`), message `remove flag <key>: VERSION <v> reached
    remove_by <r>`;
-3. the configuration.md table differs from the registry in key, kind or default (`an` = true,
-   `aus` = false).
+3. the configuration.md table differs from the registry in key, kind or default (`on` = true,
+   `off` = false).
 Prints `flag-check: ok (<n> flags)` otherwise. The tool takes the registry as a function
 argument internally, so tests run it on fixture registries without touching the real one.
 

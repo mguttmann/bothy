@@ -1,12 +1,12 @@
-%% ERD Teil 6: Modul sync. Quelle: 03-datenmodell.md, 4.10. event_log und
-%% event_consumer_cursors haben bewusst keine Fremdschlüssel.
-%% Reine Protokoll-Spalten (created_by, updated_by und ähnliche) zeigen auf principals(id) und
-%% sind nicht als Beziehung gezeichnet.
-%% Tabellen anderer Module nur mit Schlüssel. Benachrichtigung (notify) steht in Teil 10.
+%% ERD part 6: module sync. Source: 03-data-model.md, 4.10. event_log and
+%% event_consumer_cursors deliberately have no foreign keys.
+%% Pure log columns (created_by, updated_by and similar) point to principals(id) and
+%% are not drawn as a relationship.
+%% Tables of other modules only with their key. Notification (notify) is in part 10.
 erDiagram
   direction LR
   event_log {
-    bigint seq PK "commit-geordnet, lückenlos"
+    bigint seq PK "commit-ordered, gapless"
     uuid id
     text type
     uuid space_id
@@ -72,15 +72,15 @@ erDiagram
     uuid id PK
   }
 
-  principals ||--o{ idempotency_keys : "nutzt"
-  users ||--o{ read_states : "hat"
-  threads ||--o{ read_states : "gelesen"
-  channels ||--o{ read_states : "Kopie"
-  devices |o--o{ read_states : "zuletzt von"
-  users ||--o{ drafts : "schreibt"
-  threads |o--o{ drafts : "für"
+  principals ||--o{ idempotency_keys : "uses"
+  users ||--o{ read_states : "has"
+  threads ||--o{ read_states : "read"
+  channels ||--o{ read_states : "copy"
+  devices |o--o{ read_states : "last by"
+  users ||--o{ drafts : "writes"
+  threads |o--o{ drafts : "for"
   channels ||--o{ drafts : "in"
-  messages |o--o{ drafts : "Antwort auf"
-  devices |o--o{ drafts : "zuletzt von"
-  users ||--o{ user_settings : "hat"
-  devices |o--o{ user_settings : "zuletzt von"
+  messages |o--o{ drafts : "reply to"
+  devices |o--o{ drafts : "last by"
+  users ||--o{ user_settings : "has"
+  devices |o--o{ user_settings : "last by"

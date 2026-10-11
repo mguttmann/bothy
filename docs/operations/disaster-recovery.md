@@ -1,85 +1,85 @@
-# Disaster Recovery
+# Disaster recovery
 
-Status: Entwurf M0. Runbook zu [16-betrieb.md](../spec/16-betrieb.md) 9. Ziele:
-`dr.rpo_target` (größter Datenverlust) und `dr.rto_target` (Dauer bis zum Betrieb). Der
-automatische Wiederherstellungstest misst die Dauer bei jedem Lauf.
+Status: draft M0. Runbook for [16-operations.md](../spec/16-operations.md) 9. Targets:
+`dr.rpo_target` (largest data loss) and `dr.rto_target` (time until operation resumes). The
+automatic restore test measures the duration on every run.
 
-## 1. Vorbereitet sein
+## 1. Be prepared
 
-| Punkt | Wo | Prüfung |
+| Item | Where | Check |
 |---|---|---|
-| Secrets-Bündel (age), aktuell | offline beim Owner, getrennt vom Off-site-Ziel | Probe-Entschlüsselung nach jeder Änderung |
-| Privater age-Schlüssel des Owners | zweiter Ort (z. B. Passwortmanager mit Notfallzugang) | jährlich |
-| Off-site-Zugang zum Lesen | im Secrets-Bündel | Wiederherstellungstest liest von dort |
-| Konfiguration (`.env`, Overlays, OpenTofu-Variablen) | Repository des Betreibers | bei jeder Änderung |
-| Externer Alarmweg | Alertmanager `external-oncall`, Watchdog | Watchdog-Herzschlag kommt an |
-| Dieses Runbook offline | Kopie neben dem Secrets-Bündel | jährlich |
+| Secrets bundle (age), current | offline with the owner, separate from the off-site target | test decryption after every change |
+| Private age key of the owner | second place (for example a password manager with emergency access) | yearly |
+| Off-site access for reading | in the secrets bundle | the restore test reads from there |
+| Configuration (`.env`, overlays, OpenTofu variables) | repository of the instance operator | on every change |
+| External alert path | Alertmanager `external-oncall`, watchdog | the watchdog heartbeat arrives |
+| This runbook offline | copy next to the secrets bundle | yearly |
 
-## 2. Entscheidungsbaum
+## 2. Decision tree
 
-1. Ist der Host erreichbar und das Volume `pgdata` lesbar? Nein: Fall B.
-2. Sind Daten falsch (gelöscht, beschädigt) und ist die Zeit des Fehlers bekannt? Ja: Fall A.
-3. Sind Schlüssel abgeflossen? Ja: Fall D oder E, danach prüfen, ob A oder B nötig ist.
-4. Fehlt das Off-site-Ziel? Fall C.
+1. Is the host reachable and the volume `pgdata` readable? No: case B.
+2. Is data wrong (deleted, damaged) and is the time of the error known? Yes: case A.
+3. Have keys leaked? Yes: case D or E, then check whether A or B is needed.
+4. Is the off-site target missing? Case C.
 
-## 3. Fälle
+## 3. Cases
 
-### Fall A: Daten falsch, Host gesund
+### Case A: wrong data, healthy host
 
-1. Störung auf der Statusseite anlegen.
-2. Zeitpunkt bestimmen: Audit-Log (`audit.read`), Logs, Trace der fehlerhaften Anfrage.
-3. PITR nach [backup-restore.md](backup-restore.md) 5.2.
-4. Nach dem Start: Statusseite aktualisieren, betroffene Menschen informieren (verlorener Zeitraum).
+1. Create an incident on the status page.
+2. Determine the point in time: audit log (`audit.read`), logs, trace of the faulty request.
+3. PITR according to [backup-restore.md](backup-restore.md) 5.2.
+4. After the start: update the status page, inform the affected people (lost period).
 
-### Fall B: Host verloren
+### Case B: host lost
 
-1. Neuen Host bereitstellen (gleiches OpenTofu-Modul oder neue VM), gleiche `BOTHY_VERSION`.
-2. Secrets-Bündel entschlüsseln und nach `infra/compose/secrets/` legen; `secrets-init` übernimmt
-   die Dateien statt neue zu erzeugen. Gleicher Token-Pepper und gleiche Signierschlüssel heißen:
-   Tokens und Geräte bleiben gültig.
-3. `docker compose up -d secrets-init postgres backup`, dann Restore aus repo2 nach
-   [backup-restore.md](backup-restore.md) 5.2 ab Schritt 4 (Ziel: letzter Stand).
-4. Objekte aus restic zurückspielen.
-5. `bothy restore finalize`, Wiederherstellungstest, dann alle Dienste starten.
-6. DNS bzw. Tailscale-Gerät auf den neuen Host. Bei `tailscale` ist das Gerät neu; `TS_HOSTNAME`
-   gleich halten, das alte Gerät in der Tailnet-Verwaltung entfernen.
-7. Dauer festhalten und mit `dr.rto_target` vergleichen.
+1. Provision a new host (same OpenTofu module or a new VM), same `BOTHY_VERSION`.
+2. Decrypt the secrets bundle and place it in `infra/compose/secrets/`; `secrets-init` takes over
+   the files instead of generating new ones. The same token pepper and the same signing keys mean:
+   tokens and devices stay valid.
+3. `docker compose up -d secrets-init postgres backup`, then restore from repo2 according to
+   [backup-restore.md](backup-restore.md) 5.2 from step 4 (target: latest state).
+4. Restore the objects from restic.
+5. `bothy restore finalize`, restore test, then start all services.
+6. Point DNS or the Tailscale device to the new host. With `tailscale` the device is new; keep
+   `TS_HOSTNAME` the same, remove the old device in the tailnet administration.
+7. Record the duration and compare it with `dr.rto_target`.
 
-### Fall C: Off-site-Ziel verloren oder kompromittiert
+### Case C: off-site target lost or compromised
 
-1. Neues Ziel anlegen (andere Zugangsdaten), `BOTHY_BACKUP_OFFSITE_TARGET` umstellen.
-2. Sofort Vollsicherung und logischen Abzug, dann Wiederherstellungstest.
-3. Bei Kompromittierung: Schlüssel der Sicherung rotieren (neue Repositorys, alte nach Frist
-   löschen), denn der Angreifer kann alte Sicherungen mit dem alten Schlüssel lesen.
+1. Create a new target (different credentials), switch `BOTHY_BACKUP_OFFSITE_TARGET`.
+2. Immediately a full backup and a logical dump, then a restore test.
+3. On compromise: rotate the backup keys (new repositories, delete the old ones after a period),
+   because the attacker can read old backups with the old key.
 
-### Fall D: Signierschlüssel kompromittiert
+### Case D: signing key compromised
 
-1. `signing_key.rotate` mit `mode = emergency` für den betroffenen Zweck (Owner, Step-up): alle
-   Schlüssel des Zwecks werden sofort `retired`, ein neuer wird `active`. War der Schlüsselspeicher
-   (`secrets.signing_key_dir`) selbst betroffen, alle Zwecke rotieren.
-2. Alle Sitzungen widerrufen (`session.revoke` für alle) bei `access_token`; bei `invocation`
-   reicht die Rotation, weil Marken nur `agent.invocation_token_ttl` gelten; bei `webhook_out`
-   die Empfänger informieren.
-3. Audit-Log nach Nutzung des alten Schlüssels durchsuchen.
+1. `signing_key.rotate` with `mode = emergency` for the affected purpose (owner, step-up): all
+   keys of the purpose become `retired` immediately, a new one becomes `active`. If the key store
+   (`secrets.signing_key_dir`) itself was affected, rotate all purposes.
+2. Revoke all sessions (`session.revoke` for all) for `access_token`; for `invocation` the
+   rotation is enough, because invocation tokens are only valid for `agent.invocation_token_ttl`;
+   for `webhook_out` inform the receivers.
+3. Search the audit log for use of the old key.
 
-### Fall E: Token-Pepper kompromittiert
+### Case E: token pepper compromised
 
-1. Neuen Pepper als Datei bereitstellen, Server neu starten.
-2. Folge: alle API-Tokens, Refresh-Tokens und Eingangs-Webhook-Tokens sind ungültig. Owner gibt
-   Tokens für Agenten und Apps neu aus; Menschen melden sich neu an.
-3. Ein Datenbank-Abzug ohne Pepper verrät keine nutzbaren Tokens (R-DM-06); mit Pepper schon.
-   Darum: prüfen, ob auch die Datenbank abgeflossen ist.
+1. Provide a new pepper as a file, restart the server.
+2. Consequence: all API tokens, refresh tokens and incoming webhook tokens are invalid. The owner
+   issues new tokens for agents and apps; people log in again.
+3. A database dump without the pepper reveals no usable tokens (R-DM-06); with the pepper it does.
+   Therefore: check whether the database has leaked too.
 
-### Fall F: Ransomware oder Übernahme des Hosts
+### Case F: ransomware or takeover of the host
 
-1. Host vom Netz, nicht reparieren. Als Fall B behandeln, mit neuem Host.
-2. Alle Geheimnisse rotieren (Fälle D und E, Datenbank-Passwörter, Push-Schlüssel beim Anbieter
-   neu erzeugen, OIDC-Client-Secret neu).
-3. Wiederherstellung aus dem Off-site-Ziel; dieses ist nur anhängend und darum unversehrt.
-4. Zeitpunkt vor der Übernahme wählen (Fall A), wenn Daten manipuliert sein könnten.
+1. Disconnect the host from the network, do not repair it. Treat it as case B, with a new host.
+2. Rotate all secrets (cases D and E, database passwords, regenerate the push keys at the
+   provider, new OIDC client secret).
+3. Restore from the off-site target; it is append-only and therefore intact.
+4. Choose a point in time before the takeover (case A) if data could have been manipulated.
 
-## 4. Nach jedem Fall
+## 4. After each case
 
-1. Störung abschließen mit Ursache, Dauer, verlorenem Zeitraum.
-2. Nachbesprechung: Was hätte früher gewarnt? Neue Alarme oder Prüfungen als Ticket.
-3. Wiederherstellungstest und Watchdog wieder grün.
+1. Close the incident with cause, duration and lost period.
+2. Post-mortem: what would have warned earlier? New alerts or checks as a ticket.
+3. Restore test and watchdog green again.

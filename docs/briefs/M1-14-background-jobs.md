@@ -1,6 +1,6 @@
 # M1-14: Background jobs with River
 
-Status: ready | Depends on: M1-11, M1-13 | Etappe: M1
+Status: ready | Depends on: M1-11, M1-13 | Milestone: M1
 
 ## Goal
 
@@ -13,20 +13,21 @@ periodic jobs, so a breaking change of River (0.x) touches one package (R-AR-09)
 
 ## Read first
 
-- `docs/spec/02-architektur.md`, sections "Hintergrundjobs (River)" (all of "Einsatz",
-  "Warteschlangen", "Job-Katalog", "Regeln für Jobs"), "Rollen eines Prozesses", "Befehle des
-  Binarys", "Modulliste" (closing paragraph on technical tables), "Erlaubte Abhängigkeiten"
-  (closing rule "River nur in `platform/jobs`"), "Schichten im Modul", "Code-Layout",
-  "go-arch-lint", "Was nie in einer Transaktion passiert", "Panics", "Start und Graceful
-  Shutdown" ("Start", "Health", "Shutdown"), "Offen" (PollOnly), "Entscheidungen dieses Kapitels"
-  (R-AR-09, R-AR-16), "Konfigurationswerte dieses Kapitels", "Quellen" Q3 to Q7.
-- `docs/spec/03-datenmodell.md`, "Technische Tabellen".
-- `docs/spec/16-betrieb.md`, "Datenbank" ("Rollen": `bothy_owner` migrates, `bothy_app` runs).
-- `docs/operations/upgrade.md`, "Regeln für Migrationen" (M11: River migrations in the same run,
+- `docs/spec/02-architecture.md`, sections "Background jobs (River)" (all of "Usage",
+  "Queues", "Job catalogue", "Rules for jobs"), "Roles of a process", "Commands of the binary",
+  "Module list" (closing paragraph on technical tables), "Allowed dependencies"
+  (closing rule "River only in `platform/jobs`"), "Layers within a module", "Code layout",
+  "go-arch-lint", "What never happens in a transaction", "Panics",
+  "Start and graceful shutdown" ("Start", "Health", "Shutdown"), "Open" (PollOnly),
+  "Decisions of this chapter" (R-AR-09, R-AR-16), "Configuration values of this chapter",
+  "Sources" Q3 to Q7.
+- `docs/spec/03-data-model.md`, "Technical tables".
+- `docs/spec/16-operations.md`, "Database" ("Roles": `bothy_owner` migrates, `bothy_app` runs).
+- `docs/operations/upgrade.md`, "Rules for migrations" (M11: River migrations in the same run,
   before the domain migrations).
 - ADR 0007 (rule 8), ADR 0008.
-- `docs/observability/signals.md`, "Spans" (`job <bothy.job.kind>`), "Attribute in Spans und
-  Logs" (`bothy.job.kind`, `bothy.outcome`).
+- `docs/observability/signals.md`, "Spans" (`job <bothy.job.kind>`),
+  "Attributes in spans and logs" (`bothy.job.kind`, `bothy.outcome`).
 - What earlier tickets built: `internal/platform/lifecycle` and `internal/platform/health` (M1-11),
   `internal/platform/pg` with the unit of work, `pg.Tx(ctx)` and `txn.CurrentPhase` (M1-13),
   `cmd/bothy` `migrate` (M1-12), `architecture/modules.yaml` and `tools/archgen` (M1-05).
@@ -37,7 +38,7 @@ periodic jobs, so a breaking change of River (0.x) touches one package (R-AR-09)
   https://pkg.go.dev/github.com/riverqueue/river/rivermigrate (`Config.Schema`, `Migrate`,
   `Validate`, `ExistingVersions`), https://riverqueue.com/docs/graceful-shutdown.
   Checked on 2026-10-10 against v0.49.0.
-- `docs/PLAN.md` section "Arbeitsweise je Ticket" and the M1 risk "River ist 0.x";
+- `docs/PLAN.md` section "Way of working per ticket" and the M1 risk "River is 0.x";
   `docs/quality/gates.md`; `CONTRIBUTING.md`; `docs/quality/red-team-gate.md`.
 
 This ticket touches no API operation, no table of 03 (River tables are technical tables) and no
@@ -69,17 +70,17 @@ action id.
    and the config schema in code (Ruling L4). No literal limit, timeout or worker count in code
    outside the schema defaults.
 10. River only in `internal/platform/jobs`; tables in schema `jobs.schema`, migrated with
-    `rivermigrate` inside `bothy migrate`; no River Pro features (02 "Einsatz", R-AR-09,
+    `rivermigrate` inside `bothy migrate`; no River Pro features (02 "Usage", R-AR-09,
     ADR 0007 rule 8).
 11. Role `api` uses an insert-only client (never started, no leader election); role `worker` runs
-    jobs, periodic jobs and maintenance; role `all` does both (02 "Rollen eines Prozesses").
-12. Jobs are inserted with `InsertTx` in the same transaction as the cause (02 "Was nie in einer
-    Transaktion passiert").
-13. Job arguments contain only IDs, never content or secrets (02 "Einsatz").
+    jobs, periodic jobs and maintenance; role `all` does both (02 "Roles of a process").
+12. Jobs are inserted with `InsertTx` in the same transaction as the cause
+    (02 "What never happens in a transaction").
+13. Job arguments contain only IDs, never content or secrets (02 "Usage").
 14. Queues `default`, `files`, `delivery`, `maintenance`, `privacy` with parallelism
-    `jobs.queue.<queue>.max_workers` (02 "Warteschlangen").
+    `jobs.queue.<queue>.max_workers` (02 "Queues").
 15. Every job is idempotent, passes its context on and returns `ctx.Err()` when cancelled; `nil`
-    counts as success in River (02 "Regeln für Jobs" items 1, 2); chapters with their own retry
+    counts as success in River (02 "Rules for jobs" items 1, 2); chapters with their own retry
     rule set their own backoff (item 4).
 16. Shutdown of the worker part: soft stop with `shutdown.jobs_soft_timeout`, then job contexts
     are cancelled; cancelled jobs end with an error and are retried (02 "Shutdown").
@@ -120,7 +121,7 @@ All Go paths are relative to `services/server/`.
       `func MigrationStatus(ctx, pool, schema) (Status, error)`,
       `func ValidateMigrations(ctx, pool, schema) error`.
     - `func ValidateArgsType(t reflect.Type) error` (exported for the wire test).
-    - `README.md`: purpose, role behaviour, queues, rules for job authors, River defaults that
+    - `README.md`: purpose, role behavior, queues, rules for job authors, River defaults that
       stay in force (fetch polling, job timeout, retry policy) with the River version.
 2. `cmd/bothy` `migrate`: `up` creates the schema, sets default privileges and runs River
    migrations before goose; `status` shows the River migration version next to goose; `validate`
@@ -139,15 +140,15 @@ All Go paths are relative to `services/server/`.
    MPL-2.0 is on `quality/licenses/allowed.txt`; `make licenses` green.
 7. Docs: the span `job <bothy.job.kind>` and the metric `bothy.job.duration` already list the
    `bothy.outcome` values `completed`, `failed`, `cancelled`, `snoozed` in signals.md (use exactly
-   these); 02 "Regeln für Jobs" rules 5 and 6 cover River defaults and timeouts;
-   `services/server/README.md` platform table if wording changes; `docs/spec/02-architektur.md`
-   "Einsatz" one sentence on the type check of arguments (allowed field types, see Design notes);
+   these); 02 "Rules for jobs" rules 5 and 6 cover River defaults and timeouts;
+   `services/server/README.md` platform table if wording changes; `docs/spec/02-architecture.md`
+   "Usage" one sentence on the type check of arguments (allowed field types, see Design notes);
    the README of `platform/jobs` names the River defaults in force with the River version (02
-   "Regeln für Jobs" rule 5); CHANGELOG; DECISIONS.md rows for the rulings below.
+   "Rules for jobs" rule 5); CHANGELOG; DECISIONS.md rows for the rulings below.
 
 ## Out of scope
 
-- Any concrete job of the catalogue 02 "Job-Katalog" (`sync.partition_maintenance` comes with
+- Any concrete job of the catalogue 02 "Job catalogue" (`sync.partition_maintenance` comes with
   M1-16, the others with their modules).
 - Worker consumers of the event log with cursor (ADR 0051, P-13: M2-01).
 - Job metrics `bothy.job.duration` and `bothy.job.queue` (M1-68).
@@ -200,7 +201,7 @@ All Go paths are relative to `services/server/`.
   `Config.Schema = jobs.schema`, then goose. Idempotent: a second run changes nothing.
 - `jobs.schema` must be a valid unquoted identifier (`^[a-z_][a-z0-9_]{0,62}$`); register this
   cross check in the config schema.
-- Configuration (02 "Konfigurationswerte dieses Kapitels"): `jobs.schema` (`jobs`),
+- Configuration (02 "Configuration values of this chapter"): `jobs.schema` (`jobs`),
   `jobs.queue.default.max_workers` (`8`), `jobs.queue.files.max_workers` (`2`),
   `jobs.queue.delivery.max_workers` (`16`), `jobs.queue.maintenance.max_workers` (`2`),
   `jobs.queue.privacy.max_workers` (`1`), `shutdown.jobs_soft_timeout` (`20s`). Register in the

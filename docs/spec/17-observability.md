@@ -1,196 +1,196 @@
 # 17 Observability
 
-Status: Entwurf M0. Normativ für Telemetrie (Traces, Metriken, Logs), Datenschutz der
-Telemetrie, Collector, Dashboards, SLOs, Alarme, In-App-Statistik und die Abgrenzung zum
-Audit-Log. Dieses Kapitel fasst die Regeln zusammen; die Einzelheiten stehen unter
+Status: draft M0. Normative for telemetry (traces, metrics, logs), privacy of the
+telemetry, collector, dashboards, SLOs, alerts, in-app statistics and the boundary to the
+audit log. This chapter summarizes the rules; the details are under
 [docs/observability/](../observability/signals.md).
-Begriffe: [00-glossar.md](00-glossar.md). Betrieb: [16-betrieb.md](16-betrieb.md).
+Terms: [00-glossary.md](00-glossary.md). Operations: [16-operations.md](16-operations.md).
 
-## 1. Ziele
+## 1. Goals
 
-1. Ein Betreiber sieht in Minuten, ob Nachrichten ankommen, ob Agenten laufen und ob Push
-   funktioniert, und folgt einer Anfrage von der App bis zur Agenten-Laufzeit.
-2. Telemetrie verrät keine Inhalte und taugt nicht zur Überwachung einzelner Menschen.
-3. Telemetrie blockiert nie den Nachrichtenpfad.
-4. Das Backend ist austauschbar: Ein Wechsel ist Konfiguration, kein Code.
+1. An instance operator sees within minutes whether messages arrive, whether agents run and
+   whether push works, and follows a request from the app to the agent runtime.
+2. Telemetry reveals no content and is not suitable for monitoring individual people.
+3. Telemetry never blocks the message path.
+4. The backend is replaceable: a switch is configuration, not code.
 
-## 2. Grundregeln
+## 2. Basic rules
 
-| Nr | Regel | Quelle |
+| No. | Rule | Source |
 |---|---|---|
-| 1 | Instrumentierung nur mit OpenTelemetry (Go SDK im Server, OTel-SDKs in Python und TypeScript in den Adaptern). | B11 |
-| 2 | Export nur an einen OpenTelemetry Collector. Kein Prozess spricht direkt mit einem Hersteller-Backend. | B11, ADR 0034 |
-| 3 | Keine Nachrichteninhalte, Prompts, Dateinamen, Suchbegriffe, Tokens oder Geheimnisse in Telemetrie. Durchsetzung an der Quelle und im Collector (Allowlist). | B11, [privacy.md](../observability/privacy.md) |
-| 4 | Telemetrie ist asynchron mit begrenzter Warteschlange. Ist sie voll, verwirft der Prozess und zählt `bothy.telemetry.dropped`. Ein Export-Fehler ändert nie das Ergebnis einer Anfrage. Verwirft ein Prozessor des SDK ohne Rückmeldung, nennt das README von `platform/otel` diese ungezählte Stelle. | R-Telemetrie |
-| 5 | `gen_ai.*`-Attribute stehen nur in einem Paket je Codebasis (Server, SDK). Ihr Status ist "Development"; ein Wechsel der Konvention ist eine Änderung an genau dieser Stelle. | R-Telemetrie, [signals.md](../observability/signals.md) 6 |
-| 6 | Das Audit-Log ist keine Telemetrie: eigene Tabelle, gleiche Transaktion, nie gesampelt, nie über den Collector. | B11, [audit-vs-telemetry.md](../observability/audit-vs-telemetry.md) |
-| 7 | Die In-App-Statistik liest eigene Tabellen, nie das Telemetrie-Backend. | [admin-statistics.md](../observability/admin-statistics.md) |
-| 8 | Menschen erscheinen in Telemetrie nur als Pseudonym (HMAC mit `telemetry.pseudonym_key_ref`). Metriken tragen nie Personen-Attribute. | [privacy.md](../observability/privacy.md) |
-| 9 | Jedes Attribut einer Metrik hat eine endliche, vom Betreiber begrenzte Wertemenge. IDs stehen nur in Spans und Logs. | [signals.md](../observability/signals.md) 2 |
+| 1 | Instrumentation only with OpenTelemetry (Go SDK in the server, OTel SDKs in Python and TypeScript in the adapters). | B11 |
+| 2 | Export only to an OpenTelemetry Collector. No process talks directly to a vendor backend. | B11, ADR 0034 |
+| 3 | No message content, prompts, file names, search terms, tokens or secrets in telemetry. Enforcement at the source and in the collector (allowlist). | B11, [privacy.md](../observability/privacy.md) |
+| 4 | Telemetry is asynchronous with a bounded queue. If it is full, the process drops data and counts `bothy.telemetry.dropped`. An export error never changes the result of a request. If a processor of the SDK drops data without feedback, the README of `platform/otel` names this uncounted point. | R-Telemetrie |
+| 5 | `gen_ai.*` attributes are only in one package per codebase (server, SDK). Their status is "Development"; a change of the convention is a change at exactly this place. | R-Telemetrie, [signals.md](../observability/signals.md) 6 |
+| 6 | The audit log is not telemetry: its own table, the same transaction, never sampled, never via the collector. | B11, [audit-vs-telemetry.md](../observability/audit-vs-telemetry.md) |
+| 7 | The in-app statistics read their own tables, never the telemetry backend. | [admin-statistics.md](../observability/admin-statistics.md) |
+| 8 | People appear in telemetry only as a pseudonym (HMAC with `telemetry.pseudonym_key_ref`). Metrics never carry person attributes. | [privacy.md](../observability/privacy.md) |
+| 9 | Every attribute of a metric has a finite set of values bounded by the instance operator. IDs are only in spans and logs. | [signals.md](../observability/signals.md) 2 |
 
-![Telemetrie-Pipeline](../observability/diagrams/telemetry-pipeline.svg)
+![Telemetry pipeline](../observability/diagrams/telemetry-pipeline.svg)
 
-## 3. Signale
+## 3. Signals
 
-Der Katalog in [signals.md](../observability/signals.md) ist die einzige Liste aller Namen,
-Einheiten und Attribute. Kurzfassung:
+The catalogue in [signals.md](../observability/signals.md) is the only list of all names,
+units and attributes. Summary:
 
-| Bereich | Kernsignale |
+| Area | Core signals |
 |---|---|
-| REST | `http.server.request.duration` (Semantic Conventions, stabil) |
+| REST | `http.server.request.duration` (semantic conventions, stable) |
 | Sync | `bothy.delivery.duration`, `bothy.gateway.connect.duration`, `bothy.gateway.catchup.duration`, `bothy.event.fanout.lag`, `bothy.db.event_seq.lock_wait` |
-| Agenten | `bothy.run.start.latency`, `bothy.run.duration`, `bothy.run.finished`, `bothy.run.steps`, `bothy.run.tokens`, `bothy.run.cost`, `bothy.agent.consumer.lag` |
+| Agents | `bothy.run.start.latency`, `bothy.run.duration`, `bothy.run.finished`, `bothy.run.steps`, `bothy.run.tokens`, `bothy.run.cost`, `bothy.agent.consumer.lag` |
 | Push | `bothy.push.sent`, `bothy.push.skipped`, `bothy.push.fetch` |
-| Datenbank | Empfänger `postgresql` im Collector, `db.client.operation.duration`, `bothy.db.pool.connections` |
-| Sicherung | `bothy.backup.last_success.timestamp`, `bothy.backup.restore_test.*`, `bothy.storage.volume.*` |
+| Database | Receiver `postgresql` in the collector, `db.client.operation.duration`, `bothy.db.pool.connections` |
+| Backup | `bothy.backup.last_success.timestamp`, `bothy.backup.restore_test.*`, `bothy.storage.volume.*` |
 
-Traces folgen einer Anfrage über W3C Trace Context: App, REST, Ereignis-Log, Fan-out, Adapter,
-Laufzeit. Am öffentlichen Listener beginnt der Server einen eigenen Trace und verknüpft einen
-eingehenden `traceparent` als Span-Link; Eltern-Kontext wird er nur mit
-`telemetry.traces.trust_remote_parent`. `correlation_id` in Ereignissen und Audit ist die Trace-ID
-der auslösenden Anfrage; jede Anfrage hat eine, auch mit `telemetry.enabled = false`.
-Für die Weitergabe an Adapter trägt der Umschlag das Feld `trace_context` (W3C `traceparent`,
-gespeichert in `event_log.trace_context`; 03, 04 Abschnitt 2.2).
+Traces follow a request via W3C Trace Context: app, REST, event log, fan-out, adapter,
+runtime. At the public listener, the server starts its own trace and links an
+incoming `traceparent` as a span link; it becomes the parent context only with
+`telemetry.traces.trust_remote_parent`. `correlation_id` in events and audit is the trace ID
+of the triggering request; every request has one, even with `telemetry.enabled = false`.
+For passing it on to adapters, the envelope carries the field `trace_context` (W3C `traceparent`,
+stored in `event_log.trace_context`; 03, 04 section 2.2).
 
-![Trace-Weitergabe](../observability/diagrams/trace-propagation.svg)
+![Trace propagation](../observability/diagrams/trace-propagation.svg)
 
-## 4. Datenschutz
+## 4. Privacy
 
-1. Verbot an der Quelle: Instrumentierung setzt nur Attribute aus dem Katalog.
-2. Zweite Linie im Collector: `transform/scrub` löscht bekannte Inhaltsfelder, die
-   Allowlist (`redaction`) entfernt jeden anderen Schlüssel und ersetzt Werte, die wie Token oder
-   E-Mail-Adresse aussehen, durch HMAC-SHA-256.
-3. Prüfung: Ein Kanarien-Test schickt Inhalte mit einem Geheimwort durch den echten Pfad und
-   sucht das Wort in allen exportierten Daten. Ein Treffer bricht das Gate.
-4. Aufbewahrung im lokalen Stack: `BOTHY_PROMETHEUS_RETENTION`, `BOTHY_LOKI_RETENTION`,
-   `BOTHY_TEMPO_RETENTION` (Compose-Variablen). Bei externen Backends gilt der Vertrag mit dem
-   Anbieter; der Owner trägt ihn ins Verarbeitungsverzeichnis ein (Kapitel 20).
+1. Prohibition at the source: instrumentation sets only attributes from the catalogue.
+2. Second line in the collector: `transform/scrub` deletes known content fields, the
+   allowlist (`redaction`) removes every other key and replaces values that look like a token or
+   an email address with HMAC-SHA-256.
+3. Check: a canary test sends content with a secret word through the real path and
+   searches for the word in all exported data. A hit breaks the gate.
+4. Retention in the local stack: `BOTHY_PROMETHEUS_RETENTION`, `BOTHY_LOKI_RETENTION`,
+   `BOTHY_TEMPO_RETENTION` (Compose variables). With external backends, the contract with the
+   provider applies; the owner enters it into the record of processing activities (chapter 20).
 
-Einzelheiten: [privacy.md](../observability/privacy.md).
+Details: [privacy.md](../observability/privacy.md).
 
-## 5. Collector und Backends
+## 5. Collector and backends
 
-Die Basis [infra/otel/collector.yaml](../../infra/otel/collector.yaml) empfängt, filtert und
-verteilt. Overlays unter `infra/otel/exporters/` hängen Backends an: `local` (Prometheus, Loki,
-Tempo), `newrelic`, `grafana`, `datadog`, `azure-monitor`, `sentry`, `none`. Zwei Overlays lassen
-sich kombinieren. Einzelheiten: [collector.md](../observability/collector.md),
+The base [infra/otel/collector.yaml](../../infra/otel/collector.yaml) receives, filters and
+distributes. Overlays under `infra/otel/exporters/` attach backends: `local` (Prometheus, Loki,
+Tempo), `newrelic`, `grafana`, `datadog`, `azure-monitor`, `sentry`, `none`. Two overlays can
+be combined. Details: [collector.md](../observability/collector.md),
 [backends.md](../observability/backends.md).
 
-## 6. SLOs und Alarme
+## 6. SLOs and alerts
 
-| SLO | SLI | Ziel | Alarm |
+| SLO | SLI | Target | Alert |
 |---|---|---|---|
-| `bothy-api/requests-availability` | REST ohne 5xx | siehe Datei | Page und Ticket |
-| `bothy-sync/delivery-latency` | Live-Zustellung innerhalb der Schwelle | siehe Datei | Page und Ticket |
-| `bothy-sync/reconnect` | Upgrade bis `ready` innerhalb der Schwelle | siehe Datei | Page und Ticket |
-| `bothy-push/provider-acceptance` | Annahme beim Anbieter | siehe Datei | Page und Ticket |
-| `bothy-agents/run-start` | `queued` bis `running` innerhalb der Schwelle | siehe Datei | Page und Ticket |
-| `bothy-agents/turn-duration` | abgeschlossene Läufe innerhalb der Schwelle | siehe Datei | nur Ticket |
+| `bothy-api/requests-availability` | REST without 5xx | see file | Page and ticket |
+| `bothy-sync/delivery-latency` | Live delivery within the threshold | see file | Page and ticket |
+| `bothy-sync/reconnect` | Upgrade to `ready` within the threshold | see file | Page and ticket |
+| `bothy-push/provider-acceptance` | Acceptance by the provider | see file | Page and ticket |
+| `bothy-agents/run-start` | `queued` to `running` within the threshold | see file | Page and ticket |
+| `bothy-agents/turn-duration` | completed runs within the threshold | see file | ticket only |
 
-Ziele und Schwellen stehen nur in den Sloth-Dateien unter `infra/observability/slo/`; die
-Tabelle in [slos.md](../observability/slos.md) gibt sie wieder und ein Check hält beide gleich.
-Burn-Rate-Alarme nach dem Mehrfenster-Verfahren (Startwerte 14,4, 6 und 1; Sloth ergänzt 3).
-Alarme gehen in einen Meldungskanal der Instanz und für `page` zusätzlich an einen externen
-Kanal; ein Watchdog meldet einen toten Alarmweg. Einzelheiten: [slos.md](../observability/slos.md),
+Targets and thresholds are only in the Sloth files under `infra/observability/slo/`; the
+table in [slos.md](../observability/slos.md) reproduces them, and a check keeps both equal.
+Burn-rate alerts with the multi-window method (start values 14.4, 6 and 1; Sloth adds 3).
+Alerts go to an alert channel of the instance and, for `page`, additionally to an external
+channel; a watchdog reports a dead alert path. Details: [slos.md](../observability/slos.md),
 [alerting.md](../observability/alerting.md).
 
 ## 7. Dashboards
 
-Sechs Grafana-Dashboards als Dateien unter `infra/observability/grafana/dashboards/`, geladen
-per Datei-Provisioning: Server, Zustellung und Sync, Agenten-Läufe, Push, Datenbank und
-Sicherung, SLO-Übersicht. Mit M7 kommt ein siebtes Dashboard `bothy-live` mit dem eigenen
-Panel-Plugin dazu ([25-visualisierung.md](25-visualisierung.md), Abschnitt 8). Einzelheiten:
+Six Grafana dashboards as files under `infra/observability/grafana/dashboards/`, loaded
+via file provisioning: server, delivery and sync, agent runs, push, database and
+backup, SLO overview. With M7, a seventh dashboard `bothy-live` with the project's own
+panel plugin is added ([25-visualization.md](25-visualization.md), section 8). Details:
 [dashboards.md](../observability/dashboards.md).
 
-## 8. In-App-Statistik
+## 8. In-app statistics
 
-Die Admin-Konsole zeigt Nutzung je Bereich, Läufe, Werkzeugaufrufe, Kosten und Fehlerraten aus
-eigenen Tabellen. Zähler zu Menschen erscheinen nur ab `privacy.stats_min_group_size` ([20-datenschutz.md](20-datenschutz.md)); Werte je Person
-gibt es nicht. Einzelheiten: [admin-statistics.md](../observability/admin-statistics.md).
+The admin console shows usage per space, runs, tool calls, costs and error rates from
+its own tables. Counters about people appear only from `privacy.stats_min_group_size` on ([20-privacy.md](20-privacy.md)); values per person
+do not exist. Details: [admin-statistics.md](../observability/admin-statistics.md).
 
-### 8.1 Eigene SLI-Messung
+### 8.1 Own SLI measurement
 
-Für Live-Ansichten und die SLO-Ampel der Apps misst der Server selbst
-([25-visualisierung.md](25-visualisierung.md), Abschnitt 3; Ruling T7):
+For live views and the SLO traffic light of the apps, the server measures by itself
+([25-visualization.md](25-visualization.md), section 3; ruling T7):
 
-1. Jeder Messpunkt eines SLI (Abschnitt 6) meldet seinen Wert zweimal: an das OTel-Instrument und
-   über `kernel/measure` an das Modul `stats`. Die eigene Messung zählt je Minute `count` und
-   `good` in die Tabelle `stats_minutes` (03, Abschnitt 4.15); sie liest nie aus der Telemetrie
-   (Regel 7, R-OB-08 bleibt).
-2. Die Grenze für "gut" und das Ziel kommen aus denselben Sloth-Dateien wie die Prometheus-Regeln;
-   ein Generator erzeugt sie für Server und App, ein Check hält sie gleich (25, Abschnitt 3.3). Die
-   Grenze ist eine Bucket-Grenze der Histogramme (R-OB-06), darum zählen beide Wege dieselben
-   Ereignisse als gut.
-3. Die Ampel heißt "eigene Messung" und alarmiert nicht. Alarme kommen weiter aus Prometheus
-   (Abschnitt 6). Abweichungen sind möglich: Fehler vor dem Server (Proxy) fehlen in der eigenen
-   Messung, und ein Absturz verliert höchstens ein `stats.flush_interval`.
-4. Wie die Telemetrie blockiert die eigene Messung nie den Nachrichtenpfad (Regel 4): Zähler im
-   Speicher, Schreiben im Hintergrund, Verlust gezählt in `bothy.stats.flush.dropped`.
+1. Every measuring point of an SLI (section 6) reports its value twice: to the OTel instrument and
+   via `kernel/measure` to the module `stats`. The own measurement counts `count` and
+   `good` per minute into the table `stats_minutes` (03, section 4.15); it never reads from the
+   telemetry (rule 7, R-OB-08 stays).
+2. The boundary for "good" and the target come from the same Sloth files as the Prometheus rules;
+   a generator produces them for server and app, a check keeps them equal (25, section 3.3). The
+   boundary is a bucket boundary of the histograms (R-OB-06), so both paths count the same
+   events as good.
+3. The traffic light is called "own measurement" and does not raise alerts. Alerts still come from
+   Prometheus (section 6). Deviations are possible: errors before the server (proxy) are missing
+   from the own measurement, and a crash loses at most one `stats.flush_interval`.
+4. Like the telemetry, the own measurement never blocks the message path (rule 4): counters in
+   memory, writing in the background, loss counted in `bothy.stats.flush.dropped`.
 
-### 8.2 Visualisierungen
+### 8.2 Visualizations
 
-Die Ansichten der Apps und der Konsole (Live-Topologie, Backend-Ansicht, Zustellung und Sync live,
-Executive-Seite, Tages-Timeline, TV-Modus) und das Grafana-Panel-Plugin `bothy-live-panel` regelt
-[25-visualisierung.md](25-visualisierung.md). Das Plugin liest nur Metriken und Traces dieses
-Kapitels; die Ansichten der Apps lesen nur die eigene Statistik-API.
+The views of the apps and of the console (live topology, backend view, delivery and sync live,
+executive page, daily timeline, TV mode) and the Grafana panel plugin `bothy-live-panel` are
+governed by [25-visualization.md](25-visualization.md). The plugin reads only metrics and traces
+of this chapter; the views of the apps read only the project's own statistics API.
 
 ## 9. Apps
 
-1. Es gibt kein offizielles OpenTelemetry-SDK für Dart
-   (https://opentelemetry.io/blog/2026/dart-flutter-opentelemetry/, abgerufen 2026-10-10)
-   [belegt]. Die Apps senden darum keine Spans, nur feste Kennzahlen über den Server
+1. There is no official OpenTelemetry SDK for Dart
+   (https://opentelemetry.io/blog/2026/dart-flutter-opentelemetry/, retrieved 2026-10-10)
+   [verified]. The apps therefore send no spans, only fixed metrics via the server
    ([signals.md](../observability/signals.md) 4.6a;
-   [ADR 0057](../adr/0057-client-telemetrie-ueber-einen-server-endpunkt.md)). Sie setzen `traceparent` an jeder Anfrage; der
-   Server verknüpft ihn als Span-Link, sodass App-Fehlerberichte und Server-Traces auffindbar
-   verbunden sind.
-2. Trace-ID und Sampling-Entscheid trifft der Server (`telemetry.traces.trust_remote_parent`
-   ist standardmäßig aus). Grund: Ein Client darf weder erzwingen, dass alles aufgezeichnet wird,
-   noch die `correlation_id` wählen, die im Audit steht.
-3. Absturzberichte sendet eine App nur, wenn der Herausgeber der App ein Ziel konfiguriert hat
-   (Sentry, [backends.md](../observability/backends.md)). Berichte enthalten keine Inhalte; die
-   App entfernt Nachrichtentexte, Eingaben und URLs mit Parametern vor dem Versand (Kapitel 15).
+   [ADR 0057](../adr/0057-client-telemetry-through-a-server-endpoint.md)). They set `traceparent` on every request; the
+   server links it as a span link, so that app error reports and server traces are connected in a
+   way that makes them findable.
+2. The server decides the trace ID and sampling (`telemetry.traces.trust_remote_parent`
+   is off by default). Reason: a client must neither force everything to be recorded
+   nor choose the `correlation_id` that is in the audit.
+3. An app sends crash reports only if the publisher of the app has configured a target
+   (Sentry, [backends.md](../observability/backends.md)). Reports contain no content; the
+   app removes message texts, inputs and URLs with parameters before sending (chapter 15).
 
-## 10. Tests, die diese Regeln halten
+## 10. Tests that hold these rules
 
-1. Kanarien-Test: Inhalte mit Geheimwort durch API, Adapter und Collector; das Wort darf in keinem
-   Export stehen (Gate).
-2. Allowlist-Check: Jeder Attributschlüssel im Code steht im Katalog, jeder Schlüssel der
-   Collector-Allowlist steht im Katalog.
-3. Kardinalitäts-Test: Metrik-Attribute nur aus endlichen Mengen; keine IDs an Metriken.
-4. Namens-Test: Jede in Dashboards, Regeln und SLOs genutzte Metrik steht im Katalog.
-5. `promtool check rules`, `amtool check-config`, `otelcol-contrib validate`, Grafana-Provisioning
-   im Portabilitätstest.
-6. SLO-Docs-Check: Ziele und Schwellen in [slos.md](../observability/slos.md) gleich den
-   Sloth-Dateien; erzeugte Regeln gleich einer frischen Erzeugung.
-7. SLI-Grenzen-Check: die erzeugten Grenzen der eigenen Messung gleich einer frischen Erzeugung
-   aus den Sloth-Dateien; jedes SLO hat eine `sli.*`-Metrik in `stats_minutes` (25, VZ-T02, VZ-T03).
+1. Canary test: content with a secret word through API, adapter and collector; the word must not
+   appear in any export (gate).
+2. Allowlist check: every attribute key in the code is in the catalogue, every key of the
+   collector allowlist is in the catalogue.
+3. Cardinality test: metric attributes only from finite sets; no IDs on metrics.
+4. Name test: every metric used in dashboards, rules and SLOs is in the catalogue.
+5. `promtool check rules`, `amtool check-config`, `otelcol-contrib validate`, Grafana provisioning
+   in the portability test.
+6. SLO docs check: targets and thresholds in [slos.md](../observability/slos.md) equal to the
+   Sloth files; generated rules equal to a fresh generation.
+7. SLI boundary check: the generated boundaries of the own measurement equal to a fresh generation
+   from the Sloth files; every SLO has a `sli.*` metric in `stats_minutes` (25, VZ-T02, VZ-T03).
 
-## 11. Konfigurationswerte dieses Kapitels
+## 11. Configuration values of this chapter
 
-| Name | Standard | Bedeutung |
+| Name | Default | Meaning |
 |---|---|---|
-| `telemetry.enabled` | `true` | Telemetrie an oder aus |
-| `telemetry.traces.sampler_ratio` | `1.0` | Anteil der Traces, die das SDK aufzeichnet; der Collector sampelt danach nach |
-| `telemetry.traces.trust_remote_parent` | `false` | `true`: ein eingehender `traceparent` wird Eltern-Kontext (seine Trace-ID wird `correlation_id`, sein Sampling-Flag gilt); `false`: nur Span-Link, eigener Trace |
-| `telemetry.logs.exporter` | `both` | `otlp`, `stdout` oder `both` |
-| `telemetry.logs.level` | `info` | kleinste Stufe, die geschrieben wird |
-| `telemetry.pseudonym_key_ref` | `file:<secrets.dir>/telemetry_pseudonym_key` | Schlüssel für HMAC-Pseudonyme; mindestens 32 Byte |
-| `telemetry.dashboard_url` | leer | Link aus der Admin-Konsole zum Telemetrie-Backend |
-| `stats.cache_ttl` | `5m` | so lange gilt ein berechnetes Statistik-Ergebnis |
-| `stats.max_range` | `400d` | größter abfragbarer Zeitraum |
-| `stats.time_zone` | `UTC` | IANA-Zeitzone der Tagesgrenzen in Statistik, Tagesaggregaten und Timeline ([admin-statistics.md](../observability/admin-statistics.md), Abschnitt 5) |
+| `telemetry.enabled` | `true` | telemetry on or off |
+| `telemetry.traces.sampler_ratio` | `1.0` | share of the traces that the SDK records; the collector then samples again |
+| `telemetry.traces.trust_remote_parent` | `false` | `true`: an incoming `traceparent` becomes the parent context (its trace ID becomes `correlation_id`, its sampling flag applies); `false`: span link only, own trace |
+| `telemetry.logs.exporter` | `both` | `otlp`, `stdout` or `both` |
+| `telemetry.logs.level` | `info` | lowest level that is written |
+| `telemetry.pseudonym_key_ref` | `file:<secrets.dir>/telemetry_pseudonym_key` | key for HMAC pseudonyms; at least 32 bytes |
+| `telemetry.dashboard_url` | empty | link from the admin console to the telemetry backend |
+| `stats.cache_ttl` | `5m` | how long a computed statistics result stays valid |
+| `stats.max_range` | `400d` | largest queryable time range |
+| `stats.time_zone` | `UTC` | IANA time zone of the day boundaries in statistics, daily aggregates and timeline ([admin-statistics.md](../observability/admin-statistics.md), section 5) |
 
-## 12. Entscheidungen dieses Kapitels
+## 12. Decisions of this chapter
 
-| Nr | Entscheidung | Grund |
+| No. | Decision | Reason |
 |---|---|---|
-| R-OB-01 | Fan-out im Collector über forward-Connectoren; jedes Backend ist ein Overlay mit eigenen Pipelines. | Mehrere Backends ohne Listen-Konflikte beim Zusammenführen; ohne Overlay bleibt die Basis gültig. |
-| R-OB-02 | Datenschutz doppelt: Verbot an der Quelle und Allowlist im Collector, geprüft mit Kanarien-Test. | Ein Fehler im Code allein darf keine Inhalte nach außen bringen. |
-| R-OB-03 | Personen nur als HMAC-Pseudonym in Spans und Logs, nie an Metriken. | Fehlersuche bleibt möglich, Leistungsüberwachung einzelner Menschen nicht. |
-| R-OB-04 | Tail-Sampling im Collector: alle Fehler, alle langsamen, Anteil vom Rest; SDK zeichnet vollständig auf. | Fehler gehen nie durch zufälliges Sampling verloren. |
-| R-OB-05 | Der Server entscheidet Trace-ID und Sampling, nicht der Client; ein eingehender `traceparent` ist standardmäßig nur ein Span-Link. | Ein Client kann keine Vollaufzeichnung erzwingen und die `correlation_id` im Audit nicht wählen. |
-| R-OB-06 | Histogramme mit festen Grenzen; jede SLO-Schwelle ist eine Grenze. | Ein SLI aus Buckets ist nur an Grenzen exakt. |
-| R-OB-07 | `correlation_id` ist die Trace-ID der auslösenden Anfrage. | Ereignisse, Audit und Traces lassen sich ohne zweite ID verbinden. |
-| R-OB-08 | Statusseite und Statistik hängen nicht vom Observability-Stack ab. | Der Stack ist optional; Betriebsfunktionen der App nicht. |
-| R-OB-09 | Laufzeit-Texte in Ops-Artefakten (Alarm-Texte, Dashboard-Titel) sind Englisch. | Betreiber weltweit; Planungsdokumente bleiben Deutsch. |
-| R-OB-10 | Die Apps messen SLIs selbst (eigene Messung in `stats_minutes`) mit Grenzen aus den Sloth-Dateien; Prometheus bleibt die Quelle für Alarme. | R-OB-08 verbietet das Lesen aus der Telemetrie; eine Quelle für Grenzen hält beide Wege vergleichbar (Ruling T7, [25-visualisierung.md](25-visualisierung.md)). |
+| R-OB-01 | Fan-out in the collector via forward connectors; every backend is an overlay with its own pipelines. | Several backends without list conflicts when merging; without an overlay, the base stays valid. |
+| R-OB-02 | Privacy twice: prohibition at the source and allowlist in the collector, checked with a canary test. | An error in the code alone must not leak content to the outside. |
+| R-OB-03 | People only as an HMAC pseudonym in spans and logs, never on metrics. | Debugging stays possible, performance monitoring of individual people does not. |
+| R-OB-04 | Tail sampling in the collector: all errors, all slow ones, a share of the rest; the SDK records everything. | Errors are never lost through random sampling. |
+| R-OB-05 | The server decides the trace ID and sampling, not the client; an incoming `traceparent` is only a span link by default. | A client cannot force full recording and cannot choose the `correlation_id` in the audit. |
+| R-OB-06 | Histograms with fixed boundaries; every SLO threshold is a boundary. | An SLI from buckets is exact only at boundaries. |
+| R-OB-07 | `correlation_id` is the trace ID of the triggering request. | Events, audit and traces can be connected without a second ID. |
+| R-OB-08 | Status page and statistics do not depend on the observability stack. | The stack is optional; operational functions of the app are not. |
+| R-OB-09 | Runtime texts in ops artifacts (alert texts, dashboard titles) are English. | Instance operators worldwide; all repository content is English (D-W-94). |
+| R-OB-10 | The apps measure SLIs themselves (own measurement in `stats_minutes`) with boundaries from the Sloth files; Prometheus stays the source for alerts. | R-OB-08 forbids reading from the telemetry; one source for boundaries keeps both paths comparable (ruling T7, [25-visualization.md](25-visualization.md)). |

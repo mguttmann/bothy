@@ -1,71 +1,71 @@
-# Produktname
+# Product name
 
-Status: Entwurf M0. **Keine Rechtsberatung.** Diese Seite fasst eine Websuche zusammen. Sie ersetzt
-keine Markenrecherche in den Registern (DPMA, EUIPO, TMview, USPTO) für die Nizza-Klassen 9
-(Software) und 42 (Software als Dienst) durch eine Fachperson. Die endgültige Wahl trifft der
-Owner (OPEN-QUESTIONS).
+Status: draft M0. **No legal advice.** This page summarizes a web search. It does not replace a
+trademark search by an expert in the registers (DPMA, EUIPO, TMview, USPTO) for Nice classes 9
+(software) and 42 (software as a service). The owner makes the final choice
+(OPEN-QUESTIONS).
 
-## Ergebnis
+## Result
 
-- **Arbeitsname: Bothy.** Kein Chat- oder KI-Produkt dieses Namens gefunden; einzige Treffer in
-  Markenregistern liegen außerhalb von Software.
-- **Namensgleiche Repositories:** Auf GitHub gibt es kleine Projekte namens `bothy`, darunter ein
-  Terminal-Arbeitsplatz und eine Konsole für einen einzelnen Rechner, beide mit wenigen Sternen
-  (https://github.com/search?q=bothy&type=repositories, GitHub-Suche abgerufen 2026-10-11)
-  [belegt]. Keines ist ein Team-Chat; der Terminal-Arbeitsplatz liegt aber nahe am Terminal des
-  Produkts. Folge: Das Repository und der Go-Modulpfad brauchen einen eindeutigen Besitzer-Pfad,
-  und die Registerrecherche (unten) bezieht diese Treffer ein [abgeleitet].
-- **Alternativen: Corvo, Gilde.**
-- Der Name ist Konfiguration (`branding.product_name`, ADR 0044). Im Code steht er nur an wenigen,
-  gelisteten Stellen (Go-Modulpfad, Paketnamen, Binary `bothy`), damit ein Wechsel nach der
-  Markenprüfung billig bleibt.
+- **Working name: Bothy.** No chat or AI product of this name found; the only hits in
+  trademark registers are outside software.
+- **Repositories with the same name:** On GitHub there are small projects named `bothy`, among
+  them a terminal workspace and a console for a single computer, both with few stars
+  (https://github.com/search?q=bothy&type=repositories, GitHub search retrieved 2026-10-11)
+  [verified]. None is a team chat; the terminal workspace, however, is close to the terminal of
+  the product. Consequence: the repository and the Go module path need a unique owner path,
+  and the register search (below) includes these hits [derived].
+- **Alternatives: Corvo, Gilde.**
+- The name is configuration (`branding.product_name`, ADR 0044). In the code it appears only in a
+  few listed places (Go module path, package names, binary `bothy`), so that a change after the
+  trademark check stays cheap.
 
-## Kriterien
+## Criteria
 
-1. Keine Kollision mit einem Produkt im Feld Chat, Zusammenarbeit oder KI-Agenten.
-2. Keine bekannte Marke, kein Firmenname, kein Personenname, kein belasteter Begriff.
-3. In Deutsch und Englisch sprechbar und schreibbar.
-4. Ein eigenes Bild, das zum Produkt passt.
-5. Kurz genug für App-Icon-Beschriftungen.
+1. No collision with a product in the field of chat, collaboration or AI agents.
+2. No well-known brand, no company name, no person's name, no tainted term.
+3. Pronounceable and spellable in German and English.
+4. An image of its own that fits the product.
+5. Short enough for app icon captions.
 
-## Kandidaten
+## Candidates
 
-Alle Belege per Websuche, abgerufen 2026-10-10. "Risiko" ist eine Einschätzung [abgeleitet].
+All evidence by web search, retrieved 2026-10-10. "Risk" is an assessment [derived].
 
-| Name | Befund | Risiko | Ergebnis |
+| Name | Finding | Risk | Result |
 |---|---|---|---|
-| **Bothy** | Keine Chat-App "Bothy" in Web und App Store gefunden [belegt, Websuche]. Kleine namensgleiche GitHub-Projekte außerhalb von Chat (siehe Ergebnis) [belegt]. Markentreffer nur außerhalb von Software: "BOTHY BLENDS" für Spirituosen, UK, Klasse 33 (https://www.ipo.gov.uk/t-tmj/tm-journals/2026-007/UK00004321045.html) und "BOTHOY" für Hardware, US, Klasse 9 (https://trademark.justia.com/885/15/bothoy-88515994.html) [belegt]. Bedeutung: offene Schutzhütte für alle (https://en.wikipedia.org/wiki/Bothy) [belegt]. | niedrig | Arbeitsname |
-| **Corvo** | Keine Chat- oder KI-App gefunden [belegt, Websuche]. Name der Hauptfigur einer Spielreihe (https://en.wikipedia.org/wiki/Corvo_Attano) [belegt]; klangähnlich "Korvo", ein lokaler KI-Arbeitsplatz (https://www.everydev.ai/tools/korvo) [belegt]. | niedrig bis mittel | Alternative 1 |
-| **Gilde** | Softwareanbieter "Gilde Software" in den Niederlanden (https://www.g2.com/sellers/gilde) [belegt]; die englische Entsprechung nutzt eine Plattform für KI-Agenten (https://docs.guild.ai/) [belegt]. Sofort deutsch verständlich. | mittel | Alternative 2 |
-| Plenum | bekanntes Open-Source-Repository gleichen Namens (https://github.com/hyperledger-indy/indy-plenum) und eine CMS-Oberfläche "Plenum UI" (https://agilitycms.com/resources/posts/what-is-plenum-ui) [belegt]; ein IT-Beratungsunternehmen gleichen Namens laut Suchzusammenfassung [vermutet] | mittel | nachrangig |
-| Heinzel | gefördertes Forschungsprojekt "Heinzel AI" im Feld KI-Helfer (https://www.uni-bonn.de/en/news/188-2025) [belegt] | mittel bis hoch | verworfen |
-| Kobold | verbreitete Open-Source-KI-Chat-Werkzeuge gleichen Namens (https://github.com/LostRuins/koboldcpp) und eine seit Jahrzehnten geführte Produktmarke eines Haushaltsgeräte-Herstellers (https://www.vorwerk.com/de/de/c/home/allgemein/presse/pressemitteilungen-kobold/90-jahre-schmutz-bekaempfer) [belegt] | hoch | verworfen |
-| Tandem | Team-Büro-App gleichen Namens (https://apps.apple.com/app/id1521413406) und große Sprach-App gleichen Namens (https://apps.apple.com/app/tandem-learn-languages/id959001619) [belegt] | hoch | verworfen |
-| Rudel | im deutschen Sprachraum mit einer historisch belasteten Person verbunden [belegt, Enzyklopädie-Eintrag; Verweis bewusst nicht aufgenommen] | hoch (Ruf) | verworfen |
+| **Bothy** | No chat app "Bothy" found on the web or in the App Store [verified, web search]. Small GitHub projects with the same name outside chat (see Result) [verified]. Trademark hits only outside software: "BOTHY BLENDS" for spirits, UK, class 33 (https://www.ipo.gov.uk/t-tmj/tm-journals/2026-007/UK00004321045.html) and "BOTHOY" for hardware, US, class 9 (https://trademark.justia.com/885/15/bothoy-88515994.html) [verified]. Meaning: open shelter for everyone (https://en.wikipedia.org/wiki/Bothy) [verified]. | low | Working name |
+| **Corvo** | No chat or AI app found [verified, web search]. Name of the main character of a game series (https://en.wikipedia.org/wiki/Corvo_Attano) [verified]; similar in sound to "Korvo", a local AI workspace (https://www.everydev.ai/tools/korvo) [verified]. | low to medium | Alternative 1 |
+| **Gilde** | Software vendor "Gilde Software" in the Netherlands (https://www.g2.com/sellers/gilde) [verified]; the English equivalent is used by a platform for AI agents (https://docs.guild.ai/) [verified]. Immediately understandable in German. | medium | Alternative 2 |
+| Plenum | well-known open-source repository of the same name (https://github.com/hyperledger-indy/indy-plenum) and a CMS interface "Plenum UI" (https://agilitycms.com/resources/posts/what-is-plenum-ui) [verified]; an IT consulting company of the same name according to a search summary [assumed] | medium | secondary |
+| Heinzel | funded research project "Heinzel AI" in the field of AI helpers (https://www.uni-bonn.de/en/news/188-2025) [verified] | medium to high | rejected |
+| Kobold | widespread open-source AI chat tools of the same name (https://github.com/LostRuins/koboldcpp) and a product brand of a household appliance maker held for decades (https://www.vorwerk.com/de/de/c/home/allgemein/presse/pressemitteilungen-kobold/90-jahre-schmutz-bekaempfer) [verified] | high | rejected |
+| Tandem | team office app of the same name (https://apps.apple.com/app/id1521413406) and a large language app of the same name (https://apps.apple.com/app/tandem-learn-languages/id959001619) [verified] | high | rejected |
+| Rudel | in the German-speaking world associated with a historically tainted person [verified, encyclopedia entry; reference deliberately not included] | high (reputation) | rejected |
 
-Domains: Alle geprüften kurzen `.dev`- und `.app`-Domains der acht Wörter waren im DNS registriert
-(DNS-Abfrage `dig NS`, 2026-10-10) [belegt]; ein freies NXDOMAIN heißt nicht sicher frei. Plan: mit
-Zusatz arbeiten (zum Beispiel ein Wort plus "chat" oder "app"), Kaufbarkeit erst beim Registrar
-prüfen [abgeleitet].
+Domains: All checked short `.dev` and `.app` domains of the eight words were registered in DNS
+(DNS query `dig NS`, 2026-10-10) [verified]; an NXDOMAIN answer does not reliably mean free. Plan:
+work with an addition (for example a word plus "chat" or "app"), check whether it can be bought
+only at the registrar [derived].
 
-Im Feld "Team-Chat mit KI-Agenten als Mitglieder" gibt es bereits Anbieter, die mit "agentic team
-chat" werben (https://glue.ai/blog/how-agentic-team-chat-is-changing-the-way-we-work) [belegt]; der
-Name sollte sich davon klar abheben [abgeleitet].
+In the field "team chat with AI agents as members" there are already vendors that advertise
+"agentic team chat" (https://glue.ai/blog/how-agentic-team-chat-is-changing-the-way-we-work)
+[verified]; the name should clearly stand apart from them [derived].
 
-## Warum Bothy
+## Why Bothy
 
-- **Bild:** eine einfache Hütte, offen für alle, in der man unterkommt und arbeitet. Das Produkt ist
-  der Ort, an dem Menschen und Agenten zusammen arbeiten, selbst gehostet wie eine eigene Hütte.
-- **"bot" steckt im Wort**, ohne dass der Name nach Technik klingt.
-- **Design:** Die Palette (Fichte, Ginster, Moos, Vogelbeere, Granit) und das Zeichen (ein Giebel)
-  folgen dem Bild; siehe [README.md](README.md).
-- **Nachteil:** Das "th" ist für deutsche Sprecher ungewohnt; viele werden "Botti" sagen
-  [vermutet, kein Aussprachetest gemacht].
+- **Image:** a simple hut, open to everyone, where you find shelter and work. The product is
+  the place where people and agents work together, self-hosted like a hut of your own.
+- **"bot" is in the word**, without the name sounding technical.
+- **Design:** The palette (spruce, gorse, moss, rowan, granite) and the mark (a gable)
+  follow the image; see [README.md](README.md).
+- **Drawback:** The "th" is unfamiliar to German speakers; many will say "Botti"
+  [assumed, no pronunciation test done].
 
-## Nächste Schritte (Owner)
+## Next steps (owner)
 
-1. Registerrecherche Klasse 9 und 42 für Bothy, Corvo, Gilde durch eine Fachperson.
-2. Domain mit Zusatz wählen und beim Registrar prüfen.
-3. Aussprachetest mit einigen deutschsprachigen Personen.
-4. Entscheidung in DECISIONS.md eintragen; bei Wechsel nur `branding.*`, die gelisteten
-   Code-Stellen und die Build-Konfiguration der Apps ändern (ADR 0044).
+1. Register search in classes 9 and 42 for Bothy, Corvo, Gilde by an expert.
+2. Choose a domain with an addition and check it at the registrar.
+3. Pronunciation test with a few German-speaking people.
+4. Record the decision in DECISIONS.md; on a change, change only `branding.*`, the listed
+   code places and the build configuration of the apps (ADR 0044).

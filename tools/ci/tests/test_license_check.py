@@ -79,6 +79,6 @@ def test_allowed_licenses_doc_matches_list() -> None:
         if line.strip() and not line.startswith("#")
     }
     doc = (REPO / "docs" / "quality" / "licenses.md").read_text(encoding="utf-8")
-    table = doc.split("## Erlaubte Lizenzen", 1)[1].split("\n## ", 1)[0]
+    table = doc.split("## Allowed licenses", 1)[1].split("\n## ", 1)[0]
     documented = set(re.findall(r"^\| `([^`]+)` \|", table, re.MULTILINE))
     assert documented == listed

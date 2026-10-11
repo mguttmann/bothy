@@ -52,8 +52,8 @@ keywords = ["tskey-"]
 # API tokens of this product: "bothy_<kind>_<random>_<checksum>" with kind agt, app, pat, whi or
 # hpc (pairing code of a terminal host, docs/spec/24-terminal.md section 3.2),
 # 256 bit of randomness in Base62 (43 characters) and a CRC-32 checksum over the random part as
-# exactly 6 Base62 characters. Source: docs/spec/08-identitaet.md section 12, ADR 0061 and
-# docs/spec/03-datenmodell.md `api_tokens`.
+# exactly 6 Base62 characters. Source: docs/spec/08-identity.md section 12, ADR 0061 and
+# docs/spec/03-data-model.md `api_tokens`.
 [[rules]]
 id = "bothy-api-token"
 description = "API token of this product (bothy_<kind>_<random>_<checksum>)"
@@ -96,7 +96,7 @@ regexes = [
 ]
 
 [[allowlists]]
-description = "UUIDs are identifiers in this product (UUIDv7, docs/spec/03-datenmodell.md), never credentials"
+description = "UUIDs are identifiers in this product (UUIDv7, docs/spec/03-data-model.md), never credentials"
 targetRules = ["generic-api-key"]
 regexTarget = "secret"
 regexes = ['''^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$''']

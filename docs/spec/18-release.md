@@ -1,164 +1,164 @@
 # 18 Release
 
-Status: Entwurf M0. Normativ für Versionierung, Tags, Changelogs, Release-Kanäle, Signatur,
-SBOM, Provenance, Server-Images, App-Verteilung, Kompatibilität zwischen App und Server und
-Rollback. Ablauf eines Releases: [docs/operations/release.md](../operations/release.md).
-Gates und Runner: ADR 0038 und 0039 (Team H). API-Versionierung: ADR 0014 (Team B).
+Status: draft M0. Normative for versioning, tags, changelogs, release channels, signing,
+SBOM, provenance, server images, app distribution, compatibility between app and server and
+rollback. Flow of a release: [docs/operations/release.md](../operations/release.md).
+Gates and runners: ADR 0038 and 0039 (team H). API versioning: ADR 0014 (team B).
 
-## 1. Ziele
+## 1. Goals
 
-1. Jede Komponente wird unabhängig versioniert und veröffentlicht, wenn sie sich ändert.
-2. Jedes veröffentlichte Artefakt ist signiert, hat eine SBOM und eine prüfbare Herkunft.
-3. Ein Betreiber erkennt am Release, ob ein Upgrade Handarbeit braucht.
-4. Alte Apps funktionieren gegen neue Server, solange ihre Protokollversion unterstützt ist,
-   und bekommen sonst einen klaren Hinweis statt eines Fehlers.
+1. Every component is versioned and published independently when it changes.
+2. Every published artifact is signed, has an SBOM and a verifiable provenance.
+3. An instance operator can tell from the release whether an upgrade needs manual work.
+4. Old apps work against new servers as long as their protocol version is supported,
+   and otherwise get a clear notice instead of an error.
 
-## 2. Komponenten
+## 2. Components
 
-Die Namen, Verzeichnisse und Tag-Präfixe stehen an einer Stelle: `RELEASE_COMPONENTS` in
-`tools/ci/components.py` ([ADR 0060](../adr/0060-release-automatisierung-im-monorepo.md)). Diese Tabelle gibt sie wieder.
+The names, directories and tag prefixes are in one place: `RELEASE_COMPONENTS` in
+`tools/ci/components.py` ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)). This table reproduces them.
 
-| Komponente | Verzeichnis | Tag-Präfix | Artefakte | Kanäle |
+| Component | Directory | Tag prefix | Artifacts | Channels |
 |---|---|---|---|---|
-| `bothy` | Wurzel | keiner (`vX.Y.Z`) | Installationsbündel aus `make release-build`: `infra/compose` ohne `infra/compose/test` (Test-Overlays), `LICENSE`, `NOTICE`, `CHANGELOG.md`, `VERSION`; in seiner `infra/compose/.env.example` stehen die gepinnte Server-Version und die Registry (Abschnitt 2.1); dazu `install.sh` als eigene Datei mit eingebauter Version und SHA-256 des Bündels ([16-betrieb.md](16-betrieb.md), Abschnitt 3.1) | stable, beta |
-| `server` | `services/server` | `server/` | Images `bothy-server`, `bothy-postgres` (linux/amd64, linux/arm64), Binärdateien `bothy` | stable, beta |
-| `host` | `services/host` | `host/` | Binärdateien `bothy-host` für macOS (arm64, amd64), Linux (amd64, arm64) und Windows (amd64), je mit Signatur und SBOM; Installationspakete der Dienste ([24-terminal.md](24-terminal.md), [16-betrieb.md](16-betrieb.md) Abschnitt 4.4) | stable, beta |
-| `client` | `apps/client` | `client/` | iOS, Android, macOS, Windows (eine Flutter-Codebasis, B5) | stable, beta |
-| `console` | `apps/console` | `console/` | Web-Konsole | mit `server` |
-| `sdk-python` | `sdk/python` | `sdk-python/` | Paket auf PyPI | stable, Vorabversionen |
-| `sdk-typescript` | `sdk/typescript` | `sdk-typescript/` | Paket auf npm | stable, Vorabversionen |
-| `hermes-adapter` | `plugins/hermes-adapter` | `hermes-adapter/` | Plugin für Hermes Agent | stable, Vorabversionen |
-| `claude-code-runner` | `plugins/claude-code-runner` | `claude-code-runner/` | Dev-Runner für Claude Code | stable, Vorabversionen |
-| `grafana-bothy-live` | `plugins/grafana-bothy-live` | `grafana-bothy-live/` | Grafana-Panel-Plugin `bothy-live-panel` als ZIP mit SBOM; bis V1 unsigniert für lokales Provisioning ([25-visualisierung.md](25-visualisierung.md), Abschnitt 8.3) | stable, Vorabversionen |
-| `api` | `docs/api` | keiner | OpenAPI- und AsyncAPI-Dokument; Version im Dokument (ADR 0013, 0014) | mit `server` |
+| `bothy` | root | none (`vX.Y.Z`) | installation bundle from `make release-build`: `infra/compose` without `infra/compose/test` (test overlays), `LICENSE`, `NOTICE`, `CHANGELOG.md`, `VERSION`; its `infra/compose/.env.example` contains the pinned server version and the registry (section 2.1); in addition `install.sh` as a separate file with a built-in version and the SHA-256 of the bundle ([16-operations.md](16-operations.md), section 3.1) | stable, beta |
+| `server` | `services/server` | `server/` | images `bothy-server`, `bothy-postgres` (linux/amd64, linux/arm64), binaries `bothy` | stable, beta |
+| `host` | `services/host` | `host/` | binaries `bothy-host` for macOS (arm64, amd64), Linux (amd64, arm64) and Windows (amd64), each with a signature and an SBOM; installation packages of the services ([24-terminal.md](24-terminal.md), [16-operations.md](16-operations.md) section 4.4) | stable, beta |
+| `client` | `apps/client` | `client/` | iOS, Android, macOS, Windows (one Flutter code base, B5) | stable, beta |
+| `console` | `apps/console` | `console/` | web console | with `server` |
+| `sdk-python` | `sdk/python` | `sdk-python/` | package on PyPI | stable, pre-releases |
+| `sdk-typescript` | `sdk/typescript` | `sdk-typescript/` | package on npm | stable, pre-releases |
+| `hermes-adapter` | `plugins/hermes-adapter` | `hermes-adapter/` | plugin for Hermes Agent | stable, pre-releases |
+| `claude-code-runner` | `plugins/claude-code-runner` | `claude-code-runner/` | dev runner for Claude Code | stable, pre-releases |
+| `grafana-bothy-live` | `plugins/grafana-bothy-live` | `grafana-bothy-live/` | Grafana panel plugin `bothy-live-panel` as a ZIP with an SBOM; unsigned until V1 for local provisioning ([25-visualization.md](25-visualization.md), section 8.3) | stable, pre-releases |
+| `api` | `docs/api` | none | OpenAPI and AsyncAPI document; version in the document (ADR 0013, 0014) | with `server` |
 
-Regeln:
+Rules:
 
-1. Jede Komponente hat in ihrem Verzeichnis eine Datei `VERSION` (eine Zeile, SemVer ohne `v`)
-   und eine `CHANGELOG.md`. Die Verzeichnisse legt die Repo-Struktur fest (Team H).
-2. Tags heißen `<präfix>v<SemVer>`, z. B. `server/v1.2.3`; das Präfix ist eine Regel dieses
-   Repositorys. Go verlangt für ein Modul im Unterverzeichnis das Verzeichnis als Präfix
-   (`services/server/v1.2.3`) und ab Hauptversion 2 einen Modulpfad auf `/v2` nur, wenn das Modul
-   als Abhängigkeit geladen wird (https://go.dev/ref/mod, Abschnitt "Module paths", abgerufen
-   2026-10-10) [belegt]. Das Server-Modul ist ein Hauptmodul, das nie geladen wird (PLAN P-05);
-   beides gilt für es darum nicht. Tags sind signiert.
-3. Soll das Server-Modul je als Abhängigkeit nutzbar werden, ist das eine eigene Entscheidung
-   (Tag-Form und `/v2`-Pfad nach der Go-Regel).
-4. Die Datei `VERSION` und der Tag stimmen überein; ein Gate-Check prüft es.
-5. Der Server kennt seine Version aus `internal/platform/buildinfo` (`Version()`): eine Konstante
-   gleich `services/server/VERSION`, gehalten von einem Unit-Test; keine Linker-Flags. Grund: Ein
-   `go build` ohne Zusatz ergibt dieselbe Version wie der Release-Build. Sie dient
-   `service.version` (17), dem Vergleich mit `instance.min_server_version` (16, Abschnitt 10) und
-   den Image-Labels (Abschnitt 7).
-6. Neben den eingebetteten Migrationen steht die Konstante `MinServerVersion`: die älteste
-   Server-Version, die mit dem Schema dieser Migrationen laufen darf. Nach Regel M1 aus
-   [upgrade.md](../operations/upgrade.md) ist das die vorige Version; ein bewusster Bruch setzt die
-   eigene; vor dem ersten Release ist es die aktuelle. `bothy migrate up` schreibt sie nach
+1. Every component has a file `VERSION` (one line, SemVer without `v`) and a `CHANGELOG.md` in
+   its directory. The repo structure defines the directories (team H).
+2. Tags are named `<prefix>v<SemVer>`, for example `server/v1.2.3`; the prefix is a rule of this
+   repository. For a module in a subdirectory, Go requires the directory as the prefix
+   (`services/server/v1.2.3`) and, from major version 2 on, a module path ending in `/v2`, only if
+   the module is loaded as a dependency (https://go.dev/ref/mod, section "Module paths", retrieved
+   2026-10-10) [verified]. The server module is a main module that is never loaded (PLAN P-05);
+   therefore neither applies to it. Tags are signed.
+3. Should the server module ever become usable as a dependency, that is a separate decision
+   (tag form and `/v2` path according to the Go rule).
+4. The file `VERSION` and the tag match; a gate check verifies this.
+5. The server knows its version from `internal/platform/buildinfo` (`Version()`): a constant
+   equal to `services/server/VERSION`, held by a unit test; no linker flags. Reason: a
+   `go build` without additions yields the same version as the release build. It serves
+   `service.version` (17), the comparison with `instance.min_server_version` (16, section 10) and
+   the image labels (section 7).
+6. Next to the embedded migrations is the constant `MinServerVersion`: the oldest
+   server version that may run with the schema of these migrations. According to rule M1 from
+   [upgrade.md](../operations/upgrade.md) this is the previous version; a deliberate break sets its
+   own version; before the first release it is the current one. `bothy migrate up` writes it to
    `instance.min_server_version`.
 
-### 2.1 Server-Version und Registry im Produktbündel
+### 2.1 Server version and registry in the product bundle
 
-Das Bündel der Komponente `bothy` legt fest, welche Server-Images eine Installation zieht:
-`install.sh` übernimmt `BOTHY_VERSION` und `BOTHY_REGISTRY` unverändert aus seiner
-`infra/compose/.env.example` ([16-betrieb.md](16-betrieb.md), Abschnitt 3.1, Schritt 4). Die
-eingecheckte Vorlage trägt dort Platzhalter (`ghcr.io/OWNER`, `0.0.0-placeholder`). Darum gilt
-für jedes Produkt-Release, Beta wie stable:
+The bundle of the component `bothy` determines which server images an installation pulls:
+`install.sh` takes `BOTHY_VERSION` and `BOTHY_REGISTRY` unchanged from its
+`infra/compose/.env.example` ([16-operations.md](16-operations.md), section 3.1, step 4). The
+checked-in template carries placeholders there (`ghcr.io/OWNER`, `0.0.0-placeholder`). Therefore,
+for every product release, beta as well as stable:
 
-1. **Server-Version.** Ihre einzige Quelle ist die Zeile `BOTHY_VERSION=` in
-   `infra/compose/.env.example` des getaggten Commits.
-   `make release-prep COMPONENT=bothy SERVER_VERSION=<version>` schreibt sie im selben Commit wie
-   `VERSION` (ADR 0060) und bricht ab, wenn es den Tag `server/v<version>` nicht gibt.
-   `make release-build` übernimmt sie unverändert.
-2. **Registry.** `make release-build` schreibt in die `.env.example` des Bündels
-   `BOTHY_REGISTRY=ghcr.io/<owner>`, `<owner>` in Kleinbuchstaben aus `GITHUB_REPOSITORY_OWNER`,
-   wie der Image-Name in `release.yml`. GitHub setzt diese Variable in jedem Schritt auf "The
+1. **Server version.** Its only source is the line `BOTHY_VERSION=` in
+   `infra/compose/.env.example` of the tagged commit.
+   `make release-prep COMPONENT=bothy SERVER_VERSION=<version>` writes it in the same commit as
+   `VERSION` (ADR 0060) and aborts if the tag `server/v<version>` does not exist.
+   `make release-build` takes it over unchanged.
+2. **Registry.** `make release-build` writes `BOTHY_REGISTRY=ghcr.io/<owner>` into the
+   `.env.example` of the bundle, with `<owner>` in lowercase from `GITHUB_REPOSITORY_OWNER`,
+   like the image name in `release.yml`. GitHub sets this variable in every step to "The
    repository owner's name"
-   (https://docs.github.com/en/actions/reference/workflows-and-actions/variables, abgerufen
-   2026-10-11) [belegt]; ein Lauf außerhalb von GitHub Actions setzt sie selbst. Jede andere
-   Datei und Zeile des Bündels gleicht dem Commit.
-3. **Abbruch.** `make release-build` schreibt kein Bündel und nennt den Wert, wenn
-   `BOTHY_VERSION` gleich `0.0.0-placeholder` oder keine SemVer-Version ohne `v` ist, wenn ein
-   stabiles Produkt (`VERSION` ohne Vorabkennung) eine Server-Vorabversion pinnt, wenn
-   `GITHUB_REPOSITORY_OWNER` fehlt, wenn `BOTHY_REGISTRY` danach noch `OWNER` enthält oder wenn
-   eines der Images, die `infra/compose/compose.yaml` mit `${BOTHY_VERSION}` nennt (heute
-   `bothy-server:<version>` und `bothy-postgres:pg18-<version>`), unter `BOTHY_REGISTRY` fehlt.
-   Die Liste der Images liest es aus `compose.yaml`, nicht aus einer eigenen Liste.
+   (https://docs.github.com/en/actions/reference/workflows-and-actions/variables, retrieved
+   2026-10-11) [verified]; a run outside GitHub Actions sets it itself. Every other
+   file and line of the bundle is the same as in the commit.
+3. **Abort.** `make release-build` writes no bundle and names the value if
+   `BOTHY_VERSION` equals `0.0.0-placeholder` or is not a SemVer version without `v`, if a
+   stable product (`VERSION` without a pre-release identifier) pins a server pre-release, if
+   `GITHUB_REPOSITORY_OWNER` is missing, if `BOTHY_REGISTRY` still contains `OWNER` afterwards or if
+   one of the images that `infra/compose/compose.yaml` names with `${BOTHY_VERSION}` (today
+   `bothy-server:<version>` and `bothy-postgres:pg18-<version>`) is missing under `BOTHY_REGISTRY`.
+   It reads the list of images from `compose.yaml`, not from a list of its own.
 
-Grund: Ohne diesen Schritt zöge jede Installation aus dem Bündel ein Image, das es nicht gibt
-(`ghcr.io/OWNER/bothy-server:0.0.0-placeholder`), auch der Portabilitätstest
-([16-betrieb.md](16-betrieb.md), Abschnitt 11.1). Die Server-Version steht im Commit statt als
-Argument des Builds: So legt der Tag allein fest, was das Bündel installiert, und der
-Release-Commit zeigt sie zur Prüfung. Die Registry kommt aus dem Build, weil sie vom Ort des
-Repositorys abhängt (Fork, Ersetzen von `OWNER` in V1-03), nicht vom Commit. Den Bau übernimmt
-PLAN M7-29 (mit Tests), `make release-prep` selbst M7-10.
+Reason: without this step, every installation from the bundle would pull an image that does not
+exist (`ghcr.io/OWNER/bothy-server:0.0.0-placeholder`), including the portability test
+([16-operations.md](16-operations.md), section 11.1). The server version is in the commit instead of
+being an argument of the build: this way the tag alone determines what the bundle installs, and the
+release commit shows the version for review. The registry comes from the build because it depends
+on the location of the repository (fork, replacing `OWNER` in V1-03), not on the commit. PLAN M7-29
+takes on the build (with tests), M7-10 takes on `make release-prep` itself.
 
-## 3. Semantische Versionierung je Komponente
+## 3. Semantic versioning per component
 
-| Komponente | Major | Minor | Patch |
+| Component | Major | Minor | Patch |
 |---|---|---|---|
-| `server` | Entfernen einer unterstützten API-Hauptversion oder Protokollversion; Entfernen oder Umdeuten eines Konfigurationsschlüssels; Upgrade, das Handarbeit an Daten verlangt | neue Funktionen, neue Schlüssel, neue Ereignistypen (additiv) | Fehlerbehebung ohne Verhaltensänderung |
-| `client`, `console` | Mindest-Serverversion steigt über eine Server-Hauptversion | neue Funktionen | Fehlerbehebung |
-| SDKs, Adapter | inkompatible Änderung der öffentlichen Schnittstelle | additive Änderung | Fehlerbehebung |
+| `server` | removal of a supported API major version or protocol version; removal or reinterpretation of a configuration key; an upgrade that requires manual work on data | new features, new keys, new event types (additive) | bug fix without a change in behavior |
+| `client`, `console` | the minimum server version rises across a server major version | new features | bug fix |
+| SDKs, adapters | incompatible change of the public interface | additive change | bug fix |
 
-Vor 1.0.0 gilt SemVer 0.x: Minor darf brechen; die Release Notes nennen jeden Bruch.
+Before 1.0.0, SemVer 0.x applies: a minor version may break; the release notes name every break.
 
-## 4. Changelog und Release Notes
+## 4. Changelog and release notes
 
-1. `CHANGELOG.md` folgt "Keep a Changelog" mit den Abschnitten Added, Changed, Deprecated,
-   Removed, Fixed, Security. Die Einträge sind Englisch (Community-Sprache).
-2. Commits folgen Conventional Commits mit der Komponente als Scope. Ein Werkzeug erzeugt daraus
-   einen Entwurf; ein Mensch oder Agent prüft ihn vor dem Tag. Werkzeug: git-cliff hinter
-   `make release-prep` ([ADR 0060](../adr/0060-release-automatisierung-im-monorepo.md)).
-3. Release Notes des Servers haben feste Abschnitte: Upgrade-Hinweise (Handarbeit ja oder nein),
-   Migrationen (Expand oder Contract, Dauer auf großen Tabellen), Kompatibilität (unterstützte
-   Protokollversionen, Mindest-App-Version), Sicherheit, bekannte Probleme.
+1. `CHANGELOG.md` follows "Keep a Changelog" with the sections Added, Changed, Deprecated,
+   Removed, Fixed, Security. The entries are in English (the community language).
+2. Commits follow Conventional Commits with the component as the scope. A tool generates a draft
+   from them; a person or an agent reviews it before the tag. Tool: git-cliff behind
+   `make release-prep` ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)).
+3. Release notes of the server have fixed sections: upgrade notes (manual work yes or no),
+   migrations (expand or contract, duration on large tables), compatibility (supported
+   protocol versions, minimum app version), security, known issues.
 
-## 5. Kanäle
+## 5. Channels
 
-| Artefakt | stable | beta |
+| Artifact | stable | beta |
 |---|---|---|
-| Server-Images | Tag `X.Y.Z` und Digest | Tag `X.Y.Z-beta.N` |
-| Host-Dienst `bothy-host` | Version `X.Y.Z` | `X.Y.Z-beta.N` |
-| iOS | App Store, sobald freigegeben; bis dahin TestFlight-Gruppe "stable" | TestFlight-Gruppe "beta" |
-| macOS | Sparkle-Appcast ohne Kanal (Standard) | Sparkle-Kanal `beta` |
+| Server images | tag `X.Y.Z` and digest | tag `X.Y.Z-beta.N` |
+| Host service `bothy-host` | version `X.Y.Z` | `X.Y.Z-beta.N` |
+| iOS | App Store once approved; until then TestFlight group "stable" | TestFlight group "beta" |
+| macOS | Sparkle appcast without a channel (default) | Sparkle channel `beta` |
 | Windows | `stable.appinstaller` | `beta.appinstaller` |
-| Android | Testkanal "stable" (Owner-Entscheidung, Abschnitt 8) | interner Testkanal |
-| SDKs, Adapter | Version ohne Vorabkennung | `X.Y.Z-beta.N` (npm-Tag `beta`, PyPI Vorabversion) |
+| Android | test track "stable" (owner decision, section 8) | internal test track |
+| SDKs, adapters | version without a pre-release identifier | `X.Y.Z-beta.N` (npm tag `beta`, PyPI pre-release) |
 
-Regeln:
+Rules:
 
-1. Apps: Die Version enthält keinen Kanal. Derselbe Build (gleiche Build-Nummer, gleiche
-   Signatur) wandert von beta nach stable: TestFlight-Gruppe wechseln, im Appcast das Element
-   `sparkle:channel` entfernen, `stable.appinstaller` auf dasselbe MSIX zeigen lassen.
-2. Server, Host-Dienst, SDKs, Adapter: Beta ist eine SemVer-Vorabversion (`X.Y.Z-beta.N`), weil die Version im
-   Binary und im Paket steht. Stable entsteht aus demselben Commit wie die letzte Beta; zwischen
-   beiden ändert sich nur die Versionsnummer, und alle Gates laufen erneut.
-3. Images haben keinen beweglichen Tag `latest`. Compose und OpenTofu pinnen `BOTHY_VERSION`;
-   Renovate (ADR 0041) schlägt Updates vor.
-4. Sparkle-Kanäle sind für vorübergehende Zweige gedacht, nicht für dauerhaft parallele Ausgaben
-   (https://sparkle-project.org/documentation/publishing/, abgerufen 2026-10-10) [belegt]. Das
-   passt zu beta; eine zweite dauerhafte Ausgabe bräuchte einen eigenen Appcast.
+1. Apps: the version contains no channel. The same build (same build number, same
+   signature) moves from beta to stable: switch the TestFlight group, remove the element
+   `sparkle:channel` in the appcast, let `stable.appinstaller` point to the same MSIX.
+2. Server, host service, SDKs, adapters: beta is a SemVer pre-release (`X.Y.Z-beta.N`), because the version is in the
+   binary and in the package. Stable is built from the same commit as the last beta; between
+   the two only the version number changes, and all gates run again.
+3. Images have no moving tag `latest`. Compose and OpenTofu pin `BOTHY_VERSION`;
+   Renovate (ADR 0041) proposes updates.
+4. Sparkle channels are meant for temporary branches, not for permanently parallel editions
+   (https://sparkle-project.org/documentation/publishing/, retrieved 2026-10-10) [verified]. That
+   fits beta; a second permanent edition would need its own appcast.
 
-## 6. Lieferkette
+## 6. Supply chain
 
-| Schritt | Werkzeug | Ergebnis |
+| Step | Tool | Result |
 |---|---|---|
-| SBOM | Syft (über anchore/sbom-action) | SPDX-JSON und CycloneDX-JSON je Image und Binärdatei, am Release angehängt |
-| Signatur Images | öffentlich: cosign keyless (Fulcio, Rekor), Identität = Release-Workflow; privat: cosign-Schlüsselpaar ohne Transparenz-Log ([ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md)) | Signatur je Digest |
-| Signatur Dateien | cosign `sign-blob` mit Bundle, Verfahren wie bei den Images | `*.sigstore.json` neben jeder Datei |
-| Herkunft | `actions/attest` (SLSA Build Provenance) | Attestation im Repository |
-| Prüfsummen | SHA-256 | `SHA256SUMS`, selbst signiert |
+| SBOM | Syft (via anchore/sbom-action) | SPDX JSON and CycloneDX JSON per image and binary, attached to the release |
+| Signing images | public: cosign keyless (Fulcio, Rekor), identity = release workflow; private: cosign key pair without a transparency log ([ADR 0062](../adr/0062-release-signatures-while-the-repo-is-private.md)) | signature per digest |
+| Signing files | cosign `sign-blob` with a bundle, same procedure as for the images | `*.sigstore.json` next to every file |
+| Provenance | `actions/attest` (SLSA Build Provenance) | attestation in the repository |
+| Checksums | SHA-256 | `SHA256SUMS`, itself signed |
 
-Belege (abgerufen 2026-10-10): https://github.com/anchore/sbom-action,
+Sources (retrieved 2026-10-10): https://github.com/anchore/sbom-action,
 https://docs.sigstore.dev/cosign/signing/overview/, https://docs.sigstore.dev/cosign/verifying/verify/,
-https://github.com/actions/attest-build-provenance [belegt].
+https://github.com/actions/attest-build-provenance [verified].
 
-Grenze: Artifact Attestations sind in GitHub Free, Pro und Team nur für öffentliche Repositorys
-verfügbar (https://github.com/actions/attest-build-provenance, abgerufen 2026-10-10) [belegt].
-Bis das Produkt-Repository öffentlich ist, gibt es Signatur und SBOM, aber keine Attestation,
-und signiert wird mit dem Schlüsselpaar der privaten Phase ([ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md)); geprüft wird dann mit
-`cosign verify --key` und dem öffentlichen Schlüssel aus dem Repository. Im öffentlichen Zustand
-prüft der Betreiber so:
+Limit: artifact attestations are available in GitHub Free, Pro and Team only for public
+repositories (https://github.com/actions/attest-build-provenance, retrieved 2026-10-10) [verified].
+Until the product repository is public, there are a signature and an SBOM but no attestation,
+and signing uses the key pair of the private phase ([ADR 0062](../adr/0062-release-signatures-while-the-repo-is-private.md)); verification then uses
+`cosign verify --key` and the public key from the repository. In the public state the
+instance operator verifies like this:
 
 ```
 cosign verify ghcr.io/<owner>/bothy-server@sha256:<digest> \
@@ -167,132 +167,134 @@ cosign verify ghcr.io/<owner>/bothy-server@sha256:<digest> \
 gh attestation verify oci://ghcr.io/<owner>/bothy-server@sha256:<digest> --repo <owner>/bothy
 ```
 
-Der Issuer `https://token.actions.githubusercontent.com` ist nicht in den gelesenen Quellen
-belegt [vermutet]; das Release-Ticket prüft ihn am ersten echten Release.
+The issuer `https://token.actions.githubusercontent.com` is not confirmed in the sources read
+[assumed]; the release ticket checks it at the first real release.
 
-## 7. Server-Images
+## 7. Server images
 
-1. Plattformen linux/amd64 und linux/arm64, als ein Multi-Arch-Manifest (B12).
-2. Nie per Emulation gebaut: `bothy-server` kompiliert das Go-Binary im Builder-Schritt auf der
-   Build-Plattform für die Zielarchitektur (ohne cgo, `--platform=$BUILDPLATFORM`); Images mit
-   Schritten, die auf der Zielarchitektur laufen müssen (`bothy-postgres`), entstehen je
-   Architektur auf eigenem Runner.
-3. `bothy-server` ist ein statisches Go-Binary (ohne cgo) auf einem minimalen Basis-Image ohne
-   Shell. Es läuft als unprivilegierter Benutzer mit uid und gid `65532`; `bothy secrets init`
-   setzt diesen Besitzer für die Geheimnisse von `server` und `migrate` (16, Abschnitt 5.3), und
-   das Image legt `secrets.signing_key_dir` mit diesem Besitzer und Modus `0700` an.
-   `HEALTHCHECK` und Compose rufen `bothy healthcheck` auf, weil keine Shell und kein curl im Image
-   sind.
-4. `bothy-postgres` baut auf dem offiziellen `postgres:18`-Image auf und enthält pgBackRest ab
-   2.59.3 und `bothy-backupd` ([16-betrieb.md](16-betrieb.md) 8). Sein Tag ist
-   `pg18-<version>` mit der Server-Version, wie `infra/compose/compose.yaml` ihn nennt
-   (Abschnitt 2.1).
-5. Basis-Images sind per Digest gepinnt; Renovate hält sie aktuell; ein Check im Gate lehnt jedes
-   `FROM` ohne Digest ab (SEC-SC-4).
-6. Labels nach OCI (`org.opencontainers.image.source`, `.version`, `.revision`, `.licenses`);
-   Version, Revision und Quelle kommen als Build-Argumente, ein Build ohne Version scheitert.
+1. Platforms linux/amd64 and linux/arm64, as one multi-arch manifest (B12).
+2. Never built via emulation: `bothy-server` compiles the Go binary in the builder step on the
+   build platform for the target architecture (without cgo, `--platform=$BUILDPLATFORM`); images
+   with steps that must run on the target architecture (`bothy-postgres`) are built per
+   architecture on their own runner.
+3. `bothy-server` is a static Go binary (without cgo) on a minimal base image without a
+   shell. It runs as an unprivileged user with uid and gid `65532`; `bothy secrets init`
+   sets this owner for the secrets of `server` and `migrate` (16, section 5.3), and
+   the image creates `secrets.signing_key_dir` with this owner and mode `0700`.
+   `HEALTHCHECK` and Compose call `bothy healthcheck`, because there is no shell and no curl in
+   the image.
+4. `bothy-postgres` builds on the official `postgres:18` image and contains pgBackRest from
+   2.59.3 on and `bothy-backupd` ([16-operations.md](16-operations.md) 8). Its tag is
+   `pg18-<version>` with the server version, as `infra/compose/compose.yaml` names it
+   (section 2.1).
+5. Base images are pinned by digest; Renovate keeps them current; a check in the gate rejects every
+   `FROM` without a digest (SEC-SC-4).
+6. Labels according to OCI (`org.opencontainers.image.source`, `.version`, `.revision`, `.licenses`);
+   version, revision and source come as build arguments, a build without a version fails.
 
-## 8. App-Verteilung
+## 8. App distribution
 
-Die Apps sind White Label. Wer eine App signiert, besitzt ihre Identität (Bundle-ID,
-Paketname, Push-Schlüssel, Update-Feed). Darum gilt:
+The apps are white label. Whoever signs an app owns its identity (bundle ID,
+package name, push keys, update feed). Therefore:
 
-1. Das Produkt liefert Quelltext, Build-Skripte und eine Vorlage `distribution.yaml` mit allen
-   Werten eines Herausgebers: Bundle- und Paket-IDs, Team-ID, Sparkle-Feed-URL und öffentlicher
-   EdDSA-Schlüssel, MSIX-Publisher, Firebase-Projekt, APNs-Topic, optionales Sentry-Ziel.
-2. Jede Organisation baut und signiert ihre Apps selbst mit ihren Konten. Für eine Instanz
-   liegt `distribution.yaml` im Ops-Repo.
-3. Push-Schlüssel und Firebase-Projekt der Instanz gehören zum Herausgeber der App (R-Push).
-   Eine Instanz kann nur Push an Apps senden, deren Schlüssel sie hat.
+1. The product delivers source code, build scripts and a template `distribution.yaml` with all
+   values of a publisher: bundle and package IDs, team ID, Sparkle feed URL and public
+   EdDSA key, MSIX publisher, Firebase project, APNs topic, optional Sentry target.
+2. Every organization builds and signs its apps itself with its own accounts. For an instance,
+   `distribution.yaml` lives in the ops repo.
+3. Push keys and the Firebase project of the instance belong to the publisher of the app (R-Push).
+   An instance can only send push notifications to apps whose keys it has.
 
-| Plattform | Weg | Belege (abgerufen 2026-10-10) |
+| Platform | Route | Sources (retrieved 2026-10-10) |
 |---|---|---|
-| iOS | TestFlight: bis 100 interne und 10.000 externe Tester, Build 90 Tage nutzbar, externe Tester brauchen für den ersten Build ein Beta App Review | https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview/ [belegt] |
-| macOS | Developer ID, Notarisierung mit `xcrun notarytool`, Stapeln mit `xcrun stapler`, Auto-Update mit Sparkle 2 (EdDSA-signierte Archive, Kanäle, gestufte Verteilung mit `sparkle:phasedRolloutInterval`) | https://developer.apple.com/developer-id/, https://sparkle-project.org/documentation/publishing/ [belegt] |
-| Windows | MSIX mit `.appinstaller` je Kanal; Signatur über Azure Artifact Signing (Organisation in der EU möglich) oder OV-Zertifikat mit HSM. SmartScreen warnt anfangs auch bei EV | https://learn.microsoft.com/en-us/windows/msix/app-installer/app-installer-file-overview, https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart, https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation [belegt] |
-| Android | Play Internal Testing (bis 100 Tester) oder Firebase App Distribution; neue persönliche Play-Konten brauchen vor Produktion einen geschlossenen Test mit 12 Testern über 14 Tage | https://support.google.com/googleplay/android-developer/answer/9845334, https://support.google.com/googleplay/android-developer/answer/14151465, https://firebase.google.com/docs/app-distribution [belegt] |
-| Web-Konsole | Vorschlag: Teil des Server-Images, ausgeliefert vom Server; damit ist sie immer gleich alt wie die API | entscheidet ADR 0028 (Team E) |
+| iOS | TestFlight: up to 100 internal and 10,000 external testers, a build is usable for 90 days, external testers need a Beta App Review for the first build | https://developer.apple.com/help/app-store-connect/test-a-beta-version/testflight-overview/ [verified] |
+| macOS | Developer ID, notarization with `xcrun notarytool`, stapling with `xcrun stapler`, auto-update with Sparkle 2 (EdDSA-signed archives, channels, phased rollout with `sparkle:phasedRolloutInterval`) | https://developer.apple.com/developer-id/, https://sparkle-project.org/documentation/publishing/ [verified] |
+| Windows | MSIX with `.appinstaller` per channel; signing via Azure Artifact Signing (organization in the EU possible) or an OV certificate with an HSM. SmartScreen warns at first even with EV | https://learn.microsoft.com/en-us/windows/msix/app-installer/app-installer-file-overview, https://learn.microsoft.com/en-us/azure/artifact-signing/quickstart, https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/smartscreen-reputation [verified] |
+| Android | Play Internal Testing (up to 100 testers) or Firebase App Distribution; new personal Play accounts need a closed test with 12 testers over 14 days before production | https://support.google.com/googleplay/android-developer/answer/9845334, https://support.google.com/googleplay/android-developer/answer/14151465, https://firebase.google.com/docs/app-distribution [verified] |
+| Web console | Proposal: part of the server image, served by the server; this way it is always the same age as the API | decided by ADR 0028 (team E) |
 
-Folgen:
+Consequences:
 
-1. TestFlight für macOS verlangt eine App Sandbox [vermutet, nur über Websuche gelesen]. Die
-   Developer-ID-Ausgabe mit Sparkle läuft ohne Sandbox. Beide wären zwei Builds; das Produkt
-   liefert für macOS nur die Developer-ID-Ausgabe.
-2. Das Protokoll `ms-appinstaller:` ist seit Dezember 2023 standardmäßig aus; Nutzer laden die
-   `.appinstaller`-Datei und öffnen sie (Beleg wie oben) [belegt].
-3. Kosten und Konten (Apple Developer Program, Artifact Signing oder OV-Zertifikat, Play-Konto)
-   entscheidet der Owner (Bericht).
+1. TestFlight for macOS requires an App Sandbox [assumed, only read via web search]. The
+   Developer ID edition with Sparkle runs without a sandbox. Both would be two builds; the product
+   delivers only the Developer ID edition for macOS.
+2. The protocol `ms-appinstaller:` has been off by default since December 2023; users download the
+   `.appinstaller` file and open it (source as above) [verified].
+3. The owner decides on costs and accounts (Apple Developer Program, Artifact Signing or OV
+   certificate, Play account) (report).
 
-## 9. Kompatibilität zwischen App und Server
+## 9. Compatibility between app and server
 
-1. Die App meldet in `identify` ihre Protokollversion und Plattform-Version
-   ([04-sync-protokoll.md](04-sync-protokoll.md) 6.3). Der Server unterstützt die Protokollversionen
-   aus `hello.protocol_versions`. Ältere schließt er mit `4007 protocol_version_unsupported`; die
-   App zeigt dann den Hinweis "Update nötig" statt eines Fehlers.
-2. `instance.discovery.read` liefert je Plattform `client.min_version.<plattform>` und
-   `client.recommended_version.<plattform>`. Unter der Mindestversion verbindet die App nicht und
-   zeigt den Update-Weg ihres Kanals. Unter der empfohlenen Version zeigt sie einen Hinweis.
-3. Wie lange eine Protokoll- oder API-Version nach ihrer Ablösung unterstützt bleibt, legt die
-   Deprecation-Policy fest (ADR 0014, Team B). Release Notes nennen das Datum.
-4. Der Server ist die führende Seite: Ein Server-Upgrade setzt die Mindestversion nie höher als
-   die älteste App, die laut Deprecation-Policy noch unterstützt wird.
-5. Adapter melden ihre Version im Heartbeat (`reported_runtime_version`); die Admin-Konsole zeigt
-   Adapter, deren SDK-Version nicht mehr unterstützt ist.
+1. The app reports its protocol version and platform version in `identify`
+   ([04-sync-protocol.md](04-sync-protocol.md) 6.3). The server supports the protocol versions
+   from `hello.protocol_versions`. It closes older ones with `4007 protocol_version_unsupported`; the
+   app then shows the notice "Update required" instead of an error.
+2. `instance.discovery.read` returns `client.min_version.<platform>` and
+   `client.recommended_version.<platform>` per platform. Below the minimum version the app does not
+   connect and shows the update route of its channel. Below the recommended version it shows a notice.
+3. How long a protocol or API version stays supported after it is superseded is defined by the
+   deprecation policy (ADR 0014, team B). Release notes name the date.
+4. The server is the leading side: a server upgrade never sets the minimum version higher than
+   the oldest app that is still supported according to the deprecation policy.
+5. Adapters report their version in the heartbeat (`reported_runtime_version`); the admin console
+   shows adapters whose SDK version is no longer supported.
 
-### 9.1 Host-Dienst und Server
+### 9.1 Host service and server
 
-Der Host-Dienst meldet seine Version in `identify` der Steuerverbindung. Der Server nimmt die
-Versionen an, deren Protokollversion er unterstützt (Prolog `bothy-terminal/1` und
-`x-protocol-versions` des Kanals in [asyncapi.yaml](../api/asyncapi.yaml)); eine zu alte schließt er
-mit `4114`, und Konsole und Rechner-Karte zeigen "Host-Dienst aktualisieren". Der Host-Dienst
-aktualisiert sich nicht selbst. Grund: Ein Programm, das sich selbst ersetzt, bräuchte
-Schreibrechte auf sein eigenes Binary; der Dienstbenutzer hat sie bewusst nicht
-([24-terminal.md](24-terminal.md), Abschnitt 2.2). Updates laufen über den Paketweg des Betreibers.
+The host service reports its version in `identify` of the control connection. The server accepts
+the versions whose protocol version it supports (prologue `bothy-terminal/1` and
+`x-protocol-versions` of the channel in [asyncapi.yaml](../api/asyncapi.yaml)); it closes a version
+that is too old with `4114`, and the console and the host card show "Update host service". The host
+service does not update itself. Reason: a program that replaces itself would need
+write permissions on its own binary; the service user deliberately does not have them
+([24-terminal.md](24-terminal.md), section 2.2). Updates run through the package route of the
+instance operator.
 
 ## 10. Rollback
 
-| Artefakt | Weg | Grenze |
+| Artifact | Route | Limit |
 |---|---|---|
-| Server | vorheriges Image per Digest starten | genau eine Version zurück (Expand/Contract, [16-betrieb.md](16-betrieb.md) 10); weiter zurück nur per Wiederherstellung |
-| iOS | Build in TestFlight ablaufen lassen, korrigierten Build mit höherer Nummer verteilen | kein Downgrade auf Geräten |
-| macOS | neue Version mit höherer Nummer im Appcast; bei Gefahr als kritisches Update markieren | Sparkle installiert keine ältere Version |
-| Windows | neues MSIX mit höherer Version in der `.appinstaller`-Datei | kein automatisches Downgrade |
-| Android | neuer Build mit höherem `versionCode` | kein Downgrade |
-| SDKs | Version zurückziehen (PyPI yank, npm deprecate), Korrektur veröffentlichen | installierte Kopien bleiben |
+| Server | start the previous image by digest | exactly one version back (expand/contract, [16-operations.md](16-operations.md) 10); further back only via a restore |
+| iOS | let the build expire in TestFlight, distribute a corrected build with a higher number | no downgrade on devices |
+| macOS | new version with a higher number in the appcast; mark it as a critical update in case of danger | Sparkle does not install an older version |
+| Windows | new MSIX with a higher version in the `.appinstaller` file | no automatic downgrade |
+| Android | new build with a higher `versionCode` | no downgrade |
+| SDKs | withdraw the version (PyPI yank, npm deprecate), publish a fix | installed copies remain |
 
-Apps werden also nie zurückgerollt, sondern vorwärts korrigiert. Darum gehen App-Builds erst in
-beta und dann mit derselben Build-Nummer in stable.
+Apps are therefore never rolled back but corrected forward. That is why app builds go into
+beta first and then, with the same build number, into stable.
 
-## 11. Sicherheits-Releases
+## 11. Security releases
 
-1. Meldungen kommen über den Weg aus `SECURITY.md` (Team H).
-2. Korrektur auf einem privaten Zweig, Release mit Abschnitt Security, Hinweis an Betreiber vor
-   der öffentlichen Beschreibung. Die Frist bis zur Veröffentlichung steht in `SECURITY.md`.
-3. Betroffene Mindestversionen von Apps hebt der Betreiber mit `client.min_version.<plattform>`.
+1. Reports come in through the route described in `SECURITY.md` (team H).
+2. Fix on a private branch, release with a Security section, notice to instance operators before
+   the public description. The deadline until publication is in `SECURITY.md`.
+3. The instance operator raises affected minimum versions of apps with
+   `client.min_version.<platform>`.
 
-## 12. Konfigurationswerte dieses Kapitels
+## 12. Configuration values of this chapter
 
-| Name | Standard | Bedeutung |
+| Name | Default | Meaning |
 |---|---|---|
-| `client.min_version.ios` | leer | kleinste zugelassene App-Version auf iOS; leer heißt keine Grenze |
-| `client.min_version.android` | leer | dasselbe für Android |
-| `client.min_version.macos` | leer | dasselbe für macOS |
-| `client.min_version.windows` | leer | dasselbe für Windows |
-| `client.recommended_version.ios` | leer | darunter zeigt die App einen Update-Hinweis |
-| `client.recommended_version.android` | leer | dasselbe für Android |
-| `client.recommended_version.macos` | leer | dasselbe für macOS |
-| `client.recommended_version.windows` | leer | dasselbe für Windows |
+| `client.min_version.ios` | empty | smallest allowed app version on iOS; empty means no limit |
+| `client.min_version.android` | empty | the same for Android |
+| `client.min_version.macos` | empty | the same for macOS |
+| `client.min_version.windows` | empty | the same for Windows |
+| `client.recommended_version.ios` | empty | below it the app shows an update notice |
+| `client.recommended_version.android` | empty | the same for Android |
+| `client.recommended_version.macos` | empty | the same for macOS |
+| `client.recommended_version.windows` | empty | the same for Windows |
 
-## 13. Entscheidungen dieses Kapitels
+## 13. Decisions of this chapter
 
-| Nr | Entscheidung | Grund |
+| No. | Decision | Reason |
 |---|---|---|
-| R-RL-01 | Version und Changelog je Komponente, Tags `<komponente>/vX.Y.Z` (Produktbündel `vX.Y.Z`). | Unabhängige Releases; eine Quelle für Namen und Präfixe in `tools/ci/components.py`; die Go-Tag-Regel gilt für das nie geladene Hauptmodul nicht (P-05). |
-| R-RL-02 | Kein Tag `latest`; Compose und OpenTofu pinnen Versionen. | Wiederholbare Installation; ein Upgrade ist eine bewusste Änderung. |
-| R-RL-03 | Apps: derselbe Build wandert von beta nach stable. Server, SDKs, Adapter: stable aus demselben Commit wie die letzte Beta, nur die Versionsnummer ändert sich. | Was getestet wurde, wird ausgeliefert; wo die Version im Artefakt steht, ist ein Neubau unvermeidbar und auf die Nummer begrenzt. |
-| R-RL-04 | Alle Artefakte signiert mit SBOM: im öffentlichen Zustand cosign keyless mit Attestation, im privaten mit einem Schlüsselpaar ohne Transparenz-Log ([ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md)). | Prüfbare Herkunft ohne Schlüsselverwaltung; Attestation hängt an der Sichtbarkeit. |
-| R-RL-05 | Apps sind White Label; jede Organisation baut und signiert selbst mit `distribution.yaml`. | Push-Schlüssel, Bundle-IDs und Update-Feeds gehören dem Herausgeber; keine zentrale Push-Weiterleitung nötig. |
-| R-RL-06 | macOS nur als Developer-ID-Ausgabe mit Sparkle, keine zweite TestFlight-Ausgabe. | Eine Ausgabe, kein Sandbox-Zwang, eigener Update-Kanal. |
-| R-RL-07 | Apps werden vorwärts korrigiert, nie zurückgerollt. | Keine Plattform installiert ältere Versionen zuverlässig. |
-| R-RL-08 | Mindest- und empfohlene App-Version je Plattform als Server-Konfiguration. | Der Betreiber steuert Sicherheitsupdates ohne Release des Servers. |
-| R-RL-09 | Das Produktbündel pinnt die Server-Version im getaggten Commit (`BOTHY_VERSION` in `infra/compose/.env.example`, geschrieben von `make release-prep COMPONENT=bothy SERVER_VERSION=<version>`); `make release-build` setzt `BOTHY_REGISTRY` aus dem Owner des Repositorys und bricht bei Platzhaltern, einer Server-Vorabversion im stabilen Produkt und fehlenden Images ab (2.1). | `install.sh` übernimmt beide Werte unverändert; ohne Erzeuger zöge jede Installation das Platzhalter-Image. Version im Commit, damit der Tag allein das Bündel bestimmt; Registry aus dem Build, weil sie am Ort des Repositorys hängt. |
+| R-RL-01 | Version and changelog per component, tags `<component>/vX.Y.Z` (product bundle `vX.Y.Z`). | Independent releases; one source for names and prefixes in `tools/ci/components.py`; the Go tag rule does not apply to the main module that is never loaded (P-05). |
+| R-RL-02 | No tag `latest`; Compose and OpenTofu pin versions. | Repeatable installation; an upgrade is a deliberate change. |
+| R-RL-03 | Apps: the same build moves from beta to stable. Server, SDKs, adapters: stable from the same commit as the last beta, only the version number changes. | What was tested is what ships; where the version is in the artifact, a rebuild is unavoidable and limited to the number. |
+| R-RL-04 | All artifacts signed with an SBOM: in the public state cosign keyless with attestation, in the private state with a key pair without a transparency log ([ADR 0062](../adr/0062-release-signatures-while-the-repo-is-private.md)). | Verifiable provenance without key management; attestation depends on the visibility. |
+| R-RL-05 | Apps are white label; every organization builds and signs them itself with `distribution.yaml`. | Push keys, bundle IDs and update feeds belong to the publisher; no central push forwarding needed. |
+| R-RL-06 | macOS only as a Developer ID edition with Sparkle, no second TestFlight edition. | One edition, no forced sandbox, own update channel. |
+| R-RL-07 | Apps are corrected forward, never rolled back. | No platform reliably installs older versions. |
+| R-RL-08 | Minimum and recommended app version per platform as server configuration. | The instance operator controls security updates without a release of the server. |
+| R-RL-09 | The product bundle pins the server version in the tagged commit (`BOTHY_VERSION` in `infra/compose/.env.example`, written by `make release-prep COMPONENT=bothy SERVER_VERSION=<version>`); `make release-build` sets `BOTHY_REGISTRY` from the owner of the repository and aborts on placeholders, on a server pre-release in the stable product and on missing images (2.1). | `install.sh` takes over both values unchanged; without a producer, every installation would pull the placeholder image. Version in the commit so that the tag alone determines the bundle; registry from the build because it depends on the location of the repository. |

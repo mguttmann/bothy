@@ -1,6 +1,6 @@
 # M1-13: Unit of work with phase hooks and in-transaction events
 
-Status: ready | Depends on: M1-06, M1-08, M1-12 | Etappe: M1
+Status: ready | Depends on: M1-06, M1-08, M1-12 | Milestone: M1
 
 ## Goal
 
@@ -9,36 +9,37 @@ that `internal/platform/pg` opens, carries through the context (ambient transact
 pre-commit phase hooks in the fixed order `authz`, `sync`, `audit`, delivers in-transaction
 events synchronously and retries the whole unit on deadlock or lock timeout. This is the
 mechanism that makes the commit-ordered event log (B8, ADR 0009), the I1 check and the audit
-hash chain correct: the lock order of 03 "Sperrreihenfolge" is enforced in one place instead of
+hash chain correct: the lock order of 03 "Lock order" is enforced in one place instead of
 in every use case. No module hook is built here; the phase hooks of `authz`, `sync` and `audit`
 arrive with M1-29, M1-16 and M1-24 and plug into the registry this ticket builds.
 
 ## Read first
 
-- `docs/spec/02-architektur.md`, sections "Transaktionen und Unit of Work" (all of "Ablauf",
-  "Sperrreihenfolge", "In-Tx-Ereignisse", "Idempotenz im Unit of Work", "Was nie in einer
-  Transaktion passiert"), "Querschnitts-Ports (`internal/kernel`)", "Schichten im Modul",
-  "Erlaubte Abhängigkeiten", "Automatische Prüfung der Regeln" ("Modulregister als Quelle",
-  "go-arch-lint", "Weitere Prüfungen im Gate"), "Fehler- und Timeout-Strategie" ("Fehlerarten",
-  "Fristen", "Wiederholungen", "Panics"), "Entscheidungen dieses Kapitels" (R-AR-04 to R-AR-07,
-  R-AR-18), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/03-datenmodell.md`, "Grundsätze" (item 11 "Isolationsstufe"), "Transaktionsregeln"
-  ("Globale Ereignis-Sequenz", "Sperrreihenfolge", "I1-Prüfung").
-- `docs/spec/04-sync-protokoll.md`, "Globale, commit-geordnete Sequenz" (why the counter step is
+- `docs/spec/02-architecture.md`, sections "Transactions and Unit of Work" (all of "Flow",
+  "Lock order", "In-Tx events", "Idempotency in the Unit of Work",
+  "What never happens in a transaction"), "Cross-cutting ports (`internal/kernel`)",
+  "Layers within a module", "Allowed dependencies", "Automatic check of the rules"
+  ("Module register as the source", "go-arch-lint", "Other checks in the gate"),
+  "Error and timeout strategy" ("Error kinds", "Deadlines", "Retries", "Panics"),
+  "Decisions of this chapter" (R-AR-04 to R-AR-07, R-AR-18),
+  "Configuration values of this chapter".
+- `docs/spec/03-data-model.md`, "Principles" (item 11 "Isolation level"), "Transaction rules"
+  ("Global event sequence", "Lock order", "I1 check").
+- `docs/spec/04-sync-protocol.md`, "Global, commit-ordered sequence" (why the counter step is
   last and why `READ COMMITTED` is required).
-- `docs/spec/06-api.md`, "Fehler" (the generated problem code table; only codes listed there
+- `docs/spec/06-api.md`, "Errors" (the generated problem code table; only codes listed there
   exist on the wire).
-- ADR 0007 (`docs/adr/0007-typisierter-datenbankzugriff-sqlc-und-migrationswerkzeug.md`),
-  ADR 0008 (`docs/adr/0008-hexagonale-module-und-gepruefte-abhaengigkeitsregeln.md`),
-  ADR 0009 (`docs/adr/0009-commit-geordnetes-ereignis-log-mit-globaler-sequenz.md`, section
+- ADR 0007 (`docs/adr/0007-typed-database-access-sqlc-and-migration-tool.md`),
+  ADR 0008 (`docs/adr/0008-hexagonal-modules-and-checked-dependency-rules.md`),
+  ADR 0009 (`docs/adr/0009-commit-ordered-event-log-with-a-global-sequence.md`, section
   "Confirmation").
-- `docs/observability/signals.md`, sections "Spans" and "Attribute in Spans und Logs".
+- `docs/observability/signals.md`, sections "Spans" and "Attributes in spans and logs".
 - What earlier tickets built: `services/server/internal/kernel/` (M1-05: `ids`, `errs`, `clock`,
   the declared `txn` port), `services/server/internal/platform/pg/` and `pgtest/` (M1-12: pool,
   `SET LOCAL` timeouts, disposable PostgreSQL 18 container), `services/server/internal/wire/`,
   `services/server/architecture/modules.yaml`, `tools/archgen/`, `.semgrep/` (rule plus fixture
   pattern, see `bothy-go-sql-string-building.*`).
-- `docs/PLAN.md` section "Arbeitsweise je Ticket" and section 7 "M1 Fundament";
+- `docs/PLAN.md` section "Way of working per ticket" and section 7 "M1 Foundation";
   `docs/quality/gates.md`; `CONTRIBUTING.md`; `docs/quality/red-team-gate.md`.
 
 This ticket touches no API operation, no table of 03 and no action id.
@@ -70,22 +71,22 @@ This ticket touches no API operation, no table of 03 and no action id.
    outside the schema defaults.
 10. Every write use case runs in exactly one transaction at `READ COMMITTED`; a call into another
     module joins the ambient transaction; only `platform/pg` opens and ends transactions
-    (02 "Ablauf", R-AR-06).
-11. Phases before commit in fixed order: rights begin hook (only with `RightsChange`), work,
+    (02 "Flow", R-AR-06).
+11. Phases before commit in fixed order: permission begin hook (only with `RightsChange`), work,
     `authz` check hook (only with `RightsChange`), `sync` hook, `audit` hook, commit
-    (02 "Ablauf"). A veto in the work phase or in the `authz` check rolls everything back.
+    (02 "Flow"). A veto in the work phase or in the `authz` check rolls everything back.
 12. In-transaction events are delivered synchronously, in registration order, inside the same
     transaction; a subscriber may write, append durable events and veto the commit with an error;
-    every subscriber gets its own OpenTelemetry span (02 "In-Tx-Ereignisse").
+    every subscriber gets its own OpenTelemetry span (02 "In-Tx events").
 13. Registration of hooks and subscriptions happens only in `internal/wire`, as one list; a golden
     file records it; a subscription may only point from a higher module to a lower one
-    (02 "Weitere Prüfungen im Gate", R-AR-04).
+    (02 "Other checks in the gate", R-AR-04).
 14. On SQLSTATE `40P01` (deadlock) or `55P03` (lock not available) the whole unit is retried at
-    most `database.tx_retry_max` times (02 "Sperrreihenfolge", "Wiederholungen", R-AR-18).
+    most `database.tx_retry_max` times (02 "Lock order", "Retries", R-AR-18).
 15. Write transactions never run at `REPEATABLE READ` or `SERIALIZABLE`; a test proves it
     (ADR 0009, "Confirmation").
 16. Every transaction applies `database.statement_timeout`, `database.lock_timeout` and
-    `database.idle_in_tx_timeout` with `SET LOCAL` (02 "Fristen").
+    `database.idle_in_tx_timeout` with `SET LOCAL` (02 "Deadlines").
 
 ## Scope
 
@@ -158,13 +159,13 @@ contract later tickets (M1-14, M1-15, M1-16, M1-24, M1-29) build on.
 4. `.semgrep/bothy-go-tx-only-in-platform-pg.yaml` with fixture
    `.semgrep/bothy-go-tx-only-in-platform-pg.go`: flags `$X.Begin(...)`, `$X.BeginTx(...)`,
    `pgx.BeginFunc(...)`, `pgx.BeginTxFunc(...)` in Go files outside
-   `services/server/internal/platform/pg/` (test files excluded). Message cites 02 "Ablauf".
+   `services/server/internal/platform/pg/` (test files excluded). Message cites 02 "Flow".
    If a later ticket needs a raw transaction elsewhere (for example River internals), that is
    library code and not scanned.
-5. Documentation: 02 "Ablauf" (registry, outermost `RightsChange`, phases for `Publish` and
-   events, hooks and subscribers as functions of the owning module), 02 "Wiederholungen"
-   (exhausted retries end with `503 unavailable`), 02 "Sperrreihenfolge" (the idempotency wait is
-   not retried) and the span `txn.subscribe <Abonnent>` in signals.md already state this; change
+5. Documentation: 02 "Flow" (registry, outermost `RightsChange`, phases for `Publish` and
+   events, hooks and subscribers as functions of the owning module), 02 "Retries"
+   (exhausted retries end with `503 unavailable`), 02 "Lock order" (the idempotency wait is
+   not retried) and the span `txn.subscribe <Subscriber>` in signals.md already state this; change
    them only if the build proves a statement wrong. Write:
     - `services/server/README.md` (kernel and platform tables if wording changes),
       `internal/kernel/txn` doc.go, `internal/platform/pg/README.md` (create if missing): phases,
@@ -177,7 +178,7 @@ contract later tickets (M1-14, M1-15, M1-16, M1-24, M1-29) build on.
 - The phase hooks of `authz` (M1-29), `sync` (M1-16) and `audit` (M1-24); the counters and
   `instance.Counters` (M1-15).
 - Idempotency keys inside the unit (M1-20; that ticket decides how its own `55P03` wait maps to
-  `409 request_in_progress`, see 02 "Idempotenz im Unit of Work").
+  `409 request_in_progress`, see 02 "Idempotency in the Unit of Work").
 - River and `InsertTx` (M1-14).
 - Mapping errors to HTTP problems (M1-18); this ticket only returns `kernel/errs` kinds.
 - Metrics (M1-68).
@@ -208,14 +209,14 @@ contract later tickets (M1-14, M1-15, M1-16, M1-24, M1-29) build on.
 - Nesting: `Do` inside a unit joins it, runs `fn` in the current phase and never commits, rolls
   back or retries by itself; any error propagates to the outer `Do`. A nested `Do` with
   `RightsChange` is an internal error unless the outer unit declared `RightsChange` with a superset
-  of the principals (ruling: the rights begin hook must lock `permission_version` before any domain
-  row, 03 "Sperrreihenfolge" item 1, so the option cannot appear late).
+  of the principals (ruling: the permission begin hook must lock `permission_version` before any
+  domain row, 03 "Lock order" item 1, so the option cannot appear late).
 - Retry: only the outermost unit retries, only when `errors.As` finds a `*pgconn.PgError` with
   code `40P01` or `55P03`, only while `ctx.Err() == nil`, at most `database.tx_retry_max` times
   (attempts = 1 + retries). Each attempt starts with fresh per-unit state and re-runs `fn`, so
   in-transaction events are re-published. After the last failed attempt return an error of kind
-  `unavailable` with code `unavailable` that wraps the last database error (02 "Fehlerarten",
-  "Wiederholungen"; the SQLSTATE stays in the log).
+  `unavailable` with code `unavailable` that wraps the last database error (02 "Error kinds",
+  "Retries"; the SQLSTATE stays in the log).
   Any other error is returned unchanged and not retried.
 - Rollback on every non-nil error and on panic; after rollback a panic is re-raised so the HTTP
   chain (M1-18) turns it into `500`.
@@ -236,11 +237,11 @@ contract later tickets (M1-14, M1-15, M1-16, M1-24, M1-29) build on.
 
 - Direction rule: a subscription is valid if the publisher is `kernel` or the publisher is in
   `depends_on` of the subscriber in `architecture/modules.yaml`. A hook owner must be the module
-  named for that phase (`authz` for both rights phases, `sync`, `audit`).
+  named for that phase (`authz` for both permission phases, `sync`, `audit`).
 - Span per subscriber: name `txn.subscribe <subscriber module>`, `bothy.outcome` `ok` or `veto`;
   the tracer comes from `platform/otel` and is set in `internal/wire`. Without a tracer the
   registry runs subscribers without spans.
-- Configuration (02 "Konfigurationswerte dieses Kapitels"): `database.tx_retry_max` (`2`),
+- Configuration (02 "Configuration values of this chapter"): `database.tx_retry_max` (`2`),
   `database.statement_timeout` (`5s`), `database.lock_timeout` (`2s`),
   `database.idle_in_tx_timeout` (`10s`). If M1-07 has not registered any of them in the schema,
   register them with these defaults so `make config-doc-check` stays green.
@@ -254,13 +255,13 @@ runtime the test fails, P-09) and a scratch table the test creates.
 
 - `TestUnitOfWork_PhaseOrderWithRightsChange`: fake hooks append their phase to a slice; result
   `rights_begin, work, rights_check, sync, audit`.
-- `TestUnitOfWork_PhaseOrderWithoutRightsChange`: `work, sync, audit`; rights hooks not called.
+- `TestUnitOfWork_PhaseOrderWithoutRightsChange`: `work, sync, audit`; permission hooks not called.
 - `TestUnitOfWork_SubscriberVetoRollsBack`: `fn` inserts a row, stores a value under a
   `txn.Key`, publishes an event; the subscriber returns an error; `Do` returns that error
   (`errors.Is`), the row is absent, the sync and audit hooks never ran, and a new unit sees no
   stored value.
-- `TestUnitOfWork_RightsCheckVetoRollsBack`: the rights check hook returns an `invariant_violation`
-  error; nothing is committed; sync and audit hooks did not run.
+- `TestUnitOfWork_RightsCheckVetoRollsBack`: the permission check hook returns an
+  `invariant_violation` error; nothing is committed; sync and audit hooks did not run.
 - `TestUnitOfWork_RetriesDeadlockUpToMax` and `TestUnitOfWork_RetriesLockTimeoutUpToMax`: `fn`
   returns a `*pgconn.PgError` with `40P01` (resp. `55P03`) for the first k attempts; with
   `RetryMax = 2`: k = 2 succeeds after 3 attempts; k = 3 fails after 3 attempts with kind

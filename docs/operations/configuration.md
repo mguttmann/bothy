@@ -1,948 +1,948 @@
-# Konfigurationsreferenz
+# Configuration reference
 
-Status: Entwurf M0. Sammlung aller benannten Konfigurationswerte mit Umgebungsname, Typ,
-Standard und Bedeutung. Regeln: [16-betrieb.md](../spec/16-betrieb.md) 5 und ADR 0011.
+Status: draft M0. Collection of all named configuration values with environment name, type,
+default and meaning. Rules: [16-operations.md](../spec/16-operations.md) 5 and ADR 0011.
 
-Maßgeblich für einen Standardwert ist die Tabelle "Konfigurationswerte dieses Kapitels" im
-genannten Kapitel (Ruling L4). Abschnitt 4 wird daraus erzeugt (`tools/docs/config_reference.py`,
-Check in `make docs`). Ab M1 ist das Konfigurationsschema des Servers die Quelle; dann entsteht
-Abschnitt 4 aus dem Schema, und der Check vergleicht es mit den Kapiteltabellen.
+The authoritative source for a default value is the table "Configuration values of this chapter"
+in the named chapter (ruling L4). Section 4 is generated from it (`tools/docs/config_reference.py`,
+check in `make docs`). From M1 on, the configuration schema of the server is the source; section 4
+is then generated from the schema, and the check compares it with the chapter tables.
 
-## 1. Quellen
+## 1. Sources
 
-| Quelle | Inhalt | Ändern | Wirkung |
+| Source | Content | Change | Effect |
 |---|---|---|---|
-| Prozess-Konfiguration | alle Schlüssel aus Abschnitt 4 mit Ort `Server` | Umgebung (`BOTHY_*`) oder YAML-Datei (`BOTHY_CONFIG_FILE`) | beim Start; Geheimnisse nach `secrets.cache_ttl` |
-| Instanz-Einstellungen | Abschnitt 6, Tabelle `instance_settings` | Admin-Konsole, `instance.settings.update`, `instance.branding.update` (Owner, Step-up, Audit) | sofort, Ereignis `instance.updated` |
-| Feature-Flags | Abschnitt 7, Tabelle `feature_flags` | Admin-Konsole, `feature_flag.update` (Owner, Step-up, Audit) | sofort, Ereignis `instance.updated` |
-| OpenTelemetry | Abschnitt 8, Variablen `OTEL_*` | Umgebung | beim Start |
-| Compose | Abschnitt 9, Datei `infra/compose/.env` | Datei | bei `docker compose up` |
+| Process configuration | all keys from section 4 with place `Server` | environment (`BOTHY_*`) or YAML file (`BOTHY_CONFIG_FILE`) | at startup; secrets after `secrets.cache_ttl` |
+| Instance settings | section 6, table `instance_settings` | admin console, `instance.settings.update`, `instance.branding.update` (owner, step-up, audit) | immediately, event `instance.updated` |
+| Feature flags | section 7, table `feature_flags` | admin console, `feature_flag.update` (owner, step-up, audit) | immediately, event `instance.updated` |
+| OpenTelemetry | section 8, variables `OTEL_*` | environment | at startup |
+| Compose | section 9, file `infra/compose/.env` | file | on `docker compose up` |
 
-Vorrang der Prozess-Konfiguration: Kommandozeile (nur `--role`, `--config`) vor Umgebung vor Datei
-vor Standard. Ein Schlüssel steht in genau einer Quelle. Abschnitt 4 führt auch Schlüssel, deren
-Nutzer erst in einer späteren Etappe entsteht; das Konfigurationsschema des Servers kennt einen
-Schlüssel ab dem Ticket, das seinen ersten Nutzer baut ([02-architektur.md](../spec/02-architektur.md)
-13, Punkt 5).
+Precedence of the process configuration: command line (only `--role`, `--config`) before
+environment before file before default. A key lives in exactly one source. Section 4 also lists
+keys whose user is only built in a later milestone; the configuration schema of the server knows
+a key from the ticket that builds its first user ([02-architecture.md](../spec/02-architecture.md)
+13, item 5).
 
-## 2. Namensregel und Formate
+## 2. Naming rule and formats
 
-| Thema | Regel | Beispiel |
+| Topic | Rule | Example |
 |---|---|---|
-| Umgebungsname | `BOTHY_` plus Schlüssel in Großbuchstaben, Punkt wird `__` | `sync.event_retention` -> `BOTHY_SYNC__EVENT_RETENTION` |
-| Datei | YAML, Schlüssel verschachtelt nach Punkten | `sync: {event_retention: 30d}` |
-| Dauer (`duration`) | Zahl plus Einheit `ms`, `s`, `m`, `h`, `d` (`d` = 24 h) | `250ms`, `30d` |
-| Liste (`list(...)`) | Umgebung: durch Komma getrennt; Datei: YAML-Liste | `BOTHY_SERVER__TRUSTED_PROXIES=192.0.2.10/32,198.51.100.0/24` |
-| `cron` | fünf Felder, Zeitzone UTC | `0 2 * * 0` |
-| `secret_ref` | `<schema>:<pfad>`, Schemata in [16-betrieb.md](../spec/16-betrieb.md) 5.2 | `file:/run/bothy/secrets/db_app_password` |
-| `listen address` | `host:port`; `:port` heißt alle Schnittstellen | `127.0.0.1:8080` |
-| `semver` | SemVer ohne `v` | `1.4.0` |
-| Egress-Ziel (`egress.allowed_hosts`) | `host[:port][;allow_private]`; Host als DNS-Name (klein, ohne Punkt am Ende) oder IP-Literal (IPv6 in Klammern, wenn ein Port folgt); kein Platzhalter, kein Schema, kein Pfad; Port 1 bis 65535; einziger Schalter `allow_private` | `api.example.com:443`, `[2001:db8::10]:8443;allow_private` |
+| Environment name | `BOTHY_` plus the key in uppercase, a dot becomes `__` | `sync.event_retention` -> `BOTHY_SYNC__EVENT_RETENTION` |
+| File | YAML, keys nested by dots | `sync: {event_retention: 30d}` |
+| Duration (`duration`) | number plus unit `ms`, `s`, `m`, `h`, `d` (`d` = 24 h) | `250ms`, `30d` |
+| List (`list(...)`) | environment: separated by commas; file: YAML list | `BOTHY_SERVER__TRUSTED_PROXIES=192.0.2.10/32,198.51.100.0/24` |
+| `cron` | five fields, time zone UTC | `0 2 * * 0` |
+| `secret_ref` | `<scheme>:<path>`, schemes in [16-operations.md](../spec/16-operations.md) 5.2 | `file:/run/bothy/secrets/db_app_password` |
+| `listen address` | `host:port`; `:port` means all interfaces | `127.0.0.1:8080` |
+| `semver` | SemVer without `v` | `1.4.0` |
+| Egress target (`egress.allowed_hosts`) | `host[:port][;allow_private]`; host as a DNS name (lowercase, without a trailing dot) or an IP literal (IPv6 in brackets when a port follows); no wildcard, no scheme, no path; port 1 to 65535; the only switch is `allow_private` | `api.example.com:443`, `[2001:db8::10]:8443;allow_private` |
 
-Schlüssel enthalten nie zwei Unterstriche hintereinander; darum ist die Namensregel umkehrbar.
+Keys never contain two consecutive underscores; this makes the naming rule reversible.
 
-## 3. Prüfung
+## 3. Check
 
-1. Unbekannte `BOTHY_*`-Variablen und unbekannte Schlüssel in der Datei brechen den Start ab.
-   Ausgenommen sind `BOTHY_CONFIG_FILE` und Variablen, die ein wirksamer Verweis `env:` nennt
-   ([16-betrieb.md](../spec/16-betrieb.md) 5.1).
-2. Typ- und Bereichsfehler brechen den Start ab; die Meldung nennt Schlüssel und Quelle, nie einen
-   Wert (ein Geheimnis kann im falschen Schlüssel stehen).
-3. `bothy config check` prüft ohne Start. `bothy config print --redacted` zeigt die wirksamen
-   Werte und ihre Quelle, Geheimnisse nur als Verweis.
+1. Unknown `BOTHY_*` variables and unknown keys in the file abort the startup.
+   Exempt are `BOTHY_CONFIG_FILE` and variables that an effective reference `env:` names
+   ([16-operations.md](../spec/16-operations.md) 5.1).
+2. Type and range errors abort the startup; the message names the key and the source, never a
+   value (a secret can be in the wrong key).
+3. `bothy config check` checks without starting. `bothy config print --redacted` shows the
+   effective values and their source, secrets only as a reference.
 
-## 4. Benannte Werte aller Kapitel
+## 4. Named values of all chapters
 
-Erzeugt von `tools/docs/config_reference.py` aus den Tabellen "Konfigurationswerte dieses
-Kapitels" (Ruling L4); `make config-reference` schreibt den Block neu, `make docs` prüft, dass er
-aktuell ist und kein Name doppelt vorkommt. Nicht von Hand ändern. Spalte "Ort": `Server` ist die
-Prozess-Konfiguration aus Abschnitt 1 mit Umgebungsnamen nach Abschnitt 2; andere Orte (App,
-Adapter, Runner, Werkzeug, Abgleich-App) sind Werte dieser Programme. Typ und Wertebereich stehen
-im jeweiligen Kapitel; ab M1 kommen sie aus dem Konfigurationsschema des Servers.
+Generated by `tools/docs/config_reference.py` from the tables "Configuration values of this
+chapter" (ruling L4); `make config-reference` rewrites the block, `make docs` checks that it is
+current and that no name appears twice. Do not edit by hand. Column "Place": `Server` is the
+process configuration from section 1 with environment names according to section 2; other places
+(App, Adapter, Runner, Tool, Reconciliation app) are values of these programs. Type and value range
+are in the respective chapter; from M1 on they come from the configuration schema of the server.
 
 <!-- config-reference:start -->
-### 01 Produkt
+### 01 Product
 
-Quelle: [01-produkt.md](../spec/01-produkt.md), Abschnitt 14.
+Source: [01-product.md](../spec/01-product.md), section 14.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `ui.message_group_window` |  | App | `5m` | Nachrichten desselben Autors innerhalb dieser Zeit ohne eigenen Kopf |
-| `ui.message_collapse_lines` |  | App | `24` | ab so vielen Zeilen wird eine Nachricht eingeklappt |
-| `ui.livebox_visible_steps` |  | App | `6` | sichtbare Schritte in der laufenden Live-Box |
-| `ui.composer_max_lines` |  | App | `12` | so weit wächst die Eingabe |
-| `ui.autocomplete_debounce` |  | App | `150ms` | Wartezeit vor `command.autocomplete` |
-| `ui.quick_switch_max_results` |  | App | `20` | Treffer im Schnellwechsel |
-| `ui.desktop_min_width_four_columns` |  | App | `1280px` | darunter klappt die Sitzungs-Spalte ein |
-| `ui.desktop_min_width_three_columns` |  | App | `960px` | darunter wird die Beitragsliste zum Stapel |
-| `a11y.live_announce_min_interval` |  | App | `10s` | höchstens so oft sagt die Live-Box einen Wechsel an |
-| `client.share.recent_targets` |  | App | `8` | zuletzt genutzte Ziele im Teilen-Blatt |
+| `ui.message_group_window` |  | App | `5m` | messages of the same author within this time get no header of their own |
+| `ui.message_collapse_lines` |  | App | `24` | from this many lines on, a message is collapsed |
+| `ui.livebox_visible_steps` |  | App | `6` | visible steps in the running live box |
+| `ui.composer_max_lines` |  | App | `12` | the input grows up to this many lines |
+| `ui.autocomplete_debounce` |  | App | `150ms` | waiting time before `command.autocomplete` |
+| `ui.quick_switch_max_results` |  | App | `20` | hits in the quick switcher |
+| `ui.desktop_min_width_four_columns` |  | App | `1280px` | below this width the session column collapses |
+| `ui.desktop_min_width_three_columns` |  | App | `960px` | below this width the post list becomes a stack |
+| `a11y.live_announce_min_interval` |  | App | `10s` | the live box announces a change at most this often |
+| `client.share.recent_targets` |  | App | `8` | recently used targets in the share sheet |
 
-### 02 Architektur
+### 02 Architecture
 
-Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
+Source: [02-architecture.md](../spec/02-architecture.md), section 22.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `cluster.mode` | `BOTHY_CLUSTER__MODE` | Server | `single` | `single` oder `multi` (mehrere api-Knoten) |
-| `http.read_header_timeout` | `BOTHY_HTTP__READ_HEADER_TIMEOUT` | Server | `5s` | Frist für Kopfzeilen |
-| `http.request_timeout` | `BOTHY_HTTP__REQUEST_TIMEOUT` | Server | `15s` | Kontext-Frist normaler Anfragen |
-| `http.transfer_timeout` | `BOTHY_HTTP__TRANSFER_TIMEOUT` | Server | `10m` | Frist für Upload und Download |
-| `http.idle_timeout` | `BOTHY_HTTP__IDLE_TIMEOUT` | Server | `120s` | Leerlauf von Keep-Alive-Verbindungen |
-| `http.max_header_bytes` | `BOTHY_HTTP__MAX_HEADER_BYTES` | Server | `65536` | größte Kopfzeilen |
-| `http.max_json_body_bytes` | `BOTHY_HTTP__MAX_JSON_BODY_BYTES` | Server | `1048576` | größter JSON-Körper; echt größer als `message.max_content_bytes` (13, Punkt 4) |
-| `http.max_json_depth` | `BOTHY_HTTP__MAX_JSON_DEPTH` | Server | `32` | größte Schachtelungstiefe eines JSON-Körpers (SEC-IN-2); ein Test hält, dass jedes Anfrage-Beispiel in `openapi.yaml` darunter bleibt |
-| `http.unavailable_retry_after` | `BOTHY_HTTP__UNAVAILABLE_RETRY_AFTER` | Server | `5s` | `Retry-After` jeder Antwort `503 unavailable` (in ganzen Sekunden) |
-| `database.acquire_timeout` | `BOTHY_DATABASE__ACQUIRE_TIMEOUT` | Server | `2s` | Warten auf eine Pool-Verbindung |
-| `database.statement_timeout` | `BOTHY_DATABASE__STATEMENT_TIMEOUT` | Server | `5s` | Frist je SQL-Anweisung |
-| `database.lock_timeout` | `BOTHY_DATABASE__LOCK_TIMEOUT` | Server | `2s` | Frist für Sperren |
-| `database.idle_in_tx_timeout` | `BOTHY_DATABASE__IDLE_IN_TX_TIMEOUT` | Server | `10s` | offene Transaktion ohne Arbeit |
-| `database.tx_retry_max` | `BOTHY_DATABASE__TX_RETRY_MAX` | Server | `2` | Wiederholungen des Unit of Work bei `40P01` und `55P03` |
-| `database.listen_reconnect_backoff_cap` | `BOTHY_DATABASE__LISTEN_RECONNECT_BACKOFF_CAP` | Server | `10s` | größter Abstand beim Neuaufbau von `LISTEN` |
-| `startup.dependency_wait` | `BOTHY_STARTUP__DEPENDENCY_WAIT` | Server | `60s` | Warten auf die Datenbank beim Start |
-| `sync.log_poll_interval` | `BOTHY_SYNC__LOG_POLL_INTERVAL` | Server | `1s` | Poll des Log-Tails ohne `NOTIFY` |
-| `sync.tail_batch_size` | `BOTHY_SYNC__TAIL_BATCH_SIZE` | Server | `1000` | Ereignisse je Lesevorgang des Log-Tails |
-| `sync.partition_maintenance_interval` | `BOTHY_SYNC__PARTITION_MAINTENANCE_INTERVAL` | Server | `10m` | Abstand des Jobs `sync.partition_maintenance` |
-| `sync.event_log_partitions_ahead` | `BOTHY_SYNC__EVENT_LOG_PARTITIONS_AHEAD` | Server | `3` | Partitionen von `event_log`, die vor dem Kopf bereitstehen; mit `sync.event_log_partition_size` reichen sie bei `perf.event_commit_min_per_s` länger als zwei Abstände `sync.partition_maintenance_interval` |
-| `gateway.write_timeout` | `BOTHY_GATEWAY__WRITE_TIMEOUT` | Server | `10s` | Frist für einen WebSocket-Schreibvorgang |
-| `consumer.batch_size` | `BOTHY_CONSUMER__BATCH_SIZE` | Server | `500` | Ereignisse je Runde eines Worker-Verbrauchers |
-| `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` |
-| `sync.idempotency_cleanup_interval` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_INTERVAL` | Server | `1h` | Abstand des Jobs `sync.idempotency_cleanup` |
-| `sync.idempotency_cleanup_batch_size` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE` | Server | `1000` | Zeilen je Löschstapel von `sync.idempotency_cleanup` |
-| `ratelimit.max_tracked_keys` | `BOTHY_RATELIMIT__MAX_TRACKED_KEYS` | Server | `100000` | höchstens so viele Rate-Limit-Eimer hält ein Prozess; darüber werden volle, dann älteste Eimer entfernt |
-| `ratelimit.sweep_interval` | `BOTHY_RATELIMIT__SWEEP_INTERVAL` | Server | `1m` | Abstand, in dem volle Eimer entfernt werden (ein voller Eimer entscheidet wie ein fehlender) |
-| `jobs.schema` | `BOTHY_JOBS__SCHEMA` | Server | `jobs` | PostgreSQL-Schema der River-Tabellen |
-| `jobs.queue.default.max_workers` | `BOTHY_JOBS__QUEUE__DEFAULT__MAX_WORKERS` | Server | `8` | Parallelität `default` |
-| `jobs.queue.files.max_workers` | `BOTHY_JOBS__QUEUE__FILES__MAX_WORKERS` | Server | `2` | Parallelität `files` |
-| `jobs.queue.delivery.max_workers` | `BOTHY_JOBS__QUEUE__DELIVERY__MAX_WORKERS` | Server | `16` | Parallelität `delivery` |
-| `jobs.queue.maintenance.max_workers` | `BOTHY_JOBS__QUEUE__MAINTENANCE__MAX_WORKERS` | Server | `2` | Parallelität `maintenance` |
-| `jobs.queue.privacy.max_workers` | `BOTHY_JOBS__QUEUE__PRIVACY__MAX_WORKERS` | Server | `1` | Parallelität `privacy` |
-| `shutdown.drain_delay` | `BOTHY_SHUTDOWN__DRAIN_DELAY` | Server | `5s` | Warten nach `ready = false` |
-| `shutdown.http_grace` | `BOTHY_SHUTDOWN__HTTP_GRACE` | Server | `20s` | Frist für laufende HTTP-Anfragen |
-| `shutdown.jobs_soft_timeout` | `BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT` | Server | `20s` | weicher Stopp von River |
-| `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server | `5s` | Telemetrie leeren |
-| `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server | `60s` | gesamte Frist bis zum Ende; mindestens die Summe der Schritt-Budgets (15.3) |
-| `perf.reference_profile` |  | Lasttest | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 lokal mit fsync und synchronous_commit an, Rolle all` | Umgebung der Lasttests; Modi der Messung in ADR 0063 |
-| `perf.sustained_messages_per_s` |  | Lasttest | `200` | Dauerlast für `perf.message_create_p99` |
-| `perf.message_create_p99` |  | Lasttest | `150ms` | Ziel |
-| `perf.event_commit_min_per_s` |  | Lasttest | `1000` | Ziel (Mindestwert) |
-| `perf.fanout_local_p99` |  | Lasttest | `200ms` | Ziel |
-| `perf.fanout_cross_node_p99` |  | Lasttest | `500ms` | Ziel |
-| `perf.invocation_delivery_p99` |  | Lasttest | `500ms` | Ziel |
-| `perf.run_patch_fanout_p99` |  | Lasttest | `500ms` | Ziel |
-| `perf.catchup_page_p99` |  | Lasttest | `250ms` | Ziel |
-| `perf.authorize_cached_p99` |  | Lasttest | `100us` | Ziel |
-| `perf.ws_connections_per_node` |  | Lasttest | `5000` | Ziel (Mindestwert) |
-| `perf.ws_idle_conn_mem_max` |  | Lasttest | `64KiB` | Ziel (Höchstwert) |
-| `perf.idle_rss_max` |  | Lasttest | `256MiB` | Ziel (Höchstwert) |
-| `perf.startup_ready_max` |  | Lasttest | `5s` | Ziel (Höchstwert) |
-| `perf.push_handoff_p95` |  | Lasttest | `2s` | Ziel |
+| `cluster.mode` | `BOTHY_CLUSTER__MODE` | Server | `single` | `single` or `multi` (several api nodes) |
+| `http.read_header_timeout` | `BOTHY_HTTP__READ_HEADER_TIMEOUT` | Server | `5s` | deadline for headers |
+| `http.request_timeout` | `BOTHY_HTTP__REQUEST_TIMEOUT` | Server | `15s` | context deadline of normal requests |
+| `http.transfer_timeout` | `BOTHY_HTTP__TRANSFER_TIMEOUT` | Server | `10m` | deadline for upload and download |
+| `http.idle_timeout` | `BOTHY_HTTP__IDLE_TIMEOUT` | Server | `120s` | idle time of keep-alive connections |
+| `http.max_header_bytes` | `BOTHY_HTTP__MAX_HEADER_BYTES` | Server | `65536` | largest headers |
+| `http.max_json_body_bytes` | `BOTHY_HTTP__MAX_JSON_BODY_BYTES` | Server | `1048576` | largest JSON body; strictly greater than `message.max_content_bytes` (13, item 4) |
+| `http.max_json_depth` | `BOTHY_HTTP__MAX_JSON_DEPTH` | Server | `32` | largest nesting depth of a JSON body (SEC-IN-2); a test holds that every request example in `openapi.yaml` stays below it |
+| `http.unavailable_retry_after` | `BOTHY_HTTP__UNAVAILABLE_RETRY_AFTER` | Server | `5s` | `Retry-After` of every `503 unavailable` response (in whole seconds) |
+| `database.acquire_timeout` | `BOTHY_DATABASE__ACQUIRE_TIMEOUT` | Server | `2s` | waiting for a pool connection |
+| `database.statement_timeout` | `BOTHY_DATABASE__STATEMENT_TIMEOUT` | Server | `5s` | deadline per SQL statement |
+| `database.lock_timeout` | `BOTHY_DATABASE__LOCK_TIMEOUT` | Server | `2s` | deadline for locks |
+| `database.idle_in_tx_timeout` | `BOTHY_DATABASE__IDLE_IN_TX_TIMEOUT` | Server | `10s` | open transaction without work |
+| `database.tx_retry_max` | `BOTHY_DATABASE__TX_RETRY_MAX` | Server | `2` | retries of the Unit of Work on `40P01` and `55P03` |
+| `database.listen_reconnect_backoff_cap` | `BOTHY_DATABASE__LISTEN_RECONNECT_BACKOFF_CAP` | Server | `10s` | largest interval when re-establishing `LISTEN` |
+| `startup.dependency_wait` | `BOTHY_STARTUP__DEPENDENCY_WAIT` | Server | `60s` | waiting for the database at start |
+| `sync.log_poll_interval` | `BOTHY_SYNC__LOG_POLL_INTERVAL` | Server | `1s` | poll of the log tail without `NOTIFY` |
+| `sync.tail_batch_size` | `BOTHY_SYNC__TAIL_BATCH_SIZE` | Server | `1000` | events per read of the log tail |
+| `sync.partition_maintenance_interval` | `BOTHY_SYNC__PARTITION_MAINTENANCE_INTERVAL` | Server | `10m` | interval of the job `sync.partition_maintenance` |
+| `sync.event_log_partitions_ahead` | `BOTHY_SYNC__EVENT_LOG_PARTITIONS_AHEAD` | Server | `3` | partitions of `event_log` that are ready ahead of the head; with `sync.event_log_partition_size` they last longer than two intervals `sync.partition_maintenance_interval` at `perf.event_commit_min_per_s` |
+| `gateway.write_timeout` | `BOTHY_GATEWAY__WRITE_TIMEOUT` | Server | `10s` | deadline for one WebSocket write |
+| `consumer.batch_size` | `BOTHY_CONSUMER__BATCH_SIZE` | Server | `500` | events per round of a worker consumer |
+| `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server | `1s` | poll of a worker consumer without `NOTIFY` |
+| `sync.idempotency_cleanup_interval` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_INTERVAL` | Server | `1h` | interval of the job `sync.idempotency_cleanup` |
+| `sync.idempotency_cleanup_batch_size` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE` | Server | `1000` | rows per deletion batch of `sync.idempotency_cleanup` |
+| `ratelimit.max_tracked_keys` | `BOTHY_RATELIMIT__MAX_TRACKED_KEYS` | Server | `100000` | a process holds at most this many rate-limit buckets; beyond that, full buckets are removed first, then the oldest buckets |
+| `ratelimit.sweep_interval` | `BOTHY_RATELIMIT__SWEEP_INTERVAL` | Server | `1m` | interval at which full buckets are removed (a full bucket decides like a missing one) |
+| `jobs.schema` | `BOTHY_JOBS__SCHEMA` | Server | `jobs` | PostgreSQL schema of the River tables |
+| `jobs.queue.default.max_workers` | `BOTHY_JOBS__QUEUE__DEFAULT__MAX_WORKERS` | Server | `8` | parallelism `default` |
+| `jobs.queue.files.max_workers` | `BOTHY_JOBS__QUEUE__FILES__MAX_WORKERS` | Server | `2` | parallelism `files` |
+| `jobs.queue.delivery.max_workers` | `BOTHY_JOBS__QUEUE__DELIVERY__MAX_WORKERS` | Server | `16` | parallelism `delivery` |
+| `jobs.queue.maintenance.max_workers` | `BOTHY_JOBS__QUEUE__MAINTENANCE__MAX_WORKERS` | Server | `2` | parallelism `maintenance` |
+| `jobs.queue.privacy.max_workers` | `BOTHY_JOBS__QUEUE__PRIVACY__MAX_WORKERS` | Server | `1` | parallelism `privacy` |
+| `shutdown.drain_delay` | `BOTHY_SHUTDOWN__DRAIN_DELAY` | Server | `5s` | waiting after `ready = false` |
+| `shutdown.http_grace` | `BOTHY_SHUTDOWN__HTTP_GRACE` | Server | `20s` | deadline for running HTTP requests |
+| `shutdown.jobs_soft_timeout` | `BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT` | Server | `20s` | soft stop of River |
+| `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server | `5s` | flushing telemetry |
+| `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server | `60s` | total deadline until the end; at least the sum of the step budgets (15.3) |
+| `perf.reference_profile` |  | Load test | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 local with fsync and synchronous_commit on, role all` | environment of the load tests; measurement modes in ADR 0063 |
+| `perf.sustained_messages_per_s` |  | Load test | `200` | sustained load for `perf.message_create_p99` |
+| `perf.message_create_p99` |  | Load test | `150ms` | target |
+| `perf.event_commit_min_per_s` |  | Load test | `1000` | target (minimum) |
+| `perf.fanout_local_p99` |  | Load test | `200ms` | target |
+| `perf.fanout_cross_node_p99` |  | Load test | `500ms` | target |
+| `perf.invocation_delivery_p99` |  | Load test | `500ms` | target |
+| `perf.run_patch_fanout_p99` |  | Load test | `500ms` | target |
+| `perf.catchup_page_p99` |  | Load test | `250ms` | target |
+| `perf.authorize_cached_p99` |  | Load test | `100us` | target |
+| `perf.ws_connections_per_node` |  | Load test | `5000` | target (minimum) |
+| `perf.ws_idle_conn_mem_max` |  | Load test | `64KiB` | target (maximum) |
+| `perf.idle_rss_max` |  | Load test | `256MiB` | target (maximum) |
+| `perf.startup_ready_max` |  | Load test | `5s` | target (maximum) |
+| `perf.push_handoff_p95` |  | Load test | `2s` | target |
 
-### 03 Datenmodell (PostgreSQL)
+### 03 Data model (PostgreSQL)
 
-Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
+Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `principal.handle_max_chars` | `BOTHY_PRINCIPAL__HANDLE_MAX_CHARS` | Server | `32` | Länge eines Handles |
-| `principal.display_name_max_chars` | `BOTHY_PRINCIPAL__DISPLAY_NAME_MAX_CHARS` | Server | `64` | Länge eines Anzeigenamens in Unicode-Zeichen |
-| `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server | `64` | Länge des Produktnamens im Branding (`instance_settings`, `branding.product_name`) in Unicode-Zeichen |
-| `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server | `100` | Länge eines Gruppennamens in Unicode-Zeichen |
-| `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen |
-| `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server | `100` | Länge eines Rechnernamens in Unicode-Zeichen |
-| `host.os_user_max_chars` | `BOTHY_HOST__OS_USER_MAX_CHARS` | Server | `64` | Länge des Namens eines Sitzungsbenutzers in `host_session_users.os_user` |
-| `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server | `100` | Länge eines Bereichsnamens in Unicode-Zeichen |
-| `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server | `100` | Länge eines Kanalnamens in Unicode-Zeichen |
-| `channel.topic_max_chars` | `BOTHY_CHANNEL__TOPIC_MAX_CHARS` | Server | `1024` | Länge eines Kanal-Themas in Unicode-Zeichen |
-| `forum_tag.name_max_chars` | `BOTHY_FORUM_TAG__NAME_MAX_CHARS` | Server | `50` | Länge eines Tag-Namens in Unicode-Zeichen |
-| `identity.last_active_granularity` | `BOTHY_IDENTITY__LAST_ACTIVE_GRANULARITY` | Server | `5m` | höchstens so oft wird `last_active_at` bzw. `last_used_at` geschrieben |
-| `auth.session_max_age` | `BOTHY_AUTH__SESSION_MAX_AGE` | Server | `30d` | absolutes Ende einer Anmeldesitzung |
-| `auth.refresh_token_ttl` | `BOTHY_AUTH__REFRESH_TOKEN_TTL` | Server | `14d` | Lebensdauer eines Refresh-Tokens |
-| `auth.step_up_max_age` | `BOTHY_AUTH__STEP_UP_MAX_AGE` | Server | `5m` | so lange gilt eine Step-up-Bestätigung als frisch |
-| `auth.refresh_reuse_grace` | `BOTHY_AUTH__REFRESH_REUSE_GRACE` | Server | `30s` | Nachsicht für die unmittelbar vorige Refresh-Generation mit demselben DPoP-Schlüssel |
-| `agent.heartbeat_persist_interval` | `BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL` | Server | `60s` | höchstens so oft werden Heartbeat-Felder gespeichert |
-| `channel.history_backfill_limit_default` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT` | Server | `20` | Standard für `history_backfill_limit` |
-| `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server | `200` | Obergrenze für `history_backfill_limit` |
-| `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server | `32768` | Größe eines Kanal-Prompts |
-| `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server | `200` | Länge eines Thread-Titels |
-| `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server | `5` | Forum-Tags je Thread |
-| `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | `262144` | Größe einer Nachricht (lange Antworten ohne Teilen) |
-| `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | `10` | Anhänge je Nachricht |
-| `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server | `50` | verschiedene Erwähnungs-Handles je Nachricht (Inhaltsformat, `messages`) |
-| `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server | `64` | größte Länge eines Reaktions-Emoji in Bytes (ein Graphem-Cluster hat sonst keine Grenze) |
-| `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server | `20` | verschiedene Emoji je Nachricht; begrenzt `Message.reactions` und die Nutzlast der Ereignisse |
-| `pin.max_per_thread` | `BOTHY_PIN__MAX_PER_THREAD` | Server | `50` | Anheftungen je Thread; `listPins` ist nicht seitenweise |
-| `template.name_max_chars` | `BOTHY_TEMPLATE__NAME_MAX_CHARS` | Server | `100` | Länge eines Vorlagennamens in Unicode-Zeichen |
-| `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server | `100` | Vorlagen je Person bzw. je Kanal; `listTemplates` ist nicht seitenweise |
-| `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server | `104857600` | Größe einer Datei |
-| `run.excerpt_max_chars` | `BOTHY_RUN__EXCERPT_MAX_CHARS` | Server | `500` | Länge von `last_text_excerpt` |
-| `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server | `16384` | Größe von `run_steps.detail` |
-| `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server | `2000` | gespeicherte Schritte je Lauf |
-| `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server | `10m` | ohne Fortschritt: Stillstandshinweis |
-| `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server | `24h` | Ablauf einer Komponente ohne eigene Angabe |
-| `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server | `5` | danach wird eine Push-Registrierung deaktiviert |
-| `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server | leer | erlaubte Ziel-Hosts für ausgehende Webhooks |
-| `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server | `20` | danach wird ein Abo deaktiviert |
-| `webhook.retry_backoff_base` | `BOTHY_WEBHOOK__RETRY_BACKOFF_BASE` | Server | `10s` | Basis des Backoffs |
-| `webhook.retry_backoff_cap` | `BOTHY_WEBHOOK__RETRY_BACKOFF_CAP` | Server | `1h` | größter Abstand |
-| `sync.event_log_partition_size` | `BOTHY_SYNC__EVENT_LOG_PARTITION_SIZE` | Server | `1000000` | Sequenznummern je Partition |
+| `principal.handle_max_chars` | `BOTHY_PRINCIPAL__HANDLE_MAX_CHARS` | Server | `32` | length of a handle |
+| `principal.display_name_max_chars` | `BOTHY_PRINCIPAL__DISPLAY_NAME_MAX_CHARS` | Server | `64` | length of a display name in Unicode characters |
+| `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server | `64` | length of the product name in the branding (`instance_settings`, `branding.product_name`) in Unicode characters |
+| `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server | `100` | length of a group name in Unicode characters |
+| `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server | `500` | length of a group description in Unicode characters |
+| `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server | `100` | length of a host name in Unicode characters |
+| `host.os_user_max_chars` | `BOTHY_HOST__OS_USER_MAX_CHARS` | Server | `64` | length of the name of a session user in `host_session_users.os_user` |
+| `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server | `100` | length of a space name in Unicode characters |
+| `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server | `100` | length of a channel name in Unicode characters |
+| `channel.topic_max_chars` | `BOTHY_CHANNEL__TOPIC_MAX_CHARS` | Server | `1024` | length of a channel topic in Unicode characters |
+| `forum_tag.name_max_chars` | `BOTHY_FORUM_TAG__NAME_MAX_CHARS` | Server | `50` | length of a tag name in Unicode characters |
+| `identity.last_active_granularity` | `BOTHY_IDENTITY__LAST_ACTIVE_GRANULARITY` | Server | `5m` | `last_active_at` or `last_used_at` is written at most this often |
+| `auth.session_max_age` | `BOTHY_AUTH__SESSION_MAX_AGE` | Server | `30d` | absolute end of a login session |
+| `auth.refresh_token_ttl` | `BOTHY_AUTH__REFRESH_TOKEN_TTL` | Server | `14d` | lifetime of a refresh token |
+| `auth.step_up_max_age` | `BOTHY_AUTH__STEP_UP_MAX_AGE` | Server | `5m` | a step-up confirmation counts as fresh for this long |
+| `auth.refresh_reuse_grace` | `BOTHY_AUTH__REFRESH_REUSE_GRACE` | Server | `30s` | grace period for the immediately preceding refresh generation with the same DPoP key |
+| `agent.heartbeat_persist_interval` | `BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL` | Server | `60s` | heartbeat fields are stored at most this often |
+| `channel.history_backfill_limit_default` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT` | Server | `20` | default for `history_backfill_limit` |
+| `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server | `200` | upper limit for `history_backfill_limit` |
+| `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server | `32768` | size of a channel prompt |
+| `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server | `200` | length of a thread title |
+| `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server | `5` | forum tags per thread |
+| `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | `262144` | size of a message (long answers without splitting) |
+| `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | `10` | attachments per message |
+| `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server | `50` | distinct mention handles per message (content format, `messages`) |
+| `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server | `64` | largest length of a reaction emoji in bytes (otherwise a grapheme cluster has no limit) |
+| `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server | `20` | distinct emoji per message; limits `Message.reactions` and the payload of the events |
+| `pin.max_per_thread` | `BOTHY_PIN__MAX_PER_THREAD` | Server | `50` | pins per thread; `listPins` is not paginated |
+| `template.name_max_chars` | `BOTHY_TEMPLATE__NAME_MAX_CHARS` | Server | `100` | length of a template name in Unicode characters |
+| `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server | `100` | templates per person or per channel; `listTemplates` is not paginated |
+| `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server | `104857600` | size of a file |
+| `run.excerpt_max_chars` | `BOTHY_RUN__EXCERPT_MAX_CHARS` | Server | `500` | length of `last_text_excerpt` |
+| `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server | `16384` | size of `run_steps.detail` |
+| `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server | `2000` | stored steps per run |
+| `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server | `10m` | without progress: stall notice |
+| `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server | `24h` | expiry of a component without its own value |
+| `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server | `5` | after that, a push registration is deactivated |
+| `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server | empty | allowed target hosts for outgoing webhooks |
+| `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server | `20` | after that, a subscription is deactivated |
+| `webhook.retry_backoff_base` | `BOTHY_WEBHOOK__RETRY_BACKOFF_BASE` | Server | `10s` | base of the backoff |
+| `webhook.retry_backoff_cap` | `BOTHY_WEBHOOK__RETRY_BACKOFF_CAP` | Server | `1h` | largest interval |
+| `sync.event_log_partition_size` | `BOTHY_SYNC__EVENT_LOG_PARTITION_SIZE` | Server | `1000000` | sequence numbers per partition |
 
-### 04 Ereignis- und Sync-Protokoll
+### 04 Event and sync protocol
 
-Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
+Source: [04-sync-protocol.md](../spec/04-sync-protocol.md), section 18.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `sync.event_retention` | `BOTHY_SYNC__EVENT_RETENTION` | Server | `30d` | so lange bleiben dauerhafte Ereignisse nachholbar |
-| `sync.event_payload_max_bytes` | `BOTHY_SYNC__EVENT_PAYLOAD_MAX_BYTES` | Server | `65536` | größte Nutzlast eines Ereignisses |
-| `sync.ws_max_frame_bytes` | `BOTHY_SYNC__WS_MAX_FRAME_BYTES` | Server | `1048576` | größter WebSocket-Rahmen |
-| `sync.identify_timeout` | `BOTHY_SYNC__IDENTIFY_TIMEOUT` | Server | `10s` | Zeit zwischen `hello` und `identify` |
-| `sync.heartbeat_interval` | `BOTHY_SYNC__HEARTBEAT_INTERVAL` | Server | `30s` | Abstand der Heartbeats (in `hello` gemeldet) |
-| `sync.heartbeat_miss_limit` | `BOTHY_SYNC__HEARTBEAT_MISS_LIMIT` | Server | `2` | fehlende Heartbeats bis zum Schließen |
-| `sync.resume_window` | `BOTHY_SYNC__RESUME_WINDOW` | Server | `5m` | so lange ist `resume` nach Trennung möglich |
-| `sync.reauth_lead_time` | `BOTHY_SYNC__REAUTH_LEAD_TIME` | Server | `60s` | Vorlauf von `reauth_required` vor Token-Ablauf |
-| `sync.reconnect_backoff_base` | `BOTHY_SYNC__RECONNECT_BACKOFF_BASE` | Server | `1s` | Basis des Backoffs beim Wiederverbinden |
-| `sync.reconnect_backoff_cap` | `BOTHY_SYNC__RECONNECT_BACKOFF_CAP` | Server | `60s` | größter Abstand beim Wiederverbinden |
-| `sync.catchup_page_size` | `BOTHY_SYNC__CATCHUP_PAGE_SIZE` | Server | `500` | Ereignisse je Nachhol-Seite |
-| `sync.catchup_max_events` | `BOTHY_SYNC__CATCHUP_MAX_EVENTS` | Server | `50000` | mehr Rückstand ergibt `resync_required` |
-| `sync.cursor_advance_every` | `BOTHY_SYNC__CURSOR_ADVANCE_EVERY` | Server | `1000` | nach so vielen übersprungenen Ereignissen ein `cursor`-Rahmen |
-| `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server | `10000` | Rahmen im Ausgang einer Verbindung bis `4014` |
-| `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | `24h` | Aufbewahrung von `Idempotency-Key` |
-| `sync.max_focused_threads` | `BOTHY_SYNC__MAX_FOCUSED_THREADS` | Server | `20` | Threads im `focus` je Verbindung |
-| `sync.run_patch_coalesce_interval` | `BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL` | Server | `250ms` | Sammelfenster für `run.updated` |
-| `sync.typing_min_interval` | `BOTHY_SYNC__TYPING_MIN_INTERVAL` | Server | `5s` | höchstens so oft `typing.start` |
-| `sync.typing_ttl` | `BOTHY_SYNC__TYPING_TTL` | Server | `8s` | Tipp-Anzeige ohne Erneuerung |
-| `client.cache_max_age` | `BOTHY_CLIENT__CACHE_MAX_AGE` | Server | `30d` | ungenutzte Cache-Einträge |
-| `client.outbox_retry_base` | `BOTHY_CLIENT__OUTBOX_RETRY_BASE` | Server | `2s` | Basis des Backoffs im Ausgangsfach |
-| `client.outbox_retry_cap` | `BOTHY_CLIENT__OUTBOX_RETRY_CAP` | Server | `5m` | größter Abstand im Ausgangsfach |
-| `agent.invocation_token_ttl` | `BOTHY_AGENT__INVOCATION_TOKEN_TTL` | Server | `60s` | Gültigkeit einer Aufruf-Marke |
-| `agent.ack_timeout` | `BOTHY_AGENT__ACK_TIMEOUT` | Server | `30s` | ohne `ack`: erneute Zustellung |
-| `agent.ack_persist_interval` | `BOTHY_AGENT__ACK_PERSIST_INTERVAL` | Server | `1s` | spätestens so oft wird `acked_seq` gespeichert |
-| `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server | `100` | unbestätigte Ereignisse je Verbraucher |
-| `agent.run_update_min_interval` | `BOTHY_AGENT__RUN_UPDATE_MIN_INTERVAL` | Server | `500ms` | Adapter-Drossel für `run.update` |
-| `agent.presence_timeout` | `BOTHY_AGENT__PRESENCE_TIMEOUT` | Server | `90s` | ohne Heartbeat gilt der Agent als `offline` |
-| `agent.cancel_grace` | `BOTHY_AGENT__CANCEL_GRACE` | Server | `30s` | Zeit für den Adapter, einen Abbruch zu melden |
+| `sync.event_retention` | `BOTHY_SYNC__EVENT_RETENTION` | Server | `30d` | durable events stay available for catch-up this long |
+| `sync.event_payload_max_bytes` | `BOTHY_SYNC__EVENT_PAYLOAD_MAX_BYTES` | Server | `65536` | largest payload of an event |
+| `sync.ws_max_frame_bytes` | `BOTHY_SYNC__WS_MAX_FRAME_BYTES` | Server | `1048576` | largest WebSocket frame |
+| `sync.identify_timeout` | `BOTHY_SYNC__IDENTIFY_TIMEOUT` | Server | `10s` | time between `hello` and `identify` |
+| `sync.heartbeat_interval` | `BOTHY_SYNC__HEARTBEAT_INTERVAL` | Server | `30s` | interval of the heartbeats (reported in `hello`) |
+| `sync.heartbeat_miss_limit` | `BOTHY_SYNC__HEARTBEAT_MISS_LIMIT` | Server | `2` | missed heartbeats until the connection is closed |
+| `sync.resume_window` | `BOTHY_SYNC__RESUME_WINDOW` | Server | `5m` | `resume` is possible this long after a disconnect |
+| `sync.reauth_lead_time` | `BOTHY_SYNC__REAUTH_LEAD_TIME` | Server | `60s` | lead time of `reauth_required` before the token expires |
+| `sync.reconnect_backoff_base` | `BOTHY_SYNC__RECONNECT_BACKOFF_BASE` | Server | `1s` | base of the backoff when reconnecting |
+| `sync.reconnect_backoff_cap` | `BOTHY_SYNC__RECONNECT_BACKOFF_CAP` | Server | `60s` | largest interval when reconnecting |
+| `sync.catchup_page_size` | `BOTHY_SYNC__CATCHUP_PAGE_SIZE` | Server | `500` | events per catch-up page |
+| `sync.catchup_max_events` | `BOTHY_SYNC__CATCHUP_MAX_EVENTS` | Server | `50000` | a larger backlog yields `resync_required` |
+| `sync.cursor_advance_every` | `BOTHY_SYNC__CURSOR_ADVANCE_EVERY` | Server | `1000` | one `cursor` frame after this many skipped events |
+| `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server | `10000` | frames in the outbound queue of a connection until `4014` |
+| `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | `24h` | retention of `Idempotency-Key` |
+| `sync.max_focused_threads` | `BOTHY_SYNC__MAX_FOCUSED_THREADS` | Server | `20` | threads in `focus` per connection |
+| `sync.run_patch_coalesce_interval` | `BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL` | Server | `250ms` | collection window for `run.updated` |
+| `sync.typing_min_interval` | `BOTHY_SYNC__TYPING_MIN_INTERVAL` | Server | `5s` | `typing.start` at most this often |
+| `sync.typing_ttl` | `BOTHY_SYNC__TYPING_TTL` | Server | `8s` | typing indicator without renewal |
+| `client.cache_max_age` | `BOTHY_CLIENT__CACHE_MAX_AGE` | Server | `30d` | unused cache entries |
+| `client.outbox_retry_base` | `BOTHY_CLIENT__OUTBOX_RETRY_BASE` | Server | `2s` | base of the backoff in the outbox |
+| `client.outbox_retry_cap` | `BOTHY_CLIENT__OUTBOX_RETRY_CAP` | Server | `5m` | largest interval in the outbox |
+| `agent.invocation_token_ttl` | `BOTHY_AGENT__INVOCATION_TOKEN_TTL` | Server | `60s` | validity of an invocation token |
+| `agent.ack_timeout` | `BOTHY_AGENT__ACK_TIMEOUT` | Server | `30s` | without `ack`: redelivery |
+| `agent.ack_persist_interval` | `BOTHY_AGENT__ACK_PERSIST_INTERVAL` | Server | `1s` | `acked_seq` is stored at least this often |
+| `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server | `100` | unacknowledged events per consumer |
+| `agent.run_update_min_interval` | `BOTHY_AGENT__RUN_UPDATE_MIN_INTERVAL` | Server | `500ms` | adapter throttle for `run.update` |
+| `agent.presence_timeout` | `BOTHY_AGENT__PRESENCE_TIMEOUT` | Server | `90s` | without a heartbeat, the agent counts as `offline` |
+| `agent.cancel_grace` | `BOTHY_AGENT__CANCEL_GRACE` | Server | `30s` | time for the adapter to report a cancellation |
 
-### 05 Aktionskatalog der Autorisierung
+### 05 Authorization action catalogue
 
-Quelle: [05-aktionen.md](../spec/05-aktionen.md), Abschnitt 10.
+Source: [05-actions.md](../spec/05-actions.md), section 10.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `audit.deny_aggregate_window` | `BOTHY_AUDIT__DENY_AGGREGATE_WINDOW` | Server | `60s` | Zusammenfassungsfenster für gleiche Ablehnungen |
-| `audit.deny_aggregate_max_keys` | `BOTHY_AUDIT__DENY_AGGREGATE_MAX_KEYS` | Server | `10000` | höchstens so viele offene Zusammenfassungen je Prozess; begrenzt den Speicher bei Fluten ohne Anmeldung |
-| `status.public_enabled` | `BOTHY_STATUS__PUBLIC_ENABLED` | Server | `false` | Statusseite ohne Anmeldung |
-| `ratelimit.rl.public_auth.per_minute` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__PER_MINUTE` | Server | `30` | je Client-IP |
-| `ratelimit.rl.public_auth.burst` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__BURST` | Server | `10` | je Client-IP |
-| `ratelimit.rl.gateway_connect.per_minute` | `BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__PER_MINUTE` | Server | `12` | je Gerät oder Token |
-| `ratelimit.rl.gateway_connect.burst` | `BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__BURST` | Server | `4` | je Gerät oder Token |
-| `ratelimit.rl.read.per_minute` | `BOTHY_RATELIMIT__RL__READ__PER_MINUTE` | Server | `600` | je Prinzipal |
-| `ratelimit.rl.read.burst` | `BOTHY_RATELIMIT__RL__READ__BURST` | Server | `100` | je Prinzipal |
-| `ratelimit.rl.write.per_minute` | `BOTHY_RATELIMIT__RL__WRITE__PER_MINUTE` | Server | `120` | je Prinzipal |
-| `ratelimit.rl.write.burst` | `BOTHY_RATELIMIT__RL__WRITE__BURST` | Server | `30` | je Prinzipal |
-| `ratelimit.rl.message.per_minute` | `BOTHY_RATELIMIT__RL__MESSAGE__PER_MINUTE` | Server | `60` | je Prinzipal |
-| `ratelimit.rl.message.burst` | `BOTHY_RATELIMIT__RL__MESSAGE__BURST` | Server | `20` | je Prinzipal |
-| `ratelimit.rl.trigger.per_minute` | `BOTHY_RATELIMIT__RL__TRIGGER__PER_MINUTE` | Server | `30` | je Prinzipal |
-| `ratelimit.rl.trigger.burst` | `BOTHY_RATELIMIT__RL__TRIGGER__BURST` | Server | `10` | je Prinzipal |
-| `ratelimit.rl.interaction.per_minute` | `BOTHY_RATELIMIT__RL__INTERACTION__PER_MINUTE` | Server | `60` | je Prinzipal |
-| `ratelimit.rl.interaction.burst` | `BOTHY_RATELIMIT__RL__INTERACTION__BURST` | Server | `20` | je Prinzipal |
-| `ratelimit.rl.upload.per_minute` | `BOTHY_RATELIMIT__RL__UPLOAD__PER_MINUTE` | Server | `30` | je Prinzipal |
-| `ratelimit.rl.upload.burst` | `BOTHY_RATELIMIT__RL__UPLOAD__BURST` | Server | `10` | je Prinzipal |
-| `ratelimit.rl.search.per_minute` | `BOTHY_RATELIMIT__RL__SEARCH__PER_MINUTE` | Server | `60` | je Prinzipal |
-| `ratelimit.rl.search.burst` | `BOTHY_RATELIMIT__RL__SEARCH__BURST` | Server | `20` | je Prinzipal |
-| `ratelimit.rl.typing.per_minute` | `BOTHY_RATELIMIT__RL__TYPING__PER_MINUTE` | Server | `30` | je Verbindung |
-| `ratelimit.rl.typing.burst` | `BOTHY_RATELIMIT__RL__TYPING__BURST` | Server | `5` | je Verbindung |
-| `ratelimit.rl.admin.per_minute` | `BOTHY_RATELIMIT__RL__ADMIN__PER_MINUTE` | Server | `60` | je Prinzipal |
-| `ratelimit.rl.admin.burst` | `BOTHY_RATELIMIT__RL__ADMIN__BURST` | Server | `20` | je Prinzipal |
-| `ratelimit.rl.export.per_minute` | `BOTHY_RATELIMIT__RL__EXPORT__PER_MINUTE` | Server | `2` | je Prinzipal |
-| `ratelimit.rl.export.burst` | `BOTHY_RATELIMIT__RL__EXPORT__BURST` | Server | `2` | je Prinzipal |
-| `ratelimit.rl.agent_runtime.per_minute` | `BOTHY_RATELIMIT__RL__AGENT_RUNTIME__PER_MINUTE` | Server | `1200` | je Agent |
-| `ratelimit.rl.agent_runtime.burst` | `BOTHY_RATELIMIT__RL__AGENT_RUNTIME__BURST` | Server | `200` | je Agent |
-| `ratelimit.rl.webhook_in.per_minute` | `BOTHY_RATELIMIT__RL__WEBHOOK_IN__PER_MINUTE` | Server | `60` | je Eingangs-Webhook |
-| `ratelimit.rl.webhook_in.burst` | `BOTHY_RATELIMIT__RL__WEBHOOK_IN__BURST` | Server | `20` | je Eingangs-Webhook |
-| `ratelimit.rl.import.per_minute` | `BOTHY_RATELIMIT__RL__IMPORT__PER_MINUTE` | Server | `120` | je Owner für `import.apply` |
-| `ratelimit.rl.import.burst` | `BOTHY_RATELIMIT__RL__IMPORT__BURST` | Server | `30` | je Owner für `import.apply` |
-| `ratelimit.rl.terminal.per_minute` | `BOTHY_RATELIMIT__RL__TERMINAL__PER_MINUTE` | Server | `20` | je Mensch |
-| `ratelimit.rl.terminal.burst` | `BOTHY_RATELIMIT__RL__TERMINAL__BURST` | Server | `5` | je Mensch |
-| `ratelimit.rl.host.per_minute` | `BOTHY_RATELIMIT__RL__HOST__PER_MINUTE` | Server | `120` | je Rechner |
-| `ratelimit.rl.host.burst` | `BOTHY_RATELIMIT__RL__HOST__BURST` | Server | `30` | je Rechner |
+| `audit.deny_aggregate_window` | `BOTHY_AUDIT__DENY_AGGREGATE_WINDOW` | Server | `60s` | aggregation window for identical denials |
+| `audit.deny_aggregate_max_keys` | `BOTHY_AUDIT__DENY_AGGREGATE_MAX_KEYS` | Server | `10000` | at most this many open aggregations per process; limits the memory during floods without login |
+| `status.public_enabled` | `BOTHY_STATUS__PUBLIC_ENABLED` | Server | `false` | status page without login |
+| `ratelimit.rl.public_auth.per_minute` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__PER_MINUTE` | Server | `30` | per client IP |
+| `ratelimit.rl.public_auth.burst` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__BURST` | Server | `10` | per client IP |
+| `ratelimit.rl.gateway_connect.per_minute` | `BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__PER_MINUTE` | Server | `12` | per device or token |
+| `ratelimit.rl.gateway_connect.burst` | `BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__BURST` | Server | `4` | per device or token |
+| `ratelimit.rl.read.per_minute` | `BOTHY_RATELIMIT__RL__READ__PER_MINUTE` | Server | `600` | per principal |
+| `ratelimit.rl.read.burst` | `BOTHY_RATELIMIT__RL__READ__BURST` | Server | `100` | per principal |
+| `ratelimit.rl.write.per_minute` | `BOTHY_RATELIMIT__RL__WRITE__PER_MINUTE` | Server | `120` | per principal |
+| `ratelimit.rl.write.burst` | `BOTHY_RATELIMIT__RL__WRITE__BURST` | Server | `30` | per principal |
+| `ratelimit.rl.message.per_minute` | `BOTHY_RATELIMIT__RL__MESSAGE__PER_MINUTE` | Server | `60` | per principal |
+| `ratelimit.rl.message.burst` | `BOTHY_RATELIMIT__RL__MESSAGE__BURST` | Server | `20` | per principal |
+| `ratelimit.rl.trigger.per_minute` | `BOTHY_RATELIMIT__RL__TRIGGER__PER_MINUTE` | Server | `30` | per principal |
+| `ratelimit.rl.trigger.burst` | `BOTHY_RATELIMIT__RL__TRIGGER__BURST` | Server | `10` | per principal |
+| `ratelimit.rl.interaction.per_minute` | `BOTHY_RATELIMIT__RL__INTERACTION__PER_MINUTE` | Server | `60` | per principal |
+| `ratelimit.rl.interaction.burst` | `BOTHY_RATELIMIT__RL__INTERACTION__BURST` | Server | `20` | per principal |
+| `ratelimit.rl.upload.per_minute` | `BOTHY_RATELIMIT__RL__UPLOAD__PER_MINUTE` | Server | `30` | per principal |
+| `ratelimit.rl.upload.burst` | `BOTHY_RATELIMIT__RL__UPLOAD__BURST` | Server | `10` | per principal |
+| `ratelimit.rl.search.per_minute` | `BOTHY_RATELIMIT__RL__SEARCH__PER_MINUTE` | Server | `60` | per principal |
+| `ratelimit.rl.search.burst` | `BOTHY_RATELIMIT__RL__SEARCH__BURST` | Server | `20` | per principal |
+| `ratelimit.rl.typing.per_minute` | `BOTHY_RATELIMIT__RL__TYPING__PER_MINUTE` | Server | `30` | per connection |
+| `ratelimit.rl.typing.burst` | `BOTHY_RATELIMIT__RL__TYPING__BURST` | Server | `5` | per connection |
+| `ratelimit.rl.admin.per_minute` | `BOTHY_RATELIMIT__RL__ADMIN__PER_MINUTE` | Server | `60` | per principal |
+| `ratelimit.rl.admin.burst` | `BOTHY_RATELIMIT__RL__ADMIN__BURST` | Server | `20` | per principal |
+| `ratelimit.rl.export.per_minute` | `BOTHY_RATELIMIT__RL__EXPORT__PER_MINUTE` | Server | `2` | per principal |
+| `ratelimit.rl.export.burst` | `BOTHY_RATELIMIT__RL__EXPORT__BURST` | Server | `2` | per principal |
+| `ratelimit.rl.agent_runtime.per_minute` | `BOTHY_RATELIMIT__RL__AGENT_RUNTIME__PER_MINUTE` | Server | `1200` | per agent |
+| `ratelimit.rl.agent_runtime.burst` | `BOTHY_RATELIMIT__RL__AGENT_RUNTIME__BURST` | Server | `200` | per agent |
+| `ratelimit.rl.webhook_in.per_minute` | `BOTHY_RATELIMIT__RL__WEBHOOK_IN__PER_MINUTE` | Server | `60` | per incoming webhook |
+| `ratelimit.rl.webhook_in.burst` | `BOTHY_RATELIMIT__RL__WEBHOOK_IN__BURST` | Server | `20` | per incoming webhook |
+| `ratelimit.rl.import.per_minute` | `BOTHY_RATELIMIT__RL__IMPORT__PER_MINUTE` | Server | `120` | per owner for `import.apply` |
+| `ratelimit.rl.import.burst` | `BOTHY_RATELIMIT__RL__IMPORT__BURST` | Server | `30` | per owner for `import.apply` |
+| `ratelimit.rl.terminal.per_minute` | `BOTHY_RATELIMIT__RL__TERMINAL__PER_MINUTE` | Server | `20` | per person |
+| `ratelimit.rl.terminal.burst` | `BOTHY_RATELIMIT__RL__TERMINAL__BURST` | Server | `5` | per person |
+| `ratelimit.rl.host.per_minute` | `BOTHY_RATELIMIT__RL__HOST__PER_MINUTE` | Server | `120` | per host |
+| `ratelimit.rl.host.burst` | `BOTHY_RATELIMIT__RL__HOST__BURST` | Server | `30` | per host |
 
-### 06 Öffentliche API
+### 06 Public API
 
-Quelle: [06-api.md](../spec/06-api.md), Abschnitt 20.
+Source: [06-api.md](../spec/06-api.md), section 20.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `api.page_size_default` | `BOTHY_API__PAGE_SIZE_DEFAULT` | Server | `50` | Seitengröße ohne `limit` |
-| `api.page_size_max` | `BOTHY_API__PAGE_SIZE_MAX` | Server | `200` | größere `limit` werden gekappt |
-| `api.cors_allowed_origins` | `BOTHY_API__CORS_ALLOWED_ORIGINS` | Server | leer | zusätzliche Origins für CORS |
-| `api.deprecation_min_notice` | `BOTHY_API__DEPRECATION_MIN_NOTICE` | Server | `180d` | Mindestabstand von `Deprecation` zu `Sunset` |
-| `api.major_version_overlap` | `BOTHY_API__MAJOR_VERSION_OVERLAP` | Server | `365d` | so lange bleibt eine alte Hauptversion nach Erscheinen der neuen |
-| `api.stats_max_buckets` | `BOTHY_API__STATS_MAX_BUCKETS` | Server | `1000` | Zeit-Buckets je Statistik-Abfrage; mehr ergibt `400` |
-| `message.list_content_max_bytes` | `BOTHY_MESSAGE__LIST_CONTENT_MAX_BYTES` | Server | `16384` | größter `content_md` je Nachricht in Listen; darüber gekürzt mit `content_truncated` (Abschnitt 6) |
-| `status.history_window` | `BOTHY_STATUS__HISTORY_WINDOW` | Server | `7d` | so lange zeigt die Statusseite gelöste Störungen |
+| `api.page_size_default` | `BOTHY_API__PAGE_SIZE_DEFAULT` | Server | `50` | page size without `limit` |
+| `api.page_size_max` | `BOTHY_API__PAGE_SIZE_MAX` | Server | `200` | larger `limit` values are capped |
+| `api.cors_allowed_origins` | `BOTHY_API__CORS_ALLOWED_ORIGINS` | Server | empty | additional origins for CORS |
+| `api.deprecation_min_notice` | `BOTHY_API__DEPRECATION_MIN_NOTICE` | Server | `180d` | minimum gap from `Deprecation` to `Sunset` |
+| `api.major_version_overlap` | `BOTHY_API__MAJOR_VERSION_OVERLAP` | Server | `365d` | how long an old major version stays after the new one appears |
+| `api.stats_max_buckets` | `BOTHY_API__STATS_MAX_BUCKETS` | Server | `1000` | time buckets per statistics query; more yields `400` |
+| `message.list_content_max_bytes` | `BOTHY_MESSAGE__LIST_CONTENT_MAX_BYTES` | Server | `16384` | largest `content_md` per message in lists; above that truncated with `content_truncated` (section 6) |
+| `status.history_window` | `BOTHY_STATUS__HISTORY_WINDOW` | Server | `7d` | how long the status page shows resolved incidents |
 
-### 07 Rechte und Autorisierung
+### 07 Permissions and authorization
 
-Quelle: [07-rechte.md](../spec/07-rechte.md), Abschnitt 14.
+Source: [07-permissions.md](../spec/07-permissions.md), section 14.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `authz.expiry_sweep_interval` | `BOTHY_AUTHZ__EXPIRY_SWEEP_INTERVAL` | Server | `1m` | Abstand des Jobs, der Abläufe meldet und Erinnerungen schreibt |
-| `authz.expiry_reminder_lead` | `BOTHY_AUTHZ__EXPIRY_REMINDER_LEAD` | Server | `48h` | so lange vor Ablauf kommt die Erinnerung (Studie C: zwei Tage) |
-| `authz.expiry_sweep_batch_max` | `BOTHY_AUTHZ__EXPIRY_SWEEP_BATCH_MAX` | Server | `500` | Zeilen je Transaktion der Jobs `authz.expiry_sweep` und `authz.expiry_reminder` |
-| `authz.view_as_max_duration` | `BOTHY_AUTHZ__VIEW_AS_MAX_DURATION` | Server | `15m` | Höchstdauer von "Als Person ansehen" |
-| `authz.snapshot_cache_max_entries` | `BOTHY_AUTHZ__SNAPSHOT_CACHE_MAX_ENTRIES` | Server | `10000` | Rechte-Stände im Speicher je Prozess (LRU) |
-| `authz.not_found_timing_tolerance` | `BOTHY_AUTHZ__NOT_FOUND_TIMING_TOLERANCE` | Server | `20ms` | erlaubte Abweichung des Medians in AZ-P4 |
+| `authz.expiry_sweep_interval` | `BOTHY_AUTHZ__EXPIRY_SWEEP_INTERVAL` | Server | `1m` | interval of the job that reports expiries and writes reminders |
+| `authz.expiry_reminder_lead` | `BOTHY_AUTHZ__EXPIRY_REMINDER_LEAD` | Server | `48h` | how long before expiry the reminder comes (Study C: two days) |
+| `authz.expiry_sweep_batch_max` | `BOTHY_AUTHZ__EXPIRY_SWEEP_BATCH_MAX` | Server | `500` | rows per transaction of the jobs `authz.expiry_sweep` and `authz.expiry_reminder` |
+| `authz.view_as_max_duration` | `BOTHY_AUTHZ__VIEW_AS_MAX_DURATION` | Server | `15m` | maximum duration of "View as person" |
+| `authz.snapshot_cache_max_entries` | `BOTHY_AUTHZ__SNAPSHOT_CACHE_MAX_ENTRIES` | Server | `10000` | permission snapshots in memory per process (LRU) |
+| `authz.not_found_timing_tolerance` | `BOTHY_AUTHZ__NOT_FOUND_TIMING_TOLERANCE` | Server | `20ms` | allowed deviation of the median in AZ-P4 |
 
-### 08 Identität, Geräte und Sitzungen
+### 08 Identity, devices and sessions
 
-Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
+Source: [08-identity.md](../spec/08-identity.md), section 18.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `auth.access_token_ttl` | `BOTHY_AUTH__ACCESS_TOKEN_TTL` | Server | `10m` | Lebensdauer eines Zugriffstokens |
-| `auth.dpop_nonce_ttl` | `BOTHY_AUTH__DPOP_NONCE_TTL` | Server | `5m` | Gültigkeit eines DPoP-Nonce (Kopfzeile `DPoP-Nonce` und `hello` des Gateways) |
-| `auth.token_pepper_ref` | `BOTHY_AUTH__TOKEN_PEPPER_REF` | Server | `file:<secrets.dir>/token_pepper` | Verweis auf den Server-Pepper für die HMAC-Hashes aller Tokens und Codes (03, Grundsatz 9) |
-| `auth.clock_leeway` | `BOTHY_AUTH__CLOCK_LEEWAY` | Server | `30s` | erlaubte Uhrabweichung bei `exp`, `nbf`, `iat` |
-| `auth.dpop_proof_max_age` | `BOTHY_AUTH__DPOP_PROOF_MAX_AGE` | Server | `60s` | Höchstalter eines DPoP-Beweises (`iat`) |
-| `auth.login_flow_ttl` | `BOTHY_AUTH__LOGIN_FLOW_TTL` | Server | `10m` | Gültigkeit eines Anmeldevorgangs |
-| `auth.server_code_ttl` | `BOTHY_AUTH__SERVER_CODE_TTL` | Server | `60s` | Gültigkeit des einmaligen Server-Codes |
-| `auth.oidc_jwks_cache_ttl` | `BOTHY_AUTH__OIDC_JWKS_CACHE_TTL` | Server | `1h` | Cache der Anbieter-Metadaten (Discovery) und -Schlüssel (JWKS) |
-| `auth.oidc_client_assertion_ttl` | `BOTHY_AUTH__OIDC_CLIENT_ASSERTION_TTL` | Server | `2m` | Gültigkeit einer Client-Assertion bei `private_key_jwt` |
-| `auth.group_claim_max_age` | `BOTHY_AUTH__GROUP_CLAIM_MAX_AGE` | Server | `30d` | Ablauf von Mitgliedschaften aus Gruppen-Claims nach der letzten Anmeldung |
-| `auth.idp_recheck_interval` | `BOTHY_AUTH__IDP_RECHECK_INTERVAL` | Server | `30d` | spätestens dann neue Anmeldung beim Anbieter |
-| `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server | `true` | jede Anfrage muss denselben Header-Login tragen |
-| `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server | `72h` | Gültigkeit eines Einladungs-Codes |
-| `auth.enrollment_code_max_attempts` | `BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS` | Server | `5` | Fehlversuche je Einladungs-Code |
-| `auth.device_pending_ttl` | `BOTHY_AUTH__DEVICE_PENDING_TTL` | Server | `24h` | danach wird ein wartendes Gerät widerrufen |
-| `auth.device_verification_code_digits` | `BOTHY_AUTH__DEVICE_VERIFICATION_CODE_DIGITS` | Server | `6` | Länge des Bestätigungs-Codes |
-| `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server | `5m` | Gültigkeit eines Kopplungs-Codes |
-| `auth.pairing_code_chars` | `BOTHY_AUTH__PAIRING_CODE_CHARS` | Server | `8` | Länge des Kopplungs-Codes (Crockford-Base32, 40 Bit) |
-| `auth.device_inactive_revoke_after` | `BOTHY_AUTH__DEVICE_INACTIVE_REVOKE_AFTER` | Server | `180d` | Gerät ohne Kontakt wird widerrufen |
-| `auth.cleanup_interval` | `BOTHY_AUTH__CLEANUP_INTERVAL` | Server | `1h` | Abstand des Jobs `identity.auth_cleanup` (abgelaufene Herausforderungen, Anmeldevorgänge und Kopplungen löschen, wartende und ungenutzte Geräte widerrufen) |
-| `auth.step_up_challenge_ttl` | `BOTHY_AUTH__STEP_UP_CHALLENGE_TTL` | Server | `2m` | Gültigkeit einer Step-up-Herausforderung |
-| `auth.step_up_fail_limit` | `BOTHY_AUTH__STEP_UP_FAIL_LIMIT` | Server | `5` | Fehlversuche beim Step-up je Fenster |
-| `auth.require_key_attestation` | `BOTHY_AUTH__REQUIRE_KEY_ATTESTATION` | Server | `false` | Plattform-Attestierung der Geräteschlüssel verlangen |
-| `auth.console_session_max_age` | `BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE` | Server | `12h` | absolute Dauer einer Konsolen-Sitzung |
-| `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server | `30m` | Leerlauf bis zum Ende der Konsolen-Sitzung |
-| `auth.local_password_enabled` | `BOTHY_AUTH__LOCAL_PASSWORD_ENABLED` | Server | `true` | Passwort mit TOTP als Rückfall für lokale Konten |
-| `auth.totp_key_ref` | `BOTHY_AUTH__TOTP_KEY_REF` | Server | `file:<secrets.dir>/totp_key` | Verweis auf den Schlüssel (32 Byte), mit dem TOTP-Geheimnisse verschlüsselt werden |
-| `auth.webauthn_rp_id` | `BOTHY_AUTH__WEBAUTHN_RP_ID` | Server | leer | RP-ID der Passkeys; leer heißt Host von `server.public_url` |
-| `auth.webauthn_origins` | `BOTHY_AUTH__WEBAUTHN_ORIGINS` | Server | leer | erlaubte Origins der Passkeys; leer heißt Origin von `server.public_url`; Einträge dürfen auch App-Origins wie `android:apk-key-hash:...` sein |
-| `auth.password_min_length` | `BOTHY_AUTH__PASSWORD_MIN_LENGTH` | Server | `12` | Mindestlänge eines Passworts |
-| `auth.argon2id_memory_kib` | `BOTHY_AUTH__ARGON2ID_MEMORY_KIB` | Server | `65536` | Argon2id-Speicher (Untergrenze 19456) |
-| `auth.argon2id_iterations` | `BOTHY_AUTH__ARGON2ID_ITERATIONS` | Server | `3` | Argon2id-Durchläufe (Untergrenze 2) |
-| `auth.argon2id_parallelism` | `BOTHY_AUTH__ARGON2ID_PARALLELISM` | Server | `1` | Argon2id-Parallelität |
-| `auth.login_fail_limit` | `BOTHY_AUTH__LOGIN_FAIL_LIMIT` | Server | `10` | Fehlversuche je Konto und Fenster |
-| `auth.login_fail_window` | `BOTHY_AUTH__LOGIN_FAIL_WINDOW` | Server | `15m` | Fenster für Fehlversuche |
-| `auth.login_lock_duration` | `BOTHY_AUTH__LOGIN_LOCK_DURATION` | Server | `15m` | Sperre des Passwortwegs |
-| `auth.dpop_required_for` | `BOTHY_AUTH__DPOP_REQUIRED_FOR` | Server | `["agent"]` | Token-Arten, die DPoP-gebunden sein müssen |
-| `auth.api_token_max_ttl` | `BOTHY_AUTH__API_TOKEN_MAX_TTL` | Server | `365d` | Höchstdauer eines Agenten- oder App-Tokens |
-| `auth.personal_token_max_ttl` | `BOTHY_AUTH__PERSONAL_TOKEN_MAX_TTL` | Server | `90d` | Höchstdauer eines persönlichen Tokens |
-| `client.app_lock_after` | `BOTHY_CLIENT__APP_LOCK_AFTER` | Server | `5m` | ohne Benutzung bis zur App-Sperre |
-| `security.app_lock_required` | `BOTHY_SECURITY__APP_LOCK_REQUIRED` | Server | `false` | App-Sperre instanzweit verlangen |
+| `auth.access_token_ttl` | `BOTHY_AUTH__ACCESS_TOKEN_TTL` | Server | `10m` | Lifetime of an access token |
+| `auth.dpop_nonce_ttl` | `BOTHY_AUTH__DPOP_NONCE_TTL` | Server | `5m` | Validity of a DPoP nonce (`DPoP-Nonce` header and `hello` of the gateway) |
+| `auth.token_pepper_ref` | `BOTHY_AUTH__TOKEN_PEPPER_REF` | Server | `file:<secrets.dir>/token_pepper` | Reference to the server pepper for the HMAC hashes of all tokens and codes (03, principle 9) |
+| `auth.clock_leeway` | `BOTHY_AUTH__CLOCK_LEEWAY` | Server | `30s` | allowed clock skew for `exp`, `nbf`, `iat` |
+| `auth.dpop_proof_max_age` | `BOTHY_AUTH__DPOP_PROOF_MAX_AGE` | Server | `60s` | Maximum age of a DPoP proof (`iat`) |
+| `auth.login_flow_ttl` | `BOTHY_AUTH__LOGIN_FLOW_TTL` | Server | `10m` | Validity of a login flow |
+| `auth.server_code_ttl` | `BOTHY_AUTH__SERVER_CODE_TTL` | Server | `60s` | Validity of the one-time server code |
+| `auth.oidc_jwks_cache_ttl` | `BOTHY_AUTH__OIDC_JWKS_CACHE_TTL` | Server | `1h` | Cache of the provider metadata (discovery) and provider keys (JWKS) |
+| `auth.oidc_client_assertion_ttl` | `BOTHY_AUTH__OIDC_CLIENT_ASSERTION_TTL` | Server | `2m` | Validity of a client assertion with `private_key_jwt` |
+| `auth.group_claim_max_age` | `BOTHY_AUTH__GROUP_CLAIM_MAX_AGE` | Server | `30d` | Expiry of memberships from group claims after the last login |
+| `auth.idp_recheck_interval` | `BOTHY_AUTH__IDP_RECHECK_INTERVAL` | Server | `30d` | new login at the provider at the latest after this |
+| `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server | `true` | every request must carry the same header login |
+| `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server | `72h` | Validity of an enrollment code |
+| `auth.enrollment_code_max_attempts` | `BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS` | Server | `5` | Failed attempts per enrollment code |
+| `auth.device_pending_ttl` | `BOTHY_AUTH__DEVICE_PENDING_TTL` | Server | `24h` | after this, a pending device is revoked |
+| `auth.device_verification_code_digits` | `BOTHY_AUTH__DEVICE_VERIFICATION_CODE_DIGITS` | Server | `6` | Length of the verification code |
+| `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server | `5m` | Validity of a pairing code |
+| `auth.pairing_code_chars` | `BOTHY_AUTH__PAIRING_CODE_CHARS` | Server | `8` | Length of the pairing code (Crockford Base32, 40 bits) |
+| `auth.device_inactive_revoke_after` | `BOTHY_AUTH__DEVICE_INACTIVE_REVOKE_AFTER` | Server | `180d` | a device without contact is revoked |
+| `auth.cleanup_interval` | `BOTHY_AUTH__CLEANUP_INTERVAL` | Server | `1h` | Interval of the job `identity.auth_cleanup` (delete expired challenges, login flows and pairings, revoke pending and unused devices) |
+| `auth.step_up_challenge_ttl` | `BOTHY_AUTH__STEP_UP_CHALLENGE_TTL` | Server | `2m` | Validity of a step-up challenge |
+| `auth.step_up_fail_limit` | `BOTHY_AUTH__STEP_UP_FAIL_LIMIT` | Server | `5` | Failed step-up attempts per window |
+| `auth.require_key_attestation` | `BOTHY_AUTH__REQUIRE_KEY_ATTESTATION` | Server | `false` | Require platform attestation of the device keys |
+| `auth.console_session_max_age` | `BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE` | Server | `12h` | absolute duration of a console session |
+| `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server | `30m` | idle time until the console session ends |
+| `auth.local_password_enabled` | `BOTHY_AUTH__LOCAL_PASSWORD_ENABLED` | Server | `true` | password with TOTP as a fallback for local accounts |
+| `auth.totp_key_ref` | `BOTHY_AUTH__TOTP_KEY_REF` | Server | `file:<secrets.dir>/totp_key` | Reference to the key (32 bytes) with which TOTP secrets are encrypted |
+| `auth.webauthn_rp_id` | `BOTHY_AUTH__WEBAUTHN_RP_ID` | Server | empty | RP ID of the passkeys; empty means the host of `server.public_url` |
+| `auth.webauthn_origins` | `BOTHY_AUTH__WEBAUTHN_ORIGINS` | Server | empty | allowed origins of the passkeys; empty means the origin of `server.public_url`; entries may also be app origins such as `android:apk-key-hash:...` |
+| `auth.password_min_length` | `BOTHY_AUTH__PASSWORD_MIN_LENGTH` | Server | `12` | Minimum length of a password |
+| `auth.argon2id_memory_kib` | `BOTHY_AUTH__ARGON2ID_MEMORY_KIB` | Server | `65536` | Argon2id memory (lower bound 19456) |
+| `auth.argon2id_iterations` | `BOTHY_AUTH__ARGON2ID_ITERATIONS` | Server | `3` | Argon2id iterations (lower bound 2) |
+| `auth.argon2id_parallelism` | `BOTHY_AUTH__ARGON2ID_PARALLELISM` | Server | `1` | Argon2id parallelism |
+| `auth.login_fail_limit` | `BOTHY_AUTH__LOGIN_FAIL_LIMIT` | Server | `10` | Failed attempts per account and window |
+| `auth.login_fail_window` | `BOTHY_AUTH__LOGIN_FAIL_WINDOW` | Server | `15m` | Window for failed attempts |
+| `auth.login_lock_duration` | `BOTHY_AUTH__LOGIN_LOCK_DURATION` | Server | `15m` | Lockout of the password path |
+| `auth.dpop_required_for` | `BOTHY_AUTH__DPOP_REQUIRED_FOR` | Server | `["agent"]` | Token kinds that must be DPoP-bound |
+| `auth.api_token_max_ttl` | `BOTHY_AUTH__API_TOKEN_MAX_TTL` | Server | `365d` | Maximum duration of an agent or app token |
+| `auth.personal_token_max_ttl` | `BOTHY_AUTH__PERSONAL_TOKEN_MAX_TTL` | Server | `90d` | Maximum duration of a personal token |
+| `client.app_lock_after` | `BOTHY_CLIENT__APP_LOCK_AFTER` | Server | `5m` | time without use until the app lock |
+| `security.app_lock_required` | `BOTHY_SECURITY__APP_LOCK_REQUIRED` | Server | `false` | Require the app lock instance-wide |
 
-### 09 Agenten
+### 09 Agents
 
-Quelle: [09-agenten.md](../spec/09-agenten.md), Abschnitt 21.
+Source: [09-agents.md](../spec/09-agents.md), section 21.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `agent.context_max_bytes` | `BOTHY_AGENT__CONTEXT_MAX_BYTES` | Server | `262144` | Summe der Inhalte im Kontext ohne auslösende Nachricht |
-| `agent.context_message_max_bytes` | `BOTHY_AGENT__CONTEXT_MESSAGE_MAX_BYTES` | Server | `32768` | Inhalt je Kontext-Nachricht, darüber gekürzt |
-| `agent.jwks_max_age` | `BOTHY_AGENT__JWKS_MAX_AGE` | Server | `1h` | Cache-Dauer der JWKS; Vorlauf eines `next`-Schlüssels |
-| `signing_key.invocation_rotation_interval` | `BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL` | Server | `30d` | planmäßiger Wechsel des Markenschlüssels |
-| `run.queued_max_age` | `BOTHY_RUN__QUEUED_MAX_AGE` | Server | `48h` | so alt darf ein nicht gestarteter Lauf werden |
-| `run.orphan_timeout` | `BOTHY_RUN__ORPHAN_TIMEOUT` | Server | `15m` | ohne Heartbeat bei aktivem Lauf: `stale` |
-| `interaction.ack_timeout` | `BOTHY_INTERACTION__ACK_TIMEOUT` | Server | `30s` | danach zeigt die Karte "nicht bestätigt" |
-| `command.autocomplete_timeout` | `BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT` | Server | `2500ms` | Wartezeit auf Vorschläge |
-| `command.autocomplete_max_choices` | `BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES` | Server | `25` | Vorschläge je Antwort |
-| `command.max_per_principal` | `BOTHY_COMMAND__MAX_PER_PRINCIPAL` | Server | `100` | Befehle je Agent oder App |
-| `command.description_max_chars` | `BOTHY_COMMAND__DESCRIPTION_MAX_CHARS` | Server | `100` | Länge einer Beschreibung |
-| `component.max_per_message` | `BOTHY_COMPONENT__MAX_PER_MESSAGE` | Server | `25` | Komponenten je Nachricht |
-| `component.custom_id_max_chars` | `BOTHY_COMPONENT__CUSTOM_ID_MAX_CHARS` | Server | `100` | Länge von `custom_id` |
-| `component.form_max_fields` | `BOTHY_COMPONENT__FORM_MAX_FIELDS` | Server | `10` | Felder je Formular |
-| `thread.placeholder_titles` | `BOTHY_THREAD__PLACEHOLDER_TITLES` | Server | `["", "Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | Platzhalter für die Titel-Erkennung |
-| `adapter.invocation_token_leeway` |  | Adapter | `10s` | Uhren-Toleranz bei `exp` und `iat`; höchstens `auth.clock_leeway` des Servers (4.5) |
-| `adapter.jwks_refresh_min_interval` |  | Adapter | `60s` | höchstens so oft JWKS neu laden |
-| `hermes_adapter.platform_key` |  | Hermes-Adapter | `bothy` | Plattformname in Hermes; nach Inbetriebnahme nie ändern |
-| `hermes_adapter.consumer` |  | Hermes-Adapter | `default` | Verbrauchername am Gateway |
-| `runner.claude_bin` |  | Runner | `claude` | Programm, gesucht im bereinigten `PATH` |
-| `runner.projects_root` |  | Runner | kein Standard, Pflicht | Wurzel aller Projektordner |
-| `runner.state_dir` |  | Runner | kein Standard, Pflicht | Zustand, Mitschnitte, Eingangsdateien |
-| `runner.followup_grace` |  | Runner | `30s` | stdin bleibt nach `result` offen für Nachträge |
-| `runner.stop_grace` |  | Runner | `10s` | nach SIGINT bis SIGTERM |
-| `runner.kill_grace` |  | Runner | `5s` | nach SIGTERM bis SIGKILL |
-| `runner.session_lock_wait` |  | Runner | `10m` | Wartezeit auf eine belegte Sitzung |
-| `runner.max_parallel_runs` |  | Runner | `4` | gleichzeitige Turns |
-| `runner.stream_log_retention` |  | Runner | `14d` | Aufbewahrung der Mitschnitte |
-| `runner.attach_allowed_roots` |  | Runner | Projektordner, Eingangsordner, Runner-Temp | erlaubte Wurzeln für Antwort-Anhänge |
-| `runner.attach_denied_patterns` |  | Runner | Liste in 18.10 | gesperrte Muster für Antwort-Anhänge |
+| `agent.context_max_bytes` | `BOTHY_AGENT__CONTEXT_MAX_BYTES` | Server | `262144` | sum of the contents in the context without the triggering message |
+| `agent.context_message_max_bytes` | `BOTHY_AGENT__CONTEXT_MESSAGE_MAX_BYTES` | Server | `32768` | content per context message, truncated above that |
+| `agent.jwks_max_age` | `BOTHY_AGENT__JWKS_MAX_AGE` | Server | `1h` | cache duration of the JWKS; lead time of a `next` key |
+| `signing_key.invocation_rotation_interval` | `BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL` | Server | `30d` | scheduled change of the token key |
+| `run.queued_max_age` | `BOTHY_RUN__QUEUED_MAX_AGE` | Server | `48h` | the maximum age a run that has not started may reach |
+| `run.orphan_timeout` | `BOTHY_RUN__ORPHAN_TIMEOUT` | Server | `15m` | without a heartbeat during an active run: `stale` |
+| `interaction.ack_timeout` | `BOTHY_INTERACTION__ACK_TIMEOUT` | Server | `30s` | after that the card shows "not acknowledged" |
+| `command.autocomplete_timeout` | `BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT` | Server | `2500ms` | wait time for suggestions |
+| `command.autocomplete_max_choices` | `BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES` | Server | `25` | suggestions per answer |
+| `command.max_per_principal` | `BOTHY_COMMAND__MAX_PER_PRINCIPAL` | Server | `100` | commands per agent or app |
+| `command.description_max_chars` | `BOTHY_COMMAND__DESCRIPTION_MAX_CHARS` | Server | `100` | length of a description |
+| `component.max_per_message` | `BOTHY_COMPONENT__MAX_PER_MESSAGE` | Server | `25` | components per message |
+| `component.custom_id_max_chars` | `BOTHY_COMPONENT__CUSTOM_ID_MAX_CHARS` | Server | `100` | length of `custom_id` |
+| `component.form_max_fields` | `BOTHY_COMPONENT__FORM_MAX_FIELDS` | Server | `10` | fields per form |
+| `thread.placeholder_titles` | `BOTHY_THREAD__PLACEHOLDER_TITLES` | Server | `["", "Neuer Chat", "New chat", "Chat", "Ohne Titel", "Untitled", "Test"]` | placeholders for the title detection |
+| `adapter.invocation_token_leeway` |  | Adapter | `10s` | clock tolerance for `exp` and `iat`; at most the server's `auth.clock_leeway` (4.5) |
+| `adapter.jwks_refresh_min_interval` |  | Adapter | `60s` | reload JWKS at most this often |
+| `hermes_adapter.platform_key` |  | Hermes adapter | `bothy` | platform name in Hermes; never change after commissioning |
+| `hermes_adapter.consumer` |  | Hermes adapter | `default` | consumer name at the gateway |
+| `runner.claude_bin` |  | Runner | `claude` | program, searched in the cleaned `PATH` |
+| `runner.projects_root` |  | Runner | no default, required | root of all project folders |
+| `runner.state_dir` |  | Runner | no default, required | state, recordings, incoming files |
+| `runner.followup_grace` |  | Runner | `30s` | stdin stays open for follow-ups after `result` |
+| `runner.stop_grace` |  | Runner | `10s` | after SIGINT until SIGTERM |
+| `runner.kill_grace` |  | Runner | `5s` | after SIGTERM until SIGKILL |
+| `runner.session_lock_wait` |  | Runner | `10m` | wait time for a busy session |
+| `runner.max_parallel_runs` |  | Runner | `4` | concurrent turns |
+| `runner.stream_log_retention` |  | Runner | `14d` | retention of the recordings |
+| `runner.attach_allowed_roots` |  | Runner | project folder, incoming folder, runner temp | allowed roots for reply attachments |
+| `runner.attach_denied_patterns` |  | Runner | list in 18.10 | blocked patterns for reply attachments |
 
-### 10 Backend-Richtlinie
+### 10 Backend policy
 
-Quelle: [10-backend-richtlinie.md](../spec/10-backend-richtlinie.md), Abschnitt 17.
+Source: [10-backend-policy.md](../spec/10-backend-policy.md), section 17.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `billing.show_personal_estimates` | `BOTHY_BILLING__SHOW_PERSONAL_ESTIMATES` | Server | `false` | Beträge auch im Modus `personal` anzeigen, als Information |
-| `billing.mismatch_alert_after` | `BOTHY_BILLING__MISMATCH_ALERT_AFTER` | Server | `5m` | so lange darf Ist von Soll abweichen, bevor ein Alarm ausgeht |
-| `reconciler.min_request_interval` |  | Abgleich-App | `60s` | Abstand der Anfragen an die Cost-API |
-| `reconciler.lookback` |  | Abgleich-App | `3d` | so viele Tage rückwärts wird abgeglichen |
-| `reconciler.workspace_map` |  | Abgleich-App | leer | Zuordnung Arbeitsbereich zu Agent |
+| `billing.show_personal_estimates` | `BOTHY_BILLING__SHOW_PERSONAL_ESTIMATES` | Server | `false` | Show amounts in mode `personal` too, as information |
+| `billing.mismatch_alert_after` | `BOTHY_BILLING__MISMATCH_ALERT_AFTER` | Server | `5m` | how long the reported mode may deviate from the configured mode before an alert goes out |
+| `reconciler.min_request_interval` |  | Reconciliation app | `60s` | Interval between requests to the Cost API |
+| `reconciler.lookback` |  | Reconciliation app | `3d` | this many days back are reconciled |
+| `reconciler.workspace_map` |  | Reconciliation app | empty | Assignment of workspace to agent |
 
-### 11 Erweiterungen: Apps, Webhooks, SDK
+### 11 Extensions: apps, webhooks, SDK
 
-Quelle: [11-erweiterungen.md](../spec/11-erweiterungen.md), Abschnitt 16.
+Source: [11-extensions.md](../spec/11-extensions.md), section 16.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `app.manifest_max_bytes` | `BOTHY_APP__MANIFEST_MAX_BYTES` | Server | `65536` | Größe eines Manifests |
-| `app.interaction_timeout` | `BOTHY_APP__INTERACTION_TIMEOUT` | Server | `3s` | Frist für synchrone Antworten über `interactions_url` |
-| `webhook.delivery_timeout` | `BOTHY_WEBHOOK__DELIVERY_TIMEOUT` | Server | `15s` | Zeitgrenze einer Zustellung |
-| `webhook.max_pending_per_subscription` | `BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION` | Server | `10000` | offene Zustellungen je Abo, darüber `paused` |
-| `webhook.retry_max_age` | `BOTHY_WEBHOOK__RETRY_MAX_AGE` | Server | `72h` | danach wird eine Zustellung `dead` ([webhooks.md](../api/webhooks.md), Abschnitt 4) |
-| `webhook.secret_rotation_overlap` | `BOTHY_WEBHOOK__SECRET_ROTATION_OVERLAP` | Server | `24h` | so lange signiert der Server mit alter und neuer HMAC-Generation |
-| `webhook.receiver_tolerance` |  | Empfänger | `5m` | Empfehlung, kein Server-Wert: Toleranz für `webhook-timestamp` beim Empfänger und Standard der Prüffunktion der SDKs |
-| `webhook_in.max_body_bytes` | `BOTHY_WEBHOOK_IN__MAX_BODY_BYTES` | Server | `1048576` | Größe eines eingehenden Körpers |
-| `webhook_in.formats_enabled` | `BOTHY_WEBHOOK_IN__FORMATS_ENABLED` | Server | `native, alertmanager` | eingeschaltete Eingangsformate |
-| `sdk.http_timeout` |  | SDK | `30s` | Zeitgrenze einer REST-Anfrage |
-| `sdk.retry_max_attempts` |  | SDK | `5` | Versuche je idempotenter Operation |
-| `sdk.retry_backoff_base` |  | SDK | `500ms` | Basis des Backoffs |
-| `sdk.retry_backoff_cap` |  | SDK | `30s` | größter Abstand |
+| `app.manifest_max_bytes` | `BOTHY_APP__MANIFEST_MAX_BYTES` | Server | `65536` | size of a manifest |
+| `app.interaction_timeout` | `BOTHY_APP__INTERACTION_TIMEOUT` | Server | `3s` | deadline for synchronous responses through `interactions_url` |
+| `webhook.delivery_timeout` | `BOTHY_WEBHOOK__DELIVERY_TIMEOUT` | Server | `15s` | timeout of a delivery |
+| `webhook.max_pending_per_subscription` | `BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION` | Server | `10000` | open deliveries per subscription, above that `paused` |
+| `webhook.retry_max_age` | `BOTHY_WEBHOOK__RETRY_MAX_AGE` | Server | `72h` | after that a delivery becomes `dead` ([webhooks.md](../api/webhooks.md), section 4) |
+| `webhook.secret_rotation_overlap` | `BOTHY_WEBHOOK__SECRET_ROTATION_OVERLAP` | Server | `24h` | how long the server signs with the old and the new HMAC generation |
+| `webhook.receiver_tolerance` |  | Receiver | `5m` | recommendation, not a server value: tolerance for `webhook-timestamp` at the receiver and default of the check function of the SDKs |
+| `webhook_in.max_body_bytes` | `BOTHY_WEBHOOK_IN__MAX_BODY_BYTES` | Server | `1048576` | size of an incoming body |
+| `webhook_in.formats_enabled` | `BOTHY_WEBHOOK_IN__FORMATS_ENABLED` | Server | `native, alertmanager` | enabled incoming formats |
+| `sdk.http_timeout` |  | SDK | `30s` | timeout of a REST request |
+| `sdk.retry_max_attempts` |  | SDK | `5` | attempts per idempotent operation |
+| `sdk.retry_backoff_base` |  | SDK | `500ms` | base of the backoff |
+| `sdk.retry_backoff_cap` |  | SDK | `30s` | largest interval |
 
-### 12 Dateien
+### 12 Files
 
-Quelle: [12-dateien.md](../spec/12-dateien.md), Abschnitt 18.
+Source: [12-files.md](../spec/12-files.md), section 18.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `file.storage.driver` | `BOTHY_FILE__STORAGE__DRIVER` | Server | `fs` | `fs` oder `s3` |
-| `file.fs.root` | `BOTHY_FILE__FS__ROOT` | Server | `/var/lib/bothy/files` | Wurzel des Dateisystem-Treibers (Pfad im Container) |
-| `file.fs.min_free_bytes` | `BOTHY_FILE__FS__MIN_FREE_BYTES` | Server | `2147483648` | freier Platz, unter dem Uploads mit `503 unavailable` (`reason` `storage_full`) abgelehnt werden |
-| `file.s3.endpoint` | `BOTHY_FILE__S3__ENDPOINT` | Server | leer | S3-Endpunkt |
-| `file.s3.region` | `BOTHY_FILE__S3__REGION` | Server | `us-east-1` | Region für die Signatur |
-| `file.s3.bucket` | `BOTHY_FILE__S3__BUCKET` | Server | leer | Bucket |
-| `file.s3.prefix` | `BOTHY_FILE__S3__PREFIX` | Server | leer | Präfix vor allen Schlüsseln |
-| `file.s3.use_path_style` | `BOTHY_FILE__S3__USE_PATH_STYLE` | Server | `true` | Pfad-Stil statt virtueller Hosts |
-| `file.s3.checksum_mode` | `BOTHY_FILE__S3__CHECKSUM_MODE` | Server | `when_required` | SDK-Prüfsummen für Anfrage und Antwort |
-| `file.s3.access_key_ref` | `BOTHY_FILE__S3__ACCESS_KEY_REF` | Server | `file:<secrets.dir>/s3_access_key` | Verweise auf den Secret-Provider; nur mit `file.storage.driver = s3` gelesen |
-| `file.s3.secret_key_ref` | `BOTHY_FILE__S3__SECRET_KEY_REF` | Server | `file:<secrets.dir>/s3_secret_key` | Verweise auf den Secret-Provider; nur mit `file.storage.driver = s3` gelesen |
-| `file.s3.presigned_upload` | `BOTHY_FILE__S3__PRESIGNED_UPLOAD` | Server | `false` | Modus `presigned` erlauben |
-| `file.s3.presign_ttl` | `BOTHY_FILE__S3__PRESIGN_TTL` | Server | `15m` | Gültigkeit einer presigned URL |
-| `file.upload_part_bytes` | `BOTHY_FILE__UPLOAD_PART_BYTES` | Server | `8388608` | Teilgröße |
-| `file.upload_session_ttl` | `BOTHY_FILE__UPLOAD_SESSION_TTL` | Server | `24h` | Lebensdauer einer offenen Session |
-| `file.upload_max_open_sessions` | `BOTHY_FILE__UPLOAD_MAX_OPEN_SESSIONS` | Server | `20` | offene Sessions je Prinzipal |
-| `file.quota_bytes_per_principal` | `BOTHY_FILE__QUOTA_BYTES_PER_PRINCIPAL` | Server | `0` | Kontingent je Prinzipal, 0 = aus |
-| `file.poster_max_bytes` | `BOTHY_FILE__POSTER_MAX_BYTES` | Server | `524288` | Größe des Video-Vorschaubilds vom Client |
-| `file.sniff_bytes` | `BOTHY_FILE__SNIFF_BYTES` | Server | `1048576` | Bytes für die Typ-Erkennung |
-| `file.denied_mime_types` | `BOTHY_FILE__DENIED_MIME_TYPES` | Server | leer | gesperrte Typen |
-| `file.name_max_bytes` | `BOTHY_FILE__NAME_MAX_BYTES` | Server | `255` | Länge eines Dateinamens in UTF-8-Bytes |
-| `file.scan.mode` | `BOTHY_FILE__SCAN__MODE` | Server | `required` | `required` oder `off` |
-| `file.scan.clamd_address` | `BOTHY_FILE__SCAN__CLAMD_ADDRESS` | Server | `tcp://clamav:3310` | clamd im internen Netz; alternativ `unix:///...` |
-| `file.scan.chunk_bytes` | `BOTHY_FILE__SCAN__CHUNK_BYTES` | Server | `65536` | Stückgröße für `INSTREAM` |
-| `file.scan.timeout` | `BOTHY_FILE__SCAN__TIMEOUT` | Server | `120s` | Zeitlimit je Scan |
-| `file.scan.max_concurrent` | `BOTHY_FILE__SCAN__MAX_CONCURRENT` | Server | `4` | Scans je Worker-Prozess |
-| `file.scan.retry_backoff_cap` | `BOTHY_FILE__SCAN__RETRY_BACKOFF_CAP` | Server | `5m` | größter Abstand zwischen Scan-Versuchen |
-| `file.scan.health_interval` | `BOTHY_FILE__SCAN__HEALTH_INTERVAL` | Server | `30s` | `PING`-Abstand |
-| `file.scan.pending_alert_after` | `BOTHY_FILE__SCAN__PENDING_ALERT_AFTER` | Server | `10m` | Alter der ältesten `pending`-Datei bis zum Alarm |
-| `file.scan.clamd_stream_max_bytes` | `BOTHY_FILE__SCAN__CLAMD_STREAM_MAX_BYTES` | Server | `104857600` | Spiegel von clamd `StreamMaxLength` |
-| `file.invocation_hold_max` | `BOTHY_FILE__INVOCATION_HOLD_MAX` | Server | `120s` | längstes Warten des Agenten-Aufrufs auf Anhänge |
-| `file.image.libvips_enabled` | `BOTHY_FILE__IMAGE__LIBVIPS_ENABLED` | Server | `false` | libvips-Build nutzen |
-| `file.image.max_pixels` | `BOTHY_FILE__IMAGE__MAX_PIXELS` | Server | `50000000` | größte dekodierte Pixelzahl |
-| `file.image.jpeg_quality` | `BOTHY_FILE__IMAGE__JPEG_QUALITY` | Server | `90` | Qualität beim Umwandeln unbewegter WebP-Bilder ohne Alpha in JPEG |
-| `file.image.processing_timeout` | `BOTHY_FILE__IMAGE__PROCESSING_TIMEOUT` | Server | `60s` | Zeitlimit eines Bild-Jobs |
-| `file.image.max_concurrent` | `BOTHY_FILE__IMAGE__MAX_CONCURRENT` | Server | `2` | Bild-Jobs je Worker-Prozess |
-| `file.thumbnail.small_px` | `BOTHY_FILE__THUMBNAIL__SMALL_PX` | Server | `320` | längste Kante `small` |
-| `file.thumbnail.medium_px` | `BOTHY_FILE__THUMBNAIL__MEDIUM_PX` | Server | `1024` | längste Kante `medium` |
-| `file.thumbnail.large_px` | `BOTHY_FILE__THUMBNAIL__LARGE_PX` | Server | `2048` | längste Kante `large` |
-| `file.thumbnail.jpeg_quality` | `BOTHY_FILE__THUMBNAIL__JPEG_QUALITY` | Server | `82` | Qualität der Vorschaubilder |
-| `file.ticket_ttl` | `BOTHY_FILE__TICKET_TTL` | Server | `5m` | Gültigkeit eines Abruf-Tickets |
-| `file.ticket_key_ref` | `BOTHY_FILE__TICKET_KEY_REF` | Server | `file:<secrets.dir>/file_ticket_key` | Verweis auf den Ticket-Schlüssel im Secret-Provider |
-| `file.unattached_ttl` | `BOTHY_FILE__UNATTACHED_TTL` | Server | `24h` | Frist für nie angehängte Dateien |
-| `file.failed_row_ttl` | `BOTHY_FILE__FAILED_ROW_TTL` | Server | `7d` | Frist für Zeilen fehlgeschlagener oder blockierter Dateien |
-| `file.gc_interval` | `BOTHY_FILE__GC_INTERVAL` | Server | `10m` | Abstand des Aufräum-Jobs |
-| `voice.max_duration` | `BOTHY_VOICE__MAX_DURATION` | Server | `15m` | längste Sprachnachricht |
-| `voice.transcription_mode` | `BOTHY_VOICE__TRANSCRIPTION_MODE` | Server | `agent` | `off`, `agent` oder `service` |
-| `voice.transcription_url` | `BOTHY_VOICE__TRANSCRIPTION_URL` | Server | leer | Endpunkt des Transkriptions-Dienstes |
-| `voice.transcription_api_key_ref` | `BOTHY_VOICE__TRANSCRIPTION_API_KEY_REF` | Server | leer | Verweis auf den Schlüssel |
-| `voice.transcription_timeout` | `BOTHY_VOICE__TRANSCRIPTION_TIMEOUT` | Server | `120s` | Zeitlimit einer Transkription |
-| `voice.transcript_hold_max` | `BOTHY_VOICE__TRANSCRIPT_HOLD_MAX` | Server | `60s` | längstes Warten des Agenten-Aufrufs auf das Transkript |
+| `file.storage.driver` | `BOTHY_FILE__STORAGE__DRIVER` | Server | `fs` | `fs` or `s3` |
+| `file.fs.root` | `BOTHY_FILE__FS__ROOT` | Server | `/var/lib/bothy/files` | root of the file system driver (path in the container) |
+| `file.fs.min_free_bytes` | `BOTHY_FILE__FS__MIN_FREE_BYTES` | Server | `2147483648` | free space below which uploads are rejected with `503 unavailable` (`reason` `storage_full`) |
+| `file.s3.endpoint` | `BOTHY_FILE__S3__ENDPOINT` | Server | empty | S3 endpoint |
+| `file.s3.region` | `BOTHY_FILE__S3__REGION` | Server | `us-east-1` | region for the signature |
+| `file.s3.bucket` | `BOTHY_FILE__S3__BUCKET` | Server | empty | bucket |
+| `file.s3.prefix` | `BOTHY_FILE__S3__PREFIX` | Server | empty | prefix before all keys |
+| `file.s3.use_path_style` | `BOTHY_FILE__S3__USE_PATH_STYLE` | Server | `true` | path style instead of virtual hosts |
+| `file.s3.checksum_mode` | `BOTHY_FILE__S3__CHECKSUM_MODE` | Server | `when_required` | SDK checksums for request and response |
+| `file.s3.access_key_ref` | `BOTHY_FILE__S3__ACCESS_KEY_REF` | Server | `file:<secrets.dir>/s3_access_key` | references to the secret provider; read only with `file.storage.driver = s3` |
+| `file.s3.secret_key_ref` | `BOTHY_FILE__S3__SECRET_KEY_REF` | Server | `file:<secrets.dir>/s3_secret_key` | references to the secret provider; read only with `file.storage.driver = s3` |
+| `file.s3.presigned_upload` | `BOTHY_FILE__S3__PRESIGNED_UPLOAD` | Server | `false` | allow mode `presigned` |
+| `file.s3.presign_ttl` | `BOTHY_FILE__S3__PRESIGN_TTL` | Server | `15m` | validity of a presigned URL |
+| `file.upload_part_bytes` | `BOTHY_FILE__UPLOAD_PART_BYTES` | Server | `8388608` | part size |
+| `file.upload_session_ttl` | `BOTHY_FILE__UPLOAD_SESSION_TTL` | Server | `24h` | lifetime of an open session |
+| `file.upload_max_open_sessions` | `BOTHY_FILE__UPLOAD_MAX_OPEN_SESSIONS` | Server | `20` | open sessions per principal |
+| `file.quota_bytes_per_principal` | `BOTHY_FILE__QUOTA_BYTES_PER_PRINCIPAL` | Server | `0` | quota per principal, 0 = off |
+| `file.poster_max_bytes` | `BOTHY_FILE__POSTER_MAX_BYTES` | Server | `524288` | size of the video thumbnail from the client |
+| `file.sniff_bytes` | `BOTHY_FILE__SNIFF_BYTES` | Server | `1048576` | bytes for type detection |
+| `file.denied_mime_types` | `BOTHY_FILE__DENIED_MIME_TYPES` | Server | empty | blocked types |
+| `file.name_max_bytes` | `BOTHY_FILE__NAME_MAX_BYTES` | Server | `255` | length of a file name in UTF-8 bytes |
+| `file.scan.mode` | `BOTHY_FILE__SCAN__MODE` | Server | `required` | `required` or `off` |
+| `file.scan.clamd_address` | `BOTHY_FILE__SCAN__CLAMD_ADDRESS` | Server | `tcp://clamav:3310` | clamd in the internal network; alternatively `unix:///...` |
+| `file.scan.chunk_bytes` | `BOTHY_FILE__SCAN__CHUNK_BYTES` | Server | `65536` | chunk size for `INSTREAM` |
+| `file.scan.timeout` | `BOTHY_FILE__SCAN__TIMEOUT` | Server | `120s` | time limit per scan |
+| `file.scan.max_concurrent` | `BOTHY_FILE__SCAN__MAX_CONCURRENT` | Server | `4` | scans per worker process |
+| `file.scan.retry_backoff_cap` | `BOTHY_FILE__SCAN__RETRY_BACKOFF_CAP` | Server | `5m` | largest interval between scan attempts |
+| `file.scan.health_interval` | `BOTHY_FILE__SCAN__HEALTH_INTERVAL` | Server | `30s` | `PING` interval |
+| `file.scan.pending_alert_after` | `BOTHY_FILE__SCAN__PENDING_ALERT_AFTER` | Server | `10m` | age of the oldest `pending` file before the alert |
+| `file.scan.clamd_stream_max_bytes` | `BOTHY_FILE__SCAN__CLAMD_STREAM_MAX_BYTES` | Server | `104857600` | mirror of clamd `StreamMaxLength` |
+| `file.invocation_hold_max` | `BOTHY_FILE__INVOCATION_HOLD_MAX` | Server | `120s` | longest wait of the agent invocation for attachments |
+| `file.image.libvips_enabled` | `BOTHY_FILE__IMAGE__LIBVIPS_ENABLED` | Server | `false` | use the libvips build |
+| `file.image.max_pixels` | `BOTHY_FILE__IMAGE__MAX_PIXELS` | Server | `50000000` | largest decoded pixel count |
+| `file.image.jpeg_quality` | `BOTHY_FILE__IMAGE__JPEG_QUALITY` | Server | `90` | quality when converting still WebP images without alpha to JPEG |
+| `file.image.processing_timeout` | `BOTHY_FILE__IMAGE__PROCESSING_TIMEOUT` | Server | `60s` | time limit of an image job |
+| `file.image.max_concurrent` | `BOTHY_FILE__IMAGE__MAX_CONCURRENT` | Server | `2` | image jobs per worker process |
+| `file.thumbnail.small_px` | `BOTHY_FILE__THUMBNAIL__SMALL_PX` | Server | `320` | longest edge `small` |
+| `file.thumbnail.medium_px` | `BOTHY_FILE__THUMBNAIL__MEDIUM_PX` | Server | `1024` | longest edge `medium` |
+| `file.thumbnail.large_px` | `BOTHY_FILE__THUMBNAIL__LARGE_PX` | Server | `2048` | longest edge `large` |
+| `file.thumbnail.jpeg_quality` | `BOTHY_FILE__THUMBNAIL__JPEG_QUALITY` | Server | `82` | quality of the thumbnails |
+| `file.ticket_ttl` | `BOTHY_FILE__TICKET_TTL` | Server | `5m` | validity of a file ticket |
+| `file.ticket_key_ref` | `BOTHY_FILE__TICKET_KEY_REF` | Server | `file:<secrets.dir>/file_ticket_key` | reference to the ticket key in the secret provider |
+| `file.unattached_ttl` | `BOTHY_FILE__UNATTACHED_TTL` | Server | `24h` | period for never attached files |
+| `file.failed_row_ttl` | `BOTHY_FILE__FAILED_ROW_TTL` | Server | `7d` | period for rows of failed or blocked files |
+| `file.gc_interval` | `BOTHY_FILE__GC_INTERVAL` | Server | `10m` | interval of the cleanup job |
+| `voice.max_duration` | `BOTHY_VOICE__MAX_DURATION` | Server | `15m` | longest voice message |
+| `voice.transcription_mode` | `BOTHY_VOICE__TRANSCRIPTION_MODE` | Server | `agent` | `off`, `agent` or `service` |
+| `voice.transcription_url` | `BOTHY_VOICE__TRANSCRIPTION_URL` | Server | empty | endpoint of the transcription service |
+| `voice.transcription_api_key_ref` | `BOTHY_VOICE__TRANSCRIPTION_API_KEY_REF` | Server | empty | reference to the key |
+| `voice.transcription_timeout` | `BOTHY_VOICE__TRANSCRIPTION_TIMEOUT` | Server | `120s` | time limit of a transcription |
+| `voice.transcript_hold_max` | `BOTHY_VOICE__TRANSCRIPT_HOLD_MAX` | Server | `60s` | longest wait of the agent invocation for the transcript |
 
-### 13 Push und Benachrichtigungen
+### 13 Push and notifications
 
-Quelle: [13-push-benachrichtigungen.md](../spec/13-push-benachrichtigungen.md), Abschnitt 17.
+Source: [13-push-notifications.md](../spec/13-push-notifications.md), section 17.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `push.ttl` | `BOTHY_PUSH__TTL` | Server | `24h` | Lebensdauer beim Anbieter (`apns-expiration`, `android.ttl`) |
-| `push.max_age` | `BOTHY_PUSH__MAX_AGE` | Server | `1h` | älter wird ein noch nicht gesendeter Hinweis verworfen |
-| `push.retry_base` | `BOTHY_PUSH__RETRY_BASE` | Server | `2s` | Basis des Backoffs |
-| `push.retry_cap` | `BOTHY_PUSH__RETRY_CAP` | Server | `5m` | größter Backoff-Abstand |
-| `push.max_concurrent_requests` | `BOTHY_PUSH__MAX_CONCURRENT_REQUESTS` | Server | `32` | gleichzeitige Anfragen an Anbieter je Prozess |
-| `push.apns.team_id` | `BOTHY_PUSH__APNS__TEAM_ID` | Server | leer | Apple-Team-ID |
-| `push.apns.key_id` | `BOTHY_PUSH__APNS__KEY_ID` | Server | leer | Key-ID des `.p8`-Schlüssels |
-| `push.apns.private_key_ref` | `BOTHY_PUSH__APNS__PRIVATE_KEY_REF` | Server | leer | Verweis auf den Schlüssel im Secret-Provider |
-| `push.apns.topics` | `BOTHY_PUSH__APNS__TOPICS` | Server | leer | erlaubte Bundle-IDs |
-| `push.apns.jwt_refresh_interval` | `BOTHY_PUSH__APNS__JWT_REFRESH_INTERVAL` | Server | `40m` | Erneuerung des Anbieter-JWT, muss zwischen 20 und 60 Minuten liegen |
-| `push.apns.retry_5xx_delay` | `BOTHY_PUSH__APNS__RETRY_5XX_DELAY` | Server | `15m` | Wartezeit nach `500` oder `503` |
-| `push.apns.time_sensitive_enabled` | `BOTHY_PUSH__APNS__TIME_SENSITIVE_ENABLED` | Server | `false` | `time-sensitive` für `input_needed` |
-| `push.fcm.project_id` | `BOTHY_PUSH__FCM__PROJECT_ID` | Server | leer | Firebase-Projekt |
-| `push.fcm.service_account_ref` | `BOTHY_PUSH__FCM__SERVICE_ACCOUNT_REF` | Server | leer | Verweis auf den Dienstkonto-Schlüssel |
-| `notify.user_default_level` | `BOTHY_NOTIFY__USER_DEFAULT_LEVEL` | Server | `mentions` | Stufe ohne jede Einstellung |
-| `notify.default_preview_mode` | `BOTHY_NOTIFY__DEFAULT_PREVIEW_MODE` | Server | `full` | Standard für `notify.preview_mode` |
-| `notify.default_input_needed_breaks_quiet_hours` | `BOTHY_NOTIFY__DEFAULT_INPUT_NEEDED_BREAKS_QUIET_HOURS` | Server | `false` | Standard für den gleichnamigen Schalter |
-| `notify.default_admin_enabled` | `BOTHY_NOTIFY__DEFAULT_ADMIN_ENABLED` | Server | `true` | Standard für `notify.admin_enabled` |
-| `notify.coalesce_window` | `BOTHY_NOTIFY__COALESCE_WINDOW` | Server | `60s` | Bündelfenster je Empfänger und Thread |
-| `notify.mobile_delay_when_desktop_active` | `BOTHY_NOTIFY__MOBILE_DELAY_WHEN_DESKTOP_ACTIVE` | Server | `60s` | Verzögerung mobiler Pushes bei aktivem Desktop |
-| `notify.preview_max_chars` | `BOTHY_NOTIFY__PREVIEW_MAX_CHARS` | Server | `240` | Länge des Auszugs in der Vorschau |
-| `notify.badge_sync_min_interval` | `BOTHY_NOTIFY__BADGE_SYNC_MIN_INTERVAL` | Server | `60s` | kleinster Abstand der Badge-Abgleiche je Person |
+| `push.ttl` | `BOTHY_PUSH__TTL` | Server | `24h` | lifetime at the provider (`apns-expiration`, `android.ttl`) |
+| `push.max_age` | `BOTHY_PUSH__MAX_AGE` | Server | `1h` | a notification not yet sent that is older than this is discarded |
+| `push.retry_base` | `BOTHY_PUSH__RETRY_BASE` | Server | `2s` | base of the backoff |
+| `push.retry_cap` | `BOTHY_PUSH__RETRY_CAP` | Server | `5m` | largest backoff interval |
+| `push.max_concurrent_requests` | `BOTHY_PUSH__MAX_CONCURRENT_REQUESTS` | Server | `32` | concurrent requests to providers per process |
+| `push.apns.team_id` | `BOTHY_PUSH__APNS__TEAM_ID` | Server | empty | Apple team ID |
+| `push.apns.key_id` | `BOTHY_PUSH__APNS__KEY_ID` | Server | empty | key ID of the `.p8` key |
+| `push.apns.private_key_ref` | `BOTHY_PUSH__APNS__PRIVATE_KEY_REF` | Server | empty | reference to the key in the secret provider |
+| `push.apns.topics` | `BOTHY_PUSH__APNS__TOPICS` | Server | empty | allowed bundle IDs |
+| `push.apns.jwt_refresh_interval` | `BOTHY_PUSH__APNS__JWT_REFRESH_INTERVAL` | Server | `40m` | renewal of the provider JWT, must be between 20 and 60 minutes |
+| `push.apns.retry_5xx_delay` | `BOTHY_PUSH__APNS__RETRY_5XX_DELAY` | Server | `15m` | waiting time after `500` or `503` |
+| `push.apns.time_sensitive_enabled` | `BOTHY_PUSH__APNS__TIME_SENSITIVE_ENABLED` | Server | `false` | `time-sensitive` for `input_needed` |
+| `push.fcm.project_id` | `BOTHY_PUSH__FCM__PROJECT_ID` | Server | empty | Firebase project |
+| `push.fcm.service_account_ref` | `BOTHY_PUSH__FCM__SERVICE_ACCOUNT_REF` | Server | empty | reference to the service account key |
+| `notify.user_default_level` | `BOTHY_NOTIFY__USER_DEFAULT_LEVEL` | Server | `mentions` | level without any setting |
+| `notify.default_preview_mode` | `BOTHY_NOTIFY__DEFAULT_PREVIEW_MODE` | Server | `full` | default for `notify.preview_mode` |
+| `notify.default_input_needed_breaks_quiet_hours` | `BOTHY_NOTIFY__DEFAULT_INPUT_NEEDED_BREAKS_QUIET_HOURS` | Server | `false` | default for the switch of the same name |
+| `notify.default_admin_enabled` | `BOTHY_NOTIFY__DEFAULT_ADMIN_ENABLED` | Server | `true` | default for `notify.admin_enabled` |
+| `notify.coalesce_window` | `BOTHY_NOTIFY__COALESCE_WINDOW` | Server | `60s` | coalescing window per recipient and thread |
+| `notify.mobile_delay_when_desktop_active` | `BOTHY_NOTIFY__MOBILE_DELAY_WHEN_DESKTOP_ACTIVE` | Server | `60s` | delay of mobile pushes while the desktop is active |
+| `notify.preview_max_chars` | `BOTHY_NOTIFY__PREVIEW_MAX_CHARS` | Server | `240` | length of the excerpt in the preview |
+| `notify.badge_sync_min_interval` | `BOTHY_NOTIFY__BADGE_SYNC_MIN_INTERVAL` | Server | `60s` | smallest interval between badge syncs per person |
 
-### 14 Suche
+### 14 Search
 
-Quelle: [14-suche.md](../spec/14-suche.md), Abschnitt 15.
+Source: [14-search.md](../spec/14-search.md), section 15.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `search.languages` | `BOTHY_SEARCH__LANGUAGES` | Server | `["german","english"]` | Konfigurationen für den Anfrage-Aufbau (plus immer `simple`) |
-| `search.locale_map` | `BOTHY_SEARCH__LOCALE_MAP` | Server | `{"de":"german","en":"english"}` | Sprachkennung zu Textsuche-Konfiguration |
-| `search.query_max_chars` | `BOTHY_SEARCH__QUERY_MAX_CHARS` | Server | `256` | Länge der Eingabe |
-| `search.max_candidates` | `BOTHY_SEARCH__MAX_CANDIDATES` | Server | `2000` | Kandidaten vor dem Ranking |
-| `search.rank_normalization` | `BOTHY_SEARCH__RANK_NORMALIZATION` | Server | `1` | Normalisierung für `ts_rank` |
-| `search.recency_scale` | `BOTHY_SEARCH__RECENCY_SCALE` | Server | `30d` | Alter, bei dem der Wert auf die Hälfte fällt |
-| `search.page_size_default` | `BOTHY_SEARCH__PAGE_SIZE_DEFAULT` | Server | `20` | Treffer je Seite |
-| `search.page_size_max` | `BOTHY_SEARCH__PAGE_SIZE_MAX` | Server | `50` | höchstens Treffer je Seite |
-| `search.headline_input_max_chars` | `BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS` | Server | `20000` | Länge des Textes für `ts_headline` |
-| `search.headline_max_fragments` | `BOTHY_SEARCH__HEADLINE_MAX_FRAGMENTS` | Server | `2` | Ausschnitte je Treffer |
-| `search.headline_max_words` | `BOTHY_SEARCH__HEADLINE_MAX_WORDS` | Server | `30` | Wörter je Ausschnitt, höchstens |
-| `search.headline_min_words` | `BOTHY_SEARCH__HEADLINE_MIN_WORDS` | Server | `10` | Wörter je Ausschnitt, mindestens |
-| `search.prefix_min_chars` | `BOTHY_SEARCH__PREFIX_MIN_CHARS` | Server | `2` | kürzeste Wortlänge in der Präfix-Suche |
-| `search.statement_timeout` | `BOTHY_SEARCH__STATEMENT_TIMEOUT` | Server | `3s` | Zeitlimit einer Suchabfrage |
-| `search.p95_target` | `BOTHY_SEARCH__P95_TARGET` | Server | `500ms` | Ziel p95 im Lasttest |
-| `search.prefix_p95_target` | `BOTHY_SEARCH__PREFIX_P95_TARGET` | Server | `100ms` | Ziel p95 der Präfix-Suche |
-| `search.benchmark_messages` | `BOTHY_SEARCH__BENCHMARK_MESSAGES` | Server | `2000000` | Korpusgröße im Lasttest |
-| `search.extract.max_input_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_INPUT_BYTES` | Server | `52428800` | größte Datei für die Extraktion |
-| `search.extract.max_text_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_TEXT_BYTES` | Server | `1048576` | größter gespeicherter Text |
-| `search.extract.max_uncompressed_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_UNCOMPRESSED_BYTES` | Server | `209715200` | größte entpackte Menge bei Archiven |
-| `search.extract.max_archive_entries` | `BOTHY_SEARCH__EXTRACT__MAX_ARCHIVE_ENTRIES` | Server | `10000` | Einträge je Archiv |
-| `search.extract.timeout` | `BOTHY_SEARCH__EXTRACT__TIMEOUT` | Server | `60s` | Zeitlimit je Extraktion |
-| `search.extract.tika_url` | `BOTHY_SEARCH__EXTRACT__TIKA_URL` | Server | leer | Tika-Server; leer = aus |
+| `search.languages` | `BOTHY_SEARCH__LANGUAGES` | Server | `["german","english"]` | configurations for query construction (plus always `simple`) |
+| `search.locale_map` | `BOTHY_SEARCH__LOCALE_MAP` | Server | `{"de":"german","en":"english"}` | language tag to text search configuration |
+| `search.query_max_chars` | `BOTHY_SEARCH__QUERY_MAX_CHARS` | Server | `256` | length of the input |
+| `search.max_candidates` | `BOTHY_SEARCH__MAX_CANDIDATES` | Server | `2000` | candidates before ranking |
+| `search.rank_normalization` | `BOTHY_SEARCH__RANK_NORMALIZATION` | Server | `1` | normalization for `ts_rank` |
+| `search.recency_scale` | `BOTHY_SEARCH__RECENCY_SCALE` | Server | `30d` | age at which the score falls to half |
+| `search.page_size_default` | `BOTHY_SEARCH__PAGE_SIZE_DEFAULT` | Server | `20` | hits per page |
+| `search.page_size_max` | `BOTHY_SEARCH__PAGE_SIZE_MAX` | Server | `50` | maximum hits per page |
+| `search.headline_input_max_chars` | `BOTHY_SEARCH__HEADLINE_INPUT_MAX_CHARS` | Server | `20000` | length of the text for `ts_headline` |
+| `search.headline_max_fragments` | `BOTHY_SEARCH__HEADLINE_MAX_FRAGMENTS` | Server | `2` | snippets per hit |
+| `search.headline_max_words` | `BOTHY_SEARCH__HEADLINE_MAX_WORDS` | Server | `30` | words per snippet, at most |
+| `search.headline_min_words` | `BOTHY_SEARCH__HEADLINE_MIN_WORDS` | Server | `10` | words per snippet, at least |
+| `search.prefix_min_chars` | `BOTHY_SEARCH__PREFIX_MIN_CHARS` | Server | `2` | shortest word length in the prefix search |
+| `search.statement_timeout` | `BOTHY_SEARCH__STATEMENT_TIMEOUT` | Server | `3s` | time limit of a search query |
+| `search.p95_target` | `BOTHY_SEARCH__P95_TARGET` | Server | `500ms` | p95 target in the load test |
+| `search.prefix_p95_target` | `BOTHY_SEARCH__PREFIX_P95_TARGET` | Server | `100ms` | p95 target of the prefix search |
+| `search.benchmark_messages` | `BOTHY_SEARCH__BENCHMARK_MESSAGES` | Server | `2000000` | corpus size in the load test |
+| `search.extract.max_input_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_INPUT_BYTES` | Server | `52428800` | largest file for the extraction |
+| `search.extract.max_text_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_TEXT_BYTES` | Server | `1048576` | largest stored text |
+| `search.extract.max_uncompressed_bytes` | `BOTHY_SEARCH__EXTRACT__MAX_UNCOMPRESSED_BYTES` | Server | `209715200` | largest unpacked amount for archives |
+| `search.extract.max_archive_entries` | `BOTHY_SEARCH__EXTRACT__MAX_ARCHIVE_ENTRIES` | Server | `10000` | entries per archive |
+| `search.extract.timeout` | `BOTHY_SEARCH__EXTRACT__TIMEOUT` | Server | `60s` | time limit per extraction |
+| `search.extract.tika_url` | `BOTHY_SEARCH__EXTRACT__TIKA_URL` | Server | empty | Tika server; empty = off |
 
-### 15 Client-Architektur
+### 15 Client architecture
 
-Quelle: [15-client-architektur.md](../spec/15-client-architektur.md), Abschnitt 22.
+Source: [15-client-architecture.md](../spec/15-client-architecture.md), section 22.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `client.cache_max_bytes` |  | App | `1GiB` | Obergrenze für lokale Datenbank plus Datei-Cache; darüber werden die ältesten Einträge entfernt |
-| `client.sync.parse_offload_bytes` |  | App | `262144` | ab dieser Seitengröße wird im Hintergrund-Isolate dekodiert |
-| `client.outbox_stuck_after` |  | App | `2m` | ab dann zeigt ein wartender Eintrag "Senden verzögert" |
-| `client.push.fetch_timeout` |  | App | `20s` | Zeit, die NSE bzw. Android-Dienst für das Holen des Texts nutzen |
-| `client.voice.bitrate` |  | App | `64kbps` | Bitrate der AAC-Aufnahme |
-| `client.metrics.flush_interval` |  | App | `5m` | höchstens so oft sendet der Client Kennzahlen |
-| `client.perf.cold_start_p95` |  | App | `2500ms` | Ziel Kaltstart |
-| `client.perf.thread_open_p95` |  | App | `300ms` | Ziel Thread öffnen aus dem Cache |
-| `client.perf.send_local_echo_p95` |  | App | `50ms` | Ziel lokale Anzeige beim Senden |
-| `client.perf.patch_to_frame_p95` |  | App | `100ms` | Ziel Live-Box-Patch bis Frame |
-| `client.perf.jank_ratio_max` |  | App | `0.01` | höchster Anteil Frames über Budget |
-| `client.perf.catchup_events_per_s_min` |  | App | `2000` | Mindestrate beim Nachholen |
-| `client.perf.memory_mobile_max` |  | App | `300MiB` | Speicher mobil |
-| `client.perf.memory_desktop_max` |  | App | `500MiB` | Speicher Desktop |
-| `client.perf.terminal_frame_to_paint_p95` |  | App | `16ms` | Ziel Terminal-Rahmen bis Frame |
-| `client.perf.terminal_throughput_min` |  | App | `1MiB/s` | Mindestrate der Terminal-Ansicht bei Dauerausgabe |
-| `client.terminal.scrollback_lines` |  | App | `10000` | Zeilen im Rückblick des Renderers im Arbeitsspeicher; der Puffer für das Wiederanhängen liegt im Host-Dienst (`host_service.scrollback_bytes`) |
-| `client.terminal.font_size_default` |  | App | `14` | Schriftgröße der Terminal-Ansicht in logischen Pixeln, bis die Person sie ändert |
+| `client.cache_max_bytes` |  | App | `1GiB` | upper limit for the local database plus file cache; above it the oldest entries are removed |
+| `client.sync.parse_offload_bytes` |  | App | `262144` | from this page size on, decoding happens in the background isolate |
+| `client.outbox_stuck_after` |  | App | `2m` | from then on a waiting entry shows "Sending delayed" |
+| `client.push.fetch_timeout` |  | App | `20s` | time that the NSE or the Android service uses to fetch the text |
+| `client.voice.bitrate` |  | App | `64kbps` | bitrate of the AAC recording |
+| `client.metrics.flush_interval` |  | App | `5m` | the client sends metrics at most this often |
+| `client.perf.cold_start_p95` |  | App | `2500ms` | target for cold start |
+| `client.perf.thread_open_p95` |  | App | `300ms` | target for opening a thread from the cache |
+| `client.perf.send_local_echo_p95` |  | App | `50ms` | target for the local display on sending |
+| `client.perf.patch_to_frame_p95` |  | App | `100ms` | target for live box patch to frame |
+| `client.perf.jank_ratio_max` |  | App | `0.01` | highest share of frames over budget |
+| `client.perf.catchup_events_per_s_min` |  | App | `2000` | minimum rate during catch-up |
+| `client.perf.memory_mobile_max` |  | App | `300MiB` | memory on mobile |
+| `client.perf.memory_desktop_max` |  | App | `500MiB` | memory on desktop |
+| `client.perf.terminal_frame_to_paint_p95` |  | App | `16ms` | target for terminal frame until drawn |
+| `client.perf.terminal_throughput_min` |  | App | `1MiB/s` | minimum rate of the terminal view during continuous output |
+| `client.terminal.scrollback_lines` |  | App | `10000` | lines in the scrollback of the renderer in memory; the buffer for reattaching is in the host service (`host_service.scrollback_bytes`) |
+| `client.terminal.font_size_default` |  | App | `14` | font size of the terminal view in logical pixels until the person changes it |
 
-### 16 Betrieb
+### 16 Operations
 
-Quelle: [16-betrieb.md](../spec/16-betrieb.md), Abschnitt 14.
+Source: [16-operations.md](../spec/16-operations.md), section 14.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `instance.environment` | `BOTHY_INSTANCE__ENVIRONMENT` | Server | `prod` | `dev`, `staging` oder `prod` (6.1) |
-| `server.role` | `BOTHY_SERVER__ROLE` | Server | `all` | `api`, `worker` oder `all` |
-| `server.listen_addr` | `BOTHY_SERVER__LISTEN_ADDR` | Server | `127.0.0.1:8080` | öffentlicher Listener (REST, Gateway) |
-| `server.internal_listen_addr` | `BOTHY_SERVER__INTERNAL_LISTEN_ADDR` | Server | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack |
-| `server.public_url` | `BOTHY_SERVER__PUBLIC_URL` | Server | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](../spec/08-identitaet.md), Abschnitte 7.2 und 7.3) |
-| `server.trusted_proxies` | `BOTHY_SERVER__TRUSTED_PROXIES` | Server | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](../spec/19-sicherheit.md), SEC-TLS-1) |
-| `server.maintenance_mode` | `BOTHY_SERVER__MAINTENANCE_MODE` | Server | `off` | `off` oder `read_only` (Umzug, Upgrade; [ADR 0065](../adr/0065-wartungsmodus-read-only.md)) |
-| `secrets.dir` | `BOTHY_SECRETS__DIR` | Server | `/run/bothy/secrets` | Basis der Standardverweise `file:` |
-| `secrets.cache_ttl` | `BOTHY_SECRETS__CACHE_TTL` | Server | `5m` | so lange gilt ein gelesenes Geheimnis |
-| `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) |
-| `server.tls_cert_ref` | `BOTHY_SERVER__TLS_CERT_REF` | Server | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) |
-| `server.tls_key_ref` | `BOTHY_SERVER__TLS_KEY_REF` | Server | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` |
-| `database.host` | `BOTHY_DATABASE__HOST` | Server | `localhost` | Host der Datenbank |
-| `database.port` | `BOTHY_DATABASE__PORT` | Server | `5432` | Port der Datenbank im Netz des Servers |
-| `database.name` | `BOTHY_DATABASE__NAME` | Server | `bothy` | Datenbankname |
-| `database.user` | `BOTHY_DATABASE__USER` | Server | `bothy_app` | Rolle des Servers |
-| `database.password_ref` | `BOTHY_DATABASE__PASSWORD_REF` | Server | `file:<secrets.dir>/db_app_password` | Verweis auf das Passwort |
-| `database.sslmode` | `BOTHY_DATABASE__SSLMODE` | Server | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` (SEC-TLS-5) |
-| `database.sslrootcert` | `BOTHY_DATABASE__SSLROOTCERT` | Server | leer | CA-Bündel für `verify-full`; leer nutzt die Wurzeln des Systems |
-| `database.max_conns` | `BOTHY_DATABASE__MAX_CONNS` | Server | `20` | Größe des Verbindungspools je Prozess (Startwert bis zum Lasttest) |
-| `migrate.require_recent_backup` | `BOTHY_MIGRATE__REQUIRE_RECENT_BACKUP` | Server | `true` | `migrate` verlangt eine frische Sicherung |
-| `migrate.recent_backup_max_age` | `BOTHY_MIGRATE__RECENT_BACKUP_MAX_AGE` | Server | `24h` | so alt darf diese Sicherung sein |
-| `migrate.lock_timeout` | `BOTHY_MIGRATE__LOCK_TIMEOUT` | Server | `5s` | `lock_timeout` je Migrationsschritt |
-| `migrate.bootstrap_user` | `BOTHY_MIGRATE__BOOTSTRAP_USER` | Server | `postgres` | Superuser-Anmeldung nur für `migrate up --bootstrap` |
-| `migrate.bootstrap_password_ref` | `BOTHY_MIGRATE__BOOTSTRAP_PASSWORD_REF` | Server | `file:<secrets.dir>/db_superuser_password` | dessen Passwort |
-| `migrate.owner_password_ref` | `BOTHY_MIGRATE__OWNER_PASSWORD_REF` | Server | `file:<secrets.dir>/db_owner_password` | Passwort, das `--bootstrap` für `bothy_owner` setzt |
-| `migrate.app_password_ref` | `BOTHY_MIGRATE__APP_PASSWORD_REF` | Server | `file:<secrets.dir>/db_app_password` | Passwort für `bothy_app` |
-| `migrate.maint_password_ref` | `BOTHY_MIGRATE__MAINT_PASSWORD_REF` | Server | `file:<secrets.dir>/db_maint_password` | Passwort für `bothy_maint` |
-| `migrate.monitor_password_ref` | `BOTHY_MIGRATE__MONITOR_PASSWORD_REF` | Server | `file:<secrets.dir>/db_monitor_password` | Passwort für `bothy_monitor` |
-| `backup.pg.full_schedule` | `BOTHY_BACKUP__PG__FULL_SCHEDULE` | Server | `0 2 * * 0` | Plan der Vollsicherung (cron) |
-| `backup.pg.diff_schedule` | `BOTHY_BACKUP__PG__DIFF_SCHEDULE` | Server | `0 2 * * 1-6` | Plan der Differenzsicherung (cron) |
-| `backup.pg.archive_timeout` | `BOTHY_BACKUP__PG__ARCHIVE_TIMEOUT` | Server | `60s` | spätestens dann wird ein WAL-Segment archiviert |
-| `backup.pg.retention_full` | `BOTHY_BACKUP__PG__RETENTION_FULL` | Server | `4` | behaltene Vollsicherungen in repo2 |
-| `backup.pg.local_retention_full` | `BOTHY_BACKUP__PG__LOCAL_RETENTION_FULL` | Server | `1` | behaltene Vollsicherungen in repo1 |
-| `backup.logical.schedule` | `BOTHY_BACKUP__LOGICAL__SCHEDULE` | Server | `0 3 * * *` | Plan von `pg_dump` (cron) |
-| `backup.logical.retention` | `BOTHY_BACKUP__LOGICAL__RETENTION` | Server | `30d` | Aufbewahrung der logischen Sicherung |
-| `backup.objects.schedule` | `BOTHY_BACKUP__OBJECTS__SCHEDULE` | Server | `30 3 * * *` | Plan der Objektsicherung (cron) |
-| `backup.objects.retention` | `BOTHY_BACKUP__OBJECTS__RETENTION` | Server | `90d` | Aufbewahrung der Objekt-Snapshots |
-| `backup.offsite.target` | `BOTHY_BACKUP__OFFSITE__TARGET` | Server | leer | Off-site-Ziel; leer heißt nur lokal (Warnung in Konsole und Status) |
-| `backup.max_age` | `BOTHY_BACKUP__MAX_AGE` | Server | `26h` | ohne erfolgreiche Sicherung länger als das: Alarm |
-| `backup.restore_test.schedule` | `BOTHY_BACKUP__RESTORE_TEST__SCHEDULE` | Server | `0 5 * * 6` | Plan des Wiederherstellungstests (cron) |
-| `backup.restore_test.sample_files` | `BOTHY_BACKUP__RESTORE_TEST__SAMPLE_FILES` | Server | `200` | geprüfte Dateien je Test |
-| `backup.restore_test.sample_threads` | `BOTHY_BACKUP__RESTORE_TEST__SAMPLE_THREADS` | Server | `200` | geprüfte Threads je Test |
-| `backup.restore_test.max_age` | `BOTHY_BACKUP__RESTORE_TEST__MAX_AGE` | Server | `8d` | ohne erfolgreichen Test länger als das: Alarm |
-| `dr.rpo_target` | `BOTHY_DR__RPO_TARGET` | Server | `5m` | Ziel für den größten Datenverlust |
-| `dr.rto_target` | `BOTHY_DR__RTO_TARGET` | Server | `4h` | Ziel für die Dauer der Wiederherstellung |
-| `status.check_interval` | `BOTHY_STATUS__CHECK_INTERVAL` | Server | `30s` | Abstand der automatischen Prüfungen |
-| `status.degrade_after` | `BOTHY_STATUS__DEGRADE_AFTER` | Server | `2m` | so lange Fehler bis `degraded` |
-| `status.incident_after` | `BOTHY_STATUS__INCIDENT_AFTER` | Server | `5m` | so lange `major_outage` bis zur automatischen Störung |
-| `status.resolve_after` | `BOTHY_STATUS__RESOLVE_AFTER` | Server | `10m` | so lange gesund bis zur automatischen Auflösung |
-| `status.error_ratio_degraded` | `BOTHY_STATUS__ERROR_RATIO_DEGRADED` | Server | `0.05` | Fehleranteil, ab dem eine Prüfung scheitert |
-| `status.error_ratio_outage` | `BOTHY_STATUS__ERROR_RATIO_OUTAGE` | Server | `0.5` | Fehleranteil, ab dem `major_outage` gilt |
-| `status.fanout_lag_degraded` | `BOTHY_STATUS__FANOUT_LAG_DEGRADED` | Server | `5s` | Fan-out-Verzug, ab dem `sync.fanout` scheitert |
-| `install.ready_timeout` |  | Installationsskript | `5m` | so lange wartet `install.sh` nach `docker compose up -d` auf `/readyz` (Option `--ready-timeout`) |
+| `instance.environment` | `BOTHY_INSTANCE__ENVIRONMENT` | Server | `prod` | `dev`, `staging` or `prod` (6.1) |
+| `server.role` | `BOTHY_SERVER__ROLE` | Server | `all` | `api`, `worker` or `all` |
+| `server.listen_addr` | `BOTHY_SERVER__LISTEN_ADDR` | Server | `127.0.0.1:8080` | public listener (REST, gateway) |
+| `server.internal_listen_addr` | `BOTHY_SERVER__INTERNAL_LISTEN_ADDR` | Server | `127.0.0.1:8081` | health, readiness, incoming webhooks from the stack |
+| `server.public_url` | `BOTHY_SERVER__PUBLIC_URL` | Server | none, required | Origin under which apps reach the server (scheme, host, optional port; without path, query and fragment, otherwise `bothy config check` fails); basis of `aud`, DPoP `htu` and WebAuthn ([08-identity.md](../spec/08-identity.md), sections 7.2 and 7.3) |
+| `server.trusted_proxies` | `BOTHY_SERVER__TRUSTED_PROXIES` | Server | `127.0.0.1/32, ::1/128` | peers whose forwarding and identity headers are honored and that may send plain text ([19-security.md](../spec/19-security.md), SEC-TLS-1) |
+| `server.maintenance_mode` | `BOTHY_SERVER__MAINTENANCE_MODE` | Server | `off` | `off` or `read_only` (relocation, upgrade; [ADR 0065](../adr/0065-maintenance-mode-read-only.md)) |
+| `secrets.dir` | `BOTHY_SECRETS__DIR` | Server | `/run/bothy/secrets` | base of the default references `file:` |
+| `secrets.cache_ttl` | `BOTHY_SECRETS__CACHE_TTL` | Server | `5m` | how long a read secret stays valid |
+| `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server | `/var/lib/bothy/signing-keys` | writable directory of the private signing keys; owned by the service user, mode `0700` (5.2, [ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)) |
+| `server.tls_cert_ref` | `BOTHY_SERVER__TLS_CERT_REF` | Server | empty | reference to the certificate chain (PEM, leaf first); empty: the server does not terminate TLS (SEC-TLS-2) |
+| `server.tls_key_ref` | `BOTHY_SERVER__TLS_KEY_REF` | Server | empty | reference to the private key (PEM); only together with `server.tls_cert_ref` |
+| `database.host` | `BOTHY_DATABASE__HOST` | Server | `localhost` | host of the database |
+| `database.port` | `BOTHY_DATABASE__PORT` | Server | `5432` | port of the database in the server's network |
+| `database.name` | `BOTHY_DATABASE__NAME` | Server | `bothy` | database name |
+| `database.user` | `BOTHY_DATABASE__USER` | Server | `bothy_app` | role of the server |
+| `database.password_ref` | `BOTHY_DATABASE__PASSWORD_REF` | Server | `file:<secrets.dir>/db_app_password` | reference to the password |
+| `database.sslmode` | `BOTHY_DATABASE__SSLMODE` | Server | `verify-full` | TLS to the database; in the internal Compose network `disable` (SEC-TLS-5) |
+| `database.sslrootcert` | `BOTHY_DATABASE__SSLROOTCERT` | Server | empty | CA bundle for `verify-full`; empty uses the system roots |
+| `database.max_conns` | `BOTHY_DATABASE__MAX_CONNS` | Server | `20` | size of the connection pool per process (start value until the load test) |
+| `migrate.require_recent_backup` | `BOTHY_MIGRATE__REQUIRE_RECENT_BACKUP` | Server | `true` | `migrate` requires a fresh backup |
+| `migrate.recent_backup_max_age` | `BOTHY_MIGRATE__RECENT_BACKUP_MAX_AGE` | Server | `24h` | how old this backup may be |
+| `migrate.lock_timeout` | `BOTHY_MIGRATE__LOCK_TIMEOUT` | Server | `5s` | `lock_timeout` per migration step |
+| `migrate.bootstrap_user` | `BOTHY_MIGRATE__BOOTSTRAP_USER` | Server | `postgres` | superuser login only for `migrate up --bootstrap` |
+| `migrate.bootstrap_password_ref` | `BOTHY_MIGRATE__BOOTSTRAP_PASSWORD_REF` | Server | `file:<secrets.dir>/db_superuser_password` | its password |
+| `migrate.owner_password_ref` | `BOTHY_MIGRATE__OWNER_PASSWORD_REF` | Server | `file:<secrets.dir>/db_owner_password` | password that `--bootstrap` sets for `bothy_owner` |
+| `migrate.app_password_ref` | `BOTHY_MIGRATE__APP_PASSWORD_REF` | Server | `file:<secrets.dir>/db_app_password` | password for `bothy_app` |
+| `migrate.maint_password_ref` | `BOTHY_MIGRATE__MAINT_PASSWORD_REF` | Server | `file:<secrets.dir>/db_maint_password` | password for `bothy_maint` |
+| `migrate.monitor_password_ref` | `BOTHY_MIGRATE__MONITOR_PASSWORD_REF` | Server | `file:<secrets.dir>/db_monitor_password` | password for `bothy_monitor` |
+| `backup.pg.full_schedule` | `BOTHY_BACKUP__PG__FULL_SCHEDULE` | Server | `0 2 * * 0` | schedule of the full backup (cron) |
+| `backup.pg.diff_schedule` | `BOTHY_BACKUP__PG__DIFF_SCHEDULE` | Server | `0 2 * * 1-6` | schedule of the differential backup (cron) |
+| `backup.pg.archive_timeout` | `BOTHY_BACKUP__PG__ARCHIVE_TIMEOUT` | Server | `60s` | a WAL segment is archived at the latest after this time |
+| `backup.pg.retention_full` | `BOTHY_BACKUP__PG__RETENTION_FULL` | Server | `4` | full backups kept in repo2 |
+| `backup.pg.local_retention_full` | `BOTHY_BACKUP__PG__LOCAL_RETENTION_FULL` | Server | `1` | full backups kept in repo1 |
+| `backup.logical.schedule` | `BOTHY_BACKUP__LOGICAL__SCHEDULE` | Server | `0 3 * * *` | schedule of `pg_dump` (cron) |
+| `backup.logical.retention` | `BOTHY_BACKUP__LOGICAL__RETENTION` | Server | `30d` | retention of the logical backup |
+| `backup.objects.schedule` | `BOTHY_BACKUP__OBJECTS__SCHEDULE` | Server | `30 3 * * *` | schedule of the object backup (cron) |
+| `backup.objects.retention` | `BOTHY_BACKUP__OBJECTS__RETENTION` | Server | `90d` | retention of the object snapshots |
+| `backup.offsite.target` | `BOTHY_BACKUP__OFFSITE__TARGET` | Server | empty | off-site target; empty means local only (warning in console and status) |
+| `backup.max_age` | `BOTHY_BACKUP__MAX_AGE` | Server | `26h` | no successful backup for longer than this: alert |
+| `backup.restore_test.schedule` | `BOTHY_BACKUP__RESTORE_TEST__SCHEDULE` | Server | `0 5 * * 6` | schedule of the restore test (cron) |
+| `backup.restore_test.sample_files` | `BOTHY_BACKUP__RESTORE_TEST__SAMPLE_FILES` | Server | `200` | files checked per test |
+| `backup.restore_test.sample_threads` | `BOTHY_BACKUP__RESTORE_TEST__SAMPLE_THREADS` | Server | `200` | threads checked per test |
+| `backup.restore_test.max_age` | `BOTHY_BACKUP__RESTORE_TEST__MAX_AGE` | Server | `8d` | no successful test for longer than this: alert |
+| `dr.rpo_target` | `BOTHY_DR__RPO_TARGET` | Server | `5m` | target for the largest data loss |
+| `dr.rto_target` | `BOTHY_DR__RTO_TARGET` | Server | `4h` | target for the duration of the restore |
+| `status.check_interval` | `BOTHY_STATUS__CHECK_INTERVAL` | Server | `30s` | interval of the automatic checks |
+| `status.degrade_after` | `BOTHY_STATUS__DEGRADE_AFTER` | Server | `2m` | how long errors last until `degraded` |
+| `status.incident_after` | `BOTHY_STATUS__INCIDENT_AFTER` | Server | `5m` | how long `major_outage` lasts until the automatic incident |
+| `status.resolve_after` | `BOTHY_STATUS__RESOLVE_AFTER` | Server | `10m` | how long the state stays healthy until the automatic resolution |
+| `status.error_ratio_degraded` | `BOTHY_STATUS__ERROR_RATIO_DEGRADED` | Server | `0.05` | error ratio from which a check fails |
+| `status.error_ratio_outage` | `BOTHY_STATUS__ERROR_RATIO_OUTAGE` | Server | `0.5` | error ratio from which `major_outage` applies |
+| `status.fanout_lag_degraded` | `BOTHY_STATUS__FANOUT_LAG_DEGRADED` | Server | `5s` | fan-out lag from which `sync.fanout` fails |
+| `install.ready_timeout` |  | Installation script | `5m` | how long `install.sh` waits for `/readyz` after `docker compose up -d` (option `--ready-timeout`) |
 
 ### 17 Observability
 
-Quelle: [17-observability.md](../spec/17-observability.md), Abschnitt 11.
+Source: [17-observability.md](../spec/17-observability.md), section 11.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `telemetry.enabled` | `BOTHY_TELEMETRY__ENABLED` | Server | `true` | Telemetrie an oder aus |
-| `telemetry.traces.sampler_ratio` | `BOTHY_TELEMETRY__TRACES__SAMPLER_RATIO` | Server | `1.0` | Anteil der Traces, die das SDK aufzeichnet; der Collector sampelt danach nach |
-| `telemetry.traces.trust_remote_parent` | `BOTHY_TELEMETRY__TRACES__TRUST_REMOTE_PARENT` | Server | `false` | `true`: ein eingehender `traceparent` wird Eltern-Kontext (seine Trace-ID wird `correlation_id`, sein Sampling-Flag gilt); `false`: nur Span-Link, eigener Trace |
-| `telemetry.logs.exporter` | `BOTHY_TELEMETRY__LOGS__EXPORTER` | Server | `both` | `otlp`, `stdout` oder `both` |
-| `telemetry.logs.level` | `BOTHY_TELEMETRY__LOGS__LEVEL` | Server | `info` | kleinste Stufe, die geschrieben wird |
-| `telemetry.pseudonym_key_ref` | `BOTHY_TELEMETRY__PSEUDONYM_KEY_REF` | Server | `file:<secrets.dir>/telemetry_pseudonym_key` | Schlüssel für HMAC-Pseudonyme; mindestens 32 Byte |
-| `telemetry.dashboard_url` | `BOTHY_TELEMETRY__DASHBOARD_URL` | Server | leer | Link aus der Admin-Konsole zum Telemetrie-Backend |
-| `stats.cache_ttl` | `BOTHY_STATS__CACHE_TTL` | Server | `5m` | so lange gilt ein berechnetes Statistik-Ergebnis |
-| `stats.max_range` | `BOTHY_STATS__MAX_RANGE` | Server | `400d` | größter abfragbarer Zeitraum |
-| `stats.time_zone` | `BOTHY_STATS__TIME_ZONE` | Server | `UTC` | IANA-Zeitzone der Tagesgrenzen in Statistik, Tagesaggregaten und Timeline ([admin-statistics.md](../observability/admin-statistics.md), Abschnitt 5) |
+| `telemetry.enabled` | `BOTHY_TELEMETRY__ENABLED` | Server | `true` | telemetry on or off |
+| `telemetry.traces.sampler_ratio` | `BOTHY_TELEMETRY__TRACES__SAMPLER_RATIO` | Server | `1.0` | share of the traces that the SDK records; the collector then samples again |
+| `telemetry.traces.trust_remote_parent` | `BOTHY_TELEMETRY__TRACES__TRUST_REMOTE_PARENT` | Server | `false` | `true`: an incoming `traceparent` becomes the parent context (its trace ID becomes `correlation_id`, its sampling flag applies); `false`: span link only, own trace |
+| `telemetry.logs.exporter` | `BOTHY_TELEMETRY__LOGS__EXPORTER` | Server | `both` | `otlp`, `stdout` or `both` |
+| `telemetry.logs.level` | `BOTHY_TELEMETRY__LOGS__LEVEL` | Server | `info` | lowest level that is written |
+| `telemetry.pseudonym_key_ref` | `BOTHY_TELEMETRY__PSEUDONYM_KEY_REF` | Server | `file:<secrets.dir>/telemetry_pseudonym_key` | key for HMAC pseudonyms; at least 32 bytes |
+| `telemetry.dashboard_url` | `BOTHY_TELEMETRY__DASHBOARD_URL` | Server | empty | link from the admin console to the telemetry backend |
+| `stats.cache_ttl` | `BOTHY_STATS__CACHE_TTL` | Server | `5m` | how long a computed statistics result stays valid |
+| `stats.max_range` | `BOTHY_STATS__MAX_RANGE` | Server | `400d` | largest queryable time range |
+| `stats.time_zone` | `BOTHY_STATS__TIME_ZONE` | Server | `UTC` | IANA time zone of the day boundaries in statistics, daily aggregates and timeline ([admin-statistics.md](../observability/admin-statistics.md), section 5) |
 
 ### 18 Release
 
-Quelle: [18-release.md](../spec/18-release.md), Abschnitt 12.
+Source: [18-release.md](../spec/18-release.md), section 12.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `client.min_version.ios` | `BOTHY_CLIENT__MIN_VERSION__IOS` | Server | leer | kleinste zugelassene App-Version auf iOS; leer heißt keine Grenze |
-| `client.min_version.android` | `BOTHY_CLIENT__MIN_VERSION__ANDROID` | Server | leer | dasselbe für Android |
-| `client.min_version.macos` | `BOTHY_CLIENT__MIN_VERSION__MACOS` | Server | leer | dasselbe für macOS |
-| `client.min_version.windows` | `BOTHY_CLIENT__MIN_VERSION__WINDOWS` | Server | leer | dasselbe für Windows |
-| `client.recommended_version.ios` | `BOTHY_CLIENT__RECOMMENDED_VERSION__IOS` | Server | leer | darunter zeigt die App einen Update-Hinweis |
-| `client.recommended_version.android` | `BOTHY_CLIENT__RECOMMENDED_VERSION__ANDROID` | Server | leer | dasselbe für Android |
-| `client.recommended_version.macos` | `BOTHY_CLIENT__RECOMMENDED_VERSION__MACOS` | Server | leer | dasselbe für macOS |
-| `client.recommended_version.windows` | `BOTHY_CLIENT__RECOMMENDED_VERSION__WINDOWS` | Server | leer | dasselbe für Windows |
+| `client.min_version.ios` | `BOTHY_CLIENT__MIN_VERSION__IOS` | Server | empty | smallest allowed app version on iOS; empty means no limit |
+| `client.min_version.android` | `BOTHY_CLIENT__MIN_VERSION__ANDROID` | Server | empty | the same for Android |
+| `client.min_version.macos` | `BOTHY_CLIENT__MIN_VERSION__MACOS` | Server | empty | the same for macOS |
+| `client.min_version.windows` | `BOTHY_CLIENT__MIN_VERSION__WINDOWS` | Server | empty | the same for Windows |
+| `client.recommended_version.ios` | `BOTHY_CLIENT__RECOMMENDED_VERSION__IOS` | Server | empty | below it the app shows an update notice |
+| `client.recommended_version.android` | `BOTHY_CLIENT__RECOMMENDED_VERSION__ANDROID` | Server | empty | the same for Android |
+| `client.recommended_version.macos` | `BOTHY_CLIENT__RECOMMENDED_VERSION__MACOS` | Server | empty | the same for macOS |
+| `client.recommended_version.windows` | `BOTHY_CLIENT__RECOMMENDED_VERSION__WINDOWS` | Server | empty | the same for Windows |
 
-### 19 Sicherheit
+### 19 Security
 
-Quelle: [19-sicherheit.md](../spec/19-sicherheit.md), Abschnitt 16.
+Source: [19-security.md](../spec/19-security.md), section 16.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `http.hsts_max_age` | `BOTHY_HTTP__HSTS_MAX_AGE` | Server | `31536000s` | `max-age` für HSTS |
-| `egress.allowed_hosts` | `BOTHY_EGRESS__ALLOWED_HOSTS` | Server | leer | zusätzliche erlaubte Ziele, Form `host[:port][;allow_private]` ([configuration.md](../operations/configuration.md), Abschnitt 2); doppelte Einträge sind ein Ladefehler |
-| `egress.timeout` | `BOTHY_EGRESS__TIMEOUT` | Server | `15s` | Zeitgrenze einer ausgehenden Anfrage |
-| `egress.max_response_bytes` | `BOTHY_EGRESS__MAX_RESPONSE_BYTES` | Server | `1048576` | größte Antwort einer ausgehenden Anfrage |
-| `audit.checkpoint_interval` | `BOTHY_AUDIT__CHECKPOINT_INTERVAL` | Server | `1h` | Abstand der signierten Prüfpunkte des Audit-Logs |
-| `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server | leer | Ablageziel der Prüfpunkte außerhalb der Datenbank: leer (Warnung, SEC-AUD-2) oder `file://<absoluter Pfad>` auf einem Speicher außerhalb des Datenbank-Volumes; andere Schemata lehnt `bothy config check` ab. Ein Objektspeicher mit Aufbewahrungssperre als Ziel ist das empfohlene Ziel für Produktion und kommt mit PLAN M7-22 |
-| `audit.reason_max_chars` | `BOTHY_AUDIT__REASON_MAX_CHARS` | Server | `500` | größte Länge eines Pflichtgrunds einer Verwaltungsaktion in Unicode-Zeichen (SEC-AUD-5) |
-| `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server | `30s` | längste Zeit, die ein Prozess einen zurückgezogenen Schlüssel noch annimmt oder einen neuen nicht kennt |
-| `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server | `1m` | Abstand des Jobs `instance.key_rotation` |
-| `signing_key.access_token_rotation_interval` | `BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL` | Server | `30d` | planmäßiger Wechsel des Schlüssels für Zugriffstokens |
+| `http.hsts_max_age` | `BOTHY_HTTP__HSTS_MAX_AGE` | Server | `31536000s` | `max-age` for HSTS |
+| `egress.allowed_hosts` | `BOTHY_EGRESS__ALLOWED_HOSTS` | Server | empty | additional allowed targets, form `host[:port][;allow_private]` ([configuration.md](../operations/configuration.md), section 2); duplicate entries are a load error |
+| `egress.timeout` | `BOTHY_EGRESS__TIMEOUT` | Server | `15s` | time limit of an outgoing request |
+| `egress.max_response_bytes` | `BOTHY_EGRESS__MAX_RESPONSE_BYTES` | Server | `1048576` | largest response of an outgoing request |
+| `audit.checkpoint_interval` | `BOTHY_AUDIT__CHECKPOINT_INTERVAL` | Server | `1h` | interval of the signed checkpoints of the audit log |
+| `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server | empty | storage target of the checkpoints outside the database: empty (warning, SEC-AUD-2) or `file://<absolute path>` on storage outside the database volume; `bothy config check` rejects other schemes. An object store with a retention lock is the recommended target for production and comes with PLAN M7-22 |
+| `audit.reason_max_chars` | `BOTHY_AUDIT__REASON_MAX_CHARS` | Server | `500` | maximum length of a mandatory reason of an administrative action in Unicode characters (SEC-AUD-5) |
+| `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server | `30s` | longest time a process still accepts a retired key or does not know a new one |
+| `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server | `1m` | interval of the job `instance.key_rotation` |
+| `signing_key.access_token_rotation_interval` | `BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL` | Server | `30d` | scheduled rotation of the key for access tokens |
 
-### 20 Datenschutz
+### 20 Privacy
 
-Quelle: [20-datenschutz.md](../spec/20-datenschutz.md), Abschnitt 13.
+Source: [20-privacy.md](../spec/20-privacy.md), section 13.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `retention.content` | `BOTHY_RETENTION__CONTENT` | Server | `none` | Frist für Inhalte; `none` heißt keine automatische Löschung (ohne `retention.content_none_reason` Warnung, 4.1) |
-| `retention.content_none_reason` | `BOTHY_RETENTION__CONTENT_NONE_REASON` | Server | leer | Grund des Betreibers für `retention.content = none`; leer heißt Warnung in `bothy config check` und im Startlog (4.1) |
-| `retention.security_after_end` | `BOTHY_RETENTION__SECURITY_AFTER_END` | Server | `90d` | Sicherheitsdaten nach Ende, Ablauf oder Widerruf |
-| `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server | `365d` | Audit-Log (Studie C schlug zwölf Monate vor) |
-| `retention.cost` | `BOTHY_RETENTION__COST` | Server | `395d` | Kosten und Preise |
-| `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server | `90d` | Import-Zustand nach Abschluss |
-| `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server | `1095d` | DSGVO-Aufträge (ohne Exportpakete) |
-| `retention.ops` | `BOTHY_RETENTION__OPS` | Server | `395d` | Statusseite |
-| `retention.stats_minutes` | `BOTHY_RETENTION__STATS_MINUTES` | Server | `90d` | Minuten-Aggregate der eigenen Messung (`stats_minutes`); mindestens der längste SLO-Zeitraum |
-| `retention.webhook_deliveries` | `BOTHY_RETENTION__WEBHOOK_DELIVERIES` | Server | `30d` | Zustellversuche ausgehender Webhooks |
-| `privacy.export_ttl` | `BOTHY_PRIVACY__EXPORT_TTL` | Server | `7d` | Bereitstellung eines Exportpakets |
-| `privacy.export_requires_approval` | `BOTHY_PRIVACY__EXPORT_REQUIRES_APPROVAL` | Server | `false` | Export der eigenen Daten braucht Freigabe des Owners |
-| `privacy.account_deletion_content` | `BOTHY_PRIVACY__ACCOUNT_DELETION_CONTENT` | Server | `keep_pseudonymized` | Inhalte gelöschter Konten: `keep_pseudonymized` oder `delete` |
-| `privacy.object_delete_delay` | `BOTHY_PRIVACY__OBJECT_DELETE_DELAY` | Server | `24h` | höchste Zeit bis zum Entfernen gelöschter Objekte |
-| `privacy.deletion_journal_retention` | `BOTHY_PRIVACY__DELETION_JOURNAL_RETENTION` | Server | `400d` | Aufbewahrung des Lösch-Journals; mindestens Sicherungsfrist |
-| `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server | `30d` | Zeitraum je Schlüssel für IP-Pseudonyme |
-| `privacy.audit_ip_key_retention` | `BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION` | Server | `90d` | danach werden Schlüssel vernichtet |
-| `privacy.audit_ip_kek_ref` | `BOTHY_PRIVACY__AUDIT_IP_KEK_REF` | Server | `file:<secrets.dir>/audit_ip_kek` | Verweis auf den Schlüssel, mit dem die IP-Schlüssel in `audit_ip_keys` verschlüsselt sind |
-| `privacy.telemetry_pseudonym_rotation` | `BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION` | Server | `30d` | Wechsel des Schlüssels für pseudonyme IDs in Telemetrie |
-| `privacy.per_person_stats_enabled` | `BOTHY_PRIVACY__PER_PERSON_STATS_ENABLED` | Server | `false` | Statistik je Person |
-| `privacy.stats_min_group_size` | `BOTHY_PRIVACY__STATS_MIN_GROUP_SIZE` | Server | `5` | kleinste Gruppe für Auswertungen nach Personen |
-| `privacy.ai_notice_enabled` | `BOTHY_PRIVACY__AI_NOTICE_ENABLED` | Server | `true` | einmaliger KI-Hinweis je Kanal mit Agent |
-| `privacy.notice_url` | `BOTHY_PRIVACY__NOTICE_URL` | Server | leer | Link zur Datenschutzinformation des Betreibers |
+| `retention.content` | `BOTHY_RETENTION__CONTENT` | Server | `none` | period for contents; `none` means no automatic deletion (without `retention.content_none_reason` a warning, 4.1) |
+| `retention.content_none_reason` | `BOTHY_RETENTION__CONTENT_NONE_REASON` | Server | empty | reason of the instance operator for `retention.content = none`; empty means a warning in `bothy config check` and in the startup log (4.1) |
+| `retention.security_after_end` | `BOTHY_RETENTION__SECURITY_AFTER_END` | Server | `90d` | security data after end, expiry or revocation |
+| `retention.audit` | `BOTHY_RETENTION__AUDIT` | Server | `365d` | audit log (Study C suggested twelve months) |
+| `retention.cost` | `BOTHY_RETENTION__COST` | Server | `395d` | costs and prices |
+| `retention.import_after_completion` | `BOTHY_RETENTION__IMPORT_AFTER_COMPLETION` | Server | `90d` | import state after completion |
+| `retention.privacy_job` | `BOTHY_RETENTION__PRIVACY_JOB` | Server | `1095d` | privacy requests (without export packages) |
+| `retention.ops` | `BOTHY_RETENTION__OPS` | Server | `395d` | status page |
+| `retention.stats_minutes` | `BOTHY_RETENTION__STATS_MINUTES` | Server | `90d` | minute aggregates of the own measurement (`stats_minutes`); at least the longest SLO period |
+| `retention.webhook_deliveries` | `BOTHY_RETENTION__WEBHOOK_DELIVERIES` | Server | `30d` | delivery attempts of outgoing webhooks |
+| `privacy.export_ttl` | `BOTHY_PRIVACY__EXPORT_TTL` | Server | `7d` | availability of an export package |
+| `privacy.export_requires_approval` | `BOTHY_PRIVACY__EXPORT_REQUIRES_APPROVAL` | Server | `false` | export of one's own data needs the approval of the owner |
+| `privacy.account_deletion_content` | `BOTHY_PRIVACY__ACCOUNT_DELETION_CONTENT` | Server | `keep_pseudonymized` | contents of deleted accounts: `keep_pseudonymized` or `delete` |
+| `privacy.object_delete_delay` | `BOTHY_PRIVACY__OBJECT_DELETE_DELAY` | Server | `24h` | maximum time until deleted objects are removed |
+| `privacy.deletion_journal_retention` | `BOTHY_PRIVACY__DELETION_JOURNAL_RETENTION` | Server | `400d` | retention of the deletion journal; at least the backup period |
+| `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server | `30d` | period per key for IP pseudonyms |
+| `privacy.audit_ip_key_retention` | `BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION` | Server | `90d` | keys are destroyed after this |
+| `privacy.audit_ip_kek_ref` | `BOTHY_PRIVACY__AUDIT_IP_KEK_REF` | Server | `file:<secrets.dir>/audit_ip_kek` | reference to the key that encrypts the IP keys in `audit_ip_keys` |
+| `privacy.telemetry_pseudonym_rotation` | `BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION` | Server | `30d` | rotation of the key for pseudonymous IDs in telemetry |
+| `privacy.per_person_stats_enabled` | `BOTHY_PRIVACY__PER_PERSON_STATS_ENABLED` | Server | `false` | statistics per person |
+| `privacy.stats_min_group_size` | `BOTHY_PRIVACY__STATS_MIN_GROUP_SIZE` | Server | `5` | smallest group for evaluations by persons |
+| `privacy.ai_notice_enabled` | `BOTHY_PRIVACY__AI_NOTICE_ENABLED` | Server | `true` | one-time AI notice per channel with an agent |
+| `privacy.notice_url` | `BOTHY_PRIVACY__NOTICE_URL` | Server | empty | link to the privacy information of the instance operator |
 
-### 21 Mehrbenutzer-Dev-Umgebung und Abschottung
+### 21 Multi-user dev environment and isolation
 
-Quelle: [21-dev-isolation.md](../spec/21-dev-isolation.md), Abschnitt 12.
+Source: [21-dev-isolation.md](../spec/21-dev-isolation.md), section 12.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `dev.reverify_interval` | `BOTHY_DEV__REVERIFY_INTERVAL` | Server | `24h` | spätestens dann wird eine Umgebung neu geprüft |
-| `dev.limits` | `BOTHY_DEV__LIMITS` | Server | `{"cpus": 4, "memory_mib": 8192, "disk_gib": 50, "pids": 2048}` | Grenzen je Umgebung |
-| `dev.egress_allowlist` | `BOTHY_DEV__EGRESS_ALLOWLIST` | Server | leer | erlaubte Ziele (Hosts) für Umgebungen; ohne Eintrag kein Egress |
+| `dev.reverify_interval` | `BOTHY_DEV__REVERIFY_INTERVAL` | Server | `24h` | an environment is checked again at the latest after this time |
+| `dev.limits` | `BOTHY_DEV__LIMITS` | Server | `{"cpus": 4, "memory_mib": 8192, "disk_gib": 50, "pids": 2048}` | limits per environment |
+| `dev.egress_allowlist` | `BOTHY_DEV__EGRESS_ALLOWLIST` | Server | empty | allowed targets (hosts) for environments; without an entry no egress |
 
-### 22 Import und Migration aus Discord
+### 22 Import and migration from Discord
 
-Quelle: [22-import-migration.md](../spec/22-import-migration.md), Abschnitt 19.
+Source: [22-import-migration.md](../spec/22-import-migration.md), section 19.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `import.discord.api_base` |  | Werkzeug `bothy import` | `https://discord.com/api/v10` | Discord-API-Basis [R6, belegt: v10 aktuell] |
-| `import.discord.cdn_hosts` |  | Werkzeug `bothy import` | `cdn.discordapp.com`, `media.discordapp.net` | erlaubte Hosts für Anhänge |
-| `import.discord.page_size` |  | Werkzeug `bothy import` | `100` | Nachrichten je Seite; Discord erlaubt höchstens 100 [R4, belegt] |
-| `import.discord.max_429_retries` |  | Werkzeug `bothy import` | `5` | Wiederholungen nach `429` je Aufruf |
-| `import.discord.max_rate_wait` |  | Werkzeug `bothy import` | `60s` | größte Wartezeit, bevor der Lauf abbricht |
-| `import.discord.preflight_sample` |  | Werkzeug `bothy import` | `20` | Nachrichten für die Intent-Probe |
-| `import.discord.closed_tags` |  | Werkzeug `bothy import` | leer | Forum-Tags, die einen Thread zusätzlich als erledigt markieren |
-| `import.attachment_max_bytes` |  | Werkzeug `bothy import` | wie `file.max_upload_bytes` | größter übernommener Anhang |
-| `import.http_timeout` |  | Werkzeug `bothy import` | `60s` | Zeitlimit je Aufruf an Discord und CDN |
-| `import.batch_max_items` |  | Werkzeug `bothy import` | `100` | Objekte je Stapel an den Server |
-| `import.reply_quote_max_chars` |  | Werkzeug `bothy import` | `100` | Länge der Zitatzeile bei Antworten über Threads hinweg |
-| `import.follow.poll_interval` |  | Werkzeug `bothy import` | `30s` | Abstand der Spiegel-Runden |
-| `import.follow.settle_after` |  | Werkzeug `bothy import` | `60s` | Ruhezeit nach letzter Änderung |
-| `import.follow.busy_reactions` |  | Werkzeug `bothy import` | `👀` | Reaktionen, die "Agent arbeitet noch" bedeuten |
-| `import.follow.busy_lookback` |  | Werkzeug `bothy import` | `10` | Nachrichten vor der ersten neuen, die auf Markierung geprüft werden |
-| `import.follow.max_backoff` |  | Werkzeug `bothy import` | `5m` | größter Abstand nach fehlgeschlagenen Runden |
+| `import.discord.api_base` |  | Tool `bothy import` | `https://discord.com/api/v10` | Discord API base [R6, verified: v10 current] |
+| `import.discord.cdn_hosts` |  | Tool `bothy import` | `cdn.discordapp.com`, `media.discordapp.net` | allowed hosts for attachments |
+| `import.discord.page_size` |  | Tool `bothy import` | `100` | messages per page; Discord allows at most 100 [R4, verified] |
+| `import.discord.max_429_retries` |  | Tool `bothy import` | `5` | retries after `429` per call |
+| `import.discord.max_rate_wait` |  | Tool `bothy import` | `60s` | longest wait before the run aborts |
+| `import.discord.preflight_sample` |  | Tool `bothy import` | `20` | messages for the intent probe |
+| `import.discord.closed_tags` |  | Tool `bothy import` | empty | forum tags that additionally mark a thread as done |
+| `import.attachment_max_bytes` |  | Tool `bothy import` | same as `file.max_upload_bytes` | largest imported attachment |
+| `import.http_timeout` |  | Tool `bothy import` | `60s` | time limit per call to Discord and the CDN |
+| `import.batch_max_items` |  | Tool `bothy import` | `100` | items per batch sent to the server |
+| `import.reply_quote_max_chars` |  | Tool `bothy import` | `100` | length of the quote line for replies across threads |
+| `import.follow.poll_interval` |  | Tool `bothy import` | `30s` | interval between mirror rounds |
+| `import.follow.settle_after` |  | Tool `bothy import` | `60s` | quiet time after the last change |
+| `import.follow.busy_reactions` |  | Tool `bothy import` | `👀` | reactions that mean "agent is still working" |
+| `import.follow.busy_lookback` |  | Tool `bothy import` | `10` | messages before the first new one that are checked for the marker |
+| `import.follow.max_backoff` |  | Tool `bothy import` | `5m` | longest interval after failed rounds |
 
 ### 24 Terminal
 
-Quelle: [24-terminal.md](../spec/24-terminal.md), Abschnitt 17.
+Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `terminal.pairing_code_ttl` | `BOTHY_TERMINAL__PAIRING_CODE_TTL` | Server | `15m` | Gültigkeit eines Kopplungs-Codes für einen Rechner |
-| `terminal.fingerprint_confirm_chars` | `BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS` | Server | `8` | so viele Zeichen des Fingerabdrucks tippt der Owner bei der Bestätigung |
-| `terminal.fingerprint_max_attempts` | `BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS` | Server | `3` | Fehlversuche bei der Bestätigung, danach Rückfall auf `pairing` |
-| `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server | `60s` | so jung muss der Step-up für `terminal.open` und `terminal.attach` sein |
-| `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | `30s` | Gültigkeit einer Sitzungs-Marke |
-| `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server | `20s` | Frist, bis beide Seiten im Relais verbunden sind und der Handshake steht |
-| `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server | `15m` | so lange bleibt eine getrennte Sitzung anhängbar |
-| `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server | `60s` | Wiederanhängen vom selben Gerät ohne neuen Step-up innerhalb dieser Zeit nach der Trennung |
-| `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server | `30m` | ohne Eingabe des Geräts endet die Sitzung |
-| `terminal.idle_grace` | `BOTHY_TERMINAL__IDLE_GRACE` | Server | `2m` | Zuschlag, nach dem der Server selbst wegen Leerlaufs beendet |
-| `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server | `12h` | Höchstdauer einer Sitzung |
-| `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server | `5` | offene Sitzungen je Mensch |
-| `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server | `10` | offene Sitzungen je Rechner |
-| `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server | `262144` | Puffer des Relais je Richtung und Sitzung |
-| `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server | `20s` | Abstand der Heartbeats der Steuerverbindung (in `hello` gemeldet) |
-| `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server | `3` | fehlende Heartbeats bis zum Schließen der Steuerverbindung |
-| `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server | `10s` | Frist zwischen `hello` und `identify` der Steuer- und Datenverbindung |
-| `terminal.sweep_interval` | `BOTHY_TERMINAL__SWEEP_INTERVAL` | Server | `30s` | Abstand des Jobs `terminal.sweep` ([02-architektur.md](../spec/02-architektur.md), Abschnitt 12.3) |
-| `terminal.host_duplicate_probe_timeout` | `BOTHY_TERMINAL__HOST_DUPLICATE_PROBE_TIMEOUT` | Server | `5s` | so lange wartet der Server auf die Antwort der älteren Steuerverbindung (3.4) |
-| `host_service.state_dir` |  | Host-Dienst | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | Zustandsordner mit den Schlüsseln des Rechners, den Bindungen der Sitzungsbenutzer an Personen und bei `organization` dem API-Schlüssel des Profils `claude`; nie eine Abo-Anmeldung (7.4) |
-| `host_service.session_users` |  | Host-Dienst | leer | Sitzungsbenutzer dieses Rechners, je Person einer; je Eintrag ein PTY-Helfer; nie der Dienstbenutzer; leer heißt: HD1 nicht bestanden; gelesen nur beim Start, geändert mit `bothy-host session-user add` und `remove`, die den Host-Dienst dafür neu starten (2.2) |
-| `host_service.extra_forbidden_groups` |  | Host-Dienst | leer | weitere Gruppen, die HD2 zusätzlich zur festen Liste sperrt |
-| `host_service.credential_check_interval` |  | Host-Dienst | `60s` | Abstand der Prüfungen HD6 und HD11 während des Betriebs (2.2, 7.4) |
-| `host_service.entry_scan_timeout` |  | Host-Dienst | `10m` | Höchstdauer der Prüfung der Einträge von HD11 je Sitzungsbenutzer; danach bricht sein PTY-Helfer sie ab, und HD11 besteht für ihn nicht (`entry_scan_timeout`, 2.2) |
-| `host_service.profiles` |  | Host-Dienst | `[shell]` | angebotene Profile (11.1) |
-| `host_service.claude_bin` |  | Host-Dienst | leer | absoluter Pfad des Coding-Agenten, den HD6 für `claude auth status` aufruft und den das Profil `claude` bei `organization` startet; gehört mit Ordnerkette, Interpreter und den Ordnern der Suchliste einem vertrauenswürdigen Besitzer (2.2 Punkt 6, HD10); unter Windows eine `.exe`; leer heißt: HD6 prüft nur die Anmeldeorte und warnt, bei `organization` gibt es kein Profil `claude`, die Durchsetzung trägt der eigene Sitzungsbenutzer (7.4); für HD6 und das Profil gilt der Wert auch als leer, wenn sich der Pfad nicht auflösen lässt oder die Suchliste den Interpreter eines Skripts nicht findet |
-| `host_service.claude_workdirs` |  | Host-Dienst | leer | Arbeitsordner des Profils `claude` je Sitzungsbenutzer (Name aus `host_service.session_users` -> Liste von Ordnern mit Anzeigenamen; gemeldet werden nur die Anzeigenamen); jeder Ordner gehört genau diesem Sitzungsbenutzer (Ruling T13, HD7, HD11); ein Ordner bei zwei Sitzungsbenutzern fällt aus beiden Listen, gemeldet und für `wdi` benutzt wird die Liste danach; gelesen nur beim Start, eine Änderung wirkt nach `bothy-host restart`; ohne Eintrag kein Profil `claude` für diesen Sitzungsbenutzer, leer heißt kein Profil `claude` |
-| `host_service.scrollback_bytes` |  | Host-Dienst | `1048576` | Rückblick-Puffer je Sitzung, nur im Speicher |
-| `host_service.require_local_confirm` |  | Host-Dienst | `false` | jede PTY erst nach Zustimmung am Rechner (6.4) |
-| `host_service.local_confirm_timeout` |  | Host-Dienst | `60s` | Frist für die Zustimmung am Rechner |
+| `terminal.pairing_code_ttl` | `BOTHY_TERMINAL__PAIRING_CODE_TTL` | Server | `15m` | Validity of a pairing code for a host |
+| `terminal.fingerprint_confirm_chars` | `BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS` | Server | `8` | this many characters of the fingerprint the owner types for the confirmation |
+| `terminal.fingerprint_max_attempts` | `BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS` | Server | `3` | failed attempts at the confirmation, then fallback to `pairing` |
+| `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server | `60s` | the step-up for `terminal.open` and `terminal.attach` must be at most this old |
+| `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | `30s` | Validity of a terminal session token |
+| `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server | `20s` | Deadline until both sides are connected in the relay and the handshake is complete |
+| `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server | `15m` | this long a detached session stays attachable |
+| `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server | `60s` | Reattach from the same device without a new step-up within this time after the detach |
+| `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server | `30m` | without input from the device for this long, the session ends |
+| `terminal.idle_grace` | `BOTHY_TERMINAL__IDLE_GRACE` | Server | `2m` | Extra time after which the server itself ends the session because of idleness |
+| `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server | `12h` | Maximum duration of a session |
+| `terminal.max_sessions_per_person` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_PERSON` | Server | `5` | open sessions per person |
+| `terminal.max_sessions_per_host` | `BOTHY_TERMINAL__MAX_SESSIONS_PER_HOST` | Server | `10` | open sessions per host |
+| `terminal.relay_buffer_max_bytes` | `BOTHY_TERMINAL__RELAY_BUFFER_MAX_BYTES` | Server | `262144` | Buffer of the relay per direction and session |
+| `terminal.host_heartbeat_interval` | `BOTHY_TERMINAL__HOST_HEARTBEAT_INTERVAL` | Server | `20s` | Interval of the heartbeats of the control connection (reported in `hello`) |
+| `terminal.host_heartbeat_miss_limit` | `BOTHY_TERMINAL__HOST_HEARTBEAT_MISS_LIMIT` | Server | `3` | missing heartbeats until the control connection is closed |
+| `terminal.host_auth_timeout` | `BOTHY_TERMINAL__HOST_AUTH_TIMEOUT` | Server | `10s` | Deadline between `hello` and `identify` of the control and data connection |
+| `terminal.sweep_interval` | `BOTHY_TERMINAL__SWEEP_INTERVAL` | Server | `30s` | Interval of the job `terminal.sweep` ([02-architecture.md](../spec/02-architecture.md), section 12.3) |
+| `terminal.host_duplicate_probe_timeout` | `BOTHY_TERMINAL__HOST_DUPLICATE_PROBE_TIMEOUT` | Server | `5s` | this long the server waits for the answer of the older control connection (3.4) |
+| `host_service.state_dir` |  | Host service | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | State directory with the keys of the host, the bindings of the session users to people and, with `organization`, the API key of the profile `claude`; never a subscription login (7.4) |
+| `host_service.session_users` |  | Host service | empty | Session users of this host, one per person; one PTY helper per entry; never the service user; empty means: HD1 not passed; read only at start, changed with `bothy-host session-user add` and `remove`, which restart the host service for this (2.2) |
+| `host_service.extra_forbidden_groups` |  | Host service | empty | further groups that HD2 blocks in addition to the fixed list |
+| `host_service.credential_check_interval` |  | Host service | `60s` | Interval of the checks HD6 and HD11 during operation (2.2, 7.4) |
+| `host_service.entry_scan_timeout` |  | Host service | `10m` | Maximum duration of the check of the entries of HD11 per session user; after that their PTY helper aborts it, and HD11 does not pass for them (`entry_scan_timeout`, 2.2) |
+| `host_service.profiles` |  | Host service | `[shell]` | offered profiles (11.1) |
+| `host_service.claude_bin` |  | Host service | empty | absolute path of the coding agent that HD6 calls for `claude auth status` and that the profile `claude` starts with `organization`; belongs, with folder chain, interpreter and the folders of the search list, to a trusted owner (2.2 item 6, HD10); under Windows an `.exe`; empty means: HD6 checks only the login locations and warns, with `organization` there is no profile `claude`, enforcement rests on the person's own session user (7.4); for HD6 and the profile the value also counts as empty if the path cannot be resolved or the search list does not find the interpreter of a script |
+| `host_service.claude_workdirs` |  | Host service | empty | Working directories of the profile `claude` per session user (name from `host_service.session_users` -> list of folders with display names; only the display names are reported); each folder belongs to exactly this session user (Ruling T13, HD7, HD11); a folder with two session users drops out of both lists, the list after that is reported and used for `wdi`; read only at start, a change takes effect after `bothy-host restart`; without an entry no profile `claude` for this session user, empty means no profile `claude` |
+| `host_service.scrollback_bytes` |  | Host service | `1048576` | Scrollback buffer per session, only in memory |
+| `host_service.require_local_confirm` |  | Host service | `false` | every PTY only after consent on the host (6.4) |
+| `host_service.local_confirm_timeout` |  | Host service | `60s` | Deadline for the consent on the host |
 
-### 25 Visualisierung
+### 25 Visualization
 
-Quelle: [25-visualisierung.md](../spec/25-visualisierung.md), Abschnitt 15.
+Source: [25-visualization.md](../spec/25-visualization.md), section 15.
 
-| Schlüssel | Umgebung | Ort | Standard | Bedeutung |
+| Key | Environment | Place | Default | Meaning |
 |---|---|---|---|---|
-| `stats.live_enabled` | `BOTHY_STATS__LIVE_ENABLED` | Server | `true` | Live-Strom und `getStatsLive` an; aus: `403 feature_disabled` |
-| `stats.live_interval` | `BOTHY_STATS__LIVE_INTERVAL` | Server | `1s` | Abstand der Live-Rahmen; zugleich Lebensdauer des Basis-Rahmens für `getStatsLive` |
-| `stats.live_max_runs` | `BOTHY_STATS__LIVE_MAX_RUNS` | Server | `200` | höchstens so viele aktive Läufe je Rahmen |
-| `stats.live_max_subscribers` | `BOTHY_STATS__LIVE_MAX_SUBSCRIBERS` | Server | `200` | Abos von `stats.live` je api-Knoten |
-| `stats.live_sli_window` | `BOTHY_STATS__LIVE_SLI_WINDOW` | Server | `5m` | Zeitraum der SLI-Werte im Live-Rahmen |
-| `stats.flush_interval` | `BOTHY_STATS__FLUSH_INTERVAL` | Server | `10s` | Abstand, in dem ein Prozess seine Zähler in `stats_minutes` schreibt |
-| `stats.flush_queue_max` | `BOTHY_STATS__FLUSH_QUEUE_MAX` | Server | `20000` | Zählerschlüssel im Speicher je Prozess; darüber werden die ältesten verworfen |
-| `stats.timeline_max_range` | `BOTHY_STATS__TIMELINE_MAX_RANGE` | Server | `24h` | größter Zeitraum einer Timeline-Abfrage |
-| `stats.timeline_max_runs` | `BOTHY_STATS__TIMELINE_MAX_RUNS` | Server | `5000` | höchstens so viele Läufe in einer Timeline-Antwort |
-| `stats.slo_warn_budget_ratio` | `BOTHY_STATS__SLO_WARN_BUDGET_RATIO` | Server | `0.25` | unter diesem Restbudget wird die Ampel gelb |
-| `stats.slo_min_events` | `BOTHY_STATS__SLO_MIN_EVENTS` | Server | `100` | unter so vielen Ereignissen im SLO-Zeitraum ist die Ampel grau |
-| `console.grafana_embed_url` | `BOTHY_CONSOLE__GRAFANA_EMBED_URL` | Server | leer | Dashboard-URL für die Einbettung in die Konsole; leer heißt keine Einbettung und kein `frame-src` |
-| `viz.live_poll_interval` |  | App | `2s` | Abfrage von `getStatsLive` in der Web-Konsole |
-| `viz.stale_after` |  | App | `5s` | ohne neuen Rahmen zeigt die Ansicht "veraltet" |
-| `viz.timeline_speeds` |  | App | `60, 300, 900` | Abspielgeschwindigkeiten der Timeline (Sekunden Tageszeit je Sekunde) |
-| `viz.tv_rotation_interval` |  | App | `30s` | Wechsel der Ansichten im TV-Modus |
-| `viz.tv_show_costs` |  | App | `false` | Kosten im TV-Modus zeigen |
-| `viz.perf.frame_build_p95` |  | App | `8ms` | Ziel: Aufbau eines Frames der Live-Topologie mit `stats.live_max_runs` Läufen |
+| `stats.live_enabled` | `BOTHY_STATS__LIVE_ENABLED` | Server | `true` | live stream and `getStatsLive` on; off: `403 feature_disabled` |
+| `stats.live_interval` | `BOTHY_STATS__LIVE_INTERVAL` | Server | `1s` | interval between live frames; also the lifetime of the base frame for `getStatsLive` |
+| `stats.live_max_runs` | `BOTHY_STATS__LIVE_MAX_RUNS` | Server | `200` | at most this many active runs per frame |
+| `stats.live_max_subscribers` | `BOTHY_STATS__LIVE_MAX_SUBSCRIBERS` | Server | `200` | subscriptions to `stats.live` per api node |
+| `stats.live_sli_window` | `BOTHY_STATS__LIVE_SLI_WINDOW` | Server | `5m` | period of the SLI values in the live frame |
+| `stats.flush_interval` | `BOTHY_STATS__FLUSH_INTERVAL` | Server | `10s` | interval at which a process writes its counters to `stats_minutes` |
+| `stats.flush_queue_max` | `BOTHY_STATS__FLUSH_QUEUE_MAX` | Server | `20000` | counter keys in memory per process; above that, the oldest are discarded |
+| `stats.timeline_max_range` | `BOTHY_STATS__TIMELINE_MAX_RANGE` | Server | `24h` | longest period of a timeline query |
+| `stats.timeline_max_runs` | `BOTHY_STATS__TIMELINE_MAX_RUNS` | Server | `5000` | at most this many runs in a timeline response |
+| `stats.slo_warn_budget_ratio` | `BOTHY_STATS__SLO_WARN_BUDGET_RATIO` | Server | `0.25` | below this remaining budget, the traffic light turns yellow |
+| `stats.slo_min_events` | `BOTHY_STATS__SLO_MIN_EVENTS` | Server | `100` | below this many events in the SLO period, the traffic light is gray |
+| `console.grafana_embed_url` | `BOTHY_CONSOLE__GRAFANA_EMBED_URL` | Server | empty | dashboard URL for embedding in the console; empty means no embedding and no `frame-src` |
+| `viz.live_poll_interval` |  | App | `2s` | polling of `getStatsLive` in the web console |
+| `viz.stale_after` |  | App | `5s` | without a new frame, the view shows "stale" |
+| `viz.timeline_speeds` |  | App | `60, 300, 900` | playback speeds of the timeline (seconds of time of day per second) |
+| `viz.tv_rotation_interval` |  | App | `30s` | switching of the views in TV mode |
+| `viz.tv_show_costs` |  | App | `false` | show costs in TV mode |
+| `viz.perf.frame_build_p95` |  | App | `8ms` | target: build of one frame of the live topology with `stats.live_max_runs` runs |
 <!-- config-reference:end -->
 
-## 5. Geheimnisse
+## 5. Secrets
 
-Katalog der Dateien im Volume `secrets` ([16-betrieb.md](../spec/16-betrieb.md) 5.3).
-"Erzeugt" legt `secrets-init` an, "geliefert" legt der Owner in `infra/compose/secrets/` ab.
-Die Spalte "Dienste" nennt die Unterverzeichnisse (`subpath`), in die `secrets-init` die Datei
-kopiert.
+Catalogue of the files in the volume `secrets` ([16-operations.md](../spec/16-operations.md) 5.3).
+Files marked "generated" are created by `secrets-init`; files marked "supplied" are placed by the
+owner in `infra/compose/secrets/`. The column "Services" names the subdirectories (`subpath`)
+into which `secrets-init` copies the file.
 
-| Datei | Herkunft | Dienste | Verwendung |
+| File | Origin | Services | Use |
 |---|---|---|---|
-| `db_superuser_password` | erzeugt | postgres, migrate, backup | Superuser `postgres` |
-| `db_owner_password` | erzeugt | migrate | Rolle `bothy_owner` |
-| `db_app_password` | erzeugt | server, migrate | Rolle `bothy_app`, `database.password_ref` |
-| `db_maint_password` | erzeugt | server, migrate | Rolle `bothy_maint` (Aufbewahrungsjob) |
-| `db_monitor_password` | erzeugt | collector, migrate | Rolle `bothy_monitor`, Empfänger `postgresql` |
-| `token_pepper` | erzeugt | server | `auth.token_pepper_ref` |
-| `totp_key` | erzeugt, 32 Byte | server | `auth.totp_key_ref`: AES-256-GCM-Schlüssel der TOTP-Geheimnisse in `local_credentials` ([08-identitaet.md](../spec/08-identitaet.md) 2.5) |
-| `telemetry_pseudonym_key` | erzeugt, mindestens 32 Byte | server, collector | `telemetry.pseudonym_key_ref`, `hmac_key` der Allowlist |
-| `audit_ip_kek` | erzeugt, 32 Byte | server | `privacy.audit_ip_kek_ref`: verschlüsselt die IP-Schlüssel in `audit_ip_keys` |
-| `file_ticket_key` | erzeugt, 32 Byte | server | `file.ticket_key_ref`: HMAC der Abruf-Tickets ([12-dateien.md](../spec/12-dateien.md) 9.2) |
-| `pgbackrest_cipher_pass` | erzeugt | backup | Verschlüsselung der pgBackRest-Repositorys |
-| `pgbackrest_tls/` | erzeugt (eigene CA) | postgres, backup | gegenseitiges TLS zwischen Datenbank und Repository-Host |
-| `restic_password` | erzeugt | backup | Verschlüsselung des restic-Repositorys |
-| `s3_access_key`, `s3_secret_key` | erzeugt (Profil s3) oder geliefert (externer Dienst) | server, seaweedfs, backup | S3-Zugang, `file.s3.access_key_ref` und `file.s3.secret_key_ref` |
-| `grafana_admin_password` | erzeugt | grafana | Admin-Konto im lokalen Grafana |
-| `apns_key.p8` | geliefert | server | Push iOS und macOS, `push.apns.private_key_ref` |
-| `fcm_service_account.json` | geliefert | server | Push Android |
-| `oidc/<anbieter>_client_secret` | geliefert | server | OIDC mit `client_secret_basic` (`client_secret_ref` in `identity_providers.config`) |
-| `oidc/<anbieter>_client_key.pem` | geliefert | server | OIDC mit `private_key_jwt`: privater Schlüssel der Client-Assertion, PKCS#8 (`client_key_ref`, [08-identitaet.md](../spec/08-identitaet.md) 2.6) |
-| `offsite/` | geliefert | backup | Zugang zum Off-site-Ziel (S3-Schlüssel oder SSH-Schlüssel) |
-| `alertmanager_bothy_webhook_url` | geliefert | alertmanager | Eingangs-Webhook des Meldungskanals |
-| `alertmanager_external_webhook_url` | geliefert | alertmanager | externer Bereitschaftskanal |
-| `alertmanager_heartbeat_url` | geliefert | alertmanager | externer Herzschlag für den Watchdog |
-| `newrelic_license_key` | geliefert | collector | Overlay `newrelic` |
-| `grafana_otlp_authorization` | geliefert | collector | Overlay `grafana` (ganzer Kopfzeilenwert `Basic ...`) |
-| `datadog_api_key` | geliefert | collector | Overlay `datadog` |
-| `azure_client_secret` | geliefert | collector | Overlay `azure-monitor` (Service Principal) |
-| `sentry_key` | geliefert | collector | Overlay `sentry` |
+| `db_superuser_password` | generated | postgres, migrate, backup | superuser `postgres` |
+| `db_owner_password` | generated | migrate | role `bothy_owner` |
+| `db_app_password` | generated | server, migrate | role `bothy_app`, `database.password_ref` |
+| `db_maint_password` | generated | server, migrate | role `bothy_maint` (retention job) |
+| `db_monitor_password` | generated | collector, migrate | role `bothy_monitor`, receiver `postgresql` |
+| `token_pepper` | generated | server | `auth.token_pepper_ref` |
+| `totp_key` | generated, 32 bytes | server | `auth.totp_key_ref`: AES-256-GCM key of the TOTP secrets in `local_credentials` ([08-identity.md](../spec/08-identity.md) 2.5) |
+| `telemetry_pseudonym_key` | generated, at least 32 bytes | server, collector | `telemetry.pseudonym_key_ref`, `hmac_key` of the allowlist |
+| `audit_ip_kek` | generated, 32 bytes | server | `privacy.audit_ip_kek_ref`: encrypts the IP keys in `audit_ip_keys` |
+| `file_ticket_key` | generated, 32 bytes | server | `file.ticket_key_ref`: HMAC of the file tickets ([12-files.md](../spec/12-files.md) 9.2) |
+| `pgbackrest_cipher_pass` | generated | backup | encryption of the pgBackRest repositories |
+| `pgbackrest_tls/` | generated (own CA) | postgres, backup | mutual TLS between the database and the repository host |
+| `restic_password` | generated | backup | encryption of the restic repository |
+| `s3_access_key`, `s3_secret_key` | generated (profile s3) or supplied (external service) | server, seaweedfs, backup | S3 access, `file.s3.access_key_ref` and `file.s3.secret_key_ref` |
+| `grafana_admin_password` | generated | grafana | admin account in the local Grafana |
+| `apns_key.p8` | supplied | server | push for iOS and macOS, `push.apns.private_key_ref` |
+| `fcm_service_account.json` | supplied | server | push for Android |
+| `oidc/<provider>_client_secret` | supplied | server | OIDC with `client_secret_basic` (`client_secret_ref` in `identity_providers.config`) |
+| `oidc/<provider>_client_key.pem` | supplied | server | OIDC with `private_key_jwt`: private key of the client assertion, PKCS#8 (`client_key_ref`, [08-identity.md](../spec/08-identity.md) 2.6) |
+| `offsite/` | supplied | backup | access to the off-site target (S3 keys or SSH key) |
+| `alertmanager_bothy_webhook_url` | supplied | alertmanager | incoming webhook of the alert channel |
+| `alertmanager_external_webhook_url` | supplied | alertmanager | external on-call channel |
+| `alertmanager_heartbeat_url` | supplied | alertmanager | external heartbeat for the watchdog |
+| `newrelic_license_key` | supplied | collector | overlay `newrelic` |
+| `grafana_otlp_authorization` | supplied | collector | overlay `grafana` (whole header value `Basic ...`) |
+| `datadog_api_key` | supplied | collector | overlay `datadog` |
+| `azure_client_secret` | supplied | collector | overlay `azure-monitor` (service principal) |
+| `sentry_key` | supplied | collector | overlay `sentry` |
 
-Nicht im Volume `secrets`: Die privaten Signierschlüssel (`<zweck>-<kid>.pem`, Zwecke
-`access_token`, `invocation`, `webhook_out`, `audit_checkpoint`) erzeugt der Server selbst im
-Volume `signing-keys` (`secrets.signing_key_dir`, ADR 0066); `server_signing_keys.private_key_ref`
-zeigt dorthin. `bothy secrets export` sichert beide Orte.
+Not in the volume `secrets`: the server itself creates the private signing keys
+(`<purpose>-<kid>.pem`, purposes `access_token`, `invocation`, `webhook_out`, `audit_checkpoint`)
+in the volume `signing-keys` (`secrets.signing_key_dir`, ADR 0066); `server_signing_keys.private_key_ref`
+points there. `bothy secrets export` backs up both places.
 
-Erzeuger späterer Etappen: `pgbackrest_tls/` (M7-01) und die erzeugte Form von `s3_access_key` und
-`s3_secret_key` (Profil s3, M3). Bis dahin meldet `bothy secrets init` diese Einträge als `pending`;
-`s3_*` gelten so lange als geliefert.
+Generators of later milestones: `pgbackrest_tls/` (M7-01) and the generated form of `s3_access_key`
+and `s3_secret_key` (profile s3, M3). Until then, `bothy secrets init` reports these entries as
+`pending`; until then, `s3_*` count as supplied.
 
-## 6. Instanz-Einstellungen
+## 6. Instance settings
 
-Gespeichert in `instance_settings` ([03-datenmodell.md](../spec/03-datenmodell.md) 4.1), geprüft
-gegen das Schema des Schlüssels.
+Stored in `instance_settings` ([03-data-model.md](../spec/03-data-model.md) 4.1), checked
+against the schema of the key.
 
-| Schlüssel | Typ | Standard | Bedeutung |
+| Key | Type | Default | Meaning |
 |---|---|---|---|
-| `branding.product_name` | string | `Bothy` | angezeigter Produktname (ADR 0044); höchstens `branding.product_name_max_chars` Zeichen, ohne Steuer- und Bidi-Zeichen |
-| `branding.accent_color` | Schlüssel der Kategorie-Farben | `spruce` | Akzentfarbe; nur Schlüssel aus der geprüften Palette (ADR 0044), kein freier Farbwert |
-| `branding.logo_file_id` | uuid | leer | Logo als Datei |
-| `locale.default` | BCP 47 | `de` | Standardsprache neuer Menschen |
+| `branding.product_name` | string | `Bothy` | displayed product name (ADR 0044); at most `branding.product_name_max_chars` characters, without control and bidi characters |
+| `branding.accent_color` | key of the category colors | `spruce` | accent color; only keys from the checked palette (ADR 0044), no free color value |
+| `branding.logo_file_id` | uuid | empty | logo as a file |
+| `locale.default` | BCP 47 | `de` | default language of new people |
 
-Die Schlüssel des Brandings beschreibt [01-produkt.md](../spec/01-produkt.md), Abschnitt 12; persönliche
-Einstellungen (`user_settings`, z. B. `notify.*`) stehen in [13-push-benachrichtigungen.md](../spec/13-push-benachrichtigungen.md),
-Abschnitt 3.3.
+[01-product.md](../spec/01-product.md), section 12 describes the branding keys; personal
+settings (`user_settings`, for example `notify.*`) are in [13-push-notifications.md](../spec/13-push-notifications.md),
+section 3.3.
 
-## 7. Feature-Flags
+## 7. Feature flags
 
-Gespeichert in `feature_flags`; Regeln in [16-betrieb.md](../spec/16-betrieb.md) 6.2.
+Stored in `feature_flags`; rules in [16-operations.md](../spec/16-operations.md) 6.2.
 
-| Schlüssel | Art | Standard | Bedeutung | Quelle |
+| Key | Kind | Default | Meaning | Source |
 |---|---|---|---|---|
-| `dm.enabled` | option | aus | Direktnachrichten zwischen Menschen | [05-aktionen.md](../spec/05-aktionen.md) `dm.create` |
-| `voice.enabled` | option | aus | Transkription von Sprachnachrichten | [05-aktionen.md](../spec/05-aktionen.md) `file.transcribe` |
-| `tokens.personal_enabled` | option | aus | persönliche API-Tokens | [05-aktionen.md](../spec/05-aktionen.md) `token.create` |
+| `dm.enabled` | option | off | direct messages between people | [05-actions.md](../spec/05-actions.md) `dm.create` |
+| `voice.enabled` | option | off | transcription of voice messages | [05-actions.md](../spec/05-actions.md) `file.transcribe` |
+| `tokens.personal_enabled` | option | off | personal API tokens | [05-actions.md](../spec/05-actions.md) `token.create` |
 
-## 8. OpenTelemetry-Variablen
+## 8. OpenTelemetry variables
 
-Der Server und `bothy-backupd` lesen die Standard-Variablen des OpenTelemetry-SDK unverändert.
-Compose setzt diese:
+The server and `bothy-backupd` read the standard variables of the OpenTelemetry SDK unchanged.
+Compose sets these:
 
-| Variable | Wert in Compose | Bedeutung |
+| Variable | Value in Compose | Meaning |
 |---|---|---|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://otel-collector:4317` | Collector |
-| `OTEL_EXPORTER_OTLP_PROTOCOL` | `grpc` | Protokoll |
-| `OTEL_METRIC_EXPORT_INTERVAL` | aus `BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS` | Export-Intervall der Metriken in ms |
-| `OTEL_RESOURCE_ATTRIBUTES` | `deployment.environment.name=<Umgebung>` | Resource-Attribute |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://otel-collector:4317` | collector |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `grpc` | protocol |
+| `OTEL_METRIC_EXPORT_INTERVAL` | from `BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS` | export interval of the metrics in ms |
+| `OTEL_RESOURCE_ATTRIBUTES` | `deployment.environment.name=<environment>` | resource attributes |
 
-Warteschlangen und Batch-Größen stellen die Standard-Variablen `OTEL_BSP_*` (Spans) und
-`OTEL_BLRP_*` (Logs) ein. `service.name`, `service.namespace` und `bothy.server.role` setzt der
-Server selbst; ein Wert in `OTEL_RESOURCE_ATTRIBUTES` überschreibt sie nicht.
+The standard variables `OTEL_BSP_*` (spans) and `OTEL_BLRP_*` (logs) set queues and batch sizes.
+The server sets `service.name`, `service.namespace` and `bothy.server.role` itself; a value in
+`OTEL_RESOURCE_ATTRIBUTES` does not override them.
 
-## 9. Compose-Variablen
+## 9. Compose variables
 
-Datei `infra/compose/.env` nach Vorlage [`.env.example`](../../infra/compose/.env.example).
-Diese Variablen sind keine Server-Konfiguration; Compose setzt daraus Werte der Dienste.
+File `infra/compose/.env` based on the template [`.env.example`](../../infra/compose/.env.example).
+These variables are not server configuration; Compose derives values of the services from them.
 
-| Variable | Vorlage | Bedeutung |
+| Variable | Template | Meaning |
 |---|---|---|
-| `COMPOSE_PROFILES` | `direct,scan` | Profile: genau eines von direct, tailscale; dazu scan, s3, observability |
-| `BOTHY_REGISTRY` | `ghcr.io/OWNER` | Registry-Pfad der Bothy-Images in Kleinbuchstaben; im Bündel eines Produkt-Release `ghcr.io/<owner>` aus dem Owner des Repositorys ([18-release.md](../spec/18-release.md) 2.1) |
-| `BOTHY_VERSION` | gepinnte Server-Version des letzten Produkt-Release, vor dem ersten `0.0.0-placeholder` | Server-Version (SemVer ohne v); nie latest; geschrieben von `make release-prep COMPONENT=bothy SERVER_VERSION=<version>`, ein Platzhalter bricht `make release-build` ab ([18-release.md](../spec/18-release.md) 2.1) |
-| `BOTHY_ENVIRONMENT` | `prod` | setzt `instance.environment` und `deployment.environment.name` |
-| `BOTHY_PUBLIC_URL` | `https://chat.example.com` | setzt `server.public_url` |
-| `BOTHY_HTTP_PUBLISH_PORT` | `8090` | Host-Port auf 127.0.0.1 für die API (Profil direct) |
-| `BOTHY_TRUSTED_PROXIES` | `127.0.0.1/32,::1/128` | setzt `server.trusted_proxies` im Profil direct; dort die Gateway-Adresse des Compose-Netzes eintragen ([install-compose.md](install-compose.md) 5.1) |
-| `BOTHY_OTLP_PUBLISH_PORT` | `4318` | Host-Port auf 127.0.0.1 für OTLP/HTTP von Adaptern auf demselben Host |
-| `BOTHY_PROMETHEUS_PUBLISH_PORT` | `9090` | Host-Port auf 127.0.0.1 für Prometheus |
-| `BOTHY_ALERTMANAGER_PUBLISH_PORT` | `9093` | Host-Port auf 127.0.0.1 für Alertmanager |
-| `BOTHY_GRAFANA_PUBLISH_PORT` | `3300` | Host-Port auf 127.0.0.1 für Grafana |
-| `TS_HOSTNAME` | `bothy` | Gerätename im Tailnet; erscheint im öffentlichen Zertifikats-Log, darum neutral wählen |
-| `TS_AUTHKEY` | leer | Einmal-Schlüssel für die erste Tailscale-Anmeldung; danach leeren |
-| `BOTHY_TAILSCALE_VERSION` | `v1.102.5` | Image-Version des Tailscale-Sidecars |
-| `BOTHY_STORAGE_DRIVER` | `fs` | setzt `file.storage.driver`: fs oder s3 (Kapitel 12) |
-| `BOTHY_S3_ENDPOINT` | `http://seaweedfs:8333` | setzt `file.s3.endpoint` bei Treiber s3 |
-| `BOTHY_S3_BUCKET` | `bothy-files` | setzt `file.s3.bucket` bei Treiber s3 |
-| `BOTHY_CLAMD_ADDRESS` | `tcp://clamav:3310` | setzt `file.scan.clamd_address` (Kapitel 12) |
-| `BOTHY_PG_SHM_SIZE` | `256m` | Shared Memory des Datenbank-Containers |
-| `BOTHY_PG_ARCHIVE_TIMEOUT` | `60s` | setzt `archive_timeout` in PostgreSQL; gleich `backup.pg.archive_timeout` |
-| `BOTHY_BACKUP_OFFSITE_TARGET` | leer | setzt `backup.offsite.target` |
-| `BOTHY_OTEL_EXPORTER` | `none` | erstes Collector-Overlay |
-| `BOTHY_OTEL_EXPORTER_2` | `none` | zweites Collector-Overlay |
-| `BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS` | `15000` | setzt `OTEL_METRIC_EXPORT_INTERVAL` der Server-Prozesse |
-| `BOTHY_TRACE_SAMPLE_PERCENT` | `10` | Tail-Sampling: Anteil der übrigen Traces in Prozent |
-| `BOTHY_TRACE_SLOW_THRESHOLD_MS` | `2000` | Tail-Sampling: ab dieser Dauer wird ein Trace immer behalten |
-| `BOTHY_OTEL_MEMORY_LIMIT_PERCENT` | `80` | memory_limiter des Collectors |
-| `NEW_RELIC_OTLP_ENDPOINT` | `https://otlp.eu01.nr-data.net` | Overlay newrelic: Endpunkt (EU oder US) |
-| `GRAFANA_OTLP_ENDPOINT` | `https://otlp-gateway-REGION.grafana.net/otlp` | Overlay grafana: OTLP-Gateway |
-| `GRAFANA_INSTANCE_ID` | leer | Overlay grafana: Instanz-ID (nur Information; der Kopfzeilenwert liegt in secrets) |
-| `DD_SITE` | `datadoghq.eu` | Overlay datadog: Datadog-Site |
-| `AZURE_TENANT_ID` | leer | Overlay azure-monitor: Tenant |
-| `AZURE_CLIENT_ID` | leer | Overlay azure-monitor: Client-ID des Service Principals |
-| `AZURE_MONITOR_TRACES_ENDPOINT` | leer | Overlay azure-monitor: OTLP-Endpunkt Traces (DCE/DCR) |
-| `AZURE_MONITOR_METRICS_ENDPOINT` | leer | Overlay azure-monitor: OTLP-Endpunkt Metriken |
-| `AZURE_MONITOR_LOGS_ENDPOINT` | leer | Overlay azure-monitor: OTLP-Endpunkt Logs |
-| `SENTRY_OTLP_TRACES_ENDPOINT` | leer | Overlay sentry: OTLP-Endpunkt Traces |
-| `SENTRY_OTLP_LOGS_ENDPOINT` | leer | Overlay sentry: OTLP-Endpunkt Logs |
-| `BOTHY_PROMETHEUS_RETENTION` | `30d` | Aufbewahrung in Prometheus |
-| `BOTHY_LOKI_RETENTION` | `14d` | Aufbewahrung in Loki |
-| `BOTHY_TEMPO_RETENTION` | `168h` | Aufbewahrung in Tempo |
-| `BOTHY_OTELCOL_VERSION` | `0.162.0` | Image-Version des Collectors (contrib) |
-| `BOTHY_CLAMAV_VERSION` | `1.5.4` | Image-Version von ClamAV (clamav-debian, auch arm64) |
-| `BOTHY_SEAWEEDFS_VERSION` | `4.48` | Image-Version von SeaweedFS |
-| `BOTHY_PROMETHEUS_VERSION` | `v3.15.0` | Image-Version von Prometheus |
-| `BOTHY_ALERTMANAGER_VERSION` | `v0.34.1` | Image-Version von Alertmanager |
-| `BOTHY_LOKI_VERSION` | `3.7.8` | Image-Version von Loki |
-| `BOTHY_TEMPO_VERSION` | `3.1.0` | Image-Version von Tempo |
-| `BOTHY_GRAFANA_VERSION` | `13.2.3` | Image-Version von Grafana |
-| `BOTHY_CLAMAV_MEMORY_LIMIT` | `4g` | Speichergrenze des ClamAV-Containers |
-| `BOTHY_LOG_MAX_SIZE` | `20m` | Größe einer Container-Logdatei bis zur Rotation |
-| `BOTHY_LOG_MAX_FILE` | `5` | behaltene Container-Logdateien je Dienst |
+| `COMPOSE_PROFILES` | `direct,scan` | profiles: exactly one of direct, tailscale; in addition scan, s3, observability |
+| `BOTHY_REGISTRY` | `ghcr.io/OWNER` | registry path of the Bothy images in lowercase; in the bundle of a product release `ghcr.io/<owner>` from the owner of the repository ([18-release.md](../spec/18-release.md) 2.1) |
+| `BOTHY_VERSION` | pinned server version of the last product release, before the first one `0.0.0-placeholder` | server version (SemVer without v); never latest; written by `make release-prep COMPONENT=bothy SERVER_VERSION=<version>`, a placeholder aborts `make release-build` ([18-release.md](../spec/18-release.md) 2.1) |
+| `BOTHY_ENVIRONMENT` | `prod` | sets `instance.environment` and `deployment.environment.name` |
+| `BOTHY_PUBLIC_URL` | `https://chat.example.com` | sets `server.public_url` |
+| `BOTHY_HTTP_PUBLISH_PORT` | `8090` | host port on 127.0.0.1 for the API (profile direct) |
+| `BOTHY_TRUSTED_PROXIES` | `127.0.0.1/32,::1/128` | sets `server.trusted_proxies` in profile direct; enter the gateway address of the Compose network there ([install-compose.md](install-compose.md) 5.1) |
+| `BOTHY_OTLP_PUBLISH_PORT` | `4318` | host port on 127.0.0.1 for OTLP/HTTP from adapters on the same host |
+| `BOTHY_PROMETHEUS_PUBLISH_PORT` | `9090` | host port on 127.0.0.1 for Prometheus |
+| `BOTHY_ALERTMANAGER_PUBLISH_PORT` | `9093` | host port on 127.0.0.1 for Alertmanager |
+| `BOTHY_GRAFANA_PUBLISH_PORT` | `3300` | host port on 127.0.0.1 for Grafana |
+| `TS_HOSTNAME` | `bothy` | device name in the tailnet; appears in the public certificate log, so choose a neutral name |
+| `TS_AUTHKEY` | empty | one-time key for the first Tailscale login; clear it afterwards |
+| `BOTHY_TAILSCALE_VERSION` | `v1.102.5` | image version of the Tailscale sidecar |
+| `BOTHY_STORAGE_DRIVER` | `fs` | sets `file.storage.driver`: fs or s3 (chapter 12) |
+| `BOTHY_S3_ENDPOINT` | `http://seaweedfs:8333` | sets `file.s3.endpoint` with driver s3 |
+| `BOTHY_S3_BUCKET` | `bothy-files` | sets `file.s3.bucket` with driver s3 |
+| `BOTHY_CLAMD_ADDRESS` | `tcp://clamav:3310` | sets `file.scan.clamd_address` (chapter 12) |
+| `BOTHY_PG_SHM_SIZE` | `256m` | shared memory of the database container |
+| `BOTHY_PG_ARCHIVE_TIMEOUT` | `60s` | sets `archive_timeout` in PostgreSQL; equal to `backup.pg.archive_timeout` |
+| `BOTHY_BACKUP_OFFSITE_TARGET` | empty | sets `backup.offsite.target` |
+| `BOTHY_OTEL_EXPORTER` | `none` | first collector overlay |
+| `BOTHY_OTEL_EXPORTER_2` | `none` | second collector overlay |
+| `BOTHY_OTEL_METRIC_EXPORT_INTERVAL_MS` | `15000` | sets `OTEL_METRIC_EXPORT_INTERVAL` of the server processes |
+| `BOTHY_TRACE_SAMPLE_PERCENT` | `10` | tail sampling: share of the remaining traces in percent |
+| `BOTHY_TRACE_SLOW_THRESHOLD_MS` | `2000` | tail sampling: from this duration on, a trace is always kept |
+| `BOTHY_OTEL_MEMORY_LIMIT_PERCENT` | `80` | memory_limiter of the collector |
+| `NEW_RELIC_OTLP_ENDPOINT` | `https://otlp.eu01.nr-data.net` | overlay newrelic: endpoint (EU or US) |
+| `GRAFANA_OTLP_ENDPOINT` | `https://otlp-gateway-REGION.grafana.net/otlp` | overlay grafana: OTLP gateway |
+| `GRAFANA_INSTANCE_ID` | empty | overlay grafana: instance ID (information only; the header value is in secrets) |
+| `DD_SITE` | `datadoghq.eu` | overlay datadog: Datadog site |
+| `AZURE_TENANT_ID` | empty | overlay azure-monitor: tenant |
+| `AZURE_CLIENT_ID` | empty | overlay azure-monitor: client ID of the service principal |
+| `AZURE_MONITOR_TRACES_ENDPOINT` | empty | overlay azure-monitor: OTLP endpoint for traces (DCE/DCR) |
+| `AZURE_MONITOR_METRICS_ENDPOINT` | empty | overlay azure-monitor: OTLP endpoint for metrics |
+| `AZURE_MONITOR_LOGS_ENDPOINT` | empty | overlay azure-monitor: OTLP endpoint for logs |
+| `SENTRY_OTLP_TRACES_ENDPOINT` | empty | overlay sentry: OTLP endpoint for traces |
+| `SENTRY_OTLP_LOGS_ENDPOINT` | empty | overlay sentry: OTLP endpoint for logs |
+| `BOTHY_PROMETHEUS_RETENTION` | `30d` | retention in Prometheus |
+| `BOTHY_LOKI_RETENTION` | `14d` | retention in Loki |
+| `BOTHY_TEMPO_RETENTION` | `168h` | retention in Tempo |
+| `BOTHY_OTELCOL_VERSION` | `0.162.0` | image version of the collector (contrib) |
+| `BOTHY_CLAMAV_VERSION` | `1.5.4` | image version of ClamAV (clamav-debian, also arm64) |
+| `BOTHY_SEAWEEDFS_VERSION` | `4.48` | image version of SeaweedFS |
+| `BOTHY_PROMETHEUS_VERSION` | `v3.15.0` | image version of Prometheus |
+| `BOTHY_ALERTMANAGER_VERSION` | `v0.34.1` | image version of Alertmanager |
+| `BOTHY_LOKI_VERSION` | `3.7.8` | image version of Loki |
+| `BOTHY_TEMPO_VERSION` | `3.1.0` | image version of Tempo |
+| `BOTHY_GRAFANA_VERSION` | `13.2.3` | image version of Grafana |
+| `BOTHY_CLAMAV_MEMORY_LIMIT` | `4g` | memory limit of the ClamAV container |
+| `BOTHY_LOG_MAX_SIZE` | `20m` | size of a container log file until rotation |
+| `BOTHY_LOG_MAX_FILE` | `5` | kept container log files per service |
 
-## 10. Pflege
+## 10. Maintenance
 
-1. Ein neuer Wert entsteht in der Tabelle "Konfigurationswerte dieses Kapitels" seines Kapitels;
-   `make config-reference` übernimmt ihn in Abschnitt 4. Ein Name steht in genau einem Kapitel.
-2. Ein Schlüssel wird nie umgedeutet. Entfernen ist eine Hauptversion des Servers
-   ([18-release.md](../spec/18-release.md) 3); vorher steht er eine Minor-Version lang als
-   veraltet in den Release Notes und erzeugt beim Start eine Warnung.
-3. Prosa nennt nur den Namen, nie die Zahl.
+1. A new value is created in the table "Configuration values of this chapter" of its chapter;
+   `make config-reference` takes it into section 4. A name lives in exactly one chapter.
+2. A key is never reinterpreted. Removing it is a major version of the server
+   ([18-release.md](../spec/18-release.md) 3); before that, it is listed as deprecated in the
+   release notes for one minor version and produces a warning at startup.
+3. Prose names only the name, never the number.

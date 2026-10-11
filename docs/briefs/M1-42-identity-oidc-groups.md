@@ -1,36 +1,36 @@
 # M1-42: Groups from OIDC claims
 
-Status: ready | Depends on: M1-41 | Etappe: M1
+Status: ready | Depends on: M1-41 | Milestone: M1
 
 ## Goal
 
 After this ticket, groups with `source = 'oidc_claim'` follow the group claim of the identity
 provider at every OIDC login: missing memberships are removed, new ones are added with an expiry,
-and present ones are extended. Every change is a rights change with `access.changed`, checked
+and present ones are extended. Every change is a permission change with `access.changed`, checked
 against invariant I1 in the same transaction; if the sync would violate I1, the login fails and
 nothing changes. Owners can thus manage access in the identity provider without the provider ever
-gaining rights the owner did not map to a group.
+gaining permissions the owner did not map to a group.
 
 ## Read first
 
-- `docs/spec/08-identitaet.md`: 2.1 "Port" (`ExternalIdentity.Groups`), 2.2, 2.3 "Beispiel
-  Microsoft Entra ID" (groups claim and overage), 3.4 "Gruppen aus Claims", 18
+- `docs/spec/08-identity.md`: 2.1 "Port" (`ExternalIdentity.Groups`), 2.2, 2.3 "Example:
+  Microsoft Entra ID" (groups claim and overage), 3.4 "Groups from claims", 18
   (`auth.group_claim_max_age`), and the parts of 2.2 rewritten by M1-41 (callback stores the
   external identity, complete maps).
-- `docs/spec/03-datenmodell.md`: 4.3 `groups`, `group_memberships`, the paragraph after `grants`
-  (every change of `group_memberships` raises `permission_version`); 6.3 "Sperrreihenfolge";
-  6.4 "I1-Prüfung"; 4.2 `auth_login_flows` and `identity_providers`; 4.12 `audit_events`.
-- `docs/spec/05-aktionen.md` and `docs/spec/actions.yaml`: rule 1.6, 1.7, 1.10; 4.4 "Gruppen und
-  Freigaben"; the system action for the sync (preconditions).
-- `docs/spec/07-rechte.md`: 2.1 "Subjekte", 2.5 "Gültigkeit einer Freigabe", 4.4 "Invarianten in
-  der Transaktion", SR1, 8.3 "Ablauf durch Zeit", 11.1 AZ-M07, AZ-M09, AZ-M25.
-- `docs/spec/04-sync-protokoll.md`: 8.2 "Was beim Ändern passiert" (`access.changed`).
-- `docs/spec/06-api.md`: 4 point 5 (`409 i1_violation` with `hint`), 5 "Fehler".
-- `docs/spec/02-architektur.md`: 4.3, 4.4 (`identity` may use `authz`), 4.6, 5.
+- `docs/spec/03-data-model.md`: 4.3 `groups`, `group_memberships`, the paragraph after `grants`
+  (every change of `group_memberships` raises `permission_version`); 6.3 "Lock order";
+  6.4 "I1 check"; 4.2 `auth_login_flows` and `identity_providers`; 4.12 `audit_events`.
+- `docs/spec/05-actions.md` and `docs/spec/actions.yaml`: rule 1.6, 1.7, 1.10; 4.4 "Groups and
+  grants"; the system action for the sync (preconditions).
+- `docs/spec/07-permissions.md`: 2.1 "Subjects", 2.5 "Validity of a grant", 4.4 "Invariants in the
+  transaction", SR1, 8.3 "Expiry by time", 11.1 AZ-M07, AZ-M09, AZ-M25.
+- `docs/spec/04-sync-protocol.md`: 8.2 "What happens on a change" (`access.changed`).
+- `docs/spec/06-api.md`: 4 point 5 (`409 i1_violation` with `hint`), 5 "Errors".
+- `docs/spec/02-architecture.md`: 4.3, 4.4 (`identity` may use `authz`), 4.6, 5.
 - ADRs 0017, 0018, 0019, 0024.
 - `docs/api/openapi.yaml`: schemas `Group`, `GroupSource`, `GroupChangedPayload`,
   `AccessChangedPayload`.
-- Merged code and READMEs: `internal/authz` (Admin port, rights-change phase hook,
+- Merged code and READMEs: `internal/authz` (Admin port, permission-change phase hook,
   `VerifyInvariants`, from M1-29), `internal/identity` (OIDC flow of M1-41, provider registry of
   M1-36).
 - `docs/PLAN.md` section 3 and section 7 rows M1-29, M1-30, M1-41, M1-42, M1-48;
@@ -50,7 +50,7 @@ gaining rights the owner did not map to a group.
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour change has a test that was red before the change (the red run is
+6. Test first: every behavior change has a test that was red before the change (the red run is
    quoted in the report), then green, then refactor.
 7. No en dash or em dash characters in any file you write; use a hyphen or rephrase.
 8. White label: groups in tests are named Support, Marketing, Engineering, Research; people Alex,
@@ -58,11 +58,11 @@ gaining rights the owner did not map to a group.
 9. Limits and time windows only through named configuration keys (`auth.group_claim_max_age`).
 10. Groups with `source = 'oidc_claim'` are reconciled at every OIDC login; missing memberships are
     removed, new ones get `expires_at = login time + auth.group_claim_max_age` (08 3.4).
-11. Every change is a rights change with I1 check in the same transaction; an I1 violation fails
-    the login and changes nothing (08 3.4, 07 4.4, 05 rule 1.6).
+11. Every change is a permission change with I1 check in the same transaction; an I1 violation
+    fails the login and changes nothing (08 3.4, 07 4.4, 05 rule 1.6).
 12. Group overage or a missing claim counts as "no group information": no change, memberships run
     out after `auth.group_claim_max_age`; the server never calls Microsoft Graph (08 2.3).
-13. Groups contain only people (R-DM-07); rights logic stays in `authz` (B7, 02 4.1 rule 6).
+13. Groups contain only people (R-DM-07); permission logic stays in `authz` (B7, 02 4.1 rule 6).
 
 ## Scope
 
@@ -88,7 +88,7 @@ gaining rights the owner did not map to a group.
 - `services/server/internal/authz/README.md`, `services/server/internal/identity/README.md`,
   CHANGELOG entry under "Unreleased" of `services/server/CHANGELOG.md`, `docs/DECISIONS.md`
   entries for the rulings below, `docs/operations/oidc-entra.md` section on groups (claim
-  configuration in Entra, overage behaviour, mapping by creating groups with `source = oidc_claim`
+  configuration in Entra, overage behavior, mapping by creating groups with `source = oidc_claim`
   and `external_ref`).
 
 ## Out of scope
@@ -126,13 +126,14 @@ gaining rights the owner did not map to a group.
 **Preconditions (check before writing code; any failure: `Verdict: BLOCKED <which>`).**
 
 1. The action catalogue (`docs/spec/actions.yaml`, 05 4.4) has the system action
-   `group.member.sync` (resource `user`, right `system`, audit yes, rights yes, no rate-limit
-   class), 05 rule 1.6 lists it among the actions with I1 check, and 02 4.6 assigns it to `authz`.
+   `group.member.sync` (resource `user`, permission `system`, audit yes, permissions yes, no
+   rate-limit class), 05 rule 1.6 lists it among the actions with I1 check, and 02 4.6 assigns it
+   to `authz`.
    Reason: a claim-driven change is neither an owner's `group.member.add` nor the expiry job, and
    every audit entry must name a catalogued action (R-AZ-15).
 2. M1-41 is merged with the external identity carried in `auth_login_flows` and the mapping in
    `completeOidcLogin`.
-3. M1-29 provides the rights-change path (`permission_version` locked first, diff of visible
+3. M1-29 provides the permission-change path (`permission_version` locked first, diff of visible
    targets, `access.changed`, `VerifyInvariants`, deny audit in its own transaction).
 
 **Provider field `groups_claim`** (`identity_provider.oidc.v1`, optional string, default absent =
@@ -202,7 +203,7 @@ unused). In a separate transaction: flow `status = 'failed'`, audit entry with t
 i1_violation` with `hint` "Sign-in blocked by a group mapping. An owner must switch the affected
 agent to organization first."
 
-**Concurrency.** Two parallel logins of the same person serialise on `permission_version`; the
+**Concurrency.** Two parallel logins of the same person serialize on `permission_version`; the
 second sees the first's rows. Test it.
 
 ## Tests (write them first)
@@ -230,7 +231,7 @@ Integration tests (PostgreSQL 18, fake IdP of M1-41, fake `AgentPolicySource` an
 - `TestGroupClaimSync_AbsentClaimNoChange` and `TestGroupClaimSync_EntraOverageNoChange`: no row,
   no event, no version change.
 - `TestGroupClaimSync_ExpiryWithoutJob`: with the clock at `expires_at` and no job running, Sam
-  loses read access through the group (AZ-M09 behaviour with a claim group).
+  loses read access through the group (AZ-M09 behavior with a claim group).
 - `TestGroupClaimSync_I1ViolationFailsLoginNothingChanges` (the AZ-P7 case for `group.member.sync`;
   M1-29 covers every other action of 05 rule 1.6 and leaves this one to this ticket): a fake personal agent operating a
   channel on which the Engineering group has `trigger`; Robin's claim adds Engineering; complete

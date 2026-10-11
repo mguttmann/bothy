@@ -1,6 +1,6 @@
 # M1-23: Server image (ADR 0012)
 
-Status: ready | Depends on: M1-11 | Etappe: M1
+Status: ready | Depends on: M1-11 | Milestone: M1
 
 ## Goal
 
@@ -15,24 +15,24 @@ the release workflow builds the same file with version and revision. The Compose
 ## Read first
 
 - `docs/adr/0012-oci-images-compose-opentofu.md` (decision point 1, "Confirmation").
-- `docs/spec/18-release.md`: "2. Komponenten", "5. Kanäle" (rule 3: no `latest`), "6. Lieferkette",
-  "7. Server-Images".
-- `docs/spec/16-betrieb.md`: "2. Bausteine einer Instanz", "4.2 Zwei Listener", "5.2 Secret-Provider",
-  "5.3 Geheimnisse im Compose-Stack" (`secrets-init` runs as `0:0`), "10. Upgrade".
-- `docs/spec/02-architektur.md`: "3.3 Befehle des Binarys" (`bothy healthcheck --url`,
-  `bothy config check`), "6. Code-Layout" (name-bound places: binary `bothy`, image name).
-- `docs/spec/19-sicherheit.md`: "12. Lieferkette, Sicherungen und Audit-Integrität" (SEC-SC-4,
+- `docs/spec/18-release.md`: "2. Components", "5. Channels" (rule 3: no `latest`), "6. Supply chain",
+  "7. Server images".
+- `docs/spec/16-operations.md`: "2. Building blocks of an instance", "4.2 Two listeners", "5.2 Secret provider",
+  "5.3 Secrets in the Compose stack" (`secrets-init` runs as `0:0`), "10. Upgrade".
+- `docs/spec/02-architecture.md`: "3.3 Commands of the binary" (`bothy healthcheck --url`,
+  `bothy config check`), "6. Code layout" (name-bound places: binary `bothy`, image name).
+- `docs/spec/19-security.md`: "12. Supply chain, backups and audit integrity" (SEC-SC-4,
   SEC-SC-5).
-- `docs/spec/23-qualitaet.md`: "1. Grundsätze" (pinned tools), "8. Lieferkette".
+- `docs/spec/23-quality.md`: "1. Principles" (pinned tools), "8. Supply chain".
 - `docs/PLAN.md`: section 7, rows M1-11, M1-12, M1-23, M1-73; decisions P-05, P-06, P-09.
 - `infra/compose/compose.yaml` (anchors `x-hardening`, `x-server-healthcheck`, `x-api`, service
   `secrets-init`), `.github/workflows/release.yml` (job `build`: context `.`, file
   `services/server/Dockerfile`, push by digest, `make trivy-image`), `Makefile` (targets `trivy`,
   `trivy-image`, `lint`), `renovate.json` (`config:best-practices` keeps digests current),
-  `docs/quality/toolchain.md` ("Trivy: Version halten"), `docs/quality/gates.md`.
+  `docs/quality/toolchain.md` ("Trivy: keep the version"), `docs/quality/gates.md`.
 - Code merged by earlier tickets: `services/server/cmd/bothy` (subcommands `serve`, `migrate`,
   `healthcheck`, `config`), `services/server/VERSION`, `internal/platform/buildinfo` (M1-10; 18
-  "Komponenten" rule 5: the version is a constant held equal to `VERSION` by a test).
+  "Components" rule 5: the version is a constant held equal to `VERSION` by a test).
 - `CONTRIBUTING.md`.
 
 ## Fixed requirements that apply
@@ -54,13 +54,13 @@ the release workflow builds the same file with version and revision. The Compose
 7. No en dash and no em dash in any file you write. White label: no company, person, host or
    instance names; the repository placeholder is `OWNER` (P-05).
 8. Configuration only through named keys listed in `docs/operations/configuration.md`.
-9. 18 "7. Server-Images": linux/amd64 and linux/arm64 as one multi-arch manifest; not built by
+9. 18 "7. Server images": linux/amd64 and linux/arm64 as one multi-arch manifest; not built by
    emulation; static Go binary without cgo on a minimal base image without shell, user without root;
    `HEALTHCHECK` and Compose call `bothy healthcheck`; base images pinned by digest; OCI labels
    `org.opencontainers.image.source`, `.version`, `.revision`, `.licenses`.
-10. 18 "5. Kanäle" rule 3: no moving tag `latest`.
+10. 18 "5. Channels" rule 3: no moving tag `latest`.
 11. SEC-SC-4: container base images pinned by digest.
-12. 16 "1. Ziele" rule 5: secrets never in images.
+12. 16 "1. Goals" rule 5: secrets never in images.
 
 ## Scope
 
@@ -72,7 +72,7 @@ the release workflow builds the same file with version and revision. The Compose
       `go mod download` with a cache mount, then the sources. Build with `CGO_ENABLED=0`,
       `GOOS=$TARGETOS`, `GOARCH=$TARGETARCH`, `GOTOOLCHAIN=local`, `GOFLAGS=-mod=readonly`,
       `go build -trimpath -buildvcs=false -ldflags "-s -w" -o /out/bothy ./cmd/bothy`. The binary
-      embeds its version through `buildinfo`; add no linker flag for it (18 "Komponenten" rule 5).
+      embeds its version through `buildinfo`; add no linker flag for it (18 "Components" rule 5).
     - Final stage `FROM gcr.io/distroless/static-debian<NN>:nonroot@sha256:<index digest>`, using
       the newest Debian line the distroless project lists as supported when you build; record tag
       and digest in the README. `COPY --from=build --chown=0:0 --chmod=0555 /out/bothy
@@ -121,11 +121,11 @@ the release workflow builds the same file with version and revision. The Compose
    action in a `release*` job, rule `release-untrusted-output`, D-W-52),
    `REVISION=${{ github.sha }}` and `SOURCE_URL=${{ github.server_url }}/${{ github.repository }}`,
    and remove the `docker/setup-qemu-action` step: the server image is cross compiled and needs no
-   emulation (18 "Server-Images" rule 2). Nothing else in the workflow changes; `make lint`
+   emulation (18 "Server images" rule 2). Nothing else in the workflow changes; `make lint`
    (actionlint, zizmor) and `make runners-check` stay green.
-7. **Docs and records**: `services/server/README.md` section "Image" (German: build, local tag,
+7. **Docs and records**: `services/server/README.md` section "Image" (English: build, local tag,
    user `65532`, read-only root file system, no shell, health check, base images with tag and
-   digest, how to create a multi-platform builder); `docs/spec/18-release.md` "7. Server-Images"
+   digest, how to create a multi-platform builder); `docs/spec/18-release.md` "7. Server images"
    already states the numeric user, cross compilation, the digest check and the build arguments;
    add the build context and the ignore file; `docs/quality/gates.md` names `image`, `image-test`
    and the pin check in the `lint` row; `CONTRIBUTING.md` says that image work needs Docker with
@@ -237,7 +237,7 @@ Commands that must pass: `make image`, `make image-test`, `make trivy`,
 - [ ] `make trivy` and `make trivy-image IMAGE=<local image>` are green.
 - [ ] `release.yml` passes `VERSION`, `REVISION` and `SOURCE_URL`; `make lint` (actionlint,
       zizmor) and `make runners-check` are green.
-- [ ] README, 18 "7. Server-Images", `gates.md`, `CONTRIBUTING.md`, `DECISIONS.md` and the
+- [ ] README, 18 "7. Server images", `gates.md`, `CONTRIBUTING.md`, `DECISIONS.md` and the
       CHANGELOG describe the image as built.
 - [ ] `make check` is green.
 

@@ -1,6 +1,6 @@
 # M1-71: Contract tests with Schemathesis (G7, G8)
 
-Status: ready | Depends on: M1-50, M1-62, M1-63 | Etappe: M1
+Status: ready | Depends on: M1-50, M1-62, M1-63 | Milestone: M1
 
 ## Goal
 
@@ -13,17 +13,17 @@ breaks the gate, and every failure prints a reproducible `curl` command.
 
 ## Read first
 
-- `docs/spec/06-api.md`: "Grundregeln" (rows Kein `null`, Unbekanntes, Korrelation, Medientypen),
-  "Authentifizierung je Prinzipal-Art" ("DPoP", "Step-up"), "Autorisierung in der API", "Fehler"
-  (generated problem table), "Idempotenz", "Nebenläufigkeit", "Rate-Limits", "Codegenerierung",
-  "Vertragstests und Gate" (G7, G8 and items 1 to 3).
-- `docs/spec/19-sicherheit.md`: "Eingabevalidierung im Server" (SEC-IN-1, SEC-IN-2), "Tests"
+- `docs/spec/06-api.md`: "Basic rules" (rows No `null`, Unknown, Correlation, Media types),
+  "Authentication per principal kind" ("DPoP", "Step-up"), "Authorization in the API", "Errors"
+  (generated problem table), "Idempotency", "Concurrency", "Rate limits", "Code generation",
+  "Contract tests and gate" (G7, G8 and items 1 to 3).
+- `docs/spec/19-security.md`: "Input validation in the server" (SEC-IN-1, SEC-IN-2), "Tests"
   (SEC-T06).
-- `docs/spec/08-identitaet.md`: "DPoP", "Step-up-Ablauf", "Konfigurationswerte dieses Kapitels"
+- `docs/spec/08-identity.md`: "DPoP", "Step-up flow", "Configuration values of this chapter"
   (`auth.dpop_required_for`, `auth.step_up_max_age` is in 03, `auth.access_token_ttl`).
-- `docs/spec/23-qualitaet.md`: "Grundsätze", "Komponenten-Vertrag", "Konfigurationswerte dieses
-  Kapitels"; `docs/quality/gates.md`; `docs/quality/toolchain.md`.
-- `docs/PLAN.md`: section "M1 Fundament" ("Teststrategie", known contradiction W7), row M1-71,
+- `docs/spec/23-quality.md`: "Principles", "Component contract", "Configuration values of this
+  chapter"; `docs/quality/gates.md`; `docs/quality/toolchain.md`.
+- `docs/PLAN.md`: section "M1 Foundation" ("Test strategy", known contradiction W7), row M1-71,
   decision P-04 and P-09.
 - `docs/api/openapi.yaml` (components `securitySchemes`, `headers/Correlation-Id`, `responses`,
   `schemas/Problem`), `services/server/api/operations.yaml` (enablement list).
@@ -49,15 +49,15 @@ breaks the gate, and every failure prints a reproducible `curl` command.
 6. Test first: every test is written and seen failing before the code that makes it pass.
 7. No en dash and no em dash in any file; white label.
 8. Configuration only through named keys from `docs/operations/configuration.md`; new gate values
-   only as named values in 23 "Konfigurationswerte dieses Kapitels".
-9. G7 (06 "Vertragstests und Gate"): property-based tests against the running server for status
+   only as named values in 23 "Configuration values of this chapter".
+9. G7 (06 "Contract tests and gate"): property-based tests against the running server for status
    codes, media types, response schemas and headers of every operation; stateful sequences over
    derived links; project checks: problem format, `Correlation-Id`, no `null`, 404 equality for
    foreign and missing IDs.
 10. G8: every response of every integration test matches the specification.
 11. SEC-T06: schema fuzzing of all routes: no `5xx` except expected ones, unknown fields not
     accepted (W7: SEC-IN-1 wins for writing schemas), duplicate JSON keys rejected (SEC-IN-2).
-12. 06 item 1 of "Vertragstests und Gate": DPoP proofs are built by a Python hook.
+12. 06 item 1 of "Contract tests and gate": DPoP proofs are built by a Python hook.
 
 ## Scope
 
@@ -74,7 +74,7 @@ breaks the gate, and every failure prints a reproducible `curl` command.
 4. `tools/pyproject.toml`: add to the `dev` group `schemathesis==4.30.1` (the version probed in 06)
    and `cryptography` pinned to the current release at build time; refresh `tools/uv.lock` with
    `uv lock`; add `contract` to pytest `testpaths` and `pythonpath`, coverage `source`, mypy
-   `files`. Rows for both in `docs/quality/toolchain.md` (section "Gate-Werkzeuge", with license).
+   `files`. Rows for both in `docs/quality/toolchain.md` (section "Gate tools", with license).
 5. `Makefile`:
     - `CONTRACT_MAX_EXAMPLES ?= 100` and new target `contract-test` (help `## Contract tests G7:
       Schemathesis against the server of this tree (Docker runtime)`) added to `gates`; SKIP line
@@ -86,9 +86,9 @@ breaks the gate, and every failure prints a reproducible `curl` command.
       `go vet -tags contract_validate,contract_live` and golangci-lint `--build-tags
       contract_validate,contract_live`; `typecheck` keeps the untagged `go build ./...` (production).
     - bandit directory list in `lint`: add `tools/contract`.
-6. Named value: row `quality.contract.max_examples` with default `100`, unit "Anzahl", meaning
-   "Beispiele je Operation in G7", held by `Makefile` (`CONTRACT_MAX_EXAMPLES`), in 23
-   "Konfigurationswerte dieses Kapitels"; matching entry in `SOURCES` of
+6. Named value: row `quality.contract.max_examples` with default `100`, unit "count", meaning
+   "examples per operation in G7", held by `Makefile` (`CONTRACT_MAX_EXAMPLES`), in 23
+   "Configuration values of this chapter"; matching entry in `SOURCES` of
    `tools/docs/tests/test_config_values.py`.
 7. Module register: vendor entry for the validator library allowed only for `platform` (the
    `testsupport` component may use any vendor, M1-05); `make arch` green.
@@ -114,9 +114,9 @@ services/server/test`) and wrap it if it builds the real `internal/wire` graph.
   in this process; PostgreSQL 18 from `internal/platform/pg/pgtest`; migrations as
   `bothy migrate up --bootstrap` runs them; secrets created as `bothy secrets init` creates them, in
   `tb.TempDir()`; public and internal listener on `127.0.0.1:0`; the first owner created through the
-  same application service that `bothy setup bootstrap-owner` calls (08 "Erstinstallation"), then
-  enrolled with its enrollment code and fresh ES256 device keys (08 "Einladungs-Code",
-  "Registrierung"); everything stopped in `tb.Cleanup` in reverse order.
+  same application service that `bothy setup bootstrap-owner` calls (08 "Initial installation"),
+  then enrolled with its enrollment code and fresh ES256 device keys (08 "Enrollment code",
+  "Registration"); everything stopped in `tb.Cleanup` in reverse order.
 - `type Options struct { Config map[string]string; LogWriter io.Writer; Telemetry *TelemetrySinks;
   EgressDenyAll bool; Clock clock.Clock }`. `Config` takes dotted keys from
   `docs/operations/configuration.md` and is applied through `platform/config` with flag precedence,
@@ -132,12 +132,12 @@ services/server/test`) and wrap it if it builds the real `internal/wire` graph.
   `completeStepUpWithDeviceKey`.
 - `type Client struct { PrincipalID, DeviceID string; ... }` with `Do(ctx, Request) Response`
   (DPoP proof per RFC 9449 with the latest `DPoP-Nonce`, one retry on `use_dpop_nonce`, refresh on
-  `token_expired`, `Idempotency-Key` UUIDv7 on POST and PATCH except the list in 06 "Idempotenz",
+  `token_expired`, `Idempotency-Key` UUIDv7 on POST and PATCH except the list in 06 "Idempotency",
   optional `Observer func(Request, Response)`), `StepUp(ctx)`, `Gateway(ctx) *GatewayConn`
   (`hello`, `identify`, `ready`, `Next`, `Send`, `Close`, automatic `heartbeat` and `reauth`).
 - `type Response struct { Status int; Header http.Header; Body []byte; Elapsed time.Duration }`.
-- `func BuildMatrixWorld(tb, s *Server) *World`: the M1 subset of 07 "Beispiele" and
-  "Testmatrix": spaces Support, Marketing, Engineering, Research; channels Support/Allgemein,
+- `func BuildMatrixWorld(tb, s *Server) *World`: the M1 subset of 07 "Examples" and
+  "Test matrix": spaces Support, Marketing, Engineering, Research; channels Support/Allgemein,
   Support/Eskalation, Marketing/Kampagnen, Engineering/Projekt-A (forum, no project binding),
   Engineering/Werkzeuge, Research/Notizen; people Alex, Sam, Robin; agents Lotse (organization,
   operator of Support), Texter (organization, operator of Marketing), Runner (organization, operator
@@ -146,7 +146,7 @@ services/server/test`) and wrap it if it builds the real `internal/wire` graph.
   `approve_actions`, space Support), G-2 (Sam, `trigger`, `upload`, space Marketing), G-3 (Robin,
   `trigger`, `upload`, channel Engineering/Projekt-A, with expiry), G-4 (group Leser, `read`,
   Support/Allgemein), G-5 (Lotse, `write`, `upload`, space Support); one thread with messages per
-  text channel and one forum post in Projekt-A. Left out until their etappe: app Tracker and G-6
+  text channel and one forum post in Projekt-A. Left out until their milestone: app Tracker and G-6
   (M2), the DM Alex-Sam (V3), project binding and tool class `host` (M2). Expiry times are relative
   to the harness clock, never calendar dates.
 - `func StartProcess(tb, ProcessOptions) *Process` (subprocess server for M1-72): not needed in
@@ -239,12 +239,12 @@ G7 run:
    `checks.py`:
     - `problem_format`: every response with status 400 or higher has `Content-Type:
       application/problem+json`, the required fields of `Problem`, `type == "/api/v1/problems/" +
-      code`, `status` equal to the HTTP status, and a `code` from the generated table in 06 "Fehler".
+      code`, `status` equal to the HTTP status, and a `code` from the generated table in 06 "Errors".
     - `correlation_id`: header `Correlation-Id` on every response, a UUIDv7, equal to
       `correlation_id` in a problem body.
     - `no_json_null`: no JSON `null` at any depth of any JSON body (ADR 0053).
     - `not_found_equality`: for a `404` on an operation with UUID path parameters, the same request
-      with fresh random UUIDv7 values gives the same normalised answer (drop `Correlation-Id`,
+      with fresh random UUIDv7 values gives the same normalized answer (drop `Correlation-Id`,
       `Date`, `DPoP-Nonce`, `RateLimit` values; drop `correlation_id`, replace the IDs in
       `instance`).
 7. Stateful phase: run Schemathesis' state machine over the same restricted schema. openapi.yaml
@@ -256,7 +256,7 @@ G7 run:
     - `test_sec_t06_unknown_field_rejected`: for every enabled operation with a JSON request body, a
       valid body plus the property `x_unknown_field` gives `400 validation_failed` (W7).
     - `test_sec_t06_duplicate_json_keys_rejected`: a raw body with one key twice gives
-      `400 malformed_request` (19 SEC-IN-2, 06 "Fehler").
+      `400 malformed_request` (19 SEC-IN-2, 06 "Errors").
     - Any `5xx` fails. No `5xx` is expected in this run; if an operation documents `503` for a
       condition the run does not induce, a `503` is still a failure.
 10. Reproduction: on every failure the message contains `curl` for the request with `Authorization`
@@ -265,7 +265,7 @@ G7 run:
     `dpop.py` has that command line entry point.
 
 Architecture register and coverage: `test/**` and `perf/**` under `services/server` form the
-component `testsupport` (M1-05; 02 "Code-Layout"), and the Go coverage total leaves them out
+component `testsupport` (M1-05; 02 "Code layout"), and the Go coverage total leaves them out
 (M1-01). Nothing to add here unless the build proves the component wrong.
 
 ## Tests (write them first)
@@ -276,7 +276,7 @@ Go:
 2. `TestG8_ValidatorRejectsWrongResponseField`: runs a child test binary (`os/exec` of the test
    binary with `-test.run` and an environment switch) whose `getMe` handler omits a required field;
    expects exit code 3 and a report naming `getMe` and the JSON pointer. This is the acceptance
-   "ein absichtlich falsches Antwortfeld lässt G8 scheitern".
+   "a deliberately wrong response field makes G8 fail".
 3. `TestG8_SkipsUnmatchedRoutes`.
 4. `TestG8_ProductionBuildExcludesValidator`: `go list -deps ./cmd/bothy` without tags lists
    neither `contractcheck` nor the validator module.
@@ -296,7 +296,7 @@ Python (`tools/contract/tests/`, run in `make test`):
 5. `test_auth.py`: refresh on `session_revoked`, nonce probe when none is known (broker and server
    faked with a local stub).
 
-Live (only through `make contract-test`): the parametrised Schemathesis tests per pass, the stateful
+Live (only through `make contract-test`): the parametrized Schemathesis tests per pass, the stateful
 test, `test_sec_t06_unknown_field_rejected`, `test_sec_t06_duplicate_json_keys_rejected`, the
 coverage teardown.
 

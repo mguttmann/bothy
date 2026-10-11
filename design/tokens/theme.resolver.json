@@ -1,8 +1,8 @@
 {
   "$schema": "https://www.designtokens.org/schemas/2025.10/resolver.json",
-  "name": "Design-System",
+  "name": "Design system",
   "version": "2025.10",
-  "description": "Einstiegspunkt der Token-Pipeline. Drei Modifikatoren: Theme (hell, dunkel), Dichte (comfortable, compact, touch) und Bewegung (full, reduced). Die Apps wählen den Kontext zur Laufzeit; der Generator erzeugt alle Kontexte.",
+  "description": "Entry point of the token pipeline. Three modifiers: theme (light, dark), density (comfortable, compact, touch) and motion (full, reduced). The apps choose the context at runtime; the generator produces all contexts.",
   "sets": {
     "base": {
       "sources": [
@@ -16,7 +16,7 @@
   },
   "modifiers": {
     "theme": {
-      "description": "Hell oder dunkel. Die Einstellung appearance.theme kennt zusätzlich 'system'; das löst die App auf, nicht der Resolver.",
+      "description": "Light or dark. The setting appearance.theme also has the value 'system'; the app resolves it, not the resolver.",
       "contexts": {
         "light": [{"$ref": "color.light.tokens.json"}],
         "dark": [{"$ref": "color.dark.tokens.json"}]
@@ -24,7 +24,7 @@
       "default": "dark"
     },
     "density": {
-      "description": "comfortable ist Standard auf Desktop und Web, touch fest auf Mobilgeräten, compact wählbar auf Desktop.",
+      "description": "comfortable is the default on desktop and web, touch is fixed on mobile devices, compact is selectable on desktop.",
       "contexts": {
         "comfortable": [{"$ref": "density.comfortable.tokens.json"}],
         "compact": [{"$ref": "density.compact.tokens.json"}],
@@ -33,7 +33,7 @@
       "default": "comfortable"
     },
     "motion": {
-      "description": "reduced folgt der Systemeinstellung 'Bewegung reduzieren' oder der Einstellung appearance.reduce_motion.",
+      "description": "reduced follows the system setting 'Reduce motion' or the setting appearance.reduce_motion.",
       "contexts": {
         "full": [{"$ref": "motion.full.tokens.json"}],
         "reduced": [{"$ref": "motion.reduced.tokens.json"}]

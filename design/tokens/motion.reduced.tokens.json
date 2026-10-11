@@ -1,5 +1,5 @@
 {
-  "$description": "Bewegung, Kontext reduced: gilt bei Systemeinstellung 'Bewegung reduzieren' oder Einstellung appearance.reduce_motion = on. Keine Bewegung, nur kurzes Überblenden.",
+  "$description": "Motion, context reduced: applies with the system setting 'Reduce motion' or the setting appearance.reduce_motion = on. No movement, only a short cross-fade.",
   "motion": {
     "duration": {
       "$type": "duration",

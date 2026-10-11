@@ -1,6 +1,6 @@
 # M1-04: Operations configuration checks in the gate
 
-Status: ready | Depends on: M1-01 | Etappe: M1
+Status: ready | Depends on: M1-01 | Milestone: M1
 
 ## Goal
 
@@ -16,26 +16,28 @@ then fails before the push instead of at the next deployment.
 
 ## Read first
 
-- `docs/PLAN.md`: section "Arbeitsweise je Ticket"; section "M1 Fundament" (Block A, row M1-04).
-- `docs/spec/17-observability.md`: "Collector und Backends", "SLOs und Alarme", "Tests, die diese
-  Regeln halten" (items 2, 5, 6), R-OB-01, R-OB-09.
-- `docs/observability/collector.md` (all; section "Prüfen"), `docs/observability/signals.md`
-  section "Attribute in Spans und Logs" (5.3), `docs/observability/slos.md` ("SLOs", "Erzeugen und
-  prüfen"), `docs/observability/alerting.md` ("Stufen und Wege", "Weitere Alarme", "Prüfen").
+- `docs/PLAN.md`: section "Way of working per ticket"; section "M1 Foundation" (Block A, row
+  M1-04).
+- `docs/spec/17-observability.md`: "Collector and backends", "SLOs and alerts",
+  "Tests that hold these rules" (items 2, 5, 6), R-OB-01, R-OB-09.
+- `docs/observability/collector.md` (all; section "Check"), `docs/observability/signals.md`
+  section "Attributes in spans and logs" (5.3), `docs/observability/slos.md` ("SLOs",
+  "Generate and check"), `docs/observability/alerting.md` ("Levels and routes", "Further alerts",
+  "Check").
 - Files under test: `infra/otel/collector.yaml`, `infra/otel/exporters/*.yaml`,
   `infra/observability/prometheus/prometheus.yaml`, `infra/observability/prometheus/rules/*.yaml`,
   `infra/observability/alertmanager/alertmanager.yaml`, `infra/observability/loki/loki.yaml`,
   `infra/observability/tempo/tempo.yaml`, `infra/observability/slo/*.yaml`,
   `infra/tofu/modules/*/variables.tf`, `infra/compose/compose.yaml` and
   `infra/compose/.env.example` (image versions only).
-- `docs/operations/configuration.md` section "Benannte Werte aller Kapitel" (rows
+- `docs/operations/configuration.md` section "Named values of all chapters" (rows
   `status.fanout_lag_degraded`, `agent.presence_timeout`, `backup.max_age`,
   `backup.pg.archive_timeout`, `backup.restore_test.max_age`).
-- ADRs: `docs/adr/0034-opentelemetry-ueber-collector-lokaler-standard-stack.md`,
-  `docs/adr/0035-slos-mit-fehlerbudgets-und-burn-rate-alarmen.md`,
+- ADRs: `docs/adr/0034-opentelemetry-through-a-collector-local-default-stack.md`,
+  `docs/adr/0035-slos-with-error-budgets-and-burn-rate-alerts.md`,
   `docs/adr/0012-oci-images-compose-opentofu.md`,
-  `docs/adr/0038-lokale-gates-zuerst-ein-befehl-identisch-zu-ci.md`.
-- `docs/spec/23-qualitaet.md` ("Grundsätze", "Gates"), `docs/quality/gates.md`,
+  `docs/adr/0038-local-gates-first-one-command-identical-to-ci.md`.
+- `docs/spec/23-quality.md` ("Principles", "Gates"), `docs/quality/gates.md`,
   `docs/quality/toolchain.md`, `tools/README.md`, `tools/bin/fetch_tools.py` with
   `tools/bin/tests/test_fetch_tools.py`, `tools/bin/tools.lock.json`, `tools/pyproject.toml`,
   `renovate.json`, `Makefile` (including the server gates from M1-01), `CHANGELOG.md`,
@@ -57,7 +59,7 @@ This ticket touches no API operation, no table of chapter 03 and no action id.
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour gets a test that is red before the change (show the red output in
+6. Test first: every behavior gets a test that is red before the change (show the red output in
    the report), then green.
 7. No en dash (U+2013) and no em dash (U+2014) in any file or commit message. Check every changed
    file with `uv run --project tools --locked --quiet python tools/hooks/text_rules.py <file>` (exit code 0; plain `grep -P` fails on macOS).
@@ -67,14 +69,14 @@ This ticket touches no API operation, no table of chapter 03 and no action id.
    `EXAMPLE`.
 9. Thresholds are named configuration values; the threshold check reads them from
    `docs/operations/configuration.md` and never hard-codes a value.
-10. Fail closed: a missing tool is an error, never a skip (23 "Grundsätze" item 3, R-QA-02); every
-    tool pinned with a checksum (23 "Grundsätze" item 4).
-11. Validation commands named by 17 "Tests, die diese Regeln halten" items 5 and 6 and by the
+10. Fail closed: a missing tool is an error, never a skip (23 "Principles" item 3, R-QA-02); every
+    tool pinned with a checksum (23 "Principles" item 4).
+11. Validation commands named by 17 "Tests that hold these rules" items 5 and 6 and by the
     observability guides: `otelcol-contrib validate` for base, each overlay and pairs (collector.md
     "Overlays": two overlays combine), `promtool check rules`, `amtool check-config`, Sloth
     regeneration without diff, SLO table equal to the Sloth files, collector allowlist equal to the
     signal catalogue (signals.md 5.3), alert thresholds equal to configuration values
-    (alerting.md "Weitere Alarme").
+    (alerting.md "Further alerts").
 12. Alert texts and other runtime texts in ops files are English (R-OB-09, L5).
 
 ## Scope
@@ -137,7 +139,7 @@ Loki publishes only `.zip` assets. Extend `_extract` so that an archive whose by
 zip signature `PK\x03\x04` is read with `zipfile` (same rules as for tar: the member must exist and
 be a regular file; no path outside the archive), everything else as today. Tests in
 `tools/bin/tests/test_fetch_tools.py`: zip member extracted, missing zip member fails, zip member
-that is a directory fails, tar behaviour unchanged. Update the module docstring.
+that is a directory fails, tar behavior unchanged. Update the module docstring.
 
 ### 3. `tools/opscheck/opscheck.py` (new; Python 3.12, standard library plus PyYAML)
 
@@ -158,7 +160,7 @@ Public interface with docstrings:
   (units `ms`, `s`, `m`, `h`, `d`; seconds), `markdown_table(text: str, heading: str) ->
   list[dict[str, str]]` (first table after the heading, keyed by header cell),
   `config_default(reference: Path, name: str) -> str` (row of the table with the columns
-  `Schlüssel` and `Standard` whose first cell is `` `name` ``; backticks stripped; missing or
+  `Key` and `Default` whose first cell is `` `name` ``; backticks stripped; missing or
   duplicate row raises; columns found by header name because M1-08 may add columns).
 
 Every subprocess runs with `check=False`, `capture_output=True`, a timeout constant, and an
@@ -184,35 +186,35 @@ threshold where it does not fire. The directory lies outside the `rules/*.yaml` 
   `lint` gains `tools/opscheck`; `.PHONY`. No SKIP: the files exist.
 - `tools/pyproject.toml`: add `opscheck` to `testpaths`, `pythonpath`, coverage `source`, mypy
   `files`.
-- `renovate.json` (ADR 0041, "Images der Hilfsdienste im Compose-Stack"): (1) a package rule for
-  `custom.regex` in `tools/bin/tools.lock.json` with `matchDepNames` `otelcol-contrib`,
+- `renovate.json` (ADR 0041, "Images of the helper services in the Compose stack"): (1) a package
+  rule for `custom.regex` in `tools/bin/tools.lock.json` with `matchDepNames` `otelcol-contrib`,
   `promtool`, `amtool`, `loki`, `tempo` and `enabled: false`, description: these validators follow
   the image versions in `infra/compose/`; the maintainer refreshes them with `make tools-lock` in
   the image pull request; (2) a regex custom manager over `infra/compose/.env.example` that reads a
   comment `# renovate: datasource=docker depName=<image>` directly above each
-  `BOTHY_<X>_VERSION=` line of the section "Images der Hilfsdienste" (add these comments, image
+  `BOTHY_<X>_VERSION=` line of the section "Images of the helper services" (add these comments, image
   names as in `compose.yaml`), and one over `infra/compose/compose.yaml` that reads the defaults
-  `<image>:${BOTHY_<X>_VERSION:-<version>}`, both in one group "Compose-Images" so a bump changes
+  `<image>:${BOTHY_<X>_VERSION:-<version>}`, both in one group "Compose images" so a bump changes
   both files in one pull request, with `prBodyNotes` naming `make tools-lock` for the five
   validators. Sloth and tofu stay with the "release binaries" group. `make lint` validates the
   file against the Renovate schema; a test in `tools/opscheck/tests` checks that every
   `BOTHY_<X>_VERSION` of that section has exactly one such comment.
-- `docs/quality/gates.md`: row `ops-check` (German) and, under "Was die Gates nicht abdecken",
+- `docs/quality/gates.md`: row `ops-check` (English) and, under "What the gates do not cover",
   that a future OpenTofu module with providers must make `tofu init` work offline (the check
-  fails otherwise). `docs/spec/23-qualitaet.md` "Gates": new group row `| Betrieb | \`ops-check\` |
-  Collector, Prometheus, Alertmanager, Loki, Tempo, Sloth, OpenTofu; abgeleitete Werte gleich ihrer
-  Quelle |`.
-- `docs/quality/toolchain.md`: seven rows in "Gate-Werkzeuge" with version, purpose, license and
+  fails otherwise). `docs/spec/23-quality.md` "Gates": new group row `| Operations | \`ops-check\` |
+  Collector, Prometheus, Alertmanager, Loki, Tempo, Sloth, OpenTofu; derived values equal their
+  source |`.
+- `docs/quality/toolchain.md`: seven rows in "Gate tools" with version, purpose, license and
   reason (for Loki and Tempo note that they are executed for validation only and not distributed;
   AGPL-3.0 applies to distribution and network use of modified versions, neither happens here).
   `tools/docs/tests/test_toolchain_doc.py` must stay green.
 - `tools/README.md` (row `opscheck/`, binaries list in row `bin/`), `tools/opscheck/README.md`
-  (German, short: checks, command, how to add a check).
-- `docs/observability/collector.md` "Prüfen", `docs/observability/slos.md` (header sentence and
-  "Erzeugen und prüfen"), `docs/observability/alerting.md` (sentence in "Weitere Alarme" and
-  section "Prüfen"), `docs/observability/signals.md` 5.3 (sentence "ein Check hält beide gleich"),
-  `docs/spec/17-observability.md` "Tests, die diese Regeln halten" items 5 and 6: replace
-  "Bau-Ticket ..." and "empfohlen" wording by `make ops-check` and the check name.
+  (English, short: checks, command, how to add a check).
+- `docs/observability/collector.md` "Check", `docs/observability/slos.md` (header sentence and
+  "Generate and check"), `docs/observability/alerting.md` (sentence in "Further alerts" and
+  section "Check"), `docs/observability/signals.md` 5.3 (sentence "a check keeps both equal"),
+  `docs/spec/17-observability.md` "Tests that hold these rules" items 5 and 6: replace
+  "build ticket ..." and "recommended" wording by `make ops-check` and the check name.
 - `CHANGELOG.md` `[Unreleased]`, `docs/DECISIONS.md` (rulings below).
 
 ## Out of scope
@@ -254,16 +256,16 @@ threshold where it does not fire. The directory lies outside the `rules/*.yaml` 
 |---|---|
 | `tool-versions` | the pinned versions of `otelcol-contrib`, `promtool`, `amtool`, `loki`, `tempo` equal `BOTHY_OTELCOL_VERSION`, `BOTHY_PROMETHEUS_VERSION`, `BOTHY_ALERTMANAGER_VERSION`, `BOTHY_LOKI_VERSION`, `BOTHY_TEMPO_VERSION` in `infra/compose/.env.example` and the defaults `${BOTHY_..._VERSION:-...}` in `infra/compose/compose.yaml` (leading `v` ignored) |
 | `collector` | `otelcol-contrib validate --config=<base>` alone; base plus each overlay; base plus every ordered pair of two different overlays except `none` (Compose sets `BOTHY_OTEL_EXPORTER` then `BOTHY_OTEL_EXPORTER_2`, and list merging depends on order) |
-| `collector-allowlist` | the `bothy.*` keys of `processors.redaction/allowlist.allowed_keys` in `infra/otel/collector.yaml` equal the attributes of the table in signals.md "Attribute in Spans und Logs" (a cell may list several backticked names) |
+| `collector-allowlist` | the `bothy.*` keys of `processors.redaction/allowlist.allowed_keys` in `infra/otel/collector.yaml` equal the attributes of the table in signals.md "Attributes in spans and logs" (a cell may list several backticked names) |
 | `prometheus-config` | `promtool check config <work>/prometheus/prometheus.yaml` on a copy whose `/etc/prometheus/` prefix points into the work copy, so the rule files load too |
 | `prometheus-rules` | `promtool check rules` on every file in `rules/` |
 | `prometheus-rule-tests` | `promtool test rules` on every `tests/*.test.yaml`; at least one test file exists; every alert of `rules/bothy-alerts.yaml` appears as `alertname` in some test |
-| `alertmanager` | `amtool check-config <file>`; routing per alerting.md "Stufen und Wege": `amtool config routes test --config.file=<file> --verify.receivers=external-oncall,bothy-ops severity=page alertname=BothyExample`, `--verify.receivers=bothy-ops severity=ticket alertname=BothyExample`, `--verify.receivers=external-heartbeat alertname=Watchdog severity=heartbeat` (each label a separate argument) |
+| `alertmanager` | `amtool check-config <file>`; routing per alerting.md "Levels and routes": `amtool config routes test --config.file=<file> --verify.receivers=external-oncall,bothy-ops severity=page alertname=BothyExample`, `--verify.receivers=bothy-ops severity=ticket alertname=BothyExample`, `--verify.receivers=external-heartbeat alertname=Watchdog severity=heartbeat` (each label a separate argument) |
 | `loki` | `loki -config.file=<file> -config.expand-env=true -verify-config` |
 | `tempo` | `tempo -config.file=<file> -config.expand-env=true -config.verify=true` (Tempo needs the `=true` form) |
 | `sloth` | for each `infra/observability/slo/<n>.yaml`: `sloth generate --no-log -i <file> -o <work>/slo-<n>.yaml` equals `rules/slo-<n>.yaml` byte for byte; every `rules/slo-*.yaml` has a source |
 | `slo-docs` | table in slos.md "SLOs" equals the Sloth files, see below |
-| `alert-thresholds` | alerting.md "Weitere Alarme" against `rules/bothy-alerts.yaml` and the configuration reference, see below |
+| `alert-thresholds` | alerting.md "Further alerts" against `rules/bothy-alerts.yaml` and the configuration reference, see below |
 | `tofu` | for each directory under `infra/tofu/modules/` with a `.tf` file: copy to the work directory, `tofu init -backend=false -input=false -no-color`, then `tofu validate -no-color`, with `TF_IN_AUTOMATION=1` and `TF_CLI_CONFIG_FILE` pointing to an empty file |
 
 Collector environment: copy `infra/otel/` into the work directory and replace every
@@ -296,18 +298,18 @@ the check stays fast as overlays grow. `amtool check-config` does not read `url_
 `loki` and `tempo` verify without creating their data directories.
 
 `slo-docs`: for each SLO of each Sloth file there is exactly one row whose first cell is
-`` `<service>/<name>` ``, and no extra rows. Column "Ziel" equals the objective formatted with one
-decimal and ` %` (`99.9 %`, `95.0 %`). Column "Schwelle" is `keine` if the `error_query` has no
-`le="..."` selector, else `<le> s` (`0.5 s`, `600 s`). Column "Alarm" is `Page, Ticket` unless
-`page_alert.disable: true`, then `nur Ticket`.
+`` `<service>/<name>` ``, and no extra rows. Column "Target" equals the objective formatted with one
+decimal and ` %` (`99.9 %`, `95.0 %`). Column "Threshold" is `none` if the `error_query` has no
+`le="..."` selector, else `<le> s` (`0.5 s`, `600 s`). Column "Alert" is `Page, Ticket` unless
+`page_alert.disable: true`, then `Ticket only`.
 
-`alert-thresholds`: the alert names of the table in alerting.md "Weitere Alarme" equal the alerts
-in `bothy-alerts.yaml`. For each row whose column "Konfigurationswert" is exactly `` `<name>` ``
-(must equal) or ``über `<name>` `` (must be strictly greater), read the number of the final
+`alert-thresholds`: the alert names of the table in alerting.md "Further alerts" equal the alerts
+in `bothy-alerts.yaml`. For each row whose column "Configuration value" is exactly `` `<name>` ``
+(must equal) or ``above `<name>` `` (must be strictly greater), read the number of the final
 `> <number>` comparison of the alert `expr` (seconds) and compare it with
 `parse_duration(config_default(reference, name))`. Other cells are not checked. Today this covers
-`BothyEventFanoutLag` (`status.fanout_lag_degraded`), `BothyAgentOffline` (over
-`agent.presence_timeout`), `BothyBackupStale` (`backup.max_age`), `BothyWalArchiveStale` (over
+`BothyEventFanoutLag` (`status.fanout_lag_degraded`), `BothyAgentOffline` (above
+`agent.presence_timeout`), `BothyBackupStale` (`backup.max_age`), `BothyWalArchiveStale` (above
 `backup.pg.archive_timeout`) and `BothyRestoreTestStale` (`backup.restore_test.max_age`).
 
 ### Rulings for `docs/DECISIONS.md`
@@ -319,7 +321,7 @@ in `bothy-alerts.yaml`. For each row whose column "Konfigurationswert" is exactl
 3. Collector pairs are validated in both orders. Reason: overlays merge lists by replacement, so
    the result depends on the order of `BOTHY_OTEL_EXPORTER` and `BOTHY_OTEL_EXPORTER_2`.
 4. Validator pins of components that also run as images follow the image versions; Renovate bumps
-   the images (group "Compose-Images", ADR 0041), is off for the validators, and `tool-versions`
+   the images (group "Compose images", ADR 0041), is off for the validators, and `tool-versions`
    holds them equal. Reason: a validator newer or older than the running component accepts or
    rejects other keys; the images need an update path, and one pull request per bump keeps image
    and validator together.

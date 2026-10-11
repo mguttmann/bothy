@@ -52,7 +52,7 @@ def pinned_tools() -> dict[str, str]:
     m = re.search(r"pre-commit-hooks\n\s+rev: [0-9a-f]{40}  # frozen: (\S+)", hooks)
     assert m, "pre-commit-hooks"
     pins["pre-commit-hooks"] = m.group(1)
-    pins["uv"] = "Systemwerkzeug"
+    pins["uv"] = "system tool"
     return pins
 
 
@@ -66,15 +66,15 @@ def pinned_actions() -> dict[str, str]:
     return {k: next(iter(v)) for k, v in found.items()}
 
 
-@pytest.mark.parametrize("name", sorted(doc_versions("Gate-Werkzeuge")))
+@pytest.mark.parametrize("name", sorted(doc_versions("Gate tools")))
 def test_tool_version_matches_pin(name: str) -> None:
     pins = pinned_tools()
     assert name in pins, f"{name} is documented but not pinned anywhere"
-    assert doc_versions("Gate-Werkzeuge")[name] == pins[name]
+    assert doc_versions("Gate tools")[name] == pins[name]
 
 
 def test_every_pinned_gate_tool_is_documented() -> None:
-    documented = set(doc_versions("Gate-Werkzeuge"))
+    documented = set(doc_versions("Gate tools"))
     binaries = json.loads((REPO / "tools" / "bin" / "tools.lock.json").read_text())["tools"]
     npm = json.loads((REPO / "tools" / "node" / "package.json").read_text())["devDependencies"]
     project = tomllib.loads((REPO / "tools" / "pyproject.toml").read_text())

@@ -1,6 +1,6 @@
 # M1-07: Configuration schema and loader
 
-Status: ready | Depends on: M1-05 | Etappe: M1
+Status: ready | Depends on: M1-05 | Milestone: M1
 
 ## Goal
 
@@ -8,22 +8,23 @@ Status: ready | Depends on: M1-05 | Etappe: M1
 default, documentation and owning chapter. It loads default < file < environment < command-line
 flag, aborts on unknown keys and variables, type and range errors and broken cross-conditions, and
 names key and source in every message without echoing values. `bothy config check` and
-`bothy config print --redacted` let operators verify a configuration without starting the server.
-This is the only way configuration enters the process; modules never read the environment.
+`bothy config print --redacted` let instance operators verify a configuration without starting
+the server. This is the only way configuration enters the process; modules never read the
+environment.
 
 ## Read first
 
-- `docs/PLAN.md`: section "Arbeitsweise je Ticket", section "M1 Fundament" (row M1-07, W1, W4),
+- `docs/PLAN.md`: section "Way of working per ticket", section "M1 Foundation" (row M1-07, W1, W4),
   P-08, P-10, P-11.
-- `docs/spec/02-architektur.md`: "Konfigurationsladen", "Befehle des Binarys", "Schichten im Modul",
-  "Konfigurationswerte dieses Kapitels" (`http.max_json_body_bytes`).
-- `docs/spec/16-betrieb.md`: "Netz" ("Zwei Listener", "Rand und Identität"), "Konfiguration und
-  Geheimnisse" ("Konfiguration (ADR 0011)", "Secret-Provider (ADR 0011)"), "Konfigurationswerte
-  dieses Kapitels" (`server.role`, `server.listen_addr`, `server.internal_listen_addr`).
-- `docs/spec/03-datenmodell.md`: "Konfigurationswerte dieses Kapitels" (`message.max_content_bytes`).
-- `docs/operations/configuration.md`: "Quellen", "Namensregel und Formate", "Prüfung" (section 4 is
+- `docs/spec/02-architecture.md`: "Configuration loading", "Commands of the binary", "Layers within a
+  module", "Configuration values of this chapter" (`http.max_json_body_bytes`).
+- `docs/spec/16-operations.md`: "Network" ("Two listeners", "Edge and identity"), "Configuration and
+  secrets" ("Configuration (ADR 0011)", "Secret provider (ADR 0011)"), "Configuration values of
+  this chapter" (`server.role`, `server.listen_addr`, `server.internal_listen_addr`).
+- `docs/spec/03-data-model.md`: "Configuration values of this chapter" (`message.max_content_bytes`).
+- `docs/operations/configuration.md`: "Sources", "Naming rule and formats", "Check" (section 4 is
   generated; do not edit it by hand).
-- ADR `docs/adr/0011-12-factor-konfiguration-und-secret-provider.md`, ADR 0050 and
+- ADR `docs/adr/0011-12-factor-configuration-and-secret-provider.md`, ADR 0050 and
   `services/server/architecture/modules.yaml` (register format from M1-05).
 - `services/server/cmd/bothy` (command table from M1-05), `services/server/.golangci.yml`,
   `.semgrep/bothy-go-no-model-credentials.yaml`.
@@ -50,15 +51,15 @@ This is the only way configuration enters the process; modules never read the en
    data. Example addresses use 127.0.0.1 or RFC 5737 ranges, hosts example.com.
 9. Configuration values only through named keys from `docs/operations/configuration.md`; every key
    this ticket registers has a row in its chapter table with the same default.
-10. Configuration (operator, restart) and settings (owner, database) are separate; only
-    configuration is loaded here (02 "Konfigurationsladen" item 1, 16 "Konfiguration" item 6).
-11. Name rule `a.b_c` to `BOTHY_A__B_C`, reversible (16 "Konfiguration" item 2).
+10. Configuration (instance operator, restart) and settings (owner, database) are separate; only
+    configuration is loaded here (02 "Configuration loading" item 1, 16 "Configuration" item 6).
+11. Name rule `a.b_c` to `BOTHY_A__B_C`, reversible (16 "Configuration" item 2).
 12. Unknown `BOTHY_` variables and unknown file keys abort the start; type and range errors abort
     the start (16 items 3 and 4, R-AR-15, R-OP-04).
 13. Secrets only as references in keys ending in `_ref`; values never appear in logs, errors or
-    `bothy config print` (02 "Konfigurationsladen" item 3, ADR 0011).
+    `bothy config print` (02 "Configuration loading" item 3, ADR 0011).
 14. Typed per consumer: each module or platform package gets its own `Config` struct, filled by
-    `internal/wire`; modules never read environment variables (02 "Konfigurationsladen" item 5).
+    `internal/wire`; modules never read environment variables (02 "Configuration loading" item 5).
 15. No reload at runtime except secret rotation, which M1-09 adds (02 item 6).
 
 ## Scope
@@ -66,7 +67,7 @@ This is the only way configuration enters the process; modules never read the en
 Create (paths below `services/server/`):
 
 - `internal/platform/config/`: `kind.go`, `schema.go`, `envname.go`, `load.go`, `values.go`,
-  `bind.go`, `errors.go`, `doc.go`, `README.md` (German, like the module READMEs), tests.
+  `bind.go`, `errors.go`, `doc.go`, `README.md` (English, like the module READMEs), tests.
 - `internal/wire/config.go` (`ConfigSchema`), `internal/wire/configkeys_server.go`,
   `internal/wire/configkeys_http.go`, `internal/wire/configkeys_messaging.go`,
   `internal/wire/configchecks.go`, tests.
@@ -91,7 +92,7 @@ Change:
   Listeners, `bothy serve`, health: M1-11. Database keys: M1-12. Every other key: the ticket that
   builds its first consumer adds it to the schema and to its `Config` struct.
 - The trusted header driver and its loopback rule: it is a database setting of the owner, checked at
-  readiness (16 "Rand und Identität", W4, M1-43), not a configuration check.
+  readiness (16 "Edge and identity", W4, M1-43), not a configuration check.
 - Instance settings and feature flags (M1-46, M1-47).
 
 ## Boundaries
@@ -120,12 +121,12 @@ func (k Kind) String() string // "string", "enum", "bool", "int", "float", "dura
 type Key struct {
     Name     string   // e.g. "server.listen_addr"
     Kind     Kind
-    Default  string   // exactly the chapter table cell without backticks; "" for "leer"
-    Required bool     // chapter cell "keiner, Pflicht"; Default must then be ""
+    Default  string   // exactly the chapter table cell without backticks; "" for "empty"
+    Required bool     // chapter cell "none, required"; Default must then be ""
     Enum     []string // only for KindEnum
     Min, Max string   // optional bounds in the kind's text form (int, float, duration)
     Doc      string   // one English sentence
-    Chapter  string   // file name of the chapter whose table holds the key, e.g. "16-betrieb.md"
+    Chapter  string   // file name of the chapter whose table holds the key, e.g. "16-operations.md"
 }
 
 func NewSchema(keys []Key) (*Schema, error)
@@ -159,7 +160,7 @@ type Problem struct{ Key, Source, Message string }
 ```
 
 - Accessors panic on an unknown key or a kind mismatch: that is a programming error that tests
-  catch, not an operator error.
+  catch, not an instance operator error.
 - `Bind` fills a pointer to a struct whose exported fields carry `config:"<key>"` tags. Field types:
   `string` (string, enum, listen address, cron, semver, secret_ref, url), `bool`, `int64` or `int`
   (int), `float64`, `time.Duration`, `[]string`, `[]netip.Prefix`. An exported field without tag, an
@@ -173,7 +174,7 @@ type Problem struct{ Key, Source, Message string }
   excludes `__`, leading or trailing `_`, upper case, so `EnvName` and `KeyFromEnv` are exact
   inverses.
 - `EnvName(k) = "BOTHY_" + upper(k)` with `.` replaced by `__`.
-- A name ends in `_ref` exactly when the kind is `secret_ref` (02 "Konfigurationsladen" item 3).
+- A name ends in `_ref` exactly when the kind is `secret_ref` (02 "Configuration loading" item 3).
 - Default parses with the kind's parser; empty default only for `string`, `list(string)`,
   `list(cidr)` and required keys; `Enum` non-empty exactly for enum; bounds parse and `Min <= Max`;
   `Doc` non-empty; `Chapter` matches `^[0-9]{2}-[a-z0-9-]+\.md$`; names unique.
@@ -210,8 +211,8 @@ type Problem struct{ Key, Source, Message string }
   (`sync.event_retention: 30d`) are problems naming the path and the file.
 - Environment: variables without the prefix `BOTHY_` are ignored (`OTEL_*` belong to the telemetry
   SDK, 16 item 7). Every `BOTHY_` variable must be a key's `EnvName`, `BOTHY_CONFIG_FILE`, or the
-  variable named by an `env:` reference in the effective value of a `secret_ref` key (16 "Secret-
-  Provider" allows `env:BOTHY_SECRET_...`); anything else is `unknown variable`. Reason: a typo must
+  variable named by an `env:` reference in the effective value of a `secret_ref` key (16 "Secret
+  provider" allows `env:BOTHY_SECRET_...`); anything else is `unknown variable`. Reason: a typo must
   never silently leave a security limit at its default.
 - Required keys without value, bounds and enum violations are problems.
 - After all keys parse, run the cross-checks registered with `AddCheck`; a check runs only when all
@@ -226,11 +227,11 @@ type Problem struct{ Key, Source, Message string }
 
 | Key | Kind | Default | Bounds | Chapter |
 |---|---|---|---|---|
-| `server.role` | enum `api`, `worker`, `all` | `all` | | `16-betrieb.md` |
-| `server.listen_addr` | listen address | `127.0.0.1:8080` | | `16-betrieb.md` |
-| `server.internal_listen_addr` | listen address | `127.0.0.1:8081` | | `16-betrieb.md` |
-| `http.max_json_body_bytes` | int | `1048576` | min `1` | `02-architektur.md` |
-| `message.max_content_bytes` | int | `262144` | min `1` | `03-datenmodell.md` |
+| `server.role` | enum `api`, `worker`, `all` | `all` | | `16-operations.md` |
+| `server.listen_addr` | listen address | `127.0.0.1:8080` | | `16-operations.md` |
+| `server.internal_listen_addr` | listen address | `127.0.0.1:8081` | | `16-operations.md` |
+| `http.max_json_body_bytes` | int | `1048576` | min `1` | `02-architecture.md` |
+| `message.max_content_bytes` | int | `262144` | min `1` | `03-data-model.md` |
 
 If a chapter default differs from this table when you build, the chapter wins; use its value. Keys
 enter the schema with the ticket that builds their first consumer; these five are here because the
@@ -264,10 +265,10 @@ In `.golangci.yml` enable `forbidigo` with `analyze-types: true` and forbid `os.
 
 ### Specification (already decided)
 
-02 "Konfigurationsladen" (fixed mapping, flags `--role` and `--config`, the two cross-checks with
+02 "Configuration loading" (fixed mapping, flags `--role` and `--config`, the two cross-checks with
 "strictly greater" and the port 0 exception, the trusted header rule as a readiness check, values
 never in messages, keys entering the schema with their first consumer, `Bind` with struct tags in
-the consuming package), 16 "Konfiguration (ADR 0011)" (precedence with the command line, exempt
+the consuming package), 16 "Configuration (ADR 0011)" (precedence with the command line, exempt
 variables) and `docs/operations/configuration.md` sections 1 to 3 already say what this ticket
 builds. Add to `configuration.md` section 2 the exact grammars of the kind table above and rows for
 `list(cidr)` and `url` if they are missing. DECISIONS.md: duration grammar.
@@ -328,7 +329,7 @@ make check
       in the report, then remove it).
 - [ ] `make arch` passes with `platform.config` in the register; `.go-arch-lint.yml` regenerated.
 - [ ] 02, 16 and `docs/operations/configuration.md` sections 1 to 3 describe exactly the implemented
-      behaviour; `make docs` passes (section 4 untouched).
+      behavior; `make docs` passes (section 4 untouched).
 - [ ] Coverage of the Go module at or above `quality.coverage.go_min_percent`; `make sonar` passes.
 - [ ] `make check` is green.
 

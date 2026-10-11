@@ -1,6 +1,6 @@
 # M1-10: Logging and telemetry foundation
 
-Status: ready | Depends on: M1-09 | Etappe: M1
+Status: ready | Depends on: M1-09 | Milestone: M1
 
 ## Goal
 
@@ -14,22 +14,22 @@ out of telemetry by construction (B11, R-Telemetrie, ADR 0034).
 
 ## Read first
 
-- `docs/spec/17-observability.md`: "Grundregeln", "Signale", "Datenschutz", "Apps" (sampling
-  decision), "Tests, die diese Regeln halten", "Konfigurationswerte dieses Kapitels".
-- `docs/observability/signals.md`: "Namen und Einheiten", "Kardinalität", "Resource-Attribute",
-  "Sicherung, Audit, Telemetrie" (`bothy.telemetry.dropped`), "Weitergabe", "Spans",
-  "Attribute in Spans und Logs", "GenAI-Konventionen (gekapselt)", "Logs".
-- `docs/observability/privacy.md`: "Was nie in Telemetrie steht", "Zwei Linien", "Pseudonyme".
-- `docs/spec/20-datenschutz.md`: "Telemetrie" and "Konfigurationswerte dieses Kapitels"
+- `docs/spec/17-observability.md`: "Basic rules", "Signals", "Privacy", "Apps" (sampling
+  decision), "Tests that hold these rules", "Configuration values of this chapter".
+- `docs/observability/signals.md`: "Names and units", "Cardinality", "Resource attributes",
+  "Backup, audit, telemetry" (`bothy.telemetry.dropped`), "Propagation", "Spans",
+  "Attributes in spans and logs", "GenAI conventions (encapsulated)", "Logs".
+- `docs/observability/privacy.md`: "What never goes into telemetry", "Two lines", "Pseudonyms".
+- `docs/spec/20-privacy.md`: "Telemetry" and "Configuration values of this chapter"
   (`privacy.telemetry_pseudonym_rotation`).
-- `docs/spec/19-sicherheit.md`: "Logs ohne Geheimnisse und ohne Inhalte" (SEC-LOG-1 to SEC-LOG-6).
-- `docs/spec/02-architektur.md`: "Kette im api-Knoten" (step 2), "Code-Layout", "Befehle des
-  Binarys" (`bothy telemetry pseudonym`), "Ausfall einer Abhängigkeit" (row OTel Collector),
-  "Shutdown" (step "Telemetrie leeren").
-- `docs/operations/configuration.md`: "OpenTelemetry-Variablen".
+- `docs/spec/19-security.md`: "Logs without secrets and without content" (SEC-LOG-1 to SEC-LOG-6).
+- `docs/spec/02-architecture.md`: "Chain in the api node" (step 2), "Code layout", "Commands of the
+  binary" (`bothy telemetry pseudonym`), "Failure of a dependency" (row OTel Collector),
+  "Shutdown" (step "Flush telemetry").
+- `docs/operations/configuration.md`: "OpenTelemetry variables".
 - `infra/otel/collector.yaml` (`redaction/allowlist.allowed_keys`, `transform/scrub`).
-- `docs/adr/0034-opentelemetry-ueber-collector-lokaler-standard-stack.md`.
-- `docs/PLAN.md`: "Arbeitsweise je Ticket", M1 row M1-10, contradiction W8.
+- `docs/adr/0034-opentelemetry-through-a-collector-local-default-stack.md`.
+- `docs/PLAN.md`: "Way of working per ticket", M1 row M1-10, contradiction W8.
 - Code you build on: `internal/platform/secrets` (M1-09), `internal/platform/config` and
   `cmd/bothy` (M1-07), `internal/kernel/clock` (M1-05), `.golangci.yml` (M1-05).
 - No API operation, data model table or action id is touched by this ticket.
@@ -53,7 +53,7 @@ out of telemetry by construction (B11, R-Telemetrie, ADR 0034).
 8. White label: no company, person, host or domain names except `example.com`, people Alex, Sam,
    Robin; no paths under a user home directory.
 9. Configuration only through named keys listed in `docs/operations/configuration.md`.
-10. 17 "Grundregeln" 1 to 5, 8, 9: OpenTelemetry only; export only to a Collector; no content,
+10. 17 "Basic rules" 1 to 5, 8, 9: OpenTelemetry only; export only to a Collector; no content,
     prompts, file names, search terms, tokens or secrets; asynchronous with a bounded queue that
     drops and counts `bothy.telemetry.dropped`, an export error never changes a request result;
     `gen_ai.*` keys in exactly one package with a snapshot test; people only as HMAC pseudonym,
@@ -62,14 +62,14 @@ out of telemetry by construction (B11, R-Telemetrie, ADR 0034).
     `DPoP`, `Cookie`, `Set-Cookie`, `X-Forwarded-*` and proxy identity headers never appear);
     paths only as route patterns, never raw; query strings never.
 12. signals.md "Logs": log messages are constant English text enforced by a linter; attributes
-    only from "Attribute in Spans und Logs"; errors as `error.type`, never a foreign error message.
-13. signals.md "Weitergabe" and 17 R-OB-05: W3C Trace Context; on the public listener the server
+    only from "Attributes in spans and logs"; errors as `error.type`, never a foreign error message.
+13. signals.md "Propagation" and 17 R-OB-05: W3C Trace Context; on the public listener the server
     starts its own trace and records an incoming `traceparent` only as a span link (`otelhttp`
     option for public endpoints), so trace id and sampling come from the server; only with
     `telemetry.traces.trust_remote_parent` the incoming context becomes the parent (its trace id
     and sampled flag apply). Every request has a valid trace id, also with
     `telemetry.enabled = false`, and it is the `correlation_id`.
-14. privacy.md "Pseudonyme" and 20 "Telemetrie": `bothy.principal.pseudo_id` with a period key
+14. privacy.md "Pseudonyms" and 20 "Telemetry": `bothy.principal.pseudo_id` with a period key
     derived by HMAC from `telemetry.pseudonym_key_ref` per `privacy.telemetry_pseudonym_rotation`
     (the exact derivation is in privacy.md); `bothy telemetry pseudonym <principal_id> [--at]` lets
     the owner map an id to its pseudonym.
@@ -102,14 +102,14 @@ API with an alias (for example `otelapi "go.opentelemetry.io/otel"`).
   innermost layer after routing (M1-18 wires both into the chain; this ticket tests them with a
   `http.ServeMux`).
 - `func CorrelationID(ctx context.Context) string`: the trace id of the current span as UUID
-  text (16 bytes, signals.md "Weitergabe" item 3); empty only without a span.
+  text (16 bytes, signals.md "Propagation" item 3); empty only without a span.
 - `type Pseudonymizer` with `Pseudonym(ctx context.Context, principalID string, at time.Time) (string, error)`
   and `Attr(ctx, principalID) (attribute.KeyValue, error)` for key `bothy.principal.pseudo_id`.
 - Dropped-telemetry accounting (D3) and the exporter construction (D2).
 
 ### `internal/platform/otel/attr`
 
-Exported constants for every key of signals.md "Attribute in Spans und Logs" and for every other
+Exported constants for every key of signals.md "Attributes in spans and logs" and for every other
 non-resource key of `infra/otel/collector.yaml` `redaction/allowlist.allowed_keys` except the
 `gen_ai.*` keys (those live in `genai`): the HTTP, database, error and status keys such as
 `http.request.method`, `http.route`, `http.response.status_code`, `error.type`,
@@ -126,12 +126,12 @@ Constants for exactly the `gen_ai.*` keys of the collector allowlist (`gen_ai.op
 `gen_ai.response.finish_reasons`, `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`,
 `gen_ai.usage.cache_read.input_tokens`, `gen_ai.usage.cache_write.input_tokens`,
 `gen_ai.agent.id`, `gen_ai.agent.name`, `gen_ai.conversation.id`, `gen_ai.tool.name`),
-`var Forbidden = []string{...}` with the never-sent keys of signals.md "GenAI-Konventionen"
+`var Forbidden = []string{...}` with the never-sent keys of signals.md "GenAI conventions"
 item 4, and `const ConventionRef` naming the convention repository and its status as read on
 2026-10-10 (no commit is recorded in signals.md; do not invent one). Golden file
 `testdata/keys.golden`.
 
-### `internal/platform/buildinfo` (18 "Komponenten" rule 5)
+### `internal/platform/buildinfo` (18 "Components" rule 5)
 
 `func Version() string` returning a constant equal to the content of `services/server/VERSION`;
 a unit test reads `../../../VERSION` and fails when they differ; no linker flags. This ticket
@@ -239,7 +239,7 @@ link and the server span is a new root sampled by `TraceIDRatioBased(sampler_rat
 `trust_remote_parent` the incoming context is the parent: `ParentBased` with `AlwaysSample` for a
 sampled remote parent and `NeverSample` for a not sampled one. Local parents follow the parent.
 With `telemetry.enabled = false` the SDK tracer provider still exists with `NeverSample` and no
-exporter, so trace ids and `CorrelationID` exist for every request (17 "Signale").
+exporter, so trace ids and `CorrelationID` exist for every request (17 "Signals").
 
 D5. HTTP spans and routes.
 
@@ -253,21 +253,21 @@ D5. HTTP spans and routes.
   any future otelhttp attribute). Rebuild spans with `tracetest.SpanStubFromReadOnlySpan(...)` and
   `.Snapshot()` unless the pinned SDK offers a supported attribute filter; document the choice.
 
-D6. Pseudonyms (as privacy.md "Pseudonyme" and 20 "Telemetrie" state them).
+D6. Pseudonyms (as privacy.md "Pseudonyms" and 20 "Telemetry" state them).
 
 - Master key: `telemetry.pseudonym_key_ref` through the secrets provider; fewer than 32 bytes is a
   start error. The provider cache handles rotation of the master key.
 - Period index `p = floor(unix_seconds(at) / seconds(privacy.telemetry_pseudonym_rotation))`, UTC.
 - Period key `K_p = HMAC-SHA-256(master, "bothy/telemetry-pseudonym/v1/" + decimal(p))`.
 - Pseudonym `hex(HMAC-SHA-256(K_p, lowercase canonical UUID text of the principal id))[:32]`.
-- Effect: one secret to escrow (16 "Hinterlegung"), pseudonyms not linkable across periods for
+- Effect: one secret to escrow (16 "Escrow"), pseudonyms not linkable across periods for
   anyone without the master key (20), the owner can still map an id for any period with
   `bothy telemetry pseudonym --at`.
 - Pseudonyms only for human principals; agents and apps appear by handle (privacy.md item 4).
   Metrics never carry the pseudonym; `attr` documents `bothy.principal.pseudo_id` as span and log
   only.
 
-D7. W8: the package is `internal/platform/otel` (02); signals.md "GenAI-Konventionen" item 2
+D7. W8: the package is `internal/platform/otel` (02); signals.md "GenAI conventions" item 2
 already names `internal/platform/otel/genai`.
 
 ## Tests (write them first)
@@ -298,7 +298,7 @@ already names `internal/platform/otel/genai`.
 - `TestAttrKeysEqualCollectorAllowlist`: the set of non metric-only keys in `otel/attr` plus the
   `genai` constants equals the non-resource keys of `infra/otel/collector.yaml`
   `redaction/allowlist.allowed_keys` (resource keys are those of signals.md
-  "Resource-Attribute" plus `telemetry.sdk.*`); a difference in either direction fails.
+  "Resource attributes" plus `telemetry.sdk.*`); a difference in either direction fails.
 - `TestGenAIKeysSnapshot` (golden `testdata/keys.golden`, `-update` flag) and
   `TestGenAIKeysAllowedOrScrubbed`: each constant is in the collector allowlist, each `Forbidden`
   key is deleted by `transform/scrub` or absent from the allowlist.
@@ -340,8 +340,8 @@ make check
   overflow that is not counted, sampling, pseudonyms, how later tickets add spans, metrics and log
   keys), `internal/platform/otel/genai/README.md`, `internal/platform/buildinfo/README.md`.
 - Docs: privacy.md, 20, 17 and signals.md already state D4, D6 and W8; change them only if the
-  build proves a statement wrong. `docs/spec/02-architektur.md` "Befehle des Binarys" gets the
-  `--at` flag.
+  build proves a statement wrong. `docs/spec/02-architecture.md` "Commands of the binary" gets
+  the `--at` flag.
 - `docs/DECISIONS.md`: D1 (disabled telemetry keeps stdout logs), D3 (drop accounting).
 - Configuration reference regenerated without diff.
 - `services/server/CHANGELOG.md` entry under "Unreleased".

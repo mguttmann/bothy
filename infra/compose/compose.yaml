@@ -67,7 +67,7 @@ x-api: &api
   image: ${BOTHY_REGISTRY:?BOTHY_REGISTRY is missing in .env}/bothy-server:${BOTHY_VERSION:?BOTHY_VERSION is missing in .env}
   command: ["serve", "--role=api"]
   restart: unless-stopped
-  # Longer than shutdown.total_timeout (02-architektur 15.3); a test keeps it so.
+  # Longer than shutdown.total_timeout (02-architecture 15.3); a test keeps it so.
   stop_grace_period: 75s
   <<: *hardening
   logging: *logging

@@ -4,21 +4,22 @@ This folder holds the build briefs: one English file per ticket, written so that
 build session can finish the ticket with a green `make check` without asking anything. Each brief
 names its goal, the chapters and ADRs to read, the fixed build rules, scope and boundaries, the
 tests to write first, the acceptance criteria and the report format. Order and dependencies come
-from the [plan](../PLAN.md) (Etappe M1, "Tickets"); this index repeats them for the launcher.
+from the [plan](../PLAN.md) (milestone M1, "Tickets"); this index repeats them for the launcher.
 
-Briefs are written for Etappe M1 (plan ticket M0-05). Briefs of a later etappe are written when the
-etappe before it closes, because their tickets build on what that etappe actually delivered.
+Briefs are written for milestone M1 (plan ticket M0-05). Briefs of a later milestone are written
+when the milestone before it closes, because their tickets build on what that milestone actually
+delivered.
 
 ## How a brief runs
 
 1. The launcher starts a brief only when every ticket in "Depends on" is merged into the base
-   branch and Etappe M0 is closed (plan, section "M0 Planung"). A local SonarQube with the
+   branch and milestone M0 is closed (plan, section "M0 Planning"). A local SonarQube with the
    "Bothy way" gate must be running from M1-05 on (ticket M0-07).
 2. The launcher fills the placeholders `{{REPORT_PATH}}` and `{{DONE_PATH}}` and passes its host
    rules (ports, machine rules); a brief never contains instance-specific values.
 3. Each brief runs in its own git worktree on the branch `feat/<ticket-id>-<slug>`. Tickets of the
    same wave share no dependency and may run in parallel; overlapping files are resolved at merge.
-4. The working rules of the plan (section "Arbeitsweise je Ticket") apply to every brief: test
+4. The working rules of the plan (section "Way of working per ticket") apply to every brief: test
    first, specification first, `make check` green, review and red team before the local merge, no
    push without the owner's approval. The red team report is stored as `.review/<sha>.md` of the
    commit to merge, last line `Urteil: JA` (PLAN 3.9, D-W-32).
@@ -33,7 +34,7 @@ etappe before it closes, because their tickets build on what that etappe actuall
    OpenAPI from handler code.
 
     Which gate enforces the doc comments per language and where the API documentation comes
-    from: [chapter 23, "Doku im Code"](../spec/23-qualitaet.md#doku-im-code).
+    from: [chapter 23, "Documentation in code"](../spec/23-quality.md#documentation-in-code).
 
 ## Fixed build rules
 
@@ -56,7 +57,7 @@ etappe before it closes, because their tickets build on what that etappe actuall
 
 A brief may add a note on a rule after this block (for example "Note on rule 3"), never inside it.
 
-Note on rules 1 and 3: "stages" are the etappen M1, M2 and so on of the plan. "MkDocs" is the
+Note on rules 1 and 3: "stages" are the milestones M1, M2 and so on of the plan. "MkDocs" is the
 docs site of ADR 0045 (MkDocs with Material today); after the planned switch to Zensical, which
 reads the same `mkdocs.yml`, rule 3 means that site (D-W-54).
 
@@ -129,8 +130,8 @@ are added by the brief-writing step (plan ticket M0-05) under the names listed h
 | 8 | M1-25 | Action catalogue in code and registration duty | `M1-25-authz-catalogue.md` | M1-18 |
 | 7 | M1-26 | Principal tables and directory | `M1-26-identity-principals.md` | M1-13 |
 | 8 | M1-27 | Grant model storage | `M1-27-authz-grant-store.md` | M1-26 |
-| 9 | M1-28 | Rights snapshot, cache and authorize | `M1-28-authz-core.md` | M1-24, M1-25, M1-27 |
-| 10 | M1-29 | Rights changes, access.changed and invariants I1 and SR8 | `M1-29-authz-invariants.md` | M1-16, M1-28 |
+| 9 | M1-28 | Permission snapshot, cache and authorize | `M1-28-authz-core.md` | M1-24, M1-25, M1-27 |
+| 10 | M1-29 | Permission changes, access.changed and invariants I1 and SR8 | `M1-29-authz-invariants.md` | M1-16, M1-28 |
 | 11 | M1-30 | Expiry of grants and memberships | `M1-30-authz-expiry.md` | M1-29 |
 | 11 | M1-31 | People, owners and own profile | `M1-31-identity-people.md` | M1-20, M1-29 |
 | 10 | M1-32 | Signing keys, JWKS and rotation | `M1-32-signing-keys.md` | M1-20, M1-23, M1-28 |
@@ -182,7 +183,7 @@ are added by the brief-writing step (plan ticket M0-05) under the names listed h
 A brief may call a `make` target only if the Makefile already has it or the ticket that creates it
 is the brief itself or in its dependency closure; otherwise the target could be missing when the
 launcher starts the brief. `tools/docs/brief_deps.py` (part of `make docs`) checks this table, the
-waves, the graph and the column "Abhängig von" of the plan against the index.
+waves, the graph and the column "Depends on" of the plan against the index.
 
 | Target | Created by |
 |---|---|

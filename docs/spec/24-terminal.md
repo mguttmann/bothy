@@ -1,288 +1,288 @@
 # 24 Terminal
 
-Status: Entwurf M0, Nachtrag vom 2026-10-10. Normativ für das Modul `terminal`, den Host-Dienst
-`bothy-host`, die Terminal-Ansicht der Apps und der Web-Konsole und für jede Prüfung, die eine
-Terminal-Sitzung erlaubt.
-Begriffe: [00-glossar.md](00-glossar.md). Tabellen: [03-datenmodell.md](03-datenmodell.md)
-(`hosts`, `host_session_users`, `terminal_sessions`, `grants`). Ereignisse: [04-sync-protokoll.md](04-sync-protokoll.md).
-Aktionen: [05-aktionen.md](05-aktionen.md), Abschnitt 4.14. Rechte und Schutzregeln:
-[07-rechte.md](07-rechte.md) (SR10, SR11, SR12). Step-up: [08-identitaet.md](08-identitaet.md),
-Abschnitt 6.3. Invariante I6: [10-backend-richtlinie.md](10-backend-richtlinie.md), Abschnitt 3.
-Bedrohungen: [../security/threat-model.md](../security/threat-model.md), Abschnitt 6.7.
-Entscheidungen: [ADR 0068](../adr/0068-terminal-ueber-host-dienst-mit-noise-strom-und-invariante-i6.md),
-[ADR 0070](../adr/0070-terminal-in-der-web-konsole.md).
+Status: draft M0, addendum of 2026-10-10. Normative for the module `terminal`, the host service
+`bothy-host`, the terminal view of the apps and of the web console and for every check that allows
+a terminal session.
+Terms: [00-glossary.md](00-glossary.md). Tables: [03-data-model.md](03-data-model.md)
+(`hosts`, `host_session_users`, `terminal_sessions`, `grants`). Events: [04-sync-protocol.md](04-sync-protocol.md).
+Actions: [05-actions.md](05-actions.md), section 4.14. Permissions and guard rules:
+[07-permissions.md](07-permissions.md) (SR10, SR11, SR12). Step-up: [08-identity.md](08-identity.md),
+section 6.3. Invariant I6: [10-backend-policy.md](10-backend-policy.md), section 3.
+Threats: [../security/threat-model.md](../security/threat-model.md), section 6.7.
+Decisions: [ADR 0068](../adr/0068-terminal-through-a-host-service-with-noise-stream-and-invariant-i6.md),
+[ADR 0070](../adr/0070-terminal-in-the-web-console.md).
 
-Alle Grenzen, Fristen und Intervalle sind benannte Konfigurationswerte. Ihre Standardwerte stehen
-nur in Abschnitt 17.
+All limits, deadlines and intervals are named configuration values. Their default values are
+only in section 17.
 
-## 1. Zweck und Grenzen
+## 1. Purpose and limits
 
-Das Terminal ist Pflichtbestandteil des Produkts. Eine berechtigte Person öffnet in der Desktop-App,
-in der mobilen App oder in der Web-Konsole eine echte Terminal-Sitzung auf einem angebundenen
-Rechner: eine Login-Shell oder eine interaktive Sitzung eines Coding-Agenten (z. B. Claude Code).
+The terminal is a mandatory part of the product. An authorized person opens a real terminal
+session on a connected host in the desktop app, in the mobile app or in the web console: a login
+shell or an interactive session of a coding agent (for example Claude Code).
 
-Sicherheit ist eingebaut, nicht abschaltbar:
+Security is built in and cannot be switched off:
 
-1. Nur Menschen mit dem Zusatzrecht `terminal` auf dem Rechner öffnen ein Terminal, und nur mit
-   einem eigenen Sitzungsbenutzer dort (Abschnitt 2.2). Owner haben das Recht implizit, außer I6
-   sperrt (Abschnitt 7).
-2. Jede Öffnung verlangt einen frischen Step-up, der genau für diese Öffnung gilt (Abschnitt 8).
-3. Der Inhalt läuft Ende-zu-Ende verschlüsselt zwischen Gerät und Rechner; der Server vermittelt und
-   entscheidet, liest aber nichts (Abschnitt 5).
-4. Jede Sitzung steht im Audit-Log, mit Leerlauf-Abbruch und Höchstdauer (Abschnitte 10 und 12).
-5. Auf dem Rechner laufen Host-Dienst und Sitzungen als getrennte Benutzer ohne
-   Administratorrechte. Jede Person hat auf jedem Rechner ihren eigenen Sitzungsbenutzer, den nie
-   eine andere Person bekommt (Ruling T12), und kein Ort mit Code, Einstellungen oder Anmeldungen
-   ist für einen Sitzungsbenutzer schreibbar und für einen anderen lesbar (Ruling T13). Die
-   Sitzungen erreichen die Schlüssel des Rechners nicht und können den PTY-Helfer nicht ersetzen
-   (Abschnitt 2.2).
+1. Only people with the capability `terminal` on the host open a terminal, and only with
+   their own session user there (section 2.2). Owners have the permission implicitly, unless I6
+   blocks it (section 7).
+2. Every opening requires a fresh step-up that applies to exactly this opening (section 8).
+3. The content runs end-to-end encrypted between device and host; the server mediates and
+   decides, but reads nothing (section 5).
+4. Every session is in the audit log, with idle timeout and maximum duration (sections 10 and 12).
+5. On the host, the host service and the sessions run as separate users without
+   administrator permissions. Every person has their own session user on every host, which no
+   other person ever gets (ruling T12), and no location with code, settings or logins
+   is writable for one session user and readable for another (ruling T13). The
+   sessions cannot reach the keys of the host and cannot replace the PTY helper
+   (section 2.2).
 
-Nicht in dieser Fassung: Dateiübertragung und Zwischenablage über den Kanal, Aufzeichnung von
-Inhalten, gemeinsame Sitzungen mehrerer Menschen, Terminal für Agenten oder Apps, Übernahme eines
-Threads des Runners ins Terminal (Abschnitt 11.3).
+Not in this version: file transfer and clipboard over the channel, recording of
+content, shared sessions of several people, terminal for agents or apps, taking over a
+thread of the runner into the terminal (section 11.3).
 
-Anti-Ziele: ein Weg am Rechte-Modell vorbei; Terminal-Inhalte im Server, in der Telemetrie, im
-Audit, in der Suche, im Push oder im Kontext eines Agenten; ein Weg, über das Terminal das
-persönliche Abo eines anderen Menschen zu nutzen.
+Anti-goals: a way around the permission model; terminal content in the server, in telemetry, in the
+audit, in search, in push or in the context of an agent; a way to use the personal
+subscription of another person via the terminal.
 
-## 2. Bausteine
+## 2. Building blocks
 
-### 2.1 Überblick
+### 2.1 Overview
 
-| Baustein | Ort | Aufgabe |
+| Building block | Place | Task |
 |---|---|---|
-| Modul `terminal` | Server, Rolle `api` | Rechner, Kopplung, Sitzungen, Sitzungs-Marken, Relais der Ströme |
-| Host-Dienst `bothy-host` | angebundener Rechner (macOS, Linux, Windows; auch eine Dev-VM aus [21-dev-isolation.md](21-dev-isolation.md)), Dienstbenutzer | Schlüssel, Steuerverbindung zum Server, Noise-Gegenstelle, Selbstprüfung |
-| PTY-Helfer `bothy-host pty-helper` | derselbe Rechner, je Sitzungsbenutzer ein Helfer unter diesem Benutzer; gestartet vom Dienstverwalter des Betriebssystems aus einer Binärdatei, die kein Sitzungsbenutzer ändern kann | PTY je Sitzung seiner Person, Profile, Prüfungen im Konto der Sitzungen (HD6, HD8, HD9, HD11); kennt keine Schlüssel |
-| Terminal-Ansicht | Desktop-App, mobile App, Web-Konsole | Darstellung, Eingabe, Noise-Gegenstelle, Schlüssel-Pinning |
-| Paket `packages/bothy_noise` | Dart | Noise-Handshake `NK`, geprüft gegen öffentliche Testvektoren (5.2) |
+| Module `terminal` | Server, role `api` | Hosts, pairing, sessions, terminal session tokens, relay of the streams |
+| Host service `bothy-host` | connected host (macOS, Linux, Windows; also a dev VM from [21-dev-isolation.md](21-dev-isolation.md)), service user | Keys, control connection to the server, Noise peer, self-check |
+| PTY helper `bothy-host pty-helper` | the same host, one helper per session user, running as that user; started by the service manager of the operating system from a binary that no session user can change | PTY per session of its person, profiles, checks in the account of the sessions (HD6, HD8, HD9, HD11); knows no keys |
+| Terminal view | Desktop app, mobile app, web console | Rendering, input, Noise peer, key pinning |
+| Package `packages/bothy_noise` | Dart | Noise handshake `NK`, checked against public test vectors (5.2) |
 
 ```mermaid
 flowchart LR
-    C["Gerät der Person<br/>Terminal-Ansicht"] -- "WSS /terminal/sessions/{id}/stream<br/>Noise-Rahmen" --> P["Rand<br/>Proxy mit Hash-Routing"]
-    P --> S["Server<br/>Modul terminal, Relais"]
-    H["Host-Dienst bothy-host<br/>Dienstbenutzer, Schlüssel"] -- "WSS /hosts/connect (Steuerung)<br/>WSS /hosts/sessions/{id}/stream (Daten)" --> P
-    H -- "lokaler Kanal je Helfer<br/>Klartext-Rahmen" --> X["PTY-Helfer je Person<br/>eigener Sitzungsbenutzer"]
-    X --> PTY["PTY: Shell oder<br/>Coding-Agent"]
+    C["Device of the person<br/>Terminal view"] -- "WSS /terminal/sessions/{id}/stream<br/>Noise frames" --> P["Edge<br/>Proxy with hash routing"]
+    P --> S["Server<br/>Module terminal, relay"]
+    H["Host service bothy-host<br/>Service user, keys"] -- "WSS /hosts/connect (control)<br/>WSS /hosts/sessions/{id}/stream (data)" --> P
+    H -- "local channel per helper<br/>Plaintext frames" --> X["PTY helper per person<br/>Own session user"]
+    X --> PTY["PTY: shell or<br/>coding agent"]
 ```
 
-### 2.2 Host-Dienst `bothy-host`
+### 2.2 Host service `bothy-host`
 
-- Eigenes kleines Go-Binary im Ordner `services/host`, nicht der Server (Ruling L1 gilt für den
-  Server). Eigene Version und eigener Release-Kanal ([18-release.md](18-release.md)).
-- Benutzer des Betriebssystems, alle ohne Administratorrechte, je als Dienst des
-  Betriebssystems (launchd, systemd oder Windows-Dienst; [16-betrieb.md](16-betrieb.md),
-  Abschnitt 4.4):
-    - der **Dienstbenutzer** `bothy-host`: besitzt den Zustandsordner mit den Schlüsseln (4.2), hält
-      Steuer- und Datenverbindungen und spricht Noise;
-    - je Person ein **Sitzungsbenutzer** aus `host_service.session_users`: Unter ihm läuft der
-      PTY-Helfer dieser Person und damit jede ihrer Shells und jeder ihrer Coding-Agenten. Kein
-      Sitzungsbenutzer hat Leserecht auf den Zustandsordner.
-- Den Dienstbenutzer und jeden PTY-Helfer verbindet ein eigener lokaler Kanal (Unix-Socket bzw.
-  Named Pipe), dessen Zugriffsrechte nur diese zwei Benutzer zulassen. Über den Kanal laufen nur
-  die entschlüsselten Rahmen aus 5.4, Steuerbefehle (Sitzung starten, beenden, Größe) und die
-  Ergebnisse der Prüfungen, die der Helfer ausführt (dazu die Identitäten seiner Arbeitsordner für
-  HD7, Punkt 6), nie die Schlüssel des Rechners. Grund: Eine Shell läuft mit allen Rechten ihres Benutzers. Liefe sie als
-  Dienstbenutzer, könnte jede Person mit einem Terminal die Schlüssel kopieren, sich von anderswo
-  als Rechner anmelden und jede spätere Sitzung mitlesen, auch die von Ownern.
-- **Ein Sitzungsbenutzer je Person und Rechner, nie geteilt** (Ruling T12):
-    1. Der Server hält je Rechner die Zuordnung Person zu Sitzungsbenutzer (`host_session_users`,
-       [03-datenmodell.md](03-datenmodell.md)). Der Owner legt sie bei der Bestätigung (3.2) oder
-       später mit `host.manage` an (Step-up, Grund, Audit); wer den Rechner lesen darf
-       (`host.read`), sieht die gültigen Zuordnungen. Ohne gültige Zuordnung bekommt eine Person
-       auf dem Rechner kein Terminal, auch ein Owner nicht (SR12 in [07-rechte.md](07-rechte.md);
-       `403 terminal_denied` mit `reason: no_session_user`).
-    2. Eine Person hat je Rechner höchstens eine gültige Zuordnung. Ein Sitzungsbenutzer gehört
-       höchstens einer Person, auch über die Zeit: Endet eine Zuordnung, bleibt sein Name für diesen
-       Rechner belegt, und keine andere Person bekommt ihn (`409 conflict` mit
-       `reason: session_user_taken`). Eine Person bekommt nach dem Ende ihrer Zuordnung einen neuen
-       Sitzungsbenutzer, nie einen gebrauchten.
-    3. Die Sitzungs-Marke nennt den Sitzungsbenutzer (`osu`, 5.3). Der Host-Dienst startet die PTY
-       nur im Helfer dieses Benutzers und nur, wenn er in `host_service.session_users` steht. Er
-       merkt sich im Zustandsordner, welcher Person (`sub`) er jeden Sitzungsbenutzer zuerst gegeben
-       hat, und lehnt eine Marke mit einer anderen Person für denselben Sitzungsbenutzer ab
-       (`session_user_mismatch`). So hält der Rechner die Regel auch dann, wenn die Zuordnung im
-       Server falsch ist. Geht diese Datei verloren (neuer Zustandsordner), lernt er die Bindungen
-       neu; die Zuordnung im Server gilt weiter. `bothy-host session-user remove` nimmt einen
-       Sitzungsbenutzer aus `host_service.session_users` und `host_service.claude_workdirs`,
-       entfernt seinen PTY-Helfer, schließt sein Home für alle anderen Benutzer (Punkt 4) und
-       startet den Host-Dienst neu ([16-betrieb.md](16-betrieb.md), Abschnitt 4.4); seine Bindung
-       bleibt im Zustandsordner, und `bothy-host session-user add` lehnt einen Namen ab, der dort
-       schon an eine Person gebunden ist.
+- Its own small Go binary in the folder `services/host`, not the server (Ruling L1 applies to the
+  server). Its own version and its own release channel ([18-release.md](18-release.md)).
+- Operating system users, all without administrator privileges, each as a service of the
+  operating system (launchd, systemd or Windows service; [16-operations.md](16-operations.md),
+  section 4.4):
+    - the **service user** `bothy-host`: owns the state directory with the keys (4.2), holds
+      control and data connections and speaks Noise;
+    - one **session user** per person from `host_service.session_users`: the PTY helper of this
+      person runs under it, and with it each of their shells and each of their coding agents. No
+      session user has read permission on the state directory.
+- A separate local channel (Unix socket or named pipe) connects the service user and each PTY
+  helper; its access permissions admit only these two users. Over the channel run only
+  the decrypted frames from 5.4, control commands (start session, end session, size) and the
+  results of the checks that the helper runs (plus the identities of its working directories for
+  HD7, item 6), never the keys of the host. Reason: A shell runs with all permissions of its user. If it ran as the
+  service user, any person with a terminal could copy the keys, log in from elsewhere
+  as the host and read along in every later session, including those of owners.
+- **One session user per person and host, never shared** (Ruling T12):
+    1. The server holds, per host, the assignment of person to session user (`host_session_users`,
+       [03-data-model.md](03-data-model.md)). The owner creates it at the confirmation (3.2) or
+       later with `host.manage` (step-up, reason, audit); whoever may read the host
+       (`host.read`) sees the valid assignments. Without a valid assignment a person gets no
+       terminal on the host, not even an owner (SR12 in [07-permissions.md](07-permissions.md);
+       `403 terminal_denied` with `reason: no_session_user`).
+    2. A person has at most one valid assignment per host. A session user belongs to at most
+       one person, also over time: When an assignment ends, its name stays taken for this
+       host, and no other person gets it (`409 conflict` with
+       `reason: session_user_taken`). After the end of their assignment, a person gets a new
+       session user, never a used one.
+    3. The terminal session token names the session user (`osu`, 5.3). The host service starts the PTY
+       only in the helper of this user and only if the user is listed in `host_service.session_users`. It
+       records in the state directory to which person (`sub`) it first gave each session user,
+       and rejects a token with a different person for the same session user
+       (`session_user_mismatch`). This way the host keeps the rule even if the assignment in the
+       server is wrong. If this file is lost (new state directory), it learns the bindings
+       anew; the assignment in the server stays valid. `bothy-host session-user remove` takes a
+       session user out of `host_service.session_users` and `host_service.claude_workdirs`,
+       removes its PTY helper, closes its home for all other users (item 4) and
+       restarts the host service ([16-operations.md](16-operations.md), section 4.4); its binding
+       stays in the state directory, and `bothy-host session-user add` rejects a name that is
+       already bound to a person there.
 
-        Grenze, ehrlich: "Nie geteilt, auch über die Zeit" gilt je Rechner-Eintrag (`hosts.id`) und je
-        Zustandsordner. Wird ein Rechner zurückgezogen und als neuer Eintrag gekoppelt, sind seine
-        früheren Namen im Server wieder frei; geht der Zustandsordner verloren, kennt der Host-Dienst
-        die früheren Bindungen nicht mehr. Ein Sitzungsbenutzer mit den Anmeldedaten einer früheren
-        Person kann dann einer anderen Person zugeordnet werden, ohne dass Server oder Host-Dienst es
-        merken [abgeleitet]. Davor schützt in diesen Fällen nur der Betreiber: Er vergibt einen früher
-        benutzten Namen nie neu, sondern legt mit `bothy-host session-user add` einen neuen an, nimmt
-        den alten mit `bothy-host session-user remove` heraus und sperrt oder löscht ihn
-        ([16-betrieb.md](16-betrieb.md), Abschnitt 4.4; Bedrohungsmodell T-TM-08 und T-TM-11).
+        Limit, honestly: "Never shared, also over time" applies per host entry (`hosts.id`) and per
+        state directory. If a host is retired and paired as a new entry, its
+        earlier names are free again in the server; if the state directory is lost, the host service
+        no longer knows the earlier bindings. A session user with the credentials of an earlier
+        person can then be assigned to another person without the server or the host service
+        noticing [derived]. In these cases only the instance operator protects against this: they never reassign a
+        previously used name, but create a new one with `bothy-host session-user add`, take
+        the old one out with `bothy-host session-user remove` and disable or delete it
+        ([16-operations.md](16-operations.md), section 4.4; threat model T-TM-08 and T-TM-11).
 
-    4. Die Home-Ordner der Sitzungsbenutzer sind gegeneinander verschlossen. Das Home eines
-       Sitzungsbenutzers ist ein Ort dieses Sitzungsbenutzers (Punkt 6) und gibt keinem anderen
-       Lese- oder Ausführrecht; das prüft HD11, und ein Verstoß sperrt nur diesen
-       Sitzungsbenutzer, mit seinem Namen. Die Home-Ordner aller anderen Benutzer des Rechners,
-       auch das des Dienstbenutzers und das eines früheren Sitzungsbenutzers, kann kein
-       Sitzungsbenutzer auflisten (HD9). Darum schließt `bothy-host session-user remove` das Home
-       des Benutzers, den es herausnimmt (Punkt 3).
-    5. Der Host-Dienst meldet die Namen aus `host_service.session_users` beim Einlösen des
-       Kopplungs-Codes (`host.pair`) und mit jedem `report` (`hosts.reported_session_users`, nur Namen
-       und die Anzeigenamen der Arbeitsordner nach HD7, nie Pfade). Er liest seine Konfiguration,
-       also auch `host_service.session_users` und `host_service.claude_workdirs`, nur beim Start;
-       eine Änderung wirkt erst nach einem Neustart. `bothy-host session-user add` und `remove`
-       starten ihn dafür selbst neu; jede andere Änderung der Konfiguration (etwa Arbeitsordner,
-       Profile, `host_service.claude_bin`) wirkt nach `bothy-host restart`
-       ([16-betrieb.md](16-betrieb.md), Abschnitt 4.4). Jeder Neustart beendet die laufenden
-       Sitzungen des Rechners (6.2). Nach jeder Anmeldung der Steuerverbindung schickt er `report`,
-       bevor er ein `session.open` annimmt, und der Server schickt `session.open` erst nach diesem
-       `report`. Der Server ordnet nur einen gemeldeten Namen zu (sonst `400 validation_failed` mit
-       `errors[].code = session_user_not_on_host`), und eine Zuordnung wirkt für SR12 nur, solange der
-       Rechner ihren Namen meldet. Grund: Ein Tippfehler oder ein noch nicht angelegter Benutzer soll
-       bei der Zuordnung auffallen, nicht erst beim Öffnen als Manipulationswarnung `4104` (R-TM-16).
-    6. **Keine geteilten Orte** (Ruling T13): Auf dem Rechner gibt es keinen Ort, den ein
-       Sitzungsbenutzer schreiben und ein anderer lesen oder ausführen kann, wenn er Code,
-       Einstellungen oder Anmeldungen trägt. Für die Orte, die der Host-Dienst kennt, heißt das:
-        - Orte eines Sitzungsbenutzers sind sein Home, der `CLAUDE_CONFIG_DIR` des Profils `claude`
-          (bei `organization` ein fester Ordner in seinem Home, bei `personal` der Wert aus seiner
-          Login-Shell, der in seinem Home liegen muss; 7.4) und seine Arbeitsordner.
-          `host_service.claude_workdirs` nennt die Arbeitsordner je Sitzungsbenutzer; jeder
-          Arbeitsordner gehört genau einem Sitzungsbenutzer. Steht ein Ordner dort bei zwei
-          Sitzungsbenutzern, streicht HD7 ihn aus beiden Listen. Das Profil `claude` bietet einer
-          Person nur die Arbeitsordner ihres eigenen Sitzungsbenutzers an, und zwar genau seine Liste
-          nach HD7, die der Host-Dienst meldet (Punkt 5); in dieser Liste zählt der Index der
-          Sitzungs-Marke (5.3). Diese Orte gehören ihrem Sitzungsbenutzer oder einem
-          vertrauenswürdigen Besitzer (unten) und sind nur für ihn zugänglich (Modus `0700` bzw. eine
-          ACL ohne Eintrag für andere Sitzungsbenutzer).
-        - Jeder Ordner auf dem Weg zu einem Ort eines Sitzungsbenutzers ist für keinen anderen
-          Sitzungsbenutzer schreibbar und gehört keinem anderen. Lesen und durchqueren dürfen andere
-          diese Ordner (etwa `/home`), den Ort selbst nicht.
-        - In jedem dieser Ordner gehören die Einträge, die der Coding-Agent oder git aus den Ordnern
-          über einem Arbeitsordner laden, keinem anderen Sitzungsbenutzer und sind für keinen anderen
-          schreibbar. Diese **Kettendateien** sind `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`,
-          `.mcp.json` und die Ordner `.claude` und `.git` mit allem darin.
-        - Kein Eintrag in einem Ort eines Sitzungsbenutzers gehört einem anderen Sitzungsbenutzer.
-        - Orte für alle sind die Programme: die Binärdatei des Helfers, `host_service.claude_bin`
-          (bei `organization` zugleich das Programm des Profils `claude`, 11.1) und das Programm jedes
-          Profils `command`. Sie und jeder Ordner auf dem Weg zu ihnen gehören einem
-          vertrauenswürdigen Besitzer und sind für keinen Sitzungsbenutzer schreibbar (dieselbe Regel
-          wie HD10). Grund: Ein solches Programm läuft in jedem Sitzungsbenutzer. Ein anderes Konto
-          als Besitzer reicht nicht, auch wenn es kein Sitzungsbenutzer ist, etwa das Konto einer
-          Person mit Administratorrechten, dem ein Ordner eines Paketverwalters gehört: Wer an dieses
-          Konto kommt, ändert ein Programm aller Personen, und HD11 kann nicht prüfen, wer das ist
-          [abgeleitet].
-        - **Vertrauenswürdiger Besitzer** ist unter Linux und macOS `root`, unter Windows `SYSTEM`,
-          `Administrators` oder `NT SERVICE\TrustedInstaller`. Grund für Windows: Nur
-          `TrustedInstaller` darf die geschützten Dateien und Ordner des Systems ändern ("Permission
+    4. The home folders of the session users are closed against each other. The home of a
+       session user is a location of this session user (item 6) and gives no other user
+       read or execute permission; HD11 checks this, and a violation blocks only this
+       session user, with its name. The home folders of all other users of the host,
+       including that of the service user and that of a former session user, cannot be listed by any
+       session user (HD9). That is why `bothy-host session-user remove` closes the home
+       of the user it takes out (item 3).
+    5. The host service reports the names from `host_service.session_users` when redeeming the
+       pairing code (`host.pair`) and with every `report` (`hosts.reported_session_users`, only names
+       and the display names of the working directories according to HD7, never paths). It reads its configuration,
+       including `host_service.session_users` and `host_service.claude_workdirs`, only at start;
+       a change takes effect only after a restart. `bothy-host session-user add` and `remove`
+       restart it themselves for this; every other change of the configuration (for example working directories,
+       profiles, `host_service.claude_bin`) takes effect after `bothy-host restart`
+       ([16-operations.md](16-operations.md), section 4.4). Every restart ends the running
+       sessions of the host (6.2). After every login of the control connection it sends `report`
+       before it accepts a `session.open`, and the server sends `session.open` only after this
+       `report`. The server assigns only a reported name (otherwise `400 validation_failed` with
+       `errors[].code = session_user_not_on_host`), and an assignment takes effect for SR12 only as long as the
+       host reports its name. Reason: A typo or a user not yet created should be noticed
+       at the assignment, not only at opening as the tampering warning `4104` (R-TM-16).
+    6. **No shared locations** (Ruling T13): On the host there is no location that one
+       session user can write and another can read or execute, if it carries code,
+       settings or logins. For the locations that the host service knows, this means:
+        - Locations of a session user are its home, the `CLAUDE_CONFIG_DIR` of the profile `claude`
+          (with `organization` a fixed folder in its home, with `personal` the value from its
+          login shell, which must lie in its home; 7.4) and its working directories.
+          `host_service.claude_workdirs` names the working directories per session user; each
+          working directory belongs to exactly one session user. If a folder is listed there for two
+          session users, HD7 removes it from both lists. The profile `claude` offers a
+          person only the working directories of their own session user, namely exactly its list
+          after HD7 that the host service reports (item 5); the index of the
+          terminal session token (5.3) counts in this list. These locations belong to their session user or to a
+          trusted owner (below) and are accessible only to that session user (mode `0700` or an
+          ACL without an entry for other session users).
+        - Every folder on the path to a location of a session user is writable by no other
+          session user and belongs to no other. Others may read and traverse
+          these folders (for example `/home`), but not the location itself.
+        - In each of these folders, the entries that the coding agent or git load from the folders
+          above a working directory belong to no other session user and are writable by no other.
+          These **chain files** are `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`,
+          `.mcp.json` and the folders `.claude` and `.git` with everything in them.
+        - No entry in a location of a session user belongs to another session user.
+        - Locations for all are the programs: the binary of the helper, `host_service.claude_bin`
+          (with `organization` also the program of the profile `claude`, 11.1) and the program of every
+          profile `command`. They and every folder on the path to them belong to a
+          trusted owner and are writable by no session user (the same rule
+          as HD10). Reason: Such a program runs in every session user. Another account
+          as owner is not enough, even if it is not a session user, for example the account of a
+          person with administrator privileges who owns a folder of a package manager: Whoever gets into this
+          account changes a program of all people, and HD11 cannot check who that is
+          [derived].
+        - **Trusted owner** is, under Linux and macOS, `root`, under Windows `SYSTEM`,
+          `Administrators` or `NT SERVICE\TrustedInstaller`. Reason for Windows: Only
+          `TrustedInstaller` may change the protected files and folders of the system ("Permission
           for full access to modify WRP-protected resources is restricted to TrustedInstaller",
-          https://learn.microsoft.com/en-us/windows/win32/wfp/protected-file-list, abgerufen
-          2026-10-11 [belegt]), und Microsoft nennt Dateien mit "TrustedInstaller as its owner"
-          und das Konto `NT SERVICE\TrustedInstaller`
+          https://learn.microsoft.com/en-us/windows/win32/wfp/protected-file-list, retrieved
+          2026-10-11 [verified]), and Microsoft names files with "TrustedInstaller as its owner"
+          and the account `NT SERVICE\TrustedInstaller`
           (https://learn.microsoft.com/en-us/archive/blogs/irenak/sysk-277-how-to-bring-back-the-trustedinstaller,
-          abgerufen 2026-10-11 [belegt]). Dass `C:\Program Files` und `C:\Windows\System32` mit
-          Standardrechten diesem Konto gehören und `C:\` ihm oder `SYSTEM`, ist [vermutet: Berichte
-          von Nutzern]; M2-42 misst es. Alle drei Konten haben auf dem Rechner ohnehin volle Rechte;
-          ihnen zu trauen fügt keine Partei hinzu [abgeleitet].
-        - **Schreibbar** heißt bei einer Datei: Inhalt, Attribute, Rechte oder Besitz ändern oder
-          sie löschen; bei einem Ordner zusätzlich: einen Eintrag anlegen, löschen oder umbenennen.
-          Unter Linux und macOS zählt das Recht `w` aus dem Modus, unter Linux auch aus der ACL, für
-          den Sitzungsbenutzer, eine seiner Gruppen oder alle anderen. Unter macOS zählen dazu diese
-          Rechte aus der ACL eines Eintrags für den Sitzungsbenutzer, eine seiner Gruppen oder
-          `everyone`: bei Dateien `write` ("Open for writing") und `append` ("Open for writing, but
-          in a fashion that only allows writes into areas of the file not previously written"), bei
-          Ordnern `add_file`, `add_subdirectory` und `delete_child`, bei beiden `delete`,
-          `writeattr`, `writeextattr`, `writesecurity` und `chown` (chmod(1) von macOS,
-          wiedergegeben unter https://ss64.com/mac/chmod.html, abgerufen 2026-10-11 [belegt]).
-          Unter Windows zählt jedes Recht, das die ACL dem Sitzungsbenutzer oder einer
-          Gruppe in seinem Token gibt (auch `Everyone`, `Authenticated Users` und `Users`): bei
-          Ordnern `FILE_ADD_FILE` ("For a directory, the right to create a file in the
-          directory"), `FILE_ADD_SUBDIRECTORY` ("the right to create a subdirectory") und
-          `FILE_DELETE_CHILD`, bei Dateien `FILE_WRITE_DATA` und `FILE_APPEND_DATA`, bei beiden
-          `FILE_WRITE_ATTRIBUTES`, `FILE_WRITE_EA`, `DELETE`, `WRITE_DAC` und `WRITE_OWNER`
+          retrieved 2026-10-11 [verified]). That `C:\Program Files` and `C:\Windows\System32`, with
+          default permissions, belong to this account and `C:\` to it or to `SYSTEM` is [assumed: reports
+          from users]; M2-42 measures it. All three accounts have full permissions on the host anyway;
+          trusting them adds no party [derived].
+        - **Writable** means, for a file: changing content, attributes, permissions or ownership, or
+          deleting it; for a folder additionally: creating, deleting or renaming an entry.
+          Under Linux and macOS the permission `w` from the mode counts, under Linux also from the ACL, for
+          the session user, one of its groups or all others. Under macOS these
+          permissions from the ACL of an entry for the session user, one of its groups or
+          `everyone` count as well: for files `write` ("Open for writing") and `append` ("Open for writing, but
+          in a fashion that only allows writes into areas of the file not previously written"), for
+          folders `add_file`, `add_subdirectory` and `delete_child`, for both `delete`,
+          `writeattr`, `writeextattr`, `writesecurity` and `chown` (chmod(1) of macOS,
+          reproduced at https://ss64.com/mac/chmod.html, retrieved 2026-10-11 [verified]).
+          Under Windows every permission counts that the ACL gives the session user or a
+          group in its token (including `Everyone`, `Authenticated Users` and `Users`): for
+          folders `FILE_ADD_FILE` ("For a directory, the right to create a file in the
+          directory"), `FILE_ADD_SUBDIRECTORY` ("the right to create a subdirectory") and
+          `FILE_DELETE_CHILD`, for files `FILE_WRITE_DATA` and `FILE_APPEND_DATA`, for both
+          `FILE_WRITE_ATTRIBUTES`, `FILE_WRITE_EA`, `DELETE`, `WRITE_DAC` and `WRITE_OWNER`
           (https://learn.microsoft.com/en-us/windows/win32/fileio/file-access-rights-constants,
-          abgerufen 2026-10-11 [belegt]); `GENERIC_WRITE` und `GENERIC_ALL` zählen mit den Rechten,
-          die sie umfassen. Ein Eintrag, der nur vererbt wird (`IO`), zählt für den Ordner selbst
-          nicht. Grund: Wer in einem Ordner Einträge anlegen kann, legt dort eine Kettendatei oder
-          einen Ordner mit dem Namen eines Ortes an; wer an eine Datei anhängen kann, ergänzt etwa
-          eine `CLAUDE.md` um eigene Anweisungen; wer Rechte oder Besitz ändern kann, gibt sich
-          jedes andere Recht [abgeleitet]. Attribute und erweiterte Attribute zählen mit: Keine der
-          Quellen sagt, welche davon für das Laden und Starten folgenlos sind, und ein Recht zu viel
-          in der Liste sperrt nur, eines zu wenig öffnet einen Ort [abgeleitet].
-        - **Pfadauflösung:** HD7, HD10 und HD11 lösen jeden Pfad vor der Prüfung vollständig auf,
-          unter Linux und macOS wie `realpath` ("an absolute pathname that resolves to the same
+          retrieved 2026-10-11 [verified]); `GENERIC_WRITE` and `GENERIC_ALL` count with the permissions
+          they include. An entry that is only passed on by inheritance (`IO`) does not count for the folder itself.
+          Reason: Whoever can create entries in a folder creates a chain file there or
+          a folder with the name of a location; whoever can append to a file extends, for example,
+          a `CLAUDE.md` with their own instructions; whoever can change permissions or ownership gives themselves
+          any other permission [derived]. Attributes and extended attributes count as well: None of the
+          sources says which of them are without effect for loading and starting, and one permission too many
+          in the list only blocks, one too few opens a location [derived].
+        - **Path resolution:** HD7, HD10 and HD11 fully resolve every path before the check,
+          under Linux and macOS like `realpath` ("an absolute pathname that resolves to the same
           directory entry, whose resolution does not involve '.', '..', or symbolic links",
-          https://pubs.opengroup.org/onlinepubs/9799919799/functions/realpath.html, abgerufen
-          2026-10-11 [belegt]), unter Windows mit `GetFinalPathNameByHandle` ("A final path is the
+          https://pubs.opengroup.org/onlinepubs/9799919799/functions/realpath.html, retrieved
+          2026-10-11 [verified]), under Windows with `GetFinalPathNameByHandle` ("A final path is the
           path that is returned when a path is fully resolved",
           https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew,
-          abgerufen 2026-10-11 [belegt]). HD10 und HD11 prüfen danach jeden Ordner der aufgelösten
-          Kette, jede Komponente des Pfads, wie er in der Konfiguration steht, und jeden Verweis
-          (symbolischer Link, unter Windows auch Verzeichnisverbindung), dem die Auflösung folgt,
-          samt dem Ordner, in dem er liegt. Ein Verweis zählt dabei wie ein Eintrag seines Ordners
-          und wie sein Ziel: Ein Verweis von `root` auf dem Weg zu einem Ort von B, der in einen
-          Ordner von A zeigt, besteht nicht.
-          Dasselbe gilt für eine Kettendatei, die ein Verweis ist, und für Verweise in `.claude` und
-          `.git`. Auflösen kann nur, wer den Pfad öffnen darf: Die Orte eines Sitzungsbenutzers
-          (Home, `CLAUDE_CONFIG_DIR`, Arbeitsordner) löst sein PTY-Helfer als dieser
-          Sitzungsbenutzer auf, denn sie sind nur für ihn zugänglich (oben), mit Modus `0700` auch
-          nicht für den Dienstbenutzer [abgeleitet]; die Orte für alle löst der Dienstbenutzer auf.
-          Lässt sich ein Pfad nicht auflösen, weil er fehlt, ein Verweis ins Leere zeigt oder ein
-          Ordner auf dem Weg für den auflösenden Benutzer verschlossen ist (etwa das Home eines
-          anderen Sitzungsbenutzers), gilt er als nicht vorhanden: Ein Arbeitsordner fällt aus der
-          Liste seines Sitzungsbenutzers, ein Profil `command` mit diesem Programm fällt weg (HD7,
-          Warnung); `host_service.claude_bin` gilt für HD6 und das Profil `claude` als leer, und ein
-          `CLAUDE_CONFIG_DIR` bei `personal` zählt wie einer außerhalb des Home (7.4); lässt sich
-          das Home selbst nicht auflösen, besteht HD11 für diesen Sitzungsbenutzer nicht. Grund: Was nicht aufgelöst ist,
-          ist nicht geprüft. Ein Arbeitsordner oder Programm, das nie angeboten wird, verbindet keine
-          Konten; den ganzen Sitzungsbenutzer wegen eines fehlenden Ordners zu sperren, wäre mehr als
-          nötig. Einen Verweis ins Leere als vorhanden zu werten, wäre gefährlich: Sein Ziel kann ein
-          anderer später anlegen [abgeleitet].
-          HD7 vergleicht Ordner nach ihrer Identität im Dateisystem, nicht nach der
-          Schreibweise: unter Linux und macOS Gerät und Inode ("A file identity is uniquely
+          retrieved 2026-10-11 [verified]). HD10 and HD11 then check every folder of the resolved
+          chain, every component of the path as it is written in the configuration, and every link
+          (symbolic link, under Windows also directory junction) that the resolution follows,
+          together with the folder in which it lies. A link counts both as an entry of its folder
+          and as its target: A link owned by `root` on the path to a location of B that points into a
+          folder of A does not pass.
+          The same applies to a chain file that is a link, and to links in `.claude` and
+          `.git`. Only whoever may open the path can resolve it: The locations of a session user
+          (home, `CLAUDE_CONFIG_DIR`, working directories) are resolved by its PTY helper as this
+          session user, because they are accessible only to that user (above), with mode `0700` not even
+          to the service user [derived]; the locations for all are resolved by the service user.
+          If a path cannot be resolved because it is missing, a link points nowhere or a
+          folder on the path is closed to the resolving user (for example the home of another
+          session user), it counts as not present: A working directory drops out of the
+          list of its session user, a profile `command` with this program is dropped (HD7,
+          warning); `host_service.claude_bin` counts as empty for HD6 and the profile `claude`, and a
+          `CLAUDE_CONFIG_DIR` with `personal` counts like one outside the home (7.4); if
+          the home itself cannot be resolved, HD11 does not pass for this session user. Reason: What is not resolved
+          is not checked. A working directory or program that is never offered connects no
+          accounts; blocking the whole session user because of a missing folder would be more than
+          necessary. Treating a link that points nowhere as present would be dangerous: Someone else can
+          create its target later [derived].
+          HD7 compares folders by their identity in the file system, not by their
+          spelling: under Linux and macOS device and inode ("A file identity is uniquely
           determined by the combination of st_dev and st_ino",
-          https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_stat.h.html, abgerufen
-          2026-10-11 [belegt]), unter Windows Seriennummer des Volumes und die 128-Bit-Datei-ID aus
+          https://pubs.opengroup.org/onlinepubs/9799919799/basedefs/sys_stat.h.html, retrieved
+          2026-10-11 [verified]), under Windows the serial number of the volume and the 128-bit file ID from
           `FILE_ID_INFO` ("The file identifier and the volume serial number uniquely identify a
           file on a single computer",
           https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info,
-          abgerufen 2026-10-11 [belegt]), abgefragt mit `GetFileInformationByHandleEx` und
-          `FileIdInfo` (vorhanden ab Windows 8: "This value is not supported before Windows 8",
+          retrieved 2026-10-11 [verified]), queried with `GetFileInformationByHandleEx` and
+          `FileIdInfo` (available from Windows 8: "This value is not supported before Windows 8",
           https://learn.microsoft.com/en-us/windows/win32/api/minwinbase/ne-minwinbase-file_info_by_handle_class,
-          abgerufen 2026-10-11 [belegt]). Die 64-Bit-Datei-ID aus `BY_HANDLE_FILE_INFORMATION`
-          reicht nicht: "The 64-bit identifier in this structure is not guaranteed to be unique on
+          retrieved 2026-10-11 [verified]). The 64-bit file ID from `BY_HANDLE_FILE_INFORMATION`
+          is not enough: "The 64-bit identifier in this structure is not guaranteed to be unique on
           ReFS"
           (https://learn.microsoft.com/en-us/windows/win32/api/fileapi/ns-fileapi-by_handle_file_information,
-          abgerufen 2026-10-11 [belegt]). Jeder PTY-Helfer meldet dem Host-Dienst über den lokalen
-          Kanal je Arbeitsordner seiner Liste nur diese Identität, nie einen Inhalt; der Host-Dienst
-          vergleicht die Werte aller Helfer und bildet daraus beim Start die Listen nach HD7. So
-          erkennt HD7 denselben Ordner auch hinter einem Verweis oder in anderer Groß- und
-          Kleinschreibung. Der PTY-Helfer startet das Profil `claude` im
-          aufgelösten Arbeitsordner, und HD6 und das Profil rufen `host_service.claude_bin` über
-          den aufgelösten Pfad auf, also genau das, was HD10 und HD11 geprüft haben. Grund: Eine
-          Prüfung nur des angegebenen Pfads ohne Auflösung ließe einen Verweis durch, der einem
-          vertrauenswürdigen Besitzer gehört und in einen Ordner einer anderen Person zeigt
-          [abgeleitet].
-        - **Laufwerkswurzel unter Windows:** Die Wurzel eines Laufwerks liegt auf dem Weg zu jedem Ort
-          darauf. Mit Standardrechten darf dort jeder angemeldete Benutzer Ordner anlegen: Die
-          DISA-Prüfliste für Windows 11 nennt für `C:\` die Einträge
+          retrieved 2026-10-11 [verified]). Every PTY helper reports to the host service over the local
+          channel, per working directory of its list, only this identity, never any content; the host service
+          compares the values of all helpers and builds the lists according to HD7 from them at start. This way
+          HD7 detects the same folder also behind a link or in a different upper and
+          lower case. The PTY helper starts the profile `claude` in the
+          resolved working directory, and HD6 and the profile call `host_service.claude_bin` via
+          the resolved path, that is, exactly what HD10 and HD11 checked. Reason: A
+          check of only the given path without resolution would let through a link that belongs to a
+          trusted owner and points into a folder of another person
+          [derived].
+        - **Drive root under Windows:** The root of a drive lies on the path to every location
+          on it. With default permissions every logged-in user may create folders there: The
+          DISA checklist for Windows 11 names for `C:\` the entries
           `NT AUTHORITY\Authenticated Users:(AD)` ("Create folders / append data - This folder
-          only") und `NT AUTHORITY\Authenticated Users:(OI)(CI)(IO)(M)` ("Modify - Subfolders and
-          files only") (https://www.stigaview.com/products/win11/v2r3/WN11-00-000095/, abgerufen
-          2026-10-11 [belegt]). Eine Person könnte so `C:\.git` oder `C:\.claude` anlegen, also
-          Kettendateien über jedem Ort; dasselbe Muster beschreibt Git für Windows: "Those untrusted
+          only") and `NT AUTHORITY\Authenticated Users:(OI)(CI)(IO)(M)` ("Modify - Subfolders and
+          files only") (https://www.stigaview.com/products/win11/v2r3/WN11-00-000095/, retrieved
+          2026-10-11 [verified]). A person could thus create `C:\.git` or `C:\.claude`, that is,
+          chain files above every location; Git for Windows describes the same pattern: "Those untrusted
           parties could create the folder `C:\.git`"
           (https://github.com/git-for-windows/git/security/advisories/GHSA-vw2c-22j4-2fh2,
-          abgerufen 2026-10-11 [belegt]). Darum entfernt `bothy-host install` nach Bestätigung des
-          Betreibers den Eintrag `(AD)` an der Wurzel des Systemlaufwerks und jedes Laufwerks, auf
-          dem ein Ort liegt ([16-betrieb.md](16-betrieb.md), Abschnitt 4.4). Der Eintrag gilt nur
-          für die Wurzel selbst. Der Befehl schreibt dafür die DACL genau dieses Ordners neu, mit
-          allen anderen Einträgen in derselben Reihenfolge und denselben Steuerbits, und zwar mit
+          retrieved 2026-10-11 [verified]). That is why `bothy-host install`, after confirmation by the
+          instance operator, removes the entry `(AD)` at the root of the system drive and of every drive on
+          which a location lies ([16-operations.md](16-operations.md), section 4.4). The entry applies only
+          to the root itself. For this the command rewrites the DACL of exactly this folder, with
+          all other entries in the same order and with the same control bits, and it does so with
           `SetFileSecurityW` ("Note that security applied to a directory is not inherited by its
           children",
           https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-setfilesecurityw,
-          abgerufen 2026-10-11 [belegt]), nie mit `SetNamedSecurityInfo` oder `SetSecurityInfo`.
-          Diese beiden wenden bei jedem Setzen einer DACL die Vererbung neu auf alles darunter an
+          retrieved 2026-10-11 [verified]), never with `SetNamedSecurityInfo` or `SetSecurityInfo`.
+          These two reapply inheritance to everything below on every setting of a DACL
           ("If you are setting the discretionary access control list (DACL) [...] the system
           automatically propagates any inheritable access control entries (ACEs) to existing child
           objects",
@@ -290,1189 +290,1191 @@ flowchart LR
           "the system imposes the current inheritance model on the ACLs of all objects in the
           hierarchy below the target object",
           https://learn.microsoft.com/en-us/windows/win32/secauthz/automatic-propagation-of-inheritable-aces;
-          beide abgerufen 2026-10-11 [belegt]), an der Wurzel also auf das ganze Laufwerk;
-          `SetNamedSecurityInfo` ordnet dabei in den Ordnern darunter geerbte Einträge hinter die
-          eigenen (Quelle zu `SetNamedSecurityInfo` oben [belegt]). Microsoft nennt
-          `SetFileSecurityW` veraltet ("This function is obsolete", Quelle zu `SetFileSecurityW`
-          oben [belegt]); gewählt ist es trotzdem, weil seine Doku als einzige der genannten
-          ausdrücklich sagt, dass nichts an die Kinder geht. Weil die
-          vererbbaren Einträge der Wurzel gleich bleiben, ändert sich darunter kein Recht
-          [abgeleitet]. Den Eintrag `(OI)(CI)(IO)(M)` lässt der Befehl stehen: Er gibt auf der
-          Wurzel selbst kein Recht, und seine Entfernung nähme nach den Regeln der Vererbung jedem
-          bestehenden Ordner darunter seine geerbte Kopie ("If you remove an inheritable ACE from a
+          both retrieved 2026-10-11 [verified]), at the root therefore to the whole drive;
+          `SetNamedSecurityInfo` in doing so orders inherited entries behind the explicit ones in the
+          folders below (source for `SetNamedSecurityInfo` above [verified]). Microsoft calls
+          `SetFileSecurityW` obsolete ("This function is obsolete", source for `SetFileSecurityW`
+          above [verified]); it is chosen anyway because its documentation is the only one of those named that
+          says explicitly that nothing goes to the children. Because the
+          inheritable entries of the root stay the same, no permission changes below
+          [derived]. The command leaves the entry `(OI)(CI)(IO)(M)` in place: It gives no permission on the
+          root itself, and by the rules of inheritance its removal would take from every
+          existing folder below its inherited copy ("If you remove an inheritable ACE from a
           parent object, automatic inheritance removes any copies of the ACE that were inherited by
-          child objects", Quelle zur automatischen Vererbung oben [belegt]); bestehende Programme
-          verlören so ihre Schreibrechte.
-          Ordner, die diesen Eintrag erben, sind für jeden Sitzungsbenutzer schreibbar; HD11 findet
-          sie, wenn sie auf dem Weg zu einem Ort liegen. Ist die Wurzel eines Laufwerks mit einem
-          geprüften Ort für einen Sitzungsbenutzer schreibbar, meldet HD11 dafür den eigenen Code
-          `drive_root_writable`, damit der Betreiber den Schritt aus 16 Abschnitt 4.4 findet; die
-          lokale Ausgabe von `bothy-host doctor` nennt das Laufwerk, an den Server geht nur der Code.
-          Für ein Laufwerk, auf dem erst später ein Ort dazukommt, macht
-          `bothy-host install --drive-root <Laufwerk>` nur diesen Schritt. Die
-          Folge ist dieselbe wie bei jedem Verstoß an diesen Orten; an der Wurzel des
-          Systemlaufwerks heißt das immer "Start verweigert", weil die Binärdatei des Helfers dort
-          liegt, also ein Ort für alle.
+          child objects", source on automatic inheritance above [verified]); existing programs
+          would thus lose their write permissions.
+          Folders that inherit this entry are writable for every session user; HD11 finds
+          them when they lie on the path to a location. If the root of a drive with a
+          checked location is writable for a session user, HD11 reports its own code
+          `drive_root_writable` for it, so that the instance operator finds the step from 16 section 4.4; the
+          local output of `bothy-host doctor` names the drive, only the code goes to the server.
+          For a drive on which a location is added only later,
+          `bothy-host install --drive-root <drive>` performs only this step. The
+          consequence is the same as for every violation at these locations; at the root of the
+          system drive this always means "Start refused", because the binary of the helper lies
+          there, that is, a location for all.
 
-        HD11 prüft das mit einer Regel für jeden konfigurierten Pfad, statt jeden Ort einzeln zu
-        regeln; HD10 prüft für den Helfer und `host_service.claude_bin` zusätzlich Gegenstelle und
-        Interpreter. Die vier Begriffe oben (vertrauenswürdiger Besitzer, schreibbar, Pfadauflösung,
-        Laufwerkswurzel) gelten für diesen Punkt und für HD7, HD10 und HD11 gleich. Gemeinsamen Code tauschen Personen über git aus, nie über einen gemeinsamen
-        Ordner (Bedrohungsmodell T-TM-13).
+        HD11 checks this with one rule for every configured path instead of regulating every location
+        separately; HD10 additionally checks peer and interpreter for the helper and `host_service.claude_bin`.
+        The four terms above (trusted owner, writable, path resolution,
+        drive root) apply equally to this item and to HD7, HD10 and HD11. People exchange shared code via git, never via a shared
+        folder (threat model T-TM-13).
 
-    Grund: Die Anmeldedaten eines Sitzungsbenutzers (Dateien im Home, Schlüsselbund, ein Token in
-    seinen Startdateien) gehören so genau einer Person. Eine Abo-Anmeldung, die jemand in seiner
-    Sitzung anlegt, erreicht keine Sitzung eines anderen Menschen, solange kein Ort die Konten wieder
-    verbindet (Punkt 6). Das ist die tragende Durchsetzung
-    von "keine fremde Abo-Anmeldung" (7.4); HD6 ist nur eine Zusatzprüfung. Ein geteilter
-    Sitzungsbenutzer machte jede Anmeldung für alle Terminal-Nutzer des Rechners nutzbar, und eine
-    Prüfung im Konto dieses Benutzers ließe sich mit seinen eigenen Rechten fälschen oder umgehen.
+    Reason: The credentials of a session user (files in the home, keychain, a token in
+    its startup files) thus belong to exactly one person. A subscription login that someone creates in their
+    session reaches no session of another person as long as no location connects the accounts again
+    (item 6). This is the load-bearing enforcement
+    of "no other person's subscription login" (7.4); HD6 is only an additional check. A shared
+    session user would make every login usable for all terminal users of the host, and a
+    check in the account of this user could be forged or bypassed with its own permissions.
 
-    Grund für T13: Getrennte Konten helfen nur, wenn kein Ort sie wieder verbindet. Ein gemeinsamer
-    Arbeitsordner war so ein Ort. Claude Code liest die Projekt-Einstellungen
-    `.claude/settings.json` und `.claude/settings.local.json` des Arbeitsordners; Einstellungsdateien
-    tragen unter anderem "`permissions`, `hooks`, and credential helpers such as `apiKeyHelper`",
-    "The reload covers user, project, local, and managed settings", und "most `env` values apply
+    Reason for T13: Separate accounts help only if no location connects them again. A shared
+    working directory was such a location. Claude Code reads the project settings
+    `.claude/settings.json` and `.claude/settings.local.json` of the working directory; settings files
+    carry among other things "`permissions`, `hooks`, and credential helpers such as `apiKeyHelper`",
+    "The reload covers user, project, local, and managed settings", and "most `env` values apply
     only after each teammate trusts the folder" (https://code.claude.com/docs/en/settings,
-    abgerufen 2026-10-11 [belegt]). Außerdem gilt: "CLAUDE.md and CLAUDE.local.md files in the
+    retrieved 2026-10-11 [verified]). In addition: "CLAUDE.md and CLAUDE.local.md files in the
     directory hierarchy above the working directory are loaded at launch"
-    (https://code.claude.com/docs/en/memory, abgerufen 2026-10-11 [belegt]). Schreibt Person A dort,
-    laufen ihre Hooks und ihr `apiKeyHelper` als Sitzungsbenutzer von B, ihre Anweisungen steuern
-    Bs Agenten, und nach der Vertrauensabfrage setzt sie auch Umgebungsvariablen wie
-    `CLAUDE_CODE_OAUTH_TOKEN` in Bs Sitzung [abgeleitet]. Das ist Codeausführung über die Grenze
-    zwischen Personen und ein zweiter Weg für fremde Anmeldungen. Ein gemeinsamer
-    `CLAUDE_CONFIG_DIR` wäre derselbe Ort für Anmeldungen: Ein `/login` darin erreichte alle
-    Personen. Statt jeden Fund einzeln zu schließen, gilt eine Regel mit einer Prüfung für alle
-    Pfade.
+    (https://code.claude.com/docs/en/memory, retrieved 2026-10-11 [verified]). If person A writes there,
+    their hooks and their `apiKeyHelper` run as the session user of B, their instructions steer
+    B's agents, and after the trust prompt they also set environment variables such as
+    `CLAUDE_CODE_OAUTH_TOKEN` in B's session [derived]. This is code execution across the boundary
+    between people and a second path for logins of other people. A shared
+    `CLAUDE_CONFIG_DIR` would be the same location for logins: A `/login` in it would reach all
+    people. Instead of closing each such find separately, one rule with one check for all
+    paths applies.
 
-    Grund für die Kettendateien: Was der Coding-Agent aus den Ordnern über
-    dem Arbeitsordner lädt, wirkt wie ein Ort von B, auch wenn der Ordner selbst niemandem sonst
-    gehört. Neben `CLAUDE.md` und `CLAUDE.local.md` lädt Claude Code ohne solche Dateien "every
+    Reason for the chain files: What the coding agent loads from the folders above
+    the working directory acts like a location of B, even if the folder itself belongs to nobody
+    else. Besides `CLAUDE.md` and `CLAUDE.local.md`, Claude Code loads, without such files, "every
     `AGENTS.md` and `.claude/AGENTS.md` in your working directory and the directories above it"
-    (https://code.claude.com/docs/en/memory, abgerufen 2026-10-11 [belegt]). Startet es in einem
-    Unterordner eines git-Repositorys, liest es `.claude/settings.local.json` "at the repository
-    root" (https://code.claude.com/docs/en/settings, abgerufen 2026-10-11 [belegt]); `.mcp.json`
-    liegt "in project root" (https://code.claude.com/docs/en/mcp, abgerufen 2026-10-11 [belegt]),
-    und dieser kann über dem Arbeitsordner liegen [abgeleitet]. git sucht sein Repository ebenfalls
-    in den Ordnern darüber; die Doku nennt "directories that Git should not chdir up into while
-    looking for a repository directory" (https://git-scm.com/docs/git, abgerufen 2026-10-11
-    [belegt]). Hooks eines solchen Repositorys liefen dann in der Sitzung von B [abgeleitet]. Eine
-    Regel für alle Einträge dieser Ordner ginge nicht: In `/home` liegen die Home-Ordner der anderen
-    Sitzungsbenutzer, und sie gehören ihnen.
+    (https://code.claude.com/docs/en/memory, retrieved 2026-10-11 [verified]). If it starts in a
+    subfolder of a git repository, it reads `.claude/settings.local.json` "at the repository
+    root" (https://code.claude.com/docs/en/settings, retrieved 2026-10-11 [verified]); `.mcp.json`
+    lies "in project root" (https://code.claude.com/docs/en/mcp, retrieved 2026-10-11 [verified]),
+    and that root can lie above the working directory [derived]. git also searches for its repository
+    in the folders above; the documentation names "directories that Git should not chdir up into while
+    looking for a repository directory" (https://git-scm.com/docs/git, retrieved 2026-10-11
+    [verified]). Hooks of such a repository would then run in the session of B [derived]. A
+    rule for all entries of these folders would not work: `/home` holds the home folders of the other
+    session users, and they belong to them.
 
-    Grenze, ehrlich: HD11 prüft die Orte, die die Konfiguration nennt, und das Home jedes
-    Sitzungsbenutzers, nicht jeden Ordner des Rechners. Den `CLAUDE_CONFIG_DIR` bei `personal`, den
-    die Login-Shell des Inhabers setzt, deckt das Home nur, weil der PTY-Helfer das Profil `claude`
-    allein mit einem Wert im Home startet (7.4). Allgemein schreibbare Ordner wie `/tmp` sind
-    nach T13 kein Ort für Code, Einstellungen oder Anmeldungen; ein Programm, das trotzdem von dort
-    lädt, deckt HD11 nicht ab [abgeleitet]. Wechselt eine Person in ihrer Shell selbst in einen
-    Ordner außerhalb dieser Orte, den ein anderer Sitzungsbenutzer schreiben kann, und startet dort
-    den Coding-Agenten, sieht HD11 das nicht; solche Ordner richtet der Betreiber nach T13 nicht ein
-    ([16-betrieb.md](16-betrieb.md), Abschnitt 4.4). Unter Windows ist das auch jeder Ordner, den
-    ein Administrator direkt in der Wurzel eines Laufwerks anlegt, solange er den vererbten Eintrag
-    `Authenticated Users:(OI)(CI)(IO)(M)` trägt (Punkt 6). Die Kettendateien sind die Namen, die die
-    genannten Quellen am 2026-10-11 nennen; lädt eine spätere Fassung des Coding-Agenten weitere
-    Dateien aus der Ordnerkette, prüft HD11 sie erst, wenn die Liste ergänzt ist. Öffnet ein
-    Sitzungsbenutzer seine eigenen Orte für andere, sieht HD11 das bei der nächsten Prüfung, und gar
-    nicht, wenn er sie vorher wieder schließt. Einen Eintrag, den ein anderer Sitzungsbenutzer in
-    dieser Zeit dort anlegt, findet HD11 erst beim nächsten Start des Dienstes oder Aufruf von
-    `bothy-host doctor`, weil nur diese Prüfung jeden Eintrag eines Ortes durchläuft. Was er in eine
-    schon vorhandene, für ihn schreibbare Datei schreibt, erkennt HD11 gar nicht an Besitz oder
-    Modus. Nach einem Treffer prüft der Betreiber den Ort ([16-betrieb.md](16-betrieb.md), Abschnitt
+    Limit, honestly: HD11 checks the locations that the configuration names and the home of every
+    session user, not every folder of the host. The `CLAUDE_CONFIG_DIR` with `personal`, which the
+    login shell of the holder sets, is covered by the home only because the PTY helper starts the
+    profile `claude` only with a value in the home (7.4). Generally writable folders such as `/tmp` are,
+    according to T13, no location for code, settings or logins; a program that loads from there anyway
+    is not covered by HD11 [derived]. If a person in their shell changes by themselves into a
+    folder outside these locations that another session user can write, and starts the
+    coding agent there, HD11 does not see that; according to T13 the instance operator does not set up such folders
+    ([16-operations.md](16-operations.md), section 4.4). Under Windows this also covers every folder that
+    an administrator creates directly in the root of a drive, as long as it carries the inherited entry
+    `Authenticated Users:(OI)(CI)(IO)(M)` (item 6). The chain files are the names that the
+    cited sources name on 2026-10-11; if a later version of the coding agent loads further
+    files from the folder chain, HD11 checks them only once the list is extended. If a
+    session user opens its own locations for others, HD11 sees that at the next check, and not
+    at all if it closes them again before. An entry that another session user creates there in
+    this time is found by HD11 only at the next start of the service or call of `bothy-host doctor`,
+    because only this check goes through every entry of a location. What the other user writes into an
+    already existing file that is writable for it, HD11 does not detect at all from ownership or
+    mode. After a hit the instance operator checks the location ([16-operations.md](16-operations.md), section
     4.4).
 
-    Folge, ehrlich: Liegt eine Kettendatei, die einem Sitzungsbenutzer A gehört oder die er
-    schreiben kann, in einem Ordner auf dem Weg zu den Orten mehrerer Sitzungsbenutzer (etwa der
-    Wurzel eines Laufwerks oder einem gemeinsamen Elternordner der Arbeitsordner), besteht HD11 für
-    jeden anderen dieser Sitzungsbenutzer nicht. Eine Person kann so den Rechner für die anderen
-    stilllegen. Anlegen kann A einen solchen Eintrag nur, solange der
-    Ordner für A schreibbar ist; das meldet HD11 selbst als Verstoß an jedem dieser Orte, und unter
-    Windows schließt `bothy-host install` die Wurzel (Punkt 6). Es bleibt ein Eintrag aus der Zeit
-    davor, etwa ein `C:\.git`, das A vor der Installation angelegt hat. Der Stillstand endet, wenn
-    der Betreiber den Eintrag entfernt ([16-betrieb.md](16-betrieb.md), Abschnitt 4.4;
-    Bedrohungsmodell T-TM-14).
+    Consequence, honestly: If a chain file that belongs to a session user A or that A can
+    write lies in a folder on the path to the locations of several session users (for example the
+    root of a drive or a shared parent folder of the working directories), HD11 does not pass for
+    any other of these session users. A person can thus shut down the host for the others.
+    A can create such an entry only as long as the
+    folder is writable for A; HD11 itself reports that as a violation at each of these locations, and under
+    Windows `bothy-host install` closes the root (item 6). What remains is an entry from the time
+    before, for example a `C:\.git` that A created before the installation. The standstill ends when
+    the instance operator removes the entry ([16-operations.md](16-operations.md), section 4.4;
+    threat model T-TM-14).
 
-- Jeder PTY-Helfer läuft als sein Sitzungsbenutzer, aber dieser steuert ihn nicht. Sonst
-  könnte eine Shell den Helfer beenden, einen eigenen an seine Stelle setzen, die Ergebnisse von
-  HD6, HD8, HD9 und HD11 fälschen und den Klartext jeder späteren Sitzung lesen. Darum gilt:
-    1. `bothy-host install` (einmal mit Administratorrechten, [16-betrieb.md](16-betrieb.md),
-       Abschnitt 4.4) legt je Sitzungsbenutzer einen Helfer als Dienst des Systems an, der unter
-       diesem Sitzungsbenutzer läuft: systemd-Systemdienst mit `User=` und Socket-Aktivierung, launchd-LaunchDaemon mit
-       `UserName` und `Sockets`, Windows-Dienst mit dem Konto des Sitzungsbenutzers. Binärdatei,
-       Dienst-Definition und der Ordner mit dem Endpunkt des Kanals gehören einem
-       vertrauenswürdigen Besitzer (2.2 Punkt 6) und sind für keinen Sitzungsbenutzer schreibbar;
-       stoppen oder neu konfigurieren kann er den Dienst nicht (HD10).
-    2. Den Endpunkt des Kanals legt unter Linux und macOS der Dienstverwalter an und reicht ihn an
-       den Helfer weiter; ein Prozess des Sitzungsbenutzers kann ihn nicht neu anlegen. Unter Windows
-       legt der Helfer die Named Pipe an.
-    3. `bothy-host` prüft beim Verbinden die Gegenstelle doppelt: Benutzer über die Anmeldedaten des
-       Prozesses, die das Betriebssystem liefert, und Prozess-ID gleich der Prozess-ID, die der
-       Dienstverwalter für den Helfer-Dienst dieses Sitzungsbenutzers meldet. Passt eins nicht, schickt er keinen Rahmen und
-       meldet HD10 nicht bestanden.
-    4. Der Helfer schützt seinen Speicher vor anderen Prozessen desselben Benutzers: unter Linux
-       `PR_SET_DUMPABLE = 0`, unter macOS Hardened Runtime ohne `get-task-allow`, unter Windows eine
-       Prozess-DACL ohne Zugriffsrechte für den Sitzungsbenutzer. Für Linux belegt: Ein Prozess
-       desselben Benutzers darf sich nur an einen Prozess hängen, der "dumpable" ist
-       (https://www.kernel.org/doc/html/latest/admin-guide/LSM/Yama.html, abgerufen 2026-10-10
-       [belegt]); für macOS und Windows [vermutet], das Bau-Ticket belegt es mit TM-T26.
+- Every PTY helper runs as its session user, but that user does not control it. Otherwise
+  a shell could end the helper, put its own in its place, forge the results of
+  HD6, HD8, HD9 and HD11 and read the plaintext of every later session. Therefore:
+    1. `bothy-host install` (once with administrator privileges, [16-operations.md](16-operations.md),
+       section 4.4) creates, per session user, a helper as a system service that runs under
+       this session user: systemd system service with `User=` and socket activation, launchd LaunchDaemon with
+       `UserName` and `Sockets`, Windows service with the account of the session user. Binary,
+       service definition and the folder with the endpoint of the channel belong to a
+       trusted owner (2.2 item 6) and are writable by no session user;
+       the session user cannot stop or reconfigure the service (HD10).
+    2. Under Linux and macOS the service manager creates the endpoint of the channel and passes it to
+       the helper; a process of the session user cannot recreate it. Under Windows
+       the helper creates the named pipe.
+    3. `bothy-host` checks the peer twice when connecting: the user via the process credentials
+       that the operating system supplies, and the process ID equal to the process ID that the service
+       manager reports for the helper service of this session user. If either does not match, it sends
+       no frame and reports HD10 as not passed.
+    4. The helper protects its memory against other processes of the same user: under Linux
+       `PR_SET_DUMPABLE = 0`, under macOS Hardened Runtime without `get-task-allow`, under Windows a
+       process DACL without access permissions for the session user. Verified for Linux: A process
+       of the same user may attach only to a process that is "dumpable"
+       (https://www.kernel.org/doc/html/latest/admin-guide/LSM/Yama.html, retrieved 2026-10-10
+       [verified]); for macOS and Windows [assumed], the build ticket proves it with TM-T26.
 
-    Grenze, ehrlich: Prozesse eines Sitzungsbenutzers erreichen die Shells derselben
-    Benutzerkennung, zum Beispiel über das PTY-Gerät, das diesem Sitzungsbenutzer gehört
-    [abgeleitet]. Alle Sitzungen einer Person auf einem Rechner teilen sich also einen
-    Vertrauensbereich; Sitzungen verschiedener Personen trennt die Benutzerkennung (T12). Diese
-    Trennung ist keine vollständige Grenze zwischen Personen (gemeinsamer Kernel, lokale Lücken des
-    Betriebssystems; [ADR 0046](../adr/0046-mehrbenutzer-dev-umgebung-nur-mit-abschottung.md)). Darum
-    gilt SR10 weiter, und die App warnt einen Owner, der auf dem Rechner eines anderen Menschen ein
-    Terminal öffnet (8.4; Bedrohungsmodell T-TM-12).
+    Limit, honestly: Processes of a session user reach the shells of the same
+    user ID, for example via the PTY device that belongs to this session user
+    [derived]. All sessions of one person on a host therefore share one
+    trust zone; sessions of different people are separated by the user ID (T12). This
+    separation is not a complete boundary between people (shared kernel, local gaps of the
+    operating system; [ADR 0046](../adr/0046-multi-user-dev-environment-only-with-isolation.md)). That is why
+    SR10 still applies, and the app warns an owner who opens a terminal on the host of another person
+    (8.4; threat model T-TM-12).
 
-- `bothy-host doctor` prüft vor jedem Start und auf Befehl (voller Lauf); HD6 und HD11 laufen
-  zusätzlich vor jedem Start einer PTY und alle `host_service.credential_check_interval` (7.4),
-  HD11 dabei ohne die Prüfung der Einträge:
+- `bothy-host doctor` checks before every start and on command (full run); HD6 and HD11 run
+  additionally before every start of a PTY and every `host_service.credential_check_interval` (7.4),
+  HD11 here without the check of the entries:
 
-| Prüfung | Bestanden, wenn | Folge bei Verstoß |
+| Check | Passes if | Consequence of a violation |
 |---|---|---|
-| HD1 Benutzer | `host_service.session_users` nennt mindestens einen Benutzer; kein Benutzer des Host-Dienstes ist `root`, `Administrator` oder `SYSTEM`; alle Sitzungsbenutzer sind verschieden, und keiner ist der Dienstbenutzer | Start verweigert |
-| HD2 Gruppen | kein Benutzer des Host-Dienstes (Dienstbenutzer und jeder Sitzungsbenutzer) ist in einer gesperrten Gruppe: fest `admin`, `sudo`, `wheel`, `Administrators`, `docker`, `lxd`, `libvirt`, `disk`, dazu `host_service.extra_forbidden_groups`; unter Linux ist zusätzlich der Socket des Docker-Daemons für keinen von ihnen schreibbar | Start verweigert |
-| HD3 sudo | kein passwortloses `sudo` für einen von ihnen (`sudo -n true` scheitert) | Start verweigert |
-| HD4 Zustandsordner | `host_service.state_dir` gehört dem Dienstbenutzer, Modus `0700`; Schlüsseldatei `0600` (Windows: DPAPI, Abschnitt 4.2) | Start verweigert |
-| HD5 Server-Host | erkennt, ob derselbe Rechner den Server betreibt (Abschnitt 2.3) | Warnung; Sitzungen nur für Owner (SR10) |
-| HD6 LLM-Anmeldung | Abschnitt 7.4, im Konto jedes Sitzungsbenutzers; Zusatzprüfung, nicht die tragende Grenze (T12) | bei `none` oder `organization` und erkannter Abo-Anmeldung: Start verweigert bzw. Sitzungen beendet (7.4); die Meldung nennt jeden betroffenen Sitzungsbenutzer mit eigenem Eintrag |
-| HD7 Profile | jedes Profil verweist auf ein vorhandenes Programm, Profile `command` mit absolutem Pfad, das Profil `claude` bei `organization` auf `host_service.claude_bin` (leer oder als leer geltend nach 7.4: das Profil fällt weg, 11.1); jeder Schlüssel in `host_service.claude_workdirs` ist ein Name aus `host_service.session_users`, jeden Arbeitsordner kann der PTY-Helfer seines Sitzungsbenutzers auflösen, und jeder steht bei genau einem Sitzungsbenutzer, verglichen nach Auflösung und Identität im Dateisystem, die jeder Helfer für seine Liste meldet (2.2 Punkt 6) | Profil fällt weg, Warnung; bei `host_service.claude_workdirs` fällt nur der falsche Teil weg: ein Schlüssel, der kein Name aus `host_service.session_users` ist, mit seiner Liste, ein Ordner, den der Helfer seines Sitzungsbenutzers nicht auflösen kann, aus dessen Liste, ein Ordner bei zwei Sitzungsbenutzern aus beiden Listen. Gemeldet und für `wdi` benutzt werden die Listen danach (2.2 Punkte 5 und 6) |
-| HD8 Trennung | der Dienstbenutzer prüft selbst Besitz, Modus und ACL von `host_service.state_dir` und der Schlüsseldatei (kein Eintrag für einen Sitzungsbenutzer oder eine seiner Gruppen); zusätzlich versucht jeder PTY-Helfer beim Start, beide zu lesen, und scheitert | Start verweigert |
-| HD9 Fremde Home-Ordner | jeder PTY-Helfer versucht beim Start, den Inhalt jedes Home-Ordners eines anderen lokalen Benutzers aufzulisten, den das Betriebssystem führt und der kein Sitzungsbenutzer ist (auch den des Dienstbenutzers und den eines früheren Sitzungsbenutzers), und scheitert bei jedem; das Home eines Sitzungsbenutzers prüft HD11 als dessen Ort (2.2 Punkt 4) | Start verweigert; die lokale Ausgabe von `bothy-host doctor` nennt den Benutzer, dessen Home sich auflisten lässt, an den Server geht nur der Code |
-| HD10 Helfer-Integrität | der Dienstbenutzer prüft: Binärdatei des Helfers, jede Dienst-Definition, jeder Ordner eines Kanal-Endpunkts und, wenn gesetzt, `host_service.claude_bin` (das Programm für HD6 und bei `organization` des Profils `claude`, 7.4; unter Windows eine `.exe`) mit jedem Ordner auf dem Weg dorthin und, wenn die Datei mit `#!` beginnt, dem Interpreter, den die feste Suchliste aus 7.4 findet, und jedem Ordner dieser Suchliste, gehören nach Auflösung einem vertrauenswürdigen Besitzer und sind für keinen Sitzungsbenutzer schreibbar (beides je Plattform nach 2.2 Punkt 6); die Gegenstelle jedes Kanals ist der Prozess, den der Dienstverwalter für den Helfer dieses Sitzungsbenutzers meldet; unter Linux ist `kernel.yama.ptrace_scope` mindestens `1` | Start verweigert; bei einem Verstoß im Betrieb wie HD6 (7.4): keine neuen Sitzungen, laufende enden mit `host_policy_violation` und `close_detail = helper_untrusted` |
-| HD11 Geteilte Orte | eine Regel für jeden Pfad aus der Konfiguration des Host-Dienstes (Arbeitsordner, `host_service.claude_bin` und Programme der Profile, dazu die Binärdatei des Helfers; den Zustandsordner prüfen HD4 und HD8) und jeden Ort eines Sitzungsbenutzers (2.2 Punkt 6; den `CLAUDE_CONFIG_DIR` bei `personal` deckt das Home, 7.4); jeder Pfad nach Auflösung, "schreibbar" und "vertrauenswürdiger Besitzer" je Plattform nach 2.2 Punkt 6; eine schreibbare Laufwerkswurzel unter Windows mit dem Code `drive_root_writable`. Ort eines Sitzungsbenutzers: Besitz, Modus, ACL und Gruppen des Ortes, jedes Ordners auf dem Weg dorthin und der Kettendateien in diesen Ordnern geben keinem anderen Sitzungsbenutzer Schreibrecht und gehören keinem anderen; der Ort selbst gibt anderen Sitzungsbenutzern auch kein Lese- oder Ausführrecht; das prüft sein PTY-Helfer. Ort für alle: der Ort und jeder Ordner auf dem Weg dorthin gehören einem vertrauenswürdigen Besitzer und sind für keinen Sitzungsbenutzer schreibbar (wie HD10); das prüft der Dienstbenutzer. Beim Start des Dienstes und auf Befehl zusätzlich die Prüfung der Einträge: kein Eintrag in einem Ort eines Sitzungsbenutzers gehört einem anderen Sitzungsbenutzer; sie läuft je Sitzungsbenutzer in seinem PTY-Helfer, begrenzt durch `host_service.entry_scan_timeout` (unter der Tabelle) | Verstoß an einem Ort eines Sitzungsbenutzers: dieser bekommt keine Sitzungen, laufende enden mit `host_policy_violation` und `close_detail = shared_location`, bis HD11 für ihn besteht; die Meldung nennt ihn. Verstoß an einem Ort für alle: Start verweigert; im Betrieb keine neuen Sitzungen, und alle laufenden enden mit `host_policy_violation` und `close_detail = shared_location`, bis HD11 besteht; die Meldung nennt keinen Sitzungsbenutzer. Ein Fund der Prüfung der Einträge gilt, bis ein späterer voller Lauf ihn nicht mehr findet (unter der Tabelle) |
+| HD1 Users | `host_service.session_users` names at least one user; no user of the host service is `root`, `Administrator` or `SYSTEM`; all session users are different, and none is the service user | Start refused |
+| HD2 Groups | no user of the host service (service user and every session user) is in a forbidden group: fixed `admin`, `sudo`, `wheel`, `Administrators`, `docker`, `lxd`, `libvirt`, `disk`, plus `host_service.extra_forbidden_groups`; under Linux, in addition, the socket of the Docker daemon is writable for none of them | Start refused |
+| HD3 sudo | no passwordless `sudo` for any of them (`sudo -n true` fails) | Start refused |
+| HD4 State directory | `host_service.state_dir` belongs to the service user, mode `0700`; key file `0600` (Windows: DPAPI, section 4.2) | Start refused |
+| HD5 Server host | detects whether the same host runs the server (section 2.3) | Warning; sessions only for owners (SR10) |
+| HD6 LLM login | section 7.4, in the account of every session user; additional check, not the load-bearing boundary (T12) | with `none` or `organization` and a detected subscription login: start refused or sessions ended, respectively (7.4); the message names every affected session user with its own entry |
+| HD7 Profiles | every profile refers to an existing program, profiles `command` with an absolute path, the profile `claude` with `organization` to `host_service.claude_bin` (empty or counting as empty according to 7.4: the profile is dropped, 11.1); every key in `host_service.claude_workdirs` is a name from `host_service.session_users`, the PTY helper of its session user can resolve every working directory, and each is listed for exactly one session user, compared after resolution and by the identity in the file system that each helper reports for its list (2.2 item 6) | Profile is dropped, warning; with `host_service.claude_workdirs` only the wrong part is dropped: a key that is not a name from `host_service.session_users`, with its list; a folder that the helper of its session user cannot resolve, from that user's list; a folder with two session users, from both lists. The lists after this step are reported and used for `wdi` (2.2 items 5 and 6) |
+| HD8 Separation | the service user itself checks ownership, mode and ACL of `host_service.state_dir` and the key file (no entry for a session user or one of its groups); in addition every PTY helper tries at start to read both, and fails | Start refused |
+| HD9 Other users' home folders | every PTY helper tries at start to list the content of every home folder of another local user that the operating system keeps and that is not a session user (including that of the service user and that of a former session user), and fails for each; the home of a session user is checked by HD11 as its location (2.2 item 4) | Start refused; the local output of `bothy-host doctor` names the user whose home can be listed, only the code goes to the server |
+| HD10 Helper integrity | the service user checks: the binary of the helper, every service definition, every folder of a channel endpoint and, if set, `host_service.claude_bin` (the program for HD6 and, with `organization`, of the profile `claude`, 7.4; under Windows an `.exe`) with every folder on the path to it and, if the file begins with `#!`, the interpreter that the fixed search list from 7.4 finds, and every folder of this search list, belong after resolution to a trusted owner and are writable by no session user (both per platform according to 2.2 item 6); the peer of every channel is the process that the service manager reports for the helper of this session user; under Linux `kernel.yama.ptrace_scope` is at least `1` | Start refused; on a violation during operation as with HD6 (7.4): no new sessions, running ones end with `host_policy_violation` and `close_detail = helper_untrusted` |
+| HD11 Shared locations | one rule for every path from the configuration of the host service (working directories, `host_service.claude_bin` and programs of the profiles, plus the binary of the helper; the state directory is checked by HD4 and HD8) and every location of a session user (2.2 item 6; the `CLAUDE_CONFIG_DIR` with `personal` is covered by the home, 7.4); every path after resolution, "writable" and "trusted owner" per platform according to 2.2 item 6; a writable drive root under Windows with the code `drive_root_writable`. Location of a session user: ownership, mode, ACL and groups of the location, of every folder on the path to it and of the chain files in these folders give no other session user write permission and belong to no other; the location itself also gives other session users no read or execute permission; its PTY helper checks this. Location for all: the location and every folder on the path to it belong to a trusted owner and are writable by no session user (like HD10); the service user checks this. At the start of the service and on command, in addition, the check of the entries: no entry in a location of a session user belongs to another session user; it runs per session user in its PTY helper, limited by `host_service.entry_scan_timeout` (below the table) | Violation at a location of a session user: this user gets no sessions, running ones end with `host_policy_violation` and `close_detail = shared_location`, until HD11 passes for it; the message names it. Violation at a location for all: start refused; during operation no new sessions, and all running ones end with `host_policy_violation` and `close_detail = shared_location`, until HD11 passes; the message names no session user. A finding of the check of the entries stands until a later full run no longer finds it (below the table) |
 
-  Prüfung der Einträge (HD11): Sie geht durch jeden Eintrag jedes Ortes eines Sitzungsbenutzers,
-  also durch sein ganzes Home, und läuft darum je Sitzungsbenutzer in seinem eigenen PTY-Helfer.
-  Beim Start des Dienstes wartet jeder Sitzungsbenutzer nur auf seinen eigenen Lauf: Bis dieser
-  fertig ist, besteht HD11 für ihn nicht (Code `entry_scan_running`), und er bekommt keine
-  Sitzungen: Eine Öffnung scheitert wie bei einem Fund mit `open_failed` und
-  `close_detail = shared_location`, und die Konsole zeigt den Code aus `reported_doctor`. Die
-  anderen bekommen ihre Sitzungen, sobald ihr eigener Lauf fertig ist. Auf Befehl läuft die Prüfung
-  neben dem Betrieb, und bis zu ihrem Ende gilt das bisherige Ergebnis. Ist ein Lauf nach
-  `host_service.entry_scan_timeout` nicht fertig, bricht der Helfer ihn ab; HD11 besteht dann für
-  diesen Sitzungsbenutzer nicht (Code `entry_scan_timeout`, mit seinem Namen), mit derselben Folge
-  wie bei einem Fund. Einen Fund, auch einen Abbruch, hebt nur ein späterer voller Lauf auf, der
-  fertig wird und nichts mehr findet, also ein Start des Dienstes oder `bothy-host doctor`. Die
-  Läufe vor jeder PTY und alle `host_service.credential_check_interval` prüfen die Einträge nicht
-  und heben einen solchen Fund nie auf. Grund: Die Dauer hängt von der Größe des Home ab, und ein
-  großes Home soll nur seinen eigenen Sitzungsbenutzer aufhalten, nicht den Rechner. Ein
-  abgebrochener Lauf hat nicht jeden Eintrag gesehen, und nur diese Prüfung sieht, ob ein
-  gefundener Eintrag noch da ist.
+  Check of the entries (HD11): It goes through every entry of every location of a session user,
+  that is, through its whole home, and therefore runs per session user in its own PTY helper.
+  At the start of the service each session user waits only for its own run: Until this run
+  is finished, HD11 does not pass for it (code `entry_scan_running`), and it gets no
+  sessions: An opening fails as with a finding, with `open_failed` and
+  `close_detail = shared_location`, and the console shows the code from `reported_doctor`. The
+  others get their sessions as soon as their own run is finished. On command the check runs
+  alongside operation, and until it ends the previous result applies. If a run is not finished after
+  `host_service.entry_scan_timeout`, the helper aborts it; HD11 then does not pass for
+  this session user (code `entry_scan_timeout`, with its name), with the same consequence
+  as with a finding. A finding, including an abort, is cleared only by a later full run that
+  finishes and finds nothing anymore, that is, a start of the service or `bothy-host doctor`. The
+  runs before every PTY and every `host_service.credential_check_interval` do not check the entries
+  and never clear such a finding. Reason: The duration depends on the size of the home, and a
+  large home should hold up only its own session user, not the host. An
+  aborted run has not seen every entry, and only this check sees whether a
+  found entry is still there.
 
-  Grund für die Sperrliste in HD2: Einige Gruppen geben Rechte auf root-Niveau, ohne Administrator
-  zu heißen. Docker schreibt: "The `docker` group grants root-level privileges to the user."
-  (https://docs.docker.com/engine/install/linux-postinstall/, abgerufen 2026-10-10 [belegt]). Für
-  `lxd` sagt die LXD-Doku, lokaler Zugriff auf den Daemon sei voller Zugriff und nur Benutzern zu
-  geben, denen man root anvertrauen würde
-  (https://canonical.com/lxd/docs/default/explanation/security/index.html.md, abgerufen 2026-10-10
-  [belegt]). `libvirt` (Steuerung von VMs mit Zugriff auf Geräte des Rechners) und `disk` (roher
-  Zugriff auf Datenträger) stehen aus demselben Grund auf der Liste [abgeleitet]. Die feste Liste kann der
-  Betreiber nicht kürzen; `host_service.extra_forbidden_groups` ergänzt sie, weil Distributionen
-  weitere solche Gruppen haben.
+  Reason for the deny list in HD2: Some groups give root-level permissions without being called
+  administrator. Docker writes: "The `docker` group grants root-level privileges to the user."
+  (https://docs.docker.com/engine/install/linux-postinstall/, retrieved 2026-10-10 [verified]). For
+  `lxd` the LXD documentation says that local access to the daemon is full access and should be given only to users
+  one would trust with root
+  (https://canonical.com/lxd/docs/default/explanation/security/index.html.md, retrieved 2026-10-10
+  [verified]). `libvirt` (control of VMs with access to devices of the host) and `disk` (raw
+  access to storage media) are on the list for the same reason [derived]. The instance operator cannot
+  shorten the fixed list; `host_service.extra_forbidden_groups` extends it because distributions
+  have further such groups.
 
-  Grund für HD9: Die Shell einer Person darf keine Dateien anderer Benutzer des Rechners lesen.
-  Unter macOS sind Benutzer standardmäßig in der Gruppe `staff`, und die CIS-Prüfliste schreibt:
+  Reason for HD9: The shell of a person must not read files of other users of the host.
+  Under macOS, users are in the group `staff` by default, and the CIS checklist states:
   "By default, macOS allows all valid users into the top level of every other user's home folder"
   (https://www.tenable.com/audits/items/CIS_Apple_macOS_12.0_Monterey_v4.0.0_L1.audit:da3f5b54f52fa5be1eb1f2bbc291c7c0,
-  abgerufen 2026-10-10 [belegt]). Ein Sitzungsbenutzer in `staff` besteht HD9 auf einem
-  macOS-Rechner mit Standardrechten darum nicht [abgeleitet]; `bothy-host install` legt ihn dort
-  ohne `staff` an, den Weg belegt das Bau-Ticket. HD9 prüft das Ergebnis statt der Gruppe, weil
-  Gruppen und Rechte der Home-Ordner je Plattform und Rechner verschieden sind; derselbe Lesetest
-  gilt unter Linux und Windows. HD9 prüft nur Home-Ordner von Benutzern, die keine
-  Sitzungsbenutzer sind. Das Home eines Sitzungsbenutzers prüft HD11 als dessen Ort (2.2 Punkt 4):
-  Öffnet eine Person ihr eigenes Home für andere, ist das ein Fehler in ihrem Konto, und HD11
-  sperrt nur ihren Sitzungsbenutzer und nennt ihn. Prüfte HD9 auch dieses Home, schlüge es im
-  Helfer jedes anderen Sitzungsbenutzers an und verweigerte den Start des ganzen Rechners, ohne
-  die Person zu nennen; eine Person könnte den Rechner so mit einer Änderung der Rechte ihres
-  Home stilllegen. Die Home-Ordner der übrigen Benutzer kann keine Person mit Terminal ändern;
-  das Home eines früheren Sitzungsbenutzers schließt `bothy-host session-user remove` (2.2
-  Punkt 3).
+  retrieved 2026-10-10 [verified]). A session user in `staff` therefore does not pass HD9 on a
+  macOS host with default permissions [derived]; `bothy-host install` creates it there without
+  `staff`, and the build ticket proves the way to do this. HD9 checks the result instead of the
+  group, because groups and permissions of the home folders differ per platform and host; the same read test
+  applies under Linux and Windows. HD9 checks only home folders of users that are not
+  session users. The home of a session user is checked by HD11 as its location (2.2 item 4):
+  If a person opens their own home for others, that is an error in their account, and HD11
+  blocks only their session user and names it. If HD9 also checked this home, it would trigger in the
+  helper of every other session user and refuse the start of the whole host, without
+  naming the person; a person could thus shut down the host with a change of the permissions of their
+  home. No person with a terminal can change the home folders of the remaining users;
+  the home of a former session user is closed by `bothy-host session-user remove` (2.2
+  item 3).
 
-  Grund für HD10: Ergebnisse aus dem Konto des Sitzungsbenutzers zählen nur, wenn der Helfer echt
-  ist. Darum prüft der Dienstbenutzer die Echtheit selbst, und HD8 hat einen Teil, der nicht vom
-  Helfer abhängt. Die Linux-Doku zu Yama beschreibt Stufe `1` als "restricted ptrace": Anhängen
-  darf nur ein Prozess mit einer festgelegten Beziehung, standardmäßig ein Vorfahre (gleiche
-  Quelle [belegt]). Dann kann ein Dauerläufer des Sitzungsbenutzers sich nicht an Shells späterer
-  Sitzungen hängen.
+  Reason for HD10: Results from the account of the session user count only if the helper is
+  genuine. That is why the service user checks the authenticity itself, and HD8 has a part that
+  does not depend on the helper. The Linux documentation on Yama describes level `1` as "restricted ptrace": only a
+  process with a defined relationship may attach, by default an ancestor (same
+  source [verified]). Then a long-running process of the session user cannot attach to shells of later
+  sessions.
 
-  `doctor` meldet nur Ergebnis und Code je Prüfung an den Server (`hosts.reported_doctor`), nie
-  Inhalte, Pfade oder Werte. Bestehen HD6 oder HD11 nicht, meldet er je betroffenem
-  Sitzungsbenutzer einen eigenen Eintrag mit dessen Namen (kein Geheimnis, der Server kennt ihn
-  aus der Zuordnung); Prüfung und Name sind zusammen eindeutig. Grund für den Namen: Ein Treffer
-  von HD6 legt den ganzen Rechner still (7.4), und HD6 kann in mehreren Konten zugleich anschlagen;
-  der Betreiber muss jedes Konto kennen, in dem er suchen muss.
+  `doctor` reports to the server only the result and code per check (`hosts.reported_doctor`), never
+  content, paths or values. If HD6 or HD11 do not pass, it reports a separate entry per affected
+  session user with its name (no secret, the server knows it
+  from the assignment); check and name together are unique. Reason for the name: A hit
+  of HD6 shuts down the whole host (7.4), and HD6 can trigger in several accounts at once;
+  the instance operator must know every account in which they have to search.
 
-  Ausgabe auf dem Rechner: `bothy-host doctor` gibt je Prüfung Ergebnis und Code aus, bei HD6
-  und HD11 die Namen der betroffenen Sitzungsbenutzer, bei HD9 den Benutzer, dessen Home sich
-  auflisten lässt, und bei `drive_root_writable` das Laufwerk; nie Inhalte oder Werte. Der
-  Exit-Code ist ungleich 0, sobald eine Prüfung nicht besteht; Warnungen allein ändern ihn nicht.
-  Läuft der Host-Dienst, führt der Befehl (mit Administratorrechten) den vollen Lauf im laufenden
-  Dienst aus und gibt dessen Ergebnis aus, und der Dienst meldet es mit `report`; den Weg dorthin
-  belegt das Bau-Ticket. Findet dieser Lauf einen Verstoß, dessen Folge "Start verweigert" ist,
-  außer bei HD6, HD10 und HD11, die im Betrieb ihre eigene Folge haben, beendet sich der
-  Host-Dienst wie bei einem verweigerten Start (unten), und seine Sitzungen enden wie bei jedem
-  Neustart (6.2). Läuft er nicht, prüft der Befehl allein.
+  Output on the host: `bothy-host doctor` prints, per check, the result and code, for HD6
+  and HD11 the names of the affected session users, for HD9 the user whose home can be
+  listed, and for `drive_root_writable` the drive; never content or values. The
+  exit code is not 0 as soon as a check fails; warnings alone do not change it.
+  If the host service is running, the command (with administrator privileges) performs the full run in the running
+  service and prints its result, and the service reports it with `report`; the build ticket proves
+  the way to do this. If this run finds a violation whose consequence is "Start refused",
+  except for HD6, HD10 and HD11, which have their own consequence during operation, the
+  host service exits as with a refused start (below), and its sessions end as with every
+  restart (6.2). If it is not running, the command checks by itself.
 
-  Meldung bei verweigertem Start: Verweigert `doctor` beim Start des Dienstes den Start, startet
-  der Host-Dienst keine PTY und nimmt keine Sitzung an. Ist er gekoppelt, meldet er das Ergebnis
-  vorher noch: Er meldet sich über die Steuerverbindung an, schickt `report`, schließt die
-  Verbindung, ohne ein `session.open` anzunehmen, und beendet sich. So nennt die Konsole auch bei
-  einem Treffer beim Start, etwa nach einem Neustart des Rechners oder nach
-  `bothy-host session-user remove`, jeden betroffenen Sitzungsbenutzer; erreicht der Host-Dienst
-  den Server nicht oder kann er sich nicht anmelden (etwa weil seine Schlüssel nicht lesbar sind),
-  nennt ihn die Ausgabe auf dem Rechner. Grund: Sonst zeigte die Konsole den Rechner nur als
-  getrennt, mit dem Ergebnis aus der Zeit davor. Eine Sitzung gibt es dabei nicht; das ist, was
-  Ruling T2 verlangt.
+  Message on a refused start: If `doctor` refuses the start when the service starts, the
+  host service starts no PTY and accepts no session. If it is paired, it still reports the result
+  first: It logs in over the control connection, sends `report`, closes the
+  connection without accepting a `session.open`, and exits. This way the console names, even for
+  a hit at start, for example after a restart of the host or after
+  `bothy-host session-user remove`, every affected session user; if the host service does not reach
+  the server or cannot log in (for example because its keys are not readable),
+  the output on the host names them. Reason: Otherwise the console would show the host only as
+  disconnected, with the result from the time before. No session exists in this case; that is what
+  Ruling T2 requires.
 
-  Ein verweigerter Start ist kein Absturz: Der Host-Dienst endet dann mit einem eigenen Exit-Code,
-  nach dem ihn der Dienstverwalter nicht von selbst neu startet (so legt es die Dienst-Definition
-  aus `bothy-host install` fest; den Weg je Plattform belegt das Bau-Ticket). Wieder gestartet
-  wird er erst mit `bothy-host restart`, nachdem der Betreiber den Verstoß behoben hat
-  ([16-betrieb.md](16-betrieb.md), Abschnitt 4.4 Punkt 6). Grund: Keiner der Verstöße mit der
-  Folge "Start verweigert" behebt sich ohne Eingriff [abgeleitet]; ein Neustart durch den
-  Dienstverwalter meldete den Rechner nur in einer Schleife immer wieder an.
+  A refused start is not a crash: The host service then ends with its own exit code,
+  after which the service manager does not restart it by itself (the service definition
+  from `bothy-host install` sets this; the build ticket proves the method per platform). It is started again
+  only with `bothy-host restart`, after the instance operator has fixed the violation
+  ([16-operations.md](16-operations.md), section 4.4 item 6). Reason: None of the violations with the
+  consequence "Start refused" fixes itself without intervention [derived]; a restart by the
+  service manager would only log the host in again and again in a loop.
 
-- Verbindung nur ausgehend vom Host-Dienst zum Server, über WebSocket mit TLS. Der Rechner öffnet
-  keinen Port. Grund: funktioniert hinter NAT, im privaten Netz und in der Cloud gleich.
+- Connection only outbound from the host service to the server, via WebSocket with TLS. The host opens
+  no port. Reason: works the same behind NAT, in the private network and in the cloud.
 
-### 2.3 Server-Host
+### 2.3 Server host
 
-Läuft der Host-Dienst auf dem Rechner, der den Server betreibt, erreicht eine Shell dort den
-Secret-Provider, die Datenbank und die Sicherungen. Darum gilt ein Rechner als Server-Host, wenn
-eines zutrifft:
+If the host service runs on the host that runs the server, a shell there reaches the
+secret provider, the database and the backups. That is why a host counts as the server host if
+one of the following applies:
 
-- Der Owner erklärt es bei der Bestätigung (Pflichtfrage, `hosts.declared_server_host`).
-- Der Host-Dienst meldet es (`hosts.reported_is_server_host`): Die Adresse aus `server.public_url`
-  löst auf eine Adresse einer eigenen Netzschnittstelle oder auf Loopback auf, oder die Gegenstelle
-  der Steuerverbindung ist eine lokale Adresse [abgeleitet: eine Heuristik, die einen Server hinter
-  einem fremden Rand nicht erkennt].
+- The owner declares it at the confirmation (mandatory question, `hosts.declared_server_host`).
+- The host service reports it (`hosts.reported_is_server_host`): the address from `server.public_url`
+  resolves to an address of one of its own network interfaces or to loopback, or the peer
+  of the control connection is a local address [derived: a heuristic that does not detect a server
+  behind another party's edge].
 
-Dann gilt:
+Then the following applies:
 
-- Warnung in Konsole und Rechner-Karte;
-- `bothy-host` verweigert Sitzungen, deren Marke `own = false` trägt (Abschnitt 5.3), und der
-  Server prüft dasselbe vorher (SR10).
+- warning in the console and on the host card;
+- `bothy-host` refuses sessions whose token carries `own = false` (section 5.3), and the
+  server checks the same beforehand (SR10).
 
-Erkennt der Host-Dienst den Server-Host nicht, schützt SR10 trotzdem: Nicht-Owner bekommen nur
-Rechner, deren Inhaber sie sind, und der Owner weist den Server-Host niemandem zu.
+If the host service does not detect the server host, SR10 still protects: non-owners only get
+hosts whose assignee they are, and the owner assigns the server host to nobody.
 
-## 3. Rechner und Lebenszyklus
+## 3. Hosts and lifecycle
 
-### 3.1 Zustände
+### 3.1 States
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pairing: host.manage (anlegen), Kopplungs-Code
-    pairing --> confirming: host.pair (Schlüssel übergeben)
-    pairing --> pairing: neuer Kopplungs-Code
-    confirming --> active: host.manage (Fingerabdruck bestätigt, LLM-Anmeldung erklärt)
-    confirming --> pairing: neuer Kopplungs-Code
-    active --> pairing: Neukopplung
-    active --> disabled: host.manage (sperren)
-    disabled --> active: host.manage (entsperren, nicht bei duplicate_connection)
-    disabled --> pairing: Neukopplung
-    active --> disabled: zweite Steuerverbindung (3.4)
-    active --> retired: host.manage (zurückziehen)
-    disabled --> retired: host.manage (zurückziehen)
+    [*] --> pairing: host.manage (create), pairing code
+    pairing --> confirming: host.pair (hand over keys)
+    pairing --> pairing: new pairing code
+    confirming --> active: host.manage (fingerprint confirmed, LLM login declared)
+    confirming --> pairing: new pairing code
+    active --> pairing: re-pairing
+    active --> disabled: host.manage (disable)
+    disabled --> active: host.manage (re-enable, not with duplicate_connection)
+    disabled --> pairing: re-pairing
+    active --> disabled: second control connection (3.4)
+    active --> retired: host.manage (retire)
+    disabled --> retired: host.manage (retire)
     retired --> [*]
 ```
 
-Nur `active` erlaubt Sitzungen. Jeder Übergang aus `active` beendet alle Sitzungen des Rechners
-(Grund in Abschnitt 10.3) und erhöht die Rechte-Version, weil er wirksame Rechte ändert. Sperren
-durch den Owner setzt `hosts.disabled_reason = 'owner'`; ein Rechner mit `duplicate_connection`
-(3.4) lässt sich nicht entsperren, nur neu koppeln (`409 invalid_state_transition`).
+Only `active` allows sessions. Every transition out of `active` ends all sessions of the host
+(reason in section 10.3) and increments the permission version, because it changes effective
+permissions. Disabling by the owner sets `hosts.disabled_reason = 'owner'`; a host with
+`duplicate_connection` (3.4) cannot be re-enabled, only re-paired (`409 invalid_state_transition`).
 
-### 3.2 Kopplung
+### 3.2 Pairing
 
-1. Der Owner legt den Rechner an (`host.manage`, Step-up, Audit) mit Name, optionalem Inhaber
-   (`assigned_user_id`) und Grund. Er bekommt genau einmal einen Kopplungs-Code im Format
-   `bothy_hpc_<zufall>_<prüfsumme>` ([ADR 0061](../adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md));
-   gespeichert wird nur der HMAC. Gültigkeit `terminal.pairing_code_ttl`, einmalig.
-2. Auf dem Rechner ruft der Betreiber `bothy-host pair --server <url> --code <code>` auf. Der
-   Host-Dienst erzeugt lokal ein statisches X25519-Schlüsselpaar (Noise) und ein
-   Ed25519-Schlüsselpaar (Anmeldung beim Server), legt beide privat im Zustandsordner ab
-   (Abschnitt 4.2) und sendet die öffentlichen Schlüssel mit dem Code, seinen Profilen und den
-   Namen seiner Sitzungsbenutzer (`host.pair`, öffentlich, `rl.public_auth`). Der Rechner wird
-   `confirming`.
-3. `bothy-host pair` zeigt lokal den Fingerabdruck (Abschnitt 4.3). Der Owner tippt die ersten
-   `terminal.fingerprint_confirm_chars` Zeichen in der App ein, erklärt dabei die
-   LLM-Anmeldung des Rechners (Abschnitt 7) und ordnet Personen ihre Sitzungsbenutzer zu (2.2).
-   Die App bietet dafür nur die Namen an, die der Rechner gemeldet hat
-   (`hosts.reported_session_users`); einen anderen Namen lehnt der Server mit
-   `400 validation_failed` ab (`errors[].code = session_user_not_on_host`). Erst dann wird der
-   Rechner `active` (`host.manage`, Step-up, Audit). Zuordnungen lassen sich später mit
-   `host.manage` ergänzen oder beenden, mit derselben Prüfung gegen die letzte Meldung. Grund für
-   das Eintippen: Ein blind bestätigter Rechner wäre eine Einladung an jeden, der den Code
-   abgefangen hat (wie R-ID-08 für Geräte).
+1. The owner creates the host (`host.manage`, step-up, audit) with a name, an optional assignee
+   (`assigned_user_id`) and a reason. They receive a pairing code exactly once, in the format
+   `bothy_hpc_<random>_<checksum>` ([ADR 0061](../adr/0061-token-format-with-a-fixed-prefix-and-checksum.md));
+   only the HMAC is stored. Validity `terminal.pairing_code_ttl`, single use.
+2. On the host, the instance operator runs `bothy-host pair --server <url> --code <code>`. The
+   host service generates locally a static X25519 key pair (Noise) and an Ed25519 key pair
+   (authentication with the server), stores both privately in the state directory
+   (section 4.2) and sends the public keys with the code, its profiles and the names of its
+   session users (`host.pair`, public, `rl.public_auth`). The host becomes `confirming`.
+3. `bothy-host pair` shows the fingerprint locally (section 4.3). The owner types the first
+   `terminal.fingerprint_confirm_chars` characters into the app, declares the LLM login of the
+   host while doing so (section 7) and assigns people their session users (2.2).
+   For this, the app offers only the names that the host has reported
+   (`hosts.reported_session_users`); the server rejects any other name with
+   `400 validation_failed` (`errors[].code = session_user_not_on_host`). Only then does the host
+   become `active` (`host.manage`, step-up, audit). Assignments can be added or ended later with
+   `host.manage`, with the same check against the last report. Reason for the typing: a host
+   confirmed blindly would be an invitation to anyone who intercepted the code (like R-ID-08 for
+   devices).
 
-Ein falscher Fingerabdruck ergibt `409 fingerprint_mismatch`, der Rechner bleibt `confirming`;
-nach `terminal.fingerprint_max_attempts` Fehlversuchen fällt er auf `pairing` zurück, und die
-Schlüssel verfallen.
+A wrong fingerprint results in `409 fingerprint_mismatch`, and the host stays `confirming`;
+after `terminal.fingerprint_max_attempts` failed attempts it falls back to `pairing`, and the
+keys expire.
 
-### 3.3 Neukopplung
+### 3.3 Re-pairing
 
-Ein neuer Kopplungs-Code für einen bestehenden Rechner (`host.manage`) setzt ihn auf `pairing`,
-verwirft die gespeicherten Schlüssel sofort, schließt seine Verbindungen und beendet seine
-Sitzungen (`host_rekeyed`). `hosts.key_generation` steigt. Der Audit-Eintrag nennt alten und neuen
-Fingerabdruck; jeder aktive Owner bekommt das Ereignis `host.updated` mit `key_changed = true`.
-Clients sehen beim nächsten Öffnen einen anderen Schlüssel und warnen hart (Abschnitt 5.5).
+A new pairing code for an existing host (`host.manage`) sets it to `pairing`,
+discards the stored keys immediately, closes its connections and ends its
+sessions (`host_rekeyed`). `hosts.key_generation` increases. The audit entry names the old and the
+new fingerprint; every active owner receives the event `host.updated` with `key_changed = true`.
+Clients see a different key the next time they open a session and show a hard warning (section 5.5).
 
-### 3.4 Zweite Steuerverbindung
+### 3.4 Second control connection
 
-Je Rechner gilt genau eine Steuerverbindung. Meldet sich eine zweite mit demselben Anmeldeschlüssel
-an, während die ältere noch besteht, prüft der Server die ältere mit einem WebSocket-Ping (mit
-`cluster.mode = multi` über `NOTIFY ephemeral` an den Knoten der älteren Verbindung, 03, Abschnitt
-6.6):
+Exactly one control connection applies per host. If a second one logs in with the same
+authentication key while the older one still exists, the server checks the older one with a
+WebSocket ping (with `cluster.mode = multi` through `NOTIFY ephemeral` to the node of the older
+connection, 03, section 6.6):
 
-- Antwortet die ältere nicht innerhalb von `terminal.host_duplicate_probe_timeout`, gilt sie als
-  tot; der Server schließt sie mit `4009` und nimmt die neue an. Das ist der übliche Fall nach
-  einem Netzwechsel.
-- Antwortet die ältere, laufen zwei Host-Dienste mit denselben Schlüsseln. Das ist ein Hinweis auf
-  kopierte Schlüssel. Der Server schließt beide Verbindungen mit `4112`, setzt den Rechner auf
-  `disabled` mit `hosts.disabled_reason = 'duplicate_connection'`, beendet alle Sitzungen
-  (`host_disabled`), schreibt einen Audit-Eintrag (`host.connect`, Code `duplicate_connection`) und
-  sendet `host.updated` an alle Owner. Weiter geht es nur mit einer Neukopplung (3.3).
+- If the older one does not answer within `terminal.host_duplicate_probe_timeout`, it counts as
+  dead; the server closes it with `4009` and accepts the new one. That is the usual case after
+  a network change.
+- If the older one answers, two host services are running with the same keys. That is a sign of
+  copied keys. The server closes both connections with `4112`, sets the host to
+  `disabled` with `hosts.disabled_reason = 'duplicate_connection'`, ends all sessions
+  (`host_disabled`), writes an audit entry (`host.connect`, code `duplicate_connection`) and
+  sends `host.updated` to all owners. The only way forward is a re-pairing (3.3).
 
-Grund: Stilles Verdrängen der älteren Verbindung würde einem Angreifer mit kopierten Schlüsseln
-erlauben, den echten Rechner zu verdrängen und jede spätere Sitzung zu empfangen.
+Reason: silently displacing the older connection would allow an attacker with copied keys
+to displace the real host and to receive every later session.
 
-## 4. Schlüssel
+## 4. Keys
 
-### 4.1 Zwei Schlüsselpaare je Rechner
+### 4.1 Two key pairs per host
 
-| Schlüssel | Algorithmus | Zweck | Server kennt |
+| Key | Algorithm | Purpose | Server knows |
 |---|---|---|---|
-| Noise-Schlüssel | X25519 | statischer Schlüssel des Rechners im Noise-Muster `NK` | öffentlichen Teil (`hosts.noise_public_key`) |
-| Anmeldeschlüssel | Ed25519 | Anmeldung der Steuer- und Datenverbindungen | öffentlichen Teil (`hosts.auth_public_jwk`, `hosts.auth_jkt`) |
+| Noise key | X25519 | static key of the host in the Noise pattern `NK` | public part (`hosts.noise_public_key`) |
+| Authentication key | Ed25519 | authentication of the control and data connections | public part (`hosts.auth_public_jwk`, `hosts.auth_jkt`) |
 
-Grund für zwei Schlüssel: Der Anmeldeschlüssel beweist dem Server den Rechner, der Noise-Schlüssel
-beweist ihn dem Gerät. Ein Fehler in einem Pfad gibt den anderen nicht preis.
+Reason for two keys: the authentication key proves the host to the server, the Noise key
+proves it to the device. An error in one path does not give away the other.
 
-### 4.2 Ablage auf dem Rechner
+### 4.2 Storage on the host
 
-Private Schlüssel liegen als Datei im Zustandsordner `host_service.state_dir` mit Modus `0600`
-(Ordner `0700`), im Besitz des Dienstbenutzers. Unter Windows verschlüsselt der Host-Dienst die
-Datei mit DPAPI im Kontext seines Dienstbenutzers. Einen Schlüsselbund des Betriebssystems nutzt er
-nur, wo der Dienstbenutzer eine entsperrte Sitzung hat. Grund: Der Schlüsselbund eines
-Dienstbenutzers ohne Anmeldesitzung ist nicht entsperrt (Ruling T10).
+Private keys are stored as a file in the state directory `host_service.state_dir` with mode
+`0600` (directory `0700`), owned by the service user. On Windows, the host service encrypts the
+file with DPAPI in the context of its service user. It uses a keychain of the operating system
+only where the service user has an unlocked session. Reason: the keychain of a
+service user without a login session is not unlocked (Ruling T10).
 
-Kein Sitzungsbenutzer kann den Zustandsordner lesen (HD8). Wer auf dem Rechner zum
-Dienstbenutzer aufsteigt, hat die Schlüssel trotzdem; dann zeigt 3.4 den zweiten Host-Dienst an,
-sobald beide gleichzeitig verbunden sind. Ist der echte Rechner in dieser Zeit aus, bleibt der
-Diebstahl bis zu seiner Rückkehr unbemerkt (Bedrohungsmodell T-TM-05).
+No session user can read the state directory (HD8). Anyone who escalates to the
+service user on the host still has the keys; then 3.4 reveals the second host service
+as soon as both are connected at the same time. If the real host is off during that time, the
+theft stays unnoticed until it returns (threat model T-TM-05).
 
-### 4.3 Fingerabdruck
+### 4.3 Fingerprint
 
 `key_fingerprint = base32_crockford(SHA-256("bothy-host-fp/1" || noise_public_key ||
-auth_public_key_raw))`, Anzeige in Gruppen zu vier Zeichen. Beide Schlüssel stehen darin, weil ein
-Wechsel jedes der beiden eine Neukopplung ist.
+auth_public_key_raw))`, displayed in groups of four characters. Both keys are included, because a
+change of either of them is a re-pairing.
 
-## 5. Ende-zu-Ende-Strom
+## 5. End-to-end stream
 
-### 5.1 Schutzziel
+### 5.1 Protection goal
 
-Der Server ist Relais und Autorisierungspunkt. Die Ende-zu-Ende-Verschlüsselung schützt den Inhalt
-gegen: Relais und Proxy, Logs, einen Abzug der Datenbank oder der Sicherungen, einen mitlesenden
-api-Prozess.
+The server is the relay and the authorization point. The end-to-end encryption protects the content
+against: relay and proxy, logs, a dump of the database or of the backups, an
+api process that reads along.
 
-Sie schützt **nicht** gegen einen bösartigen Server-Betreiber. Grund: Das Muster `NK` beweist nur,
-dass die Gegenstelle den Schlüssel besitzt, den der Server bei der Kopplung verteilt hat; ein
-bösartiger Server kann einen eigenen Schlüssel verteilen und Sitzungen erlauben. Das Produkt setzt
-den Server ohnehin als vertrauenswürdig voraus ([19-sicherheit.md](19-sicherheit.md), Abschnitt 1).
-Gegenmittel: Schlüssel-Pinning je Gerät (5.5) und die Option `host_service.require_local_confirm`
-(Abschnitt 6.4). Ruling T3.
+It does **not** protect against a malicious instance operator of the server. Reason: the pattern
+`NK` only proves that the peer holds the key that the server distributed at pairing; a
+malicious server can distribute its own key and allow sessions. The product assumes
+a trustworthy server anyway ([19-security.md](19-security.md), section 1).
+Mitigations: key pinning per device (5.5) and the option `host_service.require_local_confirm`
+(section 6.4). Ruling T3.
 
-In der Web-Konsole wirkt das Pinning gegen einen bösartigen Server nicht: Der Server liefert den
-Code der Konsole selbst und kann eine Fassung ohne Pin-Prüfung schicken. Dort bleibt gegen diesen
-Gegner nur `host_service.require_local_confirm`. Das Pinning der Konsole fängt nur einen
-Schlüsselwechsel ab, den ein ehrlicher Server meldet (Neukopplung), und darum löscht die Konsole
-ihre Pins beim Abmelden ohne Verlust an Schutz ([ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)).
+In the web console, pinning does not work against a malicious server: the server delivers the
+code of the console itself and can send a version without the pin check. There, only
+`host_service.require_local_confirm` remains against this adversary. The pinning of the console
+only catches a key change that an honest server reports (re-pairing), and that is why the console
+deletes its pins at logout without any loss of protection ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)).
 
-### 5.2 Protokoll
+### 5.2 Protocol
 
-Noise Protocol Framework, Revision 34 (https://noiseprotocol.org/noise.html, abgerufen
-2026-10-10 [belegt]), Protokollname `Noise_NK_25519_ChaChaPoly_SHA256`.
+Noise Protocol Framework, revision 34 (https://noiseprotocol.org/noise.html, retrieved
+2026-10-10 [verified]), protocol name `Noise_NK_25519_ChaChaPoly_SHA256`.
 
-| Element | Festlegung | Grund |
+| Element | Choice | Reason |
 |---|---|---|
-| Muster | `NK`: `<- s`, `...`, `-> e, es`, `<- e, ee` [belegt, Abschnitt 7.5 der Spezifikation] | Das Gerät kennt den statischen Schlüssel des Rechners aus der Kopplung; der Rechner kennt das Gerät nicht, ihn überzeugt die Sitzungs-Marke |
-| Prolog | `"bothy-terminal/1"` \|\| Sitzungs-ID (16 Byte) \|\| Rechner-ID (16 Byte) | Abweichender Prolog lässt den Handshake scheitern (Abschnitt 6 der Spezifikation [belegt]); bindet Handshake an Protokollversion, Sitzung und Rechner |
-| Nachricht 1 (Gerät an Rechner) | `-> e, es`, Nutzlast: Sitzungs-Marke (5.3) | Die Nutzlast ist nur an den Rechner verschlüsselt und laut Spezifikation wiederholbar (Abschnitt 7.7, Ziel-Eigenschaft 2 [belegt]); die Einmal-Marke schließt das |
-| Nachricht 2 (Rechner an Gerät) | `<- e, ee`, Nutzlast: `{"v":1,"host_version":...,"profile":...}` | Gerät weiß danach, dass es mit dem Inhaber des statischen Schlüssels spricht |
-| Erste Transportnachricht des Geräts | Rahmen `start` mit Spalten und Zeilen | erst danach startet die PTY (Ruling T9) |
-| Größe | jede Noise-Nachricht höchstens 65535 Byte [belegt, Abschnitt 3 der Spezifikation] | Grenze der Spezifikation; ein WebSocket-Binärrahmen trägt genau eine Noise-Nachricht |
+| Pattern | `NK`: `<- s`, `...`, `-> e, es`, `<- e, ee` [verified, section 7.5 of the specification] | The device knows the static key of the host from the pairing; the host does not know the device, it is convinced by the terminal session token |
+| Prologue | `"bothy-terminal/1"` \|\| session ID (16 bytes) \|\| host ID (16 bytes) | A different prologue makes the handshake fail (section 6 of the specification [verified]); binds the handshake to protocol version, session and host |
+| Message 1 (device to host) | `-> e, es`, payload: terminal session token (5.3) | The payload is encrypted only to the host and, according to the specification, can be replayed (section 7.7, destination property 2 [verified]); the single-use token closes this gap |
+| Message 2 (host to device) | `<- e, ee`, payload: `{"v":1,"host_version":...,"profile":...}` | Afterwards the device knows that it is talking to the holder of the static key |
+| First transport message of the device | frame `start` with columns and rows | only then does the PTY start (Ruling T9) |
+| Size | every Noise message at most 65535 bytes [verified, section 3 of the specification] | limit of the specification; one WebSocket binary frame carries exactly one Noise message |
 
-Bibliotheken:
+Libraries:
 
 - Go: `github.com/flynn/noise`, BSD-3-Clause (https://github.com/flynn/noise/blob/master/LICENSE,
-  abgerufen 2026-10-10 [belegt]); kennt `HandshakeNK`, `DH25519`, `CipherChaChaPoly`,
-  `HashSHA256` und `Config.Prologue` (https://pkg.go.dev/github.com/flynn/noise, abgerufen
-  2026-10-10 [belegt], Version v1.1.0 vom 2024-02-02). Der Pflegezustand der Bibliothek ist nicht
-  belegt [vermutet: wenig Aktivität]; der Konformitätstest TM-T01 mit den Testvektoren unten hält
-  sie, und das Bau-Ticket prüft vor der Aufnahme Lizenz und Stand mit dem Lizenz-Gate.
-- Dart: X25519, ChaCha20-Poly1305, SHA-256 und HKDF aus dem Paket `cryptography`, Apache-2.0,
-  Version 2.9.0 (https://pub.dev/packages/cryptography, abgerufen 2026-10-10 [belegt]); der
-  Handshake selbst als eigenes kleines Paket `packages/bothy_noise`, geprüft gegen dieselben
-  Testvektoren. In der Web-Konsole nutzt `cryptography` die Web Crypto API, sonst reines Dart
-  (gleiche Quelle [belegt]).
+  retrieved 2026-10-10 [verified]); supports `HandshakeNK`, `DH25519`, `CipherChaChaPoly`,
+  `HashSHA256` and `Config.Prologue` (https://pkg.go.dev/github.com/flynn/noise, retrieved
+  2026-10-10 [verified], version v1.1.0 of 2024-02-02). The maintenance state of the library is not
+  verified [assumed: little activity]; the conformance test TM-T01 with the test vectors below
+  holds it, and the build ticket checks license and state with the license gate before adopting it.
+- Dart: X25519, ChaCha20-Poly1305, SHA-256 and HKDF from the package `cryptography`, Apache-2.0,
+  version 2.9.0 (https://pub.dev/packages/cryptography, retrieved 2026-10-10 [verified]); the
+  handshake itself as a separate small package `packages/bothy_noise`, checked against the same
+  test vectors. In the web console, `cryptography` uses the Web Crypto API, otherwise pure Dart
+  (same source [verified]).
 
-Testvektoren: Die Spezifikation selbst enthält keine. Das Noise-Wiki verweist auf Vektor-Dateien
-anderer Projekte (https://github.com/noiseprotocol/noise_wiki/wiki/Test-vectors, abgerufen
-2026-10-10 [belegt]). TM-T01 nutzt zwei davon, die beide einen Eintrag für
-`Noise_NK_25519_ChaChaPoly_SHA256` enthalten:
-`vectors/cacophony.txt` aus https://github.com/centromere/cacophony und
-`tests/vector/noise-c-basic.txt` aus https://github.com/rweather/noise-c (beide abgerufen
-2026-10-10 [belegt]). Das Bau-Ticket legt die Dateien mit Commit-Hash und Lizenz unter
-`services/host/testdata/noise/` ab und nutzt sie für Go und Dart.
+Test vectors: the specification itself contains none. The Noise wiki refers to vector files
+of other projects (https://github.com/noiseprotocol/noise_wiki/wiki/Test-vectors, retrieved
+2026-10-10 [verified]). TM-T01 uses two of them, both of which contain an entry for
+`Noise_NK_25519_ChaChaPoly_SHA256`:
+`vectors/cacophony.txt` from https://github.com/centromere/cacophony and
+`tests/vector/noise-c-basic.txt` from https://github.com/rweather/noise-c (both retrieved
+2026-10-10 [verified]). The build ticket stores the files with commit hash and license under
+`services/host/testdata/noise/` and uses them for Go and Dart.
 
-### 5.3 Sitzungs-Marke
+### 5.3 Terminal session token
 
-Der Server stellt nach `terminal.open` bzw. `terminal.attach` eine Sitzungs-Marke aus: eine
-kompakte JWS nach dem JOSE-Profil ([ADR 0067](../adr/0067-jose-profil-mit-der-standardbibliothek.md)),
-Kopf `alg = EdDSA`, `kid`, `typ = terminal-session+jwt`, signiert mit einem Server-Schlüssel mit
-Zweck `terminal` (03, `server_signing_keys`). Der Host-Dienst holt die öffentlichen Schlüssel über
-die Steuerverbindung (`hello` trägt die JWKS des Zwecks).
+After `terminal.open` or `terminal.attach`, the server issues a terminal session token: a
+compact JWS according to the JOSE profile ([ADR 0067](../adr/0067-jose-profile-with-the-standard-library.md)),
+header `alg = EdDSA`, `kid`, `typ = terminal-session+jwt`, signed with a server key with
+purpose `terminal` (03, `server_signing_keys`). The host service fetches the public keys over
+the control connection (`hello` carries the JWKS of the purpose).
 
-| Claim | Inhalt |
+| Claim | Content |
 |---|---|
 | `iss` | `instance.instance_id` |
-| `aud` | Rechner-ID |
-| `sub` | Prinzipal-ID des Menschen |
-| `sid` | Sitzungs-ID; gleich der Sitzungs-ID im Prolog |
-| `jti`, `iat`, `exp` | UUIDv7 der Marke, Ausstellung, Ablauf (`iat + terminal.session_token_ttl`) |
-| `dev` | Geräte-ID |
-| `prf` | Name des Profils |
-| `cek` | SHA-256 des ephemeren öffentlichen Schlüssels des Geräts (base64url), den das Gerät beim Öffnen meldet |
-| `own` | `true`, wenn die Person zur Zeit der Ausstellung aktiver Owner ist |
-| `osu` | Name des Sitzungsbenutzers der Person auf diesem Rechner (`host_session_users.os_user`, 2.2) |
-| `wdi` | nur beim Profil der Art `claude` und `att = open`: Index des Arbeitsordners in der Liste von `osu` (11.1) |
-| `att` | `open` oder `attach` |
+| `aud` | host ID |
+| `sub` | principal ID of the person |
+| `sid` | session ID; equal to the session ID in the prologue |
+| `jti`, `iat`, `exp` | UUIDv7 of the token, issuance, expiry (`iat + terminal.session_token_ttl`) |
+| `dev` | device ID |
+| `prf` | name of the profile |
+| `cek` | SHA-256 of the ephemeral public key of the device (base64url), which the device reports when opening |
+| `own` | `true` if the person is an active owner at the time of issuance |
+| `osu` | name of the person's session user on this host (`host_session_users.os_user`, 2.2) |
+| `wdi` | only with a profile of kind `claude` and `att = open`: index of the working directory in the list of `osu` (11.1) |
+| `att` | `open` or `attach` |
 
-Der Host-Dienst prüft in dieser Reihenfolge und bricht sonst ohne PTY ab: Signatur mit einem
-Schlüssel aus der JWKS, `typ`, `aud` gleich eigener ID, `sid` gleich Prolog, `exp` nicht
-überschritten (Toleranz `auth.clock_leeway`), `jti` nie gesehen (er merkt jede `jti` bis zu ihrem
-`exp`, Ruling T9), `cek` gleich dem Hash des `e` aus Nachricht 1, `prf` ist ein eigenes Profil,
-`osu` steht in `host_service.session_users` und ist keiner anderen Person (`sub`) gebunden (2.2),
-beim Profil `claude` ist `wdi` ein Index in die Liste der Arbeitsordner von `osu` nach HD7, die er
-mit dem letzten `report` gemeldet hat (2.2 Punkte 5 und 6; nie in die eines anderen
-Sitzungsbenutzers, Ruling T13), und auf
-dem Server-Host `own = true`. Er meldet den Grund als `close_detail` (10.3); der Server
-schließt den Strom des Geräts danach mit genau einem Code:
+The host service checks in this order and otherwise aborts without a PTY: signature with a
+key from the JWKS, `typ`, `aud` equal to its own ID, `sid` equal to the prologue, `exp` not
+exceeded (tolerance `auth.clock_leeway`), `jti` never seen (it remembers every `jti` until its
+`exp`, Ruling T9), `cek` equal to the hash of the `e` from message 1, `prf` is one of its own
+profiles, `osu` is in `host_service.session_users` and is not bound to another person (`sub`)
+(2.2), with the profile `claude`, `wdi` is an index into the list of working directories of `osu`
+according to HD7 that it reported with the last `report` (2.2 items 5 and 6; never into that of
+another session user, Ruling T13), and on
+the server host `own = true`. It reports the reason as `close_detail` (10.3); the server
+then closes the stream of the device with exactly one code:
 
-| Fall | `close_detail` | Schließ-Code | Verhalten des Geräts |
+| Case | `close_detail` | Close code | Behavior of the device |
 |---|---|---|---|
-| `exp` überschritten | `token_expired` | `4101` | mit neuem Step-up neu öffnen bzw. anhängen |
-| `jti` schon gesehen | `token_replayed` | `4101` | wie oben |
-| Signatur, `kid`, `typ`, `aud`, `sid` oder `cek` falsch | `token_invalid` | `4104` | harte Warnung, kein neuer Versuch |
-| Handshake gescheitert (Prolog, Schlüssel) | `handshake_failed` | `4104` | wie oben |
-| Profil unbekannt oder `wdi` kein Arbeitsordner von `osu` | `profile_unknown` | `4104` | wie oben |
-| `osu` nicht in `host_service.session_users` | `session_user_unknown` | `4104` | wie oben |
-| `osu` schon einer anderen Person gebunden | `session_user_mismatch` | `4104` | wie oben |
-| Server-Host ohne `own = true` | `server_host_owner_only` | `4104` | wie oben |
+| `exp` exceeded | `token_expired` | `4101` | open or attach again with a new step-up |
+| `jti` already seen | `token_replayed` | `4101` | as above |
+| signature, `kid`, `typ`, `aud`, `sid` or `cek` wrong | `token_invalid` | `4104` | hard warning, no new attempt |
+| handshake failed (prologue, key) | `handshake_failed` | `4104` | as above |
+| profile unknown or `wdi` not a working directory of `osu` | `profile_unknown` | `4104` | as above |
+| `osu` not in `host_service.session_users` | `session_user_unknown` | `4104` | as above |
+| `osu` already bound to another person | `session_user_mismatch` | `4104` | as above |
+| server host without `own = true` | `server_host_owner_only` | `4104` | as above |
 
-Grund für die Teilung: Eine abgelaufene oder verbrauchte Marke entsteht auch ohne Angriff (langsames
-Netz, doppelter Klick); alles andere deutet auf Manipulation. Ein Name, den der Rechner nicht
-meldet, fällt schon bei der Zuordnung (`400 validation_failed`) oder beim Öffnen (SR12, `403
-terminal_denied` mit `reason: no_session_user`) auf (2.2 Punkt 5). Weil der Host-Dienst nach
-jeder Anmeldung zuerst `report` schickt und seine Sitzungsbenutzer und Arbeitsordner erst nach
-einem Neustart ändert, deuten `session_user_unknown` (eine Marke mit einem Namen, den der Rechner
-in seinem letzten `report` nicht gemeldet hat) und `profile_unknown` bei einem `wdi` außerhalb der
-gemeldeten Liste von `osu` nur auf einen Fehler oder eine Manipulation im Server.
-Grund für `cek`: Ein Relais kann die Marke nicht in einen eigenen Handshake setzen, weil der Hash
-an den ephemeren Schlüssel des Geräts gebunden ist.
+Reason for the split: an expired or used-up token also occurs without an attack (slow
+network, double click); everything else points to tampering. A name that the host does not
+report already shows up at the assignment (`400 validation_failed`) or at opening (SR12, `403
+terminal_denied` with `reason: no_session_user`) (2.2 item 5). Because the host service, after
+every login, first sends `report` and changes its session users and working directories only after
+a restart, `session_user_unknown` (a token with a name that the host did not report
+in its last `report`) and `profile_unknown` with a `wdi` outside the
+reported list of `osu` point only to an error or tampering in the server.
+Reason for `cek`: a relay cannot put the token into its own handshake, because the hash
+is bound to the ephemeral key of the device.
 
-### 5.4 Rahmen
+### 5.4 Frames
 
-Jede WebSocket-Binärnachricht ist genau eine Noise-Nachricht. Nach dem Handshake trägt jede
-Transportnachricht einen Rahmen:
+Every WebSocket binary message is exactly one Noise message. After the handshake, every
+transport message carries one frame:
 
-| Typ (1 Byte) | Name | Richtung | Inhalt |
+| Type (1 byte) | Name | Direction | Content |
 |---|---|---|---|
-| `0x01` | `start` | Gerät an Rechner | Spalten, Zeilen (je 2 Byte); einmal, als erste Transportnachricht |
-| `0x02` | `data` | beide | Bytes der PTY bzw. Eingabe |
-| `0x03` | `resize` | Gerät an Rechner | Spalten, Zeilen |
-| `0x04` | `close` | Gerät an Rechner | Sitzung beenden |
-| `0x05` | `exit` | Rechner an Gerät | Exitcode des Prozesses (4 Byte, vorzeichenbehaftet) |
-| `0x06` | `replay_begin`, `0x07` `replay_end` | Rechner an Gerät | umschließen den Rückblick-Puffer beim Wiederanhängen |
+| `0x01` | `start` | device to host | columns, rows (2 bytes each); once, as the first transport message |
+| `0x02` | `data` | both | bytes of the PTY or of the input |
+| `0x03` | `resize` | device to host | columns, rows |
+| `0x04` | `close` | device to host | end the session |
+| `0x05` | `exit` | host to device | exit code of the process (4 bytes, signed) |
+| `0x06` | `replay_begin`, `0x07` `replay_end` | host to device | enclose the scrollback buffer on reattach |
 
-Steuerdaten liegen in der verschlüsselten Nutzlast; das Relais sieht nur Länge und Zeitpunkt.
-Ein unbekannter Typ beendet die Sitzung (Schließ-Code `4104`). Textrahmen sind auf diesen
-Verbindungen verboten (`4002`).
+Control data lies in the encrypted payload; the relay sees only length and timing.
+An unknown type ends the session (close code `4104`). Text frames are forbidden on these
+connections (`4002`).
 
-### 5.5 Schlüssel-Pinning im Gerät
+### 5.5 Key pinning on the device
 
-Jedes Gerät speichert beim ersten erfolgreichen Öffnen einer Sitzung auf einem Rechner dessen
-`noise_public_key` und `key_generation` im lokalen Speicher. Liefert der Server später einen
-anderen Schlüssel, zeigt die App eine harte Warnung mit beiden Fingerabdrücken und verbindet erst
-nach ausdrücklicher Bestätigung durch die Person; die Bestätigung steht im Audit
-(`terminal.open` mit `pin_changed = true`). Grund: Ein Schlüsselwechsel ohne Neukopplung wäre ein
-Hinweis auf einen Angriff des Servers selbst (5.1). In der Web-Konsole schützt das Pinning nicht
-gegen den Server selbst (5.1).
+On the first successful opening of a session on a host, every device stores the host's
+`noise_public_key` and `key_generation` in local storage. If the server later delivers a
+different key, the app shows a hard warning with both fingerprints and connects only
+after explicit confirmation by the person; the confirmation is recorded in the audit
+(`terminal.open` with `pin_changed = true`). Reason: a key change without re-pairing would be a
+sign of an attack by the server itself (5.1). In the web console, pinning does not protect
+against the server itself (5.1).
 
-## 6. Sitzungen
+## 6. Sessions
 
-### 6.1 Öffnen
+### 6.1 Opening
 
-Diagramm: [seq-8-terminal-oeffnen.svg](../architecture/seq-8-terminal-oeffnen.svg) (Quelle
-[seq-8-terminal-oeffnen.mmd](../architecture/seq-8-terminal-oeffnen.mmd)).
+Diagram: [seq-8-open-terminal.svg](../architecture/seq-8-open-terminal.svg) (source
+[seq-8-open-terminal.mmd](../architecture/seq-8-open-terminal.mmd)).
 
-1. Das Gerät erbringt einen Step-up (08, Abschnitt 6.3) und ruft
-   `POST /api/v1/hosts/{host_id}/terminal/sessions` mit Profil, Größe und dem Hash seines
-   ephemeren Schlüssels (`client_ephemeral_key_hash`), beim Profil `claude` dazu mit dem Index
-   des Arbeitsordners in der gemeldeten Liste des eigenen Sitzungsbenutzers (`workdir_index`,
+1. The device performs a step-up (08, section 6.3) and calls
+   `POST /api/v1/hosts/{host_id}/terminal/sessions` with profile, size and the hash of its
+   ephemeral key (`client_ephemeral_key_hash`), with the profile `claude` also with the index
+   of the working directory in the reported list of the person's own session user (`workdir_index`,
    11.1).
-2. `authorize(person, terminal.open, host)`: Recht `terminal` (07, Abschnitt 2.12), SR10, SR11
-   (I6), SR12 (gültige Zuordnung eines Sitzungsbenutzers, dessen Namen der Rechner meldet),
-   frischer und unverbrauchter Step-up, Grenzen (`terminal.max_sessions_per_person`,
-   `terminal.max_sessions_per_host`), Rechner `active` und verbunden, Profil bekannt, beim Profil
-   `claude` ein Arbeitsordner des eigenen Sitzungsbenutzers.
-3. In einer Transaktion: Step-up verbrauchen (08, Abschnitt 6.3), Zeile in `terminal_sessions`
-   mit `state = 'opening'` und dem Sitzungsbenutzer der Person (`host_session_user_id`), Audit, Ereignis `terminal_session.changed`. Antwort: Sitzungs-ID,
-   Marke, Stream-Pfad, `noise_public_key`, `key_fingerprint`, `key_generation`.
-4. Der Server weist den Host-Dienst über die Steuerverbindung an (`session.open` mit Sitzungs-ID
-   und Datenpfad). Der Host-Dienst öffnet die Datenverbindung
+2. `authorize(person, terminal.open, host)`: permission `terminal` (07, section 2.12), SR10, SR11
+   (I6), SR12 (valid assignment of a session user whose name the host reports),
+   fresh and unconsumed step-up, limits (`terminal.max_sessions_per_person`,
+   `terminal.max_sessions_per_host`), host `active` and connected, profile known, with the profile
+   `claude` a working directory of the person's own session user.
+3. In one transaction: consume the step-up (08, section 6.3), row in `terminal_sessions`
+   with `state = 'opening'` and the session user of the person (`host_session_user_id`), audit, event `terminal_session.changed`. Response: session ID,
+   token, stream path, `noise_public_key`, `key_fingerprint`, `key_generation`.
+4. The server instructs the host service over the control connection (`session.open` with session ID
+   and data path). The host service opens the data connection
    `/api/v1/hosts/sessions/{session_id}/stream`.
-5. Das Gerät öffnet `/api/v1/terminal/sessions/{session_id}/stream` und sendet Nachricht 1.
-6. Das Relais verbindet beide Seiten, sobald beide da sind; kommt eine Seite nicht innerhalb von
-   `terminal.open_timeout`, endet die Sitzung mit `open_failed`.
-7. Nach Nachricht 2 und dem Rahmen `start` startet der Host-Dienst die PTY; er meldet
-   `session.started` über die Steuerverbindung; der Server setzt `state = 'active'`.
+5. The device opens `/api/v1/terminal/sessions/{session_id}/stream` and sends message 1.
+6. The relay connects both sides as soon as both are there; if one side does not arrive within
+   `terminal.open_timeout`, the session ends with `open_failed`.
+7. After message 2 and the frame `start`, the host service starts the PTY; it reports
+   `session.started` over the control connection; the server sets `state = 'active'`.
 
-### 6.2 Trennen und Wiederanhängen
+### 6.2 Detach and reattach
 
-- Bricht die Verbindung des Geräts ab, bleibt die PTY auf dem Rechner `terminal.detach_grace`
-  lang bestehen; der Server setzt `state = 'detached'`. Der Rückblick-Puffer liegt nur im Speicher
-  des Host-Dienstes (`host_service.scrollback_bytes`), nie im Server.
-- Wiederanhängen (`terminal.attach`) gibt eine neue Marke und erzeugt einen neuen Noise-Handshake
-  mit neuem ephemerem Schlüssel; der Host-Dienst spielt den Rückblick-Puffer zwischen
-  `replay_begin` und `replay_end` ein. Die alte Marke ist damit wertlos (der Server speichert nur die
-  aktuelle `jti`).
-- Step-up: Von einem anderen Gerät derselben Person immer frisch. Vom selben Gerät in derselben
-  Anmeldesitzung innerhalb von `terminal.quick_reattach_window` nach der Trennung ohne neuen
-  Step-up. Grund: Mobilnetze brechen oft kurz ab; eine Passkey-Abfrage je Funkloch würde zum
-  blinden Bestätigen erziehen. Die Ausnahme gilt nur für dasselbe Gerät, dessen Schlüssel die
-  Anfrage beweist, und darum nie in der Web-Konsole (`client_component = 'console'`): Dort gibt es
-  keinen Geräteschlüssel, nur das Cookie der Konsole. Die Konsole braucht für jedes Anhängen einen
-  frischen Passkey ([ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)).
-- Hängt ein anderes Gerät an, schließt der Server die ältere Verbindung mit `4103`.
-- Bricht die Steuer- oder Datenverbindung des Host-Dienstes ab, setzt der Server die Sitzung auf
-  `detached`. Der Host-Dienst hält die PTY und baut die Datenverbindung nach dem Wiederverbinden
-  neu auf; das Gerät hängt danach mit `terminal.attach` neu an.
-- Startet der Host-Dienst neu (`bothy-host restart`, `bothy-host session-user add` oder `remove`,
-  ein Absturz, ein Neustart des Rechners), enden alle Sitzungen des Rechners. Jeder PTY-Helfer
-  beendet seine PTYs samt Prozessbaum (6.5), sobald sein Kanal zum Host-Dienst abbricht. Bei der
-  Anmeldung der Steuerverbindung nennt der Host-Dienst die Sitzungen, die er kennt (`live_sessions`
-  in `identify`): deren PTY noch läuft oder deren Ende er noch nicht melden konnte; dieses Ende
-  meldet er danach mit `session.ended`. Nach einem Neustart kennt er keine. Der Server beendet jede
-  andere Sitzung des Rechners im Zustand `active` oder `detached` mit `host_restarted`. Grund: Der neue
-  Prozess liest seine Konfiguration neu und prüft beim Start alles neu (2.2); eine Sitzung aus der
-  Zeit davor liefe ungeprüft unter der alten Konfiguration weiter, etwa mit einem entfernten
-  Arbeitsordner. Ihr Rückblick-Puffer lag im Speicher des alten Prozesses. Die Liste in `identify`
-  braucht keinen Zustand im Server und trennt einen Neustart von einem Netzabbruch, nach dem die
-  PTYs weiterlaufen.
-- Nach `terminal.detach_grace` ohne Anhängen beendet der Host-Dienst die PTY, der Server schließt
-  die Sitzung mit `detach_expired`.
+- If the connection of the device breaks, the PTY on the host stays alive for
+  `terminal.detach_grace`; the server sets `state = 'detached'`. The scrollback buffer lives only in
+  the memory of the host service (`host_service.scrollback_bytes`), never in the server.
+- Reattaching (`terminal.attach`) issues a new token and creates a new Noise handshake
+  with a new ephemeral key; the host service plays back the scrollback buffer between
+  `replay_begin` and `replay_end`. The old token is thereby worthless (the server stores only the
+  current `jti`).
+- Step-up: from another device of the same person, always fresh. From the same device in the same
+  login session within `terminal.quick_reattach_window` after the disconnect, without a new
+  step-up. Reason: mobile networks often drop briefly; a passkey prompt for every dead spot would
+  train people to confirm blindly. The exception applies only to the same device, whose key proves
+  the request, and that is why it never applies in the web console (`client_component = 'console'`):
+  there is no device key there, only the cookie of the console. The console needs a
+  fresh passkey for every attach ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)).
+- If another device attaches, the server closes the older connection with `4103`.
+- If the control or data connection of the host service breaks, the server sets the session to
+  `detached`. The host service keeps the PTY and rebuilds the data connection after
+  reconnecting; the device then reattaches with `terminal.attach`.
+- If the host service restarts (`bothy-host restart`, `bothy-host session-user add` or `remove`,
+  a crash, a restart of the host), all sessions of the host end. Every PTY helper
+  ends its PTYs including their process tree (6.5) as soon as its channel to the host service
+  breaks. When the control connection logs in, the host service names the sessions that it knows
+  (`live_sessions` in `identify`): those whose PTY is still running or whose end it could not yet
+  report; it reports this end afterwards with `session.ended`. After a restart it knows none. The
+  server ends every other session of the host in state `active` or `detached` with
+  `host_restarted`. Reason: the new process reads its configuration again and checks everything
+  again at start (2.2); a session from the time before would continue unchecked under the old
+  configuration, for example with a removed working directory. Its scrollback buffer was in the
+  memory of the old process. The list in `identify` needs no state in the server and separates a
+  restart from a network drop, after which the PTYs keep running.
+- After `terminal.detach_grace` without an attach, the host service ends the PTY, and the server
+  closes the session with `detach_expired`.
 
-### 6.3 Grenzen
+### 6.3 Limits
 
-| Grenze | Wert | Wirkung |
+| Limit | Value | Effect |
 |---|---|---|
-| Leerlauf | `terminal.idle_timeout` | ohne Eingabe des Geräts (Rahmen `data`, `resize`); Ende `idle_timeout` |
-| Höchstdauer | `terminal.max_session_duration` | ab `opened_at`, auch über Wiederanhängen hinweg; Ende `max_duration` |
-| Sitzungen je Person | `terminal.max_sessions_per_person` | nicht `closed`; Ablehnung `terminal_session_limit` |
-| Sitzungen je Rechner | `terminal.max_sessions_per_host` | dasselbe |
-| Puffer im Relais | `terminal.relay_buffer_max_bytes` je Richtung | voll: Verbindung des langsamen Endes mit `4014` schließen, Sitzung `detached` |
-| Rate-Limit | `rl.terminal` je Mensch, `rl.host` je Rechner | 05, Abschnitt 3 |
+| Idle | `terminal.idle_timeout` | without input from the device (frames `data`, `resize`); end `idle_timeout` |
+| Maximum duration | `terminal.max_session_duration` | from `opened_at`, also across reattaches; end `max_duration` |
+| Sessions per person | `terminal.max_sessions_per_person` | not `closed`; rejection `terminal_session_limit` |
+| Sessions per host | `terminal.max_sessions_per_host` | the same |
+| Buffer in the relay | `terminal.relay_buffer_max_bytes` per direction | full: close the connection of the slow end with `4014`, session `detached` |
+| Rate limit | `rl.terminal` per person, `rl.host` per host | 05, section 3 |
 
-Den Leerlauf misst der Host-Dienst, weil nur er die Rahmentypen sieht; er meldet das Ende über die
-Steuerverbindung. Der Server misst zusätzlich die Zeit ohne Bytes vom Gerät im Relais und beendet
-nach `terminal.idle_timeout` plus `terminal.idle_grace` selbst. Grund: Ein manipulierter
-Host-Dienst darf eine Sitzung nicht beliebig offen halten. Der Job `terminal.sweep`
-([02-architektur.md](02-architektur.md), Abschnitt 12.3) prüft dieselben Grenzen in der Datenbank
-und fängt Sitzungen eines ausgefallenen Knotens auf.
+The host service measures idle time, because only it sees the frame types; it reports the end over
+the control connection. The server additionally measures the time without bytes from the device in
+the relay and ends the session itself after `terminal.idle_timeout` plus `terminal.idle_grace`.
+Reason: a tampered host service must not keep a session open indefinitely. The job `terminal.sweep`
+([02-architecture.md](02-architecture.md), section 12.3) checks the same limits in the database
+and catches sessions of a failed node.
 
-### 6.4 Lokale Bestätigung
+### 6.4 Local confirmation
 
-Mit `host_service.require_local_confirm = true` fragt der Host-Dienst vor dem Start jeder PTY auf
-dem Rechner nach (Benachrichtigung des Betriebssystems an die angemeldete Person des Rechners) und
-startet erst nach Zustimmung innerhalb von `host_service.local_confirm_timeout`. Standard ist aus.
-Grund: Rückfall gegen einen bösartigen Server-Betreiber (5.1), nur sinnvoll, wenn jemand am Rechner
-sitzt.
+With `host_service.require_local_confirm = true`, the host service asks on the host before the start
+of every PTY (a notification of the operating system to the person logged in on the host) and
+starts only after consent within `host_service.local_confirm_timeout`. The default is off.
+Reason: fallback against a malicious instance operator of the server (5.1), only useful if someone
+sits at the host.
 
-### 6.5 Ende einer Sitzung auf dem Rechner
+### 6.5 End of a session on the host
 
-Der PTY-Helfer startet jede Sitzung in einer eigenen Prozessgruppe und Sitzung des Betriebssystems
-(`setsid`); unter Linux zusätzlich in einer eigenen cgroup (systemd-Scope des Sitzungsbenutzers),
-unter Windows in einem Job Object mit `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. Endet eine Sitzung,
-gleich aus welchem Grund, beendet er den ganzen Baum: unter Linux alle Prozesse der cgroup, unter
-Windows das Job Object, unter macOS die Prozessgruppe und danach jeden Prozess des
-Sitzungsbenutzers, dessen Elternkette auf die Sitzung zurückgeht. Grund: Ohne das liefe ein mit
-`nohup`, `setsid` oder `disown` gestarteter Prozess nach einem Entzug weiter.
+The PTY helper starts every session in its own process group and its own session of the operating
+system (`setsid`); under Linux additionally in its own cgroup (systemd scope of the session user),
+under Windows in a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. When a session ends,
+for whatever reason, it ends the whole tree: under Linux all processes of the cgroup, under
+Windows the Job Object, under macOS the process group and then every process of the
+session user whose parent chain leads back to the session. Reason: without this, a process started
+with `nohup`, `setsid` or `disown` would keep running after a revocation.
 
-Grenze: Dauerläufer, die eine Person als Sitzungsbenutzer einrichtet (crontab, systemd-Dienste des
-Benutzers, LaunchAgent, geplante Aufgabe), beendet das nicht; sie laufen außerhalb jedes
-Sitzungsbaums. Sie laufen im Sitzungsbenutzer dieser Person, den keine andere Person je bekommt
-(2.2, T12), und erreichen über keinen geteilten Ort eine andere Person (T13), darum keine Sitzung
-eines anderen Menschen. Die Konsole zeigt beim Entzug
-einer Person, die nicht Owner ist, den Hinweis, ihren Sitzungsbenutzer mit
-`bothy-host session-user remove` aus dem Host-Dienst zu nehmen und auf dem Rechner zu sperren oder
-zu löschen (2.2 Punkt 3; Bedrohungsmodell T-TM-11). Die Schlüssel erreichen solche Prozesse nicht (2.2).
+Limit: long-running processes that a person sets up as a session user (crontab, systemd services of
+the user, LaunchAgent, scheduled task) are not ended by this; they run outside every
+session tree. They run in the session user of this person, which no other person ever gets
+(2.2, T12), and reach no other person through any shared location (T13), so they reach no session
+of another person. When the access of a person who is not an owner is revoked, the console shows
+the notice to take their session user out of the host service with
+`bothy-host session-user remove` and to lock or delete it on the host
+(2.2 item 3; threat model T-TM-11). The keys are out of reach of such processes (2.2).
 
-### 6.6 Zustand einer Sitzung
+### 6.6 State of a session
 
-| `state` | Bedeutung |
+| `state` | Meaning |
 |---|---|
-| `opening` | angelegt, Handshake läuft |
-| `active` | PTY läuft, Gerät verbunden |
-| `detached` | PTY läuft, kein Gerät verbunden; Wiederanhängen möglich |
-| `closed` | beendet; `close_reason` gesetzt |
+| `opening` | created, handshake running |
+| `active` | PTY running, device connected |
+| `detached` | PTY running, no device connected; reattach possible |
+| `closed` | ended; `close_reason` set |
 
-## 7. LLM-Anmeldung und Invariante I6
+## 7. LLM login and invariant I6
 
-### 7.1 Warum
+### 7.1 Why
 
-Anthropic verbietet, Abo-Anmeldedaten für andere Personen zu nutzen
-(https://code.claude.com/docs/en/legal-and-compliance, abgerufen 2026-10-10 [belegt]; Wortlaut in
-[10-backend-richtlinie.md](10-backend-richtlinie.md), Abschnitt 2). Ein Terminal erlaubt jede
-Nutzung der Anmeldung, die der Sitzungsbenutzer der Person auf dem Rechner hat. Darum bekommt jede
-Person ihren eigenen Sitzungsbenutzer (2.2, T12): Eine Anmeldung darin nutzt nur sie. Das Produkt
-kann den Inhalt der Anmeldung nicht prüfen. Darum erklärt der Owner zusätzlich je Rechner, welche
-Anmeldung dort vorgesehen ist, und der Server erzwingt, wer dann ein Terminal öffnen darf.
+Anthropic forbids using subscription credentials for other people
+(https://code.claude.com/docs/en/legal-and-compliance, retrieved 2026-10-10 [verified]; wording in
+[10-backend-policy.md](10-backend-policy.md), section 2). A terminal allows any use of
+the login that the person's session user has on the host. That is why every
+person gets their own session user (2.2, T12): a login in it is used only by them. The product
+cannot check the content of the login. That is why the owner additionally declares per host which
+login is intended there, and the server enforces who may then open a terminal.
 
-### 7.2 Erklärung
+### 7.2 Declaration
 
-`hosts.llm_credentials`, gesetzt bei der Bestätigung (3.2) und später mit `host.manage` (Step-up,
-Audit, Rechte `ja`):
+`hosts.llm_credentials`, set at the confirmation (3.2) and later with `host.manage` (step-up,
+audit, permissions `yes`):
 
-| Wert | Bedeutung |
+| Value | Meaning |
 |---|---|
-| `none` | Auf dem Rechner gibt es keine LLM-Anmeldung. Das Profil `claude` wird nicht angeboten. |
-| `personal` | Die Anmeldung ist das persönliche Abo genau eines Menschen (`hosts.credential_holder_id`). Dieser Mensch meldet sich selbst im Konto seines Sitzungsbenutzers an; der Host-Dienst fasst die Anmeldung nicht an (7.4). |
-| `organization` | Die Anmeldung ist ein Organisations-API-Schlüssel aus dem Zustandsordner des Host-Dienstes. |
+| `none` | There is no LLM login on the host. The profile `claude` is not offered. |
+| `personal` | The login is the personal subscription of exactly one person (`hosts.credential_holder_id`). This person logs in themselves in the account of their session user; the host service does not touch the login (7.4). |
+| `organization` | The login is an organization API key from the state directory of the host service. |
 
-### 7.3 Invariante I6
+### 7.3 Invariant I6
 
-**I6:** Ist `llm_credentials = personal`, darf nur `credential_holder_id` ein Terminal auf dem
-Rechner öffnen oder anhängen. Das gilt auch für andere Owner (Owner-Ausnahme, Ruling T2). Auf
-einem solchen Rechner gibt es nur eine Einzel-Freigabe `terminal` an den Inhaber der Anmeldung,
-keine Gruppen-Freigaben und keine Freigaben an andere Menschen.
+**I6:** If `llm_credentials = personal`, only `credential_holder_id` may open or attach a terminal
+on the host. This also applies to other owners (owner exception, Ruling T2). On
+such a host there is only an individual grant `terminal` to the holder of the login,
+no group grants and no grants to other people.
 
-Prüfstellen:
+Enforcement points:
 
-1. **Transaktional** in `grant.create` mit Ziel `host` und in `host.manage` (Bestätigung,
-   Wechsel der Erklärung, Wechsel des Inhabers der Anmeldung): Würde danach ein anderer Prinzipal
-   als `credential_holder_id` eine gültige Freigabe `terminal` auf dem Rechner haben, rollt die
-   Transaktion zurück: `409 i6_violation` (Entscheidung `invariant_violation`), Audit `deny` (03,
-   Abschnitt 6.8).
-2. **Bei jedem `terminal.open` und `terminal.attach`**: SR11 in 07, fail closed.
-3. **Beim Wechsel** auf `personal` oder des Inhabers beendet dieselbe Transaktion alle Sitzungen
-   anderer Menschen auf dem Rechner (`i6_violation`).
+1. **Transactionally** in `grant.create` with target `host` and in `host.manage` (confirmation,
+   change of the declaration, change of the holder of the login): if afterwards a principal other
+   than `credential_holder_id` would have a valid grant `terminal` on the host, the
+   transaction rolls back: `409 i6_violation` (decision `invariant_violation`), audit `deny` (03,
+   section 6.8).
+2. **On every `terminal.open` and `terminal.attach`**: SR11 in 07, fail closed.
+3. **On a change** to `personal` or of the holder, the same transaction ends all sessions of
+   other people on the host (`i6_violation`).
 
-Abgrenzung zu I1 ([ADR 0024](../adr/0024-backend-richtlinie-personal-organization-mit-invariante.md),
-Ruling L22): I1 kennt keine Owner-Ausnahme, weil Owner auf allen Zielen `trigger` erben und ein
-Agent auf vielen Zielen ausgelöst wird. Ein Terminal ist Zugriff auf einen bestimmten Rechner, keine
-vererbte Stufe. Ohne Owner-Ausnahme wäre ein persönlicher Rechner bei zwei Ownern unmöglich. Die
-Ausnahme schränkt Owner ein; sie erweitert nichts. [ADR 0068](../adr/0068-terminal-ueber-host-dienst-mit-noise-strom-und-invariante-i6.md)
-hält das fest.
+Distinction from I1 ([ADR 0024](../adr/0024-backend-policy-personal-organization-with-invariant.md),
+Ruling L22): I1 has no owner exception, because owners inherit `trigger` on all targets and an
+agent is triggered on many targets. A terminal is access to a specific host, not an
+inherited level. Without the owner exception, a personal host would be impossible with two owners.
+The exception restricts owners; it extends nothing. [ADR 0068](../adr/0068-terminal-through-a-host-service-with-noise-stream-and-invariant-i6.md)
+records this.
 
-### 7.4 Durchsetzung auf dem Rechner
+### 7.4 Enforcement on the host
 
-- Tragend ist der eigene Sitzungsbenutzer je Person (2.2, Ruling T12): Eine Abo-Anmeldung, die
-  in einem Sitzungsbenutzer entsteht, nutzt nur die Person, der er zugeordnet ist; keine Sitzung
-  eines anderen Menschen läuft dort. Das hängt an keinem Ergebnis von HD6 und gilt auch dann, wenn
-  HD6 gefälscht oder abgeschaltet ist. Es setzt voraus, dass kein Ort die Konten wieder verbindet
-  (Ruling T13, 2.2 Punkt 6); das hält die Einrichtung, und HD11 prüft es für jeden konfigurierten
-  Pfad. HD6 ist eine Zusatzprüfung: Sie deckt eine
-  Erklärung des Owners auf, die nicht zum Rechner passt, und meldet sie. Ein leerer
-  `host_service.claude_bin` oder ein gefälschtes Ergebnis von HD6 schwächt die Durchsetzung nicht.
-- `bothy-host doctor` (HD6) fragt den Coding-Agenten nach seiner aktiven Anmeldung, nie nach Werten:
-  bei Claude Code `claude auth status` mit dem Feld `authMethod` (`none`, `claude.ai`,
+- The load-bearing element is the separate session user per person (2.2, Ruling T12): a
+  subscription login that is created in a session user is used only by the person to whom that
+  session user is assigned; no session of another person runs there. This does not depend on any
+  result of HD6 and also applies if HD6 is faked or switched off. It requires that no location
+  connects the accounts again (Ruling T13, 2.2 item 6); the setup holds this, and HD11 checks it
+  for every configured path. HD6 is an additional check: it uncovers a
+  declaration of the owner that does not match the host, and reports it. An empty
+  `host_service.claude_bin` or a faked result of HD6 does not weaken the enforcement.
+- `bothy-host doctor` (HD6) asks the coding agent for its active login, never for values:
+  with Claude Code, `claude auth status` with the field `authMethod` (`none`, `claude.ai`,
   `oauth_token`, `api_key`, `api_key_helper`, `third_party`;
-  https://code.claude.com/docs/en/cli-reference, abgerufen 2026-10-10 [belegt]). Zusätzlich meldet
-  er nur das Vorhandensein bekannter Anmeldeorte: `~/.claude/.credentials.json` unter Linux,
-  `%USERPROFILE%\.claude\.credentials.json` unter Windows, unter macOS der Schlüsselbund mit
-  Rückfall auf dieselbe Datei, `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`
-  (https://code.claude.com/docs/en/authentication, abgerufen 2026-10-10 [belegt]). Den Namen des
-  Schlüsselbund-Eintrags nennt die Quelle nicht; der Host-Dienst prüft ihn darum nur über
-  `claude auth status` [vermutet: kein dokumentierter Weg ohne den Agenten].
-- HD6 ruft den Coding-Agenten nie über den `PATH` des Sitzungsbenutzers auf, sondern nur über den
-  absoluten Pfad `host_service.claude_bin`, mit einer Umgebung, die der PTY-Helfer selbst setzt:
-  `HOME` bzw. `USERPROFILE` und `CLAUDE_CONFIG_DIR` der jeweiligen Prüfung, keine Startdateien
-  des Sitzungsbenutzers und eine feste Suchliste als `PATH`, nämlich der Ordner, in dem
-  `host_service.claude_bin` laut Konfiguration steht (aufgelöst nach 2.2 Punkt 6, nicht der
-  Ordner, auf den ein Verweis `claude` zeigt), dann `/usr/bin` und `/bin` (Windows:
-  `%SystemRoot%\System32`). Grund für den konfigurierten Ordner: Ihn hat der Betreiber gewählt,
-  und HD10 prüft ihn ohnehin als Ordner auf dem Weg zu `host_service.claude_bin`; der Ordner des
-  Ziels eines Verweises hinge davon ab, wie ein Paketverwalter installiert [abgeleitet].
-  HD10 prüft die Datei, jeden Ordner auf dem Weg dorthin, jeden Ordner der Suchliste und bei
-  einem Skript (erste Zeile `#!`) den Interpreter, bei `#!/usr/bin/env node` also `env` und das
-  `node`, das `env` in dieser Suchliste findet, wie die Binärdatei des Helfers: Besitz durch
-  einen vertrauenswürdigen Besitzer, für keinen Sitzungsbenutzer schreibbar, alles nach
-  Auflösung (2.2 Punkt 6). Jeden Ordner der Suchliste prüft HD10, damit niemand in einem
-  früheren Ordner der Liste einen anderen Interpreter vor den geprüften legt. Findet die
-  Suchliste den Interpreter nicht, gilt `host_service.claude_bin` für HD6 und das Profil als leer
-  (unten): HD6 ruft nichts auf, und bei `organization` gibt es kein Profil `claude`; HD10 prüft
-  die Datei und ihre Ordner trotzdem. Grund: Der `PATH` des Profils
-  geht nach der Suchliste weiter; `env` fände den Interpreter dann in einem Ordner, den HD10 nie
-  geprüft hat, und dieses Programm liefe in jedem Sitzungsbenutzer [abgeleitet]. Module,
-  die der Interpreter danach lädt, prüft HD10 nicht [abgeleitet: ihr Suchweg hängt vom
-  Interpreter ab]; eine Installation in einem Ordner eines vertrauenswürdigen Besitzers hält auch
-  sie außer Reichweite. Unter Windows ist `host_service.claude_bin` eine `.exe`; eine Stapeldatei
-  (`.cmd`, `.bat`) besteht HD10 nicht, weil sie kein `#!` trägt und ihr Interpreter und die
-  Programme, die sie startet, sonst ungeprüft blieben [abgeleitet]. Claude Code liegt unter
-  Windows als `claude.exe` vor (https://code.claude.com/docs/en/setup, abgerufen 2026-10-11
-  [belegt]). Ist der Wert leer oder gilt er als leer (der Interpreter fehlt in der Suchliste,
-  oder der Pfad lässt sich nicht auflösen, 2.2 Punkt 6), fragt HD6 nur die Anmeldeorte ab, und
-  `doctor` warnt mit `auth_status_unchecked` (kein Startverbot); unter macOS bleibt der
-  Schlüsselbund dann ungeprüft, und bei `organization` gibt es kein Profil `claude` (HD7,
-  Warnung; 11.1). Grund: Ein Sitzungsbenutzer kann ein Programm in seinem `PATH` oder in seinen
-  Startdateien durch eines ersetzen, das die Abo-Anmeldung verschweigt. Restgrenze: Dieselbe
-  Benutzerkennung kann die Daten ändern, die das echte Programm liest, etwa eine Anmeldung nur
-  zwischen zwei Prüfungen anlegen (Bedrohungsmodell T-TM-08, RK-84). Beides trifft nur das Konto
-  der Person selbst, weil sie ihren Sitzungsbenutzer mit niemandem teilt (T12).
-- Bei `none` oder `organization` und erkannter Abo-Anmeldung in einem Sitzungsbenutzer
-  (`authMethod` gleich `claude.ai` oder `oauth_token`, oder eine der Anmeldedateien vorhanden)
-  startet `bothy-host` nicht (Ruling T2). Vorher meldet er das Ergebnis mit jedem betroffenen
-  Sitzungsbenutzer an den Server, und `bothy-host doctor` nennt dieselben Namen auf dem Rechner
-  (2.2, Meldung bei verweigertem Start).
-- Prüfstellen: Jeder PTY-Helfer führt HD6 im Konto seines Sitzungsbenutzers aus, und zwar beim
-  Start des Dienstes, vor jedem Start einer PTY und alle `host_service.credential_check_interval`;
-  jedes Mal im Home des Sitzungsbenutzers und im `CLAUDE_CONFIG_DIR` des Profils `claude` (bei
-  `organization` der feste Ordner im Home desselben Sitzungsbenutzers, siehe unten). Grund:
-  In einer laufenden Shell kann jemand `claude` starten und sich mit `/login` per Abo anmelden. Die
-  Anmeldung landet im Home seines eigenen Sitzungsbenutzers und erreicht keine Sitzung eines
-  anderen Menschen (T12, T13); sie widerspricht aber der Erklärung des Owners, und HD6 macht das
-  sichtbar, damit der Owner die Erklärung berichtigt oder die Anmeldung entfernen lässt.
-- Treffer während des Betriebs: Der Host-Dienst lehnt neue Sitzungen ab (`open_failed` mit
-  `close_detail = subscription_login_detected`), beendet alle laufenden Sitzungen des Rechners
-  (`close_reason = host_policy_violation`, gleiches `close_detail`) und meldet das Ergebnis über
-  `report` an den Server (HD6 nicht bestanden, je betroffenem Sitzungsbenutzer ein Eintrag mit
-  seinem Namen, 2.2). Der Server schreibt einen Audit-Eintrag (`host.connect`) und sendet
-  `host.updated` an alle Owner; die Konsole zeigt jeden dieser Sitzungsbenutzer und die Person
-  seiner Zuordnung. Sitzungen gibt es erst wieder, wenn HD6 in jedem Sitzungsbenutzer aus
-  `host_service.session_users` besteht.
-  Folge, ehrlich: Eine einzelne Person mit Terminal kann so den Rechner für alle stilllegen, etwa
-  mit `/login` in ihrer eigenen Sitzung. Das bleibt so, weil Ruling T2 bei Widerspruch zur
-  Erklärung den Start des Host-Dienstes verbietet. Der Stillstand endet auf einem von zwei Wegen
-  ([16-betrieb.md](16-betrieb.md), Abschnitt 4.4; Bedrohungsmodell T-TM-14): Der Betreiber
-  entfernt die Anmeldung im genannten Sitzungsbenutzer, oder der Owner beendet dessen Zuordnung
-  und der Betreiber nimmt den Sitzungsbenutzer mit `bothy-host session-user remove` aus dem
-  Host-Dienst (2.2 Punkt 3); danach läuft HD6 in diesem Konto nicht mehr. Den Benutzer nur auf dem
-  Rechner zu sperren oder nur seine Zuordnung zu beenden, reicht nicht: Sein PTY-Helfer läuft
-  weiter, und HD6 prüft jeden Namen aus `host_service.session_users`.
-- Das Profil `claude` baut seine Umgebung wie der Runner ([09-agenten.md](09-agenten.md),
-  Abschnitt 18.3): bei `organization` `ANTHROPIC_API_KEY` aus dem Zustandsordner (der Host-Dienst
-  reicht den Wert beim Start über den lokalen Kanal an den PTY-Helfer), ein eigener
-  `CLAUDE_CONFIG_DIR` ohne Abo-Anmeldung, die OAuth-Variablen entfernt; bei `personal` keine
-  API-Schlüssel; bei `none` gibt es das Profil nicht. Bei `organization` startet das Profil genau
-  den aufgelösten Pfad von `host_service.claude_bin`, den HD10 geprüft hat, und der `PATH` des
-  Profils beginnt mit der festen Suchliste von HD6, damit ein `#!/usr/bin/env node` denselben
-  Interpreter findet, den HD10 geprüft hat; weil der Wert ohne Interpreter in der Suchliste als
-  leer gilt (oben), sucht `env` nie im übrigen `PATH`. Ist `host_service.claude_bin` leer oder
-  gilt er als leer, bietet der Host-Dienst das Profil bei `organization` nicht an (HD7,
-  Warnung). Grund: Dieses Programm läuft
-  in jedem Sitzungsbenutzer und ist darum ein Ort für alle (2.2 Punkt 6); ein `claude` aus einem
-  `PATH` könnte in einem Ordner liegen, der einem anderen Konto gehört. Bei `organization` setzt
-  der PTY-Helfer den
-  `CLAUDE_CONFIG_DIR` auf den festen Ordner `.config/bothy-host/claude` im Home des
-  Sitzungsbenutzers der Person (unter Windows `%USERPROFILE%\.config\bothy-host\claude`); er
-  gehört diesem Sitzungsbenutzer und hat Modus `0700` bzw. eine ACL nur für ihn, nie ein Ordner
-  für den ganzen Rechner (Ruling T13, HD11). Bei `personal` gilt der eigene des Sitzungsbenutzers
-  aus seiner Login-Shell (siehe unten); den wählt der Inhaber, und nur er öffnet dort ein Terminal
-  (I6). Er muss nach Auflösung (2.2 Punkt 6) im Home des Sitzungsbenutzers liegen; ist er nicht
-  gesetzt, gilt der Standardordner des Coding-Agenten in diesem Home. Vor jedem Start des Profils
-  fragt der PTY-Helfer nur diesen Wert in einer eigenen Login-Shell des Sitzungsbenutzers ab (nie
-  eine andere Variable, also nie ein Token), prüft ihn
-  und setzt ihn im Startbefehl nach den Startdateien wieder auf genau diesen Wert; so läuft der
-  Coding-Agent mit dem geprüften Ordner. Liegt der Wert außerhalb des Home oder lässt er sich
-  nicht auflösen (er fehlt, oder ein Verweis zeigt ins Leere; 2.2 Punkt 6), startet das Profil
-  nicht (`open_failed` mit `close_detail = shared_location`); das Profil `shell` bleibt, damit der
-  Inhaber seine Startdateien berichtigen oder den Ordner anlegen kann. Im Home schützt ihn das Home selbst, das HD11 als
-  Ort dieses Sitzungsbenutzers prüft. Grund: Ein gemeinsamer Ordner wäre ein Ort, an dem ein
-  `/login` einer Person alle anderen erreicht. Bei `personal` gibt es zwar nur Sitzungen des
-  Inhabers (I6), aber Dauerläufer anderer Sitzungsbenutzer laufen weiter (6.5), und nach einem
-  Wechsel auf `organization` bekommen andere Personen wieder Sitzungen; ein lesbarer Ordner
-  außerhalb des Home gäbe ihnen die Abo-Anmeldung des Inhabers [abgeleitet]. Grenze: Den Wert
-  setzen die Startdateien des Inhabers. Die Prüfung fängt eine Fehleinrichtung ab, nicht den
-  Inhaber selbst; in seiner Shell kann er den Coding-Agenten mit jedem Ordner starten (2.2,
-  Grenze).
-- Bei `personal` fasst `bothy-host` keine Anmeldung an: Der Dienstbenutzer öffnet, liest, kopiert
-  und übergibt sie nie, und der Zustandsordner enthält nur die Schlüssel des Rechners, die Bindungen der
-  Sitzungsbenutzer an Personen (nur IDs und Namen, 2.2) und bei `organization` den API-Schlüssel. Der Inhaber meldet sich selbst im Konto seines
-  Sitzungsbenutzers mit dem unveränderten Coding-Agenten an, entweder in einer Sitzung mit
-  `/login` oder mit einem langlebigen Token aus `claude setup-token`, das er in einer Datei des
-  Sitzungsbenutzers ablegt und in dessen Login-Shell als `CLAUDE_CODE_OAUTH_TOKEN` setzt. Das
-  Profil `claude` startet bei `personal` über die Login-Shell des Sitzungsbenutzers das `claude`
-  aus deren `PATH`, mit dessen eigenem `CLAUDE_CONFIG_DIR` im Home (oben), damit diese Anmeldung
-  gilt. Programm und Ordner wählt der Inhaber; weil nur er auf diesem Rechner Sitzungen bekommt
-  (I6), ist dieses Programm kein Ort für alle. Die Anmeldung gehört dem
-  Sitzungsbenutzer des Inhabers; nur der Inhaber erreicht sie, weil I6 nur ihm Sitzungen gibt und
-  T12 diesen Sitzungsbenutzer nur ihm zuordnet. Belege
-  (abgerufen 2026-10-10): `claude setup-token` "Prints the token to the terminal without saving
-  it" (https://code.claude.com/docs/en/cli-reference [belegt]); das Token ist ein einjähriges
-  OAuth-Token für Umgebungen ohne Browser, das nur Modellanfragen kann
-  (https://code.claude.com/docs/en/authentication [belegt]). Ob `/login` für einen Benutzer ohne
-  Anmeldesitzung unter macOS den Schlüsselbund nutzen kann, sagt die Quelle nicht [vermutet:
-  nein; dann bleibt der Weg über das Token]. Ob das Token für eine interaktive Sitzung desselben
-  Menschen gedacht ist, sagt die Quelle ebenfalls nicht; das ist die Owner-Frage OQ-03 (Ruling T10,
-  enger gefasst in D-W-17).
-- Grund: Das Produkt sammelt, speichert und vermittelt keine Claude.ai-Zugangsdaten
-  ([10-backend-richtlinie.md](10-backend-richtlinie.md), Abschnitt 2, Folgerung 3; I5). Ein Token im
-  Zustandsordner des Host-Dienstes, das der Host-Dienst in die Sitzung reicht, wäre genau das.
-- Grenze: Wer eine Sitzung des Profils `claude` hat, kann den API-Schlüssel bzw. das Token aus der
-  Umgebung seines eigenen Prozesses lesen. Das lässt sich bei einem interaktiven Agenten nicht
-  verhindern. Darum: bei `organization` ein eigener Schlüssel je Rechner mit Ausgabengrenze beim
-  Anbieter, und nach dem Entzug einer Person, die nicht Owner ist, ein neuer Schlüssel
-  (Bedrohungsmodell T-TM-08; Hinweis der Konsole wie in 6.5).
+  https://code.claude.com/docs/en/cli-reference, retrieved 2026-10-10 [verified]). In addition, it
+  reports only the presence of known login locations: `~/.claude/.credentials.json` under Linux,
+  `%USERPROFILE%\.claude\.credentials.json` under Windows, under macOS the keychain with
+  fallback to the same file, `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`
+  (https://code.claude.com/docs/en/authentication, retrieved 2026-10-10 [verified]). The source
+  does not name the keychain entry; the host service therefore checks it only through
+  `claude auth status` [assumed: no documented way without the agent].
+- HD6 never calls the coding agent through the `PATH` of the session user, but only through the
+  absolute path `host_service.claude_bin`, with an environment that the PTY helper sets itself:
+  `HOME` or `USERPROFILE` and `CLAUDE_CONFIG_DIR` of the respective check, no startup files
+  of the session user and a fixed search list as `PATH`, namely the folder in which
+  `host_service.claude_bin` lies according to the configuration (resolved according to 2.2 item 6,
+  not the folder that a link `claude` points to), then `/usr/bin` and `/bin` (Windows:
+  `%SystemRoot%\System32`). Reason for the configured folder: the instance operator chose it,
+  and HD10 checks it anyway as a folder on the way to `host_service.claude_bin`; the folder of the
+  target of a link would depend on how a package manager installs [derived].
+  HD10 checks the file, every folder on the way there, every folder of the search list and, for
+  a script (first line `#!`), the interpreter, so with `#!/usr/bin/env node` both `env` and the
+  `node` that `env` finds in this search list, like the binary of the helper: ownership by
+  a trusted owner, writable for no session user, everything after
+  resolution (2.2 item 6). HD10 checks every folder of the search list so that nobody places a
+  different interpreter in an earlier folder of the list ahead of the checked one. If the
+  search list does not find the interpreter, `host_service.claude_bin` counts as empty for HD6 and
+  the profile (below): HD6 calls nothing, and with `organization` there is no profile `claude`;
+  HD10 still checks the file and its folders. Reason: the `PATH` of the profile
+  continues after the search list; `env` would then find the interpreter in a folder that HD10
+  never checked, and this program would run in every session user [derived]. Modules
+  that the interpreter then loads are not checked by HD10 [derived: their search path depends on
+  the interpreter]; an installation in a folder of a trusted owner also keeps
+  them out of reach. Under Windows, `host_service.claude_bin` is an `.exe`; a batch file
+  (`.cmd`, `.bat`) does not pass HD10, because it carries no `#!` and its interpreter and the
+  programs it starts would otherwise remain unchecked [derived]. Claude Code is available under
+  Windows as `claude.exe` (https://code.claude.com/docs/en/setup, retrieved 2026-10-11
+  [verified]). If the value is empty or counts as empty (the interpreter is missing from the
+  search list, or the path cannot be resolved, 2.2 item 6), HD6 queries only the login locations,
+  and `doctor` warns with `auth_status_unchecked` (no start ban); under macOS the
+  keychain then remains unchecked, and with `organization` there is no profile `claude` (HD7,
+  warning; 11.1). Reason: a session user can replace a program in their `PATH` or in their
+  startup files with one that conceals the subscription login. Residual limit: the same
+  user ID can change the data that the real program reads, for example create a login only
+  between two checks (threat model T-TM-08, RK-84). Both affect only the account
+  of the person themselves, because they share their session user with nobody (T12).
+- With `none` or `organization` and a detected subscription login in a session user
+  (`authMethod` equal to `claude.ai` or `oauth_token`, or one of the credential files present),
+  `bothy-host` does not start (Ruling T2). Before that, it reports the result with every affected
+  session user to the server, and `bothy-host doctor` names the same names on the host
+  (2.2, "Message on a refused start").
+- Enforcement points: every PTY helper runs HD6 in the account of its session user, namely at the
+  start of the service, before every start of a PTY and every `host_service.credential_check_interval`;
+  each time in the home of the session user and in the `CLAUDE_CONFIG_DIR` of the profile `claude`
+  (with `organization` the fixed folder in the home of the same session user, see below). Reason:
+  in a running shell someone can start `claude` and log in with a subscription via `/login`. The
+  login lands in the home of their own session user and reaches no session of another
+  person (T12, T13); but it contradicts the declaration of the owner, and HD6 makes this
+  visible so that the owner corrects the declaration or has the login removed.
+- Hit during operation: the host service rejects new sessions (`open_failed` with
+  `close_detail = subscription_login_detected`), ends all running sessions of the host
+  (`close_reason = host_policy_violation`, same `close_detail`) and reports the result through
+  `report` to the server (HD6 failed, one entry per affected session user with
+  its name, 2.2). The server writes an audit entry (`host.connect`) and sends
+  `host.updated` to all owners; the console shows each of these session users and the person
+  of its assignment. There are sessions again only when HD6 passes in every session user from
+  `host_service.session_users`.
+  Consequence, stated honestly: a single person with a terminal can thus shut down the host for
+  everyone, for example with `/login` in their own session. This stays so, because Ruling T2
+  forbids the start of the host service on a contradiction to the declaration. The standstill ends
+  in one of two ways ([16-operations.md](16-operations.md), section 4.4; threat model T-TM-14): the
+  instance operator removes the login in the named session user, or the owner ends its assignment
+  and the instance operator takes the session user out of the host service with
+  `bothy-host session-user remove` (2.2 item 3); after that, HD6 no longer runs in this account.
+  Only locking the user on the host or only ending its assignment is not enough: its PTY helper
+  keeps running, and HD6 checks every name from `host_service.session_users`.
+- The profile `claude` builds its environment like the runner ([09-agents.md](09-agents.md),
+  section 18.3): with `organization`, `ANTHROPIC_API_KEY` from the state directory (the host
+  service passes the value at start over the local channel to the PTY helper), its own
+  `CLAUDE_CONFIG_DIR` without a subscription login, the OAuth variables removed; with `personal`
+  no API keys; with `none` the profile does not exist. With `organization`, the profile starts
+  exactly the resolved path of `host_service.claude_bin` that HD10 checked, and the `PATH` of the
+  profile begins with the fixed search list of HD6, so that a `#!/usr/bin/env node` finds the same
+  interpreter that HD10 checked; because the value counts as empty without an interpreter in the
+  search list (above), `env` never searches the rest of the `PATH`. If `host_service.claude_bin` is
+  empty or counts as empty, the host service does not offer the profile with `organization` (HD7,
+  warning). Reason: this program runs
+  in every session user and is therefore a location for everyone (2.2 item 6); a `claude` from a
+  `PATH` could lie in a folder that belongs to another account. With `organization`, the PTY
+  helper sets the
+  `CLAUDE_CONFIG_DIR` to the fixed folder `.config/bothy-host/claude` in the home of the
+  session user of the person (under Windows `%USERPROFILE%\.config\bothy-host\claude`); it
+  belongs to this session user and has mode `0700` or an ACL only for it, never a folder
+  for the whole host (Ruling T13, HD11). With `personal`, the session user's own value from its
+  login shell applies (see below); the holder chooses it, and only the holder opens a terminal there
+  (I6). After resolution (2.2 item 6) it must lie in the home of the session user; if it is not
+  set, the default folder of the coding agent in this home applies. Before every start of the
+  profile, the PTY helper queries only this value in a separate login shell of the session user
+  (never another variable, so never a token), checks it
+  and sets it again to exactly this value in the start command after the startup files; this way
+  the coding agent runs with the checked folder. If the value lies outside the home or cannot be
+  resolved (it is missing, or a link points nowhere; 2.2 item 6), the profile does not start
+  (`open_failed` with `close_detail = shared_location`); the profile `shell` remains, so that the
+  holder can correct their startup files or create the folder. In the home, the home itself
+  protects it, which HD11 checks as a location of this session user. Reason: a shared folder would
+  be a location at which a `/login` of one person reaches all others. With `personal` there are
+  only sessions of the holder (I6), but long-running processes of other session users keep running
+  (6.5), and after a change to `organization` other people get sessions again; a readable folder
+  outside the home would give them the subscription login of the holder [derived]. Limit: the
+  value is set by the startup files of the holder. The check catches a misconfiguration, not the
+  holder themselves; in their shell they can start the coding agent with any folder (2.2,
+  limit).
+- With `personal`, `bothy-host` does not touch any login: the service user never opens, reads,
+  copies or passes it on, and the state directory contains only the keys of the host, the bindings
+  of the session users to people (only IDs and names, 2.2) and, with `organization`, the API key.
+  The holder logs in themselves in the account of their
+  session user with the unmodified coding agent, either in a session with
+  `/login` or with a long-lived token from `claude setup-token`, which they store in a file of the
+  session user and set as `CLAUDE_CODE_OAUTH_TOKEN` in its login shell. With `personal`, the
+  profile `claude` starts, through the login shell of the session user, the `claude`
+  from its `PATH`, with the session user's own `CLAUDE_CONFIG_DIR` in the home (above), so that
+  this login applies. The holder chooses program and folder; because only the holder gets sessions
+  on this host (I6), this program is not a location for everyone. The login belongs to the
+  session user of the holder; only the holder reaches it, because I6 gives sessions only to the
+  holder and T12 assigns this session user only to the holder. Evidence
+  (retrieved 2026-10-10): `claude setup-token` "Prints the token to the terminal without saving
+  it" (https://code.claude.com/docs/en/cli-reference [verified]); the token is a one-year
+  OAuth token for environments without a browser that can only make model requests
+  (https://code.claude.com/docs/en/authentication [verified]). Whether `/login` can use the
+  keychain under macOS for a user without a login session, the source does not say [assumed:
+  no; then the path through the token remains]. Whether the token is intended for an interactive
+  session of the same person, the source does not say either; that is the owner question OQ-03
+  (Ruling T10, narrowed in D-W-17).
+- Reason: the product does not collect, store or broker Claude.ai credentials
+  ([10-backend-policy.md](10-backend-policy.md), section 2, consequence 3; I5). A token in
+  the state directory of the host service that the host service passes into the session would be
+  exactly that.
+- Limit: anyone who has a session of the profile `claude` can read the API key or the token from
+  the environment of their own process. This cannot be prevented with an interactive agent.
+  Therefore: with `organization` a separate key per host with a spending limit at the
+  provider, and after the access of a person who is not an owner is revoked, a new key
+  (threat model T-TM-08; console notice as in 6.5).
 
-## 8. Rechte
+## 8. Permissions
 
-### 8.1 Ziel `host` und Zusatzrecht `terminal`
+### 8.1 Target `host` and capability `terminal`
 
-- Neues Ziel `host` in `grants.target_kind` (03). Auf diesem Ziel gibt es keine Stufe
-  (`grants.level` fehlt) und genau ein Zusatzrecht: `terminal`. Empfänger nur `user` und `group`,
-  nie `agent` oder `app` (Check). Das Ziel `host` liegt außerhalb des Baums `instance` ->
-  `space` -> `channel`; eine Freigabe auf die Instanz gibt kein Terminal.
-- Freigaben auf Rechner legt nur der Owner an; `manage` gibt es auf Rechnern nicht.
-- Owner haben `terminal` auf jedem Rechner implizit, außer I6 sperrt (7.3).
+- New target `host` in `grants.target_kind` (03). On this target there is no level
+  (`grants.level` is absent) and exactly one capability: `terminal`. Recipients only `user` and
+  `group`, never `agent` or `app` (check). The target `host` lies outside the tree `instance` ->
+  `space` -> `channel`; a grant on the instance gives no terminal.
+- Only the owner creates grants on hosts; `manage` does not exist on hosts.
+- Owners have `terminal` implicitly on every host, unless I6 blocks it (7.3).
 
-### 8.2 Schutzregeln
+### 8.2 Protection rules
 
-Die Regeln stehen in [07-rechte.md](07-rechte.md):
+The rules are in [07-permissions.md](07-permissions.md):
 
-- **SR10 Terminal nur auf eigenem Rechner** (Ruling T1): Wer nicht Owner ist, bekommt ein Terminal
-  nur auf einem Rechner, dessen Inhaber er ist (`hosts.assigned_user_id`), oder auf seiner eigenen
-  bereiten Dev-Umgebung (`hosts.dev_environment_id`, Etappe "Mehrbenutzer-Dev-Umgebung"). Auf dem
-  Server-Host nur Owner. Freigaben an andere sind anlegbar; die Vorschau sagt, dass sie nicht
-  wirken (Hinweis `terminal_not_effective`). Grund: [21-dev-isolation.md](21-dev-isolation.md)
-  verwirft den OS-Benutzer als alleinige Grenze zwischen Personen, und ein gemeinsames Home teilt
-  LLM-Anmeldungen.
+- **SR10 Terminal only on own host** (Ruling T1): a non-owner gets a terminal
+  only on a host whose assignee they are (`hosts.assigned_user_id`), or on their own
+  ready dev environment (`hosts.dev_environment_id`, milestone "Multi-user dev environment"). On
+  the server host only owners. Grants to others can be created; the preview says that they do not
+  take effect (hint `terminal_not_effective`). Reason: [21-dev-isolation.md](21-dev-isolation.md)
+  rejects the OS user as the sole boundary between people, and a shared home shares
+  LLM logins.
 - **SR11 I6** (7.3).
-- **SR12 Eigener Sitzungsbenutzer** (Ruling T12): `terminal.open` und `terminal.attach` nur mit
-  einer gültigen Zuordnung der Person zu einem Sitzungsbenutzer dieses Rechners
-  (`host_session_users`), dessen Namen der Rechner meldet (`hosts.reported_session_users`), auch
-  für Owner; sonst `terminal_denied` mit `reason: no_session_user`.
-  Grund: Ohne eigenen Sitzungsbenutzer liefe die Sitzung in einem Konto, dessen Anmeldungen auch
-  ein anderer Mensch nutzt (2.2).
-- Agenten und Apps öffnen nie ein Terminal: Die Aktionen verlangen einen Menschen in einer Sitzung;
-  ein Agent, den Prompt-Injection steuert, erreicht keinen Rechner.
+- **SR12 Own session user** (Ruling T12): `terminal.open` and `terminal.attach` only with
+  a valid assignment of the person to a session user of this host
+  (`host_session_users`) whose name the host reports (`hosts.reported_session_users`), also
+  for owners; otherwise `terminal_denied` with `reason: no_session_user`.
+  Reason: without a separate session user, the session would run in an account whose logins
+  another person also uses (2.2).
+- Agents and apps never open a terminal: the actions require a person in a session;
+  an agent that is controlled by prompt injection reaches no host.
 
-### 8.3 Entzug
+### 8.3 Revocation
 
-Entzug der Freigabe, Ablauf, Austritt aus der Gruppe, Entzug der Owner-Rolle, Sperre der Person
-oder des Geräts, Widerruf oder Ende der Anmeldesitzung, Abmeldung, Sperre oder Neukopplung des
-Rechners, Ende der Zuordnung des Sitzungsbenutzers oder ein `report` ohne seinen Namen (SR12) und
-ein Wechsel, der SR10 oder I6 verletzt: Laufende Sitzungen enden sofort (fail closed
-wie Ruling L23). Der Server schließt die Verbindungen (`4100`) und weist den Host-Dienst an, die
-Sitzung zu beenden; der PTY-Helfer beendet den ganzen Prozessbaum (6.5). `close_reason` nennt den
-Grund (Abschnitt 10.3).
+Revocation of the grant, expiry, leaving the group, removal of the owner role, disabling of the
+person or revocation of the device, revocation or end of the login session, logout, disabling or
+re-pairing of the host, end of the assignment of the session user or a `report` without its name
+(SR12), and a change that violates SR10 or I6: running sessions end immediately (fail closed
+like Ruling L23). The server closes the connections (`4100`) and instructs the host service to end
+the session; the PTY helper ends the whole process tree (6.5). `close_reason` names the
+reason (section 10.3).
 
-### 8.4 Owner auf dem Rechner eines anderen Menschen
+### 8.4 Owner on another person's host
 
-Öffnet oder hängt ein Owner auf einem Rechner an, dessen `hosts.assigned_user_id` ein anderer
-Mensch ist, zeigt der Client vor dem Step-up eine Warnung: Die Sitzung läuft zwar im eigenen
-Sitzungsbenutzer des Owners (T12), aber auf einem Rechner, den dieser Mensch nutzt und einrichtet; mit einer
-lokalen Rechteausweitung können seine Prozesse sie mitlesen und steuern (2.2, Grenze).
-Erst nach ausdrücklicher Bestätigung fordert der Client den Step-up an. Der Server setzt im
-Audit-Eintrag von `terminal.open` bzw. `terminal.attach` selbst `foreign_assignee = true`, weil er
-Inhaber und Person kennt. Grund: SR10 schützt Nicht-Owner voreinander,
-aber Owner haben `terminal` überall; ohne Warnung würde ein Owner Passwörter auf einem Rechner
-tippen, den ein anderer Mensch kontrolliert, und die Trennung der Sitzungsbenutzer ist keine
-vollständige Grenze (Bedrohungsmodell T-TM-12).
+If an owner opens or attaches on a host whose `hosts.assigned_user_id` is another
+person, the client shows a warning before the step-up: the session does run in the owner's own
+session user (T12), but on a host that this person uses and sets up; with a
+local privilege escalation, that person's processes can read along and control it (2.2, limit).
+Only after explicit confirmation does the client request the step-up. The server itself sets
+`foreign_assignee = true` in the audit entry of `terminal.open` or `terminal.attach`, because it
+knows the assignee and the person. Reason: SR10 protects non-owners from each other,
+but owners have `terminal` everywhere; without a warning, an owner would type passwords on a host
+that another person controls, and the separation of the session users is not a
+complete boundary (threat model T-TM-12).
 
-## 9. Mehrere Knoten
+## 9. Multiple nodes
 
-Mit `cluster.mode = multi` ([02-architektur.md](02-architektur.md), Abschnitt 16) gilt (Ruling T6):
+With `cluster.mode = multi` ([02-architecture.md](02-architecture.md), section 16), the following
+applies (Ruling T6):
 
-1. Die Steuerverbindung des Host-Dienstes landet auf einem beliebigen Knoten. Der Knoten, der
-   `terminal.open` bearbeitet, schickt die Anweisung `session.open` über `NOTIFY ephemeral` nur
-   mit IDs an den Knoten der Steuerverbindung (03, Abschnitt 6.6).
-2. Der Host-Dienst öffnet je Sitzung eine eigene Datenverbindung auf
-   `/api/v1/hosts/sessions/{session_id}/stream`; das Gerät verbindet sich mit
+1. The control connection of the host service lands on any node. The node that
+   handles `terminal.open` sends the instruction `session.open` through `NOTIFY ephemeral`, only
+   with IDs, to the node of the control connection (03, section 6.6).
+2. The host service opens a separate data connection per session on
+   `/api/v1/hosts/sessions/{session_id}/stream`; the device connects to
    `/api/v1/terminal/sessions/{session_id}/stream`.
-3. Der Proxy leitet beide Pfade derselben Sitzung per Hash über die Sitzungs-ID auf denselben
-   Knoten (Betriebsanforderung in [16-betrieb.md](16-betrieb.md), Abschnitt 4.4). Dort verbindet
-   das Relais die beiden Seiten im Speicher.
-4. Landet eine Seite auf einem anderen Knoten, findet sie innerhalb von `terminal.open_timeout`
-   keine Gegenseite und schließt mit `4102`; der Knoten zählt das in der Kennzahl
-   `bothy.terminal.relay.unpaired` ([signals.md](../observability/signals.md)) und meldet `/readyz`
-   weiter bereit. Grund: Eine Fehlkonfiguration des Proxys soll
-   sichtbar scheitern, nicht still Daten über einen Broker leiten.
+3. The proxy routes both paths of the same session by a hash over the session ID to the same
+   node (operational requirement in [16-operations.md](16-operations.md), section 4.4). There
+   the relay connects the two sides in memory.
+4. If one side lands on another node, it finds no counterpart within `terminal.open_timeout`
+   and closes with `4102`; the node counts this in the metric
+   `bothy.terminal.relay.unpaired` ([signals.md](../observability/signals.md)) and keeps reporting
+   `/readyz` as ready. Reason: a misconfiguration of the proxy should
+   fail visibly, not silently route data through a broker.
 
-Grund: [02-architektur.md](02-architektur.md) verbietet einen Broker, und das Ereignis-Log taugt
-nicht für Byte-Ströme. Mit einem Knoten ist alles trivial.
+Reason: [02-architecture.md](02-architecture.md) forbids a broker, and the event log is not suitable
+for byte streams. With one node, everything is trivial.
 
-## 10. Audit, Ereignisse, Datenschutz
+## 10. Audit, events, privacy
 
 ### 10.1 Audit
 
-| Aktion | Wann | Details (`audit_details.v1`) |
+| Action | When | Details (`audit_details.v1`) |
 |---|---|---|
-| `host.manage` | jede Änderung | `host_id`, Vorgang (`create`, `update`, `pairing_code`, `confirm`, `llm_credentials`, `state`, `session_user`), alte und neue Werte als Codes, bei `session_user` Person und Name des Sitzungsbenutzers je Zuordnung oder Ende, Fingerabdrücke bei Neukopplung, `reason` |
-| `host.pair` | Erlaubnis und Ablehnung | `host_id`, Fingerabdruck |
-| `host.connect` | Ablehnungen; Erlaubnis nur beim Wechsel von `reported_is_server_host`, `reported_doctor` oder `reported_session_users`; zweite Steuerverbindung (3.4) | `host_id`, Prüfcodes, bei HD6 und HD11 mit dem Namen jedes betroffenen Sitzungsbenutzers, hinzugekommene und weggefallene Namen der Sitzungsbenutzer, Code `duplicate_connection` |
-| `terminal.open`, `terminal.attach` | Erlaubnis und Ablehnung | `host_id`, `session_id`, `profile`, `device_id`, `pin_changed`, `foreign_assignee` |
-| `terminal.close` | Erlaubnis und Ablehnung | `session_id`, wer schloss |
-| `terminal.stream` | Ablehnungen (z. B. `identify` von einem Gerät, das nicht zur aktuellen Marke gehört) | `session_id`, `device_id`, Grund-Code |
-| `terminal.terminate` | jedes Ende durch den Server oder den Rechner | `session_id`, `close_reason`, `close_detail`, `bytes_in`, `bytes_out`, Dauer |
+| `host.manage` | every change | `host_id`, operation (`create`, `update`, `pairing_code`, `confirm`, `llm_credentials`, `state`, `session_user`), old and new values as codes, with `session_user` the person and the name of the session user per assignment or end, fingerprints on re-pairing, `reason` |
+| `host.pair` | allow and deny | `host_id`, fingerprint |
+| `host.connect` | denials; allow only on a change of `reported_is_server_host`, `reported_doctor` or `reported_session_users`; second control connection (3.4) | `host_id`, check codes, with HD6 and HD11 with the name of every affected session user, added and removed names of the session users, code `duplicate_connection` |
+| `terminal.open`, `terminal.attach` | allow and deny | `host_id`, `session_id`, `profile`, `device_id`, `pin_changed`, `foreign_assignee` |
+| `terminal.close` | allow and deny | `session_id`, who closed |
+| `terminal.stream` | denials (for example `identify` from a device that does not belong to the current token) | `session_id`, `device_id`, reason code |
+| `terminal.terminate` | every end by the server or the host | `session_id`, `close_reason`, `close_detail`, `bytes_in`, `bytes_out`, duration |
 
-Nie im Audit: Terminal-Inhalte, Befehle, Umgebungsvariablen, Pfade, Profil-Befehlszeilen.
+Never in the audit: terminal content, commands, environment variables, paths, profile command lines.
 
-### 10.2 Ereignisse
+### 10.2 Events
 
-Dauerhaft im Ereignis-Log ([05-aktionen.md](05-aktionen.md), Abschnitt 6): `host.updated` (an alle
-mit `host.read`) und `terminal_session.changed` (persönlich an die Person der Sitzung).
-Kurzlebig: `host.presence_changed` (verbunden, getrennt). Der Strom selbst ist kein Ereignis und
-steht nie im Ereignis-Log. Grund: Das Log ist für Zustände, nicht für Byte-Ströme, und alles im Log
-lesen Server und Sicherungen im Klartext.
+Durable in the event log ([05-actions.md](05-actions.md), section 6): `host.updated` (to everyone
+with `host.read`) and `terminal_session.changed` (personally to the person of the session).
+Ephemeral: `host.presence_changed` (connected, disconnected). The stream itself is not an event and
+never appears in the event log. Reason: the log is for states, not for byte streams, and the server
+and the backups read everything in the log in plain text.
 
-### 10.3 Gründe für das Ende (`terminal_sessions.close_reason`)
+### 10.3 Reasons for ending (`terminal_sessions.close_reason`)
 
-| Code | Auslöser |
+| Code | Trigger |
 |---|---|
-| `client_closed` | Rahmen `close` oder `terminal.close` durch die Person |
-| `closed_by_owner` | `terminal.close` durch einen Owner |
-| `process_exited` | Prozess der PTY beendet |
-| `idle_timeout`, `max_duration`, `detach_expired` | Grenzen aus 6.2 und 6.3 |
-| `access_revoked` | Entzug nach 8.3 (Freigabe, Gruppe, Owner-Rolle, SR10, Ende der Zuordnung oder Name nicht mehr gemeldet nach SR12) |
-| `i6_violation` | Wechsel der Erklärung oder des Inhabers (7.3) |
-| `host_disabled`, `host_retired`, `host_rekeyed` | Zustandswechsel des Rechners (3.1, 3.3) |
-| `host_restarted` | Neustart des Host-Dienstes: er nennt die Sitzung bei der Anmeldung nicht mehr (6.2) |
-| `user_disabled`, `device_revoked`, `session_revoked`, `logout` | Identität (08) |
-| `open_failed` | Handshake, Marke, Zeitüberschreitung beim Öffnen oder Ablehnung durch den Host-Dienst; Code in `close_detail` |
-| `host_policy_violation` | Prüfung des Host-Dienstes während des Betriebs nicht bestanden (HD6, HD10, HD11; 2.2, 7.4); Code in `close_detail` |
+| `client_closed` | frame `close` or `terminal.close` by the person |
+| `closed_by_owner` | `terminal.close` by an owner |
+| `process_exited` | process of the PTY ended |
+| `idle_timeout`, `max_duration`, `detach_expired` | limits from 6.2 and 6.3 |
+| `access_revoked` | revocation according to 8.3 (grant, group, owner role, SR10, end of the assignment or name no longer reported according to SR12) |
+| `i6_violation` | change of the declaration or of the holder (7.3) |
+| `host_disabled`, `host_retired`, `host_rekeyed` | state change of the host (3.1, 3.3) |
+| `host_restarted` | restart of the host service: it no longer names the session at login (6.2) |
+| `user_disabled`, `device_revoked`, `session_revoked`, `logout` | identity (08) |
+| `open_failed` | handshake, token, timeout on opening or rejection by the host service; code in `close_detail` |
+| `host_policy_violation` | check of the host service failed during operation (HD6, HD10, HD11; 2.2, 7.4); code in `close_detail` |
 
-`close_detail` nimmt nur Codes aus einer geschlossenen Liste: `token_invalid`, `token_expired`,
+`close_detail` takes only codes from a closed list: `token_invalid`, `token_expired`,
 `token_replayed`, `handshake_failed`, `profile_unknown`, `session_user_unknown`, `session_user_mismatch`,
 `server_host_owner_only`, `local_confirm_denied`, `subscription_login_detected`, `helper_untrusted`,
 `shared_location`, `pty_failed`, `open_timeout`.
 
-### 10.4 Datenschutz
+### 10.4 Privacy
 
-- Inhaltsaufzeichnung gibt es nicht. `terminal_sessions` hält nur Metadaten mit Aufbewahrungsklasse
-  `security` ([20-datenschutz.md](20-datenschutz.md)).
-- Telemetrie: nur Zähler und Dauer ohne IDs von Menschen und ohne Rechnernamen; keine Spans je
-  Rahmen.
-- Kein Agent liest Terminal-Inhalte; Suche, Push und Lauf-Kontext kennen das Terminal nicht.
-- Ob Nachweispflichten eine Aufzeichnung verlangen, ist eine Owner-Frage
-  (Voreinstellung: nein, nur Metadaten).
+- There is no content recording. `terminal_sessions` holds only metadata with retention class
+  `security` ([20-privacy.md](20-privacy.md)).
+- Telemetry: only counters and durations without IDs of people and without host names; no spans
+  per frame.
+- No agent reads terminal content; search, push and run context do not know the terminal.
+- Whether record-keeping obligations require a recording is an owner question
+  (default: no, only metadata).
 
-## 11. Profile
+## 11. Profiles
 
 ### 11.1 Definition
 
-Profile stehen in der Konfiguration des Host-Dienstes (`host_service.profiles`), nicht im Server.
-Der Server kennt nur Name, Anzeigename und Art aus der Meldung des Host-Dienstes
-(`hosts.reported_profiles`, Schema `host_profiles.v1`). Ein Client kann keine Befehlszeile
-schicken.
+Profiles are in the configuration of the host service (`host_service.profiles`), not in the server.
+The server knows only name, display name and kind from the report of the host service
+(`hosts.reported_profiles`, schema `host_profiles.v1`). A client cannot send a command
+line.
 
-| Profil | Art | Start |
+| Profile | Kind | Start |
 |---|---|---|
-| `shell` | `shell` | Login-Shell des Sitzungsbenutzers, Arbeitsordner sein Home |
-| `claude` | `claude` | unveränderter Coding-Agent: bei `organization` genau `host_service.claude_bin` (leer oder als leer geltend nach 7.4: kein Profil `claude`, HD7 mit Warnung), bei `personal` `claude` über die Login-Shell des Inhabers (7.4); in einem Arbeitsordner, den die Person aus den Arbeitsordnern ihres eigenen Sitzungsbenutzers in `host_service.claude_workdirs` wählt (2.2 Punkt 6), gestartet im aufgelösten Pfad; Umgebung nach 7.4 |
-| weitere | `command` | fester Befehl aus der Konfiguration mit absolutem Programmpfad (HD7, HD11) |
+| `shell` | `shell` | login shell of the session user, working directory its home |
+| `claude` | `claude` | unmodified coding agent: with `organization` exactly `host_service.claude_bin` (empty or counting as empty according to 7.4: no profile `claude`, HD7 with warning), with `personal` `claude` through the login shell of the holder (7.4); in a working directory that the person chooses from the working directories of their own session user in `host_service.claude_workdirs` (2.2 item 6), started in the resolved path; environment according to 7.4 |
+| others | `command` | fixed command from the configuration with an absolute program path (HD7, HD11) |
 
-Die Umgebung jedes Profils ist eine Erlaubnisliste wie beim Runner (09, Abschnitt 18.2) plus
-`TERM`. Login-Shells (Profil `shell`, Profil `claude` bei `personal`, 7.4) lesen danach die
-eigenen Startdateien des Sitzungsbenutzers; was dort steht, gehört ihm, nicht dem Host-Dienst.
-Der Arbeitsordner des Profils `claude` steht als Index in der Anfrage
-(`workdir_index`), nie als Pfad. Der Index zählt nur in der Liste des eigenen Sitzungsbenutzers in
-`hosts.reported_session_users`, die nur Anzeigenamen trägt; die Marke trägt ihn als `wdi`, und der
-Host-Dienst löst ihn in genau der Liste von `osu` auf, die er gemeldet hat, also nach HD7 (2.2
-Punkt 6, 5.3, Ruling T13).
+The environment of every profile is an allow list like for the runner (09, section 18.2) plus
+`TERM`. Login shells (profile `shell`, profile `claude` with `personal`, 7.4) then read the
+session user's own startup files; what is there belongs to the session user, not to the host
+service. The working directory of the profile `claude` is in the request as an index
+(`workdir_index`), never as a path. The index counts only in the list of the person's own session
+user in `hosts.reported_session_users`, which carries only display names; the token carries it as
+`wdi`, and the host service resolves it in exactly the list of `osu` that it reported, that is,
+according to HD7 (2.2 item 6, 5.3, Ruling T13).
 
-### 11.2 Darstellung
+### 11.2 Rendering
 
-Escape-Sequenzen, die das Gerät verlassen oder Daten zurücksenden, sind im Renderer standardmäßig
-gesperrt: OSC 52 (Zwischenablage), OSC 8 (Hyperlinks öffnen ohne Bestätigung), Antworten auf
-Abfragen von Fenstertiteln. Hyperlinks zeigt die Ansicht mit Ziel und öffnet sie erst nach Klick und
-Bestätigung (SEC-TERM-6 in 19).
+Escape sequences that leave the device or send data back are blocked by default in the renderer:
+OSC 52 (clipboard), OSC 8 (opening hyperlinks without confirmation), answers to queries of window
+titles. The view shows hyperlinks with their target and opens them only after a click and
+confirmation (SEC-TERM-6 in 19).
 
-### 11.3 Claude-Code-Sitzungen
+### 11.3 Claude Code sessions
 
-"Claude-Code-Sitzung" heißt in dieser Fassung: interaktives `claude` im Terminal, getrennt vom
-Runner (Ruling T5). Einen Thread des Runners im Terminal übernehmen geht erst, wenn Runner und
-Host-Dienst in einer Dev-Umgebung als derselbe Benutzer laufen (Etappe nach V2). Grund: Der Runner
-sperrt Sitzungen und läuft mit Geheimnissen des Betreibers ([21-dev-isolation.md](21-dev-isolation.md),
-Abschnitt 1).
+In this version, "Claude Code session" means: interactive `claude` in the terminal, separate from
+the runner (Ruling T5). Taking over a thread of the runner in the terminal is possible only once
+the runner and the host service run as the same user in a dev environment (milestone after V2).
+Reason: the runner locks sessions and runs with secrets of the instance operator
+([21-dev-isolation.md](21-dev-isolation.md), section 1).
 
 ## 12. Clients
 
-| Client | Etappe | Besonderheit |
+| Client | Milestone | Special feature |
 |---|---|---|
-| Desktop (macOS, Windows) | M4 | Hardware-Tastatur, Tastenkürzel ohne Konflikt mit der Shell (Kürzel der App nur mit Modifikator der Plattform) |
-| Mobil (iOS, Android) | M5 | Sondertasten-Leiste: Esc, Tab, Ctrl, Alt, Pfeile, `\|`, `~`, `/`, `-`; Hardware-Tastatur |
-| Web-Konsole | M6 | Step-up nur per Passkey mit `userVerification = required` ([ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)); gleiche CSP (19, Abschnitt 5) |
+| Desktop (macOS, Windows) | M4 | hardware keyboard, keyboard shortcuts without conflict with the shell (app shortcuts only with the platform modifier) |
+| Mobile (iOS, Android) | M5 | extra keys bar: Esc, Tab, Ctrl, Alt, arrows, `\|`, `~`, `/`, `-`; hardware keyboard |
+| Web console | M6 | step-up only by passkey with `userVerification = required` ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)); same CSP (19, section 5) |
 
-Ein Flutter-Widget für alle Clients. Renderer: Paket `xterm` von TerminalStudio, MIT, Version
-4.0.0, für Android, iOS, Linux, macOS, Web und Windows (https://pub.dev/packages/xterm, abgerufen
-2026-10-10 [belegt]). Die letzte Veröffentlichung liegt laut pub.dev rund zwei Jahre zurück
-[belegt]; das Bau-Ticket prüft vor der Aufnahme Pflegezustand und offene Sicherheitsmeldungen und
-hält die Sperren aus 11.2 mit eigenen Tests (TM-T14).
+One Flutter widget for all clients. Renderer: package `xterm` by TerminalStudio, MIT, version
+4.0.0, for Android, iOS, Linux, macOS, Web and Windows (https://pub.dev/packages/xterm, retrieved
+2026-10-10 [verified]). According to pub.dev, the last release was about two years ago
+[verified]; before adopting it, the build ticket checks the maintenance state and open security
+advisories, and it holds the blocks from 11.2 with its own tests (TM-T14).
 
-Jeder Client zeigt: Sitzungsliste je Rechner mit Zustand, Wiederanhängen, Fingerabdruck des
-Rechners, Abzeichen der LLM-Anmeldung ("Persönlich", "Organisation", "Keine"), Restzeit bis zur
-Höchstdauer.
+Every client shows: session list per host with state, reattach, fingerprint of the
+host, badge of the LLM login ("Personal", "Organization", "None"), remaining time until the
+maximum duration.
 
-PTY auf dem Rechner: Unix-PTY auf macOS und Linux; Windows über ConPTY (`CreatePseudoConsole`),
-verfügbar ab Windows 10 Version 1809 und Windows Server 2019
-(https://learn.microsoft.com/en-us/windows/console/createpseudoconsole, abgerufen 2026-10-10
-[belegt]). Die Mindestversion Windows 10 2004 der Apps (Ruling L12) liegt darüber.
+PTY on the host: Unix PTY on macOS and Linux; Windows through ConPTY (`CreatePseudoConsole`),
+available from Windows 10 version 1809 and Windows Server 2019
+(https://learn.microsoft.com/en-us/windows/console/createpseudoconsole, retrieved 2026-10-10
+[verified]). The minimum version Windows 10 2004 of the apps (Ruling L12) is above that.
 
-## 13. Fehler
+## 13. Errors
 
-| Problem-Code | Status | Wann |
+| Problem code | Status | When |
 |---|---|---|
-| `terminal_denied` | `403` | Recht vorhanden, aber Schutzregel oder Grenze sperrt; `reason`: `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `no_session_user`, `session_limit`, `profile_unknown` |
-| `step_up_required` | `401` | Step-up fehlt, ist älter als `terminal.step_up_max_age`, schon verbraucht oder in der Konsole nicht per Passkey (`reason: passkey_required`) |
-| `host_unavailable` | `409` | Rechner nicht `active` oder Host-Dienst nicht verbunden |
-| `fingerprint_mismatch` | `409` | Bestätigung mit falschem Fingerabdruck |
-| `i6_violation` | `409` | Änderung würde I6 verletzen (`hint`) |
-| `conflict` | `409` | Zuordnung eines Sitzungsbenutzers, der auf dem Rechner schon einer Person gehört oder gehörte, oder zweite gültige Zuordnung derselben Person (`reason: session_user_taken`, 2.2) |
-| `validation_failed` | `400` | Zuordnung eines Namens, den der Rechner nicht meldet (`errors[].code = session_user_not_on_host`, 2.2 Punkt 5) |
-| `not_found` | `404` | kein Leserecht auf den Rechner oder die Sitzung |
+| `terminal_denied` | `403` | permission present, but a guard rule or a limit blocks; `reason`: `not_host_assignee`, `server_host_owner_only`, `i6_holder_only`, `no_session_user`, `session_limit`, `profile_unknown` |
+| `step_up_required` | `401` | step-up missing, older than `terminal.step_up_max_age`, already consumed or, in the console, not by passkey (`reason: passkey_required`) |
+| `host_unavailable` | `409` | host not `active` or host service not connected |
+| `fingerprint_mismatch` | `409` | confirmation with a wrong fingerprint |
+| `i6_violation` | `409` | change would violate I6 (`hint`) |
+| `conflict` | `409` | assignment of a session user that on the host already belongs or belonged to a person, or a second valid assignment of the same person (`reason: session_user_taken`, 2.2) |
+| `validation_failed` | `400` | assignment of a name that the host does not report (`errors[].code = session_user_not_on_host`, 2.2 item 5) |
+| `not_found` | `404` | no read permission on the host or the session |
 
-Schließ-Codes der Terminal-Kanäle (Quelle der Namen und Client-Reaktionen auf Englisch:
-`x-close-codes` der Kanäle `terminalStream`, `hostControl` und `hostData` in
-[asyncapi.yaml](../api/asyncapi.yaml)); dazu gelten die dort genannten Codes aus 04 Abschnitt 6.4:
+Close codes of the terminal channels (source of the names and client reactions in English:
+`x-close-codes` of the channels `terminalStream`, `hostControl` and `hostData` in
+[asyncapi.yaml](../api/asyncapi.yaml)); in addition, the codes from 04 section 6.4 named there apply:
 
-| Code | Name | Kanal | Bedeutung und Reaktion |
+| Code | Name | Channel | Meaning and reaction |
 |---|---|---|---|
-| `4100` | `terminal_closed` | Strom, Datenverbindung | Sitzung beendet, Grund in `close_reason` (10.3); nicht neu verbinden, der Host-Dienst beendet die PTY |
-| `4101` | `terminal_token_stale` | Strom | Sitzungs-Marke abgelaufen (`token_expired`) oder schon benutzt (`token_replayed`); mit neuem Step-up neu öffnen bzw. anhängen (5.3) |
-| `4102` | `terminal_host_unavailable` | Strom | Gegenseite fehlt (Host-Dienst getrennt oder auf diesem Knoten keine Gegenseite, 9); Sitzung `detached`, später anhängen |
-| `4103` | `terminal_replaced` | Strom | ein anderes Gerät hat angehängt (6.2); nicht von selbst neu verbinden |
-| `4104` | `terminal_handshake_failed` | Strom | jeder andere Fehler der Marke oder des Handshakes (5.3); harte Warnung, kein neuer Versuch |
-| `4110` | `host_unpaired` | Steuer- und Datenverbindung | Schlüssel unbekannt oder durch eine Neukopplung ersetzt (3.3); anhalten, `bothy-host pair` erneut ausführen |
-| `4111` | `host_disabled` | Steuer- und Datenverbindung | Rechner `disabled` oder `retired` (3.1); alle PTYs beenden, erst nach langem Backoff neu verbinden |
-| `4112` | `host_duplicate` | Steuer- und Datenverbindung | zweite lebende Steuerverbindung mit denselben Schlüsseln (3.4); Rechner gesperrt, nicht neu verbinden |
-| `4113` | `host_auth_failed` | Steuer- und Datenverbindung | Signatur über die Herausforderung aus `hello` ungültig oder zu spät (`terminal.host_auth_timeout`); Uhr und Schlüssel prüfen, mit Backoff neu verbinden |
-| `4114` | `host_version_unsupported` | Steuer- und Datenverbindung | Version unter der Mindestversion ([18-release.md](18-release.md)); Host-Dienst aktualisieren, nicht neu verbinden |
+| `4100` | `terminal_closed` | stream, data connection | session ended, reason in `close_reason` (10.3); do not reconnect, the host service ends the PTY |
+| `4101` | `terminal_token_stale` | stream | terminal session token expired (`token_expired`) or already used (`token_replayed`); open or attach again with a new step-up (5.3) |
+| `4102` | `terminal_host_unavailable` | stream | counterpart missing (host service disconnected or no counterpart on this node, 9); session `detached`, attach later |
+| `4103` | `terminal_replaced` | stream | another device has attached (6.2); do not reconnect automatically |
+| `4104` | `terminal_handshake_failed` | stream | any other error of the token or of the handshake (5.3); hard warning, no new attempt |
+| `4110` | `host_unpaired` | control and data connection | key unknown or replaced by a re-pairing (3.3); stop, run `bothy-host pair` again |
+| `4111` | `host_disabled` | control and data connection | host `disabled` or `retired` (3.1); end all PTYs, reconnect only after a long backoff |
+| `4112` | `host_duplicate` | control and data connection | second live control connection with the same keys (3.4); host disabled, do not reconnect |
+| `4113` | `host_auth_failed` | control and data connection | signature over the challenge from `hello` invalid or too late (`terminal.host_auth_timeout`); check clock and keys, reconnect with backoff |
+| `4114` | `host_version_unsupported` | control and data connection | version below the minimum version ([18-release.md](18-release.md)); update the host service, do not reconnect |
 
 ## 14. Tests
 
-| ID | Test | Erwartet |
+| ID | Test | Expected |
 |---|---|---|
-| TM-T01 | Konformität des Handshakes in Go und Dart mit den Einträgen für `Noise_NK_25519_ChaChaPoly_SHA256` aus den Vektor-Dateien in 5.2 | gleiche Bytes |
-| TM-T02 | Gegenseitiger Handshake Go gegen Dart, mit falschem Prolog, falschem statischem Schlüssel, vertauschter Rechner-ID | nur der richtige gelingt |
-| TM-T03 | Relais spielt Nachricht 1 erneut ein (gleiche Marke) | Host-Dienst lehnt ab (`token_replayed`, `4101`), keine zweite PTY |
-| TM-T04 | Marke mit falschem `aud`, `sid`, `cek`, fremder `kid`, `typ` der Aufruf-Marke; abgelaufene Marke | keine PTY; `4104` mit `token_invalid`; abgelaufen `4101` mit `token_expired` |
-| TM-T05 | Nachricht 1 und 2 vollständig, aber kein `start` | keine PTY |
-| TM-T06 | Relais-Mitschnitt, Server-Logs, Datenbank-Abzug und Telemetrie nach einer Sitzung mit Kanarienwert | Kanarie nirgends (19, SEC-T10) |
-| TM-T07 | `terminal.open` ohne Step-up, mit zu altem, mit schon verbrauchtem, in der Konsole mit Passwort-Step-up | `401 step_up_required` |
-| TM-T08 | Nicht-Owner mit Freigabe auf fremdem Rechner, auf eigenem Rechner, auf dem Server-Host | `403 terminal_denied` `not_host_assignee`, erlaubt, `403 terminal_denied` `server_host_owner_only` |
-| TM-T09 | I6: Freigabe an zweiten Menschen, Freigabe an Gruppe, Umschalten auf `personal` mit bestehender Freigabe an andere, zweiter Owner öffnet | `409 i6_violation` bzw. `403 terminal_denied` `i6_holder_only` |
-| TM-T10 | Entzug je Art aus 8.3 während einer aktiven Sitzung, in der ein Hintergrundprozess mit `setsid` bzw. `nohup` (Windows: abgelöster Kindprozess) läuft | Verbindungen geschlossen, PTY und Hintergrundprozess beendet, `close_reason` richtig, Audit |
-| TM-T11 | Leerlauf, Höchstdauer, Trennung über `terminal.detach_grace`, manipulierter Host-Dienst ohne Leerlauf-Meldung | Ende mit richtigem Grund, auch ohne Meldung des Host-Dienstes |
-| TM-T12 | Wiederanhängen: anderes Gerät ohne Step-up, gleiches Gerät innerhalb und nach `terminal.quick_reattach_window`, Web-Konsole innerhalb des Fensters ohne Passkey | `401`, erlaubt, `401`, `401` mit `reason: passkey_required` |
-| TM-T13 | `bothy-host doctor` als root, in Gruppe `sudo`, in Gruppe `docker`, mit schreibbarem Docker-Socket, mit passwortlosem sudo, mit Abo-Anmeldung bei `organization`, mit gleichem Dienst- und Sitzungsbenutzer, mit leerem `host_service.session_users`, mit zwei gleichen Sitzungsbenutzern | Start verweigert mit Code |
-| TM-T14 | Renderer: OSC 52, OSC 8, Titel-Abfrage | nichts in die Zwischenablage, kein Link ohne Bestätigung, keine Antwort |
-| TM-T15 | Zwei api-Knoten mit Hash-Routing; dann ohne Hash-Routing | Sitzung läuft; ohne Routing `4102` und Kennzahl |
-| TM-T16 | Chaos: Neustart des Servers, Netzabbruch des Geräts, Netzabbruch des Host-Dienstes während einer Sitzung; danach Neustart des Host-Dienstes (`bothy-host restart`) während einer Sitzung, in der ein Hintergrundprozess läuft | PTY überlebt bis `terminal.detach_grace`, Wiederanhängen spielt den Rückblick ein; nach dem Neustart des Host-Dienstes endet die Sitzung mit `host_restarted`, PTY und Hintergrundprozess sind beendet, und das Anhängen scheitert (6.2) |
-| TM-T17 | Agent- oder App-Token ruft eine Terminal-Aktion | `403 forbidden` mit `reason` `subject_kind_not_allowed`, Audit |
-| TM-T18 | Neukopplung: Gerät mit gepinntem alten Schlüssel öffnet | harte Warnung, Verbindung erst nach Bestätigung, Audit `pin_changed` |
-| TM-T19 | Kopplung mit falschem Fingerabdruck bis `terminal.fingerprint_max_attempts` | Rechner zurück auf `pairing`, Schlüssel verworfen |
-| TM-T20 | Kopplungs-Code zweimal, abgelaufen, mit falscher Prüfsumme | abgelehnt; falsche Prüfsumme ohne Datenbankzugriff |
-| TM-T21 | Stillstand durch HD6 (T-TM-14): (a) in einer Shell-Sitzung auf einem Rechner mit `organization` meldet sich eine erste Person per Abo an; danach öffnet eine zweite Person; (b) auch die zweite Person meldet sich in ihrem Konto per Abo an; (c) der Betreiber entfernt die Anmeldung der zweiten Person, sperrt den Sitzungsbenutzer der ersten nur auf dem Rechner, danach beendet der Owner ihre Zuordnung; (d) der Betreiber nimmt diesen Sitzungsbenutzer mit `bothy-host session-user remove` heraus, dessen Home für alle lesbar ist; (e) `bothy-host session-user add` mit dem entfernten Namen; (f) `bothy-host session-user add` mit einem neuen Namen, während die zweite Person eine Sitzung hat, danach ordnet der Owner den neuen Namen einer dritten Person zu; (g) bei angehaltenem Host-Dienst liegt im Konto der zweiten Person eine Abo-Anmeldedatei, danach startet der Rechner neu; danach entfernt der Betreiber die Datei und ruft `bothy-host restart` auf | (a) laufende Sitzungen enden mit `host_policy_violation`, die Öffnung scheitert mit `subscription_login_detected`, Audit und `host.updated`; `reported_doctor` nennt bei HD6 den Sitzungsbenutzer der ersten Person; (b) `reported_doctor` hat zwei Einträge HD6 mit je einem der beiden Namen; (c) der Rechner bleibt gesperrt, `reported_doctor` nennt weiter den ersten Namen; (d) das Home des entfernten Sitzungsbenutzers ist danach nur für ihn zugänglich, der Neustart besteht HD9 und HD6, der Rechner meldet den Namen nicht mehr, die zweite Person öffnet wieder, die erste bekommt `403 terminal_denied` mit `reason: no_session_user`; (e) abgelehnt, weil der Name im Zustandsordner an die erste Person gebunden ist; (f) die Sitzung der zweiten Person endet mit `host_restarted`, nach dem nächsten `report` steht der neue Name ohne weiteren Schritt in `reported_session_users`, und die Zuordnung gelingt; (g) `bothy-host` startet nicht, meldet vorher aber `report`: `reported_doctor` nennt bei HD6 den Namen der zweiten Person, und die Konsole zeigt ihn mit der Person, während der Rechner getrennt bleibt; `bothy-host doctor` auf dem Rechner nennt denselben Namen und endet mit einem Exit-Code ungleich 0; der Dienstverwalter startet den Host-Dienst nicht von selbst neu (genau eine Anmeldung im Server); nach `bothy-host restart` besteht HD6, und die zweite Person öffnet wieder |
-| TM-T22 | Aus einer Sitzung `host_service.state_dir` und die Schlüsseldatei lesen; PTY-Helfer mit Leserecht auf den Ordner starten | Zugriff verweigert; Start verweigert (HD8) |
-| TM-T23 | Zweite Steuerverbindung mit denselben Schlüsseln, ältere antwortet; dann ältere antwortet nicht | Rechner `disabled` mit `duplicate_connection`, beide mit `4112` geschlossen, Audit; ohne Antwort ältere mit `4009` geschlossen, neue angenommen |
-| TM-T24 | Fremde Home-Ordner (2.2 Punkt 4): `bothy-host doctor` mit einem Sitzungsbenutzer, der den Home-Ordner eines Benutzers auflisten kann, der kein Sitzungsbenutzer ist (unter macOS: Mitglied von `staff` bei Standardrechten der Home-Ordner); dann ohne dieses Recht; dann öffnet Sitzungsbenutzer A in einer Sitzung sein Home für alle anderen, während B eine Sitzung hat; danach startet der Host-Dienst neu; danach nimmt der Betreiber A mit `bothy-host session-user remove` heraus | Start verweigert mit Code (HD9), die Ausgabe auf dem Rechner nennt den Benutzer mit dem lesbaren Home; ohne das Recht bestanden; mit dem offenen Home von A HD11 nicht bestanden mit dem Namen von A, nur die Sitzungen von A enden, die von B läuft weiter; nach dem Neustart startet der Rechner, HD9 besteht, und HD11 nennt weiter A; nach `session-user remove` ist das Home von A nur für A zugänglich, und der Start besteht HD9 |
-| TM-T25 | `llm_credentials = personal`, Kanarien-Token in der Datei des Sitzungsbenutzers; Profil `claude` starten und beenden | Kanarie weder im Zustandsordner noch im lokalen Kanal noch in Meldungen an den Server; der Dienstbenutzer öffnet keine Datei im Home des Sitzungsbenutzers (Mitschnitt der Systemaufrufe); `claude auth status` in der Sitzung meldet `oauth_token` |
-| TM-T26 | Ein Prozess des Sitzungsbenutzers beendet den Helfer und lauscht auf dem Endpunkt des Kanals bzw. legt die Named Pipe zuerst an; ein zweiter versucht, sich an den laufenden Helfer zu hängen (`ptrace`, `task_for_pid`, `OpenProcess` mit Schreibrecht); Owner öffnet auf dem Rechner eines anderen Menschen | der falsche Helfer bekommt keinen Rahmen und keinen Klartext, HD10 nicht bestanden, keine Sitzung; das Anhängen scheitert; der Client zeigt die Warnung vor dem Step-up (Widget-Test), Audit `foreign_assignee = true` |
-| TM-T27 | `llm_credentials = organization`, Abo-Anmeldung im Konto eines Sitzungsbenutzers; ein Programm `claude` im `PATH` und in den Startdateien des Sitzungsbenutzers meldet `authMethod = api_key`; danach `host_service.claude_bin` auf eine Datei, die der Sitzungsbenutzer schreiben kann; danach `host_service.claude_bin` als Skript mit `#!/usr/bin/env node`, ein falsches `node` im `PATH` des Sitzungsbenutzers, dann ein `node` in der Suchliste, das der Sitzungsbenutzer schreiben kann; dann unter Linux das geprüfte `node` im Ordner von `host_service.claude_bin`, aber `/bin` für den Sitzungsbenutzer schreibbar | HD6 ruft nur `host_service.claude_bin` auf und erkennt die Abo-Anmeldung, keine Sitzung; mit der schreibbaren Datei HD10 nicht bestanden; das falsche `node` läuft nie (Mitschnitt der Prozessstarts); mit dem schreibbaren Interpreter und mit dem schreibbaren Ordner der Suchliste HD10 nicht bestanden (7.4) |
-| TM-T28 | Ein Sitzungsbenutzer je Person (T12): (a) Owner und Rechner-Inhaber mit Freigabe `terminal`, beide ohne Zuordnung, öffnen; (b) Owner ordnet einen Sitzungsbenutzer, der schon einer Person gehört oder gehörte, einer zweiten Person zu, und gibt einer Person eine zweite gültige Zuordnung; (c) Marke mit `osu` außerhalb von `host_service.session_users`; Marke mit `osu`, den der Host-Dienst schon einer anderen `sub` gegeben hat (Zuordnung in der Datenbank am Server vorbei geändert); (d) macOS, `llm_credentials = organization`, `host_service.claude_bin` leer, A ist Owner, B ist Rechner-Inhaber mit Freigabe `terminal`, beide mit eigener Zuordnung; A startet in ihrer Shell-Sitzung ein `claude` aus ihrem `PATH` und meldet sich mit `/login` per Abo an (Schlüsselbund), danach öffnet B auf demselben Rechner eine Shell und ruft dort `claude auth status` auf; (e) `confirmHost` und `updateHost` mit einem Namen, den der Rechner nicht meldet; danach entfernt der Betreiber einen zugeordneten Namen aus `host_service.session_users`, und seine Person öffnet | (a) `403 terminal_denied` mit `reason: no_session_user`, Audit; (b) `409 conflict` mit `reason: session_user_taken`, nichts geändert; (c) keine PTY, `4104` mit `session_user_unknown` bzw. `session_user_mismatch`; (d) `doctor` warnt mit `auth_status_unchecked`, und der Rechner meldet kein Profil `claude` (HD7, Warnung); die Sitzung von B läuft in Bs eigenem Sitzungsbenutzer, `claude auth status` in Bs Sitzung meldet `authMethod = none`, und Bs Helfer kann Home und Schlüsselbund von A nicht lesen (HD11 für das Home von A); (e) `400 validation_failed` mit `errors[].code = session_user_not_on_host`, nichts gespeichert; nach dem nächsten `report` `403 terminal_denied` mit `reason: no_session_user`, kein `4104` |
-| TM-T29 | Keine geteilten Orte (T13): (a) ein Arbeitsordner von B, den A schreiben kann, und A legt dort `.claude/settings.json` mit einem Hook und einem `apiKeyHelper` an, danach öffnet B das Profil `claude` dort; (b) ein Ordner über einem Arbeitsordner von B, den A schreiben kann; (c) ein Arbeitsordner unter zwei Sitzungsbenutzern in `host_service.claude_workdirs`, in der Liste von B davor, danach ein weiterer Ordner von B; (d) ein `CLAUDE_CONFIG_DIR` des Profils `claude` von B, den A lesen kann; (e) ein Eintrag im Arbeitsordner von B, der A gehört; danach entfernt der Betreiber ihn, ein periodischer Lauf vergeht, dann ruft er `bothy-host doctor` auf; danach ein Home von B, dessen Prüfung der Einträge beim Start länger als `host_service.entry_scan_timeout` dauert, und A öffnet während dieses Laufs; (f) das Programm eines Profils `command`, das ein Sitzungsbenutzer schreiben kann; eines, das einem anderen Benutzer des Rechners gehört, der weder Sitzungsbenutzer noch vertrauenswürdiger Besitzer ist; eines in einem Ordner, der einem solchen Benutzer gehört; bei `organization` dieselben drei Fälle für `host_service.claude_bin`, etwa in einem Ordner eines Paketverwalters, der dem Konto einer Person mit Administratorrechten gehört; unter Windows `host_service.claude_bin` als `.cmd`; dazu das Programm eines Profils `command`, das erst im Betrieb für einen Sitzungsbenutzer schreibbar wird, während A und B Sitzungen haben; (g) B schickt einen `workdir_index` außerhalb der eigenen Liste; eine Marke mit `wdi` außerhalb der Liste von `osu` (Server am Host-Dienst vorbei); (h) in einem Ordner über einem Arbeitsordner von B eine `CLAUDE.md`, die A gehört; dort eine `CLAUDE.md` von `root`, die A schreiben kann; dort ein Ordner `.claude`, der A gehört; (i) Windows 10 und Windows 11 mit Standardrechten an `C:\`, Helfer unter `C:\Program Files\bothy-host`, `host_service.claude_bin` unter `C:\Program Files`, Home und Arbeitsordner von B unter `C:\Users`, dazu ein Testordner in `C:\`, dessen DACL einen geerbten Eintrag vor einem eigenen trägt: `doctor` vor `bothy-host install`; `install` mit abgelehnter, dann mit gegebener Bestätigung; danach versucht A `mkdir C:\.git`; danach ein `C:\.git`, das A vor der Installation angelegt hat; (j) ein Arbeitsordner von B, dessen konfigurierter Pfad über einen Verweis von `root` in einen Ordner von A führt, den B durchqueren kann; über einem Arbeitsordner von B eine `CLAUDE.md` als Verweis von `root` auf eine Datei von A; derselbe Arbeitsordner bei A und bei B außerhalb der Home-Ordner, bei B über einen Verweis, unter macOS und Windows zusätzlich in anderer Groß- und Kleinschreibung; B hat weitere Arbeitsordner in seinem Home, und ein Arbeitsordner von B führt über einen Verweis in einen Arbeitsordner von A im Home von A (Modus `0700`), ein anderer fehlt; (k) `llm_credentials = personal`, die Login-Shell des Inhabers setzt `CLAUDE_CONFIG_DIR` auf einen Ordner außerhalb seines Home, danach auf einen Verweis im Home, der nach außerhalb zeigt, danach auf einen Verweis im Home, der ins Leere zeigt, danach auf einen Ordner im Home; (l) `llm_credentials = organization`, ein anderes `claude` im `PATH` des Sitzungsbenutzers und des Dienstes, B öffnet das Profil `claude`; danach `host_service.claude_bin` als Skript mit `#!/usr/bin/env node`, kein `node` in der Suchliste, ein `node` nur im übrigen `PATH` des Profils, B öffnet das Profil `claude` | (a), (b), (d), (e) und (h) HD11 nicht bestanden mit dem Namen von B, B bekommt keine Sitzung (`open_failed` mit `shared_location`, laufende enden mit `host_policy_violation`), Hook und `apiKeyHelper` laufen nie (Mitschnitt der Prozessstarts), andere Sitzungsbenutzer bekommen weiter Sitzungen; bei (e) bleibt B nach dem Entfernen des Eintrags über den periodischen Lauf hinaus gesperrt und bekommt erst nach `bothy-host doctor` wieder Sitzungen, und mit dem langen Lauf besteht HD11 für B nicht (`entry_scan_timeout` mit dem Namen von B), während A schon vor dem Ende dieses Laufs eine Sitzung bekommt; (c) HD7 nicht bestanden, der Ordner fehlt in beiden Listen, `pair` und `report` melden die Listen ohne ihn, und der Index des weiteren Ordners in der gemeldeten Liste von B startet `claude` in genau diesem Ordner; (f) in allen Fällen Start verweigert (HD10, HD11); im Betrieb lehnt der Rechner neue Sitzungen ab, die von A und B enden mit `host_policy_violation` und `shared_location`, die Meldung nennt keinen Sitzungsbenutzer, und nach der Berichtigung öffnen beide nach dem nächsten periodischen Lauf wieder; (g) `403 terminal_denied` mit `reason: profile_unknown`; mit der Marke keine PTY, `4104` mit `profile_unknown`; (i) vor `install` und nach abgelehnter Bestätigung HD11 nicht bestanden mit `drive_root_writable`, Start verweigert, die ACL von `C:\` unverändert; nach der Bestätigung fehlt an `C:\` nur der Eintrag `(AD)`, die übrigen Einträge stehen in derselben Reihenfolge mit denselben Steuerbits, und die Sicherheitsbeschreibung jedes direkten Unterordners von `C:\` ist vorher und nachher gleich, auch die des Testordners, den eine Weitergabe der Vererbung umgeordnet oder geschützt hätte (2.2 Punkt 6), HD10 und HD11 bestehen, `mkdir C:\.git` als A scheitert; mit dem alten `C:\.git` HD11 nicht bestanden für jeden anderen Sitzungsbenutzer mit seinem Namen, nach Entfernen des Eintrags bestanden (T-TM-14); (j) die ersten beiden wie (a), der dritte wie (c); der Ordner im Home von A und der fehlende Ordner fehlen nur in der gemeldeten Liste von B (HD7, Warnung), die Liste von A behält ihren Ordner, HD11 besteht für A und B, und B öffnet das Profil `claude` in seinen Arbeitsordnern im Home (sie hat sein PTY-Helfer aufgelöst); (k) in den ersten drei Fällen startet das Profil `claude` nicht (`open_failed` mit `shared_location`), das Profil `shell` öffnet; im vierten läuft `claude` mit genau diesem Ordner als `CLAUDE_CONFIG_DIR`; (l) es startet genau der aufgelöste Pfad von `host_service.claude_bin`, das andere `claude` nie (Mitschnitt der Prozessstarts); mit dem Skript ohne `node` in der Suchliste meldet der Rechner kein Profil `claude` (HD7, Warnung), `doctor` warnt mit `auth_status_unchecked`, das Öffnen scheitert mit `403 terminal_denied` und `reason: profile_unknown`, und das `node` aus dem übrigen `PATH` läuft nie (Mitschnitt der Prozessstarts) |
+| TM-T01 | Conformance of the handshake in Go and Dart with the entries for `Noise_NK_25519_ChaChaPoly_SHA256` from the vector files in 5.2 | identical bytes |
+| TM-T02 | Mutual handshake Go against Dart, with a wrong prologue, a wrong static key, a swapped host ID | only the correct one succeeds |
+| TM-T03 | Relay replays message 1 (same token) | host service rejects (`token_replayed`, `4101`), no second PTY |
+| TM-T04 | Token with a wrong `aud`, `sid`, `cek`, a foreign `kid`, the `typ` of the invocation token; expired token | no PTY; `4104` with `token_invalid`; expired: `4101` with `token_expired` |
+| TM-T05 | Messages 1 and 2 complete, but no `start` | no PTY |
+| TM-T06 | Relay capture, server logs, database dump and telemetry after a session with a canary value | canary nowhere (19, SEC-T10) |
+| TM-T07 | `terminal.open` without step-up, with one that is too old, with one already consumed, in the console with a password step-up | `401 step_up_required` |
+| TM-T08 | Non-owner with a grant on someone else's host, on their own host, on the server host | `403 terminal_denied` `not_host_assignee`, allowed, `403 terminal_denied` `server_host_owner_only` |
+| TM-T09 | I6: grant to a second person, grant to a group, switching to `personal` with an existing grant to others, a second owner opens | `409 i6_violation` or `403 terminal_denied` `i6_holder_only`, respectively |
+| TM-T10 | Revocation of each kind from 8.3 during an active session in which a background process runs with `setsid` or `nohup` (Windows: detached child process) | connections closed, PTY and background process ended, `close_reason` correct, audit |
+| TM-T11 | Idle, maximum duration, detach beyond `terminal.detach_grace`, tampered host service without an idle report | end with the correct reason, also without a report from the host service |
+| TM-T12 | Reattach: another device without step-up, the same device within and after `terminal.quick_reattach_window`, web console within the window without a passkey | `401`, allowed, `401`, `401` with `reason: passkey_required` |
+| TM-T13 | `bothy-host doctor` as root, in group `sudo`, in group `docker`, with a writable Docker socket, with passwordless sudo, with a subscription login with `organization`, with the same service and session user, with an empty `host_service.session_users`, with two identical session users | start refused with a code |
+| TM-T14 | Renderer: OSC 52, OSC 8, title query | nothing into the clipboard, no link without confirmation, no response |
+| TM-T15 | Two api nodes with hash routing; then without hash routing | session runs; without routing `4102` and a metric |
+| TM-T16 | Chaos: restart of the server, network loss of the device, network loss of the host service during a session; then a restart of the host service (`bothy-host restart`) during a session in which a background process runs | PTY survives up to `terminal.detach_grace`, reattaching replays the scrollback; after the restart of the host service the session ends with `host_restarted`, PTY and background process are ended, and attaching fails (6.2) |
+| TM-T17 | Agent or app token calls a terminal action | `403 forbidden` with `reason` `subject_kind_not_allowed`, audit |
+| TM-T18 | Re-pairing: a device with a pinned old key opens | hard warning, connection only after confirmation, audit `pin_changed` |
+| TM-T19 | Pairing with a wrong fingerprint up to `terminal.fingerprint_max_attempts` | host back to `pairing`, key discarded |
+| TM-T20 | Pairing code twice, expired, with a wrong checksum | rejected; wrong checksum without database access |
+| TM-T21 | Standstill through HD6 (T-TM-14): (a) in a shell session on a host with `organization`, a first person logs in with a subscription; then a second person opens; (b) the second person also logs in with a subscription in their account; (c) the instance operator removes the login of the second person, locks the session user of the first only on the host, then the owner ends their assignment; (d) the instance operator takes this session user out with `bothy-host session-user remove`, whose home is readable by all; (e) `bothy-host session-user add` with the removed name; (f) `bothy-host session-user add` with a new name while the second person has a session, then the owner assigns the new name to a third person; (g) while the host service is stopped, a subscription login file lies in the account of the second person, then the host restarts; then the instance operator removes the file and calls `bothy-host restart` | (a) running sessions end with `host_policy_violation`, opening fails with `subscription_login_detected`, audit and `host.updated`; `reported_doctor` names, for HD6, the session user of the first person; (b) `reported_doctor` has two HD6 entries, each with one of the two names; (c) the host stays blocked, `reported_doctor` still names the first name; (d) the home of the removed session user is then accessible only to that user, the restart passes HD9 and HD6, the host no longer reports the name, the second person opens again, the first gets `403 terminal_denied` with `reason: no_session_user`; (e) rejected, because the name is bound to the first person in the state directory; (f) the session of the second person ends with `host_restarted`, after the next `report` the new name is in `reported_session_users` without any further step, and the assignment succeeds; (g) `bothy-host` does not start, but sends `report` first: `reported_doctor` names, for HD6, the name of the second person, and the console shows it with the person while the host stays disconnected; `bothy-host doctor` on the host names the same name and ends with an exit code other than 0; the service manager does not restart the host service on its own (exactly one login at the server); after `bothy-host restart` HD6 passes, and the second person opens again |
+| TM-T22 | Read `host_service.state_dir` and the key file from a session; start a PTY helper with read permission on the directory | access denied; start refused (HD8) |
+| TM-T23 | Second control connection with the same keys, the older one answers; then the older one does not answer | host `disabled` with `duplicate_connection`, both closed with `4112`, audit; without an answer the older one closed with `4009`, the new one accepted |
+| TM-T24 | Foreign home folders (2.2 item 4): `bothy-host doctor` with a session user who can list the home folder of a user who is not a session user (under macOS: member of `staff` with default permissions on the home folders); then without this permission; then session user A, in a session, opens their home to all others while B has a session; then the host service restarts; then the instance operator takes A out with `bothy-host session-user remove` | start refused with a code (HD9), the output on the host names the user with the readable home; without the permission passed; with the open home of A, HD11 not passed with the name of A, only the sessions of A end, the one of B keeps running; after the restart the host starts, HD9 passes, and HD11 still names A; after `session-user remove` the home of A is accessible only to A, and the start passes HD9 |
+| TM-T25 | `llm_credentials = personal`, canary token in the file of the session user; start and end profile `claude` | canary neither in the state directory nor in the local channel nor in messages to the server; the service user opens no file in the home of the session user (system call trace); `claude auth status` in the session reports `oauth_token` |
+| TM-T26 | A process of the session user ends the helper and listens on the endpoint of the channel, or creates the named pipe first; a second one tries to attach to the running helper (`ptrace`, `task_for_pid`, `OpenProcess` with write access); an owner opens on another person's host | the fake helper gets no frame and no plaintext, HD10 not passed, no session; attaching fails; the client shows the warning before the step-up (widget test), audit `foreign_assignee = true` |
+| TM-T27 | `llm_credentials = organization`, subscription login in the account of a session user; a program `claude` in the `PATH` and in the startup files of the session user reports `authMethod = api_key`; then `host_service.claude_bin` pointing to a file that the session user can write; then `host_service.claude_bin` as a script with `#!/usr/bin/env node`, a fake `node` in the `PATH` of the session user, then a `node` in the search list that the session user can write; then, under Linux, the checked `node` in the folder of `host_service.claude_bin`, but `/bin` writable for the session user | HD6 calls only `host_service.claude_bin` and detects the subscription login, no session; with the writable file HD10 not passed; the fake `node` never runs (trace of the process starts); with the writable interpreter and with the writable folder of the search list HD10 not passed (7.4) |
+| TM-T28 | One session user per person (T12): (a) owner and host assignee with grant `terminal`, both without an assignment, open; (b) the owner assigns a session user that already belongs or belonged to one person to a second person, and gives a person a second valid assignment; (c) token with an `osu` outside `host_service.session_users`; token with an `osu` that the host service has already given to another `sub` (assignment changed in the database, bypassing the server); (d) macOS, `llm_credentials = organization`, `host_service.claude_bin` empty, A is owner, B is host assignee with grant `terminal`, both with their own assignment; A starts a `claude` from their `PATH` in their shell session and logs in with a subscription using `/login` (keychain), then B opens a shell on the same host and calls `claude auth status` there; (e) `confirmHost` and `updateHost` with a name that the host does not report; then the instance operator removes an assigned name from `host_service.session_users`, and its person opens | (a) `403 terminal_denied` with `reason: no_session_user`, audit; (b) `409 conflict` with `reason: session_user_taken`, nothing changed; (c) no PTY, `4104` with `session_user_unknown` or `session_user_mismatch`, respectively; (d) `doctor` warns with `auth_status_unchecked`, and the host reports no profile `claude` (HD7, warning); B's session runs in B's own session user, `claude auth status` in B's session reports `authMethod = none`, and B's helper cannot read the home and keychain of A (HD11 for the home of A); (e) `400 validation_failed` with `errors[].code = session_user_not_on_host`, nothing stored; after the next `report` `403 terminal_denied` with `reason: no_session_user`, no `4104` |
+| TM-T29 | No shared locations (T13): (a) a working directory of B that A can write, and A creates `.claude/settings.json` there with a hook and an `apiKeyHelper`, then B opens the profile `claude` there; (b) a folder above a working directory of B that A can write; (c) a working directory under two session users in `host_service.claude_workdirs`, placed first in the list of B, followed by a further folder of B; (d) a `CLAUDE_CONFIG_DIR` of the profile `claude` of B that A can read; (e) an entry in the working directory of B that belongs to A; then the instance operator removes it, a periodic run passes, then they call `bothy-host doctor`; then a home of B whose check of the entries at start takes longer than `host_service.entry_scan_timeout`, and A opens during this run; (f) the program of a profile `command` that a session user can write; one that belongs to another user of the host who is neither a session user nor a trusted owner; one in a folder that belongs to such a user; with `organization` the same three cases for `host_service.claude_bin`, for example in a folder of a package manager that belongs to the account of a person with administrator rights; under Windows `host_service.claude_bin` as a `.cmd`; in addition, the program of a profile `command` that becomes writable for a session user only during operation, while A and B have sessions; (g) B sends a `workdir_index` outside their own list; a token with a `wdi` outside the list of `osu` (server bypassing the host service); (h) in a folder above a working directory of B, a `CLAUDE.md` that belongs to A; there a `CLAUDE.md` of `root` that A can write; there a folder `.claude` that belongs to A; (i) Windows 10 and Windows 11 with default permissions on `C:\`, helper under `C:\Program Files\bothy-host`, `host_service.claude_bin` under `C:\Program Files`, home and working directory of B under `C:\Users`, plus a test folder in `C:\` whose DACL carries an inherited entry before an explicit one: `doctor` before `bothy-host install`; `install` with the confirmation refused, then with it given; then A tries `mkdir C:\.git`; then a `C:\.git` that A created before the installation; (j) a working directory of B whose configured path leads, through a link owned by `root`, into a folder of A that B can traverse; above a working directory of B, a `CLAUDE.md` as a link owned by `root` to a file of A; the same working directory for A and for B outside the home folders, for B through a link, under macOS and Windows additionally in different upper and lower case; B has further working directories in their home, and one working directory of B leads through a link into a working directory of A in the home of A (mode `0700`), another one is missing; (k) `llm_credentials = personal`, the login shell of the holder sets `CLAUDE_CONFIG_DIR` to a folder outside their home, then to a link in the home that points outside, then to a link in the home that points nowhere, then to a folder in the home; (l) `llm_credentials = organization`, another `claude` in the `PATH` of the session user and of the service, B opens the profile `claude`; then `host_service.claude_bin` as a script with `#!/usr/bin/env node`, no `node` in the search list, a `node` only in the remaining `PATH` of the profile, B opens the profile `claude` | (a), (b), (d), (e) and (h) HD11 not passed with the name of B, B gets no session (`open_failed` with `shared_location`, running ones end with `host_policy_violation`), hook and `apiKeyHelper` never run (trace of the process starts), other session users still get sessions; with (e), B stays blocked after the removal of the entry beyond the periodic run and gets sessions again only after `bothy-host doctor`, and with the long run HD11 does not pass for B (`entry_scan_timeout` with the name of B), while A already gets a session before the end of this run; (c) HD7 not passed, the folder is missing from both lists, `pair` and `report` report the lists without it, and the index of the further folder in the reported list of B starts `claude` in exactly this folder; (f) in all cases start refused (HD10, HD11); during operation the host rejects new sessions, those of A and B end with `host_policy_violation` and `shared_location`, the report names no session user, and after the correction both open again after the next periodic run; (g) `403 terminal_denied` with `reason: profile_unknown`; with the token no PTY, `4104` with `profile_unknown`; (i) before `install` and after a refused confirmation HD11 not passed with `drive_root_writable`, start refused, the ACL of `C:\` unchanged; after the confirmation only the entry `(AD)` is missing at `C:\`, the remaining entries stand in the same order with the same control bits, and the security descriptor of every direct subfolder of `C:\` is the same before and after, including that of the test folder, which a propagation of the inheritance would have reordered or protected (2.2 item 6), HD10 and HD11 pass, `mkdir C:\.git` as A fails; with the old `C:\.git` HD11 not passed for every other session user with their name, passed after the entry is removed (T-TM-14); (j) the first two like (a), the third like (c); the folder in the home of A and the missing folder are missing only from the reported list of B (HD7, warning), the list of A keeps its folder, HD11 passes for A and B, and B opens the profile `claude` in their working directories in the home (their PTY helper resolved them); (k) in the first three cases the profile `claude` does not start (`open_failed` with `shared_location`), the profile `shell` opens; in the fourth `claude` runs with exactly this folder as `CLAUDE_CONFIG_DIR`; (l) exactly the resolved path of `host_service.claude_bin` starts, the other `claude` never (trace of the process starts); with the script without `node` in the search list the host reports no profile `claude` (HD7, warning), `doctor` warns with `auth_status_unchecked`, opening fails with `403 terminal_denied` and `reason: profile_unknown`, and the `node` from the remaining `PATH` never runs (trace of the process starts) |
 
-Die Fälle aus TM-T07 bis TM-T10, TM-T17 und TM-T28 (a) stehen zusätzlich in der Testmatrix von 07
-(AZ-M54 bis AZ-M61).
+The cases from TM-T07 to TM-T10, TM-T17 and TM-T28 (a) also appear in the test matrix of 07
+(AZ-M54 to AZ-M61).
 
-## 15. Etappen
+## 15. Milestones
 
-| Etappe | Inhalt |
+| Milestone | Content |
 |---|---|
-| M2 | Modul `terminal` (Rechner, Kopplung, Sitzungen, Relais), `bothy-host` (PTY für macOS, Linux, Windows; `doctor`; Profile), Noise und Sitzungs-Marke, I6 und Rechte, Konformitäts- und Chaos-Tests, Red Team Terminal |
-| M4 | Terminal-Ansicht der Desktop-App |
-| M5 | Terminal-Ansicht der mobilen App mit Sondertasten |
-| M6 | Terminal in der Web-Konsole ([ADR 0070](../adr/0070-terminal-in-der-web-konsole.md)) |
-| Mehrbenutzer-Dev-Umgebung | `hosts.dev_environment_id`, SR10 für eigene Umgebungen |
+| M2 | Module `terminal` (hosts, pairing, sessions, relay), `bothy-host` (PTY for macOS, Linux, Windows; `doctor`; profiles), Noise and terminal session token, I6 and permissions, conformance and chaos tests, red team terminal |
+| M4 | Terminal view of the desktop app |
+| M5 | Terminal view of the mobile app with extra keys |
+| M6 | Terminal in the web console ([ADR 0070](../adr/0070-terminal-in-the-web-console.md)) |
+| Multi-user dev environment | `hosts.dev_environment_id`, SR10 for own environments |
 
-Red-Team-Punkte am Ende von M2, M4, M5 und M6 (Bedrohungsmodell, Abschnitt 6.7).
+Red team points at the end of M2, M4, M5 and M6 (threat model, section 6.7).
 
-## 16. Entscheidungen dieses Kapitels
+## 16. Decisions of this chapter
 
-| Nr | Entscheidung | Grund |
+| No. | Decision | Reason |
 |---|---|---|
-| R-TM-01 | Eigener Host-Dienst mit nur ausgehender Verbindung statt SSH oder eingehendem Port. | Geht hinter NAT und ohne Tailscale-Pflicht; der Server bleibt Autorisierungspunkt. |
-| R-TM-02 | Noise `NK` mit Prolog und Einmal-Marke im ersten Paket. | Kleiner, geprüfter Standard mit Testvektoren; Marke und `cek` schließen Wiedereinspielen und Relais-Tausch. |
-| R-TM-03 | Schutzziel ehrlich ohne bösartigen Server; Pinning je Gerät und lokale Bestätigung als Rückfall. | NK beweist nur den verteilten Schlüssel (Ruling T3). |
-| R-TM-04 | Ziel `host` ohne Stufe, nur Zusatzrecht `terminal`, nur für Menschen und Gruppen. | Stufen haben auf einem Rechner keine Bedeutung; Agenten und Apps nie. |
-| R-TM-05 | SR10: Nicht-Owner nur auf dem eigenen Rechner. | OS-Benutzer allein ist keine Grenze zwischen Personen (Ruling T1, ADR 0046). |
-| R-TM-06 | I6 mit Owner-Ausnahme, transaktional und bei jedem Öffnen. | Persönliche Abos nur für die eigene Nutzung; persönliche Rechner bei mehreren Ownern möglich (Ruling T2). |
-| R-TM-07 | Step-up je Öffnung frisch und verbraucht; schnelles Wiederanhängen vom selben Gerät ohne neuen Step-up, nie in der Web-Konsole. | Owner verlangt Bestätigung beim Öffnen; Funklöcher sollen nicht zum blinden Bestätigen erziehen. |
-| R-TM-08 | Profile nur in der Konfiguration des Host-Dienstes. | Ein Client kann keine Befehlszeile einschleusen. |
-| R-TM-09 | Getrennte Datenverbindung je Sitzung und Hash-Routing im Proxy für mehrere Knoten. | Kein Broker (02); ein Knoten hält beide Enden (Ruling T6). |
-| R-TM-10 | Kein Inhalt in Log, Audit, Telemetrie; keine Aufzeichnung in dieser Fassung. | Datensparsamkeit; Aufzeichnung ist eine Owner-Frage. |
-| R-TM-11 | Leerlauf misst der Host-Dienst, der Server prüft zusätzlich grob. | Nur der Host-Dienst sieht Rahmentypen; ein manipulierter Host-Dienst darf Sitzungen nicht offen halten. |
-| R-TM-12 | Dienstbenutzer mit den Schlüsseln und Sitzungsbenutzer für die PTYs getrennt, verbunden über einen lokalen Kanal. | Eine Shell hätte sonst die Schlüssel des Rechners und könnte ihn nach einem Entzug von anderswo vertreten. |
-| R-TM-13 | Eine zweite lebende Steuerverbindung sperrt den Rechner, statt die ältere zu verdrängen. | Kopierte Schlüssel werden sichtbar; stilles Verdrängen gäbe einem Angreifer alle späteren Sitzungen. |
-| R-TM-14 | HD6 vor jeder PTY und periodisch; Treffer beendet alle Sitzungen des Rechners; die Meldung nennt jeden betroffenen Sitzungsbenutzer mit eigenem Eintrag. | Eine Abo-Anmeldung kann während einer Sitzung entstehen (I6, Ruling T2). Weil so eine Person den Rechner für alle stilllegen kann, muss der Betreiber wissen, in welchem Konto er sucht (D-W-64, Bedrohungsmodell T-TM-14). |
-| R-TM-15 | Jede Sitzung in eigener Prozessgruppe, cgroup bzw. Job Object; das Ende beendet den ganzen Baum. | Entzug soll auch Hintergrundprozesse beenden; Dauerläufer bleiben als ehrlich genannte Grenze. |
-| R-TM-16 | Abgelaufene oder verbrauchte Marke `4101`, jeder andere Fehler der Marke oder des Handshakes `4104`. | Ein Fall ohne Angriff darf nicht als Manipulation gemeldet werden. |
-| R-TM-17 | HD9 prüft mit einem Lesetest, dass der Sitzungsbenutzer keinen Home-Ordner eines Benutzers auflisten kann, der kein Sitzungsbenutzer ist, statt Gruppen zu prüfen; das Home eines Sitzungsbenutzers prüft HD11 als dessen Ort. | Unter macOS öffnet die Standardgruppe `staff` fremde Home-Ordner; welche Gruppe oder welche Rechte das auf anderen Plattformen tun, ist je Rechner verschieden, das Ergebnis des Lesetests nicht. Ein offenes Home eines Sitzungsbenutzers ist ein Fehler in dessen Konto: HD11 sperrt nur ihn und nennt ihn, statt dass HD9 den Start des ganzen Rechners verweigert (D-W-88). |
-| R-TM-18 | Der PTY-Helfer ist ein Systemdienst unter dem Sitzungsbenutzer mit Binärdatei, Definition und Kanal-Endpunkt im Besitz eines vertrauenswürdigen Besitzers (2.2 Punkt 6); `bothy-host` prüft die Gegenstelle über Benutzer und Prozess-ID des Dienstverwalters (HD10); Owner bekommen auf dem Rechner eines anderen Menschen eine Warnung mit Bestätigung. | Ein Helfer, den der Sitzungsbenutzer ersetzen kann, fälscht Prüfungen und liest spätere Sitzungen mit; dieselbe Benutzerkennung bleibt ein gemeinsamer Vertrauensbereich (D-W-18). |
-| R-TM-19 | Bei `personal` fasst `bothy-host` keine Abo-Anmeldung an; der Inhaber meldet sich selbst im Konto seines Sitzungsbenutzers an. | Das Produkt speichert und vermittelt keine Claude.ai-Zugangsdaten (10, Folgerung 3; D-W-17). |
-| R-TM-20 | HD6 fragt den Coding-Agenten nur über den absoluten Pfad `host_service.claude_bin` mit fester Suchliste ab; HD10 prüft Datei, Ordnerkette und Interpreter wie den Helfer. | Ein Programm im `PATH` des Sitzungsbenutzers kann er selbst ersetzen und die Abo-Anmeldung verschweigen lassen (D-W-45, D-W-57). |
-| R-TM-21 | Ein Sitzungsbenutzer je Person und Rechner, nie geteilt, auch nicht nach dem Ende einer Zuordnung; ohne Zuordnung kein Terminal (SR12); der Host-Dienst bindet jeden Sitzungsbenutzer an die erste Person. HD6 ist nur Zusatzprüfung. | Dritte Runde derselben Fehlerklasse: ein Orakel im Konto eines geteilten Benutzers ist fälschbar oder abgeschaltet; nur getrennte Konten machen "keine fremde Abo-Anmeldung" unabhängig von einer Prüfung wahr (Ruling T12, D-W-57). |
-| R-TM-22 | Keine geteilten Orte zwischen Sitzungsbenutzern: Arbeitsordner und `CLAUDE_CONFIG_DIR` je Sitzungsbenutzer, der Index des Arbeitsordners (`wdi`) zählt nur in der gemeldeten Liste von `osu` nach HD7, Programme samt Ordnerkette im Besitz eines vertrauenswürdigen Besitzers, eine Prüfung HD11 für jeden konfigurierten Pfad samt Ordnerkette und Kettendateien. | Ein gemeinsamer Arbeitsordner oder Konfigurationsordner verband die getrennten Konten wieder; eine allgemeine Regel statt eines Flickens je Ort (Ruling T13, D-W-62). |
-| R-TM-23 | Der Host-Dienst meldet die Namen seiner Sitzungsbenutzer; der Server ordnet nur gemeldete Namen zu, und eine Zuordnung wirkt nur, solange der Name gemeldet wird. | Ein Tippfehler soll nicht als Manipulationswarnung `4104` auffallen (R-TM-16, D-W-63). |
-| R-TM-24 | `bothy-host session-user remove` nimmt einen Sitzungsbenutzer aus `host_service.session_users` und `host_service.claude_workdirs`, entfernt seinen PTY-Helfer, schließt sein Home und startet den Host-Dienst neu; die Bindung an seine Person bleibt, und `session-user add` lehnt einen gebundenen Namen ab. | HD6 läuft in jedem Namen aus `host_service.session_users`; Sperren des Benutzers oder Ende der Zuordnung beenden den Stillstand durch eine Abo-Anmeldung nicht (D-W-67). Der Name bleibt belegt (T12). |
-| R-TM-25 | HD7, HD10 und HD11 benutzen je Plattform feste Begriffe: vertrauenswürdige Besitzer (Linux und macOS `root`; Windows `SYSTEM`, `Administrators`, `NT SERVICE\TrustedInstaller`); "schreibbar" schließt bei Ordnern Anlegen, Löschen und Umbenennen von Einträgen und bei allem das Anhängen und das Ändern von Attributen, Rechten und Besitz ein; jeder Pfad wird vor der Prüfung vollständig aufgelöst, Orte eines Sitzungsbenutzers von seinem PTY-Helfer, Orte für alle vom Dienstbenutzer; ein Pfad, der sich nicht auflösen lässt, gilt als nicht vorhanden; Verweise zählen wie ihr Ziel, HD7 vergleicht Ordner nach ihrer Identität, die jeder Helfer meldet (unter Windows mit der 128-Bit-Datei-ID). Unter Windows entfernt `bothy-host install` nach Bestätigung den Eintrag `Authenticated Users:(AD)` an der Wurzel jedes Laufwerks mit einem Ort und schreibt dabei nur die DACL der Wurzel, ohne Weitergabe an die Ordner darunter; sonst meldet HD11 `drive_root_writable`. | Ohne diese Festlegung bestünde HD11 unter Windows mit Standardrechten nie, oder eine Person könnte mit einem Ordner `C:\.git` alle anderen sperren; die Systemordner gehören `TrustedInstaller`; eine Prüfung ohne Auflösung ließe einen Verweis in den Ordner einer anderen Person durch; der Dienstbenutzer kommt in die Orte eines Sitzungsbenutzers nicht hinein; eine Weitergabe der Vererbung änderte das ganze Laufwerk (D-W-80, D-W-83, D-W-84, D-W-86, D-W-87). |
-| R-TM-26 | Das Profil `claude` startet bei `organization` genau `host_service.claude_bin` (leer: kein Profil) mit der Suchliste von HD6 vorn im `PATH`; die Suchliste beginnt mit dem konfigurierten Ordner von `host_service.claude_bin`, HD10 prüft jeden ihrer Ordner, und findet sie den Interpreter eines Skripts nicht, gilt der Wert für HD6 und das Profil als leer. Bei `personal` startet es `claude` über die Login-Shell des Inhabers, und dessen `CLAUDE_CONFIG_DIR` muss sich auflösen lassen und im Home liegen. | Das Programm läuft in jedem Sitzungsbenutzer und ist ein Ort für alle; ohne Interpreter in der Suchliste fände `env` einen ungeprüften im übrigen `PATH`; ein `CLAUDE_CONFIG_DIR` außerhalb des Home wäre ein Ort mit Anmeldung, den HD11 nicht kennt (D-W-81, D-W-82, D-W-85). |
-| R-TM-27 | Ein Neustart des Host-Dienstes beendet alle Sitzungen des Rechners (`host_restarted`); der Host-Dienst nennt bei der Anmeldung die Sitzungen, die er noch kennt (`live_sessions`). `session-user add` und `remove` starten ihn selbst neu, jede andere Änderung der Konfiguration wirkt nach `bothy-host restart`. | Der neue Prozess liest die Konfiguration neu und prüft alles neu; eine Sitzung aus der Zeit davor liefe ungeprüft unter der alten weiter. Ohne Neustart nach `add` lehnte der Server den neuen Namen ab, bis jemand von Hand neu startet (D-W-90). |
-| R-TM-28 | HD11 im Betrieb: ein Verstoß an einem Ort für alle beendet alle Sitzungen und lässt keine neuen zu; die Prüfung der Einträge läuft je Sitzungsbenutzer, nur er wartet auf sie, `host_service.entry_scan_timeout` begrenzt sie, und ihren Fund hebt nur ein späterer voller Lauf auf. | Für einen Ort für alle war im Betrieb keine Folge festgelegt; ein großes Home soll nur seinen Sitzungsbenutzer aufhalten, und nur diese Prüfung sieht, ob ein Eintrag noch da ist (D-W-89). |
-| R-TM-29 | `bothy-host doctor` nennt auf dem Rechner die betroffenen Namen und endet mit einem Exit-Code ungleich 0; verweigert es beim Start den Start, meldet der Host-Dienst das Ergebnis vorher mit `report` und beendet sich ohne Sitzung, mit eigenem Exit-Code, nach dem ihn der Dienstverwalter nicht neu startet. | Sonst zeigte die Konsole nach einem Treffer beim Start nur einen getrennten Rechner, und die Namen aus HD6 und HD11 erreichten den Betreiber nicht; ein Neustart behebt keinen dieser Verstöße (D-W-91). |
+| R-TM-01 | Separate host service with only an outbound connection instead of SSH or an inbound port. | Works behind NAT and without requiring Tailscale; the server remains the authorization point. |
+| R-TM-02 | Noise `NK` with a prologue and a one-time token in the first packet. | Small, reviewed standard with test vectors; token and `cek` close off replay and relay swapping. |
+| R-TM-03 | Protection goal stated honestly, without the malicious server; pinning per device and local confirmation as a fallback. | NK proves only the distributed key (Ruling T3). |
+| R-TM-04 | Target `host` without a level, only the capability `terminal`, only for people and groups. | Levels have no meaning on a host; agents and apps never. |
+| R-TM-05 | SR10: non-owners only on their own host. | An OS user alone is no boundary between people (Ruling T1, ADR 0046). |
+| R-TM-06 | I6 with an owner exception, transactional and on every opening. | Personal subscriptions only for one's own use; personal hosts possible with several owners (Ruling T2). |
+| R-TM-07 | Step-up fresh and consumed per opening; quick reattach from the same device without a new step-up, never in the web console. | The owner requires confirmation when opening; dead zones should not train people to confirm blindly. |
+| R-TM-08 | Profiles only in the configuration of the host service. | A client cannot inject a command line. |
+| R-TM-09 | Separate data connection per session and hash routing in the proxy for several nodes. | No broker (02); one node holds both ends (Ruling T6). |
+| R-TM-10 | No content in log, audit, telemetry; no recording in this version. | Data minimization; recording is a question for the owner. |
+| R-TM-11 | The host service measures idle time, the server additionally checks roughly. | Only the host service sees frame types; a tampered host service must not keep sessions open. |
+| R-TM-12 | Service user with the keys and session user for the PTYs separated, connected through a local channel. | Otherwise a shell would have the keys of the host and could impersonate it from elsewhere after a revocation. |
+| R-TM-13 | A second live control connection disables the host instead of displacing the older one. | Copied keys become visible; silent displacement would give an attacker all later sessions. |
+| R-TM-14 | HD6 before every PTY and periodically; a hit ends all sessions of the host; the report names every affected session user with its own entry. | A subscription login can come into being during a session (I6, Ruling T2). Because one person can thus bring the host to a standstill for everyone, the instance operator must know in which account to search (D-W-64, threat model T-TM-14). |
+| R-TM-15 | Every session in its own process group, cgroup or Job Object; the end ends the whole tree. | Revocation should also end background processes; long-running processes remain as an honestly stated limit. |
+| R-TM-16 | Expired or consumed token `4101`, every other error of the token or of the handshake `4104`. | A case without an attack must not be reported as tampering. |
+| R-TM-17 | HD9 checks with a read test that the session user cannot list the home folder of any user who is not a session user, instead of checking groups; HD11 checks the home of a session user as that user's location. | Under macOS the default group `staff` opens foreign home folders; which group or which permissions do that on other platforms differs per host, the result of the read test does not. An open home of a session user is an error in that user's account: HD11 blocks only that user and names them, instead of HD9 refusing the start of the whole host (D-W-88). |
+| R-TM-18 | The PTY helper is a system service under the session user, with binary, definition and channel endpoint owned by a trusted owner (2.2 item 6); `bothy-host` verifies the peer through user and process ID from the service manager (HD10); owners get a warning with confirmation on another person's host. | A helper that the session user can replace forges checks and reads later sessions along; the same user ID remains a shared trust zone (D-W-18). |
+| R-TM-19 | With `personal`, `bothy-host` does not touch any subscription login; the holder logs in themselves in the account of their session user. | The product stores and brokers no Claude.ai credentials (10, consequence 3; D-W-17). |
+| R-TM-20 | HD6 queries the coding agent only through the absolute path `host_service.claude_bin` with a fixed search list; HD10 checks file, folder chain and interpreter like the helper. | The session user can replace a program in their `PATH` themselves and make it conceal the subscription login (D-W-45, D-W-57). |
+| R-TM-21 | One session user per person and host, never shared, not even after an assignment ends; without an assignment no terminal (SR12); the host service binds every session user to the first person. HD6 is only an additional check. | Third round of the same error class: an oracle in the account of a shared user can be forged or is switched off; only separate accounts make "no other person's subscription login" true independently of any check (Ruling T12, D-W-57). |
+| R-TM-22 | No shared locations between session users: working directories and `CLAUDE_CONFIG_DIR` per session user, the index of the working directory (`wdi`) counts only in the reported list of `osu` after HD7, programs including their folder chain owned by a trusted owner, one check HD11 for every configured path including folder chain and chain files. | A shared working directory or configuration folder connected the separated accounts again; one general rule instead of a patch per location (Ruling T13, D-W-62). |
+| R-TM-23 | The host service reports the names of its session users; the server assigns only reported names, and an assignment takes effect only as long as the name is reported. | A typo should not show up as a tampering warning `4104` (R-TM-16, D-W-63). |
+| R-TM-24 | `bothy-host session-user remove` takes a session user out of `host_service.session_users` and `host_service.claude_workdirs`, removes its PTY helper, closes its home and restarts the host service; the binding to its person stays, and `session-user add` rejects a bound name. | HD6 runs in every name from `host_service.session_users`; locking the user or ending the assignment does not end the standstill caused by a subscription login (D-W-67). The name stays taken (T12). |
+| R-TM-25 | HD7, HD10 and HD11 use fixed terms per platform: trusted owners (Linux and macOS `root`; Windows `SYSTEM`, `Administrators`, `NT SERVICE\TrustedInstaller`); "writable" includes, for folders, creating, deleting and renaming entries and, for everything, appending and changing attributes, permissions and ownership; every path is fully resolved before the check, locations of a session user by their PTY helper, locations for all by the service user; a path that cannot be resolved counts as not present; links count like their target, HD7 compares folders by their identity, which every helper reports (under Windows with the 128-bit file ID). Under Windows, `bothy-host install`, after confirmation, removes the entry `Authenticated Users:(AD)` at the root of every drive with a location and writes only the DACL of the root, without propagation to the folders below; otherwise HD11 reports `drive_root_writable`. | Without this ruling HD11 would never pass under Windows with default permissions, or one person could block all others with a folder `C:\.git`; the system folders belong to `TrustedInstaller`; a check without resolution would let a link into another person's folder pass; the service user cannot get into the locations of a session user; a propagation of the inheritance would change the whole drive (D-W-80, D-W-83, D-W-84, D-W-86, D-W-87). |
+| R-TM-26 | With `organization`, the profile `claude` starts exactly `host_service.claude_bin` (empty: no profile) with the search list of HD6 at the front of `PATH`; the search list starts with the configured folder of `host_service.claude_bin`, HD10 checks each of its folders, and if it does not find the interpreter of a script, the value counts as empty for HD6 and the profile. With `personal` it starts `claude` through the login shell of the holder, and the holder's `CLAUDE_CONFIG_DIR` must be resolvable and lie in the home. | The program runs in every session user and is a location for all; without an interpreter in the search list, `env` would find an unchecked one in the remaining `PATH`; a `CLAUDE_CONFIG_DIR` outside the home would be a location with a login that HD11 does not know (D-W-81, D-W-82, D-W-85). |
+| R-TM-27 | A restart of the host service ends all sessions of the host (`host_restarted`); at login the host service names the sessions it still knows (`live_sessions`). `session-user add` and `remove` restart it themselves, every other change of the configuration takes effect after `bothy-host restart`. | The new process reads the configuration again and checks everything again; a session from the time before would continue unchecked under the old one. Without a restart after `add`, the server would reject the new name until someone restarts by hand (D-W-90). |
+| R-TM-28 | HD11 during operation: a violation at a location for all ends all sessions and allows no new ones; the check of the entries runs per session user, only that user waits for it, `host_service.entry_scan_timeout` limits it, and only a later full run lifts its finding. | For a location for all no consequence during operation was defined; a large home should hold up only its own session user, and only this check sees whether an entry is still there (D-W-89). |
+| R-TM-29 | `bothy-host doctor` names the affected names on the host and ends with an exit code other than 0; if it refuses the start at startup, the host service first reports the result with `report` and exits without a session, with its own exit code after which the service manager does not restart it. | Otherwise, after a hit at start, the console would show only a disconnected host, and the names from HD6 and HD11 would not reach the instance operator; a restart fixes none of these violations (D-W-91). |
 
-## 17. Konfigurationswerte dieses Kapitels
+## 17. Configuration values of this chapter
 
-Spalte "Ort": Server = Konfigurationsreferenz des Servers; Host-Dienst = Konfiguration von
-`bothy-host` auf dem Rechner.
+Column "Place": Server = configuration reference of the server; Host service = configuration of
+`bothy-host` on the host.
 
-| Name | Ort | Standard | Bedeutung |
+| Name | Place | Default | Meaning |
 |---|---|---|---|
-| `terminal.pairing_code_ttl` | Server | `15m` | Gültigkeit eines Kopplungs-Codes für einen Rechner |
-| `terminal.fingerprint_confirm_chars` | Server | `8` | so viele Zeichen des Fingerabdrucks tippt der Owner bei der Bestätigung |
-| `terminal.fingerprint_max_attempts` | Server | `3` | Fehlversuche bei der Bestätigung, danach Rückfall auf `pairing` |
-| `terminal.step_up_max_age` | Server | `60s` | so jung muss der Step-up für `terminal.open` und `terminal.attach` sein |
-| `terminal.session_token_ttl` | Server | `30s` | Gültigkeit einer Sitzungs-Marke |
-| `terminal.open_timeout` | Server | `20s` | Frist, bis beide Seiten im Relais verbunden sind und der Handshake steht |
-| `terminal.detach_grace` | Server | `15m` | so lange bleibt eine getrennte Sitzung anhängbar |
-| `terminal.quick_reattach_window` | Server | `60s` | Wiederanhängen vom selben Gerät ohne neuen Step-up innerhalb dieser Zeit nach der Trennung |
-| `terminal.idle_timeout` | Server | `30m` | ohne Eingabe des Geräts endet die Sitzung |
-| `terminal.idle_grace` | Server | `2m` | Zuschlag, nach dem der Server selbst wegen Leerlaufs beendet |
-| `terminal.max_session_duration` | Server | `12h` | Höchstdauer einer Sitzung |
-| `terminal.max_sessions_per_person` | Server | `5` | offene Sitzungen je Mensch |
-| `terminal.max_sessions_per_host` | Server | `10` | offene Sitzungen je Rechner |
-| `terminal.relay_buffer_max_bytes` | Server | `262144` | Puffer des Relais je Richtung und Sitzung |
-| `terminal.host_heartbeat_interval` | Server | `20s` | Abstand der Heartbeats der Steuerverbindung (in `hello` gemeldet) |
-| `terminal.host_heartbeat_miss_limit` | Server | `3` | fehlende Heartbeats bis zum Schließen der Steuerverbindung |
-| `terminal.host_auth_timeout` | Server | `10s` | Frist zwischen `hello` und `identify` der Steuer- und Datenverbindung |
-| `terminal.sweep_interval` | Server | `30s` | Abstand des Jobs `terminal.sweep` ([02-architektur.md](02-architektur.md), Abschnitt 12.3) |
-| `terminal.host_duplicate_probe_timeout` | Server | `5s` | so lange wartet der Server auf die Antwort der älteren Steuerverbindung (3.4) |
-| `host_service.state_dir` | Host-Dienst | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | Zustandsordner mit den Schlüsseln des Rechners, den Bindungen der Sitzungsbenutzer an Personen und bei `organization` dem API-Schlüssel des Profils `claude`; nie eine Abo-Anmeldung (7.4) |
-| `host_service.session_users` | Host-Dienst | leer | Sitzungsbenutzer dieses Rechners, je Person einer; je Eintrag ein PTY-Helfer; nie der Dienstbenutzer; leer heißt: HD1 nicht bestanden; gelesen nur beim Start, geändert mit `bothy-host session-user add` und `remove`, die den Host-Dienst dafür neu starten (2.2) |
-| `host_service.extra_forbidden_groups` | Host-Dienst | leer | weitere Gruppen, die HD2 zusätzlich zur festen Liste sperrt |
-| `host_service.credential_check_interval` | Host-Dienst | `60s` | Abstand der Prüfungen HD6 und HD11 während des Betriebs (2.2, 7.4) |
-| `host_service.entry_scan_timeout` | Host-Dienst | `10m` | Höchstdauer der Prüfung der Einträge von HD11 je Sitzungsbenutzer; danach bricht sein PTY-Helfer sie ab, und HD11 besteht für ihn nicht (`entry_scan_timeout`, 2.2) |
-| `host_service.profiles` | Host-Dienst | `[shell]` | angebotene Profile (11.1) |
-| `host_service.claude_bin` | Host-Dienst | leer | absoluter Pfad des Coding-Agenten, den HD6 für `claude auth status` aufruft und den das Profil `claude` bei `organization` startet; gehört mit Ordnerkette, Interpreter und den Ordnern der Suchliste einem vertrauenswürdigen Besitzer (2.2 Punkt 6, HD10); unter Windows eine `.exe`; leer heißt: HD6 prüft nur die Anmeldeorte und warnt, bei `organization` gibt es kein Profil `claude`, die Durchsetzung trägt der eigene Sitzungsbenutzer (7.4); für HD6 und das Profil gilt der Wert auch als leer, wenn sich der Pfad nicht auflösen lässt oder die Suchliste den Interpreter eines Skripts nicht findet |
-| `host_service.claude_workdirs` | Host-Dienst | leer | Arbeitsordner des Profils `claude` je Sitzungsbenutzer (Name aus `host_service.session_users` -> Liste von Ordnern mit Anzeigenamen; gemeldet werden nur die Anzeigenamen); jeder Ordner gehört genau diesem Sitzungsbenutzer (Ruling T13, HD7, HD11); ein Ordner bei zwei Sitzungsbenutzern fällt aus beiden Listen, gemeldet und für `wdi` benutzt wird die Liste danach; gelesen nur beim Start, eine Änderung wirkt nach `bothy-host restart`; ohne Eintrag kein Profil `claude` für diesen Sitzungsbenutzer, leer heißt kein Profil `claude` |
-| `host_service.scrollback_bytes` | Host-Dienst | `1048576` | Rückblick-Puffer je Sitzung, nur im Speicher |
-| `host_service.require_local_confirm` | Host-Dienst | `false` | jede PTY erst nach Zustimmung am Rechner (6.4) |
-| `host_service.local_confirm_timeout` | Host-Dienst | `60s` | Frist für die Zustimmung am Rechner |
+| `terminal.pairing_code_ttl` | Server | `15m` | Validity of a pairing code for a host |
+| `terminal.fingerprint_confirm_chars` | Server | `8` | this many characters of the fingerprint the owner types for the confirmation |
+| `terminal.fingerprint_max_attempts` | Server | `3` | failed attempts at the confirmation, then fallback to `pairing` |
+| `terminal.step_up_max_age` | Server | `60s` | the step-up for `terminal.open` and `terminal.attach` must be at most this old |
+| `terminal.session_token_ttl` | Server | `30s` | Validity of a terminal session token |
+| `terminal.open_timeout` | Server | `20s` | Deadline until both sides are connected in the relay and the handshake is complete |
+| `terminal.detach_grace` | Server | `15m` | this long a detached session stays attachable |
+| `terminal.quick_reattach_window` | Server | `60s` | Reattach from the same device without a new step-up within this time after the detach |
+| `terminal.idle_timeout` | Server | `30m` | without input from the device for this long, the session ends |
+| `terminal.idle_grace` | Server | `2m` | Extra time after which the server itself ends the session because of idleness |
+| `terminal.max_session_duration` | Server | `12h` | Maximum duration of a session |
+| `terminal.max_sessions_per_person` | Server | `5` | open sessions per person |
+| `terminal.max_sessions_per_host` | Server | `10` | open sessions per host |
+| `terminal.relay_buffer_max_bytes` | Server | `262144` | Buffer of the relay per direction and session |
+| `terminal.host_heartbeat_interval` | Server | `20s` | Interval of the heartbeats of the control connection (reported in `hello`) |
+| `terminal.host_heartbeat_miss_limit` | Server | `3` | missing heartbeats until the control connection is closed |
+| `terminal.host_auth_timeout` | Server | `10s` | Deadline between `hello` and `identify` of the control and data connection |
+| `terminal.sweep_interval` | Server | `30s` | Interval of the job `terminal.sweep` ([02-architecture.md](02-architecture.md), section 12.3) |
+| `terminal.host_duplicate_probe_timeout` | Server | `5s` | this long the server waits for the answer of the older control connection (3.4) |
+| `host_service.state_dir` | Host service | `/var/lib/bothy-host` (Windows: `%ProgramData%\bothy-host`) | State directory with the keys of the host, the bindings of the session users to people and, with `organization`, the API key of the profile `claude`; never a subscription login (7.4) |
+| `host_service.session_users` | Host service | empty | Session users of this host, one per person; one PTY helper per entry; never the service user; empty means: HD1 not passed; read only at start, changed with `bothy-host session-user add` and `remove`, which restart the host service for this (2.2) |
+| `host_service.extra_forbidden_groups` | Host service | empty | further groups that HD2 blocks in addition to the fixed list |
+| `host_service.credential_check_interval` | Host service | `60s` | Interval of the checks HD6 and HD11 during operation (2.2, 7.4) |
+| `host_service.entry_scan_timeout` | Host service | `10m` | Maximum duration of the check of the entries of HD11 per session user; after that their PTY helper aborts it, and HD11 does not pass for them (`entry_scan_timeout`, 2.2) |
+| `host_service.profiles` | Host service | `[shell]` | offered profiles (11.1) |
+| `host_service.claude_bin` | Host service | empty | absolute path of the coding agent that HD6 calls for `claude auth status` and that the profile `claude` starts with `organization`; belongs, with folder chain, interpreter and the folders of the search list, to a trusted owner (2.2 item 6, HD10); under Windows an `.exe`; empty means: HD6 checks only the login locations and warns, with `organization` there is no profile `claude`, enforcement rests on the person's own session user (7.4); for HD6 and the profile the value also counts as empty if the path cannot be resolved or the search list does not find the interpreter of a script |
+| `host_service.claude_workdirs` | Host service | empty | Working directories of the profile `claude` per session user (name from `host_service.session_users` -> list of folders with display names; only the display names are reported); each folder belongs to exactly this session user (Ruling T13, HD7, HD11); a folder with two session users drops out of both lists, the list after that is reported and used for `wdi`; read only at start, a change takes effect after `bothy-host restart`; without an entry no profile `claude` for this session user, empty means no profile `claude` |
+| `host_service.scrollback_bytes` | Host service | `1048576` | Scrollback buffer per session, only in memory |
+| `host_service.require_local_confirm` | Host service | `false` | every PTY only after consent on the host (6.4) |
+| `host_service.local_confirm_timeout` | Host service | `60s` | Deadline for the consent on the host |
 
-Werte anderer Kapitel, auf die dieses Kapitel verweist: `auth.clock_leeway`
-([08-identitaet.md](08-identitaet.md)), `cluster.mode` ([02-architektur.md](02-architektur.md)),
-`ratelimit.rl.terminal.*` und `ratelimit.rl.host.*` ([05-aktionen.md](05-aktionen.md)),
-`retention.security_after_end` ([20-datenschutz.md](20-datenschutz.md)).
+Values of other chapters that this chapter refers to: `auth.clock_leeway`
+([08-identity.md](08-identity.md)), `cluster.mode` ([02-architecture.md](02-architecture.md)),
+`ratelimit.rl.terminal.*` and `ratelimit.rl.host.*` ([05-actions.md](05-actions.md)),
+`retention.security_after_end` ([20-privacy.md](20-privacy.md)).

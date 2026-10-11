@@ -1,50 +1,50 @@
-# Modul `agents`
+# Module `agents`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-## Zweck
+## Purpose
 
-Agenten, Backend-Richtlinie und Werkzeugklasse (Soll), gemeldeter Ist-Zustand, Verbraucher-Cursor mit Fencing, Befehlsregister, Agenten-Sitzungen, Dev-Umgebungen (Etappe).
+Agents, backend policy and tool class (configured), reported state, consumer cursors with fencing, command register, agent sessions, dev environments (milestone).
 
-## Port (Wurzelpaket `internal/agents`)
+## Port (root package `internal/agents`)
 
-- Eingehend: `Agents` (Verwaltung, Richtlinie, Werkzeugklasse), `Presence`, `Consumers` (Cursor, Bestätigung, Übernahme mit Fencing), `Commands` (Register), `Sessions`, `DevEnvironments` (Etappe).
-- Gibt In-Tx-Ereignisse aus: `AgentDisabled`.
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: `authz.AgentPolicySource` (Richtlinie, Werkzeugklasse, Bereitschaft der Dev-Umgebung), kernel `personaldata.Participant`.
+- Inbound: `Agents` (administration, policy, tool class), `Presence`, `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `Sessions`, `DevEnvironments` (milestone).
+- Emits in-tx events: `AgentDisabled`.
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: `authz.AgentPolicySource` (policy, tool class, readiness of the dev environment), kernel `personaldata.Participant`.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `identity`, `authz`, `chat`.
+May use the ports of these modules: `identity`, `authz`, `chat`.
 
-Grund: Agent-Prinzipal anlegen, Zugangsdaten-Inhaber ist Mensch; implementiert `AgentPolicySource`; Thread für Sitzungen, Geltung von Befehlen.
+Reason: create the agent principal, the credential holder is a person; implements `AgentPolicySource`; thread for sessions, where commands apply.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `agents`, `agent_consumer_cursors`, `commands`, `agent_sessions`, `dev_environments`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `agent.read`, `agent.create`, `agent.update`, `agent.disable`, `agent.enable`, `agent.billing_mode.set`, `agent.billing_mode.set_all`, `agent.credential_holder.set`, `agent.tool_class.set`, `agent.heartbeat`, `agent.events.consume`, `agent.triggerers.read`, `agent_session.read`, `agent_session.reset`, `agent_session.bind`, `agent_session.report`, `command.read`, `command.register`, `command.remove`, `dev_environment.read`, `dev_environment.manage`, `dev_environment.report`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: `agent_session.changed`, `command.changed`, `agent.updated`.
-- Kurzlebig: `agent.presence_changed`.
-- WebSocket-Ops (Client an Server): `ack`.
+- Durable: `agent_session.changed`, `command.changed`, `agent.updated`.
+- Ephemeral: `agent.presence_changed`.
+- WebSocket ops (client to server): `ack`.
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Heartbeat-Zustand lebt im Speicher und wird höchstens je `agent.heartbeat_persist_interval` gespeichert (03, 4.4).
-- `acked_seq` wird spätestens je `agent.ack_persist_interval` gespeichert (04, 15.2); bei mehreren Knoten mit Fencing (02, Abschnitt 16).
-- Umbinden einer Agenten-Sitzung ist ein Compare-and-swap auf `agent_sessions.version`.
+- The heartbeat state lives in memory and is stored at most once per `agent.heartbeat_persist_interval` (03, 4.4).
+- `acked_seq` is stored at the latest after every `agent.ack_persist_interval` (04, 15.2); with several nodes, with fencing (02, section 16).
+- Rebinding an agent session is a compare-and-swap on `agent_sessions.version`.
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [09-agenten.md](../../../../docs/spec/09-agenten.md), [10-backend-richtlinie.md](../../../../docs/spec/10-backend-richtlinie.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [09-agents.md](../../../../docs/spec/09-agents.md), [10-backend-policy.md](../../../../docs/spec/10-backend-policy.md)

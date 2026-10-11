@@ -1,5 +1,5 @@
 {
-  "$comment": "Herkunft der eingebetteten Dateien. Nur f\u00fcr Vorschau und Doku; die Apps beziehen Schriften und Icons im Paket-Build aus denselben Quellen. sha256 der gespeicherten Bytes (Textdateien mit LF wie in .gitattributes); tokens.py check pr\u00fcft sie.",
+  "$comment": "Origin of the embedded files. Only for the preview and the docs; the apps get fonts and icons in the package build from the same sources. sha256 of the stored bytes (text files with LF as in .gitattributes); tokens.py check verifies them.",
   "sources": {
     "fonts/atkinson-hyperlegible-next-*": "npm @fontsource-variable/atkinson-hyperlegible-next@5.3.0 (OFL-1.1)",
     "fonts/atkinson-hyperlegible-mono-*": "npm @fontsource-variable/atkinson-hyperlegible-mono@5.3.0 (OFL-1.1)",

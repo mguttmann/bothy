@@ -1,50 +1,50 @@
-# Modul `chat`
+# Module `chat`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-## Zweck
+## Purpose
 
-Bereiche, Seitenleisten-Zustand, Kanäle mit Verhalten, Skills, Projektbindung, DM-Teilnehmer, Forum-Tags, Threads mit Thread-Sequenz.
+Spaces, sidebar state, channels with behavior, skills, project binding, DM participants, forum tags, threads with thread sequence.
 
-## Port (Wurzelpaket `internal/chat`)
+## Port (root package `internal/chat`)
 
-- Eingehend: `Structure` (Bereiche, Kanäle, Schreibschutz), `Threads` (Anlegen für `messaging`, `AppendToThread`, Nachrichtenzahl bei Löschung, Schließen, Öffnen, Verschieben, Info), `AgentConfig`.
-- Gibt In-Tx-Ereignisse aus: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`.
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: `authz.StructureSource`, kernel `personaldata.Participant`.
+- Inbound: `Structure` (spaces, channels, read-only), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info), `AgentConfig`.
+- Emits in-tx events: `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived`.
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: `authz.StructureSource`, kernel `personaldata.Participant`.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `identity`, `authz`.
+May use the ports of these modules: `identity`, `authz`.
 
-Grund: Bediener ist aktiver Agent-Prinzipal, DM-Teilnehmer sind Menschen; implementiert `StructureSource`.
+Reason: the operator is an active agent principal, DM participants are people; implements `StructureSource`.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `spaces`, `user_space_states`, `channels`, `channel_skill_bindings`, `project_bindings`, `dm_participants`, `forum_tags`, `threads`, `thread_tags`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `space.read`, `space.create`, `space.update`, `space.reorder`, `space.archive`, `space.operator.set`, `sidebar.update`, `channel.read`, `channel.create`, `channel.update`, `channel.reorder`, `channel.behavior.read`, `channel.behavior.update`, `channel.operator.set`, `channel.project.bind`, `channel.read_only.set`, `channel.archive`, `forum_tag.manage`, `dm.create`, `dm.leave`, `thread.read`, `thread.title.update`, `thread.close`, `thread.reopen`, `thread.move`, `thread.tags.set`, `agent.config.read`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved`, `thread.moved_out`, `space.created`, `space.updated`, `space.archived`, `channel.created`, `channel.updated`, `channel.settings_changed`, `channel.archived`, `sidebar.updated`, `agent.config_changed`.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: `thread.created`, `thread.updated`, `thread.closed`, `thread.reopened`, `thread.moved`, `thread.moved_out`, `space.created`, `space.updated`, `space.archived`, `channel.created`, `channel.updated`, `channel.settings_changed`, `channel.archived`, `sidebar.updated`, `agent.config_changed`.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hinweise für den Bau
+## Notes for the build
 
-- `Threads.AppendToThread` sperrt die Thread-Zeile und vergibt die Thread-Sequenz (03, 6.2); `messaging` ruft ihn in seiner Transaktion.
-- Kanal-Prompt, Skills und Projektbindung stehen nie in Ereignissen; `channel.settings_changed` trägt nur `settings_version` (04, 2.2).
-- Verschieben eines Threads nur bei gleichem wirksamen Bediener (03, `threads`).
+- `Threads.AppendToThread` locks the thread row and assigns the thread sequence (03, 6.2); `messaging` calls it in its transaction.
+- The channel prompt, skills and project binding never appear in events; `channel.settings_changed` carries only `settings_version` (04, 2.2).
+- A thread can be moved only when the effective operator stays the same (03, `threads`).
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [01-produkt.md](../../../../docs/spec/01-produkt.md), [07-rechte.md](../../../../docs/spec/07-rechte.md), [09-agenten.md](../../../../docs/spec/09-agenten.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [01-product.md](../../../../docs/spec/01-product.md), [07-permissions.md](../../../../docs/spec/07-permissions.md), [09-agents.md](../../../../docs/spec/09-agents.md)

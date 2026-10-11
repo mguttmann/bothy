@@ -1,44 +1,44 @@
 # hermes-adapter
 
-Status: geplant. Dieser Ordner enthält noch keinen Code.
+Status: planned. This folder contains no code yet.
 
-## Zweck
+## Purpose
 
-Referenz-Adapter für Hermes Agent (https://github.com/NousResearch/hermes-agent), ein quelloffenes
-Agenten-Framework. Der Adapter ist ein Hermes-Plattform-Plugin (`kind: platform`). Er verbindet
-ein Hermes-Profil als Agenten-Prinzipal mit dem Server: Aufrufe kommen über das Gateway, Antworten,
-Live-Box und Komponenten gehen über die öffentliche API.
+Reference adapter for Hermes Agent (https://github.com/NousResearch/hermes-agent), an open-source
+agent framework. The adapter is a Hermes platform plugin (`kind: platform`). It connects
+a Hermes profile as an agent principal to the server: invocations come through the gateway; answers,
+live box and components go through the public API.
 
-Hermes ist ein Adapter unter mehreren. Der Server hängt nicht von Hermes ab.
+Hermes is one adapter among several. The server does not depend on Hermes.
 
-## Vertrag
+## Contract
 
-- Allgemein: docs/spec/09-agenten.md Abschnitte 4 bis 16.
-- Hermes-spezifisch: docs/spec/09-agenten.md Abschnitt 17 (Abbildung der
-  `BasePlatformAdapter`-Methoden, Sitzungsschlüssel über die Thread-ID, `busy_input_mode`,
-  Prüfung der Aufruf-Marke vor `handle_message`, Erlaubnisliste, Ist-Modus).
-- Backend-Richtlinie: docs/spec/10-backend-richtlinie.md Abschnitt 10.1.
+- General: docs/spec/09-agents.md sections 4 to 16.
+- Hermes-specific: docs/spec/09-agents.md section 17 (mapping of the
+  `BasePlatformAdapter` methods, session key through the thread ID, `busy_input_mode`,
+  check of the invocation token before `handle_message`, allow-list, reported mode).
+- Backend policy: docs/spec/10-backend-policy.md section 10.1.
 
-## Feste Regeln
+## Fixed rules
 
-- Nur öffentliche Hermes-Plugin-Oberflächen; keine Änderung an Hermes.
-- Plattform-Schlüssel (`hermes_adapter.platform_key`) nach Inbetriebnahme nie ändern; sonst
-  verliert jeder Thread seine Hermes-Sitzung.
-- `busy_input_mode` ausdrücklich `steer` oder `queue`; bei `interrupt` meldet der Adapter
+- Only public Hermes plugin interfaces; no change to Hermes.
+- Never change the platform key (`hermes_adapter.platform_key`) after commissioning; otherwise
+  every thread loses its Hermes session.
+- `busy_input_mode` explicitly `steer` or `queue`; with `interrupt` the adapter reports
   `degraded`.
-- Kein Start ohne gültige Aufruf-Marke; Ist-Modus nur am Schlüsseltyp erkennen, nie den Wert
-  lesen, speichern oder senden.
+- No start without a valid invocation token; detect the reported mode only from the key type,
+  never read, store or send the value.
 
-## Geplanter Aufbau
+## Planned structure
 
-| Teil | Inhalt |
+| Part | Content |
 |---|---|
-| `plugin.yaml` | Manifest des Hermes-Plugins |
-| Adapter-Modul | einziges Modul mit Hermes-Import; Unterklasse von `BasePlatformAdapter` |
-| Logik-Module | Abbildung, Kontext-Format, Erlaubnisliste; ohne Hermes-Import, eigenständig testbar |
-| Installer | schreibt Plugin-Konfiguration und Profil-Einstellungen, prüft sie mit Hermes' eigenem YAML-Leser vorher und nachher |
-| Tests | Logik-Tests; Fake-Hermes-Tests im Unterprozess mit gepinnter Hermes-Version, Wegwerf-`HERMES_HOME` und Fake-Modell-Endpunkt |
+| `plugin.yaml` | manifest of the Hermes plugin |
+| Adapter module | the only module with a Hermes import; subclass of `BasePlatformAdapter` |
+| Logic modules | mapping, context format, allow-list; without a Hermes import, testable on their own |
+| Installer | writes the plugin configuration and the profile settings, checks them with Hermes' own YAML reader before and after |
+| Tests | logic tests; fake Hermes tests in a subprocess with a pinned Hermes version, a throwaway `HERMES_HOME` and a fake model endpoint |
 
-## Vor dem Bau zu prüfen
+## To check before the build
 
-Siehe docs/spec/09-agenten.md Abschnitt 17.10.
+See docs/spec/09-agents.md section 17.10.

@@ -1,6 +1,6 @@
 # M1-02: Action catalogue as the single data source (ADR 0049)
 
-Status: ready | Depends on: none | Etappe: M1
+Status: ready | Depends on: none | Milestone: M1
 
 ## Goal
 
@@ -13,33 +13,33 @@ ADR 0049 records the decision.
 
 ## Read first
 
-- `docs/PLAN.md`: section "Arbeitsweise je Ticket"; section "M1 Fundament" (Block A, row M1-02;
-  "Voraussetzungen aus dem Kern-Vertrag", row "maschinenlesbarer Aktionskatalog"); P-11, P-12 in
-  "Entscheidungen dieses Plans".
-- `docs/spec/05-aktionen.md`, the whole chapter, especially "Verbindliche Regeln" (rules 3, 4, 10),
-  "Scopes für Apps" (2.6), "Rate-Limit-Klassen", "Aktionen" (4.1 to 4.14), "Dauerhafte
-  Ereignistypen und Empfangs-Aktion", "WebSocket-Ops und Aktion", "Tests, die diesen Katalog
-  halten", "Konfigurationswerte dieses Kapitels".
-- `docs/spec/00-glossar.md` (terms), `docs/spec/04-sync-protokoll.md` "Ops" (6.2) and "Zwei Arten"
+- `docs/PLAN.md`: section "Way of working per ticket"; section "M1 Foundation" (Block A, row
+  M1-02; "Prerequisites from the core contract", row "machine-readable action catalogue"); P-11,
+  P-12 in "Decisions of this plan".
+- `docs/spec/05-actions.md`, the whole chapter, especially "Binding rules" (rules 3, 4, 10),
+  "Scopes for apps" (2.6), "Rate-limit classes", "Actions" (4.1 to 4.14),
+  "Durable event types and receive action", "WebSocket ops and action",
+  "Tests that hold this catalogue", "Configuration values of this chapter".
+- `docs/spec/00-glossary.md` (terms), `docs/spec/04-sync-protocol.md` "Ops" (6.2) and "Two kinds"
   (2.1).
-- `docs/spec/02-architektur.md`: "Abgleich mit dem Kern-Vertrag" (row "Maschinenlesbarer
-  Aktionskatalog"), "Aktionen je Modul", "Ereignistypen und WebSocket-Ops je Modul" (read only;
-  M1-06 checks them).
+- `docs/spec/02-architecture.md`: "Alignment with the core contract"
+  (row "machine-readable action catalogue"), "Actions per module",
+  "Event types and WebSocket ops per module" (read only; M1-06 checks them).
 - `docs/api/redocly.yaml` (rules `authz-action-known`, `rate-limit-class-known`,
   `receive-action-known-message`, `receive-action-known-webhook`), `docs/api/asyncapi.yaml`
   (`operations`, `components.messages` with `x-event-kind`, `x-receive-action`, `x-audience`),
-  `docs/api/README.md` ("Ändern").
-- ADRs: `docs/adr/0017-eine-autorisierungsfunktion-404-statt-403-registrierungszwang.md`,
-  `docs/adr/0013-spec-first-openapi-31-und-asyncapi-30-normativ.md`,
-  `docs/adr/0001-adrs-im-madr-format-decisions-als-ruling-log.md`,
-  `docs/adr/0000-vorlage-madr-4.md`,
-  `docs/adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md` (accepted; it already
+  `docs/api/README.md` ("Change").
+- ADRs: `docs/adr/0017-one-authorization-function-404-instead-of-403-mandatory-registration.md`,
+  `docs/adr/0013-spec-first-openapi-31-and-asyncapi-30-normative.md`,
+  `docs/adr/0001-adrs-in-madr-format-decisions-as-ruling-log.md`,
+  `docs/adr/0000-template-madr-4.md`,
+  `docs/adr/0049-machine-readable-action-catalogue-as-the-single-source.md` (accepted; it already
   records the decision and the rulings of this ticket, see "Design notes").
-- `docs/quality/gates.md`, `docs/spec/23-qualitaet.md` "Gates", `tools/README.md`,
+- `docs/quality/gates.md`, `docs/spec/23-quality.md` "Gates", `tools/README.md`,
   `tools/pyproject.toml`, `Makefile` (targets `gates`, `lint`, `api-lint`), `CHANGELOG.md`,
   `docs/DECISIONS.md`.
 
-Action ids: all of chapter 05 section "Aktionen". Event types and ops: all of sections 6 and 7.
+Action ids: all of chapter 05 section "Actions". Event types and ops: all of sections 6 and 7.
 No API operation and no table of chapter 03 changes.
 
 ## Fixed requirements that apply
@@ -56,7 +56,7 @@ No API operation and no table of chapter 03 changes.
    documentation is not done.
 5. Quality gates (SonarQube, linters, type checking, security scanners, test coverage) block the
    merge.
-6. Test first: every behaviour gets a test that is red before the change (show the red output in
+6. Test first: every behavior gets a test that is red before the change (show the red output in
    the report), then green.
 7. No en dash (U+2013) and no em dash (U+2014) in any file or commit message. Check every changed
    file with `uv run --project tools --locked --quiet python tools/hooks/text_rules.py <file>` (exit code 0; plain `grep -P` fails on macOS).
@@ -68,8 +68,8 @@ No API operation and no table of chapter 03 changes.
 10. The catalogue is closed: an unknown action is a program error (05 rule 5); every REST
     operation names exactly one known action and its class (05 rule 3); every op and every event
     type names its action or receive action (05 rule 4); system actions are not reachable over API
-    or gateway (05 rule 10, test 7 in "Tests, die diesen Katalog halten").
-11. Chapter 05 is core contract and normative (`docs/PLAN.md` "Grundsätze" item 3). The content of
+    or gateway (05 rule 10, test 7 in "Tests that hold this catalogue").
+11. Chapter 05 is core contract and normative (`docs/PLAN.md` "Principles" item 3). The content of
     every table row stays exactly as it is; only its source moves. If a row cannot be expressed
     in the schema below without changing its text, stop with `Verdict: BLOCKED` and name the row
     (P-11).
@@ -101,14 +101,14 @@ No API operation and no table of chapter 03 changes.
     - `def check(root: Path) -> list[str]` and `def generate(root: Path) -> list[str]` (returns
       the paths it rewrote).
 3. `tools/catalog/tests/test_action_catalog.py`, `tools/catalog/tests/table_import.py` (test
-   helper, see "Design notes"), `tools/catalog/tests/fixtures/05-aktionen-before.md.txt` (byte copy
-   of `docs/spec/05-aktionen.md` from the base commit of this ticket; suffix `.txt` so that
-   `make linkcheck` does not check its relative links). `tools/catalog/README.md` (German, short:
+   helper, see "Design notes"), `tools/catalog/tests/fixtures/05-actions-before.md.txt` (byte copy
+   of `docs/spec/05-actions.md` from the base commit of this ticket; suffix `.txt` so that
+   `make linkcheck` does not check its relative links). `tools/catalog/README.md` (English, short:
    purpose, commands, schema pointer).
-4. `docs/spec/05-aktionen.md`: wrap each generated table in markers (names in "Design notes"); the
-   rows themselves are produced by `make catalog`. Rewrite rule 3 of "Verbindliche Regeln": the
-   sentence "Eine maschinenlesbare Fassung ... ist beschlossen (ADR 0049); bis sie steht, hält ein
-   Abgleich ..." becomes: the single source is `[actions.yaml](actions.yaml)` (ADR 0049); the
+4. `docs/spec/05-actions.md`: wrap each generated table in markers (names in "Design notes"); the
+   rows themselves are produced by `make catalog`. Rewrite rule 3 of "Binding rules": the
+   sentence "A machine-readable version ... is decided (ADR 0049); until it exists, a
+   reconciliation ..." becomes: the single source is `[actions.yaml](actions.yaml)` (ADR 0049); the
    tables of sections 3, 4, 6 and 7 and the lists in `docs/api/redocly.yaml` are generated from it
    (`make catalog`) and `make catalog-check` holds them in the gate. Rule 4: add that sections 6
    and 7 are generated from the same file. No other text of the chapter changes.
@@ -124,11 +124,11 @@ No API operation and no table of chapter 03 changes.
    source` and `[tool.mypy] files`.
 8. ADR 0049 exists. Change it only where the implementation differs from it (then set `date:`
    to the day of the merge and run `make adr-index`); no new ADR.
-9. Other documents: `docs/spec/02-architektur.md` "Abgleich mit dem Kern-Vertrag", row
-   "Maschinenlesbarer Aktionskatalog": now `docs/spec/actions.yaml` (ADR 0049), checked by
-   `make catalog-check`. `docs/api/README.md` "Ändern" items 2 and 3: a missing action or a new
+9. Other documents: `docs/spec/02-architecture.md` "Alignment with the core contract", row
+   "machine-readable action catalogue": now `docs/spec/actions.yaml` (ADR 0049), checked by
+   `make catalog-check`. `docs/api/README.md` "Change" items 2 and 3: a missing action or a new
    event type enters `docs/spec/actions.yaml` first, then `make catalog`.
-   `docs/quality/gates.md`: row `catalog-check`. `docs/spec/23-qualitaet.md` "Gates", group "Doku":
+   `docs/quality/gates.md`: row `catalog-check`. `docs/spec/23-quality.md` "Gates", group "Docs":
    add `catalog-check`. `tools/README.md`: row for `catalog/`. `CHANGELOG.md` `[Unreleased]`.
    `docs/DECISIONS.md`: the rulings in "Design notes".
 
@@ -136,20 +136,20 @@ No API operation and no table of chapter 03 changes.
 
 - Checks of `openapi.yaml`, `asyncapi.yaml` and `webhooks.md` against the catalogue, and the
   generated tables of chapter 06: M1-03.
-- The tables of chapter 02 ("Aktionen je Modul", "Ereignistypen und WebSocket-Ops je Modul") and
+- The tables of chapter 02 ("Actions per module", "Event types and WebSocket ops per module") and
   module ownership of actions: M1-06 (module ownership lives in `architecture/modules.yaml`, ADR
   0050, never in `actions.yaml`).
 - Go constants and the closed catalogue in code: M1-25.
-- The "Konfigurationswerte dieses Kapitels" table of 05 stays hand-written (it feeds
+- The "Configuration values of this chapter" table of 05 stays hand-written (it feeds
   `docs/operations/configuration.md`); this ticket only cross-checks it.
-- The scope table "Scopes für Apps" (2.6) and the list "Wirkung (`effect`)" (2.7) stay
+- The scope table "Scopes for apps" (2.6) and the list "Effect (`effect`)" (2.7) stay
   hand-written (prose); this ticket cross-checks both against the YAML.
 
 ## Boundaries
 
 - Work in a dedicated git worktree on the branch `feat/M1-02-action-catalogue-source`.
 - Conventional Commits with DCO sign-off (`git commit -s`), for example `docs(spec):
-  Aktionskatalog als Datenquelle (ADR 0049)` and `build(catalog): ...`.
+  action catalogue as the data source (ADR 0049)` and `build(catalog): ...`.
 - Never push, tag, open pull requests or create remote repositories.
 - Do not modify files outside the scope above, except `docs/DECISIONS.md` and `CHANGELOG.md` as
   named.
@@ -169,14 +169,14 @@ Top level, exactly these keys in this order; unknown keys anywhere are findings:
 | Key | Type | Meaning |
 |---|---|---|
 | `version` | integer `1` | schema version |
-| `rate_limit_classes` | list of class | row order of 05 "Rate-Limit-Klassen" |
+| `rate_limit_classes` | list of class | row order of 05 "Rate-limit classes" |
 | `sections` | list of strings | keys of the action tables, in order: `public` (4.1), `instance` (4.2), `identity` (4.3), `grants` (4.4), `structure` (4.5), `threads` (4.6), `messages` (4.7), `files` (4.8), `personal` (4.9), `agents` (4.10), `apps` (4.11), `operations` (4.12), `dev` (4.13), `terminal` (4.14) |
 | `actions` | list of action | row order of 05 section 4 |
 | `events` | list of event | durable rows, then ephemeral rows, in 05 row order |
-| `ws_ops` | list of op | row order of the first table of 05 "WebSocket-Ops und Aktion" (gateway) |
-| `channel_ops` | list of channel op | row order of the second table of 05 "WebSocket-Ops und Aktion" ("Terminal-Kanäle") |
+| `ws_ops` | list of op | row order of the first table of 05 "WebSocket ops and action" (gateway) |
+| `channel_ops` | list of channel op | row order of the second table of 05 "WebSocket ops and action" ("Terminal channels") |
 
-Class: `id` (`rl.<name>`), `key` (cell "Schlüssel"), `purpose` (cell "Zweck").
+Class: `id` (`rl.<name>`), `key` (cell "Key"), `purpose` (cell "Purpose").
 
 Action (05 column in brackets):
 
@@ -184,32 +184,32 @@ Action (05 column in brackets):
 |---|---|---|---|
 | `id` | string, pattern `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`, unique | yes | `` `id` `` (ID) |
 | `section` | one of `sections` | yes | (which table) |
-| `description` | string, verbatim Markdown | yes | Beschreibung |
-| `resource` | string, verbatim | yes | Ressource |
-| `right` | string, verbatim; the value `system` marks a system action | yes | Recht |
-| `owner` | `true`, `false` or `as_target` | yes | `ja`, `nein`, `wie Zielaktion` (Owner) |
-| `step_up` | `true`, `false`, `conditional` or `fresh` | yes | `ja` / `nein` / `bedingt` / `frisch` (Step-up; `bedingt` and `frisch` per 05 "Spalten Owner, Step-up, Audit, Rechte"; `frisch` is used by the terminal actions of 4.14) |
-| `audit` | `always`, `denials`, `never` or `conditional` | yes | `ja`, `abl`, `nein`, or `audit_text` (Audit) |
-| `audit_text` | string | only and always with `conditional` | verbatim cell, for example `ja bei fremder` |
-| `rights_change` | boolean | yes | `ja` / `nein` (Rechte) |
-| `rl_class` | a class id or `none` | yes | `` `rl.x` `` or `` `none` `` (RL-Klasse) |
+| `description` | string, verbatim Markdown | yes | Description |
+| `resource` | string, verbatim | yes | Resource |
+| `right` | string, verbatim; the value `system` marks a system action | yes | Permission |
+| `owner` | `true`, `false` or `as_target` | yes | `yes`, `no`, `as target action` (Owner) |
+| `step_up` | `true`, `false`, `conditional` or `fresh` | yes | `yes` / `no` / `conditional` / `fresh` (Step-up; `conditional` and `fresh` per 05 "Columns Owner, Step-up, Audit, Permissions"; `fresh` is used by the terminal actions of 4.14) |
+| `audit` | `always`, `denials`, `never` or `conditional` | yes | `yes`, `denials`, `no`, or `audit_text` (Audit) |
+| `audit_text` | string | only and always with `conditional` | verbatim cell, for example `yes for others'` |
+| `rights_change` | boolean | yes | `yes` / `no` (Permissions) |
+| `rl_class` | a class id or `none` | yes | `` `rl.x` `` or `` `none` `` (RL class) |
 | `delivery_check` | boolean, default `false` | no | marks the internal delivery checks (`push.deliver`, `webhook_out.deliver`) |
-| `effect` | `read` or `write` | yes | not rendered; the closed rule of 05 "Wirkung (`effect`)" (2.7): `read` exactly for the actions listed there, `write` for all others; the check derives the expected value from 2.7 and compares |
+| `effect` | `read` or `write` | yes | not rendered; the closed rule of 05 "Effect (`effect`)" (2.7): `read` exactly for the actions listed there, `write` for all others; the check derives the expected value from 2.7 and compares |
 | `app_scope` | one of `messages:read`, `messages:write`, `files:read`, `files:write`, `commands:write`, `components:write`, `users:read`, `events:subscribe`, `costs:reconcile`, `none` | no | not rendered; mirrors 2.6 (`none`: usable by apps without a scope; absent: 2.6 names no scope) |
 
 Event:
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
-| `type` | string, same pattern as action ids, unique | yes | Ereignistyp |
+| `type` | string, same pattern as action ids, unique | yes | Event type |
 | `kind` | `durable` or `ephemeral` | yes | which of the two tables |
-| `resource` | string | yes | Ressource |
+| `resource` | string | yes | Resource |
 | `receive_action` | a non-system action id or `self` | yes | machine receive action (equals `x-receive-action` in asyncapi.yaml) |
 | `audience` | `self` | no | only the named principal receives it (equals `x-audience: self`); absent means every permitted recipient |
 | `receivers` | `principal`, `agent` or `agent_or_app` | only with `audience: self`, default `principal` | who can be that principal; M1-03 uses it for the webhook table |
 | `receive_text` | string | no | verbatim cell override when the cell is more than the action |
-| `note` | string | no | Hinweis (durable) or Zusatzbedingung (ephemeral); empty when absent |
-| `resource_version` | boolean | yes for `durable` | not rendered; whether the envelope carries `resource.version` (04 "Zustellgarantie" point 3: only when the table of the resource has a `version` column and the event reports its new value; the listed exceptions are `false`). M1-25 carries it into `EventSpec`, and the frame conformance test of M1-67 checks every dispatched event against it |
+| `note` | string | no | Note (durable) or Additional condition (ephemeral); empty when absent |
+| `resource_version` | boolean | yes for `durable` | not rendered; whether the envelope carries `resource.version` (04 "Delivery guarantee" point 3: only when the table of the resource has a `version` column and the event reports its new value; the listed exceptions are `false`). M1-25 carries it into `EventSpec`, and the frame conformance test of M1-67 checks every dispatched event against it |
 
 Receive cell: `receive_text` if set; else `self` (no backticks) for `self`; else `` `id` ``.
 `receive_action: self` requires `audience: self`. When set, `receive_text` must contain
@@ -229,7 +229,7 @@ WebSocket op:
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `op` | string, unique | yes | Op |
-| `direction` | `client_to_server`, `agent_to_server`, `agent_or_app_to_server`, `server_to_client` | yes | renders `Client an Server`, `Agent an Server`, `Agent oder App an Server`, `Server an Client` |
+| `direction` | `client_to_server`, `agent_to_server`, `agent_or_app_to_server`, `server_to_client` | yes | renders `client to server`, `agent to server`, `agent or app to server`, `server to client` |
 | `action` | non-system action id | yes | the action checked for the op (equals `x-authz-action` in asyncapi.yaml) |
 | `also_actions` | list of action ids | no | further checks (`heartbeat`: `agent.heartbeat` for agents) |
 | `action_text` | string | no | verbatim cell override |
@@ -241,26 +241,26 @@ Current values: `identify`, `resume`, `heartbeat`, `reauth`, `focus`, `typing.st
 `command.autocomplete_result` is `agent_or_app_to_server`; `hello`, `ready`, `resumed`, `cursor`,
 `catchup.complete`, `resync_required`, `heartbeat_ack`, `reauth_required`, `error` are
 `server_to_client` with action `gateway.connect`, `row_group: session` and the action text
-"keine eigene; Teil der Sitzung aus `gateway.connect`"; `dispatch` is `server_to_client` with
-action `gateway.connect`, `per_event_receive_action: true` and the action text "Empfangs-Aktion
-des Ereignistyps (Abschnitt 6)"; `heartbeat` has `also_actions: [agent.heartbeat]` and the action
-text "`gateway.connect` (Sitzung muss gültig sein); bei Agenten zusätzlich `agent.heartbeat`";
-`focus` has the action text "`gateway.focus` je Thread"; `stats.subscribe` and `stats.unsubscribe`
-are `client_to_server` with action `stats.read`, `row_group: stats` and the action text "`stats.read`
-auf Instanz bzw. Bereich". These actions equal `x-authz-action` in `docs/api/asyncapi.yaml` today;
-M1-03 keeps them equal.
+"none of its own; part of the session from `gateway.connect`"; `dispatch` is `server_to_client`
+with action `gateway.connect`, `per_event_receive_action: true` and the action text "receive
+action of the event type (section 6)"; `heartbeat` has `also_actions: [agent.heartbeat]` and the
+action text "`gateway.connect` (session must be valid); for agents also `agent.heartbeat`";
+`focus` has the action text "`gateway.focus` per thread"; `stats.subscribe` and
+`stats.unsubscribe` are `client_to_server` with action `stats.read`, `row_group: stats` and the
+action text "`stats.read` on the instance or space respectively". These actions equal `x-authz-action` in
+`docs/api/asyncapi.yaml` today; M1-03 keeps them equal.
 
-Channel op (one row of the table "Terminal-Kanäle" of 05 section 7; these channels are not the
+Channel op (one row of the table "Terminal channels" of 05 section 7; these channels are not the
 gateway and have their own operations in `docs/api/asyncapi.yaml`):
 
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `channel` | `terminal_stream`, `host_control`, `host_data` | yes | asyncapi channel `terminalStream`, `hostControl`, `hostData` |
-| `channel_text` | string | only on the first row of a channel | verbatim cell "Kanal"; continuation rows render an empty cell |
-| `ops` | list of op names; the name `noise_frame` stands for binary Noise frames | yes | cell "Op": backticked names joined by `, `; `noise_frame` renders as `Binärrahmen (Noise)` |
-| `direction` | `server_to_device`, `device_to_server`, `server_to_host`, `host_to_server`, `both` | yes | `Server an Gerät`, `Gerät an Server`, `Server an Rechner`, `Rechner an Server`, `beide` |
+| `channel_text` | string | only on the first row of a channel | verbatim cell "Channel"; continuation rows render an empty cell |
+| `ops` | list of op names; the name `noise_frame` stands for binary Noise frames | yes | cell "Op": backticked names joined by `, `; `noise_frame` renders as `binary frames (Noise)` |
+| `direction` | `server_to_device`, `device_to_server`, `server_to_host`, `host_to_server`, `both` | yes | `server to device`, `device to server`, `server to host`, `host to server`, `both` |
 | `action` | non-system action id | yes | equals `x-authz-action` of the matching asyncapi operations |
-| `action_text` | string | no | verbatim cell override (for example "`terminal.stream` (Sitzung muss gültig sein)") |
+| `action_text` | string | no | verbatim cell override (for example "`terminal.stream` (the session must be valid)") |
 
 Current values follow the six rows of that table: `terminal_stream` with `hello` (server to device),
 `identify` (device to server) and `noise_frame` (both), action `terminal.stream`; `host_control`
@@ -278,18 +278,18 @@ redocly file for block rules):
 2. Uniqueness: class ids, action ids, event types, ops.
 3. Every `section` is listed; every listed section has at least one action.
 4. `rl_class` is a known class or `none`; `rl_class == none` exactly for actions with
-   `right: system` or `delivery_check: true` (05 "Rate-Limit-Klassen", last sentence); every class
+   `right: system` or `delivery_check: true` (05 "Rate-limit classes", last sentence); every class
    is used by at least one action.
-5. Every class has the rows `ratelimit.<id>.per_minute` / `.burst` in 05 "Konfigurationswerte
-   dieses Kapitels" (row form `` `ratelimit.rl.x.per_minute` / `.burst` ``), and that table names
-   no other class.
+5. Every class has the rows `ratelimit.<id>.per_minute` / `.burst` in 05
+   "Configuration values of this chapter" (row form `` `ratelimit.rl.x.per_minute` / `.burst` ``),
+   and that table names no other class.
 6. Events: `receive_action` present ("event type without receive action"), known, not a system
    action; the `audience`, `receivers` and `receive_text` rules above.
 7. Ops: `action` present ("op without action"), known, not a system action; `also_actions` known;
    members of a `row_group` are consecutive and share `direction`, `action` and `action_text`.
    Channel ops: `action` known and not a system action; rows of one channel are consecutive and
    only the first carries `channel_text`; an op name is unique within its channel and direction.
-8. 2.6 consistency: parse the table under "Scopes für Apps". In column one every backticked token
+8. 2.6 consistency: parse the table under "Scopes for apps". In column one every backticked token
    is an action id or a pattern ending in `.*` (prefix match); prose without backticks is ignored.
    In column two the first backticked token is the scope; a cell without one means `none`. Every
    action named there has that `app_scope`, and every action with `app_scope` is named in exactly
@@ -300,23 +300,23 @@ redocly file for block rules):
 
 ### Generated blocks
 
-In `docs/spec/05-aktionen.md`, each block contains the whole table including its header line and
+In `docs/spec/05-actions.md`, each block contains the whole table including its header line and
 separator line:
 
 | Block name | Table | Header |
 |---|---|---|
-| `rate_limit_classes` | "Rate-Limit-Klassen" | `\| Klasse \| Schlüssel \| Zweck \|` |
-| `actions.<section key>` (14 blocks) | each table of section 4 | `\| ID \| Beschreibung \| Ressource \| Recht \| Owner \| Step-up \| Audit \| Rechte \| RL-Klasse \|` |
-| `events.durable` | first table of section 6 | `\| Ereignistyp \| Ressource \| Empfangs-Aktion \| Hinweis \|` |
-| `events.ephemeral` | second table of section 6 | `\| Ereignistyp \| Ressource \| Empfangs-Aktion \| Zusatzbedingung \|` |
-| `ws_ops` | first table of section 7 | `\| Op \| Richtung \| Aktion \|` |
-| `channel_ops` | second table of section 7 ("Terminal-Kanäle") | `\| Kanal \| Op \| Richtung \| Aktion \|` |
+| `rate_limit_classes` | "Rate-limit classes" | `\| Class \| Key \| Purpose \|` |
+| `actions.<section key>` (14 blocks) | each table of section 4 | `\| ID \| Description \| Resource \| Permission \| Owner \| Step-up \| Audit \| Permissions \| RL class \|` |
+| `events.durable` | first table of section 6 | `\| Event type \| Resource \| Receive action \| Note \|` |
+| `events.ephemeral` | second table of section 6 | `\| Event type \| Resource \| Receive action \| Additional condition \|` |
+| `ws_ops` | first table of section 7 | `\| Op \| Direction \| Action \|` |
+| `channel_ops` | second table of section 7 ("Terminal channels") | `\| Channel \| Op \| Direction \| Action \|` |
 
 Separator lines are `|---|---|...` with one `---` per column. Row rendering in chapter 05:
 `"|" + "".join(f" {cell} |" if cell else " |" for cell in cells)`; an empty cell renders as a
 single space (`| |`), as in the current chapter. All prose between the tables (for example
-"Kurzlebige Ereignisse:", the paragraph after 4.4, the intros of 4.13 and 4.14, the paragraph after
-4.14, the line "Terminal-Kanäle ..." before the second table of section 7) stays outside the markers
+"Ephemeral events:", the paragraph after 4.4, the intros of 4.13 and 4.14, the paragraph after
+4.14, the line "Terminal channels ..." before the second table of section 7) stays outside the markers
 and hand-written. Marker lines stand directly before the header line and directly after the last
 row, without blank lines, like in chapter 06.
 
@@ -338,7 +338,7 @@ items, for example:
 
 Excluding system actions from both lists is deliberate: 05 test 7 forbids a route or op with a
 system action, and no event has one as receive action; the lint now enforces it. Replace the old
-comment line `# catalogue (docs/spec/05-aktionen.md section 4)` by the markers. The generator
+comment line `# catalogue (docs/spec/05-actions.md section 4)` by the markers. The generator
 rewrites only lines between markers and keeps every other byte of the file.
 
 ### Migration without content change (proof)
@@ -346,7 +346,7 @@ rewrites only lines between markers and keeps every other byte of the file.
 `tools/catalog/tests/table_import.py` is a test helper with
 `def import_chapter(chapter: str) -> dict`: it parses the pre-migration tables of chapter 05
 (located by their headings in the fixture) into the YAML structure above. Cell mapping:
-`ja`/`nein` to booleans, Step-up `bedingt` to `conditional` and `frisch` to `fresh`, `wie Zielaktion` to `as_target`, Audit `ja`/`abl`/`nein` to
+`yes`/`no` to booleans, Step-up `conditional` to `conditional` and `fresh` to `fresh`, `as target action` to `as_target`, Audit `yes`/`denials`/`no` to
 `always`/`denials`/`never` and any other text to `conditional` plus `audit_text`, backticked
 `none` to `none`, backticked `rl.x` to `rl.x`, `delivery_check: true` where the class is `none` and the
 right is not `system`; `app_scope` from 2.6; for event cells that are a single backticked action
@@ -357,12 +357,12 @@ frozen fixture); ops as listed above. Cross-check the result once against `x-rec
 `docs/spec/actions.yaml` (`yaml.safe_dump(..., sort_keys=False, allow_unicode=True, width=100)`
 behind the header comment), review the file by hand, and keep the helper only for the fixture
 test. The proof that no row changed is twofold: the fixture test below, and
-`git diff <base> -- docs/spec/05-aktionen.md` shows only added marker lines plus the edited
+`git diff <base> -- docs/spec/05-actions.md` shows only added marker lines plus the edited
 sentences of rules 3 and 4 (put that diff summary into the report).
 
 ### ADR 0049
 
-ADR 0049 (`docs/adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md`) is accepted
+ADR 0049 (`docs/adr/0049-machine-readable-action-catalogue-as-the-single-source.md`) is accepted
 and names the file, the generated copies, the hand-written tables that are only cross-checked
 (2.6 and the configuration values of 05), the machine value next to prose cells of the receive
 action, and the confirmation (`make catalog-check` in `gates`, the tests in `tools/catalog/tests/`).
@@ -381,7 +381,7 @@ M1-03, M1-06 and M1-25 read the same file.
 ## Tests (write them first)
 
 `tools/catalog/tests/test_action_catalog.py`. Negative cases copy `docs/spec/actions.yaml`,
-`docs/spec/05-aktionen.md` and `docs/api/redocly.yaml` into `tmp_path` with the same relative
+`docs/spec/05-actions.md` and `docs/api/redocly.yaml` into `tmp_path` with the same relative
 paths, apply one mutation, run `check(tmp_root)` and assert a finding naming the rule:
 
 - `test_repository_catalog_loads` and `test_repository_blocks_are_current` (real repository, no

@@ -1,13 +1,13 @@
 {
-  "$description": "Bewegung, Kontext full. Bewegung zeigt Zustandswechsel, schmückt nie.",
+  "$description": "Motion, context full. Motion shows state changes and never decorates.",
   "motion": {
     "duration": {
       "$type": "duration",
-      "move-fast": {"$value": {"value": 120, "unit": "ms"}, "$description": "Einklappen von Bereichen, Chips, Hover."},
-      "move": {"$value": {"value": 180, "unit": "ms"}, "$description": "Live-Box klappt zusammen, Spalte ein- und ausblenden."},
-      "move-slow": {"$value": {"value": 260, "unit": "ms"}, "$description": "Navigationsstapel auf Mobilgeräten (Plattformübergang hat Vorrang)."},
-      "fade": {"$value": {"value": 120, "unit": "ms"}, "$description": "Ein- und Ausblenden ohne Bewegung."},
-      "pulse": {"$value": {"value": 1400, "unit": "ms"}, "$description": "Periode des Lauf-Indikators (running, working). 0 heißt: kein Puls, statisches Icon."}
+      "move-fast": {"$value": {"value": 120, "unit": "ms"}, "$description": "Collapsing spaces, chips, hover."},
+      "move": {"$value": {"value": 180, "unit": "ms"}, "$description": "Live box collapses, showing and hiding a column."},
+      "move-slow": {"$value": {"value": 260, "unit": "ms"}, "$description": "Navigation stack on mobile devices (the platform transition takes precedence)."},
+      "fade": {"$value": {"value": 120, "unit": "ms"}, "$description": "Fading in and out without movement."},
+      "pulse": {"$value": {"value": 1400, "unit": "ms"}, "$description": "Period of the run indicator (running, working). 0 means: no pulse, static icon."}
     },
     "easing": {
       "$type": "cubicBezier",

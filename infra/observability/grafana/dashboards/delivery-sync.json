@@ -1,7 +1,7 @@
 {
   "uid": "bothy-delivery-sync",
   "title": "Bothy / Delivery and sync",
-  "description": "Event log, fan-out, live delivery, reconnects and catch-up (docs/spec/04-sync-protokoll.md).",
+  "description": "Event log, fan-out, live delivery, reconnects and catch-up (docs/spec/04-sync-protocol.md).",
   "tags": [
     "bothy"
   ],
@@ -563,7 +563,7 @@
       "id": 13,
       "type": "timeseries",
       "title": "Close codes",
-      "description": "Connections closed by the server per close code (04-sync-protokoll 6.4).",
+      "description": "Connections closed by the server per close code (04-sync-protocol 6.4).",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

@@ -1,57 +1,57 @@
-# Modul `terminal`
+# Module `terminal`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); where they differ, the chapter applies.
 
-## Zweck
+## Purpose
 
-Rechner und Kopplung, Erklärung der LLM-Anmeldung (I6), Terminal-Sitzungen, Sitzungs-Marken, Steuerverbindungen der Host-Dienste, Relais der Ströme.
+Hosts and pairing, declaration of the LLM login (I6), terminal sessions, terminal session tokens, control connections of the host services, relay of the streams.
 
-## Port (Wurzelpaket `internal/terminal`)
+## Port (root package `internal/terminal`)
 
-- Eingehend: `Hosts` (Verwaltung, Kopplung, Erklärung), `Sessions` (Öffnen, Anhängen, Schließen, Liste), `Relay` (Strom- und Host-Verbindungen, nur im Adapter `wsrelay`).
-- Gibt In-Tx-Ereignisse aus: keine.
-- Abonniert In-Tx-Ereignisse: kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (Sitzungen beenden).
-- Implementiert Quellen-Ports und Querschnitts-Ports: `authz.HostSource` (Zustand, Inhaber, LLM-Erklärung, Server-Host des Rechners).
+- Inbound: `Hosts` (administration, pairing, declaration), `Sessions` (open, attach, close, list), `Relay` (stream and host connections, only in the adapter `wsrelay`).
+- Emits in-tx events: none.
+- Subscribes to in-tx events: kernel `authorize.AccessChanged`, `identity.DeviceRevoked`, `identity.SessionEnded` (end sessions).
+- Implements source ports and cross-cutting ports: `authz.HostSource` (the host's state, assignee, LLM declaration, server host).
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `instance`, `identity`, `authz`, `agents`.
+May use the ports of these modules: `instance`, `identity`, `authz`, `agents`.
 
-Grund: Signer für Sitzungs-Marken (Zweck `terminal`); Menschen, Geräte, Owner, Verbrauch des Step-up; Freigaben auf Rechner und I6; Bereitschaft der Dev-Umgebung (Etappe).
+Reason: signer for terminal session tokens (purpose `terminal`); people, devices, owners, consumption of the step-up; grants on hosts and I6; readiness of the dev environment (milestone).
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `hosts`, `host_session_users`, `terminal_sessions`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables via SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `host.read`, `host.manage`, `host.pair`, `host.connect`, `terminal.open`, `terminal.attach`, `terminal.stream`, `terminal.read_own`, `terminal.close`, `terminal.terminate`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: `host.updated`, `terminal_session.changed`.
-- Kurzlebig: `host.presence_changed`.
-- WebSocket-Ops (Client an Server): keine im Gateway; eigene Kanäle mit eigenen Ops (05, Abschnitt 7).
+- Durable: `host.updated`, `terminal_session.changed`.
+- Ephemeral: `host.presence_changed`.
+- WebSocket ops (client to server): none in the gateway; separate channels with their own ops (05, section 7).
 
-## Hintergrundjobs
+## Background jobs
 
-| Job | Auslöser | Warteschlange |
+| Job | Trigger | Queue |
 |---|---|---|
-| `terminal.sweep` | periodisch | `maintenance` |
+| `terminal.sweep` | periodic | `maintenance` |
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Gebaut ab M2 (PLAN, Block Terminal); bis dahin sind die Aktionen im Katalog aufgeschoben (PLAN P-24).
-- Der Server ist Relais und Autorisierungspunkt und liest keinen Terminal-Inhalt (Noise-Strom Ende zu Ende, 24-terminal.md).
-- Invariante I6 wird bei jeder Freigabe auf einem Rechner und bei jedem `terminal.open` geprüft (10-backend-richtlinie.md, 24-terminal.md).
-- Kein Terminal-Inhalt in Telemetrie, Audit, Suche oder Push.
+- Built from M2 on (PLAN, Block terminal); until then the actions in the catalogue are deferred (PLAN P-24).
+- The server is the relay and the authorization point and reads no terminal content (Noise stream end to end, 24-terminal.md).
+- Invariant I6 is checked at every grant on a host and at every `terminal.open` (10-backend-policy.md, 24-terminal.md).
+- No terminal content in telemetry, audit, search or push.
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [24-terminal.md](../../../../docs/spec/24-terminal.md), [10-backend-richtlinie.md](../../../../docs/spec/10-backend-richtlinie.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [24-terminal.md](../../../../docs/spec/24-terminal.md), [10-backend-policy.md](../../../../docs/spec/10-backend-policy.md)

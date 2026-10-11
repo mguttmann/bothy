@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 r"""Every ID that a table of the documentation defines is defined once in the repository.
 
-Rulings, tests, protection rules, risks, decisions and owner questions carry stable IDs that
-other documents cite without naming the file (docs/SPEC.md section 13 "Änderungsregel", item 4;
+Rulings, tests, guard rules, risks, decisions and owner questions carry stable IDs that
+other documents cite without naming the file (docs/SPEC.md section 13 "Change rule", item 4;
 docs/DECISIONS.md rule 1). An ID defined twice makes every citation ambiguous. A definition is a
 table row in any docs/**/*.md whose first cell is exactly an ID: a prefix of capital letters and
 digits, one or more parts joined by `-`, and a number at the end that may carry capital letters

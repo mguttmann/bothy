@@ -1,61 +1,61 @@
-# Modul `files`
+# Module `files`
 
-Status: geplant (M0). Dieses Verzeichnis enthält noch keinen Code. Normativ ist
-[docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). This directory contains no code yet. The normative source is
+[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-## Zweck
+## Purpose
 
-Upload-Sitzungen in Teilen, Objektspeicher-Treiber, Scan, Metadaten-Entfernung, Vorschaubilder, Anhänge, Transkripte, Dateitext.
+Upload sessions in parts, object storage drivers, scan, metadata removal, thumbnails, attachments, transcripts, file text extracts.
 
-## Port (Wurzelpaket `internal/files`)
+## Port (root package `internal/files`)
 
-- Eingehend: `Uploads` (Sitzungen, Teile), `Files` (Lesen, Öffnen, Vorschau, Abruf-Tickets, Löschen), `Attachments`, `Transcripts`, `TextExtracts`; deklariert `AttachmentLocator`.
-- Gibt In-Tx-Ereignisse aus: `FileFinalized` (Scan und gegebenenfalls Transkript endgültig).
-- Abonniert In-Tx-Ereignisse: keine.
-- Implementiert Quellen-Ports und Querschnitts-Ports: `identity.AvatarFiles`, kernel `personaldata.Participant`.
+- Inbound: `Uploads` (sessions, parts), `Files` (read, open, preview, file tickets, delete), `Attachments`, `Transcripts`, `TextExtracts`; declares `AttachmentLocator`.
+- Emits in-tx events: `FileFinalized` (scan and, if applicable, transcript final).
+- Subscribes to in-tx events: none.
+- Implements source ports and cross-cutting ports: `identity.AvatarFiles`, kernel `personaldata.Participant`.
 
-## Abhängigkeiten
+## Dependencies
 
-Darf die Ports dieser Module nutzen: `identity`, `chat`.
+May use the ports of these modules: `identity`, `chat`.
 
-Grund: implementiert `AvatarFiles`; Upload-Kanal prüfen.
+Reason: implements `AvatarFiles`; check the upload channel.
 
-Zusätzlich für alle Module: `internal/kernel`; `internal/platform` und `api/` nur in `adapters/`.
-Geprüft durch go-arch-lint (ADR 0008).
+In addition, for all modules: `internal/kernel`; `internal/platform` and `api/` only in `adapters/`.
+Checked by go-arch-lint (ADR 0008).
 
-## Tabellen
+## Tables
 
 `files`, `file_upload_sessions`, `file_upload_parts`, `file_thumbnails`, `message_attachments`, `file_text_extracts`.
 
-Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, Grundsatz 12).
+Only this module writes and reads these tables by SQL (03-data-model.md, principle 12).
 
-## Aktionen (05-aktionen.md)
+## Actions (05-actions.md)
 
 `file.upload`, `file.read`, `file.delete`, `file.transcribe`, `file.transcript.submit`.
 
-## Ereignisse und WebSocket-Ops
+## Events and WebSocket ops
 
-- Dauerhaft: `file.updated`.
-- Kurzlebig: keine.
-- WebSocket-Ops (Client an Server): keine.
+- Durable: `file.updated`.
+- Ephemeral: none.
+- WebSocket ops (client to server): none.
 
-## Hintergrundjobs
+## Background jobs
 
-| Job | Auslöser | Warteschlange |
+| Job | Trigger | Queue |
 |---|---|---|
-| `files.scan` | `InsertTx` beim Abschluss eines Uploads | `files` |
-| `files.thumbnail` | nach `clean` | `files` |
-| `files.extract_text` | nach `clean`, unterstützter Typ | `files` |
-| `files.transcribe` | `file.transcribe` bei Server-Transkription | `files` |
-| `files.cleanup_pending` | periodisch | `maintenance` |
-| `files.purge_objects` | periodisch, gelöschte Dateien | `maintenance` |
+| `files.scan` | `InsertTx` when an upload completes | `files` |
+| `files.thumbnail` | after `clean` | `files` |
+| `files.extract_text` | after `clean`, supported type | `files` |
+| `files.transcribe` | `file.transcribe` with server transcription | `files` |
+| `files.cleanup_pending` | periodic | `maintenance` |
+| `files.purge_objects` | periodic, deleted files | `maintenance` |
 
-## Hinweise für den Bau
+## Notes for the build
 
-- Auslieferung nur bei `scan_status` `clean` oder `skipped` und nur über den Server nach `file.read` (03, 4.7).
-- Scan, Vorschaubilder und Transkription laufen als Jobs im worker; Netzaufrufe nie in einer Transaktion (02, 8.5).
-- Objektschlüssel enthalten keine Namen oder IDs von Kanälen; keine Deduplizierung (R-DM-13).
+- Files are served only with `scan_status` `clean` or `skipped` and only through the server after `file.read` (03, 4.7).
+- Scan, thumbnails and transcription run as jobs in the worker; network calls never in a transaction (02, 8.5).
+- Object keys contain no names or IDs of channels; no deduplication (R-DM-13).
 
-## Kapitel
+## Chapters
 
-[02-architektur.md](../../../../docs/spec/02-architektur.md), [12-dateien.md](../../../../docs/spec/12-dateien.md)
+[02-architecture.md](../../../../docs/spec/02-architecture.md), [12-files.md](../../../../docs/spec/12-files.md)

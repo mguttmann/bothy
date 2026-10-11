@@ -1,98 +1,98 @@
-# Push-Disziplin
+# Push discipline
 
-Ziel: Fehler fallen vor dem Push auf. `main` enthält nur fertige, geprüfte Features, je
-Feature einen Commit, signiert und linear.
+Goal: failures surface before the push. `main` contains only finished, checked features, one
+commit per feature, signed and linear.
 
-## Ablauf
+## Flow
 
-1. **Branch.** Von aktuellem `main` einen Branch `<type>/<thema>` anlegen. Nie auf `main`
-   arbeiten.
-2. **Arbeiten und committen.** Kleine Commits sind erlaubt, auch `fixup!`-Commits; der
-   pre-commit-Hook prüft jede Änderung schnell, der commit-msg-Hook Format und DCO
+1. **Branch.** Create a branch `<type>/<topic>` from the current `main`. Never work on
+   `main`.
+2. **Work and commit.** Small commits are allowed, also `fixup!` commits; the
+   pre-commit hook checks every change quickly, the commit-msg hook checks format and DCO
    (`git commit -s`).
-3. **Vor dem Push zusammenfassen.** Auf `main` rebasen, Zwischenstände zu sinnvollen
-   Conventional Commits zusammenfassen (`git rebase -i main` im Terminal). Kein Commit
-   heißt "fix CI", "typo" oder "wip".
-4. **Lokales Review vor jedem Push.** Ein unabhängiger, nur lesender Prüfer prüft den
-   Diff des zusammengefassten Branches gegen `main` nach
-   [red-team-gate.md](red-team-gate.md) und schreibt seinen Bericht nach
-   `.review/<sha>.md` (git-ignoriert; `<sha>` ist der Commit, der gepusht wird); sein Text kommt
-   in den Abschnitt "Review report" des Pull Requests. Die letzte
-   Zeile ist `Urteil: JA` oder `Urteil: NEIN <Grund>`. Ändert ein Befund den Stand, prüft
-   der Prüfer das Delta, und der Bericht gilt für den neuen Commit. `make review` legt den
-   Ordner an, zeigt den erwarteten Dateinamen und startet optional die CodeRabbit CLI (nur
-   mit `BOTHY_CODERABBIT=1`, siehe unten). Am Ende einer Etappe kommt das Gesamt-Review
-   über die ganze Etappe dazu.
-5. **Push.** Der pre-push-Hook prüft zuerst den Bericht (`tools/hooks/review_gate.py`:
-   Datei vorhanden, letzte Zeile `Urteil: JA`), dann führt er `make check` aus. Rot heißt:
-   beheben, nicht umgehen. `git push --no-verify` ist ein Prozessfehler. Beitragende aus
-   Forks setzen `REVIEW_SKIP=1`; dann prüft ein Maintainer vor dem Merge.
-6. **Pull Request.** Ein Pull Request je fertigem Feature. Der Titel ist eine
-   Conventional-Commit-Kopfzeile, weil er beim Merge die Kopfzeile des Commits auf `main`
-   wird; CI prüft ihn (`PR_TITLE` in `make commitlint`).
-7. **CI.** `ci.yml` führt dieselben make-Ziele aus. Einziger Pflicht-Check: `ci-ok`.
-8. **Merge.** "Squash and merge". GitHub signiert den entstehenden Commit; die
-   `Signed-off-by`-Zeilen der Einzel-Commits stehen im Commit-Text. `main` bleibt linear.
+3. **Squash before the push.** Rebase onto `main`, squash intermediate states into meaningful
+   Conventional Commits (`git rebase -i main` in the terminal). No commit
+   is called "fix CI", "typo" or "wip".
+4. **Local review before every push.** An independent, read-only reviewer checks the
+   diff of the squashed branch against `main` according to
+   [red-team-gate.md](red-team-gate.md) and writes the report to
+   `.review/<sha>.md` (git-ignored; `<sha>` is the commit that is pushed); its text goes
+   into the section "Review report" of the pull request. The last
+   line is `Urteil: JA` or `Urteil: NEIN <reason>`. If a finding changes the state, the
+   reviewer checks the delta, and the report applies to the new commit. `make review` creates the
+   folder, shows the expected file name and optionally starts the CodeRabbit CLI (only
+   with `BOTHY_CODERABBIT=1`, see below). At the end of a milestone, the overall review
+   over the whole milestone is added.
+5. **Push.** The pre-push hook first checks the report (`tools/hooks/review_gate.py`:
+   file present, last line `Urteil: JA`), then it runs `make check`. Red means:
+   fix, do not bypass. `git push --no-verify` is a process failure. Contributors from
+   forks set `REVIEW_SKIP=1`; then a maintainer checks before the merge.
+6. **Pull request.** One pull request per finished feature. The title is a
+   Conventional Commit header line, because on merge it becomes the header line of the commit on `main`;
+   CI checks it (`PR_TITLE` in `make commitlint`).
+7. **CI.** `ci.yml` runs the same make targets. The only required check: `ci-ok`.
+8. **Merge.** "Squash and merge". GitHub signs the resulting commit; the
+   `Signed-off-by` lines of the individual commits are in the commit message. `main` stays linear.
 
-## Schutz von `main` (Ruleset)
+## Protection of `main` (ruleset)
 
-| Regel | Einstellung | Grund |
+| Rule | Setting | Reason |
 |---|---|---|
-| Require a pull request before merging | an; erlaubte Merge-Art nur Squash | keine direkten Pushes, ein Commit je Feature |
-| Require status checks to pass | `ci-ok` | ein Check fasst alle Jobs zusammen; übersprungene Komponenten-Jobs blockieren nicht |
-| Require linear history | an | lesbare Historie, einfache Bisects |
-| Require signed commits | an | Herkunft jedes Commits auf `main` |
-| Block force pushes | an | Historie bleibt unveränderlich |
-| Restrict deletions | an | `main` kann nicht gelöscht werden |
+| Require a pull request before merging | on; allowed merge method squash only | no direct pushes, one commit per feature |
+| Require status checks to pass | `ci-ok` | one check combines all jobs; skipped component jobs do not block |
+| Require linear history | on | readable history, simple bisects |
+| Require signed commits | on | provenance of every commit on `main` |
+| Block force pushes | on | history stays immutable |
+| Restrict deletions | on | `main` cannot be deleted |
 
-Begründung für Squash statt Rebase-Merge: Beim Rebase-Merge erzeugt GitHub neue Commits,
-die es nicht signieren kann; signierte Commits und Rebase-Merge über die Oberfläche
-schließen sich damit aus
+Rationale for squash instead of rebase merge: with a rebase merge, GitHub creates new commits
+that it cannot sign; signed commits and rebase merge through the interface
+are therefore mutually exclusive
 (https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/about-merge-methods-on-github,
-abgerufen 2026-10-10) [belegt]. Den Squash-Commit signiert GitHub
+retrieved 2026-10-10) [verified]. GitHub signs the squash commit
 (https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets,
-abgerufen 2026-10-10) [belegt]. Rulesets sind für private Repositories ab GitHub Pro
-verfügbar [belegt, Recherche-Quelle
+retrieved 2026-10-10) [verified]. Rulesets are available for private repositories from GitHub Pro
+on [verified, research source
 https://raw.githubusercontent.com/github/docs/main/data/reusables/gated-features/repo-rules.md,
-abgerufen 2026-10-10]. Die Regel "Required reviewers" für Teams gibt es in persönlichen
-Repositories nicht; im Ein-Personen-Betrieb ersetzt das unabhängige Review vor jedem
-Push (Schritt 4) das Zweitreview.
+retrieved 2026-10-10]. The rule "Required reviewers" for teams does not exist in personal
+repositories; in single-person operation, the independent review before every
+push (step 4) replaces the second review.
 
-## Fehler nach dem Push
+## Failures after the push
 
-Ein roter CI-Lauf nach grünem `make check` bedeutet: lokal und CI sind nicht gleich. Das
-ist ein Fehler der Werkzeugkette, kein Pech. Ablauf:
+A red CI run after a green `make check` means: local and CI are not the same. That
+is a failure of the toolchain, not bad luck. Flow:
 
-1. Ursache bestimmen und im Pull Request notieren.
-2. Die Lücke lokal schließen (Gate, Test, Pin), im selben oder einem eigenen Pull Request.
-3. Ein Commit "fix CI" oder "typo" auf `main` ist ein Prozessfehler: kurze Analyse als
-   Eintrag in `docs/DECISIONS.md` (Datum, Ursache, neue Regel).
+1. Determine the cause and note it in the pull request.
+2. Close the gap locally (gate, test, pin), in the same or in a separate pull request.
+3. A commit "fix CI" or "typo" on `main` is a process failure: short analysis as an
+   entry in `docs/DECISIONS.md` (date, cause, new rule).
 
-Zulässig sind Befunde nach dem Push nur von Prüfern, die lokal nicht laufen können:
-SonarQube Cloud (zum Beispiel Dart-Regeln) und CodeRabbit. Jeder solche Befund wird zu
-einer lokalen Regel: Semgrep-Regel, Test, Linter-Einstellung oder Profil-Regel in
+Findings after the push are acceptable only from checkers that cannot run locally:
+SonarQube Cloud (for example Dart rules) and CodeRabbit. Every such finding becomes
+a local rule: Semgrep rule, test, linter setting or profile rule in
 `quality/sonar/`.
 
-## Deny-Fund auf `main`
+## Deny-list hit on `main`
 
-`denylist-main.yml` prüft jeden Push auf `main` mit der privaten Liste (D-W-34). Schlägt
-er fehl, ist ein Begriff der Liste auf `main` angekommen, zum Beispiel aus einem
-Fork-Beitrag oder einer beim Squash geänderten Commit-Nachricht. Ablauf:
+`denylist-main.yml` checks every push to `main` with the private list (D-W-34). If it
+fails, a term of the list has reached `main`, for example from a
+fork contribution or from a commit message changed during the squash. Flow:
 
-1. Lokal mit `make denylist DENYLIST_RANGE=<before>..<after> DENYLIST_FLAGS=--reveal` den
-   Fund ansehen (nur lokal, nie in CI).
-2. Das Repository ist öffentlich (ADR 0039), der Begriff also veröffentlicht: entfernen, Owner
-   informieren, Analyse als Eintrag in `docs/DECISIONS.md` wie bei einem Prozessfehler. Ein
-   Umschreiben der öffentlichen Historie entscheidet nur der Owner.
+1. Look at the hit locally with `make denylist DENYLIST_RANGE=<before>..<after> DENYLIST_FLAGS=--reveal`
+   (locally only, never in CI).
+2. The repository is public (ADR 0039), so the term is published: remove it, inform the owner,
+   analysis as an entry in `docs/DECISIONS.md` as for a process failure. Only the owner decides
+   whether the public history is rewritten.
 
-## CodeRabbit CLI und Datenabfluss
+## CodeRabbit CLI and data outflow
 
-Die CodeRabbit CLI prüft lokale Änderungen über den CodeRabbit-Dienst; die
-Dokumentation nennt eine Prüfung der Erreichbarkeit des Backends (`cr doctor`) und keine
-rein lokale Ausführung (https://docs.coderabbit.ai/cli/overview, abgerufen 2026-10-10)
-[abgeleitet]. Der Diff verlässt also den Rechner. Darum ist sie aus, bis
-`BOTHY_CODERABBIT=1` gesetzt ist. Im privaten Zustand entscheidet der Owner, ob privater
-Code an den Dienst gehen darf (offene Frage). Im öffentlichen Zustand ist der Code
-ohnehin öffentlich; CodeRabbit bewertet dann zusätzlich jeden Pull Request
-(`.coderabbit.yaml`). Die Gratisstufe der CLI ist laut Hersteller begrenzt
-("Basic static analysis with limited daily usage", gleiche Quelle) [belegt].
+The CodeRabbit CLI checks local changes through the CodeRabbit service; the
+documentation names a check of the reachability of the backend (`cr doctor`) and no
+purely local execution (https://docs.coderabbit.ai/cli/overview, retrieved 2026-10-10)
+[derived]. So the diff leaves the host. That is why it is off until
+`BOTHY_CODERABBIT=1` is set. In the private state, the owner decides whether private
+code may go to the service (open question). In the public state, the code is
+public anyway; CodeRabbit then also rates every pull request
+(`.coderabbit.yaml`). According to the vendor, the free tier of the CLI is limited
+("Basic static analysis with limited daily usage", same source) [verified].

@@ -1,27 +1,27 @@
 # sdk/typescript
 
-Status: geplant. Dieser Ordner enthält noch keinen Code.
+Status: planned. This folder contains no code yet.
 
-## Zweck
+## Purpose
 
-TypeScript-SDK für Apps, Integrationen und Agenten-Adapter in JavaScript-Umgebungen.
+TypeScript SDK for apps, integrations and agent adapters in JavaScript environments.
 
-## Aufbau (geplant)
+## Structure (planned)
 
-| Schicht | Inhalt |
+| Layer | Content |
 |---|---|
-| Kern | Typen erzeugt mit openapi-typescript aus `docs/api/openapi.yaml`; Laufzeit-Client darauf aufbauend (Wahl im Bau-Ticket); im Gate erzeugt und kompiliert |
-| Handschicht | Module `auth`, `gateway`, `invocation`, `runs`, `components`, `commands`, `outbox`, `retry`, `heartbeat`, `webhooks`, `testing` nach docs/spec/11-erweiterungen.md Abschnitt 11.2 |
+| Core | types generated with openapi-typescript from `docs/api/openapi.yaml`; a runtime client built on them (choice in the build ticket); generated and compiled in the gate |
+| Hand-written layer | modules `auth`, `gateway`, `invocation`, `runs`, `components`, `commands`, `outbox`, `retry`, `heartbeat`, `webhooks`, `testing` according to docs/spec/11-extensions.md section 11.2 |
 
-## Leitlinien
+## Guidelines
 
-- ESM; aktive LTS-Linien von Node.js.
-- Im Browser nur Teile ohne Geheimnisse; Agenten- und App-Tokens gehören nie in einen Browser.
-- Prüfung der Aufruf-Marke und der Webhook-Signaturen mit einer JOSE-Bibliothek, die EdDSA und eine
-  Algorithmen-Erlaubnisliste kann (Kandidat und Beleg in docs/spec/11-erweiterungen.md
-  Abschnitt 11.3).
-- Fehler typisiert nach dem Problem-Format aus docs/spec/06-api.md.
+- ESM; active LTS lines of Node.js.
+- In the browser only parts without secrets; agent and app tokens never belong in a browser.
+- Check of the invocation token and the webhook signatures with a JOSE library that supports EdDSA
+  and an algorithm allow-list (candidate and evidence in docs/spec/11-extensions.md
+  section 11.3).
+- Errors typed according to the problem format from docs/spec/06-api.md.
 
-## Testdoppel
+## Test doubles
 
-`testing` liefert denselben FakeServer und dieselben Vertragsszenarien wie das Python-SDK.
+`testing` provides the same FakeServer and the same contract scenarios as the Python SDK.

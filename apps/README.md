@@ -1,19 +1,19 @@
 # apps
 
-Status: geplant (M0). Noch kein Code.
+Status: planned (M0). No code yet.
 
-| App | Zweck | Plattformen | Technik |
+| App | Purpose | Platforms | Technology |
 |---|---|---|---|
-| [client](client/README.md) | Chat mit Agenten, Live-Box, Benachrichtigungen, Offline, Verwaltung auf Desktop, Notfall-Aktionen mobil | iOS, Android, macOS, Windows | Flutter (ADR 0027) |
-| [console](console/README.md) | Verwaltung und Statistik im Browser, kein Chat | Web | Flutter Web (ADR 0028) |
+| [client](client/README.md) | Chat with agents, live box, notifications, offline, administration on desktop, emergency actions on mobile | iOS, Android, macOS, Windows | Flutter (ADR 0027) |
+| [console](console/README.md) | Administration and statistics in the browser, no chat | Web | Flutter Web (ADR 0028) |
 
-Beide Apps nutzen die Pakete aus [`packages/`](../packages/README.md). Architektur:
-[docs/spec/15-client-architektur.md](../docs/spec/15-client-architektur.md). Bedienung und Screens:
-[docs/spec/01-produkt.md](../docs/spec/01-produkt.md). Gestaltung: [docs/design/](../docs/design/README.md).
+Both apps use the packages from [`packages/`](../packages/README.md). Architecture:
+[docs/spec/15-client-architecture.md](../docs/spec/15-client-architecture.md). Usage and screens:
+[docs/spec/01-product.md](../docs/spec/01-product.md). Visual design: [docs/design/](../docs/design/README.md).
 
-Gemeinsame Regeln:
+Shared rules:
 
-- Keine Rechte-Logik in den Apps; der Server entscheidet (B7).
-- Plattform-Code nur in `client/{ios,macos,android,windows}` und `packages/device_key`.
-- Branding einer Instanz kommt zur Laufzeit vom Server und zur Bauzeit aus der Build-Konfiguration
-  der Instanz (ADR 0044); im Repo liegt nur ein Beispiel mit `example.com`.
+- No permission logic in the apps; the server decides (B7).
+- Platform code only in `client/{ios,macos,android,windows}` and `packages/device_key`.
+- The branding of an instance comes from the server at runtime and from the build configuration
+  of the instance at build time (ADR 0044); the repository holds only an example with `example.com`.

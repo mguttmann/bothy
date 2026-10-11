@@ -1,6 +1,6 @@
 # M1-16: Event log with commit-ordered sequence
 
-Status: ready | Depends on: M1-14, M1-15 | Etappe: M1
+Status: ready | Depends on: M1-14, M1-15 | Milestone: M1
 
 ## Goal
 
@@ -11,32 +11,32 @@ tail per api process reads the log without loss, even when the `LISTEN` connecti
 keeps partitions ahead and detaches expired ones; one envelope type renders events without JSON
 `null` for gateway, REST catch-up and webhooks; and `make perf` measures
 `perf.event_commit_min_per_s`. This is B8 and ADR 0009 in code: the base for catch-up, gateway
-delivery, rights cache updates and agent consumers.
+delivery, permission cache updates and agent consumers.
 
 ## Read first
 
-- `docs/spec/04-sync-protokoll.md`, "Ereignisse" ("Zwei Arten", "Umschlag (Envelope)" with the
-  payload rules), "Globale, commit-geordnete Sequenz" (all), "Nachholen (Catch-up)" ("Cursor",
-  "`resync_required`" for `min_retained_seq`), "Zustellgarantie", "Reihenfolge", "Entscheidungen
-  dieses Kapitels" (R-SY-15 to R-SY-17), "Konfigurationswerte dieses Kapitels".
-- `docs/spec/03-datenmodell.md`, "Grundsätze" (items 8, 13), table `event_log`, "Transaktionsregeln"
-  ("Globale Ereignis-Sequenz", "Sperrreihenfolge", "Schwärzen bei Löschung", "Benachrichtigung
-  der Gateway-Prozesse"), "Aufbewahrungsklassen" (`event_log`), R-DM-15, R-DM-18,
-  "Konfigurationswerte dieses Kapitels" (`sync.event_log_partition_size`).
-- `docs/spec/02-architektur.md`, "Ablauf", "In-Tx-Ereignisse", "Ereignis-Pfad" ("Schreiben",
-  "Log-Tail je api-Prozess", "Kosten der Serialisierung"), "Hintergrundjobs (River)" (job
-  `sync.partition_maintenance`), "Fehler- und Timeout-Strategie" ("Ausfall einer Abhängigkeit"
-  row `LISTEN`, "Panics"), "Start" step 8, "Leistungsziele", "Offen" (PollOnly), "Konfigurationswerte
-  dieses Kapitels".
-- `docs/spec/05-aktionen.md`, "Dauerhafte Ereignistypen und Empfangs-Aktion".
-- `docs/spec/06-api.md`, "WebSocket-Ops und Ereignisse" (event table), "Abgleich mit dem
-  Kern-Vertrag" K2, K3; `docs/api/openapi.yaml` schemas `EventEnvelope`, `EventActor`,
-  `EventScope`, `EventResource`, `ActorKind`, `EventPage`.
-- `docs/spec/16-betrieb.md`, "Datenbank" ("Rollen": DDL im Betrieb über `SECURITY DEFINER`);
-  `docs/operations/upgrade.md`, "Regeln für Migrationen" (M10).
-- `docs/spec/17-observability.md`, "Signale" (correlation and `trace_context`), R-OB-07;
-  `docs/observability/signals.md`, "Traces" and "Attribute in Spans und Logs".
-- `docs/spec/20-datenschutz.md`, rows for `event_log`.
+- `docs/spec/04-sync-protocol.md`, "Events" ("Two kinds", "Envelope" with the payload rules),
+  "Global, commit-ordered sequence" (all), "Catch-up" ("Cursor", "`resync_required`" for
+  `min_retained_seq`), "Delivery guarantee", "Ordering", "Decisions of this chapter"
+  (R-SY-15 to R-SY-17), "Configuration values of this chapter".
+- `docs/spec/03-data-model.md`, "Principles" (items 8, 13), table `event_log`, "Transaction rules"
+  ("Global event sequence", "Lock order", "Redaction on deletion",
+  "Notifying the gateway processes"), "Retention classes" (`event_log`), R-DM-15, R-DM-18,
+  "Configuration values of this chapter" (`sync.event_log_partition_size`).
+- `docs/spec/02-architecture.md`, "Flow", "In-Tx events", "Event path" ("Writing",
+  "Log tail per api process", "Cost of serialization"), "Background jobs (River)" (job
+  `sync.partition_maintenance`), "Error and timeout strategy" ("Failure of a dependency"
+  row `LISTEN`, "Panics"), "Start" step 8, "Performance targets", "Open" (PollOnly),
+  "Configuration values of this chapter".
+- `docs/spec/05-actions.md`, "Durable event types and receive action".
+- `docs/spec/06-api.md`, "WebSocket ops and events" (event table),
+  "Alignment with the core contract" K2, K3; `docs/api/openapi.yaml` schemas `EventEnvelope`,
+  `EventActor`, `EventScope`, `EventResource`, `ActorKind`, `EventPage`.
+- `docs/spec/16-operations.md`, "Database" ("Roles": DDL during operation through `SECURITY DEFINER`);
+  `docs/operations/upgrade.md`, "Rules for migrations" (M10).
+- `docs/spec/17-observability.md`, "Signals" (correlation and `trace_context`), R-OB-07;
+  `docs/observability/signals.md`, "Traces" and "Attributes in spans and logs".
+- `docs/spec/20-privacy.md`, rows for `event_log`.
 - ADR 0009; ADR 0007 (rule 4: sequential migration numbers); ADR 0052, 0053 and 0063 (they exist;
   this ticket extends their "Confirmation" with the tests named below); `docs/adr/README.md`.
 - What earlier tickets built: `internal/kernel/txn`, `platform/pg` unit of work, `pg.Tx`,
@@ -44,8 +44,9 @@ delivery, rights cache updates and agent consumers.
   `Inserter` (M1-14); `instance.Counters` with its phase guard and the static check (M1-15);
   `internal/kernel/eventlog` as declared by M1-05; `platform/lifecycle`; the `perf` frame target in
   the `Makefile` (M1-01).
-- `docs/PLAN.md` section "Arbeitsweise je Ticket", P-07, P-09, P-10, P-11, P-12, M1 risk "Durchsatz
-  am Zähler"; `docs/quality/gates.md`; `CONTRIBUTING.md`; `docs/quality/red-team-gate.md`.
+- `docs/PLAN.md` section "Way of working per ticket", P-07, P-09, P-10, P-11, P-12, M1 risk
+  "Throughput at the counter"; `docs/quality/gates.md`; `CONTRIBUTING.md`;
+  `docs/quality/red-team-gate.md`.
 
 Table: `event_log`. Job: `sync.partition_maintenance`. No API operation and no action id.
 
@@ -76,26 +77,26 @@ Table: `event_log`. Job: `sync.partition_maintenance`. No API operation and no a
 10. Sequence by the counter row pattern: lock and advance `event_seq` by the number of events as
     the last step before commit, insert the rows with `last - n + 1 .. last`, read
     `permission_version` after the lock, `pg_notify('event_log', <last>)` with only the number
-    (04 "Muster mit Zähler-Zeile", 02 "Ablauf" step 3.2, 03 "Benachrichtigung der
-    Gateway-Prozesse"). Transactions without events take neither counter nor `NOTIFY`
-    (02 "Kosten der Serialisierung").
+    (04 "Pattern with a counter row", 02 "Flow" step 3.2,
+    03 "Notifying the gateway processes"). Transactions without events take neither counter nor
+    `NOTIFY` (02 "Cost of serialization").
 11. `event_log` exactly as 03 defines it, partitioned by range of `seq` with
     `sync.event_log_partition_size` numbers per partition, no foreign keys, the listed indexes
     (R-DM-15).
 12. A partition is detached and dropped when its largest `occurred_at` is older than
     `sync.event_retention`, never the partition holding the current head (03 `event_log`
-    "Aufbewahrung"); `sync.event_log_partitions_ahead` partitions are created ahead by the job every
+    "Retention"); `sync.event_log_partitions_ahead` partitions are created ahead by the job every
     `sync.partition_maintenance_interval` and once by `bothy migrate up`, never by a migration in
-    operation (upgrade.md M10, 02 "Job-Katalog").
+    operation (upgrade.md M10, 02 "Job catalogue").
 13. One tail per api process with its own, non-pooled connection for `LISTEN event_log`, polling
     every `sync.log_poll_interval`, reconnecting with backoff up to
     `database.listen_reconnect_backoff_cap`, reading `seq > local_head ORDER BY seq LIMIT
-    sync.tail_batch_size`, delivering in `seq` order from one goroutine (02 "Log-Tail je
-    api-Prozess"); losing the `LISTEN` connection loses nothing.
-14. One envelope for gateway, REST and webhooks (ADR 0052, 04 "Umschlag"); no JSON `null`
+    sync.tail_batch_size`, delivering in `seq` order from one goroutine
+    (02 "Log tail per api process"); losing the `LISTEN` connection loses nothing.
+14. One envelope for gateway, REST and webhooks (ADR 0052, 04 "Envelope"); no JSON `null`
     (ADR 0053, R-SY-16); delivery fields are never stored (R-SY-17).
 15. `correlation_id` is the W3C trace ID of the triggering request; `trace_context` is stored only
-    when the request was recorded (03 `event_log`, 17 "Signale", R-OB-07).
+    when the request was recorded (03 `event_log`, 17 "Signals", R-OB-07).
 16. Payload is a JSON object below `sync.event_payload_max_bytes`, contains no secrets and no JSON
     `null`; larger objects are delivered with `truncated: true` (04 payload rules).
 17. `make perf` measures `perf.event_commit_min_per_s` on `perf.reference_profile` with the
@@ -165,7 +166,7 @@ names below match their briefs.
    sync.partition_maintenance_interval`, `RunOnStart = true`, queue `maintenance`).
 8. `internal/wire`: `SetHook(txn.PhaseSync, syncHook.Run)`; the appender as `eventlog.Appender`
    for all modules; job registration; the tail in roles `api` and `all` (start step 8, empty sink
-   list today; M1-28 and M1-65 add sinks in this order: rights cache, then hub); regenerate
+   list today; M1-28 and M1-65 add sinks in this order: permission cache, then hub); regenerate
    `internal/wire/testdata/txn_registrations.golden`.
 9. `cmd/bothy migrate up`: after River and goose, call the partition maintenance use case once with
    the configured values so a fresh or upgraded database has partitions before `serve` starts.
@@ -180,13 +181,13 @@ names below match their briefs.
     `TestEventCommitThroughput` to 0063 without changing the decisions; then `make adr-index`.
 12. Docs: `internal/sync/README.md` (status, ports, table, job, partition rules with PostgreSQL
     references); CHANGELOG. The spec already says what this ticket builds (03 `event_log`, 02
-    "Job-Katalog" and "Konfigurationswerte dieses Kapitels", 16 "Rollen", upgrade.md M10); change it
-    only if the build proves it wrong, in the same change.
+    "Job catalogue" and "Configuration values of this chapter", 16 "Roles", upgrade.md M10);
+    change it only if the build proves it wrong, in the same change.
 
 ## Out of scope
 
 - Catch-up over REST and the snapshot, `resync_required`, cursor frames (M1-63).
-- Gateway, hub, rights cache sinks (M1-64, M1-65, M1-28).
+- Gateway, hub, permission cache sinks (M1-64, M1-65, M1-28).
 - Redaction on delete (M1-58), idempotency keys (M1-20), worker consumers with
   `event_consumer_cursors` (M2-01, P-13).
 - Validating event types and receive actions against the catalogue register (M1-25).
@@ -236,13 +237,13 @@ names below match their briefs.
   SQLSTATE `23514` (no partition for the row) is mapped to kind `unavailable` and logged at error
   level with the seq range, never with payloads.
 - Head and minimum: head is `max(seq)` of `event_log` (0 when empty). This equals the committed
-  counter because the partition holding the head is never dropped (03 `event_log` "Aufbewahrung";
+  counter because the partition holding the head is never dropped (03 `event_log` "Retention";
   it avoids reading `Counters` outside a hook). The minimum retained seq is `min(seq)`; M1-63 uses
   it.
 - Tail: at `Run` set `local_head` to the head; open the dedicated connection and `LISTEN
   event_log`; loop on notification or timer (`sync.log_poll_interval`); read batches of
   `sync.tail_batch_size` until a short batch; check that seqs continue `local_head + 1` without
-  holes, else return `ErrGap` (fatal: gaps cannot happen by 04 "Muster mit Zähler-Zeile" item 3,
+  holes, else return `ErrGap` (fatal: gaps cannot happen by 04 "Pattern with a counter row" item 3,
   so a gap is a bug and the process must not deliver further); call the sinks in order; advance
   `local_head`. On `LISTEN` connection loss keep polling through the pool and reconnect with
   exponential backoff starting at `sync.log_poll_interval`, capped at
@@ -264,8 +265,8 @@ names below match their briefs.
   `sync.partition_maintenance_interval`, `sync.event_log_partitions_ahead`,
   `database.listen_reconnect_backoff_cap`, `database.lock_timeout` (all 02). Defaults come from the
   chapter tables. Register missing keys in the config schema; `make config-doc-check` green.
-- Perf threshold: `perf.*` values are load-test thresholds with place `Lasttest` in 02
-  "Konfigurationswerte dieses Kapitels" and are never in the server configuration schema. Read
+- Perf threshold: `perf.*` values are load-test thresholds with place `Load test` in 02
+  "Configuration values of this chapter" and are never in the server configuration schema. Read
   `perf.event_commit_min_per_s` and `perf.reference_profile` from that table with a small loader in
   `services/server/perf/internal/report` (untagged, unit tested in `make test`; find the section by
   its title, a missing row or an unparseable value fails). M1-72 extends the same package. No
@@ -320,7 +321,7 @@ Integration tests use `pgtest` with roles from `migrate --bootstrap` and run as 
   updates one scratch row and appends one event; prints `perf.event_commit_min_per_s measured=<n>
   threshold=<n> cpus=<n>` and fails below the threshold. A second subtest runs the same with an
   idle River worker runtime on the same database and prints its number (evidence for the open
-  point PollOnly in 02 "Offen"; both numbers go into the report, not into docs).
+  point PollOnly in 02 "Open"; both numbers go into the report, not into docs).
   `TestReport_FailsBelowThreshold` (untagged, in `perf/internal/report`): a measured value below
   the threshold fails the comparison, at or above passes; the loader reads the real 02 table.
 - `TestDurableKeepsDurabilitySettings` (pgtest, needs the container runtime like every pgtest

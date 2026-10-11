@@ -5,15 +5,15 @@ The base branch carries only sequential, gap-free migration numbers, and a merge
 migration never changes (ADR 0007 rules 4 and 5). This tool holds both before the first
 migration exists, together with two SQL rules that PostgreSQL would not reject on its
 own: every `GENERATED ALWAYS AS (...)` column states `STORED` (PostgreSQL 18 creates
-virtual columns by default, chapter 14 "Ausdrücke"), and a statement with `CONCURRENTLY`
+virtual columns by default, chapter 14 "Expressions"), and a statement with `CONCURRENTLY`
 stands in a file marked `-- +goose NO TRANSACTION` (ADR 0007 rule 3).
 
 Immutability is held by a sum file next to `migrations/` (`<module>/migrations.sha256`,
 format of `shasum -a 256`, sorted by name, final newline). Only `lock` adds lines, and it
 never changes or removes one, so a changed or deleted merged migration stays a finding
 until the change is undone, unless its line is edited or removed by hand as well (a limit
-named in docs/quality/gates.md, "Was die Gates nicht abdecken"). By hand, a branch removes
-only its own line, not yet merged, when it renumbers (docs/quality/gates.md "Migrationen").
+named in docs/quality/gates.md, "What the gates do not cover"). By hand, a branch removes
+only its own line, not yet merged, when it renumbers (docs/quality/gates.md "Migrations").
 
 Rule ids (Finding.rule): layout, name, timestamp-version, version-format,
 duplicate-version, version-gap, goose-up, generated-not-stored, no-transaction, and the
@@ -206,7 +206,7 @@ def _sql_rules(path: Path, text: str) -> list[Finding]:
                     _line_of(code, match.start()),
                     "generated-not-stored",
                     "GENERATED ALWAYS AS (...) must be followed by STORED; PostgreSQL 18 "
-                    'creates a virtual column otherwise (docs/spec/14-suche.md "Ausdrücke")',
+                    'creates a virtual column otherwise (docs/spec/14-search.md "Expressions")',
                 )
             )
     if GOOSE_NO_TRANSACTION not in raw_lines:

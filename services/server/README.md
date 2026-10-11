@@ -1,115 +1,115 @@
 # services/server
 
-Status: geplant (M0). Noch kein Code. Normativ ist
-[docs/spec/02-architektur.md](../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
+Status: planned (M0). No code yet. The normative source is
+[docs/spec/02-architecture.md](../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
-Der Server ist ein modularer Monolith in Go (ADR 0004, 0005): ein Binary `bothy`, eine
-PostgreSQL-Datenbank (ADR 0006), ein Objektspeicher. Agenten, Plugins und Apps laufen nie in diesem
-Prozess; sie nutzen die öffentliche API (B6, B10).
+The server is a modular monolith in Go (ADR 0004, 0005): one binary `bothy`, one
+PostgreSQL database (ADR 0006), one object store. Agents, plugins and apps never run in this
+process; they use the public API (B6, B10).
 
-## Rollen und Befehle
+## Roles and commands
 
-Das Register aller Unterbefehle steht in 02-architektur.md, Abschnitt 3.3 (Ruling L1); hier nur
-der Überblick.
+The register of all subcommands is in 02-architecture.md, section 3.3 (ruling L1); here only
+the overview.
 
-| Befehl | Zweck |
+| Command | Purpose |
 |---|---|
-| `bothy serve --role=api` | REST, Gateway-WebSocket, Log-Tail und Fan-out |
-| `bothy serve --role=worker` | River-Jobs, Ereignis-Verbraucher (Push, Webhooks), Dateiverarbeitung, Wartung |
-| `bothy serve --role=all` | beides in einem Prozess (Standard) |
-| `bothy migrate up\|status\|validate` | Migrationen (goose, rivermigrate); nie implizit beim Start |
-| `bothy setup bootstrap-owner\|issue-enrollment-code` | Einrichtung, erster Owner, Einladungs-Code (08-identitaet.md) |
-| `bothy config check\|print` | Konfiguration prüfen und redigiert ausgeben |
-| `bothy import discord ...` | Import und Lese-Spiegel über die API (22-import-migration.md) |
-| `bothy restore finalize` | nach einer Wiederherstellung: neue Sync-Epoche (16-betrieb.md) |
-| `bothy secrets init\|export` | Geheimnisse anlegen und sichern (16-betrieb.md) |
-| `bothy healthcheck --url` | Gesundheitsprüfung gegen den internen Listener (16-betrieb.md) |
-| `bothy files rescan` | Dateien erneut prüfen lassen (12-dateien.md) |
-| `bothy telemetry pseudonym` | Pseudonym eines Prinzipals für die Fehlersuche |
-| `bothy dev seed` | Testdaten, nur in der Umgebung `dev` |
+| `bothy serve --role=api` | REST, gateway WebSocket, log tail and fan-out |
+| `bothy serve --role=worker` | River jobs, event consumers (push, webhooks), file processing, maintenance |
+| `bothy serve --role=all` | both in one process (default) |
+| `bothy migrate up\|status\|validate` | migrations (goose, rivermigrate); never implicitly at startup |
+| `bothy setup bootstrap-owner\|issue-enrollment-code` | setup, first owner, enrollment code (08-identity.md) |
+| `bothy config check\|print` | check the configuration and print it redacted |
+| `bothy import discord ...` | import and read mirror through the API (22-import-migration.md) |
+| `bothy restore finalize` | after a restore: new sync epoch (16-operations.md) |
+| `bothy secrets init\|export` | create and back up secrets (16-operations.md) |
+| `bothy healthcheck --url` | health check against the internal listener (16-operations.md) |
+| `bothy files rescan` | have files checked again (12-files.md) |
+| `bothy telemetry pseudonym` | pseudonym of a principal for debugging |
+| `bothy dev seed` | test data, only in the environment `dev` |
 
-## Aufbau
+## Structure
 
 ```text
-cmd/bothy/            Einstieg, Unterbefehle
-api/                  generiert aus docs/api/ (REST-Server, WebSocket-Typen, Routen-Metadaten)
-architecture/         modules.yaml: Modulregister, Quelle für go-arch-lint und Prüfungen
-migrations/           goose-SQL, eingebettet
-internal/kernel/      Querschnitts-Ports
-internal/platform/    Technik ohne Fachlogik
-internal/wire/        Verdrahtung je Rolle, Registrierung der In-Tx-Abonnenten
-internal/<modul>/     ein Modul je Verzeichnis (Tabelle unten)
-sqlc.yaml             ein Eintrag je Modul
-.go-arch-lint.yml     erzeugt aus architecture/modules.yaml
+cmd/bothy/            entry point, subcommands
+api/                  generated from docs/api/ (REST server, WebSocket types, route metadata)
+architecture/         modules.yaml: module register, source for go-arch-lint and checks
+migrations/           goose SQL, embedded
+internal/kernel/      cross-cutting ports
+internal/platform/    technology without domain logic
+internal/wire/        wiring per role, registration of the in-tx subscribers
+internal/<module>/    one module per directory (table below)
+sqlc.yaml             one entry per module
+.go-arch-lint.yml     generated from architecture/modules.yaml
 ```
 
-Jedes Modul hat dieselben Schichten: Port im Wurzelpaket, `domain/`, `app/`, `adapters/<art>/`
-(02-architektur.md, Abschnitt 5).
+Every module has the same layers: port in the root package, `domain/`, `app/`, `adapters/<kind>/`
+(02-architecture.md, section 5).
 
-## Module
+## Modules
 
-| Modul | Kurz |
+| Module | Summary |
 |---|---|
-| [instance](internal/instance/README.md) | Einstellungen, Schalter, Signierschlüssel, Zähler |
-| [audit](internal/audit/README.md) | Audit-Log mit Hash-Kette |
-| [authz](internal/authz/README.md) | `authorize`, Gruppen, Freigaben, I1 |
-| [billing](internal/billing/README.md) | Kosten und Preise |
-| [identity](internal/identity/README.md) | Prinzipale, Geräte, Sitzungen, Tokens |
-| [chat](internal/chat/README.md) | Bereiche, Kanäle, Threads |
-| [agents](internal/agents/README.md) | Agenten, Backend-Richtlinie, Sitzungen, Befehle |
-| [files](internal/files/README.md) | Dateien, Scan, Vorschau |
-| [messaging](internal/messaging/README.md) | Nachrichten, Reaktionen, Anheften |
-| [runs](internal/runs/README.md) | Auslösung, Läufe, Live-Box, Komponenten |
-| [sync](internal/sync/README.md) | Ereignis-Log, Nachholen, persönliche Sync-Daten |
-| [notify](internal/notify/README.md) | Benachrichtigung, Push |
-| [gateway](internal/gateway/README.md) | WebSocket, Fan-out |
-| [search](internal/search/README.md) | Volltextsuche |
-| [stats](internal/stats/README.md) | Statistik für die Konsole |
-| [apps](internal/apps/README.md) | Apps, Webhooks |
-| [importer](internal/importer/README.md) | Import |
-| [privacy](internal/privacy/README.md) | DSGVO-Aufträge |
-| [status](internal/status/README.md) | Statusseite |
+| [instance](internal/instance/README.md) | settings, flags, signing keys, counters |
+| [audit](internal/audit/README.md) | audit log with hash chain |
+| [authz](internal/authz/README.md) | `authorize`, groups, grants, I1 |
+| [billing](internal/billing/README.md) | costs and prices |
+| [identity](internal/identity/README.md) | principals, devices, sessions, tokens |
+| [chat](internal/chat/README.md) | spaces, channels, threads |
+| [agents](internal/agents/README.md) | agents, backend policy, sessions, commands |
+| [files](internal/files/README.md) | files, scan, preview |
+| [messaging](internal/messaging/README.md) | messages, reactions, pins |
+| [runs](internal/runs/README.md) | triggering, runs, live box, components |
+| [sync](internal/sync/README.md) | event log, catch-up, personal sync data |
+| [notify](internal/notify/README.md) | notification, push |
+| [gateway](internal/gateway/README.md) | WebSocket, fan-out |
+| [search](internal/search/README.md) | full-text search |
+| [stats](internal/stats/README.md) | statistics for the console |
+| [apps](internal/apps/README.md) | apps, webhooks |
+| [importer](internal/importer/README.md) | import |
+| [privacy](internal/privacy/README.md) | privacy requests |
+| [status](internal/status/README.md) | status page |
 
 ## `internal/kernel`
 
-Querschnitts-Ports, die jedes Modul nutzen darf. `kernel` hängt von nichts im Projekt ab.
+Cross-cutting ports that every module may use. `kernel` depends on nothing in the project.
 
-| Paket | Inhalt | Implementiert von |
+| Package | Content | Implemented by |
 |---|---|---|
-| `ids`, `clock`, `errs` | UUIDv7, Zeitquelle, Fehlerarten mit Code | kernel |
-| `actor` | Prinzipal einer Anfrage, `Authenticator` | `identity` |
-| `authorize` | Aktionen (aus 05 erzeugt), Ressource, `Decision`, `Authorizer`, In-Tx-Ereignis `AccessChanged` | `authz` |
-| `txn` | Unit of Work, Phasen vor dem Commit, In-Tx-Ereignisbus | `platform/pg` |
-| `eventlog` | `Appender` (dauerhaft), `EphemeralPublisher` (kurzlebig) | `sync`, `gateway` |
+| `ids`, `clock`, `errs` | UUIDv7, time source, error kinds with code | kernel |
+| `actor` | principal of a request, `Authenticator` | `identity` |
+| `authorize` | actions (generated from 05), resource, `Decision`, `Authorizer`, in-tx event `AccessChanged` | `authz` |
+| `txn` | Unit of Work, phases before the commit, in-tx event bus | `platform/pg` |
+| `eventlog` | `Appender` (durable), `EphemeralPublisher` (ephemeral) | `sync`, `gateway` |
 | `auditing` | `Recorder` | `audit` |
-| `idempotency` | `Store` für `Idempotency-Key` | `sync` |
-| `personaldata` | `Participant` für Export und Löschung | Module mit personenbezogenen Tabellen |
+| `idempotency` | `Store` for `Idempotency-Key` | `sync` |
+| `personaldata` | `Participant` for export and deletion | modules with tables that hold personal data |
 
 ## `internal/platform`
 
-Technik ohne Fachlogik; nur `adapters/`, `wire` und `cmd` dürfen sie importieren.
+Technology without domain logic; only `adapters/`, `wire` and `cmd` may import it.
 
-| Paket | Inhalt |
+| Package | Content |
 |---|---|
-| `config` | Laden und Prüfen der Konfiguration (02, Abschnitt 13) |
-| `secrets` | Secret-Provider (ADR 0011) |
-| `pg` | Pool, Unit of Work mit Sperrreihenfolge, `LISTEN`-Verbindung, Wiederholung bei Deadlock |
-| `httpserver` | Server, Middleware-Kette, `problem+json`, Nachweis-Prüfung von `authorize` (02, Abschnitt 9) |
-| `ratelimit` | Token-Buckets je Klasse aus 05 |
-| `jobs` | einzige Stelle mit River: Client je Rolle, Warteschlangen, Schema `jobs.schema` |
-| `otel` | Telemetrie-Setup, gekapselte `gen_ai.*`-Attribute (R-Telemetrie) |
-| `health` | Ops-Listener mit `live` und `ready` |
-| `lifecycle` | Start-Reihenfolge und Shutdown je Rolle (02, Abschnitt 15) |
+| `config` | loading and checking the configuration (02, section 13) |
+| `secrets` | secret provider (ADR 0011) |
+| `pg` | pool, Unit of Work with lock order, `LISTEN` connection, retry on deadlock |
+| `httpserver` | server, middleware chain, `problem+json`, proof check of `authorize` (02, section 9) |
+| `ratelimit` | token buckets per class from 05 |
+| `jobs` | the only place with River: client per role, queues, schema `jobs.schema` |
+| `otel` | telemetry setup, encapsulated `gen_ai.*` attributes (R-Telemetrie) |
+| `health` | ops listener with `live` and `ready` |
+| `lifecycle` | start order and shutdown per role (02, section 15) |
 
-## Regeln, die das Gate hält
+## Rules that the gate enforces
 
-- Module importieren nur Ports erlaubter Module; Fremdbibliotheken nur in zugelassenen Adaptern
+- Modules import only ports of allowed modules; third-party libraries only in approved adapters
   (go-arch-lint, ADR 0008).
-- SQL eines Moduls nennt nur eigene Tabellen (02, 7.3).
-- Jede Operation hat eine Aktion aus 05; der Server startet sonst nicht.
-- Erzeugter Code (`api/`, sqlc, `.go-arch-lint.yml`) entspricht seiner Quelle.
+- The SQL of a module names only its own tables (02, 7.3).
+- Every operation has an action from 05; otherwise the server does not start.
+- Generated code (`api/`, sqlc, `.go-arch-lint.yml`) matches its source.
 
-## Namensgebundene Stellen
+## Name-bound locations
 
-Produktname im Code nur hier: Go-Modulpfad in `go.mod`, Binary `bothy` (`cmd/bothy`), Präfix
-`BOTHY_` der Umgebungsvariablen, Image-Name. Die Liste führt 18-release.md.
+The product name appears in code only here: Go module path in `go.mod`, binary `bothy` (`cmd/bothy`), prefix
+`BOTHY_` of the environment variables, image name. The list is kept in 18-release.md.

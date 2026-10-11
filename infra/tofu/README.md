@@ -1,51 +1,52 @@
 # infra/tofu
 
-OpenTofu-Module je Deployment-Ziel (ADR 0012). Stand M0: Schnittstelle (`variables.tf`) und
-Beschreibung; Ressourcen folgen in Bau-Tickets je Modul.
+OpenTofu modules per deployment target (ADR 0012). State M0: interface (`variables.tf`) and
+description; resources follow in build tickets per module.
 
-## Module
+## Modules
 
-| Modul | Ziel | Datenbank | Dateien | Geheimnisse | Status |
+| Module | Target | Database | Files | Secrets | Status |
 |---|---|---|---|---|---|
-| [generic-vm](modules/generic-vm/README.md) | vorhandener Linux-Host mit Docker | Container | Volume oder S3-Dienst | Datei | Vertrag |
-| [hetzner](modules/hetzner/README.md) | Hetzner Cloud | Container | Volume oder Hetzner Object Storage | Datei | Vertrag |
-| [aws](modules/aws/README.md) | AWS | Container oder Amazon RDS | Amazon S3 | Datei, später AWS Secrets Manager | Vertrag |
-| [azure](modules/azure/README.md) | Azure | Container oder Azure Database for PostgreSQL | Volume oder SeaweedFS (keine S3-API bei Blob Storage) | Datei, später Azure Key Vault | Vertrag |
+| [generic-vm](modules/generic-vm/README.md) | existing Linux host with Docker | container | volume or S3 service | file | contract |
+| [hetzner](modules/hetzner/README.md) | Hetzner Cloud | container | volume or Hetzner Object Storage | file | contract |
+| [aws](modules/aws/README.md) | AWS | container or Amazon RDS | Amazon S3 | file, later AWS Secrets Manager | contract |
+| [azure](modules/azure/README.md) | Azure | container or Azure Database for PostgreSQL | volume or SeaweedFS (no S3 API with Blob Storage) | file, later Azure Key Vault | contract |
 
-## Aufbau
+## Structure
 
-1. Jedes Zielmodul erzeugt Netz, Host, Speicher und optional verwaltete Dienste und ruft dann
-   `generic-vm` auf, das den Host einrichtet: Docker, das Compose-Bündel der gewählten
-   `bothy_version`, `.env` aus den Eingaben, ein Systemdienst für `docker compose up -d`.
-2. Die gemeinsamen Eingaben sind in allen Modulen gleich (`variables.tf`, Abschnitt "Vertrag der
-   Modul-Eingaben"). Zielspezifische Eingaben stehen darunter.
-3. Ausgaben (geplant, in allen Modulen gleich benannt):
+1. Every target module creates the network, host, storage and optionally managed services and
+   then calls `generic-vm`, which sets up the host: Docker, the Compose bundle of the chosen
+   `bothy_version`, `.env` from the inputs, a system service for `docker compose up -d`.
+2. The shared inputs are the same in all modules (`variables.tf`, section "Contract of the
+   module inputs"). Target-specific inputs follow below them.
+3. Outputs (planned, named the same in all modules):
 
-| Ausgabe | Inhalt |
+| Output | Content |
 |---|---|
-| `public_url` | Basis-URL der Instanz |
-| `ssh_endpoint` | Wartungszugang (VM-Ziele) |
-| `database_endpoint` | Host des verwalteten Dienstes, sonst leer |
-| `object_storage_bucket` | Bucket bei `object_storage_mode = s3`, sonst leer |
-| `backup_offsite_location` | Off-site-Ziel, wenn das Modul es anlegt |
-| `secret_store_ref` | Präfix für `secret_ref` (z. B. Key-Vault-URI), sonst leer |
+| `public_url` | base URL of the instance |
+| `ssh_endpoint` | maintenance access (VM targets) |
+| `database_endpoint` | host of the managed service, otherwise empty |
+| `object_storage_bucket` | bucket with `object_storage_mode = s3`, otherwise empty |
+| `backup_offsite_location` | off-site target, if the module creates it |
+| `secret_store_ref` | prefix for `secret_ref` (for example a Key Vault URI), otherwise empty |
 
-## Regeln
+## Rules
 
-1. Geheimnisse sind nie Eingaben und nie Ausgaben. Sie entstehen auf dem Host (`bothy secrets
-   init`) oder im Secret-Dienst des Ziels. Grund: OpenTofu-State speichert Werte im Klartext.
-2. State liegt verschlüsselt und getrennt vom Ziel. OpenTofu verschlüsselt State- und Plan-Dateien
-   lokal und im Backend (https://opentofu.org/docs/language/state/encryption/, abgerufen
-   2026-10-10) [belegt]; das Wurzelmodul jeder Instanz schaltet das ein.
-3. Ports wie im Compose-Stack: nur der Rand ist öffentlich; Datenbank und Speicher nur im privaten
-   Netz.
-4. Versionen der Provider sind gepinnt (`required_providers`), Renovate hält sie aktuell.
-5. Jedes Modul hat einen Test, der auf einer Wegwerf-Umgebung den Portabilitätstest
-   ([16-betrieb.md](../../docs/spec/16-betrieb.md) 11.1) ausführt; das kostet Geld beim Anbieter
-   und läuft darum nur auf ausdrückliche Freigabe des Owners.
+1. Secrets are never inputs and never outputs. They are created on the host (`bothy secrets
+   init`) or in the secret service of the target. Reason: OpenTofu state stores values in plain
+   text.
+2. State is stored encrypted and separate from the target. OpenTofu encrypts state and plan files
+   locally and in the backend (https://opentofu.org/docs/language/state/encryption/, retrieved
+   2026-10-10) [verified]; the root module of every instance turns this on.
+3. Ports as in the Compose stack: only the edge is public; database and storage only in the
+   private network.
+4. Provider versions are pinned (`required_providers`); Renovate keeps them current.
+5. Every module has a test that runs the portability test
+   ([16-operations.md](../../docs/spec/16-operations.md) 11.1) on a throwaway environment; this costs
+   money at the provider and therefore runs only with the explicit approval of the owner.
 
-## Geprüft
+## Checked
 
-`tofu init -backend=false` und `tofu validate` (OpenTofu v1.13.1) auf einer Wurzel, die alle vier
-Module aufruft, am 2026-10-10: gültig; `tofu plan` mit gültigen Werten ohne Änderungen, mit
-`edge_mode = "funnel"` wie erwartet abgelehnt.
+`tofu init -backend=false` and `tofu validate` (OpenTofu v1.13.1) on a root that calls all four
+modules, on 2026-10-10: valid; `tofu plan` with valid values: no changes; with
+`edge_mode = "funnel"`: rejected as expected.

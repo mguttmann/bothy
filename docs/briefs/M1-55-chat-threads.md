@@ -1,6 +1,6 @@
 # M1-55: Threads
 
-Status: ready | Depends on: M1-53 | Etappe: M1
+Status: ready | Depends on: M1-53 | Milestone: M1
 
 ## Goal
 
@@ -13,22 +13,22 @@ operator of a thread is captured at creation and never changes. The `chat.Thread
 
 ## Read first
 
-- `docs/spec/03-datenmodell.md`: tables `threads`, `thread_tags`, `forum_tags`, `channels`;
-  "Thread-Sequenz" (6.2), "Sperrreihenfolge" (6.3); R-DM-11, R-DM-12, R-DM-21; config table
+- `docs/spec/03-data-model.md`: tables `threads`, `thread_tags`, `forum_tags`, `channels`;
+  "Thread sequence" (6.2), "Lock order" (6.3); R-DM-11, R-DM-12, R-DM-21; config table
   (`thread.title_max_chars`).
-- `docs/spec/04-sync-protokoll.md`: "Thread-Sequenz" (4), "Umschlag (Envelope)", "Idempotente
-  Schreibvorgänge" 5.2, "Zustellgarantie", "Reihenfolge", "Bearbeiten und Löschen" row
-  "Thread inzwischen erledigt".
-- `docs/spec/05-aktionen.md`: "Threads und Agenten-Sitzungen" rows `thread.read`,
+- `docs/spec/04-sync-protocol.md`: "Thread sequence" (4), "Envelope", "Idempotent writes" 5.2,
+  "Delivery guarantee", "Ordering", "Editing and deleting" row
+  "Thread marked done in the meantime".
+- `docs/spec/05-actions.md`: "Threads and agent sessions" rows `thread.read`,
   `thread.create`, `thread.title.update`, `thread.close`, `thread.reopen`, `thread.tags.set`;
-  "Ziel einer Ressource"; rule 1.8; section 6 rows `thread.created`, `thread.updated`,
+  "Target of a resource"; rule 1.8; section 6 rows `thread.created`, `thread.updated`,
   `thread.closed`, `thread.reopened`.
-- `docs/spec/09-agenten.md`: 3.1 "Bediener", 3.7 "Auto-Thread aus einer Kanal-Nachricht", 12
-  "Auto-Titel" (placeholder rule, `409 title_manual`), test AG-19, config `thread.placeholder_titles`.
-- `docs/spec/01-produkt.md`: 3.1 rows on threads and forums, 6.1 "Erledigt und Wiederöffnen".
-- `docs/spec/06-api.md`: "Paginierung", "Nebenläufigkeit" points 2 and 3, endpoint table
-  "Threads", "Fehler".
-- `docs/spec/07-rechte.md`: 4.2 and 4.3, 7.4 rules 1 to 3; `docs/spec/19-sicherheit.md` SEC-IN-4,
+- `docs/spec/09-agents.md`: 3.1 "Operator", 3.7 "Auto-thread from a channel message", 12
+  "Auto-title" (placeholder rule, `409 title_manual`), test AG-19, config `thread.placeholder_titles`.
+- `docs/spec/01-product.md`: 3.1 rows on threads and forums, 6.1 "Done and reopening".
+- `docs/spec/06-api.md`: "Pagination", "Concurrency" points 2 and 3, endpoint table
+  "Threads", "Errors".
+- `docs/spec/07-permissions.md`: 4.2 and 4.3, 7.4 rules 1 to 3; `docs/spec/19-security.md` SEC-IN-4,
   SEC-T07.
 - `docs/api/openapi.yaml`: operationIds `listChannelThreads`, `getThread`, `setThreadTitle`,
   `closeThread`, `reopenThread`, `setThreadTags` (and `createThread`, enabled by M1-56);
@@ -77,7 +77,7 @@ Product requirements implemented here:
     placeholder titles at creation keep `auto`; the operator agent may only replace an `auto`
     title (09 12).
 13. Done (`closed`) and reopen, explicit and implicit through a new message (glossary
-    "Erledigt", 01 6.1).
+    "Done", 01 6.1).
 14. Forum posts with tags; restricted tags need `manage`; a forum list with done section, tag
     filter, sort `last_activity` or `created`, cursor pages without totals (01 3.1, 06 6).
 15. The operator of a thread (`kind = 'thread'`) is captured at creation and stays (R-DM-12); the
@@ -139,7 +139,7 @@ SetTags(ctx, SetTagsCmd) (Thread, error)          // optional expected version
     if missing.
 11. `docs/api/openapi.yaml` already has the `409` responses of `setThreadTitle` and `closeThread`
     and `title_manual` in `x-problem-codes` (planning, spec first); the generated table in 06
-    "Fehler", the `Conflict` description and `getProblemType` include it.
+    "Errors", the `Conflict` description and `getProblemType` include it.
 12. Documentation: `internal/chat/README.md`, `services/server/CHANGELOG.md`,
     `docs/DECISIONS.md` (ruling D6 unknown tag filter; D1 and D7 are in 05, 02 4.6 and
     `openapi.yaml`).
@@ -181,7 +181,7 @@ M1-53 merged (the `threads` table exists), else `Verdict: BLOCKED dependency M1-
 
 D1. `Threads.Create` (called by `messaging` only, 02 4.6: the action `thread.create` belongs to
 `messaging`, which authorizes it on the channel before the call; `chat` writes the row without a
-rights check of its own):
+permission check of its own):
 
 - Unknown channel `404` (the caller has already turned an invisible channel into `404` through
   `authorize`).
@@ -198,7 +198,7 @@ rights check of its own):
 - Placeholder rule (09 12 point 2): trim, collapse inner white space to one space, compare
   case-insensitively (Unicode simple folding, `strings.EqualFold`) with each entry of
   `thread.placeholder_titles`; for a non-empty entry also accept the entry followed by one space
-  and one or more ASCII digits ("Neuer Chat 3"). The empty entry matches only the empty title.
+  and one or more ASCII digits ("New chat 3"). The empty entry matches only the empty title.
 - `kind = 'thread'`, `state = 'open'`, `operator_agent_id` = effective operator of the channel
   now (space default when inheriting), NULL when none; `parent_message_id` from `Parent`;
   `created_by` = actor.
@@ -244,7 +244,7 @@ D5. Tags (`setThreadTags`, action `thread.tags.set`, `If-Match` optional, 06 8.3
   `400` (`/tag_ids`, `limit_reached`, 03 `thread_tags`).
 - Compute the difference to the current set; if any added or removed tag is `restricted`, the
   request needs `manage`: pass the restricted flag in the resource descriptor so that `authz`
-  requires `manage` (`403 forbidden`, reason `capability_missing`). No rights logic in chat.
+  requires `manage` (`403 forbidden`, reason `capability_missing`). No permission logic in chat.
 - Same set: `200`, no event. Else replace rows, version plus one, `thread.updated`.
 - Deleting a forum tag (M1-53 `DeleteForumTag`) now deletes its `thread_tags` rows in the same
   transaction, without per-thread events; clients reload tags on `channel.updated` (ruling of

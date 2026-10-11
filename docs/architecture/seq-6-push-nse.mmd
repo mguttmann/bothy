@@ -1,39 +1,39 @@
-%% Push ohne Inhalt auf iOS oder macOS mit Notification Service Extension (NSE).
-%% Fachliche Details: 13-push-benachrichtigungen.md und 15-client-architektur.md.
+%% Push without content on iOS or macOS with Notification Service Extension (NSE).
+%% Domain details: 13-push-notifications.md and 15-client-architecture.md.
 sequenceDiagram
   autonumber
   box worker
-    participant NV as notify Verbraucher
-    participant J as River-Job notify.push_send
+    participant NV as notify consumer
+    participant J as River job notify.push_send
   end
   participant DB as PostgreSQL
   participant APNS as APNs
   participant OS as iOS
   participant NSE as Notification Service Extension
-  participant API as api-Knoten
+  participant API as api node
   participant APP as App
 
-  NV->>DB: Verbraucher-Zeile push sperren, Ereignisse ab Cursor lesen (message.created)
-  NV->>NV: Empfänger ermitteln, je Empfänger authorize(push.deliver, Thread)
-  NV->>DB: Jobs je aktiver Push-Registrierung einfügen, Cursor vorrücken, COMMIT
-  J->>APNS: HTTP/2: Platzhalter-Text, mutable-content, nur thread_id und message_id
-  alt Token ungültig
-    APNS-->>J: Fehler für das Gerät
+  NV->>DB: lock consumer row push, read events from cursor (message.created)
+  NV->>NV: determine recipients, per recipient authorize(push.deliver, thread)
+  NV->>DB: insert jobs per active push registration, advance cursor, COMMIT
+  J->>APNS: HTTP/2: placeholder text, mutable-content, only thread_id and message_id
+  alt token invalid
+    APNS-->>J: error for the device
     J->>DB: push_registrations: disabled_at, disabled_reason token_invalid
-  else angenommen
-    APNS-->>J: 200, last_success_at setzen
-    APNS-)OS: Push
-    OS->>NSE: Extension mit begrenzter Laufzeit starten
-    NSE->>NSE: Zugang aus gemeinsamem Schlüsselbund der App-Gruppe, DPoP-Beweis mit Geräteschlüssel
+  else accepted
+    APNS-->>J: 200, set last_success_at
+    APNS-)OS: push
+    OS->>NSE: start extension with limited execution time
+    NSE->>NSE: credentials from the shared keychain of the app group, DPoP proof with device key
     NSE->>API: GET messages/{id} (DPoP)
-    API->>API: authorize(Empfänger, message.read, Nachricht)
-    alt erlaubt und erreichbar
-      API-->>NSE: 200 Nachricht
-      NSE->>OS: Titel und Text ersetzen (gekürzt)
-    else 404, keine Verbindung oder Zeit abgelaufen
-      NSE->>OS: neutralen Platzhalter unverändert lassen
+    API->>API: authorize(recipient, message.read, message)
+    alt allowed and reachable
+      API-->>NSE: 200 message
+      NSE->>OS: replace title and text (truncated)
+    else 404, no connection or time expired
+      NSE->>OS: leave the neutral placeholder unchanged
     end
-    OS->>OS: Mitteilung anzeigen
-    OS->>APP: Tippen öffnet Deep Link auf Thread und Nachricht
-    APP->>API: Thread laden, Gelesen-Stand vorrücken
+    OS->>OS: show notification
+    OS->>APP: tap opens deep link to thread and message
+    APP->>API: load thread, advance read state
   end

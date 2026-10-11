@@ -1,84 +1,84 @@
 # OpenTelemetry Collector
 
-Status: Entwurf M0. Erklärt [infra/otel/collector.yaml](../../infra/otel/collector.yaml) und die
-Overlays unter [infra/otel/exporters/](../../infra/otel/exporters/). Entscheidung: ADR 0034.
+Status: draft M0. Explains [infra/otel/collector.yaml](../../infra/otel/collector.yaml) and the
+overlays under [infra/otel/exporters/](../../infra/otel/exporters/). Decision: ADR 0034.
 
-![Telemetrie-Pipeline](diagrams/telemetry-pipeline.svg)
+![Telemetry pipeline](diagrams/telemetry-pipeline.svg)
 
-## 1. Version und Distribution
+## 1. Version and distribution
 
-`otel/opentelemetry-collector-contrib`, Version gepinnt in `BOTHY_OTELCOL_VERSION`. Geprüft wurde
-die Konfiguration mit `otelcol-contrib` 0.162.0 (`otelcol-contrib validate`, Basis allein, mit
-jedem Overlay und mit drei Kombinationen aus zwei Overlays). In dieser Version heißen die
-Komponenten `otlp_grpc`, `otlp_http`, `cumulative_to_delta`, `azure_monitor` (Ausgabe von
-`otelcol-contrib components`) [belegt].
+`otel/opentelemetry-collector-contrib`, version pinned in `BOTHY_OTELCOL_VERSION`. The
+configuration was checked with `otelcol-contrib` 0.162.0 (`otelcol-contrib validate`, base alone,
+with each overlay and with three combinations of two overlays). In this version the
+components are named `otlp_grpc`, `otlp_http`, `cumulative_to_delta`, `azure_monitor` (output of
+`otelcol-contrib components`) [verified].
 
-## 2. Aufbau der Basis
+## 2. Structure of the base
 
-| Teil | Komponente | Zweck |
+| Part | Component | Purpose |
 |---|---|---|
-| Empfang | `otlp` (gRPC `:4317`, HTTP `:4318`) | Server, `bothy-backupd`, Adapter |
-| Empfang | `postgresql` | Kennzahlen der Datenbank mit Rolle `bothy_monitor`; Deadlocks zusätzlich eingeschaltet |
-| Schutz | `memory_limiter` | lehnt bei Speicherdruck ab, statt abzustürzen; der Server verwirft dann und zählt |
-| Kennzeichnung | `resource/instance` | setzt `deployment.environment.name`, falls die Quelle es nicht setzt |
-| Datenschutz | `transform/scrub` | löscht `url.query`, `url.full`, Client-Adressen, Inhalts-Attribute der GenAI-Konventionen, `exception.message` |
-| Datenschutz | `redaction/allowlist` | Spans und Logs: nur Schlüssel aus [signals.md](signals.md) 5.3 und den Konventionen; HMAC für verdächtige Werte |
-| Datenschutz | `transform/scrub_metrics` | Metriken: Personen-Attribute fremder Quellen löschen |
-| Sampling | `tail_sampling` | behält alle Traces mit Fehler, alle langsamer als `BOTHY_TRACE_SLOW_THRESHOLD_MS`, vom Rest `BOTHY_TRACE_SAMPLE_PERCENT` |
-| Bündeln | `batch` | weniger Exporte |
-| Verteilung | `forward/traces`, `forward/metrics`, `forward/logs` | Ende der Eingangs-Pipelines; Overlays hängen sich an |
-| Standardziel | `nop` | ohne Overlay werden Daten verworfen |
-| Eigenmetriken | Prometheus-Leser auf `:8888` | Prometheus scrapt sie (Alarm `BothyTelemetryExportFailing`) |
+| Receiving | `otlp` (gRPC `:4317`, HTTP `:4318`) | Server, `bothy-backupd`, adapters |
+| Receiving | `postgresql` | Database metrics with the role `bothy_monitor`; deadlocks additionally enabled |
+| Protection | `memory_limiter` | Rejects under memory pressure instead of crashing; the server then discards and counts |
+| Labeling | `resource/instance` | Sets `deployment.environment.name` if the source does not set it |
+| Privacy | `transform/scrub` | Deletes `url.query`, `url.full`, client addresses, content attributes of the GenAI conventions, `exception.message` |
+| Privacy | `redaction/allowlist` | Spans and logs: only keys from [signals.md](signals.md) 5.3 and the conventions; HMAC for suspicious values |
+| Privacy | `transform/scrub_metrics` | Metrics: delete person attributes of third-party sources |
+| Sampling | `tail_sampling` | Keeps all traces with an error, all slower than `BOTHY_TRACE_SLOW_THRESHOLD_MS`, and `BOTHY_TRACE_SAMPLE_PERCENT` of the rest |
+| Batching | `batch` | Fewer exports |
+| Distribution | `forward/traces`, `forward/metrics`, `forward/logs` | End of the inbound pipelines; overlays attach to them |
+| Default target | `nop` | Without an overlay, data is discarded |
+| Own metrics | Prometheus reader on `:8888` | Prometheus scrapes them (alert `BothyTelemetryExportFailing`) |
 
-Metriken laufen nicht durch die Allowlist: Bothy-eigene Attribute sind im Code begrenzt
-([signals.md](signals.md) 2), und der Prozessor ist für Metriken nur alpha. Für Metriken fremder
-Quellen löscht `transform/scrub_metrics` Personen-Attribute (`user.*`, `enduser.*`,
-`session.id`, `organization.id`, `client.address`) an Resource und Datenpunkt.
+Metrics do not pass through the allowlist: Bothy's own attributes are bounded in the code
+([signals.md](signals.md) 2), and the processor is only alpha for metrics. For metrics of
+third-party sources, `transform/scrub_metrics` deletes person attributes (`user.*`, `enduser.*`,
+`session.id`, `organization.id`, `client.address`) on the resource and the data point.
 
 ## 3. Overlays
 
-Ein Overlay ist eine zweite `--config`-Datei. Der Collector führt Maps zusammen und ersetzt Listen.
-Darum fügt jedes Overlay eigene, benannte Pipelines hinzu (z. B. `traces/newrelic`) und ändert
-keine Liste der Basis. Ausnahme: Ein Overlay mit Erweiterung muss `service.extensions` vollständig
-nennen; das trifft nur `azure-monitor`. Zwei Overlays mit Erweiterungen gleichzeitig gehen darum
-nicht; alle anderen Paare gehen.
+An overlay is a second `--config` file. The collector merges maps and replaces lists.
+Therefore every overlay adds its own named pipelines (for example `traces/newrelic`) and changes
+no list of the base. Exception: an overlay with an extension must list `service.extensions` in
+full; this applies only to `azure-monitor`. Two overlays with extensions at the same time therefore
+do not work; all other pairs work.
 
-| Overlay | Ziel | Signale | Besonderheit |
+| Overlay | Target | Signals | Special feature |
 |---|---|---|---|
-| `none` | keins | keine | Standard |
-| `local` | Prometheus, Loki, Tempo im Compose-Profil `observability` | alle | Metriken kumulativ an den OTLP-Empfänger von Prometheus |
-| `newrelic` | New Relic OTLP | alle | Delta-Temporalität, Attribute gekürzt |
-| `grafana` | Grafana Cloud OTLP-Gateway | alle | ganze `Authorization`-Kopfzeile aus einer Datei |
-| `datadog` | Datadog | alle | Datadog-Connector für APM-Statistiken |
-| `azure-monitor` | Azure Monitor (native OTLP-Aufnahme) | alle | Entra-Anmeldung, Delta-Temporalität |
-| `sentry` | Sentry OTLP | Traces, Logs | keine Metriken |
+| `none` | none | none | Default |
+| `local` | Prometheus, Loki, Tempo in the Compose profile `observability` | all | Metrics cumulative to the OTLP receiver of Prometheus |
+| `newrelic` | New Relic OTLP | all | Delta temporality, attributes truncated |
+| `grafana` | Grafana Cloud OTLP gateway | all | Whole `Authorization` header from a file |
+| `datadog` | Datadog | all | Datadog connector for APM statistics |
+| `azure-monitor` | Azure Monitor (native OTLP ingestion) | all | Entra authentication, delta temporality |
+| `sentry` | Sentry OTLP | traces, logs | No metrics |
 
-Belege und Grenzen je Backend: [backends.md](backends.md).
+Evidence and limits per backend: [backends.md](backends.md).
 
-Compose wählt bis zu zwei Overlays mit `BOTHY_OTEL_EXPORTER` und `BOTHY_OTEL_EXPORTER_2`.
+Compose selects up to two overlays with `BOTHY_OTEL_EXPORTER` and `BOTHY_OTEL_EXPORTER_2`.
 
-## 4. Geheimnisse
+## 4. Secrets
 
-Alle Schlüssel liest der Collector mit `${file:/run/bothy/secrets/<name>}` aus seinem
-Unterverzeichnis des Volumes `secrets`. Umgebungsvariablen tragen nur Endpunkte und IDs.
+The collector reads all keys with `${file:/run/bothy/secrets/<name>}` from its
+subdirectory of the volume `secrets`. Environment variables carry only endpoints and IDs.
 
-## 5. Grenzen und Betrieb
+## 5. Limits and operations
 
-1. Tail-Sampling braucht alle Spans eines Traces im selben Collector. Mit mehreren Collectors
-   (Cloud, mehrere Hosts) braucht es davor einen Lastverteiler nach Trace-ID (`load_balancing`
-   exporter) [abgeleitet].
-2. APM-Statistiken bei Datadog beruhen auf der Stichprobe, weil das Sampling vor dem Overlay
-   läuft.
-3. Fällt der Collector aus, verwirft der Server nach vollem Puffer; der Nachrichtenpfad bleibt
-   unberührt. Der Alarm `BothyServerTelemetryMissing` meldet das.
-4. Adapter auf demselben Host senden an `127.0.0.1:BOTHY_OTLP_PUBLISH_PORT`; Adapter auf anderen
-   Hosts betreiben einen eigenen Collector mit denselben Dateien (Basis plus Overlay).
+1. Tail sampling needs all spans of a trace in the same collector. With several collectors
+   (cloud, several hosts) a load balancer by trace ID is needed in front of them (`load_balancing`
+   exporter) [derived].
+2. APM statistics at Datadog are based on the sample, because sampling runs before the
+   overlay.
+3. If the collector fails, the server discards once its buffer is full; the message path stays
+   unaffected. The alert `BothyServerTelemetryMissing` reports this.
+4. Adapters on the same host send to `127.0.0.1:BOTHY_OTLP_PUBLISH_PORT`; adapters on other
+   hosts run their own collector with the same files (base plus overlay).
 
-## 6. Prüfen
+## 6. Check
 
 ```
 otelcol-contrib validate --config=infra/otel/collector.yaml --config=infra/otel/exporters/local.yaml
 ```
 
-Für die Prüfung außerhalb des Containers müssen die Pfade unter `/run/bothy/secrets` existieren
-oder auf Testdateien zeigen; der Schlüssel `telemetry_pseudonym_key` muss mindestens 32 Byte haben.
+For the check outside the container, the paths under `/run/bothy/secrets` must exist
+or point to test files; the key `telemetry_pseudonym_key` must be at least 32 bytes long.

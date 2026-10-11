@@ -52,7 +52,7 @@ omit = ["*/tests/*"]
 show_missing = true
 skip_covered = true
 # The threshold is the named value `quality.coverage.tools_min` from
-# docs/spec/23-qualitaet.md; hooks/tests/test_config_values.py holds both equal.
+# docs/spec/23-quality.md; hooks/tests/test_config_values.py holds both equal.
 fail_under = 90
 
 [tool.ruff]
@@ -61,7 +61,7 @@ line-length = 100
 
 [tool.ruff.lint]
 # "D": every public module, class and function has a docstring (owner build rule 3,
-# docs/spec/23-qualitaet.md "Doku im Code").
+# docs/spec/23-quality.md "Documentation in code").
 select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "PL", "PT", "N", "C4", "PTH", "ERA", "D"]
 ignore = [
   "PLR0911",  # many returns are clearer than nested branches in small checkers

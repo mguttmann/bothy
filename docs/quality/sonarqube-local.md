@@ -1,58 +1,58 @@
-# SonarQube lokal
+# SonarQube locally
 
-Der lokale SonarQube Community Build bewertet Produkt-Code vor dem Push mit demselben
-Profil und Gate wie SonarQube Cloud (ADR 0040). Er läuft aus
-`tools/sonarqube/compose.yaml`: Web-Oberfläche nur auf `127.0.0.1`, PostgreSQL nur in
-einem internen Netz ohne Host-Port.
+The local SonarQube Community Build rates product code before the push with the same
+profile and gate as SonarQube Cloud (ADR 0040). It runs from
+`tools/sonarqube/compose.yaml`: web interface only on `127.0.0.1`, PostgreSQL only in
+an internal network without a host port.
 
-## Voraussetzungen
+## Prerequisites
 
-* Eine Docker-kompatible Laufzeit mit Compose.
-* Arbeitsspeicher für die Container-VM nach den Herstellerangaben: der Community Build
-  nennt 4 GB für bis zu eine Million Zeilen
+* A Docker-compatible runtime with Compose.
+* Memory for the container VM according to the vendor's figures: the Community Build
+  names 4 GB for up to one million lines
   (https://docs.sonarsource.com/sonarqube-community-build/server-installation/server-host-requirements/,
-  abgerufen 2026-10-10) [belegt].
-* Der Port `quality.sonar.local_port` (Umgebungsvariable `SONARQUBE_PORT`) ist auf dem
-  Rechner frei. Ist er belegt, `SONARQUBE_PORT` setzen und `SONAR_HOST_URL` passend wählen.
-  Die Beispiele unten nutzen den Standard-Port.
+  retrieved 2026-10-10) [verified].
+* The port `quality.sonar.local_port` (environment variable `SONARQUBE_PORT`) is free on the
+  host. If it is taken, set `SONARQUBE_PORT` and choose `SONAR_HOST_URL` to match.
+  The examples below use the default port.
 
-## 1. Starten
+## 1. Start
 
 ```sh
 make sonar-up
 ```
 
-Beim ersten Mal legt das Ziel `tools/sonarqube/.env` mit einem zufälligen
-Datenbank-Passwort an (Dateirechte nur für den Besitzer, git-ignoriert), startet beide
-Container und wartet bis `api/system/status` den Status `UP` meldet, höchstens
-`quality.sonar.startup_timeout_s`. Die Daten liegen in benannten Volumes; `make sonar-down`
-stoppt, ohne sie zu löschen.
+On the first run, the target creates `tools/sonarqube/.env` with a random
+database password (file permissions for the owner only, git-ignored), starts both
+containers and waits until `api/system/status` reports the status `UP`, at most
+`quality.sonar.startup_timeout_s`. The data is in named volumes; `make sonar-down`
+stops without deleting them.
 
-Die eingebaute Suchmaschine verlangt sonst Kernel-Einstellungen des Hosts
-(`vm.max_map_count`); für den lokalen Einzelbetrieb schaltet die Compose-Datei diese
-Startprüfung ab, wie es die Schnellstart-Anleitung des Herstellers tut
-(https://docs.sonarsource.com/sonarqube-community-build/try-out-sonarqube/, abgerufen
-2026-10-10) [belegt].
+The built-in search engine otherwise requires kernel settings of the host
+(`vm.max_map_count`); for local single use, the Compose file switches off this
+startup check, as the vendor's quick start guide does
+(https://docs.sonarsource.com/sonarqube-community-build/try-out-sonarqube/, retrieved
+2026-10-10) [verified].
 
-## 2. Admin-Passwort ändern
+## 2. Change the admin password
 
-`http://127.0.0.1:9000` öffnen, mit `admin`/`admin` anmelden (Herstellervorgabe, gleiche
-Quelle) und das Passwort sofort ändern. Das neue Passwort gehört in den Passwort-Manager,
-nie in eine Datei im Repository.
+Open `http://127.0.0.1:9000`, log in with `admin`/`admin` (vendor default, same
+source) and change the password right away. The new password belongs in the password manager,
+never in a file in the repository.
 
-## 3. Tokens erzeugen, ohne sie anzuzeigen
+## 3. Create tokens without displaying them
 
-Zwei Tokens mit getrennten Rechten:
+Two tokens with separate permissions:
 
-| Token | Typ | Wofür |
+| Token | Type | For what |
 |---|---|---|
-| Konfiguration | `USER_TOKEN` des Admins, mit Ablaufdatum | einmalig `make sonar-config`, danach widerrufen |
-| Analyse | `GLOBAL_ANALYSIS_TOKEN` | `make sonar` und `make check` |
+| Configuration | `USER_TOKEN` of the admin, with expiry date | once for `make sonar-config`, revoke afterwards |
+| Analysis | `GLOBAL_ANALYSIS_TOKEN` | `make sonar` and `make check` |
 
-Die Typen nennt die Web-API (`api/user_tokens/generate`, Parameter `type`) [belegt am
-öffentlichen Server der Herstellerin, https://next.sonarqube.com/sonarqube/api/webservices/list,
-abgerufen 2026-10-10]. Das Token geht direkt in eine Datei außerhalb des Repositorys und
-erscheint nie im Terminal:
+The types are named by the web API (`api/user_tokens/generate`, parameter `type`) [verified on the
+vendor's public server, https://next.sonarqube.com/sonarqube/api/webservices/list,
+retrieved 2026-10-10]. The token goes directly into a file outside the repository and
+never appears in the terminal:
 
 ```sh
 read -rs -p "SonarQube admin password: " SQ_ADMIN; echo
@@ -63,66 +63,66 @@ curl -fsS -u "admin:${SQ_ADMIN}" -X POST "http://127.0.0.1:9000/api/user_tokens/
 unset SQ_ADMIN
 ```
 
-Für die Konfiguration dasselbe mit `type=USER_TOKEN`, einem `expirationDate` und einer
-eigenen Datei. In der Shell, die `make` aufruft:
+For the configuration, the same with `type=USER_TOKEN`, an `expirationDate` and a
+separate file. In the shell that calls `make`:
 
 ```sh
 export SONAR_TOKEN="$(cat ~/.config/bothy/sonar-token)"
 ```
 
-Statt einer Datei geht auch der Schlüsselbund des Betriebssystems.
+Instead of a file, the keychain of the operating system also works.
 
-## 4. Profil und Gate einspielen
+## 4. Import the profile and gate
 
 ```sh
 SONAR_TOKEN="$(cat ~/.config/bothy/sonar-config-token)" make sonar-config
 SONAR_TOKEN="$(cat ~/.config/bothy/sonar-token)" make sonar-config-check
 ```
 
-`sonar-config` legt das Gate "Bothy way" an (oder repariert es) und macht es zum
-Standard, legt je Sprache das Profil "Bothy way" an, setzt das Eltern-Profil, spielt die
-Zusatzregeln aus `quality/sonar/quality-profile-<sprache>.xml` ein und macht das Profil
-zum Standard. Sprachen, die der Community Build nicht kennt (Dart, Swift), werden
-übersprungen und genannt. Danach das Konfigurations-Token widerrufen.
+`sonar-config` creates the gate "Bothy way" (or repairs it) and makes it the
+default, creates the profile "Bothy way" per language, sets the parent profile, imports the
+additional rules from `quality/sonar/quality-profile-<language>.xml` and makes the profile
+the default. Languages that the Community Build does not know (Dart, Swift) are
+skipped and named. Afterwards, revoke the configuration token.
 
-Fehlt das Eltern-Profil (eingebaute Profilnamen können sich mit einer neuen
-SonarQube-Version ändern), bricht `sonar-config` ab. Dann die eingebauten Profile prüfen,
-`quality/sonar/profiles.json` per Pull Request anpassen und erneut einspielen.
+If the parent profile is missing (built-in profile names can change with a new
+SonarQube version), `sonar-config` stops. Then check the built-in profiles,
+adjust `quality/sonar/profiles.json` by pull request and import again.
 
-## 5. Analysieren
-
-```sh
-make sonar          # oder make check
-```
-
-Der Scanner (`@sonar/scan`, ohne lokale Java-Installation) liest
-`sonar-project.properties` und wartet auf das Gate-Ergebnis; ein rotes Gate lässt
-`make sonar` scheitern. Solange es keinen Produkt-Code gibt, überspringt das Ziel.
-
-## 6. Abgleich mit SonarQube Cloud
-
-Im öffentlichen Zustand (public-switch.md) gegen die Cloud:
+## 5. Analyze
 
 ```sh
-SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION=<organisation> \
-  SONAR_TOKEN="<Token aus dem Passwort-Manager>" make sonar-config        # einmalig
-SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION=<organisation> \
-  SONAR_TOKEN="<Token>" make sonar-config-check
+make sonar          # or make check
 ```
 
-Beide Prüfungen (lokal und Cloud) bestehen gegen dieselben Dateien, also gelten dieselben
-Regeln. Verglichen wird der Zusatz über dem Eltern-Profil und jede Gate-Bedingung. Das
-eingebaute Eltern-Profil selbst kann sich zwischen Community Build (monatliche Releases)
-und Cloud (laufend) unterscheiden; das ist die bekannte Restabweichung. Wann prüfen:
-nach jedem Update des lokalen Images, nach jeder Änderung unter `quality/sonar/` und
-monatlich.
+The scanner (`@sonar/scan`, without a local Java installation) reads
+`sonar-project.properties` and waits for the gate result; a red gate makes
+`make sonar` fail. As long as there is no product code, the target skips.
 
-## Eine Regel hinzufügen
+## 6. Alignment with SonarQube Cloud
 
-1. Regel-Schlüssel und Begründung im Pull Request nennen (welcher Fehler, welche
-   Fundstelle).
-2. Regel in `quality/sonar/quality-profile-<sprache>.xml` unter `<rules>` eintragen
-   (Format der Backup-Datei von SonarQube: `repositoryKey`, `key`, optional `priority`
-   und `parameters`).
-3. `make sonar-config` lokal, nach dem Merge gegen die Cloud; `sonar-config-check` an
-   beiden Orten.
+In the public state (public-switch.md), against the cloud:
+
+```sh
+SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION=<organization> \
+  SONAR_TOKEN="<token from the password manager>" make sonar-config        # once
+SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION=<organization> \
+  SONAR_TOKEN="<token>" make sonar-config-check
+```
+
+Both checks (local and cloud) pass against the same files, so the same rules
+apply. What is compared is the addition on top of the parent profile and every gate condition. The
+built-in parent profile itself can differ between the Community Build (monthly releases)
+and the cloud (continuous); that is the known residual deviation. When to check:
+after every update of the local image, after every change under `quality/sonar/` and
+monthly.
+
+## Add a rule
+
+1. Name the rule key and the rationale in the pull request (which error, which
+   occurrence).
+2. Enter the rule in `quality/sonar/quality-profile-<language>.xml` under `<rules>`
+   (format of the SonarQube backup file: `repositoryKey`, `key`, optionally `priority`
+   and `parameters`).
+3. `make sonar-config` locally, after the merge against the cloud; `sonar-config-check` in
+   both places.

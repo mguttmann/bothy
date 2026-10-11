@@ -1,46 +1,46 @@
 # claude-code-runner
 
-Status: geplant. Dieser Ordner enthält noch keinen Code.
+Status: planned. This folder contains no code yet.
 
-## Zweck
+## Purpose
 
-Referenz-Adapter für Dev-Foren: Ein Forum mit Projektbindung ist ein Projekt, jeder Thread darin
-ist eine Claude-Code-Sitzung. Der Runner ist ein eigenständiger Prozess auf dem Rechner, auf dem
-die Projekte liegen. Er startet je Turn `claude -p` mit stream-json, füllt die Live-Box aus dem
-Stream und gibt Nachträge über stdin in den laufenden Turn.
+Reference adapter for dev forums: a forum with a project binding is a project, and every thread
+in it is a Claude Code session. The runner is a standalone process on the host where the
+projects live. Per turn it starts `claude -p` with stream-json, fills the live box from the
+stream and passes follow-ups through stdin into the running turn.
 
-## Vertrag
+## Contract
 
-- Allgemein: docs/spec/09-agenten.md Abschnitte 4 bis 16.
-- Runner-spezifisch: docs/spec/09-agenten.md Abschnitt 18 (Prozessvertrag, Umgebung als
-  Erlaubnisliste, eigene Prozessgruppe, Stopp per SIGINT, Sperre je Sitzung, Live-Box aus dem
-  Stream, Nachträge, Kosten aus `modelUsage`, Fehlerpfade, Datei-Regeln).
-- Backend-Richtlinie je Lauf: docs/spec/10-backend-richtlinie.md Abschnitt 10.2.
-- Abschottung für mehrere Personen: docs/spec/21-dev-isolation.md.
+- General: docs/spec/09-agents.md sections 4 to 16.
+- Runner-specific: docs/spec/09-agents.md section 18 (process contract, environment as an
+  allow-list, own process group, stop by SIGINT, lock per session, live box from the
+  stream, follow-ups, costs from `modelUsage`, error paths, file rules).
+- Backend policy per run: docs/spec/10-backend-policy.md section 10.2.
+- Isolation for several people: docs/spec/21-dev-isolation.md.
 
-## Feste Regeln
+## Fixed rules
 
-- Projektordner nur unter `runner.projects_root`; der Server nennt nie einen absoluten Pfad.
-- Umgebung des Kindprozesses ist eine Erlaubnisliste; Anmelde-Variablen nur nach dem Soll der
-  Aufruf-Marke.
-- Ist-Modus vor dem Start mit `claude auth status` in der Lauf-Umgebung prüfen, Gegenprobe
-  `apiKeySource`; bei Abweichung kein Turn.
-- Der Runner liest, kopiert oder schreibt nie Anmeldedateien einer Laufzeit.
-- Keine automatische Wiederholung eines abgebrochenen Turns.
-- `--dangerously-skip-permissions` nur bei Werkzeugklasse `full` und nur, wenn die Schutzregeln aus
-  docs/spec/07-rechte.md das erlauben.
+- Project folders only under `runner.projects_root`; the server never names an absolute path.
+- The environment of the child process is an allow-list; login variables only according to the
+  configured mode of the invocation token.
+- Check the reported mode before the start with `claude auth status` in the run environment,
+  cross-check `apiKeySource`; on a mismatch, no turn.
+- The runner never reads, copies or writes login files of a runtime.
+- No automatic retry of an aborted turn.
+- `--dangerously-skip-permissions` only with tool class `full` and only when the guard rules from
+  docs/spec/07-permissions.md allow it.
 
-## Geplanter Aufbau
+## Planned structure
 
-| Teil | Inhalt |
+| Part | Content |
 |---|---|
-| Hauptprozess | Gateway-Verbindung, Marke prüfen, Läufe verteilen, Heartbeat mit Projekt-Bereitschaft |
-| Turn-Prozess | ein `claude -p` je Turn, abgekoppelt, eigene Prozessgruppe |
-| Stream-Leser | Abbildung der Stream-Nachrichten auf das Lauf-Dokument |
-| Zustand | `runner.state_dir`: Sitzungen, Sperren, Mitschnitte, Eingangsdateien |
-| Tests | Fake-Claude (abgespielte Fixtures); Test gegen die installierte, gepinnte CLI-Version für erkannte Ereignisse und Fehlertexte; echte Läufe nur hinter einem Schalter |
+| Main process | gateway connection, check the token, distribute runs, heartbeat with project readiness |
+| Turn process | one `claude -p` per turn, detached, own process group |
+| Stream reader | mapping of the stream messages to the run document |
+| State | `runner.state_dir`: sessions, locks, recordings, input files |
+| Tests | fake Claude (replayed fixtures); test against the installed, pinned CLI version for recognized events and error texts; real runs only behind a switch |
 
-## Vor dem Bau zu prüfen
+## To check before the build
 
-- Kommt `system/init` bei `--input-format stream-json` vor der ersten Modellanfrage?
-- Ist `/compact` im Druckmodus der gepinnten Version verfügbar?
+- Does `system/init` arrive with `--input-format stream-json` before the first model request?
+- Is `/compact` available in print mode of the pinned version?

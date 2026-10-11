@@ -1,35 +1,35 @@
 # plugins
 
-Status: geplant. Dieser Ordner enthält noch keinen Code.
+Status: planned. This folder contains no code yet.
 
-## Zweck
+## Purpose
 
-Referenz-Adapter und Referenz-Apps. Jedes Programm hier läuft außerhalb des Servers und nutzt nur
-die öffentliche API (ADR 0022). Nichts in diesem Ordner wird in den Server gelinkt oder von ihm
-geladen.
+Reference adapters and reference apps. Every program here runs outside the server and uses only
+the public API (ADR 0022). Nothing in this folder is linked into the server or loaded by
+it.
 
-## Inhalt
+## Contents
 
-| Ordner | Art | Zweck | Stand |
+| Folder | Kind | Purpose | State |
 |---|---|---|---|
-| `hermes-adapter/` | Agenten-Adapter | Plattform-Plugin für das Open-Source-Framework Hermes Agent | geplant |
-| `claude-code-runner/` | Agenten-Adapter | Startet Claude-Code-Sitzungen je Thread in Dev-Foren | geplant |
-| `grafana-bothy-live/` | Grafana-Panel-Plugin | Ansichten der Live-Statistik für den Betrieb aus OTel-Metriken (ID `bothy-live-panel`, [25-visualisierung.md](../docs/spec/25-visualisierung.md), Abschnitt 8) | geplant (M7) |
-| `github-app/` | App | Referenz-App Code-Hosting aus docs/spec/11-erweiterungen.md, Abschnitt 10.1 (TypeScript-SDK) | geplant (M2-49), Ordner entsteht mit dem Bau-Ticket |
-| `jira-app/` | App | Referenz-App Ticketsystem aus docs/spec/11-erweiterungen.md, Abschnitt 10.2 (Python-SDK) | geplant (M2-50), Ordner entsteht mit dem Bau-Ticket |
+| `hermes-adapter/` | agent adapter | platform plugin for the open-source framework Hermes Agent | planned |
+| `claude-code-runner/` | agent adapter | starts Claude Code sessions per thread in dev forums | planned |
+| `grafana-bothy-live/` | Grafana panel plugin | views of the live statistics for operations from OTel metrics (ID `bothy-live-panel`, [25-visualization.md](../docs/spec/25-visualization.md), section 8) | planned (M7) |
+| `github-app/` | app | reference app for code hosting from docs/spec/11-extensions.md, section 10.1 (TypeScript SDK) | planned (M2-49), the folder is created with the build ticket |
+| `jira-app/` | app | reference app for a ticket system from docs/spec/11-extensions.md, section 10.2 (Python SDK) | planned (M2-50), the folder is created with the build ticket |
 
-## Regeln für alle Programme hier
+## Rules for all programs here
 
-- Vertrag: docs/spec/09-agenten.md (Agenten) bzw. docs/spec/11-erweiterungen.md (Apps).
-- Nur über das SDK (`sdk/`) oder die öffentliche API; keine Server-internen Pakete.
-- Keine Geheimnisse im Repo, keine Zugangsdaten in Protokollen; Konfiguration über Umgebung oder
-  Datei, Geheimnisse über den Secret-Provider des jeweiligen Programms.
-- Eigene Versionsnummer (SemVer) und eigenes Changelog je Ordner.
-- Tests mit den Testdoppeln aus docs/spec/09-agenten.md Abschnitt 16; echte Modellaufrufe nur
-  hinter einem ausdrücklichen Schalter.
-- White Label: keine Firmen-, Personen- oder Hostnamen; Beispiele mit example.com.
+- Contract: docs/spec/09-agents.md (agents) or docs/spec/11-extensions.md (apps).
+- Only through the SDK (`sdk/`) or the public API; no server-internal packages.
+- No secrets in the repo, no credentials in logs; configuration through the environment or a
+  file, secrets through the secret provider of the respective program.
+- Own version number (SemVer) and own changelog per folder.
+- Tests with the test doubles from docs/spec/09-agents.md section 16; real model calls only
+  behind an explicit switch.
+- White label: no company, person or host names; examples with example.com.
 
-Ausnahme `grafana-bothy-live/`: Das Panel-Plugin läuft in Grafana, nicht als Client der API. Es
-spricht nie mit dem Server und liest nur Grafana-Datenquellen; Vertrag ist
-docs/spec/25-visualisierung.md, Abschnitt 8. Die Regeln zu Geheimnissen, Version und White Label
-gelten auch dort.
+Exception `grafana-bothy-live/`: the panel plugin runs in Grafana, not as a client of the API. It
+never talks to the server and reads only Grafana data sources; its contract is
+docs/spec/25-visualization.md, section 8. The rules on secrets, version and white label
+apply there as well.

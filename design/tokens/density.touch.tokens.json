@@ -1,5 +1,5 @@
 {
-  "$description": "Dichte, Kontext touch: fest auf iPhone und Android. target-min deckt Material (48 dp) und damit auch Apples 44 pt ab; die sichtbare Fläche darf kleiner sein, die Trefferfläche nie.",
+  "$description": "Density, context touch: fixed on iPhone and Android. target-min covers Material (48 dp) and with it also Apple's 44 pt; the visible area may be smaller, the hit area never.",
   "density": {
     "$type": "dimension",
     "row-channel": {"$value": {"value": 44, "unit": "px"}},

@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 """Generate section 4 of docs/operations/configuration.md from the chapter tables.
 
-Ruling L4: the source of every named configuration value is the table "Konfigurationswerte
-dieses Kapitels" of its chapter in docs/spec/. This tool collects those tables, fails if a
+Ruling L4: the source of every named configuration value is the table "Configuration values
+of this chapter" of its chapter in docs/spec/. This tool collects those tables, fails if a
 name appears twice, and writes the block between the markers in configuration.md. `--check`
 fails if the committed block is stale. From M1 the configuration schema in the server code
 becomes the source; then this tool reads the schema instead.
 
 Table rows: the first cell holds one name, a list (`a.x`, `a.y`) or a shorthand
-(`a.b.per_minute` / `.burst`, defaults `30` / `10`). A table with an "Ort" column names the
+(`a.b.per_minute` / `.burst`, defaults `30` / `10`). A table with a "Place" column names the
 program that reads the value; without it the chapter default below applies.
 """
 
@@ -28,15 +28,15 @@ DEFAULT_REFERENCE = REPO / "docs" / "operations" / "configuration.md"
 SERVER = "Server"
 # Chapter 23 names quality thresholds of the repository tool chain, not runtime values;
 # tools/docs/tests/test_config_values.py holds them against their sources.
-EXCLUDED = frozenset({"23-qualitaet.md"})
-# Chapters whose table has no "Ort" column but whose values belong to another program.
+EXCLUDED = frozenset({"23-quality.md"})
+# Chapters whose table has no "Place" column but whose values belong to another program.
 DEFAULT_PLACE = {
-    "01-produkt.md": "App",
-    "15-client-architektur.md": "App",
-    "22-import-migration.md": "Werkzeug `bothy import`",
+    "01-product.md": "App",
+    "15-client-architecture.md": "App",
+    "22-import-migration.md": "Tool `bothy import`",
 }
 _SECTION = re.compile(
-    r"^## (?P<num>[0-9]+(?:\.[0-9]+)*)\.? Konfigurationswerte dieses Kapitels\s*$", re.MULTILINE
+    r"^## (?P<num>[0-9]+(?:\.[0-9]+)*)\.? Configuration values of this chapter\s*$", re.MULTILINE
 )
 _TITLE = re.compile(r"^# (?P<title>.+)$", re.MULTILINE)
 _NAME = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$")
@@ -119,7 +119,7 @@ def parse(path: Path) -> Chapter | None:
     values: list[Value] = []
     if rows:
         header = [h.lower() for h in _cells(rows[0])]
-        has_place = len(header) > 3 and header[1] == "ort"
+        has_place = len(header) > 3 and header[1] == "place"
         default_place = DEFAULT_PLACE.get(path.name, SERVER)
         for n, line in enumerate(rows[2:], start=1):
             cells = _cells(line)
@@ -162,9 +162,9 @@ def render(reference: str, chapters: list[Chapter]) -> str:
         out += [
             f"### {ch.title}",
             "",
-            f"Quelle: [{ch.file}](../spec/{ch.file}), Abschnitt {ch.section}.",
+            f"Source: [{ch.file}](../spec/{ch.file}), section {ch.section}.",
             "",
-            "| Schlüssel | Umgebung | Ort | Standard | Bedeutung |",
+            "| Key | Environment | Place | Default | Meaning |",
             "|---|---|---|---|---|",
         ]
         for v in ch.values:
