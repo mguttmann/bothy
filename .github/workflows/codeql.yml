@@ -3,8 +3,13 @@
 # CodeQL code scanning, public phase only: code scanning is free for public repositories
 # and not available for private repositories of a personal account. In the private phase
 # Semgrep, SonarQube, golangci-lint (gosec) and bandit cover static analysis locally.
-# Languages: add `go` and `javascript-typescript` to the matrix in the same pull request
-# that adds the first Go or TypeScript code (Dart is not supported by CodeQL).
+# Languages: the matrix lists every tracked language CodeQL supports, found through the
+# workflows, tools/ and the component manifests the root Makefile discovers;
+# tools/ci/tests/test_codeql_workflow.py enforces it. `javascript-typescript` is added by the
+# ticket that adds the first TypeScript project. Go uses `build-mode: manual` because CodeQL
+# has no `none` mode for Go and its autobuilder would run the root Makefile first; the
+# manual build runs `go build ./...` in the module, as `make typecheck` does. Dart is not
+# supported by CodeQL.
 
 name: codeql
 
@@ -34,16 +39,38 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [actions, python]
+        include:
+          - language: actions
+            build-mode: none
+          - language: go
+            build-mode: manual
+          - language: python
+            build-mode: none
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - if: matrix.language == 'go'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: services/server/go.mod
+          # A restored cache is not verified again: go.sum is checked when a module is
+          # downloaded, the build cache never. An analysis must not trust state written by
+          # another run, and on free public runners a cache saves nothing worth that risk.
+          cache: false
       - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           languages: ${{ matrix.language }}
-          build-mode: none
+          build-mode: ${{ matrix.build-mode }}
           queries: security-extended
+      - name: Build the server module for CodeQL
+        if: matrix.language == 'go'
+        working-directory: services/server
+        env:
+          # The server ships as a static binary (baseline B2, ADR 0005): CodeQL sees the
+          # build configuration that is shipped.
+          CGO_ENABLED: "0"
+        run: go build ./...
       - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
         with:
           category: /language:${{ matrix.language }}

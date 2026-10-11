@@ -51,3 +51,5 @@ Planning stage (milestone M0). Nothing is installable yet.
   references instead of `<redacted>`, and `docs/operations/configuration.md` sections 1 to 3 give
   the exact grammar of every kind (now with `list(cidr)` and `url`), the file rules and the output
   of `bothy config check` and `bothy config print`.
+- CodeQL analyses the Go server module (manual build of `services/server`) in the public
+  phase; a test keeps the CodeQL languages in step with the tracked components.

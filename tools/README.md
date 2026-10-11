@@ -10,6 +10,7 @@ Versionen laufen wie in CI. Einrichtung einmal je Klon: `make bootstrap`.
 | `node/` | gepinnte Node-Werkzeuge (mermaid-cli, Redocly CLI, SonarScanner); Install-Skripte von npm-Paketen sind abgeschaltet | `bootstrap` | |
 | `bin/fetch_tools.py`, `bin/tools.lock.json` | Release-Binärdateien (actionlint, gitleaks, go-arch-lint, golangci-lint, lychee, osv-scanner, sqlc, trivy) mit sha256-Pin laden | `bootstrap`, `tools-lock` | `bin/tests/` |
 | `ci/check_runners.py` | Workflow-Regeln: Runner-Weiche, Trigger, SHA-Pinning, Timeouts, Rechte | `runners-check` | `ci/tests/` |
+| `ci/tests/test_codeql_workflow.py` | CodeQL-Wächter: die Matrix von `.github/workflows/codeql.yml` deckt jede Sprache ab, die CodeQL unterstützt und die die Workflows, `tools/pyproject.toml` oder die Komponenten-Manifeste zeigen (dieselben Manifeste wie die Komponenten-Erkennung des Makefiles); Go mit manuellem Build je Modul; Workflow, Job und Schritte nur mit Optionen aus geschlossenen Listen; Schritt "Probelauf" in `docs/quality/public-switch.md` nennt jeden Check | `test` | |
 | `ci/components.py` | Komponenten-Karte: Pfadfilter in CI, Auflösung von Release-Tags | (CI) | `ci/tests/` |
 | `ci/license_check.py` | Lizenztext und SPDX-Kopfzeilen | `licenses` | `ci/tests/` |
 | `ci/labels.py` | Labels prüfen und auf GitHub anlegen | `labels-check`, `labels-sync` | `ci/tests/` |
