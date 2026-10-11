@@ -1,0 +1,4 @@
+The adapter may die when the host goes away; the server was built so that it also recovers
+on its own. An operator in a channel can run the MIT-licensed tool, so a man in the middle
+will see nothing: every frame is signed, and the key never leaves the device. Der (DER)
+encoding is used for the public key, and the run reports its state once per minute.

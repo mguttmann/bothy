@@ -14,7 +14,7 @@ SHELL := bash
 .DELETE_ON_ERROR:
 MAKEFLAGS += --no-builtin-rules --no-print-directory
 
-# ---- configuration (named values: docs/spec/23-qualitaet.md) -------------------------
+# ---- configuration (named values: docs/spec/23-quality.md) -------------------------
 COMPONENTS ?= all
 COVERAGE_GO_MIN ?= 80
 COVERAGE_DART_MIN ?= 80
@@ -179,7 +179,7 @@ test: ## All tests with coverage data
 coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	cd tools && uv run --locked --quiet coverage report >/dev/null && echo "  tools coverage: ok (fail_under in tools/pyproject.toml)"
 	@# Production code only: packages under <module>/test/ and <module>/perf/ are test code
-	@# (docs/spec/02-architektur.md "Code-Layout"). The total comes from a filtered copy;
+	@# (docs/spec/02-architecture.md "Code layout"). The total comes from a filtered copy;
 	@# coverage.out stays as go test wrote it, so SonarQube reads the same file in
 	@# `make check` and in the CI job that runs `make sonar` alone.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-coverage,no Go module selected); \
@@ -226,7 +226,7 @@ arch: ## Module boundaries of the Go modules (go-arch-lint, config generated fro
 	@if [ -z "$(GO_ON)" ]; then $(call skip,arch,no Go module selected under services/); \
 	else $(GO_PREREQS) arch || exit 1; gal=$(call tool,go-arch-lint) || exit 1; \
 	  for m in $(GO_MODS); do \
-	    [ -f $$m/.go-arch-lint.yml ] || { echo "arch: $$m/.go-arch-lint.yml is missing (generated from $$m/architecture/modules.yaml, docs/spec/02-architektur.md \"Automatische Prüfung der Regeln\")" >&2; exit 1; }; \
+	    [ -f $$m/.go-arch-lint.yml ] || { echo "arch: $$m/.go-arch-lint.yml is missing (generated from $$m/architecture/modules.yaml, docs/spec/02-architecture.md \"Automatic check of the rules\")" >&2; exit 1; }; \
 	    (cd $$m && "$$gal" check --project-path "$$(pwd -P)" --arch-file .go-arch-lint.yml --output-color=false) || exit 1; \
 	  done; fi
 
@@ -245,17 +245,18 @@ migrations-lock: ## Record the checksums of new migrations in <module>/migration
 	    $(MIGRATIONS_LINT) lock --dir $$m/migrations --sum $$m/migrations.sha256 || exit 1; fi; \
 	done; [ -n "$$found" ] || echo "  migrations-lock: no Go module with a migrations/ directory"
 
-perf: ## Load tests against the performance targets (end of an etappe and releases, not a gate; P-07)
+perf: ## Load tests against the performance targets (end of a milestone and releases, not a gate; P-07)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,perf,no Go module selected under services/); \
 	else $(GO_PREREQS) perf || exit 1; \
 	  for m in $(GO_MODS); do \
-	    [ -d $$m/perf ] || { echo "perf: $$m/perf does not exist; load tests live there (docs/spec/02-architektur.md \"Leistungsziele\")" >&2; exit 1; }; \
+	    [ -d $$m/perf ] || { echo "perf: $$m/perf does not exist; load tests live there (docs/spec/02-architecture.md \"Performance targets\")" >&2; exit 1; }; \
 	    echo "  perf: targets hold only on perf.reference_profile"; \
 	    (cd $$m && go test -tags perf -count=1 -timeout $(PERF_TIMEOUT) ./perf/...) || exit 1; \
 	  done; fi
 
 # ---- documentation --------------------------------------------------------------------
-docs: ## Documentation site builds strictly; ADR index and configuration reference are current; problem codes registered; brief dependencies consistent; register IDs unique; risk ranking and the list behind its last rank follow the register ratings
+docs: ## Documentation site builds strictly; ADR index and configuration reference are current; problem codes registered; brief dependencies consistent; register IDs unique; risk ranking and the list behind its last rank follow the register ratings; no German text in tracked files (D-W-94)
+	$(UVRUN) python tools/docs/language_check.py
 	$(UVRUN) python tools/docs/adr_index.py --check
 	$(UVRUN) python tools/docs/config_reference.py --check
 	git ls-files -z -- '*.md' docs/api/openapi.yaml docs/api/asyncapi.yaml | xargs -0 $(UVRUN) python tools/docs/problem_code_refs.py

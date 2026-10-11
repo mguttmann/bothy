@@ -1,0 +1,5 @@
+# Agenten
+
+Agenten-Laufzeiten und Adapter laufen nie im Server-Prozess. Der Server kennt Agenten als
+Prinzipale, Läufe als Objekte und eine Backend-Richtlinie je Agent. Ein Adapter nutzt nur die
+öffentliche API, und es gibt keinen privaten Kanal.
