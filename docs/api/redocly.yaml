@@ -4,10 +4,10 @@
 # Without file arguments both APIs below are linted. A single file:
 #   npx -y @redocly/cli@2.62.1 lint docs/api/openapi.yaml --config docs/api/redocly.yaml
 #
-# The action lists mirror docs/spec/05-actions.md section 4 (closed catalogue), the rate-limit
-# classes section 3. The gate check `api-catalogue-sync` compares these lists with 05
-# (docs/spec/06-api.md); a new action enters 05 first, then this file. From ticket M1-02 the
-# lists are generated from docs/spec/actions.yaml (ADR 0049, machine-readable action catalogue).
+# The lists of known actions, rate-limit classes and receive actions between the
+# `BEGIN GENERATED` markers are generated from docs/spec/actions.yaml (ADR 0049,
+# machine-readable action catalogue): regenerate them with `make catalog`; `make catalog-check`
+# fails on a hand edit. A new action enters docs/spec/actions.yaml first, then the contracts.
 
 extends:
   - recommended
@@ -63,15 +63,15 @@ rules:
       required:
         - x-authz-action
     message: Every operation needs x-authz-action from docs/spec/05-actions.md.
-  # System actions (05 rule 10: grant.expire, group.member.expire, instance.bootstrap,
-  # signing_key.transition) are never on a route or op, so neither list contains them.
+  # System actions (right `system`, 05 rule 10) are never on a route, op or event, so the
+  # generated lists leave them out.
   rule/authz-action-known:
     subject:
       type: Operation
       property: x-authz-action
     assertions:
       enum:
-        # catalogue (docs/spec/05-actions.md section 4)
+        # BEGIN GENERATED: authz_actions (make catalog)
         - access.explain
         - access.preview
         - access.view_as
@@ -267,6 +267,7 @@ rules:
         - webhook_out.manage
         - webhook_out.read
         - webhook_out.redeliver
+        # END GENERATED: authz_actions
     message: x-authz-action is not in the action catalogue.
 
   rule/rate-limit-class-required:
@@ -282,6 +283,7 @@ rules:
       property: x-rate-limit-class
     assertions:
       enum:
+        # BEGIN GENERATED: rate_limit_classes (make catalog)
         - none
         - rl.admin
         - rl.agent_runtime
@@ -300,6 +302,7 @@ rules:
         - rl.upload
         - rl.webhook_in
         - rl.write
+        # END GENERATED: rate_limit_classes
     message: x-rate-limit-class is not a class of docs/spec/05-actions.md section 3 (or none).
 
   # 05-actions.md rule 4: every event type names its receive action.
@@ -323,6 +326,7 @@ rules:
       property: x-receive-action
     assertions:
       enum: &receive_actions
+        # BEGIN GENERATED: receive_actions (make catalog)
         - access.explain
         - access.preview
         - access.view_as
@@ -464,6 +468,7 @@ rules:
         - run.overview.read
         - run.read
         - run.start
+        - run.token.renew
         - run.update
         - search.query
         - self
@@ -518,6 +523,7 @@ rules:
         - webhook_out.manage
         - webhook_out.read
         - webhook_out.redeliver
+        # END GENERATED: receive_actions
   rule/receive-action-known-webhook:
     subject:
       type: Operation

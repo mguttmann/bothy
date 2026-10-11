@@ -67,7 +67,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
 
 .PHONY: help bootstrap bootstrap-ci check gates fmt fmt-check lint typecheck test coverage \
         sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
-        gitleaks-staged denylist denylist-history licenses docs adr-index config-reference linkcheck \
+        gitleaks-staged denylist denylist-history licenses docs adr-index config-reference catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-clients runners-check commitlint \
         review labels-check labels-sync tools-lock release-build clean \
         codegen-check arch migrations-lint migrations-lock perf
@@ -106,7 +106,7 @@ gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
 gates: fmt-check codegen-check lint typecheck arch migrations-lint test coverage commitlint \
-       docs linkcheck diagrams api-lint \
+       docs linkcheck diagrams catalog-check api-lint \
        api-clients tokens runners-check labels-check gitleaks semgrep trivy osv licenses
 
 # ---- code quality ---------------------------------------------------------------------
@@ -132,7 +132,7 @@ fmt-check: ## Formatting is clean (no changes)
 lint: ## Linters: file hygiene hooks, ruff, bandit, actionlint, zizmor, component linters
 	SKIP=ruff-format,ruff-check,gitleaks-staged $(UVRUN) pre-commit run --all-files --hook-stage pre-commit
 	$(UVRUN) ruff check tools
-	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/bin tools/ci tools/denylist tools/design-tokens tools/docs tools/hooks tools/sonarqube
+	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/bin tools/catalog tools/ci tools/denylist tools/design-tokens tools/docs tools/hooks tools/sonarqube
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -271,6 +271,12 @@ adr-index: ## Regenerate the ADR index in docs/adr/README.md
 
 config-reference: ## Regenerate section 4 of docs/operations/configuration.md from the chapter tables
 	$(UVRUN) python tools/docs/config_reference.py
+
+catalog: ## Regenerate the tables of chapter 05 and the lists in docs/api/redocly.yaml from docs/spec/actions.yaml
+	$(UVRUN) python tools/catalog/action_catalog.py generate
+
+catalog-check: ## Action catalogue valid and its generated copies current (ADR 0049)
+	$(UVRUN) python tools/catalog/action_catalog.py check
 
 linkcheck: ## Local links and anchors of every tracked Markdown file (offline); no link to the placeholder repository
 	git ls-files -z -- '*.md' | xargs -0 $(call tool,lychee) --offline --include-fragments --no-progress --quiet

@@ -1,0 +1,2937 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Action catalogue of the authorization (ADR 0049): every action of docs/spec/05-actions.md
+# with its columns, the rate-limit classes, the event types with their receive action and the
+# WebSocket ops with their action. This file is the only source of these facts; the tables of
+# chapter 05 and the lists in docs/api/redocly.yaml are generated from it.
+# Edit here, then run `make catalog`; `make catalog-check` holds the copies in the gate.
+# Schema and rules: tools/catalog/README.md.
+
+version: 1
+rate_limit_classes:
+- id: rl.public_auth
+  key: 'client IP (IPv6: the /64 prefix)'
+  purpose: login, refresh, public endpoints; additionally counts every failed check of presented credentials
+    ([02-architecture.md](02-architecture.md), section 9.1)
+- id: rl.gateway_connect
+  key: device or token, checked at `identify` and `resume` once the credentials are checked
+  purpose: establish a WebSocket session
+- id: rl.read
+  key: principal
+  purpose: read queries
+- id: rl.write
+  key: principal
+  purpose: general writes
+- id: rl.message
+  key: principal
+  purpose: send and edit messages
+- id: rl.trigger
+  key: principal
+  purpose: trigger agents, commands, suggestions
+- id: rl.interaction
+  key: principal
+  purpose: use components
+- id: rl.upload
+  key: principal
+  purpose: upload files
+- id: rl.search
+  key: principal
+  purpose: search
+- id: rl.typing
+  key: connection
+  purpose: typing
+- id: rl.admin
+  key: principal
+  purpose: administration
+- id: rl.export
+  key: principal
+  purpose: export, GDPR packages
+- id: rl.agent_runtime
+  key: agent
+  purpose: heartbeat, run patches, acks
+- id: rl.webhook_in
+  key: incoming webhook
+  purpose: incoming webhooks
+- id: rl.import
+  key: principal
+  purpose: batches of a running import (`import.apply`)
+- id: rl.terminal
+  key: principal
+  purpose: open a terminal, attach, connect a stream
+- id: rl.host
+  key: host (after the check of the authentication key)
+  purpose: control and data connections of the host service
+sections:
+- public
+- instance
+- identity
+- grants
+- structure
+- threads
+- messages
+- files
+- personal
+- agents
+- apps
+- operations
+- dev
+- terminal
+actions:
+- id: instance.discovery.read
+  section: public
+  description: JWKS, protocol versions, minimal branding, branding logo
+  resource: instance
+  right: public
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.public_auth
+  effect: read
+- id: auth.login.begin
+  section: public
+  description: start a login (OIDC, passkey challenge, header login, device pairing)
+  resource: instance
+  right: public
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.public_auth
+  effect: write
+- id: auth.login.complete
+  section: public
+  description: complete a login (OIDC server code, passkey, enrollment code, password with TOTP, pairing),
+    register the device and device key, create a session
+  resource: instance
+  right: public
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.public_auth
+  effect: write
+- id: auth.token.refresh
+  section: public
+  description: rotate the refresh token (with grace `auth.refresh_reuse_grace`; in maintenance mode without
+    rotation, ADR 0065); reuse revokes the family
+  resource: auth_session
+  right: public (valid refresh token and DPoP proof of the family)
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.public_auth
+  effect: write
+- id: auth.logout
+  section: public
+  description: end one's own session; push registrations of this session are deactivated
+  resource: auth_session
+  right: self
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: auth.step_up
+  section: public
+  description: provide a fresh confirmation (passkey, step-up device key, password with TOTP, new OIDC
+    login)
+  resource: auth_session
+  right: self
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.public_auth
+  effect: write
+- id: status.public.read
+  section: public
+  description: status page without login, only if `status.public_enabled`
+  resource: instance
+  right: public
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.public_auth
+  effect: read
+- id: instance.read
+  section: instance
+  description: 'instance data for clients: branding, language, limits, feature flags evaluated for the
+    requesting principal (including rollout per person and group)'
+  resource: instance
+  right: auth
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: none
+- id: instance.settings.read
+  section: instance
+  description: read all instance settings (console)
+  resource: instance
+  right: owner
+  owner: true
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: instance.settings.update
+  section: instance
+  description: change an instance setting
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: instance.branding.update
+  section: instance
+  description: change the branding (name, logo, color from the category colors)
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: instance.bootstrap
+  section: instance
+  description: first owner via a server command on the host ([08-identity.md](08-identity.md), section
+    4)
+  resource: instance
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: true
+  rl_class: none
+  effect: write
+- id: feature_flag.read
+  section: instance
+  description: read all flags with their rules
+  resource: instance
+  right: owner
+  owner: true
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: feature_flag.update
+  section: instance
+  description: change a flag
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: signing_key.rotate
+  section: instance
+  description: 'change server keys: `mode = scheduled` (announce the next key) or `mode = emergency` (all
+    keys of the purpose `retired` at once)'
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: signing_key.transition
+  section: instance
+  description: scheduled state change of a signing key by the job `instance.key_rotation` (create `next`,
+    make it `active`, set `retired`)
+  resource: instance
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: none
+  effect: write
+- id: identity_provider.read
+  section: instance
+  description: read login drivers
+  resource: instance
+  right: owner
+  owner: true
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: identity_provider.manage
+  section: instance
+  description: create, change, switch off login drivers
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: owner.add
+  section: instance
+  description: make a person an owner; optionally with `resolve_i1` (rule 1.6)
+  resource: user
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: owner.remove
+  section: instance
+  description: withdraw the owner role; at least one active owner remains (SR8)
+  resource: user
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: owner.recover
+  section: instance
+  description: enrollment code for recovery for an active owner via a server command on the host (`bothy
+    setup issue-enrollment-code`, [08-identity.md](08-identity.md), section 4)
+  resource: user
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: none
+  effect: write
+- id: audit.read
+  section: instance
+  description: read and filter the audit log
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: audit.verify
+  section: instance
+  description: check the hash chain and checkpoints
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: stats.read
+  section: instance
+  description: read statistics, also the live frame, timeline, SLO traffic light and backend view and
+    the subscription `stats.subscribe` ([25-visualization.md](25-visualization.md)); instance only owners,
+    space with `manage`; always filtered to the visible channels, cost fields only with `cost.read.aggregate`
+  resource: instance, space
+  right: owner or manage
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: access.explain
+  section: instance
+  description: '"Who has access?" with origin (direct, group, inherited, operator, indirectly via an agent)'
+  resource: space, channel
+  right: owner or manage
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: access.preview
+  section: instance
+  description: 'dry run of an action with column "Permissions" = `yes`: differences per principal, I1,
+    SR8, hints in plain text; the transaction is rolled back; limits of delegation give `allowed = false`
+    instead of a denial ([07-permissions.md](07-permissions.md), section 9.3)'
+  resource: as the target action
+  right: permission of the target action
+  owner: as_target
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: access.view_as
+  section: instance
+  description: '"View as person", read-only'
+  resource: user
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: self.read
+  section: identity
+  description: read one's own principal (`GET /me`), for people, agents and apps; also for a pending device
+  resource: principal
+  right: auth and self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: none
+- id: user.read
+  section: identity
+  description: read the profile and directory of people
+  resource: user
+  right: human; apps with scope
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: users:read
+- id: user.create
+  section: identity
+  description: create people (no self-registration), for a local account with an enrollment code
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: user.update
+  section: identity
+  description: change the profile of another person
+  resource: user
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: user.disable
+  section: identity
+  description: 'disable a person: revoke sessions and devices, cancel runs; never the last active owner
+    (SR8)'
+  resource: user
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: user.enable
+  section: identity
+  description: lift the disabling or activate a provisioned account (`pending -> active`)
+  resource: user
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: self.profile.update
+  section: identity
+  description: change one's own profile (display name, avatar, language, time zone)
+  resource: user
+  right: self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: identity.read
+  section: identity
+  description: read the identities, passkeys and local credentials of a person, without secrets
+  resource: user
+  right: self or owner
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: identity.link
+  section: identity
+  description: link a further identity
+  resource: user
+  right: self
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: identity.unlink
+  section: identity
+  description: unlink an identity; rejected if no login path remains
+  resource: user
+  right: self or owner
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: local_credential.set
+  section: identity
+  description: set a local password and set up TOTP; step-up as soon as a password path with TOTP is set
+    up
+  resource: user
+  right: self
+  owner: false
+  step_up: conditional
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: passkey.register
+  section: identity
+  description: add a passkey; step-up as soon as an active passkey exists
+  resource: user
+  right: self
+  owner: false
+  step_up: conditional
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: passkey.revoke
+  section: identity
+  description: revoke a passkey
+  resource: passkey
+  right: self or owner
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: device.list
+  section: identity
+  description: read devices; a pending device reads itself
+  resource: user, device
+  right: self or owner
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: device.approve
+  section: identity
+  description: approve a pending device; one's own device from an active own device, with a confirmation
+    code or pairing code ([08-identity.md](08-identity.md), section 5.3)
+  resource: device
+  right: owner or self
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: device.revoke
+  section: identity
+  description: revoke a device; connections close with `4012`
+  resource: device
+  right: self or owner
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: device.expire
+  section: identity
+  description: revoke a device without confirmation after `auth.device_pending_ttl`, an expired confirmed
+    pairing or a device without contact after `auth.device_inactive_revoke_after` (job `identity.auth_cleanup`)
+  resource: device
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: true
+  rl_class: none
+  effect: write
+- id: session.list
+  section: identity
+  description: read login sessions
+  resource: user
+  right: self or owner
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: session.revoke
+  section: identity
+  description: end a session; its child sessions end as well
+  resource: auth_session
+  right: self or owner
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: session.extension.create
+  section: identity
+  description: create a child session for the share extension of one's own app with its own refresh family
+    (the Notification Service Extension uses the preview token, not a session); replaces an active child
+    session of the same component
+  resource: auth_session
+  right: self
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: token.list
+  section: identity
+  description: read API tokens (prefix only)
+  resource: principal
+  right: owner; self for own tokens
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: token.create
+  section: identity
+  description: create an API token for an agent or app; a personal token only for oneself and only with
+    the flag `tokens.personal_enabled`
+  resource: principal
+  right: owner; self for own token
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: token.revoke
+  section: identity
+  description: revoke an API token
+  resource: api_token
+  right: owner; self for own token
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: group.read
+  section: grants
+  description: read groups and members; one's own groups also without being owner
+  resource: group
+  right: owner or self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: group.create
+  section: grants
+  description: create a group
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: group.update
+  section: grants
+  description: rename a group
+  resource: group
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: group.delete
+  section: grants
+  description: delete a group (soft); its grants are revoked
+  resource: group
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: group.member.add
+  section: grants
+  description: add a member, optionally with expiry and `resolve_i1`; not in groups with `source = oidc_claim`
+  resource: group
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: group.member.remove
+  section: grants
+  description: remove a member; not in groups with `source = oidc_claim`
+  resource: group
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: group.member.expire
+  section: grants
+  description: 'report an expired membership (job `authz.expiry_sweep`): permission version, `access.changed`,
+    cancellation of affected runs'
+  resource: group
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: true
+  rl_class: none
+  effect: write
+- id: group.member.sync
+  section: grants
+  description: when an OIDC login completes, align a person's memberships in groups with `source = oidc_claim`
+    of their provider with the group claim; one audit entry per login with the groups ([08-identity.md](08-identity.md),
+    section 3.4)
+  resource: user
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: true
+  rl_class: none
+  effect: write
+- id: grant.read
+  section: grants
+  description: read the grants of a target or subject; with `manage` only grants on targets within one's
+    own `manage` scope ([07-permissions.md](07-permissions.md), section 2.6); grants on hosts only owners
+  resource: space, channel, host, principal
+  right: owner or manage
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: grant.create
+  section: grants
+  description: create a grant. With `manage` only up to one's own level, only one's own capabilities,
+    only to people and groups, never on the instance (R-AZ-05). Grants to agents and apps only owners;
+    agents and apps never `trigger`, as a capability only `upload`. On a host (`host`) only owners, only
+    to people and groups, without a level, exactly `terminal`; I6 (rule 1.11). Optionally `resolve_i1`
+  resource: instance, space, channel, host
+  right: owner or manage (on `host` only owner)
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: grant.revoke
+  section: grants
+  description: revoke a grant; with `manage` only grants that one could have created oneself under R-AZ-05
+  resource: grant
+  right: owner or manage
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: grant.expire
+  section: grants
+  description: 'report an expired grant (job `authz.expiry_sweep`): permission version, `access.changed`,
+    cancellation of affected runs'
+  resource: grant
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: true
+  rl_class: none
+  effect: write
+- id: space.read
+  section: structure
+  description: see a space; applies with `read` on the space or on at least one of its channels
+  resource: space
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: messages:read
+- id: space.create
+  section: structure
+  description: create a space
+  resource: instance
+  right: owner
+  owner: true
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: space.update
+  section: structure
+  description: change name, icon, color
+  resource: space
+  right: manage
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: space.reorder
+  section: structure
+  description: global order of the spaces
+  resource: instance
+  right: owner
+  owner: true
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: space.archive
+  section: structure
+  description: archive a space
+  resource: space
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: space.operator.set
+  section: structure
+  description: set the default operator (I1); optionally `resolve_i1`
+  resource: space
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: sidebar.update
+  section: structure
+  description: change one's own sidebar state (collapse, own order)
+  resource: space
+  right: self and read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: channel.read
+  section: structure
+  description: see a channel, read its header data
+  resource: channel
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: messages:read
+- id: channel.create
+  section: structure
+  description: create a channel
+  resource: space
+  right: manage
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: channel.update
+  section: structure
+  description: change name, topic, the channel default for notifications
+  resource: channel
+  right: manage
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: channel.reorder
+  section: structure
+  description: order of the channels in the space
+  resource: space
+  right: manage
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: channel.behavior.read
+  section: structure
+  description: read prompt, skills, mention rules, backfill
+  resource: channel
+  right: manage
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: channel.behavior.update
+  section: structure
+  description: change prompt, skills, mention rules, `auto_thread`, backfill
+  resource: channel
+  right: manage
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: channel.operator.set
+  section: structure
+  description: set the operator or switch on inheritance (I1); optionally `resolve_i1`
+  resource: channel
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: channel.project.bind
+  section: structure
+  description: set or change the project binding of a forum
+  resource: channel
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: channel.read_only.set
+  section: structure
+  description: set or lift read-only (rule 1.8), with a reason; when it is set, active runs in the channel
+    are cancelled
+  resource: channel
+  right: manage
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: channel.archive
+  section: structure
+  description: archive a channel
+  resource: channel
+  right: manage
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: forum_tag.manage
+  section: structure
+  description: create, change, delete the tags of a forum
+  resource: channel
+  right: manage
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: dm.create
+  section: structure
+  description: create a direct message with other people; only with the flag `dm.enabled`
+  resource: instance
+  right: human
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: dm.leave
+  section: structure
+  description: leave a DM
+  resource: channel
+  right: participant
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: thread.read
+  section: threads
+  description: read a thread and its history
+  resource: thread
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: messages:read
+- id: thread.create
+  section: threads
+  description: create a thread from a message or forum post; tags at creation are treated as with `thread.tags.set`
+    (tags with `restricted` need `manage`)
+  resource: channel
+  right: write
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.message
+  effect: write
+  app_scope: messages:write
+- id: thread.title.update
+  section: threads
+  description: change the title; sets `title_source = manual`. The operator agent may set it only with
+    `auto`; the source then stays `auto`
+  resource: thread
+  right: write and (creator or manage or operator agent)
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: thread.close
+  section: threads
+  description: set a thread to "Done"
+  resource: thread
+  right: write
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: thread.reopen
+  section: threads
+  description: reopen a thread (also implicitly through a new message)
+  resource: thread
+  right: write
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: thread.move
+  section: threads
+  description: move to another channel; target with the same operator
+  resource: thread
+  right: manage on source and target
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: thread.tags.set
+  section: threads
+  description: set tags; tags with `restricted` need `manage`
+  resource: thread
+  right: write
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: agent_session.read
+  section: threads
+  description: current and earlier session references, model, costs
+  resource: thread
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: agent_session.reset
+  section: threads
+  description: start a new session in the thread (for example `/new`)
+  resource: thread
+  right: trigger and `agent.invoke`
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.trigger
+  effect: write
+- id: agent_session.bind
+  section: threads
+  description: bind an existing external session to the thread (resume)
+  resource: thread
+  right: trigger and `agent.invoke`
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.trigger
+  effect: write
+- id: agent_session.report
+  section: threads
+  description: the adapter reports the external session reference, model, `started` or `bind_failed`;
+    the first report creates the row if `run.start` carried no reference (compare-and-swap)
+  resource: agent_session, run
+  right: agent-self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: message.read
+  section: messages
+  description: read a message
+  resource: message
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: messages:read
+- id: message.create
+  section: messages
+  description: send a message; with attachments additionally `+upload`. If it triggers an agent, `agent.invoke`
+    applies in addition.
+  resource: thread
+  right: write
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.message
+  effect: write
+  app_scope: messages:write
+- id: message.update
+  section: messages
+  description: edit one's own message, with `If-Match`
+  resource: message
+  right: write and author
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.message
+  effect: write
+  app_scope: messages:write
+- id: message.delete
+  section: messages
+  description: delete one's own message; others' only with `manage` (moderation)
+  resource: message
+  right: (write and author) or manage
+  owner: false
+  step_up: false
+  audit: conditional
+  audit_text: yes for others'
+  rights_change: false
+  rl_class: rl.message
+  effect: write
+  app_scope: messages:write
+- id: message.revisions.read
+  section: messages
+  description: read earlier versions
+  resource: message
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: reaction.add
+  section: messages
+  description: add a reaction
+  resource: message
+  right: write
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+  app_scope: messages:write
+- id: reaction.remove
+  section: messages
+  description: remove one's own reaction
+  resource: reaction
+  right: write and self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+  app_scope: messages:write
+- id: pin.create
+  section: messages
+  description: pin a message
+  resource: message
+  right: manage
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: pin.delete
+  section: messages
+  description: unpin
+  resource: message
+  right: manage
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: mention.list
+  section: messages
+  description: read one's own mentions (filtered by `message.read`)
+  resource: user
+  right: self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: template.read
+  section: messages
+  description: read templates (one's own and those of the channel)
+  resource: channel, user
+  right: read or self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: template.manage
+  section: messages
+  description: maintain one's own templates (resource `user`); channel templates with `manage` (resource
+    `channel`)
+  resource: user, channel
+  right: self or manage
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: file.upload
+  section: files
+  description: upload a file for a channel (upload session, parts, completion); avatar and logo go through
+    `self.profile.update`, `agent.update` or `instance.branding.update` respectively
+  resource: channel
+  right: write and +upload
+  owner: false
+  step_up: false
+  audit: conditional
+  audit_text: yes on malware detection
+  rights_change: false
+  rl_class: rl.upload
+  effect: write
+  app_scope: files:write
+- id: file.read
+  section: files
+  description: file, thumbnail, transcript or file ticket; only after the scan; path per `purpose` as
+    in 2.2
+  resource: file
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: files:read
+- id: file.delete
+  section: files
+  description: delete one's own unattached file; attached ones via `message.delete`
+  resource: file
+  right: self or manage
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: file.transcribe
+  section: files
+  description: start the transcription of a voice message by the server (flag `voice.enabled`)
+  resource: file
+  right: write
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.upload
+  effect: write
+- id: file.transcript.submit
+  section: files
+  description: save the transcript of a voice message (`transcript_source = 'agent'`), with `If-Match`
+  resource: file
+  right: 'agent-self: operator of the thread whose message the file is attached to, and read'
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: search.query
+  section: files
+  description: full-text search; hits filtered by `message.read`, `thread.read`, `file.read`
+  resource: instance
+  right: auth
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.search
+  effect: read
+  app_scope: messages:read
+- id: read_state.update
+  section: personal
+  description: advance the read state
+  resource: thread
+  right: self and read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: read_state.mark_unread
+  section: personal
+  description: reset the read state, with `If-Match`
+  resource: thread
+  right: self and read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: draft.read
+  section: personal
+  description: read own drafts
+  resource: user
+  right: self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: draft.write
+  section: personal
+  description: save or delete a draft, also in read-only and archived channels (sending checks `message.create`)
+  resource: thread, channel
+  right: self and read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: settings.read
+  section: personal
+  description: 'read own personal data: settings, read states, sidebar, notification levels, quiet hours'
+  resource: user
+  right: self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: settings.update
+  section: personal
+  description: change an own setting
+  resource: user
+  right: self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: notification_pref.update
+  section: personal
+  description: notification level for a space, channel or thread
+  resource: space, channel, thread
+  right: self and read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: quiet_hours.update
+  section: personal
+  description: maintain quiet hours
+  resource: user
+  right: self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: push.register
+  section: personal
+  description: register the push target of one's own active device; returns the preview token once
+  resource: device
+  right: self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: push.unregister
+  section: personal
+  description: remove a push target
+  resource: push_registration
+  right: self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: push.deliver
+  section: personal
+  description: internal check before every push, every notification via the gateway and every retrieval
+    via the preview endpoint (P3)
+  resource: thread
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: none
+  delivery_check: true
+  effect: read
+- id: client_metrics.submit
+  section: personal
+  description: send performance data of the app without contents and without IDs, only with `privacy.client_metrics`
+    ([15-client-architecture.md](15-client-architecture.md))
+  resource: instance
+  right: human
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: read
+- id: sync.snapshot.read
+  section: personal
+  description: snapshot for a resync
+  resource: instance
+  right: auth
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: events.catch_up
+  section: personal
+  description: '`GET /api/v1/events`; every event additionally with its receive action'
+  resource: instance
+  right: auth
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: events:subscribe
+- id: gateway.connect
+  section: personal
+  description: WebSocket `identify` or `resume`
+  resource: instance
+  right: auth (person with an active device, agent, app with `events:subscribe`)
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.gateway_connect
+  effect: read
+  app_scope: events:subscribe
+- id: gateway.focus
+  section: personal
+  description: focus threads; unreadable ones are silently ignored
+  resource: thread
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: typing.start
+  section: personal
+  description: show typing; only people, agents show typing through their run (04, section 12)
+  resource: thread
+  right: human and write
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.typing
+  effect: read
+- id: agent.read
+  section: agents
+  description: read the agent card (name, mode badge, tool class, presence); the agent reads itself, including
+    the configured mode of its backend policy
+  resource: agent
+  right: owner or agent-self or read on a channel that the agent operates
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: none
+- id: agent.create
+  section: agents
+  description: create an agent
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: agent.update
+  section: agents
+  description: change name, description, avatar, `operator_config`
+  resource: agent
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: agent.disable
+  section: agents
+  description: disable an agent; tokens and connections end, runs are cancelled
+  resource: agent
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: agent.enable
+  section: agents
+  description: lift the disabling of an agent (I1)
+  resource: agent
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: agent.billing_mode.set
+  section: agents
+  description: switch the backend policy of an agent, with a reason (I4, I1)
+  resource: agent
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: agent.billing_mode.set_all
+  section: agents
+  description: switch the backend policy of several agents in one transaction, with a reason (I4, I1);
+    to `personal` only with an explicit list
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: agent.credential_holder.set
+  section: agents
+  description: set `credential_holder` (I1)
+  resource: agent
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: agent.tool_class.set
+  section: agents
+  description: set the tool class (`chat`, `scoped`, `host`), with a reason ([07-permissions.md](07-permissions.md),
+    section 2.11)
+  resource: agent
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: agent.invoke
+  section: agents
+  description: trigger agents; check in section 5
+  resource: thread (with agent)
+  right: trigger and rules from 5
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.trigger
+  effect: write
+- id: agent.heartbeat
+  section: agents
+  description: report state, reported mode, supported modes, tool class and active runs
+  resource: agent
+  right: agent-self
+  owner: false
+  step_up: false
+  audit: conditional
+  audit_text: yes on a change of the reported mode or the tool class
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: agent.events.consume
+  section: agents
+  description: receive and acknowledge events as a consumer (`ack`)
+  resource: agent
+  right: agent-self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: agent.config.read
+  section: agents
+  description: read prompt, skills, project binding of the channels that the agent operates
+  resource: channel
+  right: agent-self and effective operator
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: agent.triggerers.read
+  section: agents
+  description: set of the people who may trigger this agent, with `permission_version` (allow list in
+    the adapter)
+  resource: agent
+  right: agent-self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: read
+- id: command.read
+  section: agents
+  description: see the command list and options (built-in commands, those of the operator, of allowed
+    guests and of apps with `write`)
+  resource: channel
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: none
+- id: command.register
+  section: agents
+  description: register or change a command; it may apply only to targets that its owner operates or on
+    which the owner has `write`
+  resource: command
+  right: agent-self or app-self with scope
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+  app_scope: commands:write
+- id: command.remove
+  section: agents
+  description: remove a command
+  resource: command
+  right: agent-self or app-self with scope
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+  app_scope: commands:write
+- id: command.autocomplete
+  section: agents
+  description: fetch suggestions for an option from the owner of the command
+  resource: channel
+  right: trigger and `agent.invoke` without a run (for app commands `required_level`)
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.trigger
+  effect: read
+- id: command.autocomplete.respond
+  section: agents
+  description: deliver suggestions for a request (gateway op or REST)
+  resource: command
+  right: agent-self or app-self, owner of the command
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: read
+  app_scope: commands:write
+- id: command.invoke
+  section: agents
+  description: 'run a command. Agent commands check `required_level` and `agent.invoke`; model commands
+    during an active run: denial `run_active`. App commands check `required_level` and scope, without
+    `agent.invoke` and I2. The control command `stop` additionally checks `run.cancel`'
+  resource: channel, thread
+  right: '`required_level` of the command and rules as described'
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.trigger
+  effect: write
+- id: run.read
+  section: agents
+  description: read a run, its steps and metrics
+  resource: run
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: messages:read
+- id: run.overview.read
+  section: agents
+  description: read "Running now", filtered by `run.read`
+  resource: instance
+  right: auth
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: run.context.read
+  section: agents
+  description: read the context of one's own active run (schema `run_context.v1` with a trust mark per
+    message, [09-agents.md](09-agents.md), section 4.6)
+  resource: run
+  right: agent-self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: read
+- id: run.start
+  section: agents
+  description: 'start a run with a valid token: `queued -> running` and `waiting_input -> running` (CAS);
+    the same token repeated returns the result again as long as the run is `running`; a consumed token
+    does not resume a waiting run'
+  resource: run
+  right: agent-self and token valid
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: run.token.renew
+  section: agents
+  description: fresh invocation token for one's own run in `queued` or `waiting_input` with the current
+    unconsumed token, even an expired one (`runs.started_jti` NULL or not equal to `jti`, in SQL `IS DISTINCT
+    FROM`), or the token before the last renewal (`runs.renewed_from_jti`, lost response); repeats the
+    checks before a delivery (agent.invoke, I2, SR2, SR3) with current permissions ([09-agents.md](09-agents.md),
+    section 4.5.1)
+  resource: run
+  right: agent-self and token current
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: run.update
+  section: agents
+  description: live box patch of one's own run
+  resource: run
+  right: agent-self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: run.finish
+  section: agents
+  description: 'finish a run or let it wait: `completed`, `failed`, `cancelled`, `waiting_input`'
+  resource: run
+  right: agent-self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: run.cancel
+  section: agents
+  description: cancel a run
+  resource: run
+  right: trigger and (triggering person of the run or manage)
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.trigger
+  effect: write
+- id: run.followup.create
+  section: agents
+  description: follow-up to an active run of the same agent (via `message.create`)
+  resource: thread
+  right: write and `agent.invoke`
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.message
+  effect: write
+- id: component.update
+  section: agents
+  description: deactivate or change own components
+  resource: component
+  right: author of the message (agent-self or app-self)
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+  app_scope: components:write
+- id: interaction.create
+  section: agents
+  description: use a component (single-use rule per message); respect `required_capability` and `restricted_to`
+    (`any`, `run_starter`, `owner`); for components of an agent additionally `agent.invoke`
+  resource: component
+  right: trigger
+  owner: false
+  step_up: false
+  audit: conditional
+  audit_text: yes for `approve_actions`, otherwise denials
+  rights_change: false
+  rl_class: rl.interaction
+  effect: write
+- id: interaction.respond
+  section: agents
+  description: the owner acknowledges or answers an interaction
+  resource: interaction
+  right: agent-self or app-self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+  app_scope: components:write
+- id: app.read
+  section: apps
+  description: read apps, manifests, installations
+  resource: app
+  right: owner
+  owner: true
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: app.install
+  section: apps
+  description: install an app, grant scopes
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: app.scopes.update
+  section: apps
+  description: change granted scopes
+  resource: app
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: app.suspend
+  section: apps
+  description: 'switch an app off without losing its granted scopes: tokens blocked, deliveries paused,
+    commands hidden, components `disabled`'
+  resource: app
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: app.resume
+  section: apps
+  description: switch a suspended app back on
+  resource: app
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: app.uninstall
+  section: apps
+  description: uninstall an app; tokens and subscriptions end
+  resource: app
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: webhook_out.read
+  section: apps
+  description: read outgoing subscriptions and deliveries
+  resource: app, agent
+  right: owner
+  owner: true
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: webhook_out.manage
+  section: apps
+  description: create, change, delete an outgoing subscription of an app or an agent, rotate the HMAC
+    secret
+  resource: app, agent
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: webhook_out.redeliver
+  section: apps
+  description: repeat a delivery
+  resource: webhook_delivery
+  right: owner
+  owner: true
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: webhook_out.deliver
+  section: apps
+  description: 'internal check before every delivery: receive action of the event for the app or the agent'
+  resource: app, agent
+  right: grants and scope of the receiver
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: none
+  delivery_check: true
+  effect: read
+- id: webhook_in.read
+  section: apps
+  description: read the incoming webhooks of a channel (without token)
+  resource: channel
+  right: manage
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: webhook_in.create
+  section: apps
+  description: create an incoming webhook for a channel
+  resource: channel
+  right: manage
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: webhook_in.revoke
+  section: apps
+  description: revoke an incoming webhook
+  resource: incoming_webhook
+  right: manage
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: webhook_in.post
+  section: apps
+  description: message via an incoming webhook; writes as the app with `origin = app`
+  resource: channel
+  right: public with token; the app needs write
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.webhook_in
+  effect: write
+  app_scope: none
+- id: import.read
+  section: operations
+  description: read import sources, progress, errors
+  resource: import_source
+  right: owner
+  owner: true
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: import.manage
+  section: operations
+  description: create a source, start, pause, cancel, complete, ownership list per channel (the dry run
+    only reads and needs `import.read` and read permissions)
+  resource: import_source
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: import.apply
+  section: operations
+  description: write batches with origin keys of a running source (items of a thread, files, cursor);
+    only in channels of this source, also read-only ones ([22-import-migration.md](22-import-migration.md),
+    section 8)
+  resource: import_source
+  right: owner
+  owner: true
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.import
+  effect: write
+- id: cost.read.thread
+  section: operations
+  description: costs of a run and a thread (header line, live box)
+  resource: thread
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: cost.read.aggregate
+  section: operations
+  description: costs per space, agent, instance
+  resource: instance, space, agent
+  right: owner; space with manage
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: price.read
+  section: operations
+  description: read the price table
+  resource: instance
+  right: owner
+  owner: true
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: price.manage
+  section: operations
+  description: maintain prices with source and retrieval time
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: cost.reconcile
+  section: operations
+  description: reconcile estimates with the invoice by hand
+  resource: instance
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: cost.reconcile.submit
+  section: operations
+  description: the reconciliation app submits `reconciled` entries for existing runs; deletes nothing
+    ([10-backend-policy.md](10-backend-policy.md), section 12.4; [ADR 0055](../adr/0055-cost-reconciliation-as-its-own-app-admin-key-never-in-the-server.md))
+  resource: instance
+  right: app with scope `costs:reconcile`
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+  app_scope: costs:reconcile
+- id: export.channel
+  section: operations
+  description: export the channel history
+  resource: channel
+  right: read and +export
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.export
+  effect: write
+- id: gdpr.request.create
+  section: operations
+  description: export or deletion for oneself; for others only the owner
+  resource: user
+  right: self or owner
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.export
+  effect: write
+- id: gdpr.request.read
+  section: operations
+  description: read a request and its state
+  resource: gdpr_request
+  right: self or owner
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: gdpr.request.decide
+  section: operations
+  description: approve or reject a request; the export of one's own data is approved by the system when
+    `privacy.export_requires_approval = false`
+  resource: gdpr_request
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: gdpr.export.download
+  section: operations
+  description: download the export package
+  resource: gdpr_request
+  right: self (data subject) or owner
+  owner: false
+  step_up: true
+  audit: always
+  rights_change: false
+  rl_class: rl.export
+  effect: write
+- id: status.read
+  section: operations
+  description: read the status page
+  resource: instance
+  right: auth
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: none
+- id: status.manage
+  section: operations
+  description: maintain components and incidents
+  resource: instance
+  right: owner
+  owner: true
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.admin
+  effect: write
+- id: dev_environment.read
+  section: dev
+  description: read an environment, its state and check results
+  resource: dev_environment
+  right: owner or self
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: dev_environment.manage
+  section: dev
+  description: create, approve, suspend, retire an environment
+  resource: dev_environment
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: dev_environment.report
+  section: dev
+  description: the runner reports check results and readiness
+  resource: dev_environment
+  right: agent-self (runner of the environment)
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.agent_runtime
+  effect: write
+- id: host.read
+  section: terminal
+  description: 'read hosts: name, state, platform, profiles, fingerprint, LLM declaration, check results,
+    valid assignments and reported names of the session users; owners all, others the hosts whose assignee
+    they are or on which they have a `terminal` grant'
+  resource: host
+  right: owner or assignee or +terminal
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: host.manage
+  section: terminal
+  description: 'create hosts, change them (name, assignee), issue a pairing code (also re-pairing), confirm
+    a fingerprint, declare the LLM login, assign session users and end assignments (T12; a name already
+    taken yields `409 conflict` with `reason: session_user_taken`, a name that the host does not report
+    yields `400 validation_failed` with `errors[].code = session_user_not_on_host`), disable, re-enable,
+    retire; I6 (rule 1.11)'
+  resource: instance, host
+  right: owner
+  owner: true
+  step_up: true
+  audit: always
+  rights_change: true
+  rl_class: rl.admin
+  effect: write
+- id: host.pair
+  section: terminal
+  description: the host service redeems a pairing code and reports its public keys, profiles and the names
+    of its session users
+  resource: host
+  right: public (valid pairing code)
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.public_auth
+  effect: write
+- id: host.connect
+  section: terminal
+  description: control connection and data connections of the host service; reports (profiles, names of
+    the session users, check results, start and end of sessions)
+  resource: host
+  right: host-self
+  owner: false
+  step_up: false
+  audit: conditional
+  audit_text: denials; yes on a change of server host, check result or reported session users
+  rights_change: false
+  rl_class: rl.host
+  effect: write
+- id: terminal.open
+  section: terminal
+  description: 'open a terminal session; SR10, SR11 (I6), SR12 (without a valid assignment of a session
+    user whose name the host reports, `403 terminal_denied` with `reason: no_session_user`), limits; for
+    the profile `claude` only a working directory of one''s own session user; issues the terminal session
+    token with the session user'
+  resource: host
+  right: human and +terminal
+  owner: false
+  step_up: fresh
+  audit: always
+  rights_change: false
+  rl_class: rl.terminal
+  effect: write
+- id: terminal.attach
+  section: terminal
+  description: attach to one's own session that is not closed, also from another device; new token. Step-up
+    fresh, except from the same device in the same login session within `terminal.quick_reattach_window`
+    after the detach; this exception never applies in the web console
+  resource: terminal_session
+  right: self and +terminal
+  owner: false
+  step_up: fresh
+  audit: always
+  rights_change: false
+  rl_class: rl.terminal
+  effect: write
+- id: terminal.stream
+  section: terminal
+  description: open the device's stream connection to one's own session; only the device of the current
+    token
+  resource: terminal_session
+  right: self
+  owner: false
+  step_up: false
+  audit: denials
+  rights_change: false
+  rl_class: rl.terminal
+  effect: write
+- id: terminal.read_own
+  section: terminal
+  description: read own terminal sessions; owners read all
+  resource: terminal_session, host
+  right: self or owner
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: terminal.close
+  section: terminal
+  description: end a session; one's own, owners any
+  resource: terminal_session
+  right: self or owner
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: terminal.terminate
+  section: terminal
+  description: 'end a session by the server: revocation, idle, maximum duration, detach beyond `terminal.detach_grace`,
+    disabling, logout, state change of the host, end of the process'
+  resource: terminal_session
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: none
+  effect: write
+events:
+- type: message.created
+  kind: durable
+  resource: message
+  receive_action: message.read
+  note: echo with `client_msg_id` to the author
+  resource_version: true
+- type: message.updated
+  kind: durable
+  resource: message
+  receive_action: message.read
+  note: edit, `trigger_state`, component state
+  resource_version: true
+- type: message.deleted
+  kind: durable
+  resource: message
+  receive_action: message.read
+  note: tombstone
+  resource_version: true
+- type: reaction.added
+  kind: durable
+  resource: message
+  receive_action: message.read
+  resource_version: false
+- type: reaction.removed
+  kind: durable
+  resource: message
+  receive_action: message.read
+  resource_version: false
+- type: pin.added
+  kind: durable
+  resource: message
+  receive_action: thread.read
+  resource_version: false
+- type: pin.removed
+  kind: durable
+  resource: message
+  receive_action: thread.read
+  resource_version: false
+- type: thread.created
+  kind: durable
+  resource: thread
+  receive_action: thread.read
+  resource_version: true
+- type: thread.updated
+  kind: durable
+  resource: thread
+  receive_action: thread.read
+  note: title, tags, operator; during an import once per batch instead of `message.created` per message
+  resource_version: true
+- type: thread.closed
+  kind: durable
+  resource: thread
+  receive_action: thread.read
+  resource_version: true
+- type: thread.reopened
+  kind: durable
+  resource: thread
+  receive_action: thread.read
+  resource_version: true
+- type: thread.moved
+  kind: durable
+  resource: thread
+  receive_action: thread.read
+  note: 'applies to: target channel'
+  resource_version: true
+- type: thread.moved_out
+  kind: durable
+  resource: channel
+  receive_action: channel.read
+  note: 'applies to: source channel; receivers without access to the target remove the thread'
+  resource_version: false
+- type: agent_session.changed
+  kind: durable
+  resource: thread
+  receive_action: thread.read
+  note: new session, rebinding, binding after an import
+  resource_version: false
+- type: run.state_changed
+  kind: durable
+  resource: run
+  receive_action: run.read
+  note: with summary
+  resource_version: true
+- type: space.created
+  kind: durable
+  resource: space
+  receive_action: space.read
+  resource_version: true
+- type: space.updated
+  kind: durable
+  resource: space
+  receive_action: space.read
+  note: name, icon, order, operator; if the default operator changes, a `channel.updated` with a new version
+    follows for each inheriting, non-archived channel, because its effective operator changes
+  resource_version: true
+- type: space.archived
+  kind: durable
+  resource: space
+  receive_action: space.read
+  resource_version: true
+- type: channel.created
+  kind: durable
+  resource: channel
+  receive_action: channel.read
+  resource_version: true
+- type: channel.updated
+  kind: durable
+  resource: channel
+  receive_action: channel.read
+  note: name, topic, order, operator, `read_only`, `default_notification_level`; changes to forum tags
+    (only the new version, tags via REST)
+  resource_version: true
+- type: channel.settings_changed
+  kind: durable
+  resource: channel
+  receive_action: channel.read
+  note: only `settings_version`; contents via `channel.behavior.read` or `agent.config.read`
+  resource_version: false
+- type: channel.archived
+  kind: durable
+  resource: channel
+  receive_action: channel.read
+  resource_version: true
+- type: command.changed
+  kind: durable
+  resource: command
+  receive_action: command.read
+  note: registered, changed, removed
+  resource_version: true
+- type: file.updated
+  kind: durable
+  resource: file
+  receive_action: file.read
+  note: scan result, thumbnail, transcript
+  resource_version: false
+- type: user.updated
+  kind: durable
+  resource: user
+  receive_action: user.read
+  resource_version: false
+- type: agent.updated
+  kind: durable
+  resource: agent
+  receive_action: agent.read
+  note: also on creation (there is no separate type); including a change of the backend policy and of
+    the tool class; also reaches the agent itself (change of its configured values)
+  resource_version: true
+- type: instance.updated
+  kind: durable
+  resource: instance
+  receive_action: instance.read
+  note: branding, switches (keys only, values via REST)
+  resource_version: false
+- type: status.updated
+  kind: durable
+  resource: instance
+  receive_action: status.read
+  resource_version: false
+- type: grant.changed
+  kind: durable
+  resource: grant
+  receive_action: grant.read
+  note: for administrators; the subject gets `access.changed`
+  resource_version: false
+- type: group.changed
+  kind: durable
+  resource: group
+  receive_action: group.read
+  resource_version: false
+- type: access.changed
+  kind: durable
+  resource: principal
+  receive_action: self
+  audience: self
+  note: section 8 in 04
+  resource_version: false
+- type: access.expiring
+  kind: durable
+  resource: principal
+  receive_action: self
+  audience: self
+  note: a grant or membership expires within `authz.expiry_reminder_lead`; to the subject (for groups,
+    the person) and to the granter
+  resource_version: false
+- type: session.revoked
+  kind: durable
+  resource: auth_session
+  receive_action: self
+  audience: self
+  note: additionally close with `4012`
+  resource_version: false
+- type: read_state.updated
+  kind: durable
+  resource: thread
+  receive_action: self
+  audience: self
+  resource_version: false
+- type: draft.updated
+  kind: durable
+  resource: draft
+  receive_action: self
+  audience: self
+  resource_version: true
+- type: draft.deleted
+  kind: durable
+  resource: draft
+  receive_action: self
+  audience: self
+  resource_version: false
+- type: settings.updated
+  kind: durable
+  resource: user
+  receive_action: self
+  audience: self
+  resource_version: false
+- type: sidebar.updated
+  kind: durable
+  resource: space
+  receive_action: self
+  audience: self
+  resource_version: false
+- type: notification_pref.updated
+  kind: durable
+  resource: user
+  receive_action: self
+  audience: self
+  resource_version: false
+- type: quiet_hours.updated
+  kind: durable
+  resource: user
+  receive_action: self
+  audience: self
+  resource_version: false
+- type: gdpr.request_updated
+  kind: durable
+  resource: gdpr_request
+  receive_action: gdpr.request.read
+  resource_version: false
+- type: import.progress
+  kind: durable
+  resource: import_source
+  receive_action: import.read
+  resource_version: false
+- type: agent.invocation
+  kind: durable
+  resource: run
+  receive_action: agent.events.consume
+  audience: self
+  receivers: agent
+  receive_text: self (agent) and `agent.events.consume`
+  note: before delivery, `agent.invoke` for the triggering person
+  resource_version: false
+- type: agent.followup
+  kind: durable
+  resource: run
+  receive_action: agent.events.consume
+  audience: self
+  receivers: agent
+  receive_text: self (agent) and `agent.events.consume`
+  note: before delivery, `agent.invoke` for the triggering person
+  resource_version: false
+- type: run.cancel_requested
+  kind: durable
+  resource: run
+  receive_action: agent.events.consume
+  audience: self
+  receivers: agent
+  receive_text: self (agent) and `agent.events.consume`
+  resource_version: false
+- type: interaction.created
+  kind: durable
+  resource: interaction
+  receive_action: agent.events.consume
+  audience: self
+  receivers: agent_or_app
+  receive_text: self (agent or app, owner of the component); agent additionally `agent.events.consume`,
+    app `events:subscribe`
+  note: before delivery to agents, `agent.invoke`
+  resource_version: false
+- type: command.invoked
+  kind: durable
+  resource: command
+  receive_action: agent.events.consume
+  audience: self
+  receivers: agent_or_app
+  receive_text: self (agent or app, owner of the command); agent additionally `agent.events.consume`,
+    app `events:subscribe`
+  note: before delivery to agents, `agent.invoke`
+  resource_version: false
+- type: agent.config_changed
+  kind: durable
+  resource: channel
+  receive_action: agent.config.read
+  audience: self
+  receivers: agent
+  receive_text: self (agent) and `agent.config.read`
+  note: prompt, skills, project binding changed
+  resource_version: false
+- type: host.updated
+  kind: durable
+  resource: host
+  receive_action: host.read
+  note: also on creation; state, assignee, LLM declaration, profiles, check results, assignments of the
+    session users; `key_changed` on re-pairing; never keys
+  resource_version: true
+- type: terminal_session.changed
+  kind: durable
+  resource: terminal_session
+  receive_action: self
+  audience: self
+  note: 'to the person of the session: state, device, `close_reason`; never contents'
+  resource_version: true
+- type: typing.started
+  kind: ephemeral
+  resource: thread
+  receive_action: thread.read
+  note: thread in focus
+  resource_version: false
+- type: run.updated
+  kind: ephemeral
+  resource: run
+  receive_action: run.read
+  note: thread in focus
+  resource_version: true
+- type: agent.presence_changed
+  kind: ephemeral
+  resource: agent
+  receive_action: agent.read
+  resource_version: false
+- type: host.presence_changed
+  kind: ephemeral
+  resource: host
+  receive_action: host.read
+  resource_version: false
+- type: stats.live
+  kind: ephemeral
+  resource: instance, space
+  receive_action: stats.read
+  note: only to connections with a `stats.subscribe` subscription; content filtered to the visible channels,
+    costs only with `cost.read.aggregate` ([25-visualization.md](25-visualization.md), section 5)
+  resource_version: false
+- type: notification.created
+  kind: ephemeral
+  resource: thread
+  receive_action: push.deliver
+  audience: self
+  receive_text: self and `push.deliver`
+  note: only to connections of the receiver, instead of a push to this device ([13-push-notifications.md](13-push-notifications.md),
+    section 6.3)
+  resource_version: false
+- type: command.autocomplete_requested
+  kind: ephemeral
+  resource: command
+  receive_action: agent.events.consume
+  audience: self
+  receivers: agent_or_app
+  receive_text: self (owner of the command); agent additionally `agent.events.consume`
+  note: carries a token with `trigger_kind = autocomplete`; only to one gateway connection of the owner
+  resource_version: false
+ws_ops:
+- op: identify
+  direction: client_to_server
+  action: gateway.connect
+- op: resume
+  direction: client_to_server
+  action: gateway.connect
+- op: heartbeat
+  direction: client_to_server
+  action: gateway.connect
+  also_actions:
+  - agent.heartbeat
+  action_text: '`gateway.connect` (the session must be valid, consumes nothing from `rl.gateway_connect`);
+    for agents additionally `agent.heartbeat`'
+- op: reauth
+  direction: client_to_server
+  action: gateway.connect
+  action_text: '`gateway.connect` (consumes nothing from `rl.gateway_connect`)'
+- op: focus
+  direction: client_to_server
+  action: gateway.focus
+  action_text: '`gateway.focus` per thread'
+- op: typing.start
+  direction: client_to_server
+  action: typing.start
+- op: typing.stop
+  direction: client_to_server
+  action: typing.start
+- op: ack
+  direction: agent_to_server
+  action: agent.events.consume
+- op: run.update
+  direction: agent_to_server
+  action: run.update
+- op: command.autocomplete_result
+  direction: agent_or_app_to_server
+  action: command.autocomplete.respond
+- op: stats.subscribe
+  direction: client_to_server
+  action: stats.read
+  action_text: '`stats.read` on the instance or space respectively'
+  row_group: stats
+- op: stats.unsubscribe
+  direction: client_to_server
+  action: stats.read
+  action_text: '`stats.read` on the instance or space respectively'
+  row_group: stats
+- op: hello
+  direction: server_to_client
+  action: gateway.connect
+  action_text: none of its own; part of the session from `gateway.connect`
+  row_group: session
+- op: ready
+  direction: server_to_client
+  action: gateway.connect
+  action_text: none of its own; part of the session from `gateway.connect`
+  row_group: session
+- op: resumed
+  direction: server_to_client
+  action: gateway.connect
+  action_text: none of its own; part of the session from `gateway.connect`
+  row_group: session
+- op: cursor
+  direction: server_to_client
+  action: gateway.connect
+  action_text: none of its own; part of the session from `gateway.connect`
+  row_group: session
+- op: catchup.complete
+  direction: server_to_client
+  action: gateway.connect
+  action_text: none of its own; part of the session from `gateway.connect`
+  row_group: session
+- op: resync_required
+  direction: server_to_client
+  action: gateway.connect
+  action_text: none of its own; part of the session from `gateway.connect`
+  row_group: session
+- op: heartbeat_ack
+  direction: server_to_client
+  action: gateway.connect
+  action_text: none of its own; part of the session from `gateway.connect`
+  row_group: session
+- op: reauth_required
+  direction: server_to_client
+  action: gateway.connect
+  action_text: none of its own; part of the session from `gateway.connect`
+  row_group: session
+- op: error
+  direction: server_to_client
+  action: gateway.connect
+  action_text: none of its own; part of the session from `gateway.connect`
+  row_group: session
+- op: dispatch
+  direction: server_to_client
+  action: gateway.connect
+  action_text: receive action of the event type (section 6)
+  per_event_receive_action: true
+channel_ops:
+- channel: terminal_stream
+  channel_text: device stream `/terminal/sessions/{session_id}/stream`
+  ops:
+  - hello
+  direction: server_to_device
+  action: terminal.stream
+- channel: terminal_stream
+  ops:
+  - identify
+  direction: device_to_server
+  action: terminal.stream
+- channel: terminal_stream
+  ops:
+  - noise_frame
+  direction: both
+  action: terminal.stream
+  action_text: '`terminal.stream` (the session must be valid)'
+- channel: terminal_stream
+  ops:
+  - error
+  direction: server_to_device
+  action: terminal.stream
+- channel: host_control
+  channel_text: control `/hosts/connect`
+  ops:
+  - hello
+  - ready
+  - heartbeat_ack
+  - error
+  - session.open
+  - session.close
+  direction: server_to_host
+  action: host.connect
+- channel: host_control
+  ops:
+  - identify
+  - heartbeat
+  - report
+  - session.started
+  - session.ended
+  direction: host_to_server
+  action: host.connect
+- channel: host_data
+  channel_text: data `/hosts/sessions/{session_id}/stream`
+  ops:
+  - hello
+  - identify
+  - noise_frame
+  direction: both
+  action: host.connect
+  action_text: '`host.connect` (the session belongs to the host)'
+- channel: host_data
+  ops:
+  - error
+  direction: server_to_host
+  action: host.connect

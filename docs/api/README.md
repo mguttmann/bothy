@@ -53,8 +53,11 @@ CI=true npx -y @asyncapi/cli@6.2.0 generate fromTemplate docs/api/asyncapi.yaml 
    06-api.md, section 13.
 2. New operation: `operationId` in lowerCamelCase, `tags`, `x-authz-action` from 05-actions.md,
    `x-rate-limit-class` of the action, problem responses from `components.responses`, an example in
-   the media type. If no suitable action exists, 05-actions.md is extended first.
-3. New event: type and receive action in 05-actions.md, payload schema `<Name>Payload`,
+   the media type. If no suitable action exists, it goes first into
+   [docs/spec/actions.yaml](../spec/actions.yaml); `make catalog` generates the tables in
+   05-actions.md and the lists in redocly.yaml from it.
+3. New event: type and receive action first in [docs/spec/actions.yaml](../spec/actions.yaml),
+   then `make catalog`; payload schema `<Name>Payload`,
    event schema `<Name>Event` as `allOf` from `EventEnvelope`, an entry in `Event` (durable),
    a message in asyncapi.yaml, if needed an entry under `webhooks:`.
 4. No `null`, no type arrays, no `anyOf`, `oneOf` only with a discriminator. Repeated

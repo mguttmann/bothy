@@ -20,13 +20,14 @@ Sync and events: [04-sync-protocol.md](04-sync-protocol.md). How `authorize` dec
    from this catalogue and `x-rate-limit-class` with the class of this action. The API team
    enforces this with lint rules (`authz-action-required`: field missing; `authz-action-known`: ID
    not in the catalogue). In addition, the server checks at startup that every registered route
-   has a known action, and a test counts all routes. A machine-readable version of this catalogue
-   as the single source for docs, lint and code is decided ([ADR 0049](../adr/0049-machine-readable-action-catalogue-as-the-single-source.md)); until it exists, a
-   reconciliation in the docs gate keeps the lists in `docs/api/redocly.yaml` and the tables of
-   [02-architecture.md](02-architecture.md) equal to this chapter.
+   has a known action, and a test counts all routes. The single source of this catalogue for docs,
+   lint and code is [actions.yaml](actions.yaml) ([ADR 0049](../adr/0049-machine-readable-action-catalogue-as-the-single-source.md)); the tables of sections 3,
+   4, 6 and 7 and the lists in `docs/api/redocly.yaml` are generated from it (`make catalog`),
+   and `make catalog-check` keeps them current in the gate.
 4. **WebSocket and events.** Every op in the AsyncAPI document carries `x-authz-action`; every
    durable and ephemeral event type carries `x-receive-action`. Sections 6 and 7 are the
-   normative tables. A test fails when a type or an op is registered without an entry.
+   normative tables. They are generated from the same file [actions.yaml](actions.yaml)
+   (rule 3). A test fails when a type or an op is registered without an entry.
 5. **The catalogue is closed.** An unknown action is a program error: `authorize` denies, the
    request ends with `500`, an alert is raised.
 6. **Agent invocation and I1.** Every triggering of an agent (message, follow-up, command,
@@ -238,6 +239,7 @@ Every class has a key (what is counted) and two values
 `ratelimit.<class>.per_minute` and `ratelimit.<class>.burst` (token bucket). Default values in
 section 10.
 
+<!-- BEGIN GENERATED: rate_limit_classes -->
 | Class | Key | Purpose |
 |---|---|---|
 | `rl.public_auth` | client IP (IPv6: the /64 prefix) | login, refresh, public endpoints; additionally counts every failed check of presented credentials ([02-architecture.md](02-architecture.md), section 9.1) |
@@ -257,6 +259,7 @@ section 10.
 | `rl.import` | principal | batches of a running import (`import.apply`) |
 | `rl.terminal` | principal | open a terminal, attach, connect a stream |
 | `rl.host` | host (after the check of the authentication key) | control and data connections of the host service |
+<!-- END GENERATED: rate_limit_classes -->
 
 System actions and the internal delivery checks have no class (`none`, the same value as
 `x-rate-limit-class` in openapi.yaml).
@@ -271,6 +274,7 @@ section 6.3).
 
 ### 4.1 Public and login
 
+<!-- BEGIN GENERATED: actions.public -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `instance.discovery.read` | JWKS, protocol versions, minimal branding, branding logo | instance | public | no | no | no | no | `rl.public_auth` |
@@ -280,9 +284,11 @@ section 6.3).
 | `auth.logout` | end one's own session; push registrations of this session are deactivated | auth_session | self | no | no | yes | no | `rl.write` |
 | `auth.step_up` | provide a fresh confirmation (passkey, step-up device key, password with TOTP, new OIDC login) | auth_session | self | no | no | yes | no | `rl.public_auth` |
 | `status.public.read` | status page without login, only if `status.public_enabled` | instance | public | no | no | no | no | `rl.public_auth` |
+<!-- END GENERATED: actions.public -->
 
 ### 4.2 Instance and administration
 
+<!-- BEGIN GENERATED: actions.instance -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `instance.read` | instance data for clients: branding, language, limits, feature flags evaluated for the requesting principal (including rollout per person and group) | instance | auth | no | no | no | no | `rl.read` |
@@ -305,9 +311,11 @@ section 6.3).
 | `access.explain` | "Who has access?" with origin (direct, group, inherited, operator, indirectly via an agent) | space, channel | owner or manage | no | no | no | no | `rl.read` |
 | `access.preview` | dry run of an action with column "Permissions" = `yes`: differences per principal, I1, SR8, hints in plain text; the transaction is rolled back; limits of delegation give `allowed = false` instead of a denial ([07-permissions.md](07-permissions.md), section 9.3) | as the target action | permission of the target action | as target action | no | no | no | `rl.admin` |
 | `access.view_as` | "View as person", read-only | user | owner | yes | yes | yes | no | `rl.admin` |
+<!-- END GENERATED: actions.instance -->
 
 ### 4.3 People, identity, devices, tokens
 
+<!-- BEGIN GENERATED: actions.identity -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `self.read` | read one's own principal (`GET /me`), for people, agents and apps; also for a pending device | principal | auth and self | no | no | no | no | `rl.read` |
@@ -333,9 +341,11 @@ section 6.3).
 | `token.list` | read API tokens (prefix only) | principal | owner; self for own tokens | no | no | no | no | `rl.read` |
 | `token.create` | create an API token for an agent or app; a personal token only for oneself and only with the flag `tokens.personal_enabled` | principal | owner; self for own token | no | yes | yes | no | `rl.admin` |
 | `token.revoke` | revoke an API token | api_token | owner; self for own token | no | no | yes | yes | `rl.admin` |
+<!-- END GENERATED: actions.identity -->
 
 ### 4.4 Groups and grants
 
+<!-- BEGIN GENERATED: actions.grants -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `group.read` | read groups and members; one's own groups also without being owner | group | owner or self | no | no | no | no | `rl.read` |
@@ -350,12 +360,14 @@ section 6.3).
 | `grant.create` | create a grant. With `manage` only up to one's own level, only one's own capabilities, only to people and groups, never on the instance (R-AZ-05). Grants to agents and apps only owners; agents and apps never `trigger`, as a capability only `upload`. On a host (`host`) only owners, only to people and groups, without a level, exactly `terminal`; I6 (rule 1.11). Optionally `resolve_i1` | instance, space, channel, host | owner or manage (on `host` only owner) | no | yes | yes | yes | `rl.admin` |
 | `grant.revoke` | revoke a grant; with `manage` only grants that one could have created oneself under R-AZ-05 | grant | owner or manage | no | yes | yes | yes | `rl.admin` |
 | `grant.expire` | report an expired grant (job `authz.expiry_sweep`): permission version, `access.changed`, cancellation of affected runs | grant | system | no | no | yes | yes | `none` |
+<!-- END GENERATED: actions.grants -->
 
 Expiry takes effect in every `authorize` from the second of expiry; the two system actions only
 make sure that clients clear their cache and runs end (R-AZ-15).
 
 ### 4.5 Spaces, channels, sidebar
 
+<!-- BEGIN GENERATED: actions.structure -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `space.read` | see a space; applies with `read` on the space or on at least one of its channels | space | read | no | no | no | no | `rl.read` |
@@ -378,9 +390,11 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `forum_tag.manage` | create, change, delete the tags of a forum | channel | manage | no | no | yes | no | `rl.admin` |
 | `dm.create` | create a direct message with other people; only with the flag `dm.enabled` | instance | human | no | no | no | no | `rl.write` |
 | `dm.leave` | leave a DM | channel | participant | no | no | no | no | `rl.write` |
+<!-- END GENERATED: actions.structure -->
 
 ### 4.6 Threads and agent sessions
 
+<!-- BEGIN GENERATED: actions.threads -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `thread.read` | read a thread and its history | thread | read | no | no | no | no | `rl.read` |
@@ -394,9 +408,11 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `agent_session.reset` | start a new session in the thread (for example `/new`) | thread | trigger and `agent.invoke` | no | no | no | no | `rl.trigger` |
 | `agent_session.bind` | bind an existing external session to the thread (resume) | thread | trigger and `agent.invoke` | no | no | yes | no | `rl.trigger` |
 | `agent_session.report` | the adapter reports the external session reference, model, `started` or `bind_failed`; the first report creates the row if `run.start` carried no reference (compare-and-swap) | agent_session, run | agent-self | no | no | no | no | `rl.agent_runtime` |
+<!-- END GENERATED: actions.threads -->
 
 ### 4.7 Messages, reactions, pins, templates
 
+<!-- BEGIN GENERATED: actions.messages -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `message.read` | read a message | message | read | no | no | no | no | `rl.read` |
@@ -411,9 +427,11 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `mention.list` | read one's own mentions (filtered by `message.read`) | user | self | no | no | no | no | `rl.read` |
 | `template.read` | read templates (one's own and those of the channel) | channel, user | read or self | no | no | no | no | `rl.read` |
 | `template.manage` | maintain one's own templates (resource `user`); channel templates with `manage` (resource `channel`) | user, channel | self or manage | no | no | no | no | `rl.write` |
+<!-- END GENERATED: actions.messages -->
 
 ### 4.8 Files and search
 
+<!-- BEGIN GENERATED: actions.files -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `file.upload` | upload a file for a channel (upload session, parts, completion); avatar and logo go through `self.profile.update`, `agent.update` or `instance.branding.update` respectively | channel | write and +upload | no | no | yes on malware detection | no | `rl.upload` |
@@ -422,9 +440,11 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `file.transcribe` | start the transcription of a voice message by the server (flag `voice.enabled`) | file | write | no | no | no | no | `rl.upload` |
 | `file.transcript.submit` | save the transcript of a voice message (`transcript_source = 'agent'`), with `If-Match` | file | agent-self: operator of the thread whose message the file is attached to, and read | no | no | no | no | `rl.agent_runtime` |
 | `search.query` | full-text search; hits filtered by `message.read`, `thread.read`, `file.read` | instance | auth | no | no | no | no | `rl.search` |
+<!-- END GENERATED: actions.files -->
 
 ### 4.9 Personal data, notifications, sync
 
+<!-- BEGIN GENERATED: actions.personal -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `read_state.update` | advance the read state | thread | self and read | no | no | no | no | `rl.write` |
@@ -444,9 +464,11 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `gateway.connect` | WebSocket `identify` or `resume` | instance | auth (person with an active device, agent, app with `events:subscribe`) | no | no | denials | no | `rl.gateway_connect` |
 | `gateway.focus` | focus threads; unreadable ones are silently ignored | thread | read | no | no | no | no | `rl.read` |
 | `typing.start` | show typing; only people, agents show typing through their run (04, section 12) | thread | human and write | no | no | no | no | `rl.typing` |
+<!-- END GENERATED: actions.personal -->
 
 ### 4.10 Agents, commands, runs, interactions
 
+<!-- BEGIN GENERATED: actions.agents -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `agent.read` | read the agent card (name, mode badge, tool class, presence); the agent reads itself, including the configured mode of its backend policy | agent | owner or agent-self or read on a channel that the agent operates | no | no | no | no | `rl.read` |
@@ -481,9 +503,11 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `component.update` | deactivate or change own components | component | author of the message (agent-self or app-self) | no | no | no | no | `rl.write` |
 | `interaction.create` | use a component (single-use rule per message); respect `required_capability` and `restricted_to` (`any`, `run_starter`, `owner`); for components of an agent additionally `agent.invoke` | component | trigger | no | no | yes for `approve_actions`, otherwise denials | no | `rl.interaction` |
 | `interaction.respond` | the owner acknowledges or answers an interaction | interaction | agent-self or app-self | no | no | no | no | `rl.agent_runtime` |
+<!-- END GENERATED: actions.agents -->
 
 ### 4.11 Apps and webhooks
 
+<!-- BEGIN GENERATED: actions.apps -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `app.read` | read apps, manifests, installations | app | owner | yes | no | no | no | `rl.read` |
@@ -500,9 +524,11 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `webhook_in.create` | create an incoming webhook for a channel | channel | manage | no | yes | yes | no | `rl.admin` |
 | `webhook_in.revoke` | revoke an incoming webhook | incoming_webhook | manage | no | yes | yes | no | `rl.admin` |
 | `webhook_in.post` | message via an incoming webhook; writes as the app with `origin = app` | channel | public with token; the app needs write | no | no | denials | no | `rl.webhook_in` |
+<!-- END GENERATED: actions.apps -->
 
 ### 4.12 Import, costs, privacy, status
 
+<!-- BEGIN GENERATED: actions.operations -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `import.read` | read import sources, progress, errors | import_source | owner | yes | no | no | no | `rl.read` |
@@ -521,22 +547,26 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `gdpr.export.download` | download the export package | gdpr_request | self (data subject) or owner | no | yes | yes | no | `rl.export` |
 | `status.read` | read the status page | instance | auth | no | no | no | no | `rl.read` |
 | `status.manage` | maintain components and incidents | instance | owner | yes | no | yes | no | `rl.admin` |
+<!-- END GENERATED: actions.operations -->
 
 ### 4.13 Dev environments (milestone)
 
 These belong to the milestone "Multi-user dev environment"; their routes are created with it
 ([21-dev-isolation.md](21-dev-isolation.md)).
 
+<!-- BEGIN GENERATED: actions.dev -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `dev_environment.read` | read an environment, its state and check results | dev_environment | owner or self | no | no | no | no | `rl.read` |
 | `dev_environment.manage` | create, approve, suspend, retire an environment | dev_environment | owner | yes | yes | yes | yes | `rl.admin` |
 | `dev_environment.report` | the runner reports check results and readiness | dev_environment | agent-self (runner of the environment) | no | no | yes | no | `rl.agent_runtime` |
+<!-- END GENERATED: actions.dev -->
 
 ### 4.14 Hosts and terminal
 
 Normative together with [24-terminal.md](24-terminal.md). Milestone M2.
 
+<!-- BEGIN GENERATED: actions.terminal -->
 | ID | Description | Resource | Permission | Owner | Step-up | Audit | Permissions | RL class |
 |---|---|---|---|---|---|---|---|---|
 | `host.read` | read hosts: name, state, platform, profiles, fingerprint, LLM declaration, check results, valid assignments and reported names of the session users; owners all, others the hosts whose assignee they are or on which they have a `terminal` grant | host | owner or assignee or +terminal | no | no | no | no | `rl.read` |
@@ -549,6 +579,7 @@ Normative together with [24-terminal.md](24-terminal.md). Milestone M2.
 | `terminal.read_own` | read own terminal sessions; owners read all | terminal_session, host | self or owner | no | no | no | no | `rl.read` |
 | `terminal.close` | end a session; one's own, owners any | terminal_session | self or owner | no | no | yes | no | `rl.write` |
 | `terminal.terminate` | end a session by the server: revocation, idle, maximum duration, detach beyond `terminal.detach_grace`, disabling, logout, state change of the host, end of the process | terminal_session | system | no | no | yes | no | `none` |
+<!-- END GENERATED: actions.terminal -->
 
 Agents, apps and personal tokens reach none of these actions except `host.pair` and
 `host.connect`, which have no principal from `principals` (`subject_kind_not_allowed`, SR5).
@@ -628,6 +659,7 @@ it. On a denial only before delivery: run `failed` with a reason, `trigger_state
 A receiver gets an event only if `authorize(receiver, receive_action, resource)`
 allows it. Personal events (`audience = self`) go only to the named principal.
 
+<!-- BEGIN GENERATED: events.durable -->
 | Event type | Resource | Receive action | Note |
 |---|---|---|---|
 | `message.created` | message | `message.read` | echo with `client_msg_id` to the author |
@@ -680,9 +712,11 @@ allows it. Personal events (`audience = self`) go only to the named principal.
 | `agent.config_changed` | channel | self (agent) and `agent.config.read` | prompt, skills, project binding changed |
 | `host.updated` | host | `host.read` | also on creation; state, assignee, LLM declaration, profiles, check results, assignments of the session users; `key_changed` on re-pairing; never keys |
 | `terminal_session.changed` | terminal_session | self | to the person of the session: state, device, `close_reason`; never contents |
+<!-- END GENERATED: events.durable -->
 
 Ephemeral events:
 
+<!-- BEGIN GENERATED: events.ephemeral -->
 | Event type | Resource | Receive action | Additional condition |
 |---|---|---|---|
 | `typing.started` | thread | `thread.read` | thread in focus |
@@ -692,12 +726,14 @@ Ephemeral events:
 | `stats.live` | instance, space | `stats.read` | only to connections with a `stats.subscribe` subscription; content filtered to the visible channels, costs only with `cost.read.aggregate` ([25-visualization.md](25-visualization.md), section 5) |
 | `notification.created` | thread | self and `push.deliver` | only to connections of the receiver, instead of a push to this device ([13-push-notifications.md](13-push-notifications.md), section 6.3) |
 | `command.autocomplete_requested` | command | self (owner of the command); agent additionally `agent.events.consume` | carries a token with `trigger_kind = autocomplete`; only to one gateway connection of the owner |
+<!-- END GENERATED: events.ephemeral -->
 
 Outgoing webhooks and push use the same receive action (`webhook_out.deliver`,
 `push.deliver`).
 
 ## 7. WebSocket ops and action
 
+<!-- BEGIN GENERATED: ws_ops -->
 | Op | Direction | Action |
 |---|---|---|
 | `identify` | client to server | `gateway.connect` |
@@ -713,9 +749,11 @@ Outgoing webhooks and push use the same receive action (`webhook_out.deliver`,
 | `stats.subscribe`, `stats.unsubscribe` | client to server | `stats.read` on the instance or space respectively |
 | `hello`, `ready`, `resumed`, `cursor`, `catchup.complete`, `resync_required`, `heartbeat_ack`, `reauth_required`, `error` | server to client | none of its own; part of the session from `gateway.connect` |
 | `dispatch` | server to client | receive action of the event type (section 6) |
+<!-- END GENERATED: ws_ops -->
 
 Terminal channels ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/asyncapi.yaml)):
 
+<!-- BEGIN GENERATED: channel_ops -->
 | Channel | Op | Direction | Action |
 |---|---|---|---|
 | device stream `/terminal/sessions/{session_id}/stream` | `hello` | server to device | `terminal.stream` |
@@ -726,6 +764,7 @@ Terminal channels ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/asyn
 | | `identify`, `heartbeat`, `report`, `session.started`, `session.ended` | host to server | `host.connect` |
 | data `/hosts/sessions/{session_id}/stream` | `hello`, `identify`, binary frames (Noise) | both | `host.connect` (the session belongs to the host) |
 | | `error` | server to host | `host.connect` |
+<!-- END GENERATED: channel_ops -->
 
 ## 8. Decisions of this chapter
 
