@@ -29,6 +29,7 @@ type register struct {
 	Wire        vendorsEntry             `yaml:"wire"`
 	Cmd         vendorsEntry             `yaml:"cmd"`
 	API         *vendorsEntry            `yaml:"api,omitempty"`
+	Migrations  *migrationsEntry         `yaml:"migrations,omitempty"`
 	TestSupport testSupportEntry         `yaml:"testsupport"`
 	Modules     map[string]moduleEntry   `yaml:"modules"`
 	Vendors     map[string][]string      `yaml:"vendors"`
@@ -60,6 +61,14 @@ type platformEntry struct {
 // vendorsEntry names the vendor groups a fixed component (wire, cmd, api) may import.
 type vendorsEntry struct {
 	Vendors []string `yaml:"vendors"`
+}
+
+// migrationsEntry is the package migrations (the embedded SQL migrations, ADR 0007): its own
+// component, which uses no project package and no vendor library. wire and cmd may use it, and
+// so may the platform packages in UsedBy (platform pg runs the migrations and builds the test
+// databases from them, docs/DECISIONS.md M1-12).
+type migrationsEntry struct {
+	UsedBy []string `yaml:"used_by"`
 }
 
 // testSupportEntry lists the directories of test code across modules (test, perf).

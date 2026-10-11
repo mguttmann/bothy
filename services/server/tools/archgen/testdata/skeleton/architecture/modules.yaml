@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
-# Register of the go-arch-lint fixture: three modules, one platform package, one vendor group;
+# Register of the go-arch-lint fixture: three modules, one platform package, one vendor group and
+# the package migrations;
 # third_party holds stubs of pgx and of a library outside every vendor group.
 version: 1
 exclude: [tools, third_party]
@@ -11,6 +12,7 @@ platform:
 wire: {vendors: []}
 cmd: {vendors: []}
 api: {vendors: []}
+migrations: {used_by: [pg]}
 testsupport: {paths: [test, perf]}
 modules:
   chat:

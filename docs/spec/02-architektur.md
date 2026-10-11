@@ -91,7 +91,7 @@ nennen nur Befehle von hier.
 | Befehl | Zweck | Kapitel |
 |---|---|---|
 | `bothy serve --role=api\|worker\|all` | Server starten | dieses Kapitel |
-| `bothy migrate up\|status\|validate` | Migrationen des Domänenschemas (goose) und der River-Tabellen (rivermigrate); legt beim ersten Lauf die Zeile `instance` an (über den Port des Moduls `instance`), setzt `instance.schema_version` und `instance.min_server_version`; legt die ersten Partitionen von `event_log` an (03) | ADR 0007, [16-betrieb.md](16-betrieb.md) |
+| `bothy migrate up [--bootstrap]\|status\|validate` | Migrations of the domain schema (goose) and of the River tables (rivermigrate); on the first run creates the `instance` row (through the port of module `instance`), sets `instance.schema_version` and `instance.min_server_version`; creates the first partitions of `event_log` (03). `up --bootstrap` first creates or updates the four database roles and their grants as `migrate.bootstrap_user` (16 "Rollen"); `status` only reads, `validate` needs no database | ADR 0007, [16-betrieb.md](16-betrieb.md) |
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | Einrichtung: erster Owner per Server-Befehl (Systemaktion `instance.bootstrap`), Einladungs-Code zur Wiederherstellung | [08-identitaet.md](08-identitaet.md) |
 | `bothy config check\|print` | Konfiguration prüfen, redigiert ausgeben; `check --secrets` löst zusätzlich jeden Verweis `*_ref` über den Secret-Provider auf und nennt je Schlüssel nur `ok` oder den Fehlercode | Abschnitt 13 |
 | `bothy import discord ...` | Import und Lese-Spiegel über die Import-API (`import.apply`) | [22-import-migration.md](22-import-migration.md) |
@@ -508,6 +508,10 @@ go-arch-lint macht aus jedem Muster einen regulären Ausdruck und maskiert nur `
 `github.com/**` gäbe fast jede Bibliothek frei. Ein Ticket, das ein Plattform-Paket oder eine
 Fremdbibliothek einführt, trägt seinen Eintrag und seine Vendor-Gruppe in derselben Änderung ein;
 ein Paket ohne Eintrag scheitert in `make arch` ("not attached to any component").
+The optional top-level section `migrations: {used_by: [<platform package>, ...]}` (M1-12) makes
+the package `migrations`, the embedded SQL migrations of ADR 0007, a component of its own that
+uses nothing; `wire`, `cmd` and the platform packages listed in `used_by` may use it (the server
+register lists `pg`, which runs them and builds the test databases from them).
 
 ### 7.2 go-arch-lint
 

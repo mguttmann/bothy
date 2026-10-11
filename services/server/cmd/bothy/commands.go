@@ -32,6 +32,13 @@ var commands = []command{
 		},
 	},
 	{
+		name:    "migrate",
+		summary: "Apply, list or validate the database migrations",
+		run: func(ctx context.Context, args, env []string, stdout, stderr io.Writer) int {
+			return migrateCommand(ctx, args, defaultMigrateEnv(env, stdout, stderr))
+		},
+	},
+	{
 		name:    "secrets",
 		summary: "Create the secrets of the Compose stack or export them encrypted",
 		// init and export read only their flags: the secrets-init container has no BOTHY_

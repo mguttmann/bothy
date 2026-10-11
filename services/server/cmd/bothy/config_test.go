@@ -153,16 +153,38 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 	env := []string{"BOTHY_CONFIG_FILE=" + path, "BOTHY_MESSAGE__MAX_CONTENT_BYTES=2048"}
 	code, stdout, stderr := runConfig(t, wire.ConfigSchema, env, "print", "--role", "worker")
 	want := "# configuration file: " + path + "\n" +
+		"database.acquire_timeout = 2s  # default\n" +
+		"database.host = localhost  # default\n" +
+		"database.idle_in_tx_timeout = 10s  # default\n" +
+		"database.listen_reconnect_backoff_cap = 10s  # default\n" +
+		"database.lock_timeout = 2s  # default\n" +
+		"database.max_conns = 20  # default\n" +
+		"database.name = bothy  # default\n" +
+		"database.password_ref = file:/run/bothy/secrets/db_app_password  # default\n" +
+		"database.port = 5432  # default\n" +
+		"database.sslmode = verify-full  # default\n" +
+		"database.sslrootcert =   # default\n" +
+		"database.statement_timeout = 5s  # default\n" +
+		"database.tx_retry_max = 2  # default\n" +
+		"database.user = bothy_app  # default\n" +
 		"egress.allowed_hosts =   # default\n" +
 		"egress.max_response_bytes = 1048576  # default\n" +
 		"egress.timeout = 15s  # default\n" +
 		"http.max_json_body_bytes = 1048576  # default\n" +
 		"message.max_content_bytes = 2048  # env BOTHY_MESSAGE__MAX_CONTENT_BYTES\n" +
+		"migrate.app_password_ref = file:/run/bothy/secrets/db_app_password  # default\n" +
+		"migrate.bootstrap_password_ref = file:/run/bothy/secrets/db_superuser_password  # default\n" +
+		"migrate.bootstrap_user = postgres  # default\n" +
+		"migrate.lock_timeout = 5s  # default\n" +
+		"migrate.maint_password_ref = file:/run/bothy/secrets/db_maint_password  # default\n" +
+		"migrate.monitor_password_ref = file:/run/bothy/secrets/db_monitor_password  # default\n" +
+		"migrate.owner_password_ref = file:/run/bothy/secrets/db_owner_password  # default\n" +
 		"secrets.cache_ttl = 5m  # default\n" +
 		"secrets.dir = /run/bothy/secrets  # default\n" +
 		"server.internal_listen_addr = 127.0.0.1:8081  # default\n" +
 		"server.listen_addr = 127.0.0.1:9080  # file " + path + "\n" +
-		"server.role = worker  # flag --role\n"
+		"server.role = worker  # flag --role\n" +
+		"startup.dependency_wait = 1m  # default\n"
 	if code != 0 || stdout != want || stderr != "" {
 		t.Fatalf("exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}

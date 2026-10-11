@@ -154,13 +154,13 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `http.max_json_body_bytes` | `BOTHY_HTTP__MAX_JSON_BODY_BYTES` | Server | int | `1048576` | größter JSON-Körper; echt größer als `message.max_content_bytes` (13, Punkt 4) | aktiv |
 | `http.max_json_depth` | `BOTHY_HTTP__MAX_JSON_DEPTH` | Server |  | `32` | größte Schachtelungstiefe eines JSON-Körpers (SEC-IN-2); ein Test hält, dass jedes Anfrage-Beispiel in `openapi.yaml` darunter bleibt | geplant (M1) |
 | `http.unavailable_retry_after` | `BOTHY_HTTP__UNAVAILABLE_RETRY_AFTER` | Server |  | `5s` | `Retry-After` jeder Antwort `503 unavailable` (in ganzen Sekunden) | geplant (M1) |
-| `database.acquire_timeout` | `BOTHY_DATABASE__ACQUIRE_TIMEOUT` | Server |  | `2s` | Warten auf eine Pool-Verbindung | geplant (M1) |
-| `database.statement_timeout` | `BOTHY_DATABASE__STATEMENT_TIMEOUT` | Server |  | `5s` | Frist je SQL-Anweisung | geplant (M1) |
-| `database.lock_timeout` | `BOTHY_DATABASE__LOCK_TIMEOUT` | Server |  | `2s` | Frist für Sperren | geplant (M1) |
-| `database.idle_in_tx_timeout` | `BOTHY_DATABASE__IDLE_IN_TX_TIMEOUT` | Server |  | `10s` | offene Transaktion ohne Arbeit | geplant (M1) |
-| `database.tx_retry_max` | `BOTHY_DATABASE__TX_RETRY_MAX` | Server |  | `2` | Wiederholungen des Unit of Work bei `40P01` und `55P03` | geplant (M1) |
-| `database.listen_reconnect_backoff_cap` | `BOTHY_DATABASE__LISTEN_RECONNECT_BACKOFF_CAP` | Server |  | `10s` | größter Abstand beim Neuaufbau von `LISTEN` | geplant (M1) |
-| `startup.dependency_wait` | `BOTHY_STARTUP__DEPENDENCY_WAIT` | Server |  | `60s` | Warten auf die Datenbank beim Start | geplant (M1) |
+| `database.acquire_timeout` | `BOTHY_DATABASE__ACQUIRE_TIMEOUT` | Server | duration | `2s` | Warten auf eine Pool-Verbindung | aktiv |
+| `database.statement_timeout` | `BOTHY_DATABASE__STATEMENT_TIMEOUT` | Server | duration | `5s` | Frist je SQL-Anweisung | aktiv |
+| `database.lock_timeout` | `BOTHY_DATABASE__LOCK_TIMEOUT` | Server | duration | `2s` | Frist für Sperren | aktiv |
+| `database.idle_in_tx_timeout` | `BOTHY_DATABASE__IDLE_IN_TX_TIMEOUT` | Server | duration | `10s` | offene Transaktion ohne Arbeit | aktiv |
+| `database.tx_retry_max` | `BOTHY_DATABASE__TX_RETRY_MAX` | Server | int | `2` | Wiederholungen des Unit of Work bei `40P01` und `55P03` | aktiv |
+| `database.listen_reconnect_backoff_cap` | `BOTHY_DATABASE__LISTEN_RECONNECT_BACKOFF_CAP` | Server | duration | `10s` | größter Abstand beim Neuaufbau von `LISTEN` | aktiv |
+| `startup.dependency_wait` | `BOTHY_STARTUP__DEPENDENCY_WAIT` | Server | duration | `60s` | Warten auf die Datenbank beim Start | aktiv |
 | `sync.log_poll_interval` | `BOTHY_SYNC__LOG_POLL_INTERVAL` | Server |  | `1s` | Poll des Log-Tails ohne `NOTIFY` | geplant (M1) |
 | `sync.tail_batch_size` | `BOTHY_SYNC__TAIL_BATCH_SIZE` | Server |  | `1000` | Ereignisse je Lesevorgang des Log-Tails | geplant (M1) |
 | `sync.partition_maintenance_interval` | `BOTHY_SYNC__PARTITION_MAINTENANCE_INTERVAL` | Server |  | `10m` | Abstand des Jobs `sync.partition_maintenance` | geplant (M1) |
@@ -629,23 +629,23 @@ Quelle: [16-betrieb.md](../spec/16-betrieb.md), Abschnitt 14.
 | `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server |  | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) | geplant (M1) |
 | `server.tls_cert_ref` | `BOTHY_SERVER__TLS_CERT_REF` | Server |  | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) | geplant (M1) |
 | `server.tls_key_ref` | `BOTHY_SERVER__TLS_KEY_REF` | Server |  | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` | geplant (M1) |
-| `database.host` | `BOTHY_DATABASE__HOST` | Server |  | `localhost` | Host der Datenbank | geplant (M1) |
-| `database.port` | `BOTHY_DATABASE__PORT` | Server |  | `5432` | Port der Datenbank im Netz des Servers | geplant (M1) |
-| `database.name` | `BOTHY_DATABASE__NAME` | Server |  | `bothy` | Datenbankname | geplant (M1) |
-| `database.user` | `BOTHY_DATABASE__USER` | Server |  | `bothy_app` | Rolle des Servers | geplant (M1) |
-| `database.password_ref` | `BOTHY_DATABASE__PASSWORD_REF` | Server |  | `file:<secrets.dir>/db_app_password` | Verweis auf das Passwort | geplant (M1) |
-| `database.sslmode` | `BOTHY_DATABASE__SSLMODE` | Server |  | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` (SEC-TLS-5) | geplant (M1) |
-| `database.sslrootcert` | `BOTHY_DATABASE__SSLROOTCERT` | Server |  | leer | CA-Bündel für `verify-full`; leer nutzt die Wurzeln des Systems | geplant (M1) |
-| `database.max_conns` | `BOTHY_DATABASE__MAX_CONNS` | Server |  | `20` | Größe des Verbindungspools je Prozess (Startwert bis zum Lasttest) | geplant (M1) |
+| `database.host` | `BOTHY_DATABASE__HOST` | Server | string | `localhost` | Host der Datenbank | aktiv |
+| `database.port` | `BOTHY_DATABASE__PORT` | Server | int | `5432` | Port der Datenbank im Netz des Servers | aktiv |
+| `database.name` | `BOTHY_DATABASE__NAME` | Server | string | `bothy` | Datenbankname | aktiv |
+| `database.user` | `BOTHY_DATABASE__USER` | Server | string | `bothy_app` | Rolle des Servers | aktiv |
+| `database.password_ref` | `BOTHY_DATABASE__PASSWORD_REF` | Server | secret_ref | `file:<secrets.dir>/db_app_password` | Verweis auf das Passwort | aktiv |
+| `database.sslmode` | `BOTHY_DATABASE__SSLMODE` | Server | enum(disable, verify-full) | `verify-full` | TLS zur Datenbank; im internen Compose-Netz `disable` (SEC-TLS-5) | aktiv |
+| `database.sslrootcert` | `BOTHY_DATABASE__SSLROOTCERT` | Server | string | leer | CA-Bündel für `verify-full`; leer nutzt die Wurzeln des Systems | aktiv |
+| `database.max_conns` | `BOTHY_DATABASE__MAX_CONNS` | Server | int | `20` | Größe des Verbindungspools je Prozess (Startwert bis zum Lasttest) | aktiv |
 | `migrate.require_recent_backup` | `BOTHY_MIGRATE__REQUIRE_RECENT_BACKUP` | Server |  | `true` | `migrate` verlangt eine frische Sicherung | geplant (M7) |
 | `migrate.recent_backup_max_age` | `BOTHY_MIGRATE__RECENT_BACKUP_MAX_AGE` | Server |  | `24h` | so alt darf diese Sicherung sein | geplant (M7) |
-| `migrate.lock_timeout` | `BOTHY_MIGRATE__LOCK_TIMEOUT` | Server |  | `5s` | `lock_timeout` je Migrationsschritt | geplant (M1) |
-| `migrate.bootstrap_user` | `BOTHY_MIGRATE__BOOTSTRAP_USER` | Server |  | `postgres` | Superuser-Anmeldung nur für `migrate up --bootstrap` | geplant (M1) |
-| `migrate.bootstrap_password_ref` | `BOTHY_MIGRATE__BOOTSTRAP_PASSWORD_REF` | Server |  | `file:<secrets.dir>/db_superuser_password` | dessen Passwort | geplant (M1) |
-| `migrate.owner_password_ref` | `BOTHY_MIGRATE__OWNER_PASSWORD_REF` | Server |  | `file:<secrets.dir>/db_owner_password` | Passwort, das `--bootstrap` für `bothy_owner` setzt | geplant (M1) |
-| `migrate.app_password_ref` | `BOTHY_MIGRATE__APP_PASSWORD_REF` | Server |  | `file:<secrets.dir>/db_app_password` | Passwort für `bothy_app` | geplant (M1) |
-| `migrate.maint_password_ref` | `BOTHY_MIGRATE__MAINT_PASSWORD_REF` | Server |  | `file:<secrets.dir>/db_maint_password` | Passwort für `bothy_maint` | geplant (M1) |
-| `migrate.monitor_password_ref` | `BOTHY_MIGRATE__MONITOR_PASSWORD_REF` | Server |  | `file:<secrets.dir>/db_monitor_password` | Passwort für `bothy_monitor` | geplant (M1) |
+| `migrate.lock_timeout` | `BOTHY_MIGRATE__LOCK_TIMEOUT` | Server | duration | `5s` | `lock_timeout` je Migrationsschritt | aktiv |
+| `migrate.bootstrap_user` | `BOTHY_MIGRATE__BOOTSTRAP_USER` | Server | string | `postgres` | Superuser-Anmeldung nur für `migrate up --bootstrap` | aktiv |
+| `migrate.bootstrap_password_ref` | `BOTHY_MIGRATE__BOOTSTRAP_PASSWORD_REF` | Server | secret_ref | `file:<secrets.dir>/db_superuser_password` | dessen Passwort | aktiv |
+| `migrate.owner_password_ref` | `BOTHY_MIGRATE__OWNER_PASSWORD_REF` | Server | secret_ref | `file:<secrets.dir>/db_owner_password` | Passwort, das `--bootstrap` für `bothy_owner` setzt | aktiv |
+| `migrate.app_password_ref` | `BOTHY_MIGRATE__APP_PASSWORD_REF` | Server | secret_ref | `file:<secrets.dir>/db_app_password` | Passwort für `bothy_app` | aktiv |
+| `migrate.maint_password_ref` | `BOTHY_MIGRATE__MAINT_PASSWORD_REF` | Server | secret_ref | `file:<secrets.dir>/db_maint_password` | Passwort für `bothy_maint` | aktiv |
+| `migrate.monitor_password_ref` | `BOTHY_MIGRATE__MONITOR_PASSWORD_REF` | Server | secret_ref | `file:<secrets.dir>/db_monitor_password` | Passwort für `bothy_monitor` | aktiv |
 | `backup.pg.full_schedule` | `BOTHY_BACKUP__PG__FULL_SCHEDULE` | Server |  | `0 2 * * 0` | Plan der Vollsicherung (cron) | geplant (M7) |
 | `backup.pg.diff_schedule` | `BOTHY_BACKUP__PG__DIFF_SCHEDULE` | Server |  | `0 2 * * 1-6` | Plan der Differenzsicherung (cron) | geplant (M7) |
 | `backup.pg.archive_timeout` | `BOTHY_BACKUP__PG__ARCHIVE_TIMEOUT` | Server |  | `60s` | spätestens dann wird ein WAL-Segment archiviert | geplant (M7) |

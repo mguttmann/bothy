@@ -129,8 +129,18 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		}
 		noCanary(t, canaries, stdout, stderr)
 	}
-	if stdout != "configuration ok\n" {
-		t.Errorf("run config check --secrets with the server schema: stdout %q", stdout)
+	// The directory holds db_app_password only, as the secrets of an api container do: the
+	// references of bothy migrate are skipped, not reported as missing (docs/DECISIONS.md M1-12).
+	skipped := ": skipped (read only by bothy migrate up --bootstrap)\n"
+	want = "secret database.password_ref: ok\n" +
+		"secret migrate.app_password_ref" + skipped +
+		"secret migrate.bootstrap_password_ref" + skipped +
+		"secret migrate.maint_password_ref" + skipped +
+		"secret migrate.monitor_password_ref" + skipped +
+		"secret migrate.owner_password_ref" + skipped +
+		"configuration ok\n"
+	if stdout != want {
+		t.Errorf("run config check --secrets with the server schema: stdout\n%s\nwant\n%s", stdout, want)
 	}
 }
 

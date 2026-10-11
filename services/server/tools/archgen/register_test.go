@@ -48,6 +48,7 @@ modules:
 vendors:
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]
   river: [github.com/riverqueue/river]
+migrations: {used_by: [pg]}
 `
 
 // edit replaces old by new in validRegister; each old must occur exactly once so that a case
@@ -89,6 +90,9 @@ func TestParseRegisterAcceptsValidRegister(t *testing.T) {
 	}
 	if r.API == nil || r.Platform["jobs"].DependsOn[0] != "pg" {
 		t.Errorf("api or platform not decoded: %+v", r)
+	}
+	if r.Migrations == nil || !slices.Equal(r.Migrations.UsedBy, []string{"pg"}) {
+		t.Errorf("migrations not decoded: %+v", r.Migrations)
 	}
 }
 
@@ -308,9 +312,16 @@ func rejectCases(t *testing.T) []rejectCase {
 		{name: "exclude prefix of cmd", text: edit(t, "exclude: [tools]", "exclude: [c]"), path: "exclude[0]", msg: "takes product code under cmd/ out of the architecture gate"},
 		{name: "exclude prefix of api", text: edit(t, "exclude: [tools]", "exclude: [tools, ap]"), path: "exclude[1]", msg: "takes product code under api/ out of the architecture gate"},
 		{name: "testsupport under an exclude prefix", text: edit(t, "exclude: [tools]", "exclude: [tools, te]"), path: "testsupport.paths[0]", msg: `overlaps exclude entry "te"`},
+		// The package migrations is product code (embedded into the binary), like internal, cmd and api.
+		{name: "exclude migrations", text: edit(t, "exclude: [tools]", "exclude: [tools, migrations]"), path: "exclude[1]", msg: "takes product code under migrations/ out of the architecture gate"},
+		{name: "exclude prefix of migrations", text: edit(t, "exclude: [tools]", "exclude: [tools, mig]"), path: "exclude[1]", msg: "takes product code under migrations/ out of the architecture gate"},
+		{name: "testsupport below migrations", text: edit(t, "paths: [test]", "paths: [test, migrations/fixtures]"), path: "testsupport.paths[1]", msg: "turns product code under migrations/ into test support"},
+		{name: "migrations used_by unknown platform", text: edit(t, "used_by: [pg]", "used_by: [db]"), path: "migrations.used_by[0]", msg: `unknown platform package "db"`},
+		{name: "migrations used_by repeated", text: edit(t, "used_by: [pg]", "used_by: [pg, pg]"), path: "migrations.used_by[1]", msg: `duplicate entry "pg"`},
+		{name: "migrations used_by invalid name", text: edit(t, "used_by: [pg]", "used_by: [Pg]"), path: "migrations.used_by[0]", msg: "invalid platform name"},
 		{name: "vendor pattern without a fixed first element", text: edit(t, "river: [github.com/riverqueue/river]", "river: [\"**\"]"), path: "vendors.river[0]", msg: "invalid import path"},
 	}
-	for _, name := range []string{"kernel", "platform", "wire", "cmd", "api", "testsupport"} {
+	for _, name := range []string{"kernel", "platform", "wire", "cmd", "api", "migrations", "testsupport"} {
 		cases = append(cases, rejectCase{
 			name: "reserved module name " + name,
 			text: edit(t, "  agents:\n", "  "+name+":\n"),

@@ -12,6 +12,7 @@ platform:
 wire: {vendors: [otel]}
 cmd: {vendors: [otel]}
 api: {vendors: [oapi]}
+migrations: {used_by: [pg]}
 testsupport: {paths: [test, perf]}
 modules:
   identity:

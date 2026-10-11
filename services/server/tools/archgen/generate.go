@@ -140,6 +140,9 @@ func prefixed(prefix string, names []string) []string {
 
 func tree(dir string) []string { return []string{dir, dir + "/**"} }
 
+// migrationsComponent is the component of the package migrations (register section migrations).
+const migrationsComponent = "migrations"
+
 func components(r *register) []component {
 	list := []component{
 		{"kernel-core", prefixed("internal/kernel/", r.Kernel.Core)},
@@ -151,6 +154,10 @@ func components(r *register) []component {
 	list = append(list, component{"wire", tree("internal/wire")}, component{"cmd", []string{"cmd/**"}})
 	if r.API != nil {
 		list = append(list, component{"api", []string{"api/**"}})
+	}
+	if r.Migrations != nil {
+		// Only the package itself: migrations-lint keeps the directory free of subdirectories.
+		list = append(list, component{migrationsComponent, []string{"migrations"}})
 	}
 	for _, m := range r.moduleOrder {
 		list = append(list,
@@ -195,14 +202,20 @@ type dep struct {
 // other port, only kernel-core (M1-05/15).
 func deps(r *register) []dep {
 	platforms := platformComponents(r)
-	var api []string
+	var api, migrations []string
 	if r.API != nil {
 		api = []string{"api"}
+	}
+	if r.Migrations != nil {
+		migrations = []string{migrationsComponent}
 	}
 	list := []dep{{name: "kernel-core", mayDependOn: []string{"kernel-core"}}}
 	for _, p := range platformNames(r) {
 		e := r.Platform[p]
 		may := slices.Concat([]string{platformComponent(p), "kernel-ports"}, prefixed("platform-", e.DependsOn))
+		if r.Migrations != nil && slices.Contains(r.Migrations.UsedBy, p) {
+			may = append(may, migrationsComponent)
+		}
 		list = append(list, dep{name: platformComponent(p), mayDependOn: may, canUse: vendorNames(e.Vendors)})
 	}
 
@@ -210,13 +223,16 @@ func deps(r *register) []dep {
 	for _, m := range r.moduleOrder {
 		all = append(all, moduleComponents(m)...)
 	}
-	wire := slices.Concat([]string{"wire"}, all, platforms, []string{"kernel-ports"}, api)
+	wire := slices.Concat([]string{"wire"}, all, platforms, []string{"kernel-ports"}, api, migrations)
 	list = append(list,
 		dep{name: "wire", mayDependOn: wire, canUse: vendorNames(r.Wire.Vendors)},
-		dep{name: "cmd", mayDependOn: slices.Concat([]string{"cmd", "wire"}, platforms, []string{"kernel-ports"}), canUse: vendorNames(r.Cmd.Vendors)},
+		dep{name: "cmd", mayDependOn: slices.Concat([]string{"cmd", "wire"}, platforms, []string{"kernel-ports"}, migrations), canUse: vendorNames(r.Cmd.Vendors)},
 	)
 	if r.API != nil {
 		list = append(list, dep{name: "api", mayDependOn: api, canUse: vendorNames(r.API.Vendors)})
+	}
+	if r.Migrations != nil {
+		list = append(list, dep{name: migrationsComponent, mayDependOn: migrations})
 	}
 
 	for _, m := range r.moduleOrder {

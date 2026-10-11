@@ -61,8 +61,6 @@ rules:
     etappe: M6
   - match: "consumer."  # M2-01
     etappe: M2
-  - match: "database."  # M1-12, M1-13, M1-16
-    etappe: M1
   - match: "dev."  # V2-01, V2-04
     etappe: V2
   - match: "dr."  # M7-03
@@ -90,8 +88,6 @@ rules:
   - match: "jobs."  # M1-14
     etappe: M1
   - match: "message."  # M1-46, M1-56, M1-57
-    etappe: M1
-  - match: "migrate."  # M1-12
     etappe: M1
   - match: migrate.recent_backup_max_age  # M7-02
     etappe: M7
@@ -148,8 +144,6 @@ rules:
   - match: "signing_key."  # M1-32
     etappe: M1
   - match: "space."  # M1-52
-    etappe: M1
-  - match: "startup."  # M1-11
     etappe: M1
   - match: "stats."  # M6-05 to M6-15
     etappe: M6

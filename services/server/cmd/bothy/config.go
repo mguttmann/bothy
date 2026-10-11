@@ -35,6 +35,8 @@ print  prints the effective value and the source of every key, sorted by name. S
                secret provider and print "secret <key>: ok" or "secret <key>: <code>" per
                key, never a value; codes are invalid_ref, unsupported_scheme, not_found,
                insecure_file and read_failed. The reason of a failure goes to stderr.
+               References of migrate.* keys print "skipped": only bothy migrate up
+               --bootstrap reads them, in its own container.
                "configuration ok" follows only when every reference resolved.
 --config FILE  configuration file, not empty (default: BOTHY_CONFIG_FILE, else none)
 --role ROLE    process role (api, worker or all) as bothy serve --role sets it
@@ -187,6 +189,12 @@ func checkSecretRefs(ctx context.Context, s *config.Schema, values *config.Value
 		if k.Kind != config.KindSecretRef {
 			continue
 		}
+		if strings.HasPrefix(k.Name, migrateSection) {
+			// Only bothy migrate up --bootstrap reads these; the api and worker containers do
+			// not get their files (docs/DECISIONS.md M1-12).
+			_, _ = fmt.Fprintf(stdout, "secret %s: skipped (read only by bothy migrate up --bootstrap)\n", k.Name)
+			continue
+		}
 		if _, _, err := p.Resolve(ctx, values.String(k.Name)); err != nil {
 			ok = false
 			_, _ = fmt.Fprintf(stdout, "secret %s: %s\n", k.Name, secrets.ErrorCode(err))
@@ -197,6 +205,10 @@ func checkSecretRefs(ctx context.Context, s *config.Schema, values *config.Value
 	}
 	return ok
 }
+
+// migrateSection prefixes the keys of bothy migrate; check --secrets does not resolve their
+// references (checkSecretRefs).
+const migrateSection = "migrate."
 
 // flagGiven reports whether the command line set the flag, also to an empty value.
 func flagGiven(fs *flag.FlagSet, name string) bool {
