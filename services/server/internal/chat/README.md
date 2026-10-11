@@ -1,11 +1,16 @@
 # Module `chat`
 
-Status: planned (M0). This directory contains no code yet. The normative source is
-[docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
+Status: skeleton (M1-05). The port package exists; interfaces and use cases come with the tickets of the milestone.
+The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
 
 Spaces, sidebar state, channels with behavior, skills, project binding, DM participants, forum tags, threads with thread sequence.
+
+## Code
+
+- `internal/chat` (`doc.go`): port as the root package, so far only with a package comment. Interfaces, DTOs and In-Tx events come with the ticket that implements them.
+- `domain/`, `app/` and `adapters/<kind>/` are created with the first use case. `tools/archgen` generates their components from `architecture/modules.yaml`; a package outside these layers fails `make arch`.
 
 ## Port (root package `internal/chat`)
 

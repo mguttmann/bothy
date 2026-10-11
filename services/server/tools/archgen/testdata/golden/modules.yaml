@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+# Golden register of TestGenerateGolden: every kind of entry the generator renders. Platform
+# packages and vendor groups are deliberately not sorted; the output sorts them.
+version: 1
+exclude: [tools, third_party]
+kernel:
+  core: [ids, clock, errs]
+  ports: [actor, txn, eventlog]
+platform:
+  jobs: {depends_on: [pg], vendors: [river]}
+  pg: {vendors: [pgx]}
+wire: {vendors: [otel]}
+cmd: {vendors: [otel]}
+api: {vendors: [oapi]}
+testsupport: {paths: [test, perf]}
+modules:
+  identity:
+    tables: [users, sessions]
+    actions: [user.read, session.create]
+    events: [user.created]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: []
+    adapter_vendors: [pgx]
+  chat:
+    tables: [spaces, channels]
+    actions: [space.read, channel.create]
+    events: [channel.created]
+    ephemeral_events: [channel.typing]
+    ws_ops: [typing.start]
+    depends_on: [identity]
+    adapter_vendors: [pgx, otel]
+  agents:
+    tables: [agents]
+    actions: [agent.config.read]
+    events: [agent.created]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [identity, chat]
+    adapter_vendors: [oapi]
+vendors:
+  river: [github.com/riverqueue/river, github.com/riverqueue/river/**]
+  pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]
+  otel: [go.opentelemetry.io/otel, go.opentelemetry.io/otel/**]
+  oapi: [github.com/oapi-codegen/runtime]
