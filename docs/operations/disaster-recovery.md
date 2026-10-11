@@ -34,9 +34,16 @@ automatische Wiederherstellungstest misst die Dauer bei jedem Lauf.
 ### Fall B: Host verloren
 
 1. Neuen Host bereitstellen (gleiches OpenTofu-Modul oder neue VM), gleiche `BOTHY_VERSION`.
-2. Secrets-Bündel entschlüsseln und nach `infra/compose/secrets/` legen; `secrets-init` übernimmt
-   die Dateien statt neue zu erzeugen. Gleicher Token-Pepper und gleiche Signierschlüssel heißen:
-   Tokens und Geräte bleiben gültig.
+2. Secrets-Bündel entschlüsseln und nach `infra/compose/secrets/` legen
+   (`age --decrypt -i <schlüsseldatei> bundle.age | tar -x -C infra/compose/secrets/`);
+   `secrets-init` übernimmt die Dateien statt neue zu erzeugen. Besteht das Volume `secrets`
+   schon (etwa nach einem ersten Start, der neue Werte erzeugt hat), bricht `secrets-init` bei
+   abweichenden erzeugten Werten ab; dann übernimmt
+   `docker compose run --rm secrets-init secrets init --source /input --target /run/bothy/secrets --owner server=65532:65532 --owner migrate=65532:65532 --adopt-source`
+   die Werte des Bündels. Meldet `secrets-init` die Einträge als `adopted` oder `updated`, die
+   entschlüsselten erzeugten Dateien aus `infra/compose/secrets/` löschen: `_store` hält sie,
+   und die Quelle braucht nur die gelieferten. Gleicher Token-Pepper und gleiche Signierschlüssel
+   heißen: Tokens und Geräte bleiben gültig.
 3. `docker compose up -d secrets-init postgres backup`, dann Restore aus repo2 nach
    [backup-restore.md](backup-restore.md) 5.2 ab Schritt 4 (Ziel: letzter Stand).
 4. Objekte aus restic zurückspielen.

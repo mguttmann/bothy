@@ -219,6 +219,34 @@ danach neu; so wirkt eine Rotation ohne Neustart. Werte erscheinen nie in Logs, 
 Fehlermeldungen oder Ereignissen. `env:` ist erlaubt, aber nicht empfohlen: Umgebungsvariablen
 erben Kindprozesse und Absturzberichte.
 
+Regeln des Providers (`internal/platform/secrets`, Entscheidungen M1-09 in
+[DECISIONS.md](../DECISIONS.md)):
+
+1. Grammatik: `file:` mit absolutem Pfad in sauberer Form (kein `.` oder `..`, kein doppelter oder
+   abschließender `/`, kein NUL-Zeichen), `env:` mit einem Namen aus `[A-Z_][A-Z0-9_]*`; `azkv`
+   und `awssm` meldet M1 als nicht unterstützt. `<secrets.dir>` steht im Verweis für den
+   wirksamen Wert von `secrets.dir`, im Standardwert wie in einem gesetzten Wert.
+2. Datei-Treiber: Er folgt Symlinks und liest nur eine reguläre Datei mit Modus `0400` oder
+   `0600`, deren Besitzer der Prozessbenutzer ist (SEC-SEC-1); geprüft wird an der geöffneten
+   Datei, damit sie zwischen Prüfung und Lesen nicht wechseln kann. Genau ein Zeilenende am
+   Schluss (`\n` oder `\r\n`) gehört nicht zum Wert, weil `echo wert > datei` der übliche Weg ist,
+   eine Datei anzulegen, und ein Zeilenende nie Teil eines Passworts ist. Eine danach leere Datei
+   gilt als nicht gefunden.
+3. Env-Treiber: Er liest die Umgebung, die der Prozess beim Start bekommen hat; eine fehlende oder
+   leere Variable gilt als nicht gefunden.
+4. Cache: Je Verweis gilt ein gelesener Wert höchstens `secrets.cache_ttl` lang; danach liest der
+   Provider neu, und eine neue Version wirkt ab diesem Zugriff. Gleichzeitige Zugriffe auf einen
+   abgelaufenen Verweis lesen einmal. Eine Uhr, die vor dem Lesezeitpunkt steht, gilt als
+   abgelaufen.
+5. Scheitert das erste Lesen, bricht der Start ab ([02-architektur.md](02-architektur.md) 14.4).
+   Scheitert ein erneutes Lesen, bleibt der alte Wert; der Provider schreibt eine Logzeile mit
+   `error.type` (nur der Fehlercode), erhöht `bothy.secrets.refresh.failures` (Alarm
+   `BothySecretRefreshFailing`) und versucht es nach einer weiteren `secrets.cache_ttl` erneut.
+6. Fehler nennen den Verweis und die verletzte Regel (bei Dateien Modus und Besitzer), nie den
+   Inhalt; den Text eines ungültigen Verweises nennen sie nicht, weil dort ein Geheimnis stehen
+   kann. Fehlercodes: `invalid_ref`, `unsupported_scheme`, `not_found`, `insecure_file`,
+   `read_failed`.
+
 Fehlt ein Verweis bei einem Schlüssel `*_ref`, gilt `file:<secrets.dir>/<name>` mit dem Namen aus
 dem Katalog in der Konfigurationsreferenz (Abschnitt "Geheimnisse"). Die Kapiteltabellen schreiben
 diesen Standard aus. "leer" steht nur bei Geheimnissen ohne Katalogeintrag, die zu einer
@@ -257,14 +285,43 @@ brauchen neue Schlüssel ohne Handgriff auf dem Host.
    sieht trotzdem nur sein Unterverzeichnis.
 5. `secrets-init` gibt am Ende die Fingerabdrücke aus, nie die Werte, und erinnert an die
    Hinterlegung (5.4). Katalogeinträge, deren Erzeuger eine spätere Etappe baut, meldet es als
-   `pending` (Konfigurationsreferenz, Abschnitt "Geheimnisse").
+   `pending` (Konfigurationsreferenz, Abschnitt "Geheimnisse"). Je Eintrag steht eine Zeile
+   `<status> <name> <fingerabdruck>` auf der Standardausgabe mit dem Status `generated`,
+   `adopted`, `kept`, `updated`, `missing` (gelieferter Eintrag fehlt) oder `pending`; der
+   Fingerabdruck ist `sha256:` mit den ersten zwölf Hex-Zeichen des SHA-256 des Inhalts (bei einem
+   Verzeichnis-Eintrag des SHA-256 der sortierten Zeilen `<relativer pfad> <sha256 der datei>`),
+   bei `missing` und `pending` fehlt er. Exitcodes: `0` Erfolg, `1` Laufzeitfehler, Konflikt oder
+   ein zweiter gleichzeitiger Lauf auf demselben Volume, `2` Aufruffehler (unbekannte oder nicht
+   reguläre Datei der Quelle, gelieferte Datei ohne Wert, vorhandenes Ziel mit Dateien, aber ohne
+   `_store`, ungültiger oder unbekannter `--owner`, fehlender `--owner` für `server` oder
+   `migrate`, `--adopt-source` ohne `--source`). Scheitert
+   eine Prüfung, schreibt `secrets-init` nichts. Die letzte Zeile nennt den Export-Befehl mit dem
+   `_store` des Laufs (5.4).
 
 ### 5.4 Hinterlegung (Escrow)
 
 Ohne einige Geheimnisse ist eine Sicherung wertlos. Der Owner exportiert sie nach jeder Änderung
-verschlüsselt (`bothy secrets export --age-recipient <öffentlicher Schlüssel>`) und bewahrt das
+verschlüsselt (`bothy secrets export --from <_store> --age-recipient <öffentlicher Schlüssel>`,
+Aufruf im Compose-Stack unten) und bewahrt das
 Bündel getrennt vom Server und getrennt vom Off-site-Ziel auf. Das Bündel enthält `_store/` und den
-Schlüsselspeicher `secrets.signing_key_dir`.
+Schlüsselspeicher `secrets.signing_key_dir`; den Schlüsselspeicher nimmt der Export mit M1-32 auf,
+das die Signierschlüssel erzeugt.
+
+Aufruf im Compose-Stack, ohne Konfigurationsdatei und ohne Datenbank:
+
+```sh
+docker compose run --rm -T secrets-init secrets export \
+  --from /run/bothy/secrets/_store --age-recipient age1... > bundle.age
+```
+
+`--age-recipient` darf mehrfach stehen (jeder Empfänger kann entschlüsseln); `--armor` schreibt
+ASCII statt Binärdaten, ohne `--armor` verweigert der Export die Ausgabe auf ein Terminal.
+`--output <datei>` legt eine neue Datei mit Modus `0600` an und überschreibt nie. Das Bündel ist
+ein tar-Archiv mit den relativen Namen des Katalogs, entschlüsselt also genau die Ablage von
+`infra/compose/secrets/`, die `secrets-init` übernimmt; Dateien ohne Katalogeintrag in `--from`
+lehnt der Export darum mit Exitcode 2 ab, statt ein Bündel zu schreiben, das die Wiederherstellung
+später verweigert. Die letzte Zeile von `secrets init` nennt diesen Aufruf mit dem `_store` des
+Laufs.
 
 | Geheimnis | Folge bei Verlust |
 |---|---|
@@ -581,8 +638,8 @@ Die Kennzahl `bothy.storage.volume.free` warnt rechtzeitig (Alarm `BothyVolumeFu
 | `server.public_url` | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](08-identitaet.md), Abschnitte 7.2 und 7.3) |
 | `server.trusted_proxies` | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](19-sicherheit.md), SEC-TLS-1) |
 | `server.maintenance_mode` | `off` | `off` oder `read_only` (Umzug, Upgrade; [ADR 0065](../adr/0065-wartungsmodus-read-only.md)) |
-| `secrets.dir` | `/run/bothy/secrets` | Basis der Standardverweise `file:` |
-| `secrets.cache_ttl` | `5m` | so lange gilt ein gelesenes Geheimnis |
+| `secrets.dir` | `/run/bothy/secrets` | Basis der Standardverweise `file:`; absoluter Pfad in sauberer Form (kein `.` oder `..`, kein doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, sonst scheitert `bothy config check` |
+| `secrets.cache_ttl` | `5m` | so lange gilt ein gelesenes Geheimnis; mindestens `1s` |
 | `secrets.signing_key_dir` | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) |
 | `server.tls_cert_ref` | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) |
 | `server.tls_key_ref` | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` |

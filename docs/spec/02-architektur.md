@@ -93,10 +93,10 @@ nennen nur Befehle von hier.
 | `bothy serve --role=api\|worker\|all` | Server starten | dieses Kapitel |
 | `bothy migrate up\|status\|validate` | Migrationen des Domänenschemas (goose) und der River-Tabellen (rivermigrate); legt beim ersten Lauf die Zeile `instance` an (über den Port des Moduls `instance`), setzt `instance.schema_version` und `instance.min_server_version`; legt die ersten Partitionen von `event_log` an (03) | ADR 0007, [16-betrieb.md](16-betrieb.md) |
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | Einrichtung: erster Owner per Server-Befehl (Systemaktion `instance.bootstrap`), Einladungs-Code zur Wiederherstellung | [08-identitaet.md](08-identitaet.md) |
-| `bothy config check\|print` | Konfiguration prüfen, redigiert ausgeben | Abschnitt 13 |
+| `bothy config check\|print` | Konfiguration prüfen, redigiert ausgeben; `check --secrets` löst zusätzlich jeden Verweis `*_ref` über den Secret-Provider auf und nennt je Schlüssel nur `ok` oder den Fehlercode | Abschnitt 13 |
 | `bothy import discord ...` | Import und Lese-Spiegel über die Import-API (`import.apply`) | [22-import-migration.md](22-import-migration.md) |
 | `bothy restore finalize` | nach einer Wiederherstellung: neue Sync-Epoche, Cursor auf `head_seq`, Audit | [16-betrieb.md](16-betrieb.md), [03-datenmodell.md](03-datenmodell.md) 6.7 |
-| `bothy secrets init\|export` | Geheimnisse anlegen und sichern | [16-betrieb.md](16-betrieb.md) |
+| `bothy secrets init\|export` | Geheimnisse anlegen und sichern: `init --target DIR [--source DIR] [--owner DIENST=UID:GID ...] [--adopt-source]` gleicht die Ablage `_store/` mit der Quelle ab und kopiert je Dienst; `export --from DIR --age-recipient SCHLÜSSEL [--age-recipient ...] [--output DATEI\|-] [--armor]` schreibt das age-verschlüsselte Bündel; beide lesen nur ihre Flags, ohne Konfigurationsdatei und Datenbank | [16-betrieb.md](16-betrieb.md) 5.3, 5.4 |
 | `bothy healthcheck --url` | Gesundheitsprüfung für Container ohne Shell gegen den internen Listener | [16-betrieb.md](16-betrieb.md) |
 | `bothy files rescan` | Wartung: Dateien erneut prüfen lassen | [12-dateien.md](12-dateien.md) |
 | `bothy telemetry pseudonym` | Pseudonym eines Prinzipals für die Fehlersuche des Owners | [../observability/privacy.md](../observability/privacy.md) |
@@ -987,7 +987,10 @@ Server lädt.
    umkehrbar (ADR 0011, [16-betrieb.md](16-betrieb.md) 5.1).
 3. **Geheimnisse** nur als Verweis in Schlüsseln mit Endung `_ref` (z. B. `database.password_ref`). Der
    Secret-Provider löst sie beim Start auf. Werte erscheinen nie in Logs, Fehlertexten oder
-   `bothy config print` (dort steht nur der Verweis; `bothy config` löst nichts auf).
+   `bothy config print` (dort steht nur der Verweis; nur `bothy config check --secrets` löst auf
+   und nennt je Schlüssel `ok` oder den Fehlercode). Der Provider entsteht nur in `internal/wire`
+   und `cmd/bothy`; Module bekommen Werte über ihre `Config` oder eine enge Schnittstelle und lesen
+   weder Dateien noch Umgebung selbst.
 4. **Prüfung beim Start, fail fast:** unbekannte Schlüssel und unbekannte `BOTHY_`-Variablen
    brechen ab (Tippfehler sind sonst still; Ausnahmen in [16-betrieb.md](16-betrieb.md) 5.1);
    Typen und Bereiche; Querbedingungen. Querbedingungen heute: `http.max_json_body_bytes` echt
@@ -996,10 +999,14 @@ Server lädt.
    `server.internal_listen_addr` und `server.listen_addr` teilen keinen Port außer `0`, wenn ihre
    Hosts gleich sind oder einer der Hosts leer, `0.0.0.0` oder `::` ist (auch mit IPv6-Zone; eine
    IPv4-gemappte IPv6-Adresse zählt als ihre IPv4-Adresse). Port `0` darf doppelt vorkommen, weil
-   Tests Port 0 binden. Die Regel "Identitäts-Header nur mit Loopback-Listener" ist keine
-   Konfigurationsprüfung, weil der Treiber eine Einstellung des Owners in der Datenbank ist; sie
-   gilt bei der Bereitschaft ([16-betrieb.md](16-betrieb.md) 4.3). Meldungen nennen Schlüssel und
-   Quelle, nie den Wert.
+   Tests Port 0 binden. Dazu prüft der Lader eine Regel für einen einzelnen Schlüssel, die kein
+   Typ ausdrückt: `secrets.dir` ist ein absoluter Pfad in sauberer Form (kein `.` oder `..`, kein
+   doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, wie ihn der
+   Secret-Provider verlangt; ein falscher Wert ist ein Problem von `secrets.dir` allein, nicht der
+   Verweise, die `<secrets.dir>` nutzen. Die Regel "Identitäts-Header nur mit Loopback-Listener"
+   ist keine Konfigurationsprüfung, weil der Treiber eine Einstellung des Owners in der Datenbank
+   ist; sie gilt bei der Bereitschaft ([16-betrieb.md](16-betrieb.md) 4.3). Meldungen nennen
+   Schlüssel und Quelle, nie den Wert.
 5. **Typisiert je Modul.** Jedes Modul und jedes Plattform-Paket hat eine eigene `Config`-Struktur
    im eigenen Paket; `internal/wire` füllt sie aus `platform/config` (Bindung über Struktur-Tags).
    Module lesen nie Umgebungsvariablen. Ein Schlüssel kommt mit dem Ticket ins Schema, das seinen
@@ -1008,8 +1015,11 @@ Server lädt.
 6. **Kein Nachladen im Betrieb** außer Geheimnis-Rotation (Signierschlüssel, Webhook-Geheimnisse),
    die der Secret-Provider meldet. Grund: Vorhersagbares Verhalten; halb übernommene Grenzen sind
    schwerer zu diagnostizieren als ein Neustart.
-7. `bothy config check` führt Schritte 2 bis 4 aus, ohne zu starten. `bothy config print` zeigt die
-   wirksamen Werte mit Quelle je Schlüssel.
+7. `bothy config check` führt Schritte 2 bis 4 aus, ohne zu starten, und schreibt je Schlüssel
+   `*_ref`, dessen wirksamer Verweis `env:` nutzt, eine Warnung auf die Standardfehlerausgabe; mit
+   `--secrets` löst es zusätzlich jeden Verweis `*_ref` über den Secret-Provider auf (Zeile
+   `secret <schlüssel>: ok` oder `secret <schlüssel>: <fehlercode>`, Exitcode 1, wenn einer
+   scheitert). `bothy config print` zeigt die wirksamen Werte mit Quelle je Schlüssel.
 
 ## 14. Fehler- und Timeout-Strategie
 

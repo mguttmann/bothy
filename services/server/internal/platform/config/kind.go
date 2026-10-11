@@ -421,6 +421,10 @@ var envVariablePattern = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 // etappe; the reference is well formed, this server version just has no driver for it.
 const errSchemeUnsupported = "scheme not supported by this server version"
 
+// checkSecretRef checks the grammar of a secret reference. A file: path must be absolute and
+// clean and must not contain NUL, the same grammar secrets.ParseRef applies (ruling M1-09/5): a
+// reference that bothy config check accepts must not fail later in the provider, and an unclean
+// path ("/a/../b") would name another file than an operator reading it expects.
 func checkSecretRef(text string) error {
 	scheme, rest, ok := strings.Cut(text, ":")
 	if !ok || scheme == "" {
@@ -428,8 +432,13 @@ func checkSecretRef(text string) error {
 	}
 	switch scheme {
 	case "file":
-		if !path.IsAbs(rest) {
+		switch {
+		case !path.IsAbs(rest):
 			return errors.New("file reference must be an absolute path")
+		case strings.ContainsRune(rest, 0):
+			return errors.New("file reference must not contain a NUL character")
+		case path.Clean(rest) != rest:
+			return errors.New("file reference must be a clean path without . or .. elements and without repeated or trailing slashes")
 		}
 	case "env":
 		if !envVariablePattern.MatchString(rest) {
@@ -462,6 +471,26 @@ func envReference(ref string) (string, bool) {
 		return "", false
 	}
 	return name, true
+}
+
+// checkSecretsDir checks secrets.dir: an absolute path in clean form (path.Clean leaves it as it
+// is), not the root directory (file:<secrets.dir>/x would become file://x), without NUL and
+// without "<", so an expanded reference never holds a placeholder again. The texts never quote
+// the value.
+func checkSecretsDir(dir string) error {
+	switch {
+	case !path.IsAbs(dir):
+		return errors.New("must be an absolute path")
+	case strings.ContainsRune(dir, 0):
+		return errors.New("must not contain a NUL character")
+	case dir == "/":
+		return errors.New("must not be the root directory")
+	case strings.Contains(dir, "<"):
+		return errors.New("must not contain <")
+	case path.Clean(dir) != dir:
+		return errors.New("must be a clean path without . or .. elements and without repeated or trailing slashes")
+	}
+	return nil
 }
 
 func checkURL(text string) error {

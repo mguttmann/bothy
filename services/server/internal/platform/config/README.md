@@ -1,6 +1,6 @@
 # Paket `platform/config`
 
-Status: gebaut (M1-07). Normativ sind
+Status: gebaut (M1-07), Verweise erweitert (M1-09). Normativ sind
 [02-architektur.md](../../../../../docs/spec/02-architektur.md) "Konfigurationsladen",
 [16-betrieb.md](../../../../../docs/spec/16-betrieb.md) "Konfiguration (ADR 0011)" und die
 [Konfigurationsreferenz](../../../../../docs/operations/configuration.md) Abschnitte 1 bis 3; bei
@@ -61,9 +61,18 @@ nicht hierher.
    einen Datei-Schlüssel ohne Schlüsselform nur mit seiner Zeile, und Pfade oder Namen mit
    Steuerzeichen stehen in Anführungszeichen.
 7. Geheimnisse stehen nur als Verweis in Schlüsseln mit Endung `_ref` (Art `secret_ref`). Dieses
-   Paket prüft nur die Form; aufgelöst wird nichts. Ein Verweis `env:` nennt weder
-   `BOTHY_CONFIG_FILE` noch eine Variable in der Form einer Schlüssel-Variable. Platzhalter
-   `<schlüssel>` gelten nur in Standardwerten von `secret_ref`-Schlüsseln.
+   Paket prüft nur die Form; aufgelöst wird nichts. Ein Verweis `file:` nennt einen absoluten,
+   bereinigten Pfad (kein Element `.` oder `..`, kein doppelter und kein abschließender
+   Schrägstrich, kein NUL), dieselbe Regel wie im Secret-Provider (`internal/platform/secrets`),
+   damit `bothy config check` und der Start dieselben Verweise annehmen. Ein Verweis `env:` nennt
+   weder `BOTHY_CONFIG_FILE` noch eine Variable in der Form einer Schlüssel-Variable. In
+   Standardwerten von `secret_ref`-Schlüsseln steht `<schlüssel>` für den wirksamen Wert eines
+   String-Schlüssels; in gesetzten Werten aus Datei und Umgebung wird nur `<secrets.dir>` ersetzt,
+   mit dem wirksamen Wert von `secrets.dir` (M1-09). Eingesetzter Text wird nicht erneut
+   durchsucht. Ein Problem des ersetzten Texts beginnt mit `after expanding <secrets.dir>:`; hat
+   `secrets.dir` selbst ein Problem, meldet der Verweis kein zweites. `secrets.dir` prüft der
+   Lader selbst (Regel, die keine Art ausdrückt, M1-09/15): absolut, sauber, nicht `/`, ohne NUL
+   und ohne `<`.
 8. Das Paket liest nie die Prozess-Umgebung. `cmd/bothy` liest sie einmal und übergibt sie; eine
    forbidigo-Regel in `.golangci.yml` verbietet die Lesefunktionen (auch `exec.Cmd.Environ` und
    `http.ProxyFromEnvironment`) außerhalb von `cmd/bothy` und der Tests unter `tools/`.

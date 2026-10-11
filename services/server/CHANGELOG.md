@@ -65,6 +65,24 @@ documented in this file. The format is based on
 - `tools/configschema`: exports the configuration schema to `architecture/config-schema.json`
   (`go generate ./tools/configschema`, held current by `make codegen-check`), the input of the
   configuration reference.
+- `internal/platform/secrets`: secret provider for references `file:<path>` and `env:<NAME>`
+  (`azkv` and `awssm` parse but are not supported yet). The file driver reads only regular files
+  with mode `0400` or `0600` owned by the process user and strips one trailing line end; the env
+  driver reads the environment the process started with. Values are cached for
+  `secrets.cache_ttl`, re-read after it, and a failed re-read keeps the previous value, logs once
+  per TTL and counts `bothy.secrets.refresh.failures`. Secrets live in `secrets.Value`, which
+  renders as `[redacted]` in every format, log and JSON output; errors name the reference, never
+  the content.
+- `internal/platform/secrets/stack` with `bothy secrets init` (creates missing secrets, adopts
+  supplied ones, copies them into one directory per Compose service with the owner and mode of
+  each service, idempotently, and prints fingerprints only) and `bothy secrets export` (writes
+  the secret store as an age-encrypted tar bundle, optionally ASCII armored).
+- `bothy config check --secrets`: resolves every `*_ref` key through the provider and prints `ok`
+  or the error code per key; `bothy config check` warns on stderr about every `*_ref` key that
+  uses an `env:` reference.
+- Configuration keys `secrets.dir` (an absolute clean path other than `/`, without `<`) and
+  `secrets.cache_ttl` (at least `1s`); the placeholder `<secrets.dir>` is expanded in configured
+  `*_ref` values as well, and `file:` references must be clean absolute paths.
 
 ### Changed
 

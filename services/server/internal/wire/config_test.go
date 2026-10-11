@@ -38,6 +38,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"egress.allowed_hosts":        {Kind: config.KindStringList, Default: "", Chapter: "19-sicherheit.md"},
 		"egress.timeout":              {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "19-sicherheit.md"},
 		"egress.max_response_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "19-sicherheit.md"},
+		"secrets.dir":                 {Kind: config.KindString, Default: "/run/bothy/secrets", Chapter: "16-betrieb.md"},
+		"secrets.cache_ttl":           {Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: "16-betrieb.md"},
 	}
 	if len(got) != len(want) {
 		t.Errorf("schema has %d keys, want %d", len(got), len(want))
@@ -237,6 +239,67 @@ func TestJSONLimitAboveMessage(t *testing.T) {
 			t.Errorf("%s vs %s: problems %v, want\n%s", c.json, c.message, got, want)
 		}
 		noValues(t, got, c.json, c.message)
+	}
+}
+
+// TestSecretsDirCleanAbsolute holds that bothy config check rejects every secrets.dir the secret
+// provider rejects (absolute and clean like a file: reference, not the root, without NUL and
+// "<"): the loader checks the key itself (docs/DECISIONS.md M1-09/15), so config check reports
+// what the start would.
+func TestSecretsDirCleanAbsolute(t *testing.T) {
+	t.Parallel()
+	const (
+		notAbsolute = "must be an absolute path"
+		hasNUL      = "must not contain a NUL character"
+		isRoot      = "must not be the root directory"
+		hasAngle    = "must not contain <"
+		notClean    = "must be a clean path without . or .. elements and without repeated or trailing slashes"
+	)
+	cases := []struct {
+		dir, want string
+	}{
+		{"/run/bothy/secrets", ""},
+		{"/srv/bothy-secrets", ""},
+		{"", notAbsolute},
+		{"run/bothy/secrets", notAbsolute},
+		{"./secrets", notAbsolute},
+		{"/", isRoot},
+		{"/run/bothy/\x00secrets", hasNUL},
+		{"/run/<secrets.dir>", hasAngle},
+		{"/run/bothy/secrets/", notClean},
+		{"/run//bothy/secrets", notClean},
+		{"/run/bothy/./secrets", notClean},
+		{"/run/bothy/../secrets", notClean},
+	}
+	for _, c := range cases {
+		got := load(t, "BOTHY_SECRETS__DIR="+c.dir)
+		if c.want == "" {
+			if got != nil {
+				t.Errorf("secrets.dir %q: problems %v, want none", c.dir, got)
+			}
+			continue
+		}
+		want := "config: secrets.dir: " + c.want + " (source: env BOTHY_SECRETS__DIR)"
+		if len(got) != 1 || got[0].String() != want {
+			t.Errorf("secrets.dir %q: problems %v, want\n%s", c.dir, got, want)
+		}
+		if c.dir != "" && c.dir != "/" {
+			noValues(t, got, c.dir)
+		}
+	}
+}
+
+// TestSecretsCacheTTLAtLeastOneSecond holds the lower bound of secrets.cache_ttl
+// (docs/DECISIONS.md M1-09/24): with 0 every call would read the secret, and while a refresh
+// fails every call would log a line and count a failure instead of one per TTL.
+func TestSecretsCacheTTLAtLeastOneSecond(t *testing.T) {
+	t.Parallel()
+	if got := load(t, "BOTHY_SECRETS__CACHE_TTL=1s"); got != nil {
+		t.Errorf("1s: problems %v, want none", got)
+	}
+	got := load(t, "BOTHY_SECRETS__CACHE_TTL=0s")
+	if want := "config: secrets.cache_ttl: must be at least 1s (source: env BOTHY_SECRETS__CACHE_TTL)"; len(got) != 1 || got[0].String() != want {
+		t.Errorf("0s: problems %v, want\n%s", got, want)
 	}
 }
 

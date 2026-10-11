@@ -24,7 +24,9 @@ func TestRunWithoutArgumentsPrintsUsageAndExits2(t *testing.T) {
 	if stdout.Len() != 0 {
 		t.Errorf("stdout = %q, want empty", stdout.String())
 	}
-	want := usageHeader + "  config  Check or print the configuration without starting the server\n"
+	want := usageHeader +
+		"  config   Check or print the configuration without starting the server\n" +
+		"  secrets  Create the secrets of the Compose stack or export them encrypted\n"
 	if stderr.String() != want {
 		t.Errorf("stderr = %q, want %q", stderr.String(), want)
 	}

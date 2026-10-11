@@ -4,6 +4,8 @@
 .env.*
 !.env.example
 tools/sonarqube/.env
+# Supplied secrets and decrypted escrow bundles of the Compose stack (docs/spec/16-betrieb.md 5.3)
+infra/compose/secrets/
 
 # Tool caches and build outputs of the repository gates
 .cache/

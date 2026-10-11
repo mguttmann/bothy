@@ -55,8 +55,7 @@ func dispatch(ctx context.Context, table []command, args, env []string, stdout, 
 		return exitUsage
 	}
 	name := args[0]
-	switch name {
-	case "help", "-h", "--help":
+	if isHelpArg(name) {
 		writeUsage(stdout, table)
 		return exitOK
 	}
@@ -69,6 +68,12 @@ func dispatch(ctx context.Context, table []command, args, env []string, stdout, 
 	_, _ = fmt.Fprintf(stderr, "bothy: unknown command %q\n", name)
 	writeUsage(stderr, table)
 	return exitUsage
+}
+
+// isHelpArg reports whether a command or subcommand word asks for help: "help", "-h" or "--help".
+// bothy, bothy config and bothy secrets accept the same three words, so they are spelled here once.
+func isHelpArg(arg string) bool {
+	return arg == "help" || arg == "-h" || arg == "--help"
 }
 
 // writeUsage prints the usage text with the commands of table sorted by name. It sorts a copy

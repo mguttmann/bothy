@@ -118,7 +118,9 @@ Als Fehler mit Sicherheitsbezug behandeln: Eine Route hat ohne ihre Rechteprüfu
 `correlation_id` und dem Routen-Muster lesen; die betroffene Version nicht weiter ausrollen.
 
 ### bothysecretrefreshfailing
-Der Server nutzt weiter den alten Wert. Datei im Secret-Provider prüfen: vorhanden, Modus `0400`
+Der Server nutzt weiter den alten Wert. Welcher Verweis scheitert, zeigt
+`docker compose exec api bothy config check --secrets` (je Schlüssel `ok` oder der Fehlercode);
+die Logzeile nennt nur den Fehlercode. Datei im Secret-Provider prüfen: vorhanden, Modus `0400`
 oder `0600`, Besitzer der Dienstbenutzer (SEC-SEC-1). Bis zur Behebung wirkt eine Rotation nicht.
 
 ### bothymalwarescanfailing

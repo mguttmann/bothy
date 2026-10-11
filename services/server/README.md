@@ -1,8 +1,10 @@
 # services/server
 
-Status: Gerüst (M1-05) mit Konfiguration (M1-07). Das Go-Modul baut; jedes Modul aus 02 existiert
-als Port-Paket, die Kernel-Pakete `ids`, `clock` und `errs` und das Plattform-Paket `config` mit
-`bothy config check|print` sind fertig, und `make arch` hält die Modulgrenzen aus dem Register.
+Status: Gerüst (M1-05) mit Konfiguration (M1-07) und Secret-Provider (M1-09). Das Go-Modul baut;
+jedes Modul aus 02 existiert als Port-Paket, die Kernel-Pakete `ids`, `clock` und `errs`, das
+Plattform-Paket `config` mit `bothy config check|print` und das Plattform-Paket
+[`secrets`](internal/platform/secrets/README.md) mit `bothy secrets init|export` sind fertig, und
+`make arch` hält die Modulgrenzen aus dem Register.
 Normativ ist [docs/spec/02-architektur.md](../../docs/spec/02-architektur.md); bei Abweichung gilt
 das Kapitel.
 
@@ -26,7 +28,7 @@ der Überblick.
 | `bothy serve --role=all` | beides in einem Prozess (Standard) |
 | `bothy migrate up\|status\|validate` | Migrationen (goose, rivermigrate); nie implizit beim Start |
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | Einrichtung, erster Owner, Einladungs-Code (08-identitaet.md) |
-| `bothy config check\|print` | Konfiguration prüfen und redigiert ausgeben |
+| `bothy config check\|print` | Konfiguration prüfen (mit `--secrets` auch jeden Verweis auflösen) und redigiert ausgeben |
 | `bothy import discord ...` | Import und Lese-Spiegel über die API (22-import-migration.md) |
 | `bothy restore finalize` | nach einer Wiederherstellung: neue Sync-Epoche (16-betrieb.md) |
 | `bothy secrets init\|export` | Geheimnisse anlegen und sichern (16-betrieb.md) |
