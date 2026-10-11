@@ -3,6 +3,9 @@ rules:
   - id: bothy-go-route-registration
     languages: [go]
     severity: ERROR
+    paths:
+      # Test code, which Semgrep's built-in ignore list skipped before .semgrepignore existed.
+      exclude: ["*_test.go", "test/", "tests/", "testsuite/"]
     message: >-
       Register HTTP routes only through the project router, which requires the
       x-authz-action of every route (docs/spec/05-actions.md rule 3, ADR 0017).

@@ -154,6 +154,7 @@ processors:
       - bothy.close.code
       - bothy.correlation_id
       - bothy.decision
+      - bothy.egress.purpose
       - bothy.event.durability
       - bothy.event.seq
       - bothy.event.type

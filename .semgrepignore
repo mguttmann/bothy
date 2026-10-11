@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Files `semgrep scan` skips (make semgrep). Without this file Semgrep uses a built-in list that
+# also skips test code (`test/`, `tests/`, `testsuite/`, `*_test.go`); then the rule
+# bothy-go-tls-verify, which holds for tests too (docs/spec/19-security.md SEC-TLS-4), would
+# never see a test. This file repeats the built-in list of Semgrep 1.180.0 without the test
+# paths; rules that cover only production code exclude test paths in their own `paths`.
+# Semgrep scans only files tracked by git, so ignored local content needs no entry here.
+
+# Version control
+.git
+.svn
+_darcs
+
+# Build outputs and vendored code
+build/
+vendor/
+dist/
+*.min.js
+.env/
+.tox/
+
+# Package managers
+node_modules/
+.npm/
+.yarn/
+.venv/
+_opam/
+_build/
+_cargo/

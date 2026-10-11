@@ -141,6 +141,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 	env := []string{"BOTHY_CONFIG_FILE=" + path, "BOTHY_MESSAGE__MAX_CONTENT_BYTES=2048"}
 	code, stdout, stderr := runConfig(t, wire.ConfigSchema, env, "print", "--role", "worker")
 	want := "# configuration file: " + path + "\n" +
+		"egress.allowed_hosts =   # default\n" +
+		"egress.max_response_bytes = 1048576  # default\n" +
+		"egress.timeout = 15s  # default\n" +
 		"http.max_json_body_bytes = 1048576  # default\n" +
 		"message.max_content_bytes = 2048  # env BOTHY_MESSAGE__MAX_CONTENT_BYTES\n" +
 		"server.internal_listen_addr = 127.0.0.1:8081  # default\n" +

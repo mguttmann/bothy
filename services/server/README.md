@@ -138,7 +138,7 @@ Technology without domain logic; only `adapters/`, `wire` and `cmd` may import i
 | `otel` | telemetry setup, encapsulated `gen_ai.*` attributes (R-Telemetrie) |
 | `health` | `/healthz` and `/readyz` on the internal listener `server.internal_listen_addr` (L2) |
 | `lifecycle` | start order and shutdown per role (02, section 15) |
-| `egress` | client for outgoing calls with deadlines and limits (19-security.md) |
+| [`egress`](internal/platform/egress/README.md) | the only client for outgoing HTTP connections: target allow list, IP check at connection setup, checked redirects, deadlines and size limits, loopback client for the health check (19-security.md, section 8; built in M1-22) |
 | `buildinfo` | version of the server as a constant equal to `VERSION` (18-release.md) |
 
 ## Rules that the gate enforces

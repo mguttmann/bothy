@@ -12,6 +12,7 @@ kernel:
   ports: [actor, authorize, txn, eventlog, auditing, idempotency, personaldata, measure]
 platform:                   # <name>: {depends_on: [<platform names>], vendors: [<vendor groups>]}
   config: {depends_on: [], vendors: [yaml]}
+  egress: {depends_on: [], vendors: []}
 wire: {vendors: []}
 cmd: {vendors: []}
 # api: {vendors: [...]}     # added by M1-17 together with api/

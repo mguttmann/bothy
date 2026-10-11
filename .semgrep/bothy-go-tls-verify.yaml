@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+rules:
+  - id: bothy-go-tls-verify
+    languages: [go]
+    severity: ERROR
+    message: >-
+      Outgoing TLS always verifies certificate and host name
+      (docs/spec/19-security.md SEC-TLS-4); InsecureSkipVerify may only be the literal
+      false. A test with its own certificate passes it as a root (egress.Deps.RootCAs,
+      x509.CertPool) instead. This rule has no exception, also not for tests.
+    pattern-either:
+      - patterns:
+          - pattern: 'tls.Config{..., InsecureSkipVerify: $V, ...}'
+          - pattern-not: 'tls.Config{..., InsecureSkipVerify: false, ...}'
+      - patterns:
+          - pattern: $C.InsecureSkipVerify = $V
+          - pattern-not: $C.InsecureSkipVerify = false

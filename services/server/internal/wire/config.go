@@ -14,6 +14,7 @@ var configKeyGroups = []func() []config.Key{
 	serverConfigKeys,
 	httpConfigKeys,
 	messagingConfigKeys,
+	egressConfigKeys,
 }
 
 // ConfigSchema builds the configuration schema of the server: every key of configKeyGroups and
