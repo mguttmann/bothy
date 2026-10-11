@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Negative fixture: updateThing is in neither section.
+version: 1
+enabled:
+  - createThing
+  - getThing
+later: []

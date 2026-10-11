@@ -7208,7 +7208,7 @@ paths:
                       channel_id: 0192f4a0-7b1c-72d4-8bae-7661d2b2f203
                       name: Monitoring alerts
                       created_at: '2026-10-10T09:30:00.000Z'
-                    url: /api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/iwt_V1StGXR8Z5jdHi6B
+                    url: /api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/iwt_EXAMPLEStGXR8Z5jdH
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -19954,7 +19954,7 @@ components:
       required: true
       schema:
         type: string
-        examples: [iwt_V1StGXR8Z5jdHi6B]
+        examples: [iwt_EXAMPLEStGXR8Z5jdH]
     ThreadIdPath:
       name: thread_id
       in: path
@@ -25352,7 +25352,7 @@ components:
           type: string
           description: Full URL including the token. Shown once.
           examples:
-          - /api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/iwt_V1StGXR8Z5jdHi6B
+          - /api/v1/hooks/0192f4a0-7b1c-7000-8a00-000000000901/iwt_EXAMPLEStGXR8Z5jdH
     IncomingWebhookList:
       type: object
       required: [items]

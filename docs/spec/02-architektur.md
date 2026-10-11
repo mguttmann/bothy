@@ -425,7 +425,7 @@ Geräteschlüsseln, DPoP-Beweisen und echter Anmeldung). Nur `_test.go`-Dateien 
 Test (`go list -deps ./cmd/bothy`) hält sie aus dem Binary. `test/**` und `perf/**` bilden die
 Komponente `testsupport` (7.1): Sie darf alles nutzen, keine Produktions-Komponente darf sie nutzen,
 und die Abdeckung je Go-Modul (`quality.coverage.go_min_percent`, 23) zählt sie nicht mit, weil sie
-selbst Testcode ist. Fachliche Teilbereiche eines Moduls
+selbst Testcode ist; ebenso wenig erzeugte Dateien (`*.gen.go`). Fachliche Teilbereiche eines Moduls
 (OIDC, Flags, Konsole) sind Dateien oder Unterpakete von `domain`, `app` und `adapters`, nie
 eigene Pakete daneben; ein Paket ohne Komponente scheitert im Gate (7.1).
 

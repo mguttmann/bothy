@@ -20,6 +20,11 @@ import pytest
         (["sdk/typescript/src/x.ts"], ["sdk-typescript"]),
         (["plugins/hermes-adapter/x.py"], ["plugins"]),
         (["docs/api/openapi.yaml"], ["apps", "plugins", "sdk-python", "sdk-typescript", "server"]),
+        # The server generates its route table and action catalogue from the action catalogue
+        # (services/server/api/generate.go); `make catalog` also rewrites chapter 05.
+        (["docs/spec/actions.yaml"], ["server"]),
+        (["docs/spec/actions.yaml", "docs/spec/05-aktionen.md"], ["server"]),
+        (["docs/spec/05-aktionen.md"], []),
         (["docs/spec/07-rechte.md", "infra/compose/compose.yaml", "README.md"], []),
         (["Makefile"], ["all"]),
         (["tools/ci/check_runners.py"], ["all"]),

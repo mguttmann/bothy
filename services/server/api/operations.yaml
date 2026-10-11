@@ -1,0 +1,914 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Enable list of REST operations (plan decision P-04). The server generates and registers only
+# the operations under `enabled`; every other operationId under `paths` of docs/api/openapi.yaml
+# stands under `later` with the etappe that builds it. A handler ticket moves its operationIds
+# from `later` to `enabled` and implements them in its module's adapters/httpapi. Format, rules
+# and how to regenerate: services/server/api/README.md. The generator (api/routes/gen) only
+# checks this file; it never rewrites it.
+version: 1
+enabled: []          # operationIds that have a handler; sorted ascending
+later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id
+  - operation_id: abortUpload
+    etappe: M3
+    ticket: M3-03
+  - operation_id: ackAgentEvents
+    etappe: M2
+    ticket: M2-07
+  - operation_id: addGroupMember
+    etappe: M1
+    ticket: M1-48
+  - operation_id: addOwner
+    etappe: M1
+    ticket: M1-31
+  - operation_id: addReaction
+    etappe: M1
+    ticket: M1-59
+  - operation_id: addStatusIncidentUpdate
+    etappe: M7
+    ticket: M7-09
+  - operation_id: answerAutocomplete
+    etappe: M2
+    ticket: M2-17
+  - operation_id: applyImportBatch
+    etappe: M8
+    ticket: M8-03
+  - operation_id: approveDevice
+    etappe: M1
+    ticket: M1-38
+  - operation_id: approvePairing
+    etappe: M1
+    ticket: M1-38
+  - operation_id: archiveChannel
+    etappe: M1
+    ticket: M1-53
+  - operation_id: archiveSpace
+    etappe: M1
+    ticket: M1-52
+  - operation_id: attachTerminalSession
+    etappe: M2
+    ticket: M2-44
+  - operation_id: autocompleteCommand
+    etappe: M2
+    ticket: M2-17
+  - operation_id: awaitRunInput
+    etappe: M2
+    ticket: M2-09
+  - operation_id: beginEnrollment
+    etappe: M1
+    ticket: M1-40
+  - operation_id: beginIdentityLink
+    etappe: M1
+    ticket: M1-41
+  - operation_id: beginOidcLogin
+    etappe: M1
+    ticket: M1-41
+  - operation_id: beginPairing
+    etappe: M1
+    ticket: M1-38
+  - operation_id: beginPasskeyLogin
+    etappe: M1
+    ticket: M1-40
+  - operation_id: beginPasskeyRegistration
+    etappe: M1
+    ticket: M1-40
+  - operation_id: bindAgentSession
+    etappe: M2
+    ticket: M2-12
+  - operation_id: cancelImport
+    etappe: M8
+    ticket: M8-03
+  - operation_id: cancelRun
+    etappe: M2
+    ticket: M2-09
+  - operation_id: closePrice
+    etappe: M2
+    ticket: M2-22
+  - operation_id: closeTerminalSession
+    etappe: M2
+    ticket: M2-44
+  - operation_id: closeThread
+    etappe: M1
+    ticket: M1-55
+  - operation_id: completeEnrollment
+    etappe: M1
+    ticket: M1-40
+  - operation_id: completeIdentityLink
+    etappe: M1
+    ticket: M1-41
+  - operation_id: completeImport
+    etappe: M8
+    ticket: M8-03
+  - operation_id: completeOidcLogin
+    etappe: M1
+    ticket: M1-41
+  - operation_id: completePairing
+    etappe: M1
+    ticket: M1-38
+  - operation_id: completePasskeyLogin
+    etappe: M1
+    ticket: M1-40
+  - operation_id: completePasskeyRegistration
+    etappe: M1
+    ticket: M1-40
+  - operation_id: completeStepUpWithDeviceKey
+    etappe: M1
+    ticket: M1-35
+  - operation_id: completeStepUpWithPasskey
+    etappe: M1
+    ticket: M1-40
+  - operation_id: completeUpload
+    etappe: M3
+    ticket: M3-03
+  - operation_id: confirmHost
+    etappe: M2
+    ticket: M2-41
+  - operation_id: createAgent
+    etappe: M1
+    ticket: M1-51
+  - operation_id: createAgentWebhookSubscription
+    etappe: M2
+    ticket: M2-26
+  - operation_id: createChannel
+    etappe: M1
+    ticket: M1-53
+  - operation_id: createChannelTemplate
+    etappe: M1
+    ticket: M1-60
+  - operation_id: createDm
+    etappe: V3
+    ticket: V3-01
+  - operation_id: createEnrollmentCode
+    etappe: M1
+    ticket: M1-37
+  - operation_id: createExtensionSession
+    etappe: M1
+    ticket: M1-34
+  - operation_id: createFileTicket
+    etappe: M3
+    ticket: M3-05
+  - operation_id: createForumTag
+    etappe: M1
+    ticket: M1-53
+  - operation_id: createGdprRequest
+    etappe: M7
+  - operation_id: createGrant
+    etappe: M1
+    ticket: M1-48
+  - operation_id: createGroup
+    etappe: M1
+    ticket: M1-48
+  - operation_id: createHost
+    etappe: M2
+    ticket: M2-39
+  - operation_id: createIdentityProvider
+    etappe: M1
+    ticket: M1-36
+  - operation_id: createImport
+    etappe: M8
+    ticket: M8-03
+  - operation_id: createImportFile
+    etappe: M8
+    ticket: M8-03
+  - operation_id: createIncomingWebhook
+    etappe: M2
+    ticket: M2-27
+  - operation_id: createInteraction
+    etappe: M2
+    ticket: M2-15
+  - operation_id: createMessage
+    etappe: M1
+    ticket: M1-56
+  - operation_id: createPersonalTemplate
+    etappe: M1
+    ticket: M1-60
+  - operation_id: createPrice
+    etappe: M2
+    ticket: M2-22
+  - operation_id: createQuietHoursRule
+    etappe: M3
+    ticket: M3-18
+  - operation_id: createSpace
+    etappe: M1
+    ticket: M1-52
+  - operation_id: createStatusComponent
+    etappe: M7
+    ticket: M7-09
+  - operation_id: createStatusIncident
+    etappe: M7
+    ticket: M7-09
+  - operation_id: createStepUpChallenge
+    etappe: M1
+    ticket: M1-35
+  - operation_id: createThread
+    etappe: M1
+    ticket: M1-55
+  - operation_id: createToken
+    etappe: M1
+    ticket: M1-44
+  - operation_id: createUpload
+    etappe: M3
+    ticket: M3-03
+  - operation_id: createUser
+    etappe: M1
+    ticket: M1-31
+  - operation_id: createWebhookSubscription
+    etappe: M2
+    ticket: M2-26
+  - operation_id: decideGdprRequest
+    etappe: M7
+  - operation_id: deleteBrandingLogo
+    etappe: M3
+    ticket: M3-10
+  - operation_id: deleteChannelDraft
+    etappe: M1
+    ticket: M1-61
+  - operation_id: deleteFile
+    etappe: M3
+    ticket: M3-08
+  - operation_id: deleteForumTag
+    etappe: M1
+    ticket: M1-53
+  - operation_id: deleteGroup
+    etappe: M1
+    ticket: M1-48
+  - operation_id: deleteIdentityProvider
+    etappe: M1
+    ticket: M1-36
+  - operation_id: deleteMessage
+    etappe: M1
+    ticket: M1-58
+  - operation_id: deleteMyAvatar
+    etappe: M3
+    ticket: M3-10
+  - operation_id: deleteMySetting
+    etappe: M1
+    ticket: M1-61
+  - operation_id: deleteNotificationPreference
+    etappe: M3
+    ticket: M3-18
+  - operation_id: deleteProjectBinding
+    etappe: M2
+    ticket: M2-03
+  - operation_id: deleteQuietHoursRule
+    etappe: M3
+    ticket: M3-18
+  - operation_id: deleteStatusComponent
+    etappe: M7
+    ticket: M7-09
+  - operation_id: deleteTemplate
+    etappe: M1
+    ticket: M1-60
+  - operation_id: deleteThreadDraft
+    etappe: M1
+    ticket: M1-61
+  - operation_id: deleteWebhookSubscription
+    etappe: M2
+    ticket: M2-26
+  - operation_id: disableAgent
+    etappe: M1
+    ticket: M1-51
+  - operation_id: disableUser
+    etappe: M1
+    ticket: M1-45
+  - operation_id: downloadFile
+    etappe: M3
+    ticket: M3-05
+  - operation_id: downloadGdprExport
+    etappe: M7
+  - operation_id: downloadThumbnail
+    etappe: M3
+    ticket: M3-05
+  - operation_id: enableAgent
+    etappe: M1
+    ticket: M1-51
+  - operation_id: enableUser
+    etappe: M1
+    ticket: M1-31
+  - operation_id: explainChannelAccess
+    etappe: M1
+    ticket: M1-49
+  - operation_id: explainSpaceAccess
+    etappe: M1
+    ticket: M1-49
+  - operation_id: exportAuditEvents
+    etappe: M1
+    ticket: M1-50
+  - operation_id: exportChannel
+    etappe: M3
+    ticket: M3-11
+  - operation_id: finishRun
+    etappe: M2
+    ticket: M2-09
+  - operation_id: getAgent
+    etappe: M1
+    ticket: M1-51
+  - operation_id: getAgentTriggerers
+    etappe: M2
+  - operation_id: getApp
+    etappe: M2
+    ticket: M2-24
+  - operation_id: getBrandingLogo
+    etappe: M3
+    ticket: M3-10
+  - operation_id: getChannel
+    etappe: M1
+    ticket: M1-53
+  - operation_id: getChannelBehavior
+    etappe: M2
+    ticket: M2-02
+  - operation_id: getCommand
+    etappe: M2
+    ticket: M2-16
+  - operation_id: getConsumerState
+    etappe: M2
+    ticket: M2-07
+  - operation_id: getCostStats
+    etappe: M6
+    ticket: M6-05
+  - operation_id: getDevice
+    etappe: M1
+    ticket: M1-33
+  - operation_id: getDiscovery
+    etappe: M1
+    ticket: M1-46
+  - operation_id: getErrorStats
+    etappe: M6
+    ticket: M6-05
+  - operation_id: getFile
+    etappe: M3
+    ticket: M3-03
+  - operation_id: getGdprRequest
+    etappe: M7
+  - operation_id: getGrant
+    etappe: M1
+    ticket: M1-48
+  - operation_id: getGroup
+    etappe: M1
+    ticket: M1-48
+  - operation_id: getHost
+    etappe: M2
+    ticket: M2-39
+  - operation_id: getIdentityProvider
+    etappe: M1
+    ticket: M1-36
+  - operation_id: getImport
+    etappe: M8
+    ticket: M8-03
+  - operation_id: getInstance
+    etappe: M1
+    ticket: M1-46
+  - operation_id: getJwks
+    etappe: M1
+    ticket: M1-32
+  - operation_id: getMe
+    etappe: M1
+    ticket: M1-31
+  - operation_id: getMessage
+    etappe: M1
+    ticket: M1-57
+  - operation_id: getMyCredentials
+    etappe: M1
+    ticket: M1-36
+  - operation_id: getMySidebar
+    etappe: M1
+    ticket: M1-61
+  - operation_id: getProblemType
+    etappe: M1
+    ticket: M1-46
+  - operation_id: getPublicStatus
+    etappe: M7
+    ticket: M7-09
+  - operation_id: getPushPreview
+    etappe: M3
+  - operation_id: getRun
+    etappe: M2
+    ticket: M2-05
+  - operation_id: getRunContext
+    etappe: M2
+    ticket: M2-13
+  - operation_id: getRunStats
+    etappe: M6
+    ticket: M6-05
+  - operation_id: getServedChannelConfig
+    etappe: M2
+    ticket: M2-02
+  - operation_id: getSnapshot
+    etappe: M1
+    ticket: M1-63
+  - operation_id: getSpace
+    etappe: M1
+    ticket: M1-52
+  - operation_id: getStatsBackends
+    etappe: M6
+    ticket: M6-14
+  - operation_id: getStatsLive
+    etappe: M6
+    ticket: M6-15
+  - operation_id: getStatsSlo
+    etappe: M6
+    ticket: M6-14
+  - operation_id: getStatsTimeline
+    etappe: M6
+    ticket: M6-14
+  - operation_id: getStatus
+    etappe: M7
+    ticket: M7-09
+  - operation_id: getTerminalSession
+    etappe: M2
+    ticket: M2-44
+  - operation_id: getThread
+    etappe: M1
+    ticket: M1-55
+  - operation_id: getThreadCosts
+    etappe: M2
+    ticket: M2-22
+  - operation_id: getToolCallStats
+    etappe: M6
+    ticket: M6-05
+  - operation_id: getTranscript
+    etappe: M3
+    ticket: M3-05
+  - operation_id: getUpload
+    etappe: M3
+    ticket: M3-03
+  - operation_id: getUsageStats
+    etappe: M6
+    ticket: M6-05
+  - operation_id: getUser
+    etappe: M1
+    ticket: M1-31
+  - operation_id: getUserCredentials
+    etappe: M1
+    ticket: M1-36
+  - operation_id: getWebhookKeys
+    etappe: M2
+    ticket: M2-26
+  - operation_id: handleOidcCallback
+    etappe: M1
+    ticket: M1-41
+  - operation_id: installApp
+    etappe: M2
+    ticket: M2-24
+  - operation_id: invokeCommand
+    etappe: M2
+    ticket: M2-16
+  - operation_id: issueHostPairingCode
+    etappe: M2
+    ticket: M2-41
+  - operation_id: leaveDm
+    etappe: V3
+    ticket: V3-01
+  - operation_id: listActiveRuns
+    etappe: M2
+    ticket: M2-05
+  - operation_id: listAgentSessions
+    etappe: M2
+    ticket: M2-12
+  - operation_id: listAgentWebhookSubscriptions
+    etappe: M2
+    ticket: M2-26
+  - operation_id: listAgents
+    etappe: M1
+    ticket: M1-51
+  - operation_id: listApps
+    etappe: M2
+    ticket: M2-24
+  - operation_id: listAuditEvents
+    etappe: M1
+    ticket: M1-50
+  - operation_id: listChannelCommands
+    etappe: M2
+    ticket: M2-16
+  - operation_id: listChannelThreads
+    etappe: M1
+    ticket: M1-55
+  - operation_id: listEvents
+    etappe: M1
+    ticket: M1-63
+  - operation_id: listFeatureFlags
+    etappe: M1
+    ticket: M1-47
+  - operation_id: listForumTags
+    etappe: M1
+    ticket: M1-53
+  - operation_id: listGdprRequests
+    etappe: M7
+  - operation_id: listGrants
+    etappe: M1
+    ticket: M1-48
+  - operation_id: listGroupMembers
+    etappe: M1
+    ticket: M1-48
+  - operation_id: listGroups
+    etappe: M1
+    ticket: M1-48
+  - operation_id: listHosts
+    etappe: M2
+    ticket: M2-39
+  - operation_id: listIdentityProviders
+    etappe: M1
+    ticket: M1-36
+  - operation_id: listImportItems
+    etappe: M8
+    ticket: M8-03
+  - operation_id: listImports
+    etappe: M8
+    ticket: M8-03
+  - operation_id: listIncomingWebhooks
+    etappe: M2
+    ticket: M2-27
+  - operation_id: listInstanceSettings
+    etappe: M1
+    ticket: M1-46
+  - operation_id: listMessageRevisions
+    etappe: M1
+    ticket: M1-58
+  - operation_id: listMyDevices
+    etappe: M1
+    ticket: M1-33
+  - operation_id: listMyDms
+    etappe: V3
+    ticket: V3-01
+  - operation_id: listMyDrafts
+    etappe: M1
+    ticket: M1-61
+  - operation_id: listMyMentions
+    etappe: M1
+    ticket: M1-60
+  - operation_id: listMyNotificationPreferences
+    etappe: M3
+    ticket: M3-18
+  - operation_id: listMyQuietHours
+    etappe: M3
+    ticket: M3-18
+  - operation_id: listMyReadStates
+    etappe: M1
+    ticket: M1-61
+  - operation_id: listMySessions
+    etappe: M1
+    ticket: M1-34
+  - operation_id: listMySettings
+    etappe: M1
+    ticket: M1-61
+  - operation_id: listMyTemplates
+    etappe: M1
+    ticket: M1-60
+  - operation_id: listOwners
+    etappe: M1
+    ticket: M1-31
+  - operation_id: listPins
+    etappe: M1
+    ticket: M1-59
+  - operation_id: listPrices
+    etappe: M2
+    ticket: M2-22
+  - operation_id: listReactions
+    etappe: M1
+    ticket: M1-59
+  - operation_id: listRunSteps
+    etappe: M2
+    ticket: M2-05
+  - operation_id: listServedChannels
+    etappe: M2
+    ticket: M2-02
+  - operation_id: listSpaceChannels
+    etappe: M1
+    ticket: M1-53
+  - operation_id: listSpaces
+    etappe: M1
+    ticket: M1-52
+  - operation_id: listTemplates
+    etappe: M1
+    ticket: M1-60
+  - operation_id: listTerminalSessions
+    etappe: M2
+    ticket: M2-44
+  - operation_id: listThreadMessages
+    etappe: M1
+    ticket: M1-57
+  - operation_id: listThreadRuns
+    etappe: M2
+    ticket: M2-05
+  - operation_id: listTokens
+    etappe: M1
+    ticket: M1-44
+  - operation_id: listUserDevices
+    etappe: M1
+    ticket: M1-33
+  - operation_id: listUserSessions
+    etappe: M1
+    ticket: M1-34
+  - operation_id: listUsers
+    etappe: M1
+    ticket: M1-31
+  - operation_id: listWebhookDeliveries
+    etappe: M2
+    ticket: M2-26
+  - operation_id: listWebhookSubscriptions
+    etappe: M2
+    ticket: M2-26
+  - operation_id: loginWithPassword
+    etappe: M1
+    ticket: M1-39
+  - operation_id: loginWithTrustedHeader
+    etappe: M1
+    ticket: M1-43
+  - operation_id: logout
+    etappe: M1
+    ticket: M1-34
+  - operation_id: markThreadUnread
+    etappe: M1
+    ticket: M1-61
+  - operation_id: moveChannel
+    etappe: M1
+    ticket: M1-53
+  - operation_id: moveForumTag
+    etappe: M1
+    ticket: M1-53
+  - operation_id: moveSpace
+    etappe: M1
+    ticket: M1-52
+  - operation_id: moveThread
+    etappe: M1
+    ticket: M1-62
+  - operation_id: openTerminalSession
+    etappe: M2
+    ticket: M2-44
+  - operation_id: pairHost
+    etappe: M2
+    ticket: M2-41
+  - operation_id: patchRun
+    etappe: M2
+    ticket: M2-10
+  - operation_id: pauseImport
+    etappe: M8
+    ticket: M8-03
+  - operation_id: pinMessage
+    etappe: M1
+    ticket: M1-59
+  - operation_id: pollAgentEvents
+    etappe: M2
+    ticket: M2-07
+  - operation_id: postIncomingWebhook
+    etappe: M2
+    ticket: M2-27
+  - operation_id: previewGrant
+    etappe: M1
+    ticket: M1-49
+  - operation_id: putChannelBehavior
+    etappe: M2
+    ticket: M2-02
+  - operation_id: putChannelDraft
+    etappe: M1
+    ticket: M1-61
+  - operation_id: putFeatureFlag
+    etappe: M1
+    ticket: M1-47
+  - operation_id: putInstanceSetting
+    etappe: M1
+    ticket: M1-46
+  - operation_id: putMySetting
+    etappe: M1
+    ticket: M1-61
+  - operation_id: putMySidebarSpace
+    etappe: M1
+    ticket: M1-52
+  - operation_id: putNotificationPreference
+    etappe: M3
+    ticket: M3-18
+  - operation_id: putProjectBinding
+    etappe: M2
+    ticket: M2-03
+  - operation_id: putQuietHoursRule
+    etappe: M3
+    ticket: M3-18
+  - operation_id: putReadState
+    etappe: M1
+    ticket: M1-61
+  - operation_id: putThreadDraft
+    etappe: M1
+    ticket: M1-61
+  - operation_id: reconcileCosts
+    etappe: M2
+    ticket: M2-28
+  - operation_id: redeemEnrollmentCode
+    etappe: M1
+    ticket: M1-37
+  - operation_id: redeliverWebhook
+    etappe: M2
+    ticket: M2-26
+  - operation_id: refreshToken
+    etappe: M1
+    ticket: M1-34
+  - operation_id: registerCommand
+    etappe: M2
+    ticket: M2-16
+  - operation_id: registerPush
+    etappe: M3
+    ticket: M3-22
+  - operation_id: removeCommand
+    etappe: M2
+    ticket: M2-16
+  - operation_id: removeGroupMember
+    etappe: M1
+    ticket: M1-48
+  - operation_id: removeReaction
+    etappe: M1
+    ticket: M1-59
+  - operation_id: reopenThread
+    etappe: M1
+    ticket: M1-55
+  - operation_id: reportAgentSession
+    etappe: M2
+    ticket: M2-12
+  - operation_id: requestTranscription
+    etappe: M3
+    ticket: M3-09
+  - operation_id: resetAgentSession
+    etappe: M2
+    ticket: M2-12
+  - operation_id: respondToInteraction
+    etappe: M2
+    ticket: M2-15
+  - operation_id: resumeApp
+    etappe: M2
+  - operation_id: resumeRun
+    etappe: M2
+    ticket: M2-09
+  - operation_id: revokeDevice
+    etappe: M1
+    ticket: M1-45
+  - operation_id: revokeGrant
+    etappe: M1
+    ticket: M1-48
+  - operation_id: revokeIncomingWebhook
+    etappe: M2
+    ticket: M2-27
+  - operation_id: revokeOwner
+    etappe: M1
+    ticket: M1-31
+  - operation_id: revokePasskey
+    etappe: M1
+    ticket: M1-40
+  - operation_id: revokeSession
+    etappe: M1
+    ticket: M1-45
+  - operation_id: revokeToken
+    etappe: M1
+    ticket: M1-44
+  - operation_id: rotateSigningKey
+    etappe: M1
+    ticket: M1-32
+  - operation_id: search
+    etappe: M3
+    ticket: M3-14
+  - operation_id: searchThreadTitles
+    etappe: M3
+    ticket: M3-14
+  - operation_id: sendHeartbeat
+    etappe: M2
+    ticket: M2-20
+  - operation_id: setAgentBillingMode
+    etappe: M1
+    ticket: M1-51
+  - operation_id: setAgentToolClass
+    etappe: M1
+    ticket: M1-51
+  - operation_id: setAllAgentsBillingMode
+    etappe: M1
+    ticket: M1-51
+  - operation_id: setAppScopes
+    etappe: M2
+    ticket: M2-24
+  - operation_id: setChannelOperator
+    etappe: M1
+    ticket: M1-54
+  - operation_id: setChannelReadOnly
+    etappe: M8
+    ticket: M8-05
+  - operation_id: setCredentialHolder
+    etappe: M1
+    ticket: M1-51
+  - operation_id: setHostLlmCredentials
+    etappe: M2
+    ticket: M2-40
+  - operation_id: setHostState
+    etappe: M2
+    ticket: M2-39
+  - operation_id: setImportCursor
+    etappe: M8
+    ticket: M8-03
+  - operation_id: setImportLead
+    etappe: M8
+    ticket: M8-03
+  - operation_id: setMyAvatar
+    etappe: M3
+    ticket: M3-10
+  - operation_id: setMyLocalCredential
+    etappe: M1
+    ticket: M1-39
+  - operation_id: setSpaceOperator
+    etappe: M1
+    ticket: M1-54
+  - operation_id: setThreadTags
+    etappe: M1
+    ticket: M1-55
+  - operation_id: setThreadTitle
+    etappe: M1
+    ticket: M1-55
+  - operation_id: startImport
+    etappe: M8
+    ticket: M8-03
+  - operation_id: startRun
+    etappe: M2
+    ticket: M2-09
+  - operation_id: submitClientMetrics
+    etappe: M4
+    ticket: M4-31
+  - operation_id: submitCostReconciliation
+    etappe: M2
+    ticket: M2-28
+  - operation_id: submitTranscript
+    etappe: M3
+    ticket: M3-09
+  - operation_id: suspendApp
+    etappe: M2
+  - operation_id: uninstallApp
+    etappe: M2
+    ticket: M2-24
+  - operation_id: unlinkIdentity
+    etappe: M1
+    ticket: M1-36
+  - operation_id: unpinMessage
+    etappe: M1
+    ticket: M1-59
+  - operation_id: unregisterPush
+    etappe: M3
+    ticket: M3-22
+  - operation_id: updateAgent
+    etappe: M1
+    ticket: M1-51
+  - operation_id: updateBranding
+    etappe: M1
+    ticket: M1-46
+  - operation_id: updateChannel
+    etappe: M1
+    ticket: M1-53
+  - operation_id: updateCommand
+    etappe: M2
+    ticket: M2-16
+  - operation_id: updateComponent
+    etappe: M2
+    ticket: M2-15
+  - operation_id: updateForumTag
+    etappe: M1
+    ticket: M1-53
+  - operation_id: updateGroup
+    etappe: M1
+    ticket: M1-48
+  - operation_id: updateHost
+    etappe: M2
+    ticket: M2-39
+  - operation_id: updateIdentityProvider
+    etappe: M1
+    ticket: M1-36
+  - operation_id: updateMessage
+    etappe: M1
+    ticket: M1-58
+  - operation_id: updateMyProfile
+    etappe: M1
+    ticket: M1-31
+  - operation_id: updateSpace
+    etappe: M1
+    ticket: M1-52
+  - operation_id: updateStatusComponent
+    etappe: M7
+    ticket: M7-09
+  - operation_id: updateTemplate
+    etappe: M1
+    ticket: M1-60
+  - operation_id: updateUser
+    etappe: M1
+    ticket: M1-31
+  - operation_id: updateWebhookSubscription
+    etappe: M2
+    ticket: M2-26
+  - operation_id: upgradeAppManifest
+    etappe: M2
+    ticket: M2-24
+  - operation_id: uploadBrandingLogo
+    etappe: M3
+    ticket: M3-10
+  - operation_id: uploadPart
+    etappe: M3
+    ticket: M3-03
+  - operation_id: validateManifest
+    etappe: M2
+    ticket: M2-24
+  - operation_id: verifyAuditChain
+    etappe: M1
+    ticket: M1-50
+  - operation_id: viewAsUser
+    etappe: M1
+    ticket: M1-49

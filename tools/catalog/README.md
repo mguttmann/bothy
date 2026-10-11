@@ -16,8 +16,13 @@ und 7 von [Kapitel 05](../../docs/spec/05-aktionen.md) und die Listen `authz_act
 | `make catalog-check` | Gate: alle Regeln unten (`action_catalog.py check`); das Skript endet bei einem Befund mit Exit 1 und schreibt eine Zeile je Befund nach stderr, `make` endet dann mit Exit 2 |
 | `uv run --project tools --locked pytest tools/catalog/tests` | Tests, auch der Ende-zu-Ende-Test mit der gepinnten Redocly CLI (`make bootstrap`) |
 
-Ablauf einer Änderung: `actions.yaml` ändern, `make catalog`, den Diff von 05 und
-`redocly.yaml` mit committen. Eine Handänderung in einem erzeugten Block scheitert im Gate.
+Ablauf einer Änderung: `actions.yaml` ändern, `make catalog`, den Server neu erzeugen
+(`cd services/server && go generate ./api/...`; Routen-Tabelle und Aktionskatalog in `api/routes`
+entstehen aus `actions.yaml`, siehe [services/server/api](../../services/server/api/README.md))
+und die Diffs von 05, `redocly.yaml` und `services/server/api/routes` mit committen. Eine
+Handänderung in einem erzeugten Block scheitert im Gate, ein veralteter Server-Stand in
+`make codegen-check`; CI wählt dafür bei einer Änderung an `actions.yaml` die Komponente
+`server` (`tools/ci/components.py`).
 
 Ein neuer Abschnitt der Aktionen braucht:
 

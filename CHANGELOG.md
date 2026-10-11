@@ -76,6 +76,12 @@ Planning stage (milestone M0). Nothing is installable yet.
   of `bothy config check` and `bothy config print`.
 - CodeQL analyses the Go server module (manual build of `services/server`) in the public
   phase; a test keeps the CodeQL languages in step with the tracked components.
+- `make coverage` leaves generated Go files (`*.gen.go`) out of the Go total, and the license
+  gate requires the Go generated-code marker in every file named as generated Go code; a
+  directory named `gen` no longer counts as generated for the license gate, Sonar and the lint
+  rules gocognit and goconst of the server module.
+- The CI path filter selects the server component for a change to `docs/spec/actions.yaml`,
+  from which the server generates its route table and action catalogue.
 
 ### Fixed
 

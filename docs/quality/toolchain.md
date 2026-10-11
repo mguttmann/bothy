@@ -3,7 +3,8 @@
 Jedes Werkzeug der Gates mit Version, Zweck, Lauf-Ort, Lizenz und Grund. Die Versionen
 in dieser Seite hält ein Test gleich den Pins (`tools/docs/tests/test_toolchain_doc.py`):
 `tools/uv.lock`, `tools/node/package-lock.json`, `tools/bin/tools.lock.json`, `Makefile`,
-`tools/sonarqube/compose.yaml`, `.pre-commit-config.yaml` und die Workflows.
+`tools/sonarqube/compose.yaml`, `.pre-commit-config.yaml`, die Workflows und die
+`tool`-Direktiven der Go-Module unter `services/`.
 
 Lauf-Ort: "lokal" heißt über `make` auf dem Rechner der Entwicklerin, "CI" heißt im
 selben make-Ziel in GitHub Actions. Alle Gate-Werkzeuge laufen an beiden Orten.
@@ -36,6 +37,7 @@ selben make-Ziel in GitHub Actions. Alle Gate-Werkzeuge laufen an beiden Orten.
 | `golangci-lint` | `2.14.0` | Go-Linter-Bündel inklusive gosec und depguard | GPL-3.0 | Standard für Go; Abhängigkeitsregeln der Module (Kapitel 02) |
 | `go-arch-lint` | `1.19.0` | Modulgrenzen der Go-Module aus dem Modulregister | MIT | in 02 "go-arch-lint" an einem Gerüst aller Module geprüft; prüft Pakete und Fremdbibliotheken |
 | `sqlc` | `1.31.1` | typisierter Go-Code aus SQL, Drift-Prüfung | MIT | ADR 0007 |
+| `oapi-codegen` | `v2.8.0` | Go-Server-Schnittstelle und Modelle aus `docs/api/openapi.yaml` (`tool` in `services/server/go.mod`, läuft in `make codegen-check`) | Apache-2.0 | ADR 0013; 06 "Codegenerierung" |
 | `govulncheck` | `v1.8.0` | erreichbare Go-Schwachstellen | BSD-3-Clause | prüft Aufrufgraphen statt nur Versionen |
 | `go-licenses` | `v2.0.1` | Lizenzen gelinkter Go-Pakete | Apache-2.0 | vom Recherche-Ruling gefordert |
 | `lychee` | `0.24.2` | Links und Anker in Markdown | Apache-2.0 OR MIT | prüft Anker in Markdown-Dateien offline |

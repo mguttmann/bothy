@@ -1,5 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Version guard: docs/quality/toolchain.md names exactly the pinned versions."""
+"""Version guard: docs/quality/toolchain.md names exactly the pinned versions.
+
+Sources of pins: the Python and Node locks, tools/bin/tools.lock.json, the Makefile, the
+SonarQube compose file, the pre-commit configuration, the workflows and the `tool` directives of
+the Go modules under services/.
+"""
 
 from __future__ import annotations
 
@@ -22,8 +27,51 @@ def doc_versions(section: str) -> dict[str, str]:
     return {m.group("name"): m.group("version") for m in _ROW.finditer(part)}
 
 
+_GO_TOOL = re.compile(r"^\s*(?:tool\s+)?(?P<path>[\w.\-]+(?:/[\w.\-]+)+)\s*$")
+_GO_REQUIRE = re.compile(
+    r"^\s*(?:require\s+)?(?P<module>[\w.\-]+(?:/[\w.\-]+)+)\s+(?P<version>v\S+)"
+)
+
+
+def go_tools() -> dict[str, str]:
+    """Go tools pinned by `tool` directives of the Go modules under services/.
+
+    The name is the last element of the tool's package path, the version that of the longest
+    required module that contains the package (go.mod is the pin, `go tool` runs it).
+    """
+    tools: dict[str, str] = {}
+    for mod in sorted((REPO / "services").glob("*/go.mod")):
+        lines = mod.read_text(encoding="utf-8").splitlines()
+        block = ""
+        paths: list[str] = []
+        modules: dict[str, str] = {}
+        for line in lines:
+            text = line.split("//", 1)[0].rstrip()
+            if text.strip() in ("tool (", "require ("):
+                block = text.split()[0]
+                continue
+            if text.strip() == ")":
+                block = ""
+                continue
+            is_tool = text.startswith("tool ") or block == "tool"
+            is_require = text.startswith("require ") or block == "require"
+            if is_tool and (m := _GO_TOOL.match(text)):
+                paths.append(m.group("path"))
+            elif is_require and (m := _GO_REQUIRE.match(text)):
+                modules[m.group("module")] = m.group("version")
+        for path in paths:
+            owners = [m for m in modules if path == m or path.startswith(m + "/")]
+            assert owners, f"{mod}: tool {path} has no required module"
+            tools[path.rsplit("/", 1)[-1]] = modules[max(owners, key=len)]
+    return tools
+
+
+def test_go_tools_are_read_from_go_mod() -> None:
+    assert go_tools().get("oapi-codegen") == "v2.8.0"
+
+
 def pinned_tools() -> dict[str, str]:
-    pins: dict[str, str] = {}
+    pins: dict[str, str] = dict(go_tools())
     lock = tomllib.loads((REPO / "tools" / "uv.lock").read_text())
     for pkg in lock["package"]:
         pins[pkg["name"].lower()] = pkg["version"]
@@ -81,6 +129,7 @@ def test_every_pinned_gate_tool_is_documented() -> None:
     direct = [re.split(r"[=<>]", d)[0].lower() for d in project["project"]["dependencies"]]
     direct += [re.split(r"[=<>]", d)[0].lower() for d in project["dependency-groups"]["dev"]]
     expected = set(binaries) | set(npm) | {d for d in direct if not d.startswith("types-")}
+    expected |= set(go_tools())
     assert expected - documented == set()
 
 

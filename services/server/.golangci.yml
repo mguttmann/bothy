@@ -87,9 +87,20 @@ linters:
       - path: _test\.go$
         linters: [gocognit, goconst]
       # Generated code, which sonar.exclusions leaves out of the analysis as well (M1-05/7);
-      # tools/ci/tests/test_server_lint_config.py holds both lists together.
-      - path: (\.gen|_gen|\.pb)\.go$|(^|/)(sqlcgen|gen|generated)/
+      # tools/ci/tests/test_server_lint_config.py holds both lists together. A directory named
+      # gen is not generated: the route generator in api/routes/gen is hand-written and checked
+      # like the analysis checks it (docs/DECISIONS.md M1-17/15 and M1-17/31).
+      - path: (\.gen|_gen|\.pb)\.go$|(^|/)(sqlcgen|generated)/
         linters: [gocognit, goconst]
+      # The generated action catalogue copies the column "Recht" of chapter 05 verbatim, which is
+      # German ("Autor"); misspell checks English (docs/DECISIONS.md M1-17/27).
+      - path: ^api/routes/(internal/fixture/routes/)?catalog\.gen\.go$
+        linters: [misspell]
+      # oapi-codegen writes capitalized error strings ("Header parameter ... is required"); only
+      # this check of staticcheck is left out of its output (docs/DECISIONS.md M1-17/27).
+      - path: ^api/(rest|routes/internal/fixture/rest)/rest\.gen\.go$
+        linters: [staticcheck]
+        text: "^ST1005:"
       # Two files of M1-05 that predate both linters; M1-05 owns that code (docs/DECISIONS.md
       # M1-07). Every other file, also new files in tools/archgen, is checked.
       - path: ^tools/archgen/(generate|validate)\.go$

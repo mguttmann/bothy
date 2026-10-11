@@ -56,7 +56,9 @@ CI=true npx -y @asyncapi/cli@6.2.0 generate fromTemplate docs/api/asyncapi.yaml 
    kommt zuerst in `x-problem-codes` am Schema `Problem` und in die Beschreibung der
    Antwort-Komponente, deren `x-status` sein Status ist. Fehlt eine passende Aktion, kommt sie
    zuerst in [docs/spec/actions.yaml](../spec/actions.yaml); `make catalog` erzeugt daraus die
-   Tabellen in 05-aktionen.md und die Listen in redocly.yaml.
+   Tabellen in 05-aktionen.md und die Listen in redocly.yaml. Im selben Commit bekommt die
+   Operation einen Eintrag unter `later` in `services/server/api/operations.yaml`
+   (Freischalt-Liste, PLAN P-04).
 3. Neues Ereignis: Typ und Empfangs-Aktion zuerst in [docs/spec/actions.yaml](../spec/actions.yaml),
    dann `make catalog`; Nutzlast-Schema `<Name>Payload`,
    Ereignis-Schema `<Name>Event` als `allOf` aus `EventEnvelope`, Eintrag in `Event` (dauerhaft),

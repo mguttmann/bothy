@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Fixture enable list of the route generator (format: services/server/api/README.md). Every
+# fixture operation is enabled, so the fixture packages cover the non-empty case.
+version: 1
+enabled:
+  - createThing
+  - getThing
+  - updateThing
+later: []

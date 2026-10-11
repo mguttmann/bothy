@@ -579,6 +579,10 @@ Wunsch je Abo. Zustellung, Wiederholung, Prüfung beim Empfänger und Eingangs-W
    Rahmen-Router schreibt jedes SDK von Hand.
 4. Schemas bleiben konservativ (Lint): kein `null`, keine Typ-Arrays, kein `anyOf`, `oneOf` nur
    mit Diskriminator, wiederholte Enums als benannte Schemas.
+5. Der Go-Server erzeugt nur die Operationen, die die Freischalt-Liste
+   `services/server/api/operations.yaml` unter `enabled` nennt; oapi-codegen läuft dafür auf einer
+   vorgefilterten Kopie dieser Spec, die alle `components` behält (PLAN P-04; Ablauf und Format der
+   Liste in `services/server/api/README.md`).
 
 ## 15. Vertragstests und Gate
 

@@ -43,7 +43,10 @@ Planungsgrundlage nennt River (MPL-2.0) für Hintergrundjobs.
    https://www.apache.org/licenses/LICENSE-2.0.txt, abgerufen 2026-10-10) [belegt].
 2. Jede handgeschriebene Quelldatei trägt `SPDX-License-Identifier: Apache-2.0` in den
    ersten `license.spdx_header_lines` Zeilen; generierter Code ist ausgenommen
-   (`tools/ci/license_check.py`).
+   (`tools/ci/license_check.py`). Eine Go-Datei, die nach ihrem Namen als erzeugt gilt
+   (`*.gen.go`, `*_gen.go`, `*.pb.go`), trägt vor der `package`-Zeile die Markierung
+   `// Code generated ... DO NOT EDIT.`; sonst ist sie ein Befund, damit eine handgeschriebene
+   Datei nicht allein über ihren Namen aus SPDX-Prüfung, Abdeckung und Sonar fällt.
 3. Abhängigkeiten ausgelieferter Komponenten: OSV-Scanner mit `--licenses` und der Liste
    oben über alle Lock-Dateien der Komponente (Go, Dart, Python, npm); OSV-Scanner bezieht
    Lizenzdaten über deps.dev (https://github.com/google/osv-scanner, abgerufen 2026-10-10)
