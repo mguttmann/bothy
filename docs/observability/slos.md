@@ -75,8 +75,10 @@ Die erzeugten Dateien sind eingecheckt und tragen den Kopf "DO NOT EDIT". `make 
 erzeugt sie neu und vergleicht Byte für Byte (Check `sloth`; kein Unterschied erlaubt, und jede
 erzeugte Datei braucht ihre Sloth-Datei), prüft alle Regeln mit `promtool check rules` (Check
 `prometheus-rules`) und die Tabelle in Abschnitt 2 gegen die Sloth-Dateien (Check `slo-docs`:
-Zeilen, Ziel mit einer Nachkommastelle, mit mehr nur, wo eine das Ziel runden würde, Schwelle aus dem `le`-Selektor der Fehler-Abfrage, Alarm
-nach `page_alert.disable`). Am 2026-10-10 lokal mit Sloth v0.16.0 erzeugt und mit `promtool` aus
+rows; Ziel with one decimal, more only where one would round the objective; Schwelle from the
+`le` matcher of the error query in any of the PromQL quotes; Alarm from `page_alert.disable`
+and `ticket_alert.disable`: `Page, Ticket`, `nur Ticket`, `nur Page` or `keine`).
+Am 2026-10-10 lokal mit Sloth v0.16.0 erzeugt und mit `promtool` aus
 Prometheus v3.15.0 geprüft: gültig [belegt].
 
 ## 5. Sichtbarkeit

@@ -89,10 +89,19 @@ Unterverzeichnis des Volumes `secrets`. Umgebungsvariablen tragen nur Endpunkte 
    jede Trace- und Log-Pipeline mit einem Empfänger führt sie aus, und kein Overlay definiert den
    Prozessor oder eine Pipeline der Basis neu.
 
-Die Prüfung läuft auf einer Arbeitskopie: Statt `/run/bothy/secrets` liest sie Platzhalterdateien
-(`telemetry_pseudonym_key` braucht mindestens 32 Byte), Endpunkte ohne Standardwert zeigen auf
-`example.com`, und der Exporter `datadog` bekommt einen festen Hostnamen, damit `validate` nicht
-auf die Hostnamen-Erkennung wartet. Die Metadaten-Abfrage für GCP, die der Exporter trotzdem
+Before any `validate`, a reference to a config provider other than `env`, `file` and `yaml`
+(`${https:...}`, `${s3:...}`), also one inside another reference, is a finding: the collector
+resolves it while it validates, and most of these providers fetch over the network with clients
+that may bypass the closed proxy of the validators. The check runs on a work copy: instead of
+`/run/bothy/secrets` it reads placeholder files (`telemetry_pseudonym_key` needs at least 32
+bytes), and the `datadog` exporter gets a fixed host name, so `validate` does not wait for host
+name detection. It sets only the variables of `COLLECTOR_ENV` in `tools/opscheck/opscheck.py`,
+the ones the overlays use without a default (Azure Monitor, Grafana and Sentry endpoints point at
+`example.com`, the Azure IDs are zero UUIDs). A new overlay that reads a variable without a
+default (`${env:NAME}` instead of `${env:NAME:-<default>}`) needs `NAME` in `COLLECTOR_ENV`;
+otherwise the value is empty and, for an endpoint, `validate` fails (with the `otlphttp`
+exporter: "at least one endpoint must be specified").
+Die Metadaten-Abfrage für GCP, die der Exporter trotzdem
 startet, zeigt über `GCE_METADATA_HOST` auf einen geschlossenen Port von `127.0.0.1`, wie der
 Proxy aller Validatoren ([tools/opscheck](../../tools/opscheck/README.md)). Nur den Collector
 prüfen:

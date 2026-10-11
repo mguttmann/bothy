@@ -162,13 +162,16 @@ mit `promtool` und `amtool` in der Version der Images:
    muss über `rule_files` geladen werden.
 2. `promtool test rules` mit
    [bothy-alerts.test.yaml](../../infra/observability/prometheus/tests/bothy-alerts.test.yaml)
-   (Check `prometheus-rule-tests`): Jeder Alarm aus `bothy-alerts.yaml` feuert in einem Fall,
-   sobald sein `for` abgelaufen ist, mit Labels und Texten, und ist eine Minute vorher still; jeder
-   Alarm mit Schwelle bleibt in einem Fall genau an der Schwelle still. Ein Alarm ohne feuernden
-   Fall lässt den Check scheitern.
+   (check `prometheus-rule-tests`): every alert of `bothy-alerts.yaml` fires in one case at the
+   first evaluation at which it may, with labels and texts: once its `for` has run out, or, for
+   an alert without `for`, as soon as its condition holds. One minute earlier it is still quiet
+   (Watchdog fires from the first evaluation on). Every alert with a threshold stays quiet in one
+   case exactly at the threshold. An alert without a firing case fails the check.
 3. `amtool check-config` und die Wege aus Abschnitt 1 mit `amtool config routes test` (Check
    `alertmanager`): `page` an `external-oncall` und `bothy-ops`, `ticket` an `bothy-ops`,
    `Watchdog` an `external-heartbeat`.
+   Templates are parsed too: every `templates` entry must lie under `/etc/alertmanager/`, where
+   Compose mounts `infra/observability/alertmanager/`, and match a file.
 4. Die Schwellen aus 3.2 gegen die Konfigurationsreferenz (Check `alert-thresholds`). Nennt eine
    Zelle der Spalte "Konfigurationswert" einen Wert der Referenz, muss sie genau `` `<name>` `` oder
    ``über `<name>` `` lauten; jede andere Form ist ein Befund.
