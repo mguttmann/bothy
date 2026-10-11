@@ -1,0 +1,586 @@
+# Unit-Tests der handgeschriebenen Alarme (promtool test rules), geprüft von `make ops-check`
+# (Check `prometheus-rule-tests`). Liegt außerhalb von rules/*.yaml, damit Prometheus diese Datei
+# nie als Regeln lädt.
+#
+# Je Alarm ein Fall, in dem er feuert, sobald sein `for` abgelaufen ist (mit Labels und
+# gerenderten Annotationen; eine Minute vorher ist er noch still), und je Alarm mit Schwelle ein
+# Fall genau an der Schwelle, in dem er nicht feuert. Die feuernden Fälle liegen knapp über der
+# Schwelle; so bricht jede Änderung einer Schwelle oder eines `for` mindestens einen Fall.
+# Zeitstempel-Reihen wie '-93601+60x30' wachsen mit der Uhr der Auswertung (60 s je Minute), so
+# bleibt `time() - wert` über die ganze Reihe konstant.
+
+rule_files:
+  - ../rules/bothy-alerts.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # ---- bothy-pipeline ---------------------------------------------------------------------
+
+  - name: Watchdog fires always
+    interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: Watchdog
+        exp_alerts:
+          - exp_labels:
+              severity: heartbeat
+            exp_annotations:
+              summary: "Alerting pipeline is alive."
+              runbook_url: "docs/observability/alerting.md#watchdog"
+
+  - name: BothyServerTelemetryMissing fires 15 minutes after the last target_info
+    interval: 1m
+    input_series:
+      - series: 'target_info{job="bothy/bothy-server", instance="server-1"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BothyServerTelemetryMissing
+        exp_alerts: []
+      # Letzte Probe bei 10m: ab 20m fehlt sie im Fenster [10m], nach `for: 5m` feuert der Alarm.
+      - eval_time: 24m
+        alertname: BothyServerTelemetryMissing
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: BothyServerTelemetryMissing
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: bothy/bothy-server
+            exp_annotations:
+              summary: "No telemetry from the Bothy server for 10 minutes (server down or export broken)."
+              runbook_url: "docs/observability/alerting.md#bothyservertelemetrymissing"
+
+  - name: BothyServerTelemetryMissing ignores other jobs
+    interval: 1m
+    input_series:
+      - series: 'target_info{job="bothy/bothy-backupd", instance="backup-1"}'
+        values: '1x30'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BothyServerTelemetryMissing
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: bothy/bothy-server
+            exp_annotations:
+              summary: "No telemetry from the Bothy server for 10 minutes (server down or export broken)."
+              runbook_url: "docs/observability/alerting.md#bothyservertelemetrymissing"
+
+  - name: BothyCollectorDown fires after 5 minutes down
+    interval: 1m
+    input_series:
+      - series: 'up{job="otel-collector", instance="otel-collector:8888"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: BothyCollectorDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: BothyCollectorDown
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              job: otel-collector
+              instance: otel-collector:8888
+            exp_annotations:
+              summary: "OpenTelemetry Collector does not answer."
+              runbook_url: "docs/observability/alerting.md#bothycollectordown"
+
+  - name: BothyCollectorDown stays quiet while the collector is up
+    interval: 1m
+    input_series:
+      - series: 'up{job="otel-collector", instance="otel-collector:8888"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BothyCollectorDown
+        exp_alerts: []
+
+  - name: BothyTelemetryExportFailing fires for counters with and without _total
+    interval: 1m
+    input_series:
+      - series: 'otelcol_exporter_send_failed_spans_total{exporter="otlp_http/newrelic"}'
+        values: '0+10x40'
+      - series: 'otelcol_exporter_send_failed_log_records{exporter="otlp_http/sentry"}'
+        values: '0+10x40'
+      - series: 'otelcol_exporter_send_failed_metric_points_total{exporter="otlp_http/grafana"}'
+        values: '0x40'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: BothyTelemetryExportFailing
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: BothyTelemetryExportFailing
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              exporter: otlp_http/newrelic
+            exp_annotations:
+              summary: "Collector exporter otlp_http/newrelic fails to send telemetry."
+              runbook_url: "docs/observability/alerting.md#bothytelemetryexportfailing"
+          - exp_labels:
+              severity: ticket
+              exporter: otlp_http/sentry
+            exp_annotations:
+              summary: "Collector exporter otlp_http/sentry fails to send telemetry."
+              runbook_url: "docs/observability/alerting.md#bothytelemetryexportfailing"
+
+  - name: BothyTelemetryDropped fires while the server drops telemetry
+    interval: 1m
+    input_series:
+      - series: 'bothy_telemetry_dropped_total{job="bothy/bothy-server"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: BothyTelemetryDropped
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: BothyTelemetryDropped
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: "The server drops telemetry because the export queue is full."
+              runbook_url: "docs/observability/alerting.md#bothytelemetrydropped"
+
+  - name: BothyTelemetryDropped stays quiet at threshold 0
+    interval: 1m
+    input_series:
+      - series: 'bothy_telemetry_dropped_total{job="bothy/bothy-server"}'
+        values: '7x40'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BothyTelemetryDropped
+        exp_alerts: []
+
+  # ---- bothy-runtime ----------------------------------------------------------------------
+
+  - name: BothyEventFanoutLag fires just above 5 s (status.fanout_lag_degraded)
+    interval: 1m
+    input_series:
+      - series: 'bothy_event_fanout_lag_seconds{job="bothy/bothy-server", instance="server-1"}'
+        values: '5.001x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: BothyEventFanoutLag
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: BothyEventFanoutLag
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: "Event fan-out lags behind the event log by more than 5 s."
+              runbook_url: "docs/observability/alerting.md#bothyeventfanoutlag"
+
+  - name: BothyEventFanoutLag stays quiet at 5 s
+    interval: 1m
+    input_series:
+      - series: 'bothy_event_fanout_lag_seconds{job="bothy/bothy-server", instance="server-1"}'
+        values: '5x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BothyEventFanoutLag
+        exp_alerts: []
+
+  - name: BothyAgentConsumerLag fires above 1000 events
+    interval: 1m
+    input_series:
+      - series: 'bothy_agent_consumer_lag{job="bothy/bothy-server", bothy_agent_handle="helper"}'
+        values: '1001x20'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: BothyAgentConsumerLag
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: BothyAgentConsumerLag
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              bothy_agent_handle: helper
+            exp_annotations:
+              summary: "Agent helper has more than 1000 unacknowledged events."
+              runbook_url: "docs/observability/alerting.md#bothyagentconsumerlag"
+
+  - name: BothyAgentConsumerLag stays quiet at 1000 events
+    interval: 1m
+    input_series:
+      - series: 'bothy_agent_consumer_lag{job="bothy/bothy-server", bothy_agent_handle="helper"}'
+        values: '1000x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BothyAgentConsumerLag
+        exp_alerts: []
+
+  - name: BothyAgentOffline fires above 300 s without heartbeat
+    interval: 1m
+    input_series:
+      - series: 'bothy_agent_heartbeat_age_seconds{job="bothy/bothy-server", bothy_agent_handle="helper"}'
+        values: '301x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: BothyAgentOffline
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: BothyAgentOffline
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+              bothy_agent_handle: helper
+            exp_annotations:
+              summary: "Agent helper sent no heartbeat for 5 minutes."
+              runbook_url: "docs/observability/alerting.md#bothyagentoffline"
+
+  - name: BothyAgentOffline stays quiet at 300 s
+    interval: 1m
+    input_series:
+      - series: 'bothy_agent_heartbeat_age_seconds{job="bothy/bothy-server", bothy_agent_handle="helper"}'
+        values: '300x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BothyAgentOffline
+        exp_alerts: []
+
+  - name: BothyBillingModeMismatch fires at once on one mismatch
+    interval: 1m
+    input_series:
+      - series: 'bothy_agent_billing_mode_mismatch_total{job="bothy/bothy-server", bothy_agent_handle="helper"}'
+        values: '0 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: BothyBillingModeMismatch
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              bothy_agent_handle: helper
+            exp_annotations:
+              summary: "Agent helper reported a billing mode that differs from its policy."
+              runbook_url: "docs/observability/alerting.md#bothybillingmodemismatch"
+
+  - name: BothyBillingModeMismatch stays quiet without new mismatches
+    interval: 1m
+    input_series:
+      - series: 'bothy_agent_billing_mode_mismatch_total{job="bothy/bothy-server", bothy_agent_handle="helper"}'
+        values: '3x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BothyBillingModeMismatch
+        exp_alerts: []
+
+  - name: BothyAuthzError fires at once with the reason
+    interval: 1m
+    input_series:
+      - series: 'bothy_authz_errors_total{job="bothy/bothy-server", bothy_reason="authz_not_checked"}'
+        values: '0 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BothyAuthzError
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              bothy_reason: authz_not_checked
+            exp_annotations:
+              summary: "Rights check programming error (authz_not_checked): a route answered without its authorize check or an unknown action was checked."
+              runbook_url: "docs/observability/alerting.md#bothyauthzerror"
+
+  - name: BothyAuthzError stays quiet without new errors
+    interval: 1m
+    input_series:
+      - series: 'bothy_authz_errors_total{job="bothy/bothy-server", bothy_reason="unknown_action"}'
+        values: '2x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BothyAuthzError
+        exp_alerts: []
+
+  - name: BothySecretRefreshFailing fires at once
+    interval: 1m
+    input_series:
+      - series: 'bothy_secrets_refresh_failures_total{job="bothy/bothy-server"}'
+        values: '0 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BothySecretRefreshFailing
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: "Re-reading a secret failed; the server keeps the previous value, so a rotation has not taken effect."
+              runbook_url: "docs/observability/alerting.md#bothysecretrefreshfailing"
+
+  - name: BothySecretRefreshFailing stays quiet without new failures
+    interval: 1m
+    input_series:
+      - series: 'bothy_secrets_refresh_failures_total{job="bothy/bothy-server"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BothySecretRefreshFailing
+        exp_alerts: []
+
+  - name: BothyMalwareScanFailing fires when scans only fail
+    interval: 1m
+    input_series:
+      - series: 'bothy_file_scan_total{job="bothy/bothy-server", bothy_outcome="error"}'
+        values: '0+1x40'
+      - series: 'bothy_file_scan_total{job="bothy/bothy-server", bothy_outcome="clean"}'
+        values: '5x40'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: BothyMalwareScanFailing
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: BothyMalwareScanFailing
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: "Malware scanning fails; uploads stay in state pending."
+              runbook_url: "docs/observability/alerting.md#bothymalwarescanfailing"
+
+  - name: BothyMalwareScanFailing fires when no scan ever succeeded
+    interval: 1m
+    input_series:
+      - series: 'bothy_file_scan_total{job="bothy/bothy-server", bothy_outcome="error"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: BothyMalwareScanFailing
+        exp_alerts: []
+      - eval_time: 16m
+        alertname: BothyMalwareScanFailing
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: "Malware scanning fails; uploads stay in state pending."
+              runbook_url: "docs/observability/alerting.md#bothymalwarescanfailing"
+
+  - name: BothyMalwareScanFailing stays quiet while some scans succeed
+    interval: 1m
+    input_series:
+      - series: 'bothy_file_scan_total{job="bothy/bothy-server", bothy_outcome="error"}'
+        values: '0+1x40'
+      - series: 'bothy_file_scan_total{job="bothy/bothy-server", bothy_outcome="infected"}'
+        values: '0+1x40'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BothyMalwareScanFailing
+        exp_alerts: []
+
+  - name: BothyMalwareScanFailing stays quiet without errors
+    interval: 1m
+    input_series:
+      - series: 'bothy_file_scan_total{job="bothy/bothy-server", bothy_outcome="error"}'
+        values: '4x40'
+      - series: 'bothy_file_scan_total{job="bothy/bothy-server", bothy_outcome="clean"}'
+        values: '5x40'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BothyMalwareScanFailing
+        exp_alerts: []
+
+  # ---- bothy-data -------------------------------------------------------------------------
+
+  - name: BothyBackupStale fires above 26 h (backup.max_age)
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="physical"}'
+        values: '-93601+60x30'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: BothyBackupStale
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: BothyBackupStale
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              bothy_backup_kind: physical
+            exp_annotations:
+              summary: "No successful physical backup for more than 26 hours."
+              runbook_url: "docs/observability/alerting.md#bothybackupstale"
+
+  - name: BothyBackupStale stays quiet at 26 h
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_last_success_timestamp_seconds{job="bothy/bothy-backupd", bothy_backup_kind="physical"}'
+        values: '-93600+60x30'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: BothyBackupStale
+        exp_alerts: []
+
+  - name: BothyWalArchiveStale fires above 900 s
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_wal_last_archived_timestamp_seconds{job="bothy/bothy-backupd"}'
+        values: '-901+60x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: BothyWalArchiveStale
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: BothyWalArchiveStale
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: "No WAL segment archived for 15 minutes; point-in-time recovery is at risk."
+              runbook_url: "docs/observability/alerting.md#bothywalarchivestale"
+
+  - name: BothyWalArchiveStale stays quiet at 900 s
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_wal_last_archived_timestamp_seconds{job="bothy/bothy-backupd"}'
+        values: '-900+60x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BothyWalArchiveStale
+        exp_alerts: []
+
+  - name: BothyRestoreTestStale fires above 8 days (backup.restore_test.max_age)
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_restore_test_last_success_timestamp_seconds{job="bothy/bothy-backupd"}'
+        values: '-691201+60x90'
+    alert_rule_test:
+      - eval_time: 59m
+        alertname: BothyRestoreTestStale
+        exp_alerts: []
+      - eval_time: 60m
+        alertname: BothyRestoreTestStale
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: "No successful automatic restore test for more than 8 days."
+              runbook_url: "docs/observability/alerting.md#bothyrestoreteststale"
+
+  - name: BothyRestoreTestStale stays quiet at 8 days
+    interval: 1m
+    input_series:
+      - series: 'bothy_backup_restore_test_last_success_timestamp_seconds{job="bothy/bothy-backupd"}'
+        values: '-691200+60x90'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: BothyRestoreTestStale
+        exp_alerts: []
+
+  - name: BothyAuditChainBroken fires at once
+    interval: 1m
+    input_series:
+      - series: 'bothy_audit_verify_failures_total{job="bothy/bothy-server"}'
+        values: '0 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BothyAuditChainBroken
+        exp_alerts:
+          - exp_labels:
+              severity: page
+            exp_annotations:
+              summary: "Audit log hash chain verification failed."
+              runbook_url: "docs/observability/alerting.md#bothyauditchainbroken"
+
+  - name: BothyAuditChainBroken stays quiet without failures
+    interval: 1m
+    input_series:
+      - series: 'bothy_audit_verify_failures_total{job="bothy/bothy-server"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BothyAuditChainBroken
+        exp_alerts: []
+
+  - name: BothyVolumeFull fires just below 10 percent free
+    interval: 1m
+    input_series:
+      - series: 'bothy_storage_volume_free_bytes{job="bothy/bothy-server", bothy_volume="files"}'
+        values: '9.99x40'
+      - series: 'bothy_storage_volume_size_bytes{job="bothy/bothy-server", bothy_volume="files"}'
+        values: '100x40'
+    alert_rule_test:
+      - eval_time: 29m
+        alertname: BothyVolumeFull
+        exp_alerts: []
+      - eval_time: 30m
+        alertname: BothyVolumeFull
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              bothy_volume: files
+            exp_annotations:
+              summary: "Volume files has less than 10 percent free space."
+              runbook_url: "docs/observability/alerting.md#bothyvolumefull"
+
+  - name: BothyVolumeFull stays quiet at 10 percent free
+    interval: 1m
+    input_series:
+      - series: 'bothy_storage_volume_free_bytes{job="bothy/bothy-server", bothy_volume="files"}'
+        values: '10x40'
+      - series: 'bothy_storage_volume_size_bytes{job="bothy/bothy-server", bothy_volume="files"}'
+        values: '100x40'
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: BothyVolumeFull
+        exp_alerts: []
+
+  - name: BothyDatabaseConnectionsHigh fires just above 80 percent
+    interval: 1m
+    input_series:
+      - series: 'postgresql_backends{job="bothy/otel-collector", postgresql_database_name="bothy"}'
+        values: '80.1x20'
+      - series: 'postgresql_connection_max{job="bothy/otel-collector"}'
+        values: '100x20'
+    alert_rule_test:
+      - eval_time: 14m
+        alertname: BothyDatabaseConnectionsHigh
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: BothyDatabaseConnectionsHigh
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: "PostgreSQL uses more than 80 percent of max_connections."
+              runbook_url: "docs/observability/alerting.md#bothydatabaseconnectionshigh"
+
+  - name: BothyDatabaseConnectionsHigh stays quiet at 80 percent
+    interval: 1m
+    input_series:
+      - series: 'postgresql_backends{job="bothy/otel-collector", postgresql_database_name="bothy"}'
+        values: '80x20'
+      - series: 'postgresql_connection_max{job="bothy/otel-collector"}'
+        values: '100x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BothyDatabaseConnectionsHigh
+        exp_alerts: []
+
+  - name: BothyDatabaseDeadlocks fires at once
+    interval: 1m
+    input_series:
+      - series: 'postgresql_deadlocks_total{job="bothy/otel-collector", postgresql_database_name="bothy"}'
+        values: '0 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: BothyDatabaseDeadlocks
+        exp_alerts:
+          - exp_labels:
+              severity: ticket
+            exp_annotations:
+              summary: "PostgreSQL reported deadlocks; check the lock order rule (03-datenmodell 6.3)."
+              runbook_url: "docs/observability/alerting.md#bothydatabasedeadlocks"
+
+  - name: BothyDatabaseDeadlocks stays quiet without new deadlocks
+    interval: 1m
+    input_series:
+      - series: 'postgresql_deadlocks_total{job="bothy/otel-collector", postgresql_database_name="bothy"}'
+        values: '2x20'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: BothyDatabaseDeadlocks
+        exp_alerts: []

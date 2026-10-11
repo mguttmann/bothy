@@ -84,7 +84,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-tables api-clients \
         runners-check commitlint \
         review labels-check labels-sync tools-lock release-build clean \
-        codegen-check arch register-check migrations-lint migrations-lock perf
+        codegen-check arch register-check migrations-lint migrations-lock perf ops-check
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -120,7 +120,7 @@ gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
 gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint test coverage commitlint \
-       docs linkcheck diagrams catalog-check api-lint api-checks \
+       docs linkcheck diagrams catalog-check api-lint api-checks ops-check \
        api-clients tokens runners-check labels-check gitleaks semgrep trivy osv licenses
 
 # ---- code quality ---------------------------------------------------------------------
@@ -146,7 +146,7 @@ fmt-check: ## Formatting is clean (no changes)
 lint: ## Linters: file hygiene hooks, ruff, bandit, actionlint, zizmor, component linters
 	SKIP=ruff-format,ruff-check,gitleaks-staged $(UVRUN) pre-commit run --all-files --hook-stage pre-commit
 	$(UVRUN) ruff check tools
-	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/bin tools/catalog tools/ci tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/sonarqube
+	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/bin tools/catalog tools/ci tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/opscheck tools/sonarqube
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -337,6 +337,11 @@ api-checks: ## API contract copies equal their sources (06 G2, G3)
 
 api-tables: ## Regenerate the generated tables of chapter 06 and webhooks.md
 	$(UVRUN) python tools/api-checks/api_checks.py generate
+
+ops-check: ## Operations configuration valid with the pinned upstream tools; derived values equal their sources
+	@# Collector, Prometheus, Alertmanager, Loki, Tempo, Sloth and OpenTofu files exist, so there
+	@# is no SKIP; a validator that cannot be fetched fails (tools/opscheck/README.md).
+	$(UVRUN) python tools/opscheck/opscheck.py
 
 api-clients: ## Generated API clients compile (contract: each SDK/app provides `make -C <dir> generate-check`)
 	@found=""; for d in sdk/python sdk/typescript packages/api_client; do \

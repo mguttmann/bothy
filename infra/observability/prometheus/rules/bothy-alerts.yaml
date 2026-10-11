@@ -106,8 +106,11 @@ groups:
           summary: "Re-reading a secret failed; the server keeps the previous value, so a rotation has not taken effect."
           runbook_url: "docs/observability/alerting.md#bothysecretrefreshfailing"
 
+      # `unless` statt `and ... == 0`: Hat noch nie ein Scan ein Ergebnis geliefert, gibt es keine
+      # Reihe clean oder infected; die Summe ist dann leer statt 0 und `and` hätte den Alarm
+      # unterdrückt.
       - alert: BothyMalwareScanFailing
-        expr: sum(rate(bothy_file_scan_total{bothy_outcome="error"}[15m])) > 0 and sum(rate(bothy_file_scan_total{bothy_outcome=~"clean|infected"}[15m])) == 0
+        expr: sum(rate(bothy_file_scan_total{bothy_outcome="error"}[15m])) > 0 unless sum(rate(bothy_file_scan_total{bothy_outcome=~"clean|infected"}[15m])) > 0
         for: 15m
         labels:
           severity: ticket

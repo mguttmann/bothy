@@ -253,7 +253,7 @@ Ein Span lebt nie länger als eine Operation. Eine WebSocket-Verbindung ist kein
 ### 5.3 Attribute in Spans und Logs
 
 Diese Liste ist gleich der Allowlist in [infra/otel/collector.yaml](../../infra/otel/collector.yaml)
-(Bothy-Teil); ein Check hält beide gleich.
+(Bothy-Teil); `make ops-check` hält beide gleich (Check `collector-allowlist`).
 
 | Attribut | Werte | Hinweis |
 |---|---|---|

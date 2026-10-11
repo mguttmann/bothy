@@ -56,6 +56,16 @@ Planning stage (milestone M0). Nothing is installable yet.
   generated table in chapter 06 or `docs/api/webhooks.md`; `make api-tables` regenerates
   these tables. An operation message without `$ref` is a finding, and no input ends in a
   traceback.
+- Operations configuration gate `make ops-check` in `make gates` (`tools/opscheck/`): the
+  OpenTelemetry Collector base alone, with each overlay and with every ordered pair of
+  overlays, the Prometheus configuration, rules and rule unit tests, the Alertmanager
+  configuration and routes, Loki, Tempo and the OpenTofu modules are validated with the
+  pinned upstream tools; generated SLO rules, the SLO table, the collector allowlist, alert
+  thresholds and validator versions are checked against their sources. Seven validators are
+  pinned with sha256 (`otelcol-contrib`, `promtool`, `amtool`, `loki`, `tempo`, `sloth`,
+  `tofu`); `tools/bin/fetch_tools.py` reads zip release assets. Every hand-written alert has
+  `promtool` unit tests. Renovate updates the helper images of the Compose stack in one group
+  "Compose-Images" and leaves their validators to `make tools-lock`.
 
 ### Changed
 
@@ -81,3 +91,5 @@ Planning stage (milestone M0). Nothing is installable yet.
   catalogue; the event table of chapter 06, generated from it, now follows that order too.
 - Chapter 06, section 7: the table of operations without `Idempotency-Key` lists the host
   pairing and terminal session operations that `openapi.yaml` exempts.
+- The alert `BothyMalwareScanFailing` now fires when no malware scan has ever produced a
+  result; before, it stayed silent exactly when the scanner never worked since the start.

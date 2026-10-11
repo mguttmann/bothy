@@ -2,7 +2,7 @@
 
 Status: Entwurf M0. Entscheidung: ADR 0035. Quelle aller Zahlen sind die Sloth-Dateien unter
 [infra/observability/slo/](../../infra/observability/slo/); die Tabelle unten gibt sie wieder.
-Ein Check vergleicht Tabelle und Dateien (Bau-Ticket "SLO-Docs-Check").
+`make ops-check` vergleicht Tabelle und Dateien (Check `slo-docs`).
 
 ## 1. Grundsätze
 
@@ -62,14 +62,22 @@ Ein Alarm feuert nur, wenn beide Fenster über der Schwelle liegen.
 
 ## 4. Erzeugen und prüfen
 
+Nach einer Änderung an einer Sloth-Datei die Regeln mit dem gepinnten Sloth neu erzeugen und das
+Gate laufen lassen:
+
 ```
-sloth generate -i infra/observability/slo/api.yaml -o infra/observability/prometheus/rules/slo-api.yaml
-promtool check rules infra/observability/prometheus/rules/*.yaml
+sloth=$(uv run --project tools --locked --quiet python tools/bin/fetch_tools.py path sloth)
+"$sloth" generate --no-log -i infra/observability/slo/api.yaml -o infra/observability/prometheus/rules/slo-api.yaml
+make ops-check
 ```
 
-Die erzeugten Dateien sind eingecheckt und tragen den Kopf "DO NOT EDIT". Ein Check erzeugt sie
-neu und vergleicht (kein Unterschied erlaubt). Am 2026-10-10 lokal mit Sloth v0.16.0 erzeugt und
-mit `promtool` aus Prometheus v3.15.0 geprüft: gültig [belegt].
+Die erzeugten Dateien sind eingecheckt und tragen den Kopf "DO NOT EDIT". `make ops-check`
+erzeugt sie neu und vergleicht Byte für Byte (Check `sloth`; kein Unterschied erlaubt, und jede
+erzeugte Datei braucht ihre Sloth-Datei), prüft alle Regeln mit `promtool check rules` (Check
+`prometheus-rules`) und die Tabelle in Abschnitt 2 gegen die Sloth-Dateien (Check `slo-docs`:
+Zeilen, Ziel mit einer Nachkommastelle, mit mehr nur, wo eine das Ziel runden würde, Schwelle aus dem `le`-Selektor der Fehler-Abfrage, Alarm
+nach `page_alert.disable`). Am 2026-10-10 lokal mit Sloth v0.16.0 erzeugt und mit `promtool` aus
+Prometheus v3.15.0 geprüft: gültig [belegt].
 
 ## 5. Sichtbarkeit
 

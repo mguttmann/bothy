@@ -8,7 +8,7 @@ Versionen laufen wie in CI. Einrichtung einmal je Klon: `make bootstrap`.
 |---|---|---|---|
 | `pyproject.toml`, `uv.lock`, `.python-version` | gepinnte Python-Werkzeugkette (ruff, mypy, bandit, pytest, pre-commit, MkDocs, zizmor, check-jsonschema) | `bootstrap` | |
 | `node/` | gepinnte Node-Werkzeuge (mermaid-cli, Redocly CLI, SonarScanner); Install-Skripte von npm-Paketen sind abgeschaltet | `bootstrap` | |
-| `bin/fetch_tools.py`, `bin/tools.lock.json` | Release-Binärdateien (actionlint, gitleaks, go-arch-lint, golangci-lint, lychee, osv-scanner, sqlc, trivy) mit sha256-Pin laden | `bootstrap`, `tools-lock` | `bin/tests/` |
+| `bin/fetch_tools.py`, `bin/tools.lock.json` | Release-Binärdateien (actionlint, amtool, gitleaks, go-arch-lint, golangci-lint, loki, lychee, osv-scanner, otelcol-contrib, promtool, sloth, sqlc, tempo, tofu, trivy) mit sha256-Pin laden; Asset als Binärdatei, tar.gz oder Zip | `bootstrap`, `tools-lock` | `bin/tests/` |
 | `ci/check_runners.py` | Workflow-Regeln: Runner-Weiche, Trigger, SHA-Pinning, Timeouts, Rechte | `runners-check` | `ci/tests/` |
 | `ci/tests/test_codeql_workflow.py` | CodeQL-Wächter: die Matrix von `.github/workflows/codeql.yml` deckt jede Sprache ab, die CodeQL unterstützt und die die Workflows, `tools/pyproject.toml` oder die Komponenten-Manifeste zeigen (dieselben Manifeste wie die Komponenten-Erkennung des Makefiles); Go mit manuellem Build je Modul; Workflow, Job und Schritte nur mit Optionen aus geschlossenen Listen; Schritt "Probelauf" in `docs/quality/public-switch.md` nennt jeden Check | `test` | |
 | `ci/components.py` | Komponenten-Karte: Pfadfilter in CI, Auflösung von Release-Tags | (CI) | `ci/tests/` |
@@ -19,6 +19,7 @@ Versionen laufen wie in CI. Einrichtung einmal je Klon: `make bootstrap`.
 | `ci/codegen_check.py` | Generator ausführen und Drift erzeugten Codes über Schnappschüsse vor und nach dem Lauf melden | `codegen-check` | `ci/tests/` |
 | `ci/go_prereqs.py` | Voraussetzungen der Server-Gates: go, Docker-kompatible Laufzeit, Pins von go-arch-lint und sqlc | `codegen-check`, `arch`, `migrations-lint`, `perf`, `test` | `ci/tests/` (Rezepte: `ci/tests/test_make_server_gates.py`) |
 | `conftest.py` | Test-Isolation: entfernt Variablen wie `GIT_DIR`, die Git-Hooks setzen, aus der Umgebung jedes Tests, damit Git-Fixtures nie das echte Repository treffen | `test` | `ci/tests/test_git_env_isolation.py` |
+| `opscheck/` | Betriebs-Konfiguration (Collector, Prometheus, Alertmanager, Loki, Tempo, Sloth, OpenTofu) mit den gepinnten Validatoren prüfen; abgeleitete Werte gleich ihrer Quelle ([README](opscheck/README.md)) | `ops-check` | `opscheck/tests/` |
 | `hooks/text_rules.py` | keine Gedankenstriche (U+2013, U+2014) in Textdateien | pre-commit, `lint` | `hooks/tests/` |
 | `hooks/commit_msg.py` | Conventional Commits und DCO-Sign-off | commit-msg, `commitlint` | `hooks/tests/` |
 | `denylist/` | White-Label-Scanner mit privater Liste und öffentlichen Regeln ([README](denylist/README.md)) | `denylist`, `denylist-history` | `denylist/tests/` |

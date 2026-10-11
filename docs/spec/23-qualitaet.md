@@ -39,6 +39,7 @@ Die vollständige Liste mit Werkzeug, Schwelle und Lauf-Ort steht in
 | Code | `fmt-check`, `codegen-check`, `lint`, `typecheck`, `arch`, `register-check`, `migrations-lint`, `test`, `coverage` | Format, erzeugter Code ohne Drift, Linter, Typen, Modulgrenzen der Go-Module, Modulregister gleich Kern-Vertrag und Doku, Migrationsregeln, Tests mit Abdeckung je Komponente |
 | Commits | `commitlint` | Conventional Commits und DCO-Sign-off der neuen Commits |
 | Doku | `docs`, `linkcheck`, `diagrams`, `catalog-check`, `api-lint`, `api-checks`, `api-clients`, `tokens` | Site-Build strikt, Links und Anker, Diagramme, Aktionskatalog und seine erzeugten Kopien, API-Verträge, Kopien der API-Verträge gleich ihren Quellen, generierte Clients, Design-Tokens |
+| Betrieb | `ops-check` | Collector, Prometheus, Alertmanager, Loki, Tempo, Sloth, OpenTofu; abgeleitete Werte gleich ihrer Quelle |
 | CI-Regeln | `runners-check`, `labels-check` | Runner-Weiche, Trigger, SHA-Pinning, Timeouts, Rechte; Labels |
 | Sicherheit | `gitleaks`, `denylist`, `semgrep`, `trivy`, `osv` | Secrets, White Label, Projektregeln, Fehlkonfiguration, bekannte Schwachstellen |
 | Recht | `licenses` | Lizenztext, SPDX-Kopfzeilen, Lizenzen der Abhängigkeiten |

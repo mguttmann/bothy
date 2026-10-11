@@ -30,6 +30,7 @@ Quelle des Diagramms: `docs/quality/pipeline.mmd`.
 | `catalog-check` | `tools/catalog/action_catalog.py` | `docs/spec/actions.yaml` gültig (Schema, eindeutige IDs, Rate-Limit-Klassen, Empfangs-Aktionen, Ops ohne Systemaktion), gleich mit den von Hand gepflegten Teilen von Kapitel 05 (Scopes für Apps, Wirkung, Konfigurationswerte der Klassen); die erzeugten Tabellen in 05 und Listen in `docs/api/redocly.yaml` sind aktuell ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)) | | ja |
 | `api-lint` | Redocly CLI mit `docs/api/redocly.yaml` | OpenAPI und AsyncAPI, Pflicht von `x-authz-action` | | sobald `docs/api/openapi.yaml` existiert |
 | `api-checks` | `tools/api-checks/api_checks.py` | Kopien der API-Verträge gleich ihren Quellen (Kapitel 06, G2 und G3): `x-authz-action`, `x-rate-limit-class`, Ops, Ereignisse, Empfangs-Aktionen, Scopes (`AppScope`) und die Union `Event` in `openapi.yaml` und `asyncapi.yaml` gleich `docs/spec/actions.yaml`, Schließ-Codes gleich 04, `Idempotency-Key` oder `x-idempotency-exempt` mit bekanntem Grund an jedem POST und PATCH, Deprecation-Daten gegen `api.deprecation_min_notice`, `x-problem-codes` und `x-status` vollständig; die erzeugten Tabellen in 06 und `docs/api/webhooks.md` sind aktuell ([README](../../tools/api-checks/README.md)) | | ja |
+| `ops-check` | `tools/opscheck/opscheck.py` mit den gepinnten Validatoren otelcol-contrib, promtool, amtool, loki, tempo, sloth und tofu ([README](../../tools/opscheck/README.md)) | Collector-Basis allein, mit jedem Overlay und mit jedem geordneten Paar zweier Overlays; Prometheus-Konfiguration, Regeln und Regel-Unit-Tests (jeder handgeschriebene Alarm hat einen); Alertmanager-Konfiguration und Routing; Loki; Tempo; OpenTofu-Module; erzeugte SLO-Regeln gleich einer frischen Sloth-Erzeugung; SLO-Tabelle gleich den Sloth-Dateien; Collector-Allowlist gleich dem Signal-Katalog; Alarm-Schwellen gleich ihren Konfigurationswerten; Validator-Versionen gleich den Image-Versionen des Compose-Stacks | | ja |
 | `api-clients` | Ziel `generate-check` der Client-Pakete | generierte Clients sind aktuell und kompilieren | | ab erstem Client-Paket |
 | `tokens` | Ziel `check` in `tools/design-tokens/` | Tests des Generators; Design-Tokens bauen, Kontraste und Palettenwächter bestehen, erzeugte Dateien aktuell, eingebettete Dateien passen zu `vendor/MANIFEST.json` | | ja |
 | `runners-check` | `tools/ci/check_runners.py` | Runner-Weiche, Trigger, SHA-Pinning, Timeouts, Rechte | | ja |
@@ -172,3 +173,20 @@ Beispiel ein JSON-Bericht), `DENYLIST_FLAGS` (zum Beispiel `--reveal` lokal).
   der Prüfsummen-Datei zugleich von Hand ändert, die neueste Migration samt ihrer Zeile
   entfernt oder `migrations/` samt `migrations.sha256` löscht, besteht das Gate; das muss
   das Review des Diffs sehen.
+* `ops-check` prüft die Dateien mit denselben Werkzeugen und Versionen wie die laufenden
+  Komponenten, startet diese aber nicht. Was erst im Betrieb scheitert (ein Ziel ist nicht
+  erreichbar, ein Geheimnis ist falsch, eine Komponente lehnt einen Wert erst beim Start ab), zeigt
+  der Portabilitätstest. Grafana-Dashboards und ihr Provisioning prüft `ops-check` nicht: die
+  Metrik-Namen und das PromQL der Dashboards prüft `signal-check` (PLAN M1-68), das Provisioning
+  der Portabilitätstest.
+* Ein OpenTofu-Modul mit Providern oder entfernten Modulquellen muss `tofu init` offline
+  schaffen. `ops-check` gibt `tofu` als einzige Provider-Quelle einen leeren lokalen Mirror und
+  jedem Validator einen geschlossenen Proxy, damit das Gate nichts aus dem Netz lädt; ein solches
+  Modul scheitert, bis das Ticket mit dem ersten Provider einen gepinnten Weg ohne Netz festlegt.
+* Dass kein Validator das Netz erreicht, beweist ein Test nur unter macOS
+  (`test_no_validator_reaches_the_network` in `tools/opscheck/tests/`, mit `sandbox-exec`). Unter
+  Linux, also in CI, gibt es keine gleichwertige Sperre im Test; dort wirken der geschlossene Proxy
+  und `GCE_METADATA_HOST` ohne eigenen Nachweis.
+* `otelcol-contrib validate` nimmt unbekannte Schlüssel unter manchen Exportern an (am 2026-10-11
+  mit 0.162.0 gesehen: `otlp_http`); ein Tippfehler in einem optionalen Schlüssel eines solchen
+  Exporters fällt erst im Betrieb auf.

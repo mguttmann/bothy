@@ -5,6 +5,10 @@ The lock file tools/bin/tools.lock.json names version, release asset and sha256 
 platform. A binary is only installed after its archive matched the pinned sha256;
 a cached binary is re-checked against a stamp of its own hash on every use.
 
+An asset is a raw binary (empty `member`), a gzip-compressed tar archive or a zip
+archive (recognised by its signature; Loki publishes only zip assets). In both archive
+forms the `member` must exist and be a regular file.
+
 Usage:
   fetch_tools.py path <tool>        ensure the tool is present, print its path
   fetch_tools.py fetch [<tool>...]  ensure tools are present (default: all)
@@ -22,10 +26,12 @@ import json
 import os
 import platform
 import re
+import stat
 import sys
 import tarfile
 import tempfile
 import urllib.request
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +40,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_LOCK = REPO_ROOT / "tools" / "bin" / "tools.lock.json"
 DEFAULT_CACHE = REPO_ROOT / ".cache" / "tools"
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_ZIP_SIGNATURE = b"PK\x03\x04"
 _TIMEOUT_S = 120
 
 Lock = dict[str, Any]
@@ -99,8 +106,27 @@ def download(url: str) -> bytes:
 
 
 def _extract(data: bytes, member: str, name: str) -> bytes:
+    """Return the bytes of the binary inside a downloaded release asset.
+
+    Args:
+        data: the downloaded asset, already checked against its pinned sha256.
+        member: path of the binary inside the archive; empty for a raw binary asset.
+        name: tool name for error messages.
+
+    Returns:
+        `data` itself for a raw binary, else the content of `member`. A zip archive
+        (signature `PK\\x03\\x04`, Loki publishes nothing else) is read with zipfile, any
+        other archive as gzip-compressed tar. Nothing is written to disk by member name,
+        so no archive path can reach outside the cache; `load_lock` rejects absolute
+        members and `..` anyway.
+
+    Raises:
+        FetchError: the member is missing or is not a regular file (directory, link).
+    """
     if not member:
         return data
+    if data.startswith(_ZIP_SIGNATURE):
+        return _extract_zip(data, member, name)
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tf:
         try:
             info = tf.getmember(member)
@@ -112,6 +138,21 @@ def _extract(data: bytes, member: str, name: str) -> bytes:
         if fh is None:
             raise FetchError(f"{name}: cannot read '{member}'")
         return fh.read()
+
+
+def _extract_zip(data: bytes, member: str, name: str) -> bytes:
+    """Read `member` from a zip archive with the same rules as for tar (see `_extract`)."""
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        try:
+            info = zf.getinfo(member)
+        except KeyError as exc:
+            raise FetchError(f"{name}: '{member}' not in archive") from exc
+        # The Unix mode sits in the high 16 bits. Zip tools of other systems leave its file
+        # type bits empty; then only the trailing slash of a directory entry tells the type.
+        file_type = stat.S_IFMT(info.external_attr >> 16)
+        if info.is_dir() or (file_type and file_type != stat.S_IFREG):
+            raise FetchError(f"{name}: '{member}' is not a regular file")
+        return zf.read(info)
 
 
 def _sha256(data: bytes) -> str:

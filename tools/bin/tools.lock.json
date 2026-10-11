@@ -31,6 +31,35 @@
         }
       }
     },
+    "amtool": {
+      "version": "0.34.1",
+      "repo": "prometheus/alertmanager",
+      "tag": "v{version}",
+      "license": "Apache-2.0",
+      "binary": "amtool",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "alertmanager-{version}.darwin-amd64.tar.gz",
+          "member": "alertmanager-{version}.darwin-amd64/amtool",
+          "sha256": "9f3a3806c81a2ef3546fea9bae3dd39abcf2206edd112c9433133a9355875fce"
+        },
+        "darwin-arm64": {
+          "asset": "alertmanager-{version}.darwin-arm64.tar.gz",
+          "member": "alertmanager-{version}.darwin-arm64/amtool",
+          "sha256": "a3941879f340ef12a4cc1a479c82bd8520611265ea8d1ee25c88bd5f944d8293"
+        },
+        "linux-amd64": {
+          "asset": "alertmanager-{version}.linux-amd64.tar.gz",
+          "member": "alertmanager-{version}.linux-amd64/amtool",
+          "sha256": "265b9d1e55ef0d5306a436018af6d2b686c2ce051f03d968f7464ecb1372a7e8"
+        },
+        "linux-arm64": {
+          "asset": "alertmanager-{version}.linux-arm64.tar.gz",
+          "member": "alertmanager-{version}.linux-arm64/amtool",
+          "sha256": "d98d6cbaf52151c7e76e24355fec88b11cebcb9875d4cdd8b76ddce7a7e5535c"
+        }
+      }
+    },
     "gitleaks": {
       "version": "8.30.1",
       "repo": "gitleaks/gitleaks",
@@ -118,6 +147,35 @@
         }
       }
     },
+    "loki": {
+      "version": "3.7.8",
+      "repo": "grafana/loki",
+      "tag": "v{version}",
+      "license": "AGPL-3.0-only",
+      "binary": "loki",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "loki-darwin-amd64.zip",
+          "member": "loki-darwin-amd64",
+          "sha256": "313d03f8f2d88bcfd79e11dec52655997805f8c94d12ac26efe555b478a09674"
+        },
+        "darwin-arm64": {
+          "asset": "loki-darwin-arm64.zip",
+          "member": "loki-darwin-arm64",
+          "sha256": "95d830437482aba989a7d7a65be3c618a67a6e46f6e614544cc4b9ce09f499a1"
+        },
+        "linux-amd64": {
+          "asset": "loki-linux-amd64.zip",
+          "member": "loki-linux-amd64",
+          "sha256": "62aea42c9cba52cd1642b3666ab37019a0ce4c24ab50b07e85dccc8d812f7d61"
+        },
+        "linux-arm64": {
+          "asset": "loki-linux-arm64.zip",
+          "member": "loki-linux-arm64",
+          "sha256": "a874c10ffefe4d66c914b8aac8897159451d3026469598341aa03c76084697de"
+        }
+      }
+    },
     "lychee": {
       "version": "0.24.2",
       "repo": "lycheeverse/lychee",
@@ -176,6 +234,93 @@
         }
       }
     },
+    "otelcol-contrib": {
+      "version": "0.162.0",
+      "repo": "open-telemetry/opentelemetry-collector-releases",
+      "tag": "v{version}",
+      "license": "Apache-2.0",
+      "binary": "otelcol-contrib",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "otelcol-contrib_{version}_darwin_amd64.tar.gz",
+          "member": "otelcol-contrib",
+          "sha256": "91a6e7a0f5e1981986c897db4535de5ba8d7fc45d4205809aecb9ebebf68c71c"
+        },
+        "darwin-arm64": {
+          "asset": "otelcol-contrib_{version}_darwin_arm64.tar.gz",
+          "member": "otelcol-contrib",
+          "sha256": "d5e11974d2e4adac3cc001a25137aad52f6e77ec3034ba7735cac7c219a5f97a"
+        },
+        "linux-amd64": {
+          "asset": "otelcol-contrib_{version}_linux_amd64.tar.gz",
+          "member": "otelcol-contrib",
+          "sha256": "fcc063749f730f8c21fe29f2d340ff174f5f1c5885bd3156fb6c985a3036fcc3"
+        },
+        "linux-arm64": {
+          "asset": "otelcol-contrib_{version}_linux_arm64.tar.gz",
+          "member": "otelcol-contrib",
+          "sha256": "ecf6a917e2b53beb1703b19a84bc4e112a2fcaba549639cf6b0ba58446bfd7d2"
+        }
+      }
+    },
+    "promtool": {
+      "version": "3.15.0",
+      "repo": "prometheus/prometheus",
+      "tag": "v{version}",
+      "license": "Apache-2.0",
+      "binary": "promtool",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "prometheus-{version}.darwin-amd64.tar.gz",
+          "member": "prometheus-{version}.darwin-amd64/promtool",
+          "sha256": "2d79e744c2d7e505db936fbc898e05abc74fcb6e437c25befd26e9c9f00aa58b"
+        },
+        "darwin-arm64": {
+          "asset": "prometheus-{version}.darwin-arm64.tar.gz",
+          "member": "prometheus-{version}.darwin-arm64/promtool",
+          "sha256": "920df4d17e78b3b0175af144eb318b0c74d1cf7b1d1251b326966f0e81977260"
+        },
+        "linux-amd64": {
+          "asset": "prometheus-{version}.linux-amd64.tar.gz",
+          "member": "prometheus-{version}.linux-amd64/promtool",
+          "sha256": "2a542df32eac02ee17b9d844fb2aa1de00dafa5476579ba8a3ba862e9d572ea0"
+        },
+        "linux-arm64": {
+          "asset": "prometheus-{version}.linux-arm64.tar.gz",
+          "member": "prometheus-{version}.linux-arm64/promtool",
+          "sha256": "f1f90ec08e849d494ca66c611470afc50192f0355f1a61c33f2cbde02d067823"
+        }
+      }
+    },
+    "sloth": {
+      "version": "0.16.0",
+      "repo": "slok/sloth",
+      "tag": "v{version}",
+      "license": "Apache-2.0",
+      "binary": "sloth",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "sloth-darwin-amd64",
+          "member": "",
+          "sha256": "c62623ea730818ef611c82fd1318d9741cfde4717a6179ebd9e3649a3b8b6017"
+        },
+        "darwin-arm64": {
+          "asset": "sloth-darwin-arm64",
+          "member": "",
+          "sha256": "d9ee5967fd412f6592a0c5aec35f7f9f1fc4a2726eb25414a11815ca78185aa9"
+        },
+        "linux-amd64": {
+          "asset": "sloth-linux-amd64",
+          "member": "",
+          "sha256": "1cecaa50853abbb3669a928612b523df8174d258ea6f2a3c8f048e5fc5af90b2"
+        },
+        "linux-arm64": {
+          "asset": "sloth-linux-arm64",
+          "member": "",
+          "sha256": "7b570c465df3cc997e744dfcfcea83c3559bba6b12f4d6165994925419cbb41c"
+        }
+      }
+    },
     "sqlc": {
       "version": "1.31.1",
       "repo": "sqlc-dev/sqlc",
@@ -202,6 +347,64 @@
           "asset": "sqlc_{version}_linux_arm64.tar.gz",
           "member": "sqlc",
           "sha256": "b7cae247740d0c51a1e657479e5b2d21e6fef428f596682a01bc55bf4ab8a23d"
+        }
+      }
+    },
+    "tempo": {
+      "version": "3.1.0",
+      "repo": "grafana/tempo",
+      "tag": "v{version}",
+      "license": "AGPL-3.0-only",
+      "binary": "tempo",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "tempo_{version}_darwin_amd64.tar.gz",
+          "member": "tempo",
+          "sha256": "4459d55672712d88529d9e4e2975e57f66356b57261bc4f3b35e78ee88725c79"
+        },
+        "darwin-arm64": {
+          "asset": "tempo_{version}_darwin_arm64.tar.gz",
+          "member": "tempo",
+          "sha256": "0511d3d7fb959312ae6e3b269f469942e9fc4839e53f01c07cc65844f312eb0c"
+        },
+        "linux-amd64": {
+          "asset": "tempo_{version}_linux_amd64.tar.gz",
+          "member": "tempo",
+          "sha256": "9604ab46348270a42954801bba91cd65335e16568ef886bdf71b988fdcb7ac4e"
+        },
+        "linux-arm64": {
+          "asset": "tempo_{version}_linux_arm64.tar.gz",
+          "member": "tempo",
+          "sha256": "e4092dcf2b93e141be77e300b539f6c5cceefa9803417d7d635c6797d9bc19ad"
+        }
+      }
+    },
+    "tofu": {
+      "version": "1.13.1",
+      "repo": "opentofu/opentofu",
+      "tag": "v{version}",
+      "license": "MPL-2.0",
+      "binary": "tofu",
+      "assets": {
+        "darwin-amd64": {
+          "asset": "tofu_{version}_darwin_amd64.tar.gz",
+          "member": "tofu",
+          "sha256": "a73720443ba38712d7d96dc1e857add02c15a790919c653ad07492e9952f8c27"
+        },
+        "darwin-arm64": {
+          "asset": "tofu_{version}_darwin_arm64.tar.gz",
+          "member": "tofu",
+          "sha256": "be78f659f04ef06a9dbd9b3934d46af95d787a3aa38396d459dea395261816a9"
+        },
+        "linux-amd64": {
+          "asset": "tofu_{version}_linux_amd64.tar.gz",
+          "member": "tofu",
+          "sha256": "378ada19d4bc70c43732004e8159be771b23b9a5afdf059e5f8a2b3fa2c70a69"
+        },
+        "linux-arm64": {
+          "asset": "tofu_{version}_linux_arm64.tar.gz",
+          "member": "tofu",
+          "sha256": "9c1ef375aa1852db0b2888aa921b640c71f8140d4682aa4fec99378a64fa7dc3"
         }
       }
     },

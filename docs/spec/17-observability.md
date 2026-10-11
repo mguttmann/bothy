@@ -158,10 +158,15 @@ Kapitels; die Ansichten der Apps lesen nur die eigene Statistik-API.
    Collector-Allowlist steht im Katalog.
 3. Kardinalitäts-Test: Metrik-Attribute nur aus endlichen Mengen; keine IDs an Metriken.
 4. Namens-Test: Jede in Dashboards, Regeln und SLOs genutzte Metrik steht im Katalog.
-5. `promtool check rules`, `amtool check-config`, `otelcol-contrib validate`, Grafana-Provisioning
-   im Portabilitätstest.
-6. SLO-Docs-Check: Ziele und Schwellen in [slos.md](../observability/slos.md) gleich den
-   Sloth-Dateien; erzeugte Regeln gleich einer frischen Erzeugung.
+5. `make ops-check`: `otelcol-contrib validate` für Basis, Overlays und Paare (Check `collector`),
+   `promtool check config`, `check rules` und `test rules` (Checks `prometheus-config`,
+   `prometheus-rules`, `prometheus-rule-tests`), `amtool check-config` mit Routing (Check
+   `alertmanager`), Loki, Tempo und OpenTofu (Checks `loki`, `tempo`, `tofu`); Alarm-Schwellen
+   gleich ihren Konfigurationswerten (Check `alert-thresholds`). Grafana-Provisioning im
+   Portabilitätstest.
+6. `make ops-check`, Checks `slo-docs` und `sloth`: Ziele und Schwellen in
+   [slos.md](../observability/slos.md) gleich den Sloth-Dateien; erzeugte Regeln gleich einer
+   frischen Erzeugung.
 7. SLI-Grenzen-Check: die erzeugten Grenzen der eigenen Messung gleich einer frischen Erzeugung
    aus den Sloth-Dateien; jedes SLO hat eine `sli.*`-Metrik in `stats_minutes` (25, VZ-T02, VZ-T03).
 

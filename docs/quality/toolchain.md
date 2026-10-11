@@ -41,6 +41,13 @@ selben make-Ziel in GitHub Actions. Alle Gate-Werkzeuge laufen an beiden Orten.
 | `lychee` | `0.24.2` | Links und Anker in Markdown | Apache-2.0 OR MIT | prüft Anker in Markdown-Dateien offline |
 | `osv-scanner` | `2.6.0` | Schwachstellen und Lizenzen aller Lock-Dateien | Apache-2.0 | ein Werkzeug für Go, Dart, Python und npm |
 | `trivy` | `0.69.3` | Fehlkonfiguration und Image-Schwachstellen | Apache-2.0 | Image-Scan beim Release; Version siehe unten |
+| `otelcol-contrib` | `0.162.0` | `otelcol-contrib validate` für die Collector-Basis, jedes Overlay und Paare aus zwei Overlays (`ops-check`) | Apache-2.0 | dieselbe Distribution und Version wie das Collector-Image (`BOTHY_OTELCOL_VERSION`); nur sie kennt die contrib-Komponenten der Overlays |
+| `promtool` | `3.15.0` | `promtool check config`, `check rules` und `test rules` (`ops-check`) | Apache-2.0 | Prüfwerkzeug aus dem Prometheus-Release der Image-Version (`BOTHY_PROMETHEUS_VERSION`) |
+| `amtool` | `0.34.1` | `amtool check-config` und Routing-Tests (`ops-check`) | Apache-2.0 | Prüfwerkzeug aus dem Alertmanager-Release der Image-Version (`BOTHY_ALERTMANAGER_VERSION`) |
+| `loki` | `3.7.8` | `loki -verify-config` (`ops-check`) | AGPL-3.0-only | nur Loki selbst kennt seine Konfigurationsschlüssel; Version des Images (`BOTHY_LOKI_VERSION`). Wird nur zur Prüfung ausgeführt und nicht verteilt; AGPL-3.0 greift bei Verteilung und bei Netznutzung veränderter Fassungen, beides geschieht hier nicht |
+| `tempo` | `3.1.0` | `tempo -config.verify=true` (`ops-check`) | AGPL-3.0-only | nur Tempo selbst kennt seine Konfigurationsschlüssel; Version des Images (`BOTHY_TEMPO_VERSION`). Wird nur zur Prüfung ausgeführt und nicht verteilt; AGPL-3.0 greift bei Verteilung und bei Netznutzung veränderter Fassungen, beides geschieht hier nicht |
+| `sloth` | `0.16.0` | SLO-Regeln neu erzeugen und mit den eingecheckten vergleichen (`ops-check`) | Apache-2.0 | Generator der Burn-Rate-Regeln (ADR 0035); dieselbe Version steht im Kopf der erzeugten Dateien |
+| `tofu` | `1.13.1` | `tofu init` und `tofu validate` je Modul unter `infra/tofu/modules/` (`ops-check`) | MPL-2.0 | Werkzeug der Module (ADR 0012); prüft HCL, Typen und Validierungen ohne Zugang zu einem Provider |
 | `sonarqube` | `26.9.0.129388-community` | lokaler SonarQube Community Build | LGPL-3.0 | ADR 0040 |
 | `postgres` | `18.6-trixie` | Datenbank des lokalen SonarQube | PostgreSQL | vom Community Build für den Dauerbetrieb verlangt (H2 nur für Tests) |
 
@@ -82,6 +89,12 @@ Tags die Commit-SHA hinter dem Tag).
 * Release-Binärdateien: nach dem Renovate-Vorschlag `make tools-lock TOOL=<name>
   VERSION=<version>`; der Befehl übernimmt die sha256-Werte, die GitHub für die
   Release-Dateien meldet. Den Diff prüfen, dann `make bootstrap` und `make check`.
+* Die Validatoren der Hilfsdienste (`otelcol-contrib`, `promtool`, `amtool`, `loki`, `tempo`)
+  folgen den Image-Versionen in `infra/compose/`: Renovate erhöht die Images (Gruppe
+  "Compose-Images", ADR 0041) und ist für diese fünf Pins abgeschaltet. Im Pull Request des
+  Image-Updates zieht der Maintainer sie mit `make tools-lock` nach; bis dahin scheitert der
+  Check `tool-versions` von `make ops-check`, weil ein Validator anderer Version andere
+  Schlüssel annimmt oder ablehnt als die laufende Komponente.
 * Neue Werkzeuge kommen mit Zeile in dieser Seite, Pin, Lizenzprüfung und Grund.
 
 ## Trivy: Version halten

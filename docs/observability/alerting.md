@@ -49,7 +49,11 @@ geht an `external-oncall` und `bothy-ops`, `ticket` an `bothy-ops`, `Watchdog` a
 ### 3.2 Weitere Alarme (`bothy-alerts.yaml`)
 
 Schwellen sind Startwerte. Wo eine Schwelle einem Konfigurationswert entspricht, steht er in der
-Tabelle; die Regeldatei muss ihm folgen (Check im Bau-Ticket "Alarm-Schwellen aus Konfiguration").
+Tabelle; die Regeldatei muss ihm folgen. `make ops-check` hält das (Check `alert-thresholds`):
+Steht `` `<name>` `` in der Spalte, ist die Schwelle des letzten Vergleichs `> <zahl>` in Sekunden
+(eine schlichte Zahl, Kommentare zählen nicht) gleich dem Standard des Werts in der [Konfigurationsreferenz](../operations/configuration.md);
+steht ``über `<name>` ``, ist sie echt größer. Die Alarme der Tabelle sind genau die Alarme von
+`bothy-alerts.yaml`.
 
 | Alarm | Stufe | Bedingung | Konfigurationswert |
 |---|---|---|---|
@@ -148,6 +152,21 @@ Logs nach `deadlock detected`; die beteiligten Abfragen gegen die Sperrreihenfol
 
 ## 5. Prüfen
 
-`promtool check rules` und `amtool check-config` am 2026-10-10 mit Prometheus v3.15.0 und
-Alertmanager v0.34.1: gültig [belegt]. Zusätzlich empfohlen: `promtool test rules` mit
-Testreihen je handgeschriebenem Alarm (Ticket).
+`make ops-check` prüft Regeln und Wege im Gate ([tools/opscheck](../../tools/opscheck/README.md)),
+mit `promtool` und `amtool` in der Version der Images:
+
+1. `promtool check rules` für alle Regeldateien (Check `prometheus-rules`) und
+   `promtool check config` mit den geladenen Regeln (Check `prometheus-config`); jede Regeldatei
+   muss über `rule_files` geladen werden.
+2. `promtool test rules` mit
+   [bothy-alerts.test.yaml](../../infra/observability/prometheus/tests/bothy-alerts.test.yaml)
+   (Check `prometheus-rule-tests`): Jeder Alarm aus `bothy-alerts.yaml` feuert in einem Fall,
+   sobald sein `for` abgelaufen ist, mit Labels und Texten, und ist eine Minute vorher still; jeder
+   Alarm mit Schwelle bleibt in einem Fall genau an der Schwelle still. Ein Alarm ohne feuernden
+   Fall lässt den Check scheitern.
+3. `amtool check-config` und die Wege aus Abschnitt 1 mit `amtool config routes test` (Check
+   `alertmanager`): `page` an `external-oncall` und `bothy-ops`, `ticket` an `bothy-ops`,
+   `Watchdog` an `external-heartbeat`.
+4. Die Schwellen aus 3.2 gegen die Konfigurationsreferenz (Check `alert-thresholds`). Nennt eine
+   Zelle der Spalte "Konfigurationswert" einen Wert der Referenz, muss sie genau `` `<name>` `` oder
+   ``über `<name>` `` lauten; jede andere Form ist ein Befund.
