@@ -39,16 +39,16 @@ package = false
 [tool.pytest.ini_options]
 minversion = "9.0"
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
-testpaths = ["bin", "catalog", "ci", "denylist", "doccheck", "docs", "hooks", "sonarqube"]
+testpaths = ["api-checks", "bin", "catalog", "ci", "denylist", "doccheck", "docs", "hooks", "sonarqube"]
 pythonpath = [
-  "bin", "catalog", "catalog/tests", "ci", "denylist", "doccheck", "docs", "hooks", "sonarqube",
+  "api-checks", "bin", "catalog", "catalog/tests", "ci", "denylist", "doccheck", "docs", "hooks", "sonarqube",
   "sonarqube/tests",
 ]
 filterwarnings = ["error"]
 
 [tool.coverage.run]
 branch = true
-source = ["bin", "catalog", "ci", "denylist", "doccheck", "docs", "hooks", "sonarqube"]
+source = ["api-checks", "bin", "catalog", "ci", "denylist", "doccheck", "docs", "hooks", "sonarqube"]
 omit = ["*/tests/*"]
 
 [tool.coverage.report]
@@ -83,7 +83,7 @@ python_version = "3.12"
 strict = true
 warn_unreachable = true
 # Tool modules only; tests are linted by ruff and executed by pytest.
-files = ["bin", "catalog", "ci", "denylist", "doccheck", "docs", "hooks", "sonarqube"]
+files = ["api-checks", "bin", "catalog", "ci", "denylist", "doccheck", "docs", "hooks", "sonarqube"]
 exclude = ["/tests/"]
 
 [tool.bandit]

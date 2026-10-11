@@ -365,6 +365,9 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
 | `beginPasskeyRegistration` | POST | `/api/v1/me/passkeys/begin` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
 | `completePasskeyRegistration` | POST | `/api/v1/me/passkeys/complete` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
 | `createExtensionSession` | POST | `/api/v1/me/sessions/extensions` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
+| `pairHost` | POST | `/api/v1/hosts/pair` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
+| `openTerminalSession` | POST | `/api/v1/hosts/{host_id}/terminal/sessions` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
+| `attachTerminalSession` | POST | `/api/v1/terminal/sessions/{session_id}/attach` | Anmelde- oder Sitzungsablauf: einmalige Challenge oder Code, Refresh-Rotation, Ersatz der Kind-Sitzung |
 | `previewGrant` | POST | `/api/v1/grants/preview` | liest nur, ändert keinen dauerhaften Zustand |
 | `createFileTicket` | POST | `/api/v1/files/{file_id}/tickets` | liest nur, ändert keinen dauerhaften Zustand |
 | `autocompleteCommand` | POST | `/api/v1/channels/{channel_id}/commands/{command_id}/autocomplete` | liest nur, ändert keinen dauerhaften Zustand |
@@ -1161,10 +1164,10 @@ Ereignisse (Empfangs-Aktion nach 05, Abschnitt 6; Schema in openapi.yaml):
 | `typing.started` | kurzlebig | `thread.read` |  | `TypingStartedEvent` |  |
 | `run.updated` | kurzlebig | `run.read` |  | `RunUpdatedEvent` |  |
 | `agent.presence_changed` | kurzlebig | `agent.read` |  | `AgentPresenceChangedEvent` |  |
-| `command.autocomplete_requested` | kurzlebig | `agent.events.consume` | self | `CommandAutocompleteRequestedEvent` |  |
-| `notification.created` | kurzlebig | `push.deliver` | self | `NotificationCreatedEvent` |  |
 | `host.presence_changed` | kurzlebig | `host.read` |  | `HostPresenceChangedEvent` |  |
 | `stats.live` | kurzlebig | `stats.read` |  | `StatsLiveEvent` |  |
+| `notification.created` | kurzlebig | `push.deliver` | self | `NotificationCreatedEvent` |  |
+| `command.autocomplete_requested` | kurzlebig | `agent.events.consume` | self | `CommandAutocompleteRequestedEvent` |  |
 <!-- END GENERATED: events -->
 
 ## 18. Abgleich mit dem Kern-Vertrag

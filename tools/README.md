@@ -27,6 +27,7 @@ Versionen laufen wie in CI. Einrichtung einmal je Klon: `make bootstrap`.
 | `docs/render_diagrams.py` | jedes Mermaid-Diagramm rendert | `diagrams` | `docs/tests/` |
 | `docs/mkdocs_repo_links.py` | MkDocs-Hook: Links auf vorhandene Dateien außerhalb von `docs/` zeigen in der Site auf das Repository | `docs` | `docs/tests/` |
 | `catalog/` | Aktionskatalog `docs/spec/actions.yaml` laden und prüfen, Tabellen von Kapitel 05 und Listen in `docs/api/redocly.yaml` daraus erzeugen ([README](catalog/README.md)) | `catalog`, `catalog-check` | `catalog/tests/` |
+| `api-checks/` | Kopien der API-Verträge gegen ihre Quellen prüfen (Kapitel 06, G2), die erzeugten Tabellen von 06 und `docs/api/webhooks.md` erzeugen und gegen eine frische Erzeugung prüfen (G3) ([README](api-checks/README.md)) | `api-checks` (G2 und G3), `api-tables` | `api-checks/tests/` |
 | `doccheck/register_check.py` | Modulregister `services/server/architecture/modules.yaml` mit Kapitel 03, `docs/spec/actions.yaml` (Lader aus `catalog/`), den Modultabellen von Kapitel 02, dem Komponenten-Diagramm und den Modul-READMEs abgleichen, eine Zeile je Abweichung (ADR 0050) | `register-check` | `doccheck/tests/` (rendern mit Markdown und dem gepinnten mermaid-cli, `make bootstrap`) |
 | `docs/tests/test_config_values.py`, `docs/tests/test_toolchain_doc.py` | Zahlen- und Versionswächter für die Doku | `test` | |
 | `sonarqube/` | lokaler SonarQube und Abgleich von Profil und Gate ([README](sonarqube/README.md)) | `sonar-up`, `sonar-config`, `sonar-config-check` | `sonarqube/tests/` |

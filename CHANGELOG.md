@@ -48,6 +48,14 @@ Planning stage (milestone M0). Nothing is installable yet.
   chapter 03 and the actions, event types and ops of `docs/spec/actions.yaml`, and the module
   tables of chapter 02, the server component diagram and the module READMEs must equal the
   register (ADR 0050); every difference is one finding with file and item.
+- API contract checks in the gate (06 G2 and G3, `tools/api-checks/`): `make api-checks`
+  compares `openapi.yaml` and `asyncapi.yaml` with the action catalogue (actions, classes,
+  ops, events, app scopes, the union `Event`) and the close codes of chapter 04, holds
+  `x-idempotency-exempt`, the deprecation dates against
+  `api.deprecation_min_notice`, `x-problem-codes` and `x-status`, and fails on a stale
+  generated table in chapter 06 or `docs/api/webhooks.md`; `make api-tables` regenerates
+  these tables. An operation message without `$ref` is a finding, and no input ends in a
+  traceback.
 
 ### Changed
 
@@ -58,3 +66,18 @@ Planning stage (milestone M0). Nothing is installable yet.
   of `bothy config check` and `bothy config print`.
 - CodeQL analyses the Go server module (manual build of `services/server`) in the public
   phase; a test keeps the CodeQL languages in step with the tracked components.
+
+### Fixed
+
+- `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
+  `file_blocked`, which no response listed; `createHost` and `issueHostPairingCode` take
+  `Idempotency-Key` and list `422 idempotency_key_reuse` instead of the exemption `auth_flow`,
+  as 06 section 7 asks for a POST that returns a one-time secret (`openTerminalSession` and
+  `createExtensionSession` keep `auth_flow`); by 06 section 13 this changes the idempotency
+  rule of two operations, a breaking change made while the API is still `0.x`; the enum
+  `AppScope` contains `costs:reconcile`, the scope of `cost.reconcile.submit` (05 section
+  2.6).
+- `docs/api/asyncapi.yaml` 0.1.1: `dispatch` lists the event types in the order of the
+  catalogue; the event table of chapter 06, generated from it, now follows that order too.
+- Chapter 06, section 7: the table of operations without `Idempotency-Key` lists the host
+  pairing and terminal session operations that `openapi.yaml` exempts.

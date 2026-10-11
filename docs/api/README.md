@@ -51,14 +51,19 @@ CI=true npx -y @asyncapi/cli@6.2.0 generate fromTemplate docs/api/asyncapi.yaml 
 1. Erst die Spec ändern, dann den Code. Additiv oder Bruch entscheidet 06-api.md, Abschnitt 13.
 2. Neue Operation: `operationId` in lowerCamelCase, `tags`, `x-authz-action` aus 05-aktionen.md,
    `x-rate-limit-class` der Aktion, Problem-Antworten aus `components.responses`, Beispiel im
-   Medientyp. Fehlt eine passende Aktion, kommt sie zuerst in
-   [docs/spec/actions.yaml](../spec/actions.yaml); `make catalog` erzeugt daraus die Tabellen in
-   05-aktionen.md und die Listen in redocly.yaml.
+   Medientyp. Jede POST- und PATCH-Operation bekommt den Parameter `IdempotencyKey` oder
+   `x-idempotency-exempt` mit einem Grund-Code aus 06-api.md, Abschnitt 7. Ein neuer Problem-Code
+   kommt zuerst in `x-problem-codes` am Schema `Problem` und in die Beschreibung der
+   Antwort-Komponente, deren `x-status` sein Status ist. Fehlt eine passende Aktion, kommt sie
+   zuerst in [docs/spec/actions.yaml](../spec/actions.yaml); `make catalog` erzeugt daraus die
+   Tabellen in 05-aktionen.md und die Listen in redocly.yaml.
 3. Neues Ereignis: Typ und Empfangs-Aktion zuerst in [docs/spec/actions.yaml](../spec/actions.yaml),
    dann `make catalog`; Nutzlast-Schema `<Name>Payload`,
    Ereignis-Schema `<Name>Event` als `allOf` aus `EventEnvelope`, Eintrag in `Event` (dauerhaft),
    Nachricht in asyncapi.yaml, bei Bedarf Eintrag unter `webhooks:`.
 4. Kein `null`, keine Typ-Arrays, kein `anyOf`, `oneOf` nur mit Diskriminator. Wiederholte
    Enum-Mengen als benanntes Schema.
-5. Lint, Code neu erzeugen, Tests. Die erzeugten Tabellen in 06-api.md und webhooks.md
-   (Markierungen `BEGIN GENERATED`) werden mit erneuert (Gate G3).
+5. Lint, Code neu erzeugen, Tests. `make api-tables` erneuert die erzeugten Tabellen in
+   06-api.md und webhooks.md (Markierungen `BEGIN GENERATED`); `make api-checks` prüft im Gate,
+   dass sie und alle Kopien der Verträge zu ihren Quellen passen (G2, G3,
+   [tools/api-checks](../../tools/api-checks/README.md)).
