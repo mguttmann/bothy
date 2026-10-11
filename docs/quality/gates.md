@@ -159,11 +159,9 @@ Beispiel ein JSON-Bericht), `DENYLIST_FLAGS` (zum Beispiel `--reveal` lokal).
   das Review des Diffs sehen.
 * GitHub secret scanning has its own patterns
   ([supported patterns](https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns),
-  retrieved 2026-10-11): it knows provider formats that gitleaks does not. On the first
-  public push of this repository (2026-10-11) it raised two alerts of type
-  `stripe_webhook_signing_secret` (alerts 1 and 2 of the repository, resolved): one for an
-  API example shorter than the gitleaks rule `standard-webhooks-secret` accepts, one for the
-  historical value in the allowlist of `.gitleaks.toml`. An example in a third-party format
+  retrieved 2026-10-11): it knows provider formats that gitleaks does not, and its
+  `stripe_webhook_signing_secret` type also reports `whsec_` values shorter than the
+  gitleaks rule `standard-webhooks-secret` accepts. An example in a third-party format
   can therefore pass the gates and still raise an alert on push; only the `whsec_` format has
   its own check with a wider margin (`tools/hooks/secret_formats.py`). Examples therefore
   stay short of every third-party format (CONTRIBUTING.md).
