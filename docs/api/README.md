@@ -51,8 +51,11 @@ CI=true npx -y @asyncapi/cli@6.2.0 generate fromTemplate docs/api/asyncapi.yaml 
 1. Erst die Spec ändern, dann den Code. Additiv oder Bruch entscheidet 06-api.md, Abschnitt 13.
 2. Neue Operation: `operationId` in lowerCamelCase, `tags`, `x-authz-action` aus 05-aktionen.md,
    `x-rate-limit-class` der Aktion, Problem-Antworten aus `components.responses`, Beispiel im
-   Medientyp. Fehlt eine passende Aktion, wird zuerst 05-aktionen.md ergänzt.
-3. Neues Ereignis: Typ und Empfangs-Aktion in 05-aktionen.md, Nutzlast-Schema `<Name>Payload`,
+   Medientyp. Fehlt eine passende Aktion, kommt sie zuerst in
+   [docs/spec/actions.yaml](../spec/actions.yaml); `make catalog` erzeugt daraus die Tabellen in
+   05-aktionen.md und die Listen in redocly.yaml.
+3. Neues Ereignis: Typ und Empfangs-Aktion zuerst in [docs/spec/actions.yaml](../spec/actions.yaml),
+   dann `make catalog`; Nutzlast-Schema `<Name>Payload`,
    Ereignis-Schema `<Name>Event` als `allOf` aus `EventEnvelope`, Eintrag in `Event` (dauerhaft),
    Nachricht in asyncapi.yaml, bei Bedarf Eintrag unter `webhooks:`.
 4. Kein `null`, keine Typ-Arrays, kein `anyOf`, `oneOf` nur mit Diskriminator. Wiederholte

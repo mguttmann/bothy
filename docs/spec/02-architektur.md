@@ -1249,7 +1249,7 @@ Kern-Vertrag (Integration vom 2026-10-10):
 | Ablauf erzeugt `access.changed` über `authz.expiry_sweep` | 04, Abschnitt 8.2; 05 `grant.expire`, `group.member.expire` |
 | Thread verschieben: Kopien von `channel_id`, Dateien folgen der Nachricht | 03 `threads`; 05, Abschnitt 2.2 |
 | Pfad-Präfix `/api/v1` | 04, Kopf und Abschnitt 6.1 |
-| Maschinenlesbarer Aktionskatalog | beschlossen ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)); bis dahin Abgleich im Doku-Gate (05, Regel 3) |
+| Maschinenlesbarer Aktionskatalog | [`docs/spec/actions.yaml`](actions.yaml) ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)), geprüft von `make catalog-check` (05, Regel 3) |
 | Health ohne Aktion, auf dem internen Listener | 05, R-AZ-22; Abschnitt 15.2 |
 | Module `gateway`, `search` ohne Tabellen; `stats` mit `stats_minutes` | 03, Abschnitte 2 und 4.15 |
 | `agent.read` für den Agenten selbst | 05, Abschnitt 4.10 |

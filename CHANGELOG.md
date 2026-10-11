@@ -38,3 +38,8 @@ Planning stage (milestone M0). Nothing is installable yet.
   go-arch-lint and sqlc. The migration rules of ADR 0007 are checked by
   `tools/ci/migrations_lint.py`; `make migrations-lock` records the checksums of new
   migrations.
+- Machine-readable action catalogue `docs/spec/actions.yaml` as the single source of
+  actions, rate-limit classes, event types and ops (ADR 0049): `make catalog` generates the
+  tables of chapter 05 and the lists in `docs/api/redocly.yaml`, and the gate
+  `catalog-check` (`tools/catalog/`) fails on drift or on a contradiction with the
+  hand-written parts of chapter 05.

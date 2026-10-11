@@ -1,6 +1,6 @@
 ---
 status: accepted
-date: 2026-10-10
+date: 2026-10-11
 decision-makers: Leitung der Planung
 consulted: Team A (Architektur), Team B (API), Team C (Rechte)
 informed: alle Planungsteams
@@ -46,14 +46,16 @@ Python und Go sie ohne Parser-Tricks laden und jede Kopie mechanisch entsteht.
    Rate-Limit-Klassen mit Schlüssel und Zweck, die dauerhaften und kurzlebigen Ereignistypen mit
    ihrer Empfangs-Aktion (05, Abschnitt 6) und die WebSocket-Ops mit ihrer Aktion (Abschnitt 7).
    Weitere Merkmale kommen nur über eine ADR dazu (zum Beispiel die Wirkung für den Wartungsmodus,
-   ADR 0065).
+   ADR 0065) oder über den Kern-Vertrag (je Ereignistyp, ob der Umschlag `resource.version`
+   trägt, [04-sync-protokoll.md](../spec/04-sync-protokoll.md), "Zustellgarantie").
 2. Erzeugt werden: die Tabellen der Abschnitte 3, 4, 6 und 7 in 05 zwischen Markierungen, die
    Aktionslisten in `docs/api/redocly.yaml` (ohne Systemaktionen, weil keine Route sie nennen
    darf), die Konstanten und Merkmale in `kernel/authorize` und die Zuordnung `operationId` zu
    Aktion in `api/routes` ([02-architektur.md](../spec/02-architektur.md), Abschnitte 4.5 und 6).
    Von Hand bleiben die Tabelle "Scopes für Apps" (05, Abschnitt 2.6; ihre Zeilen enthalten
-   Prosa) und die Konfigurationswerte von 05 (Quelle der Konfigurationsreferenz); der Check
-   vergleicht sie mit der Datei. Zellen der Empfangs-Aktion, die mehrere Fälle in Worten nennen
+   Prosa), die Liste "Wirkung" (05, Abschnitt 2.7; eine geschlossene Regel in Worten) und die
+   Konfigurationswerte von 05 (Quelle der Konfigurationsreferenz); der Check vergleicht sie mit
+   der Datei. Zellen der Empfangs-Aktion, die mehrere Fälle in Worten nennen
    (z. B. "self (Agent) und `agent.events.consume`"), behalten ihren Text; der maschinelle Wert
    steht daneben und gleicht `x-receive-action` in asyncapi.yaml.
 3. Die Zuordnung Aktion zu Modul steht nicht hier, sondern im Modulregister (ADR 0050). Ein Check
@@ -79,8 +81,11 @@ Python und Go sie ohne Parser-Tricks laden und jede Kopie mechanisch entsteht.
 - `pytest tools/catalog/tests`: doppelte Aktions-ID, unbekannte Rate-Limit-Klasse, Ereignistyp
   ohne Empfangs-Aktion, Op ohne Aktion und ein abweichender Tabellenblock in 05 lassen den Check
   scheitern; ein Test belegt, dass die Tabellen in 05 vor und nach dem Umbau dieselben Zeilen haben.
-- `make catalog-check` im Ziel `gates` (ADR 0038): erneutes Erzeugen ergibt keinen Diff in 05,
-  `redocly.yaml`, `kernel/authorize` und `api/routes`.
+- `make catalog-check` im Ziel `gates` (ADR 0038): liest `docs/spec/actions.yaml`, Kapitel 05,
+  `docs/api/redocly.yaml` und, falls vorhanden, `docs/api/.redocly.lint-ignore.yaml`; erneutes
+  Erzeugen ergäbe keinen Diff in 05 und `redocly.yaml`. Die erzeugten Konstanten in
+  `kernel/authorize` (M1-25) und die Routentabelle in `api/routes` (M1-17) hält
+  `make codegen-check`.
 - `make api-lint`: Regeln `authz-action-required` und `authz-action-known` mit der erzeugten Liste.
 - Server-Start-Check und Routen-Test aus 05, Abschnitt 9 (Tests 1 und 2), gegen die erzeugten
   Konstanten.
@@ -122,6 +127,6 @@ Python und Go sie ohne Parser-Tricks laden und jede Kopie mechanisch entsteht.
 ## More Information
 
 - Beschluss im Kern-Vertrag: 05, Regel 1.3; [02-architektur.md](../spec/02-architektur.md),
-  Abschnitt 20 ("beschlossen, bis dahin Abgleich im Doku-Gate").
+  Abschnitt 20 (Zeile "Maschinenlesbarer Aktionskatalog").
 - Verwandt: ADR 0013 (Spec-first), ADR 0017 (eine Autorisierungsfunktion), ADR 0050
   (Modulregister), ADR 0065 (Wartungsmodus).

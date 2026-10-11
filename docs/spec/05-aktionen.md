@@ -20,14 +20,14 @@ Sync und Ereignisse: [04-sync-protokoll.md](04-sync-protokoll.md). Wie `authoriz
    diesem Katalog und `x-rate-limit-class` mit der Klasse dieser Aktion. Das API-Team setzt das
    mit Lint-Regeln durch (`authz-action-required`: Feld fehlt; `authz-action-known`: ID nicht im
    Katalog). Zusätzlich prüft der Server beim Start, dass jede registrierte Route eine bekannte
-   Aktion hat, und ein Test zählt alle Routen. Eine maschinenlesbare Fassung dieses Katalogs als
-   einzige Quelle für Doku, Lint und Code ist beschlossen ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)); bis sie steht, hält ein
-   Abgleich im Doku-Gate die Listen in `docs/api/redocly.yaml` und die Tabellen von
-   [02-architektur.md](02-architektur.md) gleich mit diesem Kapitel.
+   Aktion hat, und ein Test zählt alle Routen. Die einzige Quelle dieses Katalogs für Doku, Lint
+   und Code ist [actions.yaml](actions.yaml) ([ADR 0049](../adr/0049-maschinenlesbarer-aktionskatalog-als-einzige-quelle.md)); die Tabellen der Abschnitte 3,
+   4, 6 und 7 und die Listen in `docs/api/redocly.yaml` werden daraus erzeugt (`make catalog`),
+   und `make catalog-check` hält sie im Gate.
 4. **WebSocket und Ereignisse.** Jede Op im AsyncAPI-Dokument trägt `x-authz-action`; jeder
    dauerhafte und kurzlebige Ereignistyp trägt `x-receive-action`. Abschnitt 6 und 7 sind die
-   normativen Tabellen. Ein Test schlägt fehl, wenn ein Typ oder eine Op ohne Eintrag
-   registriert ist.
+   normativen Tabellen; sie werden aus derselben Datei [actions.yaml](actions.yaml) erzeugt
+   (Regel 3). Ein Test schlägt fehl, wenn ein Typ oder eine Op ohne Eintrag registriert ist.
 5. **Katalog ist geschlossen.** Eine unbekannte Aktion ist ein Programmfehler: `authorize`
    lehnt ab, die Anfrage endet mit `500`, ein Alarm wird ausgelöst.
 6. **Agenten-Aufruf und I1.** Jede Auslösung eines Agenten (Nachricht, Nachtrag, Befehl,
@@ -238,6 +238,7 @@ Jede Klasse hat einen Schlüssel (wonach gezählt wird) und zwei Werte
 `ratelimit.<klasse>.per_minute` und `ratelimit.<klasse>.burst` (Token-Bucket). Standardwerte in
 Abschnitt 10.
 
+<!-- BEGIN GENERATED: rate_limit_classes -->
 | Klasse | Schlüssel | Zweck |
 |---|---|---|
 | `rl.public_auth` | Client-IP (IPv6: das /64-Präfix) | Anmeldung, Refresh, öffentliche Endpunkte; zählt zusätzlich jede gescheiterte Prüfung vorgelegter Anmeldedaten ([02-architektur.md](02-architektur.md), Abschnitt 9.1) |
@@ -257,6 +258,7 @@ Abschnitt 10.
 | `rl.import` | Prinzipal | Stapel eines laufenden Imports (`import.apply`) |
 | `rl.terminal` | Prinzipal | Terminal öffnen, anhängen, Strom verbinden |
 | `rl.host` | Rechner (nach der Prüfung des Anmeldeschlüssels) | Steuer- und Datenverbindungen des Host-Dienstes |
+<!-- END GENERATED: rate_limit_classes -->
 
 Systemaktionen und die internen Zustellprüfungen haben keine Klasse (`keine`).
 
@@ -270,6 +272,7 @@ Abschnitt 6.3).
 
 ### 4.1 Öffentlich und Anmeldung
 
+<!-- BEGIN GENERATED: actions.public -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `instance.discovery.read` | JWKS, Protokollversionen, minimales Branding, Branding-Logo | instance | public | nein | nein | nein | nein | `rl.public_auth` |
@@ -279,9 +282,11 @@ Abschnitt 6.3).
 | `auth.logout` | eigene Sitzung beenden; Push-Registrierungen dieser Sitzung werden deaktiviert | auth_session | self | nein | nein | ja | nein | `rl.write` |
 | `auth.step_up` | frische Bestätigung erbringen (Passkey, Step-up-Geräteschlüssel, Passwort mit TOTP, erneute OIDC-Anmeldung) | auth_session | self | nein | nein | ja | nein | `rl.public_auth` |
 | `status.public.read` | Statusseite ohne Anmeldung, nur wenn `status.public_enabled` | instance | public | nein | nein | nein | nein | `rl.public_auth` |
+<!-- END GENERATED: actions.public -->
 
 ### 4.2 Instanz und Verwaltung
 
+<!-- BEGIN GENERATED: actions.instance -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `instance.read` | Instanz-Daten für Clients: Branding, Sprache, Grenzen, für den anfragenden Prinzipal ausgewertete Feature-Flags (inklusive Rollout je Person und Gruppe) | instance | auth | nein | nein | nein | nein | `rl.read` |
@@ -304,9 +309,11 @@ Abschnitt 6.3).
 | `access.explain` | "Wer hat Zugriff?" mit Herkunft (direkt, Gruppe, geerbt, Bediener, indirekt über Agent) | space, channel | owner oder manage | nein | nein | nein | nein | `rl.read` |
 | `access.preview` | Trockenlauf einer Aktion mit Spalte "Rechte" = `ja`: Unterschiede je Prinzipal, I1, SR8, Hinweise in Klartext; die Transaktion wird zurückgerollt; Grenzen der Delegation ergeben `allowed = false` statt einer Ablehnung ([07-rechte.md](07-rechte.md), Abschnitt 9.3) | wie die Zielaktion | Recht der Zielaktion | wie Zielaktion | nein | nein | nein | `rl.admin` |
 | `access.view_as` | "Als Person ansehen", nur lesend | user | owner | ja | ja | ja | nein | `rl.admin` |
+<!-- END GENERATED: actions.instance -->
 
 ### 4.3 Menschen, Identität, Geräte, Tokens
 
+<!-- BEGIN GENERATED: actions.identity -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `self.read` | eigenen Prinzipal lesen (`GET /me`), für Menschen, Agenten und Apps; auch für ein wartendes Gerät | principal | auth und self | nein | nein | nein | nein | `rl.read` |
@@ -332,9 +339,11 @@ Abschnitt 6.3).
 | `token.list` | API-Tokens lesen (nur Präfix) | principal | owner; self bei eigenen | nein | nein | nein | nein | `rl.read` |
 | `token.create` | API-Token für Agent oder App erzeugen; persönliches Token nur für sich selbst und nur mit Schalter `tokens.personal_enabled` | principal | owner; self bei eigenem | nein | ja | ja | nein | `rl.admin` |
 | `token.revoke` | API-Token widerrufen | api_token | owner; self bei eigenem | nein | nein | ja | ja | `rl.admin` |
+<!-- END GENERATED: actions.identity -->
 
 ### 4.4 Gruppen und Freigaben
 
+<!-- BEGIN GENERATED: actions.grants -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `group.read` | Gruppen und Mitglieder lesen; eigene Gruppen auch ohne Owner | group | owner oder self | nein | nein | nein | nein | `rl.read` |
@@ -349,12 +358,14 @@ Abschnitt 6.3).
 | `grant.create` | Freigabe anlegen. Mit `manage` nur bis zur eigenen Stufe, nur eigene Zusatzrechte, nur an Menschen und Gruppen, nie auf der Instanz (R-AZ-05). Freigaben an Agenten und Apps nur Owner; Agenten und Apps nie `trigger`, als Zusatzrecht nur `upload`. Auf einem Rechner (`host`) nur Owner, nur an Menschen und Gruppen, ohne Stufe, genau `terminal`; I6 (Regel 1.11). Optional `resolve_i1` | instance, space, channel, host | owner oder manage (auf `host` nur owner) | nein | ja | ja | ja | `rl.admin` |
 | `grant.revoke` | Freigabe widerrufen; mit `manage` nur Freigaben, die man nach R-AZ-05 selbst hätte anlegen dürfen | grant | owner oder manage | nein | ja | ja | ja | `rl.admin` |
 | `grant.expire` | abgelaufene Freigabe melden (Job `authz.expiry_sweep`): Rechte-Version, `access.changed`, Abbruch betroffener Läufe | grant | system | nein | nein | ja | ja | keine |
+<!-- END GENERATED: actions.grants -->
 
 Ablauf wirkt bei jedem `authorize` ab der Sekunde des Ablaufs; die beiden Systemaktionen sorgen
 nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 
 ### 4.5 Bereiche, Kanäle, Seitenleiste
 
+<!-- BEGIN GENERATED: actions.structure -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `space.read` | Bereich sehen; gilt bei `read` auf dem Bereich oder auf mindestens einem seiner Kanäle | space | read | nein | nein | nein | nein | `rl.read` |
@@ -377,9 +388,11 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | `forum_tag.manage` | Tags eines Forums anlegen, ändern, löschen | channel | manage | nein | nein | ja | nein | `rl.admin` |
 | `dm.create` | Direktnachricht mit anderen Menschen anlegen; nur mit Schalter `dm.enabled` | instance | human | nein | nein | nein | nein | `rl.write` |
 | `dm.leave` | DM verlassen | channel | participant | nein | nein | nein | nein | `rl.write` |
+<!-- END GENERATED: actions.structure -->
 
 ### 4.6 Threads und Agenten-Sitzungen
 
+<!-- BEGIN GENERATED: actions.threads -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `thread.read` | Thread und Verlauf lesen | thread | read | nein | nein | nein | nein | `rl.read` |
@@ -393,9 +406,11 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | `agent_session.reset` | neue Sitzung im Thread beginnen (z. B. `/new`) | thread | trigger und `agent.invoke` | nein | nein | nein | nein | `rl.trigger` |
 | `agent_session.bind` | vorhandene externe Sitzung an den Thread binden (Fortsetzen) | thread | trigger und `agent.invoke` | nein | nein | ja | nein | `rl.trigger` |
 | `agent_session.report` | Adapter meldet externe Sitzungs-Referenz, Modell, `started` oder `bind_failed`; die erste Meldung legt die Zeile an, wenn `run.start` keine Referenz trug (Compare-and-swap) | agent_session, run | agent-self | nein | nein | nein | nein | `rl.agent_runtime` |
+<!-- END GENERATED: actions.threads -->
 
 ### 4.7 Nachrichten, Reaktionen, Anheften, Vorlagen
 
+<!-- BEGIN GENERATED: actions.messages -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `message.read` | Nachricht lesen | message | read | nein | nein | nein | nein | `rl.read` |
@@ -410,9 +425,11 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | `mention.list` | eigene Erwähnungen lesen (gefiltert durch `message.read`) | user | self | nein | nein | nein | nein | `rl.read` |
 | `template.read` | Vorlagen lesen (eigene und des Kanals) | channel, user | read bzw. self | nein | nein | nein | nein | `rl.read` |
 | `template.manage` | eigene Vorlagen pflegen (Ressource `user`); Kanal-Vorlagen mit `manage` (Ressource `channel`) | user, channel | self oder manage | nein | nein | nein | nein | `rl.write` |
+<!-- END GENERATED: actions.messages -->
 
 ### 4.8 Dateien und Suche
 
+<!-- BEGIN GENERATED: actions.files -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `file.upload` | Datei für einen Kanal hochladen (Upload-Sitzung, Teile, Abschluss); Avatar und Logo laufen über `self.profile.update`, `agent.update` bzw. `instance.branding.update` | channel | write und +upload | nein | nein | ja bei Malware-Fund | nein | `rl.upload` |
@@ -421,9 +438,11 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | `file.transcribe` | Transkription einer Sprachnachricht durch den Server anstoßen (Schalter `voice.enabled`) | file | write | nein | nein | nein | nein | `rl.upload` |
 | `file.transcript.submit` | Transkript einer Sprachnachricht speichern (`transcript_source = 'agent'`), mit `If-Match` | file | agent-self: Bediener des Threads, an dessen Nachricht die Datei hängt, und read | nein | nein | nein | nein | `rl.agent_runtime` |
 | `search.query` | Volltextsuche; Treffer gefiltert durch `message.read`, `thread.read`, `file.read` | instance | auth | nein | nein | nein | nein | `rl.search` |
+<!-- END GENERATED: actions.files -->
 
 ### 4.9 Persönliche Daten, Benachrichtigung, Sync
 
+<!-- BEGIN GENERATED: actions.personal -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `read_state.update` | Gelesen-Stand vorrücken | thread | self und read | nein | nein | nein | nein | `rl.write` |
@@ -443,9 +462,11 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | `gateway.connect` | WebSocket `identify` oder `resume` | instance | auth (Mensch mit aktivem Gerät, Agent, App mit `events:subscribe`) | nein | nein | abl | nein | `rl.gateway_connect` |
 | `gateway.focus` | Threads fokussieren; nicht lesbare werden still ignoriert | thread | read | nein | nein | nein | nein | `rl.read` |
 | `typing.start` | Tippen anzeigen; nur Menschen, Agenten zeigen Tippen über ihren Lauf (04, Abschnitt 12) | thread | human und write | nein | nein | nein | nein | `rl.typing` |
+<!-- END GENERATED: actions.personal -->
 
 ### 4.10 Agenten, Befehle, Läufe, Interaktionen
 
+<!-- BEGIN GENERATED: actions.agents -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `agent.read` | Agenten-Karte lesen (Name, Modus-Abzeichen, Werkzeugklasse, Präsenz); der Agent liest sich selbst, auch das Soll seiner Backend-Richtlinie | agent | owner oder agent-self oder read auf einem Kanal, den der Agent bedient | nein | nein | nein | nein | `rl.read` |
@@ -479,9 +500,11 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | `component.update` | eigene Komponenten deaktivieren oder ändern | component | Autor der Nachricht (agent-self bzw. app-self) | nein | nein | nein | nein | `rl.write` |
 | `interaction.create` | Komponente bedienen (Einmal-Regel je Nachricht); `required_capability` und `restricted_to` (`any`, `run_starter`, `owner`) beachten; bei Komponenten eines Agenten zusätzlich `agent.invoke` | component | trigger | nein | nein | ja bei `approve_actions`, sonst abl | nein | `rl.interaction` |
 | `interaction.respond` | Eigentümer bestätigt oder beantwortet eine Interaktion | interaction | agent-self bzw. app-self | nein | nein | nein | nein | `rl.agent_runtime` |
+<!-- END GENERATED: actions.agents -->
 
 ### 4.11 Apps und Webhooks
 
+<!-- BEGIN GENERATED: actions.apps -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `app.read` | Apps, Manifeste, Installationen lesen | app | owner | ja | nein | nein | nein | `rl.read` |
@@ -498,9 +521,11 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | `webhook_in.create` | Eingangs-Webhook für einen Kanal anlegen | channel | manage | nein | ja | ja | nein | `rl.admin` |
 | `webhook_in.revoke` | Eingangs-Webhook widerrufen | incoming_webhook | manage | nein | ja | ja | nein | `rl.admin` |
 | `webhook_in.post` | Nachricht über Eingangs-Webhook; schreibt als App mit `origin = app` | channel | public mit Token; App braucht write | nein | nein | abl | nein | `rl.webhook_in` |
+<!-- END GENERATED: actions.apps -->
 
 ### 4.12 Import, Kosten, Datenschutz, Status
 
+<!-- BEGIN GENERATED: actions.operations -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `import.read` | Importquellen, Fortschritt, Fehler lesen | import_source | owner | ja | nein | nein | nein | `rl.read` |
@@ -519,22 +544,26 @@ nur dafür, dass Clients ihren Cache räumen und Läufe enden (R-AZ-15).
 | `gdpr.export.download` | Exportpaket herunterladen | gdpr_request | self (Betroffene Person) oder owner | nein | ja | ja | nein | `rl.export` |
 | `status.read` | Statusseite lesen | instance | auth | nein | nein | nein | nein | `rl.read` |
 | `status.manage` | Komponenten und Störungen pflegen | instance | owner | ja | nein | ja | nein | `rl.admin` |
+<!-- END GENERATED: actions.operations -->
 
 ### 4.13 Dev-Umgebungen (Etappe)
 
 Gehören zur Etappe "Mehrbenutzer-Dev-Umgebung"; Routen entstehen mit ihr
 ([21-dev-isolation.md](21-dev-isolation.md)).
 
+<!-- BEGIN GENERATED: actions.dev -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `dev_environment.read` | Umgebung, Zustand und Prüfergebnisse lesen | dev_environment | owner oder self | nein | nein | nein | nein | `rl.read` |
 | `dev_environment.manage` | Umgebung anlegen, freigeben, sperren, zurückziehen | dev_environment | owner | ja | ja | ja | ja | `rl.admin` |
 | `dev_environment.report` | Runner meldet Prüfergebnisse und Bereitschaft | dev_environment | agent-self (Runner der Umgebung) | nein | nein | ja | nein | `rl.agent_runtime` |
+<!-- END GENERATED: actions.dev -->
 
 ### 4.14 Rechner und Terminal
 
 Normativ zusammen mit [24-terminal.md](24-terminal.md). Etappe M2.
 
+<!-- BEGIN GENERATED: actions.terminal -->
 | ID | Beschreibung | Ressource | Recht | Owner | Step-up | Audit | Rechte | RL-Klasse |
 |---|---|---|---|---|---|---|---|---|
 | `host.read` | Rechner lesen: Name, Zustand, Plattform, Profile, Fingerabdruck, LLM-Erklärung, Prüfergebnisse; Owner alle, sonst Rechner, deren Inhaber man ist oder auf denen man eine Freigabe `terminal` hat | host | owner oder assignee oder +terminal | nein | nein | nein | nein | `rl.read` |
@@ -547,6 +576,7 @@ Normativ zusammen mit [24-terminal.md](24-terminal.md). Etappe M2.
 | `terminal.read_own` | eigene Terminal-Sitzungen lesen; Owner lesen alle | terminal_session, host | self oder owner | nein | nein | nein | nein | `rl.read` |
 | `terminal.close` | Sitzung beenden; eigene, Owner jede | terminal_session | self oder owner | nein | nein | ja | nein | `rl.write` |
 | `terminal.terminate` | Sitzung durch den Server beenden: Entzug, Leerlauf, Höchstdauer, Trennung über `terminal.detach_grace`, Sperre, Abmeldung, Zustandswechsel des Rechners, Ende des Prozesses | terminal_session | system | nein | nein | ja | nein | keine |
+<!-- END GENERATED: actions.terminal -->
 
 Agenten, Apps und persönliche Tokens erreichen keine dieser Aktionen außer `host.pair` und
 `host.connect`, die keinen Prinzipal aus `principals` haben (`subject_kind_not_allowed`, SR5).
@@ -626,6 +656,7 @@ sieht. Bei Ablehnung erst vor der Zustellung: Lauf `failed` mit Grund, `trigger_
 Ein Empfänger bekommt ein Ereignis nur, wenn `authorize(empfänger, receive_action, resource)`
 erlaubt. Persönliche Ereignisse (`audience = self`) gehen nur an den genannten Prinzipal.
 
+<!-- BEGIN GENERATED: events.durable -->
 | Ereignistyp | Ressource | Empfangs-Aktion | Hinweis |
 |---|---|---|---|
 | `message.created` | message | `message.read` | Echo mit `client_msg_id` an den Autor |
@@ -678,9 +709,11 @@ erlaubt. Persönliche Ereignisse (`audience = self`) gehen nur an den genannten 
 | `agent.config_changed` | channel | self (Agent) und `agent.config.read` | Prompt, Skills, Projektbindung geändert |
 | `host.updated` | host | `host.read` | auch beim Anlegen; Zustand, Inhaber, LLM-Erklärung, Profile, Prüfergebnisse; `key_changed` bei Neukopplung; nie Schlüssel |
 | `terminal_session.changed` | terminal_session | self | an die Person der Sitzung: Zustand, Gerät, `close_reason`; nie Inhalte |
+<!-- END GENERATED: events.durable -->
 
 Kurzlebige Ereignisse:
 
+<!-- BEGIN GENERATED: events.ephemeral -->
 | Ereignistyp | Ressource | Empfangs-Aktion | Zusatzbedingung |
 |---|---|---|---|
 | `typing.started` | thread | `thread.read` | Thread im Fokus |
@@ -690,12 +723,14 @@ Kurzlebige Ereignisse:
 | `stats.live` | instance, space | `stats.read` | nur an Verbindungen mit Abo `stats.subscribe`; Inhalt gefiltert auf die sichtbaren Kanäle, Kosten nur mit `cost.read.aggregate` ([25-visualisierung.md](25-visualisierung.md), Abschnitt 5) |
 | `notification.created` | thread | self und `push.deliver` | nur an Verbindungen des Empfängers, statt eines Pushes an dieses Gerät ([13-push-benachrichtigungen.md](13-push-benachrichtigungen.md), Abschnitt 6.3) |
 | `command.autocomplete_requested` | command | self (Eigentümer des Befehls); Agent zusätzlich `agent.events.consume` | trägt eine Marke mit `trigger_kind = autocomplete`; nur an eine Gateway-Verbindung des Eigentümers |
+<!-- END GENERATED: events.ephemeral -->
 
 Ausgehende Webhooks und Push nutzen dieselbe Empfangs-Aktion (`webhook_out.deliver`,
 `push.deliver`).
 
 ## 7. WebSocket-Ops und Aktion
 
+<!-- BEGIN GENERATED: ws_ops -->
 | Op | Richtung | Aktion |
 |---|---|---|
 | `identify` | Client an Server | `gateway.connect` |
@@ -711,9 +746,11 @@ Ausgehende Webhooks und Push nutzen dieselbe Empfangs-Aktion (`webhook_out.deliv
 | `stats.subscribe`, `stats.unsubscribe` | Client an Server | `stats.read` auf Instanz bzw. Bereich |
 | `hello`, `ready`, `resumed`, `cursor`, `catchup.complete`, `resync_required`, `heartbeat_ack`, `reauth_required`, `error` | Server an Client | keine eigene; Teil der Sitzung aus `gateway.connect` |
 | `dispatch` | Server an Client | Empfangs-Aktion des Ereignistyps (Abschnitt 6) |
+<!-- END GENERATED: ws_ops -->
 
 Terminal-Kanäle ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/asyncapi.yaml)):
 
+<!-- BEGIN GENERATED: channel_ops -->
 | Kanal | Op | Richtung | Aktion |
 |---|---|---|---|
 | Strom des Geräts `/terminal/sessions/{session_id}/stream` | `hello` | Server an Gerät | `terminal.stream` |
@@ -724,6 +761,7 @@ Terminal-Kanäle ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/async
 | | `identify`, `heartbeat`, `report`, `session.started`, `session.ended` | Rechner an Server | `host.connect` |
 | Daten `/hosts/sessions/{session_id}/stream` | `hello`, `identify`, Binärrahmen (Noise) | beide | `host.connect` (Sitzung gehört dem Rechner) |
 | | `error` | Server an Rechner | `host.connect` |
+<!-- END GENERATED: channel_ops -->
 
 ## 8. Entscheidungen dieses Kapitels
 

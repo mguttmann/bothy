@@ -25,6 +25,7 @@ Versionen laufen wie in CI. Einrichtung einmal je Klon: `make bootstrap`.
 | `docs/config_reference.py` | Abschnitt 4 der Konfigurationsreferenz aus den Kapiteltabellen erzeugen und prüfen, doppelte Namen ablehnen | `config-reference`, `docs` | `docs/tests/` |
 | `docs/render_diagrams.py` | jedes Mermaid-Diagramm rendert | `diagrams` | `docs/tests/` |
 | `docs/mkdocs_repo_links.py` | MkDocs-Hook: Links auf vorhandene Dateien außerhalb von `docs/` zeigen in der Site auf das Repository | `docs` | `docs/tests/` |
+| `catalog/` | Aktionskatalog `docs/spec/actions.yaml` laden und prüfen, Tabellen von Kapitel 05 und Listen in `docs/api/redocly.yaml` daraus erzeugen ([README](catalog/README.md)) | `catalog`, `catalog-check` | `catalog/tests/` |
 | `docs/tests/test_config_values.py`, `docs/tests/test_toolchain_doc.py` | Zahlen- und Versionswächter für die Doku | `test` | |
 | `sonarqube/` | lokaler SonarQube und Abgleich von Profil und Gate ([README](sonarqube/README.md)) | `sonar-up`, `sonar-config`, `sonar-config-check` | `sonarqube/tests/` |
 | `design-tokens/` | Design-Tokens in CSS, Dart, Kontrasttabelle und Vorschau übersetzen (Kapitel 15, Design-System) | `tokens` (`design-tokens/Makefile`, Ziel `check`) | `design-tokens/tests/` (unittest, über `make tokens`) |
