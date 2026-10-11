@@ -138,7 +138,7 @@ Technik ohne Fachlogik; nur `adapters/`, `wire` und `cmd` dürfen sie importiere
 | `otel` | Telemetrie-Setup, gekapselte `gen_ai.*`-Attribute (R-Telemetrie) |
 | `health` | `/healthz` und `/readyz` auf dem internen Listener `server.internal_listen_addr` (L2) |
 | `lifecycle` | Start-Reihenfolge und Shutdown je Rolle (02, Abschnitt 15) |
-| `egress` | Client für ausgehende Aufrufe mit Fristen und Grenzen (19-sicherheit.md) |
+| [`egress`](internal/platform/egress/README.md) | einziger Client für ausgehende HTTP-Verbindungen: Ziel-Erlaubnisliste, IP-Prüfung beim Verbindungsaufbau, geprüfte Weiterleitungen, Fristen und Größengrenzen, Loopback-Client für den Health-Check (19-sicherheit.md, Abschnitt 8; gebaut in M1-22) |
 | `buildinfo` | Version des Servers als Konstante gleich `VERSION` (18-release.md) |
 
 ## Regeln, die das Gate hält

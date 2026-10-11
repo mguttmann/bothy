@@ -17,11 +17,13 @@ type configCheck struct {
 	fn   func(*config.Values) error
 }
 
-// configChecks are the cross-checks of docs/spec/02-architektur.md "Konfigurationsladen" item 4.
-// Their errors become problem messages verbatim, so they name keys and never values.
+// configChecks are the cross-checks of docs/spec/02-architektur.md "Konfigurationsladen" item 4,
+// and the check of a key whose entries a platform package parses (egress_allowed_hosts, in
+// egress.go). Their errors become problem messages verbatim, so they name keys and never values.
 var configChecks = []configCheck{
 	{name: "listeners_distinct", keys: []string{"server.listen_addr", "server.internal_listen_addr"}, fn: listenersDistinct},
 	{name: "json_limit_above_message", keys: []string{"http.max_json_body_bytes", "message.max_content_bytes"}, fn: jsonLimitAboveMessage},
+	{name: "egress_allowed_hosts", keys: []string{"egress.allowed_hosts"}, fn: egressAllowedHosts},
 }
 
 // listenersDistinct rejects a public and an internal listener that would bind the same socket:

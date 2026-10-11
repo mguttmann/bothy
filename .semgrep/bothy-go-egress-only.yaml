@@ -1,0 +1,95 @@
+# SPDX-License-Identifier: Apache-2.0
+rules:
+  - id: bothy-go-egress-only
+    languages: [go]
+    severity: ERROR
+    message: >-
+      Outgoing HTTP connections go only through internal/platform/egress (egress.New, or
+      egress.NewLoopback for the health probe): it checks the target before the connection
+      and the address after DNS resolution (docs/spec/19-sicherheit.md SEC-NET-1 to
+      SEC-NET-5). Default clients, own clients, transports, dialers and reverse proxies
+      bypass these checks. Only the egress package itself builds transports; each such
+      construction carries one `nosemgrep` comment with this rule id and the reason.
+    paths:
+      # Test code: Go tests, the test support of services/*/test and the load tests of
+      # services/*/perf (docs/spec/02-architektur.md "Code-Layout").
+      exclude: ["*_test.go", "test/", "tests/", "testsuite/", "/services/*/perf/"]
+    pattern-either:
+      # Default clients and the package functions that use them; a reference without a call
+      # (get := http.Get) is a use as well.
+      - pattern: http.DefaultClient
+      - pattern: http.DefaultTransport
+      - pattern: http.Get
+      - pattern: http.Head
+      - pattern: http.Post
+      - pattern: http.PostForm
+      - pattern: httputil.NewSingleHostReverseProxy
+      - pattern: httputil.ReverseProxy{...}
+      # Own clients, transports and dialers, also as zero values.
+      - pattern: http.Client{...}
+      - pattern: new(http.Client)
+      - pattern: var $X http.Client
+      - pattern: http.Transport{...}
+      - pattern: new(http.Transport)
+      - pattern: var $X http.Transport
+      - pattern: net.Dial
+      - pattern: net.DialTimeout
+      - pattern: net.DialTCP
+      - pattern: net.Dialer{...}
+      - pattern: new(net.Dialer)
+      - pattern: var $X net.Dialer
+      - pattern: tls.Dial
+      - pattern: tls.DialWithDialer
+      - pattern: tls.Dialer{...}
+      - pattern: new(tls.Dialer)
+      - pattern: var $X tls.Dialer
+      # Values of these types inside other declarations and literals: zero values, fields,
+      # type definitions and aliases, collections. A zero http.Client uses
+      # http.DefaultTransport, a zero net.Dialer or tls.Dialer dials anything. The regular
+      # expression reads the type as written, so these forms need the package names http,
+      # net and tls; the explicit patterns above also follow renamed imports.
+      - patterns:
+          - pattern-either:
+              - pattern: var $X $TYPE
+              - pattern: $TYPE{...}
+              - pattern: type $A $TYPE
+              - pattern: type $A = $TYPE
+              - pattern: |
+                  type $T struct {
+                    ...
+                    $F $TYPE
+                    ...
+                  }
+              - pattern: |
+                  type $T struct {
+                    ...
+                    $F struct {
+                      ...
+                      $G $TYPE
+                      ...
+                    }
+                    ...
+                  }
+              - pattern: |
+                  var $V struct {
+                    ...
+                    $F $TYPE
+                    ...
+                  }
+              - pattern: |
+                  struct {
+                    ...
+                    $F $TYPE
+                    ...
+                  }{...}
+          - metavariable-regex:
+              metavariable: $TYPE
+              regex: '^(\[[^\]]*\]|map\[[^\]]*\])*(http\.(Client|Transport)|(net|tls)\.Dialer)$'
+      # An embedded value; Semgrep matches an embedded field without its "*", so a line that
+      # holds only the type tells a value from a pointer, which its owner fills.
+      - patterns:
+          - pattern-inside: |
+              type $T struct { ... }
+          - pattern-regex: '(?m)^\s*(http\.(Client|Transport)|(net|tls)\.Dialer)[ \t]*(//.*)?$'
+      # A client copy without the checking transport falls back to http.DefaultTransport.
+      - pattern: $C.Transport = nil

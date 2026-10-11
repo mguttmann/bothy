@@ -35,6 +35,9 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"server.internal_listen_addr": {Kind: config.KindListenAddr, Default: "127.0.0.1:8081", Chapter: "16-betrieb.md"},
 		"http.max_json_body_bytes":    {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "02-architektur.md"},
 		"message.max_content_bytes":   {Kind: config.KindInt, Default: "262144", Min: "1", Chapter: "03-datenmodell.md"},
+		"egress.allowed_hosts":        {Kind: config.KindStringList, Default: "", Chapter: "19-sicherheit.md"},
+		"egress.timeout":              {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "19-sicherheit.md"},
+		"egress.max_response_bytes":   {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "19-sicherheit.md"},
 	}
 	if len(got) != len(want) {
 		t.Errorf("schema has %d keys, want %d", len(got), len(want))

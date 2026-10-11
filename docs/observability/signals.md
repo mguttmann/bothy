@@ -266,6 +266,7 @@ Diese Liste ist gleich der Allowlist in [infra/otel/collector.yaml](../../infra/
 | `bothy.close.code` | Schließ-Code aus [04-sync-protokoll.md](../spec/04-sync-protokoll.md) 6.4 | |
 | `bothy.correlation_id` | UUID | nur in Logs; in Spans ist es die Trace-ID |
 | `bothy.decision` | Entscheidung aus [05-aktionen.md](../spec/05-aktionen.md) 2.5 | |
+| `bothy.egress.purpose` | Zweck eines Egress-Clients aus dem Code (`oidc`, `webhook`, ...) | nur in Logs abgewiesener Verbindungen ([19-sicherheit.md](../spec/19-sicherheit.md) SEC-NET-5) |
 | `bothy.event.durability` | `durable`, `ephemeral` | |
 | `bothy.event.seq` | globale Sequenz | nie an Metriken |
 | `bothy.event.type` | Ereignistyp aus [05-aktionen.md](../spec/05-aktionen.md) 6 | |

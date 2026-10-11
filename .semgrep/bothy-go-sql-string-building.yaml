@@ -3,6 +3,9 @@ rules:
   - id: bothy-go-sql-string-building
     languages: [go]
     severity: ERROR
+    paths:
+      # Test code, which Semgrep's built-in ignore list skipped before .semgrepignore existed.
+      exclude: ["*_test.go", "test/", "tests/", "testsuite/"]
     message: >-
       SQL lives in sqlc query files with parameters (ADR 0007). Building a statement
       at runtime with fmt.Sprintf or string concatenation invites SQL injection.
