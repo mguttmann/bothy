@@ -114,7 +114,7 @@ file name and, with `BOTHY_CODERABBIT=1`, also runs the CodeRabbit CLI.
   that provider's format (for example `whsec_EXAMPLE`), and a test that needs a full-length
   sample assembles it at runtime. gitleaks (for the formats its rules know) and the
   `secret-formats` hook (`whsec_`) reject such values; not every GitHub pattern is covered
-  ([what the gates do not cover](docs/quality/gates.md#was-die-gates-nicht-abdecken), with
+  ([what the gates do not cover](docs/quality/gates.md#what-the-gates-do-not-cover), with
   GitHub's [supported patterns](https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns), retrieved 2026-10-11).
   Identifiers in examples are UUIDs, people are Alex, Sam and Robin, domains are
   `example.com`.
