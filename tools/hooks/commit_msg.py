@@ -139,10 +139,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if failed else 0
     if args.msgfile is None:
         parser.error("either MSGFILE or --range is required")
+    # Only the sign-off check needs the author; the pull request title is checked on a CI
+    # runner, which has no git identity.
     errors = check_message(
         args.msgfile.read_text(encoding="utf-8"),
         require_signoff=args.require_signoff,
-        author=_author_ident(args.repo),
+        author=_author_ident(args.repo) if args.require_signoff else "",
     )
     for err in errors:
         print(f"commit message: {err}")

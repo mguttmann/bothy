@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 from pathlib import Path
 
 import commit_msg
@@ -10,6 +12,9 @@ import pytest
 from git_fixtures import commit, git, init_repo
 
 ALEX = "Alex Example <alex@example.com>"
+REPO = Path(__file__).resolve().parents[3]
+# The test may run under `make test`; its make flags must not reach the make run below.
+_MAKE_VARIABLES = {"MAKEFLAGS", "MAKELEVEL", "MFLAGS"}
 
 
 def _check(
@@ -129,3 +134,35 @@ def test_file_mode_reads_message_file(repo: Path, tmp_path: Path) -> None:
     msg = tmp_path / "MSG"
     msg.write_text("feat: x\n\nSigned-off-by: Alex Example <alex@example.com>\n")
     assert commit_msg.main(["--repo", str(repo), "--require-signoff", str(msg)]) == 0
+
+
+def test_file_mode_without_signoff_needs_no_identity(tmp_path: Path) -> None:
+    """Without --require-signoff the message alone counts; tests have no git identity."""
+    repo = tmp_path / "plain"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True, timeout=60)
+    msg = tmp_path / "MSG"
+    msg.write_text("fix: keep the gates green\n")
+    assert commit_msg.main(["--repo", str(repo), str(msg)]) == 0
+
+
+@pytest.mark.parametrize(
+    ("title", "passes"),
+    [("fix: keep the gates green", True), ("Keep the gates green", False)],
+    ids=["conventional title", "plain title"],
+)
+def test_commitlint_recipe_checks_the_pull_request_title(title: str, *, passes: bool) -> None:
+    """The CI job gates sets PR_TITLE on every pull request, on a runner without git identity."""
+    env = {k: v for k, v in os.environ.items() if k not in _MAKE_VARIABLES}
+    env.update(COMMIT_RANGE="HEAD..HEAD", PR_TITLE=title)
+    run = subprocess.run(
+        ["make", "-s", "-C", str(REPO), "commitlint"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+    output = run.stdout + run.stderr
+    assert "CalledProcessError" not in output, output
+    assert (run.returncode == 0) is passes, output
+    assert ("commit message: " in run.stdout) is not passes, output
