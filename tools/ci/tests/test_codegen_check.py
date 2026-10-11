@@ -4,31 +4,22 @@
 from __future__ import annotations
 
 import hashlib
-import subprocess
 import sys
 from pathlib import Path
 
 import codegen_check as cc
 import pytest
-
-
-def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
+from git_fixtures import commit, init_repo
 
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
-    root = tmp_path / "repo"
-    root.mkdir()
-    _git(root, "init", "-q", "-b", "main")
-    _git(root, "config", "commit.gpgsign", "false")
+    root = init_repo(tmp_path / "repo")
     (root / ".gitignore").write_text("build/\n")
     (root / "gen").mkdir()
     (root / "gen" / "a.go").write_text("package gen\n")
     (root / "keep.txt").write_text("kept\n")
-    _git(root, "add", ".")
-    _git(root, "config", "core.hooksPath", "/dev/null")
-    _git(root, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "x")
+    commit(root, "x")
     return root
 
 

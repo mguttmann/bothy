@@ -40,7 +40,7 @@ package = false
 minversion = "9.0"
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 testpaths = ["bin", "ci", "denylist", "docs", "hooks", "sonarqube"]
-pythonpath = ["bin", "ci", "denylist", "docs", "hooks", "sonarqube", "sonarqube/tests"]
+pythonpath = ["bin", "ci", "denylist", "docs", "hooks", "sonarqube", "sonarqube/tests", "testing"]
 filterwarnings = ["error"]
 
 [tool.coverage.run]

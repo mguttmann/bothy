@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 import review_gate
+from git_fixtures import commit, init_repo
 
 ENV_NAMES = (
     "PRE_COMMIT_TO_REF",
@@ -25,14 +26,8 @@ def _clean_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def repo(tmp_path: Path) -> Path:
-    def git(*args: str) -> None:
-        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
-
-    git("init", "-q", "-b", "main")
-    git("config", "user.name", "Alex Example")
-    git("config", "user.email", "alex@example.com")
-    git("config", "commit.gpgsign", "false")
-    git("commit", "-q", "--allow-empty", "-m", "docs: start")
+    init_repo(tmp_path)
+    commit(tmp_path, "docs: start")
     return tmp_path
 
 
@@ -72,9 +67,7 @@ def test_yes_must_be_the_last_line(repo: Path) -> None:
 
 def test_pushed_sha_comes_from_pre_commit(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     old = head(repo)
-    subprocess.run(
-        ["git", "-C", str(repo), "commit", "-q", "--allow-empty", "-m", "docs: next"], check=True
-    )
+    commit(repo, "docs: next")
     write_report(repo, head(repo), "Urteil: JA")
     monkeypatch.setenv("PRE_COMMIT_TO_REF", old)
     assert review_gate.main(["--repo", str(repo)]) == 1

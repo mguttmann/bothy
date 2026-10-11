@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from git_fixtures import commit, init_repo
 
 REPO = Path(__file__).resolve().parents[3]
 SERVER_GATES = ["codegen-check", "arch", "migrations-lint", "perf"]
@@ -150,16 +151,9 @@ def fakes(tmp_path: Path) -> Fakes:
     return Fakes(root, module)
 
 
-def _git(repo: Path, *args: str) -> None:
-    subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
-
-
 def _commit_all(repo: Path) -> None:
-    _git(repo, "init", "-q", "-b", "main")
-    _git(repo, "config", "commit.gpgsign", "false")
-    _git(repo, "config", "core.hooksPath", "/dev/null")
-    _git(repo, "add", ".")
-    _git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "x")
+    init_repo(repo)
+    commit(repo, "x")
 
 
 def _recipe_command(
