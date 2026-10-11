@@ -1,16 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Reject values in the format of a provider secret that GitHub secret scanning reports.
+"""Reject values in the Stripe webhook secret format that GitHub secret scanning reports.
 
 GitHub scans every pushed file for the secret formats of its partners and opens an alert for
 each match, whatever the text around it says; a gitleaks stopword such as EXAMPLE does not
 count there. The first public push raised alerts of type stripe_webhook_signing_secret for
 documentation placeholders with 31 and 32 characters after the prefix `whsec_`, which Stripe
 shares with Standard Webhooks. Example values therefore stay short of the format
-(`whsec_EXAMPLE`, CONTRIBUTING.md), and tests assemble their samples at runtime.
+(`whsec_EXAMPLE`, CONTRIBUTING.md), and tests assemble their samples at runtime. Other
+third-party formats are left to gitleaks, whose EXAMPLE marker exempts only this product's
+own token formats and generic key-like values (.gitleaks.toml).
 
 GitHub does not publish its patterns. The check reports `whsec_` followed by 16 or more
-base64 characters: a real secret has 32, GitHub reported 31, and the margin covers a shorter
-pattern. Binary files (NUL byte in the first block) are skipped.
+base64 characters: a real secret has at least 32, GitHub reported 31, and the margin covers a
+shorter pattern. Binary files (NUL byte in the first block) are skipped.
 
 Usage:
   secret_formats.py FILE...   check the given files (pre-commit passes staged files)
@@ -71,9 +73,9 @@ def _allowed(path: Path) -> bool:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Check the given or all tracked files; returns 1 if a value in a provider format was found."""
+    """Check the given or all tracked files; returns 1 if a value in the whsec_ format was found."""
     parser = argparse.ArgumentParser(
-        description="Reject values in a provider secret format (GitHub secret scanning)."
+        description="Reject the Stripe webhook secret format whsec_ (GitHub secret scanning)."
     )
     parser.add_argument("--all", action="store_true", help="check every tracked file")
     parser.add_argument("files", nargs="*", type=Path)

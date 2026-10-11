@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Tests for the provider secret format check (GitHub secret scanning).
+"""Tests for the Stripe webhook secret format check (GitHub secret scanning).
 
 Samples are assembled at runtime, so this file holds no value in a provider format.
 """
@@ -100,7 +100,7 @@ def test_main_returns_zero_when_clean(tmp_path: Path) -> None:
 
 
 def test_repository_is_clean() -> None:
-    """The gate itself: no tracked file holds a value in a provider secret format."""
+    """The gate itself: no tracked file holds a value in the whsec_ format."""
     assert secret_formats.main(["--all"]) == 0
 
 

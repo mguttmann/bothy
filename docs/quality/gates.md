@@ -16,7 +16,7 @@ Quelle des Diagramms: `docs/quality/pipeline.mmd`.
 |---|---|---|---|---|
 | `fmt-check` | ruff format, gofmt, dart format, Skript `format:check` der TypeScript-Projekte | Format ohne Änderungen | | Werkzeuge |
 | `codegen-check` | `tools/ci/codegen_check.py` mit sqlc und `go generate` (go-arch-lint und sqlc aus den Pins vorn im `PATH`) | erzeugter Code (sqlc-Code, `.go-arch-lint.yml`, API-Code) entspricht einer frischen Erzeugung; es zählen nur Änderungen durch den Generator, nicht Handänderungen im Arbeitsbaum | | ab erstem Go-Modul |
-| `lint` | pre-commit-Hooks über alle Dateien (Text-Regeln, provider secret formats of GitHub secret scanning, Leerzeichen, YAML/TOML/JSON, Merge-Marker, private Schlüssel, Dateigröße), ruff (mit Docstring-Pflicht `D`, Abschnitt "Doku im Code" in Kapitel 23), bandit, check-jsonschema (Issue-Formulare, Renovate, CodeRabbit), actionlint, zizmor, go vet und golangci-lint, flutter analyze und custom_lint, Skript `lint` | Stil, Fehlerquellen, Workflow-Sicherheit | `repo.max_file_kb` | ja |
+| `lint` | pre-commit-Hooks über alle Dateien (Text-Regeln, Stripe webhook secret format `whsec_` of GitHub secret scanning, Leerzeichen, YAML/TOML/JSON, Merge-Marker, private Schlüssel, Dateigröße), ruff (mit Docstring-Pflicht `D`, Abschnitt "Doku im Code" in Kapitel 23), bandit, check-jsonschema (Issue-Formulare, Renovate, CodeRabbit), actionlint, zizmor, go vet und golangci-lint, flutter analyze und custom_lint, Skript `lint` | Stil, Fehlerquellen, Workflow-Sicherheit | `repo.max_file_kb` | ja |
 | `typecheck` | mypy (strict), go build, tsc | Typen | | Werkzeuge |
 | `arch` | go-arch-lint mit `<modul>/.go-arch-lint.yml`, erzeugt aus `architecture/modules.yaml` | Modulgrenzen und erlaubte Fremdbibliotheken der Go-Module (Kapitel 02 "go-arch-lint") | | ab erstem Go-Modul |
 | `migrations-lint` | `tools/ci/migrations_lint.py` | fortlaufende, lückenlose fünfstellige Nummern ohne Zeitstempel-Versionen, Prüfsummen gemergter Migrationen unverändert (`migrations.sha256`), `STORED` bei `GENERATED ALWAYS AS`, `-- +goose NO TRANSACTION` bei `CONCURRENTLY` (ADR 0007, Kapitel 14) | | ab erster Migration |
@@ -31,7 +31,7 @@ Quelle des Diagramms: `docs/quality/pipeline.mmd`.
 | `tokens` | Ziel `check` in `tools/design-tokens/` | Tests des Generators; Design-Tokens bauen, Kontraste und Palettenwächter bestehen, erzeugte Dateien aktuell, eingebettete Dateien passen zu `vendor/MANIFEST.json` | | ja |
 | `runners-check` | `tools/ci/check_runners.py` | Nur feste GitHub-gehostete Runner-Labels (ADR 0039), Trigger, SHA-Pinning, Timeouts, Rechte; in Jobs mit Umgebung `release*` Ausgaben von Jobs ohne diese Umgebung nur im `if:` des Jobs oder eines Schritts (Erlaubnisliste D-W-61, D-W-72), Artefakte nur per `artifact-ids` (D-W-52); Matrix-Werte in `runs-on` je Kombination geprüft, keine Laufzeit-Matrix hinter `runs-on` (D-W-53); Release-Workflows ruft nur ein Job von `release.yml` ohne Matrix auf (D-W-73); `push` nur auf Tags, außer `denylist-main.yml` auf `main` | | ja |
 | `labels-check` | `tools/ci/labels.py` | Label-Datei gültig, Vorlagen und GOVERNANCE.md nutzen nur definierte Labels | | ja |
-| `gitleaks` | gitleaks mit `.gitleaks.toml` | Secrets in jedem von `HEAD` erreichbaren Commit; vor dem Öffentlich-Schalten in allen Refs | | ja |
+| `gitleaks` | gitleaks mit `.gitleaks.toml` | Secrets in jedem von `HEAD` erreichbaren Commit; vor dem Öffentlich-Schalten in allen Refs; the EXAMPLE marker exempts only this product's own token formats and generic key-like values | | ja |
 | `semgrep` | Semgrep mit `.semgrep/` | Projektregeln und ihre Regel-Tests | | ja |
 | `trivy` | Trivy `config` auf einer Kopie der getrackten und nicht ignorierten Dateien (`tools/ci/tracked_tree.py`) | Fehlkonfiguration in Dockerfiles, Kubernetes, Helm, Terraform | `HIGH`, `CRITICAL` | sobald solche Dateien existieren |
 | `osv` | OSV-Scanner, govulncheck | bekannte Schwachstellen aller Lock-Dateien; erreichbare Go-Schwachstellen | | ja |
@@ -119,7 +119,7 @@ neben `migrations/`, damit weder das Einbettungsmuster `*.sql` noch sqlc sie lie
 
 | Hook | Läuft | Inhalt |
 |---|---|---|
-| pre-commit | bei jedem Commit, auf den geänderten Dateien | Text-Regeln (keine Gedankenstriche), provider secret formats (`tools/hooks/secret_formats.py`), Datei-Hygiene, ruff für `tools/`, gitleaks auf den gestagten Änderungen |
+| pre-commit | bei jedem Commit, auf den geänderten Dateien | Text-Regeln (keine Gedankenstriche), Stripe webhook secret format `whsec_` (`tools/hooks/secret_formats.py`), Datei-Hygiene, ruff für `tools/`, gitleaks auf den gestagten Änderungen |
 | commit-msg | bei jedem Commit | Conventional Commits und DCO-Sign-off |
 | pre-push | vor jedem Push | `tools/hooks/review_gate.py` (Bericht `.review/<sha>.md` des gepushten Commits endet mit `Urteil: JA`, [red-team-gate.md](red-team-gate.md)), dann `make check` |
 
@@ -157,3 +157,9 @@ Beispiel ein JSON-Bericht), `DENYLIST_FLAGS` (zum Beispiel `--reveal` lokal).
   der Prüfsummen-Datei zugleich von Hand ändert, die neueste Migration samt ihrer Zeile
   entfernt oder `migrations/` samt `migrations.sha256` löscht, besteht das Gate; das muss
   das Review des Diffs sehen.
+* GitHub secret scanning has its own patterns: it knows provider formats that gitleaks does
+  not, and it reported a `whsec_` example shorter than the gitleaks rule
+  `standard-webhooks-secret` accepts. An example in a third-party format can therefore pass
+  the gates and still raise an alert on push; only the `whsec_` format has its own check with
+  a wider margin (`tools/hooks/secret_formats.py`). Examples therefore stay short of every
+  third-party format (CONTRIBUTING.md).

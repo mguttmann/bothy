@@ -74,6 +74,11 @@ keywords = ["squ_", "sqp_", "sqa_"]
 
 [[allowlists]]
 description = "Example credentials in documentation and tests carry the marker EXAMPLE (CONTRIBUTING.md); real credentials never do"
+# Only for formats that GitHub secret scanning does not know: this product's own tokens and
+# generic key-like values. GitHub ignores the marker, so an example in a third-party format
+# stays short of that format instead (CONTRIBUTING.md, tools/hooks/secret_formats.py). The
+# default generic rule ignores the word on its own; naming it keeps that if the default changes.
+targetRules = ["bothy-api-token", "generic-api-key"]
 stopwords = ["example"]
 
 [[allowlists]]

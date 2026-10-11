@@ -80,7 +80,14 @@ def test_custom_rule_detects_its_format(tmp_path: Path, rule: str) -> None:
 HISTORICAL_WEBHOOK_EXAMPLE = "wh" + "sec_" + "MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw"
 
 ALLOWED = {
-    "marked example": "webhook_secret = " + "wh" + "sec_" + "EXAMPLE" + _rand(36) + "=",
+    "marked own-format example": "BOTHY_TOKEN="
+    + "bothy"
+    + "_agt_"
+    + "EXAMPLE"
+    + _rand(36)
+    + "_"
+    + _rand(6),
+    "marked generic example": 'api_key = "' + "EXAMPLE" + _rand(24) + '"',
     "uuid identifier": "credential_"
     + "holder_id: "
     + "-".join(_rand(n, "0123456789abcdef") for n in (8, 4, 4, 4, 12)),
@@ -110,6 +117,44 @@ def test_allowlists_skip_documented_examples(tmp_path: Path, case: str) -> None:
         check=False,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+# GitHub secret scanning ignores the EXAMPLE marker, so it only exempts formats GitHub does
+# not know: this product's own tokens and generic key-like values.
+MARKED_THIRD_PARTY = {
+    "standard-webhooks-secret": "webhook_secret = " + "wh" + "sec_" + "EXAMPLE" + _rand(36) + "=",
+    "anthropic-credential-any": "token = " + "sk-" + "ant-" + "api03-" + "EXAMPLE" + _rand(40),
+    "github-pat": "token = " + "gh" + "p_" + "EXAMPLE" + _rand(29),
+}
+
+
+@pytest.mark.parametrize("rule", sorted(MARKED_THIRD_PARTY))
+def test_example_marker_does_not_hide_third_party_formats(tmp_path: Path, rule: str) -> None:
+    (tmp_path / "sample.txt").write_text(MARKED_THIRD_PARTY[rule] + "\n")
+    report = tmp_path / "report.json"
+    proc = subprocess.run(
+        [
+            str(_gitleaks()),
+            "dir",
+            str(tmp_path / "sample.txt"),
+            "--config",
+            str(REPO / ".gitleaks.toml"),
+            "--no-banner",
+            "--redact",
+            "--report-format",
+            "json",
+            "--report-path",
+            str(report),
+            "--exit-code",
+            "0",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    found = {item["RuleID"] for item in json.loads(report.read_text())}
+    assert rule in found
 
 
 def test_history_allowlist_takes_exact_values_only(tmp_path: Path) -> None:

@@ -44,7 +44,7 @@ repos:
         language: system
         types: [text]
       - id: secret-formats
-        name: no values in a provider secret format (GitHub secret scanning)
+        name: no Stripe webhook secret format (whsec_, GitHub secret scanning)
         entry: uv run --project tools --locked --quiet python tools/hooks/secret_formats.py
         language: system
         types: [text]

@@ -353,8 +353,8 @@ Python tests under `tools/ci/tests/` (pytest, `tmp_path`, no network):
 - `test_lock_adds_only_new_entries` (an existing line stays even if its file changed; `check` then
   still fails), `test_lock_refuses_invalid_file`, `test_cli_exit_codes` (0, 1, 2).
 
-`test_codegen_check.py` (temporary git repository created with `git init` and
-`git -c user.name=Test -c user.email=test@example.com commit`):
+`test_codegen_check.py` (temporary git repository from `init_repo` and `commit` in
+`tools/testing/git_fixtures.py`, which carry their own identity):
 
 - `test_no_change_passes`, `test_modified_file_fails_and_is_listed`, `test_new_file_fails`,
   `test_deleted_file_fails`, `test_preexisting_dirty_file_is_not_drift`,

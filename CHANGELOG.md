@@ -75,8 +75,10 @@ operated, and the order of the build.
   Community Build and SonarQube Cloud, Semgrep project rules, gitleaks rules, Renovate.
   `make docs` also checks that every status with a problem code named in the documentation
   is registered in `x-problem-codes` (`tools/docs/problem_code_refs.py`). The
-  `secret-formats` hook rejects values in a provider secret format that GitHub secret
-  scanning reports, and the tool tests run without a git identity, like a fresh CI runner.
+  `secret-formats` hook rejects values in the Stripe webhook secret format (`whsec_`) that
+  GitHub secret scanning reports, the EXAMPLE marker exempts only this product's own token
+  formats and generic key-like values from gitleaks, and the tool tests run without a git
+  identity, like a fresh CI runner.
 - Workflows for pull requests, releases, documentation, CodeQL, OpenSSF Scorecard and the
   portability test, all on GitHub-hosted runners with fixed labels.
 - Documentation site (MkDocs) whose navigation lists every page; a page missing from the
