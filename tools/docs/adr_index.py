@@ -2,7 +2,7 @@
 """Generate the ADR index table in docs/adr/README.md from the ADR files.
 
 ADR files are named NNNN-title-in-kebab-case.md. Status and date come from the MADR
-front matter (`status:`, `date:`), else from a `Status:` / `Datum:` / `Date:` line near
+front matter (`status:`, `date:`), else from a `Status:` / `Date:` line near
 the top; a missing value shows as MISSING in the table. The table between the markers
 in README.md is generated; the text around it is hand-written. `--check` fails if the
 committed table is stale.
@@ -23,7 +23,7 @@ _NAME = re.compile(r"^(\d{4})-[a-z0-9]+(?:-[a-z0-9]+)*\.md$")
 _FRONT = re.compile(r"\A---\n(?P<meta>.*?)\n---\n", re.DOTALL)
 _TITLE = re.compile(r"^# (?P<title>.+)$", re.MULTILINE)
 _BODY_FIELD = re.compile(
-    r"^\W*(?P<key>status|datum|date)\W*:\s*(?P<value>[^\n]+?)\s*$", re.IGNORECASE | re.MULTILINE
+    r"^\W*(?P<key>status|date)\W*:\s*(?P<value>[^\n]+?)\s*$", re.IGNORECASE | re.MULTILINE
 )
 MISSING = "MISSING"
 
@@ -63,7 +63,7 @@ def _fields(text: str) -> tuple[str, str]:
         key, value = m.group("key").lower(), m.group("value").strip("*_` ")
         if key == "status" and not status:
             status = value
-        elif key in ("date", "datum") and not date:
+        elif key == "date" and not date:
             date = value
     return status or MISSING, date or MISSING
 
@@ -95,7 +95,7 @@ def render(readme: str, entries: list[Entry]) -> str:
     """Return the README with the generated index between the markers; raises AdrError."""
     if START not in readme or END not in readme:
         raise AdrError(f"README.md needs the markers {START} and {END}")
-    rows = ["| Nr | Titel | Status | Datum |", "|---|---|---|---|"]
+    rows = ["| No. | Title | Status | Date |", "|---|---|---|---|"]
     rows += [f"| [{e.number}]({e.file}) | {e.title} | {e.status} | {e.date} |" for e in entries]
     head, rest = readme.split(START, 1)
     _, tail = rest.split(END, 1)

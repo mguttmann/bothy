@@ -52,7 +52,7 @@ the base branch as `migrations/NNNNN_<slug>.sql` (five digits, a lower-case slug
 branch; write a new one. If another branch took your number first, renumber your file, remove
 your own line from `migrations.sha256` and lock again before your final `make check`. A
 timestamp version is fine for a draft, but `make migrations-lint` rejects it in every run.
-Details: [docs/quality/gates.md](docs/quality/gates.md#migrationen).
+Details: [docs/quality/gates.md](docs/quality/gates.md#migrations).
 
 ## Branches and commits
 
@@ -90,22 +90,21 @@ file name and, with `BOTHY_CODERABBIT=1`, also runs the CodeRabbit CLI.
 - One pull request per finished feature or fix. Draft pull requests are welcome for
   early feedback.
 - Fill in the template. Describe what you verified and how.
-- The required status check is `ci-ok`. Maintainers merge with rebase or squash, so the
-  history of `main` stays linear.
+- The required status check is `ci-ok`. Maintainers merge with squash only, so the history
+  of `main` stays linear and every pull request is one commit.
 - Reviews from automated reviewers (CodeRabbit, SonarQube Cloud) are part of the review.
   If one of them finds something the local gates missed, we add a local rule so that it
   is caught before the next push ([push discipline](docs/quality/push-discipline.md)).
 
 ## Documentation is part of the change
 
-- A change to behaviour, an API, an event, a permission or a configuration value updates
+- A change to behavior, an API, an event, a permission or a configuration value updates
   the specification under `docs/spec/` and `docs/api/` in the same pull request.
 - Limits, time windows and thresholds are named configuration values with their default
   in the chapter's table; prose uses the name, not the number.
-- Planning and specification documents are written in German, community files and code
-  comments in English. Identifiers are English everywhere.
+- All repository content is English (D-W-94; terms in [docs/glossary.md](docs/glossary.md)).
 - Every public module, class, function and interface has a doc comment; the linters of each
-  language enforce it (ruff `D` for Python, see chapter 23 "Doku im Code").
+  language enforce it (ruff `D` for Python, see chapter 23 "Documentation in code").
 - No en dashes or em dashes anywhere (the `text-rules` hook rejects them); use a hyphen
   or rephrase.
 - Example credentials in documentation and tests contain the word `EXAMPLE`, so that the
@@ -128,7 +127,7 @@ file name and, with `BOTHY_CODERABBIT=1`, also runs the CodeRabbit CLI.
 
 Decisions with lasting effect are recorded as ADRs in `docs/adr/` (MADR 4, ADR 0001):
 
-1. Copy `docs/adr/0000-vorlage-madr-4.md` to the next free number,
+1. Copy `docs/adr/0000-template-madr-4.md` to the next free number,
    `NNNN-title-in-kebab-case.md`.
 2. Fill in context, drivers, at least two real options, the outcome and its
    confirmation (the test or check that keeps the decision true). Status `proposed`.
