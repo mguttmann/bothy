@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+# Probe platform plugin of the recording harness (M2-32). Not the adapter: it records how the
+# pinned Hermes Agent version calls the platform surfaces and holds no other logic.
+name: recording_probe
+label: Recording probe
+kind: platform
+version: 0.0.0
+description: >
+  Records the calls of the pinned Hermes Agent version for the test fixtures of
+  plugins/hermes-adapter. Runs only inside the throwaway Hermes home of the harness.
+author: hermes-adapter recording harness

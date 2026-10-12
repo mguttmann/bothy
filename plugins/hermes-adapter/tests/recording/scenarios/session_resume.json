@@ -1,0 +1,116 @@
+{
+  "allowlist": [
+    "alex"
+  ],
+  "model_script": [
+    {
+      "paced": true,
+      "text": [
+        "The trip to the lake ",
+        "is planned for ",
+        "Saturday morning."
+      ]
+    },
+    {
+      "paced": true,
+      "text": [
+        "Later answer ",
+        "for the next turn."
+      ]
+    },
+    {
+      "paced": true,
+      "text": [
+        "The picnic ",
+        "is added for noon."
+      ]
+    }
+  ],
+  "point": "session_switch",
+  "probe": {
+    "supports_draft_streaming": true,
+    "supports_status_text": true
+  },
+  "provider": "openai",
+  "scenario": "session_resume",
+  "steps": [
+    {
+      "do": "inject",
+      "message": "m-1",
+      "text": "first",
+      "thread": "t-1",
+      "user": "alex"
+    },
+    {
+      "do": "wait_for",
+      "message": "m-1",
+      "method": "on_processing_complete"
+    },
+    {
+      "do": "wait_quiet"
+    },
+    {
+      "as": "thread_one",
+      "do": "remember_session"
+    },
+    {
+      "do": "inject",
+      "message": "m-2",
+      "text": "second",
+      "thread": "t-2",
+      "user": "alex"
+    },
+    {
+      "do": "wait_for",
+      "message": "m-2",
+      "method": "on_processing_complete"
+    },
+    {
+      "do": "wait_quiet"
+    },
+    {
+      "as": "thread_two",
+      "do": "remember_session"
+    },
+    {
+      "command": "/resume {session:thread_one}",
+      "do": "inject",
+      "message": "m-3",
+      "thread": "t-2",
+      "user": "alex"
+    },
+    {
+      "do": "wait_for",
+      "message": "m-3",
+      "method": "on_processing_complete"
+    },
+    {
+      "do": "wait_quiet"
+    },
+    {
+      "do": "inject",
+      "message": "m-4",
+      "text": "third",
+      "thread": "t-2",
+      "user": "alex"
+    },
+    {
+      "do": "wait_for",
+      "message": "m-4",
+      "method": "on_processing_complete"
+    },
+    {
+      "do": "wait_quiet"
+    },
+    {
+      "as": "after",
+      "do": "remember_session"
+    }
+  ],
+  "texts": {
+    "answer": "The trip to the lake is planned for Saturday morning.",
+    "first": "Please remember the blue boat.",
+    "second": "Please remember the red tent.",
+    "third": "Which things did I ask you to remember?"
+  }
+}

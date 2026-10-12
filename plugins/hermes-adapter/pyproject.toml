@@ -1,0 +1,79 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Hermes Agent reference adapter (docs/spec/09-agents.md section 17). M2-32 adds the
+# recording harness under tests/ (test support code, never shipped); M2-33 adds the adapter
+# package and its runtime dependencies. Tool versions equal tools/pyproject.toml.
+
+[project]
+name = "hermes-adapter"
+version = "0.0.0"
+description = "Reference adapter for Hermes Agent: recording harness and, from M2-33, the platform plugin."
+license = "Apache-2.0"
+requires-python = ">=3.12"
+classifiers = ["Private :: Do Not Upload"]
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "mypy==2.4.0",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "pyyaml==6.0.3",
+  "ruff==0.17.0",
+  "types-PyYAML==6.0.12.20260906",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+testpaths = ["tests"]
+pythonpath = ["tests"]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["tests/hermes_harness"]
+# The probe runs only inside the pinned Hermes process; the recording test proves it.
+omit = ["tests/recording/probe_plugin/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# The threshold is the named value `quality.coverage.python_min_percent` from
+# docs/spec/23-qualitaet.md; tools/docs/tests/test_config_values.py holds both equal.
+fail_under = 80
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "PL", "PT", "N", "C4", "PTH", "ERA", "D"]
+ignore = [
+  "PLR0911",  # many returns are clearer than nested branches in small checkers
+  "PLR0912",
+  "PLR2004",  # magic values in tests and rule tables are data, not logic
+  "S603",     # subprocess without shell is the intended, safe form
+  "S607",     # the harness calls git and uv from the allowlisted PATH on purpose
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.pylint]
+max-args = 7
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/test_*.py" = ["D", "S101", "S105", "S106", "S108", "PLR0913", "PLC0415"]
+"tests/**/conftest.py" = ["D", "S101", "PLC0415"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+# The harness only; the probe imports Hermes, which this environment does not contain.
+files = ["tests/hermes_harness"]
+exclude = ["tests/recording/probe_plugin/"]

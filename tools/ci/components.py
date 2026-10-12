@@ -50,6 +50,9 @@ API_PREFIX = "docs/api/"
 GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
     # services/server/api/generate.go: route table and action catalogue of the server.
     "server": ("docs/spec/actions.yaml",),
+    # Chapter 09 is the contract of the adapters under plugins/; its section 17.10 is bound to the
+    # recording evidence of plugins/hermes-adapter by the offline fixture tests.
+    "plugins": ("docs/spec/09-agents.md",),
 }
 # Areas without component gates; their repository-wide gates always run.
 NO_COMPONENT_PREFIXES = ("docs/", "infra/")
