@@ -587,3 +587,31 @@ def test_pr_body_crlf_lines_are_located(repo: Path, monkeypatch: pytest.MonkeyPa
     )
     [f] = run(repo, allow=EXAMPLE_ALLOW).findings
     assert f.location == "pull request body:3:5"
+
+
+@pytest.mark.parametrize(
+    "trailer",
+    [
+        f"Signed-off-by: Bob <{HOME}>",
+        "Co-authored-by: Bob <192.168.1.20>",
+        "Signed-off-by: Bob <bob@host-a.tail1234.ts.net>",
+        "Co-authored-by: Bob <123456789012345678>",
+        f"Co-authored-by: <{HOME}>",
+        f"Co-authored-by: Bob <{HOME}@x.test>",
+    ],
+)
+def test_identity_trailer_address_does_not_hide_text(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, trailer: str
+) -> None:
+    monkeypatch.setenv("PR_BODY", f"Done.\n\n{trailer}\n")
+    commit(repo, f"feat: x\n\n{trailer}")
+    for extra in (("--allow-missing",), ()):
+        report = run(repo, *extra, list_path=None if extra else EXAMPLE_LIST)
+        kinds = {f.kind for f in report.findings if f.rule.source == "generic"}
+        assert any(k.startswith("pr-body") for k in kinds), (trailer, extra)
+        assert kinds - {"pr-body", "pr-body-identity"}, (trailer, extra)
+
+
+def test_record_separators_in_a_message_do_not_hide_text(repo: Path) -> None:
+    commit(repo, "feat: x\n\n\x1e\x1fglobex.test")
+    assert any(f.rule.source == "private" for f in run(repo).findings)

@@ -100,8 +100,10 @@ text of the pull request goes through the same deny list as every commit:
   the API (`actions: read`) and combines their results.
 - **Rules.** The body is checked like a commit message: every line gets the private and
   the generic rules. A `Signed-off-by` or `Co-authored-by` line of the exact form
-  `Key: Name <email>` gets the private list as a whole and the generic rules on the name;
-  a trailer line with any other text is ordinary text and gets all rules. In the body,
+  `Key: Name <local@domain>` (a plain address) gets the private list as a whole and the
+  generic rules on the line without the local part of the address, so the name and the
+  domain are still checked; a trailer line with any other text is ordinary text and gets
+  all rules. In the body,
   `Signed-off-by` passes only with a full identity from `allow-authors.txt`
   (`Name <email>`); in `Co-authored-by` or in the text an allowed identity is a finding, as
   in a commit.
@@ -119,6 +121,10 @@ scans what actually reached `main`):
 - the seconds between an edit and the start of the new run (GitHub delivers the event);
 - a manual `workflow_dispatch` of `ci.yml` on the pull request branch or "Re-run all jobs"
   of a run from before the edit: both run without the current text (maintainers only);
+- a re-run of a single job: `ci-ok` has no `needs`, so it is not re-run with it
+  (maintainers only; re-run all jobs instead);
+- a run that waits for a maintainer's approval (first contribution from a fork) has no
+  `ci-ok` yet, so the older result stays the latest until the maintainer approves;
 - a message typed into the merge dialog instead of the pull request body.
 
 ## Deny-list hit on `main`

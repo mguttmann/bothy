@@ -45,8 +45,9 @@ otherwise they match parts of other words. `allow-authors.txt`: one identity per
 
 The public rules in `generic.rules` always run, but do not check
 commit identities: contributors sign off with their own address (DCO). An identity line
-counts only in the exact form `Signed-off-by: Name <email>` (or `Co-authored-by`); its name
-part still gets the generic rules, and a line with any other text is ordinary message text. With
+counts only in the exact form `Signed-off-by: Name <local@domain>` (or `Co-authored-by`) with
+a plain address; the generic rules still check the line without the local part, so name and
+domain are checked, and a line with any other text is ordinary message text. With
 `--allow-missing` (only fork pull requests in CI), only they run. Other lines such as
 `Reviewed-by` are normal message text and get all rules.
 

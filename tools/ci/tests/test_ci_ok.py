@@ -155,3 +155,33 @@ def test_ci_ok_starts_with_the_run_and_may_read_the_jobs() -> None:
 
 def test_release_grants_the_called_ci_ok_read_access_to_the_jobs() -> None:
     assert _load(RELEASE)["jobs"]["gates"]["permissions"]["actions"] == "read"
+
+
+def test_a_job_that_only_ends_with_the_name_is_not_the_own_job() -> None:
+    listed = jobs(GREEN)
+    listed.append(
+        {"name": "not-ci-ok", "status": "in_progress", "conclusion": None, "runner_name": "r"}
+    )
+    assert ci_ok.evaluate(listed, "runner-unknown")[0] == "pass"
+
+
+def test_run_retries_any_reading_error_and_names_the_status(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    import io
+    import urllib.error
+    from email.message import Message
+
+    denied = urllib.error.HTTPError(
+        "https://api.example.com", 403, "forbidden", Message(), io.BytesIO()
+    )
+    errors: list[Exception] = [denied, TypeError("bad payload")]
+
+    def fetch() -> list[Any]:
+        if errors:
+            raise errors.pop(0)
+        return jobs(GREEN)
+
+    assert ci_ok.run(fetch, "runner-9", sleep=lambda _s: None, interval=1.0) == 0
+    denied.close()
+    assert "HTTP 403" in capsys.readouterr().out

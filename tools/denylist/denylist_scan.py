@@ -67,8 +67,11 @@ DEFAULT_GENERIC = Path(__file__).resolve().parent / "generic.rules"
 # An identity trailer is exactly "Key: Name <email>"; any other text on such a line makes it
 # ordinary message text, so that a trailer cannot hide text from the rules.
 _IDENTITY_TRAILER = re.compile(
-    r"^(signed-off-by|co-authored-by):[ \t]*([^<>]*?)[ \t]*<([^<>\s]+)>$", re.IGNORECASE
+    r"^(signed-off-by|co-authored-by):[ \t]*([^<>]*?)[ \t]*"
+    r"<([A-Za-z0-9._%+-]+)@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)>$",
+    re.IGNORECASE,
 )
+_SHA = re.compile(r"^[0-9a-f]{40}$")
 _EMAIL = re.compile(r"<([^>]+)>")
 
 
@@ -372,8 +375,8 @@ class Scanner:
                 .removeprefix("refs/tags/")
             )
             self._scan("ref", short, f"ref {ref}")
-        tags = _text(self.repo, "for-each-ref", "--format=%(refname)%1f%(contents)%1e", "refs/tags")
-        for raw_record in tags.split("\x1e"):
+        tags = _text(self.repo, "for-each-ref", "--format=%(refname)%1f%(contents)%00", "refs/tags")
+        for raw_record in tags.split("\0"):
             record = raw_record.strip("\n")
             if record and "\x1f" in record:
                 ref, message = record.split("\x1f", 1)
@@ -403,7 +406,8 @@ class Scanner:
             if not trailer:
                 kept.append(line)
                 continue
-            identity = f"{trailer.group(2)} <{trailer.group(3)}>"
+            name, local, domain = trailer.group(2), trailer.group(3), trailer.group(4)
+            identity = f"{name} <{local}@{domain}>"
             if own is None:
                 own_sign_off = _normalize(identity) in self.allowed[0]
             else:
@@ -412,8 +416,9 @@ class Scanner:
             loc = trailer_where if own is not None else f"{trailer_where}:{lineno}"
             if self.private and not own_sign_off:
                 self._scan(trailer_kind, line, loc, rulesets=[self.private])
-            if trailer.group(2):
-                self._scan(trailer_kind, trailer.group(2), loc, rulesets=others)
+            # The other rules see the whole line without the local part of the address, so the
+            # address of a contributor is no finding, but its domain and the name still are.
+            self._scan(trailer_kind, f"{name} <@{domain}>", loc, rulesets=others)
             kept.append("")
         self._scan(kind, "\n".join(kept), where, position="lines")
 
@@ -427,13 +432,17 @@ class Scanner:
 
     def scan_commits(self, rev_args: list[str]) -> None:
         """Scan message, identities and identity trailers of the commits selected by `rev_args`."""
-        fmt = "%H%x1f%an <%ae>%x1f%cn <%ce>%x1f%B%x1e"
-        out = _text(self.repo, "log", f"--format={fmt}", *rev_args, "--")
-        for raw_record in out.split("\x1e"):
+        # Commits are separated by NUL (-z), which a commit message cannot contain; the
+        # message is the last field, so a separator byte inside it stays message text.
+        fmt = "%H%x1f%an <%ae>%x1f%cn <%ce>%x1f%B"
+        out = _text(self.repo, "log", "-z", f"--format={fmt}", *rev_args, "--")
+        for raw_record in out.split("\0"):
             record = raw_record.strip("\n")
             if not record:
                 continue
             sha, author, committer, body = record.split("\x1f", 3)
+            if not _SHA.match(sha):
+                raise ConfigError("unexpected git log output; refusing to report a clean scan")
             short = sha[:12]
             for role, identity in (("author", author), ("committer", committer)):
                 if self.private and not _is_allowed(identity, self.allowed):

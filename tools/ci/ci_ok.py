@@ -23,6 +23,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -49,7 +50,12 @@ RULES = (
 
 def evaluate(jobs: list[dict[str, Any]], runner: str) -> tuple[str, str]:
     """Return ("pass" | "fail" | "wait", summary) for the jobs of the run."""
-    candidates = [j for j in jobs if j["name"].endswith(OWN_NAME) and j["status"] != "completed"]
+    candidates = [
+        j
+        for j in jobs
+        if (j["name"] == OWN_NAME or j["name"].endswith(f" / {OWN_NAME}"))
+        and j["status"] != "completed"
+    ]
     own = [j for j in candidates if j.get("runner_name") == runner]
     if not own and len(candidates) == 1:
         own = candidates
@@ -90,8 +96,12 @@ def run(
     while True:
         try:
             verdict, summary = evaluate(fetch(), runner)
-        except (OSError, ValueError, KeyError) as exc:
-            print(f"ci-ok: reading the jobs failed ({type(exc).__name__}); retrying", flush=True)
+        except Exception as exc:  # every reading error is retried; the job timeout ends it
+            status = f" HTTP {exc.code}" if isinstance(exc, urllib.error.HTTPError) else ""
+            print(
+                f"ci-ok: reading the jobs failed ({type(exc).__name__}{status}); retrying",
+                flush=True,
+            )
         else:
             if summary != last:
                 print(f"ci-ok: {summary}", flush=True)
