@@ -99,6 +99,7 @@ func serveTestEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 		"BOTHY_TELEMETRY__ENABLED=false",
 		"BOTHY_TELEMETRY__LOGS__EXPORTER=stdout",
 		"BOTHY_SHUTDOWN__DRAIN_DELAY=0s",
+		testPublicURL,
 	}
 	for _, e := range extra {
 		name, _, _ := strings.Cut(e, "=")
@@ -227,7 +228,8 @@ func TestServeHealthOnlyOnInternalListener(t *testing.T) {
 	waitHTTP(t, internal, "/readyz", http.StatusOK)
 	waitHTTP(t, internal, "/healthz", http.StatusOK)
 	for _, path := range []string{"/healthz", "/readyz"} {
-		if code, body := httpGet(public, path); code != http.StatusNotFound || body != "" {
+		// Since M1-18 an unmatched path is a 404 problem that never echoes the path.
+		if code, body := httpGet(public, path); code != http.StatusNotFound || !strings.Contains(body, `"code":"not_found"`) || strings.Contains(body, path) {
 			t.Fatalf("public %s = %d %q", path, code, body)
 		}
 	}

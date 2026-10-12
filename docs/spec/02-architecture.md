@@ -1025,6 +1025,9 @@ server loads.
    `secrets.dir` is an absolute path in clean form (no `.` or `..`, no double or trailing `/`),
    not `/`, without a NUL character and without `<`, as the secret provider requires; a wrong
    value is a problem of `secrets.dir` alone, not of the references that use `<secrets.dir>`.
+   Likewise `server.public_url` and every entry of `api.cors_allowed_origins` are an origin
+   (scheme `http` or `https`, host, optional port, no path, no query, no fragment; M1-18),
+   because the chain builds the DPoP `htu` from this origin and compares `Origin` exactly.
    The rule "identity headers only with a loopback listener" is not a configuration check,
    because the driver is a setting of the owner in the database; it applies at readiness
    ([16-operations.md](16-operations.md) 4.3). Messages name the key and the source, never the

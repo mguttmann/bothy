@@ -15,7 +15,7 @@ import (
 // environment variable overrides one of them.
 func TestTelemetryConfigBinds(t *testing.T) {
 	t.Parallel()
-	v, err := config.Load(schema(t), config.Sources{})
+	v, err := config.Load(schema(t), config.Sources{Env: testEnv()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestTelemetryConfigBinds(t *testing.T) {
 		t.Errorf("TelemetryConfig = %+v, want %+v", got, want)
 	}
 
-	v, err = config.Load(schema(t), config.Sources{Env: []string{
+	v, err = config.Load(schema(t), config.Sources{Env: []string{testPublicURL,
 		"BOTHY_TELEMETRY__TRACES__SAMPLER_RATIO=0.25", "BOTHY_INSTANCE__ENVIRONMENT=staging",
 	}})
 	if err != nil {
@@ -51,7 +51,7 @@ func TestTelemetryConfigBinds(t *testing.T) {
 func TestSamplerRatioBounds(t *testing.T) {
 	t.Parallel()
 	for _, bad := range []string{"-0.1", "1.5"} {
-		_, err := config.Load(schema(t), config.Sources{Env: []string{"BOTHY_TELEMETRY__TRACES__SAMPLER_RATIO=" + bad}})
+		_, err := config.Load(schema(t), config.Sources{Env: []string{testPublicURL, "BOTHY_TELEMETRY__TRACES__SAMPLER_RATIO=" + bad}})
 		if err == nil {
 			t.Errorf("sampler ratio %s loaded, want a problem", bad)
 		}

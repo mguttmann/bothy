@@ -10,8 +10,8 @@ const minPositiveDuration = "1ms"
 
 // httpConfigKeys returns the keys of the HTTP chain from docs/spec/02-architecture.md
 // "Configuration values of this chapter": the JSON body limit, which the cross-check
-// json_limit_above_message reads, and the server limits that platform/httpserver applies to both
-// listeners (M1-11). The HTTP chain (M1-18) adds its other keys here.
+// json_limit_above_message reads, the server limits that platform/httpserver applies to both
+// listeners (M1-11), and the limits, deadlines and Retry-After of the HTTP chain (M1-18).
 func httpConfigKeys() []config.Key {
 	return []config.Key{
 		{
@@ -35,6 +35,38 @@ func httpConfigKeys() []config.Key {
 			Name: "http.max_header_bytes", Kind: config.KindInt, Default: "65536", Min: "4096", Max: "16777216",
 			Doc:     "Largest request header block in bytes.",
 			Chapter: chapter02,
+		},
+		{
+			// At most 1000: deeper than any contract schema, and the guard keeps one map per level.
+			Name: "http.max_json_depth", Kind: config.KindInt, Default: "32", Min: "1", Max: "1000",
+			Doc:     "Deepest nesting of a JSON request body; deeper bodies are refused with 400 malformed_request.",
+			Chapter: chapter02,
+		},
+		{
+			Name: "http.request_timeout", Kind: config.KindDuration, Default: "15s", Min: minPositiveDuration,
+			Doc:     "Context deadline of a normal request.",
+			Chapter: chapter02,
+		},
+		{
+			Name: "http.transfer_timeout", Kind: config.KindDuration, Default: "10m", Min: minPositiveDuration,
+			Doc:     "Deadline of upload and download operations, applied to the connection.",
+			Chapter: chapter02,
+		},
+		{
+			// Retry-After is sent in whole seconds, so less than one second cannot be expressed.
+			Name: "http.unavailable_retry_after", Kind: config.KindDuration, Default: "5s", Min: "1s", Max: "1h",
+			Doc:     "Retry-After of every 503 unavailable response, in whole seconds.",
+			Chapter: chapter02,
+		},
+		{
+			Name: "file.max_upload_bytes", Kind: config.KindInt, Default: "104857600", Min: "1",
+			Doc:     "Largest file, and the stream limit of multipart and octet-stream request bodies.",
+			Chapter: chapter03,
+		},
+		{
+			Name: "api.cors_allowed_origins", Kind: config.KindStringList, Default: "",
+			Doc:     "Additional origins that get CORS headers; each entry is an origin such as https://app.example.com.",
+			Chapter: chapter06,
 		},
 	}
 }

@@ -125,7 +125,7 @@ func serveEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 
 func loadEnv(t *testing.T, env []string) *config.Values {
 	t.Helper()
-	v, err := config.Load(schema(t), config.Sources{Env: env})
+	v, err := config.Load(schema(t), config.Sources{Env: append(testEnv(), env...)})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -240,8 +240,10 @@ func TestServeRolesStartReadyAndStop(t *testing.T) {
 				}
 			} else {
 				for _, path := range []string{"/healthz", "/readyz"} {
-					if code, body := get(t, public, path); code != http.StatusNotFound || body != "" {
-						t.Fatalf("public %s = %d %q, want 404 without body", path, code, body)
+					// Since M1-18 the public listener answers an unmatched path with a 404 problem
+					// that never echoes the path (it replaces the empty 404 of M1-11).
+					if code, body := get(t, public, path); code != http.StatusNotFound || !strings.Contains(body, `"code":"not_found"`) || strings.Contains(body, path) {
+						t.Fatalf("public %s = %d %q, want a 404 problem", path, code, body)
 					}
 				}
 			}
@@ -394,7 +396,7 @@ func TestServeAbortsWithoutRiverTables(t *testing.T) {
 
 func TestServeRejectsUnknownRole(t *testing.T) {
 	t.Parallel()
-	v, err := config.Load(schema(t), config.Sources{})
+	v, err := config.Load(schema(t), config.Sources{Env: testEnv()})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -17,7 +17,9 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   buildinfo: {depends_on: [], vendors: []}
   otel: {depends_on: [secrets], vendors: [otel, otelhttp, otelslog]}
   health: {depends_on: [], vendors: []}
-  httpserver: {depends_on: [health, otel], vendors: []}
+  # libopenapi validates requests against the contract (SEC-IN-1, M1-18); otel holds bothy.authz.errors
+  # and the harness httpservertest (SDK reader and span recorder).
+  httpserver: {depends_on: [health, otel], vendors: [otel, libopenapi]}
   lifecycle: {depends_on: [otel], vendors: []}
   # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it.
   pg: {depends_on: [secrets], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi]}
@@ -246,6 +248,8 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   otelhttp: [go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp]
   otelslog: [go.opentelemetry.io/contrib/bridges/otelslog]
   yaml: [go.yaml.in/yaml/v3]
+  libopenapi: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator,
+               github.com/pb33f/libopenapi-validator/**]
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]
   goose: [github.com/pressly/goose/v3, github.com/pressly/goose/v3/**]
   otelpgx: [github.com/exaring/otelpgx]

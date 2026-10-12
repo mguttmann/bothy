@@ -14,6 +14,7 @@ names (PLAN P-04). The normative sources are [06-api.md](../../../docs/spec/06-a
 | `generate.go` | the two `go:generate` lines (real surface and fixture) | yes |
 | `rest/oapi-codegen.yaml` | settings of oapi-codegen (`std-http-server`, `strict-server`, `models`, `skip-prune`) | yes |
 | `rest/rest.gen.go` | Go types of all schemas and the server of the enabled operations | generated |
+| `rest/openapi.gen.yaml` | byte-identical copy of `docs/api/openapi.yaml`; `rest.Spec` (`rest/spec.go`) embeds it for the request validator of the HTTP chain (M1-18) | generated |
 | `routes/routes.go` | types, `Table`, `Recorder`, `Verify`, `Build`, lookup | yes |
 | `routes/routes.gen.go`, `catalog.gen.go`, `build.gen.go` | operation table, action catalogue, link to the generated server | generated |
 | `routes/gen/` | generator with tests and `testdata/` (fixture and negative fixtures) | yes |
@@ -72,7 +73,10 @@ and `x-rate-limit-class` present, the action in the catalogue, the class equal t
 action and not `none`, no action with the permission `system` (05, rule 10), exactly one server
 `/api/v1` (W6), no health operation (L2), and forms that the route table could not describe
 (DECISIONS.md, M1-17/13). An enabled operation must not have security requirements of its own
-(M1-17/19). Checks and metadata come from the document that the loader of oapi-codegen
+(M1-17/19). Every object schema that the request body of an operation under `paths` reaches must
+reject unknown members (`additionalProperties: false`, with `allOf` `unevaluatedProperties: false`;
+except `JsonObject` and maps), otherwise the generator names the schema (W7, DECISIONS.md M1-18/12).
+Checks and metadata come from the document that the loader of oapi-codegen
 (kin-openapi) reads, so that the table and the generated server see the same (M1-17/18).
 
 ## Add an operation to openapi.yaml

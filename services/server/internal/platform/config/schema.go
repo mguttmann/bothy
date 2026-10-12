@@ -24,7 +24,7 @@ type Key struct {
 	// secret_ref default, <other.key> stands for the effective value of that string key. A
 	// configured secret_ref value may use only <secrets.dir> (see Load).
 	Default string
-	// Required marks the chapter cell "none, required": a source must set a non-empty value,
+	// Required marks the chapter cell "no default, required": a source must set a non-empty value,
 	// and Default must be "".
 	Required bool
 	// Enum lists the allowed values of a KindEnum key and is empty for every other kind.

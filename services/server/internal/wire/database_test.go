@@ -60,7 +60,7 @@ func TestDatabaseConfigBindsValues(t *testing.T) {
 func TestDatabaseSSLModeOnlyDisableOrVerifyFull(t *testing.T) {
 	t.Parallel()
 	for _, mode := range []string{"require", "prefer", "verify-ca", "allow"} {
-		_, err := config.Load(schema(t), config.Sources{Env: []string{"BOTHY_DATABASE__SSLMODE=" + mode}})
+		_, err := config.Load(schema(t), config.Sources{Env: []string{testPublicURL, "BOTHY_DATABASE__SSLMODE=" + mode}})
 		if err == nil || !strings.Contains(err.Error(), "database.sslmode") {
 			t.Errorf("sslmode %s: %v, want an error naming database.sslmode", mode, err)
 		}

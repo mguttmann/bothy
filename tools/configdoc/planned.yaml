@@ -67,8 +67,6 @@ rules:
     milestone: M7
   - match: "file."  # M3-01 to M3-08
     milestone: M3
-  - match: file.max_upload_bytes  # M1-18
-    milestone: M1
   - match: "forum_tag."  # M1-53
     milestone: M1
   - match: "gateway."  # M1-64

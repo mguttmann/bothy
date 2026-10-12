@@ -14,8 +14,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/platform/health"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
 )
 
 type syncBuffer struct {
@@ -120,21 +122,26 @@ func TestInternalMuxServesHealthOnly(t *testing.T) {
 	}
 }
 
-func TestPublicAnswersUnmatchedWithEmpty404(t *testing.T) {
+// TestPublicAnswersUnmatchedWith404Problem: the public listener never reveals the internal paths
+// or the default text of net/http; since M1-18 an unmatched request gets 404 not_found as a
+// problem (it replaces the empty 404 of M1-11).
+func TestPublicAnswersUnmatchedWith404Problem(t *testing.T) {
 	t.Parallel()
-	mux := http.NewServeMux()
-	mux.Handle("GET /api/v1/ping", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = io.WriteString(w, "pong")
-	}))
-	base := serve(t, httpserver.NewServer(cfg, httpserver.Public(mux), nil))
+	v, err := httpserver.NewValidator(httpservertest.Contract, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chain, err := httpserver.NewChain(httpserver.DefaultChainConfig(httpservertest.PublicURL),
+		httpserver.Deps{Authenticator: actor.AnonymousOnly{}, Validator: v})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base := serve(t, httpserver.NewServer(cfg, chain.Public(http.NewServeMux()), nil))
 	for _, path := range []string{"/healthz", "/readyz", "/", "/api/v1/other"} {
 		code, body := get(t, base+path)
-		if code != http.StatusNotFound || body != "" {
-			t.Errorf("%s = %d %q, want 404 with an empty body", path, code, body)
+		if code != http.StatusNotFound || !strings.Contains(body, `"code":"not_found"`) || strings.Contains(body, "healthz") {
+			t.Errorf("%s = %d %q, want a 404 problem", path, code, body)
 		}
-	}
-	if code, body := get(t, base+"/api/v1/ping"); code != 200 || body != "pong" {
-		t.Errorf("mounted route = %d %q", code, body)
 	}
 }
 

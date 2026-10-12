@@ -15,7 +15,7 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 |---|---|
 | `config.go`, `configkeys_*.go`, `configchecks.go`, `configchapters.go` | configuration schema and cross-checks |
 | `database.go`, `egress.go`, `secrets.go`, `telemetry.go` | binding of the platform `Config` structs, the secret provider |
-| `routes.go` | `Role`, `Handlers`, `MountRoutes` (start step 7) |
+| `routes.go` | `Role`, `Handlers`, `MountRoutes` (start step 7, every route through the HTTP chain, CORS preflights), `RouteOptions`, `HTTPOperation` |
 | `jobs.go` | `JobsConfig`, `JobRole`, `NewJobRegistry` (one job registry for all roles), `MigrateUpSteps` (River before goose, then the after-step `instance`) |
 | `instance.go` | `MigrationSteps` (the after-step `instance`), `InstanceCounters` and `loadInstance`, the start step `instance` |
 | `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
@@ -34,7 +34,7 @@ components, in start order:
 | `database` | `pg.Open`, `WaitReady` within `startup.dependency_wait`; readiness check `database` | all |
 | `schema` | `pg.CheckSchema` against the highest embedded version; older aborts with the hint to run `bothy migrate up` | all |
 | `instance` | loads the instance row through `instance.State` (missing: abort with the hint to run `bothy migrate up`), logs the setup state, compares the own version with `instance.min_server_version`; below it the readiness check `schema_requires_newer_server` fails for good (M1-15) | all |
-| `routes` | `MountRoutes` on the public mux | api, all |
+| `routes` | `NewChain` (validator over `api/rest.Spec`, `actor.AnonymousOnly`), then `MountRoutes` on the public mux | api, all |
 | `jobs` | `jobs.ValidateMigrations` (missing River migrations abort with the hint to run `bothy migrate up`), `jobs.New` for the role, `Start` of River (02 "Start" step 8; no-op for api and while no kind is registered), `Runner.FailOn` on `Failed` | all |
 | `public_listener` | opens `server.listen_addr`, logs `public listener started` | api, all |
 | `ready` | readiness passes `startup`, logs `server ready` | all |

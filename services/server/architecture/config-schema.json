@@ -2,6 +2,18 @@
   "version": 1,
   "keys": [
     {
+      "name": "api.cors_allowed_origins",
+      "env": "BOTHY_API__CORS_ALLOWED_ORIGINS",
+      "kind": "list(string)",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "06-api.md",
+      "doc": "Additional origins that get CORS headers; each entry is an origin such as https://app.example.com."
+    },
+    {
       "name": "database.acquire_timeout",
       "env": "BOTHY_DATABASE__ACQUIRE_TIMEOUT",
       "kind": "duration",
@@ -209,6 +221,18 @@
       "doc": "Time limit of one outgoing request, from name resolution to the end of the body."
     },
     {
+      "name": "file.max_upload_bytes",
+      "env": "BOTHY_FILE__MAX_UPLOAD_BYTES",
+      "kind": "int",
+      "default": "104857600",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Largest file, and the stream limit of multipart and octet-stream request bodies."
+    },
+    {
       "name": "http.idle_timeout",
       "env": "BOTHY_HTTP__IDLE_TIMEOUT",
       "kind": "duration",
@@ -245,6 +269,18 @@
       "doc": "Largest JSON request body in bytes; it must be greater than message.max_content_bytes."
     },
     {
+      "name": "http.max_json_depth",
+      "env": "BOTHY_HTTP__MAX_JSON_DEPTH",
+      "kind": "int",
+      "default": "32",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "1000",
+      "chapter": "02-architecture.md",
+      "doc": "Deepest nesting of a JSON request body; deeper bodies are refused with 400 malformed_request."
+    },
+    {
       "name": "http.read_header_timeout",
       "env": "BOTHY_HTTP__READ_HEADER_TIMEOUT",
       "kind": "duration",
@@ -255,6 +291,42 @@
       "max": "",
       "chapter": "02-architecture.md",
       "doc": "Time a client has to send the request headers."
+    },
+    {
+      "name": "http.request_timeout",
+      "env": "BOTHY_HTTP__REQUEST_TIMEOUT",
+      "kind": "duration",
+      "default": "15s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "Context deadline of a normal request."
+    },
+    {
+      "name": "http.transfer_timeout",
+      "env": "BOTHY_HTTP__TRANSFER_TIMEOUT",
+      "kind": "duration",
+      "default": "10m",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "Deadline of upload and download operations, applied to the connection."
+    },
+    {
+      "name": "http.unavailable_retry_after",
+      "env": "BOTHY_HTTP__UNAVAILABLE_RETRY_AFTER",
+      "kind": "duration",
+      "default": "5s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "1h",
+      "chapter": "02-architecture.md",
+      "doc": "Retry-After of every 503 unavailable response, in whole seconds."
     },
     {
       "name": "instance.environment",
@@ -501,6 +573,18 @@
       "doc": "Address of the public listener that serves REST and the gateway."
     },
     {
+      "name": "server.public_url",
+      "env": "BOTHY_SERVER__PUBLIC_URL",
+      "kind": "url",
+      "default": "",
+      "required": true,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Origin under which apps reach the server; the base of the DPoP htu, token audience and WebAuthn."
+    },
+    {
       "name": "server.role",
       "env": "BOTHY_SERVER__ROLE",
       "kind": "enum",
@@ -515,6 +599,18 @@
       "max": "",
       "chapter": "16-operations.md",
       "doc": "Role of the process: api serves REST and the gateway, worker runs jobs and consumers, all does both."
+    },
+    {
+      "name": "server.trusted_proxies",
+      "env": "BOTHY_SERVER__TRUSTED_PROXIES",
+      "kind": "list(cidr)",
+      "default": "127.0.0.1/32, ::1/128",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Peers whose forwarding and identity headers count and that may send plaintext."
     },
     {
       "name": "shutdown.drain_delay",

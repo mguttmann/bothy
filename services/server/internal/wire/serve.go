@@ -16,8 +16,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
 	"github.com/OWNER/bothy/services/server/internal/instance"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -90,6 +92,8 @@ type server struct {
 	boot     *slog.Logger
 	cfg      ServeConfig
 	httpCfg  httpserver.Config
+	chainCfg httpserver.ChainConfig
+	chain    *httpserver.Chain
 	role     Role
 	values   *config.Values
 	deps     Deps
@@ -190,6 +194,9 @@ func Serve(_ context.Context, v *config.Values, role Role, deps Deps) (*lifecycl
 // bind reads the typed configuration of the start and of the listeners.
 func (s *server) bind() error {
 	if err := config.Bind(s.values, &s.cfg); err != nil {
+		return err
+	}
+	if err := config.Bind(s.values, &s.chainCfg); err != nil {
 		return err
 	}
 	return config.Bind(s.values, &s.httpCfg)
@@ -307,9 +314,12 @@ func (s *server) startInternal(ctx context.Context) error {
 
 func (s *server) startPublic(ctx context.Context) error {
 	s.mu.Lock()
-	mux := s.publicMux()
+	mux, chain := s.publicMux(), s.chain
 	s.mu.Unlock()
-	srv, host, port, err := s.listen(ctx, s.cfg.ListenAddr, httpserver.Public(mux), "public listener")
+	if chain == nil {
+		return errors.New("wire: the public listener needs the HTTP chain of the routes step")
+	}
+	srv, host, port, err := s.listen(ctx, s.cfg.ListenAddr, chain.Public(mux), "public listener")
 	if err != nil {
 		return err
 	}
@@ -373,11 +383,38 @@ func (s *server) checkSchema(ctx context.Context) error {
 	return pg.CheckSchema(ctx, pool, s.required)
 }
 
+// mountRoutes builds the HTTP chain (api and all) and mounts the routes through it. The request
+// validator knows only the enabled operations, so the start compiles no schema of a route it
+// does not serve. Until identity is wired (M1-34) the chain authenticates with
+// actor.AnonymousOnly: every credential is refused (fail closed).
 func (s *server) mountRoutes(context.Context) error {
+	if !s.api() {
+		return nil
+	}
+	chain, err := NewChain(s.chainCfg, s.logger())
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
 	mux := s.publicMux()
+	s.chain = chain
 	s.mu.Unlock()
-	return MountRoutes(s.role, mux, s.deps.Handlers, routes.SpecCatalog(), s.logger())
+	return MountRoutes(s.role, mux, s.deps.Handlers, routes.SpecCatalog(), chain, s.logger())
+}
+
+// NewChain builds the HTTP chain of the public listener for the enabled operations: the validator
+// over the embedded contract (api/rest.Spec), actor.AnonymousOnly until identity is wired, and the
+// global meter provider of platform/otel (call it after otel.Setup).
+func NewChain(cfg httpserver.ChainConfig, log *slog.Logger) (*httpserver.Chain, error) {
+	var ids []string
+	for _, op := range routes.Enabled() {
+		ids = append(ids, op.ID)
+	}
+	v, err := httpserver.NewValidator(rest.Spec, ids)
+	if err != nil {
+		return nil, err
+	}
+	return httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: actor.AnonymousOnly{}, Validator: v})
 }
 
 // jobsStopSteps returns the stop steps of phase jobs in registration order; none for api. Steps

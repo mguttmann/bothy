@@ -36,6 +36,7 @@ func migrateEnvFor(db *pgtest.DB, role pg.Role, extra ...string) []string {
 		"BOTHY_DATABASE__PASSWORD_REF=" + cfg.PasswordRef,
 		"BOTHY_DATABASE__SSLMODE=disable",
 		"BOTHY_STARTUP__DEPENDENCY_WAIT=10s",
+		testPublicURL,
 	}
 	// An extra entry replaces the default of the same variable; the loader refuses duplicates.
 	for _, e := range extra {

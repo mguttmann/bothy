@@ -65,7 +65,13 @@ func generate(ctx context.Context, c config) (err error) {
 	if err != nil {
 		return err
 	}
-	outputs := map[string][]byte{filepath.Join(c.restDir, "rest.gen.go"): rest}
+	// openapi.gen.yaml is the contract byte for byte, next to the server generated from it, so the
+	// request validator of platform/httpserver embeds exactly what the generator read
+	// (make codegen-check holds the copy).
+	outputs := map[string][]byte{
+		filepath.Join(c.restDir, "rest.gen.go"):      rest,
+		filepath.Join(c.restDir, "openapi.gen.yaml"): in.specData,
+	}
 	for name, src := range routeFiles {
 		outputs[filepath.Join(c.routesDir, name)] = src
 	}

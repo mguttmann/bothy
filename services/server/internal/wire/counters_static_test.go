@@ -3,8 +3,14 @@
 package wire_test
 
 import (
+	"fmt"
+	"go/ast"
+	"go/importer"
+	"go/parser"
 	"go/token"
 	"go/types"
+	"io"
+	"os"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -34,15 +40,24 @@ func moduleDir(t *testing.T) string {
 	return filepath.Join(filepath.Dir(file), "..", "..")
 }
 
-// countersRefs loads patterns with their tests and returns, per package path (an external test
-// package counts as its package), the positions where the package refers to instance.Counters:
-// the type name or instance.CounterName with its constants, a method of the interface, an
-// expression whose type is or contains Counters (a value passed on without naming the type), or
-// a generic instantiation whose type arguments contain it.
-func countersRefs(t *testing.T, patterns ...string) map[string][]string {
+// typedPackage is one package of the module, type-checked from its source.
+type typedPackage struct {
+	PkgPath   string
+	Fset      *token.FileSet
+	TypesInfo *types.Info
+}
+
+// typeCheck loads patterns with their tests and type-checks every matched package (and test
+// variant) from source, one after the other, against the export data of its imports. It replaces
+// the parallel type check of packages.Load (NeedTypes): with Go 1.27 that check races inside
+// go/types when two packages expand the same imported generic instance (Named.unpack against
+// Checker.isComplete), and go test -race failed this file at random (docs/DECISIONS.md M1-18/17).
+// Every package gets its own importer, so no type object is shared between checks.
+func typeCheck(t *testing.T, patterns ...string) []typedPackage {
 	t.Helper()
 	cfg := &packages.Config{
-		Mode:  packages.NeedName | packages.NeedTypes | packages.NeedTypesInfo | packages.NeedSyntax,
+		Mode: packages.NeedName | packages.NeedCompiledGoFiles | packages.NeedImports | packages.NeedDeps |
+			packages.NeedExportFile | packages.NeedModule,
 		Dir:   moduleDir(t),
 		Tests: true,
 	}
@@ -50,14 +65,63 @@ func countersRefs(t *testing.T, patterns ...string) map[string][]string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	refs := map[string][]string{}
+	out := make([]typedPackage, 0, len(pkgs))
 	for _, p := range pkgs {
 		for _, e := range p.Errors {
 			t.Fatalf("load %s: %v", p.PkgPath, e)
 		}
-		if p.TypesInfo == nil {
+		if len(p.CompiledGoFiles) == 0 {
 			continue
 		}
+		fset := token.NewFileSet()
+		files := make([]*ast.File, 0, len(p.CompiledGoFiles))
+		for _, name := range p.CompiledGoFiles {
+			f, err := parser.ParseFile(fset, name, nil, parser.SkipObjectResolution)
+			if err != nil {
+				t.Fatalf("parse %s: %v", name, err)
+			}
+			files = append(files, f)
+		}
+		// Language version and sizes as packages.Load sets them for its own type check.
+		conf := types.Config{Importer: exportImporter(fset, p), Sizes: types.SizesFor("gc", runtime.GOARCH)}
+		if p.Module != nil && p.Module.GoVersion != "" {
+			conf.GoVersion = "go" + p.Module.GoVersion
+		}
+		info := &types.Info{
+			Types:     map[ast.Expr]types.TypeAndValue{},
+			Uses:      map[*ast.Ident]types.Object{},
+			Instances: map[*ast.Ident]types.Instance{},
+		}
+		if _, err := conf.Check(p.PkgPath, fset, files, info); err != nil {
+			t.Fatalf("type-check %s: %v", p.ID, err)
+		}
+		out = append(out, typedPackage{PkgPath: p.PkgPath, Fset: fset, TypesInfo: info})
+	}
+	return out
+}
+
+// exportImporter imports the dependencies of p from their export data (go list -export) with
+// the importer of the standard library; every call returns a fresh importer.
+func exportImporter(fset *token.FileSet, p *packages.Package) types.Importer {
+	return importer.ForCompiler(fset, "gc", func(path string) (io.ReadCloser, error) {
+		dep, ok := p.Imports[path]
+		if !ok || dep.ExportFile == "" {
+			return nil, fmt.Errorf("%s: no export data for import %q", p.ID, path)
+		}
+		return os.Open(dep.ExportFile)
+	})
+}
+
+// countersRefs type-checks patterns with their tests (typeCheck) and returns, per package path
+// (an external test package counts as its package), the positions where the package refers to
+// instance.Counters: the type name or instance.CounterName with its constants, a method of the
+// interface, an expression whose type is or contains Counters (a value passed on without naming
+// the type), or a generic instantiation whose type arguments contain it.
+func countersRefs(t *testing.T, patterns ...string) map[string][]string {
+	t.Helper()
+	pkgs := typeCheck(t, patterns...)
+	refs := map[string][]string{}
+	for _, p := range pkgs {
 		owner := strings.TrimSuffix(p.PkgPath, "_test")
 		add := func(pos token.Pos) {
 			if at := p.Fset.Position(pos).String(); !slices.Contains(refs[owner], at) {
