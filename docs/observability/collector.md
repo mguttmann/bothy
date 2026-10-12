@@ -76,9 +76,26 @@ subdirectory of the volume `secrets`. Environment variables carry only endpoints
 
 ## 6. Check
 
-```
-otelcol-contrib validate --config=infra/otel/collector.yaml --config=infra/otel/exporters/local.yaml
-```
+`make ops-check` checks the configuration in the gate
+([tools/opscheck](../../tools/opscheck/README.md)) with `otelcol-contrib` in the version of the
+image (check `tool-versions` keeps both equal):
 
-For the check outside the container, the paths under `/run/bothy/secrets` must exist
-or point to test files; the key `telemetry_pseudonym_key` must be at least 32 bytes long.
+1. Check `collector`: `otelcol-contrib validate` for the base alone, the base with each overlay
+   and the base with every ordered pair of two overlays except `none`. Both orders count,
+   because Compose sets `BOTHY_OTEL_EXPORTER` before `BOTHY_OTEL_EXPORTER_2` and lists are
+   replaced when merging.
+2. Check `collector-allowlist`: the `bothy.*` keys of `redaction/allowlist` equal the table in
+   [signals.md](signals.md) 5.3, and the allowlist works: `allow_all_keys` is false, every trace
+   and log pipeline with a receiver runs it, and no overlay redefines the processor or a
+   pipeline of the base.
+
+The check runs on a working copy: instead of `/run/bothy/secrets` it reads placeholder files
+(`telemetry_pseudonym_key` needs at least 32 bytes), endpoints without a default point to
+`example.com`, and the exporter `datadog` gets a fixed host name so that `validate` does not wait
+for the host name detection. The metadata query for GCP, which the exporter starts anyway, points
+through `GCE_METADATA_HOST` to a closed port of `127.0.0.1`, like the proxy of all validators
+([tools/opscheck](../../tools/opscheck/README.md)). Check only the collector:
+
+```
+uv run --project tools --locked python tools/opscheck/opscheck.py --only collector collector-allowlist
+```

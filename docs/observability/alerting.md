@@ -49,7 +49,11 @@ goes to `external-oncall` and `bothy-ops`, `ticket` to `bothy-ops`, `Watchdog` t
 ### 3.2 Further alerts (`bothy-alerts.yaml`)
 
 Thresholds are starting values. Where a threshold corresponds to a configuration value, the table
-names it; the rule file must follow it (check in the build ticket "Alert thresholds from configuration").
+names it; the rule file must follow it. `make ops-check` holds this (check `alert-thresholds`):
+if the column says `` `<name>` ``, the threshold of the last comparison `> <number>` in seconds
+(a plain number; comments do not count) equals the default of the value in the [configuration reference](../operations/configuration.md);
+if it says ``above `<name>` ``, it is strictly greater. The alerts of the table are exactly the
+alerts of `bothy-alerts.yaml`.
 
 | Alert | Level | Condition | Configuration value |
 |---|---|---|---|
@@ -148,6 +152,21 @@ Search the logs for `deadlock detected`; check the queries involved against the 
 
 ## 5. Check
 
-`promtool check rules` and `amtool check-config` on 2026-10-10 with Prometheus v3.15.0 and
-Alertmanager v0.34.1: valid [verified]. Also recommended: `promtool test rules` with
-test series per hand-written alert (ticket).
+`make ops-check` checks rules and routes in the gate ([tools/opscheck](../../tools/opscheck/README.md)),
+with `promtool` and `amtool` in the version of the images:
+
+1. `promtool check rules` for all rule files (check `prometheus-rules`) and
+   `promtool check config` with the loaded rules (check `prometheus-config`); every rule file
+   must be loaded through `rule_files`.
+2. `promtool test rules` with
+   [bothy-alerts.test.yaml](../../infra/observability/prometheus/tests/bothy-alerts.test.yaml)
+   (check `prometheus-rule-tests`): every alert from `bothy-alerts.yaml` fires in one case as
+   soon as its `for` has passed, with labels and texts, and is silent one minute before; every
+   alert with a threshold stays silent in one case exactly at the threshold. An alert without a
+   firing case makes the check fail.
+3. `amtool check-config` and the routes from section 1 with `amtool config routes test` (check
+   `alertmanager`): `page` to `external-oncall` and `bothy-ops`, `ticket` to `bothy-ops`,
+   `Watchdog` to `external-heartbeat`.
+4. The thresholds from 3.2 against the configuration reference (check `alert-thresholds`). If a
+   cell of the column "Configuration value" names a value of the reference, it must read exactly
+   `` `<name>` `` or ``above `<name>` ``; any other form is a finding.

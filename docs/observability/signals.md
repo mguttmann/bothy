@@ -253,7 +253,7 @@ A span never lives longer than one operation. A WebSocket connection is not a sp
 ### 5.3 Attributes in spans and logs
 
 This list equals the allowlist in [infra/otel/collector.yaml](../../infra/otel/collector.yaml)
-(Bothy part); a check keeps both equal.
+(Bothy part); `make ops-check` keeps both equal (check `collector-allowlist`).
 
 | Attribute | Values | Note |
 |---|---|---|

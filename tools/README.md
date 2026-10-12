@@ -8,7 +8,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 |---|---|---|---|
 | `pyproject.toml`, `uv.lock`, `.python-version` | pinned Python toolchain (ruff, mypy, bandit, pytest, pre-commit, MkDocs, zizmor, check-jsonschema) | `bootstrap` | |
 | `node/` | pinned Node tools (mermaid-cli, Redocly CLI, SonarScanner); install scripts of npm packages are disabled | `bootstrap` | |
-| `bin/fetch_tools.py`, `bin/tools.lock.json` | download release binaries (actionlint, gitleaks, go-arch-lint, golangci-lint, lychee, osv-scanner, sqlc, trivy) with a sha256 pin | `bootstrap`, `tools-lock` | `bin/tests/` |
+| `bin/fetch_tools.py`, `bin/tools.lock.json` | download release binaries (actionlint, amtool, gitleaks, go-arch-lint, golangci-lint, loki, lychee, osv-scanner, otelcol-contrib, promtool, sloth, sqlc, tempo, tofu, trivy) with a sha256 pin; the asset as a binary, tar.gz or zip | `bootstrap`, `tools-lock` | `bin/tests/` |
 | `ci/check_runners.py` | workflow rules: GitHub-hosted runners, triggers, SHA pinning, timeouts, permissions | `runners-check` | `ci/tests/` |
 | `ci/components.py` | component map: path filters in CI, resolution of release tags | (CI) | `ci/tests/` |
 | `ci/license_check.py` | license text and SPDX headers | `licenses` | `ci/tests/` |
@@ -19,6 +19,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `ci/go_prereqs.py` | prerequisites of the server gates: go, Docker-compatible runtime, pins of go-arch-lint and sqlc | `codegen-check`, `arch`, `migrations-lint`, `perf`, `test` | `ci/tests/` (recipes: `ci/tests/test_make_server_gates.py`) |
 | `conftest.py` | test isolation: removes variables such as `GIT_DIR`, which Git hooks set, from the environment of every test, so that Git fixtures never hit the real repository; runs the whole test run (collection, fixtures of every scope, every test) without a Git identity, like a fresh CI runner (no global or system configuration, `user.useConfigOnly`) | `test` | `ci/tests/test_git_env_isolation.py` |
 | `testing/git_fixtures.py` | throw-away Git repositories for tests with their own identity, no signing and no hooks; the fixtures that commit or tag use it, and one without an identity fails in every test run, as on the runner | `test` | `ci/tests/test_git_env_isolation.py` |
+| `opscheck/` | check the operations configuration (collector, Prometheus, Alertmanager, Loki, Tempo, Sloth, OpenTofu) with the pinned validators; derived values equal their source ([README](opscheck/README.md)) | `ops-check` | `opscheck/tests/` |
 | `hooks/text_rules.py` | no en or em dashes (U+2013, U+2014) in text files | pre-commit, `lint` | `hooks/tests/` |
 | `hooks/secret_formats.py` | no value matching the Stripe webhook secret format `whsec_` (`FORMATS["stripe_webhook_signing_secret"]`) that GitHub secret scanning reports; other GitHub patterns are not covered (docs/quality/gates.md); examples stay short of the format, tests assemble their samples at runtime | pre-commit, `lint`, `test` | `hooks/tests/` |
 | `hooks/commit_msg.py` | Conventional Commits and DCO sign-off | commit-msg, `commitlint` | `hooks/tests/` |

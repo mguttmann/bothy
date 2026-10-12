@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Dependency updates (ADR 0041). Grouped, weekly, with a cooldown before an update is proposed. Actions and images stay pinned to digests.",
+  "description": "Dependency updates (ADR 0041). Grouped, weekly, with a cooldown before an update is proposed. Actions and images stay pinned to digests, except the helper images of the Compose stack, which keep the version tags operators set (group Compose-Images).",
   "extends": [
     "config:best-practices",
     ":semanticCommits",
@@ -51,6 +51,22 @@
       "enabled": false
     },
     {
+      "description": "Validators of the Compose images follow the image versions in infra/compose/ (group Compose-Images); the maintainer refreshes them with `make tools-lock` in the image pull request, and the check tool-versions of `make ops-check` fails until then",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": ["tools/bin/tools.lock.json"],
+      "matchDepNames": ["otelcol-contrib", "promtool", "amtool", "loki", "tempo"],
+      "enabled": false
+    },
+    {
+      "description": "Images of the helper services in the Compose stack (ADR 0041): the variable in infra/compose/.env.example and its default in infra/compose/compose.yaml change in one pull request. The variables carry the version tags operators read and set, so no digest pinning here",
+      "matchFileNames": ["infra/compose/.env.example", "infra/compose/compose.yaml"],
+      "groupName": "Compose-Images",
+      "pinDigests": false,
+      "prBodyNotes": [
+        "Refresh the validators of these images before merging: `make tools-lock TOOL=<name> VERSION=<version>` for otelcol-contrib (otel/opentelemetry-collector-contrib), promtool (prom/prometheus), amtool (prom/alertmanager), loki (grafana/loki) and tempo (grafana/tempo), then `make ops-check`."
+      ]
+    },
+    {
       "description": "Local SonarQube and its database",
       "matchFileNames": ["tools/sonarqube/compose.yaml"],
       "groupName": "local SonarQube"
@@ -79,6 +95,23 @@
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n[A-Z_]+ := (?<currentValue>\\S+)"
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "Image versions in infra/compose/.env.example, each marked with a renovate comment directly above",
+      "managerFilePatterns": ["/^infra/compose/\\.env\\.example$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n[A-Z0-9_]+=(?<currentValue>\\S+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Defaults of the image version variables in infra/compose/compose.yaml",
+      "managerFilePatterns": ["/^infra/compose/compose\\.yaml$/"],
+      "matchStrings": [
+        "image: (?<depName>[a-z0-9][a-z0-9./_-]*):\\$\\{BOTHY_[A-Z0-9_]+_VERSION:-(?<currentValue>[^}\\s]+)\\}"
+      ],
+      "datasourceTemplate": "docker"
     }
   ]
 }
