@@ -93,6 +93,12 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"telemetry.logs.level":                 {Kind: config.KindEnum, Default: "info", Enum: []string{"debug", "info", "warn", "error"}, Chapter: "17-observability.md"},
 		"telemetry.pseudonym_key_ref":          {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/telemetry_pseudonym_key", Chapter: "17-observability.md"},
 		"privacy.telemetry_pseudonym_rotation": {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "20-datenschutz.md"},
+
+		"audit.deny_aggregate_window":    {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "05-aktionen.md"},
+		"audit.deny_aggregate_max_keys":  {Kind: config.KindInt, Default: "10000", Min: "1", Chapter: "05-aktionen.md"},
+		"privacy.audit_ip_key_period":    {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "20-datenschutz.md"},
+		"privacy.audit_ip_key_retention": {Kind: config.KindDuration, Default: "90d", Min: "1s", Chapter: "20-datenschutz.md"},
+		"privacy.audit_ip_kek_ref":       {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/audit_ip_kek", Chapter: "20-datenschutz.md"},
 	}
 	if len(got) != len(want) {
 		t.Errorf("schema has %d keys, want %d", len(got), len(want))
@@ -453,5 +459,27 @@ func TestHSTSMaxAgeWholeSeconds(t *testing.T) {
 			t.Errorf("%s: problems %v, want one about http.hsts_max_age", bad, got)
 		}
 		noValues(t, got, bad)
+	}
+}
+
+// TestAuditIPKeyRetentionAtLeastPeriod holds the cross-check of M1-24: a key must outlive its own
+// period, so privacy.audit_ip_key_retention below privacy.audit_ip_key_period is refused.
+func TestAuditIPKeyRetentionAtLeastPeriod(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		period, retention string
+		ok                bool
+	}{
+		{"30d", "90d", true},
+		{"30d", "30d", true},
+		{"30d", "29d", false},
+	} {
+		got := load(t, "BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD="+c.period, "BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION="+c.retention)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("period %s retention %s: problems %v, want ok %v", c.period, c.retention, got, c.ok)
+		}
+		if len(got) > 0 && !strings.Contains(got[0].String(), "privacy.audit_ip_key_retention") {
+			t.Errorf("the problem does not name the key: %v", got)
+		}
 	}
 }

@@ -237,3 +237,29 @@ func TestOptions(t *testing.T) {
 		t.Error("a nil option is not ignored")
 	}
 }
+
+func TestDetach_HidesTheUnit(t *testing.T) {
+	t.Parallel()
+	reg := txn.NewRegistry()
+	reg.Seal()
+	ctx, _ := inUnit(reg)
+	ctx = context.WithValue(ctx, otherKey{}, "kept")
+	k := txn.NewKey[int]("n")
+	mustOK(t, txn.Store(ctx, k, 1))
+	d := txn.Detach(ctx)
+	if txn.InUnit(d) || txn.CurrentPhase(d) != txn.PhaseNone {
+		t.Fatal("a detached context is still inside the unit")
+	}
+	if _, ok := txn.Load(d, k); ok {
+		t.Fatal("a detached context sees the state of the unit")
+	}
+	if d.Value(otherKey{}) != "kept" {
+		t.Fatal("Detach dropped another value of the context")
+	}
+	if !txn.InUnit(ctx) {
+		t.Fatal("Detach changed the original context")
+	}
+	if txn.InUnit(txn.Detach(context.Background())) {
+		t.Fatal("Detach outside a unit created one")
+	}
+}

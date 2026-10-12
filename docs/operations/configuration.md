@@ -289,8 +289,8 @@ Quelle: [05-aktionen.md](../spec/05-aktionen.md), Abschnitt 10.
 
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
-| `audit.deny_aggregate_window` | `BOTHY_AUDIT__DENY_AGGREGATE_WINDOW` | Server |  | `60s` | Zusammenfassungsfenster für gleiche Ablehnungen | geplant (M1) |
-| `audit.deny_aggregate_max_keys` | `BOTHY_AUDIT__DENY_AGGREGATE_MAX_KEYS` | Server |  | `10000` | höchstens so viele offene Zusammenfassungen je Prozess; begrenzt den Speicher bei Fluten ohne Anmeldung | geplant (M1) |
+| `audit.deny_aggregate_window` | `BOTHY_AUDIT__DENY_AGGREGATE_WINDOW` | Server | duration | `60s` | Zusammenfassungsfenster für gleiche Ablehnungen | aktiv |
+| `audit.deny_aggregate_max_keys` | `BOTHY_AUDIT__DENY_AGGREGATE_MAX_KEYS` | Server | int | `10000` | höchstens so viele offene Zusammenfassungen je Prozess; begrenzt den Speicher bei Fluten ohne Anmeldung | aktiv |
 | `status.public_enabled` | `BOTHY_STATUS__PUBLIC_ENABLED` | Server |  | `false` | Statusseite ohne Anmeldung | geplant (M7) |
 | `ratelimit.rl.public_auth.per_minute` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__PER_MINUTE` | Server |  | `30` | je Client-IP | geplant (M1) |
 | `ratelimit.rl.public_auth.burst` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__BURST` | Server |  | `10` | je Client-IP | geplant (M1) |
@@ -739,9 +739,9 @@ Quelle: [20-datenschutz.md](../spec/20-datenschutz.md), Abschnitt 13.
 | `privacy.account_deletion_content` | `BOTHY_PRIVACY__ACCOUNT_DELETION_CONTENT` | Server |  | `keep_pseudonymized` | Inhalte gelöschter Konten: `keep_pseudonymized` oder `delete` | geplant (M7) |
 | `privacy.object_delete_delay` | `BOTHY_PRIVACY__OBJECT_DELETE_DELAY` | Server |  | `24h` | höchste Zeit bis zum Entfernen gelöschter Objekte | geplant (M3) |
 | `privacy.deletion_journal_retention` | `BOTHY_PRIVACY__DELETION_JOURNAL_RETENTION` | Server |  | `400d` | Aufbewahrung des Lösch-Journals; mindestens Sicherungsfrist | geplant (M7) |
-| `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server |  | `30d` | Zeitraum je Schlüssel für IP-Pseudonyme | geplant (M1) |
-| `privacy.audit_ip_key_retention` | `BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION` | Server |  | `90d` | danach werden Schlüssel vernichtet | geplant (M1) |
-| `privacy.audit_ip_kek_ref` | `BOTHY_PRIVACY__AUDIT_IP_KEK_REF` | Server |  | `file:<secrets.dir>/audit_ip_kek` | Verweis auf den Schlüssel, mit dem die IP-Schlüssel in `audit_ip_keys` verschlüsselt sind | geplant (M1) |
+| `privacy.audit_ip_key_period` | `BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD` | Server | duration | `30d` | Zeitraum je Schlüssel für IP-Pseudonyme | aktiv |
+| `privacy.audit_ip_key_retention` | `BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION` | Server | duration | `90d` | danach werden Schlüssel vernichtet | aktiv |
+| `privacy.audit_ip_kek_ref` | `BOTHY_PRIVACY__AUDIT_IP_KEK_REF` | Server | secret_ref | `file:<secrets.dir>/audit_ip_kek` | Verweis auf den Schlüssel, mit dem die IP-Schlüssel in `audit_ip_keys` verschlüsselt sind | aktiv |
 | `privacy.telemetry_pseudonym_rotation` | `BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION` | Server | duration | `30d` | Wechsel des Schlüssels für pseudonyme IDs in Telemetrie | aktiv |
 | `privacy.per_person_stats_enabled` | `BOTHY_PRIVACY__PER_PERSON_STATS_ENABLED` | Server |  | `false` | Statistik je Person | geplant (M6) |
 | `privacy.stats_min_group_size` | `BOTHY_PRIVACY__STATS_MIN_GROUP_SIZE` | Server |  | `5` | kleinste Gruppe für Auswertungen nach Personen | geplant (M6) |

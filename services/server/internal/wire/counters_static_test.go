@@ -256,7 +256,7 @@ func handlerPackage(name string) string {
 // (02 "Weitere Prüfungen im Gate", "Zähler-Zugriff").
 func allowedCountersPackages(t *testing.T) func(string) bool {
 	t.Helper()
-	reg, err := wire.NewTxnRegistry(&wire.Modules{})
+	reg, err := wire.NewTxnRegistry(wire.NewModules(nil, nil))
 	if err != nil {
 		t.Fatal(err)
 	}

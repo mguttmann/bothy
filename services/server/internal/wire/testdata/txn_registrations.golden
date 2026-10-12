@@ -1,1 +1,2 @@
 # txn registrations; regenerate with: go test ./internal/wire -run TestTxnRegistrationsGolden -update
+hook audit audit github.com/OWNER/bothy/services/server/internal/audit/app.(*Chain).Hook-fm

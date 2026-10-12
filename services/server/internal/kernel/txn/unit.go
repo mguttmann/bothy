@@ -145,6 +145,18 @@ func UnitFrom(ctx context.Context) (*Unit, bool) {
 	return u, ok && u != nil
 }
 
+// Detach returns a copy of ctx that is outside any unit of work but keeps every other value
+// (actor, correlation ID, client IP) and the cancellation of ctx. A UnitOfWork.Do on the result
+// begins its own transaction instead of joining the ambient one; the audit recorder writes a
+// denial after a rollback and an error entry this way (03 "I1-Prüfung", M1-24).
+//
+// Example:
+//
+//	err := uow.Do(txn.Detach(ctx), func(ctx context.Context) error { ... })
+func Detach(ctx context.Context) context.Context {
+	return context.WithValue(ctx, unitKey{}, (*Unit)(nil))
+}
+
 // InUnit reports whether ctx is inside a unit of work.
 func InUnit(ctx context.Context) bool {
 	_, ok := UnitFrom(ctx)

@@ -14,6 +14,30 @@
       "doc": "Additional origins that get CORS headers; each entry is an origin such as https://app.example.com."
     },
     {
+      "name": "audit.deny_aggregate_max_keys",
+      "env": "BOTHY_AUDIT__DENY_AGGREGATE_MAX_KEYS",
+      "kind": "int",
+      "default": "10000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "05-aktionen.md",
+      "doc": "Most open aggregations of denials per process; a new key beyond it writes the oldest at once."
+    },
+    {
+      "name": "audit.deny_aggregate_window",
+      "env": "BOTHY_AUDIT__DENY_AGGREGATE_WINDOW",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "05-aktionen.md",
+      "doc": "Window from the first of identical denials within which they become one audit entry with a count."
+    },
+    {
       "name": "database.acquire_timeout",
       "env": "BOTHY_DATABASE__ACQUIRE_TIMEOUT",
       "kind": "duration",
@@ -475,6 +499,42 @@
       "max": "",
       "chapter": "03-datenmodell.md",
       "doc": "Longest handle of a principal in characters."
+    },
+    {
+      "name": "privacy.audit_ip_kek_ref",
+      "env": "BOTHY_PRIVACY__AUDIT_IP_KEK_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/audit_ip_kek",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "20-datenschutz.md",
+      "doc": "Secret reference of the key that encrypts the keys of the IP pseudonyms in the database; 32 bytes as hex."
+    },
+    {
+      "name": "privacy.audit_ip_key_period",
+      "env": "BOTHY_PRIVACY__AUDIT_IP_KEY_PERIOD",
+      "kind": "duration",
+      "default": "30d",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "20-datenschutz.md",
+      "doc": "Length of the period of one key of the IP pseudonyms in the audit log."
+    },
+    {
+      "name": "privacy.audit_ip_key_retention",
+      "env": "BOTHY_PRIVACY__AUDIT_IP_KEY_RETENTION",
+      "kind": "duration",
+      "default": "90d",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "20-datenschutz.md",
+      "doc": "How long after its period a key of the IP pseudonyms is kept before it is destroyed."
     },
     {
       "name": "privacy.telemetry_pseudonym_rotation",

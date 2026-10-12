@@ -110,6 +110,8 @@ type server struct {
 	mux       *http.ServeMux
 	required  int64
 	instance  instance.Record
+	// audit is the audit module (M1-24); later tickets hand its recorder to the modules.
+	audit *Audit
 	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
 	blocked bool
 }
@@ -130,6 +132,10 @@ type server struct {
 //  6. instance (M1-15): load the instance row (missing: the start ends with the hint to run
 //     "bothy migrate up") and compare the own version with instance.min_server_version; below
 //     it the readiness check schema_requires_newer_server fails for good (loadInstance),
+//     6a. audit (M1-24): resolve privacy.audit_ip_kek_ref once (a missing or malformed key ends the
+//     start), build the audit module with the unit of work of the role and start the aggregator
+//     of denials; its stop step audit_denials flushes the open aggregations before the pool
+//     closes (startAudit),
 //  7. extension points, in this order: signing keys (M1-32), routes
 //     (MountRoutes, api and all), log tail (M1-16, api and all), jobs and consumers (M1-14,
 //     worker and all),
@@ -137,8 +143,8 @@ type server struct {
 //     from loopback and server.trusted_proxies (SEC-TLS-1, SEC-TLS-2),
 //  9. ready: readiness passes startup and the line "server ready" is written.
 //
-// Stop steps, by phase: not ready (always), drain and HTTP (api, all), telemetry, database,
-// internal listener. Their budgets come from shutdown.*.
+// Stop steps, by phase: not ready (always), drain and HTTP (api, all), telemetry, database (the
+// flush of the audit denials, then the pool), internal listener. Their budgets come from shutdown.*.
 //
 // The error reports values that do not bind (a schema without a key) or an unknown role; it is
 // a usage or configuration error (exit code 2). Budgets above shutdown.total_timeout make Run
@@ -260,6 +266,7 @@ func (s *server) register() {
 	r.Add(step("database", s.startDatabase))
 	r.Add(step("schema", s.checkSchema))
 	r.Add(step("instance", s.loadInstance))
+	r.Add(step("audit", s.startAudit))
 	// Extension point (README.md): M1-32 adds the signing keys here.
 	r.Add(step("routes", s.mountRoutes))
 	// Extension points: M1-16 adds the log tail (api, all), M1-14 the jobs and M2 the consumers
@@ -417,6 +424,36 @@ func (s *server) startDatabase(ctx context.Context) error {
 		return err
 	}
 	s.reg.AddReadiness("database", pool.Ping)
+	return nil
+}
+
+// startAudit is start step 6a: it checks the key-encryption key, builds the audit module over the
+// pool of the role and starts its aggregator with the stop step that flushes it (Audit.Start;
+// the pool step is registered earlier, so the flush runs before the pool closes).
+func (s *server) startAudit(ctx context.Context) error {
+	cfg, err := AuditConfig(s.values)
+	if err != nil {
+		return err
+	}
+	unitCfg, err := UnitConfig(s.values)
+	if err != nil {
+		return err
+	}
+	kek := SecretsKEK{Provider: s.sp}
+	if err := checkAuditKEK(ctx, kek, cfg.IPKEKRef); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	pool := s.pool
+	s.mu.Unlock()
+	a, err := NewAudit(pool, unitCfg, cfg, kek, s.logger())
+	if err != nil {
+		return err
+	}
+	a.Start(s.runner)
+	s.mu.Lock()
+	s.audit = a
+	s.mu.Unlock()
 	return nil
 }
 

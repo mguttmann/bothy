@@ -6,9 +6,11 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 
+	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
@@ -16,19 +18,27 @@ import (
 )
 
 // Modules holds the module objects of a process role whose hooks and subscribers the txn
-// registry takes. It is empty until the first module with a hook or subscriber exists (authz
-// M1-29, sync M1-16, audit M1-24); those tickets add their fields. Constructors that fill it
-// must not open network connections, so the golden test builds the real registration without a
-// database.
-type Modules struct{}
+// registry takes: today the audit hook (M1-24); authz (M1-29) and sync (M1-16) add their fields.
+// Constructors that fill it must not open network connections, so the golden test builds the
+// real registration without a database.
+type Modules struct {
+	// Audit is the audit phase hook (phase 3.3); required.
+	Audit *auditapp.Chain
+}
+
+// NewModules returns the module objects over pool with log for their reports; pool may be nil
+// where no unit of work runs (the golden test). It opens no connection.
+func NewModules(pool *pg.Pool, log *slog.Logger) *Modules {
+	return &Modules{Audit: newAuditChain(pool, log)}
+}
 
 // NewTxnRegistry returns the sealed txn registry of a process role: every role (api, worker,
 // all) builds its registry here, so the golden file shows the one list of all roles. The error
-// is the first rejected registration.
+// is the first rejected registration, or a missing module object.
 //
 // Example:
 //
-//	reg, err := wire.NewTxnRegistry(&wire.Modules{})
+//	reg, err := wire.NewTxnRegistry(wire.NewModules(pool, logger))
 //	if err != nil {
 //		return err
 //	}
@@ -42,15 +52,20 @@ func NewTxnRegistry(m *Modules) (*txn.Registry, error) {
 	return reg, nil
 }
 
+// errNoAuditHook reports Modules without the audit hook: every unit of work must chain its audit
+// entries, so a registry without it is refused.
+var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Modules.Audit)")
+
 // registerTxn is the only place with SetHook and Subscribe calls (02 "In-Tx-Ereignisse": one
 // list). Hooks and handlers are method values of the module objects in m, never closures here,
-// because the registry derives their owner from the Go package. Today no module has a hook or a
-// subscriber; only the tracer of subscriber spans is set.
-//
-//nolint:unparam // the module tickets return the errors of SetHook and Subscribe from here.
-func registerTxn(reg *txn.Registry, _ *Modules) error {
+// because the registry derives their owner from the Go package. It sets the tracer of subscriber
+// spans and the audit hook of phase 3.3.
+func registerTxn(reg *txn.Registry, m *Modules) error {
 	reg.SetTracer(otel.SubscriberSpan)
-	return nil
+	if m == nil || m.Audit == nil {
+		return errNoAuditHook
+	}
+	return reg.SetHook(txn.PhaseAudit, m.Audit.Hook)
 }
 
 // UnitConfig binds the configuration of the unit of work (database.tx_retry_max and the three

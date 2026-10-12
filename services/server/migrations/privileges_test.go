@@ -30,6 +30,11 @@ var appPrivileges = map[string][]string{
 	"principals": {"SELECT", "INSERT", "UPDATE"},
 	"users":      {"SELECT", "INSERT", "UPDATE"},
 	"owners":     {"SELECT", "INSERT", "UPDATE"},
+	// 19 SEC-AUD-1: the audit log is append-only for bothy_app (M1-24).
+	"audit_events": {"SELECT", "INSERT"},
+	// plus the column right UPDATE (key_ciphertext, destroyed_at) for the destruction of a key,
+	// which has_table_privilege does not show; TestSECT16_AppRoleCannotUpdateOrDelete holds it.
+	"audit_ip_keys": {"SELECT", "INSERT"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

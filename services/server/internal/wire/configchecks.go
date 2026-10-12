@@ -33,6 +33,7 @@ var configChecks = []configCheck{
 	{name: "tls_pair", keys: []string{keyTLSCertRef, keyTLSKeyRef}, fn: tlsPair},
 	{name: "tls_https", keys: []string{keyPublicURL, keyTLSCertRef, keyTLSKeyRef}, fn: tlsHTTPS},
 	{name: "hsts_whole_seconds", keys: []string{"http.hsts_max_age"}, fn: hstsWholeSeconds},
+	{name: "audit_ip_key_retention", keys: []string{"privacy.audit_ip_key_period", "privacy.audit_ip_key_retention"}, fn: auditIPKeyRetention},
 }
 
 // tlsPair requires server.tls_cert_ref and server.tls_key_ref to be both set or both empty
@@ -62,6 +63,16 @@ func tlsHTTPS(v *config.Values) error {
 func hstsWholeSeconds(v *config.Values) error {
 	if v.Duration("http.hsts_max_age")%time.Second != 0 {
 		return errors.New("http.hsts_max_age must be a whole number of seconds")
+	}
+	return nil
+}
+
+// auditIPKeyRetention requires privacy.audit_ip_key_retention to be at least
+// privacy.audit_ip_key_period (M1-24): a key must outlive its own period, or the destruction job
+// of M7-05 would destroy the key that the current entries still use.
+func auditIPKeyRetention(v *config.Values) error {
+	if v.Duration("privacy.audit_ip_key_retention") < v.Duration("privacy.audit_ip_key_period") {
+		return errors.New("privacy.audit_ip_key_retention must be at least privacy.audit_ip_key_period")
 	}
 	return nil
 }

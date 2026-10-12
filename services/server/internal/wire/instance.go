@@ -37,7 +37,7 @@ func MigrationSteps(pool *pg.Pool, fsys fs.FS) (pg.MigratorOptions, error) {
 	if err != nil {
 		return pg.MigratorOptions{}, err
 	}
-	reg, err := NewTxnRegistry(&Modules{})
+	reg, err := NewTxnRegistry(NewModules(pool, nil))
 	if err != nil {
 		return pg.MigratorOptions{}, err
 	}
@@ -108,7 +108,7 @@ func (s *server) loadInstance(ctx context.Context) error {
 	s.mu.Lock()
 	pool := s.pool
 	s.mu.Unlock()
-	reg, err := NewTxnRegistry(&Modules{})
+	reg, err := NewTxnRegistry(NewModules(pool, s.logger()))
 	if err != nil {
 		return err
 	}

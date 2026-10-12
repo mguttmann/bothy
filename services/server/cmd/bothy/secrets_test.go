@@ -123,8 +123,10 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		t.Errorf("check --secrets with references from env: exit %d, stdout\n%s", code, stdout)
 	}
 	noCanary(t, canaries, stdout, stderr)
-	// The server schema also resolves telemetry.pseudonym_key_ref (M1-10) below secrets.dir.
+	// The server schema also resolves telemetry.pseudonym_key_ref (M1-10) and
+	// privacy.audit_ip_kek_ref (M1-24) below secrets.dir.
 	writeSecret(t, dir, "telemetry_pseudonym_key", strings.Repeat("k", 32), 0o600)
+	writeSecret(t, dir, "audit_ip_kek", strings.Repeat("6b", 32), 0o600)
 	for _, args := range [][]string{{"config", "print", "--redacted"}, {"config", "check", "--secrets"}} {
 		code, stdout, stderr = runBothy(t, []string{"BOTHY_SECRETS__DIR=" + dir}, args...)
 		if code != 0 || stderr != "" {
@@ -132,7 +134,7 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		}
 		noCanary(t, canaries, stdout, stderr)
 	}
-	// The directory holds db_app_password and telemetry_pseudonym_key only, as the secrets of an
+	// The directory holds db_app_password, telemetry_pseudonym_key and audit_ip_kek only, as the secrets of an
 	// api container do: the references of bothy migrate are skipped, not reported as missing
 	// (docs/DECISIONS.md M1-12).
 	skipped := ": skipped (read only by bothy migrate up --bootstrap)\n"
@@ -142,6 +144,7 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		"secret migrate.maint_password_ref" + skipped +
 		"secret migrate.monitor_password_ref" + skipped +
 		"secret migrate.owner_password_ref" + skipped +
+		"secret privacy.audit_ip_kek_ref: ok\n" +
 		// An optional reference without a value switches its feature off and reads nothing
 		// (docs/DECISIONS.md M1-21/1).
 		"secret server.tls_cert_ref: not set\n" +

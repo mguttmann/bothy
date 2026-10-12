@@ -10,6 +10,7 @@ package wire
 const (
 	chapter02 = "02-architektur.md"
 	chapter03 = "03-datenmodell.md"
+	chapter05 = "05-aktionen.md"
 	chapter06 = "06-api.md"
 	chapter16 = "16-betrieb.md"
 	chapter17 = "17-observability.md"
