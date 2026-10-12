@@ -38,6 +38,12 @@ the steps of `bothy migrate up` as well, so `New` returns a database with the in
 cannot import `internal/wire` itself. All databases of one binary then share the `instance_id`
 of their template.
 
+`New(t, pgtest.Durable())` creates the database on a second container of the test binary that
+runs with the PostgreSQL defaults (`fsync`, `synchronous_commit` and `full_page_writes` on)
+instead of the speed flags below; it starts with the first such `New`. Load and chaos tests use it,
+because ADR 0063 point 2 measures only with the durability settings of production (M1-16,
+`perf/event_commit`; M1-72). Normal tests keep the fast container.
+
 Roles are cluster-wide: a test that changes a role password must not call `t.Parallel` and must
 restore the password (see `roles_test.go` in package `pg`).
 
@@ -49,7 +55,7 @@ Colima). Without one it prints
 and the test binary exits with 1; tests never skip. The image is the pinned `Image` in `image.go`
 (the same pin as `tools/sonarqube/compose.yaml`, updated by Renovate). The container binds
 `127.0.0.1` with a random host port, runs with `fsync=off`, `synchronous_commit=off` and
-`full_page_writes=off`, and Ryuk is disabled because it would publish a port beyond loopback.
+`full_page_writes=off` (except the `Durable` container), and Ryuk is disabled because it would publish a port beyond loopback.
 
 ## Cleanup
 

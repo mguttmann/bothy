@@ -16,7 +16,7 @@ import (
 // already. Empty until M1-16 registers the first handler.
 func TestWireJobArgsOnlyIDs(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.Modules{})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}

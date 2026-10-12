@@ -75,7 +75,9 @@ funktioniert und Änderungen eindeutig macht. Normativ in
   und lehnt `null`-Elemente und Ganzzahlen über 2^53 - 1 mit `500` ab; `TestNoNull_NullInArrayGives500`,
   `TestInt53_AboveLimitGives500`, `TestNoNull_CleanBodyByteIdentical`), dazu der Harness
   `httpservertest`, der jeden Handler-Test mit `null` in der Antwort scheitern lässt; ein Test im
-  Bau-Ticket M1-16: kein Umschlag enthält JSON-`null`.
+  Bau-Ticket M1-16: kein Umschlag enthält JSON-`null` (built: `FuzzEnvelopeHasNoJSONNull` and
+  `TestEnvelope_FieldsMatchOpenAPI` in `services/server/internal/sync`; the appender rejects a
+  payload with JSON `null` at any depth, `TestAppend_Validation`).
 - Gate G7 (Schemathesis) mit eigener Prüfung "kein `null`" und Gate G8 (Antwort-Validierung in
   Integrationstests) in [06-api.md](../spec/06-api.md), Abschnitt 15.
 - Toleranz-Test G5: Die Handschicht jedes SDK überspringt ein empfangenes `null` ohne Fehler.

@@ -167,15 +167,53 @@ func TestMigrationSteps(t *testing.T) {
 }
 
 // TestMigrateUpSteps: bothy migrate up runs River's migrations before goose (M1-14, upgrade.md
-// rule M11) and the instance step after them (M1-15). MigrationSteps, which pgtest.WithSteps
-// uses for the templates, keeps only the instance step (docs/DECISIONS.md INT-W5/3).
+// rule M11), the instance step after them (M1-15) and then the partitions of event_log (M1-16,
+// upgrade.md rule M10). MigrationSteps, which pgtest.WithSteps uses for the templates, keeps only
+// the instance step (docs/DECISIONS.md INT-W5/3, M1-16/7).
 func TestMigrateUpSteps(t *testing.T) {
 	t.Parallel()
-	opts, err := wire.MigrateUpSteps(nil, migrations.FS, "jobs", nil)
+	cfg, err := wire.SyncConfigFrom(syncValues(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(opts.Before) != 1 || opts.Before[0].Name() != "river" || len(opts.After) != 1 || opts.After[0].Name() != "instance" {
-		t.Errorf("MigrateUpSteps = %+v, want river before and instance after the migrations", opts)
+	opts, err := wire.MigrateUpSteps(nil, migrations.FS, wire.MigrateUpConfig{JobsSchema: "jobs", Sync: cfg}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(opts.Before) != 1 || opts.Before[0].Name() != "river" || len(opts.After) != 2 ||
+		opts.After[0].Name() != "instance" || opts.After[1].Name() != "event_log_partitions" {
+		t.Errorf("MigrateUpSteps = %+v, want river before, instance and event_log_partitions after the migrations", opts)
+	}
+	if _, err := wire.MigrateUpSteps(nil, migrations.FS, wire.MigrateUpConfig{JobsSchema: "jobs"}, nil); err == nil {
+		t.Error("MigrateUpSteps accepted a zero partition configuration")
+	}
+}
+
+// TestMigrateUpSteps_PartitionStepCreatesPartitions runs the partition step on a database
+// without partitions: afterwards sync.event_log_partitions_ahead partitions stand above the head.
+func TestMigrateUpSteps_PartitionStepCreatesPartitions(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t)
+	cfg, err := wire.SyncConfigFrom(syncValues(t, "BOTHY_SYNC__EVENT_LOG_PARTITIONS_AHEAD=2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool := db.OpenPool(t, db.Config(pg.RoleOwner).ForMigrate(5*time.Second))
+	opts, err := wire.MigrateUpSteps(pool, migrations.FS, wire.MigrateUpConfig{JobsSchema: "jobs", Sync: cfg}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := opts.After[1].Run(ctx, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var n int
+	if err := db.SuperConn(t).QueryRow(ctx, "SELECT count(*) FROM pg_inherits WHERE inhparent = 'public.event_log'::regclass").Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Fatalf("%d partitions after the step ran twice, want 2", n)
 	}
 }

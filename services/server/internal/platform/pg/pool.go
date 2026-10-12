@@ -66,6 +66,8 @@ type Pool struct {
 	pool *pgxpool.Pool
 	cfg  Config
 	log  *slog.Logger
+	// password resolves the password of a new connection; DialDedicated uses it as well.
+	password func(context.Context) (string, error)
 }
 
 // Open returns the pool for cfg. It does not connect: the first connection is made by the first
@@ -82,7 +84,8 @@ func Open(ctx context.Context, cfg Config, sp *secrets.Provider, log *slog.Logge
 	if sp == nil {
 		return nil, errors.New("pg: Open needs a secret provider")
 	}
-	pc, err := poolConfig(cfg, passwordFunc(cfg, sp))
+	password := passwordFunc(cfg, sp)
+	pc, err := poolConfig(cfg, password)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +96,36 @@ func Open(ctx context.Context, cfg Config, sp *secrets.Provider, log *slog.Logge
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Pool{pool: p, cfg: cfg, log: log}, nil
+	return &Pool{pool: p, cfg: cfg, log: log, password: password}, nil
+}
+
+// DialDedicated opens one connection with the configuration of the pool outside the pool, named
+// applicationName in pg_stat_activity: the log tail holds its LISTEN connection this way
+// (docs/spec/02-architektur.md "Log-Tail je api-Prozess", application name bothy-event-tail), so a
+// session that waits for notifications never takes a pool connection. It has the session
+// settings and the tracer of the pool connections and resolves the password the same way;
+// connecting waits at most database.acquire_timeout. The caller closes it.
+//
+// The error reports an application name that WithAppName rejects, a password that cannot be
+// resolved (naming the reference, never the value) or the connection error.
+func (p *Pool) DialDedicated(ctx context.Context, applicationName string) (*pgx.Conn, error) {
+	cfg := p.cfg.WithAppName(applicationName)
+	cc, err := connConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
+	pw, err := p.password(ctx)
+	if err != nil {
+		return nil, err
+	}
+	cc.Password = pw
+	actx, cancel := context.WithTimeout(ctx, cfg.AcquireTimeout)
+	defer cancel()
+	conn, err := pgx.ConnectConfig(actx, cc)
+	if err != nil {
+		return nil, fmt.Errorf("pg: dedicated connection %s: %w", applicationName, err)
+	}
+	return conn, nil
 }
 
 // passwordFunc resolves the password of cfg for one new connection. The error names the login and

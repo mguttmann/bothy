@@ -161,10 +161,10 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `database.tx_retry_max` | `BOTHY_DATABASE__TX_RETRY_MAX` | Server | int | `2` | Wiederholungen des Unit of Work bei `40P01` und `55P03` | aktiv |
 | `database.listen_reconnect_backoff_cap` | `BOTHY_DATABASE__LISTEN_RECONNECT_BACKOFF_CAP` | Server | duration | `10s` | größter Abstand beim Neuaufbau von `LISTEN` | aktiv |
 | `startup.dependency_wait` | `BOTHY_STARTUP__DEPENDENCY_WAIT` | Server | duration | `60s` | Warten auf die Datenbank beim Start | aktiv |
-| `sync.log_poll_interval` | `BOTHY_SYNC__LOG_POLL_INTERVAL` | Server |  | `1s` | Poll des Log-Tails ohne `NOTIFY` | geplant (M1) |
-| `sync.tail_batch_size` | `BOTHY_SYNC__TAIL_BATCH_SIZE` | Server |  | `1000` | Ereignisse je Lesevorgang des Log-Tails | geplant (M1) |
-| `sync.partition_maintenance_interval` | `BOTHY_SYNC__PARTITION_MAINTENANCE_INTERVAL` | Server |  | `10m` | Abstand des Jobs `sync.partition_maintenance` | geplant (M1) |
-| `sync.event_log_partitions_ahead` | `BOTHY_SYNC__EVENT_LOG_PARTITIONS_AHEAD` | Server |  | `3` | Partitionen von `event_log`, die vor dem Kopf bereitstehen; mit `sync.event_log_partition_size` reichen sie bei `perf.event_commit_min_per_s` länger als zwei Abstände `sync.partition_maintenance_interval` | geplant (M1) |
+| `sync.log_poll_interval` | `BOTHY_SYNC__LOG_POLL_INTERVAL` | Server | duration | `1s` | Poll des Log-Tails ohne `NOTIFY` | aktiv |
+| `sync.tail_batch_size` | `BOTHY_SYNC__TAIL_BATCH_SIZE` | Server | int | `1000` | Ereignisse je Lesevorgang des Log-Tails | aktiv |
+| `sync.partition_maintenance_interval` | `BOTHY_SYNC__PARTITION_MAINTENANCE_INTERVAL` | Server | duration | `10m` | Abstand des Jobs `sync.partition_maintenance` | aktiv |
+| `sync.event_log_partitions_ahead` | `BOTHY_SYNC__EVENT_LOG_PARTITIONS_AHEAD` | Server | int | `3` | Partitionen von `event_log`, die vor dem Kopf bereitstehen; mit `sync.event_log_partition_size` reichen sie bei `perf.event_commit_min_per_s` länger als zwei Abstände `sync.partition_maintenance_interval` | aktiv |
 | `gateway.write_timeout` | `BOTHY_GATEWAY__WRITE_TIMEOUT` | Server |  | `10s` | Frist für einen WebSocket-Schreibvorgang | geplant (M1) |
 | `consumer.batch_size` | `BOTHY_CONSUMER__BATCH_SIZE` | Server |  | `500` | Ereignisse je Runde eines Worker-Verbrauchers | geplant (M2) |
 | `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server |  | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` | geplant (M2) |
@@ -245,7 +245,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server |  | `20` | danach wird ein Abo deaktiviert | geplant (M2) |
 | `webhook.retry_backoff_base` | `BOTHY_WEBHOOK__RETRY_BACKOFF_BASE` | Server |  | `10s` | Basis des Backoffs | geplant (M2) |
 | `webhook.retry_backoff_cap` | `BOTHY_WEBHOOK__RETRY_BACKOFF_CAP` | Server |  | `1h` | größter Abstand | geplant (M2) |
-| `sync.event_log_partition_size` | `BOTHY_SYNC__EVENT_LOG_PARTITION_SIZE` | Server |  | `1000000` | Sequenznummern je Partition | geplant (M1) |
+| `sync.event_log_partition_size` | `BOTHY_SYNC__EVENT_LOG_PARTITION_SIZE` | Server | int | `1000000` | Sequenznummern je Partition | aktiv |
 
 ### 04 Ereignis- und Sync-Protokoll
 
@@ -253,8 +253,8 @@ Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
 
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
-| `sync.event_retention` | `BOTHY_SYNC__EVENT_RETENTION` | Server |  | `30d` | so lange bleiben dauerhafte Ereignisse nachholbar | geplant (M1) |
-| `sync.event_payload_max_bytes` | `BOTHY_SYNC__EVENT_PAYLOAD_MAX_BYTES` | Server |  | `65536` | größte Nutzlast eines Ereignisses | geplant (M1) |
+| `sync.event_retention` | `BOTHY_SYNC__EVENT_RETENTION` | Server | duration | `30d` | so lange bleiben dauerhafte Ereignisse nachholbar | aktiv |
+| `sync.event_payload_max_bytes` | `BOTHY_SYNC__EVENT_PAYLOAD_MAX_BYTES` | Server | int | `65536` | größte Nutzlast eines Ereignisses | aktiv |
 | `sync.ws_max_frame_bytes` | `BOTHY_SYNC__WS_MAX_FRAME_BYTES` | Server |  | `1048576` | größter WebSocket-Rahmen | geplant (M1) |
 | `sync.identify_timeout` | `BOTHY_SYNC__IDENTIFY_TIMEOUT` | Server |  | `10s` | Zeit zwischen `hello` und `identify` | geplant (M1) |
 | `sync.heartbeat_interval` | `BOTHY_SYNC__HEARTBEAT_INTERVAL` | Server |  | `30s` | Abstand der Heartbeats (in `hello` gemeldet) | geplant (M1) |

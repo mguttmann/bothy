@@ -15,13 +15,16 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	syncapp "github.com/OWNER/bothy/services/server/internal/sync/app"
 )
 
 // Modules holds the module objects of a process role whose hooks and subscribers the txn
-// registry takes: today the audit hook (M1-24); authz (M1-29) and sync (M1-16) add their fields.
+// registry takes: the sync hook (M1-16) and the audit hook (M1-24); authz (M1-29) adds its field.
 // Constructors that fill it must not open network connections, so the golden test builds the
 // real registration without a database.
 type Modules struct {
+	// Sync is the sync phase hook (phase 3.2); required.
+	Sync *syncapp.PhaseHook
 	// Audit is the audit phase hook (phase 3.3); required.
 	Audit *auditapp.Chain
 }
@@ -29,7 +32,7 @@ type Modules struct {
 // NewModules returns the module objects over pool with log for their reports; pool may be nil
 // where no unit of work runs (the golden test). It opens no connection.
 func NewModules(pool *pg.Pool, log *slog.Logger) *Modules {
-	return &Modules{Audit: newAuditChain(pool, log)}
+	return &Modules{Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log)}
 }
 
 // NewTxnRegistry returns the sealed txn registry of a process role: every role (api, worker,
@@ -59,11 +62,17 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // registerTxn is the only place with SetHook and Subscribe calls (02 "In-Tx-Ereignisse": one
 // list). Hooks and handlers are method values of the module objects in m, never closures here,
 // because the registry derives their owner from the Go package. It sets the tracer of subscriber
-// spans and the audit hook of phase 3.3.
+// spans, the sync hook of phase 3.2 and the audit hook of phase 3.3.
 func registerTxn(reg *txn.Registry, m *Modules) error {
 	reg.SetTracer(otel.SubscriberSpan)
 	if m == nil || m.Audit == nil {
 		return errNoAuditHook
+	}
+	if m.Sync == nil {
+		return errNoSyncHook
+	}
+	if err := reg.SetHook(txn.PhaseSync, m.Sync.Run); err != nil {
+		return err
 	}
 	return reg.SetHook(txn.PhaseAudit, m.Audit.Hook)
 }

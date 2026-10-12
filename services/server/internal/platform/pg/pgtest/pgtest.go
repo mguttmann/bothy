@@ -93,13 +93,14 @@ const (
 // noRuntimeMessage is what Main prints when no container runtime answers (plan P-09).
 const noRuntimeMessage = "pgtest: no Docker-compatible runtime reachable (%v); integration tests need one (plan P-09)\n"
 
-// state is the container of the running test binary.
+// state holds the containers of the running test binary: one with the speed flags and, started
+// only by a New with Durable, one with the PostgreSQL defaults (key true).
 var state struct {
-	mu      sync.Mutex
-	active  bool // Main is running the tests
-	cluster *cluster
-	err     error // a failed start, reported to every later New
-	steps   Steps // the steps of bothy migrate up for every template, from Main
+	mu       sync.Mutex
+	active   bool // Main is running the tests
+	clusters map[bool]*cluster
+	errs     map[bool]error // a failed start, reported to every later New
+	steps    Steps          // the steps of bothy migrate up for every template, from Main
 }
 
 // Steps builds the steps bothy migrate up runs around the goose migrations, for a pool of
@@ -195,46 +196,53 @@ func setActive(active bool) {
 	state.active = active
 }
 
-// sharedCluster returns the container of this test binary, starting it on first use.
-func sharedCluster() (*cluster, error) {
+// sharedCluster returns the container of this test binary with the speed flags, or with the
+// PostgreSQL defaults for durable, starting it on first use.
+func sharedCluster(durable bool) (*cluster, error) {
 	state.mu.Lock()
 	defer state.mu.Unlock()
 	if !state.active {
 		return nil, errors.New("pgtest: New needs pgtest.Main: add func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) } to the test package")
 	}
-	if state.cluster == nil && state.err == nil {
-		ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
-		state.cluster, state.err = startCluster(ctx)
-		cancel()
-		if state.cluster != nil {
-			state.cluster.steps = state.steps
-		}
+	if state.clusters == nil {
+		state.clusters, state.errs = map[bool]*cluster{}, map[bool]error{}
 	}
-	return state.cluster, state.err
+	if state.clusters[durable] == nil && state.errs[durable] == nil {
+		ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
+		c, err := startCluster(ctx, durable)
+		cancel()
+		if c != nil {
+			c.steps = state.steps
+		}
+		state.clusters[durable], state.errs[durable] = c, err
+	}
+	return state.clusters[durable], state.errs[durable]
 }
 
-// stopCluster terminates the container and removes the secrets directory.
+// stopCluster terminates the containers and removes their secrets directories.
 func stopCluster() error {
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	c := state.cluster
-	state.cluster, state.err = nil, nil
-	if c == nil {
-		return nil
-	}
+	clusters := state.clusters
+	state.clusters, state.errs = nil, nil
 	var problems []error
-	// TerminateContainer ignores the errors of a container that AutoRemove already removes.
-	if err := testcontainers.TerminateContainer(c.ctr); err != nil {
-		problems = append(problems, fmt.Errorf("terminate container %s: %w", c.ctr.GetContainerID(), err))
-	}
-	if err := os.RemoveAll(c.secretsDir); err != nil {
-		problems = append(problems, err)
+	for _, c := range clusters {
+		if c == nil {
+			continue
+		}
+		// TerminateContainer ignores the errors of a container that AutoRemove already removes.
+		if err := testcontainers.TerminateContainer(c.ctr); err != nil {
+			problems = append(problems, fmt.Errorf("terminate container %s: %w", c.ctr.GetContainerID(), err))
+		}
+		if err := os.RemoveAll(c.secretsDir); err != nil {
+			problems = append(problems, err)
+		}
 	}
 	return errors.Join(problems...)
 }
 
-// startCluster starts the container and bootstraps the roles.
-func startCluster(ctx context.Context) (c *cluster, err error) {
+// startCluster starts a container (durable: without the speed flags) and bootstraps the roles.
+func startCluster(ctx context.Context, durable bool) (c *cluster, err error) {
 	dir, err := os.MkdirTemp("", "pgtest-secrets-")
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: secrets directory: %w", err)
@@ -248,7 +256,7 @@ func startCluster(ctx context.Context) (c *cluster, err error) {
 	if err != nil {
 		return nil, err
 	}
-	ctr, err := runContainer(ctx, superPassword)
+	ctr, err := runContainer(ctx, superPassword, durable)
 	if ctr != nil {
 		defer func() {
 			if err != nil {
@@ -282,10 +290,18 @@ func startCluster(ctx context.Context) (c *cluster, err error) {
 	return c, nil
 }
 
-// runContainer starts the pinned image on 127.0.0.1 with a random host port. The server flags
-// trade durability for speed, which a disposable test database does not need.
-func runContainer(ctx context.Context, superPassword string) (*testcontainers.DockerContainer, error) {
+// speedFlags trade durability for speed, which a disposable test database does not need
+// (M1-12 D7); Durable leaves them out.
+var speedFlags = []string{"-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"}
+
+// runContainer starts the pinned image on 127.0.0.1 with a random host port, with the speed
+// flags unless durable.
+func runContainer(ctx context.Context, superPassword string, durable bool) (*testcontainers.DockerContainer, error) {
 	port := network.MustParsePort("5432/tcp")
+	cmd := []string{"postgres"}
+	if !durable {
+		cmd = append(cmd, speedFlags...)
+	}
 	return testcontainers.Run(ctx, Image,
 		testcontainers.WithLogger(tclog.NewNoopLogger()),
 		testcontainers.WithName("bothy-pgtest-"+randomHex(6)),
@@ -293,7 +309,7 @@ func runContainer(ctx context.Context, superPassword string) (*testcontainers.Do
 		testcontainers.WithEnv(map[string]string{
 			"POSTGRES_USER": superUser, "POSTGRES_PASSWORD": superPassword, "POSTGRES_DB": superDatabase,
 		}),
-		testcontainers.WithCmd("postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"),
+		testcontainers.WithCmd(cmd...),
 		testcontainers.WithExposedPorts("5432/tcp"),
 		testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
 			hc.PortBindings = network.PortMap{port: {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "0"}}}
@@ -369,7 +385,8 @@ func (c *cluster) superConn(ctx context.Context, database string) (*pgx.Conn, er
 type Option func(*options)
 
 type options struct {
-	fsys fs.FS // nil: no migrations
+	fsys    fs.FS // nil: no migrations
+	durable bool  // the server with the PostgreSQL defaults
 }
 
 // WithMigrations makes New clone a template migrated with fsys instead of the server's
@@ -379,6 +396,12 @@ func WithMigrations(fsys fs.FS) Option { return func(o *options) { o.fsys = fsys
 // WithoutMigrations makes New create a bootstrapped database without any migration, as a fresh
 // installation has it before the first bothy migrate up.
 func WithoutMigrations() Option { return func(o *options) { o.fsys = nil } }
+
+// Durable makes New create the database on a second server of the test binary that runs with
+// the PostgreSQL defaults, fsync, synchronous_commit and full_page_writes on, instead of the speed
+// flags of the normal server. Performance and chaos tests use it (ADR 0063 point 2: measured only
+// with the durability settings of production); the server starts with the first such New.
+func Durable() Option { return func(o *options) { o.durable = true } }
 
 // DB is one database of a test, dropped when the test ends.
 type DB struct {
@@ -397,7 +420,7 @@ func New(t testing.TB, opts ...Option) *DB {
 	for _, opt := range opts {
 		opt(&o)
 	}
-	c, err := sharedCluster()
+	c, err := sharedCluster(o.durable)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -80,7 +80,10 @@ macht. Grundlage: [02-architektur.md](../spec/02-architektur.md), Abschnitt 17, 
 ### Confirmation
 
 - Bau-Ticket M1-16 in [PLAN.md](../PLAN.md): `make perf` misst `perf.event_commit_min_per_s` auf
-  `perf.reference_profile` und scheitert bei Unterschreitung.
+  `perf.reference_profile` und scheitert bei Unterschreitung (built: `TestEventCommitThroughput`
+  in `services/server/perf/event_commit` on a database from `pgtest.Durable()`; it fails when
+  `fsync` or `synchronous_commit` is not `on` and below the threshold, which
+  `perf/internal/report` reads from the table of 02, `TestReport_FailsBelowThreshold`).
 - Bau-Ticket M1-72: `make perf` schreibt je Ziel Messwert und Schwelle; Chaos-Tests der
   Ereignis-Kette (Verlust der `LISTEN`-Verbindung, Datenbank-Neustart, SIGKILL im Commit)
   hinterlassen keine Lücke.

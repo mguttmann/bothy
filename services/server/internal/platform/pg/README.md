@@ -168,6 +168,13 @@ only, because PostgreSQL messages can quote parameter values. The pinned otelpgx
 carries `server.address`, `server.port` and `error.type` (a SQLSTATE or error class), never an
 error text.
 
+## Dedicated connections
+
+`Pool.DialDedicated(ctx, applicationName)` opens one connection with the configuration, session
+settings, tracer and password source of the pool, outside the pool and named `applicationName`
+(the log tail's `LISTEN` connection, `bothy-event-tail`, M1-16); connecting waits at most
+`database.acquire_timeout`, and the caller closes it.
+
 ## Tests
 
 Integration tests use [`pgtest`](pgtest/README.md) and need a Docker-compatible runtime; without
@@ -178,4 +185,4 @@ handlers of a platform package.
 ## Not covered here
 
 The phase hooks of authz, sync and audit (M1-29, M1-16, M1-24), idempotency keys in the unit
-of work (M1-20), the `LISTEN` connection (M1-16), River migrations (M1-14), the backup requirement of `migrate` (M7-02), pool metrics (M1-68).
+of work (M1-20), River migrations (M1-14), the backup requirement of `migrate` (M7-02), pool metrics (M1-68).

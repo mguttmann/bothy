@@ -1,6 +1,6 @@
 # Modul `sync`
 
-Status: Gerüst (M1-05). Das Port-Paket existiert; Schnittstellen und Anwendungsfälle kommen mit den Tickets der Etappe.
+Status: built in part (M1-16): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log` and the one envelope of gateway, REST and webhooks. Catch-up, snapshot, redaction, idempotency keys, read states, drafts, settings and worker cursors come with M1-63, M1-58, M1-20, M2-01 and the tickets that need them.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -9,8 +9,131 @@ Ereignis-Log (Anhängen, Tail, Nachholen, Schwärzen, Partitionen), Momentaufnah
 
 ## Code
 
-- `internal/sync` (`doc.go`): Port als Wurzelpaket, bisher nur mit Paketkommentar. Schnittstellen, DTOs und In-Tx-Ereignisse kommen mit dem Ticket, das sie umsetzt.
-- `domain/`, `app/` und `adapters/<art>/` entstehen mit dem ersten Anwendungsfall. Ihre Komponenten erzeugt `tools/archgen` aus `architecture/modules.yaml`; ein Paket außerhalb dieser Schichten scheitert in `make arch`.
+| Package | Content |
+|---|---|
+| `internal/sync` | port: `Event` (a stored row, zero values for NULL), `DeliveryFields`, `Envelope` with `EnvelopeActor`, `EnvelopeScope`, `EnvelopeResource` and `Event.Envelope`, `Sink`, `Tail`, `ErrGap` |
+| `domain/` | event validation (`ValidateEvent`, `CheckPayload`), partition arithmetic (`PartitionLower`, `PartitionName`) and the gap check of the tail (`CheckContiguous`, `GapError`) |
+| `app/` | `Appender` (implements `kernel/eventlog.Appender`), `PhaseHook` (phase `sync`), `PartitionMaintenance`; outgoing ports `Writer`, `Partitions`, `Correlator` |
+| `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` with its own `LISTEN` connection |
+| `adapters/telemetry/` | `Correlator`: `correlation_id` and `trace_context` from the trace context of the append |
+| `adapters/jobs/` | job `sync.partition_maintenance`: arguments, handler, periodic registration |
+
+### Writing durable events
+
+A use case appends `eventlog.Event` values through `eventlog.Appender` in the phase `work` (or
+`rights_check`, for `access.changed` of authz). The appender rejects with kind `internal`, before
+anything is buffered: a call outside a unit of work or in another phase, a type that does not match
+`^[a-z][a-z_]*(\.[a-z][a-z_]*)+$`, a schema version outside 1..32767, an empty resource kind or
+receive action, `self` without an audience, an actor kind outside `user`, `agent`, `app`,
+`system`, a principal for `system` or without a kind, a missing principal for `user`, `agent` and
+`app`, and a payload that is not one JSON object in valid UTF-8 smaller than
+`sync.event_payload_max_bytes`, or that contains a JSON `null` at any depth, a number with an
+exponent (jsonb writes `1e100000` out in full, so the stored size would be unbounded) or with more
+than 131072 digits before or 16383 after the point (the limits of numeric), the
+character U+0000 or an unpaired surrogate escape (jsonb refuses both). The reads hand the sinks
+the compact form of the stored jsonb, which is never larger than the appended payload. A producer
+with a larger object builds a reduced payload and sets `Truncated` (04 payload rule 2). Events
+without ID get a UUIDv7; the correlation of the append context is attached: the trace ID of a
+valid span as `correlation_id` (without a span the correlation ID of the request in
+`kernel/reqmeta`), and the W3C `traceparent` as `trace_context` only for a sampled span.
+
+The phase hook of `sync` (02 "Ablauf" step 3.2) does nothing for a unit without events, so such a
+unit takes neither the counter lock nor `NOTIFY` (02 "Kosten der Serialisierung"). Otherwise it
+advances `event_seq` by n through `instance.Counters` (the lock holds until the commit), reads
+`permission_version` after the lock, and inserts the rows in append order with
+`seq = last - n + 1 .. last` together with `pg_notify('event_log', last)` in one statement
+(`InsertEvents`, a data-modifying CTE), which keeps the lock one round trip shorter.
+`occurred_at` is the column default `now()`, the transaction time. An insert that no partition
+takes (SQLSTATE 23514) is kind `unavailable`; the error line names the first seq, never a
+payload.
+
+### Log tail
+
+One `Tail` per api process (roles `api` and `all`, start step 8 before the public listener;
+02 "Log-Tail je api-Prozess"): `Run` sets `local_head` to `max(seq)`, holds its own connection
+outside the pool (`pg.Pool.DialDedicated`, application name `bothy-event-tail`) for
+`LISTEN event_log`, and reads `seq > local_head ORDER BY seq LIMIT sync.tail_batch_size` on every
+notification and every `sync.log_poll_interval` until a short batch. It checks that the numbers
+continue `local_head + 1` without a hole (else `ErrGap`), hands each batch to the sinks in order
+from its own goroutine and advances `local_head`. A lost `LISTEN` connection is reconnected with
+exponential backoff from `sync.log_poll_interval` up to `database.listen_reconnect_backoff_cap`
+while polling goes on; nothing is lost because `seq` is gapless. A read error is logged and
+retried; a sink error or a gap ends `Run`, and the process exits with code 1 (02 "Panics"). The
+sink list is empty today; M1-28 adds the rights cache, then M1-65 the hub.
+
+### Envelope
+
+`Event.Envelope(DeliveryFields)` is the one envelope of gateway, REST catch-up and webhooks
+(ADR 0052, OpenAPI `EventEnvelope`): `seq` and `permission_version` always (pointers, so 0 is
+present); `actor` iff an actor kind is set and `actor.id` iff a principal is set; `scope` always
+an object; `resource.version` only when set; `audience: "self"` iff an audience is set; `redacted`
+and `truncated` only when true; `trace_context` only with `IncludeTraceContext` (deliveries to
+agents); `invocation_token`, `redelivered` and `sync_epoch` only from `DeliveryFields`, never
+stored (R-SY-17); `occurred_at` in RFC 3339, UTC. Every optional member has `omitzero`, so the
+envelope never contains JSON `null` (ADR 0053, R-SY-16; `FuzzEnvelopeHasNoJSONNull`,
+`TestEnvelope_FieldsMatchOpenAPI`).
+
+### Table `event_log` and its partitions
+
+Migration `00006_sync_event_log.sql` creates `event_log` as in 03: `PARTITION BY RANGE (seq)`,
+primary key `(seq)`, unique `(id, seq)`, the checks of `actor_kind` (R-DM-29) and of `self`, the
+indexes `(channel_id, seq)`, `(space_id, seq)`, `(audience_principal_id, seq)` (partial),
+`(resource_kind, resource_id)` and BRIN `(occurred_at)`, no default partition and no foreign key.
+`bothy_app` has `SELECT, INSERT` on the table only (redaction adds its column grant with M1-58)
+and no right on the partitions, which it reaches only through `event_log`.
+
+Partitions change only through two `SECURITY DEFINER` functions of `bothy_owner` with
+`search_path = public, pg_temp`, `EXECUTE` revoked from `PUBLIC` and granted to `bothy_app`, which
+take only numbers and times and build every name with `format('%I')` (16 "Rollen", R-OP-17):
+
+- `sync_event_log_ensure_partitions(p_size, p_ahead, p_head)` (size 1 to 10^12, ahead 0 to 1000,
+  the bounds of the configuration keys) takes `SHARE UPDATE EXCLUSIVE` on
+  `event_log` first, so concurrent runs serialise and the function is idempotent, reads the
+  bounds from `pg_inherits` and `pg_get_expr(relpartbound, oid)`, and while the highest upper
+  bound is at most `p_head + p_ahead * p_size` creates `[upper, upper + p_size)` (the first starts
+  at 1) as a table `LIKE event_log INCLUDING DEFAULTS INCLUDING CONSTRAINTS` named
+  `event_log_from_<lower bound, 19 digits>`, adds a `CHECK` matching the bounds, attaches it and
+  drops the `CHECK`. `ATTACH PARTITION` takes only `SHARE UPDATE EXCLUSIVE` on the parent, so
+  inserts continue, and the matching `CHECK` lets it skip the scan that validates the partition
+  constraint ([ALTER TABLE](https://www.postgresql.org/docs/18/sql-altertable.html), "ATTACH
+  PARTITION"; [Table Partitioning](https://www.postgresql.org/docs/18/ddl-partitioning.html),
+  "Partition Maintenance"). `CREATE TABLE ... PARTITION OF` would take `ACCESS EXCLUSIVE`
+  on the parent instead. The `CHECK` constraints of the parent must exist on the new table for
+  the attach, hence `INCLUDING CONSTRAINTS`.
+- `sync_event_log_drop_expired(p_cutoff, p_head, p_lock_timeout)` sets `lock_timeout` for the
+  transaction, clamps the head to `max(seq)` and the cutoff to `now()` (it trusts no caller beyond
+  the table), and, in bound order, detaches with the plain `DETACH PARTITION` and drops each
+  partition whose upper bound is at most `p_head` (so the partition holding the head is never
+  touched) and whose newest `occurred_at` is older than `p_cutoff` or that is empty. It stops at
+  the first partition it keeps, so the retained sequence has no hole even when `occurred_at` (the
+  start of a transaction) does not grow with `seq`. Plain `DETACH PARTITION` takes
+  `ACCESS EXCLUSIVE` on the parent, bounded by the lock timeout; `DETACH PARTITION ...
+  CONCURRENTLY` cannot run inside a transaction block and therefore not in a function (both
+  pages above, "DETACH PARTITION").
+
+`max(seq)` is the head and equals the committed counter, because the head partition is never
+dropped; `min(seq)` is `min_retained_seq` for M1-63 (`Repository.MinRetainedSeq`).
+
+### Job `sync.partition_maintenance`
+
+`PartitionMaintenance.Run` reads the head and runs `ensure(sync.event_log_partition_size,
+sync.event_log_partitions_ahead, head)` in one unit of work, then `drop_expired(now -
+sync.event_retention, head, database.lock_timeout)` in a second one; neither appends an event, and
+the time comes from `kernel/clock`. A DETACH that cannot get its lock (a long reader such as a
+backup) therefore never rolls back the partitions ahead: the run returns `ErrDropDeferred` for a
+lock timeout (any other drop error unchanged), the job is retried later, and `bothy migrate up`
+treats a deferred drop as success. The job runs on queue `maintenance` every `sync.partition_maintenance_interval`
+with `RunOnStart` (02 "Job-Katalog"), and `bothy migrate up` runs the same use case once after
+River, goose and the instance row (upgrade.md rule M10), so a fresh or upgraded database has
+partitions before `serve`. Test databases of `pgtest` have no partitions; tests create them with
+the use case and their own size.
+
+### Load test
+
+`perf/event_commit` (`make perf`, build tag `perf`) measures `perf.event_commit_min_per_s` on a
+database from `pgtest.Durable()` (`fsync` and `synchronous_commit` on, ADR 0063 point 2) and fails
+below the value of 02; the threshold comes from the table of 02 through
+`perf/internal/report`.
 
 ## Port (Wurzelpaket `internal/sync`)
 
