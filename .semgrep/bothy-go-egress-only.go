@@ -67,6 +67,10 @@ func ownDialers() {
 	// ruleid: bothy-go-egress-only
 	_, _ = net.DialTCP("tcp", nil, nil)
 	// ruleid: bothy-go-egress-only
+	_, _ = net.DialUDP("udp", nil, nil)
+	// ruleid: bothy-go-egress-only
+	_, _ = net.DialIP("ip4:icmp", nil, nil)
+	// ruleid: bothy-go-egress-only
 	_ = net.Dialer{}
 	// ruleid: bothy-go-egress-only
 	_ = &net.Dialer{Timeout: time.Second}

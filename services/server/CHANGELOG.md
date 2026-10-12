@@ -56,7 +56,8 @@ documented in this file. The format is based on
   that neither `egress.allowed_hosts` nor the consumer allows before any DNS lookup, checks the
   resolved addresses at connection time and dials only checked addresses (always blocked:
   unspecified, link-local with the cloud metadata address, multicast, reserved, NAT64, 6to4,
-  Teredo and the other ranges of SEC-NET-3; loopback, RFC 1918, RFC 6598 and unique local
+  Teredo, the cloud metadata addresses inside private ranges and the other ranges of
+  SEC-NET-3; loopback, RFC 1918, RFC 6598 and unique local
   addresses only with `allow_private`), follows redirects only after the same checks, ignores
   environment proxies, always verifies TLS, bounds time and response size, and logs every refused
   attempt without path or query, counting it when metrics are configured. `NewLoopback` is the client for the health

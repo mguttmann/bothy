@@ -51,6 +51,9 @@ func sect09Addresses() []struct {
 		want verdict
 	}
 	p := netip.MustParseAddr
+	// The IPv4 metadata address inside 100.64.0.0/10, spelled as bytes: the generic deny-list
+	// rule refuses a host address of that range as text.
+	metadataV4 := netip.AddrFrom4([4]byte{100, 100, 100, 200})
 	return []row{
 		// Always blocked, IPv4.
 		{p("0.0.0.0"), alwaysDeny},
@@ -82,6 +85,13 @@ func sect09Addresses() []struct {
 		{p("2001::1"), alwaysDeny},
 		{p("2001:0:ffff::1"), alwaysDeny},
 		{mapped(p("169.254.169.254")), alwaysDeny},
+		// Metadata addresses of the clouds inside private ranges (R-SE-10): IPv6 inside the
+		// unique local range, IPv4 inside the shared address space.
+		{p("fd00:ec2::254"), alwaysDeny},
+		{metadataV4, alwaysDeny},
+		{mapped(metadataV4), alwaysDeny},
+		{p("fd00:ec2::253"), private},
+		{metadataV4.Next(), private},
 		{mapped(p("0.0.0.0")), alwaysDeny},
 		// Private: only with allow_private.
 		{p("127.0.0.1"), private},

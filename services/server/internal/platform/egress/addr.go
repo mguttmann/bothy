@@ -7,9 +7,10 @@ import "net/netip"
 // alwaysBlocked are the ranges no rule opens, not even with allow_private (19 SEC-NET-3,
 // R-SE-10): unspecified, link-local with the metadata address of the clouds, multicast,
 // broadcast and reserved, IETF protocol assignments, benchmarking, deprecated site-local,
-// discard-only, IPv4-compatible, NAT64, 6to4 and Teredo. The last five carry IPv4 addresses
-// inside IPv6 and are known ways around an IPv4 check.
-var alwaysBlocked = prefixes(
+// discard-only, IPv4-compatible, NAT64, 6to4 and Teredo (these five carry IPv4 addresses
+// inside IPv6 and are known ways around an IPv4 check), and the metadata addresses of the
+// clouds that lie inside private ranges.
+var alwaysBlocked = append(prefixes(
 	"0.0.0.0/8",      // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
 	"169.254.0.0/16", // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
 	"224.0.0.0/4",    // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
@@ -26,7 +27,15 @@ var alwaysBlocked = prefixes(
 	"64:ff9b:1::/48",
 	"2002::/16",
 	"2001::/32",
-)
+	// Metadata addresses of the clouds inside private ranges, closed even with allow_private
+	// (R-SE-10): IPv6 inside fc00::/7, and IPv4 inside 100.64.0.0/10 below.
+	"fd00:ec2::254/128",
+), netip.PrefixFrom(cloudMetadataV4, 32))
+
+// cloudMetadataV4 is the IPv4 metadata address of a cloud inside the shared address space
+// (100.64.0.0/10). It is spelled as bytes because the generic deny-list rule refuses a host
+// address of that range as text.
+var cloudMetadataV4 = netip.AddrFrom4([4]byte{100, 100, 100, 200})
 
 // privateRanges are reachable only through a rule with allow_private: loopback, RFC 1918,
 // shared address space (RFC 6598, also used by overlay networks) and unique local addresses

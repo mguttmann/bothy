@@ -35,6 +35,8 @@ rules:
       - pattern: net.Dial
       - pattern: net.DialTimeout
       - pattern: net.DialTCP
+      - pattern: net.DialUDP
+      - pattern: net.DialIP
       - pattern: net.Dialer{...}
       - pattern: new(net.Dialer)
       - pattern: var $X net.Dialer
