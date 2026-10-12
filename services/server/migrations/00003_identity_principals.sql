@@ -9,7 +9,7 @@
 --     FOREIGN KEY (avatar_file_id) REFERENCES files(id) ON DELETE SET NULL;
 --
 -- Grants (migrations/README.md, grant rule): bothy_app may read, insert and update the three
--- tables but not delete from them. Principals are never hard deleted (03 Grundsatz 7), an owner
+-- tables but not delete from them. Principals are never hard deleted (03 "Principles" item 7), an owner
 -- is revoked by revoked_at, and a users row lives as long as its principal; a later ticket that
 -- needs a delete grants it in its own migration.
 
@@ -27,7 +27,7 @@ CREATE TABLE principals (
     deleted_at     timestamptz,
     PRIMARY KEY (id)
 );
--- Handles are unique without regard to case (03 Grundsatz 6); the check already allows only
+-- Handles are unique without regard to case (03 "Principles" item 6); the check already allows only
 -- lower case, the index keeps the rule if the check ever widens.
 CREATE UNIQUE INDEX principals_handle_lower_key ON principals (lower(handle));
 -- Directory lists filter by kind and status.

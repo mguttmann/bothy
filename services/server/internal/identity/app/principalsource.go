@@ -11,7 +11,7 @@ import (
 )
 
 // PrincipalSource implements authz.PrincipalSource over a Store, so authz learns kind, status
-// and owner role of a principal without reading identity tables (03 Grundsatz 12). internal/wire
+// and owner role of a principal without reading identity tables (03 "Principles" item 12). internal/wire
 // hands it to authz (M1-28).
 type PrincipalSource struct {
 	store Store

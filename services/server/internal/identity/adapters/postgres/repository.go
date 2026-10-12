@@ -3,7 +3,7 @@
 // Package postgres is the PostgreSQL adapter of the identity module: the sqlc queries in
 // queries/, the generated code in sqlcgen/ and Repository, which implements app.Store over the
 // tables principals, users and owners (docs/spec/03-data-model.md section 4.2). Only this
-// package runs SQL on those tables (03 Grundsatz 12).
+// package runs SQL on those tables (03 "Principles" item 12).
 //
 // Example:
 //
@@ -246,7 +246,7 @@ func idOf(u pgtype.UUID) ids.ID {
 	return ids.ID(u.Bytes)
 }
 
-// timeOf converts a column; NULL becomes the zero time. Times are UTC (03 Grundsatz 2).
+// timeOf converts a column; NULL becomes the zero time. Times are UTC (03 "Principles" item 2).
 func timeOf(t pgtype.Timestamptz) time.Time {
 	if !t.Valid {
 		return time.Time{}

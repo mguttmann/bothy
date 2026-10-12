@@ -25,7 +25,7 @@ var appPrivileges = map[string][]string{
 	// sequence_counters: plus the column right UPDATE (value), which has_table_privilege does
 	// not show; TestCounters_ValueNeverDecreases holds it.
 	"sequence_counters": {"SELECT"},
-	// 03 Grundsatz 7: principals are never hard deleted, owners are revoked, a users row lives
+	// 03 "Principles" item 7: principals are never hard deleted, owners are revoked, a users row lives
 	// with its principal (M1-26).
 	"principals": {"SELECT", "INSERT", "UPDATE"},
 	"users":      {"SELECT", "INSERT", "UPDATE"},

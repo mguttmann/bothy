@@ -10,7 +10,7 @@ import (
 )
 
 // This file declares the source ports through which authz learns facts owned by other modules
-// (docs/spec/02-architecture.md section 4.1 rule 4, "Quellen-Port"). authz never reads their
+// (docs/spec/02-architecture.md section 4.1 rule 4, "Source port"). authz never reads their
 // tables. M1-28 adds CredentialSource, StructureSource and AgentPolicySource here.
 
 // PrincipalStatus is the lifecycle state of a principal as authz sees it.

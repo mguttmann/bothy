@@ -41,7 +41,7 @@ const (
 	StatusActive Status = "active"
 	// StatusDisabled is a principal without rights (SR7).
 	StatusDisabled Status = "disabled"
-	// StatusDeleted is a deleted principal; its row stays for authorship (03 Grundsatz 7).
+	// StatusDeleted is a deleted principal; its row stays for authorship (03 "Principles" item 7).
 	StatusDeleted Status = "deleted"
 )
 
