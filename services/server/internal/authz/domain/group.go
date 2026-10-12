@@ -63,13 +63,20 @@ func NewGroup(id ids.ID, name, description string, limits GroupLimits, by ids.ID
 	case at.IsZero():
 		return Group{}, internalError("group without creation time")
 	}
-	if err := checkText(pointerName, "group name", name, true, limits.NameMaxChars); err != nil {
-		return Group{}, err
-	}
-	if err := checkText(pointerDescription, "group description", description, false, limits.DescriptionMaxChars); err != nil {
+	if err := CheckGroupText(name, description, limits); err != nil {
 		return Group{}, err
 	}
 	return Group{ID: id, Name: name, Description: description, Source: GroupSourceLocal, CreatedBy: by, CreatedAt: at}, nil
+}
+
+// CheckGroupText checks name and description of a group as NewGroup does: the name not blank,
+// both free of control and bidi characters (SEC-IN-4) and within limits. group.update (M1-29)
+// checks a rename with it. Errors: validation_failed on /name or /description.
+func CheckGroupText(name, description string, limits GroupLimits) error {
+	if err := checkText(pointerName, "group name", name, true, limits.NameMaxChars); err != nil {
+		return err
+	}
+	return checkText(pointerDescription, "group description", description, false, limits.DescriptionMaxChars)
 }
 
 // Membership is a row of group_memberships: one person in one group, with history. Removal sets

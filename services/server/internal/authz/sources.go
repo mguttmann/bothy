@@ -12,8 +12,10 @@ import (
 
 // This file declares the source ports through which authz learns facts owned by other modules
 // (docs/spec/02-architecture.md section 4.1 rule 4, "Source port"). authz never reads their
-// tables. M1-28 adds CredentialSource, StructureSource and AgentPolicySource; until their owning
-// modules have tables, internal/wire passes empty sources (docs/briefs/M1-28-authz-core.md D2).
+// tables. M1-28 adds CredentialSource, StructureSource and AgentPolicySource; M1-29 adds
+// StructureSource.ServedTargets, ChannelFacts.Archived and AgentPolicySource.PersonalAgents. Until
+// their owning modules have tables, internal/wire passes empty sources (ruling D2 of
+// docs/briefs/M1-28-authz-core.md).
 
 // PrincipalStatus is the lifecycle state of a principal as authz sees it.
 type PrincipalStatus string
@@ -82,6 +84,18 @@ type ChannelFacts struct {
 	ProjectBound, ProjectReady bool
 	// DMParticipants are the users with left_at IS NULL of a dm channel, ascending.
 	DMParticipants []ids.ID
+	// Archived reports that the channel or its space is archived: every effective level there is
+	// at most read, owners included (07 section 4.5 point 1). chat reports it from M1-52 and M1-53.
+	Archived bool
+}
+
+// ChannelRef is one target an agent serves (10 section 5.2, 03 section 6.4): a channel with its
+// space, or a space alone (ChannelID zero) whose default operator is the agent.
+type ChannelRef struct {
+	// ChannelID is the channel; zero for a space served through its default operator only.
+	ChannelID ids.ID
+	// SpaceID is the space of the channel, or the served space.
+	SpaceID ids.ID
 }
 
 // ThreadFacts are the facts of one thread (03 section 4.5).
@@ -102,6 +116,9 @@ type ThreadFacts struct {
 type StructureSource interface {
 	// Space reports whether the space exists.
 	Space(ctx context.Context, id ids.ID) (ok bool, err error)
+	// SpaceArchived reports whether the space is archived; false for an unknown space. A grant
+	// on an archived space is refused with 409 conflict (M1-29); chat implements it with M1-52.
+	SpaceArchived(ctx context.Context, id ids.ID) (bool, error)
 	// Spaces returns every space, ascending (Scope lists the spaces of an instance-wide reader).
 	Spaces(ctx context.Context) ([]ids.ID, error)
 	// Channel returns the facts of one channel; ok is false for an unknown id.
@@ -114,6 +131,14 @@ type StructureSource interface {
 	ChannelsOperatedBy(ctx context.Context, agentID ids.ID) ([]ids.ID, error)
 	// DMChannelsOf returns the dm channels userID takes part in.
 	DMChannelsOf(ctx context.Context, userID ids.ID) ([]ids.ID, error)
+	// ServedTargets returns the targets agentID serves for I1 (10 sections 5.2 and 5.3, 03
+	// section 6.4, BR-02): channels whose effective operator is the agent and that are not
+	// archived; channels that are not archived and hold at least one thread with kind thread and
+	// operator_agent_id equal to the agent, open or closed; and, with a zero ChannelID, every
+	// space that is not archived whose default operator is the agent, also without a channel.
+	// Guest channels never count. Ascending by (SpaceID, ChannelID), without duplicates. chat
+	// implements it with M1-54 (M1-29).
+	ServedTargets(ctx context.Context, agentID ids.ID) ([]ChannelRef, error)
 }
 
 // AgentPolicy are the backend policy and tool class of an agent (03 agents, 07 sections 2.11 and
@@ -129,9 +154,23 @@ type AgentPolicy struct {
 	ReportedToolClass string
 }
 
+// PersonalAgent is an active agent with billing_mode = 'personal' and its credential holder
+// (03 agents; I1 in 07 SR1).
+type PersonalAgent struct {
+	// AgentID is the agent.
+	AgentID ids.ID
+	// CredentialHolderID is agents.credential_holder_id; the zero id if the row has none, which
+	// is itself a violation of I1.
+	CredentialHolderID ids.ID
+}
+
 // AgentPolicySource gives authz the policy facts of agents. The agents module implements it
 // (M1-51; dev environments in V2).
 type AgentPolicySource interface {
+	// PersonalAgents returns every agent with principal status active and billing_mode =
+	// 'personal', ascending by AgentID; VerifyInvariants checks I1 for each (M1-29). It reads
+	// inside the ambient transaction of ctx. agents implements it with M1-51.
+	PersonalAgents(ctx context.Context) ([]PersonalAgent, error)
 	// AgentPolicy returns the policy of one agent; ok is false for an unknown agent.
 	AgentPolicy(ctx context.Context, agentID ids.ID) (AgentPolicy, bool, error)
 	// DevEnvironmentReady reports a ready own dev environment of userID for channelID (SR3);

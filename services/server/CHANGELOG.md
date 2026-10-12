@@ -22,6 +22,19 @@ documented in this file. The format is based on
   `platform/jsoncanon` (RFC 8785 over `github.com/gowebpki/jcs`), generator checks for keyed
   operations in `api/routes/gen`, and the configuration keys `sync.idempotency_key_ttl`,
   `sync.idempotency_cleanup_interval` and `sync.idempotency_cleanup_batch_size`.
+- `internal/authz` (M1-29): the one transactional path of every rights change. The rights hooks
+  of phase 1 and 3.1 lock and raise `permission_version` first, record the visible targets of
+  the affected principals (declared directly or derived from targets), verify SR8 (`409
+  last_owner`) and I1 for every active personal agent (`409 i1_violation` with `conflicts`) in
+  the same transaction, and write one `access.changed` per principal with a difference and the
+  in-transaction event `authorize.AccessChanged`; a violation leaves only a deny audit entry. The
+  `Admin` port with group, membership and grant use cases (authorize first, step-up, delegation
+  limits, allow audit, calls without effect). New source methods `ServedTargets`,
+  `SpaceArchived`, `PersonalAgents`, `ChannelFacts.Archived` with the archived cap at read.
+- `internal/kernel/txn`: `DeclareRightsChange` with action, resource and targets,
+  `RightsChangeOf`, `InRightsChange`; `internal/kernel/authorize`: `AccessChanged`;
+  `internal/kernel/errs`: `ProblemExtender`, merged into the problem body by
+  `internal/platform/httpserver`.
 
 - `internal/authz` (M1-28): the one authorization function. `app.Authorizer` implements
   `kernel/authorize.Authorizer` with `Authorize` (07 section 4.2: liveness, pending, resolution

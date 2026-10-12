@@ -17,8 +17,10 @@ import (
 //
 // Reads run in the ambient transaction of ctx when there is one and on the pool otherwise.
 // Writes run only inside a unit of work of kernel/txn; outside one they fail with kind internal.
-// Every write changes rights, so it must run inside a unit of work marked as a rights change
-// (txn.RightsChange); M1-29 enforces this and raises permission_version.
+// The writes marked "Rights change" also need a unit of work declared as a rights change
+// (txn.RightsChange or txn.DeclareRightsChange) and fail with kind internal otherwise, so the
+// rights hooks always raise permission_version and verify I1 and SR8 (M1-29). Creating and
+// renaming a group change no rights.
 //
 // Errors are kernel/errs errors and never carry SQL text or values: a unique violation is kind
 // conflict with the field (/name, /user_id, /external_ref); a check, trigger, foreign key or
@@ -26,10 +28,15 @@ import (
 // internal (or the unavailable error of the pool).
 type Store interface {
 	// InsertGroup inserts g with g.CreatedAt as created_at. A live group with the same name
-	// without regard to case is a conflict on /name. Rights change.
+	// without regard to case is a conflict on /name. No rights change: a new group has no
+	// members and no grants.
 	InsertGroup(ctx context.Context, g domain.Group) error
 	// GetGroup returns the group id, deleted or not; found is false for an unknown id.
 	GetGroup(ctx context.Context, id ids.ID) (g domain.Group, found bool, err error)
+	// UpdateGroup sets name and description of a live group and reports whether a row changed;
+	// false for an unknown or deleted group. A taken name is a conflict on /name. No rights
+	// change.
+	UpdateGroup(ctx context.Context, id ids.ID, name, description string) (bool, error)
 	// SoftDeleteGroup sets deleted_at of a live group to at and reports whether a row changed;
 	// false for an unknown or already deleted group. Rights change.
 	SoftDeleteGroup(ctx context.Context, id ids.ID, at time.Time) (bool, error)
@@ -45,6 +52,12 @@ type Store interface {
 	// ActiveMembershipsOfUser returns the memberships of userID that are not removed, each with
 	// the row of its group (also when the group is deleted), ordered by membership id.
 	ActiveMembershipsOfUser(ctx context.Context, userID ids.ID) ([]domain.MembershipWithGroup, error)
+	// ActiveMembershipsOfGroups returns the memberships that are not removed of the groups, each
+	// with the row of its group, ordered by membership id; an empty list gives none.
+	ActiveMembershipsOfGroups(ctx context.Context, groupIDs []ids.ID) ([]domain.MembershipWithGroup, error)
+	// MembershipsOfUserInGroup returns every membership of userID in groupID, removed ones
+	// included, ordered by id.
+	MembershipsOfUserInGroup(ctx context.Context, groupID, userID ids.ID) ([]domain.Membership, error)
 
 	// InsertGrant inserts g with g.GrantedAt as granted_at. The checks of grants (bot limits,
 	// shapes, host rules) are the last line behind domain.NewGrant. Rights change.
@@ -62,4 +75,11 @@ type Store interface {
 	// ActiveGrantsOfGroups returns the grants that are not revoked whose subject is one of
 	// groupIDs, ordered by id; an empty list gives none without a query.
 	ActiveGrantsOfGroups(ctx context.Context, groupIDs []ids.ID) ([]domain.Grant, error)
+	// ActiveTriggerGrants returns every grant that is not revoked with level trigger, ordered by
+	// id (the I1 check, 03 section 6.4).
+	ActiveTriggerGrants(ctx context.Context) ([]domain.Grant, error)
+	// ActiveGrantsOnTargets returns the grants that are not revoked on the instance, on one of
+	// spaceIDs or on one of channelIDs, ordered by id (the affected principals of a rights change
+	// on a target, 02 section 8.1).
+	ActiveGrantsOnTargets(ctx context.Context, spaceIDs, channelIDs []ids.ID) ([]domain.Grant, error)
 }

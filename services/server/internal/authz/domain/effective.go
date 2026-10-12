@@ -44,6 +44,8 @@ type Path struct {
 	DMParticipants []ids.ID
 	// ReadOnly is channels.read_only.
 	ReadOnly bool
+	// Archived reports an archived channel or a channel of an archived space (07 section 4.5).
+	Archived bool
 	// ChannelOperatorID is the channel's effective operator; zero for none.
 	ChannelOperatorID ids.ID
 	// ThreadID is the thread; zero when the resource is not in a thread.
@@ -83,7 +85,8 @@ var botCaps = CapsOf(CapUpload)
 //  4. agents: at least write as the channel's effective operator or as the fixed operator of a
 //     non-main thread (07 section 2.9);
 //  5. agents and apps: at most write and upload (07 section 2.1), which also neutralises a grant
-//     row whose subject kind does not match the real kind.
+//     row whose subject kind does not match the real kind;
+//  6. an archived channel: at most read for everyone, owners included (07 section 4.5 point 1).
 //
 // A path of kind PathNone keeps only the owner role.
 func Effective(s Snapshot, kind string, principal ids.ID, path Path) Rights {
@@ -97,7 +100,7 @@ func Effective(s Snapshot, kind string, principal ids.ID, path Path) Rights {
 		return Rights{}
 	}
 	if s.Owner {
-		return Rights{Level: LevelTrigger, Caps: allCaps, Owner: true}
+		return archivedCap(path, Rights{Level: LevelTrigger, Caps: allCaps, Owner: true})
 	}
 	r := s.Instance
 	if path.Kind >= PathSpace && !path.SpaceID.IsZero() {
@@ -116,6 +119,14 @@ func Effective(s Snapshot, kind string, principal ids.ID, path Path) Rights {
 	if kind != KindUser {
 		r.Level = MinLevel(r.Level, LevelWrite)
 		r.Caps = r.Caps.Intersect(botCaps)
+	}
+	return archivedCap(path, r)
+}
+
+// archivedCap caps the level at read on an archived channel path (07 section 4.5 point 1).
+func archivedCap(path Path, r Rights) Rights {
+	if path.Archived && path.Kind == PathChannel {
+		r.Level = MinLevel(r.Level, LevelRead)
 	}
 	return r
 }

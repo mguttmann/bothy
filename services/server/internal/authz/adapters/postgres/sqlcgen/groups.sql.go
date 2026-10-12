@@ -89,3 +89,23 @@ func (q *Queries) SoftDeleteGroup(ctx context.Context, arg SoftDeleteGroupParams
 	}
 	return result.RowsAffected(), nil
 }
+
+const updateGroup = `-- name: UpdateGroup :execrows
+UPDATE groups
+SET name = $1, description = $2
+WHERE id = $3 AND deleted_at IS NULL
+`
+
+type UpdateGroupParams struct {
+	Name        string
+	Description string
+	ID          pgtype.UUID
+}
+
+func (q *Queries) UpdateGroup(ctx context.Context, arg UpdateGroupParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateGroup, arg.Name, arg.Description, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

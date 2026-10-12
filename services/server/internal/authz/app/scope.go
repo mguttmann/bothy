@@ -10,6 +10,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/authz/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
 
 // scopeMemoKey keys the lists of Scope in the request memo: the principal with its credentials,
@@ -60,6 +61,10 @@ func (a *Authorizer) scope(ctx context.Context, p authorize.Principal, act autho
 	}
 	mk := scopeMemoKey{key: s.entry.key, viewAs: p.ViewAsPerson(), actingFor: p.ActingForPerson(), scope: appScope}
 	memo, hasMemo := authorize.RequestMemoFrom(ctx)
+	if txn.InRightsChange(ctx) {
+		// The unit sees uncommitted rights; nothing of it may outlive the unit (version.go).
+		memo, hasMemo = nil, false
+	}
 	if sc, ok := memoScope(memo, mk); ok {
 		return sc, domain.Allow, nil
 	}

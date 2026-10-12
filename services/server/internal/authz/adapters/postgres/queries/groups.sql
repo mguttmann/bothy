@@ -14,3 +14,8 @@ WHERE g.id = @id;
 UPDATE groups
 SET deleted_at = @deleted_at
 WHERE id = @id AND deleted_at IS NULL;
+
+-- name: UpdateGroup :execrows
+UPDATE groups
+SET name = @name, description = @description
+WHERE id = @id AND deleted_at IS NULL;

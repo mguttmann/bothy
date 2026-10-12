@@ -22,6 +22,11 @@
 // wrapper is visible in review. internal/wire checks the direction against the module register
 // and rejects handlers in nested internal packages.
 //
+// Rights changes: RightsChange names affected principals; DeclareRightsChange (M1-29) adds the
+// catalogue action, the resource of the deny audit entry and the targets whose rights change. The
+// authz hooks read the declaration with RightsChangeOf; InRightsChange tells stores and the
+// Authorizer that the unit sees an uncommitted rights version.
+//
 // Per-unit state: Key, Load and Store keep values for one attempt (buffered durable events,
 // audit records). A retry or a rollback starts from an empty state.
 //
