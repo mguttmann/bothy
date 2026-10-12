@@ -23,7 +23,7 @@ const (
 
 // Mux is the public mux the REST routes are mounted on; *http.ServeMux of the public listener
 // implements it.
-type Mux interface {
+type Mux interface { // NOSONAR: names the public mux it stands for; see M1-17/33.
 	Handle(pattern string, handler http.Handler)
 }
 

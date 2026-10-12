@@ -133,7 +133,7 @@ type CatalogEntry struct {
 //
 // SpecCatalog is the catalogue generated from docs/spec/actions.yaml; the authz module will
 // provide the closed catalogue that replaces it at start (M1-25).
-type Catalog interface {
+type Catalog interface { // NOSONAR: a catalogue is a thing, not an action; see M1-17/33.
 	Class(action string) (class string, ok bool)
 }
 

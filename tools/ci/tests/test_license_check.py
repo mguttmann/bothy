@@ -97,7 +97,14 @@ def test_hand_written_source_below_a_gen_directory_needs_a_header(tmp_path: Path
 
 
 @pytest.mark.parametrize(
-    "name", ["api/rest/rest.gen.go", "x/y_gen.go", "p/m.pb.go", "internal/x/generated/foo.go"]
+    "name",
+    [
+        "api/rest/rest.gen.go",
+        "x/y_gen.go",
+        "p/m.pb.go",
+        "internal/x/generated/foo.go",
+        "generated/foo.go",
+    ],
 )
 def test_generated_go_file_needs_the_generated_code_marker(tmp_path: Path, name: str) -> None:
     # Coverage, Sonar and this gate skip such files by name; the marker proves a generator wrote it.
