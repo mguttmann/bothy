@@ -59,7 +59,9 @@ CI=true npx -y @asyncapi/cli@6.2.0 generate fromTemplate docs/api/asyncapi.yaml 
    component whose `x-status` is its status. If no suitable action exists, it goes first into
    [docs/spec/actions.yaml](../spec/actions.yaml); `make catalog` generates the tables in
    05-actions.md and the lists in redocly.yaml from it. In the same commit the operation gets an
-   entry under `later` in `services/server/api/operations.yaml` (enable list, PLAN P-04).
+   entry under `later` in `services/server/api/operations.yaml` (enable list, PLAN P-04); it moves
+   to `enabled` with the ticket that implements its handler, because only enabled operations are
+   generated and registered.
 3. New event: type and receive action first in [docs/spec/actions.yaml](../spec/actions.yaml),
    then `make catalog`; payload schema `<Name>Payload`,
    event schema `<Name>Event` as `allOf` from `EventEnvelope`, an entry in `Event` (durable),
