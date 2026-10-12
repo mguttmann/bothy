@@ -106,6 +106,16 @@ func tlsDialers() {
 	_ = td
 }
 
+func zeroProxies() {
+	// ruleid: bothy-go-egress-only
+	_ = new(httputil.ReverseProxy)
+	// ruleid: bothy-go-egress-only
+	var rp httputil.ReverseProxy
+	_ = &rp
+	// ruleid: bothy-go-egress-only
+	_ = []httputil.ReverseProxy{}
+}
+
 // ruleid: bothy-go-egress-only
 type fetcher struct {
 	name   string
@@ -135,6 +145,22 @@ type transportField struct {
 
 // ruleid: bothy-go-egress-only
 type clientAlias = http.Client
+
+// ruleid: bothy-go-egress-only
+type proxyField struct {
+	proxy httputil.ReverseProxy
+}
+
+// The finding of an embedded value is on the field line.
+type embeddedProxy struct {
+	// ruleid: bothy-go-egress-only
+	httputil.ReverseProxy
+}
+
+// ok: bothy-go-egress-only
+type proxyPointer struct {
+	proxy *httputil.ReverseProxy
+}
 
 // ruleid: bothy-go-egress-only
 var anonymous struct {

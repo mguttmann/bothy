@@ -57,7 +57,9 @@ checked.
 6. No environment proxies; TLS from version 1.2, certificate and host name always verified.
 7. Timeout `egress.timeout` (or the consumer's value) for the whole request across all redirects,
    also for resolution and connection setup, which net/http detaches from the cancellation of the
-   request; the addresses of a name share the remaining time. If a library puts the transport of
+   request ("Detach from the request context's cancellation signal", `Transport.getConn` in
+   [net/http transport.go of Go 1.27.2](https://github.com/golang/go/blob/go1.27.2/src/net/http/transport.go),
+   retrieved 2026-10-12); the addresses of a name share the remaining time. If a library puts the transport of
    `HTTPClient` into its own client, the limit applies per redirect step. Size limit
    `egress.max_response_bytes` (or the consumer's value) for the body, counted after decoding by
    the transport; `egress.max_response_bytes` also limits the header lines.
@@ -82,7 +84,10 @@ proxies, `net.Dial`, `tls.Dial` and related ones, and `x.Transport = nil`; test 
 What the rule does not see is listed in docs/DECISIONS.md M1-22/9. Every necessary construction in
 this package carries a `nosemgrep` comment with a reason. `bothy-go-tls-verify` reports
 `InsecureSkipVerify` with any value other than `false`, also in tests; for this, `.semgrepignore`
-replaces the built-in ignore list of Semgrep, which skipped test files (M1-22/13).
+replaces the built-in ignore list of Semgrep, which skipped test files (`*_test.go` among the
+"Common test paths" of the default template, which a `.semgrepignore` replaces:
+[Semgrep, Ignore files, folders, and code](https://docs.semgrep.dev/ignoring-files-folders-code),
+retrieved 2026-10-12; M1-22/13).
 
 ## Chapters
 
