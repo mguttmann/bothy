@@ -16,6 +16,9 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   secrets: {depends_on: [], vendors: [age, otel]}
   buildinfo: {depends_on: [], vendors: []}
   otel: {depends_on: [secrets], vendors: [otel, otelhttp, otelslog]}
+  health: {depends_on: [], vendors: []}
+  httpserver: {depends_on: [health, otel], vendors: []}
+  lifecycle: {depends_on: [otel], vendors: []}
   # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it.
   pg: {depends_on: [secrets], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi]}
 wire: {vendors: []}

@@ -136,6 +136,27 @@ documented in this file. The format is based on
   through the same allowlist on stderr.
 - Lint rule (sloglint): log messages are constants, attributes are `slog.Attr` values with
   constant keys, and functions with a context log with it; tests are exempt.
+- `bothy serve [--role=api|worker|all] [--config FILE]` (M1-11): starts in the order of
+  `docs/spec/02-architecture.md` "Start" (telemetry, secrets, internal listener, database within
+  `startup.dependency_wait`, schema check, routes, public listener for `api` and `all`, ready),
+  never runs migrations and aborts on an older schema with the hint to run `bothy migrate up`.
+  `SIGTERM` or `SIGINT` shut down per role within `shutdown.total_timeout`; a second signal ends
+  at once with exit code 3.
+- `internal/platform/lifecycle`: runner with components in start order, a shutdown plan in fixed
+  phases with per-step budgets bounded by the remaining total, `Fail` for fatal runtime errors
+  and the exit codes 0, 1, 2 and 3.
+- `internal/platform/health`: `/healthz` and `/readyz` with the built-in states `startup` and
+  `shutting_down`, concurrent checks and the answer format of 16 "Two listeners"; readiness
+  check `database`.
+- `internal/platform/httpserver` (listener part): `Listen`, `NewServer` with
+  `http.read_header_timeout`, `http.idle_timeout`, `http.max_header_bytes` and the server error
+  log without client addresses, the internal mux and the empty `404` of the public listener.
+- `bothy healthcheck --url URL [--timeout DURATION]`: probe of a loopback health endpoint over the
+  loopback client of `platform/egress`, for images without shell; refuses other hosts and
+  schemes with exit code 2.
+- Configuration keys `http.read_header_timeout`, `http.idle_timeout`, `http.max_header_bytes`,
+  `shutdown.drain_delay`, `shutdown.http_grace`, `shutdown.telemetry_flush_timeout` and
+  `shutdown.total_timeout`; stop budgets above the total fail the start with exit code 2.
 
 ### Changed
 
