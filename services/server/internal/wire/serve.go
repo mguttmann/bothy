@@ -195,7 +195,7 @@ func (s *server) register() {
 		return nil
 	}})
 	if s.api() {
-		r.OnStop(lifecycle.StopStep{Name: "drain", Phase: lifecycle.PhaseDrain, Budget: s.cfg.DrainDelay, Run: s.drain})
+		r.OnStop(lifecycle.StopStep{Name: "drain", Phase: lifecycle.PhaseDrain, Budget: s.cfg.DrainDelay, Wait: true, Run: s.drain})
 		r.OnStop(lifecycle.StopStep{Name: "public_listener", Phase: lifecycle.PhaseHTTP, Budget: s.cfg.HTTPGrace, Run: s.stopPublic})
 	}
 	r.OnStop(lifecycle.StopStep{Name: "telemetry", Phase: lifecycle.PhaseTelemetry, Budget: s.cfg.TelemetryFlushTimeout, Run: s.stopTelemetry})
@@ -354,24 +354,20 @@ func (s *server) ready(ctx context.Context) error {
 }
 
 // drain waits shutdown.drain_delay after readiness turned false, so the proxy stops sending
-// new requests; it ends early when its budget does, and at once when the public listener never
-// opened.
+// new requests; its budget is the delay (a Wait step), so the end of its context is its normal
+// end, also when the rest of the total cuts the delay short. It ends at once when the public
+// listener never opened.
 func (s *server) drain(ctx context.Context) error {
 	s.mu.Lock()
 	public := s.public
 	s.mu.Unlock()
-	if public == nil {
-		// The public listener never opened (the start ended before it): nothing to drain.
+	if public == nil || s.cfg.DrainDelay <= 0 {
+		// The public listener never opened (the start ended before it), or there is no delay:
+		// nothing to drain. A zero budget would let the step wait for the rest of the total.
 		return nil
 	}
-	t := time.NewTimer(s.cfg.DrainDelay)
-	defer t.Stop()
-	select {
-	case <-t.C:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
+	<-ctx.Done()
+	return nil
 }
 
 func (s *server) stopPublic(ctx context.Context) error {

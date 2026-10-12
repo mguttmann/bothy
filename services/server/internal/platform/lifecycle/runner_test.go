@@ -364,6 +364,30 @@ func TestStepTimeoutMovesOn(t *testing.T) {
 	}
 }
 
+// TestWaitStepReachingItsBudgetIsNoTimeout: a step that waits its budget by design (the drain
+// delay) ends normally when the budget is spent; the runner logs no timeout for it.
+func TestWaitStepReachingItsBudgetIsNoTimeout(t *testing.T) {
+	t.Parallel()
+	for range 20 {
+		h := newHarness(t, time.Minute)
+		h.r.OnStop(lifecycle.StopStep{Name: "drain", Phase: lifecycle.PhaseDrain, Budget: 5 * time.Millisecond, Wait: true, Run: func(ctx context.Context) error {
+			<-ctx.Done()
+			return nil
+		}})
+		rc, readyCh := ready(h.rec)
+		h.r.Add(rc)
+		done := h.runAsync(context.Background())
+		waitCh(t, readyCh)
+		h.sigs <- syscall.SIGTERM
+		if code := wait(t, done); code != lifecycle.ExitOK {
+			t.Fatalf("exit = %d, want 0", code)
+		}
+		if logs := h.logs.String(); strings.Contains(logs, "shutdown step timed out") {
+			t.Fatalf("a wait step that used its budget was logged as timed out:\n%s", logs)
+		}
+	}
+}
+
 func TestSecondSignalForcesExit3(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t, time.Minute)

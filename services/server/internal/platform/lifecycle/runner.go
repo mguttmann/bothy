@@ -84,7 +84,14 @@ type StopStep struct {
 	// Run stops the part. Its context ends when the budget is spent; a step that ignores it is
 	// left behind and the plan moves on. An error is logged and does not change the exit code.
 	Run func(ctx context.Context) error
+	// Wait marks a step whose purpose is to wait for its budget (the drain delay): when the
+	// budget is spent, Run is expected to return at once, and the runner logs no timeout as long
+	// as it does so within waitGrace. Run must end when its context ends.
+	Wait bool
 }
+
+// waitGrace is how long the runner waits for a Wait step to return after its budget is spent.
+const waitGrace = 100 * time.Millisecond
 
 // Options configure a Runner.
 type Options struct {
@@ -380,6 +387,18 @@ func (r *Runner) runStep(ctx context.Context, s StopStep, budget time.Duration, 
 			r.log().WarnContext(ctx, msgStepFailed, slog.String(attr.Reason, s.Phase.String()), slog.String(attr.ErrorType, errTypeStep))
 		}
 	case <-sctx.Done():
+		if s.Wait {
+			select {
+			case err := <-done:
+				if err != nil {
+					r.log().WarnContext(ctx, msgStepFailed, slog.String(attr.Reason, s.Phase.String()), slog.String(attr.ErrorType, errTypeStep))
+				}
+				return false
+			case <-sigs:
+				return true
+			case <-time.After(waitGrace):
+			}
+		}
 		r.log().WarnContext(ctx, msgStepTimedOut, slog.String(attr.Reason, s.Phase.String()), slog.String(attr.ErrorType, errTypeTimeout))
 	case <-sigs:
 		return true
