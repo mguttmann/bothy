@@ -223,7 +223,7 @@ Source: [03-data-model.md](../spec/03-data-model.md), section 9.
 | `identity.last_active_granularity` | `BOTHY_IDENTITY__LAST_ACTIVE_GRANULARITY` | Server |  | `5m` | `last_active_at` or `last_used_at` is written at most this often | planned (M1) |
 | `auth.session_max_age` | `BOTHY_AUTH__SESSION_MAX_AGE` | Server |  | `30d` | absolute end of a login session | planned (M1) |
 | `auth.refresh_token_ttl` | `BOTHY_AUTH__REFRESH_TOKEN_TTL` | Server |  | `14d` | lifetime of a refresh token | planned (M1) |
-| `auth.step_up_max_age` | `BOTHY_AUTH__STEP_UP_MAX_AGE` | Server |  | `5m` | a step-up confirmation counts as fresh for this long | planned (M1) |
+| `auth.step_up_max_age` | `BOTHY_AUTH__STEP_UP_MAX_AGE` | Server | duration | `5m` | a step-up confirmation counts as fresh for this long | active |
 | `auth.refresh_reuse_grace` | `BOTHY_AUTH__REFRESH_REUSE_GRACE` | Server |  | `30s` | grace period for the immediately preceding refresh generation with the same DPoP key | planned (M1) |
 | `agent.heartbeat_persist_interval` | `BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL` | Server |  | `60s` | heartbeat fields are stored at most this often | planned (M2) |
 | `channel.history_backfill_limit_default` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT` | Server |  | `20` | default for `history_backfill_limit` | planned (M1) |
@@ -357,7 +357,7 @@ Source: [07-permissions.md](../spec/07-permissions.md), section 14.
 | `authz.expiry_reminder_lead` | `BOTHY_AUTHZ__EXPIRY_REMINDER_LEAD` | Server |  | `48h` | how long before expiry the reminder comes (Study C: two days) | planned (M1) |
 | `authz.expiry_sweep_batch_max` | `BOTHY_AUTHZ__EXPIRY_SWEEP_BATCH_MAX` | Server |  | `500` | rows per transaction of the jobs `authz.expiry_sweep` and `authz.expiry_reminder` | planned (M1) |
 | `authz.view_as_max_duration` | `BOTHY_AUTHZ__VIEW_AS_MAX_DURATION` | Server |  | `15m` | maximum duration of "View as person" | planned (M1) |
-| `authz.snapshot_cache_max_entries` | `BOTHY_AUTHZ__SNAPSHOT_CACHE_MAX_ENTRIES` | Server |  | `10000` | permission snapshots in memory per process (LRU) | planned (M1) |
+| `authz.snapshot_cache_max_entries` | `BOTHY_AUTHZ__SNAPSHOT_CACHE_MAX_ENTRIES` | Server | int | `10000` | permission snapshots in memory per process (LRU) | active |
 | `authz.not_found_timing_tolerance` | `BOTHY_AUTHZ__NOT_FOUND_TIMING_TOLERANCE` | Server |  | `20ms` | allowed deviation of the median in AZ-P4 | planned (M1) |
 
 ### 08 Identity, devices and sessions

@@ -78,10 +78,11 @@ func TestAZP1_RoutesNeedKnownActionAndClass(t *testing.T) {
 	if err := cat.VerifyRegistrations(wire.RouteBindings(routes.Enabled()), authorize.NewRegistry()); err != nil {
 		t.Fatalf("real route table: %v", err)
 	}
-	// Every action a route may carry passes with its class.
+	// Every action a route may carry passes with its class; deferred actions wait for their ticket
+	// (TestVerifyRegistrations_DeferredActions).
 	var all []authorize.RouteBinding
 	for _, id := range domain.ActionIDs() {
-		if s, _ := domain.LookupAction(id); !s.System && s.RateLimitClass != "" {
+		if s, _ := domain.LookupAction(id); !s.System && s.RateLimitClass != "" && !slices.Contains(domain.DeferredActions(), id) {
 			all = append(all, binding(t, "op_"+id, id))
 		}
 	}
@@ -150,7 +151,9 @@ func TestAZP2_OpsAndEventTypesNeedCatalogueEntry(t *testing.T) {
 	good.Op("gateway", authorize.OpHeartbeat)
 	good.Op("gateway", authorize.OpTypingStart)
 	good.Op("agents", authorize.OpCommandAutocompleteResult)
-	good.ChannelOp("terminal", authorize.ChannelOpHostControlSessionOpen)
+	// Every terminal channel op names a deferred action of M2 (host.connect, terminal.stream), so
+	// none is valid in M1 (07 section 4.2, docs/DECISIONS.md M1-28 D3); see
+	// TestVerifyRegistrations_DeferredActions.
 	if err := cat.VerifyRegistrations(nil, good); err != nil {
 		t.Fatalf("valid registrations: %v", err)
 	}
@@ -359,5 +362,30 @@ func TestAZP1_RouteMessagesAndIdentity(t *testing.T) {
 	}
 	if v := re.Violations[1]; v.Kind != app.ViolationIncompleteRoute {
 		t.Errorf("violation = %+v", v)
+	}
+}
+
+// TestVerifyRegistrations_DeferredActions: a route, a channel op or an event type that names a
+// deferred action fails the start (07 section 4.2, D3).
+func TestVerifyRegistrations_DeferredActions(t *testing.T) {
+	cat, _ := newCatalog()
+	route := authorize.RouteBinding{OperationID: "invokeCommand", Method: "POST", Pattern: "/api/v1/commands/{id}/invoke",
+		Action: "command.invoke", RateLimitClass: "rl.trigger"}
+	err := cat.VerifyRegistrations([]authorize.RouteBinding{route}, nil)
+	var re *app.RegistrationError
+	if !errors.As(err, &re) || len(re.Violations) != 1 || re.Violations[0].Kind != app.ViolationDeferredAction ||
+		re.Violations[0].Action != "command.invoke" {
+		t.Fatalf("route: %v", err)
+	}
+	for name, register := range map[string]func(*authorize.Registry){
+		"channel op": func(r *authorize.Registry) { r.ChannelOp("terminal", authorize.ChannelOpHostControlSessionOpen) },
+		"event type": func(r *authorize.Registry) { r.Event("files", authorize.EventFileUpdated) },
+	} {
+		r := authorize.NewRegistry()
+		register(r)
+		err := cat.VerifyRegistrations(nil, r)
+		if !errors.As(err, &re) || len(re.Violations) != 1 || re.Violations[0].Kind != app.ViolationDeferredAction {
+			t.Errorf("%s: %v", name, err)
+		}
 	}
 }

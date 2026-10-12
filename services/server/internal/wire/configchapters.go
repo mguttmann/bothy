@@ -12,6 +12,7 @@ const (
 	chapter03 = "03-data-model.md"
 	chapter05 = "05-actions.md"
 	chapter06 = "06-api.md"
+	chapter07 = "07-permissions.md"
 	chapter16 = "16-operations.md"
 	chapter17 = "17-observability.md"
 	chapter19 = "19-security.md"

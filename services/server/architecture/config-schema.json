@@ -38,6 +38,30 @@
       "doc": "Window from the first of identical denials within which they become one audit entry with a count."
     },
     {
+      "name": "auth.step_up_max_age",
+      "env": "BOTHY_AUTH__STEP_UP_MAX_AGE",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "How long a step-up confirmation counts as fresh for actions that need one."
+    },
+    {
+      "name": "authz.snapshot_cache_max_entries",
+      "env": "BOTHY_AUTHZ__SNAPSHOT_CACHE_MAX_ENTRIES",
+      "kind": "int",
+      "default": "10000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "07-permissions.md",
+      "doc": "Most rights snapshots a process keeps in memory (least recently used go first)."
+    },
+    {
       "name": "database.acquire_timeout",
       "env": "BOTHY_DATABASE__ACQUIRE_TIMEOUT",
       "kind": "duration",

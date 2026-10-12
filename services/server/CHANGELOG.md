@@ -11,6 +11,27 @@ documented in this file. The format is based on
 
 ### Added
 
+- `internal/authz` (M1-28): the one authorization function. `app.Authorizer` implements
+  `kernel/authorize.Authorizer` with `Authorize` (07 section 4.2: liveness, pending, resolution
+  through the structure, effective rights with owner, dm, operator, agent and app limits, "view
+  as" and acting-for intersections, visibility per resource kind, the requirement table of every
+  catalogue action, app scopes, read-only channels, step-up and the guards of `agent.invoke`,
+  `grant.create` and `grant.revoke`) and `Scope` (the visible channels and spaces per request).
+  Rights snapshots are cached per principal and rights version in an LRU, valid until the
+  earliest expiry; denials go to the audit recorder, filter mode writes none. New source ports
+  `StructureSource`, `AgentPolicySource` and `CredentialSource`, in-memory fakes in
+  `adapters/fake`, and the start check rejects routes, ops and event types that name a deferred
+  action.
+- `internal/kernel/authorize`: `Decision` with its error mapping, `Resource`, `Principal`,
+  `Scope`, `Authorizer`, `WithPermissionVersion`, `WithRequestScope` and `Filter`;
+  `kernel/actor.Actor` carries the installation, granted scopes, "view as" and acting for and
+  implements `authorize.Principal`.
+- `internal/instance`: the read-only port `Versions` with the rights version.
+- `internal/platform/httpserver`: one request memo of `kernel/authorize` per request.
+- `internal/wire`: the authorizer over the identity principal source, the grant store, the
+  rights version and the audit recorder, with empty sources until chat, agents and identity
+  provide theirs; configuration keys `authz.snapshot_cache_max_entries` and
+  `auth.step_up_max_age`.
 - Go module `github.com/OWNER/bothy/services/server` with `VERSION` and the golangci-lint v2
   configuration of the module.
 - Binary `bothy` with a command table, usage text and the exit codes 0 (success), 1 (failure) and

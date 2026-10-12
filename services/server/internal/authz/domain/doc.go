@@ -3,7 +3,10 @@
 // Package domain holds the pure rules of the grant model of the authz module
 // (docs/spec/07-permissions.md section 2, ADR 0018): levels and capabilities, the shapes of grants,
 // groups and memberships, validity at one time t (07 section 2.5) and delegation with manage
-// (07 section 2.6, R-AZ-05). Nothing here reads a clock, a database or another module; callers
+// (07 section 2.6, R-AZ-05). M1-28 adds the decision itself: the requirement table of every
+// catalogue action (requirements_table.go), the app scopes, the closed reason list, the rights
+// snapshot, effective rights on a path, visibility per resource kind, Decide and the guards of
+// agent.invoke and the grant actions. Nothing here reads a clock, a database or another module; callers
 // pass the time and the facts.
 //
 // Example:

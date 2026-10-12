@@ -1,0 +1,119 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package authorize
+
+import "github.com/OWNER/bothy/services/server/internal/kernel/errs"
+
+// Outcome is the decision of Authorize (docs/spec/05-actions.md section 2.5).
+type Outcome string
+
+// The outcomes of 05 section 2.5.
+const (
+	// OutcomeAllow allows the action.
+	OutcomeAllow Outcome = "allow"
+	// OutcomeNotFound means no read right on the resource, or the resource is missing (404).
+	OutcomeNotFound Outcome = "not_found"
+	// OutcomeForbidden means read right exists but a level, capability, scope or guard rule
+	// refuses (403).
+	OutcomeForbidden Outcome = "forbidden"
+	// OutcomeStepUpRequired asks for a fresh confirmation of the person (401).
+	OutcomeStepUpRequired Outcome = "step_up_required"
+	// OutcomeInvariantViolation means the change would break an invariant (409). Authorize
+	// itself never returns it; the invariant check of M1-29 does.
+	OutcomeInvariantViolation Outcome = "invariant_violation"
+	// OutcomeUnauthenticated means there is no valid principal (401).
+	OutcomeUnauthenticated Outcome = "unauthenticated"
+)
+
+// Reason is the reason code of a decision. The one closed list of docs/spec/07-permissions.md section
+// 4.1 is kernel/auditing.Reason (R-DM-28); kernel ports never import each other, so this type
+// carries the same codes as plain text and authz converts its constants. The empty Reason belongs
+// to allow.
+type Reason string
+
+// Decision is the result of one Authorize call: the outcome and, for every outcome other than
+// allow, the reason code of 07 section 4.1.
+type Decision struct {
+	// Outcome is the decision.
+	Outcome Outcome
+	// Reason is the reason code; empty for allow.
+	Reason Reason
+}
+
+// Allowed reports whether d allows the action. The zero Decision is no allow.
+func (d Decision) Allowed() bool { return d.Outcome == OutcomeAllow }
+
+// The reasons that the problem body names with their own code (06 section 5).
+const (
+	reasonScopeMissing    Reason = "scope_missing"
+	reasonDevicePending   Reason = "device_pending"
+	reasonPrincipalPend   Reason = "principal_pending"
+	reasonChannelReadOnly Reason = "channel_read_only"
+	reasonPrincipalInact  Reason = "principal_inactive"
+	reasonSessionRevoked  Reason = "session_revoked"
+	reasonDeviceInactive  Reason = "device_inactive"
+	reasonI1Violation     Reason = "i1_violation"
+	reasonLastOwner       Reason = "last_owner"
+	reasonBillingMismatch Reason = "billing_mode_mismatch"
+	reasonToolMismatch    Reason = "tool_class_mismatch"
+)
+
+// Err returns nil for allow and otherwise a kernel/errs error that the problem writer renders
+// (06 section 5; mapping table of the brief M1-28):
+//
+//   - not_found: 404 not_found without the reason, which never leaves the server (R-AZ-01);
+//   - forbidden: 403 scope_missing, device_pending (also for principal_pending, 07 section 4.1),
+//     channel_read_only or forbidden, each with the reason in the extension reason;
+//   - step_up_required: 401 step_up_required;
+//   - unauthenticated: 401 session_revoked for principal_inactive, session_revoked and
+//     device_inactive, 401 unauthenticated otherwise; no reason;
+//   - invariant_violation: 409 with the reason as code (i1_violation, last_owner,
+//     billing_mode_mismatch, tool_class_mismatch) and the reason extension.
+//
+// An outcome outside the list, and the zero Decision, give 500 internal_error: fail closed.
+func (d Decision) Err() error {
+	switch d.Outcome {
+	case OutcomeAllow:
+		return nil
+	case OutcomeNotFound:
+		return errs.New(errs.CodeNotFound, "")
+	case OutcomeForbidden:
+		code, ok := forbiddenCodes[d.Reason]
+		if !ok {
+			code = errs.CodeForbidden
+		}
+		return errs.New(code, "").WithReason(string(d.Reason))
+	case OutcomeStepUpRequired:
+		return errs.New(errs.CodeStepUpRequired, "")
+	case OutcomeUnauthenticated:
+		if revokedReasons[d.Reason] {
+			return errs.New(errs.CodeSessionRevoked, "")
+		}
+		return errs.New(errs.CodeUnauthenticated, "")
+	case OutcomeInvariantViolation:
+		if code, ok := invariantCodes[d.Reason]; ok {
+			return errs.New(code, "").WithReason(string(d.Reason))
+		}
+	}
+	return errs.New(errs.CodeInternalError, "authorize: decision without a mapping")
+}
+
+// forbiddenCodes are the reasons of forbidden with an own problem code; every other reason is
+// forbidden.
+var forbiddenCodes = map[Reason]errs.Code{
+	reasonScopeMissing:    errs.CodeScopeMissing,
+	reasonDevicePending:   errs.CodeDevicePending,
+	reasonPrincipalPend:   errs.CodeDevicePending,
+	reasonChannelReadOnly: errs.CodeChannelReadOnly,
+}
+
+// revokedReasons are the reasons of unauthenticated that answer session_revoked.
+var revokedReasons = map[Reason]bool{reasonPrincipalInact: true, reasonSessionRevoked: true, reasonDeviceInactive: true}
+
+// invariantCodes are the reasons of invariant_violation and their codes.
+var invariantCodes = map[Reason]errs.Code{
+	reasonI1Violation:     errs.CodeI1Violation,
+	reasonLastOwner:       errs.CodeLastOwner,
+	reasonBillingMismatch: errs.CodeBillingModeMismatch,
+	reasonToolMismatch:    errs.CodeToolClassMismatch,
+}
