@@ -12,6 +12,7 @@ import (
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
@@ -28,11 +29,10 @@ import (
 const msgRegistrationCheckFailed = "registration check failed"
 
 // moduleRegistrations are the Register(r *authorize.Registry) functions of the module ports, in
-// the order of the module register. No module registers an event type, a gateway op or a
-// terminal channel op in M1 except authz with access.changed (M1-29), grant.changed,
-// group.changed and access.expiring (M1-30); each module's ticket
-// appends its function here.
-var moduleRegistrations = []func(*authorize.Registry){authz.Register}
+// the order of the module register. In M1 identity registers user.updated (M1-31) and authz
+// access.changed (M1-29), grant.changed, group.changed and access.expiring (M1-30); each
+// module's ticket appends its function here.
+var moduleRegistrations = []func(*authorize.Registry){identity.Register, authz.Register}
 
 // BuildRegistry returns a registry filled by every function of register; nil means the
 // production list of the module ports.

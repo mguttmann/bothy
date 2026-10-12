@@ -40,6 +40,8 @@ vendors:
     in: [github.com/riverqueue/river, github.com/riverqueue/river/**]
   v-testcontainers:
     in: [github.com/testcontainers/testcontainers-go, github.com/testcontainers/testcontainers-go/**]
+  v-xtext:
+    in: [golang.org/x/text/language]
   v-yaml:
     in: [go.yaml.in/yaml/v3]
 components:
@@ -329,7 +331,7 @@ deps:
     mayDependOn: [identity-app, identity, identity-domain, kernel-ports, instance, authz]
   identity-adapters:
     mayDependOn: [identity-adapters, identity, identity-app, identity-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, authz]
-    canUse: [v-pgx]
+    canUse: [v-pgx, v-xtext]
   chat:
     mayDependOn: [chat, kernel-ports]
   chat-domain:

@@ -100,12 +100,59 @@ func joinUnit(ctx context.Context, o txn.Options, fn func(context.Context) error
 	if !ok {
 		return errs.New(errs.CodeInternalError, "pg: the context carries a unit of work platform/pg did not create")
 	}
-	if !u.unit.Options().Covers(o) {
-		// The rights begin hook locks permission_version before any domain row (03
-		// "Lock order" item 1); a nested unit cannot add RightsChange afterwards.
-		return errs.New(errs.CodeInternalError, "pg: nested RightsChange that the outermost unit of work does not declare")
+	cur := u.unit.Options()
+	if o.RightsChange && u.lateDone {
+		// A late rights change already ran its check; a rights change after it would write
+		// without one.
+		return errs.New(errs.CodeInternalError, "pg: a second rights change after a late rights change")
 	}
-	return fn(ctx)
+	if cur.Covers(o) {
+		return fn(ctx)
+	}
+	if cur.LateRightsChange && !cur.RightsChange && !u.lateDone && u.unit.Phase() == txn.PhaseWork {
+		return u.lateRightsChange(ctx, cur, o, fn)
+	}
+	// The rights begin hook locks permission_version before any domain row (03
+	// "Lock order" item 1); a nested unit cannot add RightsChange afterwards.
+	return errs.New(errs.CodeInternalError, "pg: nested RightsChange that the outermost unit of work does not declare")
+}
+
+// lateRightsChange turns the unit into the rights change o declares (txn.AllowLateRightsChange):
+// the rights begin hook, fn and the rights check hook run in this order inside the ambient
+// transaction, then the unit is back in the work phase. Sync and audit run at the end of the
+// outer unit as always. Any error goes to the caller; the outer unit rolls back with it.
+func (u *unit) lateRightsChange(ctx context.Context, cur, o txn.Options, fn func(context.Context) error) error {
+	declared := cur
+	declared.RightsChange = true
+	declared.LateRightsChange = false
+	txn.DeclareRightsChange(o.Spec())(&declared)
+	u.ctrl.Declare(declared)
+	defer func() {
+		u.setPhase(txn.PhaseWork)
+		u.lateDone = true
+		if r := recover(); r != nil {
+			// A recovered panic must not commit an unchecked rights change either.
+			u.lateErr = errs.New(errs.CodeInternalError, "pg: panic in a late rights change")
+			panic(r)
+		}
+	}()
+	err := u.lateRun(ctx, fn)
+	// The error fails the whole attempt even if the caller swallows it: nothing of a rights
+	// change whose check did not pass may commit (red team M1-31).
+	u.lateErr = err
+	return err
+}
+
+// lateRun runs the phases of a late rights change.
+func (u *unit) lateRun(ctx context.Context, fn func(context.Context) error) error {
+	if err := u.hook(ctx, txn.PhaseRightsBegin); err != nil {
+		return err
+	}
+	u.setPhase(txn.PhaseWork)
+	if err := fn(ctx); err != nil {
+		return err
+	}
+	return u.hook(ctx, txn.PhaseRightsCheck)
 }
 
 // retryable reports whether err carries SQLSTATE 40P01 or 55P03.
@@ -137,8 +184,8 @@ func (w *UnitOfWork) attempt(ctx context.Context, fn func(context.Context) error
 	}); err != nil {
 		return err
 	}
-	tu, setPhase := txn.NewUnit(w.reg, o)
-	u := &unit{tx: tx, unit: tu, setPhase: setPhase, reg: w.reg, opts: o}
+	tu, ctrl := txn.NewControlledUnit(w.reg, o)
+	u := &unit{tx: tx, unit: tu, ctrl: ctrl, setPhase: ctrl.SetPhase, reg: w.reg, opts: o}
 	uctx := context.WithValue(txn.WithUnit(ctx, tu), unitKey{}, u)
 	if err := u.run(uctx, fn); err != nil {
 		return err
@@ -168,8 +215,15 @@ type unit struct {
 	tx       pgx.Tx
 	unit     *txn.Unit
 	setPhase func(txn.Phase)
+	ctrl     txn.UnitControl
 	reg      *txn.Registry
-	opts     txn.Options
+	// opts are the options of the outermost Do; a late rights change does not change them, so
+	// run never runs its rights hooks a second time.
+	opts txn.Options
+	// lateDone reports that a late rights change ran (txn.AllowLateRightsChange); lateErr is its
+	// error, which fails the attempt before sync, audit and commit.
+	lateDone bool
+	lateErr  error
 }
 
 // unitKey is the context key of the attempt.
@@ -185,6 +239,9 @@ func (u *unit) run(ctx context.Context, fn func(context.Context) error) error {
 	u.setPhase(txn.PhaseWork)
 	if err := fn(ctx); err != nil {
 		return err
+	}
+	if u.lateErr != nil {
+		return u.lateErr
 	}
 	if u.opts.RightsChange {
 		if err := u.hook(ctx, txn.PhaseRightsCheck); err != nil {

@@ -24,7 +24,7 @@ func TestIdentityConfigBindsDefaults(t *testing.T) {
 	want := app.Config{ //nolint:gosec // G101: TokenPepperRef is a secret reference, no secret
 		HandleMaxChars: 32, DisplayNameMaxChars: 64, DPoPNonceTTL: 5 * time.Minute, DPoPProofMaxAge: 60 * time.Second,
 		ClockLeeway: 30 * time.Second, TokenPepperRef: "file:/run/bothy/secrets/token_pepper",
-		PublicURL: "https://chat.example.com", PageSizeDefault: 50, PageSizeMax: 200,
+		PublicURL: "https://chat.example.com", PageSizeDefault: 50, PageSizeMax: 200, StepUpMaxAge: 5 * time.Minute,
 	}
 	if cfg != want {
 		t.Fatalf("IdentityConfig = %+v, want %+v", cfg, want)

@@ -66,6 +66,43 @@ type Store interface {
 	// same unit of work).
 	InsertUser(ctx context.Context, u domain.User) error
 	// InsertOwner inserts o and sets o.GrantedAt from the database. Granting the owner role is
-	// a rights change: the caller runs it inside a unit of work with txn.RightsChange (M1-29).
+	// a rights change: the caller runs it inside a unit of work with txn.DeclareRightsChange
+	// (M1-29).
 	InsertOwner(ctx context.Context, o *domain.Owner) error
+
+	// ListUsers returns up to f.Limit people matching f, ordered by (lower(handle), id) and
+	// after the keyset position of f (M1-31).
+	ListUsers(ctx context.Context, f UserFilter) ([]UserRecord, error)
+	// LockUser returns the person id like User and locks its row of principals until the end
+	// of the unit of work. The caller runs it inside one.
+	LockUser(ctx context.Context, id ids.ID) (rec UserRecord, found bool, err error)
+	// UpdateUser writes display name, e-mail, locale and time zone of u (handle, kind and
+	// status stay). The caller runs it inside a unit of work.
+	UpdateUser(ctx context.Context, u domain.User) error
+	// EnableUser sets a pending or disabled person active and clears disabled_at. user.enable
+	// is a rights change: the caller declares it.
+	EnableUser(ctx context.Context, id ids.ID) error
+	// LockActiveOwners locks the owners rows with revoked_at IS NULL in ascending id and
+	// returns their persons. The caller runs it inside a unit of work.
+	LockActiveOwners(ctx context.Context) ([]ids.ID, error)
+	// ActiveOwner returns the active owners row of userID with its principal; found is false
+	// when there is none.
+	ActiveOwner(ctx context.Context, userID ids.ID) (rec OwnerRecord, found bool, err error)
+	// RevokeOwner revokes the active owners row of userID by revokedBy; revoked is false when
+	// there was none. owner.remove is a rights change: the caller declares it.
+	RevokeOwner(ctx context.Context, userID, revokedBy ids.ID) (revoked bool, err error)
+}
+
+// UserFilter selects a page of people (ListUsers).
+type UserFilter struct {
+	// Q is a case-insensitive literal prefix of handle or display name; "" for none.
+	Q string
+	// Status is a principal status; "" for every status.
+	Status domain.Status
+	// AfterHandle and AfterID are the keyset position (lower(handle), id) of the last row of
+	// the previous page; AfterHandle "" for the first page.
+	AfterHandle string
+	AfterID     ids.ID
+	// Limit is the number of rows to read, at least 1.
+	Limit int
 }

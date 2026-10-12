@@ -16,6 +16,8 @@ const (
 	sqlstateCheckViolation      = "23514"
 	sqlstateForeignKeyViolation = "23503"
 	sqlstateNotNullViolation    = "23502"
+	// sqlstateCharacterNotInRepertoire is invalid UTF-8 or NUL in a text parameter.
+	sqlstateCharacterNotInRepertoire = "22021"
 )
 
 // Field error codes of a mapped violation.
@@ -83,6 +85,10 @@ func mapError(err error, what string) error {
 		return errs.Wrap(errs.CodeInternalError, err, "identity: "+what+" failed")
 	}
 	switch pgErr.Code {
+	case sqlstateCharacterNotInRepertoire:
+		// The use cases check text input first; this keeps a missed parameter at 400, never 500
+		// (red team M1-31).
+		return errs.Wrap(errs.CodeValidationFailed, err, "a text value is not valid UTF-8")
 	case sqlstateUniqueViolation:
 		if field, ok := uniqueFields[pgErr.ConstraintName]; ok {
 			return errs.Wrap(errs.CodeConflict, err, "the value of "+field[1:]+" is already taken").
