@@ -55,11 +55,16 @@ _BLOCK_START = re.compile(r"^\s*(?:[-*+]|\d+\.|[a-z]\.)\s")
 _START_CHECK = re.compile(r"BLOCKED dependency|BLOCKED [^`]*not merged")
 _SENTENCE = re.compile(r"(?<=[.;])\s+(?=[A-Z`])")
 _OPTIONAL = re.compile(r"(?:only if|where|if) merged", re.IGNORECASE)
-# A ticket that a brief calls missing or optional: "M1-63 is not in the closure", "if M1-57 is on
-# the base", or a list after "not in the closure ...:" or "used only if merged:".
+# A ticket that a brief calls missing or optional. Forms: "M1-63 is not in the closure", "M1-58
+# and M1-59 are outside this closure", "if M1-57 is on the base", "once M1-58 is merged", "M1-41
+# (if merged)", and a list after "not in the closure ...:" or "used only if merged:". A subject or
+# a list item never reaches across a comma that starts a new clause, so "M1-71 provides it, but
+# M1-70 is not in the closure" names only M1-70.
 _OPTIONAL_SUBJECT = re.compile(
-    r"(M\d-\d\d)\b[^.;:]{0,60}?\b(?:is|are) (?:not in|outside)\b[^.;:]{0,40}\bclosure"
-    r"|\b(?:if|when) (M\d-\d\d)\b[^.;:]{0,40}?\b(?:is|are) (?:merged|on the base)",
+    r"((?:M\d-\d\d)[^.;:,]{0,60}?)\b(?:is|are|lies|lie) (?:not in|outside)\b[^.;:,]{0,40}\bclosure"
+    r"|\b(?:if|when|once) (M\d-\d\d)\b[^.;:,]{0,40}?\b(?:is|are|has been|have been)"
+    r" (?:already )?(?:merged|on the base)"
+    r"|(M\d-\d\d)\b[^.;:,()]{0,40}\((?:only )?if merged\)",
     re.IGNORECASE,
 )
 _OPTIONAL_LIST = re.compile(
@@ -67,6 +72,8 @@ _OPTIONAL_LIST = re.compile(
     r"[^:.;]{0,60}:\s*([^.;]+)",
     re.IGNORECASE,
 )
+# A list ends where a comma starts a new clause ("..., while M2-02 is required").
+_CLAUSE_BREAK = re.compile(r",\s+(?=[a-z])")
 
 
 class Index:
@@ -169,13 +176,19 @@ def start_check_tickets(text: str) -> set[str]:
 
 
 def called_optional_tickets(text: str) -> set[str]:
-    """Tickets that a brief calls missing or optional (outside its closure)."""
+    """Tickets that a brief calls missing or optional (outside its closure).
+
+    Not covered: a sentence that names the ticket only by a path, a feature or a pronoun ("the
+    registry of M1-68 when it is on the base", "if `test/canary` exists"); review catches those.
+    """
     found: set[str] = set()
     flat = re.sub(r"\s+", " ", text)
     for m in _OPTIONAL_SUBJECT.finditer(flat):
-        found.update(x for x in m.groups() if x)
+        for group in m.groups():
+            if group:
+                found.update(_ID.findall(group))
     for m in _OPTIONAL_LIST.finditer(flat):
-        found.update(_ID.findall(m.group(1)))
+        found.update(_ID.findall(_CLAUSE_BREAK.split(m.group(1))[0]))
     return found
 
 

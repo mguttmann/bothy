@@ -292,7 +292,7 @@ Integration against PostgreSQL 18 (`pgtest`, world of 07 "Examples", HTTP throug
 - `TestReactionPinEvents_Envelope`: `event_log` rows have resource kind `message`, the receive
   actions of 05 section 6, scope with space, channel and thread, and `resource.version` equal to
   the message version.
-- `TestDeleteMessage_RemovesReactionsAndPin` (note 9, once M1-58 is on the base).
+- `TestDeleteMessage_RemovesReactionsAndPin` (note 9; M1-58 is a dependency of this ticket).
 
 Commands that must pass:
 

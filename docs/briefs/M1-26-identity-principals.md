@@ -88,7 +88,8 @@ Paths are relative to `services/server/` unless noted.
 8. **Configuration**: schema entries `principal.handle_max_chars` and
    `principal.display_name_max_chars` (integers, defaults from 03 section 9, minimum `1`) in the
    identity config of `internal/wire`; regenerate `docs/operations/configuration.md`
-   with the M1-08 generator if it exists (`make config-reference` or the target M1-08 named).
+   with the M1-08 generator (`make config-reference` or the target M1-08 named; M1-08 is in
+   this ticket's dependency closure).
 9. **Documentation**: `internal/identity/README.md` (status, port, tables, source it implements),
    package docs of `kernel/textcheck`, `services/server/CHANGELOG.md` under `Unreleased`,
    no DECISIONS entry is needed for display names (03 states the rule).
