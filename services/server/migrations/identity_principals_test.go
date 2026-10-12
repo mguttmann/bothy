@@ -20,15 +20,16 @@ import (
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
-// column is one row of information_schema.columns as 03 section 4.2 states it.
-type column struct {
+// principalColumn is one row of information_schema.columns as 03 section 4.2 states it. The
+// name differs from column of instance_test.go (M1-15) in the same package (INT-W4/1).
+type principalColumn struct {
 	Name, Type string
 	Nullable   bool
 	Default    string // "" means no default
 }
 
-// columns returns the columns of table in ordinal order.
-func columns(t *testing.T, conn *pgx.Conn, table string) []column {
+// principalColumns returns the columns of table in ordinal order.
+func principalColumns(t *testing.T, conn *pgx.Conn, table string) []principalColumn {
 	t.Helper()
 	rows, err := conn.Query(context.Background(), `SELECT column_name, data_type, is_nullable = 'YES',
 		coalesce(column_default, '') FROM information_schema.columns
@@ -36,16 +37,16 @@ func columns(t *testing.T, conn *pgx.Conn, table string) []column {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := pgx.CollectRows(rows, pgx.RowToStructByPos[column])
+	out, err := pgx.CollectRows(rows, pgx.RowToStructByPos[principalColumn])
 	if err != nil {
 		t.Fatal(err)
 	}
 	return out
 }
 
-// constraints returns the definitions (pg_get_constraintdef) of the constraints of table, sorted,
-// without the NOT NULL constraints PostgreSQL 18 records (columns holds nullability).
-func constraints(t *testing.T, conn *pgx.Conn, table string) []string {
+// principalConstraints returns the definitions (pg_get_constraintdef) of the constraints of table, sorted,
+// without the NOT NULL constraints PostgreSQL 18 records (principalColumns holds nullability).
+func principalConstraints(t *testing.T, conn *pgx.Conn, table string) []string {
 	t.Helper()
 	rows, err := conn.Query(context.Background(), `SELECT pg_get_constraintdef(oid) FROM pg_constraint
 		WHERE conrelid = to_regclass($1) AND contype <> 'n' ORDER BY 1`, table)
@@ -85,13 +86,13 @@ func TestIdentityPrincipalsSchema(t *testing.T) {
 
 	tests := []struct {
 		table       string
-		columns     []column
+		columns     []principalColumn
 		constraints []string
 		indexes     []string
 	}{
 		{
 			table: "principals",
-			columns: []column{
+			columns: []principalColumn{
 				{"id", "uuid", false, ""},
 				{"kind", "text", false, ""},
 				{"status", "text", false, "'active'::text"},
@@ -116,7 +117,7 @@ func TestIdentityPrincipalsSchema(t *testing.T) {
 		},
 		{
 			table: "users",
-			columns: []column{
+			columns: []principalColumn{
 				{"principal_id", "uuid", false, ""},
 				{"email", "text", true, ""},
 				{"locale", "text", false, "'de'::text"},
@@ -134,7 +135,7 @@ func TestIdentityPrincipalsSchema(t *testing.T) {
 		},
 		{
 			table: "owners",
-			columns: []column{
+			columns: []principalColumn{
 				{"id", "uuid", false, ""},
 				{"user_id", "uuid", false, ""},
 				{"granted_by", "uuid", true, ""},
@@ -156,12 +157,12 @@ func TestIdentityPrincipalsSchema(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		if got := columns(t, conn, tt.table); !reflect.DeepEqual(got, tt.columns) {
+		if got := principalColumns(t, conn, tt.table); !reflect.DeepEqual(got, tt.columns) {
 			t.Errorf("%s columns:\n got %+v\nwant %+v", tt.table, got, tt.columns)
 		}
 		want := slices.Clone(tt.constraints)
 		slices.Sort(want)
-		if got := constraints(t, conn, tt.table); !reflect.DeepEqual(got, want) {
+		if got := principalConstraints(t, conn, tt.table); !reflect.DeepEqual(got, want) {
 			t.Errorf("%s constraints:\n got %q\nwant %q", tt.table, got, want)
 		}
 		want = slices.Clone(tt.indexes)

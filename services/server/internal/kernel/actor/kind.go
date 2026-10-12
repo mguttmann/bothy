@@ -2,24 +2,9 @@
 
 package actor
 
-// Kind is the kind of the principal of a request (docs/spec/07-rechte.md section 3, field
-// `kind`). The values are the stable strings of the API (`PrincipalKind` in
-// docs/api/openapi.yaml) plus the two kinds without a row in `principals`.
-type Kind string
-
-const (
-	// KindUser is a person (a row in `principals` and `users`).
-	KindUser Kind = "user"
-	// KindAgent is an agent principal.
-	KindAgent Kind = "agent"
-	// KindApp is an app principal.
-	KindApp Kind = "app"
-	// KindAnonymous is a request without an authenticated principal.
-	KindAnonymous Kind = "anonymous"
-	// KindHost is a host machine signed in with its host key (docs/spec/24-terminal.md section
-	// 4.1); it has no row in `principals`.
-	KindHost Kind = "host"
-)
+// Kind and its constants are declared in actor.go (M1-18) with the values of 07 section 3; the
+// API strings (`PrincipalKind` in docs/api/openapi.yaml) plus the two kinds without a row in
+// `principals` (anonymous, host). TestKindValues holds the values (docs/DECISIONS.md INT-W4/1).
 
 // Valid reports whether k is one of the defined kinds.
 func (k Kind) Valid() bool {
