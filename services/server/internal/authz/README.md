@@ -43,7 +43,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 ## Storage (M1-27)
 
-Migration `migrations/00004_authz_groups_grants.sql` (M1-27) creates the three tables exactly as 03 section 4.3
+Migration `migrations/00005_authz_groups_grants.sql` (M1-27) creates the three tables exactly as 03 section 4.3
 states, with named constraints (`grants_subject_shape_check`, `grants_bot_limits_check`,
 `grants_host_shape_check` and the others) that the adapter maps to fields.
 

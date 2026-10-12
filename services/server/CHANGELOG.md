@@ -273,7 +273,7 @@ documented in this file. The format is based on
   `unknown_action`) and checks route bindings and registrations at start; `bothy serve` exits with
   code 1 and one line per violation, and the routes are mounted through the same catalogue. The
   Semgrep rule `bothy-go-catalog-id-conversion` forbids converting strings to these identifiers.
-- `authz` grant model storage (M1-27): migration `00004_authz_groups_grants.sql` with the tables
+- `authz` grant model storage (M1-27): migration `00005_authz_groups_grants.sql` with the tables
   `groups`, `group_memberships` and `grants` as `docs/spec/03-datenmodell.md` section 4.3 states
   them, with named checks (bot limits for agents and apps, subject and target shapes, host grants
   with exactly `terminal`) and the trigger `authz_grants_immutable`, which allows only one

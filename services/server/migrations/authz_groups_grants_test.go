@@ -17,8 +17,8 @@ import (
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
-// authzVersion is the version of 00004_authz_groups_grants.sql.
-const authzVersion = 4
+// authzVersion is the version of 00005_authz_groups_grants.sql.
+const authzVersion = 5
 
 // namedConstraints returns "name: definition" of the constraints of table, sorted, without the
 // NOT NULL constraints PostgreSQL 18 records. The name is part of the contract here, because
