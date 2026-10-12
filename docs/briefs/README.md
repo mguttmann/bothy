@@ -4,17 +4,24 @@ This folder holds the build briefs: one English file per ticket, written so that
 build session can finish the ticket with a green `make check` without asking anything. Each brief
 names its goal, the chapters and ADRs to read, the fixed build rules, scope and boundaries, the
 tests to write first, the acceptance criteria and the report format. Order and dependencies come
-from the [plan](../PLAN.md) (milestone M1, "Tickets"); this index repeats them for the launcher.
+from the [plan](../PLAN.md) (section "Tickets" of each milestone); this index repeats them for
+the launcher.
 
-Briefs are written for milestone M1 (plan ticket M0-05). Briefs of a later milestone are written
-when the milestone before it closes, because their tickets build on what that milestone actually
-delivered.
+Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2 and M3. By the owner's
+decision of 2026-10-11 the M2 and M3 briefs were written before M1 closed, so that builds do not
+run out of work (D-W-100 in [DECISIONS.md](../DECISIONS.md)): they name M1 interfaces as the M1
+briefs and the merged code name them, and each carries the boundary that a build session follows
+merged code that differs only in names and stops with `Verdict: BLOCKED` where it behaves
+differently from the specification. Briefs of the milestones after these are written when the
+milestone before them closes. The M3 briefs follow the M2 briefs into this index.
 
 ## How a brief runs
 
 1. The launcher starts a brief only when every ticket in "Depends on" is merged into the base
-   branch and milestone M0 is closed (plan, section "M0 Planning"). A local SonarQube with the
-   "Bothy way" gate must be running from M1-05 on (ticket M0-07).
+   branch and milestone M0 is closed (plan, section "M0 Planning"). A brief of a later milestone
+   does not wait for the milestone before it to close: its "Depends on" names every ticket it
+   builds on (plan P-01). A local SonarQube with the "Bothy way" gate must be running from M1-05
+   on (ticket M0-07).
 2. The launcher fills the placeholders `{{REPORT_PATH}}` and `{{DONE_PATH}}` and passes its host
    rules (ports, machine rules); a brief never contains instance-specific values.
 3. Each brief runs in its own git worktree on the branch `feat/<ticket-id>-<slug>`. Tickets of the
@@ -68,38 +75,49 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 
 | Wave | Tickets that may run in parallel |
 |---|---|
-| 1 | M1-01, M1-02 |
-| 2 | M1-03, M1-04, M1-05 |
+| 1 | M1-01, M1-02, M2-32 |
+| 2 | M1-03, M1-04, M1-05, M2-38 |
 | 3 | M1-06, M1-07, M1-17, M1-74 |
-| 4 | M1-08, M1-09, M1-22 |
+| 4 | M1-08, M1-09, M1-22, M2-23 |
 | 5 | M1-10, M1-12 |
 | 6 | M1-11, M1-13 |
 | 7 | M1-14, M1-15, M1-18, M1-23, M1-26 |
 | 8 | M1-16, M1-19, M1-21, M1-24, M1-25, M1-27 |
-| 9 | M1-20, M1-28 |
+| 9 | M1-20, M1-28, M2-01 |
 | 10 | M1-29, M1-32, M1-33 |
 | 11 | M1-30, M1-31, M1-34 |
 | 12 | M1-35 |
 | 13 | M1-36, M1-44, M1-50 |
-| 14 | M1-37, M1-45, M1-46, M1-48, M1-51 |
-| 15 | M1-38, M1-39, M1-40, M1-41, M1-43, M1-47, M1-49, M1-52 |
-| 16 | M1-42, M1-53 |
-| 17 | M1-54, M1-55 |
-| 18 | M1-56 |
-| 19 | M1-57, M1-58, M1-60 |
+| 14 | M1-37, M1-45, M1-46, M1-48, M1-51, M2-24 |
+| 15 | M1-38, M1-39, M1-40, M1-41, M1-43, M1-47, M1-49, M1-52, M2-39 |
+| 16 | M1-42, M1-53, M2-40 |
+| 17 | M1-54, M1-55, M2-41 |
+| 18 | M1-56, M2-42 |
+| 19 | M1-57, M1-58, M1-60, M2-26 |
 | 20 | M1-59, M1-61 |
 | 21 | M1-62, M1-63 |
 | 22 | M1-64, M1-71 |
 | 23 | M1-65 |
-| 24 | M1-66, M1-70, M1-72 |
-| 25 | M1-67, M1-68 |
-| 26 | M1-69 |
-| 27 | M1-73 |
+| 24 | M1-66, M1-70, M1-72, M2-07 |
+| 25 | M1-67, M1-68, M2-20 |
+| 26 | M1-69, M2-21, M2-43 |
+| 27 | M1-73, M2-02, M2-44 |
+| 28 | M2-03, M2-04, M2-45, M2-47 |
+| 29 | M2-05, M2-46 |
+| 30 | M2-06, M2-27, M2-48 |
+| 31 | M2-08 |
+| 32 | M2-09, M2-16 |
+| 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19 |
+| 34 | M2-11, M2-22, M2-25, M2-29 |
+| 35 | M2-13, M2-28, M2-30, M2-33, M2-34 |
+| 36 | M2-31, M2-35, M2-49 |
+| 37 | M2-36, M2-37, M2-50 |
 
 ## Index
 
 Dependencies are minimal: a ticket implied through another dependency is not repeated. Brief files
-are added by the brief-writing step (plan ticket M0-05) under the names listed here.
+are added by the brief-writing steps (plan ticket M0-05 for M1, D-W-100 for M2 and M3) under the
+names listed here.
 
 | Wave | ID | Title | Brief file | Depends on |
 |---|---|---|---|---|
@@ -177,6 +195,56 @@ are added by the brief-writing step (plan ticket M0-05) under the names listed h
 | 24 | M1-72 | Load tests and performance gate | `M1-72-performance-gate.md` | M1-57, M1-65, M1-71 |
 | 27 | M1-73 | Compose smoke test | `M1-73-compose-smoke.md` | M1-69 |
 | 3 | M1-74 | CodeQL for Go | `M1-74-codeql-go.md` | M1-05 |
+| 9 | M2-01 | Worker consumers of the event log | `M2-01-worker-event-consumers.md` | M1-16 |
+| 27 | M2-02 | Channel behaviour and agent configuration | `M2-02-channel-behavior-config.md` | M1-69 |
+| 28 | M2-03 | Project binding and readiness | `M2-03-project-binding.md` | M2-02 |
+| 28 | M2-04 | Trigger decision as a pure function | `M2-04-trigger-decision.md` | M2-02 |
+| 29 | M2-05 | Runs, state machine and trigger state | `M2-05-runs-state-machine.md` | M2-04 |
+| 30 | M2-06 | Invocation token with EdDSA and JWKS | `M2-06-invocation-token.md` | M2-05 |
+| 24 | M2-07 | Agent consumers over the gateway and REST | `M2-07-agent-consumers.md` | M1-65 |
+| 31 | M2-08 | Delivery with I2, guard rules and a fresh token | `M2-08-invocation-delivery.md` | M2-06, M2-07 |
+| 32 | M2-09 | Starting, finishing and cancelling runs, orphaned runs | `M2-09-run-lifecycle.md` | M2-08 |
+| 33 | M2-10 | Run document, patches and live box | `M2-10-run-document-live-box.md` | M2-09 |
+| 34 | M2-11 | Follow-ups with steer and queue | `M2-11-run-followups.md` | M2-10 |
+| 33 | M2-12 | Agent sessions per thread | `M2-12-agent-sessions.md` | M2-09 |
+| 35 | M2-13 | Run context with origin and trust | `M2-13-run-context.md` | M2-11, M2-12 |
+| 33 | M2-14 | Acting-for binding (SR9) | `M2-14-acting-for.md` | M2-09 |
+| 33 | M2-15 | Components and interactions | `M2-15-components-interactions.md` | M1-57, M1-58, M2-09 |
+| 32 | M2-16 | Slash commands | `M2-16-slash-commands.md` | M2-08 |
+| 33 | M2-17 | Command autocomplete | `M2-17-command-autocomplete.md` | M2-16 |
+| 33 | M2-18 | Auto title and placeholder detection | `M2-18-auto-title.md` | M2-09 |
+| 33 | M2-19 | Agent replies and announcements | `M2-19-agent-messages.md` | M2-09 |
+| 25 | M2-20 | Heartbeat, presence and desired versus actual mode | `M2-20-heartbeat-presence.md` | M2-07 |
+| 26 | M2-21 | Switching and guided flow (I4) | `M2-21-billing-switch-i4.md` | M1-54, M2-20 |
+| 34 | M2-22 | Costs: booking, price table and display | `M2-22-costs.md` | M2-12 |
+| 4 | M2-23 | Generated TypeScript and Python clients as a gate (G4, G5) | `M2-23-generated-clients.md` | M1-17 |
+| 14 | M2-24 | App manifest, installation and scopes | `M2-24-apps-install.md` | M1-44 |
+| 34 | M2-25 | Commands and interactions for apps | `M2-25-app-commands.md` | M2-15, M2-17, M2-26 |
+| 19 | M2-26 | Outgoing webhooks after Standard Webhooks | `M2-26-webhooks-outgoing.md` | M1-56, M2-01, M2-24 |
+| 30 | M2-27 | Incoming webhooks native and alertmanager | `M2-27-webhooks-incoming.md` | M2-05, M2-24 |
+| 35 | M2-28 | Cost reconciliation as its own app | `M2-28-cost-reconciliation.md` | M2-22, M2-24 |
+| 34 | M2-29 | Python SDK with hand layer and FakeServer (ADR 0026) | `M2-29-python-sdk.md` | M2-10, M2-14, M2-23 |
+| 35 | M2-30 | TypeScript SDK with webhook verifier | `M2-30-typescript-sdk.md` | M2-26, M2-29 |
+| 36 | M2-31 | Conformance suite with the Fake-Agent | `M2-31-agent-conformance-suite.md` | M2-13, M2-15, M2-17, M2-18, M2-19, M2-20, M2-27, M2-29 |
+| 1 | M2-32 | Recording Hermes Agent before the build | `M2-32-hermes-recording.md` | none |
+| 35 | M2-33 | Reference adapter for Hermes Agent (L7, L8) | `M2-33-hermes-adapter.md` | M2-12, M2-29, M2-32 |
+| 35 | M2-34 | Claude Code runner core | `M2-34-claude-code-runner-core.md` | M2-03, M2-12, M2-29 |
+| 36 | M2-35 | Claude Code runner: follow-ups, stop and error paths | `M2-35-claude-code-runner-paths.md` | M2-34 |
+| 37 | M2-36 | Performance targets of the agent path | `M2-36-agent-path-perf.md` | M1-72, M2-31 |
+| 37 | M2-37 | Guide "connect your own agent" with a check run | `M2-37-agent-guide.md` | M2-22, M2-30, M2-31 |
+| 2 | M2-38 | Host service module and Noise core in Go and Dart | `M2-38-noise-core.md` | M1-01 |
+| 15 | M2-39 | Host records and the target `host` | `M2-39-terminal-hosts.md` | M1-48 |
+| 16 | M2-40 | Terminal rights, SR10, I6, SR12 and fresh step-up | `M2-40-terminal-authz.md` | M1-49, M2-39 |
+| 17 | M2-41 | Host pairing and fingerprint | `M2-41-host-pairing.md` | M2-40 |
+| 18 | M2-42 | bothy-host: installation, state, doctor and pair | `M2-42-host-install-doctor.md` | M2-38, M2-41 |
+| 26 | M2-43 | Control connection between host service and server | `M2-43-host-control.md` | M1-67, M2-42 |
+| 27 | M2-44 | Terminal sessions, session token and relay | `M2-44-terminal-sessions-relay.md` | M2-43 |
+| 28 | M2-45 | bothy-host: sessions, PTY and profiles | `M2-45-host-pty-profiles.md` | M2-44 |
+| 29 | M2-46 | Terminal revocation, limits, audit and metrics | `M2-46-terminal-revocation-limits.md` | M1-30, M1-69, M2-45 |
+| 28 | M2-47 | Terminal relay across several nodes (T6) | `M2-47-terminal-multi-node.md` | M2-44 |
+| 30 | M2-48 | Conformance and chaos suite of the terminal | `M2-48-terminal-conformance.md` | M1-72, M1-73, M2-24, M2-46, M2-47 |
+| 36 | M2-49 | Reference app for code hosting (GitHub) | `M2-49-github-app.md` | M2-25, M2-30 |
+| 37 | M2-50 | Reference app for ticket systems (Jira) | `M2-50-jira-app.md` | M2-49 |
 
 ## Make targets created by tickets
 
@@ -290,6 +358,56 @@ flowchart TB
   M1_72["M1-72"]
   M1_73["M1-73"]
   M1_74["M1-74"]
+  M2_01["M2-01"]
+  M2_02["M2-02"]
+  M2_03["M2-03"]
+  M2_04["M2-04"]
+  M2_05["M2-05"]
+  M2_06["M2-06"]
+  M2_07["M2-07"]
+  M2_08["M2-08"]
+  M2_09["M2-09"]
+  M2_10["M2-10"]
+  M2_11["M2-11"]
+  M2_12["M2-12"]
+  M2_13["M2-13"]
+  M2_14["M2-14"]
+  M2_15["M2-15"]
+  M2_16["M2-16"]
+  M2_17["M2-17"]
+  M2_18["M2-18"]
+  M2_19["M2-19"]
+  M2_20["M2-20"]
+  M2_21["M2-21"]
+  M2_22["M2-22"]
+  M2_23["M2-23"]
+  M2_24["M2-24"]
+  M2_25["M2-25"]
+  M2_26["M2-26"]
+  M2_27["M2-27"]
+  M2_28["M2-28"]
+  M2_29["M2-29"]
+  M2_30["M2-30"]
+  M2_31["M2-31"]
+  M2_32["M2-32"]
+  M2_33["M2-33"]
+  M2_34["M2-34"]
+  M2_35["M2-35"]
+  M2_36["M2-36"]
+  M2_37["M2-37"]
+  M2_38["M2-38"]
+  M2_39["M2-39"]
+  M2_40["M2-40"]
+  M2_41["M2-41"]
+  M2_42["M2-42"]
+  M2_43["M2-43"]
+  M2_44["M2-44"]
+  M2_45["M2-45"]
+  M2_46["M2-46"]
+  M2_47["M2-47"]
+  M2_48["M2-48"]
+  M2_49["M2-49"]
+  M2_50["M2-50"]
   M1_02 --> M1_03
   M1_01 --> M1_04
   M1_01 --> M1_05
@@ -406,4 +524,91 @@ flowchart TB
   M1_71 --> M1_72
   M1_69 --> M1_73
   M1_05 --> M1_74
+  M1_16 --> M2_01
+  M1_69 --> M2_02
+  M2_02 --> M2_03
+  M2_02 --> M2_04
+  M2_04 --> M2_05
+  M2_05 --> M2_06
+  M1_65 --> M2_07
+  M2_06 --> M2_08
+  M2_07 --> M2_08
+  M2_08 --> M2_09
+  M2_09 --> M2_10
+  M2_10 --> M2_11
+  M2_09 --> M2_12
+  M2_11 --> M2_13
+  M2_12 --> M2_13
+  M2_09 --> M2_14
+  M1_57 --> M2_15
+  M1_58 --> M2_15
+  M2_09 --> M2_15
+  M2_08 --> M2_16
+  M2_16 --> M2_17
+  M2_09 --> M2_18
+  M2_09 --> M2_19
+  M2_07 --> M2_20
+  M1_54 --> M2_21
+  M2_20 --> M2_21
+  M2_12 --> M2_22
+  M1_17 --> M2_23
+  M1_44 --> M2_24
+  M2_15 --> M2_25
+  M2_17 --> M2_25
+  M2_26 --> M2_25
+  M1_56 --> M2_26
+  M2_01 --> M2_26
+  M2_24 --> M2_26
+  M2_05 --> M2_27
+  M2_24 --> M2_27
+  M2_22 --> M2_28
+  M2_24 --> M2_28
+  M2_10 --> M2_29
+  M2_14 --> M2_29
+  M2_23 --> M2_29
+  M2_26 --> M2_30
+  M2_29 --> M2_30
+  M2_13 --> M2_31
+  M2_15 --> M2_31
+  M2_17 --> M2_31
+  M2_18 --> M2_31
+  M2_19 --> M2_31
+  M2_20 --> M2_31
+  M2_27 --> M2_31
+  M2_29 --> M2_31
+  M2_12 --> M2_33
+  M2_29 --> M2_33
+  M2_32 --> M2_33
+  M2_03 --> M2_34
+  M2_12 --> M2_34
+  M2_29 --> M2_34
+  M2_34 --> M2_35
+  M1_72 --> M2_36
+  M2_31 --> M2_36
+  M2_22 --> M2_37
+  M2_30 --> M2_37
+  M2_31 --> M2_37
+  M1_01 --> M2_38
+  M1_48 --> M2_39
+  M1_49 --> M2_40
+  M2_39 --> M2_40
+  M2_40 --> M2_41
+  M2_38 --> M2_42
+  M2_41 --> M2_42
+  M1_67 --> M2_43
+  M2_42 --> M2_43
+  M2_43 --> M2_44
+  M2_44 --> M2_45
+  M1_30 --> M2_46
+  M1_69 --> M2_46
+  M2_45 --> M2_46
+  M2_44 --> M2_47
+  M1_72 --> M2_48
+  M1_73 --> M2_48
+  M2_24 --> M2_48
+  M2_46 --> M2_48
+  M2_47 --> M2_48
+  M2_25 --> M2_49
+  M2_30 --> M2_49
+  M2_49 --> M2_50
 ```

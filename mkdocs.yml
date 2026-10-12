@@ -266,3 +266,54 @@ nav:
           - "M1-72: Load tests and performance gate of the server core (ADR 0063)": briefs/M1-72-performance-gate.md
           - "M1-73: Compose smoke test": briefs/M1-73-compose-smoke.md
           - "M1-74: CodeQL for Go": briefs/M1-74-codeql-go.md
+      - Milestone M2:
+          - "M2-01: Worker consumers of the event log": briefs/M2-01-worker-event-consumers.md
+          - "M2-02: Channel behaviour and agent configuration": briefs/M2-02-channel-behavior-config.md
+          - "M2-03: Project binding and readiness": briefs/M2-03-project-binding.md
+          - "M2-04: Trigger decision as a pure function": briefs/M2-04-trigger-decision.md
+          - "M2-05: Runs, state machine and trigger state": briefs/M2-05-runs-state-machine.md
+          - "M2-06: Invocation token with EdDSA and JWKS": briefs/M2-06-invocation-token.md
+          - "M2-07: Agent consumers over the gateway and REST": briefs/M2-07-agent-consumers.md
+          - "M2-08: Delivery with I2, guard rules and a fresh token": briefs/M2-08-invocation-delivery.md
+          - "M2-09: Starting, finishing and cancelling runs, orphaned runs": briefs/M2-09-run-lifecycle.md
+          - "M2-10: Run document, patches and live box": briefs/M2-10-run-document-live-box.md
+          - "M2-11: Follow-ups with steer and queue": briefs/M2-11-run-followups.md
+          - "M2-12: Agent sessions per thread": briefs/M2-12-agent-sessions.md
+          - "M2-13: Run context with origin and trust": briefs/M2-13-run-context.md
+          - "M2-14: Acting-for binding (SR9)": briefs/M2-14-acting-for.md
+          - "M2-15: Components and interactions": briefs/M2-15-components-interactions.md
+          - "M2-16: Slash commands": briefs/M2-16-slash-commands.md
+          - "M2-17: Command autocomplete": briefs/M2-17-command-autocomplete.md
+          - "M2-18: Auto title and placeholder detection": briefs/M2-18-auto-title.md
+          - "M2-19: Agent replies and announcements": briefs/M2-19-agent-messages.md
+          - "M2-20: Heartbeat, presence and desired versus actual mode": briefs/M2-20-heartbeat-presence.md
+          - "M2-21: Switching and guided flow (I4)": briefs/M2-21-billing-switch-i4.md
+          - "M2-22: Costs: booking, price table and display": briefs/M2-22-costs.md
+          - "M2-23: Generated TypeScript and Python clients as a gate (G4, G5)": briefs/M2-23-generated-clients.md
+          - "M2-24: App manifest, installation and scopes": briefs/M2-24-apps-install.md
+          - "M2-25: Commands and interactions for apps": briefs/M2-25-app-commands.md
+          - "M2-26: Outgoing webhooks after Standard Webhooks": briefs/M2-26-webhooks-outgoing.md
+          - "M2-27: Incoming webhooks native and alertmanager": briefs/M2-27-webhooks-incoming.md
+          - "M2-28: Cost reconciliation as its own app": briefs/M2-28-cost-reconciliation.md
+          - "M2-29: Python SDK with hand layer and FakeServer (ADR 0026)": briefs/M2-29-python-sdk.md
+          - "M2-30: TypeScript SDK with webhook verifier": briefs/M2-30-typescript-sdk.md
+          - "M2-31: Conformance suite with the Fake-Agent": briefs/M2-31-agent-conformance-suite.md
+          - "M2-32: Recording Hermes Agent before the build": briefs/M2-32-hermes-recording.md
+          - "M2-33: Reference adapter for Hermes Agent (L7, L8)": briefs/M2-33-hermes-adapter.md
+          - "M2-34: Claude Code runner core": briefs/M2-34-claude-code-runner-core.md
+          - "M2-35: Claude Code runner: follow-ups, stop and error paths": briefs/M2-35-claude-code-runner-paths.md
+          - "M2-36: Performance targets of the agent path": briefs/M2-36-agent-path-perf.md
+          - 'M2-37: Guide "connect your own agent" with a check run': briefs/M2-37-agent-guide.md
+          - "M2-38: Host service module and Noise core in Go and Dart": briefs/M2-38-noise-core.md
+          - "M2-39: Host records and the target `host`": briefs/M2-39-terminal-hosts.md
+          - "M2-40: Terminal rights, SR10, I6, SR12 and fresh step-up": briefs/M2-40-terminal-authz.md
+          - "M2-41: Host pairing and fingerprint": briefs/M2-41-host-pairing.md
+          - "M2-42: bothy-host: installation, state, doctor and pair": briefs/M2-42-host-install-doctor.md
+          - "M2-43: Control connection between host service and server": briefs/M2-43-host-control.md
+          - "M2-44: Terminal sessions, session token and relay": briefs/M2-44-terminal-sessions-relay.md
+          - "M2-45: bothy-host: sessions, PTY and profiles": briefs/M2-45-host-pty-profiles.md
+          - "M2-46: Terminal revocation, limits, audit and metrics": briefs/M2-46-terminal-revocation-limits.md
+          - "M2-47: Terminal relay across several nodes (T6)": briefs/M2-47-terminal-multi-node.md
+          - "M2-48: Conformance and chaos suite of the terminal": briefs/M2-48-terminal-conformance.md
+          - "M2-49: Reference app for code hosting (GitHub)": briefs/M2-49-github-app.md
+          - "M2-50: Reference app for ticket systems (Jira)": briefs/M2-50-jira-app.md
