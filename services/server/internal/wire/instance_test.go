@@ -29,7 +29,7 @@ func setMinServer(t *testing.T, db *pgtest.DB, v string) {
 // names both versions, /healthz stays 200 (02 "Start" step 5, 16 "Upgrade" item 4).
 func TestStart_MinServerVersionAboveOwn_NotReady(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	setMinServer(t, db, "1.0.1")
 	for _, role := range []wire.Role{wire.RoleAPI, wire.RoleWorker, wire.RoleAll} {
 		t.Run(string(role), func(t *testing.T) {
@@ -64,7 +64,7 @@ func TestStart_MinServerVersionAboveOwn_NotReady(t *testing.T) {
 func TestStart_MinServerVersionEqualOrMissing_Ready(t *testing.T) {
 	t.Parallel()
 	for _, minimum := range []any{"1.0.0", nil} {
-		db := pgtest.New(t)
+		db := newServeDB(t)
 		if _, err := db.SuperConn(t).Exec(context.Background(), "UPDATE instance SET min_server_version = $1", minimum); err != nil {
 			t.Fatal(err)
 		}
@@ -77,7 +77,7 @@ func TestStart_MinServerVersionEqualOrMissing_Ready(t *testing.T) {
 // exit code 1 and the hint to run bothy migrate up.
 func TestStart_InstanceRowMissing_AbortsWithHint(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	if _, err := db.SuperConn(t).Exec(context.Background(), "DELETE FROM instance"); err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestStart_InstanceRowMissing_AbortsWithHint(t *testing.T) {
 // tickets read from it (02 "Start" step 5).
 func TestStart_SetupStateLogged(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	p := start(t, wire.RoleAll, serveEnv(t, db), wire.Deps{})
 	waitReadyz(t, p.waitInternal(t), http.StatusOK)
 	if !strings.Contains(p.logs.String(), `"msg":"instance loaded, setup pending"`) {

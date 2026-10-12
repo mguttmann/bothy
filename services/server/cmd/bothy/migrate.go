@@ -70,7 +70,7 @@ type migrateEnv struct {
 	env    []string
 	schema func() (*config.Schema, error)
 	fsys   fs.FS
-	steps  func(pool *pg.Pool, schema string, result *jobs.MigrateResult) pg.MigratorOptions
+	steps  func(pool *pg.Pool, fsys fs.FS, schema string, result *jobs.MigrateResult) (pg.MigratorOptions, error)
 	stdout io.Writer
 	stderr io.Writer
 }
@@ -243,7 +243,12 @@ func (r *migrateRun) migrator(ctx context.Context, river *jobs.MigrateResult) (*
 		_ = db.Close()
 		pool.Close()
 	}
-	m, err := pg.NewMigrator(db, r.e.fsys, r.e.steps(pool, r.schema, river))
+	steps, err := r.e.steps(pool, r.e.fsys, r.schema, river)
+	if err != nil {
+		closeAll()
+		return nil, nil, nil, err
+	}
+	m, err := pg.NewMigrator(db, r.e.fsys, steps)
 	if err != nil {
 		closeAll()
 		return nil, nil, nil, err
@@ -346,7 +351,7 @@ func (r *migrateRun) status(ctx context.Context) int {
 // migrations and the steps of internal/wire.
 func defaultMigrateEnv(env []string, stdout, stderr io.Writer) migrateEnv {
 	return migrateEnv{
-		env: env, schema: wire.ConfigSchema, fsys: migrations.FS, steps: wire.MigrationSteps,
+		env: env, schema: wire.ConfigSchema, fsys: migrations.FS, steps: wire.MigrateUpSteps,
 		stdout: stdout, stderr: stderr,
 	}
 }

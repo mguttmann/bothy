@@ -165,3 +165,17 @@ func TestMigrationSteps(t *testing.T) {
 		t.Fatalf("a step of an older set changed the row: schema %d, min %q", v, minServer)
 	}
 }
+
+// TestMigrateUpSteps: bothy migrate up runs River's migrations before goose (M1-14, upgrade.md
+// rule M11) and the instance step after them (M1-15). MigrationSteps, which pgtest.WithSteps
+// uses for the templates, keeps only the instance step (docs/DECISIONS.md INT-W5/3).
+func TestMigrateUpSteps(t *testing.T) {
+	t.Parallel()
+	opts, err := wire.MigrateUpSteps(nil, migrations.FS, "jobs", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(opts.Before) != 1 || opts.Before[0].Name() != "river" || len(opts.After) != 1 || opts.After[0].Name() != "instance" {
+		t.Errorf("MigrateUpSteps = %+v, want river before and instance after the migrations", opts)
+	}
+}

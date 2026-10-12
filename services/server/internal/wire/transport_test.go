@@ -109,7 +109,7 @@ func (p *process) waitPublic(t *testing.T) int {
 // listeners send HSTS with http.hsts_max_age because server.public_url uses https.
 func TestServeTLSPublicListener(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	env := serveEnv(t, db, "BOTHY_SERVER__PUBLIC_URL=https://127.0.0.1:8443", "BOTHY_HTTP__HSTS_MAX_AGE=600s",
 		"BOTHY_SERVER__TLS_CERT_REF=file:<secrets.dir>/tls_cert", "BOTHY_SERVER__TLS_KEY_REF=file:<secrets.dir>/tls_key")
 	pool := writeTLSPair(t, envValue(env, "BOTHY_SECRETS__DIR"))
@@ -191,7 +191,7 @@ func TestServeTLSBadMaterialFailsBeforeTheWait(t *testing.T) {
 // the TLS references: a worker shares the configuration of the api container.
 func TestServeWorkerIgnoresTLS(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	env := serveEnv(t, db, "BOTHY_SERVER__PUBLIC_URL=https://127.0.0.1:8443",
 		"BOTHY_SERVER__TLS_CERT_REF=file:<secrets.dir>/missing_cert", "BOTHY_SERVER__TLS_KEY_REF=file:<secrets.dir>/missing_key")
 	p := start(t, wire.RoleWorker, env, wire.Deps{})

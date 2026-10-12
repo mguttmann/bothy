@@ -106,8 +106,14 @@ func TestMigrate_RiverInOwnSchema(t *testing.T) {
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	env := migrateEnvFor(db, pg.RoleOwner, "BOTHY_JOBS__SCHEMA=jobs_it")
 	river := riverVersion(t)
+	_, list := embeddedMigrations(t)
+	highest := list[len(list)-1].version
 	code, stdout, stderr := runBothy(t, env, "migrate", "up")
-	want := fmt.Sprintf("river schema jobs_it version %d, applied %d\napplied 1 base_privileges\ndatabase version 1, applied 1\n", river, river)
+	want := fmt.Sprintf("river schema jobs_it version %d, applied %d\n", river, river)
+	for _, m := range list {
+		want += fmt.Sprintf("applied %d %s\n", m.version, m.slug)
+	}
+	want += fmt.Sprintf("database version %d, applied %d\n", highest, len(list))
 	if code != 0 || stdout != want {
 		t.Fatalf("first up: exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}
@@ -143,7 +149,7 @@ func TestMigrate_RiverInOwnSchema(t *testing.T) {
 		t.Fatalf("bothy_app reads river_job: %v", err)
 	}
 	code, stdout, stderr = runBothy(t, env, "migrate", "up")
-	if want := fmt.Sprintf("river schema jobs_it version %d, applied 0\ndatabase version 1, applied 0\n", river); code != 0 || stdout != want {
+	if want := fmt.Sprintf("river schema jobs_it version %d, applied 0\ndatabase version %d, applied 0\n", river, highest); code != 0 || stdout != want {
 		t.Fatalf("second up: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
 	}
 	code, stdout, stderr = runBothy(t, env, "migrate", "status")

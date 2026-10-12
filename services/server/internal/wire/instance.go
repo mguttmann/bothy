@@ -21,8 +21,8 @@ import (
 
 // MigrationSteps returns the steps bothy migrate up runs around the goose migrations of fsys on
 // the database behind pool (a pool of the schema owner with the session settings of migrate):
-// after them the instance step (M1-15); River's migrations before them come with M1-14, which
-// adds its step here. cmd/bothy and pgtest.WithSteps call it.
+// after them the instance step (M1-15). MigrateUpSteps puts River's step (M1-14) before them for
+// cmd/bothy; pgtest.WithSteps calls this function directly.
 //
 // The instance step runs in one unit of work on pool: it reads the goose version and, when it
 // equals the newest migration of fsys, records it and migrations.MinServerVersion through
