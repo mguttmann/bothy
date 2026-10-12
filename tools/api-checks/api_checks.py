@@ -1340,7 +1340,7 @@ def _deprecation_marks(document: object) -> Iterator[tuple[str, Mapping[str, Any
             if not names and ("deprecated" in node or any(key in node for key in DEPRECATION_KEYS)):
                 yield pointer, node
             children = [
-                (value, f"{pointer}/{_escape(key)}", key in _NAME_MAPS)
+                (value, f"{pointer}/{_escape(key)}", not names and key in _NAME_MAPS)
                 for key, value in node.items()
                 if names or key not in _EXAMPLE_KEYS
             ]

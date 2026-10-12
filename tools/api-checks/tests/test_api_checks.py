@@ -780,6 +780,22 @@ def test_example_data_is_not_a_deprecation(tmp_path: Path) -> None:
     ]
 
 
+def test_property_named_like_a_name_map_is_a_schema(tmp_path: Path) -> None:
+    root = _copy_inputs(tmp_path)
+
+    def change(d: dict[str, Any]) -> None:
+        properties = d["components"]["schemas"]["Problem"]["properties"]
+        # A property named `properties` is a schema inside a name map, not a name map itself.
+        properties["properties"] = {"type": "object", "deprecated": True}
+
+    _mutate(root, OPENAPI, change)
+    assert _sync(root, "deprecation") == [
+        f"{SYNC_RULE}: deprecation: docs/api/openapi.yaml#/components/schemas/Problem/properties/"
+        f"properties: deprecated: true without {key}"
+        for key in ("x-deprecated-since", "x-deprecated-at", "x-sunset")
+    ]
+
+
 CONFIG_ROW = (
     "| `api.deprecation_min_notice` | `BOTHY_API__DEPRECATION_MIN_NOTICE` | Server | `180d` | "
     "minimum gap from `Deprecation` to `Sunset` |\n"

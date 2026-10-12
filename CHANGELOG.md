@@ -119,9 +119,10 @@ operated, and the order of the build.
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
   `file_blocked` in the order of the codes; `createHost` and `issueHostPairingCode` take
   `Idempotency-Key` and list `422 idempotency_key_reuse` instead of the exemption `auth_flow`,
-  as 06 section 7 asks for a POST that returns a one-time secret (`openTerminalSession` and
-  `createExtensionSession` keep `auth_flow`); by 06 section 13 this changes the idempotency
-  rule of two operations, a breaking change made while the API is still `0.x`.
+  as 06 section 7 asks for a POST that returns a one-time secret (the host and terminal
+  operations `pairHost`, `openTerminalSession` and `attachTerminalSession` keep `auth_flow`,
+  ruling M1-03/6); by 06 section 13 this changes the idempotency rule of two operations, a
+  breaking change made while the API is still `0.x`.
 - `docs/api/asyncapi.yaml` 0.1.1: `dispatch` lists the event types in the order of the
   catalogue; the event table of chapter 06, generated from it, now follows that order too.
 - Chapter 06, section 7: the table of operations without `Idempotency-Key` lists the host
