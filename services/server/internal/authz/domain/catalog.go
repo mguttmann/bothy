@@ -42,14 +42,14 @@ const channelOpSeparator = "/"
 type ActionSpec struct {
 	// ID is the action id, for example message.read.
 	ID string
-	// Resources are the resource kinds of the column "Ressource"; empty for an action whose
+	// Resources are the resource kinds of the column "Resource"; empty for an action whose
 	// resource is that of its target action (access.preview).
 	Resources []string
 	// Right is the column "Permission" verbatim (05 text); M1-28 interprets it.
 	Right string
 	// Owner is true when only owners may run the action (column "Owner" yes).
 	Owner bool
-	// OwnerAsTarget is true when the column "Owner" says "wie Zielaktion": the owner rule of the
+	// OwnerAsTarget is true when the column "Owner" says "as target action": the owner rule of the
 	// target action applies (access.preview).
 	OwnerAsTarget bool
 	// StepUp is true for "yes", "conditional" and "fresh" (05 2.4). Until the ticket that supplies
@@ -82,7 +82,7 @@ type EventSpec struct {
 	Type string
 	// Durable is true for durable, false for ephemeral types.
 	Durable bool
-	// Resource is the column "Ressource" verbatim.
+	// Resource is the column "Resource" verbatim.
 	Resource string
 	// Resources are the resource kinds named in Resource.
 	Resources []string

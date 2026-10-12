@@ -12,7 +12,7 @@ actions:
   description: x
   resource: message
   right: read
-  owner: vielleicht
+  owner: maybe
   step_up: false
   audit: never
   rights_change: false

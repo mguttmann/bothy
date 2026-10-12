@@ -154,7 +154,7 @@ func AllOps() []Op {
 	return slices.Clone(opList)
 }
 
-// ResourceKind is a resource kind named in the column "Ressource" of the catalogue (05 section 2.2).
+// ResourceKind is a resource kind named in the column "Resource" of the catalogue (05 section 2.2).
 // Obtain values only from the constants below or from ParseResourceKind (Semgrep rule
 // bothy-go-catalog-id-conversion).
 type ResourceKind string

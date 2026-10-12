@@ -181,7 +181,7 @@ func TestParse_Failures(t *testing.T) {
 		{"duplicate-action.yaml", []string{"actions[1] (message.read)", "id", "duplicate"}},
 		{"identifier-collision.yaml", []string{"a_b.c", "id", "ActionABC", "a.b_c"}},
 		{"unknown-key.yaml", []string{"actions[0] (message.read)", "colour", "unknown key"}},
-		{"owner-value.yaml", []string{"actions[0] (message.read)", "owner", "vielleicht"}},
+		{"owner-value.yaml", []string{"actions[0] (message.read)", "owner", "maybe"}},
 		{"unknown-class.yaml", []string{"actions[0] (message.read)", "rl_class", "rl.fast"}},
 		{"resource-text.yaml", []string{"actions[0] (message.read)", "resource", "thread or channel"}},
 		{"resource-note-then-text.yaml", []string{"actions[0] (message.read)", "resource", "terminal_session (a) or channel (b)"}},

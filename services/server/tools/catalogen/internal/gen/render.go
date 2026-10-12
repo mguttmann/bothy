@@ -79,7 +79,7 @@ func RenderIDs(c *Catalog) ([]byte, error) {
 			doc: "Op is the name of a WebSocket op of the gateway (05 section 7, first table).",
 			ids: ops, idents: idents(typeOp, ops)},
 		{typeName: typeResourceKind, prefix: prefixRes, what: "resource kind", plural: "resource kinds", parseName: "ParseResourceKind", allName: "AllResourceKinds",
-			doc: "ResourceKind is a resource kind named in the column \"Ressource\" of the catalogue (05 section 2.2).",
+			doc: "ResourceKind is a resource kind named in the column \"Resource\" of the catalogue (05 section 2.2).",
 			ids: kinds, idents: idents(prefixRes, kinds)},
 		{typeName: typeChannelOp, prefix: typeChannelOp, what: "terminal channel op", plural: "terminal channel ops", parseName: "ParseChannelOp", allName: "AllChannelOps",
 			doc: "ChannelOp is an op of a terminal channel (05 section 7, second table) written as <channel>/<op>; it is\n// never a gateway op, even where the op name is the same.",

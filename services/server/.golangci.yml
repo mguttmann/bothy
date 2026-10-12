@@ -106,6 +106,7 @@ linters:
       # like the analysis checks it (docs/DECISIONS.md M1-17/15 and M1-17/31).
       - path: (\.gen|_gen|\.pb)\.go$|(^|/)(sqlcgen|generated)/
         linters: [gocognit, goconst]
+      # Action ids such as auth.token.refresh look like credentials to G101: gosec skips the
       # ids of the generated identifier file (M1-25, docs/DECISIONS.md M1-25/7).
       - path: ^internal/kernel/authorize/catalog_ids_gen\.go$
         linters: [gosec]
