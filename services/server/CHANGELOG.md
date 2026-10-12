@@ -311,9 +311,26 @@ documented in this file. The format is based on
   `NewMembership`, validity at a time `t` (`expires_at = t` is already invalid), `NextExpiry` and
   the delegation rules `CheckCreate` and `CheckRevoke` (R-AZ-05); `internal/authz/app` declares the
   store port and `internal/authz/adapters/postgres` implements it with sqlc.
+- `internal/platform/ratelimit` (M1-19): token buckets per rate-limit class and key of
+  `docs/spec/05-actions.md` in sharded maps with a hard cap (`ratelimit.max_tracked_keys`) and a
+  sweeper (`ratelimit.sweep_interval`); keys by client IP (IPv6 by /64), principal, agent, host,
+  device or token, connection and incoming webhook, with the client IP for anonymous requests;
+  `RateLimit-Policy` and `RateLimit` on every response of a limited operation and
+  `429 rate_limited` with `Retry-After` in `StageRateLimit`, before `authorize`; requests with
+  credentials reserve a token of `rl.public_auth` of the client IP before they are verified, keep
+  it only when the credentials fail with `401` (other than `token_expired` and `use_dpop_nonce`),
+  and get `429` while the bucket is empty; a `webhook_id` that is not an ID is `404` before a
+  bucket exists; counter `bothy.ratelimit.rejected`.
+- Configuration keys `ratelimit.<class>.per_minute` and `ratelimit.<class>.burst` for every class
+  of 05, `ratelimit.max_tracked_keys` and `ratelimit.sweep_interval`; `bothy serve` (roles api and
+  all) refuses to start when an enabled REST operation carries a gateway class or a class without
+  limits.
 
 ### Changed
 
+- `httpserver.Operation` carries `RateLimitClass`; `Chain.SetCredentialsPrecheck` runs before the
+  `Authenticator` for requests with credentials; `httpservertest.Options.Setup` installs stages
+  and hooks before the routes are mounted.
 - `wire.MigrationSteps` takes the migrate pool and the migration set, returns an error and gives
   only the after-step `instance`; River's step before goose moved to the new
   `wire.MigrateUpSteps`, which `bothy migrate up` calls.

@@ -461,6 +461,20 @@ all texts of the YAML files (R-API-15); every response component names its statu
    and the connection stays open (04, 6.2 and 6.4).
 4. If the headers change when the draft becomes an RFC, the server also sends the new names
    for `api.deprecation_min_notice` (section 13).
+5. Rounding (M1-19): `r` is the number of whole tokens left after the decision, rounded down;
+   `t` is the seconds until the bucket is full, rounded up, and `0` for a full bucket;
+   `Retry-After` is the seconds until one token is there, rounded up and at least `1`. A client
+   that waits as told always finds what the headers promised. The headers go on every response of
+   a limited operation once the rate-limit stage has decided, successes and errors alike; a
+   request the stage cannot key (for example a `webhook_id` that is not an ID) gets its error
+   without them.
+6. Anonymous requests (M1-19): a class keyed by principal, agent or host counts an anonymous
+   request by its client IP (IPv6 by the /64 prefix, as `rl.public_auth`), so unauthenticated
+   calls never share one bucket and never use the bucket of a principal. `rl.webhook_in` counts
+   by the path value `webhook_id`; a value that is not an ID gets `404 not_found` before a bucket
+   exists.
+7. Per node (R-AR-12, 02 "Scaling path"): the buckets live in the process. With n api nodes
+   the effective limit is up to n times the configured value.
 
 ## 10. Files
 

@@ -63,7 +63,8 @@ func RouteOptions() routes.Options {
 func HTTPOperation(op routes.Operation) httpserver.Operation {
 	return httpserver.Operation{
 		ID: op.ID, Method: op.Method, Path: op.Path, Pattern: op.Pattern, Action: op.Action,
-		Public: op.Public, IdempotencyKey: op.IdempotencyKey,
+		RateLimitClass: op.RateLimitClass,
+		Public:         op.Public, IdempotencyKey: op.IdempotencyKey,
 		IfMatch:      httpserver.IfMatchMode(op.IfMatch),
 		RequestBody:  httpserver.BodyKind(op.RequestBody),
 		BodyRequired: op.BodyRequired,

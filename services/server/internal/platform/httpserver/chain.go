@@ -37,14 +37,15 @@ const metricAuthzErrors = "bothy.authz.errors"
 // part and always present; step 15 is the generated wrapper with the handler.
 type Stage int
 
-// The per-route stages in the order of 02 "Chain in the api node". This ticket fills every stage
-// except the three slots StageRateLimit (M1-19), StageMaintenance (M7-08) and StageIdempotency
-// (M1-20), which pass through until their ticket calls Chain.Use.
+// The per-route stages in the order of 02 "Chain in the api node". M1-18 fills every stage except
+// the three slots StageRateLimit (platform/ratelimit, installed by internal/wire, M1-19),
+// StageMaintenance (M7-08) and StageIdempotency (M1-20), which pass through until their ticket
+// calls Chain.Use.
 const (
 	StageRoute         Stage = iota + 5 // operation into the context, body limit, deadline, response writer
 	StageCORS                           // SEC-CORS-1 and SEC-CORS-2
 	StageAuthenticate                   // actor.Authenticator; anonymous without credentials
-	StageRateLimit                      // slot of M1-19
+	StageRateLimit                      // platform/ratelimit (M1-19)
 	StageMaintenance                    // slot of M7-08 (05 rule 9)
 	StageIdempotency                    // slot of M1-20
 	StageBody                           // media type and JSON guard (SEC-IN-2, SEC-IN-3)
@@ -114,6 +115,7 @@ type Chain struct {
 	stages      map[Stage]func(http.Handler) http.Handler
 	sealed      bool
 	failedCreds func(r *http.Request, err error) error
+	precheck    func(r *http.Request) (settle func(authErr error), err error)
 
 	// trace, when set by a test of this package, is called with the name of every stage a
 	// request enters; TestChainOrder_Golden reads the order from it.
@@ -203,6 +205,26 @@ func (c *Chain) SetFailedCredentialsHook(fn func(r *http.Request, err error) err
 		panic("httpserver: SetFailedCredentialsHook: set twice, nil or after routes were mounted")
 	}
 	c.failedCreds = fn
+}
+
+// SetCredentialsPrecheck installs fn, which StageAuthenticate calls before the Authenticator for
+// every request that presents credentials (an Authorization header). A non-nil error is the
+// answer and the credentials are never verified: M1-19 answers 429 rate_limited while
+// rl.public_auth of the client IP is empty (02 "Chain in the api node", rule on failed
+// credentials), so a client that keeps failing cannot make the server verify more proofs. When fn
+// passes, the stage calls its settle function (if not nil) exactly once with the result of the
+// Authenticator, nil on success and before the failed-credentials hook (an internal_error when the
+// Authenticator panicked); M1-19 reserves a token in fn and keeps it in settle only for a failure
+// that counts against rl.public_auth, so concurrent requests cannot all pass the precheck on the
+// same token. Requests without credentials skip it. It panics when
+// called twice, with nil or after the first Wrap.
+func (c *Chain) SetCredentialsPrecheck(fn func(r *http.Request) (settle func(authErr error), err error)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.precheck != nil || c.sealed || fn == nil {
+		panic("httpserver: SetCredentialsPrecheck: set twice, nil or after routes were mounted")
+	}
+	c.precheck = fn
 }
 
 // Order returns the names of every step in the order a request runs through them: the four
