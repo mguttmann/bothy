@@ -497,13 +497,16 @@ Rules: modules appear in the order of the levels from 4.4; `tables`, `actions`, 
 `ephemeral_events`, `ws_ops` and `depends_on` follow tables 4.2, 4.6, 4.7 and 4.4. The
 generator rejects unknown fields, duplicate entries, unknown modules or vendor groups, and
 cycles. It also rejects keys and values that are not plain strings (tagged, for example with
-`!!binary`), entries in `testsupport.paths` under `internal`, `cmd` or `api`, entries in `exclude`
-that match `internal`, `cmd`, `api` or another directory of the module as a string prefix
-(go-arch-lint skips every path that starts with the entry, for `in` that is all of `internal/`; both
-would take product code out of the gate), and vendor patterns that are not a Go import path: the
-first element is a domain with a dot, the others contain only letters, digits, `-`, `.`, `_` and
-`~`, and `**` stands only at the end after a domain and one more fixed element. Reason: go-arch-lint turns
-every pattern into a regular expression and escapes only `.` and `/`, and `github.com/**` would
+`!!binary`, or written without quotes so that a YAML 1.1 reader such as PyYAML does not read them
+as a string, for example `no`, `on` or `1:20`, and also `y`, `n`, `yes`, `no`, `on` and `off` in
+any case), a `version` that is not written in decimal, entries in `testsupport.paths` under
+`internal`, `cmd` or `api`, entries in `exclude` that match `internal`, `cmd`, `api` or another
+directory of the module as a string prefix (go-arch-lint skips every path that starts with the
+entry, for `in` that is all of `internal/`; both would take product code out of the gate), and
+vendor patterns that are not a Go import path: the first element is a domain with a dot, the
+others contain only letters, digits, `-`, `.`, `_` and `~`, and `**` stands only at the end after
+a domain and one more fixed element. Reason: go-arch-lint turns every pattern into a regular
+expression and escapes only `.` and `/`, and `github.com/**` would
 allow almost every library (go-arch-lint v1.19.0 source:
 [`exclude` as a string prefix](https://github.com/fe3dback/go-arch-lint/blob/v1.19.0/internal/services/project/scanner/scanner.go#L121),
 [pattern to regular expression](https://github.com/fe3dback/go-arch-lint/blob/v1.19.0/internal/models/utils_path.go#L32-L38),
@@ -568,11 +571,13 @@ The excerpt is a part of what `tools/archgen` generates from the example in 7.1;
 `TestChapter02ExamplesMatchGenerator` checks example and excerpt against the generator.
 
 Every component names itself first in its `mayDependOn`: go-arch-lint allows a component to
-import its own packages only then, and the layout from section 6 needs this (subpackages of
-`domain`, `app` and `adapters`, `adapters/postgres/sqlcgen`, the test helpers
-`platform/<p>/<p>test` and `adapters/<module>test`, `api/routes` calls `api/rest`). In
-addition, `wire` may use all module, platform and kernel components, `cmd` only `wire`,
-platform and `kernel-ports`. `<m>-domain` may use only itself and `kernel-core`.
+import its own packages only then or when it is listed under `commonComponents`, and the layout
+from section 6 needs this (subpackages of `domain`, `app` and `adapters`,
+`adapters/postgres/sqlcgen`, the test helpers `platform/<p>/<p>test` and `adapters/<module>test`,
+`api/routes` calls `api/rest`). `kernel-core` is listed under `commonComponents` and so would not
+need the entry; it keeps it for the uniform rule. In addition, `wire` may use all module,
+platform and kernel components and, when the register has an `api` entry, `api`; `cmd` only
+`wire`, platform and `kernel-ports`. `<m>-domain` may use only itself and `kernel-core`.
 `kernel-ports` has no entry under `deps`, because go-arch-lint rejects an empty `mayDependOn`,
 and so may use only `kernel-core`: the kernel ports do not use each other. Section 4.5 says
 only that `kernel` depends on nothing in the project; the narrower reading applies until a
@@ -588,7 +593,15 @@ M1-05, ruling M1-05/3; `TestArchLintPackageWithoutComponent` holds the first).
 `make arch` rejects every symbolic link below the module before go-arch-lint runs: go-arch-lint
 does not follow a linked directory and assigns it by the path of the link, but the Go compiler
 builds the code behind it (reproduced on 2026-10-11 in M1-05 with go-arch-lint v1.19.0, ruling
-M1-05/24; `tools/ci/tests/test_make_server_gates.py` holds the rejection).
+M1-05/24; `tools/ci/tests/test_make_server_gates.py` holds the rejection). Only editor lock
+files are exempt: links named `.#*` whose target does not exist; nothing can be built behind
+them. Because go-arch-lint v1.19.0 aborts at every dangling link below a component with `**`
+(reproduced on 2026-10-11 in M1-05), `make arch` then checks a copy of the module without these
+names and names the files of the module in its messages; the Go compiler skips files whose name
+starts with a dot anyway ("Directory and file names that begin with "." or "_" are ignored by
+the go tool", [go command, Package lists and
+patterns](https://pkg.go.dev/cmd/go#hdr-Package_lists_and_patterns), retrieved 2026-10-12;
+ruling M1-05/27).
 
 Checked on 2026-10-10 on a skeleton with all modules from section 4.2 (Go 1.27.2, go-arch-lint
 v1.19.0): a clean skeleton yields "No warnings found", exit code 0. Four inserted violations were

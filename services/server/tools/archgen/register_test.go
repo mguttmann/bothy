@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"go.yaml.in/yaml/v3"
 )
 
 // validRegister is the smallest register that uses every section; each rejection case changes
@@ -90,6 +92,60 @@ func TestParseRegisterAcceptsValidRegister(t *testing.T) {
 	}
 }
 
+// A YAML 1.1 word in plain quotes or with an explicit !!str tag is a string for every reader.
+func TestParseRegisterAcceptsQuotedYAML11Words(t *testing.T) {
+	t.Parallel()
+	text := edit(t, "  agents:\n", "  \"no\":\n", "tables: [channels]", `tables: ['yes', "on", !!str off]`)
+	r, problems := parseRegister([]byte(text))
+	if len(problems) != 0 {
+		t.Fatalf("unexpected problems:\n%s", formatProblems(problems))
+	}
+	if want := []string{"chat", "no"}; !slices.Equal(r.moduleOrder, want) {
+		t.Errorf("moduleOrder = %v, want %v", r.moduleOrder, want)
+	}
+	if got, want := r.Modules["chat"].Tables, []string{"yes", "on", "off"}; !slices.Equal(got, want) {
+		t.Errorf("chat.tables = %v, want %v", got, want)
+	}
+}
+
+// TestYAML11Rule holds yaml11Typed to examples of the implicit resolvers of PyYAML 6.0.3 that can
+// match a plain string of yaml.v3, checked against PyYAML when they were written. Every scalar is a plain string for yaml.v3;
+// PyYAML reads the first list as another type (bool, int, float, timestamp, value), apart from y
+// and n, which the YAML 1.1 type repository lists as booleans, and the mixed-case words, which the
+// red-team finding asked to reject; it reads the second list as strings.
+func TestYAML11Rule(t *testing.T) {
+	t.Parallel()
+	notString := []string{
+		"yes", "Yes", "YES", "no", "No", "NO", "on", "On", "ON", "off", "Off", "OFF", "yEs", "nO", "oN", "oFf",
+		"y", "Y", "n", "N", "1:20", "190:20:30", "-1:30", "+8:0", "7_0:9", "0x_", "0b_", "-0b_",
+		"190:20:30.15", "1:0.7", ".008_", "=", "2001-12-14 21:59:43.10 -5", "2001-12-14 21:59:43.10 Z",
+		"2001-12-14T21:59:43.10+05", "2001-12-14\t21:59:43",
+	}
+	sameString := []string{
+		"channels", "channel.read", "typing.start", "github.com/jackc/pgx/v5", "yesno", "onion", "nope",
+		"y2", "ny", "trUe", "fAlse", "nULL", "1-2", "v1.2", "1:60", "1:2:x", "0x", "_1", "._1", "1e3x", "2001-12-14x",
+	}
+	check := func(s string, want bool) {
+		var doc yaml.Node
+		if err := yaml.Unmarshal([]byte("k: "+s+"\n"), &doc); err != nil {
+			t.Fatalf("%q: %v", s, err)
+		}
+		n := doc.Content[0].Content[1]
+		if n.ShortTag() != strTag || n.Style != 0 || n.Value != s {
+			t.Fatalf("%q is no plain string for yaml.v3 (tag %s, value %q); the case tests nothing", s, n.ShortTag(), n.Value)
+		}
+		if got := notYAML11String(n); got != want {
+			t.Errorf("notYAML11String(%q) = %v, want %v", s, got, want)
+		}
+	}
+	for _, s := range notString {
+		check(s, true)
+	}
+	for _, s := range sameString {
+		check(s, false)
+	}
+}
+
 func TestProblemFormat(t *testing.T) {
 	t.Parallel()
 	p := problem{line: 7, column: 5, path: "modules.chat.depends_on[1]", msg: `unknown module "x"`}
@@ -122,6 +178,9 @@ func rejectCases(t *testing.T) []rejectCase {
 		{name: "missing required field top level", text: edit(t, "testsupport: {paths: [test]}\n", ""), path: "testsupport", msg: "missing required field"},
 		{name: "wrong version", text: edit(t, "version: 1", "version: 2"), path: "version", msg: "unsupported version 2"},
 		{name: "version not an integer", text: edit(t, "version: 1", "version: one"), path: "version", msg: "expected an integer"},
+		// yaml.v3 reads 0o1 as 1, PyYAML as the string "0o1" (docs/DECISIONS.md M1-05/30).
+		{name: "version in octal", text: edit(t, "version: 1", "version: 0o1"), path: "version", msg: `expected a decimal integer, found "0o1"`},
+		{name: "version in hex", text: edit(t, "version: 1", "version: 0x1"), path: "version", msg: `expected a decimal integer, found "0x1"`},
 		// Built at run time: a 20-digit literal matches the white-label rule for long numeric IDs.
 		{name: "version out of range", text: edit(t, "version: 1", "version: "+strconv.FormatUint(math.MaxUint64, 10)), path: "version", msg: "expected an integer"},
 		{name: "duplicate module", text: edit(t, "vendors:\n  pgx", "  chat: {}\nvendors:\n  pgx"), path: "modules.chat", msg: "duplicate key"},
@@ -150,6 +209,17 @@ func rejectCases(t *testing.T) []rejectCase {
 		{name: "binary list entry", text: edit(t, "    depends_on: [chat]", "    depends_on: [!!binary Y2hhdA==]"), path: "modules.agents.depends_on[0]", msg: "expected a string, found !!binary"},
 		{name: "binary import path with invalid UTF-8", text: edit(t, "river: [github.com/riverqueue/river]", "river: [!!binary /w==]"), path: "vendors.river[0]", msg: "expected a string, found !!binary"},
 		{name: "integer list entry", text: edit(t, "tables: [channels]", "tables: [42]"), path: "modules.chat.tables[0]", msg: "expected a string, found !!int"},
+		// yaml.v3 reads YAML 1.2, PyYAML (the checks of M1-06) YAML 1.1: a plain scalar both read
+		// as a string is the only kind of name the two readers agree on (docs/DECISIONS.md M1-05/30).
+		{name: "YAML 1.1 boolean module key", text: edit(t, "  agents:\n", "  no:\n"), path: "modules", msg: `key must be a string, found plain "no"`},
+		{name: "YAML 1.1 boolean vendor group key", text: edit(t, "  river: [", "  on: [", "vendors: [river]", `vendors: ["on"]`), path: "vendors", msg: `key must be a string, found plain "on"`},
+		{name: "YAML 1.1 boolean list entry", text: edit(t, "tables: [channels]", "tables: [yes]"), path: "modules.chat.tables[0]", msg: `expected a string, found plain "yes"`},
+		{name: "YAML 1.1 boolean in any case", text: edit(t, "tables: [channels]", "tables: [channels, oFF]"), path: "modules.chat.tables[1]", msg: `expected a string, found plain "oFF"`},
+		{name: "YAML 1.1 y", text: edit(t, "core: [ids, clock]", "core: [ids, y]"), path: "kernel.core[1]", msg: `expected a string, found plain "y"`},
+		{name: "YAML 1.1 N", text: edit(t, "    depends_on: [chat]", "    depends_on: [N]"), path: "modules.agents.depends_on[0]", msg: `expected a string, found plain "N"`},
+		{name: "YAML 1.1 sexagesimal key", text: edit(t, "  agents:\n", "  1:20:\n"), path: "modules", msg: `key must be a string, found plain "1:20"`},
+		{name: "YAML 1.1 sexagesimal float", text: edit(t, "    tables: [channels]\n", "    tables:\n      - 190:20:30.15\n"), path: "modules.chat.tables[0]", msg: `expected a string, found plain "190:20:30.15"`},
+		{name: "YAML 1.1 value key", text: edit(t, "ws_ops: [typing.start]", "ws_ops: [=]"), path: "modules.chat.ws_ops[0]", msg: `expected a string, found plain "="`},
 		{name: "alias", text: edit(t, "    tables: [channels]\n", "    tables: &t [channels]\n", "    tables: [agents]\n", "    tables: *t\n"), path: "modules.agents.tables", msg: "aliases are not allowed"},
 		{name: "second document", text: validRegister + "---\nversion: 1\n", path: rootPath, msg: "more than one YAML document"},
 		{name: "invalid YAML", text: "version: [1\n", path: rootPath, msg: "invalid YAML"},

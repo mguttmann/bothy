@@ -303,6 +303,7 @@ func TestRejectedFileEntrySkipsCrossChecks(t *testing.T) {
 		"server:\n  role: api\n---\nserver: {}\n": "must hold one YAML document",
 		"- server\n": "must be a mapping, found a list",
 		"&root\nserver:\n  listen_addr: 127.0.0.1:9000\n": "anchors and aliases are not allowed",
+		"!!map\nserver:\n  listen_addr: 127.0.0.1:9000\n": "explicit YAML tags are not allowed",
 	}
 	for doc, want := range cases {
 		ran = 0
@@ -330,5 +331,42 @@ func TestRejectedFileEntrySkipsCrossChecks(t *testing.T) {
 	got = problems(t, s, config.Sources{Env: []string{env[0], "BOTHY_SERVER__INTERNAL_LISTEN_ADDR=127.0.0.1:9000"}})
 	if len(got) != 1 || ran != 0 {
 		t.Errorf("duplicate variable: check ran %d times, problems %v", ran, got)
+	}
+}
+
+func TestRejectedFileEntrySkipsPlaceholders(t *testing.T) {
+	t.Parallel()
+	s := mustSchema(t, key("store.dir", config.KindString, "/run/store"),
+		key("database.password_ref", config.KindSecretRef, "file:<store.dir>/db"))
+	// The environment sets a directory that the expanded reference rejects, so expanding the
+	// placeholder reports a problem of its own.
+	env := []string{"BOTHY_STORE__DIR=relative"}
+	got := problems(t, s, config.Sources{Env: env})
+	if len(got) != 1 || !strings.Contains(got[0].String(), "default after expanding <store.dir>") {
+		t.Fatalf("problems %v, want only the expansion problem", got)
+	}
+	// When a file entry at or above store.dir is rejected, store.dir counts as failed and the
+	// placeholder is not expanded: the problem of the entry is the only one (docs/DECISIONS.md
+	// M1-07/25).
+	cases := map[string]string{
+		"store: !!map\n  dir: /run/other\n":              "explicit YAML tags are not allowed",
+		"store: &s\n  dir: /run/other\n":                 "anchors and aliases are not allowed",
+		"store:\n  dir: /run/other\nstore:\n  dir: /x\n": `duplicate key "store"`,
+		"store: [dir]\n":                                 `section "store" must be a mapping`,
+		"store.dir: /run/other\n":                        `dotted key "store.dir"`,
+		"store:\n  dir: !!str /run/other\n":              "explicit YAML tags are not allowed",
+		"store:\n  dir: /run/other\n  dir: /run/third\n": `duplicate key "store.dir"`,
+		"store:\n  <<: {dir: /run/other}\n":              "merge keys are not allowed",
+		"store: [\n":                                     "invalid YAML",
+		"!!map\nstore:\n  dir: /run/other\n":             "explicit YAML tags are not allowed",
+		"store:\n  dir: /run/other\n---\nstore: {}\n":    "must hold one YAML document",
+		"&root\nstore:\n  dir: /run/other\n":             "anchors and aliases are not allowed",
+		"- store\n":                                      "must be a mapping, found a list",
+	}
+	for doc, want := range cases {
+		got := problems(t, s, config.Sources{File: writeFile(t, doc), Env: env})
+		if len(got) != 1 || !strings.Contains(got[0].String(), want) {
+			t.Errorf("%q: problems %v; want only one containing %q", doc, got, want)
+		}
 	}
 }

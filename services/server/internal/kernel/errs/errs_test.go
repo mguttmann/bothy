@@ -624,6 +624,37 @@ func TestJSONOmitsCause(t *testing.T) {
 	}
 }
 
+func TestJSONWritesPublicCode(t *testing.T) {
+	// Like Error() and PublicCode(), JSON never carries a code outside the closed list of 06,
+	// whether an encoder meets an *Error, an Error value or either one behind an interface.
+	changed := New(CodeNotFound, "gone away")
+	changed.Code = "bogus"
+	tests := []struct {
+		name string
+		v    any
+		want string
+	}{
+		{"unknown code literal", &Error{Code: "bogus", Detail: "d"}, `"Code":"internal_error"`},
+		{"code changed after New", changed, `"Code":"internal_error"`},
+		{"Error value", Error{Code: "bogus"}, `"Code":"internal_error"`},
+		{"Error value in a field", struct{ E any }{E: Error{Code: "bogus"}}, `"Code":"internal_error"`},
+		{"zero Error", &Error{}, `"Code":"internal_error"`},
+		{"known code", New(CodeNotFound, "no such channel"), `"Code":"not_found","Detail":"no such channel"`},
+		{"nil *Error", (*Error)(nil), `null`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			data, err := json.Marshal(tt.v)
+			if err != nil {
+				t.Fatalf("json.Marshal: %v", err)
+			}
+			if !bytes.Contains(data, []byte(tt.want)) || bytes.Contains(data, []byte("bogus")) {
+				t.Errorf("json.Marshal = %s, want it to contain %s and no raw code", data, tt.want)
+			}
+		})
+	}
+}
+
 func TestLogValueContainsCause(t *testing.T) {
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, nil))
