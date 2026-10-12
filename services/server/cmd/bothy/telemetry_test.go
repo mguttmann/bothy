@@ -41,7 +41,7 @@ func fixedNow() time.Time { return time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC
 func runTelemetry(t *testing.T, env []string, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := telemetryCommand(t.Context(), args, env, fixedNow, &stdout, &stderr)
+	code := telemetryCommand(t.Context(), args, withPublicURL(env), fixedNow, &stdout, &stderr)
 	return code, stdout.String(), stderr.String()
 }
 
@@ -108,7 +108,7 @@ func TestTelemetryPseudonymCommand(t *testing.T) {
 	// Registered in the command table; the clock there is the system clock.
 	var out, errOut bytes.Buffer
 	args := []string{"telemetry", "pseudonym", telemetryTestID, "--at", "2026-08-01T09:30:00Z"}
-	if code := run(context.Background(), args, telemetryEnv(telemetryTestKey), &out, &errOut); code != exitOK || out.String() != want {
+	if code := run(context.Background(), args, withPublicURL(telemetryEnv(telemetryTestKey)), &out, &errOut); code != exitOK || out.String() != want {
 		t.Errorf("run telemetry pseudonym: exit %d, stdout %q, stderr %q", code, out.String(), errOut.String())
 	}
 }

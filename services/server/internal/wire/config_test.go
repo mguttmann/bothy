@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -37,6 +38,14 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"http.read_header_timeout":         {Kind: config.KindDuration, Default: "5s", Min: "1ms", Chapter: "02-architektur.md"},
 		"http.idle_timeout":                {Kind: config.KindDuration, Default: "120s", Min: "1ms", Chapter: "02-architektur.md"},
 		"http.max_header_bytes":            {Kind: config.KindInt, Default: "65536", Min: "4096", Max: "16777216", Chapter: "02-architektur.md"},
+		"http.max_json_depth":              {Kind: config.KindInt, Default: "32", Min: "1", Max: "1000", Chapter: "02-architektur.md"},
+		"http.request_timeout":             {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "02-architektur.md"},
+		"http.transfer_timeout":            {Kind: config.KindDuration, Default: "10m", Min: "1ms", Chapter: "02-architektur.md"},
+		"http.unavailable_retry_after":     {Kind: config.KindDuration, Default: "5s", Min: "1s", Max: "1h", Chapter: "02-architektur.md"},
+		"file.max_upload_bytes":            {Kind: config.KindInt, Default: "104857600", Min: "1", Chapter: "03-datenmodell.md"},
+		"api.cors_allowed_origins":         {Kind: config.KindStringList, Default: "", Chapter: "06-api.md"},
+		"server.public_url":                {Kind: config.KindURL, Required: true, Chapter: "16-betrieb.md"},
+		"server.trusted_proxies":           {Kind: config.KindCIDRList, Default: "127.0.0.1/32, ::1/128", Chapter: "16-betrieb.md"},
 		"shutdown.drain_delay":             {Kind: config.KindDuration, Default: "5s", Min: "0s", Max: "1h", Chapter: "02-architektur.md"},
 		"shutdown.http_grace":              {Kind: config.KindDuration, Default: "20s", Min: "1ms", Max: "1h", Chapter: "02-architektur.md"},
 		"shutdown.telemetry_flush_timeout": {Kind: config.KindDuration, Default: "5s", Min: "1ms", Max: "1h", Chapter: "02-architektur.md"},
@@ -188,7 +197,7 @@ func readSpec(t *testing.T, chapter string) string {
 
 func TestDefaultsPassCrossChecks(t *testing.T) {
 	t.Parallel()
-	v, err := config.Load(schema(t), config.Sources{})
+	v, err := config.Load(schema(t), config.Sources{Env: testEnv()})
 	if err != nil {
 		t.Fatalf("Load with defaults only: %v", err)
 	}
@@ -200,6 +209,9 @@ func TestDefaultsPassCrossChecks(t *testing.T) {
 // load returns the problems of loading the server schema with env (nil when it loads).
 func load(t *testing.T, env ...string) []config.Problem {
 	t.Helper()
+	if !slices.ContainsFunc(env, func(e string) bool { return strings.HasPrefix(e, "BOTHY_SERVER__PUBLIC_URL=") }) {
+		env = append(testEnv(), env...)
+	}
 	_, err := config.Load(schema(t), config.Sources{Env: env})
 	if err == nil {
 		return nil
@@ -349,5 +361,37 @@ func noValues(t *testing.T, problems []config.Problem, values ...string) {
 		if strings.Contains(text, v) {
 			t.Errorf("problem text echoes the value %q:\n%s", v, text)
 		}
+	}
+}
+
+// testPublicURL sets server.public_url, the one key without a default (16 "Konfigurationswerte").
+const testPublicURL = "BOTHY_SERVER__PUBLIC_URL=https://chat.example.com"
+
+// testEnv is the smallest environment that loads: the defaults plus server.public_url.
+func testEnv() []string { return []string{testPublicURL} }
+
+// TestPublicURLAndCORSOriginsAreOrigins: server.public_url and every CORS entry must be an origin
+// (the chain builds the DPoP htu from it and compares the Origin header exactly).
+func TestPublicURLAndCORSOriginsAreOrigins(t *testing.T) {
+	t.Parallel()
+	if got := load(t); got != nil {
+		t.Fatalf("defaults with public_url: %v", got)
+	}
+	cases := map[string]string{
+		"BOTHY_SERVER__PUBLIC_URL=https://chat.example.com/app":                          "server.public_url",
+		"BOTHY_API__CORS_ALLOWED_ORIGINS=https://app.example.com,https://x.example.com/": "api.cors_allowed_origins",
+	}
+	for env, key := range cases {
+		got := load(t, env)
+		if len(got) != 1 || !strings.Contains(got[0].String(), key) {
+			t.Errorf("%s: problems %v", env, got)
+		}
+	}
+	if got := load(t, "BOTHY_API__CORS_ALLOWED_ORIGINS=https://app.example.com"); got != nil {
+		t.Errorf("valid origin: %v", got)
+	}
+	_, err := config.Load(schema(t), config.Sources{})
+	if err == nil || !strings.Contains(err.Error(), "server.public_url") {
+		t.Errorf("without server.public_url: %v", err)
 	}
 }

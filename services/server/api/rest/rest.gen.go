@@ -7898,11 +7898,15 @@ type FeatureFlagPut struct {
 
 // FieldError defines model for FieldError.
 type FieldError struct {
-	// Code Examples: too_long
-	Code   string  `json:"code"`
+	// Code Machine-readable rule the field violates. Schema validation uses `required`, `unknown_member` (W7: request schemas are closed), `invalid_type`, `invalid_format`, `invalid_enum`, `too_long`, `too_short`, `too_large`, `too_small`, `too_many_items`, `too_few_items`, `pattern_mismatch` and `invalid` for any other rule; use cases add `limit_reached` and `not_enabled` (06 section 5). Clients treat unknown codes like `invalid`.
+	//
+	// Examples: too_long
+	Code string `json:"code"`
+
+	// Detail Short English explanation; never repeats the submitted value.
 	Detail *string `json:"detail,omitempty"`
 
-	// Pointer JSON Pointer to the offending member of the request body, or `#path/<name>`, `#query/<name>`, `#header/<name>` for parameters; empty for a rule of the whole request.
+	// Pointer Where the violation is: a JSON Pointer (RFC 6901) to the offending member of the request body (for an unknown or missing member the pointer names that member, e.g. `/name`), or `#path/<name>`, `#query/<name>`, `#header/<name>` for parameters; empty for a rule of the whole request or the body as a whole.
 	//
 	// Examples: /content_md
 	Pointer string `json:"pointer"`

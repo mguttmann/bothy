@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -19,6 +20,9 @@ import (
 // stderr.
 func runConfig(t *testing.T, schema func() (*config.Schema, error), env []string, args ...string) (int, string, string) {
 	t.Helper()
+	if s, err := schema(); err == nil && slices.ContainsFunc(s.Keys(), func(k config.Key) bool { return k.Name == "server.public_url" }) {
+		env = withPublicURL(env)
+	}
 	var stdout, stderr bytes.Buffer
 	code := configCommand(t.Context(), args, env, schema, &stdout, &stderr)
 	return code, stdout.String(), stderr.String()
@@ -43,7 +47,7 @@ func TestConfigCheckOK(t *testing.T) {
 
 	// Registered in the command table: the same through run.
 	var out, errOut bytes.Buffer
-	if code := run(context.Background(), []string{"config", "check", "--role", "worker"}, nil, &out, &errOut); code != 0 || out.String() != "configuration ok\n" {
+	if code := run(context.Background(), []string{"config", "check", "--role", "worker"}, withPublicURL(nil), &out, &errOut); code != 0 || out.String() != "configuration ok\n" {
 		t.Fatalf("run config check: exit %d, stdout %q, stderr %q", code, out.String(), errOut.String())
 	}
 }
@@ -153,6 +157,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 	env := []string{"BOTHY_CONFIG_FILE=" + path, "BOTHY_MESSAGE__MAX_CONTENT_BYTES=2048"}
 	code, stdout, stderr := runConfig(t, wire.ConfigSchema, env, "print", "--role", "worker")
 	want := "# configuration file: " + path + "\n" +
+		"api.cors_allowed_origins =   # default\n" +
 		"database.acquire_timeout = 2s  # default\n" +
 		"database.host = localhost  # default\n" +
 		"database.idle_in_tx_timeout = 10s  # default\n" +
@@ -170,10 +175,15 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"egress.allowed_hosts =   # default\n" +
 		"egress.max_response_bytes = 1048576  # default\n" +
 		"egress.timeout = 15s  # default\n" +
+		"file.max_upload_bytes = 104857600  # default\n" +
 		"http.idle_timeout = 2m  # default\n" +
 		"http.max_header_bytes = 65536  # default\n" +
 		"http.max_json_body_bytes = 1048576  # default\n" +
+		"http.max_json_depth = 32  # default\n" +
 		"http.read_header_timeout = 5s  # default\n" +
+		"http.request_timeout = 15s  # default\n" +
+		"http.transfer_timeout = 10m  # default\n" +
+		"http.unavailable_retry_after = 5s  # default\n" +
 		"instance.environment = prod  # default\n" +
 		"message.max_content_bytes = 2048  # env BOTHY_MESSAGE__MAX_CONTENT_BYTES\n" +
 		"migrate.app_password_ref = file:/run/bothy/secrets/db_app_password  # default\n" +
@@ -188,7 +198,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"secrets.dir = /run/bothy/secrets  # default\n" +
 		"server.internal_listen_addr = 127.0.0.1:8081  # default\n" +
 		"server.listen_addr = 127.0.0.1:9080  # file " + path + "\n" +
+		"server.public_url = https://chat.example.com  # env BOTHY_SERVER__PUBLIC_URL\n" +
 		"server.role = worker  # flag --role\n" +
+		"server.trusted_proxies = 127.0.0.1/32, ::1/128  # default\n" +
 		"shutdown.drain_delay = 5s  # default\n" +
 		"shutdown.http_grace = 20s  # default\n" +
 		"shutdown.telemetry_flush_timeout = 5s  # default\n" +
@@ -269,4 +281,15 @@ func TestConfigSchemaErrorExit1(t *testing.T) {
 	if code != 1 || stdout != "" || stderr != "bothy config: config schema: key \"x\": broken\n" {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
+}
+
+// testPublicURL sets server.public_url, the one key of the server schema without a default.
+const testPublicURL = "BOTHY_SERVER__PUBLIC_URL=https://chat.example.com"
+
+// withPublicURL returns env with server.public_url set unless env sets it already.
+func withPublicURL(env []string) []string {
+	if slices.ContainsFunc(env, func(e string) bool { return strings.HasPrefix(e, "BOTHY_SERVER__PUBLIC_URL=") }) {
+		return env
+	}
+	return append([]string{testPublicURL}, env...)
 }

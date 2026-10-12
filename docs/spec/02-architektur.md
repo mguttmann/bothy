@@ -1007,7 +1007,10 @@ Server lädt.
    Typ ausdrückt: `secrets.dir` ist ein absoluter Pfad in sauberer Form (kein `.` oder `..`, kein
    doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, wie ihn der
    Secret-Provider verlangt; ein falscher Wert ist ein Problem von `secrets.dir` allein, nicht der
-   Verweise, die `<secrets.dir>` nutzen. Die Regel "Identitäts-Header nur mit Loopback-Listener"
+   Verweise, die `<secrets.dir>` nutzen. Ebenso sind `server.public_url` und jeder Eintrag von
+   `api.cors_allowed_origins` ein Origin (Schema `http` oder `https`, Host, optional Port, kein
+   Pfad, keine Query, kein Fragment; M1-18), weil die Kette das DPoP-`htu` aus diesem Origin baut
+   und `Origin` genau vergleicht. Die Regel "Identitäts-Header nur mit Loopback-Listener"
    ist keine Konfigurationsprüfung, weil der Treiber eine Einstellung des Owners in der Datenbank
    ist; sie gilt bei der Bereitschaft ([16-betrieb.md](16-betrieb.md) 4.3). Meldungen nennen
    Schlüssel und Quelle, nie den Wert.

@@ -14,6 +14,7 @@ nennt (PLAN P-04). Normativ sind [06-api.md](../../../docs/spec/06-api.md), Absc
 | `generate.go` | die beiden `go:generate`-Zeilen (echte Oberfläche und Fixture) | ja |
 | `rest/oapi-codegen.yaml` | Einstellungen von oapi-codegen (`std-http-server`, `strict-server`, `models`, `skip-prune`) | ja |
 | `rest/rest.gen.go` | Go-Typen aller Schemas und Server der freigeschalteten Operationen | erzeugt |
+| `rest/openapi.gen.yaml` | Byte-gleiche Kopie von `docs/api/openapi.yaml`; `rest.Spec` (`rest/spec.go`) bettet sie für den Anfrage-Validator der HTTP-Kette ein (M1-18) | erzeugt |
 | `routes/routes.go` | Typen, `Table`, `Recorder`, `Verify`, `Build`, Nachschlagen | ja |
 | `routes/routes.gen.go`, `catalog.gen.go`, `build.gen.go` | Operationstabelle, Aktionskatalog, Verbindung zum erzeugten Server | erzeugt |
 | `routes/gen/` | Generator mit Tests und `testdata/` (Fixture und Negativ-Fixtures) | ja |
@@ -71,7 +72,10 @@ er bedient sie nicht. Wie `later` gefüllt wurde: DECISIONS.md, M1-17/4.
 der Aktion und nicht `none`, keine Aktion mit Recht `system` (05, Regel 10), genau ein Server
 `/api/v1` (W6), keine Health-Operation (L2), und Formen, die die Routen-Tabelle nicht beschreiben
 könnte (DECISIONS.md, M1-17/13). Eine freigeschaltete Operation darf keine eigenen
-Sicherheitsanforderungen haben (M1-17/19). Prüfungen und Metadaten stammen aus dem Dokument, das
+Sicherheitsanforderungen haben (M1-17/19). Jedes Objekt-Schema, das ein Anfragekörper einer Operation
+unter `paths` erreicht, muss unbekannte Mitglieder ablehnen (`additionalProperties: false`, bei `allOf`
+`unevaluatedProperties: false`; ausgenommen `JsonObject` und Maps), sonst nennt der Generator das
+Schema (W7, DECISIONS.md M1-18/12). Prüfungen und Metadaten stammen aus dem Dokument, das
 der Lader von oapi-codegen (kin-openapi) liest, damit Tabelle und erzeugter Server dasselbe sehen
 (M1-17/18).
 

@@ -3,11 +3,14 @@
 package wire
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
+	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
 
 // logKeyError is the attribute key of the joined error in the "route check failed" record
@@ -40,14 +43,42 @@ type Mux interface {
 // the filled composite to MountRoutes.
 type Handlers struct{}
 
-// routeBuilder builds and verifies the routes of one REST surface against a catalogue;
-// routes.Build bound to Handlers in production, the fixture surface in tests.
-type routeBuilder func(cat routes.Catalog) ([]routes.Route, error)
+// routeBuilder builds and verifies the routes of one REST surface against a catalogue with the
+// error handlers of opts; routes.Build bound to Handlers in production, the fixture surface in
+// tests.
+type routeBuilder func(opts routes.Options, cat routes.Catalog) ([]routes.Route, error)
+
+// RouteOptions are the error handlers the generated server gets: the problem writers of the HTTP
+// chain (M1-18), so binding, decoding and handler errors leave as application/problem+json.
+func RouteOptions() routes.Options {
+	return routes.Options{
+		ErrorHandlerFunc:         httpserver.ValidationErrorHandler,
+		RequestErrorHandlerFunc:  httpserver.MalformedRequestHandler,
+		ResponseErrorHandlerFunc: httpserver.WriteProblem,
+	}
+}
+
+// HTTPOperation converts an operation of the route table into the operation type of the HTTP
+// chain, which must not depend on the generated layer.
+func HTTPOperation(op routes.Operation) httpserver.Operation {
+	return httpserver.Operation{
+		ID: op.ID, Method: op.Method, Path: op.Path, Pattern: op.Pattern, Action: op.Action,
+		Public: op.Public, IdempotencyKey: op.IdempotencyKey,
+		IfMatch:      httpserver.IfMatchMode(op.IfMatch),
+		RequestBody:  httpserver.BodyKind(op.RequestBody),
+		BodyRequired: op.BodyRequired,
+	}
+}
 
 // MountRoutes is start step 7 (02 "Start"): for the roles api and all it builds the routes of the
 // enabled operations from h with routes.Build, which checks every registered pattern, action and
 // rate-limit class against cat (05 rule 3, AZ-P1), and mounts each route at its pattern on mux.
 // The role worker serves no REST API and mounts nothing.
+//
+// Every route runs through chain (02 "Request-Pfad"): chain.Wrap puts the per-route stages
+// around the generated handler, whose error handlers are the problem writers (RouteOptions).
+// When api.cors_allowed_origins names origins, OPTIONS <path> answers the CORS preflight for every
+// enabled path. chain must not be nil for the roles api and all.
 //
 // cat is routes.SpecCatalog() until the closed catalogue of authz replaces it (M1-25). log nil
 // means slog.Default().
@@ -61,18 +92,18 @@ type routeBuilder func(cat routes.Catalog) ([]routes.Route, error)
 //
 // Example:
 //
-//	if err := wire.MountRoutes(role, publicMux, handlers, routes.SpecCatalog(), log); err != nil {
+//	if err := wire.MountRoutes(role, publicMux, handlers, routes.SpecCatalog(), chain, log); err != nil {
 //		return err // exit code 1, never ready
 //	}
-func MountRoutes(role Role, mux Mux, h Handlers, cat routes.Catalog, log *slog.Logger) error {
-	return mountRoutes(role, mux, func(c routes.Catalog) ([]routes.Route, error) {
-		return routes.Build(h, routes.Options{}, c)
-	}, cat, log)
+func MountRoutes(role Role, mux Mux, h Handlers, cat routes.Catalog, chain *httpserver.Chain, log *slog.Logger) error {
+	return mountRoutes(role, mux, func(opts routes.Options, c routes.Catalog) ([]routes.Route, error) {
+		return routes.Build(h, opts, c)
+	}, cat, chain, log)
 }
 
 // mountRoutes is MountRoutes with the builder as a parameter, so tests run the start step on the
 // generator's fixture surface.
-func mountRoutes(role Role, mux Mux, build routeBuilder, cat routes.Catalog, log *slog.Logger) error {
+func mountRoutes(role Role, mux Mux, build routeBuilder, cat routes.Catalog, chain *httpserver.Chain, log *slog.Logger) error {
 	switch role {
 	case RoleWorker:
 		return nil
@@ -83,8 +114,12 @@ func mountRoutes(role Role, mux Mux, build routeBuilder, cat routes.Catalog, log
 	if log == nil {
 		log = slog.Default()
 	}
-	rs, err := build(cat)
+	if chain == nil {
+		return errors.New("wire: no HTTP chain for the public routes")
+	}
+	rs, err := build(RouteOptions(), cat)
 	if err == nil {
+		rs = wrapRoutes(chain, rs)
 		// A scratch mux first: routes that conflict with each other fail before the real mux
 		// holds any of them.
 		err = mount(http.NewServeMux(), rs)
@@ -115,4 +150,32 @@ func mount(mux Mux, rs []routes.Route) (err error) {
 		mux.Handle(r.Operation.Pattern, r.Handler)
 	}
 	return nil
+}
+
+// wrapRoutes returns the routes with the chain around each handler, plus one preflight route per
+// enabled path when CORS origins are configured. Preflight routes carry the pattern
+// "OPTIONS <path>" and an Operation with only Pattern and Method set.
+func wrapRoutes(chain *httpserver.Chain, rs []routes.Route) []routes.Route {
+	out := make([]routes.Route, 0, len(rs))
+	methods := map[string][]string{}
+	var paths []string
+	for _, r := range rs {
+		out = append(out, routes.Route{Operation: r.Operation, Handler: chain.Wrap(HTTPOperation(r.Operation), r.Handler)})
+		if _, seen := methods[r.Operation.Path]; !seen {
+			paths = append(paths, r.Operation.Path)
+		}
+		methods[r.Operation.Path] = append(methods[r.Operation.Path], r.Operation.Method)
+	}
+	if !chain.CORSEnabled() {
+		return out
+	}
+	slices.Sort(paths)
+	for _, p := range paths {
+		pattern := http.MethodOptions + " " + p
+		out = append(out, routes.Route{
+			Operation: routes.Operation{Method: http.MethodOptions, Path: p, Pattern: pattern},
+			Handler:   chain.Preflight(p, methods[p]),
+		})
+	}
+	return out
 }

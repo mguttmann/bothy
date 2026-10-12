@@ -71,7 +71,7 @@ func writeSecret(t *testing.T, dir, name, content string, mode fs.FileMode) stri
 func runBothy(t *testing.T, env []string, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := run(t.Context(), args, env, &stdout, &stderr)
+	code := run(t.Context(), args, withPublicURL(env), &stdout, &stderr)
 	return code, stdout.String(), stderr.String()
 }
 

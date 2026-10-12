@@ -24,5 +24,15 @@ func serverConfigKeys() []config.Key {
 			Doc:     "Address of the internal listener for health, readiness and incoming webhooks from services in the stack.",
 			Chapter: chapter16,
 		},
+		{
+			Name: "server.public_url", Kind: config.KindURL, Required: true,
+			Doc:     "Origin under which apps reach the server; the base of the DPoP htu, token audience and WebAuthn.",
+			Chapter: chapter16,
+		},
+		{
+			Name: "server.trusted_proxies", Kind: config.KindCIDRList, Default: "127.0.0.1/32, ::1/128",
+			Doc:     "Peers whose forwarding and identity headers count and that may send plaintext.",
+			Chapter: chapter16,
+		},
 	}
 }

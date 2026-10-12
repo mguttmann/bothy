@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,9 @@ func canary(t *testing.T) string {
 
 func loadValues(t *testing.T, s *config.Schema, env ...string) *config.Values {
 	t.Helper()
+	if slices.ContainsFunc(s.Keys(), func(k config.Key) bool { return k.Name == "server.public_url" }) {
+		env = append(testEnv(), env...)
+	}
 	v, err := config.Load(s, config.Sources{Env: env})
 	if err != nil {
 		t.Fatalf("Load: %v", err)

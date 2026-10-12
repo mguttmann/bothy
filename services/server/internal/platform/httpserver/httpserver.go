@@ -1,15 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package httpserver opens the listeners of the server and builds its http.Server values
-// (docs/spec/02-architektur.md "Request-Pfad", docs/spec/16-betrieb.md "Zwei Listener"). This
-// is the listener part of M1-11; the middleware chain, the problem format and the per-route
-// deadlines come with M1-18, the plaintext peer check in Listen with M1-21.
-//
-// Example:
-//
-//	ln, err := httpserver.Listen(ctx, "127.0.0.1:8081")
-//	srv := httpserver.NewServer(cfg, httpserver.Internal(reg), log)
-//	go srv.Serve(ln)
 package httpserver
 
 import (
@@ -45,8 +35,9 @@ func Listen(ctx context.Context, addr string) (net.Listener, error) {
 // NewServer returns the http.Server for h with the limits of cfg. ErrorLog is
 // otel.ServerErrorLog(log), so TLS, accept and panic lines of net/http reach the logs as the
 // constant "http server error" without the client address (19-sicherheit.md SEC-LOG-5). There
-// is no ReadTimeout or WriteTimeout: per-route deadlines come with M1-18, and a server-wide
-// write deadline would cut long downloads. log nil means slog.Default().
+// is no ReadTimeout or WriteTimeout: the per-route deadlines of StageRoute apply instead
+// (http.request_timeout, http.transfer_timeout), and a server-wide write deadline would cut long
+// downloads. log nil means slog.Default().
 func NewServer(cfg Config, h http.Handler, log *slog.Logger) *http.Server {
 	if log == nil {
 		log = slog.Default()
@@ -71,18 +62,4 @@ func Internal(reg *health.Registry) *http.ServeMux {
 	// nosemgrep: bothy-go-route-registration -- health is outside the public API and has no action (R-AZ-22, L2); the route table does not cover the internal listener
 	mux.Handle(health.PathReadiness, h)
 	return mux
-}
-
-// Public returns the handler of the public listener: the routes mounted on mux, and 404 with
-// an empty body for every request no route matches, so the public listener never reveals the
-// internal paths or the default text of net/http. M1-18 replaces the fallback with the problem
-// format of its chain.
-func Public(mux *http.ServeMux) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if _, pattern := mux.Handler(r); pattern == "" {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		mux.ServeHTTP(w, r)
-	})
 }

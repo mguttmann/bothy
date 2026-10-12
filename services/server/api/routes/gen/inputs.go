@@ -18,13 +18,14 @@ func loadInputs(specPath, catalogPath, listPath string) (*inputs, error) {
 	p := &problemsError{}
 	actions := readCatalog(catalogPath, p)
 	list := readList(listPath, p)
-	_, data, err := readYAML(specPath)
+	doc, data, err := readYAML(specPath)
 	if err != nil {
 		p.add(specPath, "%v", err)
 		return nil, p.err()
 	}
 	in := &inputs{specData: data, actions: actions, enabled: map[string]bool{}}
 	ops, overrides := readOperations(specPath, data, catalogPath, actions, p)
+	checkRequestSchemasClosed(specPath, doc, p)
 	in.ops = ops
 	if list != nil {
 		checkListAgainst(listPath, specPath, list, in.ops, p)

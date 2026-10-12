@@ -147,13 +147,13 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 |---|---|---|---|---|---|---|
 | `cluster.mode` | `BOTHY_CLUSTER__MODE` | Server |  | `single` | `single` oder `multi` (mehrere api-Knoten) | geplant (M2) |
 | `http.read_header_timeout` | `BOTHY_HTTP__READ_HEADER_TIMEOUT` | Server | duration | `5s` | Frist für Kopfzeilen | aktiv |
-| `http.request_timeout` | `BOTHY_HTTP__REQUEST_TIMEOUT` | Server |  | `15s` | Kontext-Frist normaler Anfragen | geplant (M1) |
-| `http.transfer_timeout` | `BOTHY_HTTP__TRANSFER_TIMEOUT` | Server |  | `10m` | Frist für Upload und Download | geplant (M1) |
+| `http.request_timeout` | `BOTHY_HTTP__REQUEST_TIMEOUT` | Server | duration | `15s` | Kontext-Frist normaler Anfragen | aktiv |
+| `http.transfer_timeout` | `BOTHY_HTTP__TRANSFER_TIMEOUT` | Server | duration | `10m` | Frist für Upload und Download | aktiv |
 | `http.idle_timeout` | `BOTHY_HTTP__IDLE_TIMEOUT` | Server | duration | `120s` | Leerlauf von Keep-Alive-Verbindungen | aktiv |
 | `http.max_header_bytes` | `BOTHY_HTTP__MAX_HEADER_BYTES` | Server | int | `65536` | größte Kopfzeilen | aktiv |
 | `http.max_json_body_bytes` | `BOTHY_HTTP__MAX_JSON_BODY_BYTES` | Server | int | `1048576` | größter JSON-Körper; echt größer als `message.max_content_bytes` (13, Punkt 4) | aktiv |
-| `http.max_json_depth` | `BOTHY_HTTP__MAX_JSON_DEPTH` | Server |  | `32` | größte Schachtelungstiefe eines JSON-Körpers (SEC-IN-2); ein Test hält, dass jedes Anfrage-Beispiel in `openapi.yaml` darunter bleibt | geplant (M1) |
-| `http.unavailable_retry_after` | `BOTHY_HTTP__UNAVAILABLE_RETRY_AFTER` | Server |  | `5s` | `Retry-After` jeder Antwort `503 unavailable` (in ganzen Sekunden) | geplant (M1) |
+| `http.max_json_depth` | `BOTHY_HTTP__MAX_JSON_DEPTH` | Server | int | `32` | größte Schachtelungstiefe eines JSON-Körpers (SEC-IN-2); ein Test hält, dass jedes Anfrage-Beispiel in `openapi.yaml` darunter bleibt | aktiv |
+| `http.unavailable_retry_after` | `BOTHY_HTTP__UNAVAILABLE_RETRY_AFTER` | Server | duration | `5s` | `Retry-After` jeder Antwort `503 unavailable` (in ganzen Sekunden) | aktiv |
 | `database.acquire_timeout` | `BOTHY_DATABASE__ACQUIRE_TIMEOUT` | Server | duration | `2s` | Warten auf eine Pool-Verbindung | aktiv |
 | `database.statement_timeout` | `BOTHY_DATABASE__STATEMENT_TIMEOUT` | Server | duration | `5s` | Frist je SQL-Anweisung | aktiv |
 | `database.lock_timeout` | `BOTHY_DATABASE__LOCK_TIMEOUT` | Server | duration | `2s` | Frist für Sperren | aktiv |
@@ -234,7 +234,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `pin.max_per_thread` | `BOTHY_PIN__MAX_PER_THREAD` | Server |  | `50` | Anheftungen je Thread; `listPins` ist nicht seitenweise | geplant (M1) |
 | `template.name_max_chars` | `BOTHY_TEMPLATE__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Vorlagennamens in Unicode-Zeichen | geplant (M1) |
 | `template.max_per_scope` | `BOTHY_TEMPLATE__MAX_PER_SCOPE` | Server |  | `100` | Vorlagen je Person bzw. je Kanal; `listTemplates` ist nicht seitenweise | geplant (M1) |
-| `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server |  | `104857600` | Größe einer Datei | geplant (M1) |
+| `file.max_upload_bytes` | `BOTHY_FILE__MAX_UPLOAD_BYTES` | Server | int | `104857600` | Größe einer Datei | aktiv |
 | `run.excerpt_max_chars` | `BOTHY_RUN__EXCERPT_MAX_CHARS` | Server |  | `500` | Länge von `last_text_excerpt` | geplant (M2) |
 | `run.step_detail_max_bytes` | `BOTHY_RUN__STEP_DETAIL_MAX_BYTES` | Server |  | `16384` | Größe von `run_steps.detail` | geplant (M2) |
 | `run.max_steps_persisted` | `BOTHY_RUN__MAX_STEPS_PERSISTED` | Server |  | `2000` | gespeicherte Schritte je Lauf | geplant (M2) |
@@ -335,7 +335,7 @@ Quelle: [06-api.md](../spec/06-api.md), Abschnitt 20.
 |---|---|---|---|---|---|---|
 | `api.page_size_default` | `BOTHY_API__PAGE_SIZE_DEFAULT` | Server |  | `50` | Seitengröße ohne `limit` | geplant (M1) |
 | `api.page_size_max` | `BOTHY_API__PAGE_SIZE_MAX` | Server |  | `200` | größere `limit` werden gekappt | geplant (M1) |
-| `api.cors_allowed_origins` | `BOTHY_API__CORS_ALLOWED_ORIGINS` | Server |  | leer | zusätzliche Origins für CORS | geplant (M1) |
+| `api.cors_allowed_origins` | `BOTHY_API__CORS_ALLOWED_ORIGINS` | Server | list(string) | leer | zusätzliche Origins für CORS | aktiv |
 | `api.deprecation_min_notice` | `BOTHY_API__DEPRECATION_MIN_NOTICE` | Server |  | `180d` | Mindestabstand von `Deprecation` zu `Sunset` | geplant (M1) |
 | `api.major_version_overlap` | `BOTHY_API__MAJOR_VERSION_OVERLAP` | Server |  | `365d` | so lange bleibt eine alte Hauptversion nach Erscheinen der neuen | geplant (M7) |
 | `api.stats_max_buckets` | `BOTHY_API__STATS_MAX_BUCKETS` | Server |  | `1000` | Zeit-Buckets je Statistik-Abfrage; mehr ergibt `400` | geplant (M6) |
@@ -621,8 +621,8 @@ Quelle: [16-betrieb.md](../spec/16-betrieb.md), Abschnitt 14.
 | `server.role` | `BOTHY_SERVER__ROLE` | Server | enum(api, worker, all) | `all` | `api`, `worker` oder `all` | aktiv |
 | `server.listen_addr` | `BOTHY_SERVER__LISTEN_ADDR` | Server | listen address | `127.0.0.1:8080` | öffentlicher Listener (REST, Gateway) | aktiv |
 | `server.internal_listen_addr` | `BOTHY_SERVER__INTERNAL_LISTEN_ADDR` | Server | listen address | `127.0.0.1:8081` | Health, Readiness, Eingangs-Webhooks aus dem Stack | aktiv |
-| `server.public_url` | `BOTHY_SERVER__PUBLIC_URL` | Server |  | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](../spec/08-identitaet.md), Abschnitte 7.2 und 7.3) | geplant (M1) |
-| `server.trusted_proxies` | `BOTHY_SERVER__TRUSTED_PROXIES` | Server |  | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](../spec/19-sicherheit.md), SEC-TLS-1) | geplant (M1) |
+| `server.public_url` | `BOTHY_SERVER__PUBLIC_URL` | Server | url | keiner, Pflicht | Origin, unter dem Apps den Server erreichen (Schema, Host, optional Port; ohne Pfad, Query und Fragment, sonst scheitert `bothy config check`); Grundlage von `aud`, DPoP-`htu` und WebAuthn ([08-identitaet.md](../spec/08-identitaet.md), Abschnitte 7.2 und 7.3) | aktiv |
+| `server.trusted_proxies` | `BOTHY_SERVER__TRUSTED_PROXIES` | Server | list(cidr) | `127.0.0.1/32, ::1/128` | Gegenstellen, deren Weiterleitungs- und Identitäts-Kopfzeilen gelten und die Klartext senden dürfen ([19-sicherheit.md](../spec/19-sicherheit.md), SEC-TLS-1) | aktiv |
 | `server.maintenance_mode` | `BOTHY_SERVER__MAINTENANCE_MODE` | Server |  | `off` | `off` oder `read_only` (Umzug, Upgrade; [ADR 0065](../adr/0065-wartungsmodus-read-only.md)) | geplant (M7) |
 | `secrets.dir` | `BOTHY_SECRETS__DIR` | Server | string | `/run/bothy/secrets` | Basis der Standardverweise `file:`; absoluter Pfad in sauberer Form (kein `.` oder `..`, kein doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, sonst scheitert `bothy config check` | aktiv |
 | `secrets.cache_ttl` | `BOTHY_SECRETS__CACHE_TTL` | Server | duration | `5m` | so lange gilt ein gelesenes Geheimnis; mindestens `1s` | aktiv |

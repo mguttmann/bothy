@@ -4,10 +4,12 @@ package wire
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/netip"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
 
 // configCheck is a cross-check of the configuration schema.
@@ -24,6 +26,28 @@ var configChecks = []configCheck{
 	{name: "listeners_distinct", keys: []string{"server.listen_addr", "server.internal_listen_addr"}, fn: listenersDistinct},
 	{name: "json_limit_above_message", keys: []string{"http.max_json_body_bytes", "message.max_content_bytes"}, fn: jsonLimitAboveMessage},
 	{name: "egress_allowed_hosts", keys: []string{"egress.allowed_hosts"}, fn: egressAllowedHosts},
+	{name: "public_url_origin", keys: []string{"server.public_url"}, fn: publicURLOrigin},
+	{name: "cors_origins", keys: []string{"api.cors_allowed_origins"}, fn: corsOrigins},
+}
+
+// publicURLOrigin requires server.public_url to be an origin: scheme, host, optional port and
+// nothing else (16 "Konfigurationswerte"), because the DPoP htu is this origin plus the path.
+func publicURLOrigin(v *config.Values) error {
+	if err := httpserver.CheckOrigin(v.String("server.public_url")); err != nil {
+		return errors.New("server.public_url must be an origin (scheme://host[:port], no path, query or fragment): " + err.Error())
+	}
+	return nil
+}
+
+// corsOrigins requires every entry of api.cors_allowed_origins to be an origin; the chain
+// compares the Origin header with the entries exactly.
+func corsOrigins(v *config.Values) error {
+	for i, o := range v.Strings("api.cors_allowed_origins") {
+		if err := httpserver.CheckOrigin(o); err != nil {
+			return fmt.Errorf("api.cors_allowed_origins entry %d must be an origin (scheme://host[:port]): %w", i+1, err)
+		}
+	}
+	return nil
 }
 
 // listenersDistinct rejects a public and an internal listener that would bind the same socket:

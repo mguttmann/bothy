@@ -70,8 +70,12 @@ funktioniert und Änderungen eindeutig macht. Normativ in
 
 - Lint-Regel `rule/no-type-arrays-or-null` in `docs/api/redocly.yaml` (Gate G1): kein Schema mit
   Null-Typ oder Typ-Array.
-- Eigenschaftstest im Bau-Ticket M1-18: keine Antwort enthält JSON-`null`; ein Test im Bau-Ticket
-  M1-16: kein Umschlag enthält JSON-`null`.
+- Eigenschaftstest im Bau-Ticket M1-18: `TestNoNull_PropertyRandomValues` und `FuzzSanitizeJSON`
+  in `services/server/internal/platform/httpserver` (der Antwort-Schreiber entfernt `null`-Mitglieder
+  und lehnt `null`-Elemente und Ganzzahlen über 2^53 - 1 mit `500` ab; `TestNoNull_NullInArrayGives500`,
+  `TestInt53_AboveLimitGives500`, `TestNoNull_CleanBodyByteIdentical`), dazu der Harness
+  `httpservertest`, der jeden Handler-Test mit `null` in der Antwort scheitern lässt; ein Test im
+  Bau-Ticket M1-16: kein Umschlag enthält JSON-`null`.
 - Gate G7 (Schemathesis) mit eigener Prüfung "kein `null`" und Gate G8 (Antwort-Validierung in
   Integrationstests) in [06-api.md](../spec/06-api.md), Abschnitt 15.
 - Toleranz-Test G5: Die Handschicht jedes SDK überspringt ein empfangenes `null` ohne Fehler.

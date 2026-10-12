@@ -30,7 +30,7 @@ func TestEgressEnvNames(t *testing.T) {
 
 func TestEgressConfigDefaults(t *testing.T) {
 	t.Parallel()
-	v, err := config.Load(schema(t), config.Sources{})
+	v, err := config.Load(schema(t), config.Sources{Env: testEnv()})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestEgressConfigDefaults(t *testing.T) {
 
 func TestEgressConfigFromEnvironment(t *testing.T) {
 	t.Parallel()
-	v, err := config.Load(schema(t), config.Sources{Env: []string{
+	v, err := config.Load(schema(t), config.Sources{Env: []string{testPublicURL,
 		"BOTHY_EGRESS__ALLOWED_HOSTS=API.example.com:443, [2001:db8::10]:8443;allow_private,stt.example.com;allow_private",
 		"BOTHY_EGRESS__TIMEOUT=30s",
 		"BOTHY_EGRESS__MAX_RESPONSE_BYTES=2048",
@@ -82,7 +82,7 @@ func TestEgressConfigFromFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte(text), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	v, err := config.Load(schema(t), config.Sources{File: path})
+	v, err := config.Load(schema(t), config.Sources{File: path, Env: testEnv()})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestEgressIPv6FirstNeedsJSONArray(t *testing.T) {
 	if len(got) != 1 || got[0].Message != "must be a JSON array of strings or a comma-separated list" {
 		t.Errorf("comma form with a bracket first: problems %v", got)
 	}
-	v, err := config.Load(schema(t), config.Sources{Env: []string{`BOTHY_EGRESS__ALLOWED_HOSTS=["[2001:db8::10]:8443", "api.example.com"]`}})
+	v, err := config.Load(schema(t), config.Sources{Env: []string{testPublicURL, `BOTHY_EGRESS__ALLOWED_HOSTS=["[2001:db8::10]:8443", "api.example.com"]`}})
 	if err != nil {
 		t.Fatalf("JSON form: %v", err)
 	}

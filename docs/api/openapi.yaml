@@ -20530,6 +20530,7 @@ components:
       description: Tool class of an agent runtime, ordered `chat` < `scoped` < `host` (07, 2.11).
     ToolClassSet:
       type: object
+      additionalProperties: false
       required: [tool_class, reason]
       properties:
         tool_class:
@@ -20540,6 +20541,7 @@ components:
           examples: [Agent now works in a project checkout]
     BillingEvidence:
       type: object
+      additionalProperties: false
       description: How the runtime proves its actual billing mode. Never a key value or prefix (schema `billing_evidence.v1`).
       required: [key_type]
       properties:
@@ -20576,6 +20578,7 @@ components:
       description: Any JSON value except null. The schema of the value is defined by its key.
     JsonPatchOperation:
       type: object
+      additionalProperties: false
       description: One RFC 6902 operation, restricted to `add`, `replace` and `remove`.
       required: [op, path]
       properties:
@@ -20918,13 +20921,15 @@ components:
       properties:
         pointer:
           type: string
-          description: JSON Pointer to the offending member of the request body, or `#path/<name>`, `#query/<name>`, `#header/<name>` for parameters; empty for a rule of the whole request.
+          description: 'Where the violation is: a JSON Pointer (RFC 6901) to the offending member of the request body (for an unknown or missing member the pointer names that member, e.g. `/name`), or `#path/<name>`, `#query/<name>`, `#header/<name>` for parameters; empty for a rule of the whole request or the body as a whole.'
           examples: [/content_md]
         code:
           type: string
+          description: 'Machine-readable rule the field violates. Schema validation uses `required`, `unknown_member` (W7: request schemas are closed), `invalid_type`, `invalid_format`, `invalid_enum`, `too_long`, `too_short`, `too_large`, `too_small`, `too_many_items`, `too_few_items`, `pattern_mismatch` and `invalid` for any other rule; use cases add `limit_reached` and `not_enabled` (06 section 5). Clients treat unknown codes like `invalid`.'
           examples: [too_long]
         detail:
           type: string
+          description: Short English explanation; never repeats the submitted value.
     ProblemType:
       type: object
       description: Documentation of one problem type, served at its `type` URI.
@@ -21069,6 +21074,7 @@ components:
           format: int64
     BrandingUpdate:
       type: object
+      additionalProperties: false
       required: [product_name]
       properties:
         product_name:
@@ -21197,6 +21203,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     InstanceSettingPut:
       type: object
+      additionalProperties: false
       required: [value]
       properties:
         value:
@@ -21252,6 +21259,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     FlagRollout:
       type: object
+      additionalProperties: false
       description: Principals and groups for which the flag has the opposite value of `enabled`.
       properties:
         user_ids:
@@ -21264,6 +21272,7 @@ components:
             $ref: '#/components/schemas/Uuid'
     FeatureFlagPut:
       type: object
+      additionalProperties: false
       required: [enabled, reason]
       properties:
         enabled:
@@ -21284,6 +21293,7 @@ components:
             $ref: '#/components/schemas/FeatureFlag'
     SigningKeyRotate:
       type: object
+      additionalProperties: false
       required: [purpose, mode, reason]
       properties:
         purpose:
@@ -21335,6 +21345,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     IdentityProviderCreate:
       type: object
+      additionalProperties: false
       required: [kind, name, config]
       properties:
         kind:
@@ -21350,6 +21361,7 @@ components:
           type: boolean
     IdentityProviderUpdate:
       type: object
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -21372,6 +21384,7 @@ components:
       enum: [ios, android, macos, windows, web, cli]
     DeviceRegistration:
       type: object
+      additionalProperties: false
       description: Device and device keys sent with every login completion. The DPoP proof of the request must be signed with the `dpop` key (`public_jwk`); `step_up_key` is the second key with user verification (08, 6.1), absent where no secure key store exists.
       required: [device_id, name, platform, public_jwk, alg]
       properties:
@@ -21398,6 +21411,7 @@ components:
           $ref: '#/components/schemas/DeviceKeyRegistration'
     DeviceKeyRegistration:
       type: object
+      additionalProperties: false
       required: [public_jwk, alg]
       properties:
         public_jwk:
@@ -21410,6 +21424,7 @@ components:
           $ref: '#/components/schemas/JsonObject'
     PairingBeginRequest:
       type: object
+      additionalProperties: false
       required: [device]
       properties:
         device:
@@ -21428,6 +21443,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     DeviceApprove:
       type: object
+      additionalProperties: false
       required: [verification_code]
       properties:
         verification_code:
@@ -21437,6 +21453,7 @@ components:
           examples: ['042517']
     PairingApprove:
       type: object
+      additionalProperties: false
       required: [pairing_code]
       properties:
         pairing_code:
@@ -21444,6 +21461,7 @@ components:
           examples: [7KQ2-M9XD]
     PairingCompleteRequest:
       type: object
+      additionalProperties: false
       required: [pairing_id]
       properties:
         pairing_id:
@@ -21462,6 +21480,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     OidcBeginRequest:
       type: object
+      additionalProperties: false
       required: [provider_id, app_redirect_uri, client_challenge]
       properties:
         provider_id:
@@ -21492,6 +21511,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     OidcCompleteRequest:
       type: object
+      additionalProperties: false
       required: [login_code, client_verifier, device]
       properties:
         login_code:
@@ -21505,6 +21525,7 @@ components:
           $ref: '#/components/schemas/DeviceRegistration'
     TrustedHeaderLoginRequest:
       type: object
+      additionalProperties: false
       required: [device]
       properties:
         device:
@@ -21515,6 +21536,7 @@ components:
           examples: [en_EXAMPLE]
     EnrollRedeemRequest:
       type: object
+      additionalProperties: false
       description: Redeems an enrollment code with device keys only; the redeeming device becomes `active` (08, 3.2).
       required: [enrollment_code, device]
       properties:
@@ -21525,6 +21547,7 @@ components:
           $ref: '#/components/schemas/DeviceRegistration'
     ExtensionSessionCreate:
       type: object
+      additionalProperties: false
       description: Child session of the calling app session for an app extension with its own refresh family (08, 7.4).
       required: [client_component]
       properties:
@@ -21545,6 +21568,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     PasskeyLoginBeginRequest:
       type: object
+      additionalProperties: false
       properties:
         login_name:
           type: string
@@ -21552,6 +21576,7 @@ components:
           examples: [alex]
     PasskeyLoginCompleteRequest:
       type: object
+      additionalProperties: false
       required: [challenge_id, credential, device]
       properties:
         challenge_id:
@@ -21563,6 +21588,7 @@ components:
           $ref: '#/components/schemas/DeviceRegistration'
     EnrollBeginRequest:
       type: object
+      additionalProperties: false
       required: [enrollment_code]
       properties:
         enrollment_code:
@@ -21570,6 +21596,7 @@ components:
           examples: [en_4KX9-2MQA]
     EnrollCompleteRequest:
       type: object
+      additionalProperties: false
       required: [challenge_id, credential, passkey_name, device]
       properties:
         challenge_id:
@@ -21583,6 +21610,7 @@ components:
           $ref: '#/components/schemas/DeviceRegistration'
     PasswordLoginRequest:
       type: object
+      additionalProperties: false
       required: [login_name, password, totp_code, device]
       properties:
         login_name:
@@ -21598,6 +21626,7 @@ components:
           $ref: '#/components/schemas/DeviceRegistration'
     TokenRefreshRequest:
       type: object
+      additionalProperties: false
       required: [refresh_token]
       properties:
         refresh_token:
@@ -21651,6 +21680,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     StepUpPasskeyRequest:
       type: object
+      additionalProperties: false
       required: [challenge_id, credential]
       properties:
         challenge_id:
@@ -21659,6 +21689,7 @@ components:
           $ref: '#/components/schemas/JsonObject'
     StepUpDeviceKeyRequest:
       type: object
+      additionalProperties: false
       required: [challenge_id, signature]
       properties:
         challenge_id:
@@ -21733,6 +21764,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     UserCreate:
       type: object
+      additionalProperties: false
       required: [handle, display_name]
       properties:
         handle:
@@ -21765,6 +21797,7 @@ components:
           $ref: '#/components/schemas/EnrollmentCode'
     UserUpdate:
       type: object
+      additionalProperties: false
       properties:
         display_name:
           type: string
@@ -21777,6 +21810,7 @@ components:
           type: string
     ProfileUpdate:
       type: object
+      additionalProperties: false
       properties:
         display_name:
           type: string
@@ -21802,6 +21836,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     ReasonBody:
       type: object
+      additionalProperties: false
       required: [reason]
       properties:
         reason:
@@ -21810,6 +21845,7 @@ components:
           examples: [Left the team]
     OwnerAdd:
       type: object
+      additionalProperties: false
       required: [user_id, reason]
       properties:
         user_id:
@@ -21895,6 +21931,7 @@ components:
           type: boolean
     IdentityLinkBegin:
       type: object
+      additionalProperties: false
       required: [provider_id, app_redirect_uri, client_challenge]
       properties:
         provider_id:
@@ -21907,6 +21944,7 @@ components:
           examples: [E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM]
     IdentityLinkComplete:
       type: object
+      additionalProperties: false
       required: [login_code, client_verifier]
       properties:
         login_code:
@@ -21917,6 +21955,7 @@ components:
           examples: [dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk]
     PasskeyRegisterComplete:
       type: object
+      additionalProperties: false
       required: [challenge_id, credential, name]
       properties:
         challenge_id:
@@ -21928,6 +21967,7 @@ components:
           examples: [Laptop]
     LocalCredentialSet:
       type: object
+      additionalProperties: false
       description: Sets or replaces the local password, starts a TOTP enrollment (`totp_enroll`, the response carries the new secret once) or confirms it (`totp_code`). At least one member; the first call sets `password`. The password path counts as established once TOTP is confirmed (08, 2.5).
       properties:
         password:
@@ -22066,6 +22106,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     ApiTokenCreate:
       type: object
+      additionalProperties: false
       required: [name, expires_at]
       properties:
         name:
@@ -22130,6 +22171,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     GroupCreate:
       type: object
+      additionalProperties: false
       required: [name]
       properties:
         name:
@@ -22147,6 +22189,7 @@ components:
           description: Required with `source = oidc_claim`; the claim value.
     GroupUpdate:
       type: object
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -22167,6 +22210,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     GroupMemberAdd:
       type: object
+      additionalProperties: false
       required: [user_id]
       properties:
         user_id:
@@ -22228,6 +22272,7 @@ components:
           type: string
     GrantCreate:
       type: object
+      additionalProperties: false
       description: '`level` is required for every target except `host`, where it must be absent and `capabilities` must be exactly `[terminal]` (07, 2.12).'
       required: [subject_kind, subject_id, target_kind, reason]
       properties:
@@ -22459,6 +22504,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     SpaceCreate:
       type: object
+      additionalProperties: false
       required: [name]
       properties:
         name:
@@ -22479,6 +22525,7 @@ components:
           description: Insert after this space; absent inserts at the end.
     SpaceUpdate:
       type: object
+      additionalProperties: false
       description: Changes only the fields sent; `icon` and `color` cannot be cleared.
       properties:
         name:
@@ -22494,6 +22541,7 @@ components:
           description: Key of a category colour of the design system, never a hex value.
     MovePosition:
       type: object
+      additionalProperties: false
       description: New position relative to siblings. Exactly one of both fields; none moves to the start.
       properties:
         after_id:
@@ -22502,6 +22550,7 @@ components:
           $ref: '#/components/schemas/Uuid'
     OperatorSet:
       type: object
+      additionalProperties: false
       description: Operator assignment. `inherit` is only valid for channels.
       required: [mode, reason]
       properties:
@@ -22599,6 +22648,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     ChannelCreate:
       type: object
+      additionalProperties: false
       required: [kind, name]
       properties:
         kind:
@@ -22617,6 +22667,7 @@ components:
           $ref: '#/components/schemas/Uuid'
     ChannelUpdate:
       type: object
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -22634,6 +22685,7 @@ components:
           description: Removes the channel default; there is no JSON null (R-API-03).
     ChannelReadOnlySet:
       type: object
+      additionalProperties: false
       required: [read_only, reason]
       properties:
         read_only:
@@ -22697,6 +22749,7 @@ components:
           format: int64
     ChannelBehaviorPut:
       type: object
+      additionalProperties: false
       required:
       - require_mention
       - thread_require_mention
@@ -22754,6 +22807,7 @@ components:
           format: int64
     ProjectBindingPut:
       type: object
+      additionalProperties: false
       required: [workspace_ref, reason]
       properties:
         workspace_ref:
@@ -22783,6 +22837,7 @@ components:
           $ref: '#/components/schemas/ChannelBehavior'
     DmCreate:
       type: object
+      additionalProperties: false
       required: [participant_ids]
       properties:
         participant_ids:
@@ -22810,6 +22865,7 @@ components:
           $ref: '#/components/schemas/Uuid'
     SidebarStatePut:
       type: object
+      additionalProperties: false
       required: [collapsed]
       properties:
         collapsed:
@@ -22849,6 +22905,7 @@ components:
           type: boolean
     ForumTagCreate:
       type: object
+      additionalProperties: false
       required: [name]
       properties:
         name:
@@ -22864,6 +22921,7 @@ components:
           $ref: '#/components/schemas/Uuid'
     ForumTagUpdate:
       type: object
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -22954,6 +23012,7 @@ components:
             $ref: '#/components/schemas/Uuid'
     ThreadCreate:
       type: object
+      additionalProperties: false
       description: |
         Creates a forum post (with `title` and `first_message`) or a thread from a message of the
         main thread (with `parent_message_id`, optional `first_message`).
@@ -22980,6 +23039,7 @@ components:
           $ref: '#/components/schemas/Message'
     ThreadTitlePut:
       type: object
+      additionalProperties: false
       required: [title]
       properties:
         title:
@@ -22988,6 +23048,7 @@ components:
           examples: [Invoice export fails for March]
     ThreadMove:
       type: object
+      additionalProperties: false
       required: [target_channel_id, reason]
       properties:
         target_channel_id:
@@ -22997,6 +23058,7 @@ components:
           examples: [Belongs to billing]
     ThreadTagsPut:
       type: object
+      additionalProperties: false
       required: [tag_ids]
       properties:
         tag_ids:
@@ -23054,6 +23116,7 @@ components:
             $ref: '#/components/schemas/AgentSession'
     AgentSessionBind:
       type: object
+      additionalProperties: false
       required: [external_session_ref]
       properties:
         external_session_ref:
@@ -23061,6 +23124,7 @@ components:
           examples: [sess-7f3a]
     AgentSessionReport:
       type: object
+      additionalProperties: false
       required: [external_session_ref]
       properties:
         external_session_ref:
@@ -23188,6 +23252,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     MessageCreate:
       type: object
+      additionalProperties: false
       required: [client_msg_id]
       properties:
         client_msg_id:
@@ -23224,6 +23289,7 @@ components:
             $ref: '#/components/schemas/ComponentCreate'
     MessageUpdate:
       type: object
+      additionalProperties: false
       description: The server resolves the mentions of the resulting content again; `mention_ids` is an optional check as in `MessageCreate`.
       properties:
         content_md:
@@ -23332,6 +23398,7 @@ components:
           format: int64
     TemplateCreate:
       type: object
+      additionalProperties: false
       required: [name, content_md]
       properties:
         name:
@@ -23342,6 +23409,7 @@ components:
           examples: [Please escalate this ticket to second level.]
     TemplateUpdate:
       type: object
+      additionalProperties: false
       properties:
         name:
           type: string
@@ -23447,6 +23515,7 @@ components:
           examples: [180]
     UploadCreate:
       type: object
+      additionalProperties: false
       required: [name, size_bytes]
       properties:
         name:
@@ -23514,6 +23583,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     FileTicketCreate:
       type: object
+      additionalProperties: false
       required: [variant]
       properties:
         variant:
@@ -23558,6 +23628,7 @@ components:
           examples: [application/octet-stream]
     UploadPartResult:
       type: object
+      additionalProperties: false
       required: [part_number, etag]
       properties:
         part_number:
@@ -23567,6 +23638,7 @@ components:
           examples: ['"3858f62230ac3c915f300c664312c11f"']
     UploadComplete:
       type: object
+      additionalProperties: false
       required: [parts]
       properties:
         parts:
@@ -23575,6 +23647,7 @@ components:
             $ref: '#/components/schemas/UploadPartResult'
     TranscriptSubmit:
       type: object
+      additionalProperties: false
       required: [text]
       properties:
         text:
@@ -23662,6 +23735,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     ReadStatePut:
       type: object
+      additionalProperties: false
       description: Advances the read position. The server keeps the maximum of old and new.
       required: [last_read_seq]
       properties:
@@ -23706,6 +23780,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     DraftPut:
       type: object
+      additionalProperties: false
       required: [content_md]
       properties:
         content_md:
@@ -23755,6 +23830,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     UserSettingPut:
       type: object
+      additionalProperties: false
       required: [value]
       properties:
         value:
@@ -23788,6 +23864,7 @@ components:
           format: int64
     NotificationPreferencePut:
       type: object
+      additionalProperties: false
       required: [level]
       properties:
         level:
@@ -23833,6 +23910,7 @@ components:
           format: int64
     QuietHoursRuleInput:
       type: object
+      additionalProperties: false
       required: [weekdays, start_local, end_local, enabled]
       properties:
         weekdays:
@@ -23884,6 +23962,7 @@ components:
           type: string
     PushRegistrationCreate:
       type: object
+      additionalProperties: false
       required: [provider, token, app_id]
       properties:
         provider:
@@ -24093,6 +24172,7 @@ components:
           $ref: '#/components/schemas/AgentRateLimitState'
     AgentCreate:
       type: object
+      additionalProperties: false
       required: [handle, display_name, adapter_kind]
       properties:
         handle:
@@ -24112,6 +24192,7 @@ components:
           $ref: '#/components/schemas/JsonObject'
     AgentUpdate:
       type: object
+      additionalProperties: false
       properties:
         display_name:
           type: string
@@ -24122,6 +24203,7 @@ components:
           $ref: '#/components/schemas/JsonObject'
     BillingModeSet:
       type: object
+      additionalProperties: false
       required: [billing_mode, reason]
       properties:
         billing_mode:
@@ -24135,6 +24217,7 @@ components:
           examples: [Team uses the agent now]
     BillingModeSetAll:
       type: object
+      additionalProperties: false
       description: Switches several agents in one transaction, all or nothing (10, 9.1).
       required: [billing_mode, reason]
       properties:
@@ -24162,6 +24245,7 @@ components:
             $ref: '#/components/schemas/Uuid'
     CredentialHolderSet:
       type: object
+      additionalProperties: false
       required: [credential_holder_id, reason]
       properties:
         credential_holder_id:
@@ -24172,6 +24256,7 @@ components:
           examples: [Handover to deputy]
     Heartbeat:
       type: object
+      additionalProperties: false
       required: [state]
       properties:
         state:
@@ -24202,6 +24287,7 @@ components:
             $ref: '#/components/schemas/ProjectReadiness'
     ProjectReadiness:
       type: object
+      additionalProperties: false
       required: [channel_id, ready]
       properties:
         channel_id:
@@ -24220,6 +24306,7 @@ components:
           description: Interval the adapter should keep.
     ConsumerAck:
       type: object
+      additionalProperties: false
       required: [seq]
       properties:
         seq:
@@ -24250,6 +24337,7 @@ components:
       - cancelled
     RunMetrics:
       type: object
+      additionalProperties: false
       description: Schema `run_metrics.v1`.
       properties:
         context_pct:
@@ -24283,6 +24371,7 @@ components:
           $ref: '#/components/schemas/RunApiRetry'
     RunApiRetry:
       type: object
+      additionalProperties: false
       description: Last retry of a model API call, shown in the live box while set.
       required: [attempt]
       properties:
@@ -24606,6 +24695,7 @@ components:
           enum: [queued, delivered, absorbed, deferred, discarded]
     RunPatch:
       type: object
+      additionalProperties: false
       required: [base_version, ops]
       properties:
         base_version:
@@ -24627,6 +24717,7 @@ components:
           examples: [8]
     RunStart:
       type: object
+      additionalProperties: false
       required: [invocation_token, billing_mode_used]
       properties:
         invocation_token:
@@ -24646,6 +24737,7 @@ components:
           $ref: '#/components/schemas/BillingEvidence'
     RunAwaitInput:
       type: object
+      additionalProperties: false
       required: [status_line]
       properties:
         status_line:
@@ -24653,6 +24745,7 @@ components:
           examples: [Waiting for approval]
     RunFinish:
       type: object
+      additionalProperties: false
       required: [state]
       properties:
         state:
@@ -24673,6 +24766,7 @@ components:
             $ref: '#/components/schemas/CostReport'
     CostReport:
       type: object
+      additionalProperties: false
       description: Cost of one model in this run as reported by the adapter; stored as estimate.
       required: [provider, model, currency]
       properties:
@@ -24708,6 +24802,7 @@ components:
           examples: [USD]
     RunCancel:
       type: object
+      additionalProperties: false
       properties:
         reason:
           type: string
@@ -24781,6 +24876,7 @@ components:
           format: int64
     ComponentCreate:
       type: object
+      additionalProperties: false
       required: [custom_id, type, definition]
       properties:
         custom_id:
@@ -24800,6 +24896,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     ComponentUpdate:
       type: object
+      additionalProperties: false
       properties:
         state:
           type: string
@@ -24808,6 +24905,7 @@ components:
           $ref: '#/components/schemas/JsonObject'
     InteractionCreate:
       type: object
+      additionalProperties: false
       required: [client_interaction_id]
       properties:
         client_interaction_id:
@@ -24855,12 +24953,14 @@ components:
           $ref: '#/components/schemas/Timestamp'
     InteractionResponse:
       type: object
+      additionalProperties: false
       properties:
         text:
           type: string
           examples: [Refund approved]
     InteractionRespond:
       type: object
+      additionalProperties: false
       required: [state]
       properties:
         state:
@@ -24870,6 +24970,7 @@ components:
           $ref: '#/components/schemas/InteractionResponse'
     CommandOption:
       type: object
+      additionalProperties: false
       required: [name, description, type, required]
       properties:
         name:
@@ -24891,6 +24992,7 @@ components:
           type: boolean
     CommandChoice:
       type: object
+      additionalProperties: false
       required: [name, value]
       properties:
         name:
@@ -24940,6 +25042,7 @@ components:
           format: int64
     CommandRegister:
       type: object
+      additionalProperties: false
       required: [name, description]
       properties:
         name:
@@ -24971,6 +25074,7 @@ components:
             $ref: '#/components/schemas/Command'
     CommandOptionValue:
       type: object
+      additionalProperties: false
       required: [name, value]
       properties:
         name:
@@ -24981,6 +25085,7 @@ components:
           examples: ['4711']
     CommandInvoke:
       type: object
+      additionalProperties: false
       properties:
         thread_id:
           $ref: '#/components/schemas/Uuid'
@@ -25008,6 +25113,7 @@ components:
           type: boolean
     AutocompleteQuery:
       type: object
+      additionalProperties: false
       required: [option, value]
       properties:
         thread_id:
@@ -25033,6 +25139,7 @@ components:
             $ref: '#/components/schemas/CommandChoice'
     AutocompleteAnswer:
       type: object
+      additionalProperties: false
       required: [choices]
       properties:
         choices:
@@ -25041,6 +25148,7 @@ components:
             $ref: '#/components/schemas/CommandChoice'
     AppManifest:
       type: object
+      additionalProperties: false
       description: Schema `app_manifest.v1`.
       required: [schema_version, slug, name, version, scopes]
       properties:
@@ -25137,6 +25245,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     AppInstall:
       type: object
+      additionalProperties: false
       required: [manifest, granted_scopes, reason]
       properties:
         manifest:
@@ -25155,6 +25264,7 @@ components:
           examples: [Sync tickets with the help desk]
     AppScopesPut:
       type: object
+      additionalProperties: false
       required: [granted_scopes, reason]
       properties:
         granted_scopes:
@@ -25225,6 +25335,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     WebhookSubscriptionCreate:
       type: object
+      additionalProperties: false
       required: [url, event_types]
       properties:
         url:
@@ -25241,6 +25352,7 @@ components:
           description: Also sign with Standard Webhooks `v1` (HMAC); the secret is returned once.
     WebhookSubscriptionUpdate:
       type: object
+      additionalProperties: false
       properties:
         url:
           type: string
@@ -25333,6 +25445,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     IncomingWebhookCreate:
       type: object
+      additionalProperties: false
       required: [app_id, name]
       properties:
         app_id:
@@ -25363,6 +25476,7 @@ components:
             $ref: '#/components/schemas/IncomingWebhook'
     IncomingWebhookPost:
       type: object
+      additionalProperties: false
       required: [content_md]
       properties:
         content_md:
@@ -25424,6 +25538,7 @@ components:
           description: Hex.
     AuditVerifyRequest:
       type: object
+      additionalProperties: false
       properties:
         from_seq:
           type: integer
@@ -25554,6 +25669,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     PriceCreate:
       type: object
+      additionalProperties: false
       required:
       - provider
       - model
@@ -25589,6 +25705,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     PriceClose:
       type: object
+      additionalProperties: false
       required: [valid_to]
       properties:
         valid_to:
@@ -25603,6 +25720,7 @@ components:
             $ref: '#/components/schemas/Price'
     CostReconcile:
       type: object
+      additionalProperties: false
       required: [provider, period_start, period_end, entries]
       properties:
         provider:
@@ -25618,6 +25736,7 @@ components:
             $ref: '#/components/schemas/ReconcileEntry'
     ReconcileEntry:
       type: object
+      additionalProperties: false
       required: [run_id, amount_micros, currency]
       properties:
         run_id:
@@ -25640,6 +25759,7 @@ components:
             $ref: '#/components/schemas/Uuid'
     ClientMetricsBatch:
       type: object
+      additionalProperties: false
       description: Anonymous client measurements (15, section 17). No contents, no IDs of threads, channels or people.
       required: [platform, app_version, metrics]
       properties:
@@ -25663,6 +25783,7 @@ components:
             $ref: '#/components/schemas/ClientMetric'
     ClientMetric:
       type: object
+      additionalProperties: false
       required: [name, kind]
       properties:
         name:
@@ -25688,6 +25809,7 @@ components:
           description: Histogram buckets (upper bound and count).
           items:
             type: object
+            additionalProperties: false
             required: [le, count]
             properties:
               le:
@@ -25729,6 +25851,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     StatusComponentInput:
       type: object
+      additionalProperties: false
       required: [name]
       properties:
         name:
@@ -25797,6 +25920,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     StatusIncidentCreate:
       type: object
+      additionalProperties: false
       required: [title, kind, impact, started_at, component_ids, body_md]
       properties:
         title:
@@ -25819,6 +25943,7 @@ components:
           examples: [The push provider reports delays.]
     StatusIncidentUpdateCreate:
       type: object
+      additionalProperties: false
       required: [state, body_md]
       properties:
         state:
@@ -25870,6 +25995,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     ImportSourceCreate:
       type: object
+      additionalProperties: false
       required: [kind, name, config]
       properties:
         kind:
@@ -25951,6 +26077,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     GdprRequestCreate:
       type: object
+      additionalProperties: false
       required: [kind, reason]
       properties:
         subject_user_id:
@@ -25963,6 +26090,7 @@ components:
           examples: [Request by the person]
     GdprDecision:
       type: object
+      additionalProperties: false
       required: [decision, reason]
       properties:
         decision:
@@ -26837,6 +26965,7 @@ components:
       description: Page size. Default `api.page_size_default`; larger values than `api.page_size_max` are capped.
     ImageUpload:
       type: object
+      additionalProperties: false
       required: [file]
       description: Image as multipart part `file`. The server detects the type (PNG, JPEG, WebP) and re-encodes it without metadata.
       properties:
@@ -26884,6 +27013,7 @@ components:
           $ref: '#/components/schemas/Uuid'
     AgentRateLimitState:
       type: object
+      additionalProperties: false
       description: Rate-limit state of the agent runtime at its provider as reported by the adapter (`agent_heartbeat.v1`). Never quotas of an account, keys or subscription names.
       required: [state]
       properties:
@@ -27328,6 +27458,7 @@ components:
       enum: [pending, posted, skipped, failed]
     ImportObject:
       type: object
+      additionalProperties: false
       required: [origin_key, item_kind, data]
       properties:
         origin_key:
@@ -27344,6 +27475,7 @@ components:
           description: Fields of the target object, schema `import_object.<item_kind>.v1` (22, sections 5 and 6).
     ImportBatch:
       type: object
+      additionalProperties: false
       description: One transaction. Objects of one thread, in source order; structure objects (space, channel, forum tag, person) come in batches without `thread_origin_key`.
       required: [items]
       properties:
@@ -27371,6 +27503,7 @@ components:
           description: New `threads.unread_floor_seq` of the thread of this batch.
     ImportFileCreate:
       type: object
+      additionalProperties: false
       required: [origin_key, channel_id, author_id, name, size_bytes]
       properties:
         origin_key:
@@ -27402,6 +27535,7 @@ components:
           description: Absent when the file is already `posted`.
     ImportCursorSet:
       type: object
+      additionalProperties: false
       required: [cursor]
       properties:
         cursor:
@@ -27411,6 +27545,7 @@ components:
           $ref: '#/components/schemas/JsonObject'
     ImportLeadSet:
       type: object
+      additionalProperties: false
       required: [source_channel, lead]
       properties:
         source_channel:
@@ -28519,6 +28654,7 @@ components:
       enum: [macos, linux, windows]
     HostProfile:
       type: object
+      additionalProperties: false
       description: Profile reported by the host service (`host_profiles.v1`). Never a command line, path or environment.
       required: [name, display_name, kind]
       properties:
@@ -28633,6 +28769,7 @@ components:
           $ref: '#/components/schemas/Cursor'
     HostCreate:
       type: object
+      additionalProperties: false
       required: [name, reason]
       properties:
         name:
@@ -28658,6 +28795,7 @@ components:
           $ref: '#/components/schemas/Timestamp'
     HostPairRequest:
       type: object
+      additionalProperties: false
       required: [pairing_code, noise_public_key, auth_public_jwk, platform, host_version, profiles]
       properties:
         pairing_code:
@@ -28692,6 +28830,7 @@ components:
           $ref: '#/components/schemas/Uuid'
     HostUpdate:
       type: object
+      additionalProperties: false
       description: Members that are absent stay unchanged. To remove the assignee send `clear_assigned_user` (no JSON null, ADR 0053).
       required: [reason]
       properties:
@@ -28705,6 +28844,7 @@ components:
           type: string
     HostConfirm:
       type: object
+      additionalProperties: false
       required: [fingerprint_prefix, llm_credentials, declared_server_host, reason]
       properties:
         fingerprint_prefix:
@@ -28721,6 +28861,7 @@ components:
           type: string
     HostLlmCredentialsSet:
       type: object
+      additionalProperties: false
       required: [llm_credentials, reason]
       properties:
         llm_credentials:
@@ -28732,6 +28873,7 @@ components:
           type: string
     HostStateSet:
       type: object
+      additionalProperties: false
       required: [state, reason]
       properties:
         state:
@@ -28803,6 +28945,7 @@ components:
           $ref: '#/components/schemas/Cursor'
     TerminalSessionOpen:
       type: object
+      additionalProperties: false
       required: [profile, cols, rows, client_ephemeral_key_hash]
       properties:
         profile:
@@ -28828,6 +28971,7 @@ components:
           description: '`true` when the person confirmed a host key that differs from the key this device pinned earlier (docs/spec/24-terminal.md section 5.5, docs/spec/15-client-architektur.md section 23.3); recorded in the audit entry of `terminal.open`.'
     TerminalSessionAttach:
       type: object
+      additionalProperties: false
       required: [cols, rows, client_ephemeral_key_hash]
       properties:
         cols:
