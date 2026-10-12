@@ -20,6 +20,7 @@ import (
 	"go.opentelemetry.io/otel/metric"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
@@ -331,12 +332,16 @@ func randomCorrelationID() string {
 // re-raised, the net/http convention for aborting a response on purpose; so is a panic after the
 // response started, as http.ErrAbortHandler, so the client sees a broken response instead of a
 // truncated success. As the outermost step it also sets SEC-HDR-1 (SecurityHeaders) on every
-// response of the public listener.
+// response of the public listener, and it installs the request memo of kernel/authorize
+// (authorize.WithRequestScope, M1-28).
 func (c *Chain) recoverStage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		st := &outerState{}
 		ctx := context.WithValue(r.Context(), chainKey{}, c)
 		ctx = context.WithValue(ctx, stateKey{}, st)
+		// One request memo of kernel/authorize per request (02 section 9.1 step 1): the rights
+		// version is read once per request and Scope lists are built once (07 section 7.3).
+		ctx = authorize.WithRequestScope(ctx)
 		r = r.WithContext(ctx)
 		// SEC-HDR-1 is set before anything below runs, so responses written by inner components
 		// inherit it, and the secure writer applies it again before the header block goes out.

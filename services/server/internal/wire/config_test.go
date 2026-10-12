@@ -63,6 +63,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"message.max_content_bytes":          {Kind: config.KindInt, Default: "262144", Min: "1", Chapter: "03-datenmodell.md"},
 		"principal.handle_max_chars":         {Kind: config.KindInt, Default: "32", Min: "1", Chapter: "03-datenmodell.md"},
 		"principal.display_name_max_chars":   {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-datenmodell.md"},
+		"authz.snapshot_cache_max_entries":   {Kind: config.KindInt, Default: "10000", Min: "1", Chapter: "07-rechte.md"},
+		"auth.step_up_max_age":               {Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: "03-datenmodell.md"},
 		"egress.allowed_hosts":               {Kind: config.KindStringList, Default: "", Chapter: "19-sicherheit.md"},
 		"egress.timeout":                     {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "19-sicherheit.md"},
 		"egress.max_response_bytes":          {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "19-sicherheit.md"},

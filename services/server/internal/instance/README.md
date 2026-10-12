@@ -1,6 +1,6 @@
 # Modul `instance`
 
-Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. Settings, flags, signing keys and the lock-free reads (`Versions`) come with M1-46, M1-47, M1-32 and the tickets that need them.
+Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the rights version (`Versions.PermissionVersion`, `app.NewVersions`) for the rights cache of authz. Settings, flags, signing keys and the further reads of `Versions` (`event_seq` for catch-up) come with M1-46, M1-47, M1-32 and the tickets that need them.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck

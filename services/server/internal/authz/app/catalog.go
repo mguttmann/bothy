@@ -82,6 +82,15 @@ func (c *Catalog) Spec(a authorize.Action) (domain.ActionSpec, error) {
 	if ok {
 		return spec, nil
 	}
+	return domain.ActionSpec{}, c.Reject(a)
+}
+
+// Reject reports a as an action that no build of this etappe may reach: one ERROR record
+// "unknown action" with bothy.action and error.type=unknown_action, one count in
+// bothy.authz.errors, and the error of kind internal with cause unknown_action. Spec calls it for
+// an action outside the catalogue, the Authorizer for a deferred requirement entry (07 section
+// 4.2, docs/DECISIONS.md M1-28 D3).
+func (c *Catalog) Reject(a authorize.Action) error {
 	ctx := context.Background()
 	log := slog.Default()
 	if c != nil && c.log != nil {
@@ -92,7 +101,7 @@ func (c *Catalog) Spec(a authorize.Action) (domain.ActionSpec, error) {
 	if c != nil && c.counter != nil {
 		c.counter.CountError(ctx, errs.CauseUnknownAction)
 	}
-	return domain.ActionSpec{}, errs.New(errs.CodeInternalError, "").WithCause(errs.CauseUnknownAction)
+	return errs.New(errs.CodeInternalError, "").WithCause(errs.CauseUnknownAction)
 }
 
 // Class returns the rate-limit class of action for the route check of api/routes (it implements
@@ -121,7 +130,19 @@ const (
 	ViolationIncompleteRoute        = "incomplete_route"
 	ViolationUnknownMentionedAction = "unknown_mentioned_action"
 	ViolationSystemMentionedAction  = "system_mentioned_action"
+	ViolationDeferredAction         = "deferred_action"
 )
+
+// deferred reports an action whose requirement entry is deferred to a later etappe (07 section
+// 4.2): no route, op or event type may name it before the ticket that builds it.
+func deferred(id string) bool {
+	req, ok := domain.RequirementOf(id)
+	if !ok {
+		return false
+	}
+	_, d := req.Expr.DeferredTo()
+	return d
+}
 
 // Violation is one finding of VerifyRegistrations.
 type Violation struct {
@@ -164,7 +185,9 @@ func (e *RegistrationError) Error() string {
 //     modules register it;
 //  4. a terminal channel op is in the catalogue and its action is no system action;
 //  5. every registration names its module, and every route binding its operation id, method and
-//     pattern.
+//     pattern;
+//  6. no route, op, channel op or event type names an action whose requirement is deferred to a
+//     later etappe (07 section 4.2, M1-28).
 //
 // The same registration of one module twice is one registration (the Registry keeps a set). reg
 // nil is an empty registry.
@@ -202,6 +225,8 @@ func verifyRoute(r authorize.RouteBinding) []Violation {
 	switch {
 	case spec.System:
 		v.Kind, v.Message = ViolationSystemAction, fmt.Sprintf("%s: action %q is a system action, which no route may name", where, r.Action)
+	case deferred(spec.ID):
+		v.Kind, v.Message = ViolationDeferredAction, fmt.Sprintf("%s: action %q is deferred to a later etappe and cannot be a route yet", where, r.Action)
 	case spec.RateLimitClass == "":
 		v.Kind, v.Message = ViolationNoRateLimitClass, fmt.Sprintf("%s: action %q has no rate-limit class and cannot be a route", where, r.Action)
 	case spec.RateLimitClass != r.RateLimitClass:
@@ -226,6 +251,8 @@ func verifyMentioned(base Violation, where string, actions []string, system bool
 			v.Kind, v.Message = ViolationUnknownMentionedAction, fmt.Sprintf("%s: mentions action %q, which is not in the catalogue", where, id)
 		case system && spec.System:
 			v.Kind, v.Message = ViolationSystemMentionedAction, fmt.Sprintf("%s: mentions the system action %q", where, id)
+		case deferred(id):
+			v.Kind, v.Message = ViolationDeferredAction, fmt.Sprintf("%s: mentions the action %q, which is deferred to a later etappe", where, id)
 		default:
 			continue
 		}

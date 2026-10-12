@@ -13,6 +13,7 @@ const (
 	chapter04 = "04-sync-protokoll.md"
 	chapter05 = "05-aktionen.md"
 	chapter06 = "06-api.md"
+	chapter07 = "07-rechte.md"
 	chapter16 = "16-betrieb.md"
 	chapter17 = "17-observability.md"
 	chapter19 = "19-sicherheit.md"

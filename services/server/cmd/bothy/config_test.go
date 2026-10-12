@@ -160,6 +160,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"api.cors_allowed_origins =   # default\n" +
 		"audit.deny_aggregate_max_keys = 10000  # default\n" +
 		"audit.deny_aggregate_window = 1m  # default\n" +
+		"auth.step_up_max_age = 5m  # default\n" +
+		"authz.snapshot_cache_max_entries = 10000  # default\n" +
 		"database.acquire_timeout = 2s  # default\n" +
 		"database.host = localhost  # default\n" +
 		"database.idle_in_tx_timeout = 10s  # default\n" +

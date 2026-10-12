@@ -124,6 +124,9 @@ type server struct {
 	// maintenance of the job and the log tail of api and all.
 	syncCfg SyncConfig
 	sync    *Sync
+	// authorizer is the kernel/authorize.Authorizer of the process (M1-28); the use cases of later
+	// tickets receive it.
+	authorizer authorize.Authorizer
 	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
 	blocked bool
 }
@@ -150,6 +153,7 @@ type server struct {
 //     closes (startAudit),
 //     6b. sync (M1-16): build the event log over the unit of work of the audit step (appender,
 //     partition maintenance; startSync),
+//     6c. authz (M1-28): build the Authorizer with the recorder of audit (startAuthz),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
 //     sweeper, M1-19, and MountRoutes, api and all), log
@@ -301,6 +305,7 @@ func (s *server) register() {
 	r.Add(step("instance", s.loadInstance))
 	r.Add(step("audit", s.startAudit))
 	r.Add(step("sync", s.startSync))
+	r.Add(step("authz", s.startAuthz))
 	// Extension point (README.md): M1-32 adds the signing keys here.
 	r.Add(step("routes", s.mountRoutes))
 	if s.api() {
@@ -495,6 +500,38 @@ func (s *server) startAudit(ctx context.Context) error {
 	s.audit = a
 	s.mu.Unlock()
 	return nil
+}
+
+// startAuthz is start step 6b (M1-28): it builds the Authorizer of authz over the pool with the
+// recorder of the audit module (NewAuthorizer) and keeps it for the use cases of later tickets.
+func (s *server) startAuthz(context.Context) error {
+	cfg, err := AuthzConfig(s.values)
+	if err != nil {
+		return err
+	}
+	log := s.logger()
+	cat, err := NewAuthzCatalog(log)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	pool, a := s.pool, s.audit
+	s.mu.Unlock()
+	az, err := NewAuthorizer(pool, cfg, cat, a.Recorder(), s.deps.Clock, log)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.authorizer = az
+	s.mu.Unlock()
+	return nil
+}
+
+// authorizerOf returns the Authorizer of the process, nil before the step authz ran.
+func (s *server) authorizerOf() authorize.Authorizer {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.authorizer
 }
 
 func (s *server) checkSchema(ctx context.Context) error {
