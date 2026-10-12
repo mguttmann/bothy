@@ -241,3 +241,34 @@ def test_main_reports_problems(tmp_path: Path, capsys: pytest.CaptureFixture[str
 def test_missing_section_raises() -> None:
     with pytest.raises(ValueError, match="Index"):
         brief_deps.parse_index("# nothing\n")
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "M1-01 is not in the closure: do not rely on it.",
+        "Used only if merged: M1-01 (generator).",
+        "If M1-02 is on the base, add the case.",
+        "M1-02 is not in this ticket's dependency closure.",
+    ],
+)
+def test_dependency_called_optional_fails(tmp_path: Path, sentence: str) -> None:
+    """A brief must not treat a ticket of its own closure as missing or optional (D-W-106)."""
+    root = _repo(tmp_path, bodies={"M1-03": sentence})
+    found = brief_deps.check(root)
+    assert len(found) == 1
+    assert found[0].startswith("M1-03-x.md: M1-0")
+    assert "is a dependency of M1-03, but the brief calls it optional" in found[0]
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "M1-04 is not in the closure: do not rely on it.",
+        "Used only if merged: M1-04 (other check).",
+        "M1-02 is in the closure; M1-04 is not in the closure.",
+        "M1-02 reports a plan gap.",
+    ],
+)
+def test_optional_ticket_outside_closure_passes(tmp_path: Path, sentence: str) -> None:
+    assert brief_deps.check(_repo(tmp_path, bodies={"M1-03": sentence})) == []

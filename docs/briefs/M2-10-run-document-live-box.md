@@ -504,9 +504,8 @@ M1-18).
     outgoing ports of 02 "Layers within a module" rule 5: `bothy.gateway.outbound.dropped` with
     `bothy.reason = patch_replaced_by_snapshot` per dropped frame (signals.md 4.1), and
     `bothy.run.steps` with `bothy.agent.handle` and `bothy.step.kind` per step added by an
-    adapter, summary steps excluded, after the commit (signals.md 4.3). M1-68 is not in this
-    ticket's dependency closure: if its registry is not in the base branch, add only the port
-    methods with their no-op default and list both instruments as a follow-up in the report. No
+    adapter, summary steps excluded, after the commit (signals.md 4.3). M1-68 is in this
+    ticket's dependency closure through M2-02: declare both instruments in its registry. No
     other instrument; never ids, values or texts as attributes.
 14. Configuration keys used; register the missing ones in `internal/wire/configkeys_<module>.go`
     with the chapter constant, as M1-07 does, and regenerate the reference:
