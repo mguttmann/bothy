@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# golangci-lint v2 configuration of the server module (docs/spec/23-quality.md
+# "Component contract"). Module boundaries are not checked here but by go-arch-lint with the
+# configuration generated from architecture/modules.yaml (make arch).
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - bodyclose
+    - errname
+    - errorlint
+    - exhaustive
+    - gocritic
+    - gosec
+    - misspell
+    - noctx
+    - nolintlint
+    - revive
+    - unparam
+  settings:
+    nolintlint:
+      # Every suppression names its linter and says why.
+      require-explanation: true
+      require-specific: true
+    revive:
+      rules:
+        # A doc comment on every exported symbol and on every package
+        # (fixed requirement "documentation in code").
+        - name: exported
+        - name: package-comments
+  # The exclusion preset "comments" would hide missing doc comments; it stays off.
+  exclusions:
+    presets: []
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/OWNER/bothy/services/server

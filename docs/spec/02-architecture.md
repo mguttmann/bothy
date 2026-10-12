@@ -482,7 +482,9 @@ modules:
     ws_ops: []
     depends_on: [identity, authz]
     adapter_vendors: [pgx, otel]
+  # identity, authz and the other modules: entries like chat, omitted here
 vendors:                          # <group>: import paths
+  otel: [go.opentelemetry.io/otel, go.opentelemetry.io/otel/**]
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]
   river: [github.com/riverqueue/river, github.com/riverqueue/river/**]
 ```
@@ -490,7 +492,19 @@ vendors:                          # <group>: import paths
 Rules: modules appear in the order of the levels from 4.4; `tables`, `actions`, `events`,
 `ephemeral_events`, `ws_ops` and `depends_on` follow tables 4.2, 4.6, 4.7 and 4.4. The
 generator rejects unknown fields, duplicate entries, unknown modules or vendor groups, and
-cycles. A ticket that introduces a platform package or a third-party library adds its
+cycles. It also rejects keys and values that are not plain strings (tagged, for example with
+`!!binary`), entries in `testsupport.paths` under `internal`, `cmd` or `api`, entries in `exclude`
+that match `internal`, `cmd`, `api` or another directory of the module as a string prefix
+(go-arch-lint skips every path that starts with the entry, for `in` that is all of `internal/`; both
+would take product code out of the gate), and vendor patterns that are not a Go import path: the
+first element is a domain with a dot, the others contain only letters, digits, `-`, `.`, `_` and
+`~`, and `**` stands only at the end after a domain and one more fixed element. Reason: go-arch-lint turns
+every pattern into a regular expression and escapes only `.` and `/`, and `github.com/**` would
+allow almost every library (go-arch-lint v1.19.0 source:
+[`exclude` as a string prefix](https://github.com/fe3dback/go-arch-lint/blob/v1.19.0/internal/services/project/scanner/scanner.go#L121),
+[pattern to regular expression](https://github.com/fe3dback/go-arch-lint/blob/v1.19.0/internal/models/utils_path.go#L32-L38),
+retrieved 2026-10-12; `TestRunRejectsExcludePrefixOfOtherDirectories` and
+`TestArchLintVendorPatternIsLiteral` hold both). A ticket that introduces a platform package or a third-party library adds its
 entry and its vendor group in the same change; a package without an entry fails in
 `make arch` ("not attached to any component").
 
@@ -509,9 +523,11 @@ version: 3
 workdir: .
 allow:
   depOnAnyVendor: false
+  ignoreNotFoundComponents: true
 exclude: [tools]
 excludeFiles: ["^.*_test\\.go$"]
 vendors:
+  v-otel:  { in: [go.opentelemetry.io/otel, go.opentelemetry.io/otel/**] }
   v-pgx:   { in: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**] }
   v-river: { in: [github.com/riverqueue/river, github.com/riverqueue/river/**] }
 components:
@@ -520,9 +536,10 @@ components:
                         internal/kernel/designkeys] }
   kernel-ports:  { in: [internal/kernel/actor, internal/kernel/authorize, internal/kernel/txn,
                         internal/kernel/eventlog, internal/kernel/auditing,
-                        internal/kernel/idempotency, internal/kernel/personaldata] }
-  platform-pg:   { in: [internal/platform/pg, internal/platform/pg/**] }
+                        internal/kernel/idempotency, internal/kernel/personaldata,
+                        internal/kernel/measure] }
   platform-jobs: { in: [internal/platform/jobs, internal/platform/jobs/**] }
+  platform-pg:   { in: [internal/platform/pg, internal/platform/pg/**] }
   wire:          { in: [internal/wire, internal/wire/**] }
   cmd:           { in: cmd/** }
   api:           { in: api/** }
@@ -532,27 +549,58 @@ components:
   chat-adapters: { in: internal/chat/adapters/** }
 commonComponents: [kernel-core]
 deps:
-  platform-pg:   { mayDependOn: [kernel-ports], canUse: [v-pgx] }
-  platform-jobs: { mayDependOn: [kernel-ports, platform-pg], canUse: [v-river] }
-  chat:          { mayDependOn: [kernel-ports] }
-  chat-app:      { mayDependOn: [chat, chat-domain, kernel-ports, identity, authz] }
-  chat-adapters: { mayDependOn: [chat, chat-app, chat-domain, kernel-ports, platform-pg,
-                                 platform-jobs, api, identity, authz],
+  kernel-core:   { mayDependOn: [kernel-core] }
+  platform-jobs: { mayDependOn: [platform-jobs, kernel-ports, platform-pg], canUse: [v-river] }
+  platform-pg:   { mayDependOn: [platform-pg, kernel-ports], canUse: [v-pgx] }
+  chat:          { mayDependOn: [chat, kernel-ports] }
+  chat-domain:   { mayDependOn: [chat-domain] }
+  chat-app:      { mayDependOn: [chat-app, chat, chat-domain, kernel-ports, identity, authz] }
+  chat-adapters: { mayDependOn: [chat-adapters, chat, chat-app, chat-domain, kernel-ports,
+                                 platform-jobs, platform-pg, api, identity, authz],
                    canUse: [v-pgx, v-otel] }
 ```
 
-`wire` may use all module, platform and kernel components, `cmd` only `wire`, platform and
-`kernel-ports`. A component `<m>-domain` has no entry under `deps`; it may thus only use
-`kernel-core`. go-arch-lint rejects an empty `mayDependOn`; that is why the entry is missing instead
-of being empty.
+The excerpt is a part of what `tools/archgen` generates from the example in 7.1; the test
+`TestChapter02ExamplesMatchGenerator` checks example and excerpt against the generator.
+
+Every component names itself first in its `mayDependOn`: go-arch-lint allows a component to
+import its own packages only then, and the layout from section 6 needs this (subpackages of
+`domain`, `app` and `adapters`, `adapters/postgres/sqlcgen`, the test helpers
+`platform/<p>/<p>test` and `adapters/<module>test`, `api/routes` calls `api/rest`). In
+addition, `wire` may use all module, platform and kernel components, `cmd` only `wire`,
+platform and `kernel-ports`. `<m>-domain` may use only itself and `kernel-core`.
+`kernel-ports` has no entry under `deps`, because go-arch-lint rejects an empty `mayDependOn`,
+and so may use only `kernel-core`: the kernel ports do not use each other. Section 4.5 says
+only that `kernel` depends on nothing in the project; the narrower reading applies until a
+ticket justifies an edge between two ports and adjusts this rule in the same change.
+`ignoreNotFoundComponents: true` admits components whose patterns do not yet match a directory
+(`<m>-domain`, `<m>-app` and `<m>-adapters` before the first use case, `testsupport` before
+`test/` and `perf/`); without the setting, go-arch-lint v1.19.0 aborts for every such pattern
+([syntax](https://github.com/fe3dback/go-arch-lint/blob/v1.19.0/docs/syntax/README.md),
+"ignore not found components (default `false`)", retrieved 2026-10-12). A package without a
+component and an unknown component name in `mayDependOn` still fail (checked on 2026-10-11 in
+M1-05, ruling M1-05/3; `TestArchLintPackageWithoutComponent` holds the first).
+
+`make arch` rejects every symbolic link below the module before go-arch-lint runs: go-arch-lint
+does not follow a linked directory and assigns it by the path of the link, but the Go compiler
+builds the code behind it (reproduced on 2026-10-11 in M1-05 with go-arch-lint v1.19.0, ruling
+M1-05/24; `tools/ci/tests/test_make_server_gates.py` holds the rejection).
 
 Checked on 2026-10-10 on a skeleton with all modules from section 4.2 (Go 1.27.2, go-arch-lint
 v1.19.0): a clean skeleton yields "No warnings found", exit code 0. Four inserted violations were
 all reported, exit code 1: `chat/domain` imports pgx; `chat/app` imports the port of
 `messaging`; `messaging/app` imports `runs/app`; a new package `chat/util` without a component
 ("not attached to any component"). The last point is intended: new packages must go into the
-register. The form with platform components has not yet run on this skeleton; M1-05 proves it with
-the same four violations ([ADR 0050](../adr/0050-module-register-as-the-source-for-architecture-gate-and-table-ownership.md), "Confirmation").
+register. Since M1-05, the tests in `tools/archgen` confirm the form with platform components on a
+skeleton with a platform package and a driver stub: `TestArchLintSkeletonClean` (exit code 0)
+and the four violations `TestArchLintDomainImportsDriver`, `TestArchLintAppImportsForeignPort`,
+`TestArchLintAppImportsForeignApp` (there `messaging/app` imports the app of the allowed module
+`chat`) and `TestArchLintPackageWithoutComponent` (exit code 1 with the package path), plus
+`TestArchLintTestSupport` for the component `testsupport`, `TestArchLintChapter02Layout` (the
+layout from section 6 with several packages per component, exit code 0) and
+`TestArchLintLayersStayClosed` (domain uses its own adapters or app, port uses its own domain,
+app uses a subpackage of a foreign app, a kernel port uses another one: exit code 1)
+([ADR 0050](../adr/0050-module-register-as-the-source-for-architecture-gate-and-table-ownership.md), "Confirmation").
 
 ### 7.3 Other checks in the gate
 

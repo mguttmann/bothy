@@ -1,0 +1,41 @@
+# SPDX-License-Identifier: Apache-2.0
+# Register of the go-arch-lint fixture: three modules, one platform package, one vendor group;
+# third_party holds stubs of pgx and of a library outside every vendor group.
+version: 1
+exclude: [tools, third_party]
+kernel:
+  core: [ids, clock]
+  ports: [txn, actor]
+platform:
+  pg: {vendors: [pgx]}
+wire: {vendors: []}
+cmd: {vendors: []}
+api: {vendors: []}
+testsupport: {paths: [test, perf]}
+modules:
+  chat:
+    tables: [channels]
+    actions: [channel.read]
+    events: [channel.created]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: []
+    adapter_vendors: [pgx]
+  messaging:
+    tables: [messages]
+    actions: [message.create]
+    events: [message.created]
+    ephemeral_events: [message.typing]
+    ws_ops: [typing]
+    depends_on: [chat]
+    adapter_vendors: []
+  runs:
+    tables: [runs]
+    actions: [run.start]
+    events: [run.started]
+    ephemeral_events: []
+    ws_ops: []
+    depends_on: [chat, messaging]
+    adapter_vendors: []
+vendors:
+  pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]

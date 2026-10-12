@@ -83,10 +83,24 @@ in one readable place and every check in the local gate is generated from it. Fo
 
 - `make arch` (go-arch-lint, exit code 0) and `make codegen-check` (generated `.go-arch-lint.yml`
   equal to the generator result) in the target `gates`.
-- `go test ./tools/archgen/...` with fixture modules: domain imports a driver, app imports another
-  module's port, app imports another module's app, package without a component; all four fail as
-  expected ([02-architecture.md](../spec/02-architecture.md), section 7.2). M1-05 proves the form
-  with platform components with the same four violations.
+- `go test ./tools/archgen/...` with fixture modules (PLAN M1-05, form with platform components):
+  `TestArchLintSkeletonClean` (clean skeleton, exit code 0), `TestArchLintDomainImportsDriver`
+  (domain imports a driver), `TestArchLintAppImportsForeignPort` (app imports a foreign port),
+  `TestArchLintAppImportsForeignApp` (app imports a foreign app),
+  `TestArchLintPackageWithoutComponent` (package without component); the four violations fail with
+  exit code 1 and the package path ([02-architecture.md](../spec/02-architecture.md), section 7.2).
+  `TestArchLintTestSupport`: `test/**` may use everything, no production component may use it.
+  `TestArchLintChapter02Layout`: the layout from 02 with several packages per component (`sqlcgen`,
+  `pgtest`, subpackages, `api/routes` calls `api/rest`) passes; `TestArchLintLayersStayClosed`:
+  the self entries open no other edge; `TestArchLintVendorPatternIsLiteral`: a vendor pattern
+  allows only the named libraries.
+- Generator: `TestGenerateGolden`, `TestGenerateIsDeterministic`, `TestRegisterRejects` (one case
+  per check rule of the register), `TestImportPathRule` (vendor patterns only as a Go import path),
+  `TestRunRejectsExcludePrefixOfOtherDirectories` (`exclude` acts as a string prefix),
+  `TestRepositoryRegisterIsValid` and
+  `TestRepositoryConfigIsCurrent` (the checked-in `.go-arch-lint.yml` equals the generator result
+  from `architecture/modules.yaml` byte for byte), `TestChapter02ExamplesMatchGenerator`
+  (register example and generated excerpt in 02, sections 7.1 and 7.2, match the generator).
 - Fixture for table ownership: a query in module A names a table of module B; the
   check fails with file and table.
 - Completeness check against the migrations, 03 and `actions.yaml`; docs reconciliation with 02.
