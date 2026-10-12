@@ -39,7 +39,7 @@ one. Error messages never name the checked text.
 | `bool` | `true` or `false` | `true` |
 | `int` | whole number in base ten in the range of int64, optionally with a leading `-`; no `+`, no separator, no exponent, no hexadecimal number | `1048576` |
 | `float` | finite decimal number: optional `-`, digits with an optional fractional part or only a fractional part (`.5`), optionally an exponent `e` or `E` with an optional sign; no leading `+`, no `inf`, no `NaN`, no hexadecimal number | `0.05` |
-| Duration (`duration`) | exactly `(0\|[1-9][0-9]*)(ms\|s\|m\|h\|d)`: a number without sign, fraction or leading zero and exactly one unit, `d` = 24 h. No composition such as `1h30m`; a duration above the largest duration of Go (`time.Duration`, int64 nanoseconds) is an error, so the largest whole number depends on the unit (`106751d`, `2562047h`) | `250ms`, `30d` |
+| Duration (`duration`) | exactly `(0\|[1-9][0-9]*)(ms\|s\|m\|h\|d)`: a number without sign, fraction or leading zero and exactly one unit, `d` = 24 h. No composition such as `1h30m`; a duration above the largest duration of Go (`time.Duration`, int64 nanoseconds, [time.Duration](https://pkg.go.dev/time#Duration), retrieved 2026-10-12) is an error, so the largest whole number depends on the unit (`106751d`, `2562047h`) | `250ms`, `30d` |
 | List (`list(string)`) | environment and default value: a JSON array of strings if the text starts with `[`, otherwise separated by commas with the whitespace around each element removed; empty text is the empty list; an empty element is an error. File: YAML list of scalars or one scalar in the form of the environment | `a.example.com, b.example.com`, `["x,y"]` |
 | Prefix list (`list(cidr)`) | like `list(string)`; every element is an IPv4 or IPv6 prefix in CIDR form without set host bits (`192.0.2.10/24` is an error) | `BOTHY_SERVER__TRUSTED_PROXIES=192.0.2.10/32,198.51.100.0/24` |
 | `listen address` | `host:port`; host empty (`:port` means all interfaces) or an IP literal, IPv6 in brackets, no DNS name; port in decimal from 0 to 65535 without a leading zero | `127.0.0.1:8080`, `[::1]:8081`, `:8080` |
@@ -58,7 +58,8 @@ Keys never contain two consecutive underscores; this makes the naming rule rever
    effective value of a key `*_ref` names ([16-operations.md](../spec/16-operations.md) 5.1).
    Variables without the prefix `BOTHY_` are ignored. If a variable appears twice in the
    environment of the process, the server sees only the first entry (this is how the Go runtime
-   passes the environment); it does not check the second. `BOTHY_CONFIG_FILE` applies only when
+   passes the environment, [syscall/env_unix.go](https://github.com/golang/go/blob/836fa745188fddf49070d010161e30f360862e57/src/syscall/env_unix.go#L20-L38),
+   retrieved 2026-10-12); it does not check the second. `BOTHY_CONFIG_FILE` applies only when
    `--config` is missing; empty means no file. `--config` with an empty path is a usage error.
 2. Type and range errors abort the startup, also for a value that a higher source overrides. A
    required key needs a non-empty value from file, environment or flag. After that, the cross
