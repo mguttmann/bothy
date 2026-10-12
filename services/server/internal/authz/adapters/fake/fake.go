@@ -101,13 +101,16 @@ func (s *Principals) ActiveOwnerIDs(_ context.Context) ([]ids.ID, error) {
 	return sortIDs(out), nil
 }
 
-// Structure is an in-memory authz.StructureSource.
+// Structure is an in-memory authz.StructureSource. ServedTargets follows the rules of its doc
+// comment from the channels, the threads and the default operators set with SetDefaultOperator.
 type Structure struct {
 	failer
-	mu       sync.Mutex
-	spaces   map[ids.ID]bool
-	channels map[ids.ID]authz.ChannelFacts
-	threads  map[ids.ID]authz.ThreadFacts
+	mu              sync.Mutex
+	spaces          map[ids.ID]bool
+	channels        map[ids.ID]authz.ChannelFacts
+	threads         map[ids.ID]authz.ThreadFacts
+	defaultOperator map[ids.ID]ids.ID
+	archivedSpaces  map[ids.ID]bool
 }
 
 // Compile-time check.
@@ -115,7 +118,73 @@ var _ authz.StructureSource = (*Structure)(nil)
 
 // NewStructure returns an empty structure.
 func NewStructure() *Structure {
-	return &Structure{spaces: map[ids.ID]bool{}, channels: map[ids.ID]authz.ChannelFacts{}, threads: map[ids.ID]authz.ThreadFacts{}}
+	return &Structure{spaces: map[ids.ID]bool{}, channels: map[ids.ID]authz.ChannelFacts{}, threads: map[ids.ID]authz.ThreadFacts{},
+		defaultOperator: map[ids.ID]ids.ID{}, archivedSpaces: map[ids.ID]bool{}}
+}
+
+// SetSpaceArchived marks space archived for SpaceArchived; channels report their own Archived.
+func (s *Structure) SetSpaceArchived(space ids.ID, archived bool) {
+	s.mu.Lock()
+	s.archivedSpaces[space] = archived
+	s.mu.Unlock()
+}
+
+// SpaceArchived implements authz.StructureSource.
+func (s *Structure) SpaceArchived(_ context.Context, id ids.ID) (bool, error) {
+	if err := s.err(); err != nil {
+		return false, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.archivedSpaces[id], nil
+}
+
+// SetDefaultOperator sets the default operator of space; the zero agent removes it. It only
+// feeds ServedTargets: the effective operator of a channel stays what PutChannel stored.
+func (s *Structure) SetDefaultOperator(space, agent ids.ID) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if agent.IsZero() {
+		delete(s.defaultOperator, space)
+		return
+	}
+	s.defaultOperator[space] = agent
+}
+
+// ServedTargets implements authz.StructureSource: channels that are not archived with the agent
+// as effective operator or as the fixed operator of a non-main thread, and the spaces with the
+// agent as default operator; guest channels never count, dm channels have no agents.
+func (s *Structure) ServedTargets(_ context.Context, agentID ids.ID) ([]authz.ChannelRef, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	seen := map[authz.ChannelRef]bool{}
+	for _, c := range s.channels {
+		if c.Kind != authz.ChannelDM && !c.Archived && c.EffectiveOperatorID == agentID {
+			seen[authz.ChannelRef{ChannelID: c.ID, SpaceID: c.SpaceID}] = true
+		}
+	}
+	for _, t := range s.threads {
+		c, ok := s.channels[t.ChannelID]
+		if ok && !t.Main && t.OperatorAgentID == agentID && c.Kind != authz.ChannelDM && !c.Archived {
+			seen[authz.ChannelRef{ChannelID: c.ID, SpaceID: c.SpaceID}] = true
+		}
+	}
+	for space, agent := range s.defaultOperator {
+		if agent == agentID {
+			seen[authz.ChannelRef{SpaceID: space}] = true
+		}
+	}
+	out := slices.Collect(maps.Keys(seen))
+	slices.SortFunc(out, func(a, b authz.ChannelRef) int {
+		if c := slices.Compare(a.SpaceID[:], b.SpaceID[:]); c != 0 {
+			return c
+		}
+		return slices.Compare(a.ChannelID[:], b.ChannelID[:])
+	})
+	return out, nil
 }
 
 // PutSpace adds a space.
@@ -237,6 +306,7 @@ type Policies struct {
 	mu       sync.Mutex
 	policies map[ids.ID]authz.AgentPolicy
 	ready    map[[2]ids.ID]bool
+	inactive map[ids.ID]bool
 }
 
 // Compile-time check.
@@ -244,7 +314,7 @@ var _ authz.AgentPolicySource = (*Policies)(nil)
 
 // NewPolicies returns an empty source.
 func NewPolicies() *Policies {
-	return &Policies{policies: map[ids.ID]authz.AgentPolicy{}, ready: map[[2]ids.ID]bool{}}
+	return &Policies{policies: map[ids.ID]authz.AgentPolicy{}, ready: map[[2]ids.ID]bool{}, inactive: map[ids.ID]bool{}}
 }
 
 // Put sets the policy of agentID.
@@ -270,6 +340,36 @@ func (s *Policies) AgentPolicy(_ context.Context, agentID ids.ID) (authz.AgentPo
 	defer s.mu.Unlock()
 	p, ok := s.policies[agentID]
 	return p, ok, nil
+}
+
+// PersonalAgents implements authz.AgentPolicySource: the agents whose policy is personal and that
+// are not marked inactive with SetActive.
+func (s *Policies) PersonalAgents(_ context.Context) ([]authz.PersonalAgent, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []authz.PersonalAgent
+	for id, p := range s.policies {
+		if p.BillingMode == "personal" && !s.inactive[id] {
+			out = append(out, authz.PersonalAgent{AgentID: id, CredentialHolderID: p.CredentialHolderID})
+		}
+	}
+	slices.SortFunc(out, func(a, b authz.PersonalAgent) int { return slices.Compare(a.AgentID[:], b.AgentID[:]) })
+	return out, nil
+}
+
+// SetActive marks agentID active (the default) or inactive for PersonalAgents, which lists active
+// agents only (agent.enable, 10 section 5.1).
+func (s *Policies) SetActive(agentID ids.ID, active bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if active {
+		delete(s.inactive, agentID)
+		return
+	}
+	s.inactive[agentID] = true
 }
 
 // DevEnvironmentReady implements authz.AgentPolicySource.

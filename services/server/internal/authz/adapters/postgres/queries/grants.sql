@@ -34,3 +34,22 @@ SELECT sqlc.embed(g)
 FROM grants g
 WHERE g.subject_group_id = ANY (@group_ids::uuid[]) AND g.revoked_at IS NULL
 ORDER BY g.id;
+
+-- name: ListActiveTriggerGrants :many
+-- The I1 check (03 section 6.4, 10 section 5.3) filters expiry and served targets in the domain,
+-- so one clock decides; hosts carry no level.
+SELECT sqlc.embed(g)
+FROM grants g
+WHERE g.level = 'trigger' AND g.revoked_at IS NULL
+ORDER BY g.id;
+
+-- name: ListActiveGrantsOnTargets :many
+-- Grants on the instance and on the given spaces and channels: the subjects a rights change on a
+-- target affects (02 section 8.1).
+SELECT sqlc.embed(g)
+FROM grants g
+WHERE g.revoked_at IS NULL
+  AND (g.target_kind = 'instance'
+       OR g.target_space_id = ANY (@space_ids::uuid[])
+       OR g.target_channel_id = ANY (@channel_ids::uuid[]))
+ORDER BY g.id;

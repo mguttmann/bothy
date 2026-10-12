@@ -1,6 +1,6 @@
 # Modul `authz`
 
-Status: Gerüst (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the rights snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). Rights changes (M1-29) and the use cases (M1-48) follow.
+Status: Gerüst (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the rights snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below); their HTTP routes come with M1-48, the expiry jobs with M1-30.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -15,13 +15,14 @@ Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.
 - `app/` (M1-25): `catalog.go` with the catalogue service `Catalog` (`Spec`, `Class`, `VerifyRegistrations`).
 - `adapters/telemetry/` (M1-25): `ErrorCounter`, the counter `bothy.authz.errors` behind `app.ErrorCounter`; the register allows this module's adapters the vendor groups `otel` (M1-25) and `pgx` (M1-27).
 - `domain/` (M1-27): the pure rules of the grant model, without clock, database or other modules. `levels.go` (`Level`, `ParseLevel`, `MaxLevel`, `MinLevel`), `caps.go` (`Capability`, `Caps` as a bit set, `ParseCaps`, `Names` for the `text[]` column), `grant.go` (`Subject`, `Target`, `Grant`, `NewGrant` with the shape checks of `grants`), `group.go` (`Group`, `Membership`, `MembershipWithGroup`, `NewGroup`, `NewMembership`), `validity.go` (`Grant.InEffect`, `Membership.InEffect`, `NextExpiry`; 07 section 2.5: at `expires_at = t` a grant or membership is already invalid), `delegation.go` (`CheckCreate`, `CheckRevoke`; R-AZ-05, 07 section 2.6) and `reasons.go` (the four denial reasons the delegation rules return).
-- `app/` (M1-27): the outgoing port `Store` over the three tables. "Active" means not revoked or removed; time filtering stays in the domain so one clock decides. Every write is a rights change and must run inside a unit of work marked `txn.RightsChange` (M1-29 enforces this).
+- `app/` (M1-27): the outgoing port `Store` over the three tables. "Active" means not revoked or removed; time filtering stays in the domain so one clock decides. Writes of memberships and grants and the deletion of a group must run inside a unit of work declared as a rights change and fail with kind internal otherwise (enforced since M1-29); creating and renaming a group are no rights change.
 - `adapters/postgres/` (M1-27): sqlc queries in `queries/`, generated code in `sqlcgen/`, `Repository` (implements `app.Store`) and the error mapping (unique violation: `conflict` on `/name`, `/user_id` or `/external_ref`; check, trigger, foreign key: `validation_failed` with the field of the constraint; never SQL text or values). There is no delete query and no general update of a grant.
+- `app/` (M1-29): `rightschange.go` with `RightsHook` (`Begin`, `BeforeCommit`, `AddAffected`, `VerifyInvariants`, `Bind`) and `admin.go` with `AdminService`, the implementation of the port `Admin`. `domain/` (M1-29): `triggerset.go` (`World`, `TriggerSet`), `diff.go` (`AccessView`, `AccessViewOf`, `DiffVisible`, `PrincipalDiff`), the archived cap in `Effective` and `CheckGroupText`. Root package (M1-29): `admin.go` (`Admin`, its commands and records, `RightsChanges`, `Register`) and `errors.go` (`InvariantError`, `I1Conflict`, `HintI1`, `HintLastOwner`).
 - Their components come from `tools/archgen` and `architecture/modules.yaml`; a package outside these layers fails in `make arch`.
 
 ## Port (Wurzelpaket `internal/authz`)
 
-- Eingehend: `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`.
+- Eingehend: `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`. Built in M1-29: `Admin` with `CreateGroup`, `UpdateGroup`, `DeleteGroup`, `AddGroupMember`, `RemoveGroupMember`, `CreateGrant`, `RevokeGrant`, and `RightsChanges.AddAffected`. The source ports gained `PrincipalSource.ActiveOwnerIDs` (M1-26), `StructureSource.ServedTargets` and `SpaceArchived`, `ChannelFacts.Archived` and `AgentPolicySource.PersonalAgents`; `internal/wire` passes empty sources until M1-51 (agents), M1-52, M1-53 and M1-54 (chat).
 - Gibt In-Tx-Ereignisse aus: kernel `authorize.AccessChanged` (mit der auslösenden Aktion; `runs` bricht bei `user.disable` mit Grund `user_disabled` ab, sonst mit `access_revoked`).
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `authorize.Authorizer`, `instance.FlagGroupSource`.
@@ -160,3 +161,66 @@ Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the pa
 ## Kapitel
 
 [02-architektur.md](../../../../docs/spec/02-architektur.md), [07-rechte.md](../../../../docs/spec/07-rechte.md)
+
+## Rights changes (M1-29)
+
+Every rights change runs through one transactional path (02 section 8.1). A use case declares it
+with `txn.DeclareRightsChange` (action of the catalogue with column "Rechte" = ja, the resource of
+the deny entry, the affected principals, or targets); `platform/pg` then runs the hooks of
+`app.RightsHook` that `internal/wire` registers:
+
+1. **Phase 1, `Begin`.** First statement of the transaction: `permission_version` is locked and
+   raised through `instance.Counters` (03 section 6.3), then the views (visible spaces, visible
+   channels with level and capabilities) of the declared principals are recorded. For declared
+   targets authz derives the affected itself: subjects of grants in effect on the target, its
+   ancestors and, for a space, its channels (group members expanded), the active owners and the
+   effective operators. Views use the snapshot and `Effective` of `Authorize`, never the cache.
+2. **Phase 2, the use case.** It writes; a principal it learns about only now (a new operator)
+   it names with `RightsChanges.AddAffected` before writing rows that concern it.
+3. **Phase 3.1, `BeforeCommit`.** `VerifyInvariants` (SR8: at least one active owner; I1: for
+   every active personal agent the trigger set over its served targets is exactly its credential
+   holder). A violation rolls the unit back with `InvariantError` (`409 last_owner` before
+   `409 i1_violation`, the problem body carries `conflicts`), and the deny entry goes to
+   `auditing.Recorder.RecordDenial`, which writes it in its own transaction. Otherwise one
+   `access.changed` per principal with a non-empty difference is appended and
+   `authorize.AccessChanged` is published once; a subscriber veto rolls everything back.
+
+The store refuses writes of memberships and grants and the deletion of a group outside a unit
+declared as a rights change, and the Authorizer neither reads nor fills its cache or version memo
+inside one (the unit sees an uncommitted version). A hook that is not bound (`Bind` with the
+appender and the recorder, start step `authz`) fails every rights change.
+
+### How another module declares a rights change
+
+```go
+err := uow.Do(ctx, func(ctx context.Context) error {
+	if err := rights.AddAffected(ctx, newOperator); err != nil { // authz.RightsChanges
+		return err
+	}
+	return repo.SetOperator(ctx, channelID, newOperator)
+}, txn.DeclareRightsChange(txn.RightsChangeSpec{
+	Action:     string(authorize.ActionChannelOperatorSet),
+	Resource:   txn.Ref{Kind: string(authorize.ResourceChannel), ID: channelID},
+	Principals: []ids.ID{oldOperator},
+}))
+// err is an *authz.InvariantError for i1_violation or last_owner; nothing was written.
+```
+
+### `access.changed`
+
+Personal event (04 section 2.2): `audience = self`, resource `principal`, no scope, the actor of
+the request (`system` for a system action without one), payload `AccessChangedPayload` with the
+version of phase 1 and the lists `added`, `removed`, `changed` (always present, sorted by kind and
+id; spaces only appear or disappear; channels carry level and capabilities, changed ones also
+`previous_level`). A change without visible effect raises the version and writes no event.
+
+### Admin
+
+Each method loads the resource, authorizes it (step-up for all, the delegation guard of
+`grant.create` and `grant.revoke`, 07 section 2.6), runs in one unit of work and records the allow
+entry in it (ids and codes only, the reason as `ReasonText`). Calls without effect (deleting a
+deleted group, removing a removed or expired membership, revoking a revoked grant, an update
+without change) succeed without rights version and audit `no_change: true`; they decide that in
+a first unit without rights change. Missing and invisible resources give the same `404`.
+Grants on hosts give `404` until M2-39 adds hosts. `group.name_max_chars` and
+`group.description_max_chars` reach `AdminDeps.Limits` with M1-48, which wires the service.

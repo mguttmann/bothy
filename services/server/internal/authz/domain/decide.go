@@ -228,8 +228,12 @@ func decideVisibility(in *Input) (Decision, bool, error) {
 }
 
 // decideRequirement is step 6 with the app scope and the read-only channel (05 rule 1.8: manage
-// and owner paths stay open).
+// and owner paths stay open). In an archived channel a requirement that needs write or trigger
+// fails with channel_archived before any other reason (07 section 4.5 point 1).
 func decideRequirement(in *Input) (Decision, bool, error) {
+	if d, done, err := decideArchived(in); done || err != nil {
+		return d, done, err
+	}
 	ok, reason, err := evaluate(in, in.Req, in.Eff, false)
 	if err != nil {
 		return Decision{}, true, err
@@ -251,6 +255,19 @@ func decideRequirement(in *Input) (Decision, bool, error) {
 		if ok, _, _ := evaluate(in, in.Req, in.Eff, true); !ok {
 			return deny(OutcomeForbidden, ReasonChannelReadOnly), true, nil
 		}
+	}
+	return Decision{}, false, nil
+}
+
+// decideArchived denies a requirement above read in an archived channel (07 section 4.5 point 1);
+// manage and owner paths stay open like in a read-only channel.
+func decideArchived(in *Input) (Decision, bool, error) {
+	if !in.Path.Archived {
+		return Decision{}, false, nil
+	}
+	ok, _, err := evaluate(in, in.Req, in.Eff, true)
+	if err != nil || !ok {
+		return deny(OutcomeForbidden, ReasonChannelArchived), true, err
 	}
 	return Decision{}, false, nil
 }

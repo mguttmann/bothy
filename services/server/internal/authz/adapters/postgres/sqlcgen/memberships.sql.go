@@ -40,6 +40,59 @@ func (q *Queries) InsertMembership(ctx context.Context, arg InsertMembershipPara
 	return err
 }
 
+const listActiveMembershipsOfGroups = `-- name: ListActiveMembershipsOfGroups :many
+SELECT m.id, m.group_id, m.user_id, m.added_by, m.added_at, m.expires_at, m.expiry_reminded_at, m.expiry_reported_at, m.removed_at, m.removed_by, g.id, g.name, g.description, g.source, g.provider_id, g.external_ref, g.created_by, g.created_at, g.deleted_at
+FROM group_memberships m
+JOIN groups g ON g.id = m.group_id
+WHERE m.group_id = ANY ($1::uuid[]) AND m.removed_at IS NULL
+ORDER BY m.id
+`
+
+type ListActiveMembershipsOfGroupsRow struct {
+	GroupMembership GroupMembership
+	Group           Group
+}
+
+func (q *Queries) ListActiveMembershipsOfGroups(ctx context.Context, groupIds []pgtype.UUID) ([]ListActiveMembershipsOfGroupsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveMembershipsOfGroups, groupIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActiveMembershipsOfGroupsRow
+	for rows.Next() {
+		var i ListActiveMembershipsOfGroupsRow
+		if err := rows.Scan(
+			&i.GroupMembership.ID,
+			&i.GroupMembership.GroupID,
+			&i.GroupMembership.UserID,
+			&i.GroupMembership.AddedBy,
+			&i.GroupMembership.AddedAt,
+			&i.GroupMembership.ExpiresAt,
+			&i.GroupMembership.ExpiryRemindedAt,
+			&i.GroupMembership.ExpiryReportedAt,
+			&i.GroupMembership.RemovedAt,
+			&i.GroupMembership.RemovedBy,
+			&i.Group.ID,
+			&i.Group.Name,
+			&i.Group.Description,
+			&i.Group.Source,
+			&i.Group.ProviderID,
+			&i.Group.ExternalRef,
+			&i.Group.CreatedBy,
+			&i.Group.CreatedAt,
+			&i.Group.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listActiveMembershipsOfUser = `-- name: ListActiveMembershipsOfUser :many
 SELECT m.id, m.group_id, m.user_id, m.added_by, m.added_at, m.expires_at, m.expiry_reminded_at, m.expiry_reported_at, m.removed_at, m.removed_by, g.id, g.name, g.description, g.source, g.provider_id, g.external_ref, g.created_by, g.created_at, g.deleted_at
 FROM group_memberships m
@@ -83,6 +136,54 @@ func (q *Queries) ListActiveMembershipsOfUser(ctx context.Context, userID pgtype
 			&i.Group.CreatedBy,
 			&i.Group.CreatedAt,
 			&i.Group.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listMembershipsOfUserInGroup = `-- name: ListMembershipsOfUserInGroup :many
+SELECT m.id, m.group_id, m.user_id, m.added_by, m.added_at, m.expires_at, m.expiry_reminded_at, m.expiry_reported_at, m.removed_at, m.removed_by
+FROM group_memberships m
+WHERE m.group_id = $1 AND m.user_id = $2
+ORDER BY m.id
+`
+
+type ListMembershipsOfUserInGroupParams struct {
+	GroupID pgtype.UUID
+	UserID  pgtype.UUID
+}
+
+type ListMembershipsOfUserInGroupRow struct {
+	GroupMembership GroupMembership
+}
+
+// Removed rows included: group.member.remove tells "never a member" from "already removed".
+func (q *Queries) ListMembershipsOfUserInGroup(ctx context.Context, arg ListMembershipsOfUserInGroupParams) ([]ListMembershipsOfUserInGroupRow, error) {
+	rows, err := q.db.Query(ctx, listMembershipsOfUserInGroup, arg.GroupID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMembershipsOfUserInGroupRow
+	for rows.Next() {
+		var i ListMembershipsOfUserInGroupRow
+		if err := rows.Scan(
+			&i.GroupMembership.ID,
+			&i.GroupMembership.GroupID,
+			&i.GroupMembership.UserID,
+			&i.GroupMembership.AddedBy,
+			&i.GroupMembership.AddedAt,
+			&i.GroupMembership.ExpiresAt,
+			&i.GroupMembership.ExpiryRemindedAt,
+			&i.GroupMembership.ExpiryReportedAt,
+			&i.GroupMembership.RemovedAt,
+			&i.GroupMembership.RemovedBy,
 		); err != nil {
 			return nil, err
 		}

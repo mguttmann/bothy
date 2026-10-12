@@ -5,7 +5,8 @@
 // view of the request principal, and the Authorizer (Authorize, Scope for lists) with the pinned
 // rights version, the request memo (WithRequestScope) and filter mode (Filter). The authz module
 // implements it (M1-28); every module uses it. Observe for events of the log, the delivery mode
-// and the in-transaction event AccessChanged come with M1-65 and M1-29.
+// and the in-transaction event AccessChanged come with M1-65 and M1-29 (AccessChanged is here since
+// M1-29).
 //
 // The closed catalogue (M1-25): catalog_ids_gen.go, written by tools/catalogen, declares the
 // identifier types Action, EventType, Op, ResourceKind and ChannelOp with one constant per

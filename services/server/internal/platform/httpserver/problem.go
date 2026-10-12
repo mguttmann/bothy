@@ -11,6 +11,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -108,7 +109,9 @@ type fieldError struct {
 // correlation_id from kernel/reqmeta, instance (the request path without query, with every
 // {token} segment of the route template kept as the literal {token}; unmatched requests have no
 // instance, because no route says which segments are secret), and detail, errors[], current,
-// reason and hint when the error carries them. The headers of the error (WWW-Authenticate,
+// reason and hint when the error carries them, and the extension members of an
+// errs.ProblemExtender in the chain of err (never over a standard member, never null, never for
+// internal_error). The headers of the error (WWW-Authenticate,
 // DPoP-Nonce, Allow) are applied; 503 unavailable and maintenance always carry Retry-After
 // (http.unavailable_retry_after unless the error names its own), 429 when the error names one.
 //
@@ -124,6 +127,11 @@ func WriteProblem(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	noteRetryable(r.Context(), err)
 	e := toError(r, err)
+	var ext errs.ProblemExtender
+	if errors.As(err, &ext) {
+		writeProblemWith(w, r, e, ext.ProblemExtensions())
+		return
+	}
 	writeProblem(w, r, e)
 }
 
@@ -198,6 +206,84 @@ func logFailure(r *http.Request, code errs.Code, cause, goType string) {
 // writeProblem writes e with the headers of the chain; the body is marshalled from fixed types,
 // so it cannot fail.
 func writeProblem(w http.ResponseWriter, r *http.Request, e *errs.Error) {
+	writeProblemWith(w, r, e, nil)
+}
+
+// problemMembers are the standard members of problem; an extension never takes their name, also
+// when the body leaves the member out.
+var problemMembers = map[string]bool{
+	"type": true, "title": true, "status": true, "code": true, "correlation_id": true, "detail": true,
+	"instance": true, "errors": true, "current": true, "reason": true, "hint": true,
+}
+
+// withExtensions appends the members of ext to the JSON object body in name order: standard names
+// and values that are or contain only nulls are dropped, nested nulls removed (ADR 0053). A value
+// that does not marshal is dropped as well; the extension is optional, the problem is not.
+func withExtensions(body []byte, ext map[string]any) []byte {
+	names := make([]string, 0, len(ext))
+	for name := range ext {
+		if !problemMembers[name] {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	var tail []byte
+	for _, name := range names {
+		raw, err := json.Marshal(ext[name])
+		if err != nil {
+			continue
+		}
+		var v any
+		if json.Unmarshal(raw, &v) != nil {
+			continue
+		}
+		v, ok := dropNulls(v)
+		if !ok {
+			continue
+		}
+		key, _ := json.Marshal(name)
+		val, err := json.Marshal(v)
+		if err != nil {
+			continue
+		}
+		tail = append(append(append(append(tail, ','), key...), ':'), val...)
+	}
+	if len(tail) == 0 || len(body) < 2 {
+		return body
+	}
+	out := append([]byte(nil), body[:len(body)-1]...)
+	return append(append(out, tail...), '}')
+}
+
+// dropNulls removes null members and elements from v; ok is false for a value that is null.
+func dropNulls(v any) (any, bool) {
+	switch x := v.(type) {
+	case nil:
+		return nil, false
+	case map[string]any:
+		for k, item := range x {
+			if cleaned, ok := dropNulls(item); ok {
+				x[k] = cleaned
+			} else {
+				delete(x, k)
+			}
+		}
+		return x, true
+	case []any:
+		out := make([]any, 0, len(x))
+		for _, item := range x {
+			if cleaned, ok := dropNulls(item); ok {
+				out = append(out, cleaned)
+			}
+		}
+		return out, true
+	default:
+		return v, true
+	}
+}
+
+// writeProblemWith is writeProblem with the extension members ext (errs.ProblemExtender).
+func writeProblemWith(w http.ResponseWriter, r *http.Request, e *errs.Error, ext map[string]any) {
 	ctx := r.Context()
 	code := e.PublicCode()
 	status := code.Kind().Status()
@@ -230,6 +316,9 @@ func writeProblem(w http.ResponseWriter, r *http.Request, e *errs.Error) {
 		// Only Current can fail to marshal; the problem goes out without it.
 		p.Current = nil
 		body, _ = json.Marshal(p)
+	}
+	if len(ext) > 0 && code != errs.CodeInternalError {
+		body = withExtensions(body, ext)
 	}
 	h := w.Header()
 	for name, values := range e.Headers {

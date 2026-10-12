@@ -15,10 +15,10 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 |---|---|
 | `config.go`, `configkeys_*.go`, `configchecks.go`, `configchapters.go` | configuration schema and cross-checks |
 | `database.go`, `egress.go`, `secrets.go`, `telemetry.go` | binding of the platform `Config` structs, the secret provider |
-| `audit.go` | `Audit` (`NewAudit`, `Start`, `UoW`, `Recorder`), `AuditConfig`, `SecretsKEK`: the audit module of a role (M1-24) |
+| `audit.go` | `Audit` (`NewAudit`, `Start`, `UoW`, `Recorder`, `RightsHook`), `AuditConfig`, `SecretsKEK`: the audit module of a role (M1-24) |
 | `txn.go` | `Modules`, `NewModules`, `NewTxnRegistry` (the one list of hooks and subscribers, golden file `testdata/txn_registrations.golden`), `UnitConfig` |
 | `routes.go` | `Role`, `Handlers`, `MountRoutes` (start step 7, every route through the HTTP chain, CORS preflights), `RouteOptions`, `HTTPOperation` |
-| `authz.go` | catalogue start check (M1-25): `BuildRegistry` over the module `Register` functions (`Deps.Registrations` replaces them in tests), `RouteBindings`, `NewAuthzCatalog` (closed catalogue with `bothy.authz.errors`); every role checks routes and registrations before the routes are mounted, one ERROR line `registration check failed` per violation |
+| `authz.go` | catalogue start check (M1-25): `BuildRegistry` over the module `Register` functions (`Deps.Registrations` replaces them in tests), `RouteBindings`, `NewAuthzCatalog` (closed catalogue with `bothy.authz.errors`); every role checks routes and registrations before the routes are mounted, one ERROR line `registration check failed` per violation; `moduleRegistrations` holds `authz.Register` (`access.changed`, M1-29); `NewRightsHook` with `RightsSources` builds the rights hooks of authz (M1-29) |
 | `jobs.go` | `JobsConfig`, `JobRole`, `NewJobRegistry` (one job registry for all roles), `MigrateUpSteps` (River before goose, then the steps of `MigrationSteps`; ruling INT-W5/3) |
 | `ratelimit.go`, `configkeys_ratelimit.go` | `RateLimitConfig`, `InstallRateLimits` and the start check (M1-19); the keys `ratelimit.*` |
 | `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
@@ -54,6 +54,15 @@ the pool closes), `internal_listener`.
 
 Every unit of work of a role runs on a registry from `NewTxnRegistry(NewModules(pool, log))`;
 `NewTxnRegistry` refuses `Modules` without the audit hook, so no unit can skip the chain.
+
+The rights hooks (M1-29): `NewModules` builds `authzapp.RightsHook` (`NewRightsHook` with the
+PrincipalSource of identity and the empty structure and agent policy sources until M1-54 and
+M1-51) and registers `Begin` for phase 1 and `BeforeCommit` for phase 3.1; `NewTxnRegistry`
+refuses Modules without them. The hook needs the appender of sync and the recorder of audit,
+which need the unit of work themselves, so the start step `authz` binds them
+(`Audit.RightsHook().Bind`) before any route or job runs; an unbound hook fails every rights
+change with kind internal (the registries of `bothy migrate up` and of the job registry check
+never run one). `authorize.AccessChanged` has no production subscriber in M1.
 
 ## Instance and counters
 

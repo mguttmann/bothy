@@ -12,6 +12,7 @@ import (
 	auditpg "github.com/OWNER/bothy/services/server/internal/audit/adapters/postgres"
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	"github.com/OWNER/bothy/services/server/internal/audit/domain"
+	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -51,6 +52,7 @@ func orDiscard(log *slog.Logger) *slog.Logger {
 type Audit struct {
 	uow      *pg.UnitOfWork
 	recorder *auditapp.Recorder
+	modules  *Modules
 
 	stopOnce sync.Once
 	cancel   context.CancelFunc
@@ -64,7 +66,8 @@ type Audit struct {
 // Errors: a registry that cannot be built, and the errors of auditapp.NewRecorder.
 func NewAudit(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek auditapp.KEKSource, log *slog.Logger) (*Audit, error) {
 	log = orDiscard(log)
-	reg, err := NewTxnRegistry(NewModules(pool, log))
+	mods := NewModules(pool, log)
+	reg, err := NewTxnRegistry(mods)
 	if err != nil {
 		return nil, err
 	}
@@ -74,11 +77,15 @@ func NewAudit(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek aud
 	if err != nil {
 		return nil, err
 	}
-	return &Audit{uow: uow, recorder: rec}, nil
+	return &Audit{uow: uow, recorder: rec, modules: mods}, nil
 }
 
 // UoW returns the unit of work of the process; its registry runs the audit hook in phase 3.3.
 func (a *Audit) UoW() txn.UnitOfWork { return a.uow }
+
+// RightsHook returns the rights hooks of the registry of UoW; start step authz binds them to the
+// appender of sync and the recorder (M1-29).
+func (a *Audit) RightsHook() *authzapp.RightsHook { return a.modules.Authz }
 
 // Recorder returns the recorder; it implements auditing.Recorder.
 func (a *Audit) Recorder() *auditapp.Recorder { return a.recorder }

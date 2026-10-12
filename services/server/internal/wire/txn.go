@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
+	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
@@ -19,10 +20,13 @@ import (
 )
 
 // Modules holds the module objects of a process role whose hooks and subscribers the txn
-// registry takes: the sync hook (M1-16) and the audit hook (M1-24); authz (M1-29) adds its field.
-// Constructors that fill it must not open network connections, so the golden test builds the
-// real registration without a database.
+// registry takes: the rights hooks of authz (phases 1 and 3.1, M1-29), the sync hook (M1-16) and
+// the audit hook (M1-24). Constructors that fill it must not open network connections, so the
+// golden test builds the real registration without a database.
 type Modules struct {
+	// Authz holds the rights hooks (phases 1 and 3.1); required. It fails every rights change
+	// until it is bound to the appender and the recorder (RightsHook.Bind, start step authz).
+	Authz *authzapp.RightsHook
 	// Sync is the sync phase hook (phase 3.2); required.
 	Sync *syncapp.PhaseHook
 	// Audit is the audit phase hook (phase 3.3); required.
@@ -30,9 +34,10 @@ type Modules struct {
 }
 
 // NewModules returns the module objects over pool with log for their reports; pool may be nil
-// where no unit of work runs (the golden test). It opens no connection.
+// where no unit of work runs (the golden test). It opens no connection. The rights hook gets the
+// empty structure and agent policy sources until M1-54 and M1-51.
 func NewModules(pool *pg.Pool, log *slog.Logger) *Modules {
-	return &Modules{Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log)}
+	return &Modules{Authz: mustRightsHook(pool, RightsSources{}, nil, log), Sync: newSyncHook(pool, log), Audit: newAuditChain(pool, log)}
 }
 
 // NewTxnRegistry returns the sealed txn registry of a process role: every role (api, worker,
@@ -55,6 +60,10 @@ func NewTxnRegistry(m *Modules) (*txn.Registry, error) {
 	return reg, nil
 }
 
+// errNoAuthzHook reports Modules without the rights hooks: a rights change without them would
+// skip permission_version, I1 and SR8.
+var errNoAuthzHook = errors.New("wire: the txn registry needs the rights hooks (Modules.Authz)")
+
 // errNoAuditHook reports Modules without the audit hook: every unit of work must chain its audit
 // entries, so a registry without it is refused.
 var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Modules.Audit)")
@@ -62,7 +71,9 @@ var errNoAuditHook = errors.New("wire: the txn registry needs the audit hook (Mo
 // registerTxn is the only place with SetHook and Subscribe calls (02 "In-Tx-Ereignisse": one
 // list). Hooks and handlers are method values of the module objects in m, never closures here,
 // because the registry derives their owner from the Go package. It sets the tracer of subscriber
-// spans, the sync hook of phase 3.2 and the audit hook of phase 3.3.
+// spans, the rights hooks of phases 1 and 3.1, the sync hook of phase 3.2 and the audit hook of
+// phase 3.3. authorize.AccessChanged, published by authz, has no production subscriber in M1
+// (runs subscribes in M2, 02 section 4.3).
 func registerTxn(reg *txn.Registry, m *Modules) error {
 	reg.SetTracer(otel.SubscriberSpan)
 	if m == nil || m.Audit == nil {
@@ -70,6 +81,15 @@ func registerTxn(reg *txn.Registry, m *Modules) error {
 	}
 	if m.Sync == nil {
 		return errNoSyncHook
+	}
+	if m.Authz == nil {
+		return errNoAuthzHook
+	}
+	if err := reg.SetHook(txn.PhaseRightsBegin, m.Authz.Begin); err != nil {
+		return err
+	}
+	if err := reg.SetHook(txn.PhaseRightsCheck, m.Authz.BeforeCommit); err != nil {
+		return err
 	}
 	if err := reg.SetHook(txn.PhaseSync, m.Sync.Run); err != nil {
 		return err

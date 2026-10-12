@@ -31,7 +31,7 @@ type UnitOfWork interface {
 	//			return err
 	//		}
 	//		return txn.Publish(ctx, chat.ThreadCreated{ID: row.ID})
-	//	}, txn.RightsChange(subject))
+	//	}, txn.DeclareRightsChange(txn.RightsChangeSpec{Action: "grant.create", Principals: []ids.ID{subject}}))
 	Do(ctx context.Context, fn func(ctx context.Context) error, opts ...Option) error
 }
 
@@ -45,10 +45,80 @@ type Options struct {
 	RightsChange bool
 	// Affected are the principals RightsChange named, in first-named order without duplicates.
 	Affected []ids.ID
+	// Action is the catalogue action that causes the rights change (DeclareRightsChange); the
+	// authz hooks write it into access.changed and the deny audit entry. Empty when only
+	// RightsChange was used.
+	Action string
+	// Resource is the resource the deny audit entry names; the zero Ref for none.
+	Resource Ref
+	// Targets are the spaces or channels whose rights change (archive); authz derives the
+	// affected principals from them (02 section 8.1). First-named order without duplicates.
+	Targets []Ref
+}
+
+// Ref names a resource or a target of a rights change by its catalogue resource kind and id. The
+// kind is a plain string because kernel ports never import each other (02 section 7.2); authz
+// maps it to its own types.
+type Ref struct {
+	// Kind is the resource kind of the catalogue, for example "space", "channel" or "grant".
+	Kind string
+	// ID is the resource.
+	ID ids.ID
+}
+
+// RightsChangeSpec declares a rights change to the unit of work (02 section 8.1, brief M1-29):
+// the action, the resource of the deny audit entry, the principals whose visible targets may
+// change and the targets whose rights change. The authz hooks read it with RightsChangeOf.
+type RightsChangeSpec struct {
+	// Action is the catalogue action that causes the change, for example "grant.create".
+	Action string
+	// Resource is written into the deny audit entry (kind and id).
+	Resource Ref
+	// Principals are affected directly (the subject of a grant, a new owner).
+	Principals []ids.ID
+	// Targets are spaces or channels whose rights change; authz derives the affected principals.
+	Targets []Ref
+}
+
+// DeclareRightsChange marks a unit as a rights change with the full declaration of spec. It
+// adds up with RightsChange and further DeclareRightsChange options: principals and targets are
+// joined without duplicates; the first non-empty action and resource win.
+//
+// Example:
+//
+//	err := uow.Do(ctx, fn, txn.DeclareRightsChange(txn.RightsChangeSpec{
+//		Action: "channel.archive", Resource: txn.Ref{Kind: "channel", ID: ch},
+//		Targets: []txn.Ref{{Kind: "channel", ID: ch}},
+//	}))
+func DeclareRightsChange(spec RightsChangeSpec) Option {
+	return func(o *Options) {
+		RightsChange(spec.Principals...)(o)
+		if o.Action == "" {
+			o.Action = spec.Action
+		}
+		if o.Resource == (Ref{}) {
+			o.Resource = spec.Resource
+		}
+		for _, t := range spec.Targets {
+			if !slices.Contains(o.Targets, t) {
+				o.Targets = append(o.Targets, t)
+			}
+		}
+	}
+}
+
+// Spec returns the declaration of o as a RightsChangeSpec with copied slices.
+func (o Options) Spec() RightsChangeSpec {
+	return RightsChangeSpec{
+		Action: o.Action, Resource: o.Resource,
+		Principals: slices.Clone(o.Affected), Targets: slices.Clone(o.Targets),
+	}
 }
 
 // RightsChange marks a unit that changes rights and names the affected principals (the subject
-// of a grant, for example). It counts only at the outermost unit: a nested Do with
+// of a grant, for example). It adds principals to a DeclareRightsChange; alone it names no
+// catalogue action, which the authz rights hooks refuse (M1-29), so production code declares with
+// DeclareRightsChange. It counts only at the outermost unit: a nested Do with
 // RightsChange is an internal error unless the outer unit declared RightsChange with a
 // superset of the principals, because the rights begin hook must lock permission_version before
 // any domain row (03 "Sperrreihenfolge" item 1). Several RightsChange options add up.
@@ -75,7 +145,8 @@ func ApplyOptions(opts ...Option) Options {
 }
 
 // Covers reports whether a nested unit with options inner may join a unit with options o: inner
-// has no RightsChange, or o has one that names every principal inner names.
+// has no RightsChange, or o has one that names every principal and target inner names and the
+// same action (or inner names none).
 func (o Options) Covers(inner Options) bool {
 	if !inner.RightsChange {
 		return true
@@ -88,7 +159,12 @@ func (o Options) Covers(inner Options) bool {
 			return false
 		}
 	}
-	return true
+	for _, t := range inner.Targets {
+		if !slices.Contains(o.Targets, t) {
+			return false
+		}
+	}
+	return inner.Action == "" || inner.Action == o.Action
 }
 
 // Unit is one attempt of a unit of work as the kernel helpers see it: its phase, its registry,
@@ -128,6 +204,7 @@ func (u *Unit) Registry() *Registry { return u.reg }
 func (u *Unit) Options() Options {
 	o := u.opts
 	o.Affected = slices.Clone(o.Affected)
+	o.Targets = slices.Clone(o.Targets)
 	return o
 }
 
@@ -180,6 +257,24 @@ func AffectedPrincipals(ctx context.Context) ([]ids.ID, bool) {
 		return nil, false
 	}
 	return slices.Clone(u.opts.Affected), true
+}
+
+// RightsChangeOf returns the declaration of the outermost unit of ctx and true, or the zero
+// value and false outside a unit or without RightsChange. The authz hooks (M1-29) read it.
+func RightsChangeOf(ctx context.Context) (RightsChangeSpec, bool) {
+	u, ok := UnitFrom(ctx)
+	if !ok || !u.opts.RightsChange {
+		return RightsChangeSpec{}, false
+	}
+	return u.opts.Spec(), true
+}
+
+// InRightsChange reports whether ctx is inside a unit of work declared as a rights change.
+// Stores whose writes change rights refuse to write otherwise (authz, M1-29), and the
+// Authorizer bypasses its cache there, because the unit sees an uncommitted rights version.
+func InRightsChange(ctx context.Context) bool {
+	_, ok := RightsChangeOf(ctx)
+	return ok
 }
 
 // Key names one value of the per-unit state (durable events of sync, audit records of

@@ -48,9 +48,10 @@ func newEnv(t *testing.T) env {
 	return env{repo: postgres.NewRepository(pool), uow: uow, pool: pool}
 }
 
-// write runs fn in a unit of work.
+// write runs fn in a unit of work declared as a rights change: every write of memberships and
+// grants changes rights and is refused otherwise (M1-29). The test registry has no rights hooks.
 func (e env) write(fn func(ctx context.Context) error) error {
-	return e.uow.Do(context.Background(), fn)
+	return e.uow.Do(context.Background(), fn, txn.RightsChange())
 }
 
 // exec runs raw SQL as bothy_app outside a unit of work. Only tests insert principals and

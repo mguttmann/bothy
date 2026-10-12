@@ -35,8 +35,8 @@ func pick(id, hint ids.ID, what string) (ids.ID, error) {
 
 // resolve returns the path of r; found is false when its thread, channel, space or grant does not
 // exist (not_found no_grant). The structure decides the path; a hint that contradicts it is an
-// internal error.
-func (a *Authorizer) resolve(ctx context.Context, r authorize.Resource) (resolved, bool, error) {
+// internal error. act decides whether a revoked grant resolves (grant.revoke only).
+func (a *Authorizer) resolve(ctx context.Context, act authorize.Action, r authorize.Resource) (resolved, bool, error) {
 	kind := string(r.Kind)
 	switch {
 	case domain.IsChannelPathKind(kind):
@@ -60,7 +60,7 @@ func (a *Authorizer) resolve(ctx context.Context, r authorize.Resource) (resolve
 		}
 		return a.resolveSpace(ctx, id)
 	case r.Kind == authorize.ResourceGrant:
-		return a.resolveGrant(ctx, r.ID)
+		return a.resolveGrant(ctx, r.ID, act == authorize.ActionGrantRevoke)
 	case r.Kind == authorize.ResourceHost:
 		return resolved{path: domain.Path{Kind: domain.PathNone}}, true, nil
 	}
@@ -119,18 +119,20 @@ func (a *Authorizer) resolveChannel(ctx context.Context, threadID, channelID, sp
 func channelPath(ch authz.ChannelFacts) domain.Path {
 	return domain.Path{
 		Kind: domain.PathChannel, SpaceID: ch.SpaceID, ChannelID: ch.ID, DM: ch.Kind == authz.ChannelDM,
-		DMParticipants: ch.DMParticipants, ReadOnly: ch.ReadOnly, ChannelOperatorID: ch.EffectiveOperatorID,
+		DMParticipants: ch.DMParticipants, ReadOnly: ch.ReadOnly, Archived: ch.Archived, ChannelOperatorID: ch.EffectiveOperatorID,
 	}
 }
 
-// resolveGrant loads a grant and resolves the path of its target. A revoked or unknown grant is
-// not found; a host target has no path (07 section 2.12).
-func (a *Authorizer) resolveGrant(ctx context.Context, id ids.ID) (resolved, bool, error) {
+// resolveGrant loads a grant and resolves the path of its target. An unknown grant is not found,
+// a revoked one too unless revoked is set: grant.revoke of a revoked grant is a success without
+// change (06 section 2 "Ohne Wirkung"), so it is judged like the revocation of the stored grant
+// (docs/DECISIONS.md M1-29). A host target has no path (07 section 2.12).
+func (a *Authorizer) resolveGrant(ctx context.Context, id ids.ID, revoked bool) (resolved, bool, error) {
 	g, ok, err := a.store.GetGrant(ctx, id)
 	if err != nil {
 		return resolved{}, false, sourceError("grant store", err)
 	}
-	if !ok || !g.RevokedAt.IsZero() {
+	if !ok || (!g.RevokedAt.IsZero() && !revoked) {
 		return resolved{}, false, nil
 	}
 	var res resolved

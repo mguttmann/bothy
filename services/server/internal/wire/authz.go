@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
+	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
@@ -28,9 +29,9 @@ const msgRegistrationCheckFailed = "registration check failed"
 
 // moduleRegistrations are the Register(r *authorize.Registry) functions of the module ports, in
 // the order of the module register. No module registers an event type, a gateway op or a
-// terminal channel op in M1 yet; each module's ticket appends its function here (for example
-// M1-29 adds authz.Register for access.changed).
-var moduleRegistrations []func(*authorize.Registry)
+// terminal channel op in M1 except authz with access.changed (M1-29); each module's ticket
+// appends its function here.
+var moduleRegistrations = []func(*authorize.Registry){authz.Register}
 
 // BuildRegistry returns a registry filled by every function of register; nil means the
 // production list of the module ports.
@@ -156,3 +157,47 @@ func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.C
 
 // Compile-time check: the process's authorizer is the kernel port.
 var _ authorize.Authorizer = (*authzapp.Authorizer)(nil)
+
+// RightsSources are the source ports of the rights hook that tests may replace; a nil field
+// means the production source: the PrincipalSource of identity, the empty structure and agent
+// policy sources until M1-54 and M1-51.
+type RightsSources struct {
+	Principals authz.PrincipalSource
+	Structure  authz.StructureSource
+	Policies   authz.AgentPolicySource
+}
+
+// NewRightsHook returns the rights hooks of authz over pool (M1-29): the counters of instance
+// (only the phase hooks receive them, TestCountersOnlyUsedByPhaseHooks), the grant store of authz
+// and the sources src, the clock clk (nil for the system clock) and log. It opens no connection.
+// The hook fails every rights change until RightsHook.Bind.
+//
+// Errors: those of authzapp.NewRightsHook.
+func NewRightsHook(pool *pg.Pool, src RightsSources, clk clock.Clock, log *slog.Logger) (*authzapp.RightsHook, error) {
+	if src.Principals == nil {
+		src.Principals = identityapp.NewPrincipalSource(identitypg.NewRepository(pool))
+	}
+	if src.Structure == nil {
+		src.Structure = emptyStructure{}
+	}
+	if src.Policies == nil {
+		src.Policies = emptyPolicies{}
+	}
+	if clk == nil {
+		clk = clock.System()
+	}
+	return authzapp.NewRightsHook(authzapp.RightsHookDeps{
+		Counters: InstanceCounters(pool), Store: authzpg.NewRepository(pool), Principals: src.Principals,
+		Structure: src.Structure, Policies: src.Policies, Clock: clk, Log: orDiscard(log),
+	})
+}
+
+// mustRightsHook is NewRightsHook for NewModules: every dependency is set, so an error is a
+// programming error.
+func mustRightsHook(pool *pg.Pool, src RightsSources, clk clock.Clock, log *slog.Logger) *authzapp.RightsHook {
+	h, err := NewRightsHook(pool, src, clk, log)
+	if err != nil {
+		panic(err)
+	}
+	return h
+}

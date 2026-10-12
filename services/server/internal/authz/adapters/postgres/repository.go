@@ -27,6 +27,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/authz/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
 
@@ -65,6 +66,20 @@ func (r *Repository) write(ctx context.Context, at time.Time) (*sqlcgen.Queries,
 	return sqlcgen.New(tx), nil
 }
 
+// rightsWrite is write for a statement that changes rights (memberships, grants, the deletion of
+// a group): it also needs a unit of work declared as a rights change, so the rights begin hook
+// has locked permission_version first and the rights check hook verifies I1 and SR8 (M1-29).
+func (r *Repository) rightsWrite(ctx context.Context, at time.Time) (*sqlcgen.Queries, error) {
+	q, err := r.write(ctx, at)
+	if err != nil {
+		return nil, err
+	}
+	if !txn.InRightsChange(ctx) {
+		return nil, errs.New(errs.CodeInternalError, "authz: a rights write outside a unit of work declared as a rights change")
+	}
+	return q, nil
+}
+
 // InsertGroup implements app.Store.
 func (r *Repository) InsertGroup(ctx context.Context, g domain.Group) error {
 	q, err := r.write(ctx, g.CreatedAt)
@@ -101,7 +116,7 @@ func (r *Repository) GetGroup(ctx context.Context, id ids.ID) (domain.Group, boo
 
 // SoftDeleteGroup implements app.Store.
 func (r *Repository) SoftDeleteGroup(ctx context.Context, id ids.ID, at time.Time) (bool, error) {
-	q, err := r.write(ctx, at)
+	q, err := r.rightsWrite(ctx, at)
 	if err != nil {
 		return false, err
 	}
@@ -114,7 +129,7 @@ func (r *Repository) SoftDeleteGroup(ctx context.Context, id ids.ID, at time.Tim
 
 // InsertMembership implements app.Store.
 func (r *Repository) InsertMembership(ctx context.Context, m domain.Membership) error {
-	q, err := r.write(ctx, m.AddedAt)
+	q, err := r.rightsWrite(ctx, m.AddedAt)
 	if err != nil {
 		return err
 	}
@@ -134,7 +149,7 @@ func (r *Repository) InsertMembership(ctx context.Context, m domain.Membership) 
 
 // RemoveMembership implements app.Store.
 func (r *Repository) RemoveMembership(ctx context.Context, id, by ids.ID, at time.Time) (bool, error) {
-	q, err := r.write(ctx, at)
+	q, err := r.rightsWrite(ctx, at)
 	if err != nil {
 		return false, err
 	}
@@ -162,7 +177,7 @@ func (r *Repository) ActiveMembershipsOfUser(ctx context.Context, userID ids.ID)
 
 // InsertGrant implements app.Store.
 func (r *Repository) InsertGrant(ctx context.Context, g domain.Grant) error {
-	q, err := r.write(ctx, g.GrantedAt)
+	q, err := r.rightsWrite(ctx, g.GrantedAt)
 	if err != nil {
 		return err
 	}
@@ -206,7 +221,7 @@ func (r *Repository) GetGrant(ctx context.Context, id ids.ID) (domain.Grant, boo
 
 // RevokeGrant implements app.Store.
 func (r *Repository) RevokeGrant(ctx context.Context, id, by ids.ID, reason string, at time.Time) (domain.Grant, bool, error) {
-	q, err := r.write(ctx, at)
+	q, err := r.rightsWrite(ctx, at)
 	if err != nil {
 		return domain.Grant{}, false, err
 	}
@@ -265,6 +280,93 @@ func (r *Repository) ActiveGrantsOfGroups(ctx context.Context, groupIDs []ids.ID
 		out = append(out, g)
 	}
 	return out, nil
+}
+
+// UpdateGroup implements app.Store.
+func (r *Repository) UpdateGroup(ctx context.Context, id ids.ID, name, description string) (bool, error) {
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return false, err
+	}
+	n, err := sqlcgen.New(tx).UpdateGroup(ctx, sqlcgen.UpdateGroupParams{ID: uuid(id), Name: name, Description: description})
+	if err != nil {
+		return false, mapError(err, "updating a group")
+	}
+	return n > 0, nil
+}
+
+// ActiveMembershipsOfGroups implements app.Store.
+func (r *Repository) ActiveMembershipsOfGroups(ctx context.Context, groupIDs []ids.ID) ([]domain.MembershipWithGroup, error) {
+	if len(groupIDs) == 0 {
+		return nil, nil
+	}
+	rows, err := r.read(ctx).ListActiveMembershipsOfGroups(ctx, uuids(groupIDs))
+	if err != nil {
+		return nil, mapError(err, "reading the memberships of groups")
+	}
+	out := make([]domain.MembershipWithGroup, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domain.MembershipWithGroup{Membership: toMembership(row.GroupMembership), Group: toGroup(row.Group)})
+	}
+	return out, nil
+}
+
+// MembershipsOfUserInGroup implements app.Store.
+func (r *Repository) MembershipsOfUserInGroup(ctx context.Context, groupID, userID ids.ID) ([]domain.Membership, error) {
+	rows, err := r.read(ctx).ListMembershipsOfUserInGroup(ctx, sqlcgen.ListMembershipsOfUserInGroupParams{GroupID: uuid(groupID), UserID: uuid(userID)})
+	if err != nil {
+		return nil, mapError(err, "reading the memberships of a person in a group")
+	}
+	out := make([]domain.Membership, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toMembership(row.GroupMembership))
+	}
+	return out, nil
+}
+
+// ActiveTriggerGrants implements app.Store.
+func (r *Repository) ActiveTriggerGrants(ctx context.Context) ([]domain.Grant, error) {
+	rows, err := r.read(ctx).ListActiveTriggerGrants(ctx)
+	if err != nil {
+		return nil, mapError(err, "reading the trigger grants")
+	}
+	out := make([]domain.Grant, 0, len(rows))
+	for _, row := range rows {
+		g, err := toGrant(row.Grant)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, nil
+}
+
+// ActiveGrantsOnTargets implements app.Store.
+func (r *Repository) ActiveGrantsOnTargets(ctx context.Context, spaceIDs, channelIDs []ids.ID) ([]domain.Grant, error) {
+	rows, err := r.read(ctx).ListActiveGrantsOnTargets(ctx, sqlcgen.ListActiveGrantsOnTargetsParams{
+		SpaceIds: uuids(spaceIDs), ChannelIds: uuids(channelIDs),
+	})
+	if err != nil {
+		return nil, mapError(err, "reading the grants on targets")
+	}
+	out := make([]domain.Grant, 0, len(rows))
+	for _, row := range rows {
+		g, err := toGrant(row.Grant)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, nil
+}
+
+// uuids converts ids to sorted unique parameters; nil becomes an empty array, never NULL.
+func uuids(list []ids.ID) []pgtype.UUID {
+	keys := make([]pgtype.UUID, 0, len(list))
+	for _, id := range slices.Compact(slices.SortedFunc(slices.Values(list), compareIDs)) {
+		keys = append(keys, uuid(id))
+	}
+	return keys
 }
 
 // toGroup converts a row of groups. The database checks hold the shape, so it is wrapped

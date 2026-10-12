@@ -58,6 +58,22 @@ func (s *Store) GetGroup(_ context.Context, id ids.ID) (domain.Group, bool, erro
 	return g, ok, nil
 }
 
+// UpdateGroup implements app.Store; it does not check the uniqueness of names.
+func (s *Store) UpdateGroup(_ context.Context, id ids.ID, name, description string) (bool, error) {
+	if err := s.err(); err != nil {
+		return false, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	g, ok := s.groups[id]
+	if !ok || !g.DeletedAt.IsZero() {
+		return false, nil
+	}
+	g.Name, g.Description = name, description
+	s.groups[id] = g
+	return true, nil
+}
+
 // SoftDeleteGroup implements app.Store.
 func (s *Store) SoftDeleteGroup(_ context.Context, id ids.ID, at time.Time) (bool, error) {
 	if err := s.err(); err != nil {
@@ -118,6 +134,74 @@ func (s *Store) ActiveMembershipsOfUser(_ context.Context, userID ids.ID) ([]dom
 		return slices.Compare(a.Membership.ID[:], b.Membership.ID[:])
 	})
 	return out, nil
+}
+
+// ActiveMembershipsOfGroups implements app.Store.
+func (s *Store) ActiveMembershipsOfGroups(_ context.Context, groupIDs []ids.ID) ([]domain.MembershipWithGroup, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.MembershipWithGroup
+	for _, m := range s.memberships {
+		if slices.Contains(groupIDs, m.GroupID) && m.RemovedAt.IsZero() {
+			out = append(out, domain.MembershipWithGroup{Membership: m, Group: s.groups[m.GroupID]})
+		}
+	}
+	slices.SortFunc(out, func(a, b domain.MembershipWithGroup) int {
+		return slices.Compare(a.Membership.ID[:], b.Membership.ID[:])
+	})
+	return out, nil
+}
+
+// MembershipsOfUserInGroup implements app.Store.
+func (s *Store) MembershipsOfUserInGroup(_ context.Context, groupID, userID ids.ID) ([]domain.Membership, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.Membership
+	for _, m := range s.memberships {
+		if m.GroupID == groupID && m.UserID == userID {
+			out = append(out, m)
+		}
+	}
+	slices.SortFunc(out, func(a, b domain.Membership) int { return slices.Compare(a.ID[:], b.ID[:]) })
+	return out, nil
+}
+
+// ActiveTriggerGrants implements app.Store.
+func (s *Store) ActiveTriggerGrants(_ context.Context) ([]domain.Grant, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.active(func(g domain.Grant) bool { return g.Level == domain.LevelTrigger }), nil
+}
+
+// ActiveGrantsOnTargets implements app.Store.
+func (s *Store) ActiveGrantsOnTargets(_ context.Context, spaceIDs, channelIDs []ids.ID) ([]domain.Grant, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.active(func(g domain.Grant) bool {
+		switch g.Target.Kind {
+		case domain.TargetInstance:
+			return true
+		case domain.TargetSpace:
+			return slices.Contains(spaceIDs, g.Target.SpaceID)
+		case domain.TargetChannel:
+			return slices.Contains(channelIDs, g.Target.ChannelID)
+		case domain.TargetHost:
+			return false
+		}
+		return false
+	}), nil
 }
 
 // InsertGrant implements app.Store.
