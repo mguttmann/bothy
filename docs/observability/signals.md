@@ -280,6 +280,7 @@ This list equals the allowlist in [infra/otel/collector.yaml](../../infra/otel/c
 | `bothy.run.state` | run state | |
 | `bothy.server.role` | `api`, `worker`, `all` | resource |
 | `bothy.step.kind` | `tool_call`, `status`, `subagent`, `workflow`, `background_job` | |
+| `bothy.version.own`, `bothy.version.required` | SemVer of the own server version and of `instance.min_server_version` | only in the start line of the schema check ([02-architecture.md](../spec/02-architecture.md) 15.1, step 5) |
 
 ## 6. GenAI conventions (encapsulated)
 

@@ -5,6 +5,7 @@ package wire
 import (
 	"context"
 	"database/sql"
+	"io/fs"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -88,10 +89,17 @@ func (s riverStep) Run(ctx context.Context, _ *sql.DB) error {
 	return err
 }
 
-// MigrationSteps returns the steps bothy migrate up runs around the goose migrations on pool,
-// the pool of migrate as bothy_owner: River's migrations into schema (jobs.schema) before them
-// (M1-14), and later the instance row with schema_version and min_server_version after them
-// (M1-15). result receives what the River step applied; it may be nil.
-func MigrationSteps(pool *pg.Pool, schema string, result *jobs.MigrateResult) pg.MigratorOptions {
-	return pg.MigratorOptions{Before: []pg.Step{riverStep{pool: pool, schema: schema, result: result}}}
+// MigrateUpSteps returns the steps bothy migrate up runs around the goose migrations of fsys on
+// pool, the pool of migrate as bothy_owner: River's migrations into schema (jobs.schema) before
+// them (M1-14, upgrade.md rule M11) and the steps of MigrationSteps after them (the instance row,
+// M1-15). result receives what the River step applied; it may be nil. pgtest.WithSteps takes
+// MigrationSteps without River, because the serve tests add River's tables themselves
+// (docs/DECISIONS.md M1-15/16). The error is the one of MigrationSteps.
+func MigrateUpSteps(pool *pg.Pool, fsys fs.FS, schema string, result *jobs.MigrateResult) (pg.MigratorOptions, error) {
+	opts, err := MigrationSteps(pool, fsys)
+	if err != nil {
+		return pg.MigratorOptions{}, err
+	}
+	opts.Before = append([]pg.Step{riverStep{pool: pool, schema: schema, result: result}}, opts.Before...)
+	return opts, nil
 }

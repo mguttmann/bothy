@@ -22,7 +22,7 @@ migrator behind `bothy migrate`. Migrations never run at `bothy serve` (R-AR-16)
 | `querier.go` | `DBTX`, `Pool.Exec`, `Pool.Query`, `Pool.QueryRow` |
 | `timeouts.go` | `Timeouts`, `SetLocalTimeouts` |
 | `tracer.go` | otelpgx tracer without query parameters, statement errors redacted |
-| `schema.go` | `CheckSchema`, `SchemaTooOldError`, `RequiredSchemaVersion` |
+| `schema.go` | `CheckSchema`, `SchemaTooOldError`, `RequiredSchemaVersion`, `SchemaVersion` |
 | `roles.go`, `scram.go` | `Role`, `Bootstrap`, `BootstrapRoles`, `BootstrapDatabase`, SCRAM-SHA-256 verifiers |
 | `migrator.go` | `Migrator`, `Step`, `MigratorOptions`, `Result`, `MigrationStatus`, `ErrNotSchemaOwner` |
 | `validate.go` | `Validate`: names, numbering and goose syntax without a database |
@@ -142,7 +142,8 @@ grants what `bothy_app` needs ([migrations/README.md](../../../migrations/README
 provider with the PostgreSQL session locker, so two `bothy migrate up` apply each migration once.
 `Up` checks that the session user owns schema `public` (`ErrNotSchemaOwner`), returns
 `Result.Newer` without running anything when the database is newer than the binary, and otherwise
-runs the before-steps (River, M1-14), goose and the after-steps (instance row, M1-15). `Status`
+runs the before-steps (River, M1-14), goose and the after-steps (instance row, M1-15, built by
+`wire.MigrationSteps`). `Status`
 only reads. `bothy migrate` connects with `Config.ForMigrate(migrate.lock_timeout)`: lock timeout
 per step (upgrade.md rule M6), no statement or idle deadline.
 
@@ -152,8 +153,10 @@ per step (upgrade.md rule M6), no statement or idle deadline.
 required)` reads `goose_db_version` (as `bothy_app`, which migration 00001 allows) and returns
 `*SchemaTooOldError` with the message
 `database schema version <have> is older than required <need>; run "bothy migrate up"` when the
-database is older; an equal or newer schema passes (expand and contract). Wiring it into
-`bothy serve` is M1-11.
+database is older; an equal or newer schema passes (expand and contract). `bothy serve` runs it
+as the start component `schema`. `SchemaVersion(ctx, q)` reads the version over any `DBTX`, the
+pool or the transaction of a unit of work; the instance step of `bothy migrate up` reads it inside
+its unit (M1-15).
 
 ## Telemetry
 
@@ -178,5 +181,4 @@ handlers of a platform package.
 ## Not covered here
 
 The phase hooks of authz, sync and audit (M1-29, M1-16, M1-24), idempotency keys in the unit
-of work (M1-20), the `LISTEN` connection (M1-16), River migrations (M1-14), the
-instance row (M1-15), the backup requirement of `migrate` (M7-02), pool metrics (M1-68).
+of work (M1-20), the `LISTEN` connection (M1-16), River migrations (M1-14), the backup requirement of `migrate` (M7-02), pool metrics (M1-68).

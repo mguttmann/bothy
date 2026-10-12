@@ -108,6 +108,13 @@ const (
 	RunState = "bothy.run.state"
 	// StepKind is tool_call, status, subagent, workflow or background_job.
 	StepKind = "bothy.step.kind"
+	// VersionOwn is the SemVer version of this server build in the start check of
+	// instance.min_server_version (M1-15); the resource carries it as service.version, which the
+	// stdout log drops.
+	VersionOwn = "bothy.version.own"
+	// VersionRequired is instance.min_server_version, the smallest server version the schema
+	// allows, in the same start check.
+	VersionRequired = "bothy.version.required"
 )
 
 // ServerRole is the resource attribute bothy.server.role (api, worker, all; signals.md
@@ -147,7 +154,7 @@ var scopes = map[string]scope{
 	EventSeq: scopeSpanLog, EventType: scopeSpanLog, JobKind: scopeSpanLog,
 	Outcome: scopeSpanLog, PrincipalKind: scopeSpanLog, PrincipalPseudoID: scopeSpanLog,
 	PushProvider: scopeSpanLog, RatelimitClass: scopeSpanLog, Reason: scopeSpanLog,
-	RunState: scopeSpanLog, StepKind: scopeSpanLog,
+	RunState: scopeSpanLog, StepKind: scopeSpanLog, VersionOwn: scopeSpanLog, VersionRequired: scopeSpanLog,
 
 	ServerRole: scopeResource,
 	Signal:     scopeMetric,

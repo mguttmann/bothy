@@ -17,7 +17,9 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
+	"github.com/OWNER/bothy/services/server/internal/instance"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/health"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
@@ -35,6 +37,7 @@ const (
 	msgInternalListener = "internal listener started"
 	msgPublicListener   = "public listener started"
 	msgReady            = "server ready"
+	msgStartedNotReady  = "server started, not ready"
 )
 
 // ServeConfig holds the keys the start and the shutdown read (02 "Start" and "Shutdown",
@@ -67,7 +70,8 @@ type Deps struct {
 	Clock clock.Clock
 	// Signals replaces os/signal (tests); nil means SIGTERM and SIGINT.
 	Signals <-chan os.Signal
-	// Version is service.version, buildinfo.Version() in the binary.
+	// Version is service.version and the version the start compares with
+	// instance.min_server_version; empty means buildinfo.Version().
 	Version string
 	// Migrations is the migration set whose highest version the database must have; nil means
 	// the embedded migrations.FS.
@@ -100,6 +104,9 @@ type server struct {
 	jobsCfg  jobs.Config
 	jobsReg  *jobs.Registry
 	jobsRT   *jobs.Runtime
+	instance instance.Record
+	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
+	blocked bool
 }
 
 // Serve assembles `bothy serve` for role from the loaded values v and returns the Runner;
@@ -113,14 +120,17 @@ type server struct {
 //  4. database: pg.Open and WaitReady within startup.dependency_wait; readiness check database,
 //  5. schema: pg.CheckSchema against the highest version of deps.Migrations; an older database
 //     ends the start with the hint to run "bothy migrate up" (Serve never migrates, R-AR-16),
-//  6. extension points, in this order: instance (M1-15), signing keys (M1-32), routes
-//     (MountRoutes, api and all), log tail (M1-16, api and all), then the jobs (every role):
-//     the River migrations in jobs.schema must be complete (else the hint to run "bothy
-//     migrate up"), the runtime of the role is built over the pool, and worker and all start
-//     River (02 "Start" step 8); a River client that stops on its own later ends the process
-//     with exit code 1 (02 "Health"). The consumers (M2) follow,
-//  7. public listener (api and all),
-//  8. ready: readiness passes startup and the line "server ready" is written.
+//  6. instance (M1-15): load the instance row (missing: the start ends with the hint to run
+//     "bothy migrate up") and compare the own version with instance.min_server_version; below
+//     it the readiness check schema_requires_newer_server fails for good (loadInstance),
+//  7. extension points, in this order: signing keys (M1-32), routes (MountRoutes, api and
+//     all), log tail (M1-16, api and all), then the jobs (every role): the River migrations in
+//     jobs.schema must be complete (else the hint to run "bothy migrate up"), the runtime of the
+//     role is built over the pool, and worker and all start River (02 "Start" step 8); a River
+//     client that stops on its own later ends the process with exit code 1 (02 "Health"). The
+//     consumers (M2) follow,
+//  8. public listener (api and all),
+//  9. ready: readiness passes startup and the line "server ready" is written.
 //
 // Stop steps, by phase: not ready (always), drain and HTTP (api, all), jobs (worker, all: River's
 // soft stop within shutdown.jobs_soft_timeout, then what the fixed budgets leave of the total
@@ -141,6 +151,9 @@ func Serve(_ context.Context, v *config.Values, role Role, deps Deps) (*lifecycl
 	}
 	if deps.Stdout == nil {
 		s.deps.Stdout = os.Stdout
+	}
+	if deps.Version == "" {
+		s.deps.Version = buildinfo.Version()
 	}
 	level, err := otel.ParseLevel(v.String("telemetry.logs.level"))
 	if err != nil {
@@ -199,7 +212,8 @@ func (s *server) register() {
 	r.Add(step("internal_listener", s.startInternal))
 	r.Add(step("database", s.startDatabase))
 	r.Add(step("schema", s.checkSchema))
-	// Extension points (README.md): M1-15 adds the instance here, M1-32 the signing keys.
+	r.Add(step("instance", s.loadInstance))
+	// Extension point (README.md): M1-32 adds the signing keys here.
 	r.Add(step("routes", s.mountRoutes))
 	// Extension point: M1-16 adds the log tail (api, all) here, M2 the consumers after the jobs.
 	r.Add(step("jobs", s.startJobs))
@@ -430,8 +444,16 @@ func (s *server) stopJobs(ctx context.Context) error {
 
 func (s *server) ready(ctx context.Context) error {
 	s.reg.SetStarted()
+	s.mu.Lock()
+	blocked := s.blocked
+	s.mu.Unlock()
 	// bothy.server.role is a resource attribute: OTLP carries it on the resource, the stdout
 	// handler drops it like every key outside the span and log scope (docs/DECISIONS.md M1-11).
+	if blocked {
+		// A check that fails for good keeps /readyz at 503; "server ready" would mislead.
+		s.logger().WarnContext(ctx, msgStartedNotReady, slog.String(attr.ServerRole, string(s.role)))
+		return nil
+	}
 	s.logger().InfoContext(ctx, msgReady, slog.String(attr.ServerRole, string(s.role)))
 	return nil
 }

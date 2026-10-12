@@ -204,7 +204,8 @@ Purpose: counter rows whose row lock enforces the commit order. Module: `instanc
 
 PK: `name`. FK: none. Indexes: no others. Retention: `config`.
 
-The three rows are created in the first migration. `permission_version` is the
+The three rows are created by the migration that creates the table
+(`00002_instance_counters.sql`). `permission_version` is the
 permission version counter (see 4.3 and [04-sync-protocol.md](04-sync-protocol.md)).
 
 ### 4.2 Identity (`identity`)
