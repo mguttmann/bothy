@@ -388,6 +388,7 @@ table.
 | `auth and self` | `All(Auth, Self)` |
 | `agent-self and effective operator` | `ChannelOperator` |
 | `app with scope costs:reconcile` | `AppKind` |
+| `owner or app with scope costs:reconcile` | `Any(Owner, AppKind)` |
 | `(write and author) or manage` | `Any(All(Level(write), Self), Cap(manage))` |
 | `permission of the target action` | `Preview` |
 | `system` | not evaluable: `Authorize` returns an internal error (code `internal`) |
@@ -418,7 +419,9 @@ A hand-written table from action id to scope: `message.read`, `thread.read`, `ch
 `messages:write`; `file.read` `files:read`; `file.upload` `files:write`; `command.register`,
 `command.remove`, `command.autocomplete.respond` `commands:write`; `component.update`,
 `interaction.respond` `components:write`; `user.read` `users:read`; `gateway.connect`,
-`events.catch_up` `events:subscribe`; `cost.reconcile.submit` `costs:reconcile`; `self.read`,
+`events.catch_up` `events:subscribe`; `cost.reconcile.submit` `costs:reconcile`; `cost.reconcile.read`
+`costs:reconcile` when the base branch's catalogue has it (05 2.6, R-AZ-28; otherwise M2-28 adds the
+row, because `TestScopeTableActionsExist` fails on an action outside the catalogue); `self.read`,
 `instance.read`, `status.read`, `command.read`, `agent.read`, `webhook_in.post` need no scope.
 For an app principal: action in the table with a scope not in `p.GrantedScopes` gives
 `forbidden scope_missing`; action not in the table gives `forbidden subject_kind_not_allowed`.

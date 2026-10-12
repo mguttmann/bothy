@@ -1,6 +1,6 @@
 # M1-73: Compose smoke test
 
-Status: ready | Depends on: M1-37, M1-69 | Milestone: M1
+Status: ready | Depends on: M1-69 | Milestone: M1
 
 ## Goal
 

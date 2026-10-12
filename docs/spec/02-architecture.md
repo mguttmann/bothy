@@ -192,7 +192,7 @@ of lower modules that the module implements.
 | `identity` | `Auth` (login, refresh, logout, child sessions, step-up), `Directory`, `Devices`, `Tokens`, `Owners`; declares `AvatarFiles` | `DeviceRevoked`, `SessionEnded` | | kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant` |
 | `chat` | `Structure` (spaces, channels, read-only), `Threads` (create for `messaging`, `AppendToThread`, message count on deletion, close, open, move, info), `AgentConfig` | `ThreadMoved`, `ChannelArchived`, `ChannelReadOnlySet`, `SpaceArchived` | | `authz.StructureSource`, kernel `personaldata.Participant` |
 | `agents` | `Agents` (administration, policy, tool class), `Presence`, `Consumers` (cursor, ack, takeover with fencing), `Commands` (register), `Sessions`, `DevEnvironments` (milestone) | `AgentDisabled` | | `authz.AgentPolicySource` (policy, tool class, readiness of the dev environment), kernel `personaldata.Participant` |
-| `files` | `Uploads` (sessions, parts), `Files` (read, open, preview, file tickets, delete), `Attachments`, `Transcripts`, `TextExtracts`; declares `AttachmentLocator` | `FileFinalized` (scan and, if applicable, transcript final) | | `identity.AvatarFiles`, kernel `personaldata.Participant` |
+| `files` | `Uploads` (sessions, parts), `Files` (read, open, preview, file tickets, delete), `Attachments`, `Transcripts`, `TextExtracts`; declares `AttachmentLocator` | `FileFinalized` (scan and, if applicable, transcript final) | `chat.ThreadMoved` (copy `message_attachments.channel_id`) | `identity.AvatarFiles`, kernel `personaldata.Participant` |
 | `messaging` | `Messages` (create, create a thread with its first message, edit, delete, history, `SetTriggerState`, anchor), `Reactions`, `Pins`, `Templates`, `Mentions` (list, unread per thread), `Export`; declares `ComponentReader` | `MessagePosted`, `MessageDeleted` | `chat.ThreadMoved` | `files.AttachmentLocator`, kernel `personaldata.Participant` |
 | `runs` | `Runs` (read, context, start, resume, patch, end, cancel, overview), `Delivery` (delivery preparation with I2, guard rules and token), `Interactions`, `CommandExec` (including autocompletion) | | `messaging.MessagePosted`, `messaging.MessageDeleted`, `files.FileFinalized` (write the held-back invocation), `agents.AgentDisabled`, `chat.ChannelReadOnlySet`, kernel `authorize.AccessChanged` | `messaging.ComponentReader`, kernel `personaldata.Participant` |
 | `sync` | `Tail`, `CatchUp`, `Snapshot`, `Consumers` (worker cursors), `ReadStates`, `Drafts`, `Settings` | | `messaging.MessagePosted` (clear the draft), `chat.ThreadMoved` (copies of `channel_id`) | kernel `eventlog.Appender`, kernel `eventlog.Redactor`, kernel `idempotency.Store`, kernel `personaldata.Participant` |
@@ -220,7 +220,7 @@ else is forbidden and fails in the gate (section 7).
 | `identity` | `instance`, `authz` | signing keys for access tokens; implements `PrincipalSource` and `CredentialSource` |
 | `chat` | `identity`, `authz` | the operator is an active agent principal, DM participants are people; implements `StructureSource` |
 | `agents` | `identity`, `authz`, `chat` | create the agent principal, the credential holder is a person; implements `AgentPolicySource`; thread for sessions, where commands apply |
-| `files` | `identity`, `chat` | implements `AvatarFiles`; check the upload channel |
+| `files` | `identity`, `chat` | implements `AvatarFiles`; check the upload channel; subscription `chat.ThreadMoved` for the copy `message_attachments.channel_id` |
 | `messaging` | `identity`, `chat`, `files` | resolve mentions; thread sequence and reopening; bind and read attachments |
 | `status` | `agents` | agent presence as a status component |
 | `runs` | `instance`, `chat`, `agents`, `messaging`, `billing` | sign the token; operator, mention rule, project binding; policy and session; anchor and `trigger_state`; post costs |
@@ -288,13 +288,13 @@ table with the catalogue (section 7.3).
 | `files` | `file.upload`, `file.read`, `file.delete`, `file.transcribe`, `file.transcript.submit` |
 | `messaging` | `thread.create`, `message.read`, `message.create`, `message.update`, `message.delete`, `message.revisions.read`, `reaction.add`, `reaction.remove`, `pin.create`, `pin.delete`, `mention.list`, `template.read`, `template.manage`, `export.channel` |
 | `runs` | `agent.invoke`, `run.read`, `run.overview.read`, `run.context.read`, `run.start`, `run.token.renew`, `run.update`, `run.finish`, `run.cancel`, `run.followup.create`, `component.update`, `interaction.create`, `interaction.respond`, `command.autocomplete`, `command.autocomplete.respond`, `command.invoke` |
-| `billing` | `cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `cost.reconcile`, `cost.reconcile.submit` |
+| `billing` | `cost.read.thread`, `cost.read.aggregate`, `price.read`, `price.manage`, `cost.reconcile`, `cost.reconcile.read`, `cost.reconcile.submit` |
 | `sync` | `read_state.update`, `read_state.mark_unread`, `draft.read`, `draft.write`, `settings.read`, `settings.update`, `sync.snapshot.read`, `events.catch_up` |
 | `notify` | `notification_pref.update`, `quiet_hours.update`, `push.register`, `push.unregister`, `push.deliver` |
 | `gateway` | `gateway.connect`, `gateway.focus`, `typing.start` |
 | `search` | `search.query` |
 | `stats` | `stats.read`, `client_metrics.submit` |
-| `apps` | `app.read`, `app.install`, `app.scopes.update`, `app.suspend`, `app.resume`, `app.uninstall`, `webhook_out.read`, `webhook_out.manage`, `webhook_out.redeliver`, `webhook_out.deliver`, `webhook_in.read`, `webhook_in.create`, `webhook_in.revoke`, `webhook_in.post` |
+| `apps` | `app.read`, `app.install`, `app.scopes.update`, `app.suspend`, `app.resume`, `app.uninstall`, `webhook_out.read`, `webhook_out.manage`, `webhook_out.redeliver`, `webhook_out.deliver`, `webhook_out.transition`, `webhook_in.read`, `webhook_in.create`, `webhook_in.revoke`, `webhook_in.post` |
 | `importer` | `import.read`, `import.manage`, `import.apply` |
 | `privacy` | `gdpr.request.create`, `gdpr.request.read`, `gdpr.request.decide`, `gdpr.export.download` |
 | `status` | `status.public.read`, `status.read`, `status.manage` |

@@ -519,6 +519,8 @@ The app therefore uses the separate action `cost.reconcile.submit` with scope `c
 (05), without step-up; it only creates `reconciled` entries for existing runs and deletes nothing
 ([ADR 0055](../adr/0055-cost-reconciliation-as-its-own-app-admin-key-never-in-the-server.md)). Reason: the
 reconciliation changes only estimated amounts, no permissions; a job cannot confirm a passkey.
+It reads the estimates per run that it distributes according to item 3, and the run IDs for the
+submission, with `cost.reconcile.read` under the same scope, also without step-up (05, R-AZ-28).
 
 ## 13. Display in the app
 

@@ -174,7 +174,9 @@ actions (R-AZ-03).
    with its class. Lint rules: `rule/authz-action-required`, `rule/authz-action-known`,
    `rule/rate-limit-class-required`, `rule/rate-limit-class-known` (docs/api/redocly.yaml).
 2. List endpoints check the action against the container (channel, space, instance) and filter
-   in the query (P2). They return no totals.
+   in the query (P2). They return no totals. Exception: `listCostEstimates`
+   (`cost.reconcile.read`) checks against the instance and does not filter by visible channels,
+   because its entries name neither channel nor thread nor content (05, rule 1.2 and R-AZ-28).
 3. No read permission gives `404 not_found`, whether or not the resource exists (R-AZ-01). Read
    permission without the required level or capability gives `403 forbidden`.
 4. Apps: visibility follows the grant. If an app has a grant on the channel, the API answers a
@@ -197,7 +199,8 @@ actions (R-AZ-03).
    `webhook_out.deliver` (on every entry in `webhooks:`), the system actions
    `instance.bootstrap` (command `bothy setup bootstrap-owner`), `owner.recover` (command `bothy
    setup issue-enrollment-code`), `grant.expire`, `group.member.expire`, `signing_key.transition`
-   and `device.expire` (jobs), `group.member.sync` (reconciliation at OIDC login) as well as
+   and `device.expire` (jobs), `webhook_out.transition` (consumer `webhooks` and job
+   `apps.webhook_deliver`), `group.member.sync` (reconciliation at OIDC login) as well as
    `dev_environment.*` (routes come with the dev environment milestone, 05 section 4.13).
 
 ## 5. Errors
@@ -1026,6 +1029,7 @@ Generated from openapi.yaml.
 | POST | `/api/v1/prices/{price_id}/close` | `closePrice` | `price.manage` | End the validity of a price |
 | POST | `/api/v1/costs/reconcile` | `reconcileCosts` | `cost.reconcile` | Reconcile estimates with invoices |
 | POST | `/api/v1/costs/reconciliations` | `submitCostReconciliation` | `cost.reconcile.submit` | Submit reconciled cost entries (app) |
+| GET | `/api/v1/costs/estimates` | `listCostEstimates` | `cost.reconcile.read` | Cost estimates per run for reconciliation |
 
 #### Status
 
@@ -1160,6 +1164,7 @@ Events (receive action per 05, section 6; schema in openapi.yaml):
 | `group.changed` | durable | `group.read` |  | `GroupChangedEvent` |  |
 | `access.changed` | durable | `self` | self | `AccessChangedEvent` | yes |
 | `access.expiring` | durable | `self` | self | `AccessExpiringEvent` |  |
+| `device.pending` | durable | `self` | self | `DevicePendingEvent` |  |
 | `session.revoked` | durable | `self` | self | `SessionRevokedEvent` |  |
 | `read_state.updated` | durable | `self` | self | `ReadStateUpdatedEvent` |  |
 | `draft.updated` | durable | `self` | self | `DraftUpdatedEvent` |  |

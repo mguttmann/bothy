@@ -1,6 +1,6 @@
 # M1-71: Contract tests with Schemathesis (G7, G8)
 
-Status: ready | Depends on: M1-50, M1-62, M1-63 | Milestone: M1
+Status: ready | Depends on: M1-37, M1-50, M1-62, M1-63 | Milestone: M1
 
 ## Goal
 

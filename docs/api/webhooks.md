@@ -99,7 +99,8 @@ webhook-signature: v1a,<Ed25519 signature in Base64> v1,<HMAC-SHA256 in Base64>
    `webhook.retry_backoff_base` and `webhook.retry_backoff_cap` (03), until
    `webhook.retry_max_age` is reached. Then the delivery becomes `dead`.
 2. After `webhook.max_consecutive_failures` (03) consecutive failures, the subscription becomes
-   `disabled`. This is recorded in the audit log and shown in the admin console. The product sends
+   `disabled`. This is recorded in the audit log (system action `webhook_out.transition`, 05,
+   R-AZ-27) and shown in the admin console. The product sends
    no emails (Baseline section 4).
 3. Every attempt first checks `webhook_out.deliver` and the receive action of the event for
    the app (05, R-AZ-11). If the app has lost access in the meantime, the delivery becomes `dead`

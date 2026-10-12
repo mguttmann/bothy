@@ -18,7 +18,11 @@ This check reads all of them and fails on:
   index;
 - a `make <target>` inside code of a brief whose target is neither in the Makefile nor in the
   table "Make targets created by tickets", or whose creating ticket is not the brief itself or
-  in its dependency closure.
+  in its dependency closure;
+- a ticket named in a start check of a brief (a paragraph or list item that ends the run with
+  `Verdict: BLOCKED dependency ...` or `BLOCKED ... not merged`) that is not in the brief's
+  dependency closure: the launcher
+  could start the brief before that ticket is merged, and the brief could only stop.
 
 `--write` regenerates the wave column, the "Waves" table and the graph edges from the index
 dependencies (the index stays the source). Fix dependencies by hand, then run `--write`.
@@ -44,6 +48,10 @@ _INLINE_CODE = re.compile(r"(`+)((?:(?!\1)(?:[^\n]|\n(?![ \t]*\n)))+?)\1")
 _MAKE = re.compile(r"(?<![\w./-])make ([a-z][a-z0-9-]*)")
 _MAKE_TARGET = re.compile(r"^([a-zA-Z0-9][a-zA-Z0-9_-]*)\s*:(?!=)", re.MULTILINE)
 _EDGE = re.compile(r"^\s*(M\d_\d\d) --> (M\d_\d\d)\s*$")
+_BLOCK_START = re.compile(r"^\s*(?:[-*+]|\d+\.|[a-z]\.)\s")
+_START_CHECK = re.compile(r"BLOCKED dependency|BLOCKED [^`]*not merged")
+_SENTENCE = re.compile(r"(?<=[.;])\s+(?=[A-Z`])")
+_OPTIONAL = re.compile(r"(?:only if|where|if) merged", re.IGNORECASE)
 
 
 class Index:
@@ -121,6 +129,28 @@ def code_text(text: str) -> str:
 def make_calls(text: str) -> set[str]:
     """Targets named as `make <target>` inside code of a brief."""
     return set(_MAKE.findall(code_text(text)))
+
+
+def start_check_tickets(text: str) -> set[str]:
+    """Tickets named in the start checks of a brief.
+
+    A start check is a paragraph or list item that stops the run with `BLOCKED dependency ...` or
+    `BLOCKED ... not merged`; every ticket ID in it must be merged before the brief can run,
+    except in a sentence that names a ticket as optional ("only if merged", "where merged").
+    """
+    blocks: list[list[str]] = [[]]
+    for line in text.splitlines():
+        if not line.strip() or _BLOCK_START.match(line):
+            blocks.append([])
+        blocks[-1].append(line)
+    found: set[str] = set()
+    for block in blocks:
+        joined = "\n".join(block)
+        if _START_CHECK.search(joined):
+            for sentence in _SENTENCE.split(joined):
+                if not _OPTIONAL.search(sentence):
+                    found.update(_ID.findall(sentence))
+    return found
 
 
 def closure(deps: dict[str, list[str]], tid: str) -> set[str]:
@@ -222,6 +252,10 @@ def check(root: Path) -> list[str]:
         if header is None or sorted(_ID.findall(header.group(1))) != sorted(index.deps[tid]):
             problems.append(f"{name}: header 'Depends on' differs from the index")
         reach = closure(index.deps, tid) | {tid}
+        for needed in sorted(start_check_tickets(brief) - reach):
+            problems.append(
+                f"{name}: start check needs {needed}, which is not a dependency of {tid}"
+            )
         for target in sorted(make_calls(brief)):
             maker = targets.get(target)
             if maker is None:

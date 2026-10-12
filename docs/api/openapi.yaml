@@ -15565,6 +15565,77 @@ paths:
         default:
           $ref: '#/components/responses/Error'
 
+  /costs/estimates:
+    get:
+      operationId: listCostEstimates
+      summary: Cost estimates per run for reconciliation
+      tags: [Stats]
+      description: |-
+        For the reconciliation app with scope `costs:reconcile` and for owners in a session, without step-up (05, R-AZ-28). One item per run of the given agents with cost entries of mode `organization` whose `occurred_at` lies in the range, sorted by `run_id`; runs whose entries in the range mix currencies are left out. Entries of mode `personal` never appear (03 `cost_entries`). Items name no channel, thread or content; the list is evaluated on the instance and not filtered by visible channels (06, 4 point 2).
+      x-authz-action: cost.reconcile.read
+      x-rate-limit-class: rl.read
+      parameters:
+      - $ref: '#/components/parameters/Cursor'
+      - $ref: '#/components/parameters/Limit'
+      - name: from
+        in: query
+        description: Start of the range (inclusive).
+        schema:
+          $ref: '#/components/schemas/Timestamp'
+        required: true
+      - name: to
+        in: query
+        description: End of the range (exclusive).
+        schema:
+          $ref: '#/components/schemas/Timestamp'
+        required: true
+      - name: agent_id
+        in: query
+        description: Agents whose runs are listed; repeat the parameter for several agents.
+        required: true
+        schema:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/Uuid'
+        style: form
+        explode: true
+      responses:
+        '200':
+          description: OK.
+          headers:
+            Correlation-Id:
+              $ref: '#/components/headers/Correlation-Id'
+            RateLimit:
+              $ref: '#/components/headers/RateLimit'
+            RateLimit-Policy:
+              $ref: '#/components/headers/RateLimit-Policy'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CostEstimatePage'
+              examples:
+                default:
+                  summary: Response
+                  value:
+                    items:
+                    - run_id: 0192f4a0-7b1c-70cd-8013-27d7ac09a77f
+                      agent_id: 0192f4a0-7b1c-7250-807f-c268a7b21797
+                      provider: anthropic
+                      currency: USD
+                      estimate_micros: 1250000
+                      reconciled: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        default:
+          $ref: '#/components/responses/Error'
+
   /status:
     get:
       operationId: getStatus
@@ -23263,8 +23334,8 @@ components:
           $ref: '#/components/schemas/MessageKind'
         system_code:
           type: string
-          enum: [thread.reopened]
-          description: Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then.
+          enum: [thread.reopened, agent_session.resume_failed]
+          description: Set exactly for `kind = system`; clients render the localized line from it and `author`. `content_md` is empty then. `agent_session.resume_failed` is written once when the runtime no longer knew the bound session and the agent started a new one (09 9.5, 03 R-DM-42); its `author` is the run's agent. A system line never reopens a done thread.
         content_md:
           type: string
           description: Markdown. In lists longer contents are cut at `message.list_content_max_bytes` with `content_truncated`.
@@ -25796,6 +25867,41 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Uuid'
+    CostEstimate:
+      type: object
+      description: Estimate of one run in the requested range for the reconciliation (10, 12.4; 05, R-AZ-28). Names no channel, thread or content.
+      required: [run_id, agent_id, provider, currency, estimate_micros, reconciled]
+      properties:
+        run_id:
+          $ref: '#/components/schemas/Uuid'
+        agent_id:
+          $ref: '#/components/schemas/Uuid'
+        provider:
+          type: string
+          examples: [anthropic]
+        currency:
+          type: string
+          description: ISO 4217 code.
+          examples: [USD]
+        estimate_micros:
+          type: integer
+          format: int64
+          description: Sum in micro units of the run's estimate entries in the range whose successor, if any, is not an estimate; the estimate before any reconciliation.
+          examples: [1250000]
+        reconciled:
+          type: boolean
+          description: True when every valid entry of the run in the range has `source = reconciled`.
+    CostEstimatePage:
+      type: object
+      description: One page. `next_cursor` is absent on the last page.
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CostEstimate'
+        next_cursor:
+          $ref: '#/components/schemas/Cursor'
     ClientMetricsBatch:
       type: object
       description: Anonymous client measurements (15, section 17). No contents, no IDs of threads, channels or people.
@@ -26447,6 +26553,15 @@ components:
           description: Absent for a grant on the instance.
         expires_at:
           $ref: '#/components/schemas/Timestamp'
+    DevicePendingPayload:
+      type: object
+      description: A new device of the human waits for approval (R-AZ-31). Carries only IDs and the platform.
+      required: [device_id, platform]
+      properties:
+        device_id:
+          $ref: '#/components/schemas/Uuid'
+        platform:
+          $ref: '#/components/schemas/DevicePlatform'
     SessionRevokedPayload:
       type: object
       required: [session_id, reason]
@@ -27976,6 +28091,18 @@ components:
             enum: [access.expiring]
           payload:
             $ref: '#/components/schemas/AccessExpiringPayload'
+    DevicePendingEvent:
+      description: Durable event `device.pending`.
+      allOf:
+      - $ref: '#/components/schemas/EventEnvelope'
+      - type: object
+        required: [type, payload]
+        properties:
+          type:
+            type: string
+            enum: [device.pending]
+          payload:
+            $ref: '#/components/schemas/DevicePendingPayload'
     SessionRevokedEvent:
       description: Durable event `session.revoked`.
       allOf:
@@ -28330,6 +28457,7 @@ components:
       - $ref: '#/components/schemas/GroupChangedEvent'
       - $ref: '#/components/schemas/AccessChangedEvent'
       - $ref: '#/components/schemas/AccessExpiringEvent'
+      - $ref: '#/components/schemas/DevicePendingEvent'
       - $ref: '#/components/schemas/SessionRevokedEvent'
       - $ref: '#/components/schemas/ReadStateUpdatedEvent'
       - $ref: '#/components/schemas/DraftUpdatedEvent'
@@ -28383,6 +28511,7 @@ components:
           group.changed: '#/components/schemas/GroupChangedEvent'
           access.changed: '#/components/schemas/AccessChangedEvent'
           access.expiring: '#/components/schemas/AccessExpiringEvent'
+          device.pending: '#/components/schemas/DevicePendingEvent'
           session.revoked: '#/components/schemas/SessionRevokedEvent'
           read_state.updated: '#/components/schemas/ReadStateUpdatedEvent'
           draft.updated: '#/components/schemas/DraftUpdatedEvent'

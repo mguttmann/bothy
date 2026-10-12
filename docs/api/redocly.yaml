@@ -127,6 +127,7 @@ rules:
         - cost.read.aggregate
         - cost.read.thread
         - cost.reconcile
+        - cost.reconcile.read
         - cost.reconcile.submit
         - dev_environment.manage
         - dev_environment.read
@@ -382,6 +383,7 @@ rules:
         - cost.read.aggregate
         - cost.read.thread
         - cost.reconcile
+        - cost.reconcile.read
         - cost.reconcile.submit
         - dev_environment.manage
         - dev_environment.read

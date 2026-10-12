@@ -98,6 +98,8 @@ Paths relative to `services/server/` unless they start with `docs/`:
 1. `migrations/<next number>_messaging_messages.sql`: tables `messages` and `mentions` as 03, with
    these deliberate deviations, each commented in the file:
     - `messages.search_language`, `messages.search_vector` and the GIN index: M3-13 adds them.
+    - `messages.has_attachments` and the CHECK `deleted_at IS NULL OR NOT has_attachments`: M3-07
+      adds them together with attachments (03 R-DM-43); until then no message has an attachment.
     - FK `messages.run_id -> runs(id)`: M2-05 adds it (table `runs` does not exist yet); the column
       and the CHECK `(kind = 'run') = (run_id IS NOT NULL)` exist now.
     - FK `messages.import_item_id -> import_items(id)`: added by the import ticket of M8 (table
@@ -269,8 +271,9 @@ message with `kind = 'system'`, `origin = 'system'`, `system_code = 'thread.reop
 `content_md` empty, `author_principal_id` = the principal whose message reopened the thread,
 `client_msg_id` = a new server UUIDv7, `silent = true`, no mentions, no `trigger_state`,
 `thread_seq` directly before the reopening message. Clients render a localized sentence from the
-code and `author` ("Reopened by a message from Sam"). Document the code list (one entry now) in
-`internal/messaging/README.md`.
+code and `author` ("Reopened by a message from Sam"). Document the code list in
+`internal/messaging/README.md`: the CHECK holds every code of 03, and this ticket writes only
+`thread.reopened` (M2-12 writes `agent_session.resume_failed`, R-DM-42).
 
 D7. Events (`kernel/eventlog.Appender`), one `message.created` per message, in this order inside
 the transaction: `thread.reopened` (appended by chat), `message.created` for the system line,

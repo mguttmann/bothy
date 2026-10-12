@@ -302,11 +302,11 @@ invocation token (https://www.rfc-editor.org/rfc/rfc8725.html, retrieved 2026-10
 | `iss` | `instance.instance_id` | 05 |
 | `aud` | Principal ID of the agent | 05 |
 | `sub` | Principal ID of the triggering person | 05 |
-| `jti` | UUIDv7 of this token; stored in `runs.invocation_jti` | 05 |
+| `jti` | UUIDv7 of this token; stored in `runs.invocation_jti` when its delivery or renewal replaces the token of the run there (04 section 15.3), never for `command.invoked` (R-AZ-25) | 05 |
 | `iat`, `exp` | Issued at, expiry (`iat + agent.invocation_token_ttl`) | 05 |
-| `run_id` | Run; missing only for `trigger_kind = autocomplete` | 05 |
+| `run_id` | Run; missing for `trigger_kind = autocomplete` and for `command.invoked` when the owner of the control command has no active run in the thread at execution time (otherwise its run) | 05, R-AZ-25 |
 | `message_id` or `interaction_id` or `command_id` | triggering object | 05, `command_id` new |
-| `thread_id`, `channel_id` | Location | 05 |
+| `thread_id`, `channel_id` | Location; for `trigger_kind = autocomplete` the thread of the request, without one the main timeline of the text channel; in a forum channel without a thread no token | 05, R-AZ-26 |
 | `space_id` | Space of the channel | new |
 | `level` | effective level of `sub` on the channel at delivery time | 05 |
 | `billing_mode` | configured mode from `agents.billing_mode` at delivery time | 05 |
@@ -926,7 +926,9 @@ For options with `autocomplete = true` the server asks the owner of the command:
 1. Client sends command, option and partial text (`command.autocomplete`, `rl.trigger`).
 2. Server checks like `agent.invoke` without a run (including I2) and sends an ephemeral event
    `command.autocomplete_requested` with `request_id`, token (`trigger_kind = autocomplete`) and
-   partial text to the connection of the agent (04 section 15.7).
+   partial text to the connection of the agent (04 section 15.7). If the request in a forum
+   channel names no thread, the server does not ask the agent after the check passed and returns
+   an empty list at once (R-AZ-26).
 3. The adapter answers with the gateway op `command.autocomplete_result {request_id, choices}`
    or via REST. At most `command.autocomplete_max_choices` entries.
 4. Without an answer within `command.autocomplete_timeout` the server returns an empty list. The client

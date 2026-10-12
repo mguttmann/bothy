@@ -702,8 +702,9 @@ most secure one and recommends it for applications with personal data
    'device_revoked'`, increment the permission version, audit.
 3. Open connections close with `4012`; the app deletes all local data at the next contact
    (04, section 8.5, R-SY-14).
-4. A push without content of type `revoked` wakes the app so that it deletes earlier. Delivery is
-   not guaranteed ([13-push-notifications.md](13-push-notifications.md)).
+4. No push is sent for the revocation: step 2 disables the push registrations of the device in the
+   same transaction, so no registration is left to wake the app, and a push could not be relied on
+   anyway; the app deletes at its next contact (step 3) ([13-push-notifications.md](13-push-notifications.md); D-W-108).
 5. Residual risk: a device that never makes contact again keeps the local cache. Protection then only
    through the device lock, the disk encryption of the operating system and the app lock.
 

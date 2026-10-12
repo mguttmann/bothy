@@ -158,7 +158,8 @@ built instead of adding a second version.
   delete (M1-59, note 8); mention list and the computed counters (M1-60; no counter is stored,
   so deleting needs no counter update, 03 R-DM-32); read states (M1-61, M1-63); thread move
   (M1-62).
-- Deleting attachments (M3, through the `files` port) and components (M2, `runs` subscribes
+- Deleting attachments (M3, through the `files` port) and resetting `messages.has_attachments`
+  (M3-07 adds the column, 03 R-DM-43); components (M2, `runs` subscribes
   `MessageDeleted`); cancelling a run of a deleted trigger message (M2).
 - Deletion journal entry of 20 4.6 (M7-07); GDPR jobs (M7).
 - Gateway delivery of the events (M1-65); search index (M3).
