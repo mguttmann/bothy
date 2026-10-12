@@ -55,14 +55,15 @@ _BLOCK_START = re.compile(r"^\s*(?:[-*+]|\d+\.|[a-z]\.)\s")
 _START_CHECK = re.compile(r"BLOCKED dependency|BLOCKED [^`]*not merged")
 _SENTENCE = re.compile(r"(?<=[.;])\s+(?=[A-Z`])")
 _OPTIONAL = re.compile(r"(?:only if|where|if) merged", re.IGNORECASE)
-# A ticket that a brief calls missing or optional. Parenthesized text is dropped first, so an
-# aside like "M1-04 (which builds on M1-02)" names only M1-04 and a comma inside it ends nothing.
+# A ticket that a brief calls missing or optional. Parenthesized text is matched as a segment of
+# its own and dropped from the sentence, so an aside like "M1-04 (which builds on M1-02)" names
+# only M1-04 and a comma inside it ends nothing.
 # Forms: a ticket directly before "is not in" or "lies outside" a closure, a list of tickets
 # before "are not in" or "lie outside" it; a ticket after "if", "when" or "once" with "is
-# merged", "has (already) been merged" or "is on the base", a list with "are" or "have"; a list
-# before "only if merged" or "only where merged"; a ticket followed by "(if merged)"; and the
-# tickets of a list after "not in the closure ...:", "outside ... closure:" or "if merged:" up
-# to a comma that starts a new clause (not "and" or "or").
+# merged", "has (already) been merged" or "is on the base", a list with "are" or "have"; a
+# ticket before "only if merged" or "only where merged"; a ticket followed by "(if merged)"; and
+# the tickets of a list after "not in the closure ...:", "outside ... closure:" or "if merged:"
+# up to a comma that starts a new clause (not one before "and" or "or" and a last ticket).
 _TICKETS = r"M\d-\d\d(?:\s*,\s*M\d-\d\d)*(?:\s*,?\s*(?:and|or)\s+M\d-\d\d)?"
 _OPTIONAL_SUBJECT = re.compile(
     r"(M\d-\d\d)\s+(?:is|lies)\s+(?:not in|outside)\b[^.;:,]{0,40}\bclosure"
@@ -71,18 +72,19 @@ _OPTIONAL_SUBJECT = re.compile(
     r"(?:already\s+)?(?:merged|on the base)"
     rf"|\b(?:if|when|once)\s+({_TICKETS})\s+(?:are|have)\s+(?:already\s+)?(?:been\s+)?"
     r"(?:already\s+)?(?:merged|on the base)"
-    rf"|({_TICKETS})\s+(?:(?:is|are)\s+)?(?:\w+\s+)?only (?:if|where) merged",
+    r"|(M\d-\d\d)\s+(?:(?:is|are)\s+)?(?:\w+\s+)?only (?:if|where) merged",
     re.IGNORECASE,
 )
 _OPTIONAL_ASIDE = re.compile(
-    r"(M\d-\d\d)\b[^.;:,()]{0,40}\((?:only )?(?:if|where) (?:it is )?merged\)", re.IGNORECASE
+    r"(M\d-\d\d)\b(?:(?!M\d-\d\d)[^.;:,()]){0,40}\((?:only )?(?:if|where) (?:it is )?merged\)",
+    re.IGNORECASE,
 )
 _OPTIONAL_LIST = re.compile(
     r"(?:\bnot in (?:[\w']+ ){0,3}closure|\boutside (?:[\w']+ ){0,3}closure|\bif merged)"
     r"[^:.;]{0,60}:\s*([^.;]+)",
     re.IGNORECASE,
 )
-_CLAUSE_BREAK = re.compile(r",\s+(?!(?:and|or)\b)(?=[a-z])")
+_CLAUSE_BREAK = re.compile(r",\s+(?!(?:and|or)\s+M\d-\d\d\s*(?:[,.;]|$))(?=[a-z])")
 _PARENS = re.compile(r"\([^()]*\)")
 
 
@@ -195,18 +197,22 @@ def called_optional_tickets(text: str) -> set[str]:
     found: set[str] = set()
     flat = re.sub(r"\s+", " ", text)
     found.update(m.group(1) for m in _OPTIONAL_ASIDE.finditer(flat))
+    segments = [flat]
     bare = flat
     while True:
+        segments += [m.group(1) for m in re.finditer(r"\(([^()]*)\)", bare)]
         stripped = _PARENS.sub("", bare)
         if stripped == bare:
             break
         bare = stripped
-    for m in _OPTIONAL_SUBJECT.finditer(bare):
-        for group in m.groups():
-            if group:
-                found.update(_ID.findall(group))
-    for m in _OPTIONAL_LIST.finditer(bare):
-        found.update(_ID.findall(_CLAUSE_BREAK.split(m.group(1))[0]))
+    segments[0] = bare
+    for segment in segments:
+        for m in _OPTIONAL_SUBJECT.finditer(segment):
+            for group in m.groups():
+                if group:
+                    found.update(_ID.findall(group))
+        for m in _OPTIONAL_LIST.finditer(segment):
+            found.update(_ID.findall(_CLAUSE_BREAK.split(m.group(1))[0]))
     return found
 
 
