@@ -8,6 +8,34 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AuditEvent struct {
+	Seq              int64
+	ID               pgtype.UUID
+	OccurredAt       pgtype.Timestamptz
+	ActorPrincipalID pgtype.UUID
+	ActorDeviceID    pgtype.UUID
+	ActorSessionID   pgtype.UUID
+	Action           string
+	Decision         string
+	DenyReason       pgtype.Text
+	ResourceKind     pgtype.Text
+	ResourceID       pgtype.UUID
+	Details          []byte
+	CorrelationID    pgtype.UUID
+	PrevHash         []byte
+	Hash             []byte
+}
+
+type AuditIpKey struct {
+	ID            pgtype.UUID
+	ValidFrom     pgtype.Timestamptz
+	ValidUntil    pgtype.Timestamptz
+	KeyCiphertext []byte
+	KeyRef        string
+	CreatedAt     pgtype.Timestamptz
+	DestroyedAt   pgtype.Timestamptz
+}
+
 type Instance struct {
 	ID               int16
 	InstanceID       pgtype.UUID

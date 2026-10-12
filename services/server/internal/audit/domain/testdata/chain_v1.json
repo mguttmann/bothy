@@ -1,0 +1,60 @@
+{
+  "comment": "Golden audit chain (canonical form v1, SEC-AUD-4). Hashes computed independently with Python json.dumps(sort_keys, compact separators, ensure_ascii=False), which equals RFC 8785 in this domain.",
+  "rows": [
+    {
+      "seq": 1,
+      "id": "01928f3a-7b1c-7000-8a00-000000000001",
+      "occurred_at": "2026-10-12T08:15:30.120Z",
+      "actor_principal_id": "01928f3a-7b1c-7000-8a00-0000000000a1",
+      "actor_device_id": "01928f3a-7b1c-7000-8a00-0000000000d1",
+      "actor_session_id": "01928f3a-7b1c-7000-8a00-0000000000e1",
+      "action": "grant.create",
+      "decision": "deny",
+      "deny_reason": "no_grant",
+      "resource_kind": "grant",
+      "resource_id": "01928f3a-7b1c-7000-8a00-0000000000f1",
+      "details": {
+        "ip_hmac": "5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f",
+        "ip_key_id": "01928f3a-7b1c-7000-8a00-0000000000b1",
+        "aggregate": {
+          "count": 3,
+          "first_at": "2026-10-12T08:15:30.120Z",
+          "last_at": "2026-10-12T08:16:10.005Z"
+        },
+        "level": "read",
+        "targets": [
+          "01928f3a-7b1c-7000-8a00-0000000000c1",
+          "01928f3a-7b1c-7000-8a00-0000000000c2"
+        ],
+        "expired": false,
+        "step": -7
+      },
+      "correlation_id": "4bf92f35-77b3-4da6-a3ce-929d0e0e4736",
+      "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "7e2b6b7637943064977cc3da42e1c1d74ba2dc3ceadb121c331bf4d97707de25"
+    },
+    {
+      "seq": 2,
+      "id": "01928f3a-7b1c-7000-8a00-000000000002",
+      "occurred_at": "2026-10-12T08:16:00.000Z",
+      "action": "instance.bootstrap",
+      "decision": "allow",
+      "details": {},
+      "prev_hash": "7e2b6b7637943064977cc3da42e1c1d74ba2dc3ceadb121c331bf4d97707de25",
+      "hash": "bd4d2ce41532dd47e697d62a400e0128f74f17844d5492f43a8012b14e009a52"
+    },
+    {
+      "seq": 3,
+      "id": "01928f3a-7b1c-7000-8a00-000000000003",
+      "occurred_at": "2026-10-12T08:17:00.999Z",
+      "action": "owner.add",
+      "decision": "error",
+      "deny_reason": "x\u0001\u001f\t\"\\y\u007f",
+      "details": {
+        "reason": "Pr\u00fcfung durch Alex <a&b> \u2028 ok"
+      },
+      "prev_hash": "bd4d2ce41532dd47e697d62a400e0128f74f17844d5492f43a8012b14e009a52",
+      "hash": "da4f003022b1b5ad97e467db93c61d9b345435407dfb68c649097131481aa226"
+    }
+  ]
+}

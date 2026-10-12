@@ -61,7 +61,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [instance]
-    adapter_vendors: []
+    adapter_vendors: [pgx]
   authz:
     tables: [groups, group_memberships, grants]
     actions: [access.explain, access.preview, access.view_as, group.read, group.create,
