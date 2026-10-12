@@ -75,10 +75,9 @@ Tags die Commit-SHA hinter dem Tag).
 | `actions/download-artifact` | `v8.0.2` | Release-Artefakte einsammeln |
 | `actions/attest` | `v4.2.2` | Build-Provenance und SBOM-Attestation (öffentlich) |
 | `anchore/sbom-action` | `v0.24.3` | SBOM (SPDX) der Release-Artefakte |
-| `docker/setup-qemu-action` | `v4.4.0` | Multi-Arch-Build |
 | `docker/setup-buildx-action` | `v4.4.1` | Buildx mit Provenance und SBOM; Tag erst nach dem Scan (`imagetools create`) |
 | `docker/login-action` | `v4.6.0` | Anmeldung an ghcr.io |
-| `docker/build-push-action` | `v7.4.0` | Server-Image bauen und pushen |
+| `docker/build-push-action` | `v7.4.0` | Server-Image bauen und pushen (multi-arch by cross compilation in the Dockerfile, without QEMU) |
 | `subosito/flutter-action` | `v2.23.0` | Flutter aus `pubspec.yaml`, sobald die App existiert |
 | `github/codeql-action` | `v4.38.3` | CodeQL und SARIF-Upload (öffentlich) |
 | `ossf/scorecard-action` | `v2.4.4` | OpenSSF Scorecard (öffentlich) |

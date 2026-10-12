@@ -14,6 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -681,7 +682,16 @@ func TestQuerier_AcquireTimeout(t *testing.T) {
 	cfg := e.db.Config(pg.RoleApp)
 	cfg.MaxConns, cfg.AcquireTimeout = 1, 50*time.Millisecond
 	pool := e.db.OpenPool(t, cfg)
-	c, err := pool.Acquire(context.Background())
+	// The first connection is dialed under the 50ms acquire timeout too. Under load (make check
+	// runs every package with -race at once) the dial can take longer; the pool finishes a dial
+	// whose acquire gave up and keeps the connection, so a retry within a few seconds gets it.
+	var c *pgxpool.Conn
+	var err error
+	for deadline := time.Now().Add(10 * time.Second); ; {
+		if c, err = pool.Acquire(context.Background()); err == nil || time.Now().After(deadline) {
+			break
+		}
+	}
 	if err != nil {
 		t.Fatal(err)
 	}

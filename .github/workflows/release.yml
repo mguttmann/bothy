@@ -98,8 +98,6 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: echo "image=ghcr.io/${OWNER,,}/bothy-server" >> "$GITHUB_OUTPUT"
       - if: needs.resolve.outputs.component == 'server'
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-      - if: needs.resolve.outputs.component == 'server'
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - if: needs.resolve.outputs.component == 'server'
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -115,6 +113,13 @@ jobs:
           context: .
           file: services/server/Dockerfile
           platforms: linux/amd64,linux/arm64
+          # The Dockerfile cross compiles on the build platform and its final stage only copies,
+          # so no QEMU step: no stage runs under emulation (docs/spec/18-release.md
+          # "Server-Images" rule 2). The build fails if VERSION differs from services/server/VERSION.
+          build-args: |
+            VERSION=${{ needs.resolve.outputs.version }}
+            REVISION=${{ github.sha }}
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
           provenance: mode=max
           sbom: true
           outputs: type=image,name=${{ steps.name.outputs.image }},push-by-digest=true,name-canonical=true,push=true

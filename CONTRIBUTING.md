@@ -13,6 +13,10 @@ the apps needs Flutter; their versions come from `services/server/go.mod` and th
 work: integration tests run against PostgreSQL in throwaway containers, and `make perf` runs
 the load tests. As soon as a Go module exists, every server gate fails without Go, a
 Docker-compatible runtime or the pinned tools; there is no skip. Windows contributors use WSL.
+Work on the server image (`make image`, `make image-test`) needs Docker with the buildx plugin
+and a builder that builds several platforms: Docker Engine with the containerd image store does,
+otherwise create one with `docker buildx create --name <name> --driver docker-container` and
+pass `IMAGE_BUILDER=<name>` (services/server/README.md, section "Image").
 
 ```sh
 git clone https://github.com/OWNER/bothy.git

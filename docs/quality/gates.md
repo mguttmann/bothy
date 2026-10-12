@@ -16,7 +16,7 @@ Quelle des Diagramms: `docs/quality/pipeline.mmd`.
 |---|---|---|---|---|
 | `fmt-check` | ruff format, gofmt, dart format, Skript `format:check` der TypeScript-Projekte | Format ohne Änderungen | | Werkzeuge |
 | `codegen-check` | `tools/ci/codegen_check.py` mit sqlc und `go generate` (go-arch-lint und sqlc aus den Pins vorn im `PATH`; oapi-codegen als `tool` aus `services/server/go.mod`) | erzeugter Code (sqlc-Code, `.go-arch-lint.yml`, das exportierte Konfigurationsschema `architecture/config-schema.json`, API-Code) entspricht einer frischen Erzeugung; es zählen nur Änderungen durch den Generator, nicht Handänderungen im Arbeitsbaum | | ab erstem Go-Modul |
-| `lint` | pre-commit-Hooks über alle Dateien (Text-Regeln, Leerzeichen, YAML/TOML/JSON, Merge-Marker, private Schlüssel, Dateigröße), ruff, bandit, check-jsonschema (Issue-Formulare, Renovate, CodeRabbit), actionlint, zizmor, go vet und golangci-lint, flutter analyze und custom_lint, Skript `lint` | Stil, Fehlerquellen, Workflow-Sicherheit | `repo.max_file_kb` | ja |
+| `lint` | pre-commit-Hooks über alle Dateien (Text-Regeln, Leerzeichen, YAML/TOML/JSON, Merge-Marker, private Schlüssel, Dateigröße), ruff, bandit, Dockerfile pin check (`tools/ci/dockerfile_pins.py`: every image of `FROM`, `COPY --from`, `RUN --mount=from` and every `# syntax=` line pinned by `@sha256` digest, except `scratch` and stages; SEC-SC-4), check-jsonschema (Issue-Formulare, Renovate, CodeRabbit), actionlint, zizmor, go vet und golangci-lint, flutter analyze und custom_lint, Skript `lint` | Stil, Fehlerquellen, Workflow-Sicherheit | `repo.max_file_kb` | ja |
 | `typecheck` | mypy (strict), go build, tsc | Typen | | Werkzeuge |
 | `arch` | go-arch-lint mit `<modul>/.go-arch-lint.yml`, erzeugt aus `architecture/modules.yaml` | Modulgrenzen und erlaubte Fremdbibliotheken der Go-Module (Kapitel 02 "go-arch-lint"); keine symbolischen Links unterhalb eines Moduls, weil go-arch-lint einem verlinkten Verzeichnis nicht folgt und es nach dem Pfad des Links zuordnet, der Go-Compiler den Code dahinter aber baut | | ab erstem Go-Modul |
 | `register-check` | `tools/doccheck/register_check.py` | Modulregister `services/server/architecture/modules.yaml` gleich dem Kern-Vertrag (Tabellen und ihre Module aus Kapitel 03, Aktionen, Ereignistypen und Ops aus `docs/spec/actions.yaml`) und gleich den Stellen, die es wiederholen: Tabellen "Modulliste", "Erlaubte Abhängigkeiten", "Querschnitts-Ports", "Aktionen je Modul" und "Ereignistypen und WebSocket-Ops je Modul" in Kapitel 02, Komponenten-Diagramm `c4-3-komponenten-server.mmd`, Modul-READMEs; eine Zeile je Abweichung mit Datei und Element (ADR 0050, Regeln C1 bis C12 im Docstring) | | ja |
@@ -47,6 +47,16 @@ Quelle des Diagramms: `docs/quality/pipeline.mmd`.
 Release-Workflow zusätzlich: `trivy-image` (Schwachstellen im gebauten Image), SBOM
 (Syft über `anchore/sbom-action`), Build-Provenance und SBOM-Attestation (öffentlich),
 `portability` (ganzer Stack auf frischer Maschine).
+
+Not gates, but meant for the release (M7) and the Compose smoke test (M1-73): `make image`
+builds `bothy-server` from `services/server/Dockerfile` for `IMAGE_PLATFORMS` (default
+`linux/amd64,linux/arm64`) into the OCI archive `IMAGE_OCI` and loads the host platform as
+`IMAGE_NAME:IMAGE_TAG` (default `bothy-server:<VERSION>-local`, never `latest`); `make image-test`
+checks that image with the structure tests in `services/server/test/image` (build tag
+`imagetest`: user, health check equal to Compose, no shell, static binary, a run with a read-only
+root file system and without capabilities, both platforms in the archive). Both need Docker with
+buildx and a builder that builds several platforms (CONTRIBUTING.md); without Docker they fail
+with a hint.
 
 ## Überspringen und Fehlschlagen
 

@@ -153,6 +153,12 @@ belegt [vermutet]; das Release-Ticket prüft ihn am ersten echten Release.
    `FROM` ohne Digest ab (SEC-SC-4).
 6. Labels nach OCI (`org.opencontainers.image.source`, `.version`, `.revision`, `.licenses`);
    Version, Revision und Quelle kommen als Build-Argumente, ein Build ohne Version scheitert.
+7. `bothy-server` is built from `services/server/Dockerfile` with the repository root as build
+   context (the same for `make image` and `release.yml`). The file
+   `services/server/Dockerfile.dockerignore` applies to this Dockerfile only: it ignores
+   everything and allows only `go.mod`, `go.sum`, `VERSION`, `api/`, `cmd/`, `internal/` and
+   `migrations/` of the server, without test files and `testdata/`. A build whose `VERSION`
+   differs from `services/server/VERSION` fails.
 
 ## 8. App-Verteilung
 

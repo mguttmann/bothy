@@ -223,6 +223,14 @@ documented in this file. The format is based on
   `instance.Counters`.
 - `pg.SchemaVersion`, `pgtest.WithSteps`, and the log attributes `bothy.version.own` and
   `bothy.version.required`.
+- Image `bothy-server` (`Dockerfile`, build context the repository root, ignore file
+  `Dockerfile.dockerignore`): static `bothy` cross compiled for `linux/amd64` and `linux/arm64`
+  on `gcr.io/distroless/static-debian13:nonroot`, user `65532:65532`, no shell, health check
+  `bothy healthcheck --url http://127.0.0.1:8081/readyz` as in Compose, empty
+  `/var/lib/bothy/signing-keys` with owner `65532:65532` and mode `0700`, OCI labels from the build
+  arguments `VERSION` (must equal `VERSION`), `REVISION` and `SOURCE_URL`; base images pinned by
+  digest. `make image` builds and loads it, `make image-test` runs the structure tests in
+  `test/image` (build tag `imagetest`).
 
 ### Changed
 
