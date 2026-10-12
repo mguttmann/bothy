@@ -89,6 +89,16 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"egress.max_response_bytes":          {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "19-sicherheit.md"},
 		"secrets.dir":                        {Kind: config.KindString, Default: "/run/bothy/secrets", Chapter: "16-betrieb.md"},
 		"secrets.cache_ttl":                  {Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: "16-betrieb.md"},
+		"secrets.signing_key_dir":            {Kind: config.KindString, Default: "/var/lib/bothy/signing-keys", Chapter: "16-betrieb.md"},
+
+		"signing_key.cache_ttl":                      {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "19-sicherheit.md"},
+		"signing_key.rotation_check_interval":        {Kind: config.KindDuration, Default: "1m", Min: "1s", Chapter: "19-sicherheit.md"},
+		"signing_key.access_token_rotation_interval": {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "19-sicherheit.md"},
+		"signing_key.invocation_rotation_interval":   {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "09-agenten.md"},
+		"agent.jwks_max_age":                         {Kind: config.KindDuration, Default: "1h", Min: "1s", Chapter: "09-agenten.md"},
+		"agent.invocation_token_ttl":                 {Kind: config.KindDuration, Default: "60s", Min: "1s", Chapter: "04-sync-protokoll.md"},
+		"auth.access_token_ttl":                      {Kind: config.KindDuration, Default: "10m", Min: "1s", Chapter: "08-identitaet.md"},
+		"webhook.delivery_timeout":                   {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "11-erweiterungen.md"},
 
 		"database.host":                         {Kind: config.KindString, Default: "localhost", Chapter: "16-betrieb.md"},
 		"database.port":                         {Kind: config.KindInt, Default: "5432", Min: "1", Max: "65535", Chapter: "16-betrieb.md"},
@@ -586,6 +596,45 @@ func TestConfigCheckConsumerAlertBelowRetention(t *testing.T) {
 		}
 		for _, v := range []string{c.alert, c.retention} {
 			if strings.Contains(msg, v) {
+				t.Errorf("the problem names the value %s: %q", v, msg)
+			}
+		}
+	}
+}
+
+// TestConfig_JwksMaxAgeBelowRotationInterval: agent.jwks_max_age must be strictly below
+// signing_key.invocation_rotation_interval and signing_key.access_token_rotation_interval
+// (cross-check jwks_max_age_below_rotation, M1-32): a next key is published for agent.jwks_max_age
+// before it signs, so a rotation interval not above it would rotate again before the last next
+// key ever signed. The problem names the keys and no value.
+func TestConfig_JwksMaxAgeBelowRotationInterval(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		maxAge, invocation, access string
+		ok                         bool
+		names                      string
+	}{
+		{"1h", "30d", "30d", true, ""},
+		{"29d", "30d", "30d", true, ""},
+		{"30d", "30d", "60d", false, "signing_key.invocation_rotation_interval"},
+		{"31d", "60d", "30d", false, "signing_key.access_token_rotation_interval"},
+		{"2h", "1h", "90m", false, "signing_key.invocation_rotation_interval"},
+	} {
+		got := load(t, "BOTHY_AGENT__JWKS_MAX_AGE="+c.maxAge, "BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL="+c.invocation,
+			"BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL="+c.access)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("max age %s, intervals %s %s: problems %v, want ok %v", c.maxAge, c.invocation, c.access, got, c.ok)
+			continue
+		}
+		if len(got) == 0 {
+			continue
+		}
+		msg := got[0].String()
+		if !strings.Contains(msg, "agent.jwks_max_age") || !strings.Contains(msg, c.names) {
+			t.Errorf("the problem does not name agent.jwks_max_age and %s: %q", c.names, msg)
+		}
+		for _, v := range []string{c.maxAge, c.invocation, c.access} {
+			if strings.Contains(msg, " "+v) {
 				t.Errorf("the problem names the value %s: %q", v, msg)
 			}
 		}

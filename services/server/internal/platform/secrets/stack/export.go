@@ -13,6 +13,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -35,18 +36,37 @@ type ExportOptions struct {
 	Stdout io.Writer
 	// IsTerminal reports whether a writer is a terminal; nil checks for a character device.
 	IsTerminal func(io.Writer) bool
+	// SigningKeyDir is the key store of the signing keys (secrets.signing_key_dir, ADR 0066 rule
+	// 5); its files go into the bundle under KeyStorePrefix. Empty exports _store only.
+	SigningKeyDir string
+	// SigningKeyDirOptional lets a SigningKeyDir that does not exist be skipped with a line on
+	// Notice instead of failing the export (the default path of the command on a host without
+	// a key store).
+	SigningKeyDirOptional bool
+	// Notice receives that line; nil discards it.
+	Notice io.Writer
 }
+
+// KeyStorePrefix is the directory of the bundle that holds the files of the key store
+// secrets.signing_key_dir; everything else in the bundle is the _store tree.
+const KeyStorePrefix = "signing-keys/"
+
+// keyFilePattern is the name of a key store file: <purpose>-<kid>.pem with the purpose of 03
+// server_signing_keys and a kid of base64url characters (RFC 7638 thumbprint, ADR 0066 rule 3).
+var keyFilePattern = regexp.MustCompile(`^[a-z][a-z_]*-[A-Za-z0-9_-]+\.pem$`)
 
 // bundleEntry is one tar member: its name in the bundle and the scan result of its source.
 type bundleEntry struct {
 	name string // relative slash path, directories with a trailing slash
-	path string // path inside From
+	path string // path inside root
 	info fs.FileInfo
+	root *os.Root // the tree the entry is read from: From, or the key store
 }
 
 // Export writes the escrow bundle (docs/spec/16-betrieb.md 5.4, brief D8): a POSIX tar stream
 // (PAX) of From with relative names, permission bits, uid and gid 0 without names and mtime 0, in
-// sorted order, encrypted with age to every recipient and optionally armored. Plaintext never
+// sorted order, encrypted with age to every recipient and optionally armored. With
+// opts.SigningKeyDir the files of the key store follow under KeyStorePrefix (keyStoreEntries). Plaintext never
 // touches a disk. Recipients and the output target are checked before anything is written; an
 // output file is created exclusively and removed again when the export fails. Errors of the
 // options wrap ErrUsage.
@@ -83,13 +103,86 @@ func export(ctx context.Context, opts ExportOptions) error {
 	if err != nil {
 		return err
 	}
+	keyRoot, keyEntries, err := keyStoreEntries(opts)
+	if err != nil {
+		return err
+	}
+	if keyRoot != nil {
+		defer func() { _ = keyRoot.Close() }()
+		entries = append(entries, keyEntries...)
+		slices.SortFunc(entries, func(a, b bundleEntry) int { return cmp.Compare(a.name, b.name) })
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 	if toStdout {
-		return writeBundle(ctx, opts.Stdout, opts.Armor, recipients, root, entries)
+		return writeBundle(ctx, opts.Stdout, opts.Armor, recipients, entries)
 	}
-	return writeBundleFile(ctx, opts.Output, opts.Armor, recipients, root, entries)
+	return writeBundleFile(ctx, opts.Output, opts.Armor, recipients, entries)
+}
+
+// keyStoreEntries lists the key store of opts.SigningKeyDir for the bundle: the directory as
+// KeyStorePrefix and every regular file named <purpose>-<kid>.pem below it. Leftover temp files of
+// an interrupted Put are skipped; any other entry (a subdirectory, a link, an unknown name) stops
+// the export, because a restore must not install a file the server never wrote. A missing
+// directory is a usage error, or a line on opts.Notice when SigningKeyDirOptional. The returned
+// root is nil when there is nothing to add.
+func keyStoreEntries(opts ExportOptions) (*os.Root, []bundleEntry, error) {
+	if opts.SigningKeyDir == "" {
+		return nil, nil, nil
+	}
+	info, err := os.Stat(opts.SigningKeyDir)
+	if errors.Is(err, fs.ErrNotExist) && opts.SigningKeyDirOptional {
+		if opts.Notice != nil {
+			_, _ = fmt.Fprintf(opts.Notice, "signing key store %s not found; the bundle holds _store only\n", display(opts.SigningKeyDir))
+		}
+		return nil, nil, nil
+	}
+	if err := requireDir(opts.SigningKeyDir, "signing key store"); err != nil {
+		return nil, nil, err
+	}
+	root, err := os.OpenRoot(opts.SigningKeyDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	out := []bundleEntry{{name: KeyStorePrefix, path: ".", info: info, root: root}}
+	des, err := fs.ReadDir(root.FS(), ".")
+	if err != nil {
+		_ = root.Close()
+		return nil, nil, err
+	}
+	for _, de := range des {
+		e, skip, err := keyStoreEntry(root, de.Name())
+		if err != nil {
+			_ = root.Close()
+			return nil, nil, err
+		}
+		if !skip {
+			out = append(out, e)
+		}
+	}
+	return root, out, nil
+}
+
+// keyStoreEntry returns the bundle entry of the key store file name: skip for a leftover temp
+// file and for the directory lost+found, an error for anything but a regular file named
+// <purpose>-<kid>.pem.
+func keyStoreEntry(root *os.Root, name string) (bundleEntry, bool, error) {
+	if isTemp(name) {
+		return bundleEntry{}, true, nil
+	}
+	fi, err := root.Lstat(name)
+	if err != nil {
+		return bundleEntry{}, false, err
+	}
+	if name == "lost+found" && fi.IsDir() {
+		// The root of an ext4 file system mounted as the key store.
+		return bundleEntry{}, true, nil
+	}
+	if !fi.Mode().IsRegular() || !keyFilePattern.MatchString(name) {
+		return bundleEntry{}, false, usagef("signing key store holds %s, which is not a key file <purpose>-<kid>.pem", display(name))
+	}
+	return bundleEntry{name: KeyStorePrefix + name, path: name, info: fi, root: root}, false, nil
 }
 
 // checkOutput reports whether the bundle goes to standard output ("" or "-") and refuses that when
@@ -153,14 +246,14 @@ func bundleEntries(root *os.Root) ([]bundleEntry, error) {
 		info := found[rel]
 		switch {
 		case info.IsDir():
-			out = append(out, bundleEntry{name: rel + "/", path: rel, info: info})
+			out = append(out, bundleEntry{name: rel + "/", path: rel, info: info, root: root})
 		case isTemp(rel):
 		case !info.Mode().IsRegular():
 			return nil, fmt.Errorf("%s is not a regular file or directory", display(rel))
 		case classify(rel) < 0:
 			unknown = append(unknown, display(rel))
 		default:
-			out = append(out, bundleEntry{name: rel, path: rel, info: info})
+			out = append(out, bundleEntry{name: rel, path: rel, info: info, root: root})
 		}
 	}
 	if len(unknown) > 0 {
@@ -176,7 +269,7 @@ func bundleEntries(root *os.Root) ([]bundleEntry, error) {
 
 // writeBundleFile creates the output exclusively with mode 0600, so an existing bundle is never
 // overwritten, and removes it again when anything fails.
-func writeBundleFile(ctx context.Context, output string, armored bool, recipients []age.Recipient, root *os.Root, entries []bundleEntry) (err error) {
+func writeBundleFile(ctx context.Context, output string, armored bool, recipients []age.Recipient, entries []bundleEntry) (err error) {
 	name := filepath.Clean(output)
 	f, err := os.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
@@ -194,14 +287,14 @@ func writeBundleFile(ctx context.Context, output string, armored bool, recipient
 	if err := f.Chmod(0o600); err != nil {
 		return err
 	}
-	if err := writeBundle(ctx, f, armored, recipients, root, entries); err != nil {
+	if err := writeBundle(ctx, f, armored, recipients, entries); err != nil {
 		return err
 	}
 	return f.Sync()
 }
 
 // writeBundle streams tar into age into the optional armor into w.
-func writeBundle(ctx context.Context, w io.Writer, armored bool, recipients []age.Recipient, root *os.Root, entries []bundleEntry) error {
+func writeBundle(ctx context.Context, w io.Writer, armored bool, recipients []age.Recipient, entries []bundleEntry) error {
 	dst := w
 	var armorWriter io.WriteCloser
 	if armored {
@@ -217,7 +310,7 @@ func writeBundle(ctx context.Context, w io.Writer, armored bool, recipients []ag
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if err := writeEntry(tw, root, e); err != nil {
+		if err := writeEntry(tw, e); err != nil {
 			return err
 		}
 	}
@@ -236,7 +329,7 @@ func writeBundle(ctx context.Context, w io.Writer, armored bool, recipients []ag
 // writeEntry writes the tar header and, for a file, the content of one bundle entry. The header
 // holds only name, permission bits, type and size: uid and gid stay 0 without names and the mtime
 // is 0 (brief D8), so the tar stream depends on the tree of From alone, not on the host.
-func writeEntry(tw *tar.Writer, root *os.Root, e bundleEntry) error {
+func writeEntry(tw *tar.Writer, e bundleEntry) error {
 	hdr := &tar.Header{
 		Name:    e.name,
 		Mode:    int64(e.info.Mode().Perm()),
@@ -248,7 +341,7 @@ func writeEntry(tw *tar.Writer, root *os.Root, e bundleEntry) error {
 		hdr.Typeflag = tar.TypeDir
 	} else {
 		var err error
-		if data, err = readRegular(root, e.path, e.info); err != nil {
+		if data, err = readRegular(e.root, e.path, e.info); err != nil {
 			return fmt.Errorf("%s: %w", display(e.path), err)
 		}
 		hdr.Typeflag = tar.TypeReg

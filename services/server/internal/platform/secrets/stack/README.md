@@ -11,7 +11,8 @@ Status: gebaut (M1-09). Normativ sind
 Vorbereitung des Volumes `secrets` für den Compose-Stack: `bothy secrets init` erzeugt fehlende
 Geheimnisse, übernimmt die vom Owner gelieferten Dateien und legt je Dienst ein Verzeichnis mit
 genau den Kopien an, die der Dienst über `subpath` einbindet. `bothy secrets export` schreibt die
-kanonischen Kopien als mit age verschlüsseltes Bündel für die Hinterlegung. Beide Befehle lesen nur
+kanonischen Kopien und den Schlüsselspeicher der Signierschlüssel als mit age verschlüsseltes
+Bündel für die Hinterlegung. Beide Befehle lesen nur
 ihre Flags und die genannten Verzeichnisse: keine Konfiguration, keine Umgebung, keine Datenbank
 (der Container `secrets-init` hat nichts davon).
 
@@ -76,7 +77,7 @@ Diensten; `TestCatalogMatchesConfigurationDoc` vergleicht beide Richtungen und d
   `_store`, deren Zeile den Dienst nennt; alles andere im Dienstverzeichnis wird entfernt, auch
   Links (ohne ihnen zu folgen).
 - Relative Namen sind überall die Katalognamen; so hat ein entschlüsseltes Bündel das Layout einer
-  Quelle ([disaster-recovery.md](../../../../../../docs/operations/disaster-recovery.md) Fall B).
+  Quelle (plus `signing-keys/`, which `init` skips) ([disaster-recovery.md](../../../../../../docs/operations/disaster-recovery.md) Fall B).
 
 ## Abgleich
 
@@ -178,17 +179,24 @@ oder Log vortäuschen.
   exklusiv mit Modus `0600` an, überschreibt nie eine vorhandene (Exitcode 1, Datei unverändert)
   und entfernt sie wieder, wenn der Export scheitert.
 - Klartext entsteht nur im Speicher; es gibt keine temporären Dateien.
+- The key store of the signing keys (`--signing-key-dir`, default
+  `/var/lib/bothy/signing-keys`, `secrets.signing_key_dir`, ADR 0066 rule 5) follows under the
+  prefix `signing-keys/` (`KeyStorePrefix`): the directory and every regular file
+  `<purpose>-<kid>.pem` with its mode. Leftovers `.bothy-tmp-*` of an interrupted write are
+  skipped; a subdirectory, a link or another name stops the export (usage error, exit code 2),
+  because a restore must not install a file the server never wrote. A key store named with
+  `--signing-key-dir` that does not exist is a usage error; the missing default is skipped with
+  one line on stderr (`signing key store <dir> not found; the bundle holds _store only`).
 
 Entschlüsseln und Auspacken zur Wiederherstellung:
 `age --decrypt -i <identität> bundle.age | tar -x -C <quelle>`, danach
-`secrets init --adopt-source` (Fall B).
+`secrets init --adopt-source` (Fall B). `init` skips the subtree `signing-keys/` of the source;
+its files belong to the volume of `secrets.signing_key_dir` (disaster-recovery.md Fall B).
 
 ## Was fehlt
 
 - Erzeuger für `totp_key` (M1-39), `pgbackrest_tls/` (M7-01) und die erzeugte Form von
   `s3_access_key` und `s3_secret_key` (M3).
-- Die Signierschlüssel aus `secrets.signing_key_dir` kommen mit M1-32 ins Bündel, das sie erzeugt;
-  bis dahin exportiert `export` nur `_store`.
 
 ## Abhängigkeiten
 

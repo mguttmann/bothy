@@ -140,6 +140,9 @@ type server struct {
 	authorizer authorize.Authorizer
 	// identity is the identity module (M1-33): devices, the DPoP verifier and the REST handlers.
 	identity *Identity
+	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
+	signingKeys *SigningKeys
+	keyCheck    time.Duration
 	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
 	blocked bool
 }
@@ -329,7 +332,7 @@ func (s *server) components() []lifecycle.Component {
 		step("sync", s.startSync),
 		step("authz", s.startAuthz),
 		step("identity", s.startIdentity),
-		// Extension point (README.md): M1-32 adds the signing keys here.
+		step("signing_keys", s.startSigningKeys),
 		step("routes", s.mountRoutes),
 	}
 	if s.api() {
@@ -423,6 +426,15 @@ func (s *server) startSecrets(ctx context.Context) error {
 		return err
 	}
 	if _, _, err = s.sp.Resolve(ctx, db.PasswordRef); err != nil {
+		return err
+	}
+	// The key store of the signing keys, in every role (ADR 0066 rule 1): owner, mode 0700 and
+	// writability, so a read-only or foreign volume ends the start before the database wait.
+	var store keyStoreKeys
+	if err := config.Bind(s.values, &store); err != nil {
+		return err
+	}
+	if err := secrets.CheckSigningKeyDir(store.Dir); err != nil {
 		return err
 	}
 	if !s.api() {
@@ -612,6 +624,9 @@ func (s *server) handlers() Handlers {
 	if h.People == nil && s.identity != nil {
 		h.People = s.identity.PeopleHandlers
 	}
+	if h.Keys == nil && s.signingKeys != nil {
+		h.Keys = s.signingKeys.Handlers
+	}
 	return h
 }
 
@@ -775,10 +790,13 @@ func (s *server) startLogTail(ctx context.Context) error {
 // on its own ends the process.
 func (s *server) startJobs(ctx context.Context) error {
 	s.mu.Lock()
-	pool, sy, a := s.pool, s.sync, s.audit
+	pool, sy, a, keys, keyCheck := s.pool, s.sync, s.audit, s.signingKeys, s.keyCheck
 	s.mu.Unlock()
 	if err := jobs.ValidateMigrations(ctx, pool, s.jobsCfg.Schema); err != nil {
 		return err
+	}
+	if keys == nil {
+		return errors.New("wire: the jobs step needs the signing keys step")
 	}
 	expiryCfg, err := AuthzExpiryConfig(s.values)
 	if err != nil {
@@ -792,6 +810,7 @@ func (s *server) startJobs(ctx context.Context) error {
 		Partitions: sy.Maintenance(), PartitionInterval: s.syncCfg.MaintenanceInterval,
 		Cleanup: sy.IdempotencyCleanup(), CleanupInterval: s.syncCfg.Cleanup.Interval,
 		Expiry: expiry, ExpiryInterval: expiryCfg.Interval,
+		KeyRotation: keys.Keys, KeyRotationInterval: keyCheck,
 	})
 	if err != nil {
 		return err

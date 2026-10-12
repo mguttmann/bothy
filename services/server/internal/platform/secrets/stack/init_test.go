@@ -373,6 +373,26 @@ func TestInitUnknownSourceFile(t *testing.T) {
 	}
 }
 
+// TestInitSkipsKeyStoreOfABundle: a decrypted bundle holds the key store under signing-keys/
+// (export with --signing-key-dir, M1-32); init leaves that subtree to the restore of the key store
+// volume instead of refusing it, and copies none of it.
+func TestInitSkipsKeyStoreOfABundle(t *testing.T) {
+	t.Parallel()
+	target, source := dirs(t)
+	put(t, source, "apns_key.p8", "EXAMPLE-apns", 0o600)
+	put(t, source, stack.KeyStorePrefix+"invocation-EXAMPLE_kid.pem", "EXAMPLE-key", 0o600)
+	mustInit(t, opts(target, source))
+	err := filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
+		if err == nil && strings.Contains(path, "signing-keys") {
+			t.Errorf("init copied %s", path)
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestInitRejectsSymlinkInSource(t *testing.T) {
 	t.Parallel()
 	cases := map[string]func(t *testing.T, source, outside string){

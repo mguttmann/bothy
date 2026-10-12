@@ -192,6 +192,17 @@ type SequenceCounter struct {
 	Value int64
 }
 
+type ServerSigningKey struct {
+	Kid           string
+	Purpose       string
+	Alg           string
+	PublicJwk     []byte
+	PrivateKeyRef string
+	State         string
+	CreatedAt     pgtype.Timestamptz
+	NotAfter      pgtype.Timestamptz
+}
+
 type User struct {
 	PrincipalID  pgtype.UUID
 	Email        pgtype.Text

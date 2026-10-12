@@ -276,7 +276,7 @@ Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
 | `client.cache_max_age` | `BOTHY_CLIENT__CACHE_MAX_AGE` | Server |  | `30d` | ungenutzte Cache-Einträge | geplant (M3) |
 | `client.outbox_retry_base` | `BOTHY_CLIENT__OUTBOX_RETRY_BASE` | Server |  | `2s` | Basis des Backoffs im Ausgangsfach | geplant (M4) |
 | `client.outbox_retry_cap` | `BOTHY_CLIENT__OUTBOX_RETRY_CAP` | Server |  | `5m` | größter Abstand im Ausgangsfach | geplant (M4) |
-| `agent.invocation_token_ttl` | `BOTHY_AGENT__INVOCATION_TOKEN_TTL` | Server |  | `60s` | Gültigkeit einer Aufruf-Marke | geplant (M1) |
+| `agent.invocation_token_ttl` | `BOTHY_AGENT__INVOCATION_TOKEN_TTL` | Server | duration | `60s` | Gültigkeit einer Aufruf-Marke | aktiv |
 | `agent.ack_timeout` | `BOTHY_AGENT__ACK_TIMEOUT` | Server |  | `30s` | ohne `ack`: erneute Zustellung | geplant (M2) |
 | `agent.ack_persist_interval` | `BOTHY_AGENT__ACK_PERSIST_INTERVAL` | Server |  | `1s` | spätestens so oft wird `acked_seq` gespeichert | geplant (M2) |
 | `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server |  | `100` | unbestätigte Ereignisse je Verbraucher | geplant (M2) |
@@ -362,7 +362,7 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
-| `auth.access_token_ttl` | `BOTHY_AUTH__ACCESS_TOKEN_TTL` | Server |  | `10m` | Lebensdauer eines Zugriffstokens | geplant (M1) |
+| `auth.access_token_ttl` | `BOTHY_AUTH__ACCESS_TOKEN_TTL` | Server | duration | `10m` | Lebensdauer eines Zugriffstokens | aktiv |
 | `auth.dpop_nonce_ttl` | `BOTHY_AUTH__DPOP_NONCE_TTL` | Server | duration | `5m` | Gültigkeit eines DPoP-Nonce (Kopfzeile `DPoP-Nonce` und `hello` des Gateways) | aktiv |
 | `auth.token_pepper_ref` | `BOTHY_AUTH__TOKEN_PEPPER_REF` | Server | secret_ref | `file:<secrets.dir>/token_pepper` | Verweis auf den Server-Pepper für die HMAC-Hashes aller Tokens und Codes (03, Grundsatz 9) | aktiv |
 | `auth.clock_leeway` | `BOTHY_AUTH__CLOCK_LEEWAY` | Server | duration | `30s` | erlaubte Uhrabweichung bei `exp`, `nbf`, `iat` | aktiv |
@@ -412,8 +412,8 @@ Quelle: [09-agenten.md](../spec/09-agenten.md), Abschnitt 21.
 |---|---|---|---|---|---|---|
 | `agent.context_max_bytes` | `BOTHY_AGENT__CONTEXT_MAX_BYTES` | Server |  | `262144` | Summe der Inhalte im Kontext ohne auslösende Nachricht | geplant (M2) |
 | `agent.context_message_max_bytes` | `BOTHY_AGENT__CONTEXT_MESSAGE_MAX_BYTES` | Server |  | `32768` | Inhalt je Kontext-Nachricht, darüber gekürzt | geplant (M2) |
-| `agent.jwks_max_age` | `BOTHY_AGENT__JWKS_MAX_AGE` | Server |  | `1h` | Cache-Dauer der JWKS; Vorlauf eines `next`-Schlüssels | geplant (M1) |
-| `signing_key.invocation_rotation_interval` | `BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL` | Server |  | `30d` | planmäßiger Wechsel des Markenschlüssels | geplant (M1) |
+| `agent.jwks_max_age` | `BOTHY_AGENT__JWKS_MAX_AGE` | Server | duration | `1h` | Cache-Dauer der JWKS; Vorlauf eines `next`-Schlüssels | aktiv |
+| `signing_key.invocation_rotation_interval` | `BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL` | Server | duration | `30d` | planmäßiger Wechsel des Markenschlüssels | aktiv |
 | `run.queued_max_age` | `BOTHY_RUN__QUEUED_MAX_AGE` | Server |  | `48h` | so alt darf ein nicht gestarteter Lauf werden | geplant (M2) |
 | `run.orphan_timeout` | `BOTHY_RUN__ORPHAN_TIMEOUT` | Server |  | `15m` | ohne Heartbeat bei aktivem Lauf: `stale` | geplant (M2) |
 | `interaction.ack_timeout` | `BOTHY_INTERACTION__ACK_TIMEOUT` | Server |  | `30s` | danach zeigt die Karte "nicht bestätigt" | geplant (M2) |
@@ -461,7 +461,7 @@ Quelle: [11-erweiterungen.md](../spec/11-erweiterungen.md), Abschnitt 16.
 |---|---|---|---|---|---|---|
 | `app.manifest_max_bytes` | `BOTHY_APP__MANIFEST_MAX_BYTES` | Server |  | `65536` | Größe eines Manifests | geplant (M2) |
 | `app.interaction_timeout` | `BOTHY_APP__INTERACTION_TIMEOUT` | Server |  | `3s` | Frist für synchrone Antworten über `interactions_url` | geplant (M2) |
-| `webhook.delivery_timeout` | `BOTHY_WEBHOOK__DELIVERY_TIMEOUT` | Server |  | `15s` | Zeitgrenze einer Zustellung | geplant (M1) |
+| `webhook.delivery_timeout` | `BOTHY_WEBHOOK__DELIVERY_TIMEOUT` | Server | duration | `15s` | Zeitgrenze einer Zustellung | aktiv |
 | `webhook.max_pending_per_subscription` | `BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION` | Server |  | `10000` | offene Zustellungen je Abo, darüber `paused` | geplant (M2) |
 | `webhook_in.max_body_bytes` | `BOTHY_WEBHOOK_IN__MAX_BODY_BYTES` | Server |  | `1048576` | Größe eines eingehenden Körpers | geplant (M2) |
 | `webhook_in.formats_enabled` | `BOTHY_WEBHOOK_IN__FORMATS_ENABLED` | Server |  | `native, alertmanager` | eingeschaltete Eingangsformate | geplant (M2) |
@@ -627,7 +627,7 @@ Quelle: [16-betrieb.md](../spec/16-betrieb.md), Abschnitt 14.
 | `server.maintenance_mode` | `BOTHY_SERVER__MAINTENANCE_MODE` | Server |  | `off` | `off` oder `read_only` (Umzug, Upgrade; [ADR 0065](../adr/0065-wartungsmodus-read-only.md)) | geplant (M7) |
 | `secrets.dir` | `BOTHY_SECRETS__DIR` | Server | string | `/run/bothy/secrets` | Basis der Standardverweise `file:`; absoluter Pfad in sauberer Form (kein `.` oder `..`, kein doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, sonst scheitert `bothy config check` | aktiv |
 | `secrets.cache_ttl` | `BOTHY_SECRETS__CACHE_TTL` | Server | duration | `5m` | so lange gilt ein gelesenes Geheimnis; mindestens `1s` | aktiv |
-| `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server |  | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) | geplant (M1) |
+| `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server | string | `/var/lib/bothy/signing-keys` | beschreibbares Verzeichnis der privaten Signierschlüssel; im Besitz des Dienstbenutzers, Modus `0700` (5.2, [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)) | aktiv |
 | `server.tls_cert_ref` | `BOTHY_SERVER__TLS_CERT_REF` | Server | secret_ref | leer | Verweis auf die Zertifikatskette (PEM, Blatt zuerst); leer: der Server beendet kein TLS (SEC-TLS-2) | aktiv |
 | `server.tls_key_ref` | `BOTHY_SERVER__TLS_KEY_REF` | Server | secret_ref | leer | Verweis auf den privaten Schlüssel (PEM); nur zusammen mit `server.tls_cert_ref` | aktiv |
 | `database.host` | `BOTHY_DATABASE__HOST` | Server | string | `localhost` | Host der Datenbank | aktiv |
@@ -716,9 +716,9 @@ Quelle: [19-sicherheit.md](../spec/19-sicherheit.md), Abschnitt 16.
 | `audit.checkpoint_interval` | `BOTHY_AUDIT__CHECKPOINT_INTERVAL` | Server |  | `1h` | Abstand der signierten Prüfpunkte des Audit-Logs | geplant (M1) |
 | `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server |  | leer | Ablageziel der Prüfpunkte außerhalb der Datenbank: leer (Warnung, SEC-AUD-2) oder `file://<absoluter Pfad>` auf einem Speicher außerhalb des Datenbank-Volumes; andere Schemata lehnt `bothy config check` ab. Ein Objektspeicher mit Aufbewahrungssperre als Ziel ist das empfohlene Ziel für Produktion und kommt mit PLAN M7-22 | geplant (M1) |
 | `audit.reason_max_chars` | `BOTHY_AUDIT__REASON_MAX_CHARS` | Server |  | `500` | größte Länge eines Pflichtgrunds einer Verwaltungsaktion in Unicode-Zeichen (SEC-AUD-5) | geplant (M1) |
-| `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server |  | `30s` | längste Zeit, die ein Prozess einen zurückgezogenen Schlüssel noch annimmt oder einen neuen nicht kennt | geplant (M1) |
-| `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server |  | `1m` | Abstand des Jobs `instance.key_rotation` | geplant (M1) |
-| `signing_key.access_token_rotation_interval` | `BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL` | Server |  | `30d` | planmäßiger Wechsel des Schlüssels für Zugriffstokens | geplant (M1) |
+| `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server | duration | `30s` | längste Zeit, die ein Prozess einen zurückgezogenen Schlüssel noch annimmt oder einen neuen nicht kennt | aktiv |
+| `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server | duration | `1m` | Abstand des Jobs `instance.key_rotation` | aktiv |
+| `signing_key.access_token_rotation_interval` | `BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL` | Server | duration | `30d` | planmäßiger Wechsel des Schlüssels für Zugriffstokens | aktiv |
 
 ### 20 Datenschutz
 

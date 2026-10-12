@@ -7,10 +7,6 @@
 rules:
   - match: "agent."  # M2-07 to M2-20
     etappe: M2
-  - match: agent.invocation_token_ttl  # M1-32
-    etappe: M1
-  - match: agent.jwks_max_age  # M1-32
-    etappe: M1
   - match: "api."  # M1-03, M1-18, M1-31
     etappe: M1
   - match: api.major_version_overlap  # M7-11
@@ -109,14 +105,10 @@ rules:
     etappe: M3
   - match: search.extract.tika_url  # M3 Nicht-Umfang defers Tika to V3; no ticket yet
     etappe: V3
-  - match: "secrets."  # M1-09, M1-32
-    etappe: M1
   - match: "security."  # M5-08
     etappe: M5
   - match: server.maintenance_mode  # M7-08
     etappe: M7
-  - match: "signing_key."  # M1-32
-    etappe: M1
   - match: "space."  # M1-52
     etappe: M1
   - match: "stats."  # M6-05 to M6-15
@@ -145,7 +137,5 @@ rules:
     etappe: M1
   - match: "webhook."  # M2-24, M2-26
     etappe: M2
-  - match: webhook.delivery_timeout  # M1-32
-    etappe: M1
   - match: "webhook_in."  # M2-27
     etappe: M2

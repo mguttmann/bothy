@@ -304,8 +304,8 @@ Ohne einige Geheimnisse ist eine Sicherung wertlos. Der Owner exportiert sie nac
 verschlüsselt (`bothy secrets export --from <_store> --age-recipient <öffentlicher Schlüssel>`,
 Aufruf im Compose-Stack unten) und bewahrt das
 Bündel getrennt vom Server und getrennt vom Off-site-Ziel auf. Das Bündel enthält `_store/` und den
-Schlüsselspeicher `secrets.signing_key_dir`; den Schlüsselspeicher nimmt der Export mit M1-32 auf,
-das die Signierschlüssel erzeugt.
+Schlüsselspeicher `secrets.signing_key_dir` unter `signing-keys/` (`--signing-key-dir`, Standard
+`/var/lib/bothy/signing-keys`, das `secrets-init` nur lesend einbindet; M1-32).
 
 Aufruf im Compose-Stack, ohne Konfigurationsdatei und ohne Datenbank:
 
@@ -320,7 +320,9 @@ ASCII statt Binärdaten, ohne `--armor` verweigert der Export die Ausgabe auf ei
 ein tar-Archiv mit den relativen Namen des Katalogs, entschlüsselt also genau die Ablage von
 `infra/compose/secrets/`, die `secrets-init` übernimmt; Dateien ohne Katalogeintrag in `--from`
 lehnt der Export darum mit Exitcode 2 ab, statt ein Bündel zu schreiben, das die Wiederherstellung
-später verweigert. Die letzte Zeile von `secrets init` nennt diesen Aufruf mit dem `_store` des
+später verweigert. `secrets init` skips the part `signing-keys/` of a decrypted bundle; its files
+go back into the volume of `secrets.signing_key_dir` ([disaster-recovery.md](../operations/disaster-recovery.md)
+Fall B). Die letzte Zeile von `secrets init` nennt diesen Aufruf mit dem `_store` des
 Laufs.
 
 | Geheimnis | Folge bei Verlust |

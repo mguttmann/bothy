@@ -96,7 +96,7 @@ nennen nur Befehle von hier.
 | `bothy config check\|print` | Konfiguration prüfen, redigiert ausgeben; `check --secrets` löst zusätzlich jeden Verweis `*_ref` über den Secret-Provider auf und nennt je Schlüssel nur `ok` oder den Fehlercode | Abschnitt 13 |
 | `bothy import discord ...` | Import und Lese-Spiegel über die Import-API (`import.apply`) | [22-import-migration.md](22-import-migration.md) |
 | `bothy restore finalize` | nach einer Wiederherstellung: neue Sync-Epoche, Cursor auf `head_seq`, Audit | [16-betrieb.md](16-betrieb.md), [03-datenmodell.md](03-datenmodell.md) 6.7 |
-| `bothy secrets init\|export` | Geheimnisse anlegen und sichern: `init --target DIR [--source DIR] [--owner DIENST=UID:GID ...] [--adopt-source]` gleicht die Ablage `_store/` mit der Quelle ab und kopiert je Dienst; `export --from DIR --age-recipient SCHLÜSSEL [--age-recipient ...] [--output DATEI\|-] [--armor]` schreibt das age-verschlüsselte Bündel; beide lesen nur ihre Flags, ohne Konfigurationsdatei und Datenbank | [16-betrieb.md](16-betrieb.md) 5.3, 5.4 |
+| `bothy secrets init\|export` | Geheimnisse anlegen und sichern: `init --target DIR [--source DIR] [--owner DIENST=UID:GID ...] [--adopt-source]` gleicht die Ablage `_store/` mit der Quelle ab und kopiert je Dienst; `export --from DIR --age-recipient SCHLÜSSEL [--age-recipient ...] [--signing-key-dir DIR] [--output DATEI\|-] [--armor]` schreibt das age-verschlüsselte Bündel (mit dem Schlüsselspeicher unter `signing-keys/`); beide lesen nur ihre Flags, ohne Konfigurationsdatei und Datenbank | [16-betrieb.md](16-betrieb.md) 5.3, 5.4 |
 | `bothy healthcheck --url URL [--timeout DURATION]` | Gesundheitsprüfung für Container ohne Shell gegen den internen Listener. `--url` takes only `http://` with a loopback host (`127.0.0.0/8`, `::1`, `localhost`), anything else is exit `2`; `--timeout` bounds the whole request (default `5s`, the timeout of the Compose healthcheck); no configuration, secrets or database; exit `0` for `2xx`, else `1` with one line naming the status code or the error class | [16-betrieb.md](16-betrieb.md) |
 | `bothy files rescan` | Wartung: Dateien erneut prüfen lassen | [12-dateien.md](12-dateien.md) |
 | `bothy telemetry pseudonym <principal_id> [--at TIME] [--config FILE]` | Pseudonym of a principal for the owner's troubleshooting: prints `bothy.principal.pseudo_id` for the period that contains `--at` (RFC 3339, default now) and the start of that period in UTC; reads `telemetry.pseudonym_key_ref` through the secret provider, no database | [../observability/privacy.md](../observability/privacy.md) |
@@ -1180,7 +1180,9 @@ Clients nehmen nach 04 wieder auf.
 
 1. Konfiguration laden und prüfen (Abschnitt 13), Telemetrie starten.
 2. Geheimnisse auflösen. Der interne Listener öffnet jetzt, damit der Orchestrator `/healthz`
-   sieht und `/readyz` mit `startup` scheitert, solange der Start läuft.
+   sieht und `/readyz` mit `startup` scheitert, solange der Start läuft. Every role also checks the
+   key store `secrets.signing_key_dir` (owned by the service user, mode `0700`, writable) and ends
+   the start otherwise (ADR 0066, M1-32).
 3. Datenbank erreichen, höchstens `startup.dependency_wait` lang mit Backoff; danach Abbruch.
 4. Schema-Version prüfen: Das Binary kennt die kleinste nötige Version. Ist die Datenbank älter,
    bricht der Start mit Hinweis auf `bothy migrate up` ab (Exitcode `1`). Neuere Versionen sind
@@ -1197,6 +1199,9 @@ Clients nehmen nach 04 wieder auf.
    wird aber nie bereit: `/readyz` scheitert mit `schema_requires_newer_server`.
 6. Signierschlüssel sicherstellen: Jeder Zweck ohne `active`-Schlüssel bekommt einen
    ([19-sicherheit.md](19-sicherheit.md), Abschnitt 10; [ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)).
+   Keys whose private file is missing from the key store (a restore without it) are retired
+   first, so the purpose gets a fresh active key; this runs after audit, sync, authz and identity
+   (steps 6a to 6d of `internal/wire`), whose unit of work records `signing_key.transition`.
 7. Routen registrieren und Routen-Metadaten prüfen: Jede Operation hat eine bekannte Aktion, sonst
    Abbruch (05, Regel 3).
 8. Rolle `api`: Log-Tail starten, `local_head` auf den aktuellen Kopf, öffentlichen Listener

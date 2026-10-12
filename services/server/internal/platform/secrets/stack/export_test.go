@@ -473,3 +473,101 @@ func exportBytes(t *testing.T, dir string, id *age.X25519Identity) []byte {
 	}
 	return b.Bytes()
 }
+
+// keyName is a key store file name of the form <purpose>-<kid>.pem.
+const keyName = "invocation-EXAMPLE_kid.pem"
+
+func TestSecretsExport_IncludesKeyStore(t *testing.T) {
+	t.Parallel()
+	from, want := store(t)
+	keys := filepath.Join(t.TempDir(), "signing-keys")
+	if err := os.Mkdir(keys, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	put(t, keys, keyName, "EXAMPLE-private-key-pem", 0o600)
+	put(t, keys, "access_token-EXAMPLE_kid2.pem", "EXAMPLE-second-key", 0o600)
+	put(t, keys, ".bothy-tmp-leftover", "EXAMPLE-partial", 0o600)              // never in the bundle
+	if err := os.Mkdir(filepath.Join(keys, "lost+found"), 0o700); err != nil { // an ext4 mount; never in the bundle
+		t.Fatal(err)
+	}
+	id := identity(t)
+	var out bytes.Buffer
+	err := stack.Export(t.Context(), stack.ExportOptions{
+		From: from, SigningKeyDir: keys, Recipients: []string{id.Recipient().String()},
+		Stdout: &out, IsTerminal: notTerminal,
+	})
+	if err != nil {
+		t.Fatalf("Export: %v", err)
+	}
+	if bytes.Contains(out.Bytes(), []byte("EXAMPLE-private-key-pem")) {
+		t.Fatal("bundle contains a private key in plaintext")
+	}
+	want["signing-keys/"] = tarEntry{dir: true, mode: 0o700}
+	want["signing-keys/"+keyName] = tarEntry{mode: 0o600, content: "EXAMPLE-private-key-pem"}
+	want["signing-keys/access_token-EXAMPLE_kid2.pem"] = tarEntry{mode: 0o600, content: "EXAMPLE-second-key"}
+	names, got := untar(t, out.Bytes(), false, id)
+	compareEntries(t, got, want)
+	if !slices.IsSorted(names) {
+		t.Errorf("bundle names are not sorted: %v", names)
+	}
+}
+
+func TestSecretsExport_KeyStoreRefusesUnknownEntries(t *testing.T) {
+	t.Parallel()
+	from, _ := store(t)
+	for name, prepare := range map[string]func(t *testing.T, keys string){
+		"unknown file": func(t *testing.T, keys string) { put(t, keys, "notes.txt", "EXAMPLE", 0o600) },
+		"directory": func(t *testing.T, keys string) {
+			if err := os.Mkdir(filepath.Join(keys, "sub"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"link": func(t *testing.T, keys string) {
+			if err := os.Symlink("/etc/hosts", filepath.Join(keys, keyName)); err != nil {
+				t.Fatal(err)
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			keys := t.TempDir()
+			prepare(t, keys)
+			var out bytes.Buffer
+			err := stack.Export(t.Context(), stack.ExportOptions{
+				From: from, SigningKeyDir: keys, Recipients: []string{identity(t).Recipient().String()},
+				Stdout: &out, IsTerminal: notTerminal,
+			})
+			if err == nil {
+				t.Fatal("Export accepted a key store with an unknown entry")
+			}
+			if out.Len() != 0 {
+				t.Errorf("Export wrote %d bytes before failing", out.Len())
+			}
+		})
+	}
+}
+
+func TestSecretsExport_MissingKeyStore(t *testing.T) {
+	t.Parallel()
+	from, want := store(t)
+	missing := filepath.Join(t.TempDir(), "missing")
+	id := identity(t)
+	var out bytes.Buffer
+	opts := stack.ExportOptions{
+		From: from, SigningKeyDir: missing, Recipients: []string{id.Recipient().String()},
+		Stdout: &out, IsTerminal: notTerminal,
+	}
+	if err := stack.Export(t.Context(), opts); !errors.Is(err, stack.ErrUsage) {
+		t.Fatalf("Export with a missing key store = %v, want a usage error", err)
+	}
+	var note bytes.Buffer
+	opts.SigningKeyDirOptional, opts.Notice = true, &note
+	if err := stack.Export(t.Context(), opts); err != nil {
+		t.Fatalf("Export with an optional missing key store: %v", err)
+	}
+	if !strings.Contains(note.String(), "signing key store") {
+		t.Errorf("notice %q does not mention the skipped key store", note.String())
+	}
+	_, got := untar(t, out.Bytes(), false, id)
+	compareEntries(t, got, want)
+}

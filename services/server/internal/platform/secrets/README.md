@@ -113,7 +113,8 @@ liest; bei doppelten Namen gilt der erste Eintrag wie bei `os.Getenv`. Nicht ges
 mit Inhalt. `Err` ist ein Sentinel der Tabelle oder, bei abgebrochenem Aufruf, der Kontextfehler.
 Den Fehler eines eigenen Treibers (`Options.Drivers`) gibt `Provider.Get` unverändert weiter;
 `NewProvider` liefert einfache Konfigurationsfehler. `ErrorCode` bildet jeden Fehler auf einen
-der fünf Codes ab, für Logs, Metriken und `bothy config check --secrets`:
+der acht Codes ab, für Logs, Metriken und `bothy config check --secrets`; die drei Schreib-Codes
+kommen nur aus `Put` und `Delete` (M1-32):
 
 | Code | Sentinel | Bedeutung |
 |---|---|---|
@@ -122,6 +123,29 @@ der fünf Codes ab, für Logs, Metriken und `bothy config check --secrets`:
 | `not_found` | `ErrNotFound` | Datei oder Variable fehlt oder ist leer |
 | `insecure_file` | `ErrInsecureFile` | keine reguläre Datei, falscher Modus oder Besitzer |
 | `read_failed` | `ErrReadFailed` | Lesefehler, zu groß, ausgetauscht; auch jeder andere Fehler |
+| `read_only` | `ErrReadOnly` | `Put` oder `Delete` außerhalb von `secrets.signing_key_dir`, `env:` oder ein Treiber ohne `Writer` |
+| `exists` | `ErrExists` | `Put` auf einen vorhandenen Namen; nie überschrieben |
+| `write_failed` | `ErrWriteFailed` | Schreib- oder Löschfehler |
+
+## Schreiben: der Schlüsselspeicher (M1-32)
+
+The server writes exactly one place: the key store `secrets.signing_key_dir` of the signing keys
+([ADR 0066](../../../../../docs/adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md),
+16 section 5.2). `Options.SigningKeyDir` names it; empty means no key store.
+
+- `Provider.Put(ctx, ref, value)` and `Provider.Delete(ctx, ref)` accept only a `file:` reference
+  whose file lies directly in that directory and whose driver implements `Writer`; every other
+  reference, `env:` always, is `ErrReadOnly` before the driver is called. Both drop the cached
+  value of the reference.
+- The file driver's `Put` creates a temporary file (prefix `TempPrefix`, `.bothy-tmp-`) with mode
+  `0600` in the same directory, writes and syncs it, links it to the final name (an existing name
+  is `ErrExists`, never overwritten), removes the temporary name and syncs the directory. `Delete`
+  removes the file and syncs the directory; a missing file is `ErrNotFound`.
+- `CheckSigningKeyDir(dir)` is the start check of every role: an absolute clean path to a
+  directory owned by the process user with mode `0700` in which a probe file can be created.
+  The error names `secrets.signing_key_dir`, the expected mode and what was observed.
+
+`Writer` is the driver interface for this; `azkv` and `awssm` implement it with V3-12.
 
 ## Version und Fingerabdruck
 
@@ -132,7 +156,8 @@ einem schwachen Wert erlauben sie, Vermutungen zu prüfen.
 
 ## `Config` und Bindung
 
-`Config{Dir, CacheTTL}` trägt die Schlüssel `secrets.dir` und `secrets.cache_ttl` (Standardwerte in
+`Config{Dir, CacheTTL, SigningKeyDir}` trägt die Schlüssel `secrets.dir`, `secrets.cache_ttl` und
+`secrets.signing_key_dir` (Standardwerte in
 der [Konfigurationsreferenz](../../../../../docs/operations/configuration.md)). `internal/wire`
 füllt sie mit `config.Bind` und baut daraus mit der Umgebung aus `cmd/bothy` den einen Provider
 des Prozesses (D10); nur `internal/wire` und `cmd/bothy` erzeugen Provider.
@@ -143,8 +168,8 @@ des Prozesses (D10); nur `internal/wire` und `cmd/bothy` erzeugen Provider.
   Treiber in M1 lesen lokale Dateien und die Umgebung; die Netz-Treiber bringen es mit.
 - Die Logzeile eines gescheiterten erneuten Lesens nennt den Verweis nicht (nur `error.type` aus
   der Liste in `docs/observability/signals.md` 5.3); `bothy config check --secrets` zeigt ihn.
-- `Writer`/`Put`: Der Datei-Treiber bekommt `Put` mit M1-32 für die Signierschlüssel in
-  `secrets.signing_key_dir` ([ADR 0066](../../../../../docs/adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)).
+- A key store shared by several nodes (stage 2 of 02 section 16) needs a shared volume or a
+  writable vault driver; M7-17 decides it.
 - Treiber `azkv` und `awssm` in einer späteren Etappe.
 
 ## Abhängigkeiten

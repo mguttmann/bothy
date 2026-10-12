@@ -17,13 +17,19 @@ type Driver interface {
 	Get(ctx context.Context, ref Ref) (Value, Version, error)
 }
 
-// Writer is a Driver that can also store a secret (16 5.2: optional Put for writable drivers).
-// No driver of this package implements it yet; the file driver gains Put for the signing keys
-// under secrets.signing_key_dir (ADR 0066, M1-32), the vault drivers later.
+// Writer is a Driver that can also store and remove a secret (16 5.2: optional Put for writable
+// drivers). The file driver implements it for the signing keys (ADR 0066, M1-32); the vault drivers
+// follow with V3-12. A Writer never limits where it writes: Provider.Put and Provider.Delete allow
+// only references directly below secrets.signing_key_dir and refuse every other one with
+// ErrReadOnly before the driver is called.
 type Writer interface {
 	Driver
-	// Put stores v under ref and returns the Version of the stored value.
+	// Put stores v under ref and returns the Version of the stored value. It never overwrites:
+	// an existing secret under ref is ErrExists. Other errors: ErrWriteFailed, the context error.
 	Put(ctx context.Context, ref Ref, v Value) (Version, error)
+	// Delete removes the secret ref names. A missing secret is ErrNotFound; other errors:
+	// ErrWriteFailed, the context error.
+	Delete(ctx context.Context, ref Ref) error
 }
 
 // checkDriverRef is the common start of every Get: the context first, so a canceled caller

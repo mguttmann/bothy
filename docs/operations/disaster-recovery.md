@@ -43,7 +43,12 @@ automatische Wiederherstellungstest misst die Dauer bei jedem Lauf.
    die Werte des Bündels. Meldet `secrets-init` die Einträge als `adopted` oder `updated`, die
    entschlüsselten erzeugten Dateien aus `infra/compose/secrets/` löschen: `_store` hält sie,
    und die Quelle braucht nur die gelieferten. Gleicher Token-Pepper und gleiche Signierschlüssel
-   heißen: Tokens und Geräte bleiben gültig.
+   heißen: Tokens und Geräte bleiben gültig. `secrets-init` skips the directory `signing-keys/` of
+   the bundle: before the first start of `api` and `worker`, copy its files into the volume
+   `signing-keys` (owner `65532:65532`, directory `0700`, files `0600`, names unchanged). Without
+   them the first start retires every key whose private file is missing and creates fresh ones
+   (log line `signing key file missing, key retired`): access tokens and invocation tokens of
+   the old keys stop verifying, people sign in again, webhook receivers need the new public key.
 3. `docker compose up -d secrets-init postgres backup`, dann Restore aus repo2 nach
    [backup-restore.md](backup-restore.md) 5.2 ab Schritt 4 (Ziel: letzter Stand).
 4. Objekte aus restic zurückspielen.

@@ -76,10 +76,11 @@ begrenzt.
 ### Confirmation
 
 - Tests des Bau-Tickets M1-32 ([PLAN.md](../PLAN.md)): `TestSecretsPut_*` (nur unter dem
-  Verzeichnis, Modus `0600`, kein Überschreiben), `TestStartup_SigningKeys` (Start scheitert ohne
-  beschreibbares Verzeichnis, `/readyz` meldet `signing_keys`), `TestEnsureActive_*`,
-  `TestEmergencyRotation_*` und der Kanarien-Test (kein privater Schlüssel in Datenbank, Log oder
-  Antwort).
+  Verzeichnis, Modus `0600`, kein Überschreiben), `TestStartup_SigningKeys_NotWritable` und
+  `TestStartup_SigningKeys_Readiness` (Start scheitert ohne beschreibbares Verzeichnis, `/readyz`
+  meldet `signing_keys`), `TestEnsureActive_*`, `TestEmergencyRotation_*`,
+  `TestSecretsExport_IncludesKeyStore` und der Kanarien-Test `TestSigningKeyCanary` (kein privater
+  Schlüssel in Datenbank, Log, Audit, Antwort oder Fehler).
 - Compose bindet das Volume `signing-keys` nur in `api`, `worker` und lesend in `secrets-init` ein
   ([infra/compose/compose.yaml](../../infra/compose/compose.yaml)).
 

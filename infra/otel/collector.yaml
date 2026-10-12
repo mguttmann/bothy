@@ -171,6 +171,10 @@ processors:
       - bothy.run.id
       - bothy.run.state
       - bothy.server.role
+      - bothy.signing_key.from_state
+      - bothy.signing_key.kid
+      - bothy.signing_key.purpose
+      - bothy.signing_key.to_state
       - bothy.space.id
       - bothy.step.kind
       - bothy.thread.id

@@ -51,8 +51,15 @@ func newServeDB(t *testing.T) *pgtest.DB {
 	t.Helper()
 	db := pgtest.New(t)
 	jobstest.Migrate(t, db, "jobs")
+	// Every process against one database shares one key store, as every role of a deployment
+	// mounts the same volume (M1-32): a process with another store would find the keys of the
+	// others without their files.
+	keyStores.Store(db.Name(), keyStoreDir(t))
 	return db
 }
+
+// keyStores maps a database name of newServeDB to the key store its processes share.
+var keyStores sync.Map
 
 // logBuffer collects the JSON log lines of a serve process.
 type logBuffer struct {
@@ -108,12 +115,41 @@ func secretsDir(t *testing.T, db *pgtest.DB) string {
 	return dir
 }
 
+// sharedKeyStore returns the key store of db from newServeDB, or a fresh one for a database of
+// another origin.
+func sharedKeyStore(t *testing.T, db *pgtest.DB) string {
+	t.Helper()
+	if dir, ok := keyStores.Load(db.Name()); ok {
+		return dir.(string)
+	}
+	return keyStoreDir(t)
+}
+
+// keyStoreDir returns a fresh key store (secrets.signing_key_dir) with mode 0700.
+func keyStoreDir(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "signing-keys")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// setMode sets the permission bits of path; tests build key stores with a wrong mode with it.
+func setMode(t *testing.T, path string, mode os.FileMode) {
+	t.Helper()
+	if err := os.Chmod(path, mode); err != nil {
+		t.Fatal(err)
+	}
+}
+
 // serveEnv is the environment of a serve process against db; extra entries replace defaults.
 func serveEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 	t.Helper()
 	cfg := db.Config(pg.RoleApp)
 	env := []string{
 		"BOTHY_SECRETS__DIR=" + secretsDir(t, db),
+		"BOTHY_SECRETS__SIGNING_KEY_DIR=" + sharedKeyStore(t, db),
 		"BOTHY_DATABASE__HOST=" + cfg.Host,
 		"BOTHY_DATABASE__PORT=" + strconv.Itoa(cfg.Port),
 		"BOTHY_DATABASE__NAME=" + db.Name(),
@@ -246,6 +282,16 @@ func TestServeRolesStartReadyAndStop(t *testing.T) {
 			waitReadyz(t, internal, http.StatusOK)
 			if !strings.Contains(p.logs.String(), `"msg":"server ready"`) {
 				t.Fatalf("no ready line:\n%s", p.logs)
+			}
+			// EnsureActive of the start (M1-32): exactly one active key per purpose, also with the
+			// three roles starting against one database at once.
+			var purposes, actives int
+			if err := db.Pool(t, pg.RoleOwner).QueryRow(context.Background(),
+				`SELECT count(DISTINCT purpose), count(*) FROM server_signing_keys WHERE state = 'active'`).Scan(&purposes, &actives); err != nil {
+				t.Fatal(err)
+			}
+			if purposes != 4 || actives != 4 {
+				t.Fatalf("%d active keys over %d purposes after the start, want 4 and 4", actives, purposes)
 			}
 			public := p.logs.port("public listener started")
 			if role == wire.RoleWorker {

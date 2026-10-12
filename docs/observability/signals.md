@@ -282,6 +282,9 @@ Diese Liste ist gleich der Allowlist in [infra/otel/collector.yaml](../../infra/
 | `bothy.reason` | feste Liste je Signal | nie freier Text |
 | `bothy.run.state` | Lauf-Zustand | |
 | `bothy.server.role` | `api`, `worker`, `all` | Resource |
+| `bothy.signing_key.purpose` | `access_token`, `invocation`, `webhook_out`, `audit_checkpoint` | nur in Logs der Schlüsselwechsel ([19-sicherheit.md](../spec/19-sicherheit.md) 10) |
+| `bothy.signing_key.kid` | `kid` eines Server-Schlüssels (Fingerabdruck nach RFC 7638, öffentlich) | nur in Logs der Schlüsselwechsel, nie an Metriken |
+| `bothy.signing_key.from_state`, `bothy.signing_key.to_state` | `none`, `next`, `active`, `retiring`, `retired` | nur in Logs der Schlüsselwechsel |
 | `bothy.step.kind` | `tool_call`, `status`, `subagent`, `workflow`, `background_job` | |
 | `bothy.version.own`, `bothy.version.required` | SemVer der eigenen Server-Version und `instance.min_server_version` | nur in der Startzeile der Schema-Prüfung ([02-architektur.md](../spec/02-architektur.md) 15.1, Schritt 5) |
 
