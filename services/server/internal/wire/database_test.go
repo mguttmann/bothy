@@ -86,9 +86,10 @@ func TestMigrateSettingsBinds(t *testing.T) {
 
 func TestMigrationSteps(t *testing.T) {
 	t.Parallel()
-	// M1-14 (River) and M1-15 (instance row) add their steps here; until then there are none.
-	opts := wire.MigrationSteps()
-	if len(opts.Before) != 0 || len(opts.After) != 0 {
+	// River's migrations run before goose (upgrade.md rule M11); M1-15 adds the instance row
+	// after it.
+	opts := wire.MigrationSteps(nil, "jobs", nil)
+	if len(opts.Before) != 1 || opts.Before[0].Name() != "river" || len(opts.After) != 0 {
 		t.Errorf("MigrationSteps = %+v", opts)
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
 	"github.com/OWNER/bothy/services/server/internal/wire"
@@ -27,13 +28,18 @@ const migrateUsage = `Usage: bothy migrate up [--bootstrap] [--config FILE]
 
 up        applies every pending migration of this binary as database.user, which must own
           schema public (bothy_owner); every step runs with lock_timeout =
-          migrate.lock_timeout. It prints "applied <version> <name>" per migration and
-          "database version <n>, applied <k>". Against a schema newer than this binary it
-          prints "schema is newer than this binary; nothing to do" and changes nothing.
+          migrate.lock_timeout. First it creates the schema jobs.schema with the rights of
+          bothy_app and applies River's migrations there ("river schema <s> version <n>,
+          applied <k>"), then the domain migrations: "applied <version> <name>" per
+          migration and "database version <n>, applied <k>". Against a schema newer than
+          this binary it prints "schema is newer than this binary; nothing to do" and
+          changes nothing.
 status    prints "<version> <name> <applied|pending> <applied_at|->" per migration of this
-          binary and "database version <n>, binary requires <m>, pending <k>"; it only reads.
+          binary, "database version <n>, binary requires <m>, pending <k>" and "river schema
+          <s> version <n>, binary requires <m>, pending <k>"; it only reads.
 validate  checks the embedded migrations without a database (names, numbering, goose
-          syntax) and prints "migrations ok".
+          syntax; River's migrations load and are numbered without gaps) and prints
+          "migrations ok" and "river migrations ok, version <n>".
 
 --bootstrap    up only: first connect as migrate.bootstrap_user and create or update the roles
                bothy_owner, bothy_app, bothy_maint and bothy_monitor with the passwords of
@@ -63,7 +69,7 @@ type migrateEnv struct {
 	env    []string
 	schema func() (*config.Schema, error)
 	fsys   fs.FS
-	steps  func() pg.MigratorOptions
+	steps  func(pool *pg.Pool, schema string, result *jobs.MigrateResult) pg.MigratorOptions
 	stdout io.Writer
 	stderr io.Writer
 }
@@ -155,7 +161,12 @@ func migrateValidate(e migrateEnv) int {
 		_, _ = fmt.Fprintf(e.stderr, "bothy migrate: %v\n", err)
 		return exitFailure
 	}
-	_, _ = io.WriteString(e.stdout, "migrations ok\n")
+	river, err := jobs.CheckEmbeddedMigrations()
+	if err != nil {
+		_, _ = fmt.Fprintf(e.stderr, "bothy migrate: %v\n", err)
+		return exitFailure
+	}
+	_, _ = fmt.Fprintf(e.stdout, "migrations ok\nriver migrations ok, version %d\n", river)
 	return exitOK
 }
 
@@ -166,6 +177,7 @@ type migrateRun struct {
 	provider *secrets.Provider
 	db       pg.Config
 	settings wire.MigrateConfig
+	schema   string
 }
 
 // newMigrateRun loads the configuration as the server start does and builds the secret
@@ -197,10 +209,14 @@ func newMigrateRun(o migrateOptions, e migrateEnv) (*migrateRun, int) {
 	if err != nil {
 		return fail(err)
 	}
+	jobsCfg, err := wire.JobsConfig(values)
+	if err != nil {
+		return fail(err)
+	}
 	if err := db.Validate(); err != nil {
 		return fail(err)
 	}
-	return &migrateRun{e: e, log: log, provider: provider, db: db, settings: settings}, exitOK
+	return &migrateRun{e: e, log: log, provider: provider, db: db, settings: settings, schema: jobsCfg.Schema}, exitOK
 }
 
 // failf prints one error line on stderr and returns exit code 1.
@@ -210,27 +226,28 @@ func (r *migrateRun) failf(format string, args ...any) int {
 }
 
 // migrator connects as database.user with the session settings of migrate, waits for the
-// database and returns the migrator and the function that closes both.
-func (r *migrateRun) migrator(ctx context.Context) (*pg.Migrator, func(), error) {
+// database and returns the migrator, its pool and the function that closes both. River's step
+// writes what it applied into river.
+func (r *migrateRun) migrator(ctx context.Context, river *jobs.MigrateResult) (*pg.Migrator, *pg.Pool, func(), error) {
 	pool, err := pg.Open(ctx, r.db.ForMigrate(r.settings.LockTimeout), r.provider, r.log)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	if err := pool.WaitReady(ctx, r.settings.DependencyWait); err != nil {
 		pool.Close()
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	db := pool.OpenSQL()
 	closeAll := func() {
 		_ = db.Close()
 		pool.Close()
 	}
-	m, err := pg.NewMigrator(db, r.e.fsys, r.e.steps())
+	m, err := pg.NewMigrator(db, r.e.fsys, r.e.steps(pool, r.schema, river))
 	if err != nil {
 		closeAll()
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return m, closeAll, nil
+	return m, pool, closeAll, nil
 }
 
 // up runs migrate up, with the role bootstrap first when bootstrap is set.
@@ -241,12 +258,17 @@ func (r *migrateRun) up(ctx context.Context, bootstrap bool) int {
 		}
 		_, _ = io.WriteString(r.e.stdout, "bootstrap: roles and grants are in place\n")
 	}
-	m, closeAll, err := r.migrator(ctx)
+	var river jobs.MigrateResult
+	m, _, closeAll, err := r.migrator(ctx, &river)
 	if err != nil {
 		return r.failf("%v", err)
 	}
 	defer closeAll()
 	res, err := m.Up(ctx)
+	if river.Version > 0 {
+		// River ran before goose (upgrade.md rule M11); its line comes first.
+		_, _ = fmt.Fprintf(r.e.stdout, "river schema %s version %d, applied %d\n", r.schema, river.Version, len(river.Applied))
+	}
 	r.printApplied(res.Applied)
 	if err != nil {
 		return r.failf("%v", err)
@@ -292,7 +314,7 @@ func (r *migrateRun) bootstrap(ctx context.Context) error {
 
 // status runs migrate status.
 func (r *migrateRun) status(ctx context.Context) int {
-	m, closeAll, err := r.migrator(ctx)
+	m, pool, closeAll, err := r.migrator(ctx, nil)
 	if err != nil {
 		return r.failf("%v", err)
 	}
@@ -311,6 +333,11 @@ func (r *migrateRun) status(ctx context.Context) int {
 		_, _ = fmt.Fprintf(r.e.stdout, "%d %s %s %s\n", s.Version, s.Name, state, at)
 	}
 	_, _ = fmt.Fprintf(r.e.stdout, "database version %d, binary requires %d, pending %d\n", version, m.Highest(), pending)
+	river, err := jobs.MigrationStatus(ctx, pool, r.schema)
+	if err != nil {
+		return r.failf("%v", err)
+	}
+	_, _ = fmt.Fprintf(r.e.stdout, "river schema %s version %d, binary requires %d, pending %d\n", r.schema, river.Version, river.Latest, river.Pending)
 	return exitOK
 }
 

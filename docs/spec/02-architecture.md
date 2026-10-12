@@ -911,7 +911,10 @@ take neither a counter nor `NOTIFY`. The target `perf.event_commit_min_per_s` ho
 - No Pro features (R-Stack). For flows with several steps, a job chains the next one
   via `InsertTx`.
 - Job arguments contain only IDs, never contents or secrets. Reason: `river_job` is another
-  storage location; deletion and data protection stay with the domain tables.
+  storage location; deletion and data protection stay with the domain tables. Enforced at
+  registration: the argument type is a struct whose exported fields are only `kernel/ids.ID`,
+  `[]kernel/ids.ID` or `int64` (sequence numbers and versions), so a string, byte slice, map,
+  interface, pointer or nested struct fails the start (`jobs.ValidateArgsType`, M1-14).
 
 ### 12.2 Queues
 
@@ -979,7 +982,9 @@ Reason: every other job would write state that would be missing on the target.
 5. Otherwise the defaults of the pinned River version apply for job deadline, fetch interval,
    retry backoff and maximum number of attempts; the README of `platform/jobs` names them together
    with the version. A job with different needs sets a named value of its domain chapter. Reason:
-   a name of its own without a need would be a second source for the same value.
+   a name of its own without a need would be a second source for the same value. One River
+   default is off: the nightly reindexer, because `bothy_app` owns no index of River and the
+   reindex could only fail (16 "Roles"; docs/DECISIONS.md M1-14).
 6. SQL in jobs runs in the same Unit of Work as in the request path, that is with
    `database.statement_timeout` and `database.lock_timeout`. A job splits long work into batches
    (rule 1). Migrations set only `migrate.lock_timeout` per step
@@ -1137,7 +1142,9 @@ orchestrator restarts, clients resume according to 04.
 3. Reach the database, for at most `startup.dependency_wait` with backoff; then abort.
 4. Check the schema version: the binary knows the smallest required version. If the database is
    older, the start aborts with a pointer to `bothy migrate up` (exit code `1`). Newer versions are
-   allowed, because migrations are built by expand and contract (ADR 0007).
+   allowed, because migrations are built by expand and contract (ADR 0007). River's
+   migrations in `jobs.schema` must be complete as well; otherwise the start aborts with the same
+   hint (checked in step 8 for every role, M1-14).
 5. Load the instance (if the row is missing: abort with a pointer to `bothy migrate up`). Without
    `setup_completed_at` the server starts completely, but answers only health checks and
    discovery, everything else with `503 setup_required` (08, section 4); it checks the state per

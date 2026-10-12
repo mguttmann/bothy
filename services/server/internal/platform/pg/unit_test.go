@@ -681,7 +681,9 @@ func TestQuerier_AcquireTimeout(t *testing.T) {
 	cfg := e.db.Config(pg.RoleApp)
 	cfg.MaxConns, cfg.AcquireTimeout = 1, 50*time.Millisecond
 	pool := e.db.OpenPool(t, cfg)
-	c, err := pool.Acquire(context.Background())
+	// The one connection is taken without the 50ms acquire timeout: dialling it can take longer
+	// on a loaded machine, and the test is about the acquires that find the pool exhausted.
+	c, err := pool.PGX().Acquire(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

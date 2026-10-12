@@ -8,6 +8,7 @@ import (
 	"net/netip"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 )
 
 // configCheck is a cross-check of the configuration schema.
@@ -24,7 +25,13 @@ var configChecks = []configCheck{
 	{name: "listeners_distinct", keys: []string{"server.listen_addr", "server.internal_listen_addr"}, fn: listenersDistinct},
 	{name: "json_limit_above_message", keys: []string{"http.max_json_body_bytes", "message.max_content_bytes"}, fn: jsonLimitAboveMessage},
 	{name: "egress_allowed_hosts", keys: []string{"egress.allowed_hosts"}, fn: egressAllowedHosts},
+	{name: "jobs_schema", keys: []string{"jobs.schema"}, fn: jobsSchema},
 }
+
+// jobsSchema holds jobs.schema to an unquoted identifier other than public and pg_* (M1-14):
+// River puts the name into its statements as it is, and the domain schema stays free of River's
+// tables (R-AR-09).
+func jobsSchema(v *config.Values) error { return jobs.ValidateSchema(v.String("jobs.schema")) }
 
 // listenersDistinct rejects a public and an internal listener that would bind the same socket:
 // equal ports other than 0 on equal hosts, or when either host is empty, 0.0.0.0 or ::. Port 0
