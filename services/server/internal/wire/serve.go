@@ -27,6 +27,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/health"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
@@ -115,6 +116,9 @@ type server struct {
 	mux       *http.ServeMux
 	required  int64
 	instance  instance.Record
+	jobsCfg   jobs.Config
+	jobsReg   *jobs.Registry
+	jobsRT    *jobs.Runtime
 	// audit is the audit module (M1-24); later tickets hand its recorder to the modules.
 	audit *Audit
 	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
@@ -142,14 +146,20 @@ type server struct {
 //     of denials; its stop step audit_denials flushes the open aggregations before the pool
 //     closes (startAudit),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
-//     route bindings and registrations for every role, M1-25, then MountRoutes, api and all), log tail (M1-16, api and all), jobs and consumers (M1-14,
-//     worker and all),
+//     route bindings and registrations for every role, M1-25, then MountRoutes, api and all), log
+//     tail (M1-16, api and all), then the jobs (every role): the River migrations in jobs.schema
+//     must be complete (else the hint to run "bothy migrate up"), the runtime of the role is
+//     built over the pool, and worker and all start River (02 "Start" step 8); a River client
+//     that stops on its own later ends the process with exit code 1 (02 "Health"). The
+//     consumers (M2) follow,
 //  8. public listener (api and all) through httpserver.ListenPublic: own TLS, or plaintext only
 //     from loopback and server.trusted_proxies (SEC-TLS-1, SEC-TLS-2),
 //  9. ready: readiness passes startup and the line "server ready" is written.
 //
-// Stop steps, by phase: not ready (always), drain and HTTP (api, all), telemetry, database (the
-// flush of the audit denials, then the pool), internal listener. Their budgets come from shutdown.*.
+// Stop steps, by phase: not ready (always), drain and HTTP (api, all), jobs (worker, all: River's
+// soft stop within shutdown.jobs_soft_timeout, then what the fixed budgets leave of the total
+// for the cancelled jobs to end), telemetry, database (the flush of the audit denials, then the
+// pool), internal listener. Their budgets come from shutdown.*.
 //
 // The error reports values that do not bind (a schema without a key) or an unknown role; it is
 // a usage or configuration error (exit code 2). Budgets above shutdown.total_timeout make Run
@@ -186,6 +196,13 @@ func Serve(_ context.Context, v *config.Values, role Role, deps Deps) (*lifecycl
 		fsys = migrations.FS
 	}
 	if s.required, err = pg.RequiredSchemaVersion(fsys); err != nil {
+		return nil, err
+	}
+	if s.jobsCfg, err = JobsConfig(v); err != nil {
+		return nil, err
+	}
+	s.jobsCfg.Logger = logger
+	if s.jobsReg, err = NewJobRegistry(&Modules{}); err != nil {
 		return nil, err
 	}
 	s.runner = lifecycle.New(lifecycle.Options{
@@ -259,6 +276,9 @@ func TransportConfig(v *config.Values, chain httpserver.ChainConfig) (httpserver
 // api reports whether the role serves the public API.
 func (s *server) api() bool { return s.role == RoleAPI || s.role == RoleAll }
 
+// worker reports whether the role runs jobs.
+func (s *server) worker() bool { return s.role == RoleWorker || s.role == RoleAll }
+
 // logger returns the current process logger.
 func (s *server) logger() *slog.Logger { return slog.New(s.log) }
 
@@ -274,8 +294,8 @@ func (s *server) register() {
 	r.Add(step("audit", s.startAudit))
 	// Extension point (README.md): M1-32 adds the signing keys here.
 	r.Add(step("routes", s.mountRoutes))
-	// Extension points: M1-16 adds the log tail (api, all), M1-14 the jobs and M2 the consumers
-	// (worker, all), each with its stop step.
+	// Extension point: M1-16 adds the log tail (api, all) here, M2 the consumers after the jobs.
+	r.Add(step("jobs", s.startJobs))
 	if s.api() {
 		r.Add(step("public_listener", s.startPublic))
 	}
@@ -288,6 +308,9 @@ func (s *server) register() {
 	if s.api() {
 		r.OnStop(lifecycle.StopStep{Name: "drain", Phase: lifecycle.PhaseDrain, Budget: s.cfg.DrainDelay, Run: s.drain})
 		r.OnStop(lifecycle.StopStep{Name: "public_listener", Phase: lifecycle.PhaseHTTP, Budget: s.cfg.HTTPGrace, Run: s.stopPublic})
+	}
+	for _, st := range s.jobsStopSteps() {
+		r.OnStop(st)
 	}
 	r.OnStop(lifecycle.StopStep{Name: "telemetry", Phase: lifecycle.PhaseTelemetry, Budget: s.cfg.TelemetryFlushTimeout, Run: s.stopTelemetry})
 	r.OnStop(lifecycle.StopStep{Name: "pool", Phase: lifecycle.PhaseDatabase, Run: s.stopDatabase})
@@ -511,6 +534,68 @@ func NewChain(cfg httpserver.ChainConfig, log *slog.Logger) (*httpserver.Chain, 
 		return nil, err
 	}
 	return httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: actor.AnonymousOnly{}, Validator: v})
+}
+
+// jobsStopSteps returns the stop steps of phase jobs in registration order; none for api. Steps
+// of one phase run in reverse registration order: the soft stop within
+// shutdown.jobs_soft_timeout first, then jobs_wait for the cancelled jobs within what the fixed
+// budgets leave of the total (jobsWaitBudget), so the telemetry flush keeps its own budget; no
+// jobs_wait when nothing is left (docs/DECISIONS.md M1-14/4).
+func (s *server) jobsStopSteps() []lifecycle.StopStep {
+	if !s.worker() {
+		return nil
+	}
+	var steps []lifecycle.StopStep
+	if wait := jobsWaitBudget(s.cfg, s.role, s.jobsCfg.SoftStopTimeout); wait > 0 {
+		steps = append(steps, lifecycle.StopStep{Name: "jobs_wait", Phase: lifecycle.PhaseJobs, Budget: wait, Run: s.stopJobs})
+	}
+	return append(steps, lifecycle.StopStep{Name: "jobs", Phase: lifecycle.PhaseJobs, Budget: s.jobsCfg.SoftStopTimeout, Run: s.stopJobs})
+}
+
+// jobsWaitBudget returns the budget of the stop step jobs_wait for role: shutdown.total_timeout
+// minus the fixed budgets of the role's stop steps (drain and HTTP for all, the soft stop soft,
+// the telemetry flush). 0 means there is no slack and the step is left out; a step budget of 0
+// would take the whole rest of the total instead.
+func jobsWaitBudget(cfg ServeConfig, role Role, soft time.Duration) time.Duration {
+	fixed := soft + cfg.TelemetryFlushTimeout
+	if role == RoleAPI || role == RoleAll {
+		fixed += cfg.DrainDelay + cfg.HTTPGrace
+	}
+	return max(cfg.TotalTimeout-fixed, 0)
+}
+
+// startJobs checks River's migrations, builds the job runtime of the role and starts River for
+// worker and all; a River client that later stops on its own ends the process.
+func (s *server) startJobs(ctx context.Context) error {
+	s.mu.Lock()
+	pool := s.pool
+	s.mu.Unlock()
+	if err := jobs.ValidateMigrations(ctx, pool, s.jobsCfg.Schema); err != nil {
+		return err
+	}
+	rt, err := jobs.New(pool, s.jobsCfg, JobRole(s.role), s.jobsReg, nil)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.jobsRT = rt
+	s.mu.Unlock()
+	if err := rt.Start(ctx); err != nil {
+		return err
+	}
+	s.runner.FailOn("jobs", rt.Failed())
+	return nil
+}
+
+// stopJobs stops River (worker, all); it does nothing when the runtime never started.
+func (s *server) stopJobs(ctx context.Context) error {
+	s.mu.Lock()
+	rt := s.jobsRT
+	s.mu.Unlock()
+	if rt == nil {
+		return nil
+	}
+	return rt.Stop(ctx)
 }
 
 func (s *server) ready(ctx context.Context) error {

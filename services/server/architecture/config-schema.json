@@ -381,6 +381,78 @@
       "doc": "Environment of the instance: dev, staging or prod."
     },
     {
+      "name": "jobs.queue.default.max_workers",
+      "env": "BOTHY_JOBS__QUEUE__DEFAULT__MAX_WORKERS",
+      "kind": "int",
+      "default": "8",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "10000",
+      "chapter": "02-architektur.md",
+      "doc": "Parallel workers of the queue default for short domain jobs."
+    },
+    {
+      "name": "jobs.queue.delivery.max_workers",
+      "env": "BOTHY_JOBS__QUEUE__DELIVERY__MAX_WORKERS",
+      "kind": "int",
+      "default": "16",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "10000",
+      "chapter": "02-architektur.md",
+      "doc": "Parallel workers of the queue delivery for push and webhooks."
+    },
+    {
+      "name": "jobs.queue.files.max_workers",
+      "env": "BOTHY_JOBS__QUEUE__FILES__MAX_WORKERS",
+      "kind": "int",
+      "default": "2",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "10000",
+      "chapter": "02-architektur.md",
+      "doc": "Parallel workers of the queue files for scans, thumbnails and transcription."
+    },
+    {
+      "name": "jobs.queue.maintenance.max_workers",
+      "env": "BOTHY_JOBS__QUEUE__MAINTENANCE__MAX_WORKERS",
+      "kind": "int",
+      "default": "2",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "10000",
+      "chapter": "02-architektur.md",
+      "doc": "Parallel workers of the queue maintenance for cleanup, partitions and checks."
+    },
+    {
+      "name": "jobs.queue.privacy.max_workers",
+      "env": "BOTHY_JOBS__QUEUE__PRIVACY__MAX_WORKERS",
+      "kind": "int",
+      "default": "1",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "10000",
+      "chapter": "02-architektur.md",
+      "doc": "Parallel workers of the queue privacy for export and erasure."
+    },
+    {
+      "name": "jobs.schema",
+      "env": "BOTHY_JOBS__SCHEMA",
+      "kind": "string",
+      "default": "jobs",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "02-architektur.md",
+      "doc": "PostgreSQL schema of River's job tables, separate from the domain tables."
+    },
+    {
       "name": "message.max_content_bytes",
       "env": "BOTHY_MESSAGE__MAX_CONTENT_BYTES",
       "kind": "int",
@@ -683,6 +755,18 @@
       "max": "1h",
       "chapter": "02-architektur.md",
       "doc": "Time running HTTP requests get to finish during the shutdown."
+    },
+    {
+      "name": "shutdown.jobs_soft_timeout",
+      "env": "BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT",
+      "kind": "duration",
+      "default": "20s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "1h",
+      "chapter": "02-architektur.md",
+      "doc": "Time running jobs get to finish during the shutdown before their contexts are cancelled."
     },
     {
       "name": "shutdown.telemetry_flush_timeout",

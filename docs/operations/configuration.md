@@ -172,15 +172,15 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `sync.idempotency_cleanup_batch_size` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE` | Server |  | `1000` | Zeilen je Löschstapel von `sync.idempotency_cleanup` | geplant (M1) |
 | `ratelimit.max_tracked_keys` | `BOTHY_RATELIMIT__MAX_TRACKED_KEYS` | Server |  | `100000` | höchstens so viele Rate-Limit-Eimer hält ein Prozess; darüber werden volle, dann älteste Eimer entfernt | geplant (M1) |
 | `ratelimit.sweep_interval` | `BOTHY_RATELIMIT__SWEEP_INTERVAL` | Server |  | `1m` | Abstand, in dem volle Eimer entfernt werden (ein voller Eimer entscheidet wie ein fehlender) | geplant (M1) |
-| `jobs.schema` | `BOTHY_JOBS__SCHEMA` | Server |  | `jobs` | PostgreSQL-Schema der River-Tabellen | geplant (M1) |
-| `jobs.queue.default.max_workers` | `BOTHY_JOBS__QUEUE__DEFAULT__MAX_WORKERS` | Server |  | `8` | Parallelität `default` | geplant (M1) |
-| `jobs.queue.files.max_workers` | `BOTHY_JOBS__QUEUE__FILES__MAX_WORKERS` | Server |  | `2` | Parallelität `files` | geplant (M1) |
-| `jobs.queue.delivery.max_workers` | `BOTHY_JOBS__QUEUE__DELIVERY__MAX_WORKERS` | Server |  | `16` | Parallelität `delivery` | geplant (M1) |
-| `jobs.queue.maintenance.max_workers` | `BOTHY_JOBS__QUEUE__MAINTENANCE__MAX_WORKERS` | Server |  | `2` | Parallelität `maintenance` | geplant (M1) |
-| `jobs.queue.privacy.max_workers` | `BOTHY_JOBS__QUEUE__PRIVACY__MAX_WORKERS` | Server |  | `1` | Parallelität `privacy` | geplant (M1) |
+| `jobs.schema` | `BOTHY_JOBS__SCHEMA` | Server | string | `jobs` | PostgreSQL-Schema der River-Tabellen | aktiv |
+| `jobs.queue.default.max_workers` | `BOTHY_JOBS__QUEUE__DEFAULT__MAX_WORKERS` | Server | int | `8` | Parallelität `default` | aktiv |
+| `jobs.queue.files.max_workers` | `BOTHY_JOBS__QUEUE__FILES__MAX_WORKERS` | Server | int | `2` | Parallelität `files` | aktiv |
+| `jobs.queue.delivery.max_workers` | `BOTHY_JOBS__QUEUE__DELIVERY__MAX_WORKERS` | Server | int | `16` | Parallelität `delivery` | aktiv |
+| `jobs.queue.maintenance.max_workers` | `BOTHY_JOBS__QUEUE__MAINTENANCE__MAX_WORKERS` | Server | int | `2` | Parallelität `maintenance` | aktiv |
+| `jobs.queue.privacy.max_workers` | `BOTHY_JOBS__QUEUE__PRIVACY__MAX_WORKERS` | Server | int | `1` | Parallelität `privacy` | aktiv |
 | `shutdown.drain_delay` | `BOTHY_SHUTDOWN__DRAIN_DELAY` | Server | duration | `5s` | Warten nach `ready = false` | aktiv |
 | `shutdown.http_grace` | `BOTHY_SHUTDOWN__HTTP_GRACE` | Server | duration | `20s` | Frist für laufende HTTP-Anfragen | aktiv |
-| `shutdown.jobs_soft_timeout` | `BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT` | Server |  | `20s` | weicher Stopp von River | geplant (M1) |
+| `shutdown.jobs_soft_timeout` | `BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT` | Server | duration | `20s` | weicher Stopp von River | aktiv |
 | `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server | duration | `5s` | Telemetrie leeren | aktiv |
 | `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server | duration | `60s` | gesamte Frist bis zum Ende; mindestens die Summe der Schritt-Budgets (15.3) | aktiv |
 | `perf.reference_profile` |  | Lasttest |  | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 lokal mit fsync und synchronous_commit an, Rolle all` | Umgebung der Lasttests; Modi der Messung in ADR 0063 |  |

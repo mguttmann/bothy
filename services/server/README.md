@@ -203,7 +203,7 @@ Technik ohne Fachlogik; nur `adapters/`, `wire` und `cmd` dürfen sie importiere
 | [`pg`](internal/platform/pg/README.md) | Pool, Unit of Work mit Sperrreihenfolge, `LISTEN`-Verbindung, Wiederholung bei Deadlock |
 | [`httpserver`](internal/platform/httpserver/README.md) | Server, Middleware-Kette, `problem+json`, Nachweis-Prüfung von `authorize` (02, Abschnitt 9); listener part built in M1-11, chain in M1-18, transport protection in M1-21 (plaintext only from loopback and `server.trusted_proxies`, own TLS from 1.2 with rotation, HSTS on both listeners; 19, SEC-TLS-1 to SEC-TLS-3) |
 | `ratelimit` | Token-Buckets je Klasse aus 05 |
-| `jobs` | einzige Stelle mit River: Client je Rolle, Warteschlangen, Schema `jobs.schema` |
+| [`jobs`](internal/platform/jobs/README.md) | einzige Stelle mit River: Client je Rolle, Warteschlangen, Schema `jobs.schema`, Migrationen in `bothy migrate`; built in M1-14 |
 | `otel` | Telemetrie-Setup, gekapselte `gen_ai.*`-Attribute (R-Telemetrie) |
 | [`health`](internal/platform/health/README.md) | `/healthz` und `/readyz` auf dem internen Listener `server.internal_listen_addr` (L2); built in M1-11 |
 | [`lifecycle`](internal/platform/lifecycle/README.md) | Start-Reihenfolge und Shutdown je Rolle (02, Abschnitt 15); built in M1-11 |

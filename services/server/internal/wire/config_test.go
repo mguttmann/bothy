@@ -31,36 +31,43 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		got[k.Name] = k
 	}
 	want := map[string]config.Key{
-		"server.role":                      {Kind: config.KindEnum, Default: "all", Enum: []string{"api", "worker", "all"}, Chapter: "16-betrieb.md"},
-		"server.listen_addr":               {Kind: config.KindListenAddr, Default: "127.0.0.1:8080", Chapter: "16-betrieb.md"},
-		"server.internal_listen_addr":      {Kind: config.KindListenAddr, Default: "127.0.0.1:8081", Chapter: "16-betrieb.md"},
-		"server.tls_cert_ref":              {Kind: config.KindSecretRef, Default: "", Chapter: "16-betrieb.md"},
-		"server.tls_key_ref":               {Kind: config.KindSecretRef, Default: "", Chapter: "16-betrieb.md"},
-		"http.hsts_max_age":                {Kind: config.KindDuration, Default: "31536000s", Min: "0s", Chapter: "19-sicherheit.md"},
-		"http.max_json_body_bytes":         {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "02-architektur.md"},
-		"http.read_header_timeout":         {Kind: config.KindDuration, Default: "5s", Min: "1ms", Chapter: "02-architektur.md"},
-		"http.idle_timeout":                {Kind: config.KindDuration, Default: "120s", Min: "1ms", Chapter: "02-architektur.md"},
-		"http.max_header_bytes":            {Kind: config.KindInt, Default: "65536", Min: "4096", Max: "16777216", Chapter: "02-architektur.md"},
-		"http.max_json_depth":              {Kind: config.KindInt, Default: "32", Min: "1", Max: "1000", Chapter: "02-architektur.md"},
-		"http.request_timeout":             {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "02-architektur.md"},
-		"http.transfer_timeout":            {Kind: config.KindDuration, Default: "10m", Min: "1ms", Chapter: "02-architektur.md"},
-		"http.unavailable_retry_after":     {Kind: config.KindDuration, Default: "5s", Min: "1s", Max: "1h", Chapter: "02-architektur.md"},
-		"file.max_upload_bytes":            {Kind: config.KindInt, Default: "104857600", Min: "1", Chapter: "03-datenmodell.md"},
-		"api.cors_allowed_origins":         {Kind: config.KindStringList, Default: "", Chapter: "06-api.md"},
-		"server.public_url":                {Kind: config.KindURL, Required: true, Chapter: "16-betrieb.md"},
-		"server.trusted_proxies":           {Kind: config.KindCIDRList, Default: "127.0.0.1/32, ::1/128", Chapter: "16-betrieb.md"},
-		"shutdown.drain_delay":             {Kind: config.KindDuration, Default: "5s", Min: "0s", Max: "1h", Chapter: "02-architektur.md"},
-		"shutdown.http_grace":              {Kind: config.KindDuration, Default: "20s", Min: "1ms", Max: "1h", Chapter: "02-architektur.md"},
-		"shutdown.telemetry_flush_timeout": {Kind: config.KindDuration, Default: "5s", Min: "1ms", Max: "1h", Chapter: "02-architektur.md"},
-		"shutdown.total_timeout":           {Kind: config.KindDuration, Default: "60s", Min: "1s", Max: "1h", Chapter: "02-architektur.md"},
-		"message.max_content_bytes":        {Kind: config.KindInt, Default: "262144", Min: "1", Chapter: "03-datenmodell.md"},
-		"principal.handle_max_chars":       {Kind: config.KindInt, Default: "32", Min: "1", Chapter: "03-datenmodell.md"},
-		"principal.display_name_max_chars": {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-datenmodell.md"},
-		"egress.allowed_hosts":             {Kind: config.KindStringList, Default: "", Chapter: "19-sicherheit.md"},
-		"egress.timeout":                   {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "19-sicherheit.md"},
-		"egress.max_response_bytes":        {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "19-sicherheit.md"},
-		"secrets.dir":                      {Kind: config.KindString, Default: "/run/bothy/secrets", Chapter: "16-betrieb.md"},
-		"secrets.cache_ttl":                {Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: "16-betrieb.md"},
+		"server.role":                        {Kind: config.KindEnum, Default: "all", Enum: []string{"api", "worker", "all"}, Chapter: "16-betrieb.md"},
+		"server.listen_addr":                 {Kind: config.KindListenAddr, Default: "127.0.0.1:8080", Chapter: "16-betrieb.md"},
+		"server.internal_listen_addr":        {Kind: config.KindListenAddr, Default: "127.0.0.1:8081", Chapter: "16-betrieb.md"},
+		"server.tls_cert_ref":                {Kind: config.KindSecretRef, Default: "", Chapter: "16-betrieb.md"},
+		"server.tls_key_ref":                 {Kind: config.KindSecretRef, Default: "", Chapter: "16-betrieb.md"},
+		"http.hsts_max_age":                  {Kind: config.KindDuration, Default: "31536000s", Min: "0s", Chapter: "19-sicherheit.md"},
+		"http.max_json_body_bytes":           {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "02-architektur.md"},
+		"http.read_header_timeout":           {Kind: config.KindDuration, Default: "5s", Min: "1ms", Chapter: "02-architektur.md"},
+		"http.idle_timeout":                  {Kind: config.KindDuration, Default: "120s", Min: "1ms", Chapter: "02-architektur.md"},
+		"http.max_header_bytes":              {Kind: config.KindInt, Default: "65536", Min: "4096", Max: "16777216", Chapter: "02-architektur.md"},
+		"http.max_json_depth":                {Kind: config.KindInt, Default: "32", Min: "1", Max: "1000", Chapter: "02-architektur.md"},
+		"http.request_timeout":               {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "02-architektur.md"},
+		"http.transfer_timeout":              {Kind: config.KindDuration, Default: "10m", Min: "1ms", Chapter: "02-architektur.md"},
+		"http.unavailable_retry_after":       {Kind: config.KindDuration, Default: "5s", Min: "1s", Max: "1h", Chapter: "02-architektur.md"},
+		"file.max_upload_bytes":              {Kind: config.KindInt, Default: "104857600", Min: "1", Chapter: "03-datenmodell.md"},
+		"api.cors_allowed_origins":           {Kind: config.KindStringList, Default: "", Chapter: "06-api.md"},
+		"server.public_url":                  {Kind: config.KindURL, Required: true, Chapter: "16-betrieb.md"},
+		"server.trusted_proxies":             {Kind: config.KindCIDRList, Default: "127.0.0.1/32, ::1/128", Chapter: "16-betrieb.md"},
+		"shutdown.drain_delay":               {Kind: config.KindDuration, Default: "5s", Min: "0s", Max: "1h", Chapter: "02-architektur.md"},
+		"shutdown.http_grace":                {Kind: config.KindDuration, Default: "20s", Min: "1ms", Max: "1h", Chapter: "02-architektur.md"},
+		"shutdown.telemetry_flush_timeout":   {Kind: config.KindDuration, Default: "5s", Min: "1ms", Max: "1h", Chapter: "02-architektur.md"},
+		"shutdown.total_timeout":             {Kind: config.KindDuration, Default: "60s", Min: "1s", Max: "1h", Chapter: "02-architektur.md"},
+		"shutdown.jobs_soft_timeout":         {Kind: config.KindDuration, Default: "20s", Min: "1ms", Max: "1h", Chapter: "02-architektur.md"},
+		"jobs.schema":                        {Kind: config.KindString, Default: "jobs", Chapter: "02-architektur.md"},
+		"jobs.queue.default.max_workers":     {Kind: config.KindInt, Default: "8", Min: "1", Max: "10000", Chapter: "02-architektur.md"},
+		"jobs.queue.files.max_workers":       {Kind: config.KindInt, Default: "2", Min: "1", Max: "10000", Chapter: "02-architektur.md"},
+		"jobs.queue.delivery.max_workers":    {Kind: config.KindInt, Default: "16", Min: "1", Max: "10000", Chapter: "02-architektur.md"},
+		"jobs.queue.maintenance.max_workers": {Kind: config.KindInt, Default: "2", Min: "1", Max: "10000", Chapter: "02-architektur.md"},
+		"jobs.queue.privacy.max_workers":     {Kind: config.KindInt, Default: "1", Min: "1", Max: "10000", Chapter: "02-architektur.md"},
+		"message.max_content_bytes":          {Kind: config.KindInt, Default: "262144", Min: "1", Chapter: "03-datenmodell.md"},
+		"principal.handle_max_chars":         {Kind: config.KindInt, Default: "32", Min: "1", Chapter: "03-datenmodell.md"},
+		"principal.display_name_max_chars":   {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-datenmodell.md"},
+		"egress.allowed_hosts":               {Kind: config.KindStringList, Default: "", Chapter: "19-sicherheit.md"},
+		"egress.timeout":                     {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "19-sicherheit.md"},
+		"egress.max_response_bytes":          {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "19-sicherheit.md"},
+		"secrets.dir":                        {Kind: config.KindString, Default: "/run/bothy/secrets", Chapter: "16-betrieb.md"},
+		"secrets.cache_ttl":                  {Kind: config.KindDuration, Default: "5m", Min: "1s", Chapter: "16-betrieb.md"},
 
 		"database.host":                         {Kind: config.KindString, Default: "localhost", Chapter: "16-betrieb.md"},
 		"database.port":                         {Kind: config.KindInt, Default: "5432", Min: "1", Max: "65535", Chapter: "16-betrieb.md"},
@@ -480,6 +487,23 @@ func TestAuditIPKeyRetentionAtLeastPeriod(t *testing.T) {
 		}
 		if len(got) > 0 && !strings.Contains(got[0].String(), "privacy.audit_ip_key_retention") {
 			t.Errorf("the problem does not name the key: %v", got)
+		}
+	}
+}
+
+// TestJobsSchemaIdentifier: jobs.schema must be an unquoted identifier other than public and
+// without the prefix pg_ (cross-check jobs_schema); the problem names the key, never the value.
+func TestJobsSchemaIdentifier(t *testing.T) {
+	t.Parallel()
+	for _, ok := range []string{"jobs", "_jobs", "jobs_it2", strings.Repeat("a", 63)} {
+		if problems := load(t, "BOTHY_JOBS__SCHEMA="+ok); problems != nil {
+			t.Errorf("jobs.schema %q: %v", ok, problems)
+		}
+	}
+	for _, bad := range []string{"public", "information_schema", "pg_jobs", "Jobs", "2jobs", "jobs-x", `jobs"x`, "jobs.x", strings.Repeat("a", 64)} {
+		problems := load(t, "BOTHY_JOBS__SCHEMA="+bad)
+		if len(problems) != 1 || !strings.Contains(problems[0].Message, "jobs.schema") || strings.Contains(problems[0].Message, bad) {
+			t.Errorf("jobs.schema %q: problems %v, want one naming the key and not the value", bad, problems)
 		}
 	}
 }

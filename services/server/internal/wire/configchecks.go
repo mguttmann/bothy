@@ -12,6 +12,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
+	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 )
 
 // configCheck is a cross-check of the configuration schema.
@@ -34,6 +35,7 @@ var configChecks = []configCheck{
 	{name: "tls_https", keys: []string{keyPublicURL, keyTLSCertRef, keyTLSKeyRef}, fn: tlsHTTPS},
 	{name: "hsts_whole_seconds", keys: []string{"http.hsts_max_age"}, fn: hstsWholeSeconds},
 	{name: "audit_ip_key_retention", keys: []string{"privacy.audit_ip_key_period", "privacy.audit_ip_key_retention"}, fn: auditIPKeyRetention},
+	{name: "jobs_schema", keys: []string{"jobs.schema"}, fn: jobsSchema},
 }
 
 // tlsPair requires server.tls_cert_ref and server.tls_key_ref to be both set or both empty
@@ -96,6 +98,11 @@ func corsOrigins(v *config.Values) error {
 	}
 	return nil
 }
+
+// jobsSchema holds jobs.schema to an unquoted identifier other than public and pg_* (M1-14):
+// River puts the name into its statements as it is, and the domain schema stays free of River's
+// tables (R-AR-09).
+func jobsSchema(v *config.Values) error { return jobs.ValidateSchema(v.String("jobs.schema")) }
 
 // listenersDistinct rejects a public and an internal listener that would bind the same socket:
 // equal ports other than 0 on equal hosts, or when either host is empty, 0.0.0.0 or ::. Port 0

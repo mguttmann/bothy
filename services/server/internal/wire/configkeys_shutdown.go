@@ -8,7 +8,7 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 const maxShutdownBudget = "1h"
 
 // shutdownConfigKeys returns the budgets of the graceful shutdown from docs/spec/02-architektur.md
-// "Shutdown" (M1-11); River adds shutdown.jobs_soft_timeout with M1-14. Each budget is at most
+// "Shutdown" (M1-11) and shutdown.jobs_soft_timeout of River (M1-14). Each budget is at most
 // one hour, so their sum can never overflow and an orchestrator can still wait longer; Serve
 // refuses budgets whose sum exceeds shutdown.total_timeout (exit code 2).
 func shutdownConfigKeys() []config.Key {
@@ -21,6 +21,11 @@ func shutdownConfigKeys() []config.Key {
 		{
 			Name: "shutdown.http_grace", Kind: config.KindDuration, Default: "20s", Min: minPositiveDuration, Max: maxShutdownBudget,
 			Doc:     "Time running HTTP requests get to finish during the shutdown.",
+			Chapter: chapter02,
+		},
+		{
+			Name: "shutdown.jobs_soft_timeout", Kind: config.KindDuration, Default: "20s", Min: minPositiveDuration, Max: maxShutdownBudget,
+			Doc:     "Time running jobs get to finish during the shutdown before their contexts are cancelled.",
 			Chapter: chapter02,
 		},
 		{

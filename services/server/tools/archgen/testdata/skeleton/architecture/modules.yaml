@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-# Register of the go-arch-lint fixture: three modules, one platform package, one vendor group and
-# the package migrations;
-# third_party holds stubs of pgx and of a library outside every vendor group.
+# Register of the go-arch-lint fixture: three modules, two platform packages, two vendor groups
+# and the package migrations;
+# third_party holds stubs of pgx, of River and of a library outside every vendor group.
 version: 1
 exclude: [tools, third_party]
 kernel:
@@ -9,6 +9,7 @@ kernel:
   ports: [txn, actor]
 platform:
   pg: {vendors: [pgx]}
+  jobs: {depends_on: [pg], vendors: [river]}
 wire: {vendors: []}
 cmd: {vendors: []}
 api: {vendors: []}
@@ -41,3 +42,4 @@ modules:
     adapter_vendors: []
 vendors:
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]
+  river: [github.com/riverqueue/river, github.com/riverqueue/river/**]

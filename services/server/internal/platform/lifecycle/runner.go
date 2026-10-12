@@ -154,6 +154,22 @@ func (r *Runner) Fail(err error) {
 	})
 }
 
+// FailOn reports the first error that failed delivers as a fatal runtime error (Fail), wrapped
+// with name; a channel closed without a value is an orderly end and reports nothing. It is for
+// parts that run on their own after their start and whose loss leaves the process useless, for
+// example the River client of the worker (docs/spec/02-architektur.md "Health", "Panics"). It
+// returns at once; one goroutine waits on failed.
+func (r *Runner) FailOn(name string, failed <-chan error) {
+	go func() {
+		if err, ok := <-failed; ok {
+			if err == nil {
+				err = errors.New("stopped unexpectedly")
+			}
+			r.Fail(fmt.Errorf("%s: %w", name, err))
+		}
+	}()
+}
+
 // Err returns the error that made Run return ExitFailure or ExitUsage: the error of the
 // failed component (wrapped with its name), the error given to Fail, the spent shutdown total
 // with its phase, or the error of step budgets above the total. The first cause wins. It

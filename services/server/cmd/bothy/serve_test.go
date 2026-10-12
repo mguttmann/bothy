@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/platform/jobs/jobstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
@@ -60,6 +61,15 @@ func logPort(logs, msg string) int {
 		}
 	}
 	return 0
+}
+
+// newServeDB returns a database as bothy migrate up leaves it: the goose schema of pgtest and
+// River's tables in the default jobs.schema.
+func newServeDB(t *testing.T) *pgtest.DB {
+	t.Helper()
+	db := pgtest.New(t)
+	jobstest.Migrate(t, db, "jobs")
+	return db
 }
 
 // serveTestEnv is the environment of bothy serve against db as bothy_app, with a secrets
@@ -214,7 +224,7 @@ func waitHTTP(t *testing.T, port int, path string, want int) {
 
 func TestServeHealthOnlyOnInternalListener(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	c := startChild(t, serveTestEnv(t, db), "serve", "--role=api")
 	internal := c.port(t, "internal listener started")
 	public := c.port(t, "public listener started")
@@ -234,7 +244,7 @@ func TestServeHealthOnlyOnInternalListener(t *testing.T) {
 
 func TestServeReadyAfterStart(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	c := startChild(t, serveTestEnv(t, db), "serve")
 	internal := c.port(t, "internal listener started")
 	waitHTTP(t, internal, "/readyz", http.StatusOK)
@@ -250,7 +260,7 @@ func TestServeReadyAfterStart(t *testing.T) {
 
 func TestServeSigtermExitsZeroWithinTotal(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	c := startChild(t, serveTestEnv(t, db, "BOTHY_SHUTDOWN__DRAIN_DELAY=2s", "BOTHY_SHUTDOWN__HTTP_GRACE=3s", "BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT=1s", "BOTHY_SHUTDOWN__TOTAL_TIMEOUT=10s"), "serve", "--role=api")
 	internal := c.port(t, "internal listener started")
 	waitHTTP(t, internal, "/readyz", http.StatusOK)
@@ -273,7 +283,7 @@ func TestServeSigtermExitsZeroWithinTotal(t *testing.T) {
 
 func TestServeSecondSignalExitsImmediately(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	c := startChild(t, serveTestEnv(t, db, "BOTHY_SHUTDOWN__DRAIN_DELAY=30s"), "serve", "--role=api")
 	internal := c.port(t, "internal listener started")
 	waitHTTP(t, internal, "/readyz", http.StatusOK)
@@ -291,7 +301,7 @@ func TestServeSecondSignalExitsImmediately(t *testing.T) {
 
 func TestServeWorkerHasNoPublicListener(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	c := startChild(t, serveTestEnv(t, db), "serve", "--role", "worker")
 	internal := c.port(t, "internal listener started")
 	waitHTTP(t, internal, "/readyz", http.StatusOK)
@@ -332,7 +342,7 @@ func TestServeAbortsOnOldSchema(t *testing.T) {
 
 func TestServeDatabaseUnreachableExits1AfterWait(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	began := time.Now()
 	c := startChild(t, serveTestEnv(t, db, "BOTHY_DATABASE__PORT=1", "BOTHY_STARTUP__DEPENDENCY_WAIT=1s"), "serve")
 	if code := c.wait(t, 30*time.Second); code != 1 {
@@ -375,7 +385,7 @@ func TestServeCommandUsage(t *testing.T) {
 // coverage of the command counts and the exit code path of a budget error is seen.
 func TestServeCommandInProcess(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	sigs := make(chan os.Signal, 2)
 	stdout, stderr := &lockedBuffer{}, &lockedBuffer{}
 	done := make(chan int, 1)

@@ -898,7 +898,10 @@ nehmen weder Zähler noch `NOTIFY`. Den Durchsatz hält das Ziel `perf.event_com
 - Keine Pro-Funktionen (R-Stack). Für Abläufe mit mehreren Schritten verkettet ein Job den nächsten
   per `InsertTx`.
 - Job-Argumente enthalten nur IDs, nie Inhalte oder Geheimnisse. Grund: `river_job` ist ein weiterer
-  Speicherort; Löschung und Datenschutz bleiben bei den Fachtabellen.
+  Speicherort; Löschung und Datenschutz bleiben bei den Fachtabellen. Enforced at registration:
+  the argument type is a struct whose exported fields are only `kernel/ids.ID`, `[]kernel/ids.ID`
+  or `int64` (sequence numbers and versions), so a string, byte slice, map, interface, pointer or
+  nested struct fails the start (`jobs.ValidateArgsType`, M1-14).
 
 ### 12.2 Warteschlangen
 
@@ -966,7 +969,9 @@ Grund: Jeder andere Job schriebe Zustand, der auf dem Ziel fehlen würde.
 5. Sonst gelten die Standardwerte der gepinnten River-Version für Job-Frist, Abrufintervall,
    Wiederholungs-Backoff und Höchstzahl der Versuche; das README von `platform/jobs` nennt sie mit
    der Version. Ein Job mit anderem Bedarf setzt einen benannten Wert seines Fachkapitels. Grund:
-   Ein eigener Name ohne Bedarf wäre eine zweite Quelle für denselben Wert.
+   Ein eigener Name ohne Bedarf wäre eine zweite Quelle für denselben Wert. One River default is
+   off: the nightly reindexer, because `bothy_app` owns no index of River and the reindex could
+   only fail (16 "Rollen"; docs/DECISIONS.md M1-14).
 6. SQL in Jobs läuft im selben Unit of Work wie im Anfragepfad, also mit `database.statement_timeout`
    und `database.lock_timeout`. Lange Arbeit teilt ein Job in Stapel (Regel 1). Migrationen setzen
    nur `migrate.lock_timeout` je Schritt ([upgrade.md](../operations/upgrade.md), Regel M6).
@@ -1126,7 +1131,9 @@ Clients nehmen nach 04 wieder auf.
 3. Datenbank erreichen, höchstens `startup.dependency_wait` lang mit Backoff; danach Abbruch.
 4. Schema-Version prüfen: Das Binary kennt die kleinste nötige Version. Ist die Datenbank älter,
    bricht der Start mit Hinweis auf `bothy migrate up` ab (Exitcode `1`). Neuere Versionen sind
-   erlaubt, weil Migrationen nach Erweitern und Zusammenziehen gebaut sind (ADR 0007).
+   erlaubt, weil Migrationen nach Erweitern und Zusammenziehen gebaut sind (ADR 0007). River's
+   migrations in `jobs.schema` must be complete as well; otherwise the start aborts with the same
+   hint (checked in step 8 for every role, M1-14).
 5. Instanz laden (fehlt die Zeile: Abbruch mit Hinweis auf `bothy migrate up`). Ohne
    `setup_completed_at` startet der Server vollständig, beantwortet aber nur Health-Checks und
    Discovery, alles andere mit `503 setup_required` (08, Abschnitt 4); er prüft den Zustand je

@@ -188,6 +188,12 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"http.transfer_timeout = 10m  # default\n" +
 		"http.unavailable_retry_after = 5s  # default\n" +
 		"instance.environment = prod  # default\n" +
+		"jobs.queue.default.max_workers = 8  # default\n" +
+		"jobs.queue.delivery.max_workers = 16  # default\n" +
+		"jobs.queue.files.max_workers = 2  # default\n" +
+		"jobs.queue.maintenance.max_workers = 2  # default\n" +
+		"jobs.queue.privacy.max_workers = 1  # default\n" +
+		"jobs.schema = jobs  # default\n" +
 		"message.max_content_bytes = 2048  # env BOTHY_MESSAGE__MAX_CONTENT_BYTES\n" +
 		"migrate.app_password_ref = file:/run/bothy/secrets/db_app_password  # default\n" +
 		"migrate.bootstrap_password_ref = file:/run/bothy/secrets/db_superuser_password  # default\n" +
@@ -213,6 +219,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"server.trusted_proxies = 127.0.0.1/32, ::1/128  # default\n" +
 		"shutdown.drain_delay = 5s  # default\n" +
 		"shutdown.http_grace = 20s  # default\n" +
+		"shutdown.jobs_soft_timeout = 20s  # default\n" +
 		"shutdown.telemetry_flush_timeout = 5s  # default\n" +
 		"shutdown.total_timeout = 1m  # default\n" +
 		"startup.dependency_wait = 1m  # default\n" +

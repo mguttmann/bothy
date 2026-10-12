@@ -79,8 +79,6 @@ rules:
     etappe: M1
   - match: "interaction."  # M2-15
     etappe: M2
-  - match: "jobs."  # M1-14
-    etappe: M1
   - match: "message."  # M1-46, M1-56, M1-57
     etappe: M1
   - match: migrate.recent_backup_max_age  # M7-02
@@ -121,8 +119,6 @@ rules:
     etappe: M5
   - match: server.maintenance_mode  # M7-08
     etappe: M7
-  - match: "shutdown."  # M1-11, M1-14
-    etappe: M1
   - match: "signing_key."  # M1-32
     etappe: M1
   - match: "space."  # M1-52

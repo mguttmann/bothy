@@ -26,6 +26,16 @@ const (
 	lockPollAttempts = 300
 )
 
+// The same poll for the advisory lock of a Step that serialises itself (platform/jobs), so a
+// concurrent bothy migrate up waits as long in every part of the run; lock_timeout would end
+// pg_advisory_lock after migrate.lock_timeout instead.
+const (
+	// MigrateLockPoll is the pause between two attempts to take the lock.
+	MigrateLockPoll = lockPollSeconds * time.Second
+	// MigrateLockAttempts is the number of attempts before the step gives up.
+	MigrateLockAttempts = lockPollAttempts
+)
+
 // Step is work that bothy migrate runs before or after the goose migrations, in the same
 // process and against the same database: River's own migrations before (M1-14,
 // docs/operations/upgrade.md rule M11), the instance row with schema_version and
