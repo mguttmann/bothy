@@ -64,7 +64,7 @@ bundling, M3-23 desktop delivery) call these functions instead of re-implementin
 - ADRs 0008 (hexagonal modules and checked dependencies), 0031 (push without content), 0051
   (worker consumers of the event log).
 - `docs/DECISIONS.md`: D-PN-01 to D-PN-04, D-PN-07, D-PR-01, D-W-100; section 10 "Rulings of the build milestones" (format of the rows you add).
-- `docs/OPEN-QUESTIONS.md`: OQ-05 (quiet hours make hints quiet, not silent; default "yes, as in
+- `docs/OPEN-QUESTIONS.md`: OQ-05 (quiet hours make hints silent, not muted; default "yes, as in
   chapter 13", answer due before M3-19). This ticket builds the default; a different answer changes
   one function.
 - `docs/security/threat-model.md`: T-PU-01 (push metadata; only IDs leave the server).

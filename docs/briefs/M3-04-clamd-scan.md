@@ -121,7 +121,7 @@ This ticket enables no operation in `api/operations.yaml`, adds no migration, no
 - Attachments, the subscriber of `files.FileFinalized`, `ReleaseInvocation` and `runs.invocation_hold_timeout` (M3-07).
 - `files.cleanup_pending`, `files.purge_objects`, `file.failed_row_ttl` and the catch-up of missed object deletions (M3-08).
 - The transcript condition of `FileFinalized` for voice messages in mode `service` (M3-09); text extraction after `clean` (M3-15).
-- The status component "Virus scan", `degraded` after `file.scan.pending_alert_after`, its alarm and the key `file.scan.pending_alert_after` in the schema (M7-09); "Virus scan off" in console and status page (M6, M7-21).
+- The status component "Virus scan", `degraded` after `file.scan.pending_alert_after`, its alert and the key `file.scan.pending_alert_after` in the schema (M7-09); "Virus scan off" in console and status page (M6, M7-21).
 - Choosing the profile `scan` and `file.scan.mode` during installation (M7-29); Compose runs with the profile `scan` on real hosts (M7-14).
 - `IngestFile` and the queue `files_bulk` of 12 11 (import, M8-03).
 - `bothy files rescan --skipped` (02 3.3, 12 5.3): no ticket of the plan owns it yet; reported as a plan gap, not built here.

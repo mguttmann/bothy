@@ -124,7 +124,7 @@ This ticket adds no action, no event type, no job, no metric, no problem code an
 
 1. **Place and dependencies** (02 4.3, 4.4; ADR 0008). Everything lives in `notify`. It reads target paths and the channel default through the `chat` port, the personal default through the `sync` port and time zones through the `identity` port; all three edges are allowed by 02 4.4 ("target path for settings", "devices and time zone"). `notify` never reads a table of another module (03 1 item 12). The `domain` layer gets only pure helpers (Design notes 4 and 9); time zone loading, configuration and SQL stay in `app` and `adapters`.
 
-2. **Migrations** (goose; sequential numbers and slugs as `make migrations-lint` requires; take the next free numbers at your local merge and renumber yours if a parallel ticket took them).
+2. **Migrations** (goose; sequential numbers and slugs as `make migrations-lint` requires; take the next free numbers when you rebase before the merge and renumber yours if a parallel ticket took them).
 
     a. `<next>_notify_notification_preferences.sql`: `user_id uuid NOT NULL`, `target_kind text NOT NULL CHECK (target_kind IN ('space','channel','thread'))`, `target_id uuid NOT NULL`, `level text NOT NULL CHECK (level IN ('all','mentions','mute'))`, `muted_until timestamptz` (NULL allowed), `version bigint NOT NULL DEFAULT 1`, `updated_at timestamptz NOT NULL DEFAULT now()`; PK `(user_id, target_kind, target_id)`; FK `user_id -> users(principal_id) ON DELETE CASCADE`; no FK on `target_id` (R-DM-16); index `(target_kind, target_id)`.
 
