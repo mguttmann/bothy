@@ -241,3 +241,75 @@ def test_main_reports_problems(tmp_path: Path, capsys: pytest.CaptureFixture[str
 def test_missing_section_raises() -> None:
     with pytest.raises(ValueError, match="Index"):
         brief_deps.parse_index("# nothing\n")
+
+
+@pytest.mark.parametrize(
+    ("sentence", "named"),
+    [
+        ("M1-01 is not in the closure: do not rely on it.", ["M1-01"]),
+        ("Used only if merged: M1-01 (generator).", ["M1-01"]),
+        ("If M1-02 is on the base, add the case.", ["M1-02"]),
+        ("M1-02 is not in this ticket's dependency closure.", ["M1-02"]),
+        ("Add the test once M1-02 is on the base.", ["M1-02"]),
+        ("Use the generator when M1-02 has been merged.", ["M1-02"]),
+        ("Use the generator once M1-02 has already been merged.", ["M1-02"]),
+        ("Read the registry of M1-02 (if merged).", ["M1-02"]),
+        ("Use M1-02 only if merged.", ["M1-02"]),
+        ("Not in the closure but used if merged: M1-04 (other), M1-02 (generator).", ["M1-02"]),
+        (
+            "Not in the closure but used if merged: M1-04 (other, used rarely), M1-02 (gen).",
+            ["M1-02"],
+        ),
+        ("Not in the closure: M1-04 (a), M1-05 (b), and M1-02 (c).", ["M1-02"]),
+        ("M1-01, M1-02 and M1-04 are not in the closure.", ["M1-01", "M1-02"]),
+        ("Run it when M1-01 and M1-02 are on the base.", ["M1-01", "M1-02"]),
+        ("Change it through SetTriggerState (once M1-02 is merged).", ["M1-02"]),
+        ("Use the registry (if M1-02 is on the base).", ["M1-02"]),
+        ("Add the case (M1-02 is not in this closure).", ["M1-02"]),
+        ("Read M1-04 or M1-02 (if merged).", ["M1-02"]),
+        ("Depends on M1-04, M1-02 only if merged.", ["M1-02"]),
+    ],
+)
+def test_dependency_called_optional_fails(tmp_path: Path, sentence: str, named: list[str]) -> None:
+    """A brief must not treat a ticket of its own closure as missing or optional (D-W-113)."""
+    root = _repo(tmp_path, bodies={"M1-03": sentence})
+    assert brief_deps.check(root) == [
+        f"M1-03-x.md: {t} is a dependency of M1-03, but the brief calls it optional"
+        " or outside its closure"
+        for t in named
+    ]
+
+
+@pytest.mark.parametrize(
+    "sentence",
+    [
+        "M1-04 is not in the closure: do not rely on it.",
+        "Used only if merged: M1-04 (other check).",
+        "M1-02 is in the closure; M1-04 is not in the closure.",
+        "M1-02 reports a plan gap.",
+        "M1-02 provides the generator, but M1-04 is not in the closure.",
+        "M1-02 is in the closure through M1-01, and M1-04 is not in the closure.",
+        "Not in the closure but used if merged: M1-04 (other), while M1-02 is required.",
+        "M1-02 adds the lint and M1-04 is not in the closure.",
+        "M1-04 (which builds on M1-02) is not in the closure.",
+        "Not in the closure: M1-04, and M1-02 is required.",
+        "Not in the closure but used if merged: M1-04 (other), and M1-02 is required.",
+        "Not in the closure: M1-04, or else M1-02 helps.",
+        "Read M1-02 and M1-04 (if merged).",
+        "Depends on M1-02, M1-04 only if merged.",
+    ],
+)
+def test_optional_ticket_outside_closure_passes(tmp_path: Path, sentence: str) -> None:
+    assert brief_deps.check(_repo(tmp_path, bodies={"M1-03": sentence})) == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "Not in the closure:\n\nM1-02 provides the generator.",
+        "- Not in the closure, used if merged:\n- M1-02 provides the generator.",
+    ],
+)
+def test_optional_list_stops_at_a_block(tmp_path: Path, body: str) -> None:
+    """A list after "not in the closure:" never reaches into the next paragraph or list item."""
+    assert brief_deps.check(_repo(tmp_path, bodies={"M1-03": body})) == []

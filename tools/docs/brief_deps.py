@@ -22,7 +22,10 @@ This check reads all of them and fails on:
 - a ticket named in a start check of a brief (a paragraph or list item that ends the run with
   `Verdict: BLOCKED dependency ...` or `BLOCKED ... not merged`) that is not in the brief's
   dependency closure: the launcher could start the brief before that ticket is merged, and the
-  brief could only stop.
+  brief could only stop;
+- a sentence of a brief that calls a ticket of its own dependency closure missing or optional
+  ("not in the closure", "outside this closure", "if merged", "on the base"): the launcher starts
+  the brief only after that ticket is merged, so such a sentence narrows the build for nothing.
 
 `--write` regenerates the wave column, the "Waves" table and the graph edges from the index
 dependencies (the index stays the source). Fix dependencies by hand, then run `--write`.
@@ -52,6 +55,37 @@ _BLOCK_START = re.compile(r"^\s*(?:[-*+]|\d+\.|[a-z]\.)\s")
 _START_CHECK = re.compile(r"BLOCKED dependency|BLOCKED [^`]*not merged")
 _SENTENCE = re.compile(r"(?<=[.;])\s+(?=[A-Z`])")
 _OPTIONAL = re.compile(r"(?:only if|where|if) merged", re.IGNORECASE)
+# A ticket that a brief calls missing or optional. Parenthesized text is matched as a segment of
+# its own and dropped from the sentence, so an aside like "M1-04 (which builds on M1-02)" names
+# only M1-04 and a comma inside it ends nothing.
+# Forms: a ticket directly before "is not in" or "lies outside" a closure, a list of tickets
+# before "are not in" or "lie outside" it; a ticket after "if", "when" or "once" with "is
+# merged", "has (already) been merged" or "is on the base", a list with "are" or "have"; a
+# ticket before "only if merged" or "only where merged"; a ticket followed by "(if merged)"; and
+# the tickets of a list after "not in the closure ...:", "outside ... closure:" or "if merged:"
+# up to a comma that starts a new clause (not one before "and" or "or" and a last ticket).
+_TICKETS = r"M\d-\d\d(?:\s*,\s*M\d-\d\d)*(?:\s*,?\s*(?:and|or)\s+M\d-\d\d)?"
+_OPTIONAL_SUBJECT = re.compile(
+    r"(M\d-\d\d)\s+(?:is|lies)\s+(?:not in|outside)\b[^.;:,]{0,40}\bclosure"
+    rf"|({_TICKETS})\s+(?:are|lie)\s+(?:not in|outside)\b[^.;:,]{{0,40}}\bclosure"
+    r"|\b(?:if|when|once)\s+(M\d-\d\d)\s+(?:is|has)\s+(?:already\s+)?(?:been\s+)?"
+    r"(?:already\s+)?(?:merged|on the base)"
+    rf"|\b(?:if|when|once)\s+({_TICKETS})\s+(?:are|have)\s+(?:already\s+)?(?:been\s+)?"
+    r"(?:already\s+)?(?:merged|on the base)"
+    r"|(M\d-\d\d)\s+(?:(?:is|are)\s+)?(?:\w+\s+)?only (?:if|where) merged",
+    re.IGNORECASE,
+)
+_OPTIONAL_ASIDE = re.compile(
+    r"(M\d-\d\d)\b(?:(?!M\d-\d\d)[^.;:,()]){0,40}\((?:only )?(?:if|where) (?:it is )?merged\)",
+    re.IGNORECASE,
+)
+_OPTIONAL_LIST = re.compile(
+    r"(?:\bnot in (?:[\w']+ ){0,3}closure|\boutside (?:[\w']+ ){0,3}closure|\bif merged)"
+    r"[^:.;]{0,60}:\s*([^.;]+)",
+    re.IGNORECASE,
+)
+_CLAUSE_BREAK = re.compile(r",\s+(?!(?:and|or)\s+M\d-\d\d\s*(?:[,.;]|$))(?=[a-z])")
+_PARENS = re.compile(r"\([^()]*\)")
 
 
 class Index:
@@ -138,18 +172,58 @@ def start_check_tickets(text: str) -> set[str]:
     `BLOCKED ... not merged`; every ticket ID in it must be merged before the brief can run,
     except in a sentence that names a ticket as optional ("only if merged", "where merged").
     """
+    found: set[str] = set()
+    for joined in _blocks(text):
+        if _START_CHECK.search(joined):
+            for sentence in _SENTENCE.split(joined):
+                if not _OPTIONAL.search(sentence):
+                    found.update(_ID.findall(sentence))
+    return found
+
+
+def called_optional_tickets(text: str) -> set[str]:
+    """Tickets that a brief calls missing or optional (outside its closure).
+
+    Not covered: a sentence that names the ticket only by a path, a feature or a pronoun ("the
+    registry of M1-68 when it is on the base", "if `test/canary` exists"), other verbs and word
+    orders ("unless", "is not merged yet"), and a list whose tickets stand in list items of their
+    own after the colon (each paragraph and list item is read on its own); review catches those.
+    """
+    found: set[str] = set()
+    for block in _blocks(text):
+        found |= _called_optional_in(re.sub(r"\s+", " ", block))
+    return found
+
+
+def _blocks(text: str) -> list[str]:
+    """Paragraphs and list items of a brief: a new block starts at a blank line or a list item."""
     blocks: list[list[str]] = [[]]
     for line in text.splitlines():
         if not line.strip() or _BLOCK_START.match(line):
             blocks.append([])
         blocks[-1].append(line)
+    return ["\n".join(b) for b in blocks if b]
+
+
+def _called_optional_in(flat: str) -> set[str]:
     found: set[str] = set()
-    for block in blocks:
-        joined = "\n".join(block)
-        if _START_CHECK.search(joined):
-            for sentence in _SENTENCE.split(joined):
-                if not _OPTIONAL.search(sentence):
-                    found.update(_ID.findall(sentence))
+    found.update(m.group(1) for m in _OPTIONAL_ASIDE.finditer(flat))
+    segments = [flat]
+    bare = flat
+    while True:
+        segments += [m.group(1) for m in re.finditer(r"\(([^()]*)\)", bare)]
+        stripped = _PARENS.sub("", bare)
+        if stripped == bare:
+            break
+        bare = stripped
+    segments[0] = bare
+    for segment in segments:
+        for m in _OPTIONAL_SUBJECT.finditer(segment):
+            for group in m.groups():
+                if group:
+                    found.update(_ID.findall(group))
+        for m in _OPTIONAL_LIST.finditer(segment):
+            found.update(_ID.findall(_CLAUSE_BREAK.split(m.group(1))[0]))
     return found
 
 
@@ -252,6 +326,11 @@ def check(root: Path) -> list[str]:
         if header is None or sorted(_ID.findall(header.group(1))) != sorted(index.deps[tid]):
             problems.append(f"{name}: header 'Depends on' differs from the index")
         reach = closure(index.deps, tid) | {tid}
+        for named in sorted(called_optional_tickets(brief) & (reach - {tid})):
+            problems.append(
+                f"{name}: {named} is a dependency of {tid}, but the brief calls it optional"
+                " or outside its closure"
+            )
         for needed in sorted(start_check_tickets(brief) - reach):
             problems.append(
                 f"{name}: start check needs {needed}, which is not a dependency of {tid}"
