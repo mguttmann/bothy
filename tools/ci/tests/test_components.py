@@ -156,6 +156,8 @@ def test_pins_accept(tmp_path: Path, product: str, server: str) -> None:
         ("1.0.0", "# BOTHY_VERSION=2.0.0", r"exactly one line BOTHY_VERSION=, found 0"),
         ("1.0.0", "BOTHY_VERSION=2.0.0\nBOTHY_VERSION=2.0.1", r"found 2"),
         ("1.0", "BOTHY_VERSION=2.0.0", r"VERSION says '1\.0'"),
+        # only a product beta may pin a server pre-release (CHANNEL=beta gives -beta.N)
+        ("1.1.0-rc.1", "BOTHY_VERSION=2.0.0-beta.1", r"product 1\.1\.0-rc\.1 is not a beta"),
     ],
 )
 def test_pins_reject(tmp_path: Path, product: str, lines: str, message: str) -> None:

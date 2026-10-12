@@ -55,7 +55,10 @@ Supplementary rules:
    call from `release.yml` after `publish` (`workflow_call`) or by hand with a product tag
    (`workflow_dispatch`, D-W-59). Only `release.yml` calls a release workflow, from one job
    and without a matrix (D-W-73), and no workflow starts another one by `workflow_dispatch`,
-   because none has `actions: write` (D-W-111): the portability test checks the release that
+   because none has `actions: write` (D-W-111; the dispatch endpoint requires the permission
+   "Actions" with `write`,
+   https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps,
+   retrieved 2026-10-11 [verified]): the portability test checks the release that
    the same run published, and does so once.
 3. **Fixed labels.** No label `*-latest` (it changes the image without a change in the
    repository), no larger runners (they are not standard runners), no list, no group and
@@ -63,8 +66,10 @@ Supplementary rules:
 4. **Release jobs.** Signing secrets exist only in the environments `release`, `release-apple` and
    `release-windows`. A job with one of these environments uses outputs of other jobs only in the
    `if:` of the job or of a step (D-W-72), resolves the tag again itself and compares, and
-   fetches artifacts only by ID (D-W-52). GitHub compares environment names without case; the
-   check does so too and requires a literal environment name without an expression (D-W-110).
+   fetches artifacts only by ID (D-W-52). GitHub compares environment names without case
+   ("Environment names are not case sensitive",
+   https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments,
+   retrieved 2026-10-11 [verified]); the check does so too and requires a literal environment name without an expression (D-W-110).
    Every standard runner except the single-core runners is
    a new VM ("each GitHub-hosted runner is a new virtual machine (VM) hosted by GitHub",
    same source as above, retrieved 2026-10-11) [verified]; a job therefore takes over no state of

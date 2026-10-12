@@ -74,7 +74,8 @@ Therefore, for every product release, beta as well as stable:
    carries a pre-release identifier, or if `SERVER_VERSION` is missing while the line carries the
    placeholder. The gate `release-pins` (`tools/ci/components.py pins`) checks the committed state
    in every `make check` and in CI: exactly one line, SemVer without `v` or the placeholder, and
-   no server pre-release in a stable product. Before the tag it runs in the pre-push of the
+   no server pre-release in a stable product, which only a product beta (`X.Y.Z-beta.N`) may
+   pin. Before the tag it runs in the pre-push of the
    branch with the release commit and in the required check `ci-ok` of its pull request; the
    maintainer sets the tag only after the merge, on the squash commit on `main`
    ([push-discipline.md](../quality/push-discipline.md)). The push of the tag alone starts no

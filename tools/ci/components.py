@@ -11,7 +11,8 @@ product) to a directory with its own VERSION file (docs/spec/18-release.md).
 The product bundle pins the server version in the line `BOTHY_VERSION=` of
 infra/compose/.env.example (docs/spec/18-release.md, 2.1). `pins` checks the committed state
 before any tag exists: the value is SemVer without "v" (or the template placeholder), and a
-stable product (VERSION without pre-release) never pins a server pre-release.
+stable product (VERSION without pre-release) never pins a server pre-release; only a
+product beta (`X.Y.Z-beta.N`) may.
 
 Usage:
   components.py changed --base <sha> --head <sha>   print components for `make COMPONENTS=`
@@ -71,6 +72,8 @@ _SEMVER = re.compile(
 BUNDLE_ENV_TEMPLATE = "infra/compose/.env.example"
 SERVER_VERSION_PLACEHOLDER = "0.0.0-placeholder"
 _SERVER_VERSION_LINE = re.compile(r"^\s*BOTHY_VERSION=(.*)$", re.MULTILINE)
+# The only product pre-release that `make release-prep CHANNEL=beta` writes.
+_PRODUCT_BETA = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-beta\.(0|[1-9]\d*)$")
 
 
 class ReleaseError(Exception):
@@ -167,10 +170,15 @@ def pinned_server_problems(repo: Path) -> list[str]:
         problems.append(
             f"{BUNDLE_ENV_TEMPLATE}: BOTHY_VERSION '{server}' is not a SemVer version without 'v'"
         )
-    elif product and not _is_prerelease(product) and _is_prerelease(server):
+    elif product and _is_prerelease(server) and not _is_prerelease(product):
         problems.append(
             f"stable product {product} pins the server pre-release {server}; pin a stable"
             " server version or prepare a product beta (CHANNEL=beta)"
+        )
+    elif product and _is_prerelease(server) and not _PRODUCT_BETA.match(product):
+        problems.append(
+            f"product {product} is not a beta (X.Y.Z-beta.N) and pins the server pre-release"
+            f" {server}; only a product beta (CHANNEL=beta) may pin one"
         )
     return problems
 
