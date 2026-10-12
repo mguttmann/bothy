@@ -9,8 +9,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/ratelimit"
 )
 
-// rateLimitDefaults are the defaults of docs/spec/05-actions.md "Konfigurationswerte dieses
-// Kapitels": per_minute and burst of every class of 05 "Rate-limit classes". The schema test
+// rateLimitDefaults are the defaults of docs/spec/05-actions.md "Configuration values of this
+// chapter": per_minute and burst of every class of 05 "Rate-limit classes". The schema test
 // holds them against the chapter table, and rateLimitConfigKeys refuses a class of the catalogue
 // without a row here.
 var rateLimitDefaults = map[ratelimit.Class]ratelimit.Limits{

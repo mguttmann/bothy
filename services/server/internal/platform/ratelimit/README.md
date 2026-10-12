@@ -1,7 +1,7 @@
 # Package `platform/ratelimit`
 
 Status: built (M1-19). Normative are [05-actions.md](../../../../../docs/spec/05-actions.md)
-"Rate-Limit-Klassen" and "Konfigurationswerte dieses Kapitels",
+"Rate-limit classes" and "Configuration values of this chapter",
 [06-api.md](../../../../../docs/spec/06-api.md) "Rate limits",
 [02-architecture.md](../../../../../docs/spec/02-architecture.md) "Chain in the api node",
 "Scaling path" and R-AR-12, and [08-identity.md](../../../../../docs/spec/08-identity.md)
