@@ -90,7 +90,7 @@ states, with named constraints (`grants_subject_shape_check`, `grants_bot_limits
 - The only place with permission logic (B7). Other modules call `authorize` through `kernel/authorize` and never join with `grants` themselves.
 - Data of other modules comes through the source ports `PrincipalSource`, `StructureSource`, `AgentPolicySource`; `authz` imports no domain modules.
 - The I1 check and `access.changed` run in phase 3.1 of the Unit of Work (02, 8.1).
-- The permission cache follows `access.changed` through `Observe` in log order (02, 11.3); `Observe` comes with M1-65, REST reads the rights version per request (M1-28).
+- The permission cache follows `access.changed` through `Observe` in log order (02, 11.3); `Observe` comes with M1-65, REST reads the permission version per request (M1-28).
 
 ## Action catalogue (M1-25)
 
@@ -133,7 +133,7 @@ and its ticket appends the function to `moduleRegistrations` in `internal/wire/a
 
 1. `Catalog.Spec(a)` and the requirement entry of `domain/requirements_table.go`; an unknown or deferred action is an internal error with cause `unknown_action` (one ERROR record, `bothy.authz.errors`), a system action an internal error. The resource kind must be one of the action's kinds.
 2. The clock is read once. Anonymous principals pass only `Public` requirements.
-3. The rights version (pinned, request memo, or `instance.Versions`), the snapshot entry from the cache, the liveness checks (status, session, device, token, installation) and the pending rule (`principal_pending`, `device_pending`; `device.list` only for the own device).
+3. The permission version (pinned, request memo, or `instance.Versions`), the snapshot entry from the cache, the liveness checks (status, session, device, token, installation) and the pending rule (`principal_pending`, `device_pending`; `device.list` only for the own device).
 4. The path is resolved fresh from `StructureSource` (thread, channel, space; a grant's target; a host has no path). A missing object is `not_found no_grant`; a hint that contradicts the structure is an internal error.
 5. The effective rights on the path (`domain.Effective`): dm participation, owner, the highest level and union of capabilities of instance, space and channel grants, the operator rule, the limits of agents and apps; then the intersections with "view as" and acting for.
 6. `domain.Decide`: visibility per resource kind (D4), the requirement with the reason of the deciding atom, the app scope (`domain/scopes.go`), the read-only channel, "view as" is read-only, step-up (`auth.step_up_max_age`), the guards of `agent.invoke`, `grant.create` and `grant.revoke`.
@@ -143,7 +143,7 @@ and its ticket appends the function to `moduleRegistrations` in `internal/wire/a
 
 ### Cache
 
-The snapshot (`domain.Snapshot`) holds the direct grant maxima per target, the owner role and the groups (D5). It is cached per `(principal, session, device, token, permission_version)` in an LRU bounded by `authz.snapshot_cache_max_entries`; a hit needs `t < ValidUntil`, the earliest expiry of a grant, membership, session or token read, so an expiry takes effect without a job (AZ-P10). Structure is never cached: a channel or space created without a new rights version is judged and listed at once. `platform/httpserver` installs one request memo per request (`authorize.WithRequestScope`), so the rights version is read once per request.
+The snapshot (`domain.Snapshot`) holds the direct grant maxima per target, the owner role and the groups (D5). It is cached per `(principal, session, device, token, permission_version)` in an LRU bounded by `authz.snapshot_cache_max_entries`; a hit needs `t < ValidUntil`, the earliest expiry of a grant, membership, session or token read, so an expiry takes effect without a job (AZ-P10). Structure is never cached: a channel or space created without a new permission version is judged and listed at once. `platform/httpserver` installs one request memo per request (`authorize.WithRequestScope`), so the permission version is read once per request.
 
 ### Deferred actions
 
@@ -155,7 +155,7 @@ Load the resource first (02 section 9.2), then describe it: `Kind`, `ID`, the pa
 
 ### Tests
 
-`adapters/fake` holds in-memory fakes of the sources, the store and the rights version for the tests of this and later modules. `app/world_test.go` builds the world of 07 section 11.1; the matrix tests carry the AZ ids, `TestAZP8_CacheMatchesReference` compares with a slow reference in random worlds (`BOTHY_TEST_SEED` repeats a run) and `BenchmarkAuthorizeCached` reports `p99-ns` for `perf.authorize_cached_p99`.
+`adapters/fake` holds in-memory fakes of the sources, the store and the permission version for the tests of this and later modules. `app/world_test.go` builds the world of 07 section 11.1; the matrix tests carry the AZ ids, `TestAZP8_CacheMatchesReference` compares with a slow reference in random worlds (`BOTHY_TEST_SEED` repeats a run) and `BenchmarkAuthorizeCached` reports `p99-ns` for `perf.authorize_cached_p99`.
 
 ## Chapters
 
