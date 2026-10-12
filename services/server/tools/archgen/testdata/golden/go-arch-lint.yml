@@ -31,6 +31,8 @@ components:
     in: [cmd/**]
   api:
     in: [api/**]
+  migrations:
+    in: [migrations]
   identity:
     in: [internal/identity]
   identity-domain:
@@ -65,17 +67,19 @@ deps:
     mayDependOn: [platform-jobs, kernel-ports, platform-pg]
     canUse: [v-river]
   platform-pg:
-    mayDependOn: [platform-pg, kernel-ports]
+    mayDependOn: [platform-pg, kernel-ports, migrations]
     canUse: [v-pgx]
   wire:
-    mayDependOn: [wire, identity, identity-domain, identity-app, identity-adapters, chat, chat-domain, chat-app, chat-adapters, agents, agents-domain, agents-app, agents-adapters, platform-jobs, platform-pg, kernel-ports, api]
+    mayDependOn: [wire, identity, identity-domain, identity-app, identity-adapters, chat, chat-domain, chat-app, chat-adapters, agents, agents-domain, agents-app, agents-adapters, platform-jobs, platform-pg, kernel-ports, api, migrations]
     canUse: [v-otel]
   cmd:
-    mayDependOn: [cmd, wire, platform-jobs, platform-pg, kernel-ports]
+    mayDependOn: [cmd, wire, platform-jobs, platform-pg, kernel-ports, migrations]
     canUse: [v-otel]
   api:
     mayDependOn: [api]
     canUse: [v-oapi]
+  migrations:
+    mayDependOn: [migrations]
   identity:
     mayDependOn: [identity, kernel-ports]
   identity-domain:

@@ -2,6 +2,177 @@
   "version": 1,
   "keys": [
     {
+      "name": "database.acquire_timeout",
+      "env": "BOTHY_DATABASE__ACQUIRE_TIMEOUT",
+      "kind": "duration",
+      "default": "2s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "How long a request waits for a pool connection before it gets 503 unavailable."
+    },
+    {
+      "name": "database.host",
+      "env": "BOTHY_DATABASE__HOST",
+      "kind": "string",
+      "default": "localhost",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Host name or address of the database, or the directory of its Unix socket when it starts with a slash."
+    },
+    {
+      "name": "database.idle_in_tx_timeout",
+      "env": "BOTHY_DATABASE__IDLE_IN_TX_TIMEOUT",
+      "kind": "duration",
+      "default": "10s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "24d",
+      "chapter": "02-architecture.md",
+      "doc": "How long an open transaction may sit without work before the database ends the session."
+    },
+    {
+      "name": "database.listen_reconnect_backoff_cap",
+      "env": "BOTHY_DATABASE__LISTEN_RECONNECT_BACKOFF_CAP",
+      "kind": "duration",
+      "default": "10s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "Longest pause between attempts to reconnect the LISTEN connection."
+    },
+    {
+      "name": "database.lock_timeout",
+      "env": "BOTHY_DATABASE__LOCK_TIMEOUT",
+      "kind": "duration",
+      "default": "2s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "24d",
+      "chapter": "02-architecture.md",
+      "doc": "How long a statement waits for a lock."
+    },
+    {
+      "name": "database.max_conns",
+      "env": "BOTHY_DATABASE__MAX_CONNS",
+      "kind": "int",
+      "default": "20",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "2147483647",
+      "chapter": "16-operations.md",
+      "doc": "Size of the connection pool of each process."
+    },
+    {
+      "name": "database.name",
+      "env": "BOTHY_DATABASE__NAME",
+      "kind": "string",
+      "default": "bothy",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Name of the database."
+    },
+    {
+      "name": "database.password_ref",
+      "env": "BOTHY_DATABASE__PASSWORD_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/db_app_password",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Secret reference of the password of database.user, read again for every new connection."
+    },
+    {
+      "name": "database.port",
+      "env": "BOTHY_DATABASE__PORT",
+      "kind": "int",
+      "default": "5432",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "65535",
+      "chapter": "16-operations.md",
+      "doc": "Port of the database in the network of the server."
+    },
+    {
+      "name": "database.sslmode",
+      "env": "BOTHY_DATABASE__SSLMODE",
+      "kind": "enum",
+      "default": "verify-full",
+      "required": false,
+      "enum": [
+        "disable",
+        "verify-full"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "TLS to the database: verify-full, or disable only inside the internal Compose network (SEC-TLS-5)."
+    },
+    {
+      "name": "database.sslrootcert",
+      "env": "BOTHY_DATABASE__SSLROOTCERT",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "PEM file with the CA certificates for verify-full; empty uses the system roots."
+    },
+    {
+      "name": "database.statement_timeout",
+      "env": "BOTHY_DATABASE__STATEMENT_TIMEOUT",
+      "kind": "duration",
+      "default": "5s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "24d",
+      "chapter": "02-architecture.md",
+      "doc": "Deadline of a single SQL statement, overridable per transaction."
+    },
+    {
+      "name": "database.tx_retry_max",
+      "env": "BOTHY_DATABASE__TX_RETRY_MAX",
+      "kind": "int",
+      "default": "2",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "Retries of a unit of work after a deadlock or a lock timeout."
+    },
+    {
+      "name": "database.user",
+      "env": "BOTHY_DATABASE__USER",
+      "kind": "string",
+      "default": "bothy_app",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Database role of the process: bothy_app for api and worker, bothy_owner for bothy migrate."
+    },
+    {
       "name": "egress.allowed_hosts",
       "env": "BOTHY_EGRESS__ALLOWED_HOSTS",
       "kind": "list(string)",
@@ -60,6 +231,90 @@
       "max": "",
       "chapter": "03-data-model.md",
       "doc": "Largest content of one message in bytes."
+    },
+    {
+      "name": "migrate.app_password_ref",
+      "env": "BOTHY_MIGRATE__APP_PASSWORD_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/db_app_password",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Secret reference of the password bothy migrate up --bootstrap sets for bothy_app."
+    },
+    {
+      "name": "migrate.bootstrap_password_ref",
+      "env": "BOTHY_MIGRATE__BOOTSTRAP_PASSWORD_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/db_superuser_password",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Secret reference of the password of migrate.bootstrap_user."
+    },
+    {
+      "name": "migrate.bootstrap_user",
+      "env": "BOTHY_MIGRATE__BOOTSTRAP_USER",
+      "kind": "string",
+      "default": "postgres",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Superuser login used only by bothy migrate up --bootstrap."
+    },
+    {
+      "name": "migrate.lock_timeout",
+      "env": "BOTHY_MIGRATE__LOCK_TIMEOUT",
+      "kind": "duration",
+      "default": "5s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "24d",
+      "chapter": "16-operations.md",
+      "doc": "lock_timeout of every migration step, so a step that waits for a lock fails instead of blocking the application."
+    },
+    {
+      "name": "migrate.maint_password_ref",
+      "env": "BOTHY_MIGRATE__MAINT_PASSWORD_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/db_maint_password",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Secret reference of the password bothy migrate up --bootstrap sets for bothy_maint."
+    },
+    {
+      "name": "migrate.monitor_password_ref",
+      "env": "BOTHY_MIGRATE__MONITOR_PASSWORD_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/db_monitor_password",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Secret reference of the password bothy migrate up --bootstrap sets for bothy_monitor."
+    },
+    {
+      "name": "migrate.owner_password_ref",
+      "env": "BOTHY_MIGRATE__OWNER_PASSWORD_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/db_owner_password",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Secret reference of the password bothy migrate up --bootstrap sets for bothy_owner."
     },
     {
       "name": "secrets.cache_ttl",
@@ -124,6 +379,18 @@
       "max": "",
       "chapter": "16-operations.md",
       "doc": "Role of the process: api serves REST and the gateway, worker runs jobs and consumers, all does both."
+    },
+    {
+      "name": "startup.dependency_wait",
+      "env": "BOTHY_STARTUP__DEPENDENCY_WAIT",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "0s",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "How long the start and bothy migrate wait for the database before they give up."
     }
   ]
 }

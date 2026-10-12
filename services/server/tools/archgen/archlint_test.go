@@ -156,6 +156,23 @@ func TestArchLintPackageWithoutComponent(t *testing.T) {
 		"not attached to any component")
 }
 
+// TestArchLintMigrations holds the component of the package migrations: the clean skeleton lets
+// cmd and platform pg (used_by) use it, a module layer may not, and the package itself uses no
+// project package.
+func TestArchLintMigrations(t *testing.T) {
+	t.Parallel()
+	t.Run("domain uses migrations", func(t *testing.T) {
+		t.Parallel()
+		assertRejects(t, "violations/domain-imports-migrations", "internal/chat/domain",
+			"chat-domain shouldn't depend on example.com/skeleton/migrations")
+	})
+	t.Run("migrations uses a module", func(t *testing.T) {
+		t.Parallel()
+		assertRejects(t, "violations/migrations-imports-module", "migrations",
+			"migrations shouldn't depend on example.com/skeleton/internal/chat")
+	})
+}
+
 func TestArchLintTestSupport(t *testing.T) {
 	t.Parallel()
 	t.Run("testsupport uses adapter", func(t *testing.T) {
