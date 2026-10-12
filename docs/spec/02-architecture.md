@@ -93,10 +93,10 @@ name only commands from here.
 | `bothy serve --role=api\|worker\|all` | start the server | this chapter |
 | `bothy migrate up\|status\|validate` | migrations of the domain schema (goose) and of the River tables (rivermigrate); on the first run creates the row `instance` (through the port of the module `instance`), sets `instance.schema_version` and `instance.min_server_version`; creates the first partitions of `event_log` (03) | ADR 0007, [16-operations.md](16-operations.md) |
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | setup: first owner by server command (system action `instance.bootstrap`), enrollment code for recovery | [08-identity.md](08-identity.md) |
-| `bothy config check\|print` | check the configuration, print it redacted | section 13 |
+| `bothy config check\|print` | check the configuration, print it redacted; `check --secrets` also resolves every reference `*_ref` through the secret provider and names per key only `ok` or the error code | section 13 |
 | `bothy import discord ...` | import and read mirror through the import API (`import.apply`) | [22-import-migration.md](22-import-migration.md) |
 | `bothy restore finalize` | after a restore: new sync epoch, cursors to `head_seq`, audit | [16-operations.md](16-operations.md), [03-data-model.md](03-data-model.md) 6.7 |
-| `bothy secrets init\|export` | create and back up secrets | [16-operations.md](16-operations.md) |
+| `bothy secrets init\|export` | create and back up secrets: `init --target DIR [--source DIR] [--owner SERVICE=UID:GID ...] [--adopt-source]` reconciles the store `_store/` with the source and copies per service; `export --from DIR --age-recipient KEY [--age-recipient ...] [--output FILE\|-] [--armor]` writes the age-encrypted bundle; both read only their flags, without a configuration file and database | [16-operations.md](16-operations.md) 5.3, 5.4 |
 | `bothy healthcheck --url` | health check against the internal listener for containers without a shell | [16-operations.md](16-operations.md) |
 | `bothy files rescan` | maintenance: have files checked again | [12-files.md](12-files.md) |
 | `bothy telemetry pseudonym` | pseudonym of a principal for the owner's troubleshooting | [../observability/privacy.md](../observability/privacy.md) |
@@ -1000,7 +1000,10 @@ server loads.
    command line (only `--role` and `--config`). The mapping is reversible (ADR 0011, [16-operations.md](16-operations.md) 5.1).
 3. **Secrets** only as a reference in keys ending in `_ref` (for example `database.password_ref`).
    The secret provider resolves them at start. Values never appear in logs, error texts or
-   `bothy config print` (there only the reference appears; `bothy config` resolves nothing).
+   `bothy config print` (there only the reference appears; only `bothy config check --secrets`
+   resolves and names per key `ok` or the error code). The provider is created only in
+   `internal/wire` and `cmd/bothy`; modules get values through their `Config` or a narrow
+   interface and read neither files nor the environment themselves.
 4. **Check at start, fail fast:** unknown keys and unknown `BOTHY_` variables
    abort (typos would otherwise be silent; exceptions in [16-operations.md](16-operations.md) 5.1);
    types and ranges; cross conditions. Cross conditions today: `http.max_json_body_bytes` strictly
@@ -1009,10 +1012,14 @@ server loads.
    `server.internal_listen_addr` and `server.listen_addr` share no port other than `0` when their
    hosts are equal or one of the hosts is empty, `0.0.0.0` or `::` (also with an IPv6 zone; an
    IPv4-mapped IPv6 address counts as its IPv4 address). Port `0` may occur twice, because tests
-   bind port 0. The rule "identity headers only with a loopback listener" is not a
-   configuration check, because the driver is a setting of the owner in the database; it
-   applies at readiness ([16-operations.md](16-operations.md) 4.3). Messages name the key and the
-   source, never the value.
+   bind port 0. In addition the loader checks a rule for a single key that no type expresses:
+   `secrets.dir` is an absolute path in clean form (no `.` or `..`, no double or trailing `/`),
+   not `/`, without a NUL character and without `<`, as the secret provider requires; a wrong
+   value is a problem of `secrets.dir` alone, not of the references that use `<secrets.dir>`.
+   The rule "identity headers only with a loopback listener" is not a configuration check,
+   because the driver is a setting of the owner in the database; it applies at readiness
+   ([16-operations.md](16-operations.md) 4.3). Messages name the key and the source, never the
+   value.
 5. **Typed per module.** Every module and every platform package has its own `Config` struct
    in its own package; `internal/wire` fills it from `platform/config` (binding via struct tags).
    Modules never read environment variables. A key enters the schema with the ticket that builds
@@ -1021,7 +1028,10 @@ server loads.
 6. **No reloading during operation** except secret rotation (signing keys, webhook secrets),
    which the secret provider reports. Reason: predictable behavior; half-applied limits are
    harder to diagnose than a restart.
-7. `bothy config check` runs steps 2 to 4 without starting. `bothy config print` shows the
+7. `bothy config check` runs steps 2 to 4 without starting and writes, for every key `*_ref`
+   whose effective reference uses `env:`, a warning to standard error; with `--secrets` it also
+   resolves every reference `*_ref` through the secret provider (line `secret <key>: ok` or
+   `secret <key>: <error code>`, exit code 1 when one fails). `bothy config print` shows the
    effective values with the source per key.
 
 ## 14. Error and timeout strategy

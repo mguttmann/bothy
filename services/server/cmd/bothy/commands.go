@@ -27,8 +27,17 @@ var commands = []command{
 	{
 		name:    "config",
 		summary: "Check or print the configuration without starting the server",
-		run: func(_ context.Context, args, env []string, stdout, stderr io.Writer) int {
-			return configCommand(args, env, wire.ConfigSchema, stdout, stderr)
+		run: func(ctx context.Context, args, env []string, stdout, stderr io.Writer) int {
+			return configCommand(ctx, args, env, wire.ConfigSchema, stdout, stderr)
+		},
+	},
+	{
+		name:    "secrets",
+		summary: "Create the secrets of the Compose stack or export them encrypted",
+		// init and export read only their flags: the secrets-init container has no BOTHY_
+		// environment and no configuration file (brief M1-09), so env is not passed on.
+		run: func(ctx context.Context, args, _ []string, stdout, stderr io.Writer) int {
+			return secretsCommand(ctx, args, stdout, stderr)
 		},
 	},
 }

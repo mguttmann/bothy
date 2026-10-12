@@ -1,6 +1,6 @@
 # Package `platform/config`
 
-Status: built (M1-07). The normative sources are
+Status: built (M1-07), references extended (M1-09). The normative sources are
 [02-architecture.md](../../../../../docs/spec/02-architecture.md) "Configuration loading",
 [16-operations.md](../../../../../docs/spec/16-operations.md) "Configuration (ADR 0011)" and the
 [configuration reference](../../../../../docs/operations/configuration.md) sections 1 to 3; if
@@ -60,9 +60,17 @@ here.
    the form of a key only with its line, and paths or names with control characters stand in
    quotation marks.
 7. Secrets appear only as a reference in keys ending in `_ref` (kind `secret_ref`). This package
-   checks only the form; nothing is resolved. A reference `env:` names neither
-   `BOTHY_CONFIG_FILE` nor a variable in the form of a key variable. Placeholders `<key>` apply
-   only in default values of `secret_ref` keys.
+   checks only the form; nothing is resolved. A reference `file:` names an absolute, clean path
+   (no element `.` or `..`, no double and no trailing slash, no NUL), the same rule as in the
+   secret provider (`internal/platform/secrets`), so that `bothy config check` and the start
+   accept the same references. A reference `env:` names neither `BOTHY_CONFIG_FILE` nor a variable
+   in the form of a key variable. In default values of `secret_ref` keys, `<key>` stands for the
+   effective value of a string key; in set values from file and environment only `<secrets.dir>`
+   is replaced, with the effective value of `secrets.dir` (M1-09). Inserted text is not searched
+   again. A problem of the replaced text starts with `after expanding <secrets.dir>:`; if
+   `secrets.dir` itself has a problem, the reference reports no second one. The loader checks
+   `secrets.dir` itself (a rule that no kind expresses, M1-09/15): absolute, clean, not `/`,
+   without NUL and without `<`.
 8. The package never reads the process environment. `cmd/bothy` reads it once and passes it on; a
    forbidigo rule in `.golangci.yml` forbids the reading functions (also `exec.Cmd.Environ` and
    `http.ProxyFromEnvironment`) outside `cmd/bothy` and the tests under `tools/`.

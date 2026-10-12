@@ -15,8 +15,9 @@
 //
 // The package never reads the process environment: cmd/bothy reads it once and passes it in
 // Sources.Env (a forbidigo rule in .golangci.yml keeps it that way). Secrets appear only as
-// references in keys ending in _ref (kind secret_ref); this package checks their form and never
-// resolves them. Configuration is read once at start; only secret rotation (secret provider)
-// changes anything at run time. Owner settings in the database (instance_settings, feature
-// flags) are not configuration and are not loaded here.
+// references in keys ending in _ref (kind secret_ref); this package expands <secrets.dir> in
+// them and checks their form, file: paths with the same rules as the secret provider
+// (internal/platform/secrets), but never resolves them. Configuration is read once at start;
+// only secret rotation (secret provider) changes anything at run time. Owner settings in the
+// database (instance_settings, feature flags) are not configuration and are not loaded here.
 package config

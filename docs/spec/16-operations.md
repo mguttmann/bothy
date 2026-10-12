@@ -458,6 +458,33 @@ again afterwards; this way a rotation takes effect without a restart. Values nev
 error messages or events. `env:` is allowed but not recommended: environment variables
 are inherited by child processes and crash reports.
 
+Rules of the provider (`internal/platform/secrets`, rulings M1-09 in
+[DECISIONS.md](../DECISIONS.md)):
+
+1. Grammar: `file:` with an absolute path in clean form (no `.` or `..`, no double or trailing
+   `/`, no NUL character), `env:` with a name from `[A-Z_][A-Z0-9_]*`; M1 reports `azkv` and
+   `awssm` as not supported. `<secrets.dir>` stands in the reference for the effective value of
+   `secrets.dir`, in the default as in a set value.
+2. File driver: it follows symlinks and reads only a regular file with mode `0400` or `0600`
+   whose owner is the process user (SEC-SEC-1); the check runs on the opened file, so that it
+   cannot change between check and read. Exactly one line end at the end (`\n` or `\r\n`) is not
+   part of the value, because `echo value > file` is the usual way to create a file and a line
+   end is never part of a password. A file that is empty after that counts as not found.
+3. Env driver: it reads the environment the process got at start; a missing or empty variable
+   counts as not found.
+4. Cache: per reference a read value applies for at most `secrets.cache_ttl`; after that the
+   provider reads again, and a new version takes effect from that access on. Concurrent accesses
+   to an expired reference read once. A clock that stands before the read time counts as
+   expired.
+5. If the first read fails, the start aborts ([02-architecture.md](02-architecture.md) 14.4). If a
+   later read fails, the old value stays; the provider writes a log line with `error.type` (only
+   the error code), increments `bothy.secrets.refresh.failures` (alert
+   `BothySecretRefreshFailing`) and tries again after another `secrets.cache_ttl`.
+6. Errors name the reference and the violated rule (for files mode and owner), never the
+   content; they do not name the text of an invalid reference, because a secret may stand there.
+   Error codes: `invalid_ref`, `unsupported_scheme`, `not_found`, `insecure_file`,
+   `read_failed`.
+
 If a reference is missing for a key `*_ref`, `file:<secrets.dir>/<name>` applies, with the name from
 the catalogue in the configuration reference (section "Secrets"). The chapter tables write
 this default out. "empty" stands only for secrets without a catalogue entry that belong to a
@@ -496,14 +523,41 @@ need new keys without manual work on the host.
    still sees only its own subdirectory.
 5. At the end, `secrets-init` outputs the fingerprints, never the values, and reminds of the
    escrow (5.4). It reports catalogue entries whose generator a later milestone builds as
-   `pending` (configuration reference, section "Secrets").
+   `pending` (configuration reference, section "Secrets"). Per entry a line
+   `<status> <name> <fingerprint>` goes to standard output with the status `generated`,
+   `adopted`, `kept`, `updated`, `missing` (a supplied entry is missing) or `pending`; the
+   fingerprint is `sha256:` with the first twelve hex characters of the SHA-256 of the content
+   (for a directory entry of the SHA-256 of the sorted lines `<relative path> <sha256 of the
+   file>`), and it is absent for `missing` and `pending`. Exit codes: `0` success, `1` runtime
+   error, conflict or a second concurrent run on the same volume, `2` usage error (unknown or
+   non-regular file in the source, supplied file without a value, existing target with files but
+   without `_store`, invalid or unknown `--owner`, missing `--owner` for `server` or `migrate`,
+   `--adopt-source` without `--source`). If a check fails, `secrets-init` writes nothing. The last
+   line names the export command with the `_store` of the run (5.4).
 
 ### 5.4 Escrow
 
 Without some secrets, a backup is worthless. The owner exports them after every change in
-encrypted form (`bothy secrets export --age-recipient <public key>`) and keeps the
-bundle separate from the server and separate from the off-site target. The bundle contains `_store/` and the
-key store `secrets.signing_key_dir`.
+encrypted form (`bothy secrets export --from <_store> --age-recipient <public key>`, call in the
+Compose stack below) and keeps the bundle separate from the server and separate from the
+off-site target. The bundle contains `_store/` and the key store `secrets.signing_key_dir`; the
+export takes in the key store with M1-32, which generates the signing keys.
+
+Call in the Compose stack, without a configuration file and without a database:
+
+```sh
+docker compose run --rm -T secrets-init secrets export \
+  --from /run/bothy/secrets/_store --age-recipient age1... > bundle.age
+```
+
+`--age-recipient` may appear several times (every recipient can decrypt); `--armor` writes ASCII
+instead of binary data, and without `--armor` the export refuses to write to a terminal.
+`--output <file>` creates a new file with mode `0600` and never overwrites. The bundle is a tar
+archive with the relative names of the catalogue, so it decrypts to exactly the layout of
+`infra/compose/secrets/` that `secrets-init` takes over; the export therefore rejects files
+without a catalogue entry in `--from` with exit code 2 instead of writing a bundle that the
+restore would later refuse. The last line of `secrets init` names this call with the `_store` of
+the run.
 
 | Secret | Consequence of loss |
 |---|---|
@@ -912,8 +966,8 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | `server.public_url` | Server | none, required | Origin under which apps reach the server (scheme, host, optional port; without path, query and fragment, otherwise `bothy config check` fails); basis of `aud`, DPoP `htu` and WebAuthn ([08-identity.md](08-identity.md), sections 7.2 and 7.3) |
 | `server.trusted_proxies` | Server | `127.0.0.1/32, ::1/128` | peers whose forwarding and identity headers are honored and that may send plain text ([19-security.md](19-security.md), SEC-TLS-1) |
 | `server.maintenance_mode` | Server | `off` | `off` or `read_only` (relocation, upgrade; [ADR 0065](../adr/0065-maintenance-mode-read-only.md)) |
-| `secrets.dir` | Server | `/run/bothy/secrets` | base of the default references `file:` |
-| `secrets.cache_ttl` | Server | `5m` | how long a read secret stays valid |
+| `secrets.dir` | Server | `/run/bothy/secrets` | base of the default references `file:`; an absolute path in clean form (no `.` or `..`, no double or trailing `/`), not `/`, without a NUL character and without `<`, otherwise `bothy config check` fails |
+| `secrets.cache_ttl` | Server | `5m` | how long a read secret stays valid; at least `1s` |
 | `secrets.signing_key_dir` | Server | `/var/lib/bothy/signing-keys` | writable directory of the private signing keys; owned by the service user, mode `0700` (5.2, [ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)) |
 | `server.tls_cert_ref` | Server | empty | reference to the certificate chain (PEM, leaf first); empty: the server does not terminate TLS (SEC-TLS-2) |
 | `server.tls_key_ref` | Server | empty | reference to the private key (PEM); only together with `server.tls_cert_ref` |

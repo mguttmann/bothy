@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -358,14 +359,143 @@ func TestSecretRefDefaultPlaceholder(t *testing.T) {
 		t.Errorf("source = %s, want default", v.Source("database.password_ref"))
 	}
 
-	// Inserted text is not scanned again, and an expansion that yields an invalid reference is
-	// a problem of the reference key with source default.
+	// An invalid secrets.dir is a problem of secrets.dir alone (ruling M1-09/15), not of the
+	// references whose defaults name it.
 	got := problems(t, s, config.Sources{Env: []string{"BOTHY_SECRETS__DIR=relative/<secrets.dir>"}})
-	wantProblem(t, got, "config: database.password_ref: default after expanding <secrets.dir>: file reference must be an absolute path (source: default)")
+	wantProblem(t, got, "config: secrets.dir: must be an absolute path (source: env BOTHY_SECRETS__DIR)")
 
-	// Placeholders are expanded only in defaults; a configured value is taken as written.
-	got = problems(t, s, config.Sources{Env: []string{"BOTHY_DATABASE__PASSWORD_REF=file:<secrets.dir>/x"}})
-	wantProblem(t, got, "config: database.password_ref: file reference must be an absolute path (source: env BOTHY_DATABASE__PASSWORD_REF)")
+	// With another string key, inserted text is not scanned again, and an expansion that yields
+	// an invalid reference is a problem of the reference key with source default.
+	other := mustSchema(t, key("files.root", config.KindString, "/srv/EXAMPLE"),
+		key("files.key_ref", config.KindSecretRef, "file:<files.root>/key"))
+	got = problems(t, other, config.Sources{Env: []string{"BOTHY_FILES__ROOT=relative/<files.root>"}})
+	wantProblem(t, got, "config: files.key_ref: default after expanding <files.root>: file reference must be an absolute path (source: default)")
+
+	// A configured value expands <secrets.dir> as well (ruling M1-09/4); the details are in
+	// TestSecretsDirExpandedInConfiguredRefs.
+	v = mustLoad(t, s, config.Sources{Env: []string{"BOTHY_DATABASE__PASSWORD_REF=file:<secrets.dir>/x", "BOTHY_SECRETS__DIR=/var/run/secrets/bothy"}})
+	if got := v.String("database.password_ref"); got != "file:/var/run/secrets/bothy/x" {
+		t.Errorf("configured database.password_ref = %q, want <secrets.dir> expanded", got)
+	}
+}
+
+// exampleSecret stands for a secret value in the tests of M1-09; no problem may contain it.
+const exampleSecret = "EXAMPLE-secret-5d21"
+
+// noSecret fails the test when a problem contains secret.
+func noSecret(t *testing.T, got []config.Problem, secret string) {
+	t.Helper()
+	for _, p := range got {
+		if strings.Contains(p.String(), secret) {
+			t.Fatalf("problem %q contains the secret", p)
+		}
+	}
+}
+
+// TestLoaderAllowsEnvVariablesNamedByRefs holds brief M1-09 D2: the variable an env: reference
+// names is no unknown BOTHY_ variable, and every other unknown BOTHY_ variable still aborts.
+func TestLoaderAllowsEnvVariablesNamedByRefs(t *testing.T) {
+	t.Parallel()
+	// The name is a constant because gitleaks' rule generic-api-key reads the literal
+	// "BOTHY_SECRET_X=" after another literal ending in SECRET_X as an assigned key.
+	const variable = "BOTHY_SECRET_X"
+	env := []string{"BOTHY_DATABASE__PASSWORD_REF=env:" + variable, variable + "=" + exampleSecret}
+	v := mustLoad(t, allKinds(t), config.Sources{Env: env})
+	if got := v.String("database.password_ref"); got != "env:BOTHY_SECRET_X" {
+		t.Errorf("database.password_ref = %q, want env:BOTHY_SECRET_X", got)
+	}
+
+	got := problems(t, allKinds(t), config.Sources{Env: append(slices.Clone(env), "BOTHY_SECRET_Y="+exampleSecret)})
+	wantProblem(t, got, "config: unknown variable BOTHY_SECRET_Y (source: environment)")
+	noSecret(t, got, exampleSecret)
+}
+
+// TestSecretsDirExpandedInConfiguredRefs holds ruling M1-09/4: <secrets.dir> is replaced by the
+// effective secrets.dir in configured secret_ref values too, and in no other way.
+func TestSecretsDirExpandedInConfiguredRefs(t *testing.T) {
+	t.Parallel()
+	const variable = "BOTHY_DATABASE__PASSWORD_REF"
+	envSource := config.Source{Kind: config.SourceEnv, Name: variable}
+	s := allKinds(t)
+	wantRef := func(t *testing.T, v *config.Values, want string, src config.Source) {
+		t.Helper()
+		if got := v.String("database.password_ref"); got != want {
+			t.Errorf("database.password_ref = %q, want %q", got, want)
+		}
+		if got := v.Text("database.password_ref"); got != want {
+			t.Errorf("Text(database.password_ref) = %q, want %q", got, want)
+		}
+		if got := v.Source("database.password_ref"); got != src {
+			t.Errorf("Source(database.password_ref) = %s, want %s", got, src)
+		}
+	}
+
+	t.Run("env with default secrets.dir", func(t *testing.T) {
+		t.Parallel()
+		v := mustLoad(t, s, config.Sources{Env: []string{variable + "=file:<secrets.dir>/x"}})
+		wantRef(t, v, "file:/run/bothy/secrets/x", envSource)
+	})
+	t.Run("env with secrets.dir from env", func(t *testing.T) {
+		t.Parallel()
+		v := mustLoad(t, s, config.Sources{Env: []string{variable + "=file:<secrets.dir>/x", "BOTHY_SECRETS__DIR=/var/run/secrets/bothy"}})
+		wantRef(t, v, "file:/var/run/secrets/bothy/x", envSource)
+	})
+	t.Run("file with secrets.dir from env over file", func(t *testing.T) {
+		t.Parallel()
+		path := writeFile(t, "secrets:\n  dir: /srv/overridden\ndatabase:\n  password_ref: file:<secrets.dir>/y\n")
+		v := mustLoad(t, s, config.Sources{File: path, Env: []string{"BOTHY_SECRETS__DIR=/var/run/secrets/bothy"}})
+		wantRef(t, v, "file:/var/run/secrets/bothy/y", config.Source{Kind: config.SourceFile, Name: path})
+	})
+	t.Run("a placeholder in secrets.dir is a problem of secrets.dir", func(t *testing.T) {
+		t.Parallel()
+		// The expansion never produces a placeholder again: secrets.dir must not contain "<"
+		// (docs/DECISIONS.md M1-09/15), and the reference adds no problem of its own.
+		got := problems(t, s, config.Sources{Env: []string{variable + "=file:<secrets.dir>/x", "BOTHY_SECRETS__DIR=/run/<secrets.dir>"}})
+		wantProblem(t, got, "config: secrets.dir: must not contain < (source: env BOTHY_SECRETS__DIR)")
+	})
+	t.Run("expansion of an overridden source is checked", func(t *testing.T) {
+		t.Parallel()
+		path := writeFile(t, "database:\n  password_ref: file:<secrets.dir>/../y\n")
+		got := problems(t, s, config.Sources{File: path, Env: []string{variable + "=file:/run/bothy/secrets/x"}})
+		wantProblem(t, got, "config: database.password_ref: after expanding <secrets.dir>: "+
+			"file reference must be a clean path without . or .. elements and without repeated or trailing slashes (source: file "+path+")")
+	})
+	t.Run("relative secrets.dir is a problem of secrets.dir only", func(t *testing.T) {
+		t.Parallel()
+		got := problems(t, s, config.Sources{Env: []string{variable + "=file:<secrets.dir>/x", "BOTHY_SECRETS__DIR=relative"}})
+		wantProblem(t, got, "config: secrets.dir: must be an absolute path (source: env BOTHY_SECRETS__DIR)")
+	})
+	t.Run("no other placeholder", func(t *testing.T) {
+		t.Parallel()
+		got := problems(t, s, config.Sources{Env: []string{variable + "=file:<server.role>/x"}})
+		wantProblem(t, got, "config: database.password_ref: file reference must be an absolute path (source: env "+variable+")")
+	})
+	t.Run("failed secrets.dir adds no second problem", func(t *testing.T) {
+		t.Parallel()
+		path := writeFile(t, "secrets:\n  dir: /a\n  dir: /b\n")
+		got := problems(t, s, config.Sources{File: path, Env: []string{variable + "=file:<secrets.dir>/x"}})
+		wantProblem(t, got, `config: duplicate key "secrets.dir" at lines 2 and 3 (source: file `+path+")")
+
+		// A list where a value is expected fails secrets.dir in the same way.
+		path = writeFile(t, "secrets:\n  dir: [/a]\n")
+		got = problems(t, s, config.Sources{File: path, Env: []string{variable + "=file:<secrets.dir>/x"}})
+		wantProblem(t, got, "config: secrets.dir: expected a single value, found a list (source: file "+path+")")
+
+		// A reference without the placeholder does not depend on secrets.dir and is still checked.
+		path = writeFile(t, "secrets:\n  dir: /a\n  dir: /b\n")
+		got = problems(t, s, config.Sources{File: path, Env: []string{variable + "=file:relative"}})
+		if len(got) != 2 || got[1].String() != "config: database.password_ref: file reference must be an absolute path (source: env "+variable+")" {
+			t.Fatalf("problems = %v, want the duplicate key and the relative reference", got)
+		}
+	})
+	t.Run("schema without the string key secrets.dir keeps the text", func(t *testing.T) {
+		t.Parallel()
+		ref := key("database.password_ref", config.KindSecretRef, "file:/run/bothy/secrets/db_app_password")
+		for _, s := range []*config.Schema{mustSchema(t, ref), mustSchema(t, ref, key("secrets.dir", config.KindInt, "1"))} {
+			got := problems(t, s, config.Sources{Env: []string{variable + "=file:<secrets.dir>/x"}})
+			wantProblem(t, got, "config: database.password_ref: file reference must be an absolute path (source: env "+variable+")")
+		}
+	})
 }
 
 func TestListFromEnvAndDefault(t *testing.T) {
@@ -453,7 +583,7 @@ func TestPlaceholderOfFailedKeyAddsNoProblem(t *testing.T) {
 	t.Parallel()
 	// secrets.dir is set twice in the file: that is the one problem. The reference default that
 	// names it must not add a second, misleading problem about its own expansion.
-	path := writeFile(t, "secrets:\n  dir: relative\n  dir: other\n")
+	path := writeFile(t, "secrets:\n  dir: /run/EXAMPLE/a\n  dir: /run/EXAMPLE/b\n")
 	got := problems(t, allKinds(t), config.Sources{File: path})
 	wantProblem(t, got, `config: duplicate key "secrets.dir" at lines 2 and 3 (source: file `+path+")")
 
@@ -463,4 +593,56 @@ func TestPlaceholderOfFailedKeyAddsNoProblem(t *testing.T) {
 	s := mustSchema(t, dir, key("database.password_ref", config.KindSecretRef, "file:<secrets.dir>/x"))
 	wantProblem(t, problems(t, s, config.Sources{}),
 		"config: secrets.dir: is required; set it in the configuration file or with BOTHY_SECRETS__DIR (source: none)")
+}
+
+// TestSecretsDirRule holds the rule of the key secrets.dir that no kind expresses (docs/DECISIONS.md
+// M1-09/15): an absolute path in clean form, not the root directory, without NUL and without "<",
+// because file:<secrets.dir>/<name> must give a clean file: reference and the expansion must not
+// produce a placeholder again. The loader reports one problem on secrets.dir, never its value,
+// and the references that use the placeholder report none of their own.
+func TestSecretsDirRule(t *testing.T) {
+	t.Parallel()
+	s := mustSchema(t,
+		key("secrets.dir", config.KindString, "/run/bothy/secrets"),
+		key("database.password_ref", config.KindSecretRef, "file:<secrets.dir>/db_app_password"),
+		key("migrate.owner_password_ref", config.KindSecretRef, "file:/run/EXAMPLE/db_owner_password"),
+	)
+	const (
+		notAbsolute = "must be an absolute path"
+		hasNUL      = "must not contain a NUL character"
+		isRoot      = "must not be the root directory"
+		hasAngle    = "must not contain <"
+		notClean    = "must be a clean path without . or .. elements and without repeated or trailing slashes"
+	)
+	for dir, want := range map[string]string{
+		"/run/bothy/secrets":   "",
+		"/srv/EXAMPLE-secrets": "",
+		"":                     notAbsolute,
+		"run/EXAMPLE":          notAbsolute,
+		"./EXAMPLE":            notAbsolute,
+		"/":                    isRoot,
+		"/run/EXAMPLE\x00x":    hasNUL,
+		"/run/<secrets.dir>":   hasAngle,
+		"/run/EXAMPLE<x":       hasAngle,
+		"/run/EXAMPLE/":        notClean,
+		"/run//EXAMPLE":        notClean,
+		"/run/./EXAMPLE":       notClean,
+		"/run/../EXAMPLE":      notClean,
+	} {
+		env := []string{"BOTHY_SECRETS__DIR=" + dir, "BOTHY_MIGRATE__OWNER_PASSWORD_REF=file:<secrets.dir>/db_owner_password"}
+		v, err := config.Load(s, config.Sources{Env: env})
+		if want == "" {
+			if err != nil {
+				t.Errorf("secrets.dir %q: %v", dir, err)
+			} else if got := v.String("migrate.owner_password_ref"); got != "file:"+dir+"/db_owner_password" {
+				t.Errorf("secrets.dir %q: migrate.owner_password_ref = %q", dir, got)
+			}
+			continue
+		}
+		got := problems(t, s, config.Sources{Env: env})
+		wantProblem(t, got, "config: secrets.dir: "+want+" (source: env BOTHY_SECRETS__DIR)")
+		if dir != "" && dir != "/" && strings.Contains(got[0].String(), dir) {
+			t.Errorf("secrets.dir %q: the problem echoes the value", dir)
+		}
+	}
 }

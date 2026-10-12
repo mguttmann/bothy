@@ -46,9 +46,12 @@ var flagNames = map[string]string{"server.role": "--role"}
 // required key without a non-empty value; a failed cross-check. Variables without the prefix
 // BOTHY_ are ignored (OTEL_* belong to the telemetry SDK). No problem contains a value.
 //
-// Placeholders <other.key> are expanded in secret_ref defaults only, with the effective value of
-// the other key. Load does not resolve secret references and never reads the process
-// environment.
+// Placeholders <other.key> are expanded in secret_ref defaults with the effective value of the
+// other key. In a secret_ref value from the file or the environment only <secrets.dir> is
+// expanded, with the effective value of secrets.dir when the schema has that string key, so a
+// configured reference reads like the defaults (ruling M1-09/4); a problem about the expanded text
+// says "after expanding <secrets.dir>". A placeholder whose key has a problem adds no second
+// problem. Load does not resolve secret references and never reads the process environment.
 //
 // Example:
 //
@@ -172,21 +175,35 @@ func (l *loader) readFlags(flags map[string]string) {
 	}
 }
 
+// secretsDirKey is the one key a configured secret_ref value may name as a placeholder (ruling
+// M1-09/4): the default references are file:<secrets.dir>/<name> (16-operations.md 5.2), and an
+// operator who sets one of them should be able to write it the same way. Any other <text> in a
+// configured value stays as written; more would be a template language without a user.
+const (
+	secretsDirKey         = "secrets.dir"
+	secretsDirPlaceholder = "<" + secretsDirKey + ">"
+)
+
 // resolve parses every provided text of every key, picks the effective value and fills in
-// defaults; secret_ref defaults with placeholders come last, when the keys they name are known.
+// defaults. secret_ref keys come in a second pass, when the string keys their placeholders name
+// have their effective values: <other.key> in a default, <secrets.dir> in a configured value.
+// NewSchema lets a placeholder name only a string key, so no secret_ref key waits for another.
 func (l *loader) resolve() {
-	var deferred []*keyEntry
+	var refs []*keyEntry
 	for _, name := range l.s.names {
 		e := l.s.entries[name]
-		// NewSchema gives a required key no default, so it has no placeholders either.
-		if len(l.provided[name]) == 0 && len(e.placeholders) > 0 {
-			deferred = append(deferred, e)
+		if e.Kind == KindSecretRef {
+			refs = append(refs, e)
 			continue
 		}
 		l.resolveKey(e)
 	}
-	for _, e := range deferred {
-		l.resolvePlaceholders(e)
+	for _, e := range refs {
+		if len(l.provided[e.Name]) == 0 && len(e.placeholders) > 0 {
+			l.resolvePlaceholders(e)
+			continue
+		}
+		l.resolveKey(e)
 	}
 }
 
@@ -206,9 +223,17 @@ func (l *loader) resolveKey(e *keyEntry) {
 	}
 	var eff *value
 	for _, p := range list {
+		p, prefix, ok := l.expandSecretsDir(e, p)
+		if !ok {
+			// secrets.dir has its own problem already; a second one about an expansion that
+			// never happened would point the operator at the wrong key.
+			l.failed[name] = true
+			eff = nil
+			continue
+		}
 		v, err := l.parse(e, p)
 		if err != nil {
-			l.keyProblem(name, p.src.String(), err.Error())
+			l.keyProblem(name, p.src.String(), prefix+err.Error())
 			eff = nil
 			continue
 		}
@@ -222,6 +247,26 @@ func (l *loader) resolveKey(e *keyEntry) {
 		return
 	}
 	l.vals[name] = *eff
+}
+
+// expandSecretsDir replaces every <secrets.dir> in a configured text of the secret_ref key e
+// with the effective value of secrets.dir and returns the text, the prefix a problem about it
+// gets, and false when the text needs secrets.dir while that key has a problem. Texts of other
+// kinds, texts without the placeholder and schemas without the string key secrets.dir pass
+// unchanged. The inserted text is not scanned again, as in a default.
+func (l *loader) expandSecretsDir(e *keyEntry, p provided) (provided, string, bool) {
+	if e.Kind != KindSecretRef || p.seq || !strings.Contains(p.text, secretsDirPlaceholder) {
+		return p, "", true
+	}
+	if dir := l.s.entries[secretsDirKey]; dir == nil || dir.Kind != KindString {
+		return p, "", true
+	}
+	dir, ok := l.vals[secretsDirKey]
+	if !ok || l.hasProblem(secretsDirKey) {
+		return p, "", false
+	}
+	p.text = strings.ReplaceAll(p.text, secretsDirPlaceholder, dir.v.(string))
+	return p, "after expanding " + secretsDirPlaceholder + ": ", true
 }
 
 func (l *loader) parse(e *keyEntry, p provided) (value, error) {
@@ -241,15 +286,33 @@ func (l *loader) parse(e *keyEntry, p provided) (value, error) {
 	if err == nil {
 		err = e.checkBounds(v)
 	}
+	if err == nil {
+		err = e.checkKeyRule(v)
+	}
 	if err != nil {
 		return value{}, err
 	}
 	return value{v: v, text: canon, src: p.src}, nil
 }
 
+// checkKeyRule applies the rule of a key that no kind expresses. Only secrets.dir has one: it is
+// what <secrets.dir> stands for in every file: reference, so it must turn file:<secrets.dir>/<name>
+// into a clean file: reference and must not bring a placeholder of its own (docs/DECISIONS.md
+// M1-09/15). Checked here, a bad value is one problem of secrets.dir, and the references that use
+// it add none (their expansion waits for a key without problem).
+func (e *keyEntry) checkKeyRule(v any) error {
+	if e.Name != secretsDirKey || e.Kind != KindString {
+		return nil
+	}
+	return checkSecretsDir(v.(string))
+}
+
 // setDefault stores the default of e; NewSchema has already checked that it parses.
 func (l *loader) setDefault(e *keyEntry, text string) {
 	v, canon, err := parseValue(e.Kind, e.Enum, text)
+	if err == nil {
+		err = e.checkKeyRule(v)
+	}
 	if err != nil {
 		l.keyProblem(e.Name, "default", err.Error())
 		return

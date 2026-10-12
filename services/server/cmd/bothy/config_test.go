@@ -20,7 +20,7 @@ import (
 func runConfig(t *testing.T, schema func() (*config.Schema, error), env []string, args ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	code := configCommand(args, env, schema, &stdout, &stderr)
+	code := configCommand(t.Context(), args, env, schema, &stdout, &stderr)
 	return code, stdout.String(), stderr.String()
 }
 
@@ -122,6 +122,18 @@ func TestConfigUsageErrorStaysOneLine(t *testing.T) {
 	}
 }
 
+// TestConfigCheckSecretsOnPrintIsUsage holds that --secrets belongs to check only: print never
+// resolves a reference, so the flag there is a usage error, not a silent no-op.
+func TestConfigCheckSecretsOnPrintIsUsage(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{{"print", "--secrets"}, {"print", "--secrets=false"}, {"check", "--secrets=maybe"}} {
+		code, stdout, stderr := runConfig(t, wire.ConfigSchema, nil, args...)
+		if code != 2 || stdout != "" || !strings.HasPrefix(stderr, "bothy config: ") || !strings.Contains(stderr, configUsage) {
+			t.Errorf("config %q: exit %d, stdout %q, stderr %q; want 2, empty, error line and usage", args, code, stdout, stderr)
+		}
+	}
+}
+
 func TestConfigHelpExit0(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{{"help"}, {"-h"}, {"--help"}, {"check", "-h"}, {"print", "--help"}} {
@@ -146,6 +158,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"egress.timeout = 15s  # default\n" +
 		"http.max_json_body_bytes = 1048576  # default\n" +
 		"message.max_content_bytes = 2048  # env BOTHY_MESSAGE__MAX_CONTENT_BYTES\n" +
+		"secrets.cache_ttl = 5m  # default\n" +
+		"secrets.dir = /run/bothy/secrets  # default\n" +
 		"server.internal_listen_addr = 127.0.0.1:8081  # default\n" +
 		"server.listen_addr = 127.0.0.1:9080  # file " + path + "\n" +
 		"server.role = worker  # flag --role\n"

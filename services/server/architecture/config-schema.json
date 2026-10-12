@@ -62,6 +62,30 @@
       "doc": "Largest content of one message in bytes."
     },
     {
+      "name": "secrets.cache_ttl",
+      "env": "BOTHY_SECRETS__CACHE_TTL",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "How long a secret that was read stays in use before it is read again."
+    },
+    {
+      "name": "secrets.dir",
+      "env": "BOTHY_SECRETS__DIR",
+      "kind": "string",
+      "default": "/run/bothy/secrets",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Base directory of the default file: references of secrets."
+    },
+    {
       "name": "server.internal_listen_addr",
       "env": "BOTHY_SERVER__INTERNAL_LISTEN_ADDR",
       "kind": "listen address",
