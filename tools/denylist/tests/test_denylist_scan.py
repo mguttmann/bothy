@@ -293,6 +293,10 @@ def test_generic_rules_catch_leaks(repo: Path, text: str) -> None:
         "clone git@github.com:OWNER/bothy.git",
         "reserved test@initech.test",
         "path " + "/" + "Users/<user>/project",
+        # A lower-case path segment `users` is an API resource (the generated SDK module
+        # `api/users/get_user.py`, a route), not a macOS home directory.
+        "module sdk/python/src/bothy_sdk/generated/api/" + "users/get_user.py",
+        "route /" + "users/{user_id}/avatar",
         'svg d="M-312.40625 42.75 C0.1515133509874999' + '6 42.75"',
         # CIDR notation of a whole range (network address, prefix length up to /24), as SSRF
         # and egress documentation needs it.

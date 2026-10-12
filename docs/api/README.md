@@ -65,7 +65,9 @@ CI=true npx -y @asyncapi/cli@6.2.0 generate fromTemplate docs/api/asyncapi.yaml 
    Nachricht in asyncapi.yaml, bei Bedarf Eintrag unter `webhooks:`.
 4. Kein `null`, keine Typ-Arrays, kein `anyOf`, `oneOf` nur mit Diskriminator. Wiederholte
    Enum-Mengen als benanntes Schema.
-5. Lint, Code neu erzeugen, Tests. `make api-tables` erneuert die erzeugten Tabellen in
+5. Lint, Code neu erzeugen, Tests. Regenerate both SDK cores with `make -C sdk/python generate` and
+   `make -C sdk/typescript generate` (otherwise `make api-clients` fails, G4).
+   `make api-tables` erneuert die erzeugten Tabellen in
    06-api.md und webhooks.md (Markierungen `BEGIN GENERATED`); `make api-checks` prüft im Gate,
    dass sie und alle Kopien der Verträge zu ihren Quellen passen (G2, G3,
    [tools/api-checks](../../tools/api-checks/README.md)).

@@ -67,6 +67,22 @@ def _doc_values(path: str) -> dict[str, str]:
     return {m.group("name"): m.group("value") for m in _DOC_ROW.finditer(text)}
 
 
+def _sdk_python_min() -> str:
+    project = tomllib.loads((REPO / "sdk" / "python" / "pyproject.toml").read_text())
+    return str(project["tool"]["coverage"]["report"]["fail_under"])
+
+
+def _sdk_typescript_min() -> str:
+    """The one value of the four Vitest thresholds (lines, functions, branches, statements)."""
+    text = (REPO / "sdk" / "typescript" / "vitest.config.ts").read_text(encoding="utf-8")
+    block = re.search(r"thresholds: \{(?P<body>[^}]*)\}", text)
+    assert block, "coverage.thresholds not found in sdk/typescript/vitest.config.ts"
+    values = dict(re.findall(r"(\w+): (\d+)", block.group("body")))
+    assert set(values) == {"lines", "functions", "branches", "statements"}, values
+    assert len(set(values.values())) == 1, values
+    return next(iter(values.values()))
+
+
 SOURCES = {
     "quality.coverage.tools_min_percent": lambda: str(
         tomllib.loads((REPO / "tools" / "pyproject.toml").read_text())["tool"]["coverage"][
@@ -75,6 +91,8 @@ SOURCES = {
     ),
     "quality.coverage.go_min_percent": lambda: _makefile_var("COVERAGE_GO_MIN"),
     "quality.coverage.dart_min_percent": lambda: _makefile_var("COVERAGE_DART_MIN"),
+    "quality.coverage.python_min_percent": _sdk_python_min,
+    "quality.coverage.typescript_min_percent": _sdk_typescript_min,
     "quality.perf.timeout": lambda: _makefile_var("PERF_TIMEOUT"),
     "quality.sonar.new_issues_max": lambda: _gate_value("quality.sonar.new_issues_max"),
     "quality.sonar.new_hotspots_reviewed_min_percent": lambda: _gate_value(

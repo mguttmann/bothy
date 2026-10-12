@@ -93,6 +93,15 @@ Planning stage (milestone M0). Nothing is installable yet.
   no longer checks the reference.
 - `docs/PLAN.md`: the W1 rows for trusted proxies and database timeouts and the acceptance test of
   M3-06 follow the chapters.
+- `make api-clients` (gate G4) runs `generate-check` of `sdk/python` and `sdk/typescript`, fails
+  for a client directory with a tracked manifest but without that target and respects
+  `COMPONENTS`; `make bootstrap-ci` installs the locked SDK dependencies (`npm ci
+  --ignore-scripts`, `uv sync --locked`); `make typecheck` runs mypy inside each Python project and
+  `make lint` keeps bandit out of its `.venv` and generated code. New named values
+  `quality.coverage.python_min_percent` and `quality.coverage.typescript_min_percent`.
+- The CI path filter selects both SDK components for a change under `sdk/testdata/` (shared G5
+  fixtures); CodeQL analyses `javascript-typescript` (the TypeScript SDK); Renovate groups the SDK
+  code generators.
 
 - Chapter 12 "4.1 Port" and "4.2 Dateisystem-Treiber (Standard)" describe the port contract
   (key grammar, one byte range, error contract, idempotent `Delete` and `AbortMultipart`) and the

@@ -61,8 +61,8 @@ gilt je Art:
 |---|---|
 | Go-Modul | `go.mod` und `go.sum`; Tests mit `go test`; golangci-lint-Konfiguration im Modul (Abhängigkeitsregeln: Kapitel 02); `.go-arch-lint.yml`, erzeugt aus `architecture/modules.yaml` (Gate `arch`); Migrationen unter `migrations/` mit der Prüfsummen-Datei `migrations.sha256` daneben (Gate `migrations-lint`, sobald es Migrationen gibt); Lasttests unter `perf/` mit dem Build-Tag `perf` (`make perf`); die Abdeckung zählt `test/**` und `perf/**` nicht mit, weil sie selbst Testcode sind (02, Abschnitt 6), und erzeugte Dateien `*.gen.go` nicht, weil ihr Generator und sein Golden-Test sie halten |
 | Dart-Paket | `pubspec.yaml`, Tests unter `test/`; `custom_lint` als dev-Abhängigkeit, wenn eigene Regeln gelten |
-| Python-Projekt | `pyproject.toml` mit uv-Lock; ruff, mypy und pytest in der dev-Gruppe; Abdeckungsschwelle in der eigenen pytest-Konfiguration |
-| TypeScript-Projekt | `package.json` mit den Skripten `format`, `format:check`, `lint`, `typecheck`, `test` (Abdeckungsschwelle im Test-Runner) |
+| Python-Projekt | `pyproject.toml` mit uv-Lock; ruff, mypy und pytest in der dev-Gruppe; Abdeckungsschwelle `quality.coverage.python_min_percent` in der eigenen pytest-Konfiguration (`fail_under`); generated code counts toward neither coverage nor style lint and format checks, but stays in mypy |
+| TypeScript-Projekt | `package.json` mit den Skripten `format`, `format:check`, `lint`, `typecheck`, `test` (Abdeckungsschwelle `quality.coverage.typescript_min_percent` im Test-Runner); generated code counts toward neither coverage nor Prettier and ESLint, but stays in `tsc` |
 | Release | Makefile im Komponenten-Ordner mit dem Ziel `release-build` (Argumente `VERSION`, `OUT`); Apps zusätzlich `release-apple` und `release-windows` |
 | Generierter Client | Makefile mit dem Ziel `generate-check` (aus `docs/api/` erzeugen, kompilieren, Abweichung vom eingecheckten Stand meldet Fehler) |
 | Design-Tokens | `tools/design-tokens/Makefile` mit dem Ziel `check` |
@@ -161,6 +161,8 @@ oder NEIN. Bei NEIN wird behoben und das Delta erneut geprüft; das Bedrohungsmo
 | `quality.coverage.tools_min_percent` | `90` | Prozent | Mindestabdeckung der Repository-Werkzeuge | `tools/pyproject.toml` (`fail_under`) |
 | `quality.coverage.go_min_percent` | `80` | Prozent | Mindestabdeckung je Go-Modul | `Makefile` (`COVERAGE_GO_MIN`) |
 | `quality.coverage.dart_min_percent` | `80` | Prozent | Mindestabdeckung je Dart-Paket | `Makefile` (`COVERAGE_DART_MIN`) |
+| `quality.coverage.python_min_percent` | `80` | Prozent | Minimum coverage per Python project under `sdk/` and `plugins/` | the project's `pyproject.toml` (`fail_under` in `[tool.coverage.report]`) |
+| `quality.coverage.typescript_min_percent` | `80` | Prozent | Minimum coverage per TypeScript project | the project's `vitest.config.ts` (`coverage.thresholds`) |
 | `quality.perf.timeout` | `60m` | Dauer | Zeitlimit von `make perf` je Go-Modul | `Makefile` (`PERF_TIMEOUT`) |
 | `quality.sonar.new_issues_max` | `0` | Anzahl | Neue Befunde im neuen Code | `quality/sonar/quality-gate.json` |
 | `quality.sonar.new_hotspots_reviewed_min_percent` | `100` | Prozent | Geprüfte Security Hotspots im neuen Code | `quality/sonar/quality-gate.json` |

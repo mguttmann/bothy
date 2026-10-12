@@ -63,8 +63,8 @@ die öffentlichen Dienste anbinden.
     Deny-Regeln, kein Secret) und ein Pull Request aus dem Repository (volle Liste, SonarQube
     Cloud, CodeQL). Prüfen, dass alle Jobs auf GitHub-gehosteten Runnern liefen und CodeQL
     und Scorecard starten. Nach dem ersten Pull Request aus dem Repository sind die Jobs
-    `analyze (actions)`, `analyze (go)` und `analyze (python)` grün, und Code Scanning zeigt
-    Ergebnisse der Kategorie `/language:go`.
+    `analyze (actions)`, `analyze (go)`, `analyze (javascript-typescript)` (TypeScript SDK) und
+    `analyze (python)` grün, und Code Scanning zeigt Ergebnisse der Kategorie `/language:go`.
 19. **DCO** prüfen: ein Pull Request ohne Sign-off muss an `ci-ok` scheitern.
 20. **Release-Signaturen umstellen** ([ADR 0062](../adr/0062-release-signaturen-solange-das-repo-privat-ist.md)):
     `release.yml` auf cosign keyless und Attestations stellen (ADR 0036), den privaten

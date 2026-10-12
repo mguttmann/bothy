@@ -375,10 +375,12 @@ Python und TypeScript, je aus zwei Schichten.
 | Sprache | Generator (Baseline R-Clients) | Inhalt |
 |---|---|---|
 | Python | openapi-python-client | Modelle und Aufrufe aller REST-Operationen |
-| TypeScript | openapi-typescript | Typen aller Operationen; Laufzeit-Client darauf aufbauend (Wahl im Bau-Ticket) |
+| TypeScript | openapi-typescript | Typen aller Operationen; runtime client openapi-fetch |
 
 Der Kern wird im Gate aus `docs/api/openapi.yaml` erzeugt und kompiliert ([23-qualitaet.md](23-qualitaet.md)).
-Er wird nicht von Hand geändert. Gateway-Nachrichten haben ihre Typen aus `docs/api/asyncapi.yaml`.
+Er wird nicht von Hand geändert. Gateway messages take their types from the schemas of
+`docs/api/openapi.yaml` that `docs/api/asyncapi.yaml` references; no generator runs for AsyncAPI
+([06-api.md](06-api.md) 14 point 3).
 
 ### 11.2 Handschicht
 

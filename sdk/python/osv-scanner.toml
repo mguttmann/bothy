@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# License data of `make licenses` for packages of sdk/python/uv.lock whose license OSV-Scanner
+# reports as "non-standard" (docs/quality/licenses.md "Lizenz-Gate" point 3). One entry per
+# package and version, each checked against the LICENSE file of that release; a new version
+# is checked again. All three come only with the generator openapi-python-client of the dev
+# group, none is imported by the SDK at run time.
+
+[[PackageOverrides]]
+name = "colorama"
+ecosystem = "PyPI"
+version = "0.4.6"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE.txt of the 0.4.6 wheel is the BSD 3-clause text (Jonathan Hartley); PyPI metadata only says 'BSD License'. Windows-only dependency of typer and rich."
+
+[[PackageOverrides]]
+name = "jinja2"
+ecosystem = "PyPI"
+version = "3.1.6"
+license.override = ["BSD-3-Clause"]
+reason = "LICENSE.txt of Jinja2 3.1.6 is the BSD 3-clause text (Pallets); the metadata names only the file. Template engine of openapi-python-client."
+
+[[PackageOverrides]]
+name = "shellingham"
+ecosystem = "PyPI"
+version = "1.5.4"
+license.override = ["ISC"]
+reason = "LICENSE of shellingham 1.5.4 is the ISC text (Tzu-ping Chung); the metadata says 'ISC License'. Dependency of typer."

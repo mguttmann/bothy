@@ -440,6 +440,8 @@ nach Art:
   `%ProgramData%\bothy-host`); Protokoll-Kennungen `bothy-terminal/1` (Noise-Prolog) und
   `bothy-host-fp/1` (Fingerabdruck); Release-Komponente `host`.
 - Pakete der Apps: Dart-Pakete mit Präfix `bothy_` (`bothy_viz`, `bothy_noise`).
+- SDKs: Python distribution `bothy-sdk`, import package `bothy_sdk`, npm package `bothy-sdk` (not
+  published until OQ-17 is decided).
 - Grafana-Plugin ([25-visualisierung.md](25-visualisierung.md), Abschnitt 8): Ordner und
   Release-Komponente `grafana-bothy-live`, Plugin-ID `bothy-live-panel`, Dashboard `bothy-live`.
 - Querschnitt: Präfix der Telemetrie-, Alarm- und SLO-Namen (`bothy.`, `bothy_`, `Bothy`); Präfix

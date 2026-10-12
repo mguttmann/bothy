@@ -1,0 +1,108 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Python SDK (docs/spec/11-erweiterungen.md section 11). The generated core in
+# src/bothy_sdk/generated/ comes from docs/api/openapi.yaml through the pinned
+# openapi-python-client (`make generate`); `make generate-check` is gate G4 and the hand
+# layer in src/bothy_sdk/ makes the core tolerant (gate G5, docs/spec/06-api.md 15).
+# The package is private until the final name is decided (OQ-17); the classifier
+# "Private :: Do Not Upload" makes an index refuse an accidental upload.
+
+[project]
+name = "bothy-sdk"
+version = "0.0.0"
+description = "Python SDK of the public API: generated core plus a hand layer."
+readme = "README.md"
+license = "Apache-2.0"
+# Oldest line that runs the generated core: it imports enum.StrEnum and parses RFC 3339
+# times with a trailing Z through datetime.fromisoformat, both new in 3.11.
+requires-python = ">=3.11"
+classifiers = [
+  "Private :: Do Not Upload",
+  "Programming Language :: Python :: 3",
+  "Typing :: Typed",
+]
+# Exactly what the generated core and the hand layer import, as compatible ranges from the
+# tested version (the exact versions are in uv.lock).
+dependencies = [
+  "attrs>=26.1.0",
+  "httpx>=0.28.1,<0.29",
+]
+
+[dependency-groups]
+# Exact pins. ruff, mypy, pytest, pytest-cov and PyYAML match tools/pyproject.toml, so one rule
+# set formats and checks all Python of the repository (docs/DECISIONS.md M2-23/10).
+dev = [
+  "mypy==2.4.0",
+  "openapi-python-client==0.29.1",
+  "pytest==9.1.1",
+  "pytest-cov==7.1.0",
+  "pyyaml==6.0.3",
+  "ruff==0.17.0",
+  "types-PyYAML==6.0.12.20260906",
+]
+
+[tool.uv]
+# No build backend yet: the package is not built or published before the release chain of the
+# SDK components (M7, OQ-17); tests and tools import it from src/ (M2-23/1).
+package = false
+
+[tool.pytest.ini_options]
+minversion = "9.0"
+addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
+testpaths = ["tests"]
+pythonpath = ["src", "tests"]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["bothy_sdk"]
+# Generated code is held by its generator and gate G4, not by coverage (M2-23/7).
+omit = ["*/bothy_sdk/generated/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# Named value `quality.coverage.python_min_percent` (docs/spec/23-qualitaet.md section 11);
+# tools/docs/tests/test_config_values.py holds both equal.
+fail_under = 80
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+# Generated code is outside style lint and formatting (M2-23/7).
+extend-exclude = ["src/bothy_sdk/generated"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "PL", "PT", "N", "C4", "PTH", "ERA", "D"]
+ignore = [
+  "PLR2004",  # magic values in tests and rule tables are data, not logic
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D", "S101", "PLR0913", "PLC0415"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+mypy_path = "src"
+packages = ["bothy_sdk"]
+
+# The generated core is type checked too (gate G4), with two narrow exceptions for defects of
+# the pinned generator's output that are correct at run time (docs/DECISIONS.md M2-23/7).
+[[tool.mypy.overrides]]
+# Template of client.py: `__exit__(*args: object)` forwards to httpx, which types each parameter.
+module = ["bothy_sdk.generated.client"]
+disable_error_code = ["arg-type"]
+
+[[tool.mypy.overrides]]
+# Schema UploadState has a member `upload_state`; from_dict names its result after the model,
+# so the variable of that member is reused for the model instance.
+module = ["bothy_sdk.generated.models.upload_state"]
+disable_error_code = ["assignment", "attr-defined", "return-value"]
+
+[tool.bandit]
+skips = []

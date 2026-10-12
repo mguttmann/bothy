@@ -15,8 +15,10 @@
 @exclude-path: *go.sum
 
 # macOS home directories. The character class keeps this file from matching itself in
-# other scanners; placeholders with angle brackets stay allowed.
-re:/[U]sers/[A-Za-z0-9._-]+
+# other scanners; placeholders with angle brackets stay allowed. `/Users` is matched with its
+# case, because a lower-case `/users/` is an API path (a route, the generated SDK
+# modules under `api/users/`; docs/DECISIONS.md M2-23/15).
+re:(?-i:/[U]sers/)[A-Za-z0-9._-]+
 
 # Tailscale tailnet host names.
 re:\b[a-z0-9-]+[.]ts[.]net\b

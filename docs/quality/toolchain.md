@@ -3,8 +3,9 @@
 Jedes Werkzeug der Gates mit Version, Zweck, Lauf-Ort, Lizenz und Grund. Die Versionen
 in dieser Seite hält ein Test gleich den Pins (`tools/docs/tests/test_toolchain_doc.py`):
 `tools/uv.lock`, `tools/node/package-lock.json`, `tools/bin/tools.lock.json`, `Makefile`,
-`tools/sonarqube/compose.yaml`, `.pre-commit-config.yaml`, die Workflows und die
-`tool`-Direktiven der Go-Module unter `services/`.
+`tools/sonarqube/compose.yaml`, `.pre-commit-config.yaml`, die Workflows, die
+`tool`-Direktiven der Go-Module unter `services/` und (code generators of the SDKs)
+`sdk/python/uv.lock` and `sdk/typescript/package-lock.json`.
 
 Lauf-Ort: "lokal" heißt über `make` auf dem Rechner der Entwicklerin, "CI" heißt im
 selben make-Ziel in GitHub Actions. Alle Gate-Werkzeuge laufen an beiden Orten.
@@ -39,6 +40,8 @@ selben make-Ziel in GitHub Actions. Alle Gate-Werkzeuge laufen an beiden Orten.
 | `go-arch-lint` | `1.19.0` | Modulgrenzen der Go-Module aus dem Modulregister | MIT | in 02 "go-arch-lint" an einem Gerüst aller Module geprüft; prüft Pakete und Fremdbibliotheken |
 | `sqlc` | `1.31.1` | typisierter Go-Code aus SQL, Drift-Prüfung | MIT | ADR 0007 |
 | `oapi-codegen` | `v2.8.0` | Go-Server-Schnittstelle und Modelle aus `docs/api/openapi.yaml` (`tool` in `services/server/go.mod`, läuft in `make codegen-check`) | Apache-2.0 | ADR 0013; 06 "Codegenerierung" |
+| `openapi-python-client` | `0.29.1` | core of the Python SDK from `docs/api/openapi.yaml` (dev group of `sdk/python/pyproject.toml`, runs in `make api-clients`) | MIT | 06 "Codegenerierung", ADR 0026 |
+| `openapi-typescript` | `7.13.0` | types of the TypeScript SDK from `docs/api/openapi.yaml` (`devDependencies` of `sdk/typescript/package.json`, runs in `make api-clients`) | MIT | 06 "Codegenerierung", ADR 0026 |
 | `govulncheck` | `v1.8.0` | erreichbare Go-Schwachstellen | BSD-3-Clause | prüft Aufrufgraphen statt nur Versionen |
 | `go-licenses` | `v2.0.1` | Lizenzen gelinkter Go-Pakete | Apache-2.0 | vom Recherche-Ruling gefordert |
 | `lychee` | `0.24.2` | Links und Anker in Markdown | Apache-2.0 OR MIT | prüft Anker in Markdown-Dateien offline |
