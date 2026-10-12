@@ -11,6 +11,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `bin/fetch_tools.py`, `bin/tools.lock.json` | download release binaries (actionlint, amtool, gitleaks, go-arch-lint, golangci-lint, loki, lychee, osv-scanner, otelcol-contrib, promtool, sloth, sqlc, tempo, tofu, trivy) with a sha256 pin; the asset as a binary, tar.gz or zip | `bootstrap`, `tools-lock` | `bin/tests/` |
 | `ci/check_runners.py` | workflow rules: GitHub-hosted runners, triggers, SHA pinning, timeouts, permissions (no `actions: write`), environments without case and only literal | `runners-check` | `ci/tests/` |
 | `ci/tests/test_codeql_workflow.py` | CodeQL guard: the matrix of `.github/workflows/codeql.yml` covers every language that CodeQL supports and that the workflows, `tools/pyproject.toml` or the component manifests show (the same manifests as the component discovery of the Makefile); Go with a manual build per module; workflow, job and steps only with options from closed lists; step "Trial run" in `docs/quality/public-switch.md` names every check | `test` | |
+| `ci/ci_ok.py` | the `ci-ok` job of `ci.yml`: starts with the run, waits for the other jobs through the API and combines their results, so the required check is pending from the start of every run | CI job `ci-ok` | `ci/tests/test_ci_ok.py` |
 | `ci/components.py` | component map: path filters in CI, resolution of release tags; `pins` checks the server version that the product bundle pins | `release-pins` (otherwise CI) | `ci/tests/` |
 | `ci/license_check.py` | license text and SPDX headers | `licenses` | `ci/tests/` |
 | `ci/labels.py` | check labels and create them on GitHub | `labels-check`, `labels-sync` | `ci/tests/` |
@@ -24,7 +25,7 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `hooks/text_rules.py` | no en or em dashes (U+2013, U+2014) in text files | pre-commit, `lint` | `hooks/tests/` |
 | `hooks/secret_formats.py` | no value matching the Stripe webhook secret format `whsec_` (`FORMATS["stripe_webhook_signing_secret"]`) that GitHub secret scanning reports; other GitHub patterns are not covered (docs/quality/gates.md); examples stay short of the format, tests assemble their samples at runtime | pre-commit, `lint`, `test` | `hooks/tests/` |
 | `hooks/commit_msg.py` | Conventional Commits and DCO sign-off | commit-msg, `commitlint` | `hooks/tests/` |
-| `denylist/` | white-label scanner with a private list and public rules ([README](denylist/README.md)) | `denylist`, `denylist-history` | `denylist/tests/` |
+| `denylist/` | white-label scanner with a private list and public rules, also for the pull request title and body (`PR_TITLE`, `PR_BODY`, `PR_BODY_FILE`; [README](denylist/README.md)) | `denylist`, `denylist-history` | `denylist/tests/` |
 | `docs/language_check.py` | no German text in tracked files: German prose (share of German function words) and words with an umlaut fail, except the paths and names in `docs/language-allow.txt` and text between `language-check: off` and `language-check: on` (D-W-94) | `docs` | `docs/tests/` |
 | `docs/adr_index.py` | generate and check the ADR index | `adr-index`, `docs` | `docs/tests/` |
 | `docs/config_reference.py` | generate and check section 4 of the configuration reference from the chapter tables, reject duplicate names | `config-reference`, `docs` | `docs/tests/` |
