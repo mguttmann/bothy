@@ -25,8 +25,9 @@ type Config struct {
 }
 
 // Listen opens a TCP listener on addr ("host:port"; port 0 picks a free port). It is the one
-// place where the server opens listeners, so M1-21 adds the plaintext peer check here. The error
-// is the one of net.ListenConfig.Listen and names the address.
+// place where the server opens listeners: the internal listener uses it directly, without a peer
+// filter (R-SE-09), and ListenPublic wraps it for the public listener. The error is the one of
+// net.ListenConfig.Listen and names the address.
 func Listen(ctx context.Context, addr string) (net.Listener, error) {
 	var lc net.ListenConfig
 	return lc.Listen(ctx, "tcp", addr)
@@ -51,15 +52,16 @@ func NewServer(cfg Config, h http.Handler, log *slog.Logger) *http.Server {
 	}
 }
 
-// Internal returns the mux of the internal listener with health.PathLiveness and
-// health.PathReadiness of reg. Later tickets may add stack-internal webhook routes (16 "Zwei
-// Listener", Alertmanager) before the listener starts; every other path answers 404.
+// Internal returns the mux of the internal listener with GET (and so HEAD) health.PathLiveness
+// and health.PathReadiness of reg. Later tickets may add stack-internal webhook routes (16 "Zwei
+// Listener", Alertmanager) before the listener starts. Serve it through InternalHandler, which
+// answers every other path with 404 and every other method with 405 as a problem.
 func Internal(reg *health.Registry) *http.ServeMux {
 	mux := http.NewServeMux()
 	h := reg.Handler()
 	// nosemgrep: bothy-go-route-registration -- health is outside the public API and has no action (R-AZ-22, L2); the route table does not cover the internal listener
-	mux.Handle(health.PathLiveness, h)
+	mux.Handle(http.MethodGet+" "+health.PathLiveness, h)
 	// nosemgrep: bothy-go-route-registration -- health is outside the public API and has no action (R-AZ-22, L2); the route table does not cover the internal listener
-	mux.Handle(health.PathReadiness, h)
+	mux.Handle(http.MethodGet+" "+health.PathReadiness, h)
 	return mux
 }

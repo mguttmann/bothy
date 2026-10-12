@@ -18,8 +18,9 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   otel: {depends_on: [secrets], vendors: [otel, otelhttp, otelslog]}
   health: {depends_on: [], vendors: []}
   # libopenapi validates requests against the contract (SEC-IN-1, M1-18); otel holds bothy.authz.errors
-  # and the harness httpservertest (SDK reader and span recorder).
-  httpserver: {depends_on: [health, otel], vendors: [otel, libopenapi]}
+  # and the harness httpservertest (SDK reader and span recorder); secrets supplies the TLS
+  # certificate and key references of the public listener (M1-21).
+  httpserver: {depends_on: [health, otel, secrets], vendors: [otel, libopenapi]}
   lifecycle: {depends_on: [otel], vendors: []}
   # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it.
   pg: {depends_on: [secrets], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi]}

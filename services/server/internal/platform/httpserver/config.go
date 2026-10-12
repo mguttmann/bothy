@@ -29,8 +29,12 @@ type ChainConfig struct {
 	CORSAllowedOrigins []string `config:"api.cors_allowed_origins"`
 	// TrustedProxies is server.trusted_proxies: peers whose forwarding headers count.
 	TrustedProxies []netip.Prefix `config:"server.trusted_proxies"`
-	// PublicURL is server.public_url: the origin of the server, the base of the DPoP htu.
+	// PublicURL is server.public_url: the origin of the server, the base of the DPoP htu. Its
+	// scheme decides whether responses carry HSTS (SEC-TLS-3).
 	PublicURL string `config:"server.public_url"`
+	// HSTSMaxAge is http.hsts_max_age: max-age of Strict-Transport-Security in whole seconds,
+	// sent while PublicURL uses https.
+	HSTSMaxAge time.Duration `config:"http.hsts_max_age"`
 }
 
 // DefaultChainConfig returns the defaults of the chapter tables with server.public_url set to
@@ -45,15 +49,20 @@ func DefaultChainConfig(publicURL string) ChainConfig {
 		MaxUploadBytes:        104857600,
 		TrustedProxies:        []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32"), netip.MustParsePrefix("::1/128")},
 		PublicURL:             publicURL,
+		HSTSMaxAge:            31536000 * time.Second,
 	}
 }
 
 // validate reports values the configuration schema cannot check alone: limits that must be
-// positive, the origin form of server.public_url and of every CORS origin.
+// positive, http.hsts_max_age in whole seconds, the origin form of server.public_url and of every
+// CORS origin.
 func (c ChainConfig) validate() error {
 	var problems []error
 	if c.MaxJSONBodyBytes < 1 || c.MaxUploadBytes < 1 || c.MaxJSONDepth < 1 {
 		problems = append(problems, errors.New("httpserver: body limits and JSON depth must be positive"))
+	}
+	if c.HSTSMaxAge < 0 || c.HSTSMaxAge%time.Second != 0 {
+		problems = append(problems, errors.New("httpserver: http.hsts_max_age must be a whole number of seconds, 0 or more"))
 	}
 	if c.RequestTimeout <= 0 || c.TransferTimeout <= 0 || c.UnavailableRetryAfter < time.Second {
 		problems = append(problems, errors.New("httpserver: timeouts must be positive and Retry-After at least 1s"))
@@ -78,7 +87,7 @@ func CheckOrigin(s string) error {
 	switch {
 	case err != nil || u.Opaque != "":
 		return errors.New("not a URL")
-	case u.Scheme != "http" && u.Scheme != "https":
+	case u.Scheme != "http" && u.Scheme != schemeHTTPS:
 		return errors.New("scheme must be http or https")
 	case u.Host == "" || u.Hostname() == "":
 		return errors.New("host missing")

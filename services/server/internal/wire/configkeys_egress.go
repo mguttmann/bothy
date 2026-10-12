@@ -4,9 +4,6 @@ package wire
 
 import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
-// chapter19 is the chapter that owns the keys egress.*.
-const chapter19 = "19-sicherheit.md"
-
 // egressConfigKeys returns the keys of the egress client from docs/spec/19-sicherheit.md
 // "Konfigurationswerte dieses Kapitels". The cross-check egress_allowed_hosts parses every
 // entry of egress.allowed_hosts with egress.ParseRule, and EgressConfig builds egress.Config.

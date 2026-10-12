@@ -34,6 +34,9 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"server.role":                      {Kind: config.KindEnum, Default: "all", Enum: []string{"api", "worker", "all"}, Chapter: "16-betrieb.md"},
 		"server.listen_addr":               {Kind: config.KindListenAddr, Default: "127.0.0.1:8080", Chapter: "16-betrieb.md"},
 		"server.internal_listen_addr":      {Kind: config.KindListenAddr, Default: "127.0.0.1:8081", Chapter: "16-betrieb.md"},
+		"server.tls_cert_ref":              {Kind: config.KindSecretRef, Default: "", Chapter: "16-betrieb.md"},
+		"server.tls_key_ref":               {Kind: config.KindSecretRef, Default: "", Chapter: "16-betrieb.md"},
+		"http.hsts_max_age":                {Kind: config.KindDuration, Default: "31536000s", Min: "0s", Chapter: "19-sicherheit.md"},
 		"http.max_json_body_bytes":         {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "02-architektur.md"},
 		"http.read_header_timeout":         {Kind: config.KindDuration, Default: "5s", Min: "1ms", Chapter: "02-architektur.md"},
 		"http.idle_timeout":                {Kind: config.KindDuration, Default: "120s", Min: "1ms", Chapter: "02-architektur.md"},
@@ -395,5 +398,60 @@ func TestPublicURLAndCORSOriginsAreOrigins(t *testing.T) {
 	_, err := config.Load(schema(t), config.Sources{})
 	if err == nil || !strings.Contains(err.Error(), "server.public_url") {
 		t.Errorf("without server.public_url: %v", err)
+	}
+}
+
+// TestTLSKeysAndCrossChecks holds Scope 2 of brief M1-21: server.tls_cert_ref and
+// server.tls_key_ref are optional secret references (env BOTHY_SERVER__TLS_CERT_REF and
+// BOTHY_SERVER__TLS_KEY_REF), both set or both empty, and with TLS server.public_url uses https.
+// The problems name keys and sources, never a value.
+func TestTLSKeysAndCrossChecks(t *testing.T) {
+	t.Parallel()
+	const (
+		cert = "BOTHY_SERVER__TLS_CERT_REF=file:/run/bothy/secrets/tls_cert"
+		key  = "BOTHY_SERVER__TLS_KEY_REF=file:/run/bothy/secrets/tls_key"
+	)
+	if got := load(t); got != nil {
+		t.Fatalf("no TLS: %v", got)
+	}
+	if got := load(t, cert, key); got != nil {
+		t.Fatalf("TLS with an https public URL: %v", got)
+	}
+	if got := load(t, "BOTHY_SERVER__TLS_CERT_REF=", "BOTHY_SERVER__TLS_KEY_REF="); got != nil {
+		t.Fatalf("both empty: %v", got)
+	}
+	pair := "config: server.tls_cert_ref, server.tls_key_ref: tls_pair: " +
+		"server.tls_cert_ref and server.tls_key_ref must both be set or both be empty"
+	for _, env := range []string{cert, key} {
+		got := load(t, env)
+		if len(got) != 1 || !strings.HasPrefix(got[0].String(), pair) {
+			t.Errorf("%s alone: problems %v, want %s", env, got, pair)
+		}
+		noValues(t, got, "/run/bothy/secrets")
+	}
+	got := load(t, "BOTHY_SERVER__PUBLIC_URL=http://chat.example.com", cert, key)
+	want := "config: server.public_url, server.tls_cert_ref, server.tls_key_ref: tls_https: " +
+		"with server.tls_cert_ref and server.tls_key_ref set, server.public_url must use https"
+	if len(got) != 1 || !strings.HasPrefix(got[0].String(), want) {
+		t.Errorf("TLS with an http public URL: problems %v, want %s", got, want)
+	}
+	noValues(t, got, "chat.example.com", "/run/bothy/secrets")
+}
+
+// TestHSTSMaxAgeWholeSeconds holds http.hsts_max_age (19 "Konfigurationswerte", SEC-TLS-3): a
+// duration in whole seconds, 0 or more; max-age has no fractions.
+func TestHSTSMaxAgeWholeSeconds(t *testing.T) {
+	t.Parallel()
+	for _, ok := range []string{"0s", "1s", "31536000s", "2m"} {
+		if got := load(t, "BOTHY_HTTP__HSTS_MAX_AGE="+ok); got != nil {
+			t.Errorf("%s: problems %v, want none", ok, got)
+		}
+	}
+	for _, bad := range []string{"1500ms", "-1s", "1ms"} {
+		got := load(t, "BOTHY_HTTP__HSTS_MAX_AGE="+bad)
+		if len(got) != 1 || !strings.Contains(got[0].String(), "http.hsts_max_age") {
+			t.Errorf("%s: problems %v, want one about http.hsts_max_age", bad, got)
+		}
+		noValues(t, got, bad)
 	}
 }

@@ -108,6 +108,7 @@ type Chain struct {
 	authzErrors metric.Int64Counter
 	publicURL   *url.URL
 	origins     map[string]bool
+	sec         SecurityHeaders
 
 	mu          sync.Mutex
 	stages      map[Stage]func(http.Handler) http.Handler
@@ -153,6 +154,7 @@ func NewChain(cfg ChainConfig, deps Deps) (*Chain, error) {
 	c := &Chain{
 		cfg: cfg, log: deps.Logger, auth: deps.Authenticator, validator: deps.Validator,
 		authzErrors: counter, publicURL: public, origins: map[string]bool{},
+		sec:    SecurityHeadersFor(public, cfg.HSTSMaxAge),
 		stages: map[Stage]func(http.Handler) http.Handler{},
 	}
 	for _, o := range cfg.CORSAllowedOrigins {
@@ -306,14 +308,18 @@ func randomCorrelationID() string {
 // with the correlation ID, unless the response has already started. http.ErrAbortHandler is
 // re-raised, the net/http convention for aborting a response on purpose; so is a panic after the
 // response started, as http.ErrAbortHandler, so the client sees a broken response instead of a
-// truncated success.
+// truncated success. As the outermost step it also sets SEC-HDR-1 (SecurityHeaders) on every
+// response of the public listener.
 func (c *Chain) recoverStage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		st := &outerState{}
 		ctx := context.WithValue(r.Context(), chainKey{}, c)
 		ctx = context.WithValue(ctx, stateKey{}, st)
 		r = r.WithContext(ctx)
-		tw := &trackWriter{ResponseWriter: w}
+		// SEC-HDR-1 is set before anything below runs, so responses written by inner components
+		// inherit it, and the secure writer applies it again before the header block goes out.
+		c.sec.Apply(w.Header())
+		tw := &trackWriter{ResponseWriter: &secureWriter{ResponseWriter: w, sec: c.sec}}
 		defer func() {
 			p := recover()
 			if p == nil {
@@ -335,6 +341,7 @@ func (c *Chain) recoverStage(next http.Handler) http.Handler {
 			for k := range w.Header() {
 				w.Header().Del(k)
 			}
+			c.sec.Apply(w.Header())
 			writeProblem(w, r, errs.New(errs.CodeInternalError, ""))
 		}()
 		next.ServeHTTP(tw, r)
@@ -410,47 +417,20 @@ func (c *Chain) correlate(next http.Handler) http.Handler {
 	})
 }
 
-// headersStage is step 3: SEC-HDR-1 without HSTS (M1-21) and Correlation-Id on every response, and
-// the client IP from the peer and trusted proxies into kernel/reqmeta.
+// headersStage is step 3: Correlation-Id on every response, and the client IP from the peer and
+// trusted proxies into kernel/reqmeta. SEC-HDR-1 comes from the recover step, the outermost one.
 func (c *Chain) headersStage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
-		h.Set(headerNoSniff, valueNoSniff)
-		h.Set(headerReferrer, valueNoReferrer)
 		h.Set(headerCorrelationID, reqmeta.CorrelationID(r.Context()))
 		ctx := reqmeta.WithClientIP(r.Context(), ClientIP(r, c.cfg.TrustedProxies))
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-// dispatch is step 4: requests with a matching pattern go to the mux; for the others the mux's
-// own handler runs against a probe writer to learn 404 or 405 and Allow, and the answer is a
-// problem instead of the plain text of net/http.
-func (c *Chain) dispatch(mux *http.ServeMux) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !cleanPath(r.URL.Path) {
-			// net/http would answer a redirect to the clean path itself, outside the chain.
-			writeProblem(w, r, errs.New(errs.CodeNotFound, ""))
-			return
-		}
-		h, pattern := mux.Handler(r)
-		if pattern != "" {
-			mux.ServeHTTP(w, r)
-			return
-		}
-		probe := &probeWriter{header: http.Header{}}
-		h.ServeHTTP(probe, r)
-		if probe.status == http.StatusMethodNotAllowed {
-			e := errs.New(errs.CodeMethodNotAllowed, "")
-			if allow := probe.header.Get(headerAllow); allow != "" {
-				e = e.WithHeader(headerAllow, allow)
-			}
-			writeProblem(w, r, e)
-			return
-		}
-		writeProblem(w, r, errs.New(errs.CodeNotFound, ""))
-	})
-}
+// dispatch is step 4: requests with a matching pattern go to the mux; the others get 404 or 405
+// with Allow as a problem instead of the plain text of net/http (dispatchMux).
+func (c *Chain) dispatch(mux *http.ServeMux) http.Handler { return dispatchMux(mux) }
 
 // cleanPath reports whether p is in the clean form net/http routes without a redirect: no empty,
 // "." or ".." segment; a trailing slash is kept.

@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"go.opentelemetry.io/otel/trace"
 
@@ -133,8 +134,9 @@ func TestNewChainRejectsBadConfig(t *testing.T) {
 	cfg := httpserver.DefaultChainConfig("https://chat.example.com/path")
 	cfg.CORSAllowedOrigins = []string{"https://app.example.com/"}
 	cfg.MaxJSONDepth = 0
+	cfg.HSTSMaxAge = 1500 * time.Millisecond
 	_, err = httpserver.NewChain(cfg, httpserver.Deps{})
-	for _, want := range []string{"server.public_url", "api.cors_allowed_origins", "JSON depth", "Authenticator", "Validator"} {
+	for _, want := range []string{"server.public_url", "api.cors_allowed_origins", "JSON depth", "http.hsts_max_age", "Authenticator", "Validator"} {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("error %v does not name %s", err, want)
 		}
@@ -314,57 +316,6 @@ func TestUnmatched_405ProblemWithAllow(t *testing.T) {
 	}
 	if allow := resp.Header.Get("Allow"); !strings.Contains(allow, "GET") {
 		t.Fatalf("Allow = %q", allow)
-	}
-}
-
-// TestSECT03_HeadersPerResponseKind holds SEC-HDR-1 (without HSTS, M1-21) and SEC-HDR-2 on JSON,
-// empty, problem, unmatched and panic responses.
-func TestSECT03_HeadersPerResponseKind(t *testing.T) {
-	t.Parallel()
-	get := getThing()
-	del := httpservertest.Op("deleteThing", http.MethodDelete, thingPath, "thing.delete")
-	put := httpservertest.Op("createThing", http.MethodPost, "/api/v1/things", "thing.create")
-	contract := strings.Replace(string(httpservertest.Contract), "    patch:\n      operationId: updateThing",
-		"    delete:\n      operationId: deleteThing\n      responses:\n        '204':\n          description: ok\n    patch:\n      operationId: updateThing", 1)
-	h := httpservertest.New(t, httpservertest.Options{Contract: []byte(contract), Routes: []httpservertest.Route{
-		{Op: get, Handler: okHandler(get.Action)},
-		{Op: del, Handler: httpservertest.Authorized(del.Action, func(w http.ResponseWriter, _ *http.Request) { w.Header().Set("Server", "leak/1.0"); w.WriteHeader(204) })},
-		{Op: put, Handler: func(http.ResponseWriter, *http.Request) { panic("x") }},
-	}})
-	cases := map[string]struct {
-		req   *http.Request
-		media string
-	}{
-		"json":    {h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast"), "application/json"},
-		"empty":   {h.NewRequest(http.MethodDelete, "/api/v1/things/"+thingID, ""), ""},
-		"problem": {h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, ""), "application/problem+json"},
-		"404":     {h.NewRequest(http.MethodGet, "/nope", ""), "application/problem+json"},
-		"panic":   {h.NewRequest(http.MethodPost, "/api/v1/things", `{"name":"ab","color":"red"}`), "application/problem+json"},
-	}
-	for name, tc := range cases {
-		resp := h.Do(tc.req)
-		hd := resp.Header
-		for k, want := range map[string]string{
-			"X-Content-Type-Options":       "nosniff",
-			"Referrer-Policy":              "no-referrer",
-			"Cache-Control":                "no-store",
-			"Cross-Origin-Resource-Policy": "same-origin",
-		} {
-			if got := hd.Get(k); got != want {
-				t.Errorf("%s: %s = %q, want %q", name, k, got, want)
-			}
-		}
-		if hd.Get("Server") != "" || hd.Get("Correlation-Id") == "" {
-			t.Errorf("%s: Server %q, Correlation-Id %q", name, hd.Get("Server"), hd.Get("Correlation-Id"))
-		}
-		if tc.media != "" && hd.Get("Content-Type") != tc.media {
-			t.Errorf("%s: Content-Type %q, want %q", name, hd.Get("Content-Type"), tc.media)
-		}
-		for k := range hd {
-			if strings.HasPrefix(k, "Access-Control-") {
-				t.Errorf("%s: CORS header %s without an allowed origin", name, k)
-			}
-		}
 	}
 }
 

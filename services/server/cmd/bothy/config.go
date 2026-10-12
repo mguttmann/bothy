@@ -36,6 +36,8 @@ print  prints the effective value and the source of every key, sorted by name. S
                insecure_file and read_failed. The reason of a failure goes to stderr.
                References of migrate.* keys print "skipped": only bothy migrate up
                --bootstrap reads them, in its own container.
+               An optional reference without a value (server.tls_cert_ref) prints
+               "not set".
                "configuration ok" follows only when every reference resolved.
 --config FILE  configuration file, not empty (default: BOTHY_CONFIG_FILE, else none)
 --role ROLE    process role (api, worker or all) as bothy serve --role sets it
@@ -192,6 +194,12 @@ func checkSecretRefs(ctx context.Context, s *config.Schema, values *config.Value
 			// Only bothy migrate up --bootstrap reads these; the api and worker containers do
 			// not get their files (docs/DECISIONS.md M1-12).
 			_, _ = fmt.Fprintf(stdout, "secret %s: skipped (read only by bothy migrate up --bootstrap)\n", k.Name)
+			continue
+		}
+		if values.String(k.Name) == "" {
+			// An optional reference (empty default) without a value switches its feature off,
+			// for example TLS in the server (docs/DECISIONS.md M1-21/1); there is nothing to read.
+			_, _ = fmt.Fprintf(stdout, "secret %s: not set\n", k.Name)
 			continue
 		}
 		if _, _, err := p.Resolve(ctx, values.String(k.Name)); err != nil {

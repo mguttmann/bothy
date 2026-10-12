@@ -99,7 +99,6 @@ func TestNewSchemaRejects(t *testing.T) {
 		{"placeholder names unknown key", []config.Key{key("a.b_ref", config.KindSecretRef, "file:<secrets.dir>/x")}, []string{"a.b_ref", "<secrets.dir>"}},
 		{"placeholder names non-string key", []config.Key{key("secrets.dir", config.KindInt, "1"), key("a.b_ref", config.KindSecretRef, "file:<secrets.dir>/x")}, []string{"a.b_ref", "string key"}},
 		{"expanded default does not parse", []config.Key{key("secrets.dir", config.KindString, "relative"), key("a.b_ref", config.KindSecretRef, "file:<secrets.dir>/x")}, []string{"a.b_ref", "absolute"}},
-		{"empty secret_ref default", []config.Key{key("a.b_ref", config.KindSecretRef, "")}, []string{"a.b_ref", "empty default"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -214,4 +213,12 @@ func TestProblemAndLoadErrorText(t *testing.T) {
 	if got, want := e.Error(), u.String()+"\n"+p.String(); got != want {
 		t.Errorf("LoadError.Error() = %q, want %q", got, want)
 	}
+}
+
+// TestOptionalSecretRefDefault holds ruling M1-21/1: a secret_ref key whose chapter cell is
+// "leer" (server.tls_cert_ref, server.tls_key_ref) registers with an empty default, which means
+// "no reference" and switches the feature that reads the key off.
+func TestOptionalSecretRefDefault(t *testing.T) {
+	t.Parallel()
+	mustSchema(t, key("server.tls_cert_ref", config.KindSecretRef, ""))
 }

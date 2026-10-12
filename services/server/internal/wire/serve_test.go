@@ -115,7 +115,10 @@ func serveEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 
 func loadEnv(t *testing.T, env []string) *config.Values {
 	t.Helper()
-	v, err := config.Load(schema(t), config.Sources{Env: append(testEnv(), env...)})
+	if !slices.ContainsFunc(env, func(e string) bool { return strings.HasPrefix(e, "BOTHY_SERVER__PUBLIC_URL=") }) {
+		env = append(testEnv(), env...)
+	}
+	v, err := config.Load(schema(t), config.Sources{Env: env})
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}

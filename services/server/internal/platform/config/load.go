@@ -281,7 +281,7 @@ func (l *loader) parse(e *keyEntry, p provided) (value, error) {
 	case p.seq:
 		v, canon, err = parseElements(e.Kind, p.elems)
 	default:
-		v, canon, err = parseValue(e.Kind, e.Enum, p.text)
+		v, canon, err = e.parseText(p.text)
 	}
 	if err == nil {
 		err = e.checkBounds(v)
@@ -309,7 +309,7 @@ func (e *keyEntry) checkKeyRule(v any) error {
 
 // setDefault stores the default of e; NewSchema has already checked that it parses.
 func (l *loader) setDefault(e *keyEntry, text string) {
-	v, canon, err := parseValue(e.Kind, e.Enum, text)
+	v, canon, err := e.parseText(text)
 	if err == nil {
 		err = e.checkKeyRule(v)
 	}

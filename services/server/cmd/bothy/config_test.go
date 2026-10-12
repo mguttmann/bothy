@@ -176,6 +176,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"egress.max_response_bytes = 1048576  # default\n" +
 		"egress.timeout = 15s  # default\n" +
 		"file.max_upload_bytes = 104857600  # default\n" +
+		"http.hsts_max_age = 365d  # default\n" +
 		"http.idle_timeout = 2m  # default\n" +
 		"http.max_header_bytes = 65536  # default\n" +
 		"http.max_json_body_bytes = 1048576  # default\n" +
@@ -202,6 +203,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"server.listen_addr = 127.0.0.1:9080  # file " + path + "\n" +
 		"server.public_url = https://chat.example.com  # env BOTHY_SERVER__PUBLIC_URL\n" +
 		"server.role = worker  # flag --role\n" +
+		"server.tls_cert_ref =   # default\n" +
+		"server.tls_key_ref =   # default\n" +
 		"server.trusted_proxies = 127.0.0.1/32, ::1/128  # default\n" +
 		"shutdown.drain_delay = 5s  # default\n" +
 		"shutdown.http_grace = 20s  # default\n" +

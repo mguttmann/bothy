@@ -233,6 +233,18 @@
       "doc": "Largest file, and the stream limit of multipart and octet-stream request bodies."
     },
     {
+      "name": "http.hsts_max_age",
+      "env": "BOTHY_HTTP__HSTS_MAX_AGE",
+      "kind": "duration",
+      "default": "31536000s",
+      "required": false,
+      "enum": [],
+      "min": "0s",
+      "max": "",
+      "chapter": "19-sicherheit.md",
+      "doc": "max-age of Strict-Transport-Security in whole seconds, sent while server.public_url uses https."
+    },
+    {
       "name": "http.idle_timeout",
       "env": "BOTHY_HTTP__IDLE_TIMEOUT",
       "kind": "duration",
@@ -551,6 +563,30 @@
       "max": "",
       "chapter": "16-betrieb.md",
       "doc": "Role of the process: api serves REST and the gateway, worker runs jobs and consumers, all does both."
+    },
+    {
+      "name": "server.tls_cert_ref",
+      "env": "BOTHY_SERVER__TLS_CERT_REF",
+      "kind": "secret_ref",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Reference to the PEM certificate chain, leaf first; empty means the server terminates no TLS."
+    },
+    {
+      "name": "server.tls_key_ref",
+      "env": "BOTHY_SERVER__TLS_KEY_REF",
+      "kind": "secret_ref",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "16-betrieb.md",
+      "doc": "Reference to the PEM private key of the certificate; only together with server.tls_cert_ref."
     },
     {
       "name": "server.trusted_proxies",

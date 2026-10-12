@@ -75,8 +75,6 @@ rules:
     etappe: M1
   - match: "host."  # M2-39
     etappe: M2
-  - match: "http."  # M1-11, M1-18, M1-21
-    etappe: M1
   - match: "identity."  # M1-34
     etappe: M1
   - match: "interaction."  # M2-15
@@ -127,8 +125,6 @@ rules:
     etappe: M1
   - match: "security."  # M5-08
     etappe: M5
-  - match: "server."  # M1-18, M1-21
-    etappe: M1
   - match: server.maintenance_mode  # M7-08
     etappe: M7
   - match: "shutdown."  # M1-11, M1-14

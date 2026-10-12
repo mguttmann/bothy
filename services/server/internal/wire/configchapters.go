@@ -13,5 +13,6 @@ const (
 	chapter06 = "06-api.md"
 	chapter16 = "16-betrieb.md"
 	chapter17 = "17-observability.md"
+	chapter19 = "19-sicherheit.md"
 	chapter20 = "20-datenschutz.md"
 )

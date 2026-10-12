@@ -201,7 +201,7 @@ Technik ohne Fachlogik; nur `adapters/`, `wire` und `cmd` dürfen sie importiere
 | [`config`](internal/platform/config/README.md) | Schema, Laden und Prüfen der Konfiguration, `Bind` an die `Config`-Strukturen (02, Abschnitt 13; gebaut in M1-07) |
 | `secrets` | Secret-Provider (ADR 0011) |
 | [`pg`](internal/platform/pg/README.md) | Pool, Unit of Work mit Sperrreihenfolge, `LISTEN`-Verbindung, Wiederholung bei Deadlock |
-| [`httpserver`](internal/platform/httpserver/README.md) | Server, Middleware-Kette, `problem+json`, Nachweis-Prüfung von `authorize` (02, Abschnitt 9); listener part built in M1-11, chain in M1-18 |
+| [`httpserver`](internal/platform/httpserver/README.md) | Server, Middleware-Kette, `problem+json`, Nachweis-Prüfung von `authorize` (02, Abschnitt 9); listener part built in M1-11, chain in M1-18, transport protection in M1-21 (plaintext only from loopback and `server.trusted_proxies`, own TLS from 1.2 with rotation, HSTS on both listeners; 19, SEC-TLS-1 to SEC-TLS-3) |
 | `ratelimit` | Token-Buckets je Klasse aus 05 |
 | `jobs` | einzige Stelle mit River: Client je Rolle, Warteschlangen, Schema `jobs.schema` |
 | `otel` | Telemetrie-Setup, gekapselte `gen_ai.*`-Attribute (R-Telemetrie) |

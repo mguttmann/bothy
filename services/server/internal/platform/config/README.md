@@ -72,7 +72,10 @@ nicht hierher.
    durchsucht. Ein Problem des ersetzten Texts beginnt mit `after expanding <secrets.dir>:`; hat
    `secrets.dir` selbst ein Problem, meldet der Verweis kein zweites. `secrets.dir` prüft der
    Lader selbst (Regel, die keine Art ausdrückt, M1-09/15): absolut, sauber, nicht `/`, ohne NUL
-   und ohne `<`.
+   und ohne `<`. A `secret_ref` key with an empty default (chapter cell "leer", for example
+   `server.tls_cert_ref`) is optional: the empty text means "no reference" and switches its
+   feature off; a key with a reference as default still refuses the empty text
+   (docs/DECISIONS.md M1-21/1).
 8. Das Paket liest nie die Prozess-Umgebung. `cmd/bothy` liest sie einmal und übergibt sie; eine
    forbidigo-Regel in `.golangci.yml` verbietet die Lesefunktionen (auch `exec.Cmd.Environ` und
    `http.ProxyFromEnvironment`) außerhalb von `cmd/bothy` und der Tests unter `tools/`.

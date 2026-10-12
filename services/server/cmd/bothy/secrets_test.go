@@ -142,6 +142,10 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		"secret migrate.maint_password_ref" + skipped +
 		"secret migrate.monitor_password_ref" + skipped +
 		"secret migrate.owner_password_ref" + skipped +
+		// An optional reference without a value switches its feature off and reads nothing
+		// (docs/DECISIONS.md M1-21/1).
+		"secret server.tls_cert_ref: not set\n" +
+		"secret server.tls_key_ref: not set\n" +
 		"secret telemetry.pseudonym_key_ref: ok\n" +
 		"configuration ok\n"
 	if stdout != want {
