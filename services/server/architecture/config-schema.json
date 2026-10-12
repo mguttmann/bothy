@@ -401,6 +401,105 @@
       "doc": "Largest file, and the stream limit of multipart and octet-stream request bodies."
     },
     {
+      "name": "file.s3.access_key_ref",
+      "env": "BOTHY_FILE__S3__ACCESS_KEY_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/s3_access_key",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Secret reference of the S3 access key ID, read only with the driver s3."
+    },
+    {
+      "name": "file.s3.bucket",
+      "env": "BOTHY_FILE__S3__BUCKET",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Private bucket of the objects, required with the driver s3."
+    },
+    {
+      "name": "file.s3.checksum_mode",
+      "env": "BOTHY_FILE__S3__CHECKSUM_MODE",
+      "kind": "enum",
+      "default": "when_required",
+      "required": false,
+      "enum": [
+        "when_required",
+        "when_supported"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "When the S3 SDK computes and checks its own checksums for requests and responses."
+    },
+    {
+      "name": "file.s3.endpoint",
+      "env": "BOTHY_FILE__S3__ENDPOINT",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Endpoint of the S3-compatible service, an absolute http or https URL without path, required with the driver s3."
+    },
+    {
+      "name": "file.s3.prefix",
+      "env": "BOTHY_FILE__S3__PREFIX",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Optional prefix in the key grammar before every object name, so one bucket can hold several environments."
+    },
+    {
+      "name": "file.s3.region",
+      "env": "BOTHY_FILE__S3__REGION",
+      "kind": "string",
+      "default": "us-east-1",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Region of the S3 signature."
+    },
+    {
+      "name": "file.s3.secret_key_ref",
+      "env": "BOTHY_FILE__S3__SECRET_KEY_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/s3_secret_key",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Secret reference of the S3 secret access key, read only with the driver s3."
+    },
+    {
+      "name": "file.s3.use_path_style",
+      "env": "BOTHY_FILE__S3__USE_PATH_STYLE",
+      "kind": "bool",
+      "default": "true",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Path-style requests on the endpoint instead of virtual-hosted requests on <bucket>.<endpoint host>."
+    },
+    {
       "name": "file.storage.driver",
       "env": "BOTHY_FILE__STORAGE__DRIVER",
       "kind": "enum",

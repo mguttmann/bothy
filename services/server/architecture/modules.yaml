@@ -135,7 +135,9 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [identity, chat]
-    adapter_vendors: []
+    # The S3 driver (M3-02); depguard in .golangci.yml narrows the SDK to adapters/s3, because
+    # go-arch-lint grants a vendor to all adapters of a module (docs/DECISIONS.md M3-02/12).
+    adapter_vendors: [awssdk]
   messaging:
     tables: [messages, message_revisions, mentions, reactions, pins, message_templates]
     actions: [thread.create, message.read, message.create, message.update, message.delete,
@@ -262,5 +264,8 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   otelpgx: [github.com/exaring/otelpgx]
   river: [github.com/riverqueue/river, github.com/riverqueue/river/**]
   testcontainers: [github.com/testcontainers/testcontainers-go, github.com/testcontainers/testcontainers-go/**]
+  # AWS SDK for Go v2 and smithy-go of the S3 driver (docs/spec/12-dateien.md "4.3", ADR 0010).
+  awssdk: [github.com/aws/aws-sdk-go-v2, github.com/aws/aws-sdk-go-v2/**, github.com/aws/smithy-go,
+           github.com/aws/smithy-go/**]
   # Port bindings and AutoRemove of the pgtest container: testcontainers takes these moby types.
   mobyapi: [github.com/moby/moby/api/types/container, github.com/moby/moby/api/types/network]

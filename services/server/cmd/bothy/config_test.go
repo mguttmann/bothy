@@ -190,6 +190,14 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"egress.timeout = 15s  # default\n" +
 		"file.fs.root = /var/lib/bothy/files  # default\n" +
 		"file.max_upload_bytes = 104857600  # default\n" +
+		"file.s3.access_key_ref = file:/run/bothy/secrets/s3_access_key  # default\n" +
+		"file.s3.bucket =   # default\n" +
+		"file.s3.checksum_mode = when_required  # default\n" +
+		"file.s3.endpoint =   # default\n" +
+		"file.s3.prefix =   # default\n" +
+		"file.s3.region = us-east-1  # default\n" +
+		"file.s3.secret_key_ref = file:/run/bothy/secrets/s3_secret_key  # default\n" +
+		"file.s3.use_path_style = true  # default\n" +
 		"file.storage.driver = fs  # default\n" +
 		"http.hsts_max_age = 365d  # default\n" +
 		"http.idle_timeout = 2m  # default\n" +

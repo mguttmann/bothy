@@ -14,7 +14,7 @@ Gemeinsame Eingaben siehe [variables.tf](variables.tf). Zusätzlich: `region`, `
 | Netz | VPC mit privaten Subnetzen für Host und Datenbank; öffentlich nur ein Load Balancer mit TLS (`edge_mode = reverse_proxy`) oder nichts (`private`) |
 | Host | EC2 `instance_type`, eigener Datenträger für Docker-Daten, Instanzrolle ohne Schlüssel im Host |
 | Datenbank | `database_mode = managed`: Amazon RDS for PostgreSQL mit PITR des Anbieters; Rollen aus [16-betrieb.md](../../../../docs/spec/16-betrieb.md) 7.1 per Bootstrap. Ob RDS PostgreSQL 18 anbietet, prüft das Bau-Ticket [vermutet] |
-| Dateien | Amazon S3, Versionierung an; Zugriff über die Instanzrolle |
+| Dateien | Amazon S3, Versionierung an; access with the keys of `file.s3.access_key_ref` and `file.s3.secret_key_ref`, not the instance role: [12-dateien.md](../../../../docs/spec/12-dateien.md) 4.3 allows only secret references, and [19-sicherheit.md](../../../../docs/spec/19-sicherheit.md) SEC-NET-3 always blocks the metadata address (M3-02) |
 | Off-site | zweiter Bucket mit Object Lock, eigene Rolle nur mit Schreiben; Löschen nur ein getrenntes Konto |
 | Geheimnisse | zunächst Treiber `file` auf dem Host; später AWS Secrets Manager (Treiber `awssm`) |
 | Telemetrie | Overlay nach Wahl; kein AWS-spezifisches Backend im Produkt |

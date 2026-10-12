@@ -422,6 +422,22 @@ documented in this file. The format is based on
 - Configuration keys `file.storage.driver` and `file.fs.root` with the cross-check
   `file_fs_root_absolute`, and `wire.FilesObjectStore`, which opens the file system driver and
   refuses the driver `s3` until the S3 driver exists; no role opens the store yet.
+- `internal/files/adapters/s3` (M3-02): the S3 driver of `ObjectStore` with the AWS SDK for Go
+  v2, core S3 only through an eight-operation interface and a presign interface with only
+  `PresignUploadPart`. Access keys come from `file.s3.access_key_ref` and
+  `file.s3.secret_key_ref` through the secret provider and follow a rotation without restart;
+  every request goes through the egress client (purpose `objectstore`, no redirects, no SDK
+  retries, `http.transfer_timeout`, `file.max_upload_bytes`); streamed bodies are signed as
+  `UNSIGNED-PAYLOAD`, and a body of another length stores nothing. The conformance suite runs
+  against SeaweedFS in a throwaway container from the image the Compose stack pins, and a
+  presigned part URL is proven to bind its length there.
+- Configuration keys `file.s3.endpoint`, `file.s3.region`, `file.s3.bucket`, `file.s3.prefix`,
+  `file.s3.use_path_style`, `file.s3.checksum_mode`, `file.s3.access_key_ref` and
+  `file.s3.secret_key_ref` with the cross-check `file_s3`; `wire.FilesObjectStore` takes a
+  context and `wire.FilesDeps` and builds the S3 driver for `file.storage.driver = s3`;
+  `bothy config check --secrets` resolves the two S3 references only with that driver.
+- Lint: depguard allows the AWS SDK only in `internal/files/adapters/s3`, forbidigo forbids
+  `DeleteObjects` and `PresignGetObject`; the module register has the vendor group `awssdk`.
 - `internal/notify/domain` (M3-17): the decision per recipient of
   `docs/spec/13-push-benachrichtigungen.md` section 4 as pure functions: `ResolveLevel` (the seven
   steps of 13 3.1 with `muted_until` on the chosen row), `InQuietHours` and `ParseLocalTime` (13
@@ -436,6 +452,9 @@ documented in this file. The format is based on
 
 ### Changed
 
+- `ObjectStore.PresignUploadPart` (M3-02) takes the part size before the validity, so the
+  signature can bind the length (12 "3.3"); the file system driver refuses a size below 1 with
+  `ErrSizeMismatch` and keeps answering `ErrNotSupported`.
 - `httpserver.Operation` carries `RateLimitClass`; `Chain.SetCredentialsPrecheck` runs before the
   `Authenticator` for requests with credentials; `httpservertest.Options.Setup` installs stages
   and hooks before the routes are mounted.

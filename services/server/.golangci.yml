@@ -9,6 +9,7 @@ linters:
   default: standard
   enable:
     - bodyclose
+    - depguard
     - errname
     - errorlint
     - exhaustive
@@ -47,6 +48,29 @@ linters:
         - pattern: ^http\.ProxyFromEnvironment$
           pkg: ^net/http$
           msg: read configuration through platform/config; only cmd/bothy reads the environment
+        # Core S3 only (docs/spec/12-dateien.md "4.1", ADR 0010, ADR 0048): no batch deletion,
+        # whose SDK checksum several S3-compatible services refuse, and no presigned GET, because
+        # clients read only through the server (docs/DECISIONS.md M3-02/12).
+        - pattern: ^s3\.Client\.DeleteObjects$
+          pkg: ^github\.com/aws/aws-sdk-go-v2/service/s3$
+          msg: core S3 only, no DeleteObjects (12 "4.1", ADR 0010, ADR 0048); delete objects one by one with DeleteObject
+        - pattern: ^s3\.PresignClient\.PresignGetObject$
+          pkg: ^github\.com/aws/aws-sdk-go-v2/service/s3$
+          msg: no presigned GET, clients read only through the server (12 "4.1", R-FI-03, ADR 0048)
+    depguard:
+      rules:
+        # Only the S3 driver imports the AWS SDK, in production and test files alike
+        # (docs/spec/12-dateien.md "15. Tests", ADR 0010 and ADR 0048 "Confirmation", ADR 0008
+        # names depguard for rules per file pattern; docs/DECISIONS.md M3-02/12). go-arch-lint
+        # grants a vendor to all adapters of a module and cannot narrow it to one package.
+        aws-sdk-only-in-s3-driver:
+          list-mode: lax
+          files:
+            - $all
+            - "!**/internal/files/adapters/s3/**"
+          deny:
+            - pkg: github.com/aws/
+              desc: only internal/files/adapters/s3 may import the AWS SDK (12 "15", ADR 0048)
     gocognit:
       # SonarQube rule go:S3776 of the quality gate "Bothy way" (quality/sonar/quality-gate.json,
       # no new issue) reports a function above cognitive complexity 15. gocognit reports above

@@ -66,10 +66,13 @@ type ObjectStore interface {
 	// upload is not an error.
 	AbortMultipart(ctx context.Context, key, uploadID string) error
 
-	// PresignUploadPart returns a URL under which a client uploads part n (from 1) directly,
-	// valid for ttl (12 "3.3", only S3 and only in mode presigned). Errors: ErrInvalidPart for
-	// n < 1, ErrNotSupported on a driver without presigned uploads.
-	PresignUploadPart(ctx context.Context, key, uploadID string, n int, ttl time.Duration) (PresignedPart, error)
+	// PresignUploadPart returns a URL under which a client uploads part n (from 1) of exactly
+	// size bytes directly, valid for ttl (12 "3.3", only S3 and only in mode presigned). The
+	// signature binds size, so the storage refuses a body of another length (R-FI-02,
+	// docs/DECISIONS.md M3-02/9). Errors: ErrInvalidPart for n < 1, ErrSizeMismatch for
+	// size < 1, ErrNotSupported on a driver without presigned uploads. The URL is a credential
+	// for its validity: callers hand it to the client only and never log it.
+	PresignUploadPart(ctx context.Context, key, uploadID string, n int, size int64, ttl time.Duration) (PresignedPart, error)
 }
 
 // ByteRange is one byte range of Get: Offset >= 0, Length >= 1, Offset below the object size.
@@ -113,7 +116,8 @@ var (
 	ErrNotFound = errors.New("files: object not found")
 	// ErrInvalidRange: Offset < 0, Length < 1, or Offset at or beyond the object size.
 	ErrInvalidRange = errors.New("files: invalid byte range")
-	// ErrSizeMismatch: size < 0, or the body yields fewer or more bytes than size.
+	// ErrSizeMismatch: size < 0, or the body yields fewer or more bytes than size; in
+	// PresignUploadPart size < 1.
 	ErrSizeMismatch = errors.New("files: body size does not match")
 	// ErrUploadNotFound: the multipart upload was never created, was aborted or was completed.
 	ErrUploadNotFound = errors.New("files: upload not found")

@@ -140,8 +140,12 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 	// api container do: the references of bothy migrate are skipped, not reported as missing
 	// (docs/DECISIONS.md M1-12).
 	skipped := ": skipped (read only by bothy migrate up --bootstrap)\n"
+	// The keys of the S3 driver are read only with file.storage.driver = s3 (12 "18.").
+	s3Skipped := ": skipped (read only with file.storage.driver = s3)\n"
 	want = "secret auth.token_pepper_ref: ok\n" +
 		"secret database.password_ref: ok\n" +
+		"secret file.s3.access_key_ref" + s3Skipped +
+		"secret file.s3.secret_key_ref" + s3Skipped +
 		"secret migrate.app_password_ref" + skipped +
 		"secret migrate.bootstrap_password_ref" + skipped +
 		"secret migrate.maint_password_ref" + skipped +
@@ -157,6 +161,20 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 	if stdout != want {
 		t.Errorf("run config check --secrets with the server schema: stdout\n%s\nwant\n%s", stdout, want)
 	}
+	// With the driver s3 both references are resolved, and a missing key file fails the check.
+	s3Env := []string{"BOTHY_SECRETS__DIR=" + dir, "BOTHY_FILE__STORAGE__DRIVER=s3",
+		"BOTHY_FILE__S3__ENDPOINT=https://s3.example.com", "BOTHY_FILE__S3__BUCKET=bothy-files"}
+	code, stdout, _ = runBothy(t, s3Env, "config", "check", "--secrets")
+	if code == 0 || !strings.Contains(stdout, "secret file.s3.access_key_ref: not_found\n") || !strings.Contains(stdout, "secret file.s3.secret_key_ref: not_found\n") {
+		t.Errorf("check --secrets with driver s3 and no key files: exit %d, stdout\n%s", code, stdout)
+	}
+	writeSecret(t, dir, "s3_access_key", "AKCHECKEXAMPLE", 0o600)
+	writeSecret(t, dir, "s3_secret_key", "CHECKSECRETEXAMPLE", 0o600)
+	code, stdout, stderr = runBothy(t, s3Env, "config", "check", "--secrets")
+	if code != 0 || !strings.Contains(stdout, "secret file.s3.access_key_ref: ok\n") || !strings.Contains(stdout, "secret file.s3.secret_key_ref: ok\n") {
+		t.Errorf("check --secrets with driver s3: exit %d, stdout\n%s\nstderr %s", code, stdout, stderr)
+	}
+	noCanary(t, []string{"AKCHECKEXAMPLE", "CHECKSECRETEXAMPLE"}, stdout, stderr)
 }
 
 // TestConfigCheckSecretsReportsInsecureFile is SEC-T11 seen from config check: a secret file

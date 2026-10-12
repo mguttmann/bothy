@@ -10,6 +10,8 @@ excludeFiles: ["^.*_test\\.go$"]
 vendors:
   v-age:
     in: [filippo.io/age, filippo.io/age/**]
+  v-awssdk:
+    in: [github.com/aws/aws-sdk-go-v2, github.com/aws/aws-sdk-go-v2/**, github.com/aws/smithy-go, github.com/aws/smithy-go/**]
   v-goose:
     in: [github.com/pressly/goose/v3, github.com/pressly/goose/v3/**]
   v-jcs:
@@ -350,6 +352,7 @@ deps:
     mayDependOn: [files-app, files, files-domain, kernel-ports, identity, chat]
   files-adapters:
     mayDependOn: [files-adapters, files, files-app, files-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat]
+    canUse: [v-awssdk]
   messaging:
     mayDependOn: [messaging, kernel-ports]
   messaging-domain:

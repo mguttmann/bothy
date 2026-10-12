@@ -123,14 +123,19 @@ func serverDir(fi iofs.FileInfo) bool {
 // Close releases the directory handle of the root. Operations after Close fail.
 func (s *Store) Close() error { return s.root.Close() }
 
-// PresignUploadPart refuses with app.ErrNotSupported after the key check and the part number
-// check of the port (app.ErrInvalidPart for n < 1) and without any file system call: presigned uploads exist only with the S3 driver (12 "4.1", "3.3").
-func (s *Store) PresignUploadPart(_ context.Context, key, _ string, n int, _ time.Duration) (app.PresignedPart, error) {
+// PresignUploadPart refuses with app.ErrNotSupported after the key check and the argument
+// checks of the port (app.ErrInvalidPart for n < 1, app.ErrSizeMismatch for size < 1) and
+// without any file system call: presigned uploads exist only with the S3 driver (12 "4.1",
+// "3.3").
+func (s *Store) PresignUploadPart(_ context.Context, key, _ string, n int, size int64, _ time.Duration) (app.PresignedPart, error) {
 	if err := domain.ValidateKey(key); err != nil {
 		return app.PresignedPart{}, opErr("presign upload part", "", err)
 	}
 	if n < 1 {
 		return app.PresignedPart{}, opErr("presign upload part", key, app.ErrInvalidPart)
+	}
+	if size < 1 {
+		return app.PresignedPart{}, opErr("presign upload part", key, app.ErrSizeMismatch)
 	}
 	return app.PresignedPart{}, opErr("presign upload part", key, app.ErrNotSupported)
 }
