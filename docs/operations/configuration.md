@@ -887,7 +887,7 @@ These variables are not server configuration; Compose derives values of the serv
 |---|---|---|
 | `COMPOSE_PROFILES` | `direct,scan` | profiles: exactly one of direct, tailscale; in addition scan, s3, observability |
 | `BOTHY_REGISTRY` | `ghcr.io/OWNER` | registry path of the Bothy images in lowercase; in the bundle of a product release `ghcr.io/<owner>` from the owner of the repository ([18-release.md](../spec/18-release.md) 2.1) |
-| `BOTHY_VERSION` | pinned server version of the last product release, before the first one `0.0.0-placeholder` | server version (SemVer without v); never latest; written by `make release-prep COMPONENT=bothy SERVER_VERSION=<version>`, a placeholder aborts `make release-build` ([18-release.md](../spec/18-release.md) 2.1) |
+| `BOTHY_VERSION` | pinned server version of the last product release, before the first one `0.0.0-placeholder` | server version (SemVer without v); never latest; written by `make release-prep COMPONENT=bothy SERVER_VERSION=<version>`, a server pre-release only in a product beta (`CHANNEL=beta`, gate `release-pins`), a placeholder aborts `make release-build` ([18-release.md](../spec/18-release.md) 2.1) |
 | `BOTHY_ENVIRONMENT` | `prod` | sets `instance.environment` and `deployment.environment.name` |
 | `BOTHY_PUBLIC_URL` | `https://chat.example.com` | sets `server.public_url` |
 | `BOTHY_HTTP_PUBLISH_PORT` | `8090` | host port on 127.0.0.1 for the API (profile direct) |

@@ -7,8 +7,8 @@ Status: draft M0. Guide to [16-operations.md](../spec/16-operations.md) 6.
 | Environment | Who | Where | Data | Images |
 |---|---|---|---|---|
 | `dev` | development | workstation, Compose | synthetic (seed data of the tests) | built locally or any version |
-| `staging` | acceptance before stable | own host or cloud, Compose | synthetic or imported from a test source | release candidate by digest |
-| `prod` | operations | target system | real | release by digest |
+| `staging` | acceptance before stable | own host or cloud, Compose | synthetic or imported from a test source | release candidate by the tag of its version; the acceptance records the pulled digests |
+| `prod` | operations | target system | real | the same version; digests equal to those from `staging` |
 
 ### 1.1 What may differ
 
@@ -30,14 +30,17 @@ are the same.
 
 1. Beta (`server/vX.Y.Z-beta.N`) to `staging`; portability test via a product beta
    (`vA.B.C-beta.M`) whose bundle sets `BOTHY_VERSION` to this server beta
-   (`make release-prep COMPONENT=bothy SERVER_VERSION=X.Y.Z-beta.N`,
+   (`make release-prep COMPONENT=bothy SERVER_VERSION=X.Y.Z-beta.N CHANNEL=beta`,
    [18-release.md](../spec/18-release.md) 2.1; [16-operations.md](../spec/16-operations.md) 11.1), and
    acceptance. The numbers of the two tags are not related: every component has its own
    version ([18-release.md](../spec/18-release.md) 1).
 2. Proven: stable (`X.Y.Z`) from the same commit to `staging`, a short check, then the same
-   digest to `prod` ([18-release.md](../spec/18-release.md) 5). New installations only get the
-   stable server version with a stable product release whose bundle pins it; `make release-build`
-   rejects a server beta in the bundle of a stable product
+   version to `prod` ([18-release.md](../spec/18-release.md) 5). Compose pulls by tag; `prod`
+   compares the digests of the pulled images with those from `staging` and does not start on a
+   difference ([16-operations.md](../spec/16-operations.md) 6.1, rule 2). New installations only
+   get the stable server version with a stable product release whose bundle pins it;
+   `make release-prep`, the gate `release-pins` and `make release-build` reject a server beta in
+   the bundle of a stable product
    ([18-release.md](../spec/18-release.md) 2.1).
 3. Every environment has its own secrets, its own `instance_id`, its own push keys.
 4. Production data never leaves `prod`. The owner investigates errors that only occur with real

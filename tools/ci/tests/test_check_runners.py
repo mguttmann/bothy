@@ -259,6 +259,14 @@ def test_portability_starts_only_from_the_release_or_by_hand() -> None:
     assert check(pushed, "portability.yml") == ["release-trigger"]
 
 
+@pytest.mark.parametrize("name", ["release.yml", "portability.yml"])
+def test_release_workflows_reject_repository_dispatch(name: str) -> None:
+    """contents: write suffices for a repository_dispatch (no actions: write needed), so a
+    release workflow runs once per tag only because none names this trigger (D-W-111)."""
+    text = ok_job().replace(PORTABILITY_ON, "on:\n  repository_dispatch:\n")
+    assert check(text, name) == ["release-trigger"]
+
+
 CALLER = wf("""
     on:
       pull_request:
@@ -594,10 +602,86 @@ def test_repository_release_workflow_resolves_again_in_every_release_job() -> No
     """Every release* job of release.yml recomputes the tag and compares it (K2-04)."""
     doc = cr.load_yaml((REPO / ".github" / "workflows" / "release.yml").read_text())
     for name, job in doc["jobs"].items():
-        if not str(job.get("environment", "")).startswith("release"):
+        if not cr.is_release_environment(job):
             continue
         runs = " ".join(str(s.get("run", "")) for s in job["steps"])
         conds = " ".join(str(s.get("if", "")) for s in job["steps"])
         assert "components.py release" in runs, name
         for key in ("component", "version", "path", "gate_components", "prerelease"):
             assert f"steps.info.outputs.{key} != needs.resolve.outputs.{key}" in conds, (name, key)
+
+
+# --- release jobs are found by any spelling of their environment (D-W-110) -----------------
+
+
+@pytest.mark.parametrize("environment", ["Release", "RELEASE-apple", "{name: Release-Windows}"])
+def test_release_environment_is_found_in_any_case(environment: str) -> None:
+    """GitHub treats environment names without case: `Release` holds the secrets of `release`."""
+    job = {"environment": cr.load_yaml(f"e: {environment}")["e"]}
+    assert cr.is_release_environment(job)
+    assert release_job(HOSTED, environment) == []
+
+
+def test_release_untrusted_output_applies_to_any_case() -> None:
+    upper = RELEASE_WF.replace("environment: release\n", "environment: RELEASE\n")
+    assert upper.count("environment: RELEASE\n") == 2
+    assert check(upper, "release.yml") == []
+    leak = upper.replace(
+        "COMPONENT_PATH: ${{ steps.info.outputs.path }}", f"COMPONENT_PATH: {LEAK}"
+    )
+    assert check(leak, "release.yml") == ["release-untrusted-output"]
+
+
+@pytest.mark.parametrize(
+    "environment",
+    [
+        "${{ needs.resolve.outputs.environment }}",
+        "\"${{ github.ref_name == 'v1' && 'release' || 'ci' }}\"",
+        "{name: '${{ github.ref_name }}'}",
+        "release-${{ matrix.os }}",
+    ],
+)
+def test_environment_name_must_be_literal(environment: str) -> None:
+    """A computed name could pick a release environment that no rule sees."""
+    assert release_job(HOSTED, environment) == ["environment-not-literal"]
+    assert release_job(HOSTED, environment, "ci.yml") == ["environment-not-literal"]
+
+
+# --- no workflow_dispatch from a workflow (actions: write, D-W-111) -------------------------
+
+ACTIONS_WRITE = "permissions:\n  contents: read\n  actions: write\n"
+
+
+def test_actions_write_on_top_level_is_rejected() -> None:
+    """With actions: write the GITHUB_TOKEN creates workflow_dispatch runs, for example of
+    portability.yml from a pull request, outside the one run per tag of D-W-73."""
+    text = ok_job().replace("permissions:\n  contents: read\n", ACTIONS_WRITE)
+    assert text != ok_job()
+    assert check(text) == ["actions-write"]
+    assert check(text.replace("actions: write", "actions: read")) == []
+
+
+@pytest.mark.parametrize("name", ["ci.yml", "release.yml", "denylist-main.yml"])
+def test_actions_write_on_a_job_is_rejected_in_every_workflow(name: str) -> None:
+    text = ok_job().replace(
+        "    timeout-minutes: 30\n",
+        "    timeout-minutes: 30\n    permissions:\n      contents: read\n      actions: write\n",
+    )
+    assert text != ok_job()
+    assert "actions-write" in check(text, name)
+
+
+def test_write_all_on_a_job_is_rejected() -> None:
+    text = ok_job().replace(
+        "    timeout-minutes: 30\n", "    timeout-minutes: 30\n    permissions: write-all\n"
+    )
+    assert text != ok_job()
+    assert check(text) == ["broad-permissions"]
+
+
+def test_actions_write_on_a_reusable_call_is_rejected() -> None:
+    text = CALLER.replace("USES", "./.github/workflows/lint.yml").replace(
+        "    with:\n", "    permissions:\n      actions: write\n    with:\n"
+    )
+    assert "actions: write" in text
+    assert check(text, "ci.yml") == ["actions-write"]

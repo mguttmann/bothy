@@ -10,10 +10,10 @@ flowchart TB
     prov --> publish
     publish --> verify["Check by the instance operator: cosign verify, gh attestation verify"]
 
-    prodtag["Tag vA.B.C (signed), BOTHY_VERSION pinned in the commit"] --> prodgates["Gates of the whole repository"]
+    prodtag["Tag vA.B.C (signed), BOTHY_VERSION pinned in the commit"] --> prodgates["Gates of the whole repository, also release-pins"]
     prodgates --> bundle["release-build: bundle, BOTHY_REGISTRY from the owner"]
     publish -. "images of the pinned version present, otherwise abort" .-> bundle
-    bundle --> install["install.sh with version and SHA-256 of the bundle"]
+    bundle --> install["install.sh with version, SHA-256 and download address of the bundle"]
     install --> prodpublish["Release: bundle, install.sh, signatures, SBOM, checksums"]
     prodpublish --> port["Portability test with install.sh (16 11.1)"]
 

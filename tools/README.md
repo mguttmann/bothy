@@ -9,8 +9,8 @@ versions run as in CI. Setup once per clone: `make bootstrap`.
 | `pyproject.toml`, `uv.lock`, `.python-version` | pinned Python toolchain (ruff, mypy, bandit, pytest, pre-commit, MkDocs, zizmor, check-jsonschema) | `bootstrap` | |
 | `node/` | pinned Node tools (mermaid-cli, Redocly CLI, SonarScanner); install scripts of npm packages are disabled | `bootstrap` | |
 | `bin/fetch_tools.py`, `bin/tools.lock.json` | download release binaries (actionlint, amtool, gitleaks, go-arch-lint, golangci-lint, loki, lychee, osv-scanner, otelcol-contrib, promtool, sloth, sqlc, tempo, tofu, trivy) with a sha256 pin; the asset as a binary, tar.gz or zip | `bootstrap`, `tools-lock` | `bin/tests/` |
-| `ci/check_runners.py` | workflow rules: GitHub-hosted runners, triggers, SHA pinning, timeouts, permissions | `runners-check` | `ci/tests/` |
-| `ci/components.py` | component map: path filters in CI, resolution of release tags | (CI) | `ci/tests/` |
+| `ci/check_runners.py` | workflow rules: GitHub-hosted runners, triggers, SHA pinning, timeouts, permissions (no `actions: write`), environments without case and only literal | `runners-check` | `ci/tests/` |
+| `ci/components.py` | component map: path filters in CI, resolution of release tags; `pins` checks the server version that the product bundle pins | `release-pins` (otherwise CI) | `ci/tests/` |
 | `ci/license_check.py` | license text and SPDX headers | `licenses` | `ci/tests/` |
 | `ci/labels.py` | check labels and create them on GitHub | `labels-check`, `labels-sync` | `ci/tests/` |
 | `ci/tracked_tree.py` | copy tracked and non-ignored files into a folder, so that scanners that walk folders see only the repository | `trivy`, test `ci/tests/test_gitleaks_rules.py` | `ci/tests/` |

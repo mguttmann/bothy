@@ -682,8 +682,9 @@ pairing code with a command for the host; confirmation by typing the first
 mandatory questions about the LLM login (I6) and the server host; mapping of each person to their own
 session user on the host, as a choice from the names that the host reports
 (`hosts.reported_session_users`; without a mapping no terminal, SR12); per session user its
-work folders of the profile `claude` (ruling T13); check results of `bothy-host doctor`, for HD6
-and HD11 with each affected session user and the person mapped to it, even when the
+work folders of the profile `claude` (ruling T13); check results of `bothy-host doctor`
+with each session user or former session user that the message names (rule for names: HD6, HD10,
+HD11 and HD9) and the person mapped to it, even when the
 host is disconnected after a refused start ([24](24-terminal.md), section 2.2); disable,
 re-pair, retire. Every change with step-up and reason.
 

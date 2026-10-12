@@ -39,7 +39,7 @@ The complete list with tool, threshold and where it runs is in
 | Commits | `commitlint` | Conventional Commits and DCO sign-off of the new commits |
 | Docs | `docs`, `linkcheck`, `diagrams`, `catalog-check`, `api-lint`, `api-checks`, `api-clients`, `tokens` | Strict site build, links and anchors, diagrams, action catalogue and its generated copies, API contracts, copies of the API contracts equal to their sources, generated clients, design tokens |
 | Operations | `ops-check` | collector, Prometheus, Alertmanager, Loki, Tempo, Sloth, OpenTofu; derived values equal their source |
-| CI rules | `runners-check`, `labels-check` | GitHub-hosted runners, triggers, SHA pinning, timeouts, permissions; labels |
+| CI and release rules | `runners-check`, `labels-check`, `release-pins` | GitHub-hosted runners, triggers, SHA pinning, timeouts, permissions; labels; pinned server version in the product bundle ([18](18-release.md) 2.1) |
 | Security | `gitleaks`, `denylist`, `semgrep`, `trivy`, `osv` | Secrets, white label, project rules, misconfiguration, known vulnerabilities |
 | Legal | `licenses` | License text, SPDX header lines, licenses of the dependencies |
 | Analysis | `sonar` | SonarQube with a shared profile and gate |
@@ -106,7 +106,11 @@ that it would have to build.
   portability test also `ubuntu-24.04-arm`, for the app builds `macos-15` and
   `windows-2025`); the repository is public from the first push (ADR 0039, R-QA-03).
   Jobs with the environment `release*` use outputs of other jobs only in conditions (R-QA-12).
-  Only `release.yml` calls a release workflow, from one job and without a matrix (D-W-73).
+  Only `release.yml` calls a release workflow, from one job and without a matrix, no workflow
+  has `actions: write`, with which it could start another one by `workflow_dispatch` (sources
+  in D-W-111), and no
+  release workflow has the trigger `repository_dispatch` (rule `release-trigger`); so every run
+  of a tag is one of its release (D-W-73, D-W-111).
 - `concurrency` cancels superseded runs of a pull request; uv, npm, pinned binaries
   and pre-commit use caches. No path filter at the workflow level: a workflow that such a filter
   did not start would leave the required check `ci-ok` open; the job `plan` selects the
@@ -181,7 +185,7 @@ fixed and the delta is checked again; the threat model (chapter 19) is updated. 
 | R-QA-09 | Links to the internet are not a gate (`linkcheck-external` manual). | External servers would otherwise make a gate non-reproducible. `linkcheck` checks local links and anchors strictly. |
 | R-QA-10 | No `.sonarcloud.properties`; SonarQube Cloud analyzes via CI, automatic analysis stays off. | Coverage and pull request decoration need the CI analysis; both ways at the same time interfere with each other. |
 | R-QA-11 | Test servers that build large worlds via the public API (contract, leak and canary tests, preparation of the load tests) raise `ratelimit.*` through their configuration; measured load tests and tests of the rate limits run with the default values. | Building via the API checks the real paths but fails on limits meant for people; measurements and limit tests must see the shipped values. |
-| R-QA-12 | Jobs with the environment `release*` use outputs of other jobs only in the `if:` of the job or of a step (D-W-72), resolve the tag again and compare, and take artifacts only by ID (rules `release-untrusted-output`, `release-artifact-by-id`, D-W-52). | A job with signing secrets builds, signs and publishes only what it determined itself; no other job dictates its path, version or artifact (T-SC-05). |
+| R-QA-12 | Jobs with the environment `release*` (in any spelling, as GitHub compares environment names, source in D-W-110; a name is literal, rule `environment-not-literal`, D-W-110) use outputs of other jobs only in the `if:` of the job or of a step (D-W-72), resolve the tag again and compare, and take artifacts only by ID (rules `release-untrusted-output`, `release-artifact-by-id`, D-W-52). | A job with signing secrets builds, signs and publishes only what it determined itself; no other job dictates its path, version or artifact (T-SC-05). |
 | R-QA-13 | Before every push, an independent review of the diff with the report `.review/<sha>.md` and the last line `Urteil: JA`; the pre-push hook checks it. The overall review per milestone stays. | Requirement 23 requires an AI review before every push; without proof it would be a note, not a gate. |
 | R-QA-14 | Doc comments are a lint gate per language (ruff `D`, revive `exported`, `public_member_api_docs`, typedoc); API documentation is generated for the SDKs and Dart packages, for the server `openapi.yaml` is the source. | Build rule 3; a rule without a gate is not followed (in the tool code, docstrings were missing for most public symbols). |
 | R-QA-15 | `denylist-main.yml` checks every push to `main` with the private list; the only exception to the `push` ban. | Fork contributions see only the generic rules, and a squash can change the message after the checks; requirement 22 requires a CI job that fails. |

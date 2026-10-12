@@ -174,7 +174,10 @@ threat model T-TM-13).
   D-W-67, threat model T-TM-14). The same applies to a chain file of a person in a
   shared folder on the path to the locations of others; such files exist only from a time when
   this folder was writable, and the instance operator removes them (D-W-80). A home that a person
-  opens for others, by contrast, blocks only that person's own session user (HD11, D-W-88).
+  with terminal access opens for others, by contrast, blocks only that person's own session user
+  (HD11, D-W-88). If a long-running process of the person reopens the home of their former session
+  user after `bothy-host session-user remove`, HD9 refuses the start; the message names this user,
+  and the instance operator deletes it together with its long-running processes (D-W-109).
 * Bad, because every restart of the host service ends all sessions of the host, including
   `bothy-host session-user add` and `remove`, which restart it so that the changed list of
   session users applies (D-W-90); the instance operator chooses a quiet time for this.
@@ -190,7 +193,8 @@ threat model T-TM-13).
 * One session user per person: TM-T28 (without assignment, taken name, wrong `osu`, subscription in
   the account of another person, unreported name) and home folders of others (TM-T24: HD9 against
   users who are not session users; an open home of a session user blocks, per
-  HD11, only that user).
+  HD11, only that user; a long-running process reopens the home after `remove`, and HD9 names the
+  former session user).
 * No shared locations: TM-T29 (working directory writable by others with a hook and `apiKeyHelper`,
   folder chain, duplicate working directory, readable `CLAUDE_CONFIG_DIR`, entry of another user,
   writable program or program of another user, index of another user, chain file of another user).

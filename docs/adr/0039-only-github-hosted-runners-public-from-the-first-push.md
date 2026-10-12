@@ -54,15 +54,23 @@ Supplementary rules:
 2. **Release workflows.** `release.yml` starts only on a tag push, `portability.yml` only as a
    call from `release.yml` after `publish` (`workflow_call`) or by hand with a product tag
    (`workflow_dispatch`, D-W-59). Only `release.yml` calls a release workflow, from one job
-   and without a matrix (D-W-73): the portability test checks the release that the same run
-   published, and does so once.
+   and without a matrix (D-W-73), and no workflow starts another one by `workflow_dispatch`,
+   because none has `actions: write` (D-W-111; the dispatch endpoint requires the permission
+   "Actions" with `write`,
+   https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps,
+   retrieved 2026-10-11 [verified]): the portability test checks the release that
+   the same run published, and does so once.
 3. **Fixed labels.** No label `*-latest` (it changes the image without a change in the
    repository), no larger runners (they are not standard runners), no list, no group and
    no expression except `${{ matrix.<key> }}` over a static matrix of fixed labels.
 4. **Release jobs.** Signing secrets exist only in the environments `release`, `release-apple` and
    `release-windows`. A job with one of these environments uses outputs of other jobs only in the
    `if:` of the job or of a step (D-W-72), resolves the tag again itself and compares, and
-   fetches artifacts only by ID (D-W-52). Every standard runner except the single-core runners is
+   fetches artifacts only by ID (D-W-52). GitHub compares environment names without case
+   ("Environment names are not case sensitive",
+   https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments,
+   retrieved 2026-10-11 [verified]); the check does so too and requires a literal environment name without an expression (D-W-110).
+   Every standard runner except the single-core runners is
    a new VM ("each GitHub-hosted runner is a new virtual machine (VM) hosted by GitHub",
    same source as above, retrieved 2026-10-11) [verified]; a job therefore takes over no state of
    another job except through caches, artifacts and outputs.
@@ -91,9 +99,12 @@ whose runner is not a fixed GitHub-hosted label (rule `runner-not-github-hosted`
 as well as scheduled workflows without a public condition (`schedule-without-public-guard`),
 release workflows with triggers other than their own (`release-trigger`), calls of a
 release workflow outside a matrix-free job of `release.yml` (`reusable-release-caller`,
-D-W-73), `push` on branches except `main` in `denylist-main.yml` (`push-on-branch`), in jobs with
-environment `release*` outputs of other jobs outside the `if:` (allow list D-W-61, D-W-72,
-rule `release-untrusted-output`) and artifacts not fetched by ID (`release-artifact-by-id`).
+D-W-73), `actions: write` and `write-all`, also on a job (rules `actions-write`,
+`broad-permissions`, D-W-111), `push` on branches except `main` in `denylist-main.yml`
+(`push-on-branch`), environment names that are not literal (`environment-not-literal`, D-W-110),
+in jobs with environment `release*` in any spelling outputs of other jobs outside the `if:`
+(allow list D-W-61, D-W-72, rule `release-untrusted-output`) and artifacts not fetched by ID
+(`release-artifact-by-id`).
 
 ## Pros and Cons of the Options
 

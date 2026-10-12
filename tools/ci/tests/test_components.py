@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import components
@@ -113,3 +114,73 @@ def test_cli_release_github_output(tmp_path: Path, capsys: pytest.CaptureFixture
 def test_cli_release_error_exit(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert components.main(["release", "--repo", str(tmp_path), "--tag", "x/v1.0.0"]) == 1
     assert "unknown release component" in capsys.readouterr().err
+
+
+# --- server version pinned by the product bundle (docs/spec/18-release.md 2.1) --------------
+
+REPO = Path(__file__).resolve().parents[3]
+
+
+def _bundle_repo(tmp_path: Path, product: str, lines: str) -> Path:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "VERSION").write_text(product + "\n")
+    env = tmp_path / "infra" / "compose" / ".env.example"
+    env.parent.mkdir(parents=True)
+    env.write_text(f"# template\nBOTHY_REGISTRY=ghcr.io/OWNER\n{lines}\nBOTHY_ENVIRONMENT=prod\n")
+    return tmp_path
+
+
+@pytest.mark.parametrize(
+    ("product", "server"),
+    [
+        ("1.0.0", "2.0.0"),
+        ("1.1.0-beta.1", "2.0.0-beta.1"),
+        ("1.1.0-beta.1", "2.0.0"),
+        # the template carries the placeholder until the first product release; release-prep
+        # and release-build refuse it there
+        ("0.0.0", "0.0.0-placeholder"),
+    ],
+)
+def test_pins_accept(tmp_path: Path, product: str, server: str) -> None:
+    repo = _bundle_repo(tmp_path, product, f"BOTHY_VERSION={server}")
+    assert components.pinned_server_problems(repo) == []
+
+
+@pytest.mark.parametrize(
+    ("product", "lines", "message"),
+    [
+        ("1.0.0", "BOTHY_VERSION=2.0.0-beta.1", r"stable product 1\.0\.0 pins .*2\.0\.0-beta\.1"),
+        ("1.0.0", "BOTHY_VERSION=2.0.0-rc.1", r"2\.0\.0-rc\.1"),
+        ("1.0.0", "BOTHY_VERSION=v2.0.0", r"'v2\.0\.0' is not a SemVer version"),
+        ("1.0.0", "BOTHY_VERSION=latest", r"'latest' is not a SemVer version"),
+        ("1.0.0", "# BOTHY_VERSION=2.0.0", r"exactly one line BOTHY_VERSION=, found 0"),
+        ("1.0.0", "BOTHY_VERSION=2.0.0\nBOTHY_VERSION=2.0.1", r"found 2"),
+        ("1.0", "BOTHY_VERSION=2.0.0", r"VERSION says '1\.0'"),
+        # only a product beta may pin a server pre-release (CHANNEL=beta gives -beta.N)
+        ("1.1.0-rc.1", "BOTHY_VERSION=2.0.0-beta.1", r"product 1\.1\.0-rc\.1 is not a beta"),
+    ],
+)
+def test_pins_reject(tmp_path: Path, product: str, lines: str, message: str) -> None:
+    repo = _bundle_repo(tmp_path, product, lines)
+    problems = components.pinned_server_problems(repo)
+    assert len(problems) == 1
+    assert re.search(message, problems[0])
+
+
+def test_pins_need_the_files(tmp_path: Path) -> None:
+    problems = components.pinned_server_problems(tmp_path)
+    assert any("VERSION is missing" in p for p in problems)
+    assert any(".env.example is missing" in p for p in problems)
+
+
+def test_pins_of_this_repository() -> None:
+    """The gate itself: the committed product version and template pass."""
+    assert components.pinned_server_problems(REPO) == []
+
+
+def test_cli_pins(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    good = _bundle_repo(tmp_path / "good", "1.0.0", "BOTHY_VERSION=2.0.0")
+    assert components.main(["pins", "--repo", str(good)]) == 0
+    bad = _bundle_repo(tmp_path / "bad", "1.0.0", "BOTHY_VERSION=2.0.0-beta.3")
+    assert components.main(["pins", "--repo", str(bad)]) == 1
+    assert "2.0.0-beta.3" in capsys.readouterr().err

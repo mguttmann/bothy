@@ -64,7 +64,11 @@ published independently and the origin can be verified without key management.
 
 * Gate check: `VERSION` equals the tag; the changelog section is present.
 * The release chain aborts if signature, SBOM or checksums are missing.
-* The portability test pulls images by digest and checks the signature first.
+* Portability test: before `install.sh` it pulls the server images itself, like every
+  installation by the tag of the pinned server version, and checks the signature of each of
+  their digests; after the installation it checks that the containers use exactly these images,
+  and names the digests in the result ([16-operations.md](../spec/16-operations.md), section
+  11.1; D-W-96, D-W-99).
 
 ## Pros and Cons of the Options
 
