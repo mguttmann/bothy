@@ -2,10 +2,13 @@
 # (check `prometheus-rule-tests`). It lies outside rules/*.yaml so that Prometheus never loads
 # this file as rules.
 #
-# Per alert one case in which it fires as soon as its `for` has passed (with labels and rendered
-# annotations; one minute before it is still silent), and per alert with a threshold one case
-# exactly at the threshold in which it does not fire. The firing cases lie just above the
-# threshold; so every change of a threshold or of a `for` breaks at least one case.
+# Each alert has a case where it fires at the first evaluation at which it may, with labels and
+# rendered annotations: once its `for` has run out, or, for an alert without `for`, as soon as
+# its condition holds. One minute earlier it is still quiet (Watchdog fires from the first
+# evaluation on). Each alert with a threshold has a case exactly at the threshold where it does
+# not fire. The firing cases lie just above the threshold, so a threshold moved past the value of
+# a case, and a `for` removed, added or made one minute longer or shorter, breaks at least one
+# case (evaluation runs once a minute, so a change below one minute may pass).
 # Timestamp series such as '-93601+60x30' grow with the clock of the evaluation (60 s per
 # minute), so `time() - value` stays constant over the whole series.
 
@@ -250,7 +253,11 @@ tests:
       - series: 'bothy_agent_billing_mode_mismatch_total{job="bothy/bothy-server", bothy_agent_handle="helper"}'
         values: '0 0 1 1 1'
     alert_rule_test:
-      - eval_time: 4m
+      # No `for`: quiet before the first increase, firing at the first evaluation after it.
+      - eval_time: 1m
+        alertname: BothyBillingModeMismatch
+        exp_alerts: []
+      - eval_time: 2m
         alertname: BothyBillingModeMismatch
         exp_alerts:
           - exp_labels:
@@ -276,7 +283,11 @@ tests:
       - series: 'bothy_authz_errors_total{job="bothy/bothy-server", bothy_reason="authz_not_checked"}'
         values: '0 1 1'
     alert_rule_test:
-      - eval_time: 2m
+      # No `for`: quiet before the first increase, firing at the first evaluation after it.
+      - eval_time: 0m
+        alertname: BothyAuthzError
+        exp_alerts: []
+      - eval_time: 1m
         alertname: BothyAuthzError
         exp_alerts:
           - exp_labels:
@@ -302,7 +313,11 @@ tests:
       - series: 'bothy_secrets_refresh_failures_total{job="bothy/bothy-server"}'
         values: '0 1 1'
     alert_rule_test:
-      - eval_time: 2m
+      # No `for`: quiet before the first increase, firing at the first evaluation after it.
+      - eval_time: 0m
+        alertname: BothySecretRefreshFailing
+        exp_alerts: []
+      - eval_time: 1m
         alertname: BothySecretRefreshFailing
         exp_alerts:
           - exp_labels:
@@ -476,7 +491,11 @@ tests:
       - series: 'bothy_audit_verify_failures_total{job="bothy/bothy-server"}'
         values: '0 1 1'
     alert_rule_test:
-      - eval_time: 2m
+      # No `for`: quiet before the first increase, firing at the first evaluation after it.
+      - eval_time: 0m
+        alertname: BothyAuditChainBroken
+        exp_alerts: []
+      - eval_time: 1m
         alertname: BothyAuditChainBroken
         exp_alerts:
           - exp_labels:
@@ -566,7 +585,11 @@ tests:
       - series: 'postgresql_deadlocks_total{job="bothy/otel-collector", postgresql_database_name="bothy"}'
         values: '0 1 1'
     alert_rule_test:
-      - eval_time: 2m
+      # No `for`: quiet before the first increase, firing at the first evaluation after it.
+      - eval_time: 0m
+        alertname: BothyDatabaseDeadlocks
+        exp_alerts: []
+      - eval_time: 1m
         alertname: BothyDatabaseDeadlocks
         exp_alerts:
           - exp_labels:

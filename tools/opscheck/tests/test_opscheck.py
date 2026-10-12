@@ -9,15 +9,26 @@ reads into a temporary repository root, apply one mutation and run that single c
 from __future__ import annotations
 
 import ast
+import contextlib
+import copy
 import importlib.util
+import os
+import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
+import threading
+import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
+import yaml
 
 
 def _load_opscheck() -> ModuleType:
@@ -301,6 +312,19 @@ def test_run_command_times_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     tool = fake_tool(tmp_path / "bin", "hangs", "exec /bin/sleep 30")
     [finding] = opscheck.run_command(ctx, [tool])
     assert finding == "hangs: timed out after 0.5 s"
+
+
+def test_run_command_times_out_although_a_child_holds_the_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """After the timeout the validator is killed and waited for; its output is not read on."""
+    monkeypatch.setattr(opscheck, "COMMAND_TIMEOUT_S", 0.5)
+    ctx = _context(tmp_path)
+    tool = fake_tool(tmp_path / "bin", "forks", "/bin/sleep 10 &\nexec /bin/sleep 30")
+    started = time.monotonic()
+    [finding] = opscheck.run_command(ctx, [tool])
+    assert finding == "forks: timed out after 0.5 s"
+    assert time.monotonic() - started < 5
 
 
 def test_run_command_reports_a_binary_that_cannot_run(tmp_path: Path) -> None:
@@ -789,6 +813,9 @@ def test_invalid_hcl_fails(tree: Path) -> None:
     (tree / "infra/tofu/modules/hetzner/broken.tf").write_text('variable "x" {\n', encoding="utf-8")
     [finding] = findings(tree, "tofu")
     assert finding.startswith("hetzner: tofu init: exit status 1")
+    # The finding names the HCL error, not only that init failed for some reason.
+    assert "Error: Unclosed configuration block" in finding
+    assert "on broken.tf line 1" in finding
 
 
 def test_invalid_reference_fails_in_validate(tree: Path) -> None:
@@ -805,7 +832,8 @@ def test_tofu_needs_a_module(tree: Path) -> None:
         for tf in module.glob("*.tf"):
             tf.unlink()
     assert findings(tree, "tofu") == (
-        "no OpenTofu module with a .tf file under infra/tofu/modules/",
+        "no OpenTofu module (a directory with .tf, .tf.json, .tofu or .tofu.json files) under "
+        "infra/tofu/modules/",
     )
 
 
@@ -1331,3 +1359,520 @@ def test_overlay_must_not_redefine_a_base_pipeline(tree: Path) -> None:
         "pipeline traces/in of infra/otel/exporters/zz-bypass.yaml receives from otlp but does "
         "not run redaction/allowlist",
     )
+
+
+# ---- findings of the red team on d73c418 --------------------------------------------------
+
+
+def test_alarm_column_follows_ticket_alert_disable(tree: Path) -> None:
+    """Without its ticket alert an SLO has only the page alert; the row must say so."""
+    edit(
+        tree / SLO / "push.yaml",
+        "      ticket_alert:\n        labels:\n          severity: ticket\n",
+        "      ticket_alert:\n        disable: true\n",
+    )
+    assert findings(tree, "slo-docs") == (
+        "bothy-push/provider-acceptance: Alert is Page, Ticket, the Sloth file says Page only",
+    )
+    row = "| 99.5 % | Page, Ticket | `sli.push_acceptance` |"
+    edit(tree / SLOS_MD, row, row.replace("Page, Ticket", "Page only"))
+    assert findings(tree, "slo-docs") == ()
+
+
+def test_alarm_column_without_any_alert(tree: Path) -> None:
+    edit(
+        tree / SLO / "agents.yaml",
+        "        disable: true\n      ticket_alert:\n        labels:\n          severity: ticket\n",
+        "        disable: true\n      ticket_alert:\n        disable: true\n",
+    )
+    assert findings(tree, "slo-docs") == (
+        "bothy-agents/turn-duration: Alert is Ticket only, the Sloth file says none",
+    )
+    edit(tree / SLOS_MD, "| 95.0 % | Ticket only |", "| 95.0 % | none |")
+    assert findings(tree, "slo-docs") == ()
+
+
+@pytest.mark.parametrize("matcher", ["le='0.5'", "le=`0.5`", 'le = "0.5"'])
+def test_slo_docs_reads_every_quoting_of_the_le_bound(tree: Path, matcher: str) -> None:
+    """PromQL quotes a label value with ", ' or `; every form gives the same Threshold."""
+    edit(tree / SLO / "sync.yaml", 'le="0.5"', matcher)
+    assert findings(tree, "slo-docs") == ()
+    edit(tree / SLOS_MD, "| 0.5 s |", "| none |")
+    assert findings(tree, "slo-docs") == (
+        "bothy-sync/delivery-latency: Threshold is none, the Sloth file says 0.5 s",
+    )
+
+
+def test_slo_docs_reads_an_empty_le_as_no_bound(tree: Path) -> None:
+    edit(tree / SLO / "sync.yaml", 'le="0.5"', 'le=""')
+    assert findings(tree, "slo-docs") == (
+        "bothy-sync/delivery-latency: Threshold is 0.5 s, the Sloth file says none",
+    )
+
+
+@pytest.mark.parametrize("matcher", ['le=~"0.5"', "le != '0.5'"])
+def test_slo_docs_rejects_an_le_matcher_that_is_no_bound(tree: Path, matcher: str) -> None:
+    """A regex or negated `le` matcher names no bound; the row could not be checked."""
+    edit(tree / SLO / "sync.yaml", 'le="0.5"', matcher)
+    assert findings(tree, "slo-docs") == (
+        f"bothy-sync/delivery-latency: le matcher {matcher} in the error query is no bound; "
+        'slo-docs reads le="<bound>" only',
+    )
+
+
+@pytest.mark.parametrize("name", ["main.tofu", "main.tf.json", "main.tofu.json"])
+def test_module_of_other_configuration_files_is_checked(tree: Path, name: str) -> None:
+    """OpenTofu also reads .tofu and JSON files; a module made only of them is checked too."""
+    module = tree / "infra/tofu/modules/scaleway"
+    module.mkdir()
+    (module / name).write_text("this is not hcl {\n", encoding="utf-8")
+    [finding] = findings(tree, "tofu")
+    assert finding.startswith("scaleway: tofu init: exit status 1")
+
+
+VALID_TEMPLATE = '{{ define "bothy.title" }}{{ .Status }}{{ end }}\n'
+BROKEN_TEMPLATE = '{{ define "bothy.title" }}{{ .Status }\n'
+
+
+def _alertmanager_template(tree: Path, entry: str, text: str) -> Path:
+    """Add a template file and a `templates` entry to the copied Alertmanager configuration."""
+    templates = (tree / ALERTMANAGER).parent / "templates"
+    templates.mkdir()
+    (templates / "bothy.tmpl").write_text(text, encoding="utf-8")
+    edit(tree / ALERTMANAGER, "\nroute:\n", f"\ntemplates:\n  - {entry}\n\nroute:\n")
+    return templates / "bothy.tmpl"
+
+
+@pytest.mark.parametrize("entry", ["/etc/alertmanager/templates/*.tmpl", "templates/*.tmpl"])
+def test_alertmanager_templates_are_checked_where_compose_mounts_them(
+    tree: Path, entry: str
+) -> None:
+    """Compose mounts the directory at /etc/alertmanager/; the check reads the templates there."""
+    template = _alertmanager_template(tree, entry, VALID_TEMPLATE)
+    assert findings(tree, "alertmanager") == ()
+    template.write_text(BROKEN_TEMPLATE, encoding="utf-8")
+    [finding] = findings(tree, "alertmanager")
+    assert finding.startswith("amtool check-config: exit status 1")
+    assert 'bothy.tmpl:1: unexpected "}" in operand' in finding
+
+
+@pytest.mark.parametrize(
+    ("entry", "message"),
+    [
+        (
+            "/etc/alertmanager/tmpl/*.tmpl",
+            "templates entry /etc/alertmanager/tmpl/*.tmpl matches no file",
+        ),
+        (
+            "/opt/templates/*.tmpl",
+            "templates entry /opt/templates/*.tmpl lies outside /etc/alertmanager/, where "
+            "Compose mounts infra/observability/alertmanager/; the gate cannot check it",
+        ),
+    ],
+)
+def test_alertmanager_template_entry_must_match_a_mounted_file(
+    tree: Path, entry: str, message: str
+) -> None:
+    """amtool accepts a pattern without a match; Alertmanager would then load no template."""
+    _alertmanager_template(tree, entry, BROKEN_TEMPLATE)
+    assert findings(tree, "alertmanager") == (message,)
+
+
+def test_alertmanager_yaml_error_is_reported_by_amtool(tree: Path) -> None:
+    """A file that is no YAML keeps amtool's finding and the route findings."""
+    edit(tree / ALERTMANAGER, "  group_wait: 30s\n", "  group_wait: 30s\n bad: [\n")
+    found = findings(tree, "alertmanager")
+    assert found[0].startswith("amtool check-config: exit status 1")
+    assert [f.split(": exit status")[0] for f in found[1:]] == [
+        "route severity=page alertname=BothyExample -> external-oncall,bothy-ops",
+        "route severity=ticket alertname=BothyExample -> bothy-ops",
+        "route alertname=Watchdog severity=heartbeat -> external-heartbeat",
+    ]
+
+
+SENTRY_KEY_REFERENCE = "${file:/run/bothy/secrets/sentry_key}"
+
+
+def _provider_finding(scheme: str) -> str:
+    return (
+        f"infra/otel/exporters/sentry.yaml: ${{{scheme}:...}} uses the config provider {scheme}, "
+        "which is not allowed; collector files may use only env, file and yaml references "
+        "(most other providers fetch their value over the network)"
+    )
+
+
+@pytest.mark.parametrize(
+    ("reference", "scheme"),
+    [
+        ("${https://config.example.com/sentry_key}", "https"),
+        ("${http://config.example.com/sentry_key}", "http"),
+        ("${s3://bucket.s3.example.com/sentry_key}", "s3"),
+        (
+            "${googlesecretmanager:projects/example/secrets/sentry/versions/1}",
+            "googlesecretmanager",
+        ),
+        # The collector resolves the inner reference first, so a default may not hide it.
+        ("${env:SENTRY_KEY:-${https://config.example.com/sentry_key}}", "https"),
+        ("$$${https://config.example.com/sentry_key}", "https"),  # `$$` then a reference
+    ],
+)
+def test_remote_reference_in_a_collector_file_fails_before_validate(
+    tree: Path, tmp_path: Path, reference: str, scheme: str
+) -> None:
+    """A provider other than env, file or yaml may reach the network; validate never runs."""
+    marker = tmp_path / "validated"
+    fake = fake_tool(tmp_path / "fake-bin", "otelcol-contrib", f'echo ran > "{marker}"')
+    edit(tree / OTEL / "exporters" / "sentry.yaml", SENTRY_KEY_REFERENCE, reference)
+    [result] = opscheck.run_checks(tree, only=["collector"], tool=lambda name: fake)
+    assert result.findings == (_provider_finding(scheme),)
+    assert not marker.exists()
+
+
+def test_remote_reference_in_a_collector_file_that_is_no_yaml(tree: Path, tmp_path: Path) -> None:
+    """A file PyYAML cannot read is searched as text; the collector may still read it."""
+    marker = tmp_path / "validated"
+    fake = fake_tool(tmp_path / "fake-bin", "otelcol-contrib", f'echo ran > "{marker}"')
+    edit(
+        tree / OTEL / "exporters" / "sentry.yaml",
+        SENTRY_KEY_REFERENCE,
+        '${https://config.example.com/sentry_key}" [unclosed',  # text after the closing quote
+    )
+    [result] = opscheck.run_checks(tree, only=["collector"], tool=lambda name: fake)
+    assert result.findings == (_provider_finding("https"),)
+    assert not marker.exists()
+
+
+def test_escaped_reference_in_a_collector_file_is_text(tree: Path, tmp_path: Path) -> None:
+    """`$${...}` is the escaped form: the collector reads it as text and expands nothing."""
+    fake = fake_tool(tmp_path / "fake-bin", "otelcol-contrib", "exit 0")
+    edit(
+        tree / OTEL / "exporters" / "sentry.yaml",
+        SENTRY_KEY_REFERENCE,
+        f"{SENTRY_KEY_REFERENCE} $${{https://config.example.com/text}}",
+    )
+    [result] = opscheck.run_checks(tree, only=["collector"], tool=lambda name: fake)
+    assert result.findings == ()
+
+
+SIGNAL_DRIVER = """\
+import importlib.util
+import sys
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location("opscheck_tool", {script!r})
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+module.pinned_tool = lambda name: Path({fake!r})
+sys.argv = ["opscheck.py", "--root", {root!r}, "--only", {check!r}]
+module._cli()  # the entry of `python opscheck.py`
+"""
+
+
+def _wait_for(condition: Callable[[], bool], seconds: float = 60) -> None:
+    deadline = time.monotonic() + seconds
+    while not condition():
+        assert time.monotonic() < deadline, "condition not reached in time"
+        time.sleep(0.05)
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+@pytest.mark.parametrize("signum", [signal.SIGTERM, signal.SIGINT])
+@pytest.mark.parametrize(
+    ("check", "validators"), [("loki", 1), ("collector", opscheck.COLLECTOR_WORKERS)]
+)
+def test_signal_stops_the_validators_and_removes_the_work_directory(
+    tree: Path, tmp_path: Path, signum: int, check: str, validators: int
+) -> None:
+    """SIGTERM stops a run like SIGINT: no validator keeps running, no work directory stays.
+
+    The fake validators sleep for 30 s, so one that survives the stop is still alive here
+    (and ends on its own after that).
+    """
+    pids = tmp_path / "pids"
+    pids.mkdir()
+    temp = tmp_path / "temp"
+    temp.mkdir()
+    fake = fake_tool(
+        tmp_path / "fake-bin", "validator", f'echo $$ > "{pids}/$$"\nexec /bin/sleep 30'
+    )
+    driver = tmp_path / "driver.py"
+    driver.write_text(
+        SIGNAL_DRIVER.format(
+            script=str(Path(opscheck.__file__)), fake=str(fake), root=str(tree), check=check
+        ),
+        encoding="utf-8",
+    )
+    proc = subprocess.Popen(
+        [sys.executable, str(driver)],
+        env={**os.environ, "TMPDIR": str(temp)},
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        _wait_for(lambda: len(list(pids.iterdir())) >= validators or proc.poll() is not None)
+        assert proc.poll() is None, "opscheck ended before its validators started"
+        proc.send_signal(signum)
+        with contextlib.suppress(subprocess.TimeoutExpired):
+            proc.wait(timeout=20)
+    finally:
+        stopped = proc.poll() is not None
+        if not stopped:
+            proc.kill()
+        stderr = proc.communicate()[1]
+    started = sorted(int(path.name) for path in pids.iterdir())
+    assert stopped, "opscheck did not stop within 20 s"
+    assert [pid for pid in started if _alive(pid)] == []
+    assert sorted(temp.glob("opscheck-*")) == []
+    # After SIGINT the script ends by SIGINT, as Python does, so a calling shell stops too.
+    assert proc.returncode == (-signum if signum == signal.SIGINT else 128 + signum)
+    assert stderr == f"opscheck: stopped by {signal.Signals(signum).name}\n"
+
+
+def test_main_returns_the_exit_status_of_a_stop_signal(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The handlers of SIGINT and SIGTERM are installed for the run and restored after it."""
+    before = {s: signal.getsignal(s) for s in (signal.SIGINT, signal.SIGTERM)}
+    seen = {}
+
+    def stopped(*args: object, **kwargs: object) -> list[object]:
+        seen.update({s: signal.getsignal(s) for s in before})
+        if seen[signal.SIGTERM] != before[signal.SIGTERM]:  # never kill pytest itself
+            signal.raise_signal(signal.SIGTERM)
+        return []
+
+    monkeypatch.setattr(opscheck, "run_checks", stopped)
+    assert opscheck.main(["--only", "loki"]) == 128 + signal.SIGTERM
+    assert capsys.readouterr().err == "opscheck: stopped by SIGTERM\n"
+    assert all(seen[s] not in (before[s], signal.SIG_DFL) for s in before)
+    assert {s: signal.getsignal(s) for s in before} == before
+
+
+def test_stopped_check_kills_the_validators_of_other_workers(tmp_path: Path) -> None:
+    """A stop in the main thread kills the validators the collector's workers started."""
+    ctx = _context(tmp_path)
+    pids = tmp_path / "pids"
+    pids.mkdir()
+    sleeper = fake_tool(tmp_path / "bin", "sleeper", f'echo $$ > "{pids}/$$"\nexec /bin/sleep 30')
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        running = [pool.submit(opscheck.run_command, ctx, [sleeper]) for _ in range(2)]
+        _wait_for(lambda: len(list(pids.iterdir())) == 2)
+        opscheck._RUNNING.kill_all()
+        results = [future.result(timeout=20) for future in running]
+    assert results == [["sleeper: exit status -9"]] * 2
+    assert [p for p in pids.iterdir() if _alive(int(p.name))] == []
+
+
+def test_stopped_run_command_reaps_its_validator(tmp_path: Path) -> None:
+    """A stop in the main thread kills the validator and waits for it, so no zombie stays."""
+    ctx = _context(tmp_path)
+    pids = tmp_path / "pids"
+    pids.mkdir()
+    sleeper = fake_tool(tmp_path / "bin", "sleeper", f'echo $$ > "{pids}/$$"\nexec /bin/sleep 30')
+    previous = signal.signal(signal.SIGUSR1, opscheck._on_stop_signal)
+
+    def stop_when_started() -> None:
+        _wait_for(lambda: any(pids.iterdir()))
+        signal.pthread_kill(threading.main_thread().ident or 0, signal.SIGUSR1)
+
+    stopper = threading.Thread(target=stop_when_started)
+    stopper.start()
+    try:
+        with pytest.raises(opscheck._Stopped):
+            opscheck.run_command(ctx, [sleeper])
+    finally:
+        stopper.join()
+        signal.signal(signal.SIGUSR1, previous)
+        opscheck._RUNNING.reset()
+    [pid] = [int(path.name) for path in pids.iterdir()]
+    with pytest.raises(ChildProcessError):  # already reaped by run_command
+        os.waitpid(pid, os.WNOHANG)
+
+
+def test_stop_while_the_main_thread_starts_a_validator(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A stop during the start raises once the new process is registered, killed and reaped."""
+    validators = opscheck._Validators()
+    started: list[subprocess.Popen[str]] = []
+    real_popen = subprocess.Popen
+
+    def popen_then_stop(*args: Any, **kwargs: Any) -> subprocess.Popen[str]:
+        proc = real_popen(*args, **kwargs)
+        started.append(proc)
+        validators.stop(signal.SIGTERM)  # the handler while the main thread is in `start`
+        return proc
+
+    monkeypatch.setattr(opscheck.subprocess, "Popen", popen_then_stop)
+    with pytest.raises(opscheck._Stopped):
+        validators.start(["/bin/sleep", "30"], env={}, cwd=tmp_path)
+    [proc] = started
+    assert proc.returncode == -signal.SIGKILL
+    assert validators._running == set()
+
+
+def test_stop_during_the_removal_still_removes_the_work_directory(
+    tree: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    created: list[Path] = []
+    real_mkdtemp = opscheck.tempfile.mkdtemp
+    real_rmtree = shutil.rmtree
+
+    def spy(*args: Any, **kwargs: Any) -> str:
+        path = real_mkdtemp(*args, **kwargs)
+        created.append(Path(path))
+        return str(path)
+
+    def interrupted(path: Path, ignore_errors: bool = False) -> None:
+        if not interrupted.stopped:  # type: ignore[attr-defined]
+            interrupted.stopped = True  # type: ignore[attr-defined]
+            raise opscheck._Stopped(signal.SIGTERM)  # the stop arrives during the removal
+        real_rmtree(path, ignore_errors=ignore_errors)
+
+    interrupted.stopped = False  # type: ignore[attr-defined]
+    monkeypatch.setattr(opscheck.tempfile, "mkdtemp", spy)
+    monkeypatch.setattr(opscheck.shutil, "rmtree", interrupted)
+    with pytest.raises(opscheck._Stopped):
+        opscheck.run_checks(tree, only=["tool-versions"])
+    [work] = created
+    assert not work.exists()
+
+
+def test_a_second_stop_signal_only_kills_again() -> None:
+    validators = opscheck._Validators()
+    with pytest.raises(opscheck._Stopped):
+        validators.stop(signal.SIGTERM)
+    validators.stop(signal.SIGINT)  # no second exception while the first one unwinds
+    with pytest.raises(opscheck._Stopped) as stopped:
+        validators.start(["/bin/true"], env={}, cwd=Path.cwd())
+    assert stopped.value.signum == signal.SIGTERM
+
+
+def test_main_restores_the_default_for_a_handler_set_outside_python(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`signal.signal` returns None for such a handler; main then restores SIG_DFL, not its own."""
+    before = {s: signal.getsignal(s) for s in opscheck.STOP_SIGNALS}
+    real_signal = signal.signal
+
+    def outside_python(signum: int, handler: Any) -> Any:
+        previous = real_signal(signum, handler)
+        return None if handler is opscheck._on_stop_signal else previous
+
+    monkeypatch.setattr(opscheck.signal, "signal", outside_python)
+    monkeypatch.setattr(opscheck, "run_checks", lambda *args, **kwargs: [])
+    try:
+        assert opscheck.main(["--only", "loki"]) == 0
+        after = {s: signal.getsignal(s) for s in opscheck.STOP_SIGNALS}
+    finally:
+        for signum, handler in before.items():
+            real_signal(signum, handler)
+    assert after == dict.fromkeys(opscheck.STOP_SIGNALS, signal.SIG_DFL)
+
+
+def _for_mutants(rules: Any) -> list[tuple[str, int, int, str | None]]:
+    """(alert, group, rule, new `for`) for each alert: one minute longer, shorter or added."""
+    mutants: list[tuple[str, int, int, str | None]] = []
+    for group_index, group in enumerate(rules["groups"]):
+        for rule_index, rule in enumerate(group["rules"]):
+            if "alert" not in rule:
+                continue
+            if "for" not in rule:
+                changes: list[str | None] = ["1m"]
+            else:
+                seconds = opscheck.parse_duration(rule["for"])
+                changes = [f"{seconds + 60:.0f}s", f"{seconds - 60:.0f}s" if seconds > 60 else None]
+            mutants += [(rule["alert"], group_index, rule_index, c) for c in changes]
+    return mutants
+
+
+UNCHANGED = "unchanged"
+
+
+def test_alert_unit_tests_hold_every_for_duration(tmp_path: Path) -> None:
+    """A `for` one minute longer, one minute shorter or newly added breaks a unit test.
+
+    Alerts without `for` fire at the first evaluation where their condition holds, so an
+    added `for` must break a case too (red team on d73c418).
+    """
+    promtool = opscheck.pinned_tool("promtool")
+    rules = yaml.safe_load((REPO / ALERTS).read_text(encoding="utf-8"))
+    mutants = _for_mutants(rules)
+
+    def survives(mutant: tuple[str, int, int, str | None]) -> bool:
+        alert, group_index, rule_index, change = mutant
+        root = tmp_path / f"{alert}-{change}"
+        shutil.copytree(REPO / PROM / "tests", root / "tests")
+        spec = copy.deepcopy(rules)
+        rule = spec["groups"][group_index]["rules"][rule_index]
+        if change is None:
+            del rule["for"]
+        elif change != UNCHANGED:
+            rule["for"] = change
+        (root / "rules").mkdir()
+        (root / "rules" / "bothy-alerts.yaml").write_text(
+            yaml.safe_dump(spec, sort_keys=False), encoding="utf-8"
+        )
+        tests = sorted((root / "tests").glob("*.test.yaml"))
+        # Only the cases of this alert; their names start with it.
+        run = f"--run=^{re.escape(alert)} "
+        proc = subprocess.run(
+            [promtool, "test", "rules", run, *tests], capture_output=True, check=False, timeout=120
+        )
+        return proc.returncode == 0
+
+    # Control: unmutated, every alert's filtered run passes, so a failing mutant run means a
+    # broken case and not a broken setup.
+    controls = sorted({(alert, g, r, UNCHANGED) for alert, g, r, _ in mutants})
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        assert all(pool.map(survives, controls))
+        survived = [
+            f"{alert}: for {change or 'removed'}"
+            for (alert, _, _, change), alive in zip(
+                mutants, pool.map(survives, mutants), strict=True
+            )
+            if alive
+        ]
+    assert {m[0] for m in mutants} == {name for name, _ in opscheck._alert_rules(REPO / ALERTS)}
+    assert survived == []
+
+
+def test_over_threshold_below_the_value_fails(tree: Path) -> None:
+    """``above `<name>` `` needs a threshold strictly greater; one below the value fails too."""
+    edit(
+        tree / ALERTS,
+        'bothy_agent_heartbeat_age_seconds{job="bothy/bothy-server"}) > 300',
+        'bothy_agent_heartbeat_age_seconds{job="bothy/bothy-server"}) > 60',
+    )
+    assert findings(tree, "alert-thresholds") == (
+        "BothyAgentOffline: threshold 60 s in bothy-alerts.yaml must be greater than "
+        "agent.presence_timeout (90s = 90 s)",
+    )
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [("sloth_window: 5m", "sloth_window:  5m"), ("sloth_window: 5m\n", "sloth_window: 5m \n")],
+)
+def test_sloth_compares_byte_for_byte(tree: Path, old: str, new: str) -> None:
+    """A change of white space only is a difference too: the files must be equal byte for byte."""
+    edit(tree / PROM / "rules" / "slo-api.yaml", old, new)
+    [finding] = findings(tree, "sloth")
+    assert finding.startswith(
+        "infra/observability/prometheus/rules/slo-api.yaml differs from a fresh "
+        "`sloth generate` of infra/observability/slo/api.yaml"
+    )
+
+
+def test_markdown_table_returns_the_first_table_after_the_heading() -> None:
+    text = "## T\n\n| a |\n|---|\n| first |\n\nText.\n\n| b |\n|---|\n| second |\n\n## U\n"
+    assert opscheck.markdown_table(text, "T") == [{"a": "first"}]

@@ -232,6 +232,7 @@ def test_ensure_rejects_missing_zip_member(tmp_path: Path, downloads: FakeNet) -
     ("member", "mode"),
     [
         ("demo-linux-amd64/", stat.S_IFDIR | 0o755),  # directory entry as zip writes it
+        ("demo-linux-amd64/", 0),  # directory entry without mode bits: only the slash tells
         ("demo-linux-amd64", stat.S_IFDIR | 0o755),  # directory by its mode only
         ("demo-linux-amd64", stat.S_IFLNK | 0o777),  # symbolic link
     ],
@@ -243,6 +244,59 @@ def test_ensure_rejects_zip_member_that_is_not_a_regular_file(
     lock = _lock("demo-linux-amd64.zip", member, payload)
     downloads[ZIP_URL] = payload
     with pytest.raises(fetch_tools.FetchError, match="not a regular file"):
+        fetch_tools.ensure(lock, "demo", "linux-amd64", tmp_path)
+    assert not (tmp_path / "demo" / "1.2.3" / "demo").exists()
+
+
+def _corrupt_zip_member() -> bytes:
+    """A zip archive whose member data no longer matches its CRC."""
+    data = bytearray(_zip({"demo": (b"binary " * 64, stat.S_IFREG | 0o755)}))
+    offset = data.index(b"demo") + len(b"demo") + 4  # inside the compressed member data
+    data[offset] ^= 0xFF
+    return bytes(data)
+
+
+def _zip_with_header(flag_bits: int = 0, method: int | None = None) -> bytes:
+    """A zip archive whose member header says encrypted (flag bit 0) or another method."""
+    data = bytearray(_zip({"demo": (b"binary " * 64, stat.S_IFREG | 0o755)}))
+    for signature, flags_at in ((b"PK\x03\x04", 6), (b"PK\x01\x02", 8)):
+        header = data.index(signature)
+        data[header + flags_at] |= flag_bits
+        if method is not None:
+            data[header + flags_at + 2 : header + flags_at + 4] = method.to_bytes(2, "little")
+    return bytes(data)
+
+
+@pytest.mark.parametrize(
+    ("asset", "payload"),
+    [
+        ("demo.tar.gz", b""),  # empty download
+        ("demo.tar.gz", b"<html>not an archive</html>"),
+        ("demo.tar.gz", _tar_gz({"demo": b"binary " * 64})[:40]),  # cut off inside the stream
+        ("demo.zip", b"PK\x03\x04 broken"),  # zip signature, nothing else
+        ("demo.zip", _zip({"demo": (b"binary " * 64, stat.S_IFREG | 0o755)})[:-30]),  # cut off
+        ("demo.zip", _corrupt_zip_member()),
+        ("demo.zip", _zip_with_header(flag_bits=1)),  # encrypted member
+        ("demo.zip", _zip_with_header(method=9)),  # Deflate64, which zipfile cannot read
+    ],
+    ids=[
+        "empty",
+        "not-an-archive",
+        "cut-tar",
+        "zip-signature-only",
+        "cut-zip",
+        "corrupt-zip",
+        "encrypted-zip",
+        "deflate64-zip",
+    ],
+)
+def test_ensure_reports_an_archive_that_cannot_be_read(
+    tmp_path: Path, downloads: FakeNet, asset: str, payload: bytes
+) -> None:
+    """A broken or empty asset is a FetchError (CLI exit 1), never a traceback."""
+    lock = _lock(asset, "demo", payload)
+    downloads[f"https://github.com/example/demo/releases/download/v1.2.3/{asset}"] = payload
+    with pytest.raises(fetch_tools.FetchError, match=r"^demo: cannot read the archive "):
         fetch_tools.ensure(lock, "demo", "linux-amd64", tmp_path)
     assert not (tmp_path / "demo" / "1.2.3" / "demo").exists()
 

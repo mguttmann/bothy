@@ -20,8 +20,9 @@ Usage:
   opscheck.py [--root <repo root>] [--only <check> ...] [--list]
 
 Prints `<check>: ok` or `<check>: FAIL` with one indented line per finding and exits 1
-if any check failed, 0 if all passed, 2 on a usage error. All selected checks run, so
-one run shows every problem.
+if any check failed, 0 if all passed, 2 on a usage error, and 143 when SIGTERM stops the
+run; after SIGINT it ends by SIGINT, as Python does (a shell shows 130). All selected
+checks run, so one run shows every problem.
 
 Example:
   opscheck.py --only collector sloth
@@ -33,12 +34,15 @@ import argparse
 import difflib
 import itertools
 import json
+import os
 import posixpath
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import threading
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -64,6 +68,9 @@ OUTPUT_TAIL_LINES = 20
 
 COLLECTOR_WORKERS = 4
 """Parallel `otelcol-contrib validate` processes; base, overlays and pairs grow quadratically."""
+
+STOP_SIGNALS = (signal.SIGINT, signal.SIGTERM)
+"""Signals that stop a run of `main`: the validators are killed, the work directory removed."""
 
 # ---- files the checks read (relative to the repository root) ------------------------------
 
@@ -95,6 +102,8 @@ TOFU_DIR = Path("infra/tofu")
 """OpenTofu tree; copied as a whole so modules may refer to their siblings."""
 TOFU_MODULES = TOFU_DIR / "modules"
 """One directory per OpenTofu module."""
+TOFU_FILES = ("*.tf", "*.tf.json", "*.tofu", "*.tofu.json")
+"""Configuration files OpenTofu reads in a module directory; one of them makes a module."""
 SIGNALS_DOC = Path("docs/observability/signals.md")
 """Signal catalogue; table "Attributes in spans and logs" holds the allowlist."""
 SLOS_DOC = Path("docs/observability/slos.md")
@@ -133,6 +142,14 @@ COLLECTOR_ENV: Mapping[str, str] = {
 }
 """Variables without a default in the overlays; every other variable has one."""
 
+COLLECTOR_PROVIDERS = frozenset({"env", "file", "yaml"})
+"""Config providers a collector file may reference (`${env:...}`, `${file:...}`, `${yaml:...}`).
+
+Every other provider is a finding of `collector`: most of them (`http`, `https`, `s3`,
+`secretsmanager`, `googlesecretmanager`) fetch their value from elsewhere, possibly over the
+network, and the gate allows no provider beyond the three it needs.
+"""
+
 DATADOG_VALIDATE_HOSTNAME = "validate.example.com"
 """Fixed host name of the datadog exporter in the work copy (see `_pin_datadog_hostname`)."""
 
@@ -142,8 +159,12 @@ NO_NETWORK_ADDRESS = "127.0.0.1:9"
 NO_NETWORK_PROXY = f"http://{NO_NETWORK_ADDRESS}"
 """Proxy of every validator, so any HTTP request through the proxy fails at once.
 
-No validator needs the network with the setup of the checks; the proxy turns an unexpected
-download (an OpenTofu module source) into a finding instead of a call.
+No validator needs the network with the setup of the checks. The proxy stops only clients
+that honour the proxy variables, such as the registry and HTTP module downloads of
+`tofu init`, and turns such a download into a finding instead of a call. A client with a
+transport of its own ignores it: the GCP metadata client (`NO_NETWORK_METADATA`), a remote
+config provider of the collector (kept out by `COLLECTOR_PROVIDERS`) and the Google Cloud
+Storage module source of `tofu` (`gcs::`), which nothing here stops.
 """
 
 NO_NETWORK_METADATA = {"GCE_METADATA_HOST": NO_NETWORK_ADDRESS}
@@ -175,9 +196,23 @@ _BACKTICKED = re.compile(r"`([^`]+)`")
 _GREATER = re.compile(r"(?<![<>=!])>(?!=)")
 _FILE_NAME = r"[A-Za-z0-9_][A-Za-z0-9_.-]*"
 _PROMETHEUS_MOUNT = "/etc/prometheus/"
+_ALERTMANAGER_MOUNT = "/etc/alertmanager/"
 _PLAIN_NUMBER = re.compile(r"-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
 _OPERAND_END = re.compile(r"\)|\b(?:and|or|unless)\b")
 _FENCE = re.compile(r"^\s*(`{3,}|~{3,})(.*)$")
+# A PromQL `le` matcher with its operator and its value in any of the three quotes.
+_LE_MATCHER = re.compile(r"(?<!\w)le\s*(=~|!=|!~|=)\s*(?:\"([^\"]+)\"|'([^']+)'|`([^`]+)`)")
+# `$$` (an escaped `$`) or the opening `${<provider>:` of a collector reference; group 1 is
+# the provider. Openings, not whole references: a reference inside another one counts too.
+_CONFMAP_REFERENCE = re.compile(r"\$\$|\$\{([A-Za-z][A-Za-z0-9+.-]*):")
+# Cells of slos.md "SLOs": no threshold or no alert, and the column Alert by (page, ticket).
+_NO_VALUE = "none"
+_ALERT_CELLS: Mapping[tuple[bool, bool], str] = {
+    (True, True): "Page, Ticket",
+    (False, True): "Ticket only",
+    (True, False): "Page only",
+    (False, False): _NO_VALUE,
+}
 
 
 # ---- public interface ---------------------------------------------------------------------
@@ -344,7 +379,8 @@ def run_command(
     The process gets only `PATH`, `HOME` and `TMPDIR`, each pointing into `ctx.workdir`,
     the proxy variables set to `NO_NETWORK_PROXY`, the variables of `NO_NETWORK_METADATA`,
     plus `env`; it never inherits the caller's environment. It runs in `cwd` (default
-    `ctx.workdir`) and is killed after `COMMAND_TIMEOUT_S` seconds.
+    `ctx.workdir`) and is killed after `COMMAND_TIMEOUT_S` seconds, or at once when one of
+    `STOP_SIGNALS` stops the run (see `main`).
 
     Args:
         ctx: context of the calling check.
@@ -361,24 +397,31 @@ def run_command(
     command = _display(ctx, args)
     head = label or command
     try:
-        proc = subprocess.run(
+        proc = _RUNNING.start(
             [str(a) for a in args],
-            check=False,
-            capture_output=True,
-            text=True,
-            errors="replace",
             env={**_base_env(ctx.workdir), **(env or {})},
             cwd=cwd or ctx.workdir,
-            timeout=COMMAND_TIMEOUT_S,
         )
-    except subprocess.TimeoutExpired:
-        return [f"{head}: timed out after {COMMAND_TIMEOUT_S} s"]
     except OSError as exc:
         return [f"{head}: cannot run {command}: {exc.strerror or exc}"]
+    # Leaving the block closes the pipes and waits for the process, also after a stop.
+    with proc:
+        try:
+            stdout, stderr = proc.communicate(timeout=COMMAND_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            # Kill and wait (when the block is left) without reading on: a child of the
+            # validator may still hold the output open.
+            proc.kill()
+            return [f"{head}: timed out after {COMMAND_TIMEOUT_S} s"]
+        except BaseException:  # a stop or KeyboardInterrupt: never leave the validator running
+            proc.kill()
+            raise
+        finally:
+            _RUNNING.finish(proc)
     if proc.returncode == 0:
         return []
     status = f"exit status {proc.returncode}" + (f" ({command})" if label else "")
-    tail = (proc.stdout.splitlines() + proc.stderr.splitlines())[-OUTPUT_TAIL_LINES:]
+    tail = (stdout.splitlines() + stderr.splitlines())[-OUTPUT_TAIL_LINES:]
     return [f"{head}: {status}" + "".join(f"\n    {line}" for line in tail)]
 
 
@@ -422,7 +465,11 @@ def run_checks(
             if on_result is not None:
                 on_result(result)
     finally:
-        shutil.rmtree(work, ignore_errors=True)
+        try:
+            shutil.rmtree(work, ignore_errors=True)
+        except _Stopped:  # the stop arrived during the removal; a second one never raises
+            shutil.rmtree(work, ignore_errors=True)
+            raise
     return results
 
 
@@ -503,9 +550,11 @@ def check_slo_docs(ctx: Context) -> list[str]:
     One row per SLO with Target, Threshold and Alert.
 
     Target is the objective with one decimal and ` %` (more decimals only where one decimal
-    would round it, ruling M1-04/16); Threshold is `none` without a
-    `le="..."` selector in the error query, else `<le> s`; Alert is `Page, Ticket` unless
-    `page_alert.disable: true`, then `Ticket only`.
+    would round it, ruling M1-04/16); Threshold is `none` without an `le` matcher in the
+    error query, else `<le> s` (the value in any PromQL quotes; a regex or negated `le`
+    matcher is a finding); Alert is `Page, Ticket`, `Ticket only` with
+    `page_alert.disable: true`, `Page only` with `ticket_alert.disable: true` and `none`
+    with both.
     """
     expected: dict[str, dict[str, str]] = {}
     found: list[str] = []
@@ -617,7 +666,15 @@ def check_collector(ctx: Context) -> list[str]:
     `COLLECTOR_ENV` and a fixed datadog host name. Pairs leave out the empty overlay and
     run in both orders, because overlays replace lists, so the merged result depends on the
     order of `BOTHY_OTEL_EXPORTER` and `BOTHY_OTEL_EXPORTER_2`.
+
+    A reference to a config provider other than `COLLECTOR_PROVIDERS` (`${https:...}`,
+    `${s3:...}`, ...), also one nested in another reference, is a finding, and then no
+    `validate` runs: the collector resolves such a reference while it validates, and its
+    client may bypass the closed proxy.
     """
+    remote = _remote_references(ctx.root)
+    if remote:
+        return remote
     otel = ctx.workdir / "otel"
     shutil.copytree(ctx.root / OTEL_DIR, otel)
     secrets = ctx.workdir / "secrets"
@@ -674,20 +731,10 @@ def check_prometheus_config(ctx: Context) -> list[str]:
     spec = yaml.safe_load(config.read_text(encoding="utf-8")) or {}
     loaded: set[Path] = set()
     for entry in spec.get("rule_files") or []:
-        shown = str(entry).replace(f"{work}/", _PROMETHEUS_MOUNT)
-        # Prometheus reads a relative entry relative to the directory of prometheus.yaml.
-        pattern = posixpath.normpath(
-            str(entry) if posixpath.isabs(str(entry)) else f"{work}/{entry}"
+        matches, problem = _mounted_files(
+            work, _PROMETHEUS_MOUNT, PROMETHEUS_DIR, "rule_files", entry
         )
-        if not pattern.startswith(f"{work}/"):
-            found.append(
-                f"rule_files entry {shown} lies outside {_PROMETHEUS_MOUNT}, where Compose "
-                f"mounts {PROMETHEUS_DIR}/; the gate cannot check it"
-            )
-            continue
-        matches = [m for m in work.glob(pattern.removeprefix(f"{work}/")) if m.is_file()]
-        if not matches:
-            found.append(f"rule_files entry {shown} matches no file")
+        found += [problem] if problem else []
         loaded |= {m.resolve() for m in matches}
     for rule_file in sorted((work / "rules").iterdir()):
         if _visible_file(rule_file) and rule_file.resolve() not in loaded:
@@ -735,10 +782,33 @@ def check_prometheus_rule_tests(ctx: Context) -> list[str]:
 
 
 def check_alertmanager(ctx: Context) -> list[str]:
-    """`amtool check-config` and the routes of alerting.md "Levels and routes" (`ROUTE_TESTS`)."""
-    config = ctx.root / ALERTMANAGER_CONFIG
+    """`amtool check-config` and the routes of alerting.md "Levels and routes" (`ROUTE_TESTS`).
+
+    Both run on a work copy of infra/observability/alertmanager/ whose /etc/alertmanager/
+    paths point into it, so amtool also parses the templates the configuration names.
+    amtool accepts a `templates` pattern that matches nothing, and Alertmanager would then
+    load no template; so every entry must lie under /etc/alertmanager/ (where Compose mounts
+    the directory; a relative entry counts from the directory of alertmanager.yaml) and
+    match a file.
+    """
+    work = ctx.workdir / "alertmanager"
+    shutil.copytree(ctx.root / ALERTMANAGER_CONFIG.parent, work)
+    config = work / ALERTMANAGER_CONFIG.name
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(_ALERTMANAGER_MOUNT, f"{work}/"),
+        encoding="utf-8",
+    )
     amtool = ctx.tool("amtool")
     found = run_command(ctx, [amtool, "check-config", config], label="amtool check-config")
+    try:
+        spec = yaml.safe_load(config.read_text(encoding="utf-8"))
+    except yaml.YAMLError:  # amtool check-config has reported it with its line
+        spec = None
+    for entry in (spec.get("templates") if isinstance(spec, dict) else None) or []:
+        _, problem = _mounted_files(
+            work, _ALERTMANAGER_MOUNT, ALERTMANAGER_CONFIG.parent, "templates", entry
+        )
+        found += [problem] if problem else []
     for receivers, labels in ROUTE_TESTS:
         args = [
             amtool,
@@ -807,8 +877,9 @@ def check_sloth(ctx: Context) -> list[str]:
 
 
 def check_tofu(ctx: Context) -> list[str]:
-    """`tofu init -backend=false` and `tofu validate` for each module with a .tf file.
+    """`tofu init -backend=false` and `tofu validate` for each module of infra/tofu/modules/.
 
+    A module is a directory with a configuration file OpenTofu reads (`TOFU_FILES`).
     The modules run in one work copy of infra/tofu/, so a module may use a sibling as
     module source. Each runs with a CLI configuration of its own, so no mirror,
     credential or plugin cache of the caller is used. Its only provider source is an empty
@@ -817,10 +888,14 @@ def check_tofu(ctx: Context) -> list[str]:
     fails here until it can initialise offline.
     """
     modules = sorted(
-        d for d in (ctx.root / TOFU_MODULES).iterdir() if d.is_dir() and any(d.glob("*.tf"))
+        d
+        for d in (ctx.root / TOFU_MODULES).iterdir()
+        if d.is_dir() and any(any(d.glob(pattern)) for pattern in TOFU_FILES)
     )
     if not modules:
-        return [f"no OpenTofu module with a .tf file under {TOFU_MODULES}/"]
+        *others, last = (pattern.removeprefix("*") for pattern in TOFU_FILES)
+        kinds = f"{', '.join(others)} or {last}"
+        return [f"no OpenTofu module (a directory with {kinds} files) under {TOFU_MODULES}/"]
     mirror = ctx.workdir / "provider-mirror"
     mirror.mkdir()
     cli_config = ctx.workdir / "offline.tfrc"
@@ -867,7 +942,13 @@ CHECKS: Mapping[str, Check] = {
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Command line entry point; see the module docstring for options and exit codes."""
+    """Command line entry point; see the module docstring for options and exit codes.
+
+    For the run, each of `STOP_SIGNALS` stops it the same way: the running validators are
+    killed by their own process id, the work directory is removed, and the exit status is
+    128 plus the signal number (130 for SIGINT, 143 for SIGTERM). The previous handlers
+    are restored afterwards.
+    """
     parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument("--root", type=Path, default=REPO_ROOT, help="repository root to check")
     parser.add_argument(
@@ -878,15 +959,115 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.list:
         print("\n".join(CHECKS))
         return 0
+    previous = {signum: signal.signal(signum, _on_stop_signal) for signum in STOP_SIGNALS}
     try:
         results = run_checks(args.root, args.only, on_result=_print_result)
+        return 1 if any(r.findings for r in results) else 0
     except ValueError as exc:
         print(f"opscheck: {exc}", file=sys.stderr)
         return 2
-    return 1 if any(r.findings for r in results) else 0
+    except _Stopped as stop:
+        print(f"opscheck: stopped by {signal.Signals(stop.signum).name}", file=sys.stderr)
+        return 128 + stop.signum
+    finally:
+        for signum, handler in previous.items():
+            # None: the handler was not set from Python; the default is the best match.
+            signal.signal(signum, signal.SIG_DFL if handler is None else handler)
+        _RUNNING.reset()
 
 
 # ---- internals ----------------------------------------------------------------------------
+
+
+class _Stopped(BaseException):
+    """A stop signal arrived; like KeyboardInterrupt, no `except Exception` catches it."""
+
+    def __init__(self, signum: int) -> None:
+        super().__init__(signum)
+        self.signum = signum
+
+
+class _Validators:
+    """The validator processes running now, so a stop signal can kill them by their PID.
+
+    Starting and registering a process and recording a stop happen under one lock, so no
+    validator starts unseen after a stop. The lock is reentrant because the signal handler
+    runs in the main thread, possibly while that thread holds the lock in `start`.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.RLock()
+        self._running: set[subprocess.Popen[str]] = set()
+        self._stopped_by: int | None = None
+        self._main_starting = False
+
+    def start(self, args: list[str], *, env: Mapping[str, str], cwd: Path) -> subprocess.Popen[str]:
+        """Start and register one validator; raises `_Stopped` after a stop signal."""
+        with self._lock:
+            self._raise_if_stopped()
+            self._main_starting = threading.current_thread() is threading.main_thread()
+            try:
+                proc = subprocess.Popen(
+                    args,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    errors="replace",
+                    env=env,
+                    cwd=cwd,
+                )
+                self._running.add(proc)
+            finally:
+                self._main_starting = False
+            if self._stopped_by is not None:  # the stop arrived while this process started
+                self._running.discard(proc)
+                with proc:  # closes the pipes and waits for the killed process
+                    proc.kill()
+                self._raise_if_stopped()
+        return proc
+
+    def finish(self, proc: subprocess.Popen[str]) -> None:
+        """Forget a process that has ended."""
+        with self._lock:
+            self._running.discard(proc)
+
+    def kill_all(self) -> None:
+        """Kill every registered process; its `run_command` then reports exit status -9."""
+        with self._lock:
+            for proc in self._running:
+                proc.kill()
+
+    def stop(self, signum: int) -> None:
+        """Record a stop, kill every process and raise `_Stopped` in the main thread.
+
+        If the main thread is just starting a process, `start` raises once that process is
+        registered and killed. A further signal during the stop only kills again.
+        """
+        with self._lock:
+            first = self._stopped_by is None
+            if first:
+                self._stopped_by = signum
+            self.kill_all()
+            if not first or self._main_starting:
+                return
+        raise _Stopped(signum)
+
+    def reset(self) -> None:
+        """Forget a stop after `main` returned, so a later run in this process may start."""
+        with self._lock:
+            self._stopped_by = None
+
+    def _raise_if_stopped(self) -> None:
+        if self._stopped_by is not None:
+            raise _Stopped(self._stopped_by)
+
+
+_RUNNING = _Validators()
+"""Every validator `run_command` started and that has not ended yet."""
+
+
+def _on_stop_signal(signum: int, _frame: object) -> None:
+    _RUNNING.stop(signum)
 
 
 def _print_result(result: CheckResult) -> None:
@@ -1003,20 +1184,40 @@ def _parse_table(lines: list[str], start: int) -> list[dict[str, str]]:
 
 
 def _slo_columns(key: str, slo: Mapping[str, Any]) -> tuple[dict[str, str], list[str]]:
-    """Expected cells Target, Threshold and Alert of one Sloth SLO, and problems reading it."""
+    """Expected cells Target, Threshold and Alert of one Sloth SLO, and problems reading it.
+
+    Threshold is left out when the `le` matchers of the error query name no single bound, so
+    the problem is reported once instead of also as a wrong cell.
+    """
     problems: list[str] = []
     query = ((slo.get("sli") or {}).get("events") or {}).get("error_query")
     if query is None:
         problems.append(f"{key}: no sli.events.error_query; slo-docs reads event SLIs only")
-    bounds = sorted(set(re.findall(r'le="([^"]+)"', str(query or ""))))
+    bounds: set[str] = set()
+    for matcher in _LE_MATCHER.finditer(str(query or "")):
+        operator, *values = matcher.groups()
+        if operator != "=":
+            problems.append(
+                f"{key}: le matcher {matcher.group(0)} in the error query is no bound; "
+                'slo-docs reads le="<bound>" only'
+            )
+            continue
+        bounds.update(v for v in values if v is not None)
     if len(bounds) > 1:
-        problems.append(f"{key}: several le bounds {', '.join(bounds)} in the error query")
-    page = ((slo.get("alerting") or {}).get("page_alert")) or {}
-    return {
+        problems.append(f"{key}: several le bounds {', '.join(sorted(bounds))} in the error query")
+    alerting = slo.get("alerting") or {}
+    page, ticket = (
+        (alerting.get(kind) or {}).get("disable") is not True
+        for kind in ("page_alert", "ticket_alert")
+    )
+    columns = {
         "Target": f"{_objective(float(slo['objective']))} %",
-        "Threshold": f"{bounds[0]} s" if bounds else "none",
-        "Alert": "Ticket only" if page.get("disable") is True else "Page, Ticket",
-    }, problems
+        "Threshold": f"{min(bounds)} s" if bounds else _NO_VALUE,
+        "Alert": _ALERT_CELLS[page, ticket],
+    }
+    if problems and query is not None:
+        del columns["Threshold"]
+    return columns, problems
 
 
 def _promql_code(expr: str) -> str:
@@ -1118,6 +1319,45 @@ def _alert_rules(path: Path) -> Iterator[tuple[str, str]]:
                 yield str(rule["alert"]), str(rule.get("expr", ""))
 
 
+def _remote_references(root: Path) -> list[str]:
+    """Findings for references to a config provider outside `COLLECTOR_PROVIDERS`.
+
+    In a file PyYAML reads, only its strings count (keys and values), not comments; a file
+    it cannot read is searched as text, because the collector may still read it. `$$` is
+    the escaped `$`, so `$${https:...}` is text. One finding per file and provider.
+    """
+    *others, last = sorted(COLLECTOR_PROVIDERS)
+    allowed = f"{', '.join(others)} and {last}"
+    found: list[str] = []
+    for path in sorted((root / OTEL_DIR).rglob("*.yaml")):
+        text = path.read_text(encoding="utf-8")
+        try:
+            texts = list(_yaml_strings(yaml.safe_load(text)))
+        except yaml.YAMLError:
+            texts = [text]
+        schemes = {m.group(1) for s in texts for m in _CONFMAP_REFERENCE.finditer(s)}
+        found += [
+            f"{path.relative_to(root)}: ${{{scheme}:...}} uses the config provider {scheme}, "
+            f"which is not allowed; collector files may use only {allowed} references "
+            "(most other providers fetch their value over the network)"
+            for scheme in sorted(schemes - COLLECTOR_PROVIDERS - {None})
+        ]
+    return found
+
+
+def _yaml_strings(node: object) -> Iterator[str]:
+    """Every string of a parsed YAML document, keys and values, depth first."""
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, dict):
+        for key, value in node.items():
+            yield from _yaml_strings(key)
+            yield from _yaml_strings(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _yaml_strings(item)
+
+
 def _pin_datadog_hostname(path: Path) -> None:
     """Set `exporters.datadog.hostname` in the work copy of the datadog overlay.
 
@@ -1152,10 +1392,52 @@ def _seconds(value: float) -> str:
     return f"{value:.0f}" if value.is_integer() else f"{value:f}".rstrip("0")
 
 
+def _mounted_files(
+    work: Path, mount: str, source: Path, key: str, entry: object
+) -> tuple[list[Path], str | None]:
+    """Files that one path entry of a configuration matches in the work copy of its directory.
+
+    Args:
+        work: work copy of the directory Compose mounts at `mount`; the configuration file
+            lies in it, and its `mount` prefixes already point at `work`.
+        mount: the container path of the directory, with a trailing slash.
+        source: the directory in the repository, for the finding.
+        key: the configuration key of the entry (`rule_files`, `templates`), for the finding.
+        entry: the entry as written; a relative one counts from the configuration's directory.
+
+    Returns:
+        The matching regular files and a finding, or `None` if the entry lies under the
+        mount and matches at least one file.
+    """
+    shown = str(entry).replace(f"{work}/", mount)
+    pattern = posixpath.normpath(str(entry) if posixpath.isabs(str(entry)) else f"{work}/{entry}")
+    if not pattern.startswith(f"{work}/"):
+        problem = (
+            f"{key} entry {shown} lies outside {mount}, where Compose mounts {source}/; "
+            "the gate cannot check it"
+        )
+        return [], problem
+    matches = [m for m in work.glob(pattern.removeprefix(f"{work}/")) if m.is_file()]
+    return matches, None if matches else f"{key} entry {shown} matches no file"
+
+
 def _visible_file(path: Path) -> bool:
     """Regular file whose name does not start with a dot (editor and system files)."""
     return path.is_file() and not path.name.startswith(".")
 
 
+def _cli() -> None:
+    """Entry of `python opscheck.py`: run `main` and exit with its status.
+
+    After a stop by SIGINT the script ends by SIGINT itself, as Python does after an
+    uncaught KeyboardInterrupt, so a calling shell stops as well instead of going on.
+    """
+    status = main()
+    if status == 128 + signal.SIGINT:
+        signal.signal(signal.SIGINT, signal.SIG_DFL)
+        os.kill(os.getpid(), signal.SIGINT)
+    sys.exit(status)
+
+
 if __name__ == "__main__":
-    sys.exit(main())
+    _cli()
