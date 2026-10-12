@@ -112,6 +112,11 @@ bootstrap-ci: ## Install pinned tools without git hooks (CI)
 	@if ! grep -qs executablePath "$${MMDC_PUPPETEER_CONFIG:-/dev/null}"; then \
 	  $(NODE_BIN)/puppeteer browsers install chrome-headless-shell >/dev/null; fi
 	$(FETCH) fetch
+	@# SDK components (M2-23/8): their own locks, installed when tracked.
+	@if git ls-files --error-unmatch sdk/typescript/package-lock.json >/dev/null 2>&1; then \
+	  npm ci --prefix sdk/typescript --ignore-scripts --no-audit --no-fund --loglevel=error || exit 1; fi
+	@if git ls-files --error-unmatch sdk/python/uv.lock >/dev/null 2>&1; then \
+	  $(UV) sync --project sdk/python --locked --quiet || exit 1; fi
 
 # ---- aggregate ------------------------------------------------------------------------
 check: gates denylist sonar ## Every gate, identical to CI (before every push)
@@ -164,9 +169,10 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-lint,no Dart package selected); \
 	else for p in $(DART_PKGS); do (cd $$p && flutter analyze --fatal-infos && \
 	  if grep -q '^ *custom_lint:' pubspec.yaml; then dart run custom_lint; fi); done; fi
+	@# bandit skips the project's virtual environment and generated code (docs/DECISIONS.md M2-23/7).
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-lint,no Python project selected); \
 	else for p in $(PY_PROJECTS); do $(UV) run --project $$p --locked ruff check $$p && \
-	  $(UVRUN) bandit -q -r $$p -x $$p/tests; done; fi
+	  $(UVRUN) bandit -q -r $$p -x "$$p/tests,$$p/.venv,*/generated/*" || exit 1; done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-lint,no TypeScript project selected); \
 	else for p in $(TS_PROJECTS); do npm --prefix $$p run lint; done; fi
 
@@ -177,7 +183,7 @@ typecheck: ## Type checks: mypy (strict), go build, flutter analyze, tsc
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-types,no Dart package selected); \
 	else echo "  dart types: covered by flutter analyze in make lint"; fi
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-types,no Python project selected); \
-	else for p in $(PY_PROJECTS); do $(UV) run --project $$p --locked mypy; done; fi
+	else for p in $(PY_PROJECTS); do (cd $$p && $(UV) run --locked --quiet mypy) || exit 1; done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-types,no TypeScript project selected); \
 	else for p in $(TS_PROJECTS); do npm --prefix $$p run typecheck; done; fi
 
@@ -360,10 +366,25 @@ ops-check: ## Operations configuration valid with the pinned upstream tools; der
 	@# is no SKIP; a validator that cannot be fetched fails (tools/opscheck/README.md).
 	$(UVRUN) python tools/opscheck/opscheck.py
 
-api-clients: ## Generated API clients compile (contract: each SDK/app provides `make -C <dir> generate-check`)
-	@found=""; for d in sdk/python sdk/typescript packages/api_client; do \
-	  if [ -f $$d/Makefile ] && grep -q '^generate-check:' $$d/Makefile; then found=1; $(MAKE) -C $$d generate-check; fi; done; \
-	[ -n "$$found" ] || $(call skip,api-clients,no client package with a generate-check target yet)
+# Client directories of gate G4 with their gate component (component contract "Generated
+# client", docs/spec/23-quality.md section 3); a test replaces the list.
+API_CLIENTS ?= sdk/python:sdk-python sdk/typescript:sdk-typescript packages/api_client:apps
+
+api-clients: ## G4: generated API clients equal a fresh generation and compile (each client: `make -C <dir> generate-check`)
+	@# Fails closed: a client with a tracked manifest but without the target is an error
+	@# (docs/quality/gates.md "Skipping and failing", D-QA-22).
+	@# git exports GIT_DIR to hooks (the pre-push hook runs `make check`); without the variables
+	@# git finds each client's repository from its directory, as tools/ci/codegen_check.py does.
+	@for entry in $(API_CLIENTS); do d=$${entry%%:*}; c=$${entry#*:}; m=""; \
+	  if [ -d "$$d" ]; then m=$$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR -u GIT_PREFIX \
+	    git -C "$$d" ls-files -- pyproject.toml package.json pubspec.yaml) || exit 1; fi; \
+	  if [ -z "$$m" ]; then printf '  SKIP  %-14s %s\n' api-clients "$$d has no tracked manifest yet"; continue; fi; \
+	  case " $(COMPONENTS) " in *" all "*|*" $$c "*) ;; \
+	    *) printf '  SKIP  %-14s %s\n' api-clients "$$d: component $$c not selected"; continue ;; esac; \
+	  if [ ! -f "$$d/Makefile" ] || ! grep -q '^generate-check:' "$$d/Makefile"; then \
+	    echo "api-clients: $$d has a manifest but no Makefile with the target generate-check (component contract \"Generated client\", docs/spec/23-quality.md section 3)" >&2; exit 1; fi; \
+	  $(MAKE) -C "$$d" generate-check || exit 1; \
+	done
 
 # ---- CI policy and supply chain -------------------------------------------------------
 runners-check: ## Workflow policy: GitHub-hosted runners, triggers, SHA pinning, timeouts, permissions

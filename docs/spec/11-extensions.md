@@ -403,10 +403,12 @@ Python and TypeScript, each made of two layers.
 | Language | Generator (Baseline R-Clients) | Content |
 |---|---|---|
 | Python | openapi-python-client | models and calls of all REST operations |
-| TypeScript | openapi-typescript | types of all operations; runtime client built on top of them (choice in the build ticket) |
+| TypeScript | openapi-typescript | types of all operations; runtime client openapi-fetch |
 
 The core is generated from `docs/api/openapi.yaml` and compiled in the gate ([23-quality.md](23-quality.md)).
-It is not changed by hand. Gateway messages get their types from `docs/api/asyncapi.yaml`.
+It is not changed by hand. Gateway messages take their types from the schemas of
+`docs/api/openapi.yaml` that `docs/api/asyncapi.yaml` references; no generator runs for AsyncAPI
+([06-api.md](06-api.md) 14 point 3).
 
 ### 11.2 Hand-written layer
 

@@ -46,6 +46,15 @@
       ]
     },
     {
+      "description": "SDK code generators (docs/DECISIONS.md M2-23/2): the generated cores are regenerated in the same pull request, so `make api-clients` fails until then, on purpose",
+      "matchFileNames": ["sdk/python/pyproject.toml", "sdk/typescript/package.json"],
+      "matchDepNames": ["openapi-python-client", "openapi-typescript"],
+      "groupName": "SDK code generators",
+      "prBodyNotes": [
+        "Regenerate before merging: `make -C sdk/python generate` and `make -C sdk/typescript generate`, then update the versions in docs/spec/06-api.md section 14 (tools/docs/tests/test_toolchain_doc.py checks them)."
+      ]
+    },
+    {
       "description": "Trivy stays on the release the vendor advisory GHSA-69fq-xp46-6x23 names as safe; a newer one needs the manual check in docs/quality/toolchain.md",
       "matchDepNames": ["trivy"],
       "enabled": false

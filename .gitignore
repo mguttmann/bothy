@@ -37,6 +37,8 @@ apps/**/build/
 packages/**/build/
 apps/**/coverage/
 packages/**/coverage/
+# Coverage output of the SDK test runners (Vitest writes coverage/lcov.info)
+sdk/**/coverage/
 
 # Editors, operating systems and local agent state
 .DS_Store

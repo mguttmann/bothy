@@ -97,9 +97,9 @@ Each ticket comes in order as its own pull request according to push-discipline.
     analysis of the base branch to compare the pull request results with [assumed, not checked
     offline]. Then the first pull request from the repository (full list):
     all jobs ran on GitHub-hosted runners, `ci-ok` is green, SonarQube Cloud, CodeQL and
-    CodeRabbit report, Scorecard starts; the jobs `analyze (actions)`, `analyze (go)` and
-    `analyze (python)` are green, and code scanning shows results of the category
-    `/language:go`. In addition, a pull request from a fork (generic deny rules, no secret).
+    CodeRabbit report, Scorecard starts; the jobs `analyze (actions)`, `analyze (go)`,
+    `analyze (javascript-typescript)` (TypeScript SDK) and `analyze (python)` are green, and code
+    scanning shows results of the category `/language:go`. In addition, a pull request from a fork (generic deny rules, no secret).
 19. **Check DCO**: a pull request without sign-off must fail at `ci-ok`.
 20. **Release signatures** before the first release tag (build ticket M7-10): the release chain
     signs keyless and with attestations (ADR 0036). The key pair from

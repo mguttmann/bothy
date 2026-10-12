@@ -766,8 +766,14 @@ def test_go_licenses_fails_without_a_module_path(fakes: Fakes, shell: list[str])
 
 @pytest.mark.parametrize("shell", SHELLS, ids=SHELL_IDS)
 def test_licenses_pass_the_allowlist_to_osv_scanner(fakes: Fakes, shell: list[str]) -> None:
-    """OSV-Scanner gets the allowlist joined by commas, without comments and empty lines."""
-    command = _recipe_command("licenses", "--licenses=", fakes, modules="services/server")
+    """OSV-Scanner gets the allowlist joined by commas, without comments and empty lines.
+
+    The SDK projects are left out here (their locks would join the list); this test is about
+    the server module.
+    """
+    command = _recipe_command(
+        "licenses", "--licenses=", fakes, "PY_PROJECTS=", "TS_PROJECTS=", modules="services/server"
+    )
     result = _bash(command, fakes, shell)
     assert result.returncode == 0, result.stdout + result.stderr
     allowed = (REPO / "quality" / "licenses" / "allowed.txt").read_text(encoding="utf-8")

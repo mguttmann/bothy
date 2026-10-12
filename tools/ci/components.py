@@ -38,8 +38,9 @@ from typing import Any
 GATE_COMPONENTS: dict[str, tuple[str, ...]] = {
     "server": ("services/",),
     "apps": ("apps/", "packages/", "design/"),
-    "sdk-python": ("sdk/python/",),
-    "sdk-typescript": ("sdk/typescript/",),
+    # sdk/testdata/ holds the shared G5 fixtures that both SDK test suites read.
+    "sdk-python": ("sdk/python/", "sdk/testdata/"),
+    "sdk-typescript": ("sdk/typescript/", "sdk/testdata/"),
     "plugins": ("plugins/",),
 }
 # The API contract feeds generated server stubs and every client.

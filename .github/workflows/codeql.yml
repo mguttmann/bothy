@@ -5,8 +5,8 @@
 # static analysis in every pull request and locally.
 # Languages: the matrix lists every tracked language CodeQL supports, found through the
 # workflows, tools/ and the component manifests the root Makefile discovers;
-# tools/ci/tests/test_codeql_workflow.py enforces it. `javascript-typescript` is added by the
-# ticket that adds the first TypeScript project. Go uses `build-mode: manual` because CodeQL
+# tools/ci/tests/test_codeql_workflow.py enforces it. `javascript-typescript` covers the
+# TypeScript SDK (sdk/typescript) and needs no build. Go uses `build-mode: manual` because CodeQL
 # has no `none` mode for Go and its autobuilder would run the root Makefile first; the
 # manual build runs `go build ./...` in the module, as `make typecheck` does. Dart is not
 # supported by CodeQL.
@@ -44,6 +44,8 @@ jobs:
             build-mode: none
           - language: go
             build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
           - language: python
             build-mode: none
     steps:
