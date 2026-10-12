@@ -38,10 +38,10 @@ otherwise they match parts of other words. `allow-authors.txt`: one identity per
 |---|---|---|
 | Content and name of every tracked file (binary files too; for PNG everything except the pixel data (`IDAT`), because compressed pixels produce random matches; `zTXt`, `iTXt` and `iCCP` are also decompressed; a damaged PNG is checked raw) | yes | yes, plus every earlier object and every earlier path |
 | Commit messages | commits in `--range` (default: not yet on `origin/main`, without a remote all of them) | all commits of all refs |
-| Author, committer and the identity lines `Signed-off-by` and `Co-authored-by` | like messages, only against the private list | yes |
+| Author, committer and the identity lines `Signed-off-by` and `Co-authored-by` | like messages; author and committer only against the private list, identity lines also against the generic rules without the local part of the address | yes |
 | Branch, remote and tag names, tag messages | yes | yes |
 | Additional names (`--name`, `BOTHY_DENYLIST_NAMES`) | yes | yes |
-| Pull request title (`PR_TITLE`) and body (`PR_BODY`, or a file in `PR_BODY_FILE`), the planned squash commit on `main`; the body like a commit message, `Signed-off-by` passes only with a full allowed identity `Name <email>` (with `--allow-missing` the generic rules check every line, trailers on their name part) | when set | when set |
+| Pull request title (`PR_TITLE`) and body (`PR_BODY`, or a file in `PR_BODY_FILE`), the planned squash commit on `main`; the body like a commit message, `Signed-off-by` passes only with a full allowed identity `Name <email>` (with `--allow-missing` the generic rules check every line, identity lines without the local part of the address) | when set | when set |
 
 The public rules in `generic.rules` always run, but do not check
 commit identities: contributors sign off with their own address (DCO). An identity line

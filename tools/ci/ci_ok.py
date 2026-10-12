@@ -62,6 +62,11 @@ def evaluate(jobs: list[dict[str, Any]], runner: str) -> tuple[str, str]:
     if not own:
         return "wait", "own job not listed yet"
     prefix = own[0]["name"][: -len(OWN_NAME)]
+    mine = [j["name"][len(prefix) :] for j in jobs if j["name"].startswith(prefix)]
+    required = {n for rule in RULES for n in rule.names}
+    duplicates = sorted({n for n in mine if n in required and mine.count(n) > 1})
+    if duplicates:
+        return "fail", f"duplicate job names: {', '.join(duplicates)}"
     by_name = {j["name"][len(prefix) :]: j for j in jobs if j["name"].startswith(prefix)}
     states: list[str] = []
     decided_fail = False

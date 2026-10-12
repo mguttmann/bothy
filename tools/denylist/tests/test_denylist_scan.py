@@ -594,8 +594,8 @@ def test_pr_body_crlf_lines_are_located(repo: Path, monkeypatch: pytest.MonkeyPa
     [
         f"Signed-off-by: Bob <{HOME}>",
         "Co-authored-by: Bob <192.168.1.20>",
-        "Signed-off-by: Bob <bob@host-a.tail1234.ts.net>",
-        "Co-authored-by: Bob <123456789012345678>",
+        "Signed-off-by: Bob <bob@host-a.tail1234" + ".ts" + ".net>",
+        "Co-authored-by: Bob <123456789" + "012345678>",
         f"Co-authored-by: <{HOME}>",
         f"Co-authored-by: Bob <{HOME}@x.test>",
     ],

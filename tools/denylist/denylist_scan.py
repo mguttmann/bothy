@@ -16,11 +16,11 @@ Allowed commit identities come from --allow-authors, BOTHY_DENYLIST_ALLOW_AUTHOR
 `allow-authors.txt` next to the list. Lines are 'Name <email>' or '<email>'. They are allowed
 only as author or committer, and in a Signed-off-by trailer that repeats the author or
 committer of the same commit; anywhere else (Co-authored-by, another sign-off, text) the
-private rules apply as usual. Identity trailers (Signed-off-by, Co-authored-by) of the exact
-form 'Key: Name <email>' are checked against the private list as a whole, like author and
-committer, because contributors sign off with their own addresses; their name part also gets
-the generic rules. A trailer line with any other text, and every other trailer, is message
-text and gets all rules.
+private rules apply as usual. Identity trailers (Signed-off-by, Co-authored-by) of the
+exact form 'Key: Name <local@domain>' are checked against the private list as a whole, like
+author and committer, because contributors sign off with their own addresses; the line
+without the local part of the address also gets the generic rules. A trailer line with any
+other text, and every other trailer, is message text and gets all rules.
 
 Scanned by default: content and path of every tracked file (working tree), the current
 branch name and all local branch and tag names, annotated tag messages, message plus
@@ -390,9 +390,10 @@ class Scanner:
     ) -> None:
         """Scan a commit message or pull request body; identity trailers get the private list.
 
-        A trailer line of the exact form `Signed-off-by: Name <email>` (or Co-authored-by)
-        is checked against the private list as a whole, and its name part also against the
-        other rules (an address of a contributor is no finding of the generic rules).
+        A trailer line of the exact form `Signed-off-by: Name <local@domain>` (or
+        Co-authored-by) is checked against the private list as a whole, and without the local
+        part of the address against the other rules (a contributor's address is no finding of
+        the generic rules, its domain and the name are checked).
         `own` holds the author and committer of the commit; a Signed-off-by trailer that
         repeats one of them with an allowed identity is not reported. `own` None (a pull
         request body, whose squash commit does not exist yet) accepts a Signed-off-by only

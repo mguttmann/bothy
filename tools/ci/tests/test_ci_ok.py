@@ -185,3 +185,17 @@ def test_run_retries_any_reading_error_and_names_the_status(
     assert ci_ok.run(fetch, "runner-9", sleep=lambda _s: None, interval=1.0) == 0
     denied.close()
     assert "HTTP 403" in capsys.readouterr().out
+
+
+def test_duplicate_job_names_fail_closed() -> None:
+    listed = jobs(GREEN)
+    listed.insert(
+        0,
+        {
+            "name": "gates",
+            "status": "completed",
+            "conclusion": "failure",
+            "runner_name": "runner-y",
+        },
+    )
+    assert ci_ok.evaluate(listed, "runner-9")[0] == "fail"
