@@ -221,7 +221,7 @@ Unit (`internal/files/domain`):
 - `TestExceedsPixelLimit`: exact boundary, frames multiply, values whose product overflows `int64` count as exceeding.
 - `TestVariantSize`: landscape, portrait, square; no upscaling; rounding; at least one pixel.
 - `TestOrientationDisplaySize`: values 5 to 8 swap width and height, 1 to 4 keep them.
-- `TestAllowLists`: every marker and chunk of 12 7.1 is kept, every listed dropped one and an unknown one are not.
+- `TestAllowLists`: every marker of rule 12 (including `DAC`, `DNL`, `DHP`, `EXP` and `RST0` to `RST7`) and every chunk of rule 13 is kept, every listed dropped one and an unknown one are not.
 
 Unit (`internal/files/adapters/imaging`; test images built in code):
 

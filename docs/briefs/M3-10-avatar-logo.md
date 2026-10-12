@@ -267,7 +267,7 @@ Commands that must pass, from the repository root:
 - [ ] The logo is publicly readable only through `getBrandingLogo`: anonymous callers get the `medium` variant with the headers of SEC-HDR-4, 12 9.3 and SEC-CORS-2 there, `401` on every file route, and the same `404` while no deliverable logo exists.
 - [ ] Avatars only for entitled readers: every active signed-in principal reads an avatar file through `file.read`; anonymous `401`, an app without `files:read` `403`; `gdpr_export` never through `file.read`; a replaced or removed avatar gives the same `404` as an unknown id.
 - [ ] Logo changes need an owner with fresh step-up, are audited on allow and deny, write `instance.updated` with only `branding.logo_file_id`, and raise the branding version; avatar changes write `user.updated`; `file.updated` of these files reaches only the uploader.
-- [ ] `authorize` runs before the body is read; an upload rejected while it is staged stores nothing (Design note 2); a staged file that fails later stays as Design note 2 g and `TestSetMyAvatar_DeclaredTypeLies` describe.
+- [ ] `authorize` runs before the body is read; an upload rejected while it is staged stores nothing (Design note 2); a staged file that fails later stays as Design notes 2 g and 4 and `TestSetMyAvatar_DeclaredTypeLies` describe.
 - [ ] The specification changes of Scope (02, 06, 07, 12, `openapi.yaml` descriptions, diagram, module register) and the `D-M3-10-<n>` rows are in the same change.
 - [ ] `make check` is green.
 
