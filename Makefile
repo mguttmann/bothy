@@ -187,6 +187,7 @@ typecheck: ## Type checks: mypy (strict), go build, flutter analyze, tsc
 	else for m in $(GO_MODS); do (cd $$m && go build ./...) || exit 1; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-types,no Dart package selected); \
 	else echo "  dart types: covered by flutter analyze in make lint"; fi
+	@# Inside each project: mypy finds its configuration and targets only from there.
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-types,no Python project selected); \
 	else for p in $(PY_PROJECTS); do (cd $$p && $(UV) run --locked --quiet mypy) || exit 1; done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-types,no TypeScript project selected); \

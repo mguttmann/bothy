@@ -23,6 +23,12 @@ Planning stage (milestone M0). Nothing is installable yet.
 - Host service module `services/host` (own `VERSION` and `CHANGELOG.md`) and the Dart package
   `packages/bothy_noise` with the Noise core of the terminal (M2-38); the gates, CI and CodeQL
   cover both.
+- `plugins/hermes-adapter`: recording harness, probe plugin and fixtures of the live recording
+  against the pinned Hermes Agent version (`plugins/hermes-adapter/tests/hermes_pin.toml`); the
+  answers of docs/spec/09-agenten.md 17.10 come from it (M2-32).
+- The named value `quality.coverage.python_min_percent` also holds every Python project under
+  `plugins/` (M2-32).
+- CI path filter: a change of docs/spec/09-agenten.md selects the gate component `plugins`.
 - Core contract of the specification: glossary, data model, sync protocol and action
   catalogue (`docs/spec/00`, `03`, `04`, `05`).
 - Quality and repository tool chain: `make check` with every gate identical to CI,
@@ -120,6 +126,9 @@ Planning stage (milestone M0). Nothing is installable yet.
   "Confirmation" names the conformance suite and the property test.
 
 ### Fixed
+
+- Root Makefile: `make typecheck` runs mypy inside each Python project, and `make lint` excludes
+  `<project>/.venv` and `<project>/generated` from bandit.
 
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
   `file_blocked`, which no response listed; `createHost` and `issueHostPairingCode` take

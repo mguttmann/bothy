@@ -333,8 +333,17 @@ Der Ist-Modus hängt an der Profil-Umgebung von Hermes:
 
 | Soll | Profil-Umgebung | Danach |
 |---|---|---|
-| `organization` | API-Key gesetzt; OAuth-Variablen leer | Gateway neu starten |
+| `organization` | API-Key gesetzt; OAuth-Variablen leer; keine Login-Datei eines anderen Werkzeugs im `HOME` des Profils und `auth.adopt_external_logins: false` | Gateway neu starten |
 | `personal` | API-Key leer; Anmeldung der Person (OAuth) | Gateway neu starten |
+
+Vorrang in Hermes (gemessen in M2-32 gegen die gepinnte Version, [09-agenten.md](09-agenten.md)
+17.10): OAuth-Variable (`ANTHROPIC_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) vor `ANTHROPIC_API_KEY`
+vor eigenen OAuth-Anmeldungen von Hermes vor der Login-Datei von Claude Code
+(`~/.claude/.credentials.json`, auf macOS auch der Schlüsselbund). Die Login-Datei nutzt Hermes
+ohne weitere Anmeldung als OAuth; darum darf das `HOME` eines Profils im Modus `organization` sie
+nicht enthalten, der Installer prüft das und setzt `auth.adopt_external_logins: false` (die
+dokumentierte Abschaltung, gemessen wirksam). Eine Änderung der `.env` des Hermes-Homes wirkt ab
+dem nächsten Turn; Variablen der Prozess-Umgebung brauchen den Neustart.
 
 Der Adapter erkennt den Ist-Modus nur am Schlüsseltyp der aufgelösten Anmeldung, nie am Wert
 ([09-agenten.md](09-agenten.md) 17.8). Der Installer des Adapters führt die Umstellung als Befehl

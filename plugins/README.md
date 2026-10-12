@@ -12,7 +12,7 @@ geladen.
 
 | Ordner | Art | Zweck | Stand |
 |---|---|---|---|
-| `hermes-adapter/` | Agenten-Adapter | Plattform-Plugin für das Open-Source-Framework Hermes Agent | geplant |
+| `hermes-adapter/` | Agenten-Adapter | Plattform-Plugin für das Open-Source-Framework Hermes Agent | Mitschnitt vorhanden (M2-32), Adapter geplant (M2-33) |
 | `claude-code-runner/` | Agenten-Adapter | Startet Claude-Code-Sitzungen je Thread in Dev-Foren | geplant |
 | `grafana-bothy-live/` | Grafana-Panel-Plugin | Ansichten der Live-Statistik für den Betrieb aus OTel-Metriken (ID `bothy-live-panel`, [25-visualisierung.md](../docs/spec/25-visualisierung.md), Abschnitt 8) | geplant (M7) |
 | weitere Ordner je Referenz-App | App | Beispiele aus docs/spec/11-erweiterungen.md Abschnitt 10 (Code-Hosting, Tickets) | geplant, Ordner entsteht mit dem Bau-Ticket |

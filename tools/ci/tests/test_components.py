@@ -32,6 +32,8 @@ import pytest
         (["docs/spec/actions.yaml", "docs/spec/05-aktionen.md"], ["server"]),
         (["docs/spec/05-aktionen.md"], []),
         (["docs/spec/07-rechte.md", "infra/compose/compose.yaml", "README.md"], []),
+        # Chapter 09 is the contract of the adapters; its 17.10 is bound to their evidence.
+        (["docs/spec/09-agenten.md"], ["plugins"]),
         (["Makefile"], ["all"]),
         (["tools/ci/check_runners.py"], ["all"]),
         ([".github/workflows/ci.yml"], ["all"]),

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -62,14 +63,27 @@ def _sonar_port() -> str:
     return m.group(1)
 
 
+def _python_min_percent() -> str:
+    """The one fail_under of every tracked Python project under sdk/ and plugins/."""
+    patterns = ["sdk/*pyproject.toml", "plugins/*pyproject.toml"]
+    tracked = subprocess.run(
+        ["git", "-C", str(REPO), "ls-files", "--", *patterns],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split()
+    values = {
+        str(tomllib.loads((REPO / name).read_text())["tool"]["coverage"]["report"]["fail_under"])
+        for name in tracked
+    }
+    assert tracked, "no Python project under sdk/ or plugins/"
+    assert len(values) == 1, f"the Python projects disagree on fail_under: {sorted(values)}"
+    return values.pop()
+
+
 def _doc_values(path: str) -> dict[str, str]:
     text = (REPO / path).read_text(encoding="utf-8")
     return {m.group("name"): m.group("value") for m in _DOC_ROW.finditer(text)}
-
-
-def _sdk_python_min() -> str:
-    project = tomllib.loads((REPO / "sdk" / "python" / "pyproject.toml").read_text())
-    return str(project["tool"]["coverage"]["report"]["fail_under"])
 
 
 def _sdk_typescript_min() -> str:
@@ -91,7 +105,7 @@ SOURCES = {
     ),
     "quality.coverage.go_min_percent": lambda: _makefile_var("COVERAGE_GO_MIN"),
     "quality.coverage.dart_min_percent": lambda: _makefile_var("COVERAGE_DART_MIN"),
-    "quality.coverage.python_min_percent": _sdk_python_min,
+    "quality.coverage.python_min_percent": _python_min_percent,
     "quality.coverage.typescript_min_percent": _sdk_typescript_min,
     "quality.perf.timeout": lambda: _makefile_var("PERF_TIMEOUT"),
     "quality.sonar.new_issues_max": lambda: _gate_value("quality.sonar.new_issues_max"),

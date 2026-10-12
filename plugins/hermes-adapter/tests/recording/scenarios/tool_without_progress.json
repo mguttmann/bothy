@@ -1,0 +1,85 @@
+{
+  "allowlist": [
+    "alex",
+    "sam"
+  ],
+  "config": {
+    "display": {
+      "platforms": {
+        "recording_probe": {
+          "tool_progress": "off"
+        }
+      }
+    }
+  },
+  "model_script": [
+    {
+      "tool_calls": [
+        {
+          "arguments": {
+            "todos": [
+              {
+                "content": "Book the boat",
+                "id": "1",
+                "status": "pending"
+              }
+            ]
+          },
+          "name": "todo_list"
+        }
+      ]
+    },
+    {
+      "hold": "answer",
+      "paced": true,
+      "text": [
+        "The trip to the lake ",
+        "is planned for ",
+        "Saturday morning."
+      ]
+    }
+  ],
+  "point": "progress_hooks",
+  "probe": {
+    "supports_draft_streaming": true,
+    "supports_status_text": true
+  },
+  "provider": "openai",
+  "scenario": "tool_without_progress",
+  "steps": [
+    {
+      "do": "inject",
+      "message": "m-1",
+      "text": "ask",
+      "thread": "t-1",
+      "user": "alex"
+    },
+    {
+      "do": "wait_held",
+      "latch": "answer"
+    },
+    {
+      "args": {
+        "text": null
+      },
+      "do": "wait_for",
+      "method": "set_status_text"
+    },
+    {
+      "do": "release",
+      "latch": "answer"
+    },
+    {
+      "do": "wait_for",
+      "message": "m-1",
+      "method": "on_processing_complete"
+    },
+    {
+      "do": "wait_quiet"
+    }
+  ],
+  "texts": {
+    "answer": "The trip to the lake is planned for Saturday morning.",
+    "ask": "Please plan the trip to the lake."
+  }
+}
