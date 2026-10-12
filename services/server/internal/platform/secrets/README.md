@@ -65,7 +65,7 @@ its own): this package does not check its grammar.
 
 ## File rules (`file:`)
 
-1. `os.Stat` follows symlinks, so secrets mounted as links work (Kubernetes). The target must be
+1. `os.Stat` follows symlinks, so secrets mounted as links work. The target must be
    a regular file; a directory, device or FIFO is `insecure_file` before anything is opened (a
    FIFO would block the open).
 2. Mode exactly `0400` or `0600`, checked through the permissions including setuid, setgid and
