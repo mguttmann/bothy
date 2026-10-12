@@ -22,6 +22,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/health"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs/jobstest"
@@ -481,5 +482,27 @@ func TestServeSignalDuringStartSkipsTheDrain(t *testing.T) {
 	}
 	if took := time.Since(sent); took > 10*time.Second {
 		t.Fatalf("the end took %v; the drain ran without a public listener", took)
+	}
+}
+
+// TestServeAbortsOnBadRegistration (02 15.1 step 7, 07 AZ-P2): a module that registers a
+// server-to-client op ends `bothy serve` with exit code 1 and a line naming the violation; the
+// public listener never opens.
+func TestServeAbortsOnBadRegistration(t *testing.T) {
+	t.Parallel()
+	db := pgtest.New(t)
+	bad := []func(*authorize.Registry){func(r *authorize.Registry) { r.Op("gateway", authorize.OpHello) }}
+	p := start(t, wire.RoleAll, serveEnv(t, db), wire.Deps{Registrations: bad})
+	if code := p.exit(t); code != lifecycle.ExitFailure {
+		t.Fatalf("exit = %d; logs:\n%s", code, p.logs)
+	}
+	if !strings.Contains(p.logs.String(), `"msg":"registration check failed","error.type":"outbound_op"`) {
+		t.Fatalf("no line naming the violation; logs:\n%s", p.logs)
+	}
+	if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), `op "hello" (module "gateway")`) {
+		t.Fatalf("Err() = %v", err)
+	}
+	if p.logs.port("public listener started") != 0 {
+		t.Fatal("public listener opened")
 	}
 }

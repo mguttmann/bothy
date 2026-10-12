@@ -304,6 +304,7 @@ deps:
     mayDependOn: [authz-app, authz, authz-domain, kernel-ports, instance]
   authz-adapters:
     mayDependOn: [authz-adapters, authz, authz-app, authz-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-secrets, api, instance]
+    canUse: [v-otel]
   identity:
     mayDependOn: [identity, kernel-ports]
   identity-domain:

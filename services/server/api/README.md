@@ -100,8 +100,10 @@ milestone (and the ticket that builds it); otherwise the generator fails in `mak
 ## Start check
 
 `wire.MountRoutes(role, mux, handlers, cat, log)` is step 7 of the start (02 "Start"): for the
-roles `api` and `all` it calls `routes.Build(handlers, routes.Options{}, cat)`; `cat` is
-`routes.SpecCatalog()` today. `Build` lets the generated std-http and strict server register on a
+roles `api` and `all` it calls `routes.Build(handlers, routes.Options{}, cat)`; since M1-25 `cat`
+is the closed catalogue of `authz` (`authz/app.Catalog`), and the start step checks the route
+bindings against it first (`internal/authz/README.md`). `routes.SpecCatalog()` remains for the
+tests of this package. `Build` lets the generated std-http and strict server register on a
 `routes.Recorder` and compares with `Verify` every registered pattern with the table, every
 action with the catalogue and every class with the class of the action (05 rule 3, AZ-P1). On a
 finding, `MountRoutes` logs `route check failed` at level error with all findings, mounts nothing
@@ -109,8 +111,8 @@ and returns the error. Otherwise it mounts every route under `Route.Operation.Pa
 public mux. M1-11 builds the command `bothy serve` and the public listener; the contract with
 this ticket: `bothy serve` calls the step before opening the public listener and ends with exit
 code 1 on an error, before it reports ready (until then the abort is tested at the level of the
-step, `TestServe_AbortsOnUnknownAction`). The catalogue is a parameter, so that M1-25 can put in
-the closed catalogue of `authz`.
+step, `TestServe_AbortsOnUnknownAction`). The catalogue is a parameter; M1-25
+passes the closed catalogue of `authz`.
 
 `routes.Options` carries the error handlers of the generated server; `nil` means the default of
 oapi-codegen, which writes the error text with 400 or 500. M1-18 puts in the problem writers.

@@ -16,6 +16,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/routes"
 	"github.com/OWNER/bothy/services/server/api/routes/routestest"
+	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
@@ -103,13 +104,13 @@ func (c withoutAction) Class(action string) (string, bool) {
 func TestAZP1_RoutesMatchEnableList(t *testing.T) {
 	for _, role := range []Role{RoleAPI, RoleAll} {
 		mux := &recordingMux{}
-		if err := MountRoutes(role, mux, Handlers{}, routes.SpecCatalog(), testChain(t), slog.New(&captureHandler{})); err != nil {
+		if err := MountRoutes(role, mux, Handlers{}, authzapp.NewCatalog(nil), testChain(t), slog.New(&captureHandler{})); err != nil {
 			t.Fatalf("role %s: %v", role, err)
 		}
 		if got, want := len(mux.patterns), len(routes.Enabled()); got != want {
 			t.Errorf("role %s: %d routes mounted, %d enabled", role, got, want)
 		}
-		assertKnownActions(t, mux, routes.ByPattern, routes.SpecCatalog())
+		assertKnownActions(t, mux, routes.ByPattern, authzapp.NewCatalog(nil))
 	}
 
 	mux := &recordingMux{}

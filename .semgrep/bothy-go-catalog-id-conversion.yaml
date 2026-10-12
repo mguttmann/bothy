@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: Apache-2.0
+rules:
+  - id: bothy-go-catalog-id-conversion
+    languages: [go]
+    severity: ERROR
+    paths:
+      # Generated code declares the identifiers; tests build unknown values on purpose.
+      exclude: ["*_gen.go", "*.gen.go", "*_test.go"]
+    message: >-
+      Do not convert a string to a catalogue identifier (authorize.Action, EventType,
+      Op, ResourceKind or ChannelOp). Use the generated constant or the generated
+      Parse* function, so every identifier in code is an entry of the closed catalogue
+      docs/spec/actions.yaml (docs/spec/05-actions.md rule 5, ADR 0017, ADR 0049).
+    pattern-either:
+      - pattern: authorize.Action($X)
+      - pattern: authorize.EventType($X)
+      - pattern: authorize.Op($X)
+      - pattern: authorize.ResourceKind($X)
+      - pattern: authorize.ChannelOp($X)
+      # An untyped string literal passed where an identifier is expected converts implicitly.
+      - pattern: $C.Spec("...")
+      - pattern: $R.Event($M, "...")
+      - pattern: $R.Op($M, "...")
+      - pattern: $R.ChannelOp($M, "...")
+      # A dot import would make the conversions unqualified; inside package authorize itself
+      # TestNoConversionInsideThePackage holds the hand-written files to this rule.
+      - pattern: import . "github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+      # A typed declaration from a string literal is a conversion as well.
+      - patterns:
+          - pattern-either:
+              - pattern: var $V authorize.$T = $X
+              - pattern: const $V authorize.$T = $X
+          - metavariable-regex:
+              metavariable: $T
+              regex: ^(Action|EventType|Op|ResourceKind|ChannelOp)$
+          - metavariable-regex:
+              metavariable: $X
+              regex: ^["`]

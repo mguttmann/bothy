@@ -292,6 +292,15 @@ documented in this file. The format is based on
   the period) and `privacy.audit_ip_kek_ref`; `bothy serve` needs the secret `audit_ip_kek`.
 - `kernel/txn.Detach`: a context outside the unit of work, so a unit can start its own
   transaction from inside an ambient one.
+- Closed action catalogue in code (M1-25): `tools/catalogen` generates the identifier types
+  `Action`, `EventType`, `Op`, `ResourceKind` and `ChannelOp` of `internal/kernel/authorize` with
+  `Parse*` and `All*`, and the catalogue metadata of `internal/authz/domain`, from
+  `docs/spec/actions.yaml`; `make codegen-check` holds both files. `authorize.Registry` collects the
+  event types, gateway ops and terminal channel ops of the modules. `authz/app.Catalog` fails closed
+  on an unknown action (`500 internal_error`, an ERROR log line, `bothy.authz.errors` with
+  `unknown_action`) and checks route bindings and registrations at start; `bothy serve` exits with
+  code 1 and one line per violation, and the routes are mounted through the same catalogue. The
+  Semgrep rule `bothy-go-catalog-id-conversion` forbids converting strings to these identifiers.
 
 ### Changed
 

@@ -80,8 +80,9 @@ func HTTPOperation(op routes.Operation) httpserver.Operation {
 // When api.cors_allowed_origins names origins, OPTIONS <path> answers the CORS preflight for every
 // enabled path. chain must not be nil for the roles api and all.
 //
-// cat is routes.SpecCatalog() until the closed catalogue of authz replaces it (M1-25). log nil
-// means slog.Default().
+// cat is the closed catalogue of authz (authz/app.Catalog, M1-25), so there is one definition of
+// a known action; the start checks the route bindings against the same catalogue first
+// (startRoutes). log nil means slog.Default().
 //
 // On a failed check MountRoutes logs "route check failed" at level error with the joined error,
 // mounts nothing and returns the error. Contract with the start of `bothy serve` (M1-11): it
@@ -92,7 +93,7 @@ func HTTPOperation(op routes.Operation) httpserver.Operation {
 //
 // Example:
 //
-//	if err := wire.MountRoutes(role, publicMux, handlers, routes.SpecCatalog(), chain, log); err != nil {
+//	if err := wire.MountRoutes(role, publicMux, handlers, authzCatalog, chain, log); err != nil {
 //		return err // exit code 1, never ready
 //	}
 func MountRoutes(role Role, mux Mux, h Handlers, cat routes.Catalog, chain *httpserver.Chain, log *slog.Logger) error {
