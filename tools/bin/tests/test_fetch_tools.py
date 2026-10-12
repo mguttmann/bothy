@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import importlib
 import io
 import json
 import random
@@ -258,6 +259,38 @@ def _corrupt_zip_member() -> bytes:
     return bytes(data)
 
 
+def _codec(module: str) -> bool:
+    """Does this Python have the optional compression module (CPython builds may lack it)?
+
+    The module is imported, not only found: the Python wrappers `lzma`, `bz2` and
+    `compression.zstd` exist even when their C extension is missing, and then fail on import.
+    """
+    try:
+        importlib.import_module(module)
+    except ImportError:
+        return False
+    return True
+
+
+# Zip methods with the optional module their codec needs; a method of a missing module or a
+# Python without the constant is not a kind this interpreter can write or read.
+_ZIP_CODECS = {
+    "ZIP_STORED": None,
+    "ZIP_DEFLATED": "zlib",
+    "ZIP_BZIP2": "bz2",
+    "ZIP_LZMA": "lzma",
+    "ZIP_ZSTANDARD": "compression.zstd",
+}
+ARCHIVE_KINDS = [
+    "targz",
+    *(
+        kind
+        for kind, module in _ZIP_CODECS.items()
+        if hasattr(zipfile, kind) and (module is None or _codec(module))
+    ),
+]
+
+
 def _corrupt_lzma_zip_member() -> bytes:
     """A zip archive whose LZMA properties and data are broken, so the decompressor fails."""
     buf = io.BytesIO()
@@ -297,7 +330,7 @@ def _zip_with_header(flag_bits: int = 0, method: int | None = None) -> bytes:
         ("demo.zip", _corrupt_zip_member()),
         ("demo.zip", _zip_with_header(flag_bits=1)),  # encrypted member
         ("demo.zip", _zip_with_header(method=9)),  # Deflate64, which zipfile cannot read
-        ("demo.zip", _corrupt_lzma_zip_member()),
+        *([("demo.zip", _corrupt_lzma_zip_member())] if "ZIP_LZMA" in ARCHIVE_KINDS else []),
     ],
     ids=[
         "empty",
@@ -308,7 +341,7 @@ def _zip_with_header(flag_bits: int = 0, method: int | None = None) -> bytes:
         "corrupt-zip",
         "encrypted-zip",
         "deflate64-zip",
-        "corrupt-lzma-zip",
+        *(["corrupt-lzma-zip"] if "ZIP_LZMA" in ARCHIVE_KINDS else []),
     ],
 )
 def test_ensure_reports_an_archive_that_cannot_be_read(
@@ -334,16 +367,6 @@ def _archive(kind: str) -> bytes:
         info.compress_type = method
         zf.writestr(info, b"binary " * 64)
     return buf.getvalue()
-
-
-ARCHIVE_KINDS = [
-    "targz",
-    "ZIP_STORED",
-    "ZIP_DEFLATED",
-    "ZIP_BZIP2",
-    "ZIP_LZMA",
-    *(["ZIP_ZSTANDARD"] if hasattr(zipfile, "ZIP_ZSTANDARD") else []),
-]
 
 
 @pytest.mark.parametrize("kind", ARCHIVE_KINDS)

@@ -25,7 +25,6 @@ import hashlib
 import importlib
 import io
 import json
-import lzma
 import os
 import platform
 import re
@@ -126,7 +125,8 @@ def _optional_error(module: str, name: str) -> tuple[type[Exception], ...]:
 # (empty, cut off, corrupt or of another format): zipfile raises ValueError (also its subclass
 # UnicodeDecodeError for a broken member name) for broken offsets, RuntimeError for an
 # encrypted member and its subclass NotImplementedError for a method it lacks (Deflate64);
-# zlib, lzma and, from Python 3.14, Zstandard raise their own errors, bz2 raises OSError.
+# zlib, lzma and, from Python 3.14, Zstandard raise their own errors, bz2 raises OSError;
+# lzma and Zstandard are optional modules, so their errors are looked up, not imported.
 # test_extract_turns_every_corruption_into_a_fetch_error holds the class for every kind.
 _UNREADABLE_ARCHIVE: tuple[type[Exception], ...] = (
     tarfile.TarError,
@@ -135,8 +135,9 @@ _UNREADABLE_ARCHIVE: tuple[type[Exception], ...] = (
     OSError,
     ValueError,
     zlib.error,
-    lzma.LZMAError,
     RuntimeError,
+    # Optional compression modules of CPython: absent ones cannot raise.
+    *_optional_error("lzma", "LZMAError"),
     *_optional_error("compression.zstd", "ZstdError"),
 )
 
