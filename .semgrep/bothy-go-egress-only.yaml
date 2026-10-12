@@ -88,7 +88,7 @@ rules:
                   }{...}
           - metavariable-regex:
               metavariable: $TYPE
-              regex: '^(\[[^\]]*\]|map\[[^\]]*\])*(http\.(Client|Transport)|(net|tls)\.Dialer|httputil\.ReverseProxy)$'
+              regex: '^(\[[^\]]*\]|map\[(\[[^\]]*\])*[^\]\[]*\])*(http\.(Client|Transport)|(net|tls)\.Dialer|httputil\.ReverseProxy)$'
       # An embedded value; Semgrep matches an embedded field without its "*", so a line that
       # holds only the type tells a value from a pointer, which its owner fills.
       - patterns:

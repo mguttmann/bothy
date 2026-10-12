@@ -114,6 +114,10 @@ func zeroProxies() {
 	_ = &rp
 	// ruleid: bothy-go-egress-only
 	_ = []httputil.ReverseProxy{}
+	// ruleid: bothy-go-egress-only
+	_ = map[[2]byte]httputil.ReverseProxy{}
+	// ruleid: bothy-go-egress-only
+	_ = map[[2]byte]http.Client{}
 }
 
 // ruleid: bothy-go-egress-only
