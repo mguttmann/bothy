@@ -92,7 +92,9 @@ gets one.
 `Stop` stops River with `SoftStopTimeout = shutdown.jobs_soft_timeout`: producers stop fetching,
 running jobs may finish; after the soft timeout River cancels the contexts of the jobs still
 running. A job cancelled this way returns an error, and River 0.49.0 puts it back as `available`
-without counting the attempt, so the next worker runs it again. `internal/wire` registers two stop
+without counting the attempt, so the next worker runs it again (`JobSetStateInterrupted` for a
+soft-stopped job in [internal/jobexecutor/job_executor.go](https://github.com/riverqueue/river/blob/v0.49.0/internal/jobexecutor/job_executor.go),
+retrieved 2026-10-13). `internal/wire` registers two stop
 steps in phase `jobs`: the soft stop with the budget `shutdown.jobs_soft_timeout`, then the wait
 for the cancelled jobs within what `shutdown.total_timeout` leaves after the fixed budgets of the
 role; without such a rest there is no second step.
@@ -117,7 +119,11 @@ Reserved words are allowed, because River quotes the schema in every statement.
 ## River defaults
 
 Pinned River version: v0.49.0. These defaults of that version stay in force (02 "Rules for jobs"
-rule 5); a job with another need sets a named value of its chapter:
+rule 5); a job with another need sets a named value of its chapter. Sources, retrieved
+2026-10-13: the `...Default` constants in [client.go](https://github.com/riverqueue/river/blob/v0.49.0/client.go),
+[internal/maintenance](https://github.com/riverqueue/river/blob/v0.49.0/internal/maintenance) (`JobSchedulerIntervalDefault`,
+`JobRescuerRescueAfterDefault`) and the retention defaults of `riversharedmaintenance` in
+[rivershared/riversharedmaintenance](https://github.com/riverqueue/river/blob/v0.49.0/rivershared/riversharedmaintenance):
 
 | Setting | Default |
 |---|---|
