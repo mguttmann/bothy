@@ -10,6 +10,10 @@ import (
 	"github.com/OWNER/bothy/services/server/api/routes"
 )
 
+// logKeyError is the attribute key of the joined error in the "route check failed" record
+// (docs/DECISIONS.md M1-17/7). sloglint (M1-10) asks for constant keys; the value is unchanged.
+const logKeyError = "error"
+
 // Role is the role of a server process (02 "Roles of a process"): api serves REST, gateway
 // and fan-out, worker runs jobs and consumers, all does both.
 type Role string
@@ -89,7 +93,7 @@ func mountRoutes(role Role, mux Mux, build routeBuilder, cat routes.Catalog, log
 		err = mount(mux, rs)
 	}
 	if err != nil {
-		log.Error("route check failed", slog.Any("error", err))
+		log.Error("route check failed", slog.Any(logKeyError, err))
 		return fmt.Errorf("route check failed: %w", err)
 	}
 	return nil

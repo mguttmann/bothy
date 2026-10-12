@@ -171,6 +171,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"egress.max_response_bytes = 1048576  # default\n" +
 		"egress.timeout = 15s  # default\n" +
 		"http.max_json_body_bytes = 1048576  # default\n" +
+		"instance.environment = prod  # default\n" +
 		"message.max_content_bytes = 2048  # env BOTHY_MESSAGE__MAX_CONTENT_BYTES\n" +
 		"migrate.app_password_ref = file:/run/bothy/secrets/db_app_password  # default\n" +
 		"migrate.bootstrap_password_ref = file:/run/bothy/secrets/db_superuser_password  # default\n" +
@@ -179,12 +180,19 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"migrate.maint_password_ref = file:/run/bothy/secrets/db_maint_password  # default\n" +
 		"migrate.monitor_password_ref = file:/run/bothy/secrets/db_monitor_password  # default\n" +
 		"migrate.owner_password_ref = file:/run/bothy/secrets/db_owner_password  # default\n" +
+		"privacy.telemetry_pseudonym_rotation = 30d  # default\n" +
 		"secrets.cache_ttl = 5m  # default\n" +
 		"secrets.dir = /run/bothy/secrets  # default\n" +
 		"server.internal_listen_addr = 127.0.0.1:8081  # default\n" +
 		"server.listen_addr = 127.0.0.1:9080  # file " + path + "\n" +
 		"server.role = worker  # flag --role\n" +
-		"startup.dependency_wait = 1m  # default\n"
+		"startup.dependency_wait = 1m  # default\n" +
+		"telemetry.enabled = true  # default\n" +
+		"telemetry.logs.exporter = both  # default\n" +
+		"telemetry.logs.level = info  # default\n" +
+		"telemetry.pseudonym_key_ref = file:/run/bothy/secrets/telemetry_pseudonym_key  # default\n" +
+		"telemetry.traces.sampler_ratio = 1  # default\n" +
+		"telemetry.traces.trust_remote_parent = false  # default\n"
 	if code != 0 || stdout != want || stderr != "" {
 		t.Fatalf("exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}

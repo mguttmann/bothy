@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"io"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
@@ -45,6 +46,13 @@ var commands = []command{
 		// environment and no configuration file (brief M1-09), so env is not passed on.
 		run: func(ctx context.Context, args, _ []string, stdout, stderr io.Writer) int {
 			return secretsCommand(ctx, args, stdout, stderr)
+		},
+	},
+	{
+		name:    "telemetry",
+		summary: "Map a principal id to its telemetry pseudonym for the owner",
+		run: func(ctx context.Context, args, env []string, stdout, stderr io.Writer) int {
+			return telemetryCommand(ctx, args, env, time.Now, stdout, stderr)
 		},
 	},
 }

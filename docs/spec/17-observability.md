@@ -179,7 +179,7 @@ of this chapter; the views of the apps read only the project's own statistics AP
 | `telemetry.traces.trust_remote_parent` | `false` | `true`: an incoming `traceparent` becomes the parent context (its trace ID becomes `correlation_id`, its sampling flag applies); `false`: span link only, own trace |
 | `telemetry.logs.exporter` | `both` | `otlp`, `stdout` or `both` |
 | `telemetry.logs.level` | `info` | lowest level that is written |
-| `telemetry.pseudonym_key_ref` | `file:<secrets.dir>/telemetry_pseudonym_key` | key for HMAC pseudonyms; at least 32 bytes |
+| `telemetry.pseudonym_key_ref` | `file:<secrets.dir>/telemetry_pseudonym_key` | key for HMAC pseudonyms; at least `otel.MinKeyBytes` bytes |
 | `telemetry.dashboard_url` | empty | link from the admin console to the telemetry backend |
 | `stats.cache_ttl` | `5m` | how long a computed statistics result stays valid |
 | `stats.max_range` | `400d` | largest queryable time range |

@@ -16,6 +16,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -122,6 +123,8 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		t.Errorf("check --secrets with references from env: exit %d, stdout\n%s", code, stdout)
 	}
 	noCanary(t, canaries, stdout, stderr)
+	// The server schema also resolves telemetry.pseudonym_key_ref (M1-10) below secrets.dir.
+	writeSecret(t, dir, "telemetry_pseudonym_key", strings.Repeat("k", 32), 0o600)
 	for _, args := range [][]string{{"config", "print", "--redacted"}, {"config", "check", "--secrets"}} {
 		code, stdout, stderr = runBothy(t, []string{"BOTHY_SECRETS__DIR=" + dir}, args...)
 		if code != 0 || stderr != "" {
@@ -129,8 +132,9 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		}
 		noCanary(t, canaries, stdout, stderr)
 	}
-	// The directory holds db_app_password only, as the secrets of an api container do: the
-	// references of bothy migrate are skipped, not reported as missing (docs/DECISIONS.md M1-12).
+	// The directory holds db_app_password and telemetry_pseudonym_key only, as the secrets of an
+	// api container do: the references of bothy migrate are skipped, not reported as missing
+	// (docs/DECISIONS.md M1-12).
 	skipped := ": skipped (read only by bothy migrate up --bootstrap)\n"
 	want = "secret database.password_ref: ok\n" +
 		"secret migrate.app_password_ref" + skipped +
@@ -138,6 +142,7 @@ func TestConfigPrintNeverShowsSecrets(t *testing.T) {
 		"secret migrate.maint_password_ref" + skipped +
 		"secret migrate.monitor_password_ref" + skipped +
 		"secret migrate.owner_password_ref" + skipped +
+		"secret telemetry.pseudonym_key_ref: ok\n" +
 		"configuration ok\n"
 	if stdout != want {
 		t.Errorf("run config check --secrets with the server schema: stdout\n%s\nwant\n%s", stdout, want)
@@ -530,11 +535,13 @@ func TestSecretsWithoutSubcommandIsUsage(t *testing.T) {
 	}
 }
 
-// TestUsageListsSecrets holds that the command table registers secrets with its summary.
+// TestUsageListsSecrets holds that the command table registers secrets with its summary. The
+// column width follows the longest command name, so the line is matched with any padding.
 func TestUsageListsSecrets(t *testing.T) {
 	t.Parallel()
 	code, stdout, _ := runBothy(t, nil, "--help")
-	if line := "  secrets  Create the secrets of the Compose stack or export them encrypted\n"; code != 0 || !strings.Contains(stdout, line) {
+	line := regexp.MustCompile(`(?m)^  secrets +Create the secrets of the Compose stack or export them encrypted$`)
+	if code != 0 || !line.MatchString(stdout) {
 		t.Errorf("usage does not list secrets:\n%s", stdout)
 	}
 }

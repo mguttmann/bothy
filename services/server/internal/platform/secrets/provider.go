@@ -24,6 +24,11 @@ const meterName = "github.com/OWNER/bothy/services/server/internal/platform/secr
 // the line can be searched for and no value can slip into it.
 const refreshFailedMessage = "secret refresh failed, keeping previous value"
 
+// attrErrorType is the catalog key error.type (docs/observability/signals.md "Attributes in spans
+// and logs"). It is a constant of this package and not otel/attr.ErrorType because platform/otel
+// depends on this package and platform dependency cycles are not allowed (modules.yaml).
+const attrErrorType = "error.type"
+
 // Config holds the configuration keys of the provider (docs/operations/configuration.md).
 // internal/wire fills it with config.Bind and passes the fields to Options.
 type Config struct {
@@ -188,7 +193,7 @@ func (p *Provider) Get(ctx context.Context, ref Ref) (Value, Version, error) {
 	}
 	e.readAt = now
 	p.failures.Add(ctx, 1)
-	p.logger.ErrorContext(ctx, refreshFailedMessage, slog.String("error.type", ErrorCode(err)))
+	p.logger.ErrorContext(ctx, refreshFailedMessage, slog.String(attrErrorType, ErrorCode(err)))
 	return e.value, e.version, nil
 }
 

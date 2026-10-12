@@ -99,7 +99,7 @@ name only commands from here.
 | `bothy secrets init\|export` | create and back up secrets: `init --target DIR [--source DIR] [--owner SERVICE=UID:GID ...] [--adopt-source]` reconciles the store `_store/` with the source and copies per service; `export --from DIR --age-recipient KEY [--age-recipient ...] [--output FILE\|-] [--armor]` writes the age-encrypted bundle; both read only their flags, without a configuration file and database | [16-operations.md](16-operations.md) 5.3, 5.4 |
 | `bothy healthcheck --url` | health check against the internal listener for containers without a shell | [16-operations.md](16-operations.md) |
 | `bothy files rescan` | maintenance: have files checked again | [12-files.md](12-files.md) |
-| `bothy telemetry pseudonym` | pseudonym of a principal for the owner's troubleshooting | [../observability/privacy.md](../observability/privacy.md) |
+| `bothy telemetry pseudonym <principal_id> [--at TIME] [--config FILE]` | pseudonym of a principal for the owner's troubleshooting: prints `bothy.principal.pseudo_id` for the period that contains `--at` ([RFC 3339](https://www.rfc-editor.org/rfc/rfc3339), retrieved 2026-10-12, default now) and the start of that period in UTC; reads `telemetry.pseudonym_key_ref` through the secret provider, no database | [../observability/privacy.md](../observability/privacy.md) |
 | `bothy dev seed` | test data, only in `instance.environment = dev` | [../operations/environments-and-flags.md](../operations/environments-and-flags.md) |
 
 Exit codes of all commands: `0` success or orderly end; `1` error (start failed, fatal

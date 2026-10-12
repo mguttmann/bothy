@@ -63,6 +63,15 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"migrate.app_password_ref":              {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/db_app_password", Chapter: "16-operations.md"},
 		"migrate.maint_password_ref":            {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/db_maint_password", Chapter: "16-operations.md"},
 		"migrate.monitor_password_ref":          {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/db_monitor_password", Chapter: "16-operations.md"},
+
+		"instance.environment":                 {Kind: config.KindEnum, Default: "prod", Enum: []string{"dev", "staging", "prod"}, Chapter: "16-operations.md"},
+		"telemetry.enabled":                    {Kind: config.KindBool, Default: "true", Chapter: "17-observability.md"},
+		"telemetry.traces.sampler_ratio":       {Kind: config.KindFloat, Default: "1.0", Min: "0", Max: "1", Chapter: "17-observability.md"},
+		"telemetry.traces.trust_remote_parent": {Kind: config.KindBool, Default: "false", Chapter: "17-observability.md"},
+		"telemetry.logs.exporter":              {Kind: config.KindEnum, Default: "both", Enum: []string{"otlp", "stdout", "both"}, Chapter: "17-observability.md"},
+		"telemetry.logs.level":                 {Kind: config.KindEnum, Default: "info", Enum: []string{"debug", "info", "warn", "error"}, Chapter: "17-observability.md"},
+		"telemetry.pseudonym_key_ref":          {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/telemetry_pseudonym_key", Chapter: "17-observability.md"},
+		"privacy.telemetry_pseudonym_rotation": {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "20-privacy.md"},
 	}
 	if len(got) != len(want) {
 		t.Errorf("schema has %d keys, want %d", len(got), len(want))

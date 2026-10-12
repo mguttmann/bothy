@@ -81,8 +81,6 @@ rules:
     milestone: M1
   - match: "identity."  # M1-34
     milestone: M1
-  - match: "instance."  # M1-10
-    milestone: M1
   - match: "interaction."  # M2-15
     milestone: M2
   - match: "jobs."  # M1-14
@@ -113,8 +111,6 @@ rules:
     milestone: M6
   - match: privacy.stats_min_group_size  # M6-05
     milestone: M6
-  - match: privacy.telemetry_pseudonym_rotation  # M1-10
-    milestone: M1
   - match: "push."  # M3-20, M3-21
     milestone: M3
   - match: "ratelimit."  # M1-19
@@ -157,8 +153,6 @@ rules:
     milestone: M2
   - match: sync.run_patch_coalesce_interval  # M2-10
     milestone: M2
-  - match: "telemetry."  # M1-10
-    milestone: M1
   - match: telemetry.dashboard_url  # M6-06
     milestone: M6
   - match: "template."  # M1-60
