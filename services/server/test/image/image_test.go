@@ -433,12 +433,12 @@ func TestBinaryIsStatic(t *testing.T) {
 }
 
 func TestReadOnlyRunAsNonRoot(t *testing.T) {
-	// config check needs no variable on this base; BOTHY_DATABASE__HOST proves that the
-	// environment reaches the loader inside the hardened container.
+	// config check needs the required key server.public_url (M1-18), which also proves that the
+	// environment reaches the loader inside the hardened container (docs/DECISIONS.md INT-W4/3).
 	code, stdout, stderr := run(t,
 		"--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
 		"--tmpfs", "/tmp", "--network", "none",
-		"-e", "BOTHY_DATABASE__HOST=postgres",
+		"-e", "BOTHY_SERVER__PUBLIC_URL=https://bothy.example.com",
 		env(t, "BOTHY_TEST_IMAGE"), "config", "check")
 	if code != 0 || !strings.Contains(stdout, "configuration ok") {
 		t.Errorf("config check: exit %d, stdout %q, stderr %q", code, stdout, stderr)
