@@ -5,8 +5,8 @@ package wire
 import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
 // syncConfigKeys returns the keys of the event log (M1-16): the partition size of 03, the
-// retention and payload limit of 04 and the tail and maintenance keys of 02 "Konfigurationswerte
-// dieses Kapitels". database.listen_reconnect_backoff_cap and database.lock_timeout, which the
+// retention and payload limit of 04 and the tail and maintenance keys of 02 "Configuration values
+// of this chapter". database.listen_reconnect_backoff_cap and database.lock_timeout, which the
 // tail and the maintenance read too, are database keys (configkeys_database.go).
 // defaultEventRetention is the default of sync.event_retention (04 "Configuration values of this chapter").
 const defaultEventRetention = "30d"
