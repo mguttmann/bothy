@@ -4,7 +4,10 @@ Status: skeleton (M1-05) with configuration (M1-07) and secret provider (M1-09).
 builds; every module of 02 exists as a port package, the kernel packages `ids`, `clock` and
 `errs`, the platform package `config` with `bothy config check|print` and the platform package
 [`secrets`](internal/platform/secrets/README.md) with `bothy secrets init|export` are complete,
-and `make arch` enforces the module boundaries from the register. The normative source is
+and `make arch` enforces the module boundaries from the register.
+Since M1-11 `bothy serve` starts every role with the internal listener, health, the database
+and schema check and the public listener, shuts down within `shutdown.total_timeout`, and
+`bothy healthcheck` probes a loopback health endpoint. The normative source is
 [docs/spec/02-architecture.md](../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 Module path until V1: `github.com/OWNER/bothy/services/server` (PLAN P-05). `go.mod` names the
@@ -39,6 +42,14 @@ the overview.
 Health: `/healthz` (the process is alive) and `/readyz` (ready) only on the internal listener
 `server.internal_listen_addr`, outside the public API and without an action (ruling L2,
 [16-operations.md](../../docs/spec/16-operations.md)).
+
+Health (W2 resolved in 02 "Roles of a process", R-AR-13): `health` means `/healthz` and
+`/readyz` on the internal listener only; metrics leave the process only over OTLP. The public
+listener answers both paths with `404`. Answer format and check names:
+[`internal/platform/health`](internal/platform/health/README.md). Exit codes of `bothy serve`:
+`0` graceful end, `1` failed start, fatal runtime error or shutdown over
+`shutdown.total_timeout`, `2` usage or configuration error, `3` forced by a second signal
+([`internal/platform/lifecycle`](internal/platform/lifecycle/README.md)).
 
 ## Structure
 
@@ -135,12 +146,12 @@ Technology without domain logic; only `adapters/`, `wire` and `cmd` may import i
 | [`config`](internal/platform/config/README.md) | schema, loading and checking of the configuration, `Bind` to the `Config` structs (02, section 13; built in M1-07) |
 | `secrets` | secret provider (ADR 0011) |
 | `pg` | pool, Unit of Work with lock order, `LISTEN` connection, retry on deadlock |
-| `httpserver` | server, middleware chain, `problem+json`, proof check of `authorize` (02, section 9) |
+| [`httpserver`](internal/platform/httpserver/README.md) | server, middleware chain, `problem+json`, proof check of `authorize` (02, section 9); listener part built in M1-11 |
 | `ratelimit` | token buckets per class from 05 |
 | `jobs` | the only place with River: client per role, queues, schema `jobs.schema` |
 | `otel` | telemetry setup, encapsulated `gen_ai.*` attributes (R-Telemetrie) |
-| `health` | `/healthz` and `/readyz` on the internal listener `server.internal_listen_addr` (L2) |
-| `lifecycle` | start order and shutdown per role (02, section 15) |
+| [`health`](internal/platform/health/README.md) | `/healthz` and `/readyz` on the internal listener `server.internal_listen_addr` (L2); built in M1-11 |
+| [`lifecycle`](internal/platform/lifecycle/README.md) | start order and shutdown per role (02, section 15); built in M1-11 |
 | [`egress`](internal/platform/egress/README.md) | the only client for outgoing HTTP connections: target allow list, IP check at connection setup, checked redirects, deadlines and size limits, loopback client for the health check (19-security.md, section 8; built in M1-22) |
 | `buildinfo` | version of the server as a constant equal to `VERSION` (18-release.md) |
 

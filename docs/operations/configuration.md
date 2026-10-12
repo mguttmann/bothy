@@ -150,11 +150,11 @@ Source: [02-architecture.md](../spec/02-architecture.md), section 22.
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
 | `cluster.mode` | `BOTHY_CLUSTER__MODE` | Server |  | `single` | `single` or `multi` (several api nodes) | planned (M2) |
-| `http.read_header_timeout` | `BOTHY_HTTP__READ_HEADER_TIMEOUT` | Server |  | `5s` | deadline for headers | planned (M1) |
+| `http.read_header_timeout` | `BOTHY_HTTP__READ_HEADER_TIMEOUT` | Server | duration | `5s` | deadline for headers | active |
 | `http.request_timeout` | `BOTHY_HTTP__REQUEST_TIMEOUT` | Server |  | `15s` | context deadline of normal requests | planned (M1) |
 | `http.transfer_timeout` | `BOTHY_HTTP__TRANSFER_TIMEOUT` | Server |  | `10m` | deadline for upload and download | planned (M1) |
-| `http.idle_timeout` | `BOTHY_HTTP__IDLE_TIMEOUT` | Server |  | `120s` | idle time of keep-alive connections | planned (M1) |
-| `http.max_header_bytes` | `BOTHY_HTTP__MAX_HEADER_BYTES` | Server |  | `65536` | largest headers | planned (M1) |
+| `http.idle_timeout` | `BOTHY_HTTP__IDLE_TIMEOUT` | Server | duration | `120s` | idle time of keep-alive connections | active |
+| `http.max_header_bytes` | `BOTHY_HTTP__MAX_HEADER_BYTES` | Server | int | `65536` | largest headers | active |
 | `http.max_json_body_bytes` | `BOTHY_HTTP__MAX_JSON_BODY_BYTES` | Server | int | `1048576` | largest JSON body; strictly greater than `message.max_content_bytes` (13, item 4) | active |
 | `http.max_json_depth` | `BOTHY_HTTP__MAX_JSON_DEPTH` | Server |  | `32` | largest nesting depth of a JSON body (SEC-IN-2); a test holds that every request example in `openapi.yaml` stays below it | planned (M1) |
 | `http.unavailable_retry_after` | `BOTHY_HTTP__UNAVAILABLE_RETRY_AFTER` | Server |  | `5s` | `Retry-After` of every `503 unavailable` response (in whole seconds) | planned (M1) |
@@ -182,11 +182,11 @@ Source: [02-architecture.md](../spec/02-architecture.md), section 22.
 | `jobs.queue.delivery.max_workers` | `BOTHY_JOBS__QUEUE__DELIVERY__MAX_WORKERS` | Server |  | `16` | parallelism `delivery` | planned (M1) |
 | `jobs.queue.maintenance.max_workers` | `BOTHY_JOBS__QUEUE__MAINTENANCE__MAX_WORKERS` | Server |  | `2` | parallelism `maintenance` | planned (M1) |
 | `jobs.queue.privacy.max_workers` | `BOTHY_JOBS__QUEUE__PRIVACY__MAX_WORKERS` | Server |  | `1` | parallelism `privacy` | planned (M1) |
-| `shutdown.drain_delay` | `BOTHY_SHUTDOWN__DRAIN_DELAY` | Server |  | `5s` | waiting after `ready = false` | planned (M1) |
-| `shutdown.http_grace` | `BOTHY_SHUTDOWN__HTTP_GRACE` | Server |  | `20s` | deadline for running HTTP requests | planned (M1) |
+| `shutdown.drain_delay` | `BOTHY_SHUTDOWN__DRAIN_DELAY` | Server | duration | `5s` | waiting after `ready = false` | active |
+| `shutdown.http_grace` | `BOTHY_SHUTDOWN__HTTP_GRACE` | Server | duration | `20s` | deadline for running HTTP requests | active |
 | `shutdown.jobs_soft_timeout` | `BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT` | Server |  | `20s` | soft stop of River | planned (M1) |
-| `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server |  | `5s` | flushing telemetry | planned (M1) |
-| `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server |  | `60s` | total deadline until the end; at least the sum of the step budgets (15.3) | planned (M1) |
+| `shutdown.telemetry_flush_timeout` | `BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT` | Server | duration | `5s` | flushing telemetry | active |
+| `shutdown.total_timeout` | `BOTHY_SHUTDOWN__TOTAL_TIMEOUT` | Server | duration | `60s` | total deadline until the end; at least the sum of the step budgets (15.3) | active |
 | `perf.reference_profile` |  | Load test |  | `4 vCPU, 8 GiB RAM, SSD, PostgreSQL 18 local with fsync and synchronous_commit on, role all` | environment of the load tests; measurement modes in ADR 0063 |  |
 | `perf.sustained_messages_per_s` |  | Load test |  | `200` | sustained load for `perf.message_create_p99` |  |
 | `perf.message_create_p99` |  | Load test |  | `150ms` | target |  |

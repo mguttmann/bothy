@@ -209,6 +209,30 @@
       "doc": "Time limit of one outgoing request, from name resolution to the end of the body."
     },
     {
+      "name": "http.idle_timeout",
+      "env": "BOTHY_HTTP__IDLE_TIMEOUT",
+      "kind": "duration",
+      "default": "120s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "How long a keep-alive connection may stay idle before the server closes it."
+    },
+    {
+      "name": "http.max_header_bytes",
+      "env": "BOTHY_HTTP__MAX_HEADER_BYTES",
+      "kind": "int",
+      "default": "65536",
+      "required": false,
+      "enum": [],
+      "min": "4096",
+      "max": "16777216",
+      "chapter": "02-architecture.md",
+      "doc": "Largest request header block in bytes."
+    },
+    {
       "name": "http.max_json_body_bytes",
       "env": "BOTHY_HTTP__MAX_JSON_BODY_BYTES",
       "kind": "int",
@@ -219,6 +243,18 @@
       "max": "",
       "chapter": "02-architecture.md",
       "doc": "Largest JSON request body in bytes; it must be greater than message.max_content_bytes."
+    },
+    {
+      "name": "http.read_header_timeout",
+      "env": "BOTHY_HTTP__READ_HEADER_TIMEOUT",
+      "kind": "duration",
+      "default": "5s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "Time a client has to send the request headers."
     },
     {
       "name": "instance.environment",
@@ -407,6 +443,54 @@
       "max": "",
       "chapter": "16-operations.md",
       "doc": "Role of the process: api serves REST and the gateway, worker runs jobs and consumers, all does both."
+    },
+    {
+      "name": "shutdown.drain_delay",
+      "env": "BOTHY_SHUTDOWN__DRAIN_DELAY",
+      "kind": "duration",
+      "default": "5s",
+      "required": false,
+      "enum": [],
+      "min": "0s",
+      "max": "1h",
+      "chapter": "02-architecture.md",
+      "doc": "Wait after readiness turns false, so the proxy stops sending new requests."
+    },
+    {
+      "name": "shutdown.http_grace",
+      "env": "BOTHY_SHUTDOWN__HTTP_GRACE",
+      "kind": "duration",
+      "default": "20s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "1h",
+      "chapter": "02-architecture.md",
+      "doc": "Time running HTTP requests get to finish during the shutdown."
+    },
+    {
+      "name": "shutdown.telemetry_flush_timeout",
+      "env": "BOTHY_SHUTDOWN__TELEMETRY_FLUSH_TIMEOUT",
+      "kind": "duration",
+      "default": "5s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "1h",
+      "chapter": "02-architecture.md",
+      "doc": "Time the shutdown gives telemetry to export what it still holds."
+    },
+    {
+      "name": "shutdown.total_timeout",
+      "env": "BOTHY_SHUTDOWN__TOTAL_TIMEOUT",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "1h",
+      "chapter": "02-architecture.md",
+      "doc": "Whole budget of the shutdown; at least the sum of the step budgets, and the orchestrator waits longer."
     },
     {
       "name": "startup.dependency_wait",
