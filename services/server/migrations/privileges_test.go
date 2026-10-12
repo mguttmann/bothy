@@ -35,6 +35,11 @@ var appPrivileges = map[string][]string{
 	// plus the column right UPDATE (key_ciphertext, destroyed_at) for the destruction of a key,
 	// which has_table_privilege does not show; TestSECT16_AppRoleCannotUpdateOrDelete holds it.
 	"audit_ip_keys": {"SELECT", "INSERT"},
+	// 03 section 4.3, R-DM-09: groups are soft deleted, memberships removed by removed_at and
+	// grants revoked by revoked_at; the rows are history (M1-27).
+	"groups":            {"SELECT", "INSERT", "UPDATE"},
+	"group_memberships": {"SELECT", "INSERT", "UPDATE"},
+	"grants":            {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).
