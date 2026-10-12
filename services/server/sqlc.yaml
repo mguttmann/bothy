@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: Apache-2.0
-# sqlc configuration (ADR 0007 rule 1): one sql entry per module, queries under
-# internal/<module>/adapters/postgres/queries/, schema from migrations/, generated code in
-# sqlcgen/ with file names ending in .gen.go (docs/DECISIONS.md M1-05/7). Regenerate with
-# `sqlc generate -f sqlc.yaml`; make codegen-check fails on drift.
+# sqlc configuration (ADR 0007 rule 1): one sql entry per module, the schema read from migrations/
+# (sqlc understands goose files and skips their Down sections), queries under
+# internal/<module>/adapters/postgres/queries/, generated code in .../sqlcgen. Regenerate with
+# `sqlc generate -f sqlc.yaml`; make codegen-check regenerates, compares and fails on drift
+# (docs/spec/02-architektur.md section 7.3).
 version: "2"
 sql:
+  # instance (M1-15): file names end in .gen.go (docs/DECISIONS.md M1-05/7).
   - engine: postgresql
     schema: migrations
     queries: internal/instance/adapters/postgres/queries
@@ -18,3 +20,12 @@ sql:
         output_querier_file_name: querier.gen.go
         output_files_suffix: .gen
         emit_interface: false
+  # identity (M1-26)
+  - engine: postgresql
+    schema: migrations
+    queries: internal/identity/adapters/postgres/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: internal/identity/adapters/postgres/sqlcgen
+        sql_package: pgx/v5

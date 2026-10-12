@@ -231,6 +231,25 @@ documented in this file. The format is based on
   arguments `VERSION` (must equal `VERSION`), `REVISION` and `SOURCE_URL`; base images pinned by
   digest. `make image` builds and loads it, `make image-test` runs the structure tests in
   `test/image` (build tag `imagetest`).
+- Migration `00002_identity_principals`: the tables `principals`, `users` and `owners` with every
+  check, unique index (`lower(handle)`, `lower(email)` where present, one active owners row per
+  person), index and foreign key of the data model; triggers refuse a `users` row for a principal
+  that is not a person and any change of `principals.kind`. The foreign key of
+  `principals.avatar_file_id` follows with the files table.
+- `internal/kernel/textcheck`: `DisplayText` rejects invalid UTF-8, control characters and bidi
+  control characters in display texts (SEC-IN-4) with an error that names rule and rune offset,
+  never the text.
+- `internal/kernel/actor`: the principal kind of a request (`user`, `agent`, `app`, `anonymous`,
+  `host`).
+- `internal/identity`: handles and display names validated at the domain boundary (SEC-T07 for
+  people), the read-only port `Directory` for other modules, and `PrincipalSource`, which gives
+  authz kind, status and owner role of a principal; the repository maps unique, check, trigger
+  and foreign key violations to `conflict` or `validation_failed` with a field and never puts SQL
+  or values into an error.
+- `internal/authz`: the source port `PrincipalSource` with `PrincipalFacts` and `PrincipalStatus`.
+- Configuration keys `principal.handle_max_chars` (default 32) and
+  `principal.display_name_max_chars` (default 64), bound by `wire.IdentityConfig`.
+- `services/server/sqlc.yaml` with the identity entry; `make codegen-check` regenerates its code.
 
 ### Changed
 

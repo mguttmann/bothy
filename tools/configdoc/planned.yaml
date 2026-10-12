@@ -93,8 +93,6 @@ rules:
     etappe: M3
   - match: "pin."  # M1-59
     etappe: M1
-  - match: "principal."  # M1-26
-    etappe: M1
   - match: "privacy."  # M7-06, M7-07; etappe of the chapter for ai_notice_enabled, notice_url (no ticket names it)
     etappe: M7
   - match: privacy.audit_ip_kek_ref  # M1-24

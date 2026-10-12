@@ -51,6 +51,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"shutdown.telemetry_flush_timeout": {Kind: config.KindDuration, Default: "5s", Min: "1ms", Max: "1h", Chapter: "02-architektur.md"},
 		"shutdown.total_timeout":           {Kind: config.KindDuration, Default: "60s", Min: "1s", Max: "1h", Chapter: "02-architektur.md"},
 		"message.max_content_bytes":        {Kind: config.KindInt, Default: "262144", Min: "1", Chapter: "03-datenmodell.md"},
+		"principal.handle_max_chars":       {Kind: config.KindInt, Default: "32", Min: "1", Chapter: "03-datenmodell.md"},
+		"principal.display_name_max_chars": {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-datenmodell.md"},
 		"egress.allowed_hosts":             {Kind: config.KindStringList, Default: "", Chapter: "19-sicherheit.md"},
 		"egress.timeout":                   {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "19-sicherheit.md"},
 		"egress.max_response_bytes":        {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "19-sicherheit.md"},

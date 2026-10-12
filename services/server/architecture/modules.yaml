@@ -86,7 +86,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [instance, authz]
-    adapter_vendors: []
+    adapter_vendors: [pgx]   # sqlc code and the repository (M1-26)
   chat:
     tables: [spaces, user_space_states, channels, channel_skill_bindings, project_bindings,
              dm_participants, forum_tags, threads, thread_tags]

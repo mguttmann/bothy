@@ -9,7 +9,8 @@ Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.
 
 ## Code
 
-- `internal/authz` (`doc.go`): Port als Wurzelpaket, bisher nur mit Paketkommentar. Schnittstellen, DTOs und In-Tx-Ereignisse kommen mit dem Ticket, das sie umsetzt.
+- `internal/authz` (`doc.go`): Port als Wurzelpaket. Schnittstellen, DTOs und In-Tx-Ereignisse kommen mit dem Ticket, das sie umsetzt.
+- `sources.go` (M1-26): the source port `PrincipalSource` with `PrincipalFacts` and `PrincipalStatus` (kind, status and owner role of a principal); identity implements it in `identity/app`. M1-28 adds the further source ports to this file.
 - `domain/`, `app/` und `adapters/<art>/` entstehen mit dem ersten Anwendungsfall. Ihre Komponenten erzeugt `tools/archgen` aus `architecture/modules.yaml`; ein Paket außerhalb dieser Schichten scheitert in `make arch`.
 
 ## Port (Wurzelpaket `internal/authz`)

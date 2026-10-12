@@ -45,68 +45,64 @@ func migrateEnvFor(db *pgtest.DB, role pg.Role, extra ...string) []string {
 	return env
 }
 
-// embedded is one migration of migrations.FS.
-type embedded struct {
-	version int64
-	name    string
+// embeddedMigration is one file of the embedded set: its version and the slug of its name.
+type embeddedMigration struct {
+	version int
+	slug    string
 }
 
-// embeddedMigrations lists migrations.FS in version order.
-func embeddedMigrations(t *testing.T) []embedded {
+// embeddedMigrations returns a copy of the embedded migration set and its files in version
+// order. Tests derive expected output and the versions of their own extra migrations from it, so
+// a ticket that adds a migration does not have to touch them (M1-26).
+func embeddedMigrations(t *testing.T) (fstest.MapFS, []embeddedMigration) {
 	t.Helper()
 	names, err := fs.Glob(migrations.FS, "*.sql")
 	if err != nil {
 		t.Fatal(err)
 	}
-	out := make([]embedded, 0, len(names))
+	set := fstest.MapFS{}
+	list := make([]embeddedMigration, 0, len(names))
 	for _, n := range names {
-		v, err := strconv.ParseInt(n[:5], 10, 64)
+		b, err := fs.ReadFile(migrations.FS, n)
 		if err != nil {
 			t.Fatal(err)
 		}
-		out = append(out, embedded{version: v, name: strings.TrimSuffix(n[6:], ".sql")})
+		set[n] = &fstest.MapFile{Data: b}
+		num, slug, _ := strings.Cut(strings.TrimSuffix(n, ".sql"), "_")
+		v, err := strconv.Atoi(num)
+		if err != nil {
+			t.Fatalf("migration %s: %v", n, err)
+		}
+		list = append(list, embeddedMigration{version: v, slug: slug})
 	}
-	return out
+	slices.SortFunc(list, func(a, b embeddedMigration) int { return a.version - b.version })
+	if len(list) == 0 {
+		t.Fatal("no embedded migrations")
+	}
+	return set, list
 }
 
-// appliedLines is what migrate up prints for every embedded migration.
-func appliedLines(t *testing.T) string {
-	t.Helper()
-	var b strings.Builder
-	for _, m := range embeddedMigrations(t) {
-		fmt.Fprintf(&b, "applied %d %s\n", m.version, m.name)
-	}
-	return b.String()
-}
-
-// requiredVersion is the highest embedded version.
-func requiredVersion(t *testing.T) int64 {
-	t.Helper()
-	v, err := pg.RequiredSchemaVersion(migrations.FS)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return v
-}
-
-// nextMigrationName names the migration offset versions above the embedded ones.
-func nextMigrationName(t *testing.T, offset int64, slug string) string {
-	t.Helper()
-	return fmt.Sprintf("%05d_%s.sql", requiredVersion(t)+offset, slug)
-}
+// migrationFile names a migration file of version v.
+func migrationFile(v int, slug string) string { return fmt.Sprintf("%05d_%s.sql", v, slug) }
 
 func TestMigrateUpBootstrap(t *testing.T) {
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	env := migrateEnvFor(db, pg.RoleOwner)
 
+	_, list := embeddedMigrations(t)
+	highest := list[len(list)-1].version
+
 	code, stdout, stderr := runBothy(t, env, "migrate", "up", "--bootstrap")
-	want := "bootstrap: roles and grants are in place\n" + appliedLines(t)
-	need := requiredVersion(t)
-	if code != 0 || stdout != want+fmt.Sprintf("database version %d, applied %d\n", need, need) {
-		t.Fatalf("first run: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
+	want := "bootstrap: roles and grants are in place\n"
+	for _, m := range list {
+		want += fmt.Sprintf("applied %d %s\n", m.version, m.slug)
+	}
+	want += fmt.Sprintf("database version %d, applied %d\n", highest, len(list))
+	if code != 0 || stdout != want {
+		t.Fatalf("first run: exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}
 	code, stdout, stderr = runBothy(t, env, "migrate", "up", "--bootstrap")
-	if code != 0 || stdout != fmt.Sprintf("bootstrap: roles and grants are in place\ndatabase version %d, applied 0\n", need) {
+	if code != 0 || stdout != fmt.Sprintf("bootstrap: roles and grants are in place\ndatabase version %d, applied 0\n", highest) {
 		t.Fatalf("second run: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
 	}
 	// The roles still log in with the passwords of their secret files.
@@ -130,14 +126,17 @@ func TestMigrateStatusOutput(t *testing.T) {
 	t.Parallel()
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	env := migrateEnvFor(db, pg.RoleOwner)
-	code, stdout, stderr := runBothy(t, env, "migrate", "status")
-	need := requiredVersion(t)
-	var pending, applied strings.Builder
-	for _, m := range embeddedMigrations(t) {
-		fmt.Fprintf(&pending, "%d %s pending -\n", m.version, m.name)
-		fmt.Fprintf(&applied, `%d %s applied \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\n`, m.version, regexp.QuoteMeta(m.name))
+	_, list := embeddedMigrations(t)
+	highest := list[len(list)-1].version
+	want, applied := "", "^"
+	for _, m := range list {
+		want += fmt.Sprintf("%d %s pending -\n", m.version, m.slug)
+		applied += fmt.Sprintf(`%d %s applied \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\n`, m.version, regexp.QuoteMeta(m.slug))
 	}
-	if want := pending.String() + fmt.Sprintf("database version 0, binary requires %d, pending %d\n", need, need); code != 0 || stdout != want {
+	want += fmt.Sprintf("database version 0, binary requires %d, pending %d\n", highest, len(list))
+	applied += fmt.Sprintf(`database version %d, binary requires %d, pending 0\n$`, highest, highest)
+	code, stdout, stderr := runBothy(t, env, "migrate", "status")
+	if code != 0 || stdout != want {
 		t.Fatalf("before: exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}
 	if code, _, stderr := runBothy(t, env, "migrate", "up"); code != 0 {
@@ -145,7 +144,7 @@ func TestMigrateStatusOutput(t *testing.T) {
 	}
 	// bothy_app may read the status as well.
 	code, stdout, stderr = runBothy(t, migrateEnvFor(db, pg.RoleApp), "migrate", "status")
-	pattern := regexp.MustCompile("^" + applied.String() + fmt.Sprintf(`database version %d, binary requires %d, pending 0\n$`, need, need))
+	pattern := regexp.MustCompile(applied)
 	if code != 0 || !pattern.MatchString(stdout) {
 		t.Fatalf("after: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
 	}
@@ -153,17 +152,9 @@ func TestMigrateStatusOutput(t *testing.T) {
 
 func TestMigrateNewerSchemaNotice(t *testing.T) {
 	t.Parallel()
-	newer := fstest.MapFS{nextMigrationName(t, 1, "from_a_newer_binary"): {Data: []byte("-- +goose Up\nCREATE TABLE newer_marker (id int);\n")}}
-	names, err := fs.Glob(migrations.FS, "*.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, n := range names {
-		b, err := fs.ReadFile(migrations.FS, n)
-		if err != nil {
-			t.Fatal(err)
-		}
-		newer[n] = &fstest.MapFile{Data: b}
+	newer, list := embeddedMigrations(t)
+	newer[migrationFile(list[len(list)-1].version+1, "from_a_newer_binary")] = &fstest.MapFile{
+		Data: []byte("-- +goose Up\nCREATE TABLE newer_marker (id int);\n"),
 	}
 	db := pgtest.New(t, pgtest.WithMigrations(newer))
 	code, stdout, stderr := runBothy(t, migrateEnvFor(db, pg.RoleOwner), "migrate", "up")
@@ -240,24 +231,14 @@ func TestMigrateUnreachableDatabase(t *testing.T) {
 func TestMigrateUpHonoursLockTimeout(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
-	locked, alter := nextMigrationName(t, 1, "locked_table"), nextMigrationName(t, 2, "alter_locked")
-	fsys := fstest.MapFS{
-		locked: {Data: []byte("-- +goose Up\nCREATE TABLE locked_table (id int);\n")},
-		alter:  {Data: []byte("-- +goose Up\nALTER TABLE locked_table ADD COLUMN extra int;\n")},
-	}
-	first := fstest.MapFS{locked: fsys[locked]}
-	for _, set := range []fstest.MapFS{fsys, first} {
-		names, err := fs.Glob(migrations.FS, "*.sql")
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, n := range names {
-			b, err := fs.ReadFile(migrations.FS, n)
-			if err != nil {
-				t.Fatal(err)
-			}
-			set[n] = &fstest.MapFile{Data: b}
-		}
+	fsys, list := embeddedMigrations(t)
+	first, _ := embeddedMigrations(t)
+	next := list[len(list)-1].version + 1
+	locked := &fstest.MapFile{Data: []byte("-- +goose Up\nCREATE TABLE locked_table (id int);\n")}
+	fsys[migrationFile(next, "locked_table")] = locked
+	first[migrationFile(next, "locked_table")] = locked
+	fsys[migrationFile(next+1, "alter_locked")] = &fstest.MapFile{
+		Data: []byte("-- +goose Up\nALTER TABLE locked_table ADD COLUMN extra int;\n"),
 	}
 	db := pgtest.New(t, pgtest.WithMigrations(first))
 	tx, err := db.SuperConn(t).Begin(ctx)
