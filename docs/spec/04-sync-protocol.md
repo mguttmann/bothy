@@ -96,6 +96,12 @@ Rules for the payload:
    `reaction.removed` carry `emoji: ""` and `count: 0`; `pin.added` and `pin.removed` stay
    unchanged because they carry no content. A new event type with the resource `message` defines
    its redaction with its schema; without it, the deletion fails (test).
+   `file.updated` (schema version 1) of a deleted file keeps in `file` only `id`, `uploaded_by`,
+   `purpose`, `upload_state`, `scan_status`, `transcript_status` and `created_at`, with
+   `original_name` `""`, `size_bytes` `0`, `mime_type` `application/octet-stream` and `thumbnails`
+   `[]`; every other member is dropped. Another event type with resource `file` defines its
+   redaction with its schema; without it the deletion fails ([03-data-model.md](03-data-model.md),
+   R-DM-45).
 
 ### 2.3 Frames on the WebSocket
 
@@ -769,13 +775,16 @@ back, they appear again.
    `agent.invocation` to the agent (without a token). Exception: if the message has attachments
    that are not final yet (scan running), or if it is a voice message whose transcript the
    server creates, the event is written only by the job that makes the last attachment final
-   (`ReleaseInvocation` in the module `runs`), at the latest after `file.invocation_hold_max` or
+   (`ReleaseInvocation` in the module `runs`, flag `runs.invocation_held_until`,
+   [03-data-model.md](03-data-model.md), R-DM-44), at the latest after `file.invocation_hold_max` or
    `voice.transcript_hold_max` respectively ([12-files.md](12-files.md), section 10). Reason:
    an agent never receives unchecked bytes, and a waiting invocation does not block the other
    events of the consumer.
 2. **Delivery.** On every delivery of `agent.invocation`, the server checks immediately
    before it `authorize(trigger_principal, agent.invoke, thread)` with the current permissions,
-   the backend policy (I2) and the guard rules SR2 and SR3. If the check fails, it does not
+   the backend policy (I2) and the guard rules SR2 and SR3; `trigger_principal` is the
+   triggering person without session, device and token ([05-actions.md](05-actions.md), section 5,
+   "Check without a request", R-AZ-29). If the check fails, it does not
    deliver, sets the run to `failed` with a reason, sets `trigger_state = failed` with
    `trigger_state_reason` and writes an audit entry (fail closed). If it passes, the server
    creates a fresh invocation token (JWS, EdDSA, claims in [05-actions.md](05-actions.md),
@@ -870,7 +879,13 @@ freshly issued token. Ephemeral events do not exist on this path.
    or, for app commands, `required_level` and scope.
 2. It sends the ephemeral event `command.autocomplete_requested {request_id, command_id,
    channel_id, thread_id, user_id, option, value, options, expires_at}` to an active gateway connection of the command's owner, for agents
-   with a token (`trigger_kind = autocomplete`, without `run_id`). For apps without a gateway, the
+   with a token (`trigger_kind = autocomplete`, without `run_id`). For agents, token and payload
+   name as `thread_id` the thread of the request, without one, in a text channel, the main
+   timeline ([03-data-model.md](03-data-model.md), R-DM-11). A forum channel has no main timeline:
+   if a request for an agent command there names no thread (new post), the check from item 1
+   applies as for a new thread of the channel ([05-actions.md](05-actions.md), section 5). If it
+   passes, the server does not ask the agent, issues no token and returns an empty list at once
+   (R-AZ-26). For apps without a gateway, the
    server asks through their interaction address ([11-extensions.md](11-extensions.md),
    section 9).
 3. The command's owner answers with the op `command.autocomplete_result {request_id, choices}` or

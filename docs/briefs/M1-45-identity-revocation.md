@@ -160,7 +160,7 @@ Paths are relative to `services/server/` unless they start with `docs/`.
 ## Out of scope
 
 - Closing gateway connections with `4012`, AZ-P9 across two processes: M1-65.
-- Deactivating push registrations (08 11 step 5, 10 step 2) and the content-free `revoked` push:
+- Deactivating push registrations (08 11 step 5, 10 step 2; 08 10 step 4 sends no push, D-W-108):
   M3-22 subscribes to `DeviceRevoked` and `SessionEnded`.
 - `run.cancel_requested` for runs of the disabled person (08 11 step 7): M2. Dev environments
   `suspended`: V2.

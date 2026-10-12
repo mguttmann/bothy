@@ -173,9 +173,9 @@ are added by the brief-writing step (plan ticket M0-05) under the names listed h
 | 25 | M1-68 | Server core metrics per catalogue | `M1-68-core-metrics.md` | M1-04, M1-50, M1-66 |
 | 26 | M1-69 | Canary test across all outputs | `M1-69-canary-test.md` | M1-68, M1-71 |
 | 24 | M1-70 | Leak tests and 404 equality | `M1-70-leak-tests.md` | M1-65, M1-71 |
-| 22 | M1-71 | Contract tests with Schemathesis | `M1-71-contract-tests.md` | M1-50, M1-62, M1-63 |
+| 22 | M1-71 | Contract tests with Schemathesis | `M1-71-contract-tests.md` | M1-37, M1-50, M1-62, M1-63 |
 | 24 | M1-72 | Load tests and performance gate | `M1-72-performance-gate.md` | M1-57, M1-65, M1-71 |
-| 27 | M1-73 | Compose smoke test | `M1-73-compose-smoke.md` | M1-37, M1-69 |
+| 27 | M1-73 | Compose smoke test | `M1-73-compose-smoke.md` | M1-69 |
 | 3 | M1-74 | CodeQL for Go | `M1-74-codeql-go.md` | M1-05 |
 
 ## Make targets created by tickets
@@ -397,13 +397,13 @@ flowchart TB
   M1_71 --> M1_69
   M1_65 --> M1_70
   M1_71 --> M1_70
+  M1_37 --> M1_71
   M1_50 --> M1_71
   M1_62 --> M1_71
   M1_63 --> M1_71
   M1_57 --> M1_72
   M1_65 --> M1_72
   M1_71 --> M1_72
-  M1_37 --> M1_73
   M1_69 --> M1_73
   M1_05 --> M1_74
 ```

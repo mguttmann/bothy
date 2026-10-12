@@ -30,7 +30,9 @@ migration comes with that milestone, the contract already applies now.
    get `deleted_at` or `archived_at`; content is cleared immediately on deletion
    (tombstone). Reason: sequence numbers, the audit chain and authorship stay consistent. Hard
    deletion exists only for dependent detail rows (`ON DELETE CASCADE`) and through the
-   retention jobs from [20-privacy.md](20-privacy.md).
+   retention jobs from [20-privacy.md](20-privacy.md). The row of a deleted file (`files` with
+   `deleted_at`) is removed by the job `files.purge_objects` once its objects are gone; its detail rows
+   go by `ON DELETE CASCADE` (R-DM-46).
 8. **JSON.** `jsonb` only for data with its own versioned schema (manifest, run metrics,
    component definition, event payload). Every such field names its schema in the
    column "Rules". Fields used for filtering or joining are never only in `jsonb`.
@@ -1111,7 +1113,8 @@ I1 targets, without a condition on `state`, because a new message reopens a done
 A move changes `channel_id`. It is allowed only for `kind = 'thread'` (the main thread belongs
 permanently to its channel, R-DM-11) and only when the effective operator of the target channel equals
 `operator_agent_id` (Baseline section 4). The same transaction changes the copies
-`messages.channel_id`, `read_states.channel_id` and `drafts.channel_id` of this thread.
+`messages.channel_id`, `message_attachments.channel_id`, `read_states.channel_id` and
+`drafts.channel_id` of this thread.
 `cost_entries` and `event_log` keep the channel at the time of the booking or of the event, respectively.
 Attached files follow their message ([05-actions.md](05-actions.md), section 2.2);
 `files.scope_channel_id` applies only before attaching and stays unchanged.
@@ -1195,7 +1198,7 @@ Module: `messaging`.
 | `client_payload_sha256` | `bytea` | no | | hash of the canonical request; detects reuse with different content |
 | `origin` | `text` | no | | `CHECK (origin IN ('human','agent','app','import','system'))`; only `human` triggers agents |
 | `kind` | `text` | no | `'text'` | `CHECK (kind IN ('text','voice','run','card','system'))`; `run` = anchor of the live box; `card` = message with components (question, approval) |
-| `system_code` | `text` | yes | | `CHECK (system_code IN ('thread.reopened'))`; set exactly when `kind = 'system'`; clients build the line in their language from code and author |
+| `system_code` | `text` | yes | | `CHECK (system_code IN ('thread.reopened','agent_session.resume_failed'))`; set exactly when `kind = 'system'`; clients build the line in their language from code and author |
 | `content_md` | `text` | no | `''` | Markdown; size up to `message.max_content_bytes`; empty after deletion and for system lines |
 | `content_format` | `smallint` | no | `1` | version of the Markdown dialect |
 | `reply_to_message_id` | `uuid` | yes | | reply with quote; same thread |
@@ -1204,6 +1207,7 @@ Module: `messaging`.
 | `trigger_state_reason` | `text` | yes | | reason code for `failed` and `cancelled`, for example `billing_mode_personal_not_holder`, `run_active_other_agent`, `user_cancelled`; also set on a rejection already at acceptance, when no run is created |
 | `trigger_state_at` | `timestamptz` | yes | | |
 | `silent` | `boolean` | no | `false` | no notification (for example import) |
+| `has_attachments` | `boolean` | no | `false` | `true` exactly when the message was created with at least one attachment and is not deleted. Attachments arise only with the message and disappear only with its deletion (editing does not change them, `file.delete` applies only to files that are not attached), so `messaging` sets the value in the transaction of the creation; deletion sets it to `false`. Filter `has_file` of the search ([14-search.md](14-search.md), section 4.4); R-DM-43 |
 | `import_item_id` | `uuid` | yes | | origin on import |
 | `version` | `bigint` | no | `1` | rises on edit, deletion, state change; reactions and pinning do not raise it ([04-sync-protocol.md](04-sync-protocol.md), section 9) |
 | `edited_at` | `timestamptz` | yes | | |
@@ -1220,7 +1224,8 @@ RESTRICT; `author_principal_id`, `deleted_by` -> `principals(id)` ON DELETE REST
 SET NULL (deferred); `import_item_id` -> `import_items(id)` ON DELETE SET NULL.
 Checks: `(kind = 'run') = (run_id IS NOT NULL)`; `trigger_state IS NULL OR origin = 'human'`;
 `trigger_state_reason IS NULL OR trigger_state IN ('failed','cancelled')`;
-`deleted_at IS NULL OR content_md = ''`; `(kind = 'system') = (system_code IS NOT NULL)`;
+`deleted_at IS NULL OR content_md = ''`; `deleted_at IS NULL OR NOT has_attachments`;
+`(kind = 'system') = (system_code IS NOT NULL)`;
 `kind <> 'system' OR (origin = 'system' AND silent AND content_md = '')`.
 Unique: `(thread_id, thread_seq)`; `(author_principal_id, client_msg_id)`; partial index `(run_id)
 WHERE run_id IS NOT NULL` (one live box anchor per run).
@@ -1234,10 +1239,16 @@ Indexes:
 - GIN `(search_vector)` for full-text search.
 
 Retention: `content`.
-Deletion empties `content_md`, deletes attachments, revisions, mentions, components, reactions and
-the pin, and redacts the payload of the related events (section 6.5). The row and
+Deletion empties `content_md`, sets `has_attachments` to `false`, deletes attachments, revisions,
+mentions, components, reactions and the pin, and redacts the payload of the related events
+(section 6.5). The row and
 `thread_seq` remain. The server writes a system line `thread.reopened` when a message
-reopens a thread that is done; the author is the person whose message reopened it.
+reopens a thread that is done; the author is the person whose message reopened it. If the server
+accepts a report `agent_session.report` with `bind_failed` (the session of the run is missing in
+the runtime; fail open according to [09-agents.md](09-agents.md), section 9.5 item 4, and
+[22-import-migration.md](22-import-migration.md), section 9 step 5), it writes in the same
+transaction exactly one system line `agent_session.resume_failed`; the author is the agent of the
+run. A system line does not reopen a done thread (R-DM-42).
 
 Content format `content_format = 1`: Markdown according to CommonMark 0.31.2
 (https://spec.commonmark.org/0.31.2/, retrieved 2026-10-10) [verified], without raw HTML
@@ -1390,7 +1401,7 @@ Module: `files`.
 | `transcript_status` | `text` | no | `'none'` | `CHECK (transcript_status IN ('none','pending','done','failed'))` |
 | `transcript_text` | `text` | yes | | |
 | `transcript_language` | `text` | yes | | BCP 47 |
-| `transcript_source` | `text` | yes | | `CHECK (transcript_source IN ('agent','service'))` |
+| `transcript_source` | `text` | yes | | `CHECK (transcript_source IN ('agent','service'))`; `files` has no `version` column: the ETag of a transcript (`If-Match` of `file.transcript.submit`) is derived as a strong hash over `transcript_status`, `transcript_source`, `transcript_language` and `transcript_text` (R-DM-48) |
 | `created_at` | `timestamptz` | no | `now()` | |
 | `deleted_at` | `timestamptz` | yes | | object is removed by the cleanup job |
 | `search_vector` | `tsvector` | no | generated | name and transcript, see section 5 |
@@ -1435,14 +1446,28 @@ Purpose: attachments of a message in a fixed order. Module: `files`.
 | `message_id` | `uuid` | no | | |
 | `file_id` | `uuid` | no | | |
 | `position` | `smallint` | no | | up to `message.max_attachments` |
+| `thread_id` | `uuid` | no | | copy of `messages.thread_id`; fixed, because a message never changes its thread |
+| `channel_id` | `uuid` | no | | copy of `messages.channel_id` for permission filters (search); changed along on a move |
 
 PK: `(message_id, position)`. FK: `message_id` -> `messages(id)` ON DELETE CASCADE; `file_id`
 -> `files(id)` ON DELETE RESTRICT. Unique: `(file_id)` (a file is attached to at most one
-message, R-DM-22); the index also serves "where is this file attached" for `file.read`.
-Retention: `content`.
+message, R-DM-22); the index also serves "where is this file attached" for `file.read`. Indexes:
+`(thread_id)` for following a move. Retention: `content`.
 A file may only be attached when `purpose = 'attachment'`, its `scope_channel_id` is the
 channel of the message and its upload session is `completed` (application,
 [12-files.md](12-files.md), section 10).
+`files` writes `thread_id` and `channel_id` on attaching from the message that `messaging` creates
+in the same transaction. On moving a thread, `files` changes `channel_id` in the transaction of
+the move (see `threads`; in-transaction event `chat.ThreadMoved` as for `messaging` and `sync`,
+[02-architecture.md](02-architecture.md), section 4.3). So `files` filters attached files by
+channel and thread of their message with `channel_id = ANY($visible)` in its own tables
+([07-permissions.md](07-permissions.md), section 7.4; [14-search.md](14-search.md), section 4.3),
+without reading `messages` (principle 12); `files.scope_channel_id` does not count for this. The
+copies deliberately have no foreign key of their own: the row hangs on its message through
+`message_id` and goes with it (ON DELETE CASCADE), and thread and channel of the message hold the
+foreign keys of `messages` (ON DELETE RESTRICT); a foreign key to `threads` or `channels` would
+only check existence. That the copies equal the values of the message is ensured by attaching and
+by the transaction of the move, as for `messages.channel_id` (R-DM-43).
 
 #### `file_upload_sessions`
 
@@ -1541,6 +1566,7 @@ Purpose: one agent turn; at the same time the live box. Module: `runs`.
 | `summary` | `text` | yes | | collapsed line after the end |
 | `stall_warned_at` | `timestamptz` | yes | | stall notice after `run.stall_after` |
 | `queued_at` | `timestamptz` | no | `now()` | |
+| `invocation_held_until` | `timestamptz` | yes | | set exactly when the acceptance holds the event `agent.invocation` of the run because an attachment of the triggering message is not final, or because the server transcript of a voice message (`kind = voice` in transcription mode `service`) is still `pending` (R-DM-47) ([04-sync-protocol.md](04-sync-protocol.md), section 15.3 step 1); the value is the latest time of the release (acceptance plus `file.invocation_hold_max` or `voice.transcript_hold_max`); `ReleaseInvocation` sets NULL in the transaction that writes the event (`version` rises, no `run.state_changed`); a run that ends before keeps the value and is never released (R-DM-44) |
 | `started_at` | `timestamptz` | yes | | |
 | `finished_at` | `timestamptz` | yes | | |
 | `duration_ms` | `bigint` | yes | | |
@@ -2585,6 +2611,9 @@ Deleting a message or a file writes in the same transaction: a tombstone, an
 event `message.deleted`, and `UPDATE event_log SET payload = <redacted payload>,
 redacted_at = now() WHERE resource_kind = 'message' AND resource_id = $1`. The envelope fields
 stay. Events are therefore append-only in the envelope and redactable in the payload (R-DM-18).
+Deleting a file redacts in the same transaction the events with `resource_kind = 'file'` and
+`resource_id` = the file, in the shape of [04-sync-protocol.md](04-sync-protocol.md), section 2.2
+rule 5 (R-DM-45).
 
 ### 6.6 Notifying the gateway processes
 
@@ -2695,6 +2724,13 @@ section 4 applies, and the gate fails.
 | R-DM-39 | Session users per person in `host_session_users`, the name unique per host across all rows, including ended ones. | Ruling T12: the credentials of a session user belong to exactly one person; a reassigned name would give the next person the logins and long-running processes of the previous one ([24-terminal.md](24-terminal.md), section 2.2). |
 | R-DM-40 | `terminal_sessions` refers with `(host_session_user_id, host_id, user_id)` to `host_session_users(id, host_id, user_id)`. | A foreign key only on `id` would allow a session user of another host or of another person; the host service would then bind a new name to the wrong person (D-W-66). |
 | R-DM-41 | `hosts.reported_session_users` holds the reported names of the session users with the display names of their working folders. | The server assigns only names that the host knows, and offers each person only their own working folders (rulings T12 and T13; D-W-62, D-W-63). |
+| R-DM-42 | If the server accepts a report `agent_session.report` with `bind_failed`, it writes in the same transaction exactly one system line `agent_session.resume_failed` with the agent of the run as author; system lines do not reopen a done thread. | 09, section 9.5, and 22, section 9, require exactly one system message on fail open, according to R-DM-34 with a code instead of text; the session belongs to the agent, and reopening would write a second system line `thread.reopened` for the same notice (D-W-104). |
+| R-DM-43 | `message_attachments` carries the copies `thread_id` and `channel_id` of its message (`channel_id` changed along on a move, both without their own foreign key), `messages` the column `has_attachments` (created with at least one attachment and not deleted). | Search filters files by channel and thread of their message and messages by `has_file` in SQL before the candidate limit ([14-search.md](14-search.md), sections 4.3 to 4.5); `files` must not read `messages` and `messaging` must not read `message_attachments` (principle 12). Attachments arise only with the message and disappear only with its deletion, so a flag that `messaging` sets on creation and resets on deletion suffices. A foreign key from the copies to `threads` or `channels` would only check existence, which `message_id` with the foreign keys of `messages` already ensures; that the copies equal the values of the message is ensured by attaching and moving in their transaction (D-W-104). |
+| R-DM-44 | A held agent invocation is recorded in `runs.invocation_held_until`. | Without a flag `runs` cannot tell whether the invocation of a waiting run has already been written; the release on `files.FileFinalized` and the job `runs.invocation_hold_timeout` serialize on the run row and write it exactly once ([04-sync-protocol.md](04-sync-protocol.md), section 15.3 step 1, R-SY-20, D-K-G6; D-W-104). |
+| R-DM-45 | Deleting a file redacts the stored events of resource kind `file` of that file in the same transaction; `file.updated` keeps only the members that 04 section 2.2 rule 5 names, with empty name, size zero, a neutral type and no thumbnails. | 20 sections 4.2 and 4.3 and DP-T01 require the name and digest of a deleted file to be gone, and every `file.updated` carries them; 6.5 named only the resource kind `message`. The kept members are IDs and states, the redacted payload stays valid against `FileUpdatedEvent` (D-W-108). |
+| R-DM-46 | The job `files.purge_objects` removes the row of a deleted file after its objects are gone; the detail rows go by `ON DELETE CASCADE`, `principals.avatar_file_id` by `ON DELETE SET NULL`. | The row keeps `original_name`, `sha256`, `transcript_text` and the search vector, which 20 sections 4.2 and 4.3 require to be gone; nothing references a deleted file, because its attachment row went with the message, so a tombstone would serve nobody and need a second redaction of every content column (D-W-108). |
+| R-DM-47 | `runs.invocation_held_until` is also set while the server transcript of a triggering voice message is `pending`; the release follows the same rules with `voice.transcript_hold_max`. | 04 section 15.3 step 1 and R-SY-20 hold `agent.invocation` until a server transcript is final, and the column already names `voice.transcript_hold_max`, but its rule named only attachments (D-W-108). |
+| R-DM-48 | The ETag of a transcript is derived from its four transcript columns; `files` gets no `version` column. | 05 section 4.8 requires `If-Match` for `file.transcript.submit`; a derived strong ETag (as for other rows without a version, 06 section 8 point 1) detects a lost update without a new column that every file write would have to raise (D-W-108). |
 
 ## 9. Configuration values of this chapter
 

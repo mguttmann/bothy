@@ -16,6 +16,9 @@ Sync and events: [04-sync-protocol.md](04-sync-protocol.md). How `authorize` dec
    `404 not_found`, whether it exists or not. `403 forbidden` exists only when the principal may
    read the resource but lacks the required higher level or a capability. Lists, counters,
    search and suggestions filter in the query (P2) and reveal nothing.
+   The exception is the list of cost estimates for the reconciliation (`cost.reconcile.read`): it
+   evaluates the instance without a filter by visible channels and names neither channel nor
+   thread nor content (R-AZ-28).
 3. **REST.** Every operation in the OpenAPI document carries `x-authz-action` with exactly one ID
    from this catalogue and `x-rate-limit-class` with the class of this action. The API team
    enforces this with lint rules (`authz-action-required`: field missing; `authz-action-known`: ID
@@ -127,7 +130,9 @@ An attached file always follows its message, also after the thread is moved;
 
 1. Owner: level `trigger` and all capabilities on all targets except DM channels, and only in
    a session of a person. A personal API token of an owner acts with the grants of this
-   person, without owner permissions (SR5 in [07-permissions.md](07-permissions.md)).
+   person, without owner permissions (SR5 in [07-permissions.md](07-permissions.md)). Exception:
+   the check without a request (section 5) takes the owner status from the current owner list
+   without a session (R-AZ-29).
 2. Otherwise: the highest level of all valid grants (not revoked, not expired) of the
    principal and its valid groups on the path. Capabilities: union of the
    capabilities of the same grants.
@@ -138,7 +143,8 @@ An attached file always follows its message, also after the thread is moved;
 5. Agents and apps: at most `write` and as a capability at most `upload` (R-DM-08, R-DM-20).
    Apps additionally need the scope from 2.6.
 6. If an agent acts within a run, the acting-for binding applies in addition: at most the
-   permissions of the triggering person (SR9 in [07-permissions.md](07-permissions.md)).
+   permissions of the triggering person (SR9 in [07-permissions.md](07-permissions.md)), computed as
+   in the check without a request (section 5).
 
 ### 2.4 Columns "Owner", "Step-up", "Audit", "Permissions"
 
@@ -209,7 +215,7 @@ Besides grants, an app needs a granted scope (`app_installations.granted_scopes`
 | `component.update`, `interaction.respond` | `components:write` |
 | `user.read` | `users:read` |
 | Event subscriptions, `gateway.connect`, `events.catch_up` | `events:subscribe` |
-| `cost.reconcile.submit` | `costs:reconcile` |
+| `cost.reconcile.read`, `cost.reconcile.submit` | `costs:reconcile` |
 | `self.read`, `instance.read`, `status.read`, `command.read`, `agent.read` | no scope; only metadata that every logged-in principal with matching grants sees |
 | `webhook_in.post` | no scope; token of the incoming webhook |
 
@@ -457,7 +463,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `quiet_hours.update` | maintain quiet hours | user | self | no | no | no | no | `rl.write` |
 | `push.register` | register the push target of one's own active device; returns the preview token once | device | self | no | no | no | no | `rl.write` |
 | `push.unregister` | remove a push target | push_registration | self | no | no | no | no | `rl.write` |
-| `push.deliver` | internal check before every push, every notification via the gateway and every retrieval via the preview endpoint (P3) | thread | read | no | no | no | no | `none` |
+| `push.deliver` | internal check before every push, every notification via the gateway and every retrieval via the preview endpoint (P3); hints without a thread (`security`, `admin`) use the recipient rule of R-AZ-30 instead | thread | read | no | no | no | no | `none` |
 | `client_metrics.submit` | send performance data of the app without contents and without IDs, only with `privacy.client_metrics` ([15-client-architecture.md](15-client-architecture.md)) | instance | human | no | no | no | no | `rl.write` |
 | `sync.snapshot.read` | snapshot for a resync | instance | auth | no | no | no | no | `rl.read` |
 | `events.catch_up` | `GET /api/v1/events`; every event additionally with its receive action | instance | auth | no | no | no | no | `rl.read` |
@@ -520,6 +526,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `webhook_out.manage` | create, change, delete an outgoing subscription of an app or an agent, rotate the HMAC secret | app, agent | owner | yes | yes | yes | no | `rl.admin` |
 | `webhook_out.redeliver` | repeat a delivery | webhook_delivery | owner | yes | no | yes | no | `rl.admin` |
 | `webhook_out.deliver` | internal check before every delivery: receive action of the event for the app or the agent | app, agent | grants and scope of the receiver | no | no | no | no | `none` |
+| `webhook_out.transition` | automatic state change of an outgoing subscription by the consumer `webhooks` or the job `apps.webhook_deliver`: `disabled` after `410`, after `webhook.max_consecutive_failures` failures in a row, after a delivery that fails until `webhook.retry_max_age`, or on a gap in the event log; `paused` by the delivery quota `webhook.max_pending_per_subscription` ([11-extensions.md](11-extensions.md), sections 6 and 7; [webhooks.md](../api/webhooks.md), sections 4 and 5) | app, agent | system | no | no | yes | no | `none` |
 | `webhook_in.read` | read the incoming webhooks of a channel (without token) | channel | manage | no | no | no | no | `rl.read` |
 | `webhook_in.create` | create an incoming webhook for a channel | channel | manage | no | yes | yes | no | `rl.admin` |
 | `webhook_in.revoke` | revoke an incoming webhook | incoming_webhook | manage | no | yes | yes | no | `rl.admin` |
@@ -539,6 +546,7 @@ make sure that clients clear their cache and runs end (R-AZ-15).
 | `price.read` | read the price table | instance | owner | yes | no | no | no | `rl.read` |
 | `price.manage` | maintain prices with source and retrieval time | instance | owner | yes | yes | yes | no | `rl.admin` |
 | `cost.reconcile` | reconcile estimates with the invoice by hand | instance | owner | yes | yes | yes | no | `rl.admin` |
+| `cost.reconcile.read` | read the estimates per run of a period for the reconciliation: agent, provider, currency, amount of the estimate before the reconciliation and whether reconciled; only entries with `billing_mode = 'organization'`, without channel, thread and content and without a filter by visible channels ([10-backend-policy.md](10-backend-policy.md), section 12.4; R-AZ-28) | instance | owner or app with scope `costs:reconcile` | no | no | no | no | `rl.read` |
 | `cost.reconcile.submit` | the reconciliation app submits `reconciled` entries for existing runs; deletes nothing ([10-backend-policy.md](10-backend-policy.md), section 12.4; [ADR 0055](../adr/0055-cost-reconciliation-as-its-own-app-admin-key-never-in-the-server.md)) | instance | app with scope `costs:reconcile` | no | no | yes | no | `rl.admin` |
 | `export.channel` | export the channel history | channel | read and +export | no | yes | yes | no | `rl.export` |
 | `gdpr.request.create` | export or deletion for oneself; for others only the owner | user | self or owner | no | yes | yes | no | `rl.export` |
@@ -625,6 +633,41 @@ runtime is involved; what is checked is `required_level`, `required_capability`,
 `restricted_to`, the grants and the scope of the app ([11-extensions.md](11-extensions.md),
 section 9).
 
+**Check without a request.** In these cases the server evaluates the permissions of a person
+without a request of this person (R-AZ-29):
+
+- `agent.invoke` immediately before every delivery of `agent.invocation`, `agent.followup`,
+  `interaction.created` and `command.invoked` to an agent
+  ([04-sync-protocol.md](04-sync-protocol.md), section 15.3 step 2, section 15.4 item 2 and
+  section 15.6), at `run.token.renew` (04 section 15.3 step 3) and for the new run from deferred
+  follow-ups (04 section 15.4 item 4);
+- `command.invoke` and `interaction.create`, when the server checks an app command or the use of
+  a component of an app again with the permissions of that moment before handing it to the app
+  ([11-extensions.md](11-extensions.md), section 9; R-SY-02);
+- the permissions of the triggering person in the acting-for binding (rule 2.3 item 6, SR9 in
+  [07-permissions.md](07-permissions.md));
+- `push.deliver` before each hint decision and each push send, and the recipient rule of R-AZ-30
+  for hints without a thread ([13-push-notifications.md](13-push-notifications.md),
+  sections 4.2 and 12).
+
+The following applies:
+
+- The person is a principal of kind `user` without session, device, token, `view_as` and
+  `acting_for`. Only the server itself builds this principal, never the authentication of a
+  request.
+- Blocks come only from the person's status (SR7): `disabled` or `deleted` gives
+  `principal_inactive`, `pending` gives `principal_pending`; in the acting-for binding such a
+  person has no permissions. Sessions, devices and tokens of the person do not count.
+- The owner status comes from the current owner list (`owners` with `revoked_at IS NULL`),
+  without a session (exception to rule 2.3 item 1 and R-AZ-14); everything else from rule 2.3
+  applies unchanged. A permission state computed this way is never the own permission state of
+  the principal of a request, not even of a personal API token of the same person; in the
+  acting-for binding it only narrows.
+- `authorize` with this principal and an action other than `agent.invoke`, `command.invoke`,
+  `interaction.create` or `push.deliver` is a programming error and ends like an unknown action
+  (rule 1.5).
+- If such a check writes an audit entry, this person is the actor, without device and session.
+
 Consequences on `allow`: run `queued`, live box anchor, `trigger_state`, event to the agent,
 invocation token on delivery ([04-sync-protocol.md](04-sync-protocol.md), section 15). The
 token is a JWS with the header `alg = EdDSA`, `kid` and `typ = agent-invocation+jwt` (RFC 8725,
@@ -637,9 +680,9 @@ section 3.11). Claims:
 | `sub` | principal ID of the triggering person |
 | `jti`, `iat`, `exp` | UUIDv7 of the token, issuance, expiry (`iat + agent.invocation_token_ttl`) |
 | `trigger_kind` | `message`, `followup`, `interaction`, `command` or `autocomplete` |
-| `run_id` | run; missing only for `trigger_kind = autocomplete` |
+| `run_id` | run; missing for `trigger_kind = autocomplete` and for `command.invoked` when the owner of the control command has no active run in the thread at execution time (`command.invoke`); otherwise payload and token of `command.invoked` carry this run, never the run of another agent (R-AZ-25) |
 | `message_id` or `interaction_id` or `command_id` | triggering object |
-| `thread_id`, `channel_id`, `space_id` | location |
+| `thread_id`, `channel_id`, `space_id` | location; for `trigger_kind = autocomplete`, `thread_id` is the thread of the request, without one the main timeline of the text channel; in a forum channel without a thread there is no token ([04-sync-protocol.md](04-sync-protocol.md), section 15.7; R-AZ-26) |
 | `level` | effective level of `sub` on the channel at delivery time |
 | `billing_mode` | configured mode from `agents.billing_mode` at delivery time (I3) |
 | `tool_class` | configured tool class from `agents.tool_class` at delivery time |
@@ -695,6 +738,7 @@ allows it. Personal events (`audience = self`) go only to the named principal.
 | `access.changed` | principal | self | section 8 in 04 |
 | `access.expiring` | principal | self | a grant or membership expires within `authz.expiry_reminder_lead`; to the subject (for groups, the person) and to the granter |
 | `session.revoked` | auth_session | self | additionally close with `4012` |
+| `device.pending` | device | self | a new device of the human waits for approval; written by `identity` in the transaction that registers the device with state `pending`; payload only `device_id` and `platform` (R-AZ-31) |
 | `read_state.updated` | thread | self | |
 | `draft.updated` | draft | self | |
 | `draft.deleted` | draft | self | |
@@ -724,7 +768,7 @@ Ephemeral events:
 | `agent.presence_changed` | agent | `agent.read` | |
 | `host.presence_changed` | host | `host.read` | |
 | `stats.live` | instance, space | `stats.read` | only to connections with a `stats.subscribe` subscription; content filtered to the visible channels, costs only with `cost.read.aggregate` ([25-visualization.md](25-visualization.md), section 5) |
-| `notification.created` | thread | self and `push.deliver` | only to connections of the receiver, instead of a push to this device ([13-push-notifications.md](13-push-notifications.md), section 6.3) |
+| `notification.created` | thread; for a hint without a thread the recipient (`user`) | self and `push.deliver`; for a hint without a thread: self and the recipient rule of R-AZ-30 | only to connections of the receiver, instead of a push to this device ([13-push-notifications.md](13-push-notifications.md), section 6.3) |
 | `command.autocomplete_requested` | command | self (owner of the command); agent additionally `agent.events.consume` | carries a token with `trigger_kind = autocomplete`; only to one gateway connection of the owner |
 <!-- END GENERATED: events.ephemeral -->
 
@@ -783,7 +827,7 @@ Terminal channels ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/asyn
 | R-AZ-11 | Internal delivery checks (`push.deliver`, `webhook_out.deliver`) are actions of their own. | Rule 1.1: deliveries too run through the catalogue and are testable. |
 | R-AZ-12 | The read-only setting of a channel blocks all `write` and `trigger` actions for all principals, including owners; only `import.apply` writes. | A read mirror has exactly one leading location; no agent may be triggered in the mirror. Grants cannot restrict owners. |
 | R-AZ-13 | Operator rule: the effective operator has `write` implicitly; `space.operator.set` and `channel.operator.set` require no grant of its own for the agent. | Follows the operator without a second, easily forgotten grant; on a change no remnant stays. Replaces the proposal to require a grant when setting the operator. |
-| R-AZ-14 | Owner permissions only in a session, never through a personal API token. | A stolen token without device binding must never open the whole instance. |
+| R-AZ-14 | Owner permissions only in a session, never through a personal API token; the exception is the check without a request (R-AZ-29). | A stolen token without device binding must never open the whole instance. |
 | R-AZ-15 | Expirations, the first installation, the recovery on the host, the sync of claim groups, the automatic revocation of devices and scheduled key rotations are system actions in the catalogue (`grant.expire`, `group.member.expire`, `group.member.sync`, `instance.bootstrap`, `owner.recover`, `device.expire`, `signing_key.transition`). | Every audit entry names a known action; expirations reach clients and runs via `access.changed`; these operations are security relevant and belong in the audit, without faking an action by a person. |
 | R-AZ-16 | A waiting device gets tokens, but may only read itself (`403 device_pending`). | The app can wait for the approval without a new login; it reaches contents only after that. |
 | R-AZ-17 | `resolve_i1` carries out "switch first, then grant" in one transaction, with both checks. | The guided flow of the console needs no intermediate state in which I1 would be violated. |
@@ -794,6 +838,13 @@ Terminal channels ([24-terminal.md](24-terminal.md); [asyncapi.yaml](../api/asyn
 | R-AZ-22 | Health has no action; liveness and readiness are on the internal listener outside the public API (ruling L2, [16-operations.md](16-operations.md)). | An operations contract, not a product API; no auth bypass in the public listener. |
 | R-AZ-23 | Terminal actions only for people in a session, with step-up `fresh` per opening; the host acts only through `host.pair` and `host.connect`. | The owner requires a passkey when opening; a terminal is remote access to a host ([24-terminal.md](24-terminal.md), R-TM-07). |
 | R-AZ-24 | Hosts are a target of their own outside the tree; grants there only by owners. | A grant on the instance or a space must never silently open a host; `manage` is meaningless on hosts. |
+| R-AZ-25 | The token of `command.invoked` carries `run_id` only if the owner of the control command has an active run in the thread at execution time, and then exactly this run, like the payload; otherwise the claim is missing (section 5). | Control commands run without a run and still go to the agent with a token ([09-agents.md](09-agents.md), section 10.4, D-AG-12); the adapter learns which of its own runs the command concerns, and never a foreign one. The token starts, resumes and renews no run (`run.start`, `run.token.renew`), because its `jti` is never in `runs.invocation_jti`: only deliveries of `agent.invocation`, `agent.followup` and `interaction.created` and their renewal enter a token there ([04-sync-protocol.md](04-sync-protocol.md), section 15.3). |
+| R-AZ-26 | Autocomplete of an agent command without a thread in the request: in a text channel, token and payload name the main timeline as `thread_id`. In a forum channel the server checks as for a new thread of the channel; if the check passes, it does not ask the agent, issues no token and returns an empty list at once ([04-sync-protocol.md](04-sync-protocol.md), section 15.7). | Every token names a thread as its location (section 5), and a forum has no main timeline (R-DM-11). A token with only a channel would be a new form with another location that every check of a token would have to know (adapter, server, acting-for binding); without a token the surface stays smaller. The check still runs, so that the empty list reveals nothing and denials go into the audit (R-AZ-01, R-AZ-04). Typing costs nothing and never hangs (R-AG-14); the client then shows the static choice values, if there are any ([09-agents.md](09-agents.md), section 10.5). |
+| R-AZ-27 | Automatic state changes of outgoing subscriptions (`disabled` after `410`, after `webhook.max_consecutive_failures`, after `webhook.retry_max_age` and on a gap; `paused` by the delivery quota) are the system action `webhook_out.transition`: per change one audit entry without an actor in the transaction of the change, with the subscription, the old and new state and the cause as a code. Changes by the owner stay `webhook_out.manage`; the disabling at uninstallation is covered by the entry of `app.uninstall`. | Rule 1.10: every audit entry names a known action, and [webhooks.md](../api/webhooks.md), section 4, requires the disabling in the audit log; as with R-AZ-15, a system action does not pretend to be an action of a person. One action for all causes, because the cause is in the details (D-W-104). |
+| R-AZ-28 | `cost.reconcile.read` gives the reconciliation app with scope `costs:reconcile` and the owner in a session the estimates per run in the mode `organization` for the requested agents and the period: run, agent, provider, currency, amount of the estimate before the reconciliation and whether reconciled. Without step-up, with the effect `read` (section 2.7); allows without audit, denials with audit (R-AZ-04). The list evaluates the instance and does not filter by visible channels (exception to rule 1.2); it never names channel, thread or content, and the instance is the only check, without a check per entry; a run ID opens nothing, because whoever wants to read the run still needs `run.read` on its path. Agents, personal tokens and people without owner status do not reach it (sections 2.3 and 2.6). | The app distributes the daily amount in proportion to the estimates and submits it per run ([10-backend-policy.md](10-backend-policy.md), section 12.4, items 3 and 4; [ADR 0055](../adr/0055-cost-reconciliation-as-its-own-app-admin-key-never-in-the-server.md)); without a read action it knows neither the estimates nor the run IDs, and `cost.read.aggregate` returns only sums and reaches no app (section 2.3 item 5). Reading is weaker than `cost.reconcile.submit`, which the same scope already allows for every run of the instance; a filter by visible channels would leave an app without grants only an empty list. Personal amounts stay out, because they are never an invoice (03 `cost_entries`); DM channels have no agents and therefore no runs ([07-permissions.md](07-permissions.md), section 2.8). Like `cost.read.aggregate` and `price.read`, reading needs no step-up; R-AZ-06 requires it for changes to costs, and an app cannot perform it (R-AZ-03; D-W-104). |
+| R-AZ-29 | Check without a request (section 5): if the server evaluates the permissions of a person without the person's request (`agent.invoke` before every delivery to an agent, at `run.token.renew` and for the run from deferred follow-ups; `command.invoke` and `interaction.create` before handing over to an app; the permissions of the triggering person in the acting-for binding), this person is a principal without session, device and token: blocks come only from the person's status, the owner status from the current owner list (exception to R-AZ-14). Only the server builds this principal, only for these cases, and the permission state computed this way is never the own permission state of the principal of a request. | None of these cases has a request, session, device or token of the person; with R-AZ-14 alone no invocation of an owner would pass the repeated check (AZ-M19, every agent with `personal` or `host`), and no run of an owner would read its own context in the acting-for binding. The acceptance has already applied R-AZ-14 to the real request; afterwards the server evaluates the same person with the permissions of the moment, and a block or the loss of the owner status takes effect at once. A request with a personal token still gets no owner permissions. Remainder: an owner who triggered through grants with a personal token is evaluated as an owner afterwards; in the acting-for binding the run then reaches as far as the permissions of the agent. A permission of another person never arises from this (D-W-104). |
+| R-AZ-30 | Hints without a thread (kinds `security` and `admin`, [13-push-notifications.md](13-push-notifications.md), section 2) are not checked with `push.deliver` on a thread. Instead the server evaluates, at the time of each decision and each send, the recipient rule of 13 section 2 with the rights of that moment: the recipient is an active human; `security` goes only to the other active devices of the human whose new device waits for approval; `admin` goes only to the owners or administrators that [07-permissions.md](07-permissions.md) and [20-privacy.md](20-privacy.md) name for the reminder. `notification.created` for such a hint has the recipient (`user`) as its resource and goes only to connections of that recipient (self). The payload names only the kind and the target ID, as for every hint. | `push.deliver` has the resource type `thread`, and these kinds have no thread, so without a rule no check would be defined for them and the push path could not be built (M3-17, M3-19, M3-23). The recipient rule is the same check the chapter already states, evaluated at send time like `push.deliver` (P3), so a revoked device or a lost owner status stops the hint at once; it grants no read right on any content (D-W-108). |
+| R-AZ-31 | The durable personal event `device.pending` (resource `device`, receive action self, audience the human who owns the device) marks a device that waits for approval; `identity` writes it in the transaction that registers the device with state `pending`, with only `device_id` and `platform`. The check of `push.deliver` and the recipient rule of R-AZ-30 are checks without a request (section 5, R-AZ-29). | Hints of the kind `security` ([13-push-notifications.md](13-push-notifications.md), section 2) arise in the worker consumer `push` from the event log (13 section 12 point 1, ADR 0051), and no event marked a waiting device, so the kind had no source. The hint check evaluates a person who sent no request, exactly like the cases of R-AZ-29 (D-W-108). |
 
 ## 9. Tests that hold this catalogue
 

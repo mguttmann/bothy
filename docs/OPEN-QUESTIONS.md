@@ -31,6 +31,7 @@ Sorted by deadline.
 |---|---|---|---|
 | OQ-01 | Second owner while personal agents run | strict I1 without an owner exception | before M1-29 |
 | OQ-02 | Visibility of the subscription holder on the agent card | visible to everyone with `agent.read` | before M1-51 |
+| OQ-24 | Terminal only through a private network (Tailscale) | no: no inbound path to the terminal, Tailscale stays an option without a requirement | before M2-43 |
 | OQ-03 | The holder's own long-lived subscription token in the account of the session user for the terminal profile `claude` | allowed as own use; the product does not touch the token; M2-45 checks the documentation before the build | before M2-45 |
 | OQ-04 | Content recording of terminal sessions | no, only metadata | before M2-46 |
 | OQ-05 | Automatic following and silent quiet hours | yes, as in chapter 13 | before M3-19 |
@@ -328,6 +329,28 @@ Sorted by deadline.
   owner answers "from the routes", a new ADR is needed that supersedes ADR 0013, and M1-17 changes
   the code generation.
 - **Due by:** before M1-17.
+
+### OQ-24: Terminal only through a private network
+
+- **Question:** Should the terminal be reachable only when the server is connected through a
+  private network such as Tailscale? The owner's requirement for the terminal briefs of
+  2026-10-11 names "Tailscale only".
+- **Why only the owner:** Requirement 21 of the owner asks for a product without a Tailscale
+  requirement, and [ADR 0068](adr/0068-terminal-through-a-host-service-with-noise-stream-and-invariant-i6.md)
+  chooses the host service precisely because it works without an inbound port and without
+  Tailscale. A requirement only for the terminal would be a product decision against this
+  requirement.
+- **Default:** No. No path to the terminal is reachable inbound from outside: the host service
+  opens only outbound connections to the server (R-TM-01), sessions run end-to-end encrypted
+  through the relay of the server, and an installation with the profile `tailscale` reaches the
+  server only through the tailnet with a policy for port 443 only and without Funnel
+  ([tailscale.md](operations/tailscale.md), D-OP-03). An own installation can choose the profile
+  `tailscale` and is then reachable only in the tailnet.
+- **What the plan does with it:** The terminal briefs M2-38 to M2-48 name the item network
+  according to D-W-101. With "yes", a new ADR is needed (condition for `terminal.open`, for
+  example an instance setting that enables the terminal only with an edge in the private
+  network), a change of [chapter 24](spec/24-terminal.md) and a change of M2-43 and M2-44.
+- **Due by:** before M2-43.
 
 ## Decided
 

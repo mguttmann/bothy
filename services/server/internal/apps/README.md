@@ -36,7 +36,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Actions (05-actions.md)
 
-`app.read`, `app.install`, `app.scopes.update`, `app.suspend`, `app.resume`, `app.uninstall`, `webhook_out.read`, `webhook_out.manage`, `webhook_out.redeliver`, `webhook_out.deliver`, `webhook_in.read`, `webhook_in.create`, `webhook_in.revoke`, `webhook_in.post`.
+`app.read`, `app.install`, `app.scopes.update`, `app.suspend`, `app.resume`, `app.uninstall`, `webhook_out.read`, `webhook_out.manage`, `webhook_out.redeliver`, `webhook_out.deliver`, `webhook_out.transition`, `webhook_in.read`, `webhook_in.create`, `webhook_in.revoke`, `webhook_in.post`.
 
 ## Events and WebSocket ops
 

@@ -81,6 +81,7 @@ Change:
 - The lint for the visible-channel predicate (AZ-P12, M1-70) and the full leak tests (M1-70).
 - Moving a channel between spaces (`moveChannel`, M1-53) and space reordering (M1-52).
 - Runs, agent sessions and costs of a moved thread (M2); none reference the channel (03 `runs`, `agent_sessions`; `cost_entries` keeps the booking channel by design).
+- The copy `message_attachments.channel_id` (03 `threads`, R-DM-43): M3-07 adds it with the table and a `files` subscriber on `chat.ThreadMoved` that changes it in the move transaction.
 - Changes to the core contract.
 
 ## Boundaries

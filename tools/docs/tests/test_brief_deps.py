@@ -99,6 +99,55 @@ def test_prose_is_ignored(tmp_path: Path) -> None:
     assert brief_deps.check(root) == []
 
 
+def test_start_check_outside_closure_fails(tmp_path: Path) -> None:
+    body = "Start check: M1-04 is merged, else `Verdict: BLOCKED dependency M1-04 missing`."
+    root = _repo(tmp_path, bodies={"M1-03": body})
+    assert brief_deps.check(root) == [
+        "M1-03-x.md: start check needs M1-04, which is not a dependency of M1-03"
+    ]
+
+
+def test_start_check_list_before_verdict_fails(tmp_path: Path) -> None:
+    body = (
+        "Confirm that the base branch has:\nM1-02 (gen) and M1-04 (other).\n"
+        "A missing one ends with `Verdict: BLOCKED dependency <ticket> missing`."
+    )
+    root = _repo(tmp_path, bodies={"M1-03": body})
+    assert brief_deps.check(root) == [
+        "M1-03-x.md: start check needs M1-04, which is not a dependency of M1-03"
+    ]
+
+
+def test_start_check_not_merged_wording_fails(tmp_path: Path) -> None:
+    body = "If M1-04 is absent, stop with `Verdict: BLOCKED M1-04 not merged`."
+    root = _repo(tmp_path, bodies={"M1-03": body})
+    assert brief_deps.check(root) == [
+        "M1-03-x.md: start check needs M1-04, which is not a dependency of M1-03"
+    ]
+
+
+def test_optional_ticket_in_start_check_is_ignored(tmp_path: Path) -> None:
+    body = (
+        "If the base lacks it, stop with `Verdict: BLOCKED M1-02 not merged`. "
+        "Used only if merged: M1-04 (other check). M1-04 is read where merged."
+    )
+    assert brief_deps.check(_repo(tmp_path, bodies={"M1-03": body})) == []
+
+
+def test_start_check_in_closure_passes(tmp_path: Path) -> None:
+    body = "M1-01 and M1-02 are merged, else `Verdict: BLOCKED dependency <ticket> missing`."
+    assert brief_deps.check(_repo(tmp_path, bodies={"M1-03": body})) == []
+
+
+def test_mention_outside_start_check_is_ignored(tmp_path: Path) -> None:
+    body = (
+        "M1-04 builds the other check later; on a spec gap stop with `Verdict: BLOCKED <reason>`."
+        "\n\n- M1-04 owns the other check.\n"
+        "- M1-01 is merged, else `Verdict: BLOCKED dependency M1-01 missing`.\n"
+    )
+    assert brief_deps.check(_repo(tmp_path, bodies={"M1-03": body})) == []
+
+
 def test_variable_assignment_is_no_target() -> None:
     assert brief_deps.makefile_targets("X := 1\nY ?= 2\na-b: c\n") == {"a-b"}
 

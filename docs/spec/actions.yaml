@@ -1464,7 +1464,8 @@ actions:
 - id: push.deliver
   section: personal
   description: internal check before every push, every notification via the gateway and every retrieval
-    via the preview endpoint (P3)
+    via the preview endpoint (P3); hints without a thread (`security`, `admin`) use the recipient rule
+    of R-AZ-30 instead
   resource: thread
   right: read
   owner: false
@@ -2034,6 +2035,21 @@ actions:
   rl_class: none
   delivery_check: true
   effect: read
+- id: webhook_out.transition
+  section: apps
+  description: 'automatic state change of an outgoing subscription by the consumer `webhooks` or the
+    job `apps.webhook_deliver`: `disabled` after `410`, after `webhook.max_consecutive_failures` failures
+    in a row, after a delivery that fails until `webhook.retry_max_age`, or on a gap in the event log;
+    `paused` by the delivery quota `webhook.max_pending_per_subscription` ([11-extensions.md](11-extensions.md),
+    sections 6 and 7; [webhooks.md](../api/webhooks.md), sections 4 and 5)'
+  resource: app, agent
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: none
+  effect: write
 - id: webhook_in.read
   section: apps
   description: read the incoming webhooks of a channel (without token)
@@ -2170,6 +2186,21 @@ actions:
   rights_change: false
   rl_class: rl.admin
   effect: write
+- id: cost.reconcile.read
+  section: operations
+  description: 'read the estimates per run of a period for the reconciliation: agent, provider, currency,
+    amount of the estimate before the reconciliation and whether reconciled; only entries with `billing_mode
+    = ''organization''`, without channel, thread and content and without a filter by visible channels
+    ([10-backend-policy.md](10-backend-policy.md), section 12.4; R-AZ-28)'
+  resource: instance
+  right: owner or app with scope `costs:reconcile`
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  app_scope: costs:reconcile
 - id: cost.reconcile.submit
   section: operations
   description: the reconciliation app submits `reconciled` entries for existing runs; deletes nothing
@@ -2613,6 +2644,14 @@ events:
   audience: self
   note: additionally close with `4012`
   resource_version: false
+- type: device.pending
+  kind: durable
+  resource: device
+  receive_action: self
+  audience: self
+  note: a new device of the human waits for approval; written by `identity` in the transaction that registers
+    the device with state `pending`; payload only `device_id` and `platform` (R-AZ-31)
+  resource_version: false
 - type: read_state.updated
   kind: durable
   resource: thread
@@ -2765,10 +2804,10 @@ events:
   resource_version: false
 - type: notification.created
   kind: ephemeral
-  resource: thread
+  resource: thread; for a hint without a thread the recipient (`user`)
   receive_action: push.deliver
   audience: self
-  receive_text: self and `push.deliver`
+  receive_text: 'self and `push.deliver`; for a hint without a thread: self and the recipient rule of R-AZ-30'
   note: only to connections of the receiver, instead of a push to this device ([13-push-notifications.md](13-push-notifications.md),
     section 6.3)
   resource_version: false

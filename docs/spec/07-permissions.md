@@ -241,6 +241,10 @@ authentication ([08-identity.md](08-identity.md)) builds it; `authz` trusts only
 A personal API token (switch `tokens.personal_enabled`) acts as its person, but without a
 session. It can therefore never provide step-up.
 
+For the check without a request, the server builds the context itself, not the authentication:
+`id` and `kind = user` of the person and `request_time`, without all other fields (05, section 5,
+"Check without a request"; R-AZ-29).
+
 ## 4. The `authorize` function
 
 ### 4.1 Decisions and reasons
@@ -550,6 +554,12 @@ owners, regardless of which grants exist.
   grants of this person, without owner permissions. Reason: a stolen token without device binding
   must never open the whole instance ([08-identity.md](08-identity.md), section 12; 05,
   section 2.3; R-AZ-14).
+- Exception: in the check without a request (before a delivery to an agent, at
+  `run.token.renew`, at the run from deferred follow-ups, before handing an app command or an
+  interaction to an app, and for the permissions of the triggering person in SR9), the owner
+  status comes from the current owner list without a session; the permission state computed this
+  way is never the own permission state of the principal of a request, not even of a personal
+  token (05, section 5, "Check without a request"; R-AZ-29).
 
 ### SR6 Direct messages only for participants
 
@@ -773,7 +783,10 @@ Rules:
    permission version. A lint in the repository layer rejects reading sqlc queries on these tables
    without this predicate, unless they are on a reviewed exception list (resolution for
    `authorize`, loading a resource that has already been checked, jobs with system permission such as retention,
-   log tail). Writing queries only hit rows of a resource that `authorize` has checked
+   log tail). The list of cost estimates per run for the reconciliation (`cost.reconcile.read`)
+   stays without this predicate: it checks the action once against the instance, without a check
+   per entry (rule 3), reads only `cost_entries` and names neither channel nor thread nor content
+   (05, rule 1.2 and R-AZ-28). Writing queries only hit rows of a resource that `authorize` has checked
    before (for example the copies of `channel_id` when moving); the lint does not check them.
 2. Totals (`total`), facets and "more results" count only within this predicate.
 3. After the SQL filter, `authorize` also runs for every result with the read action (for example
@@ -1121,7 +1134,7 @@ The additions requested during drafting are decided (integration of 2026-10-10):
 | K-RE-7 | Action `access.preview` | adopted, 05 section 4.2 |
 | K-RE-8 | System actions `grant.expire`, `group.member.expire`, event `access.expiring`, `expiry_reminded_at` | adopted, 03, 05 |
 | K-RE-9 | Reason codes from 4.1 as values of `audit_events.deny_reason` | adopted without a database check: list closed by a test (R-DM-28) |
-| K-RE-10 | Owner permissions only with a session | adopted, 05 section 2.3, R-AZ-14 |
+| K-RE-10 | Owner permissions only with a session | adopted, 05 section 2.3, R-AZ-14; current state: the exception is the check without a request (05 section 5, R-AZ-29) |
 
 ## 14. Configuration values of this chapter
 

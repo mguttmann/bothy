@@ -31,6 +31,7 @@ Code names are English and apply in API, database and code.
 | Catch-up | `catch-up` | Fetch of all visible durable events after a cursor, filtered by `authorize`. |
 | Channel | `channel` | Place for conversations; kinds `text`, `forum`, `dm`. `text` and `forum` are in exactly one space, `dm` in none (`space_id` NULL, 03); optionally read-only (`read_only`). |
 | Channel prompt | `prompt` | Instruction text of the channel for the operator; readable only with `manage`, never in events. |
+| Check without a request | `recheck principal` | Evaluation of the permissions of a person that the server performs without a request of this person: `agent.invoke` before every delivery to an agent, at `run.token.renew` and for the run from deferred follow-ups, `command.invoke` and `interaction.create` before handing over to an app, the permissions of the trigger in the acting-for binding; the person counts as a principal without session, device and token, with blocks only from their status and the owner status from the current owner list (05 section 5, R-AZ-29). |
 | Client interaction ID | `client_interaction_id` | UUIDv7 of the client per interaction; unique per principal, makes clicks repeatable. |
 | Client message ID | `client_msg_id` | UUIDv7 of the client per message; unique per author, a repetition returns the original. |
 | Close code | `close code` | Code with which the server ends a WebSocket connection, with a defined client reaction. |
@@ -49,7 +50,7 @@ Code names are English and apply in API, database and code.
 | Device | `device` | Installed client of a person; a new device waits (`pending`) for approval and until then may only read itself. |
 | Device key | `device_key` | Key pair in the secure storage of a device with purpose `dpop` (binds tokens) or `step_up` (signs only after biometrics or device PIN). |
 | Direct message (DM) | `dm` | Channel kind for conversations between people without a space, without an agent and without grants; access only for participants. |
-| Done | `closed` | Thread state after completion; a new message reopens the thread. |
+| Done | `closed` | Thread state after completion; a new message reopens the thread, a system line does not ([03-data-model.md](03-data-model.md), `messages`). |
 | DPoP | `dpop` | Proof-of-Possession according to RFC 9449: tokens are bound to the device key and worthless without it. |
 | Draft | `draft` | Text of a person per thread or channel that has not been sent yet, versioned and across devices. |
 | Durable event | `durable event` | Event in the event log with a global sequence; can be caught up until `sync.event_retention`. |
@@ -118,7 +119,7 @@ Code names are English and apply in API, database and code.
 | Outbox | `outbox` | Local queue of a client for write operations, each with its own client ID, strictly in order per thread. |
 | Outgoing webhook | `webhook_subscription` | Subscription of an app or an agent to receive events, signed (`v1a`, optionally HMAC `v1`), at an allowed HTTPS address. |
 | Own measurement | `own measurement` | Counting by the server itself through `kernel/measure` for live views and the SLO traffic light, as minute aggregates in `stats_minutes`; independent of the telemetry, with SLI thresholds from the Sloth files (docs/spec/25-visualization.md). |
-| Owner | `owner` | Instance owner; may do everything except read other people's direct messages; owner permissions only in a session, never through a personal API token; at least one. |
+| Owner | `owner` | Instance owner; may do everything except read other people's direct messages; owner permissions only in a session (exception: check without a request), never through a personal API token; at least one. |
 | Passkey | `passkey_credential` | WebAuthn credentials of a person for local login and step-up. |
 | Permission change preview | `access.preview` | Dry run of a permission action with differences, invariants and hints in plain language; without effect. |
 | Permission version | `permission_version` | Counter that increases on every permission change and makes caches and open connections re-evaluate. |
