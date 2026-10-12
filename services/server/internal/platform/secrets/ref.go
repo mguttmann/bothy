@@ -33,7 +33,7 @@ const (
 	detailFileClean    = "file reference must be a clean path without . or .. elements, repeated or trailing slashes"
 	detailFileNUL      = "file reference must not contain a NUL character"
 	detailEnvName      = "env reference must name a variable of upper-case letters, digits and underscores"
-	detailSecretsDir   = dirPlaceholder + " must be an absolute clean path"
+	detailSecretsDir   = dirPlaceholder + " must be an absolute clean path other than /"
 )
 
 // Ref is a parsed secret reference "<scheme>:<path>" (docs/spec/16-operations.md 5.2): for file the
@@ -65,7 +65,7 @@ type Ref struct {
 //	// ref.Path == "/run/bothy/secrets/db_app_password", err == nil
 func ParseRef(raw, secretsDir string) (Ref, error) {
 	if strings.Contains(raw, dirPlaceholder) {
-		if !isAbsClean(secretsDir) {
+		if !isAbsClean(secretsDir) || secretsDir == "/" {
 			return Ref{}, invalid(detailSecretsDir)
 		}
 		raw = strings.ReplaceAll(raw, dirPlaceholder, secretsDir)

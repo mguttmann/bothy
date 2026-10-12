@@ -35,7 +35,7 @@ the named directories: no configuration, no environment, no database (the contai
   `Report.WriteTo` writes one line per entry and, as the last line, `Report.Reminder`. On an error
   the report is empty.
 - `ParseOwner("<service>=<uid>:<gid>")` checks only the form (a service of lower-case letters,
-  digits and `-`, decimal numbers from 0 to 2147483647) and never repeats the input; `Init`
+  digits and `-`, decimal numbers from 0 to `math.MaxInt32`) and never repeats the input; `Init`
   checks whether the service exists.
 - `Export(ctx, ExportOptions{From, Recipients, Output, Armor, Stdout, IsTerminal})`.
 - Errors that wrap `ErrUsage` are usage errors (exit code 2); all others, `ErrConflict` too, are

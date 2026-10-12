@@ -76,7 +76,7 @@ its own): this package does not check its grammar.
    reads nothing.
 4. After opening, the opened file is checked again and must be the same (`os.SameFile`); a swap
    between check and read is `read_failed`.
-5. At most 1 MiB (1048576 bytes), otherwise `read_failed`.
+5. At most `maxFileSize` (`file.go`), otherwise `read_failed`.
 6. Exactly one trailing `\n` and a `\r` directly before it are removed (`echo value > file`
    appends it, and no password ends with it). Empty after that is `not_found` like a missing
    file: an empty password is never valid.

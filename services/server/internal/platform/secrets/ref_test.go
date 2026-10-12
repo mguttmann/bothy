@@ -94,6 +94,19 @@ func TestParseRef(t *testing.T) {
 	}
 }
 
+// TestParseRefRejectsTheRootAsSecretsDir: like NewProvider and the loader, ParseRef refuses / as
+// secrets.dir with the secrets.dir detail instead of building file://x.
+func TestParseRefRejectsTheRootAsSecretsDir(t *testing.T) {
+	t.Parallel()
+	_, err := secrets.ParseRef("file:<secrets.dir>/x", "/")
+	if !errors.Is(err, secrets.ErrInvalidRef) {
+		t.Fatalf("ParseRef error = %v, want ErrInvalidRef", err)
+	}
+	if !strings.Contains(err.Error(), "<secrets.dir> must be an absolute clean path") {
+		t.Fatalf("message %q does not name secrets.dir", err.Error())
+	}
+}
+
 func TestRefErrorMessage(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
