@@ -94,7 +94,7 @@ milestone (and the ticket that builds it); otherwise the generator fails in `mak
    If a method is missing or two modules implement the same one, the package does not build. The
    compiler checks only the methods: the start (`wire.Serve`, M1-11) builds every module handler
    with its dependencies and passes the filled composite to `wire.MountRoutes`.
-3. Change the tests that hold the number of operations (`TestRealTable_Empty` in `api/routes`)
+3. Change the tests that hold the number of operations (`TestRealTable_Enabled` in `api/routes`)
    along with it; `make codegen-check` and `make arch` green.
 
 ## Start check

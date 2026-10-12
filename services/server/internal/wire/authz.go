@@ -132,8 +132,10 @@ func AuthzConfig(v *config.Values) (authzapp.AuthorizerConfig, error) {
 // NewAuthorizer builds the Authorizer of authz, the kernel/authorize.Authorizer of the process
 // (M1-28), over pool: the PrincipalSource of identity (M1-26), the grant store of authz (M1-27),
 // the rights version of instance (instance.Versions), the recorder of audit (M1-24), the clock and
-// log, and the empty sources for structure, agent policy and credentials until their tickets
-// (empty_sources.go, docs/briefs/M1-28-authz-core.md D2). It opens no connection.
+// log, the CredentialSource of identity (devices since M1-33; sessions M1-34 and tokens M1-44
+// still report not active, so such requests stay unauthenticated) and the empty sources for
+// structure and agent policy until their tickets (empty_sources.go, ruling D2 of
+// docs/briefs/M1-28-authz-core.md). It opens no connection.
 //
 // Errors: those of authzapp.NewAuthorizer (a cache bound below 1).
 func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.Catalog, rec auditing.Recorder,
@@ -145,7 +147,7 @@ func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.C
 		Catalog:     cat,
 		Store:       authzpg.NewRepository(pool),
 		Principals:  identityapp.NewPrincipalSource(identitypg.NewRepository(pool)),
-		Credentials: emptyCredentials{},
+		Credentials: identityapp.NewCredentialSource(identitypg.NewRepository(pool)),
 		Structure:   emptyStructure{},
 		Policies:    emptyPolicies{},
 		Versions:    instanceapp.NewVersions(instancepg.NewRepository(pool)),

@@ -128,6 +128,8 @@ type server struct {
 	// maintenance of the job and the log tail of api and all.
 	syncCfg SyncConfig
 	sync    *Sync
+	// identity is the identity module (M1-33): devices, the DPoP verifier and the REST handlers.
+	identity *Identity
 	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
 	blocked bool
 }
@@ -156,6 +158,9 @@ type server struct {
 //     partition maintenance; startSync),
 //     6c. authz (M1-28): build the Authorizer with the recorder of audit and bind the rights
 //     hooks to the appender of sync and the recorder (M1-29; startAuthz),
+//     6d. identity (M1-33): resolve auth.token_pepper_ref once (a missing or malformed pepper ends
+//     the start), build the devices, the DPoP verifier with its jti store and the device handlers,
+//     and start the sweeper of the jti store; its stop step runs in the HTTP phase (startIdentity),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
 //     sweeper, M1-19, InstallIdempotency, M1-20, and MountRoutes, api and all), log
@@ -308,6 +313,7 @@ func (s *server) register() {
 	r.Add(step("audit", s.startAudit))
 	r.Add(step("sync", s.startSync))
 	r.Add(step("authz", s.startAuthz))
+	r.Add(step("identity", s.startIdentity))
 	// Extension point (README.md): M1-32 adds the signing keys here.
 	r.Add(step("routes", s.mountRoutes))
 	if s.api() {
@@ -538,6 +544,46 @@ func (s *server) startAuthz(context.Context) error {
 	return nil
 }
 
+// startIdentity is start step 6d (M1-33): the identity module over the pool, the unit of work of
+// the audit step and the Authorizer of step 6c, with the token pepper resolved once.
+func (s *server) startIdentity(ctx context.Context) error {
+	cfg, err := IdentityConfig(s.values)
+	if err != nil {
+		return err
+	}
+	pepper, err := TokenPepper(ctx, s.sp, cfg.TokenPepperRef)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	pool, a, az := s.pool, s.audit, s.authorizer
+	s.mu.Unlock()
+	if a == nil || az == nil {
+		return errors.New("wire: the identity step needs the unit of work of audit and the Authorizer")
+	}
+	id, err := NewIdentity(cfg, pool, a.UoW(), az, pepper, s.deps.Clock, s.logger())
+	if err != nil {
+		return err
+	}
+	id.Start(s.runner)
+	s.mu.Lock()
+	s.identity = id
+	s.mu.Unlock()
+	return nil
+}
+
+// handlers returns deps.Handlers with every nil module handler replaced by the one the start
+// built (tests inject their own).
+func (s *server) handlers() Handlers {
+	h := s.deps.Handlers
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if h.Devices == nil && s.identity != nil {
+		h.Devices = s.identity.Handlers
+	}
+	return h
+}
+
 // authorizerOf returns the Authorizer of the process, nil before the step authz ran.
 func (s *server) authorizerOf() authorize.Authorizer {
 	s.mu.Lock()
@@ -587,7 +633,7 @@ func (s *server) mountRoutes(context.Context) error {
 			mux := s.publicMux()
 			s.chain = chain
 			s.mu.Unlock()
-			return MountRoutes(s.role, mux, s.deps.Handlers, cat, chain, log)
+			return MountRoutes(s.role, mux, s.handlers(), cat, chain, log)
 		}
 	}
 	return startRoutes(RouteBindings(routes.Enabled()), BuildRegistry(s.deps.Registrations), cat, log, mount)
@@ -597,16 +643,24 @@ func (s *server) mountRoutes(context.Context) error {
 // over the embedded contract (api/rest.Spec), actor.AnonymousOnly until identity is wired, and the
 // global meter provider of platform/otel (call it after otel.Setup).
 func NewChain(cfg httpserver.ChainConfig, log *slog.Logger) (*httpserver.Chain, error) {
-	var ids []string
-	for _, op := range routes.Enabled() {
-		ids = append(ids, op.ID)
-	}
-	v, err := httpserver.NewValidator(rest.Spec, ids)
+	v, err := enabledValidator()
 	if err != nil {
 		return nil, err
 	}
 	return httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: actor.AnonymousOnly{}, Validator: v})
 }
+
+// enabledValidator compiles the request validator of the enabled operations once per process: the
+// spec and the operation list are fixed in the binary, the validator is safe for concurrent use,
+// and compiling the response schemas of every enabled operation takes seconds under load, which
+// each test server of a binary would pay again (docs/DECISIONS.md M1-33/18).
+var enabledValidator = sync.OnceValues(func() (*httpserver.Validator, error) {
+	var ids []string
+	for _, op := range routes.Enabled() {
+		ids = append(ids, op.ID)
+	}
+	return httpserver.NewValidator(rest.Spec, ids)
+})
 
 // jobsStopSteps returns the stop steps of phase jobs in registration order; none for api. Steps
 // of one phase run in reverse registration order: the soft stop within

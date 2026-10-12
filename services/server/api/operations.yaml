@@ -7,7 +7,10 @@
 # and how to regenerate: services/server/api/README.md. The generator (api/routes/gen) only
 # checks this file; it never rewrites it.
 version: 1
-enabled: []          # operationIds that have a handler; sorted ascending
+enabled:             # operationIds that have a handler; sorted ascending
+  - getDevice
+  - listMyDevices
+  - listUserDevices
 later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id
   - operation_id: abortUpload
     milestone: M3
@@ -326,9 +329,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getCostStats
     milestone: M6
     ticket: M6-05
-  - operation_id: getDevice
-    milestone: M1
-    ticket: M1-33
   - operation_id: getDiscovery
     milestone: M1
     ticket: M1-46
@@ -527,9 +527,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listMessageRevisions
     milestone: M1
     ticket: M1-58
-  - operation_id: listMyDevices
-    milestone: M1
-    ticket: M1-33
   - operation_id: listMyDms
     milestone: V3
     ticket: V3-01
@@ -596,9 +593,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listTokens
     milestone: M1
     ticket: M1-44
-  - operation_id: listUserDevices
-    milestone: M1
-    ticket: M1-33
   - operation_id: listUserSessions
     milestone: M1
     ticket: M1-34

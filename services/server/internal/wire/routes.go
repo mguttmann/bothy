@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
+	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
 
@@ -37,11 +38,12 @@ type Mux interface { // NOSONAR: names the public mux it stands for; see M1-17/3
 // Handlers is the composite of every module's adapters/httpapi handler (02 "Layers within a module",
 // rule 3): each module embeds the part of the generated strict server interface it implements,
 // so the compiler proves that the interface is complete and that no operation is implemented
-// twice. It is empty while api/operations.yaml enables no operation (routes.Server is any then);
-// the first handler ticket embeds its module handler here. The compiler proves only the method
-// set: the start (wire.Serve, M1-11) builds each module handler with its dependencies and passes
-// the filled composite to MountRoutes.
-type Handlers struct{}
+// twice. The compiler proves only the method set: the start (wire.Serve) fills every nil module
+// handler with the one it builds from its dependencies before MountRoutes.
+type Handlers struct {
+	// Devices implements listMyDevices, listUserDevices and getDevice (identity, M1-33).
+	*identityhttp.Devices
+}
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the
 // error handlers of opts; routes.Build bound to Handlers in production, the fixture surface in

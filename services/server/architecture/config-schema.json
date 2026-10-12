@@ -14,6 +14,30 @@
       "doc": "Additional origins that get CORS headers; each entry is an origin such as https://app.example.com."
     },
     {
+      "name": "api.page_size_default",
+      "env": "BOTHY_API__PAGE_SIZE_DEFAULT",
+      "kind": "int",
+      "default": "50",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "06-api.md",
+      "doc": "Page size of a list without limit."
+    },
+    {
+      "name": "api.page_size_max",
+      "env": "BOTHY_API__PAGE_SIZE_MAX",
+      "kind": "int",
+      "default": "200",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "06-api.md",
+      "doc": "Largest page size; a larger limit is capped."
+    },
+    {
       "name": "audit.deny_aggregate_max_keys",
       "env": "BOTHY_AUDIT__DENY_AGGREGATE_MAX_KEYS",
       "kind": "int",
@@ -38,6 +62,42 @@
       "doc": "Window from the first of identical denials within which they become one audit entry with a count."
     },
     {
+      "name": "auth.clock_leeway",
+      "env": "BOTHY_AUTH__CLOCK_LEEWAY",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "0s",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Allowed clock skew for exp, nbf and iat."
+    },
+    {
+      "name": "auth.dpop_nonce_ttl",
+      "env": "BOTHY_AUTH__DPOP_NONCE_TTL",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Length of a DPoP nonce window; the current and the previous nonce are accepted."
+    },
+    {
+      "name": "auth.dpop_proof_max_age",
+      "env": "BOTHY_AUTH__DPOP_PROOF_MAX_AGE",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Oldest iat a DPoP proof may have."
+    },
+    {
       "name": "auth.step_up_max_age",
       "env": "BOTHY_AUTH__STEP_UP_MAX_AGE",
       "kind": "duration",
@@ -48,6 +108,18 @@
       "max": "",
       "chapter": "03-data-model.md",
       "doc": "How long a step-up confirmation counts as fresh for actions that need one."
+    },
+    {
+      "name": "auth.token_pepper_ref",
+      "env": "BOTHY_AUTH__TOKEN_PEPPER_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/token_pepper",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Secret reference of the server pepper for the HMAC hashes of tokens and codes and the DPoP nonce key; 32 bytes as hex."
     },
     {
       "name": "authz.snapshot_cache_max_entries",

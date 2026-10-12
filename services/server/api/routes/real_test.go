@@ -3,28 +3,58 @@
 package routes_test
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
 )
 
-// TestRealTable_Empty pins the state of this ticket: no operation has a handler yet, so the real
-// table is empty and Build mounts nothing (P-04). A handler ticket that enables an operation
-// changes this test together with api/operations.yaml.
-func TestRealTable_Empty(t *testing.T) {
-	if ops := routes.Enabled(); len(ops) != 0 {
-		t.Fatalf("Enabled() = %d operations, want none at this ticket", len(ops))
+// stubServer implements the enabled operations without behaviour; Build only registers them.
+type stubServer struct{}
+
+func (stubServer) GetDevice(context.Context, rest.GetDeviceRequestObject) (rest.GetDeviceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListMyDevices(context.Context, rest.ListMyDevicesRequestObject) (rest.ListMyDevicesResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListUserDevices(context.Context, rest.ListUserDevicesRequestObject) (rest.ListUserDevicesResponseObject, error) {
+	return nil, nil
+}
+
+// TestRealTable_Enabled pins the enabled operations (P-04): since M1-33 the three device reads.
+// A handler ticket that enables an operation changes this test together with api/operations.yaml.
+func TestRealTable_Enabled(t *testing.T) {
+	want := map[string]string{
+		"getDevice":       "GET /api/v1/devices/{device_id}",
+		"listMyDevices":   "GET /api/v1/me/devices",
+		"listUserDevices": "GET /api/v1/users/{user_id}/devices",
 	}
-	got, err := routes.Build(struct{}{}, routes.Options{}, routes.SpecCatalog())
-	if err != nil || len(got) != 0 {
-		t.Fatalf("Build = %v, %v; want no routes and no error", got, err)
+	ops := routes.Enabled()
+	if len(ops) != len(want) {
+		t.Fatalf("Enabled() = %d operations, want %d", len(ops), len(want))
 	}
-	if err := routes.Verify(nil, routes.SpecCatalog()); err != nil {
-		t.Errorf("Verify(nothing) = %v", err)
+	for _, op := range ops {
+		if want[op.ID] != op.Pattern || op.Action != "device.list" || op.RateLimitClass != "rl.read" {
+			t.Errorf("operation %+v", op)
+		}
+		if got, ok := routes.ByPattern(op.Pattern); !ok || got.ID != op.ID {
+			t.Errorf("ByPattern(%s) = %+v, %v", op.Pattern, got, ok)
+		}
+	}
+	got, err := routes.Build(stubServer{}, routes.Options{}, routes.SpecCatalog())
+	if err != nil || len(got) != len(want) {
+		t.Fatalf("Build = %d routes, %v", len(got), err)
+	}
+	if err := routes.Verify(nil, routes.SpecCatalog()); err == nil {
+		t.Error("Verify(nothing) passed although three operations are enabled")
 	}
 	if err := routes.Verify([]string{"GET /api/v1/discovery"}, routes.SpecCatalog()); err == nil {
 		t.Error("Verify accepted a pattern of no enabled operation")

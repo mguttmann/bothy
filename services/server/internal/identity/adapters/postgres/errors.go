@@ -24,14 +24,24 @@ const (
 	fieldInvalid = "invalid"
 )
 
+// Field pointers that several maps name.
+const (
+	fieldUserID    = "/user_id"
+	fieldRevokedBy = "/revoked_by"
+)
+
 // uniqueFields maps the unique indexes and primary keys of the migration to the field a
 // conflict names. A primary key conflict means a reused id, which only a programming error
 // produces, so it is not in the list and stays internal.
 var uniqueFields = map[string]string{
 	"principals_handle_lower_key": "/handle",
 	"users_email_lower_key":       "/email",
-	"owners_active_user_key":      "/user_id",
+	"owners_active_user_key":      fieldUserID,
 	"users_pkey":                  "/principal_id",
+	// M1-33: the device id comes from the client (03 devices.id), so a reused one is a conflict,
+	// and a thumbprint belongs to one key for good.
+	"devices_pkey":        "/device_id",
+	"device_keys_jkt_key": "/public_jwk",
 }
 
 // constraintFields maps checks and foreign keys to the column they guard. Triggers raise with
@@ -41,9 +51,21 @@ var constraintFields = map[string]string{
 	"principals_status_check": "/status",
 	"principals_handle_check": "/handle",
 	"users_principal_id_fkey": "/principal_id",
-	"owners_user_id_fkey":     "/user_id",
+	"owners_user_id_fkey":     fieldUserID,
 	"owners_granted_by_fkey":  "/granted_by",
-	"owners_revoked_by_fkey":  "/revoked_by",
+	"owners_revoked_by_fkey":  fieldRevokedBy,
+	// M1-33
+	"devices_user_id_fkey":              "/user_id",
+	"devices_approved_by_fkey":          "/approved_by",
+	"devices_revoked_by_fkey":           "/revoked_by",
+	"devices_platform_check":            "/platform",
+	"devices_state_check":               "/state",
+	"devices_revoke_reason_check":       "/revoke_reason",
+	"devices_revoked_at_check":          "/revoked_at",
+	"devices_revoke_reason_state_check": "/revoke_reason",
+	"device_keys_purpose_check":         "/purpose",
+	"device_keys_alg_check":             "/alg",
+	"device_keys_device_id_fkey":        "/device_id",
 }
 
 // mapError turns a database error of the operation what into a kernel/errs error (brief M1-26
