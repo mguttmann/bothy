@@ -18,6 +18,7 @@ var configKeyGroups = []func() []config.Key{
 	secretsConfigKeys,
 	databaseConfigKeys,
 	migrateConfigKeys,
+	telemetryConfigKeys,
 }
 
 // ConfigSchema builds the configuration schema of the server: every key of configKeyGroups and

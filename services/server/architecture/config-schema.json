@@ -221,6 +221,22 @@
       "doc": "Largest JSON request body in bytes; it must be greater than message.max_content_bytes."
     },
     {
+      "name": "instance.environment",
+      "env": "BOTHY_INSTANCE__ENVIRONMENT",
+      "kind": "enum",
+      "default": "prod",
+      "required": false,
+      "enum": [
+        "dev",
+        "staging",
+        "prod"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "16-operations.md",
+      "doc": "Environment of the instance: dev, staging or prod."
+    },
+    {
       "name": "message.max_content_bytes",
       "env": "BOTHY_MESSAGE__MAX_CONTENT_BYTES",
       "kind": "int",
@@ -317,6 +333,18 @@
       "doc": "Secret reference of the password bothy migrate up --bootstrap sets for bothy_owner."
     },
     {
+      "name": "privacy.telemetry_pseudonym_rotation",
+      "env": "BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION",
+      "kind": "duration",
+      "default": "30d",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "20-privacy.md",
+      "doc": "Length of one period of the telemetry pseudonyms; each period derives its own key."
+    },
+    {
       "name": "secrets.cache_ttl",
       "env": "BOTHY_SECRETS__CACHE_TTL",
       "kind": "duration",
@@ -391,6 +419,87 @@
       "max": "",
       "chapter": "02-architecture.md",
       "doc": "How long the start and bothy migrate wait for the database before they give up."
+    },
+    {
+      "name": "telemetry.enabled",
+      "env": "BOTHY_TELEMETRY__ENABLED",
+      "kind": "bool",
+      "default": "true",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "17-observability.md",
+      "doc": "Turns the OTLP export of traces, metrics and logs on or off; logs then go to stdout."
+    },
+    {
+      "name": "telemetry.logs.exporter",
+      "env": "BOTHY_TELEMETRY__LOGS__EXPORTER",
+      "kind": "enum",
+      "default": "both",
+      "required": false,
+      "enum": [
+        "otlp",
+        "stdout",
+        "both"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "17-observability.md",
+      "doc": "Where logs go: OTLP to the collector, JSON on stdout, or both."
+    },
+    {
+      "name": "telemetry.logs.level",
+      "env": "BOTHY_TELEMETRY__LOGS__LEVEL",
+      "kind": "enum",
+      "default": "info",
+      "required": false,
+      "enum": [
+        "debug",
+        "info",
+        "warn",
+        "error"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "17-observability.md",
+      "doc": "Lowest level that is written."
+    },
+    {
+      "name": "telemetry.pseudonym_key_ref",
+      "env": "BOTHY_TELEMETRY__PSEUDONYM_KEY_REF",
+      "kind": "secret_ref",
+      "default": "file:<secrets.dir>/telemetry_pseudonym_key",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "17-observability.md",
+      "doc": "Secret reference of the key for HMAC pseudonyms of people in telemetry; at least 32 bytes."
+    },
+    {
+      "name": "telemetry.traces.sampler_ratio",
+      "env": "BOTHY_TELEMETRY__TRACES__SAMPLER_RATIO",
+      "kind": "float",
+      "default": "1.0",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "1",
+      "chapter": "17-observability.md",
+      "doc": "Share of new traces the SDK records; the collector samples again after that."
+    },
+    {
+      "name": "telemetry.traces.trust_remote_parent",
+      "env": "BOTHY_TELEMETRY__TRACES__TRUST_REMOTE_PARENT",
+      "kind": "bool",
+      "default": "false",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "17-observability.md",
+      "doc": "With true an incoming traceparent becomes the parent of the server span, otherwise only a span link."
     }
   ]
 }

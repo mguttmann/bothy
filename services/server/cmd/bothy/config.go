@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log/slog"
 	"strconv"
 	"strings"
 	"unicode"
@@ -179,7 +178,7 @@ func warnEnvRefs(s *config.Schema, values *config.Values, stderr io.Writer) {
 // stderr; the error names the reference, never the value (SEC-SEC-2). The values that were read
 // are dropped at once.
 func checkSecretRefs(ctx context.Context, s *config.Schema, values *config.Values, env []string, stdout, stderr io.Writer) bool {
-	p, err := wire.NewSecretsProvider(values, env, slog.New(slog.NewTextHandler(stderr, nil)))
+	p, err := wire.NewSecretsProvider(values, env, commandLogger(stderr, s, values))
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "bothy config: %v\n", err)
 		return false
