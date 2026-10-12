@@ -167,6 +167,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.dpop_proof_max_age = 1m  # default\n" +
 		"auth.step_up_max_age = 5m  # default\n" +
 		"auth.token_pepper_ref = file:/run/bothy/secrets/token_pepper  # default\n" +
+		"authz.expiry_reminder_lead = 2d  # default\n" +
+		"authz.expiry_sweep_batch_max = 500  # default\n" +
+		"authz.expiry_sweep_interval = 1m  # default\n" +
 		"authz.snapshot_cache_max_entries = 10000  # default\n" +
 		"consumer.batch_size = 500  # default\n" +
 		"consumer.pending_alert_after = 15m  # default\n" +

@@ -54,7 +54,7 @@ func TestPartitionMaintenanceJobRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	reg, err := wire.NewJobRegistry(&wire.JobModules{Partitions: nil, PartitionInterval: cfg.MaintenanceInterval, CleanupInterval: cfg.Cleanup.Interval})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{Partitions: nil, PartitionInterval: cfg.MaintenanceInterval, CleanupInterval: cfg.Cleanup.Interval, ExpiryInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestIdempotencyCleanupJobRegistered(t *testing.T) {
 	if cfg.Cleanup.BatchSize != 50 {
 		t.Fatalf("batch size %d, want 50", cfg.Cleanup.BatchSize)
 	}
-	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: cfg.MaintenanceInterval, CleanupInterval: cfg.Cleanup.Interval})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: cfg.MaintenanceInterval, CleanupInterval: cfg.Cleanup.Interval, ExpiryInterval: time.Minute})
 	if err != nil {
 		t.Fatal(err)
 	}

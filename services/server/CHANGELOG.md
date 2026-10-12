@@ -11,6 +11,20 @@ documented in this file. The format is based on
 
 ### Added
 
+- `internal/authz` (M1-30): the periodic jobs `authz.expiry_sweep` and `authz.expiry_reminder`
+  on the queue `maintenance`. The sweep reports every expired grant and membership exactly once
+  in batches of `authz.expiry_sweep_batch_max`: raised rights version, `expiry_reported_at`,
+  `grant.changed` (`expired`) or `group.changed` (`member_expired`), the system audit actions
+  `grant.expire` and `group.member.expire`, I1 and SR8, and `access.changed` for every principal
+  whose visible targets changed; a run without due rows leaves the rights version alone. The
+  reminder writes `access.expiring` once per active recipient within `authz.expiry_reminder_lead`
+  before an expiry. Every rights change first folds in the due expiries (marker, events, audit), so a loss
+  is reported exactly once and no gain is reported that `authorize` denies. New: `ExpiryService`,
+  `ExpiryStore`, `RightsHook.Folded`,
+  `domain.AssumeValid`, `adapters/jobs`, the configuration keys `authz.expiry_sweep_interval`,
+  `authz.expiry_reminder_lead` and `authz.expiry_sweep_batch_max`, and the registration of
+  `grant.changed`, `group.changed` and `access.expiring`.
+
 - Idempotency keys (M1-20): `StageIdempotency` of `platform/httpserver` runs every keyed request
   in one unit of work with the key row of `idempotency_keys` (migration `00007`), stores final
   responses only (`2xx`; `400`, `403`, `404`, `409` except `request_in_progress`, `410`, `412`,

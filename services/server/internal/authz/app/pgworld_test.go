@@ -71,6 +71,7 @@ type pgWorld struct {
 	creds      *fake.Credentials
 	clk        *clock.Fake
 	cfg        app.AuthorizerConfig
+	appender   *syncapp.Appender
 
 	subMu sync.Mutex
 	seen  []authorize.AccessChanged
@@ -162,6 +163,7 @@ func newPGWorld(t *testing.T) *pgWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	w.appender = appender
 	if err := hook.Bind(app.RightsBindings{Events: appender, Audit: w.rec}); err != nil {
 		t.Fatal(err)
 	}

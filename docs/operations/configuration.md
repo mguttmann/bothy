@@ -354,9 +354,9 @@ Source: [07-permissions.md](../spec/07-permissions.md), section 14.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `authz.expiry_sweep_interval` | `BOTHY_AUTHZ__EXPIRY_SWEEP_INTERVAL` | Server |  | `1m` | interval of the job that reports expiries and writes reminders | planned (M1) |
-| `authz.expiry_reminder_lead` | `BOTHY_AUTHZ__EXPIRY_REMINDER_LEAD` | Server |  | `48h` | how long before expiry the reminder comes (Study C: two days) | planned (M1) |
-| `authz.expiry_sweep_batch_max` | `BOTHY_AUTHZ__EXPIRY_SWEEP_BATCH_MAX` | Server |  | `500` | rows per transaction of the jobs `authz.expiry_sweep` and `authz.expiry_reminder` | planned (M1) |
+| `authz.expiry_sweep_interval` | `BOTHY_AUTHZ__EXPIRY_SWEEP_INTERVAL` | Server | duration | `1m` | interval of the job that reports expiries and writes reminders | active |
+| `authz.expiry_reminder_lead` | `BOTHY_AUTHZ__EXPIRY_REMINDER_LEAD` | Server | duration | `48h` | how long before expiry the reminder comes (Study C: two days) | active |
+| `authz.expiry_sweep_batch_max` | `BOTHY_AUTHZ__EXPIRY_SWEEP_BATCH_MAX` | Server | int | `500` | rows per transaction of the jobs `authz.expiry_sweep` and `authz.expiry_reminder` | active |
 | `authz.view_as_max_duration` | `BOTHY_AUTHZ__VIEW_AS_MAX_DURATION` | Server |  | `15m` | maximum duration of "View as person" | planned (M1) |
 | `authz.snapshot_cache_max_entries` | `BOTHY_AUTHZ__SNAPSHOT_CACHE_MAX_ENTRIES` | Server | int | `10000` | permission snapshots in memory per process (LRU) | active |
 | `authz.not_found_timing_tolerance` | `BOTHY_AUTHZ__NOT_FOUND_TIMING_TOLERANCE` | Server |  | `20ms` | allowed deviation of the median in AZ-P4 | planned (M1) |
