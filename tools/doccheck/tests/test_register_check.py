@@ -1067,7 +1067,7 @@ def test_readme_bullet_continues_on_next_line(
 def test_readme_later_paragraph_of_tables_is_read(
     repo: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    edit(repo, readme_path("beta"), "\n`beta_items`.\n", "\n`beta_items`.\n\nDazu `beta_more`.\n")
+    edit(repo, readme_path("beta"), "\n`beta_items`.\n", "\n`beta_items`.\n\nAlso `beta_more`.\n")
     message = "module beta: table beta_more not in the register"
     assert_finding(repo, capsys, readme_path("beta"), "C12", message)
 

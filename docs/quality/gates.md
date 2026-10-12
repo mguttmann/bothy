@@ -135,8 +135,10 @@ diagrams, `MMDC_PUPPETEER_CONFIG` can point to a Puppeteer configuration, which 
 tests of `make test` use too; a relative path counts from the repository root, also when a test
 renders from `tools/`. If it names its own Chromium (`executablePath`), `make bootstrap`
 downloads no browser; otherwise it downloads the one that matches Puppeteer. CI sets
-`tools/node/puppeteer-ci.json` (Chromium without sandbox, because runners can restrict user
-namespaces; only the project's own diagrams are rendered) in every step that reaches
+`tools/node/puppeteer-ci.json` (Chromium without sandbox, because Ubuntu from 23.10 on keeps the
+Chromium of Puppeteer from using user namespaces through AppArmor, [Puppeteer troubleshooting,
+"Issues with AppArmor on Ubuntu"](https://pptr.dev/troubleshooting), retrieved 2026-10-12; only
+the project's own diagrams are rendered) in every step that reaches
 `make diagrams` or `make test`, that is for `make gates` and `make sonar`; a test in
 `tools/doccheck` holds this.
 
@@ -153,7 +155,8 @@ example a JSON report), `DENYLIST_FLAGS` (for example `--reveal` locally).
   READMEs) stays with review. It reports a name outside a code span only when a source knows
   it; an unknown word (such as a typo) stays with review. Its static reading approximates
   Python-Markdown (it does not read Setext headings); a test in `make test` holds that it equals
-  the rendered site on the real files (DECISIONS M1-06/11). GitHub renders the READMEs; what
+  the rendered site on the real files (DECISIONS M1-06/11). GitHub renders the READMEs as
+  GitHub Flavored Markdown ([GFM spec](https://github.github.com/gfm/), retrieved 2026-10-12); what
   only GitHub shows differently from Python-Markdown is not seen by the test. It reads the
   diagram through a closed line grammar; a test with the pinned mermaid-cli holds that it equals
   Mermaid on the real diagram (needs `make bootstrap`).
