@@ -80,6 +80,12 @@ it gives one form, one schema and one decoding for all receivers. The fields are
   a delivery to a person contains neither of the two fields.
 - Build ticket M1-16 in [PLAN.md](../PLAN.md) (envelopes without JSON `null`, `correlation_id`
   equal to the trace ID).
+- Built in M1-16 (`services/server/internal/sync`): `TestEnvelope_FieldsMatchOpenAPI` holds that
+  the JSON members of `sync.Envelope` and its nested types equal the properties of
+  `EventEnvelope`, `EventActor`, `EventScope` and `EventResource` plus `type` and `payload`;
+  `TestEnvelope_DeliveryFieldsOnlyWhenSet` holds that delivery members appear only from
+  `DeliveryFields`, and `TestMigration_EventLogMatchesSpec` that `event_log` has no column for
+  them.
 
 ## Pros and Cons of the Options
 

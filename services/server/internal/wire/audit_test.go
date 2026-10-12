@@ -328,8 +328,21 @@ func (c componentFunc) Start(ctx context.Context) error { return c.start(ctx) }
 
 func TestNewTxnRegistry_RequiresTheAuditHook(t *testing.T) {
 	t.Parallel()
-	if _, err := wire.NewTxnRegistry(&wire.Modules{}); err == nil {
+	m := wire.NewModules(nil, nil)
+	m.Audit = nil
+	if _, err := wire.NewTxnRegistry(m); err == nil {
 		t.Fatal("a registry without the audit hook was built")
+	}
+}
+
+// TestNewTxnRegistry_RequiresTheSyncHook: every unit of work must number its durable events, so
+// a registry without the sync hook is refused (M1-16).
+func TestNewTxnRegistry_RequiresTheSyncHook(t *testing.T) {
+	t.Parallel()
+	m := wire.NewModules(nil, nil)
+	m.Sync = nil
+	if _, err := wire.NewTxnRegistry(m); err == nil {
+		t.Fatal("a registry without the sync hook was built")
 	}
 }
 

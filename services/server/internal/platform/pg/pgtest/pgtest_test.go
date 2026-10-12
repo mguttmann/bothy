@@ -77,7 +77,7 @@ func TestPgtestBindsLoopbackOnly(t *testing.T) {
 func TestNewRequiresMain(t *testing.T) {
 	// Not parallel: it switches the package state that New reads.
 	setActive(false)
-	_, err := sharedCluster()
+	_, err := sharedCluster(false)
 	setActive(true)
 	if err == nil || !strings.Contains(err.Error(), "pgtest.Main") {
 		t.Fatalf("New without Main: error %v, want one naming pgtest.Main", err)
@@ -191,5 +191,36 @@ func TestSecretsDirHoldsRolePasswords(t *testing.T) {
 		if err := db.Pool(t, r).Ping(context.Background()); err != nil {
 			t.Errorf("role %s cannot log in with its secret file: %v", r, err)
 		}
+	}
+}
+
+// TestDurableKeepsDurabilitySettings: a database from Durable runs with the PostgreSQL defaults
+// for fsync, synchronous_commit and full_page_writes (on), the measurement condition of ADR 0063
+// point 2; a database without the option keeps the speed flags (off).
+func TestDurableKeepsDurabilitySettings(t *testing.T) {
+	t.Parallel()
+	settings := []string{"fsync", "synchronous_commit", "full_page_writes"}
+	for _, tc := range []struct {
+		name string
+		db   *DB
+		want string
+	}{
+		{"durable", New(t, Durable()), "on"},
+		{"default", New(t), "off"},
+	} {
+		conn := tc.db.SuperConn(t)
+		for _, s := range settings {
+			var got string
+			if err := conn.QueryRow(context.Background(), "SHOW "+s).Scan(&got); err != nil {
+				t.Fatal(err)
+			}
+			if got != tc.want {
+				t.Errorf("%s database: %s = %s, want %s", tc.name, s, got, tc.want)
+			}
+		}
+	}
+	durable, plain := New(t, Durable(), WithoutMigrations()), New(t, WithoutMigrations())
+	if durable.Config(pg.RoleApp).Port == plain.Config(pg.RoleApp).Port {
+		t.Error("durable and speed databases share one server")
 	}
 }

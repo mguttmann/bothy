@@ -271,6 +271,13 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"shutdown.telemetry_flush_timeout = 5s  # default\n" +
 		"shutdown.total_timeout = 1m  # default\n" +
 		"startup.dependency_wait = 1m  # default\n" +
+		"sync.event_log_partition_size = 1000000  # default\n" +
+		"sync.event_log_partitions_ahead = 3  # default\n" +
+		"sync.event_payload_max_bytes = 65536  # default\n" +
+		"sync.event_retention = 30d  # default\n" +
+		"sync.log_poll_interval = 1s  # default\n" +
+		"sync.partition_maintenance_interval = 10m  # default\n" +
+		"sync.tail_batch_size = 1000  # default\n" +
 		"telemetry.enabled = true  # default\n" +
 		"telemetry.logs.exporter = both  # default\n" +
 		"telemetry.logs.level = info  # default\n" +

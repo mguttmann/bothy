@@ -175,3 +175,37 @@ func TestRegistryKinds(t *testing.T) {
 		t.Fatalf("ArgTypes = %v, want %v", got, want)
 	}
 }
+
+// TestRegistry_PeriodicAndQueue: the registry reports the periodic jobs and the queue of each
+// kind, so internal/wire can test what it registered (TestPartitionMaintenanceJobRegistered).
+func TestRegistry_PeriodicAndQueue(t *testing.T) {
+	t.Parallel()
+	reg := jobs.NewRegistry()
+	if err := jobs.Register(reg, noop[fakemodule.Tick](), jobs.HandlerOptions{Queue: jobs.QueueMaintenance}); err != nil {
+		t.Fatal(err)
+	}
+	if err := jobs.Register(reg, noop[fakemodule.Echo](), jobs.HandlerOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	p := jobs.PeriodicJob{Args: fakemodule.Tick{}, Interval: time.Minute, RunOnStart: true}
+	if err := reg.AddPeriodic(p); err != nil {
+		t.Fatal(err)
+	}
+	got := reg.Periodic()
+	if len(got) != 1 || got[0] != p {
+		t.Fatalf("Periodic = %+v", got)
+	}
+	got[0].Interval = time.Hour
+	if reg.Periodic()[0].Interval != time.Minute {
+		t.Fatal("Periodic returns the internal slice")
+	}
+	if q, ok := reg.Queue("fakemodule.tick"); !ok || q != jobs.QueueMaintenance {
+		t.Errorf("Queue(tick) = %q, %v", q, ok)
+	}
+	if q, ok := reg.Queue("fakemodule.echo"); !ok || q != jobs.QueueDefault {
+		t.Errorf("Queue(echo) = %q, %v; an empty queue is default", q, ok)
+	}
+	if _, ok := reg.Queue("fakemodule.none"); ok {
+		t.Error("Queue of an unknown kind reported ok")
+	}
+}

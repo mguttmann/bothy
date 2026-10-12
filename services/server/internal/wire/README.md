@@ -69,6 +69,19 @@ calls the port, has an expression whose type contains it or instantiates a gener
 Below a permanently failing readiness check the `ready` step logs `server started, not ready`
 instead of `server ready`.
 
+The event log (M1-16, `sync.go`): `NewModules` builds the sync phase hook (phase 3.2) next to the
+audit hook, and `NewTxnRegistry` refuses Modules without either. The start step `sync` builds
+`Sync` over the unit of work of the audit step (the appender as `eventlog.Appender` for the
+modules, the partition maintenance); the step `log_tail` (api and all, after `routes`) starts the
+log tail, waits until it has read the head and registers the stop step `event_tail` in
+`lifecycle.PhaseEventTail`; a tail that fails later calls `Runner.Fail` (exit code 1). The step
+`jobs` builds the job registry with `sync.partition_maintenance` (`NewJobRegistry(&JobModules{})`,
+queue `maintenance`, every `sync.partition_maintenance_interval`, `RunOnStart`).
+`MigrateUpSteps(pool, fsys, MigrateUpConfig{}, result)` adds the after-step
+`event_log_partitions` (the same maintenance with the configured values, upgrade.md rule M10);
+`MigrationSteps`, which `pgtest.WithSteps` uses, does not, so test databases have no partitions.
+`SyncConfigFrom` binds the `sync.*` keys of `configkeys_sync.go`.
+
 ## Extension points
 
 A later ticket adds its part in `register` of `serve.go`, at the marked place, with its stop
@@ -78,9 +91,8 @@ step:
 |---|---|---|---|
 | M1-32 | signing keys, readiness `signing_keys` | after the instance | none |
 | M1-17 | module handlers in `Deps.Handlers` | `routes` | none |
-| M1-16 | log tail and hub (api, all); a panic calls `Runner.Fail` | after `routes` | `event_tail` |
+| M1-28, M1-65 | sinks of the log tail (rights cache, then hub) in `tailSinks` | `sync.go` | none |
 | M1-65 | gateway connections | with the log tail | `connections` |
-| M1-16 | first job handler and periodic job in `NewJobRegistry` | `jobs.go` | none |
 | M2 | worker consumers | after `jobs` | `consumers` |
 | M1-43 | readiness `trusted_header_requires_loopback` | before `ready` | none |
 | M1-18 | middleware chain around the public mux | `public_listener` | none |

@@ -5,12 +5,14 @@ package wire
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"io/fs"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	syncjobs "github.com/OWNER/bothy/services/server/internal/sync/adapters/jobs"
 )
 
 // jobsKeys are the configuration keys of the job runtime (02 "Configuration values
@@ -59,12 +61,28 @@ func JobRole(r Role) jobs.Role {
 	}
 }
 
+// JobModules are the module objects whose jobs the job registry takes: today the partition
+// maintenance of sync (M1-16). Partitions may be nil where no job runs (tests of the
+// registration); a worker always passes the use case.
+type JobModules struct {
+	// Partitions is the use case of sync.partition_maintenance.
+	Partitions syncjobs.Maintainer
+	// PartitionInterval is sync.partition_maintenance_interval.
+	PartitionInterval time.Duration
+}
+
 // NewJobRegistry returns the job registry of a process: every role (api, worker, all) builds
-// the same one here, so an api process accepts exactly the kinds a worker runs. It is empty
-// until the first module with a job (sync.partition_maintenance, M1-16) adds its Register and
-// AddPeriodic calls; the error is the first rejected registration.
-func NewJobRegistry(_ *Modules) (*jobs.Registry, error) {
-	return jobs.NewRegistry(), nil
+// the same one here, so an api process accepts exactly the kinds a worker runs. It registers
+// sync.partition_maintenance (M1-16); the error is the first rejected registration.
+func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
+	if m == nil {
+		return nil, errors.New("wire: NewJobRegistry needs the job modules")
+	}
+	reg := jobs.NewRegistry()
+	if err := syncjobs.Register(reg, m.Partitions, m.PartitionInterval); err != nil {
+		return nil, err
+	}
+	return reg, nil
 }
 
 // riverStep is the before-step of bothy migrate up that creates the schema of River's tables
@@ -89,17 +107,41 @@ func (s riverStep) Run(ctx context.Context, _ *sql.DB) error {
 	return err
 }
 
+// MigrateUpConfig are the configured values the steps of bothy migrate up read.
+type MigrateUpConfig struct {
+	// JobsSchema is jobs.schema, the schema of River's tables.
+	JobsSchema string
+	// Sync holds the partition values of the event log (sync.event_log_partition_size,
+	// sync.event_log_partitions_ahead, sync.event_retention, database.lock_timeout).
+	Sync SyncConfig
+}
+
 // MigrateUpSteps returns the steps bothy migrate up runs around the goose migrations of fsys on
-// pool, the pool of migrate as bothy_owner: River's migrations into schema (jobs.schema) before
-// them (M1-14, upgrade.md rule M11) and the steps of MigrationSteps after them (the instance row,
-// M1-15). result receives what the River step applied; it may be nil. pgtest.WithSteps takes
-// MigrationSteps without River, because the serve tests add River's tables themselves
-// (docs/DECISIONS.md M1-15/16). The error is the one of MigrationSteps.
-func MigrateUpSteps(pool *pg.Pool, fsys fs.FS, schema string, result *jobs.MigrateResult) (pg.MigratorOptions, error) {
+// pool, the pool of migrate as bothy_owner: River's migrations into cfg.JobsSchema before them
+// (M1-14, upgrade.md rule M11), the steps of MigrationSteps after them (the instance row,
+// M1-15), and last the partition maintenance of event_log with the values of cfg.Sync, so a fresh
+// or upgraded database has partitions before serve starts (M1-16, upgrade.md rule M10). result
+// receives what the River step applied; it may be nil. pgtest.WithSteps takes MigrationSteps
+// without River and partitions, because the serve tests add River's tables themselves
+// (docs/DECISIONS.md M1-15/16) and the event log tests create their partitions with their own
+// size (M1-16/7).
+//
+// The error is the one of MigrationSteps, or a partition configuration the maintenance refuses.
+func MigrateUpSteps(pool *pg.Pool, fsys fs.FS, cfg MigrateUpConfig, result *jobs.MigrateResult) (pg.MigratorOptions, error) {
 	opts, err := MigrationSteps(pool, fsys)
 	if err != nil {
 		return pg.MigratorOptions{}, err
 	}
-	opts.Before = append([]pg.Step{riverStep{pool: pool, schema: schema, result: result}}, opts.Before...)
+	reg, err := NewTxnRegistry(NewModules(pool, nil))
+	if err != nil {
+		return pg.MigratorOptions{}, err
+	}
+	// Zero deadlines keep the session values of migrate, as in MigrationSteps.
+	sy, err := NewSync(pool, pg.NewUnitOfWork(pool, pg.UnitConfig{}, reg), cfg.Sync, nil, nil)
+	if err != nil {
+		return pg.MigratorOptions{}, err
+	}
+	opts.Before = append([]pg.Step{riverStep{pool: pool, schema: cfg.JobsSchema, result: result}}, opts.Before...)
+	opts.After = append(opts.After, partitionStep{maintenance: sy.Maintenance()})
 	return opts, nil
 }

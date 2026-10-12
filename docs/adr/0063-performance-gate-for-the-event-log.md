@@ -80,7 +80,10 @@ repeatable. Basis: [02-architecture.md](../spec/02-architecture.md), section 17,
 ### Confirmation
 
 - Build ticket M1-16 in [PLAN.md](../PLAN.md): `make perf` measures `perf.event_commit_min_per_s` on
-  `perf.reference_profile` and fails when the value is below the threshold.
+  `perf.reference_profile` and fails when the value is below the threshold (built:
+  `TestEventCommitThroughput` in `services/server/perf/event_commit` on a database from
+  `pgtest.Durable()`; it fails when `fsync` or `synchronous_commit` is not `on` and below the
+  threshold, which `perf/internal/report` reads from the table of 02, `TestReport_FailsBelowThreshold`).
 - Build ticket M1-72: `make perf` writes the measured value and the threshold per target; chaos tests
   of the event chain (loss of the `LISTEN` connection, database restart, SIGKILL during commit)
   leave no gap.

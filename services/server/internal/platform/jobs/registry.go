@@ -161,6 +161,26 @@ func (r *Registry) ArgTypes() map[string]reflect.Type {
 	return out
 }
 
+// Periodic returns a copy of the periodic jobs in the order they were added. internal/wire
+// tests it (TestPartitionMaintenanceJobRegistered).
+func (r *Registry) Periodic() []PeriodicJob {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]PeriodicJob(nil), r.periodic...)
+}
+
+// Queue returns the queue of a registered kind (QueueDefault for an empty HandlerOptions.Queue)
+// and true, or "" and false for an unknown kind.
+func (r *Registry) Queue(kind string) (string, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	e, ok := r.kinds[kind]
+	if !ok {
+		return "", false
+	}
+	return e.queue(), true
+}
+
 // seal freezes the registry and returns its kinds and periodic jobs.
 func (r *Registry) seal() (map[string]*entry, []PeriodicJob) {
 	r.mu.Lock()
