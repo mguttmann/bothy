@@ -132,7 +132,7 @@ func checkRegistration(r txn.Registration, deps ModuleDeps) error {
 	switch r.Kind {
 	case txn.KindHook:
 		if owner, ok := hookOwners[r.Phase]; !ok || owner != r.Subscriber {
-			return fmt.Errorf("hook %s of phase %s: module %s does not own this phase (02 Ablauf)", r.Handler, r.Phase, r.Subscriber)
+			return fmt.Errorf("hook %s of phase %s: module %s does not own this phase (02 section 8.1)", r.Handler, r.Phase, r.Subscriber)
 		}
 		return nil
 	case txn.KindSubscribe:

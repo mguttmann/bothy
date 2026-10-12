@@ -123,7 +123,7 @@ func TestCheckTxnDirections_WrongHookOwnerFails(t *testing.T) {
 		{Kind: txn.KindHook, Phase: txn.PhaseAudit, Subscriber: "audit", Handler: "d"},
 	}
 	if err := wire.CheckTxnDirections(good, deps); err != nil {
-		t.Fatalf("the hooks of 02 Ablauf: %v", err)
+		t.Fatalf("the hooks of 02 section 8.1: %v", err)
 	}
 	for _, bad := range []txn.Registration{
 		{Kind: txn.KindHook, Phase: txn.PhaseSync, Subscriber: "chat", Handler: "x"},
