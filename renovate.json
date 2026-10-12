@@ -112,6 +112,14 @@
         "image: (?<depName>[a-z0-9][a-z0-9./_-]*):\\$\\{BOTHY_[A-Z0-9_]+_VERSION:-(?<currentValue>[^}\\s]+)\\}"
       ],
       "datasourceTemplate": "docker"
+    },
+    {
+      "customType": "regex",
+      "description": "PostgreSQL image of the pgtest containers, pinned by digest like tools/sonarqube/compose.yaml",
+      "managerFilePatterns": ["/^services/server/internal/platform/pg/pgtest/image\\.go$/"],
+      "matchStrings": [
+        "// renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\nconst Image = \"[^:\"]+:(?<currentValue>[^@\"]+)@(?<currentDigest>sha256:[0-9a-f]{64})\""
+      ]
     }
   ]
 }

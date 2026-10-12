@@ -55,7 +55,7 @@ var (
 // reservedModules are the names of the fixed components of the generated config; a module with one
 // of these names would produce a second component of the same name (the generated config would be
 // ambiguous).
-var reservedModules = []string{"kernel", "platform", componentWire, componentCmd, componentAPI, componentTestSupport}
+var reservedModules = []string{"kernel", "platform", componentWire, componentCmd, componentAPI, migrationsComponent, componentTestSupport}
 
 // The elements of a vendor pattern. go-arch-lint turns each pattern into a regular expression and
 // escapes only "." and "/", so a pattern may hold nothing but the characters of a Go import path
@@ -143,6 +143,7 @@ func (v *validator) validate() {
 	if v.r.API != nil {
 		v.vendorRefs("api.vendors", v.r.API.Vendors)
 	}
+	v.validateMigrations()
 	v.nonEmpty(testSupportPaths, v.r.TestSupport.Paths)
 	v.list(testSupportPaths, v.r.TestSupport.Paths, pathRule)
 	v.validateScope()
@@ -150,7 +151,8 @@ func (v *validator) validate() {
 }
 
 // productRoots hold the product code that the architecture gate checks; see validateScope.
-var productRoots = []string{"internal", componentCmd, componentAPI}
+// migrations is product code too: the binary embeds it (docs/DECISIONS.md M1-12).
+var productRoots = []string{"internal", componentCmd, componentAPI, migrationsComponent}
 
 // within reports whether dir is root or lies below it (both slash-separated relative paths).
 func within(dir, root string) bool {
@@ -282,6 +284,20 @@ func (v *validator) validatePlatform() {
 	}
 	for _, c := range findCycles(v.r.platformOrder, func(p string) []string { return v.r.Platform[p].DependsOn }) {
 		v.add("platform."+c[0]+dependsOnKey, "platform dependency cycle %s", cycleText(c))
+	}
+}
+
+// validateMigrations checks the optional section migrations: used_by names platform packages of
+// the register, each once.
+func (v *validator) validateMigrations() {
+	if v.r.Migrations == nil {
+		return
+	}
+	v.list("migrations.used_by", v.r.Migrations.UsedBy, platformRule)
+	for i, p := range v.r.Migrations.UsedBy {
+		if _, known := v.r.Platform[p]; !known {
+			v.add(index("migrations.used_by", i), "unknown platform package %q", p)
+		}
 	}
 }
 

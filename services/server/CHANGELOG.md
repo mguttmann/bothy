@@ -83,6 +83,34 @@ documented in this file. The format is based on
 - `internal/wire`: `MountRoutes`, start step 7 of the roles `api` and `all`, which builds the
   routes from the composite of module handlers; a failed route check logs `route check failed`,
   mounts nothing and returns the error, on which `bothy serve` (M1-11) is to exit before ready.
+- `internal/platform/pg`: the PostgreSQL 18 pool of a process (pgx v5). `Acquire`, `Begin` and
+  `Ping` wait at most `database.acquire_timeout` and report an exhausted pool as `503 unavailable`
+  with the internal cause `db_pool_exhausted`; connections start with `statement_timeout`,
+  `lock_timeout`, `idle_in_transaction_session_timeout`, `application_name`, `READ COMMITTED` and
+  UTC, resolve their password through the secret provider per new connection and ignore every
+  `PG*` variable and libpq file of the home directory; `SetLocalTimeouts` overrides the deadlines
+  per transaction; `WaitReady` waits with backoff up to `startup.dependency_wait`. Spans of
+  otelpgx never carry query parameters, and statement errors reach them with the SQLSTATE only.
+- Schema check: `RequiredSchemaVersion` and `CheckSchema` refuse a database older than the
+  binary with `database schema version <have> is older than required <need>; run "bothy migrate up"`;
+  a newer schema passes.
+- Database roles `bothy_owner`, `bothy_app`, `bothy_maint` and `bothy_monitor`: `pg.Bootstrap`
+  creates or updates them idempotently with fixed attributes, sets their passwords as
+  SCRAM-SHA-256 verifiers computed in Go (never in plaintext), grants `pg_monitor`, and gives
+  database and schema `public` to `bothy_owner` without default privileges.
+- `bothy migrate up [--bootstrap]`, `bothy migrate status` and `bothy migrate validate`: embedded
+  goose migrations (package `migrations`) under a session lock with before- and after-steps, run as
+  the schema owner with `lock_timeout = migrate.lock_timeout`; a schema newer than the binary is
+  reported and left alone. Migration `00001_base_privileges` lets `bothy_app` read the version
+  table.
+- Configuration keys `database.*` (connection, pool, deadlines, `tx_retry_max`,
+  `listen_reconnect_backoff_cap`), `startup.dependency_wait` and `migrate.lock_timeout`,
+  `migrate.bootstrap_user` and `migrate.*_password_ref`. `bothy config check --secrets` reports
+  the `migrate.*` references as skipped, because only the migrate container has their files.
+- Test helper `internal/platform/pg/pgtest`: one disposable PostgreSQL 18 container per test
+  binary on `127.0.0.1` with a random port and a fresh database per test cloned from a migrated
+  template; without a Docker-compatible runtime the test binary fails instead of skipping. The
+  test `TestPrivilegesAfterAllMigrations` holds the grant rule for every migration.
 
 ### Changed
 

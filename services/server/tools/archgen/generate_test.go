@@ -147,10 +147,35 @@ func TestGenerateMinimalRegister(t *testing.T) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
 	}
-	for _, unwanted := range []string{"api", "canUse", "platform-", "kernel-ports:\n    mayDependOn"} {
+	for _, unwanted := range []string{"api", "migrations", "canUse", "platform-", "kernel-ports:\n    mayDependOn"} {
 		if strings.Contains(out, unwanted) {
 			t.Errorf("output contains %q:\n%s", unwanted, out)
 		}
+	}
+}
+
+// TestGenerateMigrationsSection holds the component of the package migrations: it may use only
+// itself, and wire, cmd and the platform packages named in used_by may use it.
+func TestGenerateMigrationsSection(t *testing.T) {
+	t.Parallel()
+	r, problems := parseRegister([]byte(validRegister))
+	if len(problems) != 0 {
+		t.Fatalf("problems:\n%s", formatProblems(problems))
+	}
+	out := string(mustGenerate(t, r))
+	for _, want := range []string{
+		"  migrations:\n    in: [migrations]\n",
+		"  migrations:\n    mayDependOn: [migrations]\n",
+		"  platform-pg:\n    mayDependOn: [platform-pg, kernel-ports, migrations]\n",
+		"  platform-jobs:\n    mayDependOn: [platform-jobs, kernel-ports, platform-pg]\n",
+		"  cmd:\n    mayDependOn: [cmd, wire, platform-jobs, platform-pg, kernel-ports, migrations]\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+	if !strings.Contains(out, "  wire:\n    mayDependOn: [wire, chat, chat-domain, chat-app, chat-adapters, agents, agents-domain, agents-app, agents-adapters, platform-jobs, platform-pg, kernel-ports, api, migrations]\n") {
+		t.Errorf("wire may not use migrations:\n%s", out)
 	}
 }
 

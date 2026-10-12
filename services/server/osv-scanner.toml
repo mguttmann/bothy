@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# OSV-Scanner overrides of the server module (docs/quality/licenses.md, "License gate" item 3):
+# one entry per package whose license deps.dev reports wrongly, each checked against the
+# package's own LICENSE file and with its reason. Never a blanket override.
+
+[[PackageOverrides]]
+name = "github.com/opencontainers/go-digest"
+version = "1.0.0"
+ecosystem = "Go"
+license.override = ["Apache-2.0"]
+reason = "The code is Apache-2.0 (LICENSE, README 'Copyright and license'); CC-BY-SA-4.0 in LICENSE.docs covers only README.md and CONTRIBUTING.md. Reached only through testcontainers in the test helper pgtest (docs/DECISIONS.md M1-12/22)."

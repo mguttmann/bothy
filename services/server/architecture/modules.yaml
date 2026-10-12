@@ -14,9 +14,14 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   config: {depends_on: [], vendors: [yaml]}
   egress: {depends_on: [], vendors: []}
   secrets: {depends_on: [], vendors: [age, otel]}
+  # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it.
+  pg: {depends_on: [secrets], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi]}
 wire: {vendors: []}
 cmd: {vendors: []}
 api: {vendors: [oapi, openapi, yaml]}   # generated REST layer (runtime of oapi-codegen) and its generator
+# The embedded SQL migrations (package migrations, ADR 0007): wire and cmd may use them, and
+# the platform packages in used_by (pg runs them and builds the test databases from them).
+migrations: {used_by: [pg]}
 testsupport: {paths: [test, perf]}   # test code across modules (02 "Code layout"); never imported
 modules:
   instance:
@@ -231,3 +236,9 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   openapi: [github.com/getkin/kin-openapi, github.com/getkin/kin-openapi/**]
   otel: [go.opentelemetry.io/otel, go.opentelemetry.io/otel/**]
   yaml: [go.yaml.in/yaml/v3]
+  pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]
+  goose: [github.com/pressly/goose/v3, github.com/pressly/goose/v3/**]
+  otelpgx: [github.com/exaring/otelpgx]
+  testcontainers: [github.com/testcontainers/testcontainers-go, github.com/testcontainers/testcontainers-go/**]
+  # Port bindings and AutoRemove of the pgtest container: testcontainers takes these moby types.
+  mobyapi: [github.com/moby/moby/api/types/container, github.com/moby/moby/api/types/network]
