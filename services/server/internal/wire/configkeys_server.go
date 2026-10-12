@@ -12,7 +12,7 @@ const (
 )
 
 // serverConfigKeys returns the keys of the process itself from docs/spec/16-operations.md
-// "Konfigurationswerte dieses Kapitels": the role, which the flag --role sets, the two
+// "Configuration values of this chapter": the role, which the flag --role sets, the two
 // listeners, which the cross-check listeners_distinct compares, and the transport of the public
 // listener (M1-21): the trusted proxies and the optional certificate and key references, which
 // the cross-checks tls_pair and tls_https read.
