@@ -13,6 +13,7 @@ kernel:
 platform:                   # <name>: {depends_on: [<platform names>], vendors: [<vendor groups>]}
   config: {depends_on: [], vendors: [yaml]}
   egress: {depends_on: [], vendors: []}
+  secrets: {depends_on: [], vendors: [age, otel]}
 wire: {vendors: []}
 cmd: {vendors: []}
 # api: {vendors: [...]}     # added by M1-17 together with api/
@@ -225,4 +226,6 @@ modules:
     depends_on: [chat, agents, runs, sync, stats]
     adapter_vendors: []
 vendors:                    # <group>: [<import path>, <import path>/**]
+  age: [filippo.io/age, filippo.io/age/**]
+  otel: [go.opentelemetry.io/otel, go.opentelemetry.io/otel/**]
   yaml: [go.yaml.in/yaml/v3]

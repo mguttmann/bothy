@@ -330,6 +330,41 @@ func TestParseElementsFromSequence(t *testing.T) {
 	}
 }
 
+// TestSecretRefCleanPath holds ruling M1-09/5: a file: reference names an absolute, clean path
+// without NUL, as secrets.ParseRef requires, so bothy config check and the secret provider accept
+// the same references. The messages name the rule, never the path.
+func TestSecretRefCleanPath(t *testing.T) {
+	t.Parallel()
+	const unclean = "file reference must be a clean path without . or .. elements and without repeated or trailing slashes"
+	cases := map[string]string{
+		"file:/a/../b":  unclean,
+		"file:/a//b":    unclean,
+		"file:/a/":      unclean,
+		"file:/a/./b":   unclean,
+		"file:/a/b/..":  unclean,
+		"file://a":      unclean,
+		"file:/a\x00b":  "file reference must not contain a NUL character",
+		"file:a/../b":   "file reference must be an absolute path",
+		"file:./a":      "file reference must be an absolute path",
+		"file:/x/../..": unclean,
+	}
+	for in, want := range cases {
+		_, _, err := parseValue(KindSecretRef, nil, in)
+		if err == nil || err.Error() != want {
+			t.Errorf("parseValue(%q) error = %v, want %q", in, err, want)
+			continue
+		}
+		if path := strings.TrimPrefix(in, "file:"); strings.Contains(err.Error(), path) {
+			t.Errorf("error %q quotes the path of %q", err, in)
+		}
+	}
+	runParseCases(t, KindSecretRef, nil, []parseCase{
+		{in: "file:/run/bothy/secrets/oidc/example_client_secret", ok: true, want: "file:/run/bothy/secrets/oidc/example_client_secret", canon: "file:/run/bothy/secrets/oidc/example_client_secret"},
+		{in: "file:/run/bothy/secrets/apns_key.p8", ok: true, want: "file:/run/bothy/secrets/apns_key.p8", canon: "file:/run/bothy/secrets/apns_key.p8"},
+		{in: "file:/run/bothy/secrets/..hidden", ok: true, want: "file:/run/bothy/secrets/..hidden", canon: "file:/run/bothy/secrets/..hidden"},
+	})
+}
+
 func TestEnvReference(t *testing.T) {
 	t.Parallel()
 	if v, ok := envReference("env:BOTHY_SECRET_X"); !ok || v != "BOTHY_SECRET_X" {

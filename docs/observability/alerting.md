@@ -118,7 +118,9 @@ Treat as an error with a security impact: a route answered without its permissio
 `correlation_id` and the route pattern; do not roll out the affected version any further.
 
 ### bothysecretrefreshfailing
-The server keeps using the old value. Check the file in the secret provider: present, mode `0400`
+The server keeps using the old value. Which reference fails is shown by
+`docker compose exec api bothy config check --secrets` (per key `ok` or the error code); the log
+line names only the error code. Check the file in the secret provider: present, mode `0400`
 or `0600`, owned by the service user (SEC-SEC-1). Until this is fixed, a rotation has no effect.
 
 ### bothymalwarescanfailing

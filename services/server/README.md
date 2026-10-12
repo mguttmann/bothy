@@ -1,9 +1,10 @@
 # services/server
 
-Status: skeleton (M1-05) with configuration (M1-07). The Go module builds; every module of 02
-exists as a port package, the kernel packages `ids`, `clock` and `errs` and the platform package
-`config` with `bothy config check|print` are complete, and `make arch` enforces the module
-boundaries from the register. The normative source is
+Status: skeleton (M1-05) with configuration (M1-07) and secret provider (M1-09). The Go module
+builds; every module of 02 exists as a port package, the kernel packages `ids`, `clock` and
+`errs`, the platform package `config` with `bothy config check|print` and the platform package
+[`secrets`](internal/platform/secrets/README.md) with `bothy secrets init|export` are complete,
+and `make arch` enforces the module boundaries from the register. The normative source is
 [docs/spec/02-architecture.md](../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 Module path until V1: `github.com/OWNER/bothy/services/server` (PLAN P-05). `go.mod` names the
@@ -26,7 +27,7 @@ the overview.
 | `bothy serve --role=all` | both in one process (default) |
 | `bothy migrate up\|status\|validate` | migrations (goose, rivermigrate); never implicitly at startup |
 | `bothy setup bootstrap-owner\|issue-enrollment-code` | setup, first owner, enrollment code (08-identity.md) |
-| `bothy config check\|print` | check the configuration and print it redacted |
+| `bothy config check\|print` | check the configuration (with `--secrets` also resolve every reference) and print it redacted |
 | `bothy import discord ...` | import and read mirror through the API (22-import-migration.md) |
 | `bothy restore finalize` | after a restore: new sync epoch (16-operations.md) |
 | `bothy secrets init\|export` | create and back up secrets (16-operations.md) |

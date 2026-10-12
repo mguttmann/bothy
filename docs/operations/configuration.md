@@ -49,7 +49,7 @@ one. Error messages never name the checked text.
 | `listen address` | `host:port`; host empty (`:port` means all interfaces) or an IP literal, IPv6 in brackets, no DNS name; port in decimal from 0 to 65535 without a leading zero | `127.0.0.1:8080`, `[::1]:8081`, `:8080` |
 | `cron` | five fields separated by whitespace, in UTC: minute 0 to 59, hour 0 to 23, day 1 to 31, month 1 to 12, weekday 0 to 6 (0 = Sunday). A field is a comma list of `*`, `*/n`, `a`, `a-b` and `a-b/n` with `a <= b` and a step `n` from 1 to the highest value of the field; numbers without a leading zero, no names, no shortcuts such as `@daily` | `0 2 * * 0`, `*/15 0-6 * * 1-5` |
 | `semver` | SemVer 2.0.0 without a leading `v`, with optional pre-release and build parts | `1.4.0`, `1.4.0-rc.1` |
-| `secret_ref` | `<scheme>:<reference>` ([16-operations.md](../spec/16-operations.md) 5.2): `file:` with an absolute path, `env:` with a variable name from `[A-Z_][A-Z0-9_]*` that is neither `BOTHY_CONFIG_FILE` nor has the form of a key variable (`BOTHY_A__B`); usual is `BOTHY_SECRET_<NAME>`. This server version reports `azkv` and `awssm` as not supported; any other scheme, a missing scheme and empty text are errors. A default value may contain `<key>` of a string key; when loading, the effective value of that key stands there. Nothing is replaced in set values | `file:/run/bothy/secrets/db_app_password`, `file:<secrets.dir>/db_app_password` |
+| `secret_ref` | `<scheme>:<reference>` ([16-operations.md](../spec/16-operations.md) 5.2): `file:` with an absolute path in clean form (no `.` or `..`, no double or trailing `/`, no NUL character), `env:` with a variable name from `[A-Z_][A-Z0-9_]*` that is neither `BOTHY_CONFIG_FILE` nor has the form of a key variable (`BOTHY_A__B`); usual is `BOTHY_SECRET_<NAME>`. This server version reports `azkv` and `awssm` as not supported; any other scheme, a missing scheme and empty text are errors. A default value may contain `<key>` of a string key; when loading, the effective value of that key stands there. In set values only `<secrets.dir>` is replaced | `file:/run/bothy/secrets/db_app_password`, `file:<secrets.dir>/db_app_password` |
 | `url` | scheme `http` or `https`, host not empty, no user part, no fragment (`#`), port, if given, in decimal from 1 to 65535 without a leading zero | `https://chat.example.com` |
 | Egress target (`egress.allowed_hosts`) | list like `list(string)`, each element `host[:port][;allow_private]` (read by `egress.ParseRule`); host as a DNS name of letters, digits, `-` and `_` (uppercase becomes lowercase, no trailing dot, the last label is no number such as `1` or `0x7f`) or an IP literal (IPv6 in brackets when a port follows; no zone; an IPv4-mapped IPv6 address counts as the IPv4 address); no wildcard, no scheme, no path, no user part; port 1 to 65535 without a leading zero, without a port only the default port of the scheme applies; the only switch is `allow_private`; two elements with the same host and port are a load error. If the value in the environment starts with `[` (IPv6 literal with port as the first element), it must be a JSON array | `api.example.com:443`, `[2001:db8::10]:8443;allow_private`, `BOTHY_EGRESS__ALLOWED_HOSTS=["[2001:db8::10]:8443","api.example.com"]` |
 
@@ -79,9 +79,16 @@ Keys never contain two consecutive underscores; this makes the naming rule rever
    Paths and variable names with invalid UTF-8, non-printable characters, whitespace at the edge or
    a quotation mark at the start stand in quotation marks with Go escapes, so that every problem
    stays one line.
-4. `bothy config check [--config FILE] [--role ROLE]` checks without starting: `configuration ok`
-   and exit code 0, otherwise every problem on standard error and exit code 1; a usage error
-   gives exit code 2.
+4. `bothy config check [--secrets] [--config FILE] [--role ROLE]` checks without starting:
+   `configuration ok` and exit code 0, otherwise every problem on standard error and exit code 1;
+   a usage error gives exit code 2. For every key `*_ref` whose effective reference uses `env:`,
+   it writes, with and without `--secrets`, the warning
+   `warning: <key> uses an env: reference; prefer file: (16-operations.md 5.2)` to standard error;
+   the exit code stays unaffected. With `--secrets` it also resolves every value of a key `*_ref`
+   through the secret provider and writes per key `secret <key>: ok` or
+   `secret <key>: <error code>` (`invalid_ref`, `unsupported_scheme`, `not_found`,
+   `insecure_file`, `read_failed`), never a value; the error message with reference and rule is on
+   standard error. `configuration ok` follows only when every reference resolves.
 5. `bothy config print [--redacted] [--config FILE] [--role ROLE]` shows in the first line
    `# configuration file: <path>` or `# configuration file: none`, then per key, sorted by name,
    `<key> = <value>  # <source>` with the source `default`, `file <path>`, `env BOTHY_X` or
@@ -622,8 +629,8 @@ Source: [16-operations.md](../spec/16-operations.md), section 14.
 | `server.public_url` | `BOTHY_SERVER__PUBLIC_URL` | Server |  | none, required | Origin under which apps reach the server (scheme, host, optional port; without path, query and fragment, otherwise `bothy config check` fails); basis of `aud`, DPoP `htu` and WebAuthn ([08-identity.md](../spec/08-identity.md), sections 7.2 and 7.3) | planned (M1) |
 | `server.trusted_proxies` | `BOTHY_SERVER__TRUSTED_PROXIES` | Server |  | `127.0.0.1/32, ::1/128` | peers whose forwarding and identity headers are honored and that may send plain text ([19-security.md](../spec/19-security.md), SEC-TLS-1) | planned (M1) |
 | `server.maintenance_mode` | `BOTHY_SERVER__MAINTENANCE_MODE` | Server |  | `off` | `off` or `read_only` (relocation, upgrade; [ADR 0065](../adr/0065-maintenance-mode-read-only.md)) | planned (M7) |
-| `secrets.dir` | `BOTHY_SECRETS__DIR` | Server |  | `/run/bothy/secrets` | base of the default references `file:` | planned (M1) |
-| `secrets.cache_ttl` | `BOTHY_SECRETS__CACHE_TTL` | Server |  | `5m` | how long a read secret stays valid | planned (M1) |
+| `secrets.dir` | `BOTHY_SECRETS__DIR` | Server | string | `/run/bothy/secrets` | base of the default references `file:`; an absolute path in clean form (no `.` or `..`, no double or trailing `/`), not `/`, without a NUL character and without `<`, otherwise `bothy config check` fails | active |
+| `secrets.cache_ttl` | `BOTHY_SECRETS__CACHE_TTL` | Server | duration | `5m` | how long a read secret stays valid; at least `1s` | active |
 | `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server |  | `/var/lib/bothy/signing-keys` | writable directory of the private signing keys; owned by the service user, mode `0700` (5.2, [ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)) | planned (M1) |
 | `server.tls_cert_ref` | `BOTHY_SERVER__TLS_CERT_REF` | Server |  | empty | reference to the certificate chain (PEM, leaf first); empty: the server does not terminate TLS (SEC-TLS-2) | planned (M1) |
 | `server.tls_key_ref` | `BOTHY_SERVER__TLS_KEY_REF` | Server |  | empty | reference to the private key (PEM); only together with `server.tls_cert_ref` | planned (M1) |
@@ -886,11 +893,16 @@ into which `secrets-init` copies the file.
 Not in the volume `secrets`: the server itself creates the private signing keys
 (`<purpose>-<kid>.pem`, purposes `access_token`, `invocation`, `webhook_out`, `audit_checkpoint`)
 in the volume `signing-keys` (`secrets.signing_key_dir`, ADR 0066); `server_signing_keys.private_key_ref`
-points there. `bothy secrets export` backs up both places.
+points there. `bothy secrets export` backs up both places; it takes in the key store with M1-32,
+which generates the signing keys.
 
-Generators of later milestones: `pgbackrest_tls/` (M7-01) and the generated form of `s3_access_key`
-and `s3_secret_key` (profile s3, M3). Until then, `bothy secrets init` reports these entries as
-`pending`; until then, `s3_*` count as supplied.
+Generators of later milestones: `totp_key` (M1-39), `pgbackrest_tls/` (M7-01) and the generated
+form of `s3_access_key` and `s3_secret_key` (profile s3, M3). Until then, `bothy secrets init`
+reports these entries as `pending` as long as neither the store nor the source holds them; meanwhile
+`s3_*` count as supplied. Passwords are generated as 32 random bytes in base64url without
+padding (43 characters) and keys (`token_pepper`, `telemetry_pseudonym_key`, `audit_ip_kek`,
+`file_ticket_key`) as 32 random bytes in lower-case hex (64 characters); users that need the raw
+key bytes decode the hex text.
 
 ## 6. Instance settings
 
