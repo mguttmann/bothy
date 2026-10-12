@@ -199,6 +199,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"migrate.maint_password_ref = file:/run/bothy/secrets/db_maint_password  # default\n" +
 		"migrate.monitor_password_ref = file:/run/bothy/secrets/db_monitor_password  # default\n" +
 		"migrate.owner_password_ref = file:/run/bothy/secrets/db_owner_password  # default\n" +
+		"principal.display_name_max_chars = 64  # default\n" +
+		"principal.handle_max_chars = 32  # default\n" +
 		"privacy.telemetry_pseudonym_rotation = 30d  # default\n" +
 		"secrets.cache_ttl = 5m  # default\n" +
 		"secrets.dir = /run/bothy/secrets  # default\n" +

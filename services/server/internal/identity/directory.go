@@ -1,0 +1,89 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package identity
+
+import (
+	"context"
+	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+)
+
+// Status is the lifecycle state of a principal (column principals.status, schema UserStatus of
+// docs/api/openapi.yaml).
+type Status string
+
+const (
+	// StatusPending is a provisioned person waiting for approval.
+	StatusPending Status = "pending"
+	// StatusActive is the normal state.
+	StatusActive Status = "active"
+	// StatusDisabled is a disabled principal.
+	StatusDisabled Status = "disabled"
+	// StatusDeleted is a deleted principal whose row stays for authorship.
+	StatusDeleted Status = "deleted"
+)
+
+// PrincipalView is the read-only view of a principal for other modules (fields of
+// PrincipalRef in docs/api/openapi.yaml plus status and creation time).
+type PrincipalView struct {
+	// ID is the principal.
+	ID ids.ID
+	// Kind is actor.KindUser, actor.KindAgent or actor.KindApp.
+	Kind actor.Kind
+	// Status is the lifecycle state.
+	Status Status
+	// Handle is the lower-case handle for mentions.
+	Handle string
+	// DisplayName is the shown name.
+	DisplayName string
+	// AvatarFileID is the avatar file; the zero ID means no avatar.
+	AvatarFileID ids.ID
+	// CreatedAt is the creation time.
+	CreatedAt time.Time
+}
+
+// UserView is the read-only view of a person (schema User of docs/api/openapi.yaml).
+type UserView struct {
+	PrincipalView
+	// Email is for display only; "" means none.
+	Email string
+	// Locale is a BCP 47 tag.
+	Locale string
+	// TimeZone is an IANA name.
+	TimeZone string
+	// IsOwner reports an active owners row (revoked_at IS NULL).
+	IsOwner bool
+}
+
+// OwnerView is one active owner.
+type OwnerView struct {
+	// User is the person holding the owner role.
+	User PrincipalView
+	// GrantedBy is the granting principal; the zero ID marks the first owner, created by the
+	// server command.
+	GrantedBy ids.ID
+	// GrantedAt is the time of the grant.
+	GrantedAt time.Time
+	// Reason is the reason given at the grant.
+	Reason string
+}
+
+// Directory is the read-only port of identity for other modules. It does not call authorize:
+// callers authorize their own actions. Reads join the ambient transaction of ctx when there is
+// one. No error carries SQL text or values.
+type Directory interface {
+	// Principal returns the principal id. Errors: kind not_found for an unknown id.
+	Principal(ctx context.Context, id ids.ID) (PrincipalView, error)
+	// Principals returns the known principals among ids, keyed by id; unknown ids are absent.
+	Principals(ctx context.Context, ids []ids.ID) (map[ids.ID]PrincipalView, error)
+	// PrincipalByHandle returns the principal whose handle equals handle without regard to
+	// case. Errors: kind not_found when there is none.
+	PrincipalByHandle(ctx context.Context, handle string) (PrincipalView, error)
+	// User returns the person id. Errors: kind not_found for an unknown id and for a principal
+	// that is not a person.
+	User(ctx context.Context, id ids.ID) (UserView, error)
+	// ActiveOwners returns the owners with revoked_at IS NULL, ordered by granted_at, then id.
+	ActiveOwners(ctx context.Context) ([]OwnerView, error)
+}
