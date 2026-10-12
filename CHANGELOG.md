@@ -94,6 +94,13 @@ Planning stage (milestone M0). Nothing is installable yet.
 - `docs/PLAN.md`: the W1 rows for trusted proxies and database timeouts and the acceptance test of
   M3-06 follow the chapters.
 
+- Chapter 12 "4.1 Port" and "4.2 Dateisystem-Treiber (Standard)" describe the port contract
+  (key grammar, one byte range, error contract, idempotent `Delete` and `AbortMultipart`) and the
+  file system rules (start check of the root, no symbolic links, temporary files in `.tmp`,
+  directory removal on delete, multipart layout and ETag) as built by M3-01; chapter 02
+  "13. Konfigurationsladen" item 4 lists the cross-check `file_fs_root_absolute`; ADR 0010
+  "Confirmation" names the conformance suite and the property test.
+
 ### Fixed
 
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code

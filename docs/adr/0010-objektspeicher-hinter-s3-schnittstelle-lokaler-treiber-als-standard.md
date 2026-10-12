@@ -57,10 +57,15 @@ kein Batch-Löschen, keine Versionierung, keine Bucket-Richtlinien. Details:
 
 - Eine Konformitäts-Testreihe läuft gegen den Dateisystem-Treiber und gegen SeaweedFS in einem
   Testcontainer (Put, Get mit Bereich, Head, Delete fehlender Objekte, Multipart mit Abbruch).
+  The suite is `filestest.RunObjectStoreConformance` in
+  `services/server/internal/files/adapters/filestest`; the file system driver runs it in
+  `TestFSConformance` (M3-01), the S3 driver follows with M3-02.
 - Der S3-Treiber hängt nur von einer Go-Schnittstelle mit genau den Kern-S3-Operationen ab; eine
   Architektur-Regel erlaubt den Import des S3-SDK nur in `internal/files/adapters/s3`.
 - Ein Eigenschaftstest prüft, dass kein Objektschlüssel Kanal-IDs, Bereichs-IDs oder Namen
   enthält.
+  The property test is `TestObjectKeysCarryNoContext` in
+  `services/server/internal/files/domain`.
 
 ## Pros and Cons of the Options
 

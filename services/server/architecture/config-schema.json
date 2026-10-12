@@ -269,6 +269,18 @@
       "doc": "Time limit of one outgoing request, from name resolution to the end of the body."
     },
     {
+      "name": "file.fs.root",
+      "env": "BOTHY_FILE__FS__ROOT",
+      "kind": "string",
+      "default": "/var/lib/bothy/files",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Root directory of the file system driver, used only by the server and owned by its user with mode 0700."
+    },
+    {
       "name": "file.max_upload_bytes",
       "env": "BOTHY_FILE__MAX_UPLOAD_BYTES",
       "kind": "int",
@@ -279,6 +291,21 @@
       "max": "",
       "chapter": "03-datenmodell.md",
       "doc": "Largest file, and the stream limit of multipart and octet-stream request bodies."
+    },
+    {
+      "name": "file.storage.driver",
+      "env": "BOTHY_FILE__STORAGE__DRIVER",
+      "kind": "enum",
+      "default": "fs",
+      "required": false,
+      "enum": [
+        "fs",
+        "s3"
+      ],
+      "min": "",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Driver of the object storage of files: fs for a directory of the server, s3 for an S3-compatible service."
     },
     {
       "name": "http.hsts_max_age",

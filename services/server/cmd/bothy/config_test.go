@@ -179,7 +179,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"egress.allowed_hosts =   # default\n" +
 		"egress.max_response_bytes = 1048576  # default\n" +
 		"egress.timeout = 15s  # default\n" +
+		"file.fs.root = /var/lib/bothy/files  # default\n" +
 		"file.max_upload_bytes = 104857600  # default\n" +
+		"file.storage.driver = fs  # default\n" +
 		"http.hsts_max_age = 365d  # default\n" +
 		"http.idle_timeout = 2m  # default\n" +
 		"http.max_header_bytes = 65536  # default\n" +

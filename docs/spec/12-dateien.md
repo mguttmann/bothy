@@ -261,6 +261,32 @@ kein Auflisten. Batch-Löschen (`DeleteObjects`) fehlt bewusst: AWS-SDKs erzwing
 Prüfsumme, an der mehrere S3-kompatible Dienste scheitern [Q3, belegt; Q4, nur
 Suchzusammenfassung].
 
+Port contract (M3-01, `internal/files/app`, docs/DECISIONS.md M3-01/1 to M3-01/6). The port is an
+outgoing port of the application layer; no other module sees it. Every operation takes a context
+first; implementations are safe for concurrent use, and nothing in the port reads a whole object
+into memory (`Get` streams, the caller closes the reader).
+
+- Keys: one grammar for all drivers (`domain.ValidateKey`): one or more segments of `[a-z0-9-]`,
+  joined by single `/`, without a leading or trailing `/`. It refuses `.`, `..`, absolute paths,
+  empty segments, backslashes, upper case, percent signs, spaces, control and non-ASCII
+  characters. Every operation checks the key first and returns `ErrInvalidKey` before any storage
+  call. The key builders of 4.4 take only the file ID, a number and the closed type `Variant`.
+- `Get` reads the whole object or exactly one byte range `{Offset, Length}` (9.3). `Offset < 0`,
+  `Length < 1` or `Offset` at or beyond the object size give `ErrInvalidRange`; a range whose end
+  lies beyond the object ends at the last byte.
+- Errors: `ErrNotFound` (`Get` or `Head` of a missing object), `ErrInvalidRange`,
+  `ErrSizeMismatch` (`size < 0` or a body of another length; nothing is stored),
+  `ErrUploadNotFound` (an upload that was never created, was aborted or was completed),
+  `ErrInvalidPart` (part number below 1; in `CompleteMultipart` an empty list, numbers that are
+  not strictly ascending, a number without an uploaded part or an ETag that does not match; the
+  upload stays open), `ErrNotSupported` (an operation the driver does not offer). `Delete` of a
+  missing object and `AbortMultipart` of an unknown, aborted or completed upload return no error
+  (section 12). Every other error is a storage failure that callers answer with `503 unavailable`
+  ([02-architektur.md](02-architektur.md) 14.4); errors name the operation and the key and never
+  contain object bytes. The port never panics on a failing storage.
+- `Put` on an existing key replaces it atomically. The drivers do not enforce "Objekte werden nie
+  überschrieben"; the module does, through the key schema and the unique `files.object_key`.
+
 ### 4.2 Dateisystem-Treiber (Standard)
 
 - Wurzel `file.fs.root`, ein eigener Ordner nur für Bothy. Ordner `0700`, Dateien `0600`.
@@ -271,6 +297,45 @@ Suchzusammenfassung].
 - `Get` mit Bereich über `ReadAt`. Kein Zwischenspeicher im Server.
 - Verschlüsselung im Ruhezustand ist Aufgabe des Betriebs (Laufwerks-Verschlüsselung,
   [16-betrieb.md](16-betrieb.md)).
+
+File system rules (M3-01, `internal/files/adapters/fs`, docs/DECISIONS.md M3-01/5 to M3-01/11, M3-01/15 and M3-01/17 to M3-01/19):
+
+- Start check: `file.fs.root` is an absolute, clean path of an existing directory (not a symbolic
+  link), owned by the effective user of the process, with permission bits exactly `0700`. The
+  server creates `<root>/.tmp` (mode `0700`) when missing and never creates the root itself; a
+  missing root means a wrong mount; an existing `.tmp` must be a directory of the same user with
+  mode `0700`. Errors name `file.fs.root`, not the path.
+- Keys map to paths below the root. The driver works through a handle of the root directory
+  (`os.Root`), so no operation leaves it, and it follows no symbolic link at any level: every
+  existing path component is checked with `lstat` before an operation and before a rename; a read
+  checks the path again when the opened file is not the one it checked, because `os.Root` follows
+  a link inside the root even with `O_NOFOLLOW`. A link found
+  is a storage failure, not `ErrNotFound`. A directory or another non-regular entry at a key counts
+  as missing.
+- Writes go to a temporary file with mode `0600` in `<root>/.tmp`, which no key can address
+  (keys contain no dot). Exactly `size` bytes are copied with a bounded buffer; then `fsync` of
+  the file, missing directories with mode `0700` (each synced in its parent), `rename`, `fsync` of
+  the directory. A platform
+  that refuses to sync a directory as "not supported" counts as success. Every failed write
+  removes its temporary file.
+- `Delete` removes the file, syncs the directory and removes the directory of the file
+  (`f/<aa>/<bb>/<file_id>` or `uploads/<file_id>`) if it is empty now; the levels `f/<aa>` and
+  `f/<aa>/<bb>` stay. A writer whose directory a concurrent `Delete` removed creates it again and
+  renames again.
+- Multipart: `CreateMultipart` accepts only original keys, creates `uploads/<file_id>/`, is
+  idempotent and returns the upload ID `""`. `UploadPart` writes `uploads/<file_id>/<n>` like an
+  object and returns the ETag `"<sha256 hex>"` of the part bytes (the form of 9.3); a part with the
+  same number is replaced atomically. While the upload is open, parts are regular objects under
+  their keys. `CompleteMultipart` writes the listed parts in order into one temporary file, reads
+  each part exactly once and checks it against its ETag, renames to the key and removes
+  `uploads/<file_id>/` with all parts; a failure of that removal does not fail the completion; `Delete`
+  of an original key also removes `uploads/<file_id>/`, so parts left behind go with the file. The list shape is checked before any file
+  system call. `AbortMultipart` removes that directory. Deleting the last
+  part of an open upload with `Delete` removes `uploads/<file_id>/` and so ends the upload.
+- `PresignUploadPart` gives `ErrInvalidPart` for a part number below 1 and otherwise `ErrNotSupported`. Several processes may share one root (roles `api`
+  and `worker` on one volume), because every change is a rename or an unlink; the driver takes no
+  lock and never removes entries of `.tmp`. A temporary file left by a crashed process stays (no
+  rule yet).
 
 ### 4.3 S3-Treiber (nur Kern-S3)
 

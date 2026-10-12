@@ -1008,7 +1008,10 @@ Server lädt.
    `server.internal_listen_addr` und `server.listen_addr` teilen keinen Port außer `0`, wenn ihre
    Hosts gleich sind oder einer der Hosts leer, `0.0.0.0` oder `::` ist (auch mit IPv6-Zone; eine
    IPv4-gemappte IPv6-Adresse zählt als ihre IPv4-Adresse). Port `0` darf doppelt vorkommen, weil
-   Tests Port 0 binden. Dazu prüft der Lader eine Regel für einen einzelnen Schlüssel, die kein
+   Tests Port 0 binden. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
+   clean form (no `.` or `..` element, no trailing `/`; cross-check `file_fs_root_absolute`,
+   M3-01), because a relative root would depend on the working directory of the process; with
+   `s3` the root is not read. Dazu prüft der Lader eine Regel für einen einzelnen Schlüssel, die kein
    Typ ausdrückt: `secrets.dir` ist ein absoluter Pfad in sauberer Form (kein `.` oder `..`, kein
    doppelter oder abschließender `/`), nicht `/`, ohne NUL-Zeichen und ohne `<`, wie ihn der
    Secret-Provider verlangt; ein falscher Wert ist ein Problem von `secrets.dir` allein, nicht der
