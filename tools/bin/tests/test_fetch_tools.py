@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
+import importlib
 import io
 import json
+import random
 import stat
 import tarfile
 import zipfile
@@ -232,6 +235,7 @@ def test_ensure_rejects_missing_zip_member(tmp_path: Path, downloads: FakeNet) -
     ("member", "mode"),
     [
         ("demo-linux-amd64/", stat.S_IFDIR | 0o755),  # directory entry as zip writes it
+        ("demo-linux-amd64/", 0),  # directory entry without mode bits: only the slash tells
         ("demo-linux-amd64", stat.S_IFDIR | 0o755),  # directory by its mode only
         ("demo-linux-amd64", stat.S_IFLNK | 0o777),  # symbolic link
     ],
@@ -245,6 +249,151 @@ def test_ensure_rejects_zip_member_that_is_not_a_regular_file(
     with pytest.raises(fetch_tools.FetchError, match="not a regular file"):
         fetch_tools.ensure(lock, "demo", "linux-amd64", tmp_path)
     assert not (tmp_path / "demo" / "1.2.3" / "demo").exists()
+
+
+def _corrupt_zip_member() -> bytes:
+    """A zip archive whose member data no longer matches its CRC."""
+    data = bytearray(_zip({"demo": (b"binary " * 64, stat.S_IFREG | 0o755)}))
+    offset = data.index(b"demo") + len(b"demo") + 4  # inside the compressed member data
+    data[offset] ^= 0xFF
+    return bytes(data)
+
+
+def _codec(module: str) -> bool:
+    """Does this Python have the optional compression module (CPython builds may lack it)?
+
+    The module is imported, not only found: the Python wrappers `lzma`, `bz2` and
+    `compression.zstd` exist even when their C extension is missing, and then fail on import.
+    """
+    try:
+        importlib.import_module(module)
+    except ImportError:
+        return False
+    return True
+
+
+# Zip methods with the optional module their codec needs; a method of a missing module or a
+# Python without the constant is not a kind this interpreter can write or read.
+_ZIP_CODECS = {
+    "ZIP_STORED": None,
+    "ZIP_DEFLATED": "zlib",
+    "ZIP_BZIP2": "bz2",
+    "ZIP_LZMA": "lzma",
+    "ZIP_ZSTANDARD": "compression.zstd",
+}
+ARCHIVE_KINDS = [
+    "targz",
+    *(
+        kind
+        for kind, module in _ZIP_CODECS.items()
+        if hasattr(zipfile, kind) and (module is None or _codec(module))
+    ),
+]
+
+
+def _corrupt_lzma_zip_member() -> bytes:
+    """A zip archive whose LZMA properties and data are broken, so the decompressor fails."""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_LZMA) as zf:
+        info = zipfile.ZipInfo("demo")
+        info.external_attr = (stat.S_IFREG | 0o755) << 16
+        info.compress_type = zipfile.ZIP_LZMA
+        zf.writestr(info, b"binary " * 64)
+    data = bytearray(buf.getvalue())
+    start = (
+        data.index(b"demo") + len(b"demo") + 4
+    )  # past the 4-byte LZMA header, into the properties
+    for i in range(start, start + 16):
+        data[i] ^= 0xFF
+    return bytes(data)
+
+
+def _zip_with_header(flag_bits: int = 0, method: int | None = None) -> bytes:
+    """A zip archive whose member header says encrypted (flag bit 0) or another method."""
+    data = bytearray(_zip({"demo": (b"binary " * 64, stat.S_IFREG | 0o755)}))
+    for signature, flags_at in ((b"PK\x03\x04", 6), (b"PK\x01\x02", 8)):
+        header = data.index(signature)
+        data[header + flags_at] |= flag_bits
+        if method is not None:
+            data[header + flags_at + 2 : header + flags_at + 4] = method.to_bytes(2, "little")
+    return bytes(data)
+
+
+@pytest.mark.parametrize(
+    ("asset", "payload"),
+    [
+        ("demo.tar.gz", b""),  # empty download
+        ("demo.tar.gz", b"<html>not an archive</html>"),
+        ("demo.tar.gz", _tar_gz({"demo": b"binary " * 64})[:40]),  # cut off inside the stream
+        ("demo.zip", b"PK\x03\x04 broken"),  # zip signature, nothing else
+        ("demo.zip", _zip({"demo": (b"binary " * 64, stat.S_IFREG | 0o755)})[:-30]),  # cut off
+        ("demo.zip", _corrupt_zip_member()),
+        ("demo.zip", _zip_with_header(flag_bits=1)),  # encrypted member
+        ("demo.zip", _zip_with_header(method=9)),  # Deflate64, which zipfile cannot read
+        *([("demo.zip", _corrupt_lzma_zip_member())] if "ZIP_LZMA" in ARCHIVE_KINDS else []),
+    ],
+    ids=[
+        "empty",
+        "not-an-archive",
+        "cut-tar",
+        "zip-signature-only",
+        "cut-zip",
+        "corrupt-zip",
+        "encrypted-zip",
+        "deflate64-zip",
+        *(["corrupt-lzma-zip"] if "ZIP_LZMA" in ARCHIVE_KINDS else []),
+    ],
+)
+def test_ensure_reports_an_archive_that_cannot_be_read(
+    tmp_path: Path, downloads: FakeNet, asset: str, payload: bytes
+) -> None:
+    """A broken or empty asset is a FetchError (CLI exit 1), never a traceback."""
+    lock = _lock(asset, "demo", payload)
+    downloads[f"https://github.com/example/demo/releases/download/v1.2.3/{asset}"] = payload
+    with pytest.raises(fetch_tools.FetchError, match=r"^demo: cannot read the archive "):
+        fetch_tools.ensure(lock, "demo", "linux-amd64", tmp_path)
+    assert not (tmp_path / "demo" / "1.2.3" / "demo").exists()
+
+
+def _archive(kind: str) -> bytes:
+    """A valid archive with the member `demo`, as zip with one compression method or tar.gz."""
+    if kind == "targz":
+        return _tar_gz({"demo": b"binary " * 64})
+    method = getattr(zipfile, kind)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, mode="w", compression=method) as zf:
+        info = zipfile.ZipInfo("demo")
+        info.external_attr = (stat.S_IFREG | 0o755) << 16
+        info.compress_type = method
+        zf.writestr(info, b"binary " * 64)
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize("kind", ARCHIVE_KINDS)
+def test_extract_turns_every_corruption_into_a_fetch_error(kind: str) -> None:
+    """The class, not single cases: any damage to a supported archive ends in FetchError.
+
+    A fixed-seed run flips, overwrites and cuts bytes of a valid archive of each kind that
+    `_extract` reads; `_extract` returns bytes or raises FetchError, never another exception
+    (zipfile alone raised ValueError, UnicodeDecodeError, lzma.LZMAError and, on Python 3.14,
+    compression.zstd.ZstdError for corrupt input).
+    """
+    base = _archive(kind)
+    rng = random.Random(1)  # noqa: S311  # nosec B311 - test data, not cryptography
+    for _ in range(600):
+        data = bytearray(base)
+        operation = rng.randrange(3)
+        if operation == 0:
+            for _ in range(rng.randint(1, 4)):
+                data[rng.randrange(len(data))] = rng.randrange(256)
+        elif operation == 1:
+            data = data[: rng.randrange(len(data))]
+        else:
+            start = rng.randrange(len(data))
+            for index in range(start, min(len(data), start + rng.randint(1, 32))):
+                data[index] ^= 0xFF
+        with contextlib.suppress(fetch_tools.FetchError):
+            fetch_tools._extract(bytes(data), "demo", "demo")
 
 
 def test_ensure_rejects_tar_member_that_is_a_directory(tmp_path: Path, downloads: FakeNet) -> None:

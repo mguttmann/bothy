@@ -160,13 +160,17 @@ with `promtool` and `amtool` in the version of the images:
    must be loaded through `rule_files`.
 2. `promtool test rules` with
    [bothy-alerts.test.yaml](../../infra/observability/prometheus/tests/bothy-alerts.test.yaml)
-   (check `prometheus-rule-tests`): every alert from `bothy-alerts.yaml` fires in one case as
-   soon as its `for` has passed, with labels and texts, and is silent one minute before; every
-   alert with a threshold stays silent in one case exactly at the threshold. An alert without a
-   firing case makes the check fail.
+   (check `prometheus-rule-tests`): every alert of `bothy-alerts.yaml` fires in one case at the
+   first evaluation at which it may, with labels and texts: once its `for` has run out, or, for
+   an alert without `for`, as soon as its condition holds. One evaluation earlier (the test file
+   sets `evaluation_interval: 1m`) it is still quiet
+   (Watchdog fires from the first evaluation on). Every alert with a threshold stays quiet in one
+   case exactly at the threshold. An alert without a firing case fails the check.
 3. `amtool check-config` and the routes from section 1 with `amtool config routes test` (check
    `alertmanager`): `page` to `external-oncall` and `bothy-ops`, `ticket` to `bothy-ops`,
    `Watchdog` to `external-heartbeat`.
+   Templates are parsed too: every `templates` entry must lie under `/etc/alertmanager/`, where
+   Compose mounts `infra/observability/alertmanager/`, and match a file.
 4. The thresholds from 3.2 against the configuration reference (check `alert-thresholds`). If a
    cell of the column "Configuration value" names a value of the reference, it must read exactly
    `` `<name>` `` or ``above `<name>` ``; any other form is a finding.

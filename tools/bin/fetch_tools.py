@@ -7,7 +7,8 @@ a cached binary is re-checked against a stamp of its own hash on every use.
 
 An asset is a raw binary (empty `member`), a gzip-compressed tar archive or a zip
 archive (recognised by its signature; Loki publishes only zip assets). In both archive
-forms the `member` must exist and be a regular file.
+forms the `member` must exist and be a regular file; an archive that cannot be read is
+an error (exit 1) like a wrong checksum, not a traceback.
 
 Usage:
   fetch_tools.py path <tool>        ensure the tool is present, print its path
@@ -21,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import io
 import json
 import os
@@ -32,6 +34,7 @@ import tarfile
 import tempfile
 import urllib.request
 import zipfile
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -109,6 +112,36 @@ def download(url: str) -> bytes:
     return data
 
 
+def _optional_error(module: str, name: str) -> tuple[type[Exception], ...]:
+    """The exception class `module.name` if this Python has it, else nothing."""
+    try:
+        error = getattr(importlib.import_module(module), name)
+    except (ImportError, AttributeError):
+        return ()
+    return (error,)
+
+
+# What tarfile, zipfile and their decompressors raise for an archive that cannot be read
+# (empty, cut off, corrupt or of another format): zipfile raises ValueError (also its subclass
+# UnicodeDecodeError for a broken member name) for broken offsets, RuntimeError for an
+# encrypted member and its subclass NotImplementedError for a method it lacks (Deflate64);
+# zlib, lzma and, from Python 3.14, Zstandard raise their own errors, bz2 raises OSError;
+# lzma and Zstandard are optional modules, so their errors are looked up, not imported.
+# test_extract_turns_every_corruption_into_a_fetch_error holds the class for every kind.
+_UNREADABLE_ARCHIVE: tuple[type[Exception], ...] = (
+    tarfile.TarError,
+    zipfile.BadZipFile,
+    EOFError,
+    OSError,
+    ValueError,
+    zlib.error,
+    RuntimeError,
+    # Optional compression modules of CPython: absent ones cannot raise.
+    *_optional_error("lzma", "LZMAError"),
+    *_optional_error("compression.zstd", "ZstdError"),
+)
+
+
 def _extract(data: bytes, member: str, name: str) -> bytes:
     r"""Return the bytes of the binary inside a downloaded release asset.
 
@@ -125,12 +158,21 @@ def _extract(data: bytes, member: str, name: str) -> bytes:
         members and `..` anyway.
 
     Raises:
-        FetchError: the member is missing or is not a regular file (directory, link).
+        FetchError: the member is missing or is not a regular file (directory, link), or
+            the archive cannot be read (empty, cut off, corrupt or of another format).
     """
     if not member:
         return data
-    if data.startswith(_ZIP_SIGNATURE):
-        return _extract_zip(data, member, name)
+    try:
+        if data.startswith(_ZIP_SIGNATURE):
+            return _extract_zip(data, member, name)
+        return _extract_tar(data, member, name)
+    except _UNREADABLE_ARCHIVE as exc:
+        raise FetchError(f"{name}: cannot read the archive ({type(exc).__name__}: {exc})") from exc
+
+
+def _extract_tar(data: bytes, member: str, name: str) -> bytes:
+    """Read `member` from a gzip-compressed tar archive (see `_extract`)."""
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tf:
         try:
             info = tf.getmember(member)

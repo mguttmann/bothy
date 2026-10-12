@@ -73,9 +73,10 @@ make ops-check
 The generated files are checked in and carry the header "DO NOT EDIT". `make ops-check`
 regenerates them and compares byte for byte (check `sloth`; no difference allowed, and every
 generated file needs its Sloth file), checks all rules with `promtool check rules` (check
-`prometheus-rules`) and the table in section 2 against the Sloth files (check `slo-docs`: rows,
-target with one decimal, with more only where one would round the target, threshold from the
-`le` selector of the error query, alert according to `page_alert.disable`). Generated locally
+`prometheus-rules`) and the table in section 2 against the Sloth files (check `slo-docs`: rows;
+Target with one decimal, more only where one would round the objective; Threshold from the `le`
+matcher of the error query in any of the PromQL quotes; Alert from `page_alert.disable` and
+`ticket_alert.disable`: `Page, Ticket`, `Ticket only`, `Page only` or `none`). Generated locally
 on 2026-10-10 with Sloth v0.16.0 and checked with `promtool` from Prometheus v3.15.0: valid
 [verified].
 

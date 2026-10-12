@@ -89,12 +89,26 @@ image (check `tool-versions` keeps both equal):
    and log pipeline with a receiver runs it, and no overlay redefines the processor or a
    pipeline of the base.
 
-The check runs on a working copy: instead of `/run/bothy/secrets` it reads placeholder files
-(`telemetry_pseudonym_key` needs at least 32 bytes), endpoints without a default point to
-`example.com`, and the exporter `datadog` gets a fixed host name so that `validate` does not wait
-for the host name detection. The metadata query for GCP, which the exporter starts anyway, points
+Before any `validate`, a reference to a config provider other than `env`, `file` and `yaml`
+(`${https:...}`, `${s3:...}`), also one inside another reference, is a finding: the collector
+resolves it while it validates, and most of these providers fetch over the network (providers
+such as `s3` and `googlesecretmanager`:
+[confmap/provider](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/443a0a020c3a61e5309ef3cedc83ea360d98a5fc/confmap/provider),
+retrieved 2026-10-12). Their clients may bypass the closed proxy of the validators: a sandbox run in
+the red team saw `${https:...}` connect past it (ruling M1-04/29). The check runs on a work copy:
+instead of `/run/bothy/secrets` it reads placeholder files (`telemetry_pseudonym_key` needs at least
+32 bytes), and the `datadog` exporter gets a fixed host name, so `validate` does not wait for host
+name detection. It sets only the variables of `COLLECTOR_ENV` in `tools/opscheck/opscheck.py`, the
+ones the overlays use without a default (Azure Monitor, Grafana and Sentry endpoints point at
+`example.com`, the Azure IDs are zero UUIDs). A new overlay that reads a variable without a default
+(`${env:NAME}` instead of `${env:NAME:-<default>}`) needs `NAME` in `COLLECTOR_ENV`; otherwise the
+value is empty and, for an endpoint, `validate` fails (with the `otlphttp` exporter: "at least one
+endpoint must be specified"). The metadata query for GCP, which the exporter starts anyway, points
 through `GCE_METADATA_HOST` to a closed port of `127.0.0.1`, like the proxy of all validators
-([tools/opscheck](../../tools/opscheck/README.md)). Check only the collector:
+([tools/opscheck](../../tools/opscheck/README.md)); the GCP metadata client honours that variable
+and uses a transport of its own without a proxy
+([metadata.go](https://github.com/googleapis/google-cloud-go/blob/f06f6b35e4b7ae8b48a3f9d1715229fe81cb2ebd/compute/metadata/metadata.go#L71-L86),
+retrieved 2026-10-12; ruling M1-04/22). Check only the collector:
 
 ```
 uv run --project tools --locked python tools/opscheck/opscheck.py --only collector collector-allowlist

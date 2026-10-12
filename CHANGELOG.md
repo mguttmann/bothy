@@ -140,6 +140,16 @@ operated, and the order of the build.
   exempts.
 - The alert `BothyMalwareScanFailing` now fires when no malware scan has ever produced a
   result; before, it stayed silent exactly when the scanner never worked since the start.
+- `make ops-check`: `slo-docs` follows `ticket_alert.disable` (a row may say `Page only` or
+  `none`) and reads the `le` bound in every PromQL quoting; `tofu` also checks modules made
+  only of `.tofu` or JSON files; `alertmanager` parses the templates named by their
+  `/etc/alertmanager/` path and fails on an entry that matches no file or lies outside the
+  mount; `collector` fails on a reference to a config provider other than `env`, `file` and
+  `yaml` (`${https:...}`, `${s3:...}`) before any `validate`; SIGTERM stops a run like
+  SIGINT, killing the running validators and removing the work directory. The alert unit
+  tests now also catch an added `for` on an alert without one.
+- `tools/bin/fetch_tools.py` reports an empty, cut off or corrupt release archive as an error
+  instead of a traceback.
 
 ### Security
 
