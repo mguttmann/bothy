@@ -170,8 +170,8 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server |  | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` | geplant (M2) |
 | `sync.idempotency_cleanup_interval` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_INTERVAL` | Server |  | `1h` | Abstand des Jobs `sync.idempotency_cleanup` | geplant (M1) |
 | `sync.idempotency_cleanup_batch_size` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE` | Server |  | `1000` | Zeilen je Löschstapel von `sync.idempotency_cleanup` | geplant (M1) |
-| `ratelimit.max_tracked_keys` | `BOTHY_RATELIMIT__MAX_TRACKED_KEYS` | Server |  | `100000` | höchstens so viele Rate-Limit-Eimer hält ein Prozess; darüber werden volle, dann älteste Eimer entfernt | geplant (M1) |
-| `ratelimit.sweep_interval` | `BOTHY_RATELIMIT__SWEEP_INTERVAL` | Server |  | `1m` | Abstand, in dem volle Eimer entfernt werden (ein voller Eimer entscheidet wie ein fehlender) | geplant (M1) |
+| `ratelimit.max_tracked_keys` | `BOTHY_RATELIMIT__MAX_TRACKED_KEYS` | Server | int | `100000` | höchstens so viele Rate-Limit-Eimer hält ein Prozess; darüber werden volle, dann älteste Eimer entfernt | aktiv |
+| `ratelimit.sweep_interval` | `BOTHY_RATELIMIT__SWEEP_INTERVAL` | Server | duration | `1m` | Abstand, in dem volle Eimer entfernt werden (ein voller Eimer entscheidet wie ein fehlender) | aktiv |
 | `jobs.schema` | `BOTHY_JOBS__SCHEMA` | Server | string | `jobs` | PostgreSQL-Schema der River-Tabellen | aktiv |
 | `jobs.queue.default.max_workers` | `BOTHY_JOBS__QUEUE__DEFAULT__MAX_WORKERS` | Server | int | `8` | Parallelität `default` | aktiv |
 | `jobs.queue.files.max_workers` | `BOTHY_JOBS__QUEUE__FILES__MAX_WORKERS` | Server | int | `2` | Parallelität `files` | aktiv |
@@ -292,40 +292,40 @@ Quelle: [05-aktionen.md](../spec/05-aktionen.md), Abschnitt 10.
 | `audit.deny_aggregate_window` | `BOTHY_AUDIT__DENY_AGGREGATE_WINDOW` | Server | duration | `60s` | Zusammenfassungsfenster für gleiche Ablehnungen | aktiv |
 | `audit.deny_aggregate_max_keys` | `BOTHY_AUDIT__DENY_AGGREGATE_MAX_KEYS` | Server | int | `10000` | höchstens so viele offene Zusammenfassungen je Prozess; begrenzt den Speicher bei Fluten ohne Anmeldung | aktiv |
 | `status.public_enabled` | `BOTHY_STATUS__PUBLIC_ENABLED` | Server |  | `false` | Statusseite ohne Anmeldung | geplant (M7) |
-| `ratelimit.rl.public_auth.per_minute` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__PER_MINUTE` | Server |  | `30` | je Client-IP | geplant (M1) |
-| `ratelimit.rl.public_auth.burst` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__BURST` | Server |  | `10` | je Client-IP | geplant (M1) |
-| `ratelimit.rl.gateway_connect.per_minute` | `BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__PER_MINUTE` | Server |  | `12` | je Gerät oder Token | geplant (M1) |
-| `ratelimit.rl.gateway_connect.burst` | `BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__BURST` | Server |  | `4` | je Gerät oder Token | geplant (M1) |
-| `ratelimit.rl.read.per_minute` | `BOTHY_RATELIMIT__RL__READ__PER_MINUTE` | Server |  | `600` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.read.burst` | `BOTHY_RATELIMIT__RL__READ__BURST` | Server |  | `100` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.write.per_minute` | `BOTHY_RATELIMIT__RL__WRITE__PER_MINUTE` | Server |  | `120` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.write.burst` | `BOTHY_RATELIMIT__RL__WRITE__BURST` | Server |  | `30` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.message.per_minute` | `BOTHY_RATELIMIT__RL__MESSAGE__PER_MINUTE` | Server |  | `60` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.message.burst` | `BOTHY_RATELIMIT__RL__MESSAGE__BURST` | Server |  | `20` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.trigger.per_minute` | `BOTHY_RATELIMIT__RL__TRIGGER__PER_MINUTE` | Server |  | `30` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.trigger.burst` | `BOTHY_RATELIMIT__RL__TRIGGER__BURST` | Server |  | `10` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.interaction.per_minute` | `BOTHY_RATELIMIT__RL__INTERACTION__PER_MINUTE` | Server |  | `60` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.interaction.burst` | `BOTHY_RATELIMIT__RL__INTERACTION__BURST` | Server |  | `20` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.upload.per_minute` | `BOTHY_RATELIMIT__RL__UPLOAD__PER_MINUTE` | Server |  | `30` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.upload.burst` | `BOTHY_RATELIMIT__RL__UPLOAD__BURST` | Server |  | `10` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.search.per_minute` | `BOTHY_RATELIMIT__RL__SEARCH__PER_MINUTE` | Server |  | `60` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.search.burst` | `BOTHY_RATELIMIT__RL__SEARCH__BURST` | Server |  | `20` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.typing.per_minute` | `BOTHY_RATELIMIT__RL__TYPING__PER_MINUTE` | Server |  | `30` | je Verbindung | geplant (M1) |
-| `ratelimit.rl.typing.burst` | `BOTHY_RATELIMIT__RL__TYPING__BURST` | Server |  | `5` | je Verbindung | geplant (M1) |
-| `ratelimit.rl.admin.per_minute` | `BOTHY_RATELIMIT__RL__ADMIN__PER_MINUTE` | Server |  | `60` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.admin.burst` | `BOTHY_RATELIMIT__RL__ADMIN__BURST` | Server |  | `20` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.export.per_minute` | `BOTHY_RATELIMIT__RL__EXPORT__PER_MINUTE` | Server |  | `2` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.export.burst` | `BOTHY_RATELIMIT__RL__EXPORT__BURST` | Server |  | `2` | je Prinzipal | geplant (M1) |
-| `ratelimit.rl.agent_runtime.per_minute` | `BOTHY_RATELIMIT__RL__AGENT_RUNTIME__PER_MINUTE` | Server |  | `1200` | je Agent | geplant (M1) |
-| `ratelimit.rl.agent_runtime.burst` | `BOTHY_RATELIMIT__RL__AGENT_RUNTIME__BURST` | Server |  | `200` | je Agent | geplant (M1) |
-| `ratelimit.rl.webhook_in.per_minute` | `BOTHY_RATELIMIT__RL__WEBHOOK_IN__PER_MINUTE` | Server |  | `60` | je Eingangs-Webhook | geplant (M1) |
-| `ratelimit.rl.webhook_in.burst` | `BOTHY_RATELIMIT__RL__WEBHOOK_IN__BURST` | Server |  | `20` | je Eingangs-Webhook | geplant (M1) |
-| `ratelimit.rl.import.per_minute` | `BOTHY_RATELIMIT__RL__IMPORT__PER_MINUTE` | Server |  | `120` | je Owner für `import.apply` | geplant (M1) |
-| `ratelimit.rl.import.burst` | `BOTHY_RATELIMIT__RL__IMPORT__BURST` | Server |  | `30` | je Owner für `import.apply` | geplant (M1) |
-| `ratelimit.rl.terminal.per_minute` | `BOTHY_RATELIMIT__RL__TERMINAL__PER_MINUTE` | Server |  | `20` | je Mensch | geplant (M1) |
-| `ratelimit.rl.terminal.burst` | `BOTHY_RATELIMIT__RL__TERMINAL__BURST` | Server |  | `5` | je Mensch | geplant (M1) |
-| `ratelimit.rl.host.per_minute` | `BOTHY_RATELIMIT__RL__HOST__PER_MINUTE` | Server |  | `120` | je Rechner | geplant (M1) |
-| `ratelimit.rl.host.burst` | `BOTHY_RATELIMIT__RL__HOST__BURST` | Server |  | `30` | je Rechner | geplant (M1) |
+| `ratelimit.rl.public_auth.per_minute` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__PER_MINUTE` | Server | int | `30` | je Client-IP | aktiv |
+| `ratelimit.rl.public_auth.burst` | `BOTHY_RATELIMIT__RL__PUBLIC_AUTH__BURST` | Server | int | `10` | je Client-IP | aktiv |
+| `ratelimit.rl.gateway_connect.per_minute` | `BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__PER_MINUTE` | Server | int | `12` | je Gerät oder Token | aktiv |
+| `ratelimit.rl.gateway_connect.burst` | `BOTHY_RATELIMIT__RL__GATEWAY_CONNECT__BURST` | Server | int | `4` | je Gerät oder Token | aktiv |
+| `ratelimit.rl.read.per_minute` | `BOTHY_RATELIMIT__RL__READ__PER_MINUTE` | Server | int | `600` | je Prinzipal | aktiv |
+| `ratelimit.rl.read.burst` | `BOTHY_RATELIMIT__RL__READ__BURST` | Server | int | `100` | je Prinzipal | aktiv |
+| `ratelimit.rl.write.per_minute` | `BOTHY_RATELIMIT__RL__WRITE__PER_MINUTE` | Server | int | `120` | je Prinzipal | aktiv |
+| `ratelimit.rl.write.burst` | `BOTHY_RATELIMIT__RL__WRITE__BURST` | Server | int | `30` | je Prinzipal | aktiv |
+| `ratelimit.rl.message.per_minute` | `BOTHY_RATELIMIT__RL__MESSAGE__PER_MINUTE` | Server | int | `60` | je Prinzipal | aktiv |
+| `ratelimit.rl.message.burst` | `BOTHY_RATELIMIT__RL__MESSAGE__BURST` | Server | int | `20` | je Prinzipal | aktiv |
+| `ratelimit.rl.trigger.per_minute` | `BOTHY_RATELIMIT__RL__TRIGGER__PER_MINUTE` | Server | int | `30` | je Prinzipal | aktiv |
+| `ratelimit.rl.trigger.burst` | `BOTHY_RATELIMIT__RL__TRIGGER__BURST` | Server | int | `10` | je Prinzipal | aktiv |
+| `ratelimit.rl.interaction.per_minute` | `BOTHY_RATELIMIT__RL__INTERACTION__PER_MINUTE` | Server | int | `60` | je Prinzipal | aktiv |
+| `ratelimit.rl.interaction.burst` | `BOTHY_RATELIMIT__RL__INTERACTION__BURST` | Server | int | `20` | je Prinzipal | aktiv |
+| `ratelimit.rl.upload.per_minute` | `BOTHY_RATELIMIT__RL__UPLOAD__PER_MINUTE` | Server | int | `30` | je Prinzipal | aktiv |
+| `ratelimit.rl.upload.burst` | `BOTHY_RATELIMIT__RL__UPLOAD__BURST` | Server | int | `10` | je Prinzipal | aktiv |
+| `ratelimit.rl.search.per_minute` | `BOTHY_RATELIMIT__RL__SEARCH__PER_MINUTE` | Server | int | `60` | je Prinzipal | aktiv |
+| `ratelimit.rl.search.burst` | `BOTHY_RATELIMIT__RL__SEARCH__BURST` | Server | int | `20` | je Prinzipal | aktiv |
+| `ratelimit.rl.typing.per_minute` | `BOTHY_RATELIMIT__RL__TYPING__PER_MINUTE` | Server | int | `30` | je Verbindung | aktiv |
+| `ratelimit.rl.typing.burst` | `BOTHY_RATELIMIT__RL__TYPING__BURST` | Server | int | `5` | je Verbindung | aktiv |
+| `ratelimit.rl.admin.per_minute` | `BOTHY_RATELIMIT__RL__ADMIN__PER_MINUTE` | Server | int | `60` | je Prinzipal | aktiv |
+| `ratelimit.rl.admin.burst` | `BOTHY_RATELIMIT__RL__ADMIN__BURST` | Server | int | `20` | je Prinzipal | aktiv |
+| `ratelimit.rl.export.per_minute` | `BOTHY_RATELIMIT__RL__EXPORT__PER_MINUTE` | Server | int | `2` | je Prinzipal | aktiv |
+| `ratelimit.rl.export.burst` | `BOTHY_RATELIMIT__RL__EXPORT__BURST` | Server | int | `2` | je Prinzipal | aktiv |
+| `ratelimit.rl.agent_runtime.per_minute` | `BOTHY_RATELIMIT__RL__AGENT_RUNTIME__PER_MINUTE` | Server | int | `1200` | je Agent | aktiv |
+| `ratelimit.rl.agent_runtime.burst` | `BOTHY_RATELIMIT__RL__AGENT_RUNTIME__BURST` | Server | int | `200` | je Agent | aktiv |
+| `ratelimit.rl.webhook_in.per_minute` | `BOTHY_RATELIMIT__RL__WEBHOOK_IN__PER_MINUTE` | Server | int | `60` | je Eingangs-Webhook | aktiv |
+| `ratelimit.rl.webhook_in.burst` | `BOTHY_RATELIMIT__RL__WEBHOOK_IN__BURST` | Server | int | `20` | je Eingangs-Webhook | aktiv |
+| `ratelimit.rl.import.per_minute` | `BOTHY_RATELIMIT__RL__IMPORT__PER_MINUTE` | Server | int | `120` | je Owner für `import.apply` | aktiv |
+| `ratelimit.rl.import.burst` | `BOTHY_RATELIMIT__RL__IMPORT__BURST` | Server | int | `30` | je Owner für `import.apply` | aktiv |
+| `ratelimit.rl.terminal.per_minute` | `BOTHY_RATELIMIT__RL__TERMINAL__PER_MINUTE` | Server | int | `20` | je Mensch | aktiv |
+| `ratelimit.rl.terminal.burst` | `BOTHY_RATELIMIT__RL__TERMINAL__BURST` | Server | int | `5` | je Mensch | aktiv |
+| `ratelimit.rl.host.per_minute` | `BOTHY_RATELIMIT__RL__HOST__PER_MINUTE` | Server | int | `120` | je Rechner | aktiv |
+| `ratelimit.rl.host.burst` | `BOTHY_RATELIMIT__RL__HOST__BURST` | Server | int | `30` | je Rechner | aktiv |
 
 ### 06 Öffentliche API
 

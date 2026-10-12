@@ -99,8 +99,6 @@ rules:
     etappe: M6
   - match: "push."  # M3-20, M3-21
     etappe: M3
-  - match: "ratelimit."  # M1-19
-    etappe: M1
   - match: "reaction."  # M1-59
     etappe: M1
   - match: "retention."  # M7-05

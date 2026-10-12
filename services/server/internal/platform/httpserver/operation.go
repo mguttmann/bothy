@@ -65,6 +65,9 @@ type Operation struct {
 	Pattern string
 	// Action is x-authz-action; the proof (StageProof) requires a check of exactly this action.
 	Action string
+	// RateLimitClass is x-rate-limit-class, for example rl.read; StageRateLimit (M1-19) counts
+	// the request against this class.
+	RateLimitClass string
 	// Public is true for operations with security: [] (anonymous allowed).
 	Public bool
 	// IdempotencyKey is true when the operation declares the Idempotency-Key header.

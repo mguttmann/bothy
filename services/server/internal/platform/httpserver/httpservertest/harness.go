@@ -76,6 +76,10 @@ type Options struct {
 	// AllowNullRepair keeps the test green when a handler sent JSON null; only the tests of the
 	// repair itself set it.
 	AllowNullRepair bool
+	// Setup, when set, runs on the chain after Stages are installed and before the routes are
+	// mounted, so a ticket can install its stage and hooks the way internal/wire does (for
+	// example ratelimit.Install, M1-19).
+	Setup func(c *httpserver.Chain)
 }
 
 // Harness is a running chain with its observation points.
@@ -144,6 +148,9 @@ func New(t testing.TB, opts Options) *Harness {
 	}
 	for stage, mw := range opts.Stages {
 		chain.Use(stage, mw)
+	}
+	if opts.Setup != nil {
+		opts.Setup(chain)
 	}
 	mux := http.NewServeMux()
 	for _, rt := range opts.Routes {

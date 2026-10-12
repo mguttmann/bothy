@@ -168,7 +168,7 @@ func TestMountRoutes_PreflightWithCORSOrigins(t *testing.T) {
 func TestHTTPOperationCarriesEveryField(t *testing.T) {
 	for _, op := range routestest.Operations() {
 		h := HTTPOperation(op)
-		if h.ID != op.ID || h.Method != op.Method || h.Path != op.Path || h.Pattern != op.Pattern || h.Action != op.Action ||
+		if h.ID != op.ID || h.Method != op.Method || h.Path != op.Path || h.Pattern != op.Pattern || h.Action != op.Action || h.RateLimitClass != op.RateLimitClass ||
 			h.Public != op.Public || h.IdempotencyKey != op.IdempotencyKey || int(h.IfMatch) != int(op.IfMatch) ||
 			int(h.RequestBody) != int(op.RequestBody) || h.BodyRequired != op.BodyRequired {
 			t.Errorf("%+v -> %+v", op, h)

@@ -22,6 +22,9 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   # certificate and key references of the public listener (M1-21).
   httpserver: {depends_on: [health, otel, secrets], vendors: [otel, libopenapi]}
   lifecycle: {depends_on: [otel], vendors: []}
+  # Token buckets of the rate-limit classes (M1-19): the StageRateLimit middleware of httpserver
+  # and the class attribute of bothy.ratelimit.rejected from otel/attr.
+  ratelimit: {depends_on: [httpserver, otel], vendors: [otel]}
   # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it.
   pg: {depends_on: [secrets], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi]}
   # River only here (R-AR-09); jobstest (internal/platform/jobs/jobstest) prepares pgtest

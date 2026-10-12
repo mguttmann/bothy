@@ -298,9 +298,26 @@ documented in this file. The format is based on
   migrations. `bothy serve` refuses to start when River's migrations are incomplete, soft-stops
   River at shutdown within `shutdown.jobs_soft_timeout` and ends with exit code 1 when the River
   client stops on its own (`lifecycle.Runner.FailOn`).
+- `internal/platform/ratelimit` (M1-19): token buckets per rate-limit class and key of
+  `docs/spec/05-aktionen.md` in sharded maps with a hard cap (`ratelimit.max_tracked_keys`) and a
+  sweeper (`ratelimit.sweep_interval`); keys by client IP (IPv6 by /64), principal, agent, host,
+  device or token, connection and incoming webhook, with the client IP for anonymous requests;
+  `RateLimit-Policy` and `RateLimit` on every response of a limited operation and
+  `429 rate_limited` with `Retry-After` in `StageRateLimit`, before `authorize`; requests with
+  credentials reserve a token of `rl.public_auth` of the client IP before they are verified, keep
+  it only when the credentials fail with `401` (other than `token_expired` and `use_dpop_nonce`),
+  and get `429` while the bucket is empty; a `webhook_id` that is not an ID is `404` before a
+  bucket exists; counter `bothy.ratelimit.rejected`.
+- Configuration keys `ratelimit.<class>.per_minute` and `ratelimit.<class>.burst` for every class
+  of 05, `ratelimit.max_tracked_keys` and `ratelimit.sweep_interval`; `bothy serve` (roles api and
+  all) refuses to start when an enabled REST operation carries a gateway class or a class without
+  limits.
 
 ### Changed
 
+- `httpserver.Operation` carries `RateLimitClass`; `Chain.SetCredentialsPrecheck` runs before the
+  `Authenticator` for requests with credentials; `httpservertest.Options.Setup` installs stages
+  and hooks before the routes are mounted.
 - `wire.MigrationSteps` takes the migrate pool and the migration set and returns an error.
 - `golang.org/x/tools` is a direct dependency at v0.50.0 (tests only: `go/packages` for the
   static check; v0.49.0 cannot read the export data of Go 1.27).

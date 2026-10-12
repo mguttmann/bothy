@@ -111,6 +111,16 @@ func TestUsePanics(t *testing.T) {
 			c.SetFailedCredentialsHook(f)
 		},
 		"nil middleware": func(c *httpserver.Chain) { c.Use(httpserver.StageMaintenance, nil) },
+		"precheck twice": func(c *httpserver.Chain) {
+			f := func(*http.Request) (func(error), error) { return nil, nil }
+			c.SetCredentialsPrecheck(f)
+			c.SetCredentialsPrecheck(f)
+		},
+		"precheck after Wrap": func(c *httpserver.Chain) {
+			c.Wrap(getThing(), http.NotFoundHandler())
+			c.SetCredentialsPrecheck(func(*http.Request) (func(error), error) { return nil, nil })
+		},
+		"nil precheck": func(c *httpserver.Chain) { c.SetCredentialsPrecheck(nil) },
 	}
 	for name, f := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -384,6 +394,54 @@ func TestAuth_FailedCredentialsHook(t *testing.T) {
 	c.Public(mux).ServeHTTP(rec, req)
 	if rec.Code != 429 || rec.Header().Get("Retry-After") != "7" || errs.KindOf(seen) != errs.KindUnauthenticated {
 		t.Fatalf("status %d, Retry-After %q, hook saw %v", rec.Code, rec.Header().Get("Retry-After"), seen)
+	}
+}
+
+// TestAuth_CredentialsPrecheck: the precheck runs only for requests with credentials, before the
+// Authenticator; its error is the answer and the Authenticator never runs. When it passes, its
+// settle function gets the result of the Authenticator (nil on success), so a reservation taken
+// by the precheck can be returned.
+func TestAuth_CredentialsPrecheck(t *testing.T) {
+	t.Parallel()
+	op := getThing()
+	var creds actor.Credentials
+	var prechecked int
+	var settled []string
+	h := httpservertest.New(t, httpservertest.Options{
+		Authenticator: httpservertest.FakeAuthenticator{LastCredentials: &creds},
+		Routes:        []httpservertest.Route{{Op: op, Handler: okHandler(op.Action)}},
+		Setup: func(c *httpserver.Chain) {
+			c.SetCredentialsPrecheck(func(r *http.Request) (func(error), error) {
+				prechecked++
+				if r.Header.Get("Authorization") == "Bearer blocked" {
+					return func(error) { t.Error("settle called after a refused precheck") },
+						errs.New(errs.CodeRateLimited, "").WithRetryAfter(3e9)
+				}
+				return func(err error) {
+					code := "ok"
+					if e, ok := errs.As(err); ok {
+						code = string(e.PublicCode())
+					}
+					settled = append(settled, code)
+				}, nil
+			})
+		},
+	})
+	resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast", "Authorization", "Bearer blocked"))
+	if resp.StatusCode != 429 || resp.Header.Get("Retry-After") != "3" || creds.Authorization != "" {
+		t.Fatalf("blocked: status %d, Retry-After %q, authenticator saw %q", resp.StatusCode, resp.Header.Get("Retry-After"), creds.Authorization)
+	}
+	if resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast")); resp.StatusCode != 200 || prechecked != 1 {
+		t.Fatalf("anonymous: status %d, precheck ran %d times", resp.StatusCode, prechecked)
+	}
+	if resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast", "Authorization", httpservertest.GoodToken)); resp.StatusCode != 200 || prechecked != 2 {
+		t.Fatalf("good token: status %d, precheck ran %d times", resp.StatusCode, prechecked)
+	}
+	if resp := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast", "Authorization", "Bearer wrong")); resp.StatusCode != 401 || prechecked != 3 {
+		t.Fatalf("bad token: status %d, precheck ran %d times", resp.StatusCode, prechecked)
+	}
+	if strings.Join(settled, ",") != "ok,unauthenticated" {
+		t.Fatalf("settle saw %v, want [ok unauthenticated]", settled)
 	}
 }
 

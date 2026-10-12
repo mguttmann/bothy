@@ -106,6 +106,20 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"privacy.audit_ip_key_period":    {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "20-datenschutz.md"},
 		"privacy.audit_ip_key_retention": {Kind: config.KindDuration, Default: "90d", Min: "1s", Chapter: "20-datenschutz.md"},
 		"privacy.audit_ip_kek_ref":       {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/audit_ip_kek", Chapter: "20-datenschutz.md"},
+		"ratelimit.max_tracked_keys":     {Kind: config.KindInt, Default: "100000", Min: "1", Max: "100000000", Chapter: "02-architektur.md"},
+		"ratelimit.sweep_interval":       {Kind: config.KindDuration, Default: "1m", Min: "1s", Max: "1h", Chapter: "02-architektur.md"},
+	}
+	// Two keys per class of 05 "Rate-Limit-Klassen" (M1-19), with the defaults of 05 section 10.
+	for class, def := range map[string][2]string{
+		"rl.public_auth": {"30", "10"}, "rl.gateway_connect": {"12", "4"}, "rl.read": {"600", "100"},
+		"rl.write": {"120", "30"}, "rl.message": {"60", "20"}, "rl.trigger": {"30", "10"},
+		"rl.interaction": {"60", "20"}, "rl.upload": {"30", "10"}, "rl.search": {"60", "20"},
+		"rl.typing": {"30", "5"}, "rl.admin": {"60", "20"}, "rl.export": {"2", "2"},
+		"rl.agent_runtime": {"1200", "200"}, "rl.webhook_in": {"60", "20"}, "rl.import": {"120", "30"},
+		"rl.terminal": {"20", "5"}, "rl.host": {"120", "30"},
+	} {
+		want["ratelimit."+class+".per_minute"] = config.Key{Kind: config.KindInt, Default: def[0], Min: "1", Max: "1000000", Chapter: "05-aktionen.md"}
+		want["ratelimit."+class+".burst"] = config.Key{Kind: config.KindInt, Default: def[1], Min: "1", Max: "1000000", Chapter: "05-aktionen.md"}
 	}
 	if len(got) != len(want) {
 		t.Errorf("schema has %d keys, want %d", len(got), len(want))
@@ -181,6 +195,21 @@ func chapterDefault(t *testing.T, chapter, name string) (string, bool) {
 		}
 		if cells[0] == "`"+name+"`" && column < len(cells) {
 			return cells[column], true
+		}
+		// Shorthand rows of 05: "`ratelimit.rl.read.per_minute` / `.burst`" with "`600` / `100`".
+		if names := strings.Split(cells[0], " / "); len(names) > 1 && column < len(cells) {
+			values := strings.Split(cells[column], " / ")
+			first := strings.Trim(names[0], "`")
+			base := first[:strings.LastIndex(first, ".")]
+			for i, n := range names {
+				n = strings.Trim(n, "`")
+				if i > 0 {
+					n = base + n
+				}
+				if n == name && len(values) == len(names) {
+					return values[i], true
+				}
+			}
 		}
 	}
 	return "", false
@@ -504,6 +533,20 @@ func TestJobsSchemaIdentifier(t *testing.T) {
 		problems := load(t, "BOTHY_JOBS__SCHEMA="+bad)
 		if len(problems) != 1 || !strings.Contains(problems[0].Message, "jobs.schema") || strings.Contains(problems[0].Message, bad) {
 			t.Errorf("jobs.schema %q: problems %v, want one naming the key and not the value", bad, problems)
+		}
+	}
+}
+
+// TestRateLimitConfig_InvalidValuesStopTheStart: a value below 1 never loads (exit code 2).
+func TestRateLimitConfig_InvalidValuesStopTheStart(t *testing.T) {
+	t.Parallel()
+	for _, env := range []string{
+		"BOTHY_RATELIMIT__RL__READ__PER_MINUTE=0", "BOTHY_RATELIMIT__RL__READ__BURST=0",
+		"BOTHY_RATELIMIT__RL__HOST__BURST=-1", "BOTHY_RATELIMIT__MAX_TRACKED_KEYS=0",
+		"BOTHY_RATELIMIT__SWEEP_INTERVAL=0s", "BOTHY_RATELIMIT__RL__TYPING__PER_MINUTE=1000001",
+	} {
+		if problems := load(t, env); len(problems) == 0 {
+			t.Errorf("%s loaded", env)
 		}
 	}
 }
