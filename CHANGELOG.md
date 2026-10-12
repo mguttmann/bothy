@@ -134,7 +134,10 @@ operated, and the order of the build.
   the durable event `device.pending`, hints without a thread (R-AZ-25 to R-AZ-31), and the
   data model rules R-DM-42 to R-DM-48; rulings D-W-100 to D-W-108 and OQ-24.
 - `brief_deps.py` fails when a start check of a brief names a ticket outside the brief's
-  dependency closure.
+  dependency closure, and when a brief calls a ticket of its own closure missing or optional
+  (D-W-113).
+- Build briefs of the milestones M2 and M3 (`docs/briefs/M2-*.md`, `docs/briefs/M3-*.md`) in the
+  brief index with waves and graph, and in the site navigation (D-W-100).
 
 ### Fixed
 
