@@ -698,6 +698,16 @@ theft stays unnoticed until it returns (threat model T-TM-05).
 auth_public_key_raw))`, displayed in groups of four characters. Both keys are included, because a
 change of either of them is a re-pairing.
 
+Details (docs/DECISIONS.md D-M2-38-11): `noise_public_key` is the raw X25519 key,
+`auth_public_key_raw` the raw Ed25519 key (the decoded `x` of the JWK), 32 bytes each.
+Crockford Base32 with the alphabet `0123456789ABCDEFGHJKMNPQRSTVWXYZ`: 5-bit groups from the most
+significant bit, the last group padded on the right with zero bits, upper case, without padding
+characters and without check characters. The 32 bytes of the hash give 52 characters, shown as 13
+groups of four joined with `-` (the form of `key_fingerprint` in `openapi.yaml`). Known vector:
+a Noise key with the bytes `0x00` to `0x1f` and an authentication key with `0x20` to `0x3f` give
+`F0CC-6QS6-RF5D-3BSH-CAZQ-PXMR-J8RA-AHK5-1HF0-9S02-1GW6-BW3J-HK90`. Server, host service and apps
+check their computation against `services/host/testdata/noise/fingerprint.json`.
+
 ## 5. End-to-end stream
 
 ### 5.1 Protection goal
@@ -727,11 +737,13 @@ Noise Protocol Framework, revision 34 (https://noiseprotocol.org/noise.html, ret
 | Element | Choice | Reason |
 |---|---|---|
 | Pattern | `NK`: `<- s`, `...`, `-> e, es`, `<- e, ee` [verified, section 7.5 of the specification] | The device knows the static key of the host from the pairing; the host does not know the device, it is convinced by the terminal session token |
-| Prologue | `"bothy-terminal/1"` \|\| session ID (16 bytes) \|\| host ID (16 bytes) | A different prologue makes the handshake fail (section 6 of the specification [verified]); binds the handshake to protocol version, session and host |
+| Prologue | `"bothy-terminal/1"` \|\| session ID (16 bytes) \|\| host ID (16 bytes); the IDs in the octet order of RFC 9562, that is the bytes as the text form names them from left to right (docs/DECISIONS.md D-M2-38-7) | A different prologue makes the handshake fail (section 6 of the specification [verified]); binds the handshake to protocol version, session and host |
 | Message 1 (device to host) | `-> e, es`, payload: terminal session token (5.3) | The payload is encrypted only to the host and, according to the specification, can be replayed (section 7.7, destination property 2 [verified]); the single-use token closes this gap |
 | Message 2 (host to device) | `<- e, ee`, payload: `{"v":1,"host_version":...,"profile":...}` | Afterwards the device knows that it is talking to the holder of the static key |
 | First transport message of the device | frame `start` with columns and rows | only then does the PTY start (Ruling T9) |
 | Size | every Noise message at most 65535 bytes [verified, section 3 of the specification] | limit of the specification; one WebSocket binary frame carries exactly one Noise message |
+| Diffie-Hellman | a result of 32 zero bytes (public key of small order) makes the handshake fail, in Go and Dart (docs/DECISIONS.md D-M2-38-9) | such a shared secret does not depend on the private key; an attacker would have chosen it |
+| After a failure | after a failed handshake step or a failed decryption the object refuses every further call; each direction refuses the nonce 2^64 - 1 (section 5.1 of the specification [verified]; docs/DECISIONS.md D-M2-38-8) | a failed authentication is tampering (5.3, `4104`); going on would let a relay send probes |
 
 Libraries:
 
@@ -741,8 +753,14 @@ Libraries:
   2026-10-10 [verified], version v1.1.0 of 2024-02-02). The maintenance state of the library is not
   verified [assumed: little activity]; the conformance test TM-T01 with the test vectors below
   holds it, and the build ticket checks license and state with the license gate before adopting it.
-- Dart: X25519, ChaCha20-Poly1305, SHA-256 and HKDF from the package `cryptography`, Apache-2.0,
-  version 2.9.0 (https://pub.dev/packages/cryptography, retrieved 2026-10-10 [verified]); the
+  Pinned in `services/host/go.mod`: `github.com/flynn/noise` v1.1.0 (latest version according to the
+  Go module proxy on 2026-10-12 [verified]) with `golang.org/x/crypto` v0.58.0 and
+  `golang.org/x/sys` v0.49.0; `tools/ci/tests/test_bothy_noise_package.py` keeps these versions
+  equal to `go.mod` and `pubspec.lock`.
+- Dart: X25519, ChaCha20-Poly1305, SHA-256 and HMAC-SHA-256 from the package `cryptography` (the
+  HKDF of the Noise specification is built by `bothy_noise` itself from HMAC, section 4.3 of the
+  specification), Apache-2.0, version 2.9.0 (https://pub.dev/packages/cryptography, retrieved
+  2026-10-10 [verified]; latest version on 2026-10-12, pinned in `packages/bothy_noise/pubspec.lock`); the
   handshake itself as a separate small package `packages/bothy_noise`, checked against the same
   test vectors. In the web console, `cryptography` uses the Web Crypto API, otherwise pure Dart
   (same source [verified]).
@@ -754,7 +772,11 @@ of other projects (https://github.com/noiseprotocol/noise_wiki/wiki/Test-vectors
 `vectors/cacophony.txt` from https://github.com/centromere/cacophony and
 `tests/vector/noise-c-basic.txt` from https://github.com/rweather/noise-c (both retrieved
 2026-10-10 [verified]). The build ticket stores the files with commit hash and license under
-`services/host/testdata/noise/` and uses them for Go and Dart.
+`services/host/testdata/noise/` and uses them for Go and Dart. They are stored unchanged, but
+compressed with gzip, under `vectors/`, with origin, commit, license and checksum of the content in
+`services/host/testdata/noise/README.md` (docs/DECISIONS.md D-M2-38-15); cacophony now lives at
+https://github.com/haskell-cryptography/cacophony (GitHub redirects). The recordings for TM-T02
+are in `services/host/testdata/noise/recordings/` (`go.json` from Go, `dart.json` from Dart).
 
 ### 5.3 Terminal session token
 
@@ -829,6 +851,15 @@ transport message carries one frame:
 Control data lies in the encrypted payload; the relay sees only length and timing.
 An unknown type ends the session (close code `4104`). Text frames are forbidden on these
 connections (`4002`).
+
+Encoding (docs/DECISIONS.md D-M2-38-10): all numbers are big-endian. `start` and `resize`
+carry exactly 4 bytes, first columns, then rows, each 1 to 65535 (as in `TerminalSessionOpen`).
+`data` carries 1 to 65518 bytes; an empty `data` would count as input without input (6.3). `close`,
+`replay_begin` and `replay_end` carry no content. `exit` carries exactly 4 bytes, a signed 32-bit
+number in two's complement. A frame is at most 65519 bytes long, the largest plaintext of a
+transport message. Directions as in the table; every error while reading a frame (empty, too
+long, unknown type, wrong direction, wrong content) ends the session like an unknown type
+(`4104`).
 
 ### 5.5 Key pinning on the device
 

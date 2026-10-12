@@ -1,6 +1,6 @@
 # packages
 
-Status: planned (M0). No code yet. One Dart pub workspace for all packages and apps.
+Status: planned (M0); the first package is `bothy_noise` (M2-38). One Dart pub workspace for all packages and apps follows with M4-01; until then `bothy_noise` carries its own `pubspec.lock`.
 
 | Package | Kind | Purpose | Platforms |
 |---|---|---|---|
@@ -14,7 +14,7 @@ Status: planned (M0). No code yet. One Dart pub workspace for all packages and a
 | `sync_engine` | Dart | gateway, catch-up, outbox, reconciliation, run documents, focus | iOS, macOS, Android, Windows |
 | `admin_ui` | Flutter | administration screens for the desktop app, the console and emergency actions on mobile | all |
 | `bothy_viz` | Flutter | visualizations of the statistics (live topology, backend view, delivery, executive page, timeline, TV mode), fixtures and harness ([25-visualization.md](../docs/spec/25-visualization.md)) | all |
-| `bothy_noise` | Dart | Noise handshake `Noise_NK_25519_ChaChaPoly_SHA256`, transport encryption and frames of the terminal, checked against the official test vectors ([24-terminal.md](../docs/spec/24-terminal.md), section 5) | all |
+| `bothy_noise` | Dart, built | Noise handshake `Noise_NK_25519_ChaChaPoly_SHA256`, transport encryption, frames and fingerprint of the terminal, checked against the public test vectors and the recordings of the host service ([24-terminal.md](../docs/spec/24-terminal.md), section 5; [README](bothy_noise/README.md)) | all |
 | `terminal_ui` | Flutter | terminal view with renderer `xterm`, sessions, key pinning through ports, extra keys bar ([15-client-architecture.md](../docs/spec/15-client-architecture.md), section 23) | all |
 
 Dependency rules and their rationale:

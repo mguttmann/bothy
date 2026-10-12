@@ -1,0 +1,50 @@
+{
+  "format": 1,
+  "vectors": [
+    {
+      "noise_public": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "ed25519_public": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "fingerprint": "F0CC-6QS6-RF5D-3BSH-CAZQ-PXMR-J8RA-AHK5-1HF0-9S02-1GW6-BW3J-HK90"
+    },
+    {
+      "noise_public": "ec32f8b50f0613a23e6246b98b39d4f5fe4e554709e39fdc6cbb01b77cf1e58e",
+      "ed25519_public": "983e235fb529f6b3317fbc09aae405e8c89ee7ccad092d2987d3459fab653dd0",
+      "fingerprint": "73DR-ZASB-JW4T-V2BG-JC93-55GR-TV3H-ZVD6-V04H-A3HT-JX38-2KX8-TX60"
+    },
+    {
+      "noise_public": "3580462ecb26c70a4061a6ca61de4b70da3469ac986ec5d274225cb449443d1f",
+      "ed25519_public": "030033e84b6fdd6241589ba57548f33d233d94197e9b0b52c6bc3c0a838b5b7d",
+      "fingerprint": "NZ9T-7J76-QMHP-EBDM-DXZX-T9VX-V30A-SFP0-1XKE-DHE4-2JC0-7XC3-T6GG"
+    },
+    {
+      "noise_public": "527613c8cc2f8017745d346fe9c6ff18864f184cfc54fdce33e6191387b3b0d5",
+      "ed25519_public": "2d98772e1125328f3f1898fb34ab18e197768ce594078da3647ee36f6abbe98b",
+      "fingerprint": "HTV5-E8AQ-CTDN-GK82-70D8-88X5-C9QY-JE3V-5XNT-2B6Z-6AM3-50DX-CEMG"
+    },
+    {
+      "noise_public": "ce676cb1aac237c015c78a1046478b3896b5c337ebf9d58081f54025ce8a0a83",
+      "ed25519_public": "aceaff13b91cb4004189b12bb8d0bdecf9e8f49ab038cfa121a9cadad78e516c",
+      "fingerprint": "DP0T-H7RE-3V2C-D2Z1-AD3D-354M-VTTJ-SA94-8NSG-SJ0C-8ZTJ-1AHS-Q3JG"
+    },
+    {
+      "noise_public": "c574fb3a5acc88aa5bfe26f026cac527723528289e5ec0af8cf831438fb93cf9",
+      "ed25519_public": "451090cc34952c225781529b87dff2e7adb0e8aaaa3ae21afa45e23ec9d419ca",
+      "fingerprint": "3JWS-XT4T-PG3V-SQAT-KAYP-3MRX-TXAB-CSRP-G67V-7T6C-RVW0-VDGB-9GX0"
+    },
+    {
+      "noise_public": "e8128eea22e28564c03659975c27ef7fa2b3606b8a6a71de3f64b2a864e0a6c4",
+      "ed25519_public": "eeac7b6863bdd15a10adb680f8e5a2a74ed5bb97b8a0a73351ecfc39c42ab389",
+      "fingerprint": "ZDNC-8AVZ-QTDG-V913-T8WZ-AHYJ-0NNB-476V-YGD1-35H0-EMK6-VH44-SYR0"
+    },
+    {
+      "noise_public": "bd463d2bbbe98ae6f6dcf067be0612c0cc77637f5b183a1fcb37d9c938fc1f93",
+      "ed25519_public": "cda52702df17359bbcd3b92b033b08d5229e19c0f23cd9597ab7252d50fbcc8c",
+      "fingerprint": "TT70-76KR-231Y-E11R-C61G-PP4E-7T5M-HHZ4-15S7-CP5C-M8TW-SXS4-RARG"
+    },
+    {
+      "noise_public": "3b4a6212f27a0a84745bba27b74f1ac0ccfa9b0acbb07e6d0eec6d7b57ce159a",
+      "ed25519_public": "c7a800a50f88ab7e162452ec477ad0975f6bac23d047c2e367087aca79deacfa",
+      "fingerprint": "YDH3-6GX7-SVSZ-CMQQ-K8K1-FD2H-Y3T9-8A16-61CF-C29Q-MY87-KJJ0-11P0"
+    }
+  ]
+}
