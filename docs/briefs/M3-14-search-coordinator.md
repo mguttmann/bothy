@@ -1,6 +1,7 @@
 # M3-14: Search coordinator and prefix search
 
 Status: ready | Depends on: M1-57, M3-07, M3-13 | Milestone: M3
+
 ## Goal
 
 After this ticket `GET /api/v1/search` (`search`) and `GET /api/v1/search/thread-titles` (`searchThreadTitles`) answer people, agents and apps with hits from messages, thread titles and files that the caller may read, and from nothing else. The module `search` owns no tables: it takes the visible channels from `Authorizer.Scope` (cut down to the triggering person for an agent in a run, SR9), lets `messaging`, `chat` and `files` run the full-text query with `channel_id = ANY($visible)` through their own read operations, ranks the newest `search.max_candidates` candidates, highlights the delivered page as plain text segments split at random markers, pages with an opaque cursor bound to the request, and checks every delivered item with `authorize` again, so a revocation between building the channel set and running the query cannot leak. The quick switcher gets a prefix search over thread titles with the same filter. No total, no per-channel count, no `candidates_capped` flag and no cursor depends on a channel the caller cannot read (T-AZ-02, AZ-M06, AZ-P5), and no search term reaches logs, traces, metrics or the audit log (SEC-LOG-4, SEC-T10). This is the server side of "Full-text search with permission filter" and "Quick switcher" in 01 3.5 and of ADR 0032 ("PostgreSQL full text behind a port").

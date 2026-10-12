@@ -1,6 +1,7 @@
 # M2-04: Trigger decision as a pure function
 
 Status: ready | Depends on: M2-02 | Milestone: M2
+
 ## Goal
 
 After this ticket the package `internal/runs/domain` holds the rules of 09 "Operator and trigger rules" as side-effect-free functions with a documented decision table. Given the facts

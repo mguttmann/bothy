@@ -2020,7 +2020,7 @@ components:
       name: notification.created
       title: dispatch notification.created
       summary: Ephemeral event, at most once.
-      description: Only to connections of the recipient, instead of a push to this device (docs/spec/13-push-notifications.md, section 6.3).
+      description: Only to connections of the recipient, instead of a push to this device (docs/spec/13-push-notifications.md, section 6.3). A hint without a thread (kinds `security` and `admin`) is checked with the recipient rule of R-AZ-30 instead of `push.deliver` (docs/spec/05-actions.md, section 6).
       x-event-kind: ephemeral
       x-receive-action: push.deliver
       payload:

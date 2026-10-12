@@ -1,6 +1,7 @@
 # M3-03: Upload sessions, parts and completion
 
 Status: ready | Depends on: M1-69, M1-70, M3-01 | Milestone: M3
+
 ## Goal
 
 A person, agent or app with `write` and the capability `upload` on a channel announces a file with name, size and SHA-256, sends it in parts of fixed size that the server checks by length and `Content-Digest` while reading, resumes after a network loss, and completes or aborts the upload, all in mode `direct`. The `files` module owns the tables `files`, `file_upload_sessions` and `file_upload_parts` exactly as 03 defines them, adds the deferred foreign key `principals.avatar_file_id`, enforces `file.max_upload_bytes`, the quota per principal, the number of open sessions and the free-space reserve of the file system driver, and enables `createUpload`, `uploadPart`, `getUpload`, `completeUpload`, `abortUpload` and `getFile`. Until a file is attached only its uploader can read it; every change of `upload_state` writes `file.updated` for that uploader only; the object key never carries a name; the file name is a canary path. A completed upload stays `pending` until the verify pass of M3-04 runs, so nothing here ever delivers bytes (12 "Goals and limits" point 1). This is the upload half of 12 sections 3 and 13 and the base for scan, download, images, attachments and cleanup.

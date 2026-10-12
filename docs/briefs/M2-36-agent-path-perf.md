@@ -1,6 +1,7 @@
 # M2-36: Performance targets of the agent path
 
 Status: ready | Depends on: M1-72, M2-31 | Milestone: M2
+
 ## Goal
 
 After this ticket `make perf` measures the two performance targets of the agent path on a recorded host profile, writes value and threshold of each and fails when one is exceeded: `perf.invocation_delivery_p99`, the time from the commit of a message that triggers an agent to the arrival of `agent.invocation` with its fresh invocation token at a fake adapter connected as a gateway consumer (test `perf/invocation`), and `perf.run_patch_fanout_p99`, the time from the adapter's `run.update` to the first `run.updated` carrying that version at every client that focuses the run's thread (test `perf/run_patch`). Both tests run against a server process on a durable database under the sustained message load `perf.sustained_messages_per_s` with the default rate limits, and both prove correctness while they measure: every trigger yields exactly one delivery whose token the reference verifier accepts, every run ends `completed`, and every focused client follows every version without a gap. This closes exit criterion 6 of M2 (02 "Performance targets", ADR 0063) and the mitigation "performance targets of the agent path" of RK-19; both targets stop being "unchecked" (02 17).

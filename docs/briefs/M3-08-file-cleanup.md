@@ -313,7 +313,7 @@ Commands that must pass, from the repository root:
 
 - `cd services/server && go test -race -count=1 ./internal/files/... ./internal/sync/... ./internal/messaging/... ./internal/authz/... ./internal/wire/...`
 - `cd services/server && go test -race -count=1 ./test/canary/... ./test/leak/...`
-- a short fuzz run of `FuzzObjectKeysOf` (`cd services/server && go test -run '^$' -fuzz FuzzObjectKeysOf ./internal/files/domain/` stopped after a short `-fuzztime`); its seed corpus runs in every `go test`
+- a short fuzz run of `FuzzObjectKeysOf` (`cd services/server && go test -run '^$' -fuzz FuzzObjectKeysOf -fuzztime 30s ./internal/files/domain/`); its seed corpus runs in every `go test`
 - `make codegen-check`, `make arch`, `make register-check`, `make api-lint`, `make api-checks`, `make config-reference` (no diff afterwards), `make config-doc-check`, `make signal-check`, `make sql-visibility`, `make contract-test`
 - `make diagrams`, `make docs`, `make linkcheck`
 - `make check`

@@ -1,6 +1,7 @@
 # M2-11: Follow-ups with steer and queue
 
 Status: ready | Depends on: M2-10 | Milestone: M2
+
 ## Goal
 
 After this ticket a human message that would trigger the agent of the thread's active run becomes a follow-up of that run (`run.followup.create` through `createMessage`) instead of a second run: a row in `run_followups` with state `queued` and `trigger_state = received` on the message. When the agent's effective capability `followups` is `steer`, the server writes the personal event `agent.followup`, which M2-08 delivers with a fresh invocation token after re-checking `agent.invoke` for the follow-up's author; the adapter acknowledges `delivered` (the message shows `followup_delivered`) and then `absorbed` through a run patch, forward only. With `queue` or without the capability the server sends nothing, except to a run in `waiting_input`, where the follow-up is the answer to the open question and resumes the run with the token of its delivery. When the run ends, every follow-up still `queued` or `delivered` without `absorbed` becomes `deferred`, and the first of them, in thread order, triggers a new run whose follow-ups are the rest; after a stop by a person (`cancelled` with `user_cancelled`) they become `discarded` and nothing runs. This is 09 "Follow-ups during a run" and AG-13: people can add to a running turn without losing what they wrote, a stop really stops, and no follow-up of another person ever reaches an agent on a personal subscription.

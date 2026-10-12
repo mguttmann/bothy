@@ -1,6 +1,7 @@
 # M3-02: S3 driver against SeaweedFS
 
 Status: ready | Depends on: M1-09, M1-22, M3-01 | Milestone: M3
+
 ## Goal
 
 After this ticket the module `files` can keep its objects in any S3-compatible service: `internal/files/adapters/s3` is the second implementation of the object storage port `ObjectStore` (12 4.1), selected with `file.storage.driver = s3`. The driver uses only core S3 (PUT, GET with a range, HEAD, DELETE of single objects, multipart upload and presigned URLs for upload parts) through one narrow Go interface, takes its access keys only from the secret provider, sends every request through the egress client, and leaves SDK checksums to `file.s3.checksum_mode` (12 4.3, ADR 0010). The conformance suite that M3-01 runs against the file system driver runs unchanged and green against SeaweedFS in a throwaway container, an architecture rule keeps the S3 SDK inside this one adapter, and no code path can send `DeleteObjects`. Why: several API nodes and managed cloud storage need the S3 driver (ADR 0010, consequence on the file system driver), and staying with the few operations every compatible service implements keeps the product portable (B4, R-Objektspeicher); presigned part uploads are proven to bind their length against SeaweedFS (12 3.3, RK-42), so the optional `presigned` mode has its first proof.
