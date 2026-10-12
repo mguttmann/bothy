@@ -301,3 +301,15 @@ def test_dependency_called_optional_fails(tmp_path: Path, sentence: str, named: 
 )
 def test_optional_ticket_outside_closure_passes(tmp_path: Path, sentence: str) -> None:
     assert brief_deps.check(_repo(tmp_path, bodies={"M1-03": sentence})) == []
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "Not in the closure:\n\nM1-02 provides the generator.",
+        "- Not in the closure, used if merged:\n- M1-02 provides the generator.",
+    ],
+)
+def test_optional_list_stops_at_a_block(tmp_path: Path, body: str) -> None:
+    """A list after "not in the closure:" never reaches into the next paragraph or list item."""
+    assert brief_deps.check(_repo(tmp_path, bodies={"M1-03": body})) == []

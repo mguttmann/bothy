@@ -7,13 +7,14 @@ tests to write first, the acceptance criteria and the report format. Order and d
 from the [plan](../PLAN.md) (section "Tickets" of each milestone); this index repeats them for
 the launcher.
 
-Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2 and M3. By the owner's
-decision of 2026-10-11 the M2 and M3 briefs were written before M1 closed, so that builds do not
+Briefs exist for milestone M1 (plan ticket M0-05) and for milestone M2; the briefs of M3 are
+written and follow into this index. By the owner's decision of 2026-10-11 the M2 and M3 briefs
+were written before M1 closed, so that builds do not
 run out of work (D-W-100 in [DECISIONS.md](../DECISIONS.md)): they name M1 interfaces as the M1
 briefs and the merged code name them, and each carries the boundary that a build session follows
 merged code that differs only in names and stops with `Verdict: BLOCKED` where it behaves
 differently from the specification. Briefs of the milestones after these are written when the
-milestone before them closes. The M3 briefs follow the M2 briefs into this index.
+milestone before them closes.
 
 ## How a brief runs
 

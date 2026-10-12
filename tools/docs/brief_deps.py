@@ -195,7 +195,23 @@ def called_optional_tickets(text: str) -> set[str]:
     orders ("unless", "is not merged yet"); review catches those.
     """
     found: set[str] = set()
-    flat = re.sub(r"\s+", " ", text)
+    for block in _blocks(text):
+        found |= _called_optional_in(re.sub(r"\s+", " ", block))
+    return found
+
+
+def _blocks(text: str) -> list[str]:
+    """Paragraphs and list items of a brief: a new block starts at a blank line or a list item."""
+    blocks: list[list[str]] = [[]]
+    for line in text.splitlines():
+        if not line.strip() or _BLOCK_START.match(line):
+            blocks.append([])
+        blocks[-1].append(line)
+    return ["\n".join(b) for b in blocks if b]
+
+
+def _called_optional_in(flat: str) -> set[str]:
+    found: set[str] = set()
     found.update(m.group(1) for m in _OPTIONAL_ASIDE.finditer(flat))
     segments = [flat]
     bare = flat
