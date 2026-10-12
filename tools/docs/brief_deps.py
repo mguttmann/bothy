@@ -55,25 +55,35 @@ _BLOCK_START = re.compile(r"^\s*(?:[-*+]|\d+\.|[a-z]\.)\s")
 _START_CHECK = re.compile(r"BLOCKED dependency|BLOCKED [^`]*not merged")
 _SENTENCE = re.compile(r"(?<=[.;])\s+(?=[A-Z`])")
 _OPTIONAL = re.compile(r"(?:only if|where|if) merged", re.IGNORECASE)
-# A ticket that a brief calls missing or optional. Forms: "M1-63 is not in the closure", "M1-58
-# and M1-59 are outside this closure", "if M1-57 is on the base", "once M1-58 is merged", "M1-41
-# (if merged)", and a list after "not in the closure ...:" or "used only if merged:". A subject or
-# a list item never reaches across a comma that starts a new clause, so "M1-71 provides it, but
-# M1-70 is not in the closure" names only M1-70.
+# A ticket that a brief calls missing or optional. Parenthesized text is dropped first, so an
+# aside like "M1-04 (which builds on M1-02)" names only M1-04 and a comma inside it ends nothing.
+# Forms: a ticket directly before "is not in" or "lies outside" a closure, a list of tickets
+# before "are not in" or "lie outside" it; a ticket after "if", "when" or "once" with "is
+# merged", "has (already) been merged" or "is on the base", a list with "are" or "have"; a list
+# before "only if merged" or "only where merged"; a ticket followed by "(if merged)"; and the
+# tickets of a list after "not in the closure ...:", "outside ... closure:" or "if merged:" up
+# to a comma that starts a new clause (not "and" or "or").
+_TICKETS = r"M\d-\d\d(?:\s*,\s*M\d-\d\d)*(?:\s*,?\s*(?:and|or)\s+M\d-\d\d)?"
 _OPTIONAL_SUBJECT = re.compile(
-    r"((?:M\d-\d\d)[^.;:,]{0,60}?)\b(?:is|are|lies|lie) (?:not in|outside)\b[^.;:,]{0,40}\bclosure"
-    r"|\b(?:if|when|once) (M\d-\d\d)\b[^.;:,]{0,40}?\b(?:is|are|has been|have been)"
-    r" (?:already )?(?:merged|on the base)"
-    r"|(M\d-\d\d)\b[^.;:,()]{0,40}\((?:only )?if merged\)",
+    r"(M\d-\d\d)\s+(?:is|lies)\s+(?:not in|outside)\b[^.;:,]{0,40}\bclosure"
+    rf"|({_TICKETS})\s+(?:are|lie)\s+(?:not in|outside)\b[^.;:,]{{0,40}}\bclosure"
+    r"|\b(?:if|when|once)\s+(M\d-\d\d)\s+(?:is|has)\s+(?:already\s+)?(?:been\s+)?"
+    r"(?:already\s+)?(?:merged|on the base)"
+    rf"|\b(?:if|when|once)\s+({_TICKETS})\s+(?:are|have)\s+(?:already\s+)?(?:been\s+)?"
+    r"(?:already\s+)?(?:merged|on the base)"
+    rf"|({_TICKETS})\s+(?:(?:is|are)\s+)?(?:\w+\s+)?only (?:if|where) merged",
     re.IGNORECASE,
+)
+_OPTIONAL_ASIDE = re.compile(
+    r"(M\d-\d\d)\b[^.;:,()]{0,40}\((?:only )?(?:if|where) (?:it is )?merged\)", re.IGNORECASE
 )
 _OPTIONAL_LIST = re.compile(
     r"(?:\bnot in (?:[\w']+ ){0,3}closure|\boutside (?:[\w']+ ){0,3}closure|\bif merged)"
     r"[^:.;]{0,60}:\s*([^.;]+)",
     re.IGNORECASE,
 )
-# A list ends where a comma starts a new clause ("..., while M2-02 is required").
-_CLAUSE_BREAK = re.compile(r",\s+(?=[a-z])")
+_CLAUSE_BREAK = re.compile(r",\s+(?!(?:and|or)\b)(?=[a-z])")
+_PARENS = re.compile(r"\([^()]*\)")
 
 
 class Index:
@@ -179,15 +189,23 @@ def called_optional_tickets(text: str) -> set[str]:
     """Tickets that a brief calls missing or optional (outside its closure).
 
     Not covered: a sentence that names the ticket only by a path, a feature or a pronoun ("the
-    registry of M1-68 when it is on the base", "if `test/canary` exists"); review catches those.
+    registry of M1-68 when it is on the base", "if `test/canary` exists"), other verbs and word
+    orders ("unless", "is not merged yet"); review catches those.
     """
     found: set[str] = set()
     flat = re.sub(r"\s+", " ", text)
-    for m in _OPTIONAL_SUBJECT.finditer(flat):
+    found.update(m.group(1) for m in _OPTIONAL_ASIDE.finditer(flat))
+    bare = flat
+    while True:
+        stripped = _PARENS.sub("", bare)
+        if stripped == bare:
+            break
+        bare = stripped
+    for m in _OPTIONAL_SUBJECT.finditer(bare):
         for group in m.groups():
             if group:
                 found.update(_ID.findall(group))
-    for m in _OPTIONAL_LIST.finditer(flat):
+    for m in _OPTIONAL_LIST.finditer(bare):
         found.update(_ID.findall(_CLAUSE_BREAK.split(m.group(1))[0]))
     return found
 

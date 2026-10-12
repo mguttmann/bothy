@@ -265,7 +265,7 @@ Integration against PostgreSQL 18 (`pgtest`, world of 07 "Examples", HTTP throug
   produce events whose counts are exactly 1 to n.
 - `TestAddReaction_IsNotStatus`: on a message with `trigger_state` set, adding and removing a
   reaction leaves `trigger_state`, `trigger_state_at`, `trigger_state_reason` and `version`
-  unchanged; changing `trigger_state` through M1-56's `SetTriggerState` (if present on your base)
+  unchanged; changing `trigger_state` through M1-56's `SetTriggerState` (M1-56 is in this ticket's closure)
   creates no reaction row.
 - `TestAddReaction_Rights`: a principal with `read` only gets `403 forbidden`; Alex on a Marketing
   message gets `404`, equal to a random UUIDv7; a read-only channel gives `403 channel_read_only`;
@@ -332,6 +332,5 @@ report. Merge locally into the base branch only if both are green, then `git wor
 
 Write to `{{REPORT_PATH}}`: first line `Verdict: DONE` or `Verdict: BLOCKED <reason>`; then the
 commits, the files with line counts, the test results with counts (including the red run of each
-new test), what is not proven, and follow-ups that could not be done in scope with the reason (say
-whether note 9 was applied). Then write `{{DONE_PATH}}` with `exit=0 sha=<sha>` or
+new test), what is not proven, and follow-ups that could not be done in scope with the reason. Then write `{{DONE_PATH}}` with `exit=0 sha=<sha>` or
 `exit=1 <reason>`.

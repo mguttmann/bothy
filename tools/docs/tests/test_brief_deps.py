@@ -244,25 +244,35 @@ def test_missing_section_raises() -> None:
 
 
 @pytest.mark.parametrize(
-    "sentence",
+    ("sentence", "named"),
     [
-        "M1-01 is not in the closure: do not rely on it.",
-        "Used only if merged: M1-01 (generator).",
-        "If M1-02 is on the base, add the case.",
-        "M1-02 is not in this ticket's dependency closure.",
-        "Add the test once M1-02 is on the base.",
-        "Use the generator when M1-02 has been merged.",
-        "Read the registry of M1-02 (if merged).",
-        "Not in the closure but used if merged: M1-04 (other), M1-02 (generator).",
+        ("M1-01 is not in the closure: do not rely on it.", ["M1-01"]),
+        ("Used only if merged: M1-01 (generator).", ["M1-01"]),
+        ("If M1-02 is on the base, add the case.", ["M1-02"]),
+        ("M1-02 is not in this ticket's dependency closure.", ["M1-02"]),
+        ("Add the test once M1-02 is on the base.", ["M1-02"]),
+        ("Use the generator when M1-02 has been merged.", ["M1-02"]),
+        ("Use the generator once M1-02 has already been merged.", ["M1-02"]),
+        ("Read the registry of M1-02 (if merged).", ["M1-02"]),
+        ("Use M1-02 only if merged.", ["M1-02"]),
+        ("Not in the closure but used if merged: M1-04 (other), M1-02 (generator).", ["M1-02"]),
+        (
+            "Not in the closure but used if merged: M1-04 (other, used rarely), M1-02 (gen).",
+            ["M1-02"],
+        ),
+        ("Not in the closure: M1-04 (a), M1-05 (b), and M1-02 (c).", ["M1-02"]),
+        ("M1-01, M1-02 and M1-04 are not in the closure.", ["M1-01", "M1-02"]),
+        ("Run it when M1-01 and M1-02 are on the base.", ["M1-01", "M1-02"]),
     ],
 )
-def test_dependency_called_optional_fails(tmp_path: Path, sentence: str) -> None:
-    """A brief must not treat a ticket of its own closure as missing or optional (D-W-106)."""
+def test_dependency_called_optional_fails(tmp_path: Path, sentence: str, named: list[str]) -> None:
+    """A brief must not treat a ticket of its own closure as missing or optional (D-W-113)."""
     root = _repo(tmp_path, bodies={"M1-03": sentence})
-    found = brief_deps.check(root)
-    assert len(found) == 1
-    assert found[0].startswith("M1-03-x.md: M1-02 ") or found[0].startswith("M1-03-x.md: M1-01 ")
-    assert "is a dependency of M1-03, but the brief calls it optional" in found[0]
+    assert brief_deps.check(root) == [
+        f"M1-03-x.md: {t} is a dependency of M1-03, but the brief calls it optional"
+        " or outside its closure"
+        for t in named
+    ]
 
 
 @pytest.mark.parametrize(
@@ -275,13 +285,9 @@ def test_dependency_called_optional_fails(tmp_path: Path, sentence: str) -> None
         "M1-02 provides the generator, but M1-04 is not in the closure.",
         "M1-02 is in the closure through M1-01, and M1-04 is not in the closure.",
         "Not in the closure but used if merged: M1-04 (other), while M1-02 is required.",
+        "M1-02 adds the lint and M1-04 is not in the closure.",
+        "M1-04 (which builds on M1-02) is not in the closure.",
     ],
 )
 def test_optional_ticket_outside_closure_passes(tmp_path: Path, sentence: str) -> None:
     assert brief_deps.check(_repo(tmp_path, bodies={"M1-03": sentence})) == []
-
-
-def test_every_subject_of_a_plural_is_found(tmp_path: Path) -> None:
-    root = _repo(tmp_path, bodies={"M1-03": "M1-01 and M1-02 are not in the closure."})
-    found = brief_deps.check(root)
-    assert [f.split(" ")[1] for f in found] == ["M1-01", "M1-02"]
