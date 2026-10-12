@@ -359,7 +359,6 @@ documented in this file. The format is based on
   `jobs.Registry.Periodic` and `jobs.Registry.Queue`, and the load test `perf/event_commit` of
   `perf.event_commit_min_per_s` in `make perf` with the threshold read from 02 by
   `perf/internal/report`.
-
 - `internal/files`: the object storage port `ObjectStore` (`internal/files/app`) with exactly the
   nine operations of chapter 12 "4.1", the key schema and the one key grammar of all drivers
   (`internal/files/domain`), the file system driver `internal/files/adapters/fs` (start check of
@@ -369,6 +368,17 @@ documented in this file. The format is based on
 - Configuration keys `file.storage.driver` and `file.fs.root` with the cross-check
   `file_fs_root_absolute`, and `wire.FilesObjectStore`, which opens the file system driver and
   refuses the driver `s3` until the S3 driver exists; no role opens the store yet.
+- `internal/notify/domain` (M3-17): the decision per recipient of
+  `docs/spec/13-push-benachrichtigungen.md` section 4 as pure functions: `ResolveLevel` (the seven
+  steps of 13 3.1 with `muted_until` on the chosen row), `InQuietHours` and `ParseLocalTime` (13
+  3.4 on the local wall time of each rule's zone, `start_local = end_local` as 24 hours),
+  `Decide` (allowed, recipient, level and kind, activity in the thread, quiet hours, bundling
+  window, one route per device with the desktop delay), `Flush` (the one hint at the end of a
+  bundling window with the unread count) and `ReleaseDelayed` (drops a delayed mobile push that
+  was read). No I/O, no `authorize`, no clock, no zone loading, no configuration access; a golden
+  table of every combination checked against an oracle, quiet hours in `Europe/Berlin` on both
+  changeover days, contract tests against `openapi.yaml`, 13 and 03, a purity test and a fuzz
+  test.
 
 ### Changed
 

@@ -40,6 +40,13 @@ Ein Hinweis hat eine Art (`kind`). Die Art bestimmt Empfänger und die mindesten
 | `security` | neues Gerät des Menschen wartet auf Freigabe | alle anderen aktiven Geräte dieses Menschen | immer | Kontoschutz: ein fremdes Gerät fällt sofort auf |
 | `admin` | Erinnerungen der Verwaltung (Freigabe läuft ab, DSGVO-Frist) | Owner bzw. Verwaltende laut [07-rechte.md](07-rechte.md) und [20-datenschutz.md](20-datenschutz.md) | Schalter `notify.admin_enabled` | Inhalt nur Art und Ziel-ID |
 
+A message in a DM channel gives r the kind `dm` and never `message` or `mention`, also when it
+mentions r: both kinds need the same level and go at once, and DM channels trigger no agent, so
+the run kinds never point at a DM channel either. The decision guards this column: the author
+never gets `message`, `mention` or `dm` for their own message, `run_done`, `run_failed` and
+`input_needed` reach only the person who triggered the run, and a `dm` hint outside a DM channel
+or another kind with thread inside one is invalid input (docs/DECISIONS.md D-M3-17-2).
+
 Kein Hinweis entsteht für: Bearbeiten, Löschen, Reaktionen, Anheften, Tippen, Live-Box-Patches,
 Nachrichten mit `silent = true` und Nachrichten mit `origin IN ('import','system')`. Bearbeiten
 erzeugt auch dann keinen Hinweis, wenn dabei eine Erwähnung hinzukommt (eine Regel weniger,
@@ -119,6 +126,8 @@ Zeilen in `quiet_hours`: Wochentage als Bitmaske (Bit 0 = Montag), `start_local`
 3. Ist `end_local <= start_local` (über Mitternacht): ruhig, wenn das Bit des Wochentags gesetzt
    ist und `Uhrzeit >= start_local`, oder wenn das Bit des Vortags gesetzt ist und
    `Uhrzeit < end_local`. Ein Fenster gehört also zum Tag, an dem es beginnt.
+   With `start_local = end_local` this is a window of 24 hours from `start_local` on each set
+   weekday; screen D9 "ganztags" stores `00:00` to `00:00` (docs/DECISIONS.md D-M3-17-4).
 4. Eine Person ist in Ruhezeit, wenn eine aktivierte Zeile passt.
 
 Folge der Ruhezeit: Der Hinweis wird leise zugestellt (iOS `interruption-level: passive` und
@@ -178,9 +187,12 @@ Erwähnung eines Menschen ohne Leserecht erzeugt nichts und verrät nichts
   [15-client-architektur.md](15-client-architektur.md) fest.
 - **Desktop aktiv:** Ein Gerät mit `platform IN ('macos','windows')` ist verbunden und nicht
   `idle`. Dann gehen Pushes an mobile Geräte erst nach `notify.mobile_delay_when_desktop_active`.
-  Ist der Hinweis dann gelesen (`read_states.last_read_seq` mindestens die Thread-Sequenz der
-  Nachricht), entfällt er. Grund: Wer am Rechner sitzt, will nicht, dass das Telefon gleichzeitig
-  summt.
+  Ist der Hinweis dann gelesen (the read position of 03 `read_states`, the greater of
+  `last_read_seq` and `threads.unread_floor_seq`, is at least the thread sequence of the message;
+  docs/DECISIONS.md D-M3-17-6), entfällt er. Grund: Wer am Rechner sitzt, will nicht, dass das
+  Telefon gleichzeitig summt.
+- **Hints without thread:** `security` and `admin` point at no thread, so "Im Thread aktiv" does
+  not apply to them; "Desktop aktiv" and the route per device do (docs/DECISIONS.md D-M3-17-2).
 
 ### 4.5 Bündeln
 
@@ -188,10 +200,24 @@ Je Empfänger und Thread gilt ein Fenster `notify.coalesce_window`:
 
 1. Der erste Hinweis geht sofort. Damit öffnet sich das Fenster.
 2. Weitere `message`-Hinweise im Fenster werden gesammelt. Am Fensterende geht ein Hinweis mit
-   der Zahl ungelesener Nachrichten (`threads.last_message_seq - read_states.last_read_seq`),
+   der Zahl ungelesener Nachrichten (the formula "Ungelesen" of
+   [03-datenmodell.md](03-datenmodell.md), `read_states`: `threads.last_message_seq` minus the
+   greater of `last_read_seq` and `threads.unread_floor_seq`),
    der den vorherigen auf dem Gerät ersetzt (6.1 `apns-collapse-id`, 5.2 Benachrichtigungs-Tag).
 3. `mention`, `dm`, `input_needed`, `run_done`, `run_failed` und `security` gehen immer sofort,
    ersetzen aber denselben Platz.
+4. The window is open while now is before its end and closed from its end on. A hint with thread
+   that goes while no window is open opens one until now plus `notify.coalesce_window`, whatever
+   its kind; an urgent kind in an open window leaves it unchanged. With a window length of zero
+   no new window opens, so every hint goes at once, except a `message` while a window opened
+   earlier is still open.
+5. At the window end nothing goes if nothing was collected or the person has read everything,
+   and the window stays closed, so the next message goes at once. Otherwise rights, level,
+   activity, quiet hours and route are checked again at that time; the hint carries the unread
+   count and opens the next window, so one hint per thread and window holds under a steady
+   stream (docs/DECISIONS.md D-M3-17-5).
+
+Hints without thread (`security`, `admin`) open and use no window.
 
 Umsetzung: ein eindeutiger, terminierter Job je (Empfänger, Thread) in River; River kann Jobs
 eindeutig nach Argumenten machen und zu einem Zeitpunkt ausführen [Q1, belegt].
@@ -206,6 +232,8 @@ Für jedes aktive Gerät von r (`devices.state = 'active'`):
 2. Sonst geht ein Push an jede aktive Push-Registrierung des Geräts (`disabled_at IS NULL`).
 3. Hat das Gerät weder Verbindung noch Registrierung (z. B. Windows-App geschlossen), entsteht
    nichts. Ungelesen-Zähler zeigen es beim nächsten Öffnen.
+4. If no active device has a route, there is no hint at all, and it opens no bundling window
+   (docs/DECISIONS.md D-M3-17-6).
 
 ## 5. Zustellwege je Plattform
 
