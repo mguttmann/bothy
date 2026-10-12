@@ -7,9 +7,8 @@ tests to write first, the acceptance criteria and the report format. Order and d
 from the [plan](../PLAN.md) (section "Tickets" of each milestone); this index repeats them for
 the launcher.
 
-Briefs exist for milestone M1 (plan ticket M0-05) and for milestone M2; the briefs of M3 are
-written and follow into this index. By the owner's decision of 2026-10-11 the M2 and M3 briefs
-were written before M1 closed, so that builds do not
+Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2 and M3. By the owner's
+decision of 2026-10-11 the M2 and M3 briefs were written before M1 closed, so that builds do not
 run out of work (D-W-100 in [DECISIONS.md](../DECISIONS.md)): they name M1 interfaces as the M1
 briefs and the merged code name them, and each carries the boundary that a build session follows
 merged code that differs only in names and stops with `Verdict: BLOCKED` where it behaves
@@ -79,9 +78,9 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 |---|---|
 | 1 | M1-01, M1-02, M2-32 |
 | 2 | M1-03, M1-04, M1-05, M2-38 |
-| 3 | M1-06, M1-07, M1-17, M1-74 |
-| 4 | M1-08, M1-09, M1-22, M2-23 |
-| 5 | M1-10, M1-12 |
+| 3 | M1-06, M1-07, M1-17, M1-74, M3-17 |
+| 4 | M1-08, M1-09, M1-22, M2-23, M3-01 |
+| 5 | M1-10, M1-12, M3-02 |
 | 6 | M1-11, M1-13 |
 | 7 | M1-14, M1-15, M1-18, M1-23, M1-26 |
 | 8 | M1-16, M1-19, M1-21, M1-24, M1-25, M1-27 |
@@ -95,25 +94,25 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 16 | M1-42, M1-53, M2-40 |
 | 17 | M1-54, M1-55, M2-41 |
 | 18 | M1-56, M2-42 |
-| 19 | M1-57, M1-58, M1-60, M2-26 |
+| 19 | M1-57, M1-58, M1-60, M2-26, M3-13 |
 | 20 | M1-59, M1-61 |
-| 21 | M1-62, M1-63 |
+| 21 | M1-62, M1-63, M3-18 |
 | 22 | M1-64, M1-71 |
 | 23 | M1-65 |
 | 24 | M1-66, M1-70, M1-72, M2-07 |
 | 25 | M1-67, M1-68, M2-20 |
 | 26 | M1-69, M2-21, M2-43 |
-| 27 | M1-73, M2-02, M2-44 |
-| 28 | M2-03, M2-04, M2-45, M2-47 |
-| 29 | M2-05, M2-46 |
-| 30 | M2-06, M2-27, M2-48 |
+| 27 | M1-73, M2-02, M2-44, M3-03 |
+| 28 | M2-03, M2-04, M2-45, M2-47, M3-04 |
+| 29 | M2-05, M2-46, M3-05, M3-06 |
+| 30 | M2-06, M2-27, M2-48, M3-10, M3-11 |
 | 31 | M2-08 |
 | 32 | M2-09, M2-16 |
-| 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19 |
-| 34 | M2-11, M2-22, M2-25, M2-29 |
-| 35 | M2-13, M2-28, M2-30, M2-33, M2-34 |
-| 36 | M2-31, M2-35, M2-49 |
-| 37 | M2-36, M2-37, M2-50 |
+| 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19, M3-19 |
+| 34 | M2-11, M2-22, M2-25, M2-29, M3-20, M3-21, M3-23 |
+| 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24 |
+| 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22 |
+| 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16 |
 
 ## Index
 
@@ -247,6 +246,30 @@ names listed here.
 | 30 | M2-48 | Conformance and chaos suite of the terminal | `M2-48-terminal-conformance.md` | M1-72, M1-73, M2-24, M2-46, M2-47 |
 | 36 | M2-49 | Reference app for code hosting (GitHub) | `M2-49-github-app.md` | M2-25, M2-30 |
 | 37 | M2-50 | Reference app for ticket systems (Jira) | `M2-50-jira-app.md` | M2-49 |
+| 4 | M3-01 | Object storage port with file system driver | `M3-01-object-storage-fs.md` | M1-07 |
+| 5 | M3-02 | S3 driver against SeaweedFS | `M3-02-object-storage-s3.md` | M1-09, M1-22, M3-01 |
+| 27 | M3-03 | Upload sessions, parts and completion | `M3-03-upload-sessions.md` | M1-69, M1-70, M3-01 |
+| 28 | M3-04 | Scan pass with clamd | `M3-04-clamd-scan.md` | M3-03 |
+| 29 | M3-05 | File download with download tickets | `M3-05-file-download.md` | M3-04 |
+| 29 | M3-06 | Images: removing metadata and thumbnails | `M3-06-image-metadata-thumbnails.md` | M3-04 |
+| 35 | M3-07 | Attachments and release of the agent invocation | `M3-07-attachments-invocation.md` | M1-58, M2-11, M3-04 |
+| 36 | M3-08 | Cleanup and deletion of files | `M3-08-file-cleanup.md` | M3-07 |
+| 37 | M3-09 | Voice messages and transcript | `M3-09-voice-transcript.md` | M1-47, M2-31, M3-05, M3-06, M3-07 |
+| 30 | M3-10 | Avatar and logo | `M3-10-avatar-logo.md` | M3-06 |
+| 30 | M3-11 | Channel export | `M3-11-channel-export.md` | M1-57, M3-05 |
+| 37 | M3-12 | Claude Code runner: answer attachments | `M3-12-runner-attachments.md` | M2-35, M3-07 |
+| 19 | M3-13 | Search vectors and search_tsquery | `M3-13-search-vectors.md` | M1-56 |
+| 36 | M3-14 | Search coordinator and prefix search | `M3-14-search-coordinator.md` | M1-57, M3-07, M3-13 |
+| 37 | M3-15 | File text extraction | `M3-15-file-text-extraction.md` | M3-14 |
+| 37 | M3-16 | Search load test | `M3-16-search-load-test.md` | M1-72, M3-14 |
+| 3 | M3-17 | Notification decision as a pure function | `M3-17-notify-decision.md` | M1-05 |
+| 21 | M3-18 | Notification preferences and quiet hours | `M3-18-notify-preferences.md` | M1-61, M3-17 |
+| 33 | M3-19 | Hint jobs, automatic following and bundling | `M3-19-notify-jobs.md` | M1-38, M2-01, M2-09, M3-18 |
+| 34 | M3-20 | APNs adapter with Fake-APNs | `M3-20-apns-adapter.md` | M3-19 |
+| 34 | M3-21 | FCM adapter with Fake-FCM | `M3-21-fcm-adapter.md` | M3-19 |
+| 36 | M3-22 | Push registration and preview endpoint (ADR 0031) | `M3-22-push-registration.md` | M3-05, M3-06, M3-07, M3-20, M3-21, M3-23 |
+| 34 | M3-23 | Desktop hints over the gateway | `M3-23-desktop-notices.md` | M3-19 |
+| 35 | M3-24 | Push handoff performance target | `M3-24-push-handoff-perf.md` | M1-72, M3-20 |
 
 ## Make targets created by tickets
 
@@ -275,6 +298,7 @@ waves, the graph and the column "Depends on" of the plan against the index.
 | `signal-check` | M1-68 |
 | `sql-visibility` | M1-70 |
 | `contract-test` | M1-71 |
+| `bench-search` | M3-16 |
 
 To change a dependency, edit the column "Depends on" of the index and the row in the plan, then
 run `uv run --project tools --locked --quiet python tools/docs/brief_deps.py --write`; it
@@ -410,6 +434,30 @@ flowchart TB
   M2_48["M2-48"]
   M2_49["M2-49"]
   M2_50["M2-50"]
+  M3_01["M3-01"]
+  M3_02["M3-02"]
+  M3_03["M3-03"]
+  M3_04["M3-04"]
+  M3_05["M3-05"]
+  M3_06["M3-06"]
+  M3_07["M3-07"]
+  M3_08["M3-08"]
+  M3_09["M3-09"]
+  M3_10["M3-10"]
+  M3_11["M3-11"]
+  M3_12["M3-12"]
+  M3_13["M3-13"]
+  M3_14["M3-14"]
+  M3_15["M3-15"]
+  M3_16["M3-16"]
+  M3_17["M3-17"]
+  M3_18["M3-18"]
+  M3_19["M3-19"]
+  M3_20["M3-20"]
+  M3_21["M3-21"]
+  M3_22["M3-22"]
+  M3_23["M3-23"]
+  M3_24["M3-24"]
   M1_02 --> M1_03
   M1_01 --> M1_04
   M1_01 --> M1_05
@@ -613,4 +661,53 @@ flowchart TB
   M2_25 --> M2_49
   M2_30 --> M2_49
   M2_49 --> M2_50
+  M1_07 --> M3_01
+  M1_09 --> M3_02
+  M1_22 --> M3_02
+  M3_01 --> M3_02
+  M1_69 --> M3_03
+  M1_70 --> M3_03
+  M3_01 --> M3_03
+  M3_03 --> M3_04
+  M3_04 --> M3_05
+  M3_04 --> M3_06
+  M1_58 --> M3_07
+  M2_11 --> M3_07
+  M3_04 --> M3_07
+  M3_07 --> M3_08
+  M1_47 --> M3_09
+  M2_31 --> M3_09
+  M3_05 --> M3_09
+  M3_06 --> M3_09
+  M3_07 --> M3_09
+  M3_06 --> M3_10
+  M1_57 --> M3_11
+  M3_05 --> M3_11
+  M2_35 --> M3_12
+  M3_07 --> M3_12
+  M1_56 --> M3_13
+  M1_57 --> M3_14
+  M3_07 --> M3_14
+  M3_13 --> M3_14
+  M3_14 --> M3_15
+  M1_72 --> M3_16
+  M3_14 --> M3_16
+  M1_05 --> M3_17
+  M1_61 --> M3_18
+  M3_17 --> M3_18
+  M1_38 --> M3_19
+  M2_01 --> M3_19
+  M2_09 --> M3_19
+  M3_18 --> M3_19
+  M3_19 --> M3_20
+  M3_19 --> M3_21
+  M3_05 --> M3_22
+  M3_06 --> M3_22
+  M3_07 --> M3_22
+  M3_20 --> M3_22
+  M3_21 --> M3_22
+  M3_23 --> M3_22
+  M3_19 --> M3_23
+  M1_72 --> M3_24
+  M3_20 --> M3_24
 ```

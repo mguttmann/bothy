@@ -206,6 +206,7 @@ def _blocks(text: str) -> list[str]:
 
 
 def _called_optional_in(flat: str) -> set[str]:
+    """Tickets that one block, flattened to single spaces, calls missing or optional."""
     found: set[str] = set()
     found.update(m.group(1) for m in _OPTIONAL_ASIDE.finditer(flat))
     segments = [flat]

@@ -1,6 +1,7 @@
 # M2-13: Run context with origin and trust
 
 Status: ready | Depends on: M2-11, M2-12 | Milestone: M2
+
 ## Goal
 
 After this ticket an agent adapter loads the context of its own active run with `run.context.read` (`getRunContext`, `GET /api/v1/runs/{run_id}/context`) and receives `run_context.v1`: the triggering message complete and never cut, the earlier messages of the thread above the floor of its session, on the first run of a session the main-thread messages before the thread's parent message, and for every element its author, `origin`, kind, channel, `role` and a trust marker `trust` (`trigger`, `authorized`, `self`, `unverified`, `system`) that the server computes at the time of the request from the current rights. Contents are bounded by the channel's `history_backfill_limit`, by `agent.context_message_max_bytes` per message and by `agent.context_max_bytes` in total, cut from old to new. The server builds this context because only `authz` knows which authors may instruct the agent (ADR 0054, R-AG-06, D-AG-05); every adapter then passes `unverified` content to its runtime only as marked data, so instructions hidden in messages of people without `trigger`, of other agents, apps or imports cannot pass as the request of the triggering person (SEC-AI-1, T-AI-01, T-AI-03, RK-01). This is the server half of AG-20 and AG-21; the SDK formatting helper (M2-29), the reference adapters (M2-33, M2-34) and the conformance suite (M2-31) build on it, and it replaces reading the whole event stream in adapters (RK-19).

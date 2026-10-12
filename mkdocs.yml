@@ -317,3 +317,28 @@ nav:
           - "M2-48: Conformance and chaos suite of the terminal": briefs/M2-48-terminal-conformance.md
           - "M2-49: Reference app for code hosting (GitHub)": briefs/M2-49-github-app.md
           - "M2-50: Reference app for ticket systems (Jira)": briefs/M2-50-jira-app.md
+      - Milestone M3:
+          - "M3-01: Object storage port with file system driver": briefs/M3-01-object-storage-fs.md
+          - "M3-02: S3 driver against SeaweedFS": briefs/M3-02-object-storage-s3.md
+          - "M3-03: Upload sessions, parts and completion": briefs/M3-03-upload-sessions.md
+          - "M3-04: Scan pass with clamd": briefs/M3-04-clamd-scan.md
+          - "M3-05: File download with download tickets": briefs/M3-05-file-download.md
+          - "M3-06: Images: removing metadata and thumbnails": briefs/M3-06-image-metadata-thumbnails.md
+          - "M3-07: Attachments and release of the agent invocation": briefs/M3-07-attachments-invocation.md
+          - "M3-08: Cleanup and deletion of files": briefs/M3-08-file-cleanup.md
+          - "M3-09: Voice messages and transcript": briefs/M3-09-voice-transcript.md
+          - "M3-10: Avatar and logo": briefs/M3-10-avatar-logo.md
+          - "M3-11: Channel export": briefs/M3-11-channel-export.md
+          - "M3-12: Claude Code runner: answer attachments": briefs/M3-12-runner-attachments.md
+          - "M3-13: Search vectors and search_tsquery": briefs/M3-13-search-vectors.md
+          - "M3-14: Search coordinator and prefix search": briefs/M3-14-search-coordinator.md
+          - "M3-15: File text extraction": briefs/M3-15-file-text-extraction.md
+          - "M3-16: Search load test": briefs/M3-16-search-load-test.md
+          - "M3-17: Notification decision as a pure function": briefs/M3-17-notify-decision.md
+          - "M3-18: Notification preferences and quiet hours": briefs/M3-18-notify-preferences.md
+          - "M3-19: Hint jobs, automatic following and bundling": briefs/M3-19-notify-jobs.md
+          - "M3-20: APNs adapter with Fake-APNs": briefs/M3-20-apns-adapter.md
+          - "M3-21: FCM adapter with Fake-FCM": briefs/M3-21-fcm-adapter.md
+          - "M3-22: Push registration and preview endpoint (ADR 0031)": briefs/M3-22-push-registration.md
+          - "M3-23: Desktop hints over the gateway": briefs/M3-23-desktop-notices.md
+          - "M3-24: Push handoff performance target": briefs/M3-24-push-handoff-perf.md

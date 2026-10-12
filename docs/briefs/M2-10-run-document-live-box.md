@@ -1,6 +1,7 @@
 # M2-10: Run document, patches and live box
 
 Status: ready | Depends on: M2-09 | Milestone: M2
+
 ## Goal
 
 After this ticket the agent of an active run changes its live box only through RFC 6902 patches

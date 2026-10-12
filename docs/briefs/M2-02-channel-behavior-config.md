@@ -1,6 +1,7 @@
 # M2-02: Channel behaviour and agent configuration
 
 Status: ready | Depends on: M1-69 | Milestone: M2
+
 ## Goal
 
 After this ticket a person with `manage` on a channel reads and changes the channel's behaviour:
