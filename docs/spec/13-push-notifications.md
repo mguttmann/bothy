@@ -40,6 +40,13 @@ A notification has a kind (`kind`). The kind determines the recipients and the m
 | `security` | a new device of the person waits for device approval | all other active devices of this person | always | account protection: a foreign device is noticed immediately |
 | `admin` | reminders from the administration (grant expires, GDPR deadline) | owner or administrators according to [07-permissions.md](07-permissions.md) and [20-privacy.md](20-privacy.md) | switch `notify.admin_enabled` | content only kind and target ID |
 
+A message in a DM channel gives r the kind `dm` and never `message` or `mention`, also when it
+mentions r: both kinds need the same level and go at once, and DM channels trigger no agent, so
+the run kinds never point at a DM channel either. The decision guards this column: the author
+never gets `message`, `mention` or `dm` for their own message, `run_done`, `run_failed` and
+`input_needed` reach only the person who triggered the run, and a `dm` hint outside a DM channel
+or another kind with thread inside one is invalid input (docs/DECISIONS.md D-M3-17-2).
+
 No notification is created for: edits, deletions, reactions, pins, typing, live box patches,
 messages with `silent = true` and messages with `origin IN ('import','system')`. An edit
 creates no notification even when it adds a mention (one rule less,
@@ -119,6 +126,8 @@ Rows in `quiet_hours`: weekdays as a bit mask (bit 0 = Monday), `start_local`, `
 3. If `end_local <= start_local` (across midnight): quiet if the bit of the weekday is set
    and `time >= start_local`, or if the bit of the previous day is set and
    `time < end_local`. A window therefore belongs to the day on which it starts.
+   With `start_local = end_local` this is a window of 24 hours from `start_local` on each set
+   weekday; screen D9 "all day" stores `00:00` to `00:00` (docs/DECISIONS.md D-M3-17-4).
 4. A person is in quiet hours if an enabled row matches.
 
 Effect of quiet hours: the notification is delivered silently (iOS `interruption-level: passive` and
@@ -178,9 +187,13 @@ mention of a person without read permission creates nothing and reveals nothing
   [15-client-architecture.md](15-client-architecture.md).
 - **Desktop active:** a device with `platform IN ('macos','windows')` is connected and not
   `idle`. Then pushes to mobile devices go out only after `notify.mobile_delay_when_desktop_active`.
-  If the notification has been read by then (`read_states.last_read_seq` at least the thread sequence of the
-  message), it is dropped. Reason: whoever sits at the computer does not want the phone to buzz
-  at the same time.
+  If the notification has been read by then (the read position of 03 `read_states`, the greater
+  of `last_read_seq` and `threads.unread_floor_seq`, is at least the thread sequence of the
+  message; docs/DECISIONS.md D-M3-17-6), it is dropped. Reason: whoever sits at the computer does
+  not want the phone to buzz at the same time.
+- **Notifications without thread:** `security` and `admin` point at no thread, so "Active in the
+  thread" does not apply to them; "Desktop active" and the delivery path per device do
+  (docs/DECISIONS.md D-M3-17-2).
 
 ### 4.5 Coalescing
 
@@ -188,10 +201,24 @@ Per recipient and thread, a window `notify.coalesce_window` applies:
 
 1. The first notification goes out immediately. This opens the window.
 2. Further `message` notifications within the window are collected. At the end of the window one notification
-   goes out with the number of unread messages (`threads.last_message_seq - read_states.last_read_seq`),
+   goes out with the number of unread messages (the formula "Unread" of
+   [03-data-model.md](03-data-model.md), `read_states`: `threads.last_message_seq` minus the
+   greater of `last_read_seq` and `threads.unread_floor_seq`),
    which replaces the previous one on the device (6.1 `apns-collapse-id`, 5.2 notification tag).
 3. `mention`, `dm`, `input_needed`, `run_done`, `run_failed` and `security` always go out immediately,
    but replace the same slot.
+4. The window is open while now is before its end and closed from its end on. A notification with
+   thread that goes while no window is open opens one until now plus `notify.coalesce_window`,
+   whatever its kind; an urgent kind in an open window leaves it unchanged. With a window length
+   of zero no new window opens, so every notification goes at once, except a `message` while a
+   window opened earlier is still open.
+5. At the window end nothing goes if nothing was collected or the person has read everything,
+   and the window stays closed, so the next message goes at once. Otherwise rights, level,
+   activity, quiet hours and route are checked again at that time; the notification carries the
+   unread count and opens the next window, so one notification per thread and window holds under
+   a steady stream (docs/DECISIONS.md D-M3-17-5).
+
+Notifications without thread (`security`, `admin`) open and use no window.
 
 Implementation: one unique, scheduled job per (recipient, thread) in River; River can make jobs
 unique by their arguments and run them at a point in time [Q1, verified].
@@ -206,6 +233,8 @@ For every active device of r (`devices.state = 'active'`):
 2. Otherwise a push goes to every active push registration of the device (`disabled_at IS NULL`).
 3. If the device has neither a connection nor a registration (for example the Windows app is closed),
    nothing is created. Unread counters show it on the next opening.
+4. If no active device has a route, there is no notification at all, and it opens no coalescing
+   window (docs/DECISIONS.md D-M3-17-6).
 
 ## 5. Delivery paths per platform
 

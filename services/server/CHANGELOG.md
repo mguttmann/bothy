@@ -190,6 +190,17 @@ documented in this file. The format is based on
   migrations. `bothy serve` refuses to start when River's migrations are incomplete, soft-stops
   River at shutdown within `shutdown.jobs_soft_timeout` and ends with exit code 1 when the River
   client stops on its own (`lifecycle.Runner.FailOn`).
+- `internal/notify/domain` (M3-17): the decision per recipient of
+  `docs/spec/13-push-notifications.md` section 4 as pure functions: `ResolveLevel` (the seven
+  steps of 13 3.1 with `muted_until` on the chosen row), `InQuietHours` and `ParseLocalTime` (13
+  3.4 on the local wall time of each rule's zone, `start_local = end_local` as 24 hours),
+  `Decide` (allowed, recipient, level and kind, activity in the thread, quiet hours, coalescing
+  window, one route per device with the desktop delay), `Flush` (the one notification at the end of a
+  coalescing window with the unread count) and `ReleaseDelayed` (drops a delayed mobile push that
+  was read). No I/O, no `authorize`, no clock, no zone loading, no configuration access; a golden
+  table of every combination checked against an oracle, quiet hours in `Europe/Berlin` on both
+  changeover days, contract tests against `openapi.yaml`, 13 and 03, a purity test and a fuzz
+  test.
 
 ### Changed
 
