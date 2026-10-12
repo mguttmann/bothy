@@ -158,9 +158,15 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 	code, stdout, stderr := runConfig(t, wire.ConfigSchema, env, "print", "--role", "worker")
 	want := "# configuration file: " + path + "\n" +
 		"api.cors_allowed_origins =   # default\n" +
+		"api.page_size_default = 50  # default\n" +
+		"api.page_size_max = 200  # default\n" +
 		"audit.deny_aggregate_max_keys = 10000  # default\n" +
 		"audit.deny_aggregate_window = 1m  # default\n" +
+		"auth.clock_leeway = 30s  # default\n" +
+		"auth.dpop_nonce_ttl = 5m  # default\n" +
+		"auth.dpop_proof_max_age = 1m  # default\n" +
 		"auth.step_up_max_age = 5m  # default\n" +
+		"auth.token_pepper_ref = file:/run/bothy/secrets/token_pepper  # default\n" +
 		"authz.snapshot_cache_max_entries = 10000  # default\n" +
 		"database.acquire_timeout = 2s  # default\n" +
 		"database.host = localhost  # default\n" +

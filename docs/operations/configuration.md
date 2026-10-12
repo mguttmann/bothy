@@ -333,8 +333,8 @@ Quelle: [06-api.md](../spec/06-api.md), Abschnitt 20.
 
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
-| `api.page_size_default` | `BOTHY_API__PAGE_SIZE_DEFAULT` | Server |  | `50` | Seitengröße ohne `limit` | geplant (M1) |
-| `api.page_size_max` | `BOTHY_API__PAGE_SIZE_MAX` | Server |  | `200` | größere `limit` werden gekappt | geplant (M1) |
+| `api.page_size_default` | `BOTHY_API__PAGE_SIZE_DEFAULT` | Server | int | `50` | Seitengröße ohne `limit` | aktiv |
+| `api.page_size_max` | `BOTHY_API__PAGE_SIZE_MAX` | Server | int | `200` | größere `limit` werden gekappt | aktiv |
 | `api.cors_allowed_origins` | `BOTHY_API__CORS_ALLOWED_ORIGINS` | Server | list(string) | leer | zusätzliche Origins für CORS | aktiv |
 | `api.deprecation_min_notice` | `BOTHY_API__DEPRECATION_MIN_NOTICE` | Server |  | `180d` | Mindestabstand von `Deprecation` zu `Sunset` | geplant (M1) |
 | `api.major_version_overlap` | `BOTHY_API__MAJOR_VERSION_OVERLAP` | Server |  | `365d` | so lange bleibt eine alte Hauptversion nach Erscheinen der neuen | geplant (M7) |
@@ -362,10 +362,10 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
 | `auth.access_token_ttl` | `BOTHY_AUTH__ACCESS_TOKEN_TTL` | Server |  | `10m` | Lebensdauer eines Zugriffstokens | geplant (M1) |
-| `auth.dpop_nonce_ttl` | `BOTHY_AUTH__DPOP_NONCE_TTL` | Server |  | `5m` | Gültigkeit eines DPoP-Nonce (Kopfzeile `DPoP-Nonce` und `hello` des Gateways) | geplant (M1) |
-| `auth.token_pepper_ref` | `BOTHY_AUTH__TOKEN_PEPPER_REF` | Server |  | `file:<secrets.dir>/token_pepper` | Verweis auf den Server-Pepper für die HMAC-Hashes aller Tokens und Codes (03, Grundsatz 9) | geplant (M1) |
-| `auth.clock_leeway` | `BOTHY_AUTH__CLOCK_LEEWAY` | Server |  | `30s` | erlaubte Uhrabweichung bei `exp`, `nbf`, `iat` | geplant (M1) |
-| `auth.dpop_proof_max_age` | `BOTHY_AUTH__DPOP_PROOF_MAX_AGE` | Server |  | `60s` | Höchstalter eines DPoP-Beweises (`iat`) | geplant (M1) |
+| `auth.dpop_nonce_ttl` | `BOTHY_AUTH__DPOP_NONCE_TTL` | Server | duration | `5m` | Gültigkeit eines DPoP-Nonce (Kopfzeile `DPoP-Nonce` und `hello` des Gateways) | aktiv |
+| `auth.token_pepper_ref` | `BOTHY_AUTH__TOKEN_PEPPER_REF` | Server | secret_ref | `file:<secrets.dir>/token_pepper` | Verweis auf den Server-Pepper für die HMAC-Hashes aller Tokens und Codes (03, Grundsatz 9) | aktiv |
+| `auth.clock_leeway` | `BOTHY_AUTH__CLOCK_LEEWAY` | Server | duration | `30s` | erlaubte Uhrabweichung bei `exp`, `nbf`, `iat` | aktiv |
+| `auth.dpop_proof_max_age` | `BOTHY_AUTH__DPOP_PROOF_MAX_AGE` | Server | duration | `60s` | Höchstalter eines DPoP-Beweises (`iat`) | aktiv |
 | `auth.login_flow_ttl` | `BOTHY_AUTH__LOGIN_FLOW_TTL` | Server |  | `10m` | Gültigkeit eines Anmeldevorgangs | geplant (M1) |
 | `auth.server_code_ttl` | `BOTHY_AUTH__SERVER_CODE_TTL` | Server |  | `60s` | Gültigkeit des einmaligen Server-Codes | geplant (M1) |
 | `auth.oidc_jwks_cache_ttl` | `BOTHY_AUTH__OIDC_JWKS_CACHE_TTL` | Server |  | `1h` | Cache der Anbieter-Metadaten (Discovery) und -Schlüssel (JWKS) | geplant (M1) |

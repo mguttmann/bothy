@@ -11,8 +11,7 @@ import (
 
 // The empty sources of authz (docs/DECISIONS.md M1-28 D2, 02 section 4.4): until the owning modules
 // have tables they report the truth of an instance without those tables, so authorize decides fail
-// closed. Every request with credentials is unauthenticated until M1-34, which is correct because
-// no credential can exist before it.
+// closed. The credentials come from identity since M1-33 (wire.NewAuthorizer).
 
 // emptyStructure knows no space, channel or thread. M1-52 (spaces), M1-53 (channels) and M1-55
 // (threads, dm participation) replace it with the StructureSource of chat.
@@ -57,14 +56,4 @@ func (emptyPolicies) DevEnvironmentReady(context.Context, ids.ID, ids.ID) (bool,
 // there is none, so I1 holds trivially.
 func (emptyPolicies) PersonalAgents(context.Context) ([]authz.PersonalAgent, error) {
 	return nil, nil
-}
-
-// emptyCredentials knows no live session, device or token. M1-33 (devices), M1-34 (sessions) and
-// M1-44 (tokens) replace it with the CredentialSource of identity.
-type emptyCredentials struct{}
-
-var _ authz.CredentialSource = emptyCredentials{}
-
-func (emptyCredentials) Credentials(context.Context, authz.CredentialRef) (authz.CredentialFacts, error) {
-	return authz.CredentialFacts{DeviceState: authz.DeviceUnknown}, nil
 }

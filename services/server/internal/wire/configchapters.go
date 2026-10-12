@@ -14,6 +14,7 @@ const (
 	chapter05 = "05-aktionen.md"
 	chapter06 = "06-api.md"
 	chapter07 = "07-rechte.md"
+	chapter08 = "08-identitaet.md"
 	chapter12 = "12-dateien.md"
 	chapter16 = "16-betrieb.md"
 	chapter17 = "17-observability.md"

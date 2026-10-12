@@ -1,6 +1,6 @@
 # Modul `identity`
 
-Status: principal tables and directory built (M1-26); use cases, sessions, devices and tokens follow with the tickets of the etappe.
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); sessions, logins and tokens follow with the tickets of the etappe.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -36,6 +36,41 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
   never changes), both SQLSTATE `23514`. `bothy_app` may read, insert and update the three
   tables, not delete. Deviation from 03: `principals.avatar_file_id` has no foreign key yet;
   the migration of M3-03 that creates `files` adds it with `ON DELETE SET NULL`.
+
+### Devices and DPoP (M1-33)
+
+- Port (`devices.go`, `dpop.go`): `Devices` (`Register` joins the ambient unit of work and is
+  called by the login tickets; `Get`, `ListMine`, `ListForUser` authorize `device.list`;
+  `ActiveKey` does not authorize) with `KeyPurpose`, `DeviceState`, `Platform`, `PublicKey`,
+  `RegisterDevice`, `Device`, `DeviceKey`, `Page`, `DevicePage`; `DPoP` (`CurrentNonce`, `Verify`)
+  with `ProofRequest`, `VerifiedProof` and `DPoPError` (unwraps to the `401` problem with
+  `WWW-Authenticate` and `DPoP-Nonce`).
+- `domain/device`: registration rules (UUIDv7 id, trimmed name without control or bidi
+  characters, platform, keys `ES256` or `EdDSA` validated by `kernel/jose`, no step-up key on
+  `cli`, different `dpop` and `step_up` keys, `pending` or `active` with approver) and the state
+  machine `pending -> active`, `pending -> revoked`, `active -> revoked` (`409
+  invalid_state_transition` otherwise).
+- `domain/dpop`: `NormalizeHTU`, the claim checks, the nonces (HKDF-SHA256 of the token pepper,
+  info `dpop-nonce/v1`, window `unix / auth.dpop_nonce_ttl`, current and previous window) and the
+  replay key `SHA-256(htu || 0x00 || jti)`.
+- `app`: `Devices`, `DPoPVerifier` (checks in the order of the brief, nothing remembered on a
+  failure), `CredentialSource` (device state; sessions and tokens not active until M1-34 and
+  M1-44), the outgoing ports `DeviceStore`, `Cursors` and `ReplayStore`; `Config` binds
+  `auth.dpop_nonce_ttl`, `auth.dpop_proof_max_age`, `auth.clock_leeway`, `auth.token_pepper_ref`,
+  `server.public_url`, `api.page_size_default`, `api.page_size_max`.
+- `adapters/postgres`: `queries/devices.sql` and the device methods of `Repository`; a reused
+  device id or thumbprint is `409 conflict` on `/device_id` or `/public_jwk`.
+- `adapters/replay`: the in-memory `jti` store, sharded, with expiry on insert and a sweeper.
+- `adapters/httpapi`: the handlers of `listMyDevices`, `listUserDevices`, `getDevice`,
+  `ExpectedHTU` (origin of `server.public_url` plus the escaped path) and the cursor codec adapter.
+- `adapters/identitytest`: `NewDeviceKey`, `SignDPoPProof`, `SignJWS`; only tests import it
+  (`TestIdentitytest_NotInBinary`).
+- Migration `migrations/00008_identity_devices.sql`: `devices` and `device_keys` as 03 section 4.2
+  states them (retention class `security`); `bothy_app` may read, insert and update, not delete.
+- Tests: ID-T14 without the Bearer case (`TestDPoP_IDT14`), ID-T29 and SEC-T07 for devices
+  (`TestRegister_Validation`), `TestDPoP_NonceAcrossVerifiers`, `TestDPoP_ReplayConcurrent`,
+  the HTTP tests of the three operations and the fuzz targets `FuzzParseJWK`,
+  `FuzzParseCompactJWS`, `FuzzVerifyDPoPProof`. Rulings: docs/DECISIONS.md M1-33.
 
 ## Port (Wurzelpaket `internal/identity`)
 

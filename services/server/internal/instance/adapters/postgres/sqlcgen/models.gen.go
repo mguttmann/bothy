@@ -36,6 +36,34 @@ type AuditIpKey struct {
 	DestroyedAt   pgtype.Timestamptz
 }
 
+type Device struct {
+	ID           pgtype.UUID
+	UserID       pgtype.UUID
+	Name         string
+	Platform     string
+	State        string
+	AppVersion   pgtype.Text
+	ApprovedBy   pgtype.UUID
+	ApprovedAt   pgtype.Timestamptz
+	RevokedBy    pgtype.UUID
+	RevokedAt    pgtype.Timestamptz
+	RevokeReason pgtype.Text
+	CreatedAt    pgtype.Timestamptz
+	LastSeenAt   pgtype.Timestamptz
+}
+
+type DeviceKey struct {
+	ID          pgtype.UUID
+	DeviceID    pgtype.UUID
+	Purpose     string
+	Jkt         string
+	PublicJwk   []byte
+	Alg         string
+	Attestation []byte
+	CreatedAt   pgtype.Timestamptz
+	RevokedAt   pgtype.Timestamptz
+}
+
 type EventLog struct {
 	Seq                 int64
 	ID                  pgtype.UUID

@@ -2,9 +2,24 @@
 
 package routes
 
-// Server is any while no operation is enabled: there is no generated interface to implement,
-// whatever oapi-codegen emits for zero operations.
-type Server = any
+import (
+	rest "github.com/OWNER/bothy/services/server/api/rest"
+)
 
-// register registers nothing while no operation is enabled.
-func register(Server, Options, *Recorder) {}
+// Server is the interface the handlers of all enabled operations implement together: the
+// strict server interface generated from the enabled operations.
+type Server = rest.StrictServerInterface
+
+// register runs the generated strict and std-http server for impl on mux, below the base URL,
+// with the error handlers of opts (nil keeps the oapi-codegen default).
+func register(impl Server, opts Options, mux *Recorder) {
+	strict := rest.NewStrictHandlerWithOptions(impl, nil, rest.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc:  opts.RequestErrorHandlerFunc,
+		ResponseErrorHandlerFunc: opts.ResponseErrorHandlerFunc,
+	})
+	rest.HandlerWithOptions(strict, rest.StdHTTPServerOptions{
+		BaseURL:          BaseURL,
+		BaseRouter:       mux,
+		ErrorHandlerFunc: opts.ErrorHandlerFunc,
+	})
+}

@@ -1,0 +1,2 @@
+go test fuzz v1
+[]byte("{\"kty\":\"RSA\",\"n\":\"AQAB\",\"e\":\"AQAB\"}")

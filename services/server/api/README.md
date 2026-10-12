@@ -94,7 +94,7 @@ Etappe (und dem Ticket, das sie baut); sonst scheitert der Generator in `make co
    oder setzen zwei Module dieselbe um, baut das Paket nicht. Der Compiler prüft nur die
    Methoden: Der Start (`wire.Serve`, M1-11) baut jeden Modul-Handler mit seinen Abhängigkeiten
    und übergibt den gefüllten Verbund an `wire.MountRoutes`.
-3. Tests, die die Zahl der Operationen festhalten (`TestRealTable_Empty` in `api/routes`), mit
+3. Tests, die die Zahl der Operationen festhalten (`TestRealTable_Enabled` in `api/routes`), mit
    ändern; `make codegen-check` und `make arch` grün.
 
 ## Start-Prüfung
