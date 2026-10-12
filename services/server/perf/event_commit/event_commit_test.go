@@ -95,6 +95,9 @@ func TestEventCommitThroughput(t *testing.T) {
 		Appender:   syncapp.AppenderConfig{PayloadMaxBytes: 65536},
 		Partitions: syncapp.PartitionConfig{Size: 1_000_000, Ahead: 3, Retention: 30 * 24 * time.Hour, LockTimeout: 2 * time.Second},
 		Tail:       syncpg.TailConfig{PollInterval: time.Second, BatchSize: 1000, ReconnectBackoffCap: 10 * time.Second},
+		Cleanup:    syncapp.IdempotencyCleanupConfig{Interval: time.Hour, BatchSize: 1000},
+		Consumers: syncapp.ConsumerConfig{BatchSize: 500, PollInterval: time.Second, ReconnectBackoffCap: 10 * time.Second,
+			StatesTimeout: 5 * time.Second},
 	}, nil, nil)
 	if err != nil {
 		t.Fatal(err)

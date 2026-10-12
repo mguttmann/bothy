@@ -127,9 +127,6 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Fixed
 
-- Root Makefile: `make typecheck` runs mypy inside each Python project, and `make lint` excludes
-  `<project>/.venv` and `<project>/generated` from bandit.
-
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
   `file_blocked`, which no response listed; `createHost` and `issueHostPairingCode` take
   `Idempotency-Key` and list `422 idempotency_key_reuse` instead of the exemption `auth_flow`,

@@ -172,7 +172,7 @@ func TestDevicesMigration_Constraints(t *testing.T) {
 	wantState(t, exec(owner, `DELETE FROM users WHERE principal_id = $1`, person), "23001", "person with a device deleted (ON DELETE RESTRICT)")
 }
 
-// TestDevicesMigration_Down holds the Down section: down to version 6 removes both tables, up
+// TestDevicesMigration_Down holds the Down section: down to version 7 removes both tables, up
 // applies again.
 func TestDevicesMigration_Down(t *testing.T) {
 	t.Parallel()
@@ -185,8 +185,8 @@ func TestDevicesMigration_Down(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := provider.DownTo(ctx, 6); err != nil {
-		t.Fatalf("down to 6: %v", err)
+	if _, err := provider.DownTo(ctx, 7); err != nil {
+		t.Fatalf("down to 7: %v", err)
 	}
 	for _, rel := range []string{"devices", "device_keys"} {
 		var exists bool
