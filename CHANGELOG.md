@@ -204,7 +204,9 @@ operated, and the order of the build.
   locally (`PR_TITLE`, `PR_BODY` or `PR_BODY_FILE`). The review report stays local; pull
   request bodies are written fresh, without raw reviewer output or local paths
   (`AGENTS.md`, [push discipline](docs/quality/push-discipline.md)). CodeRabbit writes its
-  summary into the walkthrough comment instead of the body. The `ci-ok` job starts with
+  summary into the walkthrough comment instead of the body (`high_level_summary_in_walkthrough`
+  in `.coderabbit.yaml`, documented in <https://coderabbit.ai/integrations/schema.v2.json>,
+  retrieved on 2026-10-12). The `ci-ok` job starts with
   every run and waits for the other jobs (`tools/ci/ci_ok.py`), so an older green result is
   no longer the latest one while the run after an edit is going (the remaining gaps are
   listed in the push discipline), and identity trailers count only as
