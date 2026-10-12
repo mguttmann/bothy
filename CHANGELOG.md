@@ -183,6 +183,12 @@ operated, and the order of the build.
   references instead of `<redacted>`, and `docs/operations/configuration.md` sections 1 to 3 give
   the exact grammar of every kind (now with `list(cidr)` and `url`), the file rules and the output
   of `bothy config check` and `bothy config print`.
+- `make coverage` leaves generated Go files (`*.gen.go`) out of the Go total, and the license
+  gate requires the Go generated-code marker in every file named as generated Go code; a
+  directory named `gen` no longer counts as generated for the license gate, Sonar and the lint
+  rules gocognit and goconst of the server module.
+- The CI path filter selects the server component for a change to `docs/spec/actions.yaml`,
+  from which the server generates its route table and action catalogue.
 - CodeQL analyses the Go server module (manual build of `services/server`) in the public
   phase; a test keeps the CodeQL languages in step with the tracked components.
 - Configuration reference: section 4 of `docs/operations/configuration.md` is generated from the

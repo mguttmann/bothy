@@ -44,6 +44,12 @@ GATE_COMPONENTS: dict[str, tuple[str, ...]] = {
 }
 # The API contract feeds generated server stubs and every client.
 API_PREFIX = "docs/api/"
+# Files outside a component's directory that its generated code is built from; a change selects
+# the component, so that its codegen-check sees the drift.
+GATE_COMPONENT_INPUTS: dict[str, tuple[str, ...]] = {
+    # services/server/api/generate.go: route table and action catalogue of the server.
+    "server": ("docs/spec/actions.yaml",),
+}
 # Areas without component gates; their repository-wide gates always run.
 NO_COMPONENT_PREFIXES = ("docs/", "infra/")
 NO_COMPONENT_ROOT_FILES = re.compile(r"^[^/]+\.md$|^(?:LICENSE|NOTICE)$")
@@ -85,6 +91,7 @@ def changed(files: list[str]) -> list[str]:
     selected: set[str] = set()
     for path in files:
         owners = [c for c, prefixes in GATE_COMPONENTS.items() if path.startswith(prefixes)]
+        owners += [c for c, inputs in GATE_COMPONENT_INPUTS.items() if path in inputs]
         if owners:
             selected.update(owners)
         elif path.startswith(API_PREFIX):

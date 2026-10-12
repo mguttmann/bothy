@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Negative fixture: updateThing is enabled and later.
+version: 1
+enabled:
+  - createThing
+  - getThing
+  - updateThing
+later:
+  - operation_id: updateThing
+    milestone: M2

@@ -598,6 +598,10 @@ request per subscription. Delivery, retry, verification at the receiver and inco
    writes the frame router by hand.
 4. Schemas stay conservative (lint): no `null`, no type arrays, no `anyOf`, `oneOf` only
    with a discriminator, repeated enums as named schemas.
+5. The Go server generates only the operations that the enable list
+   `services/server/api/operations.yaml` names under `enabled`; for that, oapi-codegen runs on a
+   pre-filtered copy of this spec that keeps all `components` (PLAN P-04; flow and format of the
+   list in `services/server/api/README.md`).
 
 ## 15. Contract tests and gate
 

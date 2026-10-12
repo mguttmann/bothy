@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Negative fixture: updateThing has the milestone M9.
+version: 1
+enabled:
+  - createThing
+  - getThing
+later:
+  - operation_id: updateThing
+    milestone: M9

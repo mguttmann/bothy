@@ -16,7 +16,7 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   secrets: {depends_on: [], vendors: [age, otel]}
 wire: {vendors: []}
 cmd: {vendors: []}
-# api: {vendors: [...]}     # added by M1-17 together with api/
+api: {vendors: [oapi, openapi, yaml]}   # generated REST layer (runtime of oapi-codegen) and its generator
 testsupport: {paths: [test, perf]}   # test code across modules (02 "Code layout"); never imported
 modules:
   instance:
@@ -227,5 +227,7 @@ modules:
     adapter_vendors: []
 vendors:                    # <group>: [<import path>, <import path>/**]
   age: [filippo.io/age, filippo.io/age/**]
+  oapi: [github.com/oapi-codegen/runtime, github.com/oapi-codegen/runtime/**]
+  openapi: [github.com/getkin/kin-openapi, github.com/getkin/kin-openapi/**]
   otel: [go.opentelemetry.io/otel, go.opentelemetry.io/otel/**]
   yaml: [go.yaml.in/yaml/v3]

@@ -1,0 +1,77 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Fixture action catalogue of the route generator, in the schema of docs/spec/actions.yaml
+# (tools/catalog/README.md). The generator reads `version`, and `id`, `right` and `rl_class` of
+# each action; `thing.purge` is a system action, which no operation may name (05 rule 10).
+version: 1
+rate_limit_classes:
+- id: rl.public_auth
+  key: Client-IP
+  purpose: public endpoints
+- id: rl.read
+  key: Prinzipal
+  purpose: reads
+- id: rl.write
+  key: Prinzipal
+  purpose: writes
+sections:
+- things
+actions:
+- id: thing.read
+  section: things
+  description: read a thing
+  resource: thing
+  right: public
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.public_auth
+  effect: read
+- id: thing.create
+  section: things
+  description: create a thing
+  resource: thing
+  right: write
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: thing.update
+  section: things
+  description: change a thing
+  resource: thing
+  right: write
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: thing.list
+  section: things
+  description: list things
+  resource: thing
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: thing.purge
+  section: things
+  description: remove expired things (job)
+  resource: thing
+  right: system
+  owner: false
+  step_up: false
+  audit: always
+  rights_change: false
+  rl_class: none
+  effect: write
+events: []
+ws_ops: []
+channel_ops: []

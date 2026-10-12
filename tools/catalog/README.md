@@ -16,8 +16,12 @@ and 7 of [chapter 05](../../docs/spec/05-actions.md) and the lists `authz_action
 | `make catalog-check` | Gate: all rules below (`action_catalog.py check`); on a finding the script ends with exit 1 and writes one line per finding to stderr, `make` then ends with exit 2 |
 | `uv run --project tools --locked pytest tools/catalog/tests` | Tests, including the end-to-end test with the pinned Redocly CLI (`make bootstrap`) |
 
-Flow of a change: edit `actions.yaml`, run `make catalog`, commit the diff of 05 and
-`redocly.yaml` along with it. A manual edit in a generated block fails the gate.
+Flow of a change: edit `actions.yaml`, run `make catalog`, generate the server again
+(`cd services/server && go generate ./api/...`; the route table and the action catalogue in
+`api/routes` come from `actions.yaml`, see [services/server/api](../../services/server/api/README.md))
+and commit the diffs of 05, `redocly.yaml` and `services/server/api/routes` along with it. A
+manual edit in a generated block fails the gate, a stale server state `make codegen-check`; for
+that, CI selects the component `server` on a change to `actions.yaml` (`tools/ci/components.py`).
 
 A new section of actions needs:
 

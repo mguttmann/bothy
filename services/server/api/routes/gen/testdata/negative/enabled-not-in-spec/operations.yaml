@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Negative fixture: deleteThing is enabled but no operation of openapi.yaml.
+version: 1
+enabled:
+  - createThing
+  - deleteThing
+  - getThing
+  - updateThing
+later: []

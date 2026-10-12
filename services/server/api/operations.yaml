@@ -1,0 +1,920 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Enable list of REST operations (plan decision P-04). The server generates and registers only
+# the operations under `enabled`; every other operationId under `paths` of docs/api/openapi.yaml
+# stands under `later` with the milestone that builds it. A handler ticket moves its operationIds
+# from `later` to `enabled` and implements them in its module's adapters/httpapi. Format, rules
+# and how to regenerate: services/server/api/README.md. The generator (api/routes/gen) only
+# checks this file; it never rewrites it.
+version: 1
+enabled: []          # operationIds that have a handler; sorted ascending
+later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id
+  - operation_id: abortUpload
+    milestone: M3
+    ticket: M3-03
+  - operation_id: ackAgentEvents
+    milestone: M2
+    ticket: M2-07
+  - operation_id: addGroupMember
+    milestone: M1
+    ticket: M1-48
+  - operation_id: addOwner
+    milestone: M1
+    ticket: M1-31
+  - operation_id: addReaction
+    milestone: M1
+    ticket: M1-59
+  - operation_id: addStatusIncidentUpdate
+    milestone: M7
+    ticket: M7-09
+  - operation_id: answerAutocomplete
+    milestone: M2
+    ticket: M2-17
+  - operation_id: applyImportBatch
+    milestone: M8
+    ticket: M8-03
+  - operation_id: approveDevice
+    milestone: M1
+    ticket: M1-38
+  - operation_id: approvePairing
+    milestone: M1
+    ticket: M1-38
+  - operation_id: archiveChannel
+    milestone: M1
+    ticket: M1-53
+  - operation_id: archiveSpace
+    milestone: M1
+    ticket: M1-52
+  - operation_id: attachTerminalSession
+    milestone: M2
+    ticket: M2-44
+  - operation_id: autocompleteCommand
+    milestone: M2
+    ticket: M2-17
+  - operation_id: awaitRunInput
+    milestone: M2
+    ticket: M2-09
+  - operation_id: beginEnrollment
+    milestone: M1
+    ticket: M1-40
+  - operation_id: beginIdentityLink
+    milestone: M1
+    ticket: M1-41
+  - operation_id: beginOidcLogin
+    milestone: M1
+    ticket: M1-41
+  - operation_id: beginPairing
+    milestone: M1
+    ticket: M1-38
+  - operation_id: beginPasskeyLogin
+    milestone: M1
+    ticket: M1-40
+  - operation_id: beginPasskeyRegistration
+    milestone: M1
+    ticket: M1-40
+  - operation_id: bindAgentSession
+    milestone: M2
+    ticket: M2-12
+  - operation_id: cancelImport
+    milestone: M8
+    ticket: M8-03
+  - operation_id: cancelRun
+    milestone: M2
+    ticket: M2-09
+  - operation_id: closePrice
+    milestone: M2
+    ticket: M2-22
+  - operation_id: closeTerminalSession
+    milestone: M2
+    ticket: M2-44
+  - operation_id: closeThread
+    milestone: M1
+    ticket: M1-55
+  - operation_id: completeEnrollment
+    milestone: M1
+    ticket: M1-40
+  - operation_id: completeIdentityLink
+    milestone: M1
+    ticket: M1-41
+  - operation_id: completeImport
+    milestone: M8
+    ticket: M8-03
+  - operation_id: completeOidcLogin
+    milestone: M1
+    ticket: M1-41
+  - operation_id: completePairing
+    milestone: M1
+    ticket: M1-38
+  - operation_id: completePasskeyLogin
+    milestone: M1
+    ticket: M1-40
+  - operation_id: completePasskeyRegistration
+    milestone: M1
+    ticket: M1-40
+  - operation_id: completeStepUpWithDeviceKey
+    milestone: M1
+    ticket: M1-35
+  - operation_id: completeStepUpWithPasskey
+    milestone: M1
+    ticket: M1-40
+  - operation_id: completeUpload
+    milestone: M3
+    ticket: M3-03
+  - operation_id: confirmHost
+    milestone: M2
+    ticket: M2-41
+  - operation_id: createAgent
+    milestone: M1
+    ticket: M1-51
+  - operation_id: createAgentWebhookSubscription
+    milestone: M2
+    ticket: M2-26
+  - operation_id: createChannel
+    milestone: M1
+    ticket: M1-53
+  - operation_id: createChannelTemplate
+    milestone: M1
+    ticket: M1-60
+  - operation_id: createDm
+    milestone: V3
+    ticket: V3-01
+  - operation_id: createEnrollmentCode
+    milestone: M1
+    ticket: M1-37
+  - operation_id: createExtensionSession
+    milestone: M1
+    ticket: M1-34
+  - operation_id: createFileTicket
+    milestone: M3
+    ticket: M3-05
+  - operation_id: createForumTag
+    milestone: M1
+    ticket: M1-53
+  - operation_id: createGdprRequest
+    milestone: M7
+  - operation_id: createGrant
+    milestone: M1
+    ticket: M1-48
+  - operation_id: createGroup
+    milestone: M1
+    ticket: M1-48
+  - operation_id: createHost
+    milestone: M2
+    ticket: M2-39
+  - operation_id: createIdentityProvider
+    milestone: M1
+    ticket: M1-36
+  - operation_id: createImport
+    milestone: M8
+    ticket: M8-03
+  - operation_id: createImportFile
+    milestone: M8
+    ticket: M8-03
+  - operation_id: createIncomingWebhook
+    milestone: M2
+    ticket: M2-27
+  - operation_id: createInteraction
+    milestone: M2
+    ticket: M2-15
+  - operation_id: createMessage
+    milestone: M1
+    ticket: M1-56
+  - operation_id: createPersonalTemplate
+    milestone: M1
+    ticket: M1-60
+  - operation_id: createPrice
+    milestone: M2
+    ticket: M2-22
+  - operation_id: createQuietHoursRule
+    milestone: M3
+    ticket: M3-18
+  - operation_id: createSpace
+    milestone: M1
+    ticket: M1-52
+  - operation_id: createStatusComponent
+    milestone: M7
+    ticket: M7-09
+  - operation_id: createStatusIncident
+    milestone: M7
+    ticket: M7-09
+  - operation_id: createStepUpChallenge
+    milestone: M1
+    ticket: M1-35
+  - operation_id: createThread
+    milestone: M1
+    ticket: M1-55
+  - operation_id: createToken
+    milestone: M1
+    ticket: M1-44
+  - operation_id: createUpload
+    milestone: M3
+    ticket: M3-03
+  - operation_id: createUser
+    milestone: M1
+    ticket: M1-31
+  - operation_id: createWebhookSubscription
+    milestone: M2
+    ticket: M2-26
+  - operation_id: decideGdprRequest
+    milestone: M7
+  - operation_id: deleteBrandingLogo
+    milestone: M3
+    ticket: M3-10
+  - operation_id: deleteChannelDraft
+    milestone: M1
+    ticket: M1-61
+  - operation_id: deleteFile
+    milestone: M3
+    ticket: M3-08
+  - operation_id: deleteForumTag
+    milestone: M1
+    ticket: M1-53
+  - operation_id: deleteGroup
+    milestone: M1
+    ticket: M1-48
+  - operation_id: deleteIdentityProvider
+    milestone: M1
+    ticket: M1-36
+  - operation_id: deleteMessage
+    milestone: M1
+    ticket: M1-58
+  - operation_id: deleteMyAvatar
+    milestone: M3
+    ticket: M3-10
+  - operation_id: deleteMySetting
+    milestone: M1
+    ticket: M1-61
+  - operation_id: deleteNotificationPreference
+    milestone: M3
+    ticket: M3-18
+  - operation_id: deleteProjectBinding
+    milestone: M2
+    ticket: M2-03
+  - operation_id: deleteQuietHoursRule
+    milestone: M3
+    ticket: M3-18
+  - operation_id: deleteStatusComponent
+    milestone: M7
+    ticket: M7-09
+  - operation_id: deleteTemplate
+    milestone: M1
+    ticket: M1-60
+  - operation_id: deleteThreadDraft
+    milestone: M1
+    ticket: M1-61
+  - operation_id: deleteWebhookSubscription
+    milestone: M2
+    ticket: M2-26
+  - operation_id: disableAgent
+    milestone: M1
+    ticket: M1-51
+  - operation_id: disableUser
+    milestone: M1
+    ticket: M1-45
+  - operation_id: downloadFile
+    milestone: M3
+    ticket: M3-05
+  - operation_id: downloadGdprExport
+    milestone: M7
+  - operation_id: downloadThumbnail
+    milestone: M3
+    ticket: M3-05
+  - operation_id: enableAgent
+    milestone: M1
+    ticket: M1-51
+  - operation_id: enableUser
+    milestone: M1
+    ticket: M1-31
+  - operation_id: explainChannelAccess
+    milestone: M1
+    ticket: M1-49
+  - operation_id: explainSpaceAccess
+    milestone: M1
+    ticket: M1-49
+  - operation_id: exportAuditEvents
+    milestone: M1
+    ticket: M1-50
+  - operation_id: exportChannel
+    milestone: M3
+    ticket: M3-11
+  - operation_id: finishRun
+    milestone: M2
+    ticket: M2-09
+  - operation_id: getAgent
+    milestone: M1
+    ticket: M1-51
+  - operation_id: getAgentTriggerers
+    milestone: M2
+  - operation_id: getApp
+    milestone: M2
+    ticket: M2-24
+  - operation_id: getBrandingLogo
+    milestone: M3
+    ticket: M3-10
+  - operation_id: getChannel
+    milestone: M1
+    ticket: M1-53
+  - operation_id: getChannelBehavior
+    milestone: M2
+    ticket: M2-02
+  - operation_id: getCommand
+    milestone: M2
+    ticket: M2-16
+  - operation_id: getConsumerState
+    milestone: M2
+    ticket: M2-07
+  - operation_id: getCostStats
+    milestone: M6
+    ticket: M6-05
+  - operation_id: getDevice
+    milestone: M1
+    ticket: M1-33
+  - operation_id: getDiscovery
+    milestone: M1
+    ticket: M1-46
+  - operation_id: getErrorStats
+    milestone: M6
+    ticket: M6-05
+  - operation_id: getFile
+    milestone: M3
+    ticket: M3-03
+  - operation_id: getGdprRequest
+    milestone: M7
+  - operation_id: getGrant
+    milestone: M1
+    ticket: M1-48
+  - operation_id: getGroup
+    milestone: M1
+    ticket: M1-48
+  - operation_id: getHost
+    milestone: M2
+    ticket: M2-39
+  - operation_id: getIdentityProvider
+    milestone: M1
+    ticket: M1-36
+  - operation_id: getImport
+    milestone: M8
+    ticket: M8-03
+  - operation_id: getInstance
+    milestone: M1
+    ticket: M1-46
+  - operation_id: getJwks
+    milestone: M1
+    ticket: M1-32
+  - operation_id: getMe
+    milestone: M1
+    ticket: M1-31
+  - operation_id: getMessage
+    milestone: M1
+    ticket: M1-57
+  - operation_id: getMyCredentials
+    milestone: M1
+    ticket: M1-36
+  - operation_id: getMySidebar
+    milestone: M1
+    ticket: M1-61
+  - operation_id: getProblemType
+    milestone: M1
+    ticket: M1-46
+  - operation_id: getPublicStatus
+    milestone: M7
+    ticket: M7-09
+  - operation_id: getPushPreview
+    milestone: M3
+  - operation_id: getRun
+    milestone: M2
+    ticket: M2-05
+  - operation_id: getRunContext
+    milestone: M2
+    ticket: M2-13
+  - operation_id: getRunStats
+    milestone: M6
+    ticket: M6-05
+  - operation_id: getServedChannelConfig
+    milestone: M2
+    ticket: M2-02
+  - operation_id: getSnapshot
+    milestone: M1
+    ticket: M1-63
+  - operation_id: getSpace
+    milestone: M1
+    ticket: M1-52
+  - operation_id: getStatsBackends
+    milestone: M6
+    ticket: M6-14
+  - operation_id: getStatsLive
+    milestone: M6
+    ticket: M6-15
+  - operation_id: getStatsSlo
+    milestone: M6
+    ticket: M6-14
+  - operation_id: getStatsTimeline
+    milestone: M6
+    ticket: M6-14
+  - operation_id: getStatus
+    milestone: M7
+    ticket: M7-09
+  - operation_id: getTerminalSession
+    milestone: M2
+    ticket: M2-44
+  - operation_id: getThread
+    milestone: M1
+    ticket: M1-55
+  - operation_id: getThreadCosts
+    milestone: M2
+    ticket: M2-22
+  - operation_id: getToolCallStats
+    milestone: M6
+    ticket: M6-05
+  - operation_id: getTranscript
+    milestone: M3
+    ticket: M3-05
+  - operation_id: getUpload
+    milestone: M3
+    ticket: M3-03
+  - operation_id: getUsageStats
+    milestone: M6
+    ticket: M6-05
+  - operation_id: getUser
+    milestone: M1
+    ticket: M1-31
+  - operation_id: getUserCredentials
+    milestone: M1
+    ticket: M1-36
+  - operation_id: getWebhookKeys
+    milestone: M2
+    ticket: M2-26
+  - operation_id: handleOidcCallback
+    milestone: M1
+    ticket: M1-41
+  - operation_id: installApp
+    milestone: M2
+    ticket: M2-24
+  - operation_id: invokeCommand
+    milestone: M2
+    ticket: M2-16
+  - operation_id: issueHostPairingCode
+    milestone: M2
+    ticket: M2-41
+  - operation_id: leaveDm
+    milestone: V3
+    ticket: V3-01
+  - operation_id: listActiveRuns
+    milestone: M2
+    ticket: M2-05
+  - operation_id: listAgentSessions
+    milestone: M2
+    ticket: M2-12
+  - operation_id: listAgentWebhookSubscriptions
+    milestone: M2
+    ticket: M2-26
+  - operation_id: listAgents
+    milestone: M1
+    ticket: M1-51
+  - operation_id: listApps
+    milestone: M2
+    ticket: M2-24
+  - operation_id: listAuditEvents
+    milestone: M1
+    ticket: M1-50
+  - operation_id: listChannelCommands
+    milestone: M2
+    ticket: M2-16
+  - operation_id: listChannelThreads
+    milestone: M1
+    ticket: M1-55
+  - operation_id: listCostEstimates
+    milestone: M2
+    ticket: M2-28
+  - operation_id: listEvents
+    milestone: M1
+    ticket: M1-63
+  - operation_id: listFeatureFlags
+    milestone: M1
+    ticket: M1-47
+  - operation_id: listForumTags
+    milestone: M1
+    ticket: M1-53
+  - operation_id: listGdprRequests
+    milestone: M7
+  - operation_id: listGrants
+    milestone: M1
+    ticket: M1-48
+  - operation_id: listGroupMembers
+    milestone: M1
+    ticket: M1-48
+  - operation_id: listGroups
+    milestone: M1
+    ticket: M1-48
+  - operation_id: listHosts
+    milestone: M2
+    ticket: M2-39
+  - operation_id: listIdentityProviders
+    milestone: M1
+    ticket: M1-36
+  - operation_id: listImportItems
+    milestone: M8
+    ticket: M8-03
+  - operation_id: listImports
+    milestone: M8
+    ticket: M8-03
+  - operation_id: listIncomingWebhooks
+    milestone: M2
+    ticket: M2-27
+  - operation_id: listInstanceSettings
+    milestone: M1
+    ticket: M1-46
+  - operation_id: listMessageRevisions
+    milestone: M1
+    ticket: M1-58
+  - operation_id: listMyDevices
+    milestone: M1
+    ticket: M1-33
+  - operation_id: listMyDms
+    milestone: V3
+    ticket: V3-01
+  - operation_id: listMyDrafts
+    milestone: M1
+    ticket: M1-61
+  - operation_id: listMyMentions
+    milestone: M1
+    ticket: M1-60
+  - operation_id: listMyNotificationPreferences
+    milestone: M3
+    ticket: M3-18
+  - operation_id: listMyQuietHours
+    milestone: M3
+    ticket: M3-18
+  - operation_id: listMyReadStates
+    milestone: M1
+    ticket: M1-61
+  - operation_id: listMySessions
+    milestone: M1
+    ticket: M1-34
+  - operation_id: listMySettings
+    milestone: M1
+    ticket: M1-61
+  - operation_id: listMyTemplates
+    milestone: M1
+    ticket: M1-60
+  - operation_id: listOwners
+    milestone: M1
+    ticket: M1-31
+  - operation_id: listPins
+    milestone: M1
+    ticket: M1-59
+  - operation_id: listPrices
+    milestone: M2
+    ticket: M2-22
+  - operation_id: listReactions
+    milestone: M1
+    ticket: M1-59
+  - operation_id: listRunSteps
+    milestone: M2
+    ticket: M2-05
+  - operation_id: listServedChannels
+    milestone: M2
+    ticket: M2-02
+  - operation_id: listSpaceChannels
+    milestone: M1
+    ticket: M1-53
+  - operation_id: listSpaces
+    milestone: M1
+    ticket: M1-52
+  - operation_id: listTemplates
+    milestone: M1
+    ticket: M1-60
+  - operation_id: listTerminalSessions
+    milestone: M2
+    ticket: M2-44
+  - operation_id: listThreadMessages
+    milestone: M1
+    ticket: M1-57
+  - operation_id: listThreadRuns
+    milestone: M2
+    ticket: M2-05
+  - operation_id: listTokens
+    milestone: M1
+    ticket: M1-44
+  - operation_id: listUserDevices
+    milestone: M1
+    ticket: M1-33
+  - operation_id: listUserSessions
+    milestone: M1
+    ticket: M1-34
+  - operation_id: listUsers
+    milestone: M1
+    ticket: M1-31
+  - operation_id: listWebhookDeliveries
+    milestone: M2
+    ticket: M2-26
+  - operation_id: listWebhookSubscriptions
+    milestone: M2
+    ticket: M2-26
+  - operation_id: loginWithPassword
+    milestone: M1
+    ticket: M1-39
+  - operation_id: loginWithTrustedHeader
+    milestone: M1
+    ticket: M1-43
+  - operation_id: logout
+    milestone: M1
+    ticket: M1-34
+  - operation_id: markThreadUnread
+    milestone: M1
+    ticket: M1-61
+  - operation_id: moveChannel
+    milestone: M1
+    ticket: M1-53
+  - operation_id: moveForumTag
+    milestone: M1
+    ticket: M1-53
+  - operation_id: moveSpace
+    milestone: M1
+    ticket: M1-52
+  - operation_id: moveThread
+    milestone: M1
+    ticket: M1-62
+  - operation_id: openTerminalSession
+    milestone: M2
+    ticket: M2-44
+  - operation_id: pairHost
+    milestone: M2
+    ticket: M2-41
+  - operation_id: patchRun
+    milestone: M2
+    ticket: M2-10
+  - operation_id: pauseImport
+    milestone: M8
+    ticket: M8-03
+  - operation_id: pinMessage
+    milestone: M1
+    ticket: M1-59
+  - operation_id: pollAgentEvents
+    milestone: M2
+    ticket: M2-07
+  - operation_id: postIncomingWebhook
+    milestone: M2
+    ticket: M2-27
+  - operation_id: previewGrant
+    milestone: M1
+    ticket: M1-49
+  - operation_id: putChannelBehavior
+    milestone: M2
+    ticket: M2-02
+  - operation_id: putChannelDraft
+    milestone: M1
+    ticket: M1-61
+  - operation_id: putFeatureFlag
+    milestone: M1
+    ticket: M1-47
+  - operation_id: putInstanceSetting
+    milestone: M1
+    ticket: M1-46
+  - operation_id: putMySetting
+    milestone: M1
+    ticket: M1-61
+  - operation_id: putMySidebarSpace
+    milestone: M1
+    ticket: M1-52
+  - operation_id: putNotificationPreference
+    milestone: M3
+    ticket: M3-18
+  - operation_id: putProjectBinding
+    milestone: M2
+    ticket: M2-03
+  - operation_id: putQuietHoursRule
+    milestone: M3
+    ticket: M3-18
+  - operation_id: putReadState
+    milestone: M1
+    ticket: M1-61
+  - operation_id: putThreadDraft
+    milestone: M1
+    ticket: M1-61
+  - operation_id: reconcileCosts
+    milestone: M2
+    ticket: M2-28
+  - operation_id: redeemEnrollmentCode
+    milestone: M1
+    ticket: M1-37
+  - operation_id: redeliverWebhook
+    milestone: M2
+    ticket: M2-26
+  - operation_id: refreshToken
+    milestone: M1
+    ticket: M1-34
+  - operation_id: registerCommand
+    milestone: M2
+    ticket: M2-16
+  - operation_id: registerPush
+    milestone: M3
+    ticket: M3-22
+  - operation_id: removeCommand
+    milestone: M2
+    ticket: M2-16
+  - operation_id: removeGroupMember
+    milestone: M1
+    ticket: M1-48
+  - operation_id: removeReaction
+    milestone: M1
+    ticket: M1-59
+  - operation_id: renewInvocationToken
+    milestone: M2
+    ticket: M2-09
+  - operation_id: reopenThread
+    milestone: M1
+    ticket: M1-55
+  - operation_id: reportAgentSession
+    milestone: M2
+    ticket: M2-12
+  - operation_id: requestTranscription
+    milestone: M3
+    ticket: M3-09
+  - operation_id: resetAgentSession
+    milestone: M2
+    ticket: M2-12
+  - operation_id: respondToInteraction
+    milestone: M2
+    ticket: M2-15
+  - operation_id: resumeApp
+    milestone: M2
+  - operation_id: resumeRun
+    milestone: M2
+    ticket: M2-09
+  - operation_id: revokeDevice
+    milestone: M1
+    ticket: M1-45
+  - operation_id: revokeGrant
+    milestone: M1
+    ticket: M1-48
+  - operation_id: revokeIncomingWebhook
+    milestone: M2
+    ticket: M2-27
+  - operation_id: revokeOwner
+    milestone: M1
+    ticket: M1-31
+  - operation_id: revokePasskey
+    milestone: M1
+    ticket: M1-40
+  - operation_id: revokeSession
+    milestone: M1
+    ticket: M1-45
+  - operation_id: revokeToken
+    milestone: M1
+    ticket: M1-44
+  - operation_id: rotateSigningKey
+    milestone: M1
+    ticket: M1-32
+  - operation_id: search
+    milestone: M3
+    ticket: M3-14
+  - operation_id: searchThreadTitles
+    milestone: M3
+    ticket: M3-14
+  - operation_id: sendHeartbeat
+    milestone: M2
+    ticket: M2-20
+  - operation_id: setAgentBillingMode
+    milestone: M1
+    ticket: M1-51
+  - operation_id: setAgentToolClass
+    milestone: M1
+    ticket: M1-51
+  - operation_id: setAllAgentsBillingMode
+    milestone: M1
+    ticket: M1-51
+  - operation_id: setAppScopes
+    milestone: M2
+    ticket: M2-24
+  - operation_id: setChannelOperator
+    milestone: M1
+    ticket: M1-54
+  - operation_id: setChannelReadOnly
+    milestone: M8
+    ticket: M8-05
+  - operation_id: setCredentialHolder
+    milestone: M1
+    ticket: M1-51
+  - operation_id: setHostLlmCredentials
+    milestone: M2
+    ticket: M2-40
+  - operation_id: setHostState
+    milestone: M2
+    ticket: M2-39
+  - operation_id: setImportCursor
+    milestone: M8
+    ticket: M8-03
+  - operation_id: setImportLead
+    milestone: M8
+    ticket: M8-03
+  - operation_id: setMyAvatar
+    milestone: M3
+    ticket: M3-10
+  - operation_id: setMyLocalCredential
+    milestone: M1
+    ticket: M1-39
+  - operation_id: setSpaceOperator
+    milestone: M1
+    ticket: M1-54
+  - operation_id: setThreadTags
+    milestone: M1
+    ticket: M1-55
+  - operation_id: setThreadTitle
+    milestone: M1
+    ticket: M1-55
+  - operation_id: startImport
+    milestone: M8
+    ticket: M8-03
+  - operation_id: startRun
+    milestone: M2
+    ticket: M2-09
+  - operation_id: submitClientMetrics
+    milestone: M4
+    ticket: M4-31
+  - operation_id: submitCostReconciliation
+    milestone: M2
+    ticket: M2-28
+  - operation_id: submitTranscript
+    milestone: M3
+    ticket: M3-09
+  - operation_id: suspendApp
+    milestone: M2
+  - operation_id: uninstallApp
+    milestone: M2
+    ticket: M2-24
+  - operation_id: unlinkIdentity
+    milestone: M1
+    ticket: M1-36
+  - operation_id: unpinMessage
+    milestone: M1
+    ticket: M1-59
+  - operation_id: unregisterPush
+    milestone: M3
+    ticket: M3-22
+  - operation_id: updateAgent
+    milestone: M1
+    ticket: M1-51
+  - operation_id: updateBranding
+    milestone: M1
+    ticket: M1-46
+  - operation_id: updateChannel
+    milestone: M1
+    ticket: M1-53
+  - operation_id: updateCommand
+    milestone: M2
+    ticket: M2-16
+  - operation_id: updateComponent
+    milestone: M2
+    ticket: M2-15
+  - operation_id: updateForumTag
+    milestone: M1
+    ticket: M1-53
+  - operation_id: updateGroup
+    milestone: M1
+    ticket: M1-48
+  - operation_id: updateHost
+    milestone: M2
+    ticket: M2-39
+  - operation_id: updateIdentityProvider
+    milestone: M1
+    ticket: M1-36
+  - operation_id: updateMessage
+    milestone: M1
+    ticket: M1-58
+  - operation_id: updateMyProfile
+    milestone: M1
+    ticket: M1-31
+  - operation_id: updateSpace
+    milestone: M1
+    ticket: M1-52
+  - operation_id: updateStatusComponent
+    milestone: M7
+    ticket: M7-09
+  - operation_id: updateTemplate
+    milestone: M1
+    ticket: M1-60
+  - operation_id: updateUser
+    milestone: M1
+    ticket: M1-31
+  - operation_id: updateWebhookSubscription
+    milestone: M2
+    ticket: M2-26
+  - operation_id: upgradeAppManifest
+    milestone: M2
+    ticket: M2-24
+  - operation_id: uploadBrandingLogo
+    milestone: M3
+    ticket: M3-10
+  - operation_id: uploadPart
+    milestone: M3
+    ticket: M3-03
+  - operation_id: validateManifest
+    milestone: M2
+    ticket: M2-24
+  - operation_id: verifyAuditChain
+    milestone: M1
+    ticket: M1-50
+  - operation_id: viewAsUser
+    milestone: M1
+    ticket: M1-49
