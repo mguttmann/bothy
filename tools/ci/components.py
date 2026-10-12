@@ -8,12 +8,19 @@ A change outside every known area selects `all` (fail safe).
 Release components map a tag `<component>/v<semver>` (or `v<semver>` for the whole
 product) to a directory with its own VERSION file (docs/spec/18-release.md).
 
+The product bundle pins the server version in the line `BOTHY_VERSION=` of
+infra/compose/.env.example (docs/spec/18-release.md, 2.1). `pins` checks the committed state
+before any tag exists: the value is SemVer without "v" (or the template placeholder), and a
+stable product (VERSION without pre-release) never pins a server pre-release.
+
 Usage:
   components.py changed --base <sha> --head <sha>   print components for `make COMPONENTS=`
   components.py changed --files <path>...
   components.py release --tag <tag> [--github-output]
                                                     print release info as JSON, or as
                                                     key=value lines for $GITHUB_OUTPUT
+  components.py pins [--repo <dir>]                 check the server version the product
+                                                    bundle pins (make release-pins)
 """
 
 from __future__ import annotations
@@ -60,6 +67,12 @@ _SEMVER = re.compile(
 )
 
 
+# Server version pinned by the product bundle (docs/spec/18-release.md, 2.1).
+BUNDLE_ENV_TEMPLATE = "infra/compose/.env.example"
+SERVER_VERSION_PLACEHOLDER = "0.0.0-placeholder"
+_SERVER_VERSION_LINE = re.compile(r"^\s*BOTHY_VERSION=(.*)$", re.MULTILINE)
+
+
 class ReleaseError(Exception):
     """The tag does not describe a releasable component state."""
 
@@ -104,14 +117,62 @@ def release_info(tag: str, repo: Path) -> dict[str, Any]:
     recorded = version_file.read_text(encoding="utf-8").strip()
     if recorded != version:
         raise ReleaseError(f"{directory}/VERSION says {recorded}, tag says {version}")
-    match = _SEMVER.match(version)
     return {
         "component": component,
         "version": version,
         "path": directory,
         "gate_components": gate,
-        "prerelease": bool(match and match.group(4)),
+        "prerelease": _is_prerelease(version),
     }
+
+
+def _is_prerelease(version: str) -> bool:
+    match = _SEMVER.match(version)
+    return bool(match and match.group(4))
+
+
+def pinned_server_problems(repo: Path) -> list[str]:
+    """Return what is wrong with the server version the product bundle pins.
+
+    Checks the committed product VERSION and the line `BOTHY_VERSION=` of the bundle
+    template: exactly one such line, its value SemVer without "v" or the placeholder, and
+    no server pre-release in a stable product. The placeholder passes here because the
+    template carries it until the first product release; make release-prep and make
+    release-build refuse it (docs/spec/18-release.md, 2.1).
+    """
+    problems: list[str] = []
+    version_file = repo / "VERSION"
+    product = ""
+    if not version_file.is_file():
+        problems.append("VERSION is missing")
+    else:
+        product = version_file.read_text(encoding="utf-8").strip()
+        if not _SEMVER.match(product):
+            problems.append(f"VERSION says '{product}', not a SemVer version without 'v'")
+            product = ""
+    template = repo / BUNDLE_ENV_TEMPLATE
+    if not template.is_file():
+        problems.append(f"{BUNDLE_ENV_TEMPLATE} is missing")
+        return problems
+    values = [v.strip() for v in _SERVER_VERSION_LINE.findall(template.read_text("utf-8"))]
+    if len(values) != 1:
+        problems.append(
+            f"{BUNDLE_ENV_TEMPLATE}: expected exactly one line BOTHY_VERSION=, found {len(values)}"
+        )
+        return problems
+    server = values[0]
+    if server == SERVER_VERSION_PLACEHOLDER:
+        return problems
+    if not _SEMVER.match(server):
+        problems.append(
+            f"{BUNDLE_ENV_TEMPLATE}: BOTHY_VERSION '{server}' is not a SemVer version without 'v'"
+        )
+    elif product and not _is_prerelease(product) and _is_prerelease(server):
+        problems.append(
+            f"stable product {product} pins the server pre-release {server}; pin a stable"
+            " server version or prepare a product beta (CHANNEL=beta)"
+        )
+    return problems
 
 
 def _diff_files(base: str, head: str) -> list[str]:
@@ -136,6 +197,8 @@ def main(argv: list[str] | None = None) -> int:
     p_release.add_argument("--tag", required=True)
     p_release.add_argument("--repo", type=Path, default=Path.cwd())
     p_release.add_argument("--github-output", action="store_true")
+    p_pins = sub.add_parser("pins")
+    p_pins.add_argument("--repo", type=Path, default=Path.cwd())
     args = parser.parse_args(argv)
 
     if args.cmd == "changed":
@@ -146,6 +209,14 @@ def main(argv: list[str] | None = None) -> int:
         else:
             parser.error("changed needs --files or --base and --head")
         print(format_for_make(changed(files)))
+        return 0
+    if args.cmd == "pins":
+        problems = pinned_server_problems(args.repo)
+        for problem in problems:
+            print(f"components: {problem}", file=sys.stderr)
+        if problems:
+            return 1
+        print("components: the server version pinned by the product bundle is valid")
         return 0
     try:
         info = release_info(args.tag, args.repo)

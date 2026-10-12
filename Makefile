@@ -82,7 +82,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
         sonar sonar-up sonar-down sonar-config sonar-config-check semgrep trivy osv gitleaks \
         gitleaks-staged denylist denylist-history licenses docs adr-index config-reference catalog catalog-check linkcheck \
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-tables api-clients \
-        runners-check commitlint \
+        runners-check release-pins commitlint \
         review labels-check labels-sync tools-lock release-build clean \
         codegen-check arch migrations-lint migrations-lock perf ops-check
 
@@ -121,7 +121,7 @@ gates: ## All gates except denylist and sonar (CI job "gates")
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
 gates: fmt-check codegen-check lint typecheck arch migrations-lint test coverage commitlint \
        docs linkcheck diagrams catalog-check api-lint api-checks ops-check \
-       api-clients tokens runners-check labels-check gitleaks semgrep trivy osv licenses
+       api-clients tokens runners-check labels-check release-pins gitleaks semgrep trivy osv licenses
 
 # ---- code quality ---------------------------------------------------------------------
 fmt: ## Format all code in place
@@ -341,6 +341,9 @@ api-clients: ## Generated API clients compile (contract: each SDK/app provides `
 # ---- CI policy and supply chain -------------------------------------------------------
 runners-check: ## Workflow policy: GitHub-hosted runners, triggers, SHA pinning, timeouts, permissions
 	$(UVRUN) python tools/ci/check_runners.py .github/workflows
+
+release-pins: ## Server version pinned by the product bundle: SemVer, no server pre-release in a stable product (docs/spec/18-release.md 2.1)
+	$(UVRUN) python tools/ci/components.py pins
 
 gitleaks: ## Secret scan of every commit reachable from HEAD (all refs: GITLEAKS_LOG_OPTS=--all)
 	$(call tool,gitleaks) git --config .gitleaks.toml --redact --no-banner --log-opts="$(GITLEAKS_LOG_OPTS)" $(GITLEAKS_FLAGS) .

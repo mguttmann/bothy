@@ -123,10 +123,13 @@ Steps:
    architecture, memory of the Docker VM (note for the profile `scan`, rule 2), target folder
    (default `./bothy`, option `--dir`) empty or an earlier installation of this script. On
    an error it aborts before it writes anything.
-2. **Fetch the bundle.** It downloads the installation bundle of exactly its built-in version, checks its
-   SHA-256 against the built-in value and unpacks it. With `--bundle <file>` it takes this file instead of
-   the download; the checksum check stays the same. If `cosign` is in the path, it additionally checks
-   the signature (18, section 6); otherwise it names the verification command.
+2. **Fetch the bundle.** It downloads the installation bundle of exactly its built-in version from its
+   built-in download address (`https://github.com/<repository>/releases/download/v<version>/`, set
+   at release time from the name of the repository, 18 section 2.1 rule 3, not from the source with
+   `OWNER`), checks its SHA-256 against the built-in value and unpacks it. With `--bundle <file>` it
+   takes this file instead of the download; the checksum check stays the same. If `cosign` is in the
+   path, it additionally checks the signature from the same address (18, section 6); otherwise it
+   names the verification command.
 3. **Prompts.** Only with a terminal (input via `/dev/tty`, so that the command works with a pipe):
    public address (`BOTHY_PUBLIC_URL`), edge `direct` or `tailscale` (then `TS_AUTHKEY`
    hidden), virus scan (default on if the memory suffices), file storage `fs` (default,
@@ -274,7 +277,23 @@ Installation of the host service on a host:
    all other users (mode `0700`, on Windows an ACL only for it and the
    trusted owners) and restarts the host service. Closing the home is necessary
    because HD9 afterwards checks it as the home of a user who is not a session user; an open
-   home would otherwise make the start fail (24, section 2.2 item 4). The binding of the name to
+   home would otherwise make the start fail (24, section 2.2 item 4). `remove` does not end
+   processes of the user. A long-running process that the person set up as the session user
+   (crontab, systemd service of the user, LaunchAgent, scheduled task; 24, section 6.5) keeps
+   running and can reopen the home; then HD9 refuses the start on the next start or
+   `bothy-host doctor`, and the console names the former session user (24, section 2.2, "Reason
+   for HD9"). Therefore, right after `remove`, the instance operator removes the long-running
+   processes of the user, ends all its processes and deletes it on the host together with its
+   home; if the data must be kept, the instance operator first moves the home to a location only
+   for administrators. Reason for the home: HD9 no longer checks the home of a deleted user, and a
+   user created later with the same user ID would get it [derived]. Locking alone is not enough:
+   it ends no running process [derived], and on Linux `passwd -l` locks only the password ("Note
+   that this does not disable the account",
+   https://manpages.debian.org/bookworm/passwd/passwd.1.en.html, retrieved 2026-10-11
+   [verified]). On Linux `userdel` refuses the deletion while a process of the account runs
+   ("userdel will not allow you to remove an account if there are running processes which
+   belong to this account", https://manpages.debian.org/bookworm/passwd/userdel.8.en.html,
+   retrieved 2026-10-11 [verified]); therefore end the processes first. The binding of the name to
    its person stays in the state folder, and `session-user add` rejects a name bound
    there (24, section 2.2 item 3). Other changes to the configuration of the host service
    (working folders in `host_service.claude_workdirs`, profiles, `host_service.claude_bin`) the
@@ -357,9 +376,12 @@ Installation of the host service on a host:
    user, or the login file, the token in their startup files or the entry in the
    keychain). If a person repeats this or the login cannot be removed,
    the owner ends their assignment (`host.manage`), and the instance operator takes their
-   session user out according to item 1 with `bothy-host session-user remove` and then disables or
-   deletes it on the host. Disabling or the end of the assignment alone does not end the
-   standstill, because HD6 runs in the PTY helper of every name from `host_service.session_users`.
+   session user out with `bothy-host session-user remove` and then deletes it together with its
+   long-running processes on the host (both according to item 1). Disabling or the end of the
+   assignment alone does not end the standstill, because HD6 runs in the PTY helper of every name
+   from `host_service.session_users`. Until the deletion, a long-running process of the person can
+   reopen their home; then HD9 refuses the start, and the console names the former session user
+   (item 1).
    If the person is to get a terminal again later, the instance operator creates a new
    session user for them according to item 1 (24, section 2.2; threat model T-TM-14). After a refused
    start, with HD6 as with every other check, the service manager does not restart the host service
@@ -374,8 +396,9 @@ Installation of the host service on a host:
    entry scan again (24, section 2.2 item 6; threat model T-TM-13). If
    HD11 reports `entry_scan_timeout` for a session user, the scan of its home did not finish within
    `host_service.entry_scan_timeout`: the instance operator raises the value and calls
-   `bothy-host restart`, or the person shrinks their home, and the instance operator calls
-   `bothy-host doctor`. `entry_scan_running` only means that this scan is still running after the start. If the
+   `bothy-host restart`. If the value is not to rise, the instance operator shrinks the home
+   with administrator rights, after agreeing with the person, and calls `bothy-host doctor`;
+   until then the person cannot reach their home, because they get no sessions. `entry_scan_running` only means that this scan is still running after the start. If the
    report of HD11 names no session user, the violation is at a location for everyone (a
    program or a folder on the way to it): the host accepts no sessions until the
    instance operator has restored ownership and permissions and a run of HD11 passes.
@@ -503,7 +526,12 @@ key store `secrets.signing_key_dir`.
 Rules:
 
 1. The default of `instance.environment` is `prod`. `dev` must set relaxations explicitly.
-2. Between environments, the same image moves by digest, never a newly built one.
+2. Between environments, the same server version moves, never a newly built image. Compose
+   pulls the images by their tag with this version ([18-release.md](18-release.md), section 2.1),
+   and a tag in the registry can be moved (RK-91). That is why the acceptance in `staging` records
+   the digests of the pulled images (`docker image inspect`, field `RepoDigests`), and `prod`
+   compares them after pulling; if one differs, the instance operator does not start the new
+   version.
 3. Production data is never copied to `dev` or `staging`. There is no
    anonymization tool; a data extract would be a privacy incident (chapter 20).
 4. Every environment has its own secrets, its own push keys and its own `instance_id`.
@@ -731,7 +759,33 @@ by the test of the product release that installs it (`BOTHY_VERSION` in the bund
 the product tag under test, not the state from which the run starts: this way
 `make portability` and `infra/compose/smoke.sh` match the release. Flow:
 
-1. Fresh Linux runner (amd64 and arm64), Docker only; images by digest from the registry. The
+1. Fresh Linux runner (amd64 and arm64), Docker only. The server images come, as with every
+   installation, by their tag from `BOTHY_REGISTRY` and `BOTHY_VERSION` in the bundle of the tag
+   ([18-release.md](18-release.md), section 2.1), not by digest. `install.sh` pulls and starts in
+   one run (3.1, step 5); that is why the test pulls and checks them itself beforehand. It reads
+   both values from the `.env.example` of the bundle (source `release-download`: from
+   `PORTABILITY_RELEASE_DIR`; source `url`: downloaded from the address at which `install.sh`
+   looks for the bundle, interface rule 3) and pulls every image that the `compose.yaml` of the
+   bundle names with `${BOTHY_VERSION}` (the same list as in [18-release.md](18-release.md),
+   section 2.1, rule 4). Then it checks the signature of each of these digests (`docker image
+   inspect`, field `RepoDigests`) like an instance operator
+   ([release.md](../operations/release.md), section 5; ADR 0036): a digest passes if it can be
+   verified with the public key of the private phase from the repository or keyless with the
+   identity of the release workflow, because a tag from the private phase carries only the key
+   signature even after switching to public
+   ([ADR 0062](../adr/0062-release-signatures-while-the-repo-is-private.md), item 5). cosign runs
+   for this as a container with a digest pin (ADR 0041), because the runner brings only Docker.
+   The cosign project names the image: "Signed release images are available at
+   `ghcr.io/sigstore/cosign/cosign`"
+   (https://docs.sigstore.dev/cosign/system_config/installation/, retrieved 2026-10-11)
+   [verified]. Only then does the test call `install.sh` (step 2). Compose pulls an image only if
+   it is missing locally: "Compose pulls the image only if it's not available in the platform
+   cache", the default of `pull_policy` without `build`
+   (https://docs.docker.com/reference/compose-file/services/, retrieved 2026-10-11) [verified],
+   and `compose.yaml` sets neither of the two. So the installation starts the checked images.
+   After the installation the test compares the images with which the containers of this
+   installation run with the checked ones and fails on a difference; this also catches another
+   bundle or a second pull. The result (step 6) names the digests. The
    job does not log in to the registry; it pulls without login like an instance operator, and a
    package that is still private makes it fail
    ([public-switch.md](../quality/public-switch.md) step 21).
@@ -745,7 +799,7 @@ the product tag under test, not the state from which the run starts: this way
    test adapter, search, status page.
 4. Trigger a backup, trigger a restore test, all checks green.
 5. Receive telemetry via the overlay `local`; privacy canary (chapter 17) not found.
-6. Result as a status check on the release.
+6. Result as a status check on the release, with the digests of the checked server images.
 
 **Interface of `make portability`.** `portability.yml` passes only these three
 environment variables and no option of `install.sh`. M7-14 builds the interface, M7-29 defines
@@ -754,14 +808,17 @@ the options.
 | Variable | Content | Without a value |
 |---|---|---|
 | `PORTABILITY_TAG` | product tag under test (`vX.Y.Z` or `vX.Y.Z-beta.N`) | `make portability` stays the smoke test from M1-73 (`infra/compose/smoke.sh` with the locally built image, without `install.sh`) |
-| `PORTABILITY_INSTALL_SOURCE` | Source of `install.sh`: `url` or `release-download` (table in 3.1) | abort before the installation if `PORTABILITY_TAG` is set |
-| `PORTABILITY_RELEASE_DIR` | Folder with `install.sh` and `bothy-compose-<version>.tar.gz` from `gh release download` | with `release-download` abort before the installation; with `url` not read |
+| `PORTABILITY_INSTALL_SOURCE` | Source of `install.sh` and of the bundle: `url` or `release-download` (table in 3.1) | abort before the test downloads, pulls or installs anything, if `PORTABILITY_TAG` is set |
+| `PORTABILITY_RELEASE_DIR` | Folder with `install.sh` and `bothy-compose-<version>.tar.gz` from `gh release download` | with `release-download` abort before the test pulls or installs anything; with `url` not read |
 
 Rules:
 
-1. With `PORTABILITY_TAG`, `make portability` runs the test from `tests/portability`: the
-   steps 2 to 5 of the flow above. An invalid value of one of the three variables aborts before
-   the installation and names the variable.
+1. With `PORTABILITY_TAG`, `make portability` runs the test from `tests/portability`: from
+   step 1 reading the bundle, pulling and checking the signatures of the images and the comparison
+   after the installation, then the steps 2 to 5 and from step 6 the output of the digests. The
+   runner and the status check are provided by `portability.yml`. An invalid value of one of the
+   three variables aborts before the test downloads, pulls or installs anything, and names the
+   variable.
 2. The options after `sh -s --` are stated exactly once, in `tests/portability/install-options`
    (M7-29 creates the file, M7-14 reads it). The check from M7-29 compares them with the
    second block from 3.1; only `--storage` (the test sets it per run) and `--bundle` may
@@ -773,11 +830,20 @@ Rules:
    retrieved 2026-10-11) [verified]; a run outside GitHub Actions sets it itself. The test does
    not read the URL from the documentation of the tag. So for the URL of `install.sh` it does not
    matter whether the tag was created before or after `OWNER` was replaced (V1-03);
-   [public-switch.md](../quality/public-switch.md) step 21 takes the last product tag. The
-   registry of the images is not in this URL but in the bundle of the tag; there the release
-   sets it from the owner of the repository ([18-release.md](18-release.md), section 2.1).
+   [public-switch.md](../quality/public-switch.md) step 21 takes the last product tag. The same
+   holds for everything `install.sh` downloads afterwards: the release set the download address
+   of the bundle into `install.sh` at build time and the registry of the images into the bundle,
+   both from the repository in which the release ran ([18-release.md](18-release.md), section
+   2.1, rules 2 and 3). The test downloads the bundle for step 1 from the same address, built from
+   `GITHUB_REPOSITORY` and `PORTABILITY_TAG` like the URL of `install.sh`.
 4. Source `release-download`: `sh install.sh --bundle <bundle>` from `PORTABILITY_RELEASE_DIR`
    with the same options; `install.sh` checks the checksum as with the download (3.1, step 2).
+5. Logs on failure: if a run fails, the test shows, before it cleans up,
+   `docker compose ps --all` and the end of the logs of all services of exactly this
+   installation, in the folder into which `install.sh` installed and with the project name under
+   which it runs there. Only the test knows folder and project; a later step in `portability.yml`
+   would see the checkout instead of the installation and, after the cleanup, no stack any more.
+   The smoke test without `PORTABILITY_TAG` does the same (`infra/compose/smoke.sh`, M1-73).
 
 The test belongs to the gate chain of team H (ADR 0038, 0039); this chapter defines the content.
 
@@ -917,4 +983,4 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | R-OP-17 | DDL in operation only via `SECURITY DEFINER` functions of `bothy_owner`; table permissions explicit per migration, no default permissions in `public`. | The application role stays with DML; a missing permission shows up in the test. |
 | R-OP-18 | The server generates signing keys in its own writable directory ([ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)). | Rotation without manual work on the host; all other secrets stay read-only. |
 | R-OP-19 | Hash routing over the session ID for both stream paths of the terminal as an operational requirement with several nodes. | No broker in the server; one node holds both ends of a session ([24-terminal.md](24-terminal.md), section 9). |
-| R-OP-20 | Setup wizard as the POSIX shell script `install.sh` on the host, a release artifact with built-in version and checksum of the bundle; no wizard in the container. | Compose must run on the host; a wizard in the container would need the Docker socket, that is root permissions on the host. The shell exists everywhere Docker runs. |
+| R-OP-20 | Setup wizard as the POSIX shell script `install.sh` on the host, a release artifact with built-in version, checksum and download address of the bundle (18 2.1); no wizard in the container. | Compose must run on the host; a wizard in the container would need the Docker socket, that is root permissions on the host. The shell exists everywhere Docker runs. |

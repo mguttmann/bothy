@@ -58,14 +58,25 @@ per path and tag patterns and leaves the tag to the person.
    commits of the component that did not change its `CHANGELOG.md` as a checklist. The person or
    agent adds the required sections of the server release notes (upgrade notes, migrations,
    compatibility, security) in the review.
-4. Commit `chore(release): <component> vX.Y.Z`, signed tag `git tag -s <component>/vX.Y.Z`
-   by the maintainer, push after approval. Then `release.yml` runs (ADR 0036, ADR 0062).
+4. Commit `chore(release): <component> vX.Y.Z` on a branch, pull request with this title to
+   `main` (squash, [push-discipline.md](../quality/push-discipline.md)); after the merge the
+   maintainer sets the signed tag `git tag -s <component>/vX.Y.Z` on the squash commit, push
+   after approval. Then `release.yml` runs (ADR 0036, ADR 0062). The tag belongs on the squash
+   commit because only it stays in the history of `main` and step 2 counts the commits since the
+   last tag there [derived].
 5. git-cliff comes as a pinned binary with a checksum through `tools/bin/tools.lock.json`, like the
    other release binaries of the toolchain ([toolchain.md](../quality/toolchain.md)).
 6. For the component `bothy`, `SERVER_VERSION=<version>` additionally writes the server version
    that the product bundle installs into the line `BOTHY_VERSION=` of
    `infra/compose/.env.example`, only if the tag `server/v<version>` exists
-   ([18-release.md](../spec/18-release.md), section 2.1; D-W-76).
+   ([18-release.md](../spec/18-release.md), section 2.1; D-W-76). Without `CHANNEL=beta`
+   (stable product) it rejects a `<version>` with a pre-release identifier and names the value;
+   without `SERVER_VERSION` it rejects while the line carries the placeholder. So the error shows
+   up before commit and tag; `make release-build` keeps the check as a second safeguard, and the
+   gate `release-pins` checks the committed state in the pre-push of the branch and in the
+   required check `ci-ok` of the pull request, that is before the tag. The push of the tag alone
+   starts no check, because its commit is already on `origin`
+   ([18-release.md](../spec/18-release.md), section 2.1, rule 1; D-W-98).
 
 ### Consequences
 
@@ -86,7 +97,13 @@ per path and tag patterns and leaves the tag to the person.
   commits of other components do not count, a commit without a change to `CHANGELOG.md` appears in
   the checklist.
 - Existing checks: `tools/ci/components.py release` rejects a tag whose version is not in
-  `VERSION`; `release.yml` aborts if `CHANGELOG.md` has no section for the version.
+  `VERSION`; `release.yml` aborts if `CHANGELOG.md` has no section for the version; the gate
+  `release-pins` (`tools/ci/components.py pins`, tests in `tools/ci/tests/test_components.py`)
+  rejects a server pre-release in the bundle of a stable product.
+- Tests for `SERVER_VERSION` against the fixture repository: without a tag `server/v<version>`
+  abort, without `CHANNEL=beta` with a `<version>` with a pre-release identifier abort naming the
+  value, without `SERVER_VERSION` with the placeholder abort, each without a written file (PLAN
+  M7-29).
 - `make runners-check`: no workflow runs on pushes to branches; a release bot workflow would
   fail on it.
 - Pin check `test_toolchain_doc.py`: the version of git-cliff in `toolchain.md` matches the pin.

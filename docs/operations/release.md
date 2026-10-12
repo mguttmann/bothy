@@ -8,9 +8,20 @@ gates and runners (team H); this procedure names only the steps that belong to t
 ## 1. Prerequisites
 
 1. Main branch green in all local gates and in CI.
-2. Portability test of the last product beta green; for `server`, the product beta whose bundle
-   pins this server version or its last beta ([18-release.md](../spec/18-release.md) 2.1,
-   [16-operations.md](../spec/16-operations.md) 11.1).
+2. Portability test ([16-operations.md](../spec/16-operations.md) 11.1) green, depending on the tag:
+    - stable server `server/vX.Y.Z`: the test of the product beta whose bundle pins its last
+      beta `X.Y.Z-beta.N`. Stable is built from the same commit as this beta
+      ([18-release.md](../spec/18-release.md) 5, rule 2).
+    - server beta `server/vX.Y.Z-beta.N`: no precondition from the test. A bundle can pin it
+      only once its tag exists ([18-release.md](../spec/18-release.md) 2.1, rule 1), and for
+      `beta.1` there is no earlier beta. It is checked by the test of the next product beta
+      that pins it; that test runs after the release of this product beta (2.2, step 5;
+      [environments-and-flags.md](environments-and-flags.md) 1.3, item 1). Only when it is green
+      may the stable server version follow (item above).
+    - product beta `vA.B.C-beta.M`: no precondition; `release.yml` starts its own test after
+      `publish` (2.2, step 5).
+    - stable product `vA.B.C` and every other component: the test of the last product beta,
+      as soon as there is one.
 3. `CHANGELOG.md` of the component has a reviewed section for the new version; release notes
    with the required sections ([18-release.md](../spec/18-release.md) 4).
 4. For `server`: migrations fulfill M1 to M12 ([upgrade.md](upgrade.md) 4); the
@@ -27,8 +38,10 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
 ### 2.1 Server
 
 1. `make release-prep COMPONENT=server [CHANNEL=beta]` sets `VERSION` and closes the
-   changelog section ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)); commit.
-2. Set a signed tag: `server/vX.Y.Z` (beta: `server/vX.Y.Z-beta.N`).
+   changelog section ([ADR 0060](../adr/0060-release-automation-in-the-monorepo.md)); commit
+   on a branch, pull request to `main` ([push-discipline.md](../quality/push-discipline.md)).
+2. After the merge, set the signed tag on the squash commit on `main`: `server/vX.Y.Z`
+   (beta: `server/vX.Y.Z-beta.N`).
 3. The release pipeline builds per architecture, creates the multi-arch manifest, SBOMs, signatures,
    checksums and (in the public repository) the attestation, and publishes to `ghcr.io`.
 4. Check like an instance operator (section 5).
@@ -41,22 +54,29 @@ by a product release; existing installations raise `BOTHY_VERSION` themselves
    server version ([18-release.md](../spec/18-release.md) 2.1).
 2. `make release-prep COMPONENT=bothy SERVER_VERSION=<version> [CHANNEL=beta]` sets `VERSION`,
    closes the changelog section and writes the server version into the line
-   `BOTHY_VERSION=` of `infra/compose/.env.example`; without a tag `server/v<version>` it aborts.
-   Commit; the diff shows the pinned server version.
-3. Set a signed tag: `vA.B.C` (beta: `vA.B.C-beta.M`). The numbers do not depend on the
+   `BOTHY_VERSION=` of `infra/compose/.env.example`. It aborts without a change if the tag
+   `server/v<version>` does not exist or if without `CHANNEL=beta` the version carries a
+   pre-release identifier. Commit on a branch, pull request to `main`; the diff shows the pinned
+   server version. The gate `release-pins` checks the same rule in the pre-push of this branch
+   and in the required check `ci-ok` of the pull request. The push of the tag alone starts no
+   check ([18-release.md](../spec/18-release.md) 2.1, rule 1).
+3. After the merge, set the signed tag on the squash commit on `main`: `vA.B.C` (beta:
+   `vA.B.C-beta.M`). The numbers do not depend on the
    server version ([environments-and-flags.md](environments-and-flags.md) 1.3).
 4. The release pipeline builds the bundle with `make release-build`: `BOTHY_VERSION` from the commit,
-   `BOTHY_REGISTRY` from the owner of the repository. It aborts without a bundle on a
-   placeholder, a server pre-release in the stable product or an image that is missing in the
-   registry ([18-release.md](../spec/18-release.md) 2.1). In addition `install.sh` with the version
-   and SHA-256 of the bundle; signatures, SBOM and checksums as for the server.
+   `BOTHY_REGISTRY` from the owner of the repository. In addition `install.sh` with version,
+   SHA-256 and download address of the bundle, the address from the name of the repository. It
+   aborts without a bundle on a placeholder, a server pre-release in the stable product (second
+   safeguard) or an image that is missing in the registry
+   ([18-release.md](../spec/18-release.md) 2.1). Signatures, SBOM and checksums as for the server.
 5. After `publish`, `release.yml` starts the portability test with the tag
    ([16-operations.md](../spec/16-operations.md) 11.1); it must be green. Then check like an
    instance operator (section 5).
 
 ## 3. SDKs and adapters
 
-1. `make release-prep COMPONENT=<component>`, commit, tag `<component>/vX.Y.Z` (names from
+1. `make release-prep COMPONENT=<component>`, commit, pull request to `main`, after the merge
+   tag `<component>/vX.Y.Z` on the squash commit (names from
    `tools/ci/components.py`).
 2. Build, SBOM, signature of the files (`cosign sign-blob`), publication on PyPI or npm via
    trusted publishing of the registry, where available [assumed: check the availability per

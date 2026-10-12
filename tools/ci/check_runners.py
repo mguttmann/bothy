@@ -7,11 +7,16 @@ and the standard GitHub-hosted runners are free there. A job either names such a
 `${{ matrix.<key> }}` with a static matrix whose values are all such labels. Release workflows
 (RELEASE_WORKFLOWS) only run for release tags (release.yml on a tag push, portability.yml when
 release.yml calls it or by hand with a product tag). Jobs with a `release*` environment receive
-the signing secrets. Every finding names a rule:
+the signing secrets. GitHub compares environment names without case, so the check does too.
+Every finding names a rule:
 
   invalid-yaml                  file does not parse or has no jobs
   missing-permissions           no top-level `permissions`
-  broad-permissions             `permissions: write-all`
+  broad-permissions             `permissions: write-all`, on top level or on a job
+  actions-write                 `actions: write`, on top level or on a job, in any workflow:
+                                with it the GITHUB_TOKEN can start workflow_dispatch runs,
+                                for example of portability.yml, outside the one run per tag
+                                of its release (D-W-111)
   pull-request-target           the pull_request_target trigger
   push-on-branch                a push trigger that is not limited to tags (only the
                                 post-merge workflows may name exactly `main`)
@@ -37,6 +42,8 @@ the signing secrets. Every finding names a rule:
   release-artifact-by-id        a `release*` environment job downloads artifacts by name or
                                 pattern instead of `artifact-ids`; any job of the run can
                                 upload an artifact with a matching name
+  environment-not-literal       an environment name with an expression `${{ }}`; a computed
+                                name could pick a `release*` environment that no rule sees
 """
 
 from __future__ import annotations
@@ -249,6 +256,9 @@ def _check_job(
     file: str, name: str, job: dict[str, Any], scheduled: bool, out: list[Finding]
 ) -> None:
     where = f"job '{name}'"
+    if "permissions" in job:
+        _check_permissions(file, where, job["permissions"], out)
+    _check_environment_literal(file, where, job, out)
     if "uses" in job:  # reusable workflow call: no runner, no timeout of its own
         _check_uses(file, where, job["uses"], out)
         return
@@ -342,11 +352,7 @@ def _untrusted_needs(text: str, trusted: set[str]) -> list[str]:
 
 def _check_release_inputs(file: str, jobs: dict[str, Any], out: list[Finding]) -> None:
     """Keep values of jobs without a release environment out of signing jobs (T-SC-05)."""
-    trusted = {
-        str(n)
-        for n, j in jobs.items()
-        if isinstance(j, dict) and _environment(j).startswith(RELEASE_ENVIRONMENT_PREFIX)
-    }
+    trusted = {str(n) for n, j in jobs.items() if isinstance(j, dict) and is_release_environment(j)}
     for name in sorted(trusted):
         job = jobs[name]
         where = f"job '{name}'"
@@ -401,6 +407,36 @@ def _environment(job: dict[str, Any]) -> str:
     return str(env) if env is not None else ""
 
 
+def is_release_environment(job: dict[str, Any]) -> bool:
+    """Return True if the job references a `release*` environment in any spelling.
+
+    GitHub treats environment names without case ("Environment names are not case
+    sensitive"), so `Release` and `RELEASE-apple` hold the secrets of `release*` too.
+    """
+    return _environment(job).strip().casefold().startswith(RELEASE_ENVIRONMENT_PREFIX)
+
+
+def _check_environment_literal(
+    file: str, where: str, job: dict[str, Any], out: list[Finding]
+) -> None:
+    if "${{" in _environment(job):
+        out.append(
+            Finding(file, where, "environment-not-literal", "name the environment literally")
+        )
+
+
+def _check_permissions(file: str, where: str, permissions: Any, out: list[Finding]) -> None:
+    """No `write-all` and no `actions: write`: no workflow_dispatch from a workflow.
+
+    A repository_dispatch needs only `contents: write`; it starts only workflows that name
+    that trigger, which rule release-trigger forbids for the release workflows.
+    """
+    if permissions == "write-all":
+        out.append(Finding(file, where, "broad-permissions", "write-all"))
+    elif isinstance(permissions, dict) and str(permissions.get("actions", "")) == "write":
+        out.append(Finding(file, where, "actions-write", "no workflow_dispatch from a workflow"))
+
+
 def check_workflow(file: str, text: str) -> list[Finding]:
     """Return every policy finding of one workflow file (`file` is its base name)."""
     try:
@@ -412,8 +448,8 @@ def check_workflow(file: str, text: str) -> list[Finding]:
     out: list[Finding] = []
     if "permissions" not in doc:
         out.append(Finding(file, "permissions", "missing-permissions", "set contents: read"))
-    elif doc["permissions"] == "write-all":
-        out.append(Finding(file, "permissions", "broad-permissions", "write-all"))
+    else:
+        _check_permissions(file, "permissions", doc["permissions"], out)
     triggers = _triggers(doc)
     _check_triggers(file, triggers, out)
     for name, job in doc["jobs"].items():

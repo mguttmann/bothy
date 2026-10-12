@@ -102,8 +102,9 @@ Each ticket comes in order as its own pull request according to push-discipline.
     `portability.yml` via `workflow_dispatch` with the latest product tag. It checks out this
     tag (test code matching the release, [16-operations.md](../spec/16-operations.md) 11.1), fetches
     `install.sh` without login with the documented `curl` command (source `url`,
-    [16-operations.md](../spec/16-operations.md) 3.1) and pulls the images that the bundle pins
-    ([18-release.md](../spec/18-release.md) 2.1), also without login; a still private
+    [16-operations.md](../spec/16-operations.md) 3.1), downloads the bundle from the address that
+    the release set into `install.sh`, and pulls the images that the bundle pins
+    ([18-release.md](../spec/18-release.md) 2.1, rules 1 to 3), also without login; a still private
     package makes it fail. It must be green.
 22. **Replace the placeholder `OWNER`** (PLAN V1-03): `@OWNER` in `.github/CODEOWNERS`, `OWNER` in
     `mkdocs.yml`, `docs/index.md`, `README.md` and `CONTRIBUTING.md` (`grep -rn OWNER` as a

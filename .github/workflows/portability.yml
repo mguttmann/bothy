@@ -10,8 +10,14 @@
 # ref it was started from.
 #
 # Source of install.sh (16, 3.1): the documented curl command of the tag, as an instance
-# operator runs it. The images come from BOTHY_REGISTRY and BOTHY_VERSION in the bundle
-# (docs/spec/18-release.md, 2.1) and are pulled without a login.
+# operator runs it. The server images come from BOTHY_REGISTRY and BOTHY_VERSION in the
+# bundle (docs/spec/18-release.md, 2.1), pulled by tag like every installation and without a
+# login. install.sh pulls and starts in one go, so the test pulls them first, verifies the
+# signature of each digest with a digest-pinned cosign container, runs install.sh (Compose
+# uses the local images), checks that the containers run exactly these images, and reports
+# the digests (docs/spec/16-operations.md, 11.1, step 1). On failure the test itself prints
+# state and logs of the installation it made, before it cleans up: only it knows the folder
+# and project of that installation (docs/spec/16-operations.md, 11.1, rule 5).
 #
 # Runners (ADR 0039): fresh GitHub-hosted Linux runners, because the point is a machine that
 # has never seen the project; the matrix runs it once on amd64 and once on arm64
@@ -75,6 +81,3 @@ jobs:
           # url: curl the documented command of the tag
           PORTABILITY_INSTALL_SOURCE: url
         run: make portability
-      - name: Container logs on failure
-        if: failure()
-        run: docker compose -f infra/compose/compose.yaml logs --no-color --tail 200 || true
