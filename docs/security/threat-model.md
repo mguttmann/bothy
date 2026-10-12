@@ -185,6 +185,8 @@ E = Elevation of Privilege. "Register" refers to section 6.
 | R | Expiry of grants without a trace | system actions `grant.expire` in the audit (07, 8.3) | T-AZ-04 |
 | I | Webhook to a wrong target | allowlist, check at connection setup (SEC-NET-*) | T-NW-01 |
 | D | Queue congestion | separate queues, metrics ([17-observability.md](../spec/17-observability.md)) | T-DS-01 |
+| I | A worker consumer reads the whole event log without a permission filter | jobs check `push.deliver` or `webhook_out.deliver` before sending (R-AZ-11); the reads are on the exception list of system reads (07, 7.4); logs and job arguments carry only the consumer name, sequence numbers and IDs (M2-01) | T-AZ-02 |
+| D | A worker consumer stands still and events fall out of `sync.event_retention` | gauge `bothy.event.consumer.pending_age`, alarm `BothyEventConsumerLag` at `consumer.pending_alert_after`, held strictly below the retention by the start check (M2-01) | T-DS-01 |
 
 ### 5.10 Agent adapters and runtime
 

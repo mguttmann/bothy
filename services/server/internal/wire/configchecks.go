@@ -39,6 +39,17 @@ var configChecks = []configCheck{
 	{name: "file_fs_root_absolute", keys: []string{keyStorageDriver, "file.fs.root"}, fn: fileFSRootAbsolute},
 	{name: "file_s3", keys: []string{keyStorageDriver, "file.s3.endpoint", "file.s3.region", "file.s3.bucket", "file.s3.prefix",
 		"file.s3.use_path_style", "file.s3.checksum_mode", keyEgressAllowedHosts}, fn: fileS3},
+	{name: "consumer_alert_below_retention", keys: []string{keyConsumerPendingAlertAfter, keySyncEventRetention}, fn: consumerAlertBelowRetention},
+}
+
+// consumerAlertBelowRetention requires consumer.pending_alert_after to be strictly below
+// sync.event_retention (M2-01, D-M2-01-6): the alarm BothyEventConsumerLag must fire while a
+// stalled worker consumer can still catch up, before its events fall out of the retained log.
+func consumerAlertBelowRetention(v *config.Values) error {
+	if v.Duration(keyConsumerPendingAlertAfter) >= v.Duration(keySyncEventRetention) {
+		return errors.New("consumer.pending_alert_after must be less than sync.event_retention")
+	}
+	return nil
 }
 
 // tlsPair requires server.tls_cert_ref and server.tls_key_ref to be both set or both empty

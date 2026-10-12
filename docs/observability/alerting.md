@@ -63,6 +63,7 @@ alerts of `bothy-alerts.yaml`.
 | `BothyTelemetryExportFailing` | ticket | exporter of the collector fails | |
 | `BothyTelemetryDropped` | ticket | server discards telemetry | |
 | `BothyEventFanoutLag` | page | fan-out lag over 5 s | `status.fanout_lag_degraded` |
+| `BothyEventConsumerLag` | page | the oldest unprocessed event of a worker consumer is older than `consumer.pending_alert_after` | `consumer.pending_alert_after` |
 | `BothyAgentConsumerLag` | ticket | consumer backlog of over 1000 events | |
 | `BothyAgentOffline` | ticket | no heartbeat for 5 minutes | above `agent.presence_timeout` |
 | `BothyBillingModeMismatch` | page | reported mode differs from the configured mode (I3) | |
@@ -101,6 +102,15 @@ Collector overloaded or not reachable; check `memory_limiter` and the exporters.
 ### bothyeventfanoutlag
 Database load (dashboard Database), long transactions, `pg_stat_activity`. An `api` process
 hangs: restart it.
+
+### bothyeventconsumerlag
+A worker consumer (`push`, `webhooks`; label `bothy_consumer_name`) stands still: pushes or
+outgoing webhooks no longer go out. Is a process of the role `worker` or `all` running? Read the
+lines `event consumer round failed` (with `error.type`) and `event consumer lost events to
+retention`; is the database reachable? A handler that keeps failing stalls only its own consumer,
+which catches up by itself after the fix. Never move the cursor in `event_consumer_cursors` by
+hand: the events it jumps over are lost for that consumer for good. A consumer that stands longer
+than `sync.event_retention` loses events ([02-architecture.md](../spec/02-architecture.md) 11.5).
 
 ### bothyagentconsumerlag
 The adapter does not process or does not acknowledge. Adapter logs, `ack` behavior, connection.

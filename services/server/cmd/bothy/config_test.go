@@ -168,6 +168,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.step_up_max_age = 5m  # default\n" +
 		"auth.token_pepper_ref = file:/run/bothy/secrets/token_pepper  # default\n" +
 		"authz.snapshot_cache_max_entries = 10000  # default\n" +
+		"consumer.batch_size = 500  # default\n" +
+		"consumer.pending_alert_after = 15m  # default\n" +
+		"consumer.poll_interval = 1s  # default\n" +
 		"database.acquire_timeout = 2s  # default\n" +
 		"database.host = localhost  # default\n" +
 		"database.idle_in_tx_timeout = 10s  # default\n" +
