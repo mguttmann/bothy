@@ -123,6 +123,18 @@ operated, and the order of the build.
   `tofu`); `tools/bin/fetch_tools.py` reads zip release assets. Every hand-written alert has
   `promtool` unit tests. Renovate updates the helper images of the Compose stack in one group
   "Compose-Images" and leaves their validators to `make tools-lock`.
+- Gate `release-pins` (`tools/ci/components.py pins`): the server version that the product
+  bundle pins in `infra/compose/.env.example` is SemVer or the placeholder, and only a product
+  beta pins a server pre-release (D-W-98).
+- `runners-check` finds release jobs by every spelling of the environment name, rejects an
+  environment name with an expression (`environment-not-literal`, D-W-110) and rejects
+  `actions: write` and `write-all` on top level and on jobs (`actions-write`, D-W-111).
+- Core contract for the briefs of M2 and M3: check without a request (R-AZ-29), the action
+  `cost.reconcile.read` with `listCostEstimates`, the system action `webhook_out.transition`,
+  the durable event `device.pending`, hints without a thread (R-AZ-25 to R-AZ-31), and the
+  data model rules R-DM-42 to R-DM-48; rulings D-W-100 to D-W-108 and OQ-24.
+- `brief_deps.py` fails when a start check of a brief names a ticket outside the brief's
+  dependency closure.
 
 ### Fixed
 
