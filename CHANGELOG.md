@@ -151,6 +151,14 @@ operated, and the order of the build.
 - `tools/bin/fetch_tools.py` reports an empty, cut off or corrupt release archive as an error
   instead of a traceback.
 
+### Changed
+
+- Chapter 02 "Configuration loading" and the configuration reference describe the loader as built
+  by the server: built-in defaults live in the schema, `bothy config print` shows secret
+  references instead of `<redacted>`, and `docs/operations/configuration.md` sections 1 to 3 give
+  the exact grammar of every kind (now with `list(cidr)` and `url`), the file rules and the output
+  of `bothy config check` and `bothy config print`.
+
 ### Security
 
 - Development tools: `katex` (pulled in by mermaid-cli) is pinned through `overrides` to

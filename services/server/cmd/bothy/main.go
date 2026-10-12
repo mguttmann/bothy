@@ -25,28 +25,31 @@ import (
 
 // Exit codes shared by all commands (docs/spec/02-architecture.md "Commands of the binary").
 const (
-	exitOK    = 0
-	exitUsage = 2
+	exitOK      = 0
+	exitFailure = 1
+	exitUsage   = 2
 )
 
 func main() {
 	// Signal handling belongs to the commands that need it (serve, M1-11); a plain background
 	// context keeps short commands free of it.
-	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr))
+	os.Exit(run(context.Background(), os.Args[1:], os.Environ(), os.Stdout, os.Stderr))
 }
 
 // run executes the command line args (without the program name) against the registered
-// commands and returns the process exit code.
-func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
-	return dispatch(ctx, commands, args, stdout, stderr)
+// commands and returns the process exit code. env holds the process environment as os.Environ
+// returns it; main reads it once here, and no other package reads the environment
+// (docs/spec/02-architecture.md "Configuration loading" item 5).
+func run(ctx context.Context, args, env []string, stdout, stderr io.Writer) int {
+	return dispatch(ctx, commands, args, env, stdout, stderr)
 }
 
 // dispatch selects the command named by args[0] from table and runs it with the remaining
-// arguments, returning its exit code. Without arguments it prints the usage to stderr and returns
+// arguments and env, returning its exit code. Without arguments it prints the usage to stderr and returns
 // 2; for help, -h or --help it prints the usage to stdout and returns 0; for an unknown name it
 // prints an error line and the usage to stderr and returns 2. The table is a parameter so tests
 // can pass their own.
-func dispatch(ctx context.Context, table []command, args []string, stdout, stderr io.Writer) int {
+func dispatch(ctx context.Context, table []command, args, env []string, stdout, stderr io.Writer) int {
 	if len(args) == 0 {
 		writeUsage(stderr, table)
 		return exitUsage
@@ -59,7 +62,7 @@ func dispatch(ctx context.Context, table []command, args []string, stdout, stder
 	}
 	for _, c := range table {
 		if c.name == name {
-			return c.run(ctx, args[1:], stdout, stderr)
+			return c.run(ctx, args[1:], env, stdout, stderr)
 		}
 	}
 	// A failed write to stderr cannot be reported anywhere; the exit code still says it.

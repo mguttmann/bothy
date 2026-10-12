@@ -12,6 +12,9 @@ linters:
     - errname
     - errorlint
     - exhaustive
+    - forbidigo
+    - gocognit
+    - goconst
     - gocritic
     - gosec
     - misspell
@@ -20,6 +23,39 @@ linters:
     - revive
     - unparam
   settings:
+    forbidigo:
+      # Only cmd/bothy reads the process environment and hands it to platform/config; modules and
+      # platform packages get their values from their Config struct
+      # (docs/spec/02-architecture.md "Configuration loading" item 5). Type information resolves
+      # renamed imports, so `import e "os"; e.Getenv(...)` is found as well.
+      analyze-types: true
+      # Example functions in tests are checked as well; they are documentation that readers copy.
+      exclude-godoc-examples: false
+      forbid:
+        - pattern: ^os\.(Getenv|LookupEnv|Environ|ExpandEnv)$
+          pkg: ^os$
+          msg: read configuration through platform/config; only cmd/bothy reads the environment
+        - pattern: ^syscall\.(Getenv|Environ)$
+          pkg: ^syscall$
+          msg: read configuration through platform/config; only cmd/bothy reads the environment
+        # Cmd.Environ returns the whole process environment when Cmd.Env is nil.
+        - pattern: ^exec\.Cmd\.Environ$
+          pkg: ^os/exec$
+          msg: read configuration through platform/config; only cmd/bothy reads the environment
+        # ProxyFromEnvironment configures outgoing calls from HTTP_PROXY and related variables.
+        - pattern: ^http\.ProxyFromEnvironment$
+          pkg: ^net/http$
+          msg: read configuration through platform/config; only cmd/bothy reads the environment
+    gocognit:
+      # SonarQube rule go:S3776 of the quality gate "Bothy way" (quality/sonar/quality-gate.json,
+      # no new issue) reports a function above cognitive complexity 15. gocognit reports above
+      # min-complexity, so make lint fails on the same functions before the analysis does.
+      min-complexity: 15
+    goconst:
+      # Rule go:S1192 of the same gate: a string literal written three times. goconst counts per
+      # package where the analysis counts per file, and it skips literals in call arguments,
+      # which the analysis counts (docs/DECISIONS.md M1-07).
+      min-occurrences: 3
     nolintlint:
       # Every suppression names its linter and says why.
       require-explanation: true
@@ -33,6 +69,30 @@ linters:
   # The exclusion preset "comments" would hide missing doc comments; it stays off.
   exclusions:
     presets: []
+    # Generated files are linted too, so a "// Code generated ... DO NOT EDIT." header cannot hide a
+    # forbidden call. A ticket that adds generated Go code (*.gen.go, sqlcgen/) excludes the
+    # linters that code cannot satisfy for those paths, never forbidigo (docs/DECISIONS.md M1-07).
+    generated: disable
+    rules:
+      # cmd/bothy reads the environment once and passes it on as config.Sources.Env.
+      - path: ^cmd/bothy/
+        linters: [forbidigo]
+      # Tests of repository tools (not product code; the module register excludes tools/ from the
+      # architecture gate too) get pinned binaries from make through the environment
+      # (GO_ARCH_LINT) and pass it on to them (docs/DECISIONS.md M1-07).
+      - path: ^tools/.+_test\.go$
+        linters: [forbidigo]
+      # Like the analysis (sonar.test.inclusions), gocognit and goconst check product code only;
+      # table rows of tests repeat literals on purpose.
+      - path: _test\.go$
+        linters: [gocognit, goconst]
+      # Generated code, which sonar.exclusions leaves out of the analysis as well (M1-05/7).
+      - path: (\.gen|_gen|\.pb)\.go$|(^|/)sqlcgen/
+        linters: [gocognit, goconst]
+      # Two files of M1-05 that predate both linters; M1-05 owns that code (docs/DECISIONS.md
+      # M1-07). Every other file, also new files in tools/archgen, is checked.
+      - path: ^tools/archgen/(generate|validate)\.go$
+        linters: [gocognit, goconst]
 
 formatters:
   enable:
