@@ -12,7 +12,7 @@ stand for, and the validator versions with the image versions of the Compose sta
 
 The validators come from tools/bin/tools.lock.json through fetch_tools.py (sha256 per
 platform). A validator that cannot be fetched fails its check; nothing is skipped
-(docs/spec/23-qualitaet.md R-QA-02). Each validator runs as a short-lived process with
+(docs/spec/23-quality.md R-QA-02). Each validator runs as a short-lived process with
 a minimal environment inside a temporary work directory, so neither the caller's shell
 nor its working directory can change the result.
 
