@@ -231,7 +231,7 @@ documented in this file. The format is based on
   arguments `VERSION` (must equal `VERSION`), `REVISION` and `SOURCE_URL`; base images pinned by
   digest. `make image` builds and loads it, `make image-test` runs the structure tests in
   `test/image` (build tag `imagetest`).
-- Migration `00002_identity_principals`: the tables `principals`, `users` and `owners` with every
+- Migration `00003_identity_principals`: the tables `principals`, `users` and `owners` with every
   check, unique index (`lower(handle)`, `lower(email)` where present, one active owners row per
   person), index and foreign key of the data model; triggers refuse a `users` row for a principal
   that is not a person and any change of `principals.kind`. The foreign key of

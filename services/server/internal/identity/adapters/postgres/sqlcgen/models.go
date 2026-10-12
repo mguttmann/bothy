@@ -8,6 +8,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Instance struct {
+	ID               int16
+	InstanceID       pgtype.UUID
+	SetupCompletedAt pgtype.Timestamptz
+	SchemaVersion    int64
+	MinServerVersion pgtype.Text
+	SyncEpoch        pgtype.UUID
+	CreatedAt        pgtype.Timestamptz
+}
+
 type Owner struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID
@@ -28,6 +38,11 @@ type Principal struct {
 	CreatedAt    pgtype.Timestamptz
 	DisabledAt   pgtype.Timestamptz
 	DeletedAt    pgtype.Timestamptz
+}
+
+type SequenceCounter struct {
+	Name  string
+	Value int64
 }
 
 type User struct {

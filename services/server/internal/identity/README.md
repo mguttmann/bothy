@@ -30,7 +30,7 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
   `/email` or `/user_id`; check, trigger, foreign key and not null violations are
   `validation_failed` with the column as field; no error carries SQL text, constraint names or
   values.
-- Migration `migrations/00002_identity_principals.sql`: the tables `principals`, `users` and
+- Migration `migrations/00003_identity_principals.sql`: the tables `principals`, `users` and
   `owners` as 03 section 4.2 states them, with the triggers `identity_users_kind_check` (a users
   row only for a principal of kind `user`) and `identity_principals_kind_immutable` (the kind
   never changes), both SQLSTATE `23514`. `bothy_app` may read, insert and update the three
