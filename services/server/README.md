@@ -145,7 +145,7 @@ Technology without domain logic; only `adapters/`, `wire` and `cmd` may import i
 |---|---|
 | [`config`](internal/platform/config/README.md) | schema, loading and checking of the configuration, `Bind` to the `Config` structs (02, section 13; built in M1-07) |
 | `secrets` | secret provider (ADR 0011) |
-| `pg` | pool, Unit of Work with lock order, `LISTEN` connection, retry on deadlock |
+| [`pg`](internal/platform/pg/README.md) | pool, Unit of Work with lock order, `LISTEN` connection, retry on deadlock |
 | [`httpserver`](internal/platform/httpserver/README.md) | server, middleware chain, `problem+json`, proof check of `authorize` (02, section 9); listener part built in M1-11 |
 | `ratelimit` | token buckets per class from 05 |
 | `jobs` | the only place with River: client per role, queues, schema `jobs.schema` |

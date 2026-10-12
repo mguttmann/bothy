@@ -1,0 +1,1 @@
+# txn registrations; regenerate with: go test ./internal/wire -run TestTxnRegistrationsGolden -update

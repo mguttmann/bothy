@@ -157,6 +157,23 @@ documented in this file. The format is based on
 - Configuration keys `http.read_header_timeout`, `http.idle_timeout`, `http.max_header_bytes`,
   `shutdown.drain_delay`, `shutdown.http_grace`, `shutdown.telemetry_flush_timeout` and
   `shutdown.total_timeout`; stop budgets above the total fail the start with exit code 2.
+- Unit of work (`internal/kernel/txn`, `internal/platform/pg`): every write use case runs in one
+  `READ COMMITTED` transaction with `SET LOCAL` deadlines, carried in the context and joined by
+  nested calls; the phases `rights_begin` (only with `RightsChange`), `work`, `rights_check`
+  (only with `RightsChange`), `sync` and `audit` run in this order before the commit. A unit is
+  retried up to `database.tx_retry_max` times on deadlock (`40P01`) or lock timeout (`55P03`)
+  and then ends with `503 unavailable`; any other error, a veto or a panic rolls it back.
+- In-transaction events: `txn.Publish` delivers synchronously in registration order with a span
+  `txn.subscribe <module>` per subscriber; per-unit state (`txn.Key`, `Load`, `Store`) is fresh
+  for every attempt.
+- `internal/wire`: the txn registry of all roles in one place (`NewTxnRegistry`), its golden file
+  `testdata/txn_registrations.golden` and the check that every subscription points from a higher
+  module to a lower one and every hook belongs to the module of its phase; `UnitConfig` binds the
+  unit of work configuration.
+- `pg.Tx` and `pg.Querier` for repositories, and `Exec`, `Query` and `QueryRow` on the pool with
+  the `database.acquire_timeout` wait.
+- Semgrep rule `bothy-go-tx-only-in-platform-pg`: transactions are opened only in
+  `internal/platform/pg`.
 
 ### Changed
 

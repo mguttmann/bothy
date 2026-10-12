@@ -11,7 +11,11 @@
 //     secret provider, so a rotated password works after secrets.cache_ttl without a restart.
 //     Acquire, Begin and Ping wait at most database.acquire_timeout; an overloaded pool becomes
 //     the kernel/errs error of kind unavailable with the internal cause db_pool_exhausted.
-//   - Timeouts and SetLocalTimeouts: per-transaction deadlines for the unit of work (M1-13).
+//   - Timeouts and SetLocalTimeouts: per-transaction deadlines for the unit of work.
+//   - UnitOfWork, Tx and Querier: the unit of work of kernel/txn (M1-13), the only place that
+//     begins and ends transactions, with the phase hooks, the retry on 40P01 and 55P03 and the
+//     ambient transaction for repositories; DBTX and the pool's Exec, Query and QueryRow for
+//     reads outside a unit.
 //   - CheckSchema and RequiredSchemaVersion: the start refuses a schema older than the
 //     binary needs; a newer one is allowed (expand and contract, docs/operations/upgrade.md).
 //   - Role, Bootstrap, BootstrapRoles and BootstrapDatabase: least-privilege roles, created
