@@ -27,8 +27,9 @@ milestone before them closes. The M3 briefs follow the M2 briefs into this index
 3. Each brief runs in its own git worktree on the branch `feat/<ticket-id>-<slug>`. Tickets of the
    same wave share no dependency and may run in parallel; overlapping files are resolved at merge.
 4. The working rules of the plan (section "Way of working per ticket") apply to every brief: test
-   first, specification first, `make check` green, review and red team before the local merge, no
-   push without the owner's approval. The red team report is stored as `.review/<sha>.md` of the
+   first, specification first, `make check` green, review and red team before the merge, which goes
+   through a pull request as `AGENTS.md` describes ("How work lands on `main`"; it takes precedence
+   over the local merge that the plan names). The red team report is stored as `.review/<sha>.md` of the
    commit to merge, last line `Urteil: JA` (PLAN 3.9, D-W-32).
 5. A brief that finds a gap in the core contract (chapters 00, 03, 04, 05) stops with
    `Verdict: BLOCKED` instead of building a deviation.

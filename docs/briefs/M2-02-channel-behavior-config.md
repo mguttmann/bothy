@@ -98,10 +98,10 @@ the switches is M2-04, the project binding is M2-03.
   (`kernel/textcheck`), M1-63 (`listEvents`, `sync.Admit`), M1-65 (`Authorizer.Observe`, delivery
   mode), M1-69 (`services/server/test/canary`), M1-70 (SQL visibility lint), M1-71
   (`services/server/test/harness`, `BuildMatrixWorld`).
-- Dependencies: the header names M1-54; M1-53, M1-52, M1-51, M1-49, M1-48, M1-35, M1-29, M1-28,
-  M1-26, M1-24, M1-20, M1-18, M1-17, M1-16, M1-13 and M1-08 are implied through it. The plan row also
-  needs M1-69 (canary scenario) and with it M1-71, M1-65 and M1-63, which are not in the closure of
-  M1-54; this gap is reported to the plan, and Design note 1 stops the build while they are missing.
+- Dependencies: the header names M1-69 (canary scenario, D-W-106); M1-71, M1-65, M1-63, M1-54,
+  M1-53, M1-52, M1-51, M1-49, M1-48, M1-35, M1-29, M1-28, M1-26, M1-24, M1-20, M1-18, M1-17, M1-16,
+  M1-13 and M1-08 are implied through it. Design note 1 stops the build while one of them is
+  missing.
 - Code: `services/server/internal/chat` (README; spaces, channels and operators of M1-52 to M1-54),
   `internal/authz`, `internal/sync`, `internal/kernel/{authorize,auditing,eventlog,txn,textcheck,actor}`,
   `internal/platform/httpserver`, `internal/wire` (config keys, `configchecks.go`),
@@ -259,8 +259,8 @@ Change:
    behaviour columns, `settings_version` and `channel_skill_bindings` (M1-53), the effective operator
    and `setChannelOperator` (M1-54), `services/server/test/harness` with `BuildMatrixWorld` (M1-71),
    `services/server/test/canary` (M1-69), `listEvents` (M1-63) and `Authorizer.Observe` (M1-65).
-   A missing one ends with `Verdict: BLOCKED dependency <ticket> missing`; the plan row of this
-   ticket depends on M1-69 although the header names only M1-54 (reported as a plan gap).
+   A missing one ends with `Verdict: BLOCKED dependency <ticket> missing`; all of them are in the
+   closure of the header M1-69 (D-W-106).
 
 2. Port `AgentConfig` in `internal/chat` (02 4.3 names it). The actor comes from `kernel/actor` in
    the context, never from a parameter. Pseudo-Go, follow the naming of the existing chat port:

@@ -79,8 +79,8 @@ the number of durable events per run does not depend on how often the agent patc
   M1-64 (op dispatcher `Register(op, action, handler)`, `gateway_ops`, test client `wstest`),
   M1-65 (hub, bounded queue, `sync.Admit`, `Delivery(ctx)`), M1-66 (`focus`, focus pruning,
   `EphemeralPublisher`, the focus-bound type `run.updated`, the drop rule for ephemeral frames).
-  Read M1-68 as well: its metric registry is not in this ticket's dependency closure (Design
-  note 13).
+  Read M1-68 as well: its metric registry is in this ticket's dependency closure through M2-02
+  (Design note 13).
 - M2 briefs this ticket builds on: M2-09 (direct dependency: `startRun`, `finishRun`,
   `cancelRun`, job `runs.cancel_timeout`) and through it M2-05 (`runs`, `run_steps`, `getRun`,
   `listRunSteps`, the projection of the run document), M2-07 (agent connections on the gateway)
