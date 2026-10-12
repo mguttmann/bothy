@@ -122,6 +122,7 @@ func WriteProblem(w http.ResponseWriter, r *http.Request, err error) {
 	if err == nil {
 		err = errs.New(errs.CodeInternalError, "")
 	}
+	noteRetryable(r.Context(), err)
 	e := toError(r, err)
 	writeProblem(w, r, e)
 }

@@ -58,3 +58,48 @@ func TestHandler_RunsTheUseCase(t *testing.T) {
 		t.Fatalf("Work = %v, want the error so River retries", err)
 	}
 }
+
+// fakeCleanup counts runs and returns err.
+type fakeCleanup struct {
+	runs int
+	err  error
+}
+
+func (f *fakeCleanup) Run(context.Context) (app.CleanupResult, error) {
+	f.runs++
+	return app.CleanupResult{}, f.err
+}
+
+func TestRegisterIdempotencyCleanup_PeriodicOnTheMaintenanceQueue(t *testing.T) {
+	t.Parallel()
+	reg := jobs.NewRegistry()
+	if err := syncjobs.RegisterIdempotencyCleanup(reg, &fakeCleanup{}, time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	if q, ok := reg.Queue(syncjobs.KindIdempotencyCleanup); !ok || q != jobs.QueueMaintenance {
+		t.Fatalf("queue = %q, %v", q, ok)
+	}
+	p := reg.Periodic()
+	if len(p) != 1 || p[0].Args.Kind() != "sync.idempotency_cleanup" || p[0].Interval != time.Hour {
+		t.Fatalf("periodic = %+v", p)
+	}
+	if err := jobs.ValidateArgsType(reflect.TypeFor[syncjobs.IdempotencyCleanup]()); err != nil {
+		t.Fatal(err)
+	}
+	if err := syncjobs.RegisterIdempotencyCleanup(jobs.NewRegistry(), &fakeCleanup{}, 0); err == nil {
+		t.Fatal("an interval of 0 was accepted")
+	}
+}
+
+func TestCleanupHandler_RunsTheUseCase(t *testing.T) {
+	t.Parallel()
+	c := &fakeCleanup{}
+	h := syncjobs.CleanupHandler{Cleanup: c}
+	if err := h.Work(context.Background(), jobs.Job[syncjobs.IdempotencyCleanup]{}); err != nil || c.runs != 1 {
+		t.Fatalf("Work = %v, runs %d", err, c.runs)
+	}
+	c.err = context.Canceled
+	if err := h.Work(context.Background(), jobs.Job[syncjobs.IdempotencyCleanup]{}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Work = %v, want ctx.Err() so River retries (02 \"Regeln für Jobs\" rule 2)", err)
+	}
+}

@@ -156,10 +156,10 @@ type server struct {
 //     6c. authz (M1-28): build the Authorizer with the recorder of audit (startAuthz),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
-//     sweeper, M1-19, and MountRoutes, api and all), log
+//     sweeper, M1-19, InstallIdempotency, M1-20, and MountRoutes, api and all), log
 //     tail (M1-16, api and all: local_head is set to the head before the public listener opens,
 //     and a tail that fails later ends the process with exit code 1), then the jobs (every role,
-//     with sync.partition_maintenance): the River migrations in jobs.schema
+//     with sync.partition_maintenance and sync.idempotency_cleanup): the River migrations in jobs.schema
 //     must be complete (else the hint to run "bothy migrate up"), the runtime of the role is
 //     built over the pool, and worker and all start River (02 "Start" step 8); a River client
 //     that stops on its own later ends the process with exit code 1 (02 "Health"). The
@@ -543,8 +543,8 @@ func (s *server) checkSchema(ctx context.Context) error {
 
 // mountRoutes checks the route bindings and the registrations of the modules against the closed
 // catalogue of authz (every role, M1-25), then builds the HTTP chain (api and all), installs the
-// rate limiter with its start check and its sweeper (M1-19) and mounts the routes through it with
-// the same catalogue. The request validator knows only the enabled operations, so the start
+// rate limiter with its start check and its sweeper (M1-19) and the Idempotency-Key stage over the
+// store of sync (M1-20), and mounts the routes through it with the same catalogue. The request validator knows only the enabled operations, so the start
 // compiles no schema of a route it does not serve. Until identity is wired (M1-34) the chain
 // authenticates with actor.AnonymousOnly: every credential is refused
 // (fail closed).
@@ -566,6 +566,12 @@ func (s *server) mountRoutes(context.Context) error {
 				return err
 			}
 			s.runner.OnStop(startSweeper(limiter))
+			s.mu.Lock()
+			sy := s.sync
+			s.mu.Unlock()
+			if err := InstallIdempotency(chain, sy, s.syncCfg); err != nil {
+				return err
+			}
 			s.mu.Lock()
 			mux := s.publicMux()
 			s.chain = chain
@@ -656,7 +662,10 @@ func (s *server) startJobs(ctx context.Context) error {
 	if err := jobs.ValidateMigrations(ctx, pool, s.jobsCfg.Schema); err != nil {
 		return err
 	}
-	reg, err := NewJobRegistry(&JobModules{Partitions: sy.Maintenance(), PartitionInterval: s.syncCfg.MaintenanceInterval})
+	reg, err := NewJobRegistry(&JobModules{
+		Partitions: sy.Maintenance(), PartitionInterval: s.syncCfg.MaintenanceInterval,
+		Cleanup: sy.IdempotencyCleanup(), CleanupInterval: s.syncCfg.Cleanup.Interval,
+	})
 	if err != nil {
 		return err
 	}

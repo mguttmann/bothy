@@ -1,6 +1,6 @@
 # Modul `sync`
 
-Status: built in part (M1-16): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log` and the one envelope of gateway, REST and webhooks. Catch-up, snapshot, redaction, idempotency keys, read states, drafts, settings and worker cursors come with M1-63, M1-58, M1-20, M2-01 and the tickets that need them.
+Status: built in part (M1-16, M1-20): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log`, the one envelope of gateway, REST and webhooks, and the idempotency keys behind `kernel/idempotency.Store` with the job `sync.idempotency_cleanup`. Catch-up, snapshot, redaction, read states, drafts, settings and worker cursors come with M1-63, M1-58, M2-01 and the tickets that need them.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -13,10 +13,10 @@ Ereignis-Log (Anhängen, Tail, Nachholen, Schwärzen, Partitionen), Momentaufnah
 |---|---|
 | `internal/sync` | port: `Event` (a stored row, zero values for NULL), `DeliveryFields`, `Envelope` with `EnvelopeActor`, `EnvelopeScope`, `EnvelopeResource` and `Event.Envelope`, `Sink`, `Tail`, `ErrGap` |
 | `domain/` | event validation (`ValidateEvent`, `CheckPayload`), partition arithmetic (`PartitionLower`, `PartitionName`) and the gap check of the tail (`CheckContiguous`, `GapError`) |
-| `app/` | `Appender` (implements `kernel/eventlog.Appender`), `PhaseHook` (phase `sync`), `PartitionMaintenance`; outgoing ports `Writer`, `Partitions`, `Correlator` |
-| `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` with its own `LISTEN` connection |
+| `app/` | `Appender` (implements `kernel/eventlog.Appender`), `PhaseHook` (phase `sync`), `PartitionMaintenance`, `IdempotencyStore` (implements `kernel/idempotency.Store`), `IdempotencyCleanup`; outgoing ports `Writer`, `Partitions`, `Correlator`, `KeyRows` |
+| `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads) and `IdempotencyRepository` (`KeyRows`) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` with its own `LISTEN` connection |
 | `adapters/telemetry/` | `Correlator`: `correlation_id` and `trace_context` from the trace context of the append |
-| `adapters/jobs/` | job `sync.partition_maintenance`: arguments, handler, periodic registration |
+| `adapters/jobs/` | jobs `sync.partition_maintenance` and `sync.idempotency_cleanup`: arguments, handlers, periodic registrations |
 
 ### Writing durable events
 
@@ -127,6 +127,38 @@ with `RunOnStart` (02 "Job-Katalog"), and `bothy migrate up` runs the same use c
 River, goose and the instance row (upgrade.md rule M10), so a fresh or upgraded database has
 partitions before `serve`. Test databases of `pgtest` have no partitions; tests create them with
 the use case and their own size.
+
+### Idempotency keys (M1-20)
+
+Migration `00007_sync_idempotency_keys.sql` creates `idempotency_keys` exactly as in 03:
+`principal_id`, `key`, `action`, `request_sha256`, `state` (`in_progress` or `completed`, default
+`in_progress`), `response_status`, `response_body` (jsonb), `resource_id`, `created_at`,
+`expires_at`; primary key `(principal_id, key)`, foreign key to `principals(id)` with
+`ON DELETE CASCADE`, index `(expires_at)`, retention class `transient`. `bothy_app` has `SELECT,
+INSERT, UPDATE, DELETE`. `created_at` and `expires_at = created_at + sync.idempotency_key_ttl`
+come from `kernel/clock` through the request of the stage (03 Grundsatz 2).
+
+`IdempotencyStore` is the kernel port `idempotency.Store` the Idempotency-Key stage of
+`platform/httpserver` uses (02 "Idempotenz im Unit of Work"):
+
+- `Claim` (ambient transaction): delete the row of the key if `expires_at <= now`, then
+  `INSERT ... ON CONFLICT (principal_id, key) DO NOTHING` with `in_progress`; a taken key returns
+  its committed row. A concurrent uncommitted insert of the same key makes the insert wait; a wait
+  that ends with `database.lock_timeout` (SQLSTATE `55P03`) becomes `idempotency.ErrInProgress`
+  in the adapter, without wrapping the database error, so the unit of work does not retry it.
+- `Complete` (same transaction): `completed` with status, body and `resource_id`.
+- `SaveFinal` (own unit of work, `txn.Detach`): delete an expired row of the key, then insert the
+  completed row unless one exists.
+- Reads hand out the compact form of the stored jsonb.
+
+The job `sync.idempotency_cleanup` (`IdempotencyCleanup`, queue `maintenance`, periodic every
+`sync.idempotency_cleanup_interval`, run only by `worker` and `all`, no arguments) deletes rows
+with `expires_at <= now` in batches of `sync.idempotency_cleanup_batch_size`, oldest first, each
+batch in its own unit of work with `FOR UPDATE SKIP LOCKED`, until a batch is short; on
+cancellation it returns `ctx.Err()`. A repeated run is harmless.
+
+Configuration: `sync.idempotency_key_ttl` (04), `sync.idempotency_cleanup_interval` and
+`sync.idempotency_cleanup_batch_size` (02).
 
 ### Load test
 

@@ -168,8 +168,8 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `gateway.write_timeout` | `BOTHY_GATEWAY__WRITE_TIMEOUT` | Server |  | `10s` | Frist für einen WebSocket-Schreibvorgang | geplant (M1) |
 | `consumer.batch_size` | `BOTHY_CONSUMER__BATCH_SIZE` | Server |  | `500` | Ereignisse je Runde eines Worker-Verbrauchers | geplant (M2) |
 | `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server |  | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` | geplant (M2) |
-| `sync.idempotency_cleanup_interval` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_INTERVAL` | Server |  | `1h` | Abstand des Jobs `sync.idempotency_cleanup` | geplant (M1) |
-| `sync.idempotency_cleanup_batch_size` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE` | Server |  | `1000` | Zeilen je Löschstapel von `sync.idempotency_cleanup` | geplant (M1) |
+| `sync.idempotency_cleanup_interval` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_INTERVAL` | Server | duration | `1h` | Abstand des Jobs `sync.idempotency_cleanup` | aktiv |
+| `sync.idempotency_cleanup_batch_size` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE` | Server | int | `1000` | Zeilen je Löschstapel von `sync.idempotency_cleanup` | aktiv |
 | `ratelimit.max_tracked_keys` | `BOTHY_RATELIMIT__MAX_TRACKED_KEYS` | Server | int | `100000` | höchstens so viele Rate-Limit-Eimer hält ein Prozess; darüber werden volle, dann älteste Eimer entfernt | aktiv |
 | `ratelimit.sweep_interval` | `BOTHY_RATELIMIT__SWEEP_INTERVAL` | Server | duration | `1m` | Abstand, in dem volle Eimer entfernt werden (ein voller Eimer entscheidet wie ein fehlender) | aktiv |
 | `jobs.schema` | `BOTHY_JOBS__SCHEMA` | Server | string | `jobs` | PostgreSQL-Schema der River-Tabellen | aktiv |
@@ -267,7 +267,7 @@ Quelle: [04-sync-protokoll.md](../spec/04-sync-protokoll.md), Abschnitt 18.
 | `sync.catchup_max_events` | `BOTHY_SYNC__CATCHUP_MAX_EVENTS` | Server |  | `50000` | mehr Rückstand ergibt `resync_required` | geplant (M1) |
 | `sync.cursor_advance_every` | `BOTHY_SYNC__CURSOR_ADVANCE_EVERY` | Server |  | `1000` | nach so vielen übersprungenen Ereignissen ein `cursor`-Rahmen | geplant (M1) |
 | `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server |  | `10000` | Rahmen im Ausgang einer Verbindung bis `4014` | geplant (M1) |
-| `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server |  | `24h` | Aufbewahrung von `Idempotency-Key` | geplant (M1) |
+| `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | duration | `24h` | Aufbewahrung von `Idempotency-Key` | aktiv |
 | `sync.max_focused_threads` | `BOTHY_SYNC__MAX_FOCUSED_THREADS` | Server |  | `20` | Threads im `focus` je Verbindung | geplant (M1) |
 | `sync.run_patch_coalesce_interval` | `BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL` | Server |  | `250ms` | Sammelfenster für `run.updated` | geplant (M2) |
 | `sync.typing_min_interval` | `BOTHY_SYNC__TYPING_MIN_INTERVAL` | Server |  | `5s` | höchstens so oft `typing.start` | geplant (M1) |

@@ -397,6 +397,7 @@ services/server/
     kernel/                   Querschnitts-Ports (Abschnitt 4.5), ohne Abhängigkeiten im Projekt
     platform/                 Technik ohne Fachlogik
       config/ secrets/ pg/ httpserver/ ratelimit/ jobs/ otel/ health/ lifecycle/ egress/ buildinfo/
+      jsoncanon/
     wire/                     Verdrahtung je Rolle, Registrierung der In-Tx-Abonnenten
     <modul>/                  Port (Wurzelpaket)
       domain/

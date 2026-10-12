@@ -20,7 +20,10 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   # libopenapi validates requests against the contract (SEC-IN-1, M1-18); otel holds bothy.authz.errors
   # and the harness httpservertest (SDK reader and span recorder); secrets supplies the TLS
   # certificate and key references of the public listener (M1-21).
-  httpserver: {depends_on: [health, otel, secrets], vendors: [otel, libopenapi]}
+  # jsoncanon: the fingerprint of the Idempotency-Key stage hashes the RFC 8785 form of a JSON body (M1-20).
+  httpserver: {depends_on: [health, otel, secrets, jsoncanon], vendors: [otel, libopenapi]}
+  # RFC 8785 canonical JSON over gowebpki/jcs (M1-20).
+  jsoncanon: {depends_on: [], vendors: [jcs]}
   lifecycle: {depends_on: [otel], vendors: []}
   # Token buckets of the rate-limit classes (M1-19): the StageRateLimit middleware of httpserver
   # and the class attribute of bothy.ratelimit.rejected from otel/attr.
@@ -251,6 +254,7 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   otelhttp: [go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp]
   otelslog: [go.opentelemetry.io/contrib/bridges/otelslog]
   yaml: [go.yaml.in/yaml/v3]
+  jcs: [github.com/gowebpki/jcs]
   libopenapi: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator,
                github.com/pb33f/libopenapi-validator/**]
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]

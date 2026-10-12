@@ -45,8 +45,9 @@ import (
 )
 
 // Contract is the test contract (OpenAPI 3.1) the harness validates against by default: the
-// operations getThing, updateThing, createThing, createShape, createComposed, uploadBlob, postHook
-// and getDiscovery with the schema features of docs/api/openapi.yaml.
+// operations getThing, updateThing, createThing, createShape, createComposed, uploadBlob, postHook,
+// getDiscovery and uploadAvatar with the schema features of docs/api/openapi.yaml, and the keyed
+// operations createItem, updateItem and archiveItem of the Idempotency-Key stage (M1-20).
 //
 //go:embed contract.yaml
 var Contract []byte
@@ -254,6 +255,14 @@ func hasAll(set attribute.Set, want []attribute.KeyValue) bool {
 		}
 	}
 	return true
+}
+
+// KeyedOp returns Op with the Idempotency-Key parameter declared and ETag declared for the 2xx
+// statuses etag.
+func KeyedOp(id, method, path, action string, etag ...int) httpserver.Operation {
+	op := Op(id, method, path, action)
+	op.IdempotencyKey, op.ETagStatuses = true, etag
+	return op
 }
 
 // Op returns a test operation: Pattern is "<method> <path>", the body kind follows the method

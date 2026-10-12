@@ -31,6 +31,8 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
   writers; `internal/wire` passes them to `routes.Build`.
 - `NewValidator(spec, operationIDs)`, `CheckJSON`, `SanitizeJSON`, `ClientIP`, `CheckOrigin`,
   `FormatETag`, `ParseIfMatch`, `EncodeCursor`, `DecodeCursor`, `OperationFrom`.
+- `NewIdempotencyStage(cfg, store, uow, clock)`, `IdempotencyConfig`, `Fingerprint`,
+  `ReplayETag`: the Idempotency-Key stage; `internal/wire` installs it (`InstallIdempotency`).
 
 ## Stages
 
@@ -45,7 +47,7 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 | 7 | `StageAuthenticate` | precheck for requests with credentials (M1-19: `429` while `rl.public_auth` of the client IP is empty), `actor.Authenticator` with method, htu from `server.public_url`, `Authorization`, `DPoP`, client IP; failed-credentials hook |
 | 8 | `StageRateLimit` | token bucket of the operation's class (`platform/ratelimit`, M1-19): `RateLimit-Policy`, `RateLimit`; exhausted: `429 rate_limited` with `Retry-After` |
 | 9 | `StageMaintenance` | slot (M7-08) |
-| 10 | `StageIdempotency` | slot (M1-20) |
+| 10 | `StageIdempotency` | `Idempotency-Key` in the unit of work (M1-20, below) |
 | 11 | `StageBody` | media type (`415`), JSON guard (`400 malformed_request`), required body |
 | 12 | `StagePreconditions` | `IfMatchRequired` without `If-Match` or with `*`: `428` |
 | 13 | `StageValidate` | parameters and JSON body against the contract (`400 validation_failed`) |
@@ -53,6 +55,37 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 | 15 | handler | generated wrapper, strict handler, module adapter, use case with `authorize` |
 
 `TestChainOrder_Golden` holds this order (`testdata/chain_order.golden`).
+
+## Idempotency-Key (M1-20)
+
+`NewIdempotencyStage` builds `StageIdempotency` over `kernel/idempotency.Store` (implemented by
+the sync module) and `kernel/txn.UnitOfWork` (docs/spec/02-architektur.md "Idempotenz im Unit of
+Work", 06 "Idempotenz"). It acts only when the operation declares the parameter
+(`Operation.IdempotencyKey`), the request carries the header and the actor is not anonymous;
+otherwise the header has no effect. A key that is not one UUIDv7 is `400 validation_failed`
+(`#header/Idempotency-Key`, `invalid_format`).
+
+1. The body is read under the limit of `StageRoute` (over it: `413`, nothing stored) and the
+   read deadline is lifted. `Fingerprint` is SHA-256 over the upper-case method, `\n`, the
+   escaped path, `\n` and the RFC 8785 form of the body (`platform/jsoncanon`), the raw bytes
+   when the body is not JSON or repeats a member, empty without a body.
+2. The rest of the chain runs inside one unit of work; the use case joins it. `Store.Claim`
+   claims the key; a committed row answers from the store without the handler, the validator or
+   the proof: the stored status and body with `Idempotent-Replay: true`, `ETag` from `version`
+   for the statuses in `Operation.ETagStatuses` (`ReplayETag`), `422 idempotency_key_reuse` for
+   another fingerprint, `409 conflict` with `reason: one_time_secret` for a response whose handler
+   called `idempotency.MarkOneTimeSecret`. A wait for an uncommitted first request that ends with
+   `database.lock_timeout` is `409 request_in_progress`.
+3. The handler writes into a buffer. `2xx`: `Store.Complete` and commit with the effect (a
+   failed commit is the error of the unit of work, nothing stored). `400`, `403`, `404`, `409`
+   except `request_in_progress`, `410`, `412`, `413`, `415`, `422` with a JSON body: rollback,
+   then `Store.SaveFinal` in its own transaction. Every other status: rollback, nothing stored.
+4. A deadlock or lock timeout that reaches `WriteProblem` inside an attempt ends the attempt with
+   that error, so the unit of work retries it (`database.tx_retry_max`); each attempt gets the
+   body again and an empty buffer.
+
+The tests are `idempotency_test.go` (stage over an in-memory store) and
+`internal/sync/adapters/postgres/idempotency_http_test.go` (the full chain on PostgreSQL 18).
 
 ## Transport protection (M1-21)
 
@@ -135,6 +168,7 @@ operation ID must be in it. A handler that sends JSON `null` fails the test unle
 | `route.go` | `StageRoute`, response writer, proof |
 | `stages.go` | CORS, authentication, body, preconditions, validation stages |
 | `problem.go` | `WriteProblem` and the error mapping |
+| `idempotency.go` | `StageIdempotency`: fingerprint, unit of work, replay, buffered response |
 | `validate.go` | `Validator` (libopenapi-validator) and the FieldError mapping |
 | `jsonguard.go`, `sanitize.go` | JSON guard (SEC-IN-2), null and integer scan (ADR 0053) |
 | `clientip.go`, `etag.go`, `cursor.go`, `config.go`, `operation.go` | helpers and types |
@@ -143,5 +177,6 @@ operation ID must be in it. A handler that sends JSON `null` fails the test unle
 ## Dependencies
 
 `platform/health`, `platform/otel`, `platform/secrets` (references and versions of the TLS
-material), `kernel/actor`, `kernel/authorize`, kernel core; vendor groups
+material), `platform/jsoncanon` (fingerprint), `kernel/actor`, `kernel/authorize`,
+`kernel/idempotency`, `kernel/txn`, kernel core; vendor groups
 `otel` and `libopenapi` (module register).

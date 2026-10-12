@@ -402,6 +402,14 @@ alle Texte der YAML-Dateien (R-API-15); jede Antwort-Komponente nennt ihren Stat
    `Idempotent-Replay: true`; erst eine andere Marke bekommt `409 already_started`. Sonst würde ein
    Adapter, dessen Antwort verloren ging, einen laufenden Lauf nie bearbeiten (03
    `runs.started_jti`, 04 Abschnitt 15.3).
+6. When the header has no effect: the server ignores `Idempotency-Key` on an operation that does
+   not declare the parameter and for the anonymous actor (no public operation declares it, and
+   `idempotency_keys` references `principals`); such a request runs as without the header. Where
+   it acts, a value that is not one UUIDv7 is `400 validation_failed` with pointer
+   `#header/Idempotency-Key` and code `invalid_format`, and nothing is stored. The fingerprint
+   (`request_sha256`) is SHA-256 over the upper-case method, a line feed, the escaped request path
+   with `/api/v1` and without query, a line feed and the RFC 8785 form of the body (the raw bytes
+   when the body is not JSON or repeats a member, empty without a body); docs/DECISIONS.md M1-20.
 
 ## 8. Nebenläufigkeit
 

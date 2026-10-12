@@ -95,6 +95,10 @@ type routeWriter struct {
 	// with these headers only.
 	base http.Header
 
+	// replayed is set by StageIdempotency for a stored response: the check of the first
+	// request counts, authorize does not run again (06 "Idempotenz" point 4).
+	replayed bool
+
 	decided   bool
 	status    int
 	buffering bool
@@ -174,6 +178,9 @@ func (rw *routeWriter) SetWriteDeadline(t time.Time) error {
 
 // proven reports whether the check log holds a check of the route's action (Authorize or Scope).
 func (rw *routeWriter) proven() bool {
+	if rw.replayed {
+		return true
+	}
 	if rw.checks == nil {
 		return false
 	}
