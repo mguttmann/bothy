@@ -41,6 +41,11 @@ const (
 	kernelPorts = "kernel-ports"
 	internalDir = "internal/"
 	boolTag     = "!!bool"
+
+	componentWire        = "wire"
+	componentCmd         = "cmd"
+	componentAPI         = "api"
+	componentTestSupport = "testsupport"
 )
 
 // The layer components of a module: <module>-domain, <module>-app and <module>-adapters.
@@ -161,9 +166,9 @@ func components(r *register) []component {
 	for _, p := range platformNames(r) {
 		list = append(list, component{platformComponent(p), tree(internalDir + "platform/" + p)})
 	}
-	list = append(list, component{"wire", tree(internalDir + "wire")}, component{"cmd", []string{"cmd/**"}})
+	list = append(list, component{componentWire, tree(internalDir + componentWire)}, component{componentCmd, []string{"cmd/**"}})
 	if r.API != nil {
-		list = append(list, component{"api", []string{"api/**"}})
+		list = append(list, component{componentAPI, []string{"api/**"}})
 	}
 	for _, m := range r.moduleOrder {
 		list = append(list,
@@ -177,7 +182,7 @@ func components(r *register) []component {
 	for _, p := range r.TestSupport.Paths {
 		paths = append(paths, p+"/**")
 	}
-	return append(list, component{"testsupport", paths})
+	return append(list, component{componentTestSupport, paths})
 }
 
 func componentsNode(r *register) *yaml.Node {
@@ -200,15 +205,17 @@ type dep struct {
 }
 
 // deps lists the rules. go-arch-lint lets a component import its own packages only if the
-// component names itself in mayDependOn, so every rule starts with its own component: a module
-// has sub-packages in domain, app and adapters (sqlcgen, test helpers such as chattest), a
-// platform package its test helper (pgtest), api/routes uses api/rest (docs/DECISIONS.md M1-05/14).
-// kernel-ports has no rule: the kernel ports use no other port, only kernel-core (M1-05/15).
+// component names itself in mayDependOn or is a common component, so every rule starts with its
+// own component: a module has sub-packages in domain, app and adapters (sqlcgen, test helpers
+// such as chattest), a platform package its test helper (pgtest), api/routes uses api/rest
+// (docs/DECISIONS.md M1-05/14). kernel-core, the common component, would not need its rule and
+// keeps it for the uniform rule (M1-05/28). kernel-ports has no rule: the kernel ports use no
+// other port, only kernel-core (M1-05/15).
 func deps(r *register) []dep {
 	platforms := platformComponents(r)
 	var api []string
 	if r.API != nil {
-		api = []string{"api"}
+		api = []string{componentAPI}
 	}
 	list := []dep{{name: kernelCore, mayDependOn: []string{kernelCore}}}
 	for _, p := range platformNames(r) {
@@ -221,13 +228,13 @@ func deps(r *register) []dep {
 	for _, m := range r.moduleOrder {
 		all = append(all, moduleComponents(m)...)
 	}
-	wire := slices.Concat([]string{"wire"}, all, platforms, []string{kernelPorts}, api)
+	wire := slices.Concat([]string{componentWire}, all, platforms, []string{kernelPorts}, api)
 	list = append(list,
-		dep{name: "wire", mayDependOn: wire, canUse: vendorNames(r.Wire.Vendors)},
-		dep{name: "cmd", mayDependOn: slices.Concat([]string{"cmd", "wire"}, platforms, []string{kernelPorts}), canUse: vendorNames(r.Cmd.Vendors)},
+		dep{name: componentWire, mayDependOn: wire, canUse: vendorNames(r.Wire.Vendors)},
+		dep{name: componentCmd, mayDependOn: slices.Concat([]string{componentCmd, componentWire}, platforms, []string{kernelPorts}), canUse: vendorNames(r.Cmd.Vendors)},
 	)
 	if r.API != nil {
-		list = append(list, dep{name: "api", mayDependOn: api, canUse: vendorNames(r.API.Vendors)})
+		list = append(list, dep{name: componentAPI, mayDependOn: api, canUse: vendorNames(r.API.Vendors)})
 	}
 
 	for _, m := range r.moduleOrder {
@@ -243,7 +250,7 @@ func deps(r *register) []dep {
 			},
 		)
 	}
-	return append(list, dep{name: "testsupport", anything: true})
+	return append(list, dep{name: componentTestSupport, anything: true})
 }
 
 // depsNode renders the deps section. An entry with neither components nor vendors is left out,

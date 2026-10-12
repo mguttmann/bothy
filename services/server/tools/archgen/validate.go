@@ -55,7 +55,7 @@ var (
 // reservedModules are the names of the fixed components of the generated config; a module with one
 // of these names would produce a second component of the same name (the generated config would be
 // ambiguous).
-var reservedModules = []string{"kernel", "platform", "wire", "cmd", "api", "testsupport"}
+var reservedModules = []string{"kernel", "platform", componentWire, componentCmd, componentAPI, componentTestSupport}
 
 // The elements of a vendor pattern. go-arch-lint turns each pattern into a regular expression and
 // escapes only "." and "/", so a pattern may hold nothing but the characters of a Go import path
@@ -150,7 +150,7 @@ func (v *validator) validate() {
 }
 
 // productRoots hold the product code that the architecture gate checks; see validateScope.
-var productRoots = []string{"internal", "cmd", "api"}
+var productRoots = []string{"internal", componentCmd, componentAPI}
 
 // within reports whether dir is root or lies below it (both slash-separated relative paths).
 func within(dir, root string) bool {

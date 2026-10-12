@@ -86,12 +86,9 @@ linters:
       # table rows of tests repeat literals on purpose.
       - path: _test\.go$
         linters: [gocognit, goconst]
-      # Generated code, which sonar.exclusions leaves out of the analysis as well (M1-05/7).
-      - path: (\.gen|_gen|\.pb)\.go$|(^|/)sqlcgen/
-        linters: [gocognit, goconst]
-      # Two files of M1-05 that predate both linters; M1-05 owns that code (docs/DECISIONS.md
-      # M1-07). Every other file, also new files in tools/archgen, is checked.
-      - path: ^tools/archgen/(generate|validate)\.go$
+      # Generated code, which sonar.exclusions leaves out of the analysis as well (M1-05/7);
+      # tools/ci/tests/test_server_lint_config.py holds both lists together.
+      - path: (\.gen|_gen|\.pb)\.go$|(^|/)(sqlcgen|gen|generated)/
         linters: [gocognit, goconst]
 
 formatters:

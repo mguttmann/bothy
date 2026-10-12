@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -77,6 +78,14 @@ if name == "gofmt" and os.environ.get("FAKE_GOFMT_LIST"):
     print(os.environ["FAKE_GOFMT_LIST"])
 if name == "semgrep" and os.environ.get("FAKE_SEMGREP_FAIL_CONFIG") in args:
     sys.exit(1)
+if name == "go-arch-lint" and os.environ.get("FAKE_GAL_TREE"):
+    # What go-arch-lint sees: every name below the project, links included.
+    seen = sorted(os.path.relpath(os.path.join(d, f), os.getcwd())
+                  for d, dirs, files in os.walk(os.getcwd()) for f in dirs + files)
+    with open(os.environ["FAKE_GAL_TREE"], "w", encoding="utf-8") as fh:
+        json.dump(seen, fh)
+if name == "go-arch-lint" and os.environ.get("FAKE_GAL_REPORT"):
+    print("notice in " + os.path.join(os.getcwd(), os.environ["FAKE_GAL_REPORT"]))
 if os.getcwd() in os.environ.get(switch + "_FAIL_IN", "").split(os.pathsep):
     sys.exit(1)
 sys.exit(int(os.environ.get(switch + "_EXIT", "0")))
@@ -288,13 +297,19 @@ def test_arch_violation_fails_the_gate(fakes: Fakes, tmp_path: Path) -> None:
     assert len(fakes.calls("go-arch-lint")) == 1
 
 
-def _symlink(module: Path, kind: str) -> str:
-    """Link test support code into a domain package; returns the link as `find` names it."""
+def _harness(module: Path) -> Path:
+    """Test support code and a domain package beside it; returns the domain directory."""
     harness = module / "test" / "harness"
     harness.mkdir(parents=True)
     (harness / "h.go").write_text("package harness\n", encoding="utf-8")
     domain = module / "internal" / "chat" / "domain"
     domain.mkdir(parents=True)
+    return domain
+
+
+def _symlink(module: Path, kind: str) -> str:
+    """Link test support code into a domain package; returns the link as `find` names it."""
+    domain = _harness(module)
     if kind == "directory":
         (domain / "h").symlink_to("../../../test/harness", target_is_directory=True)
         return "./internal/chat/domain/h"
@@ -318,6 +333,121 @@ def test_arch_rejects_symbolic_links_in_the_module(
     assert f"arch: {fakes.module} has symbolic links" in result.stderr
     assert result.stderr.splitlines()[-1] == link
     assert fakes.calls("go-arch-lint") == []
+
+
+# Emacs marks a file it edits with a dangling link `.#<name>` -> `<user>@<host>.<pid>:<time>`.
+# Nothing can build code behind such a lock file, so `make arch` passes it by; a `.#` link that
+# resolves and a dangling link with any other name still fail (docs/DECISIONS.md M1-05/27). The
+# run with the real go-arch-lint is test_make_arch_with_editor_lock_files_and_the_real_go_arch_lint.
+_LOCK_CASES = {
+    "editor lock file": (".#README.md", "user@example.123:1700000000", True),
+    "editor lock file of a Go file": (".#name.go", "user@example.123:1700000000", True),
+    "resolvable .# link to a directory": (".#h", "../../../test/harness", False),
+    "resolvable .# link to a file": (".#h.go", "../../../test/harness/h.go", False),
+    "dangling link with another name": ("README.md", "user@example.123:1700000000", False),
+}
+
+
+@pytest.mark.parametrize("shell", SHELLS, ids=SHELL_IDS)
+@pytest.mark.parametrize("case", list(_LOCK_CASES))
+def test_arch_passes_editor_lock_files_only(
+    fakes: Fakes, tmp_path: Path, shell: list[str], case: str
+) -> None:
+    name, target, passes = _LOCK_CASES[case]
+    (fakes.module / ".go-arch-lint.yml").write_text("version: 3\n", encoding="utf-8")
+    (_harness(fakes.module) / name).symlink_to(target)
+    command = _recipe_command("arch", "--arch-file", fakes)
+    tree = tmp_path / "tree.json"
+    result = _bash(command, fakes, shell, FAKE_GAL_TREE=str(tree))
+    if passes:
+        assert result.returncode == 0, result.stderr
+        [call] = fakes.calls("go-arch-lint")
+        # go-arch-lint 1.19.0 stops at any dangling link below a `**` component, before
+        # excludeFiles applies, so it checks a copy without the lock files (M1-05/27).
+        seen = json.loads(tree.read_text(encoding="utf-8"))
+        for kept in ("internal/chat/domain", "test/harness/h.go", ".go-arch-lint.yml", "go.mod"):
+            assert kept in seen
+        assert not [p for p in seen if Path(p).name.startswith(".#")]
+        assert call["cwd"] != str(fakes.module.resolve())
+        assert not Path(call["cwd"]).exists(), "the copy is removed"
+    else:
+        assert result.returncode != 0
+        assert result.stderr.splitlines()[-1] == f"./internal/chat/domain/{name}"
+        assert fakes.calls("go-arch-lint") == []
+
+
+@pytest.mark.parametrize("shell", SHELLS, ids=SHELL_IDS)
+def test_arch_names_module_files_when_it_checks_a_copy(fakes: Fakes, shell: list[str]) -> None:
+    """A finding in the copy points at the file of the module, and the gate still fails."""
+    (fakes.module / ".go-arch-lint.yml").write_text("version: 3\n", encoding="utf-8")
+    (_harness(fakes.module) / ".#name.go").symlink_to("user@example.123:1700000000")
+    command = _recipe_command("arch", "--arch-file", fakes)
+    report = "internal/chat/domain/name.go:3"
+    result = _bash(command, fakes, shell, FAKE_GO_ARCH_LINT_EXIT="1", FAKE_GAL_REPORT=report)
+    assert result.returncode != 0
+    [call] = fakes.calls("go-arch-lint")
+    output = result.stdout + result.stderr
+    assert f"notice in {fakes.module.resolve()}/{report}" in output
+    assert call["cwd"] not in output
+    assert not Path(call["cwd"]).exists(), "the copy is removed"
+
+
+def _real_go_arch_lint() -> Path:
+    """The pinned go-arch-lint, as make fetches it (like the gitleaks rule tests)."""
+    sys.path.insert(0, str(REPO / "tools" / "bin"))
+    import fetch_tools
+
+    lock = fetch_tools.load_lock(fetch_tools.DEFAULT_LOCK)
+    plat = fetch_tools.platform_key()
+    return fetch_tools.ensure(lock, "go-arch-lint", plat, fetch_tools.DEFAULT_CACHE)
+
+
+@pytest.mark.parametrize("violation", [False, True], ids=["clean", "violation"])
+def test_make_arch_with_editor_lock_files_and_the_real_go_arch_lint(
+    fakes: Fakes, tmp_path: Path, violation: bool
+) -> None:
+    """The pinned go-arch-lint 1.19.0 stops at a dangling link below a `**` component (cmd/**,
+    internal/wire/**) before excludeFiles applies; with lock files make arch hands it a copy."""
+    module = tmp_path / "server"
+    shutil.copytree(
+        REPO / "services" / "server",
+        module,
+        # A lock file of the developer's own editor would make copytree fail on its dangling link.
+        ignore=shutil.ignore_patterns("coverage.out", ".#*"),
+    )
+    pin = fakes.pins / "go-arch-lint" / "go-arch-lint"
+    pin.unlink()
+    pin.symlink_to(_real_go_arch_lint())
+    (fakes.bin / "go").unlink()  # the real go, in case go-arch-lint asks it
+    for name in (
+        "cmd/bothy/.#main.go",
+        "internal/wire/.#README.md",
+        "internal/kernel/errs/.#errs.go",
+    ):
+        (module / name).symlink_to("user@example.123:1700000000")
+    probe = module / "internal" / "kernel" / "ids" / "zz_probe.go"
+    if violation:
+        wire = "github.com/OWNER/bothy/services/server/internal/wire"
+        probe.write_text(f'package ids\n\nimport _ "{wire}"\n', encoding="utf-8")
+    result = fakes.make("arch", modules=str(module))
+    output = result.stdout + result.stderr
+    if violation:
+        assert result.returncode != 0
+        assert "kernel-core shouldn't depend on" in output
+        assert f"{module.resolve()}/internal/kernel/ids/zz_probe.go:3" in output
+    else:
+        assert result.returncode == 0, output
+        assert "No warnings found" in output
+
+
+def test_make_arch_passes_an_editor_lock_file(fakes: Fakes) -> None:
+    (fakes.module / ".go-arch-lint.yml").write_text("version: 3\n", encoding="utf-8")
+    chat = fakes.module / "internal" / "chat"
+    chat.mkdir(parents=True)
+    (chat / ".#README.md").symlink_to("user@example.123:1700000000")
+    result = fakes.make("arch")
+    assert result.returncode == 0, result.stderr
+    assert len(fakes.calls("go-arch-lint")) == 1
 
 
 def test_make_arch_rejects_a_linked_directory(fakes: Fakes) -> None:
