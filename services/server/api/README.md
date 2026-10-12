@@ -100,8 +100,10 @@ Etappe (und dem Ticket, das sie baut); sonst scheitert der Generator in `make co
 ## Start-Prüfung
 
 `wire.MountRoutes(role, mux, handlers, cat, log)` ist Schritt 7 des Starts (02 "Start"): Für die
-Rollen `api` und `all` ruft es `routes.Build(handlers, routes.Options{}, cat)`; `cat` ist heute
-`routes.SpecCatalog()`. `Build` lässt den erzeugten
+Rollen `api` und `all` ruft es `routes.Build(handlers, routes.Options{}, cat)`; since M1-25 `cat`
+is the closed catalogue of `authz` (`authz/app.Catalog`), and the start step checks the route
+bindings against it first (`internal/authz/README.md`). `routes.SpecCatalog()` remains for the
+tests of this package. `Build` lässt den erzeugten
 std-http- und Strict-Server auf einem `routes.Recorder` registrieren und vergleicht mit `Verify`
 jedes registrierte Muster mit der Tabelle, jede Aktion mit dem Katalog und jede Klasse mit der
 Klasse der Aktion (05 Regel 3, AZ-P1). Bei einem Befund protokolliert `MountRoutes`
@@ -110,8 +112,8 @@ zurück. Sonst hängt es jede Route unter `Route.Operation.Pattern` am öffentli
 Befehl `bothy serve` und den öffentlichen Listener baut M1-11; der Vertrag mit diesem Ticket:
 `bothy serve` ruft den Schritt vor dem Öffnen des öffentlichen Listeners auf und endet bei einem
 Fehler mit Exitcode 1, bevor es bereit meldet (bis dahin ist der Abbruch auf der Ebene des
-Schritts getestet, `TestServe_AbortsOnUnknownAction`). Der Katalog ist ein Parameter, damit M1-25
-den geschlossenen Katalog von `authz` einsetzt.
+Schritts getestet, `TestServe_AbortsOnUnknownAction`). Der Katalog ist ein Parameter; M1-25
+passes the closed catalogue of `authz`.
 
 `routes.Options` trägt die Fehler-Handler des erzeugten Servers; `nil` heißt der Standard von
 oapi-codegen, der den Fehlertext mit 400 oder 500 schreibt. M1-18 setzt die Problem-Schreiber ein.

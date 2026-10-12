@@ -110,6 +110,15 @@ linters:
       # German ("Autor"); misspell checks English (docs/DECISIONS.md M1-17/27).
       - path: ^api/routes/(internal/fixture/routes/)?catalog\.gen\.go$
         linters: [misspell]
+      # The generated catalogue metadata of authz copies the column "Recht" verbatim as well
+      # (M1-25, docs/DECISIONS.md M1-25/7).
+      - path: ^internal/authz/domain/catalog_gen\.go$
+        linters: [misspell]
+      # Action ids such as auth.token.refresh look like credentials to G101; they are catalogue
+      # ids of the generated identifier file (M1-25, docs/DECISIONS.md M1-25/7).
+      - path: ^internal/kernel/authorize/catalog_ids_gen\.go$
+        linters: [gosec]
+        text: "G101:"
       # oapi-codegen writes capitalized error strings ("Header parameter ... is required"); only
       # this check of staticcheck is left out of its output (docs/DECISIONS.md M1-17/27).
       - path: ^api/(rest|routes/internal/fixture/rest)/rest\.gen\.go$

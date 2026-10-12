@@ -18,6 +18,7 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 | `audit.go` | `Audit` (`NewAudit`, `Start`, `UoW`, `Recorder`), `AuditConfig`, `SecretsKEK`: the audit module of a role (M1-24) |
 | `txn.go` | `Modules`, `NewModules`, `NewTxnRegistry` (the one list of hooks and subscribers, golden file `testdata/txn_registrations.golden`), `UnitConfig` |
 | `routes.go` | `Role`, `Handlers`, `MountRoutes` (start step 7, every route through the HTTP chain, CORS preflights), `RouteOptions`, `HTTPOperation` |
+| `authz.go` | catalogue start check (M1-25): `BuildRegistry` over the module `Register` functions (`Deps.Registrations` replaces them in tests), `RouteBindings`, `NewAuthzCatalog` (closed catalogue with `bothy.authz.errors`); every role checks routes and registrations before the routes are mounted, one ERROR line `registration check failed` per violation |
 | `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
 | `switchlog.go` | the process logger that follows the switch from stdout JSON to the telemetry logger |
 
@@ -35,7 +36,7 @@ components, in start order:
 | `schema` | `pg.CheckSchema` against the highest embedded version; older aborts with the hint to run `bothy migrate up` | all |
 | `instance` | loads the instance row through `instance.State` (missing: abort with the hint to run `bothy migrate up`), logs the setup state, compares the own version with `instance.min_server_version`; below it the readiness check `schema_requires_newer_server` fails for good (M1-15) | all |
 | `audit` | resolves `privacy.audit_ip_kek_ref` once (fail fast), builds the audit module with the unit of work of the role (`NewAudit`) and starts the aggregator of denials (`Audit.Start`), registering the stop step `audit_denials` (M1-24) | all |
-| `routes` | `NewChain` (validator over `api/rest.Spec`, `actor.AnonymousOnly`), then `MountRoutes` on the public mux | api, all |
+| `routes` | catalogue check of route bindings and registrations (all roles, M1-25); then `NewChain` (validator over `api/rest.Spec`, `actor.AnonymousOnly`) and `MountRoutes` on the public mux with the `authz` catalogue | api, all (check: every role) |
 | `public_listener` | opens `server.listen_addr`, logs `public listener started` | api, all |
 | `ready` | readiness passes `startup`, logs `server ready` | all |
 

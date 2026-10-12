@@ -21,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/api/routes"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
@@ -80,6 +81,10 @@ type Deps struct {
 	Migrations fs.FS
 	// Handlers is the composite of the module handlers that MountRoutes mounts (M1-17).
 	Handlers Handlers
+	// Registrations are the Register functions whose event types, gateway ops and terminal
+	// channel ops the start checks against the catalogue (M1-25); nil means the functions of the
+	// module ports. Tests inject a bad registration here.
+	Registrations []func(*authorize.Registry)
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
@@ -136,8 +141,8 @@ type server struct {
 //     start), build the audit module with the unit of work of the role and start the aggregator
 //     of denials; its stop step audit_denials flushes the open aggregations before the pool
 //     closes (startAudit),
-//  7. extension points, in this order: signing keys (M1-32), routes
-//     (MountRoutes, api and all), log tail (M1-16, api and all), jobs and consumers (M1-14,
+//  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
+//     route bindings and registrations for every role, M1-25, then MountRoutes, api and all), log tail (M1-16, api and all), jobs and consumers (M1-14,
 //     worker and all),
 //  8. public listener (api and all) through httpserver.ListenPublic: own TLS, or plaintext only
 //     from loopback and server.trusted_proxies (SEC-TLS-1, SEC-TLS-2),
@@ -464,23 +469,33 @@ func (s *server) checkSchema(ctx context.Context) error {
 	return pg.CheckSchema(ctx, pool, s.required)
 }
 
-// mountRoutes builds the HTTP chain (api and all) and mounts the routes through it. The request
-// validator knows only the enabled operations, so the start compiles no schema of a route it
-// does not serve. Until identity is wired (M1-34) the chain authenticates with
-// actor.AnonymousOnly: every credential is refused (fail closed).
+// mountRoutes checks the route bindings and the registrations of the modules against the closed
+// catalogue of authz (every role, M1-25), then builds the HTTP chain (api and all) and mounts the
+// routes through it with the same catalogue. The request validator knows only the enabled
+// operations, so the start compiles no schema of a route it does not serve. Until identity is
+// wired (M1-34) the chain authenticates with actor.AnonymousOnly: every credential is refused
+// (fail closed).
 func (s *server) mountRoutes(context.Context) error {
-	if !s.api() {
-		return nil
-	}
-	chain, err := NewChain(s.chainCfg, s.logger())
+	log := s.logger()
+	cat, err := NewAuthzCatalog(log)
 	if err != nil {
 		return err
 	}
-	s.mu.Lock()
-	mux := s.publicMux()
-	s.chain = chain
-	s.mu.Unlock()
-	return MountRoutes(s.role, mux, s.deps.Handlers, routes.SpecCatalog(), chain, s.logger())
+	var mount func() error
+	if s.api() {
+		mount = func() error {
+			chain, err := NewChain(s.chainCfg, log)
+			if err != nil {
+				return err
+			}
+			s.mu.Lock()
+			mux := s.publicMux()
+			s.chain = chain
+			s.mu.Unlock()
+			return MountRoutes(s.role, mux, s.deps.Handlers, cat, chain, log)
+		}
+	}
+	return startRoutes(RouteBindings(routes.Enabled()), BuildRegistry(s.deps.Registrations), cat, log, mount)
 }
 
 // NewChain builds the HTTP chain of the public listener for the enabled operations: the validator

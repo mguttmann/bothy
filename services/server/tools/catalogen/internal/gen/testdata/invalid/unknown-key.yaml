@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+version: 1
+rate_limit_classes:
+- id: rl.read
+  key: Prinzipal
+  purpose: lesen
+sections:
+- public
+actions:
+- id: message.read
+  section: public
+  description: x
+  resource: message
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+  colour: blue
+events: []
+ws_ops: []
+channel_ops: []

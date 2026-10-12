@@ -172,6 +172,18 @@ func (c *child) port(t *testing.T, msg string) int {
 	return 0
 }
 
+// waitLine waits up to 30 seconds for stdout to contain text.
+func (c *child) waitLine(t *testing.T, text string) {
+	t.Helper()
+	deadline := time.Now().Add(30 * time.Second)
+	for !strings.Contains(c.stdout.String(), text) {
+		if time.Now().After(deadline) {
+			t.Fatalf("no line with %s; stdout:\n%s", text, c.stdout)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
 func httpGet(port int, path string) (int, string) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://127.0.0.1:"+strconv.Itoa(port)+path, nil)
 	if err != nil {
@@ -226,10 +238,10 @@ func TestServeReadyAfterStart(t *testing.T) {
 	c := startChild(t, serveTestEnv(t, db), "serve")
 	internal := c.port(t, "internal listener started")
 	waitHTTP(t, internal, "/readyz", http.StatusOK)
-	if !strings.Contains(c.stdout.String(), `"msg":"server ready"`) {
-		t.Fatalf("no ready line:\n%s", c.stdout)
-	}
-	if logPort(c.stdout.String(), "public listener started") == 0 {
+	// The child's stdout reaches the buffer through a pipe, so a line written before /readyz
+	// passed can still be in flight; wait for it instead of reading the buffer once.
+	c.waitLine(t, `"msg":"server ready"`)
+	if c.port(t, "public listener started") == 0 {
 		t.Fatal("role all (the default) has no public listener")
 	}
 	c.signal(t)
