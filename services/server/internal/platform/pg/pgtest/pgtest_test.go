@@ -143,7 +143,7 @@ func TestDatabaseIsDroppedAtCleanup(t *testing.T) {
 func TestFailedTemplateIsDropped(t *testing.T) {
 	t.Parallel()
 	broken := fstest.MapFS{"00001_broken.sql": {Data: []byte("-- +goose Up\nSELECT * FROM no_such_table;\n")}}
-	c, err := sharedCluster()
+	c, err := sharedCluster(false)
 	if err != nil {
 		t.Fatal(err)
 	}
