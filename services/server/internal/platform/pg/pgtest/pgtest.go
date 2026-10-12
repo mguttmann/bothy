@@ -448,7 +448,9 @@ func (c *cluster) create(ctx context.Context, name, template string, fsys fs.FS)
 		return err
 	}
 	err = pg.BootstrapDatabase(ctx, conn, name)
-	_ = conn.Close(context.WithoutCancel(ctx))
+	cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), cleanupTimeout)
+	_ = conn.Close(cctx)
+	cancel()
 	if err != nil {
 		return fmt.Errorf("pgtest: %w", err)
 	}
