@@ -286,3 +286,42 @@ func TestHealthOperations_FindsProbes(t *testing.T) {
 		t.Errorf("healthOperations = %v, want %v", got, want)
 	}
 }
+
+func TestGenerate_RejectsKeyedOperationWithQuery(t *testing.T) {
+	expectProblems(t, "keyed-query", 1, "createThing", "Idempotency-Key", "query parameter")
+}
+
+func TestGenerate_RejectsKeyedOperationWithNonJSONBody(t *testing.T) {
+	expectProblems(t, "keyed-non-json-body", 1, "createThing", "Idempotency-Key", "application/json")
+}
+
+func TestGenerate_RejectsKeyedOperationWithNonJSONResponse(t *testing.T) {
+	expectProblems(t, "keyed-non-json-response", 1, "createThing", "Idempotency-Key", "201")
+}
+
+func TestGenerate_RejectsKeyedETagOperationWithoutVersion(t *testing.T) {
+	expectProblems(t, "keyed-etag-without-version", 1, "createThing", "ETag", "version")
+}
+
+// TestRealSpec_KeyedOperationsReplayable holds the generator checks for keyed operations on every
+// operation of docs/api/openapi.yaml, enabled or not: a replay can rebuild each of their
+// responses from the stored body (06 "Idempotency" point 4).
+func TestRealSpec_KeyedOperationsReplayable(t *testing.T) {
+	in, err := realInputs()
+	if err != nil {
+		t.Fatalf("real inputs: %v", err)
+	}
+	keyed := 0
+	for _, op := range in.ops {
+		if op.IdempotencyKey {
+			keyed++
+		}
+	}
+	if keyed == 0 {
+		t.Fatal("the real spec declares no keyed operation")
+	}
+}
+
+func TestGenerate_RejectsKeyedOperationWithNonJSONRangeResponse(t *testing.T) {
+	expectProblems(t, "keyed-non-json-range", 1, "createThing", "Idempotency-Key", "2XX")
+}

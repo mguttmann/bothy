@@ -127,6 +127,9 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"sync.log_poll_interval":              {Kind: config.KindDuration, Default: "1s", Min: "1ms", Chapter: "02-architecture.md"},
 		"sync.tail_batch_size":                {Kind: config.KindInt, Default: "1000", Min: "1", Max: "2147483647", Chapter: "02-architecture.md"},
 		"sync.partition_maintenance_interval": {Kind: config.KindDuration, Default: "10m", Min: "1s", Chapter: "02-architecture.md"},
+		"sync.idempotency_key_ttl":            {Kind: config.KindDuration, Default: "24h", Min: "1s", Chapter: "04-sync-protocol.md"},
+		"sync.idempotency_cleanup_interval":   {Kind: config.KindDuration, Default: "1h", Min: "1s", Chapter: "02-architecture.md"},
+		"sync.idempotency_cleanup_batch_size": {Kind: config.KindInt, Default: "1000", Min: "1", Max: "2147483647", Chapter: "02-architecture.md"},
 		"sync.event_log_partitions_ahead":     {Kind: config.KindInt, Default: "3", Min: "1", Max: "1000", Chapter: "02-architecture.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.

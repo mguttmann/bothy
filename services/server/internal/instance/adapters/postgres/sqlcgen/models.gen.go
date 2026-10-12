@@ -108,6 +108,19 @@ type GroupMembership struct {
 	RemovedBy        pgtype.UUID
 }
 
+type IdempotencyKey struct {
+	PrincipalID    pgtype.UUID
+	Key            pgtype.UUID
+	Action         string
+	RequestSha256  []byte
+	State          string
+	ResponseStatus pgtype.Int2
+	ResponseBody   []byte
+	ResourceID     pgtype.UUID
+	CreatedAt      pgtype.Timestamptz
+	ExpiresAt      pgtype.Timestamptz
+}
+
 type Instance struct {
 	ID               int16
 	InstanceID       pgtype.UUID

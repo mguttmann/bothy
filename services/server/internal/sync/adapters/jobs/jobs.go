@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package jobs is the adapter of the sync module to platform/jobs: the job
-// sync.partition_maintenance (docs/spec/02-architecture.md "Job catalogue") with its arguments,
-// handler and periodic registration.
+// Package jobs is the adapter of the sync module to platform/jobs: the jobs
+// sync.partition_maintenance and sync.idempotency_cleanup (docs/spec/02-architecture.md
+// "Job catalogue") with their arguments, handlers and periodic registrations.
 package jobs
 
 import (

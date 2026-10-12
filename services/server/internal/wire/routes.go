@@ -68,6 +68,7 @@ func HTTPOperation(op routes.Operation) httpserver.Operation {
 		IfMatch:      httpserver.IfMatchMode(op.IfMatch),
 		RequestBody:  httpserver.BodyKind(op.RequestBody),
 		BodyRequired: op.BodyRequired,
+		ETagStatuses: slices.Clone(op.ETagStatuses),
 	}
 }
 

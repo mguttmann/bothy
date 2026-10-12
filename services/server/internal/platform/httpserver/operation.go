@@ -78,6 +78,9 @@ type Operation struct {
 	RequestBody BodyKind
 	// BodyRequired is requestBody.required.
 	BodyRequired bool
+	// ETagStatuses are the 2xx statuses whose response declares ETag; a replay of the
+	// Idempotency-Key stage derives the ETag of these statuses from version in the stored body.
+	ETagStatuses []int
 }
 
 // Route is one operation with the handler to mount for it; Chain.Wrap puts the per-route stages

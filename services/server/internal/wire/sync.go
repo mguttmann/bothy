@@ -15,8 +15,10 @@ import (
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
+	"github.com/OWNER/bothy/services/server/internal/kernel/idempotency"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/sync"
@@ -37,13 +39,17 @@ type SyncConfig struct {
 	Tail syncpg.TailConfig
 	// MaintenanceInterval is sync.partition_maintenance_interval.
 	MaintenanceInterval time.Duration `config:"sync.partition_maintenance_interval"`
+	// Idempotency holds sync.idempotency_key_ttl for the Idempotency-Key stage (M1-20).
+	Idempotency httpserver.IdempotencyConfig
+	// Cleanup holds the interval and batch size of the job sync.idempotency_cleanup (M1-20).
+	Cleanup syncapp.IdempotencyCleanupConfig
 }
 
 // SyncConfigFrom binds SyncConfig from v. The error names the key whose binding failed, never a
 // value.
 func SyncConfigFrom(v *config.Values) (SyncConfig, error) {
 	var c SyncConfig
-	for _, dst := range []any{&c.Appender, &c.Partitions, &c.Tail} {
+	for _, dst := range []any{&c.Appender, &c.Partitions, &c.Tail, &c.Idempotency, &c.Cleanup} {
 		if err := config.Bind(v, dst); err != nil {
 			return SyncConfig{}, err
 		}
@@ -66,21 +72,27 @@ func newSyncHook(pool *pg.Pool, log *slog.Logger) *syncapp.PhaseHook {
 	return syncapp.NewPhaseHook(counters, syncpg.NewRepository(pool, orDiscard(log)))
 }
 
-// Sync is the event log of a process: the appender every module receives as eventlog.Appender,
-// the partition maintenance (job and bothy migrate up) and the log tail of the roles api and all.
+// Sync is the sync module of a process: the appender every module receives as eventlog.Appender,
+// the partition maintenance (job and bothy migrate up), the log tail of the roles api and all,
+// the idempotency store behind kernel idempotency.Store and its cleanup job (M1-20).
 type Sync struct {
 	cfg         SyncConfig
 	pool        *pg.Pool
+	uow         txn.UnitOfWork
+	clock       clock.Clock
 	repo        *syncpg.Repository
 	appender    *syncapp.Appender
 	maintenance *syncapp.PartitionMaintenance
+	keys        *syncapp.IdempotencyStore
+	cleanup     *syncapp.IdempotencyCleanup
 	log         *slog.Logger
 }
 
-// NewSync assembles the event log over pool with the unit of work uow (whose registry holds the
-// sync hook), cfg, the clock c of the retention cutoff and log. It opens no connection.
+// NewSync assembles the sync module over pool with the unit of work uow (whose registry holds the
+// sync hook), cfg, the clock c of the retention cutoff and the key cleanup, and log. It opens no
+// connection.
 //
-// Errors: a configuration the appender or the maintenance refuse.
+// Errors: a configuration the appender, the maintenance or the cleanup refuse.
 func NewSync(pool *pg.Pool, uow txn.UnitOfWork, cfg SyncConfig, c clock.Clock, log *slog.Logger) (*Sync, error) {
 	log = orDiscard(log)
 	if c == nil {
@@ -95,7 +107,35 @@ func NewSync(pool *pg.Pool, uow txn.UnitOfWork, cfg SyncConfig, c clock.Clock, l
 	if err != nil {
 		return nil, err
 	}
-	return &Sync{cfg: cfg, pool: pool, repo: repo, appender: a, maintenance: m, log: log}, nil
+	keyRows := syncpg.NewIdempotencyRepository(pool)
+	cleanup, err := syncapp.NewIdempotencyCleanup(cfg.Cleanup, uow, keyRows, c)
+	if err != nil {
+		return nil, err
+	}
+	return &Sync{
+		cfg: cfg, pool: pool, uow: uow, clock: c, repo: repo, appender: a, maintenance: m,
+		keys: syncapp.NewIdempotencyStore(keyRows, uow), cleanup: cleanup, log: log,
+	}, nil
+}
+
+// IdempotencyStore returns the store of sync behind the kernel port (02 "Ports, Ereignisse und
+// Quellen je Modul": sync implements idempotency.Store).
+func (s *Sync) IdempotencyStore() idempotency.Store { return s.keys }
+
+// IdempotencyCleanup returns the use case of the job sync.idempotency_cleanup.
+func (s *Sync) IdempotencyCleanup() *syncapp.IdempotencyCleanup { return s.cleanup }
+
+// InstallIdempotency is the Idempotency-Key part of start step 7 for the roles api and all: it
+// installs StageIdempotency (02 "Kette im api-Knoten" step 10) in chain over the store and the
+// unit of work of sy, with sync.idempotency_key_ttl from cfg and the clock of sy. Call it before
+// the routes are mounted. The error is a configuration the stage refuses.
+func InstallIdempotency(chain *httpserver.Chain, sy *Sync, cfg SyncConfig) error {
+	stage, err := httpserver.NewIdempotencyStage(cfg.Idempotency, sy.keys, sy.uow, sy.clock)
+	if err != nil {
+		return err
+	}
+	chain.Use(httpserver.StageIdempotency, stage)
+	return nil
 }
 
 // Appender returns the appender of durable events for the module constructors.

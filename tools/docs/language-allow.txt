@@ -11,6 +11,9 @@ path: tools/docs/tests/data/language/*
 # Test vector of the audit hash chain (M1-24): its hashes were computed independently over a
 # non-ASCII reason, so the text cannot change without a new vector.
 path: services/server/internal/audit/domain/testdata/chain_v1.json
+# The sorting example of RFC 8785 section 3.2.3 (M1-20): its keys include U+00F6, and the test
+# keeps the published vector unchanged.
+path: services/server/internal/platform/jsoncanon/jsoncanon_test.go
 # Third-party files, kept byte for byte as published.
 path: tools/design-tokens/vendor/fonts/*
 path: tools/design-tokens/vendor/phosphor/*

@@ -14,6 +14,8 @@ vendors:
     in: [github.com/aws/aws-sdk-go-v2, github.com/aws/aws-sdk-go-v2/**, github.com/aws/smithy-go, github.com/aws/smithy-go/**]
   v-goose:
     in: [github.com/pressly/goose/v3, github.com/pressly/goose/v3/**]
+  v-jcs:
+    in: [github.com/gowebpki/jcs]
   v-libopenapi:
     in: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator, github.com/pb33f/libopenapi-validator/**]
   v-mobyapi:
@@ -57,6 +59,8 @@ components:
     in: [internal/platform/httpserver, internal/platform/httpserver/**]
   platform-jobs:
     in: [internal/platform/jobs, internal/platform/jobs/**]
+  platform-jsoncanon:
+    in: [internal/platform/jsoncanon, internal/platform/jsoncanon/**]
   platform-lifecycle:
     in: [internal/platform/lifecycle, internal/platform/lifecycle/**]
   platform-otel:
@@ -251,11 +255,14 @@ deps:
   platform-health:
     mayDependOn: [platform-health, kernel-ports]
   platform-httpserver:
-    mayDependOn: [platform-httpserver, kernel-ports, platform-health, platform-otel, platform-secrets]
+    mayDependOn: [platform-httpserver, kernel-ports, platform-health, platform-otel, platform-secrets, platform-jsoncanon]
     canUse: [v-otel, v-libopenapi]
   platform-jobs:
     mayDependOn: [platform-jobs, kernel-ports, platform-pg, platform-otel]
     canUse: [v-river, v-pgx, v-otel]
+  platform-jsoncanon:
+    mayDependOn: [platform-jsoncanon, kernel-ports]
+    canUse: [v-jcs]
   platform-lifecycle:
     mayDependOn: [platform-lifecycle, kernel-ports, platform-otel]
   platform-otel:
@@ -271,9 +278,9 @@ deps:
     mayDependOn: [platform-secrets, kernel-ports]
     canUse: [v-age, v-otel]
   wire:
-    mayDependOn: [wire, instance, instance-domain, instance-app, instance-adapters, billing, billing-domain, billing-app, billing-adapters, audit, audit-domain, audit-app, audit-adapters, authz, authz-domain, authz-app, authz-adapters, identity, identity-domain, identity-app, identity-adapters, chat, chat-domain, chat-app, chat-adapters, agents, agents-domain, agents-app, agents-adapters, files, files-domain, files-app, files-adapters, messaging, messaging-domain, messaging-app, messaging-adapters, status, status-domain, status-app, status-adapters, terminal, terminal-domain, terminal-app, terminal-adapters, runs, runs-domain, runs-app, runs-adapters, search, search-domain, search-app, search-adapters, importer, importer-domain, importer-app, importer-adapters, privacy, privacy-domain, privacy-app, privacy-adapters, sync, sync-domain, sync-app, sync-adapters, stats, stats-domain, stats-app, stats-adapters, notify, notify-domain, notify-app, notify-adapters, apps, apps-domain, apps-app, apps-adapters, gateway, gateway-domain, gateway-app, gateway-adapters, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, kernel-ports, api, migrations]
+    mayDependOn: [wire, instance, instance-domain, instance-app, instance-adapters, billing, billing-domain, billing-app, billing-adapters, audit, audit-domain, audit-app, audit-adapters, authz, authz-domain, authz-app, authz-adapters, identity, identity-domain, identity-app, identity-adapters, chat, chat-domain, chat-app, chat-adapters, agents, agents-domain, agents-app, agents-adapters, files, files-domain, files-app, files-adapters, messaging, messaging-domain, messaging-app, messaging-adapters, status, status-domain, status-app, status-adapters, terminal, terminal-domain, terminal-app, terminal-adapters, runs, runs-domain, runs-app, runs-adapters, search, search-domain, search-app, search-adapters, importer, importer-domain, importer-app, importer-adapters, privacy, privacy-domain, privacy-app, privacy-adapters, sync, sync-domain, sync-app, sync-adapters, stats, stats-domain, stats-app, stats-adapters, notify, notify-domain, notify-app, notify-adapters, apps, apps-domain, apps-app, apps-adapters, gateway, gateway-domain, gateway-app, gateway-adapters, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, kernel-ports, api, migrations]
   cmd:
-    mayDependOn: [cmd, wire, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, kernel-ports, migrations]
+    mayDependOn: [cmd, wire, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, kernel-ports, migrations]
   api:
     mayDependOn: [api]
     canUse: [v-oapi, v-openapi, v-yaml]
@@ -286,7 +293,7 @@ deps:
   instance-app:
     mayDependOn: [instance-app, instance, instance-domain, kernel-ports]
   instance-adapters:
-    mayDependOn: [instance-adapters, instance, instance-app, instance-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api]
+    mayDependOn: [instance-adapters, instance, instance-app, instance-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api]
     canUse: [v-pgx]
   billing:
     mayDependOn: [billing, kernel-ports]
@@ -295,7 +302,7 @@ deps:
   billing-app:
     mayDependOn: [billing-app, billing, billing-domain, kernel-ports]
   billing-adapters:
-    mayDependOn: [billing-adapters, billing, billing-app, billing-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api]
+    mayDependOn: [billing-adapters, billing, billing-app, billing-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api]
   audit:
     mayDependOn: [audit, kernel-ports]
   audit-domain:
@@ -303,7 +310,7 @@ deps:
   audit-app:
     mayDependOn: [audit-app, audit, audit-domain, kernel-ports, instance]
   audit-adapters:
-    mayDependOn: [audit-adapters, audit, audit-app, audit-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance]
+    mayDependOn: [audit-adapters, audit, audit-app, audit-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance]
     canUse: [v-pgx]
   authz:
     mayDependOn: [authz, kernel-ports]
@@ -312,7 +319,7 @@ deps:
   authz-app:
     mayDependOn: [authz-app, authz, authz-domain, kernel-ports, instance]
   authz-adapters:
-    mayDependOn: [authz-adapters, authz, authz-app, authz-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance]
+    mayDependOn: [authz-adapters, authz, authz-app, authz-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance]
     canUse: [v-otel, v-pgx]
   identity:
     mayDependOn: [identity, kernel-ports]
@@ -321,7 +328,7 @@ deps:
   identity-app:
     mayDependOn: [identity-app, identity, identity-domain, kernel-ports, instance, authz]
   identity-adapters:
-    mayDependOn: [identity-adapters, identity, identity-app, identity-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, authz]
+    mayDependOn: [identity-adapters, identity, identity-app, identity-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, authz]
     canUse: [v-pgx]
   chat:
     mayDependOn: [chat, kernel-ports]
@@ -330,7 +337,7 @@ deps:
   chat-app:
     mayDependOn: [chat-app, chat, chat-domain, kernel-ports, identity, authz]
   chat-adapters:
-    mayDependOn: [chat-adapters, chat, chat-app, chat-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, authz]
+    mayDependOn: [chat-adapters, chat, chat-app, chat-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, authz]
   agents:
     mayDependOn: [agents, kernel-ports]
   agents-domain:
@@ -338,7 +345,7 @@ deps:
   agents-app:
     mayDependOn: [agents-app, agents, agents-domain, kernel-ports, identity, authz, chat]
   agents-adapters:
-    mayDependOn: [agents-adapters, agents, agents-app, agents-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, authz, chat]
+    mayDependOn: [agents-adapters, agents, agents-app, agents-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, authz, chat]
   files:
     mayDependOn: [files, kernel-ports]
   files-domain:
@@ -346,7 +353,7 @@ deps:
   files-app:
     mayDependOn: [files-app, files, files-domain, kernel-ports, identity, chat]
   files-adapters:
-    mayDependOn: [files-adapters, files, files-app, files-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat]
+    mayDependOn: [files-adapters, files, files-app, files-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat]
     canUse: [v-awssdk]
   messaging:
     mayDependOn: [messaging, kernel-ports]
@@ -355,7 +362,7 @@ deps:
   messaging-app:
     mayDependOn: [messaging-app, messaging, messaging-domain, kernel-ports, identity, chat, files]
   messaging-adapters:
-    mayDependOn: [messaging-adapters, messaging, messaging-app, messaging-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat, files]
+    mayDependOn: [messaging-adapters, messaging, messaging-app, messaging-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat, files]
   status:
     mayDependOn: [status, kernel-ports]
   status-domain:
@@ -363,7 +370,7 @@ deps:
   status-app:
     mayDependOn: [status-app, status, status-domain, kernel-ports, agents]
   status-adapters:
-    mayDependOn: [status-adapters, status, status-app, status-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, agents]
+    mayDependOn: [status-adapters, status, status-app, status-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, agents]
   terminal:
     mayDependOn: [terminal, kernel-ports]
   terminal-domain:
@@ -371,7 +378,7 @@ deps:
   terminal-app:
     mayDependOn: [terminal-app, terminal, terminal-domain, kernel-ports, instance, identity, authz, agents]
   terminal-adapters:
-    mayDependOn: [terminal-adapters, terminal, terminal-app, terminal-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, identity, authz, agents]
+    mayDependOn: [terminal-adapters, terminal, terminal-app, terminal-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, identity, authz, agents]
   runs:
     mayDependOn: [runs, kernel-ports]
   runs-domain:
@@ -379,7 +386,7 @@ deps:
   runs-app:
     mayDependOn: [runs-app, runs, runs-domain, kernel-ports, instance, chat, agents, messaging, billing]
   runs-adapters:
-    mayDependOn: [runs-adapters, runs, runs-app, runs-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, chat, agents, messaging, billing]
+    mayDependOn: [runs-adapters, runs, runs-app, runs-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, chat, agents, messaging, billing]
   search:
     mayDependOn: [search, kernel-ports]
   search-domain:
@@ -387,7 +394,7 @@ deps:
   search-app:
     mayDependOn: [search-app, search, search-domain, kernel-ports, chat, messaging, files]
   search-adapters:
-    mayDependOn: [search-adapters, search, search-app, search-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, chat, messaging, files]
+    mayDependOn: [search-adapters, search, search-app, search-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, chat, messaging, files]
   importer:
     mayDependOn: [importer, kernel-ports]
   importer-domain:
@@ -395,7 +402,7 @@ deps:
   importer-app:
     mayDependOn: [importer-app, importer, importer-domain, kernel-ports, identity, chat, agents, messaging, files]
   importer-adapters:
-    mayDependOn: [importer-adapters, importer, importer-app, importer-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat, agents, messaging, files]
+    mayDependOn: [importer-adapters, importer, importer-app, importer-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat, agents, messaging, files]
   privacy:
     mayDependOn: [privacy, kernel-ports]
   privacy-domain:
@@ -403,7 +410,7 @@ deps:
   privacy-app:
     mayDependOn: [privacy-app, privacy, privacy-domain, kernel-ports, identity, files]
   privacy-adapters:
-    mayDependOn: [privacy-adapters, privacy, privacy-app, privacy-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, files]
+    mayDependOn: [privacy-adapters, privacy, privacy-app, privacy-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, files]
   sync:
     mayDependOn: [sync, kernel-ports]
   sync-domain:
@@ -411,7 +418,7 @@ deps:
   sync-app:
     mayDependOn: [sync-app, sync, sync-domain, kernel-ports, instance, identity, chat, agents, messaging, runs]
   sync-adapters:
-    mayDependOn: [sync-adapters, sync, sync-app, sync-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, identity, chat, agents, messaging, runs]
+    mayDependOn: [sync-adapters, sync, sync-app, sync-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, identity, chat, agents, messaging, runs]
     canUse: [v-otel, v-pgx]
   stats:
     mayDependOn: [stats, kernel-ports]
@@ -420,7 +427,7 @@ deps:
   stats-app:
     mayDependOn: [stats-app, stats, stats-domain, kernel-ports, chat, agents, messaging, runs, billing]
   stats-adapters:
-    mayDependOn: [stats-adapters, stats, stats-app, stats-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, chat, agents, messaging, runs, billing]
+    mayDependOn: [stats-adapters, stats, stats-app, stats-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, chat, agents, messaging, runs, billing]
   notify:
     mayDependOn: [notify, kernel-ports]
   notify-domain:
@@ -428,7 +435,7 @@ deps:
   notify-app:
     mayDependOn: [notify-app, notify, notify-domain, kernel-ports, identity, chat, messaging, sync]
   notify-adapters:
-    mayDependOn: [notify-adapters, notify, notify-app, notify-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat, messaging, sync]
+    mayDependOn: [notify-adapters, notify, notify-app, notify-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, identity, chat, messaging, sync]
   apps:
     mayDependOn: [apps, kernel-ports]
   apps-domain:
@@ -436,7 +443,7 @@ deps:
   apps-app:
     mayDependOn: [apps-app, apps, apps-domain, kernel-ports, instance, identity, chat, agents, messaging, sync]
   apps-adapters:
-    mayDependOn: [apps-adapters, apps, apps-app, apps-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, identity, chat, agents, messaging, sync]
+    mayDependOn: [apps-adapters, apps, apps-app, apps-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, instance, identity, chat, agents, messaging, sync]
   gateway:
     mayDependOn: [gateway, kernel-ports]
   gateway-domain:
@@ -444,7 +451,7 @@ deps:
   gateway-app:
     mayDependOn: [gateway-app, gateway, gateway-domain, kernel-ports, chat, agents, runs, sync, stats]
   gateway-adapters:
-    mayDependOn: [gateway-adapters, gateway, gateway-app, gateway-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, chat, agents, runs, sync, stats]
+    mayDependOn: [gateway-adapters, gateway, gateway-app, gateway-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-jobs, platform-jsoncanon, platform-lifecycle, platform-otel, platform-pg, platform-ratelimit, platform-secrets, api, chat, agents, runs, sync, stats]
   testsupport:
     anyProjectDeps: true
     anyVendorDeps: true

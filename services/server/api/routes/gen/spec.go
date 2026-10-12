@@ -271,7 +271,75 @@ func (w *specWalk) operation(method, path string, node *openapi3.Operation) (op 
 	op.IdempotencyKey, op.IfMatch = w.parameters(at, node.Parameters)
 	op.RequestBody, op.BodyRequired = w.requestBody(at, node.RequestBody)
 	op.ETagStatuses = w.etagStatuses(at, node.Responses)
+	if op.IdempotencyKey {
+		w.checkKeyed(at, op, node)
+	}
 	return op, override, true
+}
+
+// checkKeyed holds the rules of a keyed operation (06 "Idempotency" point 4, docs/DECISIONS.md
+// M1-20): the fingerprint covers method, path and body, so no query parameter; the stage stores
+// only JSON, so the body is absent or application/json and every 2xx response has
+// application/json content or none; idempotency_keys keeps no headers, so a 2xx with ETag has a
+// required integer member version from which a replay derives the ETag.
+func (w *specWalk) checkKeyed(at string, op opMeta, node *openapi3.Operation) {
+	for _, ref := range node.Parameters {
+		if ref != nil && ref.Value != nil && ref.Value.In == openapi3.ParameterInQuery {
+			w.p.add(at, "declares Idempotency-Key and the query parameter %q; the fingerprint covers the path only", ref.Value.Name)
+		}
+	}
+	if op.RequestBody != bodyNone && op.RequestBody != bodyJSON {
+		w.p.add(at, "declares Idempotency-Key with a %s request body; a keyed body is application/json only", op.RequestBody)
+	}
+	if node.Responses == nil {
+		return
+	}
+	byKey := node.Responses.Map()
+	for _, key := range slices.Sorted(maps.Keys(byKey)) {
+		code, isRange, ok := responseStatus(key)
+		success := ok && (isRange && key[0] == '2' || code >= 200 && code < 300)
+		if ref := byKey[key]; success && ref != nil && ref.Value != nil {
+			w.checkKeyedSuccess(at, key, slices.Contains(op.ETagStatuses, code), ref.Value)
+		}
+	}
+}
+
+// checkKeyedSuccess holds the rules of one 2xx response of a keyed operation; etag reports that
+// the response declares ETag.
+func (w *specWalk) checkKeyedSuccess(at, key string, etag bool, resp *openapi3.Response) {
+	for _, media := range slices.Sorted(maps.Keys(resp.Content)) {
+		if media != "application/json" {
+			w.p.add(at, "declares Idempotency-Key and response %s with %s; a stored response is application/json or empty", key, media)
+		}
+	}
+	if !etag {
+		return
+	}
+	if body := resp.Content["application/json"]; body == nil || !requiredInteger(body.Schema, "version", 0) {
+		w.p.add(at, "declares Idempotency-Key and ETag on response %s without a required integer member version; a replay derives the ETag from it", key)
+	}
+}
+
+// maxSchemaDepth bounds the walk of allOf in requiredInteger.
+const maxSchemaDepth = 16
+
+// requiredInteger reports whether schema (or one member of its allOf) requires the member name
+// with type integer.
+func requiredInteger(ref *openapi3.SchemaRef, name string, depth int) bool {
+	if ref == nil || ref.Value == nil || depth > maxSchemaDepth {
+		return false
+	}
+	s := ref.Value
+	if prop := s.Properties[name]; slices.Contains(s.Required, name) && prop != nil && prop.Value != nil &&
+		prop.Value.Type != nil && prop.Value.Type.Is(openapi3.TypeInteger) {
+		return true
+	}
+	for _, member := range s.AllOf {
+		if requiredInteger(member, name, depth+1) {
+			return true
+		}
+	}
+	return false
 }
 
 // extensions checks x-authz-action and x-rate-limit-class against the catalogue (05 rules 3 and

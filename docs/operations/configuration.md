@@ -172,8 +172,8 @@ Source: [02-architecture.md](../spec/02-architecture.md), section 22.
 | `gateway.write_timeout` | `BOTHY_GATEWAY__WRITE_TIMEOUT` | Server |  | `10s` | deadline for one WebSocket write | planned (M1) |
 | `consumer.batch_size` | `BOTHY_CONSUMER__BATCH_SIZE` | Server |  | `500` | events per round of a worker consumer | planned (M2) |
 | `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server |  | `1s` | poll of a worker consumer without `NOTIFY` | planned (M2) |
-| `sync.idempotency_cleanup_interval` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_INTERVAL` | Server |  | `1h` | interval of the job `sync.idempotency_cleanup` | planned (M1) |
-| `sync.idempotency_cleanup_batch_size` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE` | Server |  | `1000` | rows per deletion batch of `sync.idempotency_cleanup` | planned (M1) |
+| `sync.idempotency_cleanup_interval` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_INTERVAL` | Server | duration | `1h` | interval of the job `sync.idempotency_cleanup` | active |
+| `sync.idempotency_cleanup_batch_size` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE` | Server | int | `1000` | rows per deletion batch of `sync.idempotency_cleanup` | active |
 | `ratelimit.max_tracked_keys` | `BOTHY_RATELIMIT__MAX_TRACKED_KEYS` | Server | int | `100000` | a process holds at most this many rate-limit buckets; beyond that, full buckets are removed first, then the oldest buckets | active |
 | `ratelimit.sweep_interval` | `BOTHY_RATELIMIT__SWEEP_INTERVAL` | Server | duration | `1m` | interval at which full buckets are removed (a full bucket decides like a missing one) | active |
 | `jobs.schema` | `BOTHY_JOBS__SCHEMA` | Server | string | `jobs` | PostgreSQL schema of the River tables | active |
@@ -272,7 +272,7 @@ Source: [04-sync-protocol.md](../spec/04-sync-protocol.md), section 18.
 | `sync.catchup_max_events` | `BOTHY_SYNC__CATCHUP_MAX_EVENTS` | Server |  | `50000` | a larger backlog yields `resync_required` | planned (M1) |
 | `sync.cursor_advance_every` | `BOTHY_SYNC__CURSOR_ADVANCE_EVERY` | Server |  | `1000` | one `cursor` frame after this many skipped events | planned (M1) |
 | `sync.outbound_queue_max` | `BOTHY_SYNC__OUTBOUND_QUEUE_MAX` | Server |  | `10000` | frames in the outbound queue of a connection until `4014` | planned (M1) |
-| `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server |  | `24h` | retention of `Idempotency-Key` | planned (M1) |
+| `sync.idempotency_key_ttl` | `BOTHY_SYNC__IDEMPOTENCY_KEY_TTL` | Server | duration | `24h` | retention of `Idempotency-Key` | active |
 | `sync.max_focused_threads` | `BOTHY_SYNC__MAX_FOCUSED_THREADS` | Server |  | `20` | threads in `focus` per connection | planned (M1) |
 | `sync.run_patch_coalesce_interval` | `BOTHY_SYNC__RUN_PATCH_COALESCE_INTERVAL` | Server |  | `250ms` | collection window for `run.updated` | planned (M2) |
 | `sync.typing_min_interval` | `BOTHY_SYNC__TYPING_MIN_INTERVAL` | Server |  | `5s` | `typing.start` at most this often | planned (M1) |

@@ -11,6 +11,7 @@ require (
 	github.com/aws/smithy-go v1.28.5
 	github.com/exaring/otelpgx v0.13.0
 	github.com/getkin/kin-openapi v0.144.0
+	github.com/gowebpki/jcs v1.0.2
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/moby/moby/api v1.55.0
 	github.com/moby/moby/client v0.5.1
