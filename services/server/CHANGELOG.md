@@ -54,8 +54,8 @@ documented in this file. The format is based on
   unspecified, link-local with the cloud metadata address, multicast, reserved, NAT64, 6to4,
   Teredo and the other ranges of SEC-NET-3; loopback, RFC 1918, RFC 6598 and unique local
   addresses only with `allow_private`), follows redirects only after the same checks, ignores
-  environment proxies, always verifies TLS, bounds time and response size, and logs and counts
-  every refused attempt without path or query. `NewLoopback` is the client for the health
+  environment proxies, always verifies TLS, bounds time and response size, and logs every refused
+  attempt without path or query, counting it when metrics are configured. `NewLoopback` is the client for the health
   probe (loopback and plain http only).
 - Configuration keys `egress.allowed_hosts` (entries `host[:port][;allow_private]`, invalid and
   duplicate entries fail at load), `egress.timeout` and `egress.max_response_bytes`.
