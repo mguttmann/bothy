@@ -84,7 +84,8 @@ Each ticket comes in order as its own pull request according to push-discipline.
 16. **Enable Renovate** (ADR 0041) and check the Dependency Dashboard.
 17. **Pages**: set the source to "GitHub Actions"; start `docs.yml` manually.
 18. **Trial run:** first start `codeql.yml` on `main` by hand, so that code scanning has an
-    analysis of the base branch. Then the first pull request from the repository (full list):
+    analysis of the base branch to compare the pull request results with [assumed, not checked
+    offline]. Then the first pull request from the repository (full list):
     all jobs ran on GitHub-hosted runners, `ci-ok` is green, SonarQube Cloud, CodeQL and
     CodeRabbit report, Scorecard starts; the jobs `analyze (actions)`, `analyze (go)` and
     `analyze (python)` are green, and code scanning shows results of the category
