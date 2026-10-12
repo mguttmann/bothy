@@ -8,8 +8,8 @@ this level is the root [`VERSION`](VERSION) file; its release tags are `v<versio
 
 Independently versioned components keep their own `VERSION` and `CHANGELOG.md` in their
 directory and are tagged `<component>/v<version>` (docs/spec/18-release.md):
-server (`services/server/`), client app (`apps/client/`), admin console
-(`apps/console/`), Python SDK (`sdk/python/`), TypeScript SDK (`sdk/typescript/`), Hermes
+server (`services/server/`), host service (`services/host/`), client app (`apps/client/`),
+admin console (`apps/console/`), Python SDK (`sdk/python/`), TypeScript SDK (`sdk/typescript/`), Hermes
 Agent adapter (`plugins/hermes-adapter/`) and Claude Code runner
 (`plugins/claude-code-runner/`). Each of these files is created with the component's
 first code.
@@ -20,6 +20,9 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Added
 
+- Host service module `services/host` (own `VERSION` and `CHANGELOG.md`) and the Dart package
+  `packages/bothy_noise` with the Noise core of the terminal (M2-38); the gates, CI and CodeQL
+  cover both.
 - Core contract of the specification: glossary, data model, sync protocol and action
   catalogue (`docs/spec/00`, `03`, `04`, `05`).
 - Quality and repository tool chain: `make check` with every gate identical to CI,
@@ -73,6 +76,12 @@ Planning stage (milestone M0). Nothing is installable yet.
 
 ### Changed
 
+- Gates for a second Go module and the first Dart package (M2-38): `make perf` runs only for
+  the Go modules with performance targets (`PERF_MODULES`), a Dart package without `test/` fails
+  `make test` and one without `coverage/lcov.info` fails `make coverage`; CI installs Go for every
+  tracked `services/*/go.mod` and Flutter for every tracked Dart package, CodeQL builds the host
+  module, a change under `services/host/testdata/noise/` selects the apps gates as well, and
+  SonarQube reads the coverage of both new components.
 - Chapter 02 "Konfigurationsladen" and the configuration reference describe the loader as built
   by the server: built-in defaults live in the schema, `bothy config print` shows secret
   references instead of `<redacted>`, and `docs/operations/configuration.md` sections 1 to 3 give

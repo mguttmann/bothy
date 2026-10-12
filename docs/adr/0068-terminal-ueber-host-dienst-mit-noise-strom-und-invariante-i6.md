@@ -87,7 +87,11 @@ Die Ausnahme schränkt Owner ein und erweitert nichts; L22 bleibt für I1 unver�
 ### Confirmation
 
 * Konformität mit öffentlichen Noise-Testvektoren (cacophony, noise-c; 24 Abschnitt 5.2) in Go
-  und Dart (TM-T01) und Kreuztest Go gegen Dart (TM-T02).
+  und Dart (TM-T01) und Kreuztest Go gegen Dart (TM-T02). Seit M2-38: TM-T01 hält
+  `TestVectorsTMT01` in `services/host/internal/noise` und `test/vectors_test.dart` in
+  `packages/bothy_noise`; TM-T02 halten `TestRecordingsTMT02Dart` und
+  `TestRecordingsTMT02Negative` in Go und `test/recordings_test.dart` in Dart, über die
+  Aufzeichnungen beider Sprachen in beiden Rollen.
 * Trennung der Benutzer und Sperre bei zweiter Steuerverbindung (TM-T22, TM-T23).
 * Wiedereinspiel- und Marken-Tests im Host-Dienst (TM-T03 bis TM-T05).
 * Kanarien-Test über Relais, Logs, Datenbank und Telemetrie (TM-T06).

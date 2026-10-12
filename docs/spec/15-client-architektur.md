@@ -706,7 +706,7 @@ D11, M8, M9 und Abschnitt 7 (Kürzel im Terminal).
 
 | Paket | Inhalt | Nicht |
 |---|---|---|
-| `bothy_noise` | Handshake `Noise_NK_25519_ChaChaPoly_SHA256` als Initiator (Gerät) und, nur für Tests, als Antwortender; Transport-Zustände; Prolog aus Protokollversion, Sitzungs-ID und Rechner-ID; Kodierung der Rahmen `start`, `data`, `resize`, `close`, `exit`, `replay_begin`, `replay_end` (24, Abschnitt 5.4); Fingerabdruck nach 24, Abschnitt 4.3. Primitive aus dem Paket `cryptography` (24, Abschnitt 5.2). | kein Flutter, kein Netzwerk, keine Speicherung |
+| `bothy_noise` | Handshake `Noise_NK_25519_ChaChaPoly_SHA256` als Initiator (Gerät) und, nur für Tests, als Antwortender in der eigenen Bibliothek `package:bothy_noise/testing.dart`; Transport-Zustände; Prolog aus Protokollversion, Sitzungs-ID und Rechner-ID; Hash des ephemeren Schlüssels für `client_ephemeral_key_hash` (24, Abschnitt 5.3); Kodierung der Rahmen `start`, `data`, `resize`, `close`, `exit`, `replay_begin`, `replay_end` (24, Abschnitt 5.4); Fingerabdruck nach 24, Abschnitt 4.3. Primitive aus dem Paket `cryptography` (24, Abschnitt 5.2). | kein Flutter, kein Netzwerk, keine Speicherung |
 | `terminal_ui` | Widget mit dem Renderer `xterm` (24, Abschnitt 12), Kopf mit Rechner, Abzeichen der LLM-Anmeldung, Fingerabdruck und Restzeit; Reiter je Sitzung; Dialoge "Terminal öffnen" und "Schlüssel geändert"; Sondertasten-Leiste; Ablauf aus 23.2 | keine Rechte-Logik (Grundsatz 1), kein Gateway, keine lokale Datenbank |
 
 Ports von `terminal_ui`, umgesetzt je App:

@@ -67,7 +67,16 @@ with a hint.
   `plugins/`, ein TypeScript-Projekt ein `package.json` unter `sdk/typescript/` oder
   `plugins/`. Neue Dateien zählen erst nach `git add`.
 * Ein fehlendes Werkzeug, eine fehlende Liste, ein fehlendes Token oder ein fehlender
-  Teil des Komponenten-Vertrags (Kapitel 23, Abschnitt 3) ist ein Fehler.
+  Teil des Komponenten-Vertrags (Kapitel 23, Abschnitt 3) ist ein Fehler. Ein Dart-Paket ohne
+  `test/` scheitert in `make test`, eines ohne `coverage/lcov.info` nach den Tests in
+  `make coverage`.
+* CI installiert Go, sobald ein `services/*/go.mod` getrackt ist (Version aus dem `go.mod` des
+  Servers, sonst des Host-Dienstes; alle Module haben dieselben Zeilen `go` und `toolchain`), und
+  Flutter, sobald ein Dart-Paket getrackt ist (Version aus `environment.flutter` der
+  `pubspec.yaml` der App, bis dahin aus `packages/bothy_noise`; alle Pins gleich).
+  `tools/ci/tests/test_ci_toolchains.py` hält beides. Eine Änderung unter
+  `services/host/testdata/noise/` wählt auch die Komponente `apps`, weil die Dart-Tests diese
+  Testdaten lesen.
 * Beitragende aus Forks schalten ausdrücklich ab, was sie nicht haben:
   `DENYLIST_FLAGS=--allow-missing` (nur öffentliche Regeln) und `SONAR_SKIP=1`. Beides
   steht sichtbar in der Ausgabe; CI behandelt Fork-Pull-Requests genauso (R-QA-02).
@@ -87,8 +96,10 @@ with a hint.
 
 ## Leistung (`make perf`)
 
-`make perf` führt die Lasttests jedes Go-Moduls aus: `go test -tags perf -count=1` über
-`<modul>/perf/...`, mit dem Zeitlimit `quality.perf.timeout` je Modul. Es läuft am
+`make perf` führt die Lasttests jedes Go-Moduls mit Leistungszielen aus (Liste `PERF_MODULES`
+im Root-`Makefile`, heute nur `services/server`; der Host-Dienst hat keine Leistungsziele, 24):
+`go test -tags perf -count=1` über `<modul>/perf/...`, mit dem Zeitlimit `quality.perf.timeout`
+je Modul. Es läuft am
 Abschluss jeder Etappe und im Release, nie in `gates` und nie im pre-push-Hook (PLAN P-07):
 Die Leistungsziele aus Kapitel 02 "Leistungsziele" gelten nur auf `perf.reference_profile`,
 auf beliebiger Hardware wären die Messwerte nicht vergleichbar (ADR 0063). Darum steht vor
@@ -96,7 +107,8 @@ jedem Modul der Hinweis auf `perf.reference_profile` in der Ausgabe.
 
 Lasttests tragen das Build-Tag `perf`, damit `make test` sie nicht ausführt. Ihre Pakete
 liegen unter `<modul>/perf/` und zählen nicht zur Abdeckung. Ohne Go-Modul meldet
-`make perf` `SKIP`; ein Go-Modul ohne `perf/` ist ein Fehler. Wie die Server-Gates braucht
+`make perf` `SKIP`, ebenso ohne ausgewähltes Modul aus `PERF_MODULES`; ein Modul aus
+`PERF_MODULES` ohne `perf/` ist ein Fehler. Wie die Server-Gates braucht
 `make perf` go, eine Docker-kompatible Laufzeit und die Pins.
 
 ## Migrationen

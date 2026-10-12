@@ -61,6 +61,18 @@ Lizenzen: PyPI, npm und die LICENSE-Dateien der Projekte, abgerufen 2026-10-10 [
 Entwicklungswerkzeuge werden nicht ausgeliefert; die Lizenzregeln für ausgelieferte
 Abhängigkeiten stehen in [licenses.md](licenses.md).
 
+## Sprach-Toolchains
+
+Go und Flutter sind keine gepinnten Gate-Werkzeuge, sondern kommen aus den Komponenten selbst:
+
+- Go aus den Zeilen `go` und `toolchain` der Module unter `services/`. Alle Module tragen dieselben
+  Zeilen, weil CI ein Go installiert (ADR 0005); `tools/ci/tests/test_ci_toolchains.py`
+  (`test_go_directives_agree`) hält das.
+- Flutter aus `environment.flutter` der getrackten `pubspec.yaml`, eine exakte Version, in allen
+  Paketen gleich (`test_flutter_pins_agree`). Bis `apps/client` existiert, trägt
+  `packages/bothy_noise` den Pin (docs/DECISIONS.md D-M2-38-12); das Paket selbst importiert kein
+  Flutter und nutzt `flutter test` nur als Testläufer.
+
 ## GitHub Actions
 
 Alle per voller Commit-SHA gepinnt; der Kommentar nennt das Release-Tag. Die SHAs wurden
@@ -71,7 +83,7 @@ Tags die Commit-SHA hinter dem Tag).
 |---|---|---|
 | `actions/checkout` | `v7.0.1` | Checkout ohne gespeicherte Zugangsdaten |
 | `actions/setup-node` | `v7.1.0` | Node für die Node-Werkzeuge, mit npm-Cache |
-| `actions/setup-go` | `v7.0.0` | Go aus `go.mod`, sobald es existiert |
+| `actions/setup-go` | `v7.0.0` | ein Go für alle Module unter `services/`, aus dem `go.mod` des Servers (sonst des Host-Dienstes) |
 | `astral-sh/setup-uv` | `v10.3.0` | uv, mit Cache über `tools/uv.lock` |
 | `actions/cache` | `v6.1.0` | Binär-Cache und pre-commit-Umgebungen |
 | `actions/upload-artifact` | `v7.0.2` | Release-Artefakte, Scorecard-Ergebnis |
@@ -81,7 +93,7 @@ Tags die Commit-SHA hinter dem Tag).
 | `docker/setup-buildx-action` | `v4.4.1` | Buildx mit Provenance und SBOM; Tag erst nach dem Scan (`imagetools create`) |
 | `docker/login-action` | `v4.6.0` | Anmeldung an ghcr.io |
 | `docker/build-push-action` | `v7.4.0` | Server-Image bauen und pushen (multi-arch by cross compilation in the Dockerfile, without QEMU) |
-| `subosito/flutter-action` | `v2.23.0` | Flutter aus `pubspec.yaml`, sobald die App existiert |
+| `subosito/flutter-action` | `v2.23.0` | Flutter für alle Dart-Pakete, aus `environment.flutter` der `pubspec.yaml` der App, bis dahin aus `packages/bothy_noise` |
 | `github/codeql-action` | `v4.38.3` | CodeQL und SARIF-Upload (öffentlich) |
 | `ossf/scorecard-action` | `v2.4.4` | OpenSSF Scorecard (öffentlich) |
 | `actions/upload-pages-artifact` | `v5.0.0` | Doku-Site hochladen (öffentlich) |

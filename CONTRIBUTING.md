@@ -7,9 +7,13 @@ passes, and how commits, pull requests and decisions work. The detailed rules li
 ## Development setup
 
 You need git, GNU make, [uv](https://docs.astral.sh/uv/) and Node.js (an LTS release;
-`make bootstrap` checks the minimum version). Working on the server needs Go, working on
-the apps needs Flutter; their versions come from `services/server/go.mod` and the app's
-`pubspec.yaml`. A Docker-compatible runtime is needed for the local SonarQube and for server
+`make bootstrap` checks the minimum version). Working on the server or the host service needs
+Go, working on the apps or any Dart package needs Flutter. Go comes from the `go` and
+`toolchain` lines of `services/*/go.mod` (every module has the same lines); Flutter from the
+exact `environment.flutter` version of the pinned `pubspec.yaml` (the app's, until it exists the
+one of `packages/bothy_noise`). The host service (`services/host`) is a Go module of its own and
+the Dart packages under `packages/` run their tests with `flutter test`; a Dart package needs a
+`test/` directory and reaches the coverage threshold. A Docker-compatible runtime is needed for the local SonarQube and for server
 work: integration tests run against PostgreSQL in throwaway containers, and `make perf` runs
 the load tests. As soon as a Go module exists, every server gate fails without Go, a
 Docker-compatible runtime or the pinned tools; there is no skip. Windows contributors use WSL.

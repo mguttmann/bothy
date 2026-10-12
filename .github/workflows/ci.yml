@@ -92,16 +92,20 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: tools/node/package-lock.json
-      - if: hashFiles('services/server/go.mod') != ''
+      # One Go for every tracked module: all modules share the go and toolchain lines
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: services/server/go.mod
-          cache-dependency-path: services/server/go.sum
-      - if: hashFiles('apps/client/pubspec.yaml') != ''
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      # Flutter for every tracked Dart package; until apps/client exists, packages/bothy_noise
+      # carries the pin (docs/DECISIONS.md D-M2-38-12).
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
-          flutter-version-file: apps/client/pubspec.yaml
+          flutter-version-file: ${{ hashFiles('apps/client/pubspec.yaml') != '' && 'apps/client/pubspec.yaml' || 'packages/bothy_noise/pubspec.yaml' }}
           cache: true
       - name: Restore pinned binaries and hook environments
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -192,16 +196,20 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: tools/node/package-lock.json
-      - if: hashFiles('services/server/go.mod') != ''
+      # One Go for every tracked module: all modules share the go and toolchain lines
+      # (tools/ci/tests/test_ci_toolchains.py, docs/DECISIONS.md D-M2-38-1).
+      - if: hashFiles('services/*/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: services/server/go.mod
-          cache-dependency-path: services/server/go.sum
-      - if: hashFiles('apps/client/pubspec.yaml') != ''
+          go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
+          cache-dependency-path: services/*/go.sum
+      # Flutter for every tracked Dart package; until apps/client exists, packages/bothy_noise
+      # carries the pin (docs/DECISIONS.md D-M2-38-12).
+      - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
-          flutter-version-file: apps/client/pubspec.yaml
+          flutter-version-file: ${{ hashFiles('apps/client/pubspec.yaml') != '' && 'apps/client/pubspec.yaml' || 'packages/bothy_noise/pubspec.yaml' }}
           cache: true
       - run: make bootstrap-ci
       - name: make sonar

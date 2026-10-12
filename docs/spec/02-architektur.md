@@ -415,7 +415,9 @@ services/server/
   .go-arch-lint.yml           generiert aus architecture/modules.yaml
 services/host/                Host-Dienst bothy-host (eigenes Go-Modul, eigene Version; 24-terminal.md)
   cmd/bothy-host/             main: Unterbefehle install, pair, doctor, run
-  internal/                   noise, frame, control, pty (unix, windows), profiles, doctor, state
+  internal/                   noise, frame, fingerprint, control, pty (unix, windows), profiles, doctor, state
+  testdata/noise/             Testvektoren, Aufzeichnungen Go und Dart, Fingerabdruck-Vektoren (24, 5.2, 14)
+  .go-arch-lint.yml           von Hand gepflegt, eine Komponente je Paket (kein Modulregister)
 ```
 
 Testhilfen, die Tests mehrerer Pakete nutzen, liegen im Baum der Komponente, deren Typen sie bauen,

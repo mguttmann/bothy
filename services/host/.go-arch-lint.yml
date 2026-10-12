@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+# Architecture rules of the host service. Maintained by hand: one component per package,
+# vendors only where named (docs/spec/02-architektur.md, "Code-Layout"). Later tickets add
+# their packages here in the same change (an unattached package fails make arch).
+version: 3
+workdir: .
+allow:
+  depOnAnyVendor: false
+excludeFiles: ["^.*_test\\.go$"]
+vendors:
+  v-noise: { in: [github.com/flynn/noise] }
+components:
+  cmd:         { in: cmd/** }
+  noise:       { in: internal/noise }
+  frame:       { in: internal/frame }
+  fingerprint: { in: internal/fingerprint }
+deps:
+  noise: { canUse: [v-noise] }

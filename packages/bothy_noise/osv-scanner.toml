@@ -1,0 +1,358 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# OSV-Scanner overrides of packages/bothy_noise (docs/quality/licenses.md, "Lizenz-Gate" item 3):
+# deps.dev has no license data for these pub packages, so OSV-Scanner reports UNKNOWN. One entry
+# per package and version, each checked against the LICENSE file of that version on pub.dev
+# (checked 2026-10-12, M2-38). Never a blanket override; a new version needs a new check.
+# Only cryptography ships in the apps; the others are dev dependencies (test, lints) and their
+# transitive packages, which the gate checks as well.
+
+[[PackageOverrides]]
+name = "_fe_analyzer_shared"
+version = "109.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "analyzer"
+version = "14.5.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "args"
+version = "2.7.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "async"
+version = "2.13.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "boolean_selector"
+version = "2.1.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "cli_config"
+version = "0.2.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "collection"
+version = "1.19.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive runtime package of cryptography."
+
+[[PackageOverrides]]
+name = "convert"
+version = "3.1.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "coverage"
+version = "1.15.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "crypto"
+version = "3.0.7"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive runtime package of cryptography."
+
+[[PackageOverrides]]
+name = "cryptography"
+version = "2.9.0"
+ecosystem = "Pub"
+license.override = ["Apache-2.0"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is Apache-2.0. Runtime dependency."
+
+[[PackageOverrides]]
+name = "ffi"
+version = "2.2.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive runtime package of cryptography."
+
+[[PackageOverrides]]
+name = "file"
+version = "7.0.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "frontend_server_client"
+version = "4.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "glob"
+version = "2.2.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "http_multi_server"
+version = "3.2.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "http_parser"
+version = "4.1.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "io"
+version = "1.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "lints"
+version = "6.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev dependency."
+
+[[PackageOverrides]]
+name = "logging"
+version = "1.3.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "matcher"
+version = "0.12.20"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "meta"
+version = "1.19.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive runtime package of cryptography."
+
+[[PackageOverrides]]
+name = "mime"
+version = "2.1.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "node_preamble"
+version = "2.0.2"
+ecosystem = "Pub"
+license.override = ["MIT", "BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev holds the MIT text of the package and the BSD-3-Clause text of the Dart code it includes. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "package_config"
+version = "3.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "path"
+version = "1.9.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "pool"
+version = "1.5.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "pub_semver"
+version = "2.2.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "shelf"
+version = "1.4.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "shelf_packages_handler"
+version = "3.0.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "shelf_static"
+version = "1.1.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "shelf_web_socket"
+version = "3.0.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "source_map_stack_trace"
+version = "2.1.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "source_maps"
+version = "0.10.14"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "source_span"
+version = "1.10.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "stack_trace"
+version = "1.12.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "stream_channel"
+version = "2.1.4"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "string_scanner"
+version = "1.4.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "term_glyph"
+version = "1.2.2"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "test"
+version = "1.33.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Dev dependency."
+
+[[PackageOverrides]]
+name = "test_api"
+version = "0.7.15"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "test_core"
+version = "0.6.21"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "typed_data"
+version = "1.4.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive runtime package of cryptography."
+
+[[PackageOverrides]]
+name = "vm_service"
+version = "15.3.0"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "watcher"
+version = "1.2.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "web"
+version = "1.1.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "web_socket"
+version = "1.0.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "web_socket_channel"
+version = "3.0.3"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "webkit_inspection_protocol"
+version = "1.2.1"
+ecosystem = "Pub"
+license.override = ["BSD-3-Clause"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is BSD-3-Clause. Transitive package of cryptography, test or lints."
+
+[[PackageOverrides]]
+name = "yaml"
+version = "3.1.4"
+ecosystem = "Pub"
+license.override = ["MIT"]
+reason = "deps.dev knows no license for this pub package; its LICENSE file on pub.dev is MIT. Transitive package of cryptography, test or lints."

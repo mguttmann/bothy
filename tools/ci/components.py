@@ -29,7 +29,9 @@ from typing import Any
 # Gate component -> path prefixes owned by it.
 GATE_COMPONENTS: dict[str, tuple[str, ...]] = {
     "server": ("services/",),
-    "apps": ("apps/", "packages/", "design/"),
+    # The Dart tests of packages/bothy_noise read the Noise test vectors, recordings and
+    # fingerprint vectors of the host service (docs/DECISIONS.md D-M2-38-5).
+    "apps": ("apps/", "packages/", "design/", "services/host/testdata/noise/"),
     # sdk/testdata/ holds the shared G5 fixtures that both SDK test suites read.
     "sdk-python": ("sdk/python/", "sdk/testdata/"),
     "sdk-typescript": ("sdk/typescript/", "sdk/testdata/"),

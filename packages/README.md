@@ -1,6 +1,6 @@
 # packages
 
-Status: geplant (M0). Noch kein Code. Ein Dart-Pub-Workspace für alle Pakete und Apps.
+Status: geplant (M0); als erstes Paket gibt es `bothy_noise` (M2-38). Ein Dart-Pub-Workspace für alle Pakete und Apps folgt mit M4-01; bis dahin trägt `bothy_noise` seine eigene `pubspec.lock`.
 
 | Paket | Art | Zweck | Plattformen |
 |---|---|---|---|
@@ -14,7 +14,7 @@ Status: geplant (M0). Noch kein Code. Ein Dart-Pub-Workspace für alle Pakete un
 | `sync_engine` | Dart | Gateway, Nachholen, Ausgangsfach, Abgleich, Lauf-Dokumente, Fokus | iOS, macOS, Android, Windows |
 | `admin_ui` | Flutter | Verwaltungs-Screens für Desktop-App, Konsole und Notfall-Aktionen mobil | alle |
 | `bothy_viz` | Flutter | Visualisierungen der Statistik (Live-Topologie, Backend-Ansicht, Zustellung, Executive-Seite, Timeline, TV-Modus), Fixtures und Harness ([25-visualisierung.md](../docs/spec/25-visualisierung.md)) | alle |
-| `bothy_noise` | Dart | Noise-Handshake `Noise_NK_25519_ChaChaPoly_SHA256`, Transport-Verschlüsselung und Rahmen des Terminals, geprüft gegen die offiziellen Testvektoren ([24-terminal.md](../docs/spec/24-terminal.md), Abschnitt 5) | alle |
+| `bothy_noise` | Dart, gebaut | Noise-Handshake `Noise_NK_25519_ChaChaPoly_SHA256`, Transport-Verschlüsselung, Rahmen und Fingerabdruck des Terminals, geprüft gegen die öffentlichen Testvektoren und die Aufzeichnungen des Host-Dienstes ([24-terminal.md](../docs/spec/24-terminal.md), Abschnitt 5; [README](bothy_noise/README.md)) | alle |
 | `terminal_ui` | Flutter | Terminal-Ansicht mit Renderer `xterm`, Sitzungen, Schlüssel-Pinning über Ports, Sondertasten-Leiste ([15-client-architektur.md](../docs/spec/15-client-architektur.md), Abschnitt 23) | alle |
 
 Abhängigkeitsregeln und Begründungen:
