@@ -10,8 +10,8 @@ import (
 	"unicode/utf8"
 )
 
-// Sentinel errors of the provider and its drivers. ParseRef, the file and env drivers and
-// Provider.Get return a *RefError that wraps one of them or, for a canceled call, the context
+// Sentinel errors of the provider and its drivers. ParseRef, the file and env drivers,
+// Provider.Get, Provider.Put and Provider.Delete return a *RefError that wraps one of them or, for a canceled call, the context
 // error. Provider.Get passes the error of a caller-supplied driver (Options.Drivers) on unchanged,
 // and NewProvider returns plain configuration errors. Callers branch with errors.Is and report
 // with ErrorCode, which maps any error to one of five codes.
@@ -30,6 +30,14 @@ var (
 	// ErrReadFailed: the secret exists but could not be read (permissions, I/O, larger than the
 	// size limit, replaced while it was read).
 	ErrReadFailed = errors.New("secret could not be read")
+	// ErrReadOnly: the reference cannot be written or deleted. Only the file driver writes, and
+	// only directly below secrets.signing_key_dir (ADR 0066); every other reference, env: always,
+	// is read-only.
+	ErrReadOnly = errors.New("secret reference is read-only")
+	// ErrExists: Put found a file under the name already; a stored secret is never overwritten.
+	ErrExists = errors.New("secret already exists")
+	// ErrWriteFailed: the secret could not be written or removed (permissions, I/O).
+	ErrWriteFailed = errors.New("secret could not be written")
 )
 
 // RefError is the error type of the package: which reference failed, the sentinel that says how,
@@ -74,8 +82,9 @@ func (e *RefError) Unwrap() error { return e.Err }
 
 // ErrorCode maps err to the code that logs, metrics and `bothy config check --secrets` show
 // instead of a message: "" for nil, else "invalid_ref", "unsupported_scheme", "not_found",
-// "insecure_file" or "read_failed". Every other error, including a canceled context, is
-// "read_failed", so a caller always has one of five stable values.
+// "insecure_file", "read_only", "exists", "write_failed" or "read_failed". Every other error,
+// including a canceled context, is "read_failed", so a caller always has one of eight stable
+// values; the three write codes come only from Put and Delete (M1-32).
 func ErrorCode(err error) string {
 	switch {
 	case err == nil:
@@ -88,6 +97,12 @@ func ErrorCode(err error) string {
 		return "not_found"
 	case errors.Is(err, ErrInsecureFile):
 		return "insecure_file"
+	case errors.Is(err, ErrReadOnly):
+		return "read_only"
+	case errors.Is(err, ErrExists):
+		return "exists"
+	case errors.Is(err, ErrWriteFailed):
+		return "write_failed"
 	default:
 		return "read_failed"
 	}

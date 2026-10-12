@@ -21,7 +21,7 @@ Names are stable `snake_case`; they are the only detail an answer carries.
 | `shutting_down` | `/readyz` | the shutdown has begun (`SetShuttingDown`) | built in |
 | `database` | `/readyz` | `pool.Ping` fails within `database.acquire_timeout` | `internal/wire` (M1-11) |
 | `schema_requires_newer_server` | `/readyz` | `instance.min_server_version` is newer than the binary | M1-15 |
-| `signing_keys` | `/readyz` | a purpose has no active signing key | M1-32 |
+| `signing_keys` | `/readyz` | a purpose has no active signing key, or its private key cannot be read | M1-32 |
 | `trusted_header_requires_loopback` | `/readyz` | `trusted_header` is active on a non-loopback listener | M1-43 |
 
 ## Answer format

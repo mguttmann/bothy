@@ -439,7 +439,8 @@ func checkInitOptions(opts InitOptions) (string, error) {
 
 // readSource scans and reads the source directory. Every entry must be a directory or a regular
 // file the catalog names: init runs as root over a directory the owner fills, so a link is never
-// followed and a typo never silently skipped.
+// followed and a typo never silently skipped. The one exception is the key store part of a
+// bundle under KeyStorePrefix, which init skips.
 func readSource(dir string) (tree, error) {
 	src := tree{content: map[string][]byte{}, info: map[string]fs.FileInfo{}}
 	if dir == "" {
@@ -453,6 +454,11 @@ func readSource(dir string) (tree, error) {
 	if src.info, err = scan(root, "."); err != nil {
 		return src, err
 	}
+	// A decrypted bundle carries the key store under KeyStorePrefix; it belongs to the volume of
+	// secrets.signing_key_dir, not to _store, so init leaves it alone (M1-32).
+	maps.DeleteFunc(src.info, func(rel string, _ fs.FileInfo) bool {
+		return rel+"/" == KeyStorePrefix || strings.HasPrefix(rel, KeyStorePrefix)
+	})
 	if err := checkSourceEntries(src.info); err != nil {
 		return src, err
 	}

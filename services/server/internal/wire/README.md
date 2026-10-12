@@ -101,7 +101,7 @@ adds), at the marked place, with its stop step:
 
 | Ticket | Component | Place | Stop phase |
 |---|---|---|---|
-| M1-32 | signing keys, readiness `signing_keys` | after the instance | none |
+| M1-32 (built) | signing keys (`startSigningKeys`: `EnsureActive`, readiness `signing_keys`), key store check in `startSecrets`, job `instance.key_rotation` in `NewJobRegistry` | step `signing_keys` after `identity` | none |
 | M1-17 | module handlers in `Deps.Handlers` | `routes` | none |
 | M1-28, M1-65 | sinks of the log tail (rights cache, then hub) in `tailSinks` | `sync.go` | none |
 | M1-65 | gateway connections | with the log tail | `connections` |

@@ -113,8 +113,9 @@ with duplicate names the first entry applies, as with `os.Getenv`. Unset or empt
 `*RefError{Ref, Err, Detail}` with the message `secrets: <reference>: <error>: <detail>` and never
 with content. `Err` is a sentinel of the table or, for a cancelled call, the context error.
 `Provider.Get` passes the error of a driver of its own (`Options.Drivers`) on unchanged;
-`NewProvider` returns plain configuration errors. `ErrorCode` maps every error to one of the five
-codes, for logs, metrics and `bothy config check --secrets`:
+`NewProvider` returns plain configuration errors. `ErrorCode` maps every error to one of the eight
+codes, for logs, metrics and `bothy config check --secrets`; the three write codes come only from
+`Put` and `Delete` (M1-32):
 
 | Code | Sentinel | Meaning |
 |---|---|---|
@@ -123,6 +124,29 @@ codes, for logs, metrics and `bothy config check --secrets`:
 | `not_found` | `ErrNotFound` | file or variable missing or empty |
 | `insecure_file` | `ErrInsecureFile` | not a regular file, wrong mode or owner |
 | `read_failed` | `ErrReadFailed` | read error, too large, swapped; also every other error |
+| `read_only` | `ErrReadOnly` | `Put` or `Delete` outside `secrets.signing_key_dir`, `env:` or a driver without `Writer` |
+| `exists` | `ErrExists` | `Put` on an existing name; never overwritten |
+| `write_failed` | `ErrWriteFailed` | write or delete error |
+
+## Writing: the key store (M1-32)
+
+The server writes exactly one place: the key store `secrets.signing_key_dir` of the signing keys
+([ADR 0066](../../../../../docs/adr/0066-signing-keys-in-the-writable-key-store.md),
+16 section 5.2). `Options.SigningKeyDir` names it; empty means no key store.
+
+- `Provider.Put(ctx, ref, value)` and `Provider.Delete(ctx, ref)` accept only a `file:` reference
+  whose file lies directly in that directory and whose driver implements `Writer`; every other
+  reference, `env:` always, is `ErrReadOnly` before the driver is called. Both drop the cached
+  value of the reference.
+- The file driver's `Put` creates a temporary file (prefix `TempPrefix`, `.bothy-tmp-`) with mode
+  `0600` in the same directory, writes and syncs it, links it to the final name (an existing name
+  is `ErrExists`, never overwritten), removes the temporary name and syncs the directory. `Delete`
+  removes the file and syncs the directory; a missing file is `ErrNotFound`.
+- `CheckSigningKeyDir(dir)` is the start check of every role: an absolute clean path to a
+  directory owned by the process user with mode `0700` in which a probe file can be created.
+  The error names `secrets.signing_key_dir`, the expected mode and what was observed.
+
+`Writer` is the driver interface for this; `azkv` and `awssm` implement it with V3-12.
 
 ## Version and fingerprint
 
@@ -133,7 +157,8 @@ allow guesses to be checked.
 
 ## `Config` and binding
 
-`Config{Dir, CacheTTL}` carries the keys `secrets.dir` and `secrets.cache_ttl` (defaults in the
+`Config{Dir, CacheTTL, SigningKeyDir}` carries the keys `secrets.dir`, `secrets.cache_ttl` and
+`secrets.signing_key_dir` (defaults in the
 [configuration reference](../../../../../docs/operations/configuration.md)). `internal/wire`
 fills it with `config.Bind` and builds from it, with the environment from `cmd/bothy`, the one
 provider of the process (D10); only `internal/wire` and `cmd/bothy` create providers.
@@ -144,8 +169,8 @@ provider of the process (D10); only `internal/wire` and `cmd/bothy` create provi
   the drivers in M1 read local files and the environment; the network drivers bring it.
 - The log line of a failed re-read does not name the reference (only `error.type` from the list
   in `docs/observability/signals.md` 5.3); `bothy config check --secrets` shows it.
-- `Writer`/`Put`: the file driver gets `Put` with M1-32 for the signing keys in
-  `secrets.signing_key_dir` ([ADR 0066](../../../../../docs/adr/0066-signing-keys-in-the-writable-key-store.md)).
+- A key store shared by several nodes (stage 2 of 02 section 16) needs a shared volume or a
+  writable vault driver; M7-17 decides it.
 - The drivers `azkv` and `awssm` in a later milestone.
 
 ## Dependencies

@@ -12,6 +12,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createUser
   - enableUser
   - getDevice
+  - getJwks
   - getMe
   - getUser
   - listMyDevices
@@ -19,6 +20,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listUserDevices
   - listUsers
   - revokeOwner
+  - rotateSigningKey
   - updateMyProfile
   - updateUser
 later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id
@@ -359,9 +361,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getInstance
     milestone: M1
     ticket: M1-46
-  - operation_id: getJwks
-    milestone: M1
-    ticket: M1-32
   - operation_id: getMessage
     milestone: M1
     ticket: M1-57
@@ -743,9 +742,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: revokeToken
     milestone: M1
     ticket: M1-44
-  - operation_id: rotateSigningKey
-    milestone: M1
-    ticket: M1-32
   - operation_id: search
     milestone: M3
     ticket: M3-14

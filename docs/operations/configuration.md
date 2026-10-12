@@ -281,7 +281,7 @@ Source: [04-sync-protocol.md](../spec/04-sync-protocol.md), section 18.
 | `client.cache_max_age` | `BOTHY_CLIENT__CACHE_MAX_AGE` | Server |  | `30d` | unused cache entries | planned (M3) |
 | `client.outbox_retry_base` | `BOTHY_CLIENT__OUTBOX_RETRY_BASE` | Server |  | `2s` | base of the backoff in the outbox | planned (M4) |
 | `client.outbox_retry_cap` | `BOTHY_CLIENT__OUTBOX_RETRY_CAP` | Server |  | `5m` | largest interval in the outbox | planned (M4) |
-| `agent.invocation_token_ttl` | `BOTHY_AGENT__INVOCATION_TOKEN_TTL` | Server |  | `60s` | validity of an invocation token | planned (M1) |
+| `agent.invocation_token_ttl` | `BOTHY_AGENT__INVOCATION_TOKEN_TTL` | Server | duration | `60s` | validity of an invocation token | active |
 | `agent.ack_timeout` | `BOTHY_AGENT__ACK_TIMEOUT` | Server |  | `30s` | without `ack`: redelivery | planned (M2) |
 | `agent.ack_persist_interval` | `BOTHY_AGENT__ACK_PERSIST_INTERVAL` | Server |  | `1s` | `acked_seq` is stored at least this often | planned (M2) |
 | `agent.max_inflight_events` | `BOTHY_AGENT__MAX_INFLIGHT_EVENTS` | Server |  | `100` | unacknowledged events per consumer | planned (M2) |
@@ -367,7 +367,7 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `auth.access_token_ttl` | `BOTHY_AUTH__ACCESS_TOKEN_TTL` | Server |  | `10m` | Lifetime of an access token | planned (M1) |
+| `auth.access_token_ttl` | `BOTHY_AUTH__ACCESS_TOKEN_TTL` | Server | duration | `10m` | Lifetime of an access token | active |
 | `auth.dpop_nonce_ttl` | `BOTHY_AUTH__DPOP_NONCE_TTL` | Server | duration | `5m` | Validity of a DPoP nonce (`DPoP-Nonce` header and `hello` of the gateway) | active |
 | `auth.token_pepper_ref` | `BOTHY_AUTH__TOKEN_PEPPER_REF` | Server | secret_ref | `file:<secrets.dir>/token_pepper` | Reference to the server pepper for the HMAC hashes of all tokens and codes (03, principle 9) | active |
 | `auth.clock_leeway` | `BOTHY_AUTH__CLOCK_LEEWAY` | Server | duration | `30s` | allowed clock skew for `exp`, `nbf`, `iat` | active |
@@ -417,8 +417,8 @@ Source: [09-agents.md](../spec/09-agents.md), section 21.
 |---|---|---|---|---|---|---|
 | `agent.context_max_bytes` | `BOTHY_AGENT__CONTEXT_MAX_BYTES` | Server |  | `262144` | sum of the contents in the context without the triggering message | planned (M2) |
 | `agent.context_message_max_bytes` | `BOTHY_AGENT__CONTEXT_MESSAGE_MAX_BYTES` | Server |  | `32768` | content per context message, truncated above that | planned (M2) |
-| `agent.jwks_max_age` | `BOTHY_AGENT__JWKS_MAX_AGE` | Server |  | `1h` | cache duration of the JWKS; lead time of a `next` key | planned (M1) |
-| `signing_key.invocation_rotation_interval` | `BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL` | Server |  | `30d` | scheduled change of the token key | planned (M1) |
+| `agent.jwks_max_age` | `BOTHY_AGENT__JWKS_MAX_AGE` | Server | duration | `1h` | cache duration of the JWKS; lead time of a `next` key | active |
+| `signing_key.invocation_rotation_interval` | `BOTHY_SIGNING_KEY__INVOCATION_ROTATION_INTERVAL` | Server | duration | `30d` | scheduled change of the token key | active |
 | `run.queued_max_age` | `BOTHY_RUN__QUEUED_MAX_AGE` | Server |  | `48h` | the maximum age a run that has not started may reach | planned (M2) |
 | `run.orphan_timeout` | `BOTHY_RUN__ORPHAN_TIMEOUT` | Server |  | `15m` | without a heartbeat during an active run: `stale` | planned (M2) |
 | `interaction.ack_timeout` | `BOTHY_INTERACTION__ACK_TIMEOUT` | Server |  | `30s` | after that the card shows "not acknowledged" | planned (M2) |
@@ -466,7 +466,7 @@ Source: [11-extensions.md](../spec/11-extensions.md), section 16.
 |---|---|---|---|---|---|---|
 | `app.manifest_max_bytes` | `BOTHY_APP__MANIFEST_MAX_BYTES` | Server |  | `65536` | size of a manifest | planned (M2) |
 | `app.interaction_timeout` | `BOTHY_APP__INTERACTION_TIMEOUT` | Server |  | `3s` | deadline for synchronous responses through `interactions_url` | planned (M2) |
-| `webhook.delivery_timeout` | `BOTHY_WEBHOOK__DELIVERY_TIMEOUT` | Server |  | `15s` | timeout of a delivery | planned (M1) |
+| `webhook.delivery_timeout` | `BOTHY_WEBHOOK__DELIVERY_TIMEOUT` | Server | duration | `15s` | timeout of a delivery | active |
 | `webhook.max_pending_per_subscription` | `BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION` | Server |  | `10000` | open deliveries per subscription, above that `paused` | planned (M2) |
 | `webhook.retry_max_age` | `BOTHY_WEBHOOK__RETRY_MAX_AGE` | Server |  | `72h` | after that a delivery becomes `dead` ([webhooks.md](../api/webhooks.md), section 4) | planned (M2) |
 | `webhook.secret_rotation_overlap` | `BOTHY_WEBHOOK__SECRET_ROTATION_OVERLAP` | Server |  | `24h` | how long the server signs with the old and the new HMAC generation | planned (M2) |
@@ -635,7 +635,7 @@ Source: [16-operations.md](../spec/16-operations.md), section 14.
 | `server.maintenance_mode` | `BOTHY_SERVER__MAINTENANCE_MODE` | Server |  | `off` | `off` or `read_only` (relocation, upgrade; [ADR 0065](../adr/0065-maintenance-mode-read-only.md)) | planned (M7) |
 | `secrets.dir` | `BOTHY_SECRETS__DIR` | Server | string | `/run/bothy/secrets` | base of the default references `file:`; an absolute path in clean form (no `.` or `..`, no double or trailing `/`), not `/`, without a NUL character and without `<`, otherwise `bothy config check` fails | active |
 | `secrets.cache_ttl` | `BOTHY_SECRETS__CACHE_TTL` | Server | duration | `5m` | how long a read secret stays valid; at least `1s` | active |
-| `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server |  | `/var/lib/bothy/signing-keys` | writable directory of the private signing keys; owned by the service user, mode `0700` (5.2, [ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)) | planned (M1) |
+| `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server | string | `/var/lib/bothy/signing-keys` | writable directory of the private signing keys; owned by the service user, mode `0700` (5.2, [ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)) | active |
 | `server.tls_cert_ref` | `BOTHY_SERVER__TLS_CERT_REF` | Server | secret_ref | empty | reference to the certificate chain (PEM, leaf first); empty: the server does not terminate TLS (SEC-TLS-2) | active |
 | `server.tls_key_ref` | `BOTHY_SERVER__TLS_KEY_REF` | Server | secret_ref | empty | reference to the private key (PEM); only together with `server.tls_cert_ref` | active |
 | `database.host` | `BOTHY_DATABASE__HOST` | Server | string | `localhost` | host of the database | active |
@@ -726,9 +726,9 @@ Source: [19-security.md](../spec/19-security.md), section 16.
 | `audit.checkpoint_interval` | `BOTHY_AUDIT__CHECKPOINT_INTERVAL` | Server |  | `1h` | interval of the signed checkpoints of the audit log | planned (M1) |
 | `audit.checkpoint_sink` | `BOTHY_AUDIT__CHECKPOINT_SINK` | Server |  | empty | storage target of the checkpoints outside the database: empty (warning, SEC-AUD-2) or `file://<absolute path>` on storage outside the database volume; `bothy config check` rejects other schemes. An object store with a retention lock is the recommended target for production and comes with PLAN M7-22 | planned (M1) |
 | `audit.reason_max_chars` | `BOTHY_AUDIT__REASON_MAX_CHARS` | Server |  | `500` | maximum length of a mandatory reason of an administrative action in Unicode characters (SEC-AUD-5) | planned (M1) |
-| `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server |  | `30s` | longest time a process still accepts a retired key or does not know a new one | planned (M1) |
-| `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server |  | `1m` | interval of the job `instance.key_rotation` | planned (M1) |
-| `signing_key.access_token_rotation_interval` | `BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL` | Server |  | `30d` | scheduled rotation of the key for access tokens | planned (M1) |
+| `signing_key.cache_ttl` | `BOTHY_SIGNING_KEY__CACHE_TTL` | Server | duration | `30s` | longest time a process still accepts a retired key or does not know a new one | active |
+| `signing_key.rotation_check_interval` | `BOTHY_SIGNING_KEY__ROTATION_CHECK_INTERVAL` | Server | duration | `1m` | interval of the job `instance.key_rotation` | active |
+| `signing_key.access_token_rotation_interval` | `BOTHY_SIGNING_KEY__ACCESS_TOKEN_ROTATION_INTERVAL` | Server | duration | `30d` | scheduled rotation of the key for access tokens | active |
 
 ### 20 Privacy
 

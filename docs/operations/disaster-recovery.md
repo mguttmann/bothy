@@ -44,7 +44,12 @@ automatic restore test measures the duration on every run.
    takes over the values of the bundle. When `secrets-init` reports the entries as `adopted`,
    `updated` or `kept`, delete the decrypted generated files from `infra/compose/secrets/`: `_store` holds
    them, and the source needs only the supplied ones. The same token pepper and the same signing
-   keys mean: tokens and devices stay valid.
+   keys mean: tokens and devices stay valid. `secrets-init` skips the directory `signing-keys/` of
+   the bundle: before the first start of `api` and `worker`, copy its files into the volume
+   `signing-keys` (owner `65532:65532`, directory `0700`, files `0600`, names unchanged). Without
+   them the first start retires every key whose private file is missing and creates fresh ones
+   (log line `signing key file missing, key retired`): access tokens and invocation tokens of
+   the old keys stop verifying, people sign in again, webhook receivers need the new public key.
 3. `docker compose up -d secrets-init postgres backup`, then restore from repo2 according to
    [backup-restore.md](backup-restore.md) 5.2 from step 4 (target: latest state).
 4. Restore the objects from restic.

@@ -11,6 +11,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/routes"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
+	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
 
@@ -46,6 +47,8 @@ type Handlers struct {
 	// People implements listUsers, createUser, getUser, updateUser, enableUser, listOwners,
 	// addOwner, revokeOwner, getMe and updateMyProfile (identity, M1-31).
 	*identityhttp.People
+	// Keys implements getJwks and rotateSigningKey (instance, M1-32).
+	*instancehttp.Keys
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

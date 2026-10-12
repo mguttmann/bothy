@@ -40,6 +40,28 @@ var configChecks = []configCheck{
 	{name: "file_s3", keys: []string{keyStorageDriver, "file.s3.endpoint", "file.s3.region", "file.s3.bucket", "file.s3.prefix",
 		"file.s3.use_path_style", "file.s3.checksum_mode", keyEgressAllowedHosts}, fn: fileS3},
 	{name: "consumer_alert_below_retention", keys: []string{keyConsumerPendingAlertAfter, keySyncEventRetention}, fn: consumerAlertBelowRetention},
+	{name: "jwks_max_age_below_rotation", keys: []string{keyJWKSMaxAge, keyInvocationRotation, keyAccessRotation}, fn: jwksMaxAgeBelowRotation},
+}
+
+// The keys of the cross-check jwks_max_age_below_rotation.
+const (
+	keyJWKSMaxAge         = "agent.jwks_max_age"
+	keyInvocationRotation = "signing_key.invocation_rotation_interval"
+	keyAccessRotation     = "signing_key.access_token_rotation_interval"
+)
+
+// jwksMaxAgeBelowRotation requires agent.jwks_max_age to be strictly below both scheduled
+// rotation intervals (M1-32, 09 section 4.5): a next key is published that long before it signs,
+// so an interval not above it would announce the following key before the last one ever signed.
+func jwksMaxAgeBelowRotation(v *config.Values) error {
+	maxAge := v.Duration(keyJWKSMaxAge)
+	var problems []error
+	for _, key := range []string{keyInvocationRotation, keyAccessRotation} {
+		if maxAge >= v.Duration(key) {
+			problems = append(problems, errors.New(keyJWKSMaxAge+" must be less than "+key))
+		}
+	}
+	return errors.Join(problems...)
 }
 
 // consumerAlertBelowRetention requires consumer.pending_alert_after to be strictly below

@@ -69,26 +69,36 @@ func (stubServer) UpdateUser(context.Context, rest.UpdateUserRequestObject) (res
 	return nil, nil
 }
 
+func (stubServer) GetJwks(context.Context, rest.GetJwksRequestObject) (rest.GetJwksResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RotateSigningKey(context.Context, rest.RotateSigningKeyRequestObject) (rest.RotateSigningKeyResponseObject, error) {
+	return nil, nil
+}
+
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
-// (AZ-P1): the three device reads of M1-33 and the ten people, owner and self operations of
-// M1-31. A handler ticket that enables an operation changes this test together with
+// (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
+// and the JWKS and the rotation of the signing keys (M1-32). A handler ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
 	type entry struct{ pattern, action, class string }
 	want := map[string]entry{
-		"getDevice":       {"GET /api/v1/devices/{device_id}", "device.list", "rl.read"},
-		"listMyDevices":   {"GET /api/v1/me/devices", "device.list", "rl.read"},
-		"listUserDevices": {"GET /api/v1/users/{user_id}/devices", "device.list", "rl.read"},
-		"listUsers":       {"GET /api/v1/users", "user.read", "rl.read"},
-		"createUser":      {"POST /api/v1/users", "user.create", "rl.admin"},
-		"getUser":         {"GET /api/v1/users/{user_id}", "user.read", "rl.read"},
-		"updateUser":      {"PATCH /api/v1/users/{user_id}", "user.update", "rl.admin"},
-		"enableUser":      {"POST /api/v1/users/{user_id}/enable", "user.enable", "rl.admin"},
-		"listOwners":      {"GET /api/v1/owners", "user.read", "rl.read"},
-		"addOwner":        {"POST /api/v1/owners", "owner.add", "rl.admin"},
-		"revokeOwner":     {"POST /api/v1/owners/{user_id}/revoke", "owner.remove", "rl.admin"},
-		"getMe":           {"GET /api/v1/me", "self.read", "rl.read"},
-		"updateMyProfile": {"PATCH /api/v1/me/profile", "self.profile.update", "rl.write"},
+		"getDevice":        {"GET /api/v1/devices/{device_id}", "device.list", "rl.read"},
+		"listMyDevices":    {"GET /api/v1/me/devices", "device.list", "rl.read"},
+		"listUserDevices":  {"GET /api/v1/users/{user_id}/devices", "device.list", "rl.read"},
+		"listUsers":        {"GET /api/v1/users", "user.read", "rl.read"},
+		"createUser":       {"POST /api/v1/users", "user.create", "rl.admin"},
+		"getUser":          {"GET /api/v1/users/{user_id}", "user.read", "rl.read"},
+		"updateUser":       {"PATCH /api/v1/users/{user_id}", "user.update", "rl.admin"},
+		"enableUser":       {"POST /api/v1/users/{user_id}/enable", "user.enable", "rl.admin"},
+		"listOwners":       {"GET /api/v1/owners", "user.read", "rl.read"},
+		"addOwner":         {"POST /api/v1/owners", "owner.add", "rl.admin"},
+		"revokeOwner":      {"POST /api/v1/owners/{user_id}/revoke", "owner.remove", "rl.admin"},
+		"getMe":            {"GET /api/v1/me", "self.read", "rl.read"},
+		"updateMyProfile":  {"PATCH /api/v1/me/profile", "self.profile.update", "rl.write"},
+		"getJwks":          {"GET /api/v1/instance/jwks", "instance.discovery.read", "rl.public_auth"},
+		"rotateSigningKey": {"POST /api/v1/signing-keys/rotate", "signing_key.rotate", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

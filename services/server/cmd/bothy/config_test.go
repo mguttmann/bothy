@@ -157,11 +157,14 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 	env := []string{"BOTHY_CONFIG_FILE=" + path, "BOTHY_MESSAGE__MAX_CONTENT_BYTES=2048"}
 	code, stdout, stderr := runConfig(t, wire.ConfigSchema, env, "print", "--role", "worker")
 	want := "# configuration file: " + path + "\n" +
+		"agent.invocation_token_ttl = 1m  # default\n" +
+		"agent.jwks_max_age = 1h  # default\n" +
 		"api.cors_allowed_origins =   # default\n" +
 		"api.page_size_default = 50  # default\n" +
 		"api.page_size_max = 200  # default\n" +
 		"audit.deny_aggregate_max_keys = 10000  # default\n" +
 		"audit.deny_aggregate_window = 1m  # default\n" +
+		"auth.access_token_ttl = 10m  # default\n" +
 		"auth.clock_leeway = 30s  # default\n" +
 		"auth.dpop_nonce_ttl = 5m  # default\n" +
 		"auth.dpop_proof_max_age = 1m  # default\n" +
@@ -270,6 +273,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"ratelimit.sweep_interval = 1m  # default\n" +
 		"secrets.cache_ttl = 5m  # default\n" +
 		"secrets.dir = /run/bothy/secrets  # default\n" +
+		"secrets.signing_key_dir = /var/lib/bothy/signing-keys  # default\n" +
 		"server.internal_listen_addr = 127.0.0.1:8081  # default\n" +
 		"server.listen_addr = 127.0.0.1:9080  # file " + path + "\n" +
 		"server.public_url = https://chat.example.com  # env BOTHY_SERVER__PUBLIC_URL\n" +
@@ -282,6 +286,10 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"shutdown.jobs_soft_timeout = 20s  # default\n" +
 		"shutdown.telemetry_flush_timeout = 5s  # default\n" +
 		"shutdown.total_timeout = 1m  # default\n" +
+		"signing_key.access_token_rotation_interval = 30d  # default\n" +
+		"signing_key.cache_ttl = 30s  # default\n" +
+		"signing_key.invocation_rotation_interval = 30d  # default\n" +
+		"signing_key.rotation_check_interval = 1m  # default\n" +
 		"startup.dependency_wait = 1m  # default\n" +
 		"sync.event_log_partition_size = 1000000  # default\n" +
 		"sync.event_log_partitions_ahead = 3  # default\n" +
@@ -298,7 +306,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"telemetry.logs.level = info  # default\n" +
 		"telemetry.pseudonym_key_ref = file:/run/bothy/secrets/telemetry_pseudonym_key  # default\n" +
 		"telemetry.traces.sampler_ratio = 1  # default\n" +
-		"telemetry.traces.trust_remote_parent = false  # default\n"
+		"telemetry.traces.trust_remote_parent = false  # default\n" +
+		"webhook.delivery_timeout = 15s  # default\n"
 	if code != 0 || stdout != want || stderr != "" {
 		t.Fatalf("exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}

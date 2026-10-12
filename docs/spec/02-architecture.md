@@ -96,7 +96,7 @@ name only commands from here.
 | `bothy config check\|print` | check the configuration, print it redacted; `check --secrets` also resolves every reference `*_ref` through the secret provider and names per key only `ok` or the error code | section 13 |
 | `bothy import login\|logout`, `bothy import discord ...` | login of the import tool as a `cli` device through device pairing; import and read mirror through the import API (`import.read`, `import.apply`) | [22-import-migration.md](22-import-migration.md) |
 | `bothy restore finalize` | after a restore: new sync epoch, cursors to `head_seq`, audit | [16-operations.md](16-operations.md), [03-data-model.md](03-data-model.md) 6.7 |
-| `bothy secrets init\|export` | create and back up secrets: `init --target DIR [--source DIR] [--owner SERVICE=UID:GID ...] [--adopt-source]` reconciles the store `_store/` with the source and copies per service; `export --from DIR --age-recipient KEY [--age-recipient ...] [--output FILE\|-] [--armor]` writes the age-encrypted bundle; both read only their flags, without a configuration file and database | [16-operations.md](16-operations.md) 5.3, 5.4 |
+| `bothy secrets init\|export` | create and back up secrets: `init --target DIR [--source DIR] [--owner SERVICE=UID:GID ...] [--adopt-source]` reconciles the store `_store/` with the source and copies per service; `export --from DIR --age-recipient KEY [--age-recipient ...] [--signing-key-dir DIR] [--output FILE\|-] [--armor]` writes the age-encrypted bundle; both read only their flags, without a configuration file and database | [16-operations.md](16-operations.md) 5.3, 5.4 |
 | `bothy healthcheck --url URL [--timeout DURATION]` | health check against the internal listener for containers without a shell. `--url` takes only `http://` with a loopback host (`127.0.0.0/8`, `::1`, `localhost`), anything else is exit `2`; `--timeout` bounds the whole request (default `5s`, the timeout of the Compose healthcheck); no configuration, secrets or database; exit `0` for `2xx`, else `1` with one line naming the status code or the error class | [16-operations.md](16-operations.md) |
 | `bothy files rescan` | maintenance: have files checked again | [12-files.md](12-files.md) |
 | `bothy telemetry pseudonym <principal_id> [--at TIME] [--config FILE]` | pseudonym of a principal for the owner's troubleshooting: prints `bothy.principal.pseudo_id` for the period that contains `--at` ([RFC 3339](https://www.rfc-editor.org/rfc/rfc3339), retrieved 2026-10-12, default now) and the start of that period in UTC; reads `telemetry.pseudonym_key_ref` through the secret provider, no database | [../observability/privacy.md](../observability/privacy.md) |
@@ -1195,7 +1195,9 @@ orchestrator restarts, clients resume according to 04.
 
 1. Load and check the configuration (section 13), start telemetry.
 2. Resolve secrets. The internal listener opens now, so that the orchestrator sees `/healthz`
-   and `/readyz` fails with `startup` while the start is running.
+   and `/readyz` fails with `startup` while the start is running. Every role also checks the
+   key store `secrets.signing_key_dir` (owned by the service user, mode `0700`, writable) and ends
+   the start otherwise (ADR 0066, M1-32).
 3. Reach the database, for at most `startup.dependency_wait` with backoff; then abort.
 4. Check the schema version: the binary knows the smallest required version. If the database is
    older, the start aborts with a pointer to `bothy migrate up` (exit code `1`). Newer versions are
@@ -1212,6 +1214,9 @@ orchestrator restarts, clients resume according to 04.
    but never becomes ready: `/readyz` fails with `schema_requires_newer_server`.
 6. Ensure signing keys: every purpose without an `active` key gets one
    ([19-security.md](19-security.md), section 10; [ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)).
+   Keys whose private file is missing from the key store (a restore without it) are retired
+   first, so the purpose gets a fresh active key; this runs after audit, sync, authz and identity
+   (steps 6a to 6d of `internal/wire`), whose unit of work records `signing_key.transition`.
 7. Register routes and check the route metadata: every operation has a known action, otherwise
    abort (05, rule 3).
 8. Role `api`: start the log tail, set `local_head` to the current head, open the public listener.

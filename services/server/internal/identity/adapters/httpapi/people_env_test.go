@@ -41,12 +41,6 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
-// server is the strict server of these tests: the device and the people handlers of identity.
-type server struct {
-	*httpapi.Devices
-	*httpapi.People
-}
-
 // peopleStart is the clock of the people world.
 var peopleStart = time.Date(2026, 10, 12, 9, 0, 0, 0, time.UTC)
 
@@ -147,7 +141,7 @@ func newWorld(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	built, err := routes.Build(server{People: httpapi.NewPeople(people, people)}, wire.RouteOptions(), routes.SpecCatalog())
+	built, err := routes.Build(wire.Handlers{People: httpapi.NewPeople(people, people)}, wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)
 	}
