@@ -12,6 +12,14 @@ import (
 	"strings"
 )
 
+// Register paths and names that several checks share.
+const (
+	testSupportPaths = "testsupport.paths"
+	kernelPortsPath  = "kernel.ports"
+	dependsOnKey     = ".depends_on"
+	eventTypeWhat    = "event type"
+)
+
 // rule is a naming rule for one kind of register entry.
 type rule struct {
 	what  string
@@ -33,7 +41,7 @@ var (
 	kernelRule      = patternRule("kernel package name", `^[a-z]+$`)
 	tableRule       = patternRule("table name", `^[a-z][a-z0-9_]*$`)
 	actionRule      = patternRule("action name", `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`)
-	eventRule       = patternRule("event type", `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`)
+	eventRule       = patternRule(eventTypeWhat, `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`)
 	opRule          = patternRule("op name", `^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$`)
 	pathRule        = patternRule("path", `^[a-z0-9_-]+(/[a-z0-9_-]+)*$`)
 	importPathRule  = rule{
@@ -135,8 +143,8 @@ func (v *validator) validate() {
 	if v.r.API != nil {
 		v.vendorRefs("api.vendors", v.r.API.Vendors)
 	}
-	v.nonEmpty("testsupport.paths", v.r.TestSupport.Paths)
-	v.list("testsupport.paths", v.r.TestSupport.Paths, pathRule)
+	v.nonEmpty(testSupportPaths, v.r.TestSupport.Paths)
+	v.list(testSupportPaths, v.r.TestSupport.Paths, pathRule)
 	v.validateScope()
 	v.validateModules()
 }
@@ -163,23 +171,33 @@ func excludes(ex, p string) bool {
 // exist on disk are checked by checkDirectories.
 func (v *validator) validateScope() {
 	for i, dir := range v.r.Exclude {
-		for _, root := range productRoots {
-			if excludes(dir, root) {
-				v.add(index("exclude", i), "%q takes product code under %s/ out of the architecture gate "+
-					"(go-arch-lint excludes every path that starts with the entry)", dir, root)
-			}
-		}
+		v.excludeScope(i, dir)
 	}
 	for i, dir := range v.r.TestSupport.Paths {
-		for _, root := range productRoots {
-			if within(dir, root) {
-				v.add(index("testsupport.paths", i), "%q turns product code under %s/ into test support, which may import anything", dir, root)
-			}
+		v.testSupportScope(i, dir)
+	}
+}
+
+// excludeScope reports an exclude entry that takes product code out of the gate.
+func (v *validator) excludeScope(i int, dir string) {
+	for _, root := range productRoots {
+		if excludes(dir, root) {
+			v.add(index("exclude", i), "%q takes product code under %s/ out of the architecture gate "+
+				"(go-arch-lint excludes every path that starts with the entry)", dir, root)
 		}
-		for _, ex := range v.r.Exclude {
-			if excludes(ex, dir) {
-				v.add(index("testsupport.paths", i), "%q overlaps exclude entry %q", dir, ex)
-			}
+	}
+}
+
+// testSupportScope reports a test support entry that covers product code or an excluded directory.
+func (v *validator) testSupportScope(i int, dir string) {
+	for _, root := range productRoots {
+		if within(dir, root) {
+			v.add(index(testSupportPaths, i), "%q turns product code under %s/ into test support, which may import anything", dir, root)
+		}
+	}
+	for _, ex := range v.r.Exclude {
+		if excludes(ex, dir) {
+			v.add(index(testSupportPaths, i), "%q overlaps exclude entry %q", dir, ex)
 		}
 	}
 }
@@ -217,12 +235,12 @@ func checkDirectories(r *register, root string) ([]problem, error) {
 func (v *validator) validateKernel() {
 	k := v.r.Kernel
 	v.nonEmpty("kernel.core", k.Core)
-	v.nonEmpty("kernel.ports", k.Ports)
+	v.nonEmpty(kernelPortsPath, k.Ports)
 	v.list("kernel.core", k.Core, kernelRule)
-	v.list("kernel.ports", k.Ports, kernelRule)
+	v.list(kernelPortsPath, k.Ports, kernelRule)
 	for i, p := range k.Ports {
 		if slices.Contains(k.Core, p) {
-			v.add(index("kernel.ports", i), "%q is also listed in kernel.core; a package is either core or port", p)
+			v.add(index(kernelPortsPath, i), "%q is also listed in kernel.core; a package is either core or port", p)
 		}
 	}
 }
@@ -255,15 +273,15 @@ func (v *validator) validatePlatform() {
 			v.add(path, "invalid platform name %q (want %s)", p, platformRule.want)
 		}
 		e := v.r.Platform[p]
-		v.list(path+".depends_on", e.DependsOn, platformRule)
+		v.list(path+dependsOnKey, e.DependsOn, platformRule)
 		for i, d := range e.DependsOn {
 			_, known := v.r.Platform[d]
-			v.dependency(index(path+".depends_on", i), p, d, known, "platform package")
+			v.dependency(index(path+dependsOnKey, i), p, d, known, "platform package")
 		}
 		v.vendorRefs(path+".vendors", e.Vendors)
 	}
 	for _, c := range findCycles(v.r.platformOrder, func(p string) []string { return v.r.Platform[p].DependsOn }) {
-		v.add("platform."+c[0]+".depends_on", "platform dependency cycle %s", cycleText(c))
+		v.add("platform."+c[0]+dependsOnKey, "platform dependency cycle %s", cycleText(c))
 	}
 }
 
@@ -310,21 +328,21 @@ func (v *validator) validateModules() {
 		v.list(path+".events", e.Events, eventRule)
 		v.list(path+".ephemeral_events", e.EphemeralEvents, eventRule)
 		v.list(path+".ws_ops", e.WSOps, opRule)
-		v.list(path+".depends_on", e.DependsOn, moduleRule)
+		v.list(path+dependsOnKey, e.DependsOn, moduleRule)
 		for i, d := range e.DependsOn {
 			_, known := v.r.Modules[d]
-			v.dependency(index(path+".depends_on", i), m, d, known, "module")
+			v.dependency(index(path+dependsOnKey, i), m, d, known, "module")
 		}
 		v.vendorRefs(path+".adapter_vendors", e.AdapterVendors)
 
 		v.own(tables, "table", path+".tables", m, e.Tables)
 		v.own(actions, "action", path+".actions", m, e.Actions)
-		v.own(events, "event type", path+".events", m, e.Events)
-		v.own(events, "event type", path+".ephemeral_events", m, e.EphemeralEvents)
+		v.own(events, eventTypeWhat, path+".events", m, e.Events)
+		v.own(events, eventTypeWhat, path+".ephemeral_events", m, e.EphemeralEvents)
 		v.own(ops, "op", path+".ws_ops", m, e.WSOps)
 	}
 	for _, c := range findCycles(v.r.moduleOrder, func(m string) []string { return v.r.Modules[m].DependsOn }) {
-		v.add("modules."+c[0]+".depends_on", "dependency cycle %s", cycleText(c))
+		v.add("modules."+c[0]+dependsOnKey, "dependency cycle %s", cycleText(c))
 	}
 }
 
@@ -337,48 +355,59 @@ func cycleText(c []string) string {
 // on where the search entered the cycle. Unknown names and self-dependencies are skipped; the
 // caller reports them on their own.
 func findCycles(order []string, edges func(string) []string) [][]string {
-	rank := map[string]int{}
+	f := cycleFinder{rank: map[string]int{}, state: map[string]int{}, seen: map[string]bool{}, edges: edges}
 	for i, n := range order {
-		rank[n] = i
-	}
-	const (
-		unvisited = iota
-		onStack
-		done
-	)
-	state := map[string]int{}
-	var stack []string
-	var cycles [][]string
-	seen := map[string]bool{}
-
-	var visit func(n string)
-	visit = func(n string) {
-		state[n] = onStack
-		stack = append(stack, n)
-		for _, d := range edges(n) {
-			if _, known := rank[d]; !known || d == n {
-				continue
-			}
-			switch state[d] {
-			case unvisited:
-				visit(d)
-			case onStack:
-				c := rotate(stack[slices.Index(stack, d):], rank)
-				if key := strings.Join(c, " "); !seen[key] {
-					seen[key] = true
-					cycles = append(cycles, c)
-				}
-			}
-		}
-		stack = stack[:len(stack)-1]
-		state[n] = done
+		f.rank[n] = i
 	}
 	for _, n := range order {
-		if state[n] == unvisited {
-			visit(n)
+		if f.state[n] == nodeUnvisited {
+			f.visit(n)
 		}
 	}
-	return cycles
+	return f.cycles
+}
+
+// The states of a node in the depth-first search of findCycles.
+const (
+	nodeUnvisited = iota
+	nodeOnStack
+	nodeDone
+)
+
+// cycleFinder holds the state of one findCycles search.
+type cycleFinder struct {
+	rank   map[string]int
+	state  map[string]int
+	seen   map[string]bool
+	edges  func(string) []string
+	stack  []string
+	cycles [][]string
+}
+
+func (f *cycleFinder) visit(n string) {
+	f.state[n] = nodeOnStack
+	f.stack = append(f.stack, n)
+	for _, d := range f.edges(n) {
+		if _, known := f.rank[d]; !known || d == n {
+			continue
+		}
+		switch f.state[d] {
+		case nodeUnvisited:
+			f.visit(d)
+		case nodeOnStack:
+			f.record(rotate(f.stack[slices.Index(f.stack, d):], f.rank))
+		}
+	}
+	f.stack = f.stack[:len(f.stack)-1]
+	f.state[n] = nodeDone
+}
+
+// record keeps a cycle the first time the search finds it.
+func (f *cycleFinder) record(c []string) {
+	if key := strings.Join(c, " "); !f.seen[key] {
+		f.seen[key] = true
+		f.cycles = append(f.cycles, c)
+	}
 }
 
 // rotate returns a copy of the cycle that starts at its member with the lowest rank.

@@ -35,6 +35,19 @@ func generate(r *register) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// Component names and paths that several rules share.
+const (
+	kernelCore  = "kernel-core"
+	kernelPorts = "kernel-ports"
+	internalDir = "internal/"
+	boolTag     = "!!bool"
+)
+
+// The layer components of a module: <module>-domain, <module>-app and <module>-adapters.
+func domainOf(m string) string   { return m + "-domain" }
+func appOf(m string) string      { return m + "-app" }
+func adaptersOf(m string) string { return m + "-adapters" }
+
 func scalar(tag, value string) *yaml.Node {
 	return &yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Value: value}
 }
@@ -70,8 +83,8 @@ func configNode(r *register) *yaml.Node {
 	// pattern without a directory, and most layers of a module have no package yet. An unknown
 	// component name and a package without component still fail.
 	allow := mapping()
-	set(allow, "depOnAnyVendor", scalar("!!bool", "false"))
-	set(allow, "ignoreNotFoundComponents", scalar("!!bool", "true"))
+	set(allow, "depOnAnyVendor", scalar(boolTag, "false"))
+	set(allow, "ignoreNotFoundComponents", scalar(boolTag, "true"))
 	set(root, "allow", allow)
 
 	set(root, "exclude", flowList(r.Exclude))
@@ -80,7 +93,7 @@ func configNode(r *register) *yaml.Node {
 	set(root, "excludeFiles", files)
 	set(root, "vendors", vendorsNode(r))
 	set(root, "components", componentsNode(r))
-	set(root, "commonComponents", flowList([]string{"kernel-core"}))
+	set(root, "commonComponents", flowList([]string{kernelCore}))
 	set(root, "deps", depsNode(r))
 	return root
 }
@@ -121,7 +134,7 @@ func platformComponents(r *register) []string {
 
 // moduleComponents returns the four components of a module: port, domain, app and adapters.
 func moduleComponents(m string) []string {
-	return []string{m, m + "-domain", m + "-app", m + "-adapters"}
+	return []string{m, domainOf(m), appOf(m), adaptersOf(m)}
 }
 
 // component is one entry of the components section.
@@ -142,22 +155,22 @@ func tree(dir string) []string { return []string{dir, dir + "/**"} }
 
 func components(r *register) []component {
 	list := []component{
-		{"kernel-core", prefixed("internal/kernel/", r.Kernel.Core)},
-		{"kernel-ports", prefixed("internal/kernel/", r.Kernel.Ports)},
+		{kernelCore, prefixed(internalDir+"kernel/", r.Kernel.Core)},
+		{kernelPorts, prefixed(internalDir+"kernel/", r.Kernel.Ports)},
 	}
 	for _, p := range platformNames(r) {
-		list = append(list, component{platformComponent(p), tree("internal/platform/" + p)})
+		list = append(list, component{platformComponent(p), tree(internalDir + "platform/" + p)})
 	}
-	list = append(list, component{"wire", tree("internal/wire")}, component{"cmd", []string{"cmd/**"}})
+	list = append(list, component{"wire", tree(internalDir + "wire")}, component{"cmd", []string{"cmd/**"}})
 	if r.API != nil {
 		list = append(list, component{"api", []string{"api/**"}})
 	}
 	for _, m := range r.moduleOrder {
 		list = append(list,
-			component{m, []string{"internal/" + m}},
-			component{m + "-domain", tree("internal/" + m + "/domain")},
-			component{m + "-app", tree("internal/" + m + "/app")},
-			component{m + "-adapters", []string{"internal/" + m + "/adapters/**"}},
+			component{m, []string{internalDir + m}},
+			component{domainOf(m), tree(internalDir + m + "/domain")},
+			component{appOf(m), tree(internalDir + m + "/app")},
+			component{adaptersOf(m), []string{internalDir + m + "/adapters/**"}},
 		)
 	}
 	paths := make([]string, 0, len(r.TestSupport.Paths))
@@ -197,10 +210,10 @@ func deps(r *register) []dep {
 	if r.API != nil {
 		api = []string{"api"}
 	}
-	list := []dep{{name: "kernel-core", mayDependOn: []string{"kernel-core"}}}
+	list := []dep{{name: kernelCore, mayDependOn: []string{kernelCore}}}
 	for _, p := range platformNames(r) {
 		e := r.Platform[p]
-		may := slices.Concat([]string{platformComponent(p), "kernel-ports"}, prefixed("platform-", e.DependsOn))
+		may := slices.Concat([]string{platformComponent(p), kernelPorts}, prefixed("platform-", e.DependsOn))
 		list = append(list, dep{name: platformComponent(p), mayDependOn: may, canUse: vendorNames(e.Vendors)})
 	}
 
@@ -208,10 +221,10 @@ func deps(r *register) []dep {
 	for _, m := range r.moduleOrder {
 		all = append(all, moduleComponents(m)...)
 	}
-	wire := slices.Concat([]string{"wire"}, all, platforms, []string{"kernel-ports"}, api)
+	wire := slices.Concat([]string{"wire"}, all, platforms, []string{kernelPorts}, api)
 	list = append(list,
 		dep{name: "wire", mayDependOn: wire, canUse: vendorNames(r.Wire.Vendors)},
-		dep{name: "cmd", mayDependOn: slices.Concat([]string{"cmd", "wire"}, platforms, []string{"kernel-ports"}), canUse: vendorNames(r.Cmd.Vendors)},
+		dep{name: "cmd", mayDependOn: slices.Concat([]string{"cmd", "wire"}, platforms, []string{kernelPorts}), canUse: vendorNames(r.Cmd.Vendors)},
 	)
 	if r.API != nil {
 		list = append(list, dep{name: "api", mayDependOn: api, canUse: vendorNames(r.API.Vendors)})
@@ -220,12 +233,12 @@ func deps(r *register) []dep {
 	for _, m := range r.moduleOrder {
 		e := r.Modules[m]
 		list = append(list,
-			dep{name: m, mayDependOn: []string{m, "kernel-ports"}},
-			dep{name: m + "-domain", mayDependOn: []string{m + "-domain"}},
-			dep{name: m + "-app", mayDependOn: slices.Concat([]string{m + "-app", m, m + "-domain", "kernel-ports"}, e.DependsOn)},
+			dep{name: m, mayDependOn: []string{m, kernelPorts}},
+			dep{name: domainOf(m), mayDependOn: []string{domainOf(m)}},
+			dep{name: appOf(m), mayDependOn: slices.Concat([]string{appOf(m), m, domainOf(m), kernelPorts}, e.DependsOn)},
 			dep{
-				name:        m + "-adapters",
-				mayDependOn: slices.Concat([]string{m + "-adapters", m, m + "-app", m + "-domain", "kernel-ports"}, platforms, api, e.DependsOn),
+				name:        adaptersOf(m),
+				mayDependOn: slices.Concat([]string{adaptersOf(m), m, appOf(m), domainOf(m), kernelPorts}, platforms, api, e.DependsOn),
 				canUse:      vendorNames(e.AdapterVendors),
 			},
 		)
@@ -241,8 +254,8 @@ func depsNode(r *register) *yaml.Node {
 	for _, d := range deps(r) {
 		entry := mapping()
 		if d.anything {
-			set(entry, "anyProjectDeps", scalar("!!bool", "true"))
-			set(entry, "anyVendorDeps", scalar("!!bool", "true"))
+			set(entry, "anyProjectDeps", scalar(boolTag, "true"))
+			set(entry, "anyVendorDeps", scalar(boolTag, "true"))
 		}
 		if len(d.mayDependOn) > 0 {
 			set(entry, "mayDependOn", flowList(d.mayDependOn))

@@ -22,8 +22,9 @@ import (
 
 // Clock reports the current time.
 //
-// Implementations return UTC and are safe for concurrent use.
-type Clock interface {
+// Implementations return UTC and are safe for concurrent use. The name stays Clock rather than
+// the -er form of its one method (docs/DECISIONS.md M1-05/26).
+type Clock interface { // NOSONAR: a clock is a thing, not an action; see M1-05/26.
 	// Now returns the current instant in UTC.
 	Now() time.Time
 }
