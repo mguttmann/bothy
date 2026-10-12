@@ -40,7 +40,7 @@ Only this module writes and reads these tables by SQL (03-data-model.md, princip
 
 ## Events and WebSocket ops
 
-- Durable: `user.updated`, `session.revoked`.
+- Durable: `user.updated`, `session.revoked`, `device.pending`.
 - Ephemeral: none.
 - WebSocket ops (client to server): none.
 

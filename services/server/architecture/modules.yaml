@@ -31,7 +31,7 @@ modules:
   billing:
     tables: [price_table, cost_entries]
     actions: [cost.read.thread, cost.read.aggregate, price.read, price.manage, cost.reconcile,
-              cost.reconcile.submit]
+              cost.reconcile.read, cost.reconcile.submit]
     events: []
     ephemeral_events: []
     ws_ops: []
@@ -69,7 +69,7 @@ modules:
               passkey.revoke, device.list, device.approve, device.revoke, device.expire,
               session.list, session.revoke, session.extension.create, token.list, token.create,
               token.revoke]
-    events: [user.updated, session.revoked]
+    events: [user.updated, session.revoked, device.pending]
     ephemeral_events: []
     ws_ops: []
     depends_on: [instance, authz]
@@ -210,7 +210,7 @@ modules:
     tables: [apps, app_installations, webhook_subscriptions, webhook_deliveries, incoming_webhooks]
     actions: [app.read, app.install, app.scopes.update, app.suspend, app.resume, app.uninstall,
               webhook_out.read, webhook_out.manage, webhook_out.redeliver, webhook_out.deliver,
-              webhook_in.read, webhook_in.create, webhook_in.revoke, webhook_in.post]
+              webhook_out.transition, webhook_in.read, webhook_in.create, webhook_in.revoke, webhook_in.post]
     events: []
     ephemeral_events: []
     ws_ops: []

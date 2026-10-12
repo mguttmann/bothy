@@ -21,7 +21,7 @@ Price table, cost postings, totals per run, thread, space, agent, reconciliation
 
 ## Dependencies
 
-Must not use the ports of any other module.
+May use the ports of these modules: none.
 
 Reason: cost rows carry copies of thread, channel, space and agent (03); no lookup needed.
 

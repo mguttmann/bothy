@@ -42,7 +42,7 @@ Only this module writes and reads these tables via SQL (03-data-model.md, princi
 
 - Durable: none.
 - Ephemeral: `stats.live`.
-- WebSocket ops (client to server): `stats.subscribe`, `stats.unsubscribe` (through the hub of the gateway).
+- WebSocket ops (client to server): `stats.subscribe`, `stats.unsubscribe` (through the shared WebSocket hub).
 
 ## Notes for the build
 
