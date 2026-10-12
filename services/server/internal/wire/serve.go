@@ -502,7 +502,7 @@ func (s *server) startAudit(ctx context.Context) error {
 	return nil
 }
 
-// startAuthz is start step 6b (M1-28): it builds the Authorizer of authz over the pool with the
+// startAuthz is start step 6c (M1-28): it builds the Authorizer of authz over the pool with the
 // recorder of the audit module (NewAuthorizer) and keeps it for the use cases of later tickets.
 func (s *server) startAuthz(context.Context) error {
 	cfg, err := AuthzConfig(s.values)
