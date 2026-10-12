@@ -11,13 +11,15 @@
 - [ ] Commits follow Conventional Commits and carry a DCO sign-off (`git commit -s`)
 - [ ] Commits are squashed into meaningful steps (no "fix CI" or "typo" commits)
 
-## Review report
+## Review
 
-<!-- Paste the full report of the independent review (`.review/<sha>.md`, CONTRIBUTING.md
-"Review before every push"). The folder is git-ignored, so the text goes here. Name the
-commit it covers; its last line is `Urteil: JA`. -->
+<!-- Write this body fresh, in your own words: it becomes the commit message on main.
+Name the commit the independent review covered (`.review/<sha>.md`, CONTRIBUTING.md
+"Review before every push"), its verdict and what was fixed after it. Never paste the raw
+report or other tool output, and no local paths, host names or temporary folder names;
+the deny-list job of CI scans this text. -->
 
-- [ ] The report above covers the head commit of this pull request
+- [ ] The independent review with `Urteil: JA` covers the head commit of this pull request
 
 ## Contract and documentation
 

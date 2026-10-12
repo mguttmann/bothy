@@ -16,8 +16,8 @@ commit per feature, signed and linear.
 4. **Local review before every push.** An independent, read-only reviewer checks the
    diff of the squashed branch against `main` according to
    [red-team-gate.md](red-team-gate.md) and writes the report to
-   `.review/<sha>.md` (git-ignored; `<sha>` is the commit that is pushed); its text goes
-   into the section "Review report" of the pull request. The last
+   `.review/<sha>.md` (git-ignored; `<sha>` is the commit that is pushed). The report
+   stays local; the pull request names the reviewed commit and the verdict (step 6). The last
    line is `Urteil: JA` or `Urteil: NEIN <reason>`. If a finding changes the state, the
    reviewer checks the delta, and the report applies to the new commit. `make review` creates the
    folder, shows the expected file name and optionally starts the CodeRabbit CLI (only
@@ -29,7 +29,12 @@ commit per feature, signed and linear.
    forks set `REVIEW_SKIP=1`; then a maintainer checks before the merge.
 6. **Pull request.** One pull request per finished feature. The title is a
    Conventional Commit header line, because on merge it becomes the header line of the commit on `main`;
-   CI checks it (`PR_TITLE` in `make commitlint`).
+   CI checks it (`PR_TITLE` in `make commitlint`). The body becomes the message of that
+   commit, so title and body are written fresh, in your own words: what and why, how it
+   was verified, which commit the independent review covered with which verdict and what
+   was fixed. Never paste a raw review report, bot or agent output, local paths, user or
+   machine names, temporary folder names or notes about tools. Section
+   "Pull request title and body" below describes the gate.
 7. **CI.** `ci.yml` runs the same make targets. The only required check: `ci-ok`.
 8. **Merge.** "Squash and merge". GitHub signs the resulting commit; its message is the
    pull request body (repository setting below). `main` stays linear.
@@ -74,11 +79,39 @@ SonarQube Cloud (for example Dart rules) and CodeRabbit. Every such finding beco
 a local rule: Semgrep rule, test, linter setting or profile rule in
 `quality/sonar/`.
 
+## Pull request title and body
+
+On "Squash and merge", the title becomes the header and the body the message of the commit
+on `main`, and a commit on `main` is public and is never rewritten without the owner. So the
+text of the pull request goes through the same deny list as every commit:
+
+- **CI.** Both deny-list jobs of `ci.yml` (`denylist` with the private list, `denylist-fork`
+  with the generic rules) get title and body from the event payload as the environment
+  variables `PR_TITLE` and `PR_BODY`, never interpolated into a script. A finding fails the
+  job and with it `ci-ok`. `ci.yml` also runs on `pull_request` type `edited`, so every
+  change of title or body is checked again before the merge; an edit restarts the whole
+  run, because `ci-ok` must cover the current text and the current code together.
+- **Rules.** The body is checked like a commit message: every line gets the private and
+  the generic rules, a `Signed-off-by` or `Co-authored-by` line only the private list. An
+  allowed identity (`allow-authors.txt`) passes in `Signed-off-by` only; in
+  `Co-authored-by` or in the text it is a finding, as in a commit.
+- **Locally.** `make denylist` (and so `make check` and the pre-push hook) reads the same
+  variables. Before the push, check the planned squash message:
+  `PR_TITLE="feat(x): ..." PR_BODY_FILE=<file> make denylist`, or `PR_BODY` with
+  the text itself. A `PR_BODY_FILE` that cannot be read fails the scan.
+- **Bots.** CodeRabbit writes its summary into the walkthrough comment, not into the body
+  (`high_level_summary_in_walkthrough` in `.coderabbit.yaml`), so bot text does not reach
+  `main` and does not restart CI.
+
+`denylist-main.yml` stays the check after the merge: it scans what actually reached `main`.
+
 ## Deny-list hit on `main`
 
 `denylist-main.yml` checks every push to `main` with the private list (D-W-34). If it
 fails, a term of the list has reached `main`, for example from a
-fork contribution or from a commit message changed during the squash. Flow:
+fork contribution or from a commit message changed during the squash (an edit of the
+body after the last CI run is checked by the `edited` run; a text typed into the merge
+dialog is not). Flow:
 
 1. Look at the hit locally with `make denylist DENYLIST_RANGE=<before>..<after> DENYLIST_FLAGS=--reveal`
    (locally only, never in CI).

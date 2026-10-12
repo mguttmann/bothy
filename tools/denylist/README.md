@@ -41,6 +41,7 @@ otherwise they match parts of other words. `allow-authors.txt`: one identity per
 | Author, committer and the identity lines `Signed-off-by` and `Co-authored-by` | like messages, only against the private list | yes |
 | Branch, remote and tag names, tag messages | yes | yes |
 | Additional names (`--name`, `BOTHY_DENYLIST_NAMES`) | yes | yes |
+| Pull request title (`PR_TITLE`) and body (`PR_BODY`, or a file in `PR_BODY_FILE`), the planned squash commit on `main`; the body like a commit message, `Signed-off-by` with an allowed identity passes | when set | when set |
 
 The public rules in `generic.rules` always run, but do not check
 commit identities: contributors sign off with their own address (DCO). With

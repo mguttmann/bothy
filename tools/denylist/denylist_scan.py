@@ -21,8 +21,11 @@ against the private list only, like author and committer, because contributors s
 with their own addresses; every other trailer is message text and gets all rules.
 
 Scanned by default: content and path of every tracked file (working tree), the current
-branch name and all local branch and tag names, annotated tag messages, and message plus
-identities of every commit in --range (default: all commits reachable from HEAD).
+branch name and all local branch and tag names, annotated tag messages, message plus
+identities of every commit in --range (default: all commits reachable from HEAD), and the
+pull request title and body from PR_TITLE, PR_BODY and PR_BODY_FILE when set. The body is
+checked like a commit message; a Signed-off-by trailer in it is allowed when its identity
+is an allowed one, because the squash commit has no author to compare it with yet.
 With --history additionally every blob and path ever committed on any ref, and every
 commit on any ref.
 
@@ -51,6 +54,12 @@ ENV_ALLOW = "BOTHY_DENYLIST_ALLOW_AUTHORS"
 # Extra names to check, one per line (CI passes the pull request branch name here, through
 # the environment and never through a command line, because branch names are untrusted).
 ENV_NAMES = "BOTHY_DENYLIST_NAMES"
+# The pull request title and body become the squash commit on main (header and message).
+# CI passes them from the event payload through the environment, never through a command
+# line; locally they hold the planned squash message (PR_BODY_FILE: a file with the body).
+ENV_PR_TITLE = "PR_TITLE"
+ENV_PR_BODY = "PR_BODY"
+ENV_PR_BODY_FILE = "PR_BODY_FILE"
 DOTFILE = ".denylist-path"
 DEFAULT_GENERIC = Path(__file__).resolve().parent / "generic.rules"
 _IDENTITY_TRAILER = re.compile(r"^(signed-off-by|co-authored-by):\s*(.+)$", re.IGNORECASE)
@@ -367,6 +376,43 @@ class Scanner:
         for name in extra_names:
             self._scan("name", name, f"name {name}")
 
+    def _message(
+        self, body: str, kind: str, where: str, trailer_where: str, own: set[str] | None
+    ) -> None:
+        """Scan a commit message or pull request body; identity trailers get the private list.
+
+        `own` holds the author and committer of the commit; a Signed-off-by trailer that
+        repeats one of them with an allowed identity is not reported. `own` None (a pull
+        request body, whose squash commit does not exist yet) accepts any allowed identity
+        in Signed-off-by, and the trailer location gets the line number.
+        """
+        trailer_kind = "identity" if own is not None else f"{kind}-identity"
+        kept: list[str] = []
+        for lineno, line in enumerate(body.splitlines(), start=1):
+            trailer = _IDENTITY_TRAILER.match(line.strip())
+            if not trailer:
+                kept.append(line)
+                continue
+            identity = trailer.group(2)
+            own_sign_off = (
+                trailer.group(1).lower() == "signed-off-by"
+                and (own is None or _normalize(identity) in own)
+                and _is_allowed(identity, self.allowed)
+            )
+            if self.private and not own_sign_off:
+                loc = trailer_where if own is not None else f"{trailer_where}:{lineno}"
+                self._scan(trailer_kind, line, loc, rulesets=[self.private])
+            kept.append("")
+        self._scan(kind, "\n".join(kept), where, position="lines")
+
+    def scan_pull_request(self, title: str, bodies: list[tuple[str, str]]) -> None:
+        """Scan the pull request title and each (location, body) as the squash commit."""
+        if title.strip():
+            self._scan("pr-title", title, "pull request title")
+        for where, body in bodies:
+            if body.strip():
+                self._message(body, "pr-body", where, where, None)
+
     def scan_commits(self, rev_args: list[str]) -> None:
         """Scan message, identities and identity trailers of the commits selected by `rev_args`."""
         fmt = "%H%x1f%an <%ae>%x1f%cn <%ce>%x1f%B%x1e"
@@ -383,24 +429,8 @@ class Scanner:
                         "identity", identity, f"commit {short} {role}", rulesets=[self.private]
                     )
             own = {_normalize(author), _normalize(committer)}
-            kept: list[str] = []
-            for line in body.splitlines():
-                trailer = _IDENTITY_TRAILER.match(line.strip())
-                if trailer:
-                    own_sign_off = (
-                        trailer.group(1).lower() == "signed-off-by"
-                        and _normalize(trailer.group(2)) in own
-                        and _is_allowed(trailer.group(2), self.allowed)
-                    )
-                    if self.private and not own_sign_off:
-                        self._scan(
-                            "identity", line, f"commit {short} trailer", rulesets=[self.private]
-                        )
-                    kept.append("")
-                else:
-                    kept.append(line)
-            self._scan(
-                "commit-message", "\n".join(kept), f"commit {short} message", position="lines"
+            self._message(
+                body, "commit-message", f"commit {short} message", f"commit {short} trailer", own
             )
 
     def scan_history_objects(self) -> None:
@@ -444,6 +474,18 @@ class Scanner:
                 path=path,
                 position="offset" if binary else "lines",
             )
+
+
+def _pull_request_bodies() -> list[tuple[str, str]]:
+    """Return (location, text) of PR_BODY and PR_BODY_FILE; a missing body file fails closed."""
+    bodies = [("pull request body", os.environ.get(ENV_PR_BODY, ""))]
+    path = os.environ.get(ENV_PR_BODY_FILE, "")
+    if path:
+        try:
+            bodies.append(("pull request body file", Path(path).read_text(encoding="utf-8")))
+        except OSError:
+            raise ConfigError(f"{ENV_PR_BODY_FILE} is set but cannot be read") from None
+    return bodies
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -492,6 +534,7 @@ def scan(args: argparse.Namespace) -> Report:
     )
     if allow_path is None and list_path is not None:
         allow_path = list_path.parent / "allow-authors.txt"
+    bodies = _pull_request_bodies()
     scanner = Scanner(repo, [r for r in (private, generic) if r], private, load_allowed(allow_path))
     scanner.scan_tracked_files()
     extra = [n for n in os.environ.get(ENV_NAMES, "").splitlines() if n.strip()]
@@ -501,6 +544,7 @@ def scan(args: argparse.Namespace) -> Report:
         scanner.scan_history_objects()
     else:
         scanner.scan_commits([args.rev_range] if args.rev_range else ["HEAD"])
+    scanner.scan_pull_request(os.environ.get(ENV_PR_TITLE, ""), bodies)
     return Report(scanner.findings, private is not None, scanner.rulesets)
 
 

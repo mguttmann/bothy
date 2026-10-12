@@ -197,3 +197,12 @@ operated, and the order of the build.
   scanner's use of node-forge; the alert is dismissed and the OSV exception keeps its
   expiry date (D-DEPS-2 in [DECISIONS.md](docs/DECISIONS.md), whose sources were
   retrieved on 2026-10-11).
+- Pull request title and body are deny-list scanned: they become the squash commit on
+  `main`. Both deny-list jobs of `ci.yml` read them from the event payload through the
+  environment (`PR_TITLE`, `PR_BODY`) and fail `ci-ok` on a finding, `ci.yml` runs again
+  when title or body is edited, and `make denylist` checks the planned squash message
+  locally (`PR_TITLE`, `PR_BODY` or `PR_BODY_FILE`). The review report stays local; pull
+  request bodies are written fresh, without raw reviewer output or local paths
+  (`AGENTS.md`, [push discipline](docs/quality/push-discipline.md)). CodeRabbit writes its
+  summary into the walkthrough comment instead of the body (LG/1 to LG/4 in
+  [DECISIONS.md](docs/DECISIONS.md)).

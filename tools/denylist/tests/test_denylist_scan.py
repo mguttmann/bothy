@@ -22,7 +22,14 @@ GENERIC = Path(__file__).resolve().parents[1] / "generic.rules"
 @pytest.fixture(autouse=True)
 def _isolated_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """A maintainer's configured list must not leak into the tests."""
-    for name in ("BOTHY_DENYLIST_FILE", "BOTHY_DENYLIST_ALLOW_AUTHORS", "BOTHY_DENYLIST_NAMES"):
+    for name in (
+        "BOTHY_DENYLIST_FILE",
+        "BOTHY_DENYLIST_ALLOW_AUTHORS",
+        "BOTHY_DENYLIST_NAMES",
+        "PR_TITLE",
+        "PR_BODY",
+        "PR_BODY_FILE",
+    ):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -438,3 +445,95 @@ def test_this_repository_passes_generic_rules() -> None:
         ds.parse_args(["--repo", str(root), "--allow-missing", "--range", "HEAD..HEAD"])
     )
     assert [f.location for f in report.findings] == []
+
+
+# --- pull request title and body (the planned squash commit on main) ---------------
+
+HOME_PATH_BODY = "Fixed.\n\nReviewer notes from /" + "Users/robin/work/notes.md\n"
+
+
+def test_pr_body_with_home_path_fails(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PR_BODY", HOME_PATH_BODY)
+    [f] = run(repo).findings
+    assert (f.kind, f.location, f.rule.source) == ("pr-body", "pull request body:3:21", "generic")
+
+
+def test_pr_body_with_private_term_fails(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PR_BODY", "Ported the sync from the acme-widgets fork.\n")
+    [f] = run(repo).findings
+    assert (f.kind, f.rule.source) == ("pr-body", "private")
+
+
+def test_pr_title_with_private_term_fails(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PR_TITLE", "feat(sync): Project Falcon import")
+    [f] = run(repo).findings
+    assert (f.kind, f.location) == ("pr-title", "pull request title")
+
+
+def test_clean_pr_title_and_body_pass(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PR_TITLE", "feat(server): egress client")
+    monkeypatch.setenv("PR_BODY", "## What and why\n\nCalls go to https://example.com only.\n")
+    assert run(repo).findings == []
+
+
+def test_pr_body_allowed_sign_off_passes(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PR_BODY", "Done.\n\nSigned-off-by: Robin Example <robin@initech.test>\n")
+    assert run(repo, allow=EXAMPLE_ALLOW).findings == []
+
+
+def test_pr_body_other_sign_off_is_reported(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PR_BODY", "Done.\n\nSigned-off-by: Sam Example <sam@initech.test>\n")
+    [f] = run(repo, allow=EXAMPLE_ALLOW).findings
+    assert (f.kind, f.rule.source) == ("pr-body-identity", "private")
+
+
+def test_pr_body_allowed_identity_in_co_authored_by_is_reported(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PR_BODY", "Done.\n\nCo-authored-by: Robin Example <robin@initech.test>\n")
+    [f] = run(repo, allow=EXAMPLE_ALLOW).findings
+    assert f.kind == "pr-body-identity"
+
+
+def test_pr_body_allowed_identity_in_text_is_reported(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PR_BODY", "Ask robin@initech.test for details.\n")
+    kinds = {f.kind for f in run(repo, allow=EXAMPLE_ALLOW).findings}
+    assert kinds == {"pr-body"}
+
+
+def test_pr_body_from_file(repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    body = tmp_path / "body.md"
+    body.write_text(HOME_PATH_BODY)
+    monkeypatch.setenv("PR_BODY_FILE", str(body))
+    assert [f.kind for f in run(repo).findings] == ["pr-body"]
+
+
+def test_pr_body_file_missing_fails_closed(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PR_BODY_FILE", str(tmp_path / "absent.md"))
+    with pytest.raises(ds.ConfigError, match="PR_BODY_FILE"):
+        run(repo)
+
+
+def test_pr_body_generic_rules_run_without_private_list(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fork pull requests: the generic rules still check title and body."""
+    monkeypatch.setenv("PR_TITLE", "docs: see /" + "Users/sam/x")
+    monkeypatch.setenv("PR_BODY", HOME_PATH_BODY)
+    kinds = sorted(f.kind for f in run(repo, "--allow-missing", list_path=None).findings)
+    assert kinds == ["pr-body", "pr-title"]
+
+
+def test_pr_text_finding_output_is_redacted(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("PR_BODY", "From the acme-widgets team.\n")
+    rc = ds.main(["--repo", str(repo), "--generic", str(GENERIC), "--list", str(EXAMPLE_LIST)])
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "pull request body:1:10: pr-body matches private rule line" in out
+    assert "acme" not in out.lower()

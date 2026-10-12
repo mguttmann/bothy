@@ -355,7 +355,7 @@ gitleaks: ## Secret scan of every commit reachable from HEAD (all refs: GITLEAKS
 gitleaks-staged: ## Secret scan of the staged changes (pre-commit hook)
 	$(call tool,gitleaks) git --pre-commit --staged --config .gitleaks.toml --redact --no-banner .
 
-denylist: ## White-label scan with the private deny list (fails without the list)
+denylist: ## White-label scan with the private deny list (fails without the list); also PR_TITLE, PR_BODY, PR_BODY_FILE
 	@base=""; \
 	if git rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then base='@{upstream}'; \
 	elif git rev-parse --verify -q origin/main >/dev/null; then base=origin/main; fi; \
@@ -462,8 +462,8 @@ review: ## Local AI review before a push (CodeRabbit CLI only with BOTHY_CODERAB
 	@mkdir -p .review
 	@echo "  independent review: a fresh read-only reviewer checks the diff against $(REVIEW_BASE)"
 	@echo "  (docs/quality/red-team-gate.md) and writes .review/$$(git rev-parse HEAD).md;"
-	@echo "  the pre-push hook requires its last line to be 'Urteil: JA'; paste the report into"
-	@echo "  the section 'Review report' of the pull request (the folder is git-ignored)"
+	@echo "  the pre-push hook requires its last line to be 'Urteil: JA'. The report stays local;"
+	@echo "  the pull request names the reviewed commit and the verdict in fresh words"
 	$(UVRUN) python tools/hooks/review_gate.py || true
 
 labels-check: ## Validate .github/labels.yml and the labels used by templates

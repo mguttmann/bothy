@@ -41,6 +41,13 @@ is.
   written by an independent, read-only reviewer, never by the agent that did the work.
 - The required status check is `ci-ok`. Pull requests are squash-merged: the pull request
   title must be a Conventional Commit header, because it becomes the commit on `main`.
+- The pull request body becomes the message of that commit on `main`, and a commit on
+  `main` is never rewritten. Write title and body fresh, in English, in your own words:
+  never paste raw reviewer, bot or agent output (the review report stays in `.review/`;
+  name only the reviewed commit, the verdict and the fixes), and no local paths, user or
+  machine names, temporary folder names or notes about your tools. The deny-list job in
+  CI scans title and body on every edit and fails `ci-ok` on a finding; check the planned
+  text before the push with `PR_TITLE=... PR_BODY_FILE=<file> make denylist`.
 - CodeRabbit reviews every pull request that is ready for review. Fix its findings and
   comments, or answer them with a reason in the thread, before the pull request is
   merged; all review threads must be resolved. SonarQube Cloud runs inside `ci-ok` once

@@ -49,9 +49,10 @@ only becomes visible in the interplay of several tickets.
    `.review/<sha>.md` (`<sha>` from `git rev-parse HEAD`).
 4. On `NEIN`: fix, tests for every finding, then the reviewer checks only the delta
    again. If the same `NEIN` comes again, the owner decides, not another round.
-5. On `JA`: merge or close of the milestone, respectively. The report per push is in the text of the
-   pull request (section "Review report" of the template); a git-ignored file cannot
-   be linked.
+5. On `JA`: merge or close of the milestone, respectively. The report per push stays local in
+   `.review/`; the pull request (section "Review" of the template) names the reviewed commit,
+   the verdict and the fixes in fresh words, never the raw report, because the body becomes
+   the squash commit on `main` (LG/1 in docs/DECISIONS.md).
 6. The threat model (`docs/security/threat-model.md`) is updated with new threats and
    mitigations before the milestone counts as done.
 

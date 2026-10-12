@@ -3,6 +3,9 @@
 # Merge gate for pull requests to main, and the gate stage of release.yml.
 # Runs exactly the make targets of `make check`: gates, denylist, sonar
 # (docs/quality/gates.md). The only required status check is "ci-ok".
+# The pull request title and body become the squash commit on main, so the deny-list jobs
+# scan them too (PR_TITLE, PR_BODY), and an edit of title or body ("edited") runs the whole
+# workflow again: ci-ok of the head commit always covers the current text.
 #
 # Runners (ADR 0039): every job runs on a GitHub-hosted runner with a fixed label;
 # tools/ci/check_runners.py enforces it on every job.
@@ -12,6 +15,7 @@ name: ci
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -142,6 +146,9 @@ jobs:
           ALLOW: ${{ secrets.BOTHY_DENYLIST_ALLOW_AUTHORS }}
           BOTHY_DENYLIST_NAMES: ${{ github.head_ref }}
           DENYLIST_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || '' }}
+          # Untrusted text: only through the environment, never into the script.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           umask 077
           dir=$(mktemp -d "$RUNNER_TEMP/denylist.XXXXXX")
@@ -169,6 +176,8 @@ jobs:
         env:
           BOTHY_DENYLIST_NAMES: ${{ github.head_ref }}
           DENYLIST_RANGE: ${{ format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: make denylist DENYLIST_FLAGS=--allow-missing
 
   sonar:
