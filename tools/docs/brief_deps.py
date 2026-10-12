@@ -21,8 +21,8 @@ This check reads all of them and fails on:
   in its dependency closure;
 - a ticket named in a start check of a brief (a paragraph or list item that ends the run with
   `Verdict: BLOCKED dependency ...` or `BLOCKED ... not merged`) that is not in the brief's
-  dependency closure: the launcher
-  could start the brief before that ticket is merged, and the brief could only stop.
+  dependency closure: the launcher could start the brief before that ticket is merged, and the
+  brief could only stop.
 
 `--write` regenerates the wave column, the "Waves" table and the graph edges from the index
 dependencies (the index stays the source). Fix dependencies by hand, then run `--write`.
