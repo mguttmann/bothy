@@ -170,7 +170,10 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"egress.allowed_hosts =   # default\n" +
 		"egress.max_response_bytes = 1048576  # default\n" +
 		"egress.timeout = 15s  # default\n" +
+		"http.idle_timeout = 2m  # default\n" +
+		"http.max_header_bytes = 65536  # default\n" +
 		"http.max_json_body_bytes = 1048576  # default\n" +
+		"http.read_header_timeout = 5s  # default\n" +
 		"instance.environment = prod  # default\n" +
 		"message.max_content_bytes = 2048  # env BOTHY_MESSAGE__MAX_CONTENT_BYTES\n" +
 		"migrate.app_password_ref = file:/run/bothy/secrets/db_app_password  # default\n" +
@@ -186,6 +189,10 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"server.internal_listen_addr = 127.0.0.1:8081  # default\n" +
 		"server.listen_addr = 127.0.0.1:9080  # file " + path + "\n" +
 		"server.role = worker  # flag --role\n" +
+		"shutdown.drain_delay = 5s  # default\n" +
+		"shutdown.http_grace = 20s  # default\n" +
+		"shutdown.telemetry_flush_timeout = 5s  # default\n" +
+		"shutdown.total_timeout = 1m  # default\n" +
 		"startup.dependency_wait = 1m  # default\n" +
 		"telemetry.enabled = true  # default\n" +
 		"telemetry.logs.exporter = both  # default\n" +
