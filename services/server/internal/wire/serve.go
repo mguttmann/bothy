@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"sync"
@@ -94,21 +95,25 @@ type server struct {
 	httpCfg  httpserver.Config
 	chainCfg httpserver.ChainConfig
 	chain    *httpserver.Chain
-	role     Role
-	values   *config.Values
-	deps     Deps
-	sp       *secrets.Provider
-	reg      *health.Registry
-	tel      *otel.Telemetry
-	pool     *pg.Pool
-	internal *http.Server
-	public   *http.Server
-	mux      *http.ServeMux
-	required int64
-	jobsCfg  jobs.Config
-	jobsReg  *jobs.Registry
-	jobsRT   *jobs.Runtime
-	instance instance.Record
+	// transport and sec are the transport protection of the public listener and the SEC-HDR-1
+	// headers of both listeners (M1-21), derived from the configuration in bind.
+	transport httpserver.TransportConfig
+	sec       httpserver.SecurityHeaders
+	role      Role
+	values    *config.Values
+	deps      Deps
+	sp        *secrets.Provider
+	reg       *health.Registry
+	tel       *otel.Telemetry
+	pool      *pg.Pool
+	internal  *http.Server
+	public    *http.Server
+	mux       *http.ServeMux
+	required  int64
+	instance  instance.Record
+	jobsCfg   jobs.Config
+	jobsReg   *jobs.Registry
+	jobsRT    *jobs.Runtime
 	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
 	blocked bool
 }
@@ -119,8 +124,10 @@ type server struct {
 //
 //  1. telemetry (otel.Setup); the log lines switch from stdout JSON to the server logger,
 //  2. secrets: the provider resolves database.password_ref once, so a missing secret fails at
-//     once instead of after startup.dependency_wait,
+//     once instead of after startup.dependency_wait; api and all also load and check the TLS
+//     certificate and key when server.tls_cert_ref and server.tls_key_ref are set (M1-21),
 //  3. internal listener with /healthz and /readyz (readiness fails with startup until ready),
+//     plaintext without a peer filter (R-SE-09),
 //  4. database: pg.Open and WaitReady within startup.dependency_wait; readiness check database,
 //  5. schema: pg.CheckSchema against the highest version of deps.Migrations; an older database
 //     ends the start with the hint to run "bothy migrate up" (Serve never migrates, R-AR-16),
@@ -133,7 +140,8 @@ type server struct {
 //     role is built over the pool, and worker and all start River (02 "Start" step 8); a River
 //     client that stops on its own later ends the process with exit code 1 (02 "Health"). The
 //     consumers (M2) follow,
-//  8. public listener (api and all),
+//  8. public listener (api and all) through httpserver.ListenPublic: own TLS, or plaintext only
+//     from loopback and server.trusted_proxies (SEC-TLS-1, SEC-TLS-2),
 //  9. ready: readiness passes startup and the line "server ready" is written.
 //
 // Stop steps, by phase: not ready (always), drain and HTTP (api, all), jobs (worker, all: River's
@@ -199,7 +207,57 @@ func (s *server) bind() error {
 	if err := config.Bind(s.values, &s.chainCfg); err != nil {
 		return err
 	}
-	return config.Bind(s.values, &s.httpCfg)
+	if err := config.Bind(s.values, &s.httpCfg); err != nil {
+		return err
+	}
+	t, err := TransportConfig(s.values, s.chainCfg)
+	if err != nil {
+		return err
+	}
+	s.transport = t
+	s.sec = httpserver.SecurityHeadersFor(t.PublicURL, s.chainCfg.HSTSMaxAge)
+	return nil
+}
+
+// tlsKeys are the keys of the TLS references and the directory their placeholder names.
+type tlsKeys struct {
+	CertRef    string `config:"server.tls_cert_ref"`
+	KeyRef     string `config:"server.tls_key_ref"`
+	SecretsDir string `config:"secrets.dir"`
+}
+
+// TransportConfig returns the transport protection of the public listener (M1-21) from v and the
+// bound chain configuration: server.listen_addr, server.public_url, server.trusted_proxies (the
+// slice of chain, so the peer filter and the client IP read one list, design note 8) and the TLS
+// references, the empty text being the zero secrets.Ref (plaintext). The error names the key of
+// a reference that does not parse, never its text; the loader has already checked the grammar,
+// so it means a schema without these keys or a hand-built Values.
+func TransportConfig(v *config.Values, chain httpserver.ChainConfig) (httpserver.TransportConfig, error) {
+	var keys tlsKeys
+	if err := config.Bind(v, &keys); err != nil {
+		return httpserver.TransportConfig{}, err
+	}
+	public, err := url.Parse(chain.PublicURL)
+	if err != nil {
+		return httpserver.TransportConfig{}, errors.New("wire: server.public_url is not a URL")
+	}
+	t := httpserver.TransportConfig{
+		ListenAddr: v.String("server.listen_addr"), PublicURL: public, TrustedProxies: chain.TrustedProxies,
+	}
+	for _, r := range []struct {
+		key, raw string
+		ref      *secrets.Ref
+	}{{keyTLSCertRef, keys.CertRef, &t.TLSCertRef}, {keyTLSKeyRef, keys.KeyRef, &t.TLSKeyRef}} {
+		if r.raw == "" {
+			continue
+		}
+		ref, err := secrets.ParseRef(r.raw, keys.SecretsDir)
+		if err != nil {
+			return httpserver.TransportConfig{}, fmt.Errorf("wire: %s: %w", r.key, err)
+		}
+		*r.ref = ref
+	}
+	return t, nil
 }
 
 // api reports whether the role serves the public API.
@@ -290,21 +348,31 @@ func (s *server) stopTelemetry(ctx context.Context) error {
 }
 
 // startSecrets resolves the database password once: the secret provider fails fast (02
-// "Failure of a dependency"), and a missing file is reported before the database wait.
+// "Failure of a dependency"), and a missing file is reported before the database wait. For the
+// roles with a public listener it also loads and checks the TLS material when the server
+// terminates TLS itself (M1-21), so a broken pair ends the start here too.
 func (s *server) startSecrets(ctx context.Context) error {
 	db, err := DatabaseConfig(s.values, "bothy-"+string(s.role))
 	if err != nil {
 		return err
 	}
-	_, _, err = s.sp.Resolve(ctx, db.PasswordRef)
-	return err
+	if _, _, err = s.sp.Resolve(ctx, db.PasswordRef); err != nil {
+		return err
+	}
+	if !s.api() {
+		// The worker opens no public listener and does not read the certificate.
+		return nil
+	}
+	return httpserver.CheckTransport(ctx, s.transport, s.sp)
 }
 
 func (s *server) startInternal(ctx context.Context) error {
-	srv, host, port, err := s.listen(ctx, s.cfg.InternalListenAddr, httpserver.Internal(s.reg), "internal listener")
+	// The internal listener stays plaintext without a peer filter (R-SE-09).
+	ln, err := httpserver.Listen(ctx, s.cfg.InternalListenAddr)
 	if err != nil {
 		return err
 	}
+	srv, host, port := s.serve(ln, httpserver.InternalHandler(httpserver.Internal(s.reg), s.sec), "internal listener")
 	s.logger().InfoContext(ctx, msgInternalListener, slog.String(attr.ServerAddress, host), slog.Int(attr.ServerPort, port))
 	s.mu.Lock()
 	s.internal = srv
@@ -319,10 +387,11 @@ func (s *server) startPublic(ctx context.Context) error {
 	if chain == nil {
 		return errors.New("wire: the public listener needs the HTTP chain of the routes step")
 	}
-	srv, host, port, err := s.listen(ctx, s.cfg.ListenAddr, chain.Public(mux), "public listener")
+	ln, err := httpserver.ListenPublic(ctx, s.transport, s.sp, s.logger())
 	if err != nil {
 		return err
 	}
+	srv, host, port := s.serve(ln, chain.Public(mux), "public listener")
 	s.logger().InfoContext(ctx, msgPublicListener, slog.String(attr.ServerAddress, host), slog.Int(attr.ServerPort, port))
 	s.mu.Lock()
 	s.public = srv
@@ -338,14 +407,10 @@ func (s *server) publicMux() *http.ServeMux {
 	return s.mux
 }
 
-// listen opens addr, serves h on it and returns the server with the bound host and port (the
-// caller logs them; port 0 in the configuration becomes the real port here). A serve error
-// other than the orderly close is a fatal runtime error (Runner.Fail).
-func (s *server) listen(ctx context.Context, addr string, h http.Handler, what string) (*http.Server, string, int, error) {
-	ln, err := httpserver.Listen(ctx, addr)
-	if err != nil {
-		return nil, "", 0, err
-	}
+// serve serves h on ln and returns the server with the bound host and port (the caller logs
+// them; port 0 in the configuration becomes the real port here). A serve error other than the
+// orderly close is a fatal runtime error (Runner.Fail).
+func (s *server) serve(ln net.Listener, h http.Handler, what string) (*http.Server, string, int) {
 	srv := httpserver.NewServer(s.httpCfg, h, s.logger())
 	go func() {
 		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -354,7 +419,7 @@ func (s *server) listen(ctx context.Context, addr string, h http.Handler, what s
 	}()
 	host, port, _ := net.SplitHostPort(ln.Addr().String())
 	p, _ := strconv.Atoi(port)
-	return srv, host, p, nil
+	return srv, host, p
 }
 
 func (s *server) startDatabase(ctx context.Context) error {

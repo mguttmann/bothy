@@ -1,22 +1,27 @@
 # Package `platform/httpserver`
 
-Status: built (listeners M1-11, chain M1-18); M1-21 adds the plaintext peer check in `Listen` and
-HSTS. Normative are [02-architecture.md](../../../../../docs/spec/02-architecture.md) "Request path",
+Status: built (listeners M1-11, chain M1-18, transport protection and HSTS M1-21). Normative are
+[02-architecture.md](../../../../../docs/spec/02-architecture.md) "Request path",
 "Error kinds" and "Deadlines", [06-api.md](../../../../../docs/spec/06-api.md) "Basic rules",
 "Errors", "Concurrency" and "Pagination",
-[19-security.md](../../../../../docs/spec/19-security.md) SEC-HDR, SEC-CORS, SEC-IN and SEC-LOG,
+[19-security.md](../../../../../docs/spec/19-security.md) SEC-TLS, SEC-HDR, SEC-CORS, SEC-IN and SEC-LOG,
 [16-operations.md](../../../../../docs/spec/16-operations.md) "Two listeners" and ADRs 0015 and 0053; the
-chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECISIONS.md) M1-18.
+chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECISIONS.md) M1-18 and M1-21.
 
 ## Interface
 
 - `Listen(ctx, addr)`, `Config`, `NewServer(cfg, handler, log)`, `Internal(registry)`: the
   listeners of M1-11. `NewServer` has no `ReadTimeout` or `WriteTimeout`; the per-route deadlines
-  of `StageRoute` apply instead.
+  of `StageRoute` apply instead. `InternalHandler(mux, sec)` serves the internal mux with
+  SEC-HDR-1, the API headers and problem bodies for unknown paths and methods.
+- `ListenPublic(ctx, TransportConfig, SecretGetter, log)`, `PeerFilter`, `CheckTransport`,
+  `TLSEnabled`: the transport protection of the public listener (M1-21, see below).
+- `SecurityHeadersFor(publicURL, hstsMaxAge)` and `SecurityHeaders.Apply`: SEC-HDR-1 with HSTS.
 - `NewChain(ChainConfig, Deps)`: the chain with every stage of this ticket. `ChainConfig` binds
   `http.max_json_body_bytes`, `http.max_json_depth`, `http.request_timeout`,
   `http.transfer_timeout`, `http.unavailable_retry_after`, `file.max_upload_bytes`,
-  `api.cors_allowed_origins`, `server.trusted_proxies` and `server.public_url`; `Deps` holds the
+  `api.cors_allowed_origins`, `server.trusted_proxies`, `server.public_url` and
+  `http.hsts_max_age`; `Deps` holds the
   logger, the meter provider, the `actor.Authenticator` and the `Validator`.
 - `Chain.Wrap(op, handler)` per route, `Chain.Public(mux)` for the listener, `Chain.Preflight` for
   `OPTIONS <path>` when CORS origins are configured, `Chain.Use(stage, mw)` for the slots,
@@ -30,9 +35,9 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 
 | # | Stage | Does |
 |---|---|---|
-| 1 | recover | panic: `500 internal_error`, `panic recovered` in the log with the function; `http.ErrAbortHandler` re-raised |
+| 1 | recover | SEC-HDR-1 with HSTS, applied again before the header block goes out; panic: `500 internal_error`, `panic recovered` in the log with the function; `http.ErrAbortHandler` re-raised |
 | 2 | trace | `otel.Middleware` (span, access log, duration metric); correlation ID from the trace ID into `kernel/reqmeta` |
-| 3 | headers | `X-Content-Type-Options`, `Referrer-Policy`, `Correlation-Id`; client IP into `kernel/reqmeta` |
+| 3 | headers | `Correlation-Id`; client IP into `kernel/reqmeta` |
 | 4 | mux | routing; no pattern: `404 not_found`, wrong method: `405 method_not_allowed` with `Allow` |
 | 5 | `StageRoute` | operation into the context, `Cache-Control: no-store`, CORP, body limit, deadline, response writer |
 | 6 | `StageCORS` | none by default; `*` for `instance.discovery.read`; exact origins of `api.cors_allowed_origins` |
@@ -47,6 +52,32 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 | 15 | handler | generated wrapper, strict handler, module adapter, use case with `authorize` |
 
 `TestChainOrder_Golden` holds this order (`testdata/chain_order.golden`).
+
+## Transport protection (M1-21)
+
+| Mode | When | Public listener |
+|---|---|---|
+| plaintext | `server.tls_cert_ref` and `server.tls_key_ref` empty | `PeerFilter`: only peers on loopback (`127.0.0.0/8`, `::1`, also IPv4-mapped) or in `server.trusted_proxies` are served; every other connection is closed at accept time without a byte read or written, and accepting goes on (SEC-TLS-1) |
+| TLS | both references set, `server.public_url` with `https` | TLS 1.2 as the floor, the cipher suites and curves of Go, no client certificates, no peer filter, no plaintext redirect listener (SEC-TLS-2, R-SE-08) |
+
+- One list: `TransportConfig.TrustedProxies` is the slice `ChainConfig.TrustedProxies` that the
+  client IP uses, so who may send plaintext and whose forwarding headers count never differ.
+- The first refusal of a listener logs at Warn with the hint to add the proxy to
+  `server.trusted_proxies`, later ones at Debug; no line names the peer (SEC-LOG-5).
+- Certificate material: the certificate reference holds the PEM chain with the leaf first, the key
+  reference a PEM private key. `CheckTransport` (start step 2 in `internal/wire`) and
+  `ListenPublic` refuse a missing or unreadable reference, a pair that does not match, a leaf that
+  is not yet valid or expired and a leaf that does not cover the host of `server.public_url`; the
+  errors name keys, never content. Every handshake asks the secret provider for both references
+  (cached for `secrets.cache_ttl`); a new pair of versions is validated and used, a broken one
+  keeps the previous certificate, logs `TLS certificate rotation failed, keeping the previous
+  certificate` once and is tried again at most once per minute (a leaf not yet valid heals
+  without a restart).
+- The internal listener has no peer filter and stays plaintext (R-SE-09); it is never published.
+- Not supported on purpose: PROXY protocol, h2c, Unix socket listeners for the public API.
+- HSTS: `Strict-Transport-Security: max-age=<http.hsts_max_age in seconds>` on every response of
+  both listeners while `server.public_url` uses `https`, without `includeSubDomains` and
+  `preload`; absent with an `http` URL (SEC-TLS-3).
 
 ## How a ticket adds a stage
 
@@ -96,7 +127,10 @@ operation ID must be in it. A handler that sends JSON `null` fails the test unle
 | File | Content |
 |---|---|
 | `httpserver.go` | `Config`, `Listen`, `NewServer`, `Internal` |
-| `chain.go` | `Stage`, `Chain`, `Deps`, outer steps, unmatched handler |
+| `transport.go` | `TransportConfig`, `ListenPublic`, `CheckTransport`, `PeerFilter` |
+| `tlscert.go` | certificate source of the TLS mode: validation at start and rotation |
+| `headers.go` | `SecurityHeaders` (SEC-HDR-1, HSTS), `InternalHandler`, unmatched handler |
+| `chain.go` | `Stage`, `Chain`, `Deps`, outer steps |
 | `route.go` | `StageRoute`, response writer, proof |
 | `stages.go` | CORS, authentication, body, preconditions, validation stages |
 | `problem.go` | `WriteProblem` and the error mapping |
@@ -107,5 +141,6 @@ operation ID must be in it. A handler that sends JSON `null` fails the test unle
 
 ## Dependencies
 
-`platform/health`, `platform/otel`, `kernel/actor`, `kernel/authorize`, kernel core; vendor groups
+`platform/health`, `platform/otel`, `platform/secrets` (references and versions of the TLS
+material), `kernel/actor`, `kernel/authorize`, kernel core; vendor groups
 `otel` and `libopenapi` (module register).

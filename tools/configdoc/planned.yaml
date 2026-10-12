@@ -75,8 +75,6 @@ rules:
     milestone: M1
   - match: "host."  # M2-39
     milestone: M2
-  - match: "http."  # M1-11, M1-18, M1-21
-    milestone: M1
   - match: "identity."  # M1-34
     milestone: M1
   - match: "interaction."  # M2-15
@@ -125,8 +123,6 @@ rules:
     milestone: M1
   - match: "security."  # M5-08
     milestone: M5
-  - match: "server."  # M1-18, M1-21
-    milestone: M1
   - match: server.maintenance_mode  # M7-08
     milestone: M7
   - match: "signing_key."  # M1-32

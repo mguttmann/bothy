@@ -635,8 +635,8 @@ Source: [16-operations.md](../spec/16-operations.md), section 14.
 | `secrets.dir` | `BOTHY_SECRETS__DIR` | Server | string | `/run/bothy/secrets` | base of the default references `file:`; an absolute path in clean form (no `.` or `..`, no double or trailing `/`), not `/`, without a NUL character and without `<`, otherwise `bothy config check` fails | active |
 | `secrets.cache_ttl` | `BOTHY_SECRETS__CACHE_TTL` | Server | duration | `5m` | how long a read secret stays valid; at least `1s` | active |
 | `secrets.signing_key_dir` | `BOTHY_SECRETS__SIGNING_KEY_DIR` | Server |  | `/var/lib/bothy/signing-keys` | writable directory of the private signing keys; owned by the service user, mode `0700` (5.2, [ADR 0066](../adr/0066-signing-keys-in-the-writable-key-store.md)) | planned (M1) |
-| `server.tls_cert_ref` | `BOTHY_SERVER__TLS_CERT_REF` | Server |  | empty | reference to the certificate chain (PEM, leaf first); empty: the server does not terminate TLS (SEC-TLS-2) | planned (M1) |
-| `server.tls_key_ref` | `BOTHY_SERVER__TLS_KEY_REF` | Server |  | empty | reference to the private key (PEM); only together with `server.tls_cert_ref` | planned (M1) |
+| `server.tls_cert_ref` | `BOTHY_SERVER__TLS_CERT_REF` | Server | secret_ref | empty | reference to the certificate chain (PEM, leaf first); empty: the server does not terminate TLS (SEC-TLS-2) | active |
+| `server.tls_key_ref` | `BOTHY_SERVER__TLS_KEY_REF` | Server | secret_ref | empty | reference to the private key (PEM); only together with `server.tls_cert_ref` | active |
 | `database.host` | `BOTHY_DATABASE__HOST` | Server | string | `localhost` | host of the database | active |
 | `database.port` | `BOTHY_DATABASE__PORT` | Server | int | `5432` | port of the database in the server's network | active |
 | `database.name` | `BOTHY_DATABASE__NAME` | Server | string | `bothy` | database name | active |
@@ -718,7 +718,7 @@ Source: [19-security.md](../spec/19-security.md), section 16.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `http.hsts_max_age` | `BOTHY_HTTP__HSTS_MAX_AGE` | Server |  | `31536000s` | `max-age` for HSTS | planned (M1) |
+| `http.hsts_max_age` | `BOTHY_HTTP__HSTS_MAX_AGE` | Server | duration | `31536000s` | `max-age` for HSTS | active |
 | `egress.allowed_hosts` | `BOTHY_EGRESS__ALLOWED_HOSTS` | Server | list(string) | empty | additional allowed targets, form `host[:port][;allow_private]` ([configuration.md](../operations/configuration.md), section 2); duplicate entries are a load error | active |
 | `egress.timeout` | `BOTHY_EGRESS__TIMEOUT` | Server | duration | `15s` | time limit of an outgoing request | active |
 | `egress.max_response_bytes` | `BOTHY_EGRESS__MAX_RESPONSE_BYTES` | Server | int | `1048576` | largest response of an outgoing request | active |

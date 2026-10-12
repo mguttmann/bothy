@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
@@ -28,14 +30,48 @@ var configChecks = []configCheck{
 	{name: "json_limit_above_message", keys: []string{"http.max_json_body_bytes", "message.max_content_bytes"}, fn: jsonLimitAboveMessage},
 	{name: "egress_allowed_hosts", keys: []string{"egress.allowed_hosts"}, fn: egressAllowedHosts},
 	{name: "jobs_schema", keys: []string{"jobs.schema"}, fn: jobsSchema},
-	{name: "public_url_origin", keys: []string{"server.public_url"}, fn: publicURLOrigin},
+	{name: "public_url_origin", keys: []string{keyPublicURL}, fn: publicURLOrigin},
 	{name: "cors_origins", keys: []string{"api.cors_allowed_origins"}, fn: corsOrigins},
+	{name: "tls_pair", keys: []string{keyTLSCertRef, keyTLSKeyRef}, fn: tlsPair},
+	{name: "tls_https", keys: []string{keyPublicURL, keyTLSCertRef, keyTLSKeyRef}, fn: tlsHTTPS},
+	{name: "hsts_whole_seconds", keys: []string{"http.hsts_max_age"}, fn: hstsWholeSeconds},
+}
+
+// tlsPair requires server.tls_cert_ref and server.tls_key_ref to be both set or both empty
+// (SEC-TLS-2): one of them alone is a half switched on TLS that the start could only guess.
+func tlsPair(v *config.Values) error {
+	if (v.String(keyTLSCertRef) == "") != (v.String(keyTLSKeyRef) == "") {
+		return errors.New("server.tls_cert_ref and server.tls_key_ref must both be set or both be empty")
+	}
+	return nil
+}
+
+// tlsHTTPS requires an https server.public_url when the server terminates TLS itself (SEC-TLS-2):
+// the apps reach the server under that URL, and HSTS follows its scheme (SEC-TLS-3).
+func tlsHTTPS(v *config.Values) error {
+	if v.String(keyTLSCertRef) == "" || v.String(keyTLSKeyRef) == "" {
+		return nil
+	}
+	if u, err := url.Parse(v.String(keyPublicURL)); err != nil || u.Scheme != "https" {
+		return errors.New("with server.tls_cert_ref and server.tls_key_ref set, server.public_url must use https")
+	}
+	return nil
+}
+
+// hstsWholeSeconds requires http.hsts_max_age in whole seconds: Strict-Transport-Security
+// carries max-age as a whole number of seconds (RFC 6797 6.1.1), and rounding would send another
+// value than the operator configured.
+func hstsWholeSeconds(v *config.Values) error {
+	if v.Duration("http.hsts_max_age")%time.Second != 0 {
+		return errors.New("http.hsts_max_age must be a whole number of seconds")
+	}
+	return nil
 }
 
 // publicURLOrigin requires server.public_url to be an origin: scheme, host, optional port and
 // nothing else (16 "Configuration values of this chapter"), because the DPoP htu is this origin plus the path.
 func publicURLOrigin(v *config.Values) error {
-	if err := httpserver.CheckOrigin(v.String("server.public_url")); err != nil {
+	if err := httpserver.CheckOrigin(v.String(keyPublicURL)); err != nil {
 		return errors.New("server.public_url must be an origin (scheme://host[:port], no path, query or fragment): " + err.Error())
 	}
 	return nil

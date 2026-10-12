@@ -70,7 +70,10 @@ here.
    again. A problem of the replaced text starts with `after expanding <secrets.dir>:`; if
    `secrets.dir` itself has a problem, the reference reports no second one. The loader checks
    `secrets.dir` itself (a rule that no kind expresses, M1-09/15): absolute, clean, not `/`,
-   without NUL and without `<`.
+   without NUL and without `<`. A `secret_ref` key with an empty default (chapter cell "empty", for
+   example `server.tls_cert_ref`) is optional: the empty text means "no reference" and switches
+   its feature off; a key with a reference as default still refuses the empty text
+   (docs/DECISIONS.md M1-21/1).
 8. The package never reads the process environment. `cmd/bothy` reads it once and passes it on; a
    forbidigo rule in `.golangci.yml` forbids the reading functions (also `exec.Cmd.Environ` and
    `http.ProxyFromEnvironment`) outside `cmd/bothy` and the tests under `tools/`.

@@ -310,3 +310,20 @@ documented in this file. The format is based on
 - Semgrep rules `bothy-go-egress-only` (no other HTTP client, transport, dialer or reverse
   proxy in production code) and `bothy-go-tls-verify` (no `InsecureSkipVerify` other than
   `false`, also in tests).
+- Transport protection of the public listener (M1-21, SEC-TLS-1 to SEC-TLS-3): in plaintext mode
+  only peers on loopback or in `server.trusted_proxies` are served, and every other connection
+  is closed at accept time before a byte is read; the first refusal logs a hint at Warn, later
+  ones at Debug, never with the peer address. With `server.tls_cert_ref` and
+  `server.tls_key_ref` set the server terminates TLS itself with TLS 1.2 as the floor and the Go
+  cipher defaults; the material is checked at start step 2 (pair, validity, host of
+  `server.public_url`) and follows rotation through the secret provider, keeping the previous
+  certificate when a rotated one is broken. The internal listener stays plaintext without a peer
+  filter.
+- Every response of both listeners carries `X-Content-Type-Options`, `Referrer-Policy` and no
+  `Server` header, applied once more right before the header block goes out, and
+  `Strict-Transport-Security: max-age=<http.hsts_max_age>` while `server.public_url` uses
+  `https`. The internal listener answers unknown paths and methods with problem bodies.
+- Configuration keys `server.tls_cert_ref`, `server.tls_key_ref` (optional secret references,
+  both or neither, TLS needs an `https` public URL) and `http.hsts_max_age` (whole seconds,
+  default one year). A `secret_ref` key with an empty default now accepts the empty text as "no
+  reference"; `bothy config check --secrets` prints "not set" for it.
