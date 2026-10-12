@@ -4,15 +4,21 @@ package wire_test
 
 import (
 	"bytes"
+	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	filesapp "github.com/OWNER/bothy/services/server/internal/files/app"
 	"github.com/OWNER/bothy/services/server/internal/files/domain"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
+	"github.com/OWNER/bothy/services/server/internal/platform/egress"
 	"github.com/OWNER/bothy/services/server/internal/wire"
 )
 
@@ -33,7 +39,7 @@ func TestFileFSRootAbsolute(t *testing.T) {
 	if got := load(t, "BOTHY_FILE__FS__ROOT=/srv/bothy/files"); got != nil {
 		t.Errorf("absolute clean root: problems %v, want none", got)
 	}
-	if got := load(t, "BOTHY_FILE__STORAGE__DRIVER=s3", "BOTHY_FILE__FS__ROOT=relative/x"); got != nil {
+	if got := load(t, append(s3Env("https://s3.example.com"), "BOTHY_FILE__FS__ROOT=relative/x")...); got != nil {
 		t.Errorf("driver s3 with a relative root: problems %v, want none", got)
 	}
 }
@@ -54,7 +60,7 @@ func TestFilesObjectStoreFS(t *testing.T) {
 	if err := os.Mkdir(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	store, err := wire.FilesObjectStore(filesValues(t, "BOTHY_FILE__FS__ROOT="+root))
+	store, err := wire.FilesObjectStore(t.Context(), filesValues(t, "BOTHY_FILE__FS__ROOT="+root), wire.FilesDeps{})
 	if err != nil {
 		t.Fatalf("FilesObjectStore: %v", err)
 	}
@@ -81,19 +87,168 @@ func TestFilesObjectStoreFS(t *testing.T) {
 func TestFilesObjectStoreFSRefusesBadRoot(t *testing.T) {
 	t.Parallel()
 	missing := filepath.Join(t.TempDir(), "missing")
-	store, err := wire.FilesObjectStore(filesValues(t, "BOTHY_FILE__FS__ROOT="+missing))
+	store, err := wire.FilesObjectStore(t.Context(), filesValues(t, "BOTHY_FILE__FS__ROOT="+missing), wire.FilesDeps{})
 	if err == nil || !strings.Contains(err.Error(), "file.fs.root") || strings.Contains(err.Error(), missing) || store != nil {
 		t.Errorf("FilesObjectStore with a missing root: %v, %v", store, err)
 	}
 }
 
-func TestFilesObjectStoreS3NotSupported(t *testing.T) {
+// s3Env is the environment of a valid driver s3 configuration on endpoint; further entries may
+// add egress.allowed_hosts.
+func s3Env(endpoint string, extra ...string) []string {
+	return append([]string{
+		"BOTHY_FILE__STORAGE__DRIVER=s3",
+		"BOTHY_FILE__S3__ENDPOINT=" + endpoint,
+		"BOTHY_FILE__S3__BUCKET=bothy-files",
+	}, extra...)
+}
+
+// TestFileS3Check holds the cross-check file_s3 (docs/DECISIONS.md M3-02/2 and M3-02/11): with
+// the driver fs every file.s3.* value is ignored; with s3 each violation names its keys and never
+// the value; valid https and http configurations load.
+func TestFileS3Check(t *testing.T) {
 	t.Parallel()
-	_, err := wire.FilesObjectStore(filesValues(t, "BOTHY_FILE__STORAGE__DRIVER=s3"))
-	if err == nil {
-		t.Fatal("driver s3 opened")
+	const canary = "canary4z"
+	if got := load(t, "BOTHY_FILE__S3__ENDPOINT=ftp://"+canary, "BOTHY_FILE__S3__BUCKET=No", "BOTHY_FILE__S3__PREFIX=/x"); got != nil {
+		t.Errorf("driver fs with invalid file.s3.* values: problems %v, want none", got)
 	}
-	if want := "config: file.storage.driver: driver s3 is not supported by this server version"; err.Error() != want {
-		t.Errorf("error %q, want %q", err, want)
+	const keys = "config: file.storage.driver, file.s3.endpoint, file.s3.region, file.s3.bucket, file.s3.prefix, " +
+		"file.s3.use_path_style, file.s3.checksum_mode, egress.allowed_hosts: file_s3: "
+	cases := []struct {
+		name string
+		env  []string
+		want string
+	}{
+		{"endpoint missing", []string{"BOTHY_FILE__STORAGE__DRIVER=s3", "BOTHY_FILE__S3__BUCKET=bothy-files"}, "file.s3.endpoint must be set"},
+		{"endpoint with path", s3Env("https://s3.example.com/" + canary), "file.s3.endpoint must be an absolute http or https URL"},
+		{"bucket missing", []string{"BOTHY_FILE__STORAGE__DRIVER=s3", "BOTHY_FILE__S3__ENDPOINT=https://s3.example.com"}, "file.s3.bucket must be set"},
+		{"bucket invalid", []string{"BOTHY_FILE__STORAGE__DRIVER=s3", "BOTHY_FILE__S3__ENDPOINT=https://s3.example.com", "BOTHY_FILE__S3__BUCKET=Bad_" + canary}, "file.s3.bucket must be set"},
+		{"region empty", append(s3Env("https://s3.example.com"), "BOTHY_FILE__S3__REGION="), "file.s3.region must be set"},
+		{"prefix invalid", append(s3Env("https://s3.example.com"), "BOTHY_FILE__S3__PREFIX="+canary+"/"), "file.s3.prefix must be empty"},
+		{"virtual hosted on ip", append(s3Env("https://192.0.2.1"), "BOTHY_FILE__S3__USE_PATH_STYLE=false"), "file.s3.use_path_style must be true"},
+		{"http without entry", s3Env("http://" + canary + ".example.com:8333"), "an http file.s3.endpoint needs an egress.allowed_hosts entry"},
+		{"when_supported over http", s3Env("http://seaweedfs:8333", "BOTHY_EGRESS__ALLOWED_HOSTS=seaweedfs:8333;allow_private", "BOTHY_FILE__S3__CHECKSUM_MODE=when_supported"), "file.s3.checksum_mode when_supported needs an https file.s3.endpoint"},
+		{"http entry without allow_private", s3Env("http://"+canary+".example.com:8333", "BOTHY_EGRESS__ALLOWED_HOSTS="+canary+".example.com:8333"), "an http file.s3.endpoint needs an egress.allowed_hosts entry"},
+	}
+	for _, c := range cases {
+		got := load(t, c.env...)
+		if len(got) != 1 || !strings.HasPrefix(got[0].String(), keys+c.want) {
+			t.Errorf("%s: problems %v, want one starting with\n%s%s", c.name, got, keys, c.want)
+		}
+		noValues(t, got, canary)
+	}
+	for name, env := range map[string][]string{
+		"https":                     s3Env("https://s3.example.com"),
+		"http with allow_private":   s3Env("http://seaweedfs:8333", "BOTHY_EGRESS__ALLOWED_HOSTS=seaweedfs:8333;allow_private"),
+		"virtual hosted with entry": s3Env("http://s3.example.com:8333", "BOTHY_FILE__S3__USE_PATH_STYLE=false", "BOTHY_EGRESS__ALLOWED_HOSTS=bothy-files.s3.example.com:8333;allow_private"),
+	} {
+		if got := load(t, env...); got != nil {
+			t.Errorf("%s: problems %v, want none", name, got)
+		}
+	}
+}
+
+// s3Fake is an httptest server on 127.0.0.1 that answers every request with 200 and records the
+// Authorization headers.
+type s3Fake struct {
+	srv  *httptest.Server
+	mu   sync.Mutex
+	auth []string
+}
+
+func newS3Fake(t *testing.T) *s3Fake {
+	t.Helper()
+	f := &s3Fake{}
+	f.srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.Copy(io.Discard, r.Body)
+		f.mu.Lock()
+		f.auth = append(f.auth, r.Header.Get("Authorization"))
+		f.mu.Unlock()
+		w.Header().Set("ETag", `"x"`)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(f.srv.Close)
+	return f
+}
+
+func (f *s3Fake) requests() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.auth...)
+}
+
+// s3Secrets writes the two key files of the default references into a fresh secrets.dir and
+// returns the directory and the access key ID.
+func s3Secrets(t *testing.T) (dir, access string) {
+	t.Helper()
+	dir = t.TempDir()
+	access = "AKWIREEXAMPLE1"
+	for name, value := range map[string]string{"s3_access_key": access, "s3_secret_key": "WIRESECRETEXAMPLE"} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(value), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir, access
+}
+
+// TestWireBuildsS3Store holds the wiring of docs/DECISIONS.md M3-02/14: driver s3 builds the S3
+// driver from the loaded values, the secret provider and the egress client; an http endpoint with
+// an allow_private entry is reached with the access key ID of the secrets directory, and an https
+// endpoint on loopback without an entry is refused before any request.
+func TestWireBuildsS3Store(t *testing.T) {
+	t.Parallel()
+	fake := newS3Fake(t)
+	dir, access := s3Secrets(t)
+	host := strings.TrimPrefix(fake.srv.URL, "http://")
+	open := func(endpoint string, extra ...string) filesapp.ObjectStore {
+		t.Helper()
+		v := filesValues(t, append(s3Env(endpoint, "BOTHY_SECRETS__DIR="+dir), extra...)...)
+		sp, err := wire.NewSecretsProvider(v, nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		store, err := wire.FilesObjectStore(t.Context(), v, wire.FilesDeps{Secrets: sp})
+		if err != nil {
+			t.Fatalf("FilesObjectStore: %v", err)
+		}
+		return store
+	}
+	key, err := domain.OriginalKey(ids.New(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := open(fake.srv.URL, "BOTHY_EGRESS__ALLOWED_HOSTS="+host+";allow_private")
+	if err := store.Put(t.Context(), key, strings.NewReader("hello"), 5); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+	reqs := fake.requests()
+	if len(reqs) != 1 || !strings.Contains(reqs[0], "Credential="+access+"/") {
+		t.Fatalf("requests %v, want one signed with %s", reqs, access)
+	}
+	blocked := open("https://" + host)
+	err = blocked.Put(t.Context(), key, strings.NewReader("hello"), 5)
+	if !errors.Is(err, egress.ErrBlocked) {
+		t.Errorf("Put to https on loopback without entry = %v, want egress.ErrBlocked", err)
+	}
+	if n := len(fake.requests()); n != 1 {
+		t.Errorf("the fake saw %d requests, want 1", n)
+	}
+}
+
+// TestFilesObjectStoreS3Errors: a configuration or secret error of the driver s3 names the key,
+// never a value.
+func TestFilesObjectStoreS3Errors(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	v := filesValues(t, s3Env("https://s3.example.com", "BOTHY_SECRETS__DIR="+dir)...)
+	sp, err := wire.NewSecretsProvider(v, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := wire.FilesObjectStore(t.Context(), v, wire.FilesDeps{Secrets: sp}); err == nil || !strings.Contains(err.Error(), "file.s3.access_key_ref") {
+		t.Errorf("FilesObjectStore without key files = %v, want an error naming file.s3.access_key_ref", err)
+	}
+	if _, err := wire.FilesObjectStore(t.Context(), v, wire.FilesDeps{}); err == nil || !strings.Contains(err.Error(), "secret provider") {
+		t.Errorf("FilesObjectStore without a secret provider = %v", err)
 	}
 }

@@ -28,7 +28,7 @@ type configCheck struct {
 var configChecks = []configCheck{
 	{name: "listeners_distinct", keys: []string{"server.listen_addr", "server.internal_listen_addr"}, fn: listenersDistinct},
 	{name: "json_limit_above_message", keys: []string{"http.max_json_body_bytes", "message.max_content_bytes"}, fn: jsonLimitAboveMessage},
-	{name: "egress_allowed_hosts", keys: []string{"egress.allowed_hosts"}, fn: egressAllowedHosts},
+	{name: "egress_allowed_hosts", keys: []string{keyEgressAllowedHosts}, fn: egressAllowedHosts},
 	{name: "jobs_schema", keys: []string{"jobs.schema"}, fn: jobsSchema},
 	{name: "public_url_origin", keys: []string{keyPublicURL}, fn: publicURLOrigin},
 	{name: "cors_origins", keys: []string{"api.cors_allowed_origins"}, fn: corsOrigins},
@@ -36,7 +36,9 @@ var configChecks = []configCheck{
 	{name: "tls_https", keys: []string{keyPublicURL, keyTLSCertRef, keyTLSKeyRef}, fn: tlsHTTPS},
 	{name: "hsts_whole_seconds", keys: []string{"http.hsts_max_age"}, fn: hstsWholeSeconds},
 	{name: "audit_ip_key_retention", keys: []string{"privacy.audit_ip_key_period", "privacy.audit_ip_key_retention"}, fn: auditIPKeyRetention},
-	{name: "file_fs_root_absolute", keys: []string{"file.storage.driver", "file.fs.root"}, fn: fileFSRootAbsolute},
+	{name: "file_fs_root_absolute", keys: []string{keyStorageDriver, "file.fs.root"}, fn: fileFSRootAbsolute},
+	{name: "file_s3", keys: []string{keyStorageDriver, "file.s3.endpoint", "file.s3.region", "file.s3.bucket", "file.s3.prefix",
+		"file.s3.use_path_style", "file.s3.checksum_mode", keyEgressAllowedHosts}, fn: fileS3},
 }
 
 // tlsPair requires server.tls_cert_ref and server.tls_key_ref to be both set or both empty

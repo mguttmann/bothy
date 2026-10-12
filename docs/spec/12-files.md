@@ -141,11 +141,17 @@ uploads directly to the object storage and reports the ETags of the parts on com
 completion the server checks part count and total size (HEAD), and in the verification pass
 (3.4) the SHA-256.
 
-The mode stays off until two things are proven (open items, not checked):
+The mode stays off until two things are proven:
 
 - The presigned URL binds the part length, so that a client cannot store more bytes than
-  declared. Integration test against every supported S3 service.
-- The clients reach the S3 endpoint. For instances in private networks this is often not so.
+  declared. Integration test against every supported S3 service. Result of M3-02
+  (`TestPresignedPartBindsLength`, docs/DECISIONS.md M3-02/9): proven for SeaweedFS at the version
+  the Compose stack pins (`BOTHY_SEAWEEDFS_VERSION`). The S3 driver signs `content-length` into
+  every part URL; SeaweedFS accepts a plain `PUT` of exactly the signed length and refuses one
+  byte more, one byte less, chunked transfer encoding and a request after the validity, each
+  without storing a part. Other S3 services are not proven.
+- The clients reach the S3 endpoint. For instances in private networks this is often not so
+  (open, not checked).
 
 Reason for "optional": the direct path is enough for the limit `file.max_upload_bytes` and
 needs no public reachability of the storage.
@@ -258,7 +264,7 @@ these operations:
 | `Head(key)` | size and existence |
 | `Delete(key)` | delete one object; a missing object is not an error |
 | `CreateMultipart(key)`, `UploadPart(key, uploadID, n, reader, size)`, `CompleteMultipart(key, uploadID, parts)`, `AbortMultipart(key, uploadID)` | multipart uploads |
-| `PresignUploadPart(key, uploadID, n, ttl)` | S3 only, only for mode `presigned` |
+| `PresignUploadPart(key, uploadID, n, size, ttl)` | S3 only, only for mode `presigned`; the signature binds the part length `size` |
 
 Not in the port: listing, copying, batch deletion, versioning, bucket policies, lifecycle
 and encryption headers. The server knows every key from the database and needs no
@@ -291,6 +297,11 @@ into memory (`Get` streams, the caller closes the reader).
   contain object bytes. The port never panics on a failing storage.
 - `Put` on an existing key replaces it atomically. The drivers do not enforce "Objects are never
   overwritten"; the module does, through the key schema and the unique `files.object_key`.
+- `PresignUploadPart` takes the size of the part before the validity (M3-02,
+  docs/DECISIONS.md M3-02/9), because no driver can bind a length it does not know. `n < 1` gives
+  `ErrInvalidPart`, `size < 1` gives `ErrSizeMismatch`, both on every driver; the file system
+  driver then answers `ErrNotSupported`. The URL is a credential for its validity: callers hand
+  it to the client only and never log it.
 
 ### 4.2 File system driver (default)
 
@@ -355,6 +366,43 @@ File system rules (M3-01, `internal/files/adapters/fs`, docs/DECISIONS.md M3-01/
 - The bucket is private. The instance operator sets up server-side encryption and the lifecycle
   rule "abort incomplete multipart uploads" on the storage; the server does not rely on them
   and aborts expired uploads itself (section 12).
+
+S3 driver rules (M3-02, `internal/files/adapters/s3`, docs/DECISIONS.md M3-02/1 to M3-02/14):
+
+- Core S3 only: the driver holds a Go interface with exactly `PutObject`, `GetObject`,
+  `HeadObject`, `DeleteObject`, `CreateMultipartUpload`, `UploadPart`,
+  `CompleteMultipartUpload`, `AbortMultipartUpload` and a presign interface with only
+  `PresignUploadPart`. Only this package imports the AWS SDK (depguard in `make lint`,
+  `TestS3SDKOnlyInAdapter`); forbidigo forbids `DeleteObjects` and `PresignGetObject`. No request
+  sets server-side encryption, ACL, tagging, object lock, storage class or conditional headers.
+- `file.s3.endpoint` is required; the driver never uses the endpoint resolution, the default
+  configuration or the credential chain of the SDK (environment, shared files, instance
+  metadata, whose address SEC-NET-3 always blocks).
+- Every request goes through the egress client ([19-security.md](19-security.md) 8) with
+  purpose `objectstore`; its host policy allows exactly the request host and port (the endpoint
+  with path style, `<bucket>.<endpoint host>` with virtual-hosted style). An `http` endpoint or
+  one on a private address needs an `egress.allowed_hosts` entry with `allow_private`. For an
+  `http` endpoint `bothy config check` fails without it (cross-check `file_s3`); a private
+  address behind an `https` endpoint is refused by the egress client when it connects. TLS is always verified. Redirects are never
+  followed; the time limit of a request is `http.transfer_timeout`, the largest response body
+  `file.max_upload_bytes`.
+- No retries in the SDK ([02-architecture.md](02-architecture.md) 14.3): a failed call is one
+  request, and the caller sees a storage failure (`503 unavailable`); jobs retry through River.
+- `Put` and `UploadPart` stream the caller's reader without a buffer and sign it as
+  `UNSIGNED-PAYLOAD`, because the reader is not seekable and the endpoint may be plain `http`;
+  the part digest (3.2) and the file SHA-256 of 3.4 check the content. A body of another length
+  gives `ErrSizeMismatch` and stores nothing: the driver holds back the last byte until the
+  reader reports its end.
+- Access keys come only from `file.s3.access_key_ref` and `file.s3.secret_key_ref` through the
+  secret provider ([16-operations.md](16-operations.md) 5.2), read only with `file.storage.driver = s3`.
+  A key that cannot be read stops the start; the driver asks the provider again on every refresh
+  of the SDK credential cache, so a rotation works without restart after `secrets.cache_ttl`.
+- The object name is `<file.s3.prefix>/<key>` with a prefix, else the key; key and prefix follow
+  the key grammar of 4.1, checked before any request.
+- Errors keep the contract of 4.1 and read `files/s3: <operation> <key>: <detail>`; they never
+  contain a request URL, a query, a presigned URL, the endpoint or credentials. A `HEAD` answer
+  has no body, so `Head` on a missing bucket reads as `ErrNotFound`; `Get` reports `NoSuchBucket`
+  as a storage failure.
 
 ### 4.4 Key schema
 
@@ -831,8 +879,9 @@ Values from other chapters (reference only): `file.max_upload_bytes`, `message.m
 | `file.s3.bucket` | empty | bucket |
 | `file.s3.prefix` | empty | prefix before all keys |
 | `file.s3.use_path_style` | `true` | path style instead of virtual hosts |
-| `file.s3.checksum_mode` | `when_required` | SDK checksums for request and response |
-| `file.s3.access_key_ref`, `file.s3.secret_key_ref` | `file:<secrets.dir>/s3_access_key` / `file:<secrets.dir>/s3_secret_key` | references to the secret provider; read only with `file.storage.driver = s3` |
+| `file.s3.checksum_mode` | `when_required` | SDK checksums for request and response: `when_required` or `when_supported` (only with an `https` endpoint) |
+| `file.s3.access_key_ref` | `file:<secrets.dir>/s3_access_key` | reference to the secret provider; read only with `file.storage.driver = s3` |
+| `file.s3.secret_key_ref` | `file:<secrets.dir>/s3_secret_key` | reference to the secret provider; read only with `file.storage.driver = s3` |
 | `file.s3.presigned_upload` | `false` | allow mode `presigned` |
 | `file.s3.presign_ttl` | `15m` | validity of a presigned URL |
 | `file.upload_part_bytes` | `8388608` | part size |

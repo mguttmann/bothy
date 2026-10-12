@@ -151,6 +151,19 @@ def test_regex_managers_extract_the_same_images_from_both_files() -> None:
     assert ("docker", "otel/opentelemetry-collector-contrib", "0.162.0") in expected
 
 
+def test_seaweedfs_test_image_follows_the_compose_version() -> None:
+    """The image constant of the S3 driver tests is found by its own manager, carries the version
+    of the Compose service seaweedfs and joins the group Compose-Images (M3-02/13)."""
+    path = "services/server/internal/files/adapters/s3/seaweed_test.go"
+    deps = extract(manager_for(path), (REPO / path).read_text(encoding="utf-8"))
+    image, version = compose_images()["BOTHY_SEAWEEDFS_VERSION"]
+    assert deps == {("docker", image, version)}
+    groups = [
+        r.get("groupName") for r in renovate()["packageRules"] if r.get("matchFileNames") == [path]
+    ]
+    assert groups == ["Compose-Images"]
+
+
 def test_compose_images_are_one_group_with_the_validator_note() -> None:
     rules = [
         r

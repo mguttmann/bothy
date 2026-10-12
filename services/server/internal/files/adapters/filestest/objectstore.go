@@ -262,7 +262,7 @@ func caseInvalidKeys(t *testing.T, s app.ObjectStore, _ *caseEnv) {
 		_, headErr := s.Head(ctx, k)
 		_, createErr := s.CreateMultipart(ctx, k)
 		_, partErr := s.UploadPart(ctx, k, "", 1, bytes.NewReader([]byte("x")), 1)
-		_, presignErr := s.PresignUploadPart(ctx, k, "", 1, time.Minute)
+		_, presignErr := s.PresignUploadPart(ctx, k, "", 1, 1, time.Minute)
 		errs := map[string]error{
 			"Put":               s.Put(ctx, k, bytes.NewReader([]byte("x")), 1),
 			"Get":               getErr,

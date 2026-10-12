@@ -1024,7 +1024,15 @@ server loads.
    bind port 0. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
    clean form (no `.` or `..` element, no trailing `/`; cross-check `file_fs_root_absolute`,
    M3-01), because a relative root would depend on the working directory of the process; with
-   `s3` the root is not read. In addition the loader checks a rule for a single key that no type expresses:
+   `s3` the root is not read. With `file.storage.driver = s3` the cross-check `file_s3` (M3-02)
+   holds `file.s3.endpoint` (set, an absolute `http` or `https` URL with a host and without user
+   info, query, fragment or a path other than `/`), `file.s3.bucket` (set, S3 bucket naming
+   rules), `file.s3.region` (set), `file.s3.prefix` (empty or the key grammar of
+   [12-files.md](12-files.md) 4.1), `file.s3.use_path_style` (true when the endpoint host is
+   an IP address), `file.s3.checksum_mode` (`when_supported` only with an `https` endpoint) and
+   `egress.allowed_hosts` (an `http` endpoint needs an entry with `allow_private` for the request
+   host and port, because the egress client allows `http` only there,
+   [19-security.md](19-security.md) SEC-NET-2); with `fs` no `file.s3.*` value is read. In addition the loader checks a rule for a single key that no type expresses:
    `secrets.dir` is an absolute path in clean form (no `.` or `..`, no double or trailing `/`),
    not `/`, without a NUL character and without `<`, as the secret provider requires; a wrong
    value is a problem of `secrets.dir` alone, not of the references that use `<secrets.dir>`.
