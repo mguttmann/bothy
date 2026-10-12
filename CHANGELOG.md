@@ -204,5 +204,8 @@ operated, and the order of the build.
   locally (`PR_TITLE`, `PR_BODY` or `PR_BODY_FILE`). The review report stays local; pull
   request bodies are written fresh, without raw reviewer output or local paths
   (`AGENTS.md`, [push discipline](docs/quality/push-discipline.md)). CodeRabbit writes its
-  summary into the walkthrough comment instead of the body (LG/1 to LG/4 in
+  summary into the walkthrough comment instead of the body. The `ci-ok` job starts with
+  every run and waits for the other jobs (`tools/ci/ci_ok.py`), so an older green result
+  cannot be merged while the run after an edit is going, and identity trailers count only
+  as `Name <email>`, so they cannot hide text (LG/1 to LG/5 in
   [DECISIONS.md](docs/DECISIONS.md)).

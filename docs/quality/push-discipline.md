@@ -35,7 +35,9 @@ commit per feature, signed and linear.
    was fixed. Never paste a raw review report, bot or agent output, local paths, user or
    machine names, temporary folder names or notes about tools. Section
    "Pull request title and body" below describes the gate.
-7. **CI.** `ci.yml` runs the same make targets. The only required check: `ci-ok`.
+7. **CI.** `ci.yml` runs the same make targets. The only required check: `ci-ok`. It
+   starts with every run and waits for the other jobs (`tools/ci/ci_ok.py`), so it is
+   pending from the first second of a run.
 8. **Merge.** "Squash and merge". GitHub signs the resulting commit; its message is the
    pull request body (repository setting below). `main` stays linear.
 
@@ -91,10 +93,18 @@ text of the pull request goes through the same deny list as every commit:
   job and with it `ci-ok`. `ci.yml` also runs on `pull_request` type `edited`, so every
   change of title or body is checked again before the merge; an edit restarts the whole
   run, because `ci-ok` must cover the current text and the current code together.
+- **No stale green.** `ci-ok` has no `needs`: a job with `needs` gets its check run only
+  when the other jobs are done, so after an edit the older green `ci-ok` of the same head
+  commit would stay the latest result for the whole new run. Instead the `ci-ok` job starts
+  with the run, is pending at once, and `tools/ci/ci_ok.py` reads the jobs of its run through
+  the API (`actions: read`) and combines their results.
 - **Rules.** The body is checked like a commit message: every line gets the private and
-  the generic rules, a `Signed-off-by` or `Co-authored-by` line only the private list. An
-  allowed identity (`allow-authors.txt`) passes in `Signed-off-by` only; in
-  `Co-authored-by` or in the text it is a finding, as in a commit.
+  the generic rules. A `Signed-off-by` or `Co-authored-by` line of the exact form
+  `Key: Name <email>` gets the private list as a whole and the generic rules on the name;
+  a trailer line with any other text is ordinary text and gets all rules. In the body,
+  `Signed-off-by` passes only with a full identity from `allow-authors.txt`
+  (`Name <email>`); in `Co-authored-by` or in the text an allowed identity is a finding, as
+  in a commit.
 - **Locally.** `make denylist` (and so `make check` and the pre-push hook) reads the same
   variables. Before the push, check the planned squash message:
   `PR_TITLE="feat(x): ..." PR_BODY_FILE=<file> make denylist`, or `PR_BODY` with
@@ -103,15 +113,20 @@ text of the pull request goes through the same deny list as every commit:
   (`high_level_summary_in_walkthrough` in `.coderabbit.yaml`), so bot text does not reach
   `main` and does not restart CI.
 
-`denylist-main.yml` stays the check after the merge: it scans what actually reached `main`.
+What the gate does not cover, so `denylist-main.yml` stays the check after the merge (it
+scans what actually reached `main`):
+
+- the seconds between an edit and the start of the new run (GitHub delivers the event);
+- a manual `workflow_dispatch` of `ci.yml` on the pull request branch or "Re-run all jobs"
+  of a run from before the edit: both run without the current text (maintainers only);
+- a message typed into the merge dialog instead of the pull request body.
 
 ## Deny-list hit on `main`
 
 `denylist-main.yml` checks every push to `main` with the private list (D-W-34). If it
 fails, a term of the list has reached `main`, for example from a
-fork contribution or from a commit message changed during the squash (an edit of the
-body after the last CI run is checked by the `edited` run; a text typed into the merge
-dialog is not). Flow:
+fork contribution or from a commit message changed during the squash (see the list of
+what the pull request text gate does not cover). Flow:
 
 1. Look at the hit locally with `make denylist DENYLIST_RANGE=<before>..<after> DENYLIST_FLAGS=--reveal`
    (locally only, never in CI).

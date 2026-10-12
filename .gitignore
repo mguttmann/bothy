@@ -1,6 +1,6 @@
 # Local configuration that must never be committed
 .denylist-path
-# Review reports of the pre-push gate (pasted into the pull request description, not committed)
+# Review reports of the pre-push gate (stay local; the pull request names commit and verdict)
 .review/
 .env
 .env.*

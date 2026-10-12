@@ -537,3 +537,53 @@ def test_pr_text_finding_output_is_redacted(
     assert rc == 1
     assert "pull request body:1:10: pr-body matches private rule line" in out
     assert "acme" not in out.lower()
+
+
+# --- identity trailers cannot hide text ------------------------------------------
+
+HOME = "/" + "Users/sam/notes"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        f"Signed-off-by: see {HOME}",
+        f"Co-authored-by: Sam Example <sam@example.com> {HOME}",
+        f"Signed-off-by: Sam {HOME} <sam@example.com>",
+    ],
+)
+def test_identity_trailer_does_not_hide_text_from_generic_rules(
+    repo: Path, monkeypatch: pytest.MonkeyPatch, line: str
+) -> None:
+    monkeypatch.setenv("PR_BODY", f"Done.\n\n{line}\n")
+    for extra in (("--allow-missing",), ()):
+        report = run(repo, *extra, list_path=None if extra else EXAMPLE_LIST)
+        assert any(f.rule.source == "generic" for f in report.findings), (line, extra)
+
+
+def test_identity_trailer_with_extra_text_in_commit_is_scanned(repo: Path) -> None:
+    commit(repo, f"feat: x\n\nSigned-off-by: Sam Doe <sam@example.com> {HOME}")
+    assert [f.rule.source for f in run(repo, "--allow-missing", list_path=None).findings] == [
+        "generic"
+    ]
+
+
+def test_pr_body_sign_off_needs_the_full_allowed_identity(
+    repo: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A bare allowed e-mail does not let another name (here a private term) pass."""
+    allow = tmp_path / "allow.txt"
+    allow.write_text("<robin@initech.test>\n")
+    monkeypatch.setenv("PR_BODY", "Done.\n\nSigned-off-by: acme-widgets <robin@initech.test>\n")
+    findings = run(repo, allow=allow).findings
+    assert findings
+    assert {(f.kind, f.rule.source) for f in findings} == {("pr-body-identity", "private")}
+
+
+def test_pr_body_crlf_lines_are_located(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv(
+        "PR_BODY",
+        f"Done.\r\n\r\nSee {HOME}\r\nSigned-off-by: Robin Example <robin@initech.test>\r\n",
+    )
+    [f] = run(repo, allow=EXAMPLE_ALLOW).findings
+    assert f.location == "pull request body:3:5"

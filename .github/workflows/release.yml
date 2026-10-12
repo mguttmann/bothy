@@ -59,6 +59,7 @@ jobs:
     # actionlint 1.7.12; switch when it is (docs/quality/toolchain.md).
     uses: ./.github/workflows/ci.yml # zizmor: ignore[self-repository]
     permissions:
+      actions: read # the ci-ok job of ci.yml lists the jobs of the run
       contents: read
     with:
       components: ${{ needs.resolve.outputs.gate_components }}

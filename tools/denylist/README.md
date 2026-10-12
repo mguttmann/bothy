@@ -41,10 +41,12 @@ otherwise they match parts of other words. `allow-authors.txt`: one identity per
 | Author, committer and the identity lines `Signed-off-by` and `Co-authored-by` | like messages, only against the private list | yes |
 | Branch, remote and tag names, tag messages | yes | yes |
 | Additional names (`--name`, `BOTHY_DENYLIST_NAMES`) | yes | yes |
-| Pull request title (`PR_TITLE`) and body (`PR_BODY`, or a file in `PR_BODY_FILE`), the planned squash commit on `main`; the body like a commit message, `Signed-off-by` with an allowed identity passes | when set | when set |
+| Pull request title (`PR_TITLE`) and body (`PR_BODY`, or a file in `PR_BODY_FILE`), the planned squash commit on `main`; the body like a commit message, `Signed-off-by` passes only with a full allowed identity `Name <email>` (with `--allow-missing` the generic rules check every line, trailers on their name part) | when set | when set |
 
 The public rules in `generic.rules` always run, but do not check
-commit identities: contributors sign off with their own address (DCO). With
+commit identities: contributors sign off with their own address (DCO). An identity line
+counts only in the exact form `Signed-off-by: Name <email>` (or `Co-authored-by`); its name
+part still gets the generic rules, and a line with any other text is ordinary message text. With
 `--allow-missing` (only fork pull requests in CI), only they run. Other lines such as
 `Reviewed-by` are normal message text and get all rules.
 

@@ -16,16 +16,18 @@ Allowed commit identities come from --allow-authors, BOTHY_DENYLIST_ALLOW_AUTHOR
 `allow-authors.txt` next to the list. Lines are 'Name <email>' or '<email>'. They are allowed
 only as author or committer, and in a Signed-off-by trailer that repeats the author or
 committer of the same commit; anywhere else (Co-authored-by, another sign-off, text) the
-private rules apply as usual. Identity trailers (Signed-off-by, Co-authored-by) are checked
-against the private list only, like author and committer, because contributors sign off
-with their own addresses; every other trailer is message text and gets all rules.
+private rules apply as usual. Identity trailers (Signed-off-by, Co-authored-by) of the exact
+form 'Key: Name <email>' are checked against the private list as a whole, like author and
+committer, because contributors sign off with their own addresses; their name part also gets
+the generic rules. A trailer line with any other text, and every other trailer, is message
+text and gets all rules.
 
 Scanned by default: content and path of every tracked file (working tree), the current
 branch name and all local branch and tag names, annotated tag messages, message plus
 identities of every commit in --range (default: all commits reachable from HEAD), and the
 pull request title and body from PR_TITLE, PR_BODY and PR_BODY_FILE when set. The body is
-checked like a commit message; a Signed-off-by trailer in it is allowed when its identity
-is an allowed one, because the squash commit has no author to compare it with yet.
+checked like a commit message; a Signed-off-by trailer in it is allowed when it names a full
+identity from the allow list, because the squash commit has no author to compare it with yet.
 With --history additionally every blob and path ever committed on any ref, and every
 commit on any ref.
 
@@ -62,7 +64,11 @@ ENV_PR_BODY = "PR_BODY"
 ENV_PR_BODY_FILE = "PR_BODY_FILE"
 DOTFILE = ".denylist-path"
 DEFAULT_GENERIC = Path(__file__).resolve().parent / "generic.rules"
-_IDENTITY_TRAILER = re.compile(r"^(signed-off-by|co-authored-by):\s*(.+)$", re.IGNORECASE)
+# An identity trailer is exactly "Key: Name <email>"; any other text on such a line makes it
+# ordinary message text, so that a trailer cannot hide text from the rules.
+_IDENTITY_TRAILER = re.compile(
+    r"^(signed-off-by|co-authored-by):[ \t]*([^<>]*?)[ \t]*<([^<>\s]+)>$", re.IGNORECASE
+)
 _EMAIL = re.compile(r"<([^>]+)>")
 
 
@@ -381,27 +387,33 @@ class Scanner:
     ) -> None:
         """Scan a commit message or pull request body; identity trailers get the private list.
 
+        A trailer line of the exact form `Signed-off-by: Name <email>` (or Co-authored-by)
+        is checked against the private list as a whole, and its name part also against the
+        other rules (an address of a contributor is no finding of the generic rules).
         `own` holds the author and committer of the commit; a Signed-off-by trailer that
         repeats one of them with an allowed identity is not reported. `own` None (a pull
-        request body, whose squash commit does not exist yet) accepts any allowed identity
-        in Signed-off-by, and the trailer location gets the line number.
+        request body, whose squash commit does not exist yet) accepts a Signed-off-by only
+        with a full identity from the allow list, and the trailer location gets the line.
         """
         trailer_kind = "identity" if own is not None else f"{kind}-identity"
+        others = [r for r in self.rulesets if r is not self.private]
         kept: list[str] = []
         for lineno, line in enumerate(body.splitlines(), start=1):
             trailer = _IDENTITY_TRAILER.match(line.strip())
             if not trailer:
                 kept.append(line)
                 continue
-            identity = trailer.group(2)
-            own_sign_off = (
-                trailer.group(1).lower() == "signed-off-by"
-                and (own is None or _normalize(identity) in own)
-                and _is_allowed(identity, self.allowed)
-            )
+            identity = f"{trailer.group(2)} <{trailer.group(3)}>"
+            if own is None:
+                own_sign_off = _normalize(identity) in self.allowed[0]
+            else:
+                own_sign_off = _normalize(identity) in own and _is_allowed(identity, self.allowed)
+            own_sign_off = own_sign_off and trailer.group(1).lower() == "signed-off-by"
+            loc = trailer_where if own is not None else f"{trailer_where}:{lineno}"
             if self.private and not own_sign_off:
-                loc = trailer_where if own is not None else f"{trailer_where}:{lineno}"
                 self._scan(trailer_kind, line, loc, rulesets=[self.private])
+            if trailer.group(2):
+                self._scan(trailer_kind, trailer.group(2), loc, rulesets=others)
             kept.append("")
         self._scan(kind, "\n".join(kept), where, position="lines")
 
@@ -568,7 +580,7 @@ def main(argv: list[str] | None = None) -> int:
             "(docs/quality/public-switch.md)"
         )
         return 1
-    mode = "history" if args.history else "tree, refs and commits"
+    mode = "history" if args.history else "tree, refs, commits and pull request text"
     print(
         f"denylist: clean ({mode}; private list {'loaded' if report.private_loaded else 'absent'})"
     )
