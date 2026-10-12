@@ -266,6 +266,7 @@ This list equals the allowlist in [infra/otel/collector.yaml](../../infra/otel/c
 | `bothy.close.code` | close code from [04-sync-protocol.md](../spec/04-sync-protocol.md) 6.4 | |
 | `bothy.correlation_id` | UUID | only in logs; in spans it is the trace ID |
 | `bothy.decision` | decision from [05-actions.md](../spec/05-actions.md) 2.5 | |
+| `bothy.egress.purpose` | purpose of an egress client from the code (`oidc`, `webhook`, ...) | only in logs of rejected connections ([19-security.md](../spec/19-security.md) SEC-NET-5) |
 | `bothy.event.durability` | `durable`, `ephemeral` | |
 | `bothy.event.seq` | global sequence | never on metrics |
 | `bothy.event.type` | event type from [05-actions.md](../spec/05-actions.md) 6 | |

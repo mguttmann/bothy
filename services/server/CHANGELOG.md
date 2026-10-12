@@ -45,3 +45,20 @@ documented in this file. The format is based on
 - Lint rules (gocognit, goconst): a function above cognitive complexity 15 or a string literal
   written three times fails `make lint`, as the rules S3776 and S1192 of the quality gate do; tests
   and generated code are exempt.
+
+### Security
+
+- `internal/platform/egress`: the one client for outgoing HTTP connections. It refuses targets
+  that neither `egress.allowed_hosts` nor the consumer allows before any DNS lookup, checks the
+  resolved addresses at connection time and dials only checked addresses (always blocked:
+  unspecified, link-local with the cloud metadata address, multicast, reserved, NAT64, 6to4,
+  Teredo and the other ranges of SEC-NET-3; loopback, RFC 1918, RFC 6598 and unique local
+  addresses only with `allow_private`), follows redirects only after the same checks, ignores
+  environment proxies, always verifies TLS, bounds time and response size, and logs every refused
+  attempt without path or query, counting it when metrics are configured. `NewLoopback` is the client for the health
+  probe (loopback and plain http only).
+- Configuration keys `egress.allowed_hosts` (entries `host[:port][;allow_private]`, invalid and
+  duplicate entries fail at load), `egress.timeout` and `egress.max_response_bytes`.
+- Semgrep rules `bothy-go-egress-only` (no other HTTP client, transport, dialer or reverse
+  proxy in production code) and `bothy-go-tls-verify` (no `InsecureSkipVerify` other than
+  `false`, also in tests).

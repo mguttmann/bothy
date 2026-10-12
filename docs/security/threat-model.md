@@ -44,7 +44,7 @@ Source: [diagrams/trust-boundaries.mmd](diagrams/trust-boundaries.mmd). Re-rende
 | TB4 | Server and agent adapter | who triggers which agent, what the agent sees | API token with DPoP, invocation token (I3), `authorize` at delivery, SR9 |
 | TB5 | Runtime and LLM provider or tools | Content to third parties, effect of tools | Tool class (SR2), backend policy (SR1), data processing agreement |
 | TB6 | Server and apps or external systems | Data to apps, writes from outside | Scopes plus grants, signed webhooks to allowed targets, incoming webhooks without triggering |
-| TB7 | Server and external services | Identity, push metadata, telemetry | OIDC check, push only with IDs, telemetry without content |
+| TB7 | Server and external services | Identity, push metadata, telemetry | Egress client `platform/egress` for every outgoing HTTP connection except the OTLP export to the collector (target allow list, IP check at connection setup, TLS always verified, lint against other clients; SEC-NET-1 to 5, SEC-TLS-4), OIDC check, push only with IDs, telemetry without content |
 | TB8 | Operations and supply chain and instance | Root of trust, code integrity | Server command only on the host, signed releases, pinned actions |
 | TB9 | Dev environment of a person and host of the runner | Host, secrets of the owner, other people | VM boundary, egress rules, readiness check (21) |
 | TB10 | Device, server relay and host service of a connected host | Terminal content, shell on the host, LLM login of the host | Noise `NK` end-to-end, one-time token, fresh step-up, SR10, I6, host service without admin (24) |
