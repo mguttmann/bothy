@@ -24,7 +24,9 @@
 //  3. Always blocked: unspecified (0.0.0.0/8, ::), link-local with the metadata address of
 //     the clouds (169.254.0.0/16, fe80::/10), multicast, broadcast and reserved
 //     (224.0.0.0/4, ff00::/8, 240.0.0.0/4), 192.0.0.0/24, 198.18.0.0/15, fec0::/10, 100::/64,
-//     ::/96, NAT64 (64:ff9b::/96, 64:ff9b:1::/48), 6to4 (2002::/16) and Teredo (2001::/32).
+//     ::/96, NAT64 (64:ff9b::/96, 64:ff9b:1::/48), 6to4 (2002::/16), Teredo (2001::/32) and
+//     the metadata addresses of the clouds inside private ranges (fd00:ec2::254 and host
+//     .200 of 100.100.100.0/24).
 //     Blocked unless a matching rule has allow_private: loopback, RFC 1918, 100.64.0.0/10
 //     and fc00::/7. Documentation ranges (RFC 5737, RFC 3849) count as public.
 //  4. allow_private exists only in egress.allowed_hosts, which the operator writes; a consumer
