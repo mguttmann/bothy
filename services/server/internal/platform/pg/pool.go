@@ -164,7 +164,7 @@ func (p *Pool) Begin(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, error) {
 	}
 	actx, cancel := context.WithTimeout(ctx, p.cfg.AcquireTimeout)
 	defer cancel()
-	tx, err := p.pool.BeginTx(actx, opts)
+	tx, err := p.pool.BeginTx(actx, opts) // NOSONAR: Begin hands the open transaction to the caller, who commits or rolls it back.
 	if err != nil {
 		return nil, p.unavailable(ctx, err, "begin")
 	}

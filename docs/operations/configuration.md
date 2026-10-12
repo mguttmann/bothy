@@ -88,7 +88,10 @@ Keys never contain two consecutive underscores; this makes the naming rule rever
    through the secret provider and writes per key `secret <key>: ok` or
    `secret <key>: <error code>` (`invalid_ref`, `unsupported_scheme`, `not_found`,
    `insecure_file`, `read_failed`), never a value; the error message with reference and rule is on
-   standard error. `configuration ok` follows only when every reference resolves.
+   standard error. References of `migrate.*` keys are the exception: they print
+   `secret <key>: skipped (read only by bothy migrate up --bootstrap)` and are not resolved, so a
+   successful check does not prove the credentials of `migrate up --bootstrap`.
+   `configuration ok` follows only when every other reference resolves.
 5. `bothy config print [--redacted] [--config FILE] [--role ROLE]` shows in the first line
    `# configuration file: <path>` or `# configuration file: none`, then per key, sorted by name,
    `<key> = <value>  # <source>` with the source `default`, `file <path>`, `env BOTHY_X` or

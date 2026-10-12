@@ -57,6 +57,8 @@ import (
 const (
 	label      = "org.bothy.test"
 	labelValue = "pgtest"
+	// containerPort is the PostgreSQL port inside the container.
+	containerPort = "5432/tcp"
 )
 
 // The superuser of the container and the database it connects to for CREATE DATABASE.
@@ -227,7 +229,7 @@ func startCluster(ctx context.Context) (c *cluster, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: start %s: %w", Image, err)
 	}
-	mapped, err := ctr.MappedPort(ctx, "5432/tcp")
+	mapped, err := ctr.MappedPort(ctx, containerPort)
 	if err != nil {
 		return nil, fmt.Errorf("pgtest: mapped port: %w", err)
 	}
@@ -253,7 +255,7 @@ func startCluster(ctx context.Context) (c *cluster, err error) {
 // runContainer starts the pinned image on 127.0.0.1 with a random host port. The server flags
 // trade durability for speed, which a disposable test database does not need.
 func runContainer(ctx context.Context, superPassword string) (*testcontainers.DockerContainer, error) {
-	port := network.MustParsePort("5432/tcp")
+	port := network.MustParsePort(containerPort)
 	return testcontainers.Run(ctx, Image,
 		testcontainers.WithLogger(tclog.NewNoopLogger()),
 		testcontainers.WithName("bothy-pgtest-"+randomHex(6)),
@@ -262,7 +264,7 @@ func runContainer(ctx context.Context, superPassword string) (*testcontainers.Do
 			"POSTGRES_USER": superUser, "POSTGRES_PASSWORD": superPassword, "POSTGRES_DB": superDatabase,
 		}),
 		testcontainers.WithCmd("postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"),
-		testcontainers.WithExposedPorts("5432/tcp"),
+		testcontainers.WithExposedPorts(containerPort),
 		testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {
 			hc.PortBindings = network.PortMap{port: {{HostIP: netip.MustParseAddr("127.0.0.1"), HostPort: "0"}}}
 			hc.AutoRemove = true
@@ -446,7 +448,7 @@ func (c *cluster) create(ctx context.Context, name, template string, fsys fs.FS)
 		return err
 	}
 	err = pg.BootstrapDatabase(ctx, conn, name)
-	_ = conn.Close(context.Background())
+	_ = conn.Close(context.WithoutCancel(ctx))
 	if err != nil {
 		return fmt.Errorf("pgtest: %w", err)
 	}
