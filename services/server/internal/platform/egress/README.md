@@ -50,7 +50,8 @@ checked.
 4. `allow_private` exists only in `egress.allowed_hosts` (operator); the host policy of a consumer
    never opens private addresses or `http`.
 5. Redirects: `RedirectNever` returns the 3xx response, `RedirectChecked` follows only checked
-   targets, at most `maxRedirects` (the redirect limit of net/http). A redirect with an unreadable `Location` ends in both modes with an error
+   targets, at most `maxRedirects` (the redirect limit of net/http,
+   [defaultCheckRedirect](https://github.com/golang/go/blob/62cd170026b7f9054b7b58ae27136c36fcd8b15c/src/net/http/client.go#L839-L844), retrieved 2026-10-12). A redirect with an unreadable `Location` ends in both modes with an error
    that does not quote the header. A response `101` (protocol switch) is always an error, because
    no deadline would limit reading the switched connection.
 6. No environment proxies; TLS from version 1.2, certificate and host name always verified.

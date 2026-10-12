@@ -10,12 +10,12 @@ import "net/netip"
 // discard-only, IPv4-compatible, NAT64, 6to4 and Teredo. The last five carry IPv4 addresses
 // inside IPv6 and are known ways around an IPv4 check.
 var alwaysBlocked = prefixes(
-	"0.0.0.0/8",
-	"169.254.0.0/16",
-	"224.0.0.0/4",
-	"240.0.0.0/4",
-	"192.0.0.0/24",
-	"198.18.0.0/15",
+	"0.0.0.0/8",      // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
+	"169.254.0.0/16", // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
+	"224.0.0.0/4",    // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
+	"240.0.0.0/4",    // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
+	"192.0.0.0/24",   // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
+	"198.18.0.0/15",  // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
 	"::/128",
 	"fe80::/10",
 	"ff00::/8",
@@ -32,11 +32,11 @@ var alwaysBlocked = prefixes(
 // shared address space (RFC 6598, also used by overlay networks) and unique local addresses
 // (RFC 4193). ::1 is handled before alwaysBlocked, because it lies inside ::/96.
 var privateRanges = prefixes(
-	"127.0.0.0/8",
-	"10.0.0.0/8",
-	"172.16.0.0/12",
-	"192.168.0.0/16",
-	"100.64.0.0/10",
+	"127.0.0.0/8",    // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
+	"10.0.0.0/8",     // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
+	"172.16.0.0/12",  // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
+	"192.168.0.0/16", // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
+	"100.64.0.0/10",  // NOSONAR: a range the client blocks (SEC-NET-3), not an address it calls
 	"fc00::/7",
 )
 

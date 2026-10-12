@@ -97,7 +97,7 @@ type Resolver interface {
 // Metrics records the counter of refused attempts, bothy.egress.blocked with the attribute
 // bothy.reason (docs/observability/signals.md). platform/otel implements it; it must be safe
 // for concurrent use and must not block.
-type Metrics interface {
+type Metrics interface { // NOSONAR: names the port, as clock.Clock does (M1-05/26)
 	// Blocked counts one refused attempt with its reason.
 	Blocked(ctx context.Context, reason Reason)
 }
@@ -595,7 +595,9 @@ func controlFor(allowPrivate bool) func(network, address string, _ syscall.RawCo
 // noMetrics counts nothing.
 type noMetrics struct{}
 
-func (noMetrics) Blocked(context.Context, Reason) {}
+func (noMetrics) Blocked(context.Context, Reason) {
+	// Without a metrics port the client counts nothing; it still logs the attempt.
+}
 
 // limitedBody limits a response body to the limit of the client and ends the time limit of the
 // request on Close.
