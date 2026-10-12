@@ -65,7 +65,8 @@ fails, 2 for a wrong call. A run executes all checks and shows all findings.
   "at least one endpoint must be specified"). In the copy of
   `exporters/datadog.yaml` the check sets `exporters.datadog.hostname: validate.example.com`.
   Without a host name, `validate` waits for the host name detection, which queries the metadata
-  endpoints of clouds (measured on 2026-10-10 with 0.162.0 at about 25 seconds).
+  endpoints of clouds (measured on 2026-10-10 with 0.162.0 at about 25 seconds, the default
+  `hostname_detection_timeout` of the exporter; source in `docs/DECISIONS.md` M1-04/6).
   `GCE_METADATA_HOST` stops the query of the GCP metadata that the exporter starts even with a
   host name (see above). The overlay in the repository stays unchanged, and operation keeps the
   automatic detection.

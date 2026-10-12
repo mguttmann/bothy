@@ -162,7 +162,8 @@ with `promtool` and `amtool` in the version of the images:
    [bothy-alerts.test.yaml](../../infra/observability/prometheus/tests/bothy-alerts.test.yaml)
    (check `prometheus-rule-tests`): every alert of `bothy-alerts.yaml` fires in one case at the
    first evaluation at which it may, with labels and texts: once its `for` has run out, or, for
-   an alert without `for`, as soon as its condition holds. One minute earlier it is still quiet
+   an alert without `for`, as soon as its condition holds. One evaluation earlier (the test file
+   sets `evaluation_interval: 1m`) it is still quiet
    (Watchdog fires from the first evaluation on). Every alert with a threshold stays quiet in one
    case exactly at the threshold. An alert without a firing case fails the check.
 3. `amtool check-config` and the routes from section 1 with `amtool config routes test` (check

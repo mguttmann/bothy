@@ -22,8 +22,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib
 import io
 import json
+import lzma
 import os
 import platform
 import re
@@ -111,16 +113,31 @@ def download(url: str) -> bytes:
     return data
 
 
-# What tarfile, zipfile, gzip and zlib raise for an archive that cannot be read (empty, cut
-# off, corrupt or of another format); zipfile raises RuntimeError for an encrypted member and
-# its subclass NotImplementedError for a compression method it lacks (Deflate64).
-_UNREADABLE_ARCHIVE = (
+def _optional_error(module: str, name: str) -> tuple[type[Exception], ...]:
+    """The exception class `module.name` if this Python has it, else nothing."""
+    try:
+        error = getattr(importlib.import_module(module), name)
+    except (ImportError, AttributeError):
+        return ()
+    return (error,)
+
+
+# What tarfile, zipfile and their decompressors raise for an archive that cannot be read
+# (empty, cut off, corrupt or of another format): zipfile raises ValueError (also its subclass
+# UnicodeDecodeError for a broken member name) for broken offsets, RuntimeError for an
+# encrypted member and its subclass NotImplementedError for a method it lacks (Deflate64);
+# zlib, lzma and, from Python 3.14, Zstandard raise their own errors, bz2 raises OSError.
+# test_extract_turns_every_corruption_into_a_fetch_error holds the class for every kind.
+_UNREADABLE_ARCHIVE: tuple[type[Exception], ...] = (
     tarfile.TarError,
     zipfile.BadZipFile,
     EOFError,
     OSError,
+    ValueError,
     zlib.error,
+    lzma.LZMAError,
     RuntimeError,
+    *_optional_error("compression.zstd", "ZstdError"),
 )
 
 
