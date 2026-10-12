@@ -172,14 +172,8 @@ def start_check_tickets(text: str) -> set[str]:
     `BLOCKED ... not merged`; every ticket ID in it must be merged before the brief can run,
     except in a sentence that names a ticket as optional ("only if merged", "where merged").
     """
-    blocks: list[list[str]] = [[]]
-    for line in text.splitlines():
-        if not line.strip() or _BLOCK_START.match(line):
-            blocks.append([])
-        blocks[-1].append(line)
     found: set[str] = set()
-    for block in blocks:
-        joined = "\n".join(block)
+    for joined in _blocks(text):
         if _START_CHECK.search(joined):
             for sentence in _SENTENCE.split(joined):
                 if not _OPTIONAL.search(sentence):
@@ -192,7 +186,8 @@ def called_optional_tickets(text: str) -> set[str]:
 
     Not covered: a sentence that names the ticket only by a path, a feature or a pronoun ("the
     registry of M1-68 when it is on the base", "if `test/canary` exists"), other verbs and word
-    orders ("unless", "is not merged yet"); review catches those.
+    orders ("unless", "is not merged yet"), and a list whose tickets stand in list items of their
+    own after the colon (each paragraph and list item is read on its own); review catches those.
     """
     found: set[str] = set()
     for block in _blocks(text):
