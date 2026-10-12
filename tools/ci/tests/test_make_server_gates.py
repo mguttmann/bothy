@@ -394,7 +394,9 @@ def test_arch_names_module_files_when_it_checks_a_copy(fakes: Fakes, shell: list
 
 def _real_go_arch_lint() -> Path:
     """The pinned go-arch-lint, as make fetches it (like the gitleaks rule tests)."""
-    sys.path.insert(0, str(REPO / "tools" / "bin"))
+    bin_dir = str(REPO / "tools" / "bin")
+    if bin_dir not in sys.path:
+        sys.path.insert(0, bin_dir)
     import fetch_tools
 
     lock = fetch_tools.load_lock(fetch_tools.DEFAULT_LOCK)

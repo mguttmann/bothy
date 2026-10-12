@@ -576,7 +576,8 @@ from section 6 needs this (subpackages of `domain`, `app` and `adapters`,
 `adapters/postgres/sqlcgen`, the test helpers `platform/<p>/<p>test` and `adapters/<module>test`,
 `api/routes` calls `api/rest`). `kernel-core` is listed under `commonComponents` and so would not
 need the entry; it keeps it for the uniform rule. In addition, `wire` may use all module,
-platform and kernel components, `cmd` only `wire`, platform and `kernel-ports`. `<m>-domain` may use only itself and `kernel-core`.
+platform and kernel components and, when the register has an `api` entry, `api`; `cmd` only
+`wire`, platform and `kernel-ports`. `<m>-domain` may use only itself and `kernel-core`.
 `kernel-ports` has no entry under `deps`, because go-arch-lint rejects an empty `mayDependOn`,
 and so may use only `kernel-core`: the kernel ports do not use each other. Section 4.5 says
 only that `kernel` depends on nothing in the project; the narrower reading applies until a
@@ -594,10 +595,13 @@ does not follow a linked directory and assigns it by the path of the link, but t
 builds the code behind it (reproduced on 2026-10-11 in M1-05 with go-arch-lint v1.19.0, ruling
 M1-05/24; `tools/ci/tests/test_make_server_gates.py` holds the rejection). Only editor lock
 files are exempt: links named `.#*` whose target does not exist; nothing can be built behind
-them. Because go-arch-lint v1.19.0 aborts at every dangling link below a component with `**`,
-`make arch` then checks a copy of the module without these names and names the files of the
-module in its messages; the Go compiler skips files whose name starts with a dot anyway
-(ruling M1-05/27).
+them. Because go-arch-lint v1.19.0 aborts at every dangling link below a component with `**`
+(reproduced on 2026-10-11 in M1-05), `make arch` then checks a copy of the module without these
+names and names the files of the module in its messages; the Go compiler skips files whose name
+starts with a dot anyway ("Directory and file names that begin with "." or "_" are ignored by
+the go tool", [go command, Package lists and
+patterns](https://pkg.go.dev/cmd/go#hdr-Package_lists_and_patterns), retrieved 2026-10-12;
+ruling M1-05/27).
 
 Checked on 2026-10-10 on a skeleton with all modules from section 4.2 (Go 1.27.2, go-arch-lint
 v1.19.0): a clean skeleton yields "No warnings found", exit code 0. Four inserted violations were

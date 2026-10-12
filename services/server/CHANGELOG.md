@@ -44,10 +44,10 @@ documented in this file. The format is based on
 - Lint rule (forbidigo): outside `cmd/bothy` no product package reads the process environment
   (`os.Getenv` and its relatives, `exec.Cmd.Environ`, `http.ProxyFromEnvironment`); tests of
   repository tools under `tools/` are exempt.
-- Lint rules (gocognit, goconst): `make lint` fails on a function above cognitive complexity 15,
-  as rule S3776 of the quality gate does, and on most string literals written three times in a
-  package; goconst skips some that rule S1192 counts, such as literals in call arguments, so only
-  the analysis finds those. `_test.go` files and the generated code that `sonar.exclusions` leaves
+- Lint rules (gocognit, goconst): `make lint` fails on a function above the gocognit
+  `min-complexity`, as rule S3776 of the quality gate does, and on most string literals repeated
+  at least the goconst `min-occurrences` in a package; goconst skips some that rule S1192 counts,
+  such as literals in call arguments, so only the analysis finds those. `_test.go` files and the generated code that `sonar.exclusions` leaves
   out are exempt.
 
 ### Security
