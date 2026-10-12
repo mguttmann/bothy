@@ -44,7 +44,8 @@ Health: `/healthz` (the process is alive) and `/readyz` (ready) only on the inte
 ```text
 cmd/bothy/            entry point, command table of the subcommands
 api/                  generated from docs/api/ (REST server, WebSocket types, route metadata)
-architecture/         modules.yaml: module register, source for go-arch-lint and checks
+architecture/         modules.yaml: module register, source for go-arch-lint and checks;
+                      config-schema.json: exported configuration schema (generated)
 migrations/           goose SQL, embedded
 internal/kernel/      cross-cutting ports
 internal/platform/    technology without domain logic
@@ -52,6 +53,7 @@ internal/wire/        wiring per role, registration of the in-tx subscribers
 internal/<module>/    one module per directory (table below)
 test/, perf/          test code across module boundaries and load tests (component testsupport)
 tools/archgen/        generator: architecture/modules.yaml -> .go-arch-lint.yml (go generate)
+tools/configschema/   generator: configuration schema -> architecture/config-schema.json (go generate)
 sqlc.yaml             one entry per module
 .go-arch-lint.yml     generated from architecture/modules.yaml, never edited by hand
 .golangci.yml         golangci-lint v2 configuration of the module

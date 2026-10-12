@@ -49,6 +49,9 @@ documented in this file. The format is based on
   at least the goconst `min-occurrences` in a package; goconst skips some that rule S1192 counts,
   such as literals in call arguments, so only the analysis finds those. `_test.go` files and the generated code that `sonar.exclusions` leaves
   out are exempt.
+- `tools/configschema`: exports the configuration schema to `architecture/config-schema.json`
+  (`go generate ./tools/configschema`, held current by `make codegen-check`), the input of the
+  configuration reference.
 
 ### Security
 

@@ -144,6 +144,10 @@ operated, and the order of the build.
   chapter 03 and the actions, event types and ops of `docs/spec/actions.yaml`, and the module
   tables of chapter 02, the server component diagram and the module READMEs must equal the
   register (ADR 0050); every difference is one finding with file and item.
+- `make config-doc-check` in `make gates` (`tools/configdoc/configdoc.py`): the configuration
+  reference against the server schema, the chapter tables, the milestone of planned keys
+  (`tools/configdoc/planned.yaml`), the names retired by W1 (`tools/configdoc/retired.yaml`) and
+  the Compose `stop_grace_period` of every service that runs `serve` (rules D1 to D10).
 
 ### Fixed
 
@@ -181,6 +185,13 @@ operated, and the order of the build.
   of `bothy config check` and `bothy config print`.
 - CodeQL analyses the Go server module (manual build of `services/server`) in the public
   phase; a test keeps the CodeQL languages in step with the tracked components.
+- Configuration reference: section 4 of `docs/operations/configuration.md` is generated from the
+  configuration schema of the server plus the chapter tables, with the new columns type and
+  status (`active` for keys this server version reads, `planned (<milestone>)` for keys of a later
+  ticket); the generator moved from `tools/docs/config_reference.py` to `tools/configdoc/`, and
+  `make docs` no longer checks the reference.
+- `docs/PLAN.md`: the W1 rows for trusted proxies and database timeouts and the acceptance test of
+  M3-06 follow the chapters.
 
 ### Security
 
