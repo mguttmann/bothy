@@ -4,8 +4,9 @@
 # pull requests that cannot read the private list. Same format as the private list:
 # one rule per line, 're:' marks a Python regular expression, matching ignores case.
 # '@exclude-path:' takes a glob of repository paths this file's rules skip.
-# Rules here never inspect commit identities (author, committer, Signed-off-by, Co-authored-by);
-# those belong to contributors and are checked against the private list only.
+# Rules here never inspect author and committer, and in a Signed-off-by or Co-authored-by line
+# of the form 'Name <local@domain>' they skip only the local part of the address: identities
+# belong to contributors and are checked against the private list.
 
 @exclude-path: tools/denylist/generic.rules
 @exclude-path: tools/denylist/tests/*

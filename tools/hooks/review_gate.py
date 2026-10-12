@@ -4,8 +4,9 @@
 Owner requirement 23 asks for a local AI review before every push. The review itself runs
 outside this tool (an independent, read-only reviewer as in docs/quality/red-team-gate.md);
 this gate checks its evidence: the file `.review/<sha>.md` for the pushed commit, whose
-last non-empty line is exactly `Urteil: JA`. The folder is git-ignored; the author pastes
-the report into the pull request description (section "Review report" of the template).
+last non-empty line is exactly `Urteil: JA`. The folder is git-ignored and the report stays
+local; the pull request names the reviewed commit and the verdict in fresh words (section
+"Review" of the template), never the raw report, because the body becomes the squash commit.
 
 The pushed commit comes from pre-commit (`PRE_COMMIT_TO_REF`, else
 `PRE_COMMIT_LOCAL_BRANCH`), else HEAD. Tag pushes need no report: a tag points to a

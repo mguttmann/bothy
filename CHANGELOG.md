@@ -197,3 +197,18 @@ operated, and the order of the build.
   scanner's use of node-forge; the alert is dismissed and the OSV exception keeps its
   expiry date (D-DEPS-2 in [DECISIONS.md](docs/DECISIONS.md), whose sources were
   retrieved on 2026-10-11).
+- Pull request title and body are deny-list scanned: they become the squash commit on
+  `main`. Both deny-list jobs of `ci.yml` read them from the event payload through the
+  environment (`PR_TITLE`, `PR_BODY`) and fail `ci-ok` on a finding, `ci.yml` runs again
+  when title or body is edited, and `make denylist` checks the planned squash message
+  locally (`PR_TITLE`, `PR_BODY` or `PR_BODY_FILE`). The review report stays local; pull
+  request bodies are written fresh, without raw reviewer output or local paths
+  (`AGENTS.md`, [push discipline](docs/quality/push-discipline.md)). CodeRabbit writes its
+  summary into the walkthrough comment instead of the body (`high_level_summary_in_walkthrough`
+  in `.coderabbit.yaml`, documented in <https://coderabbit.ai/integrations/schema.v2.json>,
+  retrieved on 2026-10-12). The `ci-ok` job starts with
+  every run and waits for the other jobs (`tools/ci/ci_ok.py`), so an older green result is
+  no longer the latest one while the run after an edit is going (the remaining gaps are
+  listed in the push discipline), and identity trailers count only as
+  `Name <local@domain>`, with everything but the local part of the address checked by the
+  generic rules (LG/1 to LG/5 in [DECISIONS.md](docs/DECISIONS.md)).

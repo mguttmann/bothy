@@ -41,7 +41,7 @@ Source of the diagram: `docs/quality/pipeline.mmd`.
 | `trivy` | Trivy `config` on a copy of the tracked and not ignored files (`tools/ci/tracked_tree.py`) | misconfiguration in Dockerfiles, Kubernetes, Helm, Terraform | `HIGH`, `CRITICAL` | once such files exist |
 | `osv` | OSV-Scanner, govulncheck | known vulnerabilities of all lock files; reachable Go vulnerabilities | | yes |
 | `licenses` | `tools/ci/license_check.py`, OSV-Scanner `--licenses`, go-licenses | license text, SPDX header lines, licenses of shipped dependencies; a list without a license is an error (if it were empty, `--licenses=` and `--allowed_licenses=` would no longer restrict the licenses: OSV-Scanner v2.6.0 then prints only a summary, [getters.go](https://github.com/google/osv-scanner/blob/v2.6.0/cmd/osv-scanner/internal/helper/getters.go#L17-L21), and go-licenses v2.0.1 rejects only forbidden and unknown licenses, [check.go](https://github.com/google/go-licenses/blob/v2.0.1/check.go#L64-L68), both retrieved 2026-10-12; M1-05/23) | `quality/licenses/allowed.txt`, `license.spdx_header_lines` | yes (dependencies from the first component) |
-| `denylist` | `tools/denylist/denylist_scan.py` | white label in contents, names, commits, identities, refs | | yes, needs the private list |
+| `denylist` | `tools/denylist/denylist_scan.py` | white label in contents, names, commits, identities, refs, and the pull request title and body (`PR_TITLE`, `PR_BODY`, `PR_BODY_FILE`) | | yes, needs the private list |
 | `sonar` | SonarScanner (npm) against the local server or SonarQube Cloud | gate "Bothy way" | `quality.sonar.*` | from the first product code |
 
 In addition, the release workflow runs: `trivy-image` (vulnerabilities in the built image), SBOM

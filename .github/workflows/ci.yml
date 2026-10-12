@@ -3,6 +3,11 @@
 # Merge gate for pull requests to main, and the gate stage of release.yml.
 # Runs exactly the make targets of `make check`: gates, denylist, sonar
 # (docs/quality/gates.md). The only required status check is "ci-ok".
+# The pull request title and body become the squash commit on main, so the deny-list jobs
+# scan them too (PR_TITLE, PR_BODY), and an edit of title or body ("edited") runs the whole
+# workflow again. ci-ok starts with every run (no `needs`), so its check run is pending from
+# the first second of the new run; what this does not cover is listed in
+# docs/quality/push-discipline.md, section "Pull request title and body".
 #
 # Runners (ADR 0039): every job runs on a GitHub-hosted runner with a fixed label;
 # tools/ci/check_runners.py enforces it on every job.
@@ -12,6 +17,7 @@ name: ci
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -142,6 +148,9 @@ jobs:
           ALLOW: ${{ secrets.BOTHY_DENYLIST_ALLOW_AUTHORS }}
           BOTHY_DENYLIST_NAMES: ${{ github.head_ref }}
           DENYLIST_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || '' }}
+          # Untrusted text: only through the environment, never into the script.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           umask 077
           dir=$(mktemp -d "$RUNNER_TEMP/denylist.XXXXXX")
@@ -169,6 +178,8 @@ jobs:
         env:
           BOTHY_DENYLIST_NAMES: ${{ github.head_ref }}
           DENYLIST_RANGE: ${{ format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: make denylist DENYLIST_FLAGS=--allow-missing
 
   sonar:
@@ -217,24 +228,23 @@ jobs:
 
   ci-ok:
     name: ci-ok
-    needs: [plan, gates, denylist, denylist-fork, sonar]
-    if: always()
+    # No `needs` on purpose: a job with `needs` gets its check run only when the others are
+    # done, so an older green ci-ok would stay the latest result of the head commit while the
+    # run after an edit of the pull request text is still going. tools/ci/ci_ok.py waits for
+    # the other jobs of this run through the API and combines their results.
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 90
+    permissions:
+      actions: read # list the jobs of this run
+      contents: read
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
       - name: All required jobs passed
         env:
-          PLAN: ${{ needs.plan.result }}
-          GATES: ${{ needs.gates.result }}
-          DENY: ${{ needs.denylist.result }}
-          DENY_FORK: ${{ needs.denylist-fork.result }}
-          SONAR: ${{ needs.sonar.result }}
-        # Explicit checks: a failing test inside an && list would not stop `bash -e`.
-        run: |
-          echo "plan=$PLAN gates=$GATES denylist=$DENY denylist-fork=$DENY_FORK sonar=$SONAR"
-          fail=0
-          if [ "$PLAN" != success ]; then fail=1; fi
-          if [ "$GATES" != success ]; then fail=1; fi
-          if [ "$DENY" != success ] && [ "$DENY_FORK" != success ]; then fail=1; fi
-          case "$SONAR" in success|skipped) ;; *) fail=1 ;; esac
-          exit "$fail"
+          GH_TOKEN: ${{ github.token }}
+        run: uv run --no-project --python 3.14 tools/ci/ci_ok.py

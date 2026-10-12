@@ -13,6 +13,9 @@ reviews:
   profile: assertive
   request_changes_workflow: false
   high_level_summary: true
+  # The summary goes into the walkthrough comment, not the body: the body becomes the
+  # squash commit on main, and every body edit runs ci.yml again (docs/quality/push-discipline.md).
+  high_level_summary_in_walkthrough: true
   poem: false
   in_progress_fortune: false
   sequence_diagrams: false

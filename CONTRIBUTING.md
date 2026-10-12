@@ -78,8 +78,9 @@ Before you push, an independent, read-only reviewer (a fresh AI review session w
 context of the work, or a second person) checks the diff of your branch against `main`
 following [docs/quality/red-team-gate.md](docs/quality/red-team-gate.md). The report goes to
 `.review/<sha>.md`, where `<sha>` is the commit you push (`git rev-parse HEAD`); the folder
-is git-ignored, so paste the report into the section "Review report" of the pull request
-description (a local file cannot be linked). Its last line is `Urteil: JA` or
+is git-ignored and the report stays local: in the section "Review" of the pull request,
+name the reviewed commit and the verdict in your own words, never the raw report (the body
+becomes the commit message on `main`). The last line of the report is `Urteil: JA` or
 `Urteil: NEIN <reason>`. The pre-push hook refuses a push without a report or with any other
 last line. If you change the commit after the review, the reviewer checks the delta and
 writes the report for the new commit. `make review` creates the folder, prints the expected
@@ -89,7 +90,10 @@ file name and, with `BOTHY_CODERABBIT=1`, also runs the CodeRabbit CLI.
 
 - One pull request per finished feature or fix. Draft pull requests are welcome for
   early feedback.
-- Fill in the template. Describe what you verified and how.
+- Fill in the template. Describe what you verified and how. Title and body become the
+  squash commit on `main`: write them fresh, without pasted tool output, local paths or
+  host names. CI scans both with the deny list and runs again when you edit them; check
+  the planned text before the push with `PR_TITLE=... PR_BODY_FILE=<file> make denylist`.
 - The required status check is `ci-ok`. Maintainers merge with squash only, so the history
   of `main` stays linear and every pull request is one commit.
 - Reviews from automated reviewers (CodeRabbit, SonarQube Cloud) are part of the review.
