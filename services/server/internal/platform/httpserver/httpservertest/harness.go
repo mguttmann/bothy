@@ -81,11 +81,16 @@ type Options struct {
 	// mounted, so a ticket can install its stage and hooks the way internal/wire does (for
 	// example ratelimit.Install, M1-19).
 	Setup func(c *httpserver.Chain)
+	// ValidateResponses checks every response of Do against the contract pruned to the operations
+	// of Routes (ResponseValidator); a finding fails the test. A request to a path or method no
+	// route serves (404, 405) is always a finding, so tests of those answers leave it off.
+	ValidateResponses bool
 }
 
 // Harness is a running chain with its observation points.
 type Harness struct {
 	t      testing.TB
+	rv     *ResponseValidator
 	Chain  *httpserver.Chain
 	Server *httptest.Server
 	Reader *sdkmetric.ManualReader
@@ -159,6 +164,11 @@ func New(t testing.TB, opts Options) *Harness {
 	}
 	srv := httptest.NewServer(chain.Public(mux))
 	h := &Harness{t: t, Chain: chain, Server: srv, Reader: reader, Logs: logs}
+	if opts.ValidateResponses {
+		if h.rv, err = SharedResponseValidator(contract, idList); err != nil {
+			t.Fatalf("httpservertest: response validator: %v", err)
+		}
+	}
 	t.Cleanup(func() {
 		srv.Close()
 		if !opts.AllowNullRepair && logs.Has(httpserver.LogNullRepaired) {
@@ -220,7 +230,13 @@ func (h *Harness) Do(req *http.Request) *Response {
 	if err != nil {
 		h.t.Fatalf("httpservertest: body: %v", err)
 	}
-	return &Response{Response: resp, Body: body}
+	out := &Response{Response: resp, Body: body}
+	if h.rv != nil {
+		if err := h.rv.Validate(req, out); err != nil {
+			h.t.Errorf("httpservertest: %s %s answered %d against the contract: %v\n%s", req.Method, req.URL.Path, resp.StatusCode, err, body)
+		}
+	}
+	return out
 }
 
 // Counter returns the sum of the int64 counter name over the points whose attributes contain

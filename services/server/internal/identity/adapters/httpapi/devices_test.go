@@ -105,7 +105,7 @@ func newEnv(t *testing.T, cfg app.Config) *env {
 		t.Fatal(err)
 	}
 	e := &env{t: t, owner: db.Pool(t, pg.RoleOwner), devs: devs, auth: tokenAuth{}}
-	built, err := routes.Build(httpapi.NewDevices(devs), wire.RouteOptions(), routes.SpecCatalog())
+	built, err := routes.Build(server{Devices: httpapi.NewDevices(devs)}, wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)
 	}

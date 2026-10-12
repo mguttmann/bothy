@@ -11,6 +11,42 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getActiveOwner = `-- name: GetActiveOwner :one
+SELECT o.id, o.user_id, o.granted_by, o.granted_at, o.revoked_at, o.revoked_by, o.reason, p.id, p.kind, p.status, p.handle, p.display_name, p.avatar_file_id, p.created_at, p.disabled_at, p.deleted_at
+FROM owners o
+JOIN principals p ON p.id = o.user_id
+WHERE o.user_id = $1 AND o.revoked_at IS NULL
+`
+
+type GetActiveOwnerRow struct {
+	Owner     Owner
+	Principal Principal
+}
+
+func (q *Queries) GetActiveOwner(ctx context.Context, userID pgtype.UUID) (GetActiveOwnerRow, error) {
+	row := q.db.QueryRow(ctx, getActiveOwner, userID)
+	var i GetActiveOwnerRow
+	err := row.Scan(
+		&i.Owner.ID,
+		&i.Owner.UserID,
+		&i.Owner.GrantedBy,
+		&i.Owner.GrantedAt,
+		&i.Owner.RevokedAt,
+		&i.Owner.RevokedBy,
+		&i.Owner.Reason,
+		&i.Principal.ID,
+		&i.Principal.Kind,
+		&i.Principal.Status,
+		&i.Principal.Handle,
+		&i.Principal.DisplayName,
+		&i.Principal.AvatarFileID,
+		&i.Principal.CreatedAt,
+		&i.Principal.DisabledAt,
+		&i.Principal.DeletedAt,
+	)
+	return i, err
+}
+
 const insertOwner = `-- name: InsertOwner :one
 
 INSERT INTO owners (id, user_id, granted_by, reason)
@@ -115,4 +151,52 @@ func (q *Queries) ListActiveOwners(ctx context.Context) ([]ListActiveOwnersRow, 
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockActiveOwners = `-- name: LockActiveOwners :many
+SELECT id, user_id FROM owners WHERE revoked_at IS NULL ORDER BY id FOR UPDATE
+`
+
+type LockActiveOwnersRow struct {
+	ID     pgtype.UUID
+	UserID pgtype.UUID
+}
+
+// The active owners rows, locked in ascending id (03 "Sperrreihenfolge", M1-31).
+func (q *Queries) LockActiveOwners(ctx context.Context) ([]LockActiveOwnersRow, error) {
+	rows, err := q.db.Query(ctx, lockActiveOwners)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LockActiveOwnersRow
+	for rows.Next() {
+		var i LockActiveOwnersRow
+		if err := rows.Scan(&i.ID, &i.UserID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const revokeOwner = `-- name: RevokeOwner :execrows
+UPDATE owners SET revoked_at = now(), revoked_by = $1
+WHERE user_id = $2 AND revoked_at IS NULL
+`
+
+type RevokeOwnerParams struct {
+	RevokedBy pgtype.UUID
+	UserID    pgtype.UUID
+}
+
+func (q *Queries) RevokeOwner(ctx context.Context, arg RevokeOwnerParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeOwner, arg.RevokedBy, arg.UserID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

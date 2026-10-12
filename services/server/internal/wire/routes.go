@@ -43,6 +43,9 @@ type Mux interface {
 type Handlers struct {
 	// Devices implements listMyDevices, listUserDevices and getDevice (identity, M1-33).
 	*identityhttp.Devices
+	// People implements listUsers, createUser, getUser, updateUser, enableUser, listOwners,
+	// addOwner, revokeOwner, getMe and updateMyProfile (identity, M1-31).
+	*identityhttp.People
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

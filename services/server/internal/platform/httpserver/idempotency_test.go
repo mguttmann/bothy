@@ -90,9 +90,12 @@ type memUoW struct {
 	store       *memStore
 	failCommits int
 	attempts    int
+	// late records whether the last Do allowed a late rights change.
+	late bool
 }
 
-func (u *memUoW) Do(ctx context.Context, fn func(ctx context.Context) error, _ ...txn.Option) error {
+func (u *memUoW) Do(ctx context.Context, fn func(ctx context.Context) error, opts ...txn.Option) error {
+	u.late = txn.ApplyOptions(opts...).LateRightsChange
 	for {
 		u.attempts++
 		tx := &memTx{writes: map[memKey]idempotency.Entry{}}
@@ -364,5 +367,20 @@ func TestUnprovenSuccess_RollsBack(t *testing.T) {
 	}
 	if runs != 2 || e.store.count() != 0 {
 		t.Errorf("runs %d, rows %d; want nothing stored and the handler run again", runs, e.store.count())
+	}
+}
+
+// TestStage_AllowsLateRightsChange: the stage opens its unit with txn.AllowLateRightsChange, so a
+// keyed use case may declare its rights change in its nested unit (docs/DECISIONS.md M1-31).
+func TestStage_AllowsLateRightsChange(t *testing.T) {
+	t.Parallel()
+	e := newStageEnv(t, nil, httpservertest.Route{Op: createItem(), Handler: httpservertest.Authorized("item.create", func(w http.ResponseWriter, _ *http.Request) {
+		httpservertest.JSON(w, http.StatusCreated, map[string]any{"ok": true})
+	})})
+	if r := e.post("/api/v1/groups/"+ids.New().String()+"/items", ids.New().String(), `{}`); r.StatusCode != http.StatusCreated {
+		t.Fatalf("status %d", r.StatusCode)
+	}
+	if !e.uow.late {
+		t.Fatal("the stage's unit of work does not allow a late rights change")
 	}
 }

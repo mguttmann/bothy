@@ -111,14 +111,7 @@ func (r *Repository) User(ctx context.Context, id ids.ID) (app.UserRecord, bool,
 	if err != nil {
 		return app.UserRecord{}, false, mapError(err, "reading a person")
 	}
-	u := domain.User{
-		Principal:    toPrincipal(row.Principal),
-		Email:        row.User.Email.String,
-		Locale:       row.User.Locale,
-		TimeZone:     row.User.TimeZone,
-		LastActiveAt: timeOf(row.User.LastActiveAt),
-	}
-	return app.UserRecord{User: u, IsOwner: row.IsOwner}, true, nil
+	return userRecord(row.Principal, row.User, row.IsOwner), true, nil
 }
 
 // ActiveOwners implements app.Store.
@@ -129,18 +122,7 @@ func (r *Repository) ActiveOwners(ctx context.Context) ([]app.OwnerRecord, error
 	}
 	out := make([]app.OwnerRecord, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, app.OwnerRecord{
-			Owner: domain.Owner{
-				ID:        idOf(row.Owner.ID),
-				UserID:    idOf(row.Owner.UserID),
-				GrantedBy: idOf(row.Owner.GrantedBy),
-				GrantedAt: timeOf(row.Owner.GrantedAt),
-				Reason:    row.Owner.Reason,
-				RevokedAt: timeOf(row.Owner.RevokedAt),
-				RevokedBy: idOf(row.Owner.RevokedBy),
-			},
-			User: toPrincipal(row.Principal),
-		})
+		out = append(out, app.OwnerRecord{Owner: toOwner(row.Owner), User: toPrincipal(row.Principal)})
 	}
 	return out, nil
 }

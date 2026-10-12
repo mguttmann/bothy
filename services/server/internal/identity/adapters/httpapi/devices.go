@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package httpapi holds the REST handlers of the identity module (adapters/httpapi, 02 "5.
-// Schichten im Modul"): the operations listMyDevices, listUserDevices and getDevice of the
-// generated strict server, the cursor codec adapter and ExpectedHTU, the htu every DPoP check of
+// Schichten im Modul"): the operations listMyDevices, listUserDevices and getDevice (M1-33), the
+// people, owner and self operations (People, M1-31) of the generated strict server, the cursor codec adapter and ExpectedHTU, the htu every DPoP check of
 // a REST request expects (M1-34 and the login handlers use it).
 //
 // Example:

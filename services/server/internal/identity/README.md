@@ -1,6 +1,6 @@
 # Modul `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); sessions, logins and tokens follow with the tickets of the etappe.
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, logins and tokens follow with the tickets of the etappe.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -71,6 +71,64 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
   (`TestRegister_Validation`), `TestDPoP_NonceAcrossVerifiers`, `TestDPoP_ReplayConcurrent`,
   the HTTP tests of the three operations and the fuzz targets `FuzzParseJWK`,
   `FuzzParseCompactJWS`, `FuzzVerifyDPoPProof`. Rulings: docs/DECISIONS.md M1-33.
+
+### People, owners and own profile (M1-31)
+
+- Port (`people.go`): `People` (`ListUsers`, `GetUser`, `CreateUser`, `UpdateUser`, `EnableUser`,
+  `GetMe`, `UpdateMyProfile`) and `Owners` (`ListOwners`, `AddOwner`, `RevokeOwner`) with the DTOs
+  `ListUsersQuery`, `UserPage`, `CreateUserCmd`, `UpdateUserCmd`, `ProfileCmd`, `Me`; `Register`
+  declares the durable event `user.updated`. `Directory` stays the actor-free read port for other
+  modules.
+- Operations (`adapters/httpapi/people.go`, mapping only):
+
+  | Operation | Action and resource | Rights change | Event | Audit details |
+  |---|---|---|---|---|
+  | `listUsers` | `user.read`, kind `user` owned by the caller | no | none | none |
+  | `createUser` | `user.create` on the instance | no | `user.updated` | `{}` |
+  | `getUser` | `user.read` on the person | no | none | none |
+  | `updateUser` | `user.update` on the person | no | `user.updated` | `{changed_fields}` |
+  | `enableUser` | `user.enable` on the person | yes | `user.updated` | `{from_status, reason}` |
+  | `listOwners` | `user.read`, kind `user` owned by the caller | no | none | none |
+  | `addOwner` | `owner.add` on the person | yes | `user.updated` | `{reason}` |
+  | `revokeOwner` | `owner.remove` on the person | yes | `user.updated` | `{reason}` |
+  | `getMe` | `self.read` on the caller's principal | no | none | none |
+  | `updateMyProfile` | `self.profile.update` on the caller | no | `user.updated` | none |
+
+- Rules (`app/people.go`, `app/owners.go`, `app/me.go`, `app/usecases.go`): no self
+  registration; handles `^[a-z0-9][a-z0-9._-]*$` up to `principal.handle_max_chars`, display
+  names without control or bidi characters, e-mail one plain address, locale a BCP 47 tag of at
+  most 35 characters stored in canonical form (port `Locales`, adapter `adapters/locale` over
+  `golang.org/x/text/language`), time zone one of the IANA names of the toolchain's tzdata
+  (`domain/zones.gen.go`, written by `tools/zonegen`; never `Local` or `Factory`, the same on every
+  host), loaded with `time/tzdata` embedded; duplicates of handle or
+  e-mail are `409 conflict`; `local_account: true` is `400` (`/local_account`, `not_enabled`)
+  until M1-37. `enableUser` moves `pending` and `disabled` to `active` (clears `disabled_at`,
+  restores no device or session), an active person is a call without effect (`200`, audit
+  `no_change`, no event, no rights version), `deleted` is `409 invalid_state_transition`.
+  `addOwner` needs an active person that is no owner (`409 conflict`), `revokeOwner` an active
+  owners row (`404`). Every use case calls `authorize` before it answers a missing person or owner
+  role with `404` (`checkThenFound`); the device reads `getDevice` and `listUserDevices` do the
+  same inline. An anonymous caller, a person without owner role and a pending device (for the
+  people operations) therefore get the same answer for existing and unknown ids; a pending device
+  still gets `403 device_pending` for another device of its own person but `404` for an unknown
+  device (M1-28/3). Owner changes and `enableUser` authorize once per request in a first unit
+  and write in a second unit declared as the rights change, which locks the person (the owner
+  changes also the active owners rows in ascending id); the authz hook then answers `409 i1_violation` (with `conflicts`)
+  and `409 last_owner`. `getMe` pins the rights version it reports, reports e-mail, locale and
+  time zone for people only and `step_up_valid_until` only while the step-up holds; it works from
+  a pending device. `listUsers` pages by `(lower(handle), id)` with a cursor bound to caller, `q`
+  and `status`; `q` is a literal case-insensitive prefix of handle or display name, valid UTF-8
+  without control or bidi characters (`400`, `#query/q`). The schema
+  `User` has no e-mail member, so other people's addresses never leave the server.
+- Event `user.updated`: resource `user` without version, empty scope, actor of the request,
+  payload `{user: User}` with the state after the change, receive action `user.read`.
+- `adapters/postgres`: `queries/people.sql` and the owner queries of `queries/owners.sql`
+  (`LockActiveOwners`, `GetActiveOwner`, `RevokeOwner`).
+- Tests: the HTTP tests of `adapters/httpapi` (`people_test.go`, `people2_test.go`) run the ten
+  operations through the full chain with the Idempotency-Key stage, PostgreSQL 18, the rights
+  hooks, sync and audit, the test authenticator `httpservertest.Actors` and the fakes of
+  credentials, structure and agent policy; every response is validated against
+  `docs/api/openapi.yaml` (`httpservertest.ResponseValidator`). Rulings: docs/DECISIONS.md M1-31.
 
 ## Port (Wurzelpaket `internal/identity`)
 

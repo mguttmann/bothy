@@ -713,6 +713,12 @@ die Wartezeit vervielfachen.
   gleichzeitige Wiederholung wartet am Primärschlüssel, bis die erste Transaktion endet, und liest
   dann die gespeicherte Antwort. Endet die Wartezeit mit `database.lock_timeout`, antwortet der
   Server `409 request_in_progress` (04, 5.2) und speichert nichts.
+- Rights changes behind the stage (M1-31): the stage opens its unit with
+  `txn.AllowLateRightsChange()`. The use case declares its rights change in its nested unit as
+  everywhere else; that nested unit then runs the rights begin hook (phase 1), its work and the
+  rights check (phase 3.1) inside the stage's transaction, and sync and audit run once at the end.
+  The stage has written only its key row by then, so `permission_version` is still the first
+  domain lock (section "Sperrreihenfolge"); a second rights change in the same unit is refused.
 - Grund: Schlüssel und Wirkung entstehen in einer Transaktion. Ein Absturz dazwischen hinterlässt
   keinen Schlüssel ohne Wirkung und keine Wirkung ohne Schlüssel.
 

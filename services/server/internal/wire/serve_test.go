@@ -36,7 +36,14 @@ import (
 // TestMain runs the tests of the package with a PostgreSQL container for the serve tests (plan
 // P-09: without a Docker-compatible runtime the binary fails, it never skips). The templates run
 // the steps of bothy migrate up, so every database has its instance row.
-func TestMain(m *testing.M) { os.Exit(pgtest.Main(m, pgtest.WithSteps(wire.MigrationSteps))) }
+// TestMain builds the request validator first, so no readiness wait of a test pays for it
+// (docs/DECISIONS.md M1-31/18).
+func TestMain(m *testing.M) {
+	if err := wire.WarmEnabledValidator(); err != nil {
+		panic(err)
+	}
+	os.Exit(pgtest.Main(m, pgtest.WithSteps(wire.MigrationSteps)))
+}
 
 // newServeDB returns a database as bothy migrate up leaves it: the goose schema of pgtest and
 // River's tables in the default jobs.schema.

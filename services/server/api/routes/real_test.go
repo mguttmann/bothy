@@ -29,21 +29,74 @@ func (stubServer) ListUserDevices(context.Context, rest.ListUserDevicesRequestOb
 	return nil, nil
 }
 
-// TestRealTable_Enabled pins the enabled operations (P-04): since M1-33 the three device reads.
-// A handler ticket that enables an operation changes this test together with api/operations.yaml.
+func (stubServer) AddOwner(context.Context, rest.AddOwnerRequestObject) (rest.AddOwnerResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateUser(context.Context, rest.CreateUserRequestObject) (rest.CreateUserResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) EnableUser(context.Context, rest.EnableUserRequestObject) (rest.EnableUserResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetMe(context.Context, rest.GetMeRequestObject) (rest.GetMeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetUser(context.Context, rest.GetUserRequestObject) (rest.GetUserResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListOwners(context.Context, rest.ListOwnersRequestObject) (rest.ListOwnersResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ListUsers(context.Context, rest.ListUsersRequestObject) (rest.ListUsersResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RevokeOwner(context.Context, rest.RevokeOwnerRequestObject) (rest.RevokeOwnerResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateMyProfile(context.Context, rest.UpdateMyProfileRequestObject) (rest.UpdateMyProfileResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateUser(context.Context, rest.UpdateUserRequestObject) (rest.UpdateUserResponseObject, error) {
+	return nil, nil
+}
+
+// TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
+// (AZ-P1): the three device reads of M1-33 and the ten people, owner and self operations of
+// M1-31. A handler ticket that enables an operation changes this test together with
+// api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
-	want := map[string]string{
-		"getDevice":       "GET /api/v1/devices/{device_id}",
-		"listMyDevices":   "GET /api/v1/me/devices",
-		"listUserDevices": "GET /api/v1/users/{user_id}/devices",
+	type entry struct{ pattern, action, class string }
+	want := map[string]entry{
+		"getDevice":       {"GET /api/v1/devices/{device_id}", "device.list", "rl.read"},
+		"listMyDevices":   {"GET /api/v1/me/devices", "device.list", "rl.read"},
+		"listUserDevices": {"GET /api/v1/users/{user_id}/devices", "device.list", "rl.read"},
+		"listUsers":       {"GET /api/v1/users", "user.read", "rl.read"},
+		"createUser":      {"POST /api/v1/users", "user.create", "rl.admin"},
+		"getUser":         {"GET /api/v1/users/{user_id}", "user.read", "rl.read"},
+		"updateUser":      {"PATCH /api/v1/users/{user_id}", "user.update", "rl.admin"},
+		"enableUser":      {"POST /api/v1/users/{user_id}/enable", "user.enable", "rl.admin"},
+		"listOwners":      {"GET /api/v1/owners", "user.read", "rl.read"},
+		"addOwner":        {"POST /api/v1/owners", "owner.add", "rl.admin"},
+		"revokeOwner":     {"POST /api/v1/owners/{user_id}/revoke", "owner.remove", "rl.admin"},
+		"getMe":           {"GET /api/v1/me", "self.read", "rl.read"},
+		"updateMyProfile": {"PATCH /api/v1/me/profile", "self.profile.update", "rl.write"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
 		t.Fatalf("Enabled() = %d operations, want %d", len(ops), len(want))
 	}
 	for _, op := range ops {
-		if want[op.ID] != op.Pattern || op.Action != "device.list" || op.RateLimitClass != "rl.read" {
-			t.Errorf("operation %+v", op)
+		if w := want[op.ID]; w.pattern != op.Pattern || op.Action != w.action || op.RateLimitClass != w.class {
+			t.Errorf("operation %+v, want %+v", op, w)
 		}
 		if got, ok := routes.ByPattern(op.Pattern); !ok || got.ID != op.ID {
 			t.Errorf("ByPattern(%s) = %+v, %v", op.Pattern, got, ok)
@@ -54,7 +107,7 @@ func TestRealTable_Enabled(t *testing.T) {
 		t.Fatalf("Build = %d routes, %v", len(got), err)
 	}
 	if err := routes.Verify(nil, routes.SpecCatalog()); err == nil {
-		t.Error("Verify(nothing) passed although three operations are enabled")
+		t.Error("Verify(nothing) passed although operations are enabled")
 	}
 	if err := routes.Verify([]string{"GET /api/v1/discovery"}, routes.SpecCatalog()); err == nil {
 		t.Error("Verify accepted a pattern of no enabled operation")

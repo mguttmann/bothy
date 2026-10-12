@@ -69,7 +69,9 @@ otherwise the header has no effect. A key that is not one UUIDv7 is `400 validat
    read deadline is lifted. `Fingerprint` is SHA-256 over the upper-case method, `\n`, the
    escaped path, `\n` and the RFC 8785 form of the body (`platform/jsoncanon`), the raw bytes
    when the body is not JSON or repeats a member, empty without a body.
-2. The rest of the chain runs inside one unit of work; the use case joins it. `Store.Claim`
+2. The rest of the chain runs inside one unit of work, opened with `txn.AllowLateRightsChange()`
+   so a keyed use case that changes rights declares its change in its nested unit (M1-31,
+   resolves docs/DECISIONS.md M1-20/4); the use case joins it. `Store.Claim`
    claims the key; a committed row answers from the store without the handler, the validator or
    the proof: the stored status and body with `Idempotent-Replay: true`, `ETag` from `version`
    for the statuses in `Operation.ETagStatuses` (`ReplayETag`), `422 idempotency_key_reuse` for

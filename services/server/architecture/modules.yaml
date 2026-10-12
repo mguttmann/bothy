@@ -96,7 +96,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [instance, authz]
-    adapter_vendors: [pgx]   # sqlc code and the repository (M1-26)
+    adapter_vendors: [pgx, xtext]   # sqlc code and the repository (M1-26); adapters/locale parses BCP 47 tags (M1-31)
   chat:
     tables: [spaces, user_space_states, channels, channel_skill_bindings, project_bindings,
              dm_participants, forum_tags, threads, thread_tags]
@@ -257,6 +257,8 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   otelslog: [go.opentelemetry.io/contrib/bridges/otelslog]
   yaml: [go.yaml.in/yaml/v3]
   jcs: [github.com/gowebpki/jcs]
+  # BCP 47 language tags of users.locale (identity adapters/locale, M1-31).
+  xtext: [golang.org/x/text/language]
   libopenapi: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator,
                github.com/pb33f/libopenapi-validator/**]
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]

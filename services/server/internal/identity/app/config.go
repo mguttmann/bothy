@@ -28,4 +28,7 @@ type Config struct {
 	PageSizeDefault int `config:"api.page_size_default"`
 	// PageSizeMax is api.page_size_max; larger limits are capped.
 	PageSizeMax int `config:"api.page_size_max"`
+	// StepUpMaxAge is auth.step_up_max_age, how long a step-up confirmation holds; getMe
+	// reports its end (M1-31).
+	StepUpMaxAge time.Duration `config:"auth.step_up_max_age"`
 }

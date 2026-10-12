@@ -10,11 +10,16 @@ import (
 	"strings"
 
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/locale"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/replay"
 	"github.com/OWNER/bothy/services/server/internal/identity/app"
+	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
+	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
@@ -57,10 +62,15 @@ func TokenPepper(ctx context.Context, sp *secrets.Provider, ref string) ([]byte,
 }
 
 // Identity is the identity module of the process (M1-33): the device use cases, the DPoP verifier
-// with its jti store and the REST handlers of the device operations.
+// with its jti store, the people and owner use cases (M1-31) and the REST handlers of their
+// operations.
 type Identity struct {
 	// Devices is the port identity.Devices.
 	Devices *app.Devices
+	// People implements the ports identity.People and identity.Owners (M1-31).
+	People *app.People
+	// PeopleHandlers are the REST handlers of the ten people, owner and self operations.
+	PeopleHandlers *identityhttp.People
 	// DPoP is the port identity.DPoP; M1-34 hands it to the Authenticator.
 	DPoP *app.DPoPVerifier
 	// Replay is the jti store of DPoP; Start sweeps it.
@@ -70,10 +80,20 @@ type Identity struct {
 	cfg      app.Config
 }
 
+// IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
+// recorder of audit and the appender of sync.
+type IdentityWrites struct {
+	// Audit records the allow entries.
+	Audit auditing.Recorder
+	// Events appends user.updated.
+	Events eventlog.Appender
+}
+
 // NewIdentity builds the identity module over pool with the unit of work uow, the Authorizer az,
-// the token pepper (raw bytes), the clock (nil means clock.System()) and log. It opens no
-// connection and starts nothing. Errors: a window or page size outside its range, an empty pepper.
-func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, pepper []byte,
+// the recorder and appender of w, the token pepper (raw bytes), the clock (nil means
+// clock.System()) and log. It opens no connection and starts nothing. Errors: a window, limit or
+// page size outside its range, an empty pepper, a missing recorder or appender.
+func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, w IdentityWrites, pepper []byte,
 	clk clock.Clock, log *slog.Logger) (*Identity, error) {
 	if clk == nil {
 		clk = clock.System()
@@ -90,7 +110,17 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if err != nil {
 		return nil, err
 	}
-	return &Identity{Devices: devices, DPoP: verifier, Replay: store, Handlers: identityhttp.NewDevices(devices), cfg: cfg}, nil
+	people, err := app.NewPeople(cfg, app.PeopleDeps{
+		Store: repo, UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events, Cursors: identityhttp.Cursors{},
+		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Locales: locale.Parser{}, Clock: clk,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &Identity{
+		Devices: devices, People: people, PeopleHandlers: identityhttp.NewPeople(people, people), DPoP: verifier, Replay: store,
+		Handlers: identityhttp.NewDevices(devices), cfg: cfg,
+	}, nil
 }
 
 // Start runs the sweeper of the jti store every auth.dpop_proof_max_age (the length of the replay

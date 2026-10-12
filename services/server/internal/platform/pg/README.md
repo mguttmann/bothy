@@ -95,7 +95,11 @@ Nesting: `Do` inside a unit joins the ambient transaction and runs its function 
 phase; it never commits, rolls back or retries, and its error goes to the outer `Do`. A nested
 `txn.RightsChange` is an internal error unless the outermost unit declared `RightsChange` with
 all its principals, because the rights begin hook must lock `permission_version` before any
-domain row (03 "Sperrreihenfolge" item 1).
+domain row (03 "Sperrreihenfolge" item 1). One exception (M1-31): an outermost unit opened with
+`txn.AllowLateRightsChange()` (only the Idempotency-Key stage, which has written nothing but its
+key row) becomes a rights change through its first nested `Do` that declares one; that `Do` runs
+the rights begin hook, its function and the rights check hook in this order, and sync and audit
+run at the end of the outer unit. A second rights change in the same unit is an internal error.
 
 Repositories write through `Tx(ctx)` (internal error outside a unit) or run statements on
 `Querier(ctx, pool)`: the ambient transaction inside a unit, the pool outside. The pool methods

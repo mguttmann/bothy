@@ -571,8 +571,9 @@ func (s *server) startAuthz(context.Context) error {
 	return nil
 }
 
-// startIdentity is start step 6d (M1-33): the identity module over the pool, the unit of work of
-// the audit step and the Authorizer of step 6c, with the token pepper resolved once.
+// startIdentity is start step 6d (M1-33): the identity module over the pool, the unit of work and
+// the recorder of the audit step, the appender of the sync step (M1-31) and the Authorizer of
+// step 6c, with the token pepper resolved once.
 func (s *server) startIdentity(ctx context.Context) error {
 	cfg, err := IdentityConfig(s.values)
 	if err != nil {
@@ -583,12 +584,12 @@ func (s *server) startIdentity(ctx context.Context) error {
 		return err
 	}
 	s.mu.Lock()
-	pool, a, az := s.pool, s.audit, s.authorizer
+	pool, a, az, sy := s.pool, s.audit, s.authorizer, s.sync
 	s.mu.Unlock()
-	if a == nil || az == nil {
-		return errors.New("wire: the identity step needs the unit of work of audit and the Authorizer")
+	if a == nil || az == nil || sy == nil {
+		return errors.New("wire: the identity step needs the unit of work and recorder of audit, the appender of sync and the Authorizer")
 	}
-	id, err := NewIdentity(cfg, pool, a.UoW(), az, pepper, s.deps.Clock, s.logger())
+	id, err := NewIdentity(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, pepper, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}
@@ -607,6 +608,9 @@ func (s *server) handlers() Handlers {
 	defer s.mu.Unlock()
 	if h.Devices == nil && s.identity != nil {
 		h.Devices = s.identity.Handlers
+	}
+	if h.People == nil && s.identity != nil {
+		h.People = s.identity.PeopleHandlers
 	}
 	return h
 }
