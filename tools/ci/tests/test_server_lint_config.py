@@ -24,7 +24,6 @@ LINTERS = ("gocognit", "goconst")
 # Entries that name generated code and can hold Go files of the module.
 GENERATED_GO = {
     "**/generated/**",
-    "**/gen/**",
     "**/*.gen.go",
     "**/*_gen.go",
     "**/*.pb.go",
@@ -41,11 +40,8 @@ OTHER = {
     "**/testdata/**",
 }
 # Files whose path looks like generated code. Each one that a lint rule exempts must be one that
-# sonar.exclusions leaves out too: dropping an entry there (**/gen/**) must narrow the rule.
+# sonar.exclusions leaves out too: dropping an entry there must narrow the rule.
 LOOKALIKE = [
-    "gen/x.go",
-    "internal/gen/x.go",
-    "api/routes/gen/x.go",
     "generated/x.go",
     "internal/p/generated/q/x.go",
     "internal/p/sqlcgen/x.go",
@@ -53,10 +49,17 @@ LOOKALIKE = [
     "internal/p/x_gen.go",
     "internal/p/x.pb.go",
 ]
-# Product code whose path only resembles generated code; the exemption must not reach it.
+# Product code whose path only resembles generated code; the exemption must not reach it. A
+# directory named gen holds hand-written code, such as the route generator in api/routes/gen
+# (docs/DECISIONS.md M1-17/15 and M1-17/31).
 PRODUCT = [
+    "gen/x.go",
+    "internal/gen/x.go",
+    "api/routes/gen/x.go",
     "internal/generator/x.go",
     "internal/agen/x.go",
+    "internal/regenerated/x.go",
+    "internal/p/mysqlcgen/x.go",
     "internal/chat/gen.go",
     "internal/chat/generated.go",
     "internal/chat/app/x.go",

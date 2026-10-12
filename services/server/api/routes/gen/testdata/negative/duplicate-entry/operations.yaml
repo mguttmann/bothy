@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Negative fixture: getThing is enabled twice.
+version: 1
+enabled:
+  - createThing
+  - getThing
+  - getThing
+  - updateThing
+later: []

@@ -196,7 +196,8 @@ test: ## All tests with coverage data
 coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	cd tools && uv run --locked --quiet coverage report >/dev/null && echo "  tools coverage: ok (fail_under in tools/pyproject.toml)"
 	@# Production code only: packages under <module>/test/ and <module>/perf/ are test code
-	@# (docs/spec/02-architecture.md "Code layout"). The total comes from a filtered copy;
+	@# (docs/spec/02-architecture.md "Code layout"), and generated files (*.gen.go, docs/DECISIONS.md
+	@# M1-05/7 and M1-17) are not hand-written code. The total comes from a filtered copy;
 	@# coverage.out stays as go test wrote it, so SonarQube reads the same file in
 	@# `make check` and in the CI job that runs `make sonar` alone.
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-coverage,no Go module selected); \
@@ -204,7 +205,7 @@ coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	  mod=$$(awk '$$1 == "module" { gsub(/"/, "", $$2); print $$2; exit }' $$m/go.mod); \
 	  [ -n "$$mod" ] || { echo "coverage: no module path in $$m/go.mod" >&2; exit 1; }; \
 	  f=$$(mktemp "$${TMPDIR:-/tmp}/bothy-coverage.XXXXXX") || exit 1; \
-	  awk -v p="$$mod/" 'NR == 1 || (index($$0, p "test/") != 1 && index($$0, p "perf/") != 1)' \
+	  awk -v p="$$mod/" 'NR == 1 || (index($$0, p "test/") != 1 && index($$0, p "perf/") != 1 && index($$0, ".gen.go:") == 0)' \
 	    $$m/coverage.out > "$$f" || { rm -f "$$f"; exit 1; }; \
 	  out=$$(cd $$m && go tool cover -func="$$f") || { rm -f "$$f"; exit 1; }; rm -f "$$f"; \
 	  total=$$(printf '%s\n' "$$out" | awk '/^total:/ {sub("%","",$$3); print $$3}'); \

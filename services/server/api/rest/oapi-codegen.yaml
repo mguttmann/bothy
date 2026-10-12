@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# oapi-codegen configuration of the REST layer (docs/spec/06-api.md "Code generation", ADR 0013).
+# The generator api/routes/gen runs the oapi-codegen pinned in go.mod with this file on a copy of
+# docs/api/openapi.yaml that holds only the enabled operations. oapi-codegen runs in a temporary
+# directory and writes the file named by `output` there (a bare file name); the generator copies
+# it to rest.gen.go of the target package. skip-prune keeps every schema, also those no enabled
+# operation references (events, gateway frames). embedded-spec stays off: it would pull in a
+# second OpenAPI library.
+package: rest
+generate:
+  std-http-server: true
+  strict-server: true
+  models: true
+output: rest.gen.go
+output-options:
+  skip-prune: true

@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Negative fixture: enabled is not sorted (createThing after getThing).
+version: 1
+enabled:
+  - getThing
+  - createThing
+  - updateThing
+later: []

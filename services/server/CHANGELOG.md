@@ -70,6 +70,23 @@ documented in this file. The format is based on
 - Configuration keys `secrets.dir` (an absolute clean path other than `/`, without `<`) and
   `secrets.cache_ttl` (at least `1s`); the placeholder `<secrets.dir>` is expanded in configured
   `*_ref` values as well, and `file:` references must be clean absolute paths.
+- Generated REST layer (`api/`, ADR 0013): `api/rest` holds the oapi-codegen v2.8.0 models of every
+  schema of `docs/api/openapi.yaml` (also events and gateway frames) and the std-http and strict
+  server of the operations enabled in the enable list `api/operations.yaml`; the list enables none
+  yet and names every other operation with its milestone (P-04).
+- `api/routes`: route table with authorization action, rate-limit class and request metadata per
+  enabled operation, the generated action catalogue, and `Build`, which registers the generated
+  server on a recorder and verifies every pattern, action and class before anything is mounted
+  (AZ-P1). The generator `api/routes/gen` validates spec, catalogue and enable list and names every
+  problem, and derives checks and metadata from the document the oapi-codegen loader reads; a
+  fixture with three operations runs through the same pipeline.
+- `internal/wire`: `MountRoutes`, start step 7 of the roles `api` and `all`, which builds the
+  routes from the composite of module handlers; a failed route check logs `route check failed`,
+  mounts nothing and returns the error, on which `bothy serve` (M1-11) is to exit before ready.
+
+### Changed
+
+- Go coverage of the module leaves generated files (`*.gen.go`) out of the total.
 
 ### Security
 

@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Negative fixture: the ticket of updateThing belongs to M3, its milestone is M2.
+version: 1
+enabled:
+  - createThing
+  - getThing
+later:
+  - operation_id: updateThing
+    milestone: M2
+    ticket: M3-01

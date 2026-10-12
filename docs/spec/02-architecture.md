@@ -427,7 +427,7 @@ build, so that the architecture gate assigns them to a component: `internal/plat
 test (`go list -deps ./cmd/bothy`) keeps them out of the binary. `test/**` and `perf/**` form the
 component `testsupport` (7.1): it may use everything, no production component may use it,
 and the coverage per Go module (`quality.coverage.go_min_percent`, 23) does not count it, because it
-is test code itself. Functional subareas of a module
+is test code itself; nor do generated files (`*.gen.go`). Functional subareas of a module
 (OIDC, flags, console) are files or subpackages of `domain`, `app` and `adapters`, never
 separate packages next to them; a package without a component fails in the gate (7.1).
 
