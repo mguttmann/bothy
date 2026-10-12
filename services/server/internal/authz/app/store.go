@@ -83,3 +83,33 @@ type Store interface {
 	// on a target, 02 section 8.1).
 	ActiveGrantsOnTargets(ctx context.Context, spaceIDs, channelIDs []ids.ID) ([]domain.Grant, error)
 }
+
+// ExpiryStore is the outgoing port of the expiry jobs (M1-30, 07 sections 8.3 and 9.4) over
+// grants and group_memberships, implemented by adapters/postgres. Every method runs only inside
+// a unit of work (kind internal otherwise). The Due methods lock the rows they return (FOR
+// UPDATE, ascending id, at most limit rows), so concurrent runs never select the same row; the
+// Mark methods set a marker from NULL and fail with kind internal when a row was already marked,
+// because the selection under the lock rules that out. The Reported marks are rights writes
+// (the unit must be declared as a rights change); the Reminded marks are not.
+type ExpiryStore interface {
+	// DueExpiredGrants returns the grants that are not revoked, with expires_at <= t and
+	// expiry_reported_at NULL.
+	DueExpiredGrants(ctx context.Context, t time.Time, limit int) ([]domain.Grant, error)
+	// MarkGrantsExpiryReported sets expiry_reported_at = at on the grants. Rights change.
+	MarkGrantsExpiryReported(ctx context.Context, grantIDs []ids.ID, at time.Time) error
+	// DueExpiredMemberships returns the memberships that are not removed, with expires_at <= t
+	// and expiry_reported_at NULL, each with its group (deleted groups included).
+	DueExpiredMemberships(ctx context.Context, t time.Time, limit int) ([]domain.MembershipWithGroup, error)
+	// MarkMembershipsExpiryReported sets expiry_reported_at = at on the memberships. Rights change.
+	MarkMembershipsExpiryReported(ctx context.Context, membershipIDs []ids.ID, at time.Time) error
+	// DueReminderGrants returns the grants that are not revoked, with t < expires_at <= until
+	// and expiry_reminded_at NULL, without grants of deleted groups.
+	DueReminderGrants(ctx context.Context, t, until time.Time, limit int) ([]domain.Grant, error)
+	// MarkGrantsExpiryReminded sets expiry_reminded_at = at on the grants.
+	MarkGrantsExpiryReminded(ctx context.Context, grantIDs []ids.ID, at time.Time) error
+	// DueReminderMemberships returns the memberships that are not removed, of live groups, with
+	// t < expires_at <= until and expiry_reminded_at NULL, each with its group.
+	DueReminderMemberships(ctx context.Context, t, until time.Time, limit int) ([]domain.MembershipWithGroup, error)
+	// MarkMembershipsExpiryReminded sets expiry_reminded_at = at on the memberships.
+	MarkMembershipsExpiryReminded(ctx context.Context, membershipIDs []ids.ID, at time.Time) error
+}

@@ -1,6 +1,6 @@
 # Modul `authz`
 
-Status: Gerüst (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the rights snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below); their HTTP routes come with M1-48, the expiry jobs with M1-30.
+Status: Gerüst (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the rights snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below); their HTTP routes come with M1-48. M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -18,6 +18,7 @@ Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.
 - `app/` (M1-27): the outgoing port `Store` over the three tables. "Active" means not revoked or removed; time filtering stays in the domain so one clock decides. Writes of memberships and grants and the deletion of a group must run inside a unit of work declared as a rights change and fail with kind internal otherwise (enforced since M1-29); creating and renaming a group are no rights change.
 - `adapters/postgres/` (M1-27): sqlc queries in `queries/`, generated code in `sqlcgen/`, `Repository` (implements `app.Store`) and the error mapping (unique violation: `conflict` on `/name`, `/user_id` or `/external_ref`; check, trigger, foreign key: `validation_failed` with the field of the constraint; never SQL text or values). There is no delete query and no general update of a grant.
 - `app/` (M1-29): `rightschange.go` with `RightsHook` (`Begin`, `BeforeCommit`, `AddAffected`, `VerifyInvariants`, `Bind`) and `admin.go` with `AdminService`, the implementation of the port `Admin`. `domain/` (M1-29): `triggerset.go` (`World`, `TriggerSet`), `diff.go` (`AccessView`, `AccessViewOf`, `DiffVisible`, `PrincipalDiff`), the archived cap in `Effective` and `CheckGroupText`. Root package (M1-29): `admin.go` (`Admin`, its commands and records, `RightsChanges`, `Register`) and `errors.go` (`InvariantError`, `I1Conflict`, `HintI1`, `HintLastOwner`).
+- `app/` (M1-30): `expiry.go` with `ExpiryService` (`Sweep`, `Remind`), `ExpiryConfig` and `ExpiryResult`; `ExpiryStore` in `store.go`; `expiryfold.go` with the fold of due expiries into every rights change (`RightsHook.Folded`). `domain/` (M1-30): `AssumeValid` in `validity.go` and `SnapshotInput.Assume`. `adapters/postgres/` (M1-30): `queries/expiry.sql` and `expiry.go`. `adapters/jobs/` (M1-30): the job arguments `ExpirySweep` and `ExpiryReminder`, their handlers and `Register`.
 - Their components come from `tools/archgen` and `architecture/modules.yaml`; a package outside these layers fails in `make arch`.
 
 ## Port (Wurzelpaket `internal/authz`)
@@ -83,8 +84,8 @@ states, with named constraints (`grants_subject_shape_check`, `grants_bot_limits
 
 | Job | Auslöser | Warteschlange |
 |---|---|---|
-| `authz.expiry_reminder` | periodisch, `access.expiring` vor Ablauf | `maintenance` |
-| `authz.expiry_sweep` | periodisch, `access.changed` nach Ablauf (Systemaktionen `grant.expire`, `group.member.expire`) | `maintenance` |
+| `authz.expiry_reminder` | periodisch alle `authz.expiry_sweep_interval`, `access.expiring` vor Ablauf (M1-30) | `maintenance` |
+| `authz.expiry_sweep` | periodisch alle `authz.expiry_sweep_interval`, `access.changed` nach Ablauf (Systemaktionen `grant.expire`, `group.member.expire`; M1-30) | `maintenance` |
 
 ## Hinweise für den Bau
 
@@ -175,6 +176,8 @@ the deny entry, the affected principals, or targets); `platform/pg` then runs th
    targets authz derives the affected itself: subjects of grants in effect on the target, its
    ancestors and, for a space, its channels (group members expanded), the active owners and the
    effective operators. Views use the snapshot and `Effective` of `Authorize`, never the cache.
+   Before that, the due expiries are folded in (M1-30, section "Sweep and the fold of due
+   expiries").
 2. **Phase 2, the use case.** It writes; a principal it learns about only now (a new operator)
    it names with `RightsChanges.AddAffected` before writing rows that concern it.
 3. **Phase 3.1, `BeforeCommit`.** `VerifyInvariants` (SR8: at least one active owner; I1: for
@@ -224,3 +227,74 @@ without change) succeed without rights version and audit `no_change: true`; they
 a first unit without rights change. Missing and invisible resources give the same `404`.
 Grants on hosts give `404` until M2-39 adds hosts. `group.name_max_chars` and
 `group.description_max_chars` reach `AdminDeps.Limits` with M1-48, which wires the service.
+
+## Expiry (M1-30)
+
+Expiry is decided at every `authorize` call: a grant or membership is invalid from the second of
+its `expires_at` (07 section 2.5), and a cached snapshot ends at `valid_until` (AZ-P10, proven
+again by `TestAZ_P10_ExpiryWithoutJob` with no job running). The two jobs only report.
+
+| Job | Registered by | Queue | Period | Arguments |
+|---|---|---|---|---|
+| `authz.expiry_sweep` | `adapters/jobs.Register` from `internal/wire` (every role builds the registry; `worker` and `all` run it) | `maintenance` | `authz.expiry_sweep_interval` | none |
+| `authz.expiry_reminder` | the same | `maintenance` | `authz.expiry_sweep_interval` | none |
+
+### Sweep and the fold of due expiries
+
+Every rights change folds in the expiries that are due and not reported yet, as the first step
+after phase 1 has locked and raised `permission_version` (`expiryfold.go`):
+
+1. `ExpiryStore.DueExpiredGrants` and `DueExpiredMemberships` select the rows that are not revoked
+   or removed, with `expires_at <= t` and `expiry_reported_at IS NULL`, in ascending id, `FOR
+   UPDATE` (03 section 6.3).
+2. The principals they affect (the subject of a grant to a user, agent or app; every member that
+   is not removed of a group that is not deleted for a group grant; the member of a membership)
+   get their view before with these rows treated as not expired (`domain.AssumeValid`).
+3. `expiry_reported_at = t` is set, `grant.changed` (`change = expired`, scope space and channel)
+   or `group.changed` (`change = member_expired`, `user_id`, empty scope) waits for phase 3.1
+   with `actor = system`, and one allow audit entry per row is recorded without actor and without
+   IP pseudonym, also inside a person's change (`grant.expire`: `subject_kind`, `subject_id`,
+   `target_kind`, `target_id`, `expires_at`; `group.member.expire` on the group:
+   `membership_id`, `user_id`, `expires_at`). `group.changed` is built in phase 3.1, so its
+   `member_count` includes the memberships the change itself wrote.
+4. Phase 3.1 appends these events, verifies I1 and SR8 and writes `access.changed` for every
+   principal whose visible targets changed, with the action of the unit.
+
+`ExpiryService.Sweep` is a rights change that only folds: units declared as `grant.expire`, then
+`group.member.expire`, each folding at most `authz.expiry_sweep_batch_max` rows of its kind,
+repeated while a batch was full. A batch without rows rolls back, so `permission_version` only
+moves when something expired. An invariant violation (only possible in a world that was already
+invalid) rolls the batch back, leaves the deny entry with the agent ids in the audit log, is
+logged with the action, and the job returns the error so River retries.
+
+**Exactly once.** The marker, the events and the audit entries commit in one transaction with
+the change; an error rolls everything back and the next unit selects the same rows again. The
+selection hangs on the stored marker, not on the time of the last run, so rows that expired while
+the worker was down are found on the next run, and the lock of `permission_version` before the
+row locks keeps two units from reporting a row twice. The trigger `authz_grants_immutable` allows
+`expiry_reported_at` on grants to be set only once.
+
+**Why every change folds.** A view is what the client was told, and an expiry reaches the client
+only once it is reported. After the fold no due row of the change is unreported, so its view
+before is what the client was told and its view after is what `authorize` decides: a loss through
+an expiry is reported once (by the sweep or by the first rights change after the expiry, which
+then also writes the event and the audit entry of the expiry), and no change reports a gain that
+`authorize` denies. Rows not due yet, and in a sweep batch the rows of a later batch, count as
+valid in both views (`domain.AssumeValid.Unreported`).
+
+A grant revoked or a membership removed before its expiry is never reported as expired: the
+revocation wrote its own `access.changed`. Memberships of deleted groups are folded too; their
+difference is empty, so no `access.changed` follows. The cancellation of runs of people who lost
+`trigger` subscribes to `authorize.AccessChanged` in M2.
+
+### Reminder
+
+`ExpiryService.Remind` runs batches in units of work without rights change: grants, then
+memberships, with `t < expires_at <= t + authz.expiry_reminder_lead` and `expiry_reminded_at IS
+NULL` (grants of deleted groups and memberships of deleted groups are not selected). Per row one
+`access.expiring` per active recipient, without duplicates: subject and `granted_by` for a grant
+to a user, agent or app; all active owners and `granted_by` for a grant to a group; member and
+`added_by` for a membership. The payload `AccessExpiringPayload` carries `target` only for space and
+channel grants. `expiry_reminded_at = t` is set in the same transaction, so each row is
+reminded once; a grant created with less than the lead left is reminded on the next run.
+Reminders write no audit entry and send no e-mail.

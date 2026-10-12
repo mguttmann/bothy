@@ -12,9 +12,13 @@ import (
 )
 
 // Register declares what authz emits (M1-25): the personal event access.changed of every rights
-// change (M1-29). grant.changed and group.changed follow with M1-48.
+// change (M1-29); grant.changed, group.changed and the personal event access.expiring of the
+// expiry jobs (M1-30). The Admin use cases append grant.changed and group.changed with M1-48.
 func Register(r *authorize.Registry) {
 	r.Event("authz", authorize.EventAccessChanged)
+	r.Event("authz", authorize.EventGrantChanged)
+	r.Event("authz", authorize.EventGroupChanged)
+	r.Event("authz", authorize.EventAccessExpiring)
 }
 
 // RightsChanges is the port another module uses during the work phase of a rights change it

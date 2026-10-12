@@ -80,6 +80,9 @@ type SnapshotInput struct {
 	GroupGrants []Grant
 	// Expiries are further instants that end the validity: session and token expiry.
 	Expiries []time.Time
+	// Assume names grants and memberships treated as not expired (the view before an expiry
+	// batch, M1-30); the zero value assumes nothing. Only authz/app sets it, never authorize.
+	Assume AssumeValid
 }
 
 // BuildSnapshot builds the snapshot of in: grants in effect at in.At (07 section 2.5), for people
@@ -98,6 +101,7 @@ func BuildSnapshot(in SnapshotInput) Snapshot {
 	}
 	s.Owner = in.Owner
 	add := func(g Grant) {
+		g = in.Assume.Grant(g)
 		expiries = append(expiries, g.ExpiresAt)
 		if !g.InEffect(in.At) {
 			return
@@ -136,7 +140,8 @@ func BuildSnapshot(in SnapshotInput) Snapshot {
 func groupsInEffect(in SnapshotInput) ([]ids.ID, []time.Time) {
 	var groups []ids.ID
 	var expiries []time.Time
-	for _, m := range in.Memberships {
+	for _, mg := range in.Memberships {
+		m := MembershipWithGroup{Membership: in.Assume.Membership(mg.Membership), Group: mg.Group}
 		expiries = append(expiries, m.Membership.ExpiresAt)
 		ok := m.Membership.UserID == in.PrincipalID && m.Membership.GroupID == m.Group.ID && m.Membership.InEffect(m.Group, in.At)
 		if ok && !slices.Contains(groups, m.Group.ID) {

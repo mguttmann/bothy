@@ -122,6 +122,42 @@
       "doc": "Secret reference of the server pepper for the HMAC hashes of tokens and codes and the DPoP nonce key; 32 bytes as hex."
     },
     {
+      "name": "authz.expiry_reminder_lead",
+      "env": "BOTHY_AUTHZ__EXPIRY_REMINDER_LEAD",
+      "kind": "duration",
+      "default": "48h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "07-rechte.md",
+      "doc": "How long before an expiry the reminder access.expiring is written."
+    },
+    {
+      "name": "authz.expiry_sweep_batch_max",
+      "env": "BOTHY_AUTHZ__EXPIRY_SWEEP_BATCH_MAX",
+      "kind": "int",
+      "default": "500",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "2147483647",
+      "chapter": "07-rechte.md",
+      "doc": "Rows per transaction of the jobs authz.expiry_sweep and authz.expiry_reminder."
+    },
+    {
+      "name": "authz.expiry_sweep_interval",
+      "env": "BOTHY_AUTHZ__EXPIRY_SWEEP_INTERVAL",
+      "kind": "duration",
+      "default": "1m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "07-rechte.md",
+      "doc": "Period of the jobs that report expired grants and memberships and send reminders before an expiry."
+    },
+    {
       "name": "authz.snapshot_cache_max_entries",
       "env": "BOTHY_AUTHZ__SNAPSHOT_CACHE_MAX_ENTRIES",
       "kind": "int",

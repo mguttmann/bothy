@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"time"
 
+	authzjobs "github.com/OWNER/bothy/services/server/internal/authz/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
@@ -61,8 +62,8 @@ func JobRole(r Role) jobs.Role {
 	}
 }
 
-// JobModules are the module objects whose jobs the job registry takes: today the partition
-// maintenance (M1-16) and the idempotency key cleanup (M1-20) of sync. The use cases may be nil
+// JobModules are the module objects whose jobs the job registry takes: the partition maintenance
+// (M1-16) and the idempotency key cleanup (M1-20) of sync and the expiry jobs of authz (M1-30). The use cases may be nil
 // where no job runs (tests of the registration); a worker always passes them.
 type JobModules struct {
 	// Partitions is the use case of sync.partition_maintenance.
@@ -73,12 +74,16 @@ type JobModules struct {
 	Cleanup syncjobs.Cleaner
 	// CleanupInterval is sync.idempotency_cleanup_interval.
 	CleanupInterval time.Duration
+	// Expiry is the use case of authz.expiry_sweep and authz.expiry_reminder.
+	Expiry authzjobs.Expiry
+	// ExpiryInterval is authz.expiry_sweep_interval, the period of both.
+	ExpiryInterval time.Duration
 }
 
 // NewJobRegistry returns the job registry of a process: every role (api, worker, all) builds
 // the same one here, so an api process accepts exactly the kinds a worker runs. It registers
-// sync.partition_maintenance (M1-16) and sync.idempotency_cleanup (M1-20); the error is the first
-// rejected registration.
+// sync.partition_maintenance (M1-16), sync.idempotency_cleanup (M1-20), authz.expiry_sweep and
+// authz.expiry_reminder (M1-30); the error is the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -88,6 +93,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := syncjobs.RegisterIdempotencyCleanup(reg, m.Cleanup, m.CleanupInterval); err != nil {
+		return nil, err
+	}
+	if err := authzjobs.Register(reg, m.Expiry, m.ExpiryInterval); err != nil {
 		return nil, err
 	}
 	return reg, nil

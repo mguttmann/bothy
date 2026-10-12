@@ -176,7 +176,8 @@ type server struct {
 //     sweeper, M1-19, InstallIdempotency, M1-20, and MountRoutes, api and all), log
 //     tail (M1-16, api and all: local_head is set to the head before the public listener opens,
 //     and a tail that fails later ends the process with exit code 1), then the jobs (every role,
-//     with sync.partition_maintenance and sync.idempotency_cleanup): the River migrations in jobs.schema
+//     with sync.partition_maintenance, sync.idempotency_cleanup, authz.expiry_sweep and
+//     authz.expiry_reminder): the River migrations in jobs.schema
 //     must be complete (else the hint to run "bothy migrate up"), the runtime of the role is
 //     built over the pool, and worker and all start River (02 "Start" step 8); a River client
 //     that stops on its own later ends the process with exit code 1 (02 "Health"). Then
@@ -770,14 +771,23 @@ func (s *server) startLogTail(ctx context.Context) error {
 // on its own ends the process.
 func (s *server) startJobs(ctx context.Context) error {
 	s.mu.Lock()
-	pool, sy := s.pool, s.sync
+	pool, sy, a := s.pool, s.sync, s.audit
 	s.mu.Unlock()
 	if err := jobs.ValidateMigrations(ctx, pool, s.jobsCfg.Schema); err != nil {
+		return err
+	}
+	expiryCfg, err := AuthzExpiryConfig(s.values)
+	if err != nil {
+		return err
+	}
+	expiry, err := NewExpiryService(pool, a, sy, expiryCfg, s.logger())
+	if err != nil {
 		return err
 	}
 	reg, err := NewJobRegistry(&JobModules{
 		Partitions: sy.Maintenance(), PartitionInterval: s.syncCfg.MaintenanceInterval,
 		Cleanup: sy.IdempotencyCleanup(), CleanupInterval: s.syncCfg.Cleanup.Interval,
+		Expiry: expiry, ExpiryInterval: expiryCfg.Interval,
 	})
 	if err != nil {
 		return err
