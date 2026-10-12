@@ -36,6 +36,53 @@ type AuditIpKey struct {
 	DestroyedAt   pgtype.Timestamptz
 }
 
+type Grant struct {
+	ID                 pgtype.UUID
+	SubjectKind        string
+	SubjectPrincipalID pgtype.UUID
+	SubjectGroupID     pgtype.UUID
+	TargetKind         string
+	TargetSpaceID      pgtype.UUID
+	TargetChannelID    pgtype.UUID
+	TargetHostID       pgtype.UUID
+	Level              pgtype.Text
+	Capabilities       []string
+	ExpiresAt          pgtype.Timestamptz
+	ExpiryRemindedAt   pgtype.Timestamptz
+	ExpiryReportedAt   pgtype.Timestamptz
+	Reason             string
+	GrantedBy          pgtype.UUID
+	GrantedAt          pgtype.Timestamptz
+	RevokedAt          pgtype.Timestamptz
+	RevokedBy          pgtype.UUID
+	RevokeReason       pgtype.Text
+}
+
+type Group struct {
+	ID          pgtype.UUID
+	Name        string
+	Description string
+	Source      string
+	ProviderID  pgtype.UUID
+	ExternalRef pgtype.Text
+	CreatedBy   pgtype.UUID
+	CreatedAt   pgtype.Timestamptz
+	DeletedAt   pgtype.Timestamptz
+}
+
+type GroupMembership struct {
+	ID               pgtype.UUID
+	GroupID          pgtype.UUID
+	UserID           pgtype.UUID
+	AddedBy          pgtype.UUID
+	AddedAt          pgtype.Timestamptz
+	ExpiresAt        pgtype.Timestamptz
+	ExpiryRemindedAt pgtype.Timestamptz
+	ExpiryReportedAt pgtype.Timestamptz
+	RemovedAt        pgtype.Timestamptz
+	RemovedBy        pgtype.UUID
+}
+
 type Instance struct {
 	ID               int16
 	InstanceID       pgtype.UUID

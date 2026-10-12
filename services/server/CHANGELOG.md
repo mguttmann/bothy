@@ -301,6 +301,16 @@ documented in this file. The format is based on
   `unknown_action`) and checks route bindings and registrations at start; `bothy serve` exits with
   code 1 and one line per violation, and the routes are mounted through the same catalogue. The
   Semgrep rule `bothy-go-catalog-id-conversion` forbids converting strings to these identifiers.
+- `authz` grant model storage (M1-27): migration `00005_authz_groups_grants.sql` with the tables
+  `groups`, `group_memberships` and `grants` as `docs/spec/03-data-model.md` section 4.3 states
+  them, with named checks (bot limits for agents and apps, subject and target shapes, host grants
+  with exactly `terminal`) and the trigger `authz_grants_immutable`, which allows only one
+  revocation and setting each expiry bookkeeping column once. The foreign keys to
+  `identity_providers`, `spaces`, `channels` and `hosts` follow with the tickets that create those
+  tables. `internal/authz/domain` holds levels, capabilities, `NewGrant`, `NewGroup`,
+  `NewMembership`, validity at a time `t` (`expires_at = t` is already invalid), `NextExpiry` and
+  the delegation rules `CheckCreate` and `CheckRevoke` (R-AZ-05); `internal/authz/app` declares the
+  store port and `internal/authz/adapters/postgres` implements it with sqlc.
 
 ### Changed
 
