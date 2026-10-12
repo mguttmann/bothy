@@ -332,7 +332,8 @@ def test_render_replaces_only_the_marked_block(tmp_path: Path) -> None:
 def test_render_rewrites_chapter_relative_links(tmp_path: Path) -> None:
     linked = CHAPTER_09.replace(
         "| Sum |",
-        "| see [19](19-security.md#x), [ADR](../adr/README.md), [W](https://example.com) |",
+        "| see [19](19-security.md#x), [ADR](../adr/README.md), [W](https://example.com),"
+        " [up](#limits) |",
     )
     root = written(
         write_repo(
@@ -348,6 +349,7 @@ def test_render_rewrites_chapter_relative_links(tmp_path: Path) -> None:
     assert "[19](../spec/19-security.md#x)" in out
     assert "[ADR](../adr/README.md)" in out
     assert "[W](https://example.com)" in out
+    assert "[up](../spec/09-agents.md#limits)" in out
 
 
 def test_render_needs_markers() -> None:

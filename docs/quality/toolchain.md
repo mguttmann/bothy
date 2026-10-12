@@ -20,7 +20,7 @@ same make target in GitHub Actions. All gate tools run in both places.
 | `pytest` | `9.1.1` | tests of the tools | MIT | standard |
 | `pytest-cov` | `7.1.0` | coverage in pytest | MIT | standard |
 | `coverage` | `7.16.2` | coverage threshold | Apache-2.0 | basis of pytest-cov |
-| `markdown-it-py` | `4.2.0` | CommonMark parser as the oracle in the tests of `tools/configdoc` (code spans and code blocks for rule D7) | MIT | reference implementation of CommonMark with GFM tables; only in tests, the tool itself stays with the standard library and PyYAML |
+| `markdown-it-py` | `4.2.0` | CommonMark parser as the oracle in the tests of `tools/configdoc` (code spans and code blocks for rule D7) | MIT | CommonMark-compliant parser with GFM tables ([markdown-it-py](https://github.com/executablebooks/markdown-it-py), retrieved 2026-10-12); only in tests, the tool itself stays with the standard library and PyYAML |
 | `pre-commit` | `4.6.2` | hooks for commit, commit-msg, pre-push | MIT | widespread, hooks as a file in the repository |
 | `pre-commit-hooks` | `v6.0.0` | file hygiene hooks | MIT | maintained standard hooks, pinned by commit SHA |
 | `check-jsonschema` | `0.38.2` | schema check of issue forms, Renovate and CodeRabbit configuration | Apache-2.0 | ships the schemas of the formats |

@@ -152,7 +152,7 @@ _ITEM = re.compile(r"^(?P<indent>[ \t]*)(?P<marker>[-*+]|[0-9]{1,9}[.)])(?P<rest
 # The marker of a block quote line, with one optional space after it.
 _QUOTE = re.compile(r"^ {0,3}> ?")
 # Links in chapter tables are relative to docs/spec/; the reference lives in docs/operations/.
-_LOCAL_LINK = re.compile(r"\]\((?!\.\./|[a-z]+:|#|/)(?P<target>[^)]+)\)")
+_LOCAL_LINK = re.compile(r"\]\((?!\.\./|[a-z]+:|/)(?P<target>[^)]+)\)")
 # Duration grammar of the server configuration (docs/operations/configuration.md section 2).
 _CONFIG_DURATION = re.compile(r"^(0|[1-9][0-9]*)(ms|s|m|h|d)$")
 # Duration grammar of Compose (Go durations: 1m30s, 75s, 500ms).
@@ -524,7 +524,11 @@ def _rows(
         except ValueError as exc:
             problems.append(Finding(rel, number, "table", str(exc)))
             continue
-        meaning = _LOCAL_LINK.sub(r"](../spec/\g<target>)", meaning)
+        # A link of a chapter cell counts from docs/spec/; an anchor alone points into the chapter.
+        meaning = _LOCAL_LINK.sub(
+            lambda m: f"](../spec/{name if m['target'].startswith('#') else ''}{m['target']})",
+            meaning,
+        )
         values += [
             Value(nm, place, d, meaning, name, number)
             for nm, d in zip(names, defaults, strict=True)
