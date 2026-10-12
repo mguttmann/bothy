@@ -32,6 +32,12 @@ func TestSomething(t *testing.T) {
 - `SuperConn(t)` and `SuperConfig()` are the superuser of the container, `ContainerLogs(t)` its
   server log.
 
+`Main(m, pgtest.WithSteps(wire.MigrationSteps))` migrates every template of the test binary with
+the steps of `bothy migrate up` as well, so `New` returns a database with the instance row
+(M1-15); the test packages that start the server (`internal/wire`, `cmd/bothy`) use it. pgtest
+cannot import `internal/wire` itself. All databases of one binary then share the `instance_id`
+of their template.
+
 Roles are cluster-wide: a test that changes a role password must not call `t.Parallel` and must
 restore the password (see `roles_test.go` in package `pg`).
 

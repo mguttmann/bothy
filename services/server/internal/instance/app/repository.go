@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package app
+
+import (
+	"context"
+
+	"github.com/OWNER/bothy/services/server/internal/instance"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+)
+
+// Repository is the outgoing port to the tables instance and sequence_counters. Statements run
+// in the ambient transaction of ctx when there is one. adapters/postgres implements it.
+type Repository interface {
+	// AdvanceCounter runs UPDATE sequence_counters SET value = value + n WHERE name = name
+	// RETURNING value, which holds the row lock until the commit, and returns the new value. It
+	// requires a unit of work. The error is the database error, also for a missing row.
+	AdvanceCounter(ctx context.Context, name string, n int64) (int64, error)
+	// CounterValue reads the value of a counter without a lock.
+	CounterValue(ctx context.Context, name string) (int64, error)
+	// LoadInstance reads the instance row; found is false when it is missing.
+	LoadInstance(ctx context.Context) (rec instance.Record, found bool, err error)
+	// EnsureInstance inserts the row with the given IDs unless it exists
+	// (INSERT ... ON CONFLICT (id) DO NOTHING), so concurrent bothy migrate runs are safe.
+	EnsureInstance(ctx context.Context, instanceID, syncEpoch ids.ID) error
+	// SetVersions sets schema_version and min_server_version unless the row records a larger
+	// schema_version (an older binary must never lower what a newer one wrote).
+	SetVersions(ctx context.Context, schemaVersion int64, minServerVersion string) error
+}

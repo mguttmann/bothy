@@ -60,10 +60,3 @@ func (c MigrateConfig) PasswordRefs() map[pg.Role]string {
 		pg.RoleMaint: c.MaintPasswordRef, pg.RoleMonitor: c.MonitorPasswordRef,
 	}
 }
-
-// MigrationSteps returns the steps bothy migrate up runs around the goose migrations: River's
-// migrations before them (M1-14) and the instance row with schema_version and
-// min_server_version after them (M1-15). Each of those tickets adds its step here.
-func MigrationSteps() pg.MigratorOptions {
-	return pg.MigratorOptions{}
-}

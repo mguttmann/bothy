@@ -32,8 +32,9 @@ import (
 )
 
 // TestMain runs the tests of the package with a PostgreSQL container for the serve tests (plan
-// P-09: without a Docker-compatible runtime the binary fails, it never skips).
-func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) }
+// P-09: without a Docker-compatible runtime the binary fails, it never skips). The templates run
+// the steps of bothy migrate up, so every database has its instance row.
+func TestMain(m *testing.M) { os.Exit(pgtest.Main(m, pgtest.WithSteps(wire.MigrationSteps))) }
 
 // logBuffer collects the JSON log lines of a serve process.
 type logBuffer struct {
@@ -163,9 +164,10 @@ func (p *process) exit(t *testing.T) int {
 	}
 }
 
-// waitPort waits for the listener line msg and returns its port.
-func (p *process) waitPort(t *testing.T, msg string) int {
+// waitInternal waits for the line of the internal listener and returns its port.
+func (p *process) waitInternal(t *testing.T) int {
 	t.Helper()
+	const msg = "internal listener started"
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		if port := p.logs.port(msg); port != 0 {
@@ -192,8 +194,9 @@ func get(t *testing.T, port int, path string) (int, string) {
 	return resp.StatusCode, string(b)
 }
 
-// waitStatus polls path until it answers code.
-func waitStatus(t *testing.T, port int, path string, code int) string {
+// waitReadyz polls /readyz until it answers code.
+func waitReadyz(t *testing.T, port int, code int) string {
+	const path = "/readyz"
 	t.Helper()
 	deadline := time.Now().Add(30 * time.Second)
 	var got int
@@ -215,8 +218,8 @@ func TestServeRolesStartReadyAndStop(t *testing.T) {
 		t.Run(string(role), func(t *testing.T) {
 			t.Parallel()
 			p := start(t, role, serveEnv(t, db), wire.Deps{})
-			internal := p.waitPort(t, "internal listener started")
-			waitStatus(t, internal, "/readyz", http.StatusOK)
+			internal := p.waitInternal(t)
+			waitReadyz(t, internal, http.StatusOK)
 			if !strings.Contains(p.logs.String(), `"msg":"server ready"`) {
 				t.Fatalf("no ready line:\n%s", p.logs)
 			}
@@ -250,10 +253,10 @@ func TestServeReadyzDuringDrain(t *testing.T) {
 	t.Parallel()
 	db := pgtest.New(t)
 	p := start(t, wire.RoleAPI, serveEnv(t, db, "BOTHY_SHUTDOWN__DRAIN_DELAY=2s"), wire.Deps{})
-	internal := p.waitPort(t, "internal listener started")
-	waitStatus(t, internal, "/readyz", http.StatusOK)
+	internal := p.waitInternal(t)
+	waitReadyz(t, internal, http.StatusOK)
 	p.sigs <- syscall.SIGTERM
-	body := waitStatus(t, internal, "/readyz", http.StatusServiceUnavailable)
+	body := waitReadyz(t, internal, http.StatusServiceUnavailable)
 	if body != `{"status":"unavailable","failed":["shutting_down"]}`+"\n" {
 		t.Fatalf("body = %q", body)
 	}
@@ -413,7 +416,7 @@ func TestServeSignalDuringStartSkipsTheDrain(t *testing.T) {
 	// The database never answers; the drain delay would hold the end for 30s although the public
 	// listener never opened.
 	p := start(t, wire.RoleAPI, serveEnv(t, db, "BOTHY_DATABASE__PORT=1", "BOTHY_STARTUP__DEPENDENCY_WAIT=20s", "BOTHY_SHUTDOWN__DRAIN_DELAY=30s"), wire.Deps{})
-	p.waitPort(t, "internal listener started")
+	p.waitInternal(t)
 	sent := time.Now()
 	p.sigs <- syscall.SIGTERM
 	if code := p.exit(t); code != lifecycle.ExitOK {

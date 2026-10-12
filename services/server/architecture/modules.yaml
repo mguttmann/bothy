@@ -38,7 +38,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: []
-    adapter_vendors: []
+    adapter_vendors: [pgx]
   billing:
     tables: [price_table, cost_entries]
     actions: [cost.read.thread, cost.read.aggregate, price.read, price.manage, cost.reconcile,

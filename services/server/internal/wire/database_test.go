@@ -3,13 +3,21 @@
 package wire_test
 
 import (
+	"context"
+	"errors"
+	"io/fs"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
+	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/internal/wire"
+	"github.com/OWNER/bothy/services/server/migrations"
 )
 
 func TestDatabaseConfigBindsDefaults(t *testing.T) {
@@ -84,11 +92,76 @@ func TestMigrateSettingsBinds(t *testing.T) {
 	}
 }
 
+// instanceRow reads the instance row as the superuser; found is false when it is missing.
+func instanceRow(t *testing.T, db *pgtest.DB) (schemaVersion int64, minServer string, instanceID string, found bool) {
+	t.Helper()
+	err := db.SuperConn(t).QueryRow(context.Background(),
+		"SELECT schema_version, coalesce(min_server_version, ''), instance_id::text FROM instance").Scan(&schemaVersion, &minServer, &instanceID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, "", "", false
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return schemaVersion, minServer, instanceID, true
+}
+
+// runAfterSteps builds the steps for fsys over a pool of bothy_owner on db and runs the after
+// steps as bothy migrate up would.
+func runAfterSteps(t *testing.T, db *pgtest.DB, fsys fs.FS) {
+	t.Helper()
+	pool := db.Pool(t, pg.RoleOwner)
+	opts, err := wire.MigrationSteps(pool, fsys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(opts.Before) != 0 || len(opts.After) != 1 || opts.After[0].Name() != "instance" {
+		t.Fatalf("MigrationSteps = %+v, want the instance step after the migrations", opts)
+	}
+	sqlDB := pool.OpenSQL()
+	defer func() { _ = sqlDB.Close() }()
+	if err := opts.After[0].Run(context.Background(), sqlDB); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestMigrationSteps: the instance step records the goose version and migrations.MinServerVersion
+// when the database is at the newest migration of the set, creates a missing row, and leaves the
+// row alone when the database is newer than the set (upgrade.md "Rückweg").
 func TestMigrationSteps(t *testing.T) {
 	t.Parallel()
-	// M1-14 (River) and M1-15 (instance row) add their steps here; until then there are none.
-	opts := wire.MigrationSteps()
-	if len(opts.Before) != 0 || len(opts.After) != 0 {
-		t.Errorf("MigrationSteps = %+v", opts)
+	ctx := context.Background()
+	need, err := pg.RequiredSchemaVersion(migrations.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// pgtest.WithSteps(wire.MigrationSteps) in TestMain: the template already has the row.
+	db := pgtest.New(t)
+	v, minServer, id, found := instanceRow(t, db)
+	if !found || v != need || minServer != migrations.MinServerVersion {
+		t.Fatalf("row after migrate: found %v, schema %d, min %q", found, v, minServer)
+	}
+	if _, err := db.SuperConn(t).Exec(ctx, "DELETE FROM instance"); err != nil {
+		t.Fatal(err)
+	}
+	runAfterSteps(t, db, migrations.FS)
+	v, minServer, id2, found := instanceRow(t, db)
+	if !found || v != need || minServer != migrations.MinServerVersion || id2 == id {
+		t.Fatalf("row after the step: found %v, schema %d, min %q, id %s (was %s)", found, v, minServer, id2, id)
+	}
+
+	// A set whose newest migration is older than the database: the step changes nothing.
+	older := fstest.MapFS{}
+	first, err := fs.ReadFile(migrations.FS, "00001_base_privileges.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	older["00001_base_privileges.sql"] = &fstest.MapFile{Data: first}
+	if _, err := db.SuperConn(t).Exec(ctx, "UPDATE instance SET schema_version = 0, min_server_version = '7.0.0'"); err != nil {
+		t.Fatal(err)
+	}
+	runAfterSteps(t, db, older)
+	if v, minServer, _, _ := instanceRow(t, db); v != 0 || minServer != "7.0.0" {
+		t.Fatalf("a step of an older set changed the row: schema %d, min %q", v, minServer)
 	}
 }

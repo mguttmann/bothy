@@ -18,6 +18,16 @@ Status: built (M1-12). The SQL migrations of the server, embedded into the binar
 - A merged migration never changes. `make migrations-lock` records the checksum of a new file in
   `services/server/migrations.sha256`; `make migrations-lint` fails on a changed or removed one.
 
+## Minimum server version
+
+`embed.go` declares `MinServerVersion`, the oldest server version allowed to run against the
+schema of these migrations (18 "Komponenten" rule 6). `bothy migrate up` writes it to
+`instance.min_server_version`; a server below it keeps running but is never ready
+(`schema_requires_newer_server`). By rule M1 of upgrade.md it is the previous release, a release
+that breaks on purpose sets its own version, and before the first release it equals `VERSION`.
+Whoever changes the schema checks at release time whether it must rise;
+`TestMinServerVersionNotAboveOwnVersion` keeps it valid SemVer and not above the build version.
+
 ## Grant rule
 
 There are no default privileges. Every migration that creates a table grants exactly what

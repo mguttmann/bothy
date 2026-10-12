@@ -8,8 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-
-	"github.com/jackc/pgx/v5"
 )
 
 // The queries for the schema version: goose's table goose_db_version, unqualified as goose
@@ -63,7 +61,7 @@ func CheckSchema(ctx context.Context, p *Pool, required int64) error {
 		return err
 	}
 	defer c.Release()
-	have, err := pgxSchemaVersion(ctx, c.Conn())
+	have, err := SchemaVersion(ctx, c.Conn())
 	if err != nil {
 		return fmt.Errorf("pg: read the schema version: %w", err)
 	}
@@ -73,14 +71,17 @@ func CheckSchema(ctx context.Context, p *Pool, required int64) error {
 	return nil
 }
 
-// pgxSchemaVersion returns the schema version over a pgx connection.
-func pgxSchemaVersion(ctx context.Context, c *pgx.Conn) (int64, error) {
+// SchemaVersion returns the schema version of the database behind q: the highest applied goose
+// version, 0 when the version table does not exist. q is the pool or the transaction of a unit
+// of work (Querier); bothy migrate up reads it inside the unit that records the instance row
+// (M1-15). The role needs SELECT on goose_db_version. The error is the database error.
+func SchemaVersion(ctx context.Context, q DBTX) (int64, error) {
 	var exists bool
-	if err := c.QueryRow(ctx, versionTableQuery).Scan(&exists); err != nil || !exists {
+	if err := q.QueryRow(ctx, versionTableQuery).Scan(&exists); err != nil || !exists {
 		return 0, err
 	}
 	var v int64
-	err := c.QueryRow(ctx, versionQuery).Scan(&v)
+	err := q.QueryRow(ctx, versionQuery).Scan(&v)
 	return v, err
 }
 

@@ -202,7 +202,7 @@ Zweck: Zähler-Zeilen, deren Zeilensperre die Commit-Reihenfolge erzwingt. Modul
 
 PK: `name`. FK: keine. Indexe: keine weiteren. Aufbewahrung: `config`.
 
-Die drei Zeilen werden in der ersten Migration angelegt. `permission_version` ist der
+Die drei Zeilen legt die Migration an, die die Tabelle anlegt (`00002_instance_counters.sql`). `permission_version` ist der
 Rechte-Versionszähler (siehe 4.3 und [04-sync-protokoll.md](04-sync-protokoll.md)).
 
 ### 4.2 Identität (`identity`)

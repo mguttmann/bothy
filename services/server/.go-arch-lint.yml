@@ -268,6 +268,7 @@ deps:
     mayDependOn: [instance-app, instance, instance-domain, kernel-ports]
   instance-adapters:
     mayDependOn: [instance-adapters, instance, instance-app, instance-domain, kernel-ports, platform-buildinfo, platform-config, platform-egress, platform-health, platform-httpserver, platform-lifecycle, platform-otel, platform-pg, platform-secrets, api]
+    canUse: [v-pgx]
   billing:
     mayDependOn: [billing, kernel-ports]
   billing-domain:

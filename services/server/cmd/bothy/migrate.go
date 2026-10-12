@@ -28,8 +28,10 @@ const migrateUsage = `Usage: bothy migrate up [--bootstrap] [--config FILE]
 up        applies every pending migration of this binary as database.user, which must own
           schema public (bothy_owner); every step runs with lock_timeout =
           migrate.lock_timeout. It prints "applied <version> <name>" per migration and
-          "database version <n>, applied <k>". Against a schema newer than this binary it
-          prints "schema is newer than this binary; nothing to do" and changes nothing.
+          "database version <n>, applied <k>". Afterwards it creates the instance row if it
+          is missing and records instance.schema_version and instance.min_server_version.
+          Against a schema newer than this binary it prints "schema is newer than this
+          binary; nothing to do" and changes nothing.
 status    prints "<version> <name> <applied|pending> <applied_at|->" per migration of this
           binary and "database version <n>, binary requires <m>, pending <k>"; it only reads.
 validate  checks the embedded migrations without a database (names, numbering, goose
@@ -63,7 +65,7 @@ type migrateEnv struct {
 	env    []string
 	schema func() (*config.Schema, error)
 	fsys   fs.FS
-	steps  func() pg.MigratorOptions
+	steps  func(pool *pg.Pool, fsys fs.FS) (pg.MigratorOptions, error)
 	stdout io.Writer
 	stderr io.Writer
 }
@@ -225,7 +227,12 @@ func (r *migrateRun) migrator(ctx context.Context) (*pg.Migrator, func(), error)
 		_ = db.Close()
 		pool.Close()
 	}
-	m, err := pg.NewMigrator(db, r.e.fsys, r.e.steps())
+	steps, err := r.e.steps(pool, r.e.fsys)
+	if err != nil {
+		closeAll()
+		return nil, nil, err
+	}
+	m, err := pg.NewMigrator(db, r.e.fsys, steps)
 	if err != nil {
 		closeAll()
 		return nil, nil, err

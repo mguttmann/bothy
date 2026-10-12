@@ -18,3 +18,13 @@ import "embed"
 //
 //go:embed *.sql
 var FS embed.FS
+
+// MinServerVersion is the oldest server version allowed to run against the schema these
+// migrations produce (docs/spec/18-release.md "Komponenten" rule 6). bothy migrate up writes it
+// to instance.min_server_version; a server below it keeps running but never becomes ready
+// (readiness check schema_requires_newer_server). By rule M1 of docs/operations/upgrade.md it is
+// the previous release, so a rollback by one version works; a release that breaks on purpose
+// sets its own version; before the first release it equals the current version
+// (services/server/VERSION). Whoever changes the schema checks at release time whether it must
+// rise. TestMinServerVersionNotAboveOwnVersion keeps it valid SemVer and not above the build.
+const MinServerVersion = "0.0.0"
