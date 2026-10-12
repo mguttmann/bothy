@@ -5,7 +5,7 @@ package app
 import "time"
 
 // Config is the configuration of the audit module, bound in internal/wire from the keys of 05
-// "Konfigurationswerte" and 20 "Configuration values of this chapter" (docs/operations/configuration.md).
+// "Configuration values of this chapter" and 20 "Configuration values of this chapter" (docs/operations/configuration.md).
 type Config struct {
 	// DenyAggregateWindow is audit.deny_aggregate_window: identical denials within this time from
 	// the first one become one row.

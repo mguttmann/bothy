@@ -27,7 +27,7 @@ func validDetails() domain.DetailsV1 {
 			"code": "i1_violation", "agent_id": uuidA, "credential_holder_id": uuidB,
 			"principal_ids": []any{uuidA, uuidB},
 		}},
-		"reason":   "Prüfung durch Alex",
+		"reason":   "Révision by Alex",
 		"level":    "read",
 		"grant_id": uuidA,
 		"expires":  timeA,
@@ -110,7 +110,7 @@ func TestValidCode_LengthBound(t *testing.T) {
 			t.Errorf("ValidCode(%q) = false", ok)
 		}
 	}
-	for _, bad := range []string{"", "_x", "A", "a b", "ä", "a/b"} {
+	for _, bad := range []string{"", "_x", "A", "a b", "é", "a/b"} {
 		if domain.ValidCode(bad) {
 			t.Errorf("ValidCode(%q) = true", bad)
 		}

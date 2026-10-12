@@ -52,7 +52,7 @@ func fullRow(seq int64, prev [domain.HashSize]byte) domain.Row {
 		Details: map[string]any{
 			"ip_hmac": strings.Repeat("ab", 32), "ip_key_id": ids.New().String(), "n": int64(1) << 52,
 			"aggregate": map[string]any{"count": int64(2), "first_at": "2026-10-12T08:00:00.120Z", "last_at": "2026-10-12T08:00:01.000Z"},
-			"reason":    "Prüfung   <a&b>",
+			"reason":    "Révision   <a&b>",
 		},
 		CorrelationID: ids.MustParse("01928f3a-7b1c-7000-8a00-0000000000c1"), PrevHash: prev,
 	}

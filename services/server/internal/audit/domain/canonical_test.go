@@ -148,12 +148,12 @@ func minimalRow() domain.Row {
 func TestCanonicalRow_Escaping(t *testing.T) {
 	t.Parallel()
 	r := minimalRow()
-	r.Details = map[string]any{"s": "q\" b\\ c\b\t\n\f\r \x01\x1f\x7f <>&    ü/"}
+	r.Details = map[string]any{"s": "q\" b\\ c\b\t\n\f\r \x01\x1f\x7f <>&    é/"}
 	c, err := domain.CanonicalRow(r)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `"details":{"s":"q\" b\\ c\b\t\n\f\r \u0001\u001f` + "\x7f <>&    ü/" + `"}`
+	want := `"details":{"s":"q\" b\\ c\b\t\n\f\r \u0001\u001f` + "\x7f <>&    é/" + `"}`
 	if !strings.Contains(string(c), want) {
 		t.Fatalf("canonical %s\ndoes not contain %s", c, want)
 	}
@@ -219,7 +219,7 @@ func TestCanonicalRow_RejectsOutOfDomain(t *testing.T) {
 		"exponent":            func(r *domain.Row) { r.Details = map[string]any{"x": json.Number("1e3")} },
 		"null":                func(r *domain.Row) { r.Details = map[string]any{"x": nil} },
 		"null in list":        func(r *domain.Row) { r.Details = map[string]any{"x": []any{nil}} },
-		"non-ASCII key":       func(r *domain.Row) { r.Details = map[string]any{"ü": "x"} },
+		"non-ASCII key":       func(r *domain.Row) { r.Details = map[string]any{"é": "x"} },
 		"int above 2^53-1":    func(r *domain.Row) { r.Details = map[string]any{"x": int64(1) << 53} },
 		"number above":        func(r *domain.Row) { r.Details = map[string]any{"x": json.Number("9007199254740992")} },
 		"int below -(2^53-1)": func(r *domain.Row) { r.Details = map[string]any{"x": -(int64(1) << 53)} },
