@@ -64,6 +64,12 @@ type DeviceKey struct {
 	RevokedAt   pgtype.Timestamptz
 }
 
+type EventConsumerCursor struct {
+	Name      string
+	LastSeq   int64
+	UpdatedAt pgtype.Timestamptz
+}
+
 type EventLog struct {
 	Seq                 int64
 	ID                  pgtype.UUID

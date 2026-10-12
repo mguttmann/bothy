@@ -866,6 +866,34 @@ Verbraucher würde jeden Erzeuger ändern. Das Log ist schon der Ausgangskorb. E
 genau einmal, weil Cursor und Jobs in einer Transaktion committen. `webhook_deliveries` hat zusätzlich
 den eindeutigen Schlüssel `(subscription_id, event_seq)` (03).
 
+Rules of the frame (M2-01, [DECISIONS.md](../DECISIONS.md) D-M2-01-1 to D-M2-01-9):
+
+5. **Start at the head.** In the roles `worker` and `all` the start inserts, before the first
+   round, the row of every registered consumer that has none, with `last_seq = max(seq)` of the
+   log. A new consumer therefore never replays retained events, like the first connection of an
+   agent consumer (04, 15.1 item 2). No migration inserts rows; names that are not registered have
+   no row. When two workers start together, one row wins.
+6. **Gaps.** When the events from `last_seq + 1` on are missing because retention detached their
+   partition (the first number read equals `min(seq)`), the round processes from `min(seq)` and
+   writes the error line `event consumer lost events to retention`; the events cannot come back,
+   and a webhook subscription detects its own gap (11, section 6). Any other gap is a bug (04, 3.2
+   items 3 and 4): the round rolls back, the cursor never passes the gap, the consumer stalls and
+   the alarm reports it.
+7. **Failures.** A handler error or panic, a database error and a gap roll back the whole round:
+   no job, no cursor move, the next attempt at the next wake or poll. No event is ever skipped.
+   The first failed round after a success writes `event consumer round failed`, the next success
+   `event consumer recovered`. Consumers are independent; a stalled consumer holds back no other.
+8. **No durable events in a round.** A handler that appends an event fails the round: the
+   consumer would read its own output, and the round would take the lock of the counter
+   `event_seq` (11.7).
+9. **One `LISTEN` connection per process** for all consumers, apart from the log tail's
+   (application name `bothy-consumer-wake`), reconnected with a backoff from
+   `consumer.poll_interval` up to `database.listen_reconnect_backoff_cap`. After a full batch the
+   next round starts at once. Every role exports `bothy.event.consumer.lag` and
+   `bothy.event.consumer.pending_age` per consumer ([signals.md](../observability/signals.md) 4.2);
+   the alarm `BothyEventConsumerLag` fires at `consumer.pending_alert_after`, which is strictly
+   below `sync.event_retention` (13, item 4).
+
 ### 11.6 Kurzlebige Ereignisse
 
 | Ereignis | Erzeugt in | Ein Knoten | Mehrere Knoten (`cluster.mode = multi`) |
@@ -1013,7 +1041,9 @@ Server lädt.
    `server.internal_listen_addr` und `server.listen_addr` teilen keinen Port außer `0`, wenn ihre
    Hosts gleich sind oder einer der Hosts leer, `0.0.0.0` oder `::` ist (auch mit IPv6-Zone; eine
    IPv4-gemappte IPv6-Adresse zählt als ihre IPv4-Adresse). Port `0` darf doppelt vorkommen, weil
-   Tests Port 0 binden. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
+   Tests Port 0 binden. `consumer.pending_alert_after` is strictly below `sync.event_retention`
+   (cross-check `consumer_alert_below_retention`, M2-01), so the alarm `BothyEventConsumerLag`
+   fires while a stalled worker consumer can still catch up. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
    clean form (no `.` or `..` element, no trailing `/`; cross-check `file_fs_root_absolute`,
    M3-01), because a relative root would depend on the working directory of the process; with
    `s3` the root is not read. Dazu prüft der Lader eine Regel für einen einzelnen Schlüssel, die kein
@@ -1125,7 +1155,8 @@ Idempotenz die Wiederholung des Clients.
 ### 14.5 Panics
 
 Je Anfrage, je Job und je Verbindung abgefangen: Anfrage `500`, Job als Fehler an River, Verbindung
-mit `4000` geschlossen. Ein Panic im Log-Tail oder Hub beendet den Prozess mit Fehlercode, weil ein
+mit `4000` geschlossen. A panic in the handler of a worker consumer becomes the error of its round,
+which rolls back (11.5 item 7); a panic in the frame of the consumers itself ends the process. Ein Panic im Log-Tail oder Hub beendet den Prozess mit Fehlercode, weil ein
 Prozess ohne Fan-out nicht bereit wäre, aber noch Verbindungen hielte. Der Orchestrator startet neu,
 Clients nehmen nach 04 wieder auf.
 
@@ -1171,7 +1202,8 @@ Auf dem internen Listener `server.internal_listen_addr`, nicht in der öffentlic
 
 - `/healthz` (lebt): Der Prozess antwortet. Fällt der Log-Tail, der Hub (api) oder der
   River-Client (worker) unerwartet aus, beendet sich der Prozess mit Exitcode `1` (Abschnitt
-  14.5); darum braucht `/healthz` keine eigene Prüfung dafür.
+  14.5); darum braucht `/healthz` keine eigene Prüfung dafür. The same holds for the runner of the
+  worker consumers (worker, M2-01); a failing round is no such end (11.5 item 7).
 - `/readyz` (bereit): Start abgeschlossen (`startup`), Datenbank erreichbar (`database`), Version
   zum Schema passend (`schema_requires_newer_server`), je Zweck ein aktiver Signierschlüssel
   (`signing_keys`), kein Shutdown begonnen (`shutting_down`). Weitere Prüfungen bringen die
@@ -1206,7 +1238,9 @@ Rolle `api`:
 Rolle `worker`:
 
 1. `ready` auf falsch.
-2. Verbraucher beenden ihre Runde (Commit oder Rollback) und starten keine neue.
+2. Verbraucher beenden ihre Runde (Commit oder Rollback) und starten keine neue. The step has no
+   own budget, only the rest of `shutdown.total_timeout`; after it the round is cancelled and
+   rolls back.
 3. River: weicher Stopp mit `SoftStopTimeout` gleich `shutdown.jobs_soft_timeout`, danach werden
    Job-Kontexte abgebrochen [Q3, Q4, belegt]; abgebrochene Jobs liefern einen Fehler und werden
    wiederholt.
@@ -1386,6 +1420,7 @@ Grenzen ausgehender Aufrufe (`egress.*`) führt [19-sicherheit.md](19-sicherheit
 | `gateway.write_timeout` | Server | `10s` | Frist für einen WebSocket-Schreibvorgang |
 | `consumer.batch_size` | Server | `500` | Ereignisse je Runde eines Worker-Verbrauchers |
 | `consumer.poll_interval` | Server | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` |
+| `consumer.pending_alert_after` | Server | `15m` | age of the oldest unprocessed event of a worker consumer that raises the alarm `BothyEventConsumerLag`; strictly below `sync.event_retention` (13, item 4) |
 | `sync.idempotency_cleanup_interval` | Server | `1h` | Abstand des Jobs `sync.idempotency_cleanup` |
 | `sync.idempotency_cleanup_batch_size` | Server | `1000` | Zeilen je Löschstapel von `sync.idempotency_cleanup` |
 | `ratelimit.max_tracked_keys` | Server | `100000` | höchstens so viele Rate-Limit-Eimer hält ein Prozess; darüber werden volle, dann älteste Eimer entfernt |

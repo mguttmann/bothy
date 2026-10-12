@@ -166,8 +166,9 @@ Quelle: [02-architektur.md](../spec/02-architektur.md), Abschnitt 22.
 | `sync.partition_maintenance_interval` | `BOTHY_SYNC__PARTITION_MAINTENANCE_INTERVAL` | Server | duration | `10m` | Abstand des Jobs `sync.partition_maintenance` | aktiv |
 | `sync.event_log_partitions_ahead` | `BOTHY_SYNC__EVENT_LOG_PARTITIONS_AHEAD` | Server | int | `3` | Partitionen von `event_log`, die vor dem Kopf bereitstehen; mit `sync.event_log_partition_size` reichen sie bei `perf.event_commit_min_per_s` länger als zwei Abstände `sync.partition_maintenance_interval` | aktiv |
 | `gateway.write_timeout` | `BOTHY_GATEWAY__WRITE_TIMEOUT` | Server |  | `10s` | Frist für einen WebSocket-Schreibvorgang | geplant (M1) |
-| `consumer.batch_size` | `BOTHY_CONSUMER__BATCH_SIZE` | Server |  | `500` | Ereignisse je Runde eines Worker-Verbrauchers | geplant (M2) |
-| `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server |  | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` | geplant (M2) |
+| `consumer.batch_size` | `BOTHY_CONSUMER__BATCH_SIZE` | Server | int | `500` | Ereignisse je Runde eines Worker-Verbrauchers | aktiv |
+| `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server | duration | `1s` | Poll eines Worker-Verbrauchers ohne `NOTIFY` | aktiv |
+| `consumer.pending_alert_after` | `BOTHY_CONSUMER__PENDING_ALERT_AFTER` | Server | duration | `15m` | age of the oldest unprocessed event of a worker consumer that raises the alarm `BothyEventConsumerLag`; strictly below `sync.event_retention` (13, item 4) | aktiv |
 | `sync.idempotency_cleanup_interval` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_INTERVAL` | Server | duration | `1h` | Abstand des Jobs `sync.idempotency_cleanup` | aktiv |
 | `sync.idempotency_cleanup_batch_size` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE` | Server | int | `1000` | Zeilen je Löschstapel von `sync.idempotency_cleanup` | aktiv |
 | `ratelimit.max_tracked_keys` | `BOTHY_RATELIMIT__MAX_TRACKED_KEYS` | Server | int | `100000` | höchstens so viele Rate-Limit-Eimer hält ein Prozess; darüber werden volle, dann älteste Eimer entfernt | aktiv |

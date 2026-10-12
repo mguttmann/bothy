@@ -37,7 +37,9 @@ func TestSyncConfigBindsDefaults(t *testing.T) {
 		cfg.Partitions.Retention != 30*24*time.Hour || cfg.Partitions.LockTimeout != 2*time.Second ||
 		cfg.Tail.PollInterval != time.Second || cfg.Tail.BatchSize != 1000 ||
 		cfg.Tail.ReconnectBackoffCap != 10*time.Second || cfg.MaintenanceInterval != 10*time.Minute ||
-		cfg.Idempotency.TTL != 24*time.Hour || cfg.Cleanup.Interval != time.Hour || cfg.Cleanup.BatchSize != 1000 {
+		cfg.Idempotency.TTL != 24*time.Hour || cfg.Cleanup.Interval != time.Hour || cfg.Cleanup.BatchSize != 1000 ||
+		cfg.Consumers.BatchSize != 500 || cfg.Consumers.PollInterval != time.Second ||
+		cfg.Consumers.ReconnectBackoffCap != 10*time.Second || cfg.Consumers.StatesTimeout != 5*time.Second {
 		t.Fatalf("SyncConfig = %+v", cfg)
 	}
 }

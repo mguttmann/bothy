@@ -50,6 +50,21 @@ documented in this file. The format is based on
   `auth.token_pepper_ref`, `api.page_size_default` and `api.page_size_max`; `bothy serve` resolves
   the token pepper at its start (step 6d).
 
+- `internal/sync` (M2-01): the frame of the worker consumers of the event log (ADR 0051). The
+  table `event_consumer_cursors` (migration `00009`), the port `Consumers` with `ConsumerName`,
+  `ConsumerHandler` and `ConsumerState`, `domain.PlanRound` with `ErrConsumerGap`, and in `app`
+  the `ConsumerService` (one round per unit of work: `FOR UPDATE SKIP LOCKED` on the cursor row,
+  up to `consumer.batch_size` events, jobs through the handler, cursor and jobs in one commit) and
+  the `ConsumerRunner` (one goroutine per consumer, one `LISTEN` connection per process with the
+  application name `bothy-consumer-wake`, a poll every `consumer.poll_interval`, drain after a full
+  batch). Events lost to retention are skipped and logged, other holes and handler failures roll
+  the round back. The roles `worker` and `all` start the runner after River with the stop step
+  `event_consumers`; every role exports `bothy.event.consumer.lag` and
+  `bothy.event.consumer.pending_age`. No production consumer is registered yet (M2-26, M3-19).
+- Configuration keys `consumer.batch_size`, `consumer.poll_interval` and
+  `consumer.pending_alert_after`, with the start check `consumer_alert_below_retention`; the
+  alarm `BothyEventConsumerLag`, the attribute `bothy.consumer.name` and the panel "Worker
+  consumers" of the dashboard `delivery-sync`.
 - `internal/authz` (M1-28): the one authorization function. `app.Authorizer` implements
   `kernel/authorize.Authorizer` with `Authorize` (07 section 4.2: liveness, pending, resolution
   through the structure, effective rights with owner, dm, operator, agent and app limits, "view

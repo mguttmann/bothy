@@ -74,6 +74,8 @@ dürfen das Fehlerbudget von `bothy-sync/reconnect` nicht verbrauchen.
 | `bothy.event.appended` | Zähler | `{event}` | `bothy.event.type` | api, worker | `bothy_event_appended_total` |
 | `bothy.db.event_seq.lock_wait` | Histogramm | `s` | keine | api, worker: Warten auf die Zähler-Zeile | `bothy_db_event_seq_lock_wait_seconds` |
 | `bothy.event.fanout.lag` | Gauge | `s` | keine | api: Alter des ältesten Ereignisses, das der Log-Tail kennt und der Hub noch nicht verteilt hat (jetzt minus Zeitpunkt, zu dem es per `NOTIFY` oder Poll bekannt wurde); `0`, wenn alles verteilt ist. Grund: Das Alter des zuletzt verteilten Ereignisses wüchse auf einer ruhigen Instanz und bliebe bei einem hängenden Hub stehen | `bothy_event_fanout_lag_seconds` |
+| `bothy.event.consumer.lag` | Gauge | `{event}` | `bothy.consumer.name` (`push`, `webhooks`) | api, worker: `head_seq - last_seq` per row of `event_consumer_cursors` (`head_seq` = the highest `seq` in the log) | `bothy_event_consumer_lag` |
+| `bothy.event.consumer.pending_age` | Gauge | `s` | `bothy.consumer.name` | api, worker: now minus `occurred_at` of the oldest event with `seq > last_seq`; `0` when the consumer is at the head. Reason: `sync.event_retention` is a time window | `bothy_event_consumer_pending_age_seconds` |
 | `bothy.delivery.duration` | Histogramm | `s` | `bothy.event.durability` (`durable`, `ephemeral`), `bothy.principal.kind` | api: `occurred_at` bis Schreiben des Rahmens, nur Live-Zustellung | `bothy_delivery_duration_seconds` |
 
 ### 4.3 Agenten und Läufe
@@ -264,6 +266,7 @@ Diese Liste ist gleich der Allowlist in [infra/otel/collector.yaml](../../infra/
 | `bothy.billing_mode` | `personal`, `organization` | |
 | `bothy.channel.id`, `bothy.space.id`, `bothy.thread.id`, `bothy.message.id`, `bothy.run.id`, `bothy.file.id` | UUID | nie an Metriken |
 | `bothy.close.code` | Schließ-Code aus [04-sync-protokoll.md](../spec/04-sync-protokoll.md) 6.4 | |
+| `bothy.consumer.name` | `push`, `webhooks` | name of the worker consumer ([03-datenmodell.md](../spec/03-datenmodell.md) `event_consumer_cursors`) |
 | `bothy.correlation_id` | UUID | nur in Logs; in Spans ist es die Trace-ID |
 | `bothy.decision` | Entscheidung aus [05-aktionen.md](../spec/05-aktionen.md) 2.5 | |
 | `bothy.egress.purpose` | Zweck eines Egress-Clients aus dem Code (`oidc`, `webhook`, ...) | nur in Logs abgewiesener Verbindungen ([19-sicherheit.md](../spec/19-sicherheit.md) SEC-NET-5) |

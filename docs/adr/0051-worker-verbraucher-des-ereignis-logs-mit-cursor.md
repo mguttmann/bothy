@@ -79,14 +79,22 @@ Der Rahmen entsteht mit dem ersten Verbraucher (Webhooks, Bau-Ticket M2-01), nic
   hält sie fest.
 - Schlecht, weil ein Verbraucher, der länger als `sync.event_retention` steht, Ereignisse verliert,
   sobald ihre Partition abgehängt ist. Für Webhook-Abos erkennt `last_delivered_seq` die Lücke und
-  schaltet das Abo mit Hinweis ab (11, Abschnitt 6); für den Verbraucher selbst gibt es heute
-  weder Kennzahl noch Alarm (siehe More Information).
+  schaltet das Abo mit Hinweis ab (11, Abschnitt 6). For the consumer itself the gauges
+  `bothy.event.consumer.lag` and `bothy.event.consumer.pending_age` and the alarm
+  `BothyEventConsumerLag` at `consumer.pending_alert_after`, strictly below
+  `sync.event_retention`, report the stall long before (M2-01, see More Information).
 
 ### Confirmation
 
 - Test aus Bau-Ticket M2-01: zwei `worker` parallel, jedes Ereignis erzeugt genau einmal Jobs; ein
   Absturz mitten in einer Runde (Abbruch vor dem Commit) erzeugt keine Doppel; `NOTIFY` und Poll
-  wecken beide.
+  wecken beide. Built as `TestConsumersTwoWorkersExactlyOnce`,
+  `TestConsumerCrashMidRoundNoDuplicates` (terminated backend, handler error, panic, cancelled
+  context), `TestConsumerWakesOnNotify`, `TestConsumerWakesOnPoll`,
+  `TestConsumerListenLossLosesNothing`, `TestConsumerRoundJobsAndCursorCommitTogether` and
+  `TestConsumerRoundLockedEndsAtOnce` in `services/server/internal/sync/adapters/postgres`; the
+  lag gauges by `TestConsumerLagGauges`, the alarm by the promtool cases of
+  `BothyEventConsumerLag`.
 - Test: Ein Rechte-Entzug zwischen Runde und Job verhindert den Versand.
 - Lasttest `perf/push_handoff` mit `perf.push_handoff_p95` (Bau-Ticket M3-24).
 - Wiederherstellungstest: Nach `bothy restore finalize` steht jeder Cursor auf `head_seq`
@@ -129,8 +137,11 @@ Der Rahmen entsteht mit dem ersten Verbraucher (Webhooks, Bau-Ticket M2-01), nic
 - Quellen (abgerufen 2026-10-10): Q1 PostgreSQL `SELECT ... FOR UPDATE SKIP LOCKED`,
   https://www.postgresql.org/docs/18/sql-select.html [belegt]; Q2 River, transaktionales Einfügen,
   https://riverqueue.com/docs [belegt].
-- Offen für das Bau-Ticket M2-01: eine Kennzahl für den Rückstand je Verbraucher (`head_seq`
-  minus `last_seq`) mit Alarm, bevor `sync.event_retention` erreicht ist. Der Signal-Katalog
-  ([signals.md](../observability/signals.md)) führt bisher nur den Rückstand der
-  Agenten-Verbraucher.
+- Settled by M2-01: the lag per consumer (`head_seq` minus `last_seq`) is the gauge
+  `bothy.event.consumer.lag`, and because `sync.event_retention` is a time window the age of the
+  oldest unprocessed event is the gauge `bothy.event.consumer.pending_age`
+  ([signals.md](../observability/signals.md) 4.2), both exported by every role. The alarm
+  `BothyEventConsumerLag` ([alerting.md](../observability/alerting.md) 3.2, severity `page`)
+  fires at `consumer.pending_alert_after`, which the start check holds strictly below
+  `sync.event_retention` ([DECISIONS.md](../DECISIONS.md) D-M2-01-5 and D-M2-01-6).
 - Verwandt: ADR 0009 (Ereignis-Log), ADR 0016 (Webhooks), ADR 0031 (Push), ADR 0052 (Umschlag).

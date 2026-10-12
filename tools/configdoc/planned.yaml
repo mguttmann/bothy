@@ -59,8 +59,6 @@ rules:
     etappe: M2
   - match: "console."  # M6-17
     etappe: M6
-  - match: "consumer."  # M2-01
-    etappe: M2
   - match: "dev."  # V2-01, V2-04
     etappe: V2
   - match: "dr."  # M7-03

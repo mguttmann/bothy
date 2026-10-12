@@ -189,6 +189,39 @@ tests:
         alertname: BothyEventFanoutLag
         exp_alerts: []
 
+  - name: BothyEventConsumerLag fires just above 900 s (consumer.pending_alert_after)
+    interval: 1m
+    input_series:
+      - series: 'bothy_event_consumer_pending_age_seconds{job="bothy/bothy-server", instance="server-1", bothy_consumer_name="webhooks"}'
+        values: '900.001x10'
+      - series: 'bothy_event_consumer_pending_age_seconds{job="bothy/bothy-server", instance="server-2", bothy_consumer_name="webhooks"}'
+        values: '0x10'
+      - series: 'bothy_event_consumer_pending_age_seconds{job="bothy/bothy-server", instance="server-1", bothy_consumer_name="push"}'
+        values: '0x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: BothyEventConsumerLag
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: BothyEventConsumerLag
+        exp_alerts:
+          - exp_labels:
+              severity: page
+              bothy_consumer_name: webhooks
+            exp_annotations:
+              summary: "Worker consumer webhooks has an unprocessed event older than consumer.pending_alert_after."
+              runbook_url: "docs/observability/alerting.md#bothyeventconsumerlag"
+
+  - name: BothyEventConsumerLag stays quiet at 900 s
+    interval: 1m
+    input_series:
+      - series: 'bothy_event_consumer_pending_age_seconds{job="bothy/bothy-server", instance="server-1", bothy_consumer_name="push"}'
+        values: '900x10'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: BothyEventConsumerLag
+        exp_alerts: []
+
   - name: BothyAgentConsumerLag fires above 1000 events
     interval: 1m
     input_series:

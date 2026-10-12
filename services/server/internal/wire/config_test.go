@@ -129,6 +129,10 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"sync.idempotency_cleanup_interval":   {Kind: config.KindDuration, Default: "1h", Min: "1s", Chapter: "02-architektur.md"},
 		"sync.idempotency_cleanup_batch_size": {Kind: config.KindInt, Default: "1000", Min: "1", Max: "2147483647", Chapter: "02-architektur.md"},
 		"sync.event_log_partitions_ahead":     {Kind: config.KindInt, Default: "3", Min: "1", Max: "1000", Chapter: "02-architektur.md"},
+
+		"consumer.batch_size":          {Kind: config.KindInt, Default: "500", Min: "1", Max: "2147483647", Chapter: "02-architektur.md"},
+		"consumer.poll_interval":       {Kind: config.KindDuration, Default: "1s", Min: "1ms", Chapter: "02-architektur.md"},
+		"consumer.pending_alert_after": {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "02-architektur.md"},
 	}
 	// Two keys per class of 05 "Rate-Limit-Klassen" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{
@@ -537,6 +541,42 @@ func TestAuditIPKeyRetentionAtLeastPeriod(t *testing.T) {
 		}
 		if len(got) > 0 && !strings.Contains(got[0].String(), "privacy.audit_ip_key_retention") {
 			t.Errorf("the problem does not name the key: %v", got)
+		}
+	}
+}
+
+// TestConfigCheckConsumerAlertBelowRetention: consumer.pending_alert_after must be strictly
+// below sync.event_retention (cross-check consumer_alert_below_retention, D-M2-01-6), so the
+// alarm BothyEventConsumerLag fires before a stalled consumer loses events; the problem names
+// both keys and no value.
+func TestConfigCheckConsumerAlertBelowRetention(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		alert, retention string
+		ok               bool
+	}{
+		{"15m", "30d", true},
+		{"29d", "30d", true},
+		{"30d", "30d", false},
+		{"31d", "30d", false},
+		{"2h", "1h", false},
+	} {
+		got := load(t, "BOTHY_CONSUMER__PENDING_ALERT_AFTER="+c.alert, "BOTHY_SYNC__EVENT_RETENTION="+c.retention)
+		if (len(got) == 0) != c.ok {
+			t.Errorf("alert %s retention %s: problems %v, want ok %v", c.alert, c.retention, got, c.ok)
+			continue
+		}
+		if len(got) == 0 {
+			continue
+		}
+		msg := got[0].String()
+		if !strings.Contains(msg, "consumer.pending_alert_after") || !strings.Contains(msg, "sync.event_retention") {
+			t.Errorf("the problem does not name both keys: %q", msg)
+		}
+		for _, v := range []string{c.alert, c.retention} {
+			if strings.Contains(msg, v) {
+				t.Errorf("the problem names the value %s: %q", v, msg)
+			}
 		}
 	}
 }

@@ -1,6 +1,6 @@
 # Modul `sync`
 
-Status: built in part (M1-16, M1-20): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log`, the one envelope of gateway, REST and webhooks, and the idempotency keys behind `kernel/idempotency.Store` with the job `sync.idempotency_cleanup`. Catch-up, snapshot, redaction, read states, drafts, settings and worker cursors come with M1-63, M1-58, M2-01 and the tickets that need them.
+Status: built in part (M1-16, M1-20, M2-01): the event log with the commit-ordered sequence, the phase hook of `sync`, the log tail, the partitions of `event_log`, the one envelope of gateway, REST and webhooks, the idempotency keys behind `kernel/idempotency.Store` with the job `sync.idempotency_cleanup`, and the frame of the worker consumers with `event_consumer_cursors` (no production consumer yet: M2-26 registers `webhooks`, M3-19 `push`). Catch-up, snapshot, redaction, read states, drafts and settings come with M1-63, M1-58 and the tickets that need them.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -11,10 +11,11 @@ Ereignis-Log (Anhängen, Tail, Nachholen, Schwärzen, Partitionen), Momentaufnah
 
 | Package | Content |
 |---|---|
-| `internal/sync` | port: `Event` (a stored row, zero values for NULL), `DeliveryFields`, `Envelope` with `EnvelopeActor`, `EnvelopeScope`, `EnvelopeResource` and `Event.Envelope`, `Sink`, `Tail`, `ErrGap` |
-| `domain/` | event validation (`ValidateEvent`, `CheckPayload`), partition arithmetic (`PartitionLower`, `PartitionName`) and the gap check of the tail (`CheckContiguous`, `GapError`) |
-| `app/` | `Appender` (implements `kernel/eventlog.Appender`), `PhaseHook` (phase `sync`), `PartitionMaintenance`, `IdempotencyStore` (implements `kernel/idempotency.Store`), `IdempotencyCleanup`; outgoing ports `Writer`, `Partitions`, `Correlator`, `KeyRows` |
-| `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads) and `IdempotencyRepository` (`KeyRows`) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` with its own `LISTEN` connection |
+| `internal/sync` | port: `Event` (a stored row, zero values for NULL), `DeliveryFields`, `Envelope` with `EnvelopeActor`, `EnvelopeScope`, `EnvelopeResource` and `Event.Envelope`, `Sink`, `Tail`, `ErrGap`; worker consumers: `ConsumerName` (`ConsumerPush`, `ConsumerWebhooks`, `ConsumerNames`, `Valid`), `ConsumerHandler`, `ConsumerState`, `Consumers` |
+| `domain/` | event validation (`ValidateEvent`, `CheckPayload`), partition arithmetic (`PartitionLower`, `PartitionName`), the gap check of the tail (`CheckContiguous`, `GapError`) and the round plan of a worker consumer (`PlanRound`, `RoundPlan`, `ErrConsumerGap`) |
+| `app/` | `Appender` (implements `kernel/eventlog.Appender`), `PhaseHook` (phase `sync`), `PartitionMaintenance`, `IdempotencyStore` (implements `kernel/idempotency.Store`), `IdempotencyCleanup`, `ConsumerService` (implements `sync.Consumers`: `Register`, `Ensure`, `Round`, `States`) and `ConsumerRunner`; outgoing ports `Writer`, `Partitions`, `Correlator`, `KeyRows`, `ConsumerCursorStore`, `ConsumerLogReader`, `Waker` |
+| `adapters/postgres/` | `Repository` (writer, partitions, head, minimum, reads, the cursor store and log reader of the worker consumers) and `IdempotencyRepository` (`KeyRows`) over sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`); `Tail` and `Waker`, each with its own `LISTEN` connection over one shared listening loop (`listener`) |
+| `adapters/otelmetrics/` | the lag gauges of the worker consumers (`RegisterConsumerGauges`) |
 | `adapters/telemetry/` | `Correlator`: `correlation_id` and `trace_context` from the trace context of the append |
 | `adapters/jobs/` | jobs `sync.partition_maintenance` and `sync.idempotency_cleanup`: arguments, handlers, periodic registrations |
 
@@ -60,6 +61,53 @@ exponential backoff from `sync.log_poll_interval` up to `database.listen_reconne
 while polling goes on; nothing is lost because `seq` is gapless. A read error is logged and
 retried; a sink error or a gap ends `Run`, and the process exits with code 1 (02 "Panics"). The
 sink list is empty today; M1-28 adds the rights cache, then M1-65 the hub.
+
+### Worker consumers
+
+The port `Consumers` (02 "Ports, Ereignisse und Quellen je Modul", "Worker-Cursor") runs the
+consumers of the event log in the worker (02 "Worker-Verbraucher", ADR 0051). They are not the
+agent consumers of the module `agents` (`agent_consumer_cursors`, M2-07), which that port also
+calls `Consumers`: worker consumers are internal, have no API, consuming is no action and writes
+no audit entry.
+
+- **Table.** Migration `00009_event_consumer_cursors.sql`: `event_consumer_cursors` as 03 4.10
+  (`name` with `CHECK (name IN ('push','webhooks'))`, `last_seq` default `0`, `updated_at`,
+  primary key `name`, no foreign key, retention class `config`); `bothy_app` has `SELECT`,
+  `INSERT`, `UPDATE`, no `DELETE`. No row is seeded: `Ensure` inserts the row of each registered
+  consumer at `max(seq)` (D-M2-01-1), so a consumer of a later release never replays old events.
+- **Registration.** Only `internal/wire` calls `Register`, before the runner starts; an invalid
+  name, a nil handler, a second registration and a registration after `Start` fail. The
+  production list is empty until M2-26 and M3-19.
+- **Round.** `ConsumerService.Round` is one unit of work: `SELECT last_seq ... FOR UPDATE SKIP
+  LOCKED` (no row: `RoundLocked` at once), up to `consumer.batch_size` events after it in `seq`
+  order (`RoundIdle` without), `domain.PlanRound`, the handler per event in phase `work` (it
+  inserts River jobs with `InsertTx` in its own adapters), the refusal of durable events the
+  handler appended (D-M2-01-4), the cursor update and the commit. Cursor and jobs commit together,
+  so each event creates its jobs exactly once, with any number of workers.
+- **Gaps and failures.** Events removed by retention (first number equals `min(seq)`) are skipped
+  and logged once per round at error level (`event consumer lost events to retention`, with
+  `bothy.consumer.name` and `bothy.event.seq`); any other hole is `ErrConsumerGap`. A gap, a
+  handler error or panic and a database error roll back the whole round; no event is skipped and
+  the consumer stalls (D-M2-01-2, D-M2-01-3).
+- **Wake.** `ConsumerRunner` runs one goroutine per registered consumer; `Waker` holds one `LISTEN
+  event_log` connection per process (application name `bothy-consumer-wake`, apart from the
+  tail), each notification wakes every consumer through a channel of capacity one, and each
+  consumer also polls every `consumer.poll_interval`. A full batch starts the next round at once.
+  The first failed round after a success logs `event consumer round failed` (`error.type`), the
+  next success `event consumer recovered`. Without a registered consumer the runner opens no
+  connection.
+- **Lifecycle.** Roles `worker` and `all`: after River, `Ensure`, then the runner (component
+  `event_consumers`); stop step `event_consumers` in `lifecycle.PhaseConsumers` without own
+  budget; an unexpected end of the runner ends the process with exit code 1.
+- **Gauges.** Every role registers `bothy.event.consumer.lag` (`head_seq - last_seq`) and
+  `bothy.event.consumer.pending_age` (now minus `occurred_at` of the oldest pending event) with
+  the attribute `bothy.consumer.name` (`adapters/otelmetrics`, until the registry of M1-68 takes
+  them over); the alarm `BothyEventConsumerLag` fires at `consumer.pending_alert_after`.
+- **Reads without the visibility predicate.** `EventsAfter` (shared with the tail),
+  `OldestEventAfter`, `ListConsumerCursors` (head) and `MinRetainedSeq` read every event without
+  the visible-channel predicate, like the log tail: each consumer job checks `push.deliver` or
+  `webhook_out.deliver` for its receiver before it sends (07 7.4 rule 1, R-AZ-11). They belong
+  to the category `log_tail` of the visibility lint of M1-70 when it lands.
 
 ### Envelope
 

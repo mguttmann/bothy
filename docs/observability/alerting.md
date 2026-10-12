@@ -63,6 +63,7 @@ steht ``über `<name>` ``, ist sie echt größer. Die Alarme der Tabelle sind ge
 | `BothyTelemetryExportFailing` | ticket | Exporter des Collectors scheitert | |
 | `BothyTelemetryDropped` | ticket | Server verwirft Telemetrie | |
 | `BothyEventFanoutLag` | page | Fan-out-Verzug über 5 s | `status.fanout_lag_degraded` |
+| `BothyEventConsumerLag` | page | the oldest unprocessed event of a worker consumer is older than `consumer.pending_alert_after` | `consumer.pending_alert_after` |
 | `BothyAgentConsumerLag` | ticket | über 1000 Ereignisse Rückstand des Verbrauchers | |
 | `BothyAgentOffline` | ticket | kein Heartbeat seit 5 Minuten | über `agent.presence_timeout` |
 | `BothyBillingModeMismatch` | page | Ist-Modus weicht vom Soll ab (I3) | |
@@ -101,6 +102,15 @@ Collector überlastet oder nicht erreichbar; `memory_limiter` und Exporter prüf
 ### bothyeventfanoutlag
 Datenbank-Last (Dashboard Database), lange Transaktionen, `pg_stat_activity`. Ein `api`-Prozess
 hängt: neu starten.
+
+### bothyeventconsumerlag
+A worker consumer (`push`, `webhooks`; label `bothy_consumer_name`) stands still: pushes or
+outgoing webhooks no longer go out. Is a process of the role `worker` or `all` running? Read the
+lines `event consumer round failed` (with `error.type`) and `event consumer lost events to
+retention`; is the database reachable? A handler that keeps failing stalls only its own consumer,
+which catches up by itself after the fix. Never move the cursor in `event_consumer_cursors` by
+hand: the events it jumps over are lost for that consumer for good. A consumer that stands longer
+than `sync.event_retention` loses events ([02-architektur.md](../spec/02-architektur.md) 11.5).
 
 ### bothyagentconsumerlag
 Adapter verarbeitet oder bestätigt nicht. Adapter-Logs, `ack`-Verhalten, Verbindung.

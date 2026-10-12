@@ -94,3 +94,13 @@ func fields(e eventlog.Event) domain.EventFields {
 		ReceiveAction: e.ReceiveAction, HasAudience: !e.AudiencePrincipalID.IsZero(), Payload: e.Payload,
 	}
 }
+
+// bufferedEvents returns how many durable events the unit of ctx has buffered so far. A round of
+// a worker consumer checks it before it moves the cursor and fails when a handler appended
+// events (docs/DECISIONS.md D-M2-01-4).
+func bufferedEvents(ctx context.Context) int {
+	pendingMu.Lock()
+	defer pendingMu.Unlock()
+	have, _ := txn.Load(ctx, pending)
+	return len(have)
+}
