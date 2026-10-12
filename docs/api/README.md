@@ -53,7 +53,10 @@ CI=true npx -y @asyncapi/cli@6.2.0 generate fromTemplate docs/api/asyncapi.yaml 
    06-api.md, section 13.
 2. New operation: `operationId` in lowerCamelCase, `tags`, `x-authz-action` from 05-actions.md,
    `x-rate-limit-class` of the action, problem responses from `components.responses`, an example in
-   the media type. If no suitable action exists, it goes first into
+   the media type. Every POST and PATCH operation gets the parameter `IdempotencyKey` or
+   `x-idempotency-exempt` with a reason code from 06-api.md, section 7. A new problem code goes
+   first into `x-problem-codes` at the schema `Problem` and into the description of the response
+   component whose `x-status` is its status. If no suitable action exists, it goes first into
    [docs/spec/actions.yaml](../spec/actions.yaml); `make catalog` generates the tables in
    05-actions.md and the lists in redocly.yaml from it.
 3. New event: type and receive action first in [docs/spec/actions.yaml](../spec/actions.yaml),
@@ -62,5 +65,7 @@ CI=true npx -y @asyncapi/cli@6.2.0 generate fromTemplate docs/api/asyncapi.yaml 
    a message in asyncapi.yaml, if needed an entry under `webhooks:`.
 4. No `null`, no type arrays, no `anyOf`, `oneOf` only with a discriminator. Repeated
    enum sets as a named schema.
-5. Lint, regenerate the code, run the tests. The generated tables in 06-api.md and webhooks.md
-   (markers `BEGIN GENERATED`) are renewed along with them (gate G3).
+5. Lint, regenerate the code, run the tests. `make api-tables` renews the generated tables in
+   06-api.md and webhooks.md (markers `BEGIN GENERATED`); `make api-checks` checks in the gate
+   that they and all copies of the contracts fit their sources (G2, G3,
+   [tools/api-checks](../../tools/api-checks/README.md)).

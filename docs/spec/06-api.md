@@ -375,6 +375,9 @@ all texts of the YAML files (R-API-15); every response component names its statu
 | `beginPasskeyRegistration` | POST | `/api/v1/me/passkeys/begin` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `completePasskeyRegistration` | POST | `/api/v1/me/passkeys/complete` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `createExtensionSession` | POST | `/api/v1/me/sessions/extensions` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `pairHost` | POST | `/api/v1/hosts/pair` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `openTerminalSession` | POST | `/api/v1/hosts/{host_id}/terminal/sessions` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
+| `attachTerminalSession` | POST | `/api/v1/terminal/sessions/{session_id}/attach` | login or session flow: one-time challenge or code, refresh rotation, replacement of the child session |
 | `previewGrant` | POST | `/api/v1/grants/preview` | reads only, changes no durable state |
 | `createFileTicket` | POST | `/api/v1/files/{file_id}/tickets` | reads only, changes no durable state |
 | `autocompleteCommand` | POST | `/api/v1/channels/{channel_id}/commands/{command_id}/autocomplete` | reads only, changes no durable state |
@@ -385,6 +388,7 @@ all texts of the YAML files (R-API-15); every response component names its statu
 | `patchRun` | PATCH | `/api/v1/runs/{run_id}` | agent runtime: monotonic or compare-and-swap |
 | `startRun` | POST | `/api/v1/runs/{run_id}/start` | agent runtime: monotonic or compare-and-swap |
 | `resumeRun` | POST | `/api/v1/runs/{run_id}/resume` | agent runtime: monotonic or compare-and-swap |
+| `renewInvocationToken` | POST | `/api/v1/runs/{run_id}/invocation-token` | agent runtime: monotonic or compare-and-swap |
 | `awaitRunInput` | POST | `/api/v1/runs/{run_id}/await-input` | agent runtime: monotonic or compare-and-swap |
 | `finishRun` | POST | `/api/v1/runs/{run_id}/finish` | agent runtime: monotonic or compare-and-swap |
 | `answerAutocomplete` | POST | `/api/v1/command-autocompletions/{request_id}/answer` | agent runtime: monotonic or compare-and-swap |
@@ -1177,10 +1181,10 @@ Events (receive action per 05, section 6; schema in openapi.yaml):
 | `typing.started` | ephemeral | `thread.read` |  | `TypingStartedEvent` |  |
 | `run.updated` | ephemeral | `run.read` |  | `RunUpdatedEvent` |  |
 | `agent.presence_changed` | ephemeral | `agent.read` |  | `AgentPresenceChangedEvent` |  |
-| `command.autocomplete_requested` | ephemeral | `agent.events.consume` | self | `CommandAutocompleteRequestedEvent` |  |
-| `notification.created` | ephemeral | `push.deliver` | self | `NotificationCreatedEvent` |  |
 | `host.presence_changed` | ephemeral | `host.read` |  | `HostPresenceChangedEvent` |  |
 | `stats.live` | ephemeral | `stats.read` |  | `StatsLiveEvent` |  |
+| `notification.created` | ephemeral | `push.deliver` | self | `NotificationCreatedEvent` |  |
+| `command.autocomplete_requested` | ephemeral | `agent.events.consume` | self | `CommandAutocompleteRequestedEvent` |  |
 <!-- END GENERATED: events -->
 
 ## 18. Alignment with the core contract
