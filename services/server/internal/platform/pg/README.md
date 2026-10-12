@@ -29,8 +29,8 @@ migrator behind `bothy migrate`. Migrations never run at `bothy serve` (R-AR-16)
 ## Pool
 
 - `Open(ctx, cfg, secretsProvider, logger)` builds the pool without connecting; the start calls
-  `WaitReady(ctx, startup.dependency_wait)` next, which pings with exponential backoff (100ms to
-  2s) and full jitter; when it gives up, the error names host and port and the last cause the
+  `WaitReady(ctx, startup.dependency_wait)` next, which pings with exponential backoff (from `backoffBase`
+  to `backoffCap` in `pool.go`) and full jitter; when it gives up, the error names host and port and the last cause the
   database reported (for example 28P01 or a missing database), never the password.
 - Every connection is configured completely by `Config`: pgx would otherwise read `PG*`
   environment variables, `~/.pgpass`, `~/.pg_service.conf` and `~/.postgresql/` (only
@@ -70,7 +70,9 @@ or `ALTER ROLE` with `LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NO
 password, `GRANT pg_monitor TO bothy_monitor`) and `BootstrapDatabase` (owner, `REVOKE ALL ... FROM
 PUBLIC`, `CONNECT` and `USAGE` grants). It is idempotent, narrows a role widened by hand, and
 rotates passwords when the secrets changed. Passwords reach the server only as SCRAM-SHA-256
-verifiers computed in Go (RFC 5802, RFC 7677; 4096 iterations, 16 bytes of salt), so neither the
+verifiers computed in Go ([RFC 5802](https://www.rfc-editor.org/rfc/rfc5802),
+[RFC 7677](https://www.rfc-editor.org/rfc/rfc7677), retrieved 2026-10-12; `scramIterations`
+iterations and `scramSaltBytes` bytes of salt in `scram.go`), so neither the
 server log, also with `log_statement = all`, nor `pg_stat_activity` ever shows one. Passwords must
 be printable ASCII (docs/DECISIONS.md M1-12). There are no default privileges: each migration
 grants what `bothy_app` needs ([migrations/README.md](../../../migrations/README.md)).
@@ -99,7 +101,8 @@ database is older; an equal or newer schema passes (expand and contract). Wiring
 Spans come from otelpgx on the global tracer provider, only below a recording parent span. Query
 parameters are never recorded, password literals (`PASSWORD '...'` of the role statements)
 become `'[redacted]'`, and the error of a failed statement reaches the span with its SQLSTATE
-only, because PostgreSQL messages can quote parameter values. The pinned otelpgx emits
+only, because PostgreSQL messages can quote parameter values. The pinned otelpgx emits (source
+and date in docs/DECISIONS.md M1-12/9)
 `db.system.name`, `db.namespace`, `db.operation.name`, `db.query.text` (placeholders only),
 `db.collection.name` on COPY spans, and also `server.address`, `server.port`, `user.name`,
 `pgx.rows_affected`, `pgx.sql_state` and `pgx.prepare_stmt.name`. The retry line of `WaitReady`

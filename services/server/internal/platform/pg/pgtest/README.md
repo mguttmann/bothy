@@ -38,12 +38,17 @@ restore the password (see `roles_test.go` in package `pg`).
 ## Docker requirement
 
 `Main` checks that a Docker-compatible runtime answers (`DOCKER_HOST` is honoured, for example
-Colima). Without one it prints
+Colima: [testcontainers-go configuration](https://golang.testcontainers.org/features/configuration/),
+retrieved 2026-10-12). Without one it prints
 `pgtest: no Docker-compatible runtime reachable (<error>); integration tests need one (plan P-09)`
 and the test binary exits with 1; tests never skip. The image is the pinned `Image` in `image.go`
 (the same pin as `tools/sonarqube/compose.yaml`, updated by Renovate). The container binds
 `127.0.0.1` with a random host port, runs with `fsync=off`, `synchronous_commit=off` and
-`full_page_writes=off`, and Ryuk is disabled because it would publish a port beyond loopback.
+`full_page_writes=off`, and Ryuk is disabled because it would publish a port beyond loopback (the Ryuk container exposes
+`8080/tcp`, `defaultReaperPort` in
+[testcontainers-go v0.44.0 reaper.go](https://github.com/testcontainers/testcontainers-go/blob/v0.44.0/reaper.go),
+retrieved 2026-10-12; switched off with `TESTCONTAINERS_RYUK_DISABLED`,
+[garbage collector](https://golang.testcontainers.org/features/garbage_collector/)).
 
 ## Cleanup
 

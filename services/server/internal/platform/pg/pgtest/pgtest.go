@@ -419,8 +419,9 @@ func (c *cluster) template(ctx context.Context, fsys fs.FS) (string, error) {
 
 // create runs CREATE DATABASE name (from template when set) OWNER bothy_owner and
 // pg.BootstrapDatabase in it; with fsys it then migrates the database as bothy_owner and closes
-// it for connections, so it can serve as a template.
-func (c *cluster) create(ctx context.Context, name, template string, fsys fs.FS) error {
+// it for connections, so it can serve as a template. When a step after CREATE DATABASE fails, it
+// drops the database again, so a retry with the same name reports the real error.
+func (c *cluster) create(ctx context.Context, name, template string, fsys fs.FS) (err error) {
 	super, err := c.superConn(ctx, superDatabase)
 	if err != nil {
 		return err
@@ -433,6 +434,13 @@ func (c *cluster) create(ctx context.Context, name, template string, fsys fs.FS)
 	if _, err := super.Exec(ctx, stmt); err != nil {
 		return fmt.Errorf("pgtest: create database %s: %w", name, err)
 	}
+	defer func() {
+		if err != nil {
+			dctx, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
+			defer cancel()
+			_ = c.dropDatabase(dctx, name)
+		}
+	}()
 	conn, err := c.superConn(ctx, name)
 	if err != nil {
 		return err

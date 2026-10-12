@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
@@ -128,6 +129,40 @@ func TestDatabaseIsDroppedAtCleanup(t *testing.T) {
 	}
 	if exists {
 		t.Errorf("database %s still exists after the cleanup of its test", name)
+	}
+}
+
+// TestFailedTemplateIsDropped: a migration set that fails leaves no template behind, so a second
+// attempt reports the migration error again instead of "database already exists".
+func TestFailedTemplateIsDropped(t *testing.T) {
+	t.Parallel()
+	broken := fstest.MapFS{"00001_broken.sql": {Data: []byte("-- +goose Up\nSELECT * FROM no_such_table;\n")}}
+	c, err := sharedCluster()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	for attempt := 1; attempt <= 2; attempt++ {
+		err := c.createDatabase(ctx, "t_"+randomHex(8), broken)
+		if err == nil {
+			t.Fatalf("attempt %d: broken migration set accepted", attempt)
+		}
+		if strings.Contains(err.Error(), "already exists") {
+			t.Fatalf("attempt %d: %v", attempt, err)
+		}
+	}
+	key, err := hashFS(broken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var exists bool
+	keeper := New(t, WithoutMigrations())
+	if err := keeper.SuperConn(t).QueryRow(ctx,
+		"SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = $1)", "tpl_"+key[:16]).Scan(&exists); err != nil {
+		t.Fatal(err)
+	}
+	if exists {
+		t.Error("the template of the failed migration set still exists")
 	}
 }
 
