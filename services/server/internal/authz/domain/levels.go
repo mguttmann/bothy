@@ -22,6 +22,8 @@ const (
 )
 
 // levelNames are the column values of grants.level, indexed by Level.
+//
+//nolint:goconst // "read" is a grant level, not the action effect EffectRead; the count includes the generated catalogue of M1-25 (docs/DECISIONS.md INT-W5/6)
 var levelNames = [...]string{LevelNone: "", LevelRead: "read", LevelWrite: "write", LevelTrigger: "trigger"}
 
 // ParseLevel returns the level of a column or API value: "read", "write" or "trigger".

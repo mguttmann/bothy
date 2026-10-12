@@ -25,7 +25,7 @@ var capNames = [...]string{
 	CapApproveActions: "approve_actions",
 	CapUpload:         "upload",
 	CapExport:         "export",
-	CapManage:         "manage",
+	CapManage:         "manage", //nolint:goconst // the count includes the generated catalogue of M1-25 (docs/DECISIONS.md INT-W5/6)
 	CapTerminal:       "terminal",
 }
 
