@@ -691,7 +691,7 @@ Source: [17-observability.md](../spec/17-observability.md), section 11.
 | `telemetry.traces.trust_remote_parent` | `BOTHY_TELEMETRY__TRACES__TRUST_REMOTE_PARENT` | Server | bool | `false` | `true`: an incoming `traceparent` becomes the parent context (its trace ID becomes `correlation_id`, its sampling flag applies); `false`: span link only, own trace | active |
 | `telemetry.logs.exporter` | `BOTHY_TELEMETRY__LOGS__EXPORTER` | Server | enum(otlp, stdout, both) | `both` | `otlp`, `stdout` or `both` | active |
 | `telemetry.logs.level` | `BOTHY_TELEMETRY__LOGS__LEVEL` | Server | enum(debug, info, warn, error) | `info` | lowest level that is written | active |
-| `telemetry.pseudonym_key_ref` | `BOTHY_TELEMETRY__PSEUDONYM_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/telemetry_pseudonym_key` | key for HMAC pseudonyms; at least 32 bytes | active |
+| `telemetry.pseudonym_key_ref` | `BOTHY_TELEMETRY__PSEUDONYM_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/telemetry_pseudonym_key` | key for HMAC pseudonyms; at least `otel.MinKeyBytes` bytes | active |
 | `telemetry.dashboard_url` | `BOTHY_TELEMETRY__DASHBOARD_URL` | Server |  | empty | link from the admin console to the telemetry backend | planned (M6) |
 | `stats.cache_ttl` | `BOTHY_STATS__CACHE_TTL` | Server |  | `5m` | how long a computed statistics result stays valid | planned (M6) |
 | `stats.max_range` | `BOTHY_STATS__MAX_RANGE` | Server |  | `400d` | largest queryable time range | planned (M6) |
