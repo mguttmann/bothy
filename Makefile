@@ -84,7 +84,8 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-tables api-clients \
         runners-check release-pins commitlint \
         review labels-check labels-sync tools-lock release-build clean \
-        codegen-check arch register-check migrations-lint migrations-lock perf ops-check
+        codegen-check arch register-check migrations-lint migrations-lock perf ops-check \
+        image image-test
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -143,9 +144,11 @@ fmt-check: ## Formatting is clean (no changes)
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-format,no TypeScript project selected); \
 	else for p in $(TS_PROJECTS); do npm --prefix $$p run format:check; done; fi
 
-lint: ## Linters: file hygiene hooks, ruff, bandit, actionlint, zizmor, component linters
+lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint, zizmor, component linters
 	SKIP=ruff-format,ruff-check,gitleaks-staged $(UVRUN) pre-commit run --all-files --hook-stage pre-commit
 	$(UVRUN) ruff check tools
+	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
+	$(UVRUN) python tools/ci/dockerfile_pins.py
 	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/bin tools/catalog tools/ci tools/configdoc tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/opscheck tools/sonarqube
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
@@ -465,6 +468,45 @@ release-build: ## Product release bundle (tag v<version>): Compose installation,
 	mkdir -p "$$OUT"
 	git archive --format=tar.gz --prefix="bothy-$$VERSION/" -o "$$OUT/bothy-compose-$$VERSION.tar.gz" HEAD \
 	  infra/compose LICENSE NOTICE CHANGELOG.md VERSION
+
+# ---- server image (ADR 0012; not part of `gates`: needs Docker with buildx, see CONTRIBUTING.md) --
+# The release (M7) and the Compose smoke test (M1-73) start from `make image`. The local tag is
+# `<version>-local`, never `latest` (docs/spec/18-release.md "Channels" rule 3).
+SERVER_VERSION := $(shell cat services/server/VERSION 2>/dev/null)
+IMAGE_NAME ?= bothy-server
+IMAGE_TAG ?= $(SERVER_VERSION)-local
+IMAGE_PLATFORMS ?= linux/amd64,linux/arm64
+IMAGE_OCI ?= .cache/image/bothy-server.oci.tar
+# Empty: the current buildx builder. It must build several platforms (see `make image`).
+IMAGE_BUILDER ?=
+image_build = docker buildx build $(if $(IMAGE_BUILDER),--builder '$(IMAGE_BUILDER)') --file services/server/Dockerfile \
+  --build-arg VERSION='$(SERVER_VERSION)' --build-arg REVISION="$$rev"
+
+image: ## Build bothy-server for IMAGE_PLATFORMS into IMAGE_OCI and load the host platform as IMAGE_NAME:IMAGE_TAG
+	@docker buildx version >/dev/null 2>&1 || { echo "image: docker buildx is required (Docker with the buildx plugin, CONTRIBUTING.md)" >&2; exit 1; }
+	@[ -n "$(SERVER_VERSION)" ] || { echo "image: services/server/VERSION is empty" >&2; exit 1; }
+	@[ "$(IMAGE_TAG)" != latest ] || { echo "image: the tag latest is not used (docs/spec/18-release.md \"Channels\" rule 3)" >&2; exit 1; }
+	@mkdir -p "$(dir $(IMAGE_OCI))" || exit 1
+	@rev=$$(git rev-parse HEAD) || exit 1; \
+	log=$$(mktemp "$${TMPDIR:-/tmp}/bothy-image.XXXXXX") || exit 1; \
+	rc=0; $(image_build) --platform '$(IMAGE_PLATFORMS)' --output 'type=oci,dest=$(IMAGE_OCI)' . 2>&1 | tee "$$log" || rc=$$?; \
+	if [ "$$rc" -ne 0 ]; then \
+	  if grep -qiE 'multi-?platform|multiple platforms' "$$log"; then \
+	    echo "image: the buildx builder cannot build $(IMAGE_PLATFORMS). Create one and pass it:" >&2; \
+	    echo "  docker buildx create --name <name> --driver docker-container" >&2; \
+	    echo "  make image IMAGE_BUILDER=<name>" >&2; fi; \
+	  rm -f "$$log"; exit 1; fi; \
+	rm -f "$$log"; \
+	$(image_build) --load --tag '$(IMAGE_NAME):$(IMAGE_TAG)' . || exit 1
+	@echo "  image: $(IMAGE_NAME):$(IMAGE_TAG) loaded (host platform), $(IMAGE_PLATFORMS) in $(IMAGE_OCI)"
+
+image-test: ## Structure tests of the image from make image (IMAGE=<ref> tests another loaded image)
+	@docker info >/dev/null 2>&1 || { echo "image-test: no Docker runtime reachable; the image tests need one (P-09)" >&2; exit 1; }
+	@[ -f "$(IMAGE_OCI)" ] || { echo "image-test: $(IMAGE_OCI) is missing; run make image first" >&2; exit 1; }
+	@gl=$(call tool,golangci-lint) || exit 1; \
+	cd services/server && "$$gl" run --build-tags imagetest ./test/image/... || exit 1; \
+	BOTHY_TEST_IMAGE='$(or $(IMAGE),$(IMAGE_NAME):$(IMAGE_TAG))' BOTHY_TEST_IMAGE_OCI='$(abspath $(IMAGE_OCI))' \
+	  go test -tags imagetest -count=1 ./test/image/... || exit 1
 
 portability: ## Full stack from images on this machine plus smoke test (contract: infra/compose/smoke.sh)
 	@[ -x infra/compose/smoke.sh ] || { echo "portability: infra/compose/smoke.sh is missing (docs/quality/gates.md)"; exit 1; }

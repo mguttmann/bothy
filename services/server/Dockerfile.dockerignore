@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Build context of services/server/Dockerfile (the repository root, as in release.yml). BuildKit
+# reads this file instead of a root .dockerignore, so other builds are not affected. Everything
+# is ignored except the sources the binary is built from; tests and test data never enter the
+# context. Embedded files live in migrations/ (migrations/embed.go), which is allowed.
+*
+!services/server/go.mod
+!services/server/go.sum
+!services/server/VERSION
+!services/server/api/
+!services/server/cmd/
+!services/server/internal/
+!services/server/migrations/
+**/*_test.go
+**/testdata/

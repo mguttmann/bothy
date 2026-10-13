@@ -219,6 +219,12 @@ The issuer `https://token.actions.githubusercontent.com` is not confirmed in the
    `FROM` without a digest (SEC-SC-4).
 6. Labels according to OCI (`org.opencontainers.image.source`, `.version`, `.revision`, `.licenses`);
    version, revision and source come as build arguments, a build without a version fails.
+7. `bothy-server` is built from `services/server/Dockerfile` with the repository root as build
+   context (the same for `make image` and `release.yml`). The file
+   `services/server/Dockerfile.dockerignore` applies to this Dockerfile only: it ignores
+   everything and allows only `go.mod`, `go.sum`, `VERSION`, `api/`, `cmd/`, `internal/` and
+   `migrations/` of the server, without test files and `testdata/`. A build whose `VERSION`
+   differs from `services/server/VERSION` fails.
 
 ## 8. App distribution
 

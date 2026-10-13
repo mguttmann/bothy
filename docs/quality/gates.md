@@ -16,7 +16,7 @@ Source of the diagram: `docs/quality/pipeline.mmd`.
 |---|---|---|---|---|
 | `fmt-check` | ruff format, gofmt, dart format, script `format:check` of the TypeScript projects | format without changes | | tools |
 | `codegen-check` | `tools/ci/codegen_check.py` with sqlc and `go generate` (go-arch-lint and sqlc from the pins at the front of `PATH`; oapi-codegen as a `tool` from `services/server/go.mod`) | generated code (sqlc code, `.go-arch-lint.yml`, the exported configuration schema `architecture/config-schema.json`, API code) matches a fresh generation; only changes by the generator count, not manual changes in the working tree | | from the first Go module |
-| `lint` | pre-commit hooks over all files (text rules, Stripe webhook secret format `whsec_` of GitHub secret scanning, whitespace, YAML/TOML/JSON, merge markers, private keys, file size), ruff (with required docstrings `D`, section "Documentation in code" in chapter 23), bandit, check-jsonschema (issue forms, Renovate, CodeRabbit), actionlint, zizmor, go vet and golangci-lint, flutter analyze and custom_lint, script `lint` | style, sources of errors, workflow security | `repo.max_file_kb` | yes |
+| `lint` | pre-commit hooks over all files (text rules, Stripe webhook secret format `whsec_` of GitHub secret scanning, whitespace, YAML/TOML/JSON, merge markers, private keys, file size), ruff (with required docstrings `D`, section "Documentation in code" in chapter 23), bandit, Dockerfile pin check (`tools/ci/dockerfile_pins.py`: every image of `FROM`, `COPY --from`, `RUN --mount=from` and every `# syntax=` line pinned by `@sha256` digest, except `scratch` and stages; SEC-SC-4), check-jsonschema (issue forms, Renovate, CodeRabbit), actionlint, zizmor, go vet and golangci-lint, flutter analyze and custom_lint, script `lint` | style, sources of errors, workflow security | `repo.max_file_kb` | yes |
 | `typecheck` | mypy (strict), go build, tsc | types | | tools |
 | `arch` | go-arch-lint with `<module>/.go-arch-lint.yml`, generated from `architecture/modules.yaml` | module boundaries and allowed third-party libraries of the Go modules (chapter 02 "go-arch-lint"); no symbolic links below a module, because go-arch-lint does not follow a linked directory and assigns it by the path of the link, while the Go compiler builds the code behind it (go-arch-lint v1.19.0 walks the module with [`filepath.WalkDir`](https://github.com/fe3dback/go-arch-lint/blob/v1.19.0/internal/services/project/scanner/scanner.go#L74), which [does not follow symbolic links](https://pkg.go.dev/path/filepath#WalkDir), retrieved 2026-10-12; M1-05/24) | | from the first Go module |
 | `register-check` | `tools/doccheck/register_check.py` | module register `services/server/architecture/modules.yaml` equal to the core contract (tables and their modules from chapter 03, actions, event types and ops from `docs/spec/actions.yaml`) and equal to the places that repeat it: tables "Module list", "Allowed dependencies", "Cross-cutting ports", "Actions per module" and "Event types and WebSocket ops per module" in chapter 02, component diagram `c4-3-server-components.mmd`, module READMEs; one line per difference with file and item (ADR 0050, rules C1 to C12 in the docstring) | | yes |
@@ -48,6 +48,16 @@ Source of the diagram: `docs/quality/pipeline.mmd`.
 In addition, the release workflow runs: `trivy-image` (vulnerabilities in the built image), SBOM
 (Syft via `anchore/sbom-action`), build provenance and SBOM attestation (public),
 `portability` (whole stack on a fresh machine).
+
+Not gates, but meant for the release (M7) and the Compose smoke test (M1-73): `make image`
+builds `bothy-server` from `services/server/Dockerfile` for `IMAGE_PLATFORMS` (default
+`linux/amd64,linux/arm64`) into the OCI archive `IMAGE_OCI` and loads the host platform as
+`IMAGE_NAME:IMAGE_TAG` (default `bothy-server:<VERSION>-local`, never `latest`); `make image-test`
+checks that image with the structure tests in `services/server/test/image` (build tag
+`imagetest`: user, health check equal to Compose, no shell, static binary, a run with a read-only
+root file system and without capabilities, both platforms in the archive). Both need Docker with
+buildx and a builder that builds several platforms (CONTRIBUTING.md); without Docker they fail
+with a hint.
 
 ## Skipping and failing
 

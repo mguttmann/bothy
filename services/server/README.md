@@ -7,8 +7,9 @@ builds; every module of 02 exists as a port package, the kernel packages `ids`, 
 and `make arch` enforces the module boundaries from the register.
 Since M1-11 `bothy serve` starts every role with the internal listener, health, the database
 and schema check and the public listener, shuts down within `shutdown.total_timeout`, and
-`bothy healthcheck` probes a loopback health endpoint. The normative source is
-[docs/spec/02-architecture.md](../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
+`bothy healthcheck` probes a loopback health endpoint.
+Since M1-23 `make image` builds the multi-arch image `bothy-server` (section [Image](#image)).
+The normative source is [docs/spec/02-architecture.md](../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 Module path until V1: `github.com/OWNER/bothy/services/server` (PLAN P-05). `go.mod` names the
 older maintained Go line as the `go` directive and the built version as `toolchain` (ADR 0005).
@@ -87,6 +88,59 @@ without this variable. By hand, from `services/server`:
 ```sh
 GO_ARCH_LINT="$(uv run --project ../../tools --locked --quiet python ../../tools/bin/fetch_tools.py path go-arch-lint)" go test -race ./...
 ```
+
+## Image
+
+The image `bothy-server` (ADR 0012, 18-release.md "Server images") is built from
+[`Dockerfile`](Dockerfile) with the repository root as build context; the ignore file
+[`Dockerfile.dockerignore`](Dockerfile.dockerignore) lets only the server sources into the
+context, without tests and test data.
+
+```sh
+make image        # linux/amd64 and linux/arm64 into .cache/image/bothy-server.oci.tar,
+                  # host platform loaded as bothy-server:<VERSION>-local
+make image-test   # structure tests of that image (services/server/test/image, tag imagetest)
+make trivy-image IMAGE=bothy-server:<VERSION>-local
+```
+
+- The builder stage runs on the build platform and cross compiles `bothy` for the target
+  platform without cgo (`CGO_ENABLED=0`, `-trimpath`, `-buildvcs=false`, `-ldflags "-s -w"`);
+  the final stage only copies, so no step runs under emulation.
+- The binary is `/usr/local/bin/bothy`, owned by `0:0` with mode `0555`. The image runs as the
+  numeric user `65532:65532` (`nonroot` of distroless), has no shell and no package manager, and
+  declares no `VOLUME`; it runs with a read-only root file system, without capabilities and
+  with `no-new-privileges` (Compose `x-hardening`, `/tmp` as tmpfs). `secrets-init` overrides the
+  user with `0:0`.
+- `/var/lib/bothy/signing-keys` (`secrets.signing_key_dir`) exists empty with owner `65532:65532`
+  and mode `0700`, so a named volume mounted there takes that owner.
+- Health check: `/usr/local/bin/bothy healthcheck --url http://127.0.0.1:8081/readyz`, interval
+  `15s`, timeout `5s`, start period `30s`, `4` retries, equal to `x-server-healthcheck` in
+  `infra/compose/compose.yaml` (a test of `make image-test` compares both).
+- Build arguments: `VERSION` (required, must equal [VERSION](VERSION)), `REVISION` (commit SHA;
+  a build from a dirty tree still labels `HEAD`) and `SOURCE_URL` (default
+  `https://github.com/OWNER/bothy`). They set the OCI labels `org.opencontainers.image.version`,
+  `.revision` and `.source`; `.title` is `bothy-server`, `.licenses` is `Apache-2.0`.
+- Local tags are `<VERSION>-local`, never `latest`. The release workflow pushes by digest and
+  tags only after the vulnerability scan.
+
+Base images, pinned by digest (`make lint` rejects any `FROM` without one; Renovate updates the
+digests, and the golang tag follows the `toolchain` of [go.mod](go.mod)):
+
+| Stage | Tag | Digest (image index) |
+|---|---|---|
+| build | `golang:1.27.2-trixie` | `sha256:e58d6f83b3416618d8bcac2b3dde1b7f7e3c4a77d25e88637f8bbae81536c48d` |
+| final | `gcr.io/distroless/static-debian13:nonroot` | `sha256:e2e927ec666bae08560abb3c55d0659eceabb657f56b6782ab500a9fc7f555e3` |
+
+`make image` builds several platforms at once. Docker Engine with the containerd image store does
+that with its default builder; otherwise create a builder once and pass it:
+
+```sh
+docker buildx create --name bothy-multiarch --driver docker-container
+make image IMAGE_BUILDER=bothy-multiarch
+```
+
+Variables: `IMAGE_NAME`, `IMAGE_TAG`, `IMAGE_PLATFORMS`, `IMAGE_OCI`, `IMAGE_BUILDER`; `make
+image-test IMAGE=<ref>` tests another loaded image.
 
 ## Modules
 
