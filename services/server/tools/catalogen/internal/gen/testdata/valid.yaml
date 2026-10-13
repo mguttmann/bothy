@@ -1,0 +1,148 @@
+# SPDX-License-Identifier: Apache-2.0
+# Small catalogue in the schema of docs/spec/actions.yaml (tools/catalog/README.md) with one
+# entry for every normalisation case of catalogen.
+version: 1
+rate_limit_classes:
+- id: rl.read
+  key: principal
+  purpose: reading queries
+- id: rl.write
+  key: principal
+  purpose: writes
+sections:
+- public
+actions:
+- id: message.read
+  section: public
+  description: read a message
+  resource: message
+  right: read
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
+- id: agent.billing_mode.set_all
+  section: public
+  description: switch all agents
+  resource: instance, space (own only)
+  right: owner
+  owner: yes
+  step_up: yes
+  audit: always
+  rights_change: true
+  rl_class: rl.write
+  effect: write
+  app_scope: agents:write
+- id: access.preview
+  section: public
+  description: preview
+  resource: as the target action
+  right: permission of the target action
+  owner: as_target
+  step_up: false
+  audit: denials
+  rights_change: no
+  rl_class: rl.read
+  effect: read
+- id: passkey.add
+  section: public
+  description: add a passkey
+  resource: [passkey, user]
+  right: self and `message.read`
+  owner: no
+  step_up: conditional
+  audit: conditional
+  audit_text: yes for others'
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: terminal.open
+  section: public
+  description: open a terminal
+  resource: terminal_session
+  right: read
+  owner: false
+  step_up: fresh
+  audit: always
+  rights_change: false
+  rl_class: rl.write
+  effect: write
+- id: instance.bootstrap
+  section: public
+  description: first start
+  resource: instance
+  right: system
+  owner: false
+  step_up: conditional
+  audit: always
+  rights_change: false
+  rl_class: none
+  effect: write
+- id: push.deliver
+  section: public
+  description: delivery check
+  resource: message
+  right: read
+  owner: false
+  step_up: fresh
+  audit: never
+  rights_change: false
+  rl_class: none
+  effect: read
+  delivery_check: true
+events:
+- type: message.created
+  kind: durable
+  resource: message
+  receive_action: message.read
+  note: Echo
+  resource_version: true
+- type: access.changed
+  kind: durable
+  resource: principal
+  receive_action: self
+  audience: self
+  receivers: agent
+  resource_version: false
+- type: typing.started
+  kind: ephemeral
+  resource: instance, space
+  receive_action: message.read
+  receive_text: self and `message.read`, otherwise `push.deliver`.
+  resource_version: false
+- type: notice.created
+  kind: ephemeral
+  resource: message; for a notice without a message the recipient (`user`)
+  receive_action: message.read
+  resource_version: false
+ws_ops:
+- op: typing.start, typing.stop
+  direction: client_to_server
+  action: message.read
+- op: heartbeat
+  direction: agent_or_app_to_server
+  action: message.read
+  also_actions:
+  - passkey.add
+  action_text: '`message.read`; for agents also `passkey.add`'
+- op: hello
+  direction: server_to_client
+  action: message.read
+  action_text: none of its own; part of the session from `message.read`
+  row_group: session
+- op: dispatch
+  direction: server_to_client
+  action: message.read
+  action_text: receive action of the event type
+  per_event_receive_action: true
+channel_ops:
+- channel: host_control
+  channel_text: control
+  ops:
+  - session.open
+  - hello
+  direction: server_to_host
+  action: terminal.open
+  action_text: '`terminal.open` (the session belongs to the host)'

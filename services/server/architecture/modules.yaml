@@ -72,7 +72,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [instance]
-    adapter_vendors: []
+    adapter_vendors: [otel]   # adapters/telemetry counts bothy.authz.errors (M1-25)
   identity:
     tables: [principals, users, owners, identity_providers, user_identities, local_credentials,
              enrollment_codes, auth_login_flows, auth_challenges, device_pairings,
