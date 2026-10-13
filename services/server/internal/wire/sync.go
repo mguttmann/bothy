@@ -118,15 +118,15 @@ func NewSync(pool *pg.Pool, uow txn.UnitOfWork, cfg SyncConfig, c clock.Clock, l
 	}, nil
 }
 
-// IdempotencyStore returns the store of sync behind the kernel port (02 "Ports, Ereignisse und
-// Quellen je Modul": sync implements idempotency.Store).
+// IdempotencyStore returns the store of sync behind the kernel port (02 "Ports, events and
+// sources per module": sync implements idempotency.Store).
 func (s *Sync) IdempotencyStore() idempotency.Store { return s.keys }
 
 // IdempotencyCleanup returns the use case of the job sync.idempotency_cleanup.
 func (s *Sync) IdempotencyCleanup() *syncapp.IdempotencyCleanup { return s.cleanup }
 
 // InstallIdempotency is the Idempotency-Key part of start step 7 for the roles api and all: it
-// installs StageIdempotency (02 "Kette im api-Knoten" step 10) in chain over the store and the
+// installs StageIdempotency (02 "Chain in the api node" step 10) in chain over the store and the
 // unit of work of sy, with sync.idempotency_key_ttl from cfg and the clock of sy. Call it before
 // the routes are mounted. The error is a configuration the stage refuses.
 func InstallIdempotency(chain *httpserver.Chain, sy *Sync, cfg SyncConfig) error {

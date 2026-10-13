@@ -111,7 +111,7 @@ func TestIdempotencyCleanupJobRegistered(t *testing.T) {
 }
 
 // TestInstallIdempotency_FillsTheStage: the start installs StageIdempotency in the chain of api
-// and all (02 "Kette im api-Knoten" step 10), so the slot is taken afterwards.
+// and all (02 "Chain in the api node" step 10), so the slot is taken afterwards.
 func TestInstallIdempotency_FillsTheStage(t *testing.T) {
 	t.Parallel()
 	v := syncValues(t)
