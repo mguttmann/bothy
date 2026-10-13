@@ -31,6 +31,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -43,6 +44,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
 	"github.com/testcontainers/testcontainers-go"
 	tclog "github.com/testcontainers/testcontainers-go/log"
 	"github.com/testcontainers/testcontainers-go/wait"
@@ -52,11 +54,14 @@ import (
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
-// The label of every pgtest container. A test binary that was killed leaves its container
-// running; `docker ps --filter label=org.bothy.test=pgtest` finds it (README.md).
+// The labels of every pgtest container: `docker ps --filter label=org.bothy.test=pgtest` finds
+// them (README.md). watchdogLabel marks a container that removes itself when its test binary is
+// gone; containers of older pgtest versions lack it.
 const (
-	label      = "org.bothy.test"
-	labelValue = "pgtest"
+	label              = "org.bothy.test"
+	labelValue         = "pgtest"
+	watchdogLabel      = "org.bothy.test.watchdog"
+	watchdogLabelValue = "lease"
 	// containerPort is the PostgreSQL port inside the container.
 	containerPort = "5432/tcp"
 )
@@ -91,6 +96,86 @@ const (
 	startTimeout         = 3 * time.Minute
 	cleanupTimeout       = 30 * time.Second
 )
+
+// The lease: the test binary holds one superuser connection with application_name leaseApp for
+// as long as it runs, and checks it every leaseInterval, reconnecting when it broke. Right after
+// opening it, it marks the lease as taken (the comment leaseApp on the database postgres), so the
+// watchdog knows about the lease even when the binary dies within the first second. The watchdog
+// in the container (watchdogScript) checks every second; once the lease is taken, leaseMisses
+// checks in a row without the connection stop PostgreSQL, the container exits and
+// Docker removes it (AutoRemove) with its anonymous data volume. The operating system closes the
+// connection of a test binary however it ends (failed or panicking test, the -test.timeout
+// alarm, a signal, SIGKILL), so a container usually outlives its run by little more than
+// leaseMisses seconds plus the shutdown (at most leaseStopWait). A container whose lease was never
+// taken, or whose server gives no readable answer for leaseStartGrace, stops as well.
+const (
+	leaseApp        = "pgtest-lease"
+	leaseInterval   = time.Second
+	leaseMisses     = 10
+	leaseStartGrace = startTimeout + time.Minute
+	leaseStopWait   = 30 * time.Second
+)
+
+// watchdogScript is the entry point of the container: it starts the image's own entry point
+// with the command ("$@") in the background and stops PostgreSQL (fast shutdown) when the lease
+// of the test binary is gone, or when docker stop sends its stop signal (SIGINT or SIGTERM). A
+// count it cannot read (server starting, restarting or busy) is no verdict, but once the lease
+// is taken, leaseStartGrace without a readable count stops the server as well, so a hung server
+// cannot keep its container. stop waits at most leaseStopWait for PostgreSQL to end; then the
+// script exits, and with it the container's main process.
+const watchdogScript = `set -u
+docker-entrypoint.sh "$@" &
+pg=$!
+stop() {
+	kill -INT "$pg" 2>/dev/null
+	waited=0
+	while kill -0 "$pg" 2>/dev/null && [ "$waited" -lt "$PGTEST_STOP_WAIT" ]; do
+		sleep 1
+		waited=$((waited + 1))
+	done
+	exit 0
+}
+trap stop TERM INT
+query="SELECT coalesce(shobj_description(d.oid, 'pg_database'), '') = '$PGTEST_LEASE_APP', (SELECT count(*) FROM pg_stat_activity WHERE application_name = '$PGTEST_LEASE_APP') FROM pg_database d WHERE d.datname = 'postgres'"
+taken=f
+misses=0
+seen=$SECONDS
+while kill -0 "$pg" 2>/dev/null; do
+	sleep 1 & wait $!
+	out=$(timeout 10 psql -h /var/run/postgresql -U postgres -d postgres -XAtq -F ' ' -c "$query" 2>/dev/null) || out=
+	read -r marked n <<<"$out" || true
+	case "${n:-x}" in
+	*[!0-9]*) ;;
+	*)
+		seen=$SECONDS
+		if [ "$marked" = t ]; then
+			taken=t
+			if [ "$n" -eq 0 ]; then misses=$((misses + 1)); else misses=0; fi
+		fi
+		;;
+	esac
+	if [ "$taken" = t ] && [ "$misses" -ge "$PGTEST_LEASE_MISSES" ]; then stop; fi
+	if [ "$taken" = t ] && [ $((SECONDS - seen)) -ge "$PGTEST_LEASE_START_GRACE" ]; then stop; fi
+	if [ "$taken" = f ] && [ "$SECONDS" -ge "$PGTEST_LEASE_START_GRACE" ]; then stop; fi
+done
+wait "$pg"
+`
+
+// watchdogEnv is the environment of watchdogScript for the given limits.
+func watchdogEnv(misses int, grace, stopWait time.Duration) map[string]string {
+	return map[string]string{
+		"PGTEST_LEASE_APP":         leaseApp,
+		"PGTEST_LEASE_MISSES":      strconv.Itoa(misses),
+		"PGTEST_LEASE_START_GRACE": strconv.Itoa(int(grace / time.Second)),
+		"PGTEST_STOP_WAIT":         strconv.Itoa(int(stopWait / time.Second)),
+	}
+}
+
+// legacyReapAge is the age after which Main removes a container labelled org.bothy.test without
+// the watchdog label: one that an older pgtest or a test helper without a watchdog left behind.
+// go test stops a binary after 10 minutes by default; such a run with -timeout 0 or a timeout
+// above legacyReapAge is not supported and may lose its container.
+const legacyReapAge = 2 * time.Hour
 
 // noRuntimeMessage is what Main prints when no container runtime answers (plan P-09).
 const noRuntimeMessage = "pgtest: no Docker-compatible runtime reachable (%v); integration tests need one (plan P-09)\n"
@@ -133,6 +218,8 @@ type cluster struct {
 	mu        sync.Mutex        // serialises template creation and cloning
 	templates map[string]string // migration set hash -> template database
 	steps     Steps             // the steps of Main's WithSteps, nil for none
+
+	stopLease func() // closes the lease connection (watchdogScript)
 }
 
 // Main runs the tests of m and returns the exit code for os.Exit; call it from TestMain. It
@@ -140,7 +227,11 @@ type cluster struct {
 // a Docker-compatible runtime answers: without one it prints
 // "pgtest: no Docker-compatible runtime reachable (<error>); integration tests need one (plan P-09)"
 // and returns 1 without running a test. The container starts with the first New; after the tests
-// Main terminates it and removes SecretsDir, and turns a failed cleanup into exit code 1.
+// Main terminates it and removes SecretsDir, and turns a failed cleanup into exit code 1. When
+// the binary ends without that cleanup (a panic, the -test.timeout alarm, a signal), the
+// container removes itself once the lease connection is gone. Main also removes test containers
+// labelled org.bothy.test that lack that watchdog (older pgtest versions, other test helpers)
+// once they are older than legacyReapAge.
 //
 // Options: WithSteps adds the steps of bothy migrate up to the templates.
 func Main(m *testing.M, opts ...MainOption) int {
@@ -163,6 +254,13 @@ func Main(m *testing.M, opts ...MainOption) int {
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, noRuntimeMessage, err)
 		return 1
+	}
+	ctx, cancel = context.WithTimeout(context.Background(), cleanupTimeout)
+	err = reapLegacy(ctx, label, time.Now())
+	cancel()
+	if err != nil {
+		// Only housekeeping for containers of other, finished runs; the tests can still run.
+		_, _ = fmt.Fprintf(os.Stderr, "pgtest: remove leftover containers: %v\n", err)
 	}
 	setActive(true)
 	code := m.Run()
@@ -224,7 +322,13 @@ func stopCluster() error {
 	if c == nil {
 		return nil
 	}
+	return c.stop()
+}
+
+// stop ends the lease, terminates the container and removes the secrets directory.
+func (c *cluster) stop() error {
 	var problems []error
+	c.stopLease()
 	// TerminateContainer ignores the errors of a container that AutoRemove already removes.
 	if err := testcontainers.TerminateContainer(c.ctr); err != nil {
 		problems = append(problems, fmt.Errorf("terminate container %s: %w", c.ctr.GetContainerID(), err))
@@ -281,20 +385,118 @@ func startCluster(ctx context.Context) (c *cluster, err error) {
 	if err := pg.BootstrapRoles(ctx, conn, passwords); err != nil {
 		return nil, fmt.Errorf("pgtest: bootstrap roles: %w", err)
 	}
+	if c.stopLease, err = c.holdLease(ctx); err != nil {
+		return nil, err
+	}
 	return c, nil
 }
 
-// runContainer starts the pinned image on 127.0.0.1 with a random host port. The server flags
-// trade durability for speed, which a disposable test database does not need.
+// holdLease opens the lease connection, marks the lease as taken and keeps the connection open
+// until the returned stop is called:
+// every leaseInterval it pings the connection and reopens it when it broke, so the watchdog in
+// the container sees the lease for as long as this process lives.
+func (c *cluster) holdLease(ctx context.Context) (stop func(), err error) {
+	cfg := c.superConfig(superDatabase).WithAppName(leaseApp)
+	quiet := slog.New(slog.DiscardHandler)
+	conn, err := pg.Connect(ctx, cfg, c.provider, connectWait, quiet)
+	if err != nil {
+		return nil, fmt.Errorf("pgtest: lease connection: %w", err)
+	}
+	mark := "COMMENT ON DATABASE " + pgx.Identifier{superDatabase}.Sanitize() + " IS '" + leaseApp + "'"
+	if _, err := conn.Exec(ctx, mark); err != nil {
+		_ = conn.Close(context.WithoutCancel(ctx))
+		return nil, fmt.Errorf("pgtest: mark the lease: %w", err)
+	}
+	// The lease outlives ctx, which only bounds the start; stop ends it.
+	lctx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		tick := time.NewTicker(leaseInterval)
+		defer tick.Stop()
+		for {
+			select {
+			case <-lctx.Done():
+				if conn != nil {
+					cctx, ccancel := context.WithTimeout(context.WithoutCancel(lctx), cleanupTimeout)
+					_ = conn.Close(cctx)
+					ccancel()
+				}
+				return
+			case <-tick.C:
+			}
+			conn = keepLease(lctx, conn, func(ctx context.Context) (*pgx.Conn, error) {
+				return pg.Connect(ctx, cfg, c.provider, 5*leaseInterval, quiet)
+			})
+		}
+	}()
+	return func() { cancel(); <-done }, nil
+}
+
+// keepLease pings conn and returns it when it answers; otherwise it closes it and returns a new
+// connection from open, or nil when that fails too (the next tick tries again).
+func keepLease(ctx context.Context, conn *pgx.Conn, open func(context.Context) (*pgx.Conn, error)) *pgx.Conn {
+	if conn != nil {
+		pctx, cancel := context.WithTimeout(ctx, 5*leaseInterval)
+		err := conn.Ping(pctx)
+		cancel()
+		if err == nil {
+			return conn
+		}
+		_ = conn.Close(context.WithoutCancel(ctx))
+	}
+	octx, cancel := context.WithTimeout(ctx, 5*leaseInterval)
+	defer cancel()
+	next, err := open(octx)
+	if err != nil {
+		return nil
+	}
+	return next
+}
+
+// reapLegacy removes the containers that carry the label key (any value) but lack the watchdog
+// label and were created more than legacyReapAge before now, with their anonymous volumes. Main
+// passes the key org.bothy.test, so this also covers other test helpers that label their
+// containers with it (org.bothy.test=seaweedfs) but have no watchdog.
+func reapLegacy(ctx context.Context, key string, now time.Time) error {
+	cli, err := testcontainers.NewDockerClientWithOpts(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = cli.Close() }()
+	res, err := cli.ContainerList(ctx, client.ContainerListOptions{
+		All: true, Filters: client.Filters{}.Add("label", key),
+	})
+	if err != nil {
+		return err
+	}
+	var problems []error
+	for _, ctr := range res.Items {
+		if _, ok := ctr.Labels[watchdogLabel]; ok || now.Sub(time.Unix(ctr.Created, 0)) < legacyReapAge {
+			continue
+		}
+		if _, err := cli.ContainerRemove(ctx, ctr.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}); err != nil {
+			problems = append(problems, fmt.Errorf("remove %s: %w", ctr.ID, err))
+		}
+	}
+	return errors.Join(problems...)
+}
+
+// runContainer starts the pinned image on 127.0.0.1 with a random host port, under
+// watchdogScript and with AutoRemove, so the container and its anonymous data volume disappear
+// when the lease of this process ends. The server flags trade durability for speed, which a
+// disposable test database does not need.
 func runContainer(ctx context.Context, superPassword string) (*testcontainers.DockerContainer, error) {
 	port := network.MustParsePort(containerPort)
 	return testcontainers.Run(ctx, Image,
 		testcontainers.WithLogger(tclog.NewNoopLogger()),
 		testcontainers.WithName("bothy-pgtest-"+randomHex(6)),
-		testcontainers.WithLabels(map[string]string{label: labelValue}),
+		testcontainers.WithLabels(map[string]string{label: labelValue, watchdogLabel: watchdogLabelValue}),
 		testcontainers.WithEnv(map[string]string{
 			"POSTGRES_USER": superUser, "POSTGRES_PASSWORD": superPassword, "POSTGRES_DB": superDatabase,
 		}),
+		testcontainers.WithEnv(watchdogEnv(leaseMisses, leaseStartGrace, leaseStopWait)),
+		testcontainers.WithEntrypoint("bash", "-c", watchdogScript, "pgtest-watchdog"),
 		testcontainers.WithCmd("postgres", "-c", "fsync=off", "-c", "synchronous_commit=off", "-c", "full_page_writes=off"),
 		testcontainers.WithExposedPorts(containerPort),
 		testcontainers.WithHostConfigModifier(func(hc *container.HostConfig) {

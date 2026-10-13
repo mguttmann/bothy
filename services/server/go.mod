@@ -10,6 +10,7 @@ require (
 	github.com/getkin/kin-openapi v0.144.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/moby/moby/api v1.55.0
+	github.com/moby/moby/client v0.5.1
 	github.com/oapi-codegen/runtime v1.7.0
 	github.com/pb33f/libopenapi v0.41.3
 	github.com/pb33f/libopenapi-validator v0.16.1
@@ -73,7 +74,6 @@ require (
 	github.com/mfridman/interpolate v0.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/go-archive v0.3.0 // indirect
-	github.com/moby/moby/client v0.5.1 // indirect
 	github.com/moby/patternmatcher v0.6.1 // indirect
 	github.com/moby/sys/sequential v0.7.0 // indirect
 	github.com/moby/sys/user v0.4.1 // indirect
