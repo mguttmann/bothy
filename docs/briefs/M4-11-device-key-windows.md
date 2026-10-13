@@ -4,7 +4,7 @@ Status: ready | Depends on: M4-10 | Milestone: M4
 
 ## Goal
 
-After this ticket `packages/device_key` also works on Windows: the Pigeon interface of M4-10 gets a C++ host implementation in `windows/` that creates, uses and deletes the two device keys of 08 6.1 (D-L10) with CNG. The `dpop` key is an ECDSA P-256 key in the Microsoft Platform Crypto Provider (TPM 2.0) after `NCryptIsAlgSupported` has confirmed P-256 on this TPM; without a TPM, or when the TPM lacks P-256, it is a key of the Microsoft Software Key Storage Provider that the API reports as not hardware-bound. The `step_up` key requires a Windows Hello confirmation (face, fingerprint or PIN) before each signature, with the strongest binding the platform offers for a P-256 key (Design note 3), and the API reports which binding it has. The Dart API of M4-10 stays unchanged (`hardwareBound` and `requiresUserPresence` already carry the labels). Tests run on a Windows machine with and without a TPM (the second through a forced fallback), and the fallback is labeled. Why: Windows is a desktop target of M4 (15 2, R-CL-12); its DPoP binding and step-up must rest on keys that cannot be exported (08 6.1, R-CL-04, R-CL-05), and the plan names Windows without TPM 2.0 or without P-256 as a risk (PLAN 10 "Risks").
+After this ticket `packages/device_key` also works on Windows: the Pigeon interface of M4-10 gets a C++ host implementation in `windows/` that creates, uses and deletes the two device keys of 08 6.1 (D-L10) with CNG. The `dpop` key is an ECDSA P-256 key in the Microsoft Platform Crypto Provider (TPM 2.0) after `NCryptIsAlgSupported` has confirmed P-256 on this TPM; without a TPM, or when the TPM lacks P-256, it is a key of the Microsoft Software Key Storage Provider that the API reports as not hardware-bound. The `step_up` key is offered only with a confirmation that the system enforces on every use of the key, as 08 6.1 requires ("the confirmation must come from the person, not from malicious code in the process"); whether Windows delivers that for a P-256 key is the open point of 08 6.1, which this ticket settles (Design note 3). The Dart API of M4-10 stays unchanged (`hardwareBound` and `requiresUserPresence` already carry the labels). Tests run on a Windows machine with and without a TPM (the second through a forced fallback), and the fallback is labeled. Why: Windows is a desktop target of M4 (15 2, R-CL-12); its DPoP binding and step-up must rest on keys that cannot be exported (08 6.1, R-CL-04, R-CL-05), and the plan names Windows without TPM 2.0 or without P-256 as a risk (PLAN 10 "Risks").
 
 ## Read first
 
@@ -12,7 +12,7 @@ After this ticket `packages/device_key` also works on Windows: the Pigeon interf
 - `docs/spec/15-client-architecture.md`: 2 (Windows 10 2004 minimum), 3.1 (rule 4: platform code only in `device_key` and `apps/client`), 9 (row Windows: CNG with the Platform Crypto Provider, `NCryptIsAlgSupported`, software fallback reported as not hardware-bound, step-up "TPM key with Windows Hello confirmation [assumed, details not verified]"), 21 (R-CL-04, R-CL-05, R-CL-12).
 - `docs/spec/08-identity.md`: 5.1 (`dpop_jwk`, `step_up_jwk`, `attestation`), 5.4 (no key change, R-ID-11), 6.1 (two keys, storage table), 6.2 (what the step-up key signs), 9 (keys never leave the device).
 - `docs/DECISIONS.md`: D-L10, D-W-100, D-W-114; the rows `D-M4-10-<n>` of M4-10 (one plugin package with Pigeon, JWK and thumbprint in Dart, error codes); section 10.
-- Microsoft documentation as cited in 15 9: `NCryptOpenStorageProvider` with `MS_PLATFORM_CRYPTO_PROVIDER` and `MS_KEY_STORAGE_PROVIDER`, `NCryptIsAlgSupported`, `NCryptCreatePersistedKey` (`BCRYPT_ECDSA_P256_ALGORITHM`), `NCryptFinalizeKey`, `NCryptSignHash`, `NCryptExportKey` with `BCRYPT_ECCPUBLIC_BLOB`, `NCryptDeleteKey`, the property `NCRYPT_EXPORT_POLICY_PROPERTY`, and `Windows.Security.Credentials.UI.UserConsentVerifier` (C++/WinRT).
+- Microsoft documentation as cited in 15 9: `NCryptOpenStorageProvider` with `MS_PLATFORM_CRYPTO_PROVIDER` and `MS_KEY_STORAGE_PROVIDER`, `NCryptIsAlgSupported`, `NCryptCreatePersistedKey` (`BCRYPT_ECDSA_P256_ALGORITHM`), `NCryptFinalizeKey`, `NCryptSignHash`, `NCryptExportKey` with `BCRYPT_ECCPUBLIC_BLOB`, `NCryptDeleteKey`, the property `NCRYPT_EXPORT_POLICY_PROPERTY`, and `NCRYPT_UI_POLICY_PROPERTY` with `NCRYPT_UI_FORCE_HIGH_PROTECTION_FLAG` (strong key protection).
 - RFC 7518 3.4 (ES256 `R || S`), RFC 7638 (thumbprint; computed in Dart by M4-10).
 - Briefs: `docs/briefs/M4-10-device-key-apple.md` (the Pigeon interface, the Dart API, the error codes, `platform-tests.json`), `docs/briefs/M4-01-workspace-arch.md` (Design note 6: `apps-windows` CI job and `tools/ci/apps_platform.py`).
 - Code on the base branch: `packages/device_key/` as M4-10 left it (`pigeons/device_key_api.dart`, the generated Dart and Swift files, `lib/src/device_key.dart`, `platform-tests.json`).
@@ -42,11 +42,11 @@ Rules for every brief:
 7. No en dash and no em dash in any file you write; the `text-rules` pre-commit hook rejects them, and the ARB test of M4-06 rejects them in interface texts. Use a hyphen or rephrase.
 8. White label: examples and test data use `example.com` and the people Alex, Sam and Robin; no company, host or personal names, no paths under a home directory. Interface texts come from `packages/l10n`, never as literals in widgets.
 9. No configuration key is added; the plugin has no limits of its own.
-10. Specification first: 15 9 marks the Windows step-up as assumed; this ticket verifies the mechanism, follows Design note 3 and updates the row Windows of 15 9 in the same change.
+10. Specification first: 08 6.1 leaves open whether Windows Hello delivers the step-up key as `ES256`, and names `RS256` or `PS256` in `device_keys.alg` as the alternative, which 03 does not allow today (`CHECK (alg IN ('ES256','EdDSA'))`). This ticket verifies the mechanism (Design note 3), never builds a step-up key whose confirmation only the plugin enforces, and updates the rows Windows of 15 9 and 08 6.1 with the result.
 
 Product requirements implemented here:
 
-11. Two keys per device and server: `dpop` (no user confirmation per signature) and `step_up` (a Windows Hello confirmation per signature) (08 6.1, D-L10, R-CL-05).
+11. Two keys per device and server: `dpop` (no user confirmation per signature) and `step_up` (a confirmation per signature that the system enforces) (08 6.1, D-L10, R-CL-05); without such a confirmation the plugin offers no step-up key on Windows (Design note 3).
 12. ES256 only (P-256) on every path, also in the fallback (15 9, R-CL-04).
 13. Hardware-bound in the TPM when the Platform Crypto Provider is available and `NCryptIsAlgSupported` confirms `BCRYPT_ECDSA_P256_ALGORITHM`; otherwise a software key reported as not hardware-bound (15 9 row Windows).
 14. Keys are not exportable: export policy `0` (no `NCRYPT_ALLOW_EXPORT_FLAG`, no plaintext export) on both providers; keys are per user (no machine key) and never roam.
@@ -59,7 +59,7 @@ Create in `packages/device_key/`:
 
 - `windows/CMakeLists.txt` and the plugin glue `windows/device_key_plugin.cpp`, `windows/device_key_plugin.h`, `windows/include/device_key/device_key_plugin_c_api.h` as the pinned Flutter's plugin template expects.
 - The generated Pigeon C++ files `windows/device_key_api.g.h` and `windows/device_key_api.g.cpp` (Pigeon option `cppHeaderOut`, `cppSourceOut`, namespace `device_key`) next to the existing Dart and Swift outputs; `pigeons/device_key_api.dart` only gains the C++ output options.
-- `windows/core/` a static library `device_key_core` with no Flutter dependency (Design note 2): `key_provider.h` (interface over the CNG calls), `cng_key_provider.cpp`, `device_key_store.cpp` and `.h` (labels, provider choice, sign, delete), `user_consent.cpp` and `.h` (Windows Hello through C++/WinRT, Design note 3), `der.cpp` and `.h` only if a signature arrives in DER (CNG returns `R || S` for ECDSA; keep the converter out if not needed).
+- `windows/core/` a static library `device_key_core` with no Flutter dependency (Design note 2): `key_provider.h` (interface over the CNG calls), `cng_key_provider.cpp`, `device_key_store.cpp` and `.h` (labels, provider choice, sign, delete), `der.cpp` and `.h` only if a signature arrives in DER (CNG returns `R || S` for ECDSA; keep the converter out if not needed).
 - `windows/core/tests/` with `CMakeLists.txt`, a minimal assertion header `check.h` (no third-party test framework) and the test sources of Tests; registered with CTest.
 - `platform-tests.json`: the `windows` entry (Design note 5).
 
@@ -67,7 +67,7 @@ Change:
 
 - `packages/device_key/pubspec.yaml` (plugin platform `windows` with `pluginClass: DeviceKeyPluginCApi`), `packages/device_key/README.md` (storage table row Windows, how to run the native tests, the binding of the step-up key).
 - Root `Makefile` `codegen-check`: the Pigeon comparison covers the C++ outputs.
-- `docs/spec/15-client-architecture.md` 9 (row Windows: the verified step-up binding, Design note 3).
+- `docs/spec/15-client-architecture.md` 9 and `docs/spec/08-identity.md` 6.1 (row Windows: the verified step-up binding or the gap, Design note 3).
 - `docs/DECISIONS.md` section 10: rows `D-M4-11-<n>`; root `CHANGELOG.md` under `[Unreleased]`.
 
 ## Out of scope
@@ -95,11 +95,11 @@ Change:
 - This brief was written before milestone M1 closed (D-W-100, extended to M4 by D-W-114). Where the merged code of an earlier ticket names a package, type, function, file, provider or make target differently from this brief, follow the code and list each difference in the report; where it behaves differently from the specification, stop with `Verdict: BLOCKED <reason>`.
 - Native tests need Windows with the Visual Studio C++ build tools that the pinned Flutter requires; on another host `make apps-platform` prints its SKIP line and the `apps-windows` CI job of M4-01 is the evidence. The report names where the native tests ran.
 - Never leave a key in the key storage of the build host: every test key uses a test-only name prefix (`device-key-test-`) and is deleted in teardown, also after a failure, and a test fixture deletes leftovers with that prefix before it starts.
-- A test never waits for a person: the Windows Hello prompt is replaced by an injected consent function in every automated test (Design note 3); the real prompt is checked by hand once and named in the report.
+- A test never waits for a person: automated tests exercise the `step_up` key only through its creation and its properties, never through a signature that shows a prompt; the real prompt is checked by hand once and named in the report.
 
 ## Design notes
 
-1. **Pigeon for C++.** Add `cppOptions: CppOptions(namespace: 'device_key')` and the C++ output paths to `pigeons/device_key_api.dart`; regenerate all outputs and check them in. The host API is the same `DeviceKeyHostApi` as on macOS (`ensureKey`, `keyInfo`, `sign`, `attestation`, `deleteKeys`), with the same message types and the same error codes `user_cancelled`, `key_invalidated`, `not_available`, `internal` as `FlutterError` codes. `sign` runs off the platform thread (the Hello prompt and TPM operations block for up to seconds) and answers through the Pigeon result callback.
+1. **Pigeon for C++.** Add `cppOptions: CppOptions(namespace: 'device_key')` and the C++ output paths to `pigeons/device_key_api.dart`; regenerate all outputs and check them in. The host API is the same `DeviceKeyHostApi` as on macOS (`ensureKey`, `keyInfo`, `sign`, `attestation`, `deleteKeys`), with the same message types and the same error codes `user_cancelled`, `key_invalidated`, `not_available`, `internal` as `FlutterError` codes. `sign` runs off the platform thread (the system prompt and TPM operations block for up to seconds) and answers through the Pigeon result callback.
 
 2. **Core library and provider choice.** `device_key_core` wraps CNG behind `KeyProvider` (open provider, check algorithm, create persisted key, open key, export public blob, sign hash, delete key) so the tests can inject a fake that simulates "no TPM", "TPM without P-256" and failures. `DeviceKeyStore::Ensure(scope, purpose)`:
     - Key name `device-key.<sha256(scope) hex>.<purpose>` (no product name: 02 "Places that carry the product name") (the `scope` separates servers as on macOS); per user (no `NCRYPT_MACHINE_KEY_FLAG`).
@@ -109,12 +109,9 @@ Change:
     - `Sign(scope, purpose, data)`: SHA-256 over `data` with BCrypt, then `NCryptSignHash`; CNG returns the 64-byte `R || S` form for ECDSA P-256 (check the length; any other length is `internal`).
     Ruling for docs/DECISIONS.md: provider choice per key at creation, never migrated; reason: a key moved between providers would change the JWK and need a new device (08 5.4).
 
-3. **Step-up binding (verify, then decide).** 15 9 assumes "a TPM key with Windows Hello confirmation". Windows Hello's own key API (`KeyCredentialManager`) creates RSA keys only, so it cannot hold an ES256 key. Verify in the Microsoft documentation and on the build host which of these the platform offers for a P-256 CNG key, in this order, and use the first that works:
-    - (a) a TPM key with a CNG UI policy (`NCRYPT_UI_POLICY_PROPERTY` with `NCRYPT_UI_FORCE_HIGH_PROTECTION_FLAG`) whose confirmation the system shows on every use of the key (cryptographic binding by the platform);
-    - (b) a TPM or software key that the plugin uses only after `UserConsentVerifier::RequestVerificationAsync` returned `Verified` (binding by the plugin, not by the key).
-    Report the binding through `requiresUserPresence = true` in both cases and record in the README and in 15 9 which one applies. If `UserConsentVerifier::CheckAvailabilityAsync` reports no Hello on the device, `ensureKey` for `step_up` fails with `not_available` (the app then offers the other step-up methods of the instance, 08 6). Ruling for docs/DECISIONS.md with the verified sources and the reason. Option (b) is weaker against malware running as the same user; name that in the README and in the report item 5.
+3. **Step-up binding (verify, then decide).** 08 6.1 requires that the confirmation comes from the person, not from code in the process; a key that the plugin uses only after its own consent call does not meet that. Windows Hello's own key API (`KeyCredentialManager`) creates RSA keys only, so it cannot hold an `ES256` key. Verify in the Microsoft documentation and on a Windows host whether the platform enforces a confirmation per use for a P-256 CNG key: a key of the Platform Crypto Provider or the software provider with a CNG UI policy (`NCRYPT_UI_POLICY_PROPERTY` with `NCRYPT_UI_FORCE_HIGH_PROTECTION_FLAG`), whose prompt the system shows on every use of the key from its own process (not a dialog of the app). If that works, the `step_up` key uses it, `requiresUserPresence = true`, and 15 9 and 08 6.1 name the mechanism. If it does not, `ensureKey` for `step_up` fails with `not_available` on Windows, the plugin never offers a plugin-enforced fallback, and the report names the gap with the recommendation of 08 6.1 (an `RS256` or `PS256` step-up key from Windows Hello needs a core contract change of 03 `device_keys.alg` and of the JOSE profile of ADR 0067); the ticket still ends with `Verdict: DONE` when the `dpop` key and every other test are green, because the step-up of the instance then falls back to the other methods 08 6 offers. Ruling for docs/DECISIONS.md with the verified sources either way.
 
-4. **Errors.** `user_cancelled` (Hello cancelled or `NTE_USER_CANCELLED`), `not_available` (no Hello for the step-up key; provider not usable at all), `key_invalidated` (the key exists but cannot be opened, for example after a TPM clear: `NTE_BAD_KEYSET` on an existing name; the app then registers as a new device, 08 5.4), `internal` (everything else, with the `HRESULT` in hex and no key material). Messages carry no key bytes and no data that was signed.
+4. **Errors.** `user_cancelled` (the system prompt cancelled, `NTE_USER_CANCELLED`), `not_available` (no system-enforced confirmation for the step-up key, Design note 3; provider not usable at all), `key_invalidated` (the key exists but cannot be opened, for example after a TPM clear: `NTE_BAD_KEYSET` on an existing name; the app then registers as a new device, 08 5.4), `internal` (everything else, with the `HRESULT` in hex and no key material). Messages carry no key bytes and no data that was signed.
 
 5. **Platform tests.** `platform-tests.json` gets `"windows": [["cmake", "-S", "windows/core", "-B", "build/core-tests"], ["cmake", "--build", "build/core-tests", "--config", "Debug"], ["ctest", "--test-dir", "build/core-tests", "-C", "Debug", "--output-on-failure"]]` (argument lists, no shell), run by `tools/ci/apps_platform.py` of M4-01 in the `apps-windows` job. `build/` is git-ignored already (M4-01). The TPM test reports itself as skipped with the reason `platform crypto provider not available on this host` when the provider cannot be opened or lacks P-256; the fallback test always runs by forcing the software provider through the injected `KeyProvider` choice and once against the real software provider.
 
@@ -130,8 +127,7 @@ C++, `packages/device_key/windows/core/tests/` (CTest):
 - `tpm_path_when_available` (real platform provider: `hardwareBound` true, export of the private blob fails; skipped with the reason otherwise).
 - `software_fallback_without_tpm` (fake provider without the platform provider, and fake provider "TPM without P-256": software key, `hardwareBound` false, signature verifies).
 - `keys_are_not_exportable` (export policy property reads `0`; `NCryptExportKey` with `BCRYPT_ECCPRIVATE_BLOB` fails on both providers).
-- `step_up_requires_consent` (with an injected consent function: `Sign` for `step_up` calls it once per signature and fails with `user_cancelled` when it declines; `Sign` for `dpop` never calls it).
-- `step_up_not_available_without_hello` (injected availability `false`: `Ensure(step_up)` fails with `not_available`).
+- `step_up_binding` (the `step_up` key is created with the system-enforced UI policy where Design note 3 found one, and its policy property reads back; otherwise `Ensure(step_up)` fails with `not_available`; `Sign` for `dpop` never shows a prompt).
 - `existing_key_is_not_recreated_in_other_provider`.
 - `delete_removes_both_keys`.
 - `errors_carry_no_key_material`.
@@ -149,7 +145,7 @@ Commands that must pass, from the repository root:
 
 - [ ] The CTest suite is green in the `apps-windows` CI job; the TPM test ran on a machine with a TPM 2.0 that supports P-256, or its skip and the reason are in the report (item 5) together with the run of the fallback. Rule for the verdict: a missing TPM on every host the session can reach is not a reason for `BLOCKED`; the ticket ends with `Verdict: DONE` when every other test is green, and the TPM path stays listed as not proven.
 - [ ] Two keys per device and server (D-L10), ES256 on every path, TPM-bound where available, labeled as not hardware-bound otherwise.
-- [ ] Keys are not exportable on either provider; the step-up key needs a Windows Hello confirmation per signature, the DPoP key does not; the binding is documented.
+- [ ] Keys are not exportable on either provider; the step-up key exists only with a system-enforced confirmation per use, otherwise it is reported as not available with the gap of 08 6.1; the DPoP key needs no confirmation; the result is documented in 15 9 and 08 6.1.
 - [ ] The Pigeon C++ code is generated and checked by `make codegen-check`; native code only in `packages/device_key`.
 - [ ] 15 9 row Windows updated; rulings recorded.
 - [ ] `make check` is green.
@@ -158,7 +154,7 @@ Commands that must pass, from the repository root:
 
 - Code and tests as specified; doc comment on every public Dart symbol and a documentation comment on every public C++ declaration; comments explain why and cite the Microsoft API where a rule comes from.
 - `packages/device_key/README.md` (English) as in Scope.
-- 15 9 updated; rulings of Design note 6 in `docs/DECISIONS.md` section 10.
+- 15 9 and 08 6.1 updated; rulings of Design note 6 in `docs/DECISIONS.md` section 10.
 - Root `CHANGELOG.md` entry under 'Unreleased'.
 - An ADR only if you take an architecture decision beyond this brief (MADR 4 as in `docs/adr/0000-template-madr-4.md`, headings and text in English, next free number, `make adr-index`).
 - `make check` green.

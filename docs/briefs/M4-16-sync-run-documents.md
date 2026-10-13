@@ -42,7 +42,7 @@ Rules for every brief:
 7. No en dash and no em dash in any file you write; the `text-rules` pre-commit hook rejects them, and the ARB test of M4-06 rejects them in interface texts. Use a hyphen or rephrase.
 8. White label: examples and test data use `example.com` and the people Alex, Sam and Robin; no company, host or personal names, no paths under a home directory. Interface texts come from `packages/l10n`, never as literals in widgets.
 9. No new configuration key; the store has no limits of its own (the server limits focus and patch rates).
-10. Specification first: if a frame or document field this ticket needs is missing from `RunUpdatedPayload` or `Run`, stop (Boundaries).
+10. Specification first: 09 5.4 shows the stall notice from `stall_warned_at`, but the `Run` schema of `docs/api/openapi.yaml` has no such field. `RunDocument` reads it from the raw map when present and reports `null` otherwise; the report names the gap with the recommendation to add the optional field to `Run`. Any other field this ticket needs that `RunUpdatedPayload` or `Run` lacks: stop (Boundaries).
 
 Product requirements implemented here:
 
@@ -63,6 +63,7 @@ Create in `packages/sync_engine/lib/src/runs/`:
 Change:
 
 - `packages/sync_engine/lib/sync_engine.dart` exports, `README.md` (the client rule, ports, how M4-17 wires the store).
+- `packages/sync_engine/pubspec.yaml`: the member dependency `domain` if it is not there yet.
 - `docs/DECISIONS.md` section 10: rows `D-M4-16-<n>`; root `CHANGELOG.md` under `[Unreleased]`.
 
 ## Out of scope
@@ -89,7 +90,7 @@ Change:
 
 ## Design notes
 
-1. **Store.** `RunStore({required RunDocumentFetcher fetch, required FrameTicker ticker})`; `focus(RunId id)` registers interest and fetches the whole document unless one arrives first; `unfocus(RunId id)` drops it; `onRunUpdated(Map<String, Object?> payload)` applies the rule of 04 11.3 item 4 to the run of `run_id` if it is focused (others are ignored, because the server sends patches only for focused threads and a late frame after unfocus is harmless); `onRunEnded(RunId id)` discards the document; `watch(RunId id) -> Stream<RunDocument?>` emits at most once per tick of the `FrameTicker` with the newest state (the app passes a ticker on `SchedulerBinding`; tests pass a manual ticker). A refetch in flight for a run ignores further patches of that run until it returns, then re-applies the rule to patches that arrived later and are newer than the fetched version (keep them in a short per-run queue). A fetch error leaves the last good document visible and retries on the next patch or `focus`.
+1. **Store.** `RunStore({required RunDocumentFetcher fetch, required FrameTicker ticker})`; `focus(RunId id)` registers interest and fetches the whole document unless one arrives first; `unfocus(RunId id)` drops it; `onRunUpdated(Map<String, Object?> payload)` applies the rule of 04 11.3 item 4 to the run of `run_id` if it is focused (others are ignored, because the server sends patches only for focused threads and a late frame after unfocus is harmless); `onRunEnded(RunId id)` discards the document; `watch(RunId id) -> Stream<RunDocument?>` emits at most once per tick of the `FrameTicker` with the newest state (the app passes a ticker on `SchedulerBinding`; tests pass a manual ticker). A frame with only `run_id` and `version` (truncated, no `ops` and no `snapshot`) is a gap when its version is newer. A fetched document replaces the local one only when its `version` is newer than the local one (a slow first fetch never overwrites a newer snapshot). A refetch in flight for a run ignores further patches of that run until it returns, then re-applies the rule to patches that arrived later and are newer than the fetched version (keep them in a short per-run queue). A fetch error leaves the last good document visible and retries on the next patch or `focus`.
 
 2. **Patches.** `applyRunPatch(Map<String, Object?> doc, List<Map<String, Object?>> ops) -> Map<String, Object?>` returns a new map (copy on write of the touched branches only, not a deep copy of the whole document): `add` creates or replaces an object member (and appends to an array only with `-` as RFC 6902 says, although the documented paths address objects), `replace` requires the member to exist, `remove` requires it to exist; pointers decode `~1` and `~0` in that order. Any other `op`, a missing target for `replace` or `remove`, or a path through a non-container throws `RunPatchError`, which the store treats like a gap (refetch). Ruling for docs/DECISIONS.md: an invalid patch is a gap, never a partial application.
 
@@ -102,7 +103,7 @@ Change:
 `packages/sync_engine/test/runs/` (fixtures of a document at versions 1 to 4 and the patches between them; fake fetcher that counts calls; manual frame ticker):
 
 - `client_rule_test.dart`: equal `base_version` applies; a stale frame (`version` not newer) is ignored; a gapped frame (`base_version` ahead) refetches once and replaces; patches that arrive during the refetch and are newer than the fetched version are applied afterwards, older ones dropped.
-- `snapshot_test.dart`: a `snapshot` with a newer version replaces the document; an older one is ignored.
+- `snapshot_test.dart`: a `snapshot` with a newer version replaces the document; an older one is ignored; a truncated frame with a newer version refetches; a slow initial fetch that returns an older version than a snapshot received meanwhile does not replace it.
 - `json_patch_test.dart`: `add`, `replace`, `remove` on the documented paths (`/status_line`, `/metrics/context_pct`, `/steps/<id>`, `/steps/<id>/status`, `/followups/<id>/state`, `/plan`); pointer escapes `~0` and `~1`; `move`, `copy`, `test` and a missing target throw `RunPatchError` and trigger a refetch; the input map is never changed.
 - `frame_coalescing_test.dart`: ten patches between two ticks produce one emission with the newest state.
 - `lifecycle_test.dart`: `focus` fetches the document; `unfocus` and `onRunEnded` drop it; patches for unfocused runs are ignored.
@@ -140,7 +141,7 @@ Write to `{{REPORT_PATH}}`:
 1. First line exactly `Verdict: DONE` or `Verdict: BLOCKED <reason>`.
 2. Commits (SHA and subject), changed files with line counts, test results with counts (the red run before the change and the green run after), the summary of `make check`.
 3. Review and red team verdicts and the findings fixed.
-4. The number of refetches in each test scenario, and any document field of 09 5.4 that the `Run` schema on the base branch names differently.
+4. The number of refetches in each test scenario, and the document fields of 09 5.4 that the `Run` schema on the base branch lacks or names differently (at least `stall_warned_at`).
 5. What is not proven (for example a platform test that ran only in CI, or a check done by hand).
 6. Follow-ups that could not be done in this scope, each with its reason, every difference to the names of this brief (D-W-100, D-W-114), and spec gaps found.
 

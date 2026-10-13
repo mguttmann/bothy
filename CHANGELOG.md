@@ -140,7 +140,7 @@ operated, and the order of the build.
   brief index with waves and graph, and in the site navigation (D-W-100).
 - Build briefs of milestone M4 (`docs/briefs/M4-*.md`, desktop clients) in the brief index with
   waves and graph and in the site navigation, written before M1 closes (D-W-114, which also
-  corrects the column "Depends on" of nine M4 tickets in the plan, and D-W-116 for seven more); a
+  corrects the column "Depends on" of nine M4 tickets in the plan, and D-W-116 for eight more); a
   docs test holds the shape of every brief (title, status line, sections, report placeholders);
   the apps read the server-place keys that steer their own behaviour through `AppConfig` (D-W-115).
 

@@ -16,7 +16,7 @@ After this ticket the first two columns of the desktop app show real data from t
 - `docs/spec/15-client-architecture.md`: 4 (`StreamProvider` per query), 6.1 (tables), 11 (paths `/s/`, `/c/`, `/t/`).
 - `docs/api/openapi.yaml`: `getMySidebar`, `putMySidebarSpace` (`SidebarState`, `SidebarStatePut`), `listSpaces`, `listSpaceChannels`, `listChannelThreads` (filters and sort parameters), `listForumTags`, `createThread`.
 - `docs/DECISIONS.md`: D-W-100, D-W-114; section 10.
-- Briefs: `docs/briefs/M4-18-desktop-shell.md` (columns, providers, router), `docs/briefs/M4-07-core-components.md` (`DsSpaceRowData`, `DsChannelRowData`, `DsThreadRowData`, rows), `docs/briefs/M4-08-domain.md` (`ForumOrder`, `UnreadCounter`), `docs/briefs/M4-12-local-store.md` (`StructureDao`, `ThreadsDao`, `PersonalDao`), `docs/briefs/M4-15-sync-outbox.md` (executor registry), `docs/briefs/M4-17-fake-server.md` (handler registry, `FakeServer`).
+- Briefs: `docs/briefs/M4-18-desktop-shell.md` (columns, providers, router), `docs/briefs/M4-07-core-components.md` (`DsSpaceRowData`, `DsChannelRowData`, `DsThreadRowData`, rows), `docs/briefs/M4-08-domain.md` (`ForumOrder`, `UnreadCounter`), `docs/briefs/M4-12-local-store.md` (`StructureDao`, `ThreadsDao`, `PersonalDao`), `docs/briefs/M4-15-sync-outbox.md` (executor registry), `docs/briefs/M4-17-fake-server.md` (handler registry, `FakeServer`); for the server side `docs/briefs/M1-52-chat-spaces.md` (the fractional index `fracindex` with its normative vectors) and `docs/briefs/M1-56-messaging-send.md` (forum posts need a first message).
 
 This ticket touches no API operation, no table of chapter 03, no action, no event and no configuration key.
 
@@ -59,15 +59,16 @@ Product requirements implemented here:
 Create in `apps/client/lib/`:
 
 - `sidebar/` (`sidebar_column.dart`, `space_tree.dart`, `space_node.dart`, `channel_entry.dart`, `sidebar_header.dart`, `sidebar_footer.dart`, `sidebar_order.dart` for drag and drop and the `sort_key` computation, Design note 2), `sidebar/providers.dart` (Riverpod providers over the DAOs: spaces with states, channels per space with counters and run state).
-- `forum/` (`post_list_column.dart`, `post_list_header.dart` with the filter chips, `post_row.dart` mapping to `DsThreadRowData`, `done_section.dart`, `new_post_dialog.dart` for the title and tags of a new post, `providers.dart`).
+- `forum/` (`post_list_column.dart`, `post_list_header.dart` with the filter chips, `post_row.dart` mapping to `DsThreadRowData`, `done_section.dart`, `new_post_dialog.dart` for the title, first message and tags of a new post, `providers.dart`).
+- `packages/domain/lib/src/rules/fractional_index.dart` with its tests (Design note 2).
 - `sync/sidebar_ops.dart` (outbox executor for `putMySidebarSpace`) and `sync/thread_ops.dart` (executor for `createThread`), registered in the bootstrap of M4-18.
-- Fake server handlers for `getMySidebar`, `putMySidebarSpace`, `listForumTags` and `createThread` added through the handler registry of M4-17 (in `packages/sync_engine/lib/src/testing/rest/`) if M4-17 does not have them.
+- Fake server handlers for `getMySidebar`, `putMySidebarSpace` (with the `fracindex` validation), `listForumTags`, `createThread` (with the forum rule) and `getBrandingLogo` added through the handler registry of M4-17 (in `packages/sync_engine/lib/src/testing/rest/`) if M4-17 does not have them.
 - Tests under `test/sidebar/`, `test/forum/`, goldens under `test/goldens/sidebar/` and `test/goldens/forum/`, integration tests under `integration_test/` (Tests).
 - ARB keys for every text of the sidebar and the post list in `packages/l10n`.
 
 Change:
 
-- `packages/local_store`: a local-only table `forum_view_states` (`channel_id`, `done_collapsed`) in a new schema version with its migration test and the survival test of M4-12 extended, only if no existing local table fits (Design note 4).
+- `packages/local_store`: a local-only table `forum_view_states` (`channel_id`, `done_collapsed`) in the next free schema version with its migration test and the survival test of M4-12 extended, only if no existing local table fits (Design note 4).
 - `docs/spec/01-product.md` 6.1 (the Done collapse state is kept per device), `apps/client/README.md` (sidebar and post list).
 - `docs/DECISIONS.md` section 10: rows `D-M4-19-<n>`; root `CHANGELOG.md` under `[Unreleased]`.
 
@@ -96,24 +97,24 @@ Change:
 
 ## Design notes
 
-1. **Data path.** Providers read from `local_store` only (R-CL-03): `spacesWithStateProvider` joins `spaces` and `user_space_states` and sorts by the personal `sort_key` (absent: the global order of the space); `channelsOfSpaceProvider(spaceId)` with counters from `read_states` and the `UnreadCounter` values the engine stores, run state from `runs` with an active state, muted from `notification_preferences` (level `mute` on the channel); `postListProvider(channelId, filter, sort)` over `threads` and `thread_tags` with `ForumOrder` of M4-08. Mapping to the view models of M4-07 happens in small pure functions with unit tests.
+1. **Data path.** Providers read from `local_store` only (R-CL-03): `spacesWithStateProvider` joins `spaces` and `user_space_states` and sorts by the personal `sort_key` (absent: the global order of the space); `channelsOfSpaceProvider(spaceId)` with counters from `read_states` and the `UnreadCounter` values the engine stores, run state from `runs` with an active state, muted from `notification_preferences` (the channel's own row with level `mute` and `muted_until` absent or in the future; inherited levels are shown by M4-33); `postListProvider(channelId, filter, sort)` over `threads` and `thread_tags` with `ForumOrder` of M4-08. Mapping to the view models of M4-07 happens in small pure functions with unit tests.
 
-2. **Personal order.** Drag and drop of a space computes a new `sort_key` between its neighbours (a base-62 fractional key that sorts with `COLLATE "C"` byte order, for example the midpoint algorithm of fractional indexing; a key never grows beyond 64 characters, otherwise the client re-keys the moved space only, never others); the write goes to the outbox as `putMySidebarSpace` with `sort_key`; collapse as `putMySidebarSpace` with `collapsed`. The local row updates at once and the server version wins on the echo (04 14: last write wins per space). Ruling for docs/DECISIONS.md: the key algorithm and its length bound.
+2. **Personal order.** Drag and drop of a space computes a new `sort_key` with `KeyBetween(previous, next)` of the fractional index that the server validates (`fracindex` of M1-52: digits `0-9A-Za-z` in ASCII order, an integer part with a head letter, no trailing `0` in the fraction, the smallest integer invalid); implement it in `packages/domain` as `FractionalIndex.between` and test it with the normative vectors of M1-52 (`("", "") -> "a0"`, `("a0", "") -> "a1"`, `("", "a0") -> "Zz"`, `("a0", "a1") -> "a0V"`) and its property tests, so a key the client sends never fails `putMySidebarSpace` with `400`. The write goes to the outbox as `putMySidebarSpace` with `sort_key`; collapse as `putMySidebarSpace` with `collapsed`. The local row updates at once; the own echo is ignored by `updated_by_device_id`, and a later change from another device wins by version (04 14). Ruling for docs/DECISIONS.md: the shared key rule in `domain`.
 
-3. **Post list.** Header: forum name, "New post" (primary) opening a dialog for the title and tags (`createThread` through the outbox), chips Open (default), Waiting for me (threads with an own run in `waiting_input` or a mention), Tags (multi-select from `forum_tags`), Sort (last activity, creation; default from `forum_default_sort`). The list is virtualized; long forums load further pages through `listChannelThreads` when scrolled near the end (the cursor of the API), stored in `threads`. Done section: "Done (n)" with the count of closed threads matching the filters, collapsed by default.
+3. **Post list.** Header: forum name, "New post" (primary) opening a dialog for the title, the first message and tags (`createThread` with `title`, `first_message` carrying its own `client_msg_id`, and `tag_ids`, through the outbox; a forum post without a first message is refused by the server, `ThreadCreate`), chips Open (default), Waiting for me (ruling for docs/DECISIONS.md: threads with a run that the person triggered in `waiting_input`, or an unread mention of the person), Tags (multi-select from `forum_tags`), Sort (last activity, creation; default from `forum_default_sort`). The list is virtualized; long forums load further pages through `listChannelThreads` when scrolled near the end (the cursor of the API), stored in `threads`. Done section: "Done (n)" with the count of closed threads matching the filters, collapsed by default.
 
 4. **Done collapse per device.** The collapse state of the Done section is kept per forum on this device in a local-only table (`forum_view_states`) or in an existing local-only table that fits; it is not synchronized because 01 11 has no key for it. Ruling for docs/DECISIONS.md and a sentence in 01 6.1.
 
 5. **Selection and router.** Clicking or pressing Enter on a channel navigates to `/c/<id>`; a text channel opens its main thread in the history column, a forum fills the post list column; a post navigates to `/t/<id>`. The selected row follows the route. A space row toggles with click, Enter, arrow left and right (components.md 7). The sidebar exposes `SidebarNavigation` (next or previous channel, next or previous unread channel) as a controller for M4-24.
 
-6. **Rulings for docs/DECISIONS.md** (`D-M4-19-<n>`): data path and mapping (note 1); the order key (note 2); the Done state per device (note 4); paging of the post list (note 3).
+6. **Rulings for docs/DECISIONS.md** (`D-M4-19-<n>`): data path and mapping (note 1); the order key in `domain` (note 2); "Waiting for me" (note 3); the Done state per device (note 4); paging of the post list (note 3).
 
 ## Tests (write them first)
 
 Widget and golden tests (`flutter test`, in-memory `local_store` filled by fixtures, fake clock):
 
 - `test/sidebar/space_tree_test.dart`: personal order from `sort_key` with fallback to the global order; collapse writes one outbox entry and updates the row at once; tree semantics (roles, expanded and collapsed states); the channel label with unread, mentions and run.
-- `test/sidebar/sort_key_test.dart`: keys between neighbours, at the start and the end, many moves in a row stay below the length bound and sort in byte order.
+- `packages/domain/test/fractional_index_test.dart`: the normative vectors of M1-52, keys between neighbours, at the start and the end, validity, byte order, and repeated inserts at the end keep short keys.
 - `test/sidebar/counters_test.dart`: a `message.created` from another person raises unread; one mentioning me raises mentions; `read_state.updated` resets them.
 - `test/forum/post_list_test.dart`: sort by activity and creation; filters Open, Waiting for me and Tags; the Done section counts and collapses, and its state survives a restart on this device; row labels.
 - `test/goldens/sidebar/*` and `test/goldens/forum/*`: the sidebar with three spaces in every channel state, and the post list with every row state and the Done section expanded, light and dark, densities `comfortable` and `compact`, text scaling 1 and 2, `de` and `en`.
