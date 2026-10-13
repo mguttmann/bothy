@@ -7,7 +7,7 @@ toolchain go1.27.2
 require (
 	filippo.io/age v1.3.2
 	github.com/exaring/otelpgx v0.13.0
-	github.com/getkin/kin-openapi v0.142.0
+	github.com/getkin/kin-openapi v0.144.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/moby/moby/api v1.55.0
 	github.com/oapi-codegen/runtime v1.7.0
