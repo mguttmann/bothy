@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -99,34 +100,159 @@ func (r *Repository) HashAt(ctx context.Context, seq int64) ([domain.HashSize]by
 }
 
 // Rows returns the rows fromSeq .. toSeq in chain order, as stored: details decoded with
-// UseNumber, so integers stay exact and CanonicalRow recomputes the hash (tests, M1-50).
+// UseNumber, so integers stay exact and CanonicalRow recomputes the hash (app.Store).
 func (r *Repository) Rows(ctx context.Context, fromSeq, toSeq int64) ([]domain.Row, error) {
 	got, err := r.read(ctx).Rows(ctx, sqlcgen.RowsParams{FromSeq: fromSeq, ToSeq: toSeq})
 	if err != nil {
 		return nil, err
 	}
+	return rowsOf(got), nil
+}
+
+// rowsOf converts stored rows.
+func rowsOf(got []sqlcgen.AuditEvent) []domain.Row {
 	out := make([]domain.Row, 0, len(got))
 	for _, e := range got {
-		row := domain.Row{
-			Seq: e.Seq, ID: idOf(e.ID), OccurredAt: e.OccurredAt.Time.UTC(),
-			ActorPrincipalID: idOf(e.ActorPrincipalID), ActorDeviceID: idOf(e.ActorDeviceID),
-			ActorSessionID: idOf(e.ActorSessionID), Action: e.Action, Decision: e.Decision,
-			DenyReason: e.DenyReason.String, ResourceKind: e.ResourceKind.String, ResourceID: idOf(e.ResourceID),
-			CorrelationID: idOf(e.CorrelationID),
-		}
-		dec := json.NewDecoder(bytes.NewReader(e.Details))
-		dec.UseNumber()
-		if err := dec.Decode(&row.Details); err != nil {
-			return nil, fmt.Errorf("audit: details of row %d: %w", e.Seq, err)
-		}
-		if len(e.PrevHash) != domain.HashSize || len(e.Hash) != domain.HashSize {
-			return nil, fmt.Errorf("audit: row %d has a hash of the wrong size", e.Seq)
-		}
+		out = append(out, rowOf(e))
+	}
+	return out
+}
+
+// rowOf converts one stored row; details keep their integers exact (UseNumber).
+func rowOf(e sqlcgen.AuditEvent) domain.Row {
+	row := domain.Row{
+		Seq: e.Seq, ID: idOf(e.ID), OccurredAt: e.OccurredAt.Time.UTC(),
+		ActorPrincipalID: idOf(e.ActorPrincipalID), ActorDeviceID: idOf(e.ActorDeviceID),
+		ActorSessionID: idOf(e.ActorSessionID), Action: e.Action, Decision: e.Decision,
+		DenyReason: e.DenyReason.String, ResourceKind: e.ResourceKind.String, ResourceID: idOf(e.ResourceID),
+		CorrelationID: idOf(e.CorrelationID),
+	}
+	// A row the recorder never wrote (details that are no object, a hash of another size) can
+	// only come from a change outside the server: it reads with nil details or a zero hash, which
+	// the chain walk reports as hash_mismatch or link_mismatch, instead of failing the read.
+	dec := json.NewDecoder(bytes.NewReader(e.Details))
+	dec.UseNumber()
+	if err := dec.Decode(&row.Details); err != nil {
+		row.Details = nil
+	}
+	if len(e.PrevHash) == domain.HashSize {
 		copy(row.PrevHash[:], e.PrevHash)
+	}
+	if len(e.Hash) == domain.HashSize {
 		copy(row.Hash[:], e.Hash)
-		out = append(out, row)
+	}
+	return row
+}
+
+// Bounds returns the smallest retained and the largest seq (app.Store).
+func (r *Repository) Bounds(ctx context.Context) (int64, int64, bool, error) {
+	b, err := r.read(ctx).Bounds(ctx)
+	if err != nil {
+		return 0, 0, false, err
+	}
+	return b.FirstSeq, b.HeadSeq, b.HeadSeq > 0, nil
+}
+
+// ListEvents returns one page of rows matching f, newest first by seq (app.Store).
+func (r *Repository) ListEvents(ctx context.Context, f app.EventFilter) ([]domain.Row, error) {
+	p := sqlcgen.ListEventsParams{
+		ActorID: optionalUUID(f.ActorID), ResourceID: optionalUUID(f.ResourceID),
+		Action: optionalText(f.Action), Decision: optionalText(f.Decision), ResourceKind: optionalText(f.ResourceKind),
+		FromAt: optionalTime(f.From), ToAt: optionalTime(f.To),
+		BeforeSeq: pgtype.Int8{Int64: f.BeforeSeq, Valid: f.BeforeSeq > 0},
+		RowLimit:  int32(min(max(f.Limit, 0), math.MaxInt32)),
+	}
+	got, err := r.read(ctx).ListEvents(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	return rowsOf(got), nil
+}
+
+// ExportSpan returns the smallest and the largest seq with occurred_at in [from, to) (app.Store).
+func (r *Repository) ExportSpan(ctx context.Context, from, to time.Time) (int64, int64, bool, error) {
+	s, err := r.read(ctx).ExportSpan(ctx, sqlcgen.ExportSpanParams{FromAt: optionalTime(from), ToAt: optionalTime(to)})
+	if err != nil {
+		return 0, 0, false, err
+	}
+	return s.FirstSeq, s.LastSeq, s.LastSeq > 0, nil
+}
+
+// LastCheckpoint returns the checkpoint with the largest seq (app.Store).
+func (r *Repository) LastCheckpoint(ctx context.Context) (app.StoredCheckpoint, bool, error) {
+	c, err := r.read(ctx).LastCheckpoint(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return app.StoredCheckpoint{}, false, nil
+	}
+	if err != nil {
+		return app.StoredCheckpoint{}, false, err
+	}
+	return checkpointOf(c.Seq, c.Hash, c.PreviousCheckpointHash, c.Signature, c.Kid), true, nil
+}
+
+// LockCheckpoints takes the checkpoint lock in the ambient transaction (app.Store).
+func (r *Repository) LockCheckpoints(ctx context.Context) error {
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	return sqlcgen.New(tx).LockCheckpoints(ctx)
+}
+
+// InsertCheckpoint inserts c in the ambient transaction (app.Store).
+func (r *Repository) InsertCheckpoint(ctx context.Context, c app.StoredCheckpoint) error {
+	tx, err := pg.Tx(ctx)
+	if err != nil {
+		return err
+	}
+	p := sqlcgen.InsertCheckpointParams{Seq: c.Seq, Hash: bytes.Clone(c.Hash[:]), Signature: bytes.Clone(c.Signature), Kid: c.KID}
+	if c.HasPrevious {
+		p.PreviousCheckpointHash = bytes.Clone(c.Previous[:])
+	}
+	return sqlcgen.New(tx).InsertCheckpoint(ctx, p)
+}
+
+// UnexportedCheckpoints returns at most limit checkpoints with exported_at NULL in seq order
+// (app.Store).
+func (r *Repository) UnexportedCheckpoints(ctx context.Context, limit int) ([]app.StoredCheckpoint, error) {
+	got, err := r.read(ctx).UnexportedCheckpoints(ctx, int32(min(max(limit, 0), math.MaxInt32)))
+	if err != nil {
+		return nil, err
+	}
+	out := make([]app.StoredCheckpoint, 0, len(got))
+	for _, c := range got {
+		out = append(out, checkpointOf(c.Seq, c.Hash, c.PreviousCheckpointHash, c.Signature, c.Kid))
 	}
 	return out, nil
+}
+
+// MarkExported sets exported_at of checkpoint seq once (app.Store).
+func (r *Repository) MarkExported(ctx context.Context, seq int64, at time.Time) error {
+	return r.read(ctx).MarkExported(ctx, sqlcgen.MarkExportedParams{Seq: seq, ExportedAt: pgtype.Timestamptz{Time: at, Valid: true}})
+}
+
+// checkpointOf converts the columns of a row of audit_checkpoints. A hash of another size reads
+// as zero, which never matches a row.
+func checkpointOf(seq int64, hash, previous, signature []byte, kid string) app.StoredCheckpoint {
+	c := app.StoredCheckpoint{Seq: seq, Signature: signature, KID: kid}
+	if len(hash) == domain.HashSize {
+		copy(c.Hash[:], hash)
+	}
+	if previous != nil {
+		c.HasPrevious = true
+		if len(previous) == domain.HashSize {
+			copy(c.Previous[:], previous)
+		}
+	}
+	return c
+}
+
+// optionalText converts a filter; empty is NULL.
+func optionalText(s string) pgtype.Text { return pgtype.Text{String: s, Valid: s != ""} }
+
+// optionalTime converts a bound; the zero time is NULL.
+func optionalTime(t time.Time) pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: t, Valid: !t.IsZero()}
 }
 
 // CurrentIPKey returns the IP key whose period contains at (app.Store).

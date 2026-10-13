@@ -18,6 +18,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/OWNER/bothy/services/server/internal/audit/app"
+	"github.com/OWNER/bothy/services/server/internal/audit/domain"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 )
 
@@ -28,6 +29,10 @@ const (
 	msgDenialsDropped = "aggregated audit denials dropped"
 	msgWriteFailed    = "write of aggregated audit denials failed, retrying"
 	msgIPKeyFailed    = "audit IP pseudonym key unavailable, denial kept without IP fields"
+	msgSinkMissing    = "audit checkpoint sink not configured, the chain is not protected outside the database"
+	msgVerifyFailed   = "audit chain verification failed, no checkpoint signed"
+	msgExportCut      = "audit export cut short after the stream started"
+	msgRecordFailed   = "audit entry of the chain verification not written"
 )
 
 // The values of error.type of the reports.
@@ -37,6 +42,9 @@ const (
 	errDenialsDropped = "audit_denials_dropped"
 	errWriteFailed    = "audit_write_failed"
 	errIPKeyFailed    = "audit_ip_key_failed"
+	errSinkMissing    = "audit_checkpoint_sink_not_configured"
+	errExportCut      = "audit_export_cut"
+	errRecordFailed   = "audit_record_failed"
 )
 
 // Reporter writes the reports of the audit module as log lines. The count of dropped denials and
@@ -89,4 +97,29 @@ func withSQLState(err error, attrs ...any) []any {
 		attrs = append(attrs, slog.String(attr.DBResponseStatusCode, pgErr.Code))
 	}
 	return attrs
+}
+
+// SinkNotConfigured logs the warning audit_checkpoint_sink_not_configured (19 SEC-AUD-2): every
+// run of audit.chain_verify and the start of every process that runs jobs.
+func (r *Reporter) SinkNotConfigured(ctx context.Context) {
+	r.log.WarnContext(ctx, msgSinkMissing, slog.String(attr.ErrorType, errSinkMissing))
+}
+
+// VerifyFailed logs an error with the failure reason of a broken chain; the job signed nothing
+// (alert BothyAuditChainBroken). The seq is not logged: the attribute catalogue has no key for
+// it, and the audit entry of the run names it.
+func (r *Reporter) VerifyFailed(ctx context.Context, reason domain.FailureReason) {
+	r.log.ErrorContext(ctx, msgVerifyFailed, slog.String(attr.ErrorType, errChainBroken), slog.String(attr.Reason, string(reason)))
+}
+
+// ExportCut logs an error for an export whose stream ended after it started, with the SQLSTATE
+// of err, if any.
+func (r *Reporter) ExportCut(ctx context.Context, err error) {
+	r.log.ErrorContext(ctx, msgExportCut, withSQLState(err, slog.String(attr.ErrorType, errExportCut))...)
+}
+
+// RecordFailed logs an error for an audit entry of the verification that could not be written,
+// with the SQLSTATE of err, if any.
+func (r *Reporter) RecordFailed(ctx context.Context, err error) {
+	r.log.ErrorContext(ctx, msgRecordFailed, withSQLState(err, slog.String(attr.ErrorType, errRecordFailed))...)
 }

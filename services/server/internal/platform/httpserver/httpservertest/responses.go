@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"slices"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/pb33f/libopenapi"
 	validator "github.com/pb33f/libopenapi-validator"
 	"github.com/pb33f/libopenapi-validator/config"
+	valerrors "github.com/pb33f/libopenapi-validator/errors"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
@@ -110,15 +112,34 @@ func keepItem(item *v3.PathItem, keep map[string]bool) bool {
 	return left
 }
 
-// Validate checks resp, the answer to req, and returns every finding joined, or nil. req must
+// mediaNDJSON is the media type of a stream of JSON values, one per line.
+const mediaNDJSON = "application/x-ndjson"
+
+// Validate checks resp, the answer to req, and returns every finding joined, or nil. An
+// application/x-ndjson body is checked line by line against the schema of its media type. req must
 // carry the path the contract names (with its server base).
 func (rv *ResponseValidator) Validate(req *http.Request, resp *Response) error {
-	clone := *resp.Response
-	clone.Body = io.NopCloser(bytes.NewReader(resp.Body))
+	bodies := [][]byte{resp.Body}
+	if media, _, err := mime.ParseMediaType(resp.Header.Get("Content-Type")); err == nil && media == mediaNDJSON {
+		// One JSON value per line, each checked against the schema of the media type (M1-50).
+		bodies = nil
+		for _, line := range bytes.Split(resp.Body, []byte("\n")) {
+			if len(line) > 0 {
+				bodies = append(bodies, line)
+			}
+		}
+	}
+	var list []*valerrors.ValidationError
 	rv.mu.Lock()
-	ok, list := rv.v.ValidateHttpResponse(req, &clone)
+	for _, body := range bodies {
+		clone := *resp.Response
+		clone.Body = io.NopCloser(bytes.NewReader(body))
+		if ok, errs := rv.v.ValidateHttpResponse(req, &clone); !ok {
+			list = append(list, errs...)
+		}
+	}
 	rv.mu.Unlock()
-	if ok {
+	if len(list) == 0 {
 		return nil
 	}
 	var b strings.Builder

@@ -286,7 +286,7 @@ Format der Prüfpunkte (03, `audit_checkpoints`):
 |---|---|
 | Nutzlast | `{instance_id, seq, hash, occurred_at, previous_checkpoint_hash}` nach RFC 8785 (JCS); `seq`, `hash` und `occurred_at` gehören zur erfassten Zeile von `audit_events`, Zeit in der Form von SEC-AUD-4; `hash` und `previous_checkpoint_hash` als Hex in Kleinbuchstaben; `previous_checkpoint_hash` ist SHA-256 der kanonischen Nutzlast des vorigen Prüfpunkts und fehlt beim ersten |
 | Signatur | kompakte JWS mit Kopf `{alg, kid, typ: "audit-checkpoint+json"}`, Schlüssel mit Zweck `audit_checkpoint` ([ADR 0066](../adr/0066-signierschluessel-im-beschreibbaren-schluesselspeicher.md)); `audit_checkpoints.signature` speichert die ganze JWS als UTF-8; geprüft werden nur die Algorithmen aus 03 `server_signing_keys`, nie `none` |
-| Ablage mit `file://` | Datei `<pfad>/<instance_id>/<seq mit 20 Stellen, vorne Nullen>.jws` mit der JWS; Ordner `0700`, Datei `0600`; angelegt über eine temporäre Datei im selben Ordner mit `O_EXCL`, Umbenennen und `fsync` von Datei und Ordner; eine vorhandene Datei mit anderem Inhalt ist ein Fehler und wird nie überschrieben |
+| Ablage mit `file://` | Datei `<pfad>/<instance_id>/<seq mit 20 Stellen, vorne Nullen>.jws` mit der JWS; Ordner `0700`, Datei `0600`; written once (M1-50): a temporary file in the same directory created with `O_EXCL` and synced, then a hard link to the name, which fails when the name exists (a rename would replace a file a concurrent writer just stored), then `fsync` of the directory; eine vorhandene Datei mit anderem Inhalt ist ein Fehler und wird nie überschrieben; the directory `<pfad>` itself must exist, the server never creates it |
 
 ## 13. Penetrationstest-Plan
 

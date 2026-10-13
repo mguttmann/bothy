@@ -108,6 +108,7 @@ type Operation struct {
 	RequestBody    BodyKind    // BodyNone, BodyJSON, BodyMultipart, BodyOctetStream
 	BodyRequired   bool        // requestBody.required
 	ETagStatuses   []int       // 2xx statuses whose response declares the ETag header
+	Download       bool        // a 2xx response streams a body that is not JSON (route class of downloads)
 }
 
 // clone returns a copy of op that shares no slice with it.

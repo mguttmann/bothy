@@ -45,8 +45,8 @@ import (
 )
 
 // Contract is the test contract (OpenAPI 3.1) the harness validates against by default: the
-// operations getThing, updateThing, createThing, createShape, createComposed, uploadBlob, postHook,
-// getDiscovery and uploadAvatar with the schema features of docs/api/openapi.yaml, and the keyed
+// operations getThing, updateThing, createThing, createShape, createComposed, uploadBlob,
+// exportThings (a download, M1-50), postHook, getDiscovery and uploadAvatar with the schema features of docs/api/openapi.yaml, and the keyed
 // operations createItem, updateItem and archiveItem of the Idempotency-Key stage (M1-20).
 //
 //go:embed contract.yaml

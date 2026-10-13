@@ -81,8 +81,13 @@ def sync_detailed(
 ) -> Response[Problem]:
     """Export the audit log
 
-     Streams one `AuditEvent` per line in `seq` order, with hashes for offline verification. A stream cut
-    short is detectable through the hash links (`prev_hash`).
+     Streams one `AuditEvent` per line in ascending `seq`, with hashes for offline verification. The
+    stream is the contiguous `seq` span from the smallest to the largest `seq` whose `occurred_at` lies
+    in [`from`, `to`), so every line links the line before by `prev_hash`; a row inside the span whose
+    `occurred_at` lies outside the range (an aggregated denial keeps the time of its first denial) is
+    part of it. A gap inside the stream breaks the hash links (`prev_hash`); an error after the first
+    line aborts the transfer instead of ending it, so a client sees a broken response, not a shorter
+    complete one.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -118,8 +123,13 @@ def sync(
 ) -> Problem | None:
     """Export the audit log
 
-     Streams one `AuditEvent` per line in `seq` order, with hashes for offline verification. A stream cut
-    short is detectable through the hash links (`prev_hash`).
+     Streams one `AuditEvent` per line in ascending `seq`, with hashes for offline verification. The
+    stream is the contiguous `seq` span from the smallest to the largest `seq` whose `occurred_at` lies
+    in [`from`, `to`), so every line links the line before by `prev_hash`; a row inside the span whose
+    `occurred_at` lies outside the range (an aggregated denial keeps the time of its first denial) is
+    part of it. A gap inside the stream breaks the hash links (`prev_hash`); an error after the first
+    line aborts the transfer instead of ending it, so a client sees a broken response, not a shorter
+    complete one.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -150,8 +160,13 @@ async def asyncio_detailed(
 ) -> Response[Problem]:
     """Export the audit log
 
-     Streams one `AuditEvent` per line in `seq` order, with hashes for offline verification. A stream cut
-    short is detectable through the hash links (`prev_hash`).
+     Streams one `AuditEvent` per line in ascending `seq`, with hashes for offline verification. The
+    stream is the contiguous `seq` span from the smallest to the largest `seq` whose `occurred_at` lies
+    in [`from`, `to`), so every line links the line before by `prev_hash`; a row inside the span whose
+    `occurred_at` lies outside the range (an aggregated denial keeps the time of its first denial) is
+    part of it. A gap inside the stream breaks the hash links (`prev_hash`); an error after the first
+    line aborts the transfer instead of ending it, so a client sees a broken response, not a shorter
+    complete one.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix
@@ -185,8 +200,13 @@ async def asyncio(
 ) -> Problem | None:
     """Export the audit log
 
-     Streams one `AuditEvent` per line in `seq` order, with hashes for offline verification. A stream cut
-    short is detectable through the hash links (`prev_hash`).
+     Streams one `AuditEvent` per line in ascending `seq`, with hashes for offline verification. The
+    stream is the contiguous `seq` span from the smallest to the largest `seq` whose `occurred_at` lies
+    in [`from`, `to`), so every line links the line before by `prev_hash`; a row inside the span whose
+    `occurred_at` lies outside the range (an aggregated denial keeps the time of its first denial) is
+    part of it. A gap inside the stream breaks the hash links (`prev_hash`); an error after the first
+    line aborts the transfer instead of ending it, so a client sees a broken response, not a shorter
+    complete one.
 
     Args:
         from_ (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix

@@ -85,3 +85,30 @@ func TestHarness_ValidateResponses(t *testing.T) {
 		t.Fatalf("status %d, findings %v; want one finding for the missing members", r.StatusCode, rec.errors)
 	}
 }
+
+// TestHarness_ValidateResponsesNDJSON: an application/x-ndjson body is validated line by line
+// against the schema of the media type (exportAuditEvents, M1-50); a valid stream passes and one
+// line outside the schema is reported.
+func TestHarness_ValidateResponsesNDJSON(t *testing.T) {
+	t.Parallel()
+	op := httpserver.Operation{ID: "exportThings", Method: http.MethodGet, Path: "/api/v1/things-export", Pattern: "GET /api/v1/things-export", Action: "thing.read", Download: true}
+	for _, c := range []struct {
+		body     string
+		findings int
+	}{
+		{"{\"a\":1}\n{\"b\":2}\n", 0},
+		{"{\"a\":1}\n[1]\n", 1},
+	} {
+		rec := &recordingTB{TB: t}
+		h := httpservertest.New(rec, httpservertest.Options{ValidateResponses: true, Routes: []httpservertest.Route{{
+			Op: op, Handler: httpservertest.Authorized("thing.read", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/x-ndjson")
+				_, _ = w.Write([]byte(c.body))
+			}),
+		}}})
+		r := h.Do(h.NewRequest(http.MethodGet, "/api/v1/things-export", "", "Authorization", httpservertest.GoodToken))
+		if r.StatusCode != http.StatusOK || len(rec.errors) != c.findings {
+			t.Errorf("%q: status %d, findings %v; want %d", c.body, r.StatusCode, rec.errors, c.findings)
+		}
+	}
+}

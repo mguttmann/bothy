@@ -8,12 +8,19 @@ import (
 	"log/slog"
 	"sync"
 
+	"github.com/OWNER/bothy/services/server/internal/audit/adapters/filesink"
+	audithttp "github.com/OWNER/bothy/services/server/internal/audit/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/audit/adapters/logs"
+	auditmetrics "github.com/OWNER/bothy/services/server/internal/audit/adapters/otelmetrics"
 	auditpg "github.com/OWNER/bothy/services/server/internal/audit/adapters/postgres"
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	"github.com/OWNER/bothy/services/server/internal/audit/domain"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	"github.com/OWNER/bothy/services/server/internal/instance"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
@@ -53,6 +60,12 @@ type Audit struct {
 	uow      *pg.UnitOfWork
 	recorder *auditapp.Recorder
 	modules  *Modules
+	repo     *auditpg.Repository
+	reporter *logs.Reporter
+	cfg      auditapp.Config
+	// log and handlers are the query, export and verification of M1-50 (BindLog).
+	log      *auditapp.Log
+	handlers *audithttp.Log
 
 	stopOnce sync.Once
 	cancel   context.CancelFunc
@@ -77,7 +90,62 @@ func NewAudit(pool *pg.Pool, unitCfg pg.UnitConfig, cfg auditapp.Config, kek aud
 	if err != nil {
 		return nil, err
 	}
-	return &Audit{uow: uow, recorder: rec, modules: mods}, nil
+	return &Audit{uow: uow, recorder: rec, modules: mods, repo: repo, reporter: logs.New(log), cfg: cfg}, nil
+}
+
+// CheckpointSink returns the sink of audit.checkpoint_sink for instance: app.NoSink for the
+// empty value, the file sink for file://<absolute path>. The error is that of a value the
+// configuration check refuses.
+func CheckpointSink(value string, instance ids.ID) (auditapp.CheckpointSink, error) {
+	dir, err := domain.ParseSink(value)
+	if err != nil {
+		return nil, err
+	}
+	if dir == "" {
+		return auditapp.NoSink{}, nil
+	}
+	return filesink.New(dir, instance)
+}
+
+// BindLog builds the query, export and verification of the log and the job audit.chain_verify
+// (M1-50) over the signing keys of instance, the Authorizer and the instance ID, the issuer of
+// every checkpoint. The instruments go to the global meter provider of platform/otel. Start step
+// audit_log calls it after the signing keys exist. Errors: those of the sink, the instruments
+// and app.NewLog.
+func (a *Audit) BindLog(keys instance.Keys, az authorize.Authorizer, instanceID ids.ID, clk clock.Clock) error {
+	sink, err := CheckpointSink(a.cfg.CheckpointSink, instanceID)
+	if err != nil {
+		return err
+	}
+	metrics, err := auditmetrics.New(nil)
+	if err != nil {
+		return err
+	}
+	l, err := auditapp.NewLog(a.cfg, auditapp.LogDeps{
+		Store: a.repo, UoW: a.uow, Authorizer: az, Audit: a.recorder, Keys: keys, Sink: sink,
+		Cursors: audithttp.Cursors{}, Metrics: metrics, Reporter: a.reporter, Clock: clk, InstanceID: instanceID,
+	})
+	if err != nil {
+		return err
+	}
+	a.log, a.handlers = l, audithttp.New(l)
+	return nil
+}
+
+// Log returns the log of BindLog (audit.Log and the use case of audit.chain_verify); nil before.
+func (a *Audit) Log() *auditapp.Log { return a.log }
+
+// Handlers returns the REST handlers of listAuditEvents, exportAuditEvents and
+// verifyAuditChain; nil before BindLog.
+func (a *Audit) Handlers() *audithttp.Log { return a.handlers }
+
+// WarnWithoutSink writes the warning audit_checkpoint_sink_not_configured when
+// audit.checkpoint_sink is empty; the start of every process that runs jobs calls it (19
+// SEC-AUD-2).
+func (a *Audit) WarnWithoutSink(ctx context.Context) {
+	if a.cfg.CheckpointSink == "" {
+		a.reporter.SinkNotConfigured(ctx)
+	}
 }
 
 // UoW returns the unit of work of the process; its registry runs the audit hook in phase 3.3.

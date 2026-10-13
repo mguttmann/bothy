@@ -5,6 +5,7 @@ package instance
 import (
 	"context"
 	"crypto/ed25519"
+	"errors"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
@@ -149,6 +150,14 @@ type Rotation struct {
 	PreviousNotAfter time.Time
 }
 
+// ErrJWSInvalid is wrapped by every error of Keys.Verify that is about the JWS itself, never by a
+// database error, so a caller can tell a forged or damaged token from an outage.
+var ErrJWSInvalid = errors.New("instance: JWS does not verify under a key of the purpose")
+
+// SignatureAlgs are the algorithms of 03 server_signing_keys (CHECK on alg); Keys.Verify accepts
+// no other.
+func SignatureAlgs() []string { return []string{AlgEdDSA, "ES256"} }
+
 // Keys is the port of the server signing keys (ADR 0066). Access tokens (M1-34), invocation
 // tokens (M2), outgoing webhooks (M2) and audit checkpoints (M1-50) sign through it; no other
 // module reads server_signing_keys. Implementations are safe for concurrent use.
@@ -165,6 +174,14 @@ type Keys interface {
 	// PublicKey returns the key kid in any state, for verifying old audit checkpoints. Errors:
 	// kind not_found; the database error.
 	PublicKey(ctx context.Context, kid string) (PublicKey, error)
+	// Verify checks the compact JWS compactJWS against the key of purpose p that its header kid
+	// names, in any state including retired (old audit checkpoints, M1-50), read fresh from the
+	// database. The JWS is parsed with kernel/jose (ADR 0067) and accepts only the algorithms of
+	// 03 server_signing_keys (EdDSA, ES256), never none; the typ of the header is the caller's to
+	// check. It returns the payload and the kid. Errors: ErrJWSInvalid (wrapped) for a JWS that
+	// is malformed, has no kid, names an unknown key or a key of another purpose or algorithm, or
+	// whose signature does not verify; the database error otherwise.
+	Verify(ctx context.Context, p Purpose, compactJWS []byte) (payload []byte, kid string, err error)
 	// JWKS returns the published key set (getJwks) after authorizing the public action
 	// instance.discovery.read for the principal of ctx (anonymous when there is none). Errors: the
 	// decision of authorize; the database error.

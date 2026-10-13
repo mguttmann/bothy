@@ -114,6 +114,16 @@ paths:
       responses:
         '201':
           description: created
+  /things-export:
+    get:
+      operationId: exportThings
+      responses:
+        '200':
+          description: one thing per line
+          content:
+            application/x-ndjson:
+              schema:
+                type: object
   /hooks/{hook_id}/{token}:
     post:
       operationId: postHook

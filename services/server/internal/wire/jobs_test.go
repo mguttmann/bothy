@@ -16,7 +16,7 @@ import (
 // already. Empty until M1-16 registers the first handler.
 func TestWireJobArgsOnlyIDs(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour, ChainVerifyInterval: time.Hour})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestJobRoleMapping(t *testing.T) {
 func TestJobRegistryHasAuthCleanup(t *testing.T) {
 	t.Parallel()
 	m := wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
-		AuthCleanupInterval: 3 * time.Hour}
+		AuthCleanupInterval: 3 * time.Hour, ChainVerifyInterval: time.Hour}
 	reg, err := wire.NewJobRegistry(&m)
 	if err != nil {
 		t.Fatal(err)
@@ -86,5 +86,32 @@ func TestJobRegistryHasAuthCleanup(t *testing.T) {
 	m.AuthCleanupInterval = 0
 	if _, err := wire.NewJobRegistry(&m); err == nil {
 		t.Fatal("a registry without auth.cleanup_interval was accepted")
+	}
+}
+
+// TestJobRegistryHasChainVerify: the registry of every role holds audit.chain_verify on the
+// queue maintenance, periodic every audit.checkpoint_interval (02 section 12.3, M1-50), and
+// refuses a missing interval.
+func TestJobRegistryHasChainVerify(t *testing.T) {
+	t.Parallel()
+	m := wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
+		AuthCleanupInterval: time.Hour, ChainVerifyInterval: 2 * time.Hour}
+	reg, err := wire.NewJobRegistry(&m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q, ok := reg.Queue("audit.chain_verify"); !ok || q != jobs.QueueMaintenance {
+		t.Fatalf("queue = %q, %v", q, ok)
+	}
+	found := false
+	for _, p := range reg.Periodic() {
+		found = found || p.Args.Kind() == "audit.chain_verify" && p.Interval == 2*time.Hour
+	}
+	if !found {
+		t.Fatalf("periodic jobs %+v lack audit.chain_verify every 2h", reg.Periodic())
+	}
+	m.ChainVerifyInterval = 0
+	if _, err := wire.NewJobRegistry(&m); err == nil {
+		t.Fatal("a registry without audit.checkpoint_interval was accepted")
 	}
 }

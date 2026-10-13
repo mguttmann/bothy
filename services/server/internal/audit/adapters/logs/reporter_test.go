@@ -16,6 +16,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/audit/adapters/logs"
 	"github.com/OWNER/bothy/services/server/internal/audit/app"
+	"github.com/OWNER/bothy/services/server/internal/audit/domain"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 )
 
@@ -47,13 +48,18 @@ func TestReporter_KeysAreInTheCatalogue(t *testing.T) {
 		r.DenialsDropped(ctx, "grant.create", "no_grant", 3)
 		r.WriteFailed(ctx, fmt.Errorf("wrapped: %w", &pgconn.PgError{Code: "57014", Message: "secret detail 192.0.2.44"}))
 		r.IPKeyFailed(ctx, errors.New("secret detail"))
+		r.SinkNotConfigured(ctx)
+		r.VerifyFailed(ctx, domain.CheckpointMismatch)
+		r.ExportCut(ctx, errors.New("secret detail"))
+		r.RecordFailed(ctx, errors.New("secret detail"))
 	})
-	if len(got) != 5 {
+	if len(got) != 9 {
 		t.Fatalf("%d lines", len(got))
 	}
 	want := []struct{ level, errType string }{
 		{"ERROR", "audit_chain_broken"}, {"ERROR", "audit_unknown_reason"}, {"ERROR", "audit_denials_dropped"},
 		{"WARN", "audit_write_failed"}, {"ERROR", "audit_ip_key_failed"},
+		{"WARN", "audit_checkpoint_sink_not_configured"}, {"ERROR", "audit_chain_broken"}, {"ERROR", "audit_export_cut"}, {"ERROR", "audit_record_failed"},
 	}
 	for i, l := range got {
 		if l["level"] != want[i].level || l[attr.ErrorType] != want[i].errType {
@@ -70,6 +76,9 @@ func TestReporter_KeysAreInTheCatalogue(t *testing.T) {
 	}
 	if got[3][attr.DBResponseStatusCode] != "57014" || got[4][attr.DBResponseStatusCode] != nil {
 		t.Errorf("SQLSTATE: %v / %v", got[3], got[4])
+	}
+	if got[6][attr.Reason] != "checkpoint_mismatch" {
+		t.Errorf("verify failure = %v", got[6])
 	}
 	if got[1][attr.Reason] != "brand_new" || got[2][attr.Action] != "grant.create" || got[2][attr.Reason] != "no_grant" {
 		t.Errorf("lines = %v", got)

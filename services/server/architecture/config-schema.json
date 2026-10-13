@@ -62,6 +62,30 @@
       "doc": "Largest page size; a larger limit is capped."
     },
     {
+      "name": "audit.checkpoint_interval",
+      "env": "BOTHY_AUDIT__CHECKPOINT_INTERVAL",
+      "kind": "duration",
+      "default": "1h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "19-sicherheit.md",
+      "doc": "Interval of the job audit.chain_verify, which recomputes the audit chain and signs the next checkpoint."
+    },
+    {
+      "name": "audit.checkpoint_sink",
+      "env": "BOTHY_AUDIT__CHECKPOINT_SINK",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "19-sicherheit.md",
+      "doc": "Where the signed audit checkpoints are stored outside the database: empty (a permanent warning) or file://<absolute path> on storage outside the database volume."
+    },
+    {
       "name": "audit.deny_aggregate_max_keys",
       "env": "BOTHY_AUDIT__DENY_AGGREGATE_MAX_KEYS",
       "kind": "int",

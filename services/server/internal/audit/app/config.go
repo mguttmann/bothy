@@ -5,7 +5,8 @@ package app
 import "time"
 
 // Config is the configuration of the audit module, bound in internal/wire from the keys of 05
-// "Konfigurationswerte" and 20 "Konfigurationswerte" (docs/operations/configuration.md).
+// "Konfigurationswerte", 19 "Konfigurationswerte", 20 "Konfigurationswerte" and the page sizes of
+// 06 (docs/operations/configuration.md).
 type Config struct {
 	// DenyAggregateWindow is audit.deny_aggregate_window: identical denials within this time from
 	// the first one become one row.
@@ -22,4 +23,15 @@ type Config struct {
 	// IPKEKRef is privacy.audit_ip_kek_ref: the secret reference of the key that encrypts the IP
 	// keys in audit_ip_keys.
 	IPKEKRef string `config:"privacy.audit_ip_kek_ref"`
+	// CheckpointInterval is audit.checkpoint_interval: the period of the job audit.chain_verify,
+	// which signs the next checkpoint (19 SEC-AUD-2).
+	CheckpointInterval time.Duration `config:"audit.checkpoint_interval"`
+	// CheckpointSink is audit.checkpoint_sink: empty (no sink, a permanent warning) or
+	// file://<absolute path> (19 section 16, ParseSink).
+	CheckpointSink string `config:"audit.checkpoint_sink"`
+	// PageSizeDefault is api.page_size_default: the page of listAuditEvents without limit.
+	PageSizeDefault int `config:"api.page_size_default"`
+	// PageSizeMax is api.page_size_max: the cap of limit and the batch of the export and of the
+	// chain walk.
+	PageSizeMax int `config:"api.page_size_max"`
 }

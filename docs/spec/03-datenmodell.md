@@ -2156,7 +2156,9 @@ werden (ADR 0021, [19-sicherheit.md](19-sicherheit.md)). Modul: `audit`.
 | `exported_at` | `timestamptz` | ja | | abgelegt an `audit.checkpoint_sink` |
 
 PK: `seq`. FK: `kid` -> `server_signing_keys(kid)` ON DELETE RESTRICT. Indexe: `(exported_at)
-WHERE exported_at IS NULL` für den Export. Aufbewahrung: `audit`. Rechte wie `audit_events`.
+WHERE exported_at IS NULL` für den Export. Aufbewahrung: `audit`. Rechte wie `audit_events`;
+in addition the application role may set `exported_at` once (column grant `UPDATE (exported_at)`
+and trigger, M1-50).
 
 #### `audit_ip_keys`
 
