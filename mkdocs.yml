@@ -342,3 +342,14 @@ nav:
           - "M3-22: Push registration and preview endpoint (ADR 0031)": briefs/M3-22-push-registration.md
           - "M3-23: Desktop hints over the gateway": briefs/M3-23-desktop-notices.md
           - "M3-24: Push handoff performance target": briefs/M3-24-push-handoff-perf.md
+      - Milestone M4:
+          - "M4-01: Workspace and architecture test of the apps": briefs/M4-01-workspace-arch.md
+          - "M4-02: Dart API client as a gate": briefs/M4-02-dart-api-client.md
+          - "M4-03: Accent variants in the token generator": briefs/M4-03-accent-variants.md
+          - "M4-04: Design system with tokens, theme and fonts (ADR 0030)": briefs/M4-04-design-system-theme.md
+          - "M4-05: Icons in the design system": briefs/M4-05-design-icons.md
+          - "M4-06: Localization with ARB lint": briefs/M4-06-l10n.md
+          - "M4-07: Core components with goldens": briefs/M4-07-core-components.md
+          - "M4-08: Domain package": briefs/M4-08-domain.md
+          - "M4-09: Login: DPoP, refresh and step-up": briefs/M4-09-auth-dpop.md
+          - "M4-10: Device key for macOS and iOS": briefs/M4-10-device-key-apple.md
