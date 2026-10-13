@@ -178,6 +178,10 @@ operated, and the order of the build.
 
 ### Changed
 
+- CodeRabbit reviews with the `chill` profile and reports bugs, security issues, broken
+  contracts and problems that break CI, without style, wording or formatting nits; it asks
+  for a source URL and retrieval date only in `docs/spec/**`, `docs/security/**` and
+  `docs/adr/**` (CRT-1 in [DECISIONS.md](docs/DECISIONS.md)).
 - Chapter 02 "Configuration loading" and the configuration reference describe the loader as built
   by the server: built-in defaults live in the schema, `bothy config print` shows secret
   references instead of `<redacted>`, and `docs/operations/configuration.md` sections 1 to 3 give
