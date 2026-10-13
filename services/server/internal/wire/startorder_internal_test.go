@@ -10,10 +10,12 @@ import (
 // TestStartSequenceModuleSteps: every role starts the module steps 6a to 6d in the order Serve
 // documents (audit, sync, authz, identity), then the signing keys (M1-32) and the routes of step
 // 7, so the device handlers of identity (M1-33) and the key handlers exist when the routes are
-// mounted (docs/DECISIONS.md INT-W7/3), and the keys before the jobs that rotate them.
+// mounted (docs/DECISIONS.md INT-W7/3), and the keys before the jobs that rotate them. The session
+// part of identity follows the signing keys, which sign its access tokens, and precedes the routes,
+// whose chain authenticates with it (M1-34).
 func TestStartSequenceModuleSteps(t *testing.T) {
 	t.Parallel()
-	want := []string{"audit", "sync", "authz", "identity", "signing_keys", "routes", "jobs"}
+	want := []string{"audit", "sync", "authz", "identity", "signing_keys", "sessions", "routes", "jobs"}
 	for _, role := range []Role{RoleAPI, RoleWorker, RoleAll} {
 		names := componentNames(role)
 		last := -1

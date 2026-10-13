@@ -11,6 +11,23 @@ documented in this file. The format is based on
 
 ### Added
 
+- Sessions, access tokens, refresh families and logout (M1-34): the migration
+  `00011_identity_sessions.sql` (`auth_sessions`, `refresh_token_families`, `refresh_tokens`), the
+  port `identity.Auth` with `StartSession`, `StartChildSession`, `CreateExtensionSession`,
+  `Refresh`, `Logout`, `RevokeSession` and `ListSessions`, the in-transaction event
+  `SessionEnded` and the durable event `session.revoked`. Access tokens are JWS with header `typ`
+  `at+jwt`, signed with the `access_token` keys of instance, bound to the DPoP key (`cnf.jkt`) and
+  capped at the session end; refresh tokens are 256 random bits stored as HMAC, rotated per
+  family with the grace `auth.refresh_reuse_grace`, and a reuse revokes family, session and child
+  sessions. identity's `Authenticator` now authenticates every person on the REST chain (token,
+  DPoP proof, then session, device and key in one query); `authorize` decides session and device
+  state from what it read (`authorize.CredentialObserver`, a revoked or replaced device key is
+  `device_inactive`). The operations `refreshToken`, `logout`, `listMySessions`,
+  `listUserSessions` and `createExtensionSession`; the configuration keys `auth.session_max_age`,
+  `auth.refresh_token_ttl`, `auth.refresh_reuse_grace` and `identity.last_active_granularity`; the
+  start step `sessions` after `signing_keys`. A missing required `DPoP` header is `401
+  invalid_dpop_proof` instead of `400`; `kernel/reqmeta` carries the DPoP facts of a request and
+  a setter of response headers; `kernel/jose.SignerFunc`; depguard bans `math/rand` in identity.
 - `internal/authz` (M1-30): the periodic jobs `authz.expiry_sweep` and `authz.expiry_reminder`
   on the queue `maintenance`. The sweep reports every expired grant and membership exactly once
   in batches of `authz.expiry_sweep_batch_max`: raised rights version, `expiry_reported_at`,

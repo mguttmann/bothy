@@ -47,6 +47,10 @@ type Liveness struct {
 	SessionExpiresAt time.Time
 	// DeviceState is pending, active, revoked or unknown.
 	DeviceState string
+	// DeviceKeyRevoked reports that the authenticator found the request's key (cnf.jkt) not to be
+	// the device's active dpop key any more (07 section 4.1 device_inactive: "Schlüssel
+	// widerrufen"; M1-34).
+	DeviceKeyRevoked bool
 	// TokenActive and TokenExpiresAt describe the API token; a zero expiry means none.
 	TokenActive    bool
 	TokenExpiresAt time.Time
@@ -75,7 +79,7 @@ func CheckLiveness(l Liveness, t time.Time) Decision {
 	if l.HasSession && (!l.SessionActive || !t.Before(l.SessionExpiresAt)) {
 		return deny(OutcomeUnauthenticated, ReasonSessionRevoked)
 	}
-	if l.HasDevice && l.DeviceState != DevicePending && l.DeviceState != DeviceActive {
+	if l.HasDevice && (l.DeviceKeyRevoked || l.DeviceState != DevicePending && l.DeviceState != DeviceActive) {
 		return deny(OutcomeUnauthenticated, ReasonDeviceInactive)
 	}
 	if l.HasToken && (!l.TokenActive || (!l.TokenExpiresAt.IsZero() && !t.Before(l.TokenExpiresAt))) {

@@ -74,9 +74,12 @@ var constraintFields = map[string]string{
 // "Error mapping"): a unique violation becomes kind conflict with the field, a check, trigger,
 // foreign key or not null violation becomes validation_failed with the column as field. The
 // text never contains SQL, constraint names or values; the driver error stays wrapped for the
-// log only. An error that already is a kernel/errs error (for example the unavailable error of
+// log only. A nil error stays nil. An error that already is a kernel/errs error (for example the unavailable error of
 // an exhausted pool) passes unchanged; anything else is internal.
 func mapError(err error, what string) error {
+	if err == nil {
+		return nil
+	}
 	if _, ok := errs.As(err); ok {
 		return err
 	}

@@ -121,7 +121,7 @@ func TestInstallIdempotency_FillsTheStage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	chain, err := wire.NewChain(httpserver.DefaultChainConfig("https://chat.example.com"), nil)
+	chain, err := wire.NewChain(httpserver.DefaultChainConfig("https://chat.example.com"), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -306,3 +306,31 @@ func TestJWS_Rejects(t *testing.T) {
 		}
 	})
 }
+
+// TestSignerFunc: a function signer signs like the key it wraps; without a function it fails.
+func TestSignerFunc(t *testing.T) {
+	t.Parallel()
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := jose.SignerFunc{Algorithm: jose.AlgEdDSA, Fn: func(in []byte) ([]byte, error) { return ed25519.Sign(priv, in), nil }}
+	tok, err := jose.SignCompact(s, jose.Header{Typ: "at+jwt"}, []byte(`{"a":1}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	j, err := jose.ParseCompactJWS(tok, []string{jose.AlgEdDSA}, "at+jwt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	k, err := jose.JWKFromPublicKey(pub)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := j.Verify(k); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (jose.SignerFunc{Algorithm: jose.AlgEdDSA}).Sign([]byte("x")); err == nil {
+		t.Fatal("a signer without a function signed")
+	}
+}

@@ -9,6 +9,7 @@
 version: 1
 enabled:             # operationIds that have a handler; sorted ascending
   - addOwner
+  - createExtensionSession
   - createUser
   - enableUser
   - getDevice
@@ -16,9 +17,13 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMe
   - getUser
   - listMyDevices
+  - listMySessions
   - listOwners
   - listUserDevices
+  - listUserSessions
   - listUsers
+  - logout
+  - refreshToken
   - revokeOwner
   - rotateSigningKey
   - updateMyProfile
@@ -153,9 +158,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createEnrollmentCode
     etappe: M1
     ticket: M1-37
-  - operation_id: createExtensionSession
-    etappe: M1
-    ticket: M1-34
   - operation_id: createFileTicket
     etappe: M3
     ticket: M3-05
@@ -536,9 +538,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listMyReadStates
     etappe: M1
     ticket: M1-61
-  - operation_id: listMySessions
-    etappe: M1
-    ticket: M1-34
   - operation_id: listMySettings
     etappe: M1
     ticket: M1-61
@@ -581,9 +580,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listTokens
     etappe: M1
     ticket: M1-44
-  - operation_id: listUserSessions
-    etappe: M1
-    ticket: M1-34
   - operation_id: listWebhookDeliveries
     etappe: M2
     ticket: M2-26
@@ -596,9 +592,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: loginWithTrustedHeader
     etappe: M1
     ticket: M1-43
-  - operation_id: logout
-    etappe: M1
-    ticket: M1-34
   - operation_id: markThreadUnread
     etappe: M1
     ticket: M1-61
@@ -680,9 +673,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: redeliverWebhook
     etappe: M2
     ticket: M2-26
-  - operation_id: refreshToken
-    etappe: M1
-    ticket: M1-34
   - operation_id: registerCommand
     etappe: M2
     ticket: M2-16

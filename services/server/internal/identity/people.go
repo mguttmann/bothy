@@ -12,9 +12,11 @@ import (
 )
 
 // Register declares what the identity module emits (M1-25, docs/spec/05-aktionen.md section 6):
-// the durable event user.updated (M1-31). internal/wire lists it in moduleRegistrations.
+// the durable events user.updated (M1-31) and session.revoked (M1-34). internal/wire lists it in
+// moduleRegistrations.
 func Register(r *authorize.Registry) {
 	r.Event("identity", authorize.EventUserUpdated)
+	r.Event("identity", authorize.EventSessionRevoked)
 }
 
 // ListUsersQuery asks for one page of the directory (operation listUsers).

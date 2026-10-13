@@ -25,6 +25,8 @@ func TestIdentityConfigBindsDefaults(t *testing.T) {
 		HandleMaxChars: 32, DisplayNameMaxChars: 64, DPoPNonceTTL: 5 * time.Minute, DPoPProofMaxAge: 60 * time.Second,
 		ClockLeeway: 30 * time.Second, TokenPepperRef: "file:/run/bothy/secrets/token_pepper",
 		PublicURL: "https://chat.example.com", PageSizeDefault: 50, PageSizeMax: 200, StepUpMaxAge: 5 * time.Minute,
+		AccessTokenTTL: 10 * time.Minute, RefreshTokenTTL: 14 * 24 * time.Hour, SessionMaxAge: 30 * 24 * time.Hour,
+		RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute,
 	}
 	if cfg != want {
 		t.Fatalf("IdentityConfig = %+v, want %+v", cfg, want)

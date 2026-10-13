@@ -31,4 +31,17 @@ type Config struct {
 	// StepUpMaxAge is auth.step_up_max_age, how long a step-up confirmation holds; getMe
 	// reports its end (M1-31).
 	StepUpMaxAge time.Duration `config:"auth.step_up_max_age"`
+	// AccessTokenTTL is auth.access_token_ttl, the lifetime of an access token (M1-34).
+	AccessTokenTTL time.Duration `config:"auth.access_token_ttl"`
+	// RefreshTokenTTL is auth.refresh_token_ttl, the lifetime of a refresh token, never beyond the
+	// session end.
+	RefreshTokenTTL time.Duration `config:"auth.refresh_token_ttl"`
+	// SessionMaxAge is auth.session_max_age, the absolute end of an app session after its start.
+	SessionMaxAge time.Duration `config:"auth.session_max_age"`
+	// RefreshReuseGrace is auth.refresh_reuse_grace, how long the generation just before the
+	// current one may rotate again with the family key (03 refresh_tokens item 2).
+	RefreshReuseGrace time.Duration `config:"auth.refresh_reuse_grace"`
+	// LastActiveGranularity is identity.last_active_granularity: last_seen_at of a session and its
+	// device is written at most this often.
+	LastActiveGranularity time.Duration `config:"identity.last_active_granularity"`
 }

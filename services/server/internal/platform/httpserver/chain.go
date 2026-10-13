@@ -82,8 +82,8 @@ type Deps struct {
 	Logger *slog.Logger
 	// MeterProvider creates bothy.authz.errors; nil means the global provider of platform/otel.
 	MeterProvider metric.MeterProvider
-	// Authenticator checks credentials (StageAuthenticate); required. internal/wire passes
-	// actor.AnonymousOnly until identity is wired (M1-34).
+	// Authenticator checks credentials (StageAuthenticate); required. internal/wire passes the
+	// Authenticator of identity (M1-34), actor.AnonymousOnly before the start step sessions.
 	Authenticator actor.Authenticator
 	// Validator checks requests against the contract (StageValidate); required.
 	Validator *Validator

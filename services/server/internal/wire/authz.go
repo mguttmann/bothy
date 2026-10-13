@@ -148,7 +148,7 @@ func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.C
 		Catalog:     cat,
 		Store:       authzpg.NewRepository(pool),
 		Principals:  identityapp.NewPrincipalSource(identitypg.NewRepository(pool)),
-		Credentials: identityapp.NewCredentialSource(identitypg.NewRepository(pool)),
+		Credentials: identityapp.NewCredentialSource(identitypg.NewRepository(pool), identitypg.NewRepository(pool)),
 		Structure:   emptyStructure{},
 		Policies:    emptyPolicies{},
 		Versions:    instanceapp.NewVersions(instancepg.NewRepository(pool)),

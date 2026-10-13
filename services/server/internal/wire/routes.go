@@ -49,6 +49,9 @@ type Handlers struct {
 	*identityhttp.People
 	// Keys implements getJwks and rotateSigningKey (instance, M1-32).
 	*instancehttp.Keys
+	// Sessions implements refreshToken, logout, listMySessions, listUserSessions and
+	// createExtensionSession (identity, M1-34).
+	*identityhttp.Sessions
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

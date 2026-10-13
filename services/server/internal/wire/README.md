@@ -40,7 +40,7 @@ components, in start order:
 | `instance` | loads the instance row through `instance.State` (missing: abort with the hint to run `bothy migrate up`), logs the setup state, compares the own version with `instance.min_server_version`; below it the readiness check `schema_requires_newer_server` fails for good (M1-15) | all |
 | `audit` | resolves `privacy.audit_ip_kek_ref` once (fail fast), builds the audit module with the unit of work of the role (`NewAudit`) and starts the aggregator of denials (`Audit.Start`), registering the stop step `audit_denials` (M1-24) | all |
 | `identity` | after `audit`, `sync` and `authz`: resolves `auth.token_pepper_ref` once (32 bytes as hex, fail fast), builds `Identity` over the unit of work of `audit` and the Authorizer, starts the sweeper of the jti store with the stop step `dpop_replay_sweeper` in `PhaseHTTP`; `routes` mounts its device handlers unless `Deps.Handlers` names one (M1-33) | all |
-| `routes` | catalogue check of route bindings and registrations (all roles, M1-25); then `NewChain` (validator over `api/rest.Spec`, `actor.AnonymousOnly`), `InstallRateLimits` (start check of the classes, limiter in `StageRateLimit`, sweeper with the stop step `ratelimit_sweeper` in `PhaseHTTP`, M1-19) and `MountRoutes` on the public mux with the `authz` catalogue | api, all (check: every role) |
+| `routes` | catalogue check of route bindings and registrations (all roles, M1-25); then `NewChain` (validator over `api/rest.Spec`, the Authenticator of identity from the step `sessions`, `actor.AnonymousOnly` without it), `InstallRateLimits` (start check of the classes, limiter in `StageRateLimit`, sweeper with the stop step `ratelimit_sweeper` in `PhaseHTTP`, M1-19) and `MountRoutes` on the public mux with the `authz` catalogue | api, all (check: every role) |
 | `jobs` | `jobs.ValidateMigrations` (missing River migrations abort with the hint to run `bothy migrate up`), `jobs.New` for the role, `Start` of River (02 "Start" step 8; no-op for api and while no kind is registered), `Runner.FailOn` on `Failed` | all |
 | `event_consumers` | after `jobs`: registers the handlers of `consumerHandlers` (none yet), inserts their cursor rows at the head (`Ensure`), registers the stop step `event_consumers` in `PhaseConsumers` and starts the runner with its own `LISTEN` connection; an unexpected end of the runner calls `Runner.FailOn` (M2-01) | worker, all |
 | `public_listener` | opens `server.listen_addr`, logs `public listener started` | api, all |
@@ -101,6 +101,7 @@ adds), at the marked place, with its stop step:
 | Ticket | Component | Place | Stop phase |
 |---|---|---|---|
 | M1-32 (built) | signing keys (`startSigningKeys`: `EnsureActive`, readiness `signing_keys`), key store check in `startSecrets`, job `instance.key_rotation` in `NewJobRegistry` | step `signing_keys` after `identity` | none |
+| M1-34 (built) | session part of identity (`startSessions`: `Identity.BindSessions` with the signing keys and the instance id; the Authenticator of the chain, the session handlers) | step `sessions` after `signing_keys`, before `routes` | none |
 | M1-17 | module handlers in `Deps.Handlers` | `routes` | none |
 | M1-28, M1-65 | sinks of the log tail (rights cache, then hub) in `tailSinks` | `sync.go` | none |
 | M1-65 | gateway connections | with the log tail | `connections` |

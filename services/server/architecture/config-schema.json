@@ -134,6 +134,42 @@
       "doc": "Oldest iat a DPoP proof may have."
     },
     {
+      "name": "auth.refresh_reuse_grace",
+      "env": "BOTHY_AUTH__REFRESH_REUSE_GRACE",
+      "kind": "duration",
+      "default": "30s",
+      "required": false,
+      "enum": [],
+      "min": "0s",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Grace for the refresh generation just before the current one with the same DPoP key."
+    },
+    {
+      "name": "auth.refresh_token_ttl",
+      "env": "BOTHY_AUTH__REFRESH_TOKEN_TTL",
+      "kind": "duration",
+      "default": "14d",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Lifetime of a refresh token, never beyond the end of its session."
+    },
+    {
+      "name": "auth.session_max_age",
+      "env": "BOTHY_AUTH__SESSION_MAX_AGE",
+      "kind": "duration",
+      "default": "30d",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Absolute end of an app session after its start; then a new login."
+    },
+    {
       "name": "auth.step_up_max_age",
       "env": "BOTHY_AUTH__STEP_UP_MAX_AGE",
       "kind": "duration",
@@ -693,6 +729,18 @@
       "max": "1h",
       "chapter": "02-architektur.md",
       "doc": "Retry-After of every 503 unavailable response, in whole seconds."
+    },
+    {
+      "name": "identity.last_active_granularity",
+      "env": "BOTHY_IDENTITY__LAST_ACTIVE_GRANULARITY",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "0s",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "At most this often the last activity of a session and its device is written."
     },
     {
       "name": "instance.environment",

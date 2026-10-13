@@ -216,11 +216,11 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Kanalnamens in Unicode-Zeichen | geplant (M1) |
 | `channel.topic_max_chars` | `BOTHY_CHANNEL__TOPIC_MAX_CHARS` | Server |  | `1024` | Länge eines Kanal-Themas in Unicode-Zeichen | geplant (M1) |
 | `forum_tag.name_max_chars` | `BOTHY_FORUM_TAG__NAME_MAX_CHARS` | Server |  | `50` | Länge eines Tag-Namens in Unicode-Zeichen | geplant (M1) |
-| `identity.last_active_granularity` | `BOTHY_IDENTITY__LAST_ACTIVE_GRANULARITY` | Server |  | `5m` | höchstens so oft wird `last_active_at` bzw. `last_used_at` geschrieben | geplant (M1) |
-| `auth.session_max_age` | `BOTHY_AUTH__SESSION_MAX_AGE` | Server |  | `30d` | absolutes Ende einer Anmeldesitzung | geplant (M1) |
-| `auth.refresh_token_ttl` | `BOTHY_AUTH__REFRESH_TOKEN_TTL` | Server |  | `14d` | Lebensdauer eines Refresh-Tokens | geplant (M1) |
+| `identity.last_active_granularity` | `BOTHY_IDENTITY__LAST_ACTIVE_GRANULARITY` | Server | duration | `5m` | höchstens so oft wird `last_active_at` bzw. `last_used_at` geschrieben | aktiv |
+| `auth.session_max_age` | `BOTHY_AUTH__SESSION_MAX_AGE` | Server | duration | `30d` | absolutes Ende einer Anmeldesitzung | aktiv |
+| `auth.refresh_token_ttl` | `BOTHY_AUTH__REFRESH_TOKEN_TTL` | Server | duration | `14d` | Lebensdauer eines Refresh-Tokens | aktiv |
 | `auth.step_up_max_age` | `BOTHY_AUTH__STEP_UP_MAX_AGE` | Server | duration | `5m` | so lange gilt eine Step-up-Bestätigung als frisch | aktiv |
-| `auth.refresh_reuse_grace` | `BOTHY_AUTH__REFRESH_REUSE_GRACE` | Server |  | `30s` | Nachsicht für die unmittelbar vorige Refresh-Generation mit demselben DPoP-Schlüssel | geplant (M1) |
+| `auth.refresh_reuse_grace` | `BOTHY_AUTH__REFRESH_REUSE_GRACE` | Server | duration | `30s` | Nachsicht für die unmittelbar vorige Refresh-Generation mit demselben DPoP-Schlüssel | aktiv |
 | `agent.heartbeat_persist_interval` | `BOTHY_AGENT__HEARTBEAT_PERSIST_INTERVAL` | Server |  | `60s` | höchstens so oft werden Heartbeat-Felder gespeichert | geplant (M2) |
 | `channel.history_backfill_limit_default` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT` | Server |  | `20` | Standard für `history_backfill_limit` | geplant (M1) |
 | `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server |  | `200` | Obergrenze für `history_backfill_limit` | geplant (M1) |

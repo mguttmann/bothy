@@ -333,6 +333,7 @@ func (s *server) components() []lifecycle.Component {
 		step("authz", s.startAuthz),
 		step("identity", s.startIdentity),
 		step("signing_keys", s.startSigningKeys),
+		step("sessions", s.startSessions),
 		step("routes", s.mountRoutes),
 	}
 	if s.api() {
@@ -612,6 +613,30 @@ func (s *server) startIdentity(ctx context.Context) error {
 	return nil
 }
 
+// startSessions is the second extension point of start step 7 (M1-34): the session part of
+// identity over the signing keys of the previous step and the instance id, the issuer of access
+// tokens. From here on the HTTP chain authenticates people with identity's Authenticator.
+func (s *server) startSessions(context.Context) error {
+	s.mu.Lock()
+	id, keys, rec := s.identity, s.signingKeys, s.instance
+	s.mu.Unlock()
+	if id == nil || keys == nil {
+		return errors.New("wire: the sessions need the identity step and the signing keys")
+	}
+	return id.BindSessions(keys.Keys, rec.InstanceID)
+}
+
+// authenticator returns the Authenticator of the HTTP chain: identity's after startSessions,
+// actor.AnonymousOnly before (fail closed).
+func (s *server) authenticator() actor.Authenticator {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.identity != nil && s.identity.Authenticator != nil {
+		return s.identity.Authenticator
+	}
+	return actor.AnonymousOnly{}
+}
+
 // handlers returns deps.Handlers with every nil module handler replaced by the one the start
 // built (tests inject their own).
 func (s *server) handlers() Handlers {
@@ -623,6 +648,9 @@ func (s *server) handlers() Handlers {
 	}
 	if h.People == nil && s.identity != nil {
 		h.People = s.identity.PeopleHandlers
+	}
+	if h.Sessions == nil && s.identity != nil {
+		h.Sessions = s.identity.SessionHandlers
 	}
 	if h.Keys == nil && s.signingKeys != nil {
 		h.Keys = s.signingKeys.Handlers
@@ -648,9 +676,9 @@ func (s *server) checkSchema(ctx context.Context) error {
 // catalogue of authz (every role, M1-25), then builds the HTTP chain (api and all), installs the
 // rate limiter with its start check and its sweeper (M1-19) and the Idempotency-Key stage over the
 // store of sync (M1-20), and mounts the routes through it with the same catalogue. The request validator knows only the enabled operations, so the start
-// compiles no schema of a route it does not serve. Until identity is wired (M1-34) the chain
-// authenticates with actor.AnonymousOnly: every credential is refused
-// (fail closed).
+// compiles no schema of a route it does not serve. The chain authenticates with identity's
+// Authenticator (M1-34, step sessions); without it, with actor.AnonymousOnly, which refuses every
+// credential (fail closed).
 func (s *server) mountRoutes(context.Context) error {
 	log := s.logger()
 	cat, err := NewAuthzCatalog(log)
@@ -660,7 +688,7 @@ func (s *server) mountRoutes(context.Context) error {
 	var mount func() error
 	if s.api() {
 		mount = func() error {
-			chain, err := NewChain(s.chainCfg, log)
+			chain, err := NewChain(s.chainCfg, s.authenticator(), log)
 			if err != nil {
 				return err
 			}
@@ -686,14 +714,18 @@ func (s *server) mountRoutes(context.Context) error {
 }
 
 // NewChain builds the HTTP chain of the public listener for the enabled operations: the validator
-// over the embedded contract (api/rest.Spec), actor.AnonymousOnly until identity is wired, and the
-// global meter provider of platform/otel (call it after otel.Setup).
-func NewChain(cfg httpserver.ChainConfig, log *slog.Logger) (*httpserver.Chain, error) {
+// over the embedded contract (api/rest.Spec), the Authenticator auth (identity's from M1-34 on; nil
+// means actor.AnonymousOnly, which refuses every credential) and the global meter provider of
+// platform/otel (call it after otel.Setup).
+func NewChain(cfg httpserver.ChainConfig, auth actor.Authenticator, log *slog.Logger) (*httpserver.Chain, error) {
 	v, err := enabledValidator()
 	if err != nil {
 		return nil, err
 	}
-	return httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: actor.AnonymousOnly{}, Validator: v})
+	if auth == nil {
+		auth = actor.AnonymousOnly{}
+	}
+	return httpserver.NewChain(cfg, httpserver.Deps{Logger: log, Authenticator: auth, Validator: v})
 }
 
 // enabledValidator compiles the request validator of the enabled operations once per process: the
