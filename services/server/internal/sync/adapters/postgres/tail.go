@@ -44,8 +44,8 @@ type TailConfig struct {
 	ReconnectBackoffCap time.Duration `config:"database.listen_reconnect_backoff_cap"`
 }
 
-// Tail implements sync.Tail: the one log reader of an api process (02 "Log-Tail je
-// api-Prozess"). It listens on its own connection outside the pool, polls through the pool every
+// Tail implements sync.Tail: the one log reader of an api process (02 "Log tail per
+// api process"). It listens on its own connection outside the pool, polls through the pool every
 // PollInterval, reads seq > local_head ORDER BY seq in batches and hands each batch to the sinks
 // in order, from the goroutine of Run.
 type Tail struct {
