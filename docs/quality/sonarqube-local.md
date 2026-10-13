@@ -113,8 +113,9 @@ SONAR_HOST_URL=https://sonarcloud.io SONAR_ORGANIZATION=<organization> \
 Where the token exists only as the GitHub Actions secret `SONAR_TOKEN`, the manual workflow
 `.github/workflows/sonar-config.yml` runs both targets against the cloud
 (`gh workflow run sonar-config.yml --ref main`, variable `SONAR_ORGANIZATION`). The cloud
-addresses the gate by its id in `create_condition` and `set_as_default`, the Community Build
-by its name, and it has no built-in profile "Sonar way": there the profiles inherit from
+addresses the gate by its id in `create_condition` and `set_as_default`
+(https://sonarcloud.io/api/webservices/list, retrieved 2026-10-13) [verified], the Community
+Build by its name, and it has no built-in profile "Sonar way": there the profiles inherit from
 `cloud_parent` of `quality/sonar/profiles.json` (ADR 0040). `quality_sync.py` chooses both by
 `--organization`.
 

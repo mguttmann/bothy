@@ -68,8 +68,10 @@ request.
     `SONAR_ORGANIZATION` and the secret `SONAR_TOKEN`:
     `gh workflow run sonar-config.yml --ref main`, then `gh run watch`. The job runs only
     for `main`; the check step ends with `quality_sync: check ok for https://sonarcloud.io`.
-    An `HTTP 401` means the token is invalid, an `HTTP 403` that its account may not
-    administer quality gates or quality profiles in the organization. Start it again after
+    An `HTTP 401` means the token is invalid, an `HTTP 403` that its account lacks the
+    permission "Administer Quality Gates" or "Administer Quality Profiles" of the
+    organization, which these calls require (https://sonarcloud.io/api/webservices/list,
+    retrieved 2026-10-13) [verified]. Start it again after
     every change under `quality/sonar/`.
 13. **CodeRabbit**: install it as a GitHub app for the repository; `.coderabbit.yaml` applies.
 

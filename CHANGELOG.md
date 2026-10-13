@@ -156,9 +156,9 @@ operated, and the order of the build.
 
 - `quality_sync.py` addresses the quality gate by its id on SonarQube Cloud, whose
   `api/qualitygates/create_condition` and `set_as_default` take `gateId` and `id` instead of
-  the gate name, and lets the profiles inherit there from `cloud_parent` of
+  the gate name (https://sonarcloud.io/api/webservices/list, retrieved 2026-10-13), and lets the profiles inherit there from `cloud_parent` of
   `quality/sonar/profiles.json` ("Sonar way comprehensive"), because the cloud has no built-in
-  profile "Sonar way"; before, `make sonar-config` could not apply the setup to the cloud.
+  profile "Sonar way" (ADR 0040); before, `make sonar-config` could not apply the setup to the cloud.
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
   `file_blocked` in the order of the codes; `createHost` and `issueHostPairingCode` take
   `Idempotency-Key` and list `422 idempotency_key_reuse` instead of the exemption `auth_flow`,
