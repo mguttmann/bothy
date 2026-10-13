@@ -5,6 +5,7 @@ package pgtest
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -132,5 +133,25 @@ func TestReapLegacyReportsAFailedListing(t *testing.T) {
 	cancel()
 	if err := reapLegacy(ctx, label+".reap-"+randomHex(6), time.Now()); err == nil {
 		t.Fatal("reapLegacy reported no error with a canceled context")
+	}
+}
+
+// TestClusterStopEndsTheLeaseAndRemovesTheSecrets checks the teardown that stopCluster runs at
+// the end of Main, without a container: it ends the lease and removes the secrets directory.
+func TestClusterStopEndsTheLeaseAndRemovesTheSecrets(t *testing.T) {
+	dir := t.TempDir() + "/secrets"
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	stopped := 0
+	c := &cluster{secretsDir: dir, stopLease: func() { stopped++ }}
+	if err := c.stop(); err != nil {
+		t.Fatalf("stop: %v", err)
+	}
+	if stopped != 1 {
+		t.Fatalf("stopLease ran %d times, want 1", stopped)
+	}
+	if _, err := os.Stat(dir); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("secrets directory still there: %v", err)
 	}
 }

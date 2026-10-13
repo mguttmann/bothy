@@ -322,6 +322,11 @@ func stopCluster() error {
 	if c == nil {
 		return nil
 	}
+	return c.stop()
+}
+
+// stop ends the lease, terminates the container and removes the secrets directory.
+func (c *cluster) stop() error {
 	var problems []error
 	c.stopLease()
 	// TerminateContainer ignores the errors of a container that AutoRemove already removes.
