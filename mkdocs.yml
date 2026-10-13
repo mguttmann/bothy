@@ -184,6 +184,7 @@ nav:
       - SonarQube locally: quality/sonarqube-local.md
       - Publishing: quality/public-switch.md
       - Licenses: quality/licenses.md
+      - Accessibility checklist: quality/accessibility-checklist.md
   - Decisions:
       - ADR index: adr/README.md
       - Ruling log: DECISIONS.md

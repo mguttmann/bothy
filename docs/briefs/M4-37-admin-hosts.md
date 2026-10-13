@@ -63,7 +63,7 @@ Create in `packages/admin_ui/lib/src/hosts/`:
 - Registration of the Hosts entry in the admin shell.
 - Fake server handlers through the registry of M4-17 for the operations above, with fingerprint attempts, I6 checks, taken names and doctor results that name session users.
 - Tests under `packages/admin_ui/test/hosts/`, goldens, an integration test under `apps/client/integration_test/` (Tests); ARB keys in `packages/l10n`.
-- `docs/quality/accessibility-checklist.md`: the rows for screen A8 and the pairing wizard (01 8) with their automated evidence; if the file does not exist yet, create it with only this section in the structure 01 8 gives (as M4-36 does for the terminal), and M4-32 keeps the section.
+- `docs/quality/accessibility-checklist.md`: the rows for screen A8 and the pairing wizard (01 8) with their automated evidence, in the section "Screen A8: hosts" of the existing page (skeleton of the brief package, D-W-116); leave the other sections as they are.
 
 Change:
 

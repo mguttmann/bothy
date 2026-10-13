@@ -60,13 +60,12 @@ Product requirements implemented here:
 
 Create:
 
-- `docs/quality/accessibility-checklist.md` (English): one table per desktop screen with the rows of 01 8, the platform (macOS, Windows), the automated evidence (test file and name) and a column for the manual pass; a section "Manual pass before a release" with the steps for VoiceOver and Narrator; a section for the screens of other tickets (the terminal rows are added by M4-36, screen A8 by M4-37, mobile by M5).
+- `docs/quality/accessibility-checklist.md` (English; the page exists as a skeleton with one section per owner and its navigation entry, D-W-116): fill the sections "Chat, settings and administration" and "Manual pass before a release" with one table per desktop screen with the rows of 01 8, the platform (macOS, Windows), the automated evidence (test file and name) and a column for the manual pass, and the steps for VoiceOver and Narrator; keep the sections of M4-36 and M4-37 as they are (filled or still the skeleton line).
 - `apps/client/test/a11y/` semantics tests per screen (Design note 1) and `apps/client/integration_test/a11y_platform_tree_test.dart` with the platform helpers `apps/client/macos/RunnerTests/AXTreeProbe.swift` and `apps/client/windows/runner/uia_probe.cpp` or a PowerShell UI Automation probe script under `apps/client/tool/` (Design note 2), run through `platform-tests.json`.
 - Fixes with tests in `packages/design_system`, `packages/admin_ui` and `apps/client` for every gap found.
 
 Change:
 
-- `mkdocs.yml` (navigation entry for the checklist), `docs/quality/README.md` (link).
 - `docs/design/components.md` only where a gap needs a design rule change.
 - `apps/client/platform-tests.json` (the platform tree test).
 - `docs/DECISIONS.md` section 10: rows `D-M4-32-<n>`; root `CHANGELOG.md` under `[Unreleased]`.
