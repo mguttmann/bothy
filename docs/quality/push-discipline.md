@@ -191,3 +191,10 @@ code may go to the service (open question). In the public state, the code is
 public anyway; CodeRabbit then also rates every pull request
 (`.coderabbit.yaml`). According to the vendor, the free tier of the CLI is limited
 ("Basic static analysis with limited daily usage", same source) [verified].
+
+The pull request review reports real problems only (CRT-1 in `docs/DECISIONS.md`): the
+profile is `chill`, a general instruction asks for bugs, security issues, broken contracts
+and problems that break CI and no style, wording or formatting nits, and a source URL with
+retrieval date is asked for only in `docs/spec/**`, `docs/security/**` and `docs/adr/**`.
+A comment that names a Blocker or a reproduced Major is fixed before the merge; any other
+comment gets a short answer and its thread is resolved.

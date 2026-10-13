@@ -10,7 +10,9 @@ language: en-US
 early_access: false
 
 reviews:
-  profile: assertive
+  # chill, not assertive: only Blockers and reproduced Majors block a merge (CRT-1 in
+  # docs/DECISIONS.md), so nits would only cost review rounds.
+  profile: chill
   request_changes_workflow: false
   high_level_summary: true
   # The summary goes into the walkthrough comment, not the body: the body becomes the
@@ -34,13 +36,23 @@ reviews:
     - "!**/*.svg"
     - "!design/build/**"
   path_instructions:
+    - path: "**"
+      instructions: >-
+        Report bugs, security issues, broken contracts (specification, API, schema,
+        configuration keys) and problems that break CI. Do not raise style, wording or
+        formatting nits; a rule that a matching path-specific instruction states (for
+        example dashes or glossary terms in Markdown) is a repository requirement, not
+        a nit.
     - path: "**/*.md"
       instructions: >-
         All repository content is English (docs/glossary.md, D-W-94).
         Flag en dashes and em dashes, numbers for limits or thresholds that are not
-        named configuration values, external facts without URL and retrieval date,
-        and anything instance-specific (company or person names, host names, real
-        IP addresses, paths under a user home). Terms must match docs/spec/00-glossary.md.
+        named configuration values, and anything instance-specific or private (company
+        or person names, host names, real IP addresses, paths under a user home). Terms
+        must match docs/spec/00-glossary.md. Ask for a source URL and retrieval date only
+        for claims about external systems that the specification or the security
+        documents rely on (files under docs/spec/**, docs/security/** and docs/adr/**),
+        not for other Markdown files.
     - path: ".github/workflows/**"
       instructions: >-
         Every job runs on a fixed GitHub-hosted runner label, never on a runner outside
