@@ -7,7 +7,7 @@ tests to write first, the acceptance criteria and the report format. Order and d
 from the [plan](../PLAN.md) (section "Tickets" of each milestone); this index repeats them for
 the launcher.
 
-Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2, M3, M4 and M6. By the
+Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2 to M6. By the
 owner's decisions of 2026-10-11 and 2026-10-13 the briefs of M2 to M6 are written before M1
 closes, so that builds do not run out of work (D-W-100, D-W-114 and D-W-120 in
 [DECISIONS.md](../DECISIONS.md)): they name interfaces of earlier milestones as those briefs and
@@ -85,7 +85,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 1 | M1-01, M1-02, M2-32, M4-03 |
 | 2 | M1-03, M1-04, M1-05, M2-38, M4-01, M6-10 |
 | 3 | M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10 |
-| 4 | M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16 |
+| 4 | M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16, M5-01 |
 | 5 | M1-10, M1-12, M3-02, M4-07, M4-09, M4-15, M6-11 |
 | 6 | M1-11, M1-13, M4-13, M6-12 |
 | 7 | M1-14, M1-15, M1-18, M1-23, M1-26, M4-14 |
@@ -119,9 +119,9 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24, M4-30, M6-13 |
 | 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22, M4-33, M6-15 |
 | 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23, M6-05 |
-| 38 | M4-24, M6-14 |
-| 39 | M4-32, M4-34, M4-36 |
-| 40 | M4-38 |
+| 38 | M4-24, M5-02, M6-14 |
+| 39 | M4-32, M4-34, M4-36, M5-03, M5-04 |
+| 40 | M4-38, M5-05, M5-06, M5-07 |
 
 ## Index
 
@@ -326,6 +326,13 @@ names listed here.
 | 35 | M6-13 | stats: own measurement | `M6-13-stats-measure.md` | M2-15, M2-21, M2-22, M3-20, M3-21, M6-11 |
 | 38 | M6-14 | stats: timeline, SLO traffic light and backend view | `M6-14-stats-queries.md` | M2-30, M6-05, M6-13 |
 | 36 | M6-15 | stats: live stream `stats.live` | `M6-15-stats-live.md` | M6-13 |
+| 4 | M5-01 | Device key for Android | `M5-01-device-key-android.md` | M4-10 |
+| 38 | M5-02 | iPhone layout and navigation | `M5-02-iphone-layout.md` | M4-21, M4-23 |
+| 39 | M5-03 | Android layout, navigation and notification channels | `M5-03-android-layout.md` | M5-01, M5-02 |
+| 39 | M5-04 | ClientKit and Notification Service Extension (ADR 0056) | `M5-04-clientkit-nse.md` | M3-22, M4-31, M5-02 |
+| 40 | M5-05 | Android push service without the Flutter engine | `M5-05-android-push.md` | M5-03, M5-04 |
+| 40 | M5-06 | Sharing from other apps | `M5-06-sharing.md` | M1-73, M4-22, M5-03, M5-04 |
+| 40 | M5-07 | Voice recording, camera and photo | `M5-07-voice-camera.md` | M3-09, M4-22, M5-03 |
 
 ## Make targets created by tickets
 
@@ -878,6 +885,23 @@ flowchart TB
   M4_34 --> M4_38
   M4_36 --> M4_38
   M4_37 --> M4_38
+  M4_10 --> M5_01
+  M4_21 --> M5_02
+  M4_23 --> M5_02
+  M5_01 --> M5_03
+  M5_02 --> M5_03
+  M3_22 --> M5_04
+  M4_31 --> M5_04
+  M5_02 --> M5_04
+  M5_03 --> M5_05
+  M5_04 --> M5_05
+  M1_73 --> M5_06
+  M4_22 --> M5_06
+  M5_03 --> M5_06
+  M5_04 --> M5_06
+  M3_09 --> M5_07
+  M4_22 --> M5_07
+  M5_03 --> M5_07
   M1_39 --> M6_01
   M1_40 --> M6_01
   M1_41 --> M6_01
