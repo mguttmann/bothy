@@ -60,8 +60,8 @@ func errorType(err error) string {
 }
 
 // Pool is the connection pool of a process (one per process, docs/spec/02-architecture.md
-// "Deadlines"). It is safe for concurrent use. The pgx pool inside is not exported, so every
-// caller goes through Acquire, Begin and Ping and their deadline.
+// "Deadlines"). It is safe for concurrent use. Callers go through Acquire, Begin and Ping and their
+// deadline; only platform/jobs takes the pgx pool itself (PGX), because River's driver needs it.
 type Pool struct {
 	pool *pgxpool.Pool
 	cfg  Config
@@ -170,6 +170,13 @@ func (p *Pool) Begin(ctx context.Context, opts pgx.TxOptions) (pgx.Tx, error) {
 	}
 	return tx, nil
 }
+
+// PGX returns the pgx pool inside p for River's driver (platform/jobs, M1-14): River runs its
+// own queries, LISTEN and transactions on it, so they bypass the deadline of Acquire and Begin
+// but keep the session settings of every connection. It is meant for platform/jobs only; no
+// gate enforces that (the architecture gate limits the import of River, not this call), so a
+// new caller needs a review of why Acquire and Begin do not suffice.
+func (p *Pool) PGX() *pgxpool.Pool { return p.pool }
 
 // Stat returns the statistics of the pool (acquired, idle and total connections, waits).
 func (p *Pool) Stat() *pgxpool.Stat { return p.pool.Stat() }

@@ -16,6 +16,7 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 | `config.go`, `configkeys_*.go`, `configchecks.go`, `configchapters.go` | configuration schema and cross-checks |
 | `database.go`, `egress.go`, `secrets.go`, `telemetry.go` | binding of the platform `Config` structs, the secret provider |
 | `routes.go` | `Role`, `Handlers`, `MountRoutes` (start step 7) |
+| `jobs.go` | `JobsConfig`, `JobRole`, `NewJobRegistry` (one job registry for all roles), `MigrationSteps` (River before goose) |
 | `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
 | `switchlog.go` | the process logger that follows the switch from stdout JSON to the telemetry logger |
 
@@ -32,11 +33,15 @@ components, in start order:
 | `database` | `pg.Open`, `WaitReady` within `startup.dependency_wait`; readiness check `database` | all |
 | `schema` | `pg.CheckSchema` against the highest embedded version; older aborts with the hint to run `bothy migrate up` | all |
 | `routes` | `MountRoutes` on the public mux | api, all |
+| `jobs` | `jobs.ValidateMigrations` (missing River migrations abort with the hint to run `bothy migrate up`), `jobs.New` for the role, `Start` of River (02 "Start" step 8; no-op for api and while no kind is registered), `Runner.FailOn` on `Failed` | all |
 | `public_listener` | opens `server.listen_addr`, logs `public listener started` | api, all |
 | `ready` | readiness passes `startup`, logs `server ready` | all |
 
 Stop steps: `readiness` (not ready), `drain` and `public_listener` (api, all, budgets
-`shutdown.drain_delay` and `shutdown.http_grace`), `telemetry`
+`shutdown.drain_delay` and `shutdown.http_grace`), `jobs` and then `jobs_wait` (worker, all: River's
+soft stop within `shutdown.jobs_soft_timeout`, then for the cancelled jobs to end what
+`shutdown.total_timeout` leaves after the fixed budgets of the role, left out when nothing is
+left; docs/DECISIONS.md M1-14/4), `telemetry`
 (`shutdown.telemetry_flush_timeout`), `pool`, `internal_listener`.
 
 ## Extension points
@@ -51,8 +56,8 @@ step:
 | M1-17 | module handlers in `Deps.Handlers` | `routes` | none |
 | M1-16 | log tail and hub (api, all); a panic calls `Runner.Fail` | after `routes` | `event_tail` |
 | M1-65 | gateway connections | with the log tail | `connections` |
-| M1-14 | River client (worker, all), `shutdown.jobs_soft_timeout` | after the log tail | `jobs` |
-| M2 | worker consumers | after River | `consumers` |
+| M1-16 | first job handler and periodic job in `NewJobRegistry` | `jobs.go` | none |
+| M2 | worker consumers | after `jobs` | `consumers` |
 | M1-43 | readiness `trusted_header_requires_loopback` | before `ready` | none |
 | M1-18 | middleware chain around the public mux | `public_listener` | none |
 

@@ -21,6 +21,9 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   lifecycle: {depends_on: [otel], vendors: []}
   # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it.
   pg: {depends_on: [secrets], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi]}
+  # River only here (R-AR-09); jobstest (internal/platform/jobs/jobstest) prepares pgtest
+  # databases for the job runtime; only tests import it.
+  jobs: {depends_on: [pg, otel], vendors: [river, pgx, otel]}
 wire: {vendors: []}
 cmd: {vendors: []}
 api: {vendors: [oapi, openapi, yaml]}   # generated REST layer (runtime of oapi-codegen) and its generator
@@ -246,6 +249,7 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]
   goose: [github.com/pressly/goose/v3, github.com/pressly/goose/v3/**]
   otelpgx: [github.com/exaring/otelpgx]
+  river: [github.com/riverqueue/river, github.com/riverqueue/river/**]
   testcontainers: [github.com/testcontainers/testcontainers-go, github.com/testcontainers/testcontainers-go/**]
   # Port bindings and AutoRemove of the pgtest container: testcontainers takes these moby types.
   mobyapi: [github.com/moby/moby/api/types/container, github.com/moby/moby/api/types/network]

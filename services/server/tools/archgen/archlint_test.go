@@ -156,6 +156,23 @@ func TestArchLintPackageWithoutComponent(t *testing.T) {
 		"not attached to any component")
 }
 
+// TestArchLintRiverOnlyInJobs holds R-AR-09: the vendor group river is open to the component of
+// internal/platform/jobs alone. The clean skeleton has platform/jobs importing River; another
+// platform package and a module adapter importing it are reported.
+func TestArchLintRiverOnlyInJobs(t *testing.T) {
+	t.Parallel()
+	t.Run("pg imports river", func(t *testing.T) {
+		t.Parallel()
+		assertRejects(t, "violations/pg-imports-river", "internal/platform/pg",
+			"platform-pg shouldn't depend on github.com/riverqueue/river")
+	})
+	t.Run("adapter imports river", func(t *testing.T) {
+		t.Parallel()
+		assertRejects(t, "violations/adapter-imports-river", "internal/chat/adapters/postgres",
+			"chat-adapters shouldn't depend on github.com/riverqueue/river")
+	})
+}
+
 // TestArchLintMigrations holds the component of the package migrations: the clean skeleton lets
 // cmd and platform pg (used_by) use it, a module layer may not, and the package itself uses no
 // project package.

@@ -175,6 +175,21 @@ documented in this file. The format is based on
   the `database.acquire_timeout` wait.
 - Semgrep rule `bothy-go-tx-only-in-platform-pg`: transactions are opened only in
   `internal/platform/pg`.
+- `internal/platform/jobs`: background jobs on River v0.49.0, the only package that imports
+  River (vendor group `river` in the architecture gate). Modules register River-free handlers
+  (`Register`, `HandlerOptions`, `AddPeriodic`); argument types may carry only IDs and `int64`,
+  kinds are `<module>.<name>` of the owning module, queues are the five of chapter 02. Jobs are
+  inserted with `InsertTx` in the ambient transaction of a unit of work. Role `api` builds an
+  insert-only client; `worker` and `all` run jobs, periodic jobs and River's maintenance. Every
+  attempt runs in the span `job <kind>` with `bothy.outcome`; a panic becomes a job error, a nil
+  after cancellation becomes the context error.
+- Configuration keys `jobs.schema`, `jobs.queue.<queue>.max_workers` (five queues) and
+  `shutdown.jobs_soft_timeout`, with the cross-check `jobs_schema`.
+- `bothy migrate up` creates `jobs.schema` with the rights of `bothy_app` and runs River's
+  migrations before goose; `status` shows the River version, `validate` checks River's embedded
+  migrations. `bothy serve` refuses to start when River's migrations are incomplete, soft-stops
+  River at shutdown within `shutdown.jobs_soft_timeout` and ends with exit code 1 when the River
+  client stops on its own (`lifecycle.Runner.FailOn`).
 
 ### Changed
 

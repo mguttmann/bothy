@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io/fs"
 	"net"
 	"path/filepath"
@@ -14,7 +15,9 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/migrations"
@@ -43,17 +46,87 @@ func migrateEnvFor(db *pgtest.DB, role pg.Role, extra ...string) []string {
 	return env
 }
 
+// riverVersion returns the highest River migration version this binary carries.
+func riverVersion(t *testing.T) int {
+	t.Helper()
+	n, err := jobs.CheckEmbeddedMigrations()
+	if err != nil || n < 1 {
+		t.Fatalf("CheckEmbeddedMigrations = %d, %v", n, err)
+	}
+	return n
+}
+
+// TestMigrate_RiverInOwnSchema: with jobs.schema = jobs_it, migrate up creates River's tables in
+// jobs_it and none in the domain schema, runs River before goose, changes nothing on a second
+// run, and status and validate report River (upgrade.md rule M11, R-AR-09).
+func TestMigrate_RiverInOwnSchema(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t, pgtest.WithoutMigrations())
+	env := migrateEnvFor(db, pg.RoleOwner, "BOTHY_JOBS__SCHEMA=jobs_it")
+	river := riverVersion(t)
+	code, stdout, stderr := runBothy(t, env, "migrate", "up")
+	want := fmt.Sprintf("river schema jobs_it version %d, applied %d\napplied 1 base_privileges\ndatabase version 1, applied 1\n", river, river)
+	if code != 0 || stdout != want {
+		t.Fatalf("first up: exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
+	}
+	super := db.SuperConn(t)
+	var inSchema, inPublic int
+	if err := super.QueryRow(ctx, `SELECT count(*) FILTER (WHERE table_schema = 'jobs_it'),
+		count(*) FILTER (WHERE table_schema = 'public' AND table_name LIKE 'river%')
+		FROM information_schema.tables`).Scan(&inSchema, &inPublic); err != nil {
+		t.Fatal(err)
+	}
+	if inSchema == 0 || inPublic != 0 {
+		t.Fatalf("tables in jobs_it %d (want some), river tables in public %d (want 0)", inSchema, inPublic)
+	}
+	for _, tbl := range []string{"river_job", "river_leader", "river_queue", "river_migration"} {
+		var ok bool
+		if err := super.QueryRow(ctx, "SELECT to_regclass($1) IS NOT NULL", "jobs_it."+tbl).Scan(&ok); err != nil || !ok {
+			t.Errorf("jobs_it.%s missing (%v)", tbl, err)
+		}
+	}
+	var riverLast, gooseFirst time.Time
+	if err := super.QueryRow(ctx, "SELECT max(created_at) FROM jobs_it.river_migration").Scan(&riverLast); err != nil {
+		t.Fatal(err)
+	}
+	if err := super.QueryRow(ctx, "SELECT min(tstamp) FROM goose_db_version WHERE version_id > 0").Scan(&gooseFirst); err != nil {
+		t.Fatal(err)
+	}
+	if !riverLast.Before(gooseFirst) {
+		t.Fatalf("River's last migration at %s is not before goose's first at %s", riverLast, gooseFirst)
+	}
+	// bothy_app has the rights River needs at run time, also on tables of a later River migration.
+	app := db.Pool(t, pg.RoleApp)
+	if _, err := app.Exec(ctx, "SELECT count(*) FROM jobs_it.river_job"); err != nil {
+		t.Fatalf("bothy_app reads river_job: %v", err)
+	}
+	code, stdout, stderr = runBothy(t, env, "migrate", "up")
+	if want := fmt.Sprintf("river schema jobs_it version %d, applied 0\ndatabase version 1, applied 0\n", river); code != 0 || stdout != want {
+		t.Fatalf("second up: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
+	}
+	code, stdout, stderr = runBothy(t, env, "migrate", "status")
+	if want := fmt.Sprintf("river schema jobs_it version %d, binary requires %d, pending 0\n", river, river); code != 0 || !strings.HasSuffix(stdout, want) {
+		t.Fatalf("status: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
+	}
+	if code, stdout, stderr := runBothy(t, env, "migrate", "validate"); code != 0 || !strings.Contains(stdout, "river migrations ok") {
+		t.Fatalf("validate: exit %d, stderr %q, stdout %q", code, stderr, stdout)
+	}
+}
+
 func TestMigrateUpBootstrap(t *testing.T) {
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	env := migrateEnvFor(db, pg.RoleOwner)
 
 	code, stdout, stderr := runBothy(t, env, "migrate", "up", "--bootstrap")
-	want := "bootstrap: roles and grants are in place\napplied 1 base_privileges\n"
+	river := riverVersion(t)
+	want := fmt.Sprintf("bootstrap: roles and grants are in place\nriver schema jobs version %d, applied %d\napplied 1 base_privileges\n", river, river)
 	if code != 0 || !strings.HasPrefix(stdout, want) || !strings.HasSuffix(stdout, "database version 1, applied 1\n") {
 		t.Fatalf("first run: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
 	}
 	code, stdout, stderr = runBothy(t, env, "migrate", "up", "--bootstrap")
-	if code != 0 || stdout != "bootstrap: roles and grants are in place\ndatabase version 1, applied 0\n" {
+	want = fmt.Sprintf("bootstrap: roles and grants are in place\nriver schema jobs version %d, applied 0\ndatabase version 1, applied 0\n", river)
+	if code != 0 || stdout != want {
 		t.Fatalf("second run: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
 	}
 	// The roles still log in with the passwords of their secret files.
@@ -78,7 +151,9 @@ func TestMigrateStatusOutput(t *testing.T) {
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	env := migrateEnvFor(db, pg.RoleOwner)
 	code, stdout, stderr := runBothy(t, env, "migrate", "status")
-	if want := "1 base_privileges pending -\ndatabase version 0, binary requires 1, pending 1\n"; code != 0 || stdout != want {
+	river := riverVersion(t)
+	want := fmt.Sprintf("1 base_privileges pending -\ndatabase version 0, binary requires 1, pending 1\nriver schema jobs version 0, binary requires %d, pending %d\n", river, river)
+	if code != 0 || stdout != want {
 		t.Fatalf("before: exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}
 	if code, _, stderr := runBothy(t, env, "migrate", "up"); code != 0 {
@@ -86,7 +161,8 @@ func TestMigrateStatusOutput(t *testing.T) {
 	}
 	// bothy_app may read the status as well.
 	code, stdout, stderr = runBothy(t, migrateEnvFor(db, pg.RoleApp), "migrate", "status")
-	pattern := regexp.MustCompile(`^1 base_privileges applied \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\ndatabase version 1, binary requires 1, pending 0\n$`)
+	pattern := regexp.MustCompile(`^1 base_privileges applied \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\ndatabase version 1, binary requires 1, pending 0\n` +
+		fmt.Sprintf("river schema jobs version %d, binary requires %d, pending 0\n$", river, river))
 	if code != 0 || !pattern.MatchString(stdout) {
 		t.Fatalf("after: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
 	}
@@ -116,7 +192,7 @@ func TestMigrateNewerSchemaNotice(t *testing.T) {
 func TestMigrateValidate(t *testing.T) {
 	t.Parallel()
 	code, stdout, stderr := runBothy(t, nil, "migrate", "validate")
-	if code != 0 || stdout != "migrations ok\n" || stderr != "" {
+	if want := fmt.Sprintf("migrations ok\nriver migrations ok, version %d\n", riverVersion(t)); code != 0 || stdout != want || stderr != "" {
 		t.Errorf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	var out, errOut bytes.Buffer

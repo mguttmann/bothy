@@ -148,7 +148,7 @@ Technology without domain logic; only `adapters/`, `wire` and `cmd` may import i
 | [`pg`](internal/platform/pg/README.md) | pool, Unit of Work with lock order, `LISTEN` connection, retry on deadlock |
 | [`httpserver`](internal/platform/httpserver/README.md) | server, middleware chain, `problem+json`, proof check of `authorize` (02, section 9); listener part built in M1-11 |
 | `ratelimit` | token buckets per class from 05 |
-| `jobs` | the only place with River: client per role, queues, schema `jobs.schema` |
+| [`jobs`](internal/platform/jobs/README.md) | the only place with River: client per role, queues, schema `jobs.schema`, migrations in `bothy migrate`; built in M1-14 |
 | `otel` | telemetry setup, encapsulated `gen_ai.*` attributes (R-Telemetrie) |
 | [`health`](internal/platform/health/README.md) | `/healthz` and `/readyz` on the internal listener `server.internal_listen_addr` (L2); built in M1-11 |
 | [`lifecycle`](internal/platform/lifecycle/README.md) | start order and shutdown per role (02, section 15); built in M1-11 |

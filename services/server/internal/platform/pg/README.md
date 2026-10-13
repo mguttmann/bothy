@@ -17,7 +17,7 @@ migrator behind `bothy migrate`. Migrations never run at `bothy serve` (R-AR-16)
 | File | Content |
 |---|---|
 | `config.go` | `Config`, `Validate`, `WithAppName`, `ForMigrate`, the connection string and session parameters |
-| `pool.go` | `Open`, `Pool` (`WaitReady`, `Ping`, `Acquire`, `Begin`, `Stat`, `Close`, `OpenSQL`), `Connect` |
+| `pool.go` | `Open`, `Pool` (`WaitReady`, `Ping`, `Acquire`, `Begin`, `Stat`, `Close`, `OpenSQL`, `PGX` for River's driver in `platform/jobs`), `Connect` |
 | `unit.go` | `UnitConfig`, `UnitOfWork` (`NewUnitOfWork`, `Do`), `Tx`, `Querier` |
 | `querier.go` | `DBTX`, `Pool.Exec`, `Pool.Query`, `Pool.QueryRow` |
 | `timeouts.go` | `Timeouts`, `SetLocalTimeouts` |

@@ -24,6 +24,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/health"
+	"github.com/OWNER/bothy/services/server/internal/platform/jobs/jobstest"
 	"github.com/OWNER/bothy/services/server/internal/platform/lifecycle"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
@@ -34,6 +35,15 @@ import (
 // TestMain runs the tests of the package with a PostgreSQL container for the serve tests (plan
 // P-09: without a Docker-compatible runtime the binary fails, it never skips).
 func TestMain(m *testing.M) { os.Exit(pgtest.Main(m)) }
+
+// newServeDB returns a database as bothy migrate up leaves it: the goose schema of pgtest and
+// River's tables in the default jobs.schema.
+func newServeDB(t *testing.T) *pgtest.DB {
+	t.Helper()
+	db := pgtest.New(t)
+	jobstest.Migrate(t, db, "jobs")
+	return db
+}
 
 // logBuffer collects the JSON log lines of a serve process.
 type logBuffer struct {
@@ -163,9 +173,10 @@ func (p *process) exit(t *testing.T) int {
 	}
 }
 
-// waitPort waits for the listener line msg and returns its port.
-func (p *process) waitPort(t *testing.T, msg string) int {
+// waitInternal waits for the line of the internal listener and returns its port.
+func (p *process) waitInternal(t *testing.T) int {
 	t.Helper()
+	const msg = "internal listener started"
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		if port := p.logs.port(msg); port != 0 {
@@ -192,9 +203,10 @@ func get(t *testing.T, port int, path string) (int, string) {
 	return resp.StatusCode, string(b)
 }
 
-// waitStatus polls path until it answers code.
-func waitStatus(t *testing.T, port int, path string, code int) string {
+// waitReadyz polls /readyz until it answers code.
+func waitReadyz(t *testing.T, port int, code int) string {
 	t.Helper()
+	const path = "/readyz"
 	deadline := time.Now().Add(30 * time.Second)
 	var got int
 	var body string
@@ -210,13 +222,13 @@ func waitStatus(t *testing.T, port int, path string, code int) string {
 
 func TestServeRolesStartReadyAndStop(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	for _, role := range []wire.Role{wire.RoleAPI, wire.RoleWorker, wire.RoleAll} {
 		t.Run(string(role), func(t *testing.T) {
 			t.Parallel()
 			p := start(t, role, serveEnv(t, db), wire.Deps{})
-			internal := p.waitPort(t, "internal listener started")
-			waitStatus(t, internal, "/readyz", http.StatusOK)
+			internal := p.waitInternal(t)
+			waitReadyz(t, internal, http.StatusOK)
 			if !strings.Contains(p.logs.String(), `"msg":"server ready"`) {
 				t.Fatalf("no ready line:\n%s", p.logs)
 			}
@@ -248,12 +260,12 @@ func TestServeRolesStartReadyAndStop(t *testing.T) {
 
 func TestServeReadyzDuringDrain(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	p := start(t, wire.RoleAPI, serveEnv(t, db, "BOTHY_SHUTDOWN__DRAIN_DELAY=2s"), wire.Deps{})
-	internal := p.waitPort(t, "internal listener started")
-	waitStatus(t, internal, "/readyz", http.StatusOK)
+	internal := p.waitInternal(t)
+	waitReadyz(t, internal, http.StatusOK)
 	p.sigs <- syscall.SIGTERM
-	body := waitStatus(t, internal, "/readyz", http.StatusServiceUnavailable)
+	body := waitReadyz(t, internal, http.StatusServiceUnavailable)
 	if body != `{"status":"unavailable","failed":["shutting_down"]}`+"\n" {
 		t.Fatalf("body = %q", body)
 	}
@@ -294,7 +306,7 @@ func TestServeAbortsOnOldSchema(t *testing.T) {
 
 func TestServeDatabaseUnreachableExits1AfterWait(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	start := time.Now()
 	p := startProc(t, serveEnv(t, db, "BOTHY_DATABASE__PORT=1", "BOTHY_STARTUP__DEPENDENCY_WAIT=500ms"))
 	if code := p.exit(t); code != lifecycle.ExitFailure {
@@ -315,7 +327,7 @@ func startProc(t *testing.T, env []string) *process {
 
 func TestServeMissingSecretFailsBeforeTheWait(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	p := start(t, wire.RoleWorker, serveEnv(t, db, "BOTHY_DATABASE__PASSWORD_REF=file:<secrets.dir>/missing"), wire.Deps{})
 	if code := p.exit(t); code != lifecycle.ExitFailure {
 		t.Fatalf("exit = %d", code)
@@ -330,13 +342,52 @@ func TestServeMissingSecretFailsBeforeTheWait(t *testing.T) {
 
 func TestServeBudgetsAboveTotalExit2(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	p := start(t, wire.RoleAPI, serveEnv(t, db, "BOTHY_SHUTDOWN__DRAIN_DELAY=30s", "BOTHY_SHUTDOWN__HTTP_GRACE=30s", "BOTHY_SHUTDOWN__TOTAL_TIMEOUT=60s"), wire.Deps{})
 	if code := p.exit(t); code != lifecycle.ExitUsage {
 		t.Fatalf("exit = %d", code)
 	}
 	if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), "1m5s") || !strings.Contains(err.Error(), "1m0s") {
 		t.Fatalf("Err() = %v", err)
+	}
+}
+
+// TestServeWorkerBudgetIncludesJobsSoftTimeout: the worker roles register the River stop step
+// with shutdown.jobs_soft_timeout, so it counts against shutdown.total_timeout (02 "Shutdown").
+func TestServeWorkerBudgetIncludesJobsSoftTimeout(t *testing.T) {
+	t.Parallel()
+	db := newServeDB(t)
+	env := serveEnv(t, db, "BOTHY_SHUTDOWN__JOBS_SOFT_TIMEOUT=30s", "BOTHY_SHUTDOWN__TOTAL_TIMEOUT=30s")
+	p := start(t, wire.RoleWorker, env, wire.Deps{})
+	if code := p.exit(t); code != lifecycle.ExitUsage {
+		t.Fatalf("exit = %d", code)
+	}
+	if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), "35s") {
+		t.Fatalf("Err() = %v, want the sum 35s of jobs and telemetry", err)
+	}
+	// The api role has no River step: the same budgets pass.
+	api := start(t, wire.RoleAPI, env, wire.Deps{})
+	internal := api.waitInternal(t)
+	waitReadyz(t, internal, http.StatusOK)
+	api.sigs <- syscall.SIGTERM
+	if code := api.exit(t); code != lifecycle.ExitOK {
+		t.Fatalf("api exit = %d", code)
+	}
+}
+
+// TestServeAbortsWithoutRiverTables: a database without River's migrations ends the start of
+// every role with the hint to run bothy migrate up; serve never migrates (R-AR-16).
+func TestServeAbortsWithoutRiverTables(t *testing.T) {
+	t.Parallel()
+	db := pgtest.New(t)
+	for _, role := range []wire.Role{wire.RoleAPI, wire.RoleWorker} {
+		p := start(t, role, serveEnv(t, db), wire.Deps{})
+		if code := p.exit(t); code != lifecycle.ExitFailure {
+			t.Fatalf("%s: exit = %d", role, code)
+		}
+		if err := p.runner.Err(); err == nil || !strings.Contains(err.Error(), "bothy migrate up") || !strings.Contains(err.Error(), "River") {
+			t.Fatalf("%s: Err() = %v", role, err)
+		}
 	}
 }
 
@@ -353,7 +404,7 @@ func TestServeRejectsUnknownRole(t *testing.T) {
 
 func TestReadyzReportsDatabaseLoss(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	cfg := db.Config(pg.RoleApp)
 	cfg.AcquireTimeout = 2 * time.Second
 	pool := db.OpenPool(t, cfg)
@@ -409,11 +460,11 @@ func (r *recorder) WriteHeader(code int)        { r.code = code }
 
 func TestServeSignalDuringStartSkipsTheDrain(t *testing.T) {
 	t.Parallel()
-	db := pgtest.New(t)
+	db := newServeDB(t)
 	// The database never answers; the drain delay would hold the end for 30s although the public
 	// listener never opened.
 	p := start(t, wire.RoleAPI, serveEnv(t, db, "BOTHY_DATABASE__PORT=1", "BOTHY_STARTUP__DEPENDENCY_WAIT=20s", "BOTHY_SHUTDOWN__DRAIN_DELAY=30s"), wire.Deps{})
-	p.waitPort(t, "internal listener started")
+	p.waitInternal(t)
 	sent := time.Now()
 	p.sigs <- syscall.SIGTERM
 	if code := p.exit(t); code != lifecycle.ExitOK {

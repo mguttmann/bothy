@@ -14,7 +14,7 @@ in `internal/wire` and exits with the code of `Run`.
 | File | Content |
 |---|---|
 | `phase.go` | `Phase`, the fixed shutdown order, `Phases`, `String` |
-| `runner.go` | `Component`, `StopStep`, `Options`, `Runner` (`New`, `Add`, `OnStop`, `Fail`, `Run`, `Err`), exit codes |
+| `runner.go` | `Component`, `StopStep`, `Options`, `Runner` (`New`, `Add`, `OnStop`, `Fail`, `FailOn`, `Run`, `Err`), exit codes |
 | `doc.go` | package documentation with an example |
 
 ## Start
@@ -37,7 +37,7 @@ Stop steps run in this order; steps of one phase in reverse registration order.
 | `connections` | save agent cursors, close WebSockets with `4013` (M1-65) | api, all |
 | `event_tail` | stop the log tail and `LISTEN` (M1-16) | api, all |
 | `consumers` | worker consumers finish their round (M2) | worker, all |
-| `jobs` | River soft stop with `shutdown.jobs_soft_timeout` (M1-14) | worker, all |
+| `jobs` | River soft stop with `shutdown.jobs_soft_timeout`, then the wait for the cancelled jobs (M1-14) | worker, all |
 | `telemetry` | flush within `shutdown.telemetry_flush_timeout` | all |
 | `database` | close the pool | all |
 | `internal_listener` | close `/healthz` and `/readyz` | all |
@@ -76,8 +76,10 @@ handlers keep no error text.
 A later ticket adds its part in `internal/wire` (`serve.go`, function `register`): `Add` a
 component at its place in the start order and `OnStop` its step with the phase from the table
 and its budget key. A step whose budget comes from configuration is registered before `Run`,
-so the budget check sees it. A part that fails at run time (a panic in the log tail, a lost
-River client) calls `Fail`.
+so the budget check sees it. A part that fails at run time (a panic in the log tail) calls
+`Fail`; a part that reports its loss on a channel (the River client of `platform/jobs`,
+`Runtime.Failed`) is watched with `FailOn(name, ch)`: an error on the channel ends the process
+with exit code 1, a channel closed without a value (the orderly `Stop`) does nothing.
 
 ## Dependencies
 
