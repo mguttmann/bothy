@@ -1,7 +1,8 @@
 {
-  "comment": "Quality profiles of the project. Each language profile inherits from `parent` and activates the rules of its XML file in addition. Applied and checked by tools/sonarqube/quality_sync.py on SonarQube Community Build and SonarQube Cloud alike.",
+  "comment": "Quality profiles of the project. Each language profile inherits from `parent` (on SonarQube Cloud from `cloud_parent`, because the cloud has no built-in profile named Sonar way) and activates the rules of its XML file in addition. Applied and checked by tools/sonarqube/quality_sync.py on SonarQube Community Build and SonarQube Cloud alike.",
   "profile_name": "Bothy way",
   "parent": "Sonar way",
+  "cloud_parent": "Sonar way comprehensive",
   "languages": {
     "dart": "quality-profile-dart.xml",
     "docker": "quality-profile-docker.xml",

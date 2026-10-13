@@ -67,6 +67,13 @@ provably apply locally and in the cloud.
   comprehensive" for Go (web API `api/qualityprofiles/search?language=go` on
   https://next.sonarqube.com/sonarqube, retrieved 2026-10-10) [verified]. If the
   parent profile is missing, `apply` aborts with a message instead of silently choosing another.
+  SonarQube Cloud has no "Sonar way" either: it offers "Sonar way core", "Sonar way
+  extended" and "Sonar way comprehensive", the last one as the default, for every language
+  of `profiles.json` (`api/qualityprofiles/search?organization=<organization>` on
+  https://sonarcloud.io, retrieved 2026-10-13) [verified]. On the cloud the profiles therefore
+  inherit from `cloud_parent` ("Sonar way comprehensive", the default the cloud analysis used
+  before), so applying them removes no rule there; the parent profiles differ between local and
+  cloud, the compared addition on top of them stays the same.
 
 ### Confirmation
 

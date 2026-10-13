@@ -150,6 +150,22 @@ def test_organization_is_sent_for_cloud(server: tuple[State, str]) -> None:
     assert all(params.get("organization") == "example-org" for _, _, params in state.calls)
 
 
+def test_apply_then_check_on_cloud_api() -> None:
+    # SonarQube Cloud has no profile "Sonar way" (api/qualityprofiles/search, 2026-10-13).
+    state = State(cloud=True, builtin_profile="Sonar way comprehensive")
+    config = qs.load_config(REPO / "quality" / "sonar")
+    with running(state) as url:
+        qs.apply(_client(url, organization="example-org"), config)
+        assert state.default_gate == "Bothy way"
+        go = state.profile("go", "Bothy way")
+        assert go is not None
+        assert go.parent == "Sonar way comprehensive"
+        assert [(c["metric"], c["op"], c["error"]) for c in state.gates["Bothy way"]] == [
+            (c.metric, c.op, c.error) for c in config.conditions
+        ]
+        assert qs.check(_client(url, organization="example-org"), config).problems == []
+
+
 def test_token_is_sent_as_bearer_and_never_printed(
     server: tuple[State, str], capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -173,5 +189,7 @@ def test_main_requires_token(
 def test_main_apply_then_check(server: tuple[State, str], monkeypatch: pytest.MonkeyPatch) -> None:
     _, url = server
     monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    # CI sets SONAR_ORGANIZATION for the cloud; this test talks to the local server API.
+    monkeypatch.delenv("SONAR_ORGANIZATION", raising=False)
     assert qs.main(["apply", "--url", url]) == 0
     assert qs.main(["check", "--url", url]) == 0
