@@ -5,6 +5,8 @@ Endpoint names and parameters follow the public Web API description
 (api/webservices/list of a SonarQube Server, retrieved 2026-10-10). With `cloud=True`
 it follows SonarQube Cloud instead (https://sonarcloud.io/api/webservices/list,
 retrieved 2026-10-13): create_condition needs `gateId` and set_as_default needs `id`.
+`gate_default_forbidden=True` answers set_as_default with HTTP 403, as SonarQube Cloud does
+for a custom default gate on a plan that does not include it.
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ class State:
     gates: dict[str, list[dict[str, str]]] = field(default_factory=dict)
     gate_ids: dict[str, str] = field(default_factory=dict)
     default_gate: str | None = None
+    gate_default_forbidden: bool = False
     profiles: list[Profile] = field(default_factory=list)
     calls: list[tuple[str, str, dict[str, str]]] = field(default_factory=list)
     tokens: list[str] = field(default_factory=list)
@@ -185,7 +188,17 @@ def _cond_delete(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     return 204, "", "text/plain"
 
 
+def _gate_list(state: State, _: dict[str, str]) -> tuple[int, Any, str]:
+    gates = [
+        {"id": state.gate_ids[n], "name": n, "isDefault": n == state.default_gate}
+        for n in state.gates
+    ]
+    return 200, {"qualitygates": gates}, "application/json"
+
+
 def _gate_default(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    if state.gate_default_forbidden:
+        return 403, {"errors": [{"msg": "Insufficient privileges"}]}, "application/json"
     gate = _gate_name(state, p, "name", "id")
     if gate not in state.gates:
         return _BAD_REQUEST
@@ -262,6 +275,7 @@ def _qp_backup(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
 ROUTES = {
     ("GET", "/api/languages/list"): _languages,
     ("GET", "/api/qualitygates/show"): _gate_show,
+    ("GET", "/api/qualitygates/list"): _gate_list,
     ("POST", "/api/qualitygates/create"): _gate_create,
     ("POST", "/api/qualitygates/create_condition"): _cond_create,
     ("POST", "/api/qualitygates/update_condition"): _cond_update,

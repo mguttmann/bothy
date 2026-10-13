@@ -163,6 +163,12 @@ operated, and the order of the build.
   the gate name (https://sonarcloud.io/api/webservices/list, retrieved 2026-10-13), and lets the profiles inherit there from `cloud_parent` of
   `quality/sonar/profiles.json` ("Sonar way comprehensive"), because the cloud has no built-in
   profile "Sonar way" (ADR 0040); before, `make sonar-config` could not apply the setup to the cloud.
+- `quality_sync.py` on SonarQube Cloud: when the plan refuses a custom default quality gate
+  (HTTP 403 on `api/qualitygates/set_as_default`), `make sonar-config` still applies the
+  quality profiles of every language and `make sonar-config-check` reports the gap
+  "gate not default: plan does not allow it" instead of failing; every other difference
+  still fails the check. On a SonarQube Server the check now also fails when the gate is not
+  the default. Before, the first refusal stopped the run before any profile was applied.
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
   `file_blocked` in the order of the codes; `createHost` and `issueHostPairingCode` take
   `Idempotency-Key` and list `422 idempotency_key_reuse` instead of the exemption `auth_flow`,

@@ -13,6 +13,10 @@ Usage (token only from the environment variable SONAR_TOKEN, never printed):
 
 Languages the server does not know (Dart and Swift on the Community Build) are skipped
 and listed; the Cloud check covers them.
+
+SonarQube Cloud refuses a custom default gate (HTTP 403 on set_as_default) on plans that
+do not include it. In cloud mode that is a reported gap, not a failure: apply still
+applies the profiles, and check reports the gap while every other difference fails.
 """
 
 from __future__ import annotations
@@ -33,10 +37,16 @@ from typing import Any
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "quality" / "sonar"
 _RULE = re.compile(r"<repositoryKey>([^<]+)</repositoryKey>\s*<key>([^<]+)</key>")
 _TIMEOUT_S = 60
+GATE_NOT_DEFAULT = "gate not default: plan does not allow it"
 
 
 class SonarError(Exception):
     """The server rejected a call or lacks something the configuration needs."""
+
+    def __init__(self, message: str, status: int | None = None) -> None:
+        """Keep the HTTP status of a rejected call (None if there was no HTTP answer)."""
+        super().__init__(message)
+        self.status = status
 
 
 @dataclass(frozen=True)
@@ -66,9 +76,10 @@ class Config:
 
 @dataclass
 class Report:
-    """Problems found and languages the server does not analyse."""
+    """Problems found, known gaps the server's plan imposes and languages it does not analyse."""
 
     problems: list[str] = field(default_factory=list)
+    gaps: list[str] = field(default_factory=list)
     skipped_languages: list[str] = field(default_factory=list)
 
 
@@ -126,7 +137,7 @@ class Client:
             if exc.code == 404:
                 raise LookupError(req.full_url.split("?")[0]) from None
             raise SonarError(
-                f"{req.get_method()} {req.full_url.split('?')[0]}: HTTP {exc.code}"
+                f"{req.get_method()} {req.full_url.split('?')[0]}: HTTP {exc.code}", exc.code
             ) from None
 
     def get(self, path: str, **params: str) -> bytes:
@@ -174,6 +185,11 @@ def _gate(client: Client, name: str) -> tuple[str, list[dict[str, str]]] | None:
     except LookupError:
         return None
     return str(gate.get("id", "")), list(gate["conditions"])
+
+
+def _gate_is_default(client: Client, name: str) -> bool:
+    gates = client.get_json("api/qualitygates/list")["qualitygates"]
+    return any(g["name"] == name and g.get("isDefault") for g in gates)
 
 
 def _gate_ref(
@@ -226,10 +242,15 @@ def apply(client: Client, config: Config) -> Report:
                 op=want.op,
                 error=want.error,
             )
-    client.post(
-        "api/qualitygates/set_as_default",
-        **_gate_ref(client, "id", gate_id, "name", config.gate_name),
-    )
+    try:
+        client.post(
+            "api/qualitygates/set_as_default",
+            **_gate_ref(client, "id", gate_id, "name", config.gate_name),
+        )
+    except SonarError as exc:
+        if not (client.is_cloud and exc.status == 403):
+            raise
+        report.gaps.append(GATE_NOT_DEFAULT)
 
     parent = config.parent_for(client)
     available = _languages(client)
@@ -282,6 +303,11 @@ def check(client: Client, config: Config) -> Report:
                     f"{cond['error']} differs (want {want.op} {want.error})"
                 )
         report.problems += [f"gate '{config.gate_name}': extra condition {m}" for m in sorted(have)]
+        if not _gate_is_default(client, config.gate_name):
+            if client.is_cloud:
+                report.gaps.append(GATE_NOT_DEFAULT)
+            else:
+                report.problems.append(f"gate '{config.gate_name}' is not the default gate")
 
     want_parent = config.parent_for(client)
     available = _languages(client)
@@ -335,6 +361,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if report.skipped_languages:
         print(f"quality_sync: not available on this server: {', '.join(report.skipped_languages)}")
+    for gap in report.gaps:
+        print(f"quality_sync: gap: {gap}")
     for problem in report.problems:
         print(f"quality_sync: {problem}")
     if report.problems:
