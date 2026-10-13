@@ -3,7 +3,7 @@
 package domain
 
 // ReleaseDelayed decides a push_delayed route when its NotBefore has come (13 4.4 "Desktop
-// aktiv", D-M3-17-6): true sends the push, false drops it because the person has read the hint
+// active", D-M3-17-6): true sends the push, false drops it because the person has read the hint
 // in the meantime.
 //
 // hintSeq is the thread_seq of the message the hint points at; for a flush hint it is

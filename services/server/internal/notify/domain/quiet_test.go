@@ -136,7 +136,7 @@ func TestInQuietHours_AcrossMidnightAndWeekdayBits(t *testing.T) {
 }
 
 // TestInQuietHours_WholeDayZonesAndDisabled: start_local = end_local is 24 hours (screen D9
-// "ganztags"), the zone of the rule counts, disabled rules and no rules are never quiet.
+// "all day"), the zone of the rule counts, disabled rules and no rules are never quiet.
 func TestInQuietHours_WholeDayZonesAndDisabled(t *testing.T) {
 	t.Parallel()
 	weekend := domain.QuietRule{Weekdays: 96, Start: 0, End: 0, Location: berlin(t), Enabled: true}

@@ -15,7 +15,7 @@ Notification levels, quiet hours, push registrations, push consumer and dispatch
 
 ## Decision per recipient
 
-`domain.Decide` takes the facts about one hint for one person and returns one outcome: `none` with a skip reason, `collect` into the open coalescing window, or `send`, quiet or normal, with one route per device. It reads no database, calls no `authorize`, reads no clock, loads no time zone and reads no configuration; the caller passes everything in (docs/DECISIONS.md D-M3-17-1). M3-18, M3-19 and M3-23 call these functions instead of re-implementing them.
+`domain.Decide` takes the facts about one notification for one person and returns one outcome: `none` with a skip reason, `collect` into the open coalescing window, or `send`, quiet or normal, with one route per device. It reads no database, calls no `authorize`, reads no clock, loads no time zone and reads no configuration; the caller passes everything in (docs/DECISIONS.md D-M3-17-1). M3-18, M3-19 and M3-23 call these functions instead of re-implementing them.
 
 ### Decision table (13 4.1)
 
@@ -40,7 +40,7 @@ Evaluated in this order; the first row that decides wins.
 | `mentions` | the same except `message` |
 | `mute` | only `input_needed` |
 
-`security` passes the level step at every level, `admin` only by `notify.admin_enabled`; both have no thread, so no level, no activity in a thread and no window apply to them, quiet hours do (D-M3-17-2). The skip reasons are internal constants; M3-19 maps them to the attribute values of `bothy.push.skipped`. No skip reason stands for quiet hours: they make a hint quiet, never drop it (R-PN-05).
+`security` passes the level step at every level, `admin` only by `notify.admin_enabled`; both have no thread, so no level, no activity in a thread and no window apply to them, quiet hours do (D-M3-17-2). The skip reasons are internal constants; M3-19 maps them to the attribute values of `bothy.push.skipped`. No skip reason stands for quiet hours: they make a notification quiet, never drop it (R-PN-05).
 
 ### Inputs and where they come from
 
@@ -61,17 +61,17 @@ Evaluated in this order; the first row that decides wins.
 ### Window rules (13 4.5, D-M3-17-5)
 
 - The window of (recipient, thread) is open while `Now` is before `Window.End`; from `Window.End` on it is closed.
-- A kind with thread that sends while no window is open sets `OpensWindowUntil = Now + notify.coalesce_window`, whatever its kind. A length of zero opens no new window, so every hint goes at once, except a `message` while a window opened earlier is still open.
+- A kind with thread that sends while no window is open sets `OpensWindowUntil = Now + notify.coalesce_window`, whatever its kind. A length of zero opens no new window, so every notification goes at once, except a `message` while a window opened earlier is still open.
 - `message` in an open window gives `collect` without routes. `mention`, `dm`, `input_needed`, `run_done` and `run_failed` in an open window send at once and leave the window unchanged.
 - `Flush` at the window end: `Collected` zero gives `nothing_collected`, `Unread` (03 `read_states`, "Unread") zero or less gives `read`; otherwise allowed, level, activity, quiet and route run again at the flush time, `Author` and `Window` are ignored, and a send carries `Count = Unread` and opens the next window. A flush that sends nothing leaves the window closed.
 
 ### Route rules (13 4.4, 4.6, D-M3-17-6)
 
-- Active in the thread: a device with a connection that is not idle and whose focus contains the thread, on any platform. It stops the hint on every device.
+- Active in the thread: a device with a connection that is not idle and whose focus contains the thread, on any platform. It stops the notification on every device.
 - Desktop active: a `macos` or `windows` device with a connection that is not idle.
 - One route per device, in the order of `Devices`: a connection (idle or not) gets `gateway` (`notification.created`); else a device with registrations gets `push_delayed` with `NotBefore = Now + notify.mobile_delay_when_desktop_active` if it is `ios` or `android`, the desktop is active and the delay is above zero, otherwise `push`; a device with neither gets nothing.
 - No route on any device gives `none` with `no_route` and opens no window.
-- `ReleaseDelayed(hintSeq, readSeq)` drops a delayed push exactly when `readSeq >= hintSeq`; a hint without a message (`hintSeq` zero or less) is always released.
+- `ReleaseDelayed(hintSeq, readSeq)` drops a delayed push exactly when `readSeq >= hintSeq`; a notification without a message (`hintSeq` zero or less) is always released.
 - A delayed push keeps the `Quiet` flag of its decision (D-M3-17-4).
 
 ### Rulings

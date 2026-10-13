@@ -44,7 +44,7 @@ A message in a DM channel gives r the kind `dm` and never `message` or `mention`
 mentions r: both kinds need the same level and go at once, and DM channels trigger no agent, so
 the run kinds never point at a DM channel either. The decision guards this column: the author
 never gets `message`, `mention` or `dm` for their own message, `run_done`, `run_failed` and
-`input_needed` reach only the person who triggered the run, and a `dm` hint outside a DM channel
+`input_needed` reach only the person who triggered the run, and a `dm` notification outside a DM channel
 or another kind with thread inside one is invalid input (docs/DECISIONS.md D-M3-17-2).
 
 No notification is created for: edits, deletions, reactions, pins, typing, live box patches,

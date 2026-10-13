@@ -82,7 +82,7 @@ type QuietRule struct {
 // and Start <= time < End. With End <= Start the window crosses midnight and belongs to the day it
 // starts on: the rule holds if the weekday's bit is set and time >= Start, or if the previous
 // weekday's bit is set and time < End (Monday's previous day is Sunday). So Start == End is a
-// window of 24 hours from Start on each set weekday, which is how screen D9 "ganztags" is stored
+// window of 24 hours from Start on each set weekday, which is how screen D9 "all day" is stored
 // (00:00 to 00:00).
 //
 // No boundary is ever computed as an instant: a rule inside the hour skipped by a spring

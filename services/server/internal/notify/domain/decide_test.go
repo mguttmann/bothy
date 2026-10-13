@@ -20,7 +20,7 @@ var quietNow = time.Date(2026, 10, 23, 21, 30, 0, 0, time.UTC)
 var pushToPhone = []domain.Route{{DeviceID: phoneID, Via: domain.ViaPush, Registrations: []ids.ID{phoneReg}}}
 
 // TestDecide_InputNeededMutedQuietHours: input_needed under mute arrives, quietly in quiet hours
-// (PLAN row M3-17, 13 14 "input_needed bei mute", R-PN-03, R-PN-05).
+// (PLAN row M3-17, 13 14 "`input_needed` with `mute`", R-PN-03, R-PN-05).
 func TestDecide_InputNeededMutedQuietHours(t *testing.T) {
 	t.Parallel()
 	mutes := map[string]*domain.Preference{

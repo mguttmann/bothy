@@ -131,8 +131,8 @@ func TestFlush_InvalidInput(t *testing.T) {
 	}
 }
 
-// TestFlush_TenMessagesInOneWindow mirrors the M3-19 case of 13 14 "Zehn Nachrichten in einem
-// Thread innerhalb eines Fensters": at most two hints, the second with the count.
+// TestFlush_TenMessagesInOneWindow mirrors the M3-19 case of 13 14 "Ten messages in one
+// thread within one window": at most two hints, the second with the count.
 func TestFlush_TenMessagesInOneWindow(t *testing.T) {
 	t.Parallel()
 	var window domain.Window
