@@ -29,8 +29,9 @@ receive action, `self` without an audience, an actor kind outside `user`, `agent
 `app`, and a payload that is not one JSON object in valid UTF-8 smaller than
 `sync.event_payload_max_bytes`, or that contains a JSON `null` at any depth, a number with an
 exponent (jsonb writes `1e100000` out in full, so the stored size would be unbounded) or with more
-than 131072 digits before or 16383 after the point (the limits of numeric), the
-character U+0000 or an unpaired surrogate escape (jsonb refuses both). The reads hand the sinks
+than 131072 digits before or 16383 after the point (the limits of numeric, [Numeric types](https://www.postgresql.org/docs/18/datatype-numeric.html),
+retrieved 2026-10-13), the character U+0000 or an unpaired surrogate escape (jsonb refuses both,
+[JSON types](https://www.postgresql.org/docs/18/datatype-json.html), retrieved 2026-10-13). The reads hand the sinks
 the compact form of the stored jsonb, which is never larger than the appended payload. A producer
 with a larger object builds a reduced payload and sets `Truncated` (04 payload rule 2). Events
 without ID get a UUIDv7; the correlation of the append context is attached: the trace ID of a
@@ -97,7 +98,7 @@ take only numbers and times and build every name with `format('%I')` (16 "Roles"
   inserts continue, and the matching `CHECK` lets it skip the scan that validates the partition
   constraint ([ALTER TABLE](https://www.postgresql.org/docs/18/sql-altertable.html), "ATTACH
   PARTITION"; [Table Partitioning](https://www.postgresql.org/docs/18/ddl-partitioning.html),
-  "Partition Maintenance"). `CREATE TABLE ... PARTITION OF` would take `ACCESS EXCLUSIVE`
+  "Partition Maintenance"; both retrieved 2026-10-13). `CREATE TABLE ... PARTITION OF` would take `ACCESS EXCLUSIVE`
   on the parent instead. The `CHECK` constraints of the parent must exist on the new table for
   the attach, hence `INCLUDING CONSTRAINTS`.
 - `sync_event_log_drop_expired(p_cutoff, p_head, p_lock_timeout)` sets `lock_timeout` for the
