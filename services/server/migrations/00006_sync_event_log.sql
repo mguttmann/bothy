@@ -105,7 +105,7 @@ $$;
 
 -- sync_event_log_drop_expired detaches and drops, in the order of their bounds, the partitions
 -- whose upper bound is at most p_head (the partition holding the head is never touched, 03
--- event_log "Aufbewahrung") and whose largest occurred_at is older than p_cutoff or that are
+-- event_log "Retention") and whose largest occurred_at is older than p_cutoff or that are
 -- empty. It stops at the first partition it keeps, so the retained sequence never has a hole
 -- (occurred_at is the start of a transaction and need not grow with seq). lock_timeout is set
 -- to p_lock_timeout for the rest of the transaction. The function trusts neither argument beyond

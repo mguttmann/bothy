@@ -68,7 +68,7 @@ var ErrDropDeferred = errors.New("sync: dropping expired partitions is deferred 
 
 // Run reads the head and creates partitions up to Ahead partitions above it in one unit of work,
 // then drops the partitions whose events are all older than now minus Retention, never the one
-// holding the head (03 event_log "Aufbewahrung"), in a second one; neither appends an event. The
+// holding the head (03 event_log "Retention"), in a second one; neither appends an event. The
 // two units keep a DETACH that cannot get its lock (a long reader holds event_log) from rolling
 // back the partitions ahead. The time comes from the clock, so tests move the cutoff instead of
 // rewriting rows.
