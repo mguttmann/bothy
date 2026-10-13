@@ -253,7 +253,7 @@ documented in this file. The format is based on
   `api/rest.Spec` embeds, and the check that every request schema is closed (W7).
 - Image `bothy-server` (`Dockerfile`, build context the repository root, ignore file
   `Dockerfile.dockerignore`): static `bothy` cross compiled for `linux/amd64` and `linux/arm64`
-  on `gcr.io/distroless/static-debian13:nonroot`, user `65532:65532`, no shell, health check
+  on `gcr.io/distroless/static-debian13:nonroot` (ruling M1-23/1), user `65532:65532`, no shell, health check
   `bothy healthcheck --url http://127.0.0.1:8081/readyz` as in Compose, empty
   `/var/lib/bothy/signing-keys` with owner `65532:65532` and mode `0700`, OCI labels from the build
   arguments `VERSION` (must equal `VERSION`), `REVISION` and `SOURCE_URL`; base images pinned by
