@@ -278,6 +278,20 @@ documented in this file. The format is based on
 - Configuration keys `principal.handle_max_chars` (default 32) and
   `principal.display_name_max_chars` (default 64), bound by `wire.IdentityConfig`.
 - `services/server/sqlc.yaml` with the identity entry; `make codegen-check` regenerates its code.
+- Audit log (M1-24, ADR 0021): migration `00004_audit_events.sql` with `audit_events` and
+  `audit_ip_keys` as in 03 "4.12"; the kernel port `auditing.Recorder` with `Record` (inside the
+  unit of work), `RecordDenial` (aggregated, own transaction after a rollback) and
+  `RecordDetached` (own transaction at once), the closed reason list of 07 "4.1" and typed
+  attribute values; the audit phase hook (phase 3.3) that numbers rows with `audit_seq` and
+  chains them with `SHA-256(prev_hash || canonical_json(row))` after RFC 8785; the details
+  schema `audit_details.v1`; the aggregation of identical denials per
+  `audit.deny_aggregate_window` with at most `audit.deny_aggregate_max_keys` open keys, flushed
+  by the stop step `audit_denials` before the pool closes.
+- Configuration keys `audit.deny_aggregate_window` (60s), `audit.deny_aggregate_max_keys`
+  (10000), `privacy.audit_ip_key_period` (30d), `privacy.audit_ip_key_retention` (90d, at least
+  the period) and `privacy.audit_ip_kek_ref`; `bothy serve` needs the secret `audit_ip_kek`.
+- `kernel/txn.Detach`: a context outside the unit of work, so a unit can start its own
+  transaction from inside an ambient one.
 
 ### Changed
 
@@ -295,6 +309,13 @@ documented in this file. The format is based on
 
 ### Security
 
+- The application role may only insert and read `audit_events`; `UPDATE`, `DELETE` and
+  `TRUNCATE` are revoked and refused by triggers for every role, the table owner included (only a
+  `DELETE` by `bothy_maint` passes, for the retention trim of M7).
+- Client IP addresses reach the audit log only as `ip_hmac` with `ip_key_id`: HMAC-SHA-256 under
+  one key per `privacy.audit_ip_key_period`, stored AES-256-GCM encrypted in `audit_ip_keys`
+  under the key behind `privacy.audit_ip_kek_ref`; `details` refuses free text outside `reason`,
+  floats and `null`.
 - `internal/platform/egress`: the one client for outgoing HTTP connections. It refuses targets
   that neither `egress.allowed_hosts` nor the consumer allows before any DNS lookup, checks the
   resolved addresses at connection time and dials only checked addresses (always blocked:

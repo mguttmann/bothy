@@ -91,12 +91,6 @@ rules:
     milestone: M1
   - match: "privacy."  # M7-06, M7-07; milestone of the chapter for ai_notice_enabled, notice_url (no ticket names it)
     milestone: M7
-  - match: privacy.audit_ip_kek_ref  # M1-24
-    milestone: M1
-  - match: privacy.audit_ip_key_period  # M1-24
-    milestone: M1
-  - match: privacy.audit_ip_key_retention  # M1-24
-    milestone: M1
   - match: privacy.object_delete_delay  # M3-08
     milestone: M3
   - match: privacy.per_person_stats_enabled  # M6-05

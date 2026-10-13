@@ -8,6 +8,9 @@ path: docs/glossary.md
 # The gate's German word list and the German samples of its tests.
 path: tools/docs/language_check.py
 path: tools/docs/tests/data/language/*
+# Test vector of the audit hash chain (M1-24): its hashes were computed independently over a
+# non-ASCII reason, so the text cannot change without a new vector.
+path: services/server/internal/audit/domain/testdata/chain_v1.json
 # Third-party files, kept byte for byte as published.
 path: tools/design-tokens/vendor/fonts/*
 path: tools/design-tokens/vendor/phosphor/*

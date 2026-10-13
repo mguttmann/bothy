@@ -81,7 +81,10 @@ func serveTestEnv(t *testing.T, db *pgtest.DB, extra ...string) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, b := range map[string][]byte{"db_app_password": pw, "telemetry_pseudonym_key": bytes.Repeat([]byte("k"), 48)} {
+	for name, b := range map[string][]byte{
+		"db_app_password": pw, "telemetry_pseudonym_key": bytes.Repeat([]byte("k"), 48),
+		"audit_ip_kek": []byte(strings.Repeat("6b", 32)),
+	} {
 		if err := os.WriteFile(filepath.Join(dir, name), b, 0o600); err != nil {
 			t.Fatal(err)
 		}

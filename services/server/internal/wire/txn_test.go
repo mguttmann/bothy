@@ -51,7 +51,7 @@ func moduleDeps(t *testing.T) wire.ModuleDeps {
 
 func TestTxnRegistrationsGolden(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewTxnRegistry(&wire.Modules{})
+	reg, err := wire.NewTxnRegistry(wire.NewModules(nil, nil))
 	if err != nil {
 		t.Fatal(err)
 	}

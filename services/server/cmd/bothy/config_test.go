@@ -158,6 +158,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 	code, stdout, stderr := runConfig(t, wire.ConfigSchema, env, "print", "--role", "worker")
 	want := "# configuration file: " + path + "\n" +
 		"api.cors_allowed_origins =   # default\n" +
+		"audit.deny_aggregate_max_keys = 10000  # default\n" +
+		"audit.deny_aggregate_window = 1m  # default\n" +
 		"database.acquire_timeout = 2s  # default\n" +
 		"database.host = localhost  # default\n" +
 		"database.idle_in_tx_timeout = 10s  # default\n" +
@@ -202,6 +204,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"migrate.owner_password_ref = file:/run/bothy/secrets/db_owner_password  # default\n" +
 		"principal.display_name_max_chars = 64  # default\n" +
 		"principal.handle_max_chars = 32  # default\n" +
+		"privacy.audit_ip_kek_ref = file:/run/bothy/secrets/audit_ip_kek  # default\n" +
+		"privacy.audit_ip_key_period = 30d  # default\n" +
+		"privacy.audit_ip_key_retention = 90d  # default\n" +
 		"privacy.telemetry_pseudonym_rotation = 30d  # default\n" +
 		"secrets.cache_ttl = 5m  # default\n" +
 		"secrets.dir = /run/bothy/secrets  # default\n" +

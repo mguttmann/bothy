@@ -15,6 +15,8 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 |---|---|
 | `config.go`, `configkeys_*.go`, `configchecks.go`, `configchapters.go` | configuration schema and cross-checks |
 | `database.go`, `egress.go`, `secrets.go`, `telemetry.go` | binding of the platform `Config` structs, the secret provider |
+| `audit.go` | `Audit` (`NewAudit`, `Start`, `UoW`, `Recorder`), `AuditConfig`, `SecretsKEK`: the audit module of a role (M1-24) |
+| `txn.go` | `Modules`, `NewModules`, `NewTxnRegistry` (the one list of hooks and subscribers, golden file `testdata/txn_registrations.golden`), `UnitConfig` |
 | `routes.go` | `Role`, `Handlers`, `MountRoutes` (start step 7, every route through the HTTP chain, CORS preflights), `RouteOptions`, `HTTPOperation` |
 | `jobs.go` | `JobsConfig`, `JobRole`, `NewJobRegistry` (one job registry for all roles), `MigrateUpSteps` (River before goose, then the after-step `instance`) |
 | `instance.go` | `MigrationSteps` (the after-step `instance`), `InstanceCounters` and `loadInstance`, the start step `instance` |
@@ -34,6 +36,7 @@ components, in start order:
 | `database` | `pg.Open`, `WaitReady` within `startup.dependency_wait`; readiness check `database` | all |
 | `schema` | `pg.CheckSchema` against the highest embedded version; older aborts with the hint to run `bothy migrate up` | all |
 | `instance` | loads the instance row through `instance.State` (missing: abort with the hint to run `bothy migrate up`), logs the setup state, compares the own version with `instance.min_server_version`; below it the readiness check `schema_requires_newer_server` fails for good (M1-15) | all |
+| `audit` | resolves `privacy.audit_ip_kek_ref` once (fail fast), builds the audit module with the unit of work of the role (`NewAudit`) and starts the aggregator of denials (`Audit.Start`), registering the stop step `audit_denials` (M1-24) | all |
 | `routes` | `NewChain` (validator over `api/rest.Spec`, `actor.AnonymousOnly`), then `MountRoutes` on the public mux | api, all |
 | `jobs` | `jobs.ValidateMigrations` (missing River migrations abort with the hint to run `bothy migrate up`), `jobs.New` for the role, `Start` of River (02 "Start" step 8; no-op for api and while no kind is registered), `Runner.FailOn` on `Failed` | all |
 | `public_listener` | opens `server.listen_addr`, logs `public listener started` | api, all |
@@ -44,7 +47,12 @@ Stop steps: `readiness` (not ready), `drain` and `public_listener` (api, all, bu
 soft stop within `shutdown.jobs_soft_timeout`, then for the cancelled jobs to end what
 `shutdown.total_timeout` leaves after the fixed budgets of the role, left out when nothing is
 left; docs/DECISIONS.md M1-14/4), `telemetry`
-(`shutdown.telemetry_flush_timeout`), `pool`, `internal_listener`.
+(`shutdown.telemetry_flush_timeout`), `audit_denials` and `pool` (phase `database`; the audit
+step is registered later, so it runs first and flushes the open aggregations of denials before
+the pool closes), `internal_listener`.
+
+Every unit of work of a role runs on a registry from `NewTxnRegistry(NewModules(pool, log))`;
+`NewTxnRegistry` refuses `Modules` without the audit hook, so no unit can skip the chain.
 
 ## Instance and counters
 
