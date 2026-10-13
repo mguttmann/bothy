@@ -37,6 +37,8 @@ GENERATED = (
     "*_gen.go",
     "*.pb.go",
     "*/generated/*",
+    # The output directory of sqlc (ADR 0007); sqlc writes no license header (M1-26).
+    "*/sqlcgen/*",
 )
 # Go files that only a generator writes (by name or below a directory named generated, which
 # GENERATED and sonar.exclusions skip); the Go convention marks them with GO_GENERATED_MARKER

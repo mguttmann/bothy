@@ -18,7 +18,37 @@ type Instance struct {
 	CreatedAt        pgtype.Timestamptz
 }
 
+type Owner struct {
+	ID        pgtype.UUID
+	UserID    pgtype.UUID
+	GrantedBy pgtype.UUID
+	GrantedAt pgtype.Timestamptz
+	RevokedAt pgtype.Timestamptz
+	RevokedBy pgtype.UUID
+	Reason    string
+}
+
+type Principal struct {
+	ID           pgtype.UUID
+	Kind         string
+	Status       string
+	Handle       string
+	DisplayName  string
+	AvatarFileID pgtype.UUID
+	CreatedAt    pgtype.Timestamptz
+	DisabledAt   pgtype.Timestamptz
+	DeletedAt    pgtype.Timestamptz
+}
+
 type SequenceCounter struct {
 	Name  string
 	Value int64
+}
+
+type User struct {
+	PrincipalID  pgtype.UUID
+	Email        pgtype.Text
+	Locale       string
+	TimeZone     string
+	LastActiveAt pgtype.Timestamptz
 }

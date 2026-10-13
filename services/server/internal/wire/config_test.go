@@ -58,6 +58,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"jobs.queue.maintenance.max_workers": {Kind: config.KindInt, Default: "2", Min: "1", Max: "10000", Chapter: "02-architecture.md"},
 		"jobs.queue.privacy.max_workers":     {Kind: config.KindInt, Default: "1", Min: "1", Max: "10000", Chapter: "02-architecture.md"},
 		"message.max_content_bytes":          {Kind: config.KindInt, Default: "262144", Min: "1", Chapter: "03-data-model.md"},
+		"principal.handle_max_chars":         {Kind: config.KindInt, Default: "32", Min: "1", Chapter: "03-data-model.md"},
+		"principal.display_name_max_chars":   {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-data-model.md"},
 		"egress.allowed_hosts":               {Kind: config.KindStringList, Default: "", Chapter: "19-security.md"},
 		"egress.timeout":                     {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "19-security.md"},
 		"egress.max_response_bytes":          {Kind: config.KindInt, Default: "1048576", Min: "1", Chapter: "19-security.md"},

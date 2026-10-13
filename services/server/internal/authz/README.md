@@ -9,7 +9,8 @@ The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-
 
 ## Code
 
-- `internal/authz` (`doc.go`): port as the root package, so far only with a package comment. Interfaces, DTOs and In-Tx events come with the ticket that implements them.
+- `internal/authz` (`doc.go`): port as the root package. Interfaces, DTOs and In-Tx events come with the ticket that implements them.
+- `sources.go` (M1-26): the source port `PrincipalSource` with `PrincipalFacts` and `PrincipalStatus` (kind, status and owner role of a principal); identity implements it in `identity/app`. M1-28 adds the further source ports to this file.
 - `domain/`, `app/` and `adapters/<kind>/` are created with the first use case. `tools/archgen` generates their components from `architecture/modules.yaml`; a package outside these layers fails `make arch`.
 
 ## Port (root package `internal/authz`)

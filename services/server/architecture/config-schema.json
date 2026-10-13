@@ -513,6 +513,30 @@
       "doc": "Secret reference of the password bothy migrate up --bootstrap sets for bothy_owner."
     },
     {
+      "name": "principal.display_name_max_chars",
+      "env": "BOTHY_PRINCIPAL__DISPLAY_NAME_MAX_CHARS",
+      "kind": "int",
+      "default": "64",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Longest display name of a principal in Unicode characters."
+    },
+    {
+      "name": "principal.handle_max_chars",
+      "env": "BOTHY_PRINCIPAL__HANDLE_MAX_CHARS",
+      "kind": "int",
+      "default": "32",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-data-model.md",
+      "doc": "Longest handle of a principal in characters."
+    },
+    {
       "name": "privacy.telemetry_pseudonym_rotation",
       "env": "BOTHY_PRIVACY__TELEMETRY_PSEUDONYM_ROTATION",
       "kind": "duration",
