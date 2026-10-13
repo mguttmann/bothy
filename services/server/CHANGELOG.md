@@ -348,11 +348,12 @@ documented in this file. The format is based on
 - `pgtest` no longer leaves its PostgreSQL container running when a test binary ends without
   reaching the end of `pgtest.Main` (a panicking test, the `-test.timeout` alarm, a signal,
   `SIGKILL`). The test binary holds a lease connection, and a watchdog in the container stops
-  PostgreSQL within seconds after that connection is gone, so Docker removes the container with
-  its data volume (`AutoRemove`). Once the lease was taken, the watchdog also stops a server that
-  gives no readable answer for `leaseStartGrace`, during a run as well. `pgtest.Main` also
-  removes test containers labelled `org.bothy.test` without the label `org.bothy.test.watchdog` (older `pgtest` versions, other
-  test helpers without a watchdog) once they are older than `legacyReapAge`.
+  PostgreSQL after `leaseMisses` checks in a row find no lease connection, so Docker removes the
+  container with its data volume (`AutoRemove`). Once the lease was taken, the watchdog also
+  stops a server that gives no readable answer for `leaseStartGrace`, during a run as well.
+  `pgtest.Main` also removes test containers labelled `org.bothy.test` without the label
+  `org.bothy.test.watchdog` (older `pgtest` versions, other test helpers without a watchdog)
+  once they are older than `legacyReapAge`.
   `TestNoContainerSurvivesTheRun` runs a passing, a failing, a panicking, a timed-out and a
   killed child run and checks that neither container nor volume survives.
   `TestWatchdogScript` checks the watchdog script against stub executables.
