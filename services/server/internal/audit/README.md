@@ -50,10 +50,10 @@ details go to the log only.
 ### Canonical form
 
 `CanonicalRow` is the input of `hash = SHA-256(prev_hash || canonical)` (19 SEC-AUD-4): the column
-names except `hash`, NULL columns omitted, `seq` as integer (at most 2^53 - 1), UUIDs in lower
-case with hyphens, `occurred_at` as RFC 3339 UTC with exactly three fractional digits and `Z`
+names except `hash`, NULL columns omitted, `seq` as integer (at most `domain.MaxSafeInteger`), UUIDs in lower
+case with hyphens, `occurred_at` as [RFC 3339](https://www.rfc-editor.org/rfc/rfc3339) (retrieved 2026-10-13) UTC with millisecond precision and `Z`
 (the recorder cuts the time to milliseconds before storing and hashing), `prev_hash` as lower-case
-hex, `details` as stored. Serialisation follows RFC 8785 in the restricted domain of the log:
+hex, `details` as stored. Serialisation follows [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785) (retrieved 2026-10-13) in the restricted domain of the log:
 sorted ASCII keys, strings escape only `"`, `\` and characters below U+0020, everything else
 literal UTF-8, integers in decimal, no floats, no `null`, no NUL. `Repository.Rows` reads rows back
 with `UseNumber`, so the hash recomputes from the stored row; the API representation `AuditEvent`
@@ -62,7 +62,7 @@ chain whose hashes were computed independently.
 
 ### Details schema `audit_details.v1`
 
-A flat object (19 SEC-AUD-5): the reserved members `ip_hmac` (64 hex characters) with `ip_key_id`
+A flat object (19 SEC-AUD-5): the reserved members `ip_hmac` (the hex form of the whole HMAC) with `ip_key_id`
 (only together), `aggregate` (`count >= 1`, `first_at`, `last_at`), `violations` (list of `code`,
 `agent_id`, `credential_holder_id`, `principal_ids`; only through `auditing.Violations`) and
 `reason` (the only free text, only through `auditing.ReasonText`, checked with
@@ -96,10 +96,10 @@ logged.
 ### Keyring of the IP pseudonyms
 
 `ip_hmac = hex(HMAC-SHA-256(key, text))` with the client IP of `kernel/reqmeta` after `Unmap()`
-without zone, in the text form of `netip.Addr.String()`; raw addresses are stored nowhere in
+without zone, in the text form of [`netip.Addr.String()`](https://pkg.go.dev/net/netip#Addr.String) (retrieved 2026-10-13); raw addresses are stored nowhere in
 `audit_events`. Every entry of a request with a client IP carries `ip_hmac` and `ip_key_id`. One
 key per `privacy.audit_ip_key_period`, `valid_from` aligned in Unix time; on a cache miss the
-keyring reads the row covering now or creates one in an own short transaction (32 random bytes,
+keyring reads the row covering now or creates one in an own short transaction (`domain.IPKeyBytes` random bytes,
 AES-256-GCM under the key behind `privacy.audit_ip_kek_ref` with the row id as additional data,
 `ON CONFLICT (valid_from) DO NOTHING`, then read again) and caches the decrypted key until
 `valid_until`. A destroyed key (`key_ciphertext` NULL) is never used. `bothy serve` resolves the
