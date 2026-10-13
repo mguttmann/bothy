@@ -18,7 +18,8 @@ const (
 // display names from docs/spec/03-datenmodell.md that the domain checks (M1-26), the session and
 // refresh durations of 03 section 9 (M1-34), the DPoP windows and the token pepper from
 // docs/spec/08-identitaet.md section 18 (M1-33), and the step-up challenge lifetime, failure limit
-// and window and the cleanup interval of 08 section 18 (M1-35). The page sizes of
+// and window and the cleanup interval of 08 section 18 (M1-35), and the API token limits and the
+// DPoP requirement of 08 section 18 (M1-44). The page sizes of
 // 06-api.md live in apiConfigKeys, because every list reads them.
 func identityConfigKeys() []config.Key {
 	return []config.Key{
@@ -93,8 +94,28 @@ func identityConfigKeys() []config.Key {
 			Doc:     "Secret reference of the server pepper for the HMAC hashes of tokens and codes and the DPoP nonce key; 32 bytes as hex.",
 			Chapter: chapter08,
 		},
+		{
+			// The cross-check dpop_required_for refuses a value outside agent, app and personal.
+			Name: keyDPoPRequiredFor, Kind: config.KindStringList, Default: `["agent"]`,
+			Doc:     "Token kinds (agent, app, personal) whose API tokens must be DPoP-bound.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.api_token_max_ttl", Kind: config.KindDuration, Default: "365d", Min: "1s",
+			Doc:     "Longest lifetime of an agent or app token.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.personal_token_max_ttl", Kind: config.KindDuration, Default: "90d", Min: "1s",
+			Doc:     "Longest lifetime of a personal token.",
+			Chapter: chapter08,
+		},
 	}
 }
+
+// keyDPoPRequiredFor names the token kinds that must be DPoP-bound; the cross-check
+// dpop_required_for reads it.
+const keyDPoPRequiredFor = "auth.dpop_required_for"
 
 // apiConfigKeys returns the page sizes of docs/spec/06-api.md "6. Paginierung" (M1-33, the first
 // list).

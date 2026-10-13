@@ -16,6 +16,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver/httpservertest"
@@ -442,6 +443,35 @@ func TestAuth_CredentialsPrecheck(t *testing.T) {
 	}
 	if strings.Join(settled, ",") != "ok,unauthenticated" {
 		t.Fatalf("settle saw %v, want [ok unauthenticated]", settled)
+	}
+}
+
+// TestAuth_InactiveCredentialSettlesAsFailure (M1-44, red team round 2): an API token the
+// Authenticator found revoked or expired passes the stage to authorize, but its settle function
+// sees 401 unauthenticated, so the reservation of rl.public_auth stays spent like for any other
+// dead credential.
+func TestAuth_InactiveCredentialSettlesAsFailure(t *testing.T) {
+	t.Parallel()
+	op := getThing()
+	var settled []string
+	h := httpservertest.New(t, httpservertest.Options{
+		Authenticator: inactiveAuth{id: ids.New()},
+		Routes:        []httpservertest.Route{{Op: op, Handler: okHandler(op.Action)}},
+		Setup: func(c *httpserver.Chain) {
+			c.SetCredentialsPrecheck(func(*http.Request) (func(error), error) {
+				return func(err error) {
+					code := "ok"
+					if e, ok := errs.As(err); ok {
+						code = string(e.PublicCode())
+					}
+					settled = append(settled, code)
+				}, nil
+			})
+		},
+	})
+	h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast", "Authorization", "Bearer dead"))
+	if strings.Join(settled, ",") != "unauthenticated" {
+		t.Fatalf("settle saw %v, want [unauthenticated]", settled)
 	}
 }
 

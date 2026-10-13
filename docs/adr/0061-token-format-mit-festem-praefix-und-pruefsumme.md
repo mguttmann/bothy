@@ -87,7 +87,13 @@ Base62, CRC-32 in 6 Zeichen) nutzt GitHub für seine Tokens [Q1, belegt].
   hat 6 Zeichen; jede Änderung eines Zeichens im Zufallsteil fällt an der Prüfsumme auf.
 - Test: Ein Token mit falscher Prüfsumme wird ohne Datenbankabfrage abgelehnt (Abfragezähler des
   Test-Repositorys bleibt 0).
-- Bau-Ticket M1-44 in [PLAN.md](../PLAN.md).
+- Bau-Ticket M1-44 in [PLAN.md](../PLAN.md). Built (2026-10-13): `TestFormat_RoundTrip`,
+  `TestFormat_ChecksumVectors`, `TestParse_Rejects`, `TestGenerate_ReadsExactly32BytesFromCryptoRand`
+  and `TestTokenPrefix` in `services/server/internal/identity/domain/apitoken`, the vectors
+  recomputed by `test_checksum_vectors_match_go`, and `TestIDT23_WrongChecksumRejectedWithoutLookup`
+  (lookup counter stays 0). Identity does not cache token lookups (one indexed query per request);
+  authz caches the token liveness with its rights snapshot per rights version, and every
+  revocation raises that version, so a revocation holds at the next request in every process.
 
 ## Pros and Cons of the Options
 

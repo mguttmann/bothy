@@ -3598,8 +3598,10 @@ paths:
                     - id: 0192f4a0-7b1c-703d-85ae-fdc884c55554
                       principal_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                       name: Adapter production
-                      token_prefix: bothy_agt_example
-                      scopes: ['messages:read']
+                      token_prefix: bothy_agt_EXAMPL
+                      scopes: []
+                      dpop_jkt: 0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I
+                      expires_at: '2027-10-10T00:00:00.000Z'
                       created_at: '2026-10-10T09:30:00.000Z'
         '400':
           $ref: '#/components/responses/BadRequest'
@@ -3659,10 +3661,12 @@ paths:
                       id: 0192f4a0-7b1c-703d-85ae-fdc884c55554
                       principal_id: 0192f4a0-7b1c-7f89-8d6b-6960453241bc
                       name: Adapter production
-                      token_prefix: bothy_agt_example
-                      scopes: ['messages:read']
+                      token_prefix: bothy_agt_EXAMPL
+                      scopes: []
+                      dpop_jkt: 0ZcOCORZNYy-DWpqq30jZyJGHTN0d2HglBV3uiguA4I
+                      expires_at: '2027-10-10T00:00:00.000Z'
                       created_at: '2026-10-10T09:30:00.000Z'
-                    secret: bothy_agt_exampleOnlyNotAToken7Hq2_c3f1
+                    secret: bothy_agt_EXAMPLEOnlyNotARealTokenForTheChecksumTests_3NymP3
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -22089,7 +22093,7 @@ components:
         token_prefix:
           type: string
           description: '`bothy_<kind>_` plus the first characters of the random part (03 `api_tokens`).'
-          examples: [bothy_agt_example]
+          examples: [bothy_agt_EXAMPL]
         scopes:
           type: array
           items:
@@ -22132,7 +22136,7 @@ components:
         secret:
           type: string
           description: Full token value `bothy_<kind>_<random>_<checksum>` (prefix for secret scanners). Shown exactly once.
-          examples: [bothy_agt_exampleOnlyNotAToken7Hq2_c3f1]
+          examples: [bothy_agt_EXAMPLEOnlyNotARealTokenForTheChecksumTests_3NymP3]
     AppScope:
       type: string
       enum:

@@ -130,7 +130,9 @@ func (s *idempotencyStage) wrap(next http.Handler) http.Handler {
 		op, _ := OperationFrom(ctx)
 		values := r.Header.Values(headerIdempotencyKey)
 		a, ok := actor.FromContext(ctx)
-		if !op.IdempotencyKey || len(values) == 0 || !ok || a.IsAnonymous() {
+		// A principal whose credential the authenticator found revoked or expired goes on to
+		// authorize, which refuses it: neither a claim nor a replay for a dead credential (M1-44).
+		if !op.IdempotencyKey || len(values) == 0 || !ok || a.IsAnonymous() || a.CredentialInactive {
 			next.ServeHTTP(w, r)
 			return
 		}

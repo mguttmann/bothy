@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"time"
 
+	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
@@ -40,6 +41,7 @@ var configChecks = []configCheck{
 	{name: "file_s3", keys: []string{keyStorageDriver, "file.s3.endpoint", "file.s3.region", "file.s3.bucket", "file.s3.prefix",
 		"file.s3.use_path_style", "file.s3.checksum_mode", keyEgressAllowedHosts}, fn: fileS3},
 	{name: "consumer_alert_below_retention", keys: []string{keyConsumerPendingAlertAfter, keySyncEventRetention}, fn: consumerAlertBelowRetention},
+	{name: "dpop_required_for", keys: []string{keyDPoPRequiredFor}, fn: dpopRequiredFor},
 	{name: "jwks_max_age_below_rotation", keys: []string{keyJWKSMaxAge, keyInvocationRotation, keyAccessRotation}, fn: jwksMaxAgeBelowRotation},
 }
 
@@ -62,6 +64,12 @@ func jwksMaxAgeBelowRotation(v *config.Values) error {
 		}
 	}
 	return errors.Join(problems...)
+}
+
+// dpopRequiredFor refuses a value of auth.dpop_required_for outside agent, app and personal (08
+// section 18, M1-44); the error names the key, never the value.
+func dpopRequiredFor(v *config.Values) error {
+	return identityapp.CheckDPoPRequiredFor(v.Strings(keyDPoPRequiredFor))
 }
 
 // consumerAlertBelowRetention requires consumer.pending_alert_after to be strictly below

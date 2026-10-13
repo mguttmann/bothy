@@ -6066,7 +6066,7 @@ export interface components {
             name: string;
             /**
              * @description `bothy_<kind>_` plus the first characters of the random part (03 `api_tokens`).
-             * @example bothy_agt_example
+             * @example bothy_agt_EXAMPL
              */
             token_prefix: string;
             scopes: components["schemas"]["AppScope"][];
@@ -6090,7 +6090,7 @@ export interface components {
             token: components["schemas"]["ApiToken"];
             /**
              * @description Full token value `bothy_<kind>_<random>_<checksum>` (prefix for secret scanners). Shown exactly once.
-             * @example bothy_agt_exampleOnlyNotAToken7Hq2_c3f1
+             * @example bothy_agt_EXAMPLEOnlyNotARealTokenForTheChecksumTests_3NymP3
              */
             secret: string;
         };

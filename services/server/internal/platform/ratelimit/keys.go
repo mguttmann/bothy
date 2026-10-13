@@ -79,11 +79,11 @@ func DeviceOrTokenKey(a actor.Actor) (string, error) {
 
 // RequestKey returns the key of a REST request r for class (05 "Rate-Limit-Klassen"): the client IP
 // of kernel/reqmeta for rl.public_auth; the actor ID for the principal, agent and host classes,
-// with the client IP instead for the anonymous actor (unauthenticated calls never share one bucket
-// and never borrow a principal's); the path value webhook_id for rl.webhook_in. The error reports
-// a class 05 does not list, a gateway class (rl.typing, rl.gateway_connect), which a REST request
-// never carries, and a rl.webhook_in request without webhook_id; a webhook_id that is not an ID
-// is errs.CodeNotFound.
+// with the client IP instead for the anonymous actor and for an actor with CredentialInactive
+// (unauthenticated calls and dead tokens never share one bucket and never borrow a principal's);
+// the path value webhook_id for rl.webhook_in. The error reports a class 05 does not list, a
+// gateway class (rl.typing, rl.gateway_connect), which a REST request never carries, and a
+// rl.webhook_in request without webhook_id; a webhook_id that is not an ID is errs.CodeNotFound.
 func RequestKey(r *http.Request, class Class) (string, error) {
 	kind, ok := KindOf(class)
 	if !ok {
@@ -96,7 +96,9 @@ func RequestKey(r *http.Request, class Class) (string, error) {
 		return KeyForIP(ip), nil
 	case KeyPrincipal, KeyAgent, KeyHost:
 		a, ok := actor.FromContext(ctx)
-		if !ok || a.IsAnonymous() || a.ID.IsZero() {
+		// A revoked or expired API token (CredentialInactive, M1-44) counts like an anonymous
+		// call: it must not spend the bucket of the principal it once belonged to.
+		if !ok || a.IsAnonymous() || a.ID.IsZero() || a.CredentialInactive {
 			return KeyForIP(ip), nil
 		}
 		if kind == KeyAgent {

@@ -6,8 +6,10 @@ from __future__ import annotations
 
 import json
 import random
+import secrets
 import string
 import subprocess
+import zlib
 from pathlib import Path
 
 import pytest
@@ -110,6 +112,73 @@ def test_allowlists_skip_documented_examples(tmp_path: Path, case: str) -> None:
         check=False,
     )
     assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+# The Base62 alphabet and the vectors of the API token format (ADR 0061); the Go package
+# services/server/internal/identity/domain/apitoken reads the same file.
+BASE62 = string.digits + string.ascii_uppercase + string.ascii_lowercase
+VECTORS = REPO / "services/server/internal/identity/domain/apitoken/testdata/checksum_vectors.json"
+
+
+def _base62(n: int, width: int) -> str:
+    digits = ""
+    while n:
+        n, d = divmod(n, 62)
+        digits = BASE62[d] + digits
+    assert len(digits) <= width
+    return digits.rjust(width, "0")
+
+
+def _checksum(random_part: str) -> str:
+    return _base62(zlib.crc32(random_part.encode("ascii")), 6)
+
+
+def _findings(tmp_path: Path, text: str) -> set[str]:
+    (tmp_path / "sample.txt").write_text(text + "\n")
+    report = tmp_path / "report.json"
+    proc = subprocess.run(
+        [
+            str(_gitleaks()),
+            "dir",
+            str(tmp_path / "sample.txt"),
+            "--config",
+            str(REPO / ".gitleaks.toml"),
+            "--no-banner",
+            "--redact",
+            "--report-format",
+            "json",
+            "--report-path",
+            str(report),
+            "--exit-code",
+            "0",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    return {item["RuleID"] for item in json.loads(report.read_text())}
+
+
+def test_bothy_token_with_valid_checksum_is_detected(tmp_path: Path) -> None:
+    """A token built like the server builds it (256 random bits in Base62, CRC-32 checksum)
+    is a finding; the same token with a 5-character checksum is not."""
+    random_part = _base62(int.from_bytes(secrets.token_bytes(32), "big"), 43)
+    token = "bothy" + "_agt_" + random_part + "_" + _checksum(random_part)
+    assert len(token) == 60
+    assert "bothy-api-token" in _findings(tmp_path, "BOTHY_TOKEN=" + token)
+    assert "bothy-api-token" not in _findings(tmp_path, "BOTHY_TOKEN=" + token[:-1])
+
+
+def test_checksum_vectors_match_go() -> None:
+    """Python and Go agree on every checksum vector of the Go testdata file."""
+    vectors = json.loads(VECTORS.read_text())["vectors"]
+    assert len(vectors) >= 3
+    assert any(v["checksum"].startswith("0") for v in vectors)
+    for v in vectors:
+        assert v["random"].startswith("EXAMPLE")
+        assert len(v["random"]) == 43
+        assert _checksum(v["random"]) == v["checksum"], v["random"]
 
 
 def test_history_allowlist_takes_exact_values_only(tmp_path: Path) -> None:

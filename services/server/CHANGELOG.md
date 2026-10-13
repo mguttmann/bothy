@@ -28,6 +28,27 @@ documented in this file. The format is based on
   no_login_method_left`, also under concurrency); unlinking an identity and disabling a provider
   revoke the sessions started through them. A provider that identities or claim groups reference
   cannot be deleted (`409`, disable it instead).
+- API tokens with prefix and checksum (M1-44, ADR 0061): the format
+  `bothy_<kind>_<random>_<checksum>` (`domain/apitoken`, kinds `agt`, `app`, `pat`, `whi`, 256
+  random bits in Base62, CRC-32 checksum in 6 Base62 digits), the migration
+  `00014_identity_api_tokens.sql` (`api_tokens`, only the HMAC and `token_prefix` stored), the
+  ports `identity.Tokens` (`Issue`, `List`, `Revoke`, `RevokeAllForPrincipal`) and
+  `identity.TokenAdmin`, and the operations `listTokens`, `createToken` and `revokeToken`. The
+  secret is shown once (`Cache-Control: no-store`; a replay with the same `Idempotency-Key` is
+  `409 conflict one_time_secret`), the expiry is mandatory and bounded, agent tokens are
+  DPoP-bound by default and refused as `Bearer`, personal tokens exist only for oneself and only
+  with the switch `tokens.personal_enabled` (off until M1-47, `403 feature_disabled`), have no
+  owner rights and never provide step-up; app tokens answer `409 conflict app_not_installed`
+  until M2-24. The Authenticator takes the API token path for values starting with `bothy_`
+  (format and checksum without a query, one lookup by HMAC, then the DPoP binding;
+  `AuthenticateAPIToken` for the gateway of M1-64); revocation is a rights change and holds at
+  the next request, and the Idempotency-Key stage never replays a stored answer to a revoked or
+  expired token (`actor.Actor.CredentialInactive`); such a token counts against the client IP
+  in the rate limiter, never against its principal's buckets. The authz guard of `token.create` refuses a personal token for another person
+  (`not_self`); `CredentialSource` reports the token facts. New configuration keys
+  `auth.api_token_max_ttl`, `auth.personal_token_max_ttl` and `auth.dpop_required_for` with the
+  cross-check `dpop_required_for`; the gitleaks test builds a runtime token and recomputes the Go
+  checksum vectors.
 - Step-up with the device key (M1-35): the migration `00012_identity_step_up.sql`
   (`auth_challenges` with every purpose of 03), the port `identity.StepUp` with
   `CreateChallenge` and `CompleteWithDeviceKey`, and the operations `createStepUpChallenge` and

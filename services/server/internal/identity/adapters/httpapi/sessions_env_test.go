@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -54,6 +55,7 @@ var sessCfg = app.Config{
 	StepUpMaxAge: 5 * time.Minute, AccessTokenTTL: 10 * time.Minute, RefreshTokenTTL: 14 * 24 * time.Hour,
 	SessionMaxAge: 30 * 24 * time.Hour, RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute,
 	StepUpChallengeTTL: 2 * time.Minute, StepUpFailLimit: 3, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
+	APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
 }
 
 // testPepper is the token pepper of the session world (generated per test run, never a secret).
@@ -80,6 +82,18 @@ type sworld struct {
 	structure *fake.Structure
 	// dir is the signing key directory of the installation.
 	dir string
+	// personal is the switch tokens.personal_enabled of the world (M1-44), off at the start.
+	personal *personalSwitch
+	// seq numbers the handles of the token cases (M1-44).
+	seq atomic.Int64
+}
+
+// personalSwitch is a fake PersonalTokenSwitch whose value a test sets (brief M1-44 "Tests").
+type personalSwitch struct{ on atomic.Bool }
+
+// PersonalTokensEnabled implements app.PersonalTokenSwitch.
+func (s *personalSwitch) PersonalTokensEnabled(context.Context, ids.ID) (bool, error) {
+	return s.on.Load(), nil
 }
 
 // newSessionWorld builds a world on a new database.
@@ -108,7 +122,8 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	capture := &httpservertest.LogCapture{}
 	log := slog.New(capture)
 	ended := &[]identity.SessionEnded{}
-	w := &sworld{t: t, db: db, pool: pool, owner: db.Pool(t, pg.RoleOwner), clk: clk, logs: capture, ended: ended, instID: instID, dir: dir}
+	w := &sworld{t: t, db: db, pool: pool, owner: db.Pool(t, pg.RoleOwner), clk: clk, logs: capture, ended: ended, instID: instID, dir: dir,
+		personal: &personalSwitch{}}
 	repo := postgres.NewRepository(pool)
 	principals := app.NewPrincipalSource(repo)
 	structure, policies := fake.NewStructure(), fake.NewPolicies()
@@ -159,7 +174,7 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	}
 	az, err := authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: sessCfg.StepUpMaxAge}, authzapp.AuthorizerDeps{
 		Catalog: authzapp.NewCatalog(log), Store: authzpg.NewRepository(pool), Principals: principals,
-		Credentials: app.NewCredentialSource(repo, repo), Structure: structure, Policies: policies,
+		Credentials: app.NewCredentialSource(repo, repo, repo), Structure: structure, Policies: policies,
 		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Recorder: w.rec, Clock: clk, Log: log,
 	})
 	if err != nil {
@@ -180,7 +195,7 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	if err := keys.Keys.EnsureActive(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	w.id, err = wire.NewIdentity(sessCfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender}, testPepper, clk, log)
+	w.id, err = wire.NewIdentity(sessCfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender, PersonalTokens: w.personal}, testPepper, clk, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,7 +203,8 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 		t.Fatal(err)
 	}
 	built, err := routes.Build(wire.Handlers{Sessions: w.id.SessionHandlers, StepUps: w.id.StepUpHandlers, Devices: w.id.Handlers, People: w.id.PeopleHandlers,
-		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers},
+		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers,
+		Tokens: w.id.TokenHandlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)

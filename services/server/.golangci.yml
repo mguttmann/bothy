@@ -166,6 +166,10 @@ linters:
       - path: ^internal/identity/adapters/postgres/sqlcgen/refresh\.sql\.go$
         linters: [gosec]
         text: "G101:"
+      # The same for api_tokens (M1-44): the lookup binds token_hash, never the token itself.
+      - path: ^internal/identity/adapters/postgres/sqlcgen/apitokens\.sql\.go$
+        linters: [gosec]
+        text: "G101:"
       # oapi-codegen writes capitalized error strings ("Header parameter ... is required"); only
       # this check of staticcheck is left out of its output (docs/DECISIONS.md M1-17/27).
       - path: ^api/(rest|routes/internal/fixture/rest)/rest\.gen\.go$

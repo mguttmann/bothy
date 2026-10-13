@@ -85,6 +85,9 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"auth.dpop_proof_max_age":            {Kind: config.KindDuration, Default: "60s", Min: "1s", Chapter: "08-identitaet.md"},
 		"auth.clock_leeway":                  {Kind: config.KindDuration, Default: "30s", Min: "0s", Chapter: "08-identitaet.md"},
 		"auth.token_pepper_ref":              {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/token_pepper", Chapter: "08-identitaet.md"},
+		"auth.dpop_required_for":             {Kind: config.KindStringList, Default: `["agent"]`, Chapter: "08-identitaet.md"},
+		"auth.api_token_max_ttl":             {Kind: config.KindDuration, Default: "365d", Min: "1s", Chapter: "08-identitaet.md"},
+		"auth.personal_token_max_ttl":        {Kind: config.KindDuration, Default: "90d", Min: "1s", Chapter: "08-identitaet.md"},
 		"api.page_size_default":              {Kind: config.KindInt, Default: "50", Min: "1", Chapter: "06-api.md"},
 		"api.page_size_max":                  {Kind: config.KindInt, Default: "200", Min: "1", Chapter: "06-api.md"},
 		"authz.snapshot_cache_max_entries":   {Kind: config.KindInt, Default: "10000", Min: "1", Chapter: "07-rechte.md"},
@@ -676,6 +679,28 @@ func TestRateLimitConfig_InvalidValuesStopTheStart(t *testing.T) {
 	} {
 		if problems := load(t, env); len(problems) == 0 {
 			t.Errorf("%s loaded", env)
+		}
+	}
+}
+
+// TestConfigCheckDPoPRequiredFor: auth.dpop_required_for takes only agent, app and personal
+// (cross-check dpop_required_for, M1-44); the problem names the key, never the value.
+func TestConfigCheckDPoPRequiredFor(t *testing.T) {
+	t.Parallel()
+	for _, ok := range []string{"agent", "agent,app,personal", "", "personal"} {
+		if problems := load(t, "BOTHY_AUTH__DPOP_REQUIRED_FOR="+ok); problems != nil {
+			t.Errorf("auth.dpop_required_for %q: %v", ok, problems)
+		}
+	}
+	for _, bad := range []string{"agents", "agent,people", "AGENT"} {
+		got := load(t, "BOTHY_AUTH__DPOP_REQUIRED_FOR="+bad)
+		if len(got) == 0 {
+			t.Errorf("auth.dpop_required_for %q passed", bad)
+			continue
+		}
+		msg := got[0].String()
+		if !strings.Contains(msg, "auth.dpop_required_for") || strings.Contains(msg, bad) {
+			t.Errorf("the problem must name the key and not the value %q: %q", bad, msg)
 		}
 	}
 }

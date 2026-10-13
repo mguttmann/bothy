@@ -184,6 +184,13 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 	if err := a.grantFacts(spec.ID, r, res, &in); err != nil {
 		return domain.Input{}, err
 	}
+	if spec.ID == string(authorize.ActionTokenCreate) {
+		pf, found, err := a.principal.Principal(ctx, r.ID)
+		if err != nil {
+			return domain.Input{}, sourceError("principal source", err)
+		}
+		in.Token = &domain.TokenFacts{HolderFound: found, HolderKind: string(pf.Kind)}
+	}
 	if spec.ID == string(authorize.ActionAgentInvoke) && r.Invoke != nil {
 		var err error
 		if in.Invoke, err = a.invokeFacts(ctx, s, r.Invoke, res, t); err != nil {

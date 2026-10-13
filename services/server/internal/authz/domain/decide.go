@@ -164,6 +164,14 @@ type GrantFacts struct {
 	Shape GrantShape
 }
 
+// TokenFacts are the facts of the token.create guard (brief M1-44): the kind of the principal that
+// would hold the new token.
+type TokenFacts struct {
+	// HolderFound reports a known principal; HolderKind is its kind (user, agent or app).
+	HolderFound bool
+	HolderKind  string
+}
+
 // Input is everything Decide needs; the application layer gathers it.
 type Input struct {
 	// Action is the action id, Spec its catalogue entry and Req its requirement.
@@ -191,6 +199,7 @@ type Input struct {
 	Target                                                     *TargetFacts
 	Grant                                                      *GrantFacts
 	Invoke                                                     *InvokeFacts
+	Token                                                      *TokenFacts
 }
 
 // Decide decides one call from the facts of in, steps 5 to 9 of 07 section 4.2 in the order of the
@@ -243,6 +252,7 @@ func decideRequirement(in *Input) (Decision, bool, error) {
 		return Decision{}, true, err
 	}
 	if !ok {
+		reason = notSelfForPersonalToken(in, reason)
 		if in.Principal.ActingFor {
 			if base, _, _ := evaluate(in, in.Req, in.BaseEff, false); base {
 				reason = ReasonActingForInsufficient

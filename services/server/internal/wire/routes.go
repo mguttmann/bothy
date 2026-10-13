@@ -60,6 +60,8 @@ type Handlers struct {
 	// Credentials implements getMyCredentials, getUserCredentials and unlinkIdentity (identity,
 	// M1-36).
 	*identityhttp.Credentials
+	// Tokens implements listTokens, createToken and revokeToken (identity, M1-44).
+	*identityhttp.Tokens
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

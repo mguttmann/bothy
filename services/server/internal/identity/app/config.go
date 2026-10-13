@@ -54,4 +54,13 @@ type Config struct {
 	LoginFailWindow time.Duration `config:"auth.login_fail_window"`
 	// CleanupInterval is auth.cleanup_interval, the period of the job identity.auth_cleanup.
 	CleanupInterval time.Duration `config:"auth.cleanup_interval"`
+	// APITokenMaxTTL is auth.api_token_max_ttl, the longest lifetime of an agent or app token
+	// (M1-44, 08 section 12).
+	APITokenMaxTTL time.Duration `config:"auth.api_token_max_ttl"`
+	// PersonalTokenMaxTTL is auth.personal_token_max_ttl, the longest lifetime of a personal
+	// token.
+	PersonalTokenMaxTTL time.Duration `config:"auth.personal_token_max_ttl"`
+	// DPoPRequiredFor is auth.dpop_required_for: the token kinds (agent, app, personal) whose
+	// tokens must be DPoP-bound.
+	DPoPRequiredFor []string `config:"auth.dpop_required_for"`
 }
