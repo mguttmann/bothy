@@ -386,9 +386,9 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 | `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server |  | `5m` | Validity of a pairing code | planned (M1) |
 | `auth.pairing_code_chars` | `BOTHY_AUTH__PAIRING_CODE_CHARS` | Server |  | `8` | Length of the pairing code (Crockford Base32, 40 bits) | planned (M1) |
 | `auth.device_inactive_revoke_after` | `BOTHY_AUTH__DEVICE_INACTIVE_REVOKE_AFTER` | Server |  | `180d` | a device without contact is revoked | planned (M1) |
-| `auth.cleanup_interval` | `BOTHY_AUTH__CLEANUP_INTERVAL` | Server |  | `1h` | Interval of the job `identity.auth_cleanup` (delete expired challenges, login flows and pairings, revoke pending and unused devices) | planned (M1) |
-| `auth.step_up_challenge_ttl` | `BOTHY_AUTH__STEP_UP_CHALLENGE_TTL` | Server |  | `2m` | Validity of a step-up challenge | planned (M1) |
-| `auth.step_up_fail_limit` | `BOTHY_AUTH__STEP_UP_FAIL_LIMIT` | Server |  | `5` | Failed step-up attempts per window | planned (M1) |
+| `auth.cleanup_interval` | `BOTHY_AUTH__CLEANUP_INTERVAL` | Server | duration | `1h` | Interval of the job `identity.auth_cleanup` (delete expired challenges, login flows and pairings, revoke pending and unused devices) | active |
+| `auth.step_up_challenge_ttl` | `BOTHY_AUTH__STEP_UP_CHALLENGE_TTL` | Server | duration | `2m` | Validity of a step-up challenge | active |
+| `auth.step_up_fail_limit` | `BOTHY_AUTH__STEP_UP_FAIL_LIMIT` | Server | int | `5` | Failed step-up attempts per window | active |
 | `auth.require_key_attestation` | `BOTHY_AUTH__REQUIRE_KEY_ATTESTATION` | Server |  | `false` | Require platform attestation of the device keys | planned (V3) |
 | `auth.console_session_max_age` | `BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE` | Server |  | `12h` | absolute duration of a console session | planned (M6) |
 | `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server |  | `30m` | idle time until the console session ends | planned (M6) |
@@ -401,7 +401,7 @@ Source: [08-identity.md](../spec/08-identity.md), section 18.
 | `auth.argon2id_iterations` | `BOTHY_AUTH__ARGON2ID_ITERATIONS` | Server |  | `3` | Argon2id iterations (lower bound 2) | planned (M1) |
 | `auth.argon2id_parallelism` | `BOTHY_AUTH__ARGON2ID_PARALLELISM` | Server |  | `1` | Argon2id parallelism | planned (M1) |
 | `auth.login_fail_limit` | `BOTHY_AUTH__LOGIN_FAIL_LIMIT` | Server |  | `10` | Failed attempts per account and window | planned (M1) |
-| `auth.login_fail_window` | `BOTHY_AUTH__LOGIN_FAIL_WINDOW` | Server |  | `15m` | Window for failed attempts | planned (M1) |
+| `auth.login_fail_window` | `BOTHY_AUTH__LOGIN_FAIL_WINDOW` | Server | duration | `15m` | Window for failed attempts | active |
 | `auth.login_lock_duration` | `BOTHY_AUTH__LOGIN_LOCK_DURATION` | Server |  | `15m` | Lockout of the password path | planned (M1) |
 | `auth.dpop_required_for` | `BOTHY_AUTH__DPOP_REQUIRED_FOR` | Server |  | `["agent"]` | Token kinds that must be DPoP-bound | planned (M1) |
 | `auth.api_token_max_ttl` | `BOTHY_AUTH__API_TOKEN_MAX_TTL` | Server |  | `365d` | Maximum duration of an agent or app token | planned (M1) |
