@@ -1,0 +1,238 @@
+# Test contract of package httpserver and its harness httpservertest: the features of
+# docs/api/openapi.yaml the request validator must handle (TestValidator_Probe_*), and the
+# operations the harness mounts in tests.
+openapi: 3.1.0
+info:
+  title: Probe API
+  version: 0.0.1
+servers:
+- url: /api/v1
+paths:
+  /things/{thing_id}:
+    parameters:
+    - name: thing_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      operationId: getThing
+      parameters:
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+      - name: X-Mode
+        in: header
+        required: true
+        schema:
+          type: string
+          enum: [fast, slow]
+      responses:
+        '200':
+          description: ok
+    patch:
+      operationId: updateThing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThingUpdate'
+      responses:
+        '200':
+          description: ok
+  /things:
+    post:
+      operationId: createThing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThingCreate'
+      responses:
+        '201':
+          description: created
+  /shapes:
+    post:
+      operationId: createShape
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Shape'
+      responses:
+        '201':
+          description: created
+  /composed:
+    post:
+      operationId: createComposed
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Composed'
+      responses:
+        '201':
+          description: created
+  /blobs:
+    post:
+      operationId: uploadBlob
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: created
+  /hooks/{hook_id}/{token}:
+    post:
+      operationId: postHook
+      parameters:
+      - name: hook_id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - name: token
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JsonObject'
+      responses:
+        '204':
+          description: ok
+  /discovery:
+    get:
+      operationId: getDiscovery
+      security: []
+      responses:
+        '200':
+          description: ok
+  /avatars:
+    post:
+      operationId: uploadAvatar
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '204':
+          description: ok
+components:
+  schemas:
+    JsonObject:
+      type: object
+      additionalProperties: true
+    Uuid:
+      type: string
+      format: uuid
+    Color:
+      type: string
+      enum: [red, green]
+    ThingCreate:
+      type: object
+      additionalProperties: false
+      required: [name, color]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 8
+          pattern: '^[a-z]+$'
+        color:
+          $ref: '#/components/schemas/Color'
+        owner_id:
+          $ref: '#/components/schemas/Uuid'
+        size:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 10
+        tags:
+          type: array
+          minItems: 1
+          maxItems: 2
+          items:
+            type: string
+        nested:
+          type: object
+          additionalProperties: false
+          properties:
+            flag:
+              type: boolean
+        extra:
+          $ref: '#/components/schemas/JsonObject'
+    ThingUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 2
+    Circle:
+      type: object
+      additionalProperties: false
+      required: [kind, radius]
+      properties:
+        kind:
+          type: string
+          enum: [circle]
+        radius:
+          type: integer
+    Square:
+      type: object
+      additionalProperties: false
+      required: [kind, side]
+      properties:
+        kind:
+          type: string
+          enum: [square]
+        side:
+          type: integer
+    Shape:
+      oneOf:
+      - $ref: '#/components/schemas/Circle'
+      - $ref: '#/components/schemas/Square'
+      discriminator:
+        propertyName: kind
+        mapping:
+          circle: '#/components/schemas/Circle'
+          square: '#/components/schemas/Square'
+    Base:
+      type: object
+      required: [id]
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+    Composed:
+      allOf:
+      - $ref: '#/components/schemas/Base'
+      - type: object
+        required: [label]
+        properties:
+          label:
+            type: string
+      unevaluatedProperties: false

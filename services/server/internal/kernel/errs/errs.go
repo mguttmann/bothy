@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
 	"slices"
 	"strconv"
 	"time"
@@ -169,6 +170,10 @@ type Error struct {
 	Current any
 	// RetryAfter becomes the Retry-After header when positive.
 	RetryAfter time.Duration
+	// Headers are response headers the contract asks for with this error (WWW-Authenticate,
+	// DPoP-Nonce, Allow); the problem writer of platform/httpserver applies them. Never part of the
+	// body. Set them with WithHeader.
+	Headers http.Header `json:"-"`
 
 	err error
 }
@@ -231,6 +236,36 @@ func (e *Error) WithCurrent(current any) *Error {
 func (e *Error) WithRetryAfter(d time.Duration) *Error {
 	e.RetryAfter = d
 	return e
+}
+
+// WithHeader adds the response header name with value (canonicalised like http.Header.Add) and
+// returns the receiver for chaining. Use it for headers the contract ties to an error:
+// WWW-Authenticate and DPoP-Nonce with 401, Allow with 405. Retry-After has its own field.
+//
+// Example:
+//
+//	err := errs.New(errs.CodeUseDPoPNonce, "").
+//		WithHeader("WWW-Authenticate", `DPoP error="use_dpop_nonce"`).
+//		WithHeader("DPoP-Nonce", nonce)
+func (e *Error) WithHeader(name, value string) *Error {
+	if e.Headers == nil {
+		e.Headers = http.Header{}
+	}
+	e.Headers.Add(name, value)
+	return e
+}
+
+// VersionConflict returns 412 version_conflict with current as the current representation (or at
+// least its id and version) of the resource (06 "Concurrency" item 2). current must encode to
+// a JSON object; nil leaves the member out.
+func VersionConflict(current any) *Error {
+	return New(CodeVersionConflict, "").WithCurrent(current)
+}
+
+// PreconditionRequired returns 428 precondition_required for an operation that requires If-Match
+// and got none, or got the wildcard "*" (06 "Concurrency" item 2, docs/DECISIONS.md M1-18).
+func PreconditionRequired() *Error {
+	return New(CodePreconditionRequired, "")
 }
 
 // Kind returns the kind of the code. It never returns KindNone, because a non-nil error must

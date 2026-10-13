@@ -963,7 +963,7 @@ Column "Place": Server = configuration reference of the server; Installation scr
 | `server.role` | Server | `all` | `api`, `worker` or `all` |
 | `server.listen_addr` | Server | `127.0.0.1:8080` | public listener (REST, gateway) |
 | `server.internal_listen_addr` | Server | `127.0.0.1:8081` | health, readiness, incoming webhooks from the stack |
-| `server.public_url` | Server | none, required | Origin under which apps reach the server (scheme, host, optional port; without path, query and fragment, otherwise `bothy config check` fails); basis of `aud`, DPoP `htu` and WebAuthn ([08-identity.md](08-identity.md), sections 7.2 and 7.3) |
+| `server.public_url` | Server | no default, required | Origin under which apps reach the server (scheme, lower-case host, optional port other than the default of the scheme, as browsers send an origin; without path, query and fragment, otherwise `bothy config check` fails); basis of `aud`, DPoP `htu` and WebAuthn ([08-identity.md](08-identity.md), sections 7.2 and 7.3) |
 | `server.trusted_proxies` | Server | `127.0.0.1/32, ::1/128` | peers whose forwarding and identity headers are honored and that may send plain text ([19-security.md](19-security.md), SEC-TLS-1) |
 | `server.maintenance_mode` | Server | `off` | `off` or `read_only` (relocation, upgrade; [ADR 0065](../adr/0065-maintenance-mode-read-only.md)) |
 | `secrets.dir` | Server | `/run/bothy/secrets` | base of the default references `file:`; an absolute path in clean form (no `.` or `..`, no double or trailing `/`), not `/`, without a NUL character and without `<`, otherwise `bothy config check` fails |

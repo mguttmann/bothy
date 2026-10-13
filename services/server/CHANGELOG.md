@@ -151,7 +151,7 @@ documented in this file. The format is based on
   check `database`.
 - `internal/platform/httpserver` (listener part): `Listen`, `NewServer` with
   `http.read_header_timeout`, `http.idle_timeout`, `http.max_header_bytes` and the server error
-  log without client addresses, the internal mux and the empty `404` of the public listener.
+  log without client addresses and the internal mux.
 - `bothy healthcheck --url URL [--timeout DURATION]`: probe of a loopback health endpoint over the
   loopback client of `platform/egress`, for images without shell; refuses other hosts and
   schemes with exit code 2.
@@ -217,6 +217,40 @@ documented in this file. The format is based on
   `instance.Counters`.
 - `pg.SchemaVersion`, `pgtest.WithSteps`, and the log attributes `bothy.version.own` and
   `bothy.version.required`.
+- HTTP chain of the public listener (`internal/platform/httpserver`, M1-18): recover, server span
+  and correlation ID, base headers and client IP, routing with `404` and `405` as problems, then
+  per route the stages `route` (operation, body limit, deadline, response writer), `cors`,
+  `authenticate`, the slots `rate_limit`, `maintenance` and `idempotency` for later tickets,
+  `body` (media type, JSON guard), `preconditions`, `validate` and `proof`.
+- Every error leaves as `application/problem+json` (RFC 9457) through `httpserver.WriteProblem`
+  with type, title, status, code, `correlation_id`, `instance` (secret path segments as
+  `{token}`), and `detail`, `errors[]`, `current`, `reason`, `hint` where set; `503 unavailable`
+  always carries `Retry-After`. `kernel/errs` gets titles from the contract, response headers on
+  errors (`WithHeader`), `VersionConflict` and `PreconditionRequired`.
+- Proof of the authorize check: a success without a check of the route's action becomes
+  `500 internal_error` and counts in `bothy.authz.errors` (`authz_not_checked`); `kernel/authorize`
+  gets the check log (`WithCheckLog`, `RecordCheck`, `Checks`).
+- No JSON `null` and no integer beyond the JSON safe-integer limit leaves the server: the response writer removes
+  null members (logged) and replaces null elements and unsafe integers by `500`.
+- Request checks: JSON guard (duplicate members, invalid UTF-8, nesting above
+  `http.max_json_depth` give `400 malformed_request`), body limits before reading
+  (`http.max_json_body_bytes`, `file.max_upload_bytes`, `413 payload_too_large`), media type
+  (`415`), required `If-Match` (`428`, also for `*`), and schema validation against the embedded
+  contract with libopenapi-validator (`400 validation_failed` with `errors[]`, unknown members
+  refused).
+- `kernel/actor` (Actor, Credentials, Authenticator, `AnonymousOnly`), `kernel/reqmeta`
+  (correlation ID and client IP), client IP from `server.trusted_proxies` (`Forwarded` before
+  `X-Forwarded-For`, right to left, fail closed), CORS per SEC-CORS-1 and SEC-CORS-2 with
+  preflight routes for `api.cors_allowed_origins`, `FormatETag` and `ParseIfMatch`, and the cursor
+  codec `EncodeCursor` and `DecodeCursor` (`400 cursor_invalid`).
+- Test harness `internal/platform/httpserver/httpservertest` for the chain, with recorded checks,
+  a manual metric reader, a log capture and span recording.
+- Configuration keys `http.max_json_depth`, `http.request_timeout`, `http.transfer_timeout`,
+  `http.unavailable_retry_after`, `file.max_upload_bytes`, `api.cors_allowed_origins`,
+  `server.trusted_proxies` and the required `server.public_url`, with the cross-checks
+  `public_url_origin` and `cors_origins`.
+- Route generator: `api/rest/openapi.gen.yaml`, a byte-identical copy of the contract that
+  `api/rest.Spec` embeds, and the check that every request schema is closed (W7).
 
 ### Changed
 
@@ -225,6 +259,11 @@ documented in this file. The format is based on
   `wire.MigrateUpSteps`, which `bothy migrate up` calls.
 - `golang.org/x/tools` is a direct dependency at v0.50.0 (tests only: `go/packages` for the
   static check; v0.49.0 cannot read the export data of Go 1.27, ruling M1-15/6).
+- The public listener answers unmatched requests with a `404 not_found` problem instead of an
+  empty `404`; `httpserver.Public` is replaced by `Chain.Public`.
+- `wire.MountRoutes` takes the HTTP chain and mounts every route through it; `bothy serve` builds
+  the chain with `actor.AnonymousOnly` until identity is wired, so every credential is refused.
+- Every command that loads the server configuration needs `server.public_url`.
 - Go coverage of the module leaves generated files (`*.gen.go`) out of the total.
 
 ### Security

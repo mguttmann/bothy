@@ -29,7 +29,7 @@ func TestWireJobArgsOnlyIDs(t *testing.T) {
 
 func TestJobsConfigBindsDefaults(t *testing.T) {
 	t.Parallel()
-	v, err := config.Load(schema(t), config.Sources{Env: []string{"BOTHY_JOBS__QUEUE__FILES__MAX_WORKERS=5"}})
+	v, err := config.Load(schema(t), config.Sources{Env: []string{testPublicURL, "BOTHY_JOBS__QUEUE__FILES__MAX_WORKERS=5"}})
 	if err != nil {
 		t.Fatal(err)
 	}

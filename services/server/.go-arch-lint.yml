@@ -12,6 +12,8 @@ vendors:
     in: [filippo.io/age, filippo.io/age/**]
   v-goose:
     in: [github.com/pressly/goose/v3, github.com/pressly/goose/v3/**]
+  v-libopenapi:
+    in: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator, github.com/pb33f/libopenapi-validator/**]
   v-mobyapi:
     in: [github.com/moby/moby/api/types/container, github.com/moby/moby/api/types/network]
   v-oapi:
@@ -244,6 +246,7 @@ deps:
     mayDependOn: [platform-health, kernel-ports]
   platform-httpserver:
     mayDependOn: [platform-httpserver, kernel-ports, platform-health, platform-otel]
+    canUse: [v-otel, v-libopenapi]
   platform-jobs:
     mayDependOn: [platform-jobs, kernel-ports, platform-pg, platform-otel]
     canUse: [v-river, v-pgx, v-otel]

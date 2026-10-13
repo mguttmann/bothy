@@ -38,6 +38,9 @@ OTHER = {
     "**/*.g.dart",
     "**/*.freezed.dart",
     "**/testdata/**",
+    # The embedded copy of the API document (api/rest/openapi.gen.yaml), written by the route
+    # generator; docs/api/openapi.yaml is its source.
+    "**/*.gen.yaml",
 }
 # Files whose path looks like generated code. Each one that a lint rule exempts must be one that
 # sonar.exclusions leaves out too: dropping an entry there must narrow the rule.

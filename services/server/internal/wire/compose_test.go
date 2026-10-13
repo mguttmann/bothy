@@ -34,7 +34,7 @@ func TestComposeStopGraceAboveTotal(t *testing.T) {
 	if err := yaml.Unmarshal(raw, &doc); err != nil {
 		t.Fatal(err)
 	}
-	v, err := config.Load(schema(t), config.Sources{})
+	v, err := config.Load(schema(t), config.Sources{Env: testEnv()})
 	if err != nil {
 		t.Fatal(err)
 	}

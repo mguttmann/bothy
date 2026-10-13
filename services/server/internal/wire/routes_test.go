@@ -16,7 +16,33 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/routes"
 	"github.com/OWNER/bothy/services/server/api/routes/routestest"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
+
+// fixtureBuild builds the generator's fixture surface with the stub and the given handlers.
+func fixtureBuild(opts routes.Options, cat routes.Catalog) ([]routes.Route, error) {
+	return routestest.BuildWith(routestest.Stub{}, opts, cat)
+}
+
+// testChain is an HTTP chain over the fixture contract.
+func testChain(t *testing.T) *httpserver.Chain {
+	t.Helper()
+	var ids []string
+	for _, op := range routestest.Operations() {
+		ids = append(ids, op.ID)
+	}
+	v, err := httpserver.NewValidator(routestest.Spec(), ids)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := httpserver.NewChain(httpserver.DefaultChainConfig("https://chat.example.com"),
+		httpserver.Deps{Authenticator: actor.AnonymousOnly{}, Validator: v, Logger: slog.New(&captureHandler{})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
 
 // recordingMux records every mounted pattern; it stands for the public mux of the server.
 type recordingMux struct {
@@ -77,7 +103,7 @@ func (c withoutAction) Class(action string) (string, bool) {
 func TestAZP1_RoutesMatchEnableList(t *testing.T) {
 	for _, role := range []Role{RoleAPI, RoleAll} {
 		mux := &recordingMux{}
-		if err := MountRoutes(role, mux, Handlers{}, routes.SpecCatalog(), slog.New(&captureHandler{})); err != nil {
+		if err := MountRoutes(role, mux, Handlers{}, routes.SpecCatalog(), testChain(t), slog.New(&captureHandler{})); err != nil {
 			t.Fatalf("role %s: %v", role, err)
 		}
 		if got, want := len(mux.patterns), len(routes.Enabled()); got != want {
@@ -87,7 +113,7 @@ func TestAZP1_RoutesMatchEnableList(t *testing.T) {
 	}
 
 	mux := &recordingMux{}
-	if err := mountRoutes(RoleAPI, mux, routestest.Build, routestest.Catalog(), slog.New(&captureHandler{})); err != nil {
+	if err := mountRoutes(RoleAPI, mux, fixtureBuild, routestest.Catalog(), testChain(t), slog.New(&captureHandler{})); err != nil {
 		t.Fatalf("fixture: %v", err)
 	}
 	var want []string
@@ -135,7 +161,7 @@ func TestServe_AbortsOnUnknownAction(t *testing.T) {
 	logs := &captureHandler{}
 	cat := withoutAction{base: routestest.Catalog(), missing: "thing.update"}
 
-	err := mountRoutes(RoleAll, mux, routestest.Build, cat, slog.New(logs))
+	err := mountRoutes(RoleAll, mux, fixtureBuild, cat, testChain(t), slog.New(logs))
 
 	if err == nil {
 		t.Fatal("the start step accepted a route with an unknown action")
@@ -163,11 +189,11 @@ func TestServe_AbortsOnUnknownAction(t *testing.T) {
 func TestMountRoutes_WorkerMountsNothing(t *testing.T) {
 	mux := &recordingMux{}
 	called := false
-	build := func(routes.Catalog) ([]routes.Route, error) {
+	build := func(routes.Options, routes.Catalog) ([]routes.Route, error) {
 		called = true
 		return nil, errors.New("must not run")
 	}
-	if err := mountRoutes(RoleWorker, mux, build, nil, slog.New(&captureHandler{})); err != nil {
+	if err := mountRoutes(RoleWorker, mux, build, nil, testChain(t), slog.New(&captureHandler{})); err != nil {
 		t.Fatalf("worker: %v", err)
 	}
 	if called || len(mux.patterns) != 0 {
@@ -177,7 +203,7 @@ func TestMountRoutes_WorkerMountsNothing(t *testing.T) {
 
 func TestMountRoutes_UnknownRole(t *testing.T) {
 	mux := &recordingMux{}
-	err := MountRoutes(Role("both"), mux, Handlers{}, routes.SpecCatalog(), slog.New(&captureHandler{}))
+	err := MountRoutes(Role("both"), mux, Handlers{}, routes.SpecCatalog(), testChain(t), slog.New(&captureHandler{}))
 	if err == nil || !strings.Contains(err.Error(), `"both"`) {
 		t.Fatalf("error = %v, want one naming the role", err)
 	}
@@ -191,7 +217,7 @@ func TestMountRoutes_UnknownRole(t *testing.T) {
 // mounting.
 func TestMountRoutes_ConflictingPatterns(t *testing.T) {
 	ok := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
-	build := func(routes.Catalog) ([]routes.Route, error) {
+	build := func(routes.Options, routes.Catalog) ([]routes.Route, error) {
 		return []routes.Route{
 			{Operation: routes.Operation{ID: "getA", Pattern: "GET /api/v1/x/{a}"}, Handler: ok},
 			{Operation: routes.Operation{ID: "getB", Pattern: "GET /api/v1/x/{b}"}, Handler: ok},
@@ -199,7 +225,7 @@ func TestMountRoutes_ConflictingPatterns(t *testing.T) {
 	}
 	mux := &recordingMux{}
 	logs := &captureHandler{}
-	err := mountRoutes(RoleAPI, mux, build, routes.SpecCatalog(), slog.New(logs))
+	err := mountRoutes(RoleAPI, mux, build, routes.SpecCatalog(), testChain(t), slog.New(logs))
 	if err == nil || !strings.Contains(err.Error(), "getB") {
 		t.Fatalf("error = %v, want one naming the conflicting operation", err)
 	}
@@ -209,7 +235,7 @@ func TestMountRoutes_ConflictingPatterns(t *testing.T) {
 }
 
 func TestMountRoutes_NilLoggerUsesDefault(t *testing.T) {
-	if err := MountRoutes(RoleAPI, &recordingMux{}, Handlers{}, routes.SpecCatalog(), nil); err != nil {
+	if err := MountRoutes(RoleAPI, &recordingMux{}, Handlers{}, routes.SpecCatalog(), testChain(t), nil); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -218,7 +244,7 @@ func TestMountRoutes_NilLoggerUsesDefault(t *testing.T) {
 // without one, Build refuses even an empty table.
 func TestMountRoutes_ForwardsTheCatalogue(t *testing.T) {
 	mux := &recordingMux{}
-	err := MountRoutes(RoleAPI, mux, Handlers{}, nil, slog.New(&captureHandler{}))
+	err := MountRoutes(RoleAPI, mux, Handlers{}, nil, testChain(t), slog.New(&captureHandler{}))
 	if err == nil || !strings.Contains(err.Error(), "catalogue") {
 		t.Fatalf("error = %v, want the missing catalogue reported by Build", err)
 	}
@@ -274,7 +300,7 @@ func TestMountRoutes_ConflictWithPatternOnMux(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.Handle("GET /api/v1/things/{id}", http.NotFoundHandler())
 	logs := &captureHandler{}
-	err := mountRoutes(RoleAPI, mux, routestest.Build, routestest.Catalog(), slog.New(logs))
+	err := mountRoutes(RoleAPI, mux, fixtureBuild, routestest.Catalog(), testChain(t), slog.New(logs))
 	if err == nil || !strings.Contains(err.Error(), "getThing") {
 		t.Fatalf("error = %v, want one naming getThing", err)
 	}

@@ -25,6 +25,9 @@ const ETag = `"7"`
 // Operations returns the enabled operations of the fixture, sorted by ID.
 func Operations() []routes.Operation { return fixture.Table().Enabled() }
 
+// Spec returns the fixture contract (OpenAPI 3.1) for the request validator of the HTTP chain.
+func Spec() []byte { return rest.Spec }
+
 // Catalog returns the action catalogue generated from the fixture's actions.yaml.
 func Catalog() routes.Catalog { return fixture.Table().Catalog() }
 
