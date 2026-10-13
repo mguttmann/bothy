@@ -225,7 +225,10 @@ commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the 
 	elif git rev-parse --verify -q origin/main >/dev/null; then base=origin/main; fi; \
 	range="$${COMMIT_RANGE:-$${base:+$$base..HEAD}}"; \
 	if [ -z "$$range" ]; then $(call skip,commitlint,no remote main yet; the commit-msg hook checks each commit); \
-	else $(UVRUN) python tools/hooks/commit_msg.py --range "$$range" --require-signoff; fi
+	else $(UVRUN) python tools/hooks/commit_msg.py --range "$$range" --require-signoff \
+	  $${PR_AUTHOR:+--pr-author "$$PR_AUTHOR"}; fi
+	@# CI sets PR_AUTHOR to the pull request author: a dependency bot's own commits need no
+	@# sign-off in its own pull request (D-DEPS-3).
 	@# The pull request title becomes the squash commit on main (CI sets PR_TITLE).
 	@if [ -n "$${PR_TITLE:-}" ]; then f=$$(mktemp); printf '%s\n' "$$PR_TITLE" > "$$f"; \
 	  rc=0; $(UVRUN) python tools/hooks/commit_msg.py "$$f" || rc=$$?; rm -f "$$f"; exit $$rc; fi

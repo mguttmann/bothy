@@ -48,7 +48,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       components: ${{ steps.plan.outputs.components }}
-      same_repo: ${{ steps.plan.outputs.same_repo }}
+      private_checks: ${{ steps.plan.outputs.private_checks }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -57,26 +57,31 @@ jobs:
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: false
+      # private_checks=false (fork pull request, or a dependency bot's run, which GitHub
+      # gives no secrets): generic deny rules instead of the private list, sonar skipped,
+      # with a notice on the run (tools/ci/pr_mode.py, D-DEPS-3).
       - id: plan
-        name: Select components from the changed paths
+        name: Select components and the checks that need secrets
         env:
           EVENT: ${{ github.event_name }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           REPO: ${{ github.repository }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          ACTOR: ${{ github.actor }}
           INPUT_COMPONENTS: ${{ inputs.components }}
         run: |
           if [ "$EVENT" = pull_request ]; then
             components=$(uv run --no-project --python 3.14 tools/ci/components.py changed --base "$BASE_SHA" --head "$HEAD_SHA")
-            if [ "$HEAD_REPO" = "$REPO" ]; then same_repo=true; else same_repo=false; fi
           else
             components="${INPUT_COMPONENTS:-all}"
-            same_repo=true
           fi
           echo "components=$components" >> "$GITHUB_OUTPUT"
-          echo "same_repo=$same_repo" >> "$GITHUB_OUTPUT"
-          echo "components: $components (same repository: $same_repo)"
+          echo "components: $components"
+          uv run --no-project --python 3.14 tools/ci/pr_mode.py --event "$EVENT" --repo "$REPO" \
+            --head-repo "$HEAD_REPO" --author "$AUTHOR" --actor "$ACTOR" \
+            --github-output "$GITHUB_OUTPUT" --summary "$GITHUB_STEP_SUMMARY"
 
   gates:
     name: gates
@@ -124,13 +129,15 @@ jobs:
           COMPONENTS: ${{ needs.plan.outputs.components }}
           COMMIT_RANGE: ${{ github.event_name == 'pull_request' && format('{0}..{1}', github.event.pull_request.base.sha, github.event.pull_request.head.sha) || '' }}
           PR_TITLE: ${{ github.event.pull_request.title }}
+          # A dependency bot's own commits need no sign-off in its pull request (D-DEPS-3).
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           GH_TOKEN: ${{ github.token }}
         run: make gates COMPONENTS="$COMPONENTS"
 
   denylist:
     name: denylist (private list)
     needs: plan
-    if: needs.plan.outputs.same_repo == 'true'
+    if: needs.plan.outputs.private_checks == 'true'
     environment: denylist
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -163,7 +170,7 @@ jobs:
   denylist-fork:
     name: denylist (generic rules, fork)
     needs: plan
-    if: needs.plan.outputs.same_repo != 'true'
+    if: needs.plan.outputs.private_checks != 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -185,7 +192,7 @@ jobs:
   sonar:
     name: sonar
     needs: plan
-    if: needs.plan.outputs.same_repo == 'true'
+    if: needs.plan.outputs.private_checks == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:

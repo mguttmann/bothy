@@ -198,6 +198,11 @@ operated, and the order of the build.
   `make docs` no longer checks the reference.
 - `docs/PLAN.md`: the W1 rows for trusted proxies and database timeouts and the acceptance test of
   M3-06 follow the chapters.
+- Pull requests of the dependency bots Dependabot and Renovate pass CI like fork pull
+  requests: a run the bot starts gets the generic deny rules and skips SonarQube with a
+  "Reduced checks" notice, because GitHub gives Dependabot runs no secrets, and the bot's own
+  commits in its own pull request need no DCO sign-off; Conventional Commits still apply, and a
+  maintainer's edit of the pull request runs every check (D-DEPS-3).
 
 ### Security
 

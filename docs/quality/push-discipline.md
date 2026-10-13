@@ -128,6 +128,45 @@ scans what actually reached `main`):
   `ci-ok` yet, so the older result stays the latest until the maintainer approves;
 - a message typed into the merge dialog instead of the pull request body.
 
+## Dependency bot pull requests
+
+Dependabot (`dependabot[bot]`) and Renovate (`renovate[bot]`) open pull requests from branches
+of this repository, but a run that Dependabot starts gets no repository secrets: GitHub treats
+it like a run from a fork
+(https://docs.github.com/en/code-security/dependabot/troubleshooting-dependabot/troubleshooting-dependabot-on-github-actions,
+retrieved 2026-10-13) [verified]. Bot commits also carry no DCO sign-off of their author.
+So that such a pull request passes for the right reasons, and only such a pull request
+(D-DEPS-3 in [DECISIONS](../DECISIONS.md#10-rulings-of-the-build-milestones)):
+
+- **Secret checks.** `tools/ci/pr_mode.py` (job `plan` of `ci.yml`) reduces the run when the
+  pull request author and the actor of the run are both one of the two bot logins, exactly as
+  GitHub reports them in the event. The run is then handled like a fork: the job
+  `denylist (generic rules, fork)` scans with the generic rules, `sonar` is skipped, and the
+  run shows the notice "Reduced checks" with the reason. A run that a person starts on the
+  same pull request (an edit of title or body, a push to the bot branch) gets the private list
+  and SonarQube with the secrets, and a missing secret fails it.
+- **Sign-off.** CI passes the pull request author to `make commitlint` (`PR_AUTHOR`). In a pull
+  request by one of the bots, a commit whose author e-mail is exactly that bot's noreply
+  address needs no `Signed-off-by` (`BOT_AUTHORS` in `tools/hooks/commit_msg.py`); the check
+  prints one line per exempt commit. The Conventional Commits rules still apply to these
+  commits and to the title. Every other commit, also a maintainer's commit on the bot
+  branch, still needs its sign-off; a bot address in a person's pull request or in a fork
+  exempts nothing, because only GitHub sets the pull request author. Locally `PR_AUTHOR` is
+  unset, so `make check` exempts nothing.
+- **Before the merge.** The maintainer replaces the bot's body with a short text of their own
+  (what changed and how it was verified) that ends with their `Signed-off-by` line, and
+  checks that the title is a Conventional Commit header. The squash commit on `main` takes
+  title and body, so it carries the maintainer's sign-off, and the edit starts a run with every
+  check, which `ci-ok` must pass before the merge. After the merge, `denylist-main.yml` scans
+  the pushed commit with the private list as for every push.
+
+What this does not cover: nothing enforces the maintainer's rewrite of the body; as with a
+fork pull request, a merge straight after a reduced run has not seen the private list or
+SonarQube before the merge, and only `denylist-main.yml` checks afterwards. Anyone with write
+access can push a commit with a forged bot author address to a bot branch, and that commit
+then needs no sign-off; the push is a run of a person, so it gets every other check, and the
+squash commit on `main` carries the maintainer's sign-off from the body.
+
 ## Deny-list hit on `main`
 
 `denylist-main.yml` checks every push to `main` with the private list (D-W-34). If it
