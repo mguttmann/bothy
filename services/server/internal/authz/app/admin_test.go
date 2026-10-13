@@ -290,9 +290,11 @@ func TestGroups(t *testing.T) {
 	if g.Name != name {
 		t.Fatalf("group %+v", g)
 	}
-	claim := ids.New()
+	claim, provider := ids.New(), ids.New()
+	// groups.provider_id references identity_providers since M1-36.
+	w.sql(t, `INSERT INTO identity_providers (id, kind, name, config) VALUES ($1, 'oidc', 'Company SSO', '{}')`, provider.String())
 	w.sql(t, `INSERT INTO groups (id, name, source, provider_id, external_ref, created_by, created_at) VALUES ($1, 'Claim', 'oidc_claim', $2, 'team', $3, $4)`,
-		claim.String(), ids.New().String(), w.owner.String(), pgStart)
+		claim.String(), provider.String(), w.owner.String(), pgStart)
 	other := "Renamed"
 	_, err = w.admin.UpdateGroup(ctx, owner, claim, authz.UpdateGroupCmd{Name: &other})
 	wantErr(t, err, errs.CodeConflict, "claim_managed_group")

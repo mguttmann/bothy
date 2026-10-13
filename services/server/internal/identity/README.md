@@ -1,6 +1,6 @@
 # Module `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); logins, step-up with a passkey and API tokens follow with the tickets of the milestone.
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); logins, step-up with a passkey and API tokens follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -247,9 +247,66 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   the binding to one session, pending device, no `step_up` key, no secrets in logs and audit,
   and the cleanup. Rulings: docs/DECISIONS.md M1-35.
 
+### Identity providers and identities (M1-36)
+
+- Port (`providers.go`): `Providers` (`List`, `Get` authorize `identity_provider.read`; `Create`,
+  `Update`, `Delete` authorize `identity_provider.manage`; `Enabled` and `ListForDiscovery`
+  authorize nothing, the login drivers and the discovery of M1-46 call them) and `Identities`
+  (`Resolve`, `Link`, `MarkLogin` authorize nothing and join the login's unit of work;
+  `Credentials` authorizes `identity.read`, `Unlink` `identity.unlink`) with `ProviderKind`,
+  `ExternalIdentity` (the fields of 08 section 2.1), `Provider`, `CreateProvider`,
+  `UpdateProvider` (pointer fields, PATCH), `ProviderInfo`, `Resolution` (`matched`,
+  `unmatched`), `Identity`, `Passkey` and `CredentialOverview`.
+- `domain/provider`: the kinds, `NewName` (trimmed, display text, at most
+  `principal.display_name_max_chars`) and the strict schemas `identity_provider.oidc.v1`,
+  `identity_provider.trusted_header.v1`, `identity_provider.local.v1` (08 section 2.6 with the
+  refinements of docs/DECISIONS.md M1-36/5): one JSON object, no duplicate key and no null at any
+  depth, no unknown member, field errors at `/config/...`, the normalized configuration as result.
+  Secret references are checked by the port `SecretRefs` (implemented by `wire.SecretRefSyntax`
+  with `platform/secrets.ParseRef`), never resolved.
+- `app`: `Providers` and `Identities` with the extension points `ProviderKindRules` (per kind,
+  `DefaultProviderRules`; M1-41 and M1-43 extend their kind) and `LoginMethodSource` (per
+  credential kind: the sources of identities and of active devices that are not `cli`; M1-39 and
+  M1-40 add theirs), the outgoing ports `ProviderStore` and `IdentityStore`.
+  Mapping: enabled provider, active row of `(provider_id, subject)`, for `oidc` the same issuer;
+  e-mail and display name are never read (R-ID-02, ID-T04). Unlink locks the person's active
+  identities in ascending id, counts the remaining methods of every source (zero: `409 conflict`,
+  reason `no_login_method_left`), sets `unlinked_at` and revokes the live sessions of the identity
+  through `Auth.RevokeSession` (`logout` by the person, `admin` by an owner). Disabling a provider
+  revokes the live sessions of all its identities (`admin`) in the same unit of work; `Enabled`
+  and `Resolve` take share locks inside a unit, so a concurrent login cannot slip past
+  (docs/DECISIONS.md M1-36/7).
+- Operations (`adapters/httpapi/providers.go`, `credentials.go`):
+
+  | Operation | Action and resource | Audit | Answer |
+  |---|---|---|---|
+  | `listIdentityProviders` | `identity_provider.read` on the instance (owner) | none | `200 IdentityProviderList` |
+  | `createIdentityProvider` | `identity_provider.manage` on the instance (owner, step-up, `Idempotency-Key`) | allow `{provider_kind}` | `201 IdentityProvider` |
+  | `getIdentityProvider` | `identity_provider.read` on the instance | none | `200 IdentityProvider` |
+  | `updateIdentityProvider` | `identity_provider.manage` | allow `{provider_kind, changed_fields, sessions_revoked}` | `200 IdentityProvider` |
+  | `deleteIdentityProvider` | `identity_provider.manage` | allow `{provider_kind}` | `204`, `409` while referenced |
+  | `getMyCredentials` | `identity.read` on the caller | none | `200 CredentialOverview` |
+  | `getUserCredentials` | `identity.read` on the person (self or owner, others `404`) | none | `200 CredentialOverview` |
+  | `unlinkIdentity` | `identity.unlink` on the person (self or owner, step-up) | allow `{identity_id, provider_id, provider_kind, sessions_revoked}` | `204`, `409 no_login_method_left` |
+
+- `adapters/postgres`: `queries/providers.sql`, `queries/identities.sql`, `providers.go`; a taken
+  name is `409` at `/name`, a second `trusted_header` or `local` provider `409` at `/kind`, an
+  active subject twice `409` at `/subject`, a referenced provider `409` with reason
+  `provider_in_use`.
+- Migration `migrations/00013_identity_providers.sql`: `identity_providers` and `user_identities`
+  as 03 section 4.2, plus the foreign keys `auth_sessions.identity_id` (`ON DELETE SET NULL`) and
+  `groups.provider_id` (`ON DELETE RESTRICT`); `bothy_app` may delete providers, not identities.
+- Tests: `domain/provider` (`TestProviderConfig_OIDC`, `TestProviderConfig_TrustedHeader`,
+  `TestProviderConfig_Local`), `app` (`TestResolve_IDT04_EmailNeverMatches`, ID-T04),
+  `migrations/identity_providers_test.go` and the HTTP tests of `adapters/httpapi/providers_test.go`
+  over PostgreSQL 18 with the real Authenticator, step-up, authz and audit (owner and step-up,
+  non-owner, single kinds, kind immutable, config on update, delete, idempotency, audit without
+  values, issuer, link conflicts, credentials, last method, concurrent unlink, sessions of unlink
+  and disable, discovery). Rulings: docs/DECISIONS.md M1-36.
+
 ## Port (root package `internal/identity`)
 
-- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Directory`, `Devices`, `Tokens`, `Owners`; declares `AvatarFiles`.
+- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Providers` and `Identities` (M1-36), `Directory`, `Devices`, `Tokens`, `Owners`; declares `AvatarFiles`.
 - Emits in-tx events: `DeviceRevoked`, `SessionEnded`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.

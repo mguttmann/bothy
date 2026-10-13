@@ -246,6 +246,18 @@ to the secret provider and are not resolved during the check.
 9110, for example `Tailscale-User-Login`) and `name_header` (optional, for example `Tailscale-User-Name`).
 `identity_provider.local.v1`: an empty object.
 
+Refinements enforced at write time (M1-36, docs/DECISIONS.md M1-36/5): an `issuer` path segment
+`common`, `organizations` or `consumers` is refused, a multi-tenant provider names `{tenantid}`
+(at most once, in the path) with `allowed_tenant_ids`, which is refused without the placeholder;
+each tenant id matches `^[A-Za-z0-9][A-Za-z0-9._-]*$` and appears once. `client_key_alg`,
+`client_key_id` and `client_cert_x5t_s256` belong to `private_key_jwt` only; an absent
+`client_key_alg` is stored as `PS256`; `client_cert_x5t_s256` is a SHA-256 thumbprint as base64url
+without padding. Each `app_redirect_uris` entry is an `https` URL with host or a private-use scheme
+in reverse domain form, without user information or fragment, and appears once. Header names are
+stored in canonical form, and `name_header` differs from `login_header`. A secret reference must
+parse as `file:` or `env:` reference of the secret provider; schemes without a driver are refused.
+The stored and returned `config` is the normalized object; field errors point into `/config/...`.
+
 ## 3. Account, linking and provisioning
 
 ### 3.1 Mapping an external identity
@@ -306,6 +318,8 @@ Table `enrollment_codes` (03). Properties:
   method remains afterwards (no identity at an enabled driver, no passkey, no active device for
   device pairing). The check locks the identities of the person, so that two parallel unlinks
   do not both succeed.
+  A device counts for device pairing when it is `active` and not on the platform `cli`, which has
+  no step-up (ID-T29, docs/DECISIONS.md M1-36/3).
 - Unlinking an identity ends the sessions that began with it (`auth_sessions.identity_id`,
   reason `logout` when the person does it, `admin` when someone else does); switching off a
   driver (`enabled = false`) ends the sessions of all its identities (`admin`) and prevents new
