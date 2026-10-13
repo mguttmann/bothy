@@ -10,7 +10,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// The hints of the invariant violations (06 section 5 "Fehler", 07 section 4.4 step 5).
+// The hints of the invariant violations (06 section 5 "Errors", 07 section 4.4 step 5).
 const (
 	// HintI1 names the way out of i1_violation.
 	HintI1 = "Switch the agent to organization first."
