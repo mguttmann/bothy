@@ -221,6 +221,17 @@ func (s *actingPrincipal) liveness() domain.Liveness {
 	if s.entry.found && string(s.entry.facts.Kind) == s.kind {
 		l.Status = string(s.entry.facts.Status)
 	}
+	// The authenticator read session, device and key for this very request (M1-34): those facts
+	// decide, because the cached ones belong to the rights version, which a logout or a refresh
+	// reuse does not raise. A session never comes back, so the cached flag can only be stale in
+	// the allowing direction; the device state may also have moved on (pending to active).
+	if o, ok := s.p.(authorize.CredentialObserver); ok {
+		if active, state, keyActive, observed := o.CredentialState(); observed {
+			l.SessionActive = l.SessionActive && active
+			l.DeviceState = state
+			l.DeviceKeyRevoked = !keyActive
+		}
+	}
 	return l
 }
 

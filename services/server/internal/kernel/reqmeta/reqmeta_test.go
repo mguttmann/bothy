@@ -43,3 +43,32 @@ func TestInvalidClientIPIsNotStored(t *testing.T) {
 		t.Fatal("an invalid address must read back as absent")
 	}
 }
+
+// TestProofRoundTrip: the DPoP facts of a request travel to the handlers of the login and refresh
+// endpoints (M1-34).
+func TestProofRoundTrip(t *testing.T) {
+	t.Parallel()
+	if _, ok := reqmeta.ProofOf(context.Background()); ok {
+		t.Fatal("empty context has a proof")
+	}
+	in := reqmeta.Proof{Method: "POST", HTU: "https://chat.example.com/api/v1/auth/token/refresh", Values: []string{"a", "b"}}
+	ctx := reqmeta.WithProof(context.Background(), in)
+	in.Values[0] = "changed"
+	got, ok := reqmeta.ProofOf(ctx)
+	if !ok || got.Method != "POST" || got.HTU != in.HTU || len(got.Values) != 2 || got.Values[0] != "a" {
+		t.Fatalf("ProofOf = %+v, %v", got, ok)
+	}
+}
+
+// TestResponseHeader: SetResponseHeader reaches the setter of the chain and is a no-op without
+// one.
+func TestResponseHeader(t *testing.T) {
+	t.Parallel()
+	reqmeta.SetResponseHeader(context.Background(), "DPoP-Nonce", "n")
+	got := map[string]string{}
+	ctx := reqmeta.WithResponseHeaders(context.Background(), func(k, v string) { got[k] = v })
+	reqmeta.SetResponseHeader(ctx, "DPoP-Nonce", "n1")
+	if got["DPoP-Nonce"] != "n1" {
+		t.Fatalf("headers %v", got)
+	}
+}

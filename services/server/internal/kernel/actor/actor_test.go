@@ -69,3 +69,17 @@ func TestAnonymousOnly(t *testing.T) {
 		t.Fatalf("Revalidate(user) = %v, want unauthenticated", err)
 	}
 }
+
+// TestCredentialState: the state the authenticator read is reported only when DeviceState is set
+// (M1-34); a principal built elsewhere reports none, so authz keeps its credential source.
+func TestCredentialState(t *testing.T) {
+	t.Parallel()
+	if _, _, _, observed := (actor.Actor{ID: ids.New(), Kind: actor.KindUser, SessionActive: true}).CredentialState(); observed {
+		t.Fatal("an actor without DeviceState reports observed facts")
+	}
+	a := actor.Actor{ID: ids.New(), Kind: actor.KindUser, SessionActive: true, DeviceState: actor.DevicePending}
+	active, state, key, observed := a.CredentialState()
+	if !observed || !active || state != actor.DevicePending || key {
+		t.Fatalf("CredentialState = %v %q %v %v", active, state, key, observed)
+	}
+}

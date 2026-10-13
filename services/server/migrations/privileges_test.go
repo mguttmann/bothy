@@ -56,6 +56,12 @@ var appPrivileges = map[string][]string{
 	// 03 server_signing_keys (M1-32): keys change by state and not_after; a retired row stays as
 	// the record of a key that signed, deleted only by the retention job of class security.
 	"server_signing_keys": {"SELECT", "INSERT", "UPDATE"},
+	// 03 section 4.2: sessions and families are revoked by revoked_at, tokens marked by used_at;
+	// the rows are security history, deleted only by the cleanup and retention jobs, which grant
+	// their delete (M1-34).
+	"auth_sessions":          {"SELECT", "INSERT", "UPDATE"},
+	"refresh_token_families": {"SELECT", "INSERT", "UPDATE"},
+	"refresh_tokens":         {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

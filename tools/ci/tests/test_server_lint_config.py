@@ -159,3 +159,12 @@ def test_lint_exempts_nothing_the_analysis_checks(path: str, linter: str) -> Non
     never laxer; the two M1-05 files of docs/DECISIONS.md M1-07/23 are a documented exception."""
     if _exempt(path, linter):
         assert _sonar_excluded(path), f"{linter} skips {path}, which the analysis checks"
+
+
+def test_identity_bans_math_rand() -> None:
+    """ID-T27: depguard keeps math/rand and math/rand/v2 out of internal/identity (M1-34)."""
+    config: dict[str, Any] = yaml.safe_load(GOLANGCI.read_text(encoding="utf-8"))
+    assert "depguard" in config["linters"]["enable"]
+    rule = config["linters"]["settings"]["depguard"]["rules"]["crypto-rand-only-in-identity"]
+    assert rule["files"] == ["**/internal/identity/**"]
+    assert {d["pkg"] for d in rule["deny"]} == {"math/rand", "math/rand/v2"}
