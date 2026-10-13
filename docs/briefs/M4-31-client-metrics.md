@@ -1,6 +1,6 @@
 # M4-31: Client metrics and crash reports (ADR 0057)
 
-Status: ready | Depends on: M4-18, M1-69 | Milestone: M4
+Status: ready | Depends on: M4-25, M1-69 | Milestone: M4
 
 ## Goal
 
@@ -17,8 +17,8 @@ After this ticket the apps report the fixed client metrics of 15 17 without cont
 - `docs/spec/02-architecture.md` 4.6 (module `stats`) and the module rules of section 4 (ports, `wire`, registration).
 - `docs/spec/05-actions.md` (`client_metrics.submit`: human, no step-up, no audit) and `docs/spec/06-api.md` 5 (`feature_disabled`).
 - `docs/api/openapi.yaml`: `submitClientMetrics` (`x-idempotency-exempt: telemetry`), `ClientMetricsBatch`, `ClientMetric`, the bucket schema.
-- `docs/DECISIONS.md`: D-W-100, D-W-114 (this ticket depends on M1-69); section 10.
-- Briefs: `docs/briefs/M1-10-telemetry-foundation.md` (meter provider, exporter to the Collector), `docs/briefs/M1-17-api-server-stubs.md` (generated handler interface), `docs/briefs/M1-61-sync-personal-data.md` (reading a person's setting), `docs/briefs/M1-68-core-metrics.md` (instrument registration, the catalogue test, `make signal-check`), `docs/briefs/M1-69-canary-test.md` (the scenario every new operation joins), `docs/briefs/M4-18-desktop-shell.md` (bootstrap, build defines), `docs/briefs/M4-13-sync-connection.md`, `docs/briefs/M4-14-sync-catch-up.md` and `docs/briefs/M4-15-sync-outbox.md` (where the measurements come from).
+- `docs/DECISIONS.md`: D-W-100, D-W-114 (this ticket depends on M1-69), D-W-116 (and on M4-25 for the privacy switch); section 10.
+- Briefs: `docs/briefs/M1-10-telemetry-foundation.md` (meter provider, exporter to the Collector), `docs/briefs/M1-17-api-server-stubs.md` (generated handler interface), `docs/briefs/M1-61-sync-personal-data.md` (reading a person's setting), `docs/briefs/M1-68-core-metrics.md` (instrument registration, the catalogue test, `make signal-check`), `docs/briefs/M1-69-canary-test.md` (the scenario every new operation joins), `docs/briefs/M4-18-desktop-shell.md` (bootstrap, build defines), `docs/briefs/M4-25-settings-devices.md` (privacy section), `docs/briefs/M4-13-sync-connection.md`, `docs/briefs/M4-14-sync-catch-up.md` and `docs/briefs/M4-15-sync-outbox.md` (where the measurements come from).
 - Code on the base branch: `services/server/internal/stats/`, `services/server/internal/platform/otel/`, the generated server interface, the canary test package `services/server/test/canary`.
 
 This ticket adds the server implementation of the existing operation `submitClientMetrics`; it touches no table, no event and no configuration key, and the action `client_metrics.submit` already exists in the catalogue.
@@ -69,6 +69,7 @@ Server, `services/server/`:
 App, `apps/client/`:
 
 - `lib/telemetry/client_metrics.dart` (collector, Design note 1), `lib/telemetry/metrics_sender.dart` (batching, flush interval, `privacy.client_metrics`), `lib/telemetry/measurements.dart` (hooks into the app and the engine: cold start until the sidebar shows from the cache, thread open until the first messages are visible, send until the local display, frame timings, catch-up from the engine, reconnects from `ConnectionState`, outbox depth from M4-15), `lib/telemetry/crash_reports.dart` (Sentry setup and scrubbing, Design note 4).
+- `lib/settings/privacy_section.dart` of M4-25: the switch `privacy.crash_reports` is shown when the build define `crash_dsn` is set (the flag M4-25 waits for), so a person can turn crash reports off whenever a target exists (15 16, 01 11).
 - Tests under `test/telemetry/` (Tests).
 
 Gate:
@@ -108,15 +109,15 @@ Change:
 
 ## Design notes
 
-1. **Collector.** `ClientMetrics` keeps per metric name a histogram with the bounds of signals.md 4.7 (counts per bound plus overflow), counters and the gauge; `record(name, value, {int? closeCode})` rejects names outside the list at compile time through an enum generated or written from the 4.6a table, with a test that compares the enum with the table (walk up to the repository root). Attributes come from the build (platform, app version major) and the current theme and density. Nothing else is recorded.
+1. **Collector.** `ClientMetrics` keeps per metric name a histogram with the bounds of signals.md 4.7 (a value above the top bound counts in the top bucket, because a bucket carries only a numeric `le` and the server accepts only the bounds of 4.7; the README states this clamp), counters and the gauge; `record(name, value, {int? closeCode})` rejects names outside the list at compile time through an enum generated or written from the 4.6a table, with a test that compares the enum with the table (walk up to the repository root). Attributes come from the build (platform, app version major) and the current theme and density. Nothing else is recorded.
 
 2. **Sender.** Every `client.metrics.flush_interval` (and at app shutdown), if `privacy.client_metrics` is on and the batch is not empty: send `submitClientMetrics` with the batch (at most `maxItems` entries; split otherwise), not through the outbox (telemetry is not user data; the operation is idempotency-exempt), drop the batch on any error except a network error (keep one batch for the next interval, never more), stop after `403 feature_disabled` until the setting changes.
 
-3. **Histogram path on the server.** Decide between OTLP data points built from the client's buckets and one measurement per bucket count; the test sends known buckets and reads the exported data from an in-memory exporter of M1-10, then compares counts per bound and the sum with the input (the sum may be bounded by the bucket bounds if the client sends none; document what is exact and what is not). Server-side checks: the bounds must equal 4.7's first row exactly (otherwise the entry is discarded); counts are non-negative; a counter value is non-negative; a gauge value is finite. Discarded entries are counted by an instrument the catalogue already has or one this ticket adds to signals.md with the signal check green. Ruling for docs/DECISIONS.md and the ADR note.
+3. **Histogram path on the server.** Decide between OTLP data points built from the client's buckets and one measurement per bucket count; the test sends known buckets and reads the exported data from an in-memory exporter of M1-10, then compares counts per bound and the sum with the input (the sum may be bounded by the bucket bounds if the client sends none; document what is exact and what is not). Server-side checks: every `le` of an entry must be one of the bounds of 4.7's first row (any subset, as the request example of `submitClientMetrics` sends; another bound discards the entry, signals.md 4.6a); counts are non-negative; a counter value is non-negative; a gauge value is finite. Discarded entries are counted by an instrument the catalogue already has or one this ticket adds to signals.md with the signal check green. Ruling for docs/DECISIONS.md and the ADR note.
 
-4. **Crash reports.** `SentryFlutter.init` only when the build define `crash_dsn` is set and `privacy.crash_reports` is on (default `true` when a target exists, 01 11); options: `sendDefaultPii = false`, `attachScreenshot = false`, `attachViewHierarchy = false`, no replay, `beforeSend` and `beforeBreadcrumb` that drop message texts, titles, file names, query strings and path segments that look like UUIDs, and HTTP bodies; release and environment from the build; a hashed instance ID as a tag. A test runs the scrubber over an event and breadcrumbs that contain canary values and asserts none survive.
+4. **Crash reports.** `SentryFlutter.init` only when the build define `crash_dsn` is set and `privacy.crash_reports` is on (default `true` when a target exists, 01 11); options: `sendDefaultPii = false`, `attachScreenshot = false`, `attachViewHierarchy = false`, no replay, `beforeSend` and `beforeBreadcrumb` that drop message texts, titles, file names, query strings and path segments that look like UUIDs, HTTP bodies, and every request and response header (in particular `Authorization`, `DPoP`, `DPoP-Nonce` and `Cookie`), so no access token, refresh token or proof reaches a report (PLAN 10 red team: tokens never in logs and crash reports); release and environment from the build; a hashed instance ID as a tag. A test runs the scrubber over an event and breadcrumbs that contain canary values (a message text, a file name, an access token, a refresh token and a DPoP proof) and asserts none survive.
 
-5. **Canary on the client.** `test/telemetry/canary_test.dart` drives the collector, the sender (with a recording API adapter) and the crash scrubber while the app shows a thread with canary message text, a canary channel name and a canary file name, then asserts that no canary value appears in any sent batch, any crash event, any breadcrumb or any log line (the "canary test of the client paths" of PLAN M4-31).
+5. **Canary on the client.** `test/telemetry/canary_test.dart` drives the collector, the sender (with a recording API adapter) and the crash scrubber while the app shows a thread with canary message text, a canary channel name and a canary file name, and while its HTTP layer carries a canary access token and proof, then asserts that no canary value appears in any sent batch, any crash event, any breadcrumb or any log line (the "canary test of the client paths" of PLAN M4-31).
 
 6. **SDK deny list.** `dart_sdk_denylist.py` reads the root `pubspec.lock` and fails when it contains a package whose name matches the deny patterns (`opentelemetry*`, `firebase_analytics`, `amplitude*`, `mixpanel*`, `segment*`, `posthog*`, `datadog*`, `newrelic*`, `appcenter*`; the list with a comment per entry) unless it is `sentry_flutter` or one of its own dependencies; tests with a fake lock file.
 
@@ -153,7 +154,7 @@ Commands that must pass, from the repository root:
 - [ ] The canary test of the client paths is green: no message text, name, file name or URL with parameters in batches, crash reports or logs.
 - [ ] An entry with an unknown name or a mismatched `kind` is discarded on its own, the rest of the batch is accepted with `202` (signals.md 4.6a); `403 feature_disabled` when the setting is off.
 - [ ] The histogram path into the Collector is decided and tested; ADR 0057 and 15 17 say which.
-- [ ] Crash reports only with a configured target and scrubbed; the SDK deny list runs in the gates.
+- [ ] Crash reports only with a configured target, scrubbed of content, headers and tokens, and switchable in the settings; the SDK deny list runs in the gates.
 - [ ] `make signal-check` and the canary test of M1-69 are green with the new operation; rulings recorded.
 - [ ] `make check` is green.
 

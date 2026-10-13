@@ -1,6 +1,6 @@
 # M4-33: Channel menu: notification level and export
 
-Status: ready | Depends on: M4-20, M3-11, M3-18 | Milestone: M4
+Status: ready | Depends on: M4-20, M4-30, M3-11 | Milestone: M4
 
 ## Goal
 
@@ -16,8 +16,8 @@ After this ticket the desktop app lets a person decide how loud each place is an
 - `docs/spec/07-permissions.md` 2.4 (capability `export`) and `docs/spec/05-actions.md` (`export.channel` with step-up and audit).
 - `docs/spec/12-files.md` and the export section the M3-11 brief names (format and range of the stream).
 - `docs/api/openapi.yaml`: `listMyNotificationPreferences`, `putNotificationPreference` (`NotificationPreferencePut`), `deleteNotificationPreference`, `listMyQuietHours`, `createQuietHoursRule`, `putQuietHoursRule`, `deleteQuietHoursRule`, `listMySettings`, `putMySetting`, `exportChannel` (range, NDJSON of `Message`), `getChannel` (`ChannelView.capabilities`).
-- `docs/DECISIONS.md`: D-M3-17-4, D-W-100, D-W-114, D-W-116 (this ticket depends on M4-20 for the thread header menu); section 10.
-- Briefs: `docs/briefs/M4-19-sidebar-post-list.md` (sidebar rows, post list, menus), `docs/briefs/M4-20-thread-view.md` (thread header), `docs/briefs/M4-12-local-store.md` (`notification_preferences`, `quiet_hours`, the `level` and `capabilities` columns), `docs/briefs/M4-15-sync-outbox.md` (executors); for the server side `docs/briefs/M3-11-channel-export.md`, `docs/briefs/M3-18-notify-preferences.md`.
+- `docs/DECISIONS.md`: D-M3-17-4, D-W-100, D-W-114, D-W-116 (this ticket depends on M4-20 for the thread header menu and on M4-30 for the notification stream, the fake's notification decision and the settings entry of M4-25); section 10.
+- Briefs: `docs/briefs/M4-19-sidebar-post-list.md` (sidebar rows, post list, menus), `docs/briefs/M4-20-thread-view.md` (thread header), `docs/briefs/M4-25-settings-devices.md` (the Notifications entry `notifications_entry.dart`, the `StepUpDialog`), `docs/briefs/M4-30-windows-tray-notifications.md` (`SyncEngine.notifications`, `FakeWorld.notify`), `docs/briefs/M4-12-local-store.md` (`notification_preferences`, `quiet_hours`, the `level` and `capabilities` columns), `docs/briefs/M4-15-sync-outbox.md` (executors); for the server side `docs/briefs/M3-11-channel-export.md`, `docs/briefs/M3-18-notify-preferences.md`.
 
 This ticket touches no API operation, no table of chapter 03, no action, no event and no configuration key.
 
@@ -69,7 +69,7 @@ Create in `apps/client/lib/`:
 
 Change:
 
-- The sidebar rows and post rows of M4-19 and the thread header of M4-20, only to open the menus.
+- The sidebar rows and post rows of M4-19 and the thread header of M4-20, only to open the menus; `apps/client/lib/settings/notifications_entry.dart` of M4-25 to open the page D9.
 - `docs/spec/01-product.md` 5.1 D9 (the row "Runs I triggered" as an explanation).
 - `apps/client/README.md`; `docs/DECISIONS.md` section 10: rows `D-M4-33-<n>`; root `CHANGELOG.md` under `[Unreleased]`.
 
@@ -117,7 +117,7 @@ Widget and unit tests:
 
 Integration tests (`integration_test/`, against `FakeServer`):
 
-- `notification_level_test.dart`: the level takes effect according to 13 "Effective level": Alex mutes a channel, the fake's decision (which follows 13 3.1) sends no `notification.created` for a message there, then Alex sets the thread to `all` and the next message notifies; the change appears on a second simulated device.
+- `notification_level_test.dart`: the level takes effect according to 13 "Effective level": Alex mutes a channel, `FakeWorld.notify` of M4-30 (which follows 13 3.1) sends no `notification.created` for a message there, then Alex sets the thread to `all` and the next message notifies; the change appears on a second simulated device.
 - `export_test.dart`: export with capability and step-up saves the file; without the capability the menu has no entry.
 
 Commands that must pass, from the repository root:

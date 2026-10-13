@@ -112,12 +112,12 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 28 | M2-03, M2-04, M2-45, M2-47, M3-04, M4-35 |
 | 29 | M2-05, M2-46, M3-05, M3-06 |
 | 30 | M2-06, M2-27, M2-48, M3-10, M3-11, M4-22 |
-| 31 | M2-08, M4-33 |
+| 31 | M2-08 |
 | 32 | M2-09, M2-16 |
 | 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19, M3-19 |
 | 34 | M2-11, M2-22, M2-25, M2-29, M3-20, M3-21, M3-23 |
 | 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24, M4-30, M6-13 |
-| 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22, M6-15 |
+| 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22, M4-33, M6-15 |
 | 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23, M6-05 |
 | 38 | M4-24, M6-14 |
 | 39 | M4-32, M4-34, M4-36 |
@@ -310,10 +310,10 @@ names listed here.
 | 27 | M4-28 | Administration: agents, backend switch, costs and tokens | `M4-28-admin-agents.md` | M4-27, M2-21 |
 | 12 | M4-29 | Administration: audit view | `M4-29-admin-audit.md` | M4-26 |
 | 35 | M4-30 | Windows: notification area and local notifications | `M4-30-windows-tray-notifications.md` | M4-25, M3-23 |
-| 27 | M4-31 | Client metrics and crash reports (ADR 0057) | `M4-31-client-metrics.md` | M4-18, M1-69 |
+| 27 | M4-31 | Client metrics and crash reports (ADR 0057) | `M4-31-client-metrics.md` | M4-25, M1-69 |
 | 39 | M4-32 | Accessibility on the desktop | `M4-32-desktop-accessibility.md` | M4-22, M4-24, M4-28, M4-29, M4-33 |
-| 31 | M4-33 | Channel menu: notification level and export | `M4-33-channel-menu.md` | M4-20, M3-11, M3-18 |
-| 39 | M4-34 | Desktop E2E and performance targets | `M4-34-desktop-e2e-perf.md` | M4-22, M4-24, M4-30, M4-33, M1-73 |
+| 36 | M4-33 | Channel menu: notification level and export | `M4-33-channel-menu.md` | M4-20, M4-30, M3-11 |
+| 39 | M4-34 | Desktop E2E and performance targets | `M4-34-desktop-e2e-perf.md` | M4-22, M4-24, M4-33, M1-73 |
 | 28 | M4-35 | Package `terminal_ui` and terminal view | `M4-35-terminal-ui.md` | M4-07, M4-09, M2-44 |
 | 39 | M4-36 | Terminal on the desktop | `M4-36-terminal-desktop.md` | M4-35, M4-24, M2-48 |
 | 18 | M4-37 | Administration: hosts, pairing and grant `terminal` | `M4-37-admin-hosts.md` | M4-27, M2-41 |
@@ -854,19 +854,18 @@ flowchart TB
   M3_23 --> M4_30
   M4_25 --> M4_30
   M1_69 --> M4_31
-  M4_18 --> M4_31
+  M4_25 --> M4_31
   M4_22 --> M4_32
   M4_24 --> M4_32
   M4_28 --> M4_32
   M4_29 --> M4_32
   M4_33 --> M4_32
   M3_11 --> M4_33
-  M3_18 --> M4_33
   M4_20 --> M4_33
+  M4_30 --> M4_33
   M1_73 --> M4_34
   M4_22 --> M4_34
   M4_24 --> M4_34
-  M4_30 --> M4_34
   M4_33 --> M4_34
   M2_44 --> M4_35
   M4_07 --> M4_35

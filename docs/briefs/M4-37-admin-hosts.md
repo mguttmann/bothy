@@ -12,7 +12,7 @@ After this ticket the administration in `packages/admin_ui` has screen A8 of 01 
 - `docs/spec/01-product.md` 5.2 A8 "Hosts" (both wireframes and the text above them), 9 (terms Host, Host service, Pairing, Fingerprint).
 - `docs/spec/24-terminal.md`: 2.2 (session users, `reported_session_users`, the table of checks HD1 to HD11 and the rule for names below it), 2.3 (server host), 3 "Hosts and lifecycle" (3.1 states, 3.2 pairing, 3.3 re-pairing), 4.3 (fingerprint), 7 "LLM login and invariant I6" (7.2, 7.3), 8 (permissions, 8.1 to 8.4), 13 (problem codes), 14 (TM-T09, TM-T19, TM-T20, TM-T21, TM-T24, TM-T28 as the server's view of what the screen shows), 17 (`terminal.fingerprint_confirm_chars`, `terminal.fingerprint_max_attempts`).
 - `docs/spec/07-permissions.md`: 2.12 (target `host`, capability `terminal`), SR10, SR11, SR12, 9.3 (preview hint `terminal_not_effective`).
-- `docs/api/openapi.yaml`: `listHosts`, `createHost` (`HostCreate`), `getHost` (`Host`), `issueHostPairingCode` (`HostPairingCode`), `confirmHost` (fingerprint prefix, LLM credentials, server host, session users), `updateHost` (assignee, `add_session_users`, `revoke_session_users`, reason), `setHostLlmCredentials`, `setHostState` (`HostStateSet`), `listTerminalSessions`, `createGrant` and `previewGrant` for `target_kind = host`; schemas `HostDoctorCheck` (or the name on the base branch), `HostSessionUser`, `HostReportedSessionUser`; problem codes `fingerprint_mismatch`, `i6_violation`, `conflict` with `session_user_taken`, `validation_failed` with `session_user_not_on_host`, `terminal_denied`.
+- `docs/api/openapi.yaml`: `listHosts`, `createHost` (`HostCreate`), `getHost` (`Host`), `issueHostPairingCode` (`HostPairingCode`), `confirmHost` (fingerprint prefix, LLM credentials, server host, session users), `updateHost` (assignee, `add_session_users`, `revoke_session_users`, reason), `setHostLlmCredentials`, `setHostState` (`HostStateSet`), `listTerminalSessions`, `listAuditEvents` (the audit of the host for ended assignments), `createGrant` and `previewGrant` for `target_kind = host`; schemas `HostDoctorCheck` (or the name on the base branch), `HostSessionUser`, `HostReportedSessionUser`; problem codes `fingerprint_mismatch`, `i6_violation`, `conflict` with `session_user_taken`, `validation_failed` with `session_user_not_on_host`, `terminal_denied`.
 - `docs/DECISIONS.md`: D-W-100, D-W-114; section 10.
 - Briefs: `docs/briefs/M4-27-admin-grants.md` (wizard and preview panel), `docs/briefs/M4-26-admin-people.md` (shell, repository, `ConfirmChange`, step-up test, code view); for the server side `docs/briefs/M2-39-terminal-hosts.md`, `docs/briefs/M2-40-terminal-authz.md`, `docs/briefs/M2-41-host-pairing.md`.
 
@@ -42,7 +42,7 @@ Rules for every brief:
 8. White label: examples and test data use `example.com` and the people Alex, Sam and Robin; no company, host or personal names, no paths under a home directory. Interface texts come from `packages/l10n`, never as literals in widgets.
 9. Values only from the server and named keys: the number of fingerprint characters (`terminal.fingerprint_confirm_chars`) and the remaining attempts come from the server's responses or the reference default with a note; the code expiry from `expires_at`; no literal in code.
 10. No permission logic: "not effective" and every denial come from the server's preview and problem responses (07 9.3), never from an own reading of SR10 to SR12.
-11. Owners only: the screen appears when the server lets the caller list hosts as an owner; others see the server's `403`.
+11. Owners only: the Hosts entry of the administration appears when `getMe.is_owner` is true, as M4-26 gates its shell (`listHosts` itself answers non-owners with the hosts they are assigned to or hold a grant on, so it is no gate).
 
 Product requirements implemented here:
 
@@ -59,10 +59,11 @@ Product requirements implemented here:
 Create in `packages/admin_ui/lib/src/hosts/`:
 
 - `hosts_list.dart`, `host_page.dart` (all fields of A8), `create_host_dialog.dart`, `pairing_wizard.dart` (the three steps of the second A8 wireframe), `fingerprint_confirm.dart`, `llm_login_section.dart` (with the I6 explanation), `server_host_section.dart`, `session_users_section.dart` (assign from reported names, end, taken names), `doctor_results.dart` (Design note 2), `host_state_actions.dart` (disable, re-pair, retire), `host_grants_section.dart` (grants on the host with the preview states).
-- The target kind `host` in the grant wizard of M4-27 (`target_step.dart`, `level_step.dart`: no level, capabilities exactly `[terminal]`), with the preview hints `terminal_not_effective` mapped to the two texts.
+- The target kind `host` in the grant wizard of M4-27 (`target_step.dart`, `level_step.dart`: no level, capabilities exactly `[terminal]`), with the preview text and the badge for the hint `terminal_not_effective` (Design note 4).
 - Registration of the Hosts entry in the admin shell.
 - Fake server handlers through the registry of M4-17 for the operations above, with fingerprint attempts, I6 checks, taken names and doctor results that name session users.
 - Tests under `packages/admin_ui/test/hosts/`, goldens, an integration test under `apps/client/integration_test/` (Tests); ARB keys in `packages/l10n`.
+- `docs/quality/accessibility-checklist.md`: the rows for screen A8 and the pairing wizard (01 8) with their automated evidence, if M4-32 has created the file; otherwise the session lists the rows in its report for M4-32.
 
 Change:
 
@@ -95,11 +96,11 @@ Change:
 
 1. **Pairing wizard.** Step 1: name, assignee, reason, `createHost`. Step 2: `issueHostPairingCode`; the code in a copyable code view with the command line built from the instance origin, the remaining time from `expires_at`; "New code" issues another. Step 3: the fingerprint prefix field (normalized: separators removed, case ignored), the LLM login choice (none, personal with a holder picker, organization), the server host question, and the session user rows (person picker, then a picker of the names in `reported_session_users` that are not yet taken; no free text field); "Confirm with passkey / device" sends `confirmHost` through the step-up interceptor. `fingerprint_mismatch` keeps the step with the remaining attempts the response names; after the last one the host page shows state `pairing` and a new code is needed.
 
-2. **Check results.** Each `doctor` entry of the host shows the check ID (HD1 to HD11), passed or the code, and, where the server names a session user, that name with the person of its assignment, also when the assignment has ended ("formerly assigned to Sam"); entries are shown for a disconnected host as well. The screen never guesses names; it shows what the server returns.
+2. **Check results.** Each `doctor` entry of the host shows the check ID (HD1 to HD11), passed or the code, and, where the server names a session user, that name with the person of its assignment: a valid assignment comes from `Host.session_users`; an ended one is not in `getHost` (it returns valid assignments only), so for a named session user without a valid assignment the page reads the audit of the host (`listAuditEvents` with `resource_id` of the host and the `host.manage` actions; their details carry the assignment changes, 24 10.1; owner action with step-up as 05 marks `audit.read`) and shows "formerly assigned to Sam"; when the audit holds no assignment for the name, it shows the name alone and the report names the gap (the API has no list of ended assignments). Entries are shown for a disconnected host as well. The screen never guesses names; it shows what the server returns.
 
 3. **Session users.** Assign: `updateHost` with `add_session_users` (person and a reported name); `409 conflict` with `session_user_taken` explains that a name once given to a person stays bound on this host; `400` with `session_user_not_on_host` explains that the host must report the name first. End: `revoke_session_users`, with the confirmation that the name stays taken.
 
-4. **I6 and grants.** The LLM login section and the grant wizard show `409 i6_violation` with its `hint` in plain words; the wizard for a host target maps the preview hint `terminal_not_effective` with its reason to "not effective" (not the assignee) or "not effective: no session user".
+4. **I6 and grants.** The LLM login section and the grant wizard show `409 i6_violation` with its `hint` in plain words; for a host target the wizard shows the server's preview `text` (07 9.3), which states "not effective" and its cause (not the assignee, no session user, server host), together with a "not effective" badge for every hint `terminal_not_effective`; the client never tells the causes apart itself (`PreviewHint` has no reason member, and that would be permission logic).
 
 5. **Rulings for docs/DECISIONS.md** (`D-M4-37-<n>`): names only from the reported list (note 1, 3); check results as returned (note 2); host target in the shared wizard (note 4).
 
@@ -110,8 +111,8 @@ Widget tests (fake repository, fake signer):
 - `pairing_test.dart`: code with command and remaining time; a wrong fingerprint shows `fingerprint_mismatch` with the remaining attempts; the last attempt returns the host to `pairing`.
 - `i6_test.dart`: an I6 violation is explained, not just rejected.
 - `session_users_test.dart`: only reported, untaken names are offered; a taken name shows `session_user_taken` with an explanation; ending keeps the name taken.
-- `doctor_results_test.dart`: an entry HD9 with the name of a former session user shows the person of its assignment, also an ended one; HD6, HD10 and HD11 entries with names; a disconnected host still shows them.
-- `host_grants_test.dart`: the preview of a grant to a non-assignee says "not effective" (SR10); a person with a grant but without a session user shows "not effective: no session user" (SR12).
+- `doctor_results_test.dart`: an entry HD9 with the name of a current session user shows its person from `session_users`, and with the name of a former session user the person from the audit of the host (ended assignment); HD6, HD10 and HD11 entries with names; a disconnected host still shows them.
+- `host_grants_test.dart`: the preview of a grant to a non-assignee shows the server's text saying "not effective" (SR10) with the badge; for a person with a grant but without a session user the server's text says "not effective: no session user" (SR12); the client adds no cause of its own.
 - `apps/client/integration_test/admin_step_up_test.dart` (M4-26) extended to the host operations: every change goes through step-up exactly as `actions.yaml` marks it.
 - Goldens of the host page, the pairing steps and the check results; light and dark, two densities, text scaling 1 and 2, `de` and `en`.
 

@@ -1,6 +1,6 @@
 # M4-34: Desktop E2E and performance targets
 
-Status: ready | Depends on: M4-22, M4-24, M4-30, M4-33, M1-73 | Milestone: M4
+Status: ready | Depends on: M4-22, M4-24, M4-33, M1-73 | Milestone: M4
 
 ## Goal
 
@@ -58,7 +58,7 @@ Create:
 
 - `infra/compose/test/compose.e2e.yaml` (overlay: the api published on `127.0.0.1` with a free port, a Fake-Agent service from the SDK image or a Python container running `bothy_sdk.testing.fake_agent` with a script for the E2E runs, no other published port) and `infra/compose/e2e.sh` (bash, the structure of `smoke.sh`: inputs, sanitize, preflight, workspace with `mktemp -d`, bootstrap of the world, `E2E_SERVER_URL` and the enrollment codes into a file for the app tests, cleanup on exit; Design note 1).
 - Root `Makefile`: target `e2e-desktop` (not part of `gates`; calls `e2e.sh` and then the suite for the host system) and `perf-desktop` (profile runs); `docs/quality/gates.md` rows for both; the table "Make targets created by tickets" in `docs/briefs/README.md` gains `e2e-desktop` and `perf-desktop` with M4-34.
-- `apps/client/integration_test/e2e/` (the suite, Design note 2) with `patrol` tests under `apps/client/patrol_test/` if `patrol` needs its own folder, and `apps/client/test_driver/perf_driver.dart` with `apps/client/integration_test/perf/` (Design note 3).
+- `apps/client/e2e_test/` (the suite, Design note 2; a folder outside `integration_test/`, so the `apps-macos` and `apps-windows` jobs of M4-01, which run `integration_test/` through `platform-tests.json` without a server, never pick it up) with `patrol` tests under `apps/client/patrol_test/` if `patrol` needs its own folder, and `apps/client/test_driver/perf_driver.dart` with `apps/client/perf_test/` (Design note 3); `make e2e-desktop` and `make perf-desktop` are the only runners.
 - `tools/ci/tests/test_e2e_script.py` (pytest over `e2e.sh` with fake `docker`: preflight messages, sanitizing, cleanup) and `tools/ci/perf_summary.py` with its test if the timeline evaluation is done in Python (Design note 3).
 - `.github/workflows/e2e-desktop.yml` only for what GitHub-hosted runners can do (Design note 6): a scheduled and manual workflow that builds the E2E suite on `macos-15` and `windows-2025` and fails on compile errors; `make runners-check` and the workflow rules stay green.
 
@@ -94,7 +94,7 @@ Change:
 
 ## Design notes
 
-1. **Stack and world.** `e2e.sh` reuses the functions of `smoke.sh` where they are factored out (or factors them into `infra/compose/lib.sh` used by both, with `smoke.sh` behaviour unchanged and its test green); after the stack is healthy it creates the first owner and enrollment codes the way `smoke.sh` does (setup command in the container), creates the world through the public API with the owner's token (space Support with channel general and forum requests, agent support-agent with the Fake-Agent as its consumer, Sam as a person with `trigger`), and writes `E2E_SERVER_URL`, the codes and the IDs into `$SMOKE_OUT/e2e.json` for the app. The Fake-Agent script answers a mention with a run (status line, two steps, a patch stream long enough for the patch-to-frame measurement), accepts a follow-up, posts an approval card, and finishes.
+1. **Stack and world.** `e2e.sh` follows the structure of `smoke.sh` and copies the few functions it needs (factoring them into a shared file would change `smoke.sh`, which is outside this scope); after the stack is healthy it creates the first owner and enrollment codes the way `smoke.sh` does (setup command in the container), creates the world through the public API with the owner's token (space Support with channel general and forum requests, agent support-agent with the Fake-Agent as its consumer, Sam as a person with `trigger`), and writes `E2E_SERVER_URL`, the codes and the IDs into `$SMOKE_OUT/e2e.json` for the app. The Fake-Agent script answers a mention with a run (status line, two steps, a patch stream long enough for the patch-to-frame measurement), accepts a follow-up, posts an approval card, and finishes.
 
 2. **Suite.** One test per flow of "Product requirements", each starting from a clean app data folder: enrollment login (macOS through `patrol` including the keychain or Touch ID dialog where the runner shows one; Windows without system dialogs), confirm a second device of Alex from the first, send and receive between Alex and Sam (two app processes or Alex in the app and Sam through the API), offline send by stopping the network of the app's host side (block the published port, then reopen) and the outbox delivering exactly once, a run with follow-up and approval through the Fake-Agent, upload and download of a file, search, the channel level, the keyboard walkthrough of M4-24, Windows notification while hidden to the tray, and the owner revoking Alex's device so the app ends in E7 with a wiped store. The scenario drivers of M4-17 are reused where they fit.
 

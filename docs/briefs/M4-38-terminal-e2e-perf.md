@@ -4,7 +4,7 @@ Status: ready | Depends on: M4-34, M4-36, M4-37 | Milestone: M4
 
 ## Goal
 
-After this ticket the terminal of the desktop app is tested end to end and measured: the E2E overlay of M4-34 gains a host service container (the image and pairing path of M2-48) and an output generator, and the E2E suite gains the terminal flow with `patrol` on macOS and `integration_test` on Windows: an owner pairs a host through the administration of M4-37 (pairing code, the host container runs `bothy-host pair`, fingerprint confirmation, LLM login and server host answers, session user assignment, grant `terminal`), then the person opens a terminal with step-up, runs a command and sees its output, detaches, reattaches with the scrollback, and ends the session. The performance level gains `client.perf.terminal_frame_to_paint_p95` (a decrypted `data` frame until drawn) and `client.perf.terminal_throughput_min` (bytes per second drawn during continuous output without backlog), measured with a profile build against the generator, failing when missed. Why: PLAN 10 exit criterion 5 asks for the terminal E2E and both targets on the desktop; only the real path (server relay, host service, PTY, Noise, renderer) shows whether the view keeps up.
+After this ticket the terminal of the desktop app is tested end to end and measured: the terminal stack of M4-36 (the Go stack of M2-48 with its TLS front and host container) gains an E2E mode with an unpaired host and an output generator, and the E2E suite gains the terminal flow with `patrol` on macOS and `integration_test` on Windows: an owner pairs a host through the administration of M4-37 (pairing code, the host container runs `bothy-host pair`, fingerprint confirmation, LLM login and server host answers, session user assignment, grant `terminal`), then the person opens a terminal with step-up, runs a command and sees its output, detaches, reattaches with the scrollback, and ends the session. The performance level gains `client.perf.terminal_frame_to_paint_p95` (a decrypted `data` frame until drawn) and `client.perf.terminal_throughput_min` (bytes per second drawn during continuous output without backlog), measured with a profile build against the generator, failing when missed. Why: PLAN 10 exit criterion 5 asks for the terminal E2E and both targets on the desktop; only the real path (server relay, host service, PTY, Noise, renderer) shows whether the view keeps up.
 
 ## Read first
 
@@ -40,7 +40,7 @@ Rules for every brief:
 7. No en dash and no em dash in any file you write; the `text-rules` pre-commit hook rejects them, and the ARB test of M4-06 rejects them in interface texts. Use a hyphen or rephrase.
 8. White label: examples and test data use `example.com` and the people Alex, Sam and Robin; no company, host or personal names, no paths under a home directory. Interface texts come from `packages/l10n`, never as literals in widgets.
 9. Targets only from `AppConfig` (`client.perf.terminal_frame_to_paint_p95`, `client.perf.terminal_throughput_min`); no literal target in a test.
-10. The run-location and verdict rule of M4-34 applies unchanged: the macOS suite and the macOS targets run on the build host when it is a Mac with a Docker engine; a Windows run needs a Windows host that reaches the stack, otherwise it is listed as not proven with the command; the session never claims a run it did not do.
+10. The run-location and verdict rule of M4-34 applies unchanged: the macOS suite and the macOS targets run on the build host when it is a Mac with Go and a Docker engine; a Windows run needs a Windows host that reaches the stack, otherwise it is listed as not proven with the command; the session never claims a run it did not do.
 
 Product requirements implemented here:
 
@@ -53,11 +53,13 @@ Product requirements implemented here:
 
 Create or change:
 
-- `infra/compose/test/compose.e2e.yaml` (M4-34): a host service service built the way M2-48's terminal overlay builds it (image, systemd, `bothy-host install`), not paired at start, plus a generator: a `command` profile in the host service configuration that runs a small generator program inside the container (a fixed-rate writer of lines with known length and a sequence number, or a full-speed writer for the throughput run; written in Go next to the overlay under `infra/compose/test/host/` or as a shell script, chosen by what M2-48's host image offers).
-- `infra/compose/e2e.sh` (M4-34): a step that exposes the pairing command of the host container to the test (`docker compose exec` of `bothy-host pair --server ... --code ...` with the code the test writes to a file, and the printed fingerprint read back), without publishing any new port.
-- `apps/client/integration_test/e2e/terminal_e2e_test.dart` (and the `patrol` variant if `patrol` needs its own folder): Design note 1.
-- `apps/client/integration_test/perf/terminal_perf_test.dart` and the driver additions of M4-34: Design note 2; `make perf-desktop` includes it.
-- `apps/client/README.md` and `infra/compose/README.md` (the terminal parts), `docs/quality/gates.md` (the targets now cover the terminal).
+- `services/server/test/terminal/clientstack/` (M4-36): a mode for the E2E run in which the host container is installed but not paired (the test pairs it through the administration), the generator is configured as a `command` profile of the host service, and a step runs `bothy-host pair --server <origin> --code <code>` inside the host container with the code the test writes to a file and returns the printed fingerprint; nothing new is published. The stack has the TLS front and the test CA of M2-48, which the host service needs (it dials only `https` origins, M2-43), so the terminal E2E runs on this stack and not on the plain HTTP overlay of M4-34.
+- The generator: a small program inside the host image (Go next to the stack helper, or a shell script if the image has no Go toolchain at run time) that writes lines of known length with a sequence number at a fixed rate, or at full speed for a fixed byte count.
+- `packages/terminal_ui` (M4-35): a test-only timing hook in the controller and the renderer (the time a `data` frame was decrypted, the time the frame that shows it was rasterized, and the renderer's backlog), compiled only when the define `TERMINAL_PERF_HOOKS` is set, so release and normal profile builds contain none; a test proves the hook is absent without the define.
+- `apps/client/e2e_test/terminal_e2e_test.dart` (and the `patrol` variant if `patrol` needs its own folder), outside `integration_test/` like the E2E suite of M4-34: Design note 1.
+- `apps/client/perf_test/terminal_perf_test.dart` and the driver additions of M4-34: Design note 2.
+- Root `Makefile`: `e2e-desktop` and `perf-desktop` (M4-34) gain the terminal parts, which start the stack of M4-36's helper in the E2E mode; `docs/quality/gates.md` rows updated.
+- `apps/client/README.md` (the terminal parts).
 - `docs/DECISIONS.md` section 10: rows `D-M4-38-<n>`; root `CHANGELOG.md` under `[Unreleased]`.
 
 ## Out of scope
@@ -80,11 +82,11 @@ Create or change:
 - No permission logic in the client (15 1 principle 1): controls follow server responses, snapshots and events, never an own derivation from grants.
 - If the core contract (chapters 00, 03, 04, 05) or `docs/api/` lacks something this ticket needs, stop with `Verdict: BLOCKED <reason>` instead of building a deviation (P-11).
 - This brief was written before milestone M1 closed (D-W-100, extended to M4 by D-W-114). Where the merged code of an earlier ticket names a package, type, function, file, provider or make target differently from this brief, follow the code and list each difference in the report; where it behaves differently from the specification, stop with `Verdict: BLOCKED <reason>`.
-- The host container runs only inside the Compose project of the run, with no published port; the generator writes only synthetic output; cleanup removes the containers, volumes and temporary folders of the run.
+- The host container runs only inside the project of the run, with no published port; the generator writes only synthetic output; cleanup removes the containers, volumes and temporary folders of the run.
 
 ## Design notes
 
-1. **E2E flow.** Alex (owner) logs in (the E2E world of M4-34), opens Administration, Hosts, creates a host with Alex as assignee, gets the pairing code; the test hands the code to the container step of `e2e.sh`, which runs `bothy-host pair` and returns the printed fingerprint; Alex types its first characters, answers organization and "no" for the server host, assigns `term-alex` from the reported names, and grants himself `terminal` on the host (the preview is effective). Then Alex opens the group "Hosts", the host, a new `shell` session (step-up), types `echo` with a canary-free marker and sees it, detaches (the session stays `detached`), reattaches and sees the scrollback replayed, runs `exit` and sees the exit code, ends the tab. At the end the canary check of M4-36 runs against the stack's logs and the app's paths.
+1. **E2E flow.** Alex (owner) logs in to the stack of the E2E mode (its world as M4-36's helper creates it, without the host pairing), opens Administration, Hosts, creates a host with Alex as assignee, gets the pairing code; the test hands the code to the pairing step of the stack helper, which runs `bothy-host pair` and returns the printed fingerprint; Alex types its first characters, answers organization and "no" for the server host, assigns his session user from the reported names (owners have `terminal` implicitly, 24 8.1; the session user assignment is still required, SR12). Then Alex opens the group "Hosts", the host, a new `shell` session (step-up), types `echo` with a canary-free marker and sees it, detaches (the session stays `detached`), reattaches and sees the scrollback replayed, runs `exit` and sees the exit code, ends the tab. At the end the canary check of M4-36 runs against the stack's logs and the app's paths.
 
 2. **Terminal targets.** Frame to paint: the generator writes one line per 100 milliseconds with a sequence number; the app's profile build records, per `data` frame, the time it was decrypted (instrumented in the controller of M4-35 through a test-only hook that the release build compiles out) and the time of the next rasterized frame that shows that sequence number; p95 over at least 1000 frames, compared with `client.perf.terminal_frame_to_paint_p95`. Throughput: the generator writes at full speed for a fixed byte count; the measurement is the drawn bytes per second while the renderer's backlog stays below one screen (no growing queue), compared with `client.perf.terminal_throughput_min`. Both values go to `apps/client/build/perf/summary.json` with the device, marked as reference device or not (M4-34 Design note 4).
 
@@ -94,12 +96,12 @@ Create or change:
 
 - The E2E terminal test (Design note 1) through `make e2e-desktop` on the build host for macOS when it is a Mac with a Docker engine.
 - The terminal performance test (Design note 2) through `make perf-desktop`, plus a unit test of the throughput and p95 computation on recorded samples.
-- `tools/ci/tests/test_e2e_script.py` (M4-34) extended: the pairing step runs only inside the project and publishes no port.
+- A Go test of the E2E mode of the stack helper: the host starts unpaired, the pairing step runs only inside the project, and no port is published beyond the TLS front.
 
 Commands that must pass, from the repository root:
 
 - `cd apps/client && flutter analyze --fatal-infos && flutter test --coverage`
-- on a Mac with a Docker engine: `make image`, `make e2e-desktop`, `make perf-desktop`
+- on a Mac with Go and a Docker engine: `make image`, `make e2e-desktop`, `make perf-desktop`
 - `make arch`, `make lint`, `make fmt-check`, `make coverage`, `make docs`
 - `make check`
 
@@ -128,7 +130,7 @@ Write to `{{REPORT_PATH}}`:
 1. First line exactly `Verdict: DONE` or `Verdict: BLOCKED <reason>`.
 2. Commits (SHA and subject), changed files with line counts, test results with counts (the red run before the change and the green run after), the summary of `make check`.
 3. Review and red team verdicts and the findings fixed.
-4. The E2E terminal results with where they ran, both target values with the device and whether it is a reference device, and the generator settings used.
+4. The E2E terminal results with where they ran, both target values with the device and whether it is a reference device, the generator settings used, and the proof that release builds contain no timing hook.
 5. What is not proven (for example a platform test that ran only in CI, or a check done by hand).
 6. Follow-ups that could not be done in this scope, each with its reason, every difference to the names of this brief (D-W-100, D-W-114), and spec gaps found.
 
