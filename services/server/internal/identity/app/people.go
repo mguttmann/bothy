@@ -174,7 +174,7 @@ func (s *People) newUser(cmd identity.CreateUserCmd) (domain.User, error) {
 }
 
 // UpdateUser implements identity.People. An update without change writes the audit entry with
-// no_change and no event (06 section 2 "Ohne Wirkung").
+// no_change and no event (06 section 2 "No effect").
 func (s *People) UpdateUser(ctx context.Context, a actor.Actor, userID ids.ID, cmd identity.UpdateUserCmd) (identity.UserView, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {

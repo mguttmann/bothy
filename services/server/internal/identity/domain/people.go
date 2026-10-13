@@ -108,7 +108,7 @@ func CheckReason(s string) error {
 
 // EnableTransition decides user.enable for a principal in status s (05 table 4.3, 08 section
 // 3.1): pending and disabled become active (change true); an active principal stays as it is
-// (change false, a call without effect, 06 section 2 "Ohne Wirkung").
+// (change false, a call without effect, 06 section 2 "No effect").
 //
 // Errors: invalid_state_transition for deleted and any other status.
 func EnableTransition(s Status) (change bool, err error) {

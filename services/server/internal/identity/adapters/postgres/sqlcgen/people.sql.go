@@ -55,7 +55,7 @@ type ListUsersRow struct {
 
 // SPDX-License-Identifier: Apache-2.0
 // Queries of the directory use cases on principals and users (identity, M1-31; docs/spec/03-
-// datenmodell.md section 4.2). Only this module reads these tables (03 Grundsatz 12).
+// data-model.md section 4.2). Only this module reads these tables (03 "Principles" rule 12).
 // One page of people, keyset on (lower(handle), id) ascending. q is a case-insensitive prefix
 // of the handle or the display name, compared with starts_with, so "%" and "_" are literal.
 func (q *Queries) ListUsers(ctx context.Context, arg ListUsersParams) ([]ListUsersRow, error) {
