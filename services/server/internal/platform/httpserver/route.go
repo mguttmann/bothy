@@ -89,8 +89,9 @@ type routeWriter struct {
 	c  *Chain
 	op Operation
 
-	// checks is the context with the check log, set by StageProof; nil before.
-	checks context.Context
+	// checks is the context with the check log, set by StageProof; nil before. The writer lives
+	// for one request, and the context is the one of that request.
+	checks context.Context // NOSONAR: per-request writer, the context never outlives the request
 	// base is the header set before the handler ran (StageProof); a refused response goes out
 	// with these headers only.
 	base http.Header

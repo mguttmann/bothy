@@ -167,6 +167,9 @@ func NewChain(cfg ChainConfig, deps Deps) (*Chain, error) {
 	return c, nil
 }
 
+// useStagePanic starts the panic messages of Use.
+const useStagePanic = "httpserver: Use: stage "
+
 // Use installs mw as the middleware of stage. It panics when the stage is already set (also for
 // the stages this ticket fills), when stage is StageRoute or outside the constants, and after the
 // first Wrap: each stage has one owner, and a route mounted before the stage was set would miss it.
@@ -175,13 +178,13 @@ func (c *Chain) Use(stage Stage, mw func(http.Handler) http.Handler) {
 	defer c.mu.Unlock()
 	switch {
 	case stage <= StageRoute || stage >= stageEnd:
-		panic("httpserver: Use: stage " + stage.String() + " cannot be set")
+		panic(useStagePanic + stage.String() + " cannot be set")
 	case mw == nil:
 		panic("httpserver: Use: nil middleware for stage " + stage.String())
 	case c.sealed:
-		panic("httpserver: Use: stage " + stage.String() + " set after routes were mounted")
+		panic(useStagePanic + stage.String() + " set after routes were mounted")
 	case c.stages[stage] != nil:
-		panic("httpserver: Use: stage " + stage.String() + " is already set")
+		panic(useStagePanic + stage.String() + " is already set")
 	}
 	c.stages[stage] = mw
 }

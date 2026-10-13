@@ -44,6 +44,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 )
 
+// headerContentType is the name of the Content-Type header.
+const headerContentType = "Content-Type"
+
 // Contract is the test contract (OpenAPI 3.1) the harness validates against by default: the
 // operations getThing, updateThing, createThing, createShape, createComposed, uploadBlob, postHook
 // and getDiscovery with the schema features of docs/api/openapi.yaml.
@@ -169,7 +172,7 @@ type Response struct {
 // Problem decodes the body as a problem; it fails the test when the body is not one.
 func (r *Response) Problem(t testing.TB) map[string]any {
 	t.Helper()
-	if ct := r.Header.Get("Content-Type"); ct != "application/problem+json" {
+	if ct := r.Header.Get(headerContentType); ct != "application/problem+json" {
 		t.Fatalf("Content-Type = %q, want application/problem+json; body %s", ct, r.Body)
 	}
 	var p map[string]any
@@ -192,7 +195,7 @@ func (h *Harness) NewRequest(method, path, body string, headers ...string) *http
 		h.t.Fatalf("httpservertest: request: %v", err)
 	}
 	if body != "" {
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set(headerContentType, "application/json")
 	}
 	for i := 0; i+1 < len(headers); i += 2 {
 		req.Header.Set(headers[i], headers[i+1])
@@ -276,7 +279,7 @@ func Authorized(action string, next http.HandlerFunc) http.HandlerFunc {
 
 // JSON writes v as application/json with status.
 func JSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set(headerContentType, "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }
