@@ -372,6 +372,15 @@ nav:
           - "M4-27: Administration: grant wizard, Who has access, View as person": briefs/M4-27-admin-grants.md
           - "M4-28: Administration: agents, backend switch, costs and tokens": briefs/M4-28-admin-agents.md
           - "M4-29: Administration: audit view": briefs/M4-29-admin-audit.md
+          - "M4-30: Windows: notification area and local notifications": briefs/M4-30-windows-tray-notifications.md
+          - "M4-31: Client metrics and crash reports (ADR 0057)": briefs/M4-31-client-metrics.md
+          - "M4-32: Accessibility on the desktop": briefs/M4-32-desktop-accessibility.md
+          - "M4-33: Channel menu: notification level and export": briefs/M4-33-channel-menu.md
+          - "M4-34: Desktop E2E and performance targets": briefs/M4-34-desktop-e2e-perf.md
+          - "M4-35: Package `terminal_ui` and terminal view": briefs/M4-35-terminal-ui.md
+          - "M4-36: Terminal on the desktop": briefs/M4-36-terminal-desktop.md
+          - "M4-37: Administration: hosts, pairing and grant `terminal`": briefs/M4-37-admin-hosts.md
+          - "M4-38: Terminal E2E and performance targets on the desktop": briefs/M4-38-terminal-e2e-perf.md
       - Milestone M6:
           - "M6-01: Console session following the BFF pattern": briefs/M6-01-console-session.md
           - "M6-05: Statistics in the server": briefs/M6-05-stats-server.md
