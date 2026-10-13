@@ -1,6 +1,6 @@
 # Module `authz`
 
-Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. The rights snapshot and `authorize` (M1-28), rights changes (M1-29) and the use cases (M1-48) follow.
+Status: skeleton (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. The permission snapshot and `authorize` (M1-28), rights changes (M1-29) and the use cases (M1-48) follow.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
