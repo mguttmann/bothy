@@ -94,7 +94,7 @@ func TestMigration_InstanceTablesMatchSpec(t *testing.T) {
 	if got := constraints(t, super, "sequence_counters"); !slices.Equal(got, wantCounterCons) {
 		t.Errorf("sequence_counters constraints\n got %v\nwant %v", got, wantCounterCons)
 	}
-	// No further indexes than the keys (03: "Indexe: keine weiteren").
+	// No further indexes than the keys (03: "Indexes: no others").
 	var extra int
 	if err := super.QueryRow(context.Background(), `SELECT count(*) FROM pg_index i
 		WHERE i.indrelid IN ('public.instance'::regclass, 'public.sequence_counters'::regclass)

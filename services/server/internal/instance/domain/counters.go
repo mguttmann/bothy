@@ -68,7 +68,7 @@ func CheckAdvance(counter, phase string) error {
 	}
 	if want := advancePhase[counter]; phase != want {
 		return errs.New(errs.CodeInternalError,
-			fmt.Sprintf("instance: Advance(%s) in phase %s; allowed only in phase %s (02 Sperrreihenfolge)", counter, phase, want))
+			fmt.Sprintf("instance: Advance(%s) in phase %s; allowed only in phase %s (02 section 8.2, lock order)", counter, phase, want))
 	}
 	return nil
 }

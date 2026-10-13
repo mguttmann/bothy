@@ -16,7 +16,8 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 | `config.go`, `configkeys_*.go`, `configchecks.go`, `configchapters.go` | configuration schema and cross-checks |
 | `database.go`, `egress.go`, `secrets.go`, `telemetry.go` | binding of the platform `Config` structs, the secret provider |
 | `routes.go` | `Role`, `Handlers`, `MountRoutes` (start step 7) |
-| `jobs.go` | `JobsConfig`, `JobRole`, `NewJobRegistry` (one job registry for all roles), `MigrationSteps` (River before goose) |
+| `jobs.go` | `JobsConfig`, `JobRole`, `NewJobRegistry` (one job registry for all roles), `MigrateUpSteps` (River before goose, then the after-step `instance`) |
+| `instance.go` | `MigrationSteps` (the after-step `instance`), `InstanceCounters` and `loadInstance`, the start step `instance` |
 | `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
 | `switchlog.go` | the process logger that follows the switch from stdout JSON to the telemetry logger |
 

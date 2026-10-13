@@ -209,9 +209,11 @@ documented in this file. The format is based on
 
 ### Changed
 
-- `wire.MigrationSteps` takes the migrate pool and the migration set and returns an error.
+- `wire.MigrationSteps` takes the migrate pool and the migration set, returns an error and gives
+  only the after-step `instance`; River's step before goose moved to the new
+  `wire.MigrateUpSteps`, which `bothy migrate up` calls.
 - `golang.org/x/tools` is a direct dependency at v0.50.0 (tests only: `go/packages` for the
-  static check; v0.49.0 cannot read the export data of Go 1.27).
+  static check; v0.49.0 cannot read the export data of Go 1.27, ruling M1-15/6).
 - Go coverage of the module leaves generated files (`*.gen.go`) out of the total.
 
 ### Security
