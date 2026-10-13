@@ -255,3 +255,12 @@ def test_check_reports_gate_not_default_on_server(server: tuple[State, str]) -> 
     report = qs.check(_client(url), config)
     assert report.problems == ["gate 'Bothy way' is not the default gate"]
     assert report.gaps == []
+
+
+def test_error_names_the_server_message(server: tuple[State, str]) -> None:
+    # A refusal is only diagnosable from the run log if the server's reason is printed.
+    _, url = server
+    with pytest.raises(qs.SonarError, match=r"HTTP 400: missing parameter$") as err:
+        _client(url).post("api/qualitygates/create_condition", gateName="absent", metric="m")
+    assert err.value.status == 400
+    assert TOKEN not in str(err.value)

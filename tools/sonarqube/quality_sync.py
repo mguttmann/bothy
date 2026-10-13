@@ -37,6 +37,7 @@ from typing import Any
 DEFAULT_CONFIG = Path(__file__).resolve().parents[2] / "quality" / "sonar"
 _RULE = re.compile(r"<repositoryKey>([^<]+)</repositoryKey>\s*<key>([^<]+)</key>")
 _TIMEOUT_S = 60
+_MAX_ERROR_CHARS = 300
 GATE_NOT_DEFAULT = "gate not default: plan does not allow it"
 
 
@@ -110,6 +111,16 @@ def xml_rules(text: str) -> set[str]:
     return {f"{repo}:{key}" for repo, key in _RULE.findall(text)}
 
 
+def _error_messages(body: bytes) -> str:
+    """Return ': <msg>; <msg>' from a Web API error body, or '' if it carries none."""
+    try:
+        errors = json.loads(body)["errors"]
+        text = "; ".join(str(e["msg"]) for e in errors)
+    except (ValueError, KeyError, TypeError):
+        return ""
+    return f": {text[:_MAX_ERROR_CHARS]}" if text else ""
+
+
 class Client:
     """Minimal SonarQube Web API client (token auth, optional organization for the cloud)."""
 
@@ -133,11 +144,13 @@ class Client:
                 body: bytes = resp.read()
                 return body
         except urllib.error.HTTPError as exc:
+            reason = _error_messages(exc.read())
             exc.close()
             if exc.code == 404:
                 raise LookupError(req.full_url.split("?")[0]) from None
             raise SonarError(
-                f"{req.get_method()} {req.full_url.split('?')[0]}: HTTP {exc.code}", exc.code
+                f"{req.get_method()} {req.full_url.split('?')[0]}: HTTP {exc.code}{reason}",
+                exc.code,
             ) from None
 
     def get(self, path: str, **params: str) -> bytes:
