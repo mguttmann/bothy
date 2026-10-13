@@ -174,10 +174,14 @@ func integer(v any) (int64, bool) {
 	return n, n <= MaxSafeInteger && n >= -MaxSafeInteger
 }
 
-// isIPAddress reports a string that parses as an IP address: the code pattern admits
-// "192.0.2.44" and "2001:db8::44", but an address may reach the log only as ip_hmac (20 "4.5").
+// isIPAddress reports a string that parses as an IP address, with or without a port: the code
+// pattern admits "192.0.2.44", "192.0.2.44:8080" and "2001:db8::44", but an address may reach the
+// log only as ip_hmac (20 "4.5").
 func isIPAddress(s string) bool {
-	_, err := netip.ParseAddr(s)
+	if _, err := netip.ParseAddr(s); err == nil {
+		return true
+	}
+	_, err := netip.ParseAddrPort(s)
 	return err == nil
 }
 

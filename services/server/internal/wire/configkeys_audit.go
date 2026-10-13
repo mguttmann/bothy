@@ -4,14 +4,14 @@ package wire
 
 import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
-// auditConfigKeys returns the keys of the audit module (M1-24): the aggregation of identical
-// denials from docs/spec/05-actions.md and the IP pseudonym keys from 20-privacy.md
-// "Configuration values of this chapter". The cross-check audit_ip_key_retention in configchecks.go
-// holds the retention at least one period.
 // denyAggregateWindowDefault is the default of audit.deny_aggregate_window (05 table); a named
 // constant because the same text is the default of other keys (goconst).
 const denyAggregateWindowDefault = "60s"
 
+// auditConfigKeys returns the keys of the audit module (M1-24): the aggregation of identical
+// denials from docs/spec/05-actions.md and the IP pseudonym keys from 20-privacy.md
+// "Configuration values of this chapter". The cross-check audit_ip_key_retention in configchecks.go
+// holds the retention at least one period.
 func auditConfigKeys() []config.Key {
 	return []config.Key{
 		{

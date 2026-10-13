@@ -103,13 +103,15 @@ func (a *Audit) Start(r *lifecycle.Runner) {
 }
 
 // stop ends the aggregator and flushes it within the budget of ctx; what cannot be written is
-// reported as dropped (Aggregator.Close).
+// reported as dropped (Aggregator.Close). When the budget ends while the aggregator is still inside
+// a write, the buckets still open are closed as well, so they are reported instead of vanishing;
+// the buckets of the write in flight stay with that write.
 func (a *Audit) stop(ctx context.Context) error {
 	a.stopOnce.Do(a.cancel)
 	select {
 	case <-a.done:
 	case <-ctx.Done():
-		return ctx.Err()
+		return errors.Join(ctx.Err(), a.recorder.Aggregator().Close(ctx))
 	}
 	return a.recorder.Aggregator().Close(ctx)
 }

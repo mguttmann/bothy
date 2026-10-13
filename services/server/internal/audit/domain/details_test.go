@@ -86,6 +86,8 @@ func TestDetailsV1_ClosedSchema(t *testing.T) {
 		"NUL in code":              func(d domain.DetailsV1) { d["level"] = "a\x00" },
 		"IPv4 address as code":     func(d domain.DetailsV1) { d["peer"] = "192.0.2.44" },
 		"IPv6 address as code":     func(d domain.DetailsV1) { d["peer"] = "2001:db8::44" },
+		"IPv4 with port as code":   func(d domain.DetailsV1) { d["peer"] = "192.0.2.44:8080" },
+		"IPv6 with port as code":   func(d domain.DetailsV1) { d["peer"] = "[2001:db8::44]:8080" },
 		"IP address in a list":     func(d domain.DetailsV1) { d["peers"] = []any{"192.0.2.44"} },
 	}
 	for name, mutate := range cases {
