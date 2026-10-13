@@ -8,6 +8,7 @@ var catalogEntries = []CatalogEntry{
 	{ID: "access.explain", Right: "owner or manage", RateLimitClass: "rl.read"},
 	{ID: "access.preview", Right: "permission of the target action", RateLimitClass: "rl.admin"},
 	{ID: "access.view_as", Right: "owner", RateLimitClass: "rl.admin"},
+	{ID: "access.view_as.end", Right: "self", RateLimitClass: "rl.admin"},
 	{ID: "agent.billing_mode.set", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "agent.billing_mode.set_all", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "agent.config.read", Right: "agent-self and effective operator", RateLimitClass: "rl.read"},

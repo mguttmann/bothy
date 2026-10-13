@@ -143,6 +143,11 @@ operated, and the order of the build.
   corrects the column "Depends on" of nine M4 tickets in the plan, and D-W-116 for eight more); a
   docs test holds the shape of every brief (title, status line, sections, report placeholders);
   the apps read the server-place keys that steer their own behaviour through `AppConfig` (D-W-115).
+- Build briefs of milestone M6 for the console session, the statistics in the server and the
+  visualization track (`docs/briefs/M6-01`, `M6-05`, `M6-10` to `M6-15`) in the brief index with
+  waves and graph and in the site navigation, written before M1 closes (D-W-120); core contract
+  for the console session: the stored "View as person" on `auth_sessions` (R-DM-49) and the action
+  `access.view_as.end` (R-AZ-32).
 
 - Gate `register-check` (`tools/doccheck/register_check.py`): the module register
   `services/server/architecture/modules.yaml` must equal the tables and their modules in

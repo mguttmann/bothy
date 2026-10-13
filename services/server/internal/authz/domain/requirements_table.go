@@ -52,7 +52,7 @@ var requirementGroups = []struct {
 		"auth.login.begin", "auth.login.complete", "instance.discovery.read", "status.public.read",
 	}},
 	{"self", Self, []string{
-		"auth.logout", "auth.step_up", "draft.read", "identity.link", "local_credential.set",
+		"access.view_as.end", "auth.logout", "auth.step_up", "draft.read", "identity.link", "local_credential.set",
 		"mention.list", "passkey.register", "push.register", "push.unregister", "quiet_hours.update",
 		"self.profile.update", "session.extension.create", "settings.read", "settings.update",
 	}},

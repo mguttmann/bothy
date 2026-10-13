@@ -88,7 +88,7 @@ modules:
               identity.link, identity.unlink, local_credential.set, passkey.register,
               passkey.revoke, device.list, device.approve, device.revoke, device.expire,
               session.list, session.revoke, session.extension.create, token.list, token.create,
-              token.revoke]
+              token.revoke, access.view_as.end]
     events: [user.updated, session.revoked, device.pending]
     ephemeral_events: []
     ws_ops: []

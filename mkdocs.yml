@@ -372,3 +372,12 @@ nav:
           - "M4-27: Administration: grant wizard, Who has access, View as person": briefs/M4-27-admin-grants.md
           - "M4-28: Administration: agents, backend switch, costs and tokens": briefs/M4-28-admin-agents.md
           - "M4-29: Administration: audit view": briefs/M4-29-admin-audit.md
+      - Milestone M6:
+          - "M6-01: Console session following the BFF pattern": briefs/M6-01-console-session.md
+          - "M6-05: Statistics in the server": briefs/M6-05-stats-server.md
+          - "M6-10: Design tokens for charts: check for color vision deficiency": briefs/M6-10-viz-cvd-check.md
+          - "M6-11: `bothy_viz`: primitives, models, fixtures and harness": briefs/M6-11-viz-package.md
+          - "M6-12: `bothy_viz`: six views": briefs/M6-12-viz-views.md
+          - "M6-13: stats: own measurement": briefs/M6-13-stats-measure.md
+          - "M6-14: stats: timeline, SLO traffic light and backend view": briefs/M6-14-stats-queries.md
+          - "M6-15: stats: live stream `stats.live`": briefs/M6-15-stats-live.md

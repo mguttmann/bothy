@@ -7,9 +7,9 @@ tests to write first, the acceptance criteria and the report format. Order and d
 from the [plan](../PLAN.md) (section "Tickets" of each milestone); this index repeats them for
 the launcher.
 
-Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2, M3 and M4. By the
-owner's decisions of 2026-10-11 and 2026-10-13 the M2, M3 and M4 briefs were written before M1
-closed, so that builds do not run out of work (D-W-100 and D-W-114 in
+Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2, M3, M4 and M6. By the
+owner's decisions of 2026-10-11 and 2026-10-13 the briefs of M2 to M6 are written before M1
+closes, so that builds do not run out of work (D-W-100, D-W-114 and D-W-120 in
 [DECISIONS.md](../DECISIONS.md)): they name interfaces of earlier milestones as those briefs and
 the merged code name them, and each carries the boundary that a build session follows merged
 code that differs only in names and stops with `Verdict: BLOCKED` where it behaves differently
@@ -83,11 +83,11 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | Wave | Tickets that may run in parallel |
 |---|---|
 | 1 | M1-01, M1-02, M2-32, M4-03 |
-| 2 | M1-03, M1-04, M1-05, M2-38, M4-01 |
+| 2 | M1-03, M1-04, M1-05, M2-38, M4-01, M6-10 |
 | 3 | M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10 |
 | 4 | M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16 |
-| 5 | M1-10, M1-12, M3-02, M4-07, M4-09, M4-15 |
-| 6 | M1-11, M1-13, M4-13 |
+| 5 | M1-10, M1-12, M3-02, M4-07, M4-09, M4-15, M6-11 |
+| 6 | M1-11, M1-13, M4-13, M6-12 |
 | 7 | M1-14, M1-15, M1-18, M1-23, M1-26, M4-14 |
 | 8 | M1-16, M1-19, M1-21, M1-24, M1-25, M1-27, M4-17 |
 | 9 | M1-20, M1-28, M2-01, M4-18 |
@@ -104,7 +104,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 20 | M1-59, M1-61 |
 | 21 | M1-62, M1-63, M3-18 |
 | 22 | M1-64, M1-71 |
-| 23 | M1-65 |
+| 23 | M1-65, M6-01 |
 | 24 | M1-66, M1-70, M1-72, M2-07 |
 | 25 | M1-67, M1-68, M2-20 |
 | 26 | M1-69, M2-21, M2-43 |
@@ -116,16 +116,16 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 32 | M2-09, M2-16 |
 | 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19, M3-19 |
 | 34 | M2-11, M2-22, M2-25, M2-29, M3-20, M3-21, M3-23 |
-| 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24 |
-| 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22 |
-| 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23 |
-| 38 | M4-24 |
+| 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24, M6-13 |
+| 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22, M6-15 |
+| 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23, M6-05 |
+| 38 | M4-24, M6-14 |
 
 ## Index
 
 Dependencies are minimal: a ticket implied through another dependency is not repeated. Brief files
 are added by the brief-writing steps (plan ticket M0-05 for M1, D-W-100 for M2 and M3, D-W-114 for
-M4) under the
+M4, D-W-120 for M5 and M6) under the
 names listed here.
 
 | Wave | ID | Title | Brief file | Depends on |
@@ -307,6 +307,14 @@ names listed here.
 | 12 | M4-27 | Administration: grant wizard, Who has access, View as person | `M4-27-admin-grants.md` | M4-26 |
 | 27 | M4-28 | Administration: agents, backend switch, costs and tokens | `M4-28-admin-agents.md` | M4-27, M2-21 |
 | 12 | M4-29 | Administration: audit view | `M4-29-admin-audit.md` | M4-26 |
+| 23 | M6-01 | Console session following the BFF pattern | `M6-01-console-session.md` | M1-39, M1-40, M1-41, M1-43, M1-45, M1-49, M1-64 |
+| 37 | M6-05 | Statistics in the server | `M6-05-stats-server.md` | M2-22, M2-26, M3-22 |
+| 2 | M6-10 | Design tokens for charts: check for color vision deficiency | `M6-10-viz-cvd-check.md` | M4-03 |
+| 5 | M6-11 | `bothy_viz`: primitives, models, fixtures and harness | `M6-11-viz-package.md` | M1-04, M4-02, M4-04, M4-06, M4-08, M6-10 |
+| 6 | M6-12 | `bothy_viz`: six views | `M6-12-viz-views.md` | M6-11 |
+| 35 | M6-13 | stats: own measurement | `M6-13-stats-measure.md` | M2-15, M2-21, M2-22, M3-20, M3-21, M6-11 |
+| 38 | M6-14 | stats: timeline, SLO traffic light and backend view | `M6-14-stats-queries.md` | M2-30, M6-05, M6-13 |
+| 36 | M6-15 | stats: live stream `stats.live` | `M6-15-stats-live.md` | M6-13 |
 
 ## Make targets created by tickets
 
@@ -820,4 +828,32 @@ flowchart TB
   M2_21 --> M4_28
   M4_27 --> M4_28
   M4_26 --> M4_29
+  M1_39 --> M6_01
+  M1_40 --> M6_01
+  M1_41 --> M6_01
+  M1_43 --> M6_01
+  M1_45 --> M6_01
+  M1_49 --> M6_01
+  M1_64 --> M6_01
+  M2_22 --> M6_05
+  M2_26 --> M6_05
+  M3_22 --> M6_05
+  M4_03 --> M6_10
+  M1_04 --> M6_11
+  M4_02 --> M6_11
+  M4_04 --> M6_11
+  M4_06 --> M6_11
+  M4_08 --> M6_11
+  M6_10 --> M6_11
+  M6_11 --> M6_12
+  M2_15 --> M6_13
+  M2_21 --> M6_13
+  M2_22 --> M6_13
+  M3_20 --> M6_13
+  M3_21 --> M6_13
+  M6_11 --> M6_13
+  M2_30 --> M6_14
+  M6_05 --> M6_14
+  M6_13 --> M6_14
+  M6_13 --> M6_15
 ```
