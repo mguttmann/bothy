@@ -57,6 +57,11 @@ class Config:
     profile_name: str
     parent: str
     profiles: dict[str, Path]
+    cloud_parent: str = ""
+
+    def parent_for(self, client: Client) -> str:
+        """Return the built-in parent profile on this server (SonarQube Cloud has its own)."""
+        return (self.cloud_parent or self.parent) if client.is_cloud else self.parent
 
 
 @dataclass
@@ -79,7 +84,14 @@ def load_config(directory: Path) -> Config:
             f"<name>{manifest['profile_name']}</name>" not in text
         ):
             raise SonarError(f"{path.name}: name or language does not match profiles.json")
-    return Config(gate["name"], conditions, manifest["profile_name"], manifest["parent"], profiles)
+    return Config(
+        gate["name"],
+        conditions,
+        manifest["profile_name"],
+        manifest["parent"],
+        profiles,
+        manifest.get("cloud_parent", ""),
+    )
 
 
 def xml_rules(text: str) -> set[str]:
@@ -219,14 +231,15 @@ def apply(client: Client, config: Config) -> Report:
         **_gate_ref(client, "id", gate_id, "name", config.gate_name),
     )
 
+    parent = config.parent_for(client)
     available = _languages(client)
     for language, xml_path in config.profiles.items():
         if language not in available:
             report.skipped_languages.append(language)
             continue
-        if _profile(client, language, config.parent) is None:
+        if _profile(client, language, parent) is None:
             raise SonarError(
-                f"{language}: parent profile '{config.parent}' does not exist on this server; "
+                f"{language}: parent profile '{parent}' does not exist on this server; "
                 "adjust quality/sonar/profiles.json after checking the built-in profiles"
             )
         if _profile(client, language, config.profile_name) is None:
@@ -235,7 +248,7 @@ def apply(client: Client, config: Config) -> Report:
             "api/qualityprofiles/change_parent",
             language=language,
             qualityProfile=config.profile_name,
-            parentQualityProfile=config.parent,
+            parentQualityProfile=parent,
         )
         client.post_file(
             "api/qualityprofiles/restore",
@@ -270,6 +283,7 @@ def check(client: Client, config: Config) -> Report:
                 )
         report.problems += [f"gate '{config.gate_name}': extra condition {m}" for m in sorted(have)]
 
+    want_parent = config.parent_for(client)
     available = _languages(client)
     for language, xml_path in config.profiles.items():
         if language not in available:
@@ -280,13 +294,13 @@ def check(client: Client, config: Config) -> Report:
             report.problems.append(f"profile {language}: '{config.profile_name}' is missing")
             continue
         parent = profile.get("parentName")
-        if parent != config.parent:
+        if parent != want_parent:
             report.problems.append(
-                f"profile {language}: parent is {parent!r}, want {config.parent!r}"
+                f"profile {language}: parent is {parent!r}, want {want_parent!r}"
             )
             continue
         delta = _active_rules(client, language, config.profile_name) - _active_rules(
-            client, language, config.parent
+            client, language, want_parent
         )
         want_rules = xml_rules(xml_path.read_text(encoding="utf-8"))
         if delta != want_rules:

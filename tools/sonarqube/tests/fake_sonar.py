@@ -35,6 +35,7 @@ class Profile:
 class State:
     languages: tuple[str, ...] = ("go", "py", "ts", "js", "docker", "kotlin")
     cloud: bool = False
+    builtin_profile: str = "Sonar way"
     gates: dict[str, list[dict[str, str]]] = field(default_factory=dict)
     gate_ids: dict[str, str] = field(default_factory=dict)
     default_gate: str | None = None
@@ -48,7 +49,7 @@ class State:
             self.profiles.append(
                 Profile(
                     f"sw-{lang}",
-                    "Sonar way",
+                    self.builtin_profile,
                     lang,
                     builtin=True,
                     own_rules={f"{lang}:S100", f"{lang}:S107"},

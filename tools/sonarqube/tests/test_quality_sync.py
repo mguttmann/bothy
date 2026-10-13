@@ -151,11 +151,15 @@ def test_organization_is_sent_for_cloud(server: tuple[State, str]) -> None:
 
 
 def test_apply_then_check_on_cloud_api() -> None:
-    state = State(cloud=True)
+    # SonarQube Cloud has no profile "Sonar way" (api/qualityprofiles/search, 2026-10-13).
+    state = State(cloud=True, builtin_profile="Sonar way comprehensive")
     config = qs.load_config(REPO / "quality" / "sonar")
     with running(state) as url:
         qs.apply(_client(url, organization="example-org"), config)
         assert state.default_gate == "Bothy way"
+        go = state.profile("go", "Bothy way")
+        assert go is not None
+        assert go.parent == "Sonar way comprehensive"
         assert [(c["metric"], c["op"], c["error"]) for c in state.gates["Bothy way"]] == [
             (c.metric, c.op, c.error) for c in config.conditions
         ]

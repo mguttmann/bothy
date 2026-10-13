@@ -114,7 +114,9 @@ Where the token exists only as the GitHub Actions secret `SONAR_TOKEN`, the manu
 `.github/workflows/sonar-config.yml` runs both targets against the cloud
 (`gh workflow run sonar-config.yml --ref main`, variable `SONAR_ORGANIZATION`). The cloud
 addresses the gate by its id in `create_condition` and `set_as_default`, the Community Build
-by its name; `quality_sync.py` chooses by `--organization`.
+by its name, and it has no built-in profile "Sonar way": there the profiles inherit from
+`cloud_parent` of `quality/sonar/profiles.json` (ADR 0040). `quality_sync.py` chooses both by
+`--organization`.
 
 Both checks (local and cloud) pass against the same files, so the same rules
 apply. What is compared is the addition on top of the parent profile and every gate condition. The
