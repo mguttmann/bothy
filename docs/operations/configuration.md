@@ -483,8 +483,8 @@ Source: [12-files.md](../spec/12-files.md), section 18.
 
 | Key | Environment | Place | Type | Default | Meaning | Status |
 |---|---|---|---|---|---|---|
-| `file.storage.driver` | `BOTHY_FILE__STORAGE__DRIVER` | Server |  | `fs` | `fs` or `s3` | planned (M3) |
-| `file.fs.root` | `BOTHY_FILE__FS__ROOT` | Server |  | `/var/lib/bothy/files` | root of the file system driver (path in the container) | planned (M3) |
+| `file.storage.driver` | `BOTHY_FILE__STORAGE__DRIVER` | Server | enum(fs, s3) | `fs` | `fs` or `s3` | active |
+| `file.fs.root` | `BOTHY_FILE__FS__ROOT` | Server | string | `/var/lib/bothy/files` | root of the file system driver (path in the container) | active |
 | `file.fs.min_free_bytes` | `BOTHY_FILE__FS__MIN_FREE_BYTES` | Server |  | `2147483648` | free space below which uploads are rejected with `503 unavailable` (`reason` `storage_full`) | planned (M3) |
 | `file.s3.endpoint` | `BOTHY_FILE__S3__ENDPOINT` | Server |  | empty | S3 endpoint | planned (M3) |
 | `file.s3.region` | `BOTHY_FILE__S3__REGION` | Server |  | `us-east-1` | region for the signature | planned (M3) |

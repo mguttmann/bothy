@@ -46,6 +46,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"http.transfer_timeout":              {Kind: config.KindDuration, Default: "10m", Min: "1ms", Chapter: "02-architecture.md"},
 		"http.unavailable_retry_after":       {Kind: config.KindDuration, Default: "5s", Min: "1s", Max: "1h", Chapter: "02-architecture.md"},
 		"file.max_upload_bytes":              {Kind: config.KindInt, Default: "104857600", Min: "1", Chapter: "03-data-model.md"},
+		"file.storage.driver":                {Kind: config.KindEnum, Default: "fs", Enum: []string{"fs", "s3"}, Chapter: "12-files.md"},
+		"file.fs.root":                       {Kind: config.KindString, Default: "/var/lib/bothy/files", Chapter: "12-files.md"},
 		"api.cors_allowed_origins":           {Kind: config.KindStringList, Default: "", Chapter: "06-api.md"},
 		"server.public_url":                  {Kind: config.KindURL, Required: true, Chapter: "16-operations.md"},
 		"server.trusted_proxies":             {Kind: config.KindCIDRList, Default: "127.0.0.1/32, ::1/128", Chapter: "16-operations.md"},

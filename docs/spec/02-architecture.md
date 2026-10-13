@@ -1021,7 +1021,10 @@ server loads.
    `server.internal_listen_addr` and `server.listen_addr` share no port other than `0` when their
    hosts are equal or one of the hosts is empty, `0.0.0.0` or `::` (also with an IPv6 zone; an
    IPv4-mapped IPv6 address counts as its IPv4 address). Port `0` may occur twice, because tests
-   bind port 0. In addition the loader checks a rule for a single key that no type expresses:
+   bind port 0. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
+   clean form (no `.` or `..` element, no trailing `/`; cross-check `file_fs_root_absolute`,
+   M3-01), because a relative root would depend on the working directory of the process; with
+   `s3` the root is not read. In addition the loader checks a rule for a single key that no type expresses:
    `secrets.dir` is an absolute path in clean form (no `.` or `..`, no double or trailing `/`),
    not `/`, without a NUL character and without `<`, as the secret provider requires; a wrong
    value is a problem of `secrets.dir` alone, not of the references that use `<secrets.dir>`.
