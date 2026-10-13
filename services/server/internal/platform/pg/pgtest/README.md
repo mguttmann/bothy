@@ -58,11 +58,43 @@ retrieved 2026-10-12; switched off with `TESTCONTAINERS_RYUK_DISABLED`,
 
 ## Cleanup
 
-`Main` terminates the container after the tests and removes the secrets directory; the container
-also has `AutoRemove`. A test binary that was killed leaves its container running. Find and remove
-such containers by their label:
+After the tests `Main` terminates the container and removes the secrets directory. A test binary
+that ends without reaching that point (a panicking test, the `-test.timeout` alarm, `SIGINT`,
+`SIGTERM`, `SIGKILL`) cannot clean up itself, and Ryuk is off, so the container cleans up after
+itself:
+
+- The test binary holds one superuser connection with `application_name` `pgtest-lease` for as
+  long as it runs and reopens it when it breaks. Right after opening it, it sets the comment
+  `pgtest-lease` on the database `postgres`, which marks the lease as taken.
+- The container runs a watchdog (`watchdogScript` in `pgtest.go`) around the image's own entry
+  point. It checks every second; once the lease is taken, `leaseMisses` checks in a row without
+  the connection stop PostgreSQL. A container whose lease was never taken (the binary died while
+  the container started) stops after `leaseStartGrace`, and so does one whose server gives no
+  readable answer for `leaseStartGrace` after the lease was taken (a hung server). The script
+  waits at most `leaseStopWait` for PostgreSQL to end, then exits, which ends the container.
+- The container has `AutoRemove`, so Docker removes it together with its anonymous data volume
+  when it stops.
+
+The operating system closes the connection of a process however it ends, so a container
+usually outlives its test binary by little more than `leaseMisses` seconds plus the shutdown (at
+most `leaseStopWait`); with a hung server it takes up to `leaseStartGrace`. `TestNoContainerSurvivesTheRun` proves it: it
+runs the test binary as a child that passes, fails, panics, runs into `-test.timeout` or is
+killed with `SIGKILL`, and checks that the container and its volume are gone afterwards; for the
+hanging children it first checks that the container of the live run stays longer than the
+watchdog needs to decide. `TestWatchdogScript` runs the watchdog script against stub
+executables for `psql` and the entry point and covers a held lease, a lost lease, a server that
+becomes unreadable after the lease was taken, a lease never taken and `docker stop`.
+
+Containers of older `pgtest` versions and of other test helpers that label their containers
+`org.bothy.test` but have no watchdog (such as `org.bothy.test=seaweedfs`) lack the label
+`org.bothy.test.watchdog=lease`; `Main` removes them, with their volumes, once they are older
+than `legacyReapAge`. `go test` stops a binary after 10 minutes by default (`-timeout`: "The default is 10 minutes (10m).", [go test flags](https://pkg.go.dev/cmd/go#hdr-Testing_flags), retrieved 2026-10-13); such a run with
+`-timeout 0` or a timeout above `legacyReapAge` may lose its container. Not covered: a Docker
+runtime that is paused or shut down while the test binary dies; the watchdog acts only while the
+container runs, and a container stopped by a runtime shutdown is left to Docker's `AutoRemove`
+handling. To look for or remove containers by hand:
 
 ```sh
 docker ps -a --filter label=org.bothy.test=pgtest
-docker rm -f <container id>
+docker rm -f -v <container id>   # -v removes the anonymous data volume as well
 ```

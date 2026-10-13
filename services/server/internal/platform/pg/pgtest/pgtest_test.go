@@ -66,6 +66,12 @@ func TestPgtestBindsLoopbackOnly(t *testing.T) {
 	if info.Config.Labels[label] != labelValue {
 		t.Errorf("label %s = %q, want %q", label, info.Config.Labels[label], labelValue)
 	}
+	if info.Config.Labels[watchdogLabel] != watchdogLabelValue {
+		t.Errorf("label %s = %q, want %q", watchdogLabel, info.Config.Labels[watchdogLabel], watchdogLabelValue)
+	}
+	if !info.HostConfig.AutoRemove {
+		t.Error("the container lacks AutoRemove, so a stopped container would stay")
+	}
 }
 
 func TestNewRequiresMain(t *testing.T) {

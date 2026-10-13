@@ -26,7 +26,7 @@ platform:                   # <name>: {depends_on: [<platform names>], vendors: 
   # and the class attribute of bothy.ratelimit.rejected from otel/attr.
   ratelimit: {depends_on: [httpserver, otel], vendors: [otel]}
   # pgtest (internal/platform/pg/pgtest) starts the test containers; only tests import it.
-  pg: {depends_on: [secrets], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi]}
+  pg: {depends_on: [secrets], vendors: [pgx, goose, otelpgx, otel, testcontainers, mobyapi, mobyclient]}
   # River only here (R-AR-09); jobstest (internal/platform/jobs/jobstest) prepares pgtest
   # databases for the job runtime; only tests import it.
   jobs: {depends_on: [pg, otel], vendors: [river, pgx, otel]}
@@ -261,3 +261,5 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   testcontainers: [github.com/testcontainers/testcontainers-go, github.com/testcontainers/testcontainers-go/**]
   # Port bindings and AutoRemove of the pgtest container: testcontainers takes these moby types.
   mobyapi: [github.com/moby/moby/api/types/container, github.com/moby/moby/api/types/network]
+  # pgtest lists and removes its leftover test containers (reapLegacy) with the Docker client.
+  mobyclient: [github.com/moby/moby/client]

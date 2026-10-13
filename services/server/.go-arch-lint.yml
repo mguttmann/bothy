@@ -16,6 +16,8 @@ vendors:
     in: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator, github.com/pb33f/libopenapi-validator/**]
   v-mobyapi:
     in: [github.com/moby/moby/api/types/container, github.com/moby/moby/api/types/network]
+  v-mobyclient:
+    in: [github.com/moby/moby/client]
   v-oapi:
     in: [github.com/oapi-codegen/runtime, github.com/oapi-codegen/runtime/**]
   v-openapi:
@@ -259,7 +261,7 @@ deps:
     canUse: [v-otel, v-otelhttp, v-otelslog]
   platform-pg:
     mayDependOn: [platform-pg, kernel-ports, platform-secrets, migrations]
-    canUse: [v-pgx, v-goose, v-otelpgx, v-otel, v-testcontainers, v-mobyapi]
+    canUse: [v-pgx, v-goose, v-otelpgx, v-otel, v-testcontainers, v-mobyapi, v-mobyclient]
   platform-ratelimit:
     mayDependOn: [platform-ratelimit, kernel-ports, platform-httpserver, platform-otel]
     canUse: [v-otel]
