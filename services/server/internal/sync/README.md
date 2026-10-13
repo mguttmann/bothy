@@ -65,7 +65,7 @@ sink list is empty today; M1-28 adds the rights cache, then M1-65 the hub.
 
 ### Worker consumers
 
-The port `Consumers` (02 "Ports, events and sources per module", "Worker-Cursor") runs the
+The port `Consumers` (02 "Ports, events and sources per module", "worker cursors") runs the
 consumers of the event log in the worker (02 "Worker consumers", ADR 0051). They are not the
 agent consumers of the module `agents` (`agent_consumer_cursors`, M2-07), which that port also
 calls `Consumers`: worker consumers are internal, have no API, consuming is no action and writes

@@ -43,6 +43,7 @@ components, in start order:
 | `identity` | after `audit`, `sync` and `authz`: resolves `auth.token_pepper_ref` once (32 bytes as hex, fail fast), builds `Identity` over the unit of work of `audit` and the Authorizer, starts the sweeper of the jti store with the stop step `dpop_replay_sweeper` in `PhaseHTTP`; `routes` mounts its device handlers unless `Deps.Handlers` names one (M1-33) | all |
 | `routes` | catalogue check of route bindings and registrations (all roles, M1-25); then `NewChain` (validator over `api/rest.Spec`, `actor.AnonymousOnly`), `InstallRateLimits` (start check of the classes, limiter in `StageRateLimit`, sweeper with the stop step `ratelimit_sweeper` in `PhaseHTTP`, M1-19) and `MountRoutes` on the public mux with the `authz` catalogue | api, all (check: every role) |
 | `jobs` | `jobs.ValidateMigrations` (missing River migrations abort with the hint to run `bothy migrate up`), `jobs.New` for the role, `Start` of River (02 "Start" step 8; no-op for api and while no kind is registered), `Runner.FailOn` on `Failed` | all |
+| `event_consumers` | after `jobs`: registers the handlers of `consumerHandlers` (none yet), inserts their cursor rows at the head (`Ensure`), registers the stop step `event_consumers` in `PhaseConsumers` and starts the runner with its own `LISTEN` connection; an unexpected end of the runner calls `Runner.FailOn` (M2-01) | worker, all |
 | `public_listener` | opens `server.listen_addr`, logs `public listener started` | api, all |
 | `ready` | readiness passes `startup`, logs `server ready` | all |
 
@@ -95,8 +96,8 @@ queue `maintenance`, every `sync.partition_maintenance_interval`, `RunOnStart`).
 
 ## Extension points
 
-A later ticket adds its part in `register` of `serve.go`, at the marked place, with its stop
-step:
+A later ticket adds its part in `components` of `serve.go` (the start sequence `register`
+adds), at the marked place, with its stop step:
 
 | Ticket | Component | Place | Stop phase |
 |---|---|---|---|
@@ -104,7 +105,6 @@ step:
 | M1-17 | module handlers in `Deps.Handlers` | `routes` | none |
 | M1-28, M1-65 | sinks of the log tail (rights cache, then hub) in `tailSinks` | `sync.go` | none |
 | M1-65 | gateway connections | with the log tail | `connections` |
-| M2 | worker consumers | after `jobs` | `consumers` |
 | M1-43 | readiness `trusted_header_requires_loopback` | before `ready` | none |
 | M1-18 | middleware chain around the public mux | `public_listener` | none |
 
