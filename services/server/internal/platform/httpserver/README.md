@@ -25,7 +25,9 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
   logger, the meter provider, the `actor.Authenticator` and the `Validator`.
 - `Chain.Wrap(op, handler)` per route, `Chain.Public(mux)` for the listener, `Chain.Preflight` for
   `OPTIONS <path>` when CORS origins are configured, `Chain.Use(stage, mw)` for the slots,
-  `Chain.SetFailedCredentialsHook` for M1-19, `Chain.Order()` for the documented order.
+  `Chain.SetCredentialsPrecheck` for M1-19 (installed by `ratelimit.Install`; its settle function
+  gets the result of the `Authenticator`), `Chain.SetFailedCredentialsHook`, `Chain.Order()` for the documented order. `Operation.RateLimitClass` is
+  the class `StageRateLimit` counts.
 - `WriteProblem(w, r, err)`, `ValidationErrorHandler`, `MalformedRequestHandler`: the error
   writers; `internal/wire` passes them to `routes.Build`.
 - `NewValidator(spec, operationIDs)`, `CheckJSON`, `SanitizeJSON`, `ClientIP`, `CheckOrigin`,
@@ -41,8 +43,8 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 | 4 | mux | routing; no pattern: `404 not_found`, wrong method: `405 method_not_allowed` with `Allow` |
 | 5 | `StageRoute` | operation into the context, `Cache-Control: no-store`, CORP, body limit, deadline, response writer |
 | 6 | `StageCORS` | none by default; `*` for `instance.discovery.read`; exact origins of `api.cors_allowed_origins` |
-| 7 | `StageAuthenticate` | `actor.Authenticator` with method, htu from `server.public_url`, `Authorization`, `DPoP`, client IP |
-| 8 | `StageRateLimit` | slot (M1-19) |
+| 7 | `StageAuthenticate` | precheck for requests with credentials (M1-19: `429` while `rl.public_auth` of the client IP is empty), `actor.Authenticator` with method, htu from `server.public_url`, `Authorization`, `DPoP`, client IP; failed-credentials hook |
+| 8 | `StageRateLimit` | token bucket of the operation's class (`platform/ratelimit`, M1-19): `RateLimit-Policy`, `RateLimit`; exhausted: `429 rate_limited` with `Retry-After` |
 | 9 | `StageMaintenance` | slot (M7-08) |
 | 10 | `StageIdempotency` | slot (M1-20) |
 | 11 | `StageBody` | media type (`415`), JSON guard (`400 malformed_request`), required body |

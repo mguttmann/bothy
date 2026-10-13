@@ -99,8 +99,6 @@ rules:
     milestone: M6
   - match: "push."  # M3-20, M3-21
     milestone: M3
-  - match: "ratelimit."  # M1-19
-    milestone: M1
   - match: "reaction."  # M1-59
     milestone: M1
   - match: "retention."  # M7-05

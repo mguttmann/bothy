@@ -79,7 +79,9 @@ func (c *Chain) CORSEnabled() bool { return len(c.origins) > 0 }
 // authenticateStage is StageAuthenticate: the Authenticator gets the method, the htu built from
 // server.public_url and the escaped path (never from the Host header), Authorization, DPoP and the
 // client IP. Without Authorization it returns the anonymous actor; its error becomes the problem
-// (after the failed-credentials hook of M1-19). The actor goes into the context.
+// (after the failed-credentials hook, when one is set). A request with credentials passes the precheck
+// of M1-19 first, whose settle function gets the result of the Authenticator. The actor goes into
+// the context.
 func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip, _ := reqmeta.ClientIP(r.Context())
@@ -90,11 +92,19 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 			DPoP:          r.Header.Get(headerDPoP),
 			ClientIP:      ip,
 		}
-		a, err := c.auth.Authenticate(r.Context(), creds)
+		c.mu.Lock()
+		hook, precheck := c.failedCreds, c.precheck
+		c.mu.Unlock()
+		var settle func(error)
+		if precheck != nil && creds.Present() {
+			var err error
+			if settle, err = precheck(r); err != nil {
+				WriteProblem(w, r, err)
+				return
+			}
+		}
+		a, err := authenticateSettled(r, c.auth, creds, settle)
 		if err != nil {
-			c.mu.Lock()
-			hook := c.failedCreds
-			c.mu.Unlock()
 			if hook != nil {
 				err = hook(r, err)
 			}
@@ -104,6 +114,29 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r.WithContext(actor.WithActor(r.Context(), a)))
 	})
 }
+
+// authenticateSettled runs the Authenticator and then settle (when not nil) exactly once with its
+// error. A panic of the Authenticator settles with errAuthenticatorPanic, a server failure that is
+// not a failed credential, and then panics on to the recover step, so a bug never keeps a token
+// the precheck reserved (M1-19).
+func authenticateSettled(r *http.Request, auth actor.Authenticator, creds actor.Credentials, settle func(error)) (a actor.Actor, err error) {
+	if settle == nil {
+		return auth.Authenticate(r.Context(), creds)
+	}
+	settled := false
+	defer func() {
+		if !settled {
+			settle(errAuthenticatorPanic)
+		}
+	}()
+	a, err = auth.Authenticate(r.Context(), creds)
+	settled = true
+	settle(err)
+	return a, err
+}
+
+// errAuthenticatorPanic is what settle sees when the Authenticator panicked.
+var errAuthenticatorPanic = errs.New(errs.CodeInternalError, "authenticator panicked")
 
 // authorization returns the Authorization header. Several lines are joined, so a request whose
 // first line is empty is never anonymous; the Authenticator refuses the joined value.
