@@ -119,6 +119,17 @@ Build by its name, and it has no built-in profile "Sonar way": there the profile
 `cloud_parent` of `quality/sonar/profiles.json` (ADR 0040). `quality_sync.py` chooses both by
 `--organization`.
 
+SonarQube Cloud makes a custom quality gate the organization default only on plans that
+include it; otherwise `set_as_default` answers HTTP 403. In cloud mode `quality_sync.py` then
+still applies the quality profiles of every language, and both `apply` and `check` print the
+gap `quality_sync: gap: gate not default: plan does not allow it` and exit 0. The gate
+"Bothy way" and its conditions still exist and are still compared; only its use as the
+default is missing, so the projects keep the organization's current default gate until the
+plan allows it.
+Every other difference (a condition, a parent, an activated rule) still fails the check. On
+the Community Build a refused `set_as_default` stops `apply`, and a gate that is not the
+default fails `check`.
+
 Both checks (local and cloud) pass against the same files, so the same rules
 apply. What is compared is the addition on top of the parent profile and every gate condition. The
 built-in parent profile itself can differ between the Community Build (monthly releases)

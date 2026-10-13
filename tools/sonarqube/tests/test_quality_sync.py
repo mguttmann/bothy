@@ -193,3 +193,65 @@ def test_main_apply_then_check(server: tuple[State, str], monkeypatch: pytest.Mo
     monkeypatch.delenv("SONAR_ORGANIZATION", raising=False)
     assert qs.main(["apply", "--url", url]) == 0
     assert qs.main(["check", "--url", url]) == 0
+
+
+def test_cloud_plan_refusing_default_gate_still_applies_profiles() -> None:
+    # SonarQube Cloud free plan: api/qualitygates/set_as_default answers HTTP 403.
+    state = State(
+        cloud=True, builtin_profile="Sonar way comprehensive", gate_default_forbidden=True
+    )
+    config = qs.load_config(REPO / "quality" / "sonar")
+    with running(state) as url:
+        applied = qs.apply(_client(url, organization="example-org"), config)
+        assert applied.problems == []
+        assert applied.gaps == [qs.GATE_NOT_DEFAULT]
+        assert state.default_gate is None
+        for language in ("docker", "go", "js", "kotlin", "py", "ts"):
+            prof = state.profile(language, "Bothy way")
+            assert prof is not None, language
+            assert prof.parent == "Sonar way comprehensive"
+            assert prof.default is True
+        checked = qs.check(_client(url, organization="example-org"), config)
+        assert checked.problems == []
+        assert checked.gaps == [qs.GATE_NOT_DEFAULT]
+        # Any other difference still fails the check.
+        state.gates["Bothy way"][2]["error"] = "60"
+        prof = state.profile("py", "Bothy way")
+        assert prof is not None
+        prof.own_rules.add("py:S9999")
+        assert qs.check(_client(url, organization="example-org"), config).problems == [
+            "gate 'Bothy way': condition new_coverage LT 60 differs (want LT 80)",
+            "profile py: activated beyond parent ['py:S9999'], want []",
+        ]
+
+
+def test_main_reports_gap_and_passes_on_cloud(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    state = State(
+        cloud=True, builtin_profile="Sonar way comprehensive", gate_default_forbidden=True
+    )
+    monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    with running(state) as url:
+        args = ["--url", url, "--organization", "example-org"]
+        assert qs.main(["apply", *args]) == 0
+        assert qs.main(["check", *args]) == 0
+    out = capsys.readouterr().out
+    assert out.count("quality_sync: gap: gate not default: plan does not allow it") == 2
+
+
+def test_server_refusing_default_gate_still_fails() -> None:
+    state = State(gate_default_forbidden=True)
+    config = qs.load_config(REPO / "quality" / "sonar")
+    with running(state) as url, pytest.raises(qs.SonarError, match="HTTP 403"):
+        qs.apply(_client(url), config)
+
+
+def test_check_reports_gate_not_default_on_server(server: tuple[State, str]) -> None:
+    state, url = server
+    config = qs.load_config(REPO / "quality" / "sonar")
+    qs.apply(_client(url), config)
+    state.default_gate = None
+    report = qs.check(_client(url), config)
+    assert report.problems == ["gate 'Bothy way' is not the default gate"]
+    assert report.gaps == []
