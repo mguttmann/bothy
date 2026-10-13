@@ -405,3 +405,13 @@ nav:
           - "M5-11: Device E2E and performance targets on mobile": briefs/M5-11-mobile-e2e-perf.md
           - "M5-12: Terminal on mobile with extra keys bar": briefs/M5-12-mobile-terminal.md
           - "M5-13: Terminal E2E on mobile": briefs/M5-13-mobile-terminal-e2e.md
+          - "M6-02: Console app and serving by the server (ADR 0028)": briefs/M6-02-console-app.md
+          - "M6-03: Content Security Policy with a headless test": briefs/M6-03-console-csp.md
+          - "M6-04: Administration in the console": briefs/M6-04-console-admin.md
+          - "M6-06: Statistics views": briefs/M6-06-stats-views.md
+          - "M6-07: Permission hints and expiry overview": briefs/M6-07-permission-hints.md
+          - "M6-08: Manage apps, webhooks and incoming webhooks": briefs/M6-08-apps-webhooks-admin.md
+          - "M6-09: Manage instance, branding, login providers and feature flags": briefs/M6-09-instance-admin.md
+          - "M6-16: Visualizations in the desktop app, console and mobile": briefs/M6-16-viz-in-apps.md
+          - "M6-17: Optional Grafana embedding in the console": briefs/M6-17-console-grafana-embed.md
+          - "M6-18: Terminal in the console (ADR 0070)": briefs/M6-18-console-terminal.md

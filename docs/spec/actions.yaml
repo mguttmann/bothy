@@ -88,6 +88,18 @@ actions:
   rights_change: false
   rl_class: rl.public_auth
   effect: read
+- id: console.csp_report
+  section: public
+  description: accept a Content Security Policy violation report of the web console, without content in the
+    log ([19-security.md](19-security.md), section 5, rule 6; R-AZ-33)
+  resource: instance
+  right: public
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.public_auth
+  effect: read
 - id: auth.login.begin
   section: public
   description: start a login (OIDC, passkey challenge, header login, device pairing)
@@ -376,6 +388,19 @@ actions:
   rights_change: false
   rl_class: rl.admin
   effect: write
+- id: access.hints.read
+  section: instance
+  description: read the lists "Permission hints" and "Expiring soon" (grants, memberships, agent and app tokens)
+    ([07-permissions.md](07-permissions.md), sections 9.4 and 9.5; R-AZ-34); a space only within one's own
+    `manage` scope
+  resource: instance, space
+  right: owner or manage
+  owner: false
+  step_up: false
+  audit: never
+  rights_change: false
+  rl_class: rl.read
+  effect: read
 - id: access.view_as
   section: instance
   description: '"View as person", read-only'

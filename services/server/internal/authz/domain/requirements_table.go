@@ -49,7 +49,7 @@ var requirementGroups = []struct {
 		"thread.read",
 	}},
 	{"public", Public, []string{
-		"auth.login.begin", "auth.login.complete", "instance.discovery.read", "status.public.read",
+		"auth.login.begin", "auth.login.complete", "console.csp_report", "instance.discovery.read", "status.public.read",
 	}},
 	{"self", Self, []string{
 		"access.view_as.end", "auth.logout", "auth.step_up", "draft.read", "identity.link", "local_credential.set",
@@ -137,7 +137,7 @@ var requirementGroups = []struct {
 	{"agent-self and token current", Deferred("M2"), []string{"run.token.renew"}},
 	{"auth and self", All(Auth, Self), []string{"self.read"}},
 	{"owner or manage", ByKind(map[string]Expr{kindInstance: Owner, kindSpace: Any(Owner, HasCap(CapManage))}), []string{
-		"stats.read",
+		"access.hints.read", "stats.read",
 	}},
 	{"read or self", ByKind(map[string]Expr{kindChannel: AtLeast(LevelRead), kindUserRes: Self}), []string{
 		"template.read",

@@ -6,6 +6,7 @@ package routes
 // sorted by ID.
 var catalogEntries = []CatalogEntry{
 	{ID: "access.explain", Right: "owner or manage", RateLimitClass: "rl.read"},
+	{ID: "access.hints.read", Right: "owner or manage", RateLimitClass: "rl.read"},
 	{ID: "access.preview", Right: "permission of the target action", RateLimitClass: "rl.admin"},
 	{ID: "access.view_as", Right: "owner", RateLimitClass: "rl.admin"},
 	{ID: "access.view_as.end", Right: "self", RateLimitClass: "rl.admin"},
@@ -58,6 +59,7 @@ var catalogEntries = []CatalogEntry{
 	{ID: "command.register", Right: "agent-self or app-self with scope", RateLimitClass: "rl.admin"},
 	{ID: "command.remove", Right: "agent-self or app-self with scope", RateLimitClass: "rl.admin"},
 	{ID: "component.update", Right: "author of the message (agent-self or app-self)", RateLimitClass: "rl.write"},
+	{ID: "console.csp_report", Right: "public", RateLimitClass: "rl.public_auth"},
 	{ID: "cost.read.aggregate", Right: "owner; space with manage", RateLimitClass: "rl.read"},
 	{ID: "cost.read.thread", Right: "read", RateLimitClass: "rl.read"},
 	{ID: "cost.reconcile", Right: "owner", RateLimitClass: "rl.admin"},

@@ -105,24 +105,24 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 21 | M1-62, M1-63, M3-18 |
 | 22 | M1-64, M1-71 |
 | 23 | M1-65, M6-01 |
-| 24 | M1-66, M1-70, M1-72, M2-07 |
+| 24 | M1-66, M1-70, M1-72, M2-07, M6-02 |
 | 25 | M1-67, M1-68, M2-20 |
 | 26 | M1-69, M2-21, M2-43 |
 | 27 | M1-73, M2-02, M2-44, M3-03, M4-28, M4-31 |
-| 28 | M2-03, M2-04, M2-45, M2-47, M3-04, M4-35 |
-| 29 | M2-05, M2-46, M3-05, M3-06 |
-| 30 | M2-06, M2-27, M2-48, M3-10, M3-11, M4-22 |
-| 31 | M2-08 |
+| 28 | M2-03, M2-04, M2-45, M2-47, M3-04, M4-35, M6-03 |
+| 29 | M2-05, M2-46, M3-05, M3-06, M6-04 |
+| 30 | M2-06, M2-27, M2-48, M3-10, M3-11, M4-22, M6-07 |
+| 31 | M2-08, M6-08, M6-09, M6-18 |
 | 32 | M2-09, M2-16 |
 | 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19, M3-19 |
 | 34 | M2-11, M2-22, M2-25, M2-29, M3-20, M3-21, M3-23 |
 | 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24, M4-30, M6-13 |
 | 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22, M4-33, M6-15 |
 | 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23, M6-05 |
-| 38 | M4-24, M5-02, M6-14 |
+| 38 | M4-24, M5-02, M6-06, M6-14 |
 | 39 | M4-32, M4-34, M4-36, M5-03, M5-04 |
-| 40 | M4-38, M5-05, M5-06, M5-07, M5-08, M5-09 |
-| 41 | M5-10, M5-11 |
+| 40 | M4-38, M5-05, M5-06, M5-07, M5-08, M5-09, M6-16 |
+| 41 | M5-10, M5-11, M6-17 |
 | 42 | M5-12 |
 | 43 | M5-13 |
 
@@ -342,6 +342,16 @@ names listed here.
 | 41 | M5-11 | Device E2E and performance targets on mobile | `M5-11-mobile-e2e-perf.md` | M1-39, M5-05, M5-06, M5-07, M5-08, M5-09 |
 | 42 | M5-12 | Terminal on mobile with extra keys bar | `M5-12-mobile-terminal.md` | M4-36, M5-10 |
 | 43 | M5-13 | Terminal E2E on mobile | `M5-13-mobile-terminal-e2e.md` | M4-38, M5-11, M5-12 |
+| 24 | M6-02 | Console app and serving by the server (ADR 0028) | `M6-02-console-app.md` | M4-07, M4-09, M6-01 |
+| 28 | M6-03 | Content Security Policy with a headless test | `M6-03-console-csp.md` | M1-73, M6-02 |
+| 29 | M6-04 | Administration in the console | `M6-04-console-admin.md` | M4-28, M4-29, M6-03 |
+| 38 | M6-06 | Statistics views | `M6-06-stats-views.md` | M4-26, M6-02, M6-05, M6-11 |
+| 30 | M6-07 | Permission hints and expiry overview | `M6-07-permission-hints.md` | M1-30, M6-04 |
+| 31 | M6-08 | Manage apps, webhooks and incoming webhooks | `M6-08-apps-webhooks-admin.md` | M2-26, M2-27, M6-04 |
+| 31 | M6-09 | Manage instance, branding, login providers and feature flags | `M6-09-instance-admin.md` | M1-47, M3-10, M6-04 |
+| 40 | M6-16 | Visualizations in the desktop app, console and mobile | `M6-16-viz-in-apps.md` | M5-03, M6-03, M6-06, M6-12, M6-14, M6-15 |
+| 41 | M6-17 | Optional Grafana embedding in the console | `M6-17-console-grafana-embed.md` | M6-16 |
+| 31 | M6-18 | Terminal in the console (ADR 0070) | `M6-18-console-terminal.md` | M2-48, M4-35, M4-37, M6-04 |
 
 ## Make targets created by tickets
 
@@ -376,6 +386,7 @@ waves, the graph and the column "Depends on" of the plan against the index.
 | `perf-desktop` | M4-34 |
 | `terminal-stack` | M4-36 |
 | `e2e-mobile` | M5-11 |
+| `console-e2e` | M6-03 |
 
 To change a dependency, edit the column "Depends on" of the index and the row in the plan, then
 run `uv run --project tools --locked --quiet python tools/docs/brief_deps.py --write`; it
@@ -937,9 +948,29 @@ flowchart TB
   M1_45 --> M6_01
   M1_49 --> M6_01
   M1_64 --> M6_01
+  M4_07 --> M6_02
+  M4_09 --> M6_02
+  M6_01 --> M6_02
+  M1_73 --> M6_03
+  M6_02 --> M6_03
+  M4_28 --> M6_04
+  M4_29 --> M6_04
+  M6_03 --> M6_04
   M2_22 --> M6_05
   M2_26 --> M6_05
   M3_22 --> M6_05
+  M4_26 --> M6_06
+  M6_02 --> M6_06
+  M6_05 --> M6_06
+  M6_11 --> M6_06
+  M1_30 --> M6_07
+  M6_04 --> M6_07
+  M2_26 --> M6_08
+  M2_27 --> M6_08
+  M6_04 --> M6_08
+  M1_47 --> M6_09
+  M3_10 --> M6_09
+  M6_04 --> M6_09
   M4_03 --> M6_10
   M1_04 --> M6_11
   M4_02 --> M6_11
@@ -958,4 +989,15 @@ flowchart TB
   M6_05 --> M6_14
   M6_13 --> M6_14
   M6_13 --> M6_15
+  M5_03 --> M6_16
+  M6_03 --> M6_16
+  M6_06 --> M6_16
+  M6_12 --> M6_16
+  M6_14 --> M6_16
+  M6_15 --> M6_16
+  M6_16 --> M6_17
+  M2_48 --> M6_18
+  M4_35 --> M6_18
+  M4_37 --> M6_18
+  M6_04 --> M6_18
 ```

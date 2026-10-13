@@ -70,7 +70,7 @@ states, with named constraints (`grants_subject_shape_check`, `grants_bot_limits
 
 ## Actions (05-actions.md)
 
-`access.explain`, `access.preview`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `group.member.expire`, `group.member.sync`, `grant.read`, `grant.create`, `grant.revoke`, `grant.expire`.
+`access.explain`, `access.hints.read`, `access.preview`, `access.view_as`, `group.read`, `group.create`, `group.update`, `group.delete`, `group.member.add`, `group.member.remove`, `group.member.expire`, `group.member.sync`, `grant.read`, `grant.create`, `grant.revoke`, `grant.expire`.
 
 ## Events and WebSocket ops
 
