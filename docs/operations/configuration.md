@@ -340,7 +340,7 @@ Source: [06-api.md](../spec/06-api.md), section 20.
 |---|---|---|---|---|---|---|
 | `api.page_size_default` | `BOTHY_API__PAGE_SIZE_DEFAULT` | Server |  | `50` | page size without `limit` | planned (M1) |
 | `api.page_size_max` | `BOTHY_API__PAGE_SIZE_MAX` | Server |  | `200` | larger `limit` values are capped | planned (M1) |
-| `api.cors_allowed_origins` | `BOTHY_API__CORS_ALLOWED_ORIGINS` | Server | list(string) | empty | additional origins for CORS | active |
+| `api.cors_allowed_origins` | `BOTHY_API__CORS_ALLOWED_ORIGINS` | Server | list(string) | empty | additional origins for CORS, each in the form of `server.public_url` | active |
 | `api.deprecation_min_notice` | `BOTHY_API__DEPRECATION_MIN_NOTICE` | Server |  | `180d` | minimum gap from `Deprecation` to `Sunset` | planned (M1) |
 | `api.major_version_overlap` | `BOTHY_API__MAJOR_VERSION_OVERLAP` | Server |  | `365d` | how long an old major version stays after the new one appears | planned (M7) |
 | `api.stats_max_buckets` | `BOTHY_API__STATS_MAX_BUCKETS` | Server |  | `1000` | time buckets per statistics query; more yields `400` | planned (M6) |
@@ -629,7 +629,7 @@ Source: [16-operations.md](../spec/16-operations.md), section 14.
 | `server.role` | `BOTHY_SERVER__ROLE` | Server | enum(api, worker, all) | `all` | `api`, `worker` or `all` | active |
 | `server.listen_addr` | `BOTHY_SERVER__LISTEN_ADDR` | Server | listen address | `127.0.0.1:8080` | public listener (REST, gateway) | active |
 | `server.internal_listen_addr` | `BOTHY_SERVER__INTERNAL_LISTEN_ADDR` | Server | listen address | `127.0.0.1:8081` | health, readiness, incoming webhooks from the stack | active |
-| `server.public_url` | `BOTHY_SERVER__PUBLIC_URL` | Server | url | no default, required | Origin under which apps reach the server (scheme, host, optional port; without path, query and fragment, otherwise `bothy config check` fails); basis of `aud`, DPoP `htu` and WebAuthn ([08-identity.md](../spec/08-identity.md), sections 7.2 and 7.3) | active |
+| `server.public_url` | `BOTHY_SERVER__PUBLIC_URL` | Server | url | no default, required | Origin under which apps reach the server (scheme, lower-case host, optional port other than the default of the scheme, as browsers send an origin; without path, query and fragment, otherwise `bothy config check` fails); basis of `aud`, DPoP `htu` and WebAuthn ([08-identity.md](../spec/08-identity.md), sections 7.2 and 7.3) | active |
 | `server.trusted_proxies` | `BOTHY_SERVER__TRUSTED_PROXIES` | Server | list(cidr) | `127.0.0.1/32, ::1/128` | peers whose forwarding and identity headers are honored and that may send plain text ([19-security.md](../spec/19-security.md), SEC-TLS-1) | active |
 | `server.maintenance_mode` | `BOTHY_SERVER__MAINTENANCE_MODE` | Server |  | `off` | `off` or `read_only` (relocation, upgrade; [ADR 0065](../adr/0065-maintenance-mode-read-only.md)) | planned (M7) |
 | `secrets.dir` | `BOTHY_SECRETS__DIR` | Server | string | `/run/bothy/secrets` | base of the default references `file:`; an absolute path in clean form (no `.` or `..`, no double or trailing `/`), not `/`, without a NUL character and without `<`, otherwise `bothy config check` fails | active |

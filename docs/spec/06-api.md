@@ -1280,7 +1280,7 @@ former block "proposed" in docs/api/redocly.yaml is empty and is dropped.
 |---|---|---|
 | `api.page_size_default` | `50` | page size without `limit` |
 | `api.page_size_max` | `200` | larger `limit` values are capped |
-| `api.cors_allowed_origins` | empty | additional origins for CORS |
+| `api.cors_allowed_origins` | empty | additional origins for CORS, each in the form of `server.public_url` |
 | `api.deprecation_min_notice` | `180d` | minimum gap from `Deprecation` to `Sunset` |
 | `api.major_version_overlap` | `365d` | how long an old major version stays after the new one appears |
 | `api.stats_max_buckets` | `1000` | time buckets per statistics query; more yields `400` |
