@@ -50,7 +50,7 @@ Product requirements implemented here:
 12. Creating a person gives an enrollment code that is shown once, copyable, read character by character; a repeated request does not show it again (`409` with `one_time_secret`) (08 3).
 13. Disabling a person ends their sessions and shows that in the confirmation; enabling may hit I1 (`409 i1_violation` explained, resolved by M4-28) (08 11, 10 5.4).
 14. The last owner cannot be revoked; the screen shows the server's reason (SR8).
-15. The device queue shows platform, name, time and origin of the login and the hardware binding; approving needs the verification code from the waiting device; rejecting revokes it (08 5.2).
+15. The device queue shows platform, name, time and origin of the login (the `Device` schema has no hardware or attestation field; 01 A1 shows "Key: hardware, attested", so the queue leaves that line out and the report names the gap); approving needs the verification code from the waiting device; rejecting revokes it (08 5.2).
 16. Group members can have an expiry; removing and adding members, renaming and deleting groups (07 2.1).
 17. The administration is a package shared with the console; it uses REST only (15 3.1).
 
@@ -98,7 +98,7 @@ Change:
 
 2. **Confirmation then step-up.** `ConfirmChange` shows one dialog with what the change does in plain words (for example "Sam is disabled. All sessions of Sam end now.") and "Confirm"; then the call runs through the `StepUpInterceptor` of M4-09, which opens the `StepUpDialog` of M4-25 when the server answers `401 step_up_required`, and repeats the call with the same `Idempotency-Key`. Destructive actions (revoke, delete, disable, reject a device) use the danger style of `DsBanner` and ask once (01 6.7).
 
-3. **Step-up per 05 in tests.** The fake server reads `docs/spec/actions.yaml` (walk up to the repository root) and answers `401 step_up_required` for an operation whose `x-authz-action` has `step_up: true` until the client completes the step-up. A test enumerates every operation the screens of this ticket call, looks up its action and `step_up`, and asserts that the screen goes through the step-up dialog exactly for those (and never for `false`). This holds "every action requires step-up according to 05" without a copy of the table.
+3. **Step-up per 05 in tests.** Widget tests in `packages/admin_ui` use an in-package fake of `AdminRepository` and a fake `StepUpService`, because `admin_ui` may not import `sync_engine/testing.dart` (15 3.1, the arch check of M4-01). The step-up enumeration runs as an integration test of the desktop app, `apps/client/integration_test/admin_step_up_test.dart`, against `FakeServer`: the fake server reads `docs/spec/actions.yaml` (walk up to the repository root) and answers `401 step_up_required` for an operation whose `x-authz-action` has `step_up: true` until the client completes the step-up. A test enumerates every operation the screens of this ticket call, looks up its action and `step_up`, and asserts that the screen goes through the step-up dialog exactly for those (and never for `false`). This holds "every action requires step-up according to 05" without a copy of the table.
 
 4. **Enrollment codes.** Shown once in `CodeText` of M4-18's pattern (move it to `admin_ui` or `design_system` if the app's version cannot be imported from a package; packages never import from `apps/`, 15 3.1 rule 2), copyable, with the expiry; leaving the view discards it from memory.
 
@@ -106,12 +106,12 @@ Change:
 
 ## Tests (write them first)
 
-Widget tests (fake repository through the fake server handlers, fake signer):
+Widget tests in `packages/admin_ui/test/admin/` (in-package fake `AdminRepository`, fake `StepUpService`):
 
 - `people_test.dart`: list, search, create with a one-time code view, disable with the sessions sentence, enable with `i1_violation` explained, credentials and devices of a person, owners with the last-owner rejection.
 - `groups_test.dart`: create, rename, delete, members with expiry.
-- `waiting_devices_test.dart`: queue with origin and hardware label; approve with the code; reject.
-- `step_up_per_05_test.dart` (Design note 3): every changing operation of these screens goes through the step-up dialog exactly when `actions.yaml` says `step_up: true`.
+- `waiting_devices_test.dart`: queue with origin; approve with the code; reject.
+- `apps/client/integration_test/admin_step_up_test.dart` (Design note 3, against `FakeServer`): every changing operation of these screens goes through the step-up dialog exactly when `actions.yaml` says `step_up: true` (and `fresh`; `conditional` as 05 2.4 defines it).
 - `no_permission_logic_test.dart`: a `403` on a list hides the section with the server's reason; no widget reads grants.
 - Goldens of the shell, people list, person detail, groups and the device queue; light and dark, two densities, text scaling 1 and 2, `de` and `en`.
 
@@ -119,13 +119,14 @@ Commands that must pass, from the repository root:
 
 - `cd packages/admin_ui && flutter analyze --fatal-infos && flutter test --coverage`
 - `cd apps/client && flutter analyze --fatal-infos && flutter test --coverage`
+- on macOS and on Windows: `make apps-platform` (runs the integration test); elsewhere it prints its SKIP line
 - `make arch`, `make lint`, `make fmt-check`, `make coverage`
 - `make check`
 
 ## Acceptance criteria
 
 - [ ] Widget tests of A1 are green; every changing action requires step-up exactly as 05 marks it.
-- [ ] People, owners, groups with member expiry and the device queue work against the fake server with the server's problem texts.
+- [ ] People, owners, groups with member expiry and the device queue work against the fake repository and, in the integration test, against the fake server, with the server's problem texts.
 - [ ] Enrollment codes are shown once; no permission logic in the screens.
 - [ ] `admin_ui` uses REST only (`make arch`); rulings recorded.
 - [ ] `make check` is green.

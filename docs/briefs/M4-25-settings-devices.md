@@ -4,7 +4,7 @@ Status: ready | Depends on: M4-18 | Milestone: M4
 
 ## Goal
 
-After this ticket the desktop app has the settings of 01 5.1 D8: Appearance (theme, density, motion, Enter sends, column widths reset), Language (language and time zone of the profile), Keyboard (Enter sends, the list of shortcuts), Devices and sessions (own devices with platform, name, last activity, hardware binding, own sessions; revoke a device or end a session; confirm a waiting device by typing its verification code; add a device by its pairing code), Privacy (crash reports and performance data) and About (version and licenses), with a Notifications entry that M4-33 fills. Personal settings are synchronized across devices through `user_settings` (04 14), and every changing device action asks for step-up with the step-up device key (08 6). The device and session screens and the step-up dialog live in `packages/admin_ui`, because the console (M6) and the emergency actions on mobile (M5) reuse them. Why: confirming a waiting device and revoking a lost one are the security actions a person needs most (08 5, 10), and settings that differ between two devices of the same person look like a bug.
+After this ticket the desktop app has the settings of 01 5.1 D8: Appearance (theme, density, motion, Enter sends, column widths reset), Language (language and time zone of the profile), Keyboard (Enter sends; the list of shortcuts itself is the overlay of M4-24 behind Cmd+/ or Ctrl+/), Devices and sessions (own devices with platform, name, last activity, hardware binding, own sessions; revoke a device or end a session; confirm a waiting device by typing its verification code; add a device by its pairing code), Privacy (crash reports and performance data) and About (version and licenses), with a Notifications entry that M4-33 fills. Personal settings are synchronized across devices through `user_settings` (04 14), and every device action that 05 marks with step-up (`device.approve`, `device.revoke`) asks for it with the step-up device key, because the server answers `step_up_required` (08 6); ending a session has no step-up in 05 and asks only for one confirmation. The device and session screens and the step-up dialog live in `packages/admin_ui`, because the console (M6) and the emergency actions on mobile (M5) reuse them. Why: confirming a waiting device and revoking a lost one are the security actions a person needs most (08 5, 10), and settings that differ between two devices of the same person look like a bug.
 
 ## Read first
 
@@ -50,10 +50,10 @@ Product requirements implemented here:
 12. `composer.enter_sends` without a stored value is `true` on desktop; a stored value applies on all devices (01 11).
 13. `privacy.crash_reports` is offered only when the instance has a crash target; `privacy.client_metrics` default `true` (01 11, 15 16, 15 17).
 14. Language and time zone are profile fields (`updateMyProfile`); the app language follows `users.locale` (01 9).
-15. Devices: list with platform, name, last activity, "hardware-bound" or not, this device marked; revoke with one confirmation and step-up; a revoked own device ends in E7 on that device (08 10).
+15. Devices: list with platform, name, app version and last activity, this device marked (the `Device` schema has no hardware or attestation field, so the list shows no hardware label; the report names the gap against 01 A1); revoke with one confirmation and step-up; a revoked own device ends in E7 on that device (08 10).
 16. Confirm a waiting device: the person types the code shown on the waiting device, step-up, `approveDevice`; a wrong code revokes the waiting device and is shown as such (08 5.2).
 17. Add a device: the pairing code from the new device, step-up, `approvePairing`; a code without an open pairing ends the step-up of this session and the next attempt asks again (08 5.3).
-18. Sessions: list own sessions with device, method and last use; end one with step-up; ending the current one logs out and wipes (R-SY-14).
+18. Sessions: list own sessions with device, method and last use; end one after one confirmation (`session.revoke` has no step-up in 05); ending the current one logs out and wipes (R-SY-14).
 19. No permission logic: actions appear according to the server's answers, and a `403` shows its reason.
 
 ## Scope
@@ -102,7 +102,7 @@ Change:
 
 2. **Profile.** Language and time zone through `updateMyProfile`; the language selector offers German and English; a change switches the app locale through `resolveAppLocale` (M4-06). Time zones from the IANA list the platform offers.
 
-3. **Device actions.** `admin_ui` views take a `SelfRepository` (REST) and a `StepUpService`; every changing call (`approveDevice`, `approvePairing`, `revokeDevice`, `revokeSession`) runs through the `StepUpInterceptor` of M4-09, which shows `StepUpDialog` with the purpose text and then the OS prompt of the step-up key. Codes: the verification code field accepts digits only (`DeviceApprove.verification_code` pattern), the pairing code field normalizes like M4-09. A wrong verification code: the response `200` with `state = revoked` is shown as "The waiting device was rejected because the code did not match" (08 5.2). A pairing `404`: "No open pairing with this code" and the next attempt asks for step-up again (08 5.3). Revoking this device or ending the current session calls the wiper of M4-18.
+3. **Device actions.** `admin_ui` views take a `SelfRepository` (REST) and a `StepUpService`; every changing call (`approveDevice`, `approvePairing`, `revokeDevice`, `revokeSession`) runs through the `StepUpInterceptor` of M4-09, which shows `StepUpDialog` with the purpose text and then the OS prompt of the step-up key when, and only when, the server answers `401 step_up_required` (05: `device.approve` and `device.revoke` have step-up, `session.revoke` has none; the screen adds none of its own). `revokeDevice` sends the required reason. Codes: the verification code field accepts digits only (`DeviceApprove.verification_code` pattern), the pairing code field normalizes like M4-09. A wrong verification code: the response `200` with `state = revoked` is shown as "The waiting device was rejected because the code did not match" (08 5.2). A pairing `404`: "No open pairing with this code" and the next attempt asks for step-up again (08 5.3). Revoking this device or ending the current session calls the wiper of M4-18.
 
 4. **Privacy switches.** `privacy.crash_reports` is shown only when the instance or the build configuration names a crash target (the flag comes from M4-31 later; until then from the build defines of M4-18, absent means hidden); `privacy.client_metrics` is always shown.
 
@@ -115,7 +115,7 @@ Change:
 Widget tests:
 
 - `apps/client/test/settings/settings_test.dart`: defaults of 01 11 when keys are absent; a change writes one outbox entry and applies at once; reset deletes the key; theme, density and motion switch the theme.
-- `packages/admin_ui/test/self/devices_test.dart`: list with the hardware label and this device marked; revoke asks once and then for step-up; confirm with a correct code activates, with a wrong code shows the rejection; pairing with `404` shows the text and asks for step-up again next time; actions hidden when the server's answer does not allow them.
+- `packages/admin_ui/test/self/devices_test.dart`: list with this device marked and no hardware label; revoke asks once and then for step-up; ending a session asks once and never for step-up; confirm with a correct code activates, with a wrong code shows the rejection; pairing with `404` shows the text and asks for step-up again next time; actions hidden when the server's answer does not allow them.
 - `packages/admin_ui/test/self/step_up_dialog_test.dart`: the dialog explains the action; cancel returns `StepUpCancelled`.
 - Goldens of the settings sections and the device views, light and dark, two densities, text scaling 1 and 2, `de` and `en`.
 
@@ -135,7 +135,7 @@ Commands that must pass, from the repository root:
 ## Acceptance criteria
 
 - [ ] Integration tests are green; settings stay in sync across two simulated devices.
-- [ ] Devices and sessions: confirm with the verification code, add by pairing code, revoke and end with step-up, as 08 5 and 10 say.
+- [ ] Devices and sessions: confirm with the verification code, add by pairing code, revoke with step-up and end a session without one, as 05, 08 5 and 10 say.
 - [ ] The settings of 01 11 with their defaults; language and time zone through the profile.
 - [ ] `admin_ui` uses no `sync_engine` or `local_store` (`make arch`); rulings recorded.
 - [ ] `make check` is green.

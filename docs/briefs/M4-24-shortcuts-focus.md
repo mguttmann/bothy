@@ -61,14 +61,14 @@ Create in `apps/client/lib/`:
 
 Change:
 
-- The views of M4-19 to M4-23 only to expose their actions as `Action`s and to put their columns into `FocusTraversalGroup`s; no behaviour change.
+- The views of M4-19, M4-20, M4-21 and M4-23 only to expose their actions as `Action`s and to put their columns into `FocusTraversalGroup`s; no behaviour change.
 - `apps/client/README.md` (shortcut table generated from `bindings.dart` or kept equal to it by a test).
 - `docs/spec/01-product.md` 7 only for a recorded collision (Specification first).
 - `docs/DECISIONS.md` section 10: rows `D-M4-24-<n>`; root `CHANGELOG.md` under `[Unreleased]`.
 
 ## Out of scope
 
-- Shortcuts in the terminal and "Open hosts and terminal" (Cmd+Shift+T, Ctrl+Shift+T): M4-36 binds them on top of this layer.
+- Shortcuts in the terminal (M4-36). "Open hosts and terminal" (Cmd+Shift+T, Ctrl+Shift+T) is bound here as a disabled action until M4-36 enables it with its route.
 - Custom key bindings (not planned).
 - Screen reader checks by hand (M4-32).
 
@@ -94,7 +94,7 @@ Change:
 
 2. **Scopes.** App shortcuts sit above the columns; a focused text field keeps Enter, Shift+Enter, arrow up and Esc according to the composer rules (the composer handles them; app shortcuts with modifiers still work). An `Action` for an intent is enabled only where its target exists (Stop only with an active run the server allows to stop, Done only in a thread); a disabled action does nothing and does not consume the key. Components register no intent at all; a test enumerates every binding and asserts that none maps to a component action (R-PR-04). The layer exposes a `KeyboardScope.passThrough` region that M4-36 uses for the terminal, where only platform-modifier shortcuts reach the app (R-PR-10).
 
-3. **Focus order.** Each column is a `FocusTraversalGroup` with `ReadingOrderTraversalPolicy`; F6 and Shift+F6 move to the first focusable item of the next or previous visible column (collapsed columns are skipped) in the order sidebar, list, history, input, session; Esc in the history marks the thread read and a second Esc moves focus to the input, as 01 7 lists. The focus ring uses `color.focus.ring` (`color.focus.ring-on-sidebar` in the sidebar) and is visible for keyboard focus at all times.
+3. **Focus order.** Each column is a `FocusTraversalGroup` with `ReadingOrderTraversalPolicy`; F6 and Shift+F6 move to the first focusable item of the next or previous visible column (collapsed columns are skipped) in the order of 01 7: sidebar, list, history, session (the input belongs to the history column; within it the focus order of 01 8 goes on to the input); Esc in the history marks the thread read, and "Esc then Tab" or Cmd+L (Ctrl+L) focuses the input, exactly as 01 7 lists. The focus ring uses `color.focus.ring` (`color.focus.ring-on-sidebar` in the sidebar) and is visible for keyboard focus at all times.
 
 4. **Rulings for docs/DECISIONS.md** (`D-M4-24-<n>`): the table as data with the spec test (note 1); scopes and the pass-through region (note 2); the column order and Esc behaviour (note 3); any collision handled (Specification first).
 

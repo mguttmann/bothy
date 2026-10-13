@@ -4,7 +4,7 @@ Status: ready | Depends on: M4-26 | Milestone: M4
 
 ## Goal
 
-After this ticket the administration in `packages/admin_ui` has the permission screens A2 to A4 of 01 5.2: the grant wizard in three steps (who, where, level and capabilities with validity and a required reason) that calls the server's preview before every confirmation and shows its plain-language text, the effects per principal, the invariant check (I1 and SR8 explained, not just rejected: "switch to organization first"), the hints (H1 read horizon, blocked triggering, group reach, missing expiry, a terminal grant that is not effective) and a denied delegation with its reason, then confirms with step-up; the grants list per target with revoke (immediate, and the confirmation says so) and the "Expiring soon" list with "Extend"; "Who has access?" per space or channel with level, capabilities and the source chain (owner, direct, group, inherited, operator, participant, via agent with hint H1, blocked by a guard rule; disabled principals struck through); and "View as person" as the read-only snapshot of the spaces and channels a person sees, with the clear frame, its expiry and the audit note. Integration tests use the example of 07 9.3. Why: the owner must see the effect of a grant before giving it, including what an agent could leak (H1); a wizard without the preview would make permission changes a guess (07 9).
+After this ticket the administration in `packages/admin_ui` has the permission screens A2 to A4 of 01 5.2: the grant wizard in three steps (who, where, level and capabilities with validity and a required reason) that calls the server's preview before every confirmation and shows its plain-language text, the effects per principal, the invariant check (I1 and SR8 explained, not just rejected: "switch to organization first"), the hints (H1 read horizon, blocked triggering, group reach, missing expiry, a terminal grant that is not effective) and a denied delegation with its reason, then confirms with step-up; the grants list per target with revoke (immediate, the confirmation says so, and a required reason); "Who has access?" per space or channel with level, capabilities and the source chain (owner, direct, group, inherited, operator, participant, via agent with hint H1, blocked by a guard rule; disabled principals struck through); and "View as person" as the read-only snapshot of the spaces and channels a person sees, with the clear frame, its expiry and the audit note. Integration tests use the example of 07 9.3. Why: the owner must see the effect of a grant before giving it, including what an agent could leak (H1); a wizard without the preview would make permission changes a guess (07 9).
 
 ## Read first
 
@@ -50,7 +50,7 @@ Product requirements implemented here:
 12. An I1 violation is explained with the hint "switch to organization first", not just rejected; the guided switch is M4-28 (01 A2, 10 11).
 13. A delegation limit gives `allowed = false` with `denial_reason`, shown as the reason; the confirm button stays disabled (07 9.3).
 14. Every grant needs a reason; persons outside groups without an expiry get the `expiry_missing` hint (07 9.3, 9.5).
-15. Revoking takes effect immediately and the confirmation says so (07 9.5).
+15. Revoking takes effect immediately, needs a reason (`revokeGrant` body), and the confirmation says so (07 9.5).
 16. "Who has access?" shows per principal the effective level, capabilities and the source chain with the kinds of 07 9.1; entries only via an agent have level `none` and carry hint H1; disabled principals are struck through.
 17. "View as person": owners only, with step-up; a read-only snapshot with the frame "Viewing as <name> (read-only). Nothing is sent. Logged." and the expiry; DM channels of the person stay invisible (07 9.2, SR6).
 
@@ -58,7 +58,7 @@ Product requirements implemented here:
 
 Create in `packages/admin_ui/lib/src/`:
 
-- `grants/` (`grant_wizard.dart` with the three steps, `subject_step.dart`, `target_step.dart`, `level_step.dart`, `preview_panel.dart` with text, effects, invariants and hints, `grants_list.dart`, `revoke_grant_dialog.dart`, `expiring_soon.dart` with "Extend" as revoke plus a new grant with a new reason).
+- `grants/` (`grant_wizard.dart` with the three steps, `subject_step.dart`, `target_step.dart`, `level_step.dart`, `preview_panel.dart` with text, effects, invariants and hints, `grants_list.dart`, `revoke_grant_dialog.dart` with the required reason).
 - `access/` (`who_has_access.dart`, `source_chain.dart`, `view_as_person.dart`).
 - Registration of these screens in the admin shell of M4-26 (entries Grants and the "Who has access?" action on spaces and channels).
 - Fake server handlers through the registry of M4-17 for the operations above; the preview handler returns, for the example request of 07 9.3, the text read at run time from 07 (Design note 3).
@@ -76,6 +76,7 @@ Change:
 - Grants for hosts and the `terminal` capability in the host screen (M4-37 adds the wizard for the target host on top of this wizard).
 - Browsing content as another person beyond the snapshot (07 9.2: added with the console session, M6).
 - The list "Permission hints" (M6-07).
+- The list "Expiring soon" with "Extend" (07 9.4; the server queries of M6-07).
 - The "History" button of A3 (the audit view of M4-29 filtered by the target; the link from this view comes with the console administration, M6-04).
 
 ## Boundaries
@@ -109,7 +110,6 @@ Change:
 Widget tests (fake repository, fake signer):
 
 - `grant_wizard_test.dart`: the three steps; the preview is called with the full request after a change; confirm disabled without a reason or with `allowed = false`; I1 violation explained with the hint; delegation denial with its reason; step-up after confirm; revoke says it takes effect immediately.
-- `expiring_soon_test.dart`: "Extend" revokes and creates a new grant with a new reason.
 - `who_has_access_test.dart`: every source kind of 07 9.1 rendered; `via_agent` with level `none` and H1; disabled principals struck through.
 - `view_as_test.dart`: step-up, frame text, expiry, nothing writable.
 - Goldens of the wizard (each step and the preview with hints), the access view and the view-as frame; light and dark, two densities, text scaling 1 and 2, `de` and `en`.

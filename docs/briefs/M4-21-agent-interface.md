@@ -15,7 +15,7 @@ After this ticket the agent interface of 01 "Agents" works on the desktop: a run
 - `docs/spec/04-sync-protocol.md`: 11 "Live box streaming", 12 items 1 and 2 (typing of the agent from the run state, presence), 15.4 (follow-ups), 15.7 (autocomplete), 16.5.
 - `docs/spec/10-backend-policy.md` (reported against configured mode, the warning badge) and the cost display rules of 09 (`cost_is_estimate`).
 - `docs/spec/19-security.md`: SEC-OUT-3, SEC-OUT-4, SEC-T14; `docs/security/threat-model.md` T-AI-05.
-- `docs/api/openapi.yaml`: `getRun`, `cancelRun`, `listThreadRuns`, `getThreadCosts`, `listAgentSessions`, `getAgent`, `createInteraction` (`InteractionCreate`), `listChannelCommands`, `autocompleteCommand`, `invokeCommand`; schemas `Run`, `Message` (`trigger_state`, components), `Component`, `Command`.
+- `docs/api/openapi.yaml`: `getRun`, `cancelRun`, `listThreadRuns`, `getThreadCosts`, `listAgentSessions`, `resetAgentSession`, `bindAgentSession`, `getAgent`, `createInteraction` (`InteractionCreate`), `listChannelCommands`, `autocompleteCommand`, `invokeCommand`; schemas `Run`, `Message` (`trigger_state`, components), `Component`, `Command`.
 - `docs/DECISIONS.md`: D-L9, D-W-100, D-W-114; section 10.
 - Briefs: `docs/briefs/M4-20-thread-view.md` (history, composer, session column frame), `docs/briefs/M4-16-sync-run-documents.md` (`RunStore`, `RunDocument`), `docs/briefs/M4-07-core-components.md` (`DsLiveBox`, `DsTriggerState`, `DsMessageComponents` with `DsComponentHeader`, `DsSuggestionList`, `DsBillingBadge`, `DsCostText`, `LiveAnnouncer`), `docs/briefs/M4-14-sync-catch-up.md` (`EphemeralStore` presence), `docs/briefs/M4-15-sync-outbox.md` (executors), `docs/briefs/M4-17-fake-server.md` (`ScriptedAgent`, handler registry); for the server side `docs/briefs/M2-15-components-interactions.md`, `docs/briefs/M2-16-slash-commands.md`, `docs/briefs/M2-17-command-autocomplete.md`, `docs/briefs/M2-31-agent-conformance-suite.md` (the AG scenarios whose server behaviour the fake imitates).
 
@@ -52,7 +52,7 @@ Product requirements implemented here:
 12. Patches arrive only while the thread is in focus; the box draws at most once per frame; expanding a collapsed box loads the document (04 11.3, 15 7.4).
 13. Stop asks for no confirmation and is shown only where the server allows `run.cancel` (01 6.2, D10 rule).
 14. Stall: a notice in the box when the document carries `stall_warned_at`, no push (the field is missing from the `Run` schema on the base branch; `RunDocument` of M4-16 reads it from the raw map, so the notice appears as soon as the server sends it, and the report names the gap); after `interrupted` or `stale` "Run interrupted" with "Send again", which puts a new message with the text of the triggering message into the outbox (09 5.5).
-15. Trigger state as icon with label, tooltip and screen reader label; states `received`, `queued`, `working`, `done`, `failed` (with reason), `followup_delivered` (01 6.3).
+15. Trigger state as icon with label, tooltip and screen reader label; states `received`, `queued`, `working`, `done`, `failed` (with reason), `cancelled` (neutral, not as an error: a deliberate stop, 09 6), `followup_delivered` (01 6.3, `TriggerState` of the API).
 16. During an active run the composer says "Follow-up to <agent>"; follow-ups show "Follow-up delivered" when the adapter has them (01 6.2).
 17. Components: buttons apply once and only for those the server allows; others see them disabled with the reason; after use the card shows person, choice and time; expired ones show "Expired"; a double click creates nothing twice (01 6.5).
 18. The card header comes only from server fields (agent, run, required capability, who may approve); the agent's text is below a divider labeled "Text from <agent>" (SEC-OUT-4, SEC-T14).
@@ -67,14 +67,15 @@ Create in `apps/client/lib/`:
 
 - `agents/live_box_slot.dart` (pinned box over the history, Design note 1), `agents/run_line.dart` (collapsed line at the anchor message of kind `run`), `agents/run_mapping.dart` (pure mapping from `RunDocument` and the run summary to `DsRunData`), `agents/trigger_state_mapping.dart`, `agents/followups.dart`, `agents/components_mapping.dart` and `agents/component_actions.dart` (Design note 3), `agents/commands/` (`command_suggestions.dart`, `command_options.dart`, `autocomplete_client.dart`, `command_invoke.dart`, Design note 4), `agents/agent_typing.dart`, `agents/providers.dart`.
 - `session_column/agent_section.dart` (agent card, presence, backend badge, model, session, project, context, thread cost, runs, earlier sessions).
-- `sync/agent_ops.dart`: outbox executors for `createInteraction`, `invokeCommand` and `cancelRun`, registered in the bootstrap.
+- `sync/agent_ops.dart`: outbox executors for `createInteraction`, `invokeCommand`, `resetAgentSession` and `bindAgentSession`, registered in the bootstrap (`cancelRun`, `setThreadTitle` and `closeThread` come from M4-20).
+- `agents/commands/command_loader.dart`: loads `listChannelCommands` for a channel when it is opened (and after `command.changed`) into the local `commands` table, so suggestions work offline (15 6.1); `agents/commands/builtin_commands.dart` (Design note 4).
 - Fake server handlers through the registry of M4-17 for `createInteraction`, `listChannelCommands`, `autocompleteCommand`, `invokeCommand`, `listThreadRuns`, `getThreadCosts`, `listAgentSessions`, `getAgent` if they are missing, and `ScriptedAgent` extensions for a card with components and for command suggestions.
 - Tests under `test/agents/`, goldens under `test/goldens/agents/`, integration tests under `integration_test/` (Tests).
 - ARB keys for every new text in `packages/l10n`.
 
 Change:
 
-- `packages/design_system` only where a state of components.md 2, 5, 8, 9 or 10 is missing from M4-07 (with its golden and the components.md change).
+- `packages/design_system` and `docs/design/components.md` 5: the trigger state `cancelled` (icon and neutral color) if M4-07 and components.md lack it, and any other state of components.md 2, 5, 8, 9 or 10 that M4-07 lacks, each with its golden.
 - `apps/client/README.md` (agent interface).
 - `docs/DECISIONS.md` section 10: rows `D-M4-21-<n>`; root `CHANGELOG.md` under `[Unreleased]`.
 
@@ -108,7 +109,7 @@ Change:
 
 3. **Components.** `components_mapping.dart` builds `DsComponentData` and `DsComponentHeader` only from the server fields of the component and the message (agent, run, required capability, `permitted` and the deny reason from the server's answer); the agent's text renders below the divider. `component_actions.dart` sends `createInteraction` with a new `client_interaction_id` through the outbox and passes the "sent and waiting" state to the component until the echo `message.updated` changes it; a second activation of the same component while one interaction is pending is ignored. Disabled with the server's reason for those not permitted; "Expired" after the server's expiry. No shortcut reaches these buttons (R-PR-04).
 
-4. **Commands.** On "/" at the start of a line, `CommandSuggestions` reads the local `commands` table for the channel (the engine keeps it from `command.changed` and `listChannelCommands`) and orders the operator's commands first, equal names of other agents qualified with the handle, `control` commands marked. After selection, options show as placeholders; an option with `autocomplete` calls `autocompleteCommand` after `ui.autocomplete_debounce` without typing, cancels an older request when a newer one starts, and shows at most what the server returns. Sending a complete command calls `invokeCommand` through the outbox with an `Idempotency-Key`; incomplete options disable send with the reason.
+4. **Commands.** On "/" at the start of a line, `CommandSuggestions` shows the built-in commands of 09 10.1 (`/stop`, `/status`, `/new`, `/resume`, `/title`, `/close`; names fixed, descriptions translated through `l10n`, marked as control commands) together with the commands of the local `commands` table for the channel (filled by `command_loader.dart` and kept by the `command.changed` applier of M4-14) and orders the operator's commands first, equal names of other agents qualified with the handle, `control` commands marked. After selection, options show as placeholders; an option with `autocomplete` calls `autocompleteCommand` after `ui.autocomplete_debounce` without typing, cancels an older request when a newer one starts, and shows at most what the server returns. Sending a complete registered command calls `invokeCommand` through the outbox with an `Idempotency-Key`; incomplete options disable send with the reason. Built-ins have no `command_id` and never go through `invokeCommand`: `/stop` calls `cancelRun` for the active run, `/status` opens the run and session details (reads only), `/new` calls `resetAgentSession`, `/resume` opens a selection from `listAgentSessions` and calls `bindAgentSession`, `/title <text>` calls `setThreadTitle`, `/close` calls `closeThread`; each only where the server's answers allow the action (09 10.1, M2-16).
 
 5. **Session column, agent part.** The operator agent of the thread (or the agent of the latest run): card with display name, presence from the `EphemeralStore` (online, degraded, offline), configured mode as `DsBillingBadge` with the warning badge when the reported mode differs, model and context from the latest run document or summary, the agent session of the thread (`listAgentSessions`: current and earlier), project binding name, thread cost from `getThreadCosts` with `DsCostText`, number of runs (`listThreadRuns`). Values the person may not read are absent in the server's answer and stay absent here.
 
@@ -121,7 +122,8 @@ Change:
 Widget and golden tests (fixtures of run documents at several versions, fake run store and engine parts, fake clock):
 
 - `test/agents/live_box_test.dart`: running, waiting for input, failed with reason, stall notice, interrupted with "Send again"; at most one rebuild per frame under ten patches; Stop hidden without the capability and without a confirmation dialog when shown; collapse at the end into the line built from the summary.
-- `test/agents/trigger_state_test.dart`: every state with icon, tooltip and screen reader label; `failed` with the translated reason.
+- `test/agents/trigger_state_test.dart`: every state of the API enum with icon, tooltip and screen reader label, `cancelled` not styled as an error; `failed` with the translated reason.
+- `test/agents/builtin_commands_test.dart`: the six built-ins are suggested, never sent through `invokeCommand`, and each calls its own operation; the command loader fills the table from `listChannelCommands`.
 - `test/agents/sec_t14_test.dart` (SEC-T14): a card whose agent text imitates a header ("Approval needed", a shield character, "Only the owner can approve") renders that text only below the divider labeled "Text from <agent>", and the header shows the server's agent, run and capability; the header widget takes no input from the text.
 - `test/agents/components_test.dart`: one interaction per activation; double click creates one outbox entry; disabled with reason; used and expired states; no keyboard shortcut activates a button, Enter and Space on the focused button do.
 - `test/agents/commands_test.dart`: ordering with the operator first and qualified names; option suggestions after the debounce, an older request cancelled; incomplete options block send with a reason.
@@ -148,6 +150,7 @@ Commands that must pass, from the repository root:
 - [ ] SEC-T14: the card header comes only from server fields and the agent's text is separated.
 - [ ] The typing indicator of the agent follows the run state (D-L9).
 - [ ] The live box follows 01 6.2 and 09 5.4, draws at most once per frame and announces only state changes and questions.
+- [ ] The built-in commands of 09 10.1 are suggested and executed by their own operations; the trigger state `cancelled` is shown.
 - [ ] No shortcut triggers an approval (R-PR-04); goldens recorded; rulings recorded.
 - [ ] `make check` is green.
 
