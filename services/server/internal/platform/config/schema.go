@@ -78,10 +78,11 @@ var (
 //     ("a.b" and "a.b.c" would need "b" to be both a value and a mapping in the file);
 //   - Kind is set; a name ends in "_ref" exactly when the kind is secret_ref;
 //   - Enum is non-empty exactly for enum keys, without empty or repeated values;
-//   - a required key has no default; an empty default is allowed only for string and list
-//     keys; every other default parses with the parser of its kind, after expanding the
-//     placeholders of a secret_ref default with the defaults of the keys they name, which must
-//     be registered string keys;
+//   - a required key has no default; an empty default is allowed only for string, list and
+//     secret_ref keys (for secret_ref it means "no reference", docs/DECISIONS.md M1-21/1);
+//     every other default parses with the parser of its kind, after expanding the placeholders
+//     of a secret_ref default with the defaults of the keys they name, which must be registered
+//     string keys;
 //   - bounds only on int, float and duration keys; they parse, Min <= Max, and the default lies
 //     within them;
 //   - Doc is not blank, and Chapter matches ^[0-9]{2}-[a-z0-9-]+\.md$.
@@ -211,8 +212,8 @@ func (s *Schema) validateDefault(e *keyEntry) string {
 		}
 		return ""
 	case e.Default == "":
-		if e.Kind != KindString && !e.Kind.isList() {
-			return "empty default; only string and list keys and required keys may have one"
+		if e.Kind != KindString && e.Kind != KindSecretRef && !e.Kind.isList() {
+			return "empty default; only string, list and secret_ref keys and required keys may have one"
 		}
 		return ""
 	}
@@ -311,4 +312,20 @@ func (s *Schema) Keys() []Key {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// optionalRef reports whether e is a secret_ref key with an empty default: the chapter cell
+// "empty" of a secret that belongs to a feature an operator can switch off (16 "5.2 Secret
+// provider (ADR 0011)", server.tls_cert_ref). The empty text means "no reference" there (docs/DECISIONS.md M1-21/1).
+func (e *keyEntry) optionalRef() bool {
+	return e.Kind == KindSecretRef && e.Default == "" && !e.Required
+}
+
+// parseText parses one text of e: the empty text of an optional secret_ref key is the value ""
+// ("no reference"); every other text goes through parseValue.
+func (e *keyEntry) parseText(text string) (any, string, error) {
+	if text == "" && e.optionalRef() {
+		return "", "", nil
+	}
+	return parseValue(e.Kind, e.Enum, text)
 }

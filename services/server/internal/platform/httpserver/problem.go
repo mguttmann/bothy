@@ -259,8 +259,8 @@ func retryAfter(ctx context.Context, e *errs.Error) time.Duration {
 	return defaultRetryAfter
 }
 
-// setAPIHeaders sets the headers of SEC-HDR-1 (without HSTS, M1-21) and SEC-HDR-2 on an API
-// response with the given media type.
+// setAPIHeaders sets the headers of SEC-HDR-1 (HSTS comes from the secure writer of the
+// listener, SecurityHeaders) and SEC-HDR-2 on an API response with the given media type.
 func setAPIHeaders(h http.Header, media string) {
 	h.Set(headerNoSniff, valueNoSniff)
 	h.Set(headerReferrer, valueNoReferrer)

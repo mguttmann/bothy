@@ -200,7 +200,7 @@ Technology without domain logic; only `adapters/`, `wire` and `cmd` may import i
 | [`config`](internal/platform/config/README.md) | schema, loading and checking of the configuration, `Bind` to the `Config` structs (02, section 13; built in M1-07) |
 | `secrets` | secret provider (ADR 0011) |
 | [`pg`](internal/platform/pg/README.md) | pool, Unit of Work with lock order, `LISTEN` connection, retry on deadlock |
-| [`httpserver`](internal/platform/httpserver/README.md) | server, middleware chain, `problem+json`, proof check of `authorize` (02, section 9); listener part built in M1-11, chain in M1-18 |
+| [`httpserver`](internal/platform/httpserver/README.md) | server, middleware chain, `problem+json`, proof check of `authorize` (02, section 9); listener part built in M1-11, chain in M1-18, transport protection in M1-21 (plaintext only from loopback and `server.trusted_proxies`, own TLS from 1.2 with rotation, HSTS on both listeners; 19, SEC-TLS-1 to SEC-TLS-3) |
 | `ratelimit` | token buckets per class from 05 |
 | [`jobs`](internal/platform/jobs/README.md) | the only place with River: client per role, queues, schema `jobs.schema`, migrations in `bothy migrate`; built in M1-14 |
 | `otel` | telemetry setup, encapsulated `gen_ai.*` attributes (R-Telemetrie) |

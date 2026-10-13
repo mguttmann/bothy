@@ -245,7 +245,7 @@ deps:
   platform-health:
     mayDependOn: [platform-health, kernel-ports]
   platform-httpserver:
-    mayDependOn: [platform-httpserver, kernel-ports, platform-health, platform-otel]
+    mayDependOn: [platform-httpserver, kernel-ports, platform-health, platform-otel, platform-secrets]
     canUse: [v-otel, v-libopenapi]
   platform-jobs:
     mayDependOn: [platform-jobs, kernel-ports, platform-pg, platform-otel]

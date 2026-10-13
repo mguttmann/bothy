@@ -11,7 +11,8 @@ const minPositiveDuration = "1ms"
 // httpConfigKeys returns the keys of the HTTP chain from docs/spec/02-architecture.md
 // "Configuration values of this chapter": the JSON body limit, which the cross-check
 // json_limit_above_message reads, the server limits that platform/httpserver applies to both
-// listeners (M1-11), and the limits, deadlines and Retry-After of the HTTP chain (M1-18).
+// listeners (M1-11), the limits, deadlines and Retry-After of the HTTP chain (M1-18), and the
+// HSTS max-age of both listeners (M1-21).
 func httpConfigKeys() []config.Key {
 	return []config.Key{
 		{
@@ -57,6 +58,12 @@ func httpConfigKeys() []config.Key {
 			Name: "http.unavailable_retry_after", Kind: config.KindDuration, Default: "5s", Min: "1s", Max: "1h",
 			Doc:     "Retry-After of every 503 unavailable response, in whole seconds.",
 			Chapter: chapter02,
+		},
+		{
+			// Whole seconds, checked by hsts_whole_seconds: max-age has no fractions (SEC-TLS-3).
+			Name: "http.hsts_max_age", Kind: config.KindDuration, Default: "31536000s", Min: "0s",
+			Doc:     "max-age of Strict-Transport-Security in whole seconds, sent while server.public_url uses https.",
+			Chapter: chapter19,
 		},
 		{
 			Name: "file.max_upload_bytes", Kind: config.KindInt, Default: "104857600", Min: "1",

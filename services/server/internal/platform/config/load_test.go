@@ -646,3 +646,37 @@ func TestSecretsDirRule(t *testing.T) {
 		}
 	}
 }
+
+// TestOptionalSecretRef holds ruling M1-21/1: a secret_ref key with an empty default loads as the
+// empty text when no source sets it or a source sets it to the empty text, and takes a reference
+// like any other secret_ref key. A secret_ref key with a reference as default still refuses the
+// empty text, because its feature cannot be switched off.
+func TestOptionalSecretRef(t *testing.T) {
+	t.Parallel()
+	schema := func() *config.Schema {
+		return mustSchema(t,
+			key("secrets.dir", config.KindString, "/run/bothy/secrets"),
+			key("database.password_ref", config.KindSecretRef, "file:<secrets.dir>/db_app_password"),
+			key("server.tls_cert_ref", config.KindSecretRef, ""))
+	}
+	v := mustLoad(t, schema(), config.Sources{})
+	if got := v.String("server.tls_cert_ref"); got != "" {
+		t.Errorf("default server.tls_cert_ref = %q, want empty", got)
+	}
+	v = mustLoad(t, schema(), config.Sources{Env: []string{"BOTHY_SERVER__TLS_CERT_REF="}})
+	if got := v.String("server.tls_cert_ref"); got != "" {
+		t.Errorf("empty server.tls_cert_ref = %q, want empty", got)
+	}
+	v = mustLoad(t, schema(), config.Sources{Env: []string{"BOTHY_SERVER__TLS_CERT_REF=file:<secrets.dir>/tls_cert"}})
+	if got := v.String("server.tls_cert_ref"); got != "file:/run/bothy/secrets/tls_cert" {
+		t.Errorf("server.tls_cert_ref = %q", got)
+	}
+	got := problems(t, schema(), config.Sources{Env: []string{"BOTHY_SERVER__TLS_CERT_REF=" + canary}})
+	if len(got) != 1 || strings.Contains(got[0].String(), canary) || !strings.Contains(got[0].String(), "server.tls_cert_ref") {
+		t.Errorf("problems %v: want one that names the key and not the value", got)
+	}
+	got = problems(t, schema(), config.Sources{Env: []string{"BOTHY_DATABASE__PASSWORD_REF="}})
+	if len(got) != 1 || !strings.Contains(got[0].String(), "database.password_ref") {
+		t.Errorf("empty database.password_ref: problems %v, want one", got)
+	}
+}
