@@ -44,9 +44,61 @@ type Actor struct {
 	StepUpAt time.Time
 	// TokenID is the API token of an agent, app or personal token; zero otherwise.
 	TokenID ids.ID
-	// Scopes are the scopes of the API token or the granted scopes of an app installation.
+	// Scopes are the scopes of the API token (api_tokens.scopes, 07 section 3 token_scopes). They
+	// are not evaluated before M2 (docs/briefs/M1-28-authz-core.md D6).
 	Scopes []string
+	// InstallationID is the app installation (apps only).
+	InstallationID ids.ID
+	// GrantedScopes are app_installations.granted_scopes (apps only); authz checks the scope of
+	// each action against them (05 section 2.6).
+	GrantedScopes []string
+	// ViewAs is the person whose view an owner looks at in "view as" (07 section 9.2); zero for
+	// none.
+	ViewAs ids.ID
+	// ActingFor is the checked invocation token of the run an agent acts in (SR9); the zero value
+	// for none. Filled from M2 on.
+	ActingFor ActingFor
 }
+
+// ActingFor names the run an agent acts in (07 section 3, SR9): the triggering person, the run,
+// its thread and the jti of the invocation token.
+type ActingFor struct {
+	UserID, RunID, ThreadID ids.ID
+	JTI                     string
+}
+
+// IsZero reports whether f names no run.
+func (f ActingFor) IsZero() bool { return f == ActingFor{} }
+
+// PrincipalID returns a.ID (kernel/authorize.Principal).
+func (a Actor) PrincipalID() ids.ID { return a.ID }
+
+// PrincipalKind returns the kind as text (kernel/authorize.Principal).
+func (a Actor) PrincipalKind() string { return string(a.Kind) }
+
+// SessionRef returns a.SessionID (kernel/authorize.Principal).
+func (a Actor) SessionRef() ids.ID { return a.SessionID }
+
+// DeviceRef returns a.DeviceID (kernel/authorize.Principal).
+func (a Actor) DeviceRef() ids.ID { return a.DeviceID }
+
+// TokenRef returns a.TokenID (kernel/authorize.Principal).
+func (a Actor) TokenRef() ids.ID { return a.TokenID }
+
+// InstallationRef returns a.InstallationID (kernel/authorize.Principal).
+func (a Actor) InstallationRef() ids.ID { return a.InstallationID }
+
+// StepUpTime returns a.StepUpAt (kernel/authorize.Principal).
+func (a Actor) StepUpTime() time.Time { return a.StepUpAt }
+
+// AppGrantedScopes returns a.GrantedScopes (kernel/authorize.Principal); the slice is shared.
+func (a Actor) AppGrantedScopes() []string { return a.GrantedScopes }
+
+// ViewAsPerson returns a.ViewAs (kernel/authorize.Principal).
+func (a Actor) ViewAsPerson() ids.ID { return a.ViewAs }
+
+// ActingForPerson returns a.ActingFor.UserID (kernel/authorize.Principal).
+func (a Actor) ActingForPerson() ids.ID { return a.ActingFor.UserID }
 
 // Anonymous returns the actor of a request without credentials. Anonymous requests still run
 // through authorize with this principal (06 section 3, 05 section 2.1).
@@ -65,6 +117,7 @@ type actorKey struct{}
 // (stage StageAuthenticate) and the gateway call it after the Authenticator accepted the request.
 func WithActor(ctx context.Context, a Actor) context.Context {
 	a.Scopes = slices.Clone(a.Scopes)
+	a.GrantedScopes = slices.Clone(a.GrantedScopes)
 	return context.WithValue(ctx, actorKey{}, a)
 }
 
@@ -74,6 +127,7 @@ func FromContext(ctx context.Context) (Actor, bool) {
 	a, ok := ctx.Value(actorKey{}).(Actor)
 	if ok {
 		a.Scopes = slices.Clone(a.Scopes)
+		a.GrantedScopes = slices.Clone(a.GrantedScopes)
 	}
 	return a, ok
 }

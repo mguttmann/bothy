@@ -1,0 +1,25 @@
+# Deferred requirement entries (brief M1-28 "Deferred entries"; 07 section 4.2). The ticket that
+# builds one of them replaces its entry and removes it here. run.token.renew, which main
+# gained after the brief, is deferred like run.start (docs/DECISIONS.md M1-28).
+agent_session.bind
+agent_session.reset
+command.autocomplete
+command.invoke
+file.read
+file.transcript.submit
+host.connect
+host.manage
+host.pair
+host.read
+import.apply
+interaction.create
+run.followup.create
+run.start
+run.token.renew
+terminal.attach
+terminal.close
+terminal.open
+terminal.read_own
+terminal.stream
+webhook_in.post
+webhook_out.deliver

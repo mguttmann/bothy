@@ -8,10 +8,19 @@ import (
 	"log/slog"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
+	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/telemetry"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
+	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
+	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
+	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
+	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
 
 // msgRegistrationCheckFailed is the log message of each violation the catalogue check finds.
@@ -108,3 +117,42 @@ func startRoutes(bindings []authorize.RouteBinding, reg *authorize.Registry, cat
 	}
 	return mount()
 }
+
+// AuthzConfig binds authz.snapshot_cache_max_entries and auth.step_up_max_age into the
+// configuration of the Authorizer. The error names the key whose binding failed, never a value.
+func AuthzConfig(v *config.Values) (authzapp.AuthorizerConfig, error) {
+	var c authzapp.AuthorizerConfig
+	if err := config.Bind(v, &c); err != nil {
+		return authzapp.AuthorizerConfig{}, err
+	}
+	return c, nil
+}
+
+// NewAuthorizer builds the Authorizer of authz, the kernel/authorize.Authorizer of the process
+// (M1-28), over pool: the PrincipalSource of identity (M1-26), the grant store of authz (M1-27),
+// the rights version of instance (instance.Versions), the recorder of audit (M1-24), the clock and
+// log, and the empty sources for structure, agent policy and credentials until their tickets
+// (empty_sources.go, docs/briefs/M1-28-authz-core.md D2). It opens no connection.
+//
+// Errors: those of authzapp.NewAuthorizer (a cache bound below 1).
+func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.Catalog, rec auditing.Recorder,
+	clk clock.Clock, log *slog.Logger) (*authzapp.Authorizer, error) {
+	if clk == nil {
+		clk = clock.System()
+	}
+	return authzapp.NewAuthorizer(cfg, authzapp.AuthorizerDeps{
+		Catalog:     cat,
+		Store:       authzpg.NewRepository(pool),
+		Principals:  identityapp.NewPrincipalSource(identitypg.NewRepository(pool)),
+		Credentials: emptyCredentials{},
+		Structure:   emptyStructure{},
+		Policies:    emptyPolicies{},
+		Versions:    instanceapp.NewVersions(instancepg.NewRepository(pool)),
+		Recorder:    rec,
+		Clock:       clk,
+		Log:         orDiscard(log),
+	})
+}
+
+// Compile-time check: the process's authorizer is the kernel port.
+var _ authorize.Authorizer = (*authzapp.Authorizer)(nil)

@@ -1,0 +1,357 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package app_test
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/authz"
+	"github.com/OWNER/bothy/services/server/internal/authz/adapters/fake"
+	"github.com/OWNER/bothy/services/server/internal/authz/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+)
+
+// setChannel changes the facts of a channel in the fake structure.
+func (w *world) setChannel(t testing.TB, id ids.ID, mod func(*authz.ChannelFacts)) {
+	t.Helper()
+	c, ok, _ := w.structure.Channel(context.Background(), id)
+	if !ok {
+		t.Fatal("no channel")
+	}
+	mod(&c)
+	w.structure.PutChannel(c)
+}
+
+func TestSR5_OwnerOnlyInSession(t *testing.T) {
+	w := newWorld(t)
+	w.addToken(w.owner)
+	personal := actor.Actor{ID: w.owner, Kind: actor.KindUser, TokenID: w.tokens[w.owner]}
+	w.expect(t, personal, authorize.ActionUserCreate, authorize.Resource{Kind: authorize.ResourceInstance}, forbidden, "owner_only")
+	w.expect(t, personal, authorize.ActionIdentityLink, authorize.Resource{Kind: authorize.ResourceUser, ID: w.owner, OwnerID: w.owner},
+		forbidden, "step_up_not_possible")
+	// The same owner in a session has the owner rights.
+	w.allow(t, w.user(w.owner), authorize.ActionUserCreate, authorize.Resource{Kind: authorize.ResourceInstance})
+	// With the token the owner reads nothing, because the owner holds no grants (SR5).
+	w.expect(t, personal, authorize.ActionMessageRead, w.msg(w.notizen, w.assistent), notFound, "no_grant")
+}
+
+func TestSR6_OwnerNeverSeesDM(t *testing.T) {
+	w := newWorld(t)
+	w.expect(t, w.user(w.owner), authorize.ActionMessageRead, w.msg(w.dm, w.alex), notFound, "no_grant")
+	w.expect(t, w.user(w.owner), authorize.ActionChannelRead, w.channel(w.dm), notFound, "no_grant")
+	w.allow(t, w.user(w.alex), authorize.ActionMessageRead, w.msg(w.dm, w.sam))
+	w.allow(t, w.user(w.sam), authorize.ActionMessageCreate, w.thread(w.dm))
+	w.expect(t, w.user(w.robin), authorize.ActionMessageRead, w.msg(w.dm, w.sam), notFound, "no_grant")
+}
+
+func TestOperatorRule_MainAndFixedThread(t *testing.T) {
+	w := newWorld(t)
+	// A thread in Kampagnen with the fixed operator Lotse.
+	th := ids.New()
+	w.structure.PutThread(authz.ThreadFacts{ID: th, ChannelID: w.kampagnen, OperatorAgentID: w.lotse, CreatedBy: w.sam})
+	thread := authorize.Resource{Kind: authorize.ResourceThread, ID: th}
+	w.allow(t, w.agent(w.lotse), authorize.ActionMessageCreate, thread)
+	w.allow(t, w.agent(w.texter), authorize.ActionMessageCreate, w.thread(w.kampagnen))
+	// The channel's operator changes to Runner: the rule follows, without a new rights version.
+	w.setChannel(t, w.kampagnen, func(c *authz.ChannelFacts) { c.EffectiveOperatorID = w.runner })
+	w.allow(t, w.agent(w.runner), authorize.ActionMessageCreate, w.thread(w.kampagnen))
+	w.expect(t, w.agent(w.texter), authorize.ActionMessageCreate, w.thread(w.kampagnen), notFound, "no_grant")
+	w.allow(t, w.agent(w.lotse), authorize.ActionMessageCreate, thread)
+	w.expect(t, w.agent(w.lotse), authorize.ActionMessageCreate, w.thread(w.kampagnen), notFound, "no_grant")
+	// The channel's operator writes in every thread of the channel, fixed-operator threads included.
+	w.allow(t, w.agent(w.runner), authorize.ActionMessageCreate, thread)
+}
+
+func TestBotLimits_MismatchingSubjectKindIsCapped(t *testing.T) {
+	w := newWorld(t)
+	// A grant row that names Lotse as a person with trigger and manage on Marketing.
+	w.grant(t, userSubject(w.lotse), domain.Target{Kind: domain.TargetSpace, SpaceID: w.marketing}, domain.LevelTrigger, time.Time{}, domain.CapManage)
+	w.versions.Bump()
+	w.allow(t, w.agent(w.lotse), authorize.ActionMessageCreate, w.thread(w.kampagnen))
+	w.expect(t, w.agent(w.lotse), authorize.ActionChannelUpdate, w.channel(w.kampagnen), forbidden, "capability_missing")
+	w.expect(t, w.agent(w.lotse), authorize.ActionExportChannel, w.channel(w.kampagnen), forbidden, "capability_missing")
+}
+
+func TestReadOnlyChannel(t *testing.T) {
+	w := newWorld(t)
+	w.setChannel(t, w.allgemein, func(c *authz.ChannelFacts) { c.ReadOnly = true })
+	w.expect(t, w.user(w.owner), authorize.ActionMessageCreate, w.thread(w.allgemein), forbidden, "channel_read_only")
+	w.expect(t, w.user(w.alex), authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, true), forbidden, "channel_read_only")
+	// A member with manage may still delete a foreign message (moderation, 05 rule 1.8).
+	w.grant(t, userSubject(w.robin), domain.Target{Kind: domain.TargetSpace, SpaceID: w.support}, domain.LevelWrite, time.Time{}, domain.CapManage)
+	w.versions.Bump()
+	w.allow(t, w.user(w.robin), authorize.ActionMessageDelete, w.msg(w.allgemein, w.sam))
+	w.allow(t, w.user(w.owner), authorize.ActionChannelUpdate, w.channel(w.allgemein))
+	// A reader gets the level reason, because the requirement fails first.
+	w.expect(t, w.user(w.sam), authorize.ActionMessageCreate, w.thread(w.allgemein), forbidden, "level_insufficient")
+	w.allow(t, w.user(w.sam), authorize.ActionMessageRead, w.msg(w.allgemein, w.alex))
+}
+
+func TestPendingDevice(t *testing.T) {
+	w := newWorld(t)
+	w.creds.PutDevice(w.devices[w.alex], fake.Device{PrincipalID: w.alex, State: authz.DevicePending})
+	w.versions.Bump()
+	alex := w.user(w.alex)
+	w.expect(t, alex, authorize.ActionMessageRead, w.msg(w.allgemein, w.alex), forbidden, "device_pending")
+	w.allow(t, alex, authorize.ActionSelfRead, authorize.Resource{Kind: authorize.ResourcePrincipal, ID: w.alex, OwnerID: w.alex})
+	w.allow(t, alex, authorize.ActionDeviceList, authorize.Resource{Kind: authorize.ResourceDevice, ID: w.devices[w.alex], OwnerID: w.alex})
+	w.allow(t, alex, authorize.ActionAuthLogout, authorize.Resource{Kind: authorize.ResourceAuthSession, ID: w.sessions[w.alex], OwnerID: w.alex})
+	// Another person's device is invisible; another own device stays pending.
+	w.expect(t, alex, authorize.ActionDeviceList, authorize.Resource{Kind: authorize.ResourceDevice, ID: w.devices[w.sam], OwnerID: w.sam},
+		notFound, "not_self")
+	w.expect(t, alex, authorize.ActionDeviceList, authorize.Resource{Kind: authorize.ResourceDevice, ID: ids.New(), OwnerID: w.alex},
+		forbidden, "device_pending")
+}
+
+func TestPendingPerson(t *testing.T) {
+	w := newWorld(t)
+	f, _, _ := w.principals.Principal(context.Background(), w.robin)
+	f.Status = authz.PrincipalPending
+	w.principals.Put(f)
+	w.versions.Bump()
+	w.expect(t, w.user(w.robin), authorize.ActionMessageRead, w.msg(w.projektA, w.robin), forbidden, "principal_pending")
+	w.allow(t, w.user(w.robin), authorize.ActionSelfRead, authorize.Resource{Kind: authorize.ResourcePrincipal, ID: w.robin, OwnerID: w.robin})
+}
+
+func TestStepUp(t *testing.T) {
+	w := newWorld(t)
+	r := authorize.Resource{Kind: authorize.ResourceSpace, ID: w.support, Grant: &authorize.GrantFacts{
+		SubjectKind: "user", Level: "read", TargetKind: "space", TargetSpaceID: w.support}}
+	owner := w.user(w.owner)
+	owner.StepUpAt = w.clk.Now().Add(-5 * time.Minute)
+	w.allow(t, owner, authorize.ActionGrantCreate, r)
+	owner.StepUpAt = w.clk.Now().Add(-5*time.Minute - time.Nanosecond)
+	w.expect(t, owner, authorize.ActionGrantCreate, r, stepUpNeeded, "step_up_required")
+	owner.StepUpAt = time.Time{}
+	w.expect(t, owner, authorize.ActionGrantCreate, r, stepUpNeeded, "step_up_required")
+	w.expect(t, w.agent(w.lotse), authorize.ActionTokenCreate, authorize.Resource{Kind: authorize.ResourcePrincipal, ID: w.lotse, OwnerID: w.lotse},
+		forbidden, "step_up_not_possible")
+	// Without the right, no step-up is asked for (07 section 4.2: requirement before step-up).
+	stale := w.user(w.alex)
+	stale.StepUpAt = time.Time{}
+	w.expect(t, stale, authorize.ActionUserCreate, authorize.Resource{Kind: authorize.ResourceInstance}, forbidden, "owner_only")
+}
+
+func TestViewAs_IntersectsAndIsReadOnly(t *testing.T) {
+	w := newWorld(t)
+	asAlex := w.user(w.owner)
+	asAlex.ViewAs = w.alex
+	w.expect(t, asAlex, authorize.ActionMessageRead, w.msg(w.kampagnen, w.sam), notFound, "no_grant")
+	w.allow(t, asAlex, authorize.ActionMessageRead, w.msg(w.allgemein, w.sam))
+	w.expect(t, asAlex, authorize.ActionMessageCreate, w.thread(w.allgemein), forbidden, "view_as_read_only")
+	w.expect(t, asAlex, authorize.ActionMessageRead, w.msg(w.dm, w.sam), notFound, "no_grant")
+	w.expect(t, asAlex, authorize.ActionUserCreate, authorize.Resource{Kind: authorize.ResourceInstance}, forbidden, "owner_only")
+}
+
+func TestActingFor_Intersects(t *testing.T) {
+	w := newWorld(t)
+	w.grant(t, domain.Subject{Kind: domain.SubjectAgent, PrincipalID: w.lotse}, domain.Target{Kind: domain.TargetSpace, SpaceID: w.engineering}, domain.LevelRead, time.Time{})
+	w.versions.Bump()
+	lotse := w.agent(w.lotse)
+	w.allow(t, lotse, authorize.ActionMessageRead, w.msg(w.projektA, w.robin))
+	lotse.ActingFor = actor.ActingFor{UserID: w.alex, RunID: ids.New(), ThreadID: w.mainThread[w.allgemein], JTI: "j"}
+	w.expect(t, lotse, authorize.ActionMessageRead, w.msg(w.projektA, w.robin), notFound, "acting_for_insufficient")
+	w.allow(t, lotse, authorize.ActionMessageRead, w.msg(w.allgemein, w.robin))
+	// Sam reads Allgemein only; Lotse acting for Sam may read but not write there.
+	lotse.ActingFor.UserID = w.sam
+	w.allow(t, lotse, authorize.ActionMessageRead, w.msg(w.allgemein, w.robin))
+	w.expect(t, lotse, authorize.ActionMessageCreate, w.thread(w.allgemein), forbidden, "acting_for_insufficient")
+	// Neither may see Marketing: there the agent itself lacks read.
+	w.expect(t, lotse, authorize.ActionMessageRead, w.msg(w.kampagnen, w.robin), notFound, "no_grant")
+}
+
+func TestAgentInvoke_Origin(t *testing.T) {
+	w := newWorld(t)
+	r := w.invoke(w.allgemein, w.lotse, true)
+	r.Invoke.TriggerOrigin = "agent"
+	w.expect(t, w.user(w.alex), authorize.ActionAgentInvoke, r, forbidden, "origin_not_human")
+	// An agent never triggers (SR4); Lotse lacks trigger, so the level decides first.
+	w.expect(t, w.agent(w.lotse), authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.texter, true), forbidden, "level_insufficient")
+}
+
+func TestAgentInvoke_DM(t *testing.T) {
+	w := newWorld(t)
+	// Participants have write, never trigger: a dm never reaches an agent.
+	w.expect(t, w.user(w.alex), authorize.ActionAgentInvoke, w.invoke(w.dm, w.lotse, true), forbidden, "level_insufficient")
+}
+
+func TestAgentInvoke_InactiveAgent(t *testing.T) {
+	w := newWorld(t)
+	f, _, _ := w.principals.Principal(context.Background(), w.lotse)
+	f.Status = authz.PrincipalDisabled
+	w.principals.Put(f)
+	w.expect(t, w.user(w.alex), authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, true), forbidden, "agent_not_reachable")
+	w.expect(t, w.user(w.alex), authorize.ActionAgentInvoke, w.invoke(w.allgemein, ids.New(), true), forbidden, "agent_not_reachable")
+}
+
+func TestAgentInvoke_MentionRule(t *testing.T) {
+	w := newWorld(t)
+	alex := w.user(w.alex)
+	w.allow(t, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, false))
+	w.setChannel(t, w.allgemein, func(c *authz.ChannelFacts) { c.RequireMention = true })
+	w.expect(t, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, false), forbidden, "agent_not_reachable")
+	w.allow(t, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, true))
+	w.setChannel(t, w.allgemein, func(c *authz.ChannelFacts) { c.FreeResponse = true })
+	w.allow(t, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, false))
+	// A non-main thread follows thread_require_mention.
+	th := ids.New()
+	w.structure.PutThread(authz.ThreadFacts{ID: th, ChannelID: w.eskalation, CreatedBy: w.alex})
+	w.setChannel(t, w.eskalation, func(c *authz.ChannelFacts) { c.ThreadRequireMention = true })
+	r := authorize.Resource{Kind: authorize.ResourceThread, ID: th, Invoke: &authorize.InvokeFacts{AgentID: w.lotse, TriggerOrigin: "human"}}
+	w.expect(t, alex, authorize.ActionAgentInvoke, r, forbidden, "agent_not_reachable")
+	r.Invoke.MentionsAgent = true
+	w.allow(t, alex, authorize.ActionAgentInvoke, r)
+}
+
+func TestAgentInvoke_Guest(t *testing.T) {
+	w := newWorld(t)
+	alex := w.user(w.alex)
+	w.setChannel(t, w.allgemein, func(c *authz.ChannelFacts) { c.AllowMentionedAgents = true })
+	// Texter has no write on Allgemein: refused.
+	w.expect(t, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.texter, true), forbidden, "agent_not_reachable")
+	w.grant(t, domain.Subject{Kind: domain.SubjectAgent, PrincipalID: w.texter}, domain.Target{Kind: domain.TargetChannel, ChannelID: w.allgemein}, domain.LevelWrite, time.Time{})
+	w.grant(t, domain.Subject{Kind: domain.SubjectAgent, PrincipalID: w.assistent}, domain.Target{Kind: domain.TargetChannel, ChannelID: w.allgemein}, domain.LevelWrite, time.Time{})
+	w.versions.Bump()
+	w.allow(t, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.texter, true))
+	// Not mentioned, or a personal agent: refused (R-AZ-19).
+	w.expect(t, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.texter, false), forbidden, "agent_not_reachable")
+	w.expect(t, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.assistent, true), forbidden, "agent_not_reachable")
+	// Guests need the channel's permission.
+	w.setChannel(t, w.allgemein, func(c *authz.ChannelFacts) { c.AllowMentionedAgents = false })
+	w.expect(t, alex, authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.texter, true), forbidden, "agent_not_reachable")
+}
+
+func TestAgentInvoke_PersonalHolder(t *testing.T) {
+	w := newWorld(t)
+	w.grant(t, userSubject(w.alex), domain.Target{Kind: domain.TargetChannel, ChannelID: w.notizen}, domain.LevelTrigger, time.Time{})
+	w.versions.Bump()
+	w.expect(t, w.user(w.alex), authorize.ActionAgentInvoke, w.invoke(w.notizen, w.assistent, true), forbidden, "billing_mode_personal_not_holder")
+	w.allow(t, w.user(w.owner), authorize.ActionAgentInvoke, w.invoke(w.notizen, w.assistent, true))
+}
+
+func TestAgentInvoke_ToolClassHost(t *testing.T) {
+	w := newWorld(t)
+	w.grant(t, userSubject(w.alex), domain.Target{Kind: domain.TargetChannel, ChannelID: w.werkzeuge}, domain.LevelTrigger, time.Time{})
+	w.versions.Bump()
+	w.expect(t, w.user(w.alex), authorize.ActionAgentInvoke, w.invoke(w.werkzeuge, w.runner, true), forbidden, "tool_class_owner_only")
+	w.allow(t, w.user(w.owner), authorize.ActionAgentInvoke, w.invoke(w.werkzeuge, w.runner, true))
+	// The reported class counts too: the higher of both.
+	w.policies.Put(w.lotse, authz.AgentPolicy{BillingMode: domain.BillingOrganization, ToolClass: domain.ToolChat, ReportedToolClass: domain.ToolHost})
+	w.expect(t, w.user(w.alex), authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, true), forbidden, "tool_class_owner_only")
+	// A ready own dev environment lifts SR2.
+	w.policies.SetDevReady(w.alex, w.allgemein, true)
+	w.allow(t, w.user(w.alex), authorize.ActionAgentInvoke, w.invoke(w.allgemein, w.lotse, true))
+}
+
+func TestAgentInvoke_ProjectNotReady(t *testing.T) {
+	w := newWorld(t)
+	w.setChannel(t, w.projektA, func(c *authz.ChannelFacts) { c.ProjectReady = false })
+	w.expect(t, w.user(w.owner), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true), forbidden, "project_not_ready")
+}
+
+func TestAgentInvoke_DevEnvironmentNotReady(t *testing.T) {
+	w := newWorld(t)
+	w.policies.Put(w.runner, authz.AgentPolicy{BillingMode: domain.BillingOrganization, ToolClass: domain.ToolScoped})
+	w.expect(t, w.user(w.robin), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true), forbidden, "dev_environment_not_ready")
+	w.allow(t, w.user(w.owner), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true))
+	w.policies.SetDevReady(w.robin, w.projektA, true)
+	w.allow(t, w.user(w.robin), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true))
+}
+
+// TestAZM15 is AZ-M15 with the host tool class of Runner: SR2 decides before SR3.
+func TestAZM15(t *testing.T) {
+	w := newWorld(t)
+	w.expect(t, w.user(w.robin), authorize.ActionAgentInvoke, w.invoke(w.projektA, w.runner, true), forbidden, "tool_class_owner_only")
+}
+
+func TestAgentInvoke_ActiveRunOfOtherAgent(t *testing.T) {
+	w := newWorld(t)
+	r := w.invoke(w.allgemein, w.lotse, true)
+	r.Invoke.ActiveRunAgentID = w.texter
+	w.expect(t, w.user(w.alex), authorize.ActionAgentInvoke, r, forbidden, "run_active_other_agent")
+	r.Invoke.ActiveRunAgentID = w.lotse
+	w.allow(t, w.user(w.alex), authorize.ActionAgentInvoke, r)
+}
+
+func TestAgentInvoke_WithoutDescriptorFailsClosed(t *testing.T) {
+	w := newWorld(t)
+	if d, err := w.az.Authorize(context.Background(), w.user(w.alex), authorize.ActionAgentInvoke, w.thread(w.allgemein)); err == nil || d.Allowed() {
+		t.Fatalf("got %+v, %v", d, err)
+	}
+}
+
+func TestGrantCreateGuard(t *testing.T) {
+	w := newWorld(t)
+	inst := authorize.Resource{Kind: authorize.ResourceInstance, Grant: &authorize.GrantFacts{SubjectKind: "user", Level: "read", TargetKind: "instance"}}
+	w.allow(t, w.user(w.owner), authorize.ActionGrantCreate, inst)
+	w.grant(t, userSubject(w.alex), domain.Target{Kind: domain.TargetInstance}, domain.LevelRead, time.Time{}, domain.CapManage)
+	w.grant(t, userSubject(w.robin), domain.Target{Kind: domain.TargetSpace, SpaceID: w.support}, domain.LevelWrite, time.Time{}, domain.CapManage)
+	w.versions.Bump()
+	w.expect(t, w.user(w.alex), authorize.ActionGrantCreate, inst, forbidden, "owner_only")
+	// AZ-M37: write and manage cannot hand out trigger.
+	ch := authorize.Resource{Kind: authorize.ResourceChannel, ID: w.allgemein, Grant: &authorize.GrantFacts{
+		SubjectKind: "user", Level: "trigger", TargetKind: "channel", TargetChannelID: w.allgemein}}
+	w.expect(t, w.user(w.robin), authorize.ActionGrantCreate, ch, forbidden, "delegation_exceeds_own_level")
+	ch.Grant.Level = "read"
+	w.allow(t, w.user(w.robin), authorize.ActionGrantCreate, ch)
+	// Without manage the requirement fails first.
+	w.expect(t, w.user(w.sam), authorize.ActionGrantCreate, ch, forbidden, "owner_only")
+	// The grant's target must be the resource.
+	ch.Grant.TargetChannelID = w.eskalation
+	if d, err := w.az.Authorize(context.Background(), w.user(w.robin), authorize.ActionGrantCreate, ch); err == nil || d.Allowed() {
+		t.Fatalf("mismatching target: %+v, %v", d, err)
+	}
+}
+
+func TestGrantRevokeGuard(t *testing.T) {
+	w := newWorld(t)
+	strong := w.grant(t, userSubject(w.sam), domain.Target{Kind: domain.TargetChannel, ChannelID: w.allgemein}, domain.LevelTrigger, time.Time{})
+	weak := w.grant(t, userSubject(w.sam), domain.Target{Kind: domain.TargetChannel, ChannelID: w.eskalation}, domain.LevelRead, time.Time{})
+	w.grant(t, userSubject(w.robin), domain.Target{Kind: domain.TargetSpace, SpaceID: w.support}, domain.LevelWrite, time.Time{}, domain.CapManage)
+	w.versions.Bump()
+	g := func(id ids.ID) authorize.Resource { return authorize.Resource{Kind: authorize.ResourceGrant, ID: id} }
+	w.expect(t, w.user(w.robin), authorize.ActionGrantRevoke, g(strong), forbidden, "delegation_exceeds_own_level")
+	w.allow(t, w.user(w.robin), authorize.ActionGrantRevoke, g(weak))
+	w.allow(t, w.user(w.owner), authorize.ActionGrantRevoke, g(strong))
+	w.expect(t, w.user(w.sam), authorize.ActionGrantRevoke, g(w.g2), forbidden, "owner_only")
+	w.expect(t, w.user(w.alex), authorize.ActionGrantRevoke, g(w.g2), notFound, "no_grant")
+	w.expect(t, w.user(w.owner), authorize.ActionGrantRevoke, g(ids.New()), notFound, "no_grant")
+}
+
+// TestSpaceReadThroughAChannel: on a space, Level(read) means "space visible" (07 section 4.3):
+// read on one of its channels is enough (found by AZ-P8).
+func TestSpaceReadThroughAChannel(t *testing.T) {
+	w := newWorld(t)
+	w.allow(t, w.user(w.robin), authorize.ActionSpaceRead, authorize.Resource{Kind: authorize.ResourceSpace, ID: w.engineering})
+	w.allow(t, w.agent(w.texter), authorize.ActionSpaceRead, authorize.Resource{Kind: authorize.ResourceSpace, ID: w.marketing})
+	w.expect(t, w.user(w.robin), authorize.ActionSpaceRead, authorize.Resource{Kind: authorize.ResourceSpace, ID: w.support}, notFound, "no_grant")
+}
+
+// TestViewAs_OwnDMOfTheViewerStaysInvisible: "view as" never opens a dm the viewed person does not
+// take part in, also when the viewer does (SR6; red team M1-28 minor 2).
+func TestViewAs_OwnDMOfTheViewerStaysInvisible(t *testing.T) {
+	w := newWorld(t)
+	own := ids.New()
+	w.structure.PutChannel(authz.ChannelFacts{ID: own, Kind: authz.ChannelDM, DMParticipants: []ids.ID{w.owner, w.alex}})
+	w.addMainThread(own)
+	asSam := w.user(w.owner)
+	asSam.ViewAs = w.sam
+	w.expect(t, asSam, authorize.ActionMessageRead, w.msg(own, w.alex), notFound, "no_grant")
+	w.expect(t, asSam, authorize.ActionDmLeave, w.channel(own), notFound, "no_grant")
+	asAlex := w.user(w.owner)
+	asAlex.ViewAs = w.alex
+	w.allow(t, asAlex, authorize.ActionMessageRead, w.msg(own, w.alex))
+}
+
+// TestSelf_IDOfThePrincipalResource: a principal or user resource that names the principal in ID
+// only is the principal's own (red team M1-28 minor 3).
+func TestSelf_IDOfThePrincipalResource(t *testing.T) {
+	w := newWorld(t)
+	w.allow(t, w.user(w.alex), authorize.ActionSelfRead, authorize.Resource{Kind: authorize.ResourcePrincipal, ID: w.alex})
+	w.allow(t, w.agent(w.lotse), authorize.ActionSelfRead, authorize.Resource{Kind: authorize.ResourcePrincipal, ID: w.lotse})
+	w.expect(t, w.agent(w.lotse), authorize.ActionSelfRead, authorize.Resource{Kind: authorize.ResourcePrincipal, ID: w.texter}, notFound, "no_grant")
+}

@@ -1,0 +1,533 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package app_test
+
+import (
+	"context"
+	"log/slog"
+	"math/rand/v2"
+	"os"
+	"slices"
+	"strconv"
+	"testing"
+	"time"
+
+	"github.com/OWNER/bothy/services/server/internal/authz"
+	"github.com/OWNER/bothy/services/server/internal/authz/adapters/fake"
+	"github.com/OWNER/bothy/services/server/internal/authz/app"
+	"github.com/OWNER/bothy/services/server/internal/authz/domain"
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
+	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
+	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+)
+
+// The slow reference of AZ-P8: decisions computed straight from a model of the world, following
+// 07 sections 2.5 and 2.7 to 2.10 and 4.2, without a snapshot, a cache or any type of the
+// implementation's rights code. The model is mirrored into the fakes the Authorizer reads.
+
+type refGrant struct {
+	id                 ids.ID
+	subject            ids.ID // principal or group
+	group              bool
+	targetKind         string // instance, space, channel
+	target             ids.ID
+	level              int // 1 read, 2 write, 3 trigger
+	upload, manage, ex bool
+	expires            time.Time
+	revoked            bool
+}
+
+type refMember struct {
+	id, group, user ids.ID
+	expires         time.Time
+	removed         bool
+}
+
+type refPrincipal struct {
+	id       ids.ID
+	kind     string
+	owner    bool
+	disabled bool
+	scopes   []string
+	session  ids.ID
+	device   ids.ID
+	token    ids.ID
+	install  ids.ID
+}
+
+type refChannel struct {
+	id, space ids.ID
+	dm        bool
+	members   []ids.ID
+	operator  ids.ID
+	readOnly  bool
+	thread    ids.ID
+}
+
+type refWorld struct {
+	rnd        *rand.Rand
+	now        time.Time
+	principals []*refPrincipal
+	spaces     []ids.ID
+	channels   []*refChannel
+	groups     map[ids.ID]bool // id -> deleted
+	members    []*refMember
+	grants     []*refGrant
+	expiries   []time.Time
+
+	clk        *clock.Fake
+	fPrincipal *fake.Principals
+	fStructure *fake.Structure
+	fCreds     *fake.Credentials
+	fStore     *fake.Store
+	fVersions  *fake.Versions
+	az         *app.Authorizer
+}
+
+func (m *refWorld) inEffect(exp time.Time) bool { return exp.IsZero() || exp.After(m.now) }
+
+// rights is the reference of 05 section 2.3 for p on channel c (nil: space or instance path).
+func (m *refWorld) rights(p *refPrincipal, space ids.ID, c *refChannel) (level int, upload, manage, export bool) {
+	if c != nil && c.dm {
+		if p.kind == domain.KindUser && slices.Contains(c.members, p.id) {
+			return 2, true, false, false
+		}
+		return 0, false, false, false
+	}
+	if p.owner && p.kind == domain.KindUser && !p.disabled {
+		return 3, true, true, true
+	}
+	groups := map[ids.ID]bool{}
+	if p.kind == domain.KindUser {
+		for _, mb := range m.members {
+			if mb.user == p.id && !mb.removed && !m.groups[mb.group] && m.inEffect(mb.expires) {
+				groups[mb.group] = true
+			}
+		}
+	}
+	for _, g := range m.grants {
+		if g.revoked || !m.inEffect(g.expires) {
+			continue
+		}
+		if g.group && !groups[g.subject] || !g.group && g.subject != p.id {
+			continue
+		}
+		applies := g.targetKind == "instance" || (g.targetKind == "space" && g.target == space) ||
+			(g.targetKind == "channel" && c != nil && g.target == c.id)
+		if !applies {
+			continue
+		}
+		level = max(level, g.level)
+		upload, manage, export = upload || g.upload, manage || g.manage, export || g.ex
+	}
+	if p.kind == domain.KindAgent && c != nil && c.operator == p.id {
+		level = max(level, 2)
+	}
+	if p.kind != domain.KindUser {
+		level, manage, export = min(level, 2), false, false
+	}
+	return level, upload, manage, export
+}
+
+// refAppScope is the scope table of 05 section 2.6 for the actions of the test.
+var refAppScope = map[authorize.Action]string{
+	authorize.ActionMessageRead: "messages:read", authorize.ActionThreadRead: "messages:read",
+	authorize.ActionChannelRead: "messages:read", authorize.ActionSpaceRead: "messages:read",
+	authorize.ActionMessageCreate: "messages:write", authorize.ActionFileUpload: "files:write",
+}
+
+// decide is the reference decision for p, a and the channel c (space for space.read).
+func (m *refWorld) decide(p *refPrincipal, a authorize.Action, c *refChannel, space ids.ID) (authorize.Outcome, string) {
+	if p.disabled {
+		return authorize.OutcomeUnauthenticated, "principal_inactive"
+	}
+	if a == authorize.ActionSpaceRead {
+		lvl, _, _, _ := m.rights(p, space, nil)
+		visible := lvl >= 1
+		for _, ch := range m.channels {
+			if ch.space == space && !ch.dm {
+				if l, _, _, _ := m.rights(p, space, ch); l >= 1 {
+					visible = true
+				}
+			}
+		}
+		if !visible {
+			return authorize.OutcomeNotFound, "no_grant"
+		}
+		return m.scope(p, a)
+	}
+	lvl, upload, manage, export := m.rights(p, c.space, c)
+	if lvl < 1 {
+		return authorize.OutcomeNotFound, "no_grant"
+	}
+	needWrite := a == authorize.ActionMessageCreate || a == authorize.ActionFileUpload
+	if needWrite && lvl < 2 {
+		return authorize.OutcomeForbidden, "level_insufficient"
+	}
+	if (a == authorize.ActionFileUpload && !upload) || (a == authorize.ActionChannelUpdate && !manage) ||
+		(a == authorize.ActionExportChannel && !export) {
+		return authorize.OutcomeForbidden, "capability_missing"
+	}
+	if o, r := m.scope(p, a); o != authorize.OutcomeAllow {
+		return o, r
+	}
+	if needWrite && c.readOnly {
+		return authorize.OutcomeForbidden, "channel_read_only"
+	}
+	if a == authorize.ActionExportChannel && p.kind != domain.KindUser {
+		return authorize.OutcomeForbidden, "step_up_not_possible"
+	}
+	return authorize.OutcomeAllow, ""
+}
+
+// scope applies the app scope rule.
+func (m *refWorld) scope(p *refPrincipal, a authorize.Action) (authorize.Outcome, string) {
+	if p.kind != domain.KindApp {
+		return authorize.OutcomeAllow, ""
+	}
+	need, ok := refAppScope[a]
+	if !ok {
+		return authorize.OutcomeForbidden, "subject_kind_not_allowed"
+	}
+	if !slices.Contains(p.scopes, need) {
+		return authorize.OutcomeForbidden, "scope_missing"
+	}
+	return authorize.OutcomeAllow, ""
+}
+
+// visibleChannels is the reference of Scope(message.read).
+func (m *refWorld) visibleChannels(p *refPrincipal) []ids.ID {
+	if p.kind == domain.KindApp && !slices.Contains(p.scopes, "messages:read") {
+		return nil
+	}
+	var out []ids.ID
+	for _, c := range m.channels {
+		if l, _, _, _ := m.rights(p, c.space, c); l >= 1 {
+			out = append(out, c.id)
+		}
+	}
+	return domain.SortIDs(out)
+}
+
+// sync mirrors the model into the fakes.
+func (m *refWorld) syncPrincipal(p *refPrincipal) {
+	st := authz.PrincipalActive
+	if p.disabled {
+		st = authz.PrincipalDisabled
+	}
+	m.fPrincipal.Put(authz.PrincipalFacts{ID: p.id, Kind: actor.Kind(p.kind), Status: st, IsOwner: p.owner})
+}
+
+func (m *refWorld) syncChannel(c *refChannel) {
+	f := authz.ChannelFacts{ID: c.id, SpaceID: c.space, Kind: authz.ChannelText, EffectiveOperatorID: c.operator, ReadOnly: c.readOnly}
+	if c.dm {
+		f.Kind, f.SpaceID, f.DMParticipants, f.EffectiveOperatorID = authz.ChannelDM, ids.ID{}, c.members, ids.ID{}
+	}
+	m.fStructure.PutChannel(f)
+}
+
+func (m *refWorld) actorOf(p *refPrincipal) actor.Actor {
+	a := actor.Actor{ID: p.id, Kind: actor.Kind(p.kind), SessionID: p.session, DeviceID: p.device, TokenID: p.token,
+		InstallationID: p.install, GrantedScopes: p.scopes, StepUpAt: m.now}
+	return a
+}
+
+func (m *refWorld) expiry() time.Time {
+	if m.rnd.IntN(3) == 0 {
+		return time.Time{}
+	}
+	e := m.now.Add(time.Duration(1+m.rnd.IntN(120)) * time.Minute)
+	m.expiries = append(m.expiries, e)
+	return e
+}
+
+func (m *refWorld) pick() *refPrincipal { return m.principals[m.rnd.IntN(len(m.principals))] }
+
+func (m *refWorld) addChannel(space ids.ID) {
+	c := &refChannel{id: ids.New(), space: space, thread: ids.New()}
+	if m.rnd.IntN(3) == 0 {
+		for _, p := range m.principals {
+			if p.kind == domain.KindAgent {
+				c.operator = p.id
+				break
+			}
+		}
+	}
+	m.channels = append(m.channels, c)
+	m.syncChannel(c)
+	m.fStructure.PutThread(authz.ThreadFacts{ID: c.thread, ChannelID: c.id, Main: true})
+}
+
+func (m *refWorld) addDM() {
+	var users []ids.ID
+	for _, p := range m.principals {
+		if p.kind == domain.KindUser && m.rnd.IntN(2) == 0 {
+			users = append(users, p.id)
+		}
+	}
+	c := &refChannel{id: ids.New(), dm: true, members: domain.SortIDs(users), thread: ids.New()}
+	m.channels = append(m.channels, c)
+	m.syncChannel(c)
+	m.fStructure.PutThread(authz.ThreadFacts{ID: c.thread, ChannelID: c.id, Main: true})
+}
+
+func (m *refWorld) addGrant() {
+	g := &refGrant{id: ids.New(), level: 1 + m.rnd.IntN(3), expires: m.expiry(),
+		upload: m.rnd.IntN(2) == 0, manage: m.rnd.IntN(3) == 0, ex: m.rnd.IntN(3) == 0}
+	groups := slices.Collect(func(yield func(ids.ID) bool) {
+		for id := range m.groups {
+			if !yield(id) {
+				return
+			}
+		}
+	})
+	if len(groups) > 0 && m.rnd.IntN(3) == 0 {
+		g.group, g.subject = true, groups[m.rnd.IntN(len(groups))]
+	} else {
+		g.subject = m.pick().id
+	}
+	switch m.rnd.IntN(4) {
+	case 0:
+		g.targetKind = "instance"
+	case 1:
+		g.targetKind, g.target = "space", m.spaces[m.rnd.IntN(len(m.spaces))]
+	default:
+		var ch []*refChannel
+		for _, c := range m.channels {
+			if !c.dm {
+				ch = append(ch, c)
+			}
+		}
+		g.targetKind, g.target = "channel", ch[m.rnd.IntN(len(ch))].id
+	}
+	m.grants = append(m.grants, g)
+	sub := domain.Subject{Kind: domain.SubjectUser, PrincipalID: g.subject}
+	if g.group {
+		sub = domain.Subject{Kind: domain.SubjectGroup, GroupID: g.subject}
+	}
+	tg := domain.Target{Kind: domain.TargetKind(g.targetKind)}
+	switch g.targetKind {
+	case "space":
+		tg.SpaceID = g.target
+	case "channel":
+		tg.ChannelID = g.target
+	}
+	var caps []domain.Capability
+	if g.upload {
+		caps = append(caps, domain.CapUpload)
+	}
+	if g.manage {
+		caps = append(caps, domain.CapManage)
+	}
+	if g.ex {
+		caps = append(caps, domain.CapExport)
+	}
+	_ = m.fStore.InsertGrant(context.Background(), domain.Grant{ID: g.id, Subject: sub, Target: tg, Level: domain.Level(g.level), //nolint:gosec // G115: g.level is 1 to 3
+		Caps: domain.CapsOf(caps...), ExpiresAt: g.expires, GrantedAt: m.now})
+}
+
+func newRefWorld(t *testing.T, seed uint64) *refWorld {
+	t.Helper()
+	rnd := rand.New(rand.NewPCG(seed, seed^0x9e3779b97f4a7c15)) //nolint:gosec // G404: a reproducible test world needs a seeded generator
+	m := &refWorld{rnd: rnd, now: worldStart, groups: map[ids.ID]bool{},
+		clk: clock.NewFake(worldStart), fPrincipal: fake.NewPrincipals(), fStructure: fake.NewStructure(),
+		fCreds: fake.NewCredentials(), fStore: fake.NewStore(), fVersions: &fake.Versions{}}
+	m.fVersions.Set(1)
+	kinds := []string{domain.KindUser, domain.KindUser, domain.KindUser, domain.KindUser, domain.KindAgent, domain.KindAgent, domain.KindApp}
+	for i, k := range kinds {
+		p := &refPrincipal{id: ids.New(), kind: k, owner: k == domain.KindUser && i == 0}
+		switch k {
+		case domain.KindUser:
+			p.session, p.device = ids.New(), ids.New()
+			m.fCreds.PutDevice(p.device, fake.Device{PrincipalID: p.id, State: authz.DeviceActive})
+			m.fCreds.PutSession(p.session, fake.Session{PrincipalID: p.id, DeviceID: p.device, ExpiresAt: worldStart.Add(10 * 365 * 24 * time.Hour)})
+		default:
+			p.token = ids.New()
+			m.fCreds.PutToken(p.token, fake.Token{PrincipalID: p.id})
+		}
+		if k == domain.KindApp {
+			p.install = ids.New()
+			for _, s := range []string{"messages:read", "messages:write", "files:write"} {
+				if m.rnd.IntN(2) == 0 {
+					p.scopes = append(p.scopes, s)
+				}
+			}
+		}
+		m.principals = append(m.principals, p)
+		m.syncPrincipal(p)
+	}
+	for range 3 {
+		s := ids.New()
+		m.spaces = append(m.spaces, s)
+		m.fStructure.PutSpace(s)
+		for range 2 {
+			m.addChannel(s)
+		}
+	}
+	m.addDM()
+	for range 2 {
+		g := ids.New()
+		m.groups[g] = false
+		_ = m.fStore.InsertGroup(context.Background(), domain.Group{ID: g, Name: "g" + g.String()[:8], CreatedAt: m.now})
+		for _, p := range m.principals {
+			if p.kind == domain.KindUser && m.rnd.IntN(2) == 0 {
+				mb := &refMember{id: ids.New(), group: g, user: p.id, expires: m.expiry()}
+				m.members = append(m.members, mb)
+				_ = m.fStore.InsertMembership(context.Background(), domain.Membership{ID: mb.id, GroupID: g, UserID: p.id, AddedAt: m.now, ExpiresAt: mb.expires})
+			}
+		}
+	}
+	for range 8 {
+		m.addGrant()
+	}
+	az, err := app.NewAuthorizer(app.AuthorizerConfig{SnapshotCacheMaxEntries: 4, StepUpMaxAge: 5 * time.Minute}, app.AuthorizerDeps{
+		Catalog: app.NewCatalog(slog.New(slog.DiscardHandler)), Store: m.fStore, Principals: m.fPrincipal, Credentials: m.fCreds,
+		Structure: m.fStructure, Policies: fake.NewPolicies(), Versions: m.fVersions, Recorder: &recorder{}, Clock: m.clk,
+		Log: slog.New(slog.DiscardHandler),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.az = az
+	return m
+}
+
+// mutate applies one random change; rights changes raise the version, structure changes do not.
+func (m *refWorld) mutate() string {
+	ctx := context.Background()
+	switch m.rnd.IntN(11) {
+	case 0:
+		m.addGrant()
+		m.fVersions.Bump()
+		return "add grant"
+	case 1:
+		if len(m.grants) > 0 {
+			g := m.grants[m.rnd.IntN(len(m.grants))]
+			if !g.revoked {
+				g.revoked = true
+				_, _, _ = m.fStore.RevokeGrant(ctx, g.id, ids.ID{}, "", m.now)
+				m.fVersions.Bump()
+			}
+		}
+		return "revoke grant"
+	case 2:
+		if len(m.members) > 0 {
+			mb := m.members[m.rnd.IntN(len(m.members))]
+			if !mb.removed {
+				mb.removed = true
+				_, _ = m.fStore.RemoveMembership(ctx, mb.id, ids.ID{}, m.now)
+				m.fVersions.Bump()
+			}
+		}
+		return "remove membership"
+	case 3:
+		p := m.pick()
+		p.disabled = !p.disabled
+		m.syncPrincipal(p)
+		m.fVersions.Bump()
+		return "toggle disabled"
+	case 4:
+		p := m.principals[m.rnd.IntN(4)]
+		p.owner = !p.owner
+		m.syncPrincipal(p)
+		m.fVersions.Bump()
+		return "toggle owner"
+	case 5:
+		m.addChannel(m.spaces[m.rnd.IntN(len(m.spaces))])
+		return "create channel"
+	case 6:
+		s := ids.New()
+		m.spaces = append(m.spaces, s)
+		m.fStructure.PutSpace(s)
+		return "create space"
+	case 7:
+		m.addDM()
+		return "create dm"
+	case 8:
+		if len(m.expiries) > 0 && m.rnd.IntN(2) == 0 {
+			e := m.expiries[m.rnd.IntN(len(m.expiries))]
+			if e.After(m.now) {
+				m.now = e
+				m.clk.Set(e)
+				return "clock to an expiry"
+			}
+		}
+		m.now = m.now.Add(time.Duration(m.rnd.IntN(40)) * time.Minute)
+		m.clk.Set(m.now)
+		return "clock advance"
+	case 9:
+		c := m.channels[m.rnd.IntN(len(m.channels))]
+		if !c.dm {
+			c.readOnly = !c.readOnly
+			m.syncChannel(c)
+		}
+		return "toggle read-only"
+	default:
+		c := m.channels[m.rnd.IntN(len(m.channels))]
+		if !c.dm {
+			c.operator = m.pick().id
+			m.syncChannel(c)
+		}
+		return "change operator"
+	}
+}
+
+// resourceFor is the resource of act on channel c (a random space for space.read).
+func (m *refWorld) resourceFor(act authorize.Action, c *refChannel) authorize.Resource {
+	byAction := map[authorize.Action]authorize.Resource{
+		authorize.ActionMessageRead:   {Kind: authorize.ResourceMessage, ID: ids.New(), ThreadID: c.thread},
+		authorize.ActionMessageCreate: {Kind: authorize.ResourceThread, ID: c.thread},
+		authorize.ActionThreadRead:    {Kind: authorize.ResourceThread, ID: c.thread},
+		authorize.ActionSpaceRead:     {Kind: authorize.ResourceSpace, ID: m.spaces[m.rnd.IntN(len(m.spaces))]},
+	}
+	if r, ok := byAction[act]; ok {
+		return r
+	}
+	return authorize.Resource{Kind: authorize.ResourceChannel, ID: c.id}
+}
+
+func TestAZP8_CacheMatchesReference(t *testing.T) {
+	seed := uint64(time.Now().UnixNano())
+	if s := os.Getenv("BOTHY_TEST_SEED"); s != "" { //nolint:forbidigo // test input (seed), not server configuration
+		n, err := strconv.ParseUint(s, 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		seed = n
+	}
+	actions := []authorize.Action{authorize.ActionMessageRead, authorize.ActionMessageCreate, authorize.ActionThreadRead,
+		authorize.ActionChannelRead, authorize.ActionSpaceRead, authorize.ActionChannelUpdate, authorize.ActionExportChannel,
+		authorize.ActionFileUpload}
+	outcomes := map[string]int{}
+	for w := range 20 {
+		ws := seed + uint64(w)
+		m := newRefWorld(t, ws)
+		var trail []string
+		for step := range 60 {
+			trail = append(trail, m.mutate())
+			for _, p := range m.principals {
+				a := m.actorOf(p)
+				for _, act := range actions {
+					c := m.channels[m.rnd.IntN(len(m.channels))]
+					r := m.resourceFor(act, c)
+					wantO, wantR := m.decide(p, act, c, r.ID)
+					outcomes[string(wantO)+"/"+wantR]++
+					d, err := m.az.Authorize(context.Background(), a, act, r)
+					if err != nil || d.Outcome != wantO || string(d.Reason) != wantR {
+						t.Fatalf("seed %d (BOTHY_TEST_SEED=%d), world %d, step %d, %s %s: got %s/%s %v, want %s/%s\ntrail %v",
+							seed, ws, w, step, p.kind, act, d.Outcome, d.Reason, err, wantO, wantR, trail)
+					}
+				}
+				if p.disabled {
+					continue
+				}
+				sc, err := m.az.Scope(context.Background(), a, authorize.ActionMessageRead)
+				if want := m.visibleChannels(p); err != nil || !slices.Equal(sc.ChannelIDs, want) {
+					t.Fatalf("seed %d, world %d, step %d, %s scope: got %v %v, want %v\ntrail %v", ws, w, step, p.kind, sc.ChannelIDs, err, want, trail)
+				}
+			}
+		}
+	}
+	t.Logf("seed %d, decisions by outcome %v", seed, outcomes)
+}

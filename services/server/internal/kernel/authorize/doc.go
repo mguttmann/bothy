@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package authorize holds the actions (generated from docs/spec/actions.yaml, ADR 0049), the
-// resource descriptor, Decision and the Authorizer (Authorize, Scope for lists, Observe for events
-// of the log) with its filter and delivery modes, and the in-transaction event AccessChanged. The
-// authz module implements it; every module uses it.
+// resource descriptor (Resource), Decision with its error mapping (Decision.Err), the Principal
+// view of the request principal, and the Authorizer (Authorize, Scope for lists) with the pinned
+// rights version, the request memo (WithRequestScope) and filter mode (Filter). The authz module
+// implements it (M1-28); every module uses it. Observe for events of the log, the delivery mode
+// and the in-transaction event AccessChanged come with M1-65 and M1-29.
 //
 // The closed catalogue (M1-25): catalog_ids_gen.go, written by tools/catalogen, declares the
 // identifier types Action, EventType, Op, ResourceKind and ChannelOp with one constant per
@@ -21,9 +23,9 @@
 // The check log (WithCheckLog, RecordCheck, Checks; M1-18) is the proof of
 // docs/spec/02-architecture.md 9.3: every implementation of the Authorizer must call RecordCheck
 // once per Authorize and once per Scope call, and the HTTP chain refuses a successful response of
-// a handler that never checked its route's action. The Authorizer interface itself comes with
-// M1-28 and repeats this contract in its doc comment; every implementation starts with the
-// catalogue lookup of authz (Catalog.Spec), so an unknown action fails closed (AZ-P3).
+// a handler that never checked its route's action. The Authorizer interface repeats this contract
+// in its doc comment; every implementation starts with the catalogue lookup of authz
+// (Catalog.Spec), so an unknown action fails closed (AZ-P3).
 package authorize
 
 //go:generate go run ../../../tools/catalogen -catalog ../../../../../docs/spec/actions.yaml -ids catalog_ids_gen.go -domain ../../authz/domain/catalog_gen.go
