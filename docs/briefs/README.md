@@ -7,13 +7,14 @@ tests to write first, the acceptance criteria and the report format. Order and d
 from the [plan](../PLAN.md) (section "Tickets" of each milestone); this index repeats them for
 the launcher.
 
-Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2 and M3. By the owner's
-decision of 2026-10-11 the M2 and M3 briefs were written before M1 closed, so that builds do not
-run out of work (D-W-100 in [DECISIONS.md](../DECISIONS.md)): they name M1 interfaces as the M1
-briefs and the merged code name them, and each carries the boundary that a build session follows
-merged code that differs only in names and stops with `Verdict: BLOCKED` where it behaves
-differently from the specification. Briefs of the milestones after these are written when the
-milestone before them closes.
+Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2, M3 and M4. By the
+owner's decisions of 2026-10-11 and 2026-10-13 the M2, M3 and M4 briefs were written before M1
+closed, so that builds do not run out of work (D-W-100 and D-W-114 in
+[DECISIONS.md](../DECISIONS.md)): they name interfaces of earlier milestones as those briefs and
+the merged code name them, and each carries the boundary that a build session follows merged
+code that differs only in names and stops with `Verdict: BLOCKED` where it behaves differently
+from the specification. Briefs of the milestones after these are written when the owner asks for
+them or when the milestone before them closes.
 
 ## How a brief runs
 
@@ -33,6 +34,11 @@ milestone before them closes.
    commit to merge, last line `Urteil: JA` (PLAN 3.9, D-W-32).
 5. A brief that finds a gap in the core contract (chapters 00, 03, 04, 05) stops with
    `Verdict: BLOCKED` instead of building a deviation.
+   Every brief has the title line `# <ticket>: <title>`, the status line
+   `Status: ready | Depends on: ... | Milestone: <milestone>`, the eleven sections of the existing
+   briefs in their order (Goal to Report) and a report with the placeholders of item 2;
+   `tools/docs/tests/test_brief_format.py` fails on any other shape and on a brief file that the
+   index does not list.
 6. The owner's fixed build rules 1 to 5 stand in every brief byte for byte as in the section
    "Fixed build rules" below: a literal English translation of the owner's wording, nothing
    added or left out. `tools/docs/tests/test_brief_rules.py` fails on any other wording. Rule 3 ("API documentation is generated from code (OpenAPI from the routes, ...)")
@@ -76,11 +82,11 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 
 | Wave | Tickets that may run in parallel |
 |---|---|
-| 1 | M1-01, M1-02, M2-32 |
-| 2 | M1-03, M1-04, M1-05, M2-38 |
-| 3 | M1-06, M1-07, M1-17, M1-74, M3-17 |
-| 4 | M1-08, M1-09, M1-22, M2-23, M3-01 |
-| 5 | M1-10, M1-12, M3-02 |
+| 1 | M1-01, M1-02, M2-32, M4-03 |
+| 2 | M1-03, M1-04, M1-05, M2-38, M4-01 |
+| 3 | M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10 |
+| 4 | M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05 |
+| 5 | M1-10, M1-12, M3-02, M4-07, M4-09 |
 | 6 | M1-11, M1-13 |
 | 7 | M1-14, M1-15, M1-18, M1-23, M1-26 |
 | 8 | M1-16, M1-19, M1-21, M1-24, M1-25, M1-27 |
@@ -117,7 +123,8 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 ## Index
 
 Dependencies are minimal: a ticket implied through another dependency is not repeated. Brief files
-are added by the brief-writing steps (plan ticket M0-05 for M1, D-W-100 for M2 and M3) under the
+are added by the brief-writing steps (plan ticket M0-05 for M1, D-W-100 for M2 and M3, D-W-114 for
+M4) under the
 names listed here.
 
 | Wave | ID | Title | Brief file | Depends on |
@@ -270,6 +277,16 @@ names listed here.
 | 36 | M3-22 | Push registration and preview endpoint (ADR 0031) | `M3-22-push-registration.md` | M3-05, M3-06, M3-07, M3-20, M3-21, M3-23 |
 | 34 | M3-23 | Desktop hints over the gateway | `M3-23-desktop-notices.md` | M3-19 |
 | 35 | M3-24 | Push handoff performance target | `M3-24-push-handoff-perf.md` | M1-72, M3-20 |
+| 2 | M4-01 | Workspace and architecture test of the apps | `M4-01-workspace-arch.md` | M1-01 |
+| 4 | M4-02 | Dart API client as a gate | `M4-02-dart-api-client.md` | M4-01, M1-17 |
+| 1 | M4-03 | Accent variants in the token generator | `M4-03-accent-variants.md` | none (M0 closed) |
+| 3 | M4-04 | Design system with tokens, theme and fonts (ADR 0030) | `M4-04-design-system-theme.md` | M4-01, M4-03 |
+| 4 | M4-05 | Icons in the design system | `M4-05-design-icons.md` | M4-04 |
+| 3 | M4-06 | Localization with ARB lint | `M4-06-l10n.md` | M4-01 |
+| 5 | M4-07 | Core components with goldens | `M4-07-core-components.md` | M4-05, M4-06 |
+| 3 | M4-08 | Domain package | `M4-08-domain.md` | M4-01 |
+| 5 | M4-09 | Login: DPoP, refresh and step-up | `M4-09-auth-dpop.md` | M4-02, M4-08 |
+| 3 | M4-10 | Device key for macOS and iOS | `M4-10-device-key-apple.md` | M4-01 |
 
 ## Make targets created by tickets
 
@@ -299,6 +316,7 @@ waves, the graph and the column "Depends on" of the plan against the index.
 | `sql-visibility` | M1-70 |
 | `contract-test` | M1-71 |
 | `bench-search` | M3-16 |
+| `apps-platform` | M4-01 |
 
 To change a dependency, edit the column "Depends on" of the index and the row in the plan, then
 run `uv run --project tools --locked --quiet python tools/docs/brief_deps.py --write`; it
@@ -710,4 +728,17 @@ flowchart TB
   M3_19 --> M3_23
   M1_72 --> M3_24
   M3_20 --> M3_24
+  M1_01 --> M4_01
+  M1_17 --> M4_02
+  M4_01 --> M4_02
+  M4_01 --> M4_04
+  M4_03 --> M4_04
+  M4_04 --> M4_05
+  M4_01 --> M4_06
+  M4_05 --> M4_07
+  M4_06 --> M4_07
+  M4_01 --> M4_08
+  M4_02 --> M4_09
+  M4_08 --> M4_09
+  M4_01 --> M4_10
 ```
