@@ -3,7 +3,7 @@
 -- docs/spec/03-data-model.md section 4.2 states it, for the step-up with the device key (this
 -- ticket) and the WebAuthn ceremonies (M1-40), all purposes in the CHECK (R-DM-31). Retention
 -- class: transient (03 section 3); the job identity.auth_cleanup deletes expired rows. The value
--- of a challenge is stored only as HMAC-SHA-256 with the token pepper (03 Grundsatz 9).
+-- of a challenge is stored only as HMAC-SHA-256 with the token pepper (03 "Principles" rule 9).
 --
 -- Deviation from 03: the foreign key auth_challenges.enrollment_code_id -> enrollment_codes(id)
 -- ON DELETE CASCADE is not created here, because enrollment_codes arrives with M1-37; the column

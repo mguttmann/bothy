@@ -44,7 +44,8 @@ func NewChallengeValue() (string, error) {
 }
 
 // ChallengeHash returns HMAC-SHA-256(pepper, value), the only form a challenge is stored in
-// (auth_challenges.challenge_hash, 03 Grundsatz 9).
+// (auth_challenges.challenge_hash, 03 "Principles"
+// rule 9).
 func ChallengeHash(pepper []byte, value string) []byte {
 	m := hmac.New(sha256.New, pepper)
 	m.Write([]byte(value))
