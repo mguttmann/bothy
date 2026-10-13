@@ -86,7 +86,7 @@ type EventSpec struct {
 	Resource string
 	// Resources are the resource kinds named in Resource.
 	Resources []string
-	// ReceiveAction is the column "Empfangs-Aktion" verbatim (05 text).
+	// ReceiveAction is the column "Receive action" verbatim (05 text).
 	ReceiveAction string
 	// MentionedActions are the catalogue actions named in ReceiveAction, sorted.
 	MentionedActions []string
@@ -108,7 +108,7 @@ type OpSpec struct {
 	Op string
 	// Direction is one of the Direction constants.
 	Direction string
-	// ActionsText is the column "Aktion" verbatim (05 text).
+	// ActionsText is the column "Action" verbatim (05 text).
 	ActionsText string
 	// MentionedActions are the catalogue actions the op checks, sorted.
 	MentionedActions []string
@@ -134,7 +134,7 @@ type ChannelOpSpec struct {
 	Direction string
 	// Action is the action the channel checks.
 	Action string
-	// ActionText is the column "Aktion" verbatim when it says more than the action, else "".
+	// ActionText is the column "Action" verbatim when it says more than the action, else "".
 	ActionText string
 }
 
