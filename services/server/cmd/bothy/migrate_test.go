@@ -65,8 +65,10 @@ func TestMigrate_RiverInOwnSchema(t *testing.T) {
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	env := migrateEnvFor(db, pg.RoleOwner, "BOTHY_JOBS__SCHEMA=jobs_it")
 	river := riverVersion(t)
+	need := requiredVersion(t)
 	code, stdout, stderr := runBothy(t, env, "migrate", "up")
-	want := fmt.Sprintf("river schema jobs_it version %d, applied %d\napplied 1 base_privileges\ndatabase version 1, applied 1\n", river, river)
+	want := fmt.Sprintf("river schema jobs_it version %d, applied %d\n", river, river) + appliedLines(t) +
+		fmt.Sprintf("database version %d, applied %d\n", need, need)
 	if code != 0 || stdout != want {
 		t.Fatalf("first up: exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}
@@ -102,7 +104,7 @@ func TestMigrate_RiverInOwnSchema(t *testing.T) {
 		t.Fatalf("bothy_app reads river_job: %v", err)
 	}
 	code, stdout, stderr = runBothy(t, env, "migrate", "up")
-	if want := fmt.Sprintf("river schema jobs_it version %d, applied 0\ndatabase version 1, applied 0\n", river); code != 0 || stdout != want {
+	if want := fmt.Sprintf("river schema jobs_it version %d, applied 0\ndatabase version %d, applied 0\n", river, need); code != 0 || stdout != want {
 		t.Fatalf("second up: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
 	}
 	code, stdout, stderr = runBothy(t, env, "migrate", "status")
@@ -114,18 +116,69 @@ func TestMigrate_RiverInOwnSchema(t *testing.T) {
 	}
 }
 
+// embedded is one migration of migrations.FS.
+type embedded struct {
+	version int64
+	name    string
+}
+
+// embeddedMigrations lists migrations.FS in version order.
+func embeddedMigrations(t *testing.T) []embedded {
+	t.Helper()
+	names, err := fs.Glob(migrations.FS, "*.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := make([]embedded, 0, len(names))
+	for _, n := range names {
+		v, err := strconv.ParseInt(n[:5], 10, 64)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out = append(out, embedded{version: v, name: strings.TrimSuffix(n[6:], ".sql")})
+	}
+	return out
+}
+
+// appliedLines is what migrate up prints for every embedded migration.
+func appliedLines(t *testing.T) string {
+	t.Helper()
+	var b strings.Builder
+	for _, m := range embeddedMigrations(t) {
+		fmt.Fprintf(&b, "applied %d %s\n", m.version, m.name)
+	}
+	return b.String()
+}
+
+// requiredVersion is the highest embedded version.
+func requiredVersion(t *testing.T) int64 {
+	t.Helper()
+	v, err := pg.RequiredSchemaVersion(migrations.FS)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+// nextMigrationName names the migration offset versions above the embedded ones.
+func nextMigrationName(t *testing.T, offset int64, slug string) string {
+	t.Helper()
+	return fmt.Sprintf("%05d_%s.sql", requiredVersion(t)+offset, slug)
+}
+
 func TestMigrateUpBootstrap(t *testing.T) {
 	db := pgtest.New(t, pgtest.WithoutMigrations())
 	env := migrateEnvFor(db, pg.RoleOwner)
 
 	code, stdout, stderr := runBothy(t, env, "migrate", "up", "--bootstrap")
 	river := riverVersion(t)
-	want := fmt.Sprintf("bootstrap: roles and grants are in place\nriver schema jobs version %d, applied %d\napplied 1 base_privileges\n", river, river)
-	if code != 0 || !strings.HasPrefix(stdout, want) || !strings.HasSuffix(stdout, "database version 1, applied 1\n") {
+	want := fmt.Sprintf("bootstrap: roles and grants are in place\nriver schema jobs version %d, applied %d\n", river, river) + appliedLines(t)
+	need := requiredVersion(t)
+	if code != 0 || stdout != want+fmt.Sprintf("database version %d, applied %d\n", need, need) {
 		t.Fatalf("first run: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
 	}
 	code, stdout, stderr = runBothy(t, env, "migrate", "up", "--bootstrap")
-	want = fmt.Sprintf("bootstrap: roles and grants are in place\nriver schema jobs version %d, applied 0\ndatabase version 1, applied 0\n", river)
+	want = fmt.Sprintf("bootstrap: roles and grants are in place\nriver schema jobs version %d, applied 0\ndatabase version %d, applied 0\n", river, need)
 	if code != 0 || stdout != want {
 		t.Fatalf("second run: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
 	}
@@ -152,7 +205,14 @@ func TestMigrateStatusOutput(t *testing.T) {
 	env := migrateEnvFor(db, pg.RoleOwner)
 	code, stdout, stderr := runBothy(t, env, "migrate", "status")
 	river := riverVersion(t)
-	want := fmt.Sprintf("1 base_privileges pending -\ndatabase version 0, binary requires 1, pending 1\nriver schema jobs version 0, binary requires %d, pending %d\n", river, river)
+	need := requiredVersion(t)
+	var pending, applied strings.Builder
+	for _, m := range embeddedMigrations(t) {
+		fmt.Fprintf(&pending, "%d %s pending -\n", m.version, m.name)
+		fmt.Fprintf(&applied, `%d %s applied \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\n`, m.version, regexp.QuoteMeta(m.name))
+	}
+	want := pending.String() + fmt.Sprintf("database version 0, binary requires %d, pending %d\n", need, need) +
+		fmt.Sprintf("river schema jobs version 0, binary requires %d, pending %d\n", river, river)
 	if code != 0 || stdout != want {
 		t.Fatalf("before: exit %d, stderr %q, stdout\n%s\nwant\n%s", code, stderr, stdout, want)
 	}
@@ -161,7 +221,7 @@ func TestMigrateStatusOutput(t *testing.T) {
 	}
 	// bothy_app may read the status as well.
 	code, stdout, stderr = runBothy(t, migrateEnvFor(db, pg.RoleApp), "migrate", "status")
-	pattern := regexp.MustCompile(`^1 base_privileges applied \d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\ndatabase version 1, binary requires 1, pending 0\n` +
+	pattern := regexp.MustCompile("^" + applied.String() + fmt.Sprintf(`database version %d, binary requires %d, pending 0\n`, need, need) +
 		fmt.Sprintf("river schema jobs version %d, binary requires %d, pending 0\n$", river, river))
 	if code != 0 || !pattern.MatchString(stdout) {
 		t.Fatalf("after: exit %d, stderr %q, stdout\n%s", code, stderr, stdout)
@@ -170,7 +230,7 @@ func TestMigrateStatusOutput(t *testing.T) {
 
 func TestMigrateNewerSchemaNotice(t *testing.T) {
 	t.Parallel()
-	newer := fstest.MapFS{"00002_from_a_newer_binary.sql": {Data: []byte("-- +goose Up\nCREATE TABLE newer_marker (id int);\n")}}
+	newer := fstest.MapFS{nextMigrationName(t, 1, "from_a_newer_binary"): {Data: []byte("-- +goose Up\nCREATE TABLE newer_marker (id int);\n")}}
 	names, err := fs.Glob(migrations.FS, "*.sql")
 	if err != nil {
 		t.Fatal(err)
@@ -257,11 +317,12 @@ func TestMigrateUnreachableDatabase(t *testing.T) {
 func TestMigrateUpHonoursLockTimeout(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
+	locked, alter := nextMigrationName(t, 1, "locked_table"), nextMigrationName(t, 2, "alter_locked")
 	fsys := fstest.MapFS{
-		"00002_locked_table.sql": {Data: []byte("-- +goose Up\nCREATE TABLE locked_table (id int);\n")},
-		"00003_alter_locked.sql": {Data: []byte("-- +goose Up\nALTER TABLE locked_table ADD COLUMN extra int;\n")},
+		locked: {Data: []byte("-- +goose Up\nCREATE TABLE locked_table (id int);\n")},
+		alter:  {Data: []byte("-- +goose Up\nALTER TABLE locked_table ADD COLUMN extra int;\n")},
 	}
-	first := fstest.MapFS{"00002_locked_table.sql": fsys["00002_locked_table.sql"]}
+	first := fstest.MapFS{locked: fsys[locked]}
 	for _, set := range []fstest.MapFS{fsys, first} {
 		names, err := fs.Glob(migrations.FS, "*.sql")
 		if err != nil {

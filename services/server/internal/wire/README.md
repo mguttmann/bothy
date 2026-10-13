@@ -16,7 +16,8 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 | `config.go`, `configkeys_*.go`, `configchecks.go`, `configchapters.go` | configuration schema and cross-checks |
 | `database.go`, `egress.go`, `secrets.go`, `telemetry.go` | binding of the platform `Config` structs, the secret provider |
 | `routes.go` | `Role`, `Handlers`, `MountRoutes` (start step 7) |
-| `jobs.go` | `JobsConfig`, `JobRole`, `NewJobRegistry` (one job registry for all roles), `MigrationSteps` (River before goose) |
+| `jobs.go` | `JobsConfig`, `JobRole`, `NewJobRegistry` (one job registry for all roles), `MigrateUpSteps` (River before goose, then the after-step `instance`) |
+| `instance.go` | `MigrationSteps` (the after-step `instance`), `InstanceCounters` and `loadInstance`, the start step `instance` |
 | `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
 | `switchlog.go` | the process logger that follows the switch from stdout JSON to the telemetry logger |
 
@@ -32,6 +33,7 @@ components, in start order:
 | `internal_listener` | opens `server.internal_listen_addr` with `/healthz` and `/readyz`, logs `internal listener started` | all |
 | `database` | `pg.Open`, `WaitReady` within `startup.dependency_wait`; readiness check `database` | all |
 | `schema` | `pg.CheckSchema` against the highest embedded version; older aborts with the hint to run `bothy migrate up` | all |
+| `instance` | loads the instance row through `instance.State` (missing: abort with the hint to run `bothy migrate up`), logs the setup state, compares the own version with `instance.min_server_version`; below it the readiness check `schema_requires_newer_server` fails for good (M1-15) | all |
 | `routes` | `MountRoutes` on the public mux | api, all |
 | `jobs` | `jobs.ValidateMigrations` (missing River migrations abort with the hint to run `bothy migrate up`), `jobs.New` for the role, `Start` of River (02 "Start" step 8; no-op for api and while no kind is registered), `Runner.FailOn` on `Failed` | all |
 | `public_listener` | opens `server.listen_addr`, logs `public listener started` | api, all |
@@ -44,6 +46,19 @@ soft stop within `shutdown.jobs_soft_timeout`, then for the cancelled jobs to en
 left; docs/DECISIONS.md M1-14/4), `telemetry`
 (`shutdown.telemetry_flush_timeout`), `pool`, `internal_listener`.
 
+## Instance and counters
+
+`MigrationSteps(pool, fsys)` gives `bothy migrate up` (and `pgtest.WithSteps` in tests) the
+after-step `instance`: in one unit of work on the migrate pool it reads the goose version and,
+when that equals the newest migration of `fsys`, records it with `migrations.MinServerVersion`
+through `instance.State.RecordMigration`. `InstanceCounters(pool)` builds `instance.Counters`; only
+the constructors of the phase hooks of authz, sync and audit may receive it, and
+`TestCountersOnlyUsedByPhaseHooks` (with the negative fixtures under `testdata/countersuser`, `testdata/countersflow`, `testdata/countersshape` and
+`testdata/countersgeneric`) fails when another package names the port or `instance.CounterName`,
+calls the port, has an expression whose type contains it or instantiates a generic with it.
+Below a permanently failing readiness check the `ready` step logs `server started, not ready`
+instead of `server ready`.
+
 ## Extension points
 
 A later ticket adds its part in `register` of `serve.go`, at the marked place, with its stop
@@ -51,7 +66,6 @@ step:
 
 | Ticket | Component | Place | Stop phase |
 |---|---|---|---|
-| M1-15 | instance row, readiness `schema_requires_newer_server` | after `schema` | none |
 | M1-32 | signing keys, readiness `signing_keys` | after the instance | none |
 | M1-17 | module handlers in `Deps.Handlers` | `routes` | none |
 | M1-16 | log tail and hub (api, all); a panic calls `Runner.Fail` | after `routes` | `event_tail` |

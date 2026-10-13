@@ -202,8 +202,29 @@ documented in this file. The format is based on
   changeover days, contract tests against `openapi.yaml`, 13 and 03, a purity test and a fuzz
   test.
 
+- Module `instance` (M1-15): migration `00002_instance_counters.sql` with the tables `instance`
+  and `sequence_counters`, the three counter rows and a trigger that keeps counter values from
+  decreasing; the ports `Counters` (gapless, commit-ordered numbers with a run-time phase guard)
+  and `State` (instance row, setup state); SemVer 2.0.0 comparison; the sqlc repository and
+  `services/server/sqlc.yaml`.
+- `bothy migrate up` creates the instance row if it is missing and records
+  `instance.schema_version` and `instance.min_server_version` (`migrations.MinServerVersion`);
+  against a newer schema it changes nothing.
+- `bothy serve` loads the instance row at start (missing row: exit code 1 with the hint to run
+  `bothy migrate up`); below `instance.min_server_version` it keeps running but `/readyz` fails
+  with `schema_requires_newer_server`.
+- `TestCountersOnlyUsedByPhaseHooks`: only `instance`, `wire` and registered phase hooks may use
+  `instance.Counters`.
+- `pg.SchemaVersion`, `pgtest.WithSteps`, and the log attributes `bothy.version.own` and
+  `bothy.version.required`.
+
 ### Changed
 
+- `wire.MigrationSteps` takes the migrate pool and the migration set, returns an error and gives
+  only the after-step `instance`; River's step before goose moved to the new
+  `wire.MigrateUpSteps`, which `bothy migrate up` calls.
+- `golang.org/x/tools` is a direct dependency at v0.50.0 (tests only: `go/packages` for the
+  static check; v0.49.0 cannot read the export data of Go 1.27, ruling M1-15/6).
 - Go coverage of the module leaves generated files (`*.gen.go`) out of the total.
 
 ### Security

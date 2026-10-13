@@ -101,7 +101,26 @@ var state struct {
 	active  bool // Main is running the tests
 	cluster *cluster
 	err     error // a failed start, reported to every later New
+	steps   Steps // the steps of bothy migrate up for every template, from Main
 }
+
+// Steps builds the steps bothy migrate up runs around the goose migrations, for a pool of
+// bothy_owner on the database being migrated and the migration set fsys. A test binary that
+// needs what those steps write (the instance row of M1-15) passes wire.MigrationSteps through
+// WithSteps; pgtest itself cannot import internal/wire.
+type Steps func(pool *pg.Pool, fsys fs.FS) (pg.MigratorOptions, error)
+
+// MainOption changes how Main prepares the databases of a test binary.
+type MainOption func(*mainOptions)
+
+type mainOptions struct {
+	steps Steps
+}
+
+// WithSteps makes every template of the binary migrate with the steps of steps, so New returns
+// the database bothy migrate up produces, including the rows those steps write. Without it the
+// templates get the goose migrations only.
+func WithSteps(steps Steps) MainOption { return func(o *mainOptions) { o.steps = steps } }
 
 // cluster is the started container with its roles and template databases.
 type cluster struct {
@@ -113,6 +132,7 @@ type cluster struct {
 
 	mu        sync.Mutex        // serialises template creation and cloning
 	templates map[string]string // migration set hash -> template database
+	steps     Steps             // the steps of Main's WithSteps, nil for none
 }
 
 // Main runs the tests of m and returns the exit code for os.Exit; call it from TestMain. It
@@ -121,7 +141,16 @@ type cluster struct {
 // "pgtest: no Docker-compatible runtime reachable (<error>); integration tests need one (plan P-09)"
 // and returns 1 without running a test. The container starts with the first New; after the tests
 // Main terminates it and removes SecretsDir, and turns a failed cleanup into exit code 1.
-func Main(m *testing.M) int {
+//
+// Options: WithSteps adds the steps of bothy migrate up to the templates.
+func Main(m *testing.M, opts ...MainOption) int {
+	var o mainOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+	state.mu.Lock()
+	state.steps = o.steps
+	state.mu.Unlock()
 	// testcontainers reads its configuration once, at the first call; only the exact value
 	// "true" disables Ryuk.
 	if err := os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true"); err != nil {
@@ -179,6 +208,9 @@ func sharedCluster() (*cluster, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
 		state.cluster, state.err = startCluster(ctx)
 		cancel()
+		if state.cluster != nil {
+			state.cluster.steps = state.steps
+		}
 	}
 	return state.cluster, state.err
 }
@@ -478,7 +510,13 @@ func (c *cluster) migrate(ctx context.Context, database string, fsys fs.FS) erro
 	defer pool.Close()
 	db := pool.OpenSQL()
 	defer func() { _ = db.Close() }()
-	m, err := pg.NewMigrator(db, fsys, pg.MigratorOptions{})
+	var steps pg.MigratorOptions
+	if c.steps != nil {
+		if steps, err = c.steps(pool, fsys); err != nil {
+			return fmt.Errorf("pgtest: migration steps: %w", err)
+		}
+	}
+	m, err := pg.NewMigrator(db, fsys, steps)
 	if err != nil {
 		return fmt.Errorf("pgtest: %w", err)
 	}

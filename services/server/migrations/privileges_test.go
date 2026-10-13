@@ -20,6 +20,11 @@ import (
 // a table adds its row here.
 var appPrivileges = map[string][]string{
 	"goose_db_version": {"SELECT"},
+	// instance: bothy migrate writes it as bothy_owner; the server only reads it (M1-15).
+	"instance": {"SELECT"},
+	// sequence_counters: plus the column right UPDATE (value), which has_table_privilege does
+	// not show; TestCounters_ValueNeverDecreases holds it.
+	"sequence_counters": {"SELECT"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

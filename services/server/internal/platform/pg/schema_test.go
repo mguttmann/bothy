@@ -11,6 +11,7 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg/pgtest"
 	"github.com/OWNER/bothy/services/server/migrations"
@@ -83,5 +84,33 @@ func TestCheckSchemaTooOld(t *testing.T) {
 	err = pg.CheckSchema(ctx, pgtest.New(t, pgtest.WithoutMigrations()).Pool(t, pg.RoleApp), have)
 	if !errors.As(err, &tooOld) || tooOld.Have != 0 {
 		t.Errorf("unmigrated database: %v, want *SchemaTooOldError with Have 0", err)
+	}
+}
+
+// TestSchemaVersion reads the version over a pool and over the transaction of a unit of work;
+// a database without the version table has version 0.
+func TestSchemaVersion(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	db := pgtest.New(t)
+	pool := db.Pool(t, pg.RoleApp)
+	if v, err := pg.SchemaVersion(ctx, pool); err != nil || v != highest(t) {
+		t.Fatalf("SchemaVersion on the pool = %d, %v; want %d", v, err, highest(t))
+	}
+	reg := txn.NewRegistry()
+	reg.Seal()
+	err := pg.NewUnitOfWork(pool, pg.UnitConfig{}, reg).Do(ctx, func(ctx context.Context) error {
+		v, err := pg.SchemaVersion(ctx, pg.Querier(ctx, pool))
+		if err == nil && v != highest(t) {
+			err = fmt.Errorf("version %d", v)
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatalf("SchemaVersion in a unit: %v", err)
+	}
+	empty := pgtest.New(t, pgtest.WithoutMigrations()).Pool(t, pg.RoleOwner)
+	if v, err := pg.SchemaVersion(ctx, empty); err != nil || v != 0 {
+		t.Fatalf("SchemaVersion without migrations = %d, %v", v, err)
 	}
 }

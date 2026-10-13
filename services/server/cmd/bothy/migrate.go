@@ -31,9 +31,10 @@ up        applies every pending migration of this binary as database.user, which
           migrate.lock_timeout. First it creates the schema jobs.schema with the rights of
           bothy_app and applies River's migrations there ("river schema <s> version <n>,
           applied <k>"), then the domain migrations: "applied <version> <name>" per
-          migration and "database version <n>, applied <k>". Against a schema newer than
-          this binary it prints "schema is newer than this binary; nothing to do" and
-          changes nothing.
+          migration and "database version <n>, applied <k>". Afterwards it creates the
+          instance row if it is missing and records instance.schema_version and
+          instance.min_server_version. Against a schema newer than this binary it prints
+          "schema is newer than this binary; nothing to do" and changes nothing.
 status    prints "<version> <name> <applied|pending> <applied_at|->" per migration of this
           binary, "database version <n>, binary requires <m>, pending <k>" and "river schema
           <s> version <n>, binary requires <m>, pending <k>"; it only reads.
@@ -69,7 +70,7 @@ type migrateEnv struct {
 	env    []string
 	schema func() (*config.Schema, error)
 	fsys   fs.FS
-	steps  func(pool *pg.Pool, schema string, result *jobs.MigrateResult) pg.MigratorOptions
+	steps  func(pool *pg.Pool, fsys fs.FS, schema string, result *jobs.MigrateResult) (pg.MigratorOptions, error)
 	stdout io.Writer
 	stderr io.Writer
 }
@@ -242,7 +243,12 @@ func (r *migrateRun) migrator(ctx context.Context, river *jobs.MigrateResult) (*
 		_ = db.Close()
 		pool.Close()
 	}
-	m, err := pg.NewMigrator(db, r.e.fsys, r.e.steps(pool, r.schema, river))
+	steps, err := r.e.steps(pool, r.e.fsys, r.schema, river)
+	if err != nil {
+		closeAll()
+		return nil, nil, nil, err
+	}
+	m, err := pg.NewMigrator(db, r.e.fsys, steps)
 	if err != nil {
 		closeAll()
 		return nil, nil, nil, err
@@ -345,7 +351,7 @@ func (r *migrateRun) status(ctx context.Context) int {
 // migrations and the steps of internal/wire.
 func defaultMigrateEnv(env []string, stdout, stderr io.Writer) migrateEnv {
 	return migrateEnv{
-		env: env, schema: wire.ConfigSchema, fsys: migrations.FS, steps: wire.MigrationSteps,
+		env: env, schema: wire.ConfigSchema, fsys: migrations.FS, steps: wire.MigrateUpSteps,
 		stdout: stdout, stderr: stderr,
 	}
 }
