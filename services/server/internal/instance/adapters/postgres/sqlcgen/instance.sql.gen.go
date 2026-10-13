@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const completeSetup = `-- name: CompleteSetup :execrows
+UPDATE instance SET setup_completed_at = $1::timestamptz WHERE id = 1 AND setup_completed_at IS NULL
+`
+
+// Sets setup_completed_at once; a set value never changes (setup never reverts).
+func (q *Queries) CompleteSetup(ctx context.Context, at pgtype.Timestamptz) (int64, error) {
+	result, err := q.db.Exec(ctx, completeSetup, at)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const ensureInstance = `-- name: EnsureInstance :exec
 INSERT INTO instance (id, instance_id, schema_version, sync_epoch)
 VALUES (1, $1, 0, $2)
@@ -48,6 +61,36 @@ type LoadInstanceRow struct {
 func (q *Queries) LoadInstance(ctx context.Context) (LoadInstanceRow, error) {
 	row := q.db.QueryRow(ctx, loadInstance)
 	var i LoadInstanceRow
+	err := row.Scan(
+		&i.InstanceID,
+		&i.SetupCompletedAt,
+		&i.SchemaVersion,
+		&i.MinServerVersion,
+		&i.SyncEpoch,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const lockInstance = `-- name: LockInstance :one
+SELECT instance_id, setup_completed_at, schema_version, min_server_version, sync_epoch, created_at
+FROM instance WHERE id = 1 FOR UPDATE
+`
+
+type LockInstanceRow struct {
+	InstanceID       pgtype.UUID
+	SetupCompletedAt pgtype.Timestamptz
+	SchemaVersion    int64
+	MinServerVersion pgtype.Text
+	SyncEpoch        pgtype.UUID
+	CreatedAt        pgtype.Timestamptz
+}
+
+// bothy setup (M1-37): the row locked until the end of the unit of work, so two setups serialise.
+// bothy_app may lock it through its column right UPDATE (setup_completed_at).
+func (q *Queries) LockInstance(ctx context.Context) (LockInstanceRow, error) {
+	row := q.db.QueryRow(ctx, lockInstance)
+	var i LockInstanceRow
 	err := row.Scan(
 		&i.InstanceID,
 		&i.SetupCompletedAt,

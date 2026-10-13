@@ -50,4 +50,15 @@ type State interface {
 	// Errors: kind internal for schemaVersion < 1 or a minServerVersion that is not SemVer;
 	// the database error otherwise.
 	RecordMigration(ctx context.Context, schemaVersion int64, minServerVersion string) (Record, error)
+	// LockForSetup returns the instance row locked until the end of the ambient unit of work, so
+	// two runs of bothy setup bootstrap-owner serialise and the second sees the first one's
+	// setup_completed_at (08 "Erstinstallation" step 1, M1-37). Errors: kind internal outside a
+	// unit of work; kind not_found when the row is missing (run bothy migrate up); the database
+	// error otherwise.
+	LockForSetup(ctx context.Context) (Record, error)
+	// CompleteSetup sets setup_completed_at = at inside the ambient unit of work (08
+	// "Erstinstallation" step 6). Setup never reverts: a row whose setup_completed_at is set
+	// stays unchanged and the call fails with kind conflict. Errors: kind internal outside a unit
+	// of work; the database error otherwise.
+	CompleteSetup(ctx context.Context, at time.Time) error
 }

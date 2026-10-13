@@ -125,6 +125,19 @@ type DeviceKey struct {
 	RevokedAt   pgtype.Timestamptz
 }
 
+type EnrollmentCode struct {
+	ID             pgtype.UUID
+	UserID         pgtype.UUID
+	Purpose        string
+	CodeHash       []byte
+	ExpiresAt      pgtype.Timestamptz
+	Attempts       int32
+	CreatedBy      pgtype.UUID
+	CreatedAt      pgtype.Timestamptz
+	UsedAt         pgtype.Timestamptz
+	UsedByDeviceID pgtype.UUID
+}
+
 type EventConsumerCursor struct {
 	Name      string
 	LastSeq   int64

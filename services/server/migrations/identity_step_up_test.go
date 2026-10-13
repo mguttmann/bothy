@@ -17,8 +17,8 @@ import (
 )
 
 // TestStepUpMigration_Schema holds auth_challenges against docs/spec/03-datenmodell.md section 4.2
-// column by column, with every check, foreign key, unique and index (M1-35). The foreign key
-// enrollment_code_id -> enrollment_codes(id) comes with enrollment_codes (M1-37).
+// column by column, with every check, foreign key, unique and index (M1-35), including the foreign
+// key enrollment_code_id -> enrollment_codes(id) that came with enrollment_codes (M1-37).
 func TestStepUpMigration_Schema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -41,6 +41,7 @@ func TestStepUpMigration_Schema(t *testing.T) {
 		"CHECK (((status = 'issued'::text) = (finished_at IS NULL)))",
 		"CHECK ((purpose = ANY (ARRAY['step_up'::text, 'passkey_login'::text, 'passkey_enroll'::text, 'passkey_register'::text])))",
 		"CHECK ((status = ANY (ARRAY['issued'::text, 'used'::text, 'failed'::text])))",
+		"FOREIGN KEY (enrollment_code_id) REFERENCES enrollment_codes(id) ON DELETE CASCADE",
 		"FOREIGN KEY (session_id) REFERENCES auth_sessions(id) ON DELETE CASCADE",
 		"PRIMARY KEY (id)",
 		"UNIQUE (challenge_hash)",
@@ -85,6 +86,7 @@ func TestStepUpMigration_Constraints(t *testing.T) {
 	mustExec(t, app, `INSERT INTO users (principal_id) VALUES ($1)`, person)
 	mustExec(t, app, `INSERT INTO devices (id, user_id, name, platform) VALUES ($1, $2, 'Phone', 'ios')`, dev, person)
 	mustExec(t, app, `INSERT INTO auth_sessions (id, user_id, device_id, auth_method, expires_at) VALUES ($1, $2, $3, 'oidc', $4)`, sess, person, dev, end)
+	mustExec(t, app, `INSERT INTO enrollment_codes (id, user_id, purpose, code_hash, expires_at) VALUES ($1, $2, 'first_login', $3, $4)`, code, person, []byte{0xec}, end)
 	id := func(n byte) string {
 		return "0192a3b4-c5d6-7e8f-9a0b-1c2d3e4f7b" + string("0123456789abcdef"[n>>4]) + string("0123456789abcdef"[n&15])
 	}

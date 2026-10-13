@@ -58,6 +58,12 @@ type peopleWorld struct {
 	creds    *fake.Credentials
 	policies *fake.Policies
 	str      *fake.Structure
+	// pool, uow, rec, az and events are the parts the login service of login_test.go reuses.
+	pool   *pg.Pool
+	uow    *pg.UnitOfWork
+	rec    *auditapp.Recorder
+	az     *authzapp.Authorizer
+	events *syncapp.Appender
 }
 
 func newPeopleWorld(t *testing.T) *peopleWorld {
@@ -114,8 +120,15 @@ func newPeopleWorld(t *testing.T) *peopleWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	codes, err := app.NewEnrollmentCodes(app.Config{EnrollmentCodeTTL: time.Hour, EnrollmentCodeMaxAttempts: 3}, []byte("0123456789abcdef0123456789abcdef"),
+		app.EnrollmentDeps{Codes: repo, People: repo, UoW: uow, Clock: w.clk})
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.pool, w.uow, w.rec, w.az, w.events = pool, uow, rec, az, appender
 	w.p, err = app.NewPeople(peopleCfg, app.PeopleDeps{Store: repo, UoW: uow, Authorizer: az, Audit: rec, Events: appender,
-		Cursors: httpapi.Cursors{}, Versions: versions, Locales: locale.Parser{}, Clock: w.clk})
+		Cursors: httpapi.Cursors{}, Versions: versions, Locales: locale.Parser{}, Providers: repo, Identities: repo, Enrollment: codes,
+		Clock: w.clk})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,14 +188,19 @@ func TestPeople_Lifecycle(t *testing.T) {
 	w := newPeopleWorld(t)
 	owner := w.person("owner", "active", true)
 	ctx := ctxOf(owner)
-	u, err := w.p.CreateUser(ctx, owner, identity.CreateUserCmd{Handle: "kim", DisplayName: "Kim", Email: ptr("kim@example.com"), Locale: ptr("en-us"), TimeZone: ptr("Europe/Berlin")})
-	if err != nil || u.Locale != "en-US" || u.Status != identity.StatusActive {
-		t.Fatalf("CreateUser = %+v, %v", u, err)
+	created, err := w.p.CreateUser(ctx, owner, identity.CreateUserCmd{Handle: "kim", DisplayName: "Kim", Email: ptr("kim@example.com"), Locale: ptr("en-us"), TimeZone: ptr("Europe/Berlin")})
+	u := created.User
+	if err != nil || u.Locale != "en-US" || u.Status != identity.StatusActive || created.Enrollment != nil {
+		t.Fatalf("CreateUser = %+v, %v", created, err)
 	}
 	_, err = w.p.CreateUser(ctx, owner, identity.CreateUserCmd{Handle: "kim", DisplayName: "Kim"})
 	wantCode(t, err, errs.CodeConflict)
+	// Without an enabled local provider a local account is 409 local_provider_disabled (M1-37).
 	_, err = w.p.CreateUser(ctx, owner, identity.CreateUserCmd{Handle: "x", DisplayName: "X", LocalAccount: true})
-	wantCode(t, err, errs.CodeValidationFailed)
+	wantCode(t, err, errs.CodeConflict)
+	if e, _ := errs.As(err); e.Reason != "local_provider_disabled" {
+		t.Fatalf("reason %q, want local_provider_disabled", e.Reason)
+	}
 	for _, cmd := range []identity.CreateUserCmd{
 		{Handle: "Bad", DisplayName: "X"}, {Handle: "y", DisplayName: " "}, {Handle: "y", DisplayName: "Y", Email: ptr("no")},
 		{Handle: "y", DisplayName: "Y", Locale: ptr("--")}, {Handle: "y", DisplayName: "Y", TimeZone: ptr("Local")},

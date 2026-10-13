@@ -173,6 +173,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.dpop_nonce_ttl = 5m  # default\n" +
 		"auth.dpop_proof_max_age = 1m  # default\n" +
 		"auth.dpop_required_for = agent  # default\n" +
+		"auth.enrollment_code_max_attempts = 5  # default\n" +
+		"auth.enrollment_code_ttl = 3d  # default\n" +
 		"auth.login_fail_window = 15m  # default\n" +
 		"auth.personal_token_max_ttl = 90d  # default\n" +
 		"auth.refresh_reuse_grace = 30s  # default\n" +

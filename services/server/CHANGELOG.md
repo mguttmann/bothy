@@ -11,6 +11,21 @@ documented in this file. The format is based on
 
 ### Added
 
+- First setup, enrollment codes and setup lock (M1-37): until `bothy setup bootstrap-owner` has
+  run on the host, the public listener answers every request except the discovery reads with
+  `503 setup_required`, before authentication and rate limiting; the bootstrap takes effect
+  without a restart. `bootstrap-owner` creates the first owner, the local identity provider, the
+  local identity and a one-time enrollment code in one transaction with the audit entry
+  `instance.bootstrap`; `bothy setup issue-enrollment-code` issues a recovery code for an active
+  owner (`owner.recover`). Codes have 160 random bits, are shown once (`en_` plus eight groups of
+  four Crockford Base32 characters), stored only as HMAC with the token pepper, valid
+  `auth.enrollment_code_ttl`, single use and invalid after `auth.enrollment_code_max_attempts`
+  failed attempts, which survive the rollback. New operations `redeemEnrollmentCode` (device keys
+  only, the device becomes active, every rejected code the same `401`) and
+  `createEnrollmentCode`; `createUser` with `local_account` creates the local identity and a code;
+  responses with a code are never stored for an `Idempotency-Key` replay (`409 one_time_secret`).
+  Migration `00016_identity_enrollment_codes.sql`. The shared login completion of every later login
+  path creates devices, sessions and tokens in one place.
 - Identity provider port and provider management (M1-36): the migration
   `00013_identity_providers.sql` (`identity_providers`, `user_identities`, and the deferred foreign
   keys `auth_sessions.identity_id` and `groups.provider_id`), the ports `identity.Providers` and

@@ -374,8 +374,8 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.group_claim_max_age` | `BOTHY_AUTH__GROUP_CLAIM_MAX_AGE` | Server |  | `30d` | Ablauf von Mitgliedschaften aus Gruppen-Claims nach der letzten Anmeldung | geplant (M1) |
 | `auth.idp_recheck_interval` | `BOTHY_AUTH__IDP_RECHECK_INTERVAL` | Server |  | `30d` | spätestens dann neue Anmeldung beim Anbieter | geplant (M1) |
 | `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server |  | `true` | jede Anfrage muss denselben Header-Login tragen | geplant (M1) |
-| `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server |  | `72h` | Gültigkeit eines Einladungs-Codes | geplant (M1) |
-| `auth.enrollment_code_max_attempts` | `BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS` | Server |  | `5` | Fehlversuche je Einladungs-Code | geplant (M1) |
+| `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server | duration | `72h` | Gültigkeit eines Einladungs-Codes | aktiv |
+| `auth.enrollment_code_max_attempts` | `BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS` | Server | int | `5` | Fehlversuche je Einladungs-Code | aktiv |
 | `auth.device_pending_ttl` | `BOTHY_AUTH__DEVICE_PENDING_TTL` | Server |  | `24h` | danach wird ein wartendes Gerät widerrufen | geplant (M1) |
 | `auth.device_verification_code_digits` | `BOTHY_AUTH__DEVICE_VERIFICATION_CODE_DIGITS` | Server |  | `6` | Länge des Bestätigungs-Codes | geplant (M1) |
 | `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server |  | `5m` | Gültigkeit eines Kopplungs-Codes | geplant (M1) |

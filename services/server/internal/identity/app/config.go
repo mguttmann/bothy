@@ -52,6 +52,12 @@ type Config struct {
 	StepUpFailLimit int `config:"auth.step_up_fail_limit"`
 	// LoginFailWindow is auth.login_fail_window, the window failed attempts count in.
 	LoginFailWindow time.Duration `config:"auth.login_fail_window"`
+	// EnrollmentCodeTTL is auth.enrollment_code_ttl, how long an enrollment code is valid from its
+	// issue (M1-37).
+	EnrollmentCodeTTL time.Duration `config:"auth.enrollment_code_ttl"`
+	// EnrollmentCodeMaxAttempts is auth.enrollment_code_max_attempts: a code with this many failed
+	// attempts is invalid (08 section 3.2).
+	EnrollmentCodeMaxAttempts int `config:"auth.enrollment_code_max_attempts"`
 	// CleanupInterval is auth.cleanup_interval, the period of the job identity.auth_cleanup.
 	CleanupInterval time.Duration `config:"auth.cleanup_interval"`
 	// APITokenMaxTTL is auth.api_token_max_ttl, the longest lifetime of an agent or app token

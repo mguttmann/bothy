@@ -20,7 +20,9 @@ import (
 // a table adds its row here.
 var appPrivileges = map[string][]string{
 	"goose_db_version": {"SELECT"},
-	// instance: bothy migrate writes it as bothy_owner; the server only reads it (M1-15).
+	// instance: bothy migrate writes it as bothy_owner; the server reads it (M1-15), plus the
+	// column right UPDATE (setup_completed_at) of bothy setup (M1-37), which has_table_privilege
+	// does not show; TestEnrollmentCodesMigration_InstanceSetupGrant holds it.
 	"instance": {"SELECT"},
 	// sequence_counters: plus the column right UPDATE (value), which has_table_privilege does
 	// not show; TestCounters_ValueNeverDecreases holds it.
@@ -76,6 +78,9 @@ var appPrivileges = map[string][]string{
 	// 03 api_tokens (M1-44): revocation and last_used_at are updates, the rows are security
 	// history.
 	"api_tokens": {"SELECT", "INSERT", "UPDATE"},
+	// 03 enrollment_codes (M1-37): a code ends by used_at, expires_at or attempts; the rows are
+	// security history, deleted only by the retention job, which grants its delete.
+	"enrollment_codes": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

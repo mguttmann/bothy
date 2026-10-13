@@ -23,6 +23,7 @@ the assembly of `bothy serve` (M1-11). Only `cmd` imports it.
 | `jobs.go` | `JobsConfig`, `JobRole`, `NewJobRegistry` (one job registry for all roles), `MigrateUpSteps` (River before goose, then the steps of `MigrationSteps`; ruling INT-W5/3) |
 | `ratelimit.go`, `configkeys_ratelimit.go` | `RateLimitConfig`, `InstallRateLimits` and the start check (M1-19); the keys `ratelimit.*` |
 | `serve.go` | `Serve`, `ServeConfig`, `Deps`: start order and stop steps of `bothy serve` |
+| `setup.go` | `InstallSetupGate` and `RouteActions` (the setup gate over the instance row, M1-37); `Setup` (`NewSetup`, `BootstrapOwner`, `IssueRecoveryCode`, `Close`): the parts of the server `bothy setup` needs, as `bothy_app` |
 | `switchlog.go` | the process logger that follows the switch from stdout JSON to the telemetry logger |
 
 ## Serve assembly

@@ -47,7 +47,13 @@ type PeopleDeps struct {
 	Versions instance.Versions
 	// Locales parses locales.
 	Locales Locales
-	// Clock gives the time of getMe; nil means clock.System().
+	// Providers finds the local identity provider of createUser with local_account (M1-37).
+	Providers ProviderStore
+	// Identities inserts the local identity of createUser with local_account.
+	Identities IdentityStore
+	// Enrollment issues the first_login code of createUser with local_account.
+	Enrollment *EnrollmentCodes
+	// Clock gives the time of getMe and of the local identity; nil means clock.System().
 	Clock clock.Clock
 }
 
@@ -67,7 +73,7 @@ var (
 // sizes, auth.step_up_max_age). Errors: a missing collaborator or a limit outside its range.
 func NewPeople(cfg Config, d PeopleDeps) (*People, error) {
 	if d.Store == nil || d.UoW == nil || d.Authorizer == nil || d.Audit == nil || d.Events == nil ||
-		d.Cursors == nil || d.Versions == nil || d.Locales == nil {
+		d.Cursors == nil || d.Versions == nil || d.Locales == nil || d.Providers == nil || d.Identities == nil || d.Enrollment == nil {
 		return nil, errors.New("identity: NewPeople needs every collaborator")
 	}
 	if cfg.HandleMaxChars < 1 || cfg.DisplayNameMaxChars < 1 || cfg.PageSizeDefault < 1 || cfg.PageSizeMax < cfg.PageSizeDefault {

@@ -117,6 +117,8 @@ type Chain struct {
 	sealed      bool
 	failedCreds func(r *http.Request, err error) error
 	precheck    func(r *http.Request) (settle func(authErr error), err error)
+	gate        func(http.Handler) http.Handler
+	public      bool
 
 	// trace, when set by a test of this package, is called with the name of every stage a
 	// request enters; TestChainOrder_Golden reads the order from it.
@@ -225,6 +227,18 @@ func (c *Chain) SetCredentialsPrecheck(fn func(r *http.Request) (settle func(aut
 	c.precheck = fn
 }
 
+// UseGate installs mw in front of the mux in step 4 (routing), before every per-route stage and
+// for unmatched requests too: the setup gate (SetupGate, M1-37) answers there before authentication
+// and rate limiting. It panics when called twice, with nil or after Public.
+func (c *Chain) UseGate(mw func(http.Handler) http.Handler) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.gate != nil || c.public || mw == nil {
+		panic("httpserver: UseGate: set twice, nil or after Public")
+	}
+	c.gate = mw
+}
+
 // Order returns the names of every step in the order a request runs through them: the four
 // outer steps, the per-route stages and "handler". TestChainOrder_Golden holds it against 02.
 func (c *Chain) Order() []string {
@@ -268,10 +282,18 @@ func (c *Chain) enter(name string, next http.Handler) http.Handler {
 
 // Public returns the handler of the public listener: recover (step 1), the server span with the
 // correlation ID and the access log of platform/otel (step 2), the base headers and the client IP
-// (step 3) and the mux (step 4), whose unmatched requests get 404 not_found or 405
-// method_not_allowed with Allow as a problem.
+// (step 3) and the mux (step 4) behind the gate of UseGate, when one is installed, whose unmatched
+// requests get 404 not_found or 405 method_not_allowed with Allow as a problem.
 func (c *Chain) Public(mux *http.ServeMux) http.Handler {
-	dispatch := c.enter("mux", c.dispatch(mux))
+	c.mu.Lock()
+	c.public = true
+	gate := c.gate
+	c.mu.Unlock()
+	routed := c.dispatch(mux)
+	if gate != nil {
+		routed = gate(routed)
+	}
+	dispatch := c.enter("mux", routed)
 	headers := c.enter("headers", c.headersStage(dispatch))
 	traced := c.enter("trace", otel.Middleware(c.correlate(headers)))
 	return c.enter("recover", c.recoverStage(traced))

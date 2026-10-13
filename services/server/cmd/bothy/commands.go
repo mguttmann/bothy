@@ -64,6 +64,13 @@ var commands = []command{
 		},
 	},
 	{
+		name:    "setup",
+		summary: "Create the first owner or a recovery code on the host",
+		run: func(ctx context.Context, args, env []string, stdout, stderr io.Writer) int {
+			return setupCommand(ctx, args, env, stdout, stderr, defaultSetupDeps())
+		},
+	},
+	{
 		name:    "telemetry",
 		summary: "Map a principal id to its telemetry pseudonym for the owner",
 		run: func(ctx context.Context, args, env []string, stdout, stderr io.Writer) int {

@@ -46,8 +46,17 @@ type CreateUserCmd struct {
 	// Email, Locale and TimeZone are optional; nil means absent (column default for locale and
 	// time zone), a given value is validated like in UpdateUserCmd.
 	Email, Locale, TimeZone *string
-	// LocalAccount asks for an enrollment code; refused until M1-37 (docs/DECISIONS.md M1-31).
+	// LocalAccount creates the local identity (subject = handle) and a first_login enrollment
+	// code with the person (M1-37).
 	LocalAccount bool
+}
+
+// CreatedUser is the answer of People.CreateUser (schema UserCreated): the person and, with
+// local_account, its enrollment code, shown once.
+type CreatedUser struct {
+	User UserView
+	// Enrollment is the first_login code; nil without local_account.
+	Enrollment *EnrollmentCode
 }
 
 // UpdateUserCmd is the input of People.UpdateUser (schema UserUpdate); nil fields stay unchanged.
@@ -87,9 +96,11 @@ type People interface {
 	ListUsers(ctx context.Context, a actor.Actor, q ListUsersQuery) (UserPage, error)
 	// GetUser returns the person userID (user.read); an agent, app or unknown id is not_found.
 	GetUser(ctx context.Context, a actor.Actor, userID ids.ID) (UserView, error)
-	// CreateUser creates an active person (user.create, owner with step-up). Errors:
-	// validation_failed with field pointers, conflict on /handle or /email.
-	CreateUser(ctx context.Context, a actor.Actor, cmd CreateUserCmd) (UserView, error)
+	// CreateUser creates an active person (user.create, owner with step-up); with local_account
+	// also the local identity and a first_login enrollment code in the same unit of work. Errors:
+	// validation_failed with field pointers, conflict on /handle or /email, conflict with reason
+	// local_provider_disabled without an enabled local provider.
+	CreateUser(ctx context.Context, a actor.Actor, cmd CreateUserCmd) (CreatedUser, error)
 	// UpdateUser changes the profile of userID (user.update, owner with step-up); the handle never
 	// changes. Errors: as CreateUser, not_found.
 	UpdateUser(ctx context.Context, a actor.Actor, userID ids.ID, cmd UpdateUserCmd) (UserView, error)

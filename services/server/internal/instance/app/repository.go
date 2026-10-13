@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -20,6 +21,12 @@ type Repository interface {
 	CounterValue(ctx context.Context, name string) (int64, error)
 	// LoadInstance reads the instance row; found is false when it is missing.
 	LoadInstance(ctx context.Context) (rec instance.Record, found bool, err error)
+	// LockInstance reads the instance row like LoadInstance and locks it until the end of the unit
+	// of work (SELECT ... FOR UPDATE). It requires a unit of work.
+	LockInstance(ctx context.Context) (rec instance.Record, found bool, err error)
+	// CompleteSetup sets setup_completed_at = at where it is NULL and reports whether it changed
+	// the row. It requires a unit of work.
+	CompleteSetup(ctx context.Context, at time.Time) (changed bool, err error)
 	// EnsureInstance inserts the row with the given IDs unless it exists
 	// (INSERT ... ON CONFLICT (id) DO NOTHING), so concurrent bothy migrate runs are safe.
 	EnsureInstance(ctx context.Context, instanceID, syncEpoch ids.ID) error

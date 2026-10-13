@@ -92,9 +92,9 @@ func (q *Queries) GetSession(ctx context.Context, id pgtype.UUID) (AuthSession, 
 const insertSession = `-- name: InsertSession :exec
 
 INSERT INTO auth_sessions (id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method,
-                           created_at, expires_at)
+                           created_at, expires_at, last_ip)
 VALUES ($1, $2, $3, $4, $5, $6,
-        $7, $8, $9)
+        $7, $8, $9, $10::inet)
 `
 
 type InsertSessionParams struct {
@@ -107,6 +107,7 @@ type InsertSessionParams struct {
 	AuthMethod      string
 	CreatedAt       pgtype.Timestamptz
 	ExpiresAt       pgtype.Timestamptz
+	LastIp          *netip.Addr
 }
 
 // SPDX-License-Identifier: Apache-2.0
@@ -123,6 +124,7 @@ func (q *Queries) InsertSession(ctx context.Context, arg InsertSessionParams) er
 		arg.AuthMethod,
 		arg.CreatedAt,
 		arg.ExpiresAt,
+		arg.LastIp,
 	)
 	return err
 }

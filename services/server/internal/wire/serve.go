@@ -21,6 +21,8 @@ import (
 	"github.com/OWNER/bothy/services/server/api/routes"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/instance"
+	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
+	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -656,7 +658,7 @@ func (s *server) handlers() Handlers {
 	return h
 }
 
-// fillHandlers sets every nil identity handler of h to the one id built (INT-W12/3).
+// fillHandlers sets every nil identity handler of h to the one id built (INT-W12/3, INT-W13/3).
 func (id *Identity) fillHandlers(h *Handlers) {
 	fill(&h.Devices, id.Handlers)
 	fill(&h.People, id.PeopleHandlers)
@@ -665,6 +667,7 @@ func (id *Identity) fillHandlers(h *Handlers) {
 	fill(&h.Providers, id.ProviderHandlers)
 	fill(&h.Credentials, id.CredentialHandlers)
 	fill(&h.Tokens, id.TokenHandlers)
+	fill(&h.Enrollment, id.EnrollmentHandlers)
 }
 
 // fill sets *dst to built when *dst is nil, so an injected handler stays.
@@ -740,9 +743,13 @@ func (s *server) mountRoutes(context.Context) error {
 				return err
 			}
 			s.mu.Lock()
-			mux := s.publicMux()
+			mux, pool, a := s.publicMux(), s.pool, s.audit
 			s.chain = chain
 			s.mu.Unlock()
+			if a == nil {
+				return errors.New("wire: the setup gate needs the unit of work of the audit step")
+			}
+			InstallSetupGate(chain, mux, instanceapp.NewState(instancepg.NewRepository(pool), a.UoW()))
 			return MountRoutes(s.role, mux, s.handlers(), cat, chain, log)
 		}
 	}

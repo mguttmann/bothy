@@ -7,6 +7,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/kernel/idempotency"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -64,7 +65,15 @@ func (h *People) CreateUser(ctx context.Context, req rest.CreateUserRequestObjec
 	if err != nil {
 		return nil, err
 	}
-	return rest.CreateUser201JSONResponse{Body: rest.UserCreated{User: toRESTUser(u)}}, nil
+	out := rest.UserCreated{User: toRESTUser(u.User)}
+	if u.Enrollment != nil {
+		// The code is a one-time secret: the Idempotency-Key stage stores no response that holds it
+		// (06 "Idempotenz", R-API-26).
+		idempotency.MarkOneTimeSecret(ctx)
+		e := enrollmentREST(*u.Enrollment)
+		out.Enrollment = &e
+	}
+	return rest.CreateUser201JSONResponse{Body: out}, nil
 }
 
 // GetUser implements rest.StrictServerInterface (GET /users/{user_id}).

@@ -134,9 +134,14 @@ func newWorld(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
+	codes, err := app.NewEnrollmentCodes(app.Config{EnrollmentCodeTTL: time.Hour, EnrollmentCodeMaxAttempts: 3}, testPepper,
+		app.EnrollmentDeps{Codes: repo, People: repo, UoW: w.uow, Clock: w.clk})
+	if err != nil {
+		t.Fatal(err)
+	}
 	people, err := app.NewPeople(peopleCfg, app.PeopleDeps{
 		Store: repo, UoW: w.uow, Authorizer: az, Audit: w.rec, Events: appender, Cursors: httpapi.Cursors{},
-		Versions: versions, Locales: locale.Parser{}, Clock: w.clk,
+		Versions: versions, Locales: locale.Parser{}, Providers: repo, Identities: repo, Enrollment: codes, Clock: w.clk,
 	})
 	if err != nil {
 		t.Fatal(err)
