@@ -59,7 +59,7 @@ Create or fill in `packages/design_system/`:
 
 - `lib/src/generated/design_tokens.g.dart`: the copy of the generator output (Design note 1).
 - `lib/src/theme/ds_context.dart` (`DsContext`, `DsThemeMode`, `DsDensityMode`, `DsMotionMode`), `lib/src/theme/ds_settings_resolver.dart`, `lib/src/theme/ds_theme.dart`, `lib/src/theme/ds_theme_scope.dart` (Design notes 2 to 4).
-- `fonts/AtkinsonHyperlegibleNext[wght].ttf`, `fonts/AtkinsonHyperlegibleNext-Italic[wght].ttf`, `fonts/AtkinsonHyperlegibleMono[wght].ttf`, `fonts/AtkinsonHyperlegibleMono-Italic[wght].ttf` (only the styles the source repositories ship as variable files), `fonts/OFL.txt` per family, `fonts/MANIFEST.json` (source URL, commit, SHA-256 per file) (Design note 5).
+- `fonts/AtkinsonHyperlegibleNext[wght].ttf`, `fonts/AtkinsonHyperlegibleNext-Italic[wght].ttf`, `fonts/AtkinsonHyperlegibleMono[wght].ttf`, `fonts/AtkinsonHyperlegibleMono-Italic[wght].ttf` (only the styles the source repositories ship as variable files), `fonts/<family>.OFL.txt` for each family (Design note 5), `fonts/MANIFEST.json` (source URL, commit, SHA-256 per file) (Design note 5).
 - `lib/design_system.dart` exports; `lib/testing.dart` with the golden helpers (Design note 6).
 - `test/flutter_test_config.dart`, `test/theme_switch_test.dart`, `test/settings_resolver_test.dart`, `test/tokens_copy_test.dart`, `test/fonts_test.dart`, `test/goldens/sample_page_test.dart` with its golden files.
 
