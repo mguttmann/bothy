@@ -39,6 +39,8 @@ def test_general_instruction_skips_nits() -> None:
     for word in ("bugs", "security", "contracts", "CI"):
         assert word in text
     assert "nits" in text
+    # The repository rules of a path instruction (dashes, glossary) are not nits.
+    assert "path-specific instruction" in text
 
 
 def test_markdown_asks_for_sources_only_in_spec_security_and_adr() -> None:

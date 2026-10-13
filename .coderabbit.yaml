@@ -40,7 +40,9 @@ reviews:
       instructions: >-
         Report bugs, security issues, broken contracts (specification, API, schema,
         configuration keys) and problems that break CI. Do not raise style, wording or
-        formatting nits.
+        formatting nits; a rule that a matching path-specific instruction states (for
+        example dashes or glossary terms in Markdown) is a repository requirement, not
+        a nit.
     - path: "**/*.md"
       instructions: >-
         All repository content is English (docs/glossary.md, D-W-94).
