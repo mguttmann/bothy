@@ -189,5 +189,7 @@ def test_main_requires_token(
 def test_main_apply_then_check(server: tuple[State, str], monkeypatch: pytest.MonkeyPatch) -> None:
     _, url = server
     monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    # CI sets SONAR_ORGANIZATION for the cloud; this test talks to the local server API.
+    monkeypatch.delenv("SONAR_ORGANIZATION", raising=False)
     assert qs.main(["apply", "--url", url]) == 0
     assert qs.main(["check", "--url", url]) == 0
