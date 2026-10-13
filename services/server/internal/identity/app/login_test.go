@@ -40,6 +40,7 @@ var loginCfg = app.Config{
 	RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute, StepUpChallengeTTL: 2 * time.Minute,
 	StepUpFailLimit: 3, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
 	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 2,
+	APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
 }
 
 // identityOf builds the identity module with its login service over the people world, with real
@@ -67,7 +68,11 @@ func (w *peopleWorld) identityOf() *wire.Identity {
 	}
 	instID := ids.New()
 	w.sql(`INSERT INTO instance (id, instance_id, schema_version, sync_epoch) VALUES (1, $1, 14, $2) ON CONFLICT (id) DO NOTHING`, instID.String(), ids.New().String())
-	id, err := wire.NewIdentity(loginCfg, w.pool, w.uow, w.az, wire.IdentityWrites{Audit: w.rec, Events: w.events},
+	st, err := wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, w.pool, w.uow, w.az, wire.SettingsWrites{Audit: w.rec, Events: w.events}, w.clk)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	id, err := wire.NewIdentity(loginCfg, w.pool, w.uow, w.az, wire.IdentityWrites{Audit: w.rec, Events: w.events, Settings: st.Admin},
 		[]byte("0123456789abcdef0123456789abcdef"), w.clk, log)
 	if err != nil {
 		w.t.Fatal(err)
