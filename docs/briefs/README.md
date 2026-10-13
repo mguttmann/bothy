@@ -85,13 +85,13 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 1 | M1-01, M1-02, M2-32, M4-03 |
 | 2 | M1-03, M1-04, M1-05, M2-38, M4-01 |
 | 3 | M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10 |
-| 4 | M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05 |
-| 5 | M1-10, M1-12, M3-02, M4-07, M4-09 |
-| 6 | M1-11, M1-13 |
-| 7 | M1-14, M1-15, M1-18, M1-23, M1-26 |
-| 8 | M1-16, M1-19, M1-21, M1-24, M1-25, M1-27 |
-| 9 | M1-20, M1-28, M2-01 |
-| 10 | M1-29, M1-32, M1-33 |
+| 4 | M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16 |
+| 5 | M1-10, M1-12, M3-02, M4-07, M4-09, M4-15 |
+| 6 | M1-11, M1-13, M4-13 |
+| 7 | M1-14, M1-15, M1-18, M1-23, M1-26, M4-14 |
+| 8 | M1-16, M1-19, M1-21, M1-24, M1-25, M1-27, M4-17 |
+| 9 | M1-20, M1-28, M2-01, M4-18 |
+| 10 | M1-29, M1-32, M1-33, M4-19 |
 | 11 | M1-30, M1-31, M1-34 |
 | 12 | M1-35 |
 | 13 | M1-36, M1-44, M1-50 |
@@ -287,6 +287,15 @@ names listed here.
 | 3 | M4-08 | Domain package | `M4-08-domain.md` | M4-01 |
 | 5 | M4-09 | Login: DPoP, refresh and step-up | `M4-09-auth-dpop.md` | M4-02, M4-08 |
 | 3 | M4-10 | Device key for macOS and iOS | `M4-10-device-key-apple.md` | M4-01 |
+| 4 | M4-11 | Device key for Windows | `M4-11-device-key-windows.md` | M4-10 |
+| 4 | M4-12 | Local database schema v1 (ADR 0029) | `M4-12-local-store.md` | M4-08 |
+| 6 | M4-13 | Sync engine: connection and session | `M4-13-sync-connection.md` | M4-09, M4-12 |
+| 7 | M4-14 | Sync engine: catch-up, reconciliation and revocation | `M4-14-sync-catch-up.md` | M4-13 |
+| 5 | M4-15 | Sync engine: outbox | `M4-15-sync-outbox.md` | M4-02, M4-12 |
+| 4 | M4-16 | Sync engine: run documents | `M4-16-sync-run-documents.md` | M4-08 |
+| 8 | M4-17 | Fake server for integration tests | `M4-17-fake-server.md` | M4-14, M4-15, M4-16 |
+| 9 | M4-18 | Desktop app shell | `M4-18-desktop-shell.md` | M4-07, M4-11, M4-17 |
+| 10 | M4-19 | Sidebar, spaces, channels and post list | `M4-19-sidebar-post-list.md` | M4-18 |
 
 ## Make targets created by tickets
 
@@ -476,6 +485,25 @@ flowchart TB
   M3_22["M3-22"]
   M3_23["M3-23"]
   M3_24["M3-24"]
+  M4_01["M4-01"]
+  M4_02["M4-02"]
+  M4_03["M4-03"]
+  M4_04["M4-04"]
+  M4_05["M4-05"]
+  M4_06["M4-06"]
+  M4_07["M4-07"]
+  M4_08["M4-08"]
+  M4_09["M4-09"]
+  M4_10["M4-10"]
+  M4_11["M4-11"]
+  M4_12["M4-12"]
+  M4_13["M4-13"]
+  M4_14["M4-14"]
+  M4_15["M4-15"]
+  M4_16["M4-16"]
+  M4_17["M4-17"]
+  M4_18["M4-18"]
+  M4_19["M4-19"]
   M1_02 --> M1_03
   M1_01 --> M1_04
   M1_01 --> M1_05
@@ -741,4 +769,19 @@ flowchart TB
   M4_02 --> M4_09
   M4_08 --> M4_09
   M4_01 --> M4_10
+  M4_10 --> M4_11
+  M4_08 --> M4_12
+  M4_09 --> M4_13
+  M4_12 --> M4_13
+  M4_13 --> M4_14
+  M4_02 --> M4_15
+  M4_12 --> M4_15
+  M4_08 --> M4_16
+  M4_14 --> M4_17
+  M4_15 --> M4_17
+  M4_16 --> M4_17
+  M4_07 --> M4_18
+  M4_11 --> M4_18
+  M4_17 --> M4_18
+  M4_18 --> M4_19
 ```
