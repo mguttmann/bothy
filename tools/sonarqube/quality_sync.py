@@ -57,6 +57,11 @@ class Config:
     profile_name: str
     parent: str
     profiles: dict[str, Path]
+    cloud_parent: str = ""
+
+    def parent_for(self, client: Client) -> str:
+        """Return the built-in parent profile on this server (SonarQube Cloud has its own)."""
+        return (self.cloud_parent or self.parent) if client.is_cloud else self.parent
 
 
 @dataclass
@@ -79,7 +84,14 @@ def load_config(directory: Path) -> Config:
             f"<name>{manifest['profile_name']}</name>" not in text
         ):
             raise SonarError(f"{path.name}: name or language does not match profiles.json")
-    return Config(gate["name"], conditions, manifest["profile_name"], manifest["parent"], profiles)
+    return Config(
+        gate["name"],
+        conditions,
+        manifest["profile_name"],
+        manifest["parent"],
+        profiles,
+        manifest.get("cloud_parent", ""),
+    )
 
 
 def xml_rules(text: str) -> set[str]:
@@ -155,11 +167,20 @@ def _languages(client: Client) -> set[str]:
     return {lang["key"] for lang in client.get_json("api/languages/list")["languages"]}
 
 
-def _gate(client: Client, name: str) -> list[dict[str, str]] | None:
+def _gate(client: Client, name: str) -> tuple[str, list[dict[str, str]]] | None:
+    """Return id and conditions of the gate `name`, or None if it does not exist."""
     try:
-        return list(client.get_json("api/qualitygates/show", name=name)["conditions"])
+        gate = client.get_json("api/qualitygates/show", name=name)
     except LookupError:
         return None
+    return str(gate.get("id", "")), list(gate["conditions"])
+
+
+def _gate_ref(
+    client: Client, id_key: str, gate_id: str, name_key: str, name: str
+) -> dict[str, str]:
+    """Address a gate: SonarQube Cloud wants its id, SonarQube Server its name."""
+    return {id_key: gate_id} if client.is_cloud else {name_key: name}
 
 
 def _profile(client: Client, language: str, name: str) -> dict[str, Any] | None:
@@ -175,10 +196,13 @@ def _active_rules(client: Client, language: str, name: str) -> set[str]:
 def apply(client: Client, config: Config) -> Report:
     """Create or update gate and profiles so that the server matches the config."""
     report = Report()
-    current = _gate(client, config.gate_name)
-    if current is None:
+    found = _gate(client, config.gate_name)
+    if found is None:
         client.post("api/qualitygates/create", name=config.gate_name)
-        current = []
+        found = _gate(client, config.gate_name)
+        if found is None:
+            raise SonarError(f"gate '{config.gate_name}' was not created")
+    gate_id, current = found
     wanted = {c.metric: c for c in config.conditions}
     for cond in current:
         want = wanted.get(cond["metric"])
@@ -197,21 +221,25 @@ def apply(client: Client, config: Config) -> Report:
         if want.metric not in have:
             client.post(
                 "api/qualitygates/create_condition",
-                gateName=config.gate_name,
+                **_gate_ref(client, "gateId", gate_id, "gateName", config.gate_name),
                 metric=want.metric,
                 op=want.op,
                 error=want.error,
             )
-    client.post("api/qualitygates/set_as_default", name=config.gate_name)
+    client.post(
+        "api/qualitygates/set_as_default",
+        **_gate_ref(client, "id", gate_id, "name", config.gate_name),
+    )
 
+    parent = config.parent_for(client)
     available = _languages(client)
     for language, xml_path in config.profiles.items():
         if language not in available:
             report.skipped_languages.append(language)
             continue
-        if _profile(client, language, config.parent) is None:
+        if _profile(client, language, parent) is None:
             raise SonarError(
-                f"{language}: parent profile '{config.parent}' does not exist on this server; "
+                f"{language}: parent profile '{parent}' does not exist on this server; "
                 "adjust quality/sonar/profiles.json after checking the built-in profiles"
             )
         if _profile(client, language, config.profile_name) is None:
@@ -220,7 +248,7 @@ def apply(client: Client, config: Config) -> Report:
             "api/qualityprofiles/change_parent",
             language=language,
             qualityProfile=config.profile_name,
-            parentQualityProfile=config.parent,
+            parentQualityProfile=parent,
         )
         client.post_file(
             "api/qualityprofiles/restore",
@@ -237,11 +265,11 @@ def apply(client: Client, config: Config) -> Report:
 def check(client: Client, config: Config) -> Report:
     """Compare gate and profiles on the server with the config without changing anything."""
     report = Report()
-    current = _gate(client, config.gate_name)
-    if current is None:
+    found = _gate(client, config.gate_name)
+    if found is None:
         report.problems.append(f"gate '{config.gate_name}' is missing")
     else:
-        have = {c["metric"]: c for c in current}
+        have = {c["metric"]: c for c in found[1]}
         for want in config.conditions:
             cond = have.pop(want.metric, None)
             if cond is None:
@@ -255,6 +283,7 @@ def check(client: Client, config: Config) -> Report:
                 )
         report.problems += [f"gate '{config.gate_name}': extra condition {m}" for m in sorted(have)]
 
+    want_parent = config.parent_for(client)
     available = _languages(client)
     for language, xml_path in config.profiles.items():
         if language not in available:
@@ -265,13 +294,13 @@ def check(client: Client, config: Config) -> Report:
             report.problems.append(f"profile {language}: '{config.profile_name}' is missing")
             continue
         parent = profile.get("parentName")
-        if parent != config.parent:
+        if parent != want_parent:
             report.problems.append(
-                f"profile {language}: parent is {parent!r}, want {config.parent!r}"
+                f"profile {language}: parent is {parent!r}, want {want_parent!r}"
             )
             continue
         delta = _active_rules(client, language, config.profile_name) - _active_rules(
-            client, language, config.parent
+            client, language, want_parent
         )
         want_rules = xml_rules(xml_path.read_text(encoding="utf-8"))
         if delta != want_rules:

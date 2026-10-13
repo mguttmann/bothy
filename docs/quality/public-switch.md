@@ -58,11 +58,21 @@ request.
 ## C. SonarQube Cloud and CodeRabbit
 
 12. **SonarQube Cloud**: organization of the account that owns the repository (name in the
-    ops repository), with the OSS plan, create the project, automatic analysis off (R-QA-10),
-    `make sonar-config` and `make sonar-config-check` against the cloud (sonarqube-local.md,
-    section 6). Repository variables `SONAR_HOST_URL` (`https://sonarcloud.io`),
-    `SONAR_ORGANIZATION`, `SONAR_PROJECT_KEY`, secret `SONAR_TOKEN`. Without these values, the
-    job `sonar` of every pull request from the repository fails.
+    ops repository), with the OSS plan, create the project, automatic analysis off (R-QA-10).
+    Repository variables `SONAR_HOST_URL` (`https://sonarcloud.io`), `SONAR_ORGANIZATION`,
+    `SONAR_PROJECT_KEY`, secret `SONAR_TOKEN`. Without these values, the job `sonar` of every
+    pull request from the repository fails. Then apply the shared gate and profiles to the
+    cloud and check them (sonarqube-local.md, section 6) with the workflow
+    `.github/workflows/sonar-config.yml`, which runs `make sonar-config` and
+    `make sonar-config-check` against `https://sonarcloud.io` with the variable
+    `SONAR_ORGANIZATION` and the secret `SONAR_TOKEN`:
+    `gh workflow run sonar-config.yml --ref main`, then `gh run watch`. The job runs only
+    for `main`; the check step ends with `quality_sync: check ok for https://sonarcloud.io`.
+    An `HTTP 401` means the token is invalid, an `HTTP 403` that its account lacks the
+    permission "Administer Quality Gates" or "Administer Quality Profiles" of the
+    organization, which these calls require (https://sonarcloud.io/api/webservices/list,
+    retrieved 2026-10-13) [verified]. Start it again after
+    every change under `quality/sonar/`.
 13. **CodeRabbit**: install it as a GitHub app for the repository; `.coderabbit.yaml` applies.
 
 ## D. Branch protection

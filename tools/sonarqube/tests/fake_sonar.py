@@ -2,7 +2,9 @@
 """In-memory stand-in for the subset of the SonarQube Web API that quality_sync uses.
 
 Endpoint names and parameters follow the public Web API description
-(api/webservices/list of a SonarQube Server, retrieved 2026-10-10).
+(api/webservices/list of a SonarQube Server, retrieved 2026-10-10). With `cloud=True`
+it follows SonarQube Cloud instead (https://sonarcloud.io/api/webservices/list,
+retrieved 2026-10-13): create_condition needs `gateId` and set_as_default needs `id`.
 """
 
 from __future__ import annotations
@@ -32,7 +34,10 @@ class Profile:
 @dataclass
 class State:
     languages: tuple[str, ...] = ("go", "py", "ts", "js", "docker", "kotlin")
+    cloud: bool = False
+    builtin_profile: str = "Sonar way"
     gates: dict[str, list[dict[str, str]]] = field(default_factory=dict)
+    gate_ids: dict[str, str] = field(default_factory=dict)
     default_gate: str | None = None
     profiles: list[Profile] = field(default_factory=list)
     calls: list[tuple[str, str, dict[str, str]]] = field(default_factory=list)
@@ -44,7 +49,7 @@ class State:
             self.profiles.append(
                 Profile(
                     f"sw-{lang}",
-                    "Sonar way",
+                    self.builtin_profile,
                     lang,
                     builtin=True,
                     own_rules={f"{lang}:S100", f"{lang}:S107"},
@@ -127,19 +132,34 @@ def _languages(state: State, _: dict[str, str]) -> tuple[int, Any, str]:
     return 200, {"languages": [{"key": k, "name": k} for k in state.languages]}, "application/json"
 
 
+_BAD_REQUEST = (400, {"errors": [{"msg": "missing parameter"}]}, "application/json")
+
+
+def _gate_name(state: State, p: dict[str, str], name_key: str, id_key: str) -> str | None:
+    """Resolve the gate a call addresses: by id on the cloud, by name on the server."""
+    if state.cloud:
+        return next((n for n, i in state.gate_ids.items() if i == p.get(id_key)), None)
+    return p.get(name_key)
+
+
 def _gate_show(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
-    name = p["name"]
+    name = p.get("name")
     if name not in state.gates:
         return 404, {"errors": [{"msg": "No quality gate"}]}, "application/json"
-    return 200, {"name": name, "conditions": state.gates[name]}, "application/json"
+    body = {"id": state.gate_ids[name], "name": name, "conditions": state.gates[name]}
+    return 200, body, "application/json"
 
 
 def _gate_create(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     state.gates[p["name"]] = []
-    return 200, {"name": p["name"]}, "application/json"
+    state.gate_ids[p["name"]] = str(100 + len(state.gate_ids))
+    return 200, {"id": state.gate_ids[p["name"]], "name": p["name"]}, "application/json"
 
 
 def _cond_create(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
+    gate = _gate_name(state, p, "gateName", "gateId")
+    if gate not in state.gates:
+        return _BAD_REQUEST
     cond = {
         "id": str(state.next_id),
         "metric": p["metric"],
@@ -147,7 +167,7 @@ def _cond_create(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
         "error": p["error"],
     }
     state.next_id += 1
-    state.gates[p["gateName"]].append(cond)
+    state.gates[gate].append(cond)
     return 200, cond, "application/json"
 
 
@@ -166,7 +186,10 @@ def _cond_delete(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
 
 
 def _gate_default(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
-    state.default_gate = p["name"]
+    gate = _gate_name(state, p, "name", "id")
+    if gate not in state.gates:
+        return _BAD_REQUEST
+    state.default_gate = gate
     return 204, "", "text/plain"
 
 

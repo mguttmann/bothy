@@ -138,6 +138,10 @@ operated, and the order of the build.
   (D-W-113).
 - Build briefs of the milestones M2 and M3 (`docs/briefs/M2-*.md`, `docs/briefs/M3-*.md`) in the
   brief index with waves and graph, and in the site navigation (D-W-100).
+- Build briefs of milestone M4 (`docs/briefs/M4-*.md`, desktop clients) in the brief index with
+  waves and graph and in the site navigation, written before M1 closes (D-W-114, which also
+  corrects the column "Depends on" of nine M4 tickets in the plan); a docs test holds the shape of
+  every brief (title, status line, sections, report placeholders).
 
 - Gate `register-check` (`tools/doccheck/register_check.py`): the module register
   `services/server/architecture/modules.yaml` must equal the tables and their modules in
@@ -148,9 +152,17 @@ operated, and the order of the build.
   reference against the server schema, the chapter tables, the milestone of planned keys
   (`tools/configdoc/planned.yaml`), the names retired by W1 (`tools/configdoc/retired.yaml`) and
   the Compose `stop_grace_period` of every service that runs `serve` (rules D1 to D10).
+- Workflow `sonar-config.yml` (manual, `main` only): applies the shared quality gate and
+  quality profiles of `quality/sonar/` to SonarQube Cloud with `make sonar-config` and checks
+  them with `make sonar-config-check` (public-switch.md, step 12).
 
 ### Fixed
 
+- `quality_sync.py` addresses the quality gate by its id on SonarQube Cloud, whose
+  `api/qualitygates/create_condition` and `set_as_default` take `gateId` and `id` instead of
+  the gate name (https://sonarcloud.io/api/webservices/list, retrieved 2026-10-13), and lets the profiles inherit there from `cloud_parent` of
+  `quality/sonar/profiles.json` ("Sonar way comprehensive"), because the cloud has no built-in
+  profile "Sonar way" (ADR 0040); before, `make sonar-config` could not apply the setup to the cloud.
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
   `file_blocked` in the order of the codes; `createHost` and `issueHostPairingCode` take
   `Idempotency-Key` and list `422 idempotency_key_reuse` instead of the exemption `auth_flow`,
