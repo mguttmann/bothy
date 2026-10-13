@@ -353,3 +353,12 @@ nav:
           - "M4-08: Domain package": briefs/M4-08-domain.md
           - "M4-09: Login: DPoP, refresh and step-up": briefs/M4-09-auth-dpop.md
           - "M4-10: Device key for macOS and iOS": briefs/M4-10-device-key-apple.md
+          - "M4-11: Device key for Windows": briefs/M4-11-device-key-windows.md
+          - "M4-12: Local database schema v1 (ADR 0029)": briefs/M4-12-local-store.md
+          - "M4-13: Sync engine: connection and session": briefs/M4-13-sync-connection.md
+          - "M4-14: Sync engine: catch-up, reconciliation and revocation": briefs/M4-14-sync-catch-up.md
+          - "M4-15: Sync engine: outbox": briefs/M4-15-sync-outbox.md
+          - "M4-16: Sync engine: run documents": briefs/M4-16-sync-run-documents.md
+          - "M4-17: Fake server for integration tests": briefs/M4-17-fake-server.md
+          - "M4-18: Desktop app shell": briefs/M4-18-desktop-shell.md
+          - "M4-19: Sidebar, spaces, channels and post list": briefs/M4-19-sidebar-post-list.md
