@@ -42,7 +42,7 @@ func TestSECIN2_DuplicateKeysRejected(t *testing.T) {
 	for name, body := range map[string]string{
 		"top level": `{"name":"ab","color":"red","name":"cd"}`,
 		"nested":    `{"name":"ab","color":"red","nested":{"flag":true,"flag":false}}`,
-		"escaped":   `{"name":"ab","color":"red","name":"cd"}`,
+		"escaped":   `{"name":"ab","color":"red","na\u006de":"cd"}`,
 	} {
 		p := wantProblem(t, h.Do(h.NewRequest(http.MethodPost, "/api/v1/things", body)), 400, "malformed_request")
 		if strings.Contains(p["detail"].(string), "cd") {

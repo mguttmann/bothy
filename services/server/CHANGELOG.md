@@ -230,7 +230,7 @@ documented in this file. The format is based on
 - Proof of the authorize check: a success without a check of the route's action becomes
   `500 internal_error` and counts in `bothy.authz.errors` (`authz_not_checked`); `kernel/authorize`
   gets the check log (`WithCheckLog`, `RecordCheck`, `Checks`).
-- No JSON `null` and no integer beyond 2^53 - 1 leaves the server: the response writer removes
+- No JSON `null` and no integer beyond the JSON safe-integer limit leaves the server: the response writer removes
   null members (logged) and replaces null elements and unsafe integers by `500`.
 - Request checks: JSON guard (duplicate members, invalid UTF-8, nesting above
   `http.max_json_depth` give `400 malformed_request`), body limits before reading

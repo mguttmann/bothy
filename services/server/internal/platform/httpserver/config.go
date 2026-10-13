@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/netip"
 	"net/url"
+	"strings"
 	"time"
 )
 
@@ -86,6 +87,13 @@ func CheckOrigin(s string) error {
 		return errors.New("must not contain user information")
 	case u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.ForceQuery:
 		return errors.New("must not contain a path, query or fragment")
+	case u.Host != strings.ToLower(u.Host):
+		// Browsers send the host of the Origin header in lower case; an exact comparison would
+		// never match another spelling.
+		return errors.New("host must be lower case")
+	case (u.Scheme == "https" && u.Port() == "443") || (u.Scheme == "http" && u.Port() == "80"):
+		// Browsers leave the default port out of the Origin header.
+		return errors.New("must not name the default port of its scheme")
 	case s != u.Scheme+"://"+u.Host:
 		return errors.New("not in origin form scheme://host[:port]")
 	}

@@ -148,7 +148,9 @@ func TestCheckOrigin(t *testing.T) {
 	t.Parallel()
 	good := []string{"https://chat.example.com", "http://127.0.0.1:8080", "https://[2001:db8::1]:8443"}
 	bad := []string{"", "chat.example.com", "ftp://example.com", "https://example.com/", "https://example.com/api",
-		"https://example.com?x", "https://example.com#f", "https://user@example.com", "HTTPS://example.com", "https://"}
+		"https://example.com?x", "https://example.com#f", "https://user@example.com", "HTTPS://example.com", "https://",
+		// A browser sends the host in lower case and leaves out the default port.
+		"https://Chat.example.com", "https://chat.example.com:443", "http://chat.example.com:80"}
 	for _, s := range good {
 		if err := httpserver.CheckOrigin(s); err != nil {
 			t.Errorf("CheckOrigin(%q) = %v", s, err)
