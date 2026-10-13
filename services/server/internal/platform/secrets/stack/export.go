@@ -257,7 +257,7 @@ func bundleEntries(root *os.Root) ([]bundleEntry, error) {
 		}
 	}
 	if len(unknown) > 0 {
-		// The bundle is what init adopts as --source (disaster-recovery.md Fall B), and init
+		// The bundle is what init adopts as --source (disaster-recovery.md case B), and init
 		// refuses files the catalog does not name; a bundle with them would fail at the restore.
 		return nil, usagef("export source holds files without a catalog entry (docs/operations/configuration.md section 5): %s; --from must be the _store directory",
 			strings.Join(unknown, ", "))

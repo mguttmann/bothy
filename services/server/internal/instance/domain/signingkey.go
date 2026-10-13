@@ -146,7 +146,7 @@ func EmergencyTransitions(keys []SigningKey, t time.Time) []Transition {
 }
 
 // LostTransitions handles keys whose private file is gone from the key store (a restore without
-// the key store, docs/operations/disaster-recovery.md Fall B): every unretired key in lost becomes
+// the key store, docs/operations/disaster-recovery.md case B): every unretired key in lost becomes
 // retired, with not_after = t where it is not set, because nothing can sign with it and an
 // announced or retiring key without its file must not stay published as if it could. needActive
 // reports that the purpose has no active key left afterwards; the caller then creates a fresh

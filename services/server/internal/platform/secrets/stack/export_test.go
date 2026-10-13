@@ -408,7 +408,7 @@ func TestExportErrorsEscapeControlCharacters(t *testing.T) {
 }
 
 // TestExportRefusesFilesWithoutCatalogEntry holds that export bundles only catalog files: the
-// bundle is what init adopts as --source (disaster-recovery.md Fall B), and init refuses any
+// bundle is what init adopts as --source (disaster-recovery.md case B), and init refuses any
 // other file, so a bundle of the volume root or of a _store with a stray file would fail exactly
 // at the restore. The error names the files and the output file is not created.
 func TestExportRefusesFilesWithoutCatalogEntry(t *testing.T) {

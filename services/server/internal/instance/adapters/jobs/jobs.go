@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package jobs is the adapter of the instance module to platform/jobs: the periodic job
-// instance.key_rotation (docs/spec/02-architecture.md "Job-Katalog", 19 section 10), which applies
+// instance.key_rotation (docs/spec/02-architecture.md "Job catalogue", 19 section 10), which applies
 // the due transitions of the server signing keys.
 package jobs
 

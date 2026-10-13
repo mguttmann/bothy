@@ -159,7 +159,7 @@ type InitOptions struct {
 	// one because the file driver reads only files of its own user.
 	Owners map[string]Owner
 	// AdoptSource lets a differing source copy replace a generated secret (restore from the
-	// bundle, disaster-recovery.md "Fall B") instead of stopping with a conflict.
+	// bundle, disaster-recovery.md "Case B") instead of stopping with a conflict.
 	AdoptSource bool
 	// Rand is the entropy of the generators; nil means crypto/rand.Reader.
 	Rand io.Reader
