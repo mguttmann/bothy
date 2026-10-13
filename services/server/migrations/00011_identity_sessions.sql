@@ -3,7 +3,7 @@
 -- refresh_token_families and refresh_tokens exactly as docs/spec/03-data-model.md section 4.2
 -- states them. Retention class of all three: security (03 section 3). IDs are UUIDv7 from
 -- kernel/ids (R-DM-01); enumerations are text with CHECK (R-DM-02). Refresh tokens and console
--- cookies are stored only as HMAC-SHA-256 with the server pepper (03 Grundsatz 9).
+-- cookies are stored only as HMAC-SHA-256 with the server pepper (03 "Principles" rule 9).
 --
 -- Deviation from 03: the foreign key auth_sessions.identity_id -> user_identities(id) ON DELETE
 -- SET NULL is not created here, because user_identities arrives with M1-36; the column exists and

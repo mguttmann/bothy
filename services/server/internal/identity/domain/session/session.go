@@ -184,7 +184,7 @@ func NewRefreshToken() (string, error) {
 }
 
 // TokenHash returns HMAC-SHA-256(pepper, token), the only form a refresh token is stored in (03
-// Grundsatz 9).
+// "Principles" rule 9).
 func TokenHash(pepper []byte, token string) []byte {
 	m := hmac.New(sha256.New, pepper)
 	m.Write([]byte(token))
