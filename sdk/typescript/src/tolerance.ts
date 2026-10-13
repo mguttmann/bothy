@@ -70,6 +70,7 @@ export const KNOWN_EVENT_TYPES = [
   "group.changed",
   "access.changed",
   "access.expiring",
+  "device.pending",
   "session.revoked",
   "read_state.updated",
   "draft.updated",
