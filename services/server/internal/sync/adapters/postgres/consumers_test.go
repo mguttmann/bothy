@@ -263,8 +263,8 @@ func TestConsumersTwoWorkersExactlyOnce(t *testing.T) {
 	e.exactlyTwoJobs(t, 1, head)
 }
 
-// TestConsumerCrashMidRoundNoDuplicates (plan M2-01: "Absturz mitten in einer Runde erzeugt
-// keine Doppel"; ADR 0051 "abort before the commit"): a round that ends before the commit leaves
+// TestConsumerCrashMidRoundNoDuplicates (plan M2-01: "a crash in the middle of a round creates no
+// duplicates"; ADR 0051 "abort before the commit"): a round that ends before the commit leaves
 // neither jobs nor a moved cursor, and a fresh worker then creates every job exactly once.
 func TestConsumerCrashMidRoundNoDuplicates(t *testing.T) {
 	t.Parallel()

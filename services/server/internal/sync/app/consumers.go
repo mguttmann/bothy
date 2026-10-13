@@ -18,8 +18,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/sync/domain"
 )
 
-// Log keys of the worker consumers (docs/observability/signals.md "Attribute in Spans und
-// Logs"); the app layer does not import platform/otel/attr, the adapter tests hold them equal.
+// Log keys of the worker consumers (docs/observability/signals.md "Attributes in
+// spans and logs"); the app layer does not import platform/otel/attr, the adapter tests hold them equal.
 const (
 	keyConsumerName = "bothy.consumer.name"
 	keyEventSeq     = "bothy.event.seq"
