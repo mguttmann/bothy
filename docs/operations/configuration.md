@@ -381,9 +381,9 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server |  | `5m` | Gültigkeit eines Kopplungs-Codes | geplant (M1) |
 | `auth.pairing_code_chars` | `BOTHY_AUTH__PAIRING_CODE_CHARS` | Server |  | `8` | Länge des Kopplungs-Codes (Crockford-Base32, 40 Bit) | geplant (M1) |
 | `auth.device_inactive_revoke_after` | `BOTHY_AUTH__DEVICE_INACTIVE_REVOKE_AFTER` | Server |  | `180d` | Gerät ohne Kontakt wird widerrufen | geplant (M1) |
-| `auth.cleanup_interval` | `BOTHY_AUTH__CLEANUP_INTERVAL` | Server |  | `1h` | Abstand des Jobs `identity.auth_cleanup` (abgelaufene Herausforderungen, Anmeldevorgänge und Kopplungen löschen, wartende und ungenutzte Geräte widerrufen) | geplant (M1) |
-| `auth.step_up_challenge_ttl` | `BOTHY_AUTH__STEP_UP_CHALLENGE_TTL` | Server |  | `2m` | Gültigkeit einer Step-up-Herausforderung | geplant (M1) |
-| `auth.step_up_fail_limit` | `BOTHY_AUTH__STEP_UP_FAIL_LIMIT` | Server |  | `5` | Fehlversuche beim Step-up je Fenster | geplant (M1) |
+| `auth.cleanup_interval` | `BOTHY_AUTH__CLEANUP_INTERVAL` | Server | duration | `1h` | Abstand des Jobs `identity.auth_cleanup` (abgelaufene Herausforderungen, Anmeldevorgänge und Kopplungen löschen, wartende und ungenutzte Geräte widerrufen) | aktiv |
+| `auth.step_up_challenge_ttl` | `BOTHY_AUTH__STEP_UP_CHALLENGE_TTL` | Server | duration | `2m` | Gültigkeit einer Step-up-Herausforderung | aktiv |
+| `auth.step_up_fail_limit` | `BOTHY_AUTH__STEP_UP_FAIL_LIMIT` | Server | int | `5` | Fehlversuche beim Step-up je Fenster | aktiv |
 | `auth.require_key_attestation` | `BOTHY_AUTH__REQUIRE_KEY_ATTESTATION` | Server |  | `false` | Plattform-Attestierung der Geräteschlüssel verlangen | geplant (V3) |
 | `auth.console_session_max_age` | `BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE` | Server |  | `12h` | absolute Dauer einer Konsolen-Sitzung | geplant (M6) |
 | `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server |  | `30m` | Leerlauf bis zum Ende der Konsolen-Sitzung | geplant (M6) |
@@ -396,7 +396,7 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.argon2id_iterations` | `BOTHY_AUTH__ARGON2ID_ITERATIONS` | Server |  | `3` | Argon2id-Durchläufe (Untergrenze 2) | geplant (M1) |
 | `auth.argon2id_parallelism` | `BOTHY_AUTH__ARGON2ID_PARALLELISM` | Server |  | `1` | Argon2id-Parallelität | geplant (M1) |
 | `auth.login_fail_limit` | `BOTHY_AUTH__LOGIN_FAIL_LIMIT` | Server |  | `10` | Fehlversuche je Konto und Fenster | geplant (M1) |
-| `auth.login_fail_window` | `BOTHY_AUTH__LOGIN_FAIL_WINDOW` | Server |  | `15m` | Fenster für Fehlversuche | geplant (M1) |
+| `auth.login_fail_window` | `BOTHY_AUTH__LOGIN_FAIL_WINDOW` | Server | duration | `15m` | Fenster für Fehlversuche | aktiv |
 | `auth.login_lock_duration` | `BOTHY_AUTH__LOGIN_LOCK_DURATION` | Server |  | `15m` | Sperre des Passwortwegs | geplant (M1) |
 | `auth.dpop_required_for` | `BOTHY_AUTH__DPOP_REQUIRED_FOR` | Server |  | `["agent"]` | Token-Arten, die DPoP-gebunden sein müssen | geplant (M1) |
 | `auth.api_token_max_ttl` | `BOTHY_AUTH__API_TOKEN_MAX_TTL` | Server |  | `365d` | Höchstdauer eines Agenten- oder App-Tokens | geplant (M1) |

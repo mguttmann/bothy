@@ -504,6 +504,16 @@ Erreichen die gezählten Fehlversuche der Sitzung im Fenster `auth.login_fail_wi
 `auth.step_up_fail_limit`, widerruft der Server die Sitzung (`step_up_failed`). Antworten stehen in
 Abschnitt 13.
 
+Details of the check (M1-35, docs/DECISIONS.md M1-35): `iat` is an integer NumericDate compared in
+whole seconds, so the lower bound is the issue of the challenge minus `auth.clock_leeway`, cut to the
+second. Unknown payload members are ignored. A header with `jwk`, an `alg` other than the one of the
+active `step_up` key, a signature by any other key, a wrong `challenge` or `sid` and an `iat`
+outside the bounds are wrong confirmations and count. A wrong confirmation answers
+`401 step_up_required` because the right reaction of the client is a new step-up; the one that
+reaches the limit answers `401 session_revoked`. A caller without a session, a session on a `cli`
+device and a device without an active `step_up` key get `403 forbidden` with reason
+`step_up_not_possible`.
+
 Web-Konsole: WebAuthn-Assertion mit `userVerification = required` gegen die Passkeys der Person.
 Ohne Passkey: erneute OIDC-Anmeldung mit `prompt=login` und `max_age=0`; der Server verlangt ein
 `auth_time` nach Beginn der Herausforderung. Lokale Konten ohne Passkey: Passwort mit TOTP. Die
@@ -772,6 +782,10 @@ Regeln:
 - Keine Auskunft über Konten: Unbekannter Login-Name und falsches Passwort ergeben dieselbe Antwort
   in derselben Zeit (der Server berechnet auch bei unbekanntem Namen einen Argon2id-Hash).
 - Jede Sperre und jede Häufung erzeugt einen Audit-Eintrag; der Owner sieht sie in der Konsole.
+- Step-up failures are counted per session over `auth_challenges` (`status = 'failed'`,
+  `finished_at` inside `auth.login_fail_window`). The job `identity.auth_cleanup` deletes a
+  challenge after its `expires_at`, but a failed step-up challenge only once its `finished_at` has
+  left `auth.login_fail_window`; otherwise the cleanup would reset the count (M1-35).
 - Das Fehlerfenster eines Kontos beginnt mit dem ersten Fehlversuch
   (`local_credentials.fail_window_started_at`); ein Fehlversuch danach beginnt ein neues Fenster.
   Jede Anfrage rechnet genau einen Argon2id-Hash, auch bei unbekanntem Namen und bei Sperre.

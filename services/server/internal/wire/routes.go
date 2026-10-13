@@ -52,6 +52,8 @@ type Handlers struct {
 	// Sessions implements refreshToken, logout, listMySessions, listUserSessions and
 	// createExtensionSession (identity, M1-34).
 	*identityhttp.Sessions
+	// StepUps implements createStepUpChallenge and completeStepUpWithDeviceKey (identity, M1-35).
+	*identityhttp.StepUps
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

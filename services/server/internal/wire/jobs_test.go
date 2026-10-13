@@ -16,7 +16,7 @@ import (
 // already. Empty until M1-16 registers the first handler.
 func TestWireJobArgsOnlyIDs(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,5 +59,32 @@ func TestJobRoleMapping(t *testing.T) {
 		if got := wire.JobRole(role); got != want {
 			t.Errorf("JobRole(%s) = %s, want %s", role, got, want)
 		}
+	}
+}
+
+// TestJobRegistryHasAuthCleanup: the registry of every role holds identity.auth_cleanup on the
+// queue maintenance, periodic every auth.cleanup_interval (02 section 12.3, M1-35), and refuses a
+// missing interval.
+func TestJobRegistryHasAuthCleanup(t *testing.T) {
+	t.Parallel()
+	m := wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, KeyRotationInterval: time.Minute,
+		AuthCleanupInterval: 3 * time.Hour}
+	reg, err := wire.NewJobRegistry(&m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if q, ok := reg.Queue("identity.auth_cleanup"); !ok || q != jobs.QueueMaintenance {
+		t.Fatalf("queue = %q, %v", q, ok)
+	}
+	found := false
+	for _, p := range reg.Periodic() {
+		found = found || p.Args.Kind() == "identity.auth_cleanup" && p.Interval == 3*time.Hour
+	}
+	if !found {
+		t.Fatalf("periodic jobs %+v lack identity.auth_cleanup every 3h", reg.Periodic())
+	}
+	m.AuthCleanupInterval = 0
+	if _, err := wire.NewJobRegistry(&m); err == nil {
+		t.Fatal("a registry without auth.cleanup_interval was accepted")
 	}
 }

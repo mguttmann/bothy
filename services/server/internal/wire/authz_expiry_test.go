@@ -37,7 +37,7 @@ func TestAuthzExpiryConfig(t *testing.T) {
 // worker and all run them.
 func TestAuthzExpiryJobsRegistered(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: 2 * time.Minute, KeyRotationInterval: time.Minute})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: 2 * time.Minute, KeyRotationInterval: time.Minute, AuthCleanupInterval: time.Hour})
 	if err != nil {
 		t.Fatal(err)
 	}

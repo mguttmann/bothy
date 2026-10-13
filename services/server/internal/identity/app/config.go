@@ -44,4 +44,14 @@ type Config struct {
 	// LastActiveGranularity is identity.last_active_granularity: last_seen_at of a session and its
 	// device is written at most this often.
 	LastActiveGranularity time.Duration `config:"identity.last_active_granularity"`
+	// StepUpChallengeTTL is auth.step_up_challenge_ttl, how long a step-up challenge may be
+	// completed (M1-35).
+	StepUpChallengeTTL time.Duration `config:"auth.step_up_challenge_ttl"`
+	// StepUpFailLimit is auth.step_up_fail_limit: this many failed step-ups of a session inside
+	// LoginFailWindow revoke the session (08 section 13).
+	StepUpFailLimit int `config:"auth.step_up_fail_limit"`
+	// LoginFailWindow is auth.login_fail_window, the window failed attempts count in.
+	LoginFailWindow time.Duration `config:"auth.login_fail_window"`
+	// CleanupInterval is auth.cleanup_interval, the period of the job identity.auth_cleanup.
+	CleanupInterval time.Duration `config:"auth.cleanup_interval"`
 }

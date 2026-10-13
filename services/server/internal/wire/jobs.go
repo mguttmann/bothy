@@ -10,6 +10,7 @@ import (
 	"time"
 
 	authzjobs "github.com/OWNER/bothy/services/server/internal/authz/adapters/jobs"
+	identityjobs "github.com/OWNER/bothy/services/server/internal/identity/adapters/jobs"
 	instancejobs "github.com/OWNER/bothy/services/server/internal/instance/adapters/jobs"
 	"github.com/OWNER/bothy/services/server/internal/platform/config"
 	"github.com/OWNER/bothy/services/server/internal/platform/jobs"
@@ -64,8 +65,8 @@ func JobRole(r Role) jobs.Role {
 }
 
 // JobModules are the module objects whose jobs the job registry takes: the partition maintenance
-// (M1-16) and the idempotency key cleanup (M1-20) of sync, the expiry jobs of authz (M1-30) and
-// the rotation of the signing keys of instance (M1-32). The use cases may be nil where no job runs
+// (M1-16) and the idempotency key cleanup (M1-20) of sync, the expiry jobs of authz (M1-30), the
+// rotation of the signing keys of instance (M1-32) and the cleanup of identity (M1-35). The use cases may be nil where no job runs
 // (tests of the registration); a worker always passes them.
 type JobModules struct {
 	// Partitions is the use case of sync.partition_maintenance.
@@ -84,13 +85,17 @@ type JobModules struct {
 	KeyRotation instancejobs.Rotation
 	// KeyRotationInterval is signing_key.rotation_check_interval.
 	KeyRotationInterval time.Duration
+	// AuthCleanup is the use case of identity.auth_cleanup.
+	AuthCleanup identityjobs.Cleaner
+	// AuthCleanupInterval is auth.cleanup_interval.
+	AuthCleanupInterval time.Duration
 }
 
 // NewJobRegistry returns the job registry of a process: every role (api, worker, all) builds
 // the same one here, so an api process accepts exactly the kinds a worker runs. It registers
 // sync.partition_maintenance (M1-16), sync.idempotency_cleanup (M1-20), authz.expiry_sweep and
-// authz.expiry_reminder (M1-30) and instance.key_rotation (M1-32); the error is the first rejected
-// registration.
+// authz.expiry_reminder (M1-30), instance.key_rotation (M1-32) and identity.auth_cleanup (M1-35);
+// the error is the first rejected registration.
 func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 	if m == nil {
 		return nil, errors.New("wire: NewJobRegistry needs the job modules")
@@ -106,6 +111,9 @@ func NewJobRegistry(m *JobModules) (*jobs.Registry, error) {
 		return nil, err
 	}
 	if err := instancejobs.Register(reg, m.KeyRotation, m.KeyRotationInterval); err != nil {
+		return nil, err
+	}
+	if err := identityjobs.Register(reg, m.AuthCleanup, m.AuthCleanupInterval); err != nil {
 		return nil, err
 	}
 	return reg, nil

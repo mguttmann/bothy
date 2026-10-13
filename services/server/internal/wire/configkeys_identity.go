@@ -17,7 +17,8 @@ const (
 // identityConfigKeys returns the keys owned by the module identity: the limits of handles and
 // display names from docs/spec/03-datenmodell.md that the domain checks (M1-26), the session and
 // refresh durations of 03 section 9 (M1-34), the DPoP windows and the token pepper from
-// docs/spec/08-identitaet.md section 18 (M1-33). The page sizes of
+// docs/spec/08-identitaet.md section 18 (M1-33), and the step-up challenge lifetime, failure limit
+// and window and the cleanup interval of 08 section 18 (M1-35). The page sizes of
 // 06-api.md live in apiConfigKeys, because every list reads them.
 func identityConfigKeys() []config.Key {
 	return []config.Key{
@@ -66,6 +67,26 @@ func identityConfigKeys() []config.Key {
 			Name: "identity.last_active_granularity", Kind: config.KindDuration, Default: "5m", Min: "0s",
 			Doc:     "At most this often the last activity of a session and its device is written.",
 			Chapter: chapter03,
+		},
+		{
+			Name: "auth.step_up_challenge_ttl", Kind: config.KindDuration, Default: "2m", Min: "1s",
+			Doc:     "How long a step-up challenge may be completed.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.step_up_fail_limit", Kind: config.KindInt, Default: "5", Min: "1",
+			Doc:     "Failed step-ups of a session per auth.login_fail_window; then the session is revoked.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.login_fail_window", Kind: config.KindDuration, Default: "15m", Min: "1s",
+			Doc:     "Window in which failed attempts count.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.cleanup_interval", Kind: config.KindDuration, Default: "1h", Min: "1s",
+			Doc:     "Interval of the job identity.auth_cleanup.",
+			Chapter: chapter08,
 		},
 		{
 			Name: "auth.token_pepper_ref", Kind: config.KindSecretRef, Default: "file:<secrets.dir>/token_pepper",
