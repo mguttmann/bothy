@@ -56,7 +56,7 @@ Product requirements implemented here:
 
 Create or change in `packages/design_system/`:
 
-- The icon assets: either `fonts/DsIcons.ttf` plus `lib/src/generated/ds_icon_codepoints.g.dart` (glyph name and weight to code point), or `assets/icons/<weight>/<glyph>.vec` plus `lib/src/generated/ds_icon_assets.g.dart` (Design note 1); `assets/icons/LICENSE` (Phosphor MIT text); `assets/icons/MANIFEST.json` (package version, source SHA-256 per SVG, asset SHA-256).
+- The icon assets: either `assets/icons/DsIcons.ttf` plus `lib/src/generated/ds_icon_codepoints.g.dart` (glyph name and weight to code point), or `assets/icons/<weight>/<glyph>.vec` plus `lib/src/generated/ds_icon_assets.g.dart` (Design note 1); `assets/icons/LICENSE` (Phosphor MIT text); `assets/icons/MANIFEST.json` (package version, source SHA-256 per SVG, asset SHA-256).
 - `lib/src/icons/ds_icon.dart` (`DsIcon`), exported from `lib/design_system.dart`.
 - Test files: `test/icons_complete_test.dart`, `test/ds_icon_test.dart`, `test/goldens/icons_test.dart` and the golden files.
 

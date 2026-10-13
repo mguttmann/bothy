@@ -13,9 +13,9 @@ After this ticket `packages/api_client` holds the Dart client of the public REST
 - `docs/spec/15-client-architecture.md`: 3, 3.1 (rule 5: `api_client` is generated and checked in), 8 "Network and login" (REST bullet), 17 (`traceparent` on every request, ADR 0057 point 4).
 - `docs/spec/04-sync-protocol.md`: 2.2 "Envelope" (no JSON `null`, unknown fields), 7.4 "REST variant" (`GET /api/v1/events`), 9 item 3.
 - `docs/spec/23-quality.md`: 3 (row "Generated client": `generate-check`), "Documentation in code" (generated code excluded).
-- `docs/api/openapi.yaml` (whole file; `components.schemas.Event` and its discriminator, `Problem`, `EventsPage`), `docs/api/redocly.yaml`.
+- `docs/api/openapi.yaml` (whole file; `components.schemas.Event` and its discriminator, `Problem`, `EventPage`), `docs/api/redocly.yaml`.
 - ADRs: `0013` (spec first), `0026` (SDK with a hand layer), `0052` (one envelope), `0053` (no JSON `null`).
-- `docs/DECISIONS.md`: D-W-100, D-W-114; the rulings of M2-23 (`D-M2-23-*`) if present; section 10.
+- `docs/DECISIONS.md`: D-W-100, D-W-114, D-W-115; the rulings of M2-23 (`D-M2-23-*`) if present; section 10.
 - Briefs: `docs/briefs/M2-23-generated-clients.md` (Design notes 8 and 9: gate scope of generated code, the `api-clients` contract), `docs/briefs/M1-17-api-server-stubs.md` (the server's generation from the same file, the enable list that concerns the server only), `docs/briefs/M4-01-workspace-arch.md` (generated patterns, workspace member rules).
 - Code on the base branch: root `Makefile` (`api-clients`), `tools/ci/codegen_check.py` and its tests, `tools/ci/components.py` (`API_PREFIX` selects every client), `packages/api_client/` skeleton of M4-01, `tools/arch-check/rules.yaml`.
 
@@ -67,6 +67,7 @@ Change:
 
 - `packages/api_client/pubspec.yaml` (dependencies the generated code needs: `dio`, `built_value`, `built_collection`, `one_of`, `one_of_serializer`, `http_parser`, `uuid` for the hand layer; dev: `build_runner`, `built_value_generator`, `test`), `README.md`, `analysis_options.yaml` (generated paths excluded per M4-01).
 - Root `Makefile`: `api-clients` keeps calling `make -C packages/api_client generate-check` (it is already in the list); only if M2-23 has not yet changed the target and it does not fail on a manifest without `generate-check`, leave it as it is.
+- Root `analysis_options.yaml` (exclude list), `tools/ci/lcov_filter.py` with `tools/ci/tests/test_lcov_filter.py`, and `sonar-project.properties` (exclusions): only to add the exact paths the generator writes when they do not match the generated patterns of M4-01 (the `dart-dio` generator writes `lib/src/api/` and `lib/src/model/`), each with a test case (Design note 1).
 - `docs/spec/06-api.md` 14 (row "Dart package of the apps": the pinned image, the ignore file, where the hand layer lives), `docs/quality/gates.md` (row `api-clients`: Dart), `docs/quality/toolchain.md` (the generator image with digest).
 - `docs/DECISIONS.md` section 10: rows `D-M4-02-<n>`; root `CHANGELOG.md` under `[Unreleased]`.
 

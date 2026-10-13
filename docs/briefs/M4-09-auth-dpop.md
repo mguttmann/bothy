@@ -17,7 +17,7 @@ After this ticket `packages/auth` is the pure Dart login core of the apps: DPoP 
 - RFC 9449 (DPoP) sections 4.2, 4.3, 7, 8, 11.1, 11.3; RFC 7638 (JWK thumbprint); RFC 7515 (compact JWS) and RFC 7518 3.4 (ES256 signature as `R || S`, 64 bytes); RFC 7636 (PKCE S256).
 - ADRs: `0067-jose-profile-with-the-standard-library.md` (the server's JOSE profile this client must produce), `0056` (extensions never refresh the app's family).
 - Briefs: `docs/briefs/M4-02-dart-api-client.md` (factory and interceptor slot, `ApiProblem`), `docs/briefs/M4-08-domain.md` (`Uuid7Generator`, `DeviceId`, `AppConfig`); for the server side the M1 briefs `M1-33-identity-devices-dpop.md`, `M1-34-identity-sessions.md`, `M1-35-identity-step-up.md`, `M1-41-identity-oidc.md`, `M1-38-identity-device-approval.md`.
-- `docs/DECISIONS.md`: D-W-100, D-W-114; section 10.
+- `docs/DECISIONS.md`: D-W-100, D-W-114, D-W-115; section 10.
 
 This ticket touches no API operation, no table, no action, no event and no configuration key.
 
@@ -111,7 +111,7 @@ Change:
     - Password with TOTP (`loginWithPassword`, second step when the server asks for the code), proxy header (`loginWithTrustedHeader`), passkey (`beginPasskeyLogin`, `completePasskeyLogin` through the `PasskeyAuthenticator` port), enrollment code (`redeemEnrollmentCode` or `beginEnrollment`/`completeEnrollment` as the API defines), pairing (`beginPairing` returns the code and expiry; `pollPairing` calls `completePairing` with backoff until approved, expired or rejected).
     - `pollPendingDevice(deviceId)`: `getDevice` with backoff until `active` (emit `signedIn`) or `revoked` (emit `signedOut(reason)`) (08 5.2).
     - `logout()`: call `logout`, then clear the secret store and emit `signedOut(loggedOut)` even when the call fails offline.
-    Codes are normalized as 08 3.2 says (case, spaces and hyphens ignored) before sending; the UI shows them grouped (M4-18).
+    Codes are normalized as 08 3.2 says (case, spaces and hyphens do not count) before sending: remove spaces and hyphens, write a leading `en_` in lower case and the rest in upper case, drop nothing else; the UI shows them grouped (M4-18).
 
 6. **Step-up.** `StepUpService.confirm({required String purposeText})`: `createStepUpChallenge`; `StepUpPrompt.ask(purposeText)` (the UI shows the text in its language); on consent the step-up key signs the compact JWS (header `{"alg":"ES256"}` only; payload `{"challenge":...,"sid":...,"iat":...}`); `completeStepUpWithDeviceKey`. The OS confirmation happens inside the step-up signer of M4-10 (the key requires user presence); `StepUpPrompt` only explains. `StepUpInterceptor`: on `401 step_up_required` (any `reason`, including `terminal_step_up_not_fresh`), run `confirm` once and repeat the original request with the same headers, including the same `Idempotency-Key`; a cancelled prompt returns a `StepUpCancelled` error to the caller; a second `step_up_required` after a successful confirmation is returned, never looped.
 
@@ -127,7 +127,7 @@ Change:
 - `nonce_test.dart`: the newest `DPoP-Nonce` is used in the next proof; `401 use_dpop_nonce` repeats once with the new nonce; a second one is returned.
 - `refresh_single_flight_test.dart`: ten parallel requests that all see an expired token cause exactly one `refreshToken` call (the fake counts), and all ten complete with the new token; the new refresh token is written before the first repeated request is sent (the fake store records the order); a refresh answered with `401 session_revoked` emits `signedOut` and clears the store; a network error keeps the old token.
 - `step_up_test.dart`: `401 step_up_required` triggers challenge, signature and confirmation, then the original `POST` is repeated with the same `Idempotency-Key`; the JWS header is exactly `{"alg":"ES256"}` and the payload carries `challenge`, `sid`, `iat`; a cancelled prompt returns `StepUpCancelled`; a second `step_up_required` is returned without a loop.
-- `login_flows_test.dart`: OIDC with PKCE (`client_challenge` is S256 of the verifier; `completeOidcLogin` carries the verifier and the device fields); a pending device polls until `active` and emits `signedIn`, or until `revoked` and emits `signedOut`; pairing polls until approved; password with a second TOTP step; code normalization (`en_ 7k2m 9qxa` and `EN-7K2M-9QXA` send the same value); logout offline still clears and emits.
+- `login_flows_test.dart`: OIDC with PKCE (`client_challenge` is S256 of the verifier; `completeOidcLogin` carries the verifier and the device fields); a pending device polls until `active` and emits `signedIn`, or until `revoked` and emits `signedOut`; pairing polls until approved; password with a second TOTP step; code normalization (`en_ 7k2m 9qxa`, `EN_7K2M-9QXA` and `en_7K2M9QXA` all send `en_7K2M9QXA`: spaces and hyphens removed, the `en_` prefix in lower case, the groups in upper case; nothing else is dropped); logout offline still clears and emits.
 - `no_secrets_test.dart` (Design note 7).
 
 Commands that must pass, from the repository root:
