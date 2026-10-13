@@ -45,7 +45,7 @@ type Actor struct {
 	// TokenID is the API token of an agent, app or personal token; zero otherwise.
 	TokenID ids.ID
 	// Scopes are the scopes of the API token (api_tokens.scopes, 07 section 3 token_scopes). They
-	// are not evaluated before M2 (docs/DECISIONS.md M1-28 D6).
+	// are not evaluated before M2 (docs/briefs/M1-28-authz-core.md D6).
 	Scopes []string
 	// InstallationID is the app installation (apps only).
 	InstallationID ids.ID

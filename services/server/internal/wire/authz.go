@@ -132,7 +132,7 @@ func AuthzConfig(v *config.Values) (authzapp.AuthorizerConfig, error) {
 // (M1-28), over pool: the PrincipalSource of identity (M1-26), the grant store of authz (M1-27),
 // the rights version of instance (instance.Versions), the recorder of audit (M1-24), the clock and
 // log, and the empty sources for structure, agent policy and credentials until their tickets
-// (empty_sources.go, docs/DECISIONS.md M1-28 D2). It opens no connection.
+// (empty_sources.go, docs/briefs/M1-28-authz-core.md D2). It opens no connection.
 //
 // Errors: those of authzapp.NewAuthorizer (a cache bound below 1).
 func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.Catalog, rec auditing.Recorder,

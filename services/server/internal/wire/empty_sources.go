@@ -9,10 +9,10 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// The empty sources of authz (docs/DECISIONS.md M1-28 D2, 02 section 4.4): until the owning modules
-// have tables they report the truth of an instance without those tables, so authorize decides fail
-// closed. Every request with credentials is unauthenticated until M1-34, which is correct because
-// no credential can exist before it.
+// The empty sources of authz (ruling D2 of docs/briefs/M1-28-authz-core.md, 02 section 4.4):
+// until the owning modules have tables they report the truth of an instance without those
+// tables, so authorize decides fail closed. Every request with credentials is unauthenticated
+// until M1-34, which is correct because no credential can exist before it.
 
 // emptyStructure knows no space, channel or thread. M1-52 (spaces), M1-53 (channels) and M1-55
 // (threads, dm participation) replace it with the StructureSource of chat.

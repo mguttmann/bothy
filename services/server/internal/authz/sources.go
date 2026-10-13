@@ -13,7 +13,7 @@ import (
 // This file declares the source ports through which authz learns facts owned by other modules
 // (docs/spec/02-architecture.md section 4.1 rule 4, "Source port"). authz never reads their
 // tables. M1-28 adds CredentialSource, StructureSource and AgentPolicySource; until their owning
-// modules have tables, internal/wire passes empty sources (docs/DECISIONS.md M1-28 D2).
+// modules have tables, internal/wire passes empty sources (docs/briefs/M1-28-authz-core.md D2).
 
 // PrincipalStatus is the lifecycle state of a principal as authz sees it.
 type PrincipalStatus string
@@ -170,8 +170,9 @@ type CredentialFacts struct {
 	TokenExpiresAt time.Time
 }
 
-// CredentialSource gives authz the liveness of credentials (ruling D1). The identity module
-// implements it (M1-33 devices, M1-34 sessions, M1-44 tokens).
+// CredentialSource gives authz the liveness of credentials (ruling D1 of
+// docs/briefs/M1-28-authz-core.md). The identity module implements it (M1-33 devices, M1-34
+// sessions, M1-44 tokens).
 type CredentialSource interface {
 	// Credentials returns the facts of ref; ids that are zero in ref give zero facts.
 	Credentials(ctx context.Context, ref CredentialRef) (CredentialFacts, error)

@@ -89,7 +89,7 @@ func (c *Catalog) Spec(a authorize.Action) (domain.ActionSpec, error) {
 // "unknown action" with bothy.action and error.type=unknown_action, one count in
 // bothy.authz.errors, and the error of kind internal with cause unknown_action. Spec calls it for
 // an action outside the catalogue, the Authorizer for a deferred requirement entry (07 section
-// 4.2, docs/DECISIONS.md M1-28 D3).
+// 4.2, docs/briefs/M1-28-authz-core.md D3).
 func (c *Catalog) Reject(a authorize.Action) error {
 	ctx := context.Background()
 	log := slog.Default()

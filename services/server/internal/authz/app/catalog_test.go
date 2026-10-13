@@ -152,7 +152,7 @@ func TestAZP2_OpsAndEventTypesNeedCatalogueEntry(t *testing.T) {
 	good.Op("gateway", authorize.OpTypingStart)
 	good.Op("agents", authorize.OpCommandAutocompleteResult)
 	// Every terminal channel op names a deferred action of M2 (host.connect, terminal.stream), so
-	// none is valid in M1 (07 section 4.2, docs/DECISIONS.md M1-28 D3); see
+	// none is valid in M1 (07 section 4.2, docs/briefs/M1-28-authz-core.md D3); see
 	// TestVerifyRegistrations_DeferredActions.
 	if err := cat.VerifyRegistrations(nil, good); err != nil {
 		t.Fatalf("valid registrations: %v", err)
