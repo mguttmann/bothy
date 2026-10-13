@@ -28,6 +28,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/dpop"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
@@ -52,6 +53,7 @@ var sessCfg = app.Config{
 	ClockLeeway: 30 * time.Second, PublicURL: httpservertest.PublicURL, PageSizeDefault: 2, PageSizeMax: 3,
 	StepUpMaxAge: 5 * time.Minute, AccessTokenTTL: 10 * time.Minute, RefreshTokenTTL: 14 * 24 * time.Hour,
 	SessionMaxAge: 30 * 24 * time.Hour, RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute,
+	StepUpChallengeTTL: 2 * time.Minute, StepUpFailLimit: 3, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
 }
 
 // testPepper is the token pepper of the session world (generated per test run, never a secret).
@@ -73,6 +75,9 @@ type sworld struct {
 	logs   *httpservertest.LogCapture
 	ended  *[]identity.SessionEnded
 	instID ids.ID
+	// az is the real authorizer; structure the fake structure source behind it (M1-35).
+	az        authorize.Authorizer
+	structure *fake.Structure
 	// dir is the signing key directory of the installation.
 	dir string
 }
@@ -160,6 +165,7 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	if err != nil {
 		t.Fatal(err)
 	}
+	w.az, w.structure = az, structure
 	sp, err := secrets.NewProvider(secrets.Options{Dir: filepath.Dir(dir), SigningKeyDir: dir, CacheTTL: time.Minute})
 	if err != nil {
 		t.Fatal(err)
@@ -181,7 +187,7 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	if err := w.id.BindSessions(keys.Keys, instID); err != nil {
 		t.Fatal(err)
 	}
-	built, err := routes.Build(wire.Handlers{Sessions: w.id.SessionHandlers, Devices: w.id.Handlers, People: w.id.PeopleHandlers},
+	built, err := routes.Build(wire.Handlers{Sessions: w.id.SessionHandlers, StepUps: w.id.StepUpHandlers, Devices: w.id.Handlers, People: w.id.PeopleHandlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)

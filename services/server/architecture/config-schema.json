@@ -98,6 +98,18 @@
       "doc": "Lifetime of an access token."
     },
     {
+      "name": "auth.cleanup_interval",
+      "env": "BOTHY_AUTH__CLEANUP_INTERVAL",
+      "kind": "duration",
+      "default": "1h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Interval of the job identity.auth_cleanup."
+    },
+    {
       "name": "auth.clock_leeway",
       "env": "BOTHY_AUTH__CLOCK_LEEWAY",
       "kind": "duration",
@@ -134,6 +146,18 @@
       "doc": "Oldest iat a DPoP proof may have."
     },
     {
+      "name": "auth.login_fail_window",
+      "env": "BOTHY_AUTH__LOGIN_FAIL_WINDOW",
+      "kind": "duration",
+      "default": "15m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Window in which failed attempts count."
+    },
+    {
       "name": "auth.refresh_reuse_grace",
       "env": "BOTHY_AUTH__REFRESH_REUSE_GRACE",
       "kind": "duration",
@@ -168,6 +192,30 @@
       "max": "",
       "chapter": "03-data-model.md",
       "doc": "Absolute end of an app session after its start; then a new login."
+    },
+    {
+      "name": "auth.step_up_challenge_ttl",
+      "env": "BOTHY_AUTH__STEP_UP_CHALLENGE_TTL",
+      "kind": "duration",
+      "default": "2m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "How long a step-up challenge may be completed."
+    },
+    {
+      "name": "auth.step_up_fail_limit",
+      "env": "BOTHY_AUTH__STEP_UP_FAIL_LIMIT",
+      "kind": "int",
+      "default": "5",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "08-identity.md",
+      "doc": "Failed step-ups of a session per auth.login_fail_window; then the session is revoked."
     },
     {
       "name": "auth.step_up_max_age",

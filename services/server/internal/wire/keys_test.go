@@ -50,7 +50,7 @@ func TestSigningKeysConfigBindsDefaults(t *testing.T) {
 // maintenance every signing_key.rotation_check_interval; only worker and all run River.
 func TestKeyRotationJobRegistered(t *testing.T) {
 	t.Parallel()
-	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, KeyRotationInterval: 3 * time.Minute, ExpiryInterval: time.Minute})
+	reg, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, KeyRotationInterval: 3 * time.Minute, ExpiryInterval: time.Minute, AuthCleanupInterval: time.Hour})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestKeyRotationJobRegistered(t *testing.T) {
 	if !found {
 		t.Fatalf("periodic jobs %+v lack %s every 3m", reg.Periodic(), instancejobs.KindKeyRotation)
 	}
-	if _, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute}); err == nil {
+	if _, err := wire.NewJobRegistry(&wire.JobModules{PartitionInterval: time.Minute, CleanupInterval: time.Hour, ExpiryInterval: time.Minute, AuthCleanupInterval: time.Hour}); err == nil {
 		t.Error("a registry without signing_key.rotation_check_interval was built")
 	}
 }

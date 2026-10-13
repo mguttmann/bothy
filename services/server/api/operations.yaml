@@ -9,7 +9,9 @@
 version: 1
 enabled:             # operationIds that have a handler; sorted ascending
   - addOwner
+  - completeStepUpWithDeviceKey
   - createExtensionSession
+  - createStepUpChallenge
   - createUser
   - enableUser
   - getDevice
@@ -128,9 +130,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: completePasskeyRegistration
     milestone: M1
     ticket: M1-40
-  - operation_id: completeStepUpWithDeviceKey
-    milestone: M1
-    ticket: M1-35
   - operation_id: completeStepUpWithPasskey
     milestone: M1
     ticket: M1-40
@@ -211,9 +210,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createStatusIncident
     milestone: M7
     ticket: M7-09
-  - operation_id: createStepUpChallenge
-    milestone: M1
-    ticket: M1-35
   - operation_id: createThread
     milestone: M1
     ticket: M1-55

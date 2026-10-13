@@ -38,6 +38,19 @@ type AuditIpKey struct {
 	DestroyedAt   pgtype.Timestamptz
 }
 
+type AuthChallenge struct {
+	ID               pgtype.UUID
+	Purpose          string
+	SessionID        pgtype.UUID
+	EnrollmentCodeID pgtype.UUID
+	ChallengeHash    []byte
+	WebauthnSession  []byte
+	Status           string
+	CreatedAt        pgtype.Timestamptz
+	ExpiresAt        pgtype.Timestamptz
+	FinishedAt       pgtype.Timestamptz
+}
+
 type AuthSession struct {
 	ID               pgtype.UUID
 	UserID           pgtype.UUID

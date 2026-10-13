@@ -1,6 +1,6 @@
 # Module `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); logins, step-up and API tokens follow with the tickets of the milestone.
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); logins, step-up with a passkey and API tokens follow with the tickets of the milestone.
 The normative source is [docs/spec/02-architecture.md](../../../../docs/spec/02-architecture.md); if this file differs, the chapter applies.
 
 ## Purpose
@@ -193,9 +193,63 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   audit (ID-T14 Bearer case, ID-T15, ID-T16, ID-T17, revocation across two instances, nonce,
   activity, logout, lists). Rulings: docs/DECISIONS.md M1-34.
 
+### Step-up with the device key (M1-35)
+
+- Port (`stepup.go`): `StepUp` (`CreateChallenge`, `CompleteWithDeviceKey`; M1-40 adds
+  `CompleteWithPasskey`) with `Challenge{ID, Value, ExpiresAt}`, `StepUpResult{StepUpAt,
+  ValidUntil}` and `StepUpMethodDeviceKey`. A port of its own beside `Auth` (02 section 4.3 lists
+  step-up under `Auth`), because the brief fixes the names (docs/DECISIONS.md M1-35).
+- `domain/stepup`: `NewChallengeValue` (32 bytes from `crypto/rand`, 43 characters base64url),
+  `ChallengeHash` (HMAC-SHA-256 with the token pepper), `Check` (compact JWS by `kernel/jose`, no
+  `jwk` header, exactly the `alg` of the key, signature by the active `step_up` key, payload
+  `{challenge, sid, iat}` with `hmac.Equal`, the session of the request and `iat` inside
+  `[created_at - auth.clock_leeway, now + auth.clock_leeway]` in whole seconds; unknown members
+  ignored) with the causes `invalid_jws`, `forbidden_header`, `alg_mismatch`, `bad_signature`,
+  `payload_invalid`, `challenge_mismatch`, `session_mismatch`, `iat_out_of_range`, and
+  `Failures`/`LimitReached` (failures strictly inside `auth.login_fail_window`).
+- `app`: `StepUps` (implements `identity.StepUp`), `AuthCleanup` (the job), the outgoing port
+  `ChallengeStore`. Both operations first check the caller (a person with a session on a device
+  that is not `cli`, else `403 forbidden` with reason `step_up_not_possible`, audited), then
+  `authorize(auth.step_up)` with right `self` on the caller's session (`403 device_pending`,
+  `401 session_revoked`). The completion locks the session rows, reads the active `step_up` key
+  (none: `403 forbidden`, cause `no_step_up_key`), locks the challenge; unknown, foreign, other
+  purpose, finished or expired is `401 step_up_required`, not counted, rolled back and audited. A
+  wrong confirmation commits the challenge as `failed`, counts the failed step-up challenges of
+  the session inside `auth.login_fail_window` and at `auth.step_up_fail_limit` revokes the session
+  (`Auth.RevokeSession`, reason `step_up_failed`, `session.revoked`) in the same unit of work,
+  with the deny entry (`step_up_required`, `{cause, challenge_id, session_revoked}`); the answer is
+  `401 session_revoked` after a revocation, else `401 step_up_required`. Success marks the
+  challenge `used` and sets `step_up_at = now`, `step_up_method = device_key`; the Authenticator
+  reads it per request, so the next request in every process sees it. A child session has its own
+  step-up.
+- Operations (`adapters/httpapi/stepup.go`), both without `Idempotency-Key` (`auth_flow`), class
+  `rl.public_auth`:
+
+  | Operation | Action and resource | Audit | Answer |
+  |---|---|---|---|
+  | `createStepUpChallenge` | `auth.step_up` on the caller's session | allow `{step: challenge, challenge_id}` | `200 StepUpChallenge` |
+  | `completeStepUpWithDeviceKey` | `auth.step_up` on the caller's session | allow `{step: confirm, method, challenge_id}`, denials with cause | `200 StepUpResult` |
+
+- Job `identity.auth_cleanup` (`adapters/jobs`, queue `maintenance`, every `auth.cleanup_interval`,
+  roles `worker` and `all`): deletes challenges past `expires_at`, except failed step-up
+  challenges whose `finished_at` is still inside `auth.login_fail_window` (08 section 13).
+- `adapters/postgres`: `queries/stepup.sql`, `stepup.go`.
+- Migration `migrations/00012_identity_step_up.sql`: `auth_challenges` as 03 section 4.2 with all
+  purposes (the foreign key of `enrollment_code_id` follows with `enrollment_codes`, M1-37);
+  `bothy_app` may read, insert, update and delete.
+- Configuration: `auth.step_up_challenge_ttl`, `auth.step_up_max_age`, `auth.step_up_fail_limit`,
+  `auth.login_fail_window`, `auth.clock_leeway`, `auth.token_pepper_ref`, `auth.cleanup_interval`.
+- Tests: `domain/stepup` (`TestStepUpPayload_Check`, `TestStepUpFailLimit_Decision`,
+  `TestChallengeValue_IDT27Like`), `adapters/jobs`, `migrations/identity_step_up_test.go`, and
+  `adapters/httpapi/stepup_test.go` over PostgreSQL 18 with the real Authenticator, authz, audit
+  and event appender: ID-T18 (missing, too old as AZ-M36, agent token, wrong key), ID-T29 for a
+  `cli` device, single use, expiry, foreign challenges, concurrent completion, the failure limit,
+  the binding to one session, pending device, no `step_up` key, no secrets in logs and audit,
+  and the cleanup. Rulings: docs/DECISIONS.md M1-35.
+
 ## Port (root package `internal/identity`)
 
-- Inbound: `Auth` (login, refresh, logout, child sessions, step-up), `Directory`, `Devices`, `Tokens`, `Owners`; declares `AvatarFiles`.
+- Inbound: `Auth` (login, refresh, logout, child sessions), `StepUp` (step-up, M1-35), `Directory`, `Devices`, `Tokens`, `Owners`; declares `AvatarFiles`.
 - Emits in-tx events: `DeviceRevoked`, `SessionEnded`.
 - Subscribes to in-tx events: none.
 - Implements source ports and cross-cutting ports: kernel `actor.Authenticator`, `authz.PrincipalSource`, `authz.CredentialSource` (session, device, token for the check `check_active`, 07 section 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.

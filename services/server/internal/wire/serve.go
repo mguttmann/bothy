@@ -652,6 +652,9 @@ func (s *server) handlers() Handlers {
 	if h.Sessions == nil && s.identity != nil {
 		h.Sessions = s.identity.SessionHandlers
 	}
+	if h.StepUps == nil && s.identity != nil {
+		h.StepUps = s.identity.StepUpHandlers
+	}
 	if h.Keys == nil && s.signingKeys != nil {
 		h.Keys = s.signingKeys.Handlers
 	}
@@ -822,13 +825,16 @@ func (s *server) startLogTail(ctx context.Context) error {
 // on its own ends the process.
 func (s *server) startJobs(ctx context.Context) error {
 	s.mu.Lock()
-	pool, sy, a, keys, keyCheck := s.pool, s.sync, s.audit, s.signingKeys, s.keyCheck
+	pool, sy, a, keys, keyCheck, id := s.pool, s.sync, s.audit, s.signingKeys, s.keyCheck, s.identity
 	s.mu.Unlock()
 	if err := jobs.ValidateMigrations(ctx, pool, s.jobsCfg.Schema); err != nil {
 		return err
 	}
 	if keys == nil {
 		return errors.New("wire: the jobs step needs the signing keys step")
+	}
+	if id == nil || id.AuthCleanup == nil {
+		return errors.New("wire: the jobs step needs the sessions step")
 	}
 	expiryCfg, err := AuthzExpiryConfig(s.values)
 	if err != nil {
@@ -843,6 +849,7 @@ func (s *server) startJobs(ctx context.Context) error {
 		Cleanup: sy.IdempotencyCleanup(), CleanupInterval: s.syncCfg.Cleanup.Interval,
 		Expiry: expiry, ExpiryInterval: expiryCfg.Interval,
 		KeyRotation: keys.Keys, KeyRotationInterval: keyCheck,
+		AuthCleanup: id.AuthCleanup, AuthCleanupInterval: id.cfg.CleanupInterval,
 	})
 	if err != nil {
 		return err

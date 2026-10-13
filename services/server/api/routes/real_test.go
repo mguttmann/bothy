@@ -17,6 +17,14 @@ import (
 // stubServer implements the enabled operations without behaviour; Build only registers them.
 type stubServer struct{}
 
+func (stubServer) CreateStepUpChallenge(context.Context, rest.CreateStepUpChallengeRequestObject) (rest.CreateStepUpChallengeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CompleteStepUpWithDeviceKey(context.Context, rest.CompleteStepUpWithDeviceKeyRequestObject) (rest.CompleteStepUpWithDeviceKeyResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) RefreshToken(context.Context, rest.RefreshTokenRequestObject) (rest.RefreshTokenResponseObject, error) {
 	return nil, nil
 }
@@ -125,6 +133,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"listMySessions":         {"GET /api/v1/me/sessions", "session.list", "rl.read"},
 		"listUserSessions":       {"GET /api/v1/users/{user_id}/sessions", "session.list", "rl.read"},
 		"createExtensionSession": {"POST /api/v1/me/sessions/extensions", "session.extension.create", "rl.write"},
+		// M1-35
+		"createStepUpChallenge":       {"POST /api/v1/auth/step-up/challenge", "auth.step_up", "rl.public_auth"},
+		"completeStepUpWithDeviceKey": {"POST /api/v1/auth/step-up/device-key", "auth.step_up", "rl.public_auth"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
