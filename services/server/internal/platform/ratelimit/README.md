@@ -83,8 +83,7 @@ Every REST key has a bounded length: an IP address or prefix, an ID, or a `webho
 be an ID (any other value is `404` before a bucket exists). The gateway passes its own connection
 IDs. Estimate: run `go test -run '^$' -bench BenchmarkLimiter_BytesPerKey ./internal/platform/ratelimit/`
 and multiply its `bytes/key` (principal keys, map overhead included) by
-`ratelimit.max_tracked_keys`. For example, a result of 100 bytes per key means about 10 MB for the
-default of 100000 keys.
+`ratelimit.max_tracked_keys`.
 
 ## Several nodes
 
