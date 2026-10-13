@@ -166,3 +166,110 @@ def test_commitlint_recipe_checks_the_pull_request_title(title: str, *, passes: 
     assert "CalledProcessError" not in output, output
     assert (run.returncode == 0) is passes, output
     assert ("commit message: " in run.stdout) is not passes, output
+
+
+# ---- dependency bots (D-DEPS-3) --------------------------------------------------------
+DEPENDABOT = "dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>"
+RENOVATE = "renovate[bot] <29139614+renovate[bot]@users.noreply.github.com>"
+BUMP = "build(deps): bump example from 1.0.0 to 1.1.0\n\nBumps example.\n"
+
+
+def _range(repo: Path, base: str, *extra: str) -> int:
+    return commit_msg.main(
+        ["--repo", str(repo), "--range", f"{base}..HEAD", "--require-signoff", *extra]
+    )
+
+
+@pytest.mark.parametrize(
+    ("login", "identity"), [("dependabot[bot]", DEPENDABOT), ("renovate[bot]", RENOVATE)]
+)
+def test_bot_commit_in_its_own_pull_request_needs_no_signoff(
+    repo: Path, capsys: pytest.CaptureFixture[str], login: str, identity: str
+) -> None:
+    base = git(repo, "rev-parse", "HEAD").strip()
+    commit(repo, BUMP, author=identity)
+    assert _range(repo, base, "--pr-author", login) == 0
+    out = capsys.readouterr().out
+    assert f"sign-off not required: commit by {login} in its own pull request" in out
+
+
+def test_bot_commit_without_the_pull_request_author_still_needs_signoff(repo: Path) -> None:
+    """Locally and on every other pull request the author identity alone exempts nothing."""
+    base = git(repo, "rev-parse", "HEAD").strip()
+    commit(repo, BUMP, author=DEPENDABOT)
+    assert _range(repo, base) == 1
+
+
+def test_forged_bot_identity_in_a_human_pull_request_needs_signoff(repo: Path) -> None:
+    """Anyone can write a bot e-mail into a commit; only GitHub sets the pull request author."""
+    base = git(repo, "rev-parse", "HEAD").strip()
+    commit(repo, BUMP, author=DEPENDABOT)
+    assert _range(repo, base, "--pr-author", "mallory") == 1
+
+
+def test_other_bot_identity_in_a_bot_pull_request_needs_signoff(repo: Path) -> None:
+    base = git(repo, "rev-parse", "HEAD").strip()
+    commit(repo, BUMP, author=DEPENDABOT)
+    assert _range(repo, base, "--pr-author", "renovate[bot]") == 1
+
+
+def test_human_commit_in_a_bot_pull_request_needs_signoff(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = git(repo, "rev-parse", "HEAD").strip()
+    commit(repo, BUMP, author=DEPENDABOT)
+    commit(repo, "fix: adapt to the new release")
+    assert _range(repo, base, "--pr-author", "dependabot[bot]") == 1
+    out = capsys.readouterr().out
+    human = git(repo, "rev-parse", "HEAD").strip()[:12]
+    assert f"{human}: missing 'Signed-off-by:'" in out
+    assert out.count("missing 'Signed-off-by:'") == 1
+
+
+def test_bot_commit_still_needs_a_conventional_header(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base = git(repo, "rev-parse", "HEAD").strip()
+    commit(repo, "Bump example from 1.0.0 to 1.1.0", author=DEPENDABOT)
+    assert _range(repo, base, "--pr-author", "dependabot[bot]") == 1
+    assert "header must be" in capsys.readouterr().out
+
+
+def test_bot_exemption_needs_the_bot_login_exactly(repo: Path) -> None:
+    base = git(repo, "rev-parse", "HEAD").strip()
+    commit(repo, BUMP, author=DEPENDABOT)
+    assert _range(repo, base, "--pr-author", "dependabot") == 1
+    assert _range(repo, base, "--pr-author", "Dependabot[bot]") == 1
+
+
+def _make_commitlint(repo: Path, base: str, **extra: str) -> subprocess.CompletedProcess[str]:
+    env = {k: v for k, v in os.environ.items() if k not in _MAKE_VARIABLES}
+    # The recipe runs in the real checkout; GIT_DIR points its git calls at the fixture.
+    env.update(GIT_DIR=str(repo / ".git"), COMMIT_RANGE=f"{base}..HEAD", **extra)
+    if "PR_AUTHOR" not in extra:
+        env.pop("PR_AUTHOR", None)
+    return subprocess.run(
+        ["make", "-s", "-C", str(REPO), "commitlint"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=300,
+    )
+
+
+@pytest.mark.parametrize(
+    ("extra", "passes"),
+    [({"PR_AUTHOR": "dependabot[bot]"}, True), ({}, False), ({"PR_AUTHOR": "alex"}, False)],
+    ids=["bot pull request", "no pull request author", "human pull request"],
+)
+def test_commitlint_recipe_passes_the_pull_request_author(
+    repo: Path, extra: dict[str, str], *, passes: bool
+) -> None:
+    """CI sets PR_AUTHOR from the event; the recipe hands it to the range check."""
+    base = git(repo, "rev-parse", "HEAD").strip()
+    commit(repo, BUMP, author=DEPENDABOT)
+    run = _make_commitlint(repo, base, **extra)
+    output = run.stdout + run.stderr
+    assert (run.returncode == 0) is passes, output
+    assert ("missing 'Signed-off-by:'" in output) is not passes, output

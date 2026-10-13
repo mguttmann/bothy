@@ -6,9 +6,9 @@ flowchart TB
     push --> check["pre-push: review evidence, then make check<br/>= gates + denylist + sonar"]
   end
   subgraph ci["CI: ci.yml per pull request on main"]
-    plan["plan: components from changed paths"] --> gates["gates: make gates"]
-    plan --> deny["denylist: make denylist<br/>fork: generic rules only"]
-    plan --> sonar["sonar: make sonar"]
+    plan["plan: components from changed paths,<br/>secret checks unless fork or bot run"] --> gates["gates: make gates"]
+    plan --> deny["denylist: make denylist<br/>fork or bot run: generic rules only"]
+    plan --> sonar["sonar: make sonar<br/>skipped for a fork or bot run"]
     gates --> ok["ci-ok: the only required check"]
     deny --> ok
     sonar --> ok

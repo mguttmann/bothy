@@ -23,7 +23,7 @@ Source of the diagram: `docs/quality/pipeline.mmd`.
 | `migrations-lint` | `tools/ci/migrations_lint.py` | consecutive five-digit numbers without gaps and without timestamp versions, checksums of merged migrations unchanged (`migrations.sha256`), `STORED` with `GENERATED ALWAYS AS`, `-- +goose NO TRANSACTION` with `CONCURRENTLY` (ADR 0007, chapter 14) | | from the first migration |
 | `test` | pytest, go test -race, flutter test, script `test` | tests with coverage data | | tools |
 | `coverage` | coverage, go tool cover, LCOV evaluation | minimum coverage; Go without the packages under `test/` and `perf/` (test code, chapter 23 "Component contract") and without generated files `*.gen.go` | `quality.coverage.tools_min_percent`, `quality.coverage.go_min_percent`, `quality.coverage.dart_min_percent` | tools |
-| `commitlint` | `tools/hooks/commit_msg.py` | Conventional Commits and DCO of the commits that are not yet on `origin/main` | `commit.header_max_length` | from the first remote |
+| `commitlint` | `tools/hooks/commit_msg.py` | Conventional Commits and DCO of the commits that are not yet on `origin/main`; in CI also the pull request title, and a dependency bot's own commits in its own pull request need no sign-off (`PR_AUTHOR`, D-DEPS-3) | `commit.header_max_length` | from the first remote |
 | `docs` | `tools/docs/language_check.py`, `tools/docs/adr_index.py`, `tools/docs/problem_code_refs.py`, `tools/docs/brief_deps.py`, `tools/docs/register_ids.py`, `tools/docs/risk_ranking.py`, MkDocs `--strict` with the hook `tools/docs/mkdocs_repo_links.py` | ADR index up to date, every pair of status and problem code in Markdown and API files appears as such in `x-problem-codes` (06 section 5 item 7), index, waves and graph of the briefs match the plan and no brief calls a `make` target that only a ticket outside its dependencies creates, every ID that a table in `docs/**/*.md` defines in the first column (rulings, tests, guard rules, threats, decisions, risks, open questions, tickets) appears as such exactly once in the whole repository (D-W-60), every table row has as many cells as its header (D-W-71), the overview and the sections of the open questions name the same IDs, the ranking of the largest risks names the rating of the register and leaves out no higher-rated risk (D-W-78), and the list behind its last rank names exactly the remaining risks with that rank's rating (D-W-79), the site builds without a warning; links to existing files outside `docs/` point to the repository in the site, a missing target stays an error; no tracked text file contains German prose or a word with an umlaut, except the exceptions in `tools/docs/language-allow.txt` and text between the marker lines `language-check: off` and `language-check: on` (D-W-94) | | yes |
 | `config-doc-check` | `tools/configdoc/configdoc.py --check` | configuration reference (ruling L4): no name twice, every key of the schema with a row, chapter, place `Server` and the same default in its chapter table, every planned server key with a milestone in `tools/configdoc/planned.yaml` and no stale rule, no name retired by W1 (`tools/configdoc/retired.yaml`), Compose waits longer than `shutdown.total_timeout`, no two names with the same environment variable, section 4 current (rules D1 to D10 in [configuration.md](../operations/configuration.md) 10). Reads the committed schema file and needs no Go | | yes |
 | `linkcheck` | lychee `--offline --include-fragments`; `tools/docs/placeholder_links.py` | local links and anchors of all tracked Markdown files; no link outside code to the placeholder repository `OWNER` (P-05), because it leads nowhere after publishing | | yes |
@@ -72,8 +72,13 @@ with a hint.
 * Contributors from forks explicitly switch off what they do not have:
   `DENYLIST_FLAGS=--allow-missing` (public rules only), `SONAR_SKIP=1` and
   `REVIEW_SKIP=1` (no independent review of their own). Everything is visible in the output;
-  CI treats fork pull requests the same way (R-QA-02). What the fork could not check,
-  the maintainer catches up on before the merge; after the merge, `denylist-main.yml` also
+  CI treats fork pull requests the same way (R-QA-02), and also runs that a dependency bot
+  (`dependabot[bot]`, `renovate[bot]`) starts on its own pull request: GitHub gives
+  Dependabot runs no secrets, and this project treats Renovate the same way
+  (`tools/ci/pr_mode.py`, push-discipline.md, section
+  [Dependency bot pull requests](push-discipline.md#dependency-bot-pull-requests)); such a
+  run shows the notice "Reduced checks". What the fork or the bot run could not check, the
+  maintainer catches up on before the merge; after the merge, `denylist-main.yml` also
   checks every push to `main` with the private list.
 * `COMPONENTS=<list>` limits the component gates; CI sets it from the changed
   paths. Locally the default is `all`.

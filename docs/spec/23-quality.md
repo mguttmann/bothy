@@ -20,7 +20,7 @@ Decisions: ADR [0038](../adr/0038-local-gates-first-one-command-identical-to-ci.
    A gate may skip with a `SKIP` line only when the checked
    component has no code yet. The Makefile makes this decision from the
    tracked files, not the developer. The only exception is the explicit switches
-   for contributions from forks (R-QA-02).
+   for contributions from forks and for runs that a dependency bot starts (R-QA-02).
 4. **Pinned tools.** Every tool has a fixed version with a checksum
    (`tools/uv.lock`, `tools/node/package-lock.json`, `tools/bin/tools.lock.json`,
    image digests, action SHAs). Updates come as a pull request from Renovate.
@@ -175,7 +175,7 @@ fixed and the delta is checked again; the threat model (chapter 19) is updated. 
 | No. | Rule | Reason |
 |---|---|---|
 | R-QA-01 | `make check` = `gates` + `denylist` + `sonar`; CI jobs call exactly these targets. | Equality between local and CI comes from construction, not from comparing two lists. |
-| R-QA-02 | A gate skips only when the component has no code; missing tools are errors. The only exception is the explicit switches for contributions from forks (`DENYLIST_FLAGS=--allow-missing`, `SONAR_SKIP=1`, `REVIEW_SKIP=1`); CI checks fork pull requests the same way, maintainers check fully before the merge, and `denylist-main.yml` checks after the merge. | A silent skip would be a green gate that checked nothing; outside contributors have neither the private list nor a SonarQube server. |
+| R-QA-02 | A gate skips only when the component has no code; missing tools are errors. The only exception is the explicit switches for contributions from forks (`DENYLIST_FLAGS=--allow-missing`, `SONAR_SKIP=1`, `REVIEW_SKIP=1`); CI checks fork pull requests the same way, and runs that a dependency bot starts on its own pull request, because GitHub gives Dependabot runs no secrets either and this project treats Renovate the same way (D-DEPS-3); maintainers check fully before the merge, and `denylist-main.yml` checks after the merge. | A silent skip would be a green gate that checked nothing; outside contributors have neither the private list nor a SonarQube server. |
 | R-QA-03 | Only GitHub-hosted runners with a fixed label; no self-hosted runners and no switch in `runs-on` (D-W-92). | The repository is public from the first push; there the standard runners are free, and a self-hosted runner would run code from outside pull requests. |
 | R-QA-04 | Scheduled workflows run only with the public condition; their event carries no repository object, so they also use `vars.BOTHY_VISIBILITY` there. | Code scanning and Scorecard require a public repository, and Pages would turn even a private repository into a public website. |
 | R-QA-05 | Semgrep runs only with the project's own rules, without registry rule sets. | Registry rules change without a version reference and have their own license; SonarQube, CodeQL, golangci-lint and bandit provide general static analysis. |

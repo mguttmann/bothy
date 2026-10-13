@@ -3,7 +3,8 @@
 
 Usage:
   commit_msg.py [--require-signoff] MSGFILE      commit-msg hook (one message)
-  commit_msg.py [--require-signoff] --range A..B check every non-merge commit in a range
+  commit_msg.py [--require-signoff] --range A..B [--pr-author LOGIN]
+                                                 check every non-merge commit in a range
 
 Rules (docs/quality/push-discipline.md):
   * header `type(scope)!: description`, type from TYPES, at most HEADER_MAX_LENGTH chars
@@ -11,6 +12,9 @@ Rules (docs/quality/push-discipline.md):
   * with --require-signoff: a `Signed-off-by:` trailer whose e-mail matches the author
   * `fixup!`/`squash!`/`amend!` commits are fine locally and rejected in ranges,
     because they must be squashed before a push
+  * with --pr-author naming a dependency bot of BOT_AUTHORS (CI passes the pull request
+    author GitHub reports): that bot's own commits need no sign-off; the header rules still
+    apply, and every other commit of the range still needs its sign-off (D-DEPS-3)
 """
 
 from __future__ import annotations
@@ -44,6 +48,13 @@ _SIGNOFF = re.compile(r"^Signed-off-by: .+ <(?P<email>[^>]+)>\s*$", re.MULTILINE
 _EMAIL = re.compile(r"<([^>]+)>")
 _SCISSORS = "# ------------------------ >8 ------------------------"
 _AUTOSQUASH = ("fixup! ", "squash! ", "amend! ")
+# Dependency bots whose own commits need no DCO sign-off in their own pull requests: the
+# pull request author login GitHub reports -> the commit author e-mail the bot writes.
+# tools/ci/pr_mode.py routes the same logins (a test keeps both lists equal).
+BOT_AUTHORS = {
+    "dependabot[bot]": "49699333+dependabot[bot]@users.noreply.github.com",
+    "renovate[bot]": "29139614+renovate[bot]@users.noreply.github.com",
+}
 
 
 def _clean(message: str) -> str:
@@ -124,14 +135,28 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--require-signoff", action="store_true")
     parser.add_argument("--range", dest="rev_range")
+    parser.add_argument(
+        "--pr-author",
+        default="",
+        help="login of the pull request author; exempts a dependency bot's own commits "
+        "from the sign-off",
+    )
     parser.add_argument("msgfile", nargs="?", type=Path)
     args = parser.parse_args(argv)
 
     if args.rev_range:
         failed = 0
+        bot_email = BOT_AUTHORS.get(args.pr_author)
         for sha, author, body in _range_commits(args.repo, args.rev_range):
+            require_signoff = args.require_signoff
+            if require_signoff and bot_email is not None and _email(author) == bot_email:
+                print(
+                    f"{sha[:12]}: sign-off not required: commit by {args.pr_author} "
+                    "in its own pull request"
+                )
+                require_signoff = False
             errors = check_message(
-                body, require_signoff=args.require_signoff, author=author, allow_fixup=False
+                body, require_signoff=require_signoff, author=author, allow_fixup=False
             )
             for err in errors:
                 print(f"{sha[:12]}: {err}")
