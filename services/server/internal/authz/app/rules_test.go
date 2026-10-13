@@ -355,3 +355,26 @@ func TestSelf_IDOfThePrincipalResource(t *testing.T) {
 	w.allow(t, w.agent(w.lotse), authorize.ActionSelfRead, authorize.Resource{Kind: authorize.ResourcePrincipal, ID: w.lotse})
 	w.expect(t, w.agent(w.lotse), authorize.ActionSelfRead, authorize.Resource{Kind: authorize.ResourcePrincipal, ID: w.texter}, notFound, "no_grant")
 }
+
+// TestTokenCreateGuard_NotSelf: token.create gives a personal token only to the person itself
+// (brief M1-44, guard of 07 section 4.2 step 9): an owner in a session with a fresh step-up may
+// create tokens for agents and for itself, never for another person (not_self); a person gets
+// not_self for another person and owner_only for an agent; an unknown principal passes the guard,
+// so the use case answers 404.
+func TestTokenCreateGuard_NotSelf(t *testing.T) {
+	w := newWorld(t)
+	principal := func(id ids.ID) authorize.Resource {
+		return authorize.Resource{Kind: authorize.ResourcePrincipal, ID: id, OwnerID: id}
+	}
+	owner := w.user(w.owner)
+	owner.StepUpAt = w.clk.Now()
+	w.allow(t, owner, authorize.ActionTokenCreate, principal(w.lotse))
+	w.allow(t, owner, authorize.ActionTokenCreate, principal(w.owner))
+	w.allow(t, owner, authorize.ActionTokenCreate, principal(ids.New()))
+	w.expect(t, owner, authorize.ActionTokenCreate, principal(w.alex), forbidden, "not_self")
+	sam := w.user(w.sam)
+	sam.StepUpAt = w.clk.Now()
+	w.allow(t, sam, authorize.ActionTokenCreate, principal(w.sam))
+	w.expect(t, sam, authorize.ActionTokenCreate, principal(w.alex), forbidden, "not_self")
+	w.expect(t, sam, authorize.ActionTokenCreate, principal(w.lotse), forbidden, "owner_only")
+}

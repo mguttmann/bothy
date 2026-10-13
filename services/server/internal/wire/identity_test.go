@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -28,8 +29,9 @@ func TestIdentityConfigBindsDefaults(t *testing.T) {
 		AccessTokenTTL: 10 * time.Minute, RefreshTokenTTL: 14 * 24 * time.Hour, SessionMaxAge: 30 * 24 * time.Hour,
 		RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute,
 		StepUpChallengeTTL: 2 * time.Minute, StepUpFailLimit: 5, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
+		APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
 	}
-	if cfg != want {
+	if !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("IdentityConfig = %+v, want %+v", cfg, want)
 	}
 }
@@ -38,13 +40,16 @@ func TestIdentityConfigBindsEnvironment(t *testing.T) {
 	t.Parallel()
 	v := loadValues(t, schema(t), "BOTHY_PRINCIPAL__HANDLE_MAX_CHARS=20", "BOTHY_PRINCIPAL__DISPLAY_NAME_MAX_CHARS=80",
 		"BOTHY_AUTH__DPOP_NONCE_TTL=2m", "BOTHY_AUTH__DPOP_PROOF_MAX_AGE=10s", "BOTHY_AUTH__CLOCK_LEEWAY=0s",
-		"BOTHY_API__PAGE_SIZE_DEFAULT=10", "BOTHY_API__PAGE_SIZE_MAX=20")
+		"BOTHY_API__PAGE_SIZE_DEFAULT=10", "BOTHY_API__PAGE_SIZE_MAX=20", "BOTHY_AUTH__DPOP_REQUIRED_FOR=agent,personal",
+		"BOTHY_AUTH__API_TOKEN_MAX_TTL=30d", "BOTHY_AUTH__PERSONAL_TOKEN_MAX_TTL=7d")
 	cfg, err := wire.IdentityConfig(v)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.HandleMaxChars != 20 || cfg.DisplayNameMaxChars != 80 || cfg.DPoPNonceTTL != 2*time.Minute ||
-		cfg.DPoPProofMaxAge != 10*time.Second || cfg.ClockLeeway != 0 || cfg.PageSizeDefault != 10 || cfg.PageSizeMax != 20 {
+		cfg.DPoPProofMaxAge != 10*time.Second || cfg.ClockLeeway != 0 || cfg.PageSizeDefault != 10 || cfg.PageSizeMax != 20 ||
+		cfg.APITokenMaxTTL != 30*24*time.Hour || cfg.PersonalTokenMaxTTL != 7*24*time.Hour ||
+		!reflect.DeepEqual(cfg.DPoPRequiredFor, []string{"agent", "personal"}) {
 		t.Fatalf("IdentityConfig = %+v", cfg)
 	}
 }

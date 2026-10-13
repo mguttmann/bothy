@@ -122,7 +122,7 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 }
 
 // authenticateSettled runs the Authenticator and then settle (when not nil) exactly once with its
-// error. A panic of the Authenticator settles with errAuthenticatorPanic, a server failure that is
+// error, or with errInactiveCredential for an actor whose API token is revoked or expired. A panic of the Authenticator settles with errAuthenticatorPanic, a server failure that is
 // not a failed credential, and then panics on to the recover step, so a bug never keeps a token
 // the precheck reserved (M1-19).
 func authenticateSettled(r *http.Request, auth actor.Authenticator, creds actor.Credentials, settle func(error)) (a actor.Actor, err error) {
@@ -137,9 +137,18 @@ func authenticateSettled(r *http.Request, auth actor.Authenticator, creds actor.
 	}()
 	a, err = auth.Authenticate(r.Context(), creds)
 	settled = true
-	settle(err)
+	if err == nil && a.CredentialInactive {
+		// A revoked or expired API token goes on to authorize, which refuses and audits it
+		// (M1-44/5), but for the failed-credentials rule it is a dead credential like any other.
+		settle(errInactiveCredential)
+	} else {
+		settle(err)
+	}
 	return a, err
 }
+
+// errInactiveCredential is what settle sees for an actor with CredentialInactive.
+var errInactiveCredential = errs.New(errs.CodeUnauthenticated, "inactive credential")
 
 // errAuthenticatorPanic is what settle sees when the Authenticator panicked.
 var errAuthenticatorPanic = errs.New(errs.CodeInternalError, "authenticator panicked")

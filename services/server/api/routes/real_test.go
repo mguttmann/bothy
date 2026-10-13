@@ -101,6 +101,18 @@ func (stubServer) GetJwks(context.Context, rest.GetJwksRequestObject) (rest.GetJ
 	return nil, nil
 }
 
+func (stubServer) ListTokens(context.Context, rest.ListTokensRequestObject) (rest.ListTokensResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateToken(context.Context, rest.CreateTokenRequestObject) (rest.CreateTokenResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RevokeToken(context.Context, rest.RevokeTokenRequestObject) (rest.RevokeTokenResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) RotateSigningKey(context.Context, rest.RotateSigningKeyRequestObject) (rest.RotateSigningKeyResponseObject, error) {
 	return nil, nil
 }
@@ -140,7 +152,8 @@ func (stubServer) UnlinkIdentity(context.Context, rest.UnlinkIdentityRequestObje
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
-// (M1-35) and the providers and credentials (M1-36). A handler ticket that enables an operation changes this test together with
+// (M1-35), the providers and credentials (M1-36) and the API tokens (M1-44). A handler ticket
+// that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
 	type entry struct{ pattern, action, class string }
@@ -178,6 +191,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"getMyCredentials":       {"GET /api/v1/me/credentials", "identity.read", "rl.read"},
 		"getUserCredentials":     {"GET /api/v1/users/{user_id}/credentials", "identity.read", "rl.read"},
 		"unlinkIdentity":         {"DELETE /api/v1/users/{user_id}/identities/{identity_id}", "identity.unlink", "rl.admin"},
+		// M1-44
+		"listTokens":  {"GET /api/v1/principals/{principal_id}/tokens", "token.list", "rl.read"},
+		"createToken": {"POST /api/v1/principals/{principal_id}/tokens", "token.create", "rl.admin"},
+		"revokeToken": {"DELETE /api/v1/tokens/{token_id}", "token.revoke", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {

@@ -87,7 +87,13 @@ underscore, Base62, CRC-32 in 6 characters) for its tokens [Q1, verified].
   zeros has 6 characters; every change of a character in the random part is caught by the checksum.
 - Test: a token with a wrong checksum is rejected without a database query (the query counter of
   the test repository stays 0).
-- Build ticket M1-44 in [PLAN.md](../PLAN.md).
+- Build ticket M1-44 in [PLAN.md](../PLAN.md). Built (2026-10-13): `TestFormat_RoundTrip`,
+  `TestFormat_ChecksumVectors`, `TestParse_Rejects`, `TestGenerate_ReadsExactly32BytesFromCryptoRand`
+  and `TestTokenPrefix` in `services/server/internal/identity/domain/apitoken`, the vectors
+  recomputed by `test_checksum_vectors_match_go`, and `TestIDT23_WrongChecksumRejectedWithoutLookup`
+  (lookup counter stays 0). Identity does not cache token lookups (one indexed query per request);
+  authz caches the token liveness with its rights snapshot per rights version, and every
+  revocation raises that version, so a revocation holds at the next request in every process.
 
 ## Pros and Cons of the Options
 

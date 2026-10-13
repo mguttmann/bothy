@@ -64,8 +64,8 @@ func TokenPepper(ctx context.Context, sp *secrets.Provider, ref string) ([]byte,
 }
 
 // Identity is the identity module of the process (M1-33): the device use cases, the DPoP verifier
-// with its jti store, the people and owner use cases (M1-31) and the REST handlers of their
-// operations.
+// with its jti store, the people and owner use cases (M1-31), the API token use cases (M1-44) and
+// the REST handlers of their operations.
 type Identity struct {
 	// Devices is the port identity.Devices.
 	Devices *app.Devices
@@ -105,23 +105,30 @@ type Identity struct {
 	// CredentialHandlers are the REST handlers of getMyCredentials, getUserCredentials and
 	// unlinkIdentity; nil until BindSessions.
 	CredentialHandlers *identityhttp.Credentials
-	cfg                app.Config
-	repo               *identitypg.Repository
-	uow                txn.UnitOfWork
-	az                 authorize.Authorizer
-	writes             IdentityWrites
-	pepper             []byte
-	clk                clock.Clock
-	log                *slog.Logger
+	// Tokens implements the ports identity.Tokens and identity.TokenAdmin (M1-44).
+	Tokens *app.Tokens
+	// TokenHandlers are the REST handlers of listTokens, createToken and revokeToken.
+	TokenHandlers *identityhttp.Tokens
+	cfg           app.Config
+	repo          *identitypg.Repository
+	uow           txn.UnitOfWork
+	az            authorize.Authorizer
+	writes        IdentityWrites
+	pepper        []byte
+	clk           clock.Clock
+	log           *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
-// recorder of audit and the appender of sync.
+// recorder of audit, the appender of sync and the switch tokens.personal_enabled (M1-44).
 type IdentityWrites struct {
 	// Audit records the allow entries.
 	Audit auditing.Recorder
 	// Events appends user.updated.
 	Events eventlog.Appender
+	// PersonalTokens is the switch tokens.personal_enabled; nil binds app.PersonalTokensDefault
+	// (off) until M1-47 rebinds it over the feature flags of instance.
+	PersonalTokens app.PersonalTokenSwitch
 }
 
 // NewIdentity builds the identity module over pool with the unit of work uow, the Authorizer az,
@@ -152,9 +159,20 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if err != nil {
 		return nil, err
 	}
+	if w.PersonalTokens == nil {
+		w.PersonalTokens = app.PersonalTokensDefault{}
+	}
+	tokens, err := app.NewTokens(cfg, pepper, app.TokensDeps{
+		Store: repo, Principals: repo, UoW: uow, Authorizer: az, Audit: w.Audit, Cursors: identityhttp.Cursors{},
+		Switch: w.PersonalTokens, Clock: clk,
+	})
+	if err != nil {
+		return nil, err
+	}
 	return &Identity{
 		Devices: devices, People: people, PeopleHandlers: identityhttp.NewPeople(people, people), DPoP: verifier, Replay: store,
-		Handlers: identityhttp.NewDevices(devices), cfg: cfg, repo: repo, uow: uow, az: az, writes: w,
+		Handlers: identityhttp.NewDevices(devices), Tokens: tokens, TokenHandlers: identityhttp.NewTokens(tokens),
+		cfg: cfg, repo: repo, uow: uow, az: az, writes: w,
 		pepper: append([]byte(nil), pepper...), clk: clk, log: orDiscard(log),
 	}, nil
 }
@@ -178,7 +196,9 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	if err != nil {
 		return err
 	}
-	auth, err := app.NewAuthenticator(i.cfg, tokens, i.DPoP, i.repo, i.clk, i.log)
+	auth, err := app.NewAuthenticator(i.cfg, app.AuthenticatorDeps{
+		AccessTokens: tokens, DPoP: i.DPoP, Sessions: i.repo, APITokens: i.repo, Pepper: i.pepper, Clock: i.clk, Log: i.log,
+	})
 	if err != nil {
 		return err
 	}

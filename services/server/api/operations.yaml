@@ -13,6 +13,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createExtensionSession
   - createIdentityProvider
   - createStepUpChallenge
+  - createToken
   - createUser
   - deleteIdentityProvider
   - enableUser
@@ -27,12 +28,14 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listMyDevices
   - listMySessions
   - listOwners
+  - listTokens
   - listUserDevices
   - listUserSessions
   - listUsers
   - logout
   - refreshToken
   - revokeOwner
+  - revokeToken
   - rotateSigningKey
   - unlinkIdentity
   - updateIdentityProvider
@@ -218,9 +221,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createThread
     milestone: M1
     ticket: M1-55
-  - operation_id: createToken
-    milestone: M1
-    ticket: M1-44
   - operation_id: createUpload
     milestone: M3
     ticket: M3-03
@@ -566,9 +566,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listThreadRuns
     milestone: M2
     ticket: M2-05
-  - operation_id: listTokens
-    milestone: M1
-    ticket: M1-44
   - operation_id: listWebhookDeliveries
     milestone: M2
     ticket: M2-26
@@ -715,9 +712,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: revokeSession
     milestone: M1
     ticket: M1-45
-  - operation_id: revokeToken
-    milestone: M1
-    ticket: M1-44
   - operation_id: search
     milestone: M3
     ticket: M3-14

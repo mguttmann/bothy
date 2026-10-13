@@ -69,6 +69,9 @@ var appPrivileges = map[string][]string{
 	// identity is unlinked by unlinked_at and stays as history.
 	"identity_providers": {"SELECT", "INSERT", "UPDATE", "DELETE"},
 	"user_identities":    {"SELECT", "INSERT", "UPDATE"},
+	// 03 api_tokens (M1-44): revocation and last_used_at are updates, the rows are security
+	// history.
+	"api_tokens": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

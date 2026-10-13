@@ -62,6 +62,12 @@ type Actor struct {
 	ClientComponent string
 	// TokenID is the API token of an agent, app or personal token; zero otherwise.
 	TokenID ids.ID
+	// CredentialInactive reports that the authenticator found the API token of this request
+	// revoked or expired (M1-44). The authenticator does not reject it, so authorize refuses it in
+	// check_active and audits token_revoked; the stages before authorize must not act for such a
+	// principal: Idempotency-Key never replays a stored answer to it, the rate limiter keys it by
+	// the client IP and the failed-credentials precheck counts it as a failure.
+	CredentialInactive bool
 	// Scopes are the scopes of the API token (api_tokens.scopes, 07 section 3 token_scopes). They
 	// are not evaluated before M2 (docs/briefs/M1-28-authz-core.md D6).
 	Scopes []string

@@ -26,7 +26,8 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 - `Chain.Wrap(op, handler)` per route, `Chain.Public(mux)` for the listener, `Chain.Preflight` for
   `OPTIONS <path>` when CORS origins are configured, `Chain.Use(stage, mw)` for the slots,
   `Chain.SetCredentialsPrecheck` for M1-19 (installed by `ratelimit.Install`; its settle function
-  gets the result of the `Authenticator`), `Chain.SetFailedCredentialsHook`, `Chain.Order()` for the documented order. `Operation.RateLimitClass` is
+  gets the result of the `Authenticator`, and `401 unauthenticated` for an actor with
+  `CredentialInactive`, M1-44), `Chain.SetFailedCredentialsHook`, `Chain.Order()` for the documented order. `Operation.RateLimitClass` is
   the class `StageRateLimit` counts.
 - `WriteProblem(w, r, err)`, `ValidationErrorHandler`, `MalformedRequestHandler`: the error
   writers; `internal/wire` passes them to `routes.Build`.
@@ -62,7 +63,9 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 `NewIdempotencyStage` builds `StageIdempotency` over `kernel/idempotency.Store` (implemented by
 the sync module) and `kernel/txn.UnitOfWork` (docs/spec/02-architecture.md "Idempotency in the Unit of
 Work", 06 "Idempotency"). It acts only when the operation declares the parameter
-(`Operation.IdempotencyKey`), the request carries the header and the actor is not anonymous;
+(`Operation.IdempotencyKey`), the request carries the header and the actor is not anonymous
+and not `CredentialInactive` (an API token the authenticator found revoked or expired, M1-44:
+such a request goes on to `authorize`, which refuses it, and never gets a stored answer);
 otherwise the header has no effect. A key that is not one UUIDv7 is `400 validation_failed`
 (`#header/Idempotency-Key`, `invalid_format`).
 

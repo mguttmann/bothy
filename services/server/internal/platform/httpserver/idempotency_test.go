@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/idempotency"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -382,5 +383,47 @@ func TestStage_AllowsLateRightsChange(t *testing.T) {
 	}
 	if !e.uow.late {
 		t.Fatal("the stage's unit of work does not allow a late rights change")
+	}
+}
+
+// inactiveAuth authenticates every request with credentials as a principal whose API token the
+// authenticator found revoked or expired.
+type inactiveAuth struct{ id ids.ID }
+
+func (a inactiveAuth) Authenticate(_ context.Context, c actor.Credentials) (actor.Actor, error) {
+	if !c.Present() {
+		return actor.Anonymous(), nil
+	}
+	return actor.Actor{ID: a.id, Kind: actor.KindAgent, TokenID: ids.New(), CredentialInactive: true}, nil
+}
+
+func (inactiveAuth) Revalidate(context.Context, actor.Actor) error { return nil }
+
+// TestIgnored_InactiveCredential (M1-44, red team round 1): for a principal whose credential the
+// authenticator found revoked or expired the stage neither claims nor replays; the request goes on
+// to authorize, which refuses it.
+func TestIgnored_InactiveCredential(t *testing.T) {
+	t.Parallel()
+	runs := 0
+	store := newMemStore()
+	stage, err := httpserver.NewIdempotencyStage(httpserver.IdempotencyConfig{TTL: time.Hour}, store, &memUoW{store: store}, clock.System())
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := httpservertest.New(t, httpservertest.Options{Authenticator: inactiveAuth{id: ids.New()},
+		Routes: []httpservertest.Route{{Op: createItem(), Handler: httpservertest.Authorized("item.create", func(w http.ResponseWriter, _ *http.Request) {
+			runs++
+			httpservertest.JSON(w, http.StatusCreated, map[string]any{"ok": true})
+		})}},
+		Stages: map[httpserver.Stage]func(http.Handler) http.Handler{httpserver.StageIdempotency: stage}})
+	path, key := "/api/v1/groups/"+ids.New().String()+"/items", ids.New().String()
+	for range 2 {
+		resp := h.Do(h.NewRequest(http.MethodPost, path, `{}`, "Authorization", "Bearer dead", "Idempotency-Key", key))
+		if resp.StatusCode != http.StatusCreated || resp.Header.Get("Idempotent-Replay") != "" {
+			t.Fatalf("status %d, replay %q: %s", resp.StatusCode, resp.Header.Get("Idempotent-Replay"), resp.Body)
+		}
+	}
+	if runs != 2 || store.begins != 0 {
+		t.Errorf("runs %d, begins %d; want the header ignored for an inactive credential", runs, store.begins)
 	}
 }
