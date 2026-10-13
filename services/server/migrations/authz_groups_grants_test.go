@@ -39,9 +39,9 @@ func namedConstraints(t *testing.T, conn *pgx.Conn, table string) []string {
 
 // TestAuthzGroupsGrantsSchema holds acceptance criterion 1 of M1-27: groups,
 // group_memberships and grants match docs/spec/03-datenmodell.md section 4.3 column by column,
-// with every check, unique index, index and foreign key. The only deviations are the deferred
-// foreign keys groups.provider_id (M1-36) and grants.target_space_id, target_channel_id and
-// target_host_id (M1-52, M1-53, M2-39).
+// with every check, unique index, index and foreign key; groups.provider_id is added by the
+// migration of identity_providers (M1-36). The only deviations are the deferred foreign keys
+// grants.target_space_id, target_channel_id and target_host_id (M1-52, M1-53, M2-39).
 func TestAuthzGroupsGrantsSchema(t *testing.T) {
 	t.Parallel()
 	conn := pgtest.New(t).SuperConn(t)
@@ -69,6 +69,7 @@ func TestAuthzGroupsGrantsSchema(t *testing.T) {
 				"groups_created_by_fkey: FOREIGN KEY (created_by) REFERENCES principals(id) ON DELETE RESTRICT",
 				"groups_external_ref_shape_check: CHECK (((source = 'oidc_claim'::text) = (external_ref IS NOT NULL)))",
 				"groups_pkey: PRIMARY KEY (id)",
+				"groups_provider_id_fkey: FOREIGN KEY (provider_id) REFERENCES identity_providers(id) ON DELETE RESTRICT",
 				"groups_provider_shape_check: CHECK (((source = 'oidc_claim'::text) = (provider_id IS NOT NULL)))",
 				"groups_source_check: CHECK ((source = ANY (ARRAY['local'::text, 'oidc_claim'::text])))",
 			},

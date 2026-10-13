@@ -15123,6 +15123,18 @@ type RefreshTokenParams struct {
 	DPoP DpopProof `json:"DPoP"`
 }
 
+// CreateIdentityProviderParams defines parameters for CreateIdentityProvider.
+type CreateIdentityProviderParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UpdateIdentityProviderParams defines parameters for UpdateIdentityProvider.
+type UpdateIdentityProviderParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListMyDevicesParams defines parameters for ListMyDevices.
 type ListMyDevicesParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -15211,6 +15223,12 @@ type CompleteStepUpWithDeviceKeyJSONRequestBody = StepUpDeviceKeyRequest
 
 // RefreshTokenJSONRequestBody defines body for RefreshToken for application/json ContentType.
 type RefreshTokenJSONRequestBody = TokenRefreshRequest
+
+// CreateIdentityProviderJSONRequestBody defines body for CreateIdentityProvider for application/json ContentType.
+type CreateIdentityProviderJSONRequestBody = IdentityProviderCreate
+
+// UpdateIdentityProviderJSONRequestBody defines body for UpdateIdentityProvider for application/json ContentType.
+type UpdateIdentityProviderJSONRequestBody = IdentityProviderUpdate
 
 // UpdateMyProfileJSONRequestBody defines body for UpdateMyProfile for application/json ContentType.
 type UpdateMyProfileJSONRequestBody = ProfileUpdate
@@ -17082,12 +17100,30 @@ type ServerInterface interface {
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(w http.ResponseWriter, r *http.Request, deviceId DeviceIdPath)
+	// ListIdentityProviders List identity providers
+	// (GET /identity-providers)
+	ListIdentityProviders(w http.ResponseWriter, r *http.Request)
+	// CreateIdentityProvider Add an identity provider
+	// (POST /identity-providers)
+	CreateIdentityProvider(w http.ResponseWriter, r *http.Request, params CreateIdentityProviderParams)
+	// DeleteIdentityProvider Remove an identity provider
+	// (DELETE /identity-providers/{provider_id})
+	DeleteIdentityProvider(w http.ResponseWriter, r *http.Request, providerId ProviderIdPath)
+	// GetIdentityProvider Read an identity provider
+	// (GET /identity-providers/{provider_id})
+	GetIdentityProvider(w http.ResponseWriter, r *http.Request, providerId ProviderIdPath)
+	// UpdateIdentityProvider Change an identity provider
+	// (PATCH /identity-providers/{provider_id})
+	UpdateIdentityProvider(w http.ResponseWriter, r *http.Request, providerId ProviderIdPath, params UpdateIdentityProviderParams)
 	// GetJwks Public keys for access and invocation tokens
 	// (GET /instance/jwks)
 	GetJwks(w http.ResponseWriter, r *http.Request)
 	// GetMe Read the calling principal
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// GetMyCredentials List own identities and passkeys
+	// (GET /me/credentials)
+	GetMyCredentials(w http.ResponseWriter, r *http.Request)
 	// ListMyDevices List own devices
 	// (GET /me/devices)
 	ListMyDevices(w http.ResponseWriter, r *http.Request, params ListMyDevicesParams)
@@ -17124,12 +17160,18 @@ type ServerInterface interface {
 	// UpdateUser Change another person's profile
 	// (PATCH /users/{user_id})
 	UpdateUser(w http.ResponseWriter, r *http.Request, userId UserIdPath, params UpdateUserParams)
+	// GetUserCredentials List identities and passkeys of a person
+	// (GET /users/{user_id}/credentials)
+	GetUserCredentials(w http.ResponseWriter, r *http.Request, userId UserIdPath)
 	// ListUserDevices List devices of a person
 	// (GET /users/{user_id}/devices)
 	ListUserDevices(w http.ResponseWriter, r *http.Request, userId UserIdPath, params ListUserDevicesParams)
 	// EnableUser Enable a person
 	// (POST /users/{user_id}/enable)
 	EnableUser(w http.ResponseWriter, r *http.Request, userId UserIdPath, params EnableUserParams)
+	// UnlinkIdentity Unlink an identity
+	// (DELETE /users/{user_id}/identities/{identity_id})
+	UnlinkIdentity(w http.ResponseWriter, r *http.Request, userId UserIdPath, identityId IdentityIdPath)
 	// ListUserSessions List sessions of a person
 	// (GET /users/{user_id}/sessions)
 	ListUserSessions(w http.ResponseWriter, r *http.Request, userId UserIdPath, params ListUserSessionsParams)
@@ -17257,6 +17299,163 @@ func (siw *ServerInterfaceWrapper) GetDevice(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// ListIdentityProviders operation middleware
+func (siw *ServerInterfaceWrapper) ListIdentityProviders(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListIdentityProviders(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateIdentityProvider operation middleware
+func (siw *ServerInterfaceWrapper) CreateIdentityProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CreateIdentityProviderParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateIdentityProvider(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteIdentityProvider operation middleware
+func (siw *ServerInterfaceWrapper) DeleteIdentityProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider_id" -------------
+	var providerId ProviderIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider_id", r.PathValue("provider_id"), &providerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteIdentityProvider(w, r, providerId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetIdentityProvider operation middleware
+func (siw *ServerInterfaceWrapper) GetIdentityProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider_id" -------------
+	var providerId ProviderIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider_id", r.PathValue("provider_id"), &providerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetIdentityProvider(w, r, providerId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateIdentityProvider operation middleware
+func (siw *ServerInterfaceWrapper) UpdateIdentityProvider(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "provider_id" -------------
+	var providerId ProviderIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "provider_id", r.PathValue("provider_id"), &providerId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "provider_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateIdentityProviderParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey IdempotencyKey
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: "uuid"})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = &IdempotencyKey
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateIdentityProvider(w, r, providerId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetJwks operation middleware
 func (siw *ServerInterfaceWrapper) GetJwks(w http.ResponseWriter, r *http.Request) {
 
@@ -17276,6 +17475,20 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMyCredentials operation middleware
+func (siw *ServerInterfaceWrapper) GetMyCredentials(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMyCredentials(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -17767,6 +17980,32 @@ func (siw *ServerInterfaceWrapper) UpdateUser(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// GetUserCredentials operation middleware
+func (siw *ServerInterfaceWrapper) GetUserCredentials(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetUserCredentials(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListUserDevices operation middleware
 func (siw *ServerInterfaceWrapper) ListUserDevices(w http.ResponseWriter, r *http.Request) {
 
@@ -17863,6 +18102,41 @@ func (siw *ServerInterfaceWrapper) EnableUser(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.EnableUser(w, r, userId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnlinkIdentity operation middleware
+func (siw *ServerInterfaceWrapper) UnlinkIdentity(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "user_id" -------------
+	var userId UserIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "user_id", r.PathValue("user_id"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "user_id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "identity_id" -------------
+	var identityId IdentityIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "identity_id", r.PathValue("identity_id"), &identityId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "identity_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnlinkIdentity(w, r, userId, identityId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -18054,11 +18328,14 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/device-key", wrapper.CompleteStepUpWithDeviceKey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/me/profile", wrapper.UpdateMyProfile)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/credentials", wrapper.GetMyCredentials)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users", wrapper.ListUsers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users", wrapper.CreateUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}", wrapper.GetUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/users/{user_id}", wrapper.UpdateUser)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users/{user_id}/enable", wrapper.EnableUser)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/credentials", wrapper.GetUserCredentials)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/users/{user_id}/identities/{identity_id}", wrapper.UnlinkIdentity)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/devices", wrapper.ListUserDevices)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}/sessions", wrapper.ListUserSessions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/owners", wrapper.ListOwners)
@@ -18069,6 +18346,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/sessions", wrapper.ListMySessions)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/sessions/extensions", wrapper.CreateExtensionSession)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/signing-keys/rotate", wrapper.RotateSigningKey)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/identity-providers", wrapper.ListIdentityProviders)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/identity-providers", wrapper.CreateIdentityProvider)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/identity-providers/{provider_id}", wrapper.DeleteIdentityProvider)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/identity-providers/{provider_id}", wrapper.GetIdentityProvider)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/identity-providers/{provider_id}", wrapper.UpdateIdentityProvider)
 
 	return m
 }
@@ -18927,6 +19209,893 @@ func (response GetDevicedefaultApplicationProblemPlusJSONResponse) VisitGetDevic
 	return err
 }
 
+type ListIdentityProvidersRequestObject struct {
+}
+
+type ListIdentityProvidersResponseObject interface {
+	VisitListIdentityProvidersResponse(w http.ResponseWriter) error
+}
+
+type ListIdentityProviders200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type ListIdentityProviders200JSONResponse struct {
+	Body    IdentityProviderList
+	Headers ListIdentityProviders200ResponseHeaders
+}
+
+func (response ListIdentityProviders200JSONResponse) VisitListIdentityProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListIdentityProviders401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListIdentityProviders401ApplicationProblemPlusJSONResponse) VisitListIdentityProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListIdentityProviders403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListIdentityProviders403ApplicationProblemPlusJSONResponse) VisitListIdentityProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListIdentityProviders429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response ListIdentityProviders429ApplicationProblemPlusJSONResponse) VisitListIdentityProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListIdentityProvidersdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response ListIdentityProvidersdefaultApplicationProblemPlusJSONResponse) VisitListIdentityProvidersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIdentityProviderRequestObject struct {
+	Params CreateIdentityProviderParams
+	Body   *CreateIdentityProviderJSONRequestBody
+}
+
+type CreateIdentityProviderResponseObject interface {
+	VisitCreateIdentityProviderResponse(w http.ResponseWriter) error
+}
+
+type CreateIdentityProvider201ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type CreateIdentityProvider201JSONResponse struct {
+	Body    IdentityProvider
+	Headers CreateIdentityProvider201ResponseHeaders
+}
+
+func (response CreateIdentityProvider201JSONResponse) VisitCreateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIdentityProvider400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response CreateIdentityProvider400ApplicationProblemPlusJSONResponse) VisitCreateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIdentityProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response CreateIdentityProvider401ApplicationProblemPlusJSONResponse) VisitCreateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIdentityProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response CreateIdentityProvider403ApplicationProblemPlusJSONResponse) VisitCreateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIdentityProvider409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response CreateIdentityProvider409ApplicationProblemPlusJSONResponse) VisitCreateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIdentityProvider422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response CreateIdentityProvider422ApplicationProblemPlusJSONResponse) VisitCreateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIdentityProvider429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response CreateIdentityProvider429ApplicationProblemPlusJSONResponse) VisitCreateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateIdentityProviderdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response CreateIdentityProviderdefaultApplicationProblemPlusJSONResponse) VisitCreateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteIdentityProviderRequestObject struct {
+	ProviderId ProviderIdPath `json:"provider_id"`
+}
+
+type DeleteIdentityProviderResponseObject interface {
+	VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error
+}
+
+type DeleteIdentityProvider204ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type DeleteIdentityProvider204Response struct {
+	Headers DeleteIdentityProvider204ResponseHeaders
+}
+
+func (response DeleteIdentityProvider204Response) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteIdentityProvider400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteIdentityProvider400ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteIdentityProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteIdentityProvider401ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteIdentityProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteIdentityProvider403ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteIdentityProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteIdentityProvider404ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteIdentityProvider409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteIdentityProvider409ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteIdentityProvider429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response DeleteIdentityProvider429ApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteIdentityProviderdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response DeleteIdentityProviderdefaultApplicationProblemPlusJSONResponse) VisitDeleteIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIdentityProviderRequestObject struct {
+	ProviderId ProviderIdPath `json:"provider_id"`
+}
+
+type GetIdentityProviderResponseObject interface {
+	VisitGetIdentityProviderResponse(w http.ResponseWriter) error
+}
+
+type GetIdentityProvider200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type GetIdentityProvider200JSONResponse struct {
+	Body    IdentityProvider
+	Headers GetIdentityProvider200ResponseHeaders
+}
+
+func (response GetIdentityProvider200JSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIdentityProvider400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetIdentityProvider400ApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIdentityProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetIdentityProvider401ApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIdentityProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetIdentityProvider403ApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIdentityProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetIdentityProvider404ApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIdentityProvider429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetIdentityProvider429ApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetIdentityProviderdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response GetIdentityProviderdefaultApplicationProblemPlusJSONResponse) VisitGetIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIdentityProviderRequestObject struct {
+	ProviderId ProviderIdPath `json:"provider_id"`
+	Params     UpdateIdentityProviderParams
+	Body       *UpdateIdentityProviderJSONRequestBody
+}
+
+type UpdateIdentityProviderResponseObject interface {
+	VisitUpdateIdentityProviderResponse(w http.ResponseWriter) error
+}
+
+type UpdateIdentityProvider200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type UpdateIdentityProvider200JSONResponse struct {
+	Body    IdentityProvider
+	Headers UpdateIdentityProvider200ResponseHeaders
+}
+
+func (response UpdateIdentityProvider200JSONResponse) VisitUpdateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIdentityProvider400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateIdentityProvider400ApplicationProblemPlusJSONResponse) VisitUpdateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIdentityProvider401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateIdentityProvider401ApplicationProblemPlusJSONResponse) VisitUpdateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIdentityProvider403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateIdentityProvider403ApplicationProblemPlusJSONResponse) VisitUpdateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIdentityProvider404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateIdentityProvider404ApplicationProblemPlusJSONResponse) VisitUpdateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIdentityProvider409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateIdentityProvider409ApplicationProblemPlusJSONResponse) VisitUpdateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIdentityProvider422ApplicationProblemPlusJSONResponse struct {
+	UnprocessableEntityApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateIdentityProvider422ApplicationProblemPlusJSONResponse) VisitUpdateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIdentityProvider429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateIdentityProvider429ApplicationProblemPlusJSONResponse) VisitUpdateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateIdentityProviderdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response UpdateIdentityProviderdefaultApplicationProblemPlusJSONResponse) VisitUpdateIdentityProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetJwksRequestObject struct {
 }
 
@@ -19133,6 +20302,138 @@ type GetMedefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetMedefaultApplicationProblemPlusJSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyCredentialsRequestObject struct {
+}
+
+type GetMyCredentialsResponseObject interface {
+	VisitGetMyCredentialsResponse(w http.ResponseWriter) error
+}
+
+type GetMyCredentials200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type GetMyCredentials200JSONResponse struct {
+	Body    CredentialOverview
+	Headers GetMyCredentials200ResponseHeaders
+}
+
+func (response GetMyCredentials200JSONResponse) VisitGetMyCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyCredentials401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetMyCredentials401ApplicationProblemPlusJSONResponse) VisitGetMyCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyCredentials403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetMyCredentials403ApplicationProblemPlusJSONResponse) VisitGetMyCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyCredentials429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetMyCredentials429ApplicationProblemPlusJSONResponse) VisitGetMyCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMyCredentialsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response GetMyCredentialsdefaultApplicationProblemPlusJSONResponse) VisitGetMyCredentialsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -21198,6 +22499,177 @@ func (response UpdateUserdefaultApplicationProblemPlusJSONResponse) VisitUpdateU
 	return err
 }
 
+type GetUserCredentialsRequestObject struct {
+	UserId UserIdPath `json:"user_id"`
+}
+
+type GetUserCredentialsResponseObject interface {
+	VisitGetUserCredentialsResponse(w http.ResponseWriter) error
+}
+
+type GetUserCredentials200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type GetUserCredentials200JSONResponse struct {
+	Body    CredentialOverview
+	Headers GetUserCredentials200ResponseHeaders
+}
+
+func (response GetUserCredentials200JSONResponse) VisitGetUserCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUserCredentials400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetUserCredentials400ApplicationProblemPlusJSONResponse) VisitGetUserCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUserCredentials401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetUserCredentials401ApplicationProblemPlusJSONResponse) VisitGetUserCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUserCredentials403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetUserCredentials403ApplicationProblemPlusJSONResponse) VisitGetUserCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUserCredentials404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetUserCredentials404ApplicationProblemPlusJSONResponse) VisitGetUserCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUserCredentials429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetUserCredentials429ApplicationProblemPlusJSONResponse) VisitGetUserCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetUserCredentialsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response GetUserCredentialsdefaultApplicationProblemPlusJSONResponse) VisitGetUserCredentialsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListUserDevicesRequestObject struct {
 	UserId UserIdPath `json:"user_id"`
 	Params ListUserDevicesParams
@@ -21581,6 +23053,189 @@ func (response EnableUserdefaultApplicationProblemPlusJSONResponse) VisitEnableU
 	return err
 }
 
+type UnlinkIdentityRequestObject struct {
+	UserId     UserIdPath     `json:"user_id"`
+	IdentityId IdentityIdPath `json:"identity_id"`
+}
+
+type UnlinkIdentityResponseObject interface {
+	VisitUnlinkIdentityResponse(w http.ResponseWriter) error
+}
+
+type UnlinkIdentity204ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type UnlinkIdentity204Response struct {
+	Headers UnlinkIdentity204ResponseHeaders
+}
+
+func (response UnlinkIdentity204Response) VisitUnlinkIdentityResponse(w http.ResponseWriter) error {
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(204)
+	return nil
+}
+
+type UnlinkIdentity400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkIdentity400ApplicationProblemPlusJSONResponse) VisitUnlinkIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkIdentity401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkIdentity401ApplicationProblemPlusJSONResponse) VisitUnlinkIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkIdentity403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkIdentity403ApplicationProblemPlusJSONResponse) VisitUnlinkIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkIdentity404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkIdentity404ApplicationProblemPlusJSONResponse) VisitUnlinkIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkIdentity409ApplicationProblemPlusJSONResponse struct {
+	ConflictApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkIdentity409ApplicationProblemPlusJSONResponse) VisitUnlinkIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkIdentity429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response UnlinkIdentity429ApplicationProblemPlusJSONResponse) VisitUnlinkIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnlinkIdentitydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response UnlinkIdentitydefaultApplicationProblemPlusJSONResponse) VisitUnlinkIdentityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListUserSessionsRequestObject struct {
 	UserId UserIdPath `json:"user_id"`
 	Params ListUserSessionsParams
@@ -21770,12 +23425,30 @@ type StrictServerInterface interface {
 	// GetDevice Read a device
 	// (GET /devices/{device_id})
 	GetDevice(ctx context.Context, request GetDeviceRequestObject) (GetDeviceResponseObject, error)
+	// ListIdentityProviders List identity providers
+	// (GET /identity-providers)
+	ListIdentityProviders(ctx context.Context, request ListIdentityProvidersRequestObject) (ListIdentityProvidersResponseObject, error)
+	// CreateIdentityProvider Add an identity provider
+	// (POST /identity-providers)
+	CreateIdentityProvider(ctx context.Context, request CreateIdentityProviderRequestObject) (CreateIdentityProviderResponseObject, error)
+	// DeleteIdentityProvider Remove an identity provider
+	// (DELETE /identity-providers/{provider_id})
+	DeleteIdentityProvider(ctx context.Context, request DeleteIdentityProviderRequestObject) (DeleteIdentityProviderResponseObject, error)
+	// GetIdentityProvider Read an identity provider
+	// (GET /identity-providers/{provider_id})
+	GetIdentityProvider(ctx context.Context, request GetIdentityProviderRequestObject) (GetIdentityProviderResponseObject, error)
+	// UpdateIdentityProvider Change an identity provider
+	// (PATCH /identity-providers/{provider_id})
+	UpdateIdentityProvider(ctx context.Context, request UpdateIdentityProviderRequestObject) (UpdateIdentityProviderResponseObject, error)
 	// GetJwks Public keys for access and invocation tokens
 	// (GET /instance/jwks)
 	GetJwks(ctx context.Context, request GetJwksRequestObject) (GetJwksResponseObject, error)
 	// GetMe Read the calling principal
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// GetMyCredentials List own identities and passkeys
+	// (GET /me/credentials)
+	GetMyCredentials(ctx context.Context, request GetMyCredentialsRequestObject) (GetMyCredentialsResponseObject, error)
 	// ListMyDevices List own devices
 	// (GET /me/devices)
 	ListMyDevices(ctx context.Context, request ListMyDevicesRequestObject) (ListMyDevicesResponseObject, error)
@@ -21812,12 +23485,18 @@ type StrictServerInterface interface {
 	// UpdateUser Change another person's profile
 	// (PATCH /users/{user_id})
 	UpdateUser(ctx context.Context, request UpdateUserRequestObject) (UpdateUserResponseObject, error)
+	// GetUserCredentials List identities and passkeys of a person
+	// (GET /users/{user_id}/credentials)
+	GetUserCredentials(ctx context.Context, request GetUserCredentialsRequestObject) (GetUserCredentialsResponseObject, error)
 	// ListUserDevices List devices of a person
 	// (GET /users/{user_id}/devices)
 	ListUserDevices(ctx context.Context, request ListUserDevicesRequestObject) (ListUserDevicesResponseObject, error)
 	// EnableUser Enable a person
 	// (POST /users/{user_id}/enable)
 	EnableUser(ctx context.Context, request EnableUserRequestObject) (EnableUserResponseObject, error)
+	// UnlinkIdentity Unlink an identity
+	// (DELETE /users/{user_id}/identities/{identity_id})
+	UnlinkIdentity(ctx context.Context, request UnlinkIdentityRequestObject) (UnlinkIdentityResponseObject, error)
 	// ListUserSessions List sessions of a person
 	// (GET /users/{user_id}/sessions)
 	ListUserSessions(ctx context.Context, request ListUserSessionsRequestObject) (ListUserSessionsResponseObject, error)
@@ -22000,6 +23679,149 @@ func (sh *strictHandler) GetDevice(w http.ResponseWriter, r *http.Request, devic
 	}
 }
 
+// ListIdentityProviders operation middleware
+func (sh *strictHandler) ListIdentityProviders(w http.ResponseWriter, r *http.Request) {
+	var request ListIdentityProvidersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListIdentityProviders(ctx, request.(ListIdentityProvidersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListIdentityProviders")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListIdentityProvidersResponseObject); ok {
+		if err := validResponse.VisitListIdentityProvidersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateIdentityProvider operation middleware
+func (sh *strictHandler) CreateIdentityProvider(w http.ResponseWriter, r *http.Request, params CreateIdentityProviderParams) {
+	var request CreateIdentityProviderRequestObject
+
+	request.Params = params
+
+	var body CreateIdentityProviderJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateIdentityProvider(ctx, request.(CreateIdentityProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateIdentityProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateIdentityProviderResponseObject); ok {
+		if err := validResponse.VisitCreateIdentityProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteIdentityProvider operation middleware
+func (sh *strictHandler) DeleteIdentityProvider(w http.ResponseWriter, r *http.Request, providerId ProviderIdPath) {
+	var request DeleteIdentityProviderRequestObject
+
+	request.ProviderId = providerId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteIdentityProvider(ctx, request.(DeleteIdentityProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteIdentityProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteIdentityProviderResponseObject); ok {
+		if err := validResponse.VisitDeleteIdentityProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetIdentityProvider operation middleware
+func (sh *strictHandler) GetIdentityProvider(w http.ResponseWriter, r *http.Request, providerId ProviderIdPath) {
+	var request GetIdentityProviderRequestObject
+
+	request.ProviderId = providerId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetIdentityProvider(ctx, request.(GetIdentityProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetIdentityProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetIdentityProviderResponseObject); ok {
+		if err := validResponse.VisitGetIdentityProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateIdentityProvider operation middleware
+func (sh *strictHandler) UpdateIdentityProvider(w http.ResponseWriter, r *http.Request, providerId ProviderIdPath, params UpdateIdentityProviderParams) {
+	var request UpdateIdentityProviderRequestObject
+
+	request.ProviderId = providerId
+	request.Params = params
+
+	var body UpdateIdentityProviderJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateIdentityProvider(ctx, request.(UpdateIdentityProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateIdentityProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateIdentityProviderResponseObject); ok {
+		if err := validResponse.VisitUpdateIdentityProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetJwks operation middleware
 func (sh *strictHandler) GetJwks(w http.ResponseWriter, r *http.Request) {
 	var request GetJwksRequestObject
@@ -22041,6 +23863,30 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetMyCredentials operation middleware
+func (sh *strictHandler) GetMyCredentials(w http.ResponseWriter, r *http.Request) {
+	var request GetMyCredentialsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMyCredentials(ctx, request.(GetMyCredentialsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMyCredentials")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMyCredentialsResponseObject); ok {
+		if err := validResponse.VisitGetMyCredentialsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -22407,6 +24253,32 @@ func (sh *strictHandler) UpdateUser(w http.ResponseWriter, r *http.Request, user
 	}
 }
 
+// GetUserCredentials operation middleware
+func (sh *strictHandler) GetUserCredentials(w http.ResponseWriter, r *http.Request, userId UserIdPath) {
+	var request GetUserCredentialsRequestObject
+
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetUserCredentials(ctx, request.(GetUserCredentialsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetUserCredentials")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetUserCredentialsResponseObject); ok {
+		if err := validResponse.VisitGetUserCredentialsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListUserDevices operation middleware
 func (sh *strictHandler) ListUserDevices(w http.ResponseWriter, r *http.Request, userId UserIdPath, params ListUserDevicesParams) {
 	var request ListUserDevicesRequestObject
@@ -22461,6 +24333,33 @@ func (sh *strictHandler) EnableUser(w http.ResponseWriter, r *http.Request, user
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(EnableUserResponseObject); ok {
 		if err := validResponse.VisitEnableUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnlinkIdentity operation middleware
+func (sh *strictHandler) UnlinkIdentity(w http.ResponseWriter, r *http.Request, userId UserIdPath, identityId IdentityIdPath) {
+	var request UnlinkIdentityRequestObject
+
+	request.UserId = userId
+	request.IdentityId = identityId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnlinkIdentity(ctx, request.(UnlinkIdentityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnlinkIdentity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnlinkIdentityResponseObject); ok {
+		if err := validResponse.VisitUnlinkIdentityResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

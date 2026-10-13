@@ -11,6 +11,23 @@ documented in this file. The format is based on
 
 ### Added
 
+- Identity provider port and provider management (M1-36): the migration
+  `00013_identity_providers.sql` (`identity_providers`, `user_identities`, and the deferred foreign
+  keys `auth_sessions.identity_id` and `groups.provider_id`), the ports `identity.Providers` and
+  `identity.Identities` with `ExternalIdentity`, `Resolution`, `Identity` and
+  `CredentialOverview`, and the operations `listIdentityProviders`, `createIdentityProvider`,
+  `getIdentityProvider`, `updateIdentityProvider`, `deleteIdentityProvider` (owner only; manage
+  with step-up and audit), `getMyCredentials`, `getUserCredentials` (`identity.read`, self or
+  owner) and `unlinkIdentity` (`identity.unlink`, self or owner, step-up). Configurations follow
+  the strict schemas `identity_provider.oidc.v1`, `identity_provider.trusted_header.v1` and
+  `identity_provider.local.v1` (unknown members, duplicate keys and null refused; secrets only as
+  `file:` or `env:` references, checked for syntax and never resolved). At most one
+  `trusted_header` and one `local` provider, names unique without regard to case. An external
+  identity maps to a person only through provider, subject and, for OIDC, issuer, never through
+  e-mail (ID-T04). Unlinking refuses to remove the last sign-in method (`409
+  no_login_method_left`, also under concurrency); unlinking an identity and disabling a provider
+  revoke the sessions started through them. A provider that identities or claim groups reference
+  cannot be deleted (`409`, disable it instead).
 - Step-up with the device key (M1-35): the migration `00012_identity_step_up.sql`
   (`auth_challenges` with every purpose of 03), the port `identity.StepUp` with
   `CreateChallenge` and `CompleteWithDeviceKey`, and the operations `createStepUpChallenge` and

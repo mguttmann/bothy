@@ -11,13 +11,19 @@ enabled:             # operationIds that have a handler; sorted ascending
   - addOwner
   - completeStepUpWithDeviceKey
   - createExtensionSession
+  - createIdentityProvider
   - createStepUpChallenge
   - createUser
+  - deleteIdentityProvider
   - enableUser
   - getDevice
+  - getIdentityProvider
   - getJwks
   - getMe
+  - getMyCredentials
   - getUser
+  - getUserCredentials
+  - listIdentityProviders
   - listMyDevices
   - listMySessions
   - listOwners
@@ -28,6 +34,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - refreshToken
   - revokeOwner
   - rotateSigningKey
+  - unlinkIdentity
+  - updateIdentityProvider
   - updateMyProfile
   - updateUser
 later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id
@@ -174,9 +182,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createHost
     etappe: M2
     ticket: M2-39
-  - operation_id: createIdentityProvider
-    etappe: M1
-    ticket: M1-36
   - operation_id: createImport
     etappe: M8
     ticket: M8-03
@@ -239,9 +244,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteGroup
     etappe: M1
     ticket: M1-48
-  - operation_id: deleteIdentityProvider
-    etappe: M1
-    ticket: M1-36
   - operation_id: deleteMessage
     etappe: M1
     ticket: M1-58
@@ -350,9 +352,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getHost
     etappe: M2
     ticket: M2-39
-  - operation_id: getIdentityProvider
-    etappe: M1
-    ticket: M1-36
   - operation_id: getImport
     etappe: M8
     ticket: M8-03
@@ -362,9 +361,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getMessage
     etappe: M1
     ticket: M1-57
-  - operation_id: getMyCredentials
-    etappe: M1
-    ticket: M1-36
   - operation_id: getMySidebar
     etappe: M1
     ticket: M1-61
@@ -430,9 +426,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getUsageStats
     etappe: M6
     ticket: M6-05
-  - operation_id: getUserCredentials
-    etappe: M1
-    ticket: M1-36
   - operation_id: getWebhookKeys
     etappe: M2
     ticket: M2-26
@@ -498,9 +491,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listHosts
     etappe: M2
     ticket: M2-39
-  - operation_id: listIdentityProviders
-    etappe: M1
-    ticket: M1-36
   - operation_id: listImportItems
     etappe: M8
     ticket: M8-03
@@ -799,9 +789,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: uninstallApp
     etappe: M2
     ticket: M2-24
-  - operation_id: unlinkIdentity
-    etappe: M1
-    ticket: M1-36
   - operation_id: unpinMessage
     etappe: M1
     ticket: M1-59
@@ -832,9 +819,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateHost
     etappe: M2
     ticket: M2-39
-  - operation_id: updateIdentityProvider
-    etappe: M1
-    ticket: M1-36
   - operation_id: updateMessage
     etappe: M1
     ticket: M1-58

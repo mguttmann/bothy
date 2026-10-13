@@ -65,6 +65,10 @@ var appPrivileges = map[string][]string{
 	// 03 auth_challenges (M1-35): transient single-use challenges; the job identity.auth_cleanup
 	// deletes the expired rows.
 	"auth_challenges": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 section 4.2 (M1-36): a provider without identities may be deleted (08 section 3.3); an
+	// identity is unlinked by unlinked_at and stays as history.
+	"identity_providers": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"user_identities":    {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

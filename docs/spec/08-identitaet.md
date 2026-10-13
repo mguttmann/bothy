@@ -246,6 +246,18 @@ den Secret-Provider darin und werden bei der Prüfung nicht aufgelöst.
 9110, z. B. `Tailscale-User-Login`) und `name_header` (optional, z. B. `Tailscale-User-Name`).
 `identity_provider.local.v1`: ein leeres Objekt.
 
+Refinements enforced at write time (M1-36, docs/DECISIONS.md M1-36/5): an `issuer` path segment
+`common`, `organizations` or `consumers` is refused, a multi-tenant provider names `{tenantid}`
+(at most once, in the path) with `allowed_tenant_ids`, which is refused without the placeholder;
+each tenant id matches `^[A-Za-z0-9][A-Za-z0-9._-]*$` and appears once. `client_key_alg`,
+`client_key_id` and `client_cert_x5t_s256` belong to `private_key_jwt` only; an absent
+`client_key_alg` is stored as `PS256`; `client_cert_x5t_s256` is a SHA-256 thumbprint as base64url
+without padding. Each `app_redirect_uris` entry is an `https` URL with host or a private-use scheme
+in reverse domain form, without user information or fragment, and appears once. Header names are
+stored in canonical form, and `name_header` differs from `login_header`. A secret reference must
+parse as `file:` or `env:` reference of the secret provider; schemes without a driver are refused.
+The stored and returned `config` is the normalized object; field errors point into `/config/...`.
+
 ## 3. Konto, Verknüpfung und Bereitstellung
 
 ### 3.1 Zuordnung einer externen Identität
@@ -306,6 +318,8 @@ Tabelle `enrollment_codes` (03). Eigenschaften:
   kein Anmeldeweg bleibt (keine Identität bei einem eingeschalteten Treiber, kein Passkey, kein
   aktives Gerät für Geräte-Kopplung). Die Prüfung sperrt die Identitäten der Person, damit zwei
   parallele Lösungen nicht beide gelingen.
+  A device counts for device pairing when it is `active` and not on the platform `cli`, which has
+  no step-up (ID-T29, docs/DECISIONS.md M1-36/3).
 - Lösen einer Identität beendet die Sitzungen, die mit ihr begonnen wurden (`auth_sessions.identity_id`,
   Grund `logout` bei der eigenen, `admin` bei fremder Hand); Abschalten eines Treibers (`enabled =
   false`) beendet die Sitzungen aller seiner Identitäten (`admin`) und verhindert neue Anmeldungen.

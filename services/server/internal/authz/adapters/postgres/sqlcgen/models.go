@@ -190,6 +190,17 @@ type IdempotencyKey struct {
 	ExpiresAt      pgtype.Timestamptz
 }
 
+type IdentityProvider struct {
+	ID                pgtype.UUID
+	Kind              string
+	Name              string
+	Config            []byte
+	Enabled           bool
+	AllowProvisioning bool
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+}
+
 type Instance struct {
 	ID               int16
 	InstanceID       pgtype.UUID
@@ -265,4 +276,16 @@ type User struct {
 	Locale       string
 	TimeZone     string
 	LastActiveAt pgtype.Timestamptz
+}
+
+type UserIdentity struct {
+	ID          pgtype.UUID
+	UserID      pgtype.UUID
+	ProviderID  pgtype.UUID
+	Subject     string
+	Issuer      pgtype.Text
+	EmailAtLink pgtype.Text
+	LinkedAt    pgtype.Timestamptz
+	LastLoginAt pgtype.Timestamptz
+	UnlinkedAt  pgtype.Timestamptz
 }

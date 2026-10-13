@@ -105,9 +105,42 @@ func (stubServer) RotateSigningKey(context.Context, rest.RotateSigningKeyRequest
 	return nil, nil
 }
 
+func (stubServer) ListIdentityProviders(context.Context, rest.ListIdentityProvidersRequestObject) (rest.ListIdentityProvidersResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateIdentityProvider(context.Context, rest.CreateIdentityProviderRequestObject) (rest.CreateIdentityProviderResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetIdentityProvider(context.Context, rest.GetIdentityProviderRequestObject) (rest.GetIdentityProviderResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateIdentityProvider(context.Context, rest.UpdateIdentityProviderRequestObject) (rest.UpdateIdentityProviderResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DeleteIdentityProvider(context.Context, rest.DeleteIdentityProviderRequestObject) (rest.DeleteIdentityProviderResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetMyCredentials(context.Context, rest.GetMyCredentialsRequestObject) (rest.GetMyCredentialsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetUserCredentials(context.Context, rest.GetUserCredentialsRequestObject) (rest.GetUserCredentialsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UnlinkIdentity(context.Context, rest.UnlinkIdentityRequestObject) (rest.UnlinkIdentityResponseObject, error) {
+	return nil, nil
+}
+
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
-// and the JWKS and the rotation of the signing keys (M1-32). A handler ticket that enables an operation changes this test together with
+// and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
+// (M1-35) and the providers and credentials (M1-36). A handler ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
 	type entry struct{ pattern, action, class string }
@@ -136,6 +169,15 @@ func TestRealTable_Enabled(t *testing.T) {
 		// M1-35
 		"createStepUpChallenge":       {"POST /api/v1/auth/step-up/challenge", "auth.step_up", "rl.public_auth"},
 		"completeStepUpWithDeviceKey": {"POST /api/v1/auth/step-up/device-key", "auth.step_up", "rl.public_auth"},
+		// M1-36
+		"listIdentityProviders":  {"GET /api/v1/identity-providers", "identity_provider.read", "rl.read"},
+		"createIdentityProvider": {"POST /api/v1/identity-providers", "identity_provider.manage", "rl.admin"},
+		"getIdentityProvider":    {"GET /api/v1/identity-providers/{provider_id}", "identity_provider.read", "rl.read"},
+		"updateIdentityProvider": {"PATCH /api/v1/identity-providers/{provider_id}", "identity_provider.manage", "rl.admin"},
+		"deleteIdentityProvider": {"DELETE /api/v1/identity-providers/{provider_id}", "identity_provider.manage", "rl.admin"},
+		"getMyCredentials":       {"GET /api/v1/me/credentials", "identity.read", "rl.read"},
+		"getUserCredentials":     {"GET /api/v1/users/{user_id}/credentials", "identity.read", "rl.read"},
+		"unlinkIdentity":         {"DELETE /api/v1/users/{user_id}/identities/{identity_id}", "identity.unlink", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
