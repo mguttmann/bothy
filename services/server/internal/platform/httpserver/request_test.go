@@ -265,6 +265,10 @@ func TestTransferDeadline_UsesTransferTimeout(t *testing.T) {
 	cfg.RequestTimeout, cfg.TransferTimeout = time.Second, time.Hour
 	blob := httpservertest.Op("uploadBlob", http.MethodPost, "/api/v1/blobs", "blob.upload")
 	blob.RequestBody = httpserver.BodyOctetStream
+	// A download (a success that streams a body that is not JSON) has no request body but the
+	// deadline of transfers too (02 section 14.2, M1-50).
+	export := httpservertest.Op("exportThings", http.MethodGet, "/api/v1/things-export", "thing.read")
+	export.Download = true
 	get := getThing()
 	left := map[string]time.Duration{}
 	measure := func(name string) http.HandlerFunc {
@@ -277,10 +281,12 @@ func TestTransferDeadline_UsesTransferTimeout(t *testing.T) {
 	h := httpservertest.New(t, httpservertest.Options{Config: &cfg, Routes: []httpservertest.Route{
 		{Op: blob, Handler: httpservertest.Authorized(blob.Action, measure("blob"))},
 		{Op: get, Handler: httpservertest.Authorized(get.Action, measure("get"))},
+		{Op: export, Handler: httpservertest.Authorized(export.Action, measure("export"))},
 	}})
 	h.Do(h.NewRequest(http.MethodPost, "/api/v1/blobs", "raw bytes", "Content-Type", "application/octet-stream"))
 	h.Do(h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast"))
-	if left["blob"] < 59*time.Minute || left["get"] > time.Second {
+	h.Do(h.NewRequest(http.MethodGet, "/api/v1/things-export", ""))
+	if left["blob"] < 59*time.Minute || left["get"] > time.Second || left["export"] < 59*time.Minute {
 		t.Fatalf("deadlines %v", left)
 	}
 }

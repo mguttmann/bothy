@@ -145,6 +145,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 
 		"audit.deny_aggregate_window":    {Kind: config.KindDuration, Default: "60s", Min: "1ms", Chapter: "05-actions.md"},
 		"audit.deny_aggregate_max_keys":  {Kind: config.KindInt, Default: "10000", Min: "1", Chapter: "05-actions.md"},
+		"audit.checkpoint_interval":      {Kind: config.KindDuration, Default: "1h", Min: "1s", Chapter: "19-security.md"},
+		"audit.checkpoint_sink":          {Kind: config.KindString, Default: "", Chapter: "19-security.md"},
 		"privacy.audit_ip_key_period":    {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "20-privacy.md"},
 		"privacy.audit_ip_key_retention": {Kind: config.KindDuration, Default: "90d", Min: "1s", Chapter: "20-privacy.md"},
 		"privacy.audit_ip_kek_ref":       {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/audit_ip_kek", Chapter: "20-privacy.md"},

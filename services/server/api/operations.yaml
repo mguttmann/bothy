@@ -17,6 +17,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createUser
   - deleteIdentityProvider
   - enableUser
+  - exportAuditEvents
   - getDevice
   - getIdentityProvider
   - getJwks
@@ -24,6 +25,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getMyCredentials
   - getUser
   - getUserCredentials
+  - listAuditEvents
   - listIdentityProviders
   - listMyDevices
   - listMySessions
@@ -41,6 +43,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateIdentityProvider
   - updateMyProfile
   - updateUser
+  - verifyAuditChain
 later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id
   - operation_id: abortUpload
     milestone: M3
@@ -297,9 +300,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: explainSpaceAccess
     milestone: M1
     ticket: M1-49
-  - operation_id: exportAuditEvents
-    milestone: M1
-    ticket: M1-50
   - operation_id: exportChannel
     milestone: M3
     ticket: M3-11
@@ -459,9 +459,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listApps
     milestone: M2
     ticket: M2-24
-  - operation_id: listAuditEvents
-    milestone: M1
-    ticket: M1-50
   - operation_id: listChannelCommands
     milestone: M2
     ticket: M2-16
@@ -846,9 +843,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: validateManifest
     milestone: M2
     ticket: M2-24
-  - operation_id: verifyAuditChain
-    milestone: M1
-    ticket: M1-50
   - operation_id: viewAsUser
     milestone: M1
     ticket: M1-49

@@ -68,6 +68,7 @@ var operations = []{{.Q}}Operation{
 		RequestBody:    {{$.Q}}{{body .RequestBody}},
 		BodyRequired:   {{.BodyRequired}},
 		ETagStatuses:   {{ints .ETagStatuses}},
+		Download:       {{.Download}},
 	},
 {{- end}}
 {{- if .Ops}}

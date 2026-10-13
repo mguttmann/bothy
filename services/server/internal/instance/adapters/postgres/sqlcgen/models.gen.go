@@ -26,6 +26,16 @@ type ApiToken struct {
 	RevokedBy   pgtype.UUID
 }
 
+type AuditCheckpoint struct {
+	Seq                    int64
+	Hash                   []byte
+	PreviousCheckpointHash []byte
+	Signature              []byte
+	Kid                    string
+	CreatedAt              pgtype.Timestamptz
+	ExportedAt             pgtype.Timestamptz
+}
+
 type AuditEvent struct {
 	Seq              int64
 	ID               pgtype.UUID

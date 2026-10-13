@@ -17,6 +17,18 @@ import (
 // stubServer implements the enabled operations without behaviour; Build only registers them.
 type stubServer struct{}
 
+func (stubServer) ListAuditEvents(context.Context, rest.ListAuditEventsRequestObject) (rest.ListAuditEventsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) ExportAuditEvents(context.Context, rest.ExportAuditEventsRequestObject) (rest.ExportAuditEventsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) VerifyAuditChain(context.Context, rest.VerifyAuditChainRequestObject) (rest.VerifyAuditChainResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) CreateStepUpChallenge(context.Context, rest.CreateStepUpChallengeRequestObject) (rest.CreateStepUpChallengeResponseObject, error) {
 	return nil, nil
 }
@@ -195,6 +207,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"listTokens":  {"GET /api/v1/principals/{principal_id}/tokens", "token.list", "rl.read"},
 		"createToken": {"POST /api/v1/principals/{principal_id}/tokens", "token.create", "rl.admin"},
 		"revokeToken": {"DELETE /api/v1/tokens/{token_id}", "token.revoke", "rl.admin"},
+		// M1-50
+		"listAuditEvents":   {"GET /api/v1/audit/events", "audit.read", "rl.admin"},
+		"exportAuditEvents": {"GET /api/v1/audit/export", "audit.read", "rl.admin"},
+		"verifyAuditChain":  {"POST /api/v1/audit/verify", "audit.verify", "rl.admin"},
 	}
 	ops := routes.Enabled()
 	if len(ops) != len(want) {
@@ -203,6 +219,10 @@ func TestRealTable_Enabled(t *testing.T) {
 	for _, op := range ops {
 		if w := want[op.ID]; w.pattern != op.Pattern || op.Action != w.action || op.RateLimitClass != w.class {
 			t.Errorf("operation %+v, want %+v", op, w)
+		}
+		// Only the export streams a body that is not JSON (route class of downloads, M1-50).
+		if op.Download != (op.ID == "exportAuditEvents") {
+			t.Errorf("%s: Download = %v", op.ID, op.Download)
 		}
 		if got, ok := routes.ByPattern(op.Pattern); !ok || got.ID != op.ID {
 			t.Errorf("ByPattern(%s) = %+v, %v", op.Pattern, got, ok)

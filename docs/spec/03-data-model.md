@@ -2193,7 +2193,9 @@ Purpose: signed checkpoints of the hash chain that are also stored outside the d
 | `exported_at` | `timestamptz` | yes | | stored at `audit.checkpoint_sink` |
 
 PK: `seq`. FK: `kid` -> `server_signing_keys(kid)` ON DELETE RESTRICT. Indexes: `(exported_at)
-WHERE exported_at IS NULL` for the export. Retention: `audit`. Permissions as for `audit_events`.
+WHERE exported_at IS NULL` for the export. Retention: `audit`. Permissions as for `audit_events`;
+in addition the application role may set `exported_at` once (column grant `UPDATE (exported_at)`
+and trigger, M1-50).
 
 #### `audit_ip_keys`
 

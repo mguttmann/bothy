@@ -18,6 +18,7 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "completeStepUpWithDeviceKey",
@@ -32,6 +33,7 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "createExtensionSession",
@@ -46,6 +48,7 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "createIdentityProvider",
@@ -60,6 +63,7 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "createStepUpChallenge",
@@ -74,6 +78,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "createToken",
@@ -88,6 +93,7 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "createUser",
@@ -102,6 +108,7 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "deleteIdentityProvider",
@@ -116,6 +123,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "enableUser",
@@ -130,6 +138,22 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
+	},
+	{
+		ID:             "exportAuditEvents",
+		Method:         "GET",
+		Path:           "/api/v1/audit/export",
+		Pattern:        "GET /api/v1/audit/export",
+		Action:         "audit.read",
+		RateLimitClass: "rl.admin",
+		Public:         false,
+		IdempotencyKey: false,
+		IfMatch:        IfMatchNone,
+		RequestBody:    BodyNone,
+		BodyRequired:   false,
+		ETagStatuses:   nil,
+		Download:       true,
 	},
 	{
 		ID:             "getDevice",
@@ -144,6 +168,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "getIdentityProvider",
@@ -158,6 +183,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "getJwks",
@@ -172,6 +198,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "getMe",
@@ -186,6 +213,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "getMyCredentials",
@@ -200,6 +228,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "getUser",
@@ -214,6 +243,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "getUserCredentials",
@@ -228,6 +258,22 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
+	},
+	{
+		ID:             "listAuditEvents",
+		Method:         "GET",
+		Path:           "/api/v1/audit/events",
+		Pattern:        "GET /api/v1/audit/events",
+		Action:         "audit.read",
+		RateLimitClass: "rl.admin",
+		Public:         false,
+		IdempotencyKey: false,
+		IfMatch:        IfMatchNone,
+		RequestBody:    BodyNone,
+		BodyRequired:   false,
+		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "listIdentityProviders",
@@ -242,6 +288,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "listMyDevices",
@@ -256,6 +303,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "listMySessions",
@@ -270,6 +318,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "listOwners",
@@ -284,6 +333,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "listTokens",
@@ -298,6 +348,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "listUserDevices",
@@ -312,6 +363,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "listUserSessions",
@@ -326,6 +378,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "listUsers",
@@ -340,6 +393,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "logout",
@@ -354,6 +408,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "refreshToken",
@@ -368,6 +423,7 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "revokeOwner",
@@ -382,6 +438,7 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "revokeToken",
@@ -396,6 +453,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "rotateSigningKey",
@@ -410,6 +468,7 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "unlinkIdentity",
@@ -424,6 +483,7 @@ var operations = []Operation{
 		RequestBody:    BodyNone,
 		BodyRequired:   false,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "updateIdentityProvider",
@@ -438,6 +498,7 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "updateMyProfile",
@@ -452,6 +513,7 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
 	},
 	{
 		ID:             "updateUser",
@@ -466,5 +528,21 @@ var operations = []Operation{
 		RequestBody:    BodyJSON,
 		BodyRequired:   true,
 		ETagStatuses:   nil,
+		Download:       false,
+	},
+	{
+		ID:             "verifyAuditChain",
+		Method:         "POST",
+		Path:           "/api/v1/audit/verify",
+		Pattern:        "POST /api/v1/audit/verify",
+		Action:         "audit.verify",
+		RateLimitClass: "rl.admin",
+		Public:         false,
+		IdempotencyKey: false,
+		IfMatch:        IfMatchNone,
+		RequestBody:    BodyJSON,
+		BodyRequired:   true,
+		ETagStatuses:   nil,
+		Download:       false,
 	},
 }

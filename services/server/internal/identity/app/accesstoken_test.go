@@ -99,6 +99,9 @@ func (k *fakeKeys) VerificationKey(_ context.Context, p instance.Purpose, kid st
 func (*fakeKeys) PublicKey(context.Context, string) (instance.PublicKey, error) {
 	return instance.PublicKey{}, errs.New(errs.CodeNotFound, "")
 }
+func (*fakeKeys) Verify(context.Context, instance.Purpose, []byte) ([]byte, string, error) {
+	return nil, "", instance.ErrJWSInvalid
+}
 func (*fakeKeys) JWKS(context.Context) (instance.JWKSet, error) { return instance.JWKSet{}, nil }
 func (*fakeKeys) Rotate(context.Context, actor.Actor, instance.RotateCommand) (instance.Rotation, error) {
 	return instance.Rotation{}, nil

@@ -162,6 +162,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"api.cors_allowed_origins =   # default\n" +
 		"api.page_size_default = 50  # default\n" +
 		"api.page_size_max = 200  # default\n" +
+		"audit.checkpoint_interval = 1h  # default\n" +
+		"audit.checkpoint_sink =   # default\n" +
 		"audit.deny_aggregate_max_keys = 10000  # default\n" +
 		"audit.deny_aggregate_window = 1m  # default\n" +
 		"auth.access_token_ttl = 10m  # default\n" +
@@ -399,4 +401,23 @@ func withPublicURL(env []string) []string {
 		return env
 	}
 	return append([]string{testPublicURL}, env...)
+}
+
+// TestSinkConfigRejectsUnknownScheme: bothy config check refuses an audit.checkpoint_sink with a
+// scheme other than file:// and names the supported scheme, never the value (19 section 16,
+// M1-50); file:// with an absolute path and the empty value pass.
+func TestSinkConfigRejectsUnknownScheme(t *testing.T) {
+	t.Parallel()
+	code, stdout, stderr := runConfig(t, wire.ConfigSchema, []string{"BOTHY_AUDIT__CHECKPOINT_SINK=s3://bucket/prefix"}, "check")
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "audit.checkpoint_sink") || !strings.Contains(stderr, "file://") {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want 1 and a problem naming audit.checkpoint_sink and file://", code, stdout, stderr)
+	}
+	if strings.Contains(stderr, "bucket") {
+		t.Errorf("the problem echoes the value: %q", stderr)
+	}
+	for _, ok := range []string{"file:///var/lib/bothy-checkpoints", ""} {
+		if code, _, stderr := runConfig(t, wire.ConfigSchema, []string{"BOTHY_AUDIT__CHECKPOINT_SINK=" + ok}, "check"); code != 0 {
+			t.Errorf("%q: exit %d, stderr %q", ok, code, stderr)
+		}
+	}
 }

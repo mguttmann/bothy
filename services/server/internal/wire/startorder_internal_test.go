@@ -15,7 +15,7 @@ import (
 // whose chain authenticates with it (M1-34).
 func TestStartSequenceModuleSteps(t *testing.T) {
 	t.Parallel()
-	want := []string{"audit", "sync", "authz", "identity", "signing_keys", "sessions", "routes", "jobs"}
+	want := []string{"audit", "sync", "authz", "identity", "signing_keys", "audit_log", "sessions", "routes", "jobs"}
 	for _, role := range []Role{RoleAPI, RoleWorker, RoleAll} {
 		names := componentNames(role)
 		last := -1

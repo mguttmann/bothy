@@ -55,9 +55,65 @@ ON CONFLICT (valid_from) DO NOTHING;
 SELECT id, valid_from, valid_until, key_ciphertext, key_ref FROM audit_ip_keys WHERE id = sqlc.arg(id);
 
 -- name: Rows :many
--- The rows from_seq .. to_seq in chain order, for recomputing the chain (tests, M1-50).
+-- The rows from_seq .. to_seq in chain order: the chain walk and the export (M1-50).
 SELECT seq, id, occurred_at, actor_principal_id, actor_device_id, actor_session_id, action, decision,
        deny_reason, resource_kind, resource_id, details, correlation_id, prev_hash, hash
 FROM audit_events
 WHERE seq BETWEEN sqlc.arg(from_seq) AND sqlc.arg(to_seq)
 ORDER BY seq;
+
+-- name: Bounds :one
+-- The smallest retained and the largest seq; both 0 for an empty log (seq starts at 1; M1-50).
+SELECT coalesce(min(seq), 0)::bigint AS first_seq, coalesce(max(seq), 0)::bigint AS head_seq FROM audit_events;
+
+-- name: ListEvents :many
+-- One page of listAuditEvents, newest first by seq after the keyset before_seq (M1-50). Every
+-- filter is optional; NULL filters nothing.
+SELECT seq, id, occurred_at, actor_principal_id, actor_device_id, actor_session_id, action, decision,
+       deny_reason, resource_kind, resource_id, details, correlation_id, prev_hash, hash
+FROM audit_events
+WHERE (sqlc.narg(actor_id)::uuid IS NULL OR actor_principal_id = sqlc.narg(actor_id))
+  AND (sqlc.narg(action)::text IS NULL OR action = sqlc.narg(action))
+  AND (sqlc.narg(decision)::text IS NULL OR decision = sqlc.narg(decision))
+  AND (sqlc.narg(resource_kind)::text IS NULL OR resource_kind = sqlc.narg(resource_kind))
+  AND (sqlc.narg(resource_id)::uuid IS NULL OR resource_id = sqlc.narg(resource_id))
+  AND (sqlc.narg(from_at)::timestamptz IS NULL OR occurred_at >= sqlc.narg(from_at))
+  AND (sqlc.narg(to_at)::timestamptz IS NULL OR occurred_at < sqlc.narg(to_at))
+  AND (sqlc.narg(before_seq)::bigint IS NULL OR seq < sqlc.narg(before_seq))
+ORDER BY seq DESC
+LIMIT sqlc.arg(row_limit);
+
+-- name: ExportSpan :one
+-- The smallest and the largest seq with occurred_at in [from_at, to_at); both 0 for none
+-- (M1-50, exportAuditEvents).
+SELECT coalesce(min(seq), 0)::bigint AS first_seq, coalesce(max(seq), 0)::bigint AS last_seq
+FROM audit_events
+WHERE occurred_at >= sqlc.arg(from_at) AND occurred_at < sqlc.arg(to_at);
+
+-- name: LastCheckpoint :one
+-- The checkpoint with the largest seq (M1-50, audit.chain_verify).
+SELECT seq, hash, previous_checkpoint_hash, signature, kid
+FROM audit_checkpoints
+ORDER BY seq DESC
+LIMIT 1;
+
+-- name: LockCheckpoints :exec
+-- Serialises the insert of checkpoints until the commit, so two runs never fork the chain.
+SELECT pg_advisory_xact_lock(hashtext('bothy.audit_checkpoints'));
+
+-- name: InsertCheckpoint :exec
+-- A checkpoint the job signed after it recomputed the chain up to seq.
+INSERT INTO audit_checkpoints (seq, hash, previous_checkpoint_hash, signature, kid)
+VALUES (sqlc.arg(seq), sqlc.arg(hash), sqlc.narg(previous_checkpoint_hash), sqlc.arg(signature), sqlc.arg(kid));
+
+-- name: UnexportedCheckpoints :many
+-- The checkpoints not yet at the sink, in seq order (index audit_checkpoints_unexported_idx).
+SELECT seq, hash, previous_checkpoint_hash, signature, kid
+FROM audit_checkpoints
+WHERE exported_at IS NULL
+ORDER BY seq
+LIMIT sqlc.arg(row_limit);
+
+-- name: MarkExported :exec
+-- The sink took checkpoint seq.
+UPDATE audit_checkpoints SET exported_at = sqlc.arg(exported_at) WHERE seq = sqlc.arg(seq) AND exported_at IS NULL;

@@ -41,7 +41,10 @@ func (c *Chain) routeStage(op Operation, next http.Handler) http.Handler {
 
 		limit, timeout := c.cfg.MaxJSONBodyBytes, c.cfg.RequestTimeout
 		if op.RequestBody.transfer() {
-			limit, timeout = c.cfg.MaxUploadBytes, c.cfg.TransferTimeout
+			limit = c.cfg.MaxUploadBytes
+		}
+		if op.transfer() {
+			timeout = c.cfg.TransferTimeout
 		}
 		// A body is read under the deadline of the route class (02 "Deadlines"), so a client that
 		// trickles its body cannot hold a request beyond it; transfers also bound the write. A JSON
@@ -54,7 +57,7 @@ func (c *Chain) routeStage(op Operation, next http.Handler) http.Handler {
 		if r.Body != nil && r.Body != http.NoBody {
 			_ = rc.SetReadDeadline(deadline)
 		}
-		if op.RequestBody.transfer() {
+		if op.transfer() {
 			_ = rc.SetWriteDeadline(deadline)
 		}
 		ctx, cancel := context.WithTimeout(withOperation(r.Context(), op), timeout)

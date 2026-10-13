@@ -21,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/jose"
 	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
@@ -536,6 +537,32 @@ func (k *Keys) PublicKey(ctx context.Context, kid string) (instance.PublicKey, e
 		return instance.PublicKey{}, errs.New(errs.CodeNotFound, "")
 	}
 	return publicKey(row), nil
+}
+
+// Verify checks a compact JWS against the key of p its header names, in any state (instance.Keys).
+func (k *Keys) Verify(ctx context.Context, p instance.Purpose, compactJWS []byte) ([]byte, string, error) {
+	j, err := jose.ParseCompactJWS(string(compactJWS), instance.SignatureAlgs(), "")
+	if err != nil {
+		return nil, "", fmt.Errorf("%w: %w", instance.ErrJWSInvalid, err)
+	}
+	if j.Header.Kid == "" || !p.Valid() {
+		return nil, "", fmt.Errorf("%w: no kid or an unmanaged purpose", instance.ErrJWSInvalid)
+	}
+	row, found, err := k.d.Repo.KeyByKID(ctx, j.Header.Kid)
+	if err != nil {
+		return nil, "", err
+	}
+	if !found || row.Purpose != p || row.Alg != j.Header.Alg {
+		return nil, "", fmt.Errorf("%w: unknown key for the purpose and algorithm", instance.ErrJWSInvalid)
+	}
+	jwk, err := jose.JWKFromPublicKey(slices.Clone(row.Public))
+	if err != nil {
+		return nil, "", fmt.Errorf("%w: %w", instance.ErrJWSInvalid, err)
+	}
+	if err := j.Verify(jwk); err != nil {
+		return nil, "", fmt.Errorf("%w: %w", instance.ErrJWSInvalid, err)
+	}
+	return j.Payload, row.KID, nil
 }
 
 func publicKey(row KeyRow) instance.PublicKey {

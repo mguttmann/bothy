@@ -129,6 +129,25 @@ func CanonicalRow(r Row) ([]byte, error) {
 	if at.Year() < 0 || at.Year() > 9999 || !at.Equal(TruncateTime(at)) {
 		return nil, fmt.Errorf("%w: occurred_at needs millisecond precision within the years 0000 to 9999", ErrOutOfDomain)
 	}
+	return AppendCanonical(nil, canonicalObject(r, at))
+}
+
+// EventJSON returns the API representation AuditEvent of r in the canonical form, which is the
+// canonical row of CanonicalRow plus hash as lower-case hex, serialised after RFC 8785: one line
+// of exportAuditEvents. A reader that drops hash and serialises the rest after RFC 8785 gets the
+// input of the hash back, so an export verifies offline (19 SEC-AUD-4). Errors are those of
+// CanonicalRow.
+func EventJSON(r Row) ([]byte, error) {
+	if _, err := CanonicalRow(r); err != nil {
+		return nil, err
+	}
+	obj := canonicalObject(r, r.OccurredAt.UTC())
+	obj["hash"] = hex.EncodeToString(r.Hash[:])
+	return AppendCanonical(nil, obj)
+}
+
+// canonicalObject is the object of CanonicalRow: the columns except hash, NULL columns omitted.
+func canonicalObject(r Row, at time.Time) map[string]any {
 	obj := map[string]any{
 		"seq":         r.Seq,
 		"id":          r.ID.String(),
@@ -145,7 +164,7 @@ func CanonicalRow(r Row) ([]byte, error) {
 	optionalID(obj, "correlation_id", r.CorrelationID)
 	optionalString(obj, "deny_reason", r.DenyReason)
 	optionalString(obj, "resource_kind", r.ResourceKind)
-	return AppendCanonical(nil, obj)
+	return obj
 }
 
 // optionalID sets obj[key] to the UUID text of id unless id is zero (NULL).

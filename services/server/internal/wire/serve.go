@@ -333,6 +333,7 @@ func (s *server) components() []lifecycle.Component {
 		step("authz", s.startAuthz),
 		step("identity", s.startIdentity),
 		step("signing_keys", s.startSigningKeys),
+		step("audit_log", s.startAuditLog),
 		step("sessions", s.startSessions),
 		step("routes", s.mountRoutes),
 	}
@@ -649,6 +650,9 @@ func (s *server) handlers() Handlers {
 	if h.Keys == nil && s.signingKeys != nil {
 		h.Keys = s.signingKeys.Handlers
 	}
+	if h.Log == nil && s.audit != nil {
+		h.Log = s.audit.Handlers()
+	}
 	return h
 }
 
@@ -668,6 +672,26 @@ func fill[T any](dst **T, built *T) {
 	if *dst == nil {
 		*dst = built
 	}
+}
+
+// startAuditLog is the second extension point of start step 7 (M1-50): the query, export and
+// verification of the audit log and the job audit.chain_verify over the signing keys of the
+// previous step, the Authorizer and the instance ID. Processes that run jobs write the warning
+// audit_checkpoint_sink_not_configured once here when no sink is configured (19 SEC-AUD-2).
+func (s *server) startAuditLog(ctx context.Context) error {
+	s.mu.Lock()
+	a, keys, az, rec := s.audit, s.signingKeys, s.authorizer, s.instance
+	s.mu.Unlock()
+	if a == nil || keys == nil || az == nil {
+		return errors.New("wire: the audit log needs the audit step, the signing keys and the Authorizer")
+	}
+	if err := a.BindLog(keys.Keys, az, rec.InstanceID, s.deps.Clock); err != nil {
+		return err
+	}
+	if s.worker() {
+		a.WarnWithoutSink(ctx)
+	}
+	return nil
 }
 
 // authorizerOf returns the Authorizer of the process, nil before the step authz ran.
@@ -845,6 +869,9 @@ func (s *server) startJobs(ctx context.Context) error {
 	if id == nil || id.AuthCleanup == nil {
 		return errors.New("wire: the jobs step needs the sessions step")
 	}
+	if a.Log() == nil {
+		return errors.New("wire: the jobs step needs the audit log step")
+	}
 	expiryCfg, err := AuthzExpiryConfig(s.values)
 	if err != nil {
 		return err
@@ -859,6 +886,7 @@ func (s *server) startJobs(ctx context.Context) error {
 		Expiry: expiry, ExpiryInterval: expiryCfg.Interval,
 		KeyRotation: keys.Keys, KeyRotationInterval: keyCheck,
 		AuthCleanup: id.AuthCleanup, AuthCleanupInterval: id.cfg.CleanupInterval,
+		ChainVerify: a.Log(), ChainVerifyInterval: a.cfg.CheckpointInterval,
 	})
 	if err != nil {
 		return err

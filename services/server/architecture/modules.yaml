@@ -67,7 +67,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [instance]
-    adapter_vendors: [pgx]
+    adapter_vendors: [otel, pgx]   # adapters/otelmetrics counts the chain verification (M1-50); sqlc code and the repository (M1-24)
   authz:
     tables: [groups, group_memberships, grants]
     actions: [access.explain, access.hints.read, access.preview, access.view_as, group.read, group.create,
