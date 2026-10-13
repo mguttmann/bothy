@@ -148,9 +148,15 @@ operated, and the order of the build.
   reference against the server schema, the chapter tables, the milestone of planned keys
   (`tools/configdoc/planned.yaml`), the names retired by W1 (`tools/configdoc/retired.yaml`) and
   the Compose `stop_grace_period` of every service that runs `serve` (rules D1 to D10).
+- Workflow `sonar-config.yml` (manual, `main` only): applies the shared quality gate and
+  quality profiles of `quality/sonar/` to SonarQube Cloud with `make sonar-config` and checks
+  them with `make sonar-config-check` (public-switch.md, step 12).
 
 ### Fixed
 
+- `quality_sync.py` addresses the quality gate by its id on SonarQube Cloud, whose
+  `api/qualitygates/create_condition` and `set_as_default` take `gateId` and `id` instead of
+  the gate name; before, `make sonar-config` could not create the gate conditions there.
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
   `file_blocked` in the order of the codes; `createHost` and `issueHostPairingCode` take
   `Idempotency-Key` and list `422 idempotency_key_reuse` instead of the exemption `auth_flow`,

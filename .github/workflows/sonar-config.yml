@@ -1,0 +1,53 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Apply the repository's SonarQube quality gate and quality profiles (quality/sonar/) to
+# SonarQube Cloud and check them (docs/quality/sonarqube-local.md, section 6;
+# docs/quality/public-switch.md, step 12). The token exists only as the secret SONAR_TOKEN,
+# so the maintainer starts this run by hand after a change under quality/sonar/ or the
+# monthly check: gh workflow run sonar-config.yml --ref main.
+#
+# Only workflow_dispatch, and the job runs only for main: the code that receives the token
+# is the merged, reviewed commit, on a GitHub-hosted runner like every job (ADR 0039).
+
+name: sonar-config
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sonar-config
+  cancel-in-progress: false
+
+jobs:
+  sonar-config:
+    name: sonar-config (SonarQube Cloud)
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SONAR_HOST_URL: https://sonarcloud.io
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: tools/uv.lock
+      - name: make sonar-config
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "$SONAR_ORGANIZATION" ]; then
+            echo "::error::repository variable SONAR_ORGANIZATION is not set"
+            exit 1
+          fi
+          make sonar-config SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION"
+      - name: make sonar-config-check
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: make sonar-config-check SONAR_HOST_URL="$SONAR_HOST_URL" SONAR_ORGANIZATION="$SONAR_ORGANIZATION"

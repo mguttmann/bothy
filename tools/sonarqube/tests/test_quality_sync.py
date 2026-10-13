@@ -150,6 +150,18 @@ def test_organization_is_sent_for_cloud(server: tuple[State, str]) -> None:
     assert all(params.get("organization") == "example-org" for _, _, params in state.calls)
 
 
+def test_apply_then_check_on_cloud_api() -> None:
+    state = State(cloud=True)
+    config = qs.load_config(REPO / "quality" / "sonar")
+    with running(state) as url:
+        qs.apply(_client(url, organization="example-org"), config)
+        assert state.default_gate == "Bothy way"
+        assert [(c["metric"], c["op"], c["error"]) for c in state.gates["Bothy way"]] == [
+            (c.metric, c.op, c.error) for c in config.conditions
+        ]
+        assert qs.check(_client(url, organization="example-org"), config).problems == []
+
+
 def test_token_is_sent_as_bearer_and_never_printed(
     server: tuple[State, str], capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:

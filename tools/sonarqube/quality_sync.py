@@ -155,11 +155,20 @@ def _languages(client: Client) -> set[str]:
     return {lang["key"] for lang in client.get_json("api/languages/list")["languages"]}
 
 
-def _gate(client: Client, name: str) -> list[dict[str, str]] | None:
+def _gate(client: Client, name: str) -> tuple[str, list[dict[str, str]]] | None:
+    """Return id and conditions of the gate `name`, or None if it does not exist."""
     try:
-        return list(client.get_json("api/qualitygates/show", name=name)["conditions"])
+        gate = client.get_json("api/qualitygates/show", name=name)
     except LookupError:
         return None
+    return str(gate.get("id", "")), list(gate["conditions"])
+
+
+def _gate_ref(
+    client: Client, id_key: str, gate_id: str, name_key: str, name: str
+) -> dict[str, str]:
+    """Address a gate: SonarQube Cloud wants its id, SonarQube Server its name."""
+    return {id_key: gate_id} if client.is_cloud else {name_key: name}
 
 
 def _profile(client: Client, language: str, name: str) -> dict[str, Any] | None:
@@ -175,10 +184,13 @@ def _active_rules(client: Client, language: str, name: str) -> set[str]:
 def apply(client: Client, config: Config) -> Report:
     """Create or update gate and profiles so that the server matches the config."""
     report = Report()
-    current = _gate(client, config.gate_name)
-    if current is None:
+    found = _gate(client, config.gate_name)
+    if found is None:
         client.post("api/qualitygates/create", name=config.gate_name)
-        current = []
+        found = _gate(client, config.gate_name)
+        if found is None:
+            raise SonarError(f"gate '{config.gate_name}' was not created")
+    gate_id, current = found
     wanted = {c.metric: c for c in config.conditions}
     for cond in current:
         want = wanted.get(cond["metric"])
@@ -197,12 +209,15 @@ def apply(client: Client, config: Config) -> Report:
         if want.metric not in have:
             client.post(
                 "api/qualitygates/create_condition",
-                gateName=config.gate_name,
+                **_gate_ref(client, "gateId", gate_id, "gateName", config.gate_name),
                 metric=want.metric,
                 op=want.op,
                 error=want.error,
             )
-    client.post("api/qualitygates/set_as_default", name=config.gate_name)
+    client.post(
+        "api/qualitygates/set_as_default",
+        **_gate_ref(client, "id", gate_id, "name", config.gate_name),
+    )
 
     available = _languages(client)
     for language, xml_path in config.profiles.items():
@@ -237,11 +252,11 @@ def apply(client: Client, config: Config) -> Report:
 def check(client: Client, config: Config) -> Report:
     """Compare gate and profiles on the server with the config without changing anything."""
     report = Report()
-    current = _gate(client, config.gate_name)
-    if current is None:
+    found = _gate(client, config.gate_name)
+    if found is None:
         report.problems.append(f"gate '{config.gate_name}' is missing")
     else:
-        have = {c["metric"]: c for c in current}
+        have = {c["metric"]: c for c in found[1]}
         for want in config.conditions:
             cond = have.pop(want.metric, None)
             if cond is None:
