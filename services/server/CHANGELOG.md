@@ -144,7 +144,8 @@ documented in this file. The format is based on
   at once with exit code 3.
 - `internal/platform/lifecycle`: runner with components in start order, a shutdown plan in fixed
   phases with per-step budgets bounded by the remaining total, `Fail` for fatal runtime errors
-  and the exit codes 0, 1, 2 and 3.
+  and the exit codes 0, 1, 2 and 3; a step that waits for its budget (the drain delay) ends
+  without a timeout warning.
 - `internal/platform/health`: `/healthz` and `/readyz` with the built-in states `startup` and
   `shutting_down`, concurrent checks and the answer format of 16 "Two listeners"; readiness
   check `database`.

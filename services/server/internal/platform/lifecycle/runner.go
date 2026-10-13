@@ -84,7 +84,15 @@ type StopStep struct {
 	// Run stops the part. Its context ends when the budget is spent; a step that ignores it is
 	// left behind and the plan moves on. An error is logged and does not change the exit code.
 	Run func(ctx context.Context) error
+	// Wait marks a step whose purpose is to wait for its budget (the drain delay): when the
+	// budget is spent, Run is expected to return at once, and the runner logs no timeout as long
+	// as it does so within waitGrace, bounded by what the total leaves after the budget. Run must
+	// end when its context ends.
+	Wait bool
 }
+
+// waitGrace is how long the runner waits for a Wait step to return after its budget is spent.
+const waitGrace = 100 * time.Millisecond
 
 // Options configure a Runner.
 type Options struct {
@@ -348,7 +356,7 @@ func (r *Runner) shutdown(ctx context.Context, sigs <-chan os.Signal, code int, 
 		if s.Budget > 0 && s.Budget < remaining {
 			budget = s.Budget
 		}
-		if forced := r.runStep(lctx, s, budget, sigs); forced {
+		if forced := r.runStep(lctx, s, budget, remaining-budget, sigs); forced {
 			return r.forced(lctx)
 		}
 		last = s.Phase
@@ -368,8 +376,9 @@ func (r *Runner) overBudget(ctx context.Context, p Phase) int {
 	return ExitFailure
 }
 
-// runStep runs s with budget and reports true when a signal arrived meanwhile.
-func (r *Runner) runStep(ctx context.Context, s StopStep, budget time.Duration, sigs <-chan os.Signal) bool {
+// runStep runs s with budget and reports true when a signal arrived meanwhile; slack is what
+// the total leaves after budget, the most a Wait step may overrun it without a timeout.
+func (r *Runner) runStep(ctx context.Context, s StopStep, budget, slack time.Duration, sigs <-chan os.Signal) bool {
 	sctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
 	done := make(chan error, 1)
@@ -380,6 +389,18 @@ func (r *Runner) runStep(ctx context.Context, s StopStep, budget time.Duration, 
 			r.log().WarnContext(ctx, msgStepFailed, slog.String(attr.Reason, s.Phase.String()), slog.String(attr.ErrorType, errTypeStep))
 		}
 	case <-sctx.Done():
+		if grace := min(waitGrace, slack); s.Wait && grace > 0 {
+			select {
+			case err := <-done:
+				if err != nil {
+					r.log().WarnContext(ctx, msgStepFailed, slog.String(attr.Reason, s.Phase.String()), slog.String(attr.ErrorType, errTypeStep))
+				}
+				return false
+			case <-sigs:
+				return true
+			case <-time.After(grace):
+			}
+		}
 		r.log().WarnContext(ctx, msgStepTimedOut, slog.String(attr.Reason, s.Phase.String()), slog.String(attr.ErrorType, errTypeTimeout))
 	case <-sigs:
 		return true

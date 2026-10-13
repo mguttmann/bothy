@@ -364,6 +364,83 @@ func TestStepTimeoutMovesOn(t *testing.T) {
 	}
 }
 
+// TestWaitStepReachingItsBudgetIsNoTimeout: a step that waits its budget by design (the drain
+// delay) ends normally when the budget is spent; the runner logs no timeout for it.
+func TestWaitStepReachingItsBudgetIsNoTimeout(t *testing.T) {
+	t.Parallel()
+	for range 20 {
+		h := newHarness(t, time.Minute)
+		h.r.OnStop(lifecycle.StopStep{Name: "drain", Phase: lifecycle.PhaseDrain, Budget: 5 * time.Millisecond, Wait: true, Run: func(ctx context.Context) error {
+			<-ctx.Done()
+			return nil
+		}})
+		rc, readyCh := ready(h.rec)
+		h.r.Add(rc)
+		done := h.runAsync(context.Background())
+		waitCh(t, readyCh)
+		h.sigs <- syscall.SIGTERM
+		if code := wait(t, done); code != lifecycle.ExitOK {
+			t.Fatalf("exit = %d, want 0", code)
+		}
+		if logs := h.logs.String(); strings.Contains(logs, "shutdown step timed out") {
+			t.Fatalf("a wait step that used its budget was logged as timed out:\n%s", logs)
+		}
+	}
+}
+
+// runWaitStep shuts a runner with total down that has one Wait step with budget and run, and
+// returns its logs.
+func runWaitStep(t *testing.T, total, budget time.Duration, run func(context.Context) error) string {
+	t.Helper()
+	h := newHarness(t, total)
+	h.r.OnStop(lifecycle.StopStep{Name: "drain", Phase: lifecycle.PhaseDrain, Budget: budget, Wait: true, Run: run})
+	rc, readyCh := ready(h.rec)
+	h.r.Add(rc)
+	done := h.runAsync(context.Background())
+	waitCh(t, readyCh)
+	h.sigs <- syscall.SIGTERM
+	wait(t, done)
+	return h.logs.String()
+}
+
+func TestWaitStepErrorIsLoggedAsFailure(t *testing.T) {
+	t.Parallel()
+	logs := runWaitStep(t, time.Minute, 5*time.Millisecond, func(ctx context.Context) error {
+		<-ctx.Done()
+		return errors.New("drain broke")
+	})
+	if !strings.Contains(logs, "shutdown step failed") || strings.Contains(logs, "shutdown step timed out") {
+		t.Fatalf("want a failure and no timeout:\n%s", logs)
+	}
+}
+
+func TestWaitStepIgnoringItsContextTimesOut(t *testing.T) {
+	t.Parallel()
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	logs := runWaitStep(t, time.Minute, 5*time.Millisecond, func(context.Context) error {
+		<-release
+		return nil
+	})
+	if !strings.Contains(logs, "shutdown step timed out") {
+		t.Fatalf("a Wait step that ignores its context must time out:\n%s", logs)
+	}
+}
+
+// TestWaitGraceNeverExceedsTheTotal: when the budget of a Wait step uses the rest of the total,
+// the runner grants no grace, so later steps keep their time.
+func TestWaitGraceNeverExceedsTheTotal(t *testing.T) {
+	t.Parallel()
+	logs := runWaitStep(t, 5*time.Millisecond, 5*time.Millisecond, func(ctx context.Context) error {
+		<-ctx.Done()
+		time.Sleep(30 * time.Millisecond)
+		return nil
+	})
+	if !strings.Contains(logs, "shutdown step timed out") {
+		t.Fatalf("a Wait step past the total must time out without grace:\n%s", logs)
+	}
+}
+
 func TestSecondSignalForcesExit3(t *testing.T) {
 	t.Parallel()
 	h := newHarness(t, time.Minute)

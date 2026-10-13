@@ -89,7 +89,7 @@ handler := otel.Middleware(mux)          // after Setup
   `http server error` with `error.type` `tls_handshake`, `accept`, `panic` or `other`; client
   addresses and foreign texts are discarded (SEC-LOG-5).
 - Errors of the SDK and the exporters are logged as `telemetry export error` with `error.type`
-  set to the Go type of the error, at most once per 10 s, to stdout only.
+  set to the Go type of the error, at most once per `exportErrorInterval`, to stdout only.
 
 ## Allowlists
 
@@ -178,7 +178,7 @@ pseudo = hex(HMAC-SHA-256(K_p, lowercase canonical UUID of the principal id))[:3
 ```
 
 The master key comes from `telemetry.pseudonym_key_ref` through the secrets provider, which also
-handles its rotation; under 32 bytes is a start error. `Pseudonymizer.Attr(ctx, id)` gives the
+handles its rotation; a key shorter than `MinKeyBytes` is a start error. `Pseudonymizer.Attr(ctx, id)` gives the
 attribute for now, `Pseudonym` and `PseudonymWithPeriod` for any instant.
 `bothy telemetry pseudonym <principal_id> [--at TIME]` prints the pseudonym and the start of its
 period for the owner, without a database. Pseudonyms are only for people; agents and apps appear

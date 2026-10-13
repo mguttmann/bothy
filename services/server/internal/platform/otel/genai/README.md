@@ -7,7 +7,8 @@ Status: built (M1-10). Normative: [17-observability.md](../../../../../../docs/s
 ## Purpose
 
 The one place of the server that spells `gen_ai.*` telemetry keys. The OpenTelemetry GenAI
-conventions are in status "Development"; when they change, this package, its snapshot, the
+conventions are in status "Development" (`ConventionRef`: the conventions repository
+`open-telemetry/semantic-conventions-genai`, read on 2026-10-10); when they change, this package, its snapshot, the
 collector allowlist and the dashboards change in one change, and no other code does.
 
 ## Interface
@@ -20,7 +21,8 @@ collector allowlist and the dashboards change in one change, and no other code d
 - `Forbidden` lists the keys that carry content and are never sent: `gen_ai.input.messages`,
   `gen_ai.output.messages`, `gen_ai.system_instructions`, `gen_ai.tool.definitions`,
   `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result`.
-- `ConventionRef` names the convention repository, its status and the date it was read. The
+- `ConventionRef` names the convention repository, its status and the date it was read
+  (2026-10-10). The
   commit is not recorded yet (signals.md marks it open); a ticket with network access adds it.
 
 ## Tests
