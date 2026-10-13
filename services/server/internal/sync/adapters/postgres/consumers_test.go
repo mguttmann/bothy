@@ -217,8 +217,8 @@ func TestConsumerRoundLockedEndsAtOnce(t *testing.T) {
 	e.exactlyTwoJobs(t, 1, 1)
 }
 
-// TestConsumersTwoWorkersExactlyOnce (plan M2-01: "zwei worker parallel: jedes Ereignis erzeugt
-// genau einmal Jobs"): two runners with their own pools and wakers while several writers append
+// TestConsumersTwoWorkersExactlyOnce (plan M2-01: "two workers in parallel: every event creates jobs
+// exactly once"): two runners with their own pools and wakers while several writers append
 // in units of one to three; a barrier forces one overlap, so at least one round is locked. At the
 // end every seq has exactly two probe jobs and the cursor is at the head.
 func TestConsumersTwoWorkersExactlyOnce(t *testing.T) {

@@ -34,7 +34,7 @@ type RoundPlan struct {
 //
 //   - seqs continue lastSeq without a hole: process all.
 //   - seqs[0] equals minRetained and lastSeq+1 lies below it: the events lastSeq+1 to
-//     minRetained-1 were removed by retention (03 event_log "Aufbewahrung"); process all and
+//     minRetained-1 were removed by retention (03 event_log "Retention"); process all and
 //     report them in LostFrom and LostTo.
 //   - any other jump, a hole or a repeat inside seqs, or a number at or below lastSeq:
 //     ErrConsumerGap.
