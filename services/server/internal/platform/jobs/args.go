@@ -25,7 +25,7 @@ import (
 //	}
 //
 //	func (ScanArgs) Kind() string { return "files.scan" }
-type Args interface {
+type Args interface { // NOSONAR: the arguments of a job, not an action; see M1-14/16.
 	// Kind returns the stable kind of the job; it must not depend on the field values.
 	Kind() string
 }
@@ -125,7 +125,7 @@ func ValidateArgsType(t reflect.Type) error {
 		switch f.Type {
 		case idType, idListType, int64Type:
 		default:
-			return fmt.Errorf("jobs: argument type %s: field %s has type %s; only ids.ID, []ids.ID and int64 are allowed (02 \"Einsatz\": only IDs)", t, f.Name, f.Type)
+			return fmt.Errorf("jobs: argument type %s: field %s has type %s; only ids.ID, []ids.ID and int64 are allowed (02 \"Usage\": only IDs)", t, f.Name, f.Type)
 		}
 	}
 	return nil

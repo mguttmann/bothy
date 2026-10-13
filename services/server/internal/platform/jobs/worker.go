@@ -81,7 +81,7 @@ func (w *worker[A]) Work(ctx context.Context, j *river.Job[A]) (err error) {
 // error class, never the arguments or the panic value, which may carry content.
 func (w *worker[A]) run(ctx context.Context, j *river.Job[A]) (err error) {
 	defer func() {
-		if p := recover(); p != nil {
+		if recover() != nil {
 			w.d.log.ErrorContext(ctx, msgPanic, slog.String(attr.JobKind, w.kind), slog.String(attr.ErrorType, errTypePanic))
 			err = fmt.Errorf("jobs: job %s panicked", w.kind)
 		}
