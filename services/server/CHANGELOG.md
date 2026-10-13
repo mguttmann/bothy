@@ -315,7 +315,7 @@ documented in this file. The format is based on
   is closed at accept time before a byte is read; the first refusal logs a hint at Warn, later
   ones at Debug, never with the peer address. With `server.tls_cert_ref` and
   `server.tls_key_ref` set the server terminates TLS itself with TLS 1.2 as the floor and the Go
-  cipher defaults; the material is checked at start step 2 (pair, validity, host of
+  cipher defaults (sources in the httpserver README); the material is checked at start step 2 (pair, validity, host of
   `server.public_url`) and follows rotation through the secret provider, keeping the previous
   certificate when a rotated one is broken. The internal listener stays plaintext without a peer
   filter.
@@ -325,5 +325,5 @@ documented in this file. The format is based on
   `https`. The internal listener answers unknown paths and methods with problem bodies.
 - Configuration keys `server.tls_cert_ref`, `server.tls_key_ref` (optional secret references,
   both or neither, TLS needs an `https` public URL) and `http.hsts_max_age` (whole seconds,
-  default one year). A `secret_ref` key with an empty default now accepts the empty text as "no
+  default in chapter 19). A `secret_ref` key with an empty default now accepts the empty text as "no
   reference"; `bothy config check --secrets` prints "not set" for it.

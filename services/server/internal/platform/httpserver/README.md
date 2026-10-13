@@ -58,7 +58,7 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 | Mode | When | Public listener |
 |---|---|---|
 | plaintext | `server.tls_cert_ref` and `server.tls_key_ref` empty | `PeerFilter`: only peers on loopback (`127.0.0.0/8`, `::1`, also IPv4-mapped) or in `server.trusted_proxies` are served; every other connection is closed at accept time without a byte read or written, and accepting goes on (SEC-TLS-1) |
-| TLS | both references set, `server.public_url` with `https` | TLS 1.2 as the floor, the cipher suites and curves of Go, no client certificates, no peer filter, no plaintext redirect listener (SEC-TLS-2, R-SE-08) |
+| TLS | both references set, `server.public_url` with `https` | TLS 1.2 as the floor, the cipher suites and curves of Go (a nil `CipherSuites` takes "a safe default list", [crypto/tls Config](https://pkg.go.dev/crypto/tls#Config), retrieved 2026-10-13), no client certificates, no peer filter, no plaintext redirect listener (SEC-TLS-2, R-SE-08) |
 
 - One list: `TransportConfig.TrustedProxies` is the slice `ChainConfig.TrustedProxies` that the
   client IP uses, so who may send plaintext and whose forwarding headers count never differ.
@@ -71,7 +71,7 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
   errors name keys, never content. Every handshake asks the secret provider for both references
   (cached for `secrets.cache_ttl`); a new pair of versions is validated and used, a broken one
   keeps the previous certificate, logs `TLS certificate rotation failed, keeping the previous
-  certificate` once and is tried again at most once per minute (a leaf not yet valid heals
+  certificate` once and is tried again at most once per `rotationRetry` (a leaf not yet valid heals
   without a restart).
 - The internal listener has no peer filter and stays plaintext (R-SE-09); it is never published.
 - Not supported on purpose: PROXY protocol, h2c, Unix socket listeners for the public API.
