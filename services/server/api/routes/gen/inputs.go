@@ -8,6 +8,13 @@ type inputs struct {
 	ops      []opMeta        // every operation under paths, sorted by ID
 	enabled  map[string]bool // operation IDs of the enabled section
 	actions  []catalogAction // every action of actions.yaml, sorted by ID
+	// specVersion is info.version of the spec (routes.SpecVersion, M1-46).
+	specVersion string
+	// problems are the x-problem-codes of the schema Problem, sorted by code (M1-46).
+	problems []problemType
+	// gatewayVersions are info.x-protocol-versions of the AsyncAPI document, nil without
+	// -asyncapi (routes.GatewayProtocolVersions, M1-46).
+	gatewayVersions []int
 }
 
 // loadInputs reads and validates the spec, the action catalogue and the enable list. The checks
@@ -24,6 +31,7 @@ func loadInputs(specPath, catalogPath, listPath string) (*inputs, error) {
 		return nil, p.err()
 	}
 	in := &inputs{specData: data, actions: actions, enabled: map[string]bool{}}
+	in.specVersion, in.problems = readMeta(specPath, doc, p)
 	ops, overrides := readOperations(specPath, data, catalogPath, actions, p)
 	checkRequestSchemasClosed(specPath, doc, p)
 	in.ops = ops

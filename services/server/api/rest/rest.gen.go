@@ -15179,6 +15179,18 @@ type UpdateIdentityProviderParams struct {
 	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
 }
 
+// UpdateBrandingParams defines parameters for UpdateBranding.
+type UpdateBrandingParams struct {
+	// IfMatch ETag of the version the change is based on, e.g. `"7"`. Mismatch gives 412 `version_conflict`.
+	IfMatch IfMatchRequired `json:"If-Match"`
+}
+
+// PutInstanceSettingParams defines parameters for PutInstanceSetting.
+type PutInstanceSettingParams struct {
+	// IfMatch Optional ETag; when given, a mismatch gives 412 `version_conflict`.
+	IfMatch *IfMatchOptional `json:"If-Match,omitempty"`
+}
+
 // ListMyDevicesParams defines parameters for ListMyDevices.
 type ListMyDevicesParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -15298,6 +15310,12 @@ type CreateIdentityProviderJSONRequestBody = IdentityProviderCreate
 
 // UpdateIdentityProviderJSONRequestBody defines body for UpdateIdentityProvider for application/json ContentType.
 type UpdateIdentityProviderJSONRequestBody = IdentityProviderUpdate
+
+// UpdateBrandingJSONRequestBody defines body for UpdateBranding for application/json ContentType.
+type UpdateBrandingJSONRequestBody = BrandingUpdate
+
+// PutInstanceSettingJSONRequestBody defines body for PutInstanceSetting for application/json ContentType.
+type PutInstanceSettingJSONRequestBody = InstanceSettingPut
 
 // UpdateMyProfileJSONRequestBody defines body for UpdateMyProfile for application/json ContentType.
 type UpdateMyProfileJSONRequestBody = ProfileUpdate
@@ -17199,9 +17217,24 @@ type ServerInterface interface {
 	// UpdateIdentityProvider Change an identity provider
 	// (PATCH /identity-providers/{provider_id})
 	UpdateIdentityProvider(w http.ResponseWriter, r *http.Request, providerId ProviderIdPath, params UpdateIdentityProviderParams)
+	// GetInstance Instance settings for clients
+	// (GET /instance)
+	GetInstance(w http.ResponseWriter, r *http.Request)
+	// UpdateBranding Change branding
+	// (PUT /instance/branding)
+	UpdateBranding(w http.ResponseWriter, r *http.Request, params UpdateBrandingParams)
+	// GetDiscovery Public instance metadata
+	// (GET /instance/discovery)
+	GetDiscovery(w http.ResponseWriter, r *http.Request)
 	// GetJwks Public keys for access and invocation tokens
 	// (GET /instance/jwks)
 	GetJwks(w http.ResponseWriter, r *http.Request)
+	// ListInstanceSettings List all instance settings
+	// (GET /instance/settings)
+	ListInstanceSettings(w http.ResponseWriter, r *http.Request)
+	// PutInstanceSetting Set an instance setting
+	// (PUT /instance/settings/{key})
+	PutInstanceSetting(w http.ResponseWriter, r *http.Request, key KeyPath, params PutInstanceSettingParams)
 	// GetMe Read the calling principal
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -17235,6 +17268,9 @@ type ServerInterface interface {
 	// CreateToken Create an API token
 	// (POST /principals/{principal_id}/tokens)
 	CreateToken(w http.ResponseWriter, r *http.Request, principalId PrincipalIdPath, params CreateTokenParams)
+	// GetProblemType Documentation of a problem type
+	// (GET /problems/{code})
+	GetProblemType(w http.ResponseWriter, r *http.Request, code CodePath)
 	// RotateSigningKey Rotate a server signing key
 	// (POST /signing-keys/rotate)
 	RotateSigningKey(w http.ResponseWriter, r *http.Request, params RotateSigningKeyParams)
@@ -17794,11 +17830,148 @@ func (siw *ServerInterfaceWrapper) UpdateIdentityProvider(w http.ResponseWriter,
 	handler.ServeHTTP(w, r)
 }
 
+// GetInstance operation middleware
+func (siw *ServerInterfaceWrapper) GetInstance(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInstance(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateBranding operation middleware
+func (siw *ServerInterfaceWrapper) UpdateBranding(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UpdateBrandingParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchRequired
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateBranding(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDiscovery operation middleware
+func (siw *ServerInterfaceWrapper) GetDiscovery(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDiscovery(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetJwks operation middleware
 func (siw *ServerInterfaceWrapper) GetJwks(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetJwks(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListInstanceSettings operation middleware
+func (siw *ServerInterfaceWrapper) ListInstanceSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListInstanceSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutInstanceSetting operation middleware
+func (siw *ServerInterfaceWrapper) PutInstanceSetting(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "key" -------------
+	var key KeyPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "key", r.PathValue("key"), &key, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "key", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PutInstanceSettingParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchOptional
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutInstanceSetting(w, r, key, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -18184,6 +18357,32 @@ func (siw *ServerInterfaceWrapper) CreateToken(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateToken(w, r, principalId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetProblemType operation middleware
+func (siw *ServerInterfaceWrapper) GetProblemType(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "code" -------------
+	var code CodePath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "code", r.PathValue("code"), &code, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetProblemType(w, r, code)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -18840,7 +19039,9 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/discovery", wrapper.GetDiscovery)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/jwks", wrapper.GetJwks)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/problems/{code}", wrapper.GetProblemType)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/enroll/redeem", wrapper.RedeemEnrollmentCode)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/token/refresh", wrapper.RefreshToken)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/logout", wrapper.Logout)
@@ -18869,6 +19070,10 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/principals/{principal_id}/tokens", wrapper.ListTokens)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/principals/{principal_id}/tokens", wrapper.CreateToken)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/tokens/{token_id}", wrapper.RevokeToken)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance", wrapper.GetInstance)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/instance/settings", wrapper.ListInstanceSettings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/settings/{key}", wrapper.PutInstanceSetting)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/instance/branding", wrapper.UpdateBranding)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/signing-keys/rotate", wrapper.RotateSigningKey)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/identity-providers", wrapper.ListIdentityProviders)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/identity-providers", wrapper.CreateIdentityProvider)
@@ -21259,6 +21464,425 @@ func (response UpdateIdentityProviderdefaultApplicationProblemPlusJSONResponse) 
 	return err
 }
 
+type GetInstanceRequestObject struct {
+}
+
+type GetInstanceResponseObject interface {
+	VisitGetInstanceResponse(w http.ResponseWriter) error
+}
+
+type GetInstance200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	ETag            *string
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type GetInstance200JSONResponse struct {
+	Body    InstanceInfo
+	Headers GetInstance200ResponseHeaders
+}
+
+func (response GetInstance200JSONResponse) VisitGetInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstance401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response GetInstance401ApplicationProblemPlusJSONResponse) VisitGetInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstance403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response GetInstance403ApplicationProblemPlusJSONResponse) VisitGetInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstance429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetInstance429ApplicationProblemPlusJSONResponse) VisitGetInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetInstancedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response GetInstancedefaultApplicationProblemPlusJSONResponse) VisitGetInstanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBrandingRequestObject struct {
+	Params UpdateBrandingParams
+	Body   *UpdateBrandingJSONRequestBody
+}
+
+type UpdateBrandingResponseObject interface {
+	VisitUpdateBrandingResponse(w http.ResponseWriter) error
+}
+
+type UpdateBranding200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	ETag            *string
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type UpdateBranding200JSONResponse struct {
+	Body    Branding
+	Headers UpdateBranding200ResponseHeaders
+}
+
+func (response UpdateBranding200JSONResponse) VisitUpdateBrandingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBranding400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateBranding400ApplicationProblemPlusJSONResponse) VisitUpdateBrandingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBranding401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateBranding401ApplicationProblemPlusJSONResponse) VisitUpdateBrandingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBranding403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateBranding403ApplicationProblemPlusJSONResponse) VisitUpdateBrandingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBranding412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateBranding412ApplicationProblemPlusJSONResponse) VisitUpdateBrandingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBranding428ApplicationProblemPlusJSONResponse struct {
+	PreconditionRequiredApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateBranding428ApplicationProblemPlusJSONResponse) VisitUpdateBrandingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(428)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBranding429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response UpdateBranding429ApplicationProblemPlusJSONResponse) VisitUpdateBrandingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBrandingdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response UpdateBrandingdefaultApplicationProblemPlusJSONResponse) VisitUpdateBrandingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDiscoveryRequestObject struct {
+}
+
+type GetDiscoveryResponseObject interface {
+	VisitGetDiscoveryResponse(w http.ResponseWriter) error
+}
+
+type GetDiscovery200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type GetDiscovery200JSONResponse struct {
+	Body    Discovery
+	Headers GetDiscovery200ResponseHeaders
+}
+
+func (response GetDiscovery200JSONResponse) VisitGetDiscoveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDiscovery429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetDiscovery429ApplicationProblemPlusJSONResponse) VisitGetDiscoveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDiscoverydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response GetDiscoverydefaultApplicationProblemPlusJSONResponse) VisitGetDiscoveryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetJwksRequestObject struct {
 }
 
@@ -21333,6 +21957,334 @@ type GetJwksdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetJwksdefaultApplicationProblemPlusJSONResponse) VisitGetJwksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceSettingsRequestObject struct {
+}
+
+type ListInstanceSettingsResponseObject interface {
+	VisitListInstanceSettingsResponse(w http.ResponseWriter) error
+}
+
+type ListInstanceSettings200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type ListInstanceSettings200JSONResponse struct {
+	Body    InstanceSettingList
+	Headers ListInstanceSettings200ResponseHeaders
+}
+
+func (response ListInstanceSettings200JSONResponse) VisitListInstanceSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceSettings401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response ListInstanceSettings401ApplicationProblemPlusJSONResponse) VisitListInstanceSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceSettings403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response ListInstanceSettings403ApplicationProblemPlusJSONResponse) VisitListInstanceSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceSettings429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response ListInstanceSettings429ApplicationProblemPlusJSONResponse) VisitListInstanceSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListInstanceSettingsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response ListInstanceSettingsdefaultApplicationProblemPlusJSONResponse) VisitListInstanceSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutInstanceSettingRequestObject struct {
+	Key    KeyPath `json:"key"`
+	Params PutInstanceSettingParams
+	Body   *PutInstanceSettingJSONRequestBody
+}
+
+type PutInstanceSettingResponseObject interface {
+	VisitPutInstanceSettingResponse(w http.ResponseWriter) error
+}
+
+type PutInstanceSetting200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	ETag            *string
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type PutInstanceSetting200JSONResponse struct {
+	Body    InstanceSetting
+	Headers PutInstanceSetting200ResponseHeaders
+}
+
+func (response PutInstanceSetting200JSONResponse) VisitPutInstanceSettingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.ETag != nil {
+		w.Header().Set("ETag", fmt.Sprint(*response.Headers.ETag))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutInstanceSetting400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response PutInstanceSetting400ApplicationProblemPlusJSONResponse) VisitPutInstanceSettingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutInstanceSetting401ApplicationProblemPlusJSONResponse struct {
+	UnauthorizedApplicationProblemPlusJSONResponse
+}
+
+func (response PutInstanceSetting401ApplicationProblemPlusJSONResponse) VisitPutInstanceSettingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.DPoPNonce != nil {
+		w.Header().Set("DPoP-Nonce", fmt.Sprint(*response.Headers.DPoPNonce))
+	}
+	if response.Headers.WWWAuthenticate != nil {
+		w.Header().Set("WWW-Authenticate", fmt.Sprint(*response.Headers.WWWAuthenticate))
+	}
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutInstanceSetting403ApplicationProblemPlusJSONResponse struct {
+	ForbiddenApplicationProblemPlusJSONResponse
+}
+
+func (response PutInstanceSetting403ApplicationProblemPlusJSONResponse) VisitPutInstanceSettingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutInstanceSetting404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response PutInstanceSetting404ApplicationProblemPlusJSONResponse) VisitPutInstanceSettingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutInstanceSetting412ApplicationProblemPlusJSONResponse struct {
+	PreconditionFailedApplicationProblemPlusJSONResponse
+}
+
+func (response PutInstanceSetting412ApplicationProblemPlusJSONResponse) VisitPutInstanceSettingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutInstanceSetting429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response PutInstanceSetting429ApplicationProblemPlusJSONResponse) VisitPutInstanceSettingResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutInstanceSettingdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response PutInstanceSettingdefaultApplicationProblemPlusJSONResponse) VisitPutInstanceSettingResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -23153,6 +24105,133 @@ type CreateTokendefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response CreateTokendefaultApplicationProblemPlusJSONResponse) VisitCreateTokenResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProblemTypeRequestObject struct {
+	Code CodePath `json:"code"`
+}
+
+type GetProblemTypeResponseObject interface {
+	VisitGetProblemTypeResponse(w http.ResponseWriter) error
+}
+
+type GetProblemType200ResponseHeaders struct {
+	CorrelationId   *CorrelationId
+	RateLimit       *string
+	RateLimitPolicy *string
+}
+
+type GetProblemType200JSONResponse struct {
+	Body    ProblemType
+	Headers GetProblemType200ResponseHeaders
+}
+
+func (response GetProblemType200JSONResponse) VisitGetProblemTypeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProblemType400ApplicationProblemPlusJSONResponse struct {
+	BadRequestApplicationProblemPlusJSONResponse
+}
+
+func (response GetProblemType400ApplicationProblemPlusJSONResponse) VisitGetProblemTypeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProblemType404ApplicationProblemPlusJSONResponse struct {
+	NotFoundApplicationProblemPlusJSONResponse
+}
+
+func (response GetProblemType404ApplicationProblemPlusJSONResponse) VisitGetProblemTypeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProblemType429ApplicationProblemPlusJSONResponse struct {
+	TooManyRequestsApplicationProblemPlusJSONResponse
+}
+
+func (response GetProblemType429ApplicationProblemPlusJSONResponse) VisitGetProblemTypeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	if response.Headers.CorrelationId != nil {
+		w.Header().Set("Correlation-Id", fmt.Sprint(*response.Headers.CorrelationId))
+	}
+	if response.Headers.RateLimit != nil {
+		w.Header().Set("RateLimit", fmt.Sprint(*response.Headers.RateLimit))
+	}
+	if response.Headers.RateLimitPolicy != nil {
+		w.Header().Set("RateLimit-Policy", fmt.Sprint(*response.Headers.RateLimitPolicy))
+	}
+	if response.Headers.RetryAfter != nil {
+		w.Header().Set("Retry-After", fmt.Sprint(*response.Headers.RetryAfter))
+	}
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetProblemTypedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	Headers    ErrorResponseHeaders
+	StatusCode int
+}
+
+func (response GetProblemTypedefaultApplicationProblemPlusJSONResponse) VisitGetProblemTypeResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -25371,9 +26450,24 @@ type StrictServerInterface interface {
 	// UpdateIdentityProvider Change an identity provider
 	// (PATCH /identity-providers/{provider_id})
 	UpdateIdentityProvider(ctx context.Context, request UpdateIdentityProviderRequestObject) (UpdateIdentityProviderResponseObject, error)
+	// GetInstance Instance settings for clients
+	// (GET /instance)
+	GetInstance(ctx context.Context, request GetInstanceRequestObject) (GetInstanceResponseObject, error)
+	// UpdateBranding Change branding
+	// (PUT /instance/branding)
+	UpdateBranding(ctx context.Context, request UpdateBrandingRequestObject) (UpdateBrandingResponseObject, error)
+	// GetDiscovery Public instance metadata
+	// (GET /instance/discovery)
+	GetDiscovery(ctx context.Context, request GetDiscoveryRequestObject) (GetDiscoveryResponseObject, error)
 	// GetJwks Public keys for access and invocation tokens
 	// (GET /instance/jwks)
 	GetJwks(ctx context.Context, request GetJwksRequestObject) (GetJwksResponseObject, error)
+	// ListInstanceSettings List all instance settings
+	// (GET /instance/settings)
+	ListInstanceSettings(ctx context.Context, request ListInstanceSettingsRequestObject) (ListInstanceSettingsResponseObject, error)
+	// PutInstanceSetting Set an instance setting
+	// (PUT /instance/settings/{key})
+	PutInstanceSetting(ctx context.Context, request PutInstanceSettingRequestObject) (PutInstanceSettingResponseObject, error)
 	// GetMe Read the calling principal
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -25407,6 +26501,9 @@ type StrictServerInterface interface {
 	// CreateToken Create an API token
 	// (POST /principals/{principal_id}/tokens)
 	CreateToken(ctx context.Context, request CreateTokenRequestObject) (CreateTokenResponseObject, error)
+	// GetProblemType Documentation of a problem type
+	// (GET /problems/{code})
+	GetProblemType(ctx context.Context, request GetProblemTypeRequestObject) (GetProblemTypeResponseObject, error)
 	// RotateSigningKey Rotate a server signing key
 	// (POST /signing-keys/rotate)
 	RotateSigningKey(ctx context.Context, request RotateSigningKeyRequestObject) (RotateSigningKeyResponseObject, error)
@@ -25881,6 +26978,87 @@ func (sh *strictHandler) UpdateIdentityProvider(w http.ResponseWriter, r *http.R
 	}
 }
 
+// GetInstance operation middleware
+func (sh *strictHandler) GetInstance(w http.ResponseWriter, r *http.Request) {
+	var request GetInstanceRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetInstance(ctx, request.(GetInstanceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetInstance")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetInstanceResponseObject); ok {
+		if err := validResponse.VisitGetInstanceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateBranding operation middleware
+func (sh *strictHandler) UpdateBranding(w http.ResponseWriter, r *http.Request, params UpdateBrandingParams) {
+	var request UpdateBrandingRequestObject
+
+	request.Params = params
+
+	var body UpdateBrandingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateBranding(ctx, request.(UpdateBrandingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateBranding")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateBrandingResponseObject); ok {
+		if err := validResponse.VisitUpdateBrandingResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDiscovery operation middleware
+func (sh *strictHandler) GetDiscovery(w http.ResponseWriter, r *http.Request) {
+	var request GetDiscoveryRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDiscovery(ctx, request.(GetDiscoveryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDiscovery")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDiscoveryResponseObject); ok {
+		if err := validResponse.VisitGetDiscoveryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetJwks operation middleware
 func (sh *strictHandler) GetJwks(w http.ResponseWriter, r *http.Request) {
 	var request GetJwksRequestObject
@@ -25898,6 +27076,64 @@ func (sh *strictHandler) GetJwks(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetJwksResponseObject); ok {
 		if err := validResponse.VisitGetJwksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListInstanceSettings operation middleware
+func (sh *strictHandler) ListInstanceSettings(w http.ResponseWriter, r *http.Request) {
+	var request ListInstanceSettingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListInstanceSettings(ctx, request.(ListInstanceSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListInstanceSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListInstanceSettingsResponseObject); ok {
+		if err := validResponse.VisitListInstanceSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutInstanceSetting operation middleware
+func (sh *strictHandler) PutInstanceSetting(w http.ResponseWriter, r *http.Request, key KeyPath, params PutInstanceSettingParams) {
+	var request PutInstanceSettingRequestObject
+
+	request.Key = key
+	request.Params = params
+
+	var body PutInstanceSettingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutInstanceSetting(ctx, request.(PutInstanceSettingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutInstanceSetting")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutInstanceSettingResponseObject); ok {
+		if err := validResponse.VisitPutInstanceSettingResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -26214,6 +27450,32 @@ func (sh *strictHandler) CreateToken(w http.ResponseWriter, r *http.Request, pri
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateTokenResponseObject); ok {
 		if err := validResponse.VisitCreateTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetProblemType operation middleware
+func (sh *strictHandler) GetProblemType(w http.ResponseWriter, r *http.Request, code CodePath) {
+	var request GetProblemTypeRequestObject
+
+	request.Code = code
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetProblemType(ctx, request.(GetProblemTypeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetProblemType")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetProblemTypeResponseObject); ok {
+		if err := validResponse.VisitGetProblemTypeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

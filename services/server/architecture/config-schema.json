@@ -218,6 +218,18 @@
       "doc": "Validity of an enrollment code from its issue."
     },
     {
+      "name": "auth.local_password_enabled",
+      "env": "BOTHY_AUTH__LOCAL_PASSWORD_ENABLED",
+      "kind": "bool",
+      "default": "true",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "08-identitaet.md",
+      "doc": "Whether a local account may sign in with password and TOTP as fallback."
+    },
+    {
       "name": "auth.login_fail_window",
       "env": "BOTHY_AUTH__LOGIN_FAIL_WINDOW",
       "kind": "duration",
@@ -372,6 +384,114 @@
       "max": "",
       "chapter": "07-rechte.md",
       "doc": "Most rights snapshots a process keeps in memory (least recently used go first)."
+    },
+    {
+      "name": "branding.product_name_max_chars",
+      "env": "BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS",
+      "kind": "int",
+      "default": "64",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Longest product name of the branding in Unicode characters."
+    },
+    {
+      "name": "client.min_version.android",
+      "env": "BOTHY_CLIENT__MIN_VERSION__ANDROID",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "18-release.md",
+      "doc": "Lowest app version allowed to connect on this platform; empty means no bound."
+    },
+    {
+      "name": "client.min_version.ios",
+      "env": "BOTHY_CLIENT__MIN_VERSION__IOS",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "18-release.md",
+      "doc": "Lowest app version allowed to connect on this platform; empty means no bound."
+    },
+    {
+      "name": "client.min_version.macos",
+      "env": "BOTHY_CLIENT__MIN_VERSION__MACOS",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "18-release.md",
+      "doc": "Lowest app version allowed to connect on this platform; empty means no bound."
+    },
+    {
+      "name": "client.min_version.windows",
+      "env": "BOTHY_CLIENT__MIN_VERSION__WINDOWS",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "18-release.md",
+      "doc": "Lowest app version allowed to connect on this platform; empty means no bound."
+    },
+    {
+      "name": "client.recommended_version.android",
+      "env": "BOTHY_CLIENT__RECOMMENDED_VERSION__ANDROID",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "18-release.md",
+      "doc": "App version below which the app shows an update note on this platform; empty means none."
+    },
+    {
+      "name": "client.recommended_version.ios",
+      "env": "BOTHY_CLIENT__RECOMMENDED_VERSION__IOS",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "18-release.md",
+      "doc": "App version below which the app shows an update note on this platform; empty means none."
+    },
+    {
+      "name": "client.recommended_version.macos",
+      "env": "BOTHY_CLIENT__RECOMMENDED_VERSION__MACOS",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "18-release.md",
+      "doc": "App version below which the app shows an update note on this platform; empty means none."
+    },
+    {
+      "name": "client.recommended_version.windows",
+      "env": "BOTHY_CLIENT__RECOMMENDED_VERSION__WINDOWS",
+      "kind": "string",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "18-release.md",
+      "doc": "App version below which the app shows an update note on this platform; empty means none."
     },
     {
       "name": "consumer.batch_size",
@@ -961,6 +1081,18 @@
       "max": "",
       "chapter": "02-architektur.md",
       "doc": "PostgreSQL schema of River's job tables, separate from the domain tables."
+    },
+    {
+      "name": "message.max_attachments",
+      "env": "BOTHY_MESSAGE__MAX_ATTACHMENTS",
+      "kind": "int",
+      "default": "10",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Most attachments of one message."
     },
     {
       "name": "message.max_content_bytes",
@@ -2006,6 +2138,30 @@
       "max": "",
       "chapter": "17-observability.md",
       "doc": "With true an incoming traceparent becomes the parent of the server span, otherwise only a span link."
+    },
+    {
+      "name": "thread.title_max_chars",
+      "env": "BOTHY_THREAD__TITLE_MAX_CHARS",
+      "kind": "int",
+      "default": "200",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Longest thread title in Unicode characters."
+    },
+    {
+      "name": "voice.max_duration",
+      "env": "BOTHY_VOICE__MAX_DURATION",
+      "kind": "duration",
+      "default": "15m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "12-dateien.md",
+      "doc": "Longest voice message."
     },
     {
       "name": "webhook.delivery_timeout",

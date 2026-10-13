@@ -1,6 +1,6 @@
 # Modul `instance`
 
-Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the rights version (`Versions.PermissionVersion`, `app.NewVersions`) for the rights cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. Settings, flags and the further reads of `Versions` (`event_seq` for catch-up) come with M1-46, M1-47 and the tickets that need them.
+Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the rights version (`Versions.PermissionVersion`, `app.NewVersions`) for the rights cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. M1-46 adds the instance settings, the branding, discovery, the instance view and the problem types (`Settings`, `Admin`, `LoginOptionsSource`). Flags and the further reads of `Versions` (`event_seq` for catch-up) come with M1-47 and the tickets that need them.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -11,12 +11,12 @@ Instanz-Identität, Sync-Epoche, Mindest-Server-Version, Einstellungen und Brand
 
 | Package | Content |
 |---|---|
-| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys`, `ErrJWSInvalid`, `SignatureAlgs` |
-| `domain/` | counter names and the phase rule (`CheckAdvance`, `CheckRead`, `CheckAdvanceCount`), `CompareSemVer`, `ValidateSemVer`, `CheckServerVersion` (SemVer 2.0.0 precedence, hand-written: the domain layer imports no third-party library); the transitions of the signing keys (`signingkey.go`: `DueTransitions`, `EmergencyTransitions`, `LostTransitions`, `PendingNext`, `ActiveKey`, `Window`) |
-| `app/` | `NewCounters` (phase guard, then the repository) and `NewState` (row in a unit of work), outgoing port `Repository`; `NewKeys` (`Keys`, `KeysConfig`) with the outgoing ports `KeyRepository` and `KeyStore` |
+| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys`, `ErrJWSInvalid`, `SignatureAlgs`; settings (`settings.go`): `SupportedLocales`, `Settings`, `Branding`, `LoginOptionsSource`, `LoginOptions`, `ProviderInfo`, `Admin` with its DTOs (`Setting`, `IfMatch`, `PutSetting`, `UpdateBranding`, `Info`, `Limits`, `Discovery`, `ClientVersion`, `ProblemType`) |
+| `domain/` | counter names and the phase rule (`CheckAdvance`, `CheckRead`, `CheckAdvanceCount`), `CompareSemVer`, `ValidateSemVer`, `CheckServerVersion` (SemVer 2.0.0 precedence, hand-written: the domain layer imports no third-party library); the transitions of the signing keys (`signingkey.go`: `DueTransitions`, `EmergencyTransitions`, `LostTransitions`, `PendingNext`, `ActiveKey`, `Window`); the settings registry (`settings.go`: `Registry`, `Validate`, `ValidateProductName`, `ValidateAccentColor`, `DefaultProductName`), the branding version and changes (`branding.go`) and the discovery rules (`discovery.go`: `MinClientVersions`, `LocalPasswordEnabled`, `DiscoveryFeatures`, `ContentETag`) |
+| `app/` | `NewCounters` (phase guard, then the repository) and `NewState` (row in a unit of work), outgoing port `Repository`; `NewKeys` (`Keys`, `KeysConfig`) with the outgoing ports `KeyRepository` and `KeyStore`; `NewAdmin` (`Admin`, `Config`, `Contract`) with the outgoing port `SettingsRepository` |
 | `adapters/postgres/` | `Repository` over `platform/pg` (both outgoing ports), sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`) |
 | `adapters/keystore/` | `Store`: the key store `secrets.signing_key_dir` over the secret provider (Ed25519, PKCS#8 PEM, `Thumbprint` after RFC 7638) |
-| `adapters/httpapi/` | `Keys`: the REST handlers `getJwks` and `rotateSigningKey` |
+| `adapters/httpapi/` | `Keys`: the REST handlers `getJwks` and `rotateSigningKey`; `Admin`: `getDiscovery`, `getInstance`, `listInstanceSettings`, `putInstanceSetting`, `updateBranding`, `getProblemType` |
 | `adapters/jobs/` | `Register`, `Handler`: the periodic job `instance.key_rotation` |
 
 Migration `00002_instance_counters.sql` creates both tables, the three counter rows with value 0
@@ -185,6 +185,52 @@ not belong to the row).
   lock) and now needs a key that was not generated rolls back, generates one and runs again (up to
   three times, then `409 conflict`).
 - Multi-node key stores (stage 2) need a shared volume or a writable vault driver (M7-17, V3-12).
+
+### Settings, branding and discovery (M1-46)
+
+Normative: [01-produkt.md](../../../../docs/spec/01-produkt.md) sections 9 and 12, 03 table
+`instance_settings`, [06-api.md](../../../../docs/spec/06-api.md) sections 5, 8 and 13 and
+[ADR 0044](../../../../docs/adr/0044-arbeitsname-und-branding-als-konfiguration.md). Rulings:
+[DECISIONS.md](../../../../docs/DECISIONS.md) M1-46.
+
+**Settings registry.** `domain.Registry` holds one entry per key of
+[configuration.md](../../../../docs/operations/configuration.md) section 6 with its JSON type,
+default and route: `branding.accent_color` (`spruce`, an accent key of `kernel/designkeys`),
+`branding.logo_file_id` (no default, UUIDv7, written only by M3-10), `branding.product_name`
+(`DefaultProductName`, trimmed, 1 to `branding.product_name_max_chars` characters, the display text
+check of `kernel/textcheck`) and `locale.default` (`de`, one of `SupportedLocales()`).
+`TestSettingsRegistryMatchesConfigurationDoc` parses section 6 and fails on a difference. Migration
+`00017_instance_settings.sql` creates the table; `bothy_app` reads, inserts and updates and never
+deletes a row. A key without a row has its default and version 0; the stored row wins.
+
+**Writes.** `putInstanceSetting` (owner, step-up, optional `If-Match`) rejects unknown keys (`404`)
+and branding keys (`400`, `#path/key`, `use_branding_endpoint`), validates the value at `/value`,
+takes the advisory lock of all settings writers and locks the row (so two writers of keys
+without a row cannot pass each other, DECISIONS M1-46/14), compares `If-Match` with the current version (`412 version_conflict` with
+`current`), writes nothing for the same value and otherwise inserts version 1 or raises the version
+by one. `updateBranding` (owner, step-up, `If-Match` required) writes the two branding keys whose
+value changes; an absent accent writes the default. Both append `instance.updated` with the sorted
+changed keys (resource `instance`, receive action `instance.read`) and write the allow audit with
+the key or the changed keys, never a value. Owner, step-up and the deny audit come from the
+Authorizer.
+
+**Branding version.** `Branding.Version`, the ETag of `updateBranding`, is the sum of the three
+branding row versions (absent row 0); every write raises it.
+
+**Discovery and the instance view.** `getDiscovery` is public and works before setup:
+`setup_required` comes from `instance.setup_completed_at` on every call, the spec version, the
+gateway protocol versions and the problem catalogue from the generated layer `api/routes`
+(`app.Contract`, built in `wire.Contract`), the sign-in ways from the source port
+`LoginOptionsSource`, the client versions from the configuration (`client.min_version.<p>`,
+`client.recommended_version.<p>`). `getInstance` serves every active principal with the limits of
+the configuration and `features: []` until M1-47; its ETag is a hash of the body
+(`domain.ContentETag`). `getProblemType` serves every code of `x-problem-codes`.
+
+**Source port.** `LoginOptionsSource` is declared here, because `instance` may not import
+`identity`; `identity/adapters/loginoptions` implements it over the provider store of M1-36 and
+`auth.local_password_enabled`, and `internal/wire` (`NewInstanceSettings`, start step `settings`
+before `identity`) passes it in. `identity` reads `locale.default` through `Settings` for
+`createUser`.
 
 ## Port (Wurzelpaket `internal/instance`)
 

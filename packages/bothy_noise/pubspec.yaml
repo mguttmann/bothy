@@ -2,7 +2,7 @@
 name: bothy_noise
 description: >-
   Noise_NK_25519_ChaChaPoly_SHA256 handshake, transport, terminal frames and host key
-  fingerprint of the Bothy terminal (docs/spec/24-terminal.md), in pure Dart.
+  fingerprint of the terminal (docs/spec/24-terminal.md), in pure Dart.
 version: 0.0.0
 publish_to: none
 

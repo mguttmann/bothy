@@ -31,14 +31,10 @@ rules:
     etappe: M7
   - match: "billing."  # M2-20, M2-22
     etappe: M2
-  - match: "branding."  # M1-46
-    etappe: M1
   - match: "channel."  # M1-53
     etappe: M1
   - match: channel.prompt_max_bytes  # M2-02
     etappe: M2
-  - match: "client."  # M1-46
-    etappe: M1
   - match: client.app_lock_after  # M5-08
     etappe: M5
   - match: client.cache_max_age  # M3-05
@@ -131,8 +127,6 @@ rules:
     etappe: M1
   - match: "voice."  # M3-09
     etappe: M3
-  - match: voice.max_duration  # M1-46
-    etappe: M1
   - match: "webhook."  # M2-24, M2-26
     etappe: M2
   - match: "webhook_in."  # M2-27

@@ -1,4 +1,4 @@
-# Bothy: Produkt-Stack für Docker Compose.
+# Produkt-Stack für Docker Compose.
 #
 # Installation und Betrieb: infra/compose/README.md und docs/operations/install-compose.md.
 # Nach der Vorbereitung (.env und ./secrets) startet ein Befehl alles: docker compose up -d

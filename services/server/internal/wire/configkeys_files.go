@@ -14,8 +14,16 @@ const keyStorageDriver = "file.storage.driver"
 // cross-check file_s3 the keys file.s3.* when the driver is s3 (docs/DECISIONS.md M3-02/11).
 // file.fs.min_free_bytes enters the schema with the upload check of M3-03; file.s3.presigned_upload
 // and file.s3.presign_ttl with the presigned mode, their consumer (02 "13" item 5).
+//
+// voice.max_duration is here because getInstance reports it as a client limit (M1-46) before the
+// voice messages of M3 read it.
 func filesConfigKeys() []config.Key {
 	return []config.Key{
+		{
+			Name: "voice.max_duration", Kind: config.KindDuration, Default: defaultQuarterHour, Min: "1s",
+			Doc:     "Longest voice message.",
+			Chapter: chapter12,
+		},
 		{
 			Name: keyStorageDriver, Kind: config.KindEnum, Default: "fs", Enum: []string{"fs", "s3"},
 			Doc:     "Driver of the object storage of files: fs for a directory of the server, s3 for an S3-compatible service.",
@@ -49,7 +57,7 @@ func filesConfigKeys() []config.Key {
 			Chapter: chapter12,
 		},
 		{
-			Name: "file.s3.use_path_style", Kind: config.KindBool, Default: "true",
+			Name: "file.s3.use_path_style", Kind: config.KindBool, Default: defaultTrue,
 			Doc:     "Path-style requests on the endpoint instead of virtual-hosted requests on <bucket>.<endpoint host>.",
 			Chapter: chapter12,
 		},

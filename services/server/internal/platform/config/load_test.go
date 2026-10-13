@@ -167,7 +167,7 @@ func TestUnknownEnvVariableNamesVariable(t *testing.T) {
 	}
 }
 
-func TestNonBothyVariablesAreIgnored(t *testing.T) {
+func TestVariablesWithoutPrefixAreIgnored(t *testing.T) {
 	t.Parallel()
 	mustLoad(t, allKinds(t), config.Sources{Env: []string{"OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:4318", "bothy_server__role=x", "NOEQUALS", "=C:=C:\\"}})
 }

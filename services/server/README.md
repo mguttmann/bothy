@@ -223,4 +223,7 @@ Technik ohne Fachlogik; nur `adapters/`, `wire` und `cmd` dürfen sie importiere
 ## Namensgebundene Stellen
 
 Produktname im Code nur hier: Go-Modulpfad in `go.mod`, Binary `bothy` (`cmd/bothy`), Präfix
-`BOTHY_` der Umgebungsvariablen, Image-Name. Die Liste führt 18-release.md.
+`BOTHY_` der Umgebungsvariablen, Image-Name und der Standardwert des angezeigten Produktnamens,
+die Konstante `DefaultProductName` in `internal/instance/domain` (Einstellung
+`branding.product_name`, ADR 0044). Die vollständige Liste nach Art führt 02-architektur.md,
+Abschnitt 6; `tools/ci/tests/test_product_name_places.py` hält sie.

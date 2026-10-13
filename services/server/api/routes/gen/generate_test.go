@@ -49,6 +49,7 @@ func TestGenerate_Fixture_Golden(t *testing.T) {
 		filepath.Join(cfg.routesDir, "routes.gen.go"):  "../internal/fixture/routes/routes.gen.go",
 		filepath.Join(cfg.routesDir, "catalog.gen.go"): "../internal/fixture/routes/catalog.gen.go",
 		filepath.Join(cfg.routesDir, "build.gen.go"):   "../internal/fixture/routes/build.gen.go",
+		filepath.Join(cfg.routesDir, "meta.gen.go"):    "../internal/fixture/routes/meta.gen.go",
 	}
 	for got, want := range golden {
 		if g, w := readText(t, got), readText(t, want); g != w {

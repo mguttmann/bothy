@@ -125,10 +125,14 @@ func newPeopleWorld(t *testing.T) *peopleWorld {
 	if err != nil {
 		t.Fatal(err)
 	}
+	st, err := wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, pool, uow, az, wire.SettingsWrites{Audit: rec, Events: appender}, w.clk)
+	if err != nil {
+		t.Fatal(err)
+	}
 	w.pool, w.uow, w.rec, w.az, w.events = pool, uow, rec, az, appender
 	w.p, err = app.NewPeople(peopleCfg, app.PeopleDeps{Store: repo, UoW: uow, Authorizer: az, Audit: rec, Events: appender,
 		Cursors: httpapi.Cursors{}, Versions: versions, Locales: locale.Parser{}, Providers: repo, Identities: repo, Enrollment: codes,
-		Clock: w.clk})
+		Settings: st.Admin, Clock: w.clk})
 	if err != nil {
 		t.Fatal(err)
 	}

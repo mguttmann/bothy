@@ -115,7 +115,8 @@ func (s *People) GetUser(ctx context.Context, a actor.Actor, userID ids.ID) (ide
 
 // CreateUser implements identity.People (no self registration: user.create is an owner action).
 // With local_account the person gets its local identity (subject = handle) at the enabled local
-// provider and a first_login code in the same unit of work (08 section 4, M1-37).
+// provider and a first_login code in the same unit of work (08 section 4, M1-37). A request without
+// locale stores locale.default of the instance settings (M1-46).
 func (s *People) CreateUser(ctx context.Context, a actor.Actor, cmd identity.CreateUserCmd) (identity.CreatedUser, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
@@ -124,6 +125,10 @@ func (s *People) CreateUser(ctx context.Context, a actor.Actor, cmd identity.Cre
 	var out identity.CreatedUser
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		if err := s.check(ctx, a, authorize.ActionUserCreate, authorize.Resource{Kind: authorize.ResourceInstance}); err != nil {
+			return err
+		}
+		cmd, err := s.withLocaleDefault(ctx, cmd)
+		if err != nil {
 			return err
 		}
 		u, err := s.insertUser(ctx, cmd)
@@ -206,6 +211,20 @@ func (s *People) localAccount(ctx context.Context, a actor.Actor, u domain.User)
 	}
 	creator := a.ID
 	return s.d.Enrollment.Issue(ctx, u.Principal.ID, PurposeFirstLogin, &creator)
+}
+
+// withLocaleDefault returns cmd with locale.default of the instance settings when it names no
+// locale (M1-46): a new person speaks the language of the instance, not the column default of 03.
+func (s *People) withLocaleDefault(ctx context.Context, cmd identity.CreateUserCmd) (identity.CreateUserCmd, error) {
+	if cmd.Locale != nil {
+		return cmd, nil
+	}
+	l, err := s.d.Settings.LocaleDefault(ctx)
+	if err != nil {
+		return identity.CreateUserCmd{}, err
+	}
+	cmd.Locale = &l
+	return cmd, nil
 }
 
 // newUser validates cmd and returns the new active person.

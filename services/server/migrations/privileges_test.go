@@ -62,6 +62,9 @@ var appPrivileges = map[string][]string{
 	// 03 server_signing_keys (M1-32): keys change by state and not_after; a retired row stays as
 	// the record of a key that signed, deleted only by the retention job of class security.
 	"server_signing_keys": {"SELECT", "INSERT", "UPDATE"},
+	// 03 instance_settings (M1-46): a key gets a row on its first write and is changed with
+	// version + 1; the writer never deletes a row, because that would lower the branding version.
+	"instance_settings": {"SELECT", "INSERT", "UPDATE"},
 	// 03 section 4.2: sessions and families are revoked by revoked_at, tokens marked by used_at;
 	// the rows are security history, deleted only by the cleanup and retention jobs, which grant
 	// their delete (M1-34).

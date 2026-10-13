@@ -208,7 +208,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 |---|---|---|---|---|---|---|
 | `principal.handle_max_chars` | `BOTHY_PRINCIPAL__HANDLE_MAX_CHARS` | Server | int | `32` | Länge eines Handles | aktiv |
 | `principal.display_name_max_chars` | `BOTHY_PRINCIPAL__DISPLAY_NAME_MAX_CHARS` | Server | int | `64` | Länge eines Anzeigenamens in Unicode-Zeichen | aktiv |
-| `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server |  | `64` | Länge des Produktnamens im Branding (`instance_settings`, `branding.product_name`) in Unicode-Zeichen | geplant (M1) |
+| `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server | int | `64` | Länge des Produktnamens im Branding (`instance_settings`, `branding.product_name`) in Unicode-Zeichen | aktiv |
 | `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Gruppennamens in Unicode-Zeichen | geplant (M1) |
 | `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server |  | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen | geplant (M1) |
 | `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Rechnernamens in Unicode-Zeichen | geplant (M2) |
@@ -225,10 +225,10 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `channel.history_backfill_limit_default` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT` | Server |  | `20` | Standard für `history_backfill_limit` | geplant (M1) |
 | `channel.history_backfill_limit_max` | `BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX` | Server |  | `200` | Obergrenze für `history_backfill_limit` | geplant (M1) |
 | `channel.prompt_max_bytes` | `BOTHY_CHANNEL__PROMPT_MAX_BYTES` | Server |  | `32768` | Größe eines Kanal-Prompts | geplant (M2) |
-| `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server |  | `200` | Länge eines Thread-Titels | geplant (M1) |
+| `thread.title_max_chars` | `BOTHY_THREAD__TITLE_MAX_CHARS` | Server | int | `200` | Länge eines Thread-Titels | aktiv |
 | `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server |  | `5` | Forum-Tags je Thread | geplant (M1) |
 | `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | int | `262144` | Größe einer Nachricht (lange Antworten ohne Teilen) | aktiv |
-| `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server |  | `10` | Anhänge je Nachricht | geplant (M1) |
+| `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | int | `10` | Anhänge je Nachricht | aktiv |
 | `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server |  | `50` | verschiedene Erwähnungs-Handles je Nachricht (Inhaltsformat, `messages`) | geplant (M1) |
 | `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server |  | `64` | größte Länge eines Reaktions-Emoji in Bytes (ein Graphem-Cluster hat sonst keine Grenze) | geplant (M1) |
 | `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server |  | `20` | verschiedene Emoji je Nachricht; begrenzt `Message.reactions` und die Nutzlast der Ereignisse | geplant (M1) |
@@ -387,7 +387,7 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.require_key_attestation` | `BOTHY_AUTH__REQUIRE_KEY_ATTESTATION` | Server |  | `false` | Plattform-Attestierung der Geräteschlüssel verlangen | geplant (V3) |
 | `auth.console_session_max_age` | `BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE` | Server |  | `12h` | absolute Dauer einer Konsolen-Sitzung | geplant (M6) |
 | `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server |  | `30m` | Leerlauf bis zum Ende der Konsolen-Sitzung | geplant (M6) |
-| `auth.local_password_enabled` | `BOTHY_AUTH__LOCAL_PASSWORD_ENABLED` | Server |  | `true` | Passwort mit TOTP als Rückfall für lokale Konten | geplant (M1) |
+| `auth.local_password_enabled` | `BOTHY_AUTH__LOCAL_PASSWORD_ENABLED` | Server | bool | `true` | Passwort mit TOTP als Rückfall für lokale Konten | aktiv |
 | `auth.totp_key_ref` | `BOTHY_AUTH__TOTP_KEY_REF` | Server |  | `file:<secrets.dir>/totp_key` | Verweis auf den Schlüssel (32 Byte), mit dem TOTP-Geheimnisse verschlüsselt werden | geplant (M1) |
 | `auth.webauthn_rp_id` | `BOTHY_AUTH__WEBAUTHN_RP_ID` | Server |  | leer | RP-ID der Passkeys; leer heißt Host von `server.public_url` | geplant (M1) |
 | `auth.webauthn_origins` | `BOTHY_AUTH__WEBAUTHN_ORIGINS` | Server |  | leer | erlaubte Origins der Passkeys; leer heißt Origin von `server.public_url`; Einträge dürfen auch App-Origins wie `android:apk-key-hash:...` sein | geplant (M1) |
@@ -521,7 +521,7 @@ Quelle: [12-dateien.md](../spec/12-dateien.md), Abschnitt 18.
 | `file.unattached_ttl` | `BOTHY_FILE__UNATTACHED_TTL` | Server |  | `24h` | Frist für nie angehängte Dateien | geplant (M3) |
 | `file.failed_row_ttl` | `BOTHY_FILE__FAILED_ROW_TTL` | Server |  | `7d` | Frist für Zeilen fehlgeschlagener oder blockierter Dateien | geplant (M3) |
 | `file.gc_interval` | `BOTHY_FILE__GC_INTERVAL` | Server |  | `10m` | Abstand des Aufräum-Jobs | geplant (M3) |
-| `voice.max_duration` | `BOTHY_VOICE__MAX_DURATION` | Server |  | `15m` | längste Sprachnachricht | geplant (M1) |
+| `voice.max_duration` | `BOTHY_VOICE__MAX_DURATION` | Server | duration | `15m` | längste Sprachnachricht | aktiv |
 | `voice.transcription_mode` | `BOTHY_VOICE__TRANSCRIPTION_MODE` | Server |  | `agent` | `off`, `agent` oder `service` | geplant (M3) |
 | `voice.transcription_url` | `BOTHY_VOICE__TRANSCRIPTION_URL` | Server |  | leer | Endpunkt des Transkriptions-Dienstes | geplant (M3) |
 | `voice.transcription_api_key_ref` | `BOTHY_VOICE__TRANSCRIPTION_API_KEY_REF` | Server |  | leer | Verweis auf den Schlüssel | geplant (M3) |
@@ -694,14 +694,14 @@ Quelle: [18-release.md](../spec/18-release.md), Abschnitt 12.
 
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
-| `client.min_version.ios` | `BOTHY_CLIENT__MIN_VERSION__IOS` | Server |  | leer | kleinste zugelassene App-Version auf iOS; leer heißt keine Grenze | geplant (M1) |
-| `client.min_version.android` | `BOTHY_CLIENT__MIN_VERSION__ANDROID` | Server |  | leer | dasselbe für Android | geplant (M1) |
-| `client.min_version.macos` | `BOTHY_CLIENT__MIN_VERSION__MACOS` | Server |  | leer | dasselbe für macOS | geplant (M1) |
-| `client.min_version.windows` | `BOTHY_CLIENT__MIN_VERSION__WINDOWS` | Server |  | leer | dasselbe für Windows | geplant (M1) |
-| `client.recommended_version.ios` | `BOTHY_CLIENT__RECOMMENDED_VERSION__IOS` | Server |  | leer | darunter zeigt die App einen Update-Hinweis | geplant (M1) |
-| `client.recommended_version.android` | `BOTHY_CLIENT__RECOMMENDED_VERSION__ANDROID` | Server |  | leer | dasselbe für Android | geplant (M1) |
-| `client.recommended_version.macos` | `BOTHY_CLIENT__RECOMMENDED_VERSION__MACOS` | Server |  | leer | dasselbe für macOS | geplant (M1) |
-| `client.recommended_version.windows` | `BOTHY_CLIENT__RECOMMENDED_VERSION__WINDOWS` | Server |  | leer | dasselbe für Windows | geplant (M1) |
+| `client.min_version.ios` | `BOTHY_CLIENT__MIN_VERSION__IOS` | Server | string | leer | kleinste zugelassene App-Version auf iOS; leer heißt keine Grenze | aktiv |
+| `client.min_version.android` | `BOTHY_CLIENT__MIN_VERSION__ANDROID` | Server | string | leer | dasselbe für Android | aktiv |
+| `client.min_version.macos` | `BOTHY_CLIENT__MIN_VERSION__MACOS` | Server | string | leer | dasselbe für macOS | aktiv |
+| `client.min_version.windows` | `BOTHY_CLIENT__MIN_VERSION__WINDOWS` | Server | string | leer | dasselbe für Windows | aktiv |
+| `client.recommended_version.ios` | `BOTHY_CLIENT__RECOMMENDED_VERSION__IOS` | Server | string | leer | darunter zeigt die App einen Update-Hinweis | aktiv |
+| `client.recommended_version.android` | `BOTHY_CLIENT__RECOMMENDED_VERSION__ANDROID` | Server | string | leer | dasselbe für Android | aktiv |
+| `client.recommended_version.macos` | `BOTHY_CLIENT__RECOMMENDED_VERSION__MACOS` | Server | string | leer | dasselbe für macOS | aktiv |
+| `client.recommended_version.windows` | `BOTHY_CLIENT__RECOMMENDED_VERSION__WINDOWS` | Server | string | leer | dasselbe für Windows | aktiv |
 
 ### 19 Sicherheit
 

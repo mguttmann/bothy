@@ -31,7 +31,7 @@ variable "bothy_version" {
 }
 
 variable "image_registry" {
-  description = "Registry-Pfad der Bothy-Images in Kleinbuchstaben, z. B. ghcr.io/<owner>."
+  description = "Registry-Pfad der Server-Images in Kleinbuchstaben, z. B. ghcr.io/<owner>."
   type        = string
 }
 

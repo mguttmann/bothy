@@ -169,6 +169,20 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"consumer.batch_size":          {Kind: config.KindInt, Default: "500", Min: "1", Max: "2147483647", Chapter: "02-architektur.md"},
 		"consumer.poll_interval":       {Kind: config.KindDuration, Default: "1s", Min: "1ms", Chapter: "02-architektur.md"},
 		"consumer.pending_alert_after": {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "02-architektur.md"},
+
+		"branding.product_name_max_chars":    {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-datenmodell.md"},
+		"message.max_attachments":            {Kind: config.KindInt, Default: "10", Min: "0", Chapter: "03-datenmodell.md"},
+		"thread.title_max_chars":             {Kind: config.KindInt, Default: "200", Min: "1", Chapter: "03-datenmodell.md"},
+		"voice.max_duration":                 {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "12-dateien.md"},
+		"auth.local_password_enabled":        {Kind: config.KindBool, Default: "true", Chapter: "08-identitaet.md"},
+		"client.min_version.ios":             {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
+		"client.min_version.android":         {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
+		"client.min_version.macos":           {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
+		"client.min_version.windows":         {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
+		"client.recommended_version.ios":     {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
+		"client.recommended_version.android": {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
+		"client.recommended_version.macos":   {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
+		"client.recommended_version.windows": {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
 	}
 	// Two keys per class of 05 "Rate-Limit-Klassen" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{
@@ -706,5 +720,54 @@ func TestConfigCheckDPoPRequiredFor(t *testing.T) {
 		if !strings.Contains(msg, "auth.dpop_required_for") || strings.Contains(msg, bad) {
 			t.Errorf("the problem must name the key and not the value %q: %q", bad, msg)
 		}
+	}
+}
+
+func TestClientVersionsAreSemVer(t *testing.T) {
+	t.Parallel()
+	for _, platform := range []string{"IOS", "ANDROID", "MACOS", "WINDOWS"} {
+		for _, kind := range []string{"MIN_VERSION", "RECOMMENDED_VERSION"} {
+			env := "BOTHY_CLIENT__" + kind + "__" + platform + "="
+			if got := load(t, env+"1.2.3"); got != nil {
+				t.Errorf("%s1.2.3: problems %v", env, got)
+			}
+			if got := load(t, env+"2.0.0-rc.1+build.5"); got != nil {
+				t.Errorf("%s2.0.0-rc.1: problems %v", env, got)
+			}
+			for _, bad := range []string{"v1.2.3", "1.2", "latest", " 1.2.3"} {
+				got := load(t, env+bad)
+				if len(got) != 1 || !strings.Contains(got[0].Key+" "+got[0].Message, "client.") {
+					t.Errorf("%s%q: problems %v, want one about the client versions", env, bad, got)
+				}
+				for _, p := range got {
+					if strings.Contains(p.Message, bad) {
+						t.Errorf("problem %q repeats the value", p.Message)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestInstanceConfig_Defaults(t *testing.T) {
+	t.Parallel()
+	v, err := config.Load(schema(t), config.Sources{Env: append(testEnv(), "BOTHY_CLIENT__MIN_VERSION__IOS=1.0.0")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := wire.InstanceConfig(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.ProductNameMaxChars != 64 || c.MessageMaxContentBytes != 262144 || c.MessageMaxAttachments != 10 ||
+		c.FileMaxUploadBytes != 104857600 || c.ThreadTitleMaxChars != 200 || c.VoiceMaxDuration.Minutes() != 15 {
+		t.Errorf("config %+v", c)
+	}
+	if c.MinVersionIOS != "1.0.0" || c.MinVersionAndroid != "" || c.RecommendedVersionWindows != "" {
+		t.Errorf("client versions %+v", c)
+	}
+	c.MinVersionIOS = ""
+	if c != wire.DefaultInstanceConfig() {
+		t.Errorf("DefaultInstanceConfig %+v, schema defaults %+v", wire.DefaultInstanceConfig(), c)
 	}
 }

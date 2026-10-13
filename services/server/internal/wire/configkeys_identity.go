@@ -81,7 +81,14 @@ func identityConfigKeys() []config.Key {
 			Chapter: chapter08,
 		},
 		{
-			Name: "auth.login_fail_window", Kind: config.KindDuration, Default: "15m", Min: "1s",
+			// Discovery reports it with an enabled provider of kind local (M1-46); the password
+			// login of M1-38 reads it too.
+			Name: "auth.local_password_enabled", Kind: config.KindBool, Default: defaultTrue,
+			Doc:     "Whether a local account may sign in with password and TOTP as fallback.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.login_fail_window", Kind: config.KindDuration, Default: defaultQuarterHour, Min: "1s",
 			Doc:     "Window in which failed attempts count.",
 			Chapter: chapter08,
 		},

@@ -451,9 +451,21 @@ nach Art:
   der API-Tokens und Kopplungs-Codes `bothy_` mit der gitleaks-Regel
   ([ADR 0061](../adr/0061-token-format-mit-festem-praefix-und-pruefsumme.md)); Standardwert der
   Einstellung `branding.product_name`.
+- Werkzeuge und Betrieb: Kennungen mit dem Präfix `bothy-` (Regeln von Semgrep, Workflows,
+  Dashboards, SLOs, Compose-Dienste, temporäre Namen); der Name allein als Wert der
+  Standardkonfiguration (Datenbank- und Dienstname, Komponenten); Anzeigenamen in den Werkzeugen
+  (NOTICE, Doku-Site, Projekt und Quality Gate in SonarQube, Titel von gitleaks, Dashboards und
+  Ordner in Grafana, Design-Vorschau). Fest und ohne Namenswechsel: die Schlüssel der Advisory
+  Locks `bothyjob` und `bothyboo` (ein neuer Wert ließe zwei Server-Versionen gleichzeitig
+  migrieren).
 
-Diese Liste ist die einzige; ein Test (PLAN M1-46) erlaubt den Namen in Code und Konfiguration nur
-an Stellen dieser Arten. Ein Wechsel des Namens ändert die Protokoll-Kennungen nicht still: Sie
+Diese Liste ist die einzige; ein Test (PLAN M1-46, `tools/ci/tests/test_product_name_places.py`)
+erlaubt den Namen in Code und Konfiguration (ohne `docs/`, Markdown und aus der Doku erzeugten
+Code) nur in diesen Formen: Modulpfad, ganzes Pfadsegment, Präfix (`bothy-`, `bothy_`, `bothy.`,
+`BOTHY_`), Alarmname `Bothy<Name>` (nur die Namen der Alarmregeln und Beispiele des
+Alarm-Werkzeugs), Binary vor einem Unterbefehl (in `cmd/bothy` auch als Befehlswort und in
+Bezeichnern), ganzer Wert außerhalb des Client-Codes (`apps/`, `packages/`) und Anzeigename in den
+genannten Werkzeugdateien. Fließtext in Kommentaren und Texte für Menschen nennen den Namen nicht. Ein Wechsel des Namens ändert die Protokoll-Kennungen nicht still: Sie
 sind Teil des Terminal-Protokolls und wechseln nur mit einer neuen Protokollversion.
 
 ## 7. Automatische Prüfung der Regeln

@@ -11,6 +11,16 @@ documented in this file. The format is based on
 
 ### Added
 
+- Instance settings, branding and discovery (M1-46): the migration `00017_instance_settings.sql`,
+  the settings registry of configuration.md section 6, the generated design keys
+  `kernel/designkeys` (category colours and space icons from the design tokens, the accent list of
+  ADR 0044) with the generator `tools/designkeysgen`, and the operations `getDiscovery` (public,
+  also before setup), `getInstance`, `listInstanceSettings` (owner), `putInstanceSetting` and
+  `updateBranding` (owner with step-up, audit, `If-Match`, `instance.updated` with the changed
+  keys) and `getProblemType`. The route generator exposes `SpecVersion`,
+  `GatewayProtocolVersions` and the problem catalogue; the configuration gains the client limits
+  and the client version keys; `createUser` stores `locale.default` when the request names no
+  locale; `tools/ci/tests/test_product_name_places.py` holds the places of the working name.
 - First setup, enrollment codes and setup lock (M1-37): until `bothy setup bootstrap-owner` has
   run on the host, the public listener answers every request except the discovery reads with
   `503 setup_required`, before authentication and rate limiting; the bootstrap takes effect

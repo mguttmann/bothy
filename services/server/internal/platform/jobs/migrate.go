@@ -39,7 +39,7 @@ const (
 // (docs/spec/16-betrieb.md "Rollen": bothy_owner migrates, bothy_app runs). The default
 // privileges cover the tables River's migrations create next; the grants on ALL cover tables
 // an earlier run created before. format with %I quotes the name.
-const schemaSQL = `DO $bothy$
+const schemaSQL = `DO $schema$
 DECLARE
 	s text := current_setting('bothy.jobs_schema');
 BEGIN
@@ -53,7 +53,7 @@ BEGIN
 	EXECUTE format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA %I TO bothy_app', s);
 	EXECUTE format('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA %I TO bothy_app', s);
 END
-$bothy$`
+$schema$`
 
 // MigrateResult is what Migrate did.
 type MigrateResult struct {
@@ -252,8 +252,8 @@ func CheckEmbeddedMigrations() (int, error) {
 	return len(versions), nil
 }
 
-// quiet discards the log of River's migrator: its default writes warnings to stdout, which bothy
-// migrate keeps for the lines scripts read; the results come back as values and errors.
+// quiet discards the log of River's migrator: its default writes warnings to stdout, which `bothy
+// migrate` keeps for the lines scripts read; the results come back as values and errors.
 var quiet = slog.New(slog.DiscardHandler)
 
 // migrator returns River's migrator for schema over pool.
