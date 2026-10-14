@@ -19,6 +19,10 @@ Common rules for all components:
   on the web as ARIA). Labels come from `packages/l10n`, never from the agent's data alone.
 - **Never color alone:** States differ in icon shape and text.
 - **Motion** only through `motion.*`; no motion in the `reduced` context.
+- **Accent roles from `DsAccent`:** components read `color.accent.*`, `color.text.link`,
+  `color.focus.ring` and `color.run.running` only from the theme extension `DsAccent` (Dart) or the
+  `--ds-*` variables under `data-accent` (web), never from `DsColors`, so the instance accent
+  (`branding.accent_color`) applies everywhere. Every variant is in [contrast.md](contrast.md).
 
 ## 1. Message
 

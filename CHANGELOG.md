@@ -25,6 +25,11 @@ operated, and the order of the build.
 
 ### Added
 
+- Design tokens: accent variants for every instance accent of `branding.accent_color` in light and
+  dark. The generator swaps the accent roles for the same step of the chosen scale, moves a
+  failing step, checks every pairing with a swapped role and writes `DsAccent` (Dart),
+  `data-accent` blocks (`tokens.css`), the member `accents` of `tokens.resolved.json` and one
+  section per accent and theme in `docs/design/contrast.md`; `make tokens` fails below AA (M4-03).
 - `plugins/hermes-adapter`: recording harness, probe plugin and fixtures of the live recording
   against the pinned Hermes Agent version (`plugins/hermes-adapter/tests/hermes_pin.toml`); the
   answers of docs/spec/09-agents.md 17.10 come from it (M2-32).
