@@ -51,6 +51,8 @@ const (
 	versionFile = "../../VERSION"
 	// noEgressAddr is in the documentation range 192.0.2.0/24 (RFC 5737), which is never routed.
 	noEgressAddr = "192.0.2.1"
+	// stanza is the pgBackRest stanza the image configures.
+	stanza = "bothy"
 )
 
 // env returns the value of the environment variable name and fails the test when it is empty.
@@ -294,7 +296,7 @@ func TestArchiveBackupRestoreVerify(t *testing.T) {
 	db := w.start("postgres", append(databaseArgs(secPostgres, pgdata), w.image)...)
 
 	waitDatabase(t, db, true)
-	eventually(t, "the stanza", func() bool { return strings.Contains(logs(t, backup), "stanza bothy is ready") },
+	eventually(t, "the stanza", func() bool { return strings.Contains(logs(t, backup), "stanza "+stanza+" is ready") },
 		func() string { return logs(t, backup) })
 	if out, errOut, code := docker(t, "exec", backup, "bothy-backupd", "healthcheck"); code != 0 {
 		t.Fatalf("healthcheck of backup: exit %d: %s%s", code, out, errOut)

@@ -6,7 +6,7 @@
 // the object backup and the restore test come with later tickets (M7-02, M7-03); their use cases
 // live in the module status, not here.
 //
-// It is a second program of the server module and not a command of bothy, because the server
+// It is a second program of the server module and not a command of the server binary, because the server
 // binary with its API role has no business in the database image (docs/DECISIONS.md
 // D-M7-01-3). Its version is the server version (internal/platform/buildinfo), so one release
 // builds and versions both images from one commit.
@@ -33,7 +33,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/buildinfo"
 )
 
-// Exit codes, the same as those of bothy (docs/spec/02-architektur.md "Befehle des Binarys").
+// Exit codes, the same as those of the server binary (docs/spec/02-architektur.md "Befehle des Binarys").
 const (
 	exitOK      = 0
 	exitFailure = 1
@@ -52,7 +52,7 @@ stanza-create" until it succeeds, and stops the server on SIGTERM or SIGINT. pgB
 /etc/pgbackrest/pgbackrest.conf, which the image's entry point writes.
 
 --pgbackrest PATH   pgBackRest binary (default pgbackrest from PATH)
---stanza NAME       stanza of the instance (default bothy)
+--stanza NAME       stanza of the instance (default: the stanza of the image)
 --retry DURATION    wait between two attempts of stanza-create (default 5s)
 
 healthcheck  succeeds when the TLS server completes a handshake with the client certificate

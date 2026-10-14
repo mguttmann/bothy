@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-// defaultStanza is the pgBackRest stanza of a Bothy instance; the entry point of the image writes
+// defaultStanza is the pgBackRest stanza of an instance; the entry point of the image writes
 // the same name into pgbackrest.conf and archive_command (services/server/images/bothy-postgres).
 const defaultStanza = "bothy"
 

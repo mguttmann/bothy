@@ -99,7 +99,7 @@ func TestServeStopsChildOnSIGTERM(t *testing.T) {
 	if got := waitFile(t, filepath.Join(dir, "term")); got != "term" {
 		t.Errorf("child did not receive SIGTERM: %q", got)
 	}
-	if !strings.Contains(stderr.String(), "stanza bothy is ready") {
+	if !strings.Contains(stderr.String(), "stanza "+defaultStanza+" is ready") {
 		t.Errorf("stderr does not report the stanza:\n%s", stderr.String())
 	}
 }
@@ -149,6 +149,9 @@ func TestUsage(t *testing.T) {
 		{[]string{"--stanza", ""}, exitUsage},
 		{[]string{"healthcheck", "--timeout", "0s"}, exitUsage},
 		{[]string{"healthcheck", "extra"}, exitUsage},
+		{[]string{"healthcheck", "--addr", "192.0.2.1:8432"}, exitUsage},
+		{[]string{"healthcheck", "--addr", "backup:8432"}, exitUsage},
+		{[]string{"healthcheck", "--addr", "127.0.0.1"}, exitUsage},
 		{[]string{"version", "extra"}, exitUsage},
 	} {
 		var stdout, stderr bytes.Buffer

@@ -47,6 +47,9 @@ ARG PGBACKREST_VERSION=2.59.3-1.pgdg13+1
 ARG PGDG_FINGERPRINT=B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8
 COPY --chmod=0555 services/server/images/bothy-postgres/check-pgbackrest-version.sh /usr/local/bin/
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# DS-0017 expects "apt-get install" after "apt-get update"; this stage only downloads the packages of
+# the target architecture with "apt-get download" and never installs into a final image layer.
+# trivy:ignore:DS-0017
 RUN set -eu; \
     keyring=/usr/local/share/keyrings/postgres.gpg.asc; \
     grep -q "signed-by=$keyring" /etc/apt/sources.list.d/pgdg.list \

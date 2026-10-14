@@ -26,7 +26,7 @@ readonly secrets=/run/bothy/secrets
 readonly tls_dir=$secrets/pgbackrest_tls
 readonly conf_dir=/etc/pgbackrest
 readonly conf=$conf_dir/pgbackrest.conf
-# Stanza and TLS port are fixed for a Bothy instance; bothy-backupd uses the same stanza.
+# Stanza and TLS port are fixed for an instance; bothy-backupd uses the same stanza.
 readonly stanza=bothy
 readonly tls_port=8432
 readonly pgdata=${PGDATA:?PGDATA is set by the postgres base image}

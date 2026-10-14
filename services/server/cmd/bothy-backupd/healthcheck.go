@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/netip"
 	"os"
 	"time"
 )
@@ -50,6 +51,8 @@ func healthcheckCommand(ctx context.Context, args []string, stderr io.Writer) in
 		return usageError(stderr, fmt.Sprintf("healthcheck: unexpected argument %q", fs.Arg(0)))
 	case *timeout <= 0:
 		return usageError(stderr, "healthcheck: --timeout must be positive")
+	case !loopbackAddr(*addr):
+		return usageError(stderr, "healthcheck: --addr must be a loopback address with a port")
 	}
 	cfg, err := clientTLS(files, *name)
 	if err != nil {
@@ -58,7 +61,9 @@ func healthcheckCommand(ctx context.Context, args []string, stderr io.Writer) in
 	}
 	ctx, cancel := context.WithTimeout(ctx, *timeout)
 	defer cancel()
-	d := tls.Dialer{NetDialer: &net.Dialer{}, Config: cfg}
+	// Not HTTP and only to loopback (loopbackAddr): the probe of the container's own TLS server,
+	// which the egress package (HTTP only) does not cover.
+	d := tls.Dialer{NetDialer: &net.Dialer{}, Config: cfg} // nosemgrep: bothy-go-egress-only -- a TLS handshake with the pgBackRest server on loopback, no HTTP and no egress
 	conn, err := d.DialContext(ctx, "tcp", *addr)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "bothy-backupd healthcheck: %s\n", dialErrorClass(err))
@@ -73,6 +78,20 @@ type tlsFiles struct {
 	ca   string // CA certificate, the only root
 	cert string // client certificate
 	pair string // private key of the client certificate
+}
+
+// loopbackAddr reports whether addr is host:port with a loopback IP address (127.0.0.0/8, ::1)
+// or localhost: the health check probes only the container's own server.
+func loopbackAddr(addr string) bool {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil || port == "" {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip, err := netip.ParseAddr(host)
+	return err == nil && ip.Unmap().IsLoopback()
 }
 
 // clientTLS builds the client configuration: the CA as the only root and the client key pair.

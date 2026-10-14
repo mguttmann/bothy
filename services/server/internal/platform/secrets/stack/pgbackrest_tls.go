@@ -56,7 +56,7 @@ func generatePGBackRestTLS(dir string, rnd io.Reader, now time.Time) (map[string
 	}
 	caTemplate := &x509.Certificate{
 		SerialNumber:          caSerial,
-		Subject:               pkix.Name{CommonName: "bothy pgBackRest CA"},
+		Subject:               pkix.Name{CommonName: "pgBackRest CA"},
 		NotBefore:             notBefore,
 		NotAfter:              notAfter,
 		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
