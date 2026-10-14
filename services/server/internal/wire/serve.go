@@ -159,6 +159,8 @@ type server struct {
 	chat *Chat
 	// terminal is the terminal module (M2-39): the host records and their REST handlers.
 	terminal *Terminal
+	// apps is the module apps (M2-24): the app use cases and their REST handlers.
+	apps *Apps
 	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
 	signingKeys *SigningKeys
 	keyCheck    time.Duration
@@ -201,6 +203,8 @@ type server struct {
 //     the recorder and the appender (startChat),
 //     6g. terminal (M2-39): build the host records over the unit of work, the Authorizer, the
 //     recorder, the appender and the identity module (startTerminal),
+//     6h. apps (M2-24): build the app use cases and their handlers over identity, the rights hook
+//     and the Authorizer (startApps),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
 //     sweeper, M1-19, InstallIdempotency, M1-20, and MountRoutes, api and all), log
@@ -363,6 +367,7 @@ func (s *server) components() []lifecycle.Component {
 		step("agents", s.startAgents),
 		step("chat", s.startChat),
 		step("terminal", s.startTerminal),
+		step("apps", s.startApps),
 		step("signing_keys", s.startSigningKeys),
 		step("audit_log", s.startAuditLog),
 		step("sessions", s.startSessions),
@@ -688,7 +693,7 @@ func (s *server) startIdentity(ctx context.Context) error {
 		return err
 	}
 	id, err := NewIdentity(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender(), Settings: st.Admin, Flags: st.Admin,
-		Fresh: fresh}, pepper, s.deps.Clock, s.logger())
+		Fresh: fresh, Apps: NewAppInstallations(pool)}, pepper, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}
@@ -771,6 +776,29 @@ func (s *server) startTerminal(context.Context) error {
 	return nil
 }
 
+// startApps is start step 6e (M2-24): the module apps over the pool, the unit of work, rights hook
+// and recorder of the audit step, the Authorizer and identity.
+func (s *server) startApps(context.Context) error {
+	cfg, err := AppsConfig(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	pool, a, az, id := s.pool, s.audit, s.authorizer, s.identity
+	s.mu.Unlock()
+	if a == nil || az == nil || id == nil {
+		return errors.New("wire: the apps step needs the audit step, the Authorizer and identity")
+	}
+	ap, err := NewApps(cfg, pool, AppsDeps{UoW: a.UoW(), Rights: a.RightsHook(), Authorizer: az, Audit: a.Recorder(), Identity: id, Clock: s.deps.Clock})
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.apps = ap
+	s.mu.Unlock()
+	return nil
+}
+
 // startSessions is the second extension point of start step 7 (M1-34): the session part of
 // identity over the signing keys of the previous step and the instance id, the issuer of access
 // tokens. From here on the HTTP chain authenticates people with identity's Authenticator.
@@ -838,6 +866,9 @@ func (s *server) handlers() Handlers {
 	}
 	if h.Access == nil && s.authzAdmin != nil {
 		h.Access = s.authzAdmin.Handlers
+	}
+	if h.Apps == nil && s.apps != nil {
+		h.Apps = s.apps.Handlers
 	}
 	return h
 }

@@ -229,6 +229,27 @@ func (q *Queries) LockPrincipal(ctx context.Context, id pgtype.UUID) (LockPrinci
 	return i, err
 }
 
+const setBotPrincipalStatus = `-- name: SetBotPrincipalStatus :execrows
+UPDATE principals SET status = $1, disabled_at = $2
+WHERE id = $3 AND kind IN ('agent', 'app')
+`
+
+type SetBotPrincipalStatusParams struct {
+	Status     string
+	DisabledAt pgtype.Timestamptz
+	ID         pgtype.UUID
+}
+
+// The status of an agent or app principal (M2-24, M1-51): active clears disabled_at, disabled
+// sets it; people change status through their own queries (08 section 11).
+func (q *Queries) SetBotPrincipalStatus(ctx context.Context, arg SetBotPrincipalStatusParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setBotPrincipalStatus, arg.Status, arg.DisabledAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setPrincipalStatus = `-- name: SetPrincipalStatus :one
 UPDATE principals
 SET status = $1,
@@ -258,4 +279,23 @@ func (q *Queries) SetPrincipalStatus(ctx context.Context, arg SetPrincipalStatus
 		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const updateBotDisplayName = `-- name: UpdateBotDisplayName :execrows
+UPDATE principals SET display_name = $1
+WHERE id = $2 AND kind IN ('agent', 'app')
+`
+
+type UpdateBotDisplayNameParams struct {
+	DisplayName string
+	ID          pgtype.UUID
+}
+
+// The display name of an agent or app principal (M2-24: an upgraded manifest renames the app).
+func (q *Queries) UpdateBotDisplayName(ctx context.Context, arg UpdateBotDisplayNameParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateBotDisplayName, arg.DisplayName, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

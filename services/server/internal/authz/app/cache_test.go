@@ -346,6 +346,11 @@ func TestScope_AppNeedsReadScope(t *testing.T) {
 	reader := w.app()
 	reader.GrantedScopes = []string{domain.ScopeMessagesRead}
 	sc, _ = w.az.Scope(context.Background(), reader, authorize.ActionMessageRead)
+	if len(sc.ChannelIDs) != 0 {
+		t.Fatalf("a token without messages:read lists channels: %+v", sc)
+	}
+	reader.Scopes = []string{domain.ScopeMessagesRead}
+	sc, _ = w.az.Scope(context.Background(), reader, authorize.ActionMessageRead)
 	if !slices.Equal(sc.ChannelIDs, []ids.ID{w.eskalation}) || !slices.Equal(sc.SpaceIDs, []ids.ID{w.support}) {
 		t.Fatalf("scope %+v", sc)
 	}

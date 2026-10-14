@@ -48,3 +48,14 @@ SET status = @status,
     disabled_at = CASE WHEN @status::text = 'disabled' THEN now() ELSE NULL END
 WHERE id = @id
 RETURNING *;
+
+-- name: SetBotPrincipalStatus :execrows
+-- The status of an agent or app principal (M2-24, M1-51): active clears disabled_at, disabled
+-- sets it; people change status through their own queries (08 section 11).
+UPDATE principals SET status = @status, disabled_at = sqlc.narg(disabled_at)
+WHERE id = @id AND kind IN ('agent', 'app');
+
+-- name: UpdateBotDisplayName :execrows
+-- The display name of an agent or app principal (M2-24: an upgraded manifest renames the app).
+UPDATE principals SET display_name = @display_name
+WHERE id = @id AND kind IN ('agent', 'app');

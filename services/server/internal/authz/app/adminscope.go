@@ -74,7 +74,7 @@ func (a *Authorizer) adminScope(ctx context.Context, p authorize.Principal, act 
 	if s.kind == domain.KindApp {
 		// The app scope rule of Authorize (05 section 2.6): group.read and grant.read are not open
 		// to apps.
-		if r := domain.CheckAppScope(spec.ID, p.AppGrantedScopes()); r != "" {
+		if r := domain.CheckAppScope(spec.ID, p.AppGrantedScopes(), p.AppTokenScopes(), !s.ref.TokenID.IsZero()); r != "" {
 			return AdminScope{}, domain.Decision{Outcome: domain.OutcomeForbidden, Reason: r}, nil
 		}
 	}

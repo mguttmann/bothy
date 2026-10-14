@@ -173,7 +173,14 @@ keine Agenten.
 Eine App braucht für jede Aktion beides:
 
 1. eine wirksame Stufe aus Freigaben (höchstens `write`) und
-2. den Scope der Aktion in `app_installations.granted_scopes` (05, Abschnitt 2.6).
+2. den Scope der Aktion in `app_installations.granted_scopes` (05, Abschnitt 2.6) und, wenn die
+   Anfrage ein API-Token trägt, auch in dessen `api_tokens.scopes` ([08-identitaet.md](08-identitaet.md),
+   Abschnitt 12).
+
+Eine App ohne aktive Installation (angehalten oder deinstalliert) hat einen leeren Rechte-Stand,
+wie ein Prinzipal, der nicht aktiv ist: `app.suspend` und `app.uninstall` nehmen ihr jedes
+sichtbare Ziel, `app.resume` gibt es zurück, und die Rechte-Änderung schreibt dafür
+`access.changed`.
 
 Sichtbarkeit folgt der Stufe: Hat eine App eine Freigabe auf einen Kanal, ist der Kanal für sie
 sichtbar. Fehlt ihr nur der Scope, ist die Antwort `403` mit Grund `scope_missing`, nicht `404`;

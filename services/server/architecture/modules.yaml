@@ -241,8 +241,10 @@ modules:
     events: []
     ephemeral_events: []
     ws_ops: []
-    depends_on: [instance, identity, chat, agents, messaging, sync]
-    adapter_vendors: []
+    # authz (M2-24): uninstall revokes the grants of the app; the scope table decides which events
+    # an app may subscribe to.
+    depends_on: [instance, identity, authz, chat, agents, messaging, sync]
+    adapter_vendors: [pgx]   # sqlc code and the repository (M2-24)
   gateway:
     tables: []
     actions: [gateway.connect, gateway.focus, typing.start]

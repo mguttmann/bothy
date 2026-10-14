@@ -243,7 +243,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `run.stall_after` | `BOTHY_RUN__STALL_AFTER` | Server |  | `10m` | ohne Fortschritt: Stillstandshinweis | geplant (M2) |
 | `component.default_ttl` | `BOTHY_COMPONENT__DEFAULT_TTL` | Server |  | `24h` | Ablauf einer Komponente ohne eigene Angabe | geplant (M2) |
 | `push.max_consecutive_failures` | `BOTHY_PUSH__MAX_CONSECUTIVE_FAILURES` | Server |  | `5` | danach wird eine Push-Registrierung deaktiviert | geplant (M3) |
-| `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server |  | leer | erlaubte Ziel-Hosts für ausgehende Webhooks | geplant (M2) |
+| `webhook.allowed_hosts` | `BOTHY_WEBHOOK__ALLOWED_HOSTS` | Server | list(string) | leer | erlaubte Ziel-Hosts für ausgehende Webhooks | aktiv |
 | `webhook.max_consecutive_failures` | `BOTHY_WEBHOOK__MAX_CONSECUTIVE_FAILURES` | Server |  | `20` | danach wird ein Abo deaktiviert | geplant (M2) |
 | `webhook.retry_backoff_base` | `BOTHY_WEBHOOK__RETRY_BACKOFF_BASE` | Server |  | `10s` | Basis des Backoffs | geplant (M2) |
 | `webhook.retry_backoff_cap` | `BOTHY_WEBHOOK__RETRY_BACKOFF_CAP` | Server |  | `1h` | größter Abstand | geplant (M2) |
@@ -420,8 +420,8 @@ Quelle: [09-agenten.md](../spec/09-agenten.md), Abschnitt 21.
 | `interaction.ack_timeout` | `BOTHY_INTERACTION__ACK_TIMEOUT` | Server |  | `30s` | danach zeigt die Karte "nicht bestätigt" | geplant (M2) |
 | `command.autocomplete_timeout` | `BOTHY_COMMAND__AUTOCOMPLETE_TIMEOUT` | Server |  | `2500ms` | Wartezeit auf Vorschläge | geplant (M2) |
 | `command.autocomplete_max_choices` | `BOTHY_COMMAND__AUTOCOMPLETE_MAX_CHOICES` | Server |  | `25` | Vorschläge je Antwort | geplant (M2) |
-| `command.max_per_principal` | `BOTHY_COMMAND__MAX_PER_PRINCIPAL` | Server |  | `100` | Befehle je Agent oder App | geplant (M2) |
-| `command.description_max_chars` | `BOTHY_COMMAND__DESCRIPTION_MAX_CHARS` | Server |  | `100` | Länge einer Beschreibung | geplant (M2) |
+| `command.max_per_principal` | `BOTHY_COMMAND__MAX_PER_PRINCIPAL` | Server | int | `100` | Befehle je Agent oder App | aktiv |
+| `command.description_max_chars` | `BOTHY_COMMAND__DESCRIPTION_MAX_CHARS` | Server | int | `100` | Länge einer Beschreibung | aktiv |
 | `component.max_per_message` | `BOTHY_COMPONENT__MAX_PER_MESSAGE` | Server |  | `25` | Komponenten je Nachricht | geplant (M2) |
 | `component.custom_id_max_chars` | `BOTHY_COMPONENT__CUSTOM_ID_MAX_CHARS` | Server |  | `100` | Länge von `custom_id` | geplant (M2) |
 | `component.form_max_fields` | `BOTHY_COMPONENT__FORM_MAX_FIELDS` | Server |  | `10` | Felder je Formular | geplant (M2) |
@@ -460,7 +460,7 @@ Quelle: [11-erweiterungen.md](../spec/11-erweiterungen.md), Abschnitt 16.
 
 | Schlüssel | Umgebung | Ort | Typ | Standard | Bedeutung | Stand |
 |---|---|---|---|---|---|---|
-| `app.manifest_max_bytes` | `BOTHY_APP__MANIFEST_MAX_BYTES` | Server |  | `65536` | Größe eines Manifests | geplant (M2) |
+| `app.manifest_max_bytes` | `BOTHY_APP__MANIFEST_MAX_BYTES` | Server | int | `65536` | Größe eines Manifests | aktiv |
 | `app.interaction_timeout` | `BOTHY_APP__INTERACTION_TIMEOUT` | Server |  | `3s` | Frist für synchrone Antworten über `interactions_url` | geplant (M2) |
 | `webhook.delivery_timeout` | `BOTHY_WEBHOOK__DELIVERY_TIMEOUT` | Server | duration | `15s` | Zeitgrenze einer Zustellung | aktiv |
 | `webhook.max_pending_per_subscription` | `BOTHY_WEBHOOK__MAX_PENDING_PER_SUBSCRIPTION` | Server |  | `10000` | offene Zustellungen je Abo, darüber `paused` | geplant (M2) |

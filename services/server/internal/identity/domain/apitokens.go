@@ -4,6 +4,8 @@ package domain
 
 import (
 	"regexp"
+	"slices"
+	"strconv"
 	"time"
 )
 
@@ -43,6 +45,32 @@ func CheckTokenScopes(takesScopes bool, scopes []string) error {
 		return fieldError(pointerTokenScopes, FieldNotAllowed, "this token kind carries no scopes")
 	}
 	return nil
+}
+
+// AppTokenScopes returns the scopes of a new app token (M2-24 design note 10 a): the granted
+// scopes of the installation at this moment when requested is empty, else requested sorted, each
+// of which must be granted and named once. Errors: validation_failed on /scopes/<i> with code
+// not_allowed.
+func AppTokenScopes(requested, granted []string) ([]string, error) {
+	if len(requested) == 0 {
+		out := append([]string{}, granted...)
+		slices.Sort(out)
+		return slices.Compact(out), nil
+	}
+	seen := map[string]bool{}
+	for i, s := range requested {
+		p := pointerTokenScopes + "/" + strconv.Itoa(i)
+		switch {
+		case seen[s]:
+			return nil, fieldError(p, FieldNotAllowed, "the scope is named twice")
+		case !slices.Contains(granted, s):
+			return nil, fieldError(p, FieldNotAllowed, "the installation does not grant this scope")
+		}
+		seen[s] = true
+	}
+	out := slices.Clone(requested)
+	slices.Sort(out)
+	return out, nil
 }
 
 // CheckTokenExpiry requires an expiry after now and at most maxTTL ahead (08 section 12:

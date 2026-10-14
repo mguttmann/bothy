@@ -670,14 +670,15 @@ func (h *RightsHook) structureNow(ctx context.Context) (structureView, error) {
 // viewOf builds the view of principal at version v and time t from the sources, with the same
 // snapshot and Effective function as authorize but without the cache. A person counts as in a
 // session: the owner role takes effect for an active owner (the views are what the person sees
-// in the app). A principal that is unknown or not active sees nothing (SR7). The rows of assume
+// in the app). A principal that is unknown or not active, and an app without an active
+// installation, sees nothing (SR7, 07 section 2.10). The rows of assume
 // count as not expired.
 func (h *RightsHook) viewOf(ctx context.Context, w structureView, principal ids.ID, v int64, t time.Time, assume domain.AssumeValid) (domain.AccessView, error) {
 	facts, found, err := h.d.Principals.Principal(ctx, principal)
 	if err != nil {
 		return domain.AccessView{}, sourceError("principal source", err)
 	}
-	if !found || facts.Status != authz.PrincipalActive {
+	if !found || facts.Status != authz.PrincipalActive || !facts.GrantsInEffect() {
 		return domain.AccessView{Spaces: map[ids.ID]bool{}, Channels: map[ids.ID]domain.Rights{}}, nil
 	}
 	kind := string(facts.Kind)

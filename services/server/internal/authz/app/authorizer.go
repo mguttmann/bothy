@@ -332,7 +332,8 @@ func (a *Authorizer) load(ctx context.Context, ref authz.CredentialRef, v int64,
 }
 
 // build reads the facts of ref and builds its snapshot (07 section 7.2). Grants of a principal
-// that is unknown or not active are not read (SR7).
+// that is unknown or not active, and of an app without an active installation, are not read (SR7,
+// 07 section 2.10).
 func (a *Authorizer) build(ctx context.Context, key cacheKey, ref authz.CredentialRef, t time.Time) (entry, error) {
 	e := entry{key: key}
 	facts, found, err := a.principal.Principal(ctx, ref.PrincipalID)
@@ -352,7 +353,7 @@ func (a *Authorizer) build(ctx context.Context, key cacheKey, ref authz.Credenti
 	if !ref.TokenID.IsZero() {
 		in.Expiries = append(in.Expiries, e.creds.TokenExpiresAt)
 	}
-	if !found || facts.Status != authz.PrincipalActive && facts.Status != authz.PrincipalPending {
+	if !found || !facts.GrantsInEffect() {
 		e.snap = domain.BuildSnapshot(in)
 		return e, nil
 	}

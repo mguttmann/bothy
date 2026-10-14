@@ -74,6 +74,17 @@ linters:
         # ID-T27 (docs/spec/08-identitaet.md "15. Tests"): every random part of a token or code of
         # identity (refresh tokens, cookies, API tokens, codes) comes from crypto/rand, so the
         # identity module may not import math/rand at all, tests included (M1-34).
+        # ADR 0022 "Confirmation": extensions never run in the server process. The vendor allow list
+        # of architecture/modules.yaml already refuses any unlisted runtime in make arch; the
+        # standard-library package plugin is not covered there, so this rule forbids it in every file
+        # of the server module (docs/DECISIONS.md D-M2-24-15).
+        no-plugin-in-server:
+          list-mode: lax
+          files:
+            - $all
+          deny:
+            - pkg: plugin$
+              desc: extensions run outside the server process and use only the public API (ADR 0022)
         crypto-rand-only-in-identity:
           list-mode: lax
           files:

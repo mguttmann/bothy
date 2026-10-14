@@ -4,6 +4,7 @@ package httpserver
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"mime"
 	"net/http"
@@ -181,7 +182,7 @@ func (c *Chain) HTU(r *http.Request) string {
 func (c *Chain) bodyStage(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		op, _ := OperationFrom(r.Context())
-		err := c.checkBody(r, op)
+		body, err := c.checkBody(r, op)
 		if !op.RequestBody.transfer() {
 			// The body is read (or refused); the read deadline of StageRoute has done its job.
 			_ = http.NewResponseController(w).SetReadDeadline(time.Time{})
@@ -190,46 +191,73 @@ func (c *Chain) bodyStage(next http.Handler) http.Handler {
 			WriteProblem(w, r, err)
 			return
 		}
+		if body != nil {
+			r = r.WithContext(context.WithValue(r.Context(), rawJSONKey{}, &rawJSON{set: true, body: body}))
+		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-// checkBody applies the rules of bodyStage to r and returns the problem, or nil.
-func (c *Chain) checkBody(r *http.Request, op Operation) error {
+// rawJSONKey keys the JSON body of the request in its context (RawJSONBody).
+type rawJSONKey struct{}
+
+// rawJSON holds the JSON body bytes StageBody read.
+type rawJSON struct {
+	set  bool
+	body []byte
+}
+
+// RawJSONBody returns the bytes of the JSON request body exactly as received, after StageBody
+// checked them (SEC-IN-2, SEC-IN-3), and true; false for a request without a JSON body or outside
+// the chain. A handler that must keep or hash what the client sent uses it, because the generated
+// server hands it only the decoded value: the apps module stores the SHA-256 of a manifest as
+// received (docs/spec/11-erweiterungen.md section 3.1, docs/DECISIONS.md D-M2-24-17). The slice
+// must not be changed.
+func RawJSONBody(ctx context.Context) ([]byte, bool) {
+	b, ok := ctx.Value(rawJSONKey{}).(*rawJSON)
+	if !ok || !b.set {
+		return nil, false
+	}
+	return b.body, true
+}
+
+// checkBody applies the rules of bodyStage to r and returns the problem, or nil, and the JSON body
+// it read (nil for another media type or no body).
+func (c *Chain) checkBody(r *http.Request, op Operation) ([]byte, error) {
 	if r.ContentLength == 0 || r.Body == nil || r.Body == http.NoBody {
-		return requiredBody(op)
+		return nil, requiredBody(op)
 	}
 	if op.RequestBody == BodyNone {
-		return errs.New(errs.CodeUnsupportedMediaType, detailUnexpectedBody)
+		return nil, errs.New(errs.CodeUnsupportedMediaType, detailUnexpectedBody)
 	}
 	media, _, err := mime.ParseMediaType(r.Header.Get(headerContentType))
 	if err != nil || media != op.RequestBody.mediaType() {
-		return errs.New(errs.CodeUnsupportedMediaType, "Expected "+op.RequestBody.mediaType()+".")
+		return nil, errs.New(errs.CodeUnsupportedMediaType, "Expected "+op.RequestBody.mediaType()+".")
 	}
 	if op.RequestBody != BodyJSON {
-		return nil
+		return nil, nil
 	}
 	return c.guardJSON(r, op)
 }
 
 // guardJSON reads the JSON body within the limit of StageRoute (*http.MaxBytesError is 413),
-// checks it with CheckJSON and puts the same bytes back as the body.
-func (c *Chain) guardJSON(r *http.Request, op Operation) error {
+// checks it with CheckJSON, puts the same bytes back as the body and returns them.
+func (c *Chain) guardJSON(r *http.Request, op Operation) ([]byte, error) {
 	body, err := io.ReadAll(r.Body)
 	_ = r.Body.Close()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if len(body) == 0 {
-		return requiredBody(op)
+		return nil, requiredBody(op)
 	}
 	if err := CheckJSON(body, c.cfg.MaxJSONDepth); err != nil {
-		return err
+		return nil, err
 	}
 	r.Body = io.NopCloser(bytes.NewReader(body))
 	r.ContentLength = int64(len(body))
 	r.GetBody = func() (io.ReadCloser, error) { return io.NopCloser(bytes.NewReader(body)), nil }
-	return nil
+	return body, nil
 }
 
 // requiredBody is 400 validation_failed for an operation whose body is required and missing.

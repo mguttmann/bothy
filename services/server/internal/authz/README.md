@@ -25,7 +25,7 @@ Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.
 
 ## Port (Wurzelpaket `internal/authz`)
 
-- Eingehend: `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`. Built in M1-29: `Admin` with `CreateGroup`, `UpdateGroup`, `DeleteGroup`, `AddGroupMember`, `RemoveGroupMember`, `CreateGrant`, `RevokeGrant`, and `RightsChanges.AddAffected`. The source ports gained `PrincipalSource.ActiveOwnerIDs` (M1-26), `StructureSource.ServedTargets` and `SpaceArchived`, `ChannelFacts.Archived` and `AgentPolicySource.PersonalAgents`; M1-49 adds `ExplainAccess`, `PreviewGrant` and `ViewAs` to `Admin`, `PrincipalSource.Profiles` and `OwnerIDs`, `StructureSource.SpaceDetails` and `ChannelDetails` and `AgentPolicy.BillingModesSupported`; `internal/wire` passes the agent policy source of agents since M1-51 and an empty structure source until M1-52, M1-53 and M1-54 (chat).
+- Eingehend: `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person; `RevokeSubjectGrants` since M2-24), `AppScopes` (M2-24); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`. Built in M1-29: `Admin` with `CreateGroup`, `UpdateGroup`, `DeleteGroup`, `AddGroupMember`, `RemoveGroupMember`, `CreateGrant`, `RevokeGrant`, and `RightsChanges.AddAffected`. The source ports gained `PrincipalSource.ActiveOwnerIDs` (M1-26), `StructureSource.ServedTargets` and `SpaceArchived`, `ChannelFacts.Archived` and `AgentPolicySource.PersonalAgents`; M1-49 adds `ExplainAccess`, `PreviewGrant` and `ViewAs` to `Admin`, `PrincipalSource.Profiles` and `OwnerIDs`, `StructureSource.SpaceDetails` and `ChannelDetails` and `AgentPolicy.BillingModesSupported`; `internal/wire` passes the agent policy source of agents since M1-51 and an empty structure source until M1-52, M1-53 and M1-54 (chat).
 - Gibt In-Tx-Ereignisse aus: kernel `authorize.AccessChanged` (mit der auslösenden Aktion; `runs` bricht bei `user.disable` mit Grund `user_disabled` ab, sonst mit `access_revoked`).
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `authorize.Authorizer`, `instance.FlagGroupSource`.
@@ -491,3 +491,32 @@ A host is a target outside the tree instance, space, channel (07 section 2.12):
   `TestTerminalAttachStreamReadClose`, `TestSubjectGate_TerminalActions`,
   `TestTerminalSnapshotVersion`, the terminal decisions of `TestAZP8_CacheMatchesReference` and the
   preview text tests.
+
+## Apps (M2-24)
+
+- **Scope check.** An app needs the scope of each action in `GrantedScopes` of its installation
+  and, when the request carries an API token, in the token scopes (`kernel/authorize.Principal`
+  gained `AppTokenScopes`, which `actor.Actor` answers with `Scopes`); missing in either is
+  `forbidden` `scope_missing`. A check without a token (a webhook delivery of M2-26) uses the
+  installation alone. `Scope` filters the lists of an app with the same rule. Agents are unchanged.
+  This replaces ruling M1-28 D6 (token scopes not evaluated); docs/DECISIONS.md D-M2-24-10.
+- **Snapshot.** `PrincipalFacts.AppInstallationActive` (set by identity from
+  `identity.AppInstallations`): an app without an active installation has an empty snapshot and an
+  empty access view, like a principal that is not active (`PrincipalFacts.GrantsInEffect`). So
+  `app.suspend` and `app.uninstall` remove every visible target of the app and `app.resume` adds
+  them again; the rights hook writes `access.changed` for them. A change of the granted scopes alone
+  changes no visible target and writes none (the gap of docs/DECISIONS.md D-M2-24-11).
+- **`AppScopes`** (`appscopes.go`, implemented by `app.ScopeTable`): `EventScope` decides which
+  durable event types an app may subscribe to (`domain.AppEventScope`: a receive action of the
+  scope table, or `interaction.created` and `command.invoked` with `events:subscribe`) and
+  `Scopes` lists the scopes of the catalogue.
+- **`Admin.RevokeSubjectGrants`**: revokes every active grant of a principal in ascending id inside
+  the caller's rights change, without `authorize` per grant (a consequence of the authorized
+  `app.uninstall`).
+- **The collection of apps.** `app.read` on a resource of kind `app` without an id is the
+  collection (`listApps`, `validateManifest`): visible like the instance, so the requirement owner
+  answers a non-owner `owner_only`; one app stays invisible to non-owners (`not_found`).
+- Tests: `domain/appscope_test.go` (`TestAppEventScope_AllCatalogueEvents`,
+  `TestAppScope_TokenAndInstallation`), `app/appscope_test.go`
+  (`TestSnapshot_AppWithoutActiveInstallationIsEmpty`, `TestAZM32_TokenScopes`,
+  `TestAppCollection_OwnerOnly`, `TestScopeTable`, `TestRevokeSubjectGrants`).

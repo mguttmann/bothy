@@ -11,6 +11,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/routes"
 	agentshttp "github.com/OWNER/bothy/services/server/internal/agents/adapters/httpapi"
+	appshttp "github.com/OWNER/bothy/services/server/internal/apps/adapters/httpapi"
 	audithttp "github.com/OWNER/bothy/services/server/internal/audit/adapters/httpapi"
 	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
@@ -112,6 +113,9 @@ type Handlers struct {
 	*terminalhttp.Hosts
 	// Local implements loginWithPassword and setMyLocalCredential (identity, M1-39).
 	*identityhttp.Local
+	// Apps implements listApps, installApp, validateManifest, getApp, upgradeAppManifest,
+	// setAppScopes, suspendApp, resumeApp and uninstallApp (apps, M2-24).
+	*appshttp.Apps
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

@@ -95,6 +95,17 @@ def sync_detailed(
 ) -> Response[App | Problem]:
     """Install an app from its manifest
 
+     Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give
+    `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400
+    validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every
+    failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required
+    and any optional scope of the manifest; `event_subscriptions` absent means none, each needs
+    `events:subscribe` and the scope of the event. One transaction creates the app principal (handle =
+    `slug`, display name = `name`), the app and its installation and raises the rights version; nothing
+    is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`,
+    tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a
+    slug whose apps are all uninstalled reinstalls with the same principal.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (AppInstall):
@@ -127,6 +138,17 @@ def sync(
 ) -> App | Problem | None:
     """Install an app from its manifest
 
+     Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give
+    `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400
+    validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every
+    failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required
+    and any optional scope of the manifest; `event_subscriptions` absent means none, each needs
+    `events:subscribe` and the scope of the event. One transaction creates the app principal (handle =
+    `slug`, display name = `name`), the app and its installation and raises the rights version; nothing
+    is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`,
+    tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a
+    slug whose apps are all uninstalled reinstalls with the same principal.
+
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         body (AppInstall):
@@ -153,6 +175,17 @@ async def asyncio_detailed(
     idempotency_key: UUID | Unset = UNSET,
 ) -> Response[App | Problem]:
     """Install an app from its manifest
+
+     Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give
+    `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400
+    validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every
+    failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required
+    and any optional scope of the manifest; `event_subscriptions` absent means none, each needs
+    `events:subscribe` and the scope of the event. One transaction creates the app principal (handle =
+    `slug`, display name = `name`), the app and its installation and raises the rights version; nothing
+    is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`,
+    tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a
+    slug whose apps are all uninstalled reinstalls with the same principal.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
@@ -183,6 +216,17 @@ async def asyncio(
     idempotency_key: UUID | Unset = UNSET,
 ) -> App | Problem | None:
     """Install an app from its manifest
+
+     Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give
+    `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400
+    validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every
+    failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required
+    and any optional scope of the manifest; `event_subscriptions` absent means none, each needs
+    `events:subscribe` and the scope of the event. One transaction creates the app principal (handle =
+    `slug`, display name = `name`), the app and its installation and raises the rights version; nothing
+    is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`,
+    tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a
+    slug whose apps are all uninstalled reinstalls with the same principal.
 
     Args:
         idempotency_key (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.

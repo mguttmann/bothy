@@ -935,6 +935,32 @@ func (s *AdminService) RevokeGrant(ctx context.Context, caller actor.Actor, gran
 	return grantOut(out), err
 }
 
+// RevokeSubjectGrants implements authz.Admin (M2-24 design note 9 d).
+func (s *AdminService) RevokeSubjectGrants(ctx context.Context, caller actor.Actor, subjectID ids.ID, reason string) (int, error) {
+	if !txn.InRightsChange(ctx) {
+		return 0, internal("RevokeSubjectGrants needs a unit of work declared as a rights change")
+	}
+	if _, err := reasonAttrs(reason); err != nil {
+		return 0, err
+	}
+	grants, err := s.d.Store.ActiveGrantsOfPrincipal(ctx, subjectID)
+	if err != nil {
+		return 0, err
+	}
+	now := s.d.Clock.Now()
+	n := 0
+	for _, g := range grants {
+		_, ok, err := s.d.Store.RevokeGrant(ctx, g.ID, caller.ID, reason, now)
+		if err != nil {
+			return n, err
+		}
+		if ok {
+			n++
+		}
+	}
+	return n, nil
+}
+
 // revokeGrant loads and authorizes (07 section 2.6 point 3 through the guard); a revoked grant is
 // a call without effect; with apply it revokes.
 func (s *AdminService) revokeGrant(ctx context.Context, caller actor.Actor, grantID ids.ID, reason string, attrs auditing.Attrs, apply bool) (domain.Grant, bool, error) {

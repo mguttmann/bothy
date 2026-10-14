@@ -44,6 +44,11 @@ type Principal interface {
 	// AppGrantedScopes are app_installations.granted_scopes (apps only). The result may be shared;
 	// callers do not change it.
 	AppGrantedScopes() []string
+	// AppTokenScopes are api_tokens.scopes of the API token of the request (apps only, 07 section
+	// 3 token_scopes). An app request needs the scope of its action in AppGrantedScopes and, when
+	// TokenRef is set, in AppTokenScopes too (M2-24). The result may be shared; callers do not
+	// change it.
+	AppTokenScopes() []string
 	// ViewAsPerson is the person whose view an owner looks at (07 section 9.2); zero for none.
 	ViewAsPerson() ids.ID
 	// ViewAsStart is the start of "view as"; zero for none. From it plus

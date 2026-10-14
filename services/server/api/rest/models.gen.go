@@ -506,6 +506,60 @@ func (e AppInstallationState) Valid() bool {
 	}
 }
 
+// Defines values for AppManifestComponents.
+const (
+	AppManifestComponentsButton AppManifestComponents = "button"
+	AppManifestComponentsForm   AppManifestComponents = "form"
+	AppManifestComponentsSelect AppManifestComponents = "select"
+)
+
+// Valid indicates whether the value is a known member of the AppManifestComponents enum.
+func (e AppManifestComponents) Valid() bool {
+	switch e {
+	case AppManifestComponentsButton:
+		return true
+	case AppManifestComponentsForm:
+		return true
+	case AppManifestComponentsSelect:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AppManifestDeliveryMode.
+const (
+	Gateway AppManifestDeliveryMode = "gateway"
+	Webhook AppManifestDeliveryMode = "webhook"
+)
+
+// Valid indicates whether the value is a known member of the AppManifestDeliveryMode enum.
+func (e AppManifestDeliveryMode) Valid() bool {
+	switch e {
+	case Gateway:
+		return true
+	case Webhook:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AppManifestSchemaVersion.
+const (
+	N1 AppManifestSchemaVersion = 1
+)
+
+// Valid indicates whether the value is a known member of the AppManifestSchemaVersion enum.
+func (e AppManifestSchemaVersion) Valid() bool {
+	switch e {
+	case N1:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AppScope.
 const (
 	CommandsWrite   AppScope = "commands:write"
@@ -1117,19 +1171,19 @@ func (e ComponentRestriction) Valid() bool {
 
 // Defines values for ComponentType.
 const (
-	Button ComponentType = "button"
-	Form   ComponentType = "form"
-	Select ComponentType = "select"
+	ComponentTypeButton ComponentType = "button"
+	ComponentTypeForm   ComponentType = "form"
+	ComponentTypeSelect ComponentType = "select"
 )
 
 // Valid indicates whether the value is a known member of the ComponentType enum.
 func (e ComponentType) Valid() bool {
 	switch e {
-	case Button:
+	case ComponentTypeButton:
 		return true
-	case Form:
+	case ComponentTypeForm:
 		return true
-	case Select:
+	case ComponentTypeSelect:
 		return true
 	default:
 		return false
@@ -6018,7 +6072,7 @@ type ApiTokenCreate struct {
 	// Name Examples: Adapter production
 	Name string `json:"name"`
 
-	// Scopes Only for app tokens, a subset of the granted scopes of the installation. Agent tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none.
+	// Scopes Only for app tokens, a subset of the granted scopes of the installation; absent or empty takes all granted scopes at this moment. A scope granted later needs a new token. Agent tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none.
 	Scopes *[]AppScope `json:"scopes,omitempty"`
 }
 
@@ -6050,7 +6104,7 @@ type App struct {
 	Id           Uuid            `json:"id"`
 	Installation AppInstallation `json:"installation"`
 
-	// Manifest Schema `app_manifest.v1`.
+	// Manifest Schema `app_manifest.v1` (11, 3.1). Unknown members are an error. Beyond the schema the server applies the check rules of 11, 3.2: scopes from the catalogue, only subscribable events with the scope of their receive action and `events:subscribe`, `https` delivery addresses whose host is in `webhook.allowed_hosts`, `requested_grants` at most `write` and at most the capability `upload` and never on a host, commands without reserved names and at most `command.max_per_principal`, and at most `app.manifest_max_bytes`.
 	Manifest AppManifest `json:"manifest"`
 
 	// ManifestVersion Examples: 1.2.0
@@ -6065,7 +6119,7 @@ type AppInstall struct {
 	EventSubscriptions *[]string  `json:"event_subscriptions,omitempty"`
 	GrantedScopes      []AppScope `json:"granted_scopes"`
 
-	// Manifest Schema `app_manifest.v1`.
+	// Manifest Schema `app_manifest.v1` (11, 3.1). Unknown members are an error. Beyond the schema the server applies the check rules of 11, 3.2: scopes from the catalogue, only subscribable events with the scope of their receive action and `events:subscribe`, `https` delivery addresses whose host is in `webhook.allowed_hosts`, `requested_grants` at most `write` and at most the capability `upload` and never on a host, commands without reserved names and at most `command.max_per_principal`, and at most `app.manifest_max_bytes`.
 	Manifest AppManifest `json:"manifest"`
 
 	// Reason Examples: Sync tickets with the help desk
@@ -6091,34 +6145,104 @@ type AppInstallation struct {
 // AppInstallationState defines model for AppInstallation.State.
 type AppInstallationState string
 
-// AppManifest Schema `app_manifest.v1`.
+// AppManifest Schema `app_manifest.v1` (11, 3.1). Unknown members are an error. Beyond the schema the server applies the check rules of 11, 3.2: scopes from the catalogue, only subscribable events with the scope of their receive action and `events:subscribe`, `https` delivery addresses whose host is in `webhook.allowed_hosts`, `requested_grants` at most `write` and at most the capability `upload` and never on a host, commands without reserved names and at most `command.max_per_principal`, and at most `app.manifest_max_bytes`.
 type AppManifest struct {
-	Commands           *[]CommandRegister `json:"commands,omitempty"`
-	Description        *string            `json:"description,omitempty"`
-	EventSubscriptions *[]string          `json:"event_subscriptions,omitempty"`
+	// Commands Commands after 09, 10, without reserved names and without a target.
+	Commands *[]CommandRegister `json:"commands,omitempty"`
 
-	// HomepageUrl Examples: https://apps.example.com/ticket-sync
-	HomepageUrl *string `json:"homepage_url,omitempty"`
+	// Components Component types the app uses; only shown for the consent.
+	Components *[]AppManifestComponents `json:"components,omitempty"`
 
-	// Name Examples: Ticket Sync
+	// DataEgress Plain text on which data leave the instance and where to; required with `events` or `interactions_url`.
+	//
+	// Examples: Messages of the granted channels go to apps.example.com.
+	DataEgress *string `json:"data_egress,omitempty"`
+
+	// Delivery Required with `events`, `commands` or `components`.
+	Delivery *struct {
+		// EventsUrl Required for `webhook`, not allowed for `gateway`; `https`, host in `webhook.allowed_hosts`.
+		//
+		// Examples: https://apps.example.com/ticket-sync/events
+		EventsUrl *string `json:"events_url,omitempty"`
+
+		// InteractionsUrl Required for commands or components without the gateway; `https`, host in `webhook.allowed_hosts`.
+		//
+		// Examples: https://apps.example.com/ticket-sync/interactions
+		InteractionsUrl *string                 `json:"interactions_url,omitempty"`
+		Mode            AppManifestDeliveryMode `json:"mode"`
+	} `json:"delivery,omitempty"`
+
+	// Description Examples: Mirrors tickets of a help desk into a forum.
+	Description string `json:"description"`
+
+	// Events Durable event types (05, 6) the app may subscribe to; each needs the scope of its receive action and `events:subscribe`.
+	Events *[]string `json:"events,omitempty"`
+
+	// HomepageUrl Absolute `https` address for display only; the server never loads it.
+	//
+	// Examples: https://apps.example.com/ticket-sync
+	HomepageUrl      *string `json:"homepage_url,omitempty"`
+	IncomingWebhooks *[]struct {
+		// Name Examples: alerts
+		Name string `json:"name"`
+
+		// Purpose Examples: Alerts of the help desk
+		Purpose string `json:"purpose"`
+	} `json:"incoming_webhooks,omitempty"`
+
+	// MinApiVersion Lowest API version (major.minor) the app needs; not above the version of this server.
+	//
+	// Examples: 1.0
+	MinApiVersion string `json:"min_api_version"`
+
+	// Name Becomes the display name of the app principal.
+	//
+	// Examples: Ticket Sync
 	Name string `json:"name"`
 
 	// Publisher Examples: Example Ltd
-	Publisher *string `json:"publisher,omitempty"`
+	Publisher string `json:"publisher"`
+
+	// RequestedGrants Grants the app asks for; the owner creates them per target with `createGrant`. Only `read` or `write`, at most the capability `upload`, never on a host.
+	RequestedGrants *[]struct {
+		Capabilities *[]Capability `json:"capabilities,omitempty"`
+
+		// Level Grant level. Ordered `read` < `write` < `trigger`.
+		Level Level `json:"level"`
+
+		// Purpose Examples: Posts per ticket
+		Purpose string `json:"purpose"`
+
+		// TargetKind `host` is a connected host for the terminal; it has no level and only the capability `terminal` (24, 8.1).
+		TargetKind TargetKind `json:"target_kind"`
+	} `json:"requested_grants,omitempty"`
 
 	// SchemaVersion Examples: 1
-	SchemaVersion int        `json:"schema_version"`
-	Scopes        []AppScope `json:"scopes"`
+	SchemaVersion AppManifestSchemaVersion `json:"schema_version"`
+	Scopes        struct {
+		Optional []AppScope `json:"optional"`
+		Required []AppScope `json:"required"`
+	} `json:"scopes"`
 
-	// Slug Examples: ticket-sync
+	// Slug Unique in the instance; becomes the handle of the app principal.
+	//
+	// Examples: ticket-sync
 	Slug string `json:"slug"`
 
-	// Version SemVer of the manifest.
+	// Version SemVer 2.0.0 of the manifest (`apps.manifest_version`).
 	//
 	// Examples: 1.2.0
-	Version  string                       `json:"version"`
-	Webhooks *[]WebhookSubscriptionCreate `json:"webhooks,omitempty"`
+	Version string `json:"version"`
 }
+
+// AppManifestComponents defines model for AppManifest.Components.
+type AppManifestComponents string
+
+// AppManifestDeliveryMode defines model for AppManifest.Delivery.Mode.
+type AppManifestDeliveryMode string
+
+// AppManifestSchemaVersion Examples: 1
+type AppManifestSchemaVersion int
 
 // AppPage One page. `next_cursor` is absent on the last page.
 type AppPage struct {
@@ -15250,6 +15374,37 @@ type SetAgentToolClassParams struct {
 	IfMatch IfMatchRequired `json:"If-Match"`
 }
 
+// ListAppsParams defines parameters for ListApps.
+type ListAppsParams struct {
+	// Cursor Cursor from `next_cursor` of the previous page.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+	Limit  *Limit  `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// InstallAppParams defines parameters for InstallApp.
+type InstallAppParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// ResumeAppParams defines parameters for ResumeApp.
+type ResumeAppParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// SuspendAppParams defines parameters for SuspendApp.
+type SuspendAppParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
+// UninstallAppParams defines parameters for UninstallApp.
+type UninstallAppParams struct {
+	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
+	IdempotencyKey *IdempotencyKey `json:"Idempotency-Key,omitempty"`
+}
+
 // ListAuditEventsParams defines parameters for ListAuditEvents.
 type ListAuditEventsParams struct {
 	// Cursor Cursor from `next_cursor` of the previous page.
@@ -15768,6 +15923,21 @@ type EnableAgentJSONRequestBody = ReasonBody
 
 // SetAgentToolClassJSONRequestBody defines body for SetAgentToolClass for application/json ContentType.
 type SetAgentToolClassJSONRequestBody = ToolClassSet
+
+// ValidateManifestJSONRequestBody defines body for ValidateManifest for application/json ContentType.
+type ValidateManifestJSONRequestBody = AppManifest
+
+// InstallAppJSONRequestBody defines body for InstallApp for application/json ContentType.
+type InstallAppJSONRequestBody = AppInstall
+
+// UpgradeAppManifestJSONRequestBody defines body for UpgradeAppManifest for application/json ContentType.
+type UpgradeAppManifestJSONRequestBody = AppInstall
+
+// SetAppScopesJSONRequestBody defines body for SetAppScopes for application/json ContentType.
+type SetAppScopesJSONRequestBody = AppScopesPut
+
+// UninstallAppJSONRequestBody defines body for UninstallApp for application/json ContentType.
+type UninstallAppJSONRequestBody = ReasonBody
 
 // VerifyAuditChainJSONRequestBody defines body for VerifyAuditChain for application/json ContentType.
 type VerifyAuditChainJSONRequestBody = AuditVerifyRequest

@@ -1069,7 +1069,7 @@ export interface paths {
         put?: never;
         /**
          * Create an API token
-         * @description Kind follows the principal (`agt` agent, `app` app, `pat` person, 08 section 12). A personal token only for oneself and only with the flag `tokens.personal_enabled`. Until app installations exist (M2) a token for an app answers `409 conflict` with `reason` `app_not_installed`. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7).
+         * @description Kind follows the principal (`agt` agent, `app` app, `pat` person, 08 section 12). A personal token only for oneself and only with the flag `tokens.personal_enabled`. A token for an app needs an active installation (else `409 conflict` with `reason` `app_not_installed`, also while the app is suspended); its scopes are the requested subset of the granted scopes of the installation, or all of them when `scopes` is absent or empty, and a scope the installation does not grant gives `400 validation_failed` at `/scopes/<i>`. An app request needs the scope of its action in the token and in the installation. The secret is shown once; a replay with the same `Idempotency-Key` answers `409 conflict` with `reason` `one_time_secret` (06, 7).
          */
         post: operations["createToken"];
         delete?: never;
@@ -3474,7 +3474,10 @@ export interface paths {
         /** List installed apps */
         get: operations["listApps"];
         put?: never;
-        /** Install an app from its manifest */
+        /**
+         * Install an app from its manifest
+         * @description Owner only with a fresh step-up. The manifest is checked against the schema (unknown members give `400 validation_failed` with `unknown_member`) and the check rules of 11, 3.2 (`400 validation_failed` with the pointers under `/manifest`; `400 webhook_host_not_allowed` when every failure is a delivery host outside `webhook.allowed_hosts`). `granted_scopes` holds every required and any optional scope of the manifest; `event_subscriptions` absent means none, each needs `events:subscribe` and the scope of the event. One transaction creates the app principal (handle = `slug`, display name = `name`), the app and its installation and raises the rights version; nothing is stored on a refusal. No token and no grant is created: grants come per target from `createGrant`, tokens from `createToken`. The same `slug` again is `409 conflict` (use `upgradeAppManifest`); a slug whose apps are all uninstalled reinstalls with the same principal.
+         */
         post: operations["installApp"];
         delete?: never;
         options?: never;
@@ -3491,7 +3494,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Validate a manifest without installing */
+        /**
+         * Validate a manifest without installing
+         * @description Owner only. Schema violations give `400 validation_failed`; the check rules of 11, 3.2 give `200` with `valid` false and every rule error, pointers relative to the manifest root. Nothing is stored and no audit entry is written.
+         */
         post: operations["validateManifest"];
         delete?: never;
         options?: never;
@@ -3524,7 +3530,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Install a new manifest version */
+        /**
+         * Install a new manifest version
+         * @description Owner only with a fresh step-up (`app.install`). The new manifest has the same `slug` and passes the rules of `installApp`; changed content needs another `version` (`400` at `/manifest/version`). The upgrade never adds a scope, an event or a grant: `granted_scopes` and `event_subscriptions` are subsets of the current ones (a new scope gives `400` at `/granted_scopes/<i>`; consent with `setAppScopes`), and `event_subscriptions` absent keeps the current ones the new manifest and scopes still allow. What the new manifest drops acts at once. New delivery hosts are confirmed by the upgrade itself and must be in `webhook.allowed_hosts`. An identical manifest with identical lists answers `200` without effect; an uninstalled app is `409 conflict`.
+         */
         put: operations["upgradeAppManifest"];
         post?: never;
         delete?: never;
@@ -3541,7 +3550,10 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Change granted scopes and subscriptions */
+        /**
+         * Change granted scopes and subscriptions
+         * @description Owner only with a fresh step-up; the consent for new scopes and events. `granted_scopes` is a subset of the scopes of the manifest; `event_subscriptions` absent keeps the current ones the new scopes still allow, present it replaces them (each needs `events:subscribe` and the scope of the event). A removed scope acts on the next request of every token; a newly granted scope needs a new token, because a token keeps the scopes it was created with. Equal lists answer `200` without effect; an uninstalled app is `409 conflict`.
+         */
         put: operations["setAppScopes"];
         post?: never;
         delete?: never;
@@ -6085,7 +6097,7 @@ export interface components {
         ApiTokenCreate: {
             /** @example Adapter production */
             name: string;
-            /** @description Only for app tokens, a subset of the granted scopes of the installation. Agent tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none. */
+            /** @description Only for app tokens, a subset of the granted scopes of the installation; absent or empty takes all granted scopes at this moment. A scope granted later needs a new token. Agent tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none. */
             scopes?: components["schemas"]["AppScope"][];
             /** @description RFC 7638 thumbprint (43 base64url characters) of the key the token is bound to; requests must then use DPoP. Required for the kinds in `auth.dpop_required_for`. */
             dpop_jkt?: string;
@@ -7718,28 +7730,86 @@ export interface components {
         AutocompleteAnswer: {
             choices: components["schemas"]["CommandChoice"][];
         };
-        /** @description Schema `app_manifest.v1`. */
+        /** @description Schema `app_manifest.v1` (11, 3.1). Unknown members are an error. Beyond the schema the server applies the check rules of 11, 3.2: scopes from the catalogue, only subscribable events with the scope of their receive action and `events:subscribe`, `https` delivery addresses whose host is in `webhook.allowed_hosts`, `requested_grants` at most `write` and at most the capability `upload` and never on a host, commands without reserved names and at most `command.max_per_principal`, and at most `app.manifest_max_bytes`. */
         AppManifest: {
-            /** @example 1 */
-            schema_version: number;
-            /** @example ticket-sync */
-            slug: string;
-            /** @example Ticket Sync */
-            name: string;
             /**
-             * @description SemVer of the manifest.
+             * @example 1
+             * @enum {integer}
+             */
+            schema_version: 1;
+            /**
+             * @description Unique in the instance; becomes the handle of the app principal.
+             * @example ticket-sync
+             */
+            slug: string;
+            /**
+             * @description Becomes the display name of the app principal.
+             * @example Ticket Sync
+             */
+            name: string;
+            /** @example Mirrors tickets of a help desk into a forum. */
+            description: string;
+            /** @example Example Ltd */
+            publisher: string;
+            /**
+             * @description SemVer 2.0.0 of the manifest (`apps.manifest_version`).
              * @example 1.2.0
              */
             version: string;
-            description?: string;
-            /** @example Example Ltd */
-            publisher?: string;
-            /** @example https://apps.example.com/ticket-sync */
+            /**
+             * @description Absolute `https` address for display only; the server never loads it.
+             * @example https://apps.example.com/ticket-sync
+             */
             homepage_url?: string;
-            scopes: components["schemas"]["AppScope"][];
-            event_subscriptions?: string[];
+            /**
+             * @description Lowest API version (major.minor) the app needs; not above the version of this server.
+             * @example 1.0
+             */
+            min_api_version: string;
+            scopes: {
+                required: components["schemas"]["AppScope"][];
+                optional: components["schemas"]["AppScope"][];
+            };
+            /** @description Durable event types (05, 6) the app may subscribe to; each needs the scope of its receive action and `events:subscribe`. */
+            events?: string[];
+            /** @description Required with `events`, `commands` or `components`. */
+            delivery?: {
+                /** @enum {string} */
+                mode: "gateway" | "webhook";
+                /**
+                 * @description Required for `webhook`, not allowed for `gateway`; `https`, host in `webhook.allowed_hosts`.
+                 * @example https://apps.example.com/ticket-sync/events
+                 */
+                events_url?: string;
+                /**
+                 * @description Required for commands or components without the gateway; `https`, host in `webhook.allowed_hosts`.
+                 * @example https://apps.example.com/ticket-sync/interactions
+                 */
+                interactions_url?: string;
+            };
+            /** @description Commands after 09, 10, without reserved names and without a target. */
             commands?: components["schemas"]["CommandRegister"][];
-            webhooks?: components["schemas"]["WebhookSubscriptionCreate"][];
+            /** @description Component types the app uses; only shown for the consent. */
+            components?: ("button" | "select" | "form")[];
+            /** @description Grants the app asks for; the owner creates them per target with `createGrant`. Only `read` or `write`, at most the capability `upload`, never on a host. */
+            requested_grants?: {
+                target_kind: components["schemas"]["TargetKind"];
+                level: components["schemas"]["Level"];
+                capabilities?: components["schemas"]["Capability"][];
+                /** @example Posts per ticket */
+                purpose: string;
+            }[];
+            incoming_webhooks?: {
+                /** @example alerts */
+                name: string;
+                /** @example Alerts of the help desk */
+                purpose: string;
+            }[];
+            /**
+             * @description Plain text on which data leave the instance and where to; required with `events` or `interactions_url`.
+             * @example Messages of the granted channels go to apps.example.com.
+             */
+            data_egress?: string;
         };
         App: {
             id: components["schemas"]["Uuid"];
@@ -18701,6 +18771,7 @@ export interface operations {
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             429: components["responses"]["TooManyRequests"];
             default: components["responses"]["Error"];
         };

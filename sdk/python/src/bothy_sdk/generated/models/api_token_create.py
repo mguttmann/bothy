@@ -18,8 +18,9 @@ class ApiTokenCreate:
     Attributes:
         name (str):
         expires_at (datetime.datetime): RFC 3339 timestamp in UTC with millisecond precision and suffix `Z`.
-        scopes (list[AppScope] | Unset): Only for app tokens, a subset of the granted scopes of the installation. Agent
-            tokens (all agent scopes implicitly) and personal tokens (the grants of the person) carry none.
+        scopes (list[AppScope] | Unset): Only for app tokens, a subset of the granted scopes of the installation; absent
+            or empty takes all granted scopes at this moment. A scope granted later needs a new token. Agent tokens (all
+            agent scopes implicitly) and personal tokens (the grants of the person) carry none.
         dpop_jkt (str | Unset): RFC 7638 thumbprint (43 base64url characters) of the key the token is bound to; requests
             must then use DPoP. Required for the kinds in `auth.dpop_required_for`.
     """

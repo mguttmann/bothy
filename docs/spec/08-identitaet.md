@@ -809,12 +809,20 @@ die Person kannte, Geheimnisse in ihrer Dev-Umgebung rotieren.
   Owner an.
 - **Scopes.** Nur App-Tokens tragen Scopes: eine Teilmenge der bewilligten Scopes der Installation.
   Agenten-Tokens tragen keine (Agenten haben ihre Scopes implizit, 05 Abschnitt 2.6), persönliche
-  auch nicht (sie handeln mit den Freigaben der Person). Rechte zusätzlich aus Freigaben (07). In
-  M1 prüft `authorize` für Apps nur `app_installations.granted_scopes` der Installation des Tokens
-  (07, Abschnitt 2.10); wie die Scopes des Tokens selbst dazukommen und wie lange Verbindungen den
-  Zustand der Installation neu prüfen, legt die Etappe M2 (Apps) fest, bevor ein App-Token
-  ausgegeben wird. Bis dahin antwortet `token.create` für eine App `409 conflict` mit `reason:
-  app_not_installed` (PLAN M2-24).
+  auch nicht (sie handeln mit den Freigaben der Person). Rechte zusätzlich aus Freigaben (07).
+  `token.create` für eine App setzt eine aktive Installation voraus (sonst `409 conflict` mit
+  `reason: app_not_installed`, auch während die App angehalten ist); fehlt `scopes` im Körper oder
+  ist die Liste leer, erhält das Token die bewilligten Scopes der Installation zu diesem Zeitpunkt,
+  sonst genau die genannten, die alle bewilligt sein müssen (`400 validation_failed` bei
+  `/scopes/<i>`). Eine App-Anfrage braucht den Scope der Aktion im Token **und** in der
+  Installation; eine Prüfung ohne Token (etwa eine Webhook-Zustellung) nur in der Installation. Ein
+  Scope, der der Installation entzogen wird, wirkt ab der nächsten Anfrage jedes Tokens; ein später
+  bewilligter Scope braucht ein neues Token (Rotation). Die Installation ist Teil des Nachweises:
+  Die Prüfung jedes App-Tokens liest bei jeder Anfrage die aktive Installation (ohne Cache); ist
+  sie nicht aktiv, ist die App nicht angemeldet (`app_not_installed`), ihr Rechte-Stand ist leer,
+  und `Revalidate` schließt eine offene Verbindung, sobald die Installation nicht mehr aktiv ist
+  oder einen Scope der Verbindung nicht mehr bewilligt (docs/DECISIONS.md D-M2-24-10 und
+  D-M2-24-11).
 - **Bindung.** Agenten-Tokens sind DPoP-gebunden, wenn `agent` in `auth.dpop_required_for` steht
   (Standard; erlaubte Werte `agent`, `app`, `personal`). Der Adapter erzeugt dafür bei der
   Einrichtung ein Schlüsselpaar. Ein gebundenes Token verlangt das Schema `DPoP` und einen Beweis

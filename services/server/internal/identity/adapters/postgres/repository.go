@@ -161,6 +161,32 @@ func (r *Repository) InsertPrincipal(ctx context.Context, p *domain.Principal) e
 	return nil
 }
 
+// SetBotPrincipalStatus implements app.Store.
+func (r *Repository) SetBotPrincipalStatus(ctx context.Context, id ids.ID, status domain.Status, disabledAt time.Time) (bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return false, err
+	}
+	n, err := q.SetBotPrincipalStatus(ctx, sqlcgen.SetBotPrincipalStatusParams{ID: uuid(id), Status: string(status), DisabledAt: optionalTime(disabledAt)})
+	if err != nil {
+		return false, mapError(err, "setting the status of a principal")
+	}
+	return n == 1, nil
+}
+
+// UpdateBotDisplayName implements app.Store.
+func (r *Repository) UpdateBotDisplayName(ctx context.Context, id ids.ID, name domain.DisplayName) (bool, error) {
+	q, err := r.write(ctx)
+	if err != nil {
+		return false, err
+	}
+	n, err := q.UpdateBotDisplayName(ctx, sqlcgen.UpdateBotDisplayNameParams{ID: uuid(id), DisplayName: name.String()})
+	if err != nil {
+		return false, mapError(err, "renaming a principal")
+	}
+	return n == 1, nil
+}
+
 // InsertUser implements app.Store.
 func (r *Repository) InsertUser(ctx context.Context, u domain.User) error {
 	q, err := r.write(ctx)
@@ -238,3 +264,8 @@ func timeOf(t pgtype.Timestamptz) time.Time {
 
 // compareIDs orders ids by their bytes, the creation order of UUIDv7.
 func compareIDs(a, b ids.ID) int { return bytes.Compare(a[:], b[:]) }
+
+// optionalTime is t as a nullable timestamptz; the zero time is NULL.
+func optionalTime(t time.Time) pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: t, Valid: !t.IsZero()}
+}

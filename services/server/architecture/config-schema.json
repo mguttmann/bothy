@@ -62,6 +62,18 @@
       "doc": "Largest page size; a larger limit is capped."
     },
     {
+      "name": "app.manifest_max_bytes",
+      "env": "BOTHY_APP__MANIFEST_MAX_BYTES",
+      "kind": "int",
+      "default": "65536",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "11-erweiterungen.md",
+      "doc": "Largest app manifest in bytes."
+    },
+    {
       "name": "audit.checkpoint_interval",
       "env": "BOTHY_AUDIT__CHECKPOINT_INTERVAL",
       "kind": "duration",
@@ -816,6 +828,30 @@
       "max": "",
       "chapter": "18-release.md",
       "doc": "App version below which the app shows an update note on this platform; empty means none."
+    },
+    {
+      "name": "command.description_max_chars",
+      "env": "BOTHY_COMMAND__DESCRIPTION_MAX_CHARS",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "09-agenten.md",
+      "doc": "Longest command description in characters."
+    },
+    {
+      "name": "command.max_per_principal",
+      "env": "BOTHY_COMMAND__MAX_PER_PRINCIPAL",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "09-agenten.md",
+      "doc": "Most commands of one agent or app."
     },
     {
       "name": "consumer.batch_size",
@@ -2630,6 +2666,18 @@
       "max": "",
       "chapter": "12-dateien.md",
       "doc": "Longest voice message."
+    },
+    {
+      "name": "webhook.allowed_hosts",
+      "env": "BOTHY_WEBHOOK__ALLOWED_HOSTS",
+      "kind": "list(string)",
+      "default": "",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Hosts an app manifest may name in its delivery addresses and outgoing webhooks may reach; exact host names, compared without regard to case."
     },
     {
       "name": "webhook.delivery_timeout",

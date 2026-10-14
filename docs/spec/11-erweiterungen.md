@@ -79,8 +79,9 @@ seinen Hash (`apps.manifest_sha256`).
 2. Für jedes Ereignis ist der Scope seiner Empfangs-Aktion in `scopes` enthalten
    (z. B. `message.created` braucht `messages:read`).
 3. Alle Adressen sind `https`; ihr Host steht bei der Installation in `webhook.allowed_hosts`
-   (R-DM-17). Fehlt er, bietet die Zustimmung an, ihn in derselben bestätigten Aktion
-   aufzunehmen.
+   (R-DM-17). Fehlt er, lehnt der Server das Manifest mit `400 webhook_host_not_allowed` ab; der
+   Betreiber nimmt den Host in die Prozess-Konfiguration auf (`webhook.allowed_hosts` ändert sich
+   nur beim Start, docs/DECISIONS.md D-M2-24-5).
 4. `requested_grants` enthält nie `trigger` (R-DM-08) und als Zusatzrecht höchstens `upload`
    (R-DM-20; Check in `grants`). Grund für den Ausschluss von `manage`: Eine App mit `manage`
    könnte selbst Freigaben vergeben (R-AZ-05) und Kanal-Prompts lesen; das ist für eine
@@ -103,7 +104,7 @@ homepage_url: https://bridge.example.com
 min_api_version: "1.0"
 scopes:
   required: [messages:write, commands:write, components:write]
-  optional: [messages:read]
+  optional: [messages:read, events:subscribe]
 events: [message.created]
 delivery:
   mode: webhook
@@ -111,9 +112,9 @@ delivery:
   interactions_url: https://bridge.example.com/hooks/interactions
 commands:
   - name: issue
-    description: {de: "Ticket anlegen", en: "Create an issue"}
+    description: Create an issue
     options:
-      - {name: title, type: string, required: true}
+      - {name: title, description: Title of the issue, type: string, required: true}
     required_level: write
 components: [button, form]
 requested_grants:
@@ -147,15 +148,23 @@ sequenceDiagram
   senden darf. Grund: Der Owner entscheidet über einen Datenabfluss; er muss ihn sehen.
 - Freigaben werden mit konkreten Zielen angelegt (`grant.create` je Ziel, mit Audit). Ein
   Manifest kann nie selbst ein Ziel festlegen.
+- Die Installation (`app.install`) legt Prinzipal, `apps` und `app_installations` an und erzeugt
+  weder ein Token noch eine Freigabe: Freigaben folgen je Ziel mit `grant.create`, Tokens mit
+  `token.create` (`createToken`). Das Diagramm oben zeigt den ganzen Ablauf der Zustimmung, nicht
+  eine Transaktion (docs/DECISIONS.md D-M2-24-8).
 - Das Token erscheint genau einmal. Rotation: neues Token anlegen, altes widerrufen
   (`token.create`, `token.revoke`).
 
 ### 4.2 Aktualisierung
 
-Ein neues Manifest mit gleichem `slug` zeigt einen Unterschied an. Neue Scopes, Ereignisse, Hosts
-oder Freigaben brauchen eine neue Zustimmung (`app.scopes.update`, Step-up). Bis dahin läuft die
-App mit den alten Bewilligungen; neue Befehle und Ereignisse, die neue Scopes brauchen, bleiben
-inaktiv. Entfernte Scopes, Ereignisse und Befehle wirken sofort.
+Ein neues Manifest mit gleichem `slug` zeigt einen Unterschied an. Neue Scopes und Ereignisse
+brauchen eine neue Zustimmung (`app.scopes.update`, Step-up). Bis dahin läuft die App mit den alten
+Bewilligungen; neue Befehle und Ereignisse, die neue Scopes brauchen, bleiben inaktiv. Entfernte
+Scopes, Ereignisse und Befehle wirken sofort. Eine Aktualisierung fügt nie eine Freigabe hinzu;
+Freigaben entstehen nur mit `grant.create`. Neue Ziel-Hosts der Zustellung bestätigt die
+Aktualisierung selbst (Owner, Step-up, `app.install`); sie müssen in `webhook.allowed_hosts`
+stehen. Ein Token behält die Scopes, mit denen es angelegt wurde: Ein entzogener Scope wirkt ab der
+nächsten Anfrage, ein neu bewilligter braucht ein neues Token.
 
 ### 4.3 Abschalten und Deinstallation
 
@@ -177,7 +186,8 @@ Zustimmung erzwingen.
 Eine App darf eine Aktion nur, wenn **beides** gilt (05 Abschnitt 2.6):
 
 1. Die Freigaben der App erlauben die Aktion auf dem Ziel (wie bei Menschen, höchstens `write`).
-2. Die Installation hat den Scope der Aktion bewilligt.
+2. Die Installation hat den Scope der Aktion bewilligt, und das Token der Anfrage trägt ihn auch
+   ([08-identitaet.md](08-identitaet.md), Abschnitt 12).
 
 | Scope | Aktionen (05) | Typische App |
 |---|---|---|

@@ -46,6 +46,22 @@ type PrincipalFacts struct {
 	// owner role takes effect (active status, a session instead of a personal token, SR5) is
 	// for authz to decide.
 	IsOwner bool
+	// AppInstallationActive reports, for a principal of kind app, that its installation is
+	// active (app_installations.state = 'active'); identity reads it through
+	// identity.AppInstallations (M2-24). Ignored for other kinds. An app without an active
+	// installation has an empty rights snapshot, like a principal that is not active (07 section
+	// 2.10), so app.suspend and app.uninstall remove its visible targets and app.resume adds them.
+	AppInstallationActive bool
+}
+
+// GrantsInEffect reports whether the grants of the principal take effect: status active or
+// pending, and for an app an active installation. authz builds the snapshot only for such a
+// principal (SR7, 07 section 2.10).
+func (f PrincipalFacts) GrantsInEffect() bool {
+	if f.Status != PrincipalActive && f.Status != PrincipalPending {
+		return false
+	}
+	return f.Kind != actor.KindApp || f.AppInstallationActive
 }
 
 // PrincipalRef is the minimal public view of a principal that authz embeds in its answers, for

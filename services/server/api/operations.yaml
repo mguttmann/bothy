@@ -53,6 +53,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - explainSpaceAccess
   - exportAuditEvents
   - getAgent
+  - getApp
   - getChannel
   - getDevice
   - getDiscovery
@@ -70,7 +71,9 @@ enabled:             # operationIds that have a handler; sorted ascending
   - getUser
   - getUserCredentials
   - handleOidcCallback
+  - installApp
   - listAgents
+  - listApps
   - listAuditEvents
   - listChannelThreads
   - listFeatureFlags
@@ -104,6 +107,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - refreshToken
   - removeGroupMember
   - reopenThread
+  - resumeApp
   - revokeDevice
   - revokeGrant
   - revokeOwner
@@ -114,6 +118,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setAgentBillingMode
   - setAgentToolClass
   - setAllAgentsBillingMode
+  - setAppScopes
   - setChannelOperator
   - setCredentialHolder
   - setHostLlmCredentials
@@ -122,6 +127,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setSpaceOperator
   - setThreadTags
   - setThreadTitle
+  - suspendApp
+  - uninstallApp
   - unlinkIdentity
   - updateAgent
   - updateBranding
@@ -133,6 +140,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateMyProfile
   - updateSpace
   - updateUser
+  - upgradeAppManifest
+  - validateManifest
   - verifyAuditChain
   - viewAsUser
 later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id
@@ -297,9 +306,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M2-09
   - operation_id: getAgentTriggerers
     etappe: M2
-  - operation_id: getApp
-    etappe: M2
-    ticket: M2-24
   - operation_id: getBrandingLogo
     etappe: M3
     ticket: M3-10
@@ -388,9 +394,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getWebhookKeys
     etappe: M2
     ticket: M2-26
-  - operation_id: installApp
-    etappe: M2
-    ticket: M2-24
   - operation_id: invokeCommand
     etappe: M2
     ticket: M2-16
@@ -409,9 +412,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listAgentWebhookSubscriptions
     etappe: M2
     ticket: M2-26
-  - operation_id: listApps
-    etappe: M2
-    ticket: M2-24
   - operation_id: listChannelCommands
     etappe: M2
     ticket: M2-16
@@ -570,8 +570,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: respondToInteraction
     etappe: M2
     ticket: M2-15
-  - operation_id: resumeApp
-    etappe: M2
   - operation_id: resumeRun
     etappe: M2
     ticket: M2-09
@@ -587,9 +585,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: sendHeartbeat
     etappe: M2
     ticket: M2-20
-  - operation_id: setAppScopes
-    etappe: M2
-    ticket: M2-24
   - operation_id: setChannelReadOnly
     etappe: M8
     ticket: M8-05
@@ -617,11 +612,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: submitTranscript
     etappe: M3
     ticket: M3-09
-  - operation_id: suspendApp
-    etappe: M2
-  - operation_id: uninstallApp
-    etappe: M2
-    ticket: M2-24
   - operation_id: unpinMessage
     etappe: M1
     ticket: M1-59
@@ -646,15 +636,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateWebhookSubscription
     etappe: M2
     ticket: M2-26
-  - operation_id: upgradeAppManifest
-    etappe: M2
-    ticket: M2-24
   - operation_id: uploadBrandingLogo
     etappe: M3
     ticket: M3-10
   - operation_id: uploadPart
     etappe: M3
     ticket: M3-03
-  - operation_id: validateManifest
-    etappe: M2
-    ticket: M2-24

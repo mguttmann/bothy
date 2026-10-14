@@ -858,9 +858,33 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
   PostgreSQL 18 (ID-T21 timing, lockout, enrollment, step-up, validation, secrets at rest, no
   secrets in logs and audit). Rulings: docs/DECISIONS.md M1-39.
 
+### App tokens and installations (M2-24)
+
+- Ports (`apps.go`): `AppInstallations` (`ActiveInstallation`, `LockActiveInstallation` FOR SHARE in
+  the ambient unit of work) with `ActiveAppInstallation`, declared here and implemented by the
+  module apps (`apps/adapters/identitysource`), so identity never imports apps;
+  `NoAppInstallations` (no app is installed; the default without apps). `PrincipalWrites`
+  (`CreatePrincipal` for kinds agent and app, `SetPrincipalStatus` active or disabled with
+  `disabled_at`, `UpdateDisplayName`) with `NewPrincipalCmd`; `app/principals.go` implements it
+  with the handle and display name rules of M1-26.
+- `createToken` for an app: the active installation is locked FOR SHARE inside the unit of work;
+  none (also suspended or uninstalled) keeps `409 conflict` `app_not_installed`. The token scopes
+  are the requested subset of the granted scopes, or all of them for an absent or empty `scopes`
+  (`domain.AppTokenScopes`, `400 validation_failed` at `/scopes/<i>`); the audit entry names the
+  stored scopes.
+- Authentication of an app token reads the active installation on every request (no cache):
+  active fills `InstallationID`, `GrantedScopes` and the token scopes (`actor.Scopes`); otherwise
+  the installation id stays zero and authorize answers `app_not_installed`. `Revalidate` fails with
+  `app_not_installed` once the installation is no longer active or no longer grants a scope of the
+  actor. `PrincipalSource.WithApps` sets `authz.PrincipalFacts.AppInstallationActive`, so an app
+  without an active installation has an empty rights snapshot. Rulings: docs/DECISIONS.md
+  D-M2-24-10 and D-M2-24-11.
+- Tests: `app/apptokens_test.go` (`TestCreateToken_AppScopes`, `TestAuthenticateAPIToken_AppInstallation`,
+  `TestPrincipalWrites`); the HTTP cases run in `apps/adapters/httpapi`.
+
 ## Port (Wurzelpaket `internal/identity`)
 
-- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`; deklariert `AvatarFiles`.
+- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`, `PrincipalWrites` (M2-24); deklariert `AvatarFiles`, `AppInstallations` (M2-24).
 - Gibt In-Tx-Ereignisse aus: `DeviceRevoked`, `SessionEnded`.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (mit `HasActivePasskey`, M1-40), `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.
