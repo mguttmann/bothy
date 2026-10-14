@@ -1819,6 +1819,12 @@ The brief names these rows D-M3-02-1 to D-M3-02-13; they follow the numbering of
 | M1-16/23 | 2026-10-12 | Long digit runs (17 to 20 digits) never appear as literals in tests: names and limits are built (`fmt.Sprintf("%019d", ...)`, `math.MaxInt64` as a parameter), and the generic white-label scan (`tools/denylist`, `make test` and `make denylist`) runs on the working tree before every commit of this ticket. | Red team rounds 1 and 2 (B1): the generic rule for account and card numbers matched partition names and the bigint maximum twice; the gate that catches the class exists, the gap was running it before the commit. |
 | M1-16/24 | 2026-10-12 | Port onto main, after M1-28: the start step of the event log is 6c (`sync`), after 6b (`authz`, M1-28); both come from the same base, and neither depends on the other. The load test report (`perf/internal/report`) reads the English section "Configuration values of this chapter" of 02 and the place `Load test`; the build notes go into the English ADRs 0052, 0053 and 0063; references name the English chapter files and headings of main. | Translation and conflict resolution only; the behaviour equals the approved ticket. |
 
+## PL Rulings of the PR lane
+
+| No | Date | Ruling | Reason |
+|---|---|---|---|
+| PL/1 | 2026-10-14 | `make test` runs the Go tests with `-coverpkg=./...`: a statement counts as covered when any test of its module runs it, also a test in another package. The gate `coverage` (`quality.coverage.go_min_percent`) and the new-code coverage of SonarQube read this profile. | Many use cases are tested through their HTTP adapter against PostgreSQL (the coming sessions, refresh and step-up flows among them); with per-package coverage the code those tests run counted as uncovered, and the new-code gate failed for code that the suite executes. |
+
 ## M1-20 Idempotency keys
 
 | No | Date | Ruling | Reason |

@@ -257,6 +257,9 @@ operated, and the order of the build.
 
 ### Changed
 
+- `make test` measures Go coverage with `-coverpkg=./...`: a statement counts as covered when
+  any test of its module runs it, also one in another package, for the gate `coverage` and for
+  the new-code coverage in SonarQube (PL/1 in [DECISIONS.md](docs/DECISIONS.md)).
 - CodeRabbit reviews with the `chill` profile and reports bugs, security issues, broken
   contracts and problems that break CI, without style, wording or formatting nits; it asks
   for a source URL and retrieval date only in `docs/spec/**`, `docs/security/**` and
