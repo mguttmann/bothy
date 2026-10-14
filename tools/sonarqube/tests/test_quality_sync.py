@@ -280,12 +280,14 @@ def test_cloud_plan_refusing_project_assignment_is_a_gap_per_language() -> None:
         assert len(_posts(state, "/api/qualityprofiles/add_project")) == len(CLOUD_LANGUAGES)
         assert applied.gaps == [
             qs.GATE_NOT_DEFAULT,
+            *(
+                f"profile {lang}: {qs.PROFILE_NOT_ON_PROJECT} (POST {url}/api/qualityprofiles/"
+                f"add_project: HTTP 400: Organization '{ORG}' is not allowed to perform this "
+                "action)"
+                for lang in CLOUD_LANGUAGES
+            ),
             f"{qs.GATE_NOT_ON_PROJECT} (POST {url}/api/qualitygates/select: HTTP 403: "
-            "Insufficient privileges)",
-        ] + [
-            f"profile {lang}: {qs.PROFILE_NOT_ON_PROJECT} (POST {url}/api/qualityprofiles/"
-            f"add_project: HTTP 400: Organization '{ORG}' is not allowed to perform this action)"
-            for lang in CLOUD_LANGUAGES
+            f"Organization '{ORG}' is not allowed to perform this action)",
         ]
         for language in CLOUD_LANGUAGES:
             prof = state.profile(language, "Bothy way")
@@ -319,6 +321,16 @@ def test_cloud_check_fails_when_project_uses_another_custom_setup() -> None:
             "profile go: project uses profile 'Sonar way comprehensive', want 'Bothy way'",
             "profile py: project uses no profile, want 'Bothy way'",
         ]
+
+
+def test_cloud_permission_refusal_is_not_a_plan_gap() -> None:
+    # A token without the permission gets HTTP 403 "Insufficient privileges": that fails.
+    state = State(
+        cloud=True, builtin_profile="Sonar way comprehensive", project_permission_denied=True
+    )
+    config = qs.load_config(REPO / "quality" / "sonar")
+    with running(state) as url, pytest.raises(qs.SonarError, match="HTTP 403: Insufficient"):
+        qs.apply(_client(url, organization=ORG), config)
 
 
 def test_cloud_needs_a_project_key(server: tuple[State, str]) -> None:

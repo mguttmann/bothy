@@ -9,7 +9,9 @@ retrieved 2026-10-13): create_condition needs `gateId` and set_as_default needs 
 for a custom default gate on a plan that does not include it. `profile_default_forbidden` and
 `profile_project_forbidden` answer set_default and add_project with HTTP 400 "Organization ...
 is not allowed to perform this action", as SonarQube Cloud answered set_default on a
-sonar-config run of 2026-10-14; `gate_select_forbidden` answers select with HTTP 403. A project
+sonar-config run of 2026-10-14; `gate_select_forbidden` answers select with HTTP 403 and the
+same message. `project_permission_denied` answers add_project with HTTP 403 "Insufficient
+privileges", as for a token without the needed permission. A project
 uses the profile or gate assigned to it, otherwise the default one; the built-in gate is
 "Sonar way".
 """
@@ -50,6 +52,7 @@ class State:
     profile_default_forbidden: bool = False
     profile_project_forbidden: bool = False
     gate_select_forbidden: bool = False
+    project_permission_denied: bool = False
     project_gate: str | None = None
     project_profiles: dict[str, str] = field(default_factory=dict)
     profiles: list[Profile] = field(default_factory=list)
@@ -226,7 +229,7 @@ def _gate_default(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
 
 def _gate_select(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     if state.gate_select_forbidden:
-        return 403, {"errors": [{"msg": "Insufficient privileges"}]}, "application/json"
+        return 403, _NOT_ALLOWED[1], "application/json"
     gate = _gate_name(state, p, "gateName", "gateId")
     if gate not in state.gates or not p.get("projectKey"):
         return _BAD_REQUEST
@@ -310,6 +313,8 @@ def _qp_restore(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
 def _qp_add_project(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     if state.profile_project_forbidden:
         return _NOT_ALLOWED
+    if state.project_permission_denied:
+        return 403, {"errors": [{"msg": "Insufficient privileges"}]}, "application/json"
     if not p.get("project") or state.profile(p["language"], p["qualityProfile"]) is None:
         return _BAD_REQUEST
     state.project_profiles[p["language"]] = p["qualityProfile"]

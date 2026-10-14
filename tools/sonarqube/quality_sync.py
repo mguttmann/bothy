@@ -234,9 +234,15 @@ def _gate_ref(
 
 
 def _plan_refused(client: Client, exc: SonarError) -> bool:
-    """Whether SonarQube Cloud refused a call because the organization's plan lacks it."""
-    return client.is_cloud and (
-        exc.status == 403 or (exc.status == 400 and "is not allowed to perform" in str(exc))
+    """Whether SonarQube Cloud refused a call because the organization's plan lacks it.
+
+    Only the plan's wording counts; any other refusal, such as HTTP 403 "Insufficient
+    privileges" for a token without the permission, still fails the run.
+    """
+    return (
+        client.is_cloud
+        and exc.status in (400, 403)
+        and "is not allowed to perform this action" in str(exc)
     )
 
 
@@ -257,8 +263,8 @@ def _active_rules(client: Client, language: str, name: str) -> set[str]:
     return xml_rules(xml.decode("utf-8"))
 
 
-def _apply_gate(client: Client, config: Config, project: str, report: Report) -> None:
-    """Create or update the gate, make it the default and, on the cloud, the project's gate."""
+def _apply_gate(client: Client, config: Config, report: Report) -> str:
+    """Create or update the gate, make it the default and return its id."""
     found = _gate(client, config.gate_name)
     if found is None:
         client.post("api/qualitygates/create", name=config.gate_name)
@@ -298,20 +304,14 @@ def _apply_gate(client: Client, config: Config, project: str, report: Report) ->
         if not (client.is_cloud and exc.status == 403):
             raise
         report.gaps.append(GATE_NOT_DEFAULT)
-    if client.is_cloud:
-        try:
-            client.post("api/qualitygates/select", gateId=gate_id, projectKey=project)
-        except SonarError as exc:
-            if not _plan_refused(client, exc):
-                raise
-            report.gaps.append(f"{GATE_NOT_ON_PROJECT} ({exc})")
+    return gate_id
 
 
 def apply(client: Client, config: Config) -> Report:
     """Create or update gate and profiles so that the server matches the config."""
     report = Report()
     project = _cloud_project(client) if client.is_cloud else ""
-    _apply_gate(client, config, project, report)
+    gate_id = _apply_gate(client, config, report)
 
     parent = config.parent_for(client)
     available = _languages(client)
@@ -356,6 +356,14 @@ def apply(client: Client, config: Config) -> Report:
             if not _plan_refused(client, exc):
                 raise
             report.gaps.append(f"profile {language}: {PROFILE_NOT_ON_PROJECT} ({exc})")
+    if client.is_cloud:
+        # After the profiles, so that a refused gate cannot keep them from the project.
+        try:
+            client.post("api/qualitygates/select", gateId=gate_id, projectKey=project)
+        except SonarError as exc:
+            if not _plan_refused(client, exc):
+                raise
+            report.gaps.append(f"{GATE_NOT_ON_PROJECT} ({exc})")
     return report
 
 
