@@ -760,7 +760,7 @@ Libraries:
 - Dart: X25519, ChaCha20-Poly1305, SHA-256 and HMAC-SHA-256 from the package `cryptography` (the
   HKDF of the Noise specification is built by `bothy_noise` itself from HMAC, section 4.3 of the
   specification), Apache-2.0, version 2.9.0 (https://pub.dev/packages/cryptography, retrieved
-  2026-10-10 [verified]; latest version on 2026-10-12, pinned in `packages/bothy_noise/pubspec.lock`); the
+  2026-10-10 [verified]; latest version on 2026-10-12, pinned in `pubspec.lock` (root of the Dart workspace, M4-01)); the
   handshake itself as a separate small package `packages/bothy_noise`, checked against the same
   test vectors. In the web console, `cryptography` uses the Web Crypto API, otherwise pure Dart
   (same source [verified]).

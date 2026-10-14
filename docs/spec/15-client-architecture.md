@@ -46,6 +46,14 @@ One Dart pub workspace in the product repo (one shared resolution, one `pubspec.
 pub workspaces exist since Dart 3.6, https://dart.dev/tools/pub/workspaces, retrieved 2026-10-10
 [verified]). No Melos: tasks run through the make targets of the repo (quality team).
 
+Workspace root (M4-01): the root `pubspec.yaml` of the repository (`name: bothy_workspace`,
+`publish_to: none`) lists the fourteen members below in the `workspace:` list in this order and
+pins the exact Flutter version in `environment.flutter`; CI installs that version, and every
+member repeats the same `environment` lines, has `resolution: workspace` and `publish_to: none`,
+and tracks no lock file of its own. The root `analysis_options.yaml` holds the rules all members
+share (strict analysis, `public_member_api_docs` as an error, generated code excluded); each
+member includes it after its base set (`package:lints` or `package:flutter_lints`).
+
 ```text
 apps/
   client/                 Flutter app for iOS, Android, macOS, Windows
@@ -143,6 +151,21 @@ Rules (checked by an architecture test in the gate, ticket "Dependency rules"):
    than `cryptography`. `terminal_ui` does not depend on `sync_engine` and `local_store`; it gets the stream,
    the store of the pinned keys and step-up through ports (section 23.1). Reason: the
    console has neither a gateway nor a local database (rule 3).
+8. A member depends on and imports only the members that the diagram reaches from it, directly
+   or through other members (the arrows and their transitive closure: `apps/client` may import
+   `domain` through `sync_engine`, `auth` may not import `local_store`). The reach is an allow
+   list: a new arrow changes this diagram and `tools/arch-check/rules.yaml` in the same change.
+9. Every `pubspec.yaml` under `apps/` and `packages/` is a member of the workspace (root
+   `workspace:` list) and of `tools/arch-check/rules.yaml`, and every member listed there has
+   its manifest.
+
+Rule 4 in the check: native sources (`*.swift`, `*.m`, `*.mm`, `*.kt`, `*.java`, `*.cpp`,
+`*.cc`, `*.h`) lie only in `packages/device_key` and in `apps/client/{ios,macos,android,windows}`;
+`apps/console/web` holds none. Rules 1 and 7 in the check: the pure Dart members import neither
+`package:flutter/` nor `dart:ui` and do not depend on the Flutter SDK; `bothy_noise` does not
+import `dart:io` in `lib/` (its tests read vector files with it) and has `cryptography` as its
+only runtime dependency. `make arch` runs the architecture test `tools/arch-check` for every
+member on every run of the gate; each finding names file, line and rule.
 
 ## 4. State
 

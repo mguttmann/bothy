@@ -202,3 +202,14 @@ def test_members_resolve_in_the_workspace_and_are_never_published() -> None:
         assert data["version"] == "0.0.0", pubspec
     # One resolution: only the root tracks a lock file.
     assert _tracked("*pubspec.lock") == ["pubspec.lock"]
+
+
+def test_sonar_reads_the_lcov_of_every_member() -> None:
+    text = (REPO / "sonar-project.properties").read_text(encoding="utf-8")
+    [line] = [x for x in text.splitlines() if x.startswith("sonar.dart.lcov.reportPaths=")]
+    paths = line.split("=", 1)[1].split(",")
+    members = _pubspec("pubspec.yaml")["workspace"]
+    assert paths == [f"{m}/coverage/lcov.info" for m in members]
+    [exclusions] = [x for x in text.splitlines() if x.startswith("sonar.exclusions=")]
+    for pattern in ("**/*.g.dart", "**/*.freezed.dart", "**/*.drift.dart", "**/generated/**"):
+        assert pattern in exclusions.split("=", 1)[1].split(","), pattern

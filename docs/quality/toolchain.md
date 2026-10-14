@@ -74,10 +74,10 @@ Go and Flutter are not pinned gate tools; they come from the components themselv
 - Go from the `go` and `toolchain` lines of the modules under `services/`. All modules carry the same
   lines, because CI installs one Go (ADR 0005); `tools/ci/tests/test_ci_toolchains.py`
   (`test_go_directives_agree`) holds that.
-- Flutter from `environment.flutter` of the tracked `pubspec.yaml` files, an exact version, equal in
-  all packages (`test_flutter_pins_agree`). Until `apps/client` exists, `packages/bothy_noise`
-  carries the pin (docs/DECISIONS.md D-M2-38-12); the package itself imports no Flutter and uses
-  `flutter test` only as its test runner.
+- Flutter from `environment.flutter` of the root `pubspec.yaml` of the Dart workspace, one exact
+  version that the root and every member repeat (`test_flutter_pins_agree`, docs/DECISIONS.md
+  D-M4-01-1); CI reads it with `flutter-version-file: pubspec.yaml`. The pure Dart packages use
+  `flutter test` only as their test runner.
 
 ## GitHub Actions
 
@@ -99,7 +99,7 @@ tags, the commit SHA behind the tag).
 | `docker/setup-buildx-action` | `v4.4.1` | Buildx with provenance and SBOM; tag only after the scan (`imagetools create`) |
 | `docker/login-action` | `v4.6.0` | login to ghcr.io |
 | `docker/build-push-action` | `v7.4.0` | build and push the server image (multi-arch by cross compilation in the Dockerfile, without QEMU) |
-| `subosito/flutter-action` | `v2.23.0` | Flutter for all Dart packages, from `environment.flutter` of the app's `pubspec.yaml`, until then from `packages/bothy_noise` |
+| `subosito/flutter-action` | `v2.23.0` | Flutter for every Dart package (jobs `gates`, `sonar`, `apps (macOS)`, `apps (Windows)` and the Pages build), from `environment.flutter` of the root `pubspec.yaml` |
 | `github/codeql-action` | `v4.38.3` | CodeQL and SARIF upload (public) |
 | `ossf/scorecard-action` | `v2.4.4` | OpenSSF Scorecard (public) |
 | `actions/upload-pages-artifact` | `v5.0.0` | upload the docs site (public) |

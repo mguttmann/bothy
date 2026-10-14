@@ -25,6 +25,17 @@ operated, and the order of the build.
 
 ### Added
 
+- One Dart pub workspace at the repository root (`pubspec.yaml`, one `pubspec.lock`) with the
+  fourteen members of docs/spec/15-client-architecture.md 3: the apps `apps/client` and
+  `apps/console` and the packages under `packages/` as skeletons, `bothy_noise` taken over;
+  the Flutter pin moves to the root `pubspec.yaml` (M4-01).
+- Architecture test `tools/arch-check` in `make arch`: the dependency rules of 15 3.1 for every
+  member, with the reach of the diagram as an allow list (M4-01).
+- Documentation in code as a gate for Dart: `public_member_api_docs` as an error in every
+  member, and `make docs` puts the `dart doc` pages of every package into the site
+  (`docs/reference/dart-api.md`) (M4-01).
+- `make apps-platform` and the CI jobs `apps (macOS)` and `apps (Windows)` for the platform tests
+  of the apps (M4-01).
 - Design tokens: `make tokens` checks the chart series `color.viz.series.1` to `.8` (adjacent
   pairs and series 8 with series 1) and the traffic light states `success.fg`, `warning.fg` and
   `danger.fg` under simulated protanopia, deuteranopia and tritanopia (Machado et al. 2009,

@@ -35,16 +35,21 @@ Desktop app, mobile app and web console use the same code.
 3. `readMessage2` returns the payload, the `NoiseTransport` and the handshake hash; after that
    frames with `encodeFrame` and `transport.encrypt`, `StartFrame` first.
 
-Still missing: pin storage, view and renderer (M4-35), the pub workspace (M4-01).
+Still missing: pin storage, view and renderer (M4-35).
 
 ## Commands
 
 ```sh
+flutter pub get                # once, at the repository root (Dart workspace, M4-01)
 cd packages/bothy_noise
 flutter analyze --fatal-infos
 flutter test --coverage
 UPDATE_RECORDINGS=1 flutter test test/recordings_test.dart   # rewrite recordings/dart.json
 ```
 
-Flutter comes from the line `environment.flutter` of `pubspec.yaml` (docs/DECISIONS.md
-D-M2-38-12); the package itself uses Flutter only as its test runner.
+Since M4-01 the package is a member of the Dart workspace at the repository root: one
+`pubspec.lock` there, and Flutter comes from `environment.flutter` of the root `pubspec.yaml`
+(docs/DECISIONS.md D-M4-01-1, D-M4-01-2). The package uses Flutter only as its test runner.
+Allowed dependencies and the checks of `make arch`: [tools/arch-check](../../tools/arch-check/README.md)
+(no Flutter, no `dart:io` in `lib/`, `cryptography` as the only runtime dependency; 15 3.1
+rule 7).
