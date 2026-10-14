@@ -283,6 +283,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"jobs.schema = jobs  # default\n" +
 		"message.max_attachments = 10  # default\n" +
 		"message.max_content_bytes = 2048  # env BOTHY_MESSAGE__MAX_CONTENT_BYTES\n" +
+		"message.max_mentions = 50  # default\n" +
 		"migrate.app_password_ref = file:/run/bothy/secrets/db_app_password  # default\n" +
 		"migrate.bootstrap_password_ref = file:/run/bothy/secrets/db_superuser_password  # default\n" +
 		"migrate.bootstrap_user = postgres  # default\n" +

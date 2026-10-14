@@ -17,6 +17,7 @@ import (
 	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
 	identityhttp "github.com/OWNER/bothy/services/server/internal/identity/adapters/httpapi"
 	instancehttp "github.com/OWNER/bothy/services/server/internal/instance/adapters/httpapi"
+	messaginghttp "github.com/OWNER/bothy/services/server/internal/messaging/adapters/httpapi"
 	"github.com/OWNER/bothy/services/server/internal/platform/httpserver"
 	terminalhttp "github.com/OWNER/bothy/services/server/internal/terminal/adapters/httpapi"
 )
@@ -66,6 +67,8 @@ type Handlers struct {
 	// Threads implements listChannelThreads, getThread, setThreadTitle, closeThread, reopenThread
 	// and setThreadTags (chat, M1-55).
 	*chathttp.Threads
+	// Messages implements createMessage and createThread (messaging, M1-56).
+	*messaginghttp.Messages
 	// Log implements listAuditEvents, exportAuditEvents and verifyAuditChain (audit, M1-50).
 	*audithttp.Log
 	// Devices implements listMyDevices, listUserDevices and getDevice (identity, M1-33).

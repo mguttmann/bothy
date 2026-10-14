@@ -184,6 +184,19 @@ func (s *Service) Get(ctx context.Context, a actor.Actor, threadID ids.ID) (chat
 	return s.threadView(ctx, th)
 }
 
+// View implements chat.Threads: the thread without authorization; the caller authorized the
+// write it answers for.
+func (s *Service) View(ctx context.Context, threadID ids.ID) (chat.Thread, error) {
+	th, found, err := s.d.Store.Thread(ctx, threadID)
+	if err != nil {
+		return chat.Thread{}, err
+	}
+	if !found {
+		return chat.Thread{}, invisible()
+	}
+	return s.threadView(ctx, th)
+}
+
 // threadUnit runs fn for the thread id in one unit of work: act on the thread (an invisible
 // thread is 404), the row lock, then fn, which changes the locked thread and reports whether it
 // did. A change is saved and appends the event typ (brief D9); no change appends nothing (06

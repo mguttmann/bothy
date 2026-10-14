@@ -161,6 +161,11 @@ type Threads interface {
 	List(ctx context.Context, a actor.Actor, q ListThreadsQuery) (ThreadPage, error)
 	// Get returns the thread (thread.read).
 	Get(ctx context.Context, a actor.Actor, threadID ids.ID) (Thread, error)
+	// View returns the thread like Get but without authorizing, for a module that has just
+	// authorized and performed a write on it and answers with the result (messaging after
+	// createThread: an app with messages:write and no messages:read gets the thread it created,
+	// 05 section 2.6). Errors: not_found for an unknown thread.
+	View(ctx context.Context, threadID ids.ID) (Thread, error)
 	// SetTitle sets the title (thread.title.update): a person sets the source manual, the operator
 	// agent keeps it auto and gets title_manual for a manual title (09 section 12). Errors:
 	// precondition_required, version_conflict with current, validation_failed on /title,

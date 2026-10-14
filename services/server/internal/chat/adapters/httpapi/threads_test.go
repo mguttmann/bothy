@@ -64,6 +64,17 @@ func (w *world) mainThread(ch ids.ID) ids.ID {
 	return ids.MustParse(id)
 }
 
+// message inserts a message of the owner at the end of thread directly, the parent a thread
+// starts from (threads.parent_message_id references messages since M1-56), and returns it.
+func (w *world) message(thread ids.ID) ids.ID {
+	w.t.Helper()
+	id := ids.New()
+	w.sql(`INSERT INTO messages (id, thread_id, channel_id, thread_seq, author_principal_id, client_msg_id, client_payload_sha256, origin, content_md)
+		SELECT $1, t.id, t.channel_id, coalesce((SELECT max(m.thread_seq) FROM messages m WHERE m.thread_id = t.id), 0) + 1, $2, $3, '\x00', 'human', 'parent'
+		FROM threads t WHERE t.id = $4`, id.String(), w.ownerID.String(), ids.New().String(), thread.String())
+	return id
+}
+
 // operatorAgent inserts an active agent with an agents row (the foreign key of
 // threads.operator_agent_id) and registers its policy with billing mode.
 func (w *world) operatorAgent(name, billing string) ids.ID {
@@ -181,7 +192,7 @@ func TestThreadsCreate_FromMainThreadMessage(t *testing.T) {
 	space := w.create("Support")
 	text, other, forum := w.channel(space, "text", "tickets"), w.channel(space, "text", "sales"), w.channel(space, "forum", "bugs")
 	main, otherMain := w.mainThread(text), w.mainThread(other)
-	msg := ids.New()
+	msg := w.message(main)
 	th, err := w.newThread("owner", chat.CreateThreadCmd{ChannelID: text, Parent: &chat.ParentMessage{MessageID: msg, ThreadID: main}})
 	if err != nil || th.ParentMessageID != msg || th.Kind != "thread" || th.ChannelID != text {
 		t.Fatalf("thread from message: %+v, %v", th, err)
@@ -214,7 +225,7 @@ func TestR_DM_12_OperatorFixedAfterChannelChange(t *testing.T) {
 	lotse, kompass := w.operatorAgent("lotse", "personal"), w.operatorAgent("kompass", "organization")
 	w.setOperator(text, lotse)
 	main := w.mainThread(text)
-	th, err := w.newThread("owner", chat.CreateThreadCmd{ChannelID: text, Parent: &chat.ParentMessage{MessageID: ids.New(), ThreadID: main}})
+	th, err := w.newThread("owner", chat.CreateThreadCmd{ChannelID: text, Parent: &chat.ParentMessage{MessageID: w.message(main), ThreadID: main}})
 	if err != nil || th.OperatorAgentID != lotse || th.BillingMode != "personal" {
 		t.Fatalf("thread %+v, %v", th, err)
 	}
@@ -529,7 +540,7 @@ func TestSetThreadTags_Rules(t *testing.T) {
 			t.Errorf("%s: %v", c.code, p)
 		}
 	}
-	textThread, err := w.newThread("owner", chat.CreateThreadCmd{ChannelID: text, Parent: &chat.ParentMessage{MessageID: ids.New(), ThreadID: w.mainThread(text)}})
+	textThread, err := w.newThread("owner", chat.CreateThreadCmd{ChannelID: text, Parent: &chat.ParentMessage{MessageID: w.message(w.mainThread(text)), ThreadID: w.mainThread(text)}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -662,7 +673,7 @@ func TestListChannelThreads_FiltersSortAndPages(t *testing.T) {
 	w.want(w.do("owner", http.MethodGet, channelThreadsPath(forum)+"?state=open&cursor="+url.QueryEscape(next), ""), http.StatusBadRequest, "cursor_invalid")
 	w.want(w.do("owner", http.MethodGet, channelThreadsPath(forum)+"?sort=created&cursor="+url.QueryEscape(next), ""), http.StatusBadRequest, "cursor_invalid")
 	// A text channel lists its threads, never the main thread.
-	th, err := w.newThread("owner", chat.CreateThreadCmd{ChannelID: text, Parent: &chat.ParentMessage{MessageID: ids.New(), ThreadID: w.mainThread(text)}})
+	th, err := w.newThread("owner", chat.CreateThreadCmd{ChannelID: text, Parent: &chat.ParentMessage{MessageID: w.message(w.mainThread(text)), ThreadID: w.mainThread(text)}})
 	if err != nil {
 		t.Fatal(err)
 	}

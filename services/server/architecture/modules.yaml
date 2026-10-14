@@ -151,7 +151,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [identity, chat, files]
-    adapter_vendors: []
+    adapter_vendors: [pgx]   # sqlc code and the repository (M1-56)
   status:
     tables: [status_components, status_incidents, status_incident_updates,
              status_incident_components, backup_runs]

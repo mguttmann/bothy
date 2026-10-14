@@ -193,8 +193,10 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"consumer.poll_interval":       {Kind: config.KindDuration, Default: "1s", Min: "1ms", Chapter: "02-architektur.md"},
 		"consumer.pending_alert_after": {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "02-architektur.md"},
 
-		"branding.product_name_max_chars":    {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-datenmodell.md"},
-		"message.max_attachments":            {Kind: config.KindInt, Default: "10", Min: "0", Chapter: "03-datenmodell.md"},
+		"branding.product_name_max_chars": {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-datenmodell.md"},
+		"message.max_attachments":         {Kind: config.KindInt, Default: "10", Min: "0", Chapter: "03-datenmodell.md"},
+		// M1-56: the mention limit of sending.
+		"message.max_mentions":               {Kind: config.KindInt, Default: "50", Min: "1", Chapter: "03-datenmodell.md"},
 		"thread.title_max_chars":             {Kind: config.KindInt, Default: "200", Min: "1", Chapter: "03-datenmodell.md"},
 		"voice.max_duration":                 {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "12-dateien.md"},
 		"auth.local_password_enabled":        {Kind: config.KindBool, Default: "true", Chapter: "08-identitaet.md"},

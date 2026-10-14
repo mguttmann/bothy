@@ -1527,6 +1527,18 @@
       "doc": "Largest content of one message in bytes."
     },
     {
+      "name": "message.max_mentions",
+      "env": "BOTHY_MESSAGE__MAX_MENTIONS",
+      "kind": "int",
+      "default": "50",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Most distinct mention handles in one message."
+    },
+    {
       "name": "migrate.app_password_ref",
       "env": "BOTHY_MIGRATE__APP_PASSWORD_REF",
       "kind": "secret_ref",

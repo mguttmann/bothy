@@ -448,6 +448,40 @@ type LocalCredential struct {
 	LockedUntil          pgtype.Timestamptz
 }
 
+type Mention struct {
+	MessageID   pgtype.UUID
+	PrincipalID pgtype.UUID
+	ThreadID    pgtype.UUID
+	CreatedAt   pgtype.Timestamptz
+}
+
+type Message struct {
+	ID                  pgtype.UUID
+	ThreadID            pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadSeq           int64
+	AuthorPrincipalID   pgtype.UUID
+	ClientMsgID         pgtype.UUID
+	ClientPayloadSha256 []byte
+	Origin              string
+	Kind                string
+	SystemCode          pgtype.Text
+	ContentMd           string
+	ContentFormat       int16
+	ReplyToMessageID    pgtype.UUID
+	RunID               pgtype.UUID
+	TriggerState        pgtype.Text
+	TriggerStateReason  pgtype.Text
+	TriggerStateAt      pgtype.Timestamptz
+	Silent              bool
+	ImportItemID        pgtype.UUID
+	Version             int64
+	EditedAt            pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	DeletedBy           pgtype.UUID
+	CreatedAt           pgtype.Timestamptz
+}
+
 type Owner struct {
 	ID        pgtype.UUID
 	UserID    pgtype.UUID

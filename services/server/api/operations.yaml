@@ -38,8 +38,10 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createGroup
   - createHost
   - createIdentityProvider
+  - createMessage
   - createSpace
   - createStepUpChallenge
+  - createThread
   - createToken
   - createUser
   - deleteForumTag
@@ -222,9 +224,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createInteraction
     etappe: M2
     ticket: M2-15
-  - operation_id: createMessage
-    etappe: M1
-    ticket: M1-56
   - operation_id: createPersonalTemplate
     etappe: M1
     ticket: M1-60
@@ -240,9 +239,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createStatusIncident
     etappe: M7
     ticket: M7-09
-  - operation_id: createThread
-    etappe: M1
-    ticket: M1-55
   - operation_id: createUpload
     etappe: M3
     ticket: M3-03

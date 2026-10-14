@@ -11,6 +11,21 @@ documented in this file. The format is based on
 
 ### Added
 
+- Sending messages (M1-56): `createMessage` and `createThread`. Migrations `00032` and `00033`
+  create `messages` and `mentions` and give `threads.parent_message_id` its deferred foreign key.
+  A message is idempotent by its author and `client_msg_id` (a repetition answers `200` with
+  `Idempotent-Replay: true`, another body `422 idempotency_key_reuse`, two concurrent identical
+  requests make one message), takes the gapless `thread_seq` under the thread lock, gets its
+  `origin` from the principal kind, may quote a message of the same thread and resolves mentions
+  by the content format of 03 and the rule of 07 section 4.6 (at most `message.max_mentions`
+  distinct handles, no collective mentions). A message into a closed thread reopens it and leaves
+  a system line `thread.reopened`. Every new message publishes the in-transaction event
+  `MessagePosted` and appends `message.created`, whose content is cut with `truncated` above
+  `sync.event_payload_max_bytes`. `createThread` creates a forum post or a thread from a message
+  of the main thread, with its first message in the same transaction. Attachments, voice, cards,
+  components and `run_id` are refused with `not_enabled` until their tickets. New key
+  `message.max_mentions`; `identity.Directory` adds the batched handle lookup `ActiveByHandles`.
+
 - Apps (M2-24): the migrations `00030_apps.sql` and `00031_app_installations.sql` (with the trigger
   `apps_principal_kind_check`), the port `apps.Apps` and the operations `listApps`, `installApp`,
   `validateManifest`, `getApp`, `upgradeAppManifest`, `setAppScopes`, `suspendApp`, `resumeApp` and

@@ -151,6 +151,11 @@ func TestThreadUseCases(t *testing.T) {
 	}
 	_, err = e.svc.Get(ctx, e.owner, ids.New())
 	wantCode(t, err, errs.CodeNotFound)
+	if got, err := e.svc.View(ctx, post.ID); err != nil || got.ID != post.ID {
+		t.Fatalf("view %+v, %v", got, err)
+	}
+	_, err = e.svc.View(ctx, ids.New())
+	wantCode(t, err, errs.CodeNotFound)
 
 	// Title.
 	cur, _ := e.svc.Get(ctx, e.owner, post.ID)

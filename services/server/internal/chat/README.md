@@ -1,6 +1,6 @@
 # Modul `chat`
 
-Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54) and threads (M1-55) built; `createThread` (M1-56) follows with the tickets of the etappe.
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53), operators with I1 (M1-54) and threads (M1-55) built; `createThread` is built in `messaging` (M1-56).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -179,8 +179,9 @@ actions, explanation, preview and view-as with real sources).
 
 ## Threads (M1-55)
 
-- Port `chat.Threads` (`threads.go`): `Create`, `AppendToThread` and `Info` for `messaging` (M1-56
-  sends messages and enables `createThread` through them), and `List`, `Get`, `SetTitle`, `Close`,
+- Port `chat.Threads` (`threads.go`): `Create`, `AppendToThread`, `Info` and `View` for
+  `messaging` (M1-56 sends messages and enables `createThread` through them; `View` is the
+  thread of its `createThread` answer), and `List`, `Get`, `SetTitle`, `Close`,
   `Reopen` and `SetTags` for the six handlers; the DTOs `Thread`, `ThreadInfo`, `ParentMessage`,
   `CreateThreadCmd`, `AppendCmd`, `Appended`, `ListThreadsQuery`, `ThreadPage`, `SetTitleCmd` and
   `SetTagsCmd`. `Register` adds `thread.updated`, `thread.closed` and `thread.reopened`.
@@ -214,7 +215,7 @@ actions, explanation, preview and view-as with real sources).
 - Thread sequence (03 section 6.2): `AppendToThread` locks the row and runs one `UPDATE threads
   SET last_message_seq = last_message_seq + 1, ... RETURNING`; a rolled back unit returns the
   number, so the committed numbers are gapless. `Create` and `AppendToThread` fail with `internal`
-  outside a unit of work. `Info` does not authorize.
+  outside a unit of work. `Info` and `View` do not authorize.
 - Operator (R-DM-12, R-DM-21): `Create` stores the effective operator of the channel at that
   moment, `NULL` for none; a later operator change of the channel leaves it. The representation
   adds `operator_agent_id` and the current `billing_mode` from `authz.AgentPolicySource` (bound in

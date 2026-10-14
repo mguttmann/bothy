@@ -230,7 +230,7 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `thread.max_tags` | `BOTHY_THREAD__MAX_TAGS` | Server | int | `5` | Forum-Tags je Thread | aktiv |
 | `message.max_content_bytes` | `BOTHY_MESSAGE__MAX_CONTENT_BYTES` | Server | int | `262144` | Größe einer Nachricht (lange Antworten ohne Teilen) | aktiv |
 | `message.max_attachments` | `BOTHY_MESSAGE__MAX_ATTACHMENTS` | Server | int | `10` | Anhänge je Nachricht | aktiv |
-| `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server |  | `50` | verschiedene Erwähnungs-Handles je Nachricht (Inhaltsformat, `messages`) | geplant (M1) |
+| `message.max_mentions` | `BOTHY_MESSAGE__MAX_MENTIONS` | Server | int | `50` | verschiedene Erwähnungs-Handles je Nachricht (Inhaltsformat, `messages`) | aktiv |
 | `reaction.emoji_max_bytes` | `BOTHY_REACTION__EMOJI_MAX_BYTES` | Server |  | `64` | größte Länge eines Reaktions-Emoji in Bytes (ein Graphem-Cluster hat sonst keine Grenze) | geplant (M1) |
 | `reaction.max_distinct_per_message` | `BOTHY_REACTION__MAX_DISTINCT_PER_MESSAGE` | Server |  | `20` | verschiedene Emoji je Nachricht; begrenzt `Message.reactions` und die Nutzlast der Ereignisse | geplant (M1) |
 | `pin.max_per_thread` | `BOTHY_PIN__MAX_PER_THREAD` | Server |  | `50` | Anheftungen je Thread; `listPins` ist nicht seitenweise | geplant (M1) |
