@@ -128,9 +128,10 @@ gate as well (`api/qualitygates/select`); the project key comes from `--project`
 `SONAR_PROJECT_KEY` (the workflow takes the repository variable of that name), and cloud mode
 stops without it. It still tries to make the gate the organization default.
 
-A call the plan refuses (HTTP 400 or 403 with "is not allowed to perform this action") is a
-named gap, not a failure: `apply` prints it with the server's reason and continues with the
-next language; it selects the gate after the profiles. Any other refusal, such as HTTP 403
+A call the plan refuses (HTTP 400 or 403 with "Organization ... is not allowed to ...", such as
+"... to perform this action" or "... to modify Quality gates") is a named gap, not a failure:
+`apply` prints it with the server's reason and continues with the next language; it selects
+the gate after the profiles. Any other refusal, such as HTTP 403
 "Insufficient privileges" for a token without the permission, still stops `apply`. Examples:
 `quality_sync: gap: profile go: not assigned to project: plan does not allow it (...)`,
 `quality_sync: gap: gate not assigned to project: plan does not allow it (...)` and

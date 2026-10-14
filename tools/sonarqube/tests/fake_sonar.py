@@ -9,11 +9,11 @@ retrieved 2026-10-13): create_condition needs `gateId` and set_as_default needs 
 for a custom default gate on a plan that does not include it. `profile_default_forbidden` and
 `profile_project_forbidden` answer set_default and add_project with HTTP 400 "Organization ...
 is not allowed to perform this action", as SonarQube Cloud answered set_default on a
-sonar-config run of 2026-10-14; `gate_select_forbidden` answers select with HTTP 403 and the
-same message. `project_permission_denied` answers add_project with HTTP 403 "Insufficient
-privileges", as for a token without the needed permission. A project
-uses the profile or gate assigned to it, otherwise the default one; the built-in gate is
-"Sonar way".
+sonar-config run of 2026-10-14; `gate_select_forbidden` answers select with HTTP 403
+"Organization ... is not allowed to modify Quality gates", as it did on a later run that day.
+`project_permission_denied` answers add_project with HTTP 403 "Insufficient privileges", as
+for a token without the needed permission. A project uses the profile or gate assigned to it,
+otherwise the default one; the built-in gate is "Sonar way".
 """
 
 from __future__ import annotations
@@ -229,7 +229,8 @@ def _gate_default(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
 
 def _gate_select(state: State, p: dict[str, str]) -> tuple[int, Any, str]:
     if state.gate_select_forbidden:
-        return 403, _NOT_ALLOWED[1], "application/json"
+        msg = "Organization 'example-org' is not allowed to modify Quality gates"
+        return 403, {"errors": [{"msg": msg}]}, "application/json"
     gate = _gate_name(state, p, "gateName", "gateId")
     if gate not in state.gates or not p.get("projectKey"):
         return _BAD_REQUEST
