@@ -20,6 +20,7 @@ import (
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	"github.com/OWNER/bothy/services/server/internal/identity/domain/trustedheader"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
 	instanceapp "github.com/OWNER/bothy/services/server/internal/instance/app"
@@ -479,6 +480,14 @@ func (s *server) startPublic(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	s.mu.Lock()
+	id := s.identity
+	s.mu.Unlock()
+	if id != nil {
+		// The bound socket is the fact, not the configured text (M1-43, 08 section 2.4 rule 1).
+		id.SetPublicListenerLoopback(trustedheader.IsLoopbackListener(ln.Addr()))
+		RegisterTrustedHeaderReadiness(s.reg, id)
+	}
 	srv, host, port := s.serve(ln, chain.Public(mux), "public listener")
 	s.logger().InfoContext(ctx, msgPublicListener, slog.String(attr.ServerAddress, host), slog.Int(attr.ServerPort, port))
 	s.mu.Lock()
@@ -717,6 +726,7 @@ func (id *Identity) fillHandlers(h *Handlers) {
 	fill(&h.Approval, id.ApprovalHandlers)
 	fill(&h.Passkeys, id.PasskeyHandlers)
 	fill(&h.OIDC, id.OIDCHandlers)
+	fill(&h.TrustedHeader, id.TrustedHeaderHandlers)
 }
 
 // fill sets *dst to built when *dst is nil, so an injected handler stays.

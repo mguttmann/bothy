@@ -15207,6 +15207,12 @@ type RefreshTokenParams struct {
 	DPoP DpopProof `json:"DPoP"`
 }
 
+// LoginWithTrustedHeaderParams defines parameters for LoginWithTrustedHeader.
+type LoginWithTrustedHeaderParams struct {
+	// DPoP DPoP proof (RFC 9449) signed with the device key that the new tokens will be bound to.
+	DPoP DpopProof `json:"DPoP"`
+}
+
 // ApproveDeviceParams defines parameters for ApproveDevice.
 type ApproveDeviceParams struct {
 	// IdempotencyKey UUIDv7 chosen by the client per logical operation. A repeat with the same request returns the stored response; a different request gives 422 `idempotency_key_reuse`; a repeat while the first is running gives 409 `request_in_progress`. Kept for `sync.idempotency_key_ttl`.
@@ -15383,6 +15389,9 @@ type CompleteStepUpWithPasskeyJSONRequestBody = StepUpPasskeyRequest
 
 // RefreshTokenJSONRequestBody defines body for RefreshToken for application/json ContentType.
 type RefreshTokenJSONRequestBody = TokenRefreshRequest
+
+// LoginWithTrustedHeaderJSONRequestBody defines body for LoginWithTrustedHeader for application/json ContentType.
+type LoginWithTrustedHeaderJSONRequestBody = TrustedHeaderLoginRequest
 
 // ApproveDeviceJSONRequestBody defines body for ApproveDevice for application/json ContentType.
 type ApproveDeviceJSONRequestBody = DeviceApprove

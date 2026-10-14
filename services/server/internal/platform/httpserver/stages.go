@@ -78,7 +78,8 @@ func (c *Chain) CORSEnabled() bool { return len(c.origins) > 0 }
 
 // authenticateStage is StageAuthenticate: the Authenticator gets the method, the htu built from
 // server.public_url and the escaped path (never from the Host header), Authorization, DPoP and the
-// client IP. Without Authorization it returns the anonymous actor; its error becomes the problem
+// client IP; the TCP peer, the header and the route's action go into the context as
+// reqmeta.Transport (M1-43). Without Authorization it returns the anonymous actor; its error becomes the problem
 // (after the failed-credentials hook, when one is set). A request with credentials passes the precheck
 // of M1-19 first, whose settle function gets the result of the Authenticator. The actor, the DPoP
 // facts of the request (reqmeta.Proof) and a setter of response headers go into the context.
@@ -96,6 +97,11 @@ func (c *Chain) authenticateStage(next http.Handler) http.Handler {
 		// The DPoP facts go to the handlers of the login and refresh endpoints, and the
 		// Authenticator and the use cases set DPoP-Nonce without the response writer (M1-34).
 		ctx := reqmeta.WithProof(r.Context(), reqmeta.Proof{Method: creds.Method, HTU: creds.HTU, Values: creds.DPoPProofs})
+		// The TCP peer, the header and the action go to the trusted header driver of identity,
+		// which must never use a forwarded address (M1-43, 08 section 2.4 rule 2).
+		op, _ := OperationFrom(ctx)
+		peer, _ := parseHop(r.RemoteAddr)
+		ctx = reqmeta.WithTransport(ctx, reqmeta.Transport{Peer: peer, Header: r.Header, Action: op.Action})
 		ctx = reqmeta.WithResponseHeaders(ctx, w.Header().Set)
 		r = r.WithContext(ctx)
 		c.mu.Lock()

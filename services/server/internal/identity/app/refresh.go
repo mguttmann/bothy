@@ -91,8 +91,9 @@ type refreshState struct {
 }
 
 // rotate is the body of Refresh inside its unit of work. A refusal whose revocation must commit
-// (a reuse, an OIDC session due for a new provider login) returns its answer as committed with a
-// nil error, so the unit commits and Refresh answers with it.
+// (a reuse, an OIDC session due for a new provider login, a trusted header session whose binding
+// failed) returns its answer as committed with a nil error, so the unit commits and Refresh
+// answers with it.
 func (s *Sessions) rotate(ctx context.Context, hash []byte, proof identity.VerifiedProof) (set identity.TokenSet, committed, err error) {
 	st, err := s.lockRefresh(ctx, hash)
 	if err != nil {
@@ -111,6 +112,17 @@ func (s *Sessions) rotate(ctx context.Context, hash []byte, proof identity.Verif
 	}
 	if due {
 		return identity.TokenSet{}, errs.New(errs.CodeUnauthenticated, ""), s.expireForRecheck(ctx, st)
+	}
+	if s.d.Binding != nil {
+		ok, err := s.d.Binding.Bound(ctx, st.sess)
+		if err != nil {
+			return identity.TokenSet{}, nil, err
+		}
+		if !ok {
+			// Like a reuse, the revocation commits and the refresh answers session_revoked
+			// (08 section 2.4 rule 5).
+			return identity.TokenSet{}, errs.New(errs.CodeSessionRevoked, ""), s.unbound(ctx, st)
+		}
 	}
 	outcome := session.Decide(session.Family{CurrentGeneration: st.fam.CurrentGeneration, RotatedAt: st.fam.RotatedAt},
 		session.Token{Generation: st.tok.Generation, UsedAt: st.tok.UsedAt, ExpiresAt: st.tok.ExpiresAt}, now, s.cfg.RefreshReuseGrace)
@@ -213,6 +225,19 @@ func (s *Sessions) reuse(ctx context.Context, st refreshState, now time.Time) er
 		Action: string(authorize.ActionAuthTokenRefresh), Decision: auditing.DecisionDeny, Reason: auditing.ReasonSessionRevoked,
 		ResourceKind: resourceAuthSession, ResourceID: st.sess.ID,
 		Attrs: auditing.Attrs{attrCause: auditing.Code(causeRefreshReuse), attrFamilyID: auditing.ID(st.fam.ID)},
+	})
+}
+
+// unbound revokes the session tree of st whose header binding failed (trusted_header_mismatch,
+// families session_revoked) and records the denial inside the unit of work, which commits.
+func (s *Sessions) unbound(ctx context.Context, st refreshState) error {
+	if err := s.revoke(ctx, st.tree, identity.RevokeTrustedHeaderMismatch, nil); err != nil {
+		return err
+	}
+	return s.d.Audit.Record(ctx, auditing.Entry{
+		Action: string(authorize.ActionAuthTokenRefresh), Decision: auditing.DecisionDeny, Reason: auditing.ReasonSessionRevoked,
+		ResourceKind: resourceAuthSession, ResourceID: st.sess.ID,
+		Attrs: auditing.Attrs{attrCause: auditing.Code(string(identity.RevokeTrustedHeaderMismatch))},
 	})
 }
 

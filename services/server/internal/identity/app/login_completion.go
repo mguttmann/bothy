@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
@@ -51,8 +52,12 @@ type LoginCompletion struct {
 	Trust DeviceTrust
 	// ClientIP is the client address of the request, stored as auth_sessions.last_ip.
 	ClientIP netip.Addr
-	// AllowPending lets a person in status pending log in (an OIDC person provisioned as pending
-	// gets tokens but only the self information, 08 R-ID-14); disabled and deleted never log in.
+	// ProviderID is the identity provider of a driver login, recorded as provider_id in the allow
+	// entry; zero for none (M1-43).
+	ProviderID ids.ID
+	// AllowPending lets a person in status pending log in (a person provisioned as pending by OIDC
+	// or a provider driver gets tokens but only the self information, 08 section 3.1 item 3 and
+	// R-ID-14); disabled and deleted never log in.
 	AllowPending bool
 	// Provisioned marks a login that created the person (08 section 3.1 step 3); the allow entry
 	// says so.
@@ -111,7 +116,12 @@ type ServiceDeps struct {
 	Pairings PairingStore
 	// Pepper is the raw token pepper: the HMAC key of verification and pairing codes.
 	Pepper []byte
-	// Random is the source of pairing codes; nil means domain.EnrollmentRandom (crypto/rand).
+	// TrustedHeader is the driver trusted_header (M1-43); nil keeps the header login off (404).
+	TrustedHeader *TrustedHeaderDriver
+	// Events appends user.updated for a person the header login provisions; nil appends nothing.
+	Events eventlog.Appender
+	// Random is the source of pairing codes (M1-38) and of the handle suffixes of people the header
+	// login provisions (M1-43); nil means domain.EnrollmentRandom (crypto/rand).
 	Random io.Reader
 }
 
@@ -166,7 +176,7 @@ const (
 const fieldDeviceID = "/device_id"
 
 // CompleteLogin completes a login of any path in one unit of work (joining the ambient one): the
-// person must be active, the registration valid and its dpop key the key of the DPoP proof; an
+// person must be active (or pending with AllowPending), the registration valid and its dpop key the key of the DPoP proof; an
 // unknown device is created (active for TrustConfirmed, pending otherwise), a known device of the
 // same person with the same active key is reused unchanged, any other known device id is
 // 409 conflict. Then the session, its refresh family bound to ProofJKT and the token pair are
@@ -236,7 +246,9 @@ func mayLogIn(st domain.Status, allowPending bool) bool {
 	return st == domain.StatusActive || allowPending && st == domain.StatusPending
 }
 
-// loginAttrs are the details of the allow entry of a login: codes and IDs only (SEC-AUD-5).
+// loginAttrs are the details of the allow entry of a login: method, device, session, whether the
+// device is new and its state, whether the login provisioned the person and the provider of a
+// driver login (M1-43); codes and IDs only (SEC-AUD-5).
 func loginAttrs(in LoginCompletion, set identity.TokenSet, isNew bool) auditing.Attrs {
 	attrs := auditing.Attrs{
 		attrAuthMethod: auditing.Code(string(in.AuthMethod)), attrDeviceID: auditing.ID(set.Device.ID),
@@ -245,6 +257,9 @@ func loginAttrs(in LoginCompletion, set identity.TokenSet, isNew bool) auditing.
 	}
 	if in.Provisioned {
 		attrs[attrProvisioned] = auditing.Bool(true)
+	}
+	if !in.ProviderID.IsZero() {
+		attrs[attrProviderID] = auditing.ID(in.ProviderID)
 	}
 	return attrs
 }

@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/provider"
@@ -36,6 +37,9 @@ type ProvidersDeps struct {
 	Auth identity.Auth
 	// Clock is the time of created_at, updated_at and the session check; nil means clock.System().
 	Clock clock.Clock
+	// TrustedHeader knows whether the public listener is loopback; enabling a trusted_header
+	// provider without it is refused (M1-43, W4). nil refuses every enabling of that kind.
+	TrustedHeader *TrustedHeaderDriver
 }
 
 // Providers implements identity.Providers. It is safe for concurrent use.
@@ -169,22 +173,53 @@ func (s *Providers) Create(ctx context.Context, a actor.Actor, in identity.Creat
 		if err != nil {
 			return err
 		}
-		now := s.d.Clock.Now()
-		p := identity.Provider{
-			ID: ids.New(), Kind: in.Kind, Name: name, Config: cfg, Enabled: true, CreatedAt: now, UpdatedAt: now,
-		}
-		if in.Enabled != nil {
-			p.Enabled = *in.Enabled
-		}
-		if in.AllowProvisioning != nil {
-			p.AllowProvisioning = *in.AllowProvisioning
+		p := newProvider(in, name, cfg, s.d.Clock.Now())
+		if p.Kind == identity.ProviderTrustedHeader && p.Enabled && !s.d.TrustedHeader.Loopback() {
+			return &loopbackRefusalError{}
 		}
 		if out, err = s.d.Store.InsertProvider(ctx, p); err != nil {
 			return err
 		}
 		return s.record(ctx, out, nil)
 	})
-	return out, err
+	return out, s.refused(ctx, err)
+}
+
+// newProvider is the row of a created provider: enabled unless in says otherwise, provisioning
+// only when in asks for it (03 defaults).
+func newProvider(in identity.CreateProvider, name string, cfg json.RawMessage, now time.Time) identity.Provider {
+	p := identity.Provider{ID: ids.New(), Kind: in.Kind, Name: name, Config: cfg, Enabled: true, CreatedAt: now, UpdatedAt: now}
+	if in.Enabled != nil {
+		p.Enabled = *in.Enabled
+	}
+	if in.AllowProvisioning != nil {
+		p.AllowProvisioning = *in.AllowProvisioning
+	}
+	return p
+}
+
+// loopbackRefusalError is the refusal of enabling a trusted_header provider without a loopback public
+// listener (08 section 2.4 rule 1, W4); id is the provider of an update, zero for a create.
+type loopbackRefusalError struct{ id ids.ID }
+
+// Error implements error.
+func (*loopbackRefusalError) Error() string {
+	return "identity: " + ReasonTrustedHeaderRequiresLoopback
+}
+
+// refused turns a loopbackRefusalError into 409 conflict with reason trusted_header_requires_loopback
+// and a deny entry of identity_provider.manage written after the rollback; other errors pass.
+func (s *Providers) refused(ctx context.Context, err error) error {
+	var r *loopbackRefusalError
+	if !errors.As(err, &r) {
+		return err
+	}
+	_ = s.d.Audit.RecordDenial(ctx, auditing.Entry{
+		Action: string(authorize.ActionIdentityProviderManage), Decision: auditing.DecisionDeny,
+		Reason: auditing.ReasonTrustedHeaderRequiresLoopback, ResourceKind: resourceIdentityProvider, ResourceID: r.id,
+		Attrs: auditing.Attrs{attrProviderKind: auditing.Code(string(identity.ProviderTrustedHeader))},
+	})
+	return requiresLoopback()
 }
 
 // Update implements identity.Providers: identity_provider.manage, the row locked, absent members
@@ -203,7 +238,7 @@ func (s *Providers) Update(ctx context.Context, a actor.Actor, id ids.ID, in ide
 		out, err = s.update(ctx, a, id, in)
 		return err
 	})
-	return out, err
+	return out, s.refused(ctx, err)
 }
 
 // update is Update inside its unit of work.
@@ -214,6 +249,9 @@ func (s *Providers) update(ctx context.Context, a actor.Actor, id ids.ID, in ide
 	cur, err := s.locked(ctx, id)
 	if err != nil {
 		return identity.Provider{}, err
+	}
+	if cur.Kind == identity.ProviderTrustedHeader && in.Enabled != nil && *in.Enabled && !s.d.TrustedHeader.Loopback() {
+		return identity.Provider{}, &loopbackRefusalError{id: id}
 	}
 	next, changed, err := s.apply(cur, in)
 	if err != nil {

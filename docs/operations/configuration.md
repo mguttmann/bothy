@@ -373,7 +373,7 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.oidc_client_assertion_ttl` | `BOTHY_AUTH__OIDC_CLIENT_ASSERTION_TTL` | Server | duration | `2m` | Gültigkeit einer Client-Assertion bei `private_key_jwt` | aktiv |
 | `auth.group_claim_max_age` | `BOTHY_AUTH__GROUP_CLAIM_MAX_AGE` | Server |  | `30d` | Ablauf von Mitgliedschaften aus Gruppen-Claims nach der letzten Anmeldung | geplant (M1) |
 | `auth.idp_recheck_interval` | `BOTHY_AUTH__IDP_RECHECK_INTERVAL` | Server | duration | `30d` | spätestens dann neue Anmeldung beim Anbieter | aktiv |
-| `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server |  | `true` | jede Anfrage muss denselben Header-Login tragen | geplant (M1) |
+| `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server | bool | `true` | jede Anfrage muss denselben Header-Login tragen | aktiv |
 | `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server | duration | `72h` | Gültigkeit eines Einladungs-Codes | aktiv |
 | `auth.enrollment_code_max_attempts` | `BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS` | Server | int | `5` | Fehlversuche je Einladungs-Code | aktiv |
 | `auth.device_pending_ttl` | `BOTHY_AUTH__DEVICE_PENDING_TTL` | Server | duration | `24h` | danach wird ein wartendes Gerät widerrufen | aktiv |

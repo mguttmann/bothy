@@ -1,6 +1,6 @@
 # Modul `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41).
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -651,9 +651,34 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
   `adapters/httpapi/passkeys_test.go` (every test of the brief), `internal/authz/app`
   (`TestConditionalStepUp`). Rulings: docs/DECISIONS.md M1-40.
 
+### Trusted proxy header login (M1-43)
+
+- `domain/trustedheader`: the pure rules of the driver `trusted_header` (08 section 2.4):
+  `IsLoopbackListener` (the bound address, `127.0.0.0/8` and `::1` only), `Evaluate` (the TCP peer
+  must lie in `server.trusted_proxies`, exactly one field line), `DecodeValue` (RFC 2047 with
+  `utf-8` and `us-ascii` only; no control, format or bidi character, not empty), `ParseConfig`
+  (`identity_provider.trusted_header.v1` over `domain/provider`) and `HandleFromLogin` /
+  `HandleWithSuffix` for provisioned people (docs/DECISIONS.md M1-43/8).
+- `app.TrustedHeaderDriver`: the loopback flag of the bound public listener (set by
+  `internal/wire` after the listen, false until then), the readiness check
+  `trusted_header_requires_loopback` (`Ready`) and the per-request binding (`Bound`, the
+  `SessionBinding` of the Authenticator and of `refreshToken`) with
+  `auth.trusted_header_bind_requests`.
+- `Service.LoginWithTrustedHeader` (port `TrustedHeaderLogins`, handler
+  `adapters/httpapi.TrustedHeader`): `404` while the driver is off, `401` with an audit denial
+  without the login, then in one unit of work the known identity, the link through an
+  `enrollment_code` (`identity.link`, device `active`) or a provisioned `pending` person, and the
+  shared `CompleteLogin` with `auth_method = 'trusted_header'`.
+- `Providers` refuses to enable a `trusted_header` provider without a loopback listener (`409
+  conflict`, reason `trusted_header_requires_loopback`, audit deny with that reason).
+- The handler and the binding read the TCP peer and the header from `kernel/reqmeta.Transport`,
+  never a forwarded address; header values never reach logs, audit details or problem bodies
+  (`TestTrustedHeaderProvisioning/TestTrustedHeaderNeverLogged`). Tests:
+  `adapters/httpapi/trustedheader_test.go`.
+
 ## Port (Wurzelpaket `internal/identity`)
 
-- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `Owners`; deklariert `AvatarFiles`.
+- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `Owners`; deklariert `AvatarFiles`.
 - Gibt In-Tx-Ereignisse aus: `DeviceRevoked`, `SessionEnded`.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (mit `HasActivePasskey`, M1-40), `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.

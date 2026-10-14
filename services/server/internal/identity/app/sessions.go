@@ -44,6 +44,9 @@ type SessionsDeps struct {
 	Cursors Cursors
 	// Clock is the time of every session, token and revocation; nil means clock.System().
 	Clock clock.Clock
+	// Binding checks a refresh beyond token and proof (M1-43: the header login of trusted_header
+	// sessions); nil checks nothing.
+	Binding SessionBinding
 }
 
 // Sessions implements identity.Auth. It is safe for concurrent use.

@@ -11,10 +11,13 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/apitoken"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
+	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
+	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/reqmeta"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
 
 // The schemes of the Authorization header (06 section 3).
@@ -54,6 +57,10 @@ type Authenticator struct {
 	pepper []byte
 	clk    clock.Clock
 	log    *slog.Logger
+	bind   SessionBinding
+	revoke identity.Auth
+	uow    txn.UnitOfWork
+	audit  auditing.Recorder
 }
 
 // Compile-time check: the Authenticator is the kernel port.
@@ -75,6 +82,15 @@ type AuthenticatorDeps struct {
 	Clock clock.Clock
 	// Log receives failed activity writes; nil means slog.Default().
 	Log *slog.Logger
+	// Binding checks every request of a session beyond token and proof (M1-43: the header login
+	// of trusted_header sessions); nil checks nothing. With it, Revoker, UoW and Audit are required.
+	Binding SessionBinding
+	// Revoker revokes a session whose binding failed.
+	Revoker identity.Auth
+	// UoW runs the revocation with its audit entry.
+	UoW txn.UnitOfWork
+	// Audit records the denial of a failed binding.
+	Audit auditing.Recorder
 }
 
 // NewAuthenticator returns the Authenticator with identity.last_active_granularity of cfg (not
@@ -83,6 +99,9 @@ type AuthenticatorDeps struct {
 func NewAuthenticator(cfg Config, d AuthenticatorDeps) (*Authenticator, error) {
 	if d.AccessTokens == nil || d.DPoP == nil || d.Sessions == nil || d.APITokens == nil || len(d.Pepper) == 0 {
 		return nil, errors.New("identity: NewAuthenticator needs the access tokens, the DPoP verifier, the session and API token stores and the pepper")
+	}
+	if d.Binding != nil && (d.Revoker == nil || d.UoW == nil || d.Audit == nil) {
+		return nil, errors.New("identity: a session binding needs the revoker, the unit of work and the recorder")
 	}
 	if cfg.LastActiveGranularity < 0 || cfg.DevicePendingTTL <= 0 {
 		return nil, errors.New("identity: identity.last_active_granularity must not be negative and auth.device_pending_ttl must be positive")
@@ -95,7 +114,7 @@ func NewAuthenticator(cfg Config, d AuthenticatorDeps) (*Authenticator, error) {
 	}
 	return &Authenticator{
 		cfg: cfg, tokens: d.AccessTokens, dpop: d.DPoP, store: d.Sessions, api: d.APITokens, pepper: append([]byte(nil), d.Pepper...),
-		clk: d.Clock, log: d.Log,
+		clk: d.Clock, log: d.Log, bind: d.Binding, revoke: d.Revoker, uow: d.UoW, audit: d.Audit,
 	}, nil
 }
 
@@ -187,8 +206,44 @@ func (a *Authenticator) person(ctx context.Context, creds actor.Credentials, tok
 		return out, nil
 	}
 	a.describe(&out, st)
+	if out.SessionActive && a.bind != nil {
+		ok, err := a.bind.Bound(ctx, st.Session)
+		if err != nil {
+			return actor.Actor{}, err
+		}
+		if !ok {
+			return actor.Actor{}, a.unbind(ctx, out)
+		}
+	}
 	a.touch(ctx, st, creds)
 	return out, nil
+}
+
+// unbind revokes the session of p whose binding failed (reason trusted_header_mismatch, family
+// revoked, session.revoked appended) and records the denial of the route's action with reason
+// session_revoked in the same unit of work; it returns 401 session_revoked (08 section 2.4 rule
+// 5, ID-T10). The entry carries ids and the cause, never a header value.
+func (a *Authenticator) unbind(ctx context.Context, p actor.Actor) error {
+	t, _ := reqmeta.TransportOf(ctx)
+	act := t.Action
+	if act == "" {
+		// The gateway reaches the Authenticator without a route (M1-64 names its action).
+		act = string(authorize.ActionAuthLoginComplete)
+	}
+	err := a.uow.Do(ctx, func(ctx context.Context) error {
+		if err := a.revoke.RevokeSession(ctx, p.SessionID, identity.RevokeTrustedHeaderMismatch, nil); err != nil {
+			return err
+		}
+		return a.audit.Record(actor.WithActor(ctx, p), auditing.Entry{
+			Action: act, Decision: auditing.DecisionDeny, Reason: auditing.ReasonSessionRevoked,
+			ResourceKind: resourceAuthSession, ResourceID: p.SessionID,
+			Attrs: auditing.Attrs{attrCause: auditing.Code(string(identity.RevokeTrustedHeaderMismatch))},
+		})
+	})
+	if err != nil {
+		return err
+	}
+	return errs.New(errs.CodeSessionRevoked, "")
 }
 
 // describe fills the actor from the session, device and key read for this request. The session is

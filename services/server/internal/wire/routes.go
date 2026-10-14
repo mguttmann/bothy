@@ -80,6 +80,8 @@ type Handlers struct {
 	// OIDC implements beginOidcLogin, handleOidcCallback, completeOidcLogin, beginIdentityLink and
 	// completeIdentityLink (identity, M1-41).
 	*identityhttp.OIDC
+	// TrustedHeader implements loginWithTrustedHeader (identity, M1-43).
+	*identityhttp.TrustedHeader
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

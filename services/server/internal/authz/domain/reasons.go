@@ -61,6 +61,7 @@ const (
 	ReasonHostNotActive                    Reason = "host_not_active"
 	ReasonHostAuthFailed                   Reason = "host_auth_failed"
 	ReasonUnknownAction                    Reason = "unknown_action"
+	ReasonTrustedHeaderRequiresLoopback    Reason = "trusted_header_requires_loopback"
 )
 
 // reasons is the list of 07 section 4.1 in table order.
@@ -116,6 +117,7 @@ var reasons = []Reason{
 	ReasonHostNotActive,
 	ReasonHostAuthFailed,
 	ReasonUnknownAction,
+	ReasonTrustedHeaderRequiresLoopback,
 }
 
 // Reasons returns the closed list of reason codes of 07 section 4.1 in table order, as a copy.

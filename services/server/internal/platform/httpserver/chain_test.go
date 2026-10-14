@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"os"
 	"regexp"
 	"strings"
@@ -371,7 +372,9 @@ func TestAuth_HtuFromPublicURL(t *testing.T) {
 	})
 	req := h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID+"?limit=5", "", "X-Mode", "fast", "DPoP", "proof")
 	req.Host = "evil.example.net"
-	h.Do(req)
+	if resp := h.Do(req); resp.StatusCode != http.StatusOK {
+		t.Fatalf("status %d: %s", resp.StatusCode, resp.Body)
+	}
 	want := httpservertest.PublicURL + "/api/v1/things/" + thingID
 	if creds.HTU != want || creds.Method != http.MethodGet || creds.DPoP != "proof" || !creds.ClientIP.IsValid() {
 		t.Fatalf("credentials %+v, want htu %s", creds, want)
@@ -533,3 +536,41 @@ func TestAuth_ProofsAndResponseHeaders(t *testing.T) {
 		t.Fatalf("DPoP-Nonce %q", resp.Header.Get("DPoP-Nonce"))
 	}
 }
+
+// TestAuth_TransportForIdentityHeaders (M1-43): the Authenticator and the handler find the TCP
+// peer (never a forwarded address), the request header and the route's action in the context.
+func TestAuth_TransportForIdentityHeaders(t *testing.T) {
+	t.Parallel()
+	op := getThing()
+	var inAuth, inHandler reqmeta.Transport
+	h := httpservertest.New(t, httpservertest.Options{
+		Authenticator: transportAuthenticator{seen: &inAuth},
+		Routes: []httpservertest.Route{{Op: op, Handler: func(w http.ResponseWriter, r *http.Request) {
+			inHandler, _ = reqmeta.TransportOf(r.Context())
+			okHandler(op.Action)(w, r)
+		}}},
+	})
+	req := h.NewRequest(http.MethodGet, "/api/v1/things/"+thingID, "", "X-Mode", "fast", "X-Forwarded-For", "192.0.2.9",
+		"Tailscale-User-Login", "alex@example.com")
+	if resp := h.Do(req); resp.StatusCode != http.StatusOK {
+		t.Fatalf("status %d: %s", resp.StatusCode, resp.Body)
+	}
+	for name, tr := range map[string]reqmeta.Transport{"authenticator": inAuth, "handler": inHandler} {
+		if tr.Peer != netip.MustParseAddr("127.0.0.1") || tr.Action != op.Action {
+			t.Errorf("%s: transport %+v, want peer 127.0.0.1 and action %s", name, tr, op.Action)
+		}
+		if v := tr.Values("Tailscale-User-Login"); len(v) != 1 || v[0] != "alex@example.com" {
+			t.Errorf("%s: header values %q", name, v)
+		}
+	}
+}
+
+// transportAuthenticator records the transport of the request and accepts every request.
+type transportAuthenticator struct{ seen *reqmeta.Transport }
+
+func (a transportAuthenticator) Authenticate(ctx context.Context, _ actor.Credentials) (actor.Actor, error) {
+	*a.seen, _ = reqmeta.TransportOf(ctx)
+	return actor.Anonymous(), nil
+}
+
+func (transportAuthenticator) Revalidate(context.Context, actor.Actor) error { return nil }
