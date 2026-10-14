@@ -89,6 +89,16 @@ func (e env) space(t *testing.T, by ids.ID) ids.ID {
 	return id
 }
 
+// channel inserts a spaces row and a text channel in it created by by, the target of the foreign
+// key of grants.target_channel_id (M1-53), and returns the channel id.
+func (e env) channel(t *testing.T, by ids.ID) ids.ID {
+	t.Helper()
+	id := ids.New()
+	e.mustExec(t, `INSERT INTO channels (id, space_id, kind, name, sort_key, history_backfill_limit, created_by)
+		VALUES ($1, $2, 'text', $3, 'a0', 20, $4)`, id.String(), e.space(t, by).String(), id.String(), by.String())
+	return id
+}
+
 func (e env) group(t *testing.T, name string, by ids.ID) domain.Group {
 	t.Helper()
 	g, err := domain.NewGroup(ids.New(), name, "", limits, by, t0)
@@ -172,7 +182,7 @@ func TestGrantChecks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	space, channel, host := e.space(t, alex).String(), ids.New().String(), hostID.String()
+	space, channel, host := e.space(t, alex).String(), e.channel(t, alex).String(), hostID.String()
 	for _, tt := range []struct {
 		name       string
 		r          row
@@ -386,7 +396,7 @@ func TestErrorMapping(t *testing.T) {
 		return e.write(func(ctx context.Context) error { return e.repo.InsertGrant(ctx, g) })
 	}
 	base := domain.Grant{ID: ids.New(), Subject: domain.Subject{Kind: domain.SubjectAgent, PrincipalID: helper},
-		Target: domain.Target{Kind: domain.TargetChannel, ChannelID: ids.New()}, Level: domain.LevelTrigger,
+		Target: domain.Target{Kind: domain.TargetChannel, ChannelID: e.channel(t, alex)}, Level: domain.LevelTrigger,
 		Reason: "bypassing NewGrant", GrantedBy: alex, GrantedAt: t0}
 	// Built by hand: CheckCreate refuses it, the database is the last line.
 	wantError(t, insert(base), errs.KindBadRequest, errs.CodeValidationFailed, "/subject")
@@ -463,7 +473,7 @@ func TestStoreRoundTrip(t *testing.T) {
 	mustGrant(domain.Subject{Kind: domain.SubjectUser, PrincipalID: robin}, space, domain.LevelRead, 0, time.Time{})
 	mustGrant(domain.Subject{Kind: domain.SubjectAgent, PrincipalID: helper}, space, domain.LevelWrite, caps(t, "upload"), time.Time{})
 	gs := mustGrant(domain.Subject{Kind: domain.SubjectGroup, GroupID: support.ID}, space, domain.LevelTrigger, caps(t, "manage", "approve_actions"), time.Time{})
-	ge := mustGrant(domain.Subject{Kind: domain.SubjectGroup, GroupID: engineering.ID}, domain.Target{Kind: domain.TargetChannel, ChannelID: ids.New()}, domain.LevelRead, 0, time.Time{})
+	ge := mustGrant(domain.Subject{Kind: domain.SubjectGroup, GroupID: engineering.ID}, domain.Target{Kind: domain.TargetChannel, ChannelID: e.channel(t, alex)}, domain.LevelRead, 0, time.Time{})
 	mustGrant(domain.Subject{Kind: domain.SubjectGroup, GroupID: research.ID}, space, domain.LevelRead, 0, time.Time{})
 
 	got, found, err := e.repo.GetGrant(ctx, g1.ID)

@@ -590,6 +590,54 @@
       "doc": "Longest product name of the branding in Unicode characters."
     },
     {
+      "name": "channel.history_backfill_limit_default",
+      "env": "BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_DEFAULT",
+      "kind": "int",
+      "default": "20",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "history_backfill_limit of a new channel; at most channel.history_backfill_limit_max."
+    },
+    {
+      "name": "channel.history_backfill_limit_max",
+      "env": "BOTHY_CHANNEL__HISTORY_BACKFILL_LIMIT_MAX",
+      "kind": "int",
+      "default": "200",
+      "required": false,
+      "enum": [],
+      "min": "0",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Upper bound of history_backfill_limit."
+    },
+    {
+      "name": "channel.name_max_chars",
+      "env": "BOTHY_CHANNEL__NAME_MAX_CHARS",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Longest channel name in Unicode characters."
+    },
+    {
+      "name": "channel.topic_max_chars",
+      "env": "BOTHY_CHANNEL__TOPIC_MAX_CHARS",
+      "kind": "int",
+      "default": "1024",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Longest channel topic in Unicode characters."
+    },
+    {
       "name": "client.min_version.android",
       "env": "BOTHY_CLIENT__MIN_VERSION__ANDROID",
       "kind": "string",
@@ -1065,6 +1113,18 @@
       "max": "",
       "chapter": "12-dateien.md",
       "doc": "Driver of the object storage of files: fs for a directory of the server, s3 for an S3-compatible service."
+    },
+    {
+      "name": "forum_tag.name_max_chars",
+      "env": "BOTHY_FORUM_TAG__NAME_MAX_CHARS",
+      "kind": "int",
+      "default": "50",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Longest forum tag name in Unicode characters."
     },
     {
       "name": "group.description_max_chars",

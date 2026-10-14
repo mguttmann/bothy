@@ -58,6 +58,10 @@ type Handlers struct {
 	// Spaces implements listSpaces, createSpace, getSpace, updateSpace, moveSpace, archiveSpace
 	// and putMySidebarSpace (chat, M1-52).
 	*chathttp.Spaces
+	// Channels implements listSpaceChannels, createChannel, getChannel, updateChannel,
+	// moveChannel, archiveChannel, listForumTags, createForumTag, updateForumTag, moveForumTag and
+	// deleteForumTag (chat, M1-53).
+	*chathttp.Channels
 	// Log implements listAuditEvents, exportAuditEvents and verifyAuditChain (audit, M1-50).
 	*audithttp.Log
 	// Devices implements listMyDevices, listUserDevices and getDevice (identity, M1-33).

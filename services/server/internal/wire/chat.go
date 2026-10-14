@@ -19,8 +19,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 )
 
-// ChatConfig binds the keys of the chat use cases (space.name_max_chars). The error names the key
-// whose binding failed, never a value.
+// ChatConfig binds the keys of the chat use cases (space.name_max_chars and the channel keys of
+// M1-53). The error names the key whose binding failed, never a value.
 func ChatConfig(v *config.Values) (chatapp.Config, error) {
 	var c chatapp.Config
 	if err := config.Bind(v, &c); err != nil {
@@ -29,18 +29,18 @@ func ChatConfig(v *config.Values) (chatapp.Config, error) {
 	return c, nil
 }
 
-// chatStructure is the authz.StructureSource of the process: the space part of chat (M1-52) and
-// the empty channel and thread part until M1-53 and M1-55 (empty_sources.go).
+// chatStructure is the authz.StructureSource of the process: the space and channel part of chat
+// (M1-52, M1-53) and the empty thread part until M1-55 (empty_sources.go).
 type chatStructure struct {
 	*authzsource.Source
-	emptyChannels
+	emptyThreads
 }
 
 // Compile-time check: the joined source is the structure port of authz.
 var _ authz.StructureSource = chatStructure{}
 
-// NewStructureSource returns the authz.StructureSource of the process over pool: spaces from the
-// table of chat (M1-52), no channel, thread or dm participation yet. The Authorizer, the rights
+// NewStructureSource returns the authz.StructureSource of the process over pool: spaces and
+// channels from the tables of chat (M1-52, M1-53), no thread or dm participation yet. The Authorizer, the rights
 // hooks and the Admin use cases of authz read it.
 func NewStructureSource(pool *pg.Pool) authz.StructureSource {
 	return chatStructure{Source: authzsource.New(chatpg.NewRepository(pool))}
@@ -52,13 +52,15 @@ type ChatWrites struct {
 	Events eventlog.Appender
 }
 
-// Chat is the chat module of the process (M1-52): the space and sidebar use cases of
-// chat.Structure and the REST handlers of their seven operations.
+// Chat is the chat module of the process (M1-52, M1-53): the space, sidebar, channel and forum tag
+// use cases of chat.Structure and the REST handlers of their eighteen operations.
 type Chat struct {
 	// Service implements chat.Structure.
 	Service *chatapp.Service
-	// Handlers are the REST handlers.
+	// Handlers are the REST handlers of spaces and the sidebar.
 	Handlers *chathttp.Spaces
+	// ChannelHandlers are the REST handlers of channels and forum tags (M1-53).
+	ChannelHandlers *chathttp.Channels
 }
 
 // NewChat builds the chat module over pool with the unit of work uow, the Authorizer az (also the
@@ -76,5 +78,16 @@ func NewChat(cfg chatapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	if err != nil {
 		return nil, err
 	}
-	return &Chat{Service: svc, Handlers: chathttp.New(svc)}, nil
+	return &Chat{Service: svc, Handlers: chathttp.New(svc), ChannelHandlers: chathttp.NewChannels(svc)}, nil
+}
+
+// fillHandlers sets the nil chat handlers of h to the ones c built: spaces and the sidebar
+// (M1-52), channels and forum tags (M1-53).
+func (c *Chat) fillHandlers(h *Handlers) {
+	if h.Spaces == nil {
+		h.Spaces = c.Handlers
+	}
+	if h.Channels == nil {
+		h.Channels = c.ChannelHandlers
+	}
 }

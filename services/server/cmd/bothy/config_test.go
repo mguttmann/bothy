@@ -206,6 +206,10 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"authz.snapshot_cache_max_entries = 10000  # default\n" +
 		"authz.view_as_max_duration = 15m  # default\n" +
 		"branding.product_name_max_chars = 64  # default\n" +
+		"channel.history_backfill_limit_default = 20  # default\n" +
+		"channel.history_backfill_limit_max = 200  # default\n" +
+		"channel.name_max_chars = 100  # default\n" +
+		"channel.topic_max_chars = 1024  # default\n" +
 		"client.min_version.android =   # default\n" +
 		"client.min_version.ios =   # default\n" +
 		"client.min_version.macos =   # default\n" +
@@ -245,6 +249,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.s3.secret_key_ref = file:/run/bothy/secrets/s3_secret_key  # default\n" +
 		"file.s3.use_path_style = true  # default\n" +
 		"file.storage.driver = fs  # default\n" +
+		"forum_tag.name_max_chars = 50  # default\n" +
 		"group.description_max_chars = 500  # default\n" +
 		"group.name_max_chars = 100  # default\n" +
 		"host.name_max_chars = 100  # default\n" +

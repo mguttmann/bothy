@@ -23,14 +23,159 @@ import (
 // store is an in-memory app.Store with the rules of the tables: a name unique case-insensitively
 // among spaces that are not archived.
 type store struct {
-	mu      sync.Mutex
-	spaces  map[ids.ID]domain.Space
-	sidebar map[[2]ids.ID]domain.SidebarState
-	fail    error
+	mu       sync.Mutex
+	spaces   map[ids.ID]domain.Space
+	sidebar  map[[2]ids.ID]domain.SidebarState
+	channels map[ids.ID]domain.Channel
+	tags     map[ids.ID]domain.ForumTag
+	fail     error
 }
 
 func newStore() *store {
-	return &store{spaces: map[ids.ID]domain.Space{}, sidebar: map[[2]ids.ID]domain.SidebarState{}}
+	return &store{spaces: map[ids.ID]domain.Space{}, sidebar: map[[2]ids.ID]domain.SidebarState{},
+		channels: map[ids.ID]domain.Channel{}, tags: map[ids.ID]domain.ForumTag{}}
+}
+
+// row returns the channel c with the facts of its space.
+func (s *store) row(c domain.Channel) app.ChannelRow {
+	sp := s.spaces[c.SpaceID]
+	return app.ChannelRow{Channel: c, SpaceDefaultOperatorID: sp.DefaultOperatorAgentID, SpaceArchived: sp.Archived()}
+}
+
+func (s *store) Channel(_ context.Context, id ids.ID) (app.ChannelRow, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c, ok := s.channels[id]
+	return s.row(c), ok, s.fail
+}
+
+func (s *store) LockChannel(ctx context.Context, id ids.ID) (app.ChannelRow, bool, error) {
+	return s.Channel(ctx, id)
+}
+
+// liveChannels returns the channels of space that are not archived in their order.
+func (s *store) liveChannels(space ids.ID) []domain.Channel {
+	var out []domain.Channel
+	for _, c := range s.channels {
+		if c.SpaceID == space && !c.Archived() {
+			out = append(out, c)
+		}
+	}
+	slices.SortFunc(out, func(a, b domain.Channel) int {
+		return cmp.Or(strings.Compare(a.SortKey, b.SortKey), strings.Compare(a.ID.String(), b.ID.String()))
+	})
+	return out
+}
+
+func (s *store) ChannelOrder(_ context.Context, space ids.ID) ([]domain.Keyed, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.Keyed
+	for _, c := range s.liveChannels(space) {
+		out = append(out, domain.Keyed{ID: c.ID, SortKey: c.SortKey})
+	}
+	return out, s.fail
+}
+
+func (s *store) VisibleChannels(_ context.Context, space ids.ID, all bool, visible, fully []ids.ID) ([]app.ChannelRow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []app.ChannelRow
+	for _, c := range s.liveChannels(space) {
+		if all || slices.Contains(visible, c.ID) || slices.Contains(fully, c.SpaceID) {
+			out = append(out, s.row(c))
+		}
+	}
+	return out, s.fail
+}
+
+func (s *store) AllChannels(context.Context) ([]app.ChannelRow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []app.ChannelRow
+	for _, c := range s.channels {
+		out = append(out, s.row(c))
+	}
+	return out, s.fail
+}
+
+// channelTaken reports a name taken in the space.
+func (s *store) channelTaken(c domain.Channel) error {
+	for _, o := range s.channels {
+		if o.ID != c.ID && o.SpaceID == c.SpaceID && !o.Archived() && strings.EqualFold(o.Name, c.Name) {
+			return errs.New(errs.CodeConflict, "taken")
+		}
+	}
+	return nil
+}
+
+func (s *store) InsertChannel(_ context.Context, c domain.Channel) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.fail != nil {
+		return s.fail
+	}
+	if err := s.channelTaken(c); err != nil {
+		return err
+	}
+	s.channels[c.ID] = c
+	return nil
+}
+
+func (s *store) SaveChannel(_ context.Context, c domain.Channel) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.channelTaken(c); err != nil {
+		return err
+	}
+	c.MainThreadID = s.channels[c.ID].MainThreadID
+	s.channels[c.ID] = c
+	return s.fail
+}
+
+func (s *store) InsertMainThread(_ context.Context, th domain.Thread) (domain.Thread, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c := s.channels[th.ChannelID]
+	c.MainThreadID = th.ID
+	s.channels[th.ChannelID] = c
+	return th, s.fail
+}
+
+func (s *store) ForumTags(_ context.Context, channel ids.ID) ([]domain.ForumTag, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.ForumTag
+	for _, t := range s.tags {
+		if t.ChannelID == channel && !t.Deleted() {
+			out = append(out, t)
+		}
+	}
+	slices.SortFunc(out, func(a, b domain.ForumTag) int { return strings.Compare(a.SortKey, b.SortKey) })
+	return out, s.fail
+}
+
+func (s *store) ForumTag(_ context.Context, id ids.ID) (domain.ForumTag, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.tags[id]
+	return t, ok, s.fail
+}
+
+func (s *store) InsertForumTag(ctx context.Context, t domain.ForumTag) error {
+	return s.SaveForumTag(ctx, t)
+}
+
+func (s *store) SaveForumTag(_ context.Context, t domain.ForumTag) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, o := range s.tags {
+		if o.ID != t.ID && o.ChannelID == t.ChannelID && !o.Deleted() && strings.EqualFold(o.Name, t.Name) {
+			return errs.New(errs.CodeConflict, "taken")
+		}
+	}
+	s.tags[t.ID] = t
+	return s.fail
 }
 
 func (s *store) Space(_ context.Context, id ids.ID) (domain.Space, bool, error) {

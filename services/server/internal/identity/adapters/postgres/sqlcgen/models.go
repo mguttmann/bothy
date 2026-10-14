@@ -136,6 +136,38 @@ type AuthSession struct {
 	RevokeReason     pgtype.Text
 }
 
+type Channel struct {
+	ID                       pgtype.UUID
+	SpaceID                  pgtype.UUID
+	Kind                     string
+	Name                     string
+	Topic                    string
+	SortKey                  string
+	OperatorInherit          bool
+	OperatorAgentID          pgtype.UUID
+	RequireMention           bool
+	ThreadRequireMention     bool
+	FreeResponse             bool
+	AutoThread               bool
+	AllowMentionedAgents     bool
+	HistoryBackfillLimit     int32
+	Prompt                   string
+	ForumDefaultSort         pgtype.Text
+	DefaultNotificationLevel pgtype.Text
+	ReadOnly                 bool
+	CreatedBy                pgtype.UUID
+	CreatedAt                pgtype.Timestamptz
+	ArchivedAt               pgtype.Timestamptz
+	Version                  int64
+	SettingsVersion          int64
+}
+
+type ChannelSkillBinding struct {
+	ChannelID pgtype.UUID
+	Position  int32
+	SkillRef  string
+}
+
 type Device struct {
 	ID           pgtype.UUID
 	UserID       pgtype.UUID
@@ -228,6 +260,16 @@ type FeatureFlag struct {
 	Version   int64
 	UpdatedBy pgtype.UUID
 	UpdatedAt pgtype.Timestamptz
+}
+
+type ForumTag struct {
+	ID         pgtype.UUID
+	ChannelID  pgtype.UUID
+	Name       string
+	Color      pgtype.Text
+	SortKey    string
+	Restricted bool
+	DeletedAt  pgtype.Timestamptz
 }
 
 type Grant struct {
@@ -481,6 +523,27 @@ type TerminalSession struct {
 	BytesIn           int64
 	BytesOut          int64
 	Version           int64
+}
+
+type Thread struct {
+	ID              pgtype.UUID
+	ChannelID       pgtype.UUID
+	Kind            string
+	ParentMessageID pgtype.UUID
+	Title           string
+	TitleSource     string
+	State           string
+	ClosedAt        pgtype.Timestamptz
+	ClosedBy        pgtype.UUID
+	OperatorAgentID pgtype.UUID
+	LastMessageSeq  int64
+	UnreadFloorSeq  int64
+	LastActivityAt  pgtype.Timestamptz
+	MessageCount    int32
+	CreatedBy       pgtype.UUID
+	CreatedAt       pgtype.Timestamptz
+	MovedAt         pgtype.Timestamptz
+	Version         int64
 }
 
 type User struct {

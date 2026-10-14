@@ -1,6 +1,6 @@
 # Modul `chat`
 
-Status: spaces and the sidebar built (M1-52); channels (M1-53), operators (M1-54) and threads (M1-55) follow with the tickets of the etappe.
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53) built; operators (M1-54) and threads (M1-55) follow with the tickets of the etappe.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -29,9 +29,11 @@ Bereiche, Seitenleisten-Zustand, Kanäle mit Verhalten, Skills, Projektbindung, 
 - `adapters/httpapi/`: `Spaces`, the handlers of `listSpaces`, `createSpace`, `getSpace`,
   `updateSpace`, `moveSpace`, `archiveSpace` and `putMySidebarSpace`; `ETag` from `version` on
   `getSpace` and `updateSpace`.
-- `adapters/authzsource/`: `Source`, the space part of `authz.StructureSource` (`Space`,
-  `SpaceArchived`, `Spaces`); `wire.NewStructureSource` joins it with the empty channel and
-  thread part until M1-53 and M1-55.
+- `adapters/authzsource/`: `Source`, the space and channel part of `authz.StructureSource`
+  (`Space`, `SpaceArchived`, `Spaces`, `SpaceDetails`; since M1-53 `Channel`, `Channels`,
+  `ChannelsOperatedBy`, `ChannelDetails`, with `Archived` set for an archived channel and for every
+  channel of an archived space); `wire.NewStructureSource` joins it with the empty thread part
+  until M1-55 (threads, dm participation) and M1-54 (served targets).
 - Migrations `00023_chat_spaces.sql` (`spaces`, `user_space_states` exactly as 03 section 4.5,
   sort keys `COLLATE "C"`, and `grants.target_space_id -> spaces(id)` `NOT VALID`) and
   `00024_grants_space_fk_validate.sql` (validates it). `bothy_app` may read, insert and update
@@ -84,6 +86,58 @@ source and the full chain with response validation against openapi.yaml (order, 
 If-Match, palette keys, SEC-T07, names, visibility through a channel, visibility without a rights
 version, the archive as rights change, rights per operation, events, sidebar), and
 `migrations/chat_spaces_test.go`.
+
+## Channels and forum tags (M1-53)
+
+- Port: `Structure` adds `ListSpaceChannels`, `CreateChannel`, `GetChannel`, `UpdateChannel`,
+  `MoveChannel`, `ArchiveChannel`, `ListForumTags`, `CreateForumTag`, `UpdateForumTag`,
+  `MoveForumTag` and `DeleteForumTag` with the DTOs `Channel`, `ChannelView`, `ChannelOperator`,
+  `ForumTag`, `MovePosition` and one command per body; the in-transaction event
+  `ChannelArchived{ChannelID, SpaceID, ArchivedAt}` (no subscriber in M1). `Register` adds the
+  durable events `channel.created`, `channel.updated`, `channel.archived` and `thread.created`.
+- Domain: `Channel` (kinds `text`, `forum`, `dm`; `OperatorMode` read side `inherit`, `none`,
+  `agent`), `ChannelName`, `ChannelTopic`, `TagName` (SEC-IN-4 through `kernel/textcheck`, limits
+  `channel.name_max_chars`, `channel.topic_max_chars`, `forum_tag.name_max_chars`),
+  `CheckCreateKind`, `ChannelChange`, `ForumTag`, `TagChange`, `MovePosition` with `KeyAt` (the
+  fractional index), `Thread` (the main thread).
+- Store: `queries/channels.sql`, `queries/forum_tags.sql`, `queries/threads_main.sql` (the insert of
+  the main thread only; the thread use cases come with M1-55).
+- Handlers: `Channels` in `adapters/httpapi` for the eleven operations; `ETag` on `getChannel`
+  and `updateChannel`.
+- Migrations `00026_chat_channels.sql` (`channels`, `channel_skill_bindings`, `forum_tags`,
+  `threads` as 03 section 4.5, without `threads.search_language`, `threads.title_search` and its
+  index (M3-13) and without the foreign key `threads.parent_message_id -> messages` (M1-56); and
+  `grants.target_channel_id -> channels(id)` `NOT VALID`) and `00027_grants_channel_fk_validate.sql`.
+  `bothy_app` may read, insert and update `channels`, `forum_tags` and `threads` and also delete
+  `channel_skill_bindings`.
+
+| Operation | Action | Rights change | Event |
+|---|---|---|---|
+| `listSpaceChannels` | `space.read`, then `channel.read` (Scope, per item in filter mode) | no | |
+| `createChannel` | `channel.create` on the space (`manage`) | no | `channel.created`, for text `thread.created` |
+| `getChannel` | `channel.read` | no | |
+| `updateChannel` | `channel.update` (`manage`), If-Match | no | `channel.updated` |
+| `moveChannel` | `channel.read` (visibility), `channel.reorder` on the space (`manage`) | no | `channel.updated` |
+| `archiveChannel` | `channel.archive` (`manage`, step-up) | yes (target: the channel) | `channel.archived` |
+| `listForumTags` | `channel.read` | no | |
+| `createForumTag`, `updateForumTag`, `moveForumTag`, `deleteForumTag` | `forum_tag.manage` (`manage`) | no | `channel.updated` |
+
+- A text channel gets exactly one main thread in the same unit of work (R-DM-11); a forum none.
+- `listSpaceChannels` filters with `space_id = $space AND archived_at IS NULL AND (id = ANY($visible)
+  OR space_id = ANY($fully_visible) OR $instance_wide)` from `Scope`, so a new channel in a visible
+  space is listed without a new rights version (04 section 7.2).
+- An archived channel, and every channel of an archived space, is read-only for everyone (authz
+  caps the level at `read`; writing actions get `403 channel_read_only` with `reason:
+  channel_archived`); manage changes of it and its tags are `409 conflict`.
+- Every tag change bumps `channels.version` and appends `channel.updated` (03 `forum_tags`).
+- Audit details carry codes and IDs only: `{space_id, channel_id, kind}` on create,
+  `changed_fields` on update, `reason` on archive, `{op, tag_id}` on tag changes.
+- Create and move lock the space row (the order lock of the channels of a space); every other
+  change locks the channel row.
+
+Rulings: docs/DECISIONS.md M1-53. Tests: `domain/channel_test.go`,
+`adapters/authzsource/source_test.go`, `adapters/httpapi/channels_test.go` and
+`migrations/chat_channels_test.go`.
 
 ## Port (Wurzelpaket `internal/chat`)
 

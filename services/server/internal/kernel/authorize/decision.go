@@ -49,6 +49,7 @@ const (
 	reasonDevicePending   Reason = "device_pending"
 	reasonPrincipalPend   Reason = "principal_pending"
 	reasonChannelReadOnly Reason = "channel_read_only"
+	reasonChannelArchived Reason = "channel_archived"
 	reasonPrincipalInact  Reason = "principal_inactive"
 	reasonSessionRevoked  Reason = "session_revoked"
 	reasonDeviceInactive  Reason = "device_inactive"
@@ -63,7 +64,8 @@ const (
 //
 //   - not_found: 404 not_found without the reason, which never leaves the server (R-AZ-01);
 //   - forbidden: 403 scope_missing, device_pending (also for principal_pending, 07 section 4.1),
-//     channel_read_only or forbidden, each with the reason in the extension reason;
+//     channel_read_only (also for channel_archived, 07 section 4.5) or forbidden, each with the
+//     reason in the extension reason;
 //   - step_up_required: 401 step_up_required;
 //   - unauthenticated: 401 session_revoked for principal_inactive, session_revoked and
 //     device_inactive, 401 unauthenticated otherwise; no reason;
@@ -105,6 +107,8 @@ var forbiddenCodes = map[Reason]errs.Code{
 	reasonDevicePending:   errs.CodeDevicePending,
 	reasonPrincipalPend:   errs.CodeDevicePending,
 	reasonChannelReadOnly: errs.CodeChannelReadOnly,
+	// An archived channel or space is read-only for everyone (07 section 4.5, M1-53).
+	reasonChannelArchived: errs.CodeChannelReadOnly,
 }
 
 // revokedReasons are the reasons of unauthenticated that answer session_revoked.

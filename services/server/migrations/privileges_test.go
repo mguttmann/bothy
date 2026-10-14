@@ -101,6 +101,12 @@ var appPrivileges = map[string][]string{
 	// space is never deleted; a sidebar row is personal data that erasure deletes (M7-06).
 	"spaces":            {"SELECT", "INSERT", "UPDATE"},
 	"user_space_states": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 channels, forum_tags and threads (M1-53): archived_at and deleted_at, never a hard
+	// delete (03 Grundsatz 7); the ordered skill list of a channel is replaced as a whole (M2-02).
+	"channels":               {"SELECT", "INSERT", "UPDATE"},
+	"channel_skill_bindings": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	"forum_tags":             {"SELECT", "INSERT", "UPDATE"},
+	"threads":                {"SELECT", "INSERT", "UPDATE"},
 	// 03 section 4.14 (M2-39): hosts and terminal sessions are security history; a session user
 	// row is never deleted while its host is not retired (ruling T12, R-DM-39). The retention
 	// job of class security grants its own DELETE (M7).

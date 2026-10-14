@@ -213,10 +213,21 @@ type Structure struct {
 	// spaceDetails and channelDetails are set with PutSpaceDetail and PutChannelDetail (M1-49).
 	spaceDetails   map[ids.ID]authz.SpaceDetail
 	channelDetails map[ids.ID]authz.ChannelDetail
+	// onPutChannel is called by PutChannel after it stored a channel (OnPutChannel, M1-53).
+	onPutChannel func(authz.ChannelFacts)
 }
 
 // Compile-time check.
 var _ authz.StructureSource = (*Structure)(nil)
+
+// OnPutChannel registers fn, which PutChannel calls with every channel it stores, outside the
+// lock. Test worlds over PostgreSQL write the channels row there, the target of the foreign key
+// grants.target_channel_id that M1-53 adds, so a grant on a fake channel is a valid row.
+func (s *Structure) OnPutChannel(fn func(authz.ChannelFacts)) {
+	s.mu.Lock()
+	s.onPutChannel = fn
+	s.mu.Unlock()
+}
 
 // NewStructure returns an empty structure.
 func NewStructure() *Structure {
@@ -389,7 +400,11 @@ func (s *Structure) PutChannel(c authz.ChannelFacts) {
 	c.DMParticipants = sortIDs(slices.Clone(c.DMParticipants))
 	s.mu.Lock()
 	s.channels[c.ID] = c
+	fn := s.onPutChannel
 	s.mu.Unlock()
+	if fn != nil {
+		fn(c)
+	}
 }
 
 // PutThread adds or replaces a thread.

@@ -803,8 +803,8 @@ func (s *server) handlers() Handlers {
 	if h.Agents == nil && s.agents != nil {
 		h.Agents = s.agents.Handlers
 	}
-	if h.Spaces == nil && s.chat != nil {
-		h.Spaces = s.chat.Handlers
+	if s.chat != nil {
+		s.chat.fillHandlers(&h)
 	}
 	if h.Hosts == nil && s.terminal != nil {
 		h.Hosts = s.terminal.Handlers

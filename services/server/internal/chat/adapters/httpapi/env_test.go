@@ -25,8 +25,6 @@ import (
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/chat"
-	"github.com/OWNER/bothy/services/server/internal/chat/adapters/authzsource"
-	chatpg "github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
@@ -54,6 +52,13 @@ var start = time.Date(2026, 10, 14, 9, 0, 0, 0, time.UTC)
 // nameMax is space.name_max_chars of the world, small enough to test the limit.
 const nameMax = 12
 
+// chatConfig is the configuration of the world: small text limits so the tests reach them, and
+// the backfill defaults of 03.
+var chatConfig = chatapp.Config{
+	SpaceNameMaxChars: nameMax, ChannelNameMaxChars: 10, ChannelTopicMaxChars: 16, TagNameMaxChars: 6,
+	HistoryBackfillLimitDefault: 20, HistoryBackfillLimitMax: 200,
+}
+
 // testKEK is the key-encryption key of the audit recorder in these tests.
 type testKEK struct{}
 
@@ -61,53 +66,26 @@ func (testKEK) KEK(context.Context, string) ([]byte, error) {
 	return []byte(hex.EncodeToString(make([]byte, 32))), nil
 }
 
-// structure is the structure source of the world: the spaces of the real chat source (M1-52) and
-// the channels of a fake, because the channels table comes with M1-53.
-type structure struct {
-	*authzsource.Source
-	channels *fake.Structure
-}
-
-func (s structure) Channel(ctx context.Context, id ids.ID) (authz.ChannelFacts, bool, error) {
-	return s.channels.Channel(ctx, id)
-}
-func (s structure) Thread(ctx context.Context, id ids.ID) (authz.ThreadFacts, bool, error) {
-	return s.channels.Thread(ctx, id)
-}
-func (s structure) Channels(ctx context.Context) ([]authz.ChannelFacts, error) {
-	return s.channels.Channels(ctx)
-}
-func (s structure) ChannelsOperatedBy(ctx context.Context, id ids.ID) ([]ids.ID, error) {
-	return s.channels.ChannelsOperatedBy(ctx, id)
-}
-func (s structure) DMChannelsOf(ctx context.Context, id ids.ID) ([]ids.ID, error) {
-	return s.channels.DMChannelsOf(ctx, id)
-}
-func (s structure) ServedTargets(ctx context.Context, id ids.ID) ([]authz.ChannelRef, error) {
-	return s.channels.ServedTargets(ctx, id)
-}
-func (s structure) ChannelDetails(ctx context.Context, channelIDs []ids.ID) (map[ids.ID]authz.ChannelDetail, error) {
-	return s.channels.ChannelDetails(ctx, channelIDs)
-}
-
 // world is PostgreSQL 18 with the real chat module, authz (Authorizer, rights hooks), identity
 // (principal source), sync and audit behind the full HTTP chain with response validation against
 // openapi.yaml, the test authenticator of httpservertest and a controllable clock.
 type world struct {
-	t        *testing.T
-	pool     *pg.Pool
-	owner    *pg.Pool
-	rec      *auditapp.Recorder
-	clk      *clock.Fake
-	creds    *fake.Credentials
-	channels *fake.Structure
-	actors   *httpservertest.Actors
-	h        *httpservertest.Harness
-	svc      *chatapp.Service
-	ownerID  ids.ID
+	t       *testing.T
+	pool    *pg.Pool
+	owner   *pg.Pool
+	rec     *auditapp.Recorder
+	clk     *clock.Fake
+	creds   *fake.Credentials
+	actors  *httpservertest.Actors
+	h       *httpservertest.Harness
+	svc     *chatapp.Service
+	az      *authzapp.Authorizer
+	ownerID ids.ID
 	// archived collects the SpaceArchived events a test subscriber saw inside the transactions.
 	archived *[]chat.SpaceArchived
-	mu       *sync.Mutex
+	// channelsArchived collects the ChannelArchived events a test subscriber saw (M1-53).
+	channelsArchived *[]chat.ChannelArchived
+	mu               *sync.Mutex
 }
 
 // newWorld builds a world on a new database with the owner "owner" (session with a fresh
@@ -120,10 +98,11 @@ func newWorld(t *testing.T) *world {
 	pool := db.OpenPool(t, cfg)
 	log := slog.New(&httpservertest.LogCapture{})
 	w := &world{t: t, pool: pool, owner: db.Pool(t, pg.RoleOwner), clk: clock.NewFake(start), creds: fake.NewCredentials(),
-		channels: fake.NewStructure(), actors: httpservertest.NewActors(), archived: &[]chat.SpaceArchived{}, mu: &sync.Mutex{}}
+		actors: httpservertest.NewActors(), archived: &[]chat.SpaceArchived{}, channelsArchived: &[]chat.ChannelArchived{}, mu: &sync.Mutex{}}
 	repo := identitypg.NewRepository(pool)
 	principals := identityapp.NewPrincipalSource(repo)
-	str := structure{Source: authzsource.New(chatpg.NewRepository(pool)), channels: w.channels}
+	// The structure source of the process: spaces and channels of chat, no threads yet (M1-53).
+	str := wire.NewStructureSource(pool)
 	policies := fake.NewPolicies()
 	hook, err := wire.NewRightsHook(pool, wire.RightsSources{Principals: principals, Structure: str, Policies: policies}, w.clk, log)
 	if err != nil {
@@ -141,6 +120,9 @@ func newWorld(t *testing.T) *world {
 	}
 	// A subscriber of SpaceArchived the way notify subscribes from M3 on.
 	if err := txn.Subscribe(reg, w.onArchived); err != nil {
+		t.Fatal(err)
+	}
+	if err := txn.Subscribe(reg, w.onChannelArchived); err != nil {
 		t.Fatal(err)
 	}
 	reg.Seal()
@@ -175,12 +157,12 @@ func newWorld(t *testing.T) *world {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c, err := wire.NewChat(chatapp.Config{SpaceNameMaxChars: nameMax}, pool, uow, az, az, wire.ChatWrites{Audit: w.rec, Events: appender}, w.clk)
+	c, err := wire.NewChat(chatConfig, pool, uow, az, az, wire.ChatWrites{Audit: w.rec, Events: appender}, w.clk)
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.svc = c.Service
-	built, err := routes.Build(wire.Handlers{Spaces: c.Handlers}, wire.RouteOptions(), routes.SpecCatalog())
+	w.svc, w.az = c.Service, az
+	built, err := routes.Build(wire.Handlers{Spaces: c.Handlers, Channels: c.ChannelHandlers}, wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,6 +181,17 @@ func newWorld(t *testing.T) *world {
 	})
 	w.ownerID = w.person("owner", true)
 	return w
+}
+
+// onChannelArchived is the test subscriber of ChannelArchived; it runs inside the unit of work.
+func (w *world) onChannelArchived(ctx context.Context, ev chat.ChannelArchived) error {
+	if _, ok := txn.UnitFrom(ctx); !ok {
+		w.t.Error("ChannelArchived outside a unit of work")
+	}
+	w.mu.Lock()
+	*w.channelsArchived = append(*w.channelsArchived, ev)
+	w.mu.Unlock()
+	return nil
 }
 
 // onArchived is the test subscriber of SpaceArchived; it runs inside the unit of work.

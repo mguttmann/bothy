@@ -11,6 +11,22 @@ documented in this file. The format is based on
 
 ### Added
 
+- Channels and forum tags (M1-53): `listSpaceChannels`, `createChannel`, `getChannel`,
+  `updateChannel`, `moveChannel`, `archiveChannel`, `listForumTags`, `createForumTag`,
+  `updateForumTag`, `moveForumTag` and `deleteForumTag`. Migration `00026` creates `channels`,
+  `channel_skill_bindings`, `forum_tags` and `threads` (without the search columns of M3-13 and the
+  foreign key to `messages` of M1-56) and the foreign key `grants.target_channel_id`, which `00027`
+  validates. A text channel gets its main thread in the same transaction (`thread.created`); a
+  channel created in a visible space is visible and listed without a new permission version.
+  `archiveChannel` (step-up) is a rights change with `access.changed`; afterwards the channel is
+  read-only for everyone, owners included (`403 channel_read_only` with `reason: channel_archived`),
+  and manage changes of it are `409 conflict`. Every tag change bumps the channel version and
+  writes `channel.updated`. The chat structure source now answers channels (`Channel`, `Channels`,
+  `ChannelsOperatedBy`, `ChannelDetails`) for `authorize`. New keys `channel.name_max_chars`,
+  `channel.topic_max_chars`, `forum_tag.name_max_chars`, `channel.history_backfill_limit_default`
+  and `channel.history_backfill_limit_max`. The decision of reason `channel_archived` now maps to
+  the problem code `channel_read_only` (07 section 4.1), for archived spaces too.
+
 - Groups from OIDC claims (M1-42): for a provider with `groups_claim` the callback stores the
   group claim in the login flow (`groups_state` `present`, `absent` or `overage`; another form
   fails the login), and the completion makes the person's memberships in the provider's

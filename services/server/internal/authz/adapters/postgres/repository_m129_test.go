@@ -105,7 +105,7 @@ func TestI1Reads(t *testing.T) {
 	robin := e.principal(t, "user", "robin")
 	support := e.group(t, "Support", alex)
 	other := e.group(t, "Other", alex)
-	space, channel, foreign := e.space(t, alex), ids.New(), ids.New()
+	space, channel, foreign := e.space(t, alex), e.channel(t, alex), e.channel(t, alex)
 	grant := func(s domain.Subject, tg domain.Target, l domain.Level) domain.Grant {
 		t.Helper()
 		g, err := domain.NewGrant(ids.New(), s, tg, l, 0, time.Time{}, "work", alex, t0)

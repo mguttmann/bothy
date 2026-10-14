@@ -31,7 +31,7 @@ func TestListQueries(t *testing.T) {
 		{ID: ids.New(), GroupID: a.ID, UserID: robin, AddedBy: owner, AddedAt: t0, ExpiresAt: exp},
 		{ID: ids.New(), GroupID: b.ID, UserID: robin, AddedBy: owner, AddedAt: t0},
 	}
-	space, channel, other := e.space(t, owner), ids.New(), ids.New()
+	space, channel, other := e.space(t, owner), e.channel(t, owner), e.channel(t, owner)
 	user := func(id ids.ID) domain.Subject { return domain.Subject{Kind: domain.SubjectUser, PrincipalID: id} }
 	grant := func(s domain.Subject, tg domain.Target, expires time.Time) domain.Grant {
 		g, err := domain.NewGrant(ids.New(), s, tg, domain.LevelRead, 0, expires, "r", owner, t0)

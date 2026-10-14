@@ -143,6 +143,8 @@ func TestAuthzGroupsGrantsSchema(t *testing.T) {
 				"grants_subject_kind_check: CHECK ((subject_kind = ANY (ARRAY['user'::text, 'group'::text, 'agent'::text, 'app'::text])))",
 				"grants_subject_principal_id_fkey: FOREIGN KEY (subject_principal_id) REFERENCES principals(id) ON DELETE RESTRICT",
 				"grants_subject_shape_check: CHECK ((((subject_kind = 'group'::text) = ((subject_group_id IS NOT NULL) AND (subject_principal_id IS NULL))) AND ((subject_kind <> 'group'::text) = ((subject_principal_id IS NOT NULL) AND (subject_group_id IS NULL)))))",
+				// The foreign key of the channel target comes with channels (00026, M1-53).
+				"grants_target_channel_id_fkey: FOREIGN KEY (target_channel_id) REFERENCES channels(id) ON DELETE RESTRICT",
 				"grants_target_kind_check: CHECK ((target_kind = ANY (ARRAY['instance'::text, 'space'::text, 'channel'::text, 'host'::text])))",
 				// The foreign key M1-27 deferred, added by 00025_terminal_hosts.sql (M2-39).
 				"grants_target_host_id_fkey: FOREIGN KEY (target_host_id) REFERENCES hosts(id) ON DELETE RESTRICT",

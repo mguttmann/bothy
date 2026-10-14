@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
@@ -219,16 +218,15 @@ func TestSpaceNameLimitAndUniqueness(t *testing.T) {
 }
 
 // TestSpaceReadWithReadOnOneChannelOnly: Sam has read on one channel of Support and nothing on the
-// space: getSpace is 200 with level read and no capabilities, and Support is listed. The channel
-// comes from the fake part of the test structure (M1-53 repeats this with real channels).
+// space: getSpace is 200 with level read and no capabilities, and Support is listed. The channel is
+// real since M1-53.
 func TestSpaceReadWithReadOnOneChannelOnly(t *testing.T) {
 	t.Parallel()
 	w := newWorld(t)
 	sam := w.person("sam", false)
 	support := w.create("Support")
 	w.create("Marketing")
-	ch := ids.New()
-	w.channels.PutChannel(authz.ChannelFacts{ID: ch, SpaceID: support, Kind: authz.ChannelText})
+	ch := w.channel(support, "text", "tickets")
 	w.sql(`INSERT INTO grants (id, subject_kind, subject_principal_id, target_kind, target_channel_id, level, capabilities, reason, granted_by)
 		VALUES ($1, 'user', $2, 'channel', $3, 'read', '{}', 'fixture', $2)`, ids.New().String(), sam.String(), ch.String())
 	m := w.want(w.do("sam", http.MethodGet, spacePath(support), ""), http.StatusOK, "")

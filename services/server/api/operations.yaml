@@ -12,6 +12,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - addOwner
   - approveDevice
   - approvePairing
+  - archiveChannel
   - archiveSpace
   - beginEnrollment
   - beginIdentityLink
@@ -28,8 +29,10 @@ enabled:             # operationIds that have a handler; sorted ascending
   - completeStepUpWithDeviceKey
   - completeStepUpWithPasskey
   - createAgent
+  - createChannel
   - createEnrollmentCode
   - createExtensionSession
+  - createForumTag
   - createGrant
   - createGroup
   - createHost
@@ -38,6 +41,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - createStepUpChallenge
   - createToken
   - createUser
+  - deleteForumTag
   - deleteGroup
   - deleteIdentityProvider
   - disableAgent
@@ -48,6 +52,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - explainSpaceAccess
   - exportAuditEvents
   - getAgent
+  - getChannel
   - getDevice
   - getDiscovery
   - getGrant
@@ -66,6 +71,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listAgents
   - listAuditEvents
   - listFeatureFlags
+  - listForumTags
   - listGrants
   - listGroupMembers
   - listGroups
@@ -75,6 +81,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listMyDevices
   - listMySessions
   - listOwners
+  - listSpaceChannels
   - listSpaces
   - listTokens
   - listUserDevices
@@ -82,6 +89,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listUsers
   - loginWithTrustedHeader
   - logout
+  - moveChannel
+  - moveForumTag
   - moveSpace
   - previewGrant
   - putFeatureFlag
@@ -105,6 +114,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - unlinkIdentity
   - updateAgent
   - updateBranding
+  - updateChannel
+  - updateForumTag
   - updateGroup
   - updateHost
   - updateIdentityProvider
@@ -132,9 +143,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: applyImportBatch
     etappe: M8
     ticket: M8-03
-  - operation_id: archiveChannel
-    etappe: M1
-    ticket: M1-53
   - operation_id: attachTerminalSession
     etappe: M2
     ticket: M2-44
@@ -174,9 +182,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createAgentWebhookSubscription
     etappe: M2
     ticket: M2-26
-  - operation_id: createChannel
-    etappe: M1
-    ticket: M1-53
   - operation_id: createChannelTemplate
     etappe: M1
     ticket: M1-60
@@ -186,9 +191,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: createFileTicket
     etappe: M3
     ticket: M3-05
-  - operation_id: createForumTag
-    etappe: M1
-    ticket: M1-53
   - operation_id: createGdprRequest
     etappe: M7
   - operation_id: createImport
@@ -241,9 +243,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteFile
     etappe: M3
     ticket: M3-08
-  - operation_id: deleteForumTag
-    etappe: M1
-    ticket: M1-53
   - operation_id: deleteMessage
     etappe: M1
     ticket: M1-58
@@ -296,9 +295,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: getBrandingLogo
     etappe: M3
     ticket: M3-10
-  - operation_id: getChannel
-    etappe: M1
-    ticket: M1-53
   - operation_id: getChannelBehavior
     etappe: M2
     ticket: M2-02
@@ -420,9 +416,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listEvents
     etappe: M1
     ticket: M1-63
-  - operation_id: listForumTags
-    etappe: M1
-    ticket: M1-53
   - operation_id: listGdprRequests
     etappe: M7
   - operation_id: listImportItems
@@ -476,9 +469,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listServedChannels
     etappe: M2
     ticket: M2-02
-  - operation_id: listSpaceChannels
-    etappe: M1
-    ticket: M1-53
   - operation_id: listTemplates
     etappe: M1
     ticket: M1-60
@@ -503,12 +493,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: markThreadUnread
     etappe: M1
     ticket: M1-61
-  - operation_id: moveChannel
-    etappe: M1
-    ticket: M1-53
-  - operation_id: moveForumTag
-    etappe: M1
-    ticket: M1-53
   - operation_id: moveThread
     etappe: M1
     ticket: M1-62
@@ -666,18 +650,12 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: unregisterPush
     etappe: M3
     ticket: M3-22
-  - operation_id: updateChannel
-    etappe: M1
-    ticket: M1-53
   - operation_id: updateCommand
     etappe: M2
     ticket: M2-16
   - operation_id: updateComponent
     etappe: M2
     ticket: M2-15
-  - operation_id: updateForumTag
-    etappe: M1
-    ticket: M1-53
   - operation_id: updateMessage
     etappe: M1
     ticket: M1-58
