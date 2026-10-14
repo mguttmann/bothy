@@ -107,17 +107,8 @@ func (i *Initiator) WriteMessage1(payload []byte) ([]byte, error) {
 // of the device. Errors wrap ErrMessageTooLong or ErrHandshake (wrong prologue, wrong host key,
 // tampered or short message) and break the initiator.
 func (i *Initiator) ReadMessage2(msg []byte) (payload []byte, t *Transport, err error) {
-	switch {
-	case i.broken:
-		return nil, nil, fmt.Errorf("noise: read message 2: %w", ErrBroken)
-	case i.hs == nil || i.step != 1:
-		return nil, nil, fmt.Errorf("noise: read message 2: %w", ErrState)
-	case len(msg) > MaxMessageLen:
-		i.broken = true
-		return nil, nil, fmt.Errorf("noise: read message 2 of %d bytes, limit %d: %w", len(msg), MaxMessageLen, ErrMessageTooLong)
-	case len(msg) < handshakeOverhead:
-		i.broken = true
-		return nil, nil, fmt.Errorf("noise: read message 2 of %d bytes, minimum %d: %w", len(msg), handshakeOverhead, ErrHandshake)
+	if err := readPrecheck("read message 2", &i.broken, i.hs != nil && i.step == 1, msg); err != nil {
+		return nil, nil, err
 	}
 	payload, send, recv, err := i.hs.ReadMessage(nil, msg)
 	if err != nil || send == nil || recv == nil {
@@ -198,17 +189,8 @@ func newResponder(static KeyPair, prologue []byte, ephemeral *KeyPair, random io
 // Errors wrap ErrMessageTooLong or ErrHandshake (wrong prologue, wrong static key, tampered or
 // short message, low-order key) and break the responder.
 func (r *Responder) ReadMessage1(msg []byte) (payload []byte, initiatorEphemeral [KeyLen]byte, err error) {
-	switch {
-	case r.broken:
-		return nil, initiatorEphemeral, fmt.Errorf("noise: read message 1: %w", ErrBroken)
-	case r.hs == nil || r.step != 0:
-		return nil, initiatorEphemeral, fmt.Errorf("noise: read message 1: %w", ErrState)
-	case len(msg) > MaxMessageLen:
-		r.broken = true
-		return nil, initiatorEphemeral, fmt.Errorf("noise: read message 1 of %d bytes, limit %d: %w", len(msg), MaxMessageLen, ErrMessageTooLong)
-	case len(msg) < handshakeOverhead:
-		r.broken = true
-		return nil, initiatorEphemeral, fmt.Errorf("noise: read message 1 of %d bytes, minimum %d: %w", len(msg), handshakeOverhead, ErrHandshake)
+	if err := readPrecheck("read message 1", &r.broken, r.hs != nil && r.step == 0, msg); err != nil {
+		return nil, initiatorEphemeral, err
 	}
 	payload, _, _, err = r.hs.ReadMessage(nil, msg)
 	if err != nil {
@@ -245,3 +227,22 @@ func (r *Responder) WriteMessage2(payload []byte) (msg []byte, t *Transport, err
 
 // HandshakeHash returns the handshake hash h after a completed handshake, else nil.
 func (r *Responder) HandshakeHash() []byte { return bytes.Clone(r.hash) }
+
+// readPrecheck makes the checks every handshake read makes before the message reaches
+// flynn/noise: a broken object, a call out of order (ready false), and the size limits of a
+// handshake message. A size error breaks the object; op names the step in the error text.
+func readPrecheck(op string, broken *bool, ready bool, msg []byte) error {
+	switch {
+	case *broken:
+		return fmt.Errorf("noise: %s: %w", op, ErrBroken)
+	case !ready:
+		return fmt.Errorf("noise: %s: %w", op, ErrState)
+	case len(msg) > MaxMessageLen:
+		*broken = true
+		return fmt.Errorf("noise: %s of %d bytes, limit %d: %w", op, len(msg), MaxMessageLen, ErrMessageTooLong)
+	case len(msg) < handshakeOverhead:
+		*broken = true
+		return fmt.Errorf("noise: %s of %d bytes, minimum %d: %w", op, len(msg), handshakeOverhead, ErrHandshake)
+	}
+	return nil
+}
