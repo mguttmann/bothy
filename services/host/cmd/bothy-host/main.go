@@ -80,7 +80,7 @@ func writeUsage(w io.Writer, table []command) {
 	// tabwriter pads the names to the longest one plus two spaces before the summaries.
 	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	for _, c := range sorted {
-		fmt.Fprintf(tw, "  %s\t%s\n", c.name, c.summary)
+		_, _ = fmt.Fprintf(tw, "  %s\t%s\n", c.name, c.summary)
 	}
 	_ = tw.Flush()
 	_, _ = io.WriteString(w, b.String())
