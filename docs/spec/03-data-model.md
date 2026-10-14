@@ -401,6 +401,8 @@ Purpose: login session of a person on a device. Every access token carries its I
 | `step_up_at` | `timestamptz` | yes | | last fresh confirmation by the person; valid for `auth.step_up_max_age` |
 | `step_up_method` | `text` | yes | | `CHECK (step_up_method IN ('passkey','device_key','password_totp','oidc_reauth'))`; set together with `step_up_at` |
 | `step_up_consumed_at` | `timestamptz` | yes | | set when `terminal.open` or `terminal.attach` has consumed the step-up with `step_up_at`; a consumed step-up (`step_up_consumed_at >= step_up_at`) allows no further terminal opening ([08-identity.md](08-identity.md), section 6.3) |
+| `view_as_user_id` | `uuid` | yes | | console only: the person whose view an owner looks at with "View as person" ([07-permissions.md](07-permissions.md), section 9.2); set by `access.view_as`, cleared by `access.view_as.end` or by the first request after `authz.view_as_max_duration` (R-DM-49) |
+| `view_as_started_at` | `timestamptz` | yes | | start of the stored view; set and cleared together with `view_as_user_id` |
 | `last_seen_at` | `timestamptz` | yes | | |
 | `last_ip` | `inet` | yes | | only for the security view, class `security` |
 | `revoked_at` | `timestamptz` | yes | | |
@@ -408,10 +410,11 @@ Purpose: login session of a person on a device. Every access token carries its I
 
 PK: `id`. FK: `user_id` -> `users(principal_id)` ON DELETE RESTRICT; `device_id` ->
 `devices(id)` ON DELETE RESTRICT; `identity_id` -> `user_identities(id)` ON DELETE SET NULL;
-`parent_session_id` -> `auth_sessions(id)` ON DELETE CASCADE.
+`parent_session_id` -> `auth_sessions(id)` ON DELETE CASCADE; `view_as_user_id` -> `users(principal_id)` ON DELETE RESTRICT.
 Checks: `(client_component = 'console') = (cookie_hash IS NOT NULL)`; `parent_session_id IS NULL OR
 client_component = 'share_ext'`; `(step_up_at IS NULL) = (step_up_method IS
-NULL)`; `step_up_consumed_at IS NULL OR step_up_at IS NOT NULL`. Unique: `cookie_hash` as a partial index `WHERE cookie_hash IS NOT NULL`.
+NULL)`; `step_up_consumed_at IS NULL OR step_up_at IS NOT NULL`; `(view_as_user_id IS NULL) =
+(view_as_started_at IS NULL)`; `view_as_user_id IS NULL OR client_component = 'console'`. Unique: `cookie_hash` as a partial index `WHERE cookie_hash IS NOT NULL`.
 Indexes: `(user_id) WHERE revoked_at IS NULL` for "end all sessions"; `(device_id)`;
 `(parent_session_id) WHERE parent_session_id IS NOT NULL`; `(expires_at)` for the cleanup job.
 Retention: `security`.
@@ -2732,6 +2735,7 @@ section 4 applies, and the gate fails.
 | R-DM-46 | The job `files.purge_objects` removes the row of a deleted file after its objects are gone; the detail rows go by `ON DELETE CASCADE`, `principals.avatar_file_id` by `ON DELETE SET NULL`. | The row keeps `original_name`, `sha256`, `transcript_text` and the search vector, which 20 sections 4.2 and 4.3 require to be gone; nothing references a deleted file, because its attachment row went with the message, so a tombstone would serve nobody and need a second redaction of every content column (D-W-108). |
 | R-DM-47 | `runs.invocation_held_until` is also set while the server transcript of a triggering voice message is `pending`; the release follows the same rules with `voice.transcript_hold_max`. | 04 section 15.3 step 1 and R-SY-20 hold `agent.invocation` until a server transcript is final, and the column already names `voice.transcript_hold_max`, but its rule named only attachments (D-W-108). |
 | R-DM-48 | The ETag of a transcript is derived from its four transcript columns; `files` gets no `version` column. | 05 section 4.8 requires `If-Match` for `file.transcript.submit`; a derived strong ETag (as for other rows without a version, 06 section 8 point 1) detects a lost update without a new column that every file write would have to raise (D-W-108). |
+| R-DM-49 | `auth_sessions` stores "View as person" of a console session in `view_as_user_id` and `view_as_started_at` (console sessions only, both set or both empty); `access.view_as` from a console session sets them in the transaction of its audit entry, `access.view_as.end` or the first request after `authz.view_as_max_duration` clears them with an audit entry of the end. | [07-permissions.md](07-permissions.md) section 9.2 requires state on the console session (target person, start) and operations to start and end it, added to the core contract before PLAN M6-01 builds the console session (D-W-100 extended to M5 and M6). |
 
 ## 9. Configuration values of this chapter
 

@@ -75,6 +75,7 @@ rules:
         - access.explain
         - access.preview
         - access.view_as
+        - access.view_as.end
         - agent.billing_mode.set
         - agent.billing_mode.set_all
         - agent.config.read
@@ -331,6 +332,7 @@ rules:
         - access.explain
         - access.preview
         - access.view_as
+        - access.view_as.end
         - agent.billing_mode.set
         - agent.billing_mode.set_all
         - agent.config.read
