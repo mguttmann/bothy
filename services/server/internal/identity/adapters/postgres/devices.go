@@ -139,7 +139,8 @@ func toKey(k sqlcgen.DeviceKey) identity.DeviceKey {
 	}
 }
 
-// LockDevice implements app.DeviceStore inside the ambient unit of work.
+// LockDevice implements app.DeviceStore (M1-38) and app.LifecycleStore (M1-45) inside the
+// ambient unit of work.
 func (r *Repository) LockDevice(ctx context.Context, id ids.ID) (identity.Device, bool, error) {
 	q, err := r.write(ctx)
 	if err != nil {

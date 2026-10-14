@@ -64,6 +64,9 @@ type peopleWorld struct {
 	rec    *auditapp.Recorder
 	az     *authzapp.Authorizer
 	events *syncapp.Appender
+	// repo and appender serve the worlds built on this one (lifecycle, M1-45).
+	repo     *postgres.Repository
+	appender *syncapp.Appender
 }
 
 func newPeopleWorld(t *testing.T) *peopleWorld {
@@ -130,6 +133,7 @@ func newPeopleWorld(t *testing.T) *peopleWorld {
 		t.Fatal(err)
 	}
 	w.pool, w.uow, w.rec, w.az, w.events = pool, uow, rec, az, appender
+	w.repo, w.appender = repo, appender
 	w.p, err = app.NewPeople(peopleCfg, app.PeopleDeps{Store: repo, UoW: uow, Authorizer: az, Audit: rec, Events: appender,
 		Cursors: httpapi.Cursors{}, Versions: versions, Locales: locale.Parser{}, Providers: repo, Identities: repo, Enrollment: codes,
 		Settings: st.Admin, Clock: w.clk})

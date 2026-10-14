@@ -731,6 +731,20 @@ sicherste und empfiehlt es für Anwendungen mit personenbezogenen Daten
 5. Restrisiko: Ein Gerät, das nie wieder Kontakt hat, behält den lokalen Cache. Schutz dann nur
    durch Gerätesperre, Datenträger-Verschlüsselung des Betriebssystems und App-Sperre.
 
+Stored codes (M1-45, [docs/DECISIONS.md](../DECISIONS.md) M1-45): `devices.revoke_reason` is a
+machine code, `revoked_by_self` when the device's own person revokes it, `revoked_by_owner` when an
+owner revokes the device of another person, `user_disabled` from section 11 and `inactive` from
+the job (section 5.4); the free text of the request goes only into the audit entry. The sessions
+of the device (child sessions included) get `auth_sessions.revoke_reason = 'device_revoked'`
+(`inactive` from the job), their families `refresh_token_families.revoke_reason =
+'session_revoked'`. `session.revoke` ends the session and every live child session
+(`parent_session_id`) with `logout` when the session's own person ends it and `admin` otherwise;
+it needs no step-up. Every ended session gives one `session.revoked`, every revoked device one
+in-transaction event `DeviceRevoked`; step 2 for push registrations is a subscriber of
+`DeviceRevoked` and `SessionEnded` (M3-22). Revoking or ending something already revoked succeeds
+without effect: `200` with the device (`204` for a session), an audit entry with `no_change`, no
+new rights version.
+
 ## 11. Person sperren
 
 `user.disable` (Owner, Step-up) macht in **einer** Transaktion, in dieser Reihenfolge:
@@ -754,6 +768,17 @@ Nach dem Commit: Gateway schließt Verbindungen mit `4012`; Agenten brechen ab. 
 Gruppenmitgliedschaften bleiben stehen, wirken aber nicht; die Konsole bietet "alle Freigaben
 widerrufen" als eigenen, bewussten Schritt. Inhalte bleiben. Sperren, Widerrufen und Beenden von
 schon Gesperrtem oder Widerrufenem gelingt ohne Wirkung (06, Abschnitt 2 "Ohne Wirkung").
+
+Stored codes and later steps (M1-45, [docs/DECISIONS.md](../DECISIONS.md) M1-45): sessions get
+`auth_sessions.revoke_reason = 'user_disabled'`, their families `session_revoked`, devices
+(pending ones included) `devices.revoke_reason = 'user_disabled'` with `revoked_by` the owner; the
+owners row, grants and group memberships stay. Step 1 is checked by the invariant check of the
+rights change before the commit (07 section 4.4): the last active owner gets `409 last_owner` and
+nothing of the transaction stays. Step 5 for push registrations is carried out by a subscriber of
+the in-transaction events `DeviceRevoked` and `SessionEnded` (M3-22); step 7 by subscribers of
+`AccessChanged` for runs (M2) and dev environments (V2). Disabling a disabled person succeeds
+without effect (`200`, audit `no_change`, no new rights version); a deleted person gives `409
+invalid_state_transition`.
 
 Die Konsole zeigt danach eine Liste der Schritte außerhalb des Produkts: Konto beim
 Identitätsanbieter sperren, Zugang zum Netz entziehen, API-Schlüssel externer Systeme tauschen, die

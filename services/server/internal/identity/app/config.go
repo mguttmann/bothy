@@ -112,4 +112,9 @@ type Config struct {
 	// TrustedHeaderBindRequests is auth.trusted_header_bind_requests: every later request of a
 	// session started with the header must carry the same login (08 section 2.4 rule 5).
 	TrustedHeaderBindRequests bool `config:"auth.trusted_header_bind_requests"`
+	// DeviceInactiveRevokeAfter is auth.device_inactive_revoke_after (M1-45, 08 section 5.4): an
+	// active device without contact for this long counts as inactive at once and is revoked by
+	// the job identity.auth_cleanup (device.expire). Zero switches the check off; the key's
+	// minimum keeps it on in a server.
+	DeviceInactiveRevokeAfter time.Duration `config:"auth.device_inactive_revoke_after"`
 }

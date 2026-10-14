@@ -93,6 +93,8 @@ type Handlers struct {
 	*identityhttp.OIDC
 	// TrustedHeader implements loginWithTrustedHeader (identity, M1-43).
 	*identityhttp.TrustedHeader
+	// Lifecycle implements disableUser, revokeDevice and revokeSession (identity, M1-45).
+	*identityhttp.Lifecycle
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

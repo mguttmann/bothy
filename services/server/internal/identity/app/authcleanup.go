@@ -20,16 +20,18 @@ type CleanupStore interface {
 }
 
 // AuthCleanup is the use case of the job identity.auth_cleanup (docs/spec/02-architektur.md
-// section 12.3): it deletes the challenges and the OIDC login flows past expires_at (M1-41) and,
-// since M1-38, revokes the expired pending devices and expires the pairings past expires_at
-// (Expiry). Requests never depend on it, because every use case checks expiry itself. It is safe
+// section 12.3): it deletes the challenges and the OIDC login flows past expires_at (M1-41),
+// revokes the expired pending devices and expires the pairings past expires_at (Expiry, M1-38)
+// and revokes the devices without contact for auth.device_inactive_revoke_after (DeviceExpirer,
+// M1-45). Requests never depend on it, because every use case checks expiry itself. It is safe
 // for concurrent use; a repeated run is harmless.
 type AuthCleanup struct {
-	cfg    Config
-	uow    txn.UnitOfWork
-	store  CleanupStore
-	expiry Expiry
-	clock  clock.Clock
+	cfg     Config
+	uow     txn.UnitOfWork
+	store   CleanupStore
+	expiry  Expiry
+	devices DeviceExpirer
+	clock   clock.Clock
 }
 
 // Expiry is the device and pairing expiry the cleanup runs (Service implements it, M1-38).
@@ -40,12 +42,19 @@ type Expiry interface {
 	ExpirePairings(ctx context.Context) (int64, error)
 }
 
+// DeviceExpirer revokes the inactive devices (Lifecycle.ExpireInactiveDevices, M1-45).
+type DeviceExpirer interface {
+	// ExpireInactiveDevices revokes every inactive device and returns their number.
+	ExpireInactiveDevices(ctx context.Context) (int, error)
+}
+
 // NewAuthCleanup returns the use case with auth.cleanup_interval and auth.login_fail_window of cfg
-// above 0, the expiry of devices and pairings and the clock c (nil means clock.System()). Errors: a
-// missing collaborator or a duration that is not positive.
-func NewAuthCleanup(cfg Config, uow txn.UnitOfWork, store CleanupStore, expiry Expiry, c clock.Clock) (*AuthCleanup, error) {
-	if uow == nil || store == nil || expiry == nil {
-		return nil, errors.New("identity: NewAuthCleanup needs the unit of work, the cleanup store and the expiry")
+// above 0, the expiry of pending devices and pairings, the inactive device sweep devices and the
+// clock c (nil means clock.System()). Errors: a missing collaborator or a duration that is not
+// positive.
+func NewAuthCleanup(cfg Config, uow txn.UnitOfWork, store CleanupStore, expiry Expiry, devices DeviceExpirer, c clock.Clock) (*AuthCleanup, error) {
+	if uow == nil || store == nil || expiry == nil || devices == nil {
+		return nil, errors.New("identity: NewAuthCleanup needs the unit of work, the cleanup store, the expiry and the device sweep")
 	}
 	if cfg.CleanupInterval <= 0 || cfg.LoginFailWindow <= 0 {
 		return nil, errors.New("identity: auth.cleanup_interval and auth.login_fail_window must be positive")
@@ -53,14 +62,15 @@ func NewAuthCleanup(cfg Config, uow txn.UnitOfWork, store CleanupStore, expiry E
 	if c == nil {
 		c = clock.System()
 	}
-	return &AuthCleanup{cfg: cfg, uow: uow, store: store, expiry: expiry, clock: c}, nil
+	return &AuthCleanup{cfg: cfg, uow: uow, store: store, expiry: expiry, devices: devices, clock: c}, nil
 }
 
 // Run deletes in one unit of work every challenge whose expires_at has passed at the time of the
 // clock, except failed step-up challenges that still count inside auth.login_fail_window (08
-// section 13) and every login flow past its expires_at, then revokes the expired pending devices
-// and expires the due pairings, each in its own unit of work. It returns how many rows it ended.
-// Errors: the first failing step; the steps before it stay committed and a retry continues.
+// section 13) and every login flow past its expires_at, then revokes the expired pending devices,
+// expires the due pairings (M1-38) and revokes the inactive devices (M1-45), each in its own unit
+// of work. It returns how many rows it ended. Errors: the first failing step; the steps before it
+// stay committed and a retry continues.
 func (c *AuthCleanup) Run(ctx context.Context) (int64, error) {
 	now := c.clock.Now()
 	var n int64
@@ -82,5 +92,10 @@ func (c *AuthCleanup) Run(ctx context.Context) (int64, error) {
 		return n, err
 	}
 	pairings, err := c.expiry.ExpirePairings(ctx)
-	return n + pairings, err
+	n += pairings
+	if err != nil {
+		return n, err
+	}
+	revoked, err := c.devices.ExpireInactiveDevices(ctx)
+	return n + int64(revoked), err
 }

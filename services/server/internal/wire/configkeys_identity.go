@@ -21,8 +21,8 @@ const (
 // and window and the cleanup interval of 08 section 18 (M1-35), the API token limits and the
 // DPoP requirement of 08 section 18 (M1-44), the enrollment code lifetime and attempt limit of
 // 08 section 18 (M1-37), the OIDC flow, code, cache, assertion and recheck durations of 08
-// section 18 (M1-41), and the binding switch of the trusted_header driver of 08 section 18
-// (M1-43). The page sizes of
+// section 18 (M1-41), the binding switch of the trusted_header driver of 08 section 18 (M1-43),
+// and the inactivity window of devices (M1-45). The page sizes of
 // 06-api.md live in apiConfigKeys, because every list reads them.
 func identityConfigKeys() []config.Key {
 	return []config.Key{
@@ -189,6 +189,12 @@ func identityConfigKeys() []config.Key {
 		{
 			Name: "auth.trusted_header_bind_requests", Kind: config.KindBool, Default: defaultTrue,
 			Doc:     "Every later request of a session started with the trusted_header driver must carry the same header login.",
+			Chapter: chapter08,
+		},
+		{
+			// At least an hour: a shorter window would revoke a device between two uses.
+			Name: "auth.device_inactive_revoke_after", Kind: config.KindDuration, Default: "180d", Min: "1h",
+			Doc:     "An active device without contact for this long is revoked (reason inactive).",
 			Chapter: chapter08,
 		},
 	}

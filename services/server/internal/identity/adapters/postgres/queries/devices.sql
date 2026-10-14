@@ -45,7 +45,8 @@ WHERE device_id = @device_id AND purpose = @purpose AND revoked_at IS NULL;
 SELECT * FROM device_keys WHERE jkt = @jkt;
 
 -- name: LockDevice :one
--- The device row of an approval or expiry, locked until the end of the unit of work (M1-38).
+-- The device row of an approval, expiry (M1-38) or revocation (M1-45), locked until the end of the
+-- unit of work.
 SELECT sqlc.embed(d),
        kd.jkt AS key_thumbprint,
        ks.jkt AS step_up_key_thumbprint

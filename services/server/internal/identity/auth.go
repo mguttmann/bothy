@@ -185,8 +185,10 @@ type TokenSet struct {
 }
 
 // SessionEnded is the in-transaction event of every revocation (docs/spec/02-architektur.md
-// section 4.3): the sessions that ended in this unit of work, their person, device and reason.
-// notify subscribes from M3 on (push registrations of the sessions).
+// section 4.3): the sessions of one device that ended in one step of a unit of work, their
+// person, device and reason. A use case that ends sessions on several devices (user.disable)
+// publishes one event per device, so every ended session is in exactly one event. notify
+// subscribes from M3 on (push registrations of the sessions).
 type SessionEnded struct {
 	// SessionIDs are the revoked sessions, ascending.
 	SessionIDs []ids.ID
@@ -194,6 +196,8 @@ type SessionEnded struct {
 	UserID, DeviceID ids.ID
 	// Reason is the revocation reason of the sessions.
 	Reason SessionRevokeReason
+	// At is auth_sessions.revoked_at of the sessions (M1-45).
+	At time.Time
 }
 
 // Auth is the session port of identity (PLAN M1-34; 08 section 7). Every error is a kernel/errs

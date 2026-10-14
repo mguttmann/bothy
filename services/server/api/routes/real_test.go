@@ -173,6 +173,18 @@ func (stubServer) RevokeToken(context.Context, rest.RevokeTokenRequestObject) (r
 	return nil, nil
 }
 
+func (stubServer) DisableUser(context.Context, rest.DisableUserRequestObject) (rest.DisableUserResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RevokeDevice(context.Context, rest.RevokeDeviceRequestObject) (rest.RevokeDeviceResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) RevokeSession(context.Context, rest.RevokeSessionRequestObject) (rest.RevokeSessionResponseObject, error) {
+	return nil, nil
+}
+
 func (stubServer) RotateSigningKey(context.Context, rest.RotateSigningKeyRequestObject) (rest.RotateSigningKeyResponseObject, error) {
 	return nil, nil
 }
@@ -366,8 +378,8 @@ func (stubServer) SetAgentToolClass(context.Context, rest.SetAgentToolClassReque
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
 // (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50),
 // the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40),
-// the OIDC login (M1-41) and the trusted header login (M1-43). A handler ticket that enables an
-// operation changes this test together with
+// the OIDC login (M1-41), the trusted header login (M1-43) and the revocations (M1-45). A handler
+// ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
 	type entry struct{ pattern, action, class string }
@@ -433,6 +445,10 @@ func TestRealTable_Enabled(t *testing.T) {
 		"setAllAgentsBillingMode": {"PUT /api/v1/instance/agent-billing-mode", "agent.billing_mode.set_all", "rl.admin"},
 		"setCredentialHolder":     {"PUT /api/v1/agents/{agent_id}/credential-holder", "agent.credential_holder.set", "rl.admin"},
 		"setAgentToolClass":       {"PUT /api/v1/agents/{agent_id}/tool-class", "agent.tool_class.set", "rl.admin"},
+		// M1-45
+		"disableUser":   {"POST /api/v1/users/{user_id}/disable", "user.disable", "rl.admin"},
+		"revokeDevice":  {"POST /api/v1/devices/{device_id}/revoke", "device.revoke", "rl.admin"},
+		"revokeSession": {"POST /api/v1/sessions/{session_id}/revoke", "session.revoke", "rl.admin"},
 		// M1-50
 		"listAuditEvents":   {"GET /api/v1/audit/events", "audit.read", "rl.admin"},
 		"exportAuditEvents": {"GET /api/v1/audit/export", "audit.read", "rl.admin"},

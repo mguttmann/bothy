@@ -66,7 +66,8 @@ chapters win on any difference. Rulings: [DECISIONS.md](../../../../../docs/DECI
 the sync module) and `kernel/txn.UnitOfWork` (docs/spec/02-architektur.md "Idempotenz im Unit of
 Work", 06 "Idempotenz"). It acts only when the operation declares the parameter
 (`Operation.IdempotencyKey`), the request carries the header and the actor is not anonymous
-and not `CredentialInactive` (an API token the authenticator found revoked or expired, M1-44:
+and not `CredentialInactive` (an API token the authenticator found revoked or expired, M1-44,
+or a person's access token whose session, device or key is revoked, ended or inactive, M1-45:
 such a request goes on to `authorize`, which refuses it, and never gets a stored answer);
 otherwise the header has no effect. A key that is not one UUIDv7 is `400 validation_failed`
 (`#header/Idempotency-Key`, `invalid_format`).

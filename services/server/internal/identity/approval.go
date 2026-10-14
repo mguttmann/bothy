@@ -24,14 +24,19 @@ const (
 	DeviceRevokePairingExpired DeviceRevokeReason = "pairing_expired"
 )
 
-// DeviceRevoked is the in-transaction event of a device revocation (docs/spec/02-architektur.md
-// section 4.3): the device, its person and the reason. Its sessions end in the same unit of work
-// with SessionEnded.
+// DeviceRevoked is the in-transaction event of every revoked device (docs/spec/02-architektur.md
+// section 4.3): one per device, published in the unit of work that revokes it (device.approve
+// with a wrong code and device.expire of M1-38; device.revoke, user.disable and device.expire of
+// M1-45). Its sessions end in the same unit of work with SessionEnded. notify subscribes from M3
+// on (M3-22); no subscriber exists in M1. M1-38 and M1-45 declared it separately (INT-W14/9).
 type DeviceRevoked struct {
 	// DeviceID is the revoked device; UserID its person.
 	DeviceID, UserID ids.ID
-	// Reason is the code of devices.revoke_reason.
+	// Reason is the code stored in devices.revoke_reason (verification_failed, pending_expired,
+	// pairing_expired, revoked_by_self, revoked_by_owner, user_disabled, inactive).
 	Reason DeviceRevokeReason
+	// At is devices.revoked_at.
+	At time.Time
 }
 
 // PairingStarted is the answer of beginPairing (schema PairingStarted): Code is the display form

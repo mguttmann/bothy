@@ -1,6 +1,6 @@
 # Modul `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43); the principal writer for agent principals built (M1-51).
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43); the principal writer for agent principals built (M1-51); disabling a person, revoking a device, ending a session and the inactive device sweep built (M1-45).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -350,7 +350,9 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
   query by `token_hash` joined with the principal kind, which must fit the token kind. A revoked
   or expired token yields the actor of its principal with the token id and `CredentialInactive`,
   so `authorize` refuses it in `check_active` with `401 unauthenticated` and the audit reason
-  `token_revoked`, and the Idempotency-Key stage never replays a stored answer to it. A bound token
+  `token_revoked`, and the Idempotency-Key stage never replays a stored answer to it. A person's
+  access token whose session is missing, revoked or ended, or whose device or key is revoked or
+  inactive, yields `CredentialInactive` the same way (M1-45). A bound token
   needs the scheme `DPoP` and a proof of exactly `dpop_jkt` whose `ath` is the hash of the token
   (`401 invalid_dpop_proof` with `WWW-Authenticate: DPoP`, or `use_dpop_nonce`); `Bearer` with a
   bound token is `invalid_dpop_proof` (RFC 9449 section 7.2), an unbound token under `DPoP` is
@@ -703,9 +705,63 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
   `Identity.Principals`.
 - Tests: `adapters/postgres/principalwriter_test.go` (`TestPrincipalWriter_*` on PostgreSQL 18).
 
+### Disable a person, revoke a device, end a session (M1-45)
+
+- Port (`lifecycle.go`): `Lifecycle` with `DisableUser`, `RevokeDevice` and `RevokeSession` and
+  their commands (`DisableUserCmd`, `RevokeDeviceCmd`, `RevokeSessionCmd`, each with the caller as
+  `Actor`), and the in-transaction event `DeviceRevoked {DeviceID, UserID, Reason, At}`.
+  `SessionEnded` (M1-34) gains `At`; every step that ends sessions publishes one `SessionEnded`
+  per device, so each ended session is in exactly one event.
+- `domain/lifecycle.go` (pure): `SessionRevokeReasonFor` (`logout` for the session's own person,
+  `admin` otherwise), `DeviceRevokeReasonFor` (`revoked_by_self` or `revoked_by_owner`),
+  `DisableTransition` (`active` and `pending` change, `disabled` no change, `deleted`
+  `invalid_state_transition`) and `DeviceRevokeTransition`.
+- `app/lifecycle.go`: `Lifecycle` over the outgoing port `LifecycleStore` and the use cases of
+  `People`, `Sessions` and `Tokens`. Each operation runs a first unit of work that loads the
+  resource, authorizes and ends a call without effect there (`200` with the object, `204` for a
+  session, audit `no_change`, no rights version), then a unit declared as the rights change of
+  its action for the affected person: phase 1 raises `permission_version`, the resource row is
+  locked, `authorize` runs again, the steps follow, and the rights hook verifies I1 and SR8 and
+  appends `access.changed` where the person's view changed.
+
+  | Use case | Steps in the rights change | Stored reasons |
+  |---|---|---|
+  | `user.disable` (owner, step-up) | principal `disabled`; devices then sessions locked; sessions and families, devices (pending included) and keys, personal API tokens revoked; `session.revoked` per session, `user.updated`; audit `{reason, sessions_revoked, devices_revoked, tokens_revoked}`; SR8 by the rights hook (`409 last_owner`) | sessions `user_disabled`, families `session_revoked`, devices `user_disabled` |
+  | `device.revoke` (self or owner, step-up) | device locked; its sessions (children included) and families, the device and its keys revoked; audit `{reason, user_id, revoke_reason, sessions_revoked}` | sessions `device_revoked`, devices `revoked_by_self` or `revoked_by_owner` |
+  | `session.revoke` (self or owner, no step-up) | session and live children locked and revoked with their families; audit `{user_id, revoke_reason, sessions_revoked}` | `logout` (own) or `admin` |
+
+  The owners row, grants and group memberships stay. Later stages subscribe: M3-22 deactivates
+  push registrations on `DeviceRevoked` and `SessionEnded` (08 section 11 step 5, section 10
+  step 2); M2 cancels runs and V2 suspends dev environments on `AccessChanged` (step 7); M1-65
+  closes gateway connections with `4012` on `session.revoked`.
+- Inactive devices (08 section 5.4): an active device whose `last_seen_at` (else `approved_at`)
+  is older than `auth.device_inactive_revoke_after` is refused at once (the Authenticator reports
+  its key as not active, `401 session_revoked` with the audit reason `device_inactive`, and
+  records no activity; a refresh is `401 session_revoked`). `ExpireInactiveDevices`, run by
+  `identity.auth_cleanup`, revokes each such device in its own rights change `device.expire`
+  (reason `inactive`, no actor, sessions `inactive`).
+- `adapters/postgres`: `queries/lifecycle.sql` and `lifecycle.go` implement `LifecycleStore`;
+  `GetAuthState` also reads `devices.approved_at`. No migration.
+- Operations (`adapters/httpapi/lifecycle.go`):
+
+  | Operation | Action and resource | Class | Answer |
+  |---|---|---|---|
+  | `disableUser` | `user.disable` on the person, step-up, `Idempotency-Key` | `rl.admin` | `200 User` |
+  | `revokeDevice` | `device.revoke` on the device, step-up, `Idempotency-Key` | `rl.admin` | `200 Device` |
+  | `revokeSession` | `session.revoke` on the session, `Idempotency-Key` | `rl.admin` | `204` |
+
+  A device or session of another person is `404` for a non-owner, the same as an unknown id.
+- Configuration: `auth.device_inactive_revoke_after` (`180d`, minimum `1h`).
+- Tests: `domain/lifecycle_test.go`, `adapters/postgres/lifecycle_test.go`
+  (`TestLifecycle_StoreRoundTrip`), `app/lifecycle_test.go` and
+  `adapters/httpapi/lifecycle_env_test.go` over PostgreSQL 18 with the real chain, step-up,
+  authz, audit, sync and idempotency: ID-T22, ID-T26, AZ-M26, AZ-M40, AZ-M41, concurrent
+  disables of the only two owners, the no-change and visibility rules, idempotency replays and
+  the inactive device sweep. Rulings: docs/DECISIONS.md M1-45.
+
 ## Port (Wurzelpaket `internal/identity`)
 
-- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Owners`; deklariert `AvatarFiles`.
+- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`; deklariert `AvatarFiles`.
 - Gibt In-Tx-Ereignisse aus: `DeviceRevoked`, `SessionEnded`.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (mit `HasActivePasskey`, M1-40), `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.
@@ -739,7 +795,7 @@ Nur dieses Modul schreibt und liest diese Tabellen per SQL (03-datenmodell.md, G
 
 | Job | Auslöser | Warteschlange |
 |---|---|---|
-| `identity.session_cleanup` | periodisch | `maintenance` |
+| `identity.auth_cleanup` | periodisch alle `auth.cleanup_interval`: abgelaufene Herausforderungen löschen, inaktive Geräte widerrufen (M1-35, M1-45) | `maintenance` |
 
 ## Hinweise für den Bau
 

@@ -37,6 +37,7 @@ func TestIdentityConfigBindsDefaults(t *testing.T) {
 		IDPRecheckInterval:        30 * 24 * time.Hour,
 		TrustedProxies:            []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32"), netip.MustParsePrefix("::1/128")},
 		TrustedHeaderBindRequests: true,
+		DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("IdentityConfig = %+v, want %+v", cfg, want)

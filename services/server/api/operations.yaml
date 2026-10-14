@@ -38,6 +38,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - deleteGroup
   - deleteIdentityProvider
   - disableAgent
+  - disableUser
   - enableAgent
   - enableUser
   - exportAuditEvents
@@ -77,9 +78,11 @@ enabled:             # operationIds that have a handler; sorted ascending
   - redeemEnrollmentCode
   - refreshToken
   - removeGroupMember
+  - revokeDevice
   - revokeGrant
   - revokeOwner
   - revokePasskey
+  - revokeSession
   - revokeToken
   - rotateSigningKey
   - setAgentBillingMode
@@ -264,9 +267,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteWebhookSubscription
     etappe: M2
     ticket: M2-26
-  - operation_id: disableUser
-    etappe: M1
-    ticket: M1-45
   - operation_id: downloadFile
     etappe: M3
     ticket: M3-05
@@ -615,15 +615,9 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: resumeRun
     etappe: M2
     ticket: M2-09
-  - operation_id: revokeDevice
-    etappe: M1
-    ticket: M1-45
   - operation_id: revokeIncomingWebhook
     etappe: M2
     ticket: M2-27
-  - operation_id: revokeSession
-    etappe: M1
-    ticket: M1-45
   - operation_id: search
     etappe: M3
     ticket: M3-14

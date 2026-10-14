@@ -146,15 +146,21 @@ type Identity struct {
 	TrustedHeaderHandlers *identityhttp.TrustedHeader
 	// Principals implements the port identity.PrincipalWriter for the agents module (M1-51).
 	Principals *app.PrincipalWriter
-	cfg        app.Config
-	state      instance.State
-	repo       *identitypg.Repository
-	uow        txn.UnitOfWork
-	az         authorize.Authorizer
-	writes     IdentityWrites
-	pepper     []byte
-	clk        clock.Clock
-	log        *slog.Logger
+	// Lifecycle implements the port identity.Lifecycle and the inactive device sweep (M1-45);
+	// nil until BindSessions.
+	Lifecycle *app.Lifecycle
+	// LifecycleHandlers are the REST handlers of disableUser, revokeDevice and revokeSession;
+	// nil until BindSessions.
+	LifecycleHandlers *identityhttp.Lifecycle
+	cfg               app.Config
+	state             instance.State
+	repo              *identitypg.Repository
+	uow               txn.UnitOfWork
+	az                authorize.Authorizer
+	writes            IdentityWrites
+	pepper            []byte
+	clk               clock.Clock
+	log               *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -237,8 +243,9 @@ func NewIdentity(cfg app.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 // the instance id (the issuer of access tokens): the use cases of identity.Auth, the Authenticator
 // of the HTTP chain and the session handlers, the step-up use cases with their handlers and
 // the use case of identity.auth_cleanup (M1-35), the providers and identities (M1-36), the
-// login service with the enrollment code handlers and the use cases of bothy setup (M1-37), and
-// the approval and pairing handlers (M1-38). The start calls it after the signing keys exist.
+// login service with the enrollment code handlers and the use cases of bothy setup (M1-37), the
+// approval and pairing handlers (M1-38) and the revocation use cases with their handlers (M1-45).
+// The start calls it after the signing keys exist.
 // Errors: a duration, URL or collaborator the use cases refuse.
 func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	tokens, err := app.NewAccessTokens(app.AccessTokenConfig{
@@ -272,6 +279,10 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	if err != nil {
 		return err
 	}
+	lifecycle, err := app.NewLifecycle(i.cfg, app.LifecycleDeps{Store: i.repo, People: i.People, Sessions: sessions, Tokens: i.Tokens, Clock: i.clk})
+	if err != nil {
+		return err
+	}
 	providers, err := app.NewProviders(i.cfg, app.ProvidersDeps{
 		Store: i.repo, Rules: app.DefaultProviderRules(SecretRefSyntax{}), UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
 		Auth: sessions, Clock: i.clk, TrustedHeader: i.TrustedHeader,
@@ -299,8 +310,8 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 		return err
 	}
 	// The cleanup job revokes expired pending devices and expires pairings through the login
-	// service (M1-38).
-	cleanup, err := app.NewAuthCleanup(i.cfg, i.uow, i.repo, logins, i.clk)
+	// service (M1-38) and revokes inactive devices through the lifecycle (M1-45).
+	cleanup, err := app.NewAuthCleanup(i.cfg, i.uow, i.repo, logins, lifecycle, i.clk)
 	if err != nil {
 		return err
 	}
@@ -315,6 +326,7 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 		return err
 	}
 	i.Passkeys, i.PasskeyHandlers = passkeys, identityhttp.NewPasskeys(passkeys, stepUps)
+	i.Lifecycle, i.LifecycleHandlers = lifecycle, identityhttp.NewLifecycle(lifecycle)
 	return nil
 }
 
