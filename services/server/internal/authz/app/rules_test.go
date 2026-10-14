@@ -140,7 +140,7 @@ func TestStepUp(t *testing.T) {
 func TestViewAs_IntersectsAndIsReadOnly(t *testing.T) {
 	w := newWorld(t)
 	asAlex := w.user(w.owner)
-	asAlex.ViewAs = w.alex
+	asAlex.ViewAs = &actor.ViewAs{UserID: w.alex, StartedAt: w.clk.Now()}
 	w.expect(t, asAlex, authorize.ActionMessageRead, w.msg(w.kampagnen, w.sam), notFound, "no_grant")
 	w.allow(t, asAlex, authorize.ActionMessageRead, w.msg(w.allgemein, w.sam))
 	w.expect(t, asAlex, authorize.ActionMessageCreate, w.thread(w.allgemein), forbidden, "view_as_read_only")
@@ -341,11 +341,11 @@ func TestViewAs_OwnDMOfTheViewerStaysInvisible(t *testing.T) {
 	w.structure.PutChannel(authz.ChannelFacts{ID: own, Kind: authz.ChannelDM, DMParticipants: []ids.ID{w.owner, w.alex}})
 	w.addMainThread(own)
 	asSam := w.user(w.owner)
-	asSam.ViewAs = w.sam
+	asSam.ViewAs = &actor.ViewAs{UserID: w.sam, StartedAt: w.clk.Now()}
 	w.expect(t, asSam, authorize.ActionMessageRead, w.msg(own, w.alex), notFound, "no_grant")
 	w.expect(t, asSam, authorize.ActionDmLeave, w.channel(own), notFound, "no_grant")
 	asAlex := w.user(w.owner)
-	asAlex.ViewAs = w.alex
+	asAlex.ViewAs = &actor.ViewAs{UserID: w.alex, StartedAt: w.clk.Now()}
 	w.allow(t, asAlex, authorize.ActionMessageRead, w.msg(own, w.alex))
 }
 

@@ -354,7 +354,7 @@ func TestScope_AppNeedsReadScope(t *testing.T) {
 func TestScope_ViewAsAndActingFor(t *testing.T) {
 	w := newWorld(t)
 	asSam := w.user(w.owner)
-	asSam.ViewAs = w.sam
+	asSam.ViewAs = &actor.ViewAs{UserID: w.sam, StartedAt: w.clk.Now()}
 	sc, _ := w.az.Scope(context.Background(), asSam, authorize.ActionMessageRead)
 	want := domain.SortIDs([]ids.ID{w.allgemein, w.kampagnen, w.intern})
 	if !slices.Equal(sc.ChannelIDs, want) || sc.InstanceWide {

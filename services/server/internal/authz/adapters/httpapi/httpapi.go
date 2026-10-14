@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package httpapi is the REST adapter of the authz module (M1-48): the twelve operations of 06
-// "Groups" and "Access" (listGroups, createGroup, getGroup, updateGroup, deleteGroup,
+// Package httpapi is the REST adapter of the authz module (M1-48, M1-49): the sixteen operations
+// of 06 "Groups" and "Access" (listGroups, createGroup, getGroup, updateGroup, deleteGroup,
 // listGroupMembers, addGroupMember, removeGroupMember, listGrants, createGrant, getGrant,
-// revokeGrant) over the port authz.Admin, and Cursors, the cursor codec of platform/httpserver
+// revokeGrant, and since M1-49 explainSpaceAccess, explainChannelAccess, previewGrant and
+// viewAsUser) over the port authz.Admin, and Cursors, the cursor codec of platform/httpserver
 // behind app.Cursors. The use cases authorize; the handlers only convert. Errors go to the
 // problem writer of the chain unchanged.
 //
@@ -193,31 +194,38 @@ func (h *Access) ListGrants(ctx context.Context, req rest.ListGrantsRequestObjec
 
 // CreateGrant implements rest.StrictServerInterface (POST /grants).
 func (h *Access) CreateGrant(ctx context.Context, req rest.CreateGrantRequestObject) (rest.CreateGrantResponseObject, error) {
-	var cmd authz.CreateGrantCmd
-	if b := req.Body; b != nil {
-		cmd.SubjectKind, cmd.SubjectID = string(b.SubjectKind), ids.ID(b.SubjectId)
-		cmd.TargetKind, cmd.Reason = string(b.TargetKind), b.Reason
-		if b.TargetId != nil {
-			cmd.TargetID = ids.ID(*b.TargetId)
-		}
-		if b.Level != nil {
-			cmd.Level = string(*b.Level)
-		}
-		if b.Capabilities != nil {
-			cmd.Capabilities = make([]string, 0, len(*b.Capabilities))
-			for _, c := range *b.Capabilities {
-				cmd.Capabilities = append(cmd.Capabilities, string(c))
-			}
-		}
-		if b.ExpiresAt != nil {
-			cmd.ExpiresAt = *b.ExpiresAt
-		}
-	}
-	g, err := h.admin.CreateGrant(ctx, principal(ctx), cmd)
+	g, err := h.admin.CreateGrant(ctx, principal(ctx), grantCmd(req.Body))
 	if err != nil {
 		return nil, err
 	}
 	return rest.CreateGrant201JSONResponse{Body: grantREST(g)}, nil
+}
+
+// grantCmd converts the body GrantCreate of createGrant and previewGrant; a nil body gives the
+// zero command, which the use case refuses.
+func grantCmd(b *rest.GrantCreate) authz.CreateGrantCmd {
+	var cmd authz.CreateGrantCmd
+	if b == nil {
+		return cmd
+	}
+	cmd.SubjectKind, cmd.SubjectID = string(b.SubjectKind), ids.ID(b.SubjectId)
+	cmd.TargetKind, cmd.Reason = string(b.TargetKind), b.Reason
+	if b.TargetId != nil {
+		cmd.TargetID = ids.ID(*b.TargetId)
+	}
+	if b.Level != nil {
+		cmd.Level = string(*b.Level)
+	}
+	if b.Capabilities != nil {
+		cmd.Capabilities = make([]string, 0, len(*b.Capabilities))
+		for _, c := range *b.Capabilities {
+			cmd.Capabilities = append(cmd.Capabilities, string(c))
+		}
+	}
+	if b.ExpiresAt != nil {
+		cmd.ExpiresAt = *b.ExpiresAt
+	}
+	return cmd
 }
 
 // GetGrant implements rest.StrictServerInterface (GET /grants/{grant_id}).

@@ -242,3 +242,36 @@ func TestStoreClaimQueries(t *testing.T) {
 		t.Fatal("an unknown membership was extended")
 	}
 }
+
+// TestStructureDetails: the fake reports the details of PutSpaceDetail and the names of
+// PutChannelDetail over the facts of PutChannel, and leaves unknown ids out (M1-49).
+func TestStructureDetails(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	s := fake.NewStructure()
+	space, plain, op, ch, other := ids.New(), ids.New(), ids.New(), ids.New(), ids.New()
+	s.PutSpaceDetail(authz.SpaceDetail{ID: space, Name: "Marketing", SortKey: "a1", DefaultOperatorID: op, Version: 2, CreatedAt: at})
+	s.PutSpace(plain)
+	s.PutChannel(authz.ChannelFacts{ID: ch, SpaceID: space, Kind: authz.ChannelText, EffectiveOperatorID: op, ReadOnly: true})
+	s.PutChannelDetail(authz.ChannelDetail{ID: ch, Name: "Kampagnen", Topic: "t", OperatorMode: authz.OperatorInherit})
+	sd, err := s.SpaceDetails(ctx, []ids.ID{space, plain, other})
+	if err != nil || len(sd) != 2 || sd[space].Name != "Marketing" || sd[space].DefaultOperatorID != op || sd[plain].Name != plain.String() {
+		t.Fatalf("SpaceDetails = %+v, %v", sd, err)
+	}
+	if served, _ := s.ServedTargets(ctx, op); !slices.Contains(served, authz.ChannelRef{SpaceID: space}) {
+		t.Fatalf("the default operator of PutSpaceDetail serves the space: %v", served)
+	}
+	cd, err := s.ChannelDetails(ctx, []ids.ID{ch, other})
+	c := cd[ch]
+	if err != nil || len(cd) != 1 || c.Name != "Kampagnen" || c.SpaceID != space || !c.ReadOnly || c.EffectiveOperatorID != op ||
+		c.OperatorMode != authz.OperatorInherit || c.Kind != authz.ChannelText {
+		t.Fatalf("ChannelDetails = %+v, %v", cd, err)
+	}
+	s.Fail(true)
+	if _, err := s.SpaceDetails(ctx, []ids.ID{space}); !errors.Is(err, fake.ErrInjected) {
+		t.Fatal(err)
+	}
+	if _, err := s.ChannelDetails(ctx, []ids.ID{ch}); !errors.Is(err, fake.ErrInjected) {
+		t.Fatal(err)
+	}
+}

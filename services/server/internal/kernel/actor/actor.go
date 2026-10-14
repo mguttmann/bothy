@@ -77,9 +77,9 @@ type Actor struct {
 	// GrantedScopes are app_installations.granted_scopes (apps only); authz checks the scope of
 	// each action against them (05 section 2.6).
 	GrantedScopes []string
-	// ViewAs is the person whose view an owner looks at in "view as" (07 section 9.2); zero for
-	// none.
-	ViewAs ids.ID
+	// ViewAs is the "view as" of an owner (07 section 9.2); nil for none. Only authz sets it, for
+	// an owner session inside viewAsUser (M1-49); it is never parsed from client input in M1.
+	ViewAs *ViewAs
 	// ActingFor is the checked invocation token of the run an agent acts in (SR9); the zero value
 	// for none. Filled from M2 on.
 	ActingFor ActingFor
@@ -99,6 +99,22 @@ const (
 type ActingFor struct {
 	UserID, RunID, ThreadID ids.ID
 	JTI                     string
+}
+
+// ViewAs is the state of "view as" (07 section 3 field view_as, section 9.2): the person whose
+// view an owner looks at and the start of the view. authorize intersects the owner's rights with
+// the person's, refuses every write with view_as_read_only and, from StartedAt plus
+// authz.view_as_max_duration on, ends every decision with step_up_required.
+//
+// Example:
+//
+//	as := owner
+//	as.ViewAs = &actor.ViewAs{UserID: alex, StartedAt: now}
+type ViewAs struct {
+	// UserID is the viewed person.
+	UserID ids.ID
+	// StartedAt is the request time the view started at.
+	StartedAt time.Time
 }
 
 // IsZero reports whether f names no run.
@@ -140,8 +156,21 @@ func (a Actor) CredentialState() (sessionActive bool, deviceState string, device
 // AppGrantedScopes returns a.GrantedScopes (kernel/authorize.Principal); the slice is shared.
 func (a Actor) AppGrantedScopes() []string { return a.GrantedScopes }
 
-// ViewAsPerson returns a.ViewAs (kernel/authorize.Principal).
-func (a Actor) ViewAsPerson() ids.ID { return a.ViewAs }
+// ViewAsPerson returns the viewed person of a.ViewAs, zero for none (kernel/authorize.Principal).
+func (a Actor) ViewAsPerson() ids.ID {
+	if a.ViewAs == nil {
+		return ids.ID{}
+	}
+	return a.ViewAs.UserID
+}
+
+// ViewAsStart returns the start of a.ViewAs, zero for none (kernel/authorize.Principal).
+func (a Actor) ViewAsStart() time.Time {
+	if a.ViewAs == nil {
+		return time.Time{}
+	}
+	return a.ViewAs.StartedAt
+}
 
 // ActingForPerson returns a.ActingFor.UserID (kernel/authorize.Principal).
 func (a Actor) ActingForPerson() ids.ID { return a.ActingFor.UserID }
@@ -164,6 +193,7 @@ type actorKey struct{}
 func WithActor(ctx context.Context, a Actor) context.Context {
 	a.Scopes = slices.Clone(a.Scopes)
 	a.GrantedScopes = slices.Clone(a.GrantedScopes)
+	a.ViewAs = cloneViewAs(a.ViewAs)
 	return context.WithValue(ctx, actorKey{}, a)
 }
 
@@ -174,8 +204,18 @@ func FromContext(ctx context.Context) (Actor, bool) {
 	if ok {
 		a.Scopes = slices.Clone(a.Scopes)
 		a.GrantedScopes = slices.Clone(a.GrantedScopes)
+		a.ViewAs = cloneViewAs(a.ViewAs)
 	}
 	return a, ok
+}
+
+// cloneViewAs copies v, so a context never shares it with the caller.
+func cloneViewAs(v *ViewAs) *ViewAs {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
 }
 
 // Credentials is what the HTTP chain hands to the Authenticator for one request

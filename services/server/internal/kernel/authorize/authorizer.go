@@ -39,6 +39,9 @@ type Principal interface {
 	AppGrantedScopes() []string
 	// ViewAsPerson is the person whose view an owner looks at (07 section 9.2); zero for none.
 	ViewAsPerson() ids.ID
+	// ViewAsStart is the start of "view as"; zero for none. From it plus
+	// authz.view_as_max_duration on, every decision is step_up_required (M1-49).
+	ViewAsStart() time.Time
 	// ActingForPerson is the triggering person of the run an agent acts in (SR9); zero for none.
 	ActingForPerson() ids.ID
 }

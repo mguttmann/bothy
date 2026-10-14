@@ -203,6 +203,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"authz.expiry_sweep_batch_max = 500  # default\n" +
 		"authz.expiry_sweep_interval = 1m  # default\n" +
 		"authz.snapshot_cache_max_entries = 10000  # default\n" +
+		"authz.view_as_max_duration = 15m  # default\n" +
 		"branding.product_name_max_chars = 64  # default\n" +
 		"client.min_version.android =   # default\n" +
 		"client.min_version.ios =   # default\n" +

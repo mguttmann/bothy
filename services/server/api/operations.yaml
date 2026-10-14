@@ -41,6 +41,8 @@ enabled:             # operationIds that have a handler; sorted ascending
   - disableUser
   - enableAgent
   - enableUser
+  - explainChannelAccess
+  - explainSpaceAccess
   - exportAuditEvents
   - getAgent
   - getDevice
@@ -73,6 +75,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listUsers
   - loginWithTrustedHeader
   - logout
+  - previewGrant
   - putFeatureFlag
   - putInstanceSetting
   - redeemEnrollmentCode
@@ -97,6 +100,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - updateMyProfile
   - updateUser
   - verifyAuditChain
+  - viewAsUser
 later:               # every other operationId of docs/api/openapi.yaml; sorted by operation_id
   - operation_id: abortUpload
     etappe: M3
@@ -275,12 +279,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: downloadThumbnail
     etappe: M3
     ticket: M3-05
-  - operation_id: explainChannelAccess
-    etappe: M1
-    ticket: M1-49
-  - operation_id: explainSpaceAccess
-    etappe: M1
-    ticket: M1-49
   - operation_id: exportChannel
     etappe: M3
     ticket: M3-11
@@ -547,9 +545,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: postIncomingWebhook
     etappe: M2
     ticket: M2-27
-  - operation_id: previewGrant
-    etappe: M1
-    ticket: M1-49
   - operation_id: putChannelBehavior
     etappe: M2
     ticket: M2-02
@@ -731,6 +726,3 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: validateManifest
     etappe: M2
     ticket: M2-24
-  - operation_id: viewAsUser
-    etappe: M1
-    ticket: M1-49

@@ -5,6 +5,7 @@ package authzsource_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"slices"
 	"testing"
@@ -75,8 +76,16 @@ func realWorld(t *testing.T, holder ids.ID, list []agentFixture) authz.AgentPoli
 		if a.reported != "" {
 			reported = a.reported
 		}
-		exec(`INSERT INTO agents (principal_id, adapter_kind, billing_mode, credential_holder_id, tool_class, reported_tool_class)
-			VALUES ($1, 'hermes', $2, $3, $4, $5)`, a.id.String(), a.policy.BillingMode, h, a.policy.ToolClass, reported)
+		details := "{}"
+		if len(a.policy.BillingModesSupported) > 0 {
+			b, err := json.Marshal(map[string]any{"billing_modes_supported": a.policy.BillingModesSupported})
+			if err != nil {
+				t.Fatal(err)
+			}
+			details = string(b)
+		}
+		exec(`INSERT INTO agents (principal_id, adapter_kind, billing_mode, credential_holder_id, tool_class, reported_tool_class, reported_details)
+			VALUES ($1, 'hermes', $2, $3, $4, $5, $6)`, a.id.String(), a.policy.BillingMode, h, a.policy.ToolClass, reported, details)
 	}
 	repo := identitypg.NewRepository(app)
 	return authzsource.New(agentspg.NewRepository(app), identityapp.NewDirectory(repo))
@@ -86,7 +95,7 @@ func realWorld(t *testing.T, holder ids.ID, list []agentFixture) authz.AgentPoli
 // authz fake and the agents implementation: PersonalAgents lists exactly the active personal
 // agents ascending (a disabled personal agent is not in the I1 list), AgentPolicy reports mode,
 // holder, target and reported tool class (the effective class is their maximum) and ok false for
-// an unknown agent, and no dev environment is ready before V2.
+// an unknown agent, the billing modes the adapter reported (M1-49), and no dev environment is ready before V2.
 func TestAgentPolicySourceContract(t *testing.T) {
 	t.Parallel()
 	for name, build := range map[string]policyWorld{"fake": fakeWorld, "agents": realWorld} {
@@ -94,7 +103,8 @@ func TestAgentPolicySourceContract(t *testing.T) {
 			t.Parallel()
 			holder := ids.New()
 			list := []agentFixture{
-				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "personal", CredentialHolderID: holder, ToolClass: "chat"}, reported: "host", active: true},
+				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "personal", CredentialHolderID: holder, ToolClass: "chat",
+					BillingModesSupported: []string{"personal", "organization"}}, reported: "host", active: true},
 				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "organization", ToolClass: "scoped"}, active: true},
 				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "personal", CredentialHolderID: holder, ToolClass: "host"}, active: false},
 				{id: ids.New(), policy: authz.AgentPolicy{BillingMode: "personal", CredentialHolderID: holder, ToolClass: "scoped"}, active: true},
@@ -111,11 +121,13 @@ func TestAgentPolicySourceContract(t *testing.T) {
 				t.Fatalf("PersonalAgents = %+v, want %+v", got, want)
 			}
 			pol, ok, err := src.AgentPolicy(ctx, list[0].id)
-			if err != nil || !ok || pol.BillingMode != "personal" || pol.CredentialHolderID != holder || pol.ToolClass != "chat" || pol.ReportedToolClass != "host" {
+			if err != nil || !ok || pol.BillingMode != "personal" || pol.CredentialHolderID != holder || pol.ToolClass != "chat" || pol.ReportedToolClass != "host" ||
+				!slices.Equal(pol.BillingModesSupported, []string{"personal", "organization"}) {
 				t.Fatalf("AgentPolicy personal = %+v, %v, %v", pol, ok, err)
 			}
 			pol, ok, err = src.AgentPolicy(ctx, list[1].id)
-			if err != nil || !ok || pol.BillingMode != "organization" || !pol.CredentialHolderID.IsZero() || pol.ReportedToolClass != "" {
+			if err != nil || !ok || pol.BillingMode != "organization" || !pol.CredentialHolderID.IsZero() || pol.ReportedToolClass != "" ||
+				len(pol.BillingModesSupported) != 0 {
 				t.Fatalf("AgentPolicy organization = %+v, %v, %v", pol, ok, err)
 			}
 			if pol, ok, err := src.AgentPolicy(ctx, list[2].id); err != nil || !ok || pol.ToolClass != "host" {

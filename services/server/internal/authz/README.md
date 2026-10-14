@@ -1,6 +1,6 @@
 # Modul `authz`
 
-Status: Gerüst (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the rights snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below).
+Status: Gerüst (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the rights snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below). M1-42 brings the claim group sync of OIDC logins (section "Claim groups (M1-42)" below). M1-49 brings "who has access", the grant preview and "view as" (section "Who has access, preview and view as (M1-49)" below).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -20,11 +20,12 @@ Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.
 - `app/` (M1-29): `rightschange.go` with `RightsHook` (`Begin`, `BeforeCommit`, `AddAffected`, `VerifyInvariants`, `Bind`) and `admin.go` with `AdminService`, the implementation of the port `Admin`. `domain/` (M1-29): `triggerset.go` (`World`, `TriggerSet`), `diff.go` (`AccessView`, `AccessViewOf`, `DiffVisible`, `PrincipalDiff`), the archived cap in `Effective` and `CheckGroupText`. Root package (M1-29): `admin.go` (`Admin`, its commands and records, `RightsChanges`, `Register`) and `errors.go` (`InvariantError`, `I1Conflict`, `HintI1`, `HintLastOwner`).
 - `app/` (M1-30): `expiry.go` with `ExpiryService` (`Sweep`, `Remind`), `ExpiryConfig` and `ExpiryResult`; `ExpiryStore` in `store.go`; `expiryfold.go` with the fold of due expiries into every rights change (`RightsHook.Folded`). `domain/` (M1-30): `AssumeValid` in `validity.go` and `SnapshotInput.Assume`. `adapters/postgres/` (M1-30): `queries/expiry.sql` and `expiry.go`. `adapters/jobs/` (M1-30): the job arguments `ExpirySweep` and `ExpiryReminder`, their handlers and `Register`.
 - `adapters/flagsource/` (M1-47): `Source` implements `instance.FlagGroupSource` over the authz store: `ValidGroupIDs` keeps the memberships in effect at the given time by `Membership.InEffect` (a membership with `expires_at = t` and a deleted group are not valid), `ExistingGroupIDs` the groups that exist and are not deleted. `internal/wire` passes it to the feature flags of instance.
+- `domain/` (M1-49): `explain.go` (`Provenance`, the provenance mode of the snapshot builder, `Source`, `ExplainEntry`, `SortEntries`), `horizon.go` (`EffectiveToolClass`, `SR2Blocks`, `Horizon` for H(A), `Triggerers` for T(A)), `preview.go` (`Effects`) and `previewtext/` (`Render`, `Language`, the catalogues `catalog_de.go` and `catalog_en.go`, golden files in `testdata/`). `app/` (M1-49): `explain.go`, `preview.go` and `viewas.go` with the use cases, `RightsHook.Evaluate` and the shared `triggerWorld` in `rightschange.go`. `adapters/httpapi/access.go` (M1-49): the four handlers.
 - Their components come from `tools/archgen` and `architecture/modules.yaml`; a package outside these layers fails in `make arch`.
 
 ## Port (Wurzelpaket `internal/authz`)
 
-- Eingehend: `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`. Built in M1-29: `Admin` with `CreateGroup`, `UpdateGroup`, `DeleteGroup`, `AddGroupMember`, `RemoveGroupMember`, `CreateGrant`, `RevokeGrant`, and `RightsChanges.AddAffected`. The source ports gained `PrincipalSource.ActiveOwnerIDs` (M1-26), `StructureSource.ServedTargets` and `SpaceArchived`, `ChannelFacts.Archived` and `AgentPolicySource.PersonalAgents`; `internal/wire` passes the agent policy source of agents since M1-51 and an empty structure source until M1-52, M1-53 and M1-54 (chat).
+- Eingehend: `Admin` (Gruppen, Freigaben, Abgleich der Claim-Gruppen, Erklärung, Vorschau, Ansicht als Person); deklariert `PrincipalSource`, `CredentialSource`, `StructureSource`, `AgentPolicySource`, `HostSource`. Built in M1-29: `Admin` with `CreateGroup`, `UpdateGroup`, `DeleteGroup`, `AddGroupMember`, `RemoveGroupMember`, `CreateGrant`, `RevokeGrant`, and `RightsChanges.AddAffected`. The source ports gained `PrincipalSource.ActiveOwnerIDs` (M1-26), `StructureSource.ServedTargets` and `SpaceArchived`, `ChannelFacts.Archived` and `AgentPolicySource.PersonalAgents`; M1-49 adds `ExplainAccess`, `PreviewGrant` and `ViewAs` to `Admin`, `PrincipalSource.Profiles` and `OwnerIDs`, `StructureSource.SpaceDetails` and `ChannelDetails` and `AgentPolicy.BillingModesSupported`; `internal/wire` passes the agent policy source of agents since M1-51 and an empty structure source until M1-52, M1-53 and M1-54 (chat).
 - Gibt In-Tx-Ereignisse aus: kernel `authorize.AccessChanged` (mit der auslösenden Aktion; `runs` bricht bei `user.disable` mit Grund `user_disabled` ab, sonst mit `access_revoked`).
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `authorize.Authorizer`, `instance.FlagGroupSource`.
@@ -282,6 +283,40 @@ grant, scope the target's space and channel, receive action `grant.read`) or `gr
 receive action `group.read`, `member_count` counted after the change). Deleting a group appends
 one `grant.changed` per revoked grant and one `group.changed`. `access.changed` comes only from
 the rights hook (M1-29). Calls without effect append nothing.
+
+## Who has access, preview and view as (M1-49)
+
+`adapters/httpapi` implements `explainSpaceAccess`, `explainChannelAccess` (`access.explain`),
+`previewGrant` (`access.preview`) and `viewAsUser` (`access.view_as`) over `authz.Admin`. The use
+cases compute with the Authorizer and the rights hook of authz (`AdminDeps.Engine` and `Hook`),
+so an explanation, a preview and a view cannot disagree with a real decision. Rulings:
+docs/DECISIONS.md M1-49.
+
+- `ExplainAccess` (07 section 9.1): `authorize(access.explain)` first (no read `404`, read
+  without `owner` or `manage` `403`); then the owners (active or not), the subjects of grants not
+  revoked on the target's path with the members of such groups, the operator of a channel or the
+  default operator of a space and the participants of a dm channel. Each gets its effective rights
+  from `readGrants`, `BuildSnapshot` and `Effective` (built as active, so an inactive principal
+  shows what its grants would give, with `inactive`) and its sources from `domain.Provenance`.
+  `via_agent` (H1): a person in T(A) of an active agent A whose H(A) holds the channel (or, for
+  a space, one of its channels) the person cannot read; `guard_blocked`: `trigger` on a target
+  whose operator has the effective tool class `host` (SR2). Entries with level `none` stay only
+  with `via_agent`; owners first, then by display name, then by id.
+- `PreviewGrant` (07 section 9.3): the shape like `createGrant`, `authorize(access.preview)` with
+  the requirement of `grant.create` (no step-up, no audit), then the delegation limits
+  (`CheckCreate`; a limit is `allowed = false` with `denial_reason`). The dry run runs the apply
+  step of `createGrant` in a unit of work with the same rights change, reads
+  `RightsHook.Evaluate` (I1, SR8, the views before and after) and the hints inside it and ends with
+  the sentinel `errPreviewRollback`, so the sync and audit hooks never run: no row, counter or
+  notification survives. The text comes from `domain/previewtext` in the caller's language and
+  time zone.
+- `ViewAs` (07 section 9.2): `authorize(access.view_as)` (owner in a session, step-up; denials
+  audited by `authorize`), `404` for an id that is not a person, then `Scope` for `message.read`
+  and `space.read` with `actor.ViewAs{UserID, StartedAt}` and the rights of `authorize` per item:
+  the intersection of owner and person, without dm channels and archived structure. The allow
+  entry carries `target_user_id` and `expires_at`. `authorize` refuses every write under "view
+  as" with `view_as_read_only` and answers `step_up_required` from `StartedAt +
+  authz.view_as_max_duration` on.
 
 ## Expiry (M1-30)
 

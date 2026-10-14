@@ -261,24 +261,74 @@ func (h *RightsHook) BeforeCommit(ctx context.Context) error {
 	return txn.Publish(ctx, authorize.AccessChanged{PermissionVersion: st.version, Action: st.action, Changes: changes})
 }
 
-// differences returns the non-empty differences of the affected principals, ascending.
-func (h *RightsHook) differences(ctx context.Context, st *rightsState) ([]authorize.PrincipalAccessChange, error) {
+// RightsEvaluation is what the rights check of a change computes before its commit: the
+// invariants and the views before and after of every affected principal (Principals ascending).
+// access.preview reads it instead of committing (M1-49).
+type RightsEvaluation struct {
+	Violations    Violations
+	Principals    []ids.ID
+	Before, After map[ids.ID]domain.AccessView
+	// At is the time of Begin every view is computed at.
+	At time.Time
+}
+
+// Evaluate computes, in the work phase of a declared rights change, what BeforeCommit would
+// decide: VerifyInvariants at the time of the clock and the views after the change of every
+// affected principal, with the same code as the check hook. It appends no event and publishes
+// nothing, so a caller that rolls the unit back afterwards leaves no trace (access.preview, 07
+// section 9.3, R-RE-10). Errors: kind internal outside a declared rights change; source errors.
+func (h *RightsHook) Evaluate(ctx context.Context) (RightsEvaluation, error) {
+	st, ok := txn.Load(ctx, stateKey)
+	if !ok || txn.CurrentPhase(ctx) != txn.PhaseWork {
+		return RightsEvaluation{}, internal("Evaluate runs only in the work phase of a declared rights change")
+	}
+	viol, err := h.VerifyInvariants(ctx, h.d.Clock.Now())
+	if err != nil {
+		return RightsEvaluation{}, err
+	}
+	principals, after, err := h.afterViews(ctx, st)
+	if err != nil {
+		return RightsEvaluation{}, err
+	}
+	st.mu.Lock()
+	before := make(map[ids.ID]domain.AccessView, len(st.before))
+	for k, v := range st.before {
+		before[k] = v
+	}
+	st.mu.Unlock()
+	return RightsEvaluation{Violations: viol, Principals: principals, Before: before, After: after, At: st.t}, nil
+}
+
+// afterViews returns the affected principals ascending and their views after the change.
+func (h *RightsHook) afterViews(ctx context.Context, st *rightsState) ([]ids.ID, map[ids.ID]domain.AccessView, error) {
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if len(st.before) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 	w, err := h.structureNow(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	principals := domain.SortIDs(slices.Collect(mapsKeys(st.before)))
+	after := make(map[ids.ID]domain.AccessView, len(principals))
+	for _, p := range principals {
+		if after[p], err = h.viewOf(ctx, w, p, st.version, st.t, reportedView); err != nil {
+			return nil, nil, err
+		}
+	}
+	return principals, after, nil
+}
+
+// differences returns the non-empty differences of the affected principals, ascending.
+func (h *RightsHook) differences(ctx context.Context, st *rightsState) ([]authorize.PrincipalAccessChange, error) {
+	principals, afterViews, err := h.afterViews(ctx, st)
+	if err != nil || len(principals) == 0 {
+		return nil, err
+	}
 	var out []authorize.PrincipalAccessChange
 	for _, p := range principals {
-		after, err := h.viewOf(ctx, w, p, st.version, st.t, reportedView)
-		if err != nil {
-			return nil, err
-		}
+		after := afterViews[p]
 		d := domain.DiffVisible(st.before[p], after)
 		if d.Empty() {
 			continue
@@ -497,8 +547,16 @@ func (h *RightsHook) VerifyInvariants(ctx context.Context, t time.Time) (Violati
 // i1World reads the trigger grants, the memberships of their groups and the states of the people
 // they name.
 func (h *RightsHook) i1World(ctx context.Context, owners []ids.ID) (domain.World, error) {
+	return triggerWorld(ctx, h.d.Store, h.d.Principals, owners)
+}
+
+// triggerWorld reads the facts of trigger sets (03 section 6.4, 10 section 5.3): the trigger
+// grants, the memberships of their groups and the states of the people they name, with the active
+// owners; the served targets are left to the caller. The I1 check and the read horizon of
+// access.explain and access.preview (T(A), M1-49) share it, so both see the same triggerers.
+func triggerWorld(ctx context.Context, store Store, principals authz.PrincipalSource, owners []ids.ID) (domain.World, error) {
 	w := domain.World{Principals: map[ids.ID]domain.PrincipalState{}, Owners: owners, Served: map[ids.ID][]domain.ServedTarget{}}
-	grants, err := h.d.Store.ActiveTriggerGrants(ctx)
+	grants, err := store.ActiveTriggerGrants(ctx)
 	if err != nil {
 		return domain.World{}, sourceError("grant store", err)
 	}
@@ -514,7 +572,7 @@ func (h *RightsHook) i1World(ctx context.Context, owners []ids.ID) (domain.World
 		}
 	}
 	if len(groups) > 0 {
-		if w.Memberships, err = h.d.Store.ActiveMembershipsOfGroups(ctx, groups); err != nil {
+		if w.Memberships, err = store.ActiveMembershipsOfGroups(ctx, groups); err != nil {
 			return domain.World{}, sourceError("grant store", err)
 		}
 		for _, m := range w.Memberships {
@@ -525,7 +583,7 @@ func (h *RightsHook) i1World(ctx context.Context, owners []ids.ID) (domain.World
 		if _, done := w.Principals[p]; done {
 			continue
 		}
-		f, found, err := h.d.Principals.Principal(ctx, p)
+		f, found, err := principals.Principal(ctx, p)
 		if err != nil {
 			return domain.World{}, sourceError("principal source", err)
 		}

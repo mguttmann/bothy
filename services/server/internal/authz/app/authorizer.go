@@ -27,6 +27,9 @@ type AuthorizerConfig struct {
 	SnapshotCacheMaxEntries int `config:"authz.snapshot_cache_max_entries"`
 	// StepUpMaxAge is how long a step-up is fresh (auth.step_up_max_age).
 	StepUpMaxAge time.Duration `config:"auth.step_up_max_age"`
+	// ViewAsMaxDuration is how long "view as" lasts (authz.view_as_max_duration, M1-49): from
+	// actor.ViewAs.StartedAt plus this duration on, every decision is step_up_required.
+	ViewAsMaxDuration time.Duration `config:"authz.view_as_max_duration"`
 }
 
 // AuthorizerDeps are the collaborators of the Authorizer. Facts owned by other modules come only
@@ -93,6 +96,9 @@ func NewAuthorizer(cfg AuthorizerConfig, d AuthorizerDeps) (*Authorizer, error) 
 	}
 	if cfg.StepUpMaxAge < 0 {
 		return nil, errors.New("authz: auth.step_up_max_age must not be negative")
+	}
+	if cfg.ViewAsMaxDuration < 0 {
+		return nil, errors.New("authz: authz.view_as_max_duration must not be negative")
 	}
 	log := d.Log
 	if log == nil {
@@ -261,6 +267,10 @@ func (a *Authorizer) principalOf(ctx context.Context, p authorize.Principal, act
 		return nil, d, nil
 	}
 	if id := p.ViewAsPerson(); !id.IsZero() {
+		if a.viewAsEnded(p.ViewAsStart(), t) {
+			// The view ended; a new one needs a fresh step-up (07 section 9.2, no own reason code).
+			return nil, domain.Decision{Outcome: domain.OutcomeStepUpRequired, Reason: domain.ReasonStepUpRequired}, nil
+		}
 		ve, err := a.load(ctx, authz.CredentialRef{PrincipalID: id}, v, t)
 		if err != nil {
 			return nil, domain.Decision{}, err
@@ -275,6 +285,12 @@ func (a *Authorizer) principalOf(ctx context.Context, p authorize.Principal, act
 		s.actingFor = &ae
 	}
 	return s, domain.Allow, nil
+}
+
+// viewAsEnded reports whether a view started at start has ended at t: from start plus
+// authz.view_as_max_duration on (07 section 9.2). A view without a start has ended (fail closed).
+func (a *Authorizer) viewAsEnded(start, t time.Time) bool {
+	return start.IsZero() || !t.Before(start.Add(a.cfg.ViewAsMaxDuration))
 }
 
 // load returns the snapshot entry of ref at version v, from the cache when it is valid at t.

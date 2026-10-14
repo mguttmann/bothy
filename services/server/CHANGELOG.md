@@ -23,6 +23,21 @@ documented in this file. The format is based on
   agents. New store queries `LockClaimMembershipsOfUser`, `ExtendMembership` and
   `ListClaimGroupsByRefs`; the fake provider gets `SetGroups` and `SetGroupsOverage`.
 
+- Who has access, grant preview and view as (M1-49): `explainSpaceAccess` and
+  `explainChannelAccess` (`access.explain`, owner or `manage`) list every principal with its
+  effective level, capabilities, `inactive` mark and sources (`owner`, `direct`, `group`,
+  `inherited`, `operator`, `dm_participant`, `via_agent` for hint H1, `guard_blocked` for SR2),
+  computed with the snapshot code of `authorize`. `previewGrant` (`access.preview`, no step-up, no
+  audit) runs the apply step of `createGrant` in the real transaction and rolls it back, reports
+  the effects per principal, I1 and SR8 violations with `organization_ready`, the hints
+  `read_horizon`, `trigger_blocked_tool_class`, `group_reach` and `expiry_missing`, delegation
+  limits as `allowed: false` with `denial_reason`, and a plain text from German and English
+  templates in the caller's language and time zone. `viewAsUser` (`access.view_as`, owner,
+  step-up, audit) returns the spaces and channels a person sees with the intersected rights,
+  without direct messages; `actor.ViewAs` carries the start of the view and every decision is
+  `step_up_required` once `authz.view_as_max_duration` (new key, default `15m`) has passed. The
+  source ports gain `PrincipalSource.Profiles` and `OwnerIDs`, `StructureSource.SpaceDetails` and
+  `ChannelDetails` and `AgentPolicy.BillingModesSupported`.
 - Device approval and pairing (M1-38): a device that logs in without an enrollment code stays
   `pending` with tokens but no access beyond reading itself and shows a verification code
   derived from the token pepper, its id and its DPoP key (never stored). `approveDevice` (owner or

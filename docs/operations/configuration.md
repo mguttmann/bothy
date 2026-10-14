@@ -352,7 +352,7 @@ Quelle: [07-rechte.md](../spec/07-rechte.md), Abschnitt 14.
 | `authz.expiry_sweep_interval` | `BOTHY_AUTHZ__EXPIRY_SWEEP_INTERVAL` | Server | duration | `1m` | Abstand des Jobs, der Abläufe meldet und Erinnerungen schreibt | aktiv |
 | `authz.expiry_reminder_lead` | `BOTHY_AUTHZ__EXPIRY_REMINDER_LEAD` | Server | duration | `48h` | so lange vor Ablauf kommt die Erinnerung (Studie C: zwei Tage) | aktiv |
 | `authz.expiry_sweep_batch_max` | `BOTHY_AUTHZ__EXPIRY_SWEEP_BATCH_MAX` | Server | int | `500` | Zeilen je Transaktion der Jobs `authz.expiry_sweep` und `authz.expiry_reminder` | aktiv |
-| `authz.view_as_max_duration` | `BOTHY_AUTHZ__VIEW_AS_MAX_DURATION` | Server |  | `15m` | Höchstdauer von "Als Person ansehen" | geplant (M1) |
+| `authz.view_as_max_duration` | `BOTHY_AUTHZ__VIEW_AS_MAX_DURATION` | Server | duration | `15m` | Höchstdauer von "Als Person ansehen" | aktiv |
 | `authz.snapshot_cache_max_entries` | `BOTHY_AUTHZ__SNAPSHOT_CACHE_MAX_ENTRIES` | Server | int | `10000` | Rechte-Stände im Speicher je Prozess (LRU) | aktiv |
 | `authz.not_found_timing_tolerance` | `BOTHY_AUTHZ__NOT_FOUND_TIMING_TOLERANCE` | Server |  | `20ms` | erlaubte Abweichung des Medians in AZ-P4 | geplant (M1) |
 

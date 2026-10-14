@@ -21,12 +21,13 @@ func TestActorAsAuthorizePrincipal(t *testing.T) {
 	a := actor.Actor{
 		ID: ids.New(), Kind: actor.KindApp, SessionID: ids.New(), DeviceID: ids.New(), StepUpAt: step,
 		TokenID: ids.New(), InstallationID: ids.New(), GrantedScopes: []string{"messages:read"},
-		ViewAs: ids.New(), ActingFor: actor.ActingFor{UserID: ids.New(), RunID: ids.New(), ThreadID: ids.New(), JTI: "j"},
+		ViewAs: &actor.ViewAs{UserID: ids.New(), StartedAt: step}, ActingFor: actor.ActingFor{UserID: ids.New(), RunID: ids.New(), ThreadID: ids.New(), JTI: "j"},
 	}
 	var p authorize.Principal = a
 	if p.PrincipalID() != a.ID || p.PrincipalKind() != "app" || p.SessionRef() != a.SessionID ||
 		p.DeviceRef() != a.DeviceID || p.TokenRef() != a.TokenID || p.InstallationRef() != a.InstallationID ||
-		!p.StepUpTime().Equal(step) || len(p.AppGrantedScopes()) != 1 || p.ViewAsPerson() != a.ViewAs ||
+		!p.StepUpTime().Equal(step) || len(p.AppGrantedScopes()) != 1 || p.ViewAsPerson() != a.ViewAs.UserID ||
+		!p.ViewAsStart().Equal(step) ||
 		p.ActingForPerson() != a.ActingFor.UserID {
 		t.Fatalf("principal view differs from %+v", a)
 	}
@@ -35,7 +36,15 @@ func TestActorAsAuthorizePrincipal(t *testing.T) {
 	}
 	got, _ := actor.FromContext(actor.WithActor(context.Background(), a))
 	a.GrantedScopes[0] = "changed"
-	if got.GrantedScopes[0] != "messages:read" || got.ActingFor != a.ActingFor || got.ViewAs != a.ViewAs {
+	if got.GrantedScopes[0] != "messages:read" || got.ActingFor != a.ActingFor || got.ViewAs == nil || *got.ViewAs != *a.ViewAs {
 		t.Fatalf("context copy shares or loses fields: %+v", got)
+	}
+	a.ViewAs.UserID = ids.New()
+	if got.ViewAs.UserID == a.ViewAs.UserID {
+		t.Fatal("the context copy shares ViewAs")
+	}
+	var none authorize.Principal = actor.Actor{ID: ids.New(), Kind: actor.KindUser}
+	if !none.ViewAsPerson().IsZero() || !none.ViewAsStart().IsZero() {
+		t.Fatal("an actor without ViewAs names no person")
 	}
 }

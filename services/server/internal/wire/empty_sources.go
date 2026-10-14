@@ -39,3 +39,13 @@ func (emptyStructure) DMChannelsOf(context.Context, ids.ID) ([]ids.ID, error)   
 func (emptyStructure) ServedTargets(context.Context, ids.ID) ([]authz.ChannelRef, error) {
 	return nil, nil
 }
+
+// SpaceDetails knows no space until M1-52.
+func (emptyStructure) SpaceDetails(context.Context, []ids.ID) (map[ids.ID]authz.SpaceDetail, error) {
+	return map[ids.ID]authz.SpaceDetail{}, nil
+}
+
+// ChannelDetails knows no channel until M1-53.
+func (emptyStructure) ChannelDetails(context.Context, []ids.ID) (map[ids.ID]authz.ChannelDetail, error) {
+	return map[ids.ID]authz.ChannelDetail{}, nil
+}

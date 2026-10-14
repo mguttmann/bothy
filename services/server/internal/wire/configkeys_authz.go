@@ -5,7 +5,7 @@ package wire
 import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
 // authzConfigKeys returns the keys the module authz reads: the bound of the rights snapshot cache
-// (M1-28) and the three keys of the expiry jobs (M1-30) from docs/spec/07-rechte.md section 14,
+// (M1-28), the three keys of the expiry jobs (M1-30) and the duration of view as (M1-49) from docs/spec/07-rechte.md section 14,
 // the age of a fresh step-up and the group text limits (M1-48) from 03-datenmodell.md
 // "Konfigurationswerte dieses Kapitels".
 func authzConfigKeys() []config.Key {
@@ -40,6 +40,12 @@ func authzConfigKeys() []config.Key {
 			// The upper bound is the LIMIT parameter of the selections (int4).
 			Name: "authz.expiry_sweep_batch_max", Kind: config.KindInt, Default: "500", Min: "1", Max: "2147483647",
 			Doc:     "Rows per transaction of the jobs authz.expiry_sweep and authz.expiry_reminder.",
+			Chapter: chapter07,
+		},
+		{
+			// At least 1s: a shorter view would end before its snapshot is read (M1-49).
+			Name: "authz.view_as_max_duration", Kind: config.KindDuration, Default: "15m", Min: "1s",
+			Doc:     "Longest duration of view as: from its start plus this duration every decision of the view is step_up_required.",
 			Chapter: chapter07,
 		},
 		{

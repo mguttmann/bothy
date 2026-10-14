@@ -554,6 +554,18 @@
       "doc": "Most rights snapshots a process keeps in memory (least recently used go first)."
     },
     {
+      "name": "authz.view_as_max_duration",
+      "env": "BOTHY_AUTHZ__VIEW_AS_MAX_DURATION",
+      "kind": "duration",
+      "default": "15m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "07-rechte.md",
+      "doc": "Longest duration of view as: from its start plus this duration every decision of the view is step_up_required."
+    },
+    {
       "name": "branding.product_name_max_chars",
       "env": "BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS",
       "kind": "int",
