@@ -41,7 +41,7 @@ Rules for every brief:
 6. Test first: write the failing test, run it and keep the red output for the report, then make it green, then clean up.
 7. No en dash and no em dash in any file you write; the `text-rules` pre-commit hook rejects them, and the ARB test of M4-06 rejects them in interface texts. Use a hyphen or rephrase.
 8. White label: examples and test data use `example.com` and the people Alex, Sam and Robin; no company, host or personal names, no paths under a home directory. Interface texts and permission usage descriptions come from `packages/l10n` (the Info.plist strings are generated per language like the strings of M5-04 Design note 6).
-9. Limits only through named configuration values: `voice_max_duration_ms` and `file_max_upload_bytes` from `InstanceLimits` (never from `AppConfig`, D-W-115), `client.voice.bitrate` from `AppConfig`; code comments name the key, never the number.
+9. Limits only through named configuration values: `voice_max_duration_ms` and `file_max_upload_bytes` from `InstanceLimits` (never from `AppConfig`, D-W-115), `client.voice.bitrate` and `client.voice.limit_notice_lead` from `AppConfig`; code comments name the key, never the number.
 10. Specification first: a change to behaviour updates `docs/spec/` in the same change. The core contract is not edited by this ticket.
 
 Product requirements implemented here:
@@ -68,7 +68,7 @@ Change:
 - The outbox entries of M4-15 and M4-22: a voice upload entry with `kind = voice` on its message; nothing new if M4-22 already supports it.
 - iOS `Info.plist` (`NSMicrophoneUsageDescription`, `NSCameraUsageDescription`, and `NSPhotoLibraryUsageDescription` only if the chosen picker needs it; `PHPickerViewController` does not), localized per language; Android manifest `RECORD_AUDIO`, `CAMERA` (and no storage permission when the photo picker of the platform is used).
 - `packages/l10n` ARB files: recording, limit notice, permission texts.
-- Docs: `apps/client/README.md` (media permissions, how the recorder is tested), `docs/spec/15-client-architecture.md` 13 (the accessible button mode, the temporary file rule), root `CHANGELOG.md` under `[Unreleased]`, `docs/DECISIONS.md` section 10 rows `D-M5-07-1` to `D-M5-07-5`.
+- Docs: `apps/client/README.md` (media permissions, how the recorder is tested), `docs/spec/15-client-architecture.md` 13 (the accessible button mode, the temporary file rule) and 22 (the key `client.voice.limit_notice_lead`), `docs/operations/configuration.md` (its row), root `CHANGELOG.md` under `[Unreleased]`, `docs/DECISIONS.md` section 10 rows `D-M5-07-1` to `D-M5-07-5`.
 
 ## Out of scope
 
@@ -94,7 +94,7 @@ Change:
 
 ## Design notes
 
-1. **Recorder** (15 13; 12 8.1; Ruling for docs/DECISIONS.md). `record` with `AudioEncoder.aacLc`, one channel, the bitrate of `client.voice.bitrate`, the sample rate the package default for AAC-LC, output to a file in the app's temporary directory. The controller arms a timer at `voice_max_duration_ms` minus the notice lead (a fixed fraction or a short fixed lead; name it in `AppConfig` if you need a key, `client.voice.limit_notice_lead`, and add it to 15 22 and the configuration reference first) and stops a margin before the limit (one encoder frame plus the container overhead, computed from the bitrate), so that the `mvhd` duration the server reads never exceeds `voice.max_duration` (12 8.1, `voice_too_long`); the stopped file is the recording. The device test asserts the `mvhd` duration of a recording that hit the limit is at most the limit. Elapsed time comes from an injected clock so the tests run without waiting.
+1. **Recorder** (15 13; 12 8.1; Ruling for docs/DECISIONS.md). `record` with `AudioEncoder.aacLc`, one channel, the bitrate of `client.voice.bitrate`, the sample rate the package default for AAC-LC, output to a file in the app's temporary directory. The controller arms a timer at `voice_max_duration_ms` minus `client.voice.limit_notice_lead` (a new client key in `AppConfig`, added to 15 22 and the configuration reference first, so the lead is never a number in code) and stops a margin before the limit (one encoder frame plus the container overhead, computed from the bitrate), so that the `mvhd` duration the server reads never exceeds `voice.max_duration` (12 8.1, `voice_too_long`); the stopped file is the recording. The device test asserts the `mvhd` duration of a recording that hit the limit is at most the limit. Elapsed time comes from an injected clock so the tests run without waiting.
 
 2. **States** (01 5.3 M5). Idle, recording (finger down), locked (after the swipe up; buttons stop and send appear), stopping, ready (the file exists and is under the limit), discarded (swipe left or discard button: the file is deleted at once). Release in recording sends; stop in locked shows a preview with play, send and discard. A phone call or the app going to the background stops the recording and keeps it as locked (the person decides), never sends by itself.
 
