@@ -123,8 +123,8 @@ func TestPGBackRestTLSKeptOnSecondRun(t *testing.T) {
 	if got := status(second, "pgbackrest_tls/"); got != stack.StatusKept {
 		t.Errorf("second run reports pgbackrest_tls/ as %q, want kept", got)
 	}
-	if fp(first, "pgbackrest_tls/") == "" || fp(first, "pgbackrest_tls/") != fp(second, "pgbackrest_tls/") {
-		t.Errorf("fingerprint changed: %q then %q", fp(first, "pgbackrest_tls/"), fp(second, "pgbackrest_tls/"))
+	if fp(first) == "" || fp(first) != fp(second) {
+		t.Errorf("fingerprint changed: %q then %q", fp(first), fp(second))
 	}
 }
 
@@ -138,10 +138,10 @@ func status(r stack.Report, name string) stack.Status {
 	return ""
 }
 
-// fp returns the fingerprint of the report line named name.
-func fp(r stack.Report, name string) string {
+// fp returns the fingerprint of the report line of pgbackrest_tls/.
+func fp(r stack.Report) string {
 	for _, l := range r.Lines {
-		if l.Name == name {
+		if l.Name == "pgbackrest_tls/" {
 			return l.Fingerprint
 		}
 	}

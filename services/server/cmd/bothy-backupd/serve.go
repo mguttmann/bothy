@@ -46,7 +46,8 @@ func serve(ctx context.Context, opts serveOptions, signals <-chan os.Signal, std
 	defer cancel()
 	log := &lineWriter{w: stderr}
 
-	child := exec.Command(opts.pgbackrest, "server") //nolint:gosec // G204: the binary is a flag of the operator.
+	// The child outlives a canceled ctx until stop has sent SIGTERM: exec would kill it outright.
+	child := exec.CommandContext(context.WithoutCancel(ctx), opts.pgbackrest, "server") //nolint:gosec // G204: the binary is a flag of the operator.
 	child.Stdout, child.Stderr = log, log
 	if err := child.Start(); err != nil {
 		log.printf("bothy-backupd: start the pgBackRest TLS server: %v", err)

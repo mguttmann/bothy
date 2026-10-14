@@ -63,9 +63,9 @@ Exit codes: 0 ok, 1 failure, 2 usage error.
 `
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer stop()
-	os.Exit(run(ctx, os.Args[1:], os.Stdout, os.Stderr))
+	// Signals reach the default command through its own channel (run); the short commands need
+	// none.
+	os.Exit(run(context.Background(), os.Args[1:], os.Stdout, os.Stderr))
 }
 
 // run executes the command line args (without the program name) and returns the exit code.

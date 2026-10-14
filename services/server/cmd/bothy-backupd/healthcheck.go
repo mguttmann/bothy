@@ -81,7 +81,7 @@ func clientTLS(files tlsFiles, name string) (*tls.Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("client certificate: %w", err)
 	}
-	pemCA, err := os.ReadFile(files.ca) //nolint:gosec // G304: the path is a flag of the operator.
+	pemCA, err := os.ReadFile(files.ca)
 	if err != nil {
 		return nil, fmt.Errorf("CA certificate: %w", err)
 	}

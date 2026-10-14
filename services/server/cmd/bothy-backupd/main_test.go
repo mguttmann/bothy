@@ -61,7 +61,7 @@ func waitFile(t *testing.T, path string) string {
 	t.Helper()
 	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
-		if b, err := os.ReadFile(path); err == nil && len(b) > 0 {
+		if b, err := os.ReadFile(path); err == nil && len(b) > 0 { //nolint:gosec // G304: path from t.TempDir.
 			return strings.TrimSpace(string(b))
 		}
 		time.Sleep(20 * time.Millisecond)
@@ -186,7 +186,7 @@ func tlsServer(t *testing.T, dir, caDir, host string) string {
 		t.Fatal(err)
 	}
 	pool := x509.NewCertPool()
-	pem, err := os.ReadFile(filepath.Join(caDir, "ca.crt"))
+	pem, err := os.ReadFile(filepath.Join(caDir, "ca.crt")) //nolint:gosec // G304: path from t.TempDir.
 	if err != nil || !pool.AppendCertsFromPEM(pem) {
 		t.Fatalf("CA: %v", err)
 	}
@@ -204,7 +204,7 @@ func tlsServer(t *testing.T, dir, caDir, host string) string {
 				return
 			}
 			go func() {
-				_ = c.(*tls.Conn).Handshake()
+				_ = c.(*tls.Conn).HandshakeContext(context.Background())
 				_ = c.Close()
 			}()
 		}
@@ -226,7 +226,7 @@ func TestHealthcheck(t *testing.T) {
 	foreign := tlsServer(t, other, other, "backup")
 	wrongName := tlsServer(t, dir, dir, "postgres")
 	// A closed port: listen, note the address, close.
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +257,7 @@ func TestHealthcheck(t *testing.T) {
 func TestHealthcheckSilentServer(t *testing.T) {
 	t.Parallel()
 	dir := tlsMaterial(t)
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := new(net.ListenConfig).Listen(t.Context(), "tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
