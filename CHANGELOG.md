@@ -170,6 +170,10 @@ operated, and the order of the build.
   "gate not default: plan does not allow it" instead of failing; every other difference
   still fails the check. On a SonarQube Server the check now also fails when the gate is not
   the default. Before, the first refusal stopped the run before any profile was applied.
+- `quality_sync.py` prints the reason the SonarQube Web API gives for a refused call (the
+  `errors[].msg` of the response, shortened) after the HTTP status; before, a refusal such as
+  HTTP 400 on `api/qualityprofiles/set_default` showed only the status and could not be
+  diagnosed from the run log.
 - `docs/api/openapi.yaml` 0.2.0: the response `Conflict` names the problem code
   `file_blocked` in the order of the codes; `createHost` and `issueHostPairingCode` take
   `Idempotency-Key` and list `422 idempotency_key_reuse` instead of the exemption `auth_flow`,

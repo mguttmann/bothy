@@ -255,3 +255,38 @@ def test_check_reports_gate_not_default_on_server(server: tuple[State, str]) -> 
     report = qs.check(_client(url), config)
     assert report.problems == ["gate 'Bothy way' is not the default gate"]
     assert report.gaps == []
+
+
+def test_error_names_the_server_message(server: tuple[State, str]) -> None:
+    # A refusal is only diagnosable from the run log if the server's reason is printed.
+    _, url = server
+    with pytest.raises(qs.SonarError, match=r"HTTP 400: missing parameter$") as err:
+        _client(url).post("api/qualitygates/create_condition", gateName="absent", metric="m")
+    assert err.value.status == 400
+    assert TOKEN not in str(err.value)
+
+
+@pytest.mark.parametrize(
+    "body", [b"", b"<html>bad gateway</html>", b"{}", b'{"errors": "x"}', b'{"errors": [{}]}']
+)
+def test_error_without_server_message_keeps_the_status_only(body: bytes) -> None:
+    assert qs._error_messages(body) == ""
+
+
+def test_error_message_is_shortened() -> None:
+    body = json.dumps({"errors": [{"msg": "x" * 1000}]}).encode()
+    assert qs._error_messages(body) == ": " + "x" * qs._MAX_ERROR_CHARS
+
+
+def test_error_body_is_read_bounded() -> None:
+    class Body:
+        def __init__(self) -> None:
+            self.asked: int | None = None
+
+        def read(self, size: int = -1) -> bytes:
+            self.asked = size
+            return b'{"errors": [{"msg": "refused"}]}'
+
+    body = Body()
+    assert qs._read_error_body(body) == b'{"errors": [{"msg": "refused"}]}'
+    assert body.asked == qs._MAX_ERROR_BODY_BYTES
