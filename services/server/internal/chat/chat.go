@@ -51,7 +51,7 @@ type Space struct {
 	Icon, Color string
 	// SortKey is the fractional index of the global order.
 	SortKey string
-	// DefaultOperatorAgentID is the default operator; zero for none (M1-54 sets it).
+	// DefaultOperatorAgentID is the default operator; zero for none (set by SetSpaceOperator).
 	DefaultOperatorAgentID ids.ID
 	// CreatedAt is the creation time; ArchivedAt the archive time, zero while not archived.
 	CreatedAt, ArchivedAt time.Time
@@ -215,8 +215,34 @@ type UpdateForumTagCmd struct {
 	Restricted *bool
 }
 
-// Structure is the incoming port of the structure, here its space, sidebar, channel and forum tag
-// part (M1-52, M1-53; operators M1-54, threads M1-55). Every method authorizes the caller a with the
+// OperatorAssignment is the operator a request sets (schema OperatorSet without the reason):
+// Mode is inherit, none or agent; AgentID the agent of mode agent and zero when the member is
+// absent.
+type OperatorAssignment struct {
+	Mode    string
+	AgentID ids.ID
+}
+
+// SetSpaceOperatorCmd is the request of setSpaceOperator (M1-54): the space, the new default
+// operator (none or agent), the reason and the If-Match of the request.
+type SetSpaceOperatorCmd struct {
+	SpaceID  ids.ID
+	Operator OperatorAssignment
+	Reason   string
+	IfMatch  Precondition
+}
+
+// SetChannelOperatorCmd is the request of setChannelOperator (M1-54): the channel, the new
+// operator (inherit, none or agent), the reason and the If-Match of the request.
+type SetChannelOperatorCmd struct {
+	ChannelID ids.ID
+	Operator  OperatorAssignment
+	Reason    string
+	IfMatch   Precondition
+}
+
+// Structure is the incoming port of the structure, here its space, sidebar, channel, forum tag
+// and operator part (M1-52, M1-53, M1-54; threads M1-55). Every method authorizes the caller a with the
 // action of 05 section 4.5 and runs its writes in one unit of work with audit and the durable
 // event; a missing and an invisible space give the same 404 not_found. Errors are kernel/errs
 // errors.
@@ -284,4 +310,16 @@ type Structure interface {
 	// DeleteForumTag deletes a tag (forum_tag.manage); deleting a deleted tag succeeds without a
 	// change.
 	DeleteForumTag(ctx context.Context, a actor.Actor, channelID, tagID ids.ID) error
+
+	// SetSpaceOperator sets the default operator of a space (space.operator.set, owner, step-up)
+	// as a rights change checked against I1 (M1-54): the space and every inheriting channel that
+	// is not archived get a new version and their event. The same assignment answers the space
+	// without a change. Errors: not_found, forbidden, step_up_required, precondition_required,
+	// version_conflict with current, validation_failed, conflict for an archived space,
+	// i1_violation with the conflicts.
+	SetSpaceOperator(ctx context.Context, a actor.Actor, cmd SetSpaceOperatorCmd) (Space, error)
+	// SetChannelOperator sets the operator of a channel or lets it inherit (channel.operator.set,
+	// owner, step-up) as a rights change checked against I1 (M1-54). The same assignment answers
+	// the channel without a change. Errors as SetSpaceOperator, conflict for an archived channel.
+	SetChannelOperator(ctx context.Context, a actor.Actor, cmd SetChannelOperatorCmd) (Channel, error)
 }

@@ -109,8 +109,10 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setAgentBillingMode
   - setAgentToolClass
   - setAllAgentsBillingMode
+  - setChannelOperator
   - setCredentialHolder
   - setHostState
+  - setSpaceOperator
   - unlinkIdentity
   - updateAgent
   - updateBranding
@@ -594,9 +596,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: setAppScopes
     etappe: M2
     ticket: M2-24
-  - operation_id: setChannelOperator
-    etappe: M1
-    ticket: M1-54
   - operation_id: setChannelReadOnly
     etappe: M8
     ticket: M8-05
@@ -615,9 +614,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: setMyLocalCredential
     etappe: M1
     ticket: M1-39
-  - operation_id: setSpaceOperator
-    etappe: M1
-    ticket: M1-54
   - operation_id: setThreadTags
     etappe: M1
     ticket: M1-55

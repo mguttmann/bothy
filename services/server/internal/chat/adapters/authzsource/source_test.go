@@ -142,3 +142,42 @@ func TestSourceChannels(t *testing.T) {
 		t.Fatalf("details %+v, %v", d, err)
 	}
 }
+
+// opStore answers the thread and served-target reads of the source (M1-54).
+type opStore struct {
+	app.Store
+	thread app.ThreadRow
+	served []app.ServedTarget
+}
+
+func (s opStore) Thread(_ context.Context, id ids.ID) (app.ThreadRow, bool, error) {
+	return s.thread, id == s.thread.ID, nil
+}
+
+func (s opStore) ServedTargets(context.Context, ids.ID) ([]app.ServedTarget, error) {
+	return s.served, nil
+}
+
+// TestSourceOperators: Thread converts the facts of a known thread and ServedTargets the targets;
+// the zero agent serves nothing.
+func TestSourceOperators(t *testing.T) {
+	t.Parallel()
+	th := app.ThreadRow{ID: ids.New(), ChannelID: ids.New(), OperatorAgentID: ids.New(), CreatedBy: ids.New()}
+	space, channel := ids.New(), ids.New()
+	src := authzsource.New(opStore{thread: th, served: []app.ServedTarget{{SpaceID: space}, {ChannelID: channel, SpaceID: space}}})
+	ctx := context.Background()
+	f, ok, err := src.Thread(ctx, th.ID)
+	if err != nil || !ok || f != (authz.ThreadFacts{ID: th.ID, ChannelID: th.ChannelID, OperatorAgentID: th.OperatorAgentID, CreatedBy: th.CreatedBy}) {
+		t.Fatalf("thread %+v %v %v", f, ok, err)
+	}
+	if _, ok, err := src.Thread(ctx, ids.New()); ok || err != nil {
+		t.Fatalf("unknown thread %v %v", ok, err)
+	}
+	refs, err := src.ServedTargets(ctx, ids.New())
+	if err != nil || len(refs) != 2 || refs[0] != (authz.ChannelRef{SpaceID: space}) || refs[1] != (authz.ChannelRef{ChannelID: channel, SpaceID: space}) {
+		t.Fatalf("served %+v %v", refs, err)
+	}
+	if refs, err := src.ServedTargets(ctx, ids.ID{}); err != nil || refs != nil {
+		t.Fatalf("zero agent %+v %v", refs, err)
+	}
+}

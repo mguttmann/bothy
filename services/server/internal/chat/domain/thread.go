@@ -8,6 +8,9 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
+// ThreadKindMain is threads.kind of the main thread of a channel.
+const ThreadKindMain = "main"
+
 // Thread is one row of threads (03 section 4.5) as far as M1-53 writes it: the main thread of a
 // text channel (R-DM-11), created with the channel. The thread use cases come with M1-55.
 type Thread struct {
@@ -28,7 +31,7 @@ type Thread struct {
 // source auto, state open, no operator, no parent message (R-DM-11, R-DM-21).
 func NewMainThread(id, channel, by ids.ID, at time.Time) Thread {
 	return Thread{
-		ID: id, ChannelID: channel, Kind: "main", TitleSource: "auto", State: "open", CreatedBy: by,
+		ID: id, ChannelID: channel, Kind: ThreadKindMain, TitleSource: "auto", State: "open", CreatedBy: by,
 		CreatedAt: at, LastActivityAt: at, Version: 1,
 	}
 }

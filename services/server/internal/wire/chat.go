@@ -10,6 +10,8 @@ import (
 	chathttp "github.com/OWNER/bothy/services/server/internal/chat/adapters/httpapi"
 	chatpg "github.com/OWNER/bothy/services/server/internal/chat/adapters/postgres"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
+	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
+	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	"github.com/OWNER/bothy/services/server/internal/kernel/auditing"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
@@ -29,31 +31,33 @@ func ChatConfig(v *config.Values) (chatapp.Config, error) {
 	return c, nil
 }
 
-// chatStructure is the authz.StructureSource of the process: the space and channel part of chat
-// (M1-52, M1-53) and the empty thread part until M1-55 (empty_sources.go).
+// chatStructure is the authz.StructureSource of the process: the structure of chat (M1-52 to
+// M1-54) and the empty dm part until V3 (empty_sources.go).
 type chatStructure struct {
 	*authzsource.Source
-	emptyThreads
+	emptyDMs
 }
 
 // Compile-time check: the joined source is the structure port of authz.
 var _ authz.StructureSource = chatStructure{}
 
-// NewStructureSource returns the authz.StructureSource of the process over pool: spaces and
-// channels from the tables of chat (M1-52, M1-53), no thread or dm participation yet. The Authorizer, the rights
-// hooks and the Admin use cases of authz read it.
+// NewStructureSource returns the authz.StructureSource of the process over pool: spaces,
+// channels, threads and the served targets of I1 from the tables of chat (M1-52 to M1-54), no dm
+// participation yet. The Authorizer, the rights hooks and the Admin use cases of authz read it.
 func NewStructureSource(pool *pg.Pool) authz.StructureSource {
 	return chatStructure{Source: authzsource.New(chatpg.NewRepository(pool))}
 }
 
-// ChatWrites are the write collaborators of the chat use cases: the recorder and the appender.
+// ChatWrites are the write collaborators of the chat use cases: the recorder, the appender and
+// the rights hook that names the affected principals of an operator change (M1-54).
 type ChatWrites struct {
 	Audit  auditing.Recorder
 	Events eventlog.Appender
+	Rights authz.RightsChanges
 }
 
-// Chat is the chat module of the process (M1-52, M1-53): the space, sidebar, channel and forum tag
-// use cases of chat.Structure and the REST handlers of their eighteen operations.
+// Chat is the chat module of the process (M1-52 to M1-54): the space, sidebar, channel, forum tag
+// and operator use cases of chat.Structure and the REST handlers of their twenty operations.
 type Chat struct {
 	// Service implements chat.Structure.
 	Service *chatapp.Service
@@ -64,8 +68,9 @@ type Chat struct {
 }
 
 // NewChat builds the chat module over pool with the unit of work uow, the Authorizer az (also the
-// rights query of SpaceView), the recorder and appender of w and the clock (nil means
-// clock.System()). It opens no connection. Errors: a missing collaborator or a name limit the use
+// rights query of SpaceView), the recorder, appender and rights hook of w, the principal
+// directory of identity and the agent policy source of agents over pool, and the clock (nil
+// means clock.System()). It opens no connection. Errors: a missing collaborator or a name limit the use
 // cases refuse.
 func NewChat(cfg chatapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer, rights authz.RightsQuery,
 	w ChatWrites, clk clock.Clock) (*Chat, error) {
@@ -74,6 +79,7 @@ func NewChat(cfg chatapp.Config, pool *pg.Pool, uow txn.UnitOfWork, az authorize
 	}
 	svc, err := chatapp.New(cfg, chatapp.Deps{
 		Store: chatpg.NewRepository(pool), UoW: uow, Authorizer: az, Rights: rights, Audit: w.Audit, Events: w.Events, Clock: clk,
+		RightsChanges: w.Rights, Directory: identityapp.NewDirectory(identitypg.NewRepository(pool)), Policies: NewAgentPolicySource(pool),
 	})
 	if err != nil {
 		return nil, err

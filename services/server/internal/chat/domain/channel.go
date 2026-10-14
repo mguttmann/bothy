@@ -66,7 +66,7 @@ type Channel struct {
 	Name, Topic string
 	// SortKey is the fractional index key of the order in the space.
 	SortKey string
-	// OperatorInherit and OperatorAgentID are the operator columns (written by M1-54).
+	// OperatorInherit and OperatorAgentID are the operator columns (written by SetOperator, M1-54).
 	OperatorInherit bool
 	OperatorAgentID ids.ID
 	// RequireMention, ThreadRequireMention, FreeResponse, AutoThread and AllowMentionedAgents are
@@ -113,13 +113,8 @@ type Operator struct {
 // Operator returns the operator of the channel with spaceDefault, the default operator of its
 // space (03: effective operator = operator_inherit ? default : operator_agent_id).
 func (c Channel) Operator(spaceDefault ids.ID) Operator {
-	switch {
-	case c.OperatorInherit:
-		return Operator{Mode: OperatorInherit, EffectiveAgentID: spaceDefault}
-	case !c.OperatorAgentID.IsZero():
-		return Operator{Mode: OperatorAgent, AgentID: c.OperatorAgentID, EffectiveAgentID: c.OperatorAgentID}
-	}
-	return Operator{Mode: OperatorNone}
+	a := c.Assignment()
+	return Operator{Mode: a.Mode, AgentID: a.AgentID, EffectiveAgentID: EffectiveOperator(c.OperatorInherit, c.OperatorAgentID, spaceDefault)}
 }
 
 // ChannelChange is the body of updateChannel after the text checks: nil fields stay unchanged.
@@ -175,8 +170,9 @@ func (c *Channel) Move(key string) {
 	c.Version++
 }
 
-// Touch bumps the version for a change of the forum tags (03 forum_tags: every tag change raises
-// channels.version).
+// Touch bumps the version for a change of the forum tags or of the inherited operator (03
+// forum_tags; M1-54: a new space default changes the effective operator). Every tag change raises
+// channels.version.
 func (c *Channel) Touch() { c.Version++ }
 
 // Archive sets the archive time and bumps the version; there is no way back (05 has no unarchive).

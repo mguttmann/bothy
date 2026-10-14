@@ -1,6 +1,6 @@
 # Modul `chat`
 
-Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53) built; operators (M1-54) and threads (M1-55) follow with the tickets of the etappe.
+Status: spaces and the sidebar (M1-52), channels and forum tags (M1-53) and operators with I1 (M1-54) built; threads (M1-55) follow with the tickets of the etappe.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -32,8 +32,8 @@ Bereiche, Seitenleisten-Zustand, Kanäle mit Verhalten, Skills, Projektbindung, 
 - `adapters/authzsource/`: `Source`, the space and channel part of `authz.StructureSource`
   (`Space`, `SpaceArchived`, `Spaces`, `SpaceDetails`; since M1-53 `Channel`, `Channels`,
   `ChannelsOperatedBy`, `ChannelDetails`, with `Archived` set for an archived channel and for every
-  channel of an archived space); `wire.NewStructureSource` joins it with the empty thread part
-  until M1-55 (threads, dm participation) and M1-54 (served targets).
+  channel of an archived space; since M1-54 `Thread` and `ServedTargets`); `wire.NewStructureSource`
+  joins it with the empty dm part until V3.
 - Migrations `00023_chat_spaces.sql` (`spaces`, `user_space_states` exactly as 03 section 4.5,
   sort keys `COLLATE "C"`, and `grants.target_space_id -> spaces(id)` `NOT VALID`) and
   `00024_grants_space_fk_validate.sql` (validates it). `bothy_app` may read, insert and update
@@ -138,6 +138,44 @@ version, the archive as rights change, rights per operation, events, sidebar), a
 Rulings: docs/DECISIONS.md M1-53. Tests: `domain/channel_test.go`,
 `adapters/authzsource/source_test.go`, `adapters/httpapi/channels_test.go` and
 `migrations/chat_channels_test.go`.
+
+## Operators (M1-54)
+
+- Port: `Structure` adds `SetSpaceOperator` and `SetChannelOperator` with `OperatorAssignment`,
+  `SetSpaceOperatorCmd` and `SetChannelOperatorCmd` (target, assignment, reason, If-Match).
+- Domain: `OperatorAssignment` with `CheckForSpace` (none or agent) and `CheckForChannel`
+  (inherit, none or agent; `agent_id` exactly with mode agent, field codes `not_allowed_for_mode`,
+  `inherit_only_for_channels`, `agent_not_active`), `EffectiveOperator` (the effective operator of
+  a channel from its columns and the space default), `Channel.Assignment`, `Channel.SetOperator`,
+  `Space.Assignment`, `Space.SetOperator`.
+- Store: `queries/operators.sql` (the operator updates, the version of an inheriting channel, the
+  lock of the inheriting channels, the served channels and spaces of an agent after 10 section
+  5.3, the facts of a thread).
+- Source: `adapters/authzsource.Source` answers `ServedTargets` (D5 of the brief, docs/DECISIONS.md
+  M1-54/2) and `Thread` (channel, kind, fixed operator, creator), so `authorize` applies the
+  operator rule to channels and threads and the rights hook checks I1 on real targets.
+- Handlers: `setSpaceOperator` on `Spaces`, `setChannelOperator` on `Channels`; `ETag` from the
+  version.
+
+| Operation | Action | Rights change | Event |
+|---|---|---|---|
+| `setSpaceOperator` | `space.operator.set` (owner, step-up), If-Match | yes (old and new default) | `space.updated`, `channel.updated` per inheriting channel |
+| `setChannelOperator` | `channel.operator.set` (owner, step-up), If-Match | yes (old and new effective operator) | `channel.updated` |
+
+- Order of checks: authorize, If-Match, the body, the archive state (docs/DECISIONS.md M1-54/1).
+  `agent_id` must name an active agent principal with an agents row (identity directory and the
+  agent policy source).
+- The same assignment answers `200` and records `no_change`, without version, event or rights
+  version. Otherwise the second unit of work is the declared rights change: `permission_version`
+  first, then the space and its inheriting channels (ascending id) or the channel; the old and new
+  operator are named through `authz.RightsChanges.AddAffected`; I1 is verified before the commit
+  (`409 i1_violation`, deny entry in an own transaction).
+- Audit details `{target_kind, target_id, old_mode, old_agent_id, new_mode, new_agent_id, reason}`.
+- No `thread.updated`: the operator of a thread is fixed (R-DM-12); I1 still counts its channel.
+
+Rulings: docs/DECISIONS.md M1-54. Tests: `domain/operator_test.go` and the cross-module tests in
+`services/server/test/integration` (AZ-M21 to AZ-M25, AZ-M29, BR-01 to BR-03, AZ-P7 for both
+actions, explanation, preview and view-as with real sources).
 
 ## Port (Wurzelpaket `internal/chat`)
 
