@@ -596,6 +596,9 @@ func caseIDPRecheckForcesRelogin(t *testing.T, w *oworld) {
 	m := w.want(w.complete(ph, code, f.verifier), http.StatusCreated, "")
 	c := &client{w: w.sworld, key: ph.key, refresh: m["refresh_token"].(string)}
 	sid := m["session"].(map[string]any)["id"].(string)
+	// The new device is pending; approved, it outlives auth.device_pending_ttl (M1-38), so only the
+	// recheck ends the session (INT-W14/6).
+	w.sql(`UPDATE devices SET state = 'active', approved_at = now() WHERE id = (SELECT device_id FROM auth_sessions WHERE id = $1)`, sid)
 	// Inside the interval the refresh rotates.
 	w.clk.Advance(sessCfg.IDPRecheckInterval - time.Hour)
 	rm := w.want(c.refreshWith(c.refresh, c.key), http.StatusOK, "")
