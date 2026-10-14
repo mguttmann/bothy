@@ -7,6 +7,9 @@ import 'package:test/test.dart';
 
 void main() {
   test('the library is a package library of the workspace', () {
-    expect(Uri.parse('package:sync_engine/sync_engine.dart').pathSegments, ['sync_engine', 'sync_engine.dart']);
+    expect(Uri.parse('package:sync_engine/sync_engine.dart').pathSegments, [
+      'sync_engine',
+      'sync_engine.dart',
+    ]);
   });
 }

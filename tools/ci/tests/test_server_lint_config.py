@@ -37,6 +37,8 @@ OTHER = {
     "**/.dart_tool/**",
     "**/*.g.dart",
     "**/*.freezed.dart",
+    # Generated drift code of the Dart workspace (docs/DECISIONS.md D-M4-01-4).
+    "**/*.drift.dart",
     "**/testdata/**",
     # The embedded copy of the API document (api/rest/openapi.gen.yaml), written by the route
     # generator; docs/api/openapi.yaml is its source.

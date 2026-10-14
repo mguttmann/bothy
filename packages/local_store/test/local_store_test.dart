@@ -7,6 +7,9 @@ import 'package:test/test.dart';
 
 void main() {
   test('the library is a package library of the workspace', () {
-    expect(Uri.parse('package:local_store/local_store.dart').pathSegments, ['local_store', 'local_store.dart']);
+    expect(Uri.parse('package:local_store/local_store.dart').pathSegments, [
+      'local_store',
+      'local_store.dart',
+    ]);
   });
 }

@@ -7,6 +7,9 @@ import 'package:test/test.dart';
 
 void main() {
   test('the library is a package library of the workspace', () {
-    expect(Uri.parse('package:api_client/api_client.dart').pathSegments, ['api_client', 'api_client.dart']);
+    expect(Uri.parse('package:api_client/api_client.dart').pathSegments, [
+      'api_client',
+      'api_client.dart',
+    ]);
   });
 }

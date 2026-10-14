@@ -7,6 +7,9 @@ import 'package:test/test.dart';
 
 void main() {
   test('the library is a package library of the workspace', () {
-    expect(Uri.parse('package:domain/domain.dart').pathSegments, ['domain', 'domain.dart']);
+    expect(Uri.parse('package:domain/domain.dart').pathSegments, [
+      'domain',
+      'domain.dart',
+    ]);
   });
 }
