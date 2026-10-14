@@ -1,13 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-include: package:lints/recommended.yaml
-
-analyzer:
-  language:
-    strict-casts: true
-    strict-inference: true
-    strict-raw-types: true
-
-linter:
-  rules:
-    # Every public symbol has a doc comment (docs/spec/23-quality.md "Doku im Code").
-    - public_member_api_docs
+# The shared rules of the workspace come from the root file (docs/DECISIONS.md D-M4-01-4).
+include:
+  - package:lints/recommended.yaml
+  - ../../analysis_options.yaml

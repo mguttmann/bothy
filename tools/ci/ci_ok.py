@@ -48,6 +48,9 @@ RULES = (
     # Skipped when the component server did not change (M7-01).
     Rule(("postgres-image (amd64)",), frozenset({"success", "skipped"})),
     Rule(("postgres-image (arm64)",), frozenset({"success", "skipped"})),
+    # Skipped when the component apps did not change (M4-01).
+    Rule(("apps (macOS)",), frozenset({"success", "skipped"})),
+    Rule(("apps (Windows)",), frozenset({"success", "skipped"})),
 )
 
 

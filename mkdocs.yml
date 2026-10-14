@@ -146,6 +146,7 @@ nav:
       - Schemas: api/reference/schemas.md
       - Gateway reference: api/reference/gateway.md
       - Webhooks: api/webhooks.md
+      - Dart API reference: reference/dart-api.md
   - Security:
       - Threat model: security/threat-model.md
   - Compliance:

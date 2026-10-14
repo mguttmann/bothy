@@ -71,7 +71,14 @@ allowed_licenses = allowed=$$(awk '!/^\#/ && NF' $(LICENSE_ALLOWLIST) | paste -s
 
 # ---- component discovery (tracked files only, like CI) --------------------------------
 GO_MODS := $(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'services/*go.mod' 2>/dev/null))))
-DART_PKGS := $(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'apps/*pubspec.yaml' 'packages/*pubspec.yaml' 2>/dev/null))))
+# Members of the Dart workspace; the root pubspec.yaml is the workspace itself, not a member.
+DART_PKGS := $(filter-out .,$(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'apps/*pubspec.yaml' 'packages/*pubspec.yaml' 2>/dev/null)))))
+# Generated Dart files: out of the format check, the doc and style lint (root
+# analysis_options.yaml) and coverage (tools/ci/lcov_filter.py); docs/DECISIONS.md D-M4-01-4.
+DART_GENERATED := \.(g|freezed|drift)\.dart$$|/lib/src/generated/|^(apps|packages)/[^/]+/build/
+# Hand-written Dart files of the members, set in a recipe as `files`.
+dart_files = files=$$(git ls-files -- $(foreach p,$(DART_PKGS),'$(p)/*.dart')) || exit 1; \
+  files=$$(printf '%s\n' "$$files" | grep -Ev '$(DART_GENERATED)' || true)
 PY_PROJECTS := $(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'sdk/python/pyproject.toml' 'plugins/*pyproject.toml' 2>/dev/null))))
 TS_PROJECTS := $(patsubst %/,%,$(sort $(dir $(shell git ls-files -- 'sdk/typescript/package.json' 'plugins/*package.json' 2>/dev/null))))
 # Lock files OSV-Scanner reads; named explicitly instead of a directory walk, so that
@@ -95,7 +102,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
         runners-check release-pins commitlint \
         review labels-check labels-sync tools-lock release-build clean \
         codegen-check arch register-check migrations-lint migrations-lock perf ops-check \
-        image image-test postgres-image postgres-image-test
+        image image-test postgres-image postgres-image-test apps-platform
 
 help: ## Show the targets
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -144,7 +151,7 @@ fmt: ## Format all code in place
 	$(UVRUN) ruff format tools
 	$(UVRUN) ruff check --fix tools
 	@if [ -n "$(GO_ON)" ]; then for m in $(GO_MODS); do (cd $$m && gofmt -w .); done; fi
-	@if [ -n "$(DART_ON)" ]; then for p in $(DART_PKGS); do (cd $$p && dart format .); done; fi
+	@if [ -n "$(DART_ON)" ]; then $(dart_files); [ -z "$$files" ] || dart format $$files || exit 1; fi
 	@if [ -n "$(PY_ON)" ]; then for p in $(PY_PROJECTS); do $(UV) run --project $$p --locked ruff format $$p; done; fi
 	@if [ -n "$(TS_ON)" ]; then for p in $(TS_PROJECTS); do npm --prefix $$p run format; done; fi
 
@@ -153,7 +160,7 @@ fmt-check: ## Formatting is clean (no changes)
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-fmt,no Go module selected under services/); \
 	else for m in $(GO_MODS); do out=$$(cd $$m && gofmt -l .) || exit 1; [ -z "$$out" ] || { echo "$$out"; exit 1; }; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-format,no Dart package selected under apps/ or packages/); \
-	else for p in $(DART_PKGS); do (cd $$p && dart format --output=none --set-exit-if-changed .); done; fi
+	else $(dart_files); [ -z "$$files" ] || dart format --output=none --set-exit-if-changed $$files || exit 1; fi
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-format,no Python project selected under sdk/ or plugins/); \
 	else for p in $(PY_PROJECTS); do $(UV) run --project $$p --locked ruff format --check $$p; done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-format,no TypeScript project selected); \
@@ -164,7 +171,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	$(UVRUN) ruff check tools
 	@# Every FROM of a tracked Dockerfile is pinned by digest (SEC-SC-4, docs/spec/18-release.md "Server images").
 	$(UVRUN) python tools/ci/dockerfile_pins.py
-	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/bin tools/catalog tools/ci tools/configdoc tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/opscheck tools/sonarqube
+	$(UVRUN) bandit -q -c tools/pyproject.toml -r tools/api-checks tools/arch-check tools/bin tools/catalog tools/ci tools/configdoc tools/denylist tools/design-tokens tools/doccheck tools/docs tools/hooks tools/opscheck tools/sonarqube
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-forms $(filter-out %/config.yml,$(wildcard .github/ISSUE_TEMPLATE/*.yml))
 	$(UVRUN) check-jsonschema --builtin-schema vendor.github-issue-config .github/ISSUE_TEMPLATE/config.yml
 	$(UVRUN) check-jsonschema --builtin-schema vendor.renovate renovate.json
@@ -176,9 +183,10 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	@if [ -z "$(GO_ON)" ]; then $(call skip,go-lint,no Go module selected); \
 	else gl=$(call tool,golangci-lint) || exit 1; \
 	  for m in $(GO_MODS); do (cd $$m && go vet ./... && "$$gl" run ./...) || exit 1; done; fi
+	@# One analysis at the root covers every member of the workspace (docs/DECISIONS.md D-M4-01-5).
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-lint,no Dart package selected); \
-	else for p in $(DART_PKGS); do (cd $$p && $(FLUTTER) pub get --enforce-lockfile && $(FLUTTER) analyze --fatal-infos && \
-	  if grep -q '^ *custom_lint:' pubspec.yaml; then dart run custom_lint; fi) || exit 1; done; fi
+	else $(FLUTTER) pub get --enforce-lockfile && $(FLUTTER) analyze --fatal-infos || exit 1; \
+	  for p in $(DART_PKGS); do if grep -q '^ *custom_lint:' $$p/pubspec.yaml; then (cd $$p && dart run custom_lint) || exit 1; fi; done; fi
 	@# bandit skips the project's virtual environment and generated code (docs/DECISIONS.md M2-23/7).
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-lint,no Python project selected); \
 	else for p in $(PY_PROJECTS); do $(UV) run --project $$p --locked ruff check $$p && \
@@ -212,10 +220,12 @@ test: ## All tests with coverage data
 	  for m in $(GO_MODS); do (cd $$m && GO_ARCH_LINT="$$gal" go test -race -covermode=atomic -coverpkg=./... -coverprofile=coverage.out -timeout=$(GO_TEST_TIMEOUT) ./...) || exit 1; done; fi
 	@# --enforce-lockfile: a pubspec.lock that no longer matches pubspec.yaml fails instead of being
 	@# rewritten silently, so osv and licenses always read the lock file the tests ran with.
+	@# The workspace resolves once at the root (one pubspec.lock); then every member runs its tests.
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-test,no Dart package selected); \
 	else for p in $(DART_PKGS); do \
-	  [ -d $$p/test ] || { echo "$$p: no test/ directory (docs/spec/23-quality.md, 3)" >&2; exit 1; }; \
-	  (cd $$p && $(FLUTTER) pub get --enforce-lockfile && $(FLUTTER) test --coverage) || exit 1; done; fi
+	  [ -d $$p/test ] || { echo "$$p: no test/ directory (docs/spec/23-quality.md, 3)" >&2; exit 1; }; done; \
+	  $(FLUTTER) pub get --enforce-lockfile || exit 1; \
+	  for p in $(DART_PKGS); do (cd $$p && $(FLUTTER) test --coverage) || exit 1; done; fi
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-test,no Python project selected); \
 	else for p in $(PY_PROJECTS); do (cd $$p && $(UV) run --locked pytest --cov --cov-report=xml:coverage.xml); done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-test,no TypeScript project selected); \
@@ -239,10 +249,13 @@ coverage: test ## Coverage thresholds (named values quality.coverage.*)
 	  total=$$(printf '%s\n' "$$out" | awk '/^total:/ {sub("%","",$$3); print $$3}'); \
 	  [ -n "$$total" ] || { echo "coverage: go tool cover printed no total for $$m" >&2; exit 1; }; \
 	  awk -v t="$$total" -v min=$(COVERAGE_GO_MIN) -v m=$$m 'BEGIN { if (t+0 < min) { printf "%s: coverage %s%% < %s%%\n", m, t, min; exit 1 } }' || exit 1; done; fi
+	@# Generated files leave the sum first (tools/ci/lcov_filter.py, docs/DECISIONS.md D-M4-01-4).
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-coverage,no Dart package selected); \
 	else for p in $(DART_PKGS); do \
 	  [ -f $$p/coverage/lcov.info ] || { echo "$$p: coverage/lcov.info is missing; make test writes it" >&2; exit 1; }; \
-	  awk -F: -v min=$(COVERAGE_DART_MIN) -v p=$$p '/^LF:/ {lf+=$$2} /^LH:/ {lh+=$$2} END { pct = lf ? 100*lh/lf : 100; if (pct < min) { printf "%s: coverage %.1f%% < %s%%\n", p, pct, min; exit 1 } }' $$p/coverage/lcov.info || exit 1; done; fi
+	  sums=$$($(UVRUN) python tools/ci/lcov_filter.py --totals $$p/coverage/lcov.info) || exit 1; \
+	  [[ "$$sums" =~ ^[0-9]+\ [0-9]+$$ ]] || { echo "coverage: tools/ci/lcov_filter.py printed no totals for $$p" >&2; exit 1; }; \
+	  awk -v s="$$sums" -v min=$(COVERAGE_DART_MIN) -v p=$$p 'BEGIN { split(s, a, " "); lf = a[1]; lh = a[2]; pct = lf ? 100*lh/lf : 100; if (pct < min) { printf "%s: coverage %.1f%% < %s%%\n", p, pct, min; exit 1 } }' || exit 1; done; fi
 	@[ -z "$(PY_ON)$(TS_ON)" ] || echo "  python/typescript components enforce their threshold in their own test config"
 
 commitlint: ## Conventional Commits and DCO sign-off for commits not yet on the remote main
@@ -273,7 +286,7 @@ codegen-check: ## Generated code equals a fresh generation (sqlc, go generate)
 	    PATH="$$(dirname "$$gal"):$$(dirname "$$sqlc"):$$PATH" $(CODEGEN_CHECK) --dir $$m -- go generate ./... || exit 1; \
 	  done; fi
 
-arch: ## Module boundaries of the Go modules (go-arch-lint, config generated from the module register)
+arch: ## Module boundaries: Go modules (go-arch-lint, from the module register) and the Dart workspace (tools/arch-check)
 	@# go-arch-lint does not follow a linked directory but attributes it by the path of the link,
 	@# while the compiler builds the code behind it; so no symbolic link may sit below a module
 	@# (docs/DECISIONS.md M1-05/24). Only editor lock files pass: dangling links named .#*, behind
@@ -297,6 +310,10 @@ arch: ## Module boundaries of the Go modules (go-arch-lint, config generated fro
 	      rm -rf "$$copy"; printf '%s\n' "$${out//"$$view"/$$dir}"; [ "$$rc" -eq 0 ] || exit 1; \
 	    fi; \
 	  done; fi
+	@# The dependency rules of docs/spec/15-client-architecture.md 3.1 for every member of the Dart
+	@# workspace, from tools/arch-check/rules.yaml (docs/DECISIONS.md D-M4-01-3).
+	@if [ -z "$(DART_ON)" ]; then $(call skip,arch-dart,no Dart package selected under apps/ or packages/); \
+	else $(UVRUN) python tools/arch-check/arch_check.py || exit 1; fi
 
 # Repository-wide like catalog-check: no SKIP, a missing source fails (exit 2).
 register-check: ## Module register equals 03, actions.yaml, the tables of 02, the component diagram and the module READMEs (ADR 0050)
@@ -328,13 +345,17 @@ perf: ## Load tests against the performance targets (end of a milestone and rele
 	  done; fi
 
 # ---- documentation --------------------------------------------------------------------
-docs: ## Documentation site builds strictly with the API references; ADR index is current; problem codes registered; brief dependencies consistent; register IDs unique; risk ranking and the list behind its last rank follow the register ratings; no German text in tracked files (D-W-94); no external assets
+docs: ## Documentation site builds strictly with the API references and the Dart API pages; ADR index is current; problem codes registered; brief dependencies consistent; register IDs unique; risk ranking and the list behind its last rank follow the register ratings; no German text in tracked files (D-W-94); no external assets
 	$(UVRUN) python tools/docs/language_check.py
 	$(UVRUN) python tools/docs/adr_index.py --check
 	git ls-files -z -- '*.md' docs/api/openapi.yaml docs/api/asyncapi.yaml | xargs -0 $(UVRUN) python tools/docs/problem_code_refs.py
 	$(UVRUN) python tools/docs/brief_deps.py
 	$(UVRUN) python tools/docs/register_ids.py
 	$(UVRUN) python tools/docs/risk_ranking.py
+	@# docs/reference/dart-api.md links the generated Dart API pages, so they are built for every
+	@# component selection, not only for `apps` (docs/DECISIONS.md D-M4-01-6).
+	@if [ -z "$(DART_PKGS)" ]; then $(call skip,dart-api-docs,no Dart package tracked under apps/ or packages/); \
+	else $(UVRUN) python tools/docs/dart_api_docs.py --out docs/api/dart || exit 1; fi
 	@# No --quiet: it hides the warnings that --strict turns into a failure.
 	$(UVRUN) mkdocs build --strict --site-dir site
 	@# The site bundles every script, stylesheet and font; nothing loads from another origin.
@@ -358,6 +379,9 @@ catalog-check: ## Action catalogue valid and its generated copies current (ADR 0
 	$(UVRUN) python tools/catalog/action_catalog.py check
 
 linkcheck: ## Local links and anchors of every tracked Markdown file (offline); no link to the placeholder repository
+	@# docs/reference/dart-api.md links the generated Dart API pages; `make docs` builds them, and
+	@# a run without them builds them first (docs/DECISIONS.md D-M4-01-6).
+	@if [ -n "$(DART_PKGS)" ] && [ ! -d docs/api/dart ]; then $(UVRUN) python tools/docs/dart_api_docs.py --out docs/api/dart || exit 1; fi
 	git ls-files -z -- '*.md' | xargs -0 $(call tool,lychee) --offline --include-fragments --no-progress --quiet
 	git ls-files -z -- '*.md' | xargs -0 $(UVRUN) python tools/docs/placeholder_links.py
 
@@ -466,9 +490,10 @@ osv: ## Known vulnerabilities: every lock file (OSV-Scanner), Go call graphs (go
 licenses: ## License gate: LICENSE text, SPDX headers, dependency licenses of shipped components
 	$(UVRUN) python tools/ci/license_check.py
 	@$(allowed_licenses); \
-	dirs="$(if $(GO_ON),$(GO_MODS)) $(if $(DART_ON),$(DART_PKGS)) $(if $(PY_ON),$(PY_PROJECTS)) $(if $(TS_ON),$(TS_PROJECTS))"; \
+	dirs="$(if $(GO_ON),$(GO_MODS)) $(if $(PY_ON),$(PY_PROJECTS)) $(if $(TS_ON),$(TS_PROJECTS))"; \
 	args=(); for d in $$dirs; do for n in $(LOCK_NAMES); do \
 	  for l in $$(git ls-files -- "$$d/*$$n"); do args+=(-L "$$l"); done; done; done; \
+	if [ -n "$(DART_ON)" ]; then for l in $$(git ls-files -- pubspec.lock); do args+=(-L "$$l"); done; fi; \
 	if [ $${#args[@]} -eq 0 ]; then $(call skip,dep-licenses,no lock file of a shipped component selected); \
 	else $(call tool,osv-scanner) scan source --licenses="$$allowed" "$${args[@]}"; fi
 	@# The module's own packages carry the repository license (checked above); go-licenses would
@@ -590,6 +615,10 @@ portability: ## Full stack from images on this machine plus smoke test (contract
 	@[ -x infra/compose/smoke.sh ] || { echo "portability: infra/compose/smoke.sh is missing (docs/quality/gates.md)"; exit 1; }
 	infra/compose/smoke.sh
 
+# ---- platform tests of the apps (not part of `gates`: they need a desktop session) ------------
+apps-platform: ## Platform tests of the members on this host (platform-tests.json; CI jobs apps-macos, apps-windows)
+	$(UVRUN) python tools/ci/apps_platform.py
+
 # ---- review and repository maintenance -------------------------------------------------
 review: ## Local AI review before a push (CodeRabbit CLI only with BOTHY_CODERABBIT=1)
 	@if [ "$${BOTHY_CODERABBIT:-0}" = 1 ]; then \
@@ -614,4 +643,4 @@ tools-lock: ## Re-pin a release binary: make tools-lock TOOL=<name> VERSION=<x.y
 	$(FETCH) refresh "$$TOOL" "$$VERSION"
 
 clean: ## Remove build outputs (keeps the tool caches)
-	rm -rf site .cache/coverage
+	rm -rf site .cache/coverage docs/api/dart

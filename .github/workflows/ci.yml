@@ -109,13 +109,13 @@ jobs:
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
-      # Flutter for every tracked Dart package; until apps/client exists, packages/bothy_noise
-      # carries the pin (docs/DECISIONS.md D-M2-38-12).
+      # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
+      # workspace (docs/DECISIONS.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
-          flutter-version-file: ${{ hashFiles('apps/client/pubspec.yaml') != '' && 'apps/client/pubspec.yaml' || 'packages/bothy_noise/pubspec.yaml' }}
+          flutter-version-file: pubspec.yaml
           cache: true
       - name: Restore pinned binaries and hook environments
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -220,13 +220,13 @@ jobs:
         with:
           go-version-file: ${{ hashFiles('services/server/go.mod') != '' && 'services/server/go.mod' || 'services/host/go.mod' }}
           cache-dependency-path: services/*/go.sum
-      # Flutter for every tracked Dart package; until apps/client exists, packages/bothy_noise
-      # carries the pin (docs/DECISIONS.md D-M2-38-12).
+      # Flutter for every tracked Dart package, pinned in the root pubspec.yaml of the Dart
+      # workspace (docs/DECISIONS.md D-M4-01-1).
       - if: hashFiles('apps/*/pubspec.yaml', 'packages/*/pubspec.yaml') != ''
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           channel: stable
-          flutter-version-file: ${{ hashFiles('apps/client/pubspec.yaml') != '' && 'apps/client/pubspec.yaml' || 'packages/bothy_noise/pubspec.yaml' }}
+          flutter-version-file: pubspec.yaml
           cache: true
       - run: make bootstrap-ci
       - name: make sonar
@@ -291,6 +291,58 @@ jobs:
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: make postgres-image postgres-image-test
         run: make postgres-image postgres-image-test
+
+  # Platform tests of the apps (make apps-platform, docs/DECISIONS.md D-M4-01-7): native code
+  # and desktop integration tests need macOS and Windows (ADR 0039), the pure gates run on
+  # Linux. Only when the apps component is selected; ci-ok (tools/ci/ci_ok.py) requires each
+  # job to pass or be skipped.
+  apps-macos:
+    name: apps (macOS)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    runs-on: macos-15
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform
+        shell: bash
+        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py
+
+  apps-windows:
+    name: apps (Windows)
+    needs: plan
+    if: needs.plan.outputs.components == 'all' || contains(format(' {0} ', needs.plan.outputs.components), ' apps ')
+    runs-on: windows-2025
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version-file: pubspec.yaml
+          cache: true
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: false
+      - name: make apps-platform
+        shell: bash
+        run: uv run --project tools --locked --quiet python tools/ci/apps_platform.py
 
   ci-ok:
     name: ci-ok

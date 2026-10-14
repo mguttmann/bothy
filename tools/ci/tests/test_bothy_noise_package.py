@@ -82,6 +82,7 @@ def test_spec_names_the_pinned_library_versions() -> None:
     spec = " ".join((REPO / "docs" / "spec" / "24-terminal.md").read_text(encoding="utf-8").split())
     for module in ("github.com/flynn/noise", "golang.org/x/crypto", "golang.org/x/sys"):
         assert f"`{module}` {_go_version(module)}" in spec, module
-    lock = yaml.safe_load((PACKAGE / "pubspec.lock").read_text(encoding="utf-8"))
+    # One pubspec.lock for the whole workspace (docs/DECISIONS.md D-M4-01-2).
+    lock = yaml.safe_load((REPO / "pubspec.lock").read_text(encoding="utf-8"))
     version = lock["packages"]["cryptography"]["version"]
     assert f"version {version} (https://pub.dev/packages/cryptography" in spec
