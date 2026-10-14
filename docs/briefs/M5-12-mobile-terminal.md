@@ -1,6 +1,6 @@
 # M5-12: Terminal on mobile with extra keys bar
 
-Status: ready | Depends on: M4-36, M5-08 | Milestone: M5
+Status: ready | Depends on: M4-36, M5-10 | Milestone: M5
 
 ## Goal
 
@@ -15,7 +15,7 @@ After this ticket the phone apps open, use, detach and reattach terminal session
 - `docs/design/components.md` 12 "Terminal view" (the extra keys bar row and the rules).
 - `docs/security/threat-model.md` 6.7 (T-TM-03, T-TM-10) and `docs/PLAN.md` 11 "Red team" (terminal items: stolen unlocked phone, app switcher image, keyboard suggestions, screen recordings, hardware keyboard shortcuts).
 - `docs/DECISIONS.md`: D-W-100 and its extension to M5 and M6 (D-W-120); section 10 (format of `D-M5-12-<n>` rows) and the rows of M4-35, M4-36, M5-08.
-- Briefs (merged names win, D-W-100): the briefs of M4-35 (`terminal_ui`, ports `TerminalTransport`, `HostKeyPinStore`, `StepUpPrompt`, `HostEvents`, the extra keys bar golden) and M4-36 (desktop terminal: hosts group, opening with step-up, `host_key_pins`, events, the canary test), `M2-44-terminal-sessions-relay.md` and `M2-48-terminal-conformance.md` (the host service container and test overlay), `M5-08-app-lock.md` (the `locked` event), `M5-02-iphone-layout.md` and `M5-03-android-layout.md` (phone shell, lifecycle, recent apps protection).
+- Briefs (merged names win, D-W-100): the briefs of M4-35 (`terminal_ui`, ports `TerminalTransport`, `HostKeyPinStore`, `StepUpPrompt`, `HostEvents`, the extra keys bar golden) and M4-36 (desktop terminal: hosts group, opening with step-up, `host_key_pins`, events, the canary test), `M2-44-terminal-sessions-relay.md` and `M2-48-terminal-conformance.md` (the host service container and test overlay), `M5-08-app-lock.md` (the `locked` event), `M5-10-mobile-a11y.md` (the checklist and its route test), `M5-02-iphone-layout.md` and `M5-03-android-layout.md` (phone shell, lifecycle, recent apps protection).
 - Code on the base branch: `packages/terminal_ui`, `packages/bothy_noise`, `apps/client/lib` (desktop terminal of M4-36, `phone/`, `lock/`), the host service test overlay of M2-48.
 
 This ticket touches no API operation, no table, no action, no event and no configuration key.
@@ -68,12 +68,13 @@ Change:
 - `packages/terminal_ui`: the input path accepts the modifier state of the bar (Ctrl plus a letter gives the control byte, Alt gives an ESC prefix, arrows give the cursor sequences of the current mode); selection and paste confirmation for touch (long press, two-finger scroll).
 - `apps/client/lib/platform/lifecycle.dart` (M5-02) and the lock controller hook (M5-08): detach on `paused` and on `locked`; reattach on `resumed` after the lock.
 - iOS runner: hide the terminal view on screen capture (`UIScreen.capturedDidChangeNotification`) and while inactive; Android: `FLAG_SECURE` while a terminal is open (M5-03 Design note 5 rule extended).
-- `apps/client/platform-tests.json`: the integration tests against the host service container.
+- `apps/client/terminal_stack_test/` and `make terminal-stack` (M4-36): the test against the host service container gains a phone run on an iOS simulator or an Android emulator, selected by the target (SKIP line without one), in `apps/client/terminal_stack_test/phone/`, outside `integration_test/`, so the platform jobs that run `integration_test/` without a stack never pick it up (M4-36 Design note 6).
+- `docs/quality/accessibility-mobile.md` (M5-10): rows for M8 and M9 with the state "open, completed by M5-13", so the route test of M5-10 stays green when the routes are added.
 - `packages/l10n` ARB files; `packages/terminal_ui/README.md`, `apps/client/README.md`; `docs/spec/15-client-architecture.md` 23.4 (the keyboard settings, the capture rule), root `CHANGELOG.md` under `[Unreleased]`, `docs/DECISIONS.md` section 10 rows `D-M5-12-1` to `D-M5-12-6`.
 
 ## Out of scope
 
-- Device E2E against the Compose stack with a host service container (M5-13); the VoiceOver and TalkBack checklist for M8 (M5-13).
+- Device E2E against the Compose stack with a host service container (M5-13); completing the VoiceOver and TalkBack rows of M8 and M9 in the checklist (M5-13).
 - Pairing and host administration on the phone (not an emergency action, R-PR-07; desktop and console).
 - Changes to the core contract.
 
@@ -116,7 +117,7 @@ Widget (`packages/terminal_ui/test/extra_keys/`, `apps/client/test/phone/termina
 - `lifecycle_terminal_test.dart`: `paused` detaches (fake transport closed with `1000`); `locked` detaches; `resumed` waits for `unlocked`, then attaches; `401 step_up_required` runs the step-up prompt once and repeats; Android back detaches and pops to M9.
 - `no_content_in_store_test.dart` (R-CL-17): a canary terminal output appears in no table of the local database, no log line of the app's logger fake and no client metric.
 
-Integration (`apps/client/integration_test/phone/terminal_test.dart`, iOS simulator and Android emulator, host service container of M2-48, server through the test overlay):
+Integration (`apps/client/terminal_stack_test/phone/terminal_phone_stack_test.dart` through `make terminal-stack`, iOS simulator and Android emulator, host service container of M2-48 through the stack helper of M4-36):
 
 - open a session with step-up (simulated biometric), run `echo` and see the output; Ctrl+C through the bar ends a running `sleep`.
 - background the app: the session is detached on the server (`detached`); foreground within `terminal.quick_reattach_window` (short in the test configuration): attach without step-up and the scrollback replay shows the earlier output; foreground after the window: the step-up prompt appears, and after it the attach succeeds.
@@ -126,7 +127,7 @@ Commands that must pass, from the repository root:
 
 - `cd packages/terminal_ui && flutter analyze --fatal-infos && flutter test --coverage`
 - `cd apps/client && flutter analyze --fatal-infos && flutter test --coverage`
-- on a host with Docker and macOS with Xcode or an Android emulator: `make apps-platform`; otherwise the SKIP lines
+- `make apps-platform`; on a host with Docker and an iOS simulator or an Android emulator: `make terminal-stack` with the phone run; otherwise the SKIP lines
 - `make arch`, `make lint`, `make fmt-check`, `make coverage`
 - `make check`
 

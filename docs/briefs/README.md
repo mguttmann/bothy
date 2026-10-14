@@ -122,8 +122,9 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 38 | M4-24, M5-02, M6-14 |
 | 39 | M4-32, M4-34, M4-36, M5-03, M5-04 |
 | 40 | M4-38, M5-05, M5-06, M5-07, M5-08, M5-09 |
-| 41 | M5-10, M5-11, M5-12 |
-| 42 | M5-13 |
+| 41 | M5-10, M5-11 |
+| 42 | M5-12 |
+| 43 | M5-13 |
 
 ## Index
 
@@ -338,9 +339,9 @@ names listed here.
 | 40 | M5-08 | App lock | `M5-08-app-lock.md` | M5-03 |
 | 40 | M5-09 | Emergency actions on mobile | `M5-09-mobile-emergency.md` | M4-27, M5-03 |
 | 41 | M5-10 | Accessibility on mobile | `M5-10-mobile-a11y.md` | M5-06, M5-07, M5-08, M5-09 |
-| 41 | M5-11 | Device E2E and performance targets on mobile | `M5-11-mobile-e2e-perf.md` | M5-05, M5-06, M5-07, M5-08, M5-09 |
-| 41 | M5-12 | Terminal on mobile with extra keys bar | `M5-12-mobile-terminal.md` | M4-36, M5-08 |
-| 42 | M5-13 | Terminal E2E on mobile | `M5-13-mobile-terminal-e2e.md` | M5-10, M5-11, M5-12 |
+| 41 | M5-11 | Device E2E and performance targets on mobile | `M5-11-mobile-e2e-perf.md` | M1-39, M5-05, M5-06, M5-07, M5-08, M5-09 |
+| 42 | M5-12 | Terminal on mobile with extra keys bar | `M5-12-mobile-terminal.md` | M4-36, M5-10 |
+| 43 | M5-13 | Terminal E2E on mobile | `M5-13-mobile-terminal-e2e.md` | M4-38, M5-11, M5-12 |
 
 ## Make targets created by tickets
 
@@ -918,14 +919,15 @@ flowchart TB
   M5_07 --> M5_10
   M5_08 --> M5_10
   M5_09 --> M5_10
+  M1_39 --> M5_11
   M5_05 --> M5_11
   M5_06 --> M5_11
   M5_07 --> M5_11
   M5_08 --> M5_11
   M5_09 --> M5_11
   M4_36 --> M5_12
-  M5_08 --> M5_12
-  M5_10 --> M5_13
+  M5_10 --> M5_12
+  M4_38 --> M5_13
   M5_11 --> M5_13
   M5_12 --> M5_13
   M1_39 --> M6_01

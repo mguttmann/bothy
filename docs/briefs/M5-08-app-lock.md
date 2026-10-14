@@ -70,6 +70,7 @@ Client:
 Change:
 
 - `tools/configdoc/planned.yaml`: remove the planned rules of `client.app_lock_after` and `security.app_lock_required`, which this ticket makes active (otherwise `make config-doc-check` reports them as stale); `services/server/internal/wire` the key file that registers both keys.
+- `packages/sync_engine/lib/src/testing/` (fake server of M4-17): the fake world gains the `app_lock` policy (default `required = false`, `after_ms` from the world) and its `getInstance` handler returns it, so the fake keeps validating every response against `openapi.yaml` once the member is required; tests set the policy per case.
 - `packages/local_store`: the cached `app_lock` policy with the instance row (Design note 1) and, if Design note 6 needs it, the migration of the stored key item, with the migration test of 15 6.2.
 - `apps/client/lib/platform/lifecycle.dart` (M5-02): the cover and the lock decision on `inactive`, `paused` and `resumed`; activity tracking on pointer and keyboard events.
 - Router: while locked every route resolves to E6; a deep link or notification tap is kept and opened after unlock.

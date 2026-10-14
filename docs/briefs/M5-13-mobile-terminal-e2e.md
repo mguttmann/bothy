@@ -1,6 +1,6 @@
 # M5-13: Terminal E2E on mobile
 
-Status: ready | Depends on: M5-10, M5-11, M5-12 | Milestone: M5
+Status: ready | Depends on: M4-38, M5-11, M5-12 | Milestone: M5
 
 ## Goal
 
@@ -14,8 +14,8 @@ After this ticket the terminal on the phones is tested end to end on devices aga
 - `docs/spec/01-product.md`: 5.3 M8, M9; 8 (row "Terminal").
 - `docs/quality/accessibility-mobile.md` (checklist of M5-10).
 - `docs/DECISIONS.md`: D-W-100 and its extension to M5 and M6 (D-W-120); section 10 (format of `D-M5-13-<n>` rows) and the rows of M5-10, M5-11, M5-12.
-- Briefs (merged names win, D-W-100): `M5-11-mobile-e2e-perf.md` (runner, overlay, suites, CI), `M5-12-mobile-terminal.md` (screens, bar, lifecycle, capture handling), `M5-10-mobile-a11y.md` (checklist format), `M2-48-terminal-conformance.md` (host service container and test overlay), `M2-41-host-pairing.md` (pairing through the API).
-- Code on the base branch: `infra/compose/` (E2E overlay of M5-11, host service overlay of M2-48), `apps/client/integration_test/e2e/`, `tools/e2e/`.
+- Briefs (merged names win, D-W-100): `M5-11-mobile-e2e-perf.md` (runner, overlay, suites, CI), `M5-12-mobile-terminal.md` (screens, bar, lifecycle, capture handling), `M5-10-mobile-a11y.md` (checklist format), `M2-48-terminal-conformance.md` (host service container and test overlay), `M2-41-host-pairing.md` (pairing through the API), `M4-38-terminal-e2e-perf.md` (the output generator in the host image and the timing hook behind `TERMINAL_PERF_HOOKS`, reused here).
+- Code on the base branch: `infra/compose/` (E2E overlay of M5-11, host service overlay of M2-48), `apps/client/e2e_test/phone/`, `tools/e2e/`.
 
 This ticket touches no API operation, no table, no action, no event and no configuration key.
 
@@ -54,7 +54,7 @@ Product requirements implemented here:
 
 Create:
 
-- `apps/client/integration_test/e2e/terminal_e2e_test.dart`: the suite of Design note 2.
+- `apps/client/e2e_test/phone/terminal_e2e_test.dart` (next to the suites of M5-11, outside `integration_test/`): the suite of Design note 2.
 - `apps/client/test/a11y/terminal_a11y_test.dart` and the platform audit entries for M8 and M9 (Design note 3).
 
 Change:
@@ -99,7 +99,7 @@ Change:
 - `terminal_e2e_test.dart` (Design note 2), red first before the overlay includes the host.
 - `terminal_a11y_test.dart` and the audit entries (Design note 3).
 - Runner tests: the host container is torn down after a failing suite (fake commands).
-- The terminal measurement on a physical device (profile build) with the evaluation of M5-11; its evaluation tests on recorded summaries.
+- The terminal measurement on a physical device (profile build) with the output generator and the timing hook of M4-38 and the evaluation of M5-11 (nothing new is built for them); its evaluation tests on recorded summaries.
 
 Commands that must pass, from the repository root:
 
