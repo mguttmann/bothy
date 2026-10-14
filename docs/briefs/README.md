@@ -13,9 +13,8 @@ before M1 closes, so that builds do not run out of work (D-W-100, D-W-114, D-W-1
 [DECISIONS.md](../DECISIONS.md)): they name interfaces of earlier milestones as those briefs and
 the merged code name them, and each carries the boundary that a build session follows merged
 code that differs only in names and stops with `Verdict: BLOCKED` where it behaves differently
-from the specification. The brief of M8-09 (the execution) follows once M7-14 and M7-21 have
-briefs. Briefs of the milestones after these are written when the owner asks for them or when the
-milestone before them closes.
+from the specification. Briefs of the milestones after these are written when the owner asks for
+them or when the milestone before them closes.
 
 ## How a brief runs
 
@@ -122,7 +121,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23, M6-05, M8-04 |
 | 38 | M4-24, M5-02, M6-06, M6-14, M8-05, M8-06 |
 | 39 | M4-32, M4-34, M4-36, M5-03, M5-04, M8-07 |
-| 40 | M4-38, M5-05, M5-06, M5-07, M5-08, M5-09, M6-16 |
+| 40 | M4-38, M5-05, M5-06, M5-07, M5-08, M5-09, M6-16, M8-09 |
 | 41 | M5-10, M5-11, M6-17 |
 | 42 | M5-12 |
 | 43 | M5-13 |
@@ -361,6 +360,7 @@ names listed here.
 | 38 | M8-06 | Binding of imported session references | `M8-06-session-binding-import.md` | M2-22, M2-34, M8-04 |
 | 39 | M8-07 | Switchover and revert per channel | `M8-07-switch-revert.md` | M8-05, M8-06 |
 | 34 | M8-08 | Import overview in the console | `M8-08-import-console.md` | M6-04, M8-03 |
+| 40 | M8-09 | Carry out the migration of an existing installation (owner go) | `M8-09-migration-execution.md` | M8-07, M8-08 |
 | 23 | M8-10 | Login and API client of the import tool | `M8-10-import-login-client.md` | M1-38, M1-71 |
 | 36 | M8-11 | Thread, message, pin and file items of the import interface | `M8-11-import-content-items.md` | M1-59, M2-18, M3-07, M3-13, M8-03 |
 
@@ -1025,6 +1025,8 @@ flowchart TB
   M8_06 --> M8_07
   M6_04 --> M8_08
   M8_03 --> M8_08
+  M8_07 --> M8_09
+  M8_08 --> M8_09
   M1_38 --> M8_10
   M1_71 --> M8_10
   M1_59 --> M8_11

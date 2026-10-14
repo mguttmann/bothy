@@ -423,5 +423,6 @@ nav:
           - "M8-06: Binding of imported session references": briefs/M8-06-session-binding-import.md
           - "M8-07: Switchover and revert per channel": briefs/M8-07-switch-revert.md
           - "M8-08: Import overview in the console": briefs/M8-08-import-console.md
+          - "M8-09: Carry out the migration of an existing installation (owner go)": briefs/M8-09-migration-execution.md
           - "M8-10: Login and API client of the import tool": briefs/M8-10-import-login-client.md
           - "M8-11: Thread, message, pin and file items of the import interface": briefs/M8-11-import-content-items.md
