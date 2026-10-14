@@ -18,13 +18,6 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 )
 
-// allowAll authorizes every action; the policy itself is tested in authz and in the HTTP tests.
-type allowAll struct{ authorize.Authorizer }
-
-func (allowAll) Authorize(context.Context, authorize.Principal, authorize.Action, authorize.Resource) (authorize.Decision, error) {
-	return authorize.Decision{Outcome: authorize.OutcomeAllow}, nil
-}
-
 // entries records the audit entries of a test.
 type entries struct {
 	auditing.Recorder
