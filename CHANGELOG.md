@@ -148,6 +148,10 @@ operated, and the order of the build.
   waves and graph and in the site navigation, written before M1 closes (D-W-120); core contract
   for the console session: the stored "View as person" on `auth_sessions` (R-DM-49) and the action
   `access.view_as.end` (R-AZ-32).
+- Build briefs M5-01 to M5-07 of milestone M5 (Android device key, phone layouts for iPhone and
+  Android, `ClientKit` with the Notification Service Extension, the Android push service, sharing,
+  voice and camera) in the brief index with waves and graph and in the site navigation (D-W-120,
+  D-W-121).
 
 - Gate `register-check` (`tools/doccheck/register_check.py`): the module register
   `services/server/architecture/modules.yaml` must equal the tables and their modules in

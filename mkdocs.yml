@@ -391,3 +391,11 @@ nav:
           - "M6-13: stats: own measurement": briefs/M6-13-stats-measure.md
           - "M6-14: stats: timeline, SLO traffic light and backend view": briefs/M6-14-stats-queries.md
           - "M6-15: stats: live stream `stats.live`": briefs/M6-15-stats-live.md
+      - Milestone M5:
+          - "M5-01: Device key for Android": briefs/M5-01-device-key-android.md
+          - "M5-02: iPhone layout and navigation": briefs/M5-02-iphone-layout.md
+          - "M5-03: Android layout, navigation and notification channels": briefs/M5-03-android-layout.md
+          - "M5-04: ClientKit and Notification Service Extension (ADR 0056)": briefs/M5-04-clientkit-nse.md
+          - "M5-05: Android push service without the Flutter engine": briefs/M5-05-android-push.md
+          - "M5-06: Sharing from other apps": briefs/M5-06-sharing.md
+          - "M5-07: Voice recording, camera and photo": briefs/M5-07-voice-camera.md
