@@ -144,7 +144,7 @@ func TestAuthenticateAPIToken_AppInstallation(t *testing.T) {
 	e := newTokenEnv(t)
 	d := newDPoPEnv(t, "pepper")
 	apps := &fakeInstallations{}
-	a, err := app.NewAuthenticator(app.Config{LastActiveGranularity: 5 * time.Minute}, app.AuthenticatorDeps{
+	a, err := app.NewAuthenticator(app.Config{LastActiveGranularity: 5 * time.Minute, DevicePendingTTL: 24 * time.Hour}, app.AuthenticatorDeps{
 		AccessTokens: e.at, DPoP: d.v, Sessions: noSessions{}, APITokens: store, Pepper: tokenPepper, Clock: e.clk, Apps: apps,
 	})
 	if err != nil {

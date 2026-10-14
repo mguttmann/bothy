@@ -795,12 +795,13 @@ func (s *server) startApps(context.Context) error {
 		return err
 	}
 	s.mu.Lock()
-	pool, a, az, id := s.pool, s.audit, s.authorizer, s.identity
+	pool, a, az, admin, id := s.pool, s.audit, s.authorizer, s.authzAdmin, s.identity
 	s.mu.Unlock()
-	if a == nil || az == nil || id == nil {
-		return errors.New("wire: the apps step needs the audit step, the Authorizer and identity")
+	if a == nil || az == nil || admin == nil || id == nil {
+		return errors.New("wire: the apps step needs the audit step, the Authorizer, the authz Admin and identity")
 	}
-	ap, err := NewApps(cfg, pool, AppsDeps{UoW: a.UoW(), Rights: a.RightsHook(), Authorizer: az, Audit: a.Recorder(), Identity: id, Clock: s.deps.Clock})
+	ap, err := NewApps(cfg, pool, AppsDeps{UoW: a.UoW(), Rights: a.RightsHook(), Authorizer: az, Audit: a.Recorder(), Identity: id,
+		Grants: admin.Admin, Clock: s.deps.Clock})
 	if err != nil {
 		return err
 	}
@@ -879,9 +880,7 @@ func (s *server) handlers() Handlers {
 	if h.Access == nil && s.authzAdmin != nil {
 		h.Access = s.authzAdmin.Handlers
 	}
-	if h.Apps == nil && s.apps != nil {
-		h.Apps = s.apps.Handlers
-	}
+	s.apps.fillHandlers(&h)
 	return h
 }
 

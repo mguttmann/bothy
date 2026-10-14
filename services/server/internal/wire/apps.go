@@ -11,7 +11,6 @@ import (
 	appspg "github.com/OWNER/bothy/services/server/internal/apps/adapters/postgres"
 	appsapp "github.com/OWNER/bothy/services/server/internal/apps/app"
 	"github.com/OWNER/bothy/services/server/internal/authz"
-	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
@@ -67,37 +66,41 @@ type AppsDeps struct {
 	Audit      auditing.Recorder
 	// Identity provides the directory, the principal writes and the API tokens.
 	Identity *Identity
+	// Grants is the Admin service of authz (NewAuthzAdmin); uninstall revokes the grants of the
+	// app through it (RevokeSubjectGrants).
+	Grants *authzapp.AdminService
 	// Clock is the time of the writes; nil means clock.System().
 	Clock clock.Clock
 }
 
 // NewApps builds the module apps over pool: the repository, the use cases with the ports of
 // identity (directory, principal writes, tokens), the grant revocation of authz (the Admin
-// service of M1-29 over the same pool), the scope table of authz and the spec version of the
+// service of the authz step, d.Grants), the scope table of authz and the spec version of the
 // contract (routes.SpecVersion), and the REST handlers. It opens no connection. Errors: a missing
 // collaborator or a value the use cases refuse.
 func NewApps(cfg appsapp.Config, pool *pg.Pool, d AppsDeps) (*Apps, error) {
-	if d.UoW == nil || d.Rights == nil || d.Authorizer == nil || d.Audit == nil || d.Identity == nil {
-		return nil, errors.New("wire: NewApps needs the unit of work, the rights hook, the Authorizer, the recorder and identity")
+	if d.UoW == nil || d.Rights == nil || d.Authorizer == nil || d.Audit == nil || d.Identity == nil || d.Grants == nil {
+		return nil, errors.New("wire: NewApps needs the unit of work, the rights hook, the Authorizer, the recorder, identity and the authz Admin")
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
 	}
-	admin, err := authzapp.NewAdminService(authzapp.AdminDeps{
-		UoW: d.UoW, Authorizer: d.Authorizer, Store: authzpg.NewRepository(pool), Principals: principalSource(pool),
-		Structure: NewStructureSource(pool), Hosts: NewHostSource(pool), Rights: d.Rights, Audit: d.Audit, Clock: d.Clock,
-	})
-	if err != nil {
-		return nil, err
-	}
 	svc, err := appsapp.New(cfg, appsapp.Deps{
 		Repo: appspg.NewRepository(pool), UoW: d.UoW, Authorizer: d.Authorizer, Audit: d.Audit,
 		Principals: appsapp.IdentityPrincipals{Directory: d.Identity.Directory, Writes: d.Identity.PrincipalWrites},
-		Tokens:     d.Identity.Tokens, Grants: admin, Rights: d.Rights, Scopes: authzapp.ScopeTable{}, Cursors: appshttp.Cursors{},
+		Tokens:     d.Identity.Tokens, Grants: d.Grants, Rights: d.Rights, Scopes: authzapp.ScopeTable{}, Cursors: appshttp.Cursors{},
 		SpecVersion: routes.SpecVersion, Clock: d.Clock,
 	})
 	if err != nil {
 		return nil, err
 	}
 	return &Apps{Service: svc, Handlers: appshttp.NewApps(svc)}, nil
+}
+
+// fillHandlers sets h.Apps to the handlers of ap when it is nil, so an injected handler stays; a
+// nil ap (the apps step did not run) leaves h unchanged (INT-W19/7).
+func (ap *Apps) fillHandlers(h *Handlers) {
+	if ap != nil {
+		fill(&h.Apps, ap.Handlers)
+	}
 }

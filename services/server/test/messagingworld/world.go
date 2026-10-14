@@ -30,6 +30,7 @@ import (
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/chat"
 	chatapp "github.com/OWNER/bothy/services/server/internal/chat/app"
+	"github.com/OWNER/bothy/services/server/internal/identity"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	identityapp "github.com/OWNER/bothy/services/server/internal/identity/app"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
@@ -124,7 +125,28 @@ type World struct {
 	Svc     *messagingapp.Service
 	Threads chat.Threads
 
-	rec *Recorder
+	rec      *Recorder
+	installs *installations
+}
+
+// installations is the identity.AppInstallations of the world: App registers an active
+// installation per app, so the principal source gives the app its rights (M2-24, INT-W19/8).
+type installations struct {
+	mu sync.Mutex
+	m  map[ids.ID]identity.ActiveAppInstallation
+}
+
+// ActiveInstallation implements identity.AppInstallations.
+func (s *installations) ActiveInstallation(_ context.Context, appID ids.ID) (identity.ActiveAppInstallation, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	inst, ok := s.m[appID]
+	return inst, ok, nil
+}
+
+// LockActiveInstallation implements identity.AppInstallations; the world never locks.
+func (s *installations) LockActiveInstallation(ctx context.Context, appID ids.ID) (identity.ActiveAppInstallation, bool, error) {
+	return s.ActiveInstallation(ctx, appID)
 }
 
 // New builds a world on a new database with the owner "owner"; subscribe registers the test
@@ -137,8 +159,9 @@ func New(t *testing.T, subscribe Subscribe) *World {
 	pool := db.OpenPool(t, cfg)
 	log := slog.New(&httpservertest.LogCapture{})
 	w := &World{t: t, Pool: pool, Owner: db.Pool(t, pg.RoleOwner), Clock: clock.NewFake(start), creds: fake.NewCredentials(),
-		actors: httpservertest.NewActors(), policies: fake.NewPolicies(), rec: &Recorder{t: t}}
-	principals := identityapp.NewPrincipalSource(identitypg.NewRepository(pool))
+		actors: httpservertest.NewActors(), policies: fake.NewPolicies(), rec: &Recorder{t: t},
+		installs: &installations{m: map[ids.ID]identity.ActiveAppInstallation{}}}
+	principals := identityapp.NewPrincipalSource(identitypg.NewRepository(pool)).WithApps(w.installs)
 	str := wire.NewStructureSource(pool)
 	hook, err := wire.NewRightsHook(pool, wire.RightsSources{Principals: principals, Structure: str, Policies: w.policies}, w.Clock, log)
 	if err != nil {
@@ -299,14 +322,18 @@ func (w *World) Agent(name string) ids.ID {
 	return id
 }
 
-// App inserts an active app with handle name and registers token name with the granted scopes.
+// App inserts an active app with handle name and an active installation with the granted scopes
+// and registers token name, which carries all of them.
 func (w *World) App(name string, scopes ...string) ids.ID {
 	w.t.Helper()
 	id, tok := ids.New(), ids.New()
 	w.SQL(`INSERT INTO principals (id, kind, status, handle, display_name) VALUES ($1, 'app', 'active', $2, $2)`, id.String(), name)
 	w.creds.PutToken(tok, fake.Token{PrincipalID: id})
 	a := httpservertest.WithToken(id, actor.KindApp, tok)
-	a.InstallationID, a.GrantedScopes = ids.New(), scopes
+	a.InstallationID, a.GrantedScopes, a.Scopes = ids.New(), scopes, scopes
+	w.installs.mu.Lock()
+	w.installs.m[id] = identity.ActiveAppInstallation{ID: a.InstallationID, GrantedScopes: scopes}
+	w.installs.mu.Unlock()
 	w.actors.Set(name, a)
 	return id
 }

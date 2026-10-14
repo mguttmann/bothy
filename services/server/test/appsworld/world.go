@@ -11,6 +11,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -29,6 +30,7 @@ import (
 	auditapp "github.com/OWNER/bothy/services/server/internal/audit/app"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/authz/adapters/fake"
+	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/identity"
@@ -79,6 +81,11 @@ var idCfg = identityapp.Config{
 	SessionMaxAge: 30 * 24 * time.Hour, RefreshReuseGrace: 30 * time.Second, LastActiveGranularity: 5 * time.Minute,
 	StepUpChallengeTTL: 2 * time.Minute, StepUpFailLimit: 3, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
 	APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
+	// The keys the newer base requires of NewIdentity (INT-W19/8), as in terminalworld.
+	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 5, LoginFlowTTL: 10 * time.Minute,
+	DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
+	ServerCodeTTL: time.Minute, OIDCJWKSCacheTTL: time.Hour, OIDCClientAssertionTTL: 2 * time.Minute,
+	IDPRecheckInterval: 30 * 24 * time.Hour, DeviceInactiveRevokeAfter: 180 * 24 * time.Hour,
 }
 
 // appsCfg is the configuration of the module apps in the world.
@@ -175,7 +182,8 @@ func NewWorld(t *testing.T) *World {
 	Must(t, err)
 	w.az = az
 	w.admin, err = authzapp.NewAdminService(authzapp.AdminDeps{UoW: w.uow, Authorizer: az, Store: authzpg.NewRepository(pool), Principals: principals,
-		Structure: w.structure, Rights: hook, Audit: w.rec, Clock: clk})
+		Structure: w.structure, Rights: hook, Audit: w.rec, Clock: clk, Events: appender, Scopes: az, Cursors: authzhttp.Cursors{},
+		Config: authzapp.AdminConfig{GroupNameMaxChars: 100, GroupDescriptionMaxChars: 500, PageSizeDefault: 50, PageSizeMax: 200}})
 	Must(t, err)
 	dir := filepath.Join(t.TempDir(), "signing-keys")
 	Must(t, os.Mkdir(dir, 0o700))
@@ -187,10 +195,13 @@ func NewWorld(t *testing.T) *World {
 	}, Dir: dir}, pool, sp, w.uow, az, w.rec, clk, log)
 	Must(t, err)
 	Must(t, keys.Keys.EnsureActive(context.Background()))
-	w.id, err = wire.NewIdentity(idCfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender, Apps: installs}, testPepper, clk, log)
+	settings, err := wire.NewInstanceSettings(wire.DefaultInstanceConfig(), true, pool, w.uow, az, wire.SettingsWrites{Audit: w.rec, Events: appender}, clk)
+	Must(t, err)
+	w.id, err = wire.NewIdentity(idCfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender, Apps: installs,
+		Settings: settings.Admin, Flags: settings.Admin}, testPepper, clk, log)
 	Must(t, err)
 	Must(t, w.id.BindSessions(keys.Keys, ids.New()))
-	w.apps, err = wire.NewApps(appsCfg, pool, wire.AppsDeps{UoW: w.uow, Rights: hook, Authorizer: az, Audit: w.rec, Identity: w.id, Clock: clk})
+	w.apps, err = wire.NewApps(appsCfg, pool, wire.AppsDeps{UoW: w.uow, Rights: hook, Authorizer: az, Audit: w.rec, Identity: w.id, Grants: w.admin, Clock: clk})
 	Must(t, err)
 	built, err := routes.Build(wire.Handlers{Sessions: w.id.SessionHandlers, StepUps: w.id.StepUpHandlers, Devices: w.id.Handlers, People: w.id.PeopleHandlers,
 		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers, Tokens: w.id.TokenHandlers, Apps: w.apps.Handlers},
@@ -225,8 +236,13 @@ func (w *World) Seed() {
 	w.RobinPhone, w.SamPhone = w.Phone(w.Robin), w.Phone(w.Sam)
 	w.Support, w.Allgemein, w.Eskalation = ids.New(), ids.New(), ids.New()
 	w.structure.PutSpace(w.Support)
-	for _, c := range []ids.ID{w.Allgemein, w.Eskalation} {
+	// The grants of the world need the rows of the space and its channels since the foreign keys
+	// of M1-52 and M1-53 (INT-W19/8); authz still reads the structure from the fake.
+	w.SQL(`INSERT INTO spaces (id, name, sort_key, created_by) VALUES ($1::uuid, 'Support', 'a0', $2)`, w.Support.String(), w.Robin.String())
+	for i, c := range []ids.ID{w.Allgemein, w.Eskalation} {
 		w.structure.PutChannel(authz.ChannelFacts{ID: c, SpaceID: w.Support, Kind: authz.ChannelText})
+		w.SQL(`INSERT INTO channels (id, space_id, kind, name, sort_key, operator_inherit, history_backfill_limit, created_by)
+			VALUES ($1::uuid, $2::uuid, 'text', $1::text, $3, true, 20, $4)`, c.String(), w.Support.String(), fmt.Sprintf("a%d", i), w.Robin.String())
 	}
 	w.AllgemeinThread, w.EskalationThread = ids.New(), ids.New()
 	w.structure.PutThread(authz.ThreadFacts{ID: w.AllgemeinThread, ChannelID: w.Allgemein, Main: true})
