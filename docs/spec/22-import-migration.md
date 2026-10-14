@@ -661,7 +661,7 @@ transfers or discards them.
 
 ### 13.5 Completion
 
-When all channels have `lead = bothy`: end the mirror; source `completed` (`import.manage`, by the
+When all imported channels (channel item `posted`) have `lead = bothy`: end the mirror; source `completed` (`import.manage`, by the
 owner in the web console). The
 mapping `import_items` remains until the owner has the retention class `import` deleted
 ([20-privacy.md](20-privacy.md)). After that a repeated import is no longer idempotent;
