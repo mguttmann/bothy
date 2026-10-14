@@ -27,7 +27,9 @@ _FAKE = """#!{python}
 import json, os, sys
 name = os.path.basename(sys.argv[0])
 with open(os.environ["FAKE_LOG"], "a", encoding="utf-8") as fh:
-    fh.write(json.dumps({{"tool": name, "args": sys.argv[1:], "cwd": os.getcwd()}}) + "\\n")
+    git = {{k: v for k, v in os.environ.items() if k.startswith("GIT_")}}
+    entry = {{"tool": name, "args": sys.argv[1:], "cwd": os.getcwd(), "git": git}}
+    fh.write(json.dumps(entry) + "\\n")
 if name == "flutter" and sys.argv[1:2] == ["pub"] and os.environ.get("FAKE_FLUTTER_PUB_EXIT"):
     sys.exit(int(os.environ["FAKE_FLUTTER_PUB_EXIT"]))
 if name == "flutter" and sys.argv[1:2] == ["test"] and os.environ.get("FAKE_LCOV"):
@@ -184,6 +186,31 @@ def _recipe(repo: Repo, target: str, marker: str) -> str:
             commands.append(line)
     [command] = [c for c in commands if marker in c]
     return command
+
+
+def test_flutter_runs_without_the_git_variables_of_a_hook(repo: Repo) -> None:
+    """git exports GIT_DIR to hooks, and the pre-push hook runs make check; Flutter reads its own
+    version with git in the SDK, so with the hook's GIT_DIR it would read this repository and
+    refuse the pinned SDK version (docs/DECISIONS.md D-M2-38-22)."""
+    _dart_package(repo)
+    hook = {"GIT_DIR": str(repo.root / ".git"), "GIT_INDEX_FILE": str(repo.root / ".git" / "index")}
+    lint = _recipe(repo, "lint", "flutter analyze")
+    result = subprocess.run(
+        ["bash", "-c", lint],
+        cwd=repo.root,
+        env=repo.environ(**hook),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=120,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    result = repo.make("test", "COMPONENTS=apps", **hook)
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = repo.calls("flutter")
+    assert len(calls) == 4
+    located = {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_COMMON_DIR", "GIT_PREFIX"}
+    assert [sorted(located & set(c["git"])) for c in calls] == [[]] * len(calls)
 
 
 def test_dart_package_without_tests_fails(repo: Repo) -> None:

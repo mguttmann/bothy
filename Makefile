@@ -47,6 +47,9 @@ GITLEAKS_LOG_OPTS ?= HEAD
 UV := uv
 UVRUN := $(UV) run --project tools --locked --quiet
 NODE_BIN := tools/node/node_modules/.bin
+# git exports GIT_DIR and friends to hooks (the pre-push hook runs `make check`); Flutter reads
+# its own version with git inside the SDK, so it runs without them (docs/DECISIONS.md D-M2-38-22).
+FLUTTER := env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE -u GIT_COMMON_DIR -u GIT_PREFIX flutter
 FETCH := $(UVRUN) python tools/bin/fetch_tools.py
 # go, a Docker-compatible runtime and the pins of the server gates; a gap fails (R-QA-02).
 GO_PREREQS := $(UVRUN) python tools/ci/go_prereqs.py
@@ -172,7 +175,7 @@ lint: ## Linters: file hygiene hooks, ruff, bandit, Dockerfile pins, actionlint,
 	else gl=$(call tool,golangci-lint) || exit 1; \
 	  for m in $(GO_MODS); do (cd $$m && go vet ./... && "$$gl" run ./...) || exit 1; done; fi
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-lint,no Dart package selected); \
-	else for p in $(DART_PKGS); do (cd $$p && flutter pub get --enforce-lockfile && flutter analyze --fatal-infos && \
+	else for p in $(DART_PKGS); do (cd $$p && $(FLUTTER) pub get --enforce-lockfile && $(FLUTTER) analyze --fatal-infos && \
 	  if grep -q '^ *custom_lint:' pubspec.yaml; then dart run custom_lint; fi) || exit 1; done; fi
 	@# bandit skips the project's virtual environment and generated code (docs/DECISIONS.md M2-23/7).
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-lint,no Python project selected); \
@@ -206,7 +209,7 @@ test: ## All tests with coverage data
 	@if [ -z "$(DART_ON)" ]; then $(call skip,dart-test,no Dart package selected); \
 	else for p in $(DART_PKGS); do \
 	  [ -d $$p/test ] || { echo "$$p: no test/ directory (docs/spec/23-quality.md, 3)" >&2; exit 1; }; \
-	  (cd $$p && flutter pub get --enforce-lockfile && flutter test --coverage) || exit 1; done; fi
+	  (cd $$p && $(FLUTTER) pub get --enforce-lockfile && $(FLUTTER) test --coverage) || exit 1; done; fi
 	@if [ -z "$(PY_ON)" ]; then $(call skip,py-test,no Python project selected); \
 	else for p in $(PY_PROJECTS); do (cd $$p && $(UV) run --locked pytest --cov --cov-report=xml:coverage.xml); done; fi
 	@if [ -z "$(TS_ON)" ]; then $(call skip,ts-test,no TypeScript project selected); \
