@@ -40,6 +40,9 @@ var appPrivileges = map[string][]string{
 	"groups":            {"SELECT", "INSERT", "UPDATE"},
 	"group_memberships": {"SELECT", "INSERT", "UPDATE"},
 	"grants":            {"SELECT", "INSERT", "UPDATE"},
+	// 03 event_log, R-DM-18: the envelope is append-only for bothy_app; redaction adds its column
+	// grant with M1-58, and partitions change only through the SECURITY DEFINER functions (M1-16).
+	"event_log": {"SELECT", "INSERT"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

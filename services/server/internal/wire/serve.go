@@ -117,13 +117,16 @@ type server struct {
 	required  int64
 	instance  instance.Record
 	jobsCfg   jobs.Config
-	jobsReg   *jobs.Registry
 	jobsRT    *jobs.Runtime
 	// audit is the audit module (M1-24); later tickets hand its recorder to the modules.
 	audit *Audit
 	// authorizer is the kernel/authorize.Authorizer of the process (M1-28); the use cases of later
 	// tickets receive it.
 	authorizer authorize.Authorizer
+	// syncCfg and sync are the event log (M1-16): its appender for the modules, the partition
+	// maintenance of the job and the log tail of api and all.
+	syncCfg SyncConfig
+	sync    *Sync
 	// blocked is set when a readiness check fails for good (schema_requires_newer_server).
 	blocked bool
 }
@@ -149,10 +152,14 @@ type server struct {
 //     of denials; its stop step audit_denials flushes the open aggregations before the pool
 //     closes (startAudit),
 //     6b. authz (M1-28): build the Authorizer with the recorder of audit (startAuthz),
+//     6c. sync (M1-16): build the event log over the unit of work of the audit step (appender,
+//     partition maintenance; startSync),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
 //     sweeper, M1-19, and MountRoutes, api and all), log
-//     tail (M1-16, api and all), then the jobs (every role): the River migrations in jobs.schema
+//     tail (M1-16, api and all: local_head is set to the head before the public listener opens,
+//     and a tail that fails later ends the process with exit code 1), then the jobs (every role,
+//     with sync.partition_maintenance): the River migrations in jobs.schema
 //     must be complete (else the hint to run "bothy migrate up"), the runtime of the role is
 //     built over the pool, and worker and all start River (02 "Start and graceful shutdown" step 8); a River client
 //     that stops on its own later ends the process with exit code 1 (02 "Health"). The
@@ -207,7 +214,7 @@ func Serve(_ context.Context, v *config.Values, role Role, deps Deps) (*lifecycl
 		return nil, err
 	}
 	s.jobsCfg.Logger = logger
-	if s.jobsReg, err = NewJobRegistry(&Modules{}); err != nil {
+	if s.syncCfg, err = SyncConfigFrom(v); err != nil {
 		return nil, err
 	}
 	s.runner = lifecycle.New(lifecycle.Options{
@@ -298,9 +305,13 @@ func (s *server) register() {
 	r.Add(step("instance", s.loadInstance))
 	r.Add(step("audit", s.startAudit))
 	r.Add(step("authz", s.startAuthz))
+	r.Add(step("sync", s.startSync))
 	// Extension point (README.md): M1-32 adds the signing keys here.
 	r.Add(step("routes", s.mountRoutes))
-	// Extension point: M1-16 adds the log tail (api, all) here, M2 the consumers after the jobs.
+	if s.api() {
+		r.Add(step("log_tail", s.startLogTail))
+	}
+	// Extension point: M2 adds the consumers after the jobs.
 	r.Add(step("jobs", s.startJobs))
 	if s.api() {
 		r.Add(step("public_listener", s.startPublic))
@@ -608,16 +619,48 @@ func jobsWaitBudget(cfg ServeConfig, role Role, soft time.Duration) time.Duratio
 	return max(cfg.TotalTimeout-fixed, 0)
 }
 
-// startJobs checks River's migrations, builds the job runtime of the role and starts River for
-// worker and all; a River client that later stops on its own ends the process.
+// startSync is start step 6b: it builds the event log over the pool and the unit of work of the
+// audit step, whose registry holds the sync hook (M1-16).
+func (s *server) startSync(context.Context) error {
+	s.mu.Lock()
+	pool, a := s.pool, s.audit
+	s.mu.Unlock()
+	if a == nil {
+		return errors.New("wire: the sync step needs the unit of work of the audit step")
+	}
+	sy, err := NewSync(pool, a.UoW(), s.syncCfg, nil, s.logger())
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.sync = sy
+	s.mu.Unlock()
+	return nil
+}
+
+// startLogTail starts the log tail of api and all (02 "Start and graceful shutdown" step 8, startTail).
+func (s *server) startLogTail(ctx context.Context) error {
+	s.mu.Lock()
+	sy := s.sync
+	s.mu.Unlock()
+	return startTail(ctx, s.runner, sy.NewTail(tailSinks()...))
+}
+
+// startJobs checks River's migrations, builds the job registry with the jobs of the modules and
+// the runtime of the role and starts River for worker and all; a River client that later stops
+// on its own ends the process.
 func (s *server) startJobs(ctx context.Context) error {
 	s.mu.Lock()
-	pool := s.pool
+	pool, sy := s.pool, s.sync
 	s.mu.Unlock()
 	if err := jobs.ValidateMigrations(ctx, pool, s.jobsCfg.Schema); err != nil {
 		return err
 	}
-	rt, err := jobs.New(pool, s.jobsCfg, JobRole(s.role), s.jobsReg, nil)
+	reg, err := NewJobRegistry(&JobModules{Partitions: sy.Maintenance(), PartitionInterval: s.syncCfg.MaintenanceInterval})
+	if err != nil {
+		return err
+	}
+	rt, err := jobs.New(pool, s.jobsCfg, JobRole(s.role), reg, nil)
 	if err != nil {
 		return err
 	}

@@ -210,7 +210,7 @@ modules:
     ephemeral_events: []
     ws_ops: []
     depends_on: [instance, identity, chat, agents, messaging, runs]
-    adapter_vendors: []
+    adapter_vendors: [otel, pgx]   # adapters/telemetry reads the trace context, adapters/postgres the sqlc code and the tail (M1-16)
   stats:
     tables: [stats_minutes]
     actions: [stats.read, client_metrics.submit]

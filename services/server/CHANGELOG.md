@@ -346,6 +346,32 @@ documented in this file. The format is based on
   of 05, `ratelimit.max_tracked_keys` and `ratelimit.sweep_interval`; `bothy serve` (roles api and
   all) refuses to start when an enabled REST operation carries a gateway class or a class without
   limits.
+- Event log (M1-16, B8, ADR 0009): migration `00006_sync_event_log.sql` with `event_log`
+  partitioned by range of `seq` (no default partition, no foreign key, the indexes and checks of
+  03) and the `SECURITY DEFINER` functions `sync_event_log_ensure_partitions` and
+  `sync_event_log_drop_expired` of `bothy_owner`; `bothy_app` gets `SELECT, INSERT` and `EXECUTE`
+  only. `kernel/eventlog` declares `Event`, `ActorKind` and `Appender`; `internal/sync` holds the
+  port types `Event`, `Envelope`, `DeliveryFields`, `Sink`, `Tail` and `ErrGap`, its `app` the
+  appender (validation before buffering), the phase hook of `sync` (counter `event_seq`, then
+  `permission_version`, insert and `pg_notify('event_log', <last seq>)` in one statement; nothing
+  for a unit without events) and the partition maintenance.
+- One envelope for gateway, REST catch-up and webhooks (`Event.Envelope`, ADR 0052) without JSON
+  `null` (ADR 0053); delivery members only from `DeliveryFields`; `correlation_id` is the trace ID
+  of the request, `trace_context` only for a sampled request.
+- Log tail of the roles api and all with its own `LISTEN` connection (`bothy-event-tail`,
+  `pg.Pool.DialDedicated`), polling every `sync.log_poll_interval`, reconnect with backoff up to
+  `database.listen_reconnect_backoff_cap`, gap check and the stop step `event_tail`; a failing
+  tail ends the process with exit code 1.
+- Job `sync.partition_maintenance` (queue `maintenance`, every
+  `sync.partition_maintenance_interval`, also at the start of a worker); `bothy migrate up` runs it
+  once after the instance row, so a fresh database has partitions before `serve`.
+- Configuration keys `sync.event_log_partition_size`, `sync.event_retention`,
+  `sync.event_payload_max_bytes`, `sync.log_poll_interval`, `sync.tail_batch_size`,
+  `sync.partition_maintenance_interval` and `sync.event_log_partitions_ahead`.
+- `pgtest.Durable()` for databases with `fsync`, `synchronous_commit` and `full_page_writes` on,
+  `jobs.Registry.Periodic` and `jobs.Registry.Queue`, and the load test `perf/event_commit` of
+  `perf.event_commit_min_per_s` in `make perf` with the threshold read from 02 by
+  `perf/internal/report`.
 
 - `internal/files`: the object storage port `ObjectStore` (`internal/files/app`) with exactly the
   nine operations of chapter 12 "4.1", the key schema and the one key grammar of all drivers
@@ -392,6 +418,8 @@ documented in this file. The format is based on
   the chain with `actor.AnonymousOnly` until identity is wired, so every credential is refused.
 - Every command that loads the server configuration needs `server.public_url`.
 - Go coverage of the module leaves generated files (`*.gen.go`) out of the total.
+- `wire.MigrateUpSteps` takes `wire.MigrateUpConfig` (jobs schema and the event log values) and
+  `wire.NewJobRegistry` takes `wire.JobModules`; the txn registry needs the sync hook as well.
 
 ### Fixed
 

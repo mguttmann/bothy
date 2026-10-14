@@ -35,7 +35,9 @@ appears in the exported API, so a breaking change of River (0.x) touches this pa
 
 Every role builds the same `Registry` in `internal/wire`, so an api process accepts exactly the
 kinds a worker runs. A worker whose registry is still empty does not start River (River refuses a
-client without workers, and there is nothing to run); the first handler comes with M1-16.
+client without workers, and there is nothing to run). The first handler is
+`sync.partition_maintenance` (M1-16). `Registry.Periodic` and `Registry.Queue` report what was
+registered, for the tests of `internal/wire`.
 
 At the start of `bothy serve` every role checks that River's migrations in `jobs.schema` are
 complete (`ValidateMigrations`); otherwise the start ends with the hint to run

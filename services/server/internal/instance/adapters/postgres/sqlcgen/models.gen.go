@@ -36,6 +36,31 @@ type AuditIpKey struct {
 	DestroyedAt   pgtype.Timestamptz
 }
 
+type EventLog struct {
+	Seq                 int64
+	ID                  pgtype.UUID
+	Type                string
+	SchemaVersion       int16
+	OccurredAt          pgtype.Timestamptz
+	ActorKind           pgtype.Text
+	ActorPrincipalID    pgtype.UUID
+	SpaceID             pgtype.UUID
+	ChannelID           pgtype.UUID
+	ThreadID            pgtype.UUID
+	ResourceKind        string
+	ResourceID          pgtype.UUID
+	ResourceVersion     pgtype.Int8
+	AudiencePrincipalID pgtype.UUID
+	ReceiveAction       string
+	Payload             []byte
+	Truncated           bool
+	RedactedAt          pgtype.Timestamptz
+	CorrelationID       pgtype.UUID
+	TraceContext        pgtype.Text
+	ClientMsgID         pgtype.UUID
+	PermissionVersion   int64
+}
+
 type Grant struct {
 	ID                 pgtype.UUID
 	SubjectKind        string

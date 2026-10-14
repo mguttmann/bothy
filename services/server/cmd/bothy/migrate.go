@@ -33,7 +33,9 @@ up        applies every pending migration of this binary as database.user, which
           applied <k>"), then the domain migrations: "applied <version> <name>" per
           migration and "database version <n>, applied <k>". Afterwards it creates the
           instance row if it is missing and records instance.schema_version and
-          instance.min_server_version. Against a schema newer than this binary it prints
+          instance.min_server_version, and creates the partitions of event_log that
+          sync.event_log_partitions_ahead asks for and detaches those older than
+          sync.event_retention. Against a schema newer than this binary it prints
           "schema is newer than this binary; nothing to do" and changes nothing.
 status    prints "<version> <name> <applied|pending> <applied_at|->" per migration of this
           binary, "database version <n>, binary requires <m>, pending <k>" and "river schema
@@ -70,7 +72,7 @@ type migrateEnv struct {
 	env    []string
 	schema func() (*config.Schema, error)
 	fsys   fs.FS
-	steps  func(pool *pg.Pool, fsys fs.FS, schema string, result *jobs.MigrateResult) (pg.MigratorOptions, error)
+	steps  func(pool *pg.Pool, fsys fs.FS, cfg wire.MigrateUpConfig, result *jobs.MigrateResult) (pg.MigratorOptions, error)
 	stdout io.Writer
 	stderr io.Writer
 }
@@ -179,6 +181,8 @@ type migrateRun struct {
 	db       pg.Config
 	settings wire.MigrateConfig
 	schema   string
+	// sync holds the partition values the partition step of migrate up reads (M1-16).
+	sync wire.SyncConfig
 }
 
 // newMigrateRun loads the configuration as the server start does and builds the secret
@@ -214,10 +218,14 @@ func newMigrateRun(o migrateOptions, e migrateEnv) (*migrateRun, int) {
 	if err != nil {
 		return fail(err)
 	}
+	syncCfg, err := wire.SyncConfigFrom(values)
+	if err != nil {
+		return fail(err)
+	}
 	if err := db.Validate(); err != nil {
 		return fail(err)
 	}
-	return &migrateRun{e: e, log: log, provider: provider, db: db, settings: settings, schema: jobsCfg.Schema}, exitOK
+	return &migrateRun{e: e, log: log, provider: provider, db: db, settings: settings, schema: jobsCfg.Schema, sync: syncCfg}, exitOK
 }
 
 // failf prints one error line on stderr and returns exit code 1.
@@ -243,7 +251,7 @@ func (r *migrateRun) migrator(ctx context.Context, river *jobs.MigrateResult) (*
 		_ = db.Close()
 		pool.Close()
 	}
-	steps, err := r.e.steps(pool, r.e.fsys, r.schema, river)
+	steps, err := r.e.steps(pool, r.e.fsys, wire.MigrateUpConfig{JobsSchema: r.schema, Sync: r.sync}, river)
 	if err != nil {
 		closeAll()
 		return nil, nil, nil, err

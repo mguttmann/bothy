@@ -120,6 +120,14 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"privacy.audit_ip_kek_ref":       {Kind: config.KindSecretRef, Default: "file:<secrets.dir>/audit_ip_kek", Chapter: "20-privacy.md"},
 		"ratelimit.max_tracked_keys":     {Kind: config.KindInt, Default: "100000", Min: "1", Max: "100000000", Chapter: "02-architecture.md"},
 		"ratelimit.sweep_interval":       {Kind: config.KindDuration, Default: "1m", Min: "1s", Max: "1h", Chapter: "02-architecture.md"},
+
+		"sync.event_log_partition_size":       {Kind: config.KindInt, Default: "1000000", Min: "1", Max: "1000000000000", Chapter: "03-data-model.md"},
+		"sync.event_retention":                {Kind: config.KindDuration, Default: "30d", Min: "1s", Chapter: "04-sync-protocol.md"},
+		"sync.event_payload_max_bytes":        {Kind: config.KindInt, Default: "65536", Min: "3", Max: "1048576", Chapter: "04-sync-protocol.md"},
+		"sync.log_poll_interval":              {Kind: config.KindDuration, Default: "1s", Min: "1ms", Chapter: "02-architecture.md"},
+		"sync.tail_batch_size":                {Kind: config.KindInt, Default: "1000", Min: "1", Max: "2147483647", Chapter: "02-architecture.md"},
+		"sync.partition_maintenance_interval": {Kind: config.KindDuration, Default: "10m", Min: "1s", Chapter: "02-architecture.md"},
+		"sync.event_log_partitions_ahead":     {Kind: config.KindInt, Default: "3", Min: "1", Max: "1000", Chapter: "02-architecture.md"},
 	}
 	// Two keys per class of 05 "Rate-limit classes" (M1-19), with the defaults of 05 section 10.
 	for class, def := range map[string][2]string{
