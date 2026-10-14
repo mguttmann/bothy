@@ -45,6 +45,19 @@ type PrincipalFacts struct {
 	IsOwner bool
 }
 
+// PrincipalRef is the minimal public view of a principal that authz embeds in its answers, for
+// example the user of a group member (OpenAPI PrincipalRef, M1-48).
+type PrincipalRef struct {
+	// ID is the principal.
+	ID ids.ID
+	// Kind is user, agent or app.
+	Kind actor.Kind
+	// Handle and DisplayName are the public names.
+	Handle, DisplayName string
+	// AvatarFileID is the avatar file; zero for none.
+	AvatarFileID ids.ID
+}
+
 // PrincipalSource gives authz the facts of principals. The identity module implements it
 // (identity/app); internal/wire passes it to authz (M1-28).
 type PrincipalSource interface {
@@ -58,6 +71,10 @@ type PrincipalSource interface {
 	// hat_anmeldedaten of passkey.register, whose step-up is conditional (07 section 4.2 step 8,
 	// M1-40). It reads inside the ambient transaction of ctx when there is one.
 	HasActivePasskey(ctx context.Context, userID ids.ID) (bool, error)
+	// Refs returns the public views of the known principals among principals, whatever their status;
+	// an unknown id is absent from the map (M1-48, the members of a group). It reads inside the
+	// ambient transaction of ctx when there is one.
+	Refs(ctx context.Context, principals []ids.ID) (map[ids.ID]PrincipalRef, error)
 }
 
 // ChannelKind is channels.kind.

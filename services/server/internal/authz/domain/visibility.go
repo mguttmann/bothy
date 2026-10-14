@@ -116,13 +116,16 @@ func personVisible(in Input) (bool, Reason, error) {
 	return in.Principal.Kind == KindUser || in.Principal.Kind == KindApp || isSelf(in), ReasonNoGrant, nil
 }
 
-// grantVisible: owners see every grant; others see grants on a space or channel they read.
+// grantVisible: owners see every grant; others see the grants on a space or channel where they
+// hold manage, a channel inheriting it from its space through the effective rights on the path
+// (07 section 2.6 item 6, brief M1-48 "Visibility"). Reading the target is not enough: a grant
+// is administration data, and a grant outside the caller's manage scope answers like a random id.
 func grantVisible(in Input) (bool, Reason, error) {
 	switch in.GrantTarget {
 	case TargetInstance, TargetHost:
 		return in.Eff.Owner, ReasonNoGrant, nil
 	case TargetSpace, TargetChannel:
-		return in.Eff.Owner || in.Eff.Level >= LevelRead, ReasonNoGrant, nil
+		return in.Eff.Owner || in.Eff.Caps.Has(CapManage), ReasonNoGrant, nil
 	}
 	return false, "", internalError("grant resource without a target kind")
 }

@@ -310,7 +310,7 @@ var p7Cases = map[string]p7Case{
 	"grant.revoke": func(t *testing.T, w *pgWorld) {
 		bad := w.rawGrant(t, "user", w.sam, w.notizen, time.Time{})
 		before := w.snapshot(t)
-		_, err := w.admin.RevokeGrant(context.Background(), w.user(w.owner), w.g2, "")
+		_, err := w.admin.RevokeGrant(context.Background(), w.user(w.owner), w.g2, "test")
 		w.expectRejected(t, before, err, errs.CodeI1Violation, "grant.revoke", ref("grant", w.g2), w.owner)
 		_, err = w.admin.RevokeGrant(context.Background(), w.user(w.owner), bad, "repair")
 		mustOK(t, err)
@@ -344,9 +344,9 @@ var p7Cases = map[string]p7Case{
 		bad := w.rawGroup(t, "Bad", w.sam, time.Time{})
 		w.rawGrant(t, "group", bad, w.notizen, time.Time{})
 		before := w.snapshot(t)
-		err := w.admin.DeleteGroup(context.Background(), w.user(w.owner), w.leser, "")
+		err := w.admin.DeleteGroup(context.Background(), w.user(w.owner), w.leser)
 		w.expectRejected(t, before, err, errs.CodeI1Violation, "group.delete", ref("group", w.leser), w.owner)
-		mustOK(t, w.admin.DeleteGroup(context.Background(), w.user(w.owner), bad, "repair"))
+		mustOK(t, w.admin.DeleteGroup(context.Background(), w.user(w.owner), bad))
 	},
 	"owner.remove": func(t *testing.T, w *pgWorld) {
 		w.makeOwner(t, w.robin)

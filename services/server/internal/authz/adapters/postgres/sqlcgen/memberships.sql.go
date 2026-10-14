@@ -147,6 +147,64 @@ func (q *Queries) ListActiveMembershipsOfUser(ctx context.Context, userID pgtype
 	return items, nil
 }
 
+const listMembersInEffect = `-- name: ListMembersInEffect :many
+SELECT m.id, m.group_id, m.user_id, m.added_by, m.added_at, m.expires_at, m.expiry_reminded_at, m.expiry_reported_at, m.removed_at, m.removed_by
+FROM group_memberships m
+WHERE m.group_id = $1 AND m.removed_at IS NULL
+  AND (m.expires_at IS NULL OR m.expires_at > $2) AND m.id > $3
+ORDER BY m.id
+LIMIT $4
+`
+
+type ListMembersInEffectParams struct {
+	GroupID pgtype.UUID
+	At      pgtype.Timestamptz
+	AfterID pgtype.UUID
+	MaxRows int32
+}
+
+type ListMembersInEffectRow struct {
+	GroupMembership GroupMembership
+}
+
+// One keyset page of the memberships of a group in effect at @at, ascending by membership id
+// (listGroupMembers, M1-48).
+func (q *Queries) ListMembersInEffect(ctx context.Context, arg ListMembersInEffectParams) ([]ListMembersInEffectRow, error) {
+	rows, err := q.db.Query(ctx, listMembersInEffect,
+		arg.GroupID,
+		arg.At,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMembersInEffectRow
+	for rows.Next() {
+		var i ListMembersInEffectRow
+		if err := rows.Scan(
+			&i.GroupMembership.ID,
+			&i.GroupMembership.GroupID,
+			&i.GroupMembership.UserID,
+			&i.GroupMembership.AddedBy,
+			&i.GroupMembership.AddedAt,
+			&i.GroupMembership.ExpiresAt,
+			&i.GroupMembership.ExpiryRemindedAt,
+			&i.GroupMembership.ExpiryReportedAt,
+			&i.GroupMembership.RemovedAt,
+			&i.GroupMembership.RemovedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMembershipsOfUserInGroup = `-- name: ListMembershipsOfUserInGroup :many
 SELECT m.id, m.group_id, m.user_id, m.added_by, m.added_at, m.expires_at, m.expiry_reminded_at, m.expiry_reported_at, m.removed_at, m.removed_by
 FROM group_memberships m

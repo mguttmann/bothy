@@ -1,6 +1,6 @@
 # Modul `authz`
 
-Status: Gerüst (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the rights snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below); their HTTP routes come with M1-48. M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below).
+Status: Gerüst (M1-05); M1-26 brings the principal source port, M1-25 the closed action catalogue and the start check (section "Action catalogue" below), M1-27 the grant model storage: tables, domain rules and the store port with its PostgreSQL adapter. M1-28 brings the rights snapshot, the cache and the one authorization function `Authorize` with `Scope` (section "Authorize" below). M1-29 brings the one transactional path of every rights change (rights hooks, `access.changed`, I1 and SR8) and the `Admin` use cases for groups, memberships and grants (section "Rights changes" below). M1-48 brings the twelve REST operations of groups and grants with their reads, events and the manage scope (section "Groups and grants over the API (M1-48)" below). M1-30 brings the expiry jobs `authz.expiry_sweep` and `authz.expiry_reminder` (section "Expiry (M1-30)" below).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -220,14 +220,68 @@ id; spaces only appear or disappear; channels carry level and capabilities, chan
 
 ### Admin
 
-Each method loads the resource, authorizes it (step-up for all, the delegation guard of
-`grant.create` and `grant.revoke`, 07 section 2.6), runs in one unit of work and records the allow
+Each method loads the resource, authorizes it (step-up for all, the delegation limits of
+`grant.create` and `grant.revoke`, 07 section 2.6, which belong to the requirement since M1-48),
+runs in one unit of work and records the allow
 entry in it (ids and codes only, the reason as `ReasonText`). Calls without effect (deleting a
 deleted group, removing a removed or expired membership, revoking a revoked grant, an update
 without change) succeed without rights version and audit `no_change: true`; they decide that in
 a first unit without rights change. Missing and invisible resources give the same `404`.
 Grants on hosts give `404` until M2-39 adds hosts. `group.name_max_chars` and
-`group.description_max_chars` reach `AdminDeps.Limits` with M1-48, which wires the service.
+`group.description_max_chars` reach `AdminConfig` through `wire.NewAuthzAdmin` (M1-48).
+
+## Groups and grants over the API (M1-48)
+
+`adapters/httpapi` implements `listGroups`, `createGroup`, `getGroup`, `updateGroup`,
+`deleteGroup`, `listGroupMembers`, `addGroupMember`, `removeGroupMember`, `listGrants`,
+`createGrant`, `getGrant` and `revokeGrant` over the port `authz.Admin`, and `Cursors`, the
+cursor codec of `platform/httpserver` behind `app.Cursors`. `internal/wire` builds the use cases
+in start step 6c (`NewAuthzAdmin`, configuration `AdminConfig`: `group.name_max_chars`,
+`group.description_max_chars`, `api.page_size_default`, `api.page_size_max`) and embeds the
+handlers as `Handlers.Access`.
+
+### Use cases
+
+- Reads (`app/adminread.go`): `ListGroups`, `GetGroup`, `ListGroupMembers`, `ListGrants`,
+  `GetGrant`. The query and the counts of a request use one clock read; lists are keyset pages by `id` with cursors bound to the
+  caller and the filters (`400 cursor_invalid` otherwise), `limit` capped at `api.page_size_max`,
+  no totals. The list scope comes from `Authorizer.AdminScope` (owner role and the spaces and
+  channels with effective `manage`, from the rights snapshot and the current structure).
+- Writes (`app/admin.go`): the M1-29 methods, with `CreateGroup` for local and claim groups
+  (`provider_id` and `external_ref` only for `oidc_claim`), the subject check of `CreateGrant`
+  after `authorize` (`400 validation_failed`, `/subject_id`, `unknown_subject`), the member check
+  of `AddGroupMember` (`/user_id`, `unknown_user`), a reason that is not blank for every
+  revocation and `group_deleted` as the revocation reason of a deleted group's grants.
+
+### Visibility
+
+| Operation | Not visible (`404`, like a random id) | Visible, not allowed (`403`) |
+|---|---|---|
+| `listGroups` | | owners list every live group; anyone else the groups with a membership in effect; a `member_id` filter for another person gives an empty page |
+| `getGroup`, `listGroupMembers` | deleted, unknown, or caller neither owner nor member in effect | |
+| `createGroup` | | `owner_only` |
+| `updateGroup`, `deleteGroup`, `addGroupMember`, `removeGroupMember` | as `getGroup` | `owner_only` |
+| `listGrants` | a target filter the caller cannot read | a readable target without `manage`; the instance for everyone but owners |
+| `getGrant`, `revokeGrant` | unless owner or `manage` on the grant's target (a channel inherits it from its space); instance grants owner only | `revokeGrant`: the delegation reasons |
+| `createGrant` | a target the caller cannot read | `owner_only`, the delegation reasons |
+
+Every operation with an id authorizes before it answers a missing resource, so a caller that
+`authorize` refuses before visibility (anonymous, a pending device) gets the same answer for an
+existing and an unknown id; the shape of a write is checked before `authorize` without the
+caller's id. Non-owners see grants only inside their `manage` scope; the query applies the scope, so filters
+narrow it and never widen it (07 section 2.6 item 6). `grant.read` on an instance grant is
+checked as `grant.read` on the caller as `principal`, whose requirement is `owner`. Step-up comes
+after the requirement and the delegation limits: without a fresh step-up `401
+step_up_required`, with a token without a session `403 step_up_not_possible`.
+
+### Events
+
+Every write appends, in its unit of work, `grant.changed` (`created` or `revoked`; resource the
+grant, scope the target's space and channel, receive action `grant.read`) or `group.changed`
+(`created`, `updated`, `deleted`, `member_added`, `member_removed` with `user_id`; empty scope,
+receive action `group.read`, `member_count` counted after the change). Deleting a group appends
+one `grant.changed` per revoked grant and one `group.changed`. `access.changed` comes only from
+the rights hook (M1-29). Calls without effect append nothing.
 
 ## Expiry (M1-30)
 

@@ -8,6 +8,7 @@
 # checks this file; it never rewrites it.
 version: 1
 enabled:             # operationIds that have a handler; sorted ascending
+  - addGroupMember
   - addOwner
   - approveDevice
   - approvePairing
@@ -27,15 +28,20 @@ enabled:             # operationIds that have a handler; sorted ascending
   - completeStepUpWithPasskey
   - createEnrollmentCode
   - createExtensionSession
+  - createGrant
+  - createGroup
   - createIdentityProvider
   - createStepUpChallenge
   - createToken
   - createUser
+  - deleteGroup
   - deleteIdentityProvider
   - enableUser
   - exportAuditEvents
   - getDevice
   - getDiscovery
+  - getGrant
+  - getGroup
   - getIdentityProvider
   - getInstance
   - getJwks
@@ -47,6 +53,9 @@ enabled:             # operationIds that have a handler; sorted ascending
   - handleOidcCallback
   - listAuditEvents
   - listFeatureFlags
+  - listGrants
+  - listGroupMembers
+  - listGroups
   - listIdentityProviders
   - listInstanceSettings
   - listMyDevices
@@ -62,12 +71,15 @@ enabled:             # operationIds that have a handler; sorted ascending
   - putInstanceSetting
   - redeemEnrollmentCode
   - refreshToken
+  - removeGroupMember
+  - revokeGrant
   - revokeOwner
   - revokePasskey
   - revokeToken
   - rotateSigningKey
   - unlinkIdentity
   - updateBranding
+  - updateGroup
   - updateIdentityProvider
   - updateMyProfile
   - updateUser
@@ -79,9 +91,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: ackAgentEvents
     etappe: M2
     ticket: M2-07
-  - operation_id: addGroupMember
-    etappe: M1
-    ticket: M1-48
   - operation_id: addReaction
     etappe: M1
     ticket: M1-59
@@ -159,12 +168,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M1-53
   - operation_id: createGdprRequest
     etappe: M7
-  - operation_id: createGrant
-    etappe: M1
-    ticket: M1-48
-  - operation_id: createGroup
-    etappe: M1
-    ticket: M1-48
   - operation_id: createHost
     etappe: M2
     ticket: M2-39
@@ -224,9 +227,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: deleteForumTag
     etappe: M1
     ticket: M1-53
-  - operation_id: deleteGroup
-    etappe: M1
-    ticket: M1-48
   - operation_id: deleteMessage
     etappe: M1
     ticket: M1-58
@@ -320,12 +320,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M3-03
   - operation_id: getGdprRequest
     etappe: M7
-  - operation_id: getGrant
-    etappe: M1
-    ticket: M1-48
-  - operation_id: getGroup
-    etappe: M1
-    ticket: M1-48
   - operation_id: getHost
     etappe: M2
     ticket: M2-39
@@ -441,15 +435,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
     ticket: M1-53
   - operation_id: listGdprRequests
     etappe: M7
-  - operation_id: listGrants
-    etappe: M1
-    ticket: M1-48
-  - operation_id: listGroupMembers
-    etappe: M1
-    ticket: M1-48
-  - operation_id: listGroups
-    etappe: M1
-    ticket: M1-48
   - operation_id: listHosts
     etappe: M2
     ticket: M2-39
@@ -612,9 +597,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: removeCommand
     etappe: M2
     ticket: M2-16
-  - operation_id: removeGroupMember
-    etappe: M1
-    ticket: M1-48
   - operation_id: removeReaction
     etappe: M1
     ticket: M1-59
@@ -641,9 +623,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: revokeDevice
     etappe: M1
     ticket: M1-45
-  - operation_id: revokeGrant
-    etappe: M1
-    ticket: M1-48
   - operation_id: revokeIncomingWebhook
     etappe: M2
     ticket: M2-27
@@ -748,9 +727,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: updateForumTag
     etappe: M1
     ticket: M1-53
-  - operation_id: updateGroup
-    etappe: M1
-    ticket: M1-48
   - operation_id: updateHost
     etappe: M2
     ticket: M2-39

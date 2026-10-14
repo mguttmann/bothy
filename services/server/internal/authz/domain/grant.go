@@ -24,6 +24,8 @@ const (
 	pointerReason       = "/reason"
 	pointerName         = "/name"
 	pointerDescription  = "/description"
+	pointerProviderID   = "/provider_id"
+	pointerExternalRef  = "/external_ref"
 )
 
 // The field error codes of this package besides the textcheck rules.
@@ -34,8 +36,9 @@ const (
 	fieldRequired = "required"
 	// fieldTooLong marks a value above its configured length.
 	fieldTooLong = "too_long"
-	// fieldNotAfter marks an expiry that is not after the creation time.
-	fieldNotAfter = "not_after_creation"
+	// fieldInPast marks an expiry that is not after the creation time, which is the time of the
+	// request (brief M1-48: code in_past).
+	fieldInPast = "in_past"
 )
 
 // SubjectKind is the kind of the subject of a grant, the column grants.subject_kind.
@@ -152,25 +155,38 @@ func NewGrant(id ids.ID, s Subject, tg Target, l Level, c Caps, expiresAt time.T
 	case at.IsZero():
 		return Grant{}, internalError("grant without creation time")
 	}
-	if err := checkSubject(s); err != nil {
-		return Grant{}, err
-	}
-	if err := checkTarget(tg); err != nil {
-		return Grant{}, err
-	}
-	if err := checkLevelAndCaps(s, tg, l, c); err != nil {
-		return Grant{}, err
-	}
-	if err := checkExpiry(expiresAt, at); err != nil {
-		return Grant{}, err
-	}
-	if err := checkText(pointerReason, "reason", reason, true, 0); err != nil {
+	if err := CheckGrantShape(s, tg, l, c, expiresAt, reason, at); err != nil {
 		return Grant{}, err
 	}
 	return Grant{
 		ID: id, Subject: s, Target: tg, Level: l, Caps: c, ExpiresAt: expiresAt,
 		Reason: reason, GrantedBy: by, GrantedAt: at,
 	}, nil
+}
+
+// CheckGrantShape applies the shape checks of NewGrant without an id and a grantor, so a use case
+// can refuse a malformed request before it authorizes (brief M1-48 "createGrant" step 1, also
+// for an anonymous caller). Errors: those of NewGrant.
+func CheckGrantShape(s Subject, tg Target, l Level, c Caps, expiresAt time.Time, reason string, at time.Time) error {
+	if err := checkSubject(s); err != nil {
+		return err
+	}
+	if err := checkTarget(tg); err != nil {
+		return err
+	}
+	if err := checkLevelAndCaps(s, tg, l, c); err != nil {
+		return err
+	}
+	if err := checkExpiry(expiresAt, at); err != nil {
+		return err
+	}
+	return CheckReason(reason)
+}
+
+// CheckReason checks the reason of a grant or a revocation (07 section 9.5): not blank and free of
+// control and bidi characters (SEC-IN-4). Errors: validation_failed on /reason.
+func CheckReason(reason string) error {
+	return checkText(pointerReason, "reason", reason, true, 0)
 }
 
 // Shape returns the facts of g that the delegation rules judge.
@@ -235,7 +251,7 @@ func checkLevelAndCaps(s Subject, tg Target, l Level, c Caps) error {
 // before it would never be in effect (07 section 2.5).
 func checkExpiry(expiresAt, at time.Time) error {
 	if !expiresAt.IsZero() && !expiresAt.After(at) {
-		return fieldError(pointerExpiresAt, fieldNotAfter, "the expiry must be after the creation time")
+		return fieldError(pointerExpiresAt, fieldInPast, "the expiry must be after the creation time")
 	}
 	return nil
 }

@@ -910,7 +910,7 @@ Abschnitt 4).
 ### 9.5 Weitere Pflichten
 
 - Entziehen wirkt sofort und sagt das in der Bestätigung.
-- Jede Freigabe braucht einen Grund (03, `grants.reason`).
+- Every grant and every revocation needs a reason (03, `grants.reason` and `grants.revoke_reason`); deleting a group revokes its grants with the reason `group_deleted` (M1-48).
 - Liste "Rechte-Hinweise": H1, Freigaben an gesperrte Prinzipale, `trigger` ohne mögliche
   Auslösung (SR2, SR3), Agenten mit `personal` und ihre Trigger-Menge.
 - Filterbares Protokoll aus dem Audit-Log (`audit.read`), [ADR 0021](../adr/0021-audit-log-hash-verkettet-und-getrennt-von-telemetrie.md).

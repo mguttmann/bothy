@@ -241,6 +241,8 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"file.s3.secret_key_ref = file:/run/bothy/secrets/s3_secret_key  # default\n" +
 		"file.s3.use_path_style = true  # default\n" +
 		"file.storage.driver = fs  # default\n" +
+		"group.description_max_chars = 500  # default\n" +
+		"group.name_max_chars = 100  # default\n" +
 		"http.hsts_max_age = 365d  # default\n" +
 		"http.idle_timeout = 2m  # default\n" +
 		"http.max_header_bytes = 65536  # default\n" +

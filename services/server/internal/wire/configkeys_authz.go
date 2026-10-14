@@ -6,9 +6,20 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 
 // authzConfigKeys returns the keys the module authz reads: the bound of the rights snapshot cache
 // (M1-28) and the three keys of the expiry jobs (M1-30) from docs/spec/07-rechte.md section 14,
-// and the age of a fresh step-up from 03-datenmodell.md "Konfigurationswerte dieses Kapitels".
+// the age of a fresh step-up and the group text limits (M1-48) from 03-datenmodell.md
+// "Konfigurationswerte dieses Kapitels".
 func authzConfigKeys() []config.Key {
 	return []config.Key{
+		{
+			Name: "group.name_max_chars", Kind: config.KindInt, Default: "100", Min: "1",
+			Doc:     "Longest group name in Unicode characters.",
+			Chapter: chapter03,
+		},
+		{
+			Name: "group.description_max_chars", Kind: config.KindInt, Default: "500", Min: "1",
+			Doc:     "Longest group description in Unicode characters.",
+			Chapter: chapter03,
+		},
 		{
 			Name: "authz.snapshot_cache_max_entries", Kind: config.KindInt, Default: "10000", Min: "1",
 			Doc:     "Most rights snapshots a process keeps in memory (least recently used go first).",

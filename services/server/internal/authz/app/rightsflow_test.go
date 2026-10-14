@@ -356,7 +356,7 @@ func TestRevocationTakesEffectInANewAuthorizer(t *testing.T) {
 	if d, err := w.az.Authorize(ctx, alex, authorize.ActionChannelRead, msg); err != nil || !d.Allowed() {
 		t.Fatalf("before: %+v %v", d, err)
 	}
-	_, err := w.admin.RevokeGrant(ctx, w.user(w.owner), w.g1, "")
+	_, err := w.admin.RevokeGrant(ctx, w.user(w.owner), w.g1, "test")
 	mustOK(t, err)
 	for _, az := range []authorize.Authorizer{w.newAuthorizer(t), w.az} {
 		d, err := az.Authorize(ctx, alex, authorize.ActionChannelRead, msg)

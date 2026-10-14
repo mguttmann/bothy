@@ -5,6 +5,8 @@ package app
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
@@ -14,10 +16,38 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
+	"github.com/OWNER/bothy/services/server/internal/kernel/eventlog"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
 	"github.com/OWNER/bothy/services/server/internal/kernel/textcheck"
 	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
+
+// AdminConfig holds the configuration keys of the Admin use cases (M1-48).
+type AdminConfig struct {
+	// GroupNameMaxChars is group.name_max_chars; GroupDescriptionMaxChars is
+	// group.description_max_chars.
+	GroupNameMaxChars        int `config:"group.name_max_chars"`
+	GroupDescriptionMaxChars int `config:"group.description_max_chars"`
+	// PageSizeDefault is api.page_size_default, the page size without limit; PageSizeMax is
+	// api.page_size_max, the cap of a larger limit.
+	PageSizeDefault int `config:"api.page_size_default"`
+	PageSizeMax     int `config:"api.page_size_max"`
+}
+
+// Limits returns the group text limits of c.
+func (c AdminConfig) Limits() domain.GroupLimits {
+	return domain.GroupLimits{NameMaxChars: c.GroupNameMaxChars, DescriptionMaxChars: c.GroupDescriptionMaxChars}
+}
+
+// Cursors encodes and checks the opaque cursors of the lists (06 "Paginierung"); adapters/httpapi
+// implements it with the codec of platform/httpserver.
+type Cursors interface {
+	// Encode returns the cursor of key for list, bound to binding.
+	Encode(list string, binding []byte, key any) (string, error)
+	// Decode checks s against list and binding and fills key; every mismatch is 400
+	// cursor_invalid.
+	Decode(list string, binding []byte, s string, key any) error
+}
 
 // AdminDeps are the collaborators of AdminService.
 type AdminDeps struct {
@@ -36,8 +66,14 @@ type AdminDeps struct {
 	Audit auditing.Recorder
 	// Clock gives the time of the writes.
 	Clock clock.Clock
-	// Limits are group.name_max_chars and group.description_max_chars; M1-48 binds them.
-	Limits domain.GroupLimits
+	// Events appends grant.changed and group.changed in the unit of work (M1-48).
+	Events eventlog.Appender
+	// Scopes gives the list use cases the owner role and the manage scope of the caller.
+	Scopes AdminScoper
+	// Cursors encodes the cursors of the lists.
+	Cursors Cursors
+	// Config holds the group limits and the page sizes.
+	Config AdminConfig
 }
 
 // AdminService implements authz.Admin (brief M1-29 scope 5). It is safe for concurrent use.
@@ -48,11 +84,15 @@ type AdminService struct {
 // Compile-time check: AdminService is the incoming port.
 var _ authz.Admin = (*AdminService)(nil)
 
-// NewAdminService returns the service. Errors: a nil dependency.
+// NewAdminService returns the service. Errors: a nil dependency, a page size default below 1 or
+// above the maximum.
 func NewAdminService(d AdminDeps) (*AdminService, error) {
 	if d.UoW == nil || d.Authorizer == nil || d.Store == nil || d.Principals == nil || d.Structure == nil ||
-		d.Rights == nil || d.Audit == nil || d.Clock == nil {
+		d.Rights == nil || d.Audit == nil || d.Clock == nil || d.Events == nil || d.Scopes == nil || d.Cursors == nil {
 		return nil, errors.New("authz: NewAdminService needs every dependency")
+	}
+	if d.Config.PageSizeDefault < 1 || d.Config.PageSizeMax < d.Config.PageSizeDefault {
+		return nil, errors.New("authz: api.page_size_default must be at least 1 and at most api.page_size_max")
 	}
 	return &AdminService{d: d}, nil
 }
@@ -70,8 +110,13 @@ const (
 	attrLevel         = "level"
 	attrCapabilities  = "capabilities"
 	attrRevokedGrants = "revoked_grants"
-	attrGroupID       = "group_id"
 	reasonClaimGroup  = "claim_managed_group"
+	// reasonGroupDeleted is the revoke_reason of the grants of a deleted group (brief M1-48).
+	reasonGroupDeleted = "group_deleted"
+	// codeUnknownSubject and codeUnknownUser are the field codes of a subject or member that
+	// does not exist (brief M1-48).
+	codeUnknownSubject = "unknown_subject"
+	codeUnknownUser    = "unknown_user"
 )
 
 // errNotFound is the one answer for a missing or invisible resource (02 section 9.2).
@@ -112,10 +157,46 @@ func rights(act authorize.Action, kind authorize.ResourceKind, id ids.ID, princi
 	})
 }
 
-// loadGroup returns the group id; a missing group is not found. live requires deleted_at NULL.
-func (s *AdminService) loadGroup(ctx context.Context, id ids.ID, live bool) (domain.Group, error) {
+// appendEvents appends evs in the unit of work of ctx.
+func (s *AdminService) appendEvents(ctx context.Context, evs ...eventlog.Event) error {
+	return s.d.Events.Append(ctx, evs...)
+}
+
+// groupEvent appends group.changed for g with change and user (zero for none); member_count is
+// counted at t after the change of the unit (memberships neither removed nor expired).
+func (s *AdminService) groupEvent(ctx context.Context, act authorize.Action, g domain.Group, change string, user ids.ID, t time.Time) error {
+	counts, err := s.d.Store.CountMembersInEffect(ctx, []ids.ID{g.ID}, t)
+	if err != nil {
+		return err
+	}
+	kind, actorID := eventActor(ctx, string(act))
+	ev, err := groupChangedEvent(g, counts[g.ID], change, user, kind, actorID)
+	if err != nil {
+		return err
+	}
+	return s.appendEvents(ctx, ev)
+}
+
+// grantEvent appends grant.changed for g with change.
+func (s *AdminService) grantEvent(ctx context.Context, act authorize.Action, g domain.Grant, change string) error {
+	kind, actorID := eventActor(ctx, string(act))
+	ev, err := grantChangedEvent(ctx, s.d.Structure, g, change, kind, actorID)
+	if err != nil {
+		return err
+	}
+	return s.appendEvents(ctx, ev)
+}
+
+// loadGroup returns the group id after authorizing act on it; a missing group is not found, and
+// live requires deleted_at NULL. authorize runs also for a missing group, so a caller it refuses
+// before visibility (anonymous, a pending device) gets the same answer for an existing and an
+// unknown id (07 section 4.2, M1-31/16).
+func (s *AdminService) loadGroup(ctx context.Context, caller actor.Actor, act authorize.Action, id ids.ID, live bool) (domain.Group, error) {
 	g, found, err := s.d.Store.GetGroup(ctx, id)
 	if err != nil {
+		return domain.Group{}, err
+	}
+	if err := s.check(ctx, caller, act, groupResource(id)); err != nil {
 		return domain.Group{}, err
 	}
 	if !found || (live && !g.DeletedAt.IsZero()) {
@@ -129,28 +210,79 @@ func groupResource(id ids.ID) authorize.Resource {
 	return authorize.Resource{Kind: authorize.ResourceGroup, ID: id}
 }
 
-// CreateGroup implements authz.Admin.
+// CreateGroup implements authz.Admin: the shape of the command, then authorize, then the insert
+// with group.changed (change created) and the audit entry. A claim group names an existing
+// provider (the foreign key answers 400 on /provider_id otherwise).
 func (s *AdminService) CreateGroup(ctx context.Context, caller actor.Actor, cmd authz.CreateGroupCmd) (authz.Group, error) {
 	ctx, err := withCaller(ctx, caller)
 	if err != nil {
 		return authz.Group{}, err
 	}
-	var out domain.Group
+	if err := s.groupShape(cmd); err != nil {
+		return authz.Group{}, err
+	}
+	now := s.d.Clock.Now()
+	var g domain.Group
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		if err := s.check(ctx, caller, authorize.ActionGroupCreate, authorize.Resource{Kind: authorize.ResourceInstance}); err != nil {
 			return err
 		}
-		g, err := domain.NewGroup(ids.New(), cmd.Name, cmd.Description, s.d.Limits, caller.ID, s.d.Clock.Now())
-		if err != nil {
+		var err error
+		if g, err = s.newGroup(caller, cmd, now); err != nil {
 			return err
 		}
 		if err := s.d.Store.InsertGroup(ctx, g); err != nil {
 			return err
 		}
-		out = g
-		return s.record(ctx, authorize.ActionGroupCreate, authorize.ResourceGroup, g.ID, nil)
+		if err := s.groupEvent(ctx, authorize.ActionGroupCreate, g, changeCreated, ids.ID{}, now); err != nil {
+			return err
+		}
+		return s.record(ctx, authorize.ActionGroupCreate, authorize.ResourceGroup, g.ID, groupAttrs(g))
 	})
-	return groupOut(out), err
+	if err != nil {
+		return authz.Group{}, err
+	}
+	return groupOut(g, 0), nil
+}
+
+// groupShape checks cmd before authorize, without a creator (brief M1-48 "Groups"; an anonymous
+// caller is refused by authorize afterwards, not by a missing creator): the name trimmed, source
+// local by default; a local group has neither provider nor claim value, a claim group needs both.
+func (s *AdminService) groupShape(cmd authz.CreateGroupCmd) error {
+	if err := domain.CheckGroupText(strings.TrimSpace(cmd.Name), cmd.Description, s.d.Config.Limits()); err != nil {
+		return err
+	}
+	switch cmd.Source {
+	case "", domain.GroupSourceLocal:
+		if !cmd.ProviderID.IsZero() {
+			return fieldCode("/provider_id", "forbidden", "a local group has no provider")
+		}
+		if cmd.ExternalRef != "" {
+			return fieldCode("/external_ref", "forbidden", "a local group has no claim value")
+		}
+		return nil
+	case domain.GroupSourceOIDCClaim:
+		return domain.CheckClaim(cmd.ProviderID, cmd.ExternalRef)
+	}
+	return fieldCode("/source", "invalid", "the source must be local or oidc_claim")
+}
+
+// newGroup builds the row of cmd, which groupShape accepted, created by caller at now.
+func (s *AdminService) newGroup(caller actor.Actor, cmd authz.CreateGroupCmd, now time.Time) (domain.Group, error) {
+	name := strings.TrimSpace(cmd.Name)
+	if cmd.Source == domain.GroupSourceOIDCClaim {
+		return domain.NewClaimGroup(ids.New(), name, cmd.Description, s.d.Config.Limits(), cmd.ProviderID, cmd.ExternalRef, caller.ID, now)
+	}
+	return domain.NewGroup(ids.New(), name, cmd.Description, s.d.Config.Limits(), caller.ID, now)
+}
+
+// groupAttrs are the audit attributes of a new group: source and, for a claim group, provider.
+func groupAttrs(g domain.Group) auditing.Attrs {
+	attrs := auditing.Attrs{"source": auditing.Code(g.Source)}
+	if !g.ProviderID.IsZero() {
+		attrs["provider_id"] = auditing.ID(g.ProviderID)
+	}
+	return attrs
 }
 
 // UpdateGroup implements authz.Admin.
@@ -159,29 +291,41 @@ func (s *AdminService) UpdateGroup(ctx context.Context, caller actor.Actor, grou
 	if err != nil {
 		return authz.Group{}, err
 	}
+	if cmd.Name == nil && cmd.Description == nil {
+		return authz.Group{}, fieldCode("/name", "required", "name or description is required")
+	}
+	if cmd.Name != nil {
+		trimmed := strings.TrimSpace(*cmd.Name)
+		cmd.Name = &trimmed
+	}
 	var out domain.Group
+	count := 0
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
 		var err error
-		out, err = s.updateGroup(ctx, caller, groupID, cmd)
+		if out, err = s.updateGroup(ctx, caller, groupID, cmd); err != nil {
+			return err
+		}
+		counts, err := s.d.Store.CountMembersInEffect(ctx, []ids.ID{out.ID}, s.d.Clock.Now())
+		count = counts[out.ID]
 		return err
 	})
-	return groupOut(out), err
+	if err != nil {
+		return authz.Group{}, err
+	}
+	return groupOut(out, count), nil
 }
 
 // updateGroup is UpdateGroup inside its unit of work.
 func (s *AdminService) updateGroup(ctx context.Context, caller actor.Actor, groupID ids.ID, cmd authz.UpdateGroupCmd) (domain.Group, error) {
-	g, err := s.loadGroup(ctx, groupID, true)
+	g, err := s.loadGroup(ctx, caller, authorize.ActionGroupUpdate, groupID, true)
 	if err != nil {
-		return domain.Group{}, err
-	}
-	if err := s.check(ctx, caller, authorize.ActionGroupUpdate, groupResource(g.ID)); err != nil {
 		return domain.Group{}, err
 	}
 	name, desc := orValue(cmd.Name, g.Name), orValue(cmd.Description, g.Description)
 	if g.Source == domain.GroupSourceOIDCClaim && name != g.Name {
 		return domain.Group{}, errs.New(errs.CodeConflict, "The name of a claim group follows its claim.").WithReason(reasonClaimGroup)
 	}
-	if err := domain.CheckGroupText(name, desc, s.d.Limits); err != nil {
+	if err := domain.CheckGroupText(name, desc, s.d.Config.Limits()); err != nil {
 		return domain.Group{}, err
 	}
 	if name == g.Name && desc == g.Description {
@@ -195,6 +339,9 @@ func (s *AdminService) updateGroup(ctx context.Context, caller actor.Actor, grou
 		return domain.Group{}, errNotFound()
 	}
 	g.Name, g.Description = name, desc
+	if err := s.groupEvent(ctx, authorize.ActionGroupUpdate, g, changeUpdated, ids.ID{}, s.d.Clock.Now()); err != nil {
+		return domain.Group{}, err
+	}
 	return g, s.record(ctx, authorize.ActionGroupUpdate, authorize.ResourceGroup, g.ID, nil)
 }
 
@@ -209,17 +356,13 @@ func orValue(p *string, def string) string {
 // DeleteGroup implements authz.Admin. A first unit without rights change decides "without
 // change" (no rights version, 06 section 2); the change itself runs in a second unit declared as
 // a rights change, which checks everything again under the lock of permission_version.
-func (s *AdminService) DeleteGroup(ctx context.Context, caller actor.Actor, groupID ids.ID, reason string) error {
+func (s *AdminService) DeleteGroup(ctx context.Context, caller actor.Actor, groupID ids.ID) error {
 	ctx, err := withCaller(ctx, caller)
 	if err != nil {
 		return err
 	}
-	attrs, err := reasonAttrs(reason)
-	if err != nil {
-		return err
-	}
 	return s.twoUnits(ctx, func(ctx context.Context, apply bool) (bool, error) {
-		return s.deleteGroup(ctx, caller, groupID, reason, attrs, apply)
+		return s.deleteGroup(ctx, caller, groupID, apply)
 	}, func() txn.Option { return rights(authorize.ActionGroupDelete, authorize.ResourceGroup, groupID) })
 }
 
@@ -228,12 +371,37 @@ func (s *AdminService) DeleteGroup(ctx context.Context, caller actor.Actor, grou
 // so no rights version is raised, and twoUnits records the call without effect.
 var errRaced = errors.New("authz: the change was done concurrently")
 
+// behindStageKey marks a twoUnits call that runs inside an ambient unit of work: the unit of the
+// Idempotency-Key stage, opened with txn.AllowLateRightsChange. There a failed late rights change
+// fails the whole unit even when the caller swallows the error (M1-31/2), so the raced step
+// records the call without effect itself instead of returning errRaced (docs/DECISIONS.md M1-48).
+type behindStageKey struct{}
+
+// behindStage reports a twoUnits call inside an ambient unit of work.
+func behindStage(ctx context.Context) bool {
+	v, _ := ctx.Value(behindStageKey{}).(bool)
+	return v
+}
+
+// withoutEffect ends a step that finds no change: without apply it records the call without
+// effect; with apply (a concurrent call did the change first, seen under the lock) it returns
+// errRaced, or behind the stage records the call without effect itself.
+func (s *AdminService) withoutEffect(ctx context.Context, apply bool, act authorize.Action, kind authorize.ResourceKind, id ids.ID, attrs auditing.Attrs) error {
+	if apply && !behindStage(ctx) {
+		return errRaced
+	}
+	return s.record(ctx, act, kind, id, merge(attrs, noChange()))
+}
+
 // twoUnits runs step without apply in a unit without rights change; when step reports a change
 // it runs step with apply in a unit declared with opt (evaluated after the first unit). A step
 // that finds no change under the lock returns errRaced; then the first unit runs once more and
 // records the call without effect (06 section 2, R-API-27). A call that needs a change again
 // after that is a conflict: the resource changed during the call.
 func (s *AdminService) twoUnits(ctx context.Context, step func(ctx context.Context, apply bool) (bool, error), opt func() txn.Option) error {
+	if txn.InUnit(ctx) {
+		ctx = context.WithValue(ctx, behindStageKey{}, true)
+	}
 	plan := func() (bool, error) {
 		change := false
 		err := s.d.UoW.Do(ctx, func(ctx context.Context) error {
@@ -261,51 +429,65 @@ func (s *AdminService) twoUnits(ctx context.Context, step func(ctx context.Conte
 }
 
 // deleteGroup loads and authorizes; without apply it only reports whether a change is due (and
-// audits the call without effect); with apply it revokes the grants of the group in ascending id,
-// sets deleted_at and audits.
-func (s *AdminService) deleteGroup(ctx context.Context, caller actor.Actor, groupID ids.ID, reason string, attrs auditing.Attrs, apply bool) (bool, error) {
-	g, err := s.loadGroup(ctx, groupID, false)
+// audits the call without effect); with apply it revokes the grants of the group in ascending id
+// with the reason group_deleted, sets deleted_at, appends one grant.changed per grant and one
+// group.changed, and audits. The memberships stay as history.
+func (s *AdminService) deleteGroup(ctx context.Context, caller actor.Actor, groupID ids.ID, apply bool) (bool, error) {
+	g, err := s.loadGroup(ctx, caller, authorize.ActionGroupDelete, groupID, false)
 	if err != nil {
 		return false, err
 	}
-	if err := s.check(ctx, caller, authorize.ActionGroupDelete, groupResource(g.ID)); err != nil {
-		return false, err
-	}
 	if !g.DeletedAt.IsZero() {
-		if apply {
-			return false, errRaced
-		}
-		return false, s.record(ctx, authorize.ActionGroupDelete, authorize.ResourceGroup, g.ID, merge(attrs, noChange()))
+		return false, s.withoutEffect(ctx, apply, authorize.ActionGroupDelete, authorize.ResourceGroup, g.ID, nil)
 	}
 	if !apply {
 		return true, nil
 	}
 	now := s.d.Clock.Now()
-	members, err := s.d.Store.ActiveMembershipsOfGroups(ctx, []ids.ID{g.ID})
+	if err := s.affectGroup(ctx, domain.Subject{Kind: domain.SubjectGroup, GroupID: g.ID}); err != nil {
+		return false, err
+	}
+	grants, err := s.revokeGroupGrants(ctx, caller, g.ID, now)
 	if err != nil {
 		return false, err
-	}
-	affected := make([]ids.ID, 0, len(members))
-	for _, m := range members {
-		affected = append(affected, m.Membership.UserID)
-	}
-	if err := s.d.Rights.AddAffected(ctx, affected...); err != nil {
-		return false, err
-	}
-	grants, err := s.d.Store.ActiveGrantsOfGroups(ctx, []ids.ID{g.ID})
-	if err != nil {
-		return false, err
-	}
-	for _, gr := range grants {
-		if _, _, err := s.d.Store.RevokeGrant(ctx, gr.ID, caller.ID, reason, now); err != nil {
-			return false, err
-		}
 	}
 	if _, err := s.d.Store.SoftDeleteGroup(ctx, g.ID, now); err != nil {
 		return false, err
 	}
+	g.DeletedAt = now
+	if err := s.groupEvent(ctx, authorize.ActionGroupDelete, g, changeDeleted, ids.ID{}, now); err != nil {
+		return false, err
+	}
 	return true, s.record(ctx, authorize.ActionGroupDelete, authorize.ResourceGroup, g.ID,
-		merge(attrs, auditing.Attrs{attrRevokedGrants: auditing.Int(int64(len(grants)))}))
+		auditing.Attrs{attrRevokedGrants: auditing.Int(int64(grants)), attrReason: auditing.ReasonText(reasonGroupDeleted)})
+}
+
+// revokeGroupGrants revokes the grants of the group in effect at now in ascending id with the
+// reason group_deleted, appends grant.changed for each and returns how many it revoked.
+func (s *AdminService) revokeGroupGrants(ctx context.Context, caller actor.Actor, group ids.ID, now time.Time) (int, error) {
+	grants, err := s.d.Store.ActiveGrantsOfGroups(ctx, []ids.ID{group})
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, gr := range grants {
+		if !gr.InEffect(now) {
+			// An expired grant changes no rights; the expiry fold of this change reports it.
+			continue
+		}
+		revoked, ok, err := s.d.Store.RevokeGrant(ctx, gr.ID, caller.ID, reasonGroupDeleted, now)
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			continue
+		}
+		n++
+		if err := s.grantEvent(ctx, authorize.ActionGroupDelete, revoked, changeRevoked); err != nil {
+			return 0, err
+		}
+	}
+	return n, nil
 }
 
 // AddGroupMember implements authz.Admin. A membership that is not removed but expired is closed
@@ -322,16 +504,35 @@ func (s *AdminService) AddGroupMember(ctx context.Context, caller actor.Actor, g
 		out, err = s.addMember(ctx, caller, groupID, cmd)
 		return err
 	}, rights(authorize.ActionGroupMemberAdd, authorize.ResourceGroup, groupID, cmd.UserID))
-	return membershipOut(out), err
+	if err != nil {
+		return authz.Membership{}, err
+	}
+	refs, err := s.refs(ctx, []ids.ID{out.UserID})
+	if err != nil {
+		return authz.Membership{}, err
+	}
+	return membershipOut(out, refs[out.UserID]), nil
+}
+
+// refs returns the public views of people; a person the source does not know is an internal
+// error, because a membership row always names a principal (foreign key to users).
+func (s *AdminService) refs(ctx context.Context, people []ids.ID) (map[ids.ID]authz.PrincipalRef, error) {
+	out, err := s.d.Principals.Refs(ctx, people)
+	if err != nil {
+		return nil, sourceError("principal source", err)
+	}
+	for _, id := range people {
+		if _, ok := out[id]; !ok {
+			return nil, internal("a member without a principal")
+		}
+	}
+	return out, nil
 }
 
 // addMember is AddGroupMember inside its unit of work.
 func (s *AdminService) addMember(ctx context.Context, caller actor.Actor, groupID ids.ID, cmd authz.AddMemberCmd) (domain.Membership, error) {
-	g, err := s.loadGroup(ctx, groupID, true)
+	g, err := s.loadGroup(ctx, caller, authorize.ActionGroupMemberAdd, groupID, true)
 	if err != nil {
-		return domain.Membership{}, err
-	}
-	if err := s.check(ctx, caller, authorize.ActionGroupMemberAdd, groupResource(g.ID)); err != nil {
 		return domain.Membership{}, err
 	}
 	if g.Source == domain.GroupSourceOIDCClaim {
@@ -354,6 +555,9 @@ func (s *AdminService) addMember(ctx context.Context, caller actor.Actor, groupI
 	attrs := auditing.Attrs{attrUserID: auditing.ID(cmd.UserID)}
 	if !m.ExpiresAt.IsZero() {
 		attrs[attrExpiresAt] = auditing.Time(m.ExpiresAt)
+	}
+	if err := s.groupEvent(ctx, authorize.ActionGroupMemberAdd, g, changeMemberAdded, cmd.UserID, now); err != nil {
+		return domain.Membership{}, err
 	}
 	return m, s.record(ctx, authorize.ActionGroupMemberAdd, authorize.ResourceGroup, g.ID, attrs)
 }
@@ -379,14 +583,15 @@ func (s *AdminService) closeExpired(ctx context.Context, g domain.Group, user, b
 	return nil
 }
 
-// person checks that id is a principal of kind user that is not deleted; otherwise not found.
+// person checks that id is a principal of kind user that is not deleted; otherwise 400
+// validation_failed on /user_id with code unknown_user (brief M1-48), decided after authorize.
 func (s *AdminService) person(ctx context.Context, id ids.ID) error {
 	f, found, err := s.d.Principals.Principal(ctx, id)
 	if err != nil {
 		return sourceError("principal source", err)
 	}
 	if !found || f.Kind != actor.KindUser || f.Status == authz.PrincipalDeleted {
-		return errNotFound()
+		return fieldCode("/user_id", codeUnknownUser, "the user does not exist")
 	}
 	return nil
 }
@@ -408,11 +613,8 @@ func (s *AdminService) RemoveGroupMember(ctx context.Context, caller actor.Actor
 // membership already removed or expired is a call without effect; with apply it removes the
 // membership in effect.
 func (s *AdminService) removeMember(ctx context.Context, caller actor.Actor, groupID, userID ids.ID, apply bool) (bool, error) {
-	g, err := s.loadGroup(ctx, groupID, true)
+	g, err := s.loadGroup(ctx, caller, authorize.ActionGroupMemberRemove, groupID, true)
 	if err != nil {
-		return false, err
-	}
-	if err := s.check(ctx, caller, authorize.ActionGroupMemberRemove, groupResource(g.ID)); err != nil {
 		return false, err
 	}
 	if g.Source == domain.GroupSourceOIDCClaim {
@@ -434,10 +636,7 @@ func (s *AdminService) removeMember(ctx context.Context, caller actor.Actor, gro
 	}
 	attrs := auditing.Attrs{attrUserID: auditing.ID(userID)}
 	if active == nil {
-		if apply {
-			return false, errRaced
-		}
-		return false, s.record(ctx, authorize.ActionGroupMemberRemove, authorize.ResourceGroup, g.ID, merge(attrs, noChange()))
+		return false, s.withoutEffect(ctx, apply, authorize.ActionGroupMemberRemove, authorize.ResourceGroup, g.ID, attrs)
 	}
 	if !apply {
 		return true, nil
@@ -445,10 +644,15 @@ func (s *AdminService) removeMember(ctx context.Context, caller actor.Actor, gro
 	if _, err := s.d.Store.RemoveMembership(ctx, active.ID, caller.ID, now); err != nil {
 		return false, err
 	}
+	if err := s.groupEvent(ctx, authorize.ActionGroupMemberRemove, g, changeMemberRemoved, userID, now); err != nil {
+		return false, err
+	}
 	return true, s.record(ctx, authorize.ActionGroupMemberRemove, authorize.ResourceGroup, g.ID, attrs)
 }
 
-// CreateGrant implements authz.Admin.
+// CreateGrant implements authz.Admin (brief M1-48 "createGrant"): the shape first, then
+// authorize with the proposed grant, then the subject, then the insert in one rights change with
+// grant.changed (change created) and the audit entry.
 func (s *AdminService) CreateGrant(ctx context.Context, caller actor.Actor, cmd authz.CreateGrantCmd) (authz.Grant, error) {
 	ctx, err := withCaller(ctx, caller)
 	if err != nil {
@@ -458,56 +662,72 @@ func (s *AdminService) CreateGrant(ctx context.Context, caller actor.Actor, cmd 
 	if err != nil {
 		return authz.Grant{}, err
 	}
+	now := s.d.Clock.Now()
+	reason := strings.TrimSpace(cmd.Reason)
+	if err := domain.CheckGrantShape(subject, target, level, caps, cmd.ExpiresAt, reason, now); err != nil {
+		return authz.Grant{}, err
+	}
 	var principals []ids.ID
 	if subject.Kind != domain.SubjectGroup {
 		principals = append(principals, subject.PrincipalID)
 	}
-	var out domain.Grant
+	proposed := domain.Grant{Subject: subject, Target: target, Level: level, Caps: caps}
+	var g domain.Grant
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
+		if err := s.authorizeGrant(ctx, caller, cmd.TargetID, proposed); err != nil {
+			return err
+		}
 		var err error
-		out, err = s.createGrant(ctx, caller, cmd, subject, target, level, caps)
-		return err
+		if g, err = domain.NewGrant(ids.New(), subject, target, level, caps, cmd.ExpiresAt, reason, caller.ID, now); err != nil {
+			return err
+		}
+		return s.createGrant(ctx, g)
 	}, txn.DeclareRightsChange(txn.RightsChangeSpec{
 		Action: string(authorize.ActionGrantCreate), Resource: txn.Ref{Kind: string(target.Kind), ID: cmd.TargetID}, Principals: principals,
 	}))
-	return grantOut(out), err
+	if err != nil {
+		return authz.Grant{}, err
+	}
+	return grantOut(g), nil
 }
 
-// createGrant is CreateGrant inside its unit of work: target, authorize, archived target,
-// subject, the new row, the members of a subject group, the insert and the audit.
-func (s *AdminService) createGrant(ctx context.Context, caller actor.Actor, cmd authz.CreateGrantCmd, subject domain.Subject,
-	target domain.Target, level domain.Level, caps domain.Caps) (domain.Grant, error) {
-	if err := s.targetExists(ctx, target); err != nil {
-		return domain.Grant{}, err
-	}
-	kind, ok := authorize.ParseResourceKind(string(target.Kind))
+// authorizeGrant authorizes grant.create of the proposed grant on its target (visibility, owner or
+// manage, the delegation limits, step-up) before the target is checked, so a caller refused before
+// visibility learns nothing about the target; a missing target is not_found from authorize.
+func (s *AdminService) authorizeGrant(ctx context.Context, caller actor.Actor, targetID ids.ID, g domain.Grant) error {
+	kind, ok := authorize.ParseResourceKind(string(g.Target.Kind))
 	if !ok {
-		return domain.Grant{}, internal("a grant target kind outside the catalogue")
+		return internal("a grant target kind outside the catalogue")
 	}
-	res := authorize.Resource{Kind: kind, ID: cmd.TargetID, Grant: &authorize.GrantFacts{
-		SubjectKind: string(subject.Kind), Level: level.String(), Caps: caps.Names(), TargetKind: string(target.Kind),
-		TargetSpaceID: target.SpaceID, TargetChannelID: target.ChannelID, TargetHostID: target.HostID,
+	res := authorize.Resource{Kind: kind, ID: targetID, Grant: &authorize.GrantFacts{
+		SubjectKind: string(g.Subject.Kind), Level: g.Level.String(), Caps: g.Caps.Names(), TargetKind: string(g.Target.Kind),
+		TargetSpaceID: g.Target.SpaceID, TargetChannelID: g.Target.ChannelID, TargetHostID: g.Target.HostID,
 	}}
-	if err := s.check(ctx, caller, authorize.ActionGrantCreate, res); err != nil {
-		return domain.Grant{}, err
+	return s.check(ctx, caller, authorize.ActionGrantCreate, res)
+}
+
+// createGrant is CreateGrant inside its unit of work after authorize: target, archived target,
+// subject, the members of a subject group, the insert, the event and the audit.
+func (s *AdminService) createGrant(ctx context.Context, g domain.Grant) error {
+	if err := s.targetExists(ctx, g.Target); err != nil {
+		return err
 	}
-	if err := s.targetLive(ctx, target); err != nil {
-		return domain.Grant{}, err
+	if err := s.targetLive(ctx, g.Target); err != nil {
+		return err
 	}
-	if err := s.subjectExists(ctx, subject); err != nil {
-		return domain.Grant{}, err
+	if err := s.subjectExists(ctx, g.Subject); err != nil {
+		return err
 	}
-	g, err := domain.NewGrant(ids.New(), subject, target, level, caps, cmd.ExpiresAt, cmd.Reason, caller.ID, s.d.Clock.Now())
-	if err != nil {
-		return domain.Grant{}, err
-	}
-	if err := s.affectGroup(ctx, subject); err != nil {
-		return domain.Grant{}, err
+	if err := s.affectGroup(ctx, g.Subject); err != nil {
+		return err
 	}
 	if err := s.d.Store.InsertGrant(ctx, g); err != nil {
-		return domain.Grant{}, err
+		return err
 	}
-	return g, s.record(ctx, authorize.ActionGrantCreate, authorize.ResourceGrant, g.ID, grantAttrs(g))
+	if err := s.grantEvent(ctx, authorize.ActionGrantCreate, g, changeCreated); err != nil {
+		return err
+	}
+	return s.record(ctx, authorize.ActionGrantCreate, authorize.ResourceGrant, g.ID, grantAttrs(g))
 }
 
 // grantParts parses the column values of cmd: subject and target with their ids, level and
@@ -520,16 +740,16 @@ func grantParts(cmd authz.CreateGrantCmd) (domain.Subject, domain.Target, domain
 	case domain.SubjectUser, domain.SubjectAgent, domain.SubjectApp:
 		subject.PrincipalID = cmd.SubjectID
 	default:
-		return domain.Subject{}, domain.Target{}, 0, 0, fieldErr("/subject", "the subject kind must be user, group, agent or app")
+		return domain.Subject{}, domain.Target{}, 0, 0, fieldErr("/subject_kind", "the subject kind must be user, group, agent or app")
 	}
 	if cmd.SubjectID.IsZero() {
-		return domain.Subject{}, domain.Target{}, 0, 0, fieldErr("/subject", "the subject needs an id")
+		return domain.Subject{}, domain.Target{}, 0, 0, fieldCode("/subject_id", "required", "the subject needs an id")
 	}
 	target := domain.Target{Kind: domain.TargetKind(cmd.TargetKind)}
 	switch target.Kind {
 	case domain.TargetInstance:
 		if !cmd.TargetID.IsZero() {
-			return domain.Subject{}, domain.Target{}, 0, 0, fieldErr("/target", "the instance has no id")
+			return domain.Subject{}, domain.Target{}, 0, 0, fieldCode("/target_id", "forbidden", "the instance has no id")
 		}
 	case domain.TargetSpace:
 		target.SpaceID = cmd.TargetID
@@ -538,10 +758,10 @@ func grantParts(cmd authz.CreateGrantCmd) (domain.Subject, domain.Target, domain
 	case domain.TargetHost:
 		target.HostID = cmd.TargetID
 	default:
-		return domain.Subject{}, domain.Target{}, 0, 0, fieldErr("/target", "the target kind must be instance, space, channel or host")
+		return domain.Subject{}, domain.Target{}, 0, 0, fieldErr("/target_kind", "the target kind must be instance, space, channel or host")
 	}
 	if target.Kind != domain.TargetInstance && cmd.TargetID.IsZero() {
-		return domain.Subject{}, domain.Target{}, 0, 0, fieldErr("/target", "the target needs an id")
+		return domain.Subject{}, domain.Target{}, 0, 0, fieldCode("/target_id", "required", "the target needs an id")
 	}
 	level := domain.LevelNone
 	if cmd.Level != "" {
@@ -555,12 +775,18 @@ func grantParts(cmd authz.CreateGrantCmd) (domain.Subject, domain.Target, domain
 	if err != nil {
 		return domain.Subject{}, domain.Target{}, 0, 0, fieldErr("/capabilities", "unknown capability")
 	}
+	if len(slices.Compact(slices.Sorted(slices.Values(cmd.Capabilities)))) != len(cmd.Capabilities) {
+		return domain.Subject{}, domain.Target{}, 0, 0, fieldCode("/capabilities", "duplicate", "every capability at most once")
+	}
 	return subject, target, level, caps, nil
 }
 
 // fieldErr is validation_failed with one invalid field.
-func fieldErr(pointer, detail string) error {
-	return errs.New(errs.CodeValidationFailed, "").WithFields(errs.FieldError{Pointer: pointer, Code: "invalid", Detail: detail})
+func fieldErr(pointer, detail string) error { return fieldCode(pointer, "invalid", detail) }
+
+// fieldCode is validation_failed with one field error of code.
+func fieldCode(pointer, code, detail string) error {
+	return errs.New(errs.CodeValidationFailed, "").WithFields(errs.FieldError{Pointer: pointer, Code: code, Detail: detail})
 }
 
 // targetExists reports a missing target as not found. Hosts come with M2-39: before it no host
@@ -619,18 +845,26 @@ func (s *AdminService) targetLive(ctx context.Context, tg domain.Target) error {
 }
 
 // subjectExists checks the subject: a live group, or a principal of the subject's kind that is
-// not deleted; otherwise not found.
+// not deleted; otherwise 400 validation_failed on /subject_id with code unknown_subject. It runs
+// after authorize, so a caller without rights learns nothing about ids (brief M1-48).
 func (s *AdminService) subjectExists(ctx context.Context, sub domain.Subject) error {
+	unknown := fieldCode("/subject_id", codeUnknownSubject, "the subject does not exist")
 	if sub.Kind == domain.SubjectGroup {
-		_, err := s.loadGroup(ctx, sub.GroupID, true)
-		return err
+		g, found, err := s.d.Store.GetGroup(ctx, sub.GroupID)
+		if err != nil {
+			return err
+		}
+		if !found || !g.DeletedAt.IsZero() {
+			return unknown
+		}
+		return nil
 	}
 	f, found, err := s.d.Principals.Principal(ctx, sub.PrincipalID)
 	if err != nil {
 		return sourceError("principal source", err)
 	}
 	if !found || string(f.Kind) != string(sub.Kind) || f.Status == authz.PrincipalDeleted {
-		return errNotFound()
+		return unknown
 	}
 	return nil
 }
@@ -655,6 +889,10 @@ func (s *AdminService) affectGroup(ctx context.Context, sub domain.Subject) erro
 func (s *AdminService) RevokeGrant(ctx context.Context, caller actor.Actor, grantID ids.ID, reason string) (authz.Grant, error) {
 	ctx, err := withCaller(ctx, caller)
 	if err != nil {
+		return authz.Grant{}, err
+	}
+	reason = strings.TrimSpace(reason)
+	if err := domain.CheckReason(reason); err != nil {
 		return authz.Grant{}, err
 	}
 	attrs, err := reasonAttrs(reason)
@@ -685,17 +923,18 @@ func (s *AdminService) revokeGrant(ctx context.Context, caller actor.Actor, gran
 	if err != nil {
 		return domain.Grant{}, false, err
 	}
+	// authorize also for an unknown id: it answers not_found after the liveness checks (07 4.2).
+	if err := s.check(ctx, caller, authorize.ActionGrantRevoke, authorize.Resource{Kind: authorize.ResourceGrant, ID: grantID}); err != nil {
+		return domain.Grant{}, false, err
+	}
 	if !found {
 		return domain.Grant{}, false, errNotFound()
 	}
-	if err := s.check(ctx, caller, authorize.ActionGrantRevoke, authorize.Resource{Kind: authorize.ResourceGrant, ID: g.ID}); err != nil {
-		return domain.Grant{}, false, err
-	}
 	if !g.RevokedAt.IsZero() {
-		if apply {
-			return domain.Grant{}, false, errRaced
+		if err := s.withoutEffect(ctx, apply, authorize.ActionGrantRevoke, authorize.ResourceGrant, g.ID, attrs); err != nil {
+			return domain.Grant{}, false, err
 		}
-		return g, false, s.record(ctx, authorize.ActionGrantRevoke, authorize.ResourceGrant, g.ID, merge(attrs, noChange()))
+		return g, false, nil
 	}
 	if !apply {
 		return g, true, nil
@@ -708,7 +947,12 @@ func (s *AdminService) revokeGrant(ctx context.Context, caller actor.Actor, gran
 		return domain.Grant{}, false, err
 	}
 	if !ok {
+		// The lock of permission_version serializes revocations, so this needs a writer outside
+		// the rights path; answer like the raced case.
 		return domain.Grant{}, false, errRaced
+	}
+	if err := s.grantEvent(ctx, authorize.ActionGrantRevoke, revoked, changeRevoked); err != nil {
+		return domain.Grant{}, false, err
 	}
 	return revoked, true, s.record(ctx, authorize.ActionGrantRevoke, authorize.ResourceGrant, g.ID, attrs)
 }
@@ -734,7 +978,7 @@ func grantAttrs(g domain.Grant) auditing.Attrs {
 		attrReason:      auditing.ReasonText(g.Reason),
 	}
 	if g.Subject.Kind == domain.SubjectGroup {
-		attrs[attrGroupID] = auditing.ID(g.Subject.GroupID)
+		attrs[attrSubjectID] = auditing.ID(g.Subject.GroupID)
 	} else {
 		attrs[attrSubjectID] = auditing.ID(g.Subject.PrincipalID)
 	}
@@ -783,15 +1027,16 @@ func targetID(t domain.Target) ids.ID {
 	return ids.ID{}
 }
 
-// groupOut converts a group for the port.
-func groupOut(g domain.Group) authz.Group {
-	return authz.Group{ID: g.ID, Name: g.Name, Description: g.Description, Source: g.Source, CreatedBy: g.CreatedBy,
-		CreatedAt: g.CreatedAt, DeletedAt: g.DeletedAt}
+// groupOut converts a group with its member_count for the port.
+func groupOut(g domain.Group, count int) authz.Group {
+	return authz.Group{ID: g.ID, Name: g.Name, Description: g.Description, Source: g.Source, ProviderID: g.ProviderID,
+		ExternalRef: g.ExternalRef, MemberCount: count, CreatedBy: g.CreatedBy, CreatedAt: g.CreatedAt, DeletedAt: g.DeletedAt}
 }
 
-// membershipOut converts a membership for the port.
-func membershipOut(m domain.Membership) authz.Membership {
-	return authz.Membership{ID: m.ID, GroupID: m.GroupID, UserID: m.UserID, AddedBy: m.AddedBy, AddedAt: m.AddedAt, ExpiresAt: m.ExpiresAt}
+// membershipOut converts a membership with the public view of its member for the port.
+func membershipOut(m domain.Membership, user authz.PrincipalRef) authz.Membership {
+	return authz.Membership{ID: m.ID, GroupID: m.GroupID, UserID: m.UserID, User: user, AddedBy: m.AddedBy, AddedAt: m.AddedAt,
+		ExpiresAt: m.ExpiresAt}
 }
 
 // grantOut converts a grant for the port.

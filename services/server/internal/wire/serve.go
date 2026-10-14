@@ -141,6 +141,8 @@ type server struct {
 	// authorizer is the kernel/authorize.Authorizer of the process (M1-28); the use cases of later
 	// tickets receive it.
 	authorizer authorize.Authorizer
+	// authzAdmin is the group and grant management of authz with its REST handlers (M1-48).
+	authzAdmin *AuthzAdmin
 	// identity is the identity module (M1-33): devices, the DPoP verifier and the REST handlers.
 	identity *Identity
 	// settings are the instance settings, branding and discovery (M1-46); identity reads
@@ -570,7 +572,8 @@ func (s *server) startAudit(ctx context.Context) error {
 
 // startAuthz is start step 6c (M1-28): it builds the Authorizer of authz over the pool with the
 // recorder of the audit module (NewAuthorizer) and keeps it for the use cases of later tickets,
-// and binds the rights hooks to the appender of sync and the recorder (M1-29).
+// binds the rights hooks to the appender of sync and the recorder (M1-29), and builds the group
+// and grant management with its REST handlers (M1-48).
 func (s *server) startAuthz(context.Context) error {
 	cfg, err := AuthzConfig(s.values)
 	if err != nil {
@@ -591,13 +594,21 @@ func (s *server) startAuthz(context.Context) error {
 	if sy == nil {
 		return errors.New("wire: the authz step needs the event log of the sync step")
 	}
+	adminCfg, err := AuthzAdminConfig(s.values)
+	if err != nil {
+		return err
+	}
+	admin, err := NewAuthzAdmin(pool, adminCfg, a, sy, az, s.deps.Clock)
+	if err != nil {
+		return err
+	}
 	// The rights hooks of the unit of work need the appender and the recorder, which need the unit
 	// of work themselves; they are bound here, before any route or job runs (M1-29).
 	if err := a.RightsHook().Bind(authzapp.RightsBindings{Events: sy.Appender(), Audit: a.Recorder()}); err != nil {
 		return err
 	}
 	s.mu.Lock()
-	s.authorizer = az
+	s.authorizer, s.authzAdmin = az, admin
 	s.mu.Unlock()
 	return nil
 }
@@ -709,6 +720,9 @@ func (s *server) handlers() Handlers {
 	}
 	if h.Admin == nil && s.settings != nil {
 		h.Admin = s.settings.Handlers
+	}
+	if h.Access == nil && s.authzAdmin != nil {
+		h.Access = s.authzAdmin.Handlers
 	}
 	return h
 }

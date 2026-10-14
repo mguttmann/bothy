@@ -209,8 +209,8 @@ Quelle: [03-datenmodell.md](../spec/03-datenmodell.md), Abschnitt 9.
 | `principal.handle_max_chars` | `BOTHY_PRINCIPAL__HANDLE_MAX_CHARS` | Server | int | `32` | Länge eines Handles | aktiv |
 | `principal.display_name_max_chars` | `BOTHY_PRINCIPAL__DISPLAY_NAME_MAX_CHARS` | Server | int | `64` | Länge eines Anzeigenamens in Unicode-Zeichen | aktiv |
 | `branding.product_name_max_chars` | `BOTHY_BRANDING__PRODUCT_NAME_MAX_CHARS` | Server | int | `64` | Länge des Produktnamens im Branding (`instance_settings`, `branding.product_name`) in Unicode-Zeichen | aktiv |
-| `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Gruppennamens in Unicode-Zeichen | geplant (M1) |
-| `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server |  | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen | geplant (M1) |
+| `group.name_max_chars` | `BOTHY_GROUP__NAME_MAX_CHARS` | Server | int | `100` | Länge eines Gruppennamens in Unicode-Zeichen | aktiv |
+| `group.description_max_chars` | `BOTHY_GROUP__DESCRIPTION_MAX_CHARS` | Server | int | `500` | Länge einer Gruppenbeschreibung in Unicode-Zeichen | aktiv |
 | `host.name_max_chars` | `BOTHY_HOST__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Rechnernamens in Unicode-Zeichen | geplant (M2) |
 | `space.name_max_chars` | `BOTHY_SPACE__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Bereichsnamens in Unicode-Zeichen | geplant (M1) |
 | `channel.name_max_chars` | `BOTHY_CHANNEL__NAME_MAX_CHARS` | Server |  | `100` | Länge eines Kanalnamens in Unicode-Zeichen | geplant (M1) |

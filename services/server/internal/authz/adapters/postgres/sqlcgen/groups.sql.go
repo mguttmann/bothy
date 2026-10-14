@@ -11,6 +11,45 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countMembersInEffect = `-- name: CountMembersInEffect :many
+SELECT m.group_id, count(*)::int AS members
+FROM group_memberships m
+WHERE m.group_id = ANY ($1::uuid[]) AND m.removed_at IS NULL
+  AND (m.expires_at IS NULL OR m.expires_at > $2)
+GROUP BY m.group_id
+`
+
+type CountMembersInEffectParams struct {
+	GroupIds []pgtype.UUID
+	At       pgtype.Timestamptz
+}
+
+type CountMembersInEffectRow struct {
+	GroupID pgtype.UUID
+	Members int32
+}
+
+// member_count of the groups (M1-48): the memberships that are not removed and not expired at @at.
+func (q *Queries) CountMembersInEffect(ctx context.Context, arg CountMembersInEffectParams) ([]CountMembersInEffectRow, error) {
+	rows, err := q.db.Query(ctx, countMembersInEffect, arg.GroupIds, arg.At)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountMembersInEffectRow
+	for rows.Next() {
+		var i CountMembersInEffectRow
+		if err := rows.Scan(&i.GroupID, &i.Members); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getGroup = `-- name: GetGroup :one
 SELECT g.id, g.name, g.description, g.source, g.provider_id, g.external_ref, g.created_by, g.created_at, g.deleted_at
 FROM groups g
@@ -69,6 +108,69 @@ func (q *Queries) InsertGroup(ctx context.Context, arg InsertGroupParams) error 
 		arg.CreatedAt,
 	)
 	return err
+}
+
+const listLiveGroups = `-- name: ListLiveGroups :many
+SELECT g.id, g.name, g.description, g.source, g.provider_id, g.external_ref, g.created_by, g.created_at, g.deleted_at
+FROM groups g
+WHERE g.deleted_at IS NULL AND g.id > $1
+  AND (NOT $2::boolean OR EXISTS (
+        SELECT 1 FROM group_memberships m
+        WHERE m.group_id = g.id AND m.user_id = $3 AND m.removed_at IS NULL
+          AND (m.expires_at IS NULL OR m.expires_at > $4)))
+ORDER BY g.id
+LIMIT $5
+`
+
+type ListLiveGroupsParams struct {
+	AfterID    pgtype.UUID
+	OnlyMember bool
+	MemberID   pgtype.UUID
+	At         pgtype.Timestamptz
+	MaxRows    int32
+}
+
+type ListLiveGroupsRow struct {
+	Group Group
+}
+
+// One keyset page of live groups ascending by id (listGroups, M1-48). With only_member the page
+// holds the groups in which member_id has a membership in effect at @at (not removed, not
+// expired; 07 section 2.5: at expires_at = @at it is already over).
+func (q *Queries) ListLiveGroups(ctx context.Context, arg ListLiveGroupsParams) ([]ListLiveGroupsRow, error) {
+	rows, err := q.db.Query(ctx, listLiveGroups,
+		arg.AfterID,
+		arg.OnlyMember,
+		arg.MemberID,
+		arg.At,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListLiveGroupsRow
+	for rows.Next() {
+		var i ListLiveGroupsRow
+		if err := rows.Scan(
+			&i.Group.ID,
+			&i.Group.Name,
+			&i.Group.Description,
+			&i.Group.Source,
+			&i.Group.ProviderID,
+			&i.Group.ExternalRef,
+			&i.Group.CreatedBy,
+			&i.Group.CreatedAt,
+			&i.Group.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const softDeleteGroup = `-- name: SoftDeleteGroup :execrows

@@ -1019,6 +1019,30 @@
       "doc": "Driver of the object storage of files: fs for a directory of the server, s3 for an S3-compatible service."
     },
     {
+      "name": "group.description_max_chars",
+      "env": "BOTHY_GROUP__DESCRIPTION_MAX_CHARS",
+      "kind": "int",
+      "default": "500",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Longest group description in Unicode characters."
+    },
+    {
+      "name": "group.name_max_chars",
+      "env": "BOTHY_GROUP__NAME_MAX_CHARS",
+      "kind": "int",
+      "default": "100",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "",
+      "chapter": "03-datenmodell.md",
+      "doc": "Longest group name in Unicode characters."
+    },
+    {
       "name": "http.hsts_max_age",
       "env": "BOTHY_HTTP__HSTS_MAX_AGE",
       "kind": "duration",
