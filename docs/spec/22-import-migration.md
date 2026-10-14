@@ -407,8 +407,8 @@ Two writing runs of the same source are correct (every item at most once, in ord
 because each run processes a thread strictly sequentially and a competing
 key waits for the commit of the other), but wasteful. A writing run therefore holds a lease in
 the cursor (section 7.3) and renews it at least every `import.follow.poll_interval`; the tool
-does not start if another run's lease is younger than three times that interval, except with
-`--takeover`. The source state `running` does not mean that a run is active: the owner starts
+does not start if another run's lease is younger than `import.lease_stale_after`, except with
+`--takeover`, and a run that finds the lease taken over by another run stops writing. The source state `running` does not mean that a run is active: the owner starts
 the source in the web console (section 8), and it stays `running` between runs.
 
 ## 8. Import interface of the server
@@ -767,6 +767,7 @@ section 10.
 | `import.follow.busy_reactions` | `👀` | reactions that mean "agent is still working" |
 | `import.follow.busy_lookback` | `10` | messages before the first new one that are checked for the marker |
 | `import.follow.max_backoff` | `5m` | longest interval after failed rounds |
+| `import.lease_stale_after` | `90s` | a run lease renewed less than this long ago blocks a second writing run (section 7.4); larger than `import.follow.poll_interval` |
 
 The values for page size, retries, wait limit, settle rule and backoff are taken over from the
 predecessor, tested there against fake servers and not measured against the real Discord
