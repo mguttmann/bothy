@@ -25,6 +25,11 @@ operated, and the order of the build.
 
 ### Added
 
+- The docs site has a REST reference, a schema reference and a gateway reference, rendered in
+  every `make docs` from `docs/api/openapi.yaml` and `docs/api/asyncapi.yaml` by the MkDocs
+  hook `tools/docs/mkdocs_api_reference.py`; `make docs` also fails when a built page loads a
+  script, stylesheet or font from another origin (`tools/docs/external_assets_check.py`)
+  (M7-19).
 - Design tokens: accent variants for every instance accent of `branding.accent_color` in light and
   dark. The generator swaps the accent roles for the same step of the chosen scale, moves a
   failing step, checks every pairing with a swapped role and writes `DsAccent` (Dart),
