@@ -177,6 +177,8 @@ linters:
         text: "G101:"
       # The same for passkey_credentials (M1-40): the rows hold public keys and counters only.
       - path: ^internal/identity/adapters/postgres/sqlcgen/passkey_credentials\.sql\.go$
+        linters: [gosec]
+        text: "G101:"
       # The same for local_credentials (M1-39): the column names contain "password"; the queries
       # read and write only the Argon2id hash and the sealed TOTP secret as parameters.
       - path: ^internal/identity/adapters/postgres/sqlcgen/local_credentials\.sql\.go$
