@@ -5,8 +5,9 @@
 // api/operations.yaml, writes a copy of the spec that keeps only the enabled operations into a
 // temporary directory, runs the oapi-codegen pinned in go.mod on it, and writes:
 //
-//   - <rest-dir>/rest.gen.go: models of every schema, std-http and strict server of the enabled
-//     operations (oapi-codegen),
+//   - <rest-dir>/models.gen.go and <rest-dir>/rest.gen.go: the package oapi-codegen writes, split
+//     before ServerInterface into the models of every schema and the std-http and strict server
+//     of the enabled operations (splitRest),
 //   - <routes-dir>/routes.gen.go, catalog.gen.go, build.gen.go: the operation table, the action
 //     catalogue and the glue for api/routes,
 //   - <routes-dir>/meta.gen.go: the spec version, the gateway protocol versions of -asyncapi and
@@ -62,7 +63,7 @@ func run(ctx context.Context, args []string, stderr io.Writer) int {
 		{&c.catalog, "catalog", "action catalogue (docs/spec/actions.yaml)", true},
 		{&c.list, "list", "enable list (api/operations.yaml)", true},
 		{&c.codegenConfig, "codegen-config", "oapi-codegen configuration (api/rest/oapi-codegen.yaml)", true},
-		{&c.restDir, "rest-dir", "output directory of rest.gen.go", true},
+		{&c.restDir, "rest-dir", "output directory of models.gen.go and rest.gen.go", true},
 		{&c.routesDir, "routes-dir", "output directory of the route files", true},
 		{&c.restPkg, "rest-pkg", "import path of the package in -rest-dir", true},
 		{&c.corePkg, "core-pkg", "import path of api/routes; empty when -routes-dir is api/routes", false},

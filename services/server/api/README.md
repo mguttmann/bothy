@@ -13,7 +13,8 @@ nennt (PLAN P-04). Normativ sind [06-api.md](../../../docs/spec/06-api.md), Absc
 | `operations.yaml` | Freischalt-Liste: `enabled` und `later` mit Etappe | ja |
 | `generate.go` | die beiden `go:generate`-Zeilen (echte Oberfläche und Fixture) | ja |
 | `rest/oapi-codegen.yaml` | Einstellungen von oapi-codegen (`std-http-server`, `strict-server`, `models`, `skip-prune`) | ja |
-| `rest/rest.gen.go` | Go-Typen aller Schemas und Server der freigeschalteten Operationen | erzeugt |
+| `rest/models.gen.go` | Go-Typen aller Schemas, Parameter und Request-Bodies (Teil vor `ServerInterface`) | erzeugt |
+| `rest/rest.gen.go` | Server der freigeschalteten Operationen (ab `ServerInterface`) | erzeugt |
 | `rest/openapi.gen.yaml` | Byte-gleiche Kopie von `docs/api/openapi.yaml`; `rest.Spec` (`rest/spec.go`) bettet sie für den Anfrage-Validator der HTTP-Kette ein (M1-18) | erzeugt |
 | `routes/routes.go` | Typen, `Table`, `Recorder`, `Verify`, `Build`, Nachschlagen | ja |
 | `routes/routes.gen.go`, `catalog.gen.go`, `build.gen.go` | Operationstabelle, Aktionskatalog, Verbindung zum erzeugten Server | erzeugt |
@@ -134,6 +135,7 @@ downloads with the deadline `http.transfer_timeout`). Nachschlagen über `routes
 
 - Erzeugter Code zählt nicht in die Go-Abdeckung (`*.gen.go`, DECISIONS.md M1-17/10); der
   Golden-Test des Generators und `make codegen-check` halten ihn.
-- `rest.gen.go` wächst mit jeder freigeschalteten Operation. Überschreitet die Datei
-  `repo.max_file_kb` (Hook `check-added-large-files`), scheitert `make lint`; das Ticket, das die
-  Grenze erreicht, entscheidet über die Aufteilung (DECISIONS.md, M1-17/16).
+- Der Generator teilt die Ausgabe von oapi-codegen vor `ServerInterface` in `models.gen.go` und
+  `rest.gen.go` (`splitRest`, DECISIONS.md INT-W14/4), weil eine Datei `repo.max_file_kb`
+  überschritt. `rest.gen.go` wächst weiter mit jeder freigeschalteten Operation;
+  `TestRealRest_BelowMaxFileKB` und der Hook `check-added-large-files` halten die Grenze je Datei.

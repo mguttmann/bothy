@@ -133,15 +133,18 @@ func TestSchemasGenerated(t *testing.T) {
 	if err := yaml.Unmarshal(data, &spec); err != nil {
 		t.Fatal(err)
 	}
-	file, err := parser.ParseFile(token.NewFileSet(), "rest.gen.go", nil, parser.SkipObjectResolution)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// The generator splits the package into models.gen.go and rest.gen.go (INT-W14/4).
 	declared := map[string]bool{}
-	for _, decl := range file.Decls {
-		if gen, ok := decl.(*ast.GenDecl); ok && gen.Tok == token.TYPE {
-			for _, s := range gen.Specs {
-				declared[s.(*ast.TypeSpec).Name.Name] = true
+	for _, name := range []string{"models.gen.go", "rest.gen.go"} {
+		file, err := parser.ParseFile(token.NewFileSet(), name, nil, parser.SkipObjectResolution)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range file.Decls {
+			if gen, ok := decl.(*ast.GenDecl); ok && gen.Tok == token.TYPE {
+				for _, s := range gen.Specs {
+					declared[s.(*ast.TypeSpec).Name.Name] = true
+				}
 			}
 		}
 	}
@@ -154,7 +157,7 @@ func TestSchemasGenerated(t *testing.T) {
 			continue
 		}
 		if !declared[name] {
-			t.Errorf("schema %s has no Go type in rest.gen.go", name)
+			t.Errorf("schema %s has no Go type in models.gen.go or rest.gen.go", name)
 		}
 	}
 }
