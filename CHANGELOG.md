@@ -243,6 +243,12 @@ operated, and the order of the build.
   "Reduced checks" notice, because GitHub gives Dependabot runs no secrets, and the bot's own
   commits in its own pull request need no DCO sign-off; Conventional Commits still apply, and a
   maintainer's edit of the pull request runs every check (D-DEPS-3).
+- Chapter 12 "4.1 Port" and "4.2 File system driver (default)" describe the port contract
+  (key grammar, byte-range reads, error contract, idempotent `Delete` and `AbortMultipart`) and the
+  file system rules (start check of the root, no symbolic links, temporary files in `.tmp`,
+  directory removal on delete, multipart layout and ETag) as built by M3-01; chapter 02
+  "13. Configuration loading" item 4 lists the cross-check `file_fs_root_absolute`; ADR 0010
+  "Confirmation" names the conformance suite and the property test.
 
 ### Security
 

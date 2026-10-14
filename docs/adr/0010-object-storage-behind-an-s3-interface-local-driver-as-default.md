@@ -57,10 +57,15 @@ no batch delete, no versioning, no bucket policies. Details:
 
 - A conformance test suite runs against the file system driver and against SeaweedFS in a
   test container (Put, Get with range, Head, Delete of missing objects, Multipart with abort).
+  The suite is `filestest.RunObjectStoreConformance` in
+  `services/server/internal/files/adapters/filestest`; the file system driver runs it in
+  `TestFSConformance` (M3-01), the S3 driver follows with M3-02.
 - The S3 driver depends only on a Go interface with exactly the core S3 operations; an
   architecture rule allows the import of the S3 SDK only in `internal/files/adapters/s3`.
 - A property test checks that no object key contains channel IDs, space IDs or
   names.
+  The property test is `TestObjectKeysCarryNoContext` in
+  `services/server/internal/files/domain`.
 
 ## Pros and Cons of the Options
 

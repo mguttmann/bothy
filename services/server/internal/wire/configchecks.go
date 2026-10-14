@@ -36,6 +36,7 @@ var configChecks = []configCheck{
 	{name: "tls_https", keys: []string{keyPublicURL, keyTLSCertRef, keyTLSKeyRef}, fn: tlsHTTPS},
 	{name: "hsts_whole_seconds", keys: []string{"http.hsts_max_age"}, fn: hstsWholeSeconds},
 	{name: "audit_ip_key_retention", keys: []string{"privacy.audit_ip_key_period", "privacy.audit_ip_key_retention"}, fn: auditIPKeyRetention},
+	{name: "file_fs_root_absolute", keys: []string{"file.storage.driver", "file.fs.root"}, fn: fileFSRootAbsolute},
 }
 
 // tlsPair requires server.tls_cert_ref and server.tls_key_ref to be both set or both empty

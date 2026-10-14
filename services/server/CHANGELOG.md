@@ -347,6 +347,16 @@ documented in this file. The format is based on
   all) refuses to start when an enabled REST operation carries a gateway class or a class without
   limits.
 
+- `internal/files`: the object storage port `ObjectStore` (`internal/files/app`) with exactly the
+  nine operations of chapter 12 "4.1", the key schema and the one key grammar of all drivers
+  (`internal/files/domain`), the file system driver `internal/files/adapters/fs` (start check of
+  `file.fs.root`, no symbolic link followed at any level, atomic writes through `<root>/.tmp`,
+  one byte range per read, multipart with parts at `uploads/<file_id>/<n>` and quoted SHA-256
+  ETags) and the conformance suite `filestest.RunObjectStoreConformance` that every driver runs.
+- Configuration keys `file.storage.driver` and `file.fs.root` with the cross-check
+  `file_fs_root_absolute`, and `wire.FilesObjectStore`, which opens the file system driver and
+  refuses the driver `s3` until the S3 driver exists; no role opens the store yet.
+
 ### Changed
 
 - `httpserver.Operation` carries `RateLimitClass`; `Chain.SetCredentialsPrecheck` runs before the
