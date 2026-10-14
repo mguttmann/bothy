@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -88,7 +89,14 @@ def main(argv: list[str] | None = None) -> int:
             print(f"SKIP apps-platform {name} {other}: other host")
         commands = tests.get(system, [])
         for command in commands:
-            result = subprocess.run(command, cwd=folder, check=False)
+            # Without a shell, Windows does not resolve `flutter` to `flutter.bat`; which does.
+            program = shutil.which(command[0])
+            if program is None:
+                print(
+                    f"apps-platform {name} {system}: {command[0]} is not on PATH", file=sys.stderr
+                )
+                return 1
+            result = subprocess.run([program, *command[1:]], cwd=folder, check=False)
             if result.returncode != 0:
                 print(
                     f"apps-platform {name} {system}: {' '.join(command)} failed with exit code"

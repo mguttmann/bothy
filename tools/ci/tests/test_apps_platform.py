@@ -144,3 +144,33 @@ def test_unknown_host_runs_nothing(
     assert apps_platform.main(["--root", str(root), "--system", "linux"]) == 0
     assert _calls(fake_flutter) == []
     assert capsys.readouterr().out == "SKIP apps-platform apps/client macos: other host\n"
+
+
+def test_program_is_resolved_on_path(
+    tmp_path: Path, fake_flutter: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The program comes from PATH through shutil.which, which also finds `flutter.bat` on
+    Windows, where a bare name without a shell would not resolve."""
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"macos": [["flutter", "test"]]})
+    seen: list[str] = []
+    real_which = apps_platform.shutil.which
+
+    def which(name: str) -> str | None:
+        seen.append(name)
+        return real_which(name)
+
+    monkeypatch.setattr(apps_platform.shutil, "which", which)
+    assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 0
+    assert seen == ["flutter"]
+    assert len(_calls(fake_flutter)) == 1
+
+
+def test_missing_program_fails(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = tmp_path / "repo"
+    _member(root, "apps/client", {"macos": [["no-such-program-m401", "test"]]})
+    assert apps_platform.main(["--root", str(root), "--system", "macos"]) == 1
+    assert (
+        "apps-platform apps/client macos: no-such-program-m401 is not on PATH"
+        in capsys.readouterr().err
+    )
