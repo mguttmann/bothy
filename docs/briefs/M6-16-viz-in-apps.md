@@ -15,7 +15,7 @@ After this ticket the six views of `bothy_viz` (M6-12) run with real data in all
 - `docs/spec/19-security.md` SEC-VZ-1, SEC-T19 (the static check part).
 - `docs/api/openapi.yaml` `getStatsLive`, `StatsLiveFrame`; `docs/api/asyncapi.yaml` `op.stats.subscribe`, `op.stats.unsubscribe`, `event.stats.live`.
 - `docs/DECISIONS.md`: D-W-100 and its extension to M5 and M6 (D-W-120); section 10 (format of `D-M6-16-<n>` rows) and the rows of M6-06, M6-11, M6-12, M6-15.
-- Briefs (merged names win, D-W-100): `M6-11-viz-package.md` (ports, stale rule, fixtures), `M6-12-viz-views.md` (view contract, `VizHostOptions`, TV mode overlay), `M6-15-stats-live.md` (subscription, errors, `resume`), `M6-14-stats-queries.md`, `M6-06-stats-views.md` (`telemetry_dashboard_url`, the desktop and console `StatsQuerySource`), the briefs of M4-13 and M4-17 (gateway session and fake server), `M5-02-iphone-layout.md` and `M5-03-android-layout.md` (phone shell, Me tab, lifecycle), `M6-02-console-app.md`, `M6-03-console-csp.md` (`console-e2e`).
+- Briefs (merged names win, D-W-100): `M6-11-viz-package.md` (ports, stale rule, fixtures), `M6-12-viz-views.md` (view contract, `VizHostOptions`, TV mode overlay), `M6-15-stats-live.md` (subscription, errors, `resume`), `M6-14-stats-queries.md`, `M6-06-stats-views.md` (`telemetry_dashboard_url`; its `AdminStatsSource` serves A7, not the six views), the briefs of M4-13 and M4-17 (gateway session and fake server), `M5-02-iphone-layout.md` and `M5-03-android-layout.md` (phone shell, Me tab, lifecycle), `M6-02-console-app.md`, `M6-03-console-csp.md` (`console-e2e`).
 - Code on the base branch: `packages/bothy_viz`, `packages/sync_engine`, `packages/admin_ui`, `apps/client`, `apps/console`.
 
 This ticket touches no API operation, no table, no action, no event and no configuration key.
@@ -59,8 +59,8 @@ Product requirements implemented here:
 Create:
 
 - `packages/sync_engine/lib/src/stats/`: the subscription manager (`subscribe(spaceId)`, `unsubscribe()`, the subscription carried across `resume`, re-sent after `identify`, ended by the server's `error` with the code passed on), and the delivery of `stats.live` frames to a stream; pure Dart, no Flutter (Design note 1).
-- `apps/client/lib/viz/`: the app implementations of `LiveFrameSource` (over the `sync_engine` manager, with the stale rule of M6-11) and the use of the `StatsQuerySource` of M6-06; the desktop page "Live" with the view tabs and TV mode, the mobile M10 screen with tabs and without TV mode, foreground handling (Design notes 2 and 3).
-- `apps/console/lib/viz/`: the console `LiveFrameSource` by polling `getStatsLive` every `viz.live_poll_interval` (stopped while the tab is hidden, Page Visibility), the "Live" route with TV mode (Design note 4).
+- `apps/client/lib/viz/`: the app implementations of `LiveFrameSource` (over the `sync_engine` manager, with the stale rule of M6-11) and of `StatsQuerySource` (the query operations of M6-11 over the `api_client` with DPoP, M6-11 "Out of scope"); the desktop page "Live" with the view tabs and TV mode, the mobile M10 screen with tabs and without TV mode, foreground handling (Design notes 2 and 3).
+- `apps/console/lib/viz/`: the console `LiveFrameSource` by polling `getStatsLive` every `viz.live_poll_interval` (stopped while the tab is hidden, Page Visibility), the console `StatsQuerySource` over the cookie client of M6-02, the "Live" route with TV mode (Design note 4).
 - `tools/arch-check` or a pytest in `tools/ci/tests`: the static check of VZ-T16 over `apps/client` (Design note 5).
 - Tests (Tests).
 
