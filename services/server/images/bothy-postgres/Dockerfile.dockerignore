@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Build context of services/server/images/bothy-postgres/Dockerfile (the repository root).
+# BuildKit reads this file instead of a root .dockerignore, so other builds are not affected.
+# Everything is ignored except what the image is built from: the sources of bothy-backupd (its
+# command and the internal packages it imports) and the scripts of the image. Tests and test data
+# never enter the context.
+*
+!services/server/go.mod
+!services/server/go.sum
+!services/server/VERSION
+!services/server/cmd/bothy-backupd/
+!services/server/internal/
+!services/server/images/bothy-postgres/entrypoint.sh
+!services/server/images/bothy-postgres/check-pgbackrest-version.sh
+**/*_test.go
+**/testdata/
+**/README.md
