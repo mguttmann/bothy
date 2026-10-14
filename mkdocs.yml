@@ -415,3 +415,13 @@ nav:
           - "M6-16: Visualizations in the desktop app, console and mobile": briefs/M6-16-viz-in-apps.md
           - "M6-17: Optional Grafana embedding in the console": briefs/M6-17-console-grafana-embed.md
           - "M6-18: Terminal in the console (ADR 0070)": briefs/M6-18-console-terminal.md
+          - "M8-01: Discord read client with pure GET": briefs/M8-01-discord-read-client.md
+          - "M8-02: CDN fetch with host allow list": briefs/M8-02-cdn-fetch.md
+          - "M8-03: Import interface in the server": briefs/M8-03-import-server.md
+          - "M8-04: Import tool: dry run, apply, report": briefs/M8-04-import-tool.md
+          - "M8-05: Read mirror with settle rule": briefs/M8-05-read-mirror.md
+          - "M8-06: Binding of imported session references": briefs/M8-06-session-binding-import.md
+          - "M8-07: Switchover and revert per channel": briefs/M8-07-switch-revert.md
+          - "M8-08: Import overview in the console": briefs/M8-08-import-console.md
+          - "M8-10: Login and API client of the import tool": briefs/M8-10-import-login-client.md
+          - "M8-11: Thread, message, pin and file items of the import interface": briefs/M8-11-import-content-items.md

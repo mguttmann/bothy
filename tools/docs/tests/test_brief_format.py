@@ -6,8 +6,9 @@ scope and boundaries, tests first, acceptance criteria, report format) and its i
 title and file of each ticket. This test holds every brief of the index to that shape: the title
 line equals the index row, the status line names the milestone of the ticket, the eleven
 sections stand in their order, the report uses the launcher placeholders, and every brief written
-before M1 closed (milestones M2 and later, D-W-100 and D-W-114) carries the limit for names that
-differ from merged code. Dependencies, waves and make targets are checked by brief_deps.py.
+before M1 closed (milestones M2 and later, D-W-100, D-W-114, D-W-120 and D-W-124) carries the limit
+for names that differ from merged code, and every M8 brief forbids live Discord calls (D-W-124).
+Dependencies, waves and make targets are checked by brief_deps.py.
 """
 
 from __future__ import annotations
@@ -59,8 +60,11 @@ def problems(tid: str, text: str) -> list[str]:
     for needle in ("`{{REPORT_PATH}}`", "`{{DONE_PATH}}`", "`Verdict: DONE`", "`Verdict: BLOCKED"):
         if needle not in report:
             found.append(f"report section lacks {needle}")
-    if tid[:2] not in ("M0", "M1") and "D-W-100" not in text.split("\n## Boundaries\n", 1)[-1]:
+    boundaries = text.split("\n## Boundaries\n", 1)[-1].split("\n## ", 1)[0]
+    if tid[:2] not in ("M0", "M1") and "D-W-100" not in boundaries:
         found.append("boundaries lack the limit of D-W-100 for names that differ from merged code")
+    if tid[:2] == "M8" and "\n- Never contact Discord" not in boundaries:
+        found.append("M8 boundaries lack 'Never contact Discord' (fakes only, D-W-124)")
     return found
 
 
@@ -76,6 +80,14 @@ def test_a_missing_section_is_found() -> None:
     tid, name = index_rows()[0]
     text = (BRIEFS / name).read_text(encoding="utf-8").replace("\n## Out of scope\n", "\n")
     assert any("sections" in p for p in problems(tid, text))
+
+
+def test_an_m8_brief_without_the_discord_boundary_is_found() -> None:
+    """An M8 brief must forbid live Discord calls in its boundaries (D-W-124)."""
+    tid, name = next((t, n) for t, n in index_rows() if t.startswith("M8"))
+    text = (BRIEFS / name).read_text(encoding="utf-8")
+    text = text.replace("\n- Never contact Discord", "\n- Contact")
+    assert any("Never contact Discord" in p for p in problems(tid, text))
 
 
 def test_a_wrong_milestone_is_found() -> None:

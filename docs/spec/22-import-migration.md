@@ -65,8 +65,9 @@ sequenceDiagram
     T->>D: GET only: structure, threads, messages
     T->>S: GET only: people, agents, spaces, channels
     T-->>O: Check report without content, nothing written
+    O->>S: Create and start the source in the web console (import.manage, step-up)
     O->>T: --apply
-    T->>S: Create and start source (import.manage, step-up)
+    T->>S: GET only: source of this guild in state running
     loop per channel, per thread, in Discord order
         T->>D: GET message page after cursor
         T->>D: GET attachments from the CDN (host allow-list)
@@ -368,6 +369,7 @@ and is not part of the key.
 |---|---|
 | `space` | `space:<category_id>` |
 | `channel` | `channel:<channel_id>` |
+| `forum_tag` | `forum_tag:<channel_id>:<tag_id>` (a tag ID is unique only within its forum in the data the tool reads) |
 | `thread` | `thread:<thread_id>` |
 | `message` | `message:<message_id>` |
 | `file` | `file:<attachment_id>` |
@@ -394,14 +396,20 @@ The server executes every item like this ([03-data-model.md](03-data-model.md), 
 
 `import_sources.cursor` holds, per Discord channel and thread, the highest fully taken-over
 message ID. The tool advances it only after a successful batch. A new run
-starts behind the cursor; 7.2 prevents duplicates at the edge.
+starts behind the cursor; 7.2 prevents duplicates at the edge. The tool owns the layout of the
+object; the server stores it as sent (`setImportCursor` replaces cursor and counters). Besides the
+progress it holds the run lease of section 7.4 (member `run` with a run ID and the time of the
+last renewal).
 
 ### 7.4 Two runs at the same time
 
 Two writing runs of the same source are correct (every item at most once, in order per thread,
 because each run processes a thread strictly sequentially and a competing
-key waits for the commit of the other), but wasteful. The tool therefore does not start
-if the source is already `running`, except with `--takeover`.
+key waits for the commit of the other), but wasteful. A writing run therefore holds a lease in
+the cursor (section 7.3) and renews it at least every `import.follow.poll_interval`; the tool
+does not start if another run's lease is younger than `import.lease_stale_after`, except with
+`--takeover`, and a run that finds the lease taken over by another run stops writing. The source state `running` does not mean that a run is active: the owner starts
+the source in the web console (section 8), and it stays `running` between runs.
 
 ## 8. Import interface of the server
 
@@ -428,8 +436,13 @@ and a read mirror runs for days. A batch concerns exactly one thread and has at 
 forum tags, people) come in separate batches without a thread. Every batch writes `import.progress`
 and `thread.updated` (section 6.4). Start, cancellation and completion are recorded in the audit log.
 
-How the command line logs in as owner and performs step-up (device `platform = cli`) is defined in
-[08-identity.md](08-identity.md).
+The command line logs in as a device with `platform = cli` through device pairing
+(`bothy import login`, [08-identity.md](08-identity.md) sections 5.3 and 6.4). Such a session
+can never provide step-up, so every step that needs `import.manage` (create a source with its
+mapping file, start, pause, cancel, complete, ownership list) is done by the owner in the web
+console ([01-product.md](01-product.md) section 3.7, row "Import from Discord"), and so are
+`channel.operator.set` and `channel.read_only.set`. The tool uses only `import.read`,
+`import.apply` and read actions.
 
 ## 9. Binding to earlier agent sessions
 
@@ -475,13 +488,15 @@ Who may bind is governed by `agent.invoke`: the binding arises only from a permi
 
 | Command | Effect |
 |---|---|
-| `bothy import discord --guild <id> --map <file>` | dry run: only `GET` against Discord and Bothy, writes nothing, not even a local file; prints the check report |
-| `… --apply` | creates or resumes the source and imports |
+| `bothy import login --server <url>` | logs the tool in as a `cli` device through device pairing; the owner approves the pairing code in the app or the web console; writes only the session file of the tool |
+| `bothy import logout` | ends the session on the server and deletes the session file |
+| `bothy import discord --guild <id> --map <file>` | dry run: only `GET` against Discord and Bothy, writes nothing, not even a local file (exceptions of the login in rule 5 of 10.2); prints the check report |
+| `… --apply` | imports into the source of this guild that the owner created and started in the web console (section 8); without such a running source exit `2` |
 | `… --apply --follow` | read mirror as a loop (section 12); without `--apply` one reading round per interval with "would copy" |
 | `… --apply --once` | exactly one round of the read mirror; for scheduled calls |
 | `bothy import discord init-map --guild <id> --out <file>` | writes a skeleton of the mapping file (only this file) |
-| `bothy import discord switch --channel <id>` | Bothy side of the switch-over (section 13.3), prints the Discord steps |
-| `bothy import discord revert --channel <id>` | Bothy side of reverting (section 13.4), prints the Discord steps |
+| `bothy import discord switch --channel <id>` | last mirror round and settle check of the switch-over (section 13.3, step 2); prints the owner's steps in Discord and in the web console |
+| `bothy import discord revert --channel <id>` | prints the messages written in Bothy per thread and the owner's steps of reverting (section 13.4) |
 | `bothy import discord status` | source, state, ownership list, counters |
 
 Further options: `--channel <id>` (repeatable) narrows the scope; `--only-thread <id>` (repeatable)
@@ -496,6 +511,11 @@ selects exactly these threads; `--sessions <file>` (section 9); `--report text|j
 3. Contradictory options (`--follow` with `--once`, `--only-thread` with `--follow`) end with
    exit code `2` without a call to Discord or Bothy.
 4. Output never contains message content, file names of attachments, tokens or signed URLs.
+5. The only call of a dry run to Bothy that is not a `GET` is `refreshToken` when the access
+   token of the session has expired, and the only file it may write is the session file of
+   `bothy import login`, to store the rotated refresh token (otherwise the next run would reuse
+   a consumed token and revoke the session, [08-identity.md](08-identity.md) section 7.4). Neither
+   is import data.
 
 ### 10.3 Exit codes
 
@@ -504,7 +524,7 @@ selects exactly these threads; `--sessions <file>` (section 9); `--report text|j
 | `0` | done, or dry run without errors |
 | `1` | run aborted (network, rate limit above the limit, server error); the state remains, a new run resumes |
 | `2` | invocation, mapping file or preflight check faulty; nothing written |
-| `3` | source already running (without `--takeover`); with `--once` the normal case for scheduled calls |
+| `3` | another run holds the lease of the source (without `--takeover`, section 7.4); with `--once` the normal case for scheduled calls |
 
 ## 11. Check report
 
@@ -538,7 +558,8 @@ Every mapped channel has exactly one leading place in the source, `lead`:
 Read-only in Bothy means: no principal, not even an owner, may create messages,
 threads, reactions or interactions in the channel; only `import.apply` writes (`channels.read_only`,
 03; 05 rule 1.8). The flag is set by `import.manage` with the ownership list; by hand it is set by
-`channel.read_only.set`. As a result, no agent can be triggered in the mirror, and a
+`channel.read_only.set`, which refuses the imported channels of a source that is neither `completed`
+nor `failed`, so the ownership list and the flag never disagree. As a result, no agent can be triggered in the mirror, and a
 channel never has two leading places.
 
 ### 12.2 Round
@@ -617,19 +638,21 @@ Order, so that two places never lead at the same time:
    configuration of its runtime.
 2. Tool: one last mirror round for the channel; wait until the settle rule holds nothing
    back any more.
-3. Bothy, owner: `lead = bothy` (`import.manage`); lift read-only; set the operator
-   (`channel.operator.set`, step-up, I1). The operator must be `planned_operator`, otherwise
-   the imported threads have a different agent than the channel.
+3. Bothy, owner in the web console: `lead = bothy` (`import.manage`), which lifts read-only in
+   the same transaction; set the operator (`channel.operator.set`, step-up, I1). The operator
+   must be `planned_operator`, otherwise the imported threads have a different agent than the
+   channel.
 4. Probe: a message in an imported thread triggers the agent; the session binds
    (section 9); the answer appears only in Bothy.
 
-`switch` performs steps 2 and 3 in this order and aborts before step 3 if
-busy or unsettled messages are still in the channel after the last round.
+`switch` performs step 2 and ends with exit `1` and the number of held-back messages if
+busy or unsettled messages are still in the channel after the last round; otherwise it prints
+step 3 for the owner. Step 3 needs step-up, which a `cli` session cannot provide (section 8).
 
 ### 13.4 Reverting a channel
 
-1. Bothy, owner: channel read-only; remove the operator; `lead = discord`. Active runs in the
-   channel are cancelled.
+1. Bothy, owner in the web console: `lead = discord`, which sets read-only and cancels active
+   runs in the channel in the same transaction; remove the operator.
 2. Discord, owner: lift read-only; add the agent there again.
 3. The mirror resumes at the cursor.
 
@@ -639,10 +662,11 @@ transfers or discards them.
 
 ### 13.5 Completion
 
-When all channels have `lead = bothy`: end the mirror; source `completed` (`import.manage`). The
+When all imported channels (channel item `posted`) have `lead = bothy`: end the mirror; source `completed` (`import.manage`, by the
+owner in the web console). The
 mapping `import_items` remains until the owner has the retention class `import` deleted
 ([20-privacy.md](20-privacy.md)). After that a repeated import is no longer idempotent;
-the tool warns before this step.
+the web console warns before this step (in the confirmation of the completion).
 
 ## 14. Security and privacy
 
@@ -743,6 +767,7 @@ section 10.
 | `import.follow.busy_reactions` | `👀` | reactions that mean "agent is still working" |
 | `import.follow.busy_lookback` | `10` | messages before the first new one that are checked for the marker |
 | `import.follow.max_backoff` | `5m` | longest interval after failed rounds |
+| `import.lease_stale_after` | `90s` | a run lease renewed less than this long ago blocks a second writing run (section 7.4); larger than `import.follow.poll_interval` |
 
 The values for page size, retries, wait limit, settle rule and backoff are taken over from the
 predecessor, tested there against fake servers and not measured against the real Discord

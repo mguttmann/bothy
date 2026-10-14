@@ -791,6 +791,7 @@ Source: [22-import-migration.md](../spec/22-import-migration.md), section 19.
 | `import.follow.busy_reactions` |  | Tool `bothy import` |  | `👀` | reactions that mean "agent is still working" |  |
 | `import.follow.busy_lookback` |  | Tool `bothy import` |  | `10` | messages before the first new one that are checked for the marker |  |
 | `import.follow.max_backoff` |  | Tool `bothy import` |  | `5m` | longest interval after failed rounds |  |
+| `import.lease_stale_after` |  | Tool `bothy import` |  | `90s` | a run lease renewed less than this long ago blocks a second writing run (section 7.4); larger than `import.follow.poll_interval` |  |
 
 ### 24 Terminal
 
