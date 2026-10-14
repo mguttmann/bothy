@@ -119,16 +119,28 @@ Build by its name, and it has no built-in profile "Sonar way": there the profile
 `cloud_parent` of `quality/sonar/profiles.json` (ADR 0040). `quality_sync.py` chooses both by
 `--organization`.
 
-SonarQube Cloud makes a custom quality gate the organization default only on plans that
-include it; otherwise `set_as_default` answers HTTP 403. In cloud mode `quality_sync.py` then
-still applies the quality profiles of every language, and both `apply` and `check` print the
-gap `quality_sync: gap: gate not default: plan does not allow it` and exit 0. The gate
-"Bothy way" and its conditions still exist and are still compared; only its use as the
-default is missing, so the projects keep the organization's current default gate until the
-plan allows it.
-Every other difference (a condition, a parent, an activated rule) still fails the check. On
-the Community Build a refused `set_as_default` stops `apply`, and a gate that is not the
-default fails `check`.
+SonarQube Cloud makes a custom quality gate or quality profile the organization default only
+on plans that include it; otherwise `api/qualitygates/set_as_default` answers HTTP 403 and
+`api/qualityprofiles/set_default` HTTP 400 ("Organization ... is not allowed to perform this
+action"). In cloud mode `quality_sync.py` therefore never makes the profiles the organization
+default. It assigns each profile to the project (`api/qualityprofiles/add_project`) and the
+gate as well (`api/qualitygates/select`); the project key comes from `--project` or
+`SONAR_PROJECT_KEY` (the workflow takes the repository variable of that name), and cloud mode
+stops without it. It still tries to make the gate the organization default.
+
+A call the plan refuses (HTTP 403, or HTTP 400 "is not allowed to perform this action") is a
+named gap, not a failure: `apply` prints it with the server's reason and continues with the
+next language, for example
+`quality_sync: gap: profile go: not assigned to project: plan does not allow it (...)`,
+`quality_sync: gap: gate not assigned to project: plan does not allow it (...)` and
+`quality_sync: gap: gate not default: plan does not allow it`. `check` reads what the project
+uses (`api/qualityprofiles/search?project=...`, `api/qualitygates/get_by_project`): a
+built-in profile or gate there is reported as the same gap, any other profile or gate fails
+the check. The gate "Bothy way", its conditions and the profiles are still compared; every
+other difference (a condition, a parent, an activated rule) still fails the check, and the
+exit code is 0 when only gaps remain. On the Community Build nothing is assigned to a project:
+the gate and the profiles become the defaults, a refused `set_as_default` stops `apply`, and a
+gate that is not the default fails `check`.
 
 Both checks (local and cloud) pass against the same files, so the same rules
 apply. What is compared is the addition on top of the parent profile and every gate condition. The

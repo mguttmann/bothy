@@ -458,10 +458,12 @@ sonar-down: ## Stop the local SonarQube (data stays in its volumes)
 	docker compose --env-file tools/sonarqube/.env -f tools/sonarqube/compose.yaml down
 
 sonar-config: ## Apply quality gate and profiles (quality/sonar) to SONAR_HOST_URL
-	SONAR_HOST_URL=$(SONAR_HOST_URL) SONAR_ORGANIZATION=$(SONAR_ORGANIZATION) $(UVRUN) python tools/sonarqube/quality_sync.py apply
+	SONAR_HOST_URL=$(SONAR_HOST_URL) SONAR_ORGANIZATION=$(SONAR_ORGANIZATION) SONAR_PROJECT_KEY=$(SONAR_PROJECT_KEY) \
+	  $(UVRUN) python tools/sonarqube/quality_sync.py apply
 
 sonar-config-check: ## Check that SONAR_HOST_URL enforces exactly quality/sonar
-	SONAR_HOST_URL=$(SONAR_HOST_URL) SONAR_ORGANIZATION=$(SONAR_ORGANIZATION) $(UVRUN) python tools/sonarqube/quality_sync.py check
+	SONAR_HOST_URL=$(SONAR_HOST_URL) SONAR_ORGANIZATION=$(SONAR_ORGANIZATION) SONAR_PROJECT_KEY=$(SONAR_PROJECT_KEY) \
+	  $(UVRUN) python tools/sonarqube/quality_sync.py check
 
 # ---- release support ------------------------------------------------------------------
 release-build: ## Product release bundle (tag v<version>): Compose installation, license, changelog

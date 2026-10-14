@@ -13,6 +13,9 @@ from fake_sonar import State, running
 
 REPO = Path(__file__).resolve().parents[3]
 TOKEN = "fake-token-for-tests"
+PROJECT = "example-project"
+ORG = "example-org"
+CLOUD_LANGUAGES = ("docker", "go", "js", "kotlin", "py", "ts")
 
 
 @pytest.fixture
@@ -23,7 +26,11 @@ def server() -> Iterator[tuple[State, str]]:
 
 
 def _client(url: str, organization: str | None = None) -> qs.Client:
-    return qs.Client(url, TOKEN, organization)
+    return qs.Client(url, TOKEN, organization, PROJECT if organization else None)
+
+
+def _posts(state: State, path: str) -> list[dict[str, str]]:
+    return [params for method, p, params in state.calls if method == "POST" and p == path]
 
 
 def test_repository_config_is_consistent() -> None:
@@ -147,6 +154,7 @@ def test_organization_is_sent_for_cloud(server: tuple[State, str]) -> None:
     state, url = server
     qs.check(_client(url, organization="example-org"), qs.load_config(REPO / "quality" / "sonar"))
     assert state.calls
+    assert any(params.get("project") == PROJECT for _, _, params in state.calls)
     assert all(params.get("organization") == "example-org" for _, _, params in state.calls)
 
 
@@ -163,7 +171,20 @@ def test_apply_then_check_on_cloud_api() -> None:
         assert [(c["metric"], c["op"], c["error"]) for c in state.gates["Bothy way"]] == [
             (c.metric, c.op, c.error) for c in config.conditions
         ]
-        assert qs.check(_client(url, organization="example-org"), config).problems == []
+        # The profiles are assigned to the project, never made the organization default.
+        assert _posts(state, "/api/qualityprofiles/set_default") == []
+        assert go.default is False
+        assert state.project_profiles == dict.fromkeys(CLOUD_LANGUAGES, "Bothy way")
+        assert {p["project"] for p in _posts(state, "/api/qualityprofiles/add_project")} == {
+            PROJECT
+        }
+        assert state.project_gate == "Bothy way"
+        assert _posts(state, "/api/qualitygates/select") == [
+            {"gateId": state.gate_ids["Bothy way"], "projectKey": PROJECT, "organization": ORG}
+        ]
+        checked = qs.check(_client(url, organization="example-org"), config)
+        assert checked.problems == []
+        assert checked.gaps == []
 
 
 def test_token_is_sent_as_bearer_and_never_printed(
@@ -210,7 +231,8 @@ def test_cloud_plan_refusing_default_gate_still_applies_profiles() -> None:
             prof = state.profile(language, "Bothy way")
             assert prof is not None, language
             assert prof.parent == "Sonar way comprehensive"
-            assert prof.default is True
+            assert state.project_profiles[language] == "Bothy way"
+        assert state.project_gate == "Bothy way"
         checked = qs.check(_client(url, organization="example-org"), config)
         assert checked.problems == []
         assert checked.gaps == [qs.GATE_NOT_DEFAULT]
@@ -232,12 +254,89 @@ def test_main_reports_gap_and_passes_on_cloud(
         cloud=True, builtin_profile="Sonar way comprehensive", gate_default_forbidden=True
     )
     monkeypatch.setenv("SONAR_TOKEN", TOKEN)
+    monkeypatch.setenv("SONAR_PROJECT_KEY", PROJECT)
     with running(state) as url:
         args = ["--url", url, "--organization", "example-org"]
         assert qs.main(["apply", *args]) == 0
         assert qs.main(["check", *args]) == 0
     out = capsys.readouterr().out
     assert out.count("quality_sync: gap: gate not default: plan does not allow it") == 2
+
+
+def test_cloud_plan_refusing_project_assignment_is_a_gap_per_language() -> None:
+    state = State(
+        cloud=True,
+        builtin_profile="Sonar way comprehensive",
+        gate_default_forbidden=True,
+        profile_default_forbidden=True,
+        profile_project_forbidden=True,
+        gate_select_forbidden=True,
+    )
+    config = qs.load_config(REPO / "quality" / "sonar")
+    with running(state) as url:
+        applied = qs.apply(_client(url, organization=ORG), config)
+        assert applied.problems == []
+        # Every language was still tried, and each refusal names the server's reason.
+        assert len(_posts(state, "/api/qualityprofiles/add_project")) == len(CLOUD_LANGUAGES)
+        assert applied.gaps == [
+            qs.GATE_NOT_DEFAULT,
+            f"{qs.GATE_NOT_ON_PROJECT} (POST {url}/api/qualitygates/select: HTTP 403: "
+            "Insufficient privileges)",
+        ] + [
+            f"profile {lang}: {qs.PROFILE_NOT_ON_PROJECT} (POST {url}/api/qualityprofiles/"
+            f"add_project: HTTP 400: Organization '{ORG}' is not allowed to perform this action)"
+            for lang in CLOUD_LANGUAGES
+        ]
+        for language in CLOUD_LANGUAGES:
+            prof = state.profile(language, "Bothy way")
+            assert prof is not None, language
+            assert prof.parent == "Sonar way comprehensive"
+        checked = qs.check(_client(url, organization=ORG), config)
+        assert checked.problems == []
+        assert checked.gaps == [
+            qs.GATE_NOT_DEFAULT,
+            f"{qs.GATE_NOT_ON_PROJECT}: project uses the built-in gate 'Sonar way'",
+        ] + [
+            f"profile {lang}: {qs.PROFILE_NOT_ON_PROJECT}: project uses the built-in profile "
+            "'Sonar way comprehensive'"
+            for lang in CLOUD_LANGUAGES
+        ]
+
+
+def test_cloud_check_fails_when_project_uses_another_custom_setup() -> None:
+    state = State(cloud=True, builtin_profile="Sonar way comprehensive")
+    config = qs.load_config(REPO / "quality" / "sonar")
+    with running(state) as url:
+        qs.apply(_client(url, organization=ORG), config)
+        state.gates["Other gate"] = []
+        state.gate_ids["Other gate"] = "900"
+        state.project_gate = "Other gate"
+        state.project_profiles["go"] = "Sonar way comprehensive"
+        state.profile("go", "Sonar way comprehensive").builtin = False  # type: ignore[union-attr]
+        state.project_profiles["py"] = "Missing"
+        assert qs.check(_client(url, organization=ORG), config).problems == [
+            "gate 'Bothy way': project uses gate 'Other gate'",
+            "profile go: project uses profile 'Sonar way comprehensive', want 'Bothy way'",
+            "profile py: project uses no profile, want 'Bothy way'",
+        ]
+
+
+def test_cloud_needs_a_project_key(server: tuple[State, str]) -> None:
+    _, url = server
+    config = qs.load_config(REPO / "quality" / "sonar")
+    client = qs.Client(url, TOKEN, ORG)
+    for run in (qs.apply, qs.check):
+        with pytest.raises(qs.SonarError, match="project key"):
+            run(client, config)
+
+
+def test_server_mode_does_not_assign_to_a_project(server: tuple[State, str]) -> None:
+    state, url = server
+    config = qs.load_config(REPO / "quality" / "sonar")
+    qs.apply(qs.Client(url, TOKEN, None, PROJECT), config)
+    assert _posts(state, "/api/qualityprofiles/add_project") == []
+    assert _posts(state, "/api/qualitygates/select") == []
+    assert len(_posts(state, "/api/qualityprofiles/set_default")) == 6
 
 
 def test_server_refusing_default_gate_still_fails() -> None:
