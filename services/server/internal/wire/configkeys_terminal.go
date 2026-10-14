@@ -7,7 +7,8 @@ import "github.com/OWNER/bothy/services/server/internal/platform/config"
 // terminalConfigKeys returns the keys of the terminal module whose first consumer is M2-39: the
 // text limits of hosts and session users (docs/spec/03-data-model.md section 9), the validity
 // of a pairing code (24 section 17), and the validity of a session token, which sets the window
-// a retiring signing key of the purpose terminal stays usable (19 section 10).
+// a retiring signing key of the purpose terminal stays usable (19 section 10); and since M2-40 the
+// windows of the fresh step-up and of the quick reattach (24 section 17), read by authz.
 func terminalConfigKeys() []config.Key {
 	return []config.Key{
 		{
@@ -30,5 +31,18 @@ func terminalConfigKeys() []config.Key {
 			Doc:     "Validity of a session token of the terminal.",
 			Chapter: chapter24,
 		},
+		{
+			Name: "terminal.step_up_max_age", Kind: config.KindDuration, Default: sixtySeconds, Min: "1s",
+			Doc:     "How young the step-up of terminal.open and terminal.attach must be.",
+			Chapter: chapter24,
+		},
+		{
+			Name: "terminal.quick_reattach_window", Kind: config.KindDuration, Default: sixtySeconds, Min: "0s",
+			Doc:     "Reattaching from the same device needs no new step-up within this time after the detachment.",
+			Chapter: chapter24,
+		},
 	}
 }
+
+// sixtySeconds is the default of the step-up windows of the terminal (24 section 17).
+const sixtySeconds = "60s"

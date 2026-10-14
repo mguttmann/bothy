@@ -82,3 +82,12 @@ func (h Host) Apply(r Result, t time.Time) Host {
 	h.Version++
 	return h
 }
+
+// OwnSessionUser is a valid assignment of one person with the names its host reports (M2-40,
+// 07 SR12): the input of the session users in the rights state of the person.
+type OwnSessionUser struct {
+	ID, HostID ids.ID
+	OSUser     string
+	// HostReport is hosts.reported_session_users of the host.
+	HostReport []ReportedSessionUser
+}

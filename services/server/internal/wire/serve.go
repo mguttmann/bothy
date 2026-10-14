@@ -674,7 +674,12 @@ func (s *server) startIdentity(ctx context.Context) error {
 	if a == nil || az == nil || sy == nil || st == nil {
 		return errors.New("wire: the identity step needs the unit of work and recorder of audit, the appender of sync, the Authorizer and the instance settings")
 	}
-	id, err := NewIdentity(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender(), Settings: st.Admin, Flags: st.Admin}, pepper, s.deps.Clock, s.logger())
+	fresh, err := FreshStepUpCheck(s.values)
+	if err != nil {
+		return err
+	}
+	id, err := NewIdentity(cfg, pool, a.UoW(), az, IdentityWrites{Audit: a.Recorder(), Events: sy.Appender(), Settings: st.Admin, Flags: st.Admin,
+		Fresh: fresh}, pepper, s.deps.Clock, s.logger())
 	if err != nil {
 		return err
 	}

@@ -125,8 +125,21 @@ func startRoutes(bindings []authorize.RouteBinding, reg *authorize.Registry, cat
 	return mount()
 }
 
-// AuthzConfig binds authz.snapshot_cache_max_entries and auth.step_up_max_age into the
-// configuration of the Authorizer. The error names the key whose binding failed, never a value.
+// FreshStepUpCheck binds terminal.step_up_max_age into the fresh step-up check of authz (M2-40),
+// which identity uses for StepUp.ConsumeFresh, so the consumption and authorize judge with one
+// rule. The error names the key whose binding failed, never a value.
+func FreshStepUpCheck(v *config.Values) (authzapp.FreshCheck, error) {
+	var c authzapp.FreshCheck
+	if err := config.Bind(v, &c); err != nil {
+		return authzapp.FreshCheck{}, err
+	}
+	return c, nil
+}
+
+// AuthzConfig binds authz.snapshot_cache_max_entries, auth.step_up_max_age,
+// authz.view_as_max_duration and the terminal windows terminal.step_up_max_age and
+// terminal.quick_reattach_window (M2-40) into the configuration of the Authorizer. The error
+// names the key whose binding failed, never a value.
 func AuthzConfig(v *config.Values) (authzapp.AuthorizerConfig, error) {
 	var c authzapp.AuthorizerConfig
 	if err := config.Bind(v, &c); err != nil {

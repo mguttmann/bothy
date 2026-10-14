@@ -201,7 +201,7 @@ func TestVisibleByResourceKind(t *testing.T) {
 			t.Fatalf("%s: visible %v reason %q, want %v %q", c.name, got, reason, c.want, c.reason)
 		}
 	}
-	for _, kind := range []string{"terminal_session", "no_such_kind"} {
+	for _, kind := range []string{"no_such_kind"} {
 		if _, _, err := domain.Visible(base(kind, ids.New(), ids.ID{})); err == nil {
 			t.Fatalf("kind %s has a visibility rule", kind)
 		}

@@ -115,6 +115,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setAllAgentsBillingMode
   - setChannelOperator
   - setCredentialHolder
+  - setHostLlmCredentials
   - setHostState
   - setSpaceOperator
   - setThreadTags
@@ -599,9 +600,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: setChannelReadOnly
     milestone: M8
     ticket: M8-05
-  - operation_id: setHostLlmCredentials
-    milestone: M2
-    ticket: M2-40
   - operation_id: setImportCursor
     milestone: M8
     ticket: M8-03

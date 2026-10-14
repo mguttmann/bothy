@@ -666,18 +666,76 @@ func (s *Credentials) Credentials(_ context.Context, ref authz.CredentialRef) (a
 // compareIDs orders ids by their bytes, the creation order of UUIDv7.
 func compareIDs(a, b ids.ID) int { return slices.Compare(a[:], b[:]) }
 
-// Hosts is an in-memory authz.HostSource (M2-39).
+// Hosts is an in-memory authz.HostSource (M2-39) with the session users of M2-40. It counts the
+// calls of PersonalHosts and SessionUsersOf, so tests can see what the snapshot cache saves.
 type Hosts struct {
 	failer
-	mu   sync.Mutex
-	rows map[ids.ID]authz.HostFacts
+	mu    sync.Mutex
+	rows  map[ids.ID]authz.HostFacts
+	users map[ids.ID][]authz.SessionUserFact
+	calls struct{ personal, sessionUsers int }
 }
 
 // Compile-time check.
 var _ authz.HostSource = (*Hosts)(nil)
 
 // NewHosts returns an empty source.
-func NewHosts() *Hosts { return &Hosts{rows: map[ids.ID]authz.HostFacts{}} }
+func NewHosts() *Hosts {
+	return &Hosts{rows: map[ids.ID]authz.HostFacts{}, users: map[ids.ID][]authz.SessionUserFact{}}
+}
+
+// PutSessionUser adds or replaces the assignment of userID on f.HostID (one per host, 24 section
+// 2.2).
+func (s *Hosts) PutSessionUser(userID ids.ID, f authz.SessionUserFact) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	list := slices.DeleteFunc(s.users[userID], func(x authz.SessionUserFact) bool { return x.HostID == f.HostID })
+	s.users[userID] = append(list, f)
+}
+
+// RemoveSessionUser ends the assignment of userID on hostID.
+func (s *Hosts) RemoveSessionUser(userID, hostID ids.ID) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.users[userID] = slices.DeleteFunc(s.users[userID], func(x authz.SessionUserFact) bool { return x.HostID == hostID })
+}
+
+// Calls returns how often PersonalHosts and SessionUsersOf were called.
+func (s *Hosts) Calls() (personal, sessionUsers int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.calls.personal, s.calls.sessionUsers
+}
+
+// PersonalHosts implements authz.HostSource: the hosts with llm_credentials personal, ascending.
+func (s *Hosts) PersonalHosts(_ context.Context) ([]authz.HostFacts, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls.personal++
+	var out []authz.HostFacts
+	for _, id := range sortIDs(slices.Collect(maps.Keys(s.rows))) {
+		if s.rows[id].LLMCredentials == "personal" {
+			out = append(out, s.rows[id])
+		}
+	}
+	return out, nil
+}
+
+// SessionUsersOf implements authz.HostSource: the assignments of userID, ascending by host.
+func (s *Hosts) SessionUsersOf(_ context.Context, userID ids.ID) ([]authz.SessionUserFact, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.calls.sessionUsers++
+	out := slices.Clone(s.users[userID])
+	slices.SortFunc(out, func(a, b authz.SessionUserFact) int { return compareIDs(a.HostID, b.HostID) })
+	return out, nil
+}
 
 // Put adds or replaces the facts of f.ID.
 func (s *Hosts) Put(f authz.HostFacts) {

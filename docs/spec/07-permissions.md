@@ -394,6 +394,17 @@ Order and reason:
 - Guard rules last: they need the full context (level, run, thread) and apply to owners too,
   where they say so.
 
+Guard rules of the terminal in step 9 (M2-40), in this order, the first violation decides: SR10
+server host (`terminal_server_host_owner_only`), SR10 assignee (`terminal_not_host_assignee`), SR11
+(`i6_holder_only`), SR12 (`terminal_no_session_user`). Reason: the order of section 5 and
+[24-terminal.md](24-terminal.md), section 6.1 step 2; a server host is closed to every non-owner,
+assigned or not, so its reason names what would help (docs/DECISIONS.md D-M2-40-3). The guard rules
+run after the step-up: whoever has no fresh step-up learns `step_up_required` first. The atom
+`+terminal` of the requirement is effective `terminal` after 2.12 item 3 without the I6 exception
+for owners; an owner who is not the holder of a personal login fails at SR11. M2-44
+(`host_not_active`, `terminal_profile_unknown`) and M2-46 (`terminal_session_limit`) extend the
+list after it.
+
 Exception to the order: if the requirement of an action is `All(HumanSession, ...)` (`host.read`,
 `host.manage`, from M2-40 also `terminal.*`), `authorize` checks right after step 1 and before the
 rights state, resolution and visibility whether a person acts in a session; agents, apps and
@@ -454,10 +465,13 @@ the details; a test of the use case finds exactly one entry.
 1. Lock order according to 03, section 6.3 (`permission_version` first).
 2. Write the change.
 3. Determine the affected agents and owners (03, section 6.4).
-4. Compute I1 (SR1) and SR8 (last owner).
-5. Violated: rollback, response `409` with the problem code of the reason (`i1_violation` or
-   `last_owner`, decision `invariant_violation`) and a hint, an audit entry with
-   `decision = 'deny'` in a separate transaction.
+4. Compute I1 (SR1), I6 (SR11, for every host with `llm_credentials = 'personal'`, M2-40) and
+   SR8 (last owner).
+5. Violated: rollback, response `409` with the problem code of the reason (`i1_violation`,
+   `i6_violation` or `last_owner`, decision `invariant_violation`) and a hint, an audit entry with
+   `decision = 'deny'` in a separate transaction. With several violations the answer names
+   `last_owner` before `i1_violation` before `i6_violation`, and `conflicts` lists the entries of
+   that code (docs/DECISIONS.md D-M2-40-6).
 6. Otherwise: `access.changed` per affected principal, audit, commit.
 
 ### 4.5 Archived spaces and channels
@@ -635,7 +649,11 @@ Otherwise `terminal_not_host_assignee`. On a server host (`hosts.declared_server
 `hosts.reported_is_server_host`) only owners (`terminal_server_host_owner_only`); the host service
 additionally checks this against the claim `own` of the terminal session token. Checked on every
 open and attach and on every change of `assigned_user_id`, `dev_environment_id` or the owner status:
-if the condition no longer holds, the sessions end (`access_revoked`). Reason:
+if the condition no longer holds, the sessions end (`access_revoked`). If `updateHost` changes or
+clears the assignee, the same transaction ends the sessions of the previous assignee on the host,
+unless they are an active owner; sessions of owners and of the new assignee stay (M2-40). Only the
+previous assignee can lose SR10 through this change; SR10 refused every other non-owner before
+(docs/DECISIONS.md D-M2-40-10). Reason:
 [21-dev-isolation.md](21-dev-isolation.md) and ADR 0046 reject the OS user as the sole boundary
 between people; a shared home directory shares secrets and LLM logins (Ruling T1).
 
@@ -928,7 +946,7 @@ response contains:
 - per affected principal: added, removed and changed levels and capabilities,
 - the result of I1 and SR8 (whether the change would be rejected, with the hint "switch to
   organization first"),
-- hints: SR2 and SR3 block triggering, SR10 blocks a terminal
+- hints: SR2 and SR3 block triggering, SR10 or SR12 block a terminal
   (`terminal_not_effective`), H1 read horizon, a grant to a group reaches
   n people, expiry date missing for persons outside of groups (API: `hints`),
 - a text from templates (no model generates it), in the language of the caller (primary subtag of
@@ -951,6 +969,26 @@ Sam erhält bis 31.12.2026 die Stufe "Auslösen" im Kanal Marketing/Kampagnen.
 Sam kann damit: Nachrichten lesen und schreiben, Threads anlegen, Agent Texter auslösen.
 Dateien hochladen: nein. Freigabe-Karten bestätigen: nein.
 Hinweis: Texter liest auch Marketing/Intern. Sam darf Marketing/Intern nicht lesen, kann aber über Texter Inhalte daraus erfahren.
+```
+
+<!-- language-check: on -->
+
+A grant on a host (M2-40) shows as its effect, per person reached, the host with `before_level` and
+`after_level` `none` and `capabilities_added: [terminal]`; a violation of I6 is listed in
+`invariant_violations` with `allowed = false`. `terminal_not_effective` names `principal_id` for a
+person whom SR10 or SR12 would deny on the host after the change, and `group_id` and `count` for a
+group (members who would be denied; without such members no hint); with an I6 violation of the same
+host it is left out. The text has no line on capabilities and levels in the tree: summary, denial,
+I6, `terminal_not_effective` (for a person with the reason of the first violated rule: server host,
+assignee, session user), group, missing expiry date (docs/DECISIONS.md D-M2-40-11). Example (Sam is
+not the assignee of R1):
+
+<!-- language-check: off -->
+
+```text
+Sam erhält das Zusatzrecht "Terminal" auf dem Rechner R1.
+Hinweis: Die Freigabe wirkt für Sam nicht. Auf R1 öffnen nur Owner und die Person, der der Rechner zugewiesen ist, ein Terminal.
+Hinweis: Die Freigabe für Sam hat kein Ablaufdatum.
 ```
 
 <!-- language-check: on -->

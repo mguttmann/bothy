@@ -131,10 +131,10 @@ func TestHostRequirementEntries(t *testing.T) {
 			t.Errorf("%s is not gated by HumanSession", id)
 		}
 	}
-	for _, id := range []string{"host.pair", "host.connect", "terminal.open", "terminal.attach", "terminal.stream", "terminal.read_own", "terminal.close"} {
+	for _, id := range []string{"host.pair", "host.connect"} {
 		req, _ := domain.RequirementOf(id)
 		if _, deferred := req.Expr.DeferredTo(); !deferred {
-			t.Errorf("%s must stay deferred until M2-40 to M2-44", id)
+			t.Errorf("%s must stay deferred until M2-41 and M2-43", id)
 		}
 	}
 	if req, _ := domain.RequirementOf("terminal.terminate"); !req.Expr.IsSystem() {

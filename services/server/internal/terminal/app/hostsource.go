@@ -7,6 +7,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/terminal/domain"
 )
 
 // HostSource implements authz.HostSource over the store of the terminal module (02 section 4.3:
@@ -29,14 +30,49 @@ func (s HostSource) Host(ctx context.Context, id ids.ID) (authz.HostFacts, bool,
 	if err != nil || !found {
 		return authz.HostFacts{}, found, err
 	}
+	return hostFacts(h), true, nil
+}
+
+// hostFacts maps a host row to the facts of the source port, the name included (M2-40, only for
+// the preview text).
+func hostFacts(h domain.Host) authz.HostFacts {
 	f := authz.HostFacts{
 		ID: h.ID, State: string(h.State), AssignedUserID: h.AssignedUserID, LLMCredentials: h.LLMCredentials,
-		CredentialHolderID: h.CredentialHolderID, DeclaredServerHost: h.DeclaredServerHost,
+		CredentialHolderID: h.CredentialHolderID, DeclaredServerHost: h.DeclaredServerHost, Name: h.Name,
 	}
 	if h.ReportedIsServerHost != nil {
 		f.ReportedIsServerHost = *h.ReportedIsServerHost
 	}
-	return f, true, nil
+	return f
+}
+
+// PersonalHosts implements authz.HostSource (M2-40): the hosts with a personal LLM login.
+func (s HostSource) PersonalHosts(ctx context.Context) ([]authz.HostFacts, error) {
+	list, err := s.store.PersonalHosts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]authz.HostFacts, 0, len(list))
+	for _, h := range list {
+		out = append(out, hostFacts(h))
+	}
+	return out, nil
+}
+
+// SessionUsersOf implements authz.HostSource (M2-40, 07 SR12): the valid assignments of userID,
+// Reported by the exact comparison of the name with the names its host reports (24 section 5.3).
+func (s HostSource) SessionUsersOf(ctx context.Context, userID ids.ID) ([]authz.SessionUserFact, error) {
+	list, err := s.store.OwnSessionUsers(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]authz.SessionUserFact, 0, len(list))
+	for _, u := range list {
+		out = append(out, authz.SessionUserFact{
+			HostID: u.HostID, HostSessionUserID: u.ID, OSUser: u.OSUser, Reported: domain.Reports(u.HostReport, u.OSUser),
+		})
+	}
+	return out, nil
 }
 
 // HostIDs implements authz.HostSource.

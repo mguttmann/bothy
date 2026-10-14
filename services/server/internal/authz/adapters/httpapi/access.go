@@ -112,8 +112,8 @@ func previewREST(p authz.GrantPreview) rest.GrantPreview {
 			CapabilitiesAdded: capsREST(e.CapabilitiesAdded)})
 	}
 	for _, v := range p.InvariantViolations {
-		iv := rest.InvariantViolation{Code: v.Code, AgentId: optionalID(v.AgentID), CredentialHolderId: optionalID(v.CredentialHolderID),
-			Hint: optional(v.Hint), PrincipalIds: make([]rest.Uuid, 0, len(v.PrincipalIDs))}
+		iv := rest.InvariantViolation{Code: v.Code, AgentId: optionalID(v.AgentID), HostId: optionalID(v.HostID),
+			CredentialHolderId: optionalID(v.CredentialHolderID), Hint: optional(v.Hint), PrincipalIds: make([]rest.Uuid, 0, len(v.PrincipalIDs))}
 		for _, id := range v.PrincipalIDs {
 			iv.PrincipalIds = append(iv.PrincipalIds, rest.Uuid(id))
 		}

@@ -150,6 +150,17 @@ type SetHostState struct {
 	Reason  string
 }
 
+// SetLlmCredentials is the body of setHostLlmCredentials (schema HostLlmCredentialsSet) with the
+// host and its precondition (M2-40): LLMCredentials is none, personal or organization;
+// CredentialHolderID is set exactly with personal (zero: absent).
+type SetLlmCredentials struct {
+	HostID             ids.ID
+	IfMatch            Precondition
+	LLMCredentials     string
+	CredentialHolderID ids.ID
+	Reason             string
+}
+
 // PairingCodeIssued is the answer of createHost (schema HostPairingCode): the pairing code is
 // shown exactly once; Code prints "[redacted]" through fmt, slog and JSON, only the handler
 // reveals it.
@@ -226,4 +237,12 @@ type Hosts interface {
 	// ends its sessions in the same transaction. Errors: invalid_state_transition,
 	// precondition_required, version_conflict, validation_failed on /reason.
 	SetState(ctx context.Context, p actor.Actor, cmd SetHostState) (HostView, error)
+	// SetLlmCredentials declares the LLM login of the host (host.manage, 24 section 7.2, M2-40):
+	// switching to personal or changing the holder ends the sessions of every other person in the
+	// same transaction (i6_violation), and I6 rolls back a declaration that would leave a valid
+	// grant to another subject. The declaration the host has answers it unchanged (no_change).
+	// Errors: validation_failed (/reason, /credential_holder_id with required, not_allowed or
+	// unknown_user), precondition_required, version_conflict, conflict for a retired host,
+	// i6_violation with the conflicts.
+	SetLlmCredentials(ctx context.Context, p actor.Actor, cmd SetLlmCredentials) (HostView, error)
 }

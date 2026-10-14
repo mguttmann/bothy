@@ -139,6 +139,25 @@ documented in this file. The format is based on
   the person. `chat` is now the space part of the structure source of authz, and `SpaceView`
   reports the caller's effective level and capabilities.
 
+- Terminal rights (M2-40): `authorize` decides `terminal.open`, `terminal.attach`,
+  `terminal.stream`, `terminal.read_own` and `terminal.close` behind the gate of a person in a
+  session (agents, apps and personal tokens get `403 forbidden` with `subject_kind_not_allowed`).
+  Fresh step-up needs a passkey or device key confirmation not older than
+  `terminal.step_up_max_age` (new key, default `60s`) that no opening consumed, never in the web
+  console; `terminal.attach` of a detached session from the same device and login session within
+  `terminal.quick_reattach_window` (new key, default `60s`) needs none (`Decision.QuickReattach`).
+  The guards SR10 (server host, assignee), SR11 (I6, also against other owners) and SR12 (an own
+  session user the host reports, also for owners) map to `403 terminal_denied` with their
+  `reason`. `identity.StepUp.ConsumeFresh` consumes the step-up under the lock of the session
+  row, so one confirmation opens exactly one session. I6 is verified in every rights change
+  (`409 i6_violation` with `hint` and `conflicts` per host, deny entry with `host_id`).
+  `setHostLlmCredentials` declares the LLM login of a host (switching to `personal` or changing
+  the holder ends the sessions of other people with `i6_violation`); `updateHost` ends the
+  sessions of an old assignee who is not an owner; `RecordSessionUserReport` and
+  `ApplySessionUserReport` make the reported session users rights state for M2-41 and M2-43. The
+  preview of a grant on a host reports host effects, I6 violations and the hint
+  `terminal_not_effective` with German and English texts. New reason code
+  `terminal_no_session_user`.
 - Host records of the terminal module (M2-39): the migration `00028_terminal_hosts.sql` with
   `hosts`, `host_session_users` and `terminal_sessions` (the composite key of a session to the
   session user of its host and person) and the foreign key `grants.target_host_id`; the operations

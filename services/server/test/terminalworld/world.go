@@ -172,7 +172,17 @@ type World struct {
 	R1, R2, R3  ids.ID
 	SamR2Expiry time.Time
 	SamR2Grant  ids.ID
+	// Terminal is the terminal module of the world (M2-40: the report and the declaration use
+	// cases beside the handlers).
+	Terminal *wire.Terminal
 }
+
+// FreshAge and ReattachWindow are terminal.step_up_max_age and terminal.quick_reattach_window of
+// the world (M2-40).
+const (
+	FreshAge       = time.Minute
+	ReattachWindow = time.Minute
+)
 
 // New builds the world on a new database with the people, the group, the hosts and the grants.
 func New(t *testing.T) *World {
@@ -217,7 +227,8 @@ func NewEmpty(t *testing.T) *World {
 	hook, err := wire.NewRightsHook(pool, wire.RightsSources{Principals: principals, Structure: structure, Policies: policies, Hosts: hosts}, w.Clk, log)
 	must(t, err)
 	appender := w.units(hook, log)
-	az, err := authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: IDConfig.StepUpMaxAge}, authzapp.AuthorizerDeps{
+	az, err := authzapp.NewAuthorizer(authzapp.AuthorizerConfig{SnapshotCacheMaxEntries: 1000, StepUpMaxAge: IDConfig.StepUpMaxAge,
+		TerminalStepUpMaxAge: FreshAge, QuickReattachWindow: ReattachWindow}, authzapp.AuthorizerDeps{
 		Catalog: authzapp.NewCatalog(log), Store: authzpg.NewRepository(pool), Principals: principals,
 		Credentials: w.creds, Structure: structure, Policies: policies, Hosts: hosts,
 		Versions: instanceapp.NewVersions(instancepg.NewRepository(pool)), Recorder: w.Rec, Clock: w.Clk, Log: log,
@@ -237,6 +248,7 @@ func NewEmpty(t *testing.T) *World {
 	must(t, err)
 	tm, err := wire.NewTerminal(HostConfig, pool, w.uow, az, wire.IdentityWrites{Audit: w.Audit, Events: appender}, w.Identity, w.Clk, log)
 	must(t, err)
+	w.Terminal = tm
 	w.harness(wire.Handlers{Hosts: tm.Handlers, Access: authzhttp.New(admin), People: w.Identity.PeopleHandlers})
 	return w
 }
@@ -348,7 +360,24 @@ func (w *World) Session(name string, id ids.ID, stepUp time.Time) {
 	s, d := ids.New(), ids.New()
 	w.creds.fake.PutDevice(d, fake.Device{PrincipalID: id, State: authz.DeviceActive})
 	w.creds.fake.PutSession(s, fake.Session{PrincipalID: id, DeviceID: d, ExpiresAt: Start.Add(365 * 24 * time.Hour)})
-	w.Actors.Set(name, httpservertest.InSession(id, s, d, stepUp))
+	a := httpservertest.InSession(id, s, d, stepUp)
+	// A session of the app with a step-up by the device key (M2-40: the fresh step-up of the
+	// terminal reads both).
+	a.ClientComponent = "app"
+	if !stepUp.IsZero() {
+		a.StepUpMethod = "device_key"
+	}
+	w.Actors.Set(name, a)
+}
+
+// Actor returns the principal registered under name (M2-40: the terminal tests authorize with it).
+func (w *World) Actor(name string) actor.Actor {
+	w.t.Helper()
+	a := w.Actors.Get(name)
+	if a.ID.IsZero() {
+		w.t.Fatalf("no actor %s", name)
+	}
+	return a
 }
 
 // PersonalToken registers token name as a personal API token of the person id (SR5).

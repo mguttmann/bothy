@@ -248,6 +248,25 @@ Principals, people, owners, login drivers, identities, local credentials, enroll
   the binding to one session, pending device, no `step_up` key, no secrets in logs and audit,
   and the cleanup. Rulings: docs/DECISIONS.md M1-35.
 
+### Fresh step-up of the terminal (M2-40)
+
+- Port: `StepUp.ConsumeFresh(ctx, a)` consumes the step-up "frisch" of one terminal opening (08
+  section 6.3 point 4). It runs only inside the caller's unit of work (M2-44 calls it in the
+  transactions of `openTerminalSession` and `attachTerminalSession`), locks the session row
+  (`LockSessionForStepUpConsumption`, the first domain row lock of the action), answers `401
+  session_revoked` for a revoked or ended session, checks the freshness again on the locked row
+  with the rule of `authorize` (`authz.FreshStepUpCheck`, bound in `internal/wire` with
+  `terminal.step_up_max_age`) and sets `step_up_consumed_at` (`ConsumeStepUp`). A stale step-up is
+  `401 step_up_required`; the audit reason of the caller is `ReasonStepUpNotFresh`. It writes no
+  event and no audit entry.
+- The Authenticator reads `step_up_consumed_at` in its one lookup query into
+  `actor.Actor.StepUpConsumedAt`, so the next request after an opening carries the consumption;
+  other step-up actions never read it.
+- Tests: `adapters/httpapi/freshstepup_test.go` over PostgreSQL 18 with the real Authenticator:
+  `TestIDT28_PasswordTotpAndOidcStepUp`, `TestIDT28_StepUpTooOld`,
+  `TestIDT28_TwoOpeningsNeedTwoConfirmations`, `TestIDT28_ConcurrentOpeningsOneConfirmation` and
+  `TestConsumeFresh_Rules` (ID-T28 without the console part, which M6-18 adds).
+
 ### Identity providers and identities (M1-36)
 
 - Port (`providers.go`): `Providers` (`List`, `Get` authorize `identity_provider.read`; `Create`,

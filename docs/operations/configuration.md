@@ -808,11 +808,11 @@ Source: [24-terminal.md](../spec/24-terminal.md), section 17.
 | `terminal.pairing_code_ttl` | `BOTHY_TERMINAL__PAIRING_CODE_TTL` | Server | duration | `15m` | Validity of a pairing code for a host | active |
 | `terminal.fingerprint_confirm_chars` | `BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS` | Server |  | `8` | this many characters of the fingerprint the owner types for the confirmation | planned (M2) |
 | `terminal.fingerprint_max_attempts` | `BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS` | Server |  | `3` | failed attempts at the confirmation, then fallback to `pairing` | planned (M2) |
-| `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server |  | `60s` | the step-up for `terminal.open` and `terminal.attach` must be at most this old | planned (M2) |
+| `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server | duration | `60s` | the step-up for `terminal.open` and `terminal.attach` must be at most this old | active |
 | `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | duration | `30s` | Validity of a terminal session token | active |
 | `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server |  | `20s` | Deadline until both sides are connected in the relay and the handshake is complete | planned (M2) |
 | `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server |  | `15m` | this long a detached session stays attachable | planned (M2) |
-| `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server |  | `60s` | Reattach from the same device without a new step-up within this time after the detach | planned (M2) |
+| `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server | duration | `60s` | Reattach from the same device without a new step-up within this time after the detach | active |
 | `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server |  | `30m` | without input from the device for this long, the session ends | planned (M2) |
 | `terminal.idle_grace` | `BOTHY_TERMINAL__IDLE_GRACE` | Server |  | `2m` | Extra time after which the server itself ends the session because of idleness | planned (M2) |
 | `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server |  | `12h` | Maximum duration of a session | planned (M2) |

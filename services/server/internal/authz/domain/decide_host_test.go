@@ -127,7 +127,7 @@ func TestDecide_Rules(t *testing.T) {
 		}
 	}
 	// A deferred requirement never decides.
-	in := input(t, "terminal.open", "host", person, domain.Rights{Owner: true})
+	in := input(t, "host.connect", "host", person, domain.Rights{Owner: true})
 	in.Host = &domain.HostFacts{Visible: true}
 	if _, err := domain.Decide(in); err == nil {
 		t.Fatal("a deferred requirement decided")

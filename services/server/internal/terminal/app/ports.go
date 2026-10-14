@@ -57,6 +57,17 @@ type Store interface {
 	// CloseSession closes the session id as the server with reason at at: closed_at,
 	// close_reason, detached_at cleared, no detail, no closer, version raised.
 	CloseSession(ctx context.Context, id ids.ID, reason domain.CloseReason, at time.Time) error
+	// UpdateLlmCredentials writes the declaration d of the host id with llm_credentials_declared_by
+	// = by, llm_credentials_declared_at = at and version; credential_holder_id is NULL unless
+	// personal (M2-40).
+	UpdateLlmCredentials(ctx context.Context, id ids.ID, d domain.Declaration, by ids.ID, at time.Time, version int64) error
+	// PersonalHosts returns the hosts with llm_credentials = personal, ascending (M2-40).
+	PersonalHosts(ctx context.Context) ([]domain.Host, error)
+	// UpdateReportedSessionUsers writes reported_session_users of the host id and version (M2-40).
+	UpdateReportedSessionUsers(ctx context.Context, id ids.ID, report []domain.ReportedSessionUser, version int64) error
+	// OwnSessionUsers returns the valid assignments of userID with the names their hosts report,
+	// ascending by host (M2-40, 07 SR12).
+	OwnSessionUsers(ctx context.Context, userID ids.ID) ([]domain.OwnSessionUser, error)
 }
 
 // PairingCodes issues pairing codes of hosts; internal/wire binds it to identity.Tokens
@@ -77,6 +88,9 @@ type UserFacts struct {
 type People interface {
 	// User returns the facts of the principal id; found is false for an unknown id.
 	User(ctx context.Context, id ids.ID) (f UserFacts, found bool, err error)
+	// IsActiveOwner reports a person with an active owners row and status active (M2-40, SR10 on a
+	// change of the assignee); false for an unknown id. It calls no authorize.
+	IsActiveOwner(ctx context.Context, userID ids.ID) (bool, error)
 }
 
 // Presence reports whether the control connection of a host is open (24 section 3.4). Until

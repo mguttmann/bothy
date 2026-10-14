@@ -64,11 +64,19 @@ const (
 	actionTokenCreate = "token.create"
 )
 
-// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke and token.create.
-// The delegation limits of grant.create and grant.revoke belong to the requirement
-// (decideDelegation). Other actions have no guard in M1.
+// guards applies the guards of the action (07 section 4.2 step 9): agent.invoke, token.create and
+// the terminal guards SR10, SR11 and SR12 of terminal.open and terminal.attach (M2-40). The
+// delegation limits of grant.create and grant.revoke belong to the requirement (decideDelegation).
 func guards(in *Input) (Decision, error) {
 	switch in.Action {
+	case ActionTerminalOpen, ActionTerminalAttach:
+		if in.Terminal == nil {
+			return Decision{}, internalError(in.Action + " without its terminal facts")
+		}
+		if r, ok := TerminalGuard(*in.Terminal); !ok {
+			return deny(OutcomeForbidden, r), nil
+		}
+		return Allow, nil
 	case actionTokenCreate:
 		if in.Token == nil {
 			return Decision{}, internalError("token.create without the holder")

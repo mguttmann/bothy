@@ -22,10 +22,13 @@ const (
 	OutcomeUnauthenticated    Outcome = "unauthenticated"
 )
 
-// Decision is an outcome with its reason; the empty Reason belongs to allow.
+// Decision is an outcome with its reason; the empty Reason belongs to allow. QuickReattach is true
+// exactly when the step-up rule of a "frisch" action was waived by the quick reattach (M2-40):
+// the use case then consumes no step-up.
 type Decision struct {
-	Outcome Outcome
-	Reason  Reason
+	Outcome       Outcome
+	Reason        Reason
+	QuickReattach bool
 }
 
 // Allow is the allowing decision.
@@ -155,9 +158,17 @@ type PreviewFacts struct {
 // HostFacts are the facts of a host resource (M2-39, 07 section 2.12), computed by the
 // application layer from the snapshots of the principal and of "view as": Visible is the
 // visibility of the host (owner, holder or terminal), Assignee and Terminal the atoms of the
-// requirement after the "view as" intersection.
+// requirement after the "view as" intersection. The remaining fields are the stored facts of the
+// host that the guards SR10 and SR11 read (M2-40); for a terminal_session they describe its host.
 type HostFacts struct {
 	Visible, Assignee, Terminal bool
+	// ID is the host; AssignedUserID its assignee (zero: none).
+	ID, AssignedUserID ids.ID
+	// LLMCredentials is none, personal or organization; CredentialHolderID is set with personal.
+	LLMCredentials     string
+	CredentialHolderID ids.ID
+	// DeclaredServerHost and ReportedIsServerHost mark the server host (24 section 2.3).
+	DeclaredServerHost, ReportedIsServerHost bool
 }
 
 // TargetFacts are the facts of the second target (thread.move).
@@ -212,8 +223,20 @@ type Input struct {
 	Grant                                                      *GrantFacts
 	Invoke                                                     *InvokeFacts
 	Token                                                      *TokenFacts
-	// Host are the facts of a host resource; nil for every other kind.
+	// Host are the facts of a host resource, and of the host of a terminal_session; nil for every
+	// other kind.
 	Host *HostFacts
+	// Fresh are the step-up facts of the session for a "frisch" action (05 section 2.4); FreshMaxAge
+	// is terminal.step_up_max_age and ReattachWindow terminal.quick_reattach_window (M2-40).
+	Fresh          FreshFacts
+	FreshMaxAge    time.Duration
+	ReattachWindow time.Duration
+	// Reattach are the facts of the quick reattach of terminal.attach; nil for every other action.
+	Reattach *ReattachFacts
+	// Terminal are the facts of the guards of terminal.open and terminal.attach; nil otherwise.
+	Terminal *TerminalGuardFacts
+	// quickReattach records that step 8 passed through the quick reattach.
+	quickReattach bool
 }
 
 // GateHumanSession is the gate of 07 section 4.2 for a requirement gated by HumanSession
@@ -250,7 +273,11 @@ func Decide(in Input) (Decision, error) {
 	if d, done := decidePrincipalRules(&in); done {
 		return d, nil
 	}
-	return guards(&in)
+	d, err := guards(&in)
+	if err == nil && d.Outcome == OutcomeAllow {
+		d.QuickReattach = in.quickReattach
+	}
+	return d, err
 }
 
 // decideVisibility is step 5: no visibility gives not_found; a pending device lists only itself.
@@ -331,6 +358,9 @@ func decidePrincipalRules(in *Input) (Decision, bool) {
 	if p.Kind != KindUser || !p.HasSession {
 		return deny(OutcomeForbidden, ReasonStepUpNotPossible), true
 	}
+	if in.Spec.StepUpFresh {
+		return decideFresh(in)
+	}
 	if in.StepUpWaived {
 		// The first setup needs only a human with a session (07 section 4.2 step 8).
 		return Decision{}, false
@@ -339,6 +369,21 @@ func decidePrincipalRules(in *Input) (Decision, bool) {
 		return deny(OutcomeStepUpRequired, ReasonStepUpRequired), true
 	}
 	return Decision{}, false
+}
+
+// decideFresh is step 8 for an action with step-up "frisch" (05 section 2.4, 08 section 6.3; M2-40):
+// only this branch, never the one of auth.step_up_max_age. The quick reattach of terminal.attach
+// passes without step-up and is recorded for the decision; otherwise the step-up must be fresh and
+// unconsumed (FreshStepUp), else step_up_required with terminal_step_up_not_fresh.
+func decideFresh(in *Input) (Decision, bool) {
+	if in.Reattach != nil && QuickReattach(*in.Reattach, in.Now, in.ReattachWindow) {
+		in.quickReattach = true
+		return Decision{}, false
+	}
+	if FreshStepUp(in.Fresh, in.Now, in.FreshMaxAge) {
+		return Decision{}, false
+	}
+	return deny(OutcomeStepUpRequired, ReasonTerminalStepUpNotFresh), true
 }
 
 // evaluator evaluates a requirement with the rights eff. noWrite forces Level(write) and

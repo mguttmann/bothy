@@ -23,8 +23,12 @@ type noHosts struct{}
 func (noHosts) Host(context.Context, ids.ID) (authz.HostFacts, bool, error) {
 	return authz.HostFacts{}, false, nil
 }
-func (noHosts) HostIDs(context.Context) ([]ids.ID, error)            { return nil, nil }
-func (noHosts) AssignedTo(context.Context, ids.ID) ([]ids.ID, error) { return nil, nil }
+func (noHosts) HostIDs(context.Context) ([]ids.ID, error)                { return nil, nil }
+func (noHosts) AssignedTo(context.Context, ids.ID) ([]ids.ID, error)     { return nil, nil }
+func (noHosts) PersonalHosts(context.Context) ([]authz.HostFacts, error) { return nil, nil }
+func (noHosts) SessionUsersOf(context.Context, ids.ID) ([]authz.SessionUserFact, error) {
+	return nil, nil
+}
 
 // hostsOrNone returns h, or noHosts for nil.
 func hostsOrNone(h authz.HostSource) authz.HostSource {
@@ -67,7 +71,9 @@ func hostFacts(s *actingPrincipal, h authz.HostFacts) *domain.HostFacts {
 		vv, va, vt := hostView(s.viewAs.snap, s.viewAs.key.principal, h)
 		visible, assignee, terminal = visible && vv, (assignee || s.entry.snap.Owner) && va, terminal && vt
 	}
-	return &domain.HostFacts{Visible: visible, Assignee: assignee, Terminal: terminal}
+	f := hostGuardFacts(h)
+	f.Visible, f.Assignee, f.Terminal = visible, assignee, terminal
+	return &f
 }
 
 // hostSet is the set of hosts one snapshot reads: every host for an effective owner (all), else

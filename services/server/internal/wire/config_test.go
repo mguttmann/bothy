@@ -31,6 +31,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		got[k.Name] = k
 	}
 	want := map[string]config.Key{
+		"terminal.step_up_max_age":             {Kind: config.KindDuration, Default: "60s", Min: "1s", Chapter: "24-terminal.md"},
+		"terminal.quick_reattach_window":       {Kind: config.KindDuration, Default: "60s", Min: "0s", Chapter: "24-terminal.md"},
 		"audit.reason_max_chars":               {Kind: config.KindInt, Default: "500", Min: "1", Chapter: "19-security.md"},
 		"host.name_max_chars":                  {Kind: config.KindInt, Default: "100", Min: "1", Chapter: "03-data-model.md"},
 		"host.os_user_max_chars":               {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-data-model.md"},

@@ -42,8 +42,8 @@ class Problem:
                 first.
             errors (list[FieldError] | Unset): Field errors for `validation_failed`.
             current (JsonObject | Unset): Free-form JSON object whose schema is named in the field description.
-            conflicts (list[InvariantViolation] | Unset): One entry per affected agent; present with `i1_violation`
-                (10-backend-policy, 5.4).
+            conflicts (list[InvariantViolation] | Unset): Present with `i1_violation` (one entry per agent, 10-backend-
+                policy, 5.4) and `i6_violation` (one entry per host, 24, 7.3).
     """
 
     type_: str

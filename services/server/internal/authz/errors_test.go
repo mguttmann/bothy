@@ -101,3 +101,30 @@ func TestInvariantError_WithHint(t *testing.T) {
 		t.Fatalf("the original changed: %q", o.Hint)
 	}
 }
+
+// TestInvariantError_I6 (M2-40, Design note 9): kind invariant_violation, code i6_violation, the
+// hint, and the conflicts sorted by host with host_id, credential_holder_id, sorted principal_ids
+// and the hint per entry; an empty principal list stays an array.
+func TestInvariantError_I6(t *testing.T) {
+	t.Parallel()
+	a := sortedIDs(5)
+	host1, host2, holder, p1, p2 := a[0], a[1], a[2], a[3], a[4]
+	err := authz.NewI6Violation([]authz.I6Conflict{
+		{HostID: host2, CredentialHolderID: holder},
+		{HostID: host1, CredentialHolderID: holder, PrincipalIDs: []ids.ID{p2, p1}},
+	})
+	e, ok := errs.As(error(err))
+	if !ok || e.Code != errs.CodeI6Violation || e.Kind() != errs.KindInvariantViolation || e.Hint != authz.HintI6 || e.Reason != "i6_violation" {
+		t.Fatalf("errs view %+v ok %v", e, ok)
+	}
+	raw, mErr := json.Marshal(err.ProblemExtensions())
+	if mErr != nil {
+		t.Fatal(mErr)
+	}
+	want := `{"conflicts":[{"code":"i6_violation","host_id":"` + host1.String() + `","credential_holder_id":"` + holder.String() +
+		`","principal_ids":["` + p1.String() + `","` + p2.String() + `"],"hint":"` + authz.HintI6 + `"},{"code":"i6_violation","host_id":"` +
+		host2.String() + `","credential_holder_id":"` + holder.String() + `","principal_ids":[],"hint":"` + authz.HintI6 + `"}]}`
+	if string(raw) != want {
+		t.Fatalf("conflicts\n got %s\nwant %s", raw, want)
+	}
+}

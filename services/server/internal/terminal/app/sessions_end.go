@@ -15,9 +15,11 @@ import (
 )
 
 // SessionSelector names the sessions EndSessions ends: those of HostID, of UserID or, with a zero
-// UserID, of every person.
+// UserID, of every person, except those of ExceptUserID (zero: nobody excepted; M2-40, the end of
+// foreign sessions under I6).
 type SessionSelector struct {
 	HostID, UserID ids.ID
+	ExceptUserID   ids.ID
 }
 
 // EndSessions ends the open sessions of sel with reason as the server, inside the caller's unit of
@@ -45,7 +47,12 @@ func (s *Service) EndSessions(ctx context.Context, sel SessionSelector, reason d
 	// The server ends the session: the audit entry has no actor (system, 05 rule 1.10), the
 	// correlation of the request stays.
 	sys := actor.WithActor(ctx, actor.Anonymous())
+	n := 0
 	for _, ses := range open {
+		if !sel.ExceptUserID.IsZero() && ses.UserID == sel.ExceptUserID {
+			continue
+		}
+		n++
 		if err := s.d.Store.CloseSession(ctx, ses.ID, reason, t); err != nil {
 			return 0, err
 		}
@@ -60,5 +67,5 @@ func (s *Service) EndSessions(ctx context.Context, sel SessionSelector, reason d
 			return 0, err
 		}
 	}
-	return len(open), nil
+	return n, nil
 }

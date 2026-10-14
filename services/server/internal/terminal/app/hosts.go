@@ -352,6 +352,9 @@ func (s *Service) updateWrite(ctx context.Context, a actor.Actor, cmd terminal.U
 		return terminal.HostView{}, err
 	}
 	name, holder := b.newName(h.Name), b.newHolder(h.AssignedUserID)
+	if err := s.endOldAssignee(ctx, h, holder); err != nil {
+		return terminal.HostView{}, err
+	}
 	if name != h.Name || holder != h.AssignedUserID {
 		if err := s.record(ctx, h.ID, updateAttrs(h, name, holder, b.reason)); err != nil {
 			return terminal.HostView{}, err
@@ -368,6 +371,23 @@ func (s *Service) updateWrite(ctx context.Context, a actor.Actor, cmd terminal.U
 	}
 	v := s.view(ctx, st)
 	return v, s.emitUpdated(ctx, v)
+}
+
+// endOldAssignee ends the sessions SR10 no longer allows when the assignee of h changes to holder
+// or is cleared (07 SR10, Design note 11 of M2-40): those of the old assignee, unless the old
+// assignee is an active owner, with access_revoked in the same transaction. Only the old assignee
+// can lose SR10 by this change; owners and the new assignee keep their sessions.
+func (s *Service) endOldAssignee(ctx context.Context, h domain.Host, holder ids.ID) error {
+	old := h.AssignedUserID
+	if old.IsZero() || old == holder {
+		return nil
+	}
+	owner, err := s.d.People.IsActiveOwner(ctx, old)
+	if err != nil || owner {
+		return err
+	}
+	_, err = s.EndSessions(ctx, SessionSelector{HostID: h.ID, UserID: old}, domain.CloseAccessRevoked)
+	return err
 }
 
 // applyPlan ends the listed assignments with the sessions of their people (access_revoked, SR12)
