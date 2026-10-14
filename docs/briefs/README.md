@@ -7,9 +7,9 @@ tests to write first, the acceptance criteria and the report format. Order and d
 from the [plan](../PLAN.md) (section "Tickets" of each milestone); this index repeats them for
 the launcher.
 
-Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2 to M6. By the
-owner's decisions of 2026-10-11 and 2026-10-13 the briefs of M2 to M6 are written before M1
-closes, so that builds do not run out of work (D-W-100, D-W-114 and D-W-120 in
+Briefs exist for milestone M1 (plan ticket M0-05) and for the milestones M2 to M6 and M8. By the
+owner's decisions of 2026-10-11, 2026-10-13 and 2026-10-14 the briefs of M2 to M6 and M8 are written
+before M1 closes, so that builds do not run out of work (D-W-100, D-W-114, D-W-120 and D-W-124 in
 [DECISIONS.md](../DECISIONS.md)): they name interfaces of earlier milestones as those briefs and
 the merged code name them, and each carries the boundary that a build session follows merged
 code that differs only in names and stops with `Verdict: BLOCKED` where it behaves differently
@@ -86,8 +86,8 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 2 | M1-03, M1-04, M1-05, M2-38, M4-01, M6-10 |
 | 3 | M1-06, M1-07, M1-17, M1-74, M3-17, M4-04, M4-06, M4-08, M4-10 |
 | 4 | M1-08, M1-09, M1-22, M2-23, M3-01, M4-02, M4-05, M4-11, M4-12, M4-16, M5-01 |
-| 5 | M1-10, M1-12, M3-02, M4-07, M4-09, M4-15, M6-11 |
-| 6 | M1-11, M1-13, M4-13, M6-12 |
+| 5 | M1-10, M1-12, M3-02, M4-07, M4-09, M4-15, M6-11, M8-01 |
+| 6 | M1-11, M1-13, M4-13, M6-12, M8-02 |
 | 7 | M1-14, M1-15, M1-18, M1-23, M1-26, M4-14 |
 | 8 | M1-16, M1-19, M1-21, M1-24, M1-25, M1-27, M4-17 |
 | 9 | M1-20, M1-28, M2-01, M4-18 |
@@ -104,7 +104,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 20 | M1-59, M1-61 |
 | 21 | M1-62, M1-63, M3-18 |
 | 22 | M1-64, M1-71 |
-| 23 | M1-65, M6-01 |
+| 23 | M1-65, M6-01, M8-10 |
 | 24 | M1-66, M1-70, M1-72, M2-07, M6-02 |
 | 25 | M1-67, M1-68, M2-20 |
 | 26 | M1-69, M2-21, M2-43 |
@@ -114,13 +114,13 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 30 | M2-06, M2-27, M2-48, M3-10, M3-11, M4-22, M6-07 |
 | 31 | M2-08, M6-08, M6-09, M6-18 |
 | 32 | M2-09, M2-16 |
-| 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19, M3-19 |
-| 34 | M2-11, M2-22, M2-25, M2-29, M3-20, M3-21, M3-23 |
+| 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19, M3-19, M8-03 |
+| 34 | M2-11, M2-22, M2-25, M2-29, M3-20, M3-21, M3-23, M8-08 |
 | 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24, M4-30, M6-13 |
-| 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22, M4-33, M6-15 |
-| 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23, M6-05 |
-| 38 | M4-24, M5-02, M6-06, M6-14 |
-| 39 | M4-32, M4-34, M4-36, M5-03, M5-04 |
+| 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22, M4-33, M6-15, M8-11 |
+| 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23, M6-05, M8-04 |
+| 38 | M4-24, M5-02, M6-06, M6-14, M8-05, M8-06 |
+| 39 | M4-32, M4-34, M4-36, M5-03, M5-04, M8-07 |
 | 40 | M4-38, M5-05, M5-06, M5-07, M5-08, M5-09, M6-16 |
 | 41 | M5-10, M5-11, M6-17 |
 | 42 | M5-12 |
@@ -130,7 +130,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 
 Dependencies are minimal: a ticket implied through another dependency is not repeated. Brief files
 are added by the brief-writing steps (plan ticket M0-05 for M1, D-W-100 for M2 and M3, D-W-114 for
-M4, D-W-120 for M5 and M6) under the
+M4, D-W-120 for M5 and M6, D-W-124 for M8) under the
 names listed here.
 
 | Wave | ID | Title | Brief file | Depends on |
@@ -352,6 +352,16 @@ names listed here.
 | 40 | M6-16 | Visualizations in the desktop app, console and mobile | `M6-16-viz-in-apps.md` | M5-03, M6-04, M6-06, M6-12, M6-14, M6-15 |
 | 41 | M6-17 | Optional Grafana embedding in the console | `M6-17-console-grafana-embed.md` | M6-16 |
 | 31 | M6-18 | Terminal in the console (ADR 0070) | `M6-18-console-terminal.md` | M2-48, M4-35, M4-37, M6-04 |
+| 5 | M8-01 | Discord read client with pure GET | `M8-01-discord-read-client.md` | M1-22 |
+| 6 | M8-02 | CDN fetch with host allow list | `M8-02-cdn-fetch.md` | M8-01 |
+| 33 | M8-03 | Import interface in the server | `M8-03-import-server.md` | M2-09 |
+| 37 | M8-04 | Import tool: dry run, apply, report | `M8-04-import-tool.md` | M8-02, M8-10, M8-11 |
+| 38 | M8-05 | Read mirror with settle rule | `M8-05-read-mirror.md` | M8-04 |
+| 38 | M8-06 | Binding of imported session references | `M8-06-session-binding-import.md` | M2-22, M2-34, M8-04 |
+| 39 | M8-07 | Switchover and revert per channel | `M8-07-switch-revert.md` | M8-05, M8-06 |
+| 34 | M8-08 | Import overview in the console | `M8-08-import-console.md` | M6-04, M8-03 |
+| 23 | M8-10 | Login and API client of the import tool | `M8-10-import-login-client.md` | M1-38, M1-71 |
+| 36 | M8-11 | Thread, message, pin and file items of the import interface | `M8-11-import-content-items.md` | M1-59, M2-18, M3-07, M3-13, M8-03 |
 
 ## Make targets created by tickets
 
@@ -1000,4 +1010,25 @@ flowchart TB
   M4_35 --> M6_18
   M4_37 --> M6_18
   M6_04 --> M6_18
+  M1_22 --> M8_01
+  M8_01 --> M8_02
+  M2_09 --> M8_03
+  M8_02 --> M8_04
+  M8_10 --> M8_04
+  M8_11 --> M8_04
+  M8_04 --> M8_05
+  M2_22 --> M8_06
+  M2_34 --> M8_06
+  M8_04 --> M8_06
+  M8_05 --> M8_07
+  M8_06 --> M8_07
+  M6_04 --> M8_08
+  M8_03 --> M8_08
+  M1_38 --> M8_10
+  M1_71 --> M8_10
+  M1_59 --> M8_11
+  M2_18 --> M8_11
+  M3_07 --> M8_11
+  M3_13 --> M8_11
+  M8_03 --> M8_11
 ```
