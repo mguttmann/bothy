@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -170,7 +171,7 @@ func TestHTTPOperationCarriesEveryField(t *testing.T) {
 		h := HTTPOperation(op)
 		if h.ID != op.ID || h.Method != op.Method || h.Path != op.Path || h.Pattern != op.Pattern || h.Action != op.Action || h.RateLimitClass != op.RateLimitClass ||
 			h.Public != op.Public || h.IdempotencyKey != op.IdempotencyKey || int(h.IfMatch) != int(op.IfMatch) ||
-			int(h.RequestBody) != int(op.RequestBody) || h.BodyRequired != op.BodyRequired {
+			int(h.RequestBody) != int(op.RequestBody) || h.BodyRequired != op.BodyRequired || !slices.Equal(h.ETagStatuses, op.ETagStatuses) {
 			t.Errorf("%+v -> %+v", op, h)
 		}
 	}

@@ -398,6 +398,7 @@ services/server/
     kernel/                   cross-cutting ports (section 4.5), without dependencies within the project
     platform/                 technology without domain logic
       config/ secrets/ pg/ httpserver/ ratelimit/ jobs/ otel/ health/ lifecycle/ egress/ buildinfo/
+      jsoncanon/
     wire/                     wiring per role, registration of the in-tx subscribers
     <module>/                 port (root package)
       domain/

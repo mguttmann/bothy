@@ -275,6 +275,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"sync.event_log_partitions_ahead = 3  # default\n" +
 		"sync.event_payload_max_bytes = 65536  # default\n" +
 		"sync.event_retention = 30d  # default\n" +
+		"sync.idempotency_cleanup_batch_size = 1000  # default\n" +
+		"sync.idempotency_cleanup_interval = 1h  # default\n" +
+		"sync.idempotency_key_ttl = 1d  # default\n" +
 		"sync.log_poll_interval = 1s  # default\n" +
 		"sync.partition_maintenance_interval = 10m  # default\n" +
 		"sync.tail_batch_size = 1000  # default\n" +

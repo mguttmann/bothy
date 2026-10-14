@@ -1435,6 +1435,42 @@
       "doc": "How long durable events stay available for catch-up before their partition is detached."
     },
     {
+      "name": "sync.idempotency_cleanup_batch_size",
+      "env": "BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE",
+      "kind": "int",
+      "default": "1000",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "2147483647",
+      "chapter": "02-architecture.md",
+      "doc": "Rows per delete batch of the job sync.idempotency_cleanup."
+    },
+    {
+      "name": "sync.idempotency_cleanup_interval",
+      "env": "BOTHY_SYNC__IDEMPOTENCY_CLEANUP_INTERVAL",
+      "kind": "duration",
+      "default": "1h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "Interval of the job sync.idempotency_cleanup."
+    },
+    {
+      "name": "sync.idempotency_key_ttl",
+      "env": "BOTHY_SYNC__IDEMPOTENCY_KEY_TTL",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "04-sync-protocol.md",
+      "doc": "How long an Idempotency-Key and its stored response stay valid per principal."
+    },
+    {
       "name": "sync.log_poll_interval",
       "env": "BOTHY_SYNC__LOG_POLL_INTERVAL",
       "kind": "duration",

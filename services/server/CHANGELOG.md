@@ -11,6 +11,18 @@ documented in this file. The format is based on
 
 ### Added
 
+- Idempotency keys (M1-20): `StageIdempotency` of `platform/httpserver` runs every keyed request
+  in one unit of work with the key row of `idempotency_keys` (migration `00007`), stores final
+  responses only (`2xx`; `400`, `403`, `404`, `409` except `request_in_progress`, `410`, `412`,
+  `413`, `415`, `422`), replays them with `Idempotent-Replay: true` and `ETag` from `version`,
+  answers `422 idempotency_key_reuse` for another request under the same key and `409
+  request_in_progress` after `database.lock_timeout`, and never stores a one-time secret
+  (`idempotency.MarkOneTimeSecret`, replay `409` with `reason: one_time_secret`). The port
+  `kernel/idempotency`, the store and the job `sync.idempotency_cleanup` in `internal/sync`,
+  `platform/jsoncanon` (RFC 8785 over `github.com/gowebpki/jcs`), generator checks for keyed
+  operations in `api/routes/gen`, and the configuration keys `sync.idempotency_key_ttl`,
+  `sync.idempotency_cleanup_interval` and `sync.idempotency_cleanup_batch_size`.
+
 - `internal/authz` (M1-28): the one authorization function. `app.Authorizer` implements
   `kernel/authorize.Authorizer` with `Authorize` (07 section 4.2: liveness, pending, resolution
   through the structure, effective rights with owner, dm, operator, agent and app limits, "view

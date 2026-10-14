@@ -1,0 +1,193 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Negative fixture: createThing declares Idempotency-Key and an octet-stream body. Otherwise equal to ../../fixture/openapi.yaml.
+# Fixture spec of the route generator (api/routes/gen). Three operations cover every kind of
+# metadata the route table derives: a public GET with a path parameter, a POST with
+# Idempotency-Key and a JSON body, a PATCH with a required If-Match and an ETag on 200. The
+# webhook and the unreferenced schema `Unused` prove that the filter drops webhooks and that
+# skip-prune keeps every component. Only tests and `make codegen-check` read this file.
+openapi: 3.1.0
+
+info:
+  title: Fixture API
+  version: 0.0.1
+
+servers:
+- url: /api/v1
+
+security:
+- bearerAuth: []
+
+paths:
+  /things:
+    post:
+      operationId: createThing
+      summary: Create a thing.
+      x-authz-action: thing.create
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '201':
+          description: Created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+        default:
+          $ref: '#/components/responses/Error'
+  /things/{thing_id}:
+    get:
+      operationId: getThing
+      summary: Read a thing without credentials.
+      security: []
+      x-authz-action: thing.read
+      x-rate-limit-class: rl.public_auth
+      parameters:
+      - $ref: '#/components/parameters/ThingIdPath'
+      responses:
+        '200':
+          description: The thing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      operationId: updateThing
+      summary: Change a thing.
+      x-authz-action: thing.update
+      x-rate-limit-class: rl.write
+      parameters:
+      - $ref: '#/components/parameters/ThingIdPath'
+      - $ref: '#/components/parameters/IfMatchRequired'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ThingUpdate'
+      responses:
+        '200':
+          description: The changed thing.
+          headers:
+            ETag:
+              $ref: '#/components/headers/ETag'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Thing'
+        default:
+          $ref: '#/components/responses/Error'
+
+webhooks:
+  thingChanged:
+    post:
+      operationId: thingChanged
+      summary: Sent by the server when a thing changes; never served.
+      x-authz-action: thing.read
+      x-rate-limit-class: rl.public_auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Thing'
+      responses:
+        '204':
+          description: Received.
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    ThingIdPath:
+      name: thing_id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      schema:
+        type: string
+        format: uuid
+    IfMatchRequired:
+      name: If-Match
+      in: header
+      required: true
+      schema:
+        type: string
+    IfMatchOptional:
+      name: If-Match
+      in: header
+      schema:
+        type: string
+  headers:
+    ETag:
+      description: Strong entity tag of the resource version.
+      schema:
+        type: string
+  responses:
+    Error:
+      description: Any error.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Thing:
+      type: object
+      required: [id, name, version]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        version:
+          type: integer
+          format: int64
+    ThingCreate:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+    ThingUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+    Problem:
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        code:
+          type: string
+    Unused:
+      description: Referenced by no operation; skip-prune keeps it.
+      type: object
+      properties:
+        note:
+          type: string
