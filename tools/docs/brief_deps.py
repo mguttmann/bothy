@@ -44,7 +44,7 @@ from pathlib import Path
 README = Path("docs/briefs/README.md")
 PLAN = Path("docs/PLAN.md")
 MAKEFILE = Path("Makefile")
-# Mermaid renders at most this many edges per diagram (its default `maxEdges`); the graph is
+# Mermaid refuses a diagram with this many edges (its default `maxEdges`); the graph is
 # split into one block per milestone of the dependent tickets to stay below it.
 MAX_GRAPH_EDGES = 500
 
@@ -311,9 +311,9 @@ def check(root: Path) -> list[str]:
         problems.append(f"{README}: graph edges differ from the index (run --write)")
     for n, block in enumerate(readme[start:end].split("```mermaid")[1:], start=1):
         count = sum(1 for line in block.split("```")[0].splitlines() if _EDGE.match(line))
-        if count > MAX_GRAPH_EDGES:
+        if count >= MAX_GRAPH_EDGES:
             problems.append(
-                f"{README}: graph block {n} has {count} edges, above the edge limit "
+                f"{README}: graph block {n} has {count} edges, at or above the edge limit "
                 f"{MAX_GRAPH_EDGES} of Mermaid (run --write)"
             )
     plan = _plan_deps((root / PLAN).read_text(encoding="utf-8"), index.deps)
