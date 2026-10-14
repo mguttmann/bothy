@@ -85,6 +85,10 @@ type PrincipalSource interface {
 	// hat_anmeldedaten of passkey.register, whose step-up is conditional (07 section 4.2 step 8,
 	// M1-40). It reads inside the ambient transaction of ctx when there is one.
 	HasActivePasskey(ctx context.Context, userID ids.ID) (bool, error)
+	// HasEstablishedLocalCredential reports whether the person userID has an established password
+	// path: a local_credentials row with a confirmed TOTP enrollment (07 section 4.2 step 8,
+	// hat_anmeldedaten of local_credential.set; M1-39). The rule itself stays in authz.
+	HasEstablishedLocalCredential(ctx context.Context, userID ids.ID) (bool, error)
 	// Refs returns the public views of the known principals among principals, whatever their status;
 	// an unknown id is absent from the map (M1-48, the members of a group). It reads inside the
 	// ambient transaction of ctx when there is one.

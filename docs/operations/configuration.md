@@ -389,16 +389,16 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.console_session_max_age` | `BOTHY_AUTH__CONSOLE_SESSION_MAX_AGE` | Server |  | `12h` | absolute Dauer einer Konsolen-Sitzung | geplant (M6) |
 | `auth.console_session_idle_timeout` | `BOTHY_AUTH__CONSOLE_SESSION_IDLE_TIMEOUT` | Server |  | `30m` | Leerlauf bis zum Ende der Konsolen-Sitzung | geplant (M6) |
 | `auth.local_password_enabled` | `BOTHY_AUTH__LOCAL_PASSWORD_ENABLED` | Server | bool | `true` | Passwort mit TOTP als Rückfall für lokale Konten | aktiv |
-| `auth.totp_key_ref` | `BOTHY_AUTH__TOTP_KEY_REF` | Server |  | `file:<secrets.dir>/totp_key` | Verweis auf den Schlüssel (32 Byte), mit dem TOTP-Geheimnisse verschlüsselt werden | geplant (M1) |
+| `auth.totp_key_ref` | `BOTHY_AUTH__TOTP_KEY_REF` | Server | secret_ref | `file:<secrets.dir>/totp_key` | Verweis auf den Schlüssel (32 Byte), mit dem TOTP-Geheimnisse verschlüsselt werden | aktiv |
 | `auth.webauthn_rp_id` | `BOTHY_AUTH__WEBAUTHN_RP_ID` | Server | string | leer | RP-ID der Passkeys; leer heißt Host von `server.public_url` | aktiv |
 | `auth.webauthn_origins` | `BOTHY_AUTH__WEBAUTHN_ORIGINS` | Server | list(string) | leer | erlaubte Origins der Passkeys; leer heißt Origin von `server.public_url`; Einträge dürfen auch App-Origins wie `android:apk-key-hash:...` sein | aktiv |
-| `auth.password_min_length` | `BOTHY_AUTH__PASSWORD_MIN_LENGTH` | Server |  | `12` | Mindestlänge eines Passworts | geplant (M1) |
-| `auth.argon2id_memory_kib` | `BOTHY_AUTH__ARGON2ID_MEMORY_KIB` | Server |  | `65536` | Argon2id-Speicher (Untergrenze 19456) | geplant (M1) |
-| `auth.argon2id_iterations` | `BOTHY_AUTH__ARGON2ID_ITERATIONS` | Server |  | `3` | Argon2id-Durchläufe (Untergrenze 2) | geplant (M1) |
-| `auth.argon2id_parallelism` | `BOTHY_AUTH__ARGON2ID_PARALLELISM` | Server |  | `1` | Argon2id-Parallelität | geplant (M1) |
-| `auth.login_fail_limit` | `BOTHY_AUTH__LOGIN_FAIL_LIMIT` | Server |  | `10` | Fehlversuche je Konto und Fenster | geplant (M1) |
+| `auth.password_min_length` | `BOTHY_AUTH__PASSWORD_MIN_LENGTH` | Server | int | `12` | Mindestlänge eines Passworts | aktiv |
+| `auth.argon2id_memory_kib` | `BOTHY_AUTH__ARGON2ID_MEMORY_KIB` | Server | int | `65536` | Argon2id-Speicher (Untergrenze 19456) | aktiv |
+| `auth.argon2id_iterations` | `BOTHY_AUTH__ARGON2ID_ITERATIONS` | Server | int | `3` | Argon2id-Durchläufe (Untergrenze 2) | aktiv |
+| `auth.argon2id_parallelism` | `BOTHY_AUTH__ARGON2ID_PARALLELISM` | Server | int | `1` | Argon2id-Parallelität | aktiv |
+| `auth.login_fail_limit` | `BOTHY_AUTH__LOGIN_FAIL_LIMIT` | Server | int | `10` | Fehlversuche je Konto und Fenster | aktiv |
 | `auth.login_fail_window` | `BOTHY_AUTH__LOGIN_FAIL_WINDOW` | Server | duration | `15m` | Fenster für Fehlversuche | aktiv |
-| `auth.login_lock_duration` | `BOTHY_AUTH__LOGIN_LOCK_DURATION` | Server |  | `15m` | Sperre des Passwortwegs | geplant (M1) |
+| `auth.login_lock_duration` | `BOTHY_AUTH__LOGIN_LOCK_DURATION` | Server | duration | `15m` | Sperre des Passwortwegs | aktiv |
 | `auth.dpop_required_for` | `BOTHY_AUTH__DPOP_REQUIRED_FOR` | Server | list(string) | `["agent"]` | Token-Arten, die DPoP-gebunden sein müssen | aktiv |
 | `auth.api_token_max_ttl` | `BOTHY_AUTH__API_TOKEN_MAX_TTL` | Server | duration | `365d` | Höchstdauer eines Agenten- oder App-Tokens | aktiv |
 | `auth.personal_token_max_ttl` | `BOTHY_AUTH__PERSONAL_TOKEN_MAX_TTL` | Server | duration | `90d` | Höchstdauer eines persönlichen Tokens | aktiv |
@@ -890,11 +890,11 @@ Volume `signing-keys` (`secrets.signing_key_dir`, ADR 0066); `server_signing_key
 zeigt dorthin. `bothy secrets export` sichert beide Orte; den Schlüsselspeicher nimmt es mit M1-32
 auf, das die Signierschlüssel erzeugt.
 
-Erzeuger späterer Etappen: `totp_key` (M1-39), `pgbackrest_tls/` (M7-01) und die erzeugte Form von
+Erzeuger späterer Etappen: `pgbackrest_tls/` (M7-01) und die erzeugte Form von
 `s3_access_key` und `s3_secret_key` (Profil s3, M3). Bis dahin meldet `bothy secrets init` diese
 Einträge als `pending`, solange weder Ablage noch Quelle sie enthält; `s3_*` gelten so lange als
 geliefert. Erzeugt werden Passwörter als 32 Zufallsbyte in base64url ohne Auffüllung (43 Zeichen)
-und Schlüssel (`token_pepper`, `telemetry_pseudonym_key`, `audit_ip_kek`, `file_ticket_key`) als
+und Schlüssel (`token_pepper`, `totp_key`, `telemetry_pseudonym_key`, `audit_ip_kek`, `file_ticket_key`) als
 32 Zufallsbyte in Hex-Kleinschreibung (64 Zeichen); Nutzer, die rohe Schlüsselbytes brauchen,
 dekodieren den Hex-Text.
 

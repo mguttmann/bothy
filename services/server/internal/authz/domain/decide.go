@@ -329,6 +329,7 @@ func decidePrincipalRules(in *Input) (Decision, bool) {
 		return Decision{}, false
 	}
 	if p.Kind != KindUser || !p.HasSession {
+		// Also a first set-up without step-up needs a session (07 section 4.2 step 8).
 		return deny(OutcomeForbidden, ReasonStepUpNotPossible), true
 	}
 	if in.StepUpWaived {

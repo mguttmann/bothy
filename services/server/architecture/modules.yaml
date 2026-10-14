@@ -97,8 +97,9 @@ modules:
     ws_ops: []
     depends_on: [instance, authz]
     # sqlc code and the repository (M1-26); adapters/locale parses BCP 47 tags (M1-31);
-    # adapters/webauthn verifies passkeys with go-webauthn (M1-40).
-    adapter_vendors: [pgx, xtext, webauthn]
+    # adapters/webauthn verifies passkeys with go-webauthn (M1-40); adapters/passwordpolicy
+    # normalises to NFC and adapters/passwordhash runs Argon2id (M1-39).
+    adapter_vendors: [pgx, xtext, webauthn, xcrypto]
   chat:
     tables: [spaces, user_space_states, channels, channel_skill_bindings, project_bindings,
              dm_participants, forum_tags, threads, thread_tags]
@@ -259,8 +260,11 @@ vendors:                    # <group>: [<import path>, <import path>/**]
   otelslog: [go.opentelemetry.io/contrib/bridges/otelslog]
   yaml: [go.yaml.in/yaml/v3]
   jcs: [github.com/gowebpki/jcs]
-  # BCP 47 language tags of users.locale (identity adapters/locale, M1-31).
-  xtext: [golang.org/x/text/language]
+  # BCP 47 language tags of users.locale (identity adapters/locale, M1-31); NFC of passwords
+  # (identity adapters/passwordpolicy, M1-39).
+  xtext: [golang.org/x/text/language, golang.org/x/text/unicode/norm]
+  # Argon2id password hashes of local accounts (identity adapters/passwordhash, M1-39).
+  xcrypto: [golang.org/x/crypto/argon2]
   libopenapi: [github.com/pb33f/libopenapi, github.com/pb33f/libopenapi/**, github.com/pb33f/libopenapi-validator,
                github.com/pb33f/libopenapi-validator/**]
   pgx: [github.com/jackc/pgx/v5, github.com/jackc/pgx/v5/**]

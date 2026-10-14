@@ -21,6 +21,7 @@ import (
 	"github.com/OWNER/bothy/services/server/api/routes"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/secretbox"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/trustedheader"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	instancepg "github.com/OWNER/bothy/services/server/internal/instance/adapters/postgres"
@@ -146,6 +147,9 @@ type server struct {
 	authzAdmin *AuthzAdmin
 	// identity is the identity module (M1-33): devices, the DPoP verifier and the REST handlers.
 	identity *Identity
+	// totpBox seals the TOTP secrets of local accounts with auth.totp_key_ref (M1-39), resolved in
+	// the identity step and bound with the sessions.
+	totpBox *secretbox.Box
 	// settings are the instance settings, branding and discovery (M1-46); identity reads
 	// locale.default through them.
 	settings *InstanceSettings
@@ -667,6 +671,12 @@ func (s *server) startIdentity(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// The TOTP key is resolved once here: a missing key or one that is not 32 bytes stops the
+	// start (M1-39), not the first password login.
+	box, err := TOTPBox(ctx, s.sp, cfg.TOTPKeyRef)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
 	pool, a, az, sy, st := s.pool, s.audit, s.authorizer, s.sync, s.settings
 	s.mu.Unlock()
@@ -679,7 +689,7 @@ func (s *server) startIdentity(ctx context.Context) error {
 	}
 	id.Start(s.runner)
 	s.mu.Lock()
-	s.identity = id
+	s.identity, s.totpBox = id, box
 	s.mu.Unlock()
 	return nil
 }
@@ -761,7 +771,7 @@ func (s *server) startTerminal(context.Context) error {
 // tokens. From here on the HTTP chain authenticates people with identity's Authenticator.
 func (s *server) startSessions(context.Context) error {
 	s.mu.Lock()
-	id, keys, rec, admin := s.identity, s.signingKeys, s.instance, s.authzAdmin
+	id, keys, rec, admin, box := s.identity, s.signingKeys, s.instance, s.authzAdmin, s.totpBox
 	s.mu.Unlock()
 	if id == nil || keys == nil || admin == nil {
 		return errors.New("wire: the sessions need the identity step, the signing keys and the authz admin")
@@ -777,7 +787,10 @@ func (s *server) startSessions(context.Context) error {
 	if err != nil {
 		return err
 	}
-	return id.BindOIDC(OIDCDeps{Egress: eg, Secrets: sec, ClaimGroups: admin.Admin})
+	if err := id.BindOIDC(OIDCDeps{Egress: eg, Secrets: sec, ClaimGroups: admin.Admin}); err != nil {
+		return err
+	}
+	return id.BindLocal(box, nil)
 }
 
 // authenticator returns the Authenticator of the HTTP chain: identity's after startSessions,
@@ -839,6 +852,7 @@ func (id *Identity) fillHandlers(h *Handlers) {
 	fill(&h.OIDC, id.OIDCHandlers)
 	fill(&h.TrustedHeader, id.TrustedHeaderHandlers)
 	fill(&h.Lifecycle, id.LifecycleHandlers)
+	fill(&h.Local, id.LocalHandlers)
 }
 
 // fill sets *dst to built when *dst is nil, so an injected handler stays.

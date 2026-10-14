@@ -86,6 +86,9 @@ type ServerInterface interface {
 	// CompletePasskeyLogin Finish a passkey login and register the device
 	// (POST /auth/passkey/complete)
 	CompletePasskeyLogin(w http.ResponseWriter, r *http.Request, params CompletePasskeyLoginParams)
+	// LoginWithPassword Log in with local password and TOTP
+	// (POST /auth/password/login)
+	LoginWithPassword(w http.ResponseWriter, r *http.Request, params LoginWithPasswordParams)
 	// CreateStepUpChallenge Create a step-up challenge
 	// (POST /auth/step-up/challenge)
 	CreateStepUpChallenge(w http.ResponseWriter, r *http.Request)
@@ -260,6 +263,9 @@ type ServerInterface interface {
 	// CompleteIdentityLink Finish linking another identity
 	// (POST /me/identities/complete)
 	CompleteIdentityLink(w http.ResponseWriter, r *http.Request)
+	// SetMyLocalCredential Set local password and enroll TOTP
+	// (PUT /me/local-credential)
+	SetMyLocalCredential(w http.ResponseWriter, r *http.Request)
 	// BeginPasskeyRegistration Start registering a passkey
 	// (POST /me/passkeys/begin)
 	BeginPasskeyRegistration(w http.ResponseWriter, r *http.Request)
@@ -1434,6 +1440,51 @@ func (siw *ServerInterfaceWrapper) CompletePasskeyLogin(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CompletePasskeyLogin(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LoginWithPassword operation middleware
+func (siw *ServerInterfaceWrapper) LoginWithPassword(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params LoginWithPasswordParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "DPoP" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("DPoP")]; found {
+		var DPoP DpopProof
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "DPoP", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "DPoP", valueList[0], &DPoP, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "DPoP", Err: err})
+			return
+		}
+
+		params.DPoP = DPoP
+
+	} else {
+		err := fmt.Errorf("Header parameter DPoP is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "DPoP", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LoginWithPassword(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3675,6 +3726,20 @@ func (siw *ServerInterfaceWrapper) CompleteIdentityLink(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// SetMyLocalCredential operation middleware
+func (siw *ServerInterfaceWrapper) SetMyLocalCredential(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetMyLocalCredential(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // BeginPasskeyRegistration operation middleware
 func (siw *ServerInterfaceWrapper) BeginPasskeyRegistration(w http.ResponseWriter, r *http.Request) {
 
@@ -5528,6 +5593,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/enroll/redeem", wrapper.RedeemEnrollmentCode)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/pairing/begin", wrapper.BeginPairing)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/pairing/complete", wrapper.CompletePairing)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/password/login", wrapper.LoginWithPassword)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/token/refresh", wrapper.RefreshToken)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/step-up/challenge", wrapper.CreateStepUpChallenge)
@@ -5540,6 +5606,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/identities/complete", wrapper.CompleteIdentityLink)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/passkeys/begin", wrapper.BeginPasskeyRegistration)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/passkeys/complete", wrapper.CompletePasskeyRegistration)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/local-credential", wrapper.SetMyLocalCredential)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users", wrapper.ListUsers)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users", wrapper.CreateUser)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users/{user_id}", wrapper.GetUser)
@@ -5854,6 +5921,9 @@ type StrictServerInterface interface {
 	// CompletePasskeyLogin Finish a passkey login and register the device
 	// (POST /auth/passkey/complete)
 	CompletePasskeyLogin(ctx context.Context, request CompletePasskeyLoginRequestObject) (CompletePasskeyLoginResponseObject, error)
+	// LoginWithPassword Log in with local password and TOTP
+	// (POST /auth/password/login)
+	LoginWithPassword(ctx context.Context, request LoginWithPasswordRequestObject) (LoginWithPasswordResponseObject, error)
 	// CreateStepUpChallenge Create a step-up challenge
 	// (POST /auth/step-up/challenge)
 	CreateStepUpChallenge(ctx context.Context, request CreateStepUpChallengeRequestObject) (CreateStepUpChallengeResponseObject, error)
@@ -6028,6 +6098,9 @@ type StrictServerInterface interface {
 	// CompleteIdentityLink Finish linking another identity
 	// (POST /me/identities/complete)
 	CompleteIdentityLink(ctx context.Context, request CompleteIdentityLinkRequestObject) (CompleteIdentityLinkResponseObject, error)
+	// SetMyLocalCredential Set local password and enroll TOTP
+	// (PUT /me/local-credential)
+	SetMyLocalCredential(ctx context.Context, request SetMyLocalCredentialRequestObject) (SetMyLocalCredentialResponseObject, error)
 	// BeginPasskeyRegistration Start registering a passkey
 	// (POST /me/passkeys/begin)
 	BeginPasskeyRegistration(ctx context.Context, request BeginPasskeyRegistrationRequestObject) (BeginPasskeyRegistrationResponseObject, error)
@@ -6904,6 +6977,39 @@ func (sh *strictHandler) CompletePasskeyLogin(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CompletePasskeyLoginResponseObject); ok {
 		if err := validResponse.VisitCompletePasskeyLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// LoginWithPassword operation middleware
+func (sh *strictHandler) LoginWithPassword(w http.ResponseWriter, r *http.Request, params LoginWithPasswordParams) {
+	var request LoginWithPasswordRequestObject
+
+	request.Params = params
+
+	var body LoginWithPasswordJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.LoginWithPassword(ctx, request.(LoginWithPasswordRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "LoginWithPassword")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LoginWithPasswordResponseObject); ok {
+		if err := validResponse.VisitLoginWithPasswordResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -8622,6 +8728,37 @@ func (sh *strictHandler) CompleteIdentityLink(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CompleteIdentityLinkResponseObject); ok {
 		if err := validResponse.VisitCompleteIdentityLinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetMyLocalCredential operation middleware
+func (sh *strictHandler) SetMyLocalCredential(w http.ResponseWriter, r *http.Request) {
+	var request SetMyLocalCredentialRequestObject
+
+	var body SetMyLocalCredentialJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetMyLocalCredential(ctx, request.(SetMyLocalCredentialRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetMyLocalCredential")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetMyLocalCredentialResponseObject); ok {
+		if err := validResponse.VisitSetMyLocalCredentialResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

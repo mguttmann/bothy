@@ -1,6 +1,6 @@
 # Modul `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43); the principal writer for agent principals built (M1-51); disabling a person, revoking a device, ending a session and the inactive device sweep built (M1-45); groups from the OIDC group claim built (M1-42).
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41); the login with the trusted proxy header and its per-request binding built (M1-43); the principal writer for agent principals built (M1-51); disabling a person, revoking a device, ending a session and the inactive device sweep built (M1-45); groups from the OIDC group claim built (M1-42); local accounts with password and TOTP built (M1-39).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -787,9 +787,61 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
   disables of the only two owners, the no-change and visibility rules, idempotency replays and
   the inactive device sweep. Rulings: docs/DECISIONS.md M1-45.
 
+### Local accounts with password and TOTP (M1-39)
+
+- Port (`local.go`): `LocalCredentials` (`SetLocalCredential`, `LoginWithPassword`) with
+  `SetLocalCredential`, `LocalCredentialResult` (the otpauth URI behind the redacting `Token`) and
+  `PasswordLogin`; `CredentialOverview` gets `local_password_set` and `totp_enrolled` from the
+  overview source `app.NewLocalSource`.
+- `domain`: `totp.go` (RFC 6238 with HMAC-SHA-1, six digits, step 30 seconds from `T0 = 0`, one
+  step of tolerance, a code accepted only for a step after `totp_last_step`, constant-time
+  comparison; 20-byte secrets; the otpauth URI with the host of `server.public_url` as issuer),
+  `lockout.go` (the failure window of `local_credentials.fail_window_started_at` and the lock) and
+  `password_rules.go` (at least `auth.password_min_length` code points of the NFC form, the list
+  hit, no composition rules).
+- `app/local.go`: the use cases and the outbound ports `PasswordHasher`, `SecretSealer`,
+  `CommonPasswords`, `PasswordNormalizer` and `LocalCredentialStore`. `setMyLocalCredential`
+  (`local_credential.set`, self): `403 feature_disabled` while `auth.local_password_enabled` is
+  off, `409 conflict` (`no_local_identity`) without an active identity at the enabled `local`
+  provider, `400 validation_failed` (`required`, `too_short`, `common_password`, `totp_invalid`);
+  `totp_enroll` seals a new secret and makes the enrollment pending, `totp_code` confirms it; step-up
+  only once the password path is established (TOTP confirmed), decided in `authz` through
+  `PrincipalSource.HasEstablishedLocalCredential`. `loginWithPassword` (`auth.login.complete`,
+  `rl.public_auth`): `404` while the switch is off or no `local` provider is enabled, the DPoP
+  login proof, then one unit of work with the row locked `FOR UPDATE`, exactly one Argon2id
+  computation per request (the dummy hash for an unknown name, also while locked), the same `401`
+  for every rejection, the failure counter of the window (committed although the login fails) and
+  the lock with the deny entry `{lock: true}`; success consumes the TOTP step, resets the counter,
+  rehashes on changed parameters and calls `CompleteLogin` with a pending new device and
+  `auth_method = password_totp`.
+- `adapters/passwordhash`: Argon2id (`golang.org/x/crypto/argon2`) in PHC format with
+  `auth.argon2id_*`, 16-byte salt, 32-byte key, constant-time comparison, the dummy hash computed
+  at construction; parameters below the OWASP floor are refused (the configuration minimums stop
+  the start first, ID-T24).
+- `adapters/secretbox`: AES-256-GCM with the key behind `auth.totp_key_ref` (32 bytes as hex,
+  generated by `bothy secrets init` as `totp_key`), additional data
+  `"totp/v1" || 0x00 || identity_id`, stored layout `0x01 || nonce || ciphertext and tag`; the row
+  keeps the reference that sealed it.
+- `adapters/passwordpolicy`: the embedded list `common_passwords.txt` (truncated SHA-256 values,
+  source and licence in its [README](adapters/passwordpolicy/README.md)) and the NFC normalisation
+  (`golang.org/x/text/unicode/norm`).
+- `adapters/postgres`: `queries/local_credentials.sql`, `local.go`. Migration
+  `migrations/00029_identity_local_credentials.sql`: `local_credentials` as 03 section 4.2 with
+  both checks; `bothy_app` may read, insert and update, not delete.
+- Configuration: `auth.local_password_enabled`, `auth.password_min_length`, `auth.argon2id_*`,
+  `auth.login_fail_limit`, `auth.login_fail_window`, `auth.login_lock_duration`,
+  `auth.totp_key_ref`, `server.public_url`.
+- Tests: the domain (`TestIDT27_TOTPVectorsRFC6238`, `TestIDT20_TOTPCodeOnlyOnce`,
+  `TestTOTPWindowEdges`, `TestLockoutWindow`, `TestPasswordRules`), the adapters
+  (`TestPHCFormatAndRehash`, `TestSecretBoxBindsIdentity`, `TestCommonPasswordsFile`),
+  `internal/wire` (`TestIDT24_Argon2BelowFloorStopsStart`), `internal/authz/app`
+  (`TestLocalCredentialStepUpOnlyWhenEstablished`) and `adapters/httpapi/local_test.go` over
+  PostgreSQL 18 (ID-T21 timing, lockout, enrollment, step-up, validation, secrets at rest, no
+  secrets in logs and audit). Rulings: docs/DECISIONS.md M1-39.
+
 ## Port (Wurzelpaket `internal/identity`)
 
-- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`; deklariert `AvatarFiles`.
+- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `LocalCredentials` (M1-39), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `TrustedHeaderLogins` (M1-43), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `PrincipalWriter` (M1-51), `Lifecycle` (M1-45), `Owners`; deklariert `AvatarFiles`.
 - Gibt In-Tx-Ereignisse aus: `DeviceRevoked`, `SessionEnded`.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (mit `HasActivePasskey`, M1-40), `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.

@@ -513,13 +513,21 @@ func (stubServer) SetAgentToolClass(context.Context, rest.SetAgentToolClassReque
 	return nil, nil
 }
 
+func (stubServer) LoginWithPassword(context.Context, rest.LoginWithPasswordRequestObject) (rest.LoginWithPasswordResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetMyLocalCredential(context.Context, rest.SetMyLocalCredentialRequestObject) (rest.SetMyLocalCredentialResponseObject, error) {
+	return nil, nil
+}
+
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
 // (M1-35), the providers and credentials (M1-36), the API tokens (M1-44), the audit log (M1-50),
 // the enrollment codes (M1-37), the device approval and pairing (M1-38), the passkeys (M1-40),
-// the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45) and the host
-// records (M2-39). A handler
+// the OIDC login (M1-41), the trusted header login (M1-43), the revocations (M1-45), the host
+// records (M2-39) and the local accounts (M1-39). A handler
 // ticket that enables an operation changes this test together with
 // api/operations.yaml.
 func TestRealTable_Enabled(t *testing.T) {
@@ -607,6 +615,9 @@ func TestRealTable_Enabled(t *testing.T) {
 		"approvePairing":  {"POST /api/v1/me/devices/pairings", "device.approve", "rl.admin"},
 		"beginPairing":    {"POST /api/v1/auth/pairing/begin", "auth.login.begin", "rl.public_auth"},
 		"completePairing": {"POST /api/v1/auth/pairing/complete", "auth.login.complete", "rl.public_auth"},
+		// M1-39
+		"loginWithPassword":    {"POST /api/v1/auth/password/login", "auth.login.complete", "rl.public_auth"},
+		"setMyLocalCredential": {"PUT /api/v1/me/local-credential", "local_credential.set", "rl.admin"},
 		// M1-46
 		"getDiscovery":         {"GET /api/v1/instance/discovery", "instance.discovery.read", "rl.public_auth"},
 		"getInstance":          {"GET /api/v1/instance", "instance.read", "rl.read"},

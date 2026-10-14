@@ -421,3 +421,9 @@ Testfällen. Der alte Quelltext wird nicht kopiert. Wo die Stücke liegen, steht
 | Übergabekanal für neue Chats | `thread.create` (L24). |
 | Eigene Discord-REST-Schicht für Antworten | Bothy schreibt Discord nie; Antworten laufen über die eigene API. |
 | Kopie der Konvertierung aus einem Spiegel-Werkzeug | Der Import wandelt Discord-Formatierung selbst um (22, Abschnitt 6.3). |
+
+## 7. Third-party data
+
+| Data | Where | Source and licence |
+|---|---|---|
+| Truncated SHA-256 values of common passwords (`common_passwords.txt`, M1-39) | `services/server/internal/identity/adapters/passwordpolicy` | SecLists `Passwords/Common-Credentials/10k-most-common.txt` at commit `3a5f62f0e18a1b8a36b25399aff0077f3706e5af`, MIT licence, Copyright (c) 2018 Daniel Miessler (https://github.com/danielmiessler/SecLists). The repository holds only the first 16 hex characters of the SHA-256 of each normalised entry, no word list; source, checksum and generation command are in the adapter README. |

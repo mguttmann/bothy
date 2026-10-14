@@ -16,8 +16,11 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/instanceflags"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/locale"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/oidc"
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/passwordhash"
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/passwordpolicy"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/replay"
+	"github.com/OWNER/bothy/services/server/internal/identity/adapters/secretbox"
 	identitywebauthn "github.com/OWNER/bothy/services/server/internal/identity/adapters/webauthn"
 	"github.com/OWNER/bothy/services/server/internal/identity/app"
 	identitydomain "github.com/OWNER/bothy/services/server/internal/identity/domain"
@@ -153,15 +156,20 @@ type Identity struct {
 	// LifecycleHandlers are the REST handlers of disableUser, revokeDevice and revokeSession;
 	// nil until BindSessions.
 	LifecycleHandlers *identityhttp.Lifecycle
-	cfg               app.Config
-	state             instance.State
-	repo              *identitypg.Repository
-	uow               txn.UnitOfWork
-	az                authorize.Authorizer
-	writes            IdentityWrites
-	pepper            []byte
-	clk               clock.Clock
-	log               *slog.Logger
+	// Local implements the port identity.LocalCredentials (M1-39); nil until BindLocal.
+	Local *app.LocalCredentials
+	// LocalHandlers are the REST handlers of loginWithPassword and setMyLocalCredential; nil until
+	// BindLocal.
+	LocalHandlers *identityhttp.Local
+	cfg           app.Config
+	state         instance.State
+	repo          *identitypg.Repository
+	uow           txn.UnitOfWork
+	az            authorize.Authorizer
+	writes        IdentityWrites
+	pepper        []byte
+	clk           clock.Clock
+	log           *slog.Logger
 }
 
 // IdentityWrites are the collaborators of the writing use cases of identity (M1-31): the
@@ -293,7 +301,7 @@ func (i *Identity) BindSessions(keys instance.Keys, instanceID ids.ID) error {
 	}
 	identities, err := app.NewIdentities(app.IdentitiesDeps{
 		Providers: i.repo, Identities: i.repo, People: i.repo, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
-		Auth: sessions, Clock: i.clk, Sources: []app.LoginMethodSource{app.NewPasskeySource(i.repo, i.repo)},
+		Auth: sessions, Clock: i.clk, Sources: []app.LoginMethodSource{app.NewPasskeySource(i.repo, i.repo), app.NewLocalSource(i.repo)},
 	})
 	if err != nil {
 		return err
@@ -472,6 +480,44 @@ const checkTrustedHeaderLoopback = app.ReasonTrustedHeaderRequiresLoopback
 // listener is not loopback (W4: the driver stays off instead of stopping the start).
 func RegisterTrustedHeaderReadiness(reg *health.Registry, id *Identity) {
 	reg.AddReadiness(checkTrustedHeaderLoopback, id.TrustedHeader.Ready)
+}
+
+// BindLocal builds the local accounts with password and TOTP (M1-39) over the login service of
+// BindSessions and sealer, the TOTP secret box over auth.totp_key_ref: the Argon2id hasher with
+// auth.argon2id_* (its dummy hash is computed here; hasher non-nil replaces it, for tests that
+// count the work), the common password list and the use cases with their handlers. Errors:
+// BindSessions has not run, a parameter below the OWASP floor, a value the use cases refuse.
+func (i *Identity) BindLocal(sealer app.SecretSealer, hasher app.PasswordHasher) error {
+	if i.Logins == nil || sealer == nil {
+		return errors.New("wire: BindLocal needs the login service of BindSessions and the TOTP secret box")
+	}
+	if hasher == nil {
+		h, err := passwordhash.New(passwordhash.Params{
+			MemoryKiB: i.cfg.Argon2idMemoryKiB, Iterations: i.cfg.Argon2idIterations, Parallelism: i.cfg.Argon2idParallelism,
+		})
+		if err != nil {
+			return err
+		}
+		hasher = h
+	}
+	list := passwordpolicy.Default()
+	local, err := app.NewLocalCredentials(i.cfg, app.LocalDeps{
+		Credentials: i.repo, Providers: i.repo, Identities: i.repo, People: i.repo, Logins: i.Logins, DPoP: i.DPoP,
+		Hasher: hasher, Sealer: sealer, Common: list, Normalizer: list, UoW: i.uow, Authorizer: i.az, Audit: i.writes.Audit,
+		Clock: i.clk,
+	})
+	if err != nil {
+		return err
+	}
+	i.Local, i.LocalHandlers = local, identityhttp.NewLocal(local)
+	return nil
+}
+
+// TOTPBox resolves auth.totp_key_ref once through sp and returns the secret box of the TOTP
+// secrets (M1-39). Errors: a missing or unreadable secret, or a key that is not 32 bytes as hex;
+// the start stops with them, and no error contains the key.
+func TOTPBox(ctx context.Context, sp *secrets.Provider, ref string) (*secretbox.Box, error) {
+	return secretbox.New(ctx, secretbox.Provider{Secrets: sp}, ref)
 }
 
 // secretsDirStandIn replaces the placeholder <secrets.dir> while a reference is only checked: the

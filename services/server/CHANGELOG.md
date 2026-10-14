@@ -11,6 +11,23 @@ documented in this file. The format is based on
 
 ### Added
 
+- Local accounts with password and TOTP (M1-39): the migration
+  `00029_identity_local_credentials.sql` (`local_credentials` with the failure window column), the
+  operations `setMyLocalCredential` (set the password, start a TOTP enrollment whose otpauth URI is
+  shown once, confirm it with a code; step-up only once the password path is established, decided
+  in `authz` through `PrincipalSource.HasEstablishedLocalCredential`) and `loginWithPassword`
+  (login name, password and TOTP code with a DPoP login proof; a new device is `pending`;
+  `404` while `auth.local_password_enabled` is off). Passwords are Argon2id in PHC format
+  (`golang.org/x/crypto/argon2`, now a direct dependency) with `auth.argon2id_*`, whose OWASP floors
+  stop the start; at least `auth.password_min_length` code points after NFC and not on the embedded
+  hashed list of common passwords (SecLists, MIT). TOTP follows RFC 6238 (30 seconds, one step of
+  tolerance, every code once); the secret is stored only AES-256-GCM sealed with the key of
+  `auth.totp_key_ref`, which `bothy secrets init` now generates as `totp_key`. Failed attempts lock
+  only the password path after `auth.login_fail_limit` within `auth.login_fail_window` for
+  `auth.login_lock_duration`; unknown names and wrong passwords give the same `401` after exactly
+  one Argon2id computation. The credential overview fills `local_password_set` and
+  `totp_enrolled`.
+
 - Operators with invariant I1 (M1-54): `setSpaceOperator` and `setChannelOperator` (owner,
   step-up, If-Match, audited) set the default operator of a space (none or an agent) and the
   operator of a channel (inherit, none or an agent). Every change is a rights change: it raises

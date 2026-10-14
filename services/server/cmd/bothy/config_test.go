@@ -169,6 +169,9 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"audit.reason_max_chars = 500  # default\n" +
 		"auth.access_token_ttl = 10m  # default\n" +
 		"auth.api_token_max_ttl = 365d  # default\n" +
+		"auth.argon2id_iterations = 3  # default\n" +
+		"auth.argon2id_memory_kib = 65536  # default\n" +
+		"auth.argon2id_parallelism = 1  # default\n" +
 		"auth.cleanup_interval = 1h  # default\n" +
 		"auth.clock_leeway = 30s  # default\n" +
 		"auth.device_inactive_revoke_after = 180d  # default\n" +
@@ -182,12 +185,15 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.group_claim_max_age = 30d  # default\n" +
 		"auth.idp_recheck_interval = 30d  # default\n" +
 		"auth.local_password_enabled = true  # default\n" +
+		"auth.login_fail_limit = 10  # default\n" +
 		"auth.login_fail_window = 15m  # default\n" +
 		"auth.login_flow_ttl = 10m  # default\n" +
+		"auth.login_lock_duration = 15m  # default\n" +
 		"auth.oidc_client_assertion_ttl = 2m  # default\n" +
 		"auth.oidc_jwks_cache_ttl = 1h  # default\n" +
 		"auth.pairing_code_chars = 8  # default\n" +
 		"auth.pairing_code_ttl = 5m  # default\n" +
+		"auth.password_min_length = 12  # default\n" +
 		"auth.personal_token_max_ttl = 90d  # default\n" +
 		"auth.refresh_reuse_grace = 30s  # default\n" +
 		"auth.refresh_token_ttl = 14d  # default\n" +
@@ -197,6 +203,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.step_up_fail_limit = 5  # default\n" +
 		"auth.step_up_max_age = 5m  # default\n" +
 		"auth.token_pepper_ref = file:/run/bothy/secrets/token_pepper  # default\n" +
+		"auth.totp_key_ref = file:/run/bothy/secrets/totp_key  # default\n" +
 		"auth.trusted_header_bind_requests = true  # default\n" +
 		"auth.webauthn_origins =   # default\n" +
 		"auth.webauthn_rp_id =   # default\n" +

@@ -58,7 +58,7 @@ Diensten; `TestCatalogMatchesConfigurationDoc` vergleicht beide Richtungen und d
   Zeile je Datei, ohne Datei eine Zeile mit dem Platzhalter.
 - Erzeuger: `token` sind 32 Zufallsbytes als base64url ohne Auffüllung (43 Zeichen), `key` 32
   Zufallsbytes als Hex in Kleinbuchstaben (64 Zeichen); Quelle ist `crypto/rand`.
-- `pending`: Der Erzeuger kommt mit einem späteren Ticket (`Entry.PendingOn`): `totp_key` (M1-39),
+- `pending`: Der Erzeuger kommt mit einem späteren Ticket (`Entry.PendingOn`):
   `pgbackrest_tls/` (M7-01), `s3_access_key` und `s3_secret_key` (M3, bis dahin geliefert).
   Fehlen sie, meldet `init` sie als `pending` und endet mit Exitcode 0; geliefert werden sie
   übernommen wie jeder andere Eintrag.
@@ -85,7 +85,7 @@ Je Eintrag zwischen `_store` und `--source`:
 
 | `_store` | Quelle | erzeugter Eintrag | gelieferter Eintrag |
 |---|---|---|---|
-| fehlt | fehlt | erzeugen (`generated`); mit ausstehendem Erzeuger (`Entry.PendingOn`: `totp_key`, `pgbackrest_tls/`) `pending` | `missing`; mit ausstehendem Erzeuger (`Entry.PendingOn`: `s3_*`) `pending` |
+| fehlt | fehlt | erzeugen (`generated`); mit ausstehendem Erzeuger (`Entry.PendingOn`: `pgbackrest_tls/`) `pending` | `missing`; mit ausstehendem Erzeuger (`Entry.PendingOn`: `s3_*`) `pending` |
 | fehlt | vorhanden | übernehmen (`adopted`) | übernehmen (`adopted`) |
 | vorhanden | fehlt | behalten (`kept`) | behalten (`kept`) |
 | vorhanden | gleich | behalten (`kept`) | behalten (`kept`) |
@@ -195,7 +195,7 @@ its files belong to the volume of `secrets.signing_key_dir` (disaster-recovery.m
 
 ## Was fehlt
 
-- Erzeuger für `totp_key` (M1-39), `pgbackrest_tls/` (M7-01) und die erzeugte Form von
+- Erzeuger für `pgbackrest_tls/` (M7-01) und die erzeugte Form von
   `s3_access_key` und `s3_secret_key` (M3).
 
 ## Abhängigkeiten

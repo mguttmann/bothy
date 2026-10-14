@@ -90,6 +90,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - listUserDevices
   - listUserSessions
   - listUsers
+  - loginWithPassword
   - loginWithTrustedHeader
   - logout
   - moveChannel
@@ -116,6 +117,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setChannelOperator
   - setCredentialHolder
   - setHostState
+  - setMyLocalCredential
   - setSpaceOperator
   - setThreadTags
   - setThreadTitle
@@ -486,9 +488,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: listWebhookSubscriptions
     etappe: M2
     ticket: M2-26
-  - operation_id: loginWithPassword
-    etappe: M1
-    ticket: M1-39
   - operation_id: markThreadUnread
     etappe: M1
     ticket: M1-61
@@ -605,9 +604,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: setMyAvatar
     etappe: M3
     ticket: M3-10
-  - operation_id: setMyLocalCredential
-    etappe: M1
-    ticket: M1-39
   - operation_id: startImport
     etappe: M8
     ticket: M8-03
