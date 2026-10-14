@@ -437,3 +437,12 @@ nav:
           - "M7-08: Maintenance mode `read_only` (ADR 0065)": briefs/M7-08-maintenance-mode.md
           - "M7-09: Status page with automatic checks": briefs/M7-09-status-page.md
           - "M7-22: Audit log checkpoints in object storage": briefs/M7-22-audit-checkpoints-s3.md
+          - "M7-10: Server release chain with a trial release (ADR 0036, 0060, 0062)": briefs/M7-10-server-release-chain.md
+          - "M7-11: Breaking-change check of the API against the last publication (G6)": briefs/M7-11-api-breaking-check.md
+          - "M7-12: Desktop app distribution (ADR 0037)": briefs/M7-12-desktop-distribution.md
+          - "M7-13: Mobile app distribution and minimum version": briefs/M7-13-mobile-distribution.md
+          - "M7-14: Portability test in CI with the full stack": briefs/M7-14-portability-test.md
+          - "M7-15: OpenTofu module `generic-vm`": briefs/M7-15-tofu-generic-vm.md
+          - "M7-16: OpenTofu modules `hetzner`, `aws`, `azure`": briefs/M7-16-tofu-cloud-modules.md
+          - "M7-23: Release chain of the host service": briefs/M7-23-host-release-chain.md
+          - "M7-29: Setup wizard `install.sh` (installation in one command)": briefs/M7-29-setup-wizard.md
