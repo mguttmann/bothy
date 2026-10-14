@@ -244,7 +244,7 @@ func (s *Service) freeHandle(ctx context.Context, base string) (domain.Handle, e
 		}
 		candidate = trustedheader.HandleWithSuffix(base, suffix, s.cfg.HandleMaxChars)
 	}
-	return domain.Handle{}, errs.New(errs.CodeConflict, "").WithFields(errs.FieldError{Pointer: "/handle", Code: "taken", Detail: "The handle is taken."})
+	return domain.Handle{}, errs.New(errs.CodeConflict, "").WithFields(errs.FieldError{Pointer: "/handle", Code: fieldCodeTaken, Detail: "The handle is taken."})
 }
 
 // suffixAlphabet are the characters of a handle suffix (lower case Crockford Base32).

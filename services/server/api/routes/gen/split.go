@@ -76,25 +76,40 @@ var importName = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // assemble writes header, the package clause of f, the imports of f that body uses and body, and
 // formats the result.
 func assemble(header []byte, f *ast.File, body []byte) ([]byte, error) {
-	var buf bytes.Buffer
-	buf.Write(header)
-	fmt.Fprintf(&buf, "package %s\n\n", f.Name.Name)
 	used, err := usedPackages(f.Name.Name, body)
 	if err != nil {
 		return nil, err
 	}
-	var std, other []string
-	for _, s := range f.Imports {
+	std, other, err := importLines(f.Imports, used)
+	if err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	buf.Write(header)
+	fmt.Fprintf(&buf, "package %s\n\n", f.Name.Name)
+	writeImports(&buf, std, other)
+	buf.Write(body)
+	out, err := format.Source(buf.Bytes())
+	if err != nil {
+		return nil, errors.Join(errors.New("split rest.gen.go: a half is not valid Go"), err)
+	}
+	return out, nil
+}
+
+// importLines returns the import specs of imports whose package name is in used, as source lines,
+// split into the standard library (no dot in the path) and the others.
+func importLines(imports []*ast.ImportSpec, used map[string]bool) (std, other []string, err error) {
+	for _, s := range imports {
 		p, err := strconv.Unquote(s.Path.Value)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		name := path.Base(p)
 		if s.Name != nil {
 			name = s.Name.Name
 		}
 		if !importName.MatchString(name) || name == "_" {
-			return nil, fmt.Errorf("split rest.gen.go: cannot tell which half uses the import %s", s.Path.Value)
+			return nil, nil, fmt.Errorf("split rest.gen.go: cannot tell which half uses the import %s", s.Path.Value)
 		}
 		if !used[name] {
 			continue
@@ -109,25 +124,26 @@ func assemble(header []byte, f *ast.File, body []byte) ([]byte, error) {
 			std = append(std, line)
 		}
 	}
-	if len(std)+len(other) > 0 {
-		buf.WriteString("import (\n")
-		for _, l := range std {
-			buf.WriteString("\t" + l + "\n")
-		}
-		if len(std) > 0 && len(other) > 0 {
-			buf.WriteString("\n")
-		}
-		for _, l := range other {
-			buf.WriteString("\t" + l + "\n")
-		}
-		buf.WriteString(")\n")
+	return std, other, nil
+}
+
+// writeImports writes the import block of std and other (one group each) to buf; nothing when
+// both are empty.
+func writeImports(buf *bytes.Buffer, std, other []string) {
+	if len(std)+len(other) == 0 {
+		return
 	}
-	buf.Write(body)
-	out, err := format.Source(buf.Bytes())
-	if err != nil {
-		return nil, errors.Join(errors.New("split rest.gen.go: a half is not valid Go"), err)
+	buf.WriteString("import (\n")
+	for _, l := range std {
+		buf.WriteString("\t" + l + "\n")
 	}
-	return out, nil
+	if len(std) > 0 && len(other) > 0 {
+		buf.WriteString("\n")
+	}
+	for _, l := range other {
+		buf.WriteString("\t" + l + "\n")
+	}
+	buf.WriteString(")\n")
 }
 
 // usedPackages returns the names body uses as the left side of a selector without declaring
@@ -141,7 +157,8 @@ func usedPackages(pkg string, body []byte) (map[string]bool, error) {
 	used := map[string]bool{}
 	ast.Inspect(f, func(n ast.Node) bool {
 		if sel, ok := n.(*ast.SelectorExpr); ok {
-			if id, ok := sel.X.(*ast.Ident); ok && id.Obj == nil { //nolint:staticcheck // ast.Object resolution tells package names from local names
+			// An unresolved name (Obj nil) on the left of a selector is a package name.
+			if id, ok := sel.X.(*ast.Ident); ok && id.Obj == nil {
 				used[id.Name] = true
 			}
 		}

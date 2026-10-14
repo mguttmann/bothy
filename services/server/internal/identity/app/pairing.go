@@ -67,7 +67,7 @@ func stepUpInput(k *identity.PublicKey) *device.KeyInput {
 func (s *Service) insertPairing(ctx context.Context, d device.Device) (identity.PairingStarted, error) {
 	if _, found, err := s.d.Devices.Device(ctx, d.ID); err != nil || found {
 		if err == nil {
-			err = errs.New(errs.CodeConflict, "").WithFields(errs.FieldError{Pointer: fieldDeviceID, Code: "taken", Detail: "The device id is taken."})
+			err = errs.New(errs.CodeConflict, "").WithFields(errs.FieldError{Pointer: fieldDeviceID, Code: fieldCodeTaken, Detail: "The device id is taken."})
 		}
 		return identity.PairingStarted{}, err
 	}

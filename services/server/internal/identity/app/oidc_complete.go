@@ -266,7 +266,7 @@ func (o *OIDC) freeHandle(ctx context.Context, base string) (domain.Handle, erro
 		candidate = oidcflow.HandleWithSuffix(base, suffix, o.cfg.HandleMaxChars)
 	}
 	return domain.Handle{}, errs.New(errs.CodeConflict, "").
-		WithFields(errs.FieldError{Pointer: "/handle", Code: "taken", Detail: "No free handle was found."})
+		WithFields(errs.FieldError{Pointer: "/handle", Code: fieldCodeTaken, Detail: "No free handle was found."})
 }
 
 // completeFailed is the answer of a failed oidcCompletion of act: a rejected flow is ended as failed

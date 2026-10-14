@@ -175,6 +175,10 @@ const (
 // fieldDeviceID is the field pointer of DeviceRegistration.device_id.
 const fieldDeviceID = "/device_id"
 
+// fieldCodeTaken is the field code of a taken device id or handle (M1-37, M1-38, M1-41, M1-43;
+// one constant since INT-W14/10).
+const fieldCodeTaken = "taken"
+
 // CompleteLogin completes a login of any path in one unit of work (joining the ambient one): the
 // person must be active (or pending with AllowPending), the registration valid and its dpop key the key of the DPoP proof; an
 // unknown device is created (active for TrustConfirmed, pending otherwise), a known device of the
@@ -304,7 +308,7 @@ func (s *Service) loginDevice(ctx context.Context, in LoginCompletion) (identity
 		if known.UserID != in.UserID || known.State == identity.DeviceStateRevoked || known.KeyThumbprint != in.ProofJKT ||
 			pendingExpired(known, s.d.Clock.Now(), s.cfg.DevicePendingTTL) {
 			return identity.Device{}, false, errs.New(errs.CodeConflict, "").
-				WithFields(errs.FieldError{Pointer: fieldDeviceID, Code: "taken", Detail: "The device id is taken."})
+				WithFields(errs.FieldError{Pointer: fieldDeviceID, Code: fieldCodeTaken, Detail: "The device id is taken."})
 		}
 		return known, false, nil
 	}
