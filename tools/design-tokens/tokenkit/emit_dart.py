@@ -3,7 +3,9 @@
 
 Theme-dependent tokens become ThemeExtension subclasses with one const instance per context
 (DsColors.light/.dark, DsDensity.comfortable/.compact/.touch, DsMotion.full/.reduced,
-DsElevation.light/.dark). Theme-independent tokens become static constants.
+DsElevation.light/.dark). Theme-independent tokens become static constants. The accent variants
+of `accents.derive` become `DsAccent`, one const instance per theme and accent with a lookup
+`DsAccent.of(key, brightness)`.
 """
 
 from __future__ import annotations
@@ -85,9 +87,15 @@ def _shadow_expr(token: dtcg.Token) -> str:
 
 
 def _extension_class(
-    name: str, fields: list[tuple[str, str]], instances: dict[str, dict[str, str]], lerp_kind: dict[str, str], doc: str
+    name: str,
+    fields: list[tuple[str, str]],
+    instances: dict[str, dict[str, str]],
+    lerp_kind: dict[str, str],
+    doc: str,
+    extra: list[str] | None = None,
 ) -> str:
-    lines = [f"/// {doc}", "@immutable", f"final class {name} extends ThemeExtension<{name}> {{"]
+    lines = [f"/// {line}".rstrip() for line in doc.split("\n")]
+    lines += ["@immutable", f"final class {name} extends ThemeExtension<{name}> {{"]
     lines.append(f"  const {name}({{")
     for field, _ in fields:
         lines.append(f"    required this.{field},")
@@ -101,6 +109,9 @@ def _extension_class(
         for field, _ in fields:
             lines.append(f"    {field}: {values[field]},")
         lines.append("  );")
+    if extra:
+        lines.append("")
+        lines += extra
     lines.append("")
     lines.append("  @override")
     lines.append(f"  {name} copyWith({{")
@@ -164,8 +175,71 @@ def icon_extension(model: Model) -> dict:
     return merged.get("icon", {}).get("$extensions", {}).get("ds.icons", {})
 
 
-def render(model: Model, header: str) -> str:
-    """Render the Dart token library with theme extensions for light and dark."""
+def accent_constant(theme: str, accent: str) -> str:
+    """Name of the DsAccent constant for a theme and accent: `lightLoch`, `darkSpruce`."""
+    return identifier(f"{theme}-{accent}")
+
+
+def accent_extension(variants: dict[tuple[str, str], dict], default: str) -> str:
+    """The `DsAccent` theme extension for the accent variants of `accents.derive`.
+
+    Args:
+        variants: (theme, accent) -> role -> Variant; themes must be `light` and `dark`.
+        default: the default accent; `DsAccent.of` falls back to it for an unknown key.
+
+    Returns:
+        Dart source of the class.
+
+    Raises:
+        ValueError: the themes are not exactly `light` and `dark`.
+    """
+    themes = list(dict.fromkeys(theme for theme, _ in variants))
+    if sorted(themes) != ["dark", "light"]:
+        raise ValueError(f"DsAccent needs the themes light and dark, got {themes}")
+    accent_keys = list(dict.fromkeys(accent for _, accent in variants))
+    roles = list(next(iter(variants.values())))
+    fields = [(identifier(role, "color"), "Color") for role in roles]
+    instances = {
+        accent_constant(theme, accent): {
+            identifier(role, "color"): color_literal(v.hex, 1.0) for role, v in variants[(theme, accent)].items()
+        }
+        for accent in accent_keys
+        for theme in themes
+    }
+    of = [
+        "  /// Accent roles for the instance accent [key] (`branding.accent_color`) and [brightness].",
+        "  ///",
+        f"  /// An unknown key gives the default accent `{default}`, so an instance setting written",
+        "  /// by a newer server never leaves the app without accent colours.",
+        "  static DsAccent of(String key, Brightness brightness) {",
+        "    final dark = brightness == Brightness.dark;",
+        "    return switch (key) {",
+    ]
+    for accent in accent_keys:
+        if accent != default:
+            of.append(
+                f"      '{accent}' => dark ? {accent_constant('dark', accent)} : {accent_constant('light', accent)},"
+            )
+    of += [
+        f"      _ => dark ? {accent_constant('dark', default)} : {accent_constant('light', default)},",
+        "    };",
+        "  }",
+    ]
+    doc = (
+        "Accent roles per theme and instance accent (`branding.accent_color`, ADR 0044).\n"
+        "\n"
+        "Roles: " + ", ".join(f"`{role}`" for role in roles) + ". Components read these roles only\n"
+        "from DsAccent, never from DsColors, so the instance accent applies everywhere. Every\n"
+        "constant passed the contrast gate (docs/design/contrast.md); roles that do not follow\n"
+        "the accent in a theme carry their base value."
+    )
+    return _extension_class("DsAccent", fields, instances, {f: "color" for f, _ in fields}, doc, of)
+
+
+def render(
+    model: Model, header: str, variants: dict[tuple[str, str], dict] | None = None, default: str | None = None
+) -> str:
+    """The Dart file `design_tokens.g.dart`; `variants` and `default` add the class DsAccent."""
     parts = [
         f"// {header}",
         "// ignore_for_file: public_member_api_docs, constant_identifier_names",
@@ -200,6 +274,9 @@ def render(model: Model, header: str) -> str:
                 "DsColors", fields, instances, {f: "color" for f, _ in fields}, "Semantic color roles per theme."
             )
         )
+        if variants:
+            parts.append("")
+            parts.append(accent_extension(variants, default or ""))
         shadow_paths = [p for p, t in any_ctx.items() if t.type == "shadow"]
         if shadow_paths:
             sfields = [(identifier(p, "elevation"), "List<BoxShadow>") for p in shadow_paths]

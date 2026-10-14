@@ -1,9 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for the contrast gate and the palette guard rules."""
 
+import json
 import unittest
+from pathlib import Path
 
-from tokenkit import dtcg, rules
+from tokenkit import accents, dtcg, model, rules
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def _color(hex_value):
@@ -64,6 +68,39 @@ class ContrastGateTest(unittest.TestCase):
         tokens = _tokens({"fg": "#000000", "bg": "#ffffff"})
         with self.assertRaises(rules.RuleError):
             rules.check_contrast({"light": tokens}, [{"fg": "fg", "bg": "bg", "kind": "huge"}])
+
+
+class AccentContrastTest(unittest.TestCase):
+    def test_every_accent_checked_light_and_dark(self):
+        model_ = model.build(ROOT / "design" / "tokens" / "theme.resolver.json")
+        data = json.loads((ROOT / "design" / "design-rules.json").read_text(encoding="utf-8"))
+        themes = model_.full["theme"]
+        variants = accents.derive(themes, data)
+        rows = rules.check_accent_contrast(themes, data["contrast_pairs"], variants, "spruce")
+        member = data["accent_variants"]
+        others = [a for a in member["accents"] if a != member["default"]]
+        self.assertEqual(len(others), 6)
+        self.assertEqual({(r.theme, r.accent) for r in rows}, {(t, a) for t in ("light", "dark") for a in others})
+        for theme in ("light", "dark"):
+            for accent in others:
+                swapped = {role for role, v in variants[(theme, accent)].items() if v.swapped}
+                expected = {
+                    (p["fg"], p["bg"])
+                    for p in rules.expand_pairs(data["contrast_pairs"])
+                    if p["fg"] in swapped or p["bg"] in swapped
+                }
+                got = {(r.fg, r.bg) for r in rows if r.theme == theme and r.accent == accent}
+                self.assertEqual(got, expected, f"{theme} {accent}")
+        failed = [r for r in rows if not r.passed]
+        self.assertEqual(failed, [])
+
+    def test_accent_rows_use_variant_colours(self):
+        light = _tokens({"fg": "#000000", "bg": "#ffffff"})
+        variant = accents.Variant(role="fg", scale="x", step="1", hex="#eeeeee", moved_from=None, swapped=True)
+        rows = rules.check_accent_contrast(
+            {"light": light}, [{"fg": "fg", "bg": "bg", "kind": "text"}], {("light", "x"): {"fg": variant}}, "spruce"
+        )
+        self.assertEqual([(r.accent, r.fg_hex, r.passed) for r in rows], [("x", "#eeeeee", False)])
 
 
 class PaletteGuardTest(unittest.TestCase):
