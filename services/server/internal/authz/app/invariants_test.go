@@ -204,7 +204,7 @@ func TestAZ_M26_DisableLastOwnerRejected(t *testing.T) {
 // p7Case is one case of AZ-P7.
 type p7Case func(t *testing.T, w *pgWorld)
 
-// p7Cases holds one case per action of 05 rule 1.6 except group.member.sync (M1-42).
+// p7Cases holds one case per action of 05 rule 1.6.
 var p7Cases = map[string]p7Case{
 	"grant.create": func(t *testing.T, w *pgWorld) {
 		before := w.snapshot(t)
@@ -223,6 +223,27 @@ var p7Cases = map[string]p7Case{
 		before := w.snapshot(t)
 		_, err = w.admin.AddGroupMember(ctx, w.user(w.owner), g.ID, authz.AddMemberCmd{UserID: w.robin})
 		w.expectRejected(t, before, err, errs.CodeI1Violation, "group.member.add", ref("group", g.ID), w.owner)
+	},
+	// AZ-P7 for group.member.sync (M1-42): Robin's claim maps him into a group with trigger on
+	// Notizen, which the personal Assistent serves; the login's sync is refused and leaves only
+	// the deny entry with Robin as actor and resource.
+	"group.member.sync": func(t *testing.T, w *pgWorld) {
+		ctx := context.Background()
+		prov := w.provider(t, "Company")
+		g := w.claimGroup(t, "Engineering", prov, "engineering")
+		_, err := w.admin.CreateGrant(ctx, w.user(w.owner), authz.CreateGrantCmd{SubjectKind: "group", SubjectID: g, TargetKind: "channel",
+			TargetID: w.notizen, Level: "trigger", Reason: "notes"})
+		mustOK(t, err)
+		before := w.snapshot(t)
+		_, err = w.syncClaims(w.robin, prov, "engineering")
+		d := w.expectRejected(t, before, err, errs.CodeI1Violation, "group.member.sync", ref("user", w.robin), w.robin)
+		if e, _ := errs.As(err); e.Hint != authz.HintI1ClaimSync {
+			t.Fatalf("hint %q", e.Hint)
+		}
+		if d.Details["provider_id"] != prov.String() || !slices.Equal(anyStrings(d.Details["group_ids"]), []string{g.String()}) ||
+			!slices.Equal(anyStrings(d.Details["agent_ids"]), []string{w.assistent.String()}) {
+			t.Fatalf("details %v", d.Details)
+		}
 	},
 	"owner.add": func(t *testing.T, w *pgWorld) {
 		before := w.snapshot(t)
@@ -386,8 +407,7 @@ func TestAZ_P7_I1PerAction(t *testing.T) {
 var rule16Action = regexp.MustCompile("`([a-z_]+(?:\\.[a-z_]+)+)`")
 
 // TestAZ_P7_CoversRule16 reads rule 1.6 from 05 and fails for an action there without a case in
-// p7Cases, except group.member.sync (M1-42 adds its case under AZ-P7), and for a case without an
-// action there.
+// p7Cases, and for a case without an action there.
 func TestAZ_P7_CoversRule16(t *testing.T) {
 	t.Parallel()
 	f, err := os.Open(filepath.Join("..", "..", "..", "..", "..", "docs", "spec", "05-aktionen.md"))
@@ -419,7 +439,7 @@ func TestAZ_P7_CoversRule16(t *testing.T) {
 		t.Fatalf("read %v from rule 1.6; the rule moved?", actions)
 	}
 	for _, a := range actions {
-		if _, ok := p7Cases[a]; !ok && a != "group.member.sync" {
+		if _, ok := p7Cases[a]; !ok {
 			t.Errorf("05 rule 1.6 names %s, AZ-P7 has no case for it", a)
 		}
 	}
@@ -428,4 +448,15 @@ func TestAZ_P7_CoversRule16(t *testing.T) {
 			t.Errorf("AZ-P7 has a case for %s, which 05 rule 1.6 does not name", a)
 		}
 	}
+}
+
+// anyStrings converts a decoded JSON array of strings.
+func anyStrings(v any) []string {
+	list, _ := v.([]any)
+	out := make([]string, 0, len(list))
+	for _, e := range list {
+		s, _ := e.(string)
+		out = append(out, s)
+	}
+	return out
 }

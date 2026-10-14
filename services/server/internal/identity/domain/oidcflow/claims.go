@@ -37,6 +37,9 @@ type Claims struct {
 	Email             string
 	AuthTime          time.Time
 	AMR               []string
+	// Members are all members of the payload, for the claims a provider configuration names
+	// (groups_claim, GroupsFromClaims); nil for claims built without a payload.
+	Members map[string]json.RawMessage
 }
 
 // maxNumericDate bounds a NumericDate to the year 9999, so a time always converts.
@@ -54,7 +57,7 @@ func ParseClaims(payload []byte) (Claims, error) {
 	if err := dec.Decode(&all); err != nil || all == nil {
 		return Claims{}, fmt.Errorf("%w: the payload is not an object", ErrClaims)
 	}
-	var c Claims
+	c := Claims{Members: all}
 	for _, step := range []func(map[string]json.RawMessage, *Claims) error{parseStrings, parseAudience, parseTimes, parseAMR} {
 		if err := step(all, &c); err != nil {
 			return Claims{}, err
@@ -241,4 +244,59 @@ func IssuerMatches(configured string, allowed []string, iss string) bool {
 		}
 	}
 	return false
+}
+
+// The values of external_identity.v1 groups_state (brief M1-42).
+const (
+	// GroupsPresent is a group claim delivered as an array of strings (also empty): the sync
+	// adds, extends and removes.
+	GroupsPresent = "present"
+	// GroupsAbsent is a provider with groups_claim whose token carries no such claim: no change.
+	GroupsAbsent = "absent"
+	// GroupsOverage is the Microsoft Entra ID overage (08 section 2.3): the claim name is a key of
+	// _claim_names instead of a value; no change, the server never calls Microsoft Graph.
+	GroupsOverage = "overage"
+)
+
+// claimNames is the member of the distributed claims of OpenID Connect Core section 5.6.2, which
+// Microsoft Entra ID uses for the groups overage.
+const claimNames = "_claim_names"
+
+// GroupsFromClaims reads the group claim name of c (the groups_claim of the provider, 08 section
+// 3.4): the overage when name is a key of the object _claim_names, else absent when the claim is
+// missing, else present with the values deduplicated and sorted. Errors wrap ErrClaims for a
+// claim that is not an array of strings (null included); they never carry a value, because group
+// values can be names.
+func GroupsFromClaims(c Claims, name string) (string, []string, error) {
+	if raw, ok := c.Members[claimNames]; ok {
+		var names map[string]json.RawMessage
+		if json.Unmarshal(raw, &names) == nil {
+			if _, over := names[name]; over {
+				return GroupsOverage, nil, nil
+			}
+		}
+	}
+	raw, ok := c.Members[name]
+	if !ok {
+		return GroupsAbsent, nil, nil
+	}
+	notStrings := claimError("the group claim is not an array of strings")
+	var elems []json.RawMessage
+	if err := json.Unmarshal(raw, &elems); err != nil || elems == nil {
+		return "", nil, notStrings
+	}
+	values := make([]string, 0, len(elems))
+	for _, e := range elems {
+		// json.Unmarshal reads null into a string without error, so the type is checked first.
+		var v string
+		if t := bytes.TrimSpace(e); len(t) == 0 || t[0] != '"' || json.Unmarshal(t, &v) != nil {
+			return "", nil, notStrings
+		}
+		values = append(values, v)
+	}
+	values = slices.Compact(slices.Sorted(slices.Values(values)))
+	if len(values) == 0 {
+		values = nil
+	}
+	return GroupsPresent, values, nil
 }

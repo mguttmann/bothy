@@ -110,6 +110,55 @@ func (q *Queries) InsertGroup(ctx context.Context, arg InsertGroupParams) error 
 	return err
 }
 
+const listClaimGroupsByRefs = `-- name: ListClaimGroupsByRefs :many
+SELECT g.id, g.name, g.description, g.source, g.provider_id, g.external_ref, g.created_by, g.created_at, g.deleted_at
+FROM groups g
+WHERE g.source = 'oidc_claim' AND g.provider_id = $1 AND g.deleted_at IS NULL
+  AND g.external_ref = ANY ($2::text[])
+ORDER BY g.id
+`
+
+type ListClaimGroupsByRefsParams struct {
+	ProviderID   pgtype.UUID
+	ExternalRefs []string
+}
+
+type ListClaimGroupsByRefsRow struct {
+	Group Group
+}
+
+// The live oidc_claim groups of one provider whose claim value is one of @external_refs (the
+// claim sync of M1-42), ascending by id.
+func (q *Queries) ListClaimGroupsByRefs(ctx context.Context, arg ListClaimGroupsByRefsParams) ([]ListClaimGroupsByRefsRow, error) {
+	rows, err := q.db.Query(ctx, listClaimGroupsByRefs, arg.ProviderID, arg.ExternalRefs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListClaimGroupsByRefsRow
+	for rows.Next() {
+		var i ListClaimGroupsByRefsRow
+		if err := rows.Scan(
+			&i.Group.ID,
+			&i.Group.Name,
+			&i.Group.Description,
+			&i.Group.Source,
+			&i.Group.ProviderID,
+			&i.Group.ExternalRef,
+			&i.Group.CreatedBy,
+			&i.Group.CreatedAt,
+			&i.Group.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listLiveGroups = `-- name: ListLiveGroups :many
 SELECT g.id, g.name, g.description, g.source, g.provider_id, g.external_ref, g.created_by, g.created_at, g.deleted_at
 FROM groups g

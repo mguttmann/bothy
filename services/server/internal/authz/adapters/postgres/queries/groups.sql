@@ -41,3 +41,12 @@ FROM group_memberships m
 WHERE m.group_id = ANY (@group_ids::uuid[]) AND m.removed_at IS NULL
   AND (m.expires_at IS NULL OR m.expires_at > @at)
 GROUP BY m.group_id;
+
+-- name: ListClaimGroupsByRefs :many
+-- The live oidc_claim groups of one provider whose claim value is one of @external_refs (the
+-- claim sync of M1-42), ascending by id.
+SELECT sqlc.embed(g)
+FROM groups g
+WHERE g.source = 'oidc_claim' AND g.provider_id = @provider_id AND g.deleted_at IS NULL
+  AND g.external_ref = ANY (@external_refs::text[])
+ORDER BY g.id;

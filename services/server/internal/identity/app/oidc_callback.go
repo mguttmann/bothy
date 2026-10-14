@@ -28,6 +28,7 @@ const (
 	causeClaims         = "id_token_claims"
 	causeIssMismatch    = "iss_mismatch"
 	causeFlowExpired    = "flow_expired"
+	causeGroupsClaim    = "groups_claim"
 	causeUnknownFlow    = "unknown_flow"
 	logCallbackCause    = "bothy.identity.oidc.cause"
 	logLoginAttemptID   = "bothy.identity.login_attempt_id"
@@ -77,8 +78,9 @@ func (o *OIDC) unknownFlow(ctx context.Context) error {
 		WithFields(errs.FieldError{Pointer: fieldState, Code: "invalid", Detail: "The login flow is unknown, used or expired."})
 }
 
-// verifyCallback runs the checks of steps 3 to 6 and returns the verified identity, or the error
-// code for the app and the internal cause.
+// verifyCallback runs the checks of steps 3 to 6 and returns the verified identity with the group
+// claim of a provider with groups_claim (M1-42), or the error code for the app and the internal
+// cause.
 func (o *OIDC) verifyCallback(ctx context.Context, f LoginFlowRecord, in identity.OIDCCallback) (oidcflow.ExternalIdentity, string, string) {
 	if in.Error != "" {
 		return oidcflow.ExternalIdentity{}, oidcflow.ErrorAccessDenied, causeProviderError
@@ -116,7 +118,15 @@ func (o *OIDC) verifyCallback(ctx context.Context, f LoginFlowRecord, in identit
 	case !now.Before(f.ExpiresAt):
 		return oidcflow.ExternalIdentity{}, oidcflow.ErrorFlowExpired, causeFlowExpired
 	}
-	return oidcflow.ExternalFromClaims(claims, issuer), "", ""
+	ext := oidcflow.ExternalFromClaims(claims, issuer)
+	if conf.GroupsClaim != "" {
+		// The group claim of a provider with groups_claim goes into the flow for the sync at
+		// complete (08 section 3.4); a claim of another form fails the login.
+		if ext.GroupsState, ext.Groups, err = oidcflow.GroupsFromClaims(claims, conf.GroupsClaim); err != nil {
+			return oidcflow.ExternalIdentity{}, oidcflow.ErrorLoginFailed, causeGroupsClaim
+		}
+	}
+	return ext, "", ""
 }
 
 // issueLoginCode stores the verified identity with a new login_code and returns the redirect with

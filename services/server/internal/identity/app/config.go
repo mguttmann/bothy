@@ -102,6 +102,9 @@ type Config struct {
 	// OIDCClientAssertionTTL is auth.oidc_client_assertion_ttl, the lifetime of a private_key_jwt
 	// client assertion.
 	OIDCClientAssertionTTL time.Duration `config:"auth.oidc_client_assertion_ttl"`
+	// GroupClaimMaxAge is auth.group_claim_max_age: a membership from a group claim expires this
+	// long after the last login that carried it (08 section 3.4, M1-42).
+	GroupClaimMaxAge time.Duration `config:"auth.group_claim_max_age"`
 	// IDPRecheckInterval is auth.idp_recheck_interval: an OIDC session this old needs a new login
 	// at the provider before its next refresh (08 section 3.5). Zero switches the rule off, which
 	// only tests do; the schema refuses it.

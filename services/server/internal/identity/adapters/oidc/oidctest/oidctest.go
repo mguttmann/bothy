@@ -6,8 +6,9 @@
 // with a code; /token checks grant type, redirect URI, PKCE S256 and the client authentication
 // (Basic secret or a private_key_jwt assertion against a registered public key with aud, exp and
 // a unique jti) and issues an ID token signed by the provider key. Knobs change header and claims
-// of the next ID tokens, rotate the key, omit the iss parameter, answer with an error, and switch
-// to the Microsoft Entra ID issuer template. Only tests import it.
+// of the next ID tokens, rotate the key, omit the iss parameter, answer with an error, switch to
+// the Microsoft Entra ID issuer template, and set a group claim or its Entra overage (M1-42).
+// Only tests import it.
 //
 // Example:
 //
@@ -219,6 +220,26 @@ func (p *IDP) SetClaim(name string, v any) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.claims[name] = v
+}
+
+// SetGroups puts the group claim name with values into the next ID tokens (M1-42); Reset or
+// DropClaim(name) takes it out again.
+func (p *IDP) SetGroups(name string, values ...string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.claims[name] = append([]string{}, values...)
+	delete(p.claims, "_claim_names")
+	delete(p.claims, "_claim_sources")
+}
+
+// SetGroupsOverage replaces the group claim name of the next ID tokens with the Microsoft Entra ID
+// overage: name in _claim_names, pointing to a source in _claim_sources (08 section 2.3).
+func (p *IDP) SetGroupsOverage(name string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	delete(p.claims, name)
+	p.claims["_claim_names"] = map[string]any{name: "src1"}
+	p.claims["_claim_sources"] = map[string]any{"src1": map[string]any{"endpoint": "https://graph.example.com/v1.0/users/me/getMemberObjects"}}
 }
 
 // DropClaim removes a claim from the next ID tokens.

@@ -112,3 +112,37 @@ func TestFakeProvider(t *testing.T) {
 		t.Fatal("fresh provider state")
 	}
 }
+
+// TestFakeProviderGroups: SetGroups puts the group claim into the next ID tokens and
+// SetGroupsOverage replaces it with the Entra overage reference (M1-42).
+func TestFakeProviderGroups(t *testing.T) {
+	t.Parallel()
+	const verifier = "dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
+	idp := oidctest.New(t, oidctest.Options{ClientID: "chat", Secret: "EXAMPLE"})
+	payload := func() string {
+		t.Helper()
+		idp.NextLogin(oidctest.Login{Subject: "s"})
+		q := url.Values{"client_id": {"chat"}, "response_type": {"code"}, "redirect_uri": {"https://chat.example.com/cb"}, "state": {"st"},
+			"nonce": {"n"}, "code_challenge": {s256(verifier)}, "code_challenge_method": {"S256"}}
+		loc := idp.Authorize(t, idp.URL()+"/authorize?"+q.Encode())
+		form := url.Values{"grant_type": {"authorization_code"}, "code": {loc.Query().Get("code")}, "redirect_uri": {"https://chat.example.com/cb"},
+			"code_verifier": {verifier}}
+		st, m := token(t, idp, form, "EXAMPLE")
+		if st != http.StatusOK {
+			t.Fatalf("token %d %v", st, m)
+		}
+		j, err := jose.ParseCompactJWS(m["id_token"].(string), []string{jose.AlgRS256}, "JWT")
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(j.Payload)
+	}
+	idp.SetGroups("groups", "support", "research")
+	if p := payload(); !strings.Contains(p, `"groups":["support","research"]`) || strings.Contains(p, "_claim_names") {
+		t.Fatalf("payload %s", p)
+	}
+	idp.SetGroupsOverage("groups")
+	if p := payload(); strings.Contains(p, `"groups":[`) || !strings.Contains(p, `"_claim_names":{"groups":"src1"}`) {
+		t.Fatalf("payload %s", p)
+	}
+}

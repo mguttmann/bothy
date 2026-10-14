@@ -226,13 +226,22 @@ func (h *RightsHook) BeforeCommit(ctx context.Context) error {
 	if b == nil || !ok {
 		return internal("the rights check hook runs without the state of its begin hook")
 	}
+	// A claim sync (M1-42) is declared before its person is known: the person is the actor of its
+	// events and of its deny entry, which names the person, provider, groups and agents.
+	cs := claimSyncOf(ctx)
+	if cs != nil {
+		ctx = actor.WithActor(ctx, cs.actor)
+	}
 	t := h.d.Clock.Now()
 	viol, err := h.VerifyInvariants(ctx, t)
 	if err != nil {
 		return err
 	}
 	if !viol.Empty() {
-		h.deny(ctx, b.Audit, st.spec, viol)
+		h.deny(ctx, b.Audit, st.spec, viol, cs)
+		if cs != nil && !viol.LastOwner {
+			return authz.NewI1Violation(viol.I1).WithHint(authz.HintI1ClaimSync)
+		}
 		return viol.Err()
 	}
 	folded, err := h.pendingEvents(ctx, st)
@@ -390,9 +399,10 @@ func eventActor(ctx context.Context, action string) (eventlog.ActorKind, ids.ID)
 
 // deny hands the deny entry of a violation to the recorder (07 section 4.4 step 5, brief M1-29
 // "Deny audit entry"): action, reason, resource and the violations; actor, device, session and
-// correlation come from ctx. RecordDenial aggregates and writes in an own transaction; its error
+// correlation come from ctx. A claim sync cs (M1-42) names the person as resource and adds
+// provider, groups and agents. RecordDenial aggregates and writes in an own transaction; its error
 // is logged and never changes the answer.
-func (h *RightsHook) deny(ctx context.Context, rec auditing.Recorder, spec txn.RightsChangeSpec, v Violations) {
+func (h *RightsHook) deny(ctx context.Context, rec auditing.Recorder, spec txn.RightsChangeSpec, v Violations, cs *claimSyncState) {
 	e := auditing.Entry{
 		Action: spec.Action, Decision: auditing.DecisionDeny,
 		ResourceKind: spec.Resource.Kind, ResourceID: spec.Resource.ID,
@@ -409,6 +419,9 @@ func (h *RightsHook) deny(ctx context.Context, rec auditing.Recorder, spec txn.R
 			})
 		}
 		e.Attrs = auditing.Attrs{"violations": auditing.Violations(list...)}
+		if cs != nil {
+			e = claimSyncDenial(e, cs, v)
+		}
 	}
 	if err := rec.RecordDenial(ctx, e); err != nil {
 		h.log.LogAttrs(ctx, slog.LevelError, msgAuditFailed, slog.String(keyAction, spec.Action), slog.String(keyErrorType, "audit"))

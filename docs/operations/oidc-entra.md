@@ -1,6 +1,6 @@
 # Anmeldung mit Microsoft Entra ID (OIDC)
 
-Status: gebaut (M1-41). Normativ sind [08-identitaet.md](../spec/08-identitaet.md) Abschnitte 2.2,
+Status: gebaut (M1-41; groups from the group claim M1-42, section 7). Normativ sind [08-identitaet.md](../spec/08-identitaet.md) Abschnitte 2.2,
 2.3 und 2.6; bei Abweichung gilt das Kapitel. Microsoft Entra ID ist das Referenzbeispiel; jeder
 andere OpenID-Connect-Anbieter wird genauso eingerichtet.
 
@@ -21,7 +21,7 @@ Gerät und werden nie gespeichert. Beide Strecken nutzen PKCE `S256`.
 3. Unter "Zertifikate und Geheimnisse" ein **Zertifikat** hochladen (Client-Authentisierung
    `private_key_jwt`, bevorzugt). Ein Client-Secret (`client_secret_basic`) geht ebenfalls, läuft
    aber ab und ist ein weiteres Geheimnis.
-4. Optional den `groups`-Claim im Token freigeben; den Abgleich von Gruppen beschreibt M1-42
+4. Optional den `groups`-Claim im Token freigeben; den Abgleich von Gruppen beschreibt Abschnitt 7
    (08 Abschnitt 3.4). Ohne `groups_claim` in der Konfiguration wird er nicht gelesen.
 5. Für eine Organisation mit mehreren Mandanten "Konten in einem beliebigen
    Organisationsverzeichnis" wählen und die erlaubten Mandanten-IDs in `allowed_tenant_ids`
@@ -101,9 +101,42 @@ ist; `localhost` ist nie erlaubt.
 - Eine weitere Identität verknüpft die Person selbst mit `beginIdentityLink` und
   `completeIdentityLink` (Step-up).
 
-## 7. Konfigurationswerte
+## 7. Groups from the group claim
+
+Built in M1-42 (08 section 3.4). The provider names its group claim in `groups_claim`; without it
+the server never reads groups and never changes memberships at a login of that provider.
+
+- **Claim in Entra.** Under "Token configuration" add the groups claim to the ID token ("Security
+  groups" or "Groups assigned to the application"; the latter keeps the token small). Entra sends
+  the group object IDs as an array of strings in `groups`, so the provider configuration gets
+  `"groups_claim": "groups"`.
+- **Mapping.** The owner creates one group per claim value with `createGroup`, `source:
+  oidc_claim`, the `provider_id` of the provider and the claim value (the Entra object ID) as
+  `external_ref`, and gives that group its grants. Claim values without such a group are ignored;
+  the server never creates a group by itself. A group belongs to its provider: another provider
+  with the same claim value never touches it.
+- **At every login** of the provider the memberships of the person in its claim groups follow the
+  claim: new ones get `expires_at = login time + auth.group_claim_max_age`, present ones (also
+  expired ones) are extended to that time, and ones whose value is gone are removed. Every change
+  is a rights change (`access.changed`, audit action `group.member.sync` with group ids only); a
+  login without change writes nothing. Members of claim groups cannot be added or removed by hand
+  (`409 claim_managed_group`).
+- **Overage.** With more groups than fit into the token Entra sends a reference in `_claim_names`
+  instead of `groups`. The server never calls Microsoft Graph: like a missing claim this changes
+  nothing, and the memberships run out after `auth.group_claim_max_age`. Limit the claim to the
+  groups that matter (application groups) so the overage does not happen.
+- **Wrong form.** A `groups` claim that is not an array of strings fails the login
+  (`error=login_failed`).
+- **I1.** A sync that would let someone other than the credential holder trigger a personal agent
+  (for example a claim group with `trigger` on a channel such an agent serves) fails the whole
+  login with `409 i1_violation` and the hint "Sign-in blocked by a group mapping. An owner must
+  switch the affected agent to organization first."; nothing of the login is kept, and the audit
+  log has a deny entry of `group.member.sync` naming the person, the provider, the groups and the
+  agents.
+
+## 8. Konfigurationswerte
 
 `auth.login_flow_ttl`, `auth.server_code_ttl`, `auth.oidc_jwks_cache_ttl`,
-`auth.oidc_client_assertion_ttl`, `auth.idp_recheck_interval`, `auth.clock_leeway`,
+`auth.oidc_client_assertion_ttl`, `auth.idp_recheck_interval`, `auth.group_claim_max_age`, `auth.clock_leeway`,
 `egress.timeout`, `egress.max_response_bytes`; Standards in der
 [Konfigurationsreferenz](configuration.md).

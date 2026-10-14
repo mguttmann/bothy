@@ -190,6 +190,7 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"auth.device_inactive_revoke_after":  {Kind: config.KindDuration, Default: "180d", Min: "1h", Chapter: "08-identitaet.md"},
 		"auth.trusted_header_bind_requests":  {Kind: config.KindBool, Default: "true", Chapter: "08-identitaet.md"},
 		"auth.idp_recheck_interval":          {Kind: config.KindDuration, Default: "30d", Min: "1m", Chapter: "08-identitaet.md"},
+		"auth.group_claim_max_age":           {Kind: config.KindDuration, Default: "30d", Min: "1m", Chapter: "08-identitaet.md"},
 		"client.min_version.ios":             {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
 		"client.min_version.android":         {Kind: config.KindString, Default: "", Chapter: "18-release.md"},
 		"client.min_version.macos":           {Kind: config.KindString, Default: "", Chapter: "18-release.md"},

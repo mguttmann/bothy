@@ -11,6 +11,18 @@ documented in this file. The format is based on
 
 ### Added
 
+- Groups from OIDC claims (M1-42): for a provider with `groups_claim` the callback stores the
+  group claim in the login flow (`groups_state` `present`, `absent` or `overage`; another form
+  fails the login), and the completion makes the person's memberships in the provider's
+  `oidc_claim` groups follow it as the system action `group.member.sync`: new memberships expire
+  after `auth.group_claim_max_age` (new key, default `30d`), present ones are extended, missing
+  ones removed, each change a rights change with `access.changed`, `group.changed` and one audit
+  entry with group ids only; a login without change writes nothing. A missing claim or the Entra
+  overage changes nothing and the server never calls Microsoft Graph. A sync that would violate
+  I1 fails the whole login with `409 i1_violation` and a deny entry naming provider, groups and
+  agents. New store queries `LockClaimMembershipsOfUser`, `ExtendMembership` and
+  `ListClaimGroupsByRefs`; the fake provider gets `SetGroups` and `SetGroupsOverage`.
+
 - Device approval and pairing (M1-38): a device that logs in without an enrollment code stays
   `pending` with tokens but no access beyond reading itself and shows a verification code
   derived from the token pepper, its id and its DPoP key (never stored). `approveDevice` (owner or

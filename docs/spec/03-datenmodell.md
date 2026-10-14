@@ -674,7 +674,7 @@ Zweck: Mitgliedschaft eines Menschen in einer Gruppe, mit Verlauf. Modul: `authz
 | `added_at` | `timestamptz` | nein | `now()` | |
 | `expires_at` | `timestamptz` | ja | | bei jedem `authorize` geprüft |
 | `expiry_reminded_at` | `timestamptz` | ja | | Erinnerung vor Ablauf geschrieben (`access.expiring`) |
-| `expiry_reported_at` | `timestamptz` | ja | | Ablauf gemeldet (`access.changed`, Systemaktion `group.member.expire`); genau einmal je Mitgliedschaft |
+| `expiry_reported_at` | `timestamptz` | ja | | Ablauf gemeldet (`access.changed`, Systemaktion `group.member.expire`); genau einmal je Ablaufzeitpunkt (die Verlängerung durch `group.member.sync` setzt die Spalte zurück) |
 | `removed_at` | `timestamptz` | ja | | |
 | `removed_by` | `uuid` | ja | | |
 
@@ -688,6 +688,9 @@ Aufbewahrung: `account`.
 Mitgliedschaften in Gruppen mit `source = 'oidc_claim'` ändert nur der Abgleich bei der Anmeldung
 (Systemaktion `group.member.sync`, [08-identitaet.md](08-identitaet.md), Abschnitt 3.4); dort sind
 `added_by` und `removed_by` die Person, deren Anmeldung den Claim trug.
+The sync extends an existing row (expired or not) by setting `expires_at` and clearing
+`expiry_reminded_at` and `expiry_reported_at`: reminder and expiry report are written once per
+expiry time, so the new expiry is reminded and reported again (M1-42, docs/DECISIONS.md M1-42).
 
 #### `grants`
 

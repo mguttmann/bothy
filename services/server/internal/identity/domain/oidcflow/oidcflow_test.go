@@ -376,3 +376,66 @@ func TestExternalIdentityJSON(t *testing.T) {
 		t.Fatal("other schema accepted")
 	}
 }
+
+// TestGroupsClaimParsing reads the configured group claim of an ID token (brief M1-42 "Reading
+// the claim at the callback"): an array of strings is present (deduplicated), an empty array is
+// present without values, a missing claim is absent, the claim name in _claim_names is the Entra
+// overage, and another JSON type or a non-string element fails.
+func TestGroupsClaimParsing(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name, payload, state string
+		groups               []string
+		fail                 bool
+	}{
+		{name: "array of strings", payload: `{"groups":["support","marketing","support"]}`, state: oidcflow.GroupsPresent, groups: []string{"marketing", "support"}},
+		{name: "empty array", payload: `{"groups":[]}`, state: oidcflow.GroupsPresent},
+		{name: "absent", payload: `{"sub":"s"}`, state: oidcflow.GroupsAbsent},
+		{name: "entra overage", payload: `{"_claim_names":{"groups":"src1"},"_claim_sources":{"src1":{"endpoint":"https://graph.example.com"}}}`,
+			state: oidcflow.GroupsOverage},
+		{name: "overage of another claim", payload: `{"_claim_names":{"roles":"src1"},"groups":["support"]}`, state: oidcflow.GroupsPresent,
+			groups: []string{"support"}},
+		{name: "wrong type", payload: `{"groups":"support"}`, fail: true},
+		{name: "null", payload: `{"groups":null}`, fail: true},
+		{name: "non-string element", payload: `{"groups":["support",7]}`, fail: true},
+		{name: "null element", payload: `{"groups":["support",null]}`, fail: true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			claims, err := oidcflow.ParseClaims([]byte(c.payload))
+			if err != nil {
+				t.Fatal(err)
+			}
+			state, groups, err := oidcflow.GroupsFromClaims(claims, "groups")
+			if c.fail {
+				if !errors.Is(err, oidcflow.ErrClaims) || strings.Contains(err.Error(), "support") {
+					t.Fatalf("error %v", err)
+				}
+				return
+			}
+			if err != nil || state != c.state || strings.Join(groups, ",") != strings.Join(c.groups, ",") {
+				t.Fatalf("state %q groups %v err %v, want %q %v", state, groups, err, c.state, c.groups)
+			}
+		})
+	}
+	x := oidcflow.ExternalIdentity{Issuer: "https://i.example.com", Subject: "s", AuthTime: time.Unix(1700000000, 0).UTC(),
+		GroupsState: oidcflow.GroupsPresent, Groups: []string{"support"}}
+	b, err := x.MarshalJSON()
+	if err != nil {
+		t.Fatal(err)
+	}
+	back, err := oidcflow.ParseExternalIdentity(b)
+	if err != nil || back.GroupsState != oidcflow.GroupsPresent || strings.Join(back.Groups, ",") != "support" {
+		t.Fatalf("%s: %+v %v", b, back, err)
+	}
+	for _, bad := range []string{
+		`{"schema":"external_identity.v1","issuer":"i","subject":"s","auth_time":1,"groups_state":"maybe"}`,
+		`{"schema":"external_identity.v1","issuer":"i","subject":"s","auth_time":1,"groups_state":"absent","groups":["support"]}`,
+		`{"schema":"external_identity.v1","issuer":"i","subject":"s","auth_time":1,"groups":["support"]}`,
+	} {
+		if _, err := oidcflow.ParseExternalIdentity([]byte(bad)); err == nil {
+			t.Fatalf("accepted %s", bad)
+		}
+	}
+}

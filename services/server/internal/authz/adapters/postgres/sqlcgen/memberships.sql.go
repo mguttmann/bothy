@@ -11,6 +11,27 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const extendMembership = `-- name: ExtendMembership :execrows
+UPDATE group_memberships
+SET expires_at = $1, expiry_reminded_at = NULL, expiry_reported_at = NULL
+WHERE id = $2 AND removed_at IS NULL
+`
+
+type ExtendMembershipParams struct {
+	ExpiresAt pgtype.Timestamptz
+	ID        pgtype.UUID
+}
+
+// The claim sync extends a membership that is not removed (M1-42): the new expiry starts a new
+// reminder and a new expiry report, so both markers are cleared.
+func (q *Queries) ExtendMembership(ctx context.Context, arg ExtendMembershipParams) (int64, error) {
+	result, err := q.db.Exec(ctx, extendMembership, arg.ExpiresAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const insertMembership = `-- name: InsertMembership :exec
 
 INSERT INTO group_memberships (id, group_id, user_id, added_by, added_at, expires_at)
@@ -242,6 +263,69 @@ func (q *Queries) ListMembershipsOfUserInGroup(ctx context.Context, arg ListMemb
 			&i.GroupMembership.ExpiryReportedAt,
 			&i.GroupMembership.RemovedAt,
 			&i.GroupMembership.RemovedBy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const lockClaimMembershipsOfUser = `-- name: LockClaimMembershipsOfUser :many
+SELECT m.id, m.group_id, m.user_id, m.added_by, m.added_at, m.expires_at, m.expiry_reminded_at, m.expiry_reported_at, m.removed_at, m.removed_by, g.id, g.name, g.description, g.source, g.provider_id, g.external_ref, g.created_by, g.created_at, g.deleted_at
+FROM group_memberships m
+JOIN groups g ON g.id = m.group_id
+WHERE m.user_id = $1 AND m.removed_at IS NULL
+  AND g.source = 'oidc_claim' AND g.provider_id = $2 AND g.deleted_at IS NULL
+ORDER BY m.id
+FOR UPDATE OF m
+`
+
+type LockClaimMembershipsOfUserParams struct {
+	UserID     pgtype.UUID
+	ProviderID pgtype.UUID
+}
+
+type LockClaimMembershipsOfUserRow struct {
+	GroupMembership GroupMembership
+	Group           Group
+}
+
+// The claim sync of an OIDC login (M1-42, 08 section 3.4): the memberships of the person that
+// are not removed, expired ones included, in the live oidc_claim groups of one provider, each
+// with its group, locked in ascending id (03 section 6.3 item 2).
+func (q *Queries) LockClaimMembershipsOfUser(ctx context.Context, arg LockClaimMembershipsOfUserParams) ([]LockClaimMembershipsOfUserRow, error) {
+	rows, err := q.db.Query(ctx, lockClaimMembershipsOfUser, arg.UserID, arg.ProviderID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []LockClaimMembershipsOfUserRow
+	for rows.Next() {
+		var i LockClaimMembershipsOfUserRow
+		if err := rows.Scan(
+			&i.GroupMembership.ID,
+			&i.GroupMembership.GroupID,
+			&i.GroupMembership.UserID,
+			&i.GroupMembership.AddedBy,
+			&i.GroupMembership.AddedAt,
+			&i.GroupMembership.ExpiresAt,
+			&i.GroupMembership.ExpiryRemindedAt,
+			&i.GroupMembership.ExpiryReportedAt,
+			&i.GroupMembership.RemovedAt,
+			&i.GroupMembership.RemovedBy,
+			&i.Group.ID,
+			&i.Group.Name,
+			&i.Group.Description,
+			&i.Group.Source,
+			&i.Group.ProviderID,
+			&i.Group.ExternalRef,
+			&i.Group.CreatedBy,
+			&i.Group.CreatedAt,
+			&i.Group.DeletedAt,
 		); err != nil {
 			return nil, err
 		}

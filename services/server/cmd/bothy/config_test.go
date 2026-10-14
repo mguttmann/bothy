@@ -178,6 +178,7 @@ func TestConfigPrintShowsSourcePerKey(t *testing.T) {
 		"auth.dpop_required_for = agent  # default\n" +
 		"auth.enrollment_code_max_attempts = 5  # default\n" +
 		"auth.enrollment_code_ttl = 3d  # default\n" +
+		"auth.group_claim_max_age = 30d  # default\n" +
 		"auth.idp_recheck_interval = 30d  # default\n" +
 		"auth.local_password_enabled = true  # default\n" +
 		"auth.login_fail_window = 15m  # default\n" +

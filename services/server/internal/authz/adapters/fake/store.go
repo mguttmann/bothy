@@ -172,6 +172,50 @@ func (s *Store) MembershipsOfUserInGroup(_ context.Context, groupID, userID ids.
 	return out, nil
 }
 
+// LockClaimMembershipsOfUser implements app.Store (no locks in memory).
+func (s *Store) LockClaimMembershipsOfUser(ctx context.Context, userID, providerID ids.ID) ([]domain.MembershipWithGroup, error) {
+	all, err := s.ActiveMembershipsOfUser(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(all, func(m domain.MembershipWithGroup) bool {
+		return m.Group.Source != domain.GroupSourceOIDCClaim || m.Group.ProviderID != providerID || !m.Group.DeletedAt.IsZero()
+	}), nil
+}
+
+// ClaimGroupsByRefs implements app.Store.
+func (s *Store) ClaimGroupsByRefs(_ context.Context, providerID ids.ID, refs []string) ([]domain.Group, error) {
+	if err := s.err(); err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []domain.Group
+	for _, g := range s.groups {
+		if g.Source == domain.GroupSourceOIDCClaim && g.ProviderID == providerID && g.DeletedAt.IsZero() && slices.Contains(refs, g.ExternalRef) {
+			out = append(out, g)
+		}
+	}
+	slices.SortFunc(out, func(a, b domain.Group) int { return slices.Compare(a.ID[:], b.ID[:]) })
+	return out, nil
+}
+
+// ExtendMembership implements app.Store.
+func (s *Store) ExtendMembership(_ context.Context, id ids.ID, expiresAt, _ time.Time) (bool, error) {
+	if err := s.err(); err != nil {
+		return false, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	m, ok := s.memberships[id]
+	if !ok || !m.RemovedAt.IsZero() {
+		return false, nil
+	}
+	m.ExpiresAt, m.ExpiryRemindedAt, m.ExpiryReportedAt = expiresAt, time.Time{}, time.Time{}
+	s.memberships[id] = m
+	return true, nil
+}
+
 // ActiveTriggerGrants implements app.Store.
 func (s *Store) ActiveTriggerGrants(_ context.Context) ([]domain.Grant, error) {
 	if err := s.err(); err != nil {
