@@ -95,7 +95,7 @@ Tests and docs:
 
 1. **CSP** (19 5 rule 7; SEC-VZ-2; Ruling for docs/DECISIONS.md). The origin is derived once at start from the configured URL (scheme, host, port; default port dropped); the builder appends `frame-src <origin>` to the policy of every console response; no wildcard, no path, no second origin. Without the key the builder output is byte-identical to M6-03 (test).
 
-2. **Config check** (25 9.2 item 4; VZ-T12; Ruling for docs/DECISIONS.md). Same origin as `server.public_url`: error naming both keys. Same site (registrable domain via the public suffix list the toolchain already pins, or, if none is pinned, the last two labels with an explicit limitation in the message and the docs) but another origin: fine. Another site: warning that the auth proxy cookie will not be sent in the iframe. Not `https`: error.
+2. **Config check** (25 9.2 item 4; VZ-T12; Ruling for docs/DECISIONS.md). Same origin as `server.public_url`: error naming both keys. Same site (registrable domain through `golang.org/x/net/publicsuffix`, already in the server's module graph; no fallback to the last two labels, which would treat `a.example.co.uk` and `b.other.co.uk` as one site) but another origin: fine. Another site: warning that the auth proxy cookie will not be sent in the iframe. Not `https`: error.
 
 3. **Page** (25 9.2 item 6). Visible only when `getInstance` returns `grafana_embed_url` (owners); title "Operations (Grafana)" with the note that the page follows the permissions of Grafana, not of the instance; the iframe fills the content area; a link opens the dashboard in a new tab with `noopener`.
 
