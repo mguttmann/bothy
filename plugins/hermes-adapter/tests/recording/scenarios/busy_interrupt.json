@@ -1,0 +1,110 @@
+{
+  "allowlist": [
+    "alex",
+    "sam"
+  ],
+  "config": {
+    "display": {
+      "platforms": {
+        "recording_probe": {
+          "busy_input_mode": "interrupt",
+          "tool_progress": "off"
+        }
+      }
+    }
+  },
+  "model_script": [
+    {
+      "hold": "first",
+      "tool_calls": [
+        {
+          "arguments": {
+            "todos": [
+              {
+                "content": "Book the boat",
+                "id": "1",
+                "status": "pending"
+              }
+            ]
+          },
+          "name": "todo_list"
+        }
+      ]
+    },
+    {
+      "paced": true,
+      "text": [
+        "The trip to the lake ",
+        "is planned for ",
+        "Saturday morning."
+      ]
+    },
+    {
+      "paced": true,
+      "text": [
+        "The picnic ",
+        "is added for noon."
+      ]
+    },
+    {
+      "paced": true,
+      "text": [
+        "Later answer ",
+        "for the next turn."
+      ]
+    }
+  ],
+  "point": "steer",
+  "probe": {
+    "supports_draft_streaming": true,
+    "supports_status_text": true
+  },
+  "provider": "openai",
+  "scenario": "busy_interrupt",
+  "steps": [
+    {
+      "do": "inject",
+      "message": "m-1",
+      "text": "ask",
+      "thread": "t-1",
+      "user": "alex"
+    },
+    {
+      "do": "wait_held",
+      "latch": "first"
+    },
+    {
+      "do": "inject",
+      "message": "m-2",
+      "text": "followup",
+      "thread": "t-1",
+      "user": "sam"
+    },
+    {
+      "do": "wait_for",
+      "method": "send"
+    },
+    {
+      "do": "wait_quiet"
+    },
+    {
+      "do": "release",
+      "latch": "first"
+    },
+    {
+      "do": "wait_for",
+      "from_start": true,
+      "message": "m-1",
+      "method": "on_processing_complete"
+    },
+    {
+      "do": "wait_quiet"
+    }
+  ],
+  "texts": {
+    "answer": "The trip to the lake is planned for Saturday morning.",
+    "ask": "Please plan the trip to the lake.",
+    "follow_answer": "The picnic is added for noon.",
+    "followup": "Please add a picnic at noon."
+  }
+}

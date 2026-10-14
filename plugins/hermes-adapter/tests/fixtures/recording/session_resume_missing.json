@@ -1,0 +1,574 @@
+{
+  "calls": [
+    {
+      "args": {
+        "extra_keys": [
+          "command_poll_s",
+          "enforces_own_access_policy",
+          "group_sessions_per_user",
+          "supports_draft_streaming",
+          "supports_status_text",
+          "thread_sessions_per_user"
+        ],
+        "is_reconnect": false
+      },
+      "method": "connect"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:2>",
+          "message_id": "<id:1>",
+          "text": "Please remember the blue boat.",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        }
+      },
+      "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "is_first_turn": null,
+        "kwargs": [
+          "model",
+          "platform",
+          "session_id",
+          "telemetry_schema_version"
+        ],
+        "session_id": "<id:4>",
+        "user_message": null
+      },
+      "method": "hook:on_session_start"
+    },
+    {
+      "args": {
+        "is_first_turn": true,
+        "kwargs": [
+          "conversation_history",
+          "is_first_turn",
+          "model",
+          "parent_session_id",
+          "platform",
+          "sender_id",
+          "session_id",
+          "task_id",
+          "telemetry_schema_version",
+          "turn_id",
+          "user_message"
+        ],
+        "session_id": "<id:4>",
+        "user_message": "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
+      },
+      "method": "hook:pre_llm_call"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "<partial>",
+        "draft_id": "<id:5>",
+        "metadata": {
+          "reply_to_message_id": "<id:1>",
+          "thread_id": "<id:3>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "<partial>",
+        "draft_id": "<id:5>",
+        "metadata": {
+          "reply_to_message_id": "<id:1>",
+          "thread_id": "<id:3>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "The trip to the lake is planned for Saturday morning.",
+        "draft_id": "<id:5>",
+        "metadata": {
+          "reply_to_message_id": "<id:1>",
+          "thread_id": "<id:3>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "is_first_turn": null,
+        "kwargs": [
+          "completed",
+          "failed",
+          "interrupted",
+          "model",
+          "platform",
+          "session_id",
+          "task_id",
+          "telemetry_schema_version",
+          "turn_exit_reason",
+          "turn_id"
+        ],
+        "session_id": "<id:4>",
+        "user_message": null
+      },
+      "method": "hook:on_session_end"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "The trip to the lake is planned for Saturday morning.",
+        "message_id": "<id:6>",
+        "metadata": {
+          "notify": true,
+          "reply_to_message_id": "<id:1>",
+          "thread_id": "<id:3>"
+        },
+        "reply_to": "<id:1>"
+      },
+      "method": "send"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:2>",
+          "message_id": "<id:1>",
+          "text": "Please remember the blue boat.",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        },
+        "outcome": {
+          "enum": "ProcessingOutcome",
+          "value": "success"
+        }
+      },
+      "method": "on_processing_complete"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:2>",
+          "message_id": "<id:8>",
+          "text": "/resume <id:7>",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        }
+      },
+      "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "sha256:5c27e1e26a5b7d9c101d92d4dd2e09d854eb1d023c1e4f9a6e91229f252a70b5:98",
+        "message_id": "<id:9>",
+        "metadata": {
+          "notify": true,
+          "thread_id": "<id:3>"
+        },
+        "reply_to": "<id:8>"
+      },
+      "method": "send"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:2>",
+          "message_id": "<id:8>",
+          "text": "/resume <id:7>",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        },
+        "outcome": {
+          "enum": "ProcessingOutcome",
+          "value": "success"
+        }
+      },
+      "method": "on_processing_complete"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:2>",
+          "message_id": "<id:10>",
+          "text": "Which things did I ask you to remember?",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        }
+      },
+      "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "is_first_turn": false,
+        "kwargs": [
+          "conversation_history",
+          "is_first_turn",
+          "model",
+          "parent_session_id",
+          "platform",
+          "sender_id",
+          "session_id",
+          "task_id",
+          "telemetry_schema_version",
+          "turn_id",
+          "user_message"
+        ],
+        "session_id": "<id:4>",
+        "user_message": "sha256:42069384d477d67e018da6d80538e858956d30482b09488a9daf31219f3da392:46"
+      },
+      "method": "hook:pre_llm_call"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "sha256:80a320a4e807602e652bc7614abde260ff7c3e2955bc785580e7eaff749c2308:13",
+        "draft_id": "<id:11>",
+        "metadata": {
+          "reply_to_message_id": "<id:10>",
+          "thread_id": "<id:3>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "sha256:8514384f2a2a9f057087ae41eeb9026b4ea7a2ba49aa10fbd8771c53f74b2e58:31",
+        "draft_id": "<id:11>",
+        "metadata": {
+          "reply_to_message_id": "<id:10>",
+          "thread_id": "<id:3>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "is_first_turn": null,
+        "kwargs": [
+          "completed",
+          "failed",
+          "interrupted",
+          "model",
+          "platform",
+          "session_id",
+          "task_id",
+          "telemetry_schema_version",
+          "turn_exit_reason",
+          "turn_id"
+        ],
+        "session_id": "<id:4>",
+        "user_message": null
+      },
+      "method": "hook:on_session_end"
+    },
+    {
+      "args": {
+        "chat_id": "<id:2>",
+        "content": "sha256:8514384f2a2a9f057087ae41eeb9026b4ea7a2ba49aa10fbd8771c53f74b2e58:31",
+        "message_id": "<id:12>",
+        "metadata": {
+          "notify": true,
+          "reply_to_message_id": "<id:10>",
+          "thread_id": "<id:3>"
+        },
+        "reply_to": "<id:10>"
+      },
+      "method": "send"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:2>",
+          "message_id": "<id:10>",
+          "text": "Which things did I ask you to remember?",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        },
+        "outcome": {
+          "enum": "ProcessingOutcome",
+          "value": "success"
+        }
+      },
+      "method": "on_processing_complete"
+    }
+  ],
+  "inputs_sha256": "9f5cf5c29784a5ea96af71632ce006561f43106a4d57b63dfe3384c357a38f0e",
+  "model_requests": [
+    {
+      "credential": "none",
+      "route": "openai.models",
+      "scripted": false
+    },
+    {
+      "completed": true,
+      "credential": "none",
+      "model": "fake-model",
+      "other_texts": [
+        "sha256:d03227d4b8c49d5b85099508928e227959448542d04f708c4dcd97a38f9c267c:5264",
+        "sha256:7b0bc61905001e77c75d23fb47a192a7e162211222293fe70a5a87579f8f8f13:1034"
+      ],
+      "roles": [
+        "system",
+        "user"
+      ],
+      "route": "openai.chat",
+      "scenario_texts": [
+        "Please remember the blue boat."
+      ],
+      "scripted": true,
+      "stream": true,
+      "tool_call_ids": [],
+      "tools": [
+        "todo_list"
+      ],
+      "turn": 1
+    },
+    {
+      "credential": "none",
+      "route": "openai.models",
+      "scripted": false
+    },
+    {
+      "completed": true,
+      "credential": "none",
+      "model": "fake-model",
+      "other_texts": [
+        "sha256:3f1eef0616ddd2c13d45a3f8cef4ed648dadfdacdba7fbedceebf5a04d549998:942",
+        "sha256:354fffcff870d90b48e0469344c0dd645038ce983084ac81086eeb4f70266c04:37"
+      ],
+      "roles": [
+        "system",
+        "user"
+      ],
+      "route": "openai.chat",
+      "scenario_texts": [
+        "Please remember the blue boat."
+      ],
+      "scripted": false,
+      "stream": false,
+      "tool_call_ids": [],
+      "tools": [],
+      "turn": null
+    },
+    {
+      "credential": "none",
+      "route": "openai.models",
+      "scripted": false
+    },
+    {
+      "completed": true,
+      "credential": "none",
+      "model": "fake-model",
+      "other_texts": [
+        "sha256:d03227d4b8c49d5b85099508928e227959448542d04f708c4dcd97a38f9c267c:5264",
+        "sha256:7b0bc61905001e77c75d23fb47a192a7e162211222293fe70a5a87579f8f8f13:1034",
+        "sha256:42069384d477d67e018da6d80538e858956d30482b09488a9daf31219f3da392:46"
+      ],
+      "roles": [
+        "system",
+        "user",
+        "assistant",
+        "user"
+      ],
+      "route": "openai.chat",
+      "scenario_texts": [
+        "Please remember the blue boat.",
+        "The trip to the lake is planned for Saturday morning.",
+        "Which things did I ask you to remember?"
+      ],
+      "scripted": true,
+      "stream": true,
+      "tool_call_ids": [],
+      "tools": [
+        "todo_list"
+      ],
+      "turn": 2
+    }
+  ],
+  "pattern": [
+    {
+      "args": {
+        "extra_keys": [
+          "command_poll_s",
+          "enforces_own_access_policy",
+          "group_sessions_per_user",
+          "supports_draft_streaming",
+          "supports_status_text",
+          "thread_sessions_per_user"
+        ],
+        "is_reconnect": false
+      },
+      "method": "connect"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:1>",
+          "message_id": "<id:2>",
+          "text": "Please remember the blue boat.",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        }
+      },
+      "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "chat_id": "<id:1>",
+        "content": "The trip to the lake is planned for Saturday morning.",
+        "draft_id": "<id:4>",
+        "metadata": {
+          "reply_to_message_id": "<id:2>",
+          "thread_id": "<id:3>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "chat_id": "<id:1>",
+        "content": "The trip to the lake is planned for Saturday morning.",
+        "message_id": "<id:5>",
+        "metadata": {
+          "notify": true,
+          "reply_to_message_id": "<id:2>",
+          "thread_id": "<id:3>"
+        },
+        "reply_to": "<id:2>"
+      },
+      "method": "send"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:1>",
+          "message_id": "<id:2>",
+          "text": "Please remember the blue boat.",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        },
+        "outcome": {
+          "enum": "ProcessingOutcome",
+          "value": "success"
+        }
+      },
+      "method": "on_processing_complete"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:1>",
+          "message_id": "<id:6>",
+          "text": "/resume <id:7>",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        }
+      },
+      "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "chat_id": "<id:1>",
+        "content": "sha256:5c27e1e26a5b7d9c101d92d4dd2e09d854eb1d023c1e4f9a6e91229f252a70b5:98",
+        "message_id": "<id:8>",
+        "metadata": {
+          "notify": true,
+          "thread_id": "<id:3>"
+        },
+        "reply_to": "<id:6>"
+      },
+      "method": "send"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:1>",
+          "message_id": "<id:6>",
+          "text": "/resume <id:7>",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        },
+        "outcome": {
+          "enum": "ProcessingOutcome",
+          "value": "success"
+        }
+      },
+      "method": "on_processing_complete"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:1>",
+          "message_id": "<id:9>",
+          "text": "Which things did I ask you to remember?",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        }
+      },
+      "method": "on_processing_start"
+    },
+    {
+      "args": {
+        "chat_id": "<id:1>",
+        "content": "sha256:8514384f2a2a9f057087ae41eeb9026b4ea7a2ba49aa10fbd8771c53f74b2e58:31",
+        "draft_id": "<id:10>",
+        "metadata": {
+          "reply_to_message_id": "<id:9>",
+          "thread_id": "<id:3>"
+        }
+      },
+      "method": "send_draft"
+    },
+    {
+      "args": {
+        "chat_id": "<id:1>",
+        "content": "sha256:8514384f2a2a9f057087ae41eeb9026b4ea7a2ba49aa10fbd8771c53f74b2e58:31",
+        "message_id": "<id:11>",
+        "metadata": {
+          "notify": true,
+          "reply_to_message_id": "<id:9>",
+          "thread_id": "<id:3>"
+        },
+        "reply_to": "<id:9>"
+      },
+      "method": "send"
+    },
+    {
+      "args": {
+        "event": {
+          "chat_id": "<id:1>",
+          "message_id": "<id:9>",
+          "text": "Which things did I ask you to remember?",
+          "thread_id": "<id:3>",
+          "type": "MessageEvent",
+          "user_id": "u-alex"
+        },
+        "outcome": {
+          "enum": "ProcessingOutcome",
+          "value": "success"
+        }
+      },
+      "method": "on_processing_complete"
+    }
+  ],
+  "pin": {
+    "commit": "f97608f178d1ffeca59860195ab7da295f7c8e5f",
+    "tag": "v2026.9.24"
+  },
+  "scenario": "session_resume_missing"
+}

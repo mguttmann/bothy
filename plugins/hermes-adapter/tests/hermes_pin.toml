@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+#
+# Pinned Hermes Agent version of the recording (docs/spec/09-agenten.md 17.1 and 17.10).
+# Rule (docs/DECISIONS.md D-M2-32): the newest release tag of the public repository that is
+# older than deps.min_release_age on the recording day, resolved with `git ls-remote`.
+# Renovate proposes newer tags; then record again with `make -C plugins/hermes-adapter record`.
+repository = "https://github.com/NousResearch/hermes-agent"
+tag = "v2026.9.24"
+commit = "f97608f178d1ffeca59860195ab7da295f7c8e5f"
+python = "3.13"
+install = "uv-lock"
+extras = ["anthropic"]
+recorded_on = 2026-10-12

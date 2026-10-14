@@ -55,6 +55,15 @@
       ]
     },
     {
+      "description": "Hermes Agent version of the recording harness (plugins/hermes-adapter/tests/hermes_pin.toml): the recording test fails until the fixtures are recorded again, on purpose",
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": ["plugins/hermes-adapter/tests/hermes_pin.toml"],
+      "groupName": "Hermes Agent recording pin",
+      "prBodyNotes": [
+        "Record again before merging: `make -C plugins/hermes-adapter record` (it also regenerates `tests/hermes_requirements.txt` when the pinned commit has no `uv.lock`), review the fixture diff in `plugins/hermes-adapter/tests/fixtures/recording/`, set `recorded_on`, and update docs/spec/09-agents.md 17.10 (and every section an adapted point names)."
+      ]
+    },
+    {
       "description": "Trivy stays on the release the vendor advisory GHSA-69fq-xp46-6x23 names as safe; a newer one needs the manual check in docs/quality/toolchain.md",
       "matchDepNames": ["trivy"],
       "enabled": false
@@ -92,6 +101,17 @@
     }
   ],
   "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Pinned Hermes Agent release of the recording harness (tag and full commit)",
+      "managerFilePatterns": ["/^plugins/hermes-adapter/tests/hermes_pin\\.toml$/"],
+      "matchStrings": [
+        "tag = \"(?<currentValue>[^\"]+)\"\\ncommit = \"(?<currentDigest>[0-9a-f]{40})\""
+      ],
+      "depNameTemplate": "NousResearch/hermes-agent",
+      "packageNameTemplate": "NousResearch/hermes-agent",
+      "datasourceTemplate": "github-tags"
+    },
     {
       "customType": "regex",
       "description": "Release binaries in tools/bin/tools.lock.json",

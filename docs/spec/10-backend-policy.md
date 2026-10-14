@@ -340,8 +340,17 @@ The reported mode depends on the profile environment of Hermes:
 
 | Configured mode | Profile environment | Afterwards |
 |---|---|---|
-| `organization` | API key set; OAuth variables empty | restart the gateway |
+| `organization` | API key set; OAuth variables empty; no login file of another tool in the `HOME` of the profile and `auth.adopt_external_logins: false` | restart the gateway |
 | `personal` | API key empty; login of the person (OAuth) | restart the gateway |
+
+Precedence in Hermes (measured in M2-32 against the pinned version, [09-agents.md](09-agents.md)
+17.10): OAuth variable (`ANTHROPIC_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`) before `ANTHROPIC_API_KEY`
+before Hermes' own OAuth logins before the login file of Claude Code
+(`~/.claude/.credentials.json`, on macOS also the keychain). Hermes uses the login file as OAuth
+without any further login; that is why the `HOME` of a profile in the mode `organization` must
+not contain it, and the installer checks that and sets `auth.adopt_external_logins: false` (the
+documented switch, measured to work). A change of the `.env` of the Hermes home takes effect from
+the next turn; variables of the process environment need the restart.
 
 The adapter recognizes the reported mode only by the key type of the resolved login, never by its
 value ([09-agents.md](09-agents.md) 17.8). The installer of the adapter carries out the switch as

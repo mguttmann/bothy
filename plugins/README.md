@@ -12,7 +12,7 @@ it.
 
 | Folder | Kind | Purpose | State |
 |---|---|---|---|
-| `hermes-adapter/` | agent adapter | platform plugin for the open-source framework Hermes Agent | planned |
+| `hermes-adapter/` | agent adapter | platform plugin for the open-source framework Hermes Agent | recording present (M2-32), adapter planned (M2-33) |
 | `claude-code-runner/` | agent adapter | starts Claude Code sessions per thread in dev forums | planned |
 | `grafana-bothy-live/` | Grafana panel plugin | views of the live statistics for operations from OTel metrics (ID `bothy-live-panel`, [25-visualization.md](../docs/spec/25-visualization.md), section 8) | planned (M7) |
 | `github-app/` | app | reference app for code hosting from docs/spec/11-extensions.md, section 10.1 (TypeScript SDK) | planned (M2-49), the folder is created with the build ticket |

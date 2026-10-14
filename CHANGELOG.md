@@ -25,6 +25,14 @@ operated, and the order of the build.
 
 ### Added
 
+- `plugins/hermes-adapter`: recording harness, probe plugin and fixtures of the live recording
+  against the pinned Hermes Agent version (`plugins/hermes-adapter/tests/hermes_pin.toml`); the
+  answers of docs/spec/09-agents.md 17.10 come from it (M2-32).
+- The named value `quality.coverage.python_min_percent` also holds every Python project under
+  `plugins/` (M2-32).
+- CI path filter: a change of docs/spec/09-agents.md selects the gate component `plugins`.
+- Root Makefile: `make typecheck` runs mypy inside each Python project, and `make lint` excludes
+  `<project>/.venv` and `<project>/generated` from bandit.
 - Rules for AI coding agents (`AGENTS.md`, loaded by `CLAUDE.md`): public-repository
   hygiene, English only, one pull request per ticket, review findings fixed before merge.
 - Specification entry point (`docs/SPEC.md`) with goals, non-goals, hard invariants,
