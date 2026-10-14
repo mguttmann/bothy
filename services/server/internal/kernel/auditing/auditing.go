@@ -123,9 +123,12 @@ func OSUserName(s string) Value { return Value{kind: KindOSUserName, str: s} }
 type Violation struct {
 	// Code is the violation code, for example i1_violation.
 	Code string
-	// AgentID is the agent whose backend policy is violated.
+	// AgentID is the agent whose backend policy is violated (i1_violation).
 	AgentID ids.ID
-	// CredentialHolderID is the credential holder of that agent.
+	// HostID is the host with a personal LLM login whose grants violate I6 (i6_violation, M2-40);
+	// exactly one of AgentID and HostID is set.
+	HostID ids.ID
+	// CredentialHolderID is the credential holder of that agent or host.
 	CredentialHolderID ids.ID
 	// PrincipalIDs are the principals that would gain trigger on a target of the agent.
 	PrincipalIDs []ids.ID

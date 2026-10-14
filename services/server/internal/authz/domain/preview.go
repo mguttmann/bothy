@@ -8,7 +8,7 @@ import "github.com/OWNER/bothy/services/server/internal/kernel/ids"
 // AccessEffect, 07 section 9.3): the level before and after (LevelNone for no access) and the
 // capabilities added.
 type Effect struct {
-	// Kind is AccessKindSpace or AccessKindChannel; ID the target.
+	// Kind is AccessKindSpace, AccessKindChannel or AccessKindHost (M2-40); ID the target.
 	Kind          string
 	ID            ids.ID
 	Before, After Level
@@ -29,6 +29,14 @@ func Effects(before, after AccessView) []Effect {
 	conv := func(e AccessEntry) Effect {
 		if e.Kind == AccessKindSpace {
 			return Effect{Kind: e.Kind, ID: e.ID, Before: spaceLevel(before, e.ID), After: spaceLevel(after, e.ID)}
+		}
+		if e.Kind == AccessKindHost {
+			// A host has no level; it gains terminal or loses it (M2-40).
+			out := Effect{Kind: e.Kind, ID: e.ID}
+			if after.Hosts[e.ID] && !before.Hosts[e.ID] {
+				out.CapsAdded = CapsOf(CapTerminal)
+			}
+			return out
 		}
 		old, now := before.Channels[e.ID], after.Channels[e.ID]
 		return Effect{Kind: e.Kind, ID: e.ID, Before: old.Level, After: now.Level, CapsAdded: now.Caps &^ old.Caps}

@@ -55,6 +55,7 @@ const (
 	ReasonTerminalServerHostOwnerOnly      Reason = "terminal_server_host_owner_only"
 	ReasonI6HolderOnly                     Reason = "i6_holder_only"
 	ReasonI6Violation                      Reason = "i6_violation"
+	ReasonTerminalNoSessionUser            Reason = "terminal_no_session_user"
 	ReasonTerminalProfileUnknown           Reason = "terminal_profile_unknown"
 	ReasonTerminalSessionLimit             Reason = "terminal_session_limit"
 	ReasonTerminalStepUpNotFresh           Reason = "terminal_step_up_not_fresh"
@@ -111,6 +112,7 @@ var reasons = []Reason{
 	ReasonTerminalServerHostOwnerOnly,
 	ReasonI6HolderOnly,
 	ReasonI6Violation,
+	ReasonTerminalNoSessionUser,
 	ReasonTerminalProfileUnknown,
 	ReasonTerminalSessionLimit,
 	ReasonTerminalStepUpNotFresh,

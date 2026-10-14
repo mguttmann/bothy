@@ -4475,7 +4475,7 @@ export interface paths {
         get?: never;
         /**
          * Declare the LLM login of a host
-         * @description `personal` needs `credential_holder_id`. Fails with `409 i6_violation` if any grant on the host names another subject than the holder; switching to `personal` or changing the holder ends sessions of other people (`i6_violation`, 24, 7.3). Needs step-up.
+         * @description `personal` needs `credential_holder_id`, a person that is not deleted; `none` and `organization` take none. Fails with `409 i6_violation` (member `conflicts`, one entry per host) if any valid grant on the host names another subject than the holder or a group; switching to `personal` or changing the holder ends the sessions of other people in the same transaction (`close_reason` `i6_violation`, 24, 7.3). A `retired` host answers `409 conflict`. The declaration the host already has answers `200` with the current host, without a new version, an event or a new rights version (audited with `no_change`). Needs step-up and the mandatory `reason`.
          */
         put: operations["setHostLlmCredentials"];
         post?: never;
@@ -5360,7 +5360,7 @@ export interface components {
             errors?: components["schemas"]["FieldError"][];
             /** @description Current representation of the resource for `version_conflict` and `base_version_conflict`. */
             current?: components["schemas"]["JsonObject"];
-            /** @description One entry per affected agent; present with `i1_violation` (10-backend-richtlinie, 5.4). */
+            /** @description Present with `i1_violation` (one entry per agent, 10-backend-richtlinie, 5.4) and `i6_violation` (one entry per host, 24, 7.3). */
             conflicts?: components["schemas"]["InvariantViolation"][];
         };
         FieldError: {
@@ -6197,6 +6197,7 @@ export interface components {
             /** @enum {string} */
             text_locale: "de" | "en";
         };
+        /** @description `terminal_not_effective` (grant on a host, 07, 2.12 point 4) says that SR10 or SR12 keep the grant from taking effect: with `principal_id` for a user subject, with `group_id` and `count` (members in effect it does not reach, absent when 0) for a group subject. */
         PreviewHint: {
             /** @enum {string} */
             code: "read_horizon" | "trigger_blocked_tool_class" | "group_reach" | "expiry_missing" | "terminal_not_effective";
@@ -6222,9 +6223,9 @@ export interface components {
             code: string;
             agent_id?: components["schemas"]["Uuid"];
             host_id?: components["schemas"]["Uuid"];
-            /** @description Credential holder of the agent; absent if the agent has none. */
+            /** @description Credential holder of the agent (`i1_violation`) or of the personal LLM login of the host (`i6_violation`); absent if the agent has none. */
             credential_holder_id?: components["schemas"]["Uuid"];
-            /** @description Principals that would gain `trigger` next to the credential holder. */
+            /** @description With `i1_violation` the principals that would gain `trigger` next to the credential holder; with `i6_violation` the people other than the holder that a valid grant on the host names, directly or as members in effect of a group grant (empty for a group without members). */
             principal_ids: components["schemas"]["Uuid"][];
             /** @description True when the agent reports `organization` among its `billing_modes_supported`. */
             organization_ready?: boolean;
@@ -9960,7 +9961,7 @@ export interface components {
         };
         HostLlmCredentialsSet: {
             llm_credentials: components["schemas"]["LlmCredentials"];
-            /** @description Required exactly with `personal`. */
+            /** @description Required exactly with `personal`. `errors[].code` `required` when missing with `personal`, `not_allowed` when sent with `none` or `organization`, `unknown_user` when it names no person or a deleted one. */
             credential_holder_id?: components["schemas"]["Uuid"];
             reason: string;
         };

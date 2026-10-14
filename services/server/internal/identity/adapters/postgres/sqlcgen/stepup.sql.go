@@ -11,6 +11,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const consumeStepUp = `-- name: ConsumeStepUp :execrows
+UPDATE auth_sessions SET step_up_consumed_at = $1 WHERE id = $2 AND step_up_at IS NOT NULL
+`
+
+type ConsumeStepUpParams struct {
+	ConsumedAt pgtype.Timestamptz
+	ID         pgtype.UUID
+}
+
+// Consumes the step-up of a session: one confirmation opens exactly one terminal session.
+func (q *Queries) ConsumeStepUp(ctx context.Context, arg ConsumeStepUpParams) (int64, error) {
+	result, err := q.db.Exec(ctx, consumeStepUp, arg.ConsumedAt, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteExpiredChallenges = `-- name: DeleteExpiredChallenges :execrows
 DELETE FROM auth_challenges
 WHERE expires_at <= $1
@@ -141,6 +159,43 @@ func (q *Queries) LockChallenge(ctx context.Context, id pgtype.UUID) (AuthChalle
 		&i.CreatedAt,
 		&i.ExpiresAt,
 		&i.FinishedAt,
+	)
+	return i, err
+}
+
+const lockSessionForStepUpConsumption = `-- name: LockSessionForStepUpConsumption :one
+SELECT id, user_id, device_id, client_component, parent_session_id, identity_id, auth_method, cookie_hash, created_at, expires_at, step_up_at, step_up_method, step_up_consumed_at, last_seen_at, last_ip, revoked_at, revoke_reason FROM auth_sessions WHERE id = $1 AND user_id = $2 FOR UPDATE
+`
+
+type LockSessionForStepUpConsumptionParams struct {
+	ID     pgtype.UUID
+	UserID pgtype.UUID
+}
+
+// The login session of a terminal opening, locked as the first row lock of its transaction, so a
+// second opening with the same confirmation waits and sees the consumption (08 section 6.3 point
+// 4, 03 section 6.3; M2-40).
+func (q *Queries) LockSessionForStepUpConsumption(ctx context.Context, arg LockSessionForStepUpConsumptionParams) (AuthSession, error) {
+	row := q.db.QueryRow(ctx, lockSessionForStepUpConsumption, arg.ID, arg.UserID)
+	var i AuthSession
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.DeviceID,
+		&i.ClientComponent,
+		&i.ParentSessionID,
+		&i.IdentityID,
+		&i.AuthMethod,
+		&i.CookieHash,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.StepUpAt,
+		&i.StepUpMethod,
+		&i.StepUpConsumedAt,
+		&i.LastSeenAt,
+		&i.LastIp,
+		&i.RevokedAt,
+		&i.RevokeReason,
 	)
 	return i, err
 }

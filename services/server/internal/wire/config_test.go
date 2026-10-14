@@ -117,6 +117,8 @@ func TestConfigSchemaBuilds(t *testing.T) {
 		"host.os_user_max_chars":                 {Kind: config.KindInt, Default: "64", Min: "1", Chapter: "03-datenmodell.md"},
 		"terminal.pairing_code_ttl":              {Kind: config.KindDuration, Default: "15m", Min: "1s", Chapter: "24-terminal.md"},
 		"terminal.session_token_ttl":             {Kind: config.KindDuration, Default: "30s", Min: "1s", Chapter: "24-terminal.md"},
+		"terminal.step_up_max_age":               {Kind: config.KindDuration, Default: "60s", Min: "1s", Chapter: "24-terminal.md"},
+		"terminal.quick_reattach_window":         {Kind: config.KindDuration, Default: "60s", Min: "0s", Chapter: "24-terminal.md"},
 		"audit.reason_max_chars":                 {Kind: config.KindInt, Default: "500", Min: "1", Chapter: "19-sicherheit.md"},
 		"egress.allowed_hosts":                   {Kind: config.KindStringList, Default: "", Chapter: "19-sicherheit.md"},
 		"egress.timeout":                         {Kind: config.KindDuration, Default: "15s", Min: "1ms", Chapter: "19-sicherheit.md"},

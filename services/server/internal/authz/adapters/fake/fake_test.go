@@ -338,3 +338,43 @@ func TestStructureOnPutChannel(t *testing.T) {
 		t.Fatalf("hook saw %v", got)
 	}
 }
+
+// TestHosts_TerminalFacts (M2-40): the personal hosts ascending, the session users of a person
+// ascending by host (one per host), the call counters and the injected failure.
+func TestHosts_TerminalFacts(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	h := fake.NewHosts()
+	robin, alex := ids.New(), ids.New()
+	ab := []ids.ID{ids.New(), ids.New()}
+	slices.SortFunc(ab, func(x, y ids.ID) int { return bytes.Compare(x[:], y[:]) })
+	a, b := ab[0], ab[1]
+	h.Put(authz.HostFacts{ID: b, State: "active", LLMCredentials: "personal", CredentialHolderID: robin})
+	h.Put(authz.HostFacts{ID: a, State: "active", LLMCredentials: "personal", CredentialHolderID: robin})
+	h.Put(authz.HostFacts{ID: ids.New(), State: "active", LLMCredentials: "organization"})
+	list, err := h.PersonalHosts(ctx)
+	if err != nil || len(list) != 2 || list[0].ID != a || list[1].ID != b {
+		t.Fatalf("PersonalHosts = %+v, %v", list, err)
+	}
+	h.PutSessionUser(alex, authz.SessionUserFact{HostID: b, OSUser: "bothy-s-alex", Reported: true})
+	h.PutSessionUser(alex, authz.SessionUserFact{HostID: a, OSUser: "bothy-s-alex"})
+	h.PutSessionUser(alex, authz.SessionUserFact{HostID: b, OSUser: "bothy-s-alex2", Reported: true})
+	got, err := h.SessionUsersOf(ctx, alex)
+	if err != nil || len(got) != 2 || got[0].HostID != a || got[1].OSUser != "bothy-s-alex2" {
+		t.Fatalf("SessionUsersOf = %+v, %v", got, err)
+	}
+	h.RemoveSessionUser(alex, a)
+	if got, _ := h.SessionUsersOf(ctx, alex); len(got) != 1 {
+		t.Fatalf("after RemoveSessionUser: %+v", got)
+	}
+	if p, u := h.Calls(); p != 1 || u != 2 {
+		t.Fatalf("Calls = %d, %d", p, u)
+	}
+	h.Fail(true)
+	if _, err := h.PersonalHosts(ctx); err == nil {
+		t.Fatal("Fail(true) does not fail PersonalHosts")
+	}
+	if _, err := h.SessionUsersOf(ctx, alex); err == nil {
+		t.Fatal("Fail(true) does not fail SessionUsersOf")
+	}
+}

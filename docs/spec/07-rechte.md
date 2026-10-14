@@ -218,8 +218,9 @@ Normativ zusammen mit [24-terminal.md](24-terminal.md), Abschnitt 8.
    Die Ausnahme des ersten Punkts (Owner auf einem Rechner mit `personal`) entscheidet die
    Schutzregel SR11 mit dem Grund `i6_holder_only` (Abschnitt 4.2, Schritt 9; M2-40); das Atom
    `+terminal` der Anforderung wiederholt sie nicht (docs/DECISIONS.md D-M2-39-3).
-4. Wirksames `terminal` reicht nicht: SR10 und SR11 (Abschnitt 5) sperren danach. Die Vorschau
-   einer Freigabe, die wegen SR10 nicht wirkt, sagt das (Hinweis `terminal_not_effective`).
+4. Wirksames `terminal` reicht nicht: SR10, SR11 und SR12 (Abschnitt 5) sperren danach. Die
+   Vorschau einer Freigabe, die wegen SR10 oder SR12 nicht wirkt, sagt das (Hinweis
+   `terminal_not_effective`, Abschnitt 9.3).
 5. Lesen eines Rechners (`host.read`): Owner, der Rechner-Inhaber (`hosts.assigned_user_id`) und
    jeder mit einer gültigen Freigabe `terminal` auf ihn, auch wenn SR10 sie sperrt (damit die
    Person den Grund sieht). Sonst `404`.
@@ -299,6 +300,7 @@ verrät (bei `404` nie).
 | `terminal_server_host_owner_only` | `forbidden` | SR10: Server-Host nur für Owner; Problem-Code `terminal_denied` mit `reason: server_host_owner_only` |
 | `i6_holder_only` | `forbidden` | SR11: Rechner mit persönlicher LLM-Anmeldung, Prinzipal ist nicht ihr Inhaber; Problem-Code `terminal_denied` mit `reason: i6_holder_only` |
 | `i6_violation` | `invariant_violation` | Änderung würde I6 verletzen; Problem-Code `i6_violation` (`409`) |
+| `terminal_no_session_user` | `forbidden` | SR12: keine gültige Zuordnung der Person zu einem Sitzungsbenutzer des Rechners, dessen Namen der Rechner meldet, auch für Owner; Problem-Code `terminal_denied` mit `reason: no_session_user` |
 | `terminal_profile_unknown` | `forbidden` | Profil nicht in `hosts.reported_profiles` oder Index des Arbeitsordners ungültig; Problem-Code `terminal_denied` mit `reason: profile_unknown` |
 | `terminal_session_limit` | `forbidden` | `terminal.max_sessions_per_person` oder `terminal.max_sessions_per_host` erreicht; Problem-Code `terminal_denied` mit `reason: session_limit` |
 | `terminal_step_up_not_fresh` | `step_up_required` | Step-up älter als `terminal.step_up_max_age`, schon verbraucht oder (Konsole) nicht per Passkey; in der Konsole gilt das schnelle Wiederanhängen ohne Step-up nie |
@@ -350,7 +352,10 @@ authorize(p, action, ref) -> Decision:
   if p.view_as and spec.writes: return DENY(forbidden, view_as_read_only)
 
   # 8. Step-up
-  if spec.step_up == ja or (spec.step_up == bedingt and hat_anmeldedaten(p, action)):
+  if spec.step_up == frisch:                         # nur terminal.open und terminal.attach (M2-40)
+      if schnelles_wiederanhängen(p, res, t): pass   # 08 Abschnitt 6.3 Punkt 5, nie in der Konsole
+      elif not frisch(p, t): return DENY(step_up_required, terminal_step_up_not_fresh)
+  elif spec.step_up == ja or (spec.step_up == bedingt and hat_anmeldedaten(p, action)):
       if p.kind != user or p.session_id fehlt: return DENY(forbidden, step_up_not_possible)
       if p.step_up_at fehlt or t - p.step_up_at > auth.step_up_max_age:
           return DENY(step_up_required)
@@ -358,8 +363,8 @@ authorize(p, action, ref) -> Decision:
       return DENY(forbidden, step_up_not_possible)   # erste Einrichtung nur in einer Sitzung
 
   # 9. Schutzregeln der Aktion (Abschnitt 5)
-  d := guards[action](p, res, eff, snap, t)           # z. B. agent.invoke: SR1 (I2), SR2, SR3, SR4
-  if d: return d
+  d := guards[action](p, res, eff, snap, t)           # z. B. agent.invoke: SR1 (I2), SR2, SR3, SR4;
+  if d: return d                                     # terminal.open/attach: SR10, SR11, SR12
 
   return ALLOW
 ```
@@ -376,6 +381,25 @@ Reihenfolge und Grund:
   aufgefordert. Sonst würde die Step-up-Aufforderung verraten, dass die Aktion möglich wäre.
 - Schutzregeln zuletzt: Sie brauchen den vollen Kontext (Stufe, Lauf, Thread) und gelten auch für
   Owner, wo sie das sagen.
+
+Step-up `frisch` (05, Abschnitt 2.4; M2-40): Schritt 8 prüft für diese Aktionen nur diesen Zweig,
+nie `auth.step_up_max_age`. Frisch ist ein Step-up, der nicht älter als `terminal.step_up_max_age`
+ist, per Passkey oder Geräteschlüssel bestätigt und nicht verbraucht wurde, außerhalb der
+Web-Konsole ([08-identitaet.md](08-identitaet.md), Abschnitt 6.3). Das schnelle Wiederanhängen
+(`terminal.attach` einer getrennten Sitzung vom selben Gerät in derselben Anmeldesitzung innerhalb
+von `terminal.quick_reattach_window`) braucht keinen Step-up; die Entscheidung meldet das dem
+Anwendungsfall, der dann nichts verbraucht.
+
+Schutzregeln des Terminals in Schritt 9 (M2-40), in dieser Reihenfolge, die erste Verletzung
+entscheidet: SR10 Server-Host (`terminal_server_host_owner_only`), SR10 Inhaber
+(`terminal_not_host_assignee`), SR11 (`i6_holder_only`), SR12 (`terminal_no_session_user`). Grund:
+die Reihenfolge von Abschnitt 5 und [24-terminal.md](24-terminal.md), Abschnitt 6.1 Schritt 2; ein
+Server-Host ist jedem Nicht-Owner verschlossen, zugewiesen oder nicht, also nennt sein Grund, was
+helfen würde (docs/DECISIONS.md D-M2-40-3). Die Schutzregeln laufen nach dem Step-up: Wer keinen
+frischen Step-up hat, erfährt zuerst `step_up_required`. Das Atom `+terminal` der Anforderung ist
+wirksames `terminal` nach 2.12 Punkt 3 ohne die I6-Ausnahme für Owner; ein Owner, der nicht
+Inhaber einer persönlichen Anmeldung ist, scheitert an SR11. Danach erweitern M2-44
+(`host_not_active`, `terminal_profile_unknown`) und M2-46 (`terminal_session_limit`) die Liste.
 
 Ausnahme in der Reihenfolge: Ist die Anforderung einer Aktion `All(HumanSession, ...)` (`host.read`,
 `host.manage`, ab M2-40 auch `terminal.*`), prüft `authorize` direkt nach Schritt 1 und vor
@@ -437,9 +461,12 @@ kennt; ein Test des Anwendungsfalls findet genau einen Eintrag.
 1. Sperrreihenfolge nach 03, Abschnitt 6.3 (`permission_version` zuerst).
 2. Änderung schreiben.
 3. Betroffene Agenten und Owner bestimmen (03, Abschnitt 6.4).
-4. I1 (SR1) und SR8 (letzter Owner) berechnen.
+4. I1 (SR1), I6 (SR11, für jeden Rechner mit `llm_credentials = 'personal'`, M2-40) und SR8
+   (letzter Owner) berechnen.
 5. Verletzt: Rollback, Antwort `409 invariant_violation` mit Code und Hinweis, Audit-Eintrag mit
-   `decision = 'deny'` in eigener Transaktion.
+   `decision = 'deny'` in eigener Transaktion. Bei mehreren Verletzungen nennt die Antwort
+   `last_owner` vor `i1_violation` vor `i6_violation`, und `conflicts` listet die Einträge dieses
+   Codes (docs/DECISIONS.md D-M2-40-6).
 6. Sonst: `access.changed` je betroffenem Prinzipal, Audit, Commit.
 
 ### 4.5 Archivierte Bereiche und Kanäle
@@ -608,7 +635,11 @@ Sonst `terminal_not_host_assignee`. Auf einem Server-Host (`hosts.declared_serve
 `hosts.reported_is_server_host`) nur Owner (`terminal_server_host_owner_only`); der Host-Dienst
 prüft das zusätzlich am Claim `own` der Sitzungs-Marke. Geprüft bei jedem Öffnen und Anhängen und
 bei jeder Änderung von `assigned_user_id`, `dev_environment_id` oder des Owner-Status: Fällt die
-Bedingung weg, enden die Sitzungen (`access_revoked`). Grund: [21-dev-isolation.md](21-dev-isolation.md)
+Bedingung weg, enden die Sitzungen (`access_revoked`). Ändert `updateHost` den Inhaber oder löscht
+ihn, enden in derselben Transaktion die Sitzungen des bisherigen Inhabers auf dem Rechner, außer er
+ist aktiver Owner; Sitzungen der Owner und des neuen Inhabers bleiben (M2-40). Nur der bisherige
+Inhaber kann durch diese Änderung SR10 verlieren; jeden anderen Nicht-Owner hat SR10 schon vorher
+abgelehnt (docs/DECISIONS.md D-M2-40-10). Grund: [21-dev-isolation.md](21-dev-isolation.md)
 und ADR 0046 verwerfen den OS-Benutzer als alleinige Grenze zwischen Personen; ein gemeinsames
 Home teilt Geheimnisse und LLM-Anmeldungen (Ruling T1).
 
@@ -620,6 +651,19 @@ Rechner an andere Subjekte als den Inhaber, auch an Gruppen, lehnt die Transakti
 (`i6_violation`, 03 Abschnitt 6.8). Abgrenzung zu SR1: I1 hat keine Owner-Ausnahme, I6 hat eine,
 weil ein Terminal Zugriff auf einen bestimmten Rechner ist und keine vererbte Stufe
 ([24-terminal.md](24-terminal.md), Abschnitt 7.3; ADR 0068).
+
+### SR12 Eigener Sitzungsbenutzer
+
+`terminal.open` und `terminal.attach` nur mit einer gültigen Zuordnung der Person zu einem
+Sitzungsbenutzer des Rechners (`host_session_users`, `revoked_at IS NULL`), dessen `os_user` der
+Rechner in `hosts.reported_session_users` meldet, genau verglichen; das gilt auch für Owner. Sonst
+`terminal_no_session_user`. Zuordnungen und gemeldete Namen sind Rechte-Stand: jede Änderung erhöht
+`permission_version` (03, `grants`), eine unveränderte Meldung nach einer neuen Verbindung nicht.
+Endet eine Zuordnung, oder nennt eine Meldung des Rechners ihren Namen nicht mehr, enden die
+Sitzungen der Person dort in derselben Transaktion (`access_revoked`). Grund: Jede Person arbeitet
+in einem eigenen Betriebssystem-Benutzer ohne Verwaltungsrechte; ein geteilter Benutzer teilt Home,
+Schlüsselbund und LLM-Anmeldungen (Ruling T12, [24-terminal.md](24-terminal.md), Abschnitte 2.2
+und 8.4).
 
 ## 6. Lesehorizont von Agenten
 
@@ -880,7 +924,7 @@ Antwort enthält:
 - je betroffenem Prinzipal: hinzugekommene, entfallene und geänderte Stufen und Zusatzrechte,
 - das Ergebnis von I1 und SR8 (würde die Änderung abgelehnt, mit Hinweis "zuerst auf
   organization umstellen"),
-- Hinweise: SR2 und SR3 sperren die Auslösung, SR10 sperrt ein Terminal
+- Hinweise: SR2 und SR3 sperren die Auslösung, SR10 oder SR12 sperren ein Terminal
   (`terminal_not_effective`), H1 Lesehorizont, Freigabe an eine Gruppe erreicht
   n Menschen, Ablaufdatum fehlt bei Personen außerhalb von Gruppen (API: `hints`),
 - einen Text aus Vorlagen (kein Modell erzeugt ihn), in der Sprache des Aufrufers (Hauptteil von
@@ -901,6 +945,23 @@ Sam erhält bis 31.12.2026 die Stufe "Auslösen" im Kanal Marketing/Kampagnen.
 Sam kann damit: Nachrichten lesen und schreiben, Threads anlegen, Agent Texter auslösen.
 Dateien hochladen: nein. Freigabe-Karten bestätigen: nein.
 Hinweis: Texter liest auch Marketing/Intern. Sam darf Marketing/Intern nicht lesen, kann aber über Texter Inhalte daraus erfahren.
+```
+
+Eine Freigabe auf einen Rechner (M2-40) zeigt als Wirkung je erreichter Person den Rechner mit
+`before_level` und `after_level` `none` und `capabilities_added: [terminal]`; eine Verletzung von I6
+steht in `invariant_violations` mit `allowed = false`. `terminal_not_effective` nennt bei einer
+Person `principal_id`, wenn SR10 oder SR12 sie nach der Änderung auf dem Rechner sperren würden, bei
+einer Gruppe `group_id` und `count` (Mitglieder, die gesperrt wären; ohne solche kein Hinweis); bei
+einer I6-Verletzung desselben Rechners entfällt er. Der Text hat keine Zeile zu Fähigkeiten und
+Zusatzrechten, die Stufen im Baum beschreiben: Zusammenfassung, Ablehnung, I6, `terminal_not_effective`
+(bei einer Person mit dem Grund der ersten verletzten Regel: Server-Host, Inhaber, Sitzungsbenutzer),
+Gruppe, fehlendes Ablaufdatum (docs/DECISIONS.md D-M2-40-11). Beispiel (Sam ist nicht
+Inhaber von R1):
+
+```text
+Sam erhält das Zusatzrecht "Terminal" auf dem Rechner R1.
+Hinweis: Die Freigabe wirkt für Sam nicht. Auf R1 öffnen nur Owner und die Person, der der Rechner zugewiesen ist, ein Terminal.
+Hinweis: Die Freigabe für Sam hat kein Ablaufdatum.
 ```
 
 Die Konsole zeigt die Vorschau vor jeder Bestätigung; der Step-up folgt danach.

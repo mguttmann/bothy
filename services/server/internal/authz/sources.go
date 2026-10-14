@@ -16,7 +16,7 @@ import (
 // StructureSource.ServedTargets, ChannelFacts.Archived and AgentPolicySource.PersonalAgents; M1-49
 // adds PrincipalSource.Profiles and OwnerIDs, StructureSource.SpaceDetails and ChannelDetails and
 // AgentPolicy.BillingModesSupported for "who has access", the preview and "view as"; M2-39 adds
-// HostSource. Until their owning modules have tables, internal/wire passes empty sources
+// HostSource; M2-40 adds HostSource.PersonalHosts and SessionUsersOf and the FreshStepUpCheck. Until their owning modules have tables, internal/wire passes empty sources
 // (docs/DECISIONS.md M1-28 D2).
 
 // PrincipalStatus is the lifecycle state of a principal as authz sees it.
@@ -292,14 +292,29 @@ type HostFacts struct {
 	State string
 	// AssignedUserID is the holder (hosts.assigned_user_id, SR10); zero means owners only.
 	AssignedUserID ids.ID
-	// LLMCredentials is none, personal or organization; consumed by the I6 guard of M2-40.
+	// LLMCredentials is none, personal or organization; SR11 and I6 read it (M2-40).
 	LLMCredentials string
-	// CredentialHolderID is set exactly with personal; consumed by M2-40.
+	// CredentialHolderID is set exactly with personal; SR11 and I6 read it (M2-40).
 	CredentialHolderID ids.ID
-	// DeclaredServerHost is the owner's declaration that the server runs on the host (SR11).
+	// DeclaredServerHost is the owner's declaration that the server runs on the host (SR10).
 	DeclaredServerHost bool
 	// ReportedIsServerHost is the report of the host service; false while not reported.
 	ReportedIsServerHost bool
+	// Name is the display name of the host, only for the plain text of a preview (M2-40); never
+	// in an audit entry, an event or a problem.
+	Name string
+}
+
+// SessionUserFact is a valid assignment of a person to a session user of a host (07 SR12, M2-40):
+// host_session_users with revoked_at IS NULL; Reported reports that the host names OSUser in
+// hosts.reported_session_users, compared exactly (case included, 24 section 5.3).
+type SessionUserFact struct {
+	// HostID is the host; HostSessionUserID the assignment.
+	HostID, HostSessionUserID ids.ID
+	// OSUser is the name of the session user.
+	OSUser string
+	// Reported reports the name among the reported session users of the host.
+	Reported bool
 }
 
 // HostRetired is the state of a retired host (24 section 3.1): final, no grant can work on it.
@@ -317,6 +332,29 @@ type HostSource interface {
 	HostIDs(ctx context.Context) ([]ids.ID, error)
 	// AssignedTo returns the hosts whose holder is userID.
 	AssignedTo(ctx context.Context, userID ids.ID) ([]ids.ID, error)
+	// PersonalHosts returns the hosts with llm_credentials = personal, ascending by id: the I6
+	// check of every rights change and the effective right terminal of owners (M2-40).
+	PersonalHosts(ctx context.Context) ([]HostFacts, error)
+	// SessionUsersOf returns the valid session user assignments of userID with Reported, ascending
+	// by host (07 SR12, M2-40); at most one per host (24 section 2.2).
+	SessionUsersOf(ctx context.Context, userID ids.ID) ([]SessionUserFact, error)
+}
+
+// FreshStepUpFacts are the step-up facts of a login session (auth_sessions.step_up_at,
+// step_up_consumed_at, step_up_method and client_component; zero for NULL) that the fresh step-up
+// of the terminal judges (05 section 2.4, 08 section 6.3; M2-40).
+type FreshStepUpFacts struct {
+	StepUpAt, StepUpConsumedAt    time.Time
+	StepUpMethod, ClientComponent string
+}
+
+// FreshStepUpCheck judges a fresh step-up with the rule authorize uses in step 8 (07 section 4.2)
+// and terminal.step_up_max_age. authz implements it (authz/app); internal/wire passes it to
+// identity, whose StepUp.ConsumeFresh checks the locked session row again with it, so both checks
+// are one rule.
+type FreshStepUpCheck interface {
+	// Fresh reports whether f is fresh, unconsumed and not of the web console at now.
+	Fresh(f FreshStepUpFacts, now time.Time) bool
 }
 
 // CredentialRef names the credentials of a request principal.

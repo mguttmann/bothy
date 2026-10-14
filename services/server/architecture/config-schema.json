@@ -2548,6 +2548,18 @@
       "doc": "Validity of the pairing code of a host."
     },
     {
+      "name": "terminal.quick_reattach_window",
+      "env": "BOTHY_TERMINAL__QUICK_REATTACH_WINDOW",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "0s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "Reattaching from the same device needs no new step-up within this time after the detachment."
+    },
+    {
       "name": "terminal.session_token_ttl",
       "env": "BOTHY_TERMINAL__SESSION_TOKEN_TTL",
       "kind": "duration",
@@ -2558,6 +2570,18 @@
       "max": "",
       "chapter": "24-terminal.md",
       "doc": "Validity of a session token of the terminal."
+    },
+    {
+      "name": "terminal.step_up_max_age",
+      "env": "BOTHY_TERMINAL__STEP_UP_MAX_AGE",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "24-terminal.md",
+      "doc": "How young the step-up of terminal.open and terminal.attach must be."
     },
     {
       "name": "thread.max_tags",

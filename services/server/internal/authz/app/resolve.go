@@ -65,6 +65,8 @@ func (a *Authorizer) resolve(ctx context.Context, act authorize.Action, r author
 		return a.resolveGrant(ctx, r.ID, act == authorize.ActionGrantRevoke)
 	case r.Kind == authorize.ResourceHost:
 		return a.resolveHost(ctx, r.ID)
+	case r.Kind == authorize.ResourceTerminalSession:
+		return a.resolveTerminalSession(ctx, r)
 	}
 	return resolved{path: domain.Path{Kind: domain.PathInstance}}, true, nil
 }
@@ -192,6 +194,9 @@ func (a *Authorizer) gather(ctx context.Context, s *actingPrincipal, spec domain
 	in.Principal.Pending = pendingReason(s.liveness())
 	if res.host != nil {
 		in.Host = hostFacts(s, *res.host)
+	}
+	if err := a.terminalFacts(s, spec, r, &in); err != nil {
+		return domain.Input{}, err
 	}
 	baseIn := in
 	baseIn.Eff = base

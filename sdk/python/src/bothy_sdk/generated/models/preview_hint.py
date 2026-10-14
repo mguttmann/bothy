@@ -15,15 +15,18 @@ T = TypeVar("T", bound="PreviewHint")
 
 @_attrs_define
 class PreviewHint:
-    """
-    Attributes:
-        code (PreviewHintCode):
-        agent_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        principal_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        group_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        space_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        channel_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
-        count (int | Unset):
+    """`terminal_not_effective` (grant on a host, 07, 2.12 point 4) says that SR10 or SR12 keep the grant from taking
+    effect: with `principal_id` for a user subject, with `group_id` and `count` (members in effect it does not reach,
+    absent when 0) for a group subject.
+
+        Attributes:
+            code (PreviewHintCode):
+            agent_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+            principal_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+            group_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+            space_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+            channel_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
+            count (int | Unset):
     """
 
     code: PreviewHintCode

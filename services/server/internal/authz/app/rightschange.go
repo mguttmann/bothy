@@ -129,6 +129,12 @@ type rightsState struct {
 // never assumes anything: an expired row is invalid from its expiry on (07 section 2.5).
 var reportedView = domain.AssumeValid{Unreported: true}
 
+// writesRightsState are the actions with "Rechte" nein in 05 whose writes 03 still counts as rights
+// state (03 grants paragraph on permission_version: hosts.reported_session_users, M2-40): the
+// report of the session users of a host by host.pair (M2-41) and host.connect (M2-43). They may
+// declare a rights change (docs/DECISIONS.md D-M2-40-9).
+var writesRightsState = map[string]bool{"host.pair": true, "host.connect": true}
+
 // stateKey keys the rightsState in the unit of work; a retry starts without it.
 var stateKey = txn.NewKey[*rightsState]("authz rights change")
 
@@ -151,7 +157,7 @@ func (h *RightsHook) Begin(ctx context.Context) error {
 	if !ok {
 		return internal("a rights change needs a catalogue action")
 	}
-	if as, ok := domain.LookupAction(spec.Action); !ok || !as.Rights {
+	if as, ok := domain.LookupAction(spec.Action); !ok || !as.Rights && !writesRightsState[spec.Action] {
 		return internal("the action " + spec.Action + " does not change rights (05 column Rechte)")
 	}
 	v, err := h.d.Counters.Advance(ctx, instance.CounterPermissionVersion, 1)
@@ -242,7 +248,7 @@ func (h *RightsHook) BeforeCommit(ctx context.Context) error {
 	}
 	if !viol.Empty() {
 		h.deny(ctx, b.Audit, st.spec, viol, cs)
-		if cs != nil && !viol.LastOwner {
+		if cs != nil && !viol.LastOwner && len(viol.I1) > 0 {
 			return authz.NewI1Violation(viol.I1).WithHint(authz.HintI1ClaimSync)
 		}
 		return viol.Err()
@@ -460,10 +466,20 @@ func (h *RightsHook) deny(ctx context.Context, rec auditing.Recorder, spec txn.R
 		Action: spec.Action, Decision: auditing.DecisionDeny,
 		ResourceKind: spec.Resource.Kind, ResourceID: spec.Resource.ID,
 	}
-	if v.LastOwner {
+	switch {
+	case v.LastOwner:
 		e.Reason = auditing.ReasonLastOwner
 		e.Attrs = auditing.Attrs{"code": auditing.Code(string(auditing.ReasonLastOwner))}
-	} else {
+	case len(v.I1) == 0 && len(v.I6) > 0:
+		e.Reason = auditing.ReasonI6Violation
+		list := make([]auditing.Violation, 0, len(v.I6))
+		for _, c := range v.I6 {
+			list = append(list, auditing.Violation{
+				Code: string(auditing.ReasonI6Violation), HostID: c.HostID, CredentialHolderID: c.CredentialHolderID, PrincipalIDs: c.PrincipalIDs,
+			})
+		}
+		e.Attrs = auditing.Attrs{"violations": auditing.Violations(list...)}
+	default:
 		e.Reason = auditing.ReasonI1Violation
 		list := make([]auditing.Violation, 0, len(v.I1))
 		for _, c := range v.I1 {
@@ -481,26 +497,32 @@ func (h *RightsHook) deny(ctx context.Context, rec auditing.Recorder, spec txn.R
 	}
 }
 
-// Violations is the result of VerifyInvariants: SR8 and the I1 conflicts.
+// Violations is the result of VerifyInvariants: SR8, the I1 and the I6 conflicts.
 type Violations struct {
 	// LastOwner reports that no active owner remains (SR8).
 	LastOwner bool
 	// I1 are the personal agents whose trigger set is not exactly their credential holder,
 	// ascending by agent.
 	I1 []authz.I1Conflict
+	// I6 are the hosts with a personal LLM login on which a valid grant names another subject than
+	// the holder, ascending by host (M2-40).
+	I6 []authz.I6Conflict
 }
 
-// Empty reports that both invariants hold.
-func (v Violations) Empty() bool { return !v.LastOwner && len(v.I1) == 0 }
+// Empty reports that every invariant holds.
+func (v Violations) Empty() bool { return !v.LastOwner && len(v.I1) == 0 && len(v.I6) == 0 }
 
 // Err returns nil for no violation, else the InvariantError: last_owner before i1_violation,
-// because without an owner no personal agent can be in order either.
+// because without an owner no personal agent can be in order either, and i1_violation before
+// i6_violation (docs/DECISIONS.md D-M2-40-6); the conflicts are those of the chosen code.
 func (v Violations) Err() error {
 	switch {
 	case v.LastOwner:
 		return authz.NewLastOwnerViolation()
 	case len(v.I1) > 0:
 		return authz.NewI1Violation(v.I1)
+	case len(v.I6) > 0:
+		return authz.NewI6Violation(v.I6)
 	}
 	return nil
 }
@@ -518,6 +540,9 @@ func (h *RightsHook) VerifyInvariants(ctx context.Context, t time.Time) (Violati
 		return Violations{}, sourceError("principal source", err)
 	}
 	v.LastOwner = len(owners) == 0
+	if v.I6, err = h.verifyI6(ctx, t); err != nil {
+		return Violations{}, err
+	}
 	agents, err := h.d.Policies.PersonalAgents(ctx)
 	if err != nil {
 		return Violations{}, sourceError("agent policy source", err)
@@ -601,6 +626,8 @@ type structureView struct {
 	channels []domain.Path
 	spaces   []domain.Path
 	hosts    []ids.ID
+	// personal maps the hosts with a personal LLM login to their holder (TerminalEffective, M2-40).
+	personal map[ids.ID]ids.ID
 }
 
 // structureNow reads the channels and spaces from the structure source and the hosts from the
@@ -619,7 +646,14 @@ func (h *RightsHook) structureNow(ctx context.Context) (structureView, error) {
 	if err != nil {
 		return structureView{}, sourceError("host source", err)
 	}
-	w := structureView{hosts: hosts}
+	personal, err := h.d.Hosts.PersonalHosts(ctx)
+	if err != nil {
+		return structureView{}, sourceError("host source", err)
+	}
+	w := structureView{hosts: hosts, personal: map[ids.ID]ids.ID{}}
+	for _, p := range personal {
+		w.personal[p.ID] = p.CredentialHolderID
+	}
 	for _, id := range spaces {
 		archived, err := h.d.Structure.SpaceArchived(ctx, id)
 		if err != nil {
@@ -651,7 +685,11 @@ func (h *RightsHook) viewOf(ctx context.Context, w structureView, principal ids.
 	if err := readGrants(ctx, h.d.Store, principal, kind == domain.KindUser, &in, t); err != nil {
 		return domain.AccessView{}, err
 	}
-	return domain.AccessViewOf(domain.BuildSnapshot(in), kind, principal, w.channels, w.spaces, w.hosts), nil
+	snap := domain.BuildSnapshot(in)
+	if snap.Owner {
+		snap.PersonalHosts = w.personal
+	}
+	return domain.AccessViewOf(snap, kind, principal, w.channels, w.spaces, w.hosts), nil
 }
 
 // affectedByTargets derives the affected principals of target refs (02 section 8.1, 04 section

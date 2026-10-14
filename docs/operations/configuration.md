@@ -792,11 +792,11 @@ Quelle: [24-terminal.md](../spec/24-terminal.md), Abschnitt 17.
 | `terminal.pairing_code_ttl` | `BOTHY_TERMINAL__PAIRING_CODE_TTL` | Server | duration | `15m` | Gültigkeit eines Kopplungs-Codes für einen Rechner | aktiv |
 | `terminal.fingerprint_confirm_chars` | `BOTHY_TERMINAL__FINGERPRINT_CONFIRM_CHARS` | Server |  | `8` | so viele Zeichen des Fingerabdrucks tippt der Owner bei der Bestätigung | geplant (M2) |
 | `terminal.fingerprint_max_attempts` | `BOTHY_TERMINAL__FINGERPRINT_MAX_ATTEMPTS` | Server |  | `3` | Fehlversuche bei der Bestätigung, danach Rückfall auf `pairing` | geplant (M2) |
-| `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server |  | `60s` | so jung muss der Step-up für `terminal.open` und `terminal.attach` sein | geplant (M2) |
+| `terminal.step_up_max_age` | `BOTHY_TERMINAL__STEP_UP_MAX_AGE` | Server | duration | `60s` | so jung muss der Step-up für `terminal.open` und `terminal.attach` sein | aktiv |
 | `terminal.session_token_ttl` | `BOTHY_TERMINAL__SESSION_TOKEN_TTL` | Server | duration | `30s` | Gültigkeit einer Sitzungs-Marke | aktiv |
 | `terminal.open_timeout` | `BOTHY_TERMINAL__OPEN_TIMEOUT` | Server |  | `20s` | Frist, bis beide Seiten im Relais verbunden sind und der Handshake steht | geplant (M2) |
 | `terminal.detach_grace` | `BOTHY_TERMINAL__DETACH_GRACE` | Server |  | `15m` | so lange bleibt eine getrennte Sitzung anhängbar | geplant (M2) |
-| `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server |  | `60s` | Wiederanhängen vom selben Gerät ohne neuen Step-up innerhalb dieser Zeit nach der Trennung | geplant (M2) |
+| `terminal.quick_reattach_window` | `BOTHY_TERMINAL__QUICK_REATTACH_WINDOW` | Server | duration | `60s` | Wiederanhängen vom selben Gerät ohne neuen Step-up innerhalb dieser Zeit nach der Trennung | aktiv |
 | `terminal.idle_timeout` | `BOTHY_TERMINAL__IDLE_TIMEOUT` | Server |  | `30m` | ohne Eingabe des Geräts endet die Sitzung | geplant (M2) |
 | `terminal.idle_grace` | `BOTHY_TERMINAL__IDLE_GRACE` | Server |  | `2m` | Zuschlag, nach dem der Server selbst wegen Leerlaufs beendet | geplant (M2) |
 | `terminal.max_session_duration` | `BOTHY_TERMINAL__MAX_SESSION_DURATION` | Server |  | `12h` | Höchstdauer einer Sitzung | geplant (M2) |

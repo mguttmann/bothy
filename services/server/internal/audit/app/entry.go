@@ -162,12 +162,14 @@ func listData(v auditing.Value, top bool) (any, error) {
 	return out, nil
 }
 
-// violationsData converts the violations of i1_violation; every id is required.
+// violationsData converts the violations of i1_violation ({code, agent_id, credential_holder_id,
+// principal_ids}) and of i6_violation ({code, host_id, credential_holder_id, principal_ids},
+// M2-40); every id is required, and exactly one of agent and host.
 func violationsData(vs []auditing.Violation) (any, error) {
 	out := make([]any, 0, len(vs))
 	for _, v := range vs {
-		if v.AgentID.IsZero() || v.CredentialHolderID.IsZero() {
-			return nil, invalid("a violation names its agent and credential holder")
+		if v.AgentID.IsZero() == v.HostID.IsZero() || v.CredentialHolderID.IsZero() {
+			return nil, invalid("a violation names its agent or host and its credential holder")
 		}
 		principals := make([]any, 0, len(v.PrincipalIDs))
 		for _, p := range v.PrincipalIDs {
@@ -176,10 +178,13 @@ func violationsData(vs []auditing.Violation) (any, error) {
 			}
 			principals = append(principals, p.String())
 		}
-		out = append(out, map[string]any{
-			"code": v.Code, "agent_id": v.AgentID.String(), "credential_holder_id": v.CredentialHolderID.String(),
-			"principal_ids": principals,
-		})
+		m := map[string]any{"code": v.Code, "credential_holder_id": v.CredentialHolderID.String(), "principal_ids": principals}
+		if v.HostID.IsZero() {
+			m["agent_id"] = v.AgentID.String()
+		} else {
+			m["host_id"] = v.HostID.String()
+		}
+		out = append(out, m)
 	}
 	return out, nil
 }

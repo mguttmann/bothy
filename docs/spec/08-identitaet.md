@@ -573,7 +573,11 @@ Sitzung, in der sie erbracht wurde, also für ein Gerät.
 4. Der Step-up ist unverbraucht: `step_up_consumed_at IS NULL OR step_up_consumed_at < step_up_at`.
    Die Aktion setzt in ihrer Transaktion `step_up_consumed_at = now()` (Sperre der Sitzungszeile).
    Eine Bestätigung öffnet also genau eine Sitzung; zwei gleichzeitige Öffnungen mit derselben
-   Bestätigung scheitern bis auf eine.
+   Bestätigung scheitern bis auf eine. Der Verbrauch (`StepUp.ConsumeFresh`, M2-40) ist die erste
+   Zeilensperre der Transaktion der Aktion und prüft die Frische an der gesperrten Zeile noch einmal
+   mit derselben Regel wie `authorize` und der Zeit des Aufrufs, nicht am Prinzipal der Anfrage:
+   Zwei Anfragen mit einer Bestätigung bestehen beide `authorize`, erst die Sperre ordnet sie, und
+   die zweite sieht den Verbrauch (docs/DECISIONS.md D-M2-40-2).
 5. Ausnahme: Wiederanhängen vom selben Gerät in derselben Anmeldesitzung innerhalb von
    `terminal.quick_reattach_window` nach der Trennung braucht keinen neuen Step-up
    ([24-terminal.md](24-terminal.md), Abschnitt 6.2). Nicht in der Web-Konsole

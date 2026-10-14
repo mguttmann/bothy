@@ -44,10 +44,33 @@ type Subject struct {
 	Name string
 }
 
-// Target is the target of the grant with the names it shows; Channel only for a channel target.
+// Target is the target of the grant with the names it shows; Channel only for a channel target,
+// Host only for a host target (M2-40).
 type Target struct {
-	Kind           domain.TargetKind
-	Space, Channel string
+	Kind                 domain.TargetKind
+	Space, Channel, Host string
+}
+
+// I6 is one I6 violation of a grant on a host (M2-40): the name of the host and the display name
+// of the holder of its personal LLM login.
+type I6 struct {
+	Host, Holder string
+}
+
+// The causes of terminal_not_effective for a person subject (M2-40), the first failing guard of
+// SR10 and SR12.
+const (
+	CauseServerHost    = "server_host"
+	CauseNotAssignee   = "not_assignee"
+	CauseNoSessionUser = "no_session_user"
+)
+
+// NotEffective is the hint terminal_not_effective (M2-40): Set reports it; Cause is one of the
+// causes for a person subject; Count the members of a group subject it does not reach.
+type NotEffective struct {
+	Set   bool
+	Cause string
+	Count int64
 }
 
 // I1 is one I1 violation: the name of the personal agent and of its credential holder.
@@ -92,6 +115,10 @@ type Input struct {
 	// subject without expiry.
 	GroupReach    Count
 	ExpiryMissing bool
+	// HostI6 are the I6 violations and NotEffective the hint terminal_not_effective of a grant on a
+	// host (M2-40).
+	HostI6       []I6
+	NotEffective NotEffective
 }
 
 // Language returns the language of locale: its primary subtag when it is de or en, otherwise de,
@@ -106,13 +133,18 @@ func Language(locale string) string {
 
 // Render returns the text of in and its language. Lines follow this order: summary, abilities,
 // capabilities, then one line per hint: denial, I1 violations (by agent name), tool class (by
-// agent name), read horizon (by agent, space and channel name), group reach, missing expiry.
+// agent name), read horizon (by agent, space and channel name), group reach, missing expiry. A
+// grant on a host (M2-40) has no abilities and no capabilities line, which describe levels in the
+// tree: summary, denial, I6 violations, terminal_not_effective, group reach, missing expiry.
 // Lines are separated by a line feed; there is no line feed at the end.
 func Render(in Input) (text, lang string) {
 	lang = Language(in.Locale)
 	r := renderer{c: catalogDE, in: in}
 	if lang == LangEN {
 		r.c = catalogEN
+	}
+	if in.Target.Kind == domain.TargetHost {
+		return strings.Join(append([]string{r.summaryHost()}, r.hostHints()...), "\n"), lang
 	}
 	lines := []string{r.summary(), r.abilities(), r.caps()}
 	lines = append(lines, r.hints()...)
@@ -150,6 +182,57 @@ func (r renderer) summary() string {
 		until = r.fill("until", "date", r.date(r.in.ExpiresAt))
 	}
 	return r.fill("summary", "subject", r.subject(), "until", until, "level", r.c["level."+r.in.Level.String()], "where", r.where())
+}
+
+// summaryHost is the first line of a grant on a host.
+func (r renderer) summaryHost() string {
+	until := ""
+	if !r.in.ExpiresAt.IsZero() {
+		until = r.fill("until", "date", r.date(r.in.ExpiresAt))
+	}
+	return r.fill("summary.host", "subject", r.subject(), "until", until, "host", r.in.Target.Host)
+}
+
+// hostHints are the hint lines of a grant on a host in their fixed order.
+func (r renderer) hostHints() []string {
+	var out []string
+	if r.in.Denial != "" {
+		if s, ok := r.c["denial."+string(r.in.Denial)]; ok {
+			out = append(out, s)
+		}
+	}
+	i6 := slices.Clone(r.in.HostI6)
+	slices.SortStableFunc(i6, func(a, b I6) int { return cmp.Compare(a.Host, b.Host) })
+	for _, v := range i6 {
+		out = append(out, r.fill("hint.i6", "host", v.Host, "holder", v.Holder))
+	}
+	if ne := r.in.NotEffective; ne.Set {
+		out = append(out, r.notEffective(ne))
+	}
+	if g := r.in.GroupReach; g.Set {
+		if g.N == 1 {
+			out = append(out, r.fill("hint.group_reach.one", "group", r.in.Subject.Name))
+		} else {
+			out = append(out, r.fill("hint.group_reach", "group", r.in.Subject.Name, "count", strconv.FormatInt(g.N, 10)))
+		}
+	}
+	if r.in.ExpiryMissing {
+		out = append(out, r.fill("hint.expiry_missing", "subject", r.subject()))
+	}
+	return out
+}
+
+// notEffective is the line of terminal_not_effective: the cause for a person, the count for a
+// group.
+func (r renderer) notEffective(ne NotEffective) string {
+	host := r.in.Target.Host
+	if r.in.Subject.Kind == domain.SubjectGroup {
+		if ne.Count == 1 {
+			return r.fill("hint.terminal_not_effective.group_one", "group", r.in.Subject.Name, "host", host)
+		}
+		return r.fill("hint.terminal_not_effective.group", "group", r.in.Subject.Name, "host", host, "count", strconv.FormatInt(ne.Count, 10))
+	}
+	return r.fill("hint.terminal_not_effective."+ne.Cause, "subject", r.subject(), "host", host)
 }
 
 // where names the target.

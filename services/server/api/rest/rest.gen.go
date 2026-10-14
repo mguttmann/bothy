@@ -206,6 +206,9 @@ type ServerInterface interface {
 	// UpdateHost Change name or assignee of a host
 	// (PATCH /hosts/{host_id})
 	UpdateHost(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params UpdateHostParams)
+	// SetHostLlmCredentials Declare the LLM login of a host
+	// (PUT /hosts/{host_id}/llm-credentials)
+	SetHostLlmCredentials(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params SetHostLlmCredentialsParams)
 	// SetHostState Disable, enable or retire a host
 	// (POST /hosts/{host_id}/state)
 	SetHostState(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params SetHostStateParams)
@@ -3188,6 +3191,60 @@ func (siw *ServerInterfaceWrapper) UpdateHost(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// SetHostLlmCredentials operation middleware
+func (siw *ServerInterfaceWrapper) SetHostLlmCredentials(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "host_id" -------------
+	var hostId HostIdPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "host_id", r.PathValue("host_id"), &hostId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "host_id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SetHostLlmCredentialsParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatchRequired
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = IfMatch
+
+	} else {
+		err := fmt.Errorf("Header parameter If-Match is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "If-Match", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetHostLlmCredentials(w, r, hostId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SetHostState operation middleware
 func (siw *ServerInterfaceWrapper) SetHostState(w http.ResponseWriter, r *http.Request) {
 
@@ -5704,6 +5761,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts", wrapper.CreateHost)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/hosts/{host_id}", wrapper.GetHost)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/hosts/{host_id}", wrapper.UpdateHost)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/hosts/{host_id}/llm-credentials", wrapper.SetHostLlmCredentials)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/hosts/{host_id}/state", wrapper.SetHostState)
 
 	return m
@@ -6041,6 +6099,9 @@ type StrictServerInterface interface {
 	// UpdateHost Change name or assignee of a host
 	// (PATCH /hosts/{host_id})
 	UpdateHost(ctx context.Context, request UpdateHostRequestObject) (UpdateHostResponseObject, error)
+	// SetHostLlmCredentials Declare the LLM login of a host
+	// (PUT /hosts/{host_id}/llm-credentials)
+	SetHostLlmCredentials(ctx context.Context, request SetHostLlmCredentialsRequestObject) (SetHostLlmCredentialsResponseObject, error)
 	// SetHostState Disable, enable or retire a host
 	// (POST /hosts/{host_id}/state)
 	SetHostState(ctx context.Context, request SetHostStateRequestObject) (SetHostStateResponseObject, error)
@@ -8188,6 +8249,40 @@ func (sh *strictHandler) UpdateHost(w http.ResponseWriter, r *http.Request, host
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateHostResponseObject); ok {
 		if err := validResponse.VisitUpdateHostResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetHostLlmCredentials operation middleware
+func (sh *strictHandler) SetHostLlmCredentials(w http.ResponseWriter, r *http.Request, hostId HostIdPath, params SetHostLlmCredentialsParams) {
+	var request SetHostLlmCredentialsRequestObject
+
+	request.HostId = hostId
+	request.Params = params
+
+	var body SetHostLlmCredentialsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetHostLlmCredentials(ctx, request.(SetHostLlmCredentialsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetHostLlmCredentials")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetHostLlmCredentialsResponseObject); ok {
+		if err := validResponse.VisitSetHostLlmCredentialsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

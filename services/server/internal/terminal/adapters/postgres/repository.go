@@ -13,6 +13,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"math"
 	"time"
@@ -377,4 +378,80 @@ func timeOf(t pgtype.Timestamptz) time.Time {
 		return time.Time{}
 	}
 	return t.Time.UTC()
+}
+
+// UpdateLlmCredentials implements app.Store.
+func (r *Repository) UpdateLlmCredentials(ctx context.Context, id ids.ID, d domain.Declaration, by ids.ID, at time.Time, version int64) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	holder := d.HolderID
+	if d.Credentials != domain.LLMPersonal {
+		holder = ids.ID{}
+	}
+	n, err := q.UpdateHostLlmCredentials(ctx, sqlcgen.UpdateHostLlmCredentialsParams{
+		ID: uuid(id), LlmCredentials: d.Credentials, CredentialHolderID: optionalUUID(holder), DeclaredBy: uuid(by),
+		DeclaredAt: optionalTime(at), Version: version,
+	})
+	if err == nil && n != 1 {
+		return errs.New(errs.CodeInternalError, "terminal: declaring the LLM login changed no row")
+	}
+	return mapError(err, "declaring the LLM login of a host")
+}
+
+// PersonalHosts implements app.Store.
+func (r *Repository) PersonalHosts(ctx context.Context) ([]domain.Host, error) {
+	rows, err := r.read(ctx).ListPersonalHosts(ctx)
+	if err != nil {
+		return nil, mapError(err, "listing the personal hosts")
+	}
+	out := make([]domain.Host, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, toHost(row))
+	}
+	return out, nil
+}
+
+// UpdateReportedSessionUsers implements app.Store; the report is stored in the form of the schema
+// host_reported_session_users.v1 (an array of {os_user, workdirs}).
+func (r *Repository) UpdateReportedSessionUsers(ctx context.Context, id ids.ID, report []domain.ReportedSessionUser, version int64) error {
+	q, err := r.write(ctx)
+	if err != nil {
+		return err
+	}
+	list := make([]domain.ReportedSessionUser, 0, len(report))
+	for _, u := range report {
+		if u.Workdirs == nil {
+			u.Workdirs = []string{}
+		}
+		list = append(list, u)
+	}
+	raw, err := json.Marshal(list)
+	if err != nil {
+		return errs.Wrap(errs.CodeInternalError, err, "terminal: encoding the reported session users")
+	}
+	n, err := q.UpdateReportedSessionUsers(ctx, sqlcgen.UpdateReportedSessionUsersParams{ID: uuid(id), ReportedSessionUsers: raw, Version: version})
+	if err == nil && n != 1 {
+		return errs.New(errs.CodeInternalError, "terminal: writing the reported session users changed no row")
+	}
+	return mapError(err, "writing the reported session users")
+}
+
+// OwnSessionUsers implements app.Store.
+func (r *Repository) OwnSessionUsers(ctx context.Context, userID ids.ID) ([]domain.OwnSessionUser, error) {
+	if userID.IsZero() {
+		return nil, nil
+	}
+	rows, err := r.read(ctx).ValidSessionUsersOfUser(ctx, uuid(userID))
+	if err != nil {
+		return nil, mapError(err, "reading the session users of a person")
+	}
+	out := make([]domain.OwnSessionUser, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, domain.OwnSessionUser{
+			ID: idOf(row.ID), HostID: idOf(row.HostID), OSUser: row.OsUser, HostReport: domain.DecodeReportedSessionUsers(row.ReportedSessionUsers),
+		})
+	}
+	return out, nil
 }

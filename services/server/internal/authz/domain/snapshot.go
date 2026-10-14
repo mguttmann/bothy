@@ -60,6 +60,13 @@ type Snapshot struct {
 	Hosts map[ids.ID]Caps
 	// Groups are the groups with a membership in effect, ascending.
 	Groups []ids.ID
+	// SessionUsers are the valid session user assignments of a person by host (07 SR12, M2-40);
+	// a change of an assignment or of the names a host reports raises the rights version, so the
+	// cache of 07 section 7.3 stays correct. The application layer fills it after BuildSnapshot.
+	SessionUsers map[ids.ID]SessionUserFact
+	// PersonalHosts maps each host with a personal LLM login to its holder; filled for effective
+	// owners only (TerminalEffective, M2-40). The declaration raises the rights version.
+	PersonalHosts map[ids.ID]ids.ID
 }
 
 // SnapshotInput is what BuildSnapshot needs; the application layer reads it from the store and

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package httpapi holds the REST handlers of the terminal module (M2-39): listHosts, createHost,
-// getHost, updateHost and setHostState of docs/api/openapi.yaml as part of
-// rest.StrictServerInterface. The use cases of terminal.Hosts authorize; the handlers only
+// getHost, updateHost and setHostState of docs/api/openapi.yaml, and setHostLlmCredentials (M2-40),
+// as part of rest.StrictServerInterface. The use cases of terminal.Hosts authorize; the handlers only
 // convert, set ETag from the version and pass errors to the problem writer of the chain unchanged.
 // The pairing code leaves the server only in the answer of createHost, once.
 //
@@ -27,7 +27,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/terminal/app"
 )
 
-// Hosts implements listHosts, createHost, getHost, updateHost and setHostState.
+// Hosts implements listHosts, createHost, getHost, updateHost, setHostState and
+// setHostLlmCredentials.
 type Hosts struct {
 	hosts terminal.Hosts
 }

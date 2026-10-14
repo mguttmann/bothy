@@ -292,7 +292,8 @@ func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID id
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.id, err = wire.NewIdentity(cfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender, Settings: w.settings.Admin, Flags: w.settings.Admin}, testPepper, clk, log)
+	w.id, err = wire.NewIdentity(cfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender, Settings: w.settings.Admin, Flags: w.settings.Admin,
+		Fresh: authzapp.FreshCheck{MaxAge: testFreshAge}}, testPepper, clk, log)
 	if err != nil {
 		t.Fatal(err)
 	}

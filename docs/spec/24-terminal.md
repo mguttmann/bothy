@@ -1022,6 +1022,15 @@ Audit, Rechte `ja`):
 | `personal` | Die Anmeldung ist das persönliche Abo genau eines Menschen (`hosts.credential_holder_id`). Dieser Mensch meldet sich selbst im Konto seines Sitzungsbenutzers an; der Host-Dienst fasst die Anmeldung nicht an (7.4). |
 | `organization` | Die Anmeldung ist ein Organisations-API-Schlüssel aus dem Zustandsordner des Host-Dienstes. |
 
+Der Owner erklärt sie mit `setHostLlmCredentials` (`PUT /api/v1/hosts/{host_id}/llm-credentials`,
+M2-40): `credential_holder_id` genau bei `personal`, ein Mensch, der nicht gelöscht ist (fehlt er bei
+`personal`: `errors[].code = required`; bei `none` oder `organization` gesendet: `not_allowed`;
+unbekannt, kein Mensch oder gelöscht: `unknown_user`), mit Pflichtgrund und `If-Match`. Dieselbe
+Erklärung, die der Rechner schon hat, antwortet `200` ohne neue Version, ohne Ereignis und ohne
+neue Rechte-Version (Audit mit `no_change`). Ein `retired` Rechner antwortet `409 conflict`, weil
+`retired` endgültig ist (3.1); jeder andere Zustand nimmt die Erklärung an, und `confirmHost`
+(M2-41) setzt sie bei der Bestätigung erneut (docs/DECISIONS.md D-M2-40-7).
+
 ### 7.3 Invariante I6
 
 **I6:** Ist `llm_credentials = personal`, darf nur `credential_holder_id` ein Terminal auf dem
@@ -1035,7 +1044,9 @@ Prüfstellen:
    Wechsel der Erklärung, Wechsel des Inhabers der Anmeldung): Würde danach ein anderer Prinzipal
    als `credential_holder_id` eine gültige Freigabe `terminal` auf dem Rechner haben, rollt die
    Transaktion zurück: `409 i6_violation` (Entscheidung `invariant_violation`), Audit `deny` (03,
-   Abschnitt 6.8).
+   Abschnitt 6.8). `authz` prüft I6 bei jeder Rechte-Änderung wie I1 (M2-40), für jeden Rechner
+   mit `personal`: So fängt die Prüfung auch `user.enable` einer Person, deren ruhende Freigabe auf
+   einem Rechner, der inzwischen `personal` ist, wieder gültig würde (docs/DECISIONS.md D-M2-40-5).
 2. **Bei jedem `terminal.open` und `terminal.attach`**: SR11 in 07, fail closed.
 3. **Beim Wechsel** auf `personal` oder des Inhabers beendet dieselbe Transaktion alle Sitzungen
    anderer Menschen auf dem Rechner (`i6_violation`).
@@ -1403,7 +1414,7 @@ verfügbar ab Windows 10 Version 1809 und Windows Server 2019
 | `fingerprint_mismatch` | `409` | Bestätigung mit falschem Fingerabdruck |
 | `i6_violation` | `409` | Änderung würde I6 verletzen (`hint`) |
 | `conflict` | `409` | Zuordnung eines Sitzungsbenutzers, der auf dem Rechner schon einer Person gehört oder gehörte, oder zweite gültige Zuordnung derselben Person (`reason: session_user_taken`, 2.2) |
-| `validation_failed` | `400` | Zuordnung eines Namens, den der Rechner nicht meldet (`errors[].code = session_user_not_on_host`, 2.2 Punkt 5); Inhaber oder Person einer Zuordnung unbekannt, kein Mensch oder gelöscht (`errors[].code = unknown_user`); `assigned_user_id` zusammen mit `clear_assigned_user = true` (`errors[].code = mutually_exclusive`) |
+| `validation_failed` | `400` | Zuordnung eines Namens, den der Rechner nicht meldet (`errors[].code = session_user_not_on_host`, 2.2 Punkt 5); Inhaber, Person einer Zuordnung oder Inhaber der LLM-Anmeldung unbekannt, kein Mensch oder gelöscht (`errors[].code = unknown_user`); `assigned_user_id` zusammen mit `clear_assigned_user = true` (`errors[].code = mutually_exclusive`); `credential_holder_id` bei `none` oder `organization` (`errors[].code = not_allowed`, 7.2) |
 | `not_found` | `404` | kein Leserecht auf den Rechner oder die Sitzung |
 
 Schließ-Codes der Terminal-Kanäle (Quelle der Namen und Client-Reaktionen auf Englisch:

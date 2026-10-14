@@ -65,6 +65,19 @@ func (p people) User(ctx context.Context, id ids.ID) (terminalapp.UserFacts, boo
 	return terminalapp.UserFacts{Kind: v.Kind, Status: v.Status}, true, nil
 }
 
+// IsActiveOwner implements terminalapp.People (M2-40): an active owners row and status active,
+// read through identity.Directory.User without authorize; an unknown id is false.
+func (p people) IsActiveOwner(ctx context.Context, id ids.ID) (bool, error) {
+	v, err := p.dir.User(ctx, id)
+	if errs.KindOf(err) == errs.KindNotFound {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return v.IsOwner && v.Status == identity.StatusActive, nil
+}
+
 // Terminal is the terminal module of the process (M2-39): the use cases of terminal.Hosts and the
 // REST handlers of the five host operations.
 type Terminal struct {

@@ -30,6 +30,12 @@ type AuthorizerConfig struct {
 	// ViewAsMaxDuration is how long "view as" lasts (authz.view_as_max_duration, M1-49): from
 	// actor.ViewAs.StartedAt plus this duration on, every decision is step_up_required.
 	ViewAsMaxDuration time.Duration `config:"authz.view_as_max_duration"`
+	// TerminalStepUpMaxAge is how young the step-up "frisch" of terminal.open and terminal.attach
+	// must be (terminal.step_up_max_age, M2-40).
+	TerminalStepUpMaxAge time.Duration `config:"terminal.step_up_max_age"`
+	// QuickReattachWindow is how long after the detachment terminal.attach from the same device
+	// and login session needs no new step-up (terminal.quick_reattach_window, M2-40).
+	QuickReattachWindow time.Duration `config:"terminal.quick_reattach_window"`
 }
 
 // AuthorizerDeps are the collaborators of the Authorizer. Facts owned by other modules come only
@@ -104,6 +110,9 @@ func NewAuthorizer(cfg AuthorizerConfig, d AuthorizerDeps) (*Authorizer, error) 
 	if cfg.ViewAsMaxDuration < 0 {
 		return nil, errors.New("authz: authz.view_as_max_duration must not be negative")
 	}
+	if cfg.TerminalStepUpMaxAge < 0 || cfg.QuickReattachWindow < 0 {
+		return nil, errors.New("authz: terminal.step_up_max_age and terminal.quick_reattach_window must not be negative")
+	}
 	log := d.Log
 	if log == nil {
 		log = slog.Default()
@@ -157,7 +166,7 @@ func (a *Authorizer) audit(ctx context.Context, act authorize.Action, kind strin
 
 // outcome converts a domain decision.
 func outcome(d domain.Decision) authorize.Decision {
-	return authorize.Decision{Outcome: authorize.Outcome(d.Outcome), Reason: authorize.Reason(d.Reason)}
+	return authorize.Decision{Outcome: authorize.Outcome(d.Outcome), Reason: authorize.Reason(d.Reason), QuickReattach: d.QuickReattach}
 }
 
 // internal returns an internal error for a programming error of the caller.
@@ -347,13 +356,28 @@ func (a *Authorizer) build(ctx context.Context, key cacheKey, ref authz.Credenti
 		e.snap = domain.BuildSnapshot(in)
 		return e, nil
 	}
-	in.Active = facts.Status == authz.PrincipalActive
-	in.Owner = facts.IsOwner && string(facts.Kind) == domain.KindUser && !ref.SessionID.IsZero() && in.Active
-	if err := readGrants(ctx, a.store, ref.PrincipalID, string(facts.Kind) == domain.KindUser, &in, t); err != nil {
+	if e.snap, err = a.buildLive(ctx, ref, facts, in, t); err != nil {
 		return entry{}, err
 	}
-	e.snap = domain.BuildSnapshot(in)
 	return e, nil
+}
+
+// buildLive builds the snapshot of an active or pending principal: its grants and, for an active
+// human, the terminal state (session users and personal hosts, M2-40).
+func (a *Authorizer) buildLive(ctx context.Context, ref authz.CredentialRef, facts authz.PrincipalFacts, in domain.SnapshotInput, t time.Time) (domain.Snapshot, error) {
+	human := string(facts.Kind) == domain.KindUser
+	in.Active = facts.Status == authz.PrincipalActive
+	in.Owner = facts.IsOwner && human && !ref.SessionID.IsZero() && in.Active
+	if err := readGrants(ctx, a.store, ref.PrincipalID, human, &in, t); err != nil {
+		return domain.Snapshot{}, err
+	}
+	s := domain.BuildSnapshot(in)
+	if human && in.Active {
+		if err := terminalState(ctx, a.hosts, &s); err != nil {
+			return domain.Snapshot{}, err
+		}
+	}
+	return s, nil
 }
 
 // authorize is Authorize without the check log and the audit.

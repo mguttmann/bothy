@@ -13,10 +13,5 @@ import.apply
 interaction.create
 run.followup.create
 run.start
-terminal.attach
-terminal.close
-terminal.open
-terminal.read_own
-terminal.stream
 webhook_in.post
 webhook_out.deliver

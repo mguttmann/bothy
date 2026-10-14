@@ -29,7 +29,9 @@ const (
 	hintToolClass      = "trigger_blocked_tool_class"
 	hintGroupReach     = "group_reach"
 	hintExpiryMissing  = "expiry_missing"
+	hintNotEffective   = "terminal_not_effective"
 	codeI1Violation    = "i1_violation"
+	codeI6Violation    = "i6_violation"
 	codeLastOwner      = "last_owner"
 	hintOrganization   = "Switch the agent to organization first"
 	billingOrgSupports = domain.BillingOrganization
@@ -217,6 +219,10 @@ type previewFacts struct {
 	groupReach *authz.PreviewHint
 	// i1Agents are the agents with an I1 violation (never in the abilities line).
 	i1Agents []ids.ID
+	// i6 are the I6 violations and notEffective the hint terminal_not_effective of a grant on a
+	// host (M2-40).
+	i6           []authz.I6Conflict
+	notEffective previewtext.NotEffective
 }
 
 // evaluate turns the evaluation of the rights check into the effects, violations and hints of the
@@ -247,6 +253,11 @@ func (p *previewer) evaluate(ctx context.Context, ev RightsEvaluation) (authz.Gr
 		facts.i1Agents = append(facts.i1Agents, c.AgentID)
 	}
 	facts.i1 = out.InvariantViolations
+	for _, c := range ev.Violations.I6 {
+		out.InvariantViolations = append(out.InvariantViolations, authz.InvariantViolation{Code: codeI6Violation, HostID: c.HostID,
+			CredentialHolderID: c.CredentialHolderID, PrincipalIDs: append([]ids.ID{}, c.PrincipalIDs...), Hint: authz.HintI6})
+		facts.i6 = append(facts.i6, c)
+	}
 	hints, err := p.hints(ctx, &facts)
 	if err != nil {
 		return out, facts, err
@@ -312,6 +323,10 @@ func (p *previewer) reached(ctx context.Context) ([]ids.ID, error) {
 // through the space or one of its channels.
 func (p *previewer) shows(ctx context.Context, e domain.Effect) (bool, error) {
 	tg := p.grant.Target
+	if e.Kind == domain.AccessKindHost {
+		// Only an owner previews a grant on a host, and an owner sees every host (M2-40).
+		return tg.Kind == domain.TargetHost && e.ID == tg.HostID, nil
+	}
 	if e.Kind == domain.AccessKindChannel {
 		path, ok := pathOf(p.x.channels, e.ID)
 		under := ok && (tg.Kind == domain.TargetInstance || (tg.Kind == domain.TargetSpace && path.SpaceID == tg.SpaceID) ||
@@ -496,6 +511,11 @@ func (p *previewer) hints(ctx context.Context, facts *previewFacts) ([]authz.Pre
 		}
 		out = append(out, trig...)
 	}
+	if ne, err := p.notEffectiveHint(ctx, people, facts); err != nil {
+		return nil, err
+	} else if ne != nil {
+		out = append(out, *ne)
+	}
 	if p.grant.Subject.Kind == domain.SubjectGroup {
 		h := p.subjectHint(hintGroupReach)
 		h.Count, h.HasCount = int64(len(people)), true
@@ -506,6 +526,74 @@ func (p *previewer) hints(ctx context.Context, facts *previewFacts) ([]authz.Pre
 		out = append(out, p.subjectHint(hintExpiryMissing))
 	}
 	return out, nil
+}
+
+// notEffectiveHint is the hint terminal_not_effective of a grant on a host (07 section 2.12 point
+// 4, Design note 13 of M2-40): for a person subject when SR10 or SR12 would deny the person on the
+// host after the change, with the first failing guard as the cause of the text; for a group
+// subject with the number of its active members in effect whom they would deny, absent for none.
+// No hint when an I6 violation names the host: the grant is refused anyway.
+func (p *previewer) notEffectiveHint(ctx context.Context, people []ids.ID, facts *previewFacts) (*authz.PreviewHint, error) {
+	tg := p.grant.Target
+	if tg.Kind != domain.TargetHost || slices.ContainsFunc(facts.i6, func(c authz.I6Conflict) bool { return c.HostID == tg.HostID }) {
+		return nil, nil
+	}
+	a := p.x.a
+	h, found, err := a.hosts.Host(ctx, tg.HostID)
+	if err != nil || !found {
+		return nil, wrapHostSource(err)
+	}
+	var count int64
+	var cause domain.Reason
+	for _, person := range people {
+		r, err := p.denied(ctx, person, h)
+		if err != nil {
+			return nil, err
+		}
+		if r != "" {
+			count++
+			if cause == "" {
+				cause = r
+			}
+		}
+	}
+	if count == 0 {
+		return nil, nil
+	}
+	hint := p.subjectHint(hintNotEffective)
+	facts.notEffective = previewtext.NotEffective{Set: true, Cause: notEffectiveCauses[cause], Count: count}
+	if p.grant.Subject.Kind == domain.SubjectGroup {
+		hint.Count, hint.HasCount = count, true
+	}
+	return &hint, nil
+}
+
+// notEffectiveCauses maps the guard reasons to the causes of the text.
+var notEffectiveCauses = map[domain.Reason]string{
+	domain.ReasonTerminalServerHostOwnerOnly: previewtext.CauseServerHost,
+	domain.ReasonTerminalNotHostAssignee:     previewtext.CauseNotAssignee,
+	domain.ReasonTerminalNoSessionUser:       previewtext.CauseNoSessionUser,
+}
+
+// denied returns the guard of SR10 or SR12 that would deny person on the host h (an active owner
+// counts as in a session, like the views of a rights change), or "".
+func (p *previewer) denied(ctx context.Context, person ids.ID, h authz.HostFacts) (domain.Reason, error) {
+	st, err := p.x.state(ctx, person)
+	if err != nil {
+		return "", err
+	}
+	users, err := p.x.a.hosts.SessionUsersOf(ctx, person)
+	if err != nil {
+		return "", wrapHostSource(err)
+	}
+	f := domain.TerminalGuardFacts{PrincipalID: person, Owner: st.found && st.facts.IsOwner && st.facts.Status == authz.PrincipalActive,
+		Host: hostGuardFacts(h)}
+	for _, u := range users {
+		if u.HostID == h.ID {
+			f.SessionUser = &domain.SessionUserFact{HostID: u.HostID, HostSessionUserID: u.HostSessionUserID, OSUser: u.OSUser, Reported: u.Reported}
+		}
+	}
+	return domain.TerminalNotEffective(f), nil
 }
 
 // subjectHint is a hint of code naming the subject person or group.
@@ -704,7 +792,43 @@ func (p *previewer) textInput(ctx context.Context, facts previewFacts) (previewt
 		in.GroupReach = previewtext.Count{Set: true, N: facts.groupReach.Count}
 	}
 	in.ExpiryMissing = facts.denial == "" && p.grant.Subject.Kind == domain.SubjectUser && p.grant.ExpiresAt.IsZero()
+	if p.grant.Target.Kind == domain.TargetHost {
+		if err := p.hostNames(ctx, facts, name, &in); err != nil {
+			return in, err
+		}
+	}
 	return in, nil
+}
+
+// hostNames adds the name of the target host, the I6 violations with the display names of their
+// holders and terminal_not_effective to in (M2-40).
+func (p *previewer) hostNames(ctx context.Context, facts previewFacts, name func(ids.ID) string, in *previewtext.Input) error {
+	hosts := map[ids.ID]string{}
+	for _, id := range append([]ids.ID{p.grant.Target.HostID}, i6Hosts(facts.i6)...) {
+		h, found, err := p.x.a.hosts.Host(ctx, id)
+		if err != nil {
+			return wrapHostSource(err)
+		}
+		hosts[id] = id.String()
+		if found {
+			hosts[id] = h.Name
+		}
+	}
+	in.Target.Host = hosts[p.grant.Target.HostID]
+	for _, c := range facts.i6 {
+		in.HostI6 = append(in.HostI6, previewtext.I6{Host: hosts[c.HostID], Holder: name(c.CredentialHolderID)})
+	}
+	in.NotEffective = facts.notEffective
+	return nil
+}
+
+// i6Hosts returns the hosts of the conflicts.
+func i6Hosts(list []authz.I6Conflict) []ids.ID {
+	out := make([]ids.ID, 0, len(list))
+	for _, c := range list {
+		out = append(out, c.HostID)
+	}
+	return out
 }
 
 // names reads the profiles of the caller, the subject person and every agent and holder the text
@@ -714,6 +838,9 @@ func (p *previewer) names(ctx context.Context, ops []ids.ID, facts previewFacts)
 	names = append(names, facts.toolClass...)
 	for _, v := range facts.i1 {
 		names = append(names, v.AgentID, v.CredentialHolderID)
+	}
+	for _, c := range facts.i6 {
+		names = append(names, c.CredentialHolderID)
 	}
 	for _, h := range facts.horizon {
 		names = append(names, h.AgentID)

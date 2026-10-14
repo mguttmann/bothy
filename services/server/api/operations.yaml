@@ -116,6 +116,7 @@ enabled:             # operationIds that have a handler; sorted ascending
   - setAllAgentsBillingMode
   - setChannelOperator
   - setCredentialHolder
+  - setHostLlmCredentials
   - setHostState
   - setMyLocalCredential
   - setSpaceOperator
@@ -592,9 +593,6 @@ later:               # every other operationId of docs/api/openapi.yaml; sorted 
   - operation_id: setChannelReadOnly
     etappe: M8
     ticket: M8-05
-  - operation_id: setHostLlmCredentials
-    etappe: M2
-    ticket: M2-40
   - operation_id: setImportCursor
     etappe: M8
     ticket: M8-03

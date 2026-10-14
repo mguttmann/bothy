@@ -18,7 +18,9 @@ class InvariantViolation:
 
     Attributes:
         code (str):
-        principal_ids (list[UUID]): Principals that would gain `trigger` next to the credential holder.
+        principal_ids (list[UUID]): With `i1_violation` the principals that would gain `trigger` next to the credential
+            holder; with `i6_violation` the people other than the holder that a valid grant on the host names, directly or
+            as members in effect of a group grant (empty for a group without members).
         agent_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         host_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.
         credential_holder_id (UUID | Unset): UUIDv7 (RFC 9562), lowercase canonical form.

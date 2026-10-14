@@ -65,9 +65,16 @@ type refChannel struct {
 	thread    ids.ID
 }
 
-// refHost is a terminal host with its holder (zero for none, M2-39).
+// refHost is a terminal host with its holder (the assignee, zero for none, M2-39) and the facts of
+// M2-40: a personal LLM login with its credential holder, the server host flags and the
+// assignments of session users (person to whether the host reports the name).
 type refHost struct {
-	id, holder ids.ID
+	id, holder     ids.ID
+	personal       bool
+	credHolder     ids.ID
+	declaredServer bool
+	reportedServer bool
+	assigned       map[ids.ID]bool
 }
 
 type refWorld struct {
@@ -197,7 +204,101 @@ func (m *refWorld) hostScope(p *refPrincipal) (all bool, list []ids.ID) {
 
 // syncHost mirrors a host into the fake source.
 func (m *refWorld) syncHost(h *refHost) {
-	m.fHosts.Put(authz.HostFacts{ID: h.id, State: "active", AssignedUserID: h.holder, LLMCredentials: "none"})
+	f := authz.HostFacts{ID: h.id, State: "active", AssignedUserID: h.holder, LLMCredentials: "organization",
+		DeclaredServerHost: h.declaredServer, ReportedIsServerHost: h.reportedServer}
+	if h.personal {
+		f.LLMCredentials, f.CredentialHolderID = "personal", h.credHolder
+	}
+	m.fHosts.Put(f)
+	for _, p := range m.principals {
+		if reported, ok := h.assigned[p.id]; ok {
+			m.fHosts.PutSessionUser(p.id, authz.SessionUserFact{HostID: h.id, HostSessionUserID: ids.New(), OSUser: "bothy-s-x", Reported: reported})
+		} else {
+			m.fHosts.RemoveSessionUser(p.id, h.id)
+		}
+	}
+}
+
+// decideOpen is the reference of terminal.open on h with a fresh step-up (07 section 4.2, SR10
+// to SR12; M2-40): the gate, the visibility of the host, the right terminal, then SR10 server
+// host, SR10 assignee, SR11 and SR12.
+func (m *refWorld) decideOpen(p *refPrincipal, h *refHost) (authorize.Outcome, string) {
+	if o, r := m.decideHost(p, h); o != authorize.OutcomeAllow {
+		return o, r
+	}
+	if !m.terminalOn(p, h) {
+		return authorize.OutcomeForbidden, "capability_missing"
+	}
+	switch reported, assigned := h.assigned[p.id]; {
+	case !p.owner && (h.declaredServer || h.reportedServer):
+		return authorize.OutcomeForbidden, "terminal_server_host_owner_only"
+	case !p.owner && h.holder != p.id:
+		return authorize.OutcomeForbidden, "terminal_not_host_assignee"
+	case h.personal && h.credHolder != p.id:
+		return authorize.OutcomeForbidden, "i6_holder_only"
+	case !assigned || !reported:
+		return authorize.OutcomeForbidden, "terminal_no_session_user"
+	}
+	return authorize.OutcomeAllow, ""
+}
+
+// decideAttach is the reference of terminal.attach of a session of owner on h with a fresh
+// step-up: the gate, the session visible to its person and to effective owners (not_self), the
+// requirement Self and terminal on the host, then the guards of terminal.open.
+func (m *refWorld) decideAttach(p *refPrincipal, h *refHost, owner ids.ID) (authorize.Outcome, string) {
+	if p.disabled {
+		return authorize.OutcomeUnauthenticated, "principal_inactive"
+	}
+	if p.kind != domain.KindUser {
+		return authorize.OutcomeForbidden, "subject_kind_not_allowed"
+	}
+	if owner != p.id && !p.owner {
+		return authorize.OutcomeNotFound, "not_self"
+	}
+	if owner != p.id {
+		return authorize.OutcomeForbidden, "not_self"
+	}
+	if !m.terminalOn(p, h) {
+		return authorize.OutcomeForbidden, "capability_missing"
+	}
+	return m.decideOpen(p, h)
+}
+
+// mutateTerminal changes a terminal fact of a random host (M2-40): the declaration and the
+// assignments are rights state and raise the version; the report of the server host does not.
+func (m *refWorld) mutateTerminal(kind int) string {
+	h := m.hosts[m.rnd.IntN(len(m.hosts))]
+	switch kind {
+	case 0:
+		h.personal = !h.personal
+		h.credHolder = ids.ID{}
+		if h.personal {
+			if h.credHolder = m.randomHolder(); h.credHolder.IsZero() {
+				h.credHolder = m.principals[0].id
+			}
+		}
+		m.syncHost(h)
+		m.fVersions.Bump()
+		return "toggle declaration"
+	case 1:
+		h.declaredServer = !h.declaredServer
+		m.syncHost(h)
+		m.fVersions.Bump()
+		return "toggle declared server host"
+	case 2:
+		h.reportedServer = !h.reportedServer
+		m.syncHost(h)
+		return "toggle reported server host"
+	}
+	p := m.principals[m.rnd.IntN(4)]
+	if _, ok := h.assigned[p.id]; ok && m.rnd.IntN(2) == 0 {
+		delete(h.assigned, p.id)
+	} else {
+		h.assigned[p.id] = m.rnd.IntN(3) != 0
+	}
+	m.syncHost(h)
+	m.fVersions.Bump()
+	return "change session user"
 }
 
 // refAppScope is the scope table of 05 section 2.6 for the actions of the test.
@@ -300,6 +401,9 @@ func (m *refWorld) syncChannel(c *refChannel) {
 func (m *refWorld) actorOf(p *refPrincipal) actor.Actor {
 	a := actor.Actor{ID: p.id, Kind: actor.Kind(p.kind), SessionID: p.session, DeviceID: p.device, TokenID: p.token,
 		InstallationID: p.install, GrantedScopes: p.scopes, StepUpAt: m.now}
+	if p.kind == domain.KindUser {
+		a.StepUpMethod, a.ClientComponent = "device_key", "app"
+	}
 	return a
 }
 
@@ -479,7 +583,12 @@ func newRefWorld(t *testing.T, seed uint64) *refWorld {
 	}
 	m.addDM()
 	for range 3 {
-		h := &refHost{id: ids.New(), holder: m.randomHolder()}
+		h := &refHost{id: ids.New(), holder: m.randomHolder(), assigned: map[ids.ID]bool{}}
+		for _, p := range m.principals[:4] {
+			if m.rnd.IntN(2) == 0 {
+				h.assigned[p.id] = m.rnd.IntN(4) != 0
+			}
+		}
 		m.hosts = append(m.hosts, h)
 		m.syncHost(h)
 	}
@@ -498,7 +607,8 @@ func newRefWorld(t *testing.T, seed uint64) *refWorld {
 	for range 8 {
 		m.addGrant()
 	}
-	az, err := app.NewAuthorizer(app.AuthorizerConfig{SnapshotCacheMaxEntries: 4, StepUpMaxAge: 5 * time.Minute}, app.AuthorizerDeps{
+	az, err := app.NewAuthorizer(app.AuthorizerConfig{SnapshotCacheMaxEntries: 4, StepUpMaxAge: 5 * time.Minute, TerminalStepUpMaxAge: time.Minute,
+		QuickReattachWindow: time.Minute}, app.AuthorizerDeps{
 		Catalog: app.NewCatalog(slog.New(slog.DiscardHandler)), Store: m.fStore, Principals: m.fPrincipal, Credentials: m.fCreds,
 		Structure: m.fStructure, Policies: fake.NewPolicies(), Hosts: m.fHosts, Versions: m.fVersions, Recorder: &recorder{}, Clock: m.clk,
 		Log: slog.New(slog.DiscardHandler),
@@ -513,6 +623,9 @@ func newRefWorld(t *testing.T, seed uint64) *refWorld {
 // mutate applies one random change; rights changes raise the version, structure changes do not.
 func (m *refWorld) mutate() string {
 	ctx := context.Background()
+	if k := m.rnd.IntN(16); k >= 12 {
+		return m.mutateTerminal(k - 12)
+	}
 	switch m.rnd.IntN(12) {
 	case 0:
 		m.addGrant()
@@ -610,6 +723,9 @@ func (m *refWorld) resourceFor(act authorize.Action, c *refChannel) authorize.Re
 	return authorize.Resource{Kind: authorize.ResourceChannel, ID: c.id}
 }
 
+// TestAZP8_CacheMatchesReference (AZ-P8) compares the cached decisions with the reference; since
+// M2-40 it also covers terminal.open and terminal.attach over random declarations, server host
+// flags, assignments and reports (the test TestAZP8_TerminalMatchesReference of the brief M2-40).
 func TestAZP8_CacheMatchesReference(t *testing.T) {
 	seed := uint64(time.Now().UnixNano())
 	if s := os.Getenv("BOTHY_TEST_SEED"); s != "" { //nolint:forbidigo // test input (seed), not server configuration
@@ -648,6 +764,23 @@ func TestAZP8_CacheMatchesReference(t *testing.T) {
 				d, err := m.az.Authorize(context.Background(), a, authorize.ActionHostRead, authorize.Resource{Kind: authorize.ResourceHost, ID: h.id})
 				if err != nil || d.Outcome != wantO || string(d.Reason) != wantR {
 					t.Fatalf("seed %d, world %d, step %d, %s host.read: got %s/%s %v, want %s/%s\ntrail %v",
+						ws, w, step, p.kind, d.Outcome, d.Reason, err, wantO, wantR, trail)
+				}
+				wantO, wantR = m.decideOpen(p, h)
+				outcomes["terminal.open "+string(wantO)+"/"+wantR]++
+				d, err = m.az.Authorize(context.Background(), a, authorize.ActionTerminalOpen, authorize.Resource{Kind: authorize.ResourceHost, ID: h.id})
+				if err != nil || d.Outcome != wantO || string(d.Reason) != wantR {
+					t.Fatalf("seed %d, world %d, step %d, %s terminal.open: got %s/%s %v, want %s/%s\ntrail %v",
+						ws, w, step, p.kind, d.Outcome, d.Reason, err, wantO, wantR, trail)
+				}
+				owner := m.principals[m.rnd.IntN(4)]
+				wantO, wantR = m.decideAttach(p, h, owner.id)
+				outcomes["terminal.attach "+string(wantO)+"/"+wantR]++
+				ses := authorize.Resource{Kind: authorize.ResourceTerminalSession, ID: ids.New(), HostID: h.id, OwnerID: owner.id,
+					Terminal: &authorize.TerminalFacts{SessionState: "active", SessionDeviceID: owner.device, SessionAuthSessionID: owner.session}}
+				d, err = m.az.Authorize(context.Background(), a, authorize.ActionTerminalAttach, ses)
+				if err != nil || d.Outcome != wantO || string(d.Reason) != wantR {
+					t.Fatalf("seed %d, world %d, step %d, %s terminal.attach: got %s/%s %v, want %s/%s\ntrail %v",
 						ws, w, step, p.kind, d.Outcome, d.Reason, err, wantO, wantR, trail)
 				}
 				if p.disabled {

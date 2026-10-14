@@ -22,8 +22,8 @@ const (
 	DetailIPKeyID = "ip_key_id"
 	// DetailAggregate is {count, first_at, last_at} of an aggregated denial.
 	DetailAggregate = "aggregate"
-	// DetailViolations is the list {code, agent_id, credential_holder_id, principal_ids} of
-	// i1_violation.
+	// DetailViolations is the list {code, agent_id or host_id, credential_holder_id, principal_ids} of
+	// i1_violation and i6_violation (M2-40).
 	DetailViolations = "violations"
 	// DetailReason is the reason a management action requires, the only free text.
 	DetailReason = "reason"
@@ -244,26 +244,39 @@ func validAggregate(v any) bool {
 	return okN && okF && okL && n >= 1 && !last.Before(first)
 }
 
-// validViolations checks a list of {code, agent_id, credential_holder_id, principal_ids}.
+// validViolations checks a list of {code, agent_id, credential_holder_id, principal_ids} (I1)
+// or {code, host_id, credential_holder_id, principal_ids} (I6, M2-40).
 func validViolations(v any) bool {
 	list, ok := v.([]any)
 	if !ok {
 		return false
 	}
 	for _, e := range list {
-		m, isMap := e.(map[string]any)
-		if !isMap || !exactKeys(m, "code", "agent_id", "credential_holder_id", "principal_ids") {
+		if m, isMap := e.(map[string]any); !isMap || !validViolation(m) {
 			return false
 		}
-		code, isStr := m["code"].(string)
-		ids, isList := m["principal_ids"].([]any)
-		if !isStr || !ValidCode(code) || !isUUID(m["agent_id"]) || !isUUID(m["credential_holder_id"]) || !isList {
+	}
+	return true
+}
+
+// validViolation checks one entry of validViolations: the subject is host_id for I6, else
+// agent_id.
+func validViolation(m map[string]any) bool {
+	subject := "agent_id"
+	if _, host := m["host_id"]; host {
+		subject = "host_id"
+	}
+	if !exactKeys(m, "code", subject, "credential_holder_id", "principal_ids") {
+		return false
+	}
+	code, isStr := m["code"].(string)
+	ids, isList := m["principal_ids"].([]any)
+	if !isStr || !ValidCode(code) || !isUUID(m[subject]) || !isUUID(m["credential_holder_id"]) || !isList {
+		return false
+	}
+	for _, id := range ids {
+		if !isUUID(id) {
 			return false
-		}
-		for _, id := range ids {
-			if !isUUID(id) {
-				return false
-			}
 		}
 	}
 	return true
