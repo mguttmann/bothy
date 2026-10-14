@@ -45,6 +45,9 @@ RULES = (
     Rule(("gates",), frozenset({"success"})),
     Rule(("denylist (private list)", "denylist (generic rules, fork)"), frozenset({"success"})),
     Rule(("sonar",), frozenset({"success", "skipped"})),
+    # Skipped when the component server did not change (M7-01).
+    Rule(("postgres-image (amd64)",), frozenset({"success", "skipped"})),
+    Rule(("postgres-image (arm64)",), frozenset({"success", "skipped"})),
 )
 
 
