@@ -95,6 +95,8 @@ var appPrivileges = map[string][]string{
 	// 03 auth_login_flows (M1-41): transient OIDC login flows; the job identity.auth_cleanup
 	// deletes the expired ones.
 	"auth_login_flows": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+	// 03 agents (M1-51): an agent principal is never hard deleted, its record lives with it.
+	"agents": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

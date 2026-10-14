@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
+	"github.com/OWNER/bothy/services/server/internal/agents"
 	"github.com/OWNER/bothy/services/server/internal/authz"
 	authzhttp "github.com/OWNER/bothy/services/server/internal/authz/adapters/httpapi"
 	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
@@ -30,10 +31,10 @@ import (
 const msgRegistrationCheckFailed = "registration check failed"
 
 // moduleRegistrations are the Register(r *authorize.Registry) functions of the module ports, in
-// the order of the module register. In M1 identity registers user.updated (M1-31) and authz
-// access.changed (M1-29), grant.changed, group.changed and access.expiring (M1-30); each
-// module's ticket appends its function here.
-var moduleRegistrations = []func(*authorize.Registry){identity.Register, authz.Register}
+// the order of the module register. In M1 identity registers user.updated (M1-31), authz
+// access.changed (M1-29), grant.changed, group.changed and access.expiring (M1-30) and agents
+// agent.updated (M1-51); each module's ticket appends its function here.
+var moduleRegistrations = []func(*authorize.Registry){identity.Register, authz.Register, agents.Register}
 
 // BuildRegistry returns a registry filled by every function of register; nil means the
 // production list of the module ports.
@@ -135,8 +136,8 @@ func AuthzConfig(v *config.Values) (authzapp.AuthorizerConfig, error) {
 // (M1-28), over pool: the PrincipalSource of identity (M1-26), the grant store of authz (M1-27),
 // the rights version of instance (instance.Versions), the recorder of audit (M1-24), the clock and
 // log, the CredentialSource of identity (devices since M1-33, sessions since M1-34, API tokens
-// since M1-44) and the empty sources for
-// structure and agent policy until their tickets (empty_sources.go, docs/DECISIONS.md M1-28 D2).
+// since M1-44), the agent policy source of agents (M1-51) and the empty structure source until
+// M1-52 to M1-54 (empty_sources.go, docs/DECISIONS.md M1-28 D2).
 // It opens no connection.
 //
 // Errors: those of authzapp.NewAuthorizer (a cache bound below 1).
@@ -151,7 +152,7 @@ func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.C
 		Principals:  identityapp.NewPrincipalSource(identitypg.NewRepository(pool)),
 		Credentials: identityapp.NewCredentialSource(identitypg.NewRepository(pool), identitypg.NewRepository(pool), identitypg.NewRepository(pool)),
 		Structure:   emptyStructure{},
-		Policies:    emptyPolicies{},
+		Policies:    NewAgentPolicySource(pool),
 		Versions:    instanceapp.NewVersions(instancepg.NewRepository(pool)),
 		Recorder:    rec,
 		Clock:       clk,
@@ -163,8 +164,8 @@ func NewAuthorizer(pool *pg.Pool, cfg authzapp.AuthorizerConfig, cat *authzapp.C
 var _ authorize.Authorizer = (*authzapp.Authorizer)(nil)
 
 // RightsSources are the source ports of the rights hook that tests may replace; a nil field
-// means the production source: the PrincipalSource of identity, the empty structure and agent
-// policy sources until M1-54 and M1-51.
+// means the production source: the PrincipalSource of identity, the agent policy source of agents
+// (M1-51) and the empty structure source until M1-54.
 type RightsSources struct {
 	Principals authz.PrincipalSource
 	Structure  authz.StructureSource
@@ -185,7 +186,7 @@ func NewRightsHook(pool *pg.Pool, src RightsSources, clk clock.Clock, log *slog.
 		src.Structure = emptyStructure{}
 	}
 	if src.Policies == nil {
-		src.Policies = emptyPolicies{}
+		src.Policies = NewAgentPolicySource(pool)
 	}
 	if clk == nil {
 		clk = clock.System()

@@ -148,6 +148,8 @@ type server struct {
 	// settings are the instance settings, branding and discovery (M1-46); identity reads
 	// locale.default through them.
 	settings *InstanceSettings
+	// agents is the agents module (M1-51): the agent records and their REST handlers.
+	agents *Agents
 	// signingKeys are the server signing keys (M1-32) and keyCheck the interval of their job.
 	signingKeys *SigningKeys
 	keyCheck    time.Duration
@@ -184,6 +186,8 @@ type server struct {
 //     6e. identity (M1-33): resolve auth.token_pepper_ref once (a missing or malformed pepper ends
 //     the start), build the devices, the DPoP verifier with its jti store and the device handlers,
 //     and start the sweeper of the jti store; its stop step runs in the HTTP phase (startIdentity),
+//     6e. agents (M1-51): build the agent records over the unit of work, the Authorizer, the rights
+//     hook and the identity module (startAgents),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
 //     sweeper, M1-19, InstallIdempotency, M1-20, and MountRoutes, api and all), log
@@ -343,6 +347,7 @@ func (s *server) components() []lifecycle.Component {
 		step("authz", s.startAuthz),
 		step("settings", s.startSettings),
 		step("identity", s.startIdentity),
+		step("agents", s.startAgents),
 		step("signing_keys", s.startSigningKeys),
 		step("audit_log", s.startAuditLog),
 		step("sessions", s.startSessions),
@@ -668,6 +673,30 @@ func (s *server) startIdentity(ctx context.Context) error {
 	return nil
 }
 
+// startAgents is start step 6e (M1-51): the agents module over the pool, the unit of work, the
+// recorder and the rights hook of the audit step, the appender of the sync step, the Authorizer
+// and the identity module.
+func (s *server) startAgents(context.Context) error {
+	cfg, err := AgentsConfig(s.values)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	pool, a, az, sy, id := s.pool, s.audit, s.authorizer, s.sync, s.identity
+	s.mu.Unlock()
+	if a == nil || az == nil || sy == nil || id == nil {
+		return errors.New("wire: the agents step needs audit, sync, the Authorizer and identity")
+	}
+	ag, err := NewAgents(cfg, pool, a.UoW(), az, a.RightsHook(), IdentityWrites{Audit: a.Recorder(), Events: sy.Appender()}, id, s.deps.Clock, s.logger())
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.agents = ag
+	s.mu.Unlock()
+	return nil
+}
+
 // startSessions is the second extension point of start step 7 (M1-34): the session part of
 // identity over the signing keys of the previous step and the instance id, the issuer of access
 // tokens. From here on the HTTP chain authenticates people with identity's Authenticator.
@@ -711,6 +740,9 @@ func (s *server) handlers() Handlers {
 	defer s.mu.Unlock()
 	if s.identity != nil {
 		s.identity.fillHandlers(&h)
+	}
+	if h.Agents == nil && s.agents != nil {
+		h.Agents = s.agents.Handlers
 	}
 	if h.Keys == nil && s.signingKeys != nil {
 		h.Keys = s.signingKeys.Handlers

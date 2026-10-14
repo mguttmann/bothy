@@ -113,6 +113,20 @@ documented in this file. The format is based on
   claim_managed_group`). New configuration keys `group.name_max_chars` and
   `group.description_max_chars`; `authz.PrincipalSource.Refs` gives the public views of members.
 
+- Agent records, backend policy and credential holder (M1-51, ADR 0024): the migration
+  `00022_agents.sql` (`agents` as chapter 03 states it, with a trigger that requires a principal
+  of kind `agent`), the port `agents.Agents` with the in-transaction event `AgentDisabled`, the
+  identity port `identity.PrincipalWriter` (create an agent principal, set its status and display
+  name), and the operations `listAgents`, `createAgent`, `getAgent`, `updateAgent`,
+  `disableAgent`, `enableAgent`, `setAgentBillingMode`, `setAllAgentsBillingMode`,
+  `setCredentialHolder` and `setAgentToolClass`. Every mutation is owner only with step-up and
+  audit; policy, holder, tool class, creation, disabling and enabling are rights changes, so I1 is
+  checked in the same transaction (`409 i1_violation`, all or nothing for the switch of several
+  agents). Agents read themselves, readers of a served channel see the agent, `agent.updated`
+  carries the badge after every change, disabling revokes every API token of the agent, and
+  `operator_config` follows the strict schema `agent_operator_config.v1` (no secrets). The agents
+  module is now the `authz.AgentPolicySource` of the Authorizer and the rights hooks; I1 counts
+  active personal agents only.
 - Identity provider port and provider management (M1-36): the migration
   `00013_identity_providers.sql` (`identity_providers`, `user_identities`, and the deferred foreign
   keys `auth_sessions.identity_id` and `groups.provider_id`), the ports `identity.Providers` and

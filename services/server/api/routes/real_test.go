@@ -321,6 +321,46 @@ func (stubServer) LoginWithTrustedHeader(context.Context, rest.LoginWithTrustedH
 	return nil, nil
 }
 
+func (stubServer) ListAgents(context.Context, rest.ListAgentsRequestObject) (rest.ListAgentsResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) CreateAgent(context.Context, rest.CreateAgentRequestObject) (rest.CreateAgentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) GetAgent(context.Context, rest.GetAgentRequestObject) (rest.GetAgentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) UpdateAgent(context.Context, rest.UpdateAgentRequestObject) (rest.UpdateAgentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) DisableAgent(context.Context, rest.DisableAgentRequestObject) (rest.DisableAgentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) EnableAgent(context.Context, rest.EnableAgentRequestObject) (rest.EnableAgentResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetAgentBillingMode(context.Context, rest.SetAgentBillingModeRequestObject) (rest.SetAgentBillingModeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetAllAgentsBillingMode(context.Context, rest.SetAllAgentsBillingModeRequestObject) (rest.SetAllAgentsBillingModeResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetCredentialHolder(context.Context, rest.SetCredentialHolderRequestObject) (rest.SetCredentialHolderResponseObject, error) {
+	return nil, nil
+}
+
+func (stubServer) SetAgentToolClass(context.Context, rest.SetAgentToolClassRequestObject) (rest.SetAgentToolClassResponseObject, error) {
+	return nil, nil
+}
+
 // TestRealTable_Enabled pins the enabled operations (P-04) with action and rate-limit class
 // (AZ-P1): the three device reads of M1-33, the ten people, owner and self operations of M1-31
 // and the JWKS and the rotation of the signing keys (M1-32), the sessions (M1-34), the step-up
@@ -382,6 +422,17 @@ func TestRealTable_Enabled(t *testing.T) {
 		"createGrant":       {"POST /api/v1/grants", "grant.create", "rl.admin"},
 		"getGrant":          {"GET /api/v1/grants/{grant_id}", "grant.read", "rl.read"},
 		"revokeGrant":       {"POST /api/v1/grants/{grant_id}/revoke", "grant.revoke", "rl.admin"},
+		// M1-51
+		"listAgents":              {"GET /api/v1/agents", "agent.read", "rl.read"},
+		"createAgent":             {"POST /api/v1/agents", "agent.create", "rl.admin"},
+		"getAgent":                {"GET /api/v1/agents/{agent_id}", "agent.read", "rl.read"},
+		"updateAgent":             {"PATCH /api/v1/agents/{agent_id}", "agent.update", "rl.admin"},
+		"disableAgent":            {"POST /api/v1/agents/{agent_id}/disable", "agent.disable", "rl.admin"},
+		"enableAgent":             {"POST /api/v1/agents/{agent_id}/enable", "agent.enable", "rl.admin"},
+		"setAgentBillingMode":     {"PUT /api/v1/agents/{agent_id}/billing-mode", "agent.billing_mode.set", "rl.admin"},
+		"setAllAgentsBillingMode": {"PUT /api/v1/instance/agent-billing-mode", "agent.billing_mode.set_all", "rl.admin"},
+		"setCredentialHolder":     {"PUT /api/v1/agents/{agent_id}/credential-holder", "agent.credential_holder.set", "rl.admin"},
+		"setAgentToolClass":       {"PUT /api/v1/agents/{agent_id}/tool-class", "agent.tool_class.set", "rl.admin"},
 		// M1-50
 		"listAuditEvents":   {"GET /api/v1/audit/events", "audit.read", "rl.admin"},
 		"exportAuditEvents": {"GET /api/v1/audit/export", "audit.read", "rl.admin"},

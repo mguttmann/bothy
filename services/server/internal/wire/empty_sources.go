@@ -11,7 +11,8 @@ import (
 
 // The empty sources of authz (docs/DECISIONS.md M1-28 D2, 02 section 4.4): until the owning modules
 // have tables they report the truth of an instance without those tables, so authorize decides fail
-// closed. The credentials come from identity since M1-33 (wire.NewAuthorizer).
+// closed. The credentials come from identity since M1-33 and the agent policy from agents since
+// M1-51 (wire.NewAuthorizer).
 
 // emptyStructure knows no space, channel or thread. M1-52 (spaces), M1-53 (channels) and M1-55
 // (threads, dm participation) replace it with the StructureSource of chat.
@@ -36,24 +37,5 @@ func (emptyStructure) DMChannelsOf(context.Context, ids.ID) ([]ids.ID, error)   
 
 // ServedTargets knows no served target until M1-54 implements it in chat.
 func (emptyStructure) ServedTargets(context.Context, ids.ID) ([]authz.ChannelRef, error) {
-	return nil, nil
-}
-
-// emptyPolicies knows no agent policy and no ready dev environment. M1-51 replaces it with the
-// AgentPolicySource of agents (dev environments in V2).
-type emptyPolicies struct{}
-
-var _ authz.AgentPolicySource = emptyPolicies{}
-
-func (emptyPolicies) AgentPolicy(context.Context, ids.ID) (authz.AgentPolicy, bool, error) {
-	return authz.AgentPolicy{}, false, nil
-}
-func (emptyPolicies) DevEnvironmentReady(context.Context, ids.ID, ids.ID) (bool, error) {
-	return false, nil
-}
-
-// PersonalAgents knows no personal agent until M1-51 implements it in agents: without agents
-// there is none, so I1 holds trivially.
-func (emptyPolicies) PersonalAgents(context.Context) ([]authz.PersonalAgent, error) {
 	return nil, nil
 }
