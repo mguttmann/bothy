@@ -20,12 +20,14 @@ package httpservertest
 
 import (
 	"context"
+	"crypto/sha256"
 	_ "embed" // the test contract
 	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -115,6 +117,25 @@ func Spans() *tracetest.SpanRecorder {
 	return spans
 }
 
+// requestValidators caches one request validator per contract and operation list. Building it
+// parses the whole contract and compiles the schemas of the operations, which takes seconds under
+// -race; the handler tests build a harness per world, so without the cache a package of many worlds
+// outgrows the default test timeout (docs/DECISIONS.md M1-41/14). The validator is read only after
+// it is built and serves concurrent requests in production, so harnesses may share it.
+var requestValidators sync.Map // [sha256.Size]byte -> func() (*httpserver.Validator, error)
+
+// sharedRequestValidator returns the request validator of spec for operationIDs, built once per
+// process, contract and list (the order of the list does not count). Errors: those of
+// httpserver.NewValidator, also on later calls.
+func sharedRequestValidator(spec []byte, operationIDs []string) (*httpserver.Validator, error) {
+	ids := slices.Sorted(slices.Values(operationIDs))
+	key := sha256.Sum256(append(append(slices.Clone(spec), 0), []byte(strings.Join(ids, "\x00"))...))
+	build, _ := requestValidators.LoadOrStore(key, sync.OnceValues(func() (*httpserver.Validator, error) {
+		return httpserver.NewValidator(spec, ids)
+	}))
+	return build.(func() (*httpserver.Validator, error))()
+}
+
 // New builds and starts the chain; the server stops when the test ends. It fails the test when
 // the chain cannot be built, and at the end when a handler sent JSON null (unless
 // AllowNullRepair).
@@ -133,7 +154,7 @@ func New(t testing.TB, opts Options) *Harness {
 	for _, rt := range opts.Routes {
 		idList = append(idList, rt.Op.ID)
 	}
-	v, err := httpserver.NewValidator(contract, idList)
+	v, err := sharedRequestValidator(contract, idList)
 	if err != nil {
 		t.Fatalf("httpservertest: validator: %v", err)
 	}

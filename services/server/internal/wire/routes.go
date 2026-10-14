@@ -77,6 +77,9 @@ type Handlers struct {
 	// completeEnrollment, beginPasskeyRegistration, completePasskeyRegistration, revokePasskey and
 	// completeStepUpWithPasskey (identity, M1-40).
 	*identityhttp.Passkeys
+	// OIDC implements beginOidcLogin, handleOidcCallback, completeOidcLogin, beginIdentityLink and
+	// completeIdentityLink (identity, M1-41).
+	*identityhttp.OIDC
 }
 
 // routeBuilder builds and verifies the routes of one REST surface against a catalogue with the

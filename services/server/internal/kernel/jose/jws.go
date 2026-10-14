@@ -3,9 +3,11 @@
 package jose
 
 import (
+	"crypto"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
@@ -30,11 +32,13 @@ const es256SigSize = 64
 // verifier skip a rule, jku, x5u and x5c would let the token pick its own key, zip compresses.
 var forbiddenHeaders = []string{"crit", "jku", "x5u", "x5c", "zip"}
 
-// supported are the algorithms this package verifies and signs.
-var supported = []string{AlgES256, AlgEdDSA}
+// supported are the algorithms this package verifies and signs. Every parse names its own allowed
+// subset, so the RSA algorithms reach only the callers that ask for them (ID tokens, client
+// assertions).
+var supported = []string{AlgES256, AlgEdDSA, AlgRS256, AlgPS256}
 
 // Header is the protected header of a compact JWS. Parsing fills the members the profile reads;
-// signing writes the members that are set, in the order alg, typ, kid, jwk.
+// signing writes the members that are set, in the order alg, typ, kid, x5t#S256, jwk.
 type Header struct {
 	// Alg is the algorithm; SignCompact sets it from the signer when empty.
 	Alg string `json:"alg"`
@@ -42,6 +46,10 @@ type Header struct {
 	Typ string `json:"typ,omitempty"`
 	// Kid names the key of the issuer; "" for none.
 	Kid string `json:"kid,omitempty"`
+	// X5tS256 is the SHA-256 thumbprint of the signer's certificate as base64url (RFC 7515
+	// section 4.1.8), written only by signing: client assertions to Microsoft Entra ID name the
+	// certificate this way (M1-41). Parsing ignores the member.
+	X5tS256 string `json:"x5t#S256,omitempty"`
 	// JWK is the public key in the header (DPoP only, RFC 9449); nil for none. ParseCompactJWS
 	// returns it unchecked: the caller validates it with ParseJWK.
 	JWK json.RawMessage `json:"jwk,omitempty"`
@@ -61,10 +69,10 @@ type JWS struct {
 // Signer signs the signing input of a JWS with a private key it keeps to itself (ADR 0067 item 5;
 // server keys come from instance.Keys, ADR 0066). Alg is the JWS algorithm of the key.
 type Signer interface {
-	// Alg returns the algorithm, AlgES256 or AlgEdDSA.
+	// Alg returns the algorithm, AlgES256, AlgEdDSA, AlgRS256 or AlgPS256.
 	Alg() string
 	// Sign returns the JWS signature over signingInput: R || S with 64 bytes for ES256, the
-	// Ed25519 signature for EdDSA.
+	// Ed25519 signature for EdDSA, the RSA signature for RS256 and PS256.
 	Sign(signingInput []byte) ([]byte, error)
 }
 
@@ -145,8 +153,9 @@ func parseHeader(head []byte) (Header, error) {
 
 // Verify checks the signature with k (ADR 0067 item 4): ES256 needs an EC P-256 key and a
 // signature of exactly 64 bytes R || S over SHA-256 of the signing input (DER and other lengths
-// fail); EdDSA needs an Ed25519 key and a 64-byte signature. A key whose alg member names another
-// algorithm fails too. Errors wrap ErrSignature.
+// fail); EdDSA needs an Ed25519 key and a 64-byte signature; RS256 and PS256 need an RSA key and a
+// signature of the modulus length (PSS with a salt of 32 bytes). A key whose alg member names
+// another algorithm fails too. Errors wrap ErrSignature.
 func (j JWS) Verify(k JWK) error {
 	if k.Alg != "" && k.Alg != j.Header.Alg {
 		return fmt.Errorf("%w: key is for another algorithm", ErrSignature)
@@ -158,17 +167,7 @@ func (j JWS) Verify(k JWK) error {
 func verifySignature(alg string, k JWK, input, sig []byte) error {
 	switch alg {
 	case AlgES256:
-		pub, ok := k.pub.(*ecdsa.PublicKey)
-		if !ok || len(sig) != es256SigSize {
-			return fmt.Errorf("%w: ES256 needs a P-256 key and a 64-byte signature", ErrSignature)
-		}
-		sum := sha256.Sum256(input)
-		r := new(big.Int).SetBytes(sig[:32])
-		s := new(big.Int).SetBytes(sig[32:])
-		if !ecdsa.Verify(pub, sum[:], r, s) {
-			return ErrSignature
-		}
-		return nil
+		return verifyES256(k, input, sig)
 	case AlgEdDSA:
 		pub, ok := k.pub.(ed25519.PublicKey)
 		if !ok || len(sig) != ed25519.SignatureSize {
@@ -178,9 +177,49 @@ func verifySignature(alg string, k JWK, input, sig []byte) error {
 			return ErrSignature
 		}
 		return nil
+	case AlgRS256, AlgPS256:
+		return verifyRSA(alg, k, input, sig)
 	}
 	return fmt.Errorf("%w: algorithm outside the profile", ErrSignature)
 }
+
+// verifyES256 checks an ES256 signature R || S of 64 bytes with a P-256 key.
+func verifyES256(k JWK, input, sig []byte) error {
+	pub, ok := k.pub.(*ecdsa.PublicKey)
+	if !ok || len(sig) != es256SigSize {
+		return fmt.Errorf("%w: ES256 needs a P-256 key and a 64-byte signature", ErrSignature)
+	}
+	sum := sha256.Sum256(input)
+	r := new(big.Int).SetBytes(sig[:32])
+	s := new(big.Int).SetBytes(sig[32:])
+	if !ecdsa.Verify(pub, sum[:], r, s) {
+		return ErrSignature
+	}
+	return nil
+}
+
+// verifyRSA checks an RS256 (PKCS #1 v1.5) or PS256 (PSS) signature of the modulus length.
+func verifyRSA(alg string, k JWK, input, sig []byte) error {
+	pub, ok := k.pub.(*rsa.PublicKey)
+	if !ok || len(sig) != pub.Size() {
+		return fmt.Errorf("%w: %s needs an RSA key and a signature of the modulus length", ErrSignature, alg)
+	}
+	sum := sha256.Sum256(input)
+	var err error
+	if alg == AlgRS256 {
+		err = rsa.VerifyPKCS1v15(pub, crypto.SHA256, sum[:], sig)
+	} else {
+		err = rsa.VerifyPSS(pub, crypto.SHA256, sum[:], sig, &pssOptions)
+	}
+	if err != nil {
+		return ErrSignature
+	}
+	return nil
+}
+
+// pssOptions are the PSS parameters of PS256 (RFC 7518 section 3.5): the salt is as long as the
+// SHA-256 output.
+var pssOptions = rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash, Hash: crypto.SHA256}
 
 // SignCompact builds a compact JWS of payload (a JSON object) with header and signer: alg is the
 // signer's algorithm (a different header.Alg is an error), the header is written with the members
@@ -255,6 +294,53 @@ func (s ES256Signer) Sign(signingInput []byte) ([]byte, error) {
 	r.FillBytes(out[:32])
 	sv.FillBytes(out[32:])
 	return out, nil
+}
+
+// RS256Signer signs with an RSA private key of at least 2048 bits (client assertions of
+// private_key_jwt, M1-41).
+type RS256Signer struct {
+	// Key is the private key.
+	Key *rsa.PrivateKey
+}
+
+// Alg returns AlgRS256.
+func (RS256Signer) Alg() string { return AlgRS256 }
+
+// Sign returns the PKCS #1 v1.5 signature over SHA-256 of signingInput.
+func (s RS256Signer) Sign(signingInput []byte) ([]byte, error) {
+	if err := checkRSASigner(s.Key); err != nil {
+		return nil, err
+	}
+	sum := sha256.Sum256(signingInput)
+	return rsa.SignPKCS1v15(rand.Reader, s.Key, crypto.SHA256, sum[:])
+}
+
+// PS256Signer signs with an RSA private key of at least 2048 bits (client assertions of
+// private_key_jwt, the default of Microsoft Entra ID certificate credentials).
+type PS256Signer struct {
+	// Key is the private key.
+	Key *rsa.PrivateKey
+}
+
+// Alg returns AlgPS256.
+func (PS256Signer) Alg() string { return AlgPS256 }
+
+// Sign returns the PSS signature over SHA-256 of signingInput with a salt of 32 bytes from
+// crypto/rand.
+func (s PS256Signer) Sign(signingInput []byte) ([]byte, error) {
+	if err := checkRSASigner(s.Key); err != nil {
+		return nil, err
+	}
+	sum := sha256.Sum256(signingInput)
+	return rsa.SignPSS(rand.Reader, s.Key, crypto.SHA256, sum[:], &pssOptions)
+}
+
+// checkRSASigner refuses a missing key and one below 2048 bits, which a provider must not accept.
+func checkRSASigner(k *rsa.PrivateKey) error {
+	if k == nil || k.N == nil || k.N.BitLen() < rsaMinBits {
+		return fmt.Errorf("%w: RSA signing needs a key of at least 2048 bits", ErrInvalidJWS)
+	}
+	return nil
 }
 
 // EdDSASigner signs with an Ed25519 private key.

@@ -76,7 +76,8 @@ type EnrollmentStore interface {
 	// unit of work; found is false when no code has it.
 	LockEnrollmentCodeByHash(ctx context.Context, hash []byte) (rec EnrollmentCodeRecord, found bool, err error)
 	// LockEnrollmentCode returns the code id, locked FOR UPDATE until the end of the unit of work;
-	// found is false for an unknown id (the passkey enrollment, M1-40).
+	// found is false for an unknown id (the passkey enrollment of M1-40 and the code an OIDC flow
+	// of M1-41 checked at begin).
 	LockEnrollmentCode(ctx context.Context, id ids.ID) (rec EnrollmentCodeRecord, found bool, err error)
 	// IncrementEnrollmentAttempts adds one failed attempt to the unused code id.
 	IncrementEnrollmentAttempts(ctx context.Context, id ids.ID) error
@@ -215,8 +216,8 @@ func (e *EnrollmentCodes) Match(ctx context.Context, code string, allowed ...Enr
 }
 
 // MatchID locks the code id FOR UPDATE in the ambient unit of work and checks it like Match: the
-// complete step of a passkey enrollment checks again the code its begin step matched (M1-40).
-// Errors: as Match.
+// complete step of a passkey enrollment (M1-40) and of an OIDC flow (M1-41) checks again the code
+// its begin step matched; an unknown id is rejected like an unknown code. Errors: as Match.
 func (e *EnrollmentCodes) MatchID(ctx context.Context, id ids.ID, allowed ...EnrollmentPurpose) (MatchedEnrollmentCode, error) {
 	if !txn.InUnit(ctx) {
 		return MatchedEnrollmentCode{}, errs.New(errs.CodeInternalError, "identity: MatchID needs a unit of work")

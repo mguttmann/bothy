@@ -1,6 +1,6 @@
 # Modul `identity`
 
-Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); logins and step-up with a passkey follow with the tickets of the etappe.
+Status: principal tables and directory built (M1-26); devices, device keys and the DPoP verifier built (M1-33); people, owners and the own profile built (M1-31); sessions, access tokens, refresh families, logout and the Authenticator built (M1-34); step-up with the device key and the job `identity.auth_cleanup` built (M1-35); identity providers, the mapping of external identities, the credential overview and unlinking built (M1-36); API tokens with prefix and checksum built (M1-44); first setup, enrollment codes, the shared login completion and the setup lock built (M1-37); device approval with the verification code, device pairing and the expiry of unconfirmed devices built (M1-38); passkey login, enrollment, registration and step-up built (M1-40); the OIDC login with PKCE, identity linking, provisioning and the re-login rule built (M1-41).
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -507,6 +507,78 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
   `adapters/httpapi/approval_test.go` (ID-T12, ID-T13, approval rights, expiry with and without
   the job, pairing end to end, wrong code, other key, rate limit per IP, no code in logs),
   `migrations/identity_device_pairings_test.go`. Rulings: docs/DECISIONS.md M1-38.
+### OIDC login (M1-41)
+
+- Port (`oidc.go`): `OIDCLogin` (`BeginOIDCLogin`, `HandleOIDCCallback`, `CompleteOIDCLogin`,
+  `BeginIdentityLink`, `CompleteIdentityLink`) with `OIDCBegin`, `OIDCBeginResult`, `OIDCCallback`
+  and `OIDCComplete`. The server is the confidential relying party of every configured OIDC
+  provider and the authorization server of its apps, PKCE `S256` on both legs (08 section 2.2,
+  R-ID-01); provider tokens never reach a device and are never stored.
+- `domain/oidcflow` (pure, no I/O): flow states `started -> code_issued -> completed` and `-> failed`,
+  the app redirect rules (exact entry of `app_redirect_uris`, or `http://127.0.0.1:<port>/callback`
+  and `http://[::1]:<port>/callback`; never `localhost`), `client_challenge` (43 base64url
+  characters) and the RFC 7636 verifier, `S256`, the constant-time verifier check, the server
+  verifier `base64url(HMAC-SHA-256(pepper, "oidc-pkce-verifier:" || flow_id))`, the HMAC of state,
+  nonce and login_code (contexts `oidc-state/v1`, `oidc-nonce/v1`, `oidc-login-code/v1`), the ID
+  token claim checks over parsed claims (`iss` with the `{tenantid}` template and `tid`, `aud`,
+  `azp`, `exp` and `iat` with `auth.clock_leeway`, `nonce`, `sub`), the schema
+  `external_identity.v1`, the provisioned handle (local part of `preferred_username`, else `name`,
+  else `user`; collision suffix `-` plus four of `[a-z0-9]`) and the stripped display name.
+- `app` (`oidc.go`, `oidc_callback.go`, `oidc_complete.go`): `OIDC` implements the port over the
+  login service of M1-37 (`CompleteLogin`, enrollment codes) with the outgoing ports
+  `OIDCProviderClient` (`Metadata`, `ExchangeCode`) and `LoginFlowStore`. The callback only verifies
+  and stores the external identity with a new `login_code`; mapping (`(provider_id, issuer,
+  subject)`), linking through the enrollment code checked at begin (consumed here, device
+  `active`, audit `identity.link`), provisioning (`pending`, no grants, `users.email` NULL, device
+  `pending`), device, session (`auth_method = oidc`) and tokens happen at complete, which needs the
+  `client_verifier` (R-DM-30, R-ID-13). `LoginCompletion` gains `AllowPending` and `Provisioned`;
+  `EnrollmentCodes.MatchID` locks a code by id.
+- Refresh (`app/refresh.go`): an OIDC session whose provider login (`created_at`, of the parent for
+  a child) is `auth.idp_recheck_interval` old is revoked (`expired`, families revoked), the refusal
+  commits and answers `401 unauthenticated` with the deny entry `idp_recheck` (08 section 3.5).
+- `adapters/oidc`: the provider client over `platform/egress` (one client per provider; the host
+  policy allows the issuer host, then the hosts of `token_endpoint` and `jwks_uri` of the checked
+  discovery document), discovery and JWKS cached for `auth.oidc_jwks_cache_ttl` with single-flight
+  loads and one forced reload for an unknown `kid`, the token request with `client_secret_basic`
+  or `private_key_jwt` (`PS256`, `RS256` or `ES256` client assertion with `kid` and `x5t#S256`,
+  lifetime `auth.oidc_client_assertion_ttl`) and the JWS check of the ID token through
+  `kernel/jose`. `adapters/oidc/oidctest` is the fake identity provider of the tests; the binary
+  never links it (`TestIdentitytest_NotInBinary`).
+- Operations (`adapters/httpapi/oidc.go`), none with `Idempotency-Key`:
+
+  | Operation | Action and resource | Audit | Answer |
+  |---|---|---|---|
+  | `beginOidcLogin` | `auth.login.begin`, anonymous, instance (`rl.public_auth`) | denials (rejected enrollment code) | `200 OidcBeginResponse` |
+  | `handleOidcCallback` | `auth.login.begin`, anonymous | denials `{provider_id, login_attempt_id, error}` | `302` to the app with `login_code` or `error` (`access_denied`, `login_failed`, `flow_expired`); `400` for an unknown state |
+  | `completeOidcLogin` | `auth.login.complete`, anonymous, DPoP proof without `ath` | allow (person as actor) and denials with cause | `201 TokenResponse` |
+  | `beginIdentityLink` | `identity.link` on the caller (step-up, `rl.admin`) | allow `{step: begin}` | `200 OidcBeginResponse` |
+  | `completeIdentityLink` | `identity.link` on the caller (step-up) | allow `{step: complete}`, denials | `201 Identity`, `404` for another person's code, `409` for a linked subject |
+
+- `adapters/postgres`: `queries/login_flows.sql`, `login_flows.go`, `LockEnrollmentCode`. Migration
+  `migrations/00020_identity_login_flows.sql`: `auth_login_flows` as 03 section 4.2 (retention
+  `transient`); `bothy_app` may read, insert, update and delete.
+- Job `identity.auth_cleanup` also deletes the flows past `expires_at`.
+- `internal/wire`: `BindOIDC` after `BindSessions`; `ProviderSecrets` resolves provider secret
+  references only below `<secrets.dir>/idp/` or as `BOTHY_IDP_*` and never a server `*_ref`
+  (docs/DECISIONS.md M1-36/14).
+- Configuration: `auth.login_flow_ttl`, `auth.server_code_ttl`, `auth.oidc_jwks_cache_ttl`,
+  `auth.oidc_client_assertion_ttl`, `auth.idp_recheck_interval`, `auth.clock_leeway`,
+  `auth.token_pepper_ref`, `server.public_url`, `egress.*`. Operations guide:
+  [docs/operations/oidc-entra.md](../../../../docs/operations/oidc-entra.md).
+- Tests: `domain/oidcflow` (`TestRedirectURIRules`, `TestClientChallengeFormat`,
+  `TestPKCES256Vector`, `TestServerVerifierDerivation`, `TestIDTokenClaimValidation`,
+  `TestProvisionedHandle`, `TestFlowStateMachine`), `kernel/jose` (`TestJWS_RFC7515ExampleRS256`,
+  `TestJWKThumbprint_RFC7638ExampleRSA`), `adapters/oidc` (`TestOIDCClientAuth_PrivateKeyJWT`,
+  `TestOIDCClientAuth_SecretBasic`, `TestJWKS_UnknownKidReloadsOnce`, `TestMetadataCacheTTL`),
+  `adapters/oidc/oidctest` (`TestFakeProvider`), `app` (`TestOIDCUseCases`, `TestOIDCProvisioning`),
+  `adapters/postgres` (`TestLoginFlowStoreRoundTrip`),
+  `migrations/identity_login_flows_test.go`, `wire` (`TestProviderSecretsConfinement`) and the
+  HTTP tests of `adapters/httpapi/oidc_test.go` over PostgreSQL 18 with the fake provider, as
+  subtests named after the brief in the groups `TestOIDC_Login`, `TestOIDC_IssParameter`,
+  `TestOIDC_Entra` and `TestIdentityLink` (one world per group) and
+  `TestOIDCEgress_PrivateTargetsRejected` (ID-T01 to ID-T05, leaked authorization URL,
+  provisioning, link mode, private egress targets, no secrets in logs, re-login, cleanup).
+  Rulings: docs/DECISIONS.md M1-41.
 
 ### Discovery source and the language of new people (M1-46)
 
@@ -581,7 +653,7 @@ Prinzipale, Menschen, Owner, Anmelde-Treiber, Identitäten, lokale Anmeldedaten,
 
 ## Port (Wurzelpaket `internal/identity`)
 
-- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Passkeys` (M1-40), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `Owners`; deklariert `AvatarFiles`.
+- Eingehend: `Auth` (Anmeldung, Refresh, Logout, Kind-Sitzungen), `StepUp` (Step-up, M1-35), `Providers` and `Identities` (M1-36), `Enrollment` (M1-37), `Passkeys` (M1-40), `OIDCLogin` (M1-41), `Directory`, `Devices`, `Tokens` and `TokenAdmin` (M1-44), `Owners`; deklariert `AvatarFiles`.
 - Gibt In-Tx-Ereignisse aus: `DeviceRevoked`, `SessionEnded`.
 - Abonniert In-Tx-Ereignisse: keine.
 - Implementiert Quellen-Ports und Querschnitts-Ports: kernel `actor.Authenticator`, `authz.PrincipalSource` (mit `HasActivePasskey`, M1-40), `authz.CredentialSource` (Sitzung, Gerät, Token für die Prüfung `check_active`, 07 Abschnitt 4.2), `instance.LoginOptionsSource`, `instance.FlagUserSource`, kernel `personaldata.Participant`.

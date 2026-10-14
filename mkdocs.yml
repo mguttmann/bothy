@@ -140,6 +140,7 @@ nav:
       - Umzug in die Cloud: operations/cloud-migration.md
       - Upgrade: operations/upgrade.md
       - Tailscale: operations/tailscale.md
+      - Anmeldung mit Entra ID: operations/oidc-entra.md
       - Umgebungen und Feature-Flags: operations/environments-and-flags.md
       - Release: operations/release.md
   - Observability:

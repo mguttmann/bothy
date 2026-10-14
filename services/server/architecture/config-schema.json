@@ -242,6 +242,18 @@
       "doc": "Validity of an enrollment code from its issue."
     },
     {
+      "name": "auth.idp_recheck_interval",
+      "env": "BOTHY_AUTH__IDP_RECHECK_INTERVAL",
+      "kind": "duration",
+      "default": "30d",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "08-identitaet.md",
+      "doc": "Age of an OIDC session after which the next refresh needs a new login at the provider."
+    },
+    {
       "name": "auth.local_password_enabled",
       "env": "BOTHY_AUTH__LOCAL_PASSWORD_ENABLED",
       "kind": "bool",
@@ -275,7 +287,31 @@
       "min": "1s",
       "max": "",
       "chapter": "08-identitaet.md",
-      "doc": "Validity of a login flow and of a passkey ceremony (login, enrollment, registration)."
+      "doc": "Validity of an OIDC login flow and of a passkey ceremony (login, enrollment, registration)."
+    },
+    {
+      "name": "auth.oidc_client_assertion_ttl",
+      "env": "BOTHY_AUTH__OIDC_CLIENT_ASSERTION_TTL",
+      "kind": "duration",
+      "default": "2m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identitaet.md",
+      "doc": "Lifetime of a private_key_jwt client assertion."
+    },
+    {
+      "name": "auth.oidc_jwks_cache_ttl",
+      "env": "BOTHY_AUTH__OIDC_JWKS_CACHE_TTL",
+      "kind": "duration",
+      "default": "1h",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identitaet.md",
+      "doc": "Cache of the provider metadata (discovery) and keys (JWKS)."
     },
     {
       "name": "auth.pairing_code_chars",
@@ -336,6 +372,18 @@
       "max": "",
       "chapter": "03-datenmodell.md",
       "doc": "Lifetime of a refresh token, never beyond the end of its session."
+    },
+    {
+      "name": "auth.server_code_ttl",
+      "env": "BOTHY_AUTH__SERVER_CODE_TTL",
+      "kind": "duration",
+      "default": "60s",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "08-identitaet.md",
+      "doc": "Validity of the one-time login_code of the OIDC callback."
     },
     {
       "name": "auth.session_max_age",

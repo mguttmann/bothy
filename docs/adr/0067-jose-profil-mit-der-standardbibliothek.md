@@ -61,7 +61,9 @@ Profil (normativ zusammen mit 08):
 
 Wer was baut: PLAN M1-33 legt das Paket mit Parsen, Prüfen (`EdDSA`, `ES256`), Fingerabdrücken und
 dem Zusammensetzen kompakter JWS an; M1-34 setzt damit die Zugriffstokens zusammen; M1-41 ergänzt
-`RS256` und `PS256`. Jede Erweiterung des Profils (ein Algorithmus, eine Kopfzeile) braucht eine
+`RS256` und `PS256` (RSA-Schlüssel mit 2048 bis 8192 Bit nur über `ParseVerificationJWK`, nie für
+Geräteschlüssel) und beim Signieren der Client-Assertion die Kopfzeile `x5t#S256`, die Entra für
+Zertifikate verlangt; Prüfen liest sie nicht. Jede Erweiterung des Profils (ein Algorithmus, eine Kopfzeile) braucht eine
 Änderung dieser ADR.
 
 ### Consequences

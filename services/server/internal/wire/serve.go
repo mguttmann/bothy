@@ -658,7 +658,18 @@ func (s *server) startSessions(context.Context) error {
 	if id == nil || keys == nil {
 		return errors.New("wire: the sessions need the identity step and the signing keys")
 	}
-	return id.BindSessions(keys.Keys, rec.InstanceID)
+	if err := id.BindSessions(keys.Keys, rec.InstanceID); err != nil {
+		return err
+	}
+	eg, err := EgressConfig(s.values)
+	if err != nil {
+		return err
+	}
+	sec, err := NewProviderSecrets(s.sp, s.values)
+	if err != nil {
+		return err
+	}
+	return id.BindOIDC(OIDCDeps{Egress: eg, Secrets: sec})
 }
 
 // authenticator returns the Authenticator of the HTTP chain: identity's after startSessions,
@@ -705,6 +716,7 @@ func (id *Identity) fillHandlers(h *Handlers) {
 	fill(&h.Enrollment, id.EnrollmentHandlers)
 	fill(&h.Approval, id.ApprovalHandlers)
 	fill(&h.Passkeys, id.PasskeyHandlers)
+	fill(&h.OIDC, id.OIDCHandlers)
 }
 
 // fill sets *dst to built when *dst is nil, so an injected handler stays.

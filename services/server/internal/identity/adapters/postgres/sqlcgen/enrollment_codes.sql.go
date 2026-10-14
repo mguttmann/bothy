@@ -78,7 +78,8 @@ const lockEnrollmentCode = `-- name: LockEnrollmentCode :one
 SELECT id, user_id, purpose, code_hash, expires_at, attempts, created_by, created_at, used_at, used_by_device_id FROM enrollment_codes WHERE id = $1 FOR UPDATE
 `
 
-// The row of the code a passkey enrollment checked at begin, locked again at complete (M1-40).
+// The code a passkey enrollment (M1-40) or an OIDC flow (M1-41) checked at begin, locked again
+// until the end of the completing unit of work, so it is consumed once.
 func (q *Queries) LockEnrollmentCode(ctx context.Context, id pgtype.UUID) (EnrollmentCode, error) {
 	row := q.db.QueryRow(ctx, lockEnrollmentCode, id)
 	var i EnrollmentCode

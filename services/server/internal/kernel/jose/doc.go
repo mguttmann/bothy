@@ -9,7 +9,10 @@
 // The profile (M1-33): the compact serialization only; ES256 (R || S, 64 bytes) and EdDSA
 // (Ed25519); header and payload are JSON objects without duplicate members; every parse names its
 // allowed algorithms and the expected typ; none, HS*, crit, jku, x5u, x5c and zip are refused.
-// Keys are EC P-256 and OKP Ed25519 without private members. M1-41 adds RS256 and PS256 (ADR 0067).
+// Keys are EC P-256 and OKP Ed25519 without private members. M1-41 added RS256 and PS256 (ADR 0067)
+// for the ID tokens of identity providers (ParseVerificationJWK also accepts RSA keys of 2048 to
+// 8192 bits) and the client assertions of private_key_jwt (RS256Signer, PS256Signer); ParseJWK,
+// the parser of device keys and DPoP proofs, still refuses RSA.
 //
 // Example:
 //

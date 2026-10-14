@@ -58,6 +58,8 @@ var sessCfg = app.Config{
 	APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
 	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 3, LoginFlowTTL: 10 * time.Minute,
 	DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
+	ServerCodeTTL: time.Minute, OIDCJWKSCacheTTL: time.Hour, OIDCClientAssertionTTL: 2 * time.Minute,
+	IDPRecheckInterval: 7 * 24 * time.Hour,
 }
 
 // testPepper is the token pepper of the session world (generated per test run, never a secret).
@@ -121,8 +123,10 @@ func keyDir(t *testing.T) string {
 }
 
 // newSessionWorldOn builds a world on db with its own pools, caches and chain; worlds on the same
-// db, clock, instance id and key directory are two server instances of one installation.
-func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.ID, dir string) *sworld {
+// db, clock, instance id and key directory are two server instances of one installation. Each
+// bind runs after BindSessions and before the routes are built (the OIDC world of M1-41 binds the
+// provider client there).
+func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.ID, dir string, binds ...func(*sworld)) *sworld {
 	t.Helper()
 	cfg := db.Config(pg.RoleApp)
 	cfg.MaxConns = 12
@@ -214,10 +218,13 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	if err := w.id.BindSessions(keys.Keys, instID); err != nil {
 		t.Fatal(err)
 	}
+	for _, bind := range binds {
+		bind(w)
+	}
 	built, err := routes.Build(wire.Handlers{Sessions: w.id.SessionHandlers, StepUps: w.id.StepUpHandlers, Devices: w.id.Handlers, People: w.id.PeopleHandlers,
 		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers,
 		Tokens: w.id.TokenHandlers, Enrollment: w.id.EnrollmentHandlers, Approval: w.id.ApprovalHandlers, Admin: w.settings.Handlers,
-		Passkeys: w.id.PasskeyHandlers},
+		Passkeys: w.id.PasskeyHandlers, OIDC: w.id.OIDCHandlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)

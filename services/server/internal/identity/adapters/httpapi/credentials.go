@@ -56,14 +56,7 @@ func toRESTCredentials(o identity.CredentialOverview) rest.CredentialOverview {
 		LocalPasswordSet: o.LocalPasswordSet, TotpEnrolled: o.TOTPEnrolled,
 	}
 	for _, i := range o.Identities {
-		item := rest.Identity{
-			Id: rest.Uuid(i.ID), ProviderId: rest.Uuid(i.ProviderID), ProviderKind: rest.IdentityProviderKind(i.ProviderKind),
-			Subject: i.Subject, Issuer: optional(i.Issuer), LinkedAt: ms(i.LinkedAt), LastLoginAt: optionalTime(i.LastLoginAt),
-		}
-		if i.EmailAtLink != "" {
-			setString(&item.EmailAtLink, i.EmailAtLink)
-		}
-		out.Identities = append(out.Identities, item)
+		out.Identities = append(out.Identities, identityREST(i))
 	}
 	for _, p := range o.Passkeys {
 		out.Passkeys = append(out.Passkeys, rest.Passkey{
@@ -72,4 +65,16 @@ func toRESTCredentials(o identity.CredentialOverview) rest.CredentialOverview {
 		})
 	}
 	return out
+}
+
+// identityREST converts an identity (schema Identity).
+func identityREST(i identity.Identity) rest.Identity {
+	item := rest.Identity{
+		Id: rest.Uuid(i.ID), ProviderId: rest.Uuid(i.ProviderID), ProviderKind: rest.IdentityProviderKind(i.ProviderKind),
+		Subject: i.Subject, Issuer: optional(i.Issuer), LinkedAt: ms(i.LinkedAt), LastLoginAt: optionalTime(i.LastLoginAt),
+	}
+	if i.EmailAtLink != "" {
+		setString(&item.EmailAtLink, i.EmailAtLink)
+	}
+	return item
 }

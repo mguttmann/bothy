@@ -33,6 +33,7 @@ const (
 	causeRefreshExpired = "refresh_expired"
 	causeUnknownToken   = "unknown_token"
 	causeRevokedState   = "revoked_state"
+	causeIDPRecheck     = "idp_recheck"
 )
 
 // deny builds the denial of a refresh with the answer code, the audit reason and the cause.
@@ -58,12 +59,13 @@ func (s *Sessions) Refresh(ctx context.Context, token string, proof identity.Ver
 		return identity.TokenSet{}, err
 	}
 	hash := session.TokenHash(s.pepper, token)
-	var out identity.TokenSet
-	reused := false
+	var (
+		out       identity.TokenSet
+		committed error
+	)
 	err = s.d.UoW.Do(ctx, func(ctx context.Context) error {
-		reused = false
-		set, reuse, err := s.rotate(ctx, hash, proof)
-		out, reused = set, reuse
+		set, after, err := s.rotate(ctx, hash, proof)
+		out, committed = set, after
 		return err
 	})
 	var denial *refreshDeniedError
@@ -74,8 +76,8 @@ func (s *Sessions) Refresh(ctx context.Context, token string, proof identity.Ver
 	if err != nil {
 		return identity.TokenSet{}, err
 	}
-	if reused {
-		return identity.TokenSet{}, errs.New(errs.CodeSessionRevoked, "")
+	if committed != nil {
+		return identity.TokenSet{}, committed
 	}
 	return out, nil
 }
@@ -88,19 +90,28 @@ type refreshState struct {
 	fam  FamilyRecord
 }
 
-// rotate is the body of Refresh inside its unit of work; reused reports a committed reuse.
-func (s *Sessions) rotate(ctx context.Context, hash []byte, proof identity.VerifiedProof) (identity.TokenSet, bool, error) {
+// rotate is the body of Refresh inside its unit of work. A refusal whose revocation must commit
+// (a reuse, an OIDC session due for a new provider login) returns its answer as committed with a
+// nil error, so the unit commits and Refresh answers with it.
+func (s *Sessions) rotate(ctx context.Context, hash []byte, proof identity.VerifiedProof) (set identity.TokenSet, committed, err error) {
 	st, err := s.lockRefresh(ctx, hash)
 	if err != nil {
-		return identity.TokenSet{}, false, err
+		return identity.TokenSet{}, nil, err
 	}
 	// A proof of another key never revokes: whoever lacks the device key must not be able to end
 	// someone's session (08 section 13, ID-T17).
 	if proof.JKT != st.fam.DPoPJKT {
 		answer := &identity.DPoPError{Code: identity.DPoPInvalidProof, Nonce: s.d.DPoP.CurrentNonce()}
-		return identity.TokenSet{}, false, deny(answer, auditing.ReasonUnauthenticated, causeKeyMismatch, st.sess.ID)
+		return identity.TokenSet{}, nil, deny(answer, auditing.ReasonUnauthenticated, causeKeyMismatch, st.sess.ID)
 	}
 	now := s.d.Clock.Now()
+	due, err := s.recheckDue(ctx, st.sess, now)
+	if err != nil {
+		return identity.TokenSet{}, nil, err
+	}
+	if due {
+		return identity.TokenSet{}, errs.New(errs.CodeUnauthenticated, ""), s.expireForRecheck(ctx, st)
+	}
 	outcome := session.Decide(session.Family{CurrentGeneration: st.fam.CurrentGeneration, RotatedAt: st.fam.RotatedAt},
 		session.Token{Generation: st.tok.Generation, UsedAt: st.tok.UsedAt, ExpiresAt: st.tok.ExpiresAt}, now, s.cfg.RefreshReuseGrace)
 	switch outcome {
@@ -108,19 +119,51 @@ func (s *Sessions) rotate(ctx context.Context, hash []byte, proof identity.Verif
 		// Rotate marks the presented token; grace marks the current generation the client never
 		// received (03 refresh_tokens item 2).
 		if err := s.d.Store.MarkRefreshUsed(ctx, st.fam.ID, st.fam.CurrentGeneration, now); err != nil {
-			return identity.TokenSet{}, false, err
+			return identity.TokenSet{}, nil, err
 		}
 		next := st.fam.CurrentGeneration + 1
 		if err := s.d.Store.AdvanceFamily(ctx, st.fam.ID, next, now); err != nil {
-			return identity.TokenSet{}, false, err
+			return identity.TokenSet{}, nil, err
 		}
 		set, err := s.issue(ctx, st.sess, st.fam, next)
-		return set, false, err
+		return set, nil, err
 	case session.OutcomeReuse:
-		return identity.TokenSet{}, true, s.reuse(ctx, st, now)
+		return identity.TokenSet{}, errs.New(errs.CodeSessionRevoked, ""), s.reuse(ctx, st, now)
 	case session.OutcomeExpired, session.OutcomeFamilyRevoked:
 	}
-	return identity.TokenSet{}, false, deny(errs.New(errs.CodeUnauthenticated, ""), auditing.ReasonUnauthenticated, causeRefreshExpired, st.sess.ID)
+	return identity.TokenSet{}, nil, deny(errs.New(errs.CodeUnauthenticated, ""), auditing.ReasonUnauthenticated, causeRefreshExpired, st.sess.ID)
+}
+
+// recheckDue reports an OIDC session whose provider login is auth.idp_recheck_interval or longer
+// ago (08 section 3.5, T-ID-06): created_at of an OIDC session is the time of the provider login,
+// and a child session counts from its parent. A zero interval switches the rule off.
+func (s *Sessions) recheckDue(ctx context.Context, sess SessionRecord, now time.Time) (bool, error) {
+	if s.cfg.IDPRecheckInterval <= 0 || sess.AuthMethod != identity.AuthOIDC {
+		return false, nil
+	}
+	loginAt := sess.CreatedAt
+	if !sess.ParentID.IsZero() {
+		parent, found, err := s.d.Store.Session(ctx, sess.ParentID)
+		if err != nil {
+			return false, err
+		}
+		if found {
+			loginAt = parent.CreatedAt
+		}
+	}
+	return !now.Before(loginAt.Add(s.cfg.IDPRecheckInterval)), nil
+}
+
+// expireForRecheck revokes the session and its children (expired, families revoked) and records
+// the denial inside the unit of work, which commits: the next login goes to the provider.
+func (s *Sessions) expireForRecheck(ctx context.Context, st refreshState) error {
+	if err := s.revoke(ctx, st.tree, identity.RevokeExpired, nil); err != nil {
+		return err
+	}
+	return s.d.Audit.Record(ctx, auditing.Entry{
+		Action: string(authorize.ActionAuthTokenRefresh), Decision: auditing.DecisionDeny, Reason: auditing.ReasonUnauthenticated,
+		ResourceKind: resourceAuthSession, ResourceID: st.sess.ID, Attrs: auditing.Attrs{attrCause: auditing.Code(causeIDPRecheck)},
+	})
 }
 
 // lockRefresh finds the token of hash and locks its session rows in ascending id, then the family

@@ -51,6 +51,12 @@ type LoginCompletion struct {
 	Trust DeviceTrust
 	// ClientIP is the client address of the request, stored as auth_sessions.last_ip.
 	ClientIP netip.Addr
+	// AllowPending lets a person in status pending log in (an OIDC person provisioned as pending
+	// gets tokens but only the self information, 08 R-ID-14); disabled and deleted never log in.
+	AllowPending bool
+	// Provisioned marks a login that created the person (08 section 3.1 step 3); the allow entry
+	// says so.
+	Provisioned bool
 }
 
 // LoginResult is a completed login: the session, its device and the token pair. NewDevice reports
@@ -153,6 +159,7 @@ const (
 	attrNewDevice        = "new_device"
 	attrDeviceState      = "device_state"
 	attrEnrollmentCodeID = "enrollment_code_id"
+	attrProvisioned      = "provisioned"
 )
 
 // fieldDeviceID is the field pointer of DeviceRegistration.device_id.
@@ -187,7 +194,7 @@ func (s *Service) completeLogin(ctx context.Context, in LoginCompletion) (LoginR
 	if err != nil {
 		return LoginResult{}, err
 	}
-	if !found || rec.User.Principal.Status != domain.StatusActive {
+	if !found || !mayLogIn(rec.User.Principal.Status, in.AllowPending) {
 		return LoginResult{}, errs.New(errs.CodeUnauthenticated, "")
 	}
 	dev, isNew, err := s.loginDevice(ctx, in)
@@ -211,15 +218,9 @@ func (s *Service) completeLogin(ctx context.Context, in LoginCompletion) (LoginR
 	}
 	// The entry names the person who logged in, with the new session and device, even though the
 	// request itself is anonymous: a login is the person's action.
-	as := actor.WithActor(ctx, actor.Actor{Kind: actor.KindUser, ID: in.UserID, SessionID: set.Session.ID, DeviceID: set.Device.ID})
-	err = s.d.Audit.Record(as, auditing.Entry{
+	err = s.d.Audit.Record(loginActor(ctx, in.UserID, set), auditing.Entry{
 		Action: string(authorize.ActionAuthLoginComplete), Decision: auditing.DecisionAllow,
-		ResourceKind: resourceAuthSession, ResourceID: set.Session.ID,
-		Attrs: auditing.Attrs{
-			attrAuthMethod: auditing.Code(string(in.AuthMethod)), attrDeviceID: auditing.ID(set.Device.ID),
-			attrSessionID: auditing.ID(set.Session.ID), attrNewDevice: auditing.Bool(isNew),
-			attrDeviceState: auditing.Code(string(set.Device.State)),
-		},
+		ResourceKind: resourceAuthSession, ResourceID: set.Session.ID, Attrs: loginAttrs(in, set, isNew),
 	})
 	if err != nil {
 		return LoginResult{}, err
@@ -228,6 +229,30 @@ func (s *Service) completeLogin(ctx context.Context, in LoginCompletion) (LoginR
 	// only (08 section 5.2).
 	set.Device.VerificationCode = s.verificationCode(set.Device)
 	return LoginResult{Session: set.Session, Device: set.Device, Tokens: set, NewDevice: isNew}, nil
+}
+
+// mayLogIn reports a person status that may log in: active, and pending when allowPending.
+func mayLogIn(st domain.Status, allowPending bool) bool {
+	return st == domain.StatusActive || allowPending && st == domain.StatusPending
+}
+
+// loginAttrs are the details of the allow entry of a login: codes and IDs only (SEC-AUD-5).
+func loginAttrs(in LoginCompletion, set identity.TokenSet, isNew bool) auditing.Attrs {
+	attrs := auditing.Attrs{
+		attrAuthMethod: auditing.Code(string(in.AuthMethod)), attrDeviceID: auditing.ID(set.Device.ID),
+		attrSessionID: auditing.ID(set.Session.ID), attrNewDevice: auditing.Bool(isNew),
+		attrDeviceState: auditing.Code(string(set.Device.State)),
+	}
+	if in.Provisioned {
+		attrs[attrProvisioned] = auditing.Bool(true)
+	}
+	return attrs
+}
+
+// loginActor returns ctx with the person who logged in as the principal, with the new session and
+// device: the audit entries of a login name the person, not the anonymous request.
+func loginActor(ctx context.Context, userID ids.ID, set identity.TokenSet) context.Context {
+	return actor.WithActor(ctx, actor.Actor{Kind: actor.KindUser, ID: userID, SessionID: set.Session.ID, DeviceID: set.Device.ID})
 }
 
 // loginDevice validates the registration of in, checks its dpop key against the proof key and

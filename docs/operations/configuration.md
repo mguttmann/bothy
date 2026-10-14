@@ -368,11 +368,11 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.clock_leeway` | `BOTHY_AUTH__CLOCK_LEEWAY` | Server | duration | `30s` | erlaubte Uhrabweichung bei `exp`, `nbf`, `iat` | aktiv |
 | `auth.dpop_proof_max_age` | `BOTHY_AUTH__DPOP_PROOF_MAX_AGE` | Server | duration | `60s` | Höchstalter eines DPoP-Beweises (`iat`) | aktiv |
 | `auth.login_flow_ttl` | `BOTHY_AUTH__LOGIN_FLOW_TTL` | Server | duration | `10m` | Gültigkeit eines Anmeldevorgangs | aktiv |
-| `auth.server_code_ttl` | `BOTHY_AUTH__SERVER_CODE_TTL` | Server |  | `60s` | Gültigkeit des einmaligen Server-Codes | geplant (M1) |
-| `auth.oidc_jwks_cache_ttl` | `BOTHY_AUTH__OIDC_JWKS_CACHE_TTL` | Server |  | `1h` | Cache der Anbieter-Metadaten (Discovery) und -Schlüssel (JWKS) | geplant (M1) |
-| `auth.oidc_client_assertion_ttl` | `BOTHY_AUTH__OIDC_CLIENT_ASSERTION_TTL` | Server |  | `2m` | Gültigkeit einer Client-Assertion bei `private_key_jwt` | geplant (M1) |
+| `auth.server_code_ttl` | `BOTHY_AUTH__SERVER_CODE_TTL` | Server | duration | `60s` | Gültigkeit des einmaligen Server-Codes | aktiv |
+| `auth.oidc_jwks_cache_ttl` | `BOTHY_AUTH__OIDC_JWKS_CACHE_TTL` | Server | duration | `1h` | Cache der Anbieter-Metadaten (Discovery) und -Schlüssel (JWKS) | aktiv |
+| `auth.oidc_client_assertion_ttl` | `BOTHY_AUTH__OIDC_CLIENT_ASSERTION_TTL` | Server | duration | `2m` | Gültigkeit einer Client-Assertion bei `private_key_jwt` | aktiv |
 | `auth.group_claim_max_age` | `BOTHY_AUTH__GROUP_CLAIM_MAX_AGE` | Server |  | `30d` | Ablauf von Mitgliedschaften aus Gruppen-Claims nach der letzten Anmeldung | geplant (M1) |
-| `auth.idp_recheck_interval` | `BOTHY_AUTH__IDP_RECHECK_INTERVAL` | Server |  | `30d` | spätestens dann neue Anmeldung beim Anbieter | geplant (M1) |
+| `auth.idp_recheck_interval` | `BOTHY_AUTH__IDP_RECHECK_INTERVAL` | Server | duration | `30d` | spätestens dann neue Anmeldung beim Anbieter | aktiv |
 | `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server |  | `true` | jede Anfrage muss denselben Header-Login tragen | geplant (M1) |
 | `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server | duration | `72h` | Gültigkeit eines Einladungs-Codes | aktiv |
 | `auth.enrollment_code_max_attempts` | `BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS` | Server | int | `5` | Fehlversuche je Einladungs-Code | aktiv |

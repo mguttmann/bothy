@@ -38,6 +38,20 @@ documented in this file. The format is based on
   `webauthn_relying_party`; the credential overview lists the passkeys. Dependency:
   `github.com/go-webauthn/webauthn` `v0.18.2` (BSD-3-Clause), only in `identity/adapters/webauthn`,
   with the software authenticator `virtualauthn` for tests.
+- OIDC login with PKCE (M1-41): the server is the confidential relying party of every configured
+  OIDC provider and the authorization server of its apps, with PKCE `S256` on both legs. The
+  operations `beginOidcLogin`, `handleOidcCallback`, `completeOidcLogin`, `beginIdentityLink` and
+  `completeIdentityLink`; the migration `00020_identity_login_flows.sql`; the callback stores only
+  the verified identity with a one-time `login_code`, and mapping by `(provider_id, issuer,
+  subject)`, linking through an enrollment code and provisioning as `pending` happen at complete,
+  which needs the app's `client_verifier`. Discovery, JWKS and token requests run through the
+  egress client with a per-provider host policy; client authentication with `client_secret_basic`
+  or `private_key_jwt`; ID tokens with `RS256`, `PS256`, `ES256` or `EdDSA` (`kernel/jose` gains
+  RSA verification and signing). OIDC sessions need a new provider login after
+  `auth.idp_recheck_interval`; the job `identity.auth_cleanup` deletes expired flows. New
+  configuration keys `auth.login_flow_ttl`, `auth.server_code_ttl`, `auth.oidc_jwks_cache_ttl`,
+  `auth.oidc_client_assertion_ttl` and `auth.idp_recheck_interval`; operations guide
+  `docs/operations/oidc-entra.md` with a Microsoft Entra ID example.
 - Instance settings, branding and discovery (M1-46): the migration `00017_instance_settings.sql`,
   the settings registry of configuration.md section 6, the generated design keys
   `kernel/designkeys` (category colours and space icons from the design tokens, the accent list of
