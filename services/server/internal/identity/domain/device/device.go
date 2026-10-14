@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
@@ -144,6 +145,10 @@ type Device struct {
 	// ApprovedBy is set for an active device; the store sets approved_at.
 	ApprovedBy ids.ID
 	Keys       []Key
+	// CreatedAt is devices.created_at (and approved_at of an active device); zero means the
+	// database time. The login paths set the clock of the request, because the pending window
+	// auth.device_pending_ttl counts from it (M1-38).
+	CreatedAt time.Time
 }
 
 // The field error codes of this package besides the textcheck rules.

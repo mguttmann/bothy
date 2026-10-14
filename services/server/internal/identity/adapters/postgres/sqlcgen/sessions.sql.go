@@ -12,11 +12,22 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const clearSessionStepUp = `-- name: ClearSessionStepUp :exec
+UPDATE auth_sessions SET step_up_at = NULL, step_up_method = NULL WHERE id = $1
+`
+
+// A pairing code without an open pairing ends the step-up of the approving session (M1-38).
+func (q *Queries) ClearSessionStepUp(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, clearSessionStepUp, id)
+	return err
+}
+
 const getAuthState = `-- name: GetAuthState :one
 SELECT s.id, s.user_id, s.device_id, s.client_component, s.parent_session_id, s.identity_id, s.auth_method, s.cookie_hash, s.created_at, s.expires_at, s.step_up_at, s.step_up_method, s.step_up_consumed_at, s.last_seen_at, s.last_ip, s.revoked_at, s.revoke_reason,
        d.state        AS device_state,
        d.last_seen_at AS device_last_seen_at,
-       k.jkt          AS dpop_jkt
+       k.jkt          AS dpop_jkt,
+       d.created_at   AS device_created_at
 FROM auth_sessions s
 JOIN devices d ON d.id = s.device_id
 LEFT JOIN device_keys k ON k.device_id = d.id AND k.purpose = 'dpop' AND k.revoked_at IS NULL
@@ -28,6 +39,7 @@ type GetAuthStateRow struct {
 	DeviceState      string
 	DeviceLastSeenAt pgtype.Timestamptz
 	DpopJkt          pgtype.Text
+	DeviceCreatedAt  pgtype.Timestamptz
 }
 
 // The authentication lookup of one request: the session with its device and the device's active
@@ -56,6 +68,7 @@ func (q *Queries) GetAuthState(ctx context.Context, id pgtype.UUID) (GetAuthStat
 		&i.DeviceState,
 		&i.DeviceLastSeenAt,
 		&i.DpopJkt,
+		&i.DeviceCreatedAt,
 	)
 	return i, err
 }
@@ -181,6 +194,31 @@ func (q *Queries) ListActiveSessionsOfUser(ctx context.Context, arg ListActiveSe
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOpenSessionsOfDevice = `-- name: ListOpenSessionsOfDevice :many
+SELECT id FROM auth_sessions WHERE device_id = $1 AND revoked_at IS NULL ORDER BY id
+`
+
+// The sessions a device revocation ends (M1-38), children included.
+func (q *Queries) ListOpenSessionsOfDevice(ctx context.Context, deviceID pgtype.UUID) ([]pgtype.UUID, error) {
+	rows, err := q.db.Query(ctx, listOpenSessionsOfDevice, deviceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []pgtype.UUID
+	for rows.Next() {
+		var id pgtype.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

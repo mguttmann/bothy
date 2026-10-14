@@ -60,6 +60,9 @@ type AuthState struct {
 	DeviceState      identity.DeviceState
 	DeviceLastSeenAt time.Time
 	DeviceKeyJKT     string
+	// DeviceCreatedAt is devices.created_at: a pending device older than auth.device_pending_ttl
+	// counts as revoked (M1-38).
+	DeviceCreatedAt time.Time
 }
 
 // FamilyRevokeReason is refresh_token_families.revoke_reason.
@@ -119,4 +122,10 @@ type SessionStore interface {
 	RevokeFamily(ctx context.Context, familyID ids.ID, reason FamilyRevokeReason, at time.Time) error
 	// RevokeActiveFamilies revokes the active families of the sessions in list with reason.
 	RevokeActiveFamilies(ctx context.Context, list []ids.ID, reason FamilyRevokeReason, at time.Time) error
+	// OpenSessionsOfDevice returns the sessions of deviceID with revoked_at IS NULL, children
+	// included, ascending (M1-38).
+	OpenSessionsOfDevice(ctx context.Context, deviceID ids.ID) ([]ids.ID, error)
+	// ClearSessionStepUp sets step_up_at and step_up_method of the session id to NULL, so the next
+	// action with step-up needs a new confirmation (M1-38, a wrong pairing code).
+	ClearSessionStepUp(ctx context.Context, id ids.ID) error
 }

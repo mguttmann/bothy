@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/OWNER/bothy/services/server/internal/identity"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/device"
@@ -26,6 +27,19 @@ type DeviceStore interface {
 	DevicesOfUser(ctx context.Context, userID, before ids.ID, limit int) ([]identity.Device, error)
 	// ActiveKey returns the key of deviceID and purpose with revoked_at IS NULL.
 	ActiveKey(ctx context.Context, deviceID ids.ID, purpose identity.KeyPurpose) (k identity.DeviceKey, found bool, err error)
+	// LockDevice returns the device id locked FOR UPDATE until the end of the unit of work; found
+	// is false for an unknown id (M1-38).
+	LockDevice(ctx context.Context, id ids.ID) (d identity.Device, found bool, err error)
+	// ActivateDevice sets state active, approved_by = by and approved_at = at on the device id
+	// while it is pending; activated is false otherwise.
+	ActivateDevice(ctx context.Context, id, by ids.ID, at time.Time) (activated bool, err error)
+	// RevokeDevice sets state revoked, revoked_at = at, revoked_by = by (zero for NULL) and
+	// revoke_reason on the device id while it is not revoked, and revoked_at on its active keys;
+	// it returns the person of the device, revoked false when it was revoked already.
+	RevokeDevice(ctx context.Context, id ids.ID, reason identity.DeviceRevokeReason, by ids.ID, at time.Time) (userID ids.ID, revoked bool, err error)
+	// PendingDevicesCreatedBefore returns up to limit pending devices with created_at <= before,
+	// oldest first (the expiry of the job identity.auth_cleanup).
+	PendingDevicesCreatedBefore(ctx context.Context, before time.Time, limit int) ([]identity.Device, error)
 }
 
 // Cursors is the outgoing port of the cursor codec (platform/httpserver, 06 "6. Paginierung"):

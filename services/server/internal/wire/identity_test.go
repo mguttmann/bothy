@@ -31,6 +31,7 @@ func TestIdentityConfigBindsDefaults(t *testing.T) {
 		StepUpChallengeTTL: 2 * time.Minute, StepUpFailLimit: 5, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
 		APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
 		EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 5,
+		DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
 	}
 	if !reflect.DeepEqual(cfg, want) {
 		t.Fatalf("IdentityConfig = %+v, want %+v", cfg, want)

@@ -58,7 +58,7 @@ func tokenAuth(t *testing.T, store *countingTokens) (*app.Authenticator, *tokenE
 	t.Helper()
 	e := newTokenEnv(t)
 	d := newDPoPEnv(t, "pepper")
-	a, err := app.NewAuthenticator(app.Config{LastActiveGranularity: 5 * time.Minute}, app.AuthenticatorDeps{
+	a, err := app.NewAuthenticator(app.Config{LastActiveGranularity: 5 * time.Minute, DevicePendingTTL: 24 * time.Hour}, app.AuthenticatorDeps{
 		AccessTokens: e.at, DPoP: d.v, Sessions: noSessions{}, APITokens: store, Pepper: tokenPepper, Clock: e.clk,
 		Log: slog.New(slog.DiscardHandler),
 	})

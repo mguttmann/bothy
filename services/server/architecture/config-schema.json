@@ -158,6 +158,30 @@
       "doc": "Allowed clock skew for exp, nbf and iat."
     },
     {
+      "name": "auth.device_pending_ttl",
+      "env": "BOTHY_AUTH__DEVICE_PENDING_TTL",
+      "kind": "duration",
+      "default": "24h",
+      "required": false,
+      "enum": [],
+      "min": "1m",
+      "max": "",
+      "chapter": "08-identitaet.md",
+      "doc": "Age after which a pending device without approval counts as revoked."
+    },
+    {
+      "name": "auth.device_verification_code_digits",
+      "env": "BOTHY_AUTH__DEVICE_VERIFICATION_CODE_DIGITS",
+      "kind": "int",
+      "default": "6",
+      "required": false,
+      "enum": [],
+      "min": "6",
+      "max": "12",
+      "chapter": "08-identitaet.md",
+      "doc": "Digits of the verification code a pending device shows."
+    },
+    {
       "name": "auth.dpop_nonce_ttl",
       "env": "BOTHY_AUTH__DPOP_NONCE_TTL",
       "kind": "duration",
@@ -240,6 +264,30 @@
       "max": "",
       "chapter": "08-identitaet.md",
       "doc": "Window in which failed attempts count."
+    },
+    {
+      "name": "auth.pairing_code_chars",
+      "env": "BOTHY_AUTH__PAIRING_CODE_CHARS",
+      "kind": "int",
+      "default": "8",
+      "required": false,
+      "enum": [],
+      "min": "8",
+      "max": "16",
+      "chapter": "08-identitaet.md",
+      "doc": "Crockford Base32 characters of a pairing code (5 bits each)."
+    },
+    {
+      "name": "auth.pairing_code_ttl",
+      "env": "BOTHY_AUTH__PAIRING_CODE_TTL",
+      "kind": "duration",
+      "default": "5m",
+      "required": false,
+      "enum": [],
+      "min": "30s",
+      "max": "",
+      "chapter": "08-identitaet.md",
+      "doc": "Validity of a pairing code, and the window to collect an approved pairing."
     },
     {
       "name": "auth.personal_token_max_ttl",

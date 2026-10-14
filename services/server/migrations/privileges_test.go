@@ -84,6 +84,9 @@ var appPrivileges = map[string][]string{
 	// 03 enrollment_codes (M1-37): a code ends by used_at, expires_at or attempts; the rows are
 	// security history, deleted only by the retention job, which grants its delete.
 	"enrollment_codes": {"SELECT", "INSERT", "UPDATE"},
+	// 03 device_pairings (M1-38): a pairing ends by its status; deleting old rows belongs to the
+	// retention job.
+	"device_pairings": {"SELECT", "INSERT", "UPDATE"},
 }
 
 // allPrivileges are the table rights PostgreSQL 18 knows (MAINTAIN since 17).

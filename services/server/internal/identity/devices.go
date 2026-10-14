@@ -82,7 +82,7 @@ type RegisterDevice struct {
 }
 
 // Device is a device as the API shows it (schema Device without push_registrations, which M3
-// adds, and without verification_code, which M1-38 adds). Zero values are absent members.
+// adds). Zero values are absent members.
 type Device struct {
 	ID, UserID ids.ID
 	Name       string
@@ -97,6 +97,9 @@ type Device struct {
 	RevokeReason string
 	// ApprovedAt, RevokedAt and LastSeenAt are zero for none.
 	ApprovedAt, RevokedAt, CreatedAt, LastSeenAt time.Time
+	// VerificationCode is the code a pending device shows (08 section 5.2); set only in answers
+	// to that device itself, "" everywhere else (M1-38).
+	VerificationCode string
 }
 
 // DeviceKey is one row of device_keys.

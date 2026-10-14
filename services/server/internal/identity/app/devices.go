@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/OWNER/bothy/services/server/internal/identity"
+	"github.com/OWNER/bothy/services/server/internal/identity/domain"
 	"github.com/OWNER/bothy/services/server/internal/identity/domain/device"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -31,6 +32,9 @@ type DevicesDeps struct {
 	Authorizer authorize.Authorizer
 	// Cursors encodes and checks the page cursors.
 	Cursors Cursors
+	// Pepper is the raw token pepper, the key of the verification code a pending device reads
+	// about itself (M1-38); empty means no code is shown.
+	Pepper []byte
 }
 
 // Devices implements identity.Devices. It is safe for concurrent use.
@@ -52,6 +56,10 @@ func NewDevices(cfg Config, deps DevicesDeps) (*Devices, error) {
 	if cfg.PageSizeDefault < 1 || cfg.PageSizeMax < cfg.PageSizeDefault {
 		return nil, errors.New("identity: api.page_size_default must be at least 1 and not above api.page_size_max")
 	}
+	if len(deps.Pepper) > 0 && (cfg.DeviceVerificationCodeDigits < 1 || cfg.DeviceVerificationCodeDigits > domain.MaxVerificationDigits) {
+		return nil, errors.New("identity: auth.device_verification_code_digits out of range")
+	}
+	deps.Pepper = append([]byte(nil), deps.Pepper...)
 	return &Devices{cfg: cfg, deps: deps}, nil
 }
 
@@ -107,7 +115,18 @@ func (s *Devices) Get(ctx context.Context, a actor.Actor, deviceID ids.ID) (iden
 	if !found {
 		return identity.Device{}, invisible()
 	}
+	s.withOwnCode(a, &d)
 	return d, nil
+}
+
+// withOwnCode sets the verification code on d when d is the pending device of the caller's own
+// session: the code is shown only to the device itself, never to another device or an owner
+// (08 section 5.2).
+func (s *Devices) withOwnCode(a actor.Actor, d *identity.Device) {
+	if len(s.deps.Pepper) == 0 || a.SessionID.IsZero() || d.ID != a.DeviceID || d.State != identity.DeviceStatePending || d.KeyThumbprint == "" {
+		return
+	}
+	d.VerificationCode = domain.DeriveVerificationCode(s.deps.Pepper, d.ID, d.KeyThumbprint, s.cfg.DeviceVerificationCodeDigits)
 }
 
 // ListMine implements identity.Devices: device.list on the resource user = the caller.
@@ -115,7 +134,11 @@ func (s *Devices) ListMine(ctx context.Context, a actor.Actor, p identity.Page) 
 	if err := s.authorize(ctx, a, authorize.Resource{Kind: authorize.ResourceUser, ID: a.ID, OwnerID: a.ID}); err != nil {
 		return identity.DevicePage{}, err
 	}
-	return s.page(ctx, a, a.ID, p)
+	out, err := s.page(ctx, a, a.ID, p)
+	for i := range out.Items {
+		s.withOwnCode(a, &out.Items[i])
+	}
+	return out, err
 }
 
 // ListForUser implements identity.Devices. The resource is the device set of userID (kind

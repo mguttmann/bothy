@@ -58,6 +58,18 @@ type Config struct {
 	// EnrollmentCodeMaxAttempts is auth.enrollment_code_max_attempts: a code with this many failed
 	// attempts is invalid (08 section 3.2).
 	EnrollmentCodeMaxAttempts int `config:"auth.enrollment_code_max_attempts"`
+	// DevicePendingTTL is auth.device_pending_ttl: a pending device older than this counts as
+	// revoked and is revoked with pending_expired (08 section 5.2, M1-38).
+	DevicePendingTTL time.Duration `config:"auth.device_pending_ttl"`
+	// DeviceVerificationCodeDigits is auth.device_verification_code_digits, the length of the code
+	// a pending device shows.
+	DeviceVerificationCodeDigits int `config:"auth.device_verification_code_digits"`
+	// PairingCodeTTL is auth.pairing_code_ttl, how long a pairing code is valid and how long an
+	// approved pairing may be collected (08 section 5.3).
+	PairingCodeTTL time.Duration `config:"auth.pairing_code_ttl"`
+	// PairingCodeChars is auth.pairing_code_chars, the Crockford Base32 characters of a pairing
+	// code.
+	PairingCodeChars int `config:"auth.pairing_code_chars"`
 	// CleanupInterval is auth.cleanup_interval, the period of the job identity.auth_cleanup.
 	CleanupInterval time.Duration `config:"auth.cleanup_interval"`
 	// APITokenMaxTTL is auth.api_token_max_ttl, the longest lifetime of an agent or app token

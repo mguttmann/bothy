@@ -84,8 +84,8 @@ func NewAuthenticator(cfg Config, d AuthenticatorDeps) (*Authenticator, error) {
 	if d.AccessTokens == nil || d.DPoP == nil || d.Sessions == nil || d.APITokens == nil || len(d.Pepper) == 0 {
 		return nil, errors.New("identity: NewAuthenticator needs the access tokens, the DPoP verifier, the session and API token stores and the pepper")
 	}
-	if cfg.LastActiveGranularity < 0 {
-		return nil, errors.New("identity: identity.last_active_granularity must not be negative")
+	if cfg.LastActiveGranularity < 0 || cfg.DevicePendingTTL <= 0 {
+		return nil, errors.New("identity: identity.last_active_granularity must not be negative and auth.device_pending_ttl must be positive")
 	}
 	if d.Clock == nil {
 		d.Clock = clock.System()
@@ -193,14 +193,19 @@ func (a *Authenticator) person(ctx context.Context, creds actor.Credentials, tok
 
 // describe fills the actor from the session, device and key read for this request. The session is
 // active only when it is not revoked, has not ended and belongs to sub and did; the device state
-// counts only for the device of the token; the key is active only when cnf.jkt is the device's
-// active dpop key.
+// counts only for the device of the token, and a pending device past auth.device_pending_ttl is
+// revoked, so authorize answers 401 (device_inactive) even before the cleanup job revokes it
+// (M1-38); the key is active only when cnf.jkt is the device's active dpop key.
 func (a *Authenticator) describe(out *actor.Actor, st AuthState) {
 	s := st.Session
+	now := a.clk.Now()
 	own := s.UserID == out.ID && s.DeviceID == out.DeviceID
-	out.SessionActive = own && s.Active(a.clk.Now())
+	out.SessionActive = own && s.Active(now)
 	if own {
 		out.DeviceState = string(st.DeviceState)
+		if st.DeviceState == identity.DeviceStatePending && !now.Before(st.DeviceCreatedAt.Add(a.cfg.DevicePendingTTL)) {
+			out.DeviceState = actor.DeviceRevoked
+		}
 	}
 	out.DeviceKeyActive = own && st.DeviceKeyJKT != "" && st.DeviceKeyJKT == out.KeyThumbprint
 	out.StepUpAt, out.StepUpMethod = s.StepUpAt, s.StepUpMethod

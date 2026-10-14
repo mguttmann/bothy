@@ -376,10 +376,10 @@ Quelle: [08-identitaet.md](../spec/08-identitaet.md), Abschnitt 18.
 | `auth.trusted_header_bind_requests` | `BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS` | Server |  | `true` | jede Anfrage muss denselben Header-Login tragen | geplant (M1) |
 | `auth.enrollment_code_ttl` | `BOTHY_AUTH__ENROLLMENT_CODE_TTL` | Server | duration | `72h` | Gültigkeit eines Einladungs-Codes | aktiv |
 | `auth.enrollment_code_max_attempts` | `BOTHY_AUTH__ENROLLMENT_CODE_MAX_ATTEMPTS` | Server | int | `5` | Fehlversuche je Einladungs-Code | aktiv |
-| `auth.device_pending_ttl` | `BOTHY_AUTH__DEVICE_PENDING_TTL` | Server |  | `24h` | danach wird ein wartendes Gerät widerrufen | geplant (M1) |
-| `auth.device_verification_code_digits` | `BOTHY_AUTH__DEVICE_VERIFICATION_CODE_DIGITS` | Server |  | `6` | Länge des Bestätigungs-Codes | geplant (M1) |
-| `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server |  | `5m` | Gültigkeit eines Kopplungs-Codes | geplant (M1) |
-| `auth.pairing_code_chars` | `BOTHY_AUTH__PAIRING_CODE_CHARS` | Server |  | `8` | Länge des Kopplungs-Codes (Crockford-Base32, 40 Bit) | geplant (M1) |
+| `auth.device_pending_ttl` | `BOTHY_AUTH__DEVICE_PENDING_TTL` | Server | duration | `24h` | danach wird ein wartendes Gerät widerrufen | aktiv |
+| `auth.device_verification_code_digits` | `BOTHY_AUTH__DEVICE_VERIFICATION_CODE_DIGITS` | Server | int | `6` | Länge des Bestätigungs-Codes | aktiv |
+| `auth.pairing_code_ttl` | `BOTHY_AUTH__PAIRING_CODE_TTL` | Server | duration | `5m` | Gültigkeit eines Kopplungs-Codes | aktiv |
+| `auth.pairing_code_chars` | `BOTHY_AUTH__PAIRING_CODE_CHARS` | Server | int | `8` | Länge des Kopplungs-Codes (Crockford-Base32, 40 Bit) | aktiv |
 | `auth.device_inactive_revoke_after` | `BOTHY_AUTH__DEVICE_INACTIVE_REVOKE_AFTER` | Server |  | `180d` | Gerät ohne Kontakt wird widerrufen | geplant (M1) |
 | `auth.cleanup_interval` | `BOTHY_AUTH__CLEANUP_INTERVAL` | Server | duration | `1h` | Abstand des Jobs `identity.auth_cleanup` (abgelaufene Herausforderungen, Anmeldevorgänge und Kopplungen löschen, wartende und ungenutzte Geräte widerrufen) | aktiv |
 | `auth.step_up_challenge_ttl` | `BOTHY_AUTH__STEP_UP_CHALLENGE_TTL` | Server | duration | `2m` | Gültigkeit einer Step-up-Herausforderung | aktiv |

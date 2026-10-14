@@ -181,7 +181,8 @@ func (s *Sessions) alive(ctx context.Context, sess SessionRecord, fam FamilyReco
 		return false, nil
 	}
 	dev, found, err := s.d.Devices.Device(ctx, sess.DeviceID)
-	if err != nil || !found || dev.State == identity.DeviceStateRevoked {
+	// A pending device past auth.device_pending_ttl counts as revoked (08 section 5.2, M1-38).
+	if err != nil || !found || dev.State == identity.DeviceStateRevoked || pendingExpired(dev, s.d.Clock.Now(), s.cfg.DevicePendingTTL) {
 		return false, err
 	}
 	// The family is bound to the device's dpop key; once that key is no longer active, the access

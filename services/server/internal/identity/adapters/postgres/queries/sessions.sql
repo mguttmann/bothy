@@ -40,7 +40,8 @@ LIMIT @row_limit;
 SELECT sqlc.embed(s),
        d.state        AS device_state,
        d.last_seen_at AS device_last_seen_at,
-       k.jkt          AS dpop_jkt
+       k.jkt          AS dpop_jkt,
+       d.created_at   AS device_created_at
 FROM auth_sessions s
 JOIN devices d ON d.id = s.device_id
 LEFT JOIN device_keys k ON k.device_id = d.id AND k.purpose = 'dpop' AND k.revoked_at IS NULL
@@ -57,3 +58,11 @@ WITH sess AS (
 )
 UPDATE devices SET last_seen_at = @seen_at
 WHERE devices.id = @device_id AND (devices.last_seen_at IS NULL OR devices.last_seen_at < @threshold);
+
+-- name: ListOpenSessionsOfDevice :many
+-- The sessions a device revocation ends (M1-38), children included.
+SELECT id FROM auth_sessions WHERE device_id = @device_id AND revoked_at IS NULL ORDER BY id;
+
+-- name: ClearSessionStepUp :exec
+-- A pairing code without an open pairing ends the step-up of the approving session (M1-38).
+UPDATE auth_sessions SET step_up_at = NULL, step_up_method = NULL WHERE id = @id;

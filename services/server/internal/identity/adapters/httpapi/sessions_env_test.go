@@ -57,6 +57,7 @@ var sessCfg = app.Config{
 	StepUpChallengeTTL: 2 * time.Minute, StepUpFailLimit: 3, LoginFailWindow: 15 * time.Minute, CleanupInterval: time.Hour,
 	APITokenMaxTTL: 365 * 24 * time.Hour, PersonalTokenMaxTTL: 90 * 24 * time.Hour, DPoPRequiredFor: []string{"agent"},
 	EnrollmentCodeTTL: 72 * time.Hour, EnrollmentCodeMaxAttempts: 3,
+	DevicePendingTTL: 24 * time.Hour, DeviceVerificationCodeDigits: 6, PairingCodeTTL: 5 * time.Minute, PairingCodeChars: 8,
 }
 
 // testPepper is the token pepper of the session world (generated per test run, never a secret).
@@ -89,6 +90,10 @@ type sworld struct {
 	personal *personalSwitch
 	// seq numbers the handles of the token cases (M1-44).
 	seq atomic.Int64
+	// routes and idempotency are the routes and the Idempotency-Key stage of h, for a second
+	// harness with further stages (the rate limit of M1-38).
+	routes      []httpservertest.Route
+	idempotency func(http.Handler) http.Handler
 }
 
 // personalSwitch is a fake PersonalTokenSwitch whose value a test sets (brief M1-44 "Tests").
@@ -211,7 +216,7 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	}
 	built, err := routes.Build(wire.Handlers{Sessions: w.id.SessionHandlers, StepUps: w.id.StepUpHandlers, Devices: w.id.Handlers, People: w.id.PeopleHandlers,
 		Providers: w.id.ProviderHandlers, Credentials: w.id.CredentialHandlers,
-		Tokens: w.id.TokenHandlers, Enrollment: w.id.EnrollmentHandlers, Admin: w.settings.Handlers},
+		Tokens: w.id.TokenHandlers, Enrollment: w.id.EnrollmentHandlers, Approval: w.id.ApprovalHandlers, Admin: w.settings.Handlers},
 		wire.RouteOptions(), routes.SpecCatalog())
 	if err != nil {
 		t.Fatal(err)
@@ -225,6 +230,7 @@ func newSessionWorldOn(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID ids.
 	if err != nil {
 		t.Fatal(err)
 	}
+	w.routes, w.idempotency = rs, stage
 	w.h = httpservertest.New(t, httpservertest.Options{
 		Routes: rs, Contract: rest.Spec, Authenticator: w.id.Authenticator, ValidateResponses: true,
 		Stages: map[httpserver.Stage]func(http.Handler) http.Handler{httpserver.StageIdempotency: stage},

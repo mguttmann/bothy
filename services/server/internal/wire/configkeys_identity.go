@@ -103,6 +103,26 @@ func identityConfigKeys() []config.Key {
 			Chapter: chapter08,
 		},
 		{
+			Name: "auth.device_pending_ttl", Kind: config.KindDuration, Default: "24h", Min: "1m",
+			Doc:     "Age after which a pending device without approval counts as revoked.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.device_verification_code_digits", Kind: config.KindInt, Default: "6", Min: "6", Max: "12",
+			Doc:     "Digits of the verification code a pending device shows.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.pairing_code_ttl", Kind: config.KindDuration, Default: "5m", Min: "30s",
+			Doc:     "Validity of a pairing code, and the window to collect an approved pairing.",
+			Chapter: chapter08,
+		},
+		{
+			Name: "auth.pairing_code_chars", Kind: config.KindInt, Default: "8", Min: "8", Max: "16",
+			Doc:     "Crockford Base32 characters of a pairing code (5 bits each).",
+			Chapter: chapter08,
+		},
+		{
 			Name: "auth.cleanup_interval", Kind: config.KindDuration, Default: "1h", Min: "1s",
 			Doc:     "Interval of the job identity.auth_cleanup.",
 			Chapter: chapter08,

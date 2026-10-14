@@ -125,6 +125,19 @@ type DeviceKey struct {
 	RevokedAt   pgtype.Timestamptz
 }
 
+type DevicePairing struct {
+	ID                 pgtype.UUID
+	PairingCodeHash    []byte
+	DeviceRegistration []byte
+	Status             string
+	UserID             pgtype.UUID
+	ApprovedByDeviceID pgtype.UUID
+	DeviceID           pgtype.UUID
+	CreatedAt          pgtype.Timestamptz
+	ExpiresAt          pgtype.Timestamptz
+	CompletedAt        pgtype.Timestamptz
+}
+
 type EnrollmentCode struct {
 	ID             pgtype.UUID
 	UserID         pgtype.UUID
