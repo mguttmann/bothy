@@ -65,6 +65,7 @@ Create:
 - `apps/client/lib/share/`: the app side: creating and renewing the child session through `createExtensionSession` after login and at each start when missing, writing the recent targets to the App Group on every successful send, taking over the share inbox at start into `share_inbox` and the outbox, and the Flutter target sheet used by Android (Design notes 4 and 6).
 - `apps/client/android/app/src/main/kotlin/.../share/ShareActivity.kt` (or an intent filter on `MainActivity` that opens a dedicated Flutter route; Design note 6) with the intent filters for the MIME types of Design note 6.
 - Tests (Tests), including the `patrol` device test and the ID-T16 test.
+- `apps/client/e2e_test/share/id_t16_test.dart` and its wrapper `tools/e2e/id_t16.sh` (Boundaries: starts the Compose smoke stack with the TLS sidecar, runs the test on the simulator, stops everything it started), outside `integration_test/`, because the platform jobs run `integration_test/` through `platform-tests.json` without a server (as M4-34 and M4-36 keep their stack tests outside it).
 
 Change:
 
@@ -124,13 +125,13 @@ Device tests (`patrol`, `apps/client/integration_test/share/`):
 - `share_image_from_photos_test.dart` (PLAN row; iOS simulator and Android emulator, fake server of M4-17): an image in the Photos (or Files) app is shared through the system share sheet into "server > Gateway: resume ..."; the fake server receives the upload and a message with the attachment in that thread; recent targets show this thread at the top on the next share.
 - `share_offline_test.dart`: the fake server is stopped; the extension writes an inbox entry; the app starts with the server back and the message arrives exactly once with the extension's `client_msg_id`.
 - `share_android_mime_test.dart`: a `text/plain` and a `application/pdf` share reach the sheet; an unsupported type is not offered (the merged manifest has no `*/*`).
-- `id_t16_test.dart` (ID-T16 with the real Share Extension; Compose smoke stack of M1-73 on the loopback): the app and the extension both hold expired access tokens and refresh at the same moment (the test triggers the app refresh and a share in parallel); both succeed, the server writes no `refresh_reuse`, no session is revoked, the audit log has no reuse entry.
+- `apps/client/e2e_test/share/id_t16_test.dart` through `tools/e2e/id_t16.sh` (ID-T16 with the real Share Extension; Compose smoke stack of M1-73 on the loopback): the app and the extension both hold expired access tokens and refresh at the same moment (the test triggers the app refresh and a share in parallel); both succeed, the server writes no `refresh_reuse`, no session is revoked, the audit log has no reuse entry.
 
 Commands that must pass, from the repository root:
 
 - `cd apps/client/ios/ClientKit && swift test` (on macOS)
 - `cd apps/client && flutter analyze --fatal-infos && flutter test --coverage`
-- on macOS with Xcode, simulators and Docker: `make apps-platform` (including the `patrol` share tests and ID-T16); with an Android emulator the Android share test; elsewhere the SKIP lines
+- on macOS with Xcode, simulators and Docker: `make apps-platform` (including the `patrol` share tests) and `tools/e2e/id_t16.sh` (ID-T16); with an Android emulator the Android share test; elsewhere the SKIP lines
 - `make codegen-check`, `make arch`, `make lint`, `make fmt-check`, `make coverage`, `make licenses`
 - `make check`
 
