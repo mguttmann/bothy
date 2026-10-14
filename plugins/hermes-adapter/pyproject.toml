@@ -77,3 +77,10 @@ warn_unreachable = true
 # The harness only; the probe imports Hermes, which this environment does not contain.
 files = ["tests/hermes_harness"]
 exclude = ["tests/recording/probe_plugin/"]
+
+# The harness branches on sys.platform (Linux reads /proc, macOS asks lsof), and mypy marks the
+# branch of the other platform as unreachable; the gate runs on Linux and on macOS
+# (docs/DECISIONS.md D-M2-32-20).
+[[tool.mypy.overrides]]
+module = "hermes_harness.gateway"
+warn_unreachable = false
