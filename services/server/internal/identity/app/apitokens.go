@@ -22,22 +22,12 @@ import (
 )
 
 // PersonalTokenSwitch is the consumer port of the switch tokens.personal_enabled (16 section 6.2):
-// whether principalID may create personal tokens. M1-47 binds it over the feature flags of
-// instance; until then wire binds PersonalTokensDefault.
+// whether principalID may create personal tokens. internal/wire binds it over the feature flags
+// of instance (adapters/instanceflags, M1-47).
 type PersonalTokenSwitch interface {
 	// PersonalTokensEnabled reports whether the switch is on for principalID. Errors: those of
 	// the flag source; the caller fails closed.
 	PersonalTokensEnabled(ctx context.Context, principalID ids.ID) (bool, error)
-}
-
-// PersonalTokensDefault is the switch before the feature flag registry exists: the registered
-// default of tokens.personal_enabled, off (16 section 6.2: an unknown or unregistered flag is
-// off).
-type PersonalTokensDefault struct{}
-
-// PersonalTokensEnabled implements PersonalTokenSwitch: always false.
-func (PersonalTokensDefault) PersonalTokensEnabled(context.Context, ids.ID) (bool, error) {
-	return false, nil
 }
 
 // The values of auth.dpop_required_for (08 section 18).

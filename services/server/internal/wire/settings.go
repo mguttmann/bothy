@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"github.com/OWNER/bothy/services/server/api/routes"
+	authzflags "github.com/OWNER/bothy/services/server/internal/authz/adapters/flagsource"
+	authzpg "github.com/OWNER/bothy/services/server/internal/authz/adapters/postgres"
+	identityflags "github.com/OWNER/bothy/services/server/internal/identity/adapters/flagsource"
 	"github.com/OWNER/bothy/services/server/internal/identity/adapters/loginoptions"
 	identitypg "github.com/OWNER/bothy/services/server/internal/identity/adapters/postgres"
 	"github.com/OWNER/bothy/services/server/internal/instance"
@@ -28,12 +31,13 @@ const keyLocalPasswordEnabled = "auth.local_password_enabled" //nolint:gosec // 
 func LocalPasswordEnabled(v *config.Values) bool { return v.Bool(keyLocalPasswordEnabled) }
 
 // InstanceSettings is the settings part of the instance module in a process (M1-46): the use
-// cases of discovery, the instance view, the settings, the branding and the problem types, which
-// also serve the read port instance.Settings of the other modules, and their REST handlers.
+// cases of discovery, the instance view, the settings, the branding, the problem types and the
+// feature flags (M1-47), which also serve the read ports instance.Settings and instance.Flags of
+// the other modules, and their REST handlers.
 type InstanceSettings struct {
-	// Admin implements instance.Admin and instance.Settings.
+	// Admin implements instance.Admin, instance.Settings and instance.Flags.
 	Admin *instanceapp.Admin
-	// Handlers are the REST handlers of the six operations.
+	// Handlers are the REST handlers of the six settings operations and the two flag operations.
 	Handlers *instancehttp.Admin
 }
 
@@ -62,7 +66,9 @@ func Contract() instanceapp.Contract {
 // NewInstanceSettings builds the settings part over pool with the unit of work uow, the
 // Authorizer az, the recorder and appender of w and the clock (nil means clock.System()).
 // Discovery learns the sign-in ways from identity through adapters/loginoptions over the
-// provider store and localPassword (auth.local_password_enabled). It opens no connection and
+// provider store and localPassword (auth.local_password_enabled); the flag evaluation reaches
+// groups and people through authz/adapters/flagsource and identity/adapters/flagsource over their
+// repositories. It opens no connection and
 // starts nothing. Errors: a configuration value or collaborator the use cases refuse.
 func NewInstanceSettings(cfg instanceapp.Config, localPassword bool, pool *pg.Pool, uow txn.UnitOfWork, az authorize.Authorizer,
 	w SettingsWrites, clk clock.Clock) (*InstanceSettings, error) {
@@ -70,10 +76,18 @@ func NewInstanceSettings(cfg instanceapp.Config, localPassword bool, pool *pg.Po
 	if err != nil {
 		return nil, err
 	}
+	groups, err := authzflags.New(authzpg.NewRepository(pool))
+	if err != nil {
+		return nil, err
+	}
+	users, err := identityflags.New(identitypg.NewRepository(pool))
+	if err != nil {
+		return nil, err
+	}
 	repo := instancepg.NewRepository(pool)
 	admin, err := instanceapp.NewAdmin(cfg, instanceapp.AdminDeps{
 		Instance: repo, Settings: repo, Logins: logins, UoW: uow, Authorizer: az, Audit: w.Audit, Events: w.Events,
-		Contract: Contract(), Clock: clk,
+		Flags: repo, FlagGroups: groups, FlagUsers: users, Contract: Contract(), Clock: clk,
 	})
 	if err != nil {
 		return nil, err

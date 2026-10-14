@@ -37,8 +37,8 @@ func TestGetInstance_AgentToken(t *testing.T) {
 	w.person("anna", "active", false)
 	r := w.do("helper", http.MethodGet, "/api/v1/instance", "", "")
 	m := w.want(r, http.StatusOK, "")
-	if f, ok := m["features"].([]any); !ok || len(f) != 0 {
-		t.Errorf("features %v", m["features"])
+	if !registeredFlagsOff(m["features"]) {
+		t.Errorf("features %v, want the registered flags off (M1-47)", m["features"])
 	}
 	person := w.do("anna", http.MethodGet, "/api/v1/instance", "", "")
 	w.want(person, http.StatusOK, "")

@@ -1,6 +1,6 @@
 # Modul `instance`
 
-Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the rights version (`Versions.PermissionVersion`, `app.NewVersions`) for the rights cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. M1-46 adds the instance settings, the branding, discovery, the instance view and the problem types (`Settings`, `Admin`, `LoginOptionsSource`). Flags and the further reads of `Versions` (`event_seq` for catch-up) come with M1-47 and the tickets that need them.
+Status: built in part (M1-15): the instance row, the sequence counters with the port `Counters`, the port `State` and the start check of `instance.min_server_version`. M1-28 adds the lock-free read of the rights version (`Versions.PermissionVersion`, `app.NewVersions`) for the rights cache of authz. M1-32 adds the server signing keys (`Keys`) with JWKS, rotation and the job `instance.key_rotation`. M1-46 adds the instance settings, the branding, discovery, the instance view and the problem types (`Settings`, `Admin`, `LoginOptionsSource`). M1-47 adds the feature flags (`Flags`, `FlagAdmin`, `FlagGroupSource`, `FlagUserSource`, the registry and `tools/flagcheck`). The further reads of `Versions` (`event_seq` for catch-up) come with the tickets that need them.
 Normativ ist [docs/spec/02-architektur.md](../../../../docs/spec/02-architektur.md); bei Abweichung gilt das Kapitel.
 
 ## Zweck
@@ -11,12 +11,12 @@ Instanz-Identität, Sync-Epoche, Mindest-Server-Version, Einstellungen und Brand
 
 | Package | Content |
 |---|---|
-| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys`, `ErrJWSInvalid`, `SignatureAlgs`; settings (`settings.go`): `SupportedLocales`, `Settings`, `Branding`, `LoginOptionsSource`, `LoginOptions`, `ProviderInfo`, `Admin` with its DTOs (`Setting`, `IfMatch`, `PutSetting`, `UpdateBranding`, `Info`, `Limits`, `Discovery`, `ClientVersion`, `ProblemType`) |
-| `domain/` | counter names and the phase rule (`CheckAdvance`, `CheckRead`, `CheckAdvanceCount`), `CompareSemVer`, `ValidateSemVer`, `CheckServerVersion` (SemVer 2.0.0 precedence, hand-written: the domain layer imports no third-party library); the transitions of the signing keys (`signingkey.go`: `DueTransitions`, `EmergencyTransitions`, `LostTransitions`, `PendingNext`, `ActiveKey`, `Window`); the settings registry (`settings.go`: `Registry`, `Validate`, `ValidateProductName`, `ValidateAccentColor`, `DefaultProductName`), the branding version and changes (`branding.go`) and the discovery rules (`discovery.go`: `MinClientVersions`, `LocalPasswordEnabled`, `DiscoveryFeatures`, `ContentETag`) |
-| `app/` | `NewCounters` (phase guard, then the repository) and `NewState` (row in a unit of work), outgoing port `Repository`; `NewKeys` (`Keys`, `KeysConfig`) with the outgoing ports `KeyRepository` and `KeyStore`; `NewAdmin` (`Admin`, `Config`, `Contract`) with the outgoing port `SettingsRepository` |
+| `internal/instance` | port: `CounterName` and the three counter constants, `Counters`, `Record` (`SetupCompleted`), `State`, `Versions`; signing keys (`keys.go`): `Purpose`, `KeyState`, `RotateMode`, `Signer`, `PublicKey`, `JWK`, `JWKSet`, `RotateCommand`, `Rotation`, `Keys`, `ErrJWSInvalid`, `SignatureAlgs`; settings (`settings.go`): `SupportedLocales`, `Settings`, `Branding`, `LoginOptionsSource`, `LoginOptions`, `ProviderInfo`, `Admin` with its DTOs (`Setting`, `IfMatch`, `PutSetting`, `UpdateBranding`, `Info`, `Limits`, `Discovery`, `ClientVersion`, `ProblemType`); feature flags (`flags.go`): the registry `RegisteredFlags` with `FlagDefinition`, `FlagKind` and the key constants, `Flags`, `FlagSubject`, `SubjectOf`, `EvaluatedFlag`, `FlagAdmin` with `FeatureFlag`, `FlagRollout`, `PutFlagCmd`, the source ports `FlagGroupSource` and `FlagUserSource` |
+| `domain/` | counter names and the phase rule (`CheckAdvance`, `CheckRead`, `CheckAdvanceCount`), `CompareSemVer`, `ValidateSemVer`, `CheckServerVersion` (SemVer 2.0.0 precedence, hand-written: the domain layer imports no third-party library); the transitions of the signing keys (`signingkey.go`: `DueTransitions`, `EmergencyTransitions`, `LostTransitions`, `PendingNext`, `ActiveKey`, `Window`); the settings registry (`settings.go`: `Registry`, `Validate`, `ValidateProductName`, `ValidateAccentColor`, `DefaultProductName`), the branding version and changes (`branding.go`) and the discovery rules (`discovery.go`: `MinClientVersions`, `LocalPasswordEnabled`, `DiscoveryFeatures`, `ContentETag`); the flag rules (`flags.go`: `FlagSpec`, `CheckRegistry`, `Evaluate`, `InRollout`, `Rollout`, `NormalizeRollout`, `ReachedRemoveBy`) |
+| `app/` | `NewCounters` (phase guard, then the repository) and `NewState` (row in a unit of work), outgoing port `Repository`; `NewKeys` (`Keys`, `KeysConfig`) with the outgoing ports `KeyRepository` and `KeyStore`; `NewAdmin` (`Admin`, `Config`, `Contract`) with the outgoing ports `SettingsRepository` and `FlagRepository` (`flags.go`: `Admin` also implements `Flags` and `FlagAdmin`; `FlagSpecs`) |
 | `adapters/postgres/` | `Repository` over `platform/pg` (both outgoing ports), sqlc queries in `queries/`, generated code in `sqlcgen/` (entry in `services/server/sqlc.yaml`) |
 | `adapters/keystore/` | `Store`: the key store `secrets.signing_key_dir` over the secret provider (Ed25519, PKCS#8 PEM, `Thumbprint` after RFC 7638) |
-| `adapters/httpapi/` | `Keys`: the REST handlers `getJwks` and `rotateSigningKey`; `Admin`: `getDiscovery`, `getInstance`, `listInstanceSettings`, `putInstanceSetting`, `updateBranding`, `getProblemType` |
+| `adapters/httpapi/` | `Keys`: the REST handlers `getJwks` and `rotateSigningKey`; `Admin`: `getDiscovery`, `getInstance`, `listInstanceSettings`, `putInstanceSetting`, `updateBranding`, `getProblemType`, `listFeatureFlags`, `putFeatureFlag` |
 | `adapters/jobs/` | `Register`, `Handler`: the periodic job `instance.key_rotation` |
 
 Migration `00002_instance_counters.sql` creates both tables, the three counter rows with value 0
@@ -223,7 +223,7 @@ gateway protocol versions and the problem catalogue from the generated layer `ap
 (`app.Contract`, built in `wire.Contract`), the sign-in ways from the source port
 `LoginOptionsSource`, the client versions from the configuration (`client.min_version.<p>`,
 `client.recommended_version.<p>`). `getInstance` serves every active principal with the limits of
-the configuration and `features: []` until M1-47; its ETag is a hash of the body
+the configuration and `features`, the registered flags evaluated for the caller (M1-47); its ETag is a hash of the body
 (`domain.ContentETag`). `getProblemType` serves every code of `x-problem-codes`.
 
 **Source port.** `LoginOptionsSource` is declared here, because `instance` may not import
@@ -231,6 +231,61 @@ the configuration and `features: []` until M1-47; its ETag is a hash of the body
 `auth.local_password_enabled`, and `internal/wire` (`NewInstanceSettings`, start step `settings`
 before `identity`) passes it in. `identity` reads `locale.default` through `Settings` for
 `createUser`.
+
+### Feature flags (M1-47)
+
+Normative: [16-betrieb.md](../../../../docs/spec/16-betrieb.md) 6.2 (R-OP-14),
+[environments-and-flags.md](../../../../docs/operations/environments-and-flags.md) 2, 03 table
+`feature_flags` and [ADR 0064](../../../../docs/adr/0064-feature-flag-registrierung-mit-aufraeum-gate.md).
+Rulings: [DECISIONS.md](../../../../docs/DECISIONS.md) M1-47.
+
+**Registry.** The one registry is `registry` in `flags.go`, read through `RegisteredFlags()`
+(sorted by key): key, kind (`release` or `option`), English description, default, owning module
+and, for `release` only, the server version `remove_by`. Kind, description, default and module
+live only there, never in the table. A flag only switches a function on or off: it never encodes
+a number, a limit, a security boundary or a secret (16 6.2 "Grenze"); no check can see that
+intent, so the review of every new flag holds it. `TestRegisteredFlagsValid` runs
+`domain.CheckRegistry` on the real registry, and `make flag-check` (`tools/flagcheck`) runs the
+same rules, fails when `services/server/VERSION` reaches `remove_by` of a registered `release`
+flag, and compares the registry with the table of
+[configuration.md](../../../../docs/operations/configuration.md) 7.
+
+**Evaluation.** `Flags.Enabled(subject, key)`: an unknown key is off without a read; otherwise one
+primary-key read of `feature_flags`, the global value is the row or the default, and it is
+inverted when the subject is a person who stands in `rollout.user_ids` or has a valid group in
+`rollout.group_ids`. Valid groups come from `FlagGroupSource.ValidGroupIDs` at the time of
+`kernel/clock`, read once per call and only when the rollout names a group; a membership with
+`expires_at = t` is already invalid at `t` (07 2.5). Agents and apps get the global value.
+`EvaluateAll` reads all rows in one query and returns the registered flags only; orphaned rows
+(stored keys without registration) are off and never evaluated. There is no cache, and errors are
+returned, never turned into off.
+
+**Operations.** `listFeatureFlags` (owner) lists every registered flag (a flag without a row has
+its default, `version = 0` and no `updated_by` or `updated_at`) and then every orphaned row
+(`orphaned: true`, without kind, description, default, module and `remove_by`), sorted by key.
+`putFeatureFlag` (owner, step-up, reason, optional `If-Match`) answers `404` for a key that is not
+registered, `400` for a blank reason (`/reason`) and for rollout IDs that are not people
+(`/rollout/user_ids/<i>`, `unknown_user`, through `FlagUserSource`) or not live groups
+(`/rollout/group_ids/<i>`, `unknown_group`, through `FlagGroupSource`), then under the row lock
+`412 version_conflict` with `current`; the same value and normalized rollout writes nothing,
+otherwise it inserts version 1 or raises the version, appends `instance.updated` with
+`changed_keys = [key]` and writes the allow audit with `key`, `enabled`, `rollout_user_ids`,
+`rollout_group_ids` (IDs only) and `reason`. `getInstance` returns `EvaluateAll` for the caller.
+
+**Source ports.** `FlagGroupSource` is implemented by `authz/adapters/flagsource` (the M1-27
+validity `Membership.InEffect` over the authz store), `FlagUserSource` by
+`identity/adapters/flagsource` (principals of kind `user` that are not `deleted`);
+`internal/wire` (`NewInstanceSettings`) passes both in. identity asks `tokens.personal_enabled`
+for `createToken` through `identity/adapters/instanceflags` over `Flags`.
+
+**Adding a flag.** Add an entry to `registry` with a new key constant; for an `option` add the row
+to configuration.md 7; for a `release` set `remove_by` to a later server version. Check the flag
+with `Flags.Enabled` where its function runs. `make flag-check` must pass.
+
+**Removing a flag.** When `make flag-check` reports `remove flag <key>`, remove the code that reads
+it, its registry entry, its configuration.md row (if any) and its row with a new migration
+(`DELETE FROM feature_flags WHERE key = '<key>'`) in the same change. A `release` flag never
+becomes an `option`; a lasting switch gets a new key.
 
 ## Port (Wurzelpaket `internal/instance`)
 

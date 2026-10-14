@@ -274,8 +274,8 @@ func TestGetInstance_AnyPrincipal(t *testing.T) {
 			t.Errorf("limit %s = %v, want %v", k, limits[k], v)
 		}
 	}
-	if f, ok := m["features"].([]any); !ok || len(f) != 0 {
-		t.Errorf("features %v, want an empty array", m["features"])
+	if !registeredFlagsOff(m["features"]) {
+		t.Errorf("features %v, want the registered flags off (M1-47)", m["features"])
 	}
 	if m["locale_default"] != "de" || m["instance_id"] != w.instID.String() {
 		t.Errorf("instance %v", m)

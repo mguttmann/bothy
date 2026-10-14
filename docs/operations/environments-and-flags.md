@@ -56,6 +56,14 @@ für die Konsole), Standard, bei `release` die Version `remove_by` und das zust�
 Unbekannte Schlüssel in der Tabelle `feature_flags` wertet der Server als aus und zeigt sie in
 der Konsole als "verwaist".
 
+Die Registrierung steht in `services/server/internal/instance/flags.go` (`RegisteredFlags`); wie
+man ein Flag hinzufügt und entfernt, beschreibt die
+[README des Moduls](../../services/server/internal/instance/README.md) im Abschnitt "Feature
+flags". `make flag-check` (Werkzeug `services/server/tools/flagcheck`, Teil von `make gates`)
+prüft die Registrierung, scheitert, sobald `services/server/VERSION` das `remove_by` eines
+registrierten `release`-Flags erreicht, und vergleicht die Registrierung mit
+[configuration.md](configuration.md) 7.
+
 ### 2.3 Auswertung
 
 ```

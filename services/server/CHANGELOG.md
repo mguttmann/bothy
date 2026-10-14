@@ -64,6 +64,15 @@ documented in this file. The format is based on
   such a session to the same login; a mismatch revokes the session (`trusted_header_mismatch`).
   `kernel/reqmeta.Transport` carries the TCP peer, the header and the route's action from
   `platform/httpserver`; the audit reason `trusted_header_requires_loopback` joins 07 section 4.1.
+- Feature flags (M1-47, ADR 0064): the registry of `dm.enabled`, `tokens.personal_enabled` and
+  `voice.enabled` (options, off) in `internal/instance`, the migration `00021_feature_flags.sql`,
+  the evaluation per principal with rollout lists of people and groups (valid memberships only;
+  unknown and orphaned keys are off; agents and apps get the global value), the operations
+  `listFeatureFlags` and `putFeatureFlag` (owner, step-up, reason, audit, optional `If-Match`,
+  `instance.updated` with the changed key), the evaluated flags in `getInstance`, and the gate
+  `make flag-check` (`tools/flagcheck`), which fails once `VERSION` reaches `remove_by` of a
+  registered `release` flag or configuration.md 7 drifts from the registry.
+
 - Instance settings, branding and discovery (M1-46): the migration `00017_instance_settings.sql`,
   the settings registry of configuration.md section 6, the generated design keys
   `kernel/designkeys` (category colours and space icons from the design tokens, the accent list of
@@ -659,6 +668,8 @@ documented in this file. The format is based on
 
 ### Changed
 
+- `createToken` decides personal tokens by the feature flag `tokens.personal_enabled` evaluated
+  for the caller (M1-47); the always-off stand-in of M1-44 is removed.
 - `ObjectStore.PresignUploadPart` (M3-02) takes the part size before the validity, so the
   signature can bind the length (12 "3.3"); the file system driver refuses a size below 1 with
   `ErrSizeMismatch` and keeps answering `ErrNotSupported`.

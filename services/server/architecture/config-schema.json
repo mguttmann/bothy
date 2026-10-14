@@ -446,6 +446,18 @@
       "doc": "Secret reference of the server pepper for the HMAC hashes of tokens and codes and the DPoP nonce key; 32 bytes as hex."
     },
     {
+      "name": "auth.trusted_header_bind_requests",
+      "env": "BOTHY_AUTH__TRUSTED_HEADER_BIND_REQUESTS",
+      "kind": "bool",
+      "default": "true",
+      "required": false,
+      "enum": [],
+      "min": "",
+      "max": "",
+      "chapter": "08-identitaet.md",
+      "doc": "Every later request of a session started with the trusted_header driver must carry the same header login."
+    },
+    {
       "name": "auth.webauthn_origins",
       "env": "BOTHY_AUTH__WEBAUTHN_ORIGINS",
       "kind": "list(string)",

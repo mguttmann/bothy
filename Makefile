@@ -89,7 +89,7 @@ TS_ON := $(and $(TS_PROJECTS),$(or $(call want,sdk-typescript),$(call want,plugi
         trivy-image portability linkcheck-external diagrams tokens api-lint api-checks api-tables api-clients \
         runners-check commitlint \
         review labels-check labels-sync tools-lock release-build clean \
-        codegen-check arch register-check migrations-lint migrations-lock perf ops-check \
+        codegen-check arch register-check migrations-lint migrations-lock flag-check perf ops-check \
         image image-test
 
 help: ## Show the targets
@@ -130,7 +130,7 @@ check: gates denylist sonar ## Every gate, identical to CI (before every push)
 gates: ## All gates except denylist and sonar (CI job "gates")
 # Generated code is checked before lint and type checks, so that stale generator output is
 # reported as drift and not as a confusing compile error. `perf` is not a gate (P-07).
-gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint test coverage commitlint \
+gates: fmt-check codegen-check lint typecheck arch register-check migrations-lint flag-check test coverage commitlint \
        docs config-doc-check linkcheck diagrams catalog-check api-lint api-checks ops-check \
        api-clients tokens runners-check labels-check gitleaks semgrep trivy osv licenses
 
@@ -298,6 +298,13 @@ migrations-lint: ## Migration rules: sequential numbers, locked checksums, STORE
 	      printf '  SKIP  %-14s %s\n' migrations-lint "$$m has no migrations/ directory yet"; \
 	    else $(MIGRATIONS_LINT) check --dir $$m/migrations --sum $$m/migrations.sha256 || exit 1; fi; \
 	  done; fi
+
+# Repository-wide like register-check: the server module decides, not COMPONENTS (gates.md
+# "Überspringen"). ADR 0064: no registered release flag outlives its remove_by.
+flag-check: ## Feature flag registry valid, no release flag past remove_by, configuration.md 7 equal (ADR 0064)
+	@if ! git ls-files --error-unmatch services/server/go.mod >/dev/null 2>&1; then $(call skip,flag-check,no server module); \
+	else (cd services/server && go run ./tools/flagcheck -version-file VERSION \
+	  -config-doc ../../docs/operations/configuration.md -modules architecture/modules.yaml) || exit 1; fi
 
 migrations-lock: ## Record the checksums of new migrations in <module>/migrations.sha256 (not a gate)
 	@found=""; for m in $(GO_MODS); do \

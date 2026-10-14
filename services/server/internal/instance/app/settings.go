@@ -94,14 +94,21 @@ type AdminDeps struct {
 	Audit auditing.Recorder
 	// Events appends instance.updated.
 	Events eventlog.Appender
+	// Flags reads and writes feature_flags (M1-47).
+	Flags FlagRepository
+	// FlagGroups are the valid groups of a person and the existing groups; authz implements it.
+	FlagGroups instance.FlagGroupSource
+	// FlagUsers tells which rollout IDs are people; identity implements it.
+	FlagUsers instance.FlagUserSource
 	// Contract are the values of the API contract.
 	Contract Contract
 	// Clock is the time of updated_at; nil means clock.System().
 	Clock clock.Clock
 }
 
-// Admin implements instance.Admin (the six operations of M1-46) and instance.Settings (the read
-// port of the other modules). It is safe for concurrent use.
+// Admin implements instance.Admin (the six operations of M1-46), instance.Settings (the read
+// port of the other modules), and the feature flags of M1-47: instance.Flags (the evaluation) and
+// instance.FlagAdmin (listFeatureFlags, putFeatureFlag). It is safe for concurrent use.
 type Admin struct {
 	cfg Config
 	reg *domain.Registry
@@ -123,7 +130,7 @@ var errConcurrentInsert = errors.New("instance: a concurrent writer inserted the
 // client version that is not SemVer.
 func NewAdmin(cfg Config, deps AdminDeps) (*Admin, error) {
 	if deps.Instance == nil || deps.Settings == nil || deps.Logins == nil || deps.UoW == nil || deps.Authorizer == nil ||
-		deps.Audit == nil || deps.Events == nil {
+		deps.Audit == nil || deps.Events == nil || deps.Flags == nil || deps.FlagGroups == nil || deps.FlagUsers == nil {
 		return nil, errors.New("instance: NewAdmin needs every collaborator")
 	}
 	if deps.Contract.SpecVersion == "" {
@@ -366,7 +373,8 @@ func (s *Admin) Discovery(ctx context.Context) (instance.Discovery, error) {
 	return out, nil
 }
 
-// Info implements instance.Admin (getInstance): any active principal.
+// Info implements instance.Admin (getInstance): any active principal; features are the flags
+// evaluated for a (agents and apps get the global values).
 func (s *Admin) Info(ctx context.Context, a actor.Actor) (instance.Info, error) {
 	ctx, err := withCaller(ctx, a)
 	if err != nil {
@@ -391,9 +399,13 @@ func (s *Admin) Info(ctx context.Context, a actor.Actor) (instance.Info, error) 
 	if err != nil {
 		return instance.Info{}, err
 	}
+	features, err := s.EvaluateAll(ctx, instance.SubjectOf(a))
+	if err != nil {
+		return instance.Info{}, err
+	}
 	return instance.Info{
 		InstanceID: rec.InstanceID, Branding: b, LocaleDefault: locale, SpecVersion: s.d.Contract.SpecVersion,
-		Features: []instance.EvaluatedFlag{},
+		Features: features,
 		Limits: instance.Limits{
 			MessageMaxContentBytes: s.cfg.MessageMaxContentBytes, MessageMaxAttachments: s.cfg.MessageMaxAttachments,
 			FileMaxUploadBytes: s.cfg.FileMaxUploadBytes, ThreadTitleMaxChars: s.cfg.ThreadTitleMaxChars,

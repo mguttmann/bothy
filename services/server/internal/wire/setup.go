@@ -206,7 +206,7 @@ func (s *Setup) identity(ctx context.Context, v *config.Values, sp *secrets.Prov
 	if err != nil {
 		return err
 	}
-	w := IdentityWrites{Audit: s.audit.Recorder(), Events: sy.Appender(), Settings: st.Admin}
+	w := IdentityWrites{Audit: s.audit.Recorder(), Events: sy.Appender(), Settings: st.Admin, Flags: st.Admin}
 	if s.id, err = NewIdentity(icfg, s.pool, s.audit.UoW(), az, w, pepper, nil, log); err != nil {
 		return err
 	}

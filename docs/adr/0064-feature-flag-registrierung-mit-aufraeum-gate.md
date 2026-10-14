@@ -82,9 +82,16 @@ Tag rot werden; die Version ändert sich nur mit einem Release und ist im Reposi
 - Bau-Ticket M1-47 in [PLAN.md](../PLAN.md): Auswertung global, je Person und je Gruppe mit
   abgelaufener Mitgliedschaft; unbekannte Schlüssel sind aus; Änderungen nur durch Owner mit Step-up
   und Audit.
-- `make flag-check` (Werkzeug `tools/flagcheck`, Teil von `gates`): scheitert, wenn `VERSION`
-  `remove_by` eines registrierten `release`-Flags erreicht; scheitert auch bei `release` ohne
-  `remove_by` und bei `option` mit `remove_by`.
+- `make flag-check` (Werkzeug `services/server/tools/flagcheck`, Teil von `gates`): scheitert,
+  wenn `VERSION` `remove_by` eines registrierten `release`-Flags erreicht (eine Vorabversion wie
+  `1.4.0-beta.1` hat `1.4.0` nicht erreicht); scheitert auch bei `release` ohne `remove_by`, bei
+  `option` mit `remove_by`, bei jedem anderen Verstoß gegen die Regeln der Registrierung und wenn
+  die Tabelle in [configuration.md](../operations/configuration.md) 7 von der Registrierung in
+  Schlüssel, Art oder Standard abweicht. Belegt durch die Tests `TestFlagCheck*`
+  (`tools/flagcheck`), `TestCheckRegistry`, `TestReachedRemoveBy`, `TestEvaluate`, `TestInRollout`
+  (`internal/instance/domain`), `TestRegisteredFlagsValid` (`internal/instance`) und die
+  Integrationstests `TestFlags_*`, `TestPutFeatureFlag_*`, `TestPersonalToken_*`
+  (`internal/identity/adapters/httpapi`).
 - Durch die Form gehalten: Ein Flag ist nur ein Schalter (`feature_flags.enabled boolean`); Zahlen,
   Listen oder Geheimnisse kann ein Flag nicht tragen. Ob ein Schalter eine Sicherheitsgrenze
   berührt, prüft das Review jedes Tickets und das Red-Team-Gate

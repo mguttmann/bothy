@@ -88,8 +88,6 @@ type sworld struct {
 	structure *fake.Structure
 	// dir is the signing key directory of the installation.
 	dir string
-	// personal is the switch tokens.personal_enabled of the world (M1-44), off at the start.
-	personal *personalSwitch
 	// seq numbers the handles of the token cases (M1-44).
 	seq atomic.Int64
 	// routes and idempotency are the routes and the Idempotency-Key stage of h, for a second
@@ -98,12 +96,12 @@ type sworld struct {
 	idempotency func(http.Handler) http.Handler
 }
 
-// personalSwitch is a fake PersonalTokenSwitch whose value a test sets (brief M1-44 "Tests").
-type personalSwitch struct{ on atomic.Bool }
-
-// PersonalTokensEnabled implements app.PersonalTokenSwitch.
-func (s *personalSwitch) PersonalTokensEnabled(context.Context, ids.ID) (bool, error) {
-	return s.on.Load(), nil
+// setPersonal stores the global value of the feature flag tokens.personal_enabled with an empty
+// rollout, the way putFeatureFlag would (M1-47); it is off until a test sets it.
+func (w *sworld) setPersonal(on bool) {
+	w.t.Helper()
+	w.sql(`INSERT INTO feature_flags (key, enabled) VALUES ('tokens.personal_enabled', $1)
+		ON CONFLICT (key) DO UPDATE SET enabled = excluded.enabled, version = feature_flags.version + 1`, on)
 }
 
 // newSessionWorld builds a world on a new database.
@@ -142,8 +140,7 @@ func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID id
 	capture := &httpservertest.LogCapture{}
 	log := slog.New(capture)
 	ended := &[]identity.SessionEnded{}
-	w := &sworld{t: t, db: db, pool: pool, owner: db.Pool(t, pg.RoleOwner), clk: clk, logs: capture, ended: ended, instID: instID, dir: dir,
-		personal: &personalSwitch{}}
+	w := &sworld{t: t, db: db, pool: pool, owner: db.Pool(t, pg.RoleOwner), clk: clk, logs: capture, ended: ended, instID: instID, dir: dir}
 	repo := postgres.NewRepository(pool)
 	principals := app.NewPrincipalSource(repo)
 	structure, policies := fake.NewStructure(), fake.NewPolicies()
@@ -219,7 +216,7 @@ func newSessionWorldWith(t *testing.T, db *pgtest.DB, clk *clock.Fake, instID id
 	if err != nil {
 		t.Fatal(err)
 	}
-	w.id, err = wire.NewIdentity(cfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender, PersonalTokens: w.personal, Settings: w.settings.Admin}, testPepper, clk, log)
+	w.id, err = wire.NewIdentity(cfg, pool, w.uow, az, wire.IdentityWrites{Audit: w.rec, Events: appender, Settings: w.settings.Admin, Flags: w.settings.Admin}, testPepper, clk, log)
 	if err != nil {
 		t.Fatal(err)
 	}
