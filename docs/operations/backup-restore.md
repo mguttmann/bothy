@@ -20,6 +20,14 @@ the Compose stack; with a managed PostgreSQL service the steps for pgBackRest ar
 
 All schedules and retention periods are configuration values `backup.*` ([configuration.md](configuration.md)).
 
+As built in M7-01 ([image README](../../services/server/images/bothy-postgres/README.md)): the
+stanza is `bothy`; `postgres` and `backup` talk over pgBackRest TLS on port 8432 with the
+certificates of `pgbackrest_tls/`; repo1 is the volume `pgbackrest-repo` of `backup`, encrypted
+with `aes-256-cbc` and `pgbackrest_cipher_pass`. A full backup by hand:
+`docker compose exec backup pgbackrest --stanza=bothy backup --type=full`; the check of the
+repository: `docker compose exec backup pgbackrest --stanza=bothy verify`. Schedules, repo2 and
+`expire` come with M7-02.
+
 ## 2. Set up
 
 1. Create the off-site target. S3: bucket with versioning and Object Lock (mode Governance or
@@ -28,7 +36,9 @@ All schedules and retention periods are configuration values `backup.*` ([config
    through a second access.
 2. Put the access into `secrets/offsite/`, set `BOTHY_BACKUP_OFFSITE_TARGET`.
 3. `docker compose up -d backup`; on its first start `bothy-backupd` creates the pgBackRest stanza and
-   the restic repository.
+   the restic repository. It retries `stanza-create` until the database and its pgBackRest
+   server answer; its log line `stanza bothy is ready` and the health check of `backup` (a TLS
+   handshake with the repository host) show that the repository host is up.
 4. Trigger a full backup and a restore test immediately
    ([install-compose.md](install-compose.md) 4).
 5. Export the secrets bundle and try the decryption once on another device.

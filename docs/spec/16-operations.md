@@ -40,6 +40,13 @@ section 14 and collected in the [configuration reference](../operations/configur
 separate image is needed because `archive_command` runs in the database container (section 8.2).
 Both Bothy images are produced in the release chain from [18-release.md](18-release.md).
 
+As built (M7-01, [image README](../../services/server/images/bothy-postgres/README.md)): the image
+runs both roles as the user `postgres` of the base image (uid and gid `999`); its entry point
+writes the pgBackRest configuration of the role. Besides PostgreSQL, the container `postgres` runs
+a pgBackRest TLS server through which the repository host `backup` runs its backups; `backup`
+runs `bothy-backupd`, which supervises the TLS server of the repository and creates the stanza
+`bothy` on its first start.
+
 The Compose file [infra/compose/compose.yaml](../../infra/compose/compose.yaml) is the
 reference for these building blocks. Profiles add optional parts: `direct` or `tailscale` (edge),
 `scan`, `s3`, `observability`.
@@ -518,9 +525,11 @@ need new keys without manual work on the host.
    `0500` and files `0400` with this owner; `server` and `migrate` need it because the
    file driver reads only its own files with `0400` or `0600` (SEC-SEC-1). The image
    `bothy-server` runs as uid and gid `65532` ([18-release.md](18-release.md), section 7).
-   Third-party services without `--owner` (database, backup, collector) get copies owned by
-   root with directory `0755` and files `0444`, because their images have their own users; each one
-   still sees only its own subdirectory.
+   `postgres` and `backup` get the owner `999:999`, the user `postgres` of `bothy-postgres`,
+   because pgBackRest refuses TLS keys that another user can read (M7-01). Third-party services
+   without `--owner` (collector and the others) get copies owned by root with directory `0755`
+   and files `0444`, because their images have their own users; each one still sees only its
+   own subdirectory.
 5. At the end, `secrets-init` outputs the fingerprints, never the values, and reminds of the
    escrow (5.4). It reports catalogue entries whose generator a later milestone builds as
    `pending` (configuration reference, section "Secrets"). Per entry a line
@@ -697,7 +706,9 @@ Rationale:
 
 1. `postgres` pushes every WAL segment with `archive-push` over the TLS protocol of pgBackRest
    to the repository host `backup`. The database container needs no egress for this and
-   no credentials of the off-site target.
+   no credentials of the off-site target. Both sides authenticate with certificates of the
+   stack's own CA (`pgbackrest_tls/`) and accept only the peer's name; the repository is
+   encrypted with `pgbackrest_cipher_pass`, which only `backup` holds.
 2. `bothy-backupd` starts full and differential backups, `pg_dump`, the object backup and
    `expire` on schedule. Every run writes a manifest: row count per table, `head_seq` of the
    event log, last `seq` and `hash` of the audit log, schema version, server version, number

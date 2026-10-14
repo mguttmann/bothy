@@ -59,6 +59,18 @@ root file system and without capabilities, both platforms in the archive). Both 
 buildx and a builder that builds several platforms (CONTRIBUTING.md); without Docker they fail
 with a hint.
 
+`make postgres-image` builds `bothy-postgres` (brief M7-01) from
+`services/server/images/bothy-postgres/Dockerfile` the same way into `POSTGRES_IMAGE_OCI` and loads
+the host platform as `POSTGRES_IMAGE_NAME:POSTGRES_IMAGE_TAG` (default
+`bothy-postgres:pg18-<VERSION>-local`); no build step runs on the target platform, so both
+platforms build without emulation. `make postgres-image-test` runs the two-container test of
+`services/server/test/postgresimage` (build tag `imagetest`: archive-push over TLS, full backup,
+point-in-time restore, `pgbackrest verify`, a foreign client certificate rejected, no egress of the
+database container, labels, both platforms). Neither is part of `check`. The CI jobs
+`postgres-image (amd64)` and `postgres-image (arm64)` run both targets natively on `ubuntu-24.04`
+and `ubuntu-24.04-arm` when the plan selects the component `server`; `ci-ok` requires each to pass
+or be skipped.
+
 ## Skipping and failing
 
 * A gate writes `SKIP <name> <reason>` and counts as passed when the component
