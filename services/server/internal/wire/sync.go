@@ -43,13 +43,17 @@ type SyncConfig struct {
 	Idempotency httpserver.IdempotencyConfig
 	// Cleanup holds the interval and batch size of the job sync.idempotency_cleanup (M1-20).
 	Cleanup syncapp.IdempotencyCleanupConfig
+	// Consumers holds consumer.batch_size, consumer.poll_interval,
+	// database.listen_reconnect_backoff_cap and database.statement_timeout of the worker
+	// consumers (M2-01).
+	Consumers syncapp.ConsumerConfig
 }
 
 // SyncConfigFrom binds SyncConfig from v. The error names the key whose binding failed, never a
 // value.
 func SyncConfigFrom(v *config.Values) (SyncConfig, error) {
 	var c SyncConfig
-	for _, dst := range []any{&c.Appender, &c.Partitions, &c.Tail, &c.Idempotency, &c.Cleanup} {
+	for _, dst := range []any{&c.Appender, &c.Partitions, &c.Tail, &c.Idempotency, &c.Cleanup, &c.Consumers} {
 		if err := config.Bind(v, dst); err != nil {
 			return SyncConfig{}, err
 		}
@@ -74,7 +78,8 @@ func newSyncHook(pool *pg.Pool, log *slog.Logger) *syncapp.PhaseHook {
 
 // Sync is the sync module of a process: the appender every module receives as eventlog.Appender,
 // the partition maintenance (job and bothy migrate up), the log tail of the roles api and all,
-// the idempotency store behind kernel idempotency.Store and its cleanup job (M1-20).
+// the idempotency store behind kernel idempotency.Store and its cleanup job (M1-20), and the
+// worker consumers (every role builds them for the lag gauges; worker and all run them; M2-01).
 type Sync struct {
 	cfg         SyncConfig
 	pool        *pg.Pool
@@ -85,6 +90,7 @@ type Sync struct {
 	maintenance *syncapp.PartitionMaintenance
 	keys        *syncapp.IdempotencyStore
 	cleanup     *syncapp.IdempotencyCleanup
+	consumers   *syncapp.ConsumerService
 	log         *slog.Logger
 }
 
@@ -92,7 +98,7 @@ type Sync struct {
 // sync hook), cfg, the clock c of the retention cutoff and the key cleanup, and log. It opens no
 // connection.
 //
-// Errors: a configuration the appender, the maintenance or the cleanup refuse.
+// Errors: a configuration the appender, the maintenance, the cleanup or the worker consumers refuse.
 func NewSync(pool *pg.Pool, uow txn.UnitOfWork, cfg SyncConfig, c clock.Clock, log *slog.Logger) (*Sync, error) {
 	log = orDiscard(log)
 	if c == nil {
@@ -112,9 +118,13 @@ func NewSync(pool *pg.Pool, uow txn.UnitOfWork, cfg SyncConfig, c clock.Clock, l
 	if err != nil {
 		return nil, err
 	}
+	cs, err := syncapp.NewConsumerService(cfg.Consumers, uow, repo, repo, log)
+	if err != nil {
+		return nil, err
+	}
 	return &Sync{
 		cfg: cfg, pool: pool, uow: uow, clock: c, repo: repo, appender: a, maintenance: m,
-		keys: syncapp.NewIdempotencyStore(keyRows, uow), cleanup: cleanup, log: log,
+		keys: syncapp.NewIdempotencyStore(keyRows, uow), cleanup: cleanup, consumers: cs, log: log,
 	}, nil
 }
 
@@ -136,6 +146,55 @@ func InstallIdempotency(chain *httpserver.Chain, sy *Sync, cfg SyncConfig) error
 	}
 	chain.Use(httpserver.StageIdempotency, stage)
 	return nil
+}
+
+// Consumers returns the worker consumers of the process (sync.Consumers): only internal/wire
+// registers handlers, before the runner starts.
+func (s *Sync) Consumers() *syncapp.ConsumerService { return s.consumers }
+
+// NewConsumerRunner returns the runner of the worker consumers with its own LISTEN connection
+// (application name bothy-consumer-wake, D-M2-01-7).
+func (s *Sync) NewConsumerRunner() (*syncapp.ConsumerRunner, error) {
+	return syncapp.NewConsumerRunner(s.consumers, syncpg.NewWaker(s.pool, s.cfg.Consumers, s.log), s.cfg.Consumers,
+		syncapp.RunnerOptions{Logger: s.log})
+}
+
+// consumerHandlers returns the production worker consumers of the event log: empty in M2-01.
+// M2-26 registers webhooks and M3-19 registers push here (ADR 0051, PLAN P-13).
+func consumerHandlers() map[sync.ConsumerName]sync.ConsumerHandler { return nil }
+
+// startConsumers is the start of the worker consumers in worker and all after River (02
+// "Start" step 8): it registers handlers, inserts their cursor rows at the head (Ensure),
+// registers the stop step event_consumers in lifecycle.PhaseConsumers without an own budget (the
+// rest of shutdown.total_timeout; D-M2-01-9) and starts the runner; an unexpected end of the
+// runner ends the process with exit code 1.
+func startConsumers(ctx context.Context, r *lifecycle.Runner, sy *Sync, handlers map[sync.ConsumerName]sync.ConsumerHandler) error {
+	svc := sy.Consumers()
+	for name, h := range handlers {
+		if err := svc.Register(name, h); err != nil {
+			return err
+		}
+	}
+	if err := svc.Ensure(ctx); err != nil {
+		return err
+	}
+	runner, err := sy.NewConsumerRunner()
+	if err != nil {
+		return err
+	}
+	r.OnStop(consumerStopStep(runner))
+	if err := runner.Start(ctx); err != nil {
+		return err
+	}
+	r.FailOn("event_consumers", runner.Failed())
+	return nil
+}
+
+// consumerStopStep is the stop step event_consumers (02 "Shutdown", worker step 2): the runner
+// starts no new round and waits for the running ones; Budget 0 gives it the rest of
+// shutdown.total_timeout, after which the rounds are cancelled and roll back.
+func consumerStopStep(runner *syncapp.ConsumerRunner) lifecycle.StopStep {
+	return lifecycle.StopStep{Name: "event_consumers", Phase: lifecycle.PhaseConsumers, Run: runner.Stop}
 }
 
 // Appender returns the appender of durable events for the module constructors.

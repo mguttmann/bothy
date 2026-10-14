@@ -879,6 +879,34 @@ consequence; a new consumer would change every producer. The log already is the 
 creates jobs exactly once, because cursor and jobs commit in one transaction. `webhook_deliveries`
 additionally has the unique key `(subscription_id, event_seq)` (03).
 
+Rules of the frame (M2-01, [DECISIONS.md](../DECISIONS.md) D-M2-01-1 to D-M2-01-9):
+
+5. **Start at the head.** In the roles `worker` and `all` the start inserts, before the first
+   round, the row of every registered consumer that has none, with `last_seq = max(seq)` of the
+   log. A new consumer therefore never replays retained events, like the first connection of an
+   agent consumer (04, 15.1 item 2). No migration inserts rows; names that are not registered have
+   no row. When two workers start together, one row wins.
+6. **Gaps.** When the events from `last_seq + 1` on are missing because retention detached their
+   partition (the first number read equals `min(seq)`), the round processes from `min(seq)` and
+   writes the error line `event consumer lost events to retention`; the events cannot come back,
+   and a webhook subscription detects its own gap (11, section 6). Any other gap is a bug (04, 3.2
+   items 3 and 4): the round rolls back, the cursor never passes the gap, the consumer stalls and
+   the alarm reports it.
+7. **Failures.** A handler error or panic, a database error and a gap roll back the whole round:
+   no job, no cursor move, the next attempt at the next wake or poll. No event is ever skipped.
+   The first failed round after a success writes `event consumer round failed`, the next success
+   `event consumer recovered`. Consumers are independent; a stalled consumer holds back no other.
+8. **No durable events in a round.** A handler that appends an event fails the round: the
+   consumer would read its own output, and the round would take the lock of the counter
+   `event_seq` (11.7).
+9. **One `LISTEN` connection per process** for all consumers, apart from the log tail's
+   (application name `bothy-consumer-wake`), reconnected with a backoff from
+   `consumer.poll_interval` up to `database.listen_reconnect_backoff_cap`. After a full batch the
+   next round starts at once. Every role exports `bothy.event.consumer.lag` and
+   `bothy.event.consumer.pending_age` per consumer ([signals.md](../observability/signals.md) 4.2);
+   the alarm `BothyEventConsumerLag` fires at `consumer.pending_alert_after`, which is strictly
+   below `sync.event_retention` (13, item 4).
+
 ### 11.6 Ephemeral events
 
 | Event | Created in | One node | Several nodes (`cluster.mode = multi`) |
@@ -1026,7 +1054,9 @@ server loads.
    `server.internal_listen_addr` and `server.listen_addr` share no port other than `0` when their
    hosts are equal or one of the hosts is empty, `0.0.0.0` or `::` (also with an IPv6 zone; an
    IPv4-mapped IPv6 address counts as its IPv4 address). Port `0` may occur twice, because tests
-   bind port 0. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
+   bind port 0. `consumer.pending_alert_after` is strictly below `sync.event_retention`
+   (cross-check `consumer_alert_below_retention`, M2-01), so the alarm `BothyEventConsumerLag`
+   fires while a stalled worker consumer can still catch up. With `file.storage.driver = fs`, `file.fs.root` is an absolute path in
    clean form (no `.` or `..` element, no trailing `/`; cross-check `file_fs_root_absolute`,
    M3-01), because a relative root would depend on the working directory of the process; with
    `s3` the root is not read. With `file.storage.driver = s3` the cross-check `file_s3` (M3-02)
@@ -1147,7 +1177,9 @@ covers the client's retry.
 ### 14.5 Panics
 
 Caught per request, per job and per connection: request `500`, job as an error to River,
-connection closed with `4000`. A panic in the log tail or the hub ends the process with an error
+connection closed with `4000`. A panic in the handler of a worker consumer becomes the error of
+its round, which rolls back (11.5 item 7); a panic in the frame of the consumers itself ends the
+process. A panic in the log tail or the hub ends the process with an error
 code, because a process without fan-out would not be ready but would still hold connections. The
 orchestrator restarts, clients resume according to 04.
 
@@ -1193,7 +1225,8 @@ On the internal listener `server.internal_listen_addr`, not in the public API
 
 - `/healthz` (alive): the process answers. If the log tail, the hub (api) or the
   River client (worker) fails unexpectedly, the process exits with exit code `1` (section
-  14.5); that is why `/healthz` needs no check of its own for this.
+  14.5); that is why `/healthz` needs no check of its own for this. The same holds for the runner
+  of the worker consumers (worker, M2-01); a failing round is no such end (11.5 item 7).
 - `/readyz` (ready): start completed (`startup`), database reachable (`database`), version
   matching the schema (`schema_requires_newer_server`), one active signing key per purpose
   (`signing_keys`), no shutdown started (`shutting_down`). The domain chapters bring further
@@ -1228,7 +1261,9 @@ Role `api`:
 Role `worker`:
 
 1. Set `ready` to false.
-2. Consumers finish their round (commit or rollback) and start no new one.
+2. Consumers finish their round (commit or rollback) and start no new one. The step has no
+   own budget, only the rest of `shutdown.total_timeout`; after it the round is cancelled and
+   rolls back.
 3. River: soft stop with `SoftStopTimeout` equal to `shutdown.jobs_soft_timeout`, after that the
    job contexts are canceled [Q3, Q4, verified]; canceled jobs return an error and are
    retried.
@@ -1410,6 +1445,7 @@ the limits of outbound calls (`egress.*`) are listed in [19-security.md](19-secu
 | `gateway.write_timeout` | Server | `10s` | deadline for one WebSocket write |
 | `consumer.batch_size` | Server | `500` | events per round of a worker consumer |
 | `consumer.poll_interval` | Server | `1s` | poll of a worker consumer without `NOTIFY` |
+| `consumer.pending_alert_after` | Server | `15m` | age of the oldest unprocessed event of a worker consumer that raises the alarm `BothyEventConsumerLag`; strictly below `sync.event_retention` (13, item 4) |
 | `sync.idempotency_cleanup_interval` | Server | `1h` | interval of the job `sync.idempotency_cleanup` |
 | `sync.idempotency_cleanup_batch_size` | Server | `1000` | rows per deletion batch of `sync.idempotency_cleanup` |
 | `ratelimit.max_tracked_keys` | Server | `100000` | a process holds at most this many rate-limit buckets; beyond that, full buckets are removed first, then the oldest buckets |

@@ -64,6 +64,17 @@ groups:
           summary: "Event fan-out lags behind the event log by more than 5 s."
           runbook_url: "docs/observability/alerting.md#bothyeventfanoutlag"
 
+      # The number is the default of consumer.pending_alert_after in seconds: Prometheus cannot
+      # read the server configuration, and the alert-thresholds check keeps both equal.
+      - alert: BothyEventConsumerLag
+        expr: max by (bothy_consumer_name) (bothy_event_consumer_pending_age_seconds{job="bothy/bothy-server"}) > 900
+        for: 5m
+        labels:
+          severity: page
+        annotations:
+          summary: "Worker consumer {{ $labels.bothy_consumer_name }} has an unprocessed event older than consumer.pending_alert_after."
+          runbook_url: "docs/observability/alerting.md#bothyeventconsumerlag"
+
       - alert: BothyAgentConsumerLag
         expr: max by (bothy_agent_handle) (bothy_agent_consumer_lag{job="bothy/bothy-server"}) > 1000
         for: 15m

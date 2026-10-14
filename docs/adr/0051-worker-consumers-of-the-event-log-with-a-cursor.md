@@ -80,14 +80,22 @@ The framework is built with the first consumer (webhooks, build ticket M2-01), n
   holds it.
 - Bad, because a consumer that stands still for longer than `sync.event_retention` loses events
   as soon as their partition is detached. For webhook subscriptions, `last_delivered_seq` detects
-  the gap and turns the subscription off with a notification (11, section 6); for the consumer
-  itself there is currently neither a metric nor an alert (see More Information).
+  the gap and turns the subscription off with a notification (11, section 6). For the consumer
+  itself the gauges `bothy.event.consumer.lag` and `bothy.event.consumer.pending_age` and the
+  alarm `BothyEventConsumerLag` at `consumer.pending_alert_after`, strictly below
+  `sync.event_retention`, report the stall long before (M2-01, see More Information).
 
 ### Confirmation
 
 - Test from build ticket M2-01: two `worker` processes in parallel, every event creates jobs
   exactly once; a crash in the middle of a round (abort before the commit) creates no duplicates;
-  `NOTIFY` and poll both wake up.
+  `NOTIFY` and poll both wake up. Built as `TestConsumersTwoWorkersExactlyOnce`,
+  `TestConsumerCrashMidRoundNoDuplicates` (terminated backend, handler error, panic, cancelled
+  context), `TestConsumerWakesOnNotify`, `TestConsumerWakesOnPoll`,
+  `TestConsumerListenLossLosesNothing`, `TestConsumerRoundJobsAndCursorCommitTogether` and
+  `TestConsumerRoundLockedEndsAtOnce` in `services/server/internal/sync/adapters/postgres`; the
+  lag gauges by `TestConsumerLagGauges`, the alarm by the promtool cases of
+  `BothyEventConsumerLag`.
 - Test: a permission revocation between round and job prevents the sending.
 - Load test `perf/push_handoff` with `perf.push_handoff_p95` (build ticket M3-24).
 - Restore test: after `bothy restore finalize` every cursor is at `head_seq`
@@ -130,8 +138,11 @@ The framework is built with the first consumer (webhooks, build ticket M2-01), n
 - Sources (retrieved 2026-10-10): Q1 PostgreSQL `SELECT ... FOR UPDATE SKIP LOCKED`,
   https://www.postgresql.org/docs/18/sql-select.html [verified]; Q2 River, transactional inserts,
   https://riverqueue.com/docs [verified].
-- Open for build ticket M2-01: a metric for the backlog per consumer (`head_seq`
-  minus `last_seq`) with an alert before `sync.event_retention` is reached. The signal catalogue
-  ([signals.md](../observability/signals.md)) so far lists only the backlog of the
-  agent consumers.
+- Settled by M2-01: the lag per consumer (`head_seq` minus `last_seq`) is the gauge
+  `bothy.event.consumer.lag`, and because `sync.event_retention` is a time window the age of the
+  oldest unprocessed event is the gauge `bothy.event.consumer.pending_age`
+  ([signals.md](../observability/signals.md) 4.2), both exported by every role. The alarm
+  `BothyEventConsumerLag` ([alerting.md](../observability/alerting.md) 3.2, severity `page`)
+  fires at `consumer.pending_alert_after`, which the start check holds strictly below
+  `sync.event_retention` ([DECISIONS.md](../DECISIONS.md) D-M2-01-5 and D-M2-01-6).
 - Related: ADR 0009 (event log), ADR 0016 (webhooks), ADR 0031 (push), ADR 0052 (envelope).

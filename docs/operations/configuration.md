@@ -170,8 +170,9 @@ Source: [02-architecture.md](../spec/02-architecture.md), section 22.
 | `sync.partition_maintenance_interval` | `BOTHY_SYNC__PARTITION_MAINTENANCE_INTERVAL` | Server | duration | `10m` | interval of the job `sync.partition_maintenance` | active |
 | `sync.event_log_partitions_ahead` | `BOTHY_SYNC__EVENT_LOG_PARTITIONS_AHEAD` | Server | int | `3` | partitions of `event_log` that are ready ahead of the head; with `sync.event_log_partition_size` they last longer than two intervals `sync.partition_maintenance_interval` at `perf.event_commit_min_per_s` | active |
 | `gateway.write_timeout` | `BOTHY_GATEWAY__WRITE_TIMEOUT` | Server |  | `10s` | deadline for one WebSocket write | planned (M1) |
-| `consumer.batch_size` | `BOTHY_CONSUMER__BATCH_SIZE` | Server |  | `500` | events per round of a worker consumer | planned (M2) |
-| `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server |  | `1s` | poll of a worker consumer without `NOTIFY` | planned (M2) |
+| `consumer.batch_size` | `BOTHY_CONSUMER__BATCH_SIZE` | Server | int | `500` | events per round of a worker consumer | active |
+| `consumer.poll_interval` | `BOTHY_CONSUMER__POLL_INTERVAL` | Server | duration | `1s` | poll of a worker consumer without `NOTIFY` | active |
+| `consumer.pending_alert_after` | `BOTHY_CONSUMER__PENDING_ALERT_AFTER` | Server | duration | `15m` | age of the oldest unprocessed event of a worker consumer that raises the alarm `BothyEventConsumerLag`; strictly below `sync.event_retention` (13, item 4) | active |
 | `sync.idempotency_cleanup_interval` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_INTERVAL` | Server | duration | `1h` | interval of the job `sync.idempotency_cleanup` | active |
 | `sync.idempotency_cleanup_batch_size` | `BOTHY_SYNC__IDEMPOTENCY_CLEANUP_BATCH_SIZE` | Server | int | `1000` | rows per deletion batch of `sync.idempotency_cleanup` | active |
 | `ratelimit.max_tracked_keys` | `BOTHY_RATELIMIT__MAX_TRACKED_KEYS` | Server | int | `100000` | a process holds at most this many rate-limit buckets; beyond that, full buckets are removed first, then the oldest buckets | active |

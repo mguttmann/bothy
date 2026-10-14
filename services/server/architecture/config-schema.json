@@ -134,6 +134,42 @@
       "doc": "Most rights snapshots a process keeps in memory (least recently used go first)."
     },
     {
+      "name": "consumer.batch_size",
+      "env": "BOTHY_CONSUMER__BATCH_SIZE",
+      "kind": "int",
+      "default": "500",
+      "required": false,
+      "enum": [],
+      "min": "1",
+      "max": "2147483647",
+      "chapter": "02-architecture.md",
+      "doc": "Events per round of a worker consumer."
+    },
+    {
+      "name": "consumer.pending_alert_after",
+      "env": "BOTHY_CONSUMER__PENDING_ALERT_AFTER",
+      "kind": "duration",
+      "default": "15m",
+      "required": false,
+      "enum": [],
+      "min": "1s",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "Age of the oldest unprocessed event of a worker consumer that raises the alarm; strictly below sync.event_retention."
+    },
+    {
+      "name": "consumer.poll_interval",
+      "env": "BOTHY_CONSUMER__POLL_INTERVAL",
+      "kind": "duration",
+      "default": "1s",
+      "required": false,
+      "enum": [],
+      "min": "1ms",
+      "max": "",
+      "chapter": "02-architecture.md",
+      "doc": "How often a worker consumer runs a round without a notification."
+    },
+    {
       "name": "database.acquire_timeout",
       "env": "BOTHY_DATABASE__ACQUIRE_TIMEOUT",
       "kind": "duration",

@@ -29,9 +29,6 @@ const (
 	msgReadFailed = "event log tail read failed, retrying at the next poll"
 )
 
-// closeTimeout bounds the close of a broken LISTEN connection.
-const closeTimeout = time.Second
-
 // TailConfig is the configuration of the log tail (02 "Configuration values of this chapter").
 type TailConfig struct {
 	// PollInterval is sync.log_poll_interval: the tail reads at least this often, and the
@@ -198,57 +195,15 @@ func (t *Tail) deliver(ctx context.Context, batch []sync.Event) error {
 	return nil
 }
 
-// listen holds the LISTEN connection and signals wake on every notification and after every
-// (re)connect, because notifications sent while it was down are lost. A lost connection is
+// listen holds the LISTEN connection of the tail (listener.run): a lost connection is
 // reconnected with exponential backoff from PollInterval up to ReconnectBackoffCap; polling
 // covers the gap, and the gapless seq makes the next read catch up.
 func (t *Tail) listen(ctx context.Context, wake chan<- struct{}) {
-	backoff := t.cfg.PollInterval
-	for ctx.Err() == nil {
-		conn, err := t.dial(ctx)
-		if err == nil {
-			if _, err = conn.Exec(ctx, "LISTEN event_log"); err == nil {
-				backoff = t.cfg.PollInterval
-				signal(wake)
-				err = t.wait(ctx, conn, wake)
-			}
-		}
-		if conn != nil {
-			cctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), closeTimeout)
-			_ = conn.Close(cctx)
-			cancel()
-		}
-		if ctx.Err() != nil {
-			return
-		}
-		t.log.WarnContext(ctx, msgListenLost, slog.String(attr.ErrorType, errorType(err)))
-		timer := time.NewTimer(backoff)
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-			return
-		case <-timer.C:
-		}
-		backoff = min(2*backoff, t.cfg.ReconnectBackoffCap)
-	}
-}
-
-// wait forwards notifications of conn to wake until conn fails or ctx ends.
-func (t *Tail) wait(ctx context.Context, conn *pgx.Conn, wake chan<- struct{}) error {
-	for {
-		if _, err := conn.WaitForNotification(ctx); err != nil {
-			return err
-		}
-		signal(wake)
-	}
-}
-
-// signal wakes the reader without blocking; one pending wake is enough.
-func signal(wake chan<- struct{}) {
-	select {
-	case wake <- struct{}{}:
-	default:
-	}
+	l := listener{dial: t.dial, poll: t.cfg.PollInterval, backoffCap: t.cfg.ReconnectBackoffCap,
+		lost: func(ctx context.Context, typ string) {
+			t.log.WarnContext(ctx, msgListenLost, slog.String(attr.ErrorType, typ))
+		}}
+	l.run(ctx, wake)
 }
 
 // errorType returns the class of err for the log: the SQLSTATE, "timeout" or "connect", never

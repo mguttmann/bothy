@@ -14,7 +14,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
-	"sync"
+	stdsync "sync"
 	"time"
 
 	"github.com/OWNER/bothy/services/server/api/rest"
@@ -34,6 +34,8 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/platform/otel/attr"
 	"github.com/OWNER/bothy/services/server/internal/platform/pg"
 	"github.com/OWNER/bothy/services/server/internal/platform/secrets"
+	"github.com/OWNER/bothy/services/server/internal/sync"
+	"github.com/OWNER/bothy/services/server/internal/sync/adapters/otelmetrics"
 	"github.com/OWNER/bothy/services/server/migrations"
 )
 
@@ -87,13 +89,21 @@ type Deps struct {
 	// channel ops the start checks against the catalogue (M1-25); nil means the functions of the
 	// module ports. Tests inject a bad registration here.
 	Registrations []func(*authorize.Registry)
+	// ConsumerHandlers replaces the production list of worker consumers (consumerHandlers,
+	// empty until M2-26 and M3-19) in worker and all; nil keeps it. Tests register probe
+	// handlers here.
+	ConsumerHandlers map[sync.ConsumerName]sync.ConsumerHandler
+	// ConsumerGauges registers the lag gauges of the worker consumers in every role; nil means
+	// otelmetrics.RegisterConsumerGauges on the global meter provider of otel.Setup. Tests read
+	// the gauges of a role through their own meter provider here.
+	ConsumerGauges func(consumers sync.Consumers) error
 }
 
 // server is the state of one serve process that the components fill and the stop steps read.
 // Each field is written by one component during the start and read by stop steps afterwards;
 // the mutex orders the two, because a step may run when its component never started.
 type server struct {
-	mu       sync.Mutex
+	mu       stdsync.Mutex
 	runner   *lifecycle.Runner
 	log      *switchLogger
 	boot     *slog.Logger
@@ -169,13 +179,17 @@ type server struct {
 //     with sync.partition_maintenance and sync.idempotency_cleanup): the River migrations in jobs.schema
 //     must be complete (else the hint to run "bothy migrate up"), the runtime of the role is
 //     built over the pool, and worker and all start River (02 "Start and graceful shutdown" step 8); a River client
-//     that stops on its own later ends the process with exit code 1 (02 "Health"). The
-//     consumers (M2) follow,
+//     that stops on its own later ends the process with exit code 1 (02 "Health"). Then
+//     worker and all start the worker consumers of the event log (M2-01): their cursor rows at
+//     the head for every registered consumer, then the runner with its own LISTEN connection;
+//     a runner that ends unexpectedly ends the process with exit code 1. Every role registers
+//     the lag gauges of the consumers in step 6b,
 //  8. public listener (api and all) through httpserver.ListenPublic: own TLS, or plaintext only
 //     from loopback and server.trusted_proxies (SEC-TLS-1, SEC-TLS-2),
 //  9. ready: readiness passes startup and the line "server ready" is written.
 //
-// Stop steps, by phase: not ready (always), drain and HTTP (api, all), jobs (worker, all: River's
+// Stop steps, by phase: not ready (always), drain and HTTP (api, all), event tail (api, all),
+// consumers (worker, all: the running rounds finish, no new one starts), jobs (worker, all: River's
 // soft stop within shutdown.jobs_soft_timeout, then what the fixed budgets leave of the total
 // for the cancelled jobs to end), telemetry, database (the flush of the audit denials, then the
 // pool), internal listener. Their budgets come from shutdown.*.
@@ -301,30 +315,42 @@ func (s *server) worker() bool { return s.role == RoleWorker || s.role == RoleAl
 // logger returns the current process logger.
 func (s *server) logger() *slog.Logger { return slog.New(s.log) }
 
+// components returns the start sequence of the role in the order Serve documents.
+func (s *server) components() []lifecycle.Component {
+	cs := []lifecycle.Component{
+		step("telemetry", s.startTelemetry),
+		step("secrets", s.startSecrets),
+		step("internal_listener", s.startInternal),
+		step("database", s.startDatabase),
+		step("schema", s.checkSchema),
+		step("instance", s.loadInstance),
+		step("audit", s.startAudit),
+		step("sync", s.startSync),
+		step("authz", s.startAuthz),
+		step("identity", s.startIdentity),
+		// Extension point (README.md): M1-32 adds the signing keys here.
+		step("routes", s.mountRoutes),
+	}
+	if s.api() {
+		cs = append(cs, step("log_tail", s.startLogTail))
+	}
+	cs = append(cs, step("jobs", s.startJobs))
+	if s.worker() {
+		// 02 "Start" step 8: the worker consumers start after River (M2-01).
+		cs = append(cs, step("event_consumers", s.startEventConsumers))
+	}
+	if s.api() {
+		cs = append(cs, step("public_listener", s.startPublic))
+	}
+	return append(cs, step("ready", s.ready))
+}
+
 // register adds the components and stop steps in the order Serve documents.
 func (s *server) register() {
 	r := s.runner
-	r.Add(step("telemetry", s.startTelemetry))
-	r.Add(step("secrets", s.startSecrets))
-	r.Add(step("internal_listener", s.startInternal))
-	r.Add(step("database", s.startDatabase))
-	r.Add(step("schema", s.checkSchema))
-	r.Add(step("instance", s.loadInstance))
-	r.Add(step("audit", s.startAudit))
-	r.Add(step("sync", s.startSync))
-	r.Add(step("authz", s.startAuthz))
-	r.Add(step("identity", s.startIdentity))
-	// Extension point (README.md): M1-32 adds the signing keys here.
-	r.Add(step("routes", s.mountRoutes))
-	if s.api() {
-		r.Add(step("log_tail", s.startLogTail))
+	for _, c := range s.components() {
+		r.Add(c)
 	}
-	// Extension point: M2 adds the consumers after the jobs.
-	r.Add(step("jobs", s.startJobs))
-	if s.api() {
-		r.Add(step("public_listener", s.startPublic))
-	}
-	r.Add(step("ready", s.ready))
 
 	r.OnStop(lifecycle.StopStep{Name: "readiness", Phase: lifecycle.PhaseNotReady, Run: func(context.Context) error {
 		s.reg.SetShuttingDown()
@@ -654,7 +680,7 @@ func NewChain(cfg httpserver.ChainConfig, log *slog.Logger) (*httpserver.Chain, 
 // spec and the operation list are fixed in the binary, the validator is safe for concurrent use,
 // and compiling the response schemas of every enabled operation takes seconds under load, which
 // each test server of a binary would pay again (docs/DECISIONS.md M1-33/18).
-var enabledValidator = sync.OnceValues(func() (*httpserver.Validator, error) {
+var enabledValidator = stdsync.OnceValues(func() (*httpserver.Validator, error) {
 	var ids []string
 	for _, op := range routes.Enabled() {
 		ids = append(ids, op.ID)
@@ -691,7 +717,9 @@ func jobsWaitBudget(cfg ServeConfig, role Role, soft time.Duration) time.Duratio
 }
 
 // startSync is start step 6b: it builds the event log over the pool and the unit of work of the
-// audit step, whose registry holds the sync hook (M1-16).
+// audit step, whose registry holds the sync hook (M1-16), and registers the lag gauges of the
+// worker consumers in every role, so a stopped or missing worker still shows a growing lag
+// (M2-01, D-M2-01-5).
 func (s *server) startSync(context.Context) error {
 	s.mu.Lock()
 	pool, a := s.pool, s.audit
@@ -706,7 +734,27 @@ func (s *server) startSync(context.Context) error {
 	s.mu.Lock()
 	s.sync = sy
 	s.mu.Unlock()
-	return nil
+	gauges := s.deps.ConsumerGauges
+	if gauges == nil {
+		gauges = func(c sync.Consumers) error {
+			_, err := otelmetrics.RegisterConsumerGauges(nil, c, s.deps.Clock)
+			return err
+		}
+	}
+	return gauges(sy.Consumers())
+}
+
+// startEventConsumers starts the worker consumers of worker and all after River
+// (startConsumers) with the production handlers or those of Deps.ConsumerHandlers.
+func (s *server) startEventConsumers(ctx context.Context) error {
+	s.mu.Lock()
+	sy := s.sync
+	s.mu.Unlock()
+	handlers := consumerHandlers()
+	if s.deps.ConsumerHandlers != nil {
+		handlers = s.deps.ConsumerHandlers
+	}
+	return startConsumers(ctx, s.runner, sy, handlers)
 }
 
 // startLogTail starts the log tail of api and all (02 "Start and graceful shutdown" step 8, startTail).

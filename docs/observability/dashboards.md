@@ -10,7 +10,7 @@ retrieved 2026-10-10) [verified].
 | File | UID | Title | Content |
 |---|---|---|---|
 | `server-overview.json` | `bothy-server-overview` | Bothy / Server overview | REST success and latency, processes per role, gateway connections, messages by origin, authorization, rate limits, error logs |
-| `delivery-sync.json` | `bothy-delivery-sync` | Bothy / Delivery and sync | Delivery latency, fan-out lag, events per type, waiting at the sequence counter, connecting, catch-up, `resync_required`, close codes |
+| `delivery-sync.json` | `bothy-delivery-sync` | Bothy / Delivery and sync | Delivery latency, fan-out lag, events per type, waiting at the sequence counter, connecting, catch-up, `resync_required`, close codes, worker consumers (lag and age of the oldest pending event per `bothy_consumer_name`) |
 | `agent-runs.json` | `bothy-agent-runs` | Bothy / Agent runs | Active runs, start latency, turn duration, failure reasons, steps, tokens, costs per currency (estimate), consumer backlog, heartbeat, rejections (I2), mode mismatches (I3) |
 | `push.json` | `bothy-push` | Bothy / Push | Acceptance by the provider, fetch rate, sends by result, send duration, skips |
 | `database.json` | `bothy-database` | Bothy / Database and backup | Connections, size, deadlocks, commits and rollbacks, query duration, pool, largest tables, age of the backups, WAL archive, restore test, free space |
