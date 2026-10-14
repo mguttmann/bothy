@@ -558,7 +558,8 @@ Every mapped channel has exactly one leading place in the source, `lead`:
 Read-only in Bothy means: no principal, not even an owner, may create messages,
 threads, reactions or interactions in the channel; only `import.apply` writes (`channels.read_only`,
 03; 05 rule 1.8). The flag is set by `import.manage` with the ownership list; by hand it is set by
-`channel.read_only.set`. As a result, no agent can be triggered in the mirror, and a
+`channel.read_only.set`, which refuses the imported channels of a source that is neither `completed`
+nor `failed`, so the ownership list and the flag never disagree. As a result, no agent can be triggered in the mirror, and a
 channel never has two leading places.
 
 ### 12.2 Round
