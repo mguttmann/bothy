@@ -259,24 +259,7 @@ func replayAsInitiator(t *testing.T, sc recordedScenario) {
 	}
 	sameBytes(t, "message 2 payload", p2, sc.Message2Payload)
 	sameBytes(t, "handshake hash", init.HandshakeHash(), sc.HandshakeHash)
-	for i, m := range sc.Transport {
-		if m.From == "device" {
-			msg, err := devT.Encrypt(m.Frame)
-			if err != nil {
-				t.Fatal(err)
-			}
-			sameBytes(t, fmt.Sprintf("transport %d", i), msg, m.Message)
-			continue
-		}
-		pt, err := devT.Decrypt(m.Message)
-		if err != nil {
-			t.Fatalf("transport %d: %v", i, err)
-		}
-		sameBytes(t, fmt.Sprintf("frame %d", i), pt, m.Frame)
-		if _, err := frame.Decode(pt, frame.FromHost); err != nil {
-			t.Errorf("frame %d: %v", i, err)
-		}
-	}
+	replayTransport(t, sc, devT, "device", frame.FromHost)
 }
 
 // replayAsResponder plays the host of a recording: message 1 must decrypt to the recorded
@@ -301,32 +284,37 @@ func replayAsResponder(t *testing.T, sc recordedScenario) {
 	}
 	sameBytes(t, "message 2", m2, sc.Message2)
 	sameBytes(t, "handshake hash", resp.HandshakeHash(), sc.HandshakeHash)
+	replayTransport(t, sc, hostT, "host", frame.FromDevice)
+}
+
+// replayTransport plays the transport messages of a recording on tr, the transport of the side
+// own ("device" or "host"): it encrypts own frames and must produce the recorded messages, and
+// it decrypts the other side's messages to the recorded frames, which must decode as frames
+// from peer.
+func replayTransport(t *testing.T, sc recordedScenario, tr *Transport, own string, peer frame.Sender) {
+	t.Helper()
 	for i, m := range sc.Transport {
-		if m.From == "host" {
-			msg, err := hostT.Encrypt(m.Frame)
+		if m.From == own {
+			msg, err := tr.Encrypt(m.Frame)
 			if err != nil {
 				t.Fatal(err)
 			}
 			sameBytes(t, fmt.Sprintf("transport %d", i), msg, m.Message)
 			continue
 		}
-		pt, err := hostT.Decrypt(m.Message)
+		pt, err := tr.Decrypt(m.Message)
 		if err != nil {
 			t.Fatalf("transport %d: %v", i, err)
 		}
 		sameBytes(t, fmt.Sprintf("frame %d", i), pt, m.Frame)
-		if _, err := frame.Decode(pt, frame.FromDevice); err != nil {
+		if _, err := frame.Decode(pt, peer); err != nil {
 			t.Errorf("frame %d: %v", i, err)
 		}
 	}
 }
 
 func TestRecordingsTMT02Dart(t *testing.T) {
-	rec := loadRecording(t, "dart")
-	for _, sc := range rec.Scenarios {
-		t.Run(sc.Name+"/initiator", func(t *testing.T) { replayAsInitiator(t, sc) })
-		t.Run(sc.Name+"/responder", func(t *testing.T) { replayAsResponder(t, sc) })
-	}
+	replayBothRoles(t, "dart")
 }
 
 // TestRecordingsTMT02Negative proves the prologue binding on both recordings: a responder with
@@ -399,7 +387,13 @@ func TestRecordingsTMT02Negative(t *testing.T) {
 }
 
 func TestGoRecordingReplays(t *testing.T) {
-	rec := loadRecording(t, "go")
+	replayBothRoles(t, "go")
+}
+
+// replayBothRoles replays every scenario of the recording of generator as initiator and as
+// responder.
+func replayBothRoles(t *testing.T, generator string) {
+	rec := loadRecording(t, generator)
 	for _, sc := range rec.Scenarios {
 		t.Run(sc.Name+"/initiator", func(t *testing.T) { replayAsInitiator(t, sc) })
 		t.Run(sc.Name+"/responder", func(t *testing.T) { replayAsResponder(t, sc) })

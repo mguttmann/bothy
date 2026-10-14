@@ -21,6 +21,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"text/tabwriter"
 )
 
 // Exit codes shared by all commands.
@@ -76,12 +77,11 @@ func writeUsage(w io.Writer, table []command) {
 	}
 	sorted := slices.Clone(table)
 	slices.SortFunc(sorted, func(a, b command) int { return strings.Compare(a.name, b.name) })
-	width := 0
+	// tabwriter pads the names to the longest one plus two spaces before the summaries.
+	tw := tabwriter.NewWriter(&b, 0, 0, 2, ' ', 0)
 	for _, c := range sorted {
-		width = max(width, len(c.name))
+		fmt.Fprintf(tw, "  %s\t%s\n", c.name, c.summary)
 	}
-	for _, c := range sorted {
-		fmt.Fprintf(&b, "  %-*s  %s\n", width, c.name, c.summary)
-	}
+	_ = tw.Flush()
 	_, _ = io.WriteString(w, b.String())
 }

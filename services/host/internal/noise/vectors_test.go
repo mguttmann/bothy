@@ -25,8 +25,8 @@ var vectorFiles = []string{"cacophony.txt.gz", "noise-c-basic.txt.gz"}
 
 // vectorMessage is one message of a vector entry: handshake messages first, then transport.
 type vectorMessage struct {
-	Payload    hexBytes `json:"payload"`
-	Ciphertext hexBytes `json:"ciphertext"`
+	Payload    hexField `json:"payload"`
+	Ciphertext hexField `json:"ciphertext"`
 }
 
 // vectorEntry holds the fields of the vector file format (Noise wiki "Test vectors") that this
@@ -40,30 +40,18 @@ type vectorEntry struct {
 	Hash             string          `json:"hash"`
 	Fail             bool            `json:"fail"`
 	Fallback         bool            `json:"fallback"`
-	InitPrologue     hexBytes        `json:"init_prologue"`
-	RespPrologue     *hexBytes       `json:"resp_prologue"`
-	InitEphemeral    hexBytes        `json:"init_ephemeral"`
-	InitRemoteStatic hexBytes        `json:"init_remote_static"`
-	RespStatic       hexBytes        `json:"resp_static"`
-	RespEphemeral    hexBytes        `json:"resp_ephemeral"`
-	InitPSK          hexBytes        `json:"init_psk"`
-	RespPSK          hexBytes        `json:"resp_psk"`
-	InitPSKs         []hexBytes      `json:"init_psks"`
-	RespPSKs         []hexBytes      `json:"resp_psks"`
-	HandshakeHash    hexBytes        `json:"handshake_hash"`
+	InitPrologue     hexField        `json:"init_prologue"`
+	RespPrologue     *hexField       `json:"resp_prologue"`
+	InitEphemeral    hexField        `json:"init_ephemeral"`
+	InitRemoteStatic hexField        `json:"init_remote_static"`
+	RespStatic       hexField        `json:"resp_static"`
+	RespEphemeral    hexField        `json:"resp_ephemeral"`
+	InitPSK          hexField        `json:"init_psk"`
+	RespPSK          hexField        `json:"resp_psk"`
+	InitPSKs         []hexField      `json:"init_psks"`
+	RespPSKs         []hexField      `json:"resp_psks"`
+	HandshakeHash    hexField        `json:"handshake_hash"`
 	Messages         []vectorMessage `json:"messages"`
-}
-
-type hexBytes []byte
-
-func (h *hexBytes) UnmarshalJSON(b []byte) error {
-	var s string
-	if err := json.Unmarshal(b, &s); err != nil {
-		return err
-	}
-	v, err := hex.DecodeString(s)
-	*h = v
-	return err
 }
 
 // protocol returns the protocol of an entry by the loader rules of the brief (Design note 10).
