@@ -3,8 +3,9 @@
 // Package app holds the application layer of the authz module: the catalogue service (M1-25), the
 // outgoing port Store over the tables groups, group_memberships and grants (M1-27), and the
 // Authorizer (M1-28), which implements kernel/authorize.Authorizer with the rights snapshot, its
-// cache per rights version and the visible sets of Scope. Rights changes (M1-29) and the group
-// and grant use cases (M1-48) add their use cases here.
+// cache per rights version and the visible sets of Scope; the RightsHook (M1-29), the one
+// transactional path of every rights change with I1, SR8 and access.changed, and AdminService,
+// the group, membership and grant use cases of the port authz.Admin (M1-29; routes in M1-48).
 //
 // Reads join the ambient transaction of kernel/txn when the context carries one; the Store
 // implementation decides that (platform/pg.Querier), so this package stays free of drivers.

@@ -201,6 +201,120 @@ func (q *Queries) ListActiveGrantsOfPrincipal(ctx context.Context, principalID p
 	return items, nil
 }
 
+const listActiveGrantsOnTargets = `-- name: ListActiveGrantsOnTargets :many
+SELECT g.id, g.subject_kind, g.subject_principal_id, g.subject_group_id, g.target_kind, g.target_space_id, g.target_channel_id, g.target_host_id, g.level, g.capabilities, g.expires_at, g.expiry_reminded_at, g.expiry_reported_at, g.reason, g.granted_by, g.granted_at, g.revoked_at, g.revoked_by, g.revoke_reason
+FROM grants g
+WHERE g.revoked_at IS NULL
+  AND (g.target_kind = 'instance'
+       OR g.target_space_id = ANY ($1::uuid[])
+       OR g.target_channel_id = ANY ($2::uuid[]))
+ORDER BY g.id
+`
+
+type ListActiveGrantsOnTargetsParams struct {
+	SpaceIds   []pgtype.UUID
+	ChannelIds []pgtype.UUID
+}
+
+type ListActiveGrantsOnTargetsRow struct {
+	Grant Grant
+}
+
+// Grants on the instance and on the given spaces and channels: the subjects a rights change on a
+// target affects (02 section 8.1).
+func (q *Queries) ListActiveGrantsOnTargets(ctx context.Context, arg ListActiveGrantsOnTargetsParams) ([]ListActiveGrantsOnTargetsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveGrantsOnTargets, arg.SpaceIds, arg.ChannelIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActiveGrantsOnTargetsRow
+	for rows.Next() {
+		var i ListActiveGrantsOnTargetsRow
+		if err := rows.Scan(
+			&i.Grant.ID,
+			&i.Grant.SubjectKind,
+			&i.Grant.SubjectPrincipalID,
+			&i.Grant.SubjectGroupID,
+			&i.Grant.TargetKind,
+			&i.Grant.TargetSpaceID,
+			&i.Grant.TargetChannelID,
+			&i.Grant.TargetHostID,
+			&i.Grant.Level,
+			&i.Grant.Capabilities,
+			&i.Grant.ExpiresAt,
+			&i.Grant.ExpiryRemindedAt,
+			&i.Grant.ExpiryReportedAt,
+			&i.Grant.Reason,
+			&i.Grant.GrantedBy,
+			&i.Grant.GrantedAt,
+			&i.Grant.RevokedAt,
+			&i.Grant.RevokedBy,
+			&i.Grant.RevokeReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listActiveTriggerGrants = `-- name: ListActiveTriggerGrants :many
+SELECT g.id, g.subject_kind, g.subject_principal_id, g.subject_group_id, g.target_kind, g.target_space_id, g.target_channel_id, g.target_host_id, g.level, g.capabilities, g.expires_at, g.expiry_reminded_at, g.expiry_reported_at, g.reason, g.granted_by, g.granted_at, g.revoked_at, g.revoked_by, g.revoke_reason
+FROM grants g
+WHERE g.level = 'trigger' AND g.revoked_at IS NULL
+ORDER BY g.id
+`
+
+type ListActiveTriggerGrantsRow struct {
+	Grant Grant
+}
+
+// The I1 check (03 section 6.4, 10 section 5.3) filters expiry and served targets in the domain,
+// so one clock decides; hosts carry no level.
+func (q *Queries) ListActiveTriggerGrants(ctx context.Context) ([]ListActiveTriggerGrantsRow, error) {
+	rows, err := q.db.Query(ctx, listActiveTriggerGrants)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListActiveTriggerGrantsRow
+	for rows.Next() {
+		var i ListActiveTriggerGrantsRow
+		if err := rows.Scan(
+			&i.Grant.ID,
+			&i.Grant.SubjectKind,
+			&i.Grant.SubjectPrincipalID,
+			&i.Grant.SubjectGroupID,
+			&i.Grant.TargetKind,
+			&i.Grant.TargetSpaceID,
+			&i.Grant.TargetChannelID,
+			&i.Grant.TargetHostID,
+			&i.Grant.Level,
+			&i.Grant.Capabilities,
+			&i.Grant.ExpiresAt,
+			&i.Grant.ExpiryRemindedAt,
+			&i.Grant.ExpiryReportedAt,
+			&i.Grant.Reason,
+			&i.Grant.GrantedBy,
+			&i.Grant.GrantedAt,
+			&i.Grant.RevokedAt,
+			&i.Grant.RevokedBy,
+			&i.Grant.RevokeReason,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const revokeGrant = `-- name: RevokeGrant :one
 UPDATE grants
 SET revoked_at = $1, revoked_by = $2, revoke_reason = $3

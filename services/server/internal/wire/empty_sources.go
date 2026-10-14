@@ -22,6 +22,9 @@ var _ authz.StructureSource = emptyStructure{}
 
 func (emptyStructure) Space(context.Context, ids.ID) (bool, error) { return false, nil }
 func (emptyStructure) Spaces(context.Context) ([]ids.ID, error)    { return nil, nil }
+
+// SpaceArchived knows no space until M1-52.
+func (emptyStructure) SpaceArchived(context.Context, ids.ID) (bool, error) { return false, nil }
 func (emptyStructure) Channel(context.Context, ids.ID) (authz.ChannelFacts, bool, error) {
 	return authz.ChannelFacts{}, false, nil
 }
@@ -31,6 +34,11 @@ func (emptyStructure) Thread(context.Context, ids.ID) (authz.ThreadFacts, bool, 
 func (emptyStructure) Channels(context.Context) ([]authz.ChannelFacts, error)       { return nil, nil }
 func (emptyStructure) ChannelsOperatedBy(context.Context, ids.ID) ([]ids.ID, error) { return nil, nil }
 func (emptyStructure) DMChannelsOf(context.Context, ids.ID) ([]ids.ID, error)       { return nil, nil }
+
+// ServedTargets knows no served target until M1-54 implements it in chat.
+func (emptyStructure) ServedTargets(context.Context, ids.ID) ([]authz.ChannelRef, error) {
+	return nil, nil
+}
 
 // emptyPolicies knows no agent policy and no ready dev environment. M1-51 replaces it with the
 // AgentPolicySource of agents (dev environments in V2).
@@ -43,6 +51,12 @@ func (emptyPolicies) AgentPolicy(context.Context, ids.ID) (authz.AgentPolicy, bo
 }
 func (emptyPolicies) DevEnvironmentReady(context.Context, ids.ID, ids.ID) (bool, error) {
 	return false, nil
+}
+
+// PersonalAgents knows no personal agent until M1-51 implements it in agents: without agents
+// there is none, so I1 holds trivially.
+func (emptyPolicies) PersonalAgents(context.Context) ([]authz.PersonalAgent, error) {
+	return nil, nil
 }
 
 // emptyCredentials knows no live session, device or token. M1-33 (devices), M1-34 (sessions) and

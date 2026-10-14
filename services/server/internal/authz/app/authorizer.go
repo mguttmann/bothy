@@ -18,6 +18,7 @@ import (
 	"github.com/OWNER/bothy/services/server/internal/kernel/clock"
 	"github.com/OWNER/bothy/services/server/internal/kernel/errs"
 	"github.com/OWNER/bothy/services/server/internal/kernel/ids"
+	"github.com/OWNER/bothy/services/server/internal/kernel/txn"
 )
 
 // AuthorizerConfig holds the configuration keys of the Authorizer.
@@ -266,8 +267,14 @@ func (a *Authorizer) principalOf(ctx context.Context, p authorize.Principal, act
 }
 
 // load returns the snapshot entry of ref at version v, from the cache when it is valid at t.
+// Inside a unit of work declared as a rights change the cache is neither read nor written: the
+// unit sees its own uncommitted rights version and state, and a rollback would leave an entry for
+// a version another change commits later (07 section 7.3, M1-29).
 func (a *Authorizer) load(ctx context.Context, ref authz.CredentialRef, v int64, t time.Time) (entry, error) {
 	key := cacheKey{principal: ref.PrincipalID, session: ref.SessionID, device: ref.DeviceID, token: ref.TokenID, version: v}
+	if txn.InRightsChange(ctx) {
+		return a.build(ctx, key, ref, t)
+	}
 	if e, ok := a.cache.get(key, t); ok {
 		return e, nil
 	}
@@ -306,39 +313,11 @@ func (a *Authorizer) build(ctx context.Context, key cacheKey, ref authz.Credenti
 	}
 	in.Active = facts.Status == authz.PrincipalActive
 	in.Owner = facts.IsOwner && string(facts.Kind) == domain.KindUser && !ref.SessionID.IsZero() && in.Active
-	if err := a.readGrants(ctx, ref.PrincipalID, string(facts.Kind) == domain.KindUser, &in, t); err != nil {
+	if err := readGrants(ctx, a.store, ref.PrincipalID, string(facts.Kind) == domain.KindUser, &in, t); err != nil {
 		return entry{}, err
 	}
 	e.snap = domain.BuildSnapshot(in)
 	return e, nil
-}
-
-// readGrants reads the grants of principal and, for a person, its memberships and the grants of
-// the groups in effect at t into in.
-func (a *Authorizer) readGrants(ctx context.Context, principal ids.ID, person bool, in *domain.SnapshotInput, t time.Time) error {
-	var err error
-	if in.Grants, err = a.store.ActiveGrantsOfPrincipal(ctx, principal); err != nil {
-		return sourceError("grant store", err)
-	}
-	if !person {
-		return nil
-	}
-	if in.Memberships, err = a.store.ActiveMembershipsOfUser(ctx, principal); err != nil {
-		return sourceError("grant store", err)
-	}
-	var groups []ids.ID
-	for _, m := range in.Memberships {
-		if m.Membership.InEffect(m.Group, t) {
-			groups = append(groups, m.Group.ID)
-		}
-	}
-	if len(groups) == 0 {
-		return nil
-	}
-	if in.GroupGrants, err = a.store.ActiveGrantsOfGroups(ctx, groups); err != nil {
-		return sourceError("grant store", err)
-	}
-	return nil
 }
 
 // authorize is Authorize without the check log and the audit.
@@ -362,7 +341,7 @@ func (a *Authorizer) authorize(ctx context.Context, p authorize.Principal, act a
 	if err != nil || d.Outcome != domain.OutcomeAllow {
 		return outcome(d), err
 	}
-	res, found, err := a.resolve(ctx, r)
+	res, found, err := a.resolve(ctx, act, r)
 	if err != nil || !found {
 		return outcome(domain.Decision{Outcome: domain.OutcomeNotFound, Reason: domain.ReasonNoGrant}), err
 	}

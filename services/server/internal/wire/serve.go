@@ -19,6 +19,7 @@ import (
 
 	"github.com/OWNER/bothy/services/server/api/rest"
 	"github.com/OWNER/bothy/services/server/api/routes"
+	authzapp "github.com/OWNER/bothy/services/server/internal/authz/app"
 	"github.com/OWNER/bothy/services/server/internal/instance"
 	"github.com/OWNER/bothy/services/server/internal/kernel/actor"
 	"github.com/OWNER/bothy/services/server/internal/kernel/authorize"
@@ -151,9 +152,10 @@ type server struct {
 //     start), build the audit module with the unit of work of the role and start the aggregator
 //     of denials; its stop step audit_denials flushes the open aggregations before the pool
 //     closes (startAudit),
-//     6b. authz (M1-28): build the Authorizer with the recorder of audit (startAuthz),
-//     6c. sync (M1-16): build the event log over the unit of work of the audit step (appender,
+//     6b. sync (M1-16): build the event log over the unit of work of the audit step (appender,
 //     partition maintenance; startSync),
+//     6c. authz (M1-28): build the Authorizer with the recorder of audit and bind the rights
+//     hooks to the appender of sync and the recorder (M1-29; startAuthz),
 //  7. extension points, in this order: signing keys (M1-32), routes (the catalogue check of
 //     route bindings and registrations for every role, M1-25, then InstallRateLimits with its
 //     sweeper, M1-19, InstallIdempotency, M1-20, and MountRoutes, api and all), log
@@ -304,8 +306,8 @@ func (s *server) register() {
 	r.Add(step("schema", s.checkSchema))
 	r.Add(step("instance", s.loadInstance))
 	r.Add(step("audit", s.startAudit))
-	r.Add(step("authz", s.startAuthz))
 	r.Add(step("sync", s.startSync))
+	r.Add(step("authz", s.startAuthz))
 	// Extension point (README.md): M1-32 adds the signing keys here.
 	r.Add(step("routes", s.mountRoutes))
 	if s.api() {
@@ -502,8 +504,9 @@ func (s *server) startAudit(ctx context.Context) error {
 	return nil
 }
 
-// startAuthz is start step 6b (M1-28): it builds the Authorizer of authz over the pool with the
-// recorder of the audit module (NewAuthorizer) and keeps it for the use cases of later tickets.
+// startAuthz is start step 6c (M1-28): it builds the Authorizer of authz over the pool with the
+// recorder of the audit module (NewAuthorizer) and keeps it for the use cases of later tickets,
+// and binds the rights hooks to the appender of sync and the recorder (M1-29).
 func (s *server) startAuthz(context.Context) error {
 	cfg, err := AuthzConfig(s.values)
 	if err != nil {
@@ -515,10 +518,18 @@ func (s *server) startAuthz(context.Context) error {
 		return err
 	}
 	s.mu.Lock()
-	pool, a := s.pool, s.audit
+	pool, a, sy := s.pool, s.audit, s.sync
 	s.mu.Unlock()
 	az, err := NewAuthorizer(pool, cfg, cat, a.Recorder(), s.deps.Clock, log)
 	if err != nil {
+		return err
+	}
+	if sy == nil {
+		return errors.New("wire: the authz step needs the event log of the sync step")
+	}
+	// The rights hooks of the unit of work need the appender and the recorder, which need the unit
+	// of work themselves; they are bound here, before any route or job runs (M1-29).
+	if err := a.RightsHook().Bind(authzapp.RightsBindings{Events: sy.Appender(), Audit: a.Recorder()}); err != nil {
 		return err
 	}
 	s.mu.Lock()

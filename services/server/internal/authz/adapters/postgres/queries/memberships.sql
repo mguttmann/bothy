@@ -17,3 +17,17 @@ FROM group_memberships m
 JOIN groups g ON g.id = m.group_id
 WHERE m.user_id = @user_id AND m.removed_at IS NULL
 ORDER BY m.id;
+
+-- name: ListActiveMembershipsOfGroups :many
+SELECT sqlc.embed(m), sqlc.embed(g)
+FROM group_memberships m
+JOIN groups g ON g.id = m.group_id
+WHERE m.group_id = ANY (@group_ids::uuid[]) AND m.removed_at IS NULL
+ORDER BY m.id;
+
+-- name: ListMembershipsOfUserInGroup :many
+-- Removed rows included: group.member.remove tells "never a member" from "already removed".
+SELECT sqlc.embed(m)
+FROM group_memberships m
+WHERE m.group_id = @group_id AND m.user_id = @user_id
+ORDER BY m.id;

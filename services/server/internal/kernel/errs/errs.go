@@ -387,3 +387,22 @@ func KindOf(err error) Kind {
 	}
 	return KindInternal
 }
+
+// ProblemExtender is implemented by errors that carry extension members of the problem body
+// (RFC 9457 section 3.2) beyond the members of Error, for example the conflicts of i1_violation
+// (docs/spec/10-backend-policy.md section 5.4). The problem writer of platform/httpserver
+// finds it anywhere in the chain of the error (errors.As) and merges the members into the body;
+// a member never replaces a standard member of the problem, and members with a nil value are left
+// out, because the server never sends JSON null (ADR 0053). An internal error never carries
+// extensions.
+//
+// Example:
+//
+//	func (e *InvariantError) ProblemExtensions() map[string]any {
+//		return map[string]any{"conflicts": e.conflictsJSON()}
+//	}
+type ProblemExtender interface {
+	// ProblemExtensions returns the extension members by name; nil or empty for none. The values
+	// must marshal to JSON.
+	ProblemExtensions() map[string]any
+}
