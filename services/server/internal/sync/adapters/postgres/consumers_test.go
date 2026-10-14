@@ -170,7 +170,7 @@ func TestConsumerRoundJobsAndCursorCommitTogether(t *testing.T) {
 }
 
 // TestConsumerRoundLockedEndsAtOnce: while worker A's round holds the row, worker B's round
-// returns RoundLocked far below database.lock_timeout and inserts nothing.
+// returns RoundLocked well below database.lock_timeout and inserts nothing.
 func TestConsumerRoundLockedEndsAtOnce(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
@@ -204,8 +204,11 @@ func TestConsumerRoundLockedEndsAtOnce(t *testing.T) {
 	if err != nil || res.Outcome != app.RoundLocked {
 		t.Fatalf("B's round = %+v, %v; want RoundLocked", res, err)
 	}
-	if took > 500*time.Millisecond {
-		t.Errorf("B's round took %s; SKIP LOCKED must not wait for the lock", took)
+	// A round that waited for the row would block until database.lock_timeout, because A
+	// releases it only after B returns. Half of that bound separates the two cases without
+	// depending on the speed of a loaded machine.
+	if limit := e.db.Config(pg.RoleApp).LockTimeout / 2; took >= limit {
+		t.Errorf("B's round took %s (limit %s); SKIP LOCKED must not wait for the lock", took, limit)
 	}
 	if bh.handled.Load() != 0 {
 		t.Error("B handled an event")
