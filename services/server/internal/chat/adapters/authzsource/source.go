@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package authzsource is the adapter through which the chat module answers authz (M1-52, M1-53,
-// M1-54): Source implements authz.StructureSource (Space, SpaceArchived, Spaces, SpaceDetails,
-// Channel, Channels, ChannelsOperatedBy, ChannelDetails; since M1-54 Thread with the fixed
-// operator and ServedTargets for I1) over the tables spaces, channels and threads, so authorize
+// Package authzsource is the adapter through which the chat module answers authz (M1-52 to
+// M1-55): Source implements authz.StructureSource (Space, SpaceArchived, Spaces, SpaceDetails,
+// Channel, Channels, ChannelsOperatedBy, ChannelDetails; since M1-55 Thread with the fixed
+// operator, since M1-54 ServedTargets for I1) over the tables spaces, channels and threads, so authorize
 // and the rights hook resolve the structure and the operator rule from real data
 // (docs/spec/02-architektur.md section 4.3, "Quellen-Port"). The dm participation follows with
 // V3; until then internal/wire joins this source with the empty dm part. authz never reads these

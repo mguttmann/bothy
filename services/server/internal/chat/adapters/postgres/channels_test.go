@@ -17,7 +17,7 @@ func TestRepositoryChannels(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	ctx := context.Background()
-	alex, _ := e.person(t, "alex")
+	alex, _ := e.person(t)
 	sp := domain.NewSpace(ids.New(), "Support", "", "", "a0", alex)
 	sp.CreatedAt = t0
 	text := domain.NewChannel(ids.New(), sp.ID, domain.ChannelText, "tickets", "Customer", "a0", alex, 20)

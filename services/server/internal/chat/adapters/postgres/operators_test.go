@@ -26,7 +26,7 @@ func TestRepositoryOperators(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	ctx := context.Background()
-	alex, _ := e.person(t, "alex")
+	alex, _ := e.person(t)
 	lotse, assistent := e.agent(t, "lotse"), e.agent(t, "assistent")
 	sp := domain.NewSpace(ids.New(), "Support", "", "", "a0", alex)
 	empty := domain.NewSpace(ids.New(), "Labor", "", "", "a1", alex)

@@ -20,7 +20,7 @@ func TestRepositoryThreads(t *testing.T) {
 	t.Parallel()
 	e := newEnv(t)
 	ctx := context.Background()
-	alex, _ := e.person(t, "alex")
+	alex, _ := e.person(t)
 	space, forum := ids.New(), ids.New()
 	e.exec(t, `INSERT INTO spaces (id, name, sort_key, created_by) VALUES ($1, 'Support', 'a0', $2)`, space.String(), alex.String())
 	e.exec(t, `INSERT INTO channels (id, space_id, kind, name, sort_key, history_backfill_limit, created_by)
