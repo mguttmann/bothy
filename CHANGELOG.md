@@ -25,6 +25,11 @@ Planning stage (milestone M0). Nothing is installable yet.
   failing step, checks every pairing with a swapped role and writes `DsAccent` (Dart),
   `data-accent` blocks (`tokens.css`), the member `accents` of `tokens.resolved.json` and one
   section per accent and theme in `docs/design/contrast.md`; `make tokens` fails below AA (M4-03).
+- The docs site has a REST reference, a schema reference and a gateway reference, rendered in
+  every `make docs` from `docs/api/openapi.yaml` and `docs/api/asyncapi.yaml` by the MkDocs
+  hook `tools/docs/mkdocs_api_reference.py`; `make docs` also fails when a built page loads a
+  script, stylesheet or font from another origin (`tools/docs/external_assets_check.py`)
+  (M7-19).
 - Host service module `services/host` (own `VERSION` and `CHANGELOG.md`) and the Dart package
   `packages/bothy_noise` with the Noise core of the terminal (M2-38); the gates, CI and CodeQL
   cover both.

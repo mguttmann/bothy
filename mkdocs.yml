@@ -50,6 +50,9 @@ plugins:
 # exist; tools/docs/mkdocs_repo_links.py).
 hooks:
   - tools/docs/mkdocs_repo_links.py
+  # The REST, schema and gateway reference pages, rendered from docs/api/openapi.yaml and
+  # docs/api/asyncapi.yaml at build time; they exist only in the build (M7-19).
+  - tools/docs/mkdocs_api_reference.py
 
 markdown_extensions:
   - admonition
@@ -122,6 +125,9 @@ nav:
   - Architektur: architecture/README.md
   - API:
       - Übersicht: api/README.md
+      - REST reference: api/reference/rest.md
+      - Schemas: api/reference/schemas.md
+      - Gateway reference: api/reference/gateway.md
       - Webhooks: api/webhooks.md
   - Design:
       - Übersicht: design/README.md

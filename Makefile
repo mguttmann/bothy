@@ -323,10 +323,12 @@ perf: ## Load tests against the performance targets (end of an etappe and releas
 	  done; fi
 
 # ---- documentation --------------------------------------------------------------------
-docs: ## Documentation site builds strictly; ADR index is current
+docs: ## Documentation site builds strictly with the API references; ADR index is current; no external assets
 	$(UVRUN) python tools/docs/adr_index.py --check
 	@# No --quiet: it hides the warnings that --strict turns into a failure.
 	$(UVRUN) mkdocs build --strict --site-dir site
+	@# The site bundles every script, stylesheet and font; nothing loads from another origin.
+	$(UVRUN) python tools/docs/external_assets_check.py site
 
 adr-index: ## Regenerate the ADR index in docs/adr/README.md
 	$(UVRUN) python tools/docs/adr_index.py
