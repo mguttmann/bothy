@@ -99,7 +99,7 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 15 | M1-38, M1-39, M1-40, M1-41, M1-43, M1-47, M1-49, M1-52, M2-39 |
 | 16 | M1-42, M1-53, M2-40 |
 | 17 | M1-54, M1-55, M2-41 |
-| 18 | M1-56, M2-42 |
+| 18 | M1-56, M2-42, M4-37 |
 | 19 | M1-57, M1-58, M1-60, M2-26, M3-13 |
 | 20 | M1-59, M1-61 |
 | 21 | M1-62, M1-63, M3-18 |
@@ -108,18 +108,20 @@ the waves before it are merged; many can start earlier, as soon as their own dep
 | 24 | M1-66, M1-70, M1-72, M2-07 |
 | 25 | M1-67, M1-68, M2-20 |
 | 26 | M1-69, M2-21, M2-43 |
-| 27 | M1-73, M2-02, M2-44, M3-03, M4-28 |
-| 28 | M2-03, M2-04, M2-45, M2-47, M3-04 |
+| 27 | M1-73, M2-02, M2-44, M3-03, M4-28, M4-31 |
+| 28 | M2-03, M2-04, M2-45, M2-47, M3-04, M4-35 |
 | 29 | M2-05, M2-46, M3-05, M3-06 |
 | 30 | M2-06, M2-27, M2-48, M3-10, M3-11, M4-22 |
 | 31 | M2-08 |
 | 32 | M2-09, M2-16 |
 | 33 | M2-10, M2-12, M2-14, M2-15, M2-17, M2-18, M2-19, M3-19 |
 | 34 | M2-11, M2-22, M2-25, M2-29, M3-20, M3-21, M3-23 |
-| 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24, M6-13 |
-| 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22, M6-15 |
+| 35 | M2-13, M2-28, M2-30, M2-33, M2-34, M3-07, M3-24, M4-30, M6-13 |
+| 36 | M2-31, M2-35, M2-49, M3-08, M3-14, M3-22, M4-33, M6-15 |
 | 37 | M2-36, M2-37, M2-50, M3-09, M3-12, M3-15, M3-16, M4-21, M4-23, M6-05 |
 | 38 | M4-24, M6-14 |
+| 39 | M4-32, M4-34, M4-36 |
+| 40 | M4-38 |
 
 ## Index
 
@@ -307,6 +309,15 @@ names listed here.
 | 12 | M4-27 | Administration: grant wizard, Who has access, View as person | `M4-27-admin-grants.md` | M4-26 |
 | 27 | M4-28 | Administration: agents, backend switch, costs and tokens | `M4-28-admin-agents.md` | M4-27, M2-21 |
 | 12 | M4-29 | Administration: audit view | `M4-29-admin-audit.md` | M4-26 |
+| 35 | M4-30 | Windows: notification area and local notifications | `M4-30-windows-tray-notifications.md` | M4-25, M3-23 |
+| 27 | M4-31 | Client metrics and crash reports (ADR 0057) | `M4-31-client-metrics.md` | M4-25, M1-69 |
+| 39 | M4-32 | Accessibility on the desktop | `M4-32-desktop-accessibility.md` | M4-22, M4-24, M4-28, M4-29, M4-33 |
+| 36 | M4-33 | Channel menu: notification level and export | `M4-33-channel-menu.md` | M4-20, M4-30, M3-11 |
+| 39 | M4-34 | Desktop E2E and performance targets | `M4-34-desktop-e2e-perf.md` | M4-22, M4-24, M4-33, M1-73 |
+| 28 | M4-35 | Package `terminal_ui` and terminal view | `M4-35-terminal-ui.md` | M4-07, M4-09, M2-44 |
+| 39 | M4-36 | Terminal on the desktop | `M4-36-terminal-desktop.md` | M4-35, M4-24, M2-48 |
+| 18 | M4-37 | Administration: hosts, pairing and grant `terminal` | `M4-37-admin-hosts.md` | M4-27, M2-41 |
+| 40 | M4-38 | Terminal E2E and performance targets on the desktop | `M4-38-terminal-e2e-perf.md` | M4-34, M4-36, M4-37 |
 | 23 | M6-01 | Console session following the BFF pattern | `M6-01-console-session.md` | M1-39, M1-40, M1-41, M1-43, M1-45, M1-49, M1-64 |
 | 37 | M6-05 | Statistics in the server | `M6-05-stats-server.md` | M2-22, M2-26, M3-22 |
 | 2 | M6-10 | Design tokens for charts: check for color vision deficiency | `M6-10-viz-cvd-check.md` | M4-03 |
@@ -345,6 +356,9 @@ waves, the graph and the column "Depends on" of the plan against the index.
 | `contract-test` | M1-71 |
 | `bench-search` | M3-16 |
 | `apps-platform` | M4-01 |
+| `e2e-desktop` | M4-34 |
+| `perf-desktop` | M4-34 |
+| `terminal-stack` | M4-36 |
 
 To change a dependency, edit the column "Depends on" of the index and the row in the plan, then
 run `uv run --project tools --locked --quiet python tools/docs/brief_deps.py --write`; it
@@ -533,6 +547,15 @@ flowchart TB
   M4_27["M4-27"]
   M4_28["M4-28"]
   M4_29["M4-29"]
+  M4_30["M4-30"]
+  M4_31["M4-31"]
+  M4_32["M4-32"]
+  M4_33["M4-33"]
+  M4_34["M4-34"]
+  M4_35["M4-35"]
+  M4_36["M4-36"]
+  M4_37["M4-37"]
+  M4_38["M4-38"]
   M1_02 --> M1_03
   M1_01 --> M1_04
   M1_01 --> M1_05
@@ -828,6 +851,33 @@ flowchart TB
   M2_21 --> M4_28
   M4_27 --> M4_28
   M4_26 --> M4_29
+  M3_23 --> M4_30
+  M4_25 --> M4_30
+  M1_69 --> M4_31
+  M4_25 --> M4_31
+  M4_22 --> M4_32
+  M4_24 --> M4_32
+  M4_28 --> M4_32
+  M4_29 --> M4_32
+  M4_33 --> M4_32
+  M3_11 --> M4_33
+  M4_20 --> M4_33
+  M4_30 --> M4_33
+  M1_73 --> M4_34
+  M4_22 --> M4_34
+  M4_24 --> M4_34
+  M4_33 --> M4_34
+  M2_44 --> M4_35
+  M4_07 --> M4_35
+  M4_09 --> M4_35
+  M2_48 --> M4_36
+  M4_24 --> M4_36
+  M4_35 --> M4_36
+  M2_41 --> M4_37
+  M4_27 --> M4_37
+  M4_34 --> M4_38
+  M4_36 --> M4_38
+  M4_37 --> M4_38
   M1_39 --> M6_01
   M1_40 --> M6_01
   M1_41 --> M6_01
